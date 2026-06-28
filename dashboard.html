@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fahrschul-System – Schüler-Status-Zentrale</title>
+  <style>
+    /* ── Design-System CSS-Variablen ─────────────────────────────────── */
+    :root {
+      --bg-main:           #0B0F19;
+      --bg-surface:        #1E2640;
+      --bg-surface-hover:  #2A3558;
+      --border-color:      #2D3A64;
+      --text-main:         #F3F4F6;
+      --text-muted:        #9CA3AF;
+      --status-red:        #EF4444;
+      --status-orange:     #F59E0B;
+      --status-yellow:     #FBBF24;
+      --status-blue:       #3B82F6;
+      --status-purple:     #8B5CF6;
+      --status-green:      #10B981;
+      --status-gray:       #4B5563;
+      --status-darkred:    #DC2626;
+      --accent-primary:    #6366F1;
+      --accent-hover:      #4F46E5;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg-main);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      font-size: 14px;
+    }
+
+    /* ── Header ──────────────────────────────────────────────────────── */
+    .app-header {
+      flex-shrink: 0;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .header-brand { display: flex; align-items: center; gap: 10px; }
+    .header-brand-icon { font-size: 20px; }
+    .header-brand-title { font-size: 16px; font-weight: 700; }
+    .header-brand-sub { font-size: 11px; color: var(--text-muted); }
+    .header-user {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--accent-primary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: #fff;
+    }
+
+    /* ── Filter Bar ──────────────────────────────────────────────────── */
+    .filter-bar {
+      flex-shrink: 0;
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .search-box {
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 6px 12px;
+      color: var(--text-main);
+      font-size: 13px;
+      width: 200px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .search-box:focus { border-color: var(--accent-primary); }
+    .filter-btn {
+      background: var(--bg-main);
+      border: 1px solid var(--border-color);
+      border-radius: 7px;
+      padding: 5px 12px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .filter-btn:hover { background: var(--bg-surface-hover); color: var(--text-main); }
+    .filter-btn.active { border-color: var(--accent-primary); color: var(--accent-primary); background: rgba(99,102,241,.12); }
+    .filter-sep { width: 1px; height: 20px; background: var(--border-color); margin: 0 4px; }
+    .student-count { margin-left: auto; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+    /* ── 3-Spalten-Layout ────────────────────────────────────────────── */
+    .main-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 270px 1fr 310px;
+      overflow: hidden;
+    }
+    .col { display: flex; flex-direction: column; overflow: hidden; }
+    .col + .col { border-left: 1px solid var(--border-color); }
+    .col-head {
+      flex-shrink: 0;
+      padding: 10px 14px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-surface);
+    }
+    .col-body { flex: 1; overflow-y: auto; padding: 10px; }
+    .col-body::-webkit-scrollbar { width: 5px; }
+    .col-body::-webkit-scrollbar-track { background: transparent; }
+    .col-body::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+    /* ── Spalte 1: Prio-Pipeline ─────────────────────────────────────── */
+    .prio-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .prio-card:hover { background: var(--bg-surface-hover); }
+    .prio-card.selected { border-color: var(--accent-primary); background: rgba(99,102,241,.08); }
+    .prio-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+    .prio-card-name { font-size: 13px; font-weight: 700; }
+    .prio-badge {
+      font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 20px;
+      background: rgba(245,158,11,.15); color: var(--status-orange); border: 1px solid rgba(245,158,11,.3);
+    }
+    .prio-badge.critical {
+      background: rgba(239,68,68,.15); color: var(--status-red); border-color: rgba(239,68,68,.3);
+    }
+    .prio-badge.ok {
+      background: rgba(16,185,129,.1); color: var(--status-green); border-color: rgba(16,185,129,.25);
+    }
+    .prio-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+    .prio-reason { font-size: 11px; color: var(--text-muted); font-style: italic; margin-bottom: 6px; }
+    .prio-dots { display: flex; gap: 5px; align-items: center; }
+    .prio-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      transition: transform .15s;
+    }
+    .prio-dot-label { font-size: 9px; color: var(--text-muted); margin-left: 2px; }
+
+    /* ── Spalte 2: Status-Matrix ─────────────────────────────────────── */
+    .matrix-header-row, .matrix-row {
+      display: grid;
+      grid-template-columns: 1fr 68px 68px 68px 68px 68px 88px;
+      gap: 6px;
+      align-items: center;
+    }
+    .matrix-header-row {
+      padding: 6px 10px;
+      margin-bottom: 4px;
+    }
+    .mh-cell {
+      font-size: 9px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .6px; text-align: center;
+    }
+    .mh-cell:first-child { text-align: left; }
+    .matrix-row {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .matrix-row:hover { background: var(--bg-surface-hover); }
+    .matrix-row.selected { border-color: var(--accent-primary); }
+    .mx-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .class-badge {
+      font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+      background: var(--bg-main); border: 1px solid var(--border-color); color: var(--text-muted);
+    }
+
+    /* Status-Kacheln */
+    .tile {
+      height: 34px; border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; letter-spacing: .3px;
+      cursor: pointer; transition: transform .1s, filter .1s;
+      border: 1.5px solid transparent;
+      text-align: center; line-height: 1.2;
+      user-select: none;
+    }
+    .tile:hover { transform: scale(1.06); filter: brightness(1.18); }
+    .tile.red    { background: rgba(239,68,68,.18);   color: var(--status-red);     border-color: rgba(239,68,68,.4); }
+    .tile.orange { background: rgba(245,158,11,.18);  color: var(--status-orange);  border-color: rgba(245,158,11,.4); }
+    .tile.yellow { background: rgba(251,191,36,.18);  color: var(--status-yellow);  border-color: rgba(251,191,36,.4); }
+    .tile.blue   { background: rgba(59,130,246,.18);  color: var(--status-blue);    border-color: rgba(59,130,246,.4); }
+    .tile.purple { background: rgba(139,92,246,.18);  color: var(--status-purple);  border-color: rgba(139,92,246,.4); }
+    .tile.green  { background: rgba(16,185,129,.18);  color: var(--status-green);   border-color: rgba(16,185,129,.4); }
+    .tile.gray   { background: rgba(75,85,99,.2);     color: var(--status-gray);    border-color: rgba(75,85,99,.4); }
+    .tile.darkred{ background: rgba(185,28,28,.18);   color: var(--status-darkred); border-color: rgba(185,28,28,.4); }
+
+    .exam-btn {
+      height: 34px; border-radius: 7px; font-size: 10px; font-weight: 700;
+      cursor: pointer; border: none; transition: all .15s; text-align: center;
+    }
+    .exam-btn.ready { background: var(--status-green); color: #fff; }
+    .exam-btn.ready:hover { filter: brightness(1.1); }
+    .exam-btn.not-ready { background: rgba(75,85,99,.25); color: var(--status-gray); cursor: default; }
+
+    /* ── Spalte 3: Kontext-Panel ─────────────────────────────────────── */
+    .context-empty {
+      height: 100%; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: var(--text-muted); text-align: center; gap: 10px;
+      padding: 24px;
+    }
+    .context-empty-icon { font-size: 40px; opacity: .35; }
+    .context-empty-title { font-size: 14px; font-weight: 600; }
+    .context-empty-sub { font-size: 12px; line-height: 1.5; }
+
+    .profile-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .avatar {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--accent-primary);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .profile-name { font-size: 16px; font-weight: 700; }
+    .profile-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    .rule-alert {
+      border-radius: 8px; padding: 9px 12px; font-size: 11px;
+      margin-bottom: 6px; display: flex; gap: 8px; align-items: flex-start; line-height: 1.4;
+    }
+    .rule-alert.red    { background: rgba(239,68,68,.1);   border: 1px solid rgba(239,68,68,.3);   color: #FCA5A5; }
+    .rule-alert.orange { background: rgba(245,158,11,.1);  border: 1px solid rgba(245,158,11,.3);  color: #FDE68A; }
+    .rule-alert.info   { background: rgba(99,102,241,.1);  border: 1px solid rgba(99,102,241,.3);  color: #A5B4FC; }
+
+    .detail-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+    }
+    .detail-card-title {
+      font-size: 10px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+    }
+    .detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 5px 0; font-size: 12px;
+      border-bottom: 1px solid rgba(45,58,100,.5);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-label { color: var(--text-muted); }
+    .detail-val { font-weight: 600; }
+
+    .progress-bar-wrap { height: 5px; background: var(--bg-main); border-radius: 3px; flex: 1; margin-left: 8px; }
+    .progress-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+
+    .action-btn-row { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+    .action-btn {
+      width: 100%; padding: 9px 12px; border-radius: 8px;
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      color: var(--text-main); font-size: 12px; font-weight: 600;
+      cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;
+      transition: all .15s;
+    }
+    .action-btn:hover { background: var(--bg-surface-hover); border-color: var(--accent-primary); }
+    .action-btn.primary { background: var(--accent-primary); border-color: var(--accent-primary); color: #fff; justify-content: center; }
+    .action-btn.primary:hover { background: var(--accent-hover); }
+    .action-btn.success { background: var(--status-green); border-color: var(--status-green); color: #fff; justify-content: center; }
+
+    /* Chat-Leiste */
+    .chat-bar {
+      flex-shrink: 0;
+      display: flex; gap: 8px;
+      padding: 10px 12px;
+      border-top: 1px solid var(--border-color);
+      background: var(--bg-surface);
+    }
+    .chat-input {
+      flex: 1; background: var(--bg-main); border: 1px solid var(--border-color);
+      border-radius: 8px; padding: 7px 11px; color: var(--text-main); font-size: 12px; outline: none;
+    }
+    .chat-input:focus { border-color: var(--accent-primary); }
+    .chat-send {
+      background: var(--accent-primary); border: none; border-radius: 8px;
+      padding: 7px 14px; color: #fff; font-size: 13px; cursor: pointer;
+    }
+    .chat-send:hover { background: var(--accent-hover); }
+
+    /* ── Modal ───────────────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(5,7,14,.78); backdrop-filter: blur(5px);
+      z-index: 1000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: 16px; padding: 24px; width: 500px; max-width: 95vw;
+      max-height: 85vh; overflow-y: auto;
+      box-shadow: 0 30px 60px rgba(0,0,0,.6);
+    }
+    .modal-box::-webkit-scrollbar { width: 5px; }
+    .modal-box::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-title { font-size: 15px; font-weight: 700; }
+    .modal-close {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 18px; cursor: pointer; padding: 4px; border-radius: 6px; line-height: 1;
+    }
+    .modal-close:hover { color: var(--text-main); }
+    .modal-section { margin-bottom: 20px; }
+    .modal-section-title {
+      font-size: 10px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+    }
+    .radio-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 7px; cursor: pointer; transition: background .12s; margin-bottom: 3px;
+    }
+    .radio-option:hover { background: var(--bg-surface-hover); }
+    .radio-option input[type="radio"] { accent-color: var(--accent-primary); }
+    .color-dot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+    .modal-save {
+      width: 100%; padding: 11px; background: var(--accent-primary);
+      color: #fff; border: none; border-radius: 10px; font-size: 14px;
+      font-weight: 700; cursor: pointer; transition: background .15s; margin-top: 4px;
+    }
+    .modal-save:hover { background: var(--accent-hover); }
+    .modal-text-input {
+      width: 100%; background: var(--bg-main); border: 1px solid var(--border-color);
+      border-radius: 8px; padding: 9px 12px; color: var(--text-main);
+      font-size: 14px; outline: none;
+    }
+    .modal-text-input:focus { border-color: var(--accent-primary); }
+    .range-wrap { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+    .range-wrap input[type="range"] { flex: 1; accent-color: var(--accent-primary); }
+    .range-val { font-size: 20px; font-weight: 700; min-width: 28px; text-align: center; }
+    .cb-option { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 7px; cursor: pointer; }
+    .cb-option:hover { background: var(--bg-surface-hover); }
+    .cb-option input[type="checkbox"] { accent-color: var(--accent-primary); width: 15px; height: 15px; }
+    .num-inputs { display: flex; flex-direction: column; gap: 8px; }
+    .num-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+    .num-input {
+      width: 60px; background: var(--bg-main); border: 1px solid var(--border-color);
+      border-radius: 7px; padding: 5px 8px; color: var(--text-main); text-align: center;
+      font-size: 13px; outline: none;
+    }
+    .the-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+    .the-checkbox { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+    .the-checkbox input { accent-color: var(--accent-primary); width: 16px; height: 16px; }
+    .the-checkbox span { font-size: 10px; color: var(--text-muted); }
+    .re-list { display: flex; flex-direction: column; gap: 6px; }
+    .re-row { display: flex; gap: 6px; align-items: center; }
+    .re-input {
+      flex: 1; background: var(--bg-main); border: 1px solid var(--border-color);
+      border-radius: 6px; padding: 6px 9px; color: var(--text-main); font-size: 12px; outline: none;
+    }
+    .re-del {
+      background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.35);
+      border-radius: 6px; padding: 4px 9px; color: var(--status-red); cursor: pointer; font-size: 13px;
+    }
+    .re-add {
+      width: 100%; background: var(--bg-main); border: 1px dashed var(--border-color);
+      border-radius: 6px; padding: 7px; color: var(--text-muted); font-size: 12px; cursor: pointer;
+    }
+
+    /* ── Toast ───────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--bg-surface); border: 1px solid var(--accent-primary);
+      color: var(--text-main); padding: 11px 20px; border-radius: 10px;
+      font-size: 13px; font-weight: 600; z-index: 9999;
+      box-shadow: 0 6px 24px rgba(0,0,0,.5); pointer-events: none;
+      opacity: 0; transition: opacity .25s;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ── Utilities ───────────────────────────────────────────────────── */
+    .no-result { text-align: center; padding: 32px 16px; color: var(--text-muted); font-size: 13px; }
+    .section-divider { height: 1px; background: var(--border-color); margin: 12px 0; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header class="app-header">
+  <div class="header-brand">
+    <span class="header-brand-icon">🏎️</span>
+    <div>
+      <div class="header-brand-title">Fahrschul-System</div>
+      <div class="header-brand-sub">Schüler-Status-Zentrale · Büro-Dashboard</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span style="font-size:12px;color:var(--text-muted);" id="currentDate"></span>
+    <div class="header-user">B</div>
+  </div>
+</header>
+
+<!-- ── Filter-Leiste ───────────────────────────────────────────────────── -->
+<div class="filter-bar">
+  <input class="search-box" id="searchInput" type="text" placeholder="🔍 Schüler suchen…" oninput="applyFilters()">
+  <div class="filter-sep"></div>
+  <button class="filter-btn active" id="btn-all"        onclick="setFilter('all')">Alle</button>
+  <button class="filter-btn"        id="btn-critical"   onclick="setFilter('critical')"   style="color:var(--status-red);">🔴 Kritisch</button>
+  <button class="filter-btn"        id="btn-waiting"    onclick="setFilter('waiting')"    style="color:var(--status-yellow);">🟡 Wartet auf Büro</button>
+  <button class="filter-btn"        id="btn-exam-ready" onclick="setFilter('exam-ready')" style="color:var(--status-green);">✅ Prüfungsreif</button>
+  <span class="student-count" id="studentCount">3 Schüler</span>
+</div>
+
+<!-- ── 3-Spalten-Layout ────────────────────────────────────────────────── -->
+<div class="main-grid">
+
+  <!-- Spalte 1: Prio-Pipeline -->
+  <div class="col">
+    <div class="col-head">🔥 Prio-Pipeline &amp; Warteliste</div>
+    <div class="col-body" id="prioList"></div>
+  </div>
+
+  <!-- Spalte 2: Status-Matrix -->
+  <div class="col">
+    <div class="col-head" style="padding:10px 18px;">
+      <div class="matrix-header-row" style="padding:0;">
+        <div class="mh-cell" style="text-align:left;">Schüler</div>
+        <div class="mh-cell">📂 DOK</div>
+        <div class="mh-cell">💳 FIN</div>
+        <div class="mh-cell">📚 THE</div>
+        <div class="mh-cell">📝 TP</div>
+        <div class="mh-cell">🏎️ PRAX</div>
+        <div class="mh-cell">Aktion</div>
+      </div>
+    </div>
+    <div class="col-body" style="padding:8px 10px;" id="matrixBody"></div>
+  </div>
+
+  <!-- Spalte 3: Kontext & Aktionen -->
+  <div class="col">
+    <div class="col-head">📋 Kontext &amp; Aktionen</div>
+    <div class="col-body" id="contextPanel">
+      <div class="context-empty">
+        <div class="context-empty-icon">👆</div>
+        <div class="context-empty-title">Schüler auswählen</div>
+        <div class="context-empty-sub">Klicke auf einen Schüler in der Prio-Liste oder Matrix, um Details und Schnell-Aktionen anzuzeigen.</div>
+      </div>
+    </div>
+    <div class="chat-bar" id="chatBar" style="display:none;">
+      <input class="chat-input" id="chatInput" type="text" placeholder="Nachricht senden…">
+      <button class="chat-send" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+
+</div><!-- /main-grid -->
+
+<!-- ── Modal ───────────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="modalOverlay" onclick="overlayClick(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Status bearbeiten</div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modalBody"></div>
+    <button class="modal-save" onclick="saveModal()">💾 Änderungen speichern</button>
+  </div>
+</div>
+
+<!-- ── Toast ────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DATEN-STATE (3 Test-Schüler mit unterschiedlichen Ausbildungsständen)
+═══════════════════════════════════════════════════════════════════════ */
+const students = [
+  {
+    id: 'SCH-001',
+    name: 'Tobias Maier',
+    geburtsdatum: '12.05.2003',
+    klasse: 'B',
+    vorbesitz: false,
+    ausbildungsTyp: 'Schaltung',
+    daysInSystem: 42,
+    lastActivity: 14,           // Tage seit letzter Aktivität
+    dok: {
+      passbild: 'Fehlt',
+      sehtest: 'Fehlt',
+      ersteHilfe: 'Fehlt',
+      tuevAntrag: 'Nicht gestellt',
+    },
+    fin: {
+      guthaben_cent: -15500,    // -155,00 € → Finanz-Sperre (§3)
+      offeneRechnungen: ['RE-2024-011', 'RE-2024-012'],
+    },
+    the: {
+      stundenBesucht: [1, 2],
+      pflichtStunden: 12,
+    },
+    tp: { status: 'Nicht angemeldet' },
+    prax: {
+      simulatorErledigt: 1,     // < 3 → Simulator-Sperre (§2)
+      grundausbildungAbgeschlossen: false,
+      ueberlandAbsolviert: 0, ueberlandPflicht: 5,
+      autobahnAbsolviert:  0, autobahnPflicht: 4,
+      nachtAbsolviert:     0, nachtPflicht: 3,
+      praktischePruefung: 'Offen',
+    },
+  },
+  {
+    id: 'SCH-002',
+    name: 'Lisa Baumann',
+    geburtsdatum: '28.11.2001',
+    klasse: 'B',
+    vorbesitz: false,
+    ausbildungsTyp: 'Automatik',
+    daysInSystem: 90,
+    lastActivity: 3,
+    dok: {
+      passbild: 'Verifiziert',
+      sehtest: 'Eingereicht',   // wartet auf Büro-Prüfung → DOK Gelb
+      ersteHilfe: 'Verifiziert',
+      tuevAntrag: 'Läuft',      // beim Amt → DOK Blau (überschreibt Gelb)
+    },
+    fin: {
+      guthaben_cent: -7500,     // -75,00 € → FIN Orange (< 100 €)
+      offeneRechnungen: ['RE-2024-019'],
+    },
+    the: {
+      stundenBesucht: [1,2,3,4,5,6,7,8,9],
+      pflichtStunden: 12,
+    },
+    tp: { status: 'Warteliste' },
+    prax: {
+      simulatorErledigt: 4,
+      grundausbildungAbgeschlossen: true,
+      ueberlandAbsolviert: 2, ueberlandPflicht: 5,
+      autobahnAbsolviert:  1, autobahnPflicht: 4,
+      nachtAbsolviert:     1, nachtPflicht: 3,
+      praktischePruefung: 'Offen',
+    },
+  },
+  {
+    id: 'SCH-003',
+    name: 'Marco Schulze',
+    geburtsdatum: '03.08.1998',
+    klasse: 'B',
+    vorbesitz: true,            // → Pflichtstunden 12→6 (§1)
+    ausbildungsTyp: 'B197',
+    daysInSystem: 130,
+    lastActivity: 1,
+    dok: {
+      passbild: 'Verifiziert',
+      sehtest: 'Verifiziert',
+      ersteHilfe: 'Verifiziert',
+      tuevAntrag: 'Genehmigt',
+    },
+    fin: {
+      guthaben_cent: 2000,      // +20,00 € → FIN Grün
+      offeneRechnungen: [],
+    },
+    the: {
+      stundenBesucht: [1,2,3,4,5,6],
+      pflichtStunden: 6,        // Vorbesitz-Reduktion bereits eingetragen (§1)
+    },
+    tp: { status: 'Bestanden' },
+    prax: {
+      simulatorErledigt: 3,
+      grundausbildungAbgeschlossen: true,
+      ueberlandAbsolviert: 5, ueberlandPflicht: 5,
+      autobahnAbsolviert:  4, autobahnPflicht: 4,
+      nachtAbsolviert:     3, nachtPflicht: 3,
+      praktischePruefung: 'Sucht Termin', // PRAX → Grau (alle SF erledigt, sucht Prüfungstermin)
+    },
+  },
+];
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BUSINESS RULES / STATUS-BERECHNUNG
+═══════════════════════════════════════════════════════════════════════ */
+
+function computeDOK(s) {
+  const d = s.dok;
+  if (d.passbild === 'Verifiziert' && d.sehtest === 'Verifiziert'
+      && d.ersteHilfe === 'Verifiziert' && d.tuevAntrag === 'Genehmigt')
+    return { color: 'green', label: '✓ OK', desc: 'Vollständig' };
+  if (d.sehtest === 'Beim Amt' || d.tuevAntrag === 'Läuft')
+    return { color: 'blue', label: '🔵 AMT', desc: 'Beim Amt/TÜV' };
+  if ([d.passbild, d.sehtest, d.ersteHilfe].some(v => v === 'Eingereicht'))
+    return { color: 'yellow', label: '⏳ BÜRO', desc: 'Wartet auf Büro' };
+  return { color: 'red', label: '✗ FEHLT', desc: 'Dokumente fehlen' };
+}
+
+function computeFIN(s) {
+  const g = s.fin.guthaben_cent;
+  // Regel 3: Finanz-Sperre bei > 100 € Minus
+  if (g < -10000) return { color: 'red',    label: '⛔ SPERRE', desc: formatEur(g) };
+  if (g < 0)      return { color: 'orange', label: '⚠ OFFEN',  desc: formatEur(g) };
+  return               { color: 'green',  label: '✓ OK',     desc: formatEur(g) };
+}
+
+function computeTHE(s) {
+  const visited = s.the.stundenBesucht.length;
+  const required = s.the.pflichtStunden; // ggf. per §1 bereits auf 6 gesetzt
+  if (visited >= required)                  return { color: 'green',  label: `${visited}/${required}`, desc: `${visited}/${required} Std.` };
+  if (visited >= Math.ceil(required * .75)) return { color: 'purple', label: `${visited}/${required}`, desc: 'Bereit für Vortest' };
+  if (visited >= Math.ceil(required * .35)) return { color: 'yellow', label: `${visited}/${required}`, desc: 'In Ausbildung' };
+  return                                         { color: 'red',    label: `${visited}/${required}`, desc: 'Anfang' };
+}
+
+function computeTP(s) {
+  switch (s.tp.status) {
+    case 'Bestanden':         return { color: 'green',   label: '✓ BEST.', desc: 'Bestanden' };
+    case 'Nicht bestanden':   return { color: 'darkred', label: '✗ FAIL',  desc: 'Nicht bestanden' };
+    case 'Angemeldet':        return { color: 'blue',    label: '📅 TÜV',  desc: 'TÜV-Termin' };
+    case 'Warteliste':        return { color: 'gray',    label: '🔍 WARTE', desc: 'Warteliste' };
+    default:                  return { color: 'gray',    label: '— OFFEN', desc: 'Nicht angemeldet' };
+  }
+}
+
+function computePRAX(s) {
+  const p = s.prax;
+  // Regel 4: Sonderfahrten gesperrt wenn Grundausbildung nicht abgeschlossen
+  if (!p.grundausbildungAbgeschlossen)
+    return { color: 'red', label: '🔴 BASIS', desc: 'Grundausb. läuft' };
+
+  const allDone = p.ueberlandAbsolviert >= p.ueberlandPflicht
+               && p.autobahnAbsolviert  >= p.autobahnPflicht
+               && p.nachtAbsolviert     >= p.nachtPflicht;
+
+  if (!allDone) {
+    const land = `🏔${p.ueberlandAbsolviert}/${p.ueberlandPflicht}`;
+    const ab   = `🛣${p.autobahnAbsolviert}/${p.autobahnPflicht}`;
+    const nacht= `🌙${p.nachtAbsolviert}/${p.nachtPflicht}`;
+    return { color: 'yellow', label: '🟡 SF', desc: `${land} ${ab} ${nacht}` };
+  }
+
+  if (p.praktischePruefung === 'Bestanden')
+    return { color: 'green',  label: '🏆 BEST.', desc: 'Prüfung bestanden!' };
+  if (p.praktischePruefung === 'Termin gebucht')
+    return { color: 'blue',   label: '📅 TERMIN', desc: 'Termin beim TÜV' };
+  return { color: 'gray', label: '🔍 SUCHT', desc: 'Sucht Praxisprüfungstermin' };
+}
+
+// Prüfungsreif: Alle 4 Haupt-Kacheln grün + PRAX min. grau (SF fertig)
+function isExamReady(s) {
+  const prax = computePRAX(s);
+  return computeDOK(s).color === 'green'
+      && computeFIN(s).color === 'green'
+      && computeTHE(s).color === 'green'
+      && computeTP(s).color  === 'green'
+      && (prax.color === 'gray' || prax.color === 'blue' || prax.color === 'green');
+}
+
+// Aktive Regelwerk-Warnungen für einen Schüler
+function getActiveRules(s) {
+  const rules = [];
+  if (s.fin.guthaben_cent < -10000)
+    rules.push({ type: 'red', text: '⛔ Regelwerk §3 – Finanz-Sperre aktiv: Fahrstunden-Buchung blockiert (Rückstand > 100 €).' });
+  if ((s.klasse === 'B' || s.klasse === 'B197') && s.prax.simulatorErledigt < 3)
+    rules.push({ type: 'orange', text: `⚠ Regelwerk §2 – Simulator-Sperre: Erst ${s.prax.simulatorErledigt}/3 Simulator-Grundübungen absolviert. Echte Fahrstunden blockiert.` });
+  if (!s.prax.grundausbildungAbgeschlossen)
+    rules.push({ type: 'orange', text: '⚠ Regelwerk §4 – Sonderfahrten gesperrt: Grundausbildung noch nicht abgeschlossen.' });
+  if (s.vorbesitz)
+    rules.push({ type: 'info', text: 'ℹ Regelwerk §1 – Vorbesitz erkannt: Theorie-Pflichtstunden automatisch von 12 auf 6 reduziert.' });
+  return rules;
+}
+
+// Prioritätsscore (höher = weiter oben in der Liste)
+function priorityScore(s) {
+  let score = 0;
+  if (computeFIN(s).color === 'red')    score += 55; // Finanz-Sperre – kritisch
+  if (computeDOK(s).color === 'red')    score += 30;
+  if (computeDOK(s).color === 'yellow') score += 28; // Wartet auf Büro (§5)
+  if (computeDOK(s).color === 'blue')   score += 20; // Beim Amt (§5)
+  if (computeTP(s).color  === 'gray')   score += 18; // Wartet auf Prüfungstermin (§5)
+  score += s.lastActivity * 1.8;                      // Tage ohne Aktivität
+  return score;
+}
+
+function priorityReason(s) {
+  if (computeFIN(s).color === 'red')
+    return `⛔ Kritischer Finanzrückstand: ${formatEur(s.fin.guthaben_cent)}`;
+  if (computeDOK(s).color === 'yellow')
+    return '📂 Dokumente warten auf Büro-Prüfung';
+  if (computeDOK(s).color === 'blue')
+    return '🔵 Unterlagen beim Amt/TÜV eingereicht';
+  if (computeTP(s).color === 'gray')
+    return '📝 Wartet auf Theorieprüfungstermin';
+  if (s.lastActivity >= 7)
+    return `⏱ Seit ${s.lastActivity} Tagen ohne Aktivität`;
+  return '✓ Regulärer Ausbildungsstand';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HILFSFUNKTIONEN
+═══════════════════════════════════════════════════════════════════════ */
+function formatEur(cents) {
+  const sign = cents >= 0 ? '+' : '−';
+  return `${sign}${(Math.abs(cents) / 100).toFixed(2)} €`;
+}
+
+function initials(name) {
+  return name.split(' ').map(p => p[0]).join('').toUpperCase();
+}
+
+const COLOR_HEX = {
+  red: 'var(--status-red)', orange: 'var(--status-orange)',
+  yellow: 'var(--status-yellow)', blue: 'var(--status-blue)',
+  purple: 'var(--status-purple)', green: 'var(--status-green)',
+  gray: 'var(--status-gray)', darkred: 'var(--status-darkred)',
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FILTER & SORT STATE
+═══════════════════════════════════════════════════════════════════════ */
+let activeFilter = 'all';
+let selectedId   = null;
+let currentModal = null; // { studentId, tile }
+
+function setFilter(f) {
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + f)?.classList.add('active');
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let list = students.filter(s => {
+    if (q && !s.name.toLowerCase().includes(q)) return false;
+    if (activeFilter === 'critical')
+      return computeFIN(s).color === 'red' || computeDOK(s).color === 'red';
+    if (activeFilter === 'waiting')
+      return computeDOK(s).color === 'yellow';
+    if (activeFilter === 'exam-ready')
+      return isExamReady(s);
+    return true;
+  });
+  // Regelwerk §5 – nach Dringlichkeit sortieren
+  list.sort((a, b) => priorityScore(b) - priorityScore(a));
+  document.getElementById('studentCount').textContent = `${list.length} Schüler`;
+  renderPrio(list);
+  renderMatrix(list);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SPALTE 1: PRIO-PIPELINE RENDERN
+═══════════════════════════════════════════════════════════════════════ */
+function renderPrio(list) {
+  const el = document.getElementById('prioList');
+  if (!list.length) { el.innerHTML = '<div class="no-result">Keine Schüler gefunden.</div>'; return; }
+
+  el.innerHTML = list.map((s, idx) => {
+    const dok = computeDOK(s); const fin = computeFIN(s);
+    const the = computeTHE(s); const tp  = computeTP(s); const prax = computePRAX(s);
+    const ready = isExamReady(s);
+    const sel = s.id === selectedId;
+
+    let badgeClass = '', badgeText = '';
+    if (idx === 0 && list.length > 1) { badgeClass = 'critical'; badgeText = '⬆ PRIO #1'; }
+    else if (ready)                   { badgeClass = 'ok';       badgeText = '✅ PRÜF.REIF'; }
+
+    return `<div class="prio-card${sel ? ' selected' : ''}" onclick="selectStudent('${s.id}')">
+      <div class="prio-card-top">
+        <span class="prio-card-name">${s.name}</span>
+        ${badgeText ? `<span class="prio-badge ${badgeClass}">${badgeText}</span>` : ''}
+      </div>
+      <div class="prio-meta">Klasse ${s.klasse} · ${s.ausbildungsTyp}${s.vorbesitz ? ' · Vorbesitz' : ''}</div>
+      <div class="prio-reason">${priorityReason(s)}</div>
+      <div class="prio-dots">
+        <div class="prio-dot" style="background:${COLOR_HEX[dok.color]}" title="DOK: ${dok.desc}"></div>
+        <div class="prio-dot" style="background:${COLOR_HEX[fin.color]}" title="FIN: ${fin.desc}"></div>
+        <div class="prio-dot" style="background:${COLOR_HEX[the.color]}" title="THE: ${the.desc}"></div>
+        <div class="prio-dot" style="background:${COLOR_HEX[tp.color]}"  title="TP: ${tp.desc}"></div>
+        <div class="prio-dot" style="background:${COLOR_HEX[prax.color]}" title="PRAX: ${prax.desc}"></div>
+        <span class="prio-dot-label">DOK · FIN · THE · TP · PRAX</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SPALTE 2: STATUS-MATRIX RENDERN
+═══════════════════════════════════════════════════════════════════════ */
+function renderMatrix(list) {
+  const el = document.getElementById('matrixBody');
+  if (!list.length) { el.innerHTML = '<div class="no-result">Keine Schüler gefunden.</div>'; return; }
+
+  el.innerHTML = list.map(s => {
+    const dok  = computeDOK(s);  const fin  = computeFIN(s);
+    const the  = computeTHE(s);  const tp   = computeTP(s);
+    const prax = computePRAX(s); const ready = isExamReady(s);
+    const sel  = s.id === selectedId;
+
+    return `<div class="matrix-row${sel ? ' selected' : ''}" onclick="selectStudent('${s.id}')">
+      <div class="mx-name">${s.name}<span class="class-badge">${s.klasse}</span></div>
+      <div class="tile ${dok.color}"  title="${dok.desc}"  onclick="openModal(event,'${s.id}','DOK')">${dok.label}</div>
+      <div class="tile ${fin.color}"  title="${fin.desc}"  onclick="openModal(event,'${s.id}','FIN')">${fin.label}</div>
+      <div class="tile ${the.color}"  title="${the.desc}"  onclick="openModal(event,'${s.id}','THE')">${the.label}</div>
+      <div class="tile ${tp.color}"   title="${tp.desc}"   onclick="openModal(event,'${s.id}','TP')">${tp.label}</div>
+      <div class="tile ${prax.color}" title="${prax.desc}" onclick="openModal(event,'${s.id}','PRAX')">${prax.label}</div>
+      <button class="exam-btn ${ready ? 'ready' : 'not-ready'}"
+              onclick="${ready ? `event.stopPropagation();examReadyAction('${s.id}')` : 'event.stopPropagation()'}">
+        ${ready ? '✅ Zulassen' : '⏳ Offen'}
+      </button>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SPALTE 3: KONTEXT-PANEL RENDERN
+═══════════════════════════════════════════════════════════════════════ */
+function selectStudent(id) {
+  selectedId = id;
+  const s = students.find(x => x.id === id);
+  if (!s) return;
+  applyFilters(); // highlight aktualisieren
+
+  const dok  = computeDOK(s);  const fin  = computeFIN(s);
+  const the  = computeTHE(s);  const tp   = computeTP(s);
+  const prax = computePRAX(s); const ready = isExamReady(s);
+  const rules = getActiveRules(s);
+
+  const p = s.prax;
+  const theVisited = s.the.stundenBesucht.length;
+  const thePct = Math.min(100, Math.round(theVisited / s.the.pflichtStunden * 100));
+
+  document.getElementById('chatBar').style.display = 'flex';
+  document.getElementById('contextPanel').innerHTML = `
+    <div class="profile-header">
+      <div class="avatar">${initials(s.name)}</div>
+      <div>
+        <div class="profile-name">${s.name}</div>
+        <div class="profile-sub">${s.id} · Klasse ${s.klasse} · ${s.ausbildungsTyp}</div>
+        <div class="profile-sub">Geb. ${s.geburtsdatum} · Im System seit ${s.daysInSystem} Tagen</div>
+      </div>
+    </div>
+
+    ${rules.map(r => `<div class="rule-alert ${r.type}">${r.text}</div>`).join('')}
+    ${rules.length ? '<div class="section-divider"></div>' : ''}
+
+    <div class="detail-card">
+      <div class="detail-card-title">📂 Dokumente (DOK) <span style="float:right;color:${COLOR_HEX[dok.color]}">${dok.desc}</span></div>
+      <div class="detail-row">
+        <span class="detail-label">Passbild</span>
+        <span class="detail-val" style="color:${s.dok.passbild==='Verifiziert'?'var(--status-green)':'var(--status-red)'}">${s.dok.passbild}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Sehtest</span>
+        <span class="detail-val" style="color:${s.dok.sehtest==='Verifiziert'?'var(--status-green)':s.dok.sehtest==='Fehlt'?'var(--status-red)':'var(--status-yellow)'}">${s.dok.sehtest}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Erste Hilfe</span>
+        <span class="detail-val" style="color:${s.dok.ersteHilfe==='Verifiziert'?'var(--status-green)':'var(--status-red)'}">${s.dok.ersteHilfe}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">TÜV-Antrag</span>
+        <span class="detail-val" style="color:${s.dok.tuevAntrag==='Genehmigt'?'var(--status-green)':s.dok.tuevAntrag==='Läuft'?'var(--status-blue)':'var(--status-gray)'}">${s.dok.tuevAntrag}</span>
+      </div>
+    </div>
+
+    <div class="detail-card">
+      <div class="detail-card-title">💳 Finanzen (FIN) <span style="float:right;color:${COLOR_HEX[fin.color]}">${formatEur(s.fin.guthaben_cent)}</span></div>
+      <div class="detail-row">
+        <span class="detail-label">Kontostand</span>
+        <span class="detail-val" style="color:${COLOR_HEX[fin.color]}">${formatEur(s.fin.guthaben_cent)}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Offene Rechnungen</span>
+        <span class="detail-val" style="color:${s.fin.offeneRechnungen.length?'var(--status-orange)':'var(--status-green)'}">${s.fin.offeneRechnungen.length}</span>
+      </div>
+      ${s.fin.offeneRechnungen.map(r => `
+      <div class="detail-row">
+        <span class="detail-label" style="font-size:11px;">↳ ${r}</span>
+        <span style="color:var(--status-red);font-size:11px;">Offen</span>
+      </div>`).join('')}
+    </div>
+
+    <div class="detail-card">
+      <div class="detail-card-title">📚 Theorie (THE) <span style="float:right;color:${COLOR_HEX[the.color]}">${theVisited}/${s.the.pflichtStunden} Std.</span></div>
+      <div class="detail-row" style="gap:8px;">
+        <span class="detail-label">Fortschritt</span>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" style="width:${thePct}%;background:${COLOR_HEX[the.color]};"></div>
+        </div>
+        <span class="detail-val" style="color:${COLOR_HEX[the.color]}">${thePct}%</span>
+      </div>
+      ${s.vorbesitz ? `<div class="detail-row"><span class="detail-label" style="font-size:11px;">§1 Vorbesitz: Pflicht von 12 auf 6 reduziert</span></div>` : ''}
+    </div>
+
+    <div class="detail-card">
+      <div class="detail-card-title">🏎️ Praxis (PRAX) <span style="float:right;color:${COLOR_HEX[prax.color]}">${prax.desc}</span></div>
+      <div class="detail-row">
+        <span class="detail-label">Simulator-Std.</span>
+        <span class="detail-val" style="color:${p.simulatorErledigt>=3?'var(--status-green)':'var(--status-orange)'">${p.simulatorErledigt}/3</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Grundausbildung</span>
+        <span class="detail-val" style="color:${p.grundausbildungAbgeschlossen?'var(--status-green)':'var(--status-red)'}">${p.grundausbildungAbgeschlossen?'✓ Abgeschlossen':'⏳ Läuft'}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">🏔️ Überland</span>
+        <span class="detail-val" style="color:${p.ueberlandAbsolviert>=p.ueberlandPflicht?'var(--status-green)':'var(--text-muted)'}">${p.ueberlandAbsolviert}/${p.ueberlandPflicht}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">🛣️ Autobahn</span>
+        <span class="detail-val" style="color:${p.autobahnAbsolviert>=p.autobahnPflicht?'var(--status-green)':'var(--text-muted)'}">${p.autobahnAbsolviert}/${p.autobahnPflicht}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">🌙 Nacht</span>
+        <span class="detail-val" style="color:${p.nachtAbsolviert>=p.nachtPflicht?'var(--status-green)':'var(--text-muted)'}">${p.nachtAbsolviert}/${p.nachtPflicht}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Prakt. Prüfung</span>
+        <span class="detail-val">${p.praktischePruefung}</span>
+      </div>
+    </div>
+
+    <div class="action-btn-row">
+      <button class="action-btn" onclick="sendPush('${s.id}')">📣 Push-Mahnung senden</button>
+      <button class="action-btn" onclick="openModal(event,'${s.id}','DOK')">📂 Dokument-Status bearbeiten</button>
+      <button class="action-btn" onclick="openModal(event,'${s.id}','FIN')">💳 Finanzen bearbeiten</button>
+      <button class="action-btn" onclick="openModal(event,'${s.id}','THE')">📚 Theorie-Stunden bearbeiten</button>
+      <button class="action-btn" onclick="openModal(event,'${s.id}','TP')">📝 TP-Status bearbeiten</button>
+      <button class="action-btn" onclick="openModal(event,'${s.id}','PRAX')">🏎️ Praxis / Sonderfahrten bearbeiten</button>
+      ${ready ? `<div class="section-divider"></div>
+      <button class="action-btn success" onclick="examReadyAction('${s.id}')">🎉 Prüfungsfreigabe erteilen!</button>` : ''}
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MODAL – ÖFFNEN, BODY, SPEICHERN
+═══════════════════════════════════════════════════════════════════════ */
+function openModal(e, studentId, tile) {
+  e.stopPropagation();
+  selectStudent(studentId);
+  const s = students.find(x => x.id === studentId);
+  currentModal = { studentId, tile };
+  const titles = { DOK:'📂 Dokumente', FIN:'💳 Finanzen', THE:'📚 Theorie', TP:'📝 Theorieprüfungs-Status', PRAX:'🏎️ Praxis & Sonderfahrten' };
+  document.getElementById('modalTitle').textContent = `${titles[tile]} – ${s.name}`;
+  document.getElementById('modalBody').innerHTML = buildModalBody(s, tile);
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function buildModalBody(s, tile) {
+  if (tile === 'DOK') return `
+    ${buildRadio('dok_passbild', 'Passbild', s.dok.passbild, ['Fehlt','Eingereicht','Verifiziert'], ['var(--status-red)','var(--status-yellow)','var(--status-green)'])}
+    ${buildRadio('dok_sehtest', 'Sehtest', s.dok.sehtest, ['Fehlt','Eingereicht','Beim Amt','Verifiziert'], ['var(--status-red)','var(--status-yellow)','var(--status-blue)','var(--status-green)'])}
+    ${buildRadio('dok_ersteHilfe', 'Erste Hilfe', s.dok.ersteHilfe, ['Fehlt','Eingereicht','Verifiziert'], ['var(--status-red)','var(--status-yellow)','var(--status-green)'])}
+    ${buildRadio('dok_tuevAntrag', 'TÜV-Antrag', s.dok.tuevAntrag, ['Nicht gestellt','Läuft','Genehmigt'], ['var(--status-gray)','var(--status-blue)','var(--status-green)'])}`;
+
+  if (tile === 'FIN') return `
+    <div class="modal-section">
+      <div class="modal-section-title">Kontostand (in €)</div>
+      <input class="modal-text-input" id="fin_guthaben" type="number" step="0.01"
+        value="${(s.fin.guthaben_cent / 100).toFixed(2)}">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+        Aktuell: <strong style="color:${COLOR_HEX[computeFIN(s).color]}">${formatEur(s.fin.guthaben_cent)}</strong>
+        · Sperre bei unter −100,00 € (Regelwerk §3)
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">Offene Rechnungen</div>
+      <div class="re-list" id="reList">
+        ${s.fin.offeneRechnungen.map((r,i)=>`
+        <div class="re-row">
+          <input class="re-input" id="re_${i}" value="${r}">
+          <button class="re-del" onclick="delRE(${i})">✕</button>
+        </div>`).join('')}
+        <button class="re-add" onclick="addRE()">+ Rechnung hinzufügen</button>
+      </div>
+    </div>`;
+
+  if (tile === 'THE') {
+    const n = s.the.pflichtStunden;
+    return `
+    <div class="modal-section">
+      <div class="modal-section-title">Besuchte Lektionen (${s.the.stundenBesucht.length}/${n})</div>
+      <div class="the-grid">
+        ${Array.from({length: n}, (_,i) => i+1).map(num => `
+        <label class="the-checkbox">
+          <input type="checkbox" id="the_${num}" ${s.the.stundenBesucht.includes(num)?'checked':''}>
+          <span>L${num}</span>
+        </label>`).join('')}
+      </div>
+      ${s.vorbesitz ? '<div style="margin-top:10px;font-size:11px;color:var(--status-purple);">ℹ Vorbesitz: Pflicht auf 6 Std. reduziert (Regelwerk §1)</div>' : ''}
+    </div>`;
+  }
+
+  if (tile === 'TP') return buildRadio('tp_status', 'Prüfungsstatus', s.tp.status,
+    ['Nicht angemeldet','Warteliste','Angemeldet','Bestanden','Nicht bestanden'],
+    ['var(--status-gray)','var(--status-gray)','var(--status-blue)','var(--status-green)','var(--status-darkred)']);
+
+  if (tile === 'PRAX') {
+    const p = s.prax;
+    return `
+    <div class="modal-section">
+      <div class="modal-section-title">Simulator-Stunden (min. 3 für Echtfahrten – Regelwerk §2)</div>
+      <div class="range-wrap">
+        <input type="range" id="prax_sim" min="0" max="6" value="${p.simulatorErledigt}"
+          oninput="document.getElementById('simVal').textContent=this.value">
+        <span class="range-val" id="simVal">${p.simulatorErledigt}</span>
+        <span style="font-size:12px;color:var(--text-muted);">/6</span>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">Grundausbildung (Regelwerk §4)</div>
+      <label class="cb-option">
+        <input type="checkbox" id="prax_grundausb" ${p.grundausbildungAbgeschlossen?'checked':''}>
+        <span>Grundausbildung abgeschlossen</span>
+      </label>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">Sonderfahrten</div>
+      <div class="num-inputs">
+        <div class="num-row">
+          <span>🏔️ Überland (Pflicht: ${p.ueberlandPflicht})</span>
+          <input class="num-input" id="prax_ul" type="number" min="0" max="${p.ueberlandPflicht}" value="${p.ueberlandAbsolviert}">
+        </div>
+        <div class="num-row">
+          <span>🛣️ Autobahn (Pflicht: ${p.autobahnPflicht})</span>
+          <input class="num-input" id="prax_ab" type="number" min="0" max="${p.autobahnPflicht}" value="${p.autobahnAbsolviert}">
+        </div>
+        <div class="num-row">
+          <span>🌙 Nacht (Pflicht: ${p.nachtPflicht})</span>
+          <input class="num-input" id="prax_nacht" type="number" min="0" max="${p.nachtPflicht}" value="${p.nachtAbsolviert}">
+        </div>
+      </div>
+    </div>
+    ${buildRadio('prax_pruefung', 'Praktische Prüfung', p.praktischePruefung,
+      ['Offen','Sucht Termin','Termin gebucht','Bestanden'],
+      ['var(--status-gray)','var(--status-gray)','var(--status-blue)','var(--status-green)'])}`;
+  }
+  return '';
+}
+
+function buildRadio(name, title, current, options, colors) {
+  return `<div class="modal-section">
+    <div class="modal-section-title">${title}</div>
+    ${options.map((opt, i) => `
+    <label class="radio-option">
+      <input type="radio" name="${name}" value="${opt}" ${current===opt?'checked':''}>
+      <div class="color-dot" style="background:${colors[i]||'var(--status-gray)'}"></div>
+      <span>${opt}</span>
+    </label>`).join('')}
+  </div>`;
+}
+
+// Rechnung entfernen / hinzufügen
+function delRE(idx) {
+  const s = students.find(x => x.id === currentModal.studentId);
+  s.fin.offeneRechnungen.splice(idx, 1);
+  rerenderREList(s);
+}
+function addRE() {
+  const s = students.find(x => x.id === currentModal.studentId);
+  s.fin.offeneRechnungen.push(`RE-2024-0${Math.floor(10+Math.random()*89)}`);
+  rerenderREList(s);
+}
+function rerenderREList(s) {
+  document.getElementById('reList').innerHTML =
+    s.fin.offeneRechnungen.map((r,i)=>`
+    <div class="re-row">
+      <input class="re-input" id="re_${i}" value="${r}">
+      <button class="re-del" onclick="delRE(${i})">✕</button>
+    </div>`).join('') +
+    '<button class="re-add" onclick="addRE()">+ Rechnung hinzufügen</button>';
+}
+
+function saveModal() {
+  const s = students.find(x => x.id === currentModal.studentId);
+  const { tile } = currentModal;
+  const val = n => document.querySelector(`input[name="${n}"]:checked`)?.value;
+
+  if (tile === 'DOK') {
+    s.dok.passbild    = val('dok_passbild')    || s.dok.passbild;
+    s.dok.sehtest     = val('dok_sehtest')     || s.dok.sehtest;
+    s.dok.ersteHilfe  = val('dok_ersteHilfe')  || s.dok.ersteHilfe;
+    s.dok.tuevAntrag  = val('dok_tuevAntrag')  || s.dok.tuevAntrag;
+  } else if (tile === 'FIN') {
+    const eurVal = parseFloat(document.getElementById('fin_guthaben').value) || 0;
+    s.fin.guthaben_cent = Math.round(eurVal * 100);
+    s.fin.offeneRechnungen = Array.from(
+      document.querySelectorAll('[id^="re_"]')
+    ).map(el => el.value.trim()).filter(Boolean);
+  } else if (tile === 'THE') {
+    s.the.stundenBesucht = Array.from({length: s.the.pflichtStunden}, (_,i) => i+1)
+      .filter(n => document.getElementById(`the_${n}`)?.checked);
+  } else if (tile === 'TP') {
+    s.tp.status = val('tp_status') || s.tp.status;
+  } else if (tile === 'PRAX') {
+    s.prax.simulatorErledigt          = parseInt(document.getElementById('prax_sim').value)    || 0;
+    s.prax.grundausbildungAbgeschlossen = document.getElementById('prax_grundausb').checked;
+    s.prax.ueberlandAbsolviert        = parseInt(document.getElementById('prax_ul').value)     || 0;
+    s.prax.autobahnAbsolviert         = parseInt(document.getElementById('prax_ab').value)     || 0;
+    s.prax.nachtAbsolviert            = parseInt(document.getElementById('prax_nacht').value)  || 0;
+    s.prax.praktischePruefung         = val('prax_pruefung') || s.prax.praktischePruefung;
+  }
+
+  closeModal();
+  applyFilters();
+  if (selectedId) selectStudent(selectedId);
+  toast(`✅ Status für ${s.name} gespeichert!`);
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  currentModal = null;
+}
+function overlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AKTIONEN
+═══════════════════════════════════════════════════════════════════════ */
+function examReadyAction(id) {
+  const s = students.find(x => x.id === id);
+  toast(`🎉 ${s.name} wurde für die Praxisprüfung freigegeben!`);
+}
+
+function sendPush(id) {
+  const s = students.find(x => x.id === id);
+  const fin = computeFIN(s); const dok = computeDOK(s);
+  let msg;
+  if (fin.color === 'red')    msg = `⛔ Zahlungserinnerung an ${s.name} gesendet! (Rückstand: ${formatEur(s.fin.guthaben_cent)})`;
+  else if (dok.color === 'red') msg = `📂 Dokument-Erinnerung an ${s.name} gesendet!`;
+  else                          msg = `📣 Push-Benachrichtigung an ${s.name} gesendet!`;
+  toast(msg);
+}
+
+function sendChat() {
+  const input = document.getElementById('chatInput');
+  if (!input.value.trim()) return;
+  const s = students.find(x => x.id === selectedId);
+  toast(`💬 Nachricht an ${s?.name || '?'}: "${input.value}"`);
+  input.value = '';
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════════════════ */
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════════ */
+document.getElementById('currentDate').textContent =
+  new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+
+applyFilters();
+</script>
+</body>
+</html>
