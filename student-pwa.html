@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0F172A">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Fahrschul-App">
+  <link rel="manifest" href="manifest.json">
+  <title>Fahrschul-App – Mein Cockpit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* ── Design System: Quiet Luxury (Light Mode) ──────────────────── */
+    :root {
+      --bg:           #F8FAFC;
+      --surface:      #FFFFFF;
+      --surface-2:    #F1F5F9;
+      --surface-3:    #E2E8F0;
+      --border:       #E2E8F0;
+      --border-2:     #CBD5E1;
+      --text:         #0F172A;
+      --text-muted:   #64748B;
+      --text-light:   #94A3B8;
+      --accent:       #0F172A;
+
+      --red-bg: #FEF2F2; --red-text: #991B1B; --red-border: #FECACA;
+      --orange-bg: #FFF7ED; --orange-text: #9A3412; --orange-border: #FED7AA;
+      --yellow-bg: #FEFCE8; --yellow-text: #854D0E; --yellow-border: #FEF08A;
+      --blue-bg: #EFF6FF;   --blue-text: #1D4ED8;   --blue-border: #BFDBFE;
+      --purple-bg: #FAF5FF; --purple-text: #6B21A8; --purple-border: #E9D5FF;
+      --green-bg: #F0FDF4;  --green-text: #166534;  --green-border: #BBF7D0;
+      --gray-bg: #F8FAFC;   --gray-text: #475569;   --gray-border: #CBD5E1;
+      --darkred-bg: #FFF1F2; --darkred-text: #9F1239; --darkred-border: #FECDD3;
+
+      --nav-h: 68px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --safe-t: env(safe-area-inset-top, 0px);
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%; overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      font-size: 14px;
+    }
+
+    /* ── Auth Screens ─────────────────────────────────────────────── */
+    .auth-screen {
+      display: none; position: fixed; inset: 0;
+      flex-direction: column; align-items: center;
+      background: var(--bg);
+      overflow-y: auto; padding: 0 20px 40px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .auth-screen.active { display: flex; }
+
+    .auth-inner { width: 100%; max-width: 400px; }
+
+    .auth-logo-wrap { text-align: center; margin: calc(var(--safe-t) + 40px) 0 20px; }
+    .auth-logo {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 64px; height: 64px; border-radius: 20px;
+      background: var(--accent); font-size: 30px;
+      box-shadow: 0 8px 24px rgba(15,23,42,0.15);
+    }
+    .auth-title { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; text-align: center; }
+    .auth-sub   { font-size: 14px; color: var(--text-muted); text-align: center; margin: 8px 0 28px; line-height: 1.6; }
+
+    .form-group { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 11px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+
+    .form-input, .form-select {
+      width: 100%; background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+      font-size: 16px; font-weight: 500; color: var(--text);
+      font-family: inherit; outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance: none;
+    }
+    .form-input:focus, .form-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15,23,42,0.08);
+    }
+    .form-input::placeholder { color: var(--text-light); }
+    .form-select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 14px center; padding-right: 40px;
+      cursor: pointer;
+    }
+
+    .toggle-group {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; padding: 14px 16px; cursor: pointer;
+    }
+    .toggle-label { font-size: 15px; font-weight: 600; color: var(--text); }
+    .toggle-sub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .toggle-pill {
+      width: 46px; height: 26px; border-radius: 13px;
+      background: var(--surface-3); position: relative;
+      flex-shrink: 0; border: none; cursor: pointer;
+      transition: background 0.2s; outline: none;
+    }
+    .toggle-pill.on { background: var(--accent); }
+    .toggle-pill::after {
+      content: ''; position: absolute;
+      width: 20px; height: 20px; background: #fff; border-radius: 50%;
+      top: 3px; left: 3px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      transition: transform 0.2s;
+    }
+    .toggle-pill.on::after { transform: translateX(20px); }
+
+    .btn-primary {
+      width: 100%; padding: 16px; border: none; border-radius: 14px;
+      background: var(--accent); color: #fff;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      cursor: pointer; margin-top: 6px;
+      transition: opacity 0.15s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn-primary:active { opacity: 0.8; transform: scale(0.98); }
+
+    .auth-switch {
+      text-align: center; font-size: 14px; color: var(--text-muted); margin-top: 22px;
+    }
+    .auth-switch a { color: var(--accent); font-weight: 700; text-decoration: none; }
+
+    .form-error {
+      display: none; background: var(--red-bg); border: 1px solid var(--red-border);
+      border-radius: 10px; padding: 12px 14px; font-size: 13px; color: var(--red-text);
+      font-weight: 500; margin-bottom: 12px;
+    }
+    .form-error.show { display: block; }
+
+    /* ── App Shell ────────────────────────────────────────────────── */
+    .app-screen { display: none; position: fixed; inset: 0; flex-direction: column; }
+    .app-screen.active { display: flex; }
+
+    .app-header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 18px; padding-top: var(--safe-t);
+      height: calc(58px + var(--safe-t));
+      display: flex; align-items: center; justify-content: space-between;
+      flex-shrink: 0; z-index: 10;
+    }
+    .hdr-brand { display: flex; align-items: center; gap: 10px; }
+    .hdr-logo {
+      width: 34px; height: 34px; border-radius: 9px;
+      background: var(--accent); font-size: 17px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hdr-title { font-size: 15px; font-weight: 800; }
+    .hdr-sub   { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+    .hdr-avatar {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tab-area { flex: 1; overflow: hidden; position: relative; }
+
+    .tab-pane {
+      position: absolute; inset: 0;
+      overflow-y: auto; padding: 16px 16px;
+      padding-bottom: calc(var(--nav-h) + var(--safe-b) + 16px);
+      display: none; -webkit-overflow-scrolling: touch;
+    }
+    .tab-pane.active { display: block; }
+    .tab-pane::-webkit-scrollbar { display: none; }
+
+    /* ── Bottom Nav ───────────────────────────────────────────────── */
+    .bottom-nav {
+      display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding-bottom: var(--safe-b);
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .bottom-nav.show { display: grid; }
+    .nav-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 9px 4px; border: none; background: none;
+      font-family: inherit; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nav-btn:active { opacity: 0.55; }
+    .nav-ico  { font-size: 21px; line-height: 1; transition: transform 0.15s; }
+    .nav-lbl  { font-size: 10px; font-weight: 600; color: var(--text-muted); }
+    .nav-btn.active .nav-lbl  { color: var(--accent); font-weight: 800; }
+    .nav-btn.active .nav-ico  { transform: translateY(-2px); }
+
+    /* ── Shared Card ──────────────────────────────────────────────── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 16px; margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 11px; font-weight: 800; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 12px;
+    }
+
+    /* ── Welcome Card ─────────────────────────────────────────────── */
+    .welcome-card {
+      background: var(--accent); border-radius: 20px;
+      padding: 22px 20px; margin-bottom: 14px;
+    }
+    .wc-greet  { font-size: 13px; color: rgba(255,255,255,.65); font-weight: 500; }
+    .wc-name   { font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -0.5px; margin: 4px 0 2px; }
+    .wc-meta   { font-size: 12px; color: rgba(255,255,255,.55); }
+    .wc-badge  {
+      display: inline-block; margin-top: 12px;
+      background: rgba(255,255,255,.15); border-radius: 7px;
+      padding: 4px 10px; font-size: 11px; font-weight: 700; color: #fff;
+    }
+
+    /* ── Status Tiles ─────────────────────────────────────────────── */
+    .tiles-row {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      gap: 8px; margin-bottom: 12px;
+    }
+    .s-tile {
+      border-radius: 13px; padding: 10px 4px 8px;
+      display: flex; flex-direction: column; align-items: center;
+      gap: 3px; cursor: pointer; border: 1.5px solid;
+      min-height: 62px;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s;
+    }
+    .s-tile:active { transform: scale(0.91); }
+    .s-tile-ico { font-size: 15px; line-height: 1; }
+    .s-tile-lbl { font-size: 8px; font-weight: 800; letter-spacing: 0.2px; }
+    .s-tile-val { font-size: 8px; font-weight: 600; opacity: 0.8; text-align: center; line-height: 1.2; }
+
+    .t-red     { background: var(--red-bg);     color: var(--red-text);     border-color: var(--red-border); }
+    .t-orange  { background: var(--orange-bg);  color: var(--orange-text);  border-color: var(--orange-border); }
+    .t-yellow  { background: var(--yellow-bg);  color: var(--yellow-text);  border-color: var(--yellow-border); }
+    .t-blue    { background: var(--blue-bg);     color: var(--blue-text);    border-color: var(--blue-border); }
+    .t-purple  { background: var(--purple-bg);  color: var(--purple-text);  border-color: var(--purple-border); }
+    .t-green   { background: var(--green-bg);   color: var(--green-text);   border-color: var(--green-border); }
+    .t-gray    { background: var(--gray-bg);    color: var(--gray-text);    border-color: var(--gray-border); }
+    .t-darkred { background: var(--darkred-bg); color: var(--darkred-text); border-color: var(--darkred-border); }
+
+    /* ── Rule Alert ───────────────────────────────────────────────── */
+    .rule-alert {
+      border-radius: 12px; padding: 12px 14px; font-size: 13px;
+      font-weight: 500; margin-bottom: 8px; line-height: 1.55; border: 1px solid;
+    }
+    .rule-alert.red    { background: var(--red-bg);    color: var(--red-text);    border-color: var(--red-border); }
+    .rule-alert.orange { background: var(--orange-bg); color: var(--orange-text); border-color: var(--orange-border); }
+    .rule-alert.info   { background: var(--blue-bg);   color: var(--blue-text);   border-color: var(--blue-border); }
+
+    /* ── Finance CTA ──────────────────────────────────────────────── */
+    .fin-cta {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      background: var(--red-bg); border: 1.5px solid var(--red-border);
+      border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
+    }
+    .fin-cta-lbl { font-size: 13px; font-weight: 700; color: var(--red-text); }
+    .fin-cta-sub { font-size: 11px; color: var(--red-text); opacity: .75; margin-top: 2px; }
+    .fin-cta-btn {
+      background: var(--red-text); color: #fff; border: none; border-radius: 8px;
+      padding: 9px 14px; font-size: 12px; font-weight: 700;
+      font-family: inherit; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+    }
+
+    /* ── Prüfungs-Ready Card ──────────────────────────────────────── */
+    .pruef-card {
+      border-radius: 18px; padding: 22px 20px; text-align: center;
+      margin-bottom: 12px; border: 2px solid;
+    }
+    .pruef-card.ready {
+      background: var(--green-bg); border-color: var(--green-border);
+      animation: softGlow 3s ease-in-out infinite;
+    }
+    .pruef-card.locked { background: var(--surface-2); border-color: var(--border); }
+    @keyframes softGlow {
+      0%,100% { box-shadow: 0 0 0 0 rgba(34,197,94,.25); }
+      50%      { box-shadow: 0 0 0 8px rgba(34,197,94,0); }
+    }
+    .pruef-ico   { font-size: 36px; margin-bottom: 8px; }
+    .pruef-title { font-size: 17px; font-weight: 800; }
+    .pruef-sub   { font-size: 12px; margin-top: 6px; line-height: 1.5; }
+    .pruef-card.ready  .pruef-title { color: var(--green-text); }
+    .pruef-card.ready  .pruef-sub   { color: #4ADE80; }
+    .pruef-card.locked .pruef-title { color: var(--text-muted); }
+    .pruef-card.locked .pruef-sub   { color: var(--text-light); }
+
+    /* ── Countdown Card ───────────────────────────────────────────── */
+    .cntd-card {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 14px 16px; margin-bottom: 12px;
+    }
+    .cntd-icon {
+      width: 46px; height: 46px; border-radius: 12px;
+      background: var(--surface-2); font-size: 22px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .cntd-lbl { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .cntd-val { font-size: 20px; font-weight: 800; margin-top: 2px; }
+    .cntd-sub { font-size: 11px; color: var(--text-muted); }
+
+    /* ── Detail Row ───────────────────────────────────────────────── */
+    .d-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; font-size: 13px;
+      border-bottom: 1px solid var(--border);
+    }
+    .d-row:last-child { border-bottom: none; }
+    .d-row-lbl { color: var(--text-muted); font-weight: 500; }
+    .d-row-val { font-weight: 700; }
+
+    /* ── Progress Bar ─────────────────────────────────────────────── */
+    .prog-wrap {
+      background: var(--surface-2); border-radius: 6px; height: 7px;
+      overflow: hidden; flex: 1;
+    }
+    .prog-fill {
+      height: 100%; border-radius: 6px;
+      transition: width 0.5s cubic-bezier(.4,0,.2,1);
+    }
+    .pf-green  { background: #22C55E; }
+    .pf-yellow { background: #EAB308; }
+    .pf-purple { background: #A855F7; }
+    .pf-red    { background: #EF4444; }
+    .pf-blue   { background: #3B82F6; }
+    .pf-gray   { background: #94A3B8; }
+
+    /* ── Theory Checklist ─────────────────────────────────────────── */
+    .topic-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 9px 0; border-bottom: 1px solid var(--border);
+    }
+    .topic-row:last-child { border-bottom: none; }
+    .topic-chk {
+      width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; margin-top: 1px;
+      display: flex; align-items: center; justify-content: center; font-size: 11px;
+    }
+    .topic-chk.done { background: var(--green-bg); color: var(--green-text); border: 1.5px solid var(--green-border); }
+    .topic-chk.open { background: var(--surface-2); border: 1.5px solid var(--border-2); }
+    .topic-txt { font-size: 12px; font-weight: 500; line-height: 1.45; }
+    .topic-txt.done { color: var(--text-muted); }
+
+    /* ── Sonderfahrten ────────────────────────────────────────────── */
+    .sf-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .sf-item:last-child { border-bottom: none; }
+    .sf-icon { font-size: 22px; flex-shrink: 0; }
+    .sf-info { flex: 1; }
+    .sf-name { font-size: 13px; font-weight: 700; }
+    .sf-sub  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .sf-prog-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
+    .sf-badge {
+      font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; flex-shrink: 0;
+    }
+    .sf-done { background: var(--green-bg); color: var(--green-text); }
+    .sf-prog { background: var(--yellow-bg); color: var(--yellow-text); }
+    .sf-lock { background: var(--gray-bg); color: var(--gray-text); }
+
+    /* ── Simulator Booking ────────────────────────────────────────── */
+    .week-strip {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 5px; margin-bottom: 14px;
+    }
+    .day-pill {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 7px 2px; border-radius: 10px; border: 1.5px solid var(--border);
+      background: var(--surface); cursor: pointer;
+      -webkit-tap-highlight-color: transparent; transition: all 0.15s;
+    }
+    .day-pill.active { background: var(--accent); border-color: var(--accent); }
+    .day-pill.active .dp-name, .day-pill.active .dp-num { color: #fff; }
+    .dp-name { font-size: 9px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+    .dp-num  { font-size: 16px; font-weight: 800; color: var(--text); margin-top: 1px; }
+
+    .slot-row {
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 14px; padding: 14px 15px;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 12px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent; transition: all 0.12s;
+    }
+    .slot-row:active { transform: scale(0.97); }
+    .slot-row.mine   { background: var(--blue-bg);   border-color: var(--blue-border); }
+    .slot-row.taken  { background: var(--surface-2); opacity: 0.55; cursor: not-allowed; }
+    .slot-t-wrap { text-align: center; min-width: 52px; flex-shrink: 0; }
+    .slot-time   { font-size: 15px; font-weight: 800; }
+    .slot-dur    { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+    .slot-div    { width: 1px; height: 32px; background: var(--border); flex-shrink: 0; }
+    .slot-info   { flex: 1; }
+    .slot-lbl    { font-size: 13px; font-weight: 700; }
+    .slot-sub    { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .slot-badge  { font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: 8px; flex-shrink: 0; }
+    .sb-free { background: var(--green-bg);  color: var(--green-text); }
+    .sb-mine { background: var(--blue-bg);   color: var(--blue-text); }
+    .sb-take { background: var(--gray-bg);   color: var(--gray-text); }
+
+    .lock-box {
+      background: var(--red-bg); border: 1.5px solid var(--red-border);
+      border-radius: 16px; padding: 28px 20px; text-align: center;
+    }
+    .lock-box-ico   { font-size: 36px; margin-bottom: 10px; }
+    .lock-box-title { font-size: 16px; font-weight: 800; color: var(--red-text); }
+    .lock-box-sub   { font-size: 13px; color: var(--red-text); opacity: .8; margin-top: 6px; line-height: 1.5; }
+
+    /* ── Leistungen ───────────────────────────────────────────────── */
+    .leis-card {
+      display: flex; align-items: flex-start; gap: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 16px; margin-bottom: 10px;
+    }
+    .leis-ico {
+      width: 44px; height: 44px; border-radius: 12px; background: var(--surface-2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .leis-name { font-size: 14px; font-weight: 800; }
+    .leis-desc { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+
+    /* ── Bottom Sheet ─────────────────────────────────────────────── */
+    .sheet-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(15,23,42,.35); backdrop-filter: blur(4px);
+      align-items: flex-end;
+    }
+    .sheet-overlay.open { display: flex; }
+    .sheet-box {
+      background: var(--surface); border-radius: 22px 22px 0 0;
+      padding: 20px 20px calc(20px + var(--safe-b));
+      width: 100%; max-height: 68vh; overflow-y: auto;
+    }
+    .sheet-box::-webkit-scrollbar { display: none; }
+    .sheet-handle {
+      width: 38px; height: 4px; background: var(--surface-3);
+      border-radius: 2px; margin: 0 auto 18px;
+    }
+    .sheet-title { font-size: 18px; font-weight: 800; margin-bottom: 14px; }
+
+    /* ── Logout Button ────────────────────────────────────────────── */
+    .logout-btn {
+      width: 100%; padding: 13px; border-radius: 12px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      font-size: 14px; font-weight: 600; color: var(--text-muted);
+      font-family: inherit; cursor: pointer; margin-top: 10px;
+    }
+    .logout-btn.danger { color: var(--red-text); border-color: var(--red-border); background: var(--red-bg); }
+
+    /* ── Toast ────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed; bottom: calc(var(--nav-h) + var(--safe-b) + 10px);
+      left: 50%; transform: translateX(-50%) translateY(12px);
+      background: var(--accent); color: #fff;
+      padding: 11px 22px; border-radius: 100px;
+      font-size: 13px; font-weight: 600; white-space: nowrap;
+      z-index: 999; opacity: 0;
+      transition: all 0.28s cubic-bezier(.4,0,.2,1);
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Sim Ring SVG ─────────────────────────────────────────────── */
+    .sim-wrap { display: flex; align-items: center; gap: 16px; }
+    .sim-lbl  { font-size: 14px; font-weight: 700; }
+    .sim-sub  { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+    .sim-cta  {
+      margin-top: 8px; background: var(--accent); color: #fff; border: none;
+      border-radius: 9px; padding: 8px 14px;
+      font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+
+    /* ── Section heading ─────────────────────────────────────────── */
+    .sec-head {
+      font-size: 13px; font-weight: 800; color: var(--text);
+      margin: 18px 0 10px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════ REGISTRIERUNG ════════════════ -->
+<div class="auth-screen" id="screenReg">
+  <div class="auth-inner">
+    <div class="auth-logo-wrap"><div class="auth-logo">🚗</div></div>
+    <div class="auth-title">Willkommen!</div>
+    <div class="auth-sub">Erstelle dein persönliches Konto und behalte deinen Ausbildungsfortschritt immer im Blick.</div>
+
+    <div id="regErr" class="form-error"></div>
+
+    <div class="form-group">
+      <label class="form-label">Vollständiger Name</label>
+      <input class="form-input" id="rName" type="text" placeholder="Max Mustermann" autocomplete="name">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Geburtsdatum</label>
+      <input class="form-input" id="rGeb" type="date" max="2010-01-01">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Ausbildungsklasse</label>
+      <select class="form-select" id="rKlasse">
+        <option value="">Klasse wählen…</option>
+        <optgroup label="🚗 PKW">
+          <option value="B">Klasse B – Autoführerschein</option>
+          <option value="B197">Klasse B197 – B mit Schaltnachweis</option>
+          <option value="B96">Klasse B96 – PKW + Anhänger (leicht)</option>
+          <option value="BE">Klasse BE – PKW + Anhänger (schwer)</option>
+        </optgroup>
+        <optgroup label="🏍️ Motorrad">
+          <option value="A">Klasse A – Schwere Motorräder</option>
+          <option value="A2">Klasse A2 – Mittelschwere Motorräder</option>
+          <option value="A1">Klasse A1 – Leichtkrafträder (125 ccm)</option>
+          <option value="AM">Klasse AM – Roller & Kleinkrafträder</option>
+          <option value="Mofa">Mofa-Prüfbescheinigung</option>
+        </optgroup>
+        <optgroup label="🚛 LKW & Bus">
+          <option value="C">Klasse C – Schwere LKW</option>
+          <option value="CE">Klasse CE – Sattelzüge & Lastzüge</option>
+          <option value="C1">Klasse C1 – Leichte LKW</option>
+          <option value="D">Klasse D – Große Omnibusse</option>
+          <option value="D1">Klasse D1 – Kleinbusse</option>
+        </optgroup>
+        <optgroup label="🚜 Sonstige">
+          <option value="L">Klasse L – Traktoren (bis 40 km/h)</option>
+          <option value="T">Klasse T – Traktoren (bis 60 km/h)</option>
+          <option value="Gabelstapler">Gabelstapler-Schein</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="form-group">
+      <div class="toggle-group" onclick="toggleVorbesitz()">
+        <div>
+          <div class="toggle-label">Führerschein-Vorbesitz</div>
+          <div class="toggle-sub">Reduziert Theorie-Pflichtstunden auf 6</div>
+        </div>
+        <button class="toggle-pill" id="rVorbesitz"></button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">4-stellige PIN</label>
+      <input class="form-input" id="rPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="••••" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label class="form-label">PIN bestätigen</label>
+      <input class="form-input" id="rPin2" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="••••" autocomplete="new-password">
+    </div>
+
+    <button class="btn-primary" onclick="doRegister()">Konto erstellen &amp; starten</button>
+    <div class="auth-switch">Bereits registriert? <a href="#" onclick="showAuth('login')">Einloggen</a></div>
+  </div>
+</div>
+
+<!-- ════════════════ LOGIN ════════════════ -->
+<div class="auth-screen" id="screenLogin">
+  <div class="auth-inner">
+    <div class="auth-logo-wrap"><div class="auth-logo" style="background:#334155;">🔑</div></div>
+    <div class="auth-title">Willkommen zurück</div>
+    <div class="auth-sub">Melde dich mit deinem Namen und deiner PIN an.</div>
+
+    <div id="loginErr" class="form-error"></div>
+
+    <div class="form-group">
+      <label class="form-label">Name</label>
+      <input class="form-input" id="lName" type="text" placeholder="Max Mustermann" autocomplete="name" list="nameHints">
+      <datalist id="nameHints"></datalist>
+    </div>
+    <div class="form-group">
+      <label class="form-label">PIN</label>
+      <input class="form-input" id="lPin" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]*" placeholder="••••" autocomplete="current-password">
+    </div>
+
+    <button class="btn-primary" onclick="doLogin()">Einloggen</button>
+    <div class="auth-switch">Noch kein Konto? <a href="#" onclick="showAuth('register')">Jetzt registrieren</a></div>
+  </div>
+</div>
+
+<!-- ════════════════ APP SHELL ════════════════ -->
+<div class="app-screen" id="screenApp">
+
+  <header class="app-header">
+    <div class="hdr-brand">
+      <div class="hdr-logo">🚗</div>
+      <div>
+        <div class="hdr-title">Fahrschul-App</div>
+        <div class="hdr-sub" id="hdrSub">Mein Cockpit</div>
+      </div>
+    </div>
+    <div class="hdr-avatar" id="hdrAvatar" onclick="openAccountSheet()">?</div>
+  </header>
+
+  <div class="tab-area">
+    <div class="tab-pane active" id="tHome"><div id="homeContent"></div></div>
+    <div class="tab-pane"        id="tFortschritt"><div id="fortContent"></div></div>
+    <div class="tab-pane"        id="tSimulator"><div id="simContent"></div></div>
+    <div class="tab-pane"        id="tLeistungen"><div id="leisContent"></div></div>
+  </div>
+
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-btn active" id="nHome"        onclick="switchTab('Home')">
+      <span class="nav-ico">🏠</span><span class="nav-lbl">Home</span>
+    </button>
+    <button class="nav-btn"        id="nFortschritt" onclick="switchTab('Fortschritt')">
+      <span class="nav-ico">📊</span><span class="nav-lbl">Fortschritt</span>
+    </button>
+    <button class="nav-btn"        id="nSimulator"   onclick="switchTab('Simulator')">
+      <span class="nav-ico">🎮</span><span class="nav-lbl">Simulator</span>
+    </button>
+    <button class="nav-btn"        id="nLeistungen"  onclick="switchTab('Leistungen')">
+      <span class="nav-ico">💼</span><span class="nav-lbl">Leistungen</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ════════════════ BOTTOM SHEET ════════════════ -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()">
+  <div class="sheet-box" onclick="event.stopPropagation()">
+    <div class="sheet-handle"></div>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════
+   CONSTANTS
+═══════════════════════════════════════════════════════════════ */
+const LS_STUDENTS = 'fahrschul_students';
+const LS_SESSION  = 'fahrschul_active_session';
+const LS_SLOTS    = 'fahrschul_simulator_slots';
+
+const SLOT_DEFS = [
+  { id: 's1', time: '08:00', end: '09:30' },
+  { id: 's2', time: '09:30', end: '11:00' },
+  { id: 's3', time: '11:00', end: '12:30' },
+  { id: 's4', time: '12:30', end: '14:00' },
+  { id: 's5', time: '14:00', end: '15:30' },
+  { id: 's6', time: '15:30', end: '17:00' },
+];
+
+const TOPICS_B = [
+  'Persönliche Voraussetzungen & Risikofaktor Mensch',
+  'Rechtliche Rahmenbedingungen (Führerschein, Versicherung)',
+  'Grundregeln, Verkehrszeichen & Verkehrseinrichtungen',
+  'Straßenverkehrssystem & seine Nutzung',
+  'Vorfahrt (Rechts vor Links, Kreisverkehr, Abknickende Vorfahrt)',
+  'Verkehrsregelungen & Bahnübergänge',
+  'Geschwindigkeit, Abstand & umweltschonende Fahrweise',
+  'Andere Teilnehmer im Straßenverkehr',
+  'Verkehrsverhalten bei Fahrmanövern (Abbiegen, Überholen)',
+  'Ruhender Verkehr (Halten, Parken)',
+  'Verhalten in besonderen Situationen (Panne, Unfall)',
+  'Lebenslanges Lernen & Probezeit',
+  'Klasse B – Technik, Beladung & Assistenzsysteme',
+  'Klasse B – Anhänger & umweltbewusster Umgang',
+];
+
+const TOPICS_DEFAULT = TOPICS_B.slice(0, 12);
+
+const LEISTUNGEN_LIST = [
+  { ico: '🚗', name: 'Führerscheinklassen', desc: 'Vollständige Ausbildung für alle Klassen – von Mofa über PKW bis LKW, Bus und Anhänger.' },
+  { ico: '♿', name: 'Handicap-Führerschein', desc: 'Spezialisierte Ausbildung für Fahrschüler mit körperlichen Einschränkungen auf Anfrage.' },
+  { ico: '🚛', name: 'Berufskraftfahrer', desc: 'Grundqualifikation und gesetzlich vorgeschriebene Weiterbildungsmodule für gewerbliche Fahrer.' },
+  { ico: '🚜', name: 'Staplerschein', desc: 'Flurförderzeug-Schulung nach DGUV-Richtlinien mit Theorie- und Praxisprüfung.' },
+  { ico: '🛑', name: 'ASF-Seminar', desc: 'Aufbauseminar für Fahranfänger in der 2-jährigen Probezeit – Pflicht nach schweren Verstößen.' },
+  { ico: '🍷', name: 'FES-Seminar', desc: 'Fahreignungsseminar zum Abbau von Punkten im Fahreignungsregister (Flensburg).' },
+  { ico: '☢️', name: 'Gefahrgutschulung ADR', desc: 'Spezialschulung für den sicheren Transport gefährlicher Güter im LKW-Bereich.' },
+  { ico: '🎮', name: 'Simulator-Ausbildung', desc: 'Gefahrlose erste Praxisschritte am modernen High-End-Fahrsimulator – ideal für den Einstieg.' },
+];
+
+const WEEKDAYS = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+/* ═══════════════════════════════════════════════════════════════
+   BUSINESS RULES (identical logic to dashboard.html)
+═══════════════════════════════════════════════════════════════ */
+function computeDOK(s) {
+  const d = s.dok;
+  if (d.passbild==='Verifiziert' && d.sehtest==='Verifiziert' && d.ersteHilfe==='Verifiziert' && d.tuevAntrag==='Genehmigt')
+    return { color:'green',   label:'DOK', desc:'Vollständig ✓' };
+  if (d.sehtest==='Beim Amt' || d.tuevAntrag==='Läuft')
+    return { color:'blue',    label:'DOK', desc:'Beim Amt/TÜV' };
+  if ([d.passbild, d.sehtest, d.ersteHilfe].some(v => v==='Eingereicht'))
+    return { color:'yellow',  label:'DOK', desc:'Wartet Büro' };
+  return   { color:'red',     label:'DOK', desc:'Fehlen' };
+}
+function computeFIN(s) {
+  const g = s.fin.guthaben_cent;
+  if (g < -10000) return { color:'red',    label:'FIN', desc:fmtEur(g)+' ⛔' };
+  if (g < 0)      return { color:'orange', label:'FIN', desc:fmtEur(g) };
+  return               { color:'green',  label:'FIN', desc:fmtEur(g) };
+}
+function computeTHE(s) {
+  const v = s.the.stundenBesucht.length, r = s.the.pflichtStunden;
+  if (v >= r)                  return { color:'green',  label:'THE', desc:`${v}/${r} ✓` };
+  if (v >= Math.ceil(r*.75))   return { color:'purple', label:'THE', desc:`${v}/${r} Vortest` };
+  if (v >= Math.ceil(r*.35))   return { color:'yellow', label:'THE', desc:`${v}/${r}` };
+  return                            { color:'red',    label:'THE', desc:`${v}/${r}` };
+}
+function computeTP(s) {
+  switch (s.tp.status) {
+    case 'Bestanden':        return { color:'green',   label:'TP', desc:'Bestanden ✓' };
+    case 'Nicht bestanden':  return { color:'darkred', label:'TP', desc:'Nicht best.' };
+    case 'Angemeldet':       return { color:'blue',    label:'TP', desc:'TÜV-Termin' };
+    case 'Warteliste':       return { color:'gray',    label:'TP', desc:'Warteliste' };
+    default:                 return { color:'gray',    label:'TP', desc:'Offen' };
+  }
+}
+function computePRAX(s) {
+  const p = s.prax;
+  if (!p.grundausbildungAbgeschlossen) return { color:'red',    label:'PRAX', desc:'Grundausb.' };
+  const allDone = p.ueberlandAbsolviert>=p.ueberlandPflicht && p.autobahnAbsolviert>=p.autobahnPflicht && p.nachtAbsolviert>=p.nachtPflicht;
+  if (!allDone) return { color:'yellow', label:'PRAX', desc:'Sonderfahrten' };
+  if (p.praktischePruefung==='Bestanden')      return { color:'green', label:'PRAX', desc:'Bestanden! 🏆' };
+  if (p.praktischePruefung==='Termin gebucht') return { color:'blue',  label:'PRAX', desc:'TÜV-Termin' };
+  return { color:'gray', label:'PRAX', desc:'Sucht Termin' };
+}
+function isExamReady(s) {
+  const prax = computePRAX(s);
+  return computeDOK(s).color==='green' && computeFIN(s).color==='green'
+      && computeTHE(s).color==='green' && computeTP(s).color==='green'
+      && (prax.color==='gray'||prax.color==='blue'||prax.color==='green');
+}
+function getActiveRules(s) {
+  const rules = [];
+  if (s.fin.guthaben_cent < -10000)
+    rules.push({ type:'red', text:'⛔ Finanz-Sperre aktiv — Fahrstunden-Buchung blockiert. Bitte begleiche deinen Rückstand von über 100 €.' });
+  if ((s.klasse==='B'||s.klasse==='B197') && s.prax.simulatorErledigt < 3)
+    rules.push({ type:'orange', text:`⚠️ Simulator-Pflicht — Erst ${s.prax.simulatorErledigt} von 3 Einheiten absolviert. Buche jetzt deinen nächsten Simulator-Slot!` });
+  if (!s.prax.grundausbildungAbgeschlossen)
+    rules.push({ type:'orange', text:'⚠️ Sonderfahrten gesperrt — Grundausbildung noch nicht vom Fahrlehrer freigegeben.' });
+  if (s.vorbesitz)
+    rules.push({ type:'info', text:'ℹ️ Vorbesitz erkannt — Deine Theorie-Pflichtstunden wurden von 12 auf 6 reduziert (Regelwerk §1).' });
+  return rules;
+}
+function fmtEur(c) { return `${c<0?'−':'+'}${(Math.abs(c)/100).toFixed(2)} €`; }
+function initials(name) { return name.trim().split(/\s+/).map(p=>p[0]).join('').toUpperCase().slice(0,2); }
+
+/* ═══════════════════════════════════════════════════════════════
+   STORAGE
+═══════════════════════════════════════════════════════════════ */
+const getStudents  = () => { try { return JSON.parse(localStorage.getItem(LS_STUDENTS)||'[]'); } catch { return []; } };
+const saveStudents = (a) => localStorage.setItem(LS_STUDENTS, JSON.stringify(a));
+const getSession   = () => { try { return JSON.parse(localStorage.getItem(LS_SESSION)||'null'); } catch { return null; } };
+const saveSession  = (s) => localStorage.setItem(LS_SESSION, JSON.stringify(s));
+const clearSession = ()  => localStorage.removeItem(LS_SESSION);
+const getSlots     = () => { try { return JSON.parse(localStorage.getItem(LS_SLOTS)||'{}'); } catch { return {}; } };
+const saveSlots    = (o) => localStorage.setItem(LS_SLOTS, JSON.stringify(o));
+
+function getCurrentStudent() {
+  const sess = getSession();
+  return sess ? getStudents().find(s => s.id === sess.id) || null : null;
+}
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PIN
+═══════════════════════════════════════════════════════════════ */
+function hashPin(pin) {
+  let h = 5381;
+  for (let i = 0; i < pin.length; i++) h = (h * 33) ^ pin.charCodeAt(i);
+  return (h >>> 0).toString(36);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   AUTH
+═══════════════════════════════════════════════════════════════ */
+let vorbesitzOn = false;
+
+function toggleVorbesitz() {
+  vorbesitzOn = !vorbesitzOn;
+  document.getElementById('rVorbesitz').classList.toggle('on', vorbesitzOn);
+}
+
+function showAuth(which) {
+  document.querySelectorAll('.auth-screen, .app-screen').forEach(el => el.classList.remove('active'));
+  if (which === 'register') {
+    document.getElementById('screenReg').classList.add('active');
+    document.getElementById('bottomNav').classList.remove('show');
+  } else if (which === 'login') {
+    const names = getStudents().map(s => `<option value="${s.name}">`).join('');
+    document.getElementById('nameHints').innerHTML = names;
+    document.getElementById('screenLogin').classList.add('active');
+    document.getElementById('bottomNav').classList.remove('show');
+  } else if (which === 'app') {
+    document.getElementById('screenApp').classList.add('active');
+    document.getElementById('bottomNav').classList.add('show');
+    renderAll();
+  }
+}
+
+function doRegister() {
+  const name  = document.getElementById('rName').value.trim();
+  const geb   = document.getElementById('rGeb').value;
+  const kl    = document.getElementById('rKlasse').value;
+  const pin   = document.getElementById('rPin').value;
+  const pin2  = document.getElementById('rPin2').value;
+  const errEl = document.getElementById('regErr');
+  const err   = (m) => { errEl.textContent = m; errEl.classList.add('show'); };
+  errEl.classList.remove('show');
+
+  if (!name)              return err('Bitte gib deinen vollständigen Namen ein.');
+  if (!geb)               return err('Bitte gib dein Geburtsdatum ein.');
+  if (!kl)                return err('Bitte wähle deine Ausbildungsklasse.');
+  if (!/^\d{4}$/.test(pin)) return err('Die PIN muss genau 4 Ziffern enthalten.');
+  if (pin !== pin2)       return err('Die PINs stimmen nicht überein.');
+
+  const students = getStudents();
+  if (students.find(s => s.name.toLowerCase() === name.toLowerCase()))
+    return err('Ein Konto mit diesem Namen existiert bereits. Bitte einloggen.');
+
+  const [y, m, d] = geb.split('-');
+  const id = `SCH-${Date.now()}`;
+  const pflicht = vorbesitzOn ? 6 : 12;
+
+  const newS = {
+    id, name,
+    geburtsdatum: `${d}.${m}.${y}`,
+    klasse: kl, vorbesitz: vorbesitzOn,
+    ausbildungsTyp: kl==='B197' ? 'B197' : 'Schaltung',
+    daysInSystem: 0, lastActivity: 0,
+    registeredAt: new Date().toISOString(),
+    pin_hash: hashPin(pin),
+    dok: { passbild:'Fehlt', sehtest:'Fehlt', ersteHilfe:'Fehlt', tuevAntrag:'Nicht gestellt' },
+    fin: { guthaben_cent: 0, offeneRechnungen: [] },
+    the: { stundenBesucht: [], pflichtStunden: pflicht },
+    tp:  { status: 'Nicht angemeldet' },
+    prax: {
+      simulatorErledigt: 0, grundausbildungAbgeschlossen: false,
+      ueberlandAbsolviert: 0, ueberlandPflicht: 5,
+      autobahnAbsolviert:  0, autobahnPflicht:  4,
+      nachtAbsolviert:     0, nachtPflicht:     3,
+      praktischePruefung: 'Offen'
+    }
+  };
+
+  students.push(newS);
+  saveStudents(students);
+  saveSession({ id, name, pinHash: hashPin(pin) });
+  showAuth('app');
+}
+
+function doLogin() {
+  const name  = document.getElementById('lName').value.trim();
+  const pin   = document.getElementById('lPin').value;
+  const errEl = document.getElementById('loginErr');
+  const err   = (m) => { errEl.textContent = m; errEl.classList.add('show'); };
+  errEl.classList.remove('show');
+
+  if (!name) return err('Bitte gib deinen Namen ein.');
+  if (!pin)  return err('Bitte gib deine PIN ein.');
+
+  const found = getStudents().find(s => s.name.toLowerCase() === name.toLowerCase());
+  if (!found)                        return err('Kein Konto mit diesem Namen gefunden. Bitte registrieren.');
+  if (found.pin_hash !== hashPin(pin)) return err('Falsche PIN. Bitte versuche es erneut.');
+
+  saveSession({ id: found.id, name: found.name, pinHash: found.pin_hash });
+  showAuth('app');
+}
+
+function doLogout() {
+  clearSession();
+  closeSheet();
+  showAuth('login');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════════════════════ */
+let activeTab = 'Home';
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('t' + tab).classList.add('active');
+  document.getElementById('n' + tab).classList.add('active');
+  activeTab = tab;
+  if (tab === 'Simulator') renderSim();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDER ALL
+═══════════════════════════════════════════════════════════════ */
+function renderAll() {
+  const s = getCurrentStudent();
+  if (!s) { doLogout(); return; }
+  document.getElementById('hdrAvatar').textContent = initials(s.name);
+  document.getElementById('hdrSub').textContent = `Klasse ${s.klasse}`;
+  renderHome(s);
+  renderFortschritt(s);
+  renderLeistungen();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   HOME TAB
+═══════════════════════════════════════════════════════════════ */
+function renderHome(s) {
+  const dok   = computeDOK(s), fin  = computeFIN(s),  the  = computeTHE(s);
+  const tp    = computeTP(s),  prax = computePRAX(s);
+  const ready = isExamReady(s);
+  const rules = getActiveRules(s);
+
+  const enrolled = s.registeredAt
+    ? new Date(s.registeredAt).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })
+    : '–';
+
+  const TILE_ICONS = { DOK:'📂', FIN:'💳', THE:'📚', TP:'📝', PRAX:'🏎️' };
+  const tiles = [
+    { k:'DOK', d:dok }, { k:'FIN', d:fin }, { k:'THE', d:the },
+    { k:'TP',  d:tp  }, { k:'PRAX', d:prax },
+  ];
+
+  // Next booked simulator slot today
+  const todaySlots = getSlots()[dateKey(new Date())] || {};
+  const mySlot     = SLOT_DEFS.find(sl => todaySlots[sl.id] === s.id);
+  const nextHtml   = mySlot
+    ? `<div class="cntd-card">
+        <div class="cntd-icon">📅</div>
+        <div>
+          <div class="cntd-lbl">Nächste Simulator-Session</div>
+          <div class="cntd-val">Heute · ${mySlot.time}–${mySlot.end}</div>
+          <div class="cntd-sub">90 Minuten · Fahrsimulator</div>
+        </div>
+      </div>` : '';
+
+  const finCta = (fin.color === 'red' || fin.color === 'orange')
+    ? `<div class="fin-cta">
+        <div>
+          <div class="fin-cta-lbl">Offener Betrag</div>
+          <div class="fin-cta-sub">${fin.desc}</div>
+        </div>
+        <button class="fin-cta-btn" onclick="toast('💳 Online-Zahlung wird bald verfügbar.')">Begleichen</button>
+      </div>` : '';
+
+  document.getElementById('homeContent').innerHTML = `
+    <div class="welcome-card">
+      <div class="wc-greet">Hallo,</div>
+      <div class="wc-name">${s.name}</div>
+      <div class="wc-meta">Angemeldet seit ${enrolled}</div>
+      <div class="wc-badge">Klasse ${s.klasse}${s.vorbesitz ? ' · Vorbesitz' : ''}</div>
+    </div>
+
+    <div class="tiles-row">
+      ${tiles.map(t =>
+        `<div class="s-tile t-${t.d.color}" onclick="openTileSheet('${t.k}')">
+          <div class="s-tile-ico">${TILE_ICONS[t.k]}</div>
+          <div class="s-tile-lbl">${t.k}</div>
+          <div class="s-tile-val">${t.d.desc.split(' ')[0]}</div>
+        </div>`).join('')}
+    </div>
+
+    ${rules.map(r => `<div class="rule-alert ${r.type}">${r.text}</div>`).join('')}
+    ${finCta}
+    ${nextHtml}
+
+    <div class="pruef-card ${ready ? 'ready' : 'locked'}">
+      <div class="pruef-ico">${ready ? '🏆' : '🔒'}</div>
+      <div class="pruef-title">${ready ? 'Prüfungs-Ready!' : 'Prüfungsfreigabe gesperrt'}</div>
+      <div class="pruef-sub">${ready
+        ? 'Alle Bedingungen erfüllt! Das Büro kann dich jetzt zur Praxisprüfung offiziell zulassen.'
+        : 'Alle 5 Status-Kacheln müssen grün sein, damit die finale Freigabe erteilt werden kann.'}</div>
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FORTSCHRITT TAB
+═══════════════════════════════════════════════════════════════ */
+function renderFortschritt(s) {
+  const the  = computeTHE(s);
+  const p    = s.prax;
+  const v    = s.the.stundenBesucht.length, r = s.the.pflichtStunden;
+  const pct  = Math.min(100, Math.round(v / r * 100));
+
+  // Topic list
+  const topics = (TOPICS_B.slice(0, r));
+
+  // Simulator ring
+  const simPct    = Math.min(100, Math.round(p.simulatorErledigt / 3 * 100));
+  const circumf   = 2 * Math.PI * 26;
+  const dashOff   = circumf - (simPct / 100 * circumf);
+  const simColor  = p.simulatorErledigt >= 3 ? '#22C55E' : '#3B82F6';
+
+  // Sonderfahrten
+  const sonders = [
+    { ico:'🏔️', name:'Überland',  done: p.ueberlandAbsolviert, req: p.ueberlandPflicht },
+    { ico:'🛣️', name:'Autobahn',  done: p.autobahnAbsolviert,  req: p.autobahnPflicht  },
+    { ico:'🌌', name:'Nachtfahrt', done: p.nachtAbsolviert,     req: p.nachtPflicht     },
+  ];
+  const sfLocked = !p.grundausbildungAbgeschlossen;
+
+  const tpMap = {
+    'Nicht angemeldet': '○ Noch nicht angemeldet',
+    'Warteliste':       '⏳ Auf der Warteliste',
+    'Angemeldet':       '📋 TÜV-Termin gebucht',
+    'Bestanden':        '✅ Bestanden',
+    'Nicht bestanden':  '❌ Nicht bestanden – Nachschulung',
+  };
+
+  document.getElementById('fortContent').innerHTML = `
+
+    <div class="card">
+      <div class="card-title">📚 Theorie-Fortschritt</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:6px;">
+        <span style="color:var(--text-muted);font-weight:500;">${v} von ${r} Lektionen</span>
+        <span style="font-weight:800;color:var(--${the.color}-text)">${pct}%</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:${s.vorbesitz?'8px':'12px'};">
+        <div class="prog-wrap"><div class="prog-fill pf-${the.color}" style="width:${pct}%"></div></div>
+      </div>
+      ${s.vorbesitz ? '<div style="font-size:11px;color:var(--purple-text);margin-bottom:10px;">ℹ Vorbesitz aktiv – Pflicht auf 6 Std. reduziert (§1)</div>' : ''}
+      ${topics.map((t, i) => {
+        const done = s.the.stundenBesucht.includes(i + 1);
+        return `<div class="topic-row">
+          <div class="topic-chk ${done?'done':'open'}">${done?'✓':''}</div>
+          <div class="topic-txt ${done?'done':''}"><strong>L${i+1}</strong> – ${t}</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="card">
+      <div class="card-title">📝 Theorieprüfung</div>
+      <div class="d-row" style="border:none;padding:4px 0;">
+        <span class="d-row-lbl">Aktueller Status</span>
+        <span class="d-row-val">${tpMap[s.tp.status] || s.tp.status}</span>
+      </div>
+      ${s.tp.status === 'Nicht angemeldet' && v >= r
+        ? `<button class="btn-primary" style="margin-top:10px;" onclick="toast('📋 Bitte wende dich ans Büro zur Prüfungsanmeldung.')">Zur Prüfung anmelden</button>`
+        : ''}
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎮 Simulator</div>
+      <div class="sim-wrap">
+        <svg width="64" height="64" viewBox="0 0 64 64" style="flex-shrink:0;">
+          <circle cx="32" cy="32" r="26" fill="none" stroke="var(--surface-2)" stroke-width="7"/>
+          <circle cx="32" cy="32" r="26" fill="none"
+            stroke="${simColor}" stroke-width="7" stroke-linecap="round"
+            stroke-dasharray="${circumf.toFixed(2)}"
+            stroke-dashoffset="${dashOff.toFixed(2)}"
+            transform="rotate(-90 32 32)" style="transition:stroke-dashoffset .5s;"/>
+          <text x="32" y="37" text-anchor="middle" font-size="15" font-weight="800" fill="var(--text)">${p.simulatorErledigt}</text>
+        </svg>
+        <div>
+          <div class="sim-lbl">${p.simulatorErledigt}/3 Einheiten absolviert</div>
+          <div class="sim-sub">${p.simulatorErledigt >= 3
+            ? '✅ Simulator-Pflicht erfüllt. Echtfahrten freigeschaltet!'
+            : `Noch ${3 - p.simulatorErledigt} Einheit(en) bis zur Freischaltung echter Fahrstunden (§2).`}</div>
+          ${p.simulatorErledigt < 3
+            ? `<button class="sim-cta" onclick="switchTab('Simulator')">Jetzt buchen →</button>` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🏎️ Sonderfahrten</div>
+      ${sfLocked ? `<div class="rule-alert orange" style="margin-bottom:10px;">⚠️ Noch gesperrt – Grundausbildung muss erst abgeschlossen werden.</div>` : ''}
+      ${sonders.map(sf => {
+        const done = sf.done >= sf.req;
+        const sfPct = Math.min(100, Math.round(sf.done / sf.req * 100));
+        return `<div class="sf-item">
+          <div class="sf-icon">${sf.ico}</div>
+          <div class="sf-info">
+            <div class="sf-name">${sf.name}</div>
+            <div class="sf-prog-row">
+              <div class="prog-wrap"><div class="prog-fill ${done?'pf-green':sfLocked?'pf-gray':'pf-yellow'}" style="width:${sfLocked?0:sfPct}%"></div></div>
+              <span style="font-size:11px;font-weight:700;color:var(--text-muted);white-space:nowrap;">${sf.done}/${sf.req}</span>
+            </div>
+          </div>
+          <div class="sf-badge ${done?'sf-done':sfLocked?'sf-lock':'sf-prog'}">${done?'✓':sfLocked?'🔒':`${sf.done}/${sf.req}`}</div>
+        </div>`;
+      }).join('')}
+      <div class="d-row" style="margin-top:6px;">
+        <span class="d-row-lbl">Grundausbildung</span>
+        <span class="d-row-val" style="color:${p.grundausbildungAbgeschlossen?'var(--green-text)':'var(--red-text)'}">
+          ${p.grundausbildungAbgeschlossen ? '✅ Abgeschlossen' : '⏳ Noch offen'}
+        </span>
+      </div>
+      <div class="d-row">
+        <span class="d-row-lbl">Praxisprüfung</span>
+        <span class="d-row-val">${p.praktischePruefung}</span>
+      </div>
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SIMULATOR TAB
+═══════════════════════════════════════════════════════════════ */
+let selDate = new Date();
+
+function renderSim() {
+  const s = getCurrentStudent();
+  if (!s) return;
+
+  if (s.fin.guthaben_cent < -10000) {
+    document.getElementById('simContent').innerHTML = `
+      <div class="lock-box">
+        <div class="lock-box-ico">⛔</div>
+        <div class="lock-box-title">Buchung gesperrt</div>
+        <div class="lock-box-sub">Dein Konto weist einen Rückstand von über 100 € auf. Bitte begleiche deinen Saldo, um wieder Slots buchen zu können.</div>
+      </div>`;
+    return;
+  }
+
+  const today   = new Date();
+  const slots   = getSlots();
+  const dk      = dateKey(selDate);
+  const dayData = slots[dk] || {};
+
+  let weekHtml = '';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    const active = dateKey(d) === dk;
+    weekHtml += `<div class="day-pill${active?' active':''}" onclick="pickDay(${i})">
+      <div class="dp-name">${WEEKDAYS[d.getDay()]}</div>
+      <div class="dp-num">${d.getDate()}</div>
+    </div>`;
+  }
+
+  const slotsHtml = SLOT_DEFS.map(sl => {
+    const booked = dayData[sl.id];
+    const mine   = booked === s.id;
+    const taken  = booked && !mine;
+    return `<div class="slot-row${mine?' mine':taken?' taken':''}" onclick="${taken?'':(`bookSlot('${sl.id}')`)}">
+      <div class="slot-t-wrap">
+        <div class="slot-time">${sl.time}</div>
+        <div class="slot-dur">90 min</div>
+      </div>
+      <div class="slot-div"></div>
+      <div class="slot-info">
+        <div class="slot-lbl">${mine?'✅ Meine Buchung':taken?'Belegt':'Simulator-Slot'}</div>
+        <div class="slot-sub">${mine?'Tippe zum Stornieren':taken?'Von anderem Schüler belegt':'Tippe zum Reservieren'}</div>
+      </div>
+      <div class="slot-badge ${mine?'sb-mine':taken?'sb-take':'sb-free'}">${mine?'Gebucht':taken?'Belegt':'Frei'}</div>
+    </div>`;
+  }).join('');
+
+  const dStr = selDate.toLocaleDateString('de-DE', { weekday:'long', day:'2-digit', month:'long' });
+
+  document.getElementById('simContent').innerHTML = `
+    <div class="card" style="padding:12px 12px 8px;">
+      <div class="week-strip">${weekHtml}</div>
+    </div>
+    <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin:12px 2px 8px;">${dStr}</div>
+    ${slotsHtml}
+    <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:14px;line-height:1.6;">
+      Jede Session dauert 90 Minuten. Eine absolvierte Simulator-Session zählt auf deinen Fortschritt an.
+    </div>
+  `;
+}
+
+function pickDay(offset) {
+  selDate = new Date(); selDate.setDate(selDate.getDate() + offset);
+  renderSim();
+}
+
+function bookSlot(slotId) {
+  const s = getCurrentStudent(); if (!s) return;
+  const dk       = dateKey(selDate);
+  const slots    = getSlots();
+  const dayData  = slots[dk] || {};
+  const students = getStudents();
+  const idx      = students.findIndex(x => x.id === s.id);
+
+  if (dayData[slotId] === s.id) {
+    // Cancel
+    delete dayData[slotId];
+    slots[dk] = dayData; saveSlots(slots);
+    if (idx >= 0 && students[idx].prax.simulatorErledigt > 0) {
+      students[idx].prax.simulatorErledigt--;
+      saveStudents(students);
+    }
+    toast('📅 Buchung storniert.');
+  } else if (!dayData[slotId]) {
+    // Book
+    dayData[slotId] = s.id;
+    slots[dk] = dayData; saveSlots(slots);
+    if (idx >= 0) {
+      students[idx].prax.simulatorErledigt = Math.min(6, students[idx].prax.simulatorErledigt + 1);
+      saveStudents(students);
+    }
+    toast('🎮 Simulator-Slot erfolgreich gebucht!');
+  }
+
+  renderSim();
+  const updated = getCurrentStudent();
+  if (updated) { renderHome(updated); renderFortschritt(updated); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LEISTUNGEN TAB
+═══════════════════════════════════════════════════════════════ */
+function renderLeistungen() {
+  document.getElementById('leisContent').innerHTML = `
+    <div style="font-size:22px;font-weight:800;letter-spacing:-0.5px;margin-bottom:4px;">Unsere Leistungen</div>
+    <div style="font-size:14px;color:var(--text-muted);margin-bottom:18px;">Alles aus einer Hand – deine Fahrschule.</div>
+    ${LEISTUNGEN_LIST.map(l => `
+      <div class="leis-card">
+        <div class="leis-ico">${l.ico}</div>
+        <div>
+          <div class="leis-name">${l.name}</div>
+          <div class="leis-desc">${l.desc}</div>
+        </div>
+      </div>`).join('')}
+    <div style="margin-top:14px;">
+      <button class="logout-btn" onclick="toast('📞 Bitte kontaktiere uns direkt für eine persönliche Beratung.')">Beratungstermin anfragen</button>
+    </div>
+  `;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BOTTOM SHEETS
+═══════════════════════════════════════════════════════════════ */
+function openTileSheet(key) {
+  const s = getCurrentStudent(); if (!s) return;
+  const dok  = computeDOK(s), fin  = computeFIN(s), the  = computeTHE(s);
+  const tp   = computeTP(s),  prax = computePRAX(s);
+  const HEADS = { DOK:'📂 Dokumente', FIN:'💳 Finanzen', THE:'📚 Theorie', TP:'📝 Theorieprüfung', PRAX:'🏎️ Praxis' };
+
+  let body = '';
+  if (key === 'DOK') {
+    const col = (v) => v==='Verifiziert'||v==='Genehmigt' ? 'var(--green-text)' : v==='Eingereicht'||v==='Läuft' ? 'var(--yellow-text)' : v==='Beim Amt' ? 'var(--blue-text)' : 'var(--red-text)';
+    body = `
+      <div class="d-row"><span class="d-row-lbl">Passbild</span>    <span class="d-row-val" style="color:${col(s.dok.passbild)}">${s.dok.passbild}</span></div>
+      <div class="d-row"><span class="d-row-lbl">Sehtest</span>     <span class="d-row-val" style="color:${col(s.dok.sehtest)}">${s.dok.sehtest}</span></div>
+      <div class="d-row"><span class="d-row-lbl">Erste Hilfe</span> <span class="d-row-val" style="color:${col(s.dok.ersteHilfe)}">${s.dok.ersteHilfe}</span></div>
+      <div class="d-row"><span class="d-row-lbl">TÜV-Antrag</span>  <span class="d-row-val" style="color:${col(s.dok.tuevAntrag)}">${s.dok.tuevAntrag}</span></div>
+      <p style="margin-top:10px;font-size:12px;color:var(--text-muted);line-height:1.6;">Fehlende Unterlagen werden vom Büro bei dir angefragt. Bringe Originale zum nächsten Besuch mit.</p>`;
+  } else if (key === 'FIN') {
+    body = `
+      <div class="d-row"><span class="d-row-lbl">Kontostand</span>      <span class="d-row-val" style="color:var(--${fin.color}-text)">${fin.desc}</span></div>
+      <div class="d-row"><span class="d-row-lbl">Offene Posten</span>   <span class="d-row-val">${s.fin.offeneRechnungen.length}</span></div>
+      ${s.fin.offeneRechnungen.map(r => `<div class="d-row" style="padding:5px 0;"><span class="d-row-lbl" style="font-size:11px;">↳ ${r}</span><span style="color:var(--red-text);font-size:11px;font-weight:700;">Offen</span></div>`).join('')}
+      ${fin.color!=='green' ? `<button class="btn-primary" style="margin-top:10px;" onclick="toast('💳 Online-Zahlung wird bald verfügbar.')">Jetzt begleichen</button>` : ''}`;
+  } else if (key === 'THE') {
+    const pct = Math.min(100, Math.round(s.the.stundenBesucht.length / s.the.pflichtStunden * 100));
+    body = `
+      <div class="d-row"><span class="d-row-lbl">Absolviert</span><span class="d-row-val">${s.the.stundenBesucht.length} / ${s.the.pflichtStunden}</span></div>
+      <div style="display:flex;align-items:center;gap:8px;margin:8px 0;">
+        <div class="prog-wrap"><div class="prog-fill pf-${the.color}" style="width:${pct}%"></div></div>
+        <span style="font-size:12px;font-weight:800;color:var(--${the.color}-text)">${pct}%</span>
+      </div>
+      ${s.vorbesitz ? '<p style="font-size:12px;color:var(--purple-text);">ℹ Vorbesitz: Pflichtstunden auf 6 reduziert (§1)</p>' : ''}`;
+  } else if (key === 'TP') {
+    body = `
+      <div class="d-row"><span class="d-row-lbl">Status</span><span class="d-row-val">${s.tp.status}</span></div>
+      <p style="margin-top:10px;font-size:12px;color:var(--text-muted);line-height:1.6;">Die Anmeldung zur Theorieprüfung erfolgt über das Büro, sobald alle Pflichtlektionen absolviert sind.</p>`;
+  } else if (key === 'PRAX') {
+    const p = s.prax;
+    body = `
+      <div class="d-row"><span class="d-row-lbl">Simulator</span>        <span class="d-row-val" style="color:${p.simulatorErledigt>=3?'var(--green-text)':'var(--orange-text)'}">${p.simulatorErledigt}/3 Std.</span></div>
+      <div class="d-row"><span class="d-row-lbl">Grundausbildung</span>  <span class="d-row-val" style="color:${p.grundausbildungAbgeschlossen?'var(--green-text)':'var(--red-text)'}">${p.grundausbildungAbgeschlossen?'✅ Abgeschlossen':'⏳ Noch offen'}</span></div>
+      <div class="d-row"><span class="d-row-lbl">🏔️ Überland</span>      <span class="d-row-val">${p.ueberlandAbsolviert}/${p.ueberlandPflicht}</span></div>
+      <div class="d-row"><span class="d-row-lbl">🛣️ Autobahn</span>      <span class="d-row-val">${p.autobahnAbsolviert}/${p.autobahnPflicht}</span></div>
+      <div class="d-row"><span class="d-row-lbl">🌌 Nacht</span>         <span class="d-row-val">${p.nachtAbsolviert}/${p.nachtPflicht}</span></div>
+      <div class="d-row"><span class="d-row-lbl">Prakt. Prüfung</span>   <span class="d-row-val">${p.praktischePruefung}</span></div>`;
+  }
+
+  document.getElementById('sheetBody').innerHTML = `<div class="sheet-title">${HEADS[key]}</div>${body}`;
+  document.getElementById('sheetOverlay').classList.add('open');
+}
+
+function openAccountSheet() {
+  const s = getCurrentStudent(); if (!s) return;
+  document.getElementById('sheetBody').innerHTML = `
+    <div class="sheet-title">Mein Konto</div>
+    <div class="d-row"><span class="d-row-lbl">Name</span>         <span class="d-row-val">${s.name}</span></div>
+    <div class="d-row"><span class="d-row-lbl">Klasse</span>       <span class="d-row-val">${s.klasse}</span></div>
+    <div class="d-row"><span class="d-row-lbl">Geburtsdatum</span> <span class="d-row-val">${s.geburtsdatum}</span></div>
+    <div class="d-row" style="border:none;"><span class="d-row-lbl">Schüler-ID</span> <span class="d-row-val" style="font-family:monospace;font-size:12px;">${s.id}</span></div>
+    <div style="margin-top:6px;">
+      <button class="logout-btn" onclick="toast('💡 Zum Ändern der PIN bitte das Büro kontaktieren.')">PIN ändern</button>
+      <button class="logout-btn danger" onclick="doLogout()">Ausloggen</button>
+    </div>
+  `;
+  document.getElementById('sheetOverlay').classList.add('open');
+}
+
+function closeSheet() {
+  document.getElementById('sheetOverlay').classList.remove('open');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════════ */
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3800);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   REAL-TIME SYNC (when admin changes data in other tab)
+═══════════════════════════════════════════════════════════════ */
+window.addEventListener('storage', function(e) {
+  if (e.key !== LS_STUDENTS) return;
+  const s = getCurrentStudent();
+  if (!s) return;
+  if (activeTab === 'Home')        renderHome(s);
+  if (activeTab === 'Fortschritt') renderFortschritt(s);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════ */
+(function init() {
+  const sess = getSession();
+  if (sess) {
+    const s = getStudents().find(x => x.id === sess.id);
+    if (s) { showAuth('app'); return; }
+  }
+  showAuth(getStudents().length > 0 ? 'login' : 'register');
+})();
+</script>
+</body>
+</html>

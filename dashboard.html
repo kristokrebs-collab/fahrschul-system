@@ -573,6 +573,25 @@
 /* ═══════════════════════════════════════════════════════════════════════
    DATEN-STATE
 ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   LOCALSTORAGE BRIDGE (shared state with student PWA)
+═══════════════════════════════════════════════════════════════════════ */
+const LS_STUDENTS = 'fahrschul_students';
+
+function persistStudents() {
+  try { localStorage.setItem(LS_STUDENTS, JSON.stringify(students)); } catch(e) {}
+}
+
+function mergeFromStorage() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LS_STUDENTS) || '[]');
+    stored.forEach(ss => {
+      const idx = students.findIndex(s => s.id === ss.id);
+      if (idx === -1) students.push(ss);
+    });
+  } catch(e) {}
+}
+
 const students = [
   {
     id: 'SCH-001',
@@ -1111,6 +1130,7 @@ function saveModal() {
   }
 
   closeModal();
+  persistStudents();
   applyFilters();
   if (selectedId) selectStudent(selectedId);
   toast(`🔒 Konfiguration für ${s.name} systemweit synchronisiert.`);
@@ -1161,6 +1181,19 @@ function toast(msg) {
 ═══════════════════════════════════════════════════════════════════════ */
 document.getElementById('currentDate').textContent =
   new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+
+// Merge PWA-registered students on load
+mergeFromStorage();
+persistStudents();
+
+// React to new students registered via PWA in other tabs
+window.addEventListener('storage', function(e) {
+  if (e.key === LS_STUDENTS) {
+    mergeFromStorage();
+    applyFilters();
+    if (selectedId) selectStudent(selectedId);
+  }
+});
 
 applyFilters();
 </script>
