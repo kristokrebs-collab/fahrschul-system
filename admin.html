@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Büro-Zentrale · Fahrschul-Cockpit</title>
+  <meta name="theme-color" content="#060813">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <style>
+    body { user-select: text; }
+    .admin { max-width: 1180px; margin: 0 auto; padding: 22px 22px 60px; }
+    .admin-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; align-items: start; }
+    @media (max-width: 880px){ .admin-grid { grid-template-columns: 1fr; } }
+    .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); animation: blink 1.6s ease-in-out infinite; }
+    @keyframes blink { 50% { opacity: .35; } }
+    .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+    @media (max-width: 620px){ .stat-grid { grid-template-columns: repeat(2,1fr); } }
+    .feed-item { display: flex; gap: 11px; padding: 11px 0; border-top: 1px solid var(--border); animation: viewIn .4s var(--ease) both; }
+    .toggle { width: 44px; height: 26px; border-radius: 99px; background: rgba(255,255,255,.1); position: relative; cursor: pointer; transition: background .3s; flex-shrink: 0; border: none; }
+    .toggle.on { background: var(--green); }
+    .toggle::after { content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition: transform .3s var(--spring); }
+    .toggle.on::after { transform: translateX(18px); }
+  </style>
+</head>
+<body>
+  <div class="admin" id="admin"></div>
+  <script type="module" src="assets/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "Fahrschul-Cockpit",
+  "short_name": "Cockpit",
+  "description": "Dein persönliches High-End Fahrschul-Cockpit – Termine, Theorie & Fortschritt.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#060813",
+  "theme_color": "#060813",
+  "categories": ["education", "productivity"],
+  "lang": "de",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Theorie buchen", "url": "./index.html", "description": "Theorie-Doppelstunde buchen" },
+    { "name": "Büro-Zentrale", "url": "./admin.html", "description": "Admin-Echtzeitansicht" }
+  ]
+}
