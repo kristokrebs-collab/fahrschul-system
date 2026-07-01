@@ -1,0 +1,30 @@
+FAHRSCHUL-COCKPIT · LOKAL STARTEN
+==================================
+
+1. Diese ZIP-Datei entpacken (Rechtsklick → "Alle extrahieren" / "Entpacken").
+
+2. Je nach Betriebssystem eine Datei per DOPPELKLICK öffnen:
+
+   Windows  →  start-windows.bat
+   Mac      →  start-mac.command
+                (Falls macOS eine Sicherheitswarnung zeigt: Rechtsklick auf
+                 die Datei → "Öffnen" → im Dialog nochmal "Öffnen" bestätigen.)
+   Linux    →  start-linux.sh
+                (Öffnet sich nur ein Texteditor? Dann ein Terminal in diesem
+                 Ordner öffnen und eingeben: bash start-linux.sh)
+
+3. Es öffnet sich automatisch ein Fenster/Tab im Browser mit der App
+   (http://localhost:8099/index.html).
+
+4. Für die Büro-Zentrale (Admin-Ansicht) im selben Browser einen ZWEITEN
+   Tab öffnen und dort aufrufen: http://localhost:8099/admin.html
+   → Aktionen im Admin-Tab erscheinen dann in Echtzeit im PWA-Tab.
+
+5. Zum Beenden: das schwarze Fenster/Terminal, das sich mit geöffnet hat,
+   einfach schließen.
+
+Voraussetzung: Python 3 muss installiert sein (auf macOS meist schon
+vorhanden; für Windows kostenlos unter python.org, beim Installieren
+"Add Python to PATH" anhaken).
+
+Bei Problemen einfach Bescheid geben.
