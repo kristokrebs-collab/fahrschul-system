@@ -771,8 +771,8 @@ svg.lci{width:18px;height:18px;flex:0 0 auto;}
 @keyframes screenIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 
 /* Scroll-Animate-on-Reveal: Sektionen erscheinen beim Hereinscrollen */
-.reveal{opacity:0;transform:translate3d(0,26px,0);transition:opacity .8s var(--ease-out),transform .8s var(--ease-out);will-change:opacity,transform;}
-.reveal.revealed{opacity:1;transform:translate3d(0,0,0);}
+.reveal{opacity:0;transform:translate3d(0,26px,0) scale(.985);transition:opacity .8s var(--ease-out),transform .8s var(--ease-out);will-change:opacity,transform;}
+.reveal.revealed{opacity:1;transform:translate3d(0,0,0) scale(1);}
 
 /* ---------- Topbar & Branding ---------- */
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;}
@@ -1244,6 +1244,45 @@ input.txt:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accen
 .ki-chips{display:flex;flex-wrap:wrap;gap:8px;}
 .klasse-cta{margin-top:auto;padding:15px;font-size:14px;border-radius:14px;}
 
+/* Ausbildungsart: Ersterwerb / Erweiterung */
+.besitz-row{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+.besitz-tile{
+  position:relative;overflow:hidden;text-align:left;padding:13px 14px;border-radius:var(--radius-sm);
+  border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text);
+  font-family:inherit;cursor:pointer;transition:var(--spring-soft),border-color .25s,background .25s,opacity .25s;
+  display:flex;align-items:flex-start;gap:11px;
+}
+.besitz-tile:hover{transform:scale(1.02);border-color:var(--text-faint);}
+.besitz-tile:active{transform:scale(.98);}
+.besitz-tile .bic{width:32px;height:32px;border-radius:10px;background:var(--surface-3);border:1px solid var(--border);display:grid;place-items:center;flex:0 0 32px;transition:background .25s,border-color .25s;}
+.besitz-tile .bic svg{width:16px;height:16px;color:var(--text-dim);transition:color .25s;}
+.besitz-tile .bt-t{font-size:13px;font-weight:800;letter-spacing:-.01em;}
+.besitz-tile .bt-s{font-size:10.5px;color:var(--text-faint);margin-top:2px;line-height:1.4;}
+.besitz-tile.selected{background:var(--accent-soft);border-color:var(--accent);}
+.besitz-tile.selected .bic{background:rgba(225,29,72,.16);border-color:var(--accent-line);}
+.besitz-tile.selected .bic svg{color:var(--accent-hi);}
+.besitz-tile.disabled{opacity:.4;cursor:not-allowed;}
+.besitz-tile.disabled:hover{transform:none;border-color:var(--border-strong);}
+.besitz-note{display:flex;align-items:flex-start;gap:8px;font-size:11px;color:var(--text-faint);line-height:1.5;margin-top:10px;}
+.besitz-note svg{width:13px;height:13px;flex:0 0 13px;margin-top:2px;color:var(--accent-hi);}
+.besitz-block{margin-bottom:16px;}
+.besitz-block .eyebrow{margin:0 2px 10px;display:block;}
+
+/* Theorie-Filter-Chips */
+.filter-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.fchip{
+  position:relative;overflow:hidden;display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:999px;
+  font-size:12px;font-weight:700;font-family:inherit;letter-spacing:.01em;
+  background:var(--surface);border:1px solid var(--border);color:var(--text-dim);cursor:pointer;
+  transition:var(--spring-soft),background .25s,border-color .25s,color .25s;
+}
+.fchip b{color:var(--text-faint);font-weight:800;}
+.fchip:hover{transform:scale(1.04);border-color:var(--border-strong);}
+.fchip:active{transform:scale(.96);}
+.fchip.active{background:var(--accent-soft);border-color:var(--accent-line);color:#FCA5B5;}
+.fchip.active b{color:var(--accent-hi);}
+.theory-empty{flex:0 0 100%;padding:24px 12px;text-align:center;font-size:12.5px;color:var(--text-faint);background:var(--surface);border:1px dashed var(--border-strong);border-radius:var(--radius);}
+
 /* ============================================================
    HISTORIE  ·  Fahrstunden & Theorie
    ============================================================ */
@@ -1296,10 +1335,46 @@ button.pill{font-family:inherit;}
 .ripple{position:absolute;border-radius:50%;transform:scale(0);background:rgba(248,250,252,.32);pointer-events:none;animation:ripple .6s var(--ease-out) forwards;}
 @keyframes ripple{to{transform:scale(2.6);opacity:0;}}
 
-/* Konfetti */
-.confetti-layer{position:fixed;inset:0;pointer-events:none;z-index:300;overflow:hidden;}
-.confetti-piece{position:absolute;top:0;left:0;border-radius:2px;will-change:transform,opacity;animation:confFall var(--dur,1000ms) var(--ease-out) forwards;}
-@keyframes confFall{0%{transform:translate3d(var(--x0),var(--y0),0) rotate(0);opacity:1;}100%{transform:translate3d(var(--x1),var(--y1),0) rotate(var(--rot));opacity:0;}}
+/* Erfolgs-Puls: dezenter, expandierender Ring statt Konfetti */
+.pulse-ring{
+  position:fixed;z-index:290;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
+  border:2px solid var(--accent-hi);box-shadow:0 0 26px -4px var(--accent-glow);
+  pointer-events:none;animation:pulseRing .85s var(--ease-out) forwards;
+}
+.pulse-ring.second{animation-delay:.16s;opacity:0;}
+.pulse-ring.emerald{border-color:var(--emerald-hi);box-shadow:0 0 26px -4px rgba(16,185,129,.5);}
+@keyframes pulseRing{0%{transform:scale(.5);opacity:.9;}100%{transform:scale(6.5);opacity:0;}}
+
+/* Glanz-Sweep über gefüllte Fortschrittsbalken (einmalig nach Reveal) */
+[data-fill]{position:relative;overflow:hidden;}
+[data-fill].shimmer::after{
+  content:"";position:absolute;inset:0;
+  background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,.28) 50%,transparent 70%);
+  transform:translateX(-130%);animation:sweep 1.3s var(--ease-io) .9s 1 both;
+}
+@keyframes sweep{to{transform:translateX(130%);}}
+
+/* Zeilen-Stagger (Historie, Listen) */
+.row-in{opacity:0;animation:rowIn .5s var(--ease-out) forwards;}
+@keyframes rowIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+/* Sheet-Inhalte gestaffelt einblenden */
+.morph-layer.open .morph-inner>*{animation:moIn .5s var(--ease-out) both;}
+.morph-layer.open .morph-inner>*:nth-child(2){animation-delay:.05s;}
+.morph-layer.open .morph-inner>*:nth-child(3){animation-delay:.1s;}
+.morph-layer.open .morph-inner>*:nth-child(4){animation-delay:.15s;}
+.morph-layer.open .morph-inner>*:nth-child(5){animation-delay:.2s;}
+.morph-layer.open .morph-inner>*:nth-child(6){animation-delay:.25s;}
+.morph-layer.open .morph-inner>*:nth-child(n+7){animation-delay:.3s;}
+@keyframes moIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+
+/* Primär-Button: feiner Licht-Sweep beim Hover */
+.btn-primary::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.16) 50%,transparent 60%);
+  transform:translateX(-130%);transition:transform .7s var(--ease-io);
+}
+.btn-primary:hover::before{transform:translateX(130%);}
 
 /* Animierter Haken + Spinner */
 .cdraw{width:13px;height:13px;display:block;}
@@ -1392,7 +1467,6 @@ button.pill{font-family:inherit;}
 </div>
 
 <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
-<div class="confetti-layer" id="confettiLayer" aria-hidden="true"></div>
 <input type="file" id="docInput" accept="image/*" capture="environment" style="display:none" aria-hidden="true" />
 
 <!-- Inline-SVG-Defs (Ring-Gradient/Glow) – einmal im Dokument -->
@@ -1432,7 +1506,7 @@ function ic(name,cls){
 
 /* ---------- 1 · Storage (localStorage mit Fallback) ---------- */
 const PROFILE_KEY='fk_profile_v1';
-const STATE_KEY='fk_state_v2';
+const STATE_KEY='fk_state_v3';
 const SESSION_KEY='fk_session_v1';
 const Store=(()=>{
   let ok=false; try{ const k='__fk_t__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); ok=true; }catch(e){ ok=false; }
@@ -1474,38 +1548,47 @@ const PERIODS=[{k:'vormittag',l:'Vormittag',icon:'sunrise',hour:9},{k:'nachmitta
 const FL_PLAN={ 1:{vormittag:true,nachmittag:true,abend:false}, 2:{vormittag:false,nachmittag:true,abend:true}, 3:{vormittag:true,nachmittag:false,abend:true}, 4:{vormittag:true,nachmittag:true,abend:false}, 5:{vormittag:false,nachmittag:true,abend:false}, 6:{vormittag:true,nachmittag:false,abend:false} };
 
 /* ---------- 4 · Führerscheinklassen-Katalog ----------
-   grund/zusatz = Doppelstunden Theorie · sonder = Pflicht-Sonderfahrten (à 45 min)
-   Werte nach FahrschAusbO – bei Angebotsänderungen hier pflegen. */
+   zusatz = Doppelstunden klassenspezifischer Zusatzstoff · sonder = Pflicht-Sonderfahrten (à 45 min)
+   Grundstoff: 12 Doppelstunden bei Ersterwerb, 6 bei Erweiterung (FahrschAusbO).
+   Werte bei Angebotsänderungen hier pflegen. */
 const CLASS_CONFIG={
-  B:   {code:'B',   name:'Pkw',              icon:'car-front',    vehikel:'pkw',      minAlter:'ab 17 (BF17)', ausbildungsart:'Erst-Erwerb', beliebt:true,
+  B:   {code:'B',   name:'Pkw',              icon:'car-front',    vehikel:'pkw',      minAlter:'ab 17 (BF17)', beliebt:true,
         beschreibung:'Kraftwagen bis 3,5 t zulässige Gesamtmasse – der Klassiker, auch mit Begleitetem Fahren ab 17.',
-        grund:12, zusatz:2, zusatzKat:'Zusatzstoff Klasse B', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
-  B197:{code:'B197',name:'Pkw · Automatik',  icon:'car-front',    vehikel:'pkw',      minAlter:'ab 17 (BF17)', ausbildungsart:'Erst-Erwerb', beliebt:false,
+        zusatz:2, zusatzKat:'Zusatzstoff Klasse B', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
+  B197:{code:'B197',name:'Pkw · Automatik',  icon:'car-front',    vehikel:'pkw',      minAlter:'ab 17 (BF17)', beliebt:false,
         beschreibung:'Ausbildung überwiegend auf Automatik, Prüfung ohne Schaltbeschränkung im Führerschein.',
-        grund:12, zusatz:2, zusatzKat:'Zusatzstoff Klasse B', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
-  BE:  {code:'BE',  name:'Pkw + Anhänger',   icon:'caravan',      vehikel:'pkw',      minAlter:'ab 18 · Vorbesitz B', ausbildungsart:'Erweiterung', beliebt:false,
+        zusatz:2, zusatzKat:'Zusatzstoff Klasse B', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
+  BE:  {code:'BE',  name:'Pkw + Anhänger',   icon:'caravan',      vehikel:'pkw',      minAlter:'ab 18 · Vorbesitz B', beliebt:false,
         beschreibung:'Anhänger von 750 kg bis 3,5 t hinter Klasse B – rein praktische Ausbildung ohne Theorieprüfung.',
-        grund:0, zusatz:0, zusatzKat:'Zusatzstoff Klasse B', sonder:{ueberland:3,autobahn:1,nacht:1}, theoriePruefung:false},
-  A:   {code:'A',   name:'Motorrad',         icon:'motorbike',    vehikel:'kraftrad', minAlter:'ab 24 (Direkteinstieg)', ausbildungsart:'Erst-Erwerb', beliebt:false,
+        zusatz:0, zusatzKat:'Zusatzstoff Klasse B', sonder:{ueberland:3,autobahn:1,nacht:1}, theoriePruefung:false,
+        keinTheorie:true, vorbesitzPflicht:true, vorbesitzHinweis:'Klasse BE setzt den Vorbesitz der Klasse B voraus – die Ausbildung ist immer eine Erweiterung.'},
+  A:   {code:'A',   name:'Motorrad',         icon:'motorbike',    vehikel:'kraftrad', minAlter:'ab 24 (Direkteinstieg)', beliebt:false,
         beschreibung:'Krafträder ohne Leistungsbegrenzung – der Direkteinstieg in die offene Klasse.',
-        grund:12, zusatz:4, zusatzKat:'Zusatzstoff Klasse A', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
-  A2:  {code:'A2',  name:'Motorrad · 35 kW', icon:'motorbike',    vehikel:'kraftrad', minAlter:'ab 18', ausbildungsart:'Erst-Erwerb', beliebt:false,
+        zusatz:4, zusatzKat:'Zusatzstoff Klasse A', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
+  A2:  {code:'A2',  name:'Motorrad · 35 kW', icon:'motorbike',    vehikel:'kraftrad', minAlter:'ab 18', beliebt:false,
         beschreibung:'Krafträder bis 35 kW und maximal 0,2 kW/kg – die Mittelklasse für Einsteiger ab 18.',
-        grund:12, zusatz:4, zusatzKat:'Zusatzstoff Klasse A', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
-  A1:  {code:'A1',  name:'Leichtkraftrad',   icon:'motorbike',    vehikel:'kraftrad', minAlter:'ab 16', ausbildungsart:'Erst-Erwerb', beliebt:false,
+        zusatz:4, zusatzKat:'Zusatzstoff Klasse A', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
+  A1:  {code:'A1',  name:'Leichtkraftrad',   icon:'motorbike',    vehikel:'kraftrad', minAlter:'ab 16', beliebt:false,
         beschreibung:'Leichtkrafträder bis 125 cm³ und 11 kW – Einstieg auf zwei Rädern ab 16 Jahren.',
-        grund:12, zusatz:4, zusatzKat:'Zusatzstoff Klasse A', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
-  AM:  {code:'AM',  name:'Roller & Moped',   icon:'scooter',      vehikel:'kraftrad', minAlter:'ab 15', ausbildungsart:'Erst-Erwerb', beliebt:false,
+        zusatz:4, zusatzKat:'Zusatzstoff Klasse A', sonder:{ueberland:5,autobahn:4,nacht:3}, theoriePruefung:true},
+  AM:  {code:'AM',  name:'Roller & Moped',   icon:'scooter',      vehikel:'kraftrad', minAlter:'ab 15', beliebt:false,
         beschreibung:'Zweirädrige Kleinkrafträder bis 45 km/h – mobil ab 15 Jahren, ohne Pflicht-Sonderfahrten.',
-        grund:12, zusatz:2, zusatzKat:'Zusatzstoff Klasse A', sonder:{ueberland:0,autobahn:0,nacht:0}, theoriePruefung:true},
-  C:   {code:'C',   name:'Lkw',              icon:'truck',        vehikel:'lkw',      minAlter:'ab 21 · Vorbesitz B', ausbildungsart:'Erweiterung', beliebt:false,
+        zusatz:2, zusatzKat:'Zusatzstoff Klasse A', sonder:{ueberland:0,autobahn:0,nacht:0}, theoriePruefung:true},
+  C:   {code:'C',   name:'Lkw',              icon:'truck',        vehikel:'lkw',      minAlter:'ab 21 · Vorbesitz B', beliebt:false,
         beschreibung:'Kraftwagen über 3,5 t zulässige Gesamtmasse – die Basis für den Berufskraftverkehr.',
-        grund:6, zusatz:10, zusatzKat:'Zusatzstoff Klasse C', sonder:{ueberland:5,autobahn:2,nacht:3}, theoriePruefung:true},
-  CE:  {code:'CE',  name:'Lastzug',          icon:'truck-trailer',vehikel:'lkw',      minAlter:'ab 21 · Vorbesitz C', ausbildungsart:'Erweiterung', beliebt:false,
+        zusatz:10, zusatzKat:'Zusatzstoff Klasse C', sonder:{ueberland:5,autobahn:2,nacht:3}, theoriePruefung:true,
+        vorbesitzPflicht:true, vorbesitzHinweis:'Klasse C setzt den Vorbesitz der Klasse B voraus – die Ausbildung ist immer eine Erweiterung.'},
+  CE:  {code:'CE',  name:'Lastzug',          icon:'truck-trailer',vehikel:'lkw',      minAlter:'ab 21 · Vorbesitz C', beliebt:false,
         beschreibung:'Lastzüge und Sattelkraftfahrzeuge – Klasse C mit Anhänger über 750 kg.',
-        grund:6, zusatz:4, zusatzKat:'Zusatzstoff Klasse C', sonder:{ueberland:5,autobahn:2,nacht:3}, theoriePruefung:true}
+        zusatz:4, zusatzKat:'Zusatzstoff Klasse C', sonder:{ueberland:5,autobahn:2,nacht:3}, theoriePruefung:true,
+        vorbesitzPflicht:true, vorbesitzHinweis:'Klasse CE setzt den Vorbesitz der Klasse C voraus – die Ausbildung ist immer eine Erweiterung.'}
 };
 const CLASS_ORDER=['B','B197','BE','A','A2','A1','AM','C','CE'];
+/* Ausbildungsart: Ersterwerb (12 DS Grundstoff) vs. Erweiterung (6 DS Grundstoff) */
+function defaultBesitz(code){ const c=CLASS_CONFIG[code]; return (c&&c.vorbesitzPflicht)?'erweiterung':'erst'; }
+function grundCountFor(code,besitz){ const c=CLASS_CONFIG[code]; if(!c||c.keinTheorie) return 0; return besitz==='erweiterung'?6:12; }
+function besitzLabel(besitz){ return besitz==='erweiterung'?'Erweiterung':'Erst-Erwerb'; }
+function theorieGesamtFor(code,besitz){ const c=CLASS_CONFIG[code]; if(!c||c.keinTheorie) return 0; return grundCountFor(code,besitz)+c.zusatz; }
 
 /* Theorie-Themenkatalog (Grundstoff, 12 Doppelstunden) */
 const GRUND_TOPICS=[
@@ -1547,6 +1630,37 @@ const ZUSATZ_TOPICS={
     ['C10','Umweltschutz & Betriebssicherheit']
   ]
 };
+/* Kursbeschreibungen aller Theoriethemen (Schlüssel = Themen-Nummer) */
+const TOPIC_DESCS={
+  '1':'Sehvermögen, Gesundheit, Medikamente und Fahrtüchtigkeit – wer fahren darf und was die Fahreignung beeinflusst.',
+  '2':'Emotionen, Stress, Ablenkung und Selbstüberschätzung – wie der Mensch zum größten Risiko im Straßenverkehr wird.',
+  '3':'Führerscheinklassen, Probezeit, Punktesystem in Flensburg und die wichtigsten Rechtsfolgen von Verstößen.',
+  '4':'Autobahn, Landstraße, Stadtverkehr und Bahnübergänge – die Verkehrsräume und ihre besonderen Regeln.',
+  '5':'Rechts vor links, Ampelregelungen, Vorfahrtszeichen sowie das Verhalten an komplexen Kreuzungen und Kreisverkehren.',
+  '6':'Gefahr-, Vorschrift- und Richtzeichen sicher lesen, Markierungen und Verkehrseinrichtungen richtig deuten.',
+  '7':'Fußgänger, Radfahrer, Kinder und Senioren – Schutzbedürfnis, Rücksicht und typische Konfliktsituationen.',
+  '8':'Angepasste Geschwindigkeit, Sicherheitsabstand, Bremswege und eine vorausschauende, umweltschonende Fahrweise.',
+  '9':'Anfahren, Abbiegen, Wenden, Ein- und Ausparken sowie sicheres Überholen unter realen Verkehrsbedingungen.',
+  '10':'Halten, Parken, Ein- und Aussteigen – Regeln, Verbote und das richtige Sichern des Fahrzeugs.',
+  '11':'Unfallstelle absichern, Erste Hilfe, Pannen, Bahnübergänge und das richtige Verhalten gegenüber Einsatzfahrzeugen.',
+  '12':'Weiterbildung nach dem Führerschein, Fahrkompetenz erhalten und die eigene Selbsteinschätzung realistisch halten.',
+  'B1':'Technische Bedingungen, umweltbewusster Umgang mit dem Kfz, Wartung und einfache Fehlerkontrolle am Fahrzeug.',
+  'B2':'Fahren mit Solokraftfahrzeugen und Zügen, Personen- und Güterbeförderung sowie Anhängerbetrieb in der Praxis.',
+  'A1':'Schutzhelm, Schutzkleidung und die richtige Vorbereitung von Fahrer und Beifahrer auf jede Fahrt.',
+  'A2':'Fahrphysik motorisierter Zweiräder: Kurvenlage, Kreiselkräfte, Bremsen und der Grenzbereich der Haftung.',
+  'A3':'Fahrtechnik und Blickführung – Linienwahl, Schräglage und kontrolliertes Bremsen in jeder Situation.',
+  'A4':'Besondere Schwierigkeiten und Gefahren: Fahrbahnzustand, Witterung, Gruppenfahrten und Übersehen-Werden.',
+  'C1':'Sozialvorschriften, Lenk- und Ruhezeiten sowie die Grundlagen der Personen- und Güterbeförderung.',
+  'C2':'Abmessungen, Achslasten und zulässige Gesamtgewichte – berechnen, prüfen und richtig ausnutzen.',
+  'C3':'Formschlüssige und kraftschlüssige Ladungssicherung, Zurrmittel und Lastverteilungsplan.',
+  'C4':'Druckluftbremsanlage, Dauerbremsen und die Bremsprüfung am Nutzfahrzeug.',
+  'C5':'Fahrwerk, Reifen, Räder und Achsen – Zustand prüfen und Verschleiß rechtzeitig erkennen.',
+  'C6':'Motor, Kraftübertragung und Wartung – Abfahrtkontrolle und einfache Fehlersuche.',
+  'C7':'Wirtschaftliches und vorausschauendes Fahren mit dem Lkw – Schaltstrategie und Verbrauch.',
+  'C8':'Kurven-, Brems- und Ausweichverhalten beladener Fahrzeuge sicher beherrschen.',
+  'C9':'Rangieren, Halten und Liefern im Stadtgebiet – Schleppkurve und tote Winkel.',
+  'C10':'Umweltschutz und Betriebssicherheit im Güterverkehr – Vorschriften und Verantwortung.'
+};
 /* Ausbildungsschwerpunkte der Übungsfahrten je Fahrzeugart */
 const FOCUS_BY_VEHIKEL={
   pkw:['Grundfahraufgaben & Bedienung','Anfahren, Schalten & Verkehrsbeobachtung','Rechts vor links im Wohngebiet','Einparken längs & quer','Stadtverkehr Fulda Innenstadt','Kreisverkehre & Spurwahl','Berganfahren & Wenden','Spurwechsel & Einfädeln auf der B27','Vorfahrt & komplexe Kreuzungen','Fahren im Berufsverkehr','Prüfungsstrecken-Training Fulda'],
@@ -1579,26 +1693,43 @@ const hotspots=[
   {lat:50.5477,lng:9.6893,cat:'Wohngebiet',title:'Künzeller Straße',desc:'Bushaltestellen, parkende Autos und Schulwege – besonders zu Stoßzeiten defensiv und bremsbereit fahren.'}
 ];
 
-/* ---------- 6 · State-Fabrik (je Führerscheinklasse) ---------- */
-function buildThemeSessions(cfg){
-  const specs=[
-    {id:'t1',num:'5', cat:'Grundstoff',           title:'Vorfahrt & Verkehrsregelungen',            off:-4,time:'19:00',base:'erledigt',kap:{belegt:22,gesamt:24},desc:'Rechts vor links, Ampelregelungen, Vorfahrtszeichen sowie das Verhalten an komplexen Kreuzungen und Kreisverkehren.'},
-    {id:'t2',num:'9', cat:'Grundstoff',           title:'Verkehrsverhalten bei Fahrmanövern',       off:-2,time:'19:00',base:'erledigt',kap:{belegt:19,gesamt:24},desc:'Anfahren, Abbiegen, Wenden, Ein- und Ausparken sowie sicheres Überholen unter realen Verkehrsbedingungen.'},
-    {id:'t3',num:'11',cat:'Grundstoff',           title:'Verhalten in besonderen Situationen',      off:1, time:'18:00',base:'offen',   kap:{belegt:9, gesamt:24},desc:'Unfallstelle absichern, Erste Hilfe, Pannen, Bahnübergänge und das richtige Verhalten gegenüber Einsatzfahrzeugen.'},
-    {id:'t4',num:'Z', cat:'Zusatzstoff Klasse B', title:'Fahren mit Solokraftfahrzeugen & Zügen',   off:2, time:'19:00',base:'offen',   kap:{belegt:14,gesamt:24},desc:'Klassenspezifische Inhalte für Klasse B: Fahrphysik, Beladung, Anhängerbetrieb und wirtschaftliches, umweltbewusstes Fahren.'},
-    {id:'t5',num:'12',cat:'Grundstoff',           title:'Lebenslanges Lernen',                      off:4, time:'17:00',base:'gebucht', kap:{belegt:21,gesamt:24},desc:'Weiterbildung nach dem Führerschein, Fahrkompetenz erhalten und die eigene Selbsteinschätzung realistisch halten.'},
-    {id:'t6',num:'Z', cat:'Zusatzstoff Klasse A', title:'Fahrphysik motorisierter Zweiräder',       off:5, time:'19:00',base:'offen',   kap:{belegt:8, gesamt:24},desc:'Kurvenfahren, Bremsen und Blickführung auf dem Kraftrad – Zusatzstoff für die Klassen AM, A1, A2 und A.'},
-    {id:'t7',num:'Z', cat:'Zusatzstoff Klasse C', title:'Ladung & Ladungssicherung',                off:7, time:'19:00',base:'offen',   kap:{belegt:5, gesamt:24},desc:'Formschlüssige und kraftschlüssige Sicherung, Zurrmittel und Lastverteilung – Zusatzstoff für die Lkw-Klassen.'},
-    {id:'t8',num:'8', cat:'Grundstoff',           title:'Geschwindigkeit, Abstand & Umwelt',        off:9, time:'18:00',base:'offen',   kap:{belegt:11,gesamt:24},desc:'Angepasste Geschwindigkeit, Sicherheitsabstand, Bremswege und eine vorausschauende, umweltschonende Fahrweise.'}
-  ];
-  return specs.map(s=>{
-    const d=new Date(); d.setHours(12,0,0,0); d.setDate(d.getDate()+s.off); if(d.getDay()===0) d.setDate(d.getDate()+1);
-    const relevant=s.cat==='Grundstoff'||s.cat===cfg.zusatzKat;
-    const status=relevant?s.base:'gesperrt';
-    return {id:s.id,num:s.num,cat:s.cat,title:s.title,day:fmtDay(d),time:s.time+' Uhr',relevant,status,kap:{belegt:s.kap.belegt,gesamt:s.kap.gesamt},desc:s.desc};
-  });
+/* ---------- 6 · State-Fabrik (je Führerscheinklasse & Ausbildungsart) ---------- */
+/* Vollständiger Themenkatalog der Klasse: Grundstoff (12 bzw. 6 bei Erweiterung) + Zusatzstoff */
+function buildCatalog(code,besitz){
+  const cfg=CLASS_CONFIG[code]||CLASS_CONFIG.B;
+  const grund=GRUND_TOPICS.slice(0,grundCountFor(code,besitz)).map(t=>({num:String(t[0]),cat:'Grundstoff',title:t[1]}));
+  const zusatz=(ZUSATZ_TOPICS[cfg.zusatzKat]||[]).slice(0,cfg.zusatz).map(t=>({num:t[0],cat:cfg.zusatzKat,title:t[1]}));
+  return grund.concat(zusatz).map(t=>Object.assign({desc:TOPIC_DESCS[t.num]||''},t));
 }
-function buildHistory(cfg,seed){
+/* Theorie-Sessions: der komplette Katalog der eigenen Klasse ist buchbar.
+   Besuchte Themen tragen ihr vergangenes Datum, fehlende den nächsten Termin. */
+function buildThemeSessions(code,besitz){
+  const catalog=buildCatalog(code,besitz);
+  const n=catalog.length; if(!n) return [];
+  const grundCount=grundCountFor(code,besitz);
+  const missing=new Set();
+  if(n>grundCount) missing.add(n-1);                 /* letztes Zusatzthema fehlt noch */
+  if(grundCount>=12){ missing.add(7); missing.add(10); } /* Thema 8 & 11 fehlen noch */
+  else if(grundCount>=6){ missing.add(4); }          /* Thema 5 fehlt noch */
+  const attendedIdx=catalog.map((_,i)=>i).filter(i=>!missing.has(i));
+  const an=attendedIdx.length;
+  const sessions=[]; let futureSeq=0;
+  catalog.forEach((tp,i)=>{
+    let d,status;
+    if(missing.has(i)){
+      d=new Date(); d.setHours(futureSeq%2?19:18,0,0,0); d.setDate(d.getDate()+2+futureSeq*3);
+      if(d.getDay()===0) d.setDate(d.getDate()+1);
+      status='offen'; futureSeq++;
+    } else {
+      const k=attendedIdx.indexOf(i);
+      d=new Date(); d.setHours(19,0,0,0); d.setDate(d.getDate()-(16+Math.round((an-1-k)*3.5)));
+      status='erledigt';
+    }
+    sessions.push({id:'th-'+tp.num,num:tp.num,cat:tp.cat,title:tp.title,desc:tp.desc,status,dateISO:d.toISOString(),day:fmtDay(d),time:pad(d.getHours())+':00 Uhr',kap:{belegt:6+((i*7)%15),gesamt:24}});
+  });
+  return sessions;
+}
+function buildHistory(cfg,seed,sessions){
   const fahr=[],theorie=[];
   const mk=(daysAgo,h,m)=>{ const d=new Date(); d.setDate(d.getDate()-daysAgo); d.setHours(h,m||0,0,0); return d.toISOString(); };
   /* Simulator-Einheiten (je 90 min) */
@@ -1618,19 +1749,19 @@ function buildHistory(cfg,seed){
   if(seed.sonderIst.autobahn>0) fahr.push({type:'autobahn',date:mk(6,10,0),minutes:seed.sonderIst.autobahn*45,focus:'A7 / A66 – Auffahren, Überholen, Abstand halten'});
   if(seed.sonderIst.nacht>0) fahr.push({type:'nacht',date:mk(3,20,0),minutes:seed.sonderIst.nacht*45,focus:'Beleuchtung, Blendung & Orientierung bei Dunkelheit'});
   fahr.sort((a,b)=>new Date(b.date)-new Date(a.date));
-  /* Theorie-Doppelstunden (je 90 min) – chronologisch nach Themenkatalog */
-  const topics=[
-    ...GRUND_TOPICS.slice(0,cfg.grund).map(t=>({num:String(t[0]),cat:'Grundstoff',title:t[1]})),
-    ...(ZUSATZ_TOPICS[cfg.zusatzKat]||[]).slice(0,cfg.zusatz).map(t=>({num:t[0],cat:cfg.zusatzKat,title:t[1]}))
-  ];
-  const n=topics.length;
-  topics.forEach((tp,k)=>{ const off=16+Math.round((n-1-k)*3.5); theorie.push({num:tp.num,cat:tp.cat,title:tp.title,date:mk(off,19,0),minutes:90}); });
+  /* Theorie-Doppelstunden (je 90 min) – exakt die besuchten Themen aus dem Katalog */
+  (sessions||[]).filter(s=>s.status==='erledigt').forEach(s=>{
+    theorie.push({num:s.num,cat:s.cat,title:s.title,date:s.dateISO,minutes:90});
+  });
   theorie.sort((a,b)=>new Date(b.date)-new Date(a.date));
   return {fahr,theorie};
 }
-function buildDefaultState(klasse){
+function buildDefaultState(klasse,besitz){
   const cfg=CLASS_CONFIG[klasse]||CLASS_CONFIG.B;
-  const theorieGesamt=cfg.grund+cfg.zusatz;
+  besitz=besitz||defaultBesitz(klasse);
+  const sessions=buildThemeSessions(klasse,besitz);
+  const theorieGesamt=theorieGesamtFor(klasse,besitz);
+  const theorieBesucht=sessions.filter(s=>s.status==='erledigt').length;
   const sonderIst={ueberland:Math.min(3,cfg.sonder.ueberland),autobahn:Math.min(2,cfg.sonder.autobahn),nacht:0};
   const verf={}; DAYS.forEach(d=>verf[d.k]={vormittag:false,nachmittag:false,abend:false});
   verf[2].nachmittag=true; verf[4].vormittag=true; /* sinnvolle Vorauswahl (überlappt Dienstplan) */
@@ -1638,9 +1769,9 @@ function buildDefaultState(klasse){
   simDays.forEach((dd,di)=>simTimes.forEach((t,ti)=>{ const reserved=(di===0&&ti===1)||(di===2&&ti===0); simSlots.push({id:`sim-${di}-${ti}`,day:dd.label,time:t,reserved}); }));
   const examTermine=[10,18,25].map((add,i)=>{ const d=new Date(Date.now()+add*86400000); if(d.getDay()===0) d.setDate(d.getDate()+1); return {id:`px-${i}`,label:fmtDay(d),dNum:pad(d.getDate()),mon:MON[d.getMonth()],ort:'TÜV Hessen · Prüfstelle Fulda',time:['09:15','11:30','08:45'][i]}; });
   return {
-    version:2, klasse:cfg.code,
+    version:3, klasse:cfg.code, besitz,
     grundausbildungAbgeschlossen:true,
-    theorie:{besucht:theorieGesamt,gesamt:theorieGesamt},
+    theorie:{besucht:theorieBesucht,gesamt:theorieGesamt},
     sonderfahrten:{
       ueberland:{ist:sonderIst.ueberland,soll:cfg.sonder.ueberland},
       autobahn:{ist:sonderIst.autobahn,soll:cfg.sonder.autobahn},
@@ -1660,8 +1791,8 @@ function buildDefaultState(klasse){
     naechsteFahrstunde:new Date(Date.now()+(1*86400000)+(4*3600000)+(12*60000)).toISOString(),
     verfuegbarkeit:verf,
     simSlots, examTermine,
-    themeSessions:buildThemeSessions(cfg),
-    history:buildHistory(cfg,{sonderIst,uebungen:22,sim:4})
+    themeSessions:sessions,
+    history:buildHistory(cfg,{sonderIst,uebungen:22,sim:4},sessions)
   };
 }
 
@@ -1671,14 +1802,15 @@ let state=null;
 function saveState(){ try{ Store.set(STATE_KEY,JSON.stringify(state)); }catch(e){} }
 function loadState(){
   const raw=Store.get(STATE_KEY); if(!raw) return false;
-  try{ const saved=JSON.parse(raw); if(saved&&saved.version===2&&saved.klasse&&CLASS_CONFIG[saved.klasse]){ state=saved; return true; } }catch(e){}
+  try{ const saved=JSON.parse(raw); if(saved&&saved.version===3&&saved.klasse&&CLASS_CONFIG[saved.klasse]&&saved.besitz){ state=saved; return true; } }catch(e){}
   return false;
 }
 function ensureState(){
   const p=getProfile(); if(!p||!p.klasse) return false;
-  if(state&&state.klasse===p.klasse) return true;
-  if(loadState()&&state.klasse===p.klasse) return true;
-  state=buildDefaultState(p.klasse); saveState(); return true;
+  if(!p.besitz){ p.besitz=defaultBesitz(p.klasse); saveProfile(p); }
+  if(state&&state.klasse===p.klasse&&state.besitz===p.besitz) return true;
+  if(loadState()&&state.klasse===p.klasse&&state.besitz===p.besitz) return true;
+  state=buildDefaultState(p.klasse,p.besitz); saveState(); return true;
 }
 function openAmount(){ return state.finanzen.posten.reduce((s,p)=>s+p.betrag,0); }
 
@@ -1716,7 +1848,8 @@ function bootAuth(){
 function who(){
   const p=getProfile()||pendingProfile||{name:'',email:'',klasse:'B'};
   const cfg=CLASS_CONFIG[p.klasse]||CLASS_CONFIG.B;
-  return {name:p.name||'',email:p.email||'',initials:initialsOf(p.name||''),klasse:p.klasse||cfg.code,klasseLabel:'Klasse '+(p.klasse||cfg.code),ausbildungsart:cfg.ausbildungsart,cfg};
+  const besitz=p.besitz||defaultBesitz(p.klasse||cfg.code);
+  return {name:p.name||'',email:p.email||'',initials:initialsOf(p.name||''),klasse:p.klasse||cfg.code,klasseLabel:'Klasse '+(p.klasse||cfg.code),besitz,ausbildungsart:besitzLabel(besitz),cfg};
 }
 function logout(){
   const p=getProfile(); if(p){ p.remember=false; saveProfile(p); }
@@ -1790,23 +1923,21 @@ function toast(kind,msg,sub){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),450); },3400);
 }
 
-/* Konfetti */
-function burst(x,y){
-  const layer=el('confettiLayer'); if(!layer||reducedMotion()) return;
-  const cols=['#E11D48','#F43F5E','#F8FAFC','#10B981','#34D399'];
-  const cx=(x==null?window.innerWidth/2:x), cy=(y==null?window.innerHeight*0.36:y);
-  for(let i=0;i<30;i++){
-    const p=document.createElement('div'); p.className='confetti-piece';
-    const ang=Math.random()*Math.PI*2, dist=70+Math.random()*180;
-    const dx=Math.cos(ang)*dist, dy=Math.sin(ang)*dist-(70+Math.random()*130), dur=850+Math.random()*750;
-    p.style.setProperty('--x0',cx+'px'); p.style.setProperty('--y0',cy+'px');
-    p.style.setProperty('--x1',(cx+dx)+'px'); p.style.setProperty('--y1',(cy+dy)+'px');
-    p.style.setProperty('--rot',(Math.random()*720-360)+'deg'); p.style.setProperty('--dur',dur+'ms');
-    p.style.background=cols[i%cols.length]; p.style.width=(6+Math.random()*6)+'px'; p.style.height=(10+Math.random()*8)+'px';
-    layer.appendChild(p); setTimeout(()=>p.remove(),dur+60);
-  }
+/* Erfolgs-Puls: zwei feine, expandierende Ringe (dezent statt Konfetti) */
+function pulseAt(x,y,emerald){
+  if(reducedMotion()) return;
+  [0,1].forEach(i=>{
+    const ring=document.createElement('div');
+    ring.className='pulse-ring'+(i?' second':'')+(emerald?' emerald':'');
+    ring.style.left=x+'px'; ring.style.top=y+'px';
+    document.body.appendChild(ring); setTimeout(()=>ring.remove(),1100);
+  });
 }
-function burstFrom(elm){ if(!elm) return burst(); const r=elm.getBoundingClientRect(); burst(r.left+r.width/2, r.top+r.height/2); }
+function pulseFrom(elm,emerald){
+  if(!elm){ pulseAt(window.innerWidth/2,window.innerHeight*0.4,emerald); return; }
+  const r=elm.getBoundingClientRect();
+  pulseAt(r.left+r.width/2,r.top+r.height/2,emerald);
+}
 
 /* Scroll-Animate-on-Reveal (IntersectionObserver) */
 const Reveal=(()=>{
@@ -1843,9 +1974,17 @@ const Reveal=(()=>{
 function animateFills(scope){
   const root=scope||document;
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-    root.querySelectorAll('[data-fill]').forEach(n=>{ n.style.width=(n.getAttribute('data-fill')||0)+'%'; });
+    root.querySelectorAll('[data-fill]').forEach(n=>{
+      n.style.width=(n.getAttribute('data-fill')||0)+'%';
+      if(!n.dataset.shimmered&&!reducedMotion()&&parseInt(n.getAttribute('data-fill'),10)>0){ n.dataset.shimmered='1'; n.classList.add('shimmer'); }
+    });
   }));
 }
+/* Stagger-Klasse nach der Eintrittsanimation entfernen (gibt Hover-Transforms frei) */
+document.addEventListener('animationend',e=>{
+  const t=e.target;
+  if(t&&t.classList&&t.classList.contains('row-in')&&e.animationName==='rowIn'){ t.classList.remove('row-in'); t.style.animationDelay=''; }
+});
 function countUps(scope){
   const root=scope||document;
   root.querySelectorAll('[data-countup]').forEach(n=>{
@@ -2084,12 +2223,14 @@ function togglePassVisibility(btn){
   btn.setAttribute('aria-label',show?'Passwort verbergen':'Passwort anzeigen');
 }
 
-/* ---------- Screen 2 · Führerscheinklasse ---------- */
-function classInfoHTML(code){
+/* ---------- Screen 2 · Führerscheinklasse & Ausbildungsart ---------- */
+let besitzSelected='erst';
+function classInfoHTML(code,besitz){
   if(!code) return `<div class="h-empty">Wähle oben deine Führerscheinklasse –<br/>die Eckdaten zur Ausbildung erscheinen hier.</div>`;
   const c=CLASS_CONFIG[code];
-  const theorieChip=(c.grund+c.zusatz)>0
-    ?`<span class="chip">${ic('graduation-cap')}${c.grund+c.zusatz} Doppelstunden Theorie</span>`
+  const gesamt=theorieGesamtFor(code,besitz);
+  const theorieChip=gesamt>0
+    ?`<span class="chip">${ic('graduation-cap')}${gesamt} Doppelstunden Theorie</span>`
     :`<span class="chip">${ic('graduation-cap')}Kein Pflicht-Theorieunterricht</span>`;
   const sonderSum=c.sonder.ueberland+c.sonder.autobahn+c.sonder.nacht;
   const sonderChip=sonderSum>0
@@ -2101,10 +2242,26 @@ function classInfoHTML(code){
   return `<p class="ki-desc"><b style="color:var(--text)">${c.code} · ${c.name}</b> — ${c.beschreibung}</p>
     <div class="ki-chips">${theorieChip}${sonderChip}${examChip}<span class="chip">${ic('clock')}${c.minAlter}</span></div>`;
 }
+function besitzBlockHTML(code){
+  const cfg=code?CLASS_CONFIG[code]:null;
+  const forced=!!(cfg&&cfg.vorbesitzPflicht);
+  const opt=(val,icon,t,s,disabled)=>`<button type="button" class="besitz-tile ${besitzSelected===val?'selected':''} ${disabled?'disabled':''}" data-action="besitz-pick" data-besitz="${val}" ${disabled?'aria-disabled="true"':''} aria-pressed="${besitzSelected===val}">
+      <span class="bic">${ic(icon)}</span>
+      <span><span class="bt-t" style="display:block">${t}</span><span class="bt-s" style="display:block">${s}</span></span>
+    </button>`;
+  return `<span class="eyebrow">Ausbildungsart</span>
+    <div class="besitz-row">
+      ${opt('erst','graduation-cap','Ersterwerb','Mein erster Führerschein',forced)}
+      ${opt('erweiterung','badge-check','Erweiterung','Ich besitze bereits eine Klasse (Vorbesitz)',false)}
+    </div>
+    ${forced?`<div class="besitz-note">${ic('info')}<span>${cfg.vorbesitzHinweis}</span></div>`:''}`;
+}
 function renderClassScreen(){
   const p=getProfile();
   classCtx=(authed&&p&&p.klasse)?'change':'onboarding';
   klasseSelected=classCtx==='change'?p.klasse:null;
+  besitzSelected=classCtx==='change'?(p.besitz||defaultBesitz(p.klasse)):'erst';
+  if(klasseSelected&&CLASS_CONFIG[klasseSelected]&&CLASS_CONFIG[klasseSelected].vorbesitzPflicht) besitzSelected='erweiterung';
   const tiles=CLASS_ORDER.map(code=>{
     const c=CLASS_CONFIG[code];
     return `<button type="button" class="class-tile ${klasseSelected===code?'selected':''}" data-action="klasse-pick" data-klasse="${code}" aria-pressed="${klasseSelected===code}">
@@ -2126,7 +2283,8 @@ function renderClassScreen(){
       </div>
     </div>
     <div class="klasse-grid reveal">${tiles}</div>
-    <div class="card klasse-info reveal" id="klasseInfo">${classInfoHTML(klasseSelected)}</div>
+    <div class="card besitz-block reveal" id="besitzBlock">${besitzBlockHTML(klasseSelected)}</div>
+    <div class="card klasse-info reveal" id="klasseInfo">${classInfoHTML(klasseSelected,besitzSelected)}</div>
     <button class="btn btn-primary klasse-cta reveal" id="klasseContinue" data-action="klasse-continue" ${klasseSelected?'':'disabled'}>${ic('check')}${classCtx==='change'?'Klasse übernehmen':'Ausbildung starten'}</button>
   </div>`;
   Reveal.wire(app);
@@ -2134,34 +2292,50 @@ function renderClassScreen(){
 function pickKlasse(btn){
   const code=btn.getAttribute('data-klasse'); if(!CLASS_CONFIG[code]) return;
   klasseSelected=code;
+  if(CLASS_CONFIG[code].vorbesitzPflicht) besitzSelected='erweiterung';
   document.querySelectorAll('.class-tile').forEach(t=>{
     const on=t.getAttribute('data-klasse')===code;
     t.classList.toggle('selected',on); t.setAttribute('aria-pressed',on?'true':'false');
   });
-  const info=el('klasseInfo'); if(info) info.innerHTML=classInfoHTML(code);
+  const bes=el('besitzBlock'); if(bes) bes.innerHTML=besitzBlockHTML(code);
+  const info=el('klasseInfo'); if(info) info.innerHTML=classInfoHTML(code,besitzSelected);
   const cta=el('klasseContinue'); if(cta) cta.disabled=false;
+  if('vibrate' in navigator) navigator.vibrate(8);
+}
+function pickBesitz(btn){
+  if(btn.classList.contains('disabled')){
+    haptic('block');
+    const cfg=klasseSelected?CLASS_CONFIG[klasseSelected]:null;
+    if(cfg&&cfg.vorbesitzHinweis) toast('block','Nur als Erweiterung möglich',cfg.vorbesitzHinweis);
+    return;
+  }
+  const val=btn.getAttribute('data-besitz'); if(val!=='erst'&&val!=='erweiterung') return;
+  besitzSelected=val;
+  const bes=el('besitzBlock'); if(bes) bes.innerHTML=besitzBlockHTML(klasseSelected);
+  const info=el('klasseInfo'); if(info) info.innerHTML=classInfoHTML(klasseSelected,besitzSelected);
   if('vibrate' in navigator) navigator.vibrate(8);
 }
 function klasseBack(){ if(classCtx==='change') nav('cockpit'); else nav('login'); }
 function klasseContinue(){
   const code=klasseSelected; if(!code||!CLASS_CONFIG[code]) return;
+  const besitz=CLASS_CONFIG[code].vorbesitzPflicht?'erweiterung':(besitzSelected||'erst');
   if(classCtx==='change'){
     const p=getProfile(); if(!p){ nav('login'); return; }
-    if(p.klasse===code){ nav('cockpit'); return; }
-    let go=true; try{ go=confirm('Klasse wirklich zu '+code+' wechseln? Dein Cockpit wird auf die neue Klasse umgestellt.'); }catch(e){}
+    if(p.klasse===code&&(p.besitz||defaultBesitz(code))===besitz){ nav('cockpit'); return; }
+    let go=true; try{ go=confirm('Ausbildung wirklich auf Klasse '+code+' ('+besitzLabel(besitz)+') umstellen? Dein Cockpit wird entsprechend angepasst.'); }catch(e){}
     if(!go) return;
-    p.klasse=code; saveProfile(p);
-    state=buildDefaultState(code); saveState();
+    p.klasse=code; p.besitz=besitz; saveProfile(p);
+    state=buildDefaultState(code,besitz); saveState();
     haptic('confirm'); nav('cockpit');
-    setTimeout(()=>toast('ok','Klasse gewechselt','Dein Cockpit läuft jetzt auf Klasse '+code+'.'),350);
+    setTimeout(()=>toast('ok','Ausbildung umgestellt','Klasse '+code+' · '+besitzLabel(besitz)+'.'),350);
   } else {
     if(!pendingProfile){ nav('login'); return; }
-    const p=Object.assign({},pendingProfile,{klasse:code});
+    const p=Object.assign({},pendingProfile,{klasse:code,besitz});
     saveProfile(p); pendingProfile=null;
     authed=true; Session.set('1');
-    state=buildDefaultState(code); saveState();
+    state=buildDefaultState(code,besitz); saveState();
     haptic('confirm'); nav('cockpit');
-    setTimeout(()=>{ toast('ok','Willkommen, '+esc(firstName(p.name))+'!','Dein Cockpit für Klasse '+code+' ist bereit.'); burst(); },400);
+    setTimeout(()=>toast('ok','Willkommen, '+esc(firstName(p.name))+'!','Dein Cockpit für Klasse '+code+' ('+besitzLabel(besitz)+') ist bereit.'),400);
   }
 }
 
@@ -2246,12 +2420,12 @@ function renderFahrstil(){
 function historyRowsFahr(){
   const w=who(); const entries=state.history.fahr;
   const list=historyUI.expanded?entries:entries.slice(0,6);
-  return list.map(e=>{
+  return list.map((e,i)=>{
     const meta=HISTORY_TYPES[e.type]||HISTORY_TYPES.uebung;
     const d=new Date(e.date);
     const iconName=e.type==='uebung'?w.cfg.icon:(meta.icon||'car-front');
     const wo=e.type==='simulator'?'Simulator · Fahrschule Krebs':FL_NAME;
-    return `<div class="h-row"><div class="h-ic ${meta.sonder?'sonder':''}">${ic(iconName)}</div>
+    return `<div class="h-row row-in" style="animation-delay:${Math.min(i*40,360)}ms"><div class="h-ic ${meta.sonder?'sonder':''}">${ic(iconName)}</div>
       <div class="h-main"><div class="h-title">${meta.label}</div><div class="h-sub">${e.focus}</div>
       <div class="h-meta">${ic('calendar')}${fmtDay(d)}<span>·</span>${ic('clock')}${fmtTime(d)}–${fmtTime(new Date(d.getTime()+e.minutes*60000))} Uhr<span>·</span>${wo}</div></div>
       <div class="h-dur">${e.minutes} min</div></div>`;
@@ -2261,9 +2435,9 @@ function historyRowsTheorie(){
   const entries=state.history.theorie;
   if(!entries.length) return `<div class="h-empty">Für ${who().klasseLabel} ist kein Theorieunterricht vorgesehen –<br/>daher gibt es hier keine Einträge.</div>`;
   const list=historyUI.expanded?entries:entries.slice(0,6);
-  return list.map(e=>{
+  return list.map((e,i)=>{
     const d=new Date(e.date);
-    return `<div class="h-row"><div class="h-ic num">${e.num}</div>
+    return `<div class="h-row row-in" style="animation-delay:${Math.min(i*40,360)}ms"><div class="h-ic num">${e.num}</div>
       <div class="h-main"><div class="h-title">${e.title}</div><div class="h-sub">Thema ${e.num} · ${e.cat}</div>
       <div class="h-meta">${ic('calendar')}${fmtDay(d)}<span>·</span>${ic('clock')}${fmtTime(d)}–${fmtTime(new Date(d.getTime()+e.minutes*60000))} Uhr<span>·</span>Schulungsraum</div></div>
       <div class="h-dur">${e.minutes} min</div></div>`;
@@ -2373,8 +2547,11 @@ function renderExam(){
   if(tp.angemeldet){
     return `<div class="card" id="card-exam"><div class="card-title"><span class="ic">${ic('clipboard-check')}</span>Theorieprüfung<span class="spacer"></span><span class="finance-badge due">${ic('calendar-check')}Angemeldet</span></div><div class="mo-note" style="margin-bottom:14px">${ic('calendar-clock')}<span>Fester Termin: <b style="color:var(--text)">${tp.datum}${tp.time?(' · '+tp.time+' Uhr'):''}</b><br>${tp.ort}</span></div><button class="btn btn-ghost" data-action="exam-pass">${ic('check-check')}Prüfung als bestanden markieren</button></div>`;
   }
-  const eligible=state.theorie.gesamt>0&&state.theorie.besucht>=state.theorie.gesamt;
-  return `<div class="card" id="card-exam"><div class="card-title"><span class="ic">${ic('clipboard-check')}</span>Theorieprüfung</div>${eligible?`<button class="btn btn-primary" data-action="exam-open">${ic('calendar-check')}Zur Theorieprüfung anmelden</button>`:`<div class="mo-note" style="margin-bottom:0">${ic('lock')}<span>Anmeldung frei, sobald alle ${state.theorie.gesamt} Pflichtthemen besucht sind – aktuell ${state.theorie.besucht}/${state.theorie.gesamt}.</span></div>`}</div>`;
+  const sess=state.themeSessions;
+  const besucht=sess.filter(s=>s.status==='erledigt').length;
+  const gebucht=sess.filter(s=>s.status==='gebucht').length;
+  const eligible=state.theorie.gesamt>0&&sess.every(s=>s.status==='erledigt'||s.status==='gebucht');
+  return `<div class="card" id="card-exam"><div class="card-title"><span class="ic">${ic('clipboard-check')}</span>Theorieprüfung</div>${eligible?`<button class="btn btn-primary" data-action="exam-open">${ic('calendar-check')}Zur Theorieprüfung anmelden</button>`:`<div class="mo-note" style="margin-bottom:0">${ic('lock')}<span>Anmeldung frei, sobald alle ${state.theorie.gesamt} Pflichtthemen besucht oder fest gebucht sind – aktuell ${besucht} besucht${gebucht?', '+gebucht+' gebucht':''}. Die fehlenden Themen findest du unten im Themenkatalog.</span></div>`}</div>`;
 }
 function readyConditions(){
   const d=state.dokumente, sf=state.sonderfahrten, tp=state.theoriePruefung;
@@ -2404,13 +2581,37 @@ function renderFuture(){
   return `<section class="section reveal" id="sec-future"><div class="section-head"><div><div class="eyebrow">Ebene C</div><h2 class="section-title">Anstehende Prüfungen</h2></div></div>${renderExam()}${renderReady()}</section>`;
 }
 
-/* ---------- Theorie-Kalender ---------- */
+/* ---------- Theorie-Katalog · alle Themen der eigenen Klasse ---------- */
+let theoryUI={filter:'alle'};
 function tileBadge(s){ if(s==='offen') return `<span class="tt-badge open">${ic('calendar-plus')}Frei</span>`; if(s==='gebucht') return `<span class="tt-badge booked">${ic('check')}Gebucht</span>`; if(s==='erledigt') return `<span class="tt-badge done">${ic('check-check')}Besucht</span>`; return `<span class="tt-badge locked">${ic('lock')}Gesperrt</span>`; }
-function themeTileHTML(t){ const cls=t.status==='gesperrt'?'is-locked':(t.status==='erledigt'?'is-done':''); const numCls=t.num==='Z'?'tt-num z':'tt-num'; return `<article class="theme-tile ${cls}" data-action="theme" data-id="${t.id}" tabindex="0"><div class="tt-top"><div class="${numCls}">${t.num}</div>${tileBadge(t.status)}</div><div class="tt-cat">${t.cat}</div><div class="tt-title">${t.title}</div><div class="tt-foot">${ic('calendar')}${t.day} · ${t.time}</div></article>`; }
+function themeTileHTML(t,i){
+  const cls=t.status==='gesperrt'?'is-locked':(t.status==='erledigt'?'is-done':'');
+  const numCls=t.num.length>2?'tt-num z':'tt-num';
+  const delay=Math.min((i||0)*45,360);
+  return `<article class="theme-tile row-in ${cls}" style="animation-delay:${delay}ms" data-action="theme" data-id="${t.id}" tabindex="0"><div class="tt-top"><div class="${numCls}">${t.num}</div>${tileBadge(t.status)}</div><div class="tt-cat">${t.cat}</div><div class="tt-title">${t.title}</div><div class="tt-foot">${ic('calendar')}${t.day} · ${t.time}</div></article>`;
+}
+function theoryCounts(){
+  const s=state.themeSessions;
+  return {alle:s.length,fehlend:s.filter(x=>x.status!=='erledigt').length,besucht:s.filter(x=>x.status==='erledigt').length};
+}
+function theoryBodyHTML(){
+  const c=theoryCounts(), f=theoryUI.filter;
+  let list=state.themeSessions;
+  if(f==='offen') list=list.filter(s=>s.status!=='erledigt');
+  else if(f==='besucht') list=list.filter(s=>s.status==='erledigt');
+  const chips=`<div class="filter-row" role="tablist">
+    <button class="fchip ${f==='alle'?'active':''}" role="tab" aria-selected="${f==='alle'}" data-action="theory-filter" data-f="alle">Alle <b>${c.alle}</b></button>
+    <button class="fchip ${f==='offen'?'active':''}" role="tab" aria-selected="${f==='offen'}" data-action="theory-filter" data-f="offen">Fehlen noch <b>${c.fehlend}</b></button>
+    <button class="fchip ${f==='besucht'?'active':''}" role="tab" aria-selected="${f==='besucht'}" data-action="theory-filter" data-f="besucht">Besucht <b>${c.besucht}</b></button>
+  </div>`;
+  const tiles=list.length?list.map((t,i)=>themeTileHTML(t,i)).join(''):`<div class="theory-empty">Alle Pflichtthemen sind besucht oder fest gebucht – stark!</div>`;
+  return `${chips}<div class="theme-scroller" id="theme-scroller">${tiles}</div>`;
+}
 function renderTheory(){
   if(state.theorie.gesamt<=0) return '';
-  return `<section class="section reveal" id="sec-theory"><div class="section-head"><div><div class="eyebrow">Theorie-Buchung</div><h2 class="section-title">Termine &amp; Buchung</h2></div><span class="head-note">Thema wählen →</span></div><div class="theme-scroller" id="theme-scroller">${state.themeSessions.map(themeTileHTML).join('')}</div></section>`;
+  return `<section class="section reveal" id="sec-theory"><div class="section-head"><div><div class="eyebrow">Theorie-Buchung</div><h2 class="section-title">Dein Themenkatalog</h2></div><span class="head-note">${who().klasseLabel} · ${besitzLabel(state.besitz)}</span></div><div id="theory-body">${theoryBodyHTML()}</div></section>`;
 }
+function setTheoryFilter(f){ if(!['alle','offen','besucht'].includes(f)||theoryUI.filter===f) return; theoryUI.filter=f; refreshTheory(); }
 
 /* ---------- Karte · Gefahren-Hotspots Fulda ---------- */
 function renderMap(){
@@ -2435,6 +2636,7 @@ function renderFooter(){ return `<div class="foot reveal"><div class="fbrand">Fa
 /* ---------- Cockpit-Mount ---------- */
 function renderCockpitScreen(){
   if(!ensureState()){ navReplace('login'); return; }
+  theoryUI={filter:'alle'};
   const app=el('app'); app.className='';
   app.innerHTML=`<div class="app screen">${renderTopbar()}${renderGreeting()}${renderProgress()}${renderFahrstil()}${renderHistorySection()}${renderFocus()}${renderAvail()}${renderFuture()}${renderTheory()}${renderMap()}${renderTree()}${renderFooter()}</div>`;
   Reveal.wire(app);
@@ -2479,14 +2681,14 @@ function initMap(){
 function refreshDocs(){ const n=el('card-docs'); if(n) n.outerHTML=renderDocs(); }
 function refreshExam(){ const n=el('card-exam'); if(n) n.outerHTML=renderExam(); }
 function refreshCountdown(){ const n=el('card-countdown'); if(n){ n.outerHTML=renderCountdown(); startCountdown(); } }
-function refreshTheory(){ const n=el('theme-scroller'); if(n) n.innerHTML=state.themeSessions.map(themeTileHTML).join(''); }
+function refreshTheory(){ const n=el('theory-body'); if(n) n.innerHTML=theoryBodyHTML(); }
 function refreshFinanceCard(){ const n=el('card-finance'); if(n) n.outerHTML=renderFinance(); }
 function refreshReady(){
   const n=el('ready-panel'); if(n) n.outerHTML=renderReady();
   const ready=readyConditions().all, goal=el('treeGoal'), goalText=el('treeGoalText');
   if(goal) goal.classList.toggle('ready',ready);
   if(goalText) goalText.textContent=ready?'Alle Voraussetzungen erfüllt':'Voraussetzungen in Arbeit';
-  if(ready&&!prevReady){ prevReady=true; setTimeout(()=>{ burst(); haptic('confirm'); toast('ok','Prüfungsreife erreicht!','Du erfüllst alle Voraussetzungen.'); },250); }
+  if(ready&&!prevReady){ prevReady=true; setTimeout(()=>{ pulseFrom(el('ready-panel'),true); haptic('confirm'); toast('ok','Prüfungsreife erreicht!','Du erfüllst alle Voraussetzungen.'); },250); }
   else prevReady=ready;
 }
 function updateSimCount(){ const n=el('simNum'); if(n){ n.innerHTML=`${state.simulator.ist}<small>/${state.simulator.soll}</small>`; n.classList.remove('pop'); void n.offsetWidth; n.classList.add('pop'); } }
@@ -2542,8 +2744,10 @@ function notifSheetHTML(){
   if(pend.length) items.push({icon:'file-warning',t:'Dokumente ausstehend',s:`${pend.length} Nachweis${pend.length>1?'e':''} noch einzuscannen`});
   const off=openAmount();
   if(off>0) items.push({icon:'banknote',t:'Offener Betrag: '+fmtEuro(off),s:'Begleichung vor Ort in der Fahrschule – bar oder mit Karte'});
+  const fehlt=state.themeSessions.filter(s=>s.status==='offen').length;
+  if(fehlt) items.push({icon:'graduation-cap',t:fehlt===1?'1 Theorie-Thema fehlt noch':fehlt+' Theorie-Themen fehlen noch',s:'Termine dafür findest du im Themenkatalog'});
   const tp=state.theoriePruefung;
-  if(tp.erforderlich&&!tp.bestanden) items.push({icon:'clipboard-check',t:'Theorieprüfung',s:tp.angemeldet?`Angemeldet für ${tp.datum} · ${tp.time} Uhr`:'Anmeldung möglich – Termin wählen'});
+  if(tp.erforderlich&&!tp.bestanden) items.push({icon:'clipboard-check',t:'Theorieprüfung',s:tp.angemeldet?`Angemeldet für ${tp.datum} · ${tp.time} Uhr`:'Anmeldung nach Abschluss aller Pflichtthemen'});
   const geb=state.themeSessions.filter(s=>s.status==='gebucht').length;
   if(geb) items.push({icon:'calendar-check',t:'Theorie-Buchungen',s:`${geb===1?'Ein Platz':geb+' Plätze'} fest reserviert`});
   if(state.simulator.ist<state.simulator.soll) items.push({icon:'gamepad-2',t:'Simulator-Empfehlung',s:`Noch ${state.simulator.soll-state.simulator.ist} empfohlene Einheit${(state.simulator.soll-state.simulator.ist)>1?'en':''} offen – Slot sichern`});
@@ -2573,25 +2777,25 @@ function handleTheme(id,tileEl){
   if(s.status==='gebucht'){ toast('info','Bereits gebucht','Dein Platz für dieses Thema ist reserviert.'); return; }
   openMorph(tileEl,themeSheetHTML(s));
 }
-function confirmBooking(id){
-  const s=state.themeSessions.find(x=>x.id===id); if(!s) return;
+function confirmBooking(id,btnEl){
+  const s=state.themeSessions.find(x=>x.id===id); if(!s||s.status!=='offen') return;
   s.status='gebucht'; s.kap.belegt=Math.min(s.kap.gesamt,s.kap.belegt+1);
-  saveState(); haptic('confirm'); closeMorph(); refreshTheory(); burst(); toast('ok','Platz gebucht','„'+s.title+'" – wir sehen uns.');
+  saveState(); haptic('confirm'); pulseFrom(btnEl); closeMorph(); refreshTheory(); refreshExam(); toast('ok','Platz gebucht','„'+s.title+'" – wir sehen uns.');
 }
 let simSelected=null;
 function pickSimSlot(chip){ if(chip.classList.contains('reserved')) return; document.querySelectorAll('#morphInner .slot-chip.selected').forEach(c=>c.classList.remove('selected')); chip.classList.add('selected'); simSelected=chip.getAttribute('data-id'); const b=el('simConfirm'); if(b) b.disabled=false; }
-function confirmSim(){
+function confirmSim(btnEl){
   const slot=state.simSlots.find(s=>s.id===simSelected); if(!slot||slot.reserved) return;
-  slot.reserved=true; state.simulator.ist++; saveState(); haptic('confirm'); closeMorph(); updateSimCount(); burst(); toast('ok','Simulator reserviert',`${slot.day} · ${slot.time} Uhr`); simSelected=null;
+  slot.reserved=true; state.simulator.ist++; saveState(); haptic('confirm'); pulseFrom(btnEl); closeMorph(); updateSimCount(); toast('ok','Simulator reserviert',`${slot.day} · ${slot.time} Uhr`); simSelected=null;
 }
 let examSelected=null;
 function pickExam(row){ document.querySelectorAll('#morphInner .exam-opt.selected').forEach(c=>c.classList.remove('selected')); row.classList.add('selected'); examSelected=row.getAttribute('data-id'); const b=el('examConfirm'); if(b) b.disabled=false; }
-function confirmExam(){
+function confirmExam(btnEl){
   const t=state.examTermine.find(x=>x.id===examSelected); if(!t) return;
   const tp=state.theoriePruefung; tp.angemeldet=true; tp.terminId=t.id; tp.datum=t.label; tp.ort=t.ort; tp.time=t.time;
-  saveState(); haptic('confirm'); closeMorph(); refreshExam(); burst(); toast('ok','Zur Theorieprüfung angemeldet',`${t.label} · ${t.ort}`); examSelected=null;
+  saveState(); haptic('confirm'); pulseFrom(btnEl); closeMorph(); refreshExam(); toast('ok','Zur Theorieprüfung angemeldet',`${t.label} · ${t.ort}`); examSelected=null;
 }
-function passExam(){ state.theoriePruefung.bestanden=true; saveState(); haptic('confirm'); refreshExam(); refreshReady(); burst(); toast('ok','Theorieprüfung bestanden','Glückwunsch!'); }
+function passExam(btnEl){ state.theoriePruefung.bestanden=true; saveState(); haptic('confirm'); pulseFrom(btnEl,true); refreshExam(); refreshReady(); toast('ok','Theorieprüfung bestanden','Glückwunsch!'); }
 function toggleAvail(cell){ const d=cell.getAttribute('data-d'), p=cell.getAttribute('data-p'); const cur=!!(state.verfuegbarkeit[d]&&state.verfuegbarkeit[d][p]); if(!state.verfuegbarkeit[d]) state.verfuegbarkeit[d]={}; state.verfuegbarkeit[d][p]=!cur; cell.classList.toggle('on',!cur); saveState(); if('vibrate' in navigator) navigator.vibrate(8); }
 function requestLesson(btnEl){
   let selected=0, candidates=[];
@@ -2599,17 +2803,18 @@ function requestLesson(btnEl){
   if(selected===0){ haptic('block'); toast('info','Noch keine Zeiten markiert','Tippe im Raster deine freien Fenster an.'); return; }
   if(candidates.length===0){ haptic('block'); toast('block','Kein Match gefunden',`Deine Zeiten überschneiden sich nicht mit ${FL_NAME}. Markiere weitere Fenster.`); return; }
   candidates.sort((a,b)=>a.dt-b.dt); const m=candidates[0];
-  state.naechsteFahrstunde=m.dt.toISOString(); saveState(); refreshCountdown(); haptic('confirm'); burstFrom(btnEl); toast('ok','Fahrstunde gematcht!',`${fmtDayTime(m.dt)} mit ${FL_NAME}`);
+  state.naechsteFahrstunde=m.dt.toISOString(); saveState(); refreshCountdown(); haptic('confirm'); pulseFrom(btnEl); toast('ok','Fahrstunde gematcht!',`${fmtDayTime(m.dt)} mit ${FL_NAME}`);
 }
 function focusHotspot(idx){ const h=hotspots[idx]; if(!h||!mapInstance) return; mapInstance.flyTo([h.lat,h.lng],16,{duration:.8}); if(h._marker) h._marker.openPopup(); const m=el('map'); if(m) m.scrollIntoView({behavior:'smooth',block:'center'}); }
-function readyGo(){ haptic('confirm'); burst(); toast('ok','Prüfungsreife bestätigt','Alle Voraussetzungen sind erfüllt.'); }
+function readyGo(btnEl){ haptic('confirm'); pulseFrom(btnEl,true); toast('ok','Prüfungsreife bestätigt','Alle Voraussetzungen sind erfüllt.'); }
 function resetTraining(){
   let go=true; try{ go=confirm('Ausbildungsdaten wirklich zurücksetzen? Buchungen, Scans und Fortschritt in diesem Cockpit werden auf den Ausgangsstand gebracht.'); }catch(e){}
   if(!go) return;
   const p=getProfile(); if(!p||!p.klasse) return;
   closeMorphInstant();
-  state=buildDefaultState(p.klasse); saveState();
+  state=buildDefaultState(p.klasse,p.besitz||defaultBesitz(p.klasse)); saveState();
   historyUI={tab:'fahr',expanded:false};
+  theoryUI={filter:'alle'};
   renderScreen('cockpit',true);
   setTimeout(()=>toast('ok','Cockpit zurückgesetzt','Ausgangsstand wiederhergestellt.'),250);
 }
@@ -2654,23 +2859,25 @@ document.addEventListener('click',e=>{
     case 'toggle-pass': togglePassVisibility(trg); break;
     case 'auth-reset': deleteAccountFlow(); break;
     case 'klasse-pick': pickKlasse(trg); break;
+    case 'besitz-pick': pickBesitz(trg); break;
     case 'klasse-back': klasseBack(); break;
     case 'klasse-continue': klasseContinue(); break;
     case 'theme': handleTheme(trg.getAttribute('data-id'),trg); break;
-    case 'confirm-booking': confirmBooking(trg.getAttribute('data-id')); break;
+    case 'theory-filter': setTheoryFilter(trg.getAttribute('data-f')); break;
+    case 'confirm-booking': confirmBooking(trg.getAttribute('data-id'),trg); break;
     case 'close-morph': closeMorph(); break;
     case 'scan': startScan(trg.getAttribute('data-doc')); break;
     case 'book-sim': openMorph(trg,simSheetHTML()); break;
     case 'sim-pick': pickSimSlot(trg); break;
-    case 'confirm-sim': confirmSim(); break;
+    case 'confirm-sim': confirmSim(trg); break;
     case 'exam-open': openMorph(trg,examSheetHTML()); break;
     case 'exam-pick': pickExam(trg); break;
-    case 'confirm-exam': confirmExam(); break;
-    case 'exam-pass': passExam(); break;
+    case 'confirm-exam': confirmExam(trg); break;
+    case 'exam-pass': passExam(trg); break;
     case 'avail': toggleAvail(trg); break;
     case 'request-lesson': requestLesson(trg); break;
     case 'focus-hot': focusHotspot(parseInt(trg.getAttribute('data-idx'),10)); break;
-    case 'ready-go': readyGo(); break;
+    case 'ready-go': readyGo(trg); break;
     case 'notifs': openMorph(trg,notifSheetHTML()); break;
     case 'profile': openMorph(trg,profileSheetHTML()); break;
     case 'history-tab': setHistoryTab(trg.getAttribute('data-tab')); break;
