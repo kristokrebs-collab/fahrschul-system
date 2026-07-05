@@ -1,1168 +1,741 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fahrschul-System Pro – Status-Zentrale</title>
-  <!-- Google Fonts für das Premium-Schriftbild -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fahrschul-Zentrale · Admin</title>
+<style>
+/* ── Design-Tokens ─────────────────────────────────────────────────── */
+:root{
+  --bg:#0B0F1E; --surface:#131931; --surface2:#1A2140; --surface3:#222A52;
+  --border:rgba(255,255,255,.08); --border2:rgba(255,255,255,.14);
+  --ink:#F1F5F9; --ink2:#A5B0C6; --ink3:#6B7694;
+  --accent:#6366F1; --accent2:#818CF8;
+  --ok:#10B981; --warn:#F59E0B; --bad:#EF4444; --info:#3B82F6; --neutral:#64748B;
+  --r:12px;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font:14px/1.45 -apple-system,'Segoe UI',Roboto,sans-serif;
+  display:flex; flex-direction:column; overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select{font:inherit}
 
-  <style>
-    /* ── Premium Design-System (Enterprise Dark Mode) ────────────────── */
-    :root {
-      --bg-main:           #060813;
-      --bg-surface:        rgba(30, 41, 74, 0.45);
-      --bg-surface-solid:  #131931;
-      --bg-surface-hover:  rgba(42, 58, 106, 0.7);
-      --border-color:      rgba(255, 255, 255, 0.06);
-      --border-glow:       rgba(99, 102, 241, 0.2);
-      --text-main:         #F8FAFC;
-      --text-muted:        #94A3B8;
+/* ── Header ────────────────────────────────────────────────────────── */
+header{
+  flex-shrink:0; height:60px; padding:0 20px;
+  display:flex; align-items:center; gap:16px;
+  background:var(--surface); border-bottom:1px solid var(--border);
+}
+.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#6366F1,#4F46E5);
+  display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.brand b{font-size:15px;display:block}
+.brand span{font-size:11px;color:var(--ink3)}
+.kpis{margin-left:auto;display:flex;gap:10px}
+.kpi{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:6px 14px;text-align:right;min-width:96px}
+.kpi b{font-size:16px;display:block;font-variant-numeric:tabular-nums}
+.kpi span{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px}
+.kpi.warn b{color:var(--warn)} .kpi.ok b{color:var(--ok)}
+.live-pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  color:var(--ok);background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);
+  border-radius:99px;padding:3px 10px}
+.live-pill.off{color:var(--ink3);background:var(--surface2);border-color:var(--border)}
+.live-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1.6s infinite}
+.live-pill.off .live-dot{animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
-      /* Edelere, weniger gesättigte Ampelfarben mit Glow-Potenzial */
-      --status-red:        #EF4444;
-      --status-orange:     #F97316;
-      --status-yellow:     #F59E0B;
-      --status-blue:       #3B82F6;
-      --status-purple:     #A855F7;
-      --status-green:      #10B981;
-      --status-gray:       #64748B;
-      --status-darkred:    #991B1B;
+/* ── Toolbar ───────────────────────────────────────────────────────── */
+.toolbar{
+  flex-shrink:0; padding:10px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background:rgba(19,25,49,.6); border-bottom:1px solid var(--border);
+}
+.search{position:relative;flex:1;min-width:200px;max-width:340px}
+.search input{
+  width:100%; padding:8px 12px 8px 34px; border-radius:9px;
+  background:var(--surface2); border:1px solid var(--border); color:var(--ink); outline:none;
+}
+.search input:focus{border-color:var(--accent)}
+.search .ic{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink3);font-size:13px}
+select{
+  padding:8px 10px;border-radius:9px;background:var(--surface2);
+  border:1px solid var(--border);color:var(--ink);outline:none;cursor:pointer;
+}
+.chip{
+  padding:7px 13px;border-radius:99px;border:1px solid var(--border);
+  background:var(--surface2);color:var(--ink2);font-size:12.5px;font-weight:600;
+}
+.chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-add{
+  margin-left:auto;padding:8px 16px;border-radius:9px;font-weight:700;
+  background:linear-gradient(135deg,#6366F1,#4F46E5);color:#fff;
+}
+.btn-add:hover{filter:brightness(1.12)}
 
-      --accent-primary:    #4F46E5;
-      --accent-gradient:   linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
-      --accent-hover:      #4338CA;
+/* ── Hauptlayout ───────────────────────────────────────────────────── */
+.main{flex:1;display:grid;grid-template-columns:minmax(340px,430px) 1fr;min-height:0}
+.list-col{border-right:1px solid var(--border);overflow-y:auto;padding:12px}
+.detail-col{overflow-y:auto;padding:18px 22px}
+@media(max-width:860px){
+  .main{grid-template-columns:1fr}
+  .detail-col{display:none}
+  .main.show-detail .list-col{display:none}
+  .main.show-detail .detail-col{display:block}
+}
+.back-btn{display:none;margin-bottom:10px;color:var(--accent2);font-weight:600}
+@media(max-width:860px){.back-btn{display:inline-block}}
 
-      --shadow-sm:         0 2px 8px rgba(0, 0, 0, 0.2);
-      --shadow-md:         0 12px 32px rgba(0, 0, 0, 0.4);
-      --shadow-lg:         0 24px 64px rgba(0, 0, 0, 0.6);
-    }
+/* ── Schüler-Karten ────────────────────────────────────────────────── */
+.count-line{font-size:12px;color:var(--ink3);padding:2px 6px 10px}
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+  padding:12px 14px; margin-bottom:8px; cursor:pointer; transition:border-color .12s;
+}
+.card:hover{border-color:var(--border2)}
+.card.sel{border-color:var(--accent);background:var(--surface2)}
+.card-top{display:flex;align-items:center;gap:10px}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--surface3);
+  display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.card-name{font-weight:700}
+.card-meta{font-size:11.5px;color:var(--ink3)}
+.badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:auto}
+.badge.live{color:var(--ok);background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3)}
+.badge.ready{color:#0B0F1E;background:var(--ok)}
+.badge.crit{color:var(--bad);background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3)}
+.mini-rows{margin-top:9px;display:grid;gap:5px}
+.mini-row{display:grid;grid-template-columns:52px 1fr 64px;gap:8px;align-items:center;font-size:11px}
+.mini-row .lbl{color:var(--ink3);font-weight:600}
+.mini-row .val{text-align:right;color:var(--ink2);font-variant-numeric:tabular-nums}
+.bar{height:5px;border-radius:99px;background:var(--surface3);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--accent2)}
+.card-flags{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.flag{font-size:10.5px;padding:2px 8px;border-radius:6px;font-weight:600}
+.flag.bad{color:var(--bad);background:rgba(239,68,68,.1)}
+.flag.warn{color:var(--warn);background:rgba(245,158,11,.1)}
+.flag.ok{color:var(--ok);background:rgba(16,185,129,.1)}
+.no-result{color:var(--ink3);text-align:center;padding:40px 10px}
 
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+/* ── Detail ────────────────────────────────────────────────────────── */
+.d-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--ink3);gap:8px}
+.d-empty .big{font-size:34px}
+.d-head{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.d-avatar{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,#6366F1,#4F46E5);
+  display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;color:#fff}
+.d-name{font-size:19px;font-weight:800}
+.d-sub{font-size:12.5px;color:var(--ink3)}
+.d-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.panel h3{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--ink3);margin-bottom:12px;
+  display:flex;align-items:center;gap:7px}
+.prog-row{margin-bottom:12px}
+.prog-row:last-child{margin-bottom:0}
+.prog-top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px}
+.prog-top .l{color:var(--ink2);font-weight:600}
+.prog-top .v{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:700}
+.bar.big{height:8px}
+.bar i.full{background:var(--ok)}
+.step-btns{display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle}
+.step-btns button{width:20px;height:20px;border-radius:6px;background:var(--surface3);
+  font-size:12px;line-height:1;color:var(--ink2)}
+.step-btns button:hover{background:var(--accent);color:#fff}
+.status-chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;display:inline-flex;align-items:center;gap:5px}
+.status-chip.ok{color:var(--ok);background:rgba(16,185,129,.12)}
+.status-chip.warn{color:var(--warn);background:rgba(245,158,11,.12)}
+.status-chip.bad{color:var(--bad);background:rgba(239,68,68,.12)}
+.status-chip.info{color:var(--info);background:rgba(59,130,246,.12)}
+.doc-row,.fin-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.doc-row:last-child,.fin-row:last-child{border-bottom:none}
+.doc-name{font-weight:600;flex:1}
+.mini-btn{font-size:11.5px;font-weight:600;padding:5px 10px;border-radius:7px;
+  background:var(--surface3);color:var(--ink2)}
+.mini-btn:hover{background:var(--accent);color:#fff}
+.mini-btn.ok:hover{background:var(--ok)}
+.fin-label{flex:1;color:var(--ink2)}
+.fin-amount{font-weight:700;font-variant-numeric:tabular-nums}
+.fin-total{display:flex;justify-content:space-between;padding-top:10px;margin-top:4px;
+  border-top:1px solid var(--border2);font-weight:800}
+.fin-add{display:flex;gap:6px;margin-top:10px}
+.fin-add input{flex:1;min-width:0;padding:6px 9px;border-radius:7px;background:var(--surface2);
+  border:1px solid var(--border);color:var(--ink);outline:none;font-size:12.5px}
+.check-item{display:flex;gap:9px;padding:6px 0;font-size:13px;align-items:baseline}
+.check-item .mark{font-weight:800;flex-shrink:0}
+.check-item.done .mark{color:var(--ok)} .check-item.done{color:var(--ink3);text-decoration:line-through}
+.check-item.open .mark{color:var(--warn)}
+.ready-banner{margin-top:10px;padding:10px 12px;border-radius:9px;font-weight:700;font-size:13px;text-align:center}
+.ready-banner.yes{color:var(--ok);background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3)}
+.ready-banner.no{color:var(--warn);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25)}
+.danger-zone{margin-top:14px;text-align:right}
+.danger-zone button{color:var(--bad);font-size:12px;opacity:.75}
+.danger-zone button:hover{opacity:1}
 
-    body {
-      background: radial-gradient(circle at 50% 0%, #111736 0%, var(--bg-main) 70%);
-      color: var(--text-main);
-      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      font-size: 14px;
-      letter-spacing: -0.1px;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── Premium Header ──────────────────────────────────────────────── */
-    .app-header {
-      flex-shrink: 0;
-      background: rgba(11, 15, 30, 0.6);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--border-color);
-      padding: 0 28px;
-      height: 64px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .header-brand { display: flex; align-items: center; gap: 14px; }
-    .header-brand-icon-wrap {
-      width: 36px; height: 36px; border-radius: 10px;
-      background: var(--accent-gradient);
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
-    }
-    .header-brand-icon { font-size: 18px; }
-    .header-brand-title { font-size: 16px; font-weight: 800; letter-spacing: 0.2px; background: linear-gradient(to right, #FFF, #C7D2FE); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .header-brand-sub { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 1px; }
-    .header-user {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 700; color: var(--text-main);
-      box-shadow: var(--shadow-sm);
-    }
-
-    /* ── High-End Filter Bar ─────────────────────────────────────────── */
-    .filter-bar {
-      flex-shrink: 0;
-      background: rgba(11, 15, 30, 0.3);
-      border-bottom: 1px solid var(--border-color);
-      padding: 12px 28px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .search-wrap { position: relative; }
-    .search-box {
-      background: rgba(5, 7, 16, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      padding: 8px 14px 8px 36px;
-      color: var(--text-main);
-      font-size: 13px;
-      font-weight: 500;
-      width: 240px;
-      outline: none;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .search-box:focus { border-color: var(--accent-primary); box-shadow: 0 0 12px rgba(99, 102, 241, 0.2); width: 280px; }
-    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; font-size: 12px; }
-
-    .filter-btn {
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: 9px;
-      padding: 7px 14px;
-      color: var(--text-muted);
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .filter-btn:hover { background: rgba(255, 255, 255, 0.04); color: var(--text-main); }
-    .filter-btn.active {
-      background: rgba(99, 102, 241, 0.08);
-      border-color: rgba(99, 102, 241, 0.3);
-      color: #A5B4FC;
-      box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
-    }
-    .filter-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.08); margin: 0 4px; }
-    .student-count { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-muted); background: rgba(255,255,255,0.03); padding: 4px 10px; border-radius: 20px; border: 1px solid var(--border-color); }
-
-    /* ── Glassmorphism 3-Spalten-Grid ────────────────────────────────── */
-    .main-grid {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 310px 1fr 340px;
-      overflow: hidden;
-    }
-    .col { display: flex; flex-direction: column; overflow: hidden; }
-    .col + .col { border-left: 1px solid var(--border-color); }
-    .col-head {
-      flex-shrink: 0;
-      padding: 16px 20px;
-      font-size: 11px;
-      font-weight: 800;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 1.2px;
-      border-bottom: 1px solid var(--border-color);
-      background: rgba(11, 15, 30, 0.2);
-    }
-    .col-body { flex: 1; overflow-y: auto; padding: 16px; }
-    .col-body::-webkit-scrollbar { width: 6px; }
-    .col-body::-webkit-scrollbar-track { background: transparent; }
-    .col-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 20px; }
-    .col-body::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
-
-    /* ── Spalte 1: High-Tech Prio Card ───────────────────────────────── */
-    .prio-card {
-      background: var(--bg-surface);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border: 1px solid var(--border-color);
-      border-radius: 14px;
-      padding: 16px;
-      margin-bottom: 12px;
-      cursor: pointer;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: var(--shadow-sm);
-    }
-    .prio-card:hover {
-      background: var(--bg-surface-hover);
-      border-color: rgba(255, 255, 255, 0.12);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
-    .prio-card.selected {
-      border-color: var(--accent-primary);
-      background: rgba(79, 70, 229, 0.08);
-      box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), inset 0 0 12px rgba(99, 102, 241, 0.05);
-    }
-    .prio-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-    .prio-card-name { font-size: 14px; font-weight: 700; color: #FFF; }
-    .prio-badge {
-      font-size: 9px; font-weight: 800; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.3px;
-      background: rgba(249, 115, 22, 0.1); color: var(--status-orange); border: 1px solid rgba(249, 115, 22, 0.2);
-    }
-    .prio-badge.critical {
-      background: rgba(239, 68, 68, 0.1); color: var(--status-red); border-color: rgba(239, 68, 68, 0.25);
-      animation: pulseGlow 2s infinite ease-in-out;
-    }
-    .prio-badge.ok {
-      background: rgba(16, 185, 129, 0.1); color: var(--status-green); border-color: rgba(16, 185, 129, 0.25);
-    }
-    @keyframes pulseGlow {
-      0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-      70%  { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-    }
-
-    .prio-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; font-weight: 500; }
-    .prio-reason {
-      font-size: 11px; color: #FDA4AF; background: rgba(239, 68, 68, 0.05);
-      padding: 6px 10px; border-radius: 8px; margin-bottom: 10px; border-left: 2px solid var(--status-red);
-    }
-    .prio-card.selected .prio-reason { background: rgba(239, 68, 68, 0.1); }
-    .prio-reason.normal  { color: #A5B4FC; border-left-color: var(--accent-primary); background: rgba(99,102,241,0.05); }
-    .prio-reason.warning { color: #FDE047; border-left-color: var(--status-yellow); background: rgba(245,158,11,0.05); }
-
-    .prio-dots { display: flex; gap: 6px; align-items: center; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 10px; }
-    .prio-dot { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.5); }
-    .prio-dot-label { font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.5px; margin-left: 2px; }
-
-    /* ── Spalte 2: Data Matrix Grid ──────────────────────────────────── */
-    .matrix-header-row, .matrix-row {
-      display: grid;
-      grid-template-columns: 1fr repeat(5, 76px) 100px;
-      gap: 10px;
-      align-items: center;
-    }
-    .matrix-header-row { padding: 0 16px 8px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); margin-bottom: 10px; }
-    .mh-cell { font-size: 10px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.8px; text-transform: uppercase; text-align: center; }
-    .mh-cell:first-child { text-align: left; }
-
-    .matrix-row {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      border-radius: 14px;
-      padding: 12px 16px;
-      margin-bottom: 10px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .matrix-row:hover { background: var(--bg-surface-hover); border-color: rgba(255,255,255,0.1); }
-    .matrix-row.selected { border-color: var(--accent-primary); box-shadow: 0 0 15px rgba(99, 102, 241, 0.1); }
-    .mx-name { font-size: 14px; font-weight: 700; color: #FFF; display: flex; align-items: center; gap: 8px; }
-    .class-badge {
-      font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px;
-      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08); color: #E2E8F0;
-    }
-
-    /* Premium Status-Tiles */
-    .tile {
-      height: 38px; border-radius: 10px;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-size: 10px; font-weight: 800; letter-spacing: 0.5px;
-      cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-      border: 1px solid transparent;
-      line-height: 1.1; user-select: none; position: relative; overflow: hidden;
-    }
-    .tile::after {
-      content: ''; position: absolute; inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 100%);
-      pointer-events: none;
-    }
-    .tile:hover { transform: translateY(-2px); filter: brightness(1.25); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
-
-    .tile.red      { background: rgba(239, 68, 68, 0.12);   color: #FCA5A5; border-color: rgba(239, 68, 68, 0.3); }
-    .tile.orange   { background: rgba(249, 115, 22, 0.12);  color: #FED7AA; border-color: rgba(249, 115, 22, 0.3); }
-    .tile.yellow   { background: rgba(245, 158, 11, 0.12);  color: #FEF08A; border-color: rgba(245, 158, 11, 0.3); }
-    .tile.blue     { background: rgba(59, 130, 246, 0.12);  color: #BFDBFE; border-color: rgba(59, 130, 246, 0.3); }
-    .tile.purple   { background: rgba(168, 85, 247, 0.12);  color: #E9D5FF; border-color: rgba(168, 85, 247, 0.3); }
-    .tile.green    { background: rgba(16, 185, 129, 0.12);  color: #A7F3D0; border-color: rgba(16, 185, 129, 0.3); }
-    .tile.gray     { background: rgba(100, 116, 139, 0.12); color: #CBD5E1; border-color: rgba(100, 116, 139, 0.25); }
-    .tile.darkred  { background: rgba(153, 27, 27, 0.15);   color: #FCA5A5; border-color: rgba(153, 27, 27, 0.35); }
-
-    .exam-btn {
-      height: 38px; border-radius: 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
-      cursor: pointer; border: 1px solid transparent; transition: all 0.2s;
-    }
-    .exam-btn.ready {
-      background: var(--status-green); color: #FFF;
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-    }
-    .exam-btn.ready:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(16, 185, 129, 0.45); }
-    .exam-btn.not-ready {
-      background: rgba(255,255,255,0.02); border-color: rgba(255,255,255,0.05);
-      color: var(--text-muted); cursor: not-allowed;
-    }
-
-    /* ── Spalte 3: High-End Kontext-Panel ────────────────────────────── */
-    .context-empty {
-      height: 100%; display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      color: var(--text-muted); text-align: center; padding: 32px; gap: 14px;
-    }
-    .context-empty-icon {
-      width: 56px; height: 56px; border-radius: 16px; background: rgba(255,255,255,0.02);
-      display: flex; align-items: center; justify-content: center; font-size: 24px;
-      border: 1px solid var(--border-color); opacity: 0.7;
-    }
-    .context-empty-title { font-size: 15px; font-weight: 700; color: #FFF; }
-    .context-empty-sub { font-size: 12px; line-height: 1.6; max-width: 220px; }
-
-    .profile-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
-    .avatar {
-      width: 52px; height: 52px; border-radius: 14px;
-      background: var(--accent-gradient);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px; font-weight: 800; color: #FFF;
-      flex-shrink: 0; box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
-    }
-    .profile-name { font-size: 16px; font-weight: 800; color: #FFF; letter-spacing: -0.2px; }
-    .profile-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; font-weight: 500; }
-
-    .rule-alert {
-      border-radius: 10px; padding: 10px 14px; font-size: 11px; font-weight: 500;
-      margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; line-height: 1.5;
-    }
-    .rule-alert.red    { background: rgba(239,68,68,0.08);   border: 1px solid rgba(239,68,68,0.2);   color: #FCA5A5; }
-    .rule-alert.orange { background: rgba(249,115,22,0.08);  border: 1px solid rgba(249,115,22,0.2);  color: #FFEDD5; }
-    .rule-alert.info   { background: rgba(99,102,241,0.08);  border: 1px solid rgba(99,102,241,0.2);  color: #E0E7FF; }
-
-    .detail-card {
-      background: rgba(15, 22, 49, 0.4);
-      border: 1px solid var(--border-color);
-      border-radius: 14px;
-      padding: 14px 16px;
-      margin-bottom: 12px;
-      box-shadow: var(--shadow-sm);
-    }
-    .detail-card-title {
-      font-size: 10px; font-weight: 800; color: var(--text-muted);
-      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
-    }
-    .detail-row {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 7px 0; font-size: 12px;
-      border-bottom: 1px solid rgba(255,255,255,0.03);
-    }
-    .detail-row:last-child { border-bottom: none; }
-    .detail-label { color: var(--text-muted); font-weight: 500; }
-    .detail-val { font-weight: 600; color: #FFF; }
-
-    .progress-bar-wrap { height: 6px; background: rgba(5,7,16,0.5); border-radius: 4px; flex: 1; margin-left: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.02); }
-    .progress-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
-
-    .action-btn-row { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
-    .action-btn {
-      width: 100%; padding: 10px 14px; border-radius: 10px;
-      background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);
-      color: var(--text-main); font-size: 12px; font-weight: 600;
-      cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px;
-      transition: all 0.2s;
-    }
-    .action-btn:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); transform: translateY(-1px); }
-    .action-btn.success {
-      background: var(--status-green); border-color: transparent; color: #FFF; justify-content: center;
-      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2); font-weight: 700;
-    }
-    .action-btn.success:hover { background: #059669; box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35); }
-
-    /* Premium Chat bar */
-    .chat-bar {
-      flex-shrink: 0; display: flex; gap: 8px; padding: 12px 16px;
-      border-top: 1px solid var(--border-color); background: rgba(11, 15, 30, 0.4);
-    }
-    .chat-input {
-      flex: 1; background: rgba(5, 7, 16, 0.5); border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 10px; padding: 8px 14px; color: var(--text-main); font-size: 13px; outline: none; transition: border-color 0.2s;
-      font-family: inherit;
-    }
-    .chat-input:focus { border-color: var(--accent-primary); }
-    .chat-send {
-      background: var(--accent-gradient); border: none; border-radius: 10px;
-      padding: 0 16px; color: #FFF; font-size: 13px; font-weight: 600; cursor: pointer;
-      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2); transition: all 0.2s; font-family: inherit;
-    }
-    .chat-send:hover { filter: brightness(1.15); transform: translateY(-1px); }
-
-    /* ── High-End Studio Modal ───────────────────────────────────────── */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(3, 5, 12, 0.85); backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal-box {
-      background: var(--bg-surface-solid); border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 20px; padding: 28px; width: 480px; max-width: 92vw;
-      max-height: 82vh; overflow-y: auto; box-shadow: var(--shadow-lg);
-    }
-    .modal-box::-webkit-scrollbar { width: 5px; }
-    .modal-box::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 20px; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-    .modal-title { font-size: 16px; font-weight: 800; color: #FFF; }
-    .modal-close {
-      background: rgba(255,255,255,0.04); border: none; color: var(--text-muted);
-      width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.15s;
-    }
-    .modal-close:hover { background: rgba(255,255,255,0.1); color: #FFF; }
-    .modal-section { margin-bottom: 20px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.03); padding: 14px; border-radius: 12px; }
-    .modal-section-title { font-size: 10px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
-
-    .radio-option {
-      display: flex; align-items: center; gap: 12px;
-      padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; margin-bottom: 4px;
-    }
-    .radio-option:hover { background: rgba(255,255,255,0.04); }
-    .radio-option input[type="radio"] { accent-color: #6366F1; width: 16px; height: 16px; }
-    .color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-
-    .modal-save {
-      width: 100%; padding: 12px; background: var(--accent-gradient);
-      color: #FFF; border: none; border-radius: 12px; font-size: 14px;
-      font-weight: 700; cursor: pointer; transition: all 0.2s; margin-top: 8px;
-      box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3); font-family: inherit;
-    }
-    .modal-save:hover { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45); }
-
-    .modal-text-input {
-      width: 100%; background: rgba(5,7,16,0.5); border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 8px; padding: 10px 14px; color: var(--text-main); font-size: 14px; outline: none;
-      transition: border-color 0.15s; font-family: inherit;
-    }
-    .modal-text-input:focus { border-color: var(--accent-primary); }
-    .range-wrap { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
-    .range-wrap input[type="range"] { flex: 1; accent-color: #6366F1; }
-    .range-val { font-size: 22px; font-weight: 800; min-width: 32px; text-align: center; color: #FFF; }
-
-    .cb-option { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; cursor: pointer; }
-    .cb-option:hover { background: rgba(255,255,255,0.04); }
-    .cb-option input[type="checkbox"] { accent-color: #6366F1; width: 16px; height: 16px; }
-
-    .num-inputs { display: flex; flex-direction: column; gap: 10px; }
-    .num-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 500; }
-    .num-input {
-      width: 64px; background: rgba(5,7,16,0.5); border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 8px; padding: 6px 10px; color: var(--text-main); text-align: center;
-      font-size: 13px; font-weight: 600; outline: none; font-family: inherit;
-    }
-    .the-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-    .the-checkbox { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; padding: 6px 0; border-radius: 6px; }
-    .the-checkbox:hover { background: rgba(255,255,255,0.03); }
-    .the-checkbox input { accent-color: #6366F1; width: 15px; height: 15px; }
-    .the-checkbox span { font-size: 11px; color: var(--text-muted); font-weight: 600; }
-
-    .re-list { display: flex; flex-direction: column; gap: 8px; }
-    .re-row { display: flex; gap: 8px; align-items: center; }
-    .re-input {
-      flex: 1; background: rgba(5,7,16,0.5); border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 8px; padding: 8px 12px; color: var(--text-main); font-size: 13px;
-      outline: none; font-family: inherit;
-    }
-    .re-del {
-      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
-      border-radius: 8px; padding: 7px 12px; color: #FCA5A5; cursor: pointer; font-size: 12px; transition: all 0.15s;
-    }
-    .re-del:hover { background: rgba(239,68,68,0.2); }
-    .re-add {
-      width: 100%; background: transparent; border: 1px dashed rgba(255,255,255,0.15);
-      border-radius: 8px; padding: 9px; color: var(--text-muted); font-size: 12px; font-weight: 600;
-      cursor: pointer; transition: all 0.2s; font-family: inherit;
-    }
-    .re-add:hover { border-color: rgba(255,255,255,0.3); color: #FFF; background: rgba(255,255,255,0.01); }
-
-    /* ── Toast Notification ──────────────────────────────────────────── */
-    #toast {
-      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px);
-      background: #1E1B4B; border: 1px solid #4F46E5; color: #E0E7FF;
-      padding: 12px 24px; border-radius: 12px; font-size: 13px; font-weight: 600;
-      z-index: 9999; box-shadow: var(--shadow-lg); pointer-events: none;
-      opacity: 0; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* ── Utilities ───────────────────────────────────────────────────── */
-    .no-result { text-align: center; padding: 40px 16px; color: var(--text-muted); font-size: 13px; font-weight: 500; }
-    .section-divider { height: 1px; background: rgba(255,255,255,0.05); margin: 16px 0; }
-  </style>
+/* ── Modal & Toast ─────────────────────────────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(4,6,14,.7);display:none;
+  align-items:center;justify-content:center;z-index:50;padding:16px}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;
+  width:100%;max-width:420px;padding:20px}
+.modal h2{font-size:16px;margin-bottom:14px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11.5px;font-weight:600;color:var(--ink3);margin-bottom:5px}
+.field input,.field select{width:100%;padding:9px 11px;border-radius:9px;
+  background:var(--surface2);border:1px solid var(--border);color:var(--ink);outline:none}
+.field input:focus{border-color:var(--accent)}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.btn-ghost{padding:9px 14px;border-radius:9px;color:var(--ink2);border:1px solid var(--border)}
+.btn-primary{padding:9px 18px;border-radius:9px;font-weight:700;
+  background:linear-gradient(135deg,#6366F1,#4F46E5);color:#fff}
+#toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--surface3);border:1px solid var(--border2);border-radius:10px;
+  padding:10px 18px;font-weight:600;font-size:13px;opacity:0;transition:.25s;z-index:60;pointer-events:none}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+::-webkit-scrollbar{width:9px} ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:9px}
+</style>
 </head>
 <body>
 
-<!-- ── Header ──────────────────────────────────────────────────────────── -->
-<header class="app-header">
-  <div class="header-brand">
-    <div class="header-brand-icon-wrap"><span class="header-brand-icon">⚡</span></div>
-    <div>
-      <div class="header-brand-title">Fahrschul-System Pro</div>
-      <div class="header-brand-sub">Schüler-Status-Zentrale · Enterprise-Steuerung</div>
-    </div>
-  </div>
-  <div style="display:flex;align-items:center;gap:18px;">
-    <span style="font-size:12px;color:var(--text-muted);font-weight:600;" id="currentDate"></span>
-    <div class="header-user">M</div>
+<header>
+  <div class="logo">🚗</div>
+  <div class="brand"><b>Fahrschul-Zentrale</b><span>Admin · Schüler-Verwaltung</span></div>
+  <span class="live-pill off" id="livePill"><span class="live-dot"></span><span id="livePillText">Keine App verbunden</span></span>
+  <div class="kpis">
+    <div class="kpi"><b id="kpiCount">0</b><span>Schüler</span></div>
+    <div class="kpi warn"><b id="kpiOpen">0 €</b><span>Offen</span></div>
+    <div class="kpi ok"><b id="kpiReady">0</b><span>Prüfungsreif</span></div>
   </div>
 </header>
 
-<!-- ── Filter-Leiste ───────────────────────────────────────────────────── -->
-<div class="filter-bar">
-  <div class="search-wrap">
-    <span class="search-icon">🔍</span>
-    <input class="search-box" id="searchInput" type="text" placeholder="Schüler suchen…" oninput="applyFilters()">
+<div class="toolbar">
+  <div class="search">
+    <span class="ic">🔍</span>
+    <input id="searchInput" type="text" placeholder="Schüler suchen (Name, Klasse) …" oninput="render()">
   </div>
-  <div class="filter-sep"></div>
-  <button class="filter-btn active" id="btn-all"        onclick="setFilter('all')">Alle</button>
-  <button class="filter-btn"        id="btn-critical"   onclick="setFilter('critical')"><span style="color:var(--status-red)">●</span> Kritisch</button>
-  <button class="filter-btn"        id="btn-waiting"    onclick="setFilter('waiting')"><span style="color:var(--status-yellow)">●</span> Wartet auf Büro</button>
-  <button class="filter-btn"        id="btn-exam-ready" onclick="setFilter('exam-ready')"><span style="color:var(--status-green)">●</span> Prüfungsreif</button>
-  <span class="student-count" id="studentCount">3 Schüler</span>
+  <select id="sortSel" onchange="render()">
+    <option value="prio">Sortierung: Priorität</option>
+    <option value="name">Name A–Z</option>
+    <option value="klasse">Klasse</option>
+    <option value="theorie">Theorie-Fortschritt</option>
+    <option value="praxis">Praxis-Fortschritt</option>
+    <option value="offen">Offener Betrag</option>
+  </select>
+  <button class="chip active" data-f="all" onclick="setFilter('all')">Alle</button>
+  <button class="chip" data-f="crit" onclick="setFilter('crit')">⛔ Kritisch</button>
+  <button class="chip" data-f="docs" onclick="setFilter('docs')">📂 Nachweise fehlen</button>
+  <button class="chip" data-f="ready" onclick="setFilter('ready')">🏁 Prüfungsreif</button>
+  <button class="chip" data-f="live" onclick="setFilter('live')">🟢 Live-App</button>
+  <button class="btn-add" onclick="openAdd()">＋ Neuer Schüler</button>
 </div>
 
-<!-- ── 3-Spalten-Layout ────────────────────────────────────────────────── -->
-<div class="main-grid">
-
-  <!-- Spalte 1: Prio-Pipeline -->
-  <div class="col">
-    <div class="col-head">⚡ Prio-Pipeline &amp; Dringlichkeit</div>
-    <div class="col-body" id="prioList"></div>
+<div class="main" id="mainGrid">
+  <div class="list-col">
+    <div class="count-line" id="countLine"></div>
+    <div id="studentList"></div>
   </div>
-
-  <!-- Spalte 2: Status-Matrix -->
-  <div class="col">
-    <div class="col-head" style="padding:16px 20px 16px 24px;">
-      <div class="matrix-header-row" style="padding:0;">
-        <div class="mh-cell" style="text-align:left;">Schüler</div>
-        <div class="mh-cell">DOK</div>
-        <div class="mh-cell">FIN</div>
-        <div class="mh-cell">THE</div>
-        <div class="mh-cell">TP</div>
-        <div class="mh-cell">PRAX</div>
-        <div class="mh-cell">Freigabe</div>
-      </div>
-    </div>
-    <div class="col-body" style="padding:8px 10px 16px 10px;" id="matrixBody"></div>
-  </div>
-
-  <!-- Spalte 3: Kontext & Aktionen -->
-  <div class="col">
-    <div class="col-head">⚙️ System-Aktionen &amp; Akte</div>
-    <div class="col-body" id="contextPanel">
-      <div class="context-empty">
-        <div class="context-empty-icon">📂</div>
-        <div class="context-empty-title">Schüler-Kontext laden</div>
-        <div class="context-empty-sub">Wähle einen Datensatz aus, um automatische Regelprüfungen und Schnell-Aktionen zu steuern.</div>
-      </div>
-    </div>
-    <div class="chat-bar" id="chatBar" style="display:none;">
-      <input class="chat-input" id="chatInput" type="text" placeholder="Schnellnotiz für Schülerakte erfassen…">
-      <button class="chat-send" onclick="sendChat()">Senden</button>
-    </div>
-  </div>
-
-</div>
-
-<!-- ── Modal ───────────────────────────────────────────────────────────── -->
-<div class="modal-overlay" id="modalOverlay" onclick="overlayClick(event)">
-  <div class="modal-box">
-    <div class="modal-header">
-      <div class="modal-title" id="modalTitle">Status bearbeiten</div>
-      <button class="modal-close" onclick="closeModal()">✕</button>
-    </div>
-    <div id="modalBody"></div>
-    <button class="modal-save" onclick="saveModal()">💾 Konfiguration anwenden</button>
+  <div class="detail-col" id="detailCol">
+    <div class="d-empty"><span class="big">📂</span><b>Kein Schüler ausgewählt</b>
+      <span>Wähle links einen Schüler, um Theorie, Praxis, Zahlungen und Nachweise zu sehen.</span></div>
   </div>
 </div>
 
-<!-- ── Toast ────────────────────────────────────────────────────────────── -->
+<div class="overlay" id="addOverlay">
+  <div class="modal">
+    <h2>Neuen Schüler anlegen</h2>
+    <div class="field"><label>Name</label><input id="fName" type="text" placeholder="Vor- und Nachname"></div>
+    <div class="field"><label>Geburtsdatum</label><input id="fGeb" type="date"></div>
+    <div class="field"><label>Führerscheinklasse</label>
+      <select id="fKlasse">
+        <option value="B">B · Pkw</option><option value="B197">B197 · Pkw Automatik</option>
+        <option value="BE">BE · Pkw + Anhänger</option><option value="A">A · Motorrad</option>
+        <option value="A2">A2 · Motorrad 35 kW</option><option value="A1">A1 · Leichtkraftrad</option>
+        <option value="AM">AM · Roller/Moped</option><option value="C">C · Lkw</option>
+        <option value="CE">CE · Lastzug</option>
+      </select></div>
+    <div class="field"><label>Ausbildungsart</label>
+      <select id="fBesitz"><option value="erst">Erst-Erwerb</option><option value="erweiterung">Erweiterung (Vorbesitz)</option></select></div>
+    <div class="field"><label>Grundbetrag offen (€)</label><input id="fGrund" type="number" min="0" step="10" value="450"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeAdd()">Abbrechen</button>
+      <button class="btn-primary" onclick="saveAdd()">Anlegen</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
 'use strict';
-
-/* ═══════════════════════════════════════════════════════════════════════
-   DATEN-STATE
-═══════════════════════════════════════════════════════════════════════ */
-const students = [
-  {
-    id: 'SCH-001',
-    name: 'Tobias Maier',
-    geburtsdatum: '12.05.2003',
-    klasse: 'B',
-    vorbesitz: false,
-    ausbildungsTyp: 'Schaltung',
-    daysInSystem: 42,
-    lastActivity: 14,
-    dok: { passbild: 'Fehlt', sehtest: 'Fehlt', ersteHilfe: 'Fehlt', tuevAntrag: 'Nicht gestellt' },
-    fin: { guthaben_cent: -15500, offeneRechnungen: ['RE-2024-011', 'RE-2024-012'] },
-    the: { stundenBesucht: [1, 2], pflichtStunden: 12 },
-    tp: { status: 'Nicht angemeldet' },
-    prax: {
-      simulatorErledigt: 1, grundausbildungAbgeschlossen: false,
-      ueberlandAbsolviert: 0, ueberlandPflicht: 5,
-      autobahnAbsolviert: 0, autobahnPflicht: 4,
-      nachtAbsolviert: 0, nachtPflicht: 3, praktischePruefung: 'Offen'
-    }
-  },
-  {
-    id: 'SCH-002',
-    name: 'Lisa Baumann',
-    geburtsdatum: '28.11.2001',
-    klasse: 'B',
-    vorbesitz: false,
-    ausbildungsTyp: 'Automatik',
-    daysInSystem: 90,
-    lastActivity: 3,
-    dok: { passbild: 'Verifiziert', sehtest: 'Eingereicht', ersteHilfe: 'Verifiziert', tuevAntrag: 'Läuft' },
-    fin: { guthaben_cent: -7500, offeneRechnungen: ['RE-2024-019'] },
-    the: { stundenBesucht: [1,2,3,4,5,6,7,8,9], pflichtStunden: 12 },
-    tp: { status: 'Warteliste' },
-    prax: {
-      simulatorErledigt: 4, grundausbildungAbgeschlossen: true,
-      ueberlandAbsolviert: 2, ueberlandPflicht: 5,
-      autobahnAbsolviert: 1, autobahnPflicht: 4,
-      nachtAbsolviert: 1, nachtPflicht: 3, praktischePruefung: 'Offen'
-    }
-  },
-  {
-    id: 'SCH-003',
-    name: 'Marco Schulze',
-    geburtsdatum: '03.08.1998',
-    klasse: 'B',
-    vorbesitz: true,
-    ausbildungsTyp: 'B197',
-    daysInSystem: 130,
-    lastActivity: 1,
-    dok: { passbild: 'Verifiziert', sehtest: 'Verifiziert', ersteHilfe: 'Verifiziert', tuevAntrag: 'Genehmigt' },
-    fin: { guthaben_cent: 2000, offeneRechnungen: [] },
-    the: { stundenBesucht: [1,2,3,4,5,6], pflichtStunden: 6 },
-    tp: { status: 'Bestanden' },
-    prax: {
-      simulatorErledigt: 3, grundausbildungAbgeschlossen: true,
-      ueberlandAbsolviert: 5, ueberlandPflicht: 5,
-      autobahnAbsolviert: 4, autobahnPflicht: 4,
-      nachtAbsolviert: 3, nachtPflicht: 3, praktischePruefung: 'Sucht Termin'
-    }
-  }
-];
-
-/* ═══════════════════════════════════════════════════════════════════════
-   BUSINESS RULES / STATUS-BERECHNUNG
-═══════════════════════════════════════════════════════════════════════ */
-function computeDOK(s) {
-  const d = s.dok;
-  if (d.passbild === 'Verifiziert' && d.sehtest === 'Verifiziert' && d.ersteHilfe === 'Verifiziert' && d.tuevAntrag === 'Genehmigt')
-    return { color: 'green', label: '✓ OK', desc: 'Vollständig' };
-  if (d.sehtest === 'Beim Amt' || d.tuevAntrag === 'Läuft')
-    return { color: 'blue', label: 'AMT', desc: 'Beim Amt/TÜV' };
-  if ([d.passbild, d.sehtest, d.ersteHilfe].some(v => v === 'Eingereicht'))
-    return { color: 'yellow', label: 'BÜRO', desc: 'Wartet auf Büro' };
-  return { color: 'red', label: 'FEHLT', desc: 'Dokumente fehlen' };
-}
-
-function computeFIN(s) {
-  const g = s.fin.guthaben_cent;
-  if (g < -10000) return { color: 'red',    label: 'SPERRE', desc: formatEur(g) };
-  if (g < 0)      return { color: 'orange', label: 'OFFEN',  desc: formatEur(g) };
-  return               { color: 'green',  label: '✓ OK',     desc: formatEur(g) };
-}
-
-function computeTHE(s) {
-  const visited = s.the.stundenBesucht.length;
-  const required = s.the.pflichtStunden;
-  if (visited >= required)                  return { color: 'green',  label: `${visited}/${required}`, desc: `${visited}/${required} Std.` };
-  if (visited >= Math.ceil(required * .75)) return { color: 'purple', label: `${visited}/${required}`, desc: 'Bereit für Vortest' };
-  if (visited >= Math.ceil(required * .35)) return { color: 'yellow', label: `${visited}/${required}`, desc: 'In Ausbildung' };
-  return                                         { color: 'red',    label: `${visited}/${required}`, desc: 'Anfang' };
-}
-
-function computeTP(s) {
-  switch (s.tp.status) {
-    case 'Bestanden':       return { color: 'green',   label: 'BEST.', desc: 'Bestanden' };
-    case 'Nicht bestanden': return { color: 'darkred', label: 'FAIL',  desc: 'Nicht bestanden' };
-    case 'Angemeldet':      return { color: 'blue',    label: 'TÜV',   desc: 'TÜV-Termin' };
-    case 'Warteliste':      return { color: 'gray',    label: 'WARTE', desc: 'Warteliste' };
-    default:                return { color: 'gray',    label: 'OFFEN', desc: 'Nicht angemeldet' };
-  }
-}
-
-function computePRAX(s) {
-  const p = s.prax;
-  if (!p.grundausbildungAbgeschlossen) return { color: 'red', label: 'BASIS', desc: 'Grundausb. läuft' };
-  const allDone = p.ueberlandAbsolviert >= p.ueberlandPflicht
-               && p.autobahnAbsolviert  >= p.autobahnPflicht
-               && p.nachtAbsolviert     >= p.nachtPflicht;
-  if (!allDone) return { color: 'yellow', label: 'SF', desc: 'Sonderfahrten laufen' };
-  if (p.praktischePruefung === 'Bestanden')      return { color: 'green', label: '🏆 BEST.', desc: 'Prüfung bestanden!' };
-  if (p.praktischePruefung === 'Termin gebucht') return { color: 'blue',  label: 'TERMIN',   desc: 'Termin beim TÜV' };
-  return { color: 'gray', label: 'SUCHT', desc: 'Sucht Praxisprüfungstermin' };
-}
-
-function isExamReady(s) {
-  const prax = computePRAX(s);
-  return computeDOK(s).color === 'green'
-      && computeFIN(s).color === 'green'
-      && computeTHE(s).color === 'green'
-      && computeTP(s).color  === 'green'
-      && (prax.color === 'gray' || prax.color === 'blue' || prax.color === 'green');
-}
-
-function getActiveRules(s) {
-  const rules = [];
-  if (s.fin.guthaben_cent < -10000)
-    rules.push({ type: 'red', text: '⛔ Regelwerk §3 – Finanz-Sperre aktiv: Fahrstunden-Buchung blockiert (Rückstand > 100 €).' });
-  if ((s.klasse === 'B' || s.klasse === 'B197') && s.prax.simulatorErledigt < 3)
-    rules.push({ type: 'orange', text: `⚠ Regelwerk §2 – Simulator-Sperre: Erst ${s.prax.simulatorErledigt}/3 Einheiten absolviert. Echtfahrten blockiert.` });
-  if (!s.prax.grundausbildungAbgeschlossen)
-    rules.push({ type: 'orange', text: '⚠ Regelwerk §4 – Sonderfahrten gesperrt: Grundausbildung noch nicht abgeschlossen.' });
-  if (s.vorbesitz)
-    rules.push({ type: 'info', text: 'ℹ Regelwerk §1 – Vorbesitz: Theorie-Pflichtstunden automatisch von 12 auf 6 reduziert.' });
-  return rules;
-}
-
-function priorityScore(s) {
-  let score = 0;
-  if (computeFIN(s).color === 'red')    score += 55;
-  if (computeDOK(s).color === 'red')    score += 30;
-  if (computeDOK(s).color === 'yellow') score += 28;
-  if (computeDOK(s).color === 'blue')   score += 20;
-  if (computeTP(s).color  === 'gray')   score += 18;
-  score += s.lastActivity * 1.8;
-  return score;
-}
-
-function priorityReason(s) {
-  if (computeFIN(s).color === 'red')    return { text: `⛔ Finanzrückstand: ${formatEur(s.fin.guthaben_cent)}`, type: 'critical' };
-  if (computeDOK(s).color === 'yellow') return { text: '📂 Dokumente warten auf Freigabe', type: 'warning' };
-  if (computeDOK(s).color === 'blue')   return { text: '🔵 Unterlagen beim Straßenverkehrsamt', type: 'normal' };
-  if (s.lastActivity >= 7)              return { text: `⏱ Seit ${s.lastActivity} Tagen inaktiv`, type: 'normal' };
-  return { text: '✓ Ausbildung verläuft regulär', type: 'normal' };
-}
-
-function formatEur(cents) { return `${cents >= 0 ? '+' : '−'}${(Math.abs(cents) / 100).toFixed(2)} €`; }
-function initials(name) { return name.split(' ').map(p => p[0]).join('').toUpperCase(); }
-
-const COLOR_HEX = {
-  red: 'var(--status-red)', orange: 'var(--status-orange)', yellow: 'var(--status-yellow)',
-  blue: 'var(--status-blue)', purple: 'var(--status-purple)', green: 'var(--status-green)',
-  gray: 'var(--status-gray)', darkred: 'var(--status-darkred)',
+/* ════════════════════════════════════════════════════════════════════
+   1 · Klassen-Regeln (gespiegelt aus der Schüler-App / FahrschAusbO)
+════════════════════════════════════════════════════════════════════ */
+const CLASS_RULES={
+  B:   {zusatz:2, sonder:{ueberland:5,autobahn:4,nacht:3}, tp:true},
+  B197:{zusatz:2, sonder:{ueberland:5,autobahn:4,nacht:3}, tp:true},
+  BE:  {zusatz:0, sonder:{ueberland:3,autobahn:1,nacht:1}, tp:false, keinTheorie:true},
+  A:   {zusatz:4, sonder:{ueberland:5,autobahn:4,nacht:3}, tp:true},
+  A2:  {zusatz:4, sonder:{ueberland:5,autobahn:4,nacht:3}, tp:true},
+  A1:  {zusatz:4, sonder:{ueberland:5,autobahn:4,nacht:3}, tp:true},
+  AM:  {zusatz:2, sonder:{ueberland:0,autobahn:0,nacht:0}, tp:true},
+  C:   {zusatz:10,sonder:{ueberland:5,autobahn:2,nacht:3}, tp:true},
+  CE:  {zusatz:4, sonder:{ueberland:5,autobahn:2,nacht:3}, tp:true}
 };
-
-/* ═══════════════════════════════════════════════════════════════════════
-   FILTER & SORT STATE
-═══════════════════════════════════════════════════════════════════════ */
-let activeFilter = 'all';
-let selectedId   = null;
-let currentModal = null;
-
-function setFilter(f) {
-  activeFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('btn-' + f)?.classList.add('active');
-  applyFilters();
+function theorieGesamt(klasse,besitz){
+  const r=CLASS_RULES[klasse]||CLASS_RULES.B;
+  if(r.keinTheorie) return 0;
+  return (besitz==='erweiterung'?6:12)+r.zusatz;
 }
 
-function applyFilters() {
-  const q = document.getElementById('searchInput').value.toLowerCase();
-  let list = students.filter(s => {
-    if (q && !s.name.toLowerCase().includes(q)) return false;
-    if (activeFilter === 'critical')   return computeFIN(s).color === 'red' || computeDOK(s).color === 'red';
-    if (activeFilter === 'waiting')    return computeDOK(s).color === 'yellow';
-    if (activeFilter === 'exam-ready') return isExamReady(s);
+/* ════════════════════════════════════════════════════════════════════
+   2 · Daten: Verwaltungs-Kartei (localStorage) + Live-Schüler aus App
+════════════════════════════════════════════════════════════════════ */
+const ADMIN_KEY='fk_admin_students_v1';
+const STATE_KEY='fk_state_v3';       /* geteilt mit app.html */
+const PROFILE_KEY='fk_profile_v2';   /* geteilt mit app.html */
+const LIVE_ID='LIVE-APP';
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtEuro(n){try{return n.toLocaleString('de-DE',{style:'currency',currency:'EUR'});}catch(e){return n.toFixed(2).replace('.',',')+' €';}}
+function initials(name){const p=(name||'').trim().split(/\s+/).filter(Boolean);
+  return p.length?((p[0][0]||'')+(p.length>1?p[p.length-1][0]:p[0][1]||'')).toUpperCase():'–';}
+
+function seedStudents(){
+  const mk=(id,name,geb,klasse,besitz,ov)=>Object.assign({
+    id,name,geb,klasse,besitz,live:false,lastActivity:3,
+    theorie:{besucht:0,gesamt:theorieGesamt(klasse,besitz)},
+    theoriePruefung:{bestanden:false},
+    uebungsstunden:0, simulator:{ist:0,soll:6},
+    sonderfahrten:{
+      ueberland:{ist:0,soll:CLASS_RULES[klasse].sonder.ueberland},
+      autobahn:{ist:0,soll:CLASS_RULES[klasse].sonder.autobahn},
+      nacht:{ist:0,soll:CLASS_RULES[klasse].sonder.nacht}},
+    dokumente:{sehtest:'ausstehend',ersteHilfe:'ausstehend',passbild:'ausstehend'},
+    finanzen:{bezahlt:0,posten:[]},
+    praxisPruefung:'offen'
+  },ov);
+  return [
+    mk('S-001','Tobias Maier','2005-05-12','B','erst',{lastActivity:14,
+      theorie:{besucht:3,gesamt:14},uebungsstunden:4,simulator:{ist:1,soll:6},
+      finanzen:{bezahlt:200,posten:[{label:'Grundbetrag (Rest)',betrag:250},{label:'Fahrstunden Juni (4 × 45 min)',betrag:160}]}}),
+    mk('S-002','Lisa Baumann','2001-11-28','B197','erst',{lastActivity:2,
+      theorie:{besucht:11,gesamt:14},uebungsstunden:16,simulator:{ist:4,soll:6},
+      sonderfahrten:{ueberland:{ist:2,soll:5},autobahn:{ist:1,soll:4},nacht:{ist:0,soll:3}},
+      dokumente:{sehtest:'verifiziert',ersteHilfe:'pruefung',passbild:'verifiziert'},
+      finanzen:{bezahlt:1450,posten:[{label:'Fahrstunden Juni (2 × 90 min)',betrag:180}]}}),
+    mk('S-003','Marco Schulze','1998-08-03','C','erweiterung',{lastActivity:1,
+      theorie:{besucht:16,gesamt:16},theoriePruefung:{bestanden:true},
+      uebungsstunden:24,simulator:{ist:6,soll:6},
+      sonderfahrten:{ueberland:{ist:5,soll:5},autobahn:{ist:2,soll:2},nacht:{ist:3,soll:3}},
+      dokumente:{sehtest:'verifiziert',ersteHilfe:'verifiziert',passbild:'verifiziert'},
+      finanzen:{bezahlt:2890,posten:[]},praxisPruefung:'suchtTermin'}),
+    mk('S-004','Ayşe Demir','2007-02-19','A1','erst',{lastActivity:5,
+      theorie:{besucht:8,gesamt:16},uebungsstunden:10,simulator:{ist:2,soll:4},
+      sonderfahrten:{ueberland:{ist:1,soll:5},autobahn:{ist:0,soll:4},nacht:{ist:0,soll:3}},
+      dokumente:{sehtest:'verifiziert',ersteHilfe:'ausstehend',passbild:'pruefung'},
+      finanzen:{bezahlt:780,posten:[{label:'Fahrstunden Mai (3 × 45 min)',betrag:135}]}}),
+    mk('S-005','Jan Hoffmann','2004-09-30','BE','erweiterung',{lastActivity:8,
+      theorie:{besucht:0,gesamt:0},theoriePruefung:{bestanden:true},
+      uebungsstunden:6,simulator:{ist:0,soll:0},
+      sonderfahrten:{ueberland:{ist:2,soll:3},autobahn:{ist:1,soll:1},nacht:{ist:0,soll:1}},
+      dokumente:{sehtest:'verifiziert',ersteHilfe:'verifiziert',passbild:'ausstehend'},
+      finanzen:{bezahlt:520,posten:[{label:'Sonderfahrt Überland',betrag:110}]}})
+  ];
+}
+function loadAdmin(){
+  try{const raw=localStorage.getItem(ADMIN_KEY);if(raw){const a=JSON.parse(raw);if(Array.isArray(a))return a;}}catch(e){}
+  const s=seedStudents(); saveAdmin(s); return s;
+}
+function saveAdmin(list){try{localStorage.setItem(ADMIN_KEY,JSON.stringify(list||students.filter(s=>!s.live)));}catch(e){}}
+
+/* Live-Schüler: Profil + Ausbildungsstand direkt aus der Schüler-App */
+function readLiveStudent(){
+  let profile=null,st=null;
+  try{profile=JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');}catch(e){}
+  try{st=JSON.parse(localStorage.getItem(STATE_KEY)||'null');}catch(e){}
+  if(!profile||!profile.name||!st||st.version!==3) return null;
+  return {
+    id:LIVE_ID, live:true, name:profile.name, geb:profile.geburtstag||'', lastActivity:0,
+    klasse:st.klasse, besitz:st.besitz,
+    theorie:{besucht:st.theorie.besucht,gesamt:st.theorie.gesamt},
+    theoriePruefung:{bestanden:!!(st.theoriePruefung&&st.theoriePruefung.bestanden)},
+    uebungsstunden:st.uebungsstunden||0,
+    simulator:{ist:st.simulator?st.simulator.ist:0,soll:st.simulator?st.simulator.soll:0},
+    sonderfahrten:{
+      ueberland:{ist:st.sonderfahrten.ueberland.ist,soll:st.sonderfahrten.ueberland.soll},
+      autobahn:{ist:st.sonderfahrten.autobahn.ist,soll:st.sonderfahrten.autobahn.soll},
+      nacht:{ist:st.sonderfahrten.nacht.ist,soll:st.sonderfahrten.nacht.soll}},
+    dokumente:{
+      sehtest:st.dokumente.sehtest.status,
+      ersteHilfe:st.dokumente.ersteHilfe.status,
+      passbild:st.dokumente.passbild.status},
+    finanzen:{bezahlt:null,posten:(st.finanzen&&st.finanzen.posten||[]).map(p=>({label:p.label,betrag:p.betrag}))},
+    praxisPruefung:'offen'
+  };
+}
+/* Änderungen der Zentrale am Live-Schüler zurück in den App-State schreiben */
+function writeLive(mut){
+  let st=null; try{st=JSON.parse(localStorage.getItem(STATE_KEY)||'null');}catch(e){}
+  if(!st||st.version!==3) return false;
+  mut(st);
+  try{localStorage.setItem(STATE_KEY,JSON.stringify(st));}catch(e){return false;}
+  try{if(bc)bc.postMessage({src:'admin',key:STATE_KEY});}catch(e){}
+  try{localStorage.setItem('fk_sync_ping',String(Date.now()));}catch(e){}
+  return true;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   3 · Abgeleitete Werte
+════════════════════════════════════════════════════════════════════ */
+function offen(s){return s.finanzen.posten.reduce((a,p)=>a+p.betrag,0);}
+function theorieP(s){return s.theorie.gesamt?Math.min(1,s.theorie.besucht/s.theorie.gesamt):1;}
+function praxisP(s){
+  const sf=s.sonderfahrten;
+  const ist=sf.ueberland.ist+sf.autobahn.ist+sf.nacht.ist+(s.simulator.ist||0);
+  const soll=sf.ueberland.soll+sf.autobahn.soll+sf.nacht.soll+(s.simulator.soll||0);
+  return soll?Math.min(1,ist/soll):1;
+}
+const DOC_LABELS={sehtest:'Sehtest',ersteHilfe:'Erste-Hilfe-Kurs',passbild:'Passbild'};
+function missingDocs(s){return Object.keys(DOC_LABELS).filter(k=>s.dokumente[k]!=='verifiziert');}
+function checklist(s){
+  const items=[]; const push=(done,txt)=>items.push({done,txt});
+  Object.keys(DOC_LABELS).forEach(k=>{
+    const st=s.dokumente[k];
+    push(st==='verifiziert',DOC_LABELS[k]+(st==='pruefung'?' (eingereicht, prüfen!)':''));
+  });
+  if(s.theorie.gesamt>0){
+    push(s.theorie.besucht>=s.theorie.gesamt,`Theorie ${s.theorie.besucht}/${s.theorie.gesamt} Doppelstunden`);
+    push(s.theoriePruefung.bestanden,'Theorieprüfung bestanden');
+  }
+  const sf=s.sonderfahrten;
+  [['ueberland','Überlandfahrten'],['autobahn','Autobahnfahrten'],['nacht','Nachtfahrten']].forEach(([k,l])=>{
+    if(sf[k].soll>0) push(sf[k].ist>=sf[k].soll,`${l} ${sf[k].ist}/${sf[k].soll}`);
+  });
+  if(s.simulator.soll>0) push(s.simulator.ist>=s.simulator.soll,`Simulator ${s.simulator.ist}/${s.simulator.soll}`);
+  push(offen(s)<=0,offen(s)>0?`Offener Saldo ${fmtEuro(offen(s))} ausgleichen`:'Konto ausgeglichen');
+  return items;
+}
+function isReady(s){return checklist(s).every(i=>i.done);}
+function isCritical(s){return offen(s)>=100||missingDocs(s).length===3;}
+function prioScore(s){
+  let p=0;
+  if(offen(s)>=100)p+=50; else if(offen(s)>0)p+=20;
+  p+=missingDocs(s).length*12;
+  p+=(s.lastActivity||0)*1.5;
+  if(isReady(s))p-=30;
+  return p;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   4 · Rendering
+════════════════════════════════════════════════════════════════════ */
+let students=loadAdmin();
+let selectedId=null, activeFilter='all';
+let bc=null; try{bc=new BroadcastChannel('fk_sync_v1');}catch(e){}
+
+function allStudents(){
+  const live=readLiveStudent();
+  return live?[live].concat(students):students.slice();
+}
+function byId(id){return allStudents().find(s=>s.id===id)||null;}
+
+function setFilter(f){
+  activeFilter=f;
+  document.querySelectorAll('.chip').forEach(c=>c.classList.toggle('active',c.dataset.f===f));
+  render();
+}
+
+function filteredSorted(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
+  let list=allStudents().filter(s=>{
+    if(q&&!(s.name.toLowerCase().includes(q)||s.klasse.toLowerCase().includes(q))) return false;
+    if(activeFilter==='crit')  return isCritical(s);
+    if(activeFilter==='docs')  return missingDocs(s).length>0;
+    if(activeFilter==='ready') return isReady(s);
+    if(activeFilter==='live')  return !!s.live;
     return true;
   });
-  list.sort((a, b) => priorityScore(b) - priorityScore(a));
-  document.getElementById('studentCount').textContent = `${list.length} Schüler`;
-  renderPrio(list);
-  renderMatrix(list);
+  const sort=document.getElementById('sortSel').value;
+  const cmp={
+    prio:(a,b)=>prioScore(b)-prioScore(a),
+    name:(a,b)=>a.name.localeCompare(b.name,'de'),
+    klasse:(a,b)=>a.klasse.localeCompare(b.klasse)||a.name.localeCompare(b.name,'de'),
+    theorie:(a,b)=>theorieP(b)-theorieP(a),
+    praxis:(a,b)=>praxisP(b)-praxisP(a),
+    offen:(a,b)=>offen(b)-offen(a)
+  }[sort]||((a,b)=>0);
+  list.sort((a,b)=>{ if(a.live!==b.live) return a.live?-1:1; return cmp(a,b); });
+  return list;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   SPALTE 1: PRIO-PIPELINE
-═══════════════════════════════════════════════════════════════════════ */
-function renderPrio(list) {
-  const el = document.getElementById('prioList');
-  if (!list.length) { el.innerHTML = '<div class="no-result">Keine Schüler in dieser Auswahl.</div>'; return; }
-  el.innerHTML = list.map((s, idx) => {
-    const dok = computeDOK(s); const fin = computeFIN(s); const the = computeTHE(s);
-    const tp  = computeTP(s);  const prax = computePRAX(s);
-    const ready = isExamReady(s); const sel = s.id === selectedId; const reason = priorityReason(s);
-    let badgeClass = '', badgeText = '';
-    if (idx === 0 && list.length > 1) { badgeClass = 'critical'; badgeText = 'PRIO HÖCHST'; }
-    else if (ready)                   { badgeClass = 'ok';       badgeText = 'PRÜFUNGSREIF'; }
-    return `<div class="prio-card${sel ? ' selected' : ''}" onclick="selectStudent('${s.id}')">
-      <div class="prio-card-top">
-        <span class="prio-card-name">${s.name}</span>
-        ${badgeText ? `<span class="prio-badge ${badgeClass}">${badgeText}</span>` : ''}
+function render(){
+  const all=allStudents(), list=filteredSorted();
+  /* KPIs + Live-Pille */
+  document.getElementById('kpiCount').textContent=all.length;
+  document.getElementById('kpiOpen').textContent=fmtEuro(all.reduce((a,s)=>a+offen(s),0));
+  document.getElementById('kpiReady').textContent=all.filter(isReady).length;
+  const live=all.find(s=>s.live);
+  const pill=document.getElementById('livePill');
+  pill.classList.toggle('off',!live);
+  document.getElementById('livePillText').textContent=live?`Live: ${live.name} (App verbunden)`:'Keine App verbunden';
+  /* Liste */
+  document.getElementById('countLine').textContent=`${list.length} von ${all.length} Schülern`;
+  const el=document.getElementById('studentList');
+  if(!list.length){el.innerHTML='<div class="no-result">Keine Schüler in dieser Auswahl.</div>';}
+  else el.innerHTML=list.map(s=>{
+    const tp=theorieP(s),pp=praxisP(s),off=offen(s),docs=missingDocs(s);
+    let badge='';
+    if(s.live)badge='<span class="badge live">● LIVE</span>';
+    else if(isReady(s))badge='<span class="badge ready">PRÜFUNGSREIF</span>';
+    else if(isCritical(s))badge='<span class="badge crit">KRITISCH</span>';
+    return `<div class="card${s.id===selectedId?' sel':''}" onclick="select('${s.id}')">
+      <div class="card-top">
+        <div class="avatar">${initials(s.name)}</div>
+        <div><div class="card-name">${esc(s.name)}</div>
+          <div class="card-meta">Klasse ${esc(s.klasse)} · ${s.besitz==='erweiterung'?'Erweiterung':'Erst-Erwerb'}</div></div>
+        ${badge}
       </div>
-      <div class="prio-meta">Klasse ${s.klasse} · ${s.ausbildungsTyp}</div>
-      <div class="prio-reason ${reason.type}">${reason.text}</div>
-      <div class="prio-dots">
-        <div class="prio-dot" style="background:${COLOR_HEX[dok.color]}" title="DOK: ${dok.desc}"></div>
-        <div class="prio-dot" style="background:${COLOR_HEX[fin.color]}" title="FIN: ${fin.desc}"></div>
-        <div class="prio-dot" style="background:${COLOR_HEX[the.color]}" title="THE: ${the.desc}"></div>
-        <div class="prio-dot" style="background:${COLOR_HEX[tp.color]}"  title="TP: ${tp.desc}"></div>
-        <div class="prio-dot" style="background:${COLOR_HEX[prax.color]}" title="PRAX: ${prax.desc}"></div>
-        <span class="prio-dot-label">DOK · FIN · THE · TP · PX</span>
+      <div class="mini-rows">
+        ${s.theorie.gesamt>0?`<div class="mini-row"><span class="lbl">Theorie</span>
+          <div class="bar"><i class="${tp>=1?'full':''}" style="width:${Math.round(tp*100)}%"></i></div>
+          <span class="val">${s.theorie.besucht}/${s.theorie.gesamt}</span></div>`:''}
+        <div class="mini-row"><span class="lbl">Praxis</span>
+          <div class="bar"><i class="${pp>=1?'full':''}" style="width:${Math.round(pp*100)}%"></i></div>
+          <span class="val">${Math.round(pp*100)} %</span></div>
       </div>
-    </div>`;
-  }).join('');
+      <div class="card-flags">
+        ${off>0?`<span class="flag ${off>=100?'bad':'warn'}">💶 ${fmtEuro(off)} offen</span>`:'<span class="flag ok">✓ bezahlt</span>'}
+        ${docs.length?`<span class="flag warn">📂 ${docs.length} Nachweis${docs.length>1?'e':''} offen</span>`:'<span class="flag ok">✓ Nachweise</span>'}
+      </div>
+    </div>`;}).join('');
+  renderDetail();
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   SPALTE 2: STATUS-MATRIX
-═══════════════════════════════════════════════════════════════════════ */
-function renderMatrix(list) {
-  const el = document.getElementById('matrixBody');
-  if (!list.length) { el.innerHTML = '<div class="no-result">Keine Matrix-Daten verfügbar.</div>'; return; }
-  el.innerHTML = list.map(s => {
-    const dok = computeDOK(s); const fin = computeFIN(s); const the = computeTHE(s);
-    const tp  = computeTP(s);  const prax = computePRAX(s);
-    const ready = isExamReady(s); const sel = s.id === selectedId;
-    return `<div class="matrix-row${sel ? ' selected' : ''}" onclick="selectStudent('${s.id}')">
-      <div class="mx-name">${s.name}<span class="class-badge">${s.klasse}</span></div>
-      <div class="tile ${dok.color}"  title="${dok.desc}"  onclick="openModal(event,'${s.id}','DOK')">${dok.label}</div>
-      <div class="tile ${fin.color}"  title="${fin.desc}"  onclick="openModal(event,'${s.id}','FIN')">${fin.label}</div>
-      <div class="tile ${the.color}"  title="${the.desc}"  onclick="openModal(event,'${s.id}','THE')">${the.label}</div>
-      <div class="tile ${tp.color}"   title="${tp.desc}"   onclick="openModal(event,'${s.id}','TP')">${tp.label}</div>
-      <div class="tile ${prax.color}" title="${prax.desc}" onclick="openModal(event,'${s.id}','PRAX')">${prax.label}</div>
-      <button class="exam-btn ${ready ? 'ready' : 'not-ready'}"
-        onclick="${ready ? `event.stopPropagation();examReadyAction('${s.id}')` : 'event.stopPropagation()'}">
-        ${ready ? 'Zulassen' : 'Gesperrt'}
-      </button>
-    </div>`;
-  }).join('');
+function select(id){
+  selectedId=id;
+  document.getElementById('mainGrid').classList.add('show-detail');
+  render();
+}
+function backToList(){document.getElementById('mainGrid').classList.remove('show-detail');}
+
+function docChip(status){
+  if(status==='verifiziert')return '<span class="status-chip ok">✓ Verifiziert</span>';
+  if(status==='pruefung')   return '<span class="status-chip info">📥 Eingereicht</span>';
+  return '<span class="status-chip bad">✕ Fehlt</span>';
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   SPALTE 3: KONTEXT-PANEL
-═══════════════════════════════════════════════════════════════════════ */
-function selectStudent(id) {
-  selectedId = id;
-  const s = students.find(x => x.id === id);
-  if (!s) return;
-  applyFilters();
+function renderDetail(){
+  const el=document.getElementById('detailCol');
+  const s=selectedId?byId(selectedId):null;
+  if(!s){
+    el.innerHTML=`<div class="d-empty"><span class="big">📂</span><b>Kein Schüler ausgewählt</b>
+      <span>Wähle links einen Schüler, um Theorie, Praxis, Zahlungen und Nachweise zu sehen.</span></div>`;
+    return;
+  }
+  const sf=s.sonderfahrten, off=offen(s), items=checklist(s), openItems=items.filter(i=>!i.done);
+  const stepper=(fn)=>`<span class="step-btns"><button onclick="event.stopPropagation();adjust('${s.id}','${fn}',-1)">−</button><button onclick="event.stopPropagation();adjust('${s.id}','${fn}',1)">＋</button></span>`;
+  const prog=(label,ist,soll,fn)=>`<div class="prog-row">
+    <div class="prog-top"><span class="l">${label}${fn?stepper(fn):''}</span><span class="v">${ist}/${soll}</span></div>
+    <div class="bar big"><i class="${soll>0&&ist>=soll?'full':''}" style="width:${soll?Math.min(100,Math.round(ist/soll*100)):100}%"></i></div>
+  </div>`;
+  el.innerHTML=`
+  <button class="back-btn" onclick="backToList()">← Zur Liste</button>
+  <div class="d-head">
+    <div class="d-avatar">${initials(s.name)}</div>
+    <div>
+      <div class="d-name">${esc(s.name)} ${s.live?'<span class="badge live">● LIVE aus Schüler-App</span>':''}</div>
+      <div class="d-sub">Klasse ${esc(s.klasse)} · ${s.besitz==='erweiterung'?'Erweiterung':'Erst-Erwerb'}${s.geb?' · geb. '+esc(s.geb):''}${s.live?' · Änderungen erscheinen sofort in der App':''}</div>
+    </div>
+  </div>
+  <div class="d-grid">
 
-  const dok  = computeDOK(s);  const fin  = computeFIN(s);
-  const the  = computeTHE(s);  const tp   = computeTP(s);
-  const prax = computePRAX(s); const ready = isExamReady(s);
-  const rules = getActiveRules(s);
-  const p = s.prax;
-  const theVisited = s.the.stundenBesucht.length;
-  const thePct = Math.min(100, Math.round(theVisited / s.the.pflichtStunden * 100));
+    <div class="panel"><h3>📖 Theorie</h3>
+      ${s.theorie.gesamt>0
+        ? prog('Doppelstunden besucht',s.theorie.besucht,s.theorie.gesamt,'theorie')
+          +`<div style="margin-top:10px;display:flex;align-items:center;gap:10px">
+             <span style="color:var(--ink2);font-weight:600;flex:1">Theorieprüfung</span>
+             ${s.theoriePruefung.bestanden?'<span class="status-chip ok">🏆 Bestanden</span>':'<span class="status-chip warn">Offen</span>'}
+             <button class="mini-btn ok" onclick="toggleTP('${s.id}')">${s.theoriePruefung.bestanden?'Zurücksetzen':'Als bestanden markieren'}</button>
+           </div>`
+        : '<div style="color:var(--ink3)">Klasse '+esc(s.klasse)+' – keine Theorieprüfung erforderlich (rein praktische Ausbildung).</div>'}
+    </div>
 
-  document.getElementById('chatBar').style.display = 'flex';
-  document.getElementById('contextPanel').innerHTML = `
-    <div class="profile-header">
-      <div class="avatar">${initials(s.name)}</div>
-      <div>
-        <div class="profile-name">${s.name}</div>
-        <div class="profile-sub">${s.id} · Klasse ${s.klasse} · ${s.ausbildungsTyp}</div>
-        <div class="profile-sub">Aktivität vor ${s.lastActivity} Tagen · System: ${s.daysInSystem} Tage</div>
+    <div class="panel"><h3>🚗 Praxis</h3>
+      ${prog('Übungsfahrstunden (à 45 min)',s.uebungsstunden,Math.max(s.uebungsstunden,20),'uebung')}
+      ${s.simulator.soll>0?prog('Simulator-Einheiten',s.simulator.ist,s.simulator.soll,'sim'):''}
+      ${sf.ueberland.soll>0?prog('Sonderfahrt Überland',sf.ueberland.ist,sf.ueberland.soll,'ueberland'):''}
+      ${sf.autobahn.soll>0?prog('Sonderfahrt Autobahn',sf.autobahn.ist,sf.autobahn.soll,'autobahn'):''}
+      ${sf.nacht.soll>0?prog('Sonderfahrt Nacht',sf.nacht.ist,sf.nacht.soll,'nacht'):''}
+    </div>
+
+    <div class="panel"><h3>💶 Zahlungen</h3>
+      ${s.finanzen.bezahlt!=null?`<div class="fin-row"><span class="fin-label">Bereits bezahlt</span><span class="fin-amount" style="color:var(--ok)">${fmtEuro(s.finanzen.bezahlt)}</span></div>`:''}
+      ${s.finanzen.posten.length
+        ? s.finanzen.posten.map((p,i)=>`<div class="fin-row">
+            <span class="fin-label">${esc(p.label)}</span>
+            <span class="fin-amount" style="color:var(--warn)">${fmtEuro(p.betrag)}</span>
+            <button class="mini-btn ok" onclick="payItem('${s.id}',${i})">✓ Bezahlt</button>
+          </div>`).join('')
+        : '<div class="fin-row"><span class="fin-label">Keine offenen Posten 🎉</span></div>'}
+      <div class="fin-total"><span>Offen gesamt</span><span style="color:${off>0?'var(--warn)':'var(--ok)'}">${fmtEuro(off)}</span></div>
+      <div class="fin-add">
+        <input id="finLabel" type="text" placeholder="Neuer Posten (z. B. Fahrstunden Juli)">
+        <input id="finBetrag" type="number" min="1" step="5" placeholder="€" style="max-width:80px">
+        <button class="mini-btn" onclick="addItem('${s.id}')">＋</button>
       </div>
     </div>
 
-    ${rules.map(r => `<div class="rule-alert ${r.type}">${r.text}</div>`).join('')}
-    ${rules.length ? '<div class="section-divider"></div>' : ''}
-
-    <div class="detail-card">
-      <div class="detail-card-title">📂 Dokumenten-Zustand</div>
-      <div class="detail-row">
-        <span class="detail-label">Passbild</span>
-        <span class="detail-val" style="color:${s.dok.passbild==='Verifiziert'?'var(--status-green)':'var(--status-red)'}">${s.dok.passbild}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Sehtest</span>
-        <span class="detail-val" style="color:${s.dok.sehtest==='Verifiziert'?'var(--status-green)':s.dok.sehtest==='Fehlt'?'var(--status-red)':'var(--status-yellow)'}">${s.dok.sehtest}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Erste Hilfe</span>
-        <span class="detail-val" style="color:${s.dok.ersteHilfe==='Verifiziert'?'var(--status-green)':'var(--status-red)'}">${s.dok.ersteHilfe}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">TÜV-Antragsstatus</span>
-        <span class="detail-val" style="color:${COLOR_HEX[dok.color]}">${s.dok.tuevAntrag}</span>
-      </div>
-    </div>
-
-    <div class="detail-card">
-      <div class="detail-card-title">💳 Finanzbuchhaltung</div>
-      <div class="detail-row">
-        <span class="detail-label">Saldo</span>
-        <span class="detail-val" style="color:${COLOR_HEX[fin.color]}">${formatEur(s.fin.guthaben_cent)}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Außenstände</span>
-        <span class="detail-val">${s.fin.offeneRechnungen.length} Posten</span>
-      </div>
-      ${s.fin.offeneRechnungen.map(r => `
-      <div class="detail-row">
-        <span class="detail-label" style="font-size:11px;">↳ ${r}</span>
-        <span style="color:var(--status-red);font-size:11px;font-weight:600;">Offen</span>
+    <div class="panel"><h3>📂 Nachweise</h3>
+      ${Object.keys(DOC_LABELS).map(k=>`<div class="doc-row">
+        <span class="doc-name">${DOC_LABELS[k]}</span>
+        ${docChip(s.dokumente[k])}
+        ${s.dokumente[k]!=='verifiziert'
+          ?`<button class="mini-btn ok" onclick="setDoc('${s.id}','${k}','verifiziert')">Verifizieren</button>`
+          :`<button class="mini-btn" onclick="setDoc('${s.id}','${k}','ausstehend')">Zurücksetzen</button>`}
       </div>`).join('')}
     </div>
 
-    <div class="detail-card">
-      <div class="detail-card-title">📚 Theorie-Soll · ${s.the.pflichtStunden} Pflicht-Std.${s.vorbesitz ? ' (§1 reduziert)' : ''}</div>
-      <div class="detail-row" style="gap:8px;">
-        <span class="detail-label">Lektionen</span>
-        <div class="progress-bar-wrap">
-          <div class="progress-bar-fill" style="width:${thePct}%;background:${COLOR_HEX[the.color]};"></div>
-        </div>
-        <span class="detail-val" style="color:${COLOR_HEX[the.color]}">${theVisited}/${s.the.pflichtStunden}</span>
+    <div class="panel" style="grid-column:1/-1"><h3>🏁 Prüfungs-Check – was fehlt noch?</h3>
+      ${items.map(i=>`<div class="check-item ${i.done?'done':'open'}"><span class="mark">${i.done?'✓':'○'}</span><span>${esc(i.txt)}</span></div>`).join('')}
+      <div class="ready-banner ${openItems.length?'no':'yes'}">
+        ${openItems.length?`⏳ Noch ${openItems.length} Punkt${openItems.length>1?'e':''} offen bis zur Prüfungsreife`:'✅ PRÜFUNGSREIF – alle Voraussetzungen erfüllt!'}
       </div>
+      ${s.live?'':`<div class="danger-zone"><button onclick="removeStudent('${s.id}')">Schüler löschen …</button></div>`}
     </div>
-
-    <div class="detail-card">
-      <div class="detail-card-title">🏎️ Praxis-Fortschritt</div>
-      <div class="detail-row">
-        <span class="detail-label">Simulator</span>
-        <span class="detail-val" style="color:${p.simulatorErledigt>=3?'var(--status-green)':'var(--status-orange)'}">${p.simulatorErledigt}/3 Std.</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Grundausbildung</span>
-        <span class="detail-val" style="color:${p.grundausbildungAbgeschlossen?'var(--status-green)':'var(--status-red)'}">${p.grundausbildungAbgeschlossen?'✓ Abgeschlossen':'⏳ Läuft'}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">🏔️ Überland</span>
-        <span class="detail-val" style="color:${p.ueberlandAbsolviert>=p.ueberlandPflicht?'var(--status-green)':'var(--text-muted)'}">${p.ueberlandAbsolviert}/${p.ueberlandPflicht}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">🛣️ Autobahn</span>
-        <span class="detail-val" style="color:${p.autobahnAbsolviert>=p.autobahnPflicht?'var(--status-green)':'var(--text-muted)'}">${p.autobahnAbsolviert}/${p.autobahnPflicht}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">🌙 Nacht</span>
-        <span class="detail-val" style="color:${p.nachtAbsolviert>=p.nachtPflicht?'var(--status-green)':'var(--text-muted)'}">${p.nachtAbsolviert}/${p.nachtPflicht}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">Prakt. Prüfung</span>
-        <span class="detail-val">${p.praktischePruefung}</span>
-      </div>
-    </div>
-
-    <div class="action-btn-row">
-      <button class="action-btn" onclick="sendPush('${s.id}')">📣 Push-Mahnung an Tablet senden</button>
-      <button class="action-btn" onclick="openModal(event,'${s.id}','DOK')">⚙️ Dokumenten-Workflow öffnen</button>
-      <button class="action-btn" onclick="openModal(event,'${s.id}','FIN')">⚙️ Buchungssystem anpassen</button>
-      <button class="action-btn" onclick="openModal(event,'${s.id}','THE')">⚙️ Theorie-Lektionen bearbeiten</button>
-      <button class="action-btn" onclick="openModal(event,'${s.id}','TP')">⚙️ Prüfungs-Status setzen</button>
-      <button class="action-btn" onclick="openModal(event,'${s.id}','PRAX')">⚙️ Fahrstunden-Matrix steuern</button>
-      ${ready ? `<div class="section-divider"></div>
-      <button class="action-btn success" onclick="examReadyAction('${s.id}')">🎉 Offizielle Prüfungsfreigabe erteilen</button>` : ''}
-    </div>
-  `;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   MODAL
-═══════════════════════════════════════════════════════════════════════ */
-function openModal(e, studentId, tile) {
-  e.stopPropagation();
-  selectStudent(studentId);
-  const s = students.find(x => x.id === studentId);
-  currentModal = { studentId, tile };
-  const titles = { DOK:'📂 Dokumente', FIN:'💳 Finanzen', THE:'📚 Theorie', TP:'📝 Prüfungs-Status', PRAX:'🏎️ Praxis & Sonderfahrten' };
-  document.getElementById('modalTitle').textContent = `${titles[tile]} – ${s.name}`;
-  document.getElementById('modalBody').innerHTML = buildModalBody(s, tile);
-  document.getElementById('modalOverlay').classList.add('open');
-}
-
-function buildModalBody(s, tile) {
-  if (tile === 'DOK') return [
-    buildRadio('dok_passbild',   'Passbild',    s.dok.passbild,   ['Fehlt','Eingereicht','Verifiziert'],              ['var(--status-red)','var(--status-yellow)','var(--status-green)']),
-    buildRadio('dok_sehtest',    'Sehtest',     s.dok.sehtest,    ['Fehlt','Eingereicht','Beim Amt','Verifiziert'],    ['var(--status-red)','var(--status-yellow)','var(--status-blue)','var(--status-green)']),
-    buildRadio('dok_ersteHilfe', 'Erste Hilfe', s.dok.ersteHilfe, ['Fehlt','Eingereicht','Verifiziert'],              ['var(--status-red)','var(--status-yellow)','var(--status-green)']),
-    buildRadio('dok_tuevAntrag', 'TÜV-Antrag',  s.dok.tuevAntrag, ['Nicht gestellt','Läuft','Genehmigt'],             ['var(--status-gray)','var(--status-blue)','var(--status-green)']),
-  ].join('');
-
-  if (tile === 'FIN') return `
-    <div class="modal-section">
-      <div class="modal-section-title">Kontostand (EUR)</div>
-      <input class="modal-text-input" id="fin_guthaben" type="number" step="0.01" value="${(s.fin.guthaben_cent / 100).toFixed(2)}">
-      <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
-        Aktuell: <strong style="color:${COLOR_HEX[computeFIN(s).color]}">${formatEur(s.fin.guthaben_cent)}</strong>
-        · Sperre bei unter −100,00 € (Regelwerk §3)
-      </div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-title">Offene Forderungen</div>
-      <div class="re-list" id="reList">
-        ${s.fin.offeneRechnungen.map((r,i) => `
-        <div class="re-row">
-          <input class="re-input" id="re_${i}" value="${r}">
-          <button class="re-del" onclick="delRE(${i})">✕</button>
-        </div>`).join('')}
-        <button class="re-add" onclick="addRE()">+ Posten hinzufügen</button>
-      </div>
-    </div>`;
-
-  if (tile === 'THE') {
-    const n = s.the.pflichtStunden;
-    return `<div class="modal-section">
-      <div class="modal-section-title">Erledigte Lektionen (${s.the.stundenBesucht.length}/${n})</div>
-      <div class="the-grid">
-        ${Array.from({length: n}, (_,i) => i+1).map(num => `
-        <label class="the-checkbox">
-          <input type="checkbox" id="the_${num}" ${s.the.stundenBesucht.includes(num)?'checked':''}>
-          <span>L${num}</span>
-        </label>`).join('')}
-      </div>
-      ${s.vorbesitz ? '<div style="margin-top:12px;font-size:11px;color:var(--status-purple);">ℹ Vorbesitz aktiv: Pflicht auf 6 Std. reduziert (Regelwerk §1)</div>' : ''}
-    </div>`;
-  }
-
-  if (tile === 'TP') return buildRadio('tp_status', 'Prüfungsstatus', s.tp.status,
-    ['Nicht angemeldet','Warteliste','Angemeldet','Bestanden','Nicht bestanden'],
-    ['var(--status-gray)','var(--status-gray)','var(--status-blue)','var(--status-green)','var(--status-darkred)']);
-
-  if (tile === 'PRAX') {
-    const p = s.prax;
-    return `
-    <div class="modal-section">
-      <div class="modal-section-title">Simulator-Einheiten (min. 3 – Regelwerk §2)</div>
-      <div class="range-wrap">
-        <input type="range" id="prax_sim" min="0" max="6" value="${p.simulatorErledigt}"
-          oninput="document.getElementById('simVal').textContent=this.value">
-        <span class="range-val" id="simVal">${p.simulatorErledigt}</span>
-        <span style="font-size:12px;color:var(--text-muted);">/6</span>
-      </div>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-title">Ausbildungsstand (Regelwerk §4)</div>
-      <label class="cb-option">
-        <input type="checkbox" id="prax_grundausb" ${p.grundausbildungAbgeschlossen?'checked':''}>
-        <span>Grundausbildung vollständig abgeschlossen</span>
-      </label>
-    </div>
-    <div class="modal-section">
-      <div class="modal-section-title">Nachweise Sonderfahrten</div>
-      <div class="num-inputs">
-        <div class="num-row">
-          <span>🏔️ Überland (Pflicht: ${p.ueberlandPflicht})</span>
-          <input class="num-input" id="prax_ul" type="number" min="0" max="${p.ueberlandPflicht}" value="${p.ueberlandAbsolviert}">
-        </div>
-        <div class="num-row">
-          <span>🛣️ Autobahn (Pflicht: ${p.autobahnPflicht})</span>
-          <input class="num-input" id="prax_ab" type="number" min="0" max="${p.autobahnPflicht}" value="${p.autobahnAbsolviert}">
-        </div>
-        <div class="num-row">
-          <span>🌙 Nacht (Pflicht: ${p.nachtPflicht})</span>
-          <input class="num-input" id="prax_nacht" type="number" min="0" max="${p.nachtPflicht}" value="${p.nachtAbsolviert}">
-        </div>
-      </div>
-    </div>
-    ${buildRadio('prax_pruefung', 'Praktische Prüfung', p.praktischePruefung,
-      ['Offen','Sucht Termin','Termin gebucht','Bestanden'],
-      ['var(--status-gray)','var(--status-gray)','var(--status-blue)','var(--status-green)'])}`;
-  }
-  return '';
-}
-
-function buildRadio(name, title, current, options, colors) {
-  return `<div class="modal-section">
-    <div class="modal-section-title">${title}</div>
-    ${options.map((opt, i) => `
-    <label class="radio-option">
-      <input type="radio" name="${name}" value="${opt}" ${current===opt?'checked':''}>
-      <div class="color-dot" style="background:${colors[i]}"></div>
-      <span>${opt}</span>
-    </label>`).join('')}
   </div>`;
 }
 
-function delRE(idx) {
-  const s = students.find(x => x.id === currentModal.studentId);
-  s.fin.offeneRechnungen.splice(idx, 1);
-  rerenderREList(s);
+/* ════════════════════════════════════════════════════════════════════
+   5 · Aktionen (schreiben in Kartei bzw. live in den App-State)
+════════════════════════════════════════════════════════════════════ */
+function persist(s){
+  if(s.live) return; /* Live-Schüler wird über writeLive() gespeichert */
+  const i=students.findIndex(x=>x.id===s.id);
+  if(i>=0){students[i]=s; saveAdmin(students);}
 }
-function addRE() {
-  const s = students.find(x => x.id === currentModal.studentId);
-  s.fin.offeneRechnungen.push(`RE-2024-0${Math.floor(10 + Math.random() * 89)}`);
-  rerenderREList(s);
+function adjust(id,what,delta){
+  const s=byId(id); if(!s)return;
+  const clamp=(v,max)=>Math.max(0,max!=null?Math.min(max,v):v);
+  if(what==='theorie') s.theorie.besucht=clamp(s.theorie.besucht+delta,s.theorie.gesamt);
+  else if(what==='uebung') s.uebungsstunden=clamp(s.uebungsstunden+delta);
+  else if(what==='sim') s.simulator.ist=clamp(s.simulator.ist+delta,s.simulator.soll);
+  else s.sonderfahrten[what].ist=clamp(s.sonderfahrten[what].ist+delta,s.sonderfahrten[what].soll);
+  if(s.live){
+    writeLive(st=>{
+      if(what==='theorie') st.theorie.besucht=s.theorie.besucht;
+      else if(what==='uebung') st.uebungsstunden=s.uebungsstunden;
+      else if(what==='sim') st.simulator.ist=s.simulator.ist;
+      else st.sonderfahrten[what].ist=s.sonderfahrten[what].ist;
+    });
+  } else persist(s);
+  render();
 }
-function rerenderREList(s) {
-  document.getElementById('reList').innerHTML =
-    s.fin.offeneRechnungen.map((r,i) => `
-    <div class="re-row">
-      <input class="re-input" id="re_${i}" value="${r}">
-      <button class="re-del" onclick="delRE(${i})">✕</button>
-    </div>`).join('') +
-    '<button class="re-add" onclick="addRE()">+ Posten hinzufügen</button>';
+function toggleTP(id){
+  const s=byId(id); if(!s)return;
+  const v=!s.theoriePruefung.bestanden;
+  if(s.live) writeLive(st=>{if(st.theoriePruefung)st.theoriePruefung.bestanden=v;});
+  else {s.theoriePruefung.bestanden=v; persist(s);}
+  toast(v?'🏆 Theorieprüfung als bestanden markiert':'Theorieprüfung zurückgesetzt');
+  render();
 }
-
-function saveModal() {
-  const s = students.find(x => x.id === currentModal.studentId);
-  const { tile } = currentModal;
-  const val = n => document.querySelector(`input[name="${n}"]:checked`)?.value;
-
-  if (tile === 'DOK') {
-    s.dok.passbild   = val('dok_passbild')   || s.dok.passbild;
-    s.dok.sehtest    = val('dok_sehtest')    || s.dok.sehtest;
-    s.dok.ersteHilfe = val('dok_ersteHilfe') || s.dok.ersteHilfe;
-    s.dok.tuevAntrag = val('dok_tuevAntrag') || s.dok.tuevAntrag;
-  } else if (tile === 'FIN') {
-    s.fin.guthaben_cent = Math.round(parseFloat(document.getElementById('fin_guthaben').value) * 100) || 0;
-    s.fin.offeneRechnungen = Array.from(
-      document.querySelectorAll('[id^="re_"]')
-    ).map(el => el.value.trim()).filter(Boolean);
-  } else if (tile === 'THE') {
-    s.the.stundenBesucht = Array.from({length: s.the.pflichtStunden}, (_,i) => i+1)
-      .filter(n => document.getElementById(`the_${n}`)?.checked);
-  } else if (tile === 'TP') {
-    s.tp.status = val('tp_status') || s.tp.status;
-  } else if (tile === 'PRAX') {
-    s.prax.simulatorErledigt          = parseInt(document.getElementById('prax_sim').value)    || 0;
-    s.prax.grundausbildungAbgeschlossen = document.getElementById('prax_grundausb').checked;
-    s.prax.ueberlandAbsolviert        = parseInt(document.getElementById('prax_ul').value)    || 0;
-    s.prax.autobahnAbsolviert         = parseInt(document.getElementById('prax_ab').value)    || 0;
-    s.prax.nachtAbsolviert            = parseInt(document.getElementById('prax_nacht').value) || 0;
-    s.prax.praktischePruefung         = val('prax_pruefung') || s.prax.praktischePruefung;
-  }
-
-  closeModal();
-  applyFilters();
-  if (selectedId) selectStudent(selectedId);
-  toast(`🔒 Konfiguration für ${s.name} systemweit synchronisiert.`);
+function setDoc(id,key,status){
+  const s=byId(id); if(!s)return;
+  if(s.live) writeLive(st=>{st.dokumente[key].status=status; if(status==='ausstehend')st.dokumente[key].thumb=null;});
+  else {s.dokumente[key]=status; persist(s);}
+  toast(status==='verifiziert'?`✓ ${DOC_LABELS[key]} verifiziert`:`${DOC_LABELS[key]} zurückgesetzt`);
+  render();
 }
-
-function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
-  currentModal = null;
+function payItem(id,idx){
+  const s=byId(id); if(!s)return;
+  const p=s.finanzen.posten[idx]; if(!p)return;
+  if(s.live) writeLive(st=>{st.finanzen.posten.splice(idx,1);});
+  else {s.finanzen.posten.splice(idx,1); s.finanzen.bezahlt=(s.finanzen.bezahlt||0)+p.betrag; persist(s);}
+  toast(`💶 ${fmtEuro(p.betrag)} als bezahlt verbucht`);
+  render();
 }
-function overlayClick(e) {
-  if (e.target === document.getElementById('modalOverlay')) closeModal();
+function addItem(id){
+  const s=byId(id); if(!s)return;
+  const label=(document.getElementById('finLabel').value||'').trim();
+  const betrag=parseFloat(document.getElementById('finBetrag').value);
+  if(!label||!(betrag>0)){toast('⚠️ Bezeichnung und Betrag angeben');return;}
+  if(s.live) writeLive(st=>{st.finanzen.posten.push({label,betrag});});
+  else {s.finanzen.posten.push({label,betrag}); persist(s);}
+  toast('Posten hinzugefügt');
+  render();
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-
-/* ═══════════════════════════════════════════════════════════════════════
-   AKTIONEN & TOAST
-═══════════════════════════════════════════════════════════════════════ */
-function examReadyAction(id) {
-  const s = students.find(x => x.id === id);
-  toast(`🎉 System-Erfolg: ${s.name} zur Prüfung übermittelt.`);
-}
-function sendPush(id) {
-  const s = students.find(x => x.id === id);
-  const fin = computeFIN(s); const dok = computeDOK(s);
-  if (fin.color === 'red')    toast(`⛔ Zahlungserinnerung an ${s.name} eskaliert (${formatEur(s.fin.guthaben_cent)}).`);
-  else if (dok.color === 'red') toast(`📂 Dokument-Mahnung an ${s.name} gesendet.`);
-  else                          toast(`📣 Push-Benachrichtigung erfolgreich an ${s.name} gesendet.`);
-}
-function sendChat() {
-  const input = document.getElementById('chatInput');
-  if (!input.value.trim()) return;
-  const s = students.find(x => x.id === selectedId);
-  toast(`📝 Eintrag in Schülerakte erfasst: „${input.value}"`);
-  input.value = '';
+function removeStudent(id){
+  const s=byId(id); if(!s||s.live)return;
+  if(!confirm(`„${s.name}" wirklich aus der Kartei löschen?`))return;
+  students=students.filter(x=>x.id!==id);
+  saveAdmin(students);
+  if(selectedId===id)selectedId=null;
+  toast('Schüler gelöscht');
+  render();
 }
 
-let toastTimer = null;
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+/* Neuer Schüler */
+function openAdd(){document.getElementById('addOverlay').classList.add('open');document.getElementById('fName').focus();}
+function closeAdd(){document.getElementById('addOverlay').classList.remove('open');}
+function saveAdd(){
+  const name=(document.getElementById('fName').value||'').trim();
+  if(!name){toast('⚠️ Bitte einen Namen eingeben');return;}
+  const klasse=document.getElementById('fKlasse').value;
+  const besitz=document.getElementById('fBesitz').value;
+  const grund=parseFloat(document.getElementById('fGrund').value)||0;
+  const r=CLASS_RULES[klasse];
+  const s={
+    id:'S-'+Date.now().toString(36).toUpperCase(),
+    name, geb:document.getElementById('fGeb').value||'', klasse, besitz, live:false, lastActivity:0,
+    theorie:{besucht:0,gesamt:theorieGesamt(klasse,besitz)},
+    theoriePruefung:{bestanden:false},
+    uebungsstunden:0, simulator:{ist:0,soll:r.keinTheorie?0:6},
+    sonderfahrten:{
+      ueberland:{ist:0,soll:r.sonder.ueberland},
+      autobahn:{ist:0,soll:r.sonder.autobahn},
+      nacht:{ist:0,soll:r.sonder.nacht}},
+    dokumente:{sehtest:'ausstehend',ersteHilfe:'ausstehend',passbild:'ausstehend'},
+    finanzen:{bezahlt:0,posten:grund>0?[{label:'Grundbetrag',betrag:grund}]:[]},
+    praxisPruefung:'offen'
+  };
+  students.unshift(s); saveAdmin(students);
+  closeAdd();
+  document.getElementById('fName').value=''; document.getElementById('fGeb').value='';
+  selectedId=s.id;
+  toast(`✓ ${name} angelegt (Klasse ${klasse})`);
+  render();
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   INIT
-═══════════════════════════════════════════════════════════════════════ */
-document.getElementById('currentDate').textContent =
-  new Date().toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' });
+/* ════════════════════════════════════════════════════════════════════
+   6 · Live-Sync: auf Änderungen aus der Schüler-App reagieren
+════════════════════════════════════════════════════════════════════ */
+if(bc) bc.onmessage=e=>{if(e.data&&e.data.src==='app')render();};
+window.addEventListener('storage',e=>{
+  if(e.key===STATE_KEY||e.key===PROFILE_KEY)render();
+});
+/* Fallback-Poll: nur neu zeichnen, wenn sich App-Daten wirklich geändert
+   haben und gerade kein Eingabefeld benutzt wird. */
+let lastSnap='';
+function liveSnap(){try{return (localStorage.getItem(STATE_KEY)||'')+(localStorage.getItem(PROFILE_KEY)||'');}catch(e){return '';}}
+lastSnap=liveSnap();
+setInterval(()=>{
+  if(document.visibilityState!=='visible')return;
+  const ae=document.activeElement;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='SELECT'))return;
+  const snap=liveSnap();
+  if(snap!==lastSnap){lastSnap=snap;render();}
+},3000);
 
-applyFilters();
+let toastTimer=null;
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2400);
+}
+document.getElementById('addOverlay').addEventListener('click',e=>{if(e.target.id==='addOverlay')closeAdd();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeAdd();});
+
+render();
 </script>
 </body>
 </html>
