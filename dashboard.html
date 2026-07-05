@@ -1535,9 +1535,12 @@ function ic(name,cls){
 }
 
 /* ---------- 1 · Storage (localStorage mit Fallback) ---------- */
-const PROFILE_KEY='fk_profile_v1';
+const PROFILE_KEY='fk_profile_v2';
 const STATE_KEY='fk_state_v3';
-const SESSION_KEY='fk_session_v1';
+const SESSION_KEY='fk_session_v2';
+/* Altlasten früherer Versionen entfernen – neue Version startet immer
+   mit Anmeldung → Klassenwahl, bis ein aktuelles Konto angelegt ist. */
+const LEGACY_KEYS=['fk_profile_v1','fk_session_v1','fk_state_v2','fk_cockpit_state'];
 const Store=(()=>{
   let ok=false; try{ const k='__fk_t__'; localStorage.setItem(k,'1'); localStorage.removeItem(k); ok=true; }catch(e){ ok=false; }
   const mem={};
@@ -2980,6 +2983,8 @@ window.addEventListener('resize',()=>{ if(mapInstance) mapInstance.invalidateSiz
 
 /* ---------- Start ---------- */
 document.addEventListener('DOMContentLoaded',()=>{
+  LEGACY_KEYS.forEach(k=>Store.del(k));
+  try{ LEGACY_KEYS.forEach(k=>sessionStorage.removeItem(k)); }catch(e){}
   const mc=document.querySelector('.morph-close'); if(mc) mc.innerHTML=ic('x');
   bootAuth();
   FX.init();
