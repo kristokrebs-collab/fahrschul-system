@@ -3032,6 +3032,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('storage',e=>{
     if(e.key===STATE_KEY||e.key===PROFILE_KEY||e.key==='fk_sync_ping') applyExternal();
   });
+  /* Lesezugriff für Diagnose & Tests (state ist eine lexikalische Variable) */
+  window.__fkGetState=function(){ return state; };
 })();
 </script>
 </body>
