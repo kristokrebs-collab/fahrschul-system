@@ -292,6 +292,34 @@ select.sel{
 .flag.warn{color:var(--amber);background:var(--amber-soft)}
 .flag.ok{color:var(--emerald-hi);background:var(--emerald-soft)}
 .no-result{color:var(--text-faint);text-align:center;padding:48px 12px;font-weight:600}
+.card{content-visibility:auto;contain-intrinsic-size:auto 148px}
+
+/* Ansicht-Umschalter Schüler / Fahrlehrer */
+.seg{display:inline-flex;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:3px;gap:2px}
+.seg button{padding:7px 15px;border-radius:9px;font-size:12.5px;font-weight:800;color:var(--text-dim);display:inline-flex;align-items:center;gap:6px}
+.seg button.active{background:linear-gradient(135deg,var(--accent-hi),var(--accent));color:#fff;box-shadow:0 4px 12px -4px rgba(225,29,72,.5)}
+
+/* Fahrlehrer-Auswahl im Schüler-Detail */
+.fl-pick{margin-left:auto}
+.fl-pick label{display:block;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-faint);margin-bottom:4px}
+.fl-pick select{padding:8px 11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);outline:none;max-width:200px}
+
+/* Fahrlehrer-Karten */
+.fl-klassen{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
+.fl-k{font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;background:var(--surface-3);border:1px solid var(--border);color:var(--text-dim)}
+.fl-extra{font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-hi)}
+.fl-stat{display:flex;gap:14px;margin-top:9px;font-size:11px;color:var(--text-dim);font-weight:700}
+.fl-stat b{color:var(--text)}
+.fl-student-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px}
+.fl-student-row:hover{background:var(--surface-3)}
+.fl-student-row:last-child{border-bottom:none}
+.fl-student-row .n{font-weight:700;flex:1;font-size:13px}
+.fl-student-row .k{font-size:11px;color:var(--text-faint);font-weight:700}
+.filter-pill{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;font-weight:800;
+  color:var(--accent-hi);background:var(--accent-soft);border:1px solid var(--accent-line);
+  border-radius:999px;padding:4px 6px 4px 12px;margin-left:8px}
+.filter-pill button{width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;font-size:11px;line-height:1}
 
 /* ── Detail ─────────────────────────────────────────────────────────── */
 .d-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-faint);gap:10px;text-align:center;padding:20px}
@@ -454,6 +482,10 @@ select.sel{
 <div class="kpi-strip" id="kpiStrip"></div>
 
 <div class="toolbar">
+  <div class="seg" role="tablist">
+    <button class="active" id="tab-schueler" onclick="setView('schueler')"><span data-ic="users"></span>Schüler</button>
+    <button id="tab-fahrlehrer" onclick="setView('fahrlehrer')"><span data-ic="graduation-cap"></span>Fahrlehrer</button>
+  </div>
   <div class="search">
     <span class="sic" data-ic="search"></span>
     <input id="searchInput" type="text" placeholder="Schüler suchen (Name, Klasse) …" oninput="render()">
@@ -592,11 +624,46 @@ function theorieGesamt(klasse,besitz){
   if(r.keinTheorie) return 0;
   return (besitz==='erweiterung'?6:12)+r.zusatz;
 }
-/* Dienstplan des Fahrlehrers (Spiegel aus app.html · FL_PLAN) für Smart-Matching */
-const FL_NAME='Herr Schäfer';
-const FL_PLAN={1:{vormittag:true,nachmittag:true,abend:false},2:{vormittag:false,nachmittag:true,abend:true},
-  3:{vormittag:true,nachmittag:false,abend:true},4:{vormittag:true,nachmittag:true,abend:false},
-  5:{vormittag:false,nachmittag:true,abend:false},6:{vormittag:true,nachmittag:false,abend:false}};
+/* ── Fahrlehrer-Team (mit Dienstplänen fürs Smart-Matching) ──
+   P(vormittag,nachmittag,abend) je Wochentag Mo(1)–Sa(6) */
+const P=(v,n,a)=>({vormittag:!!v,nachmittag:!!n,abend:!!a});
+const INSTRUCTORS=[
+  {id:'FL-01',name:'Björn Eifert',    klassen:['B','BE','C','CE','T'],extra:'Dozent',
+   plan:{1:P(1,1,0),2:P(1,0,1),3:P(0,1,1),4:P(1,1,0),5:P(1,0,0),6:P(1,0,0)}},
+  {id:'FL-02',name:'Bertram Feulner', klassen:['A','B','BE','C','CE','T'],extra:'',
+   plan:{1:P(0,1,1),2:P(1,1,0),3:P(1,0,0),4:P(0,1,1),5:P(1,1,0),6:P(0,0,0)}},
+  {id:'FL-03',name:'Christian Ricken',klassen:['B','BE'],extra:'',
+   plan:{1:P(1,0,0),2:P(1,1,0),3:P(1,1,0),4:P(1,0,1),5:P(0,1,1),6:P(1,0,0)}},
+  {id:'FL-04',name:'Enis Alijoski',   klassen:['B','BE'],extra:'',
+   plan:{1:P(0,1,1),2:P(0,1,1),3:P(1,1,0),4:P(1,0,0),5:P(1,1,0),6:P(0,1,0)}},
+  {id:'FL-05',name:'Harald Manger',   klassen:['A','B','BE'],extra:'Handicap-Ausbildung',
+   plan:{1:P(1,1,0),2:P(1,0,0),3:P(0,1,1),4:P(1,1,0),5:P(1,0,1),6:P(0,0,0)}},
+  {id:'FL-06',name:'Sabine Krautwald',klassen:['B','BE'],extra:'',
+   plan:{1:P(1,0,1),2:P(1,1,0),3:P(1,0,0),4:P(0,1,1),5:P(1,1,0),6:P(1,0,0)}},
+  {id:'FL-07',name:'Markus Dehler',   klassen:['B'],extra:'Automatik-Spezialist',
+   plan:{1:P(0,1,0),2:P(1,1,1),3:P(1,1,0),4:P(1,0,0),5:P(0,1,1),6:P(0,0,0)}},
+  {id:'FL-08',name:'Jutta Simon',     klassen:['B'],extra:'',
+   plan:{1:P(1,1,0),2:P(0,0,1),3:P(1,1,0),4:P(1,1,0),5:P(1,0,0),6:P(1,1,0)}},
+  {id:'FL-09',name:'Peter Wingenfeld',klassen:['B','C','CE'],extra:'',
+   plan:{1:P(1,0,0),2:P(1,1,0),3:P(0,1,1),4:P(1,1,0),5:P(1,1,0),6:P(0,0,0)}},
+  {id:'FL-10',name:'Miriam Otto',     klassen:['A','B'],extra:'',
+   plan:{1:P(0,1,1),2:P(1,0,1),3:P(1,1,0),4:P(0,1,0),5:P(1,1,0),6:P(1,0,0)}},
+  {id:'FL-11',name:'Timo Baumgart',   klassen:['B','BE','T'],extra:'',
+   plan:{1:P(1,1,0),2:P(1,1,0),3:P(1,0,0),4:P(1,0,1),5:P(0,1,1),6:P(0,1,0)}},
+  {id:'FL-12',name:'Karin Möller',    klassen:['B'],extra:'',
+   plan:{1:P(1,0,1),2:P(0,1,0),3:P(1,1,0),4:P(1,1,0),5:P(1,0,0),6:P(1,0,0)}},
+  {id:'FL-13',name:'Stefan Hohmann',  klassen:['B','BE','C'],extra:'',
+   plan:{1:P(0,1,1),2:P(1,1,0),3:P(1,0,1),4:P(0,1,0),5:P(1,1,0),6:P(0,0,0)}},
+  {id:'FL-14',name:'Aylin Kaya',      klassen:['A','B'],extra:'',
+   plan:{1:P(1,1,0),2:P(1,0,0),3:P(0,1,1),4:P(1,1,0),5:P(0,1,1),6:P(1,0,0)}},
+  {id:'FL-15',name:'Dominik Frank',   klassen:['B','BE'],extra:'',
+   plan:{1:P(1,0,0),2:P(0,1,1),3:P(1,1,0),4:P(1,0,1),5:P(1,1,0),6:P(1,1,0)}}
+];
+/* Welche Basisklasse braucht der Fahrlehrer für diese Schülerklasse? */
+function baseKlasse(k){ if(k==='B197')return 'B'; if(k==='A1'||k==='A2'||k==='AM')return 'A'; return k; }
+function canTeach(fl,klasse){ return fl.klassen.indexOf(baseKlasse(klasse))>=0; }
+function flById(id){ return INSTRUCTORS.find(f=>f.id===id)||null; }
+function slotsPerWeek(fl){ let n=0; for(let d=1;d<=6;d++)['vormittag','nachmittag','abend'].forEach(p=>{ if(fl.plan[d][p])n++; }); return n; }
 const DAY_LABELS={1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};
 const DAY_FULL={1:'Montag',2:'Dienstag',3:'Mittwoch',4:'Donnerstag',5:'Freitag',6:'Samstag'};
 const PERIOD_LABELS={vormittag:'Vorm.',nachmittag:'Nachm.',abend:'Abend'};
@@ -611,17 +678,17 @@ function nextDateForDow(dow,hour,offsetWeeks){
   d.setDate(now.getDate()+add+(offsetWeeks||0)*7); d.setHours(hour,0,0,0);
   return d;
 }
-function matchingSlots(verf){
-  if(!verf) return [];
+function matchingSlots(verf,fl){
+  if(!verf||!fl) return [];
   const out=[];
   [0,1].forEach(w=>{
     for(let d=1;d<=6;d++){
       ['vormittag','nachmittag','abend'].forEach(p=>{
-        if(verf[d]&&verf[d][p]&&FL_PLAN[d]&&FL_PLAN[d][p]){
+        if(verf[d]&&verf[d][p]&&fl.plan[d]&&fl.plan[d][p]){
           const date=nextDateForDow(d,PERIOD_HOURS[p],w);
           out.push({iso:date.toISOString(),date,dow:d,period:p,
             label:`${DAY_FULL[d]} ${PERIOD_FULL[p].toLowerCase()}`,
-            sub:date.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' · '+String(PERIOD_HOURS[p]).padStart(2,'0')+':00 Uhr · '+FL_NAME});
+            sub:date.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' · '+String(PERIOD_HOURS[p]).padStart(2,'0')+':00 Uhr · '+fl.name});
         }
       });
     }
@@ -633,7 +700,7 @@ function matchingSlots(verf){
 /* ════════════════════════════════════════════════════════════════════
    2 · Daten: Kartei (localStorage) + Live-Schüler aus der App
 ════════════════════════════════════════════════════════════════════ */
-const ADMIN_KEY='fk_admin_students_v1';
+const ADMIN_KEY='fk_admin_students_v2';
 const NOTES_KEY='fk_admin_notes_v1';
 const STATE_KEY='fk_state_v3';       /* geteilt mit app.html */
 const PROFILE_KEY='fk_profile_v2';   /* geteilt mit app.html */
@@ -646,54 +713,86 @@ function initials(name){const p=(name||'').trim().split(/\s+/).filter(Boolean);
 function fmtDate(iso){try{const d=new Date(iso);return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})+' · '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr';}catch(e){return '';}}
 
 function seedStudents(){
-  const mk=(id,name,geb,klasse,besitz,ov)=>Object.assign({
-    id,name,geb,klasse,besitz,live:false,lastActivity:3,
-    theorie:{besucht:0,gesamt:theorieGesamt(klasse,besitz)},
-    theoriePruefung:{bestanden:false},
-    praxisPruefung:{bestanden:false},
-    uebungsstunden:0, simulator:{ist:0,soll:6},
-    sonderfahrten:{
-      ueberland:{ist:0,soll:CLASS_RULES[klasse].sonder.ueberland},
-      autobahn:{ist:0,soll:CLASS_RULES[klasse].sonder.autobahn},
-      nacht:{ist:0,soll:CLASS_RULES[klasse].sonder.nacht}},
-    dokumente:{sehtest:'ausstehend',ersteHilfe:'ausstehend',passbild:'ausstehend'},
-    finanzen:{bezahlt:0,posten:[]}
-  },ov);
-  return [
-    mk('S-001','Tobias Maier','2005-05-12','B','erst',{lastActivity:14,
-      theorie:{besucht:3,gesamt:14},uebungsstunden:4,simulator:{ist:1,soll:6},
-      finanzen:{bezahlt:200,posten:[{label:'Grundbetrag (Rest)',betrag:250},{label:'Fahrstunden Juni (4 × 45 min)',betrag:160}]}}),
-    mk('S-002','Lisa Baumann','2001-11-28','B197','erst',{lastActivity:2,
-      theorie:{besucht:11,gesamt:14},uebungsstunden:16,simulator:{ist:4,soll:6},
-      sonderfahrten:{ueberland:{ist:2,soll:5},autobahn:{ist:1,soll:4},nacht:{ist:0,soll:3}},
-      dokumente:{sehtest:'verifiziert',ersteHilfe:'pruefung',passbild:'verifiziert'},
-      finanzen:{bezahlt:1450,posten:[{label:'Fahrstunden Juni (2 × 90 min)',betrag:180}]}}),
-    mk('S-003','Marco Schulze','1998-08-03','C','erweiterung',{lastActivity:1,
-      theorie:{besucht:16,gesamt:16},theoriePruefung:{bestanden:true},
-      uebungsstunden:24,simulator:{ist:6,soll:6},
-      sonderfahrten:{ueberland:{ist:5,soll:5},autobahn:{ist:2,soll:2},nacht:{ist:3,soll:3}},
-      dokumente:{sehtest:'verifiziert',ersteHilfe:'verifiziert',passbild:'verifiziert'},
-      finanzen:{bezahlt:2890,posten:[]}}),
-    mk('S-004','Ayşe Demir','2007-02-19','A1','erst',{lastActivity:5,
-      theorie:{besucht:8,gesamt:16},uebungsstunden:10,simulator:{ist:2,soll:4},
-      sonderfahrten:{ueberland:{ist:1,soll:5},autobahn:{ist:0,soll:4},nacht:{ist:0,soll:3}},
-      dokumente:{sehtest:'verifiziert',ersteHilfe:'ausstehend',passbild:'pruefung'},
-      finanzen:{bezahlt:780,posten:[{label:'Fahrstunden Mai (3 × 45 min)',betrag:135}]}}),
-    mk('S-005','Jan Hoffmann','2004-09-30','BE','erweiterung',{lastActivity:8,
-      theorie:{besucht:0,gesamt:0},theoriePruefung:{bestanden:true},
-      uebungsstunden:6,simulator:{ist:0,soll:0},
-      sonderfahrten:{ueberland:{ist:2,soll:3},autobahn:{ist:1,soll:1},nacht:{ist:0,soll:1}},
-      dokumente:{sehtest:'verifiziert',ersteHilfe:'verifiziert',passbild:'ausstehend'},
-      finanzen:{bezahlt:520,posten:[{label:'Sonderfahrt Überland',betrag:110}]}})
-  ];
+  /* 100 realistische Schüler, deterministisch generiert (mulberry32-Seed) */
+  let t=20260706;
+  const rnd=()=>{t|=0;t=(t+0x6D2B79F5)|0;let r=Math.imul(t^(t>>>15),1|t);r=(r+Math.imul(r^(r>>>7),61|r))^r;return ((r^(r>>>14))>>>0)/4294967296;};
+  const FIRST=['Leon','Mia','Paul','Emma','Ben','Hannah','Finn','Lea','Jonas','Lina','Luca','Marie','Noah','Sofia','Elias','Clara','Felix','Ella','Max','Amelie','Tim','Laura','David','Nele','Jan','Zoe','Erik','Ida','Tom','Maja','Ali','Elif','Samuel','Greta','Moritz','Johanna','Nico','Melissa','Kai','Selin'];
+  const LAST=['Müller','Schmidt','Schneider','Fischer','Weber','Meyer','Wagner','Becker','Schulz','Hoffmann','Koch','Bauer','Richter','Klein','Wolf','Schröder','Neumann','Schwarz','Zimmermann','Braun','Krüger','Hofmann','Hartmann','Lange','Schmitt','Werner','Krause','Meier','Lehmann','Yilmaz','Kaya','Demir','Öztürk','Peters','Jung','Möller','Weiß','König','Walter','Huber'];
+  const KLASSEN=['B','B','B','B','B','B','B197','B197','BE','A','A2','A1','AM','C','CE'];
+  const POSTEN_LBL=['Grundbetrag (Rest)','Fahrstunden Juni','Fahrstunden Mai','Sonderfahrt Überland','Sonderfahrt Autobahn','Vorstellungsentgelt Theorieprüfung','Lernmaterial-Paket'];
+  const out=[];
+  const used=new Set();
+  for(let i=0;i<100;i++){
+    let name;
+    do{ name=FIRST[Math.floor(rnd()*FIRST.length)]+' '+LAST[Math.floor(rnd()*LAST.length)]; }while(used.has(name));
+    used.add(name);
+    const klasse=KLASSEN[Math.floor(rnd()*KLASSEN.length)];
+    const r=CLASS_RULES[klasse];
+    const besitz=(klasse==='BE'||klasse==='C'||klasse==='CE')?'erweiterung':(rnd()<0.12?'erweiterung':'erst');
+    const p=rnd(); /* Ausbildungsfortschritt 0..1 */
+    const tg=theorieGesamt(klasse,besitz);
+    const simSoll=r.keinTheorie?0:6;
+    const clampR=(x,max)=>Math.max(0,Math.min(max,Math.round(x)));
+    const doc=()=>{const q=rnd();return q<p?'verifiziert':(q<p+0.15?'pruefung':'ausstehend');};
+    const geb=`${1998+Math.floor(rnd()*10)}-${String(1+Math.floor(rnd()*12)).padStart(2,'0')}-${String(1+Math.floor(rnd()*28)).padStart(2,'0')}`;
+    const fits=INSTRUCTORS.filter(f=>canTeach(f,klasse));
+    const fl=fits.length?fits[Math.floor(rnd()*fits.length)]:INSTRUCTORS[0];
+    const posten=[];
+    if(rnd()<0.42){
+      const n=1+(rnd()<0.3?1:0);
+      for(let k=0;k<n;k++) posten.push({label:POSTEN_LBL[Math.floor(rnd()*POSTEN_LBL.length)],betrag:Math.round((40+rnd()*220)/5)*5});
+    }
+    out.push({
+      id:'S-'+String(i+1).padStart(3,'0'),
+      name, geb, klasse, besitz, live:false,
+      lastActivity:Math.floor(rnd()*16),
+      fahrlehrer:fl.id,
+      theorie:{besucht:clampR(tg*Math.min(1,p*1.25),tg),gesamt:tg},
+      theoriePruefung:{bestanden:tg>0&&p>0.72&&rnd()<0.8},
+      praxisPruefung:{bestanden:false},
+      uebungsstunden:clampR(p*26,40),
+      simulator:{ist:clampR(simSoll*p*1.1,simSoll),soll:simSoll},
+      sonderfahrten:{
+        ueberland:{ist:clampR(r.sonder.ueberland*Math.max(0,p*1.3-0.25),r.sonder.ueberland),soll:r.sonder.ueberland},
+        autobahn:{ist:clampR(r.sonder.autobahn*Math.max(0,p*1.3-0.3),r.sonder.autobahn),soll:r.sonder.autobahn},
+        nacht:{ist:clampR(r.sonder.nacht*Math.max(0,p*1.3-0.4),r.sonder.nacht),soll:r.sonder.nacht}},
+      dokumente:{sehtest:doc(),ersteHilfe:doc(),passbild:doc()},
+      finanzen:{bezahlt:Math.round((300+p*2400)/10)*10,posten}
+    });
+  }
+  return out;
 }
 function loadAdmin(){
   try{const raw=localStorage.getItem(ADMIN_KEY);if(raw){const a=JSON.parse(raw);if(Array.isArray(a)){
-    a.forEach(s=>{if(!s.praxisPruefung)s.praxisPruefung={bestanden:false};});
+    a.forEach(s=>{
+      if(!s.praxisPruefung)s.praxisPruefung={bestanden:false};
+      if(!s.fahrlehrer||!flById(s.fahrlehrer)){const f=INSTRUCTORS.find(x=>canTeach(x,s.klasse))||INSTRUCTORS[0];s.fahrlehrer=f.id;}
+    });
     return a;}}}catch(e){}
   const s=seedStudents(); localStorage.setItem(ADMIN_KEY,JSON.stringify(s)); return s;
 }
 function saveAdmin(){try{localStorage.setItem(ADMIN_KEY,JSON.stringify(students));}catch(e){}}
+
+/* Fahrlehrer-Zuweisung für Live-Schüler (Kartei-Schüler tragen sie selbst) */
+const ASSIGN_KEY='fk_admin_assign_v1';
+let assignMap={};
+try{assignMap=JSON.parse(localStorage.getItem(ASSIGN_KEY)||'{}')||{};}catch(e){}
+function saveAssign(){try{localStorage.setItem(ASSIGN_KEY,JSON.stringify(assignMap));}catch(e){}}
+function instructorOf(s){
+  const id=s.live?assignMap[s.id]:s.fahrlehrer;
+  let fl=flById(id);
+  if(!fl) fl=INSTRUCTORS.find(f=>canTeach(f,s.klasse))||INSTRUCTORS[0];
+  return fl;
+}
+function assignFL(sid,flid){
+  const s=byId(sid); if(!s)return;
+  const fl=flById(flid); if(!fl)return;
+  if(s.live){assignMap[s.id]=flid;saveAssign();}
+  else {s.fahrlehrer=flid;persist(s);}
+  addNoteSilent(s.id,'Fahrlehrer zugewiesen: '+fl.name);
+  toast('Fahrlehrer: '+fl.name);
+  render();
+}
 
 /* Notizen der Schülerakte (auch für den Live-Schüler) */
 function loadNotes(){try{return JSON.parse(localStorage.getItem(NOTES_KEY)||'{}')||{};}catch(e){return {};}}
@@ -1012,6 +1111,34 @@ function prioScore(s){
 let students=loadAdmin();
 let notes=loadNotes();
 let selectedId=null, activeFilter='all';
+let view='schueler', selectedFl=null, flFilter=null;
+function setView(v){
+  view=v;
+  document.getElementById('tab-schueler').classList.toggle('active',v==='schueler');
+  document.getElementById('tab-fahrlehrer').classList.toggle('active',v==='fahrlehrer');
+  document.getElementById('searchInput').placeholder=v==='fahrlehrer'?'Fahrlehrer suchen (Name, Klasse) …':'Schüler suchen (Name, Klasse) …';
+  document.getElementById('mainGrid').classList.remove('show-detail');
+  render();
+}
+function selectFl(id){
+  selectedFl=id;
+  document.getElementById('mainGrid').classList.add('show-detail');
+  render();
+}
+function filterByFl(id){
+  flFilter=id; view='schueler'; selectedId=null;
+  document.getElementById('tab-schueler').classList.add('active');
+  document.getElementById('tab-fahrlehrer').classList.remove('active');
+  document.getElementById('mainGrid').classList.remove('show-detail');
+  render();
+}
+function clearFlFilter(){flFilter=null;render();}
+function jumpToStudent(id){
+  view='schueler';
+  document.getElementById('tab-schueler').classList.add('active');
+  document.getElementById('tab-fahrlehrer').classList.remove('active');
+  select(id);
+}
 let bc=null; try{bc=new BroadcastChannel('fk_sync_v1');}catch(e){}
 
 function liveStudents(){
@@ -1038,6 +1165,7 @@ function setFilter(f){
 function filteredSorted(){
   const q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
   let list=allStudents().filter(s=>{
+    if(flFilter&&instructorOf(s).id!==flFilter) return false;
     if(q&&!(s.name.toLowerCase().includes(q)||s.klasse.toLowerCase().includes(q))) return false;
     if(activeFilter==='crit')  return isCritical(s);
     if(activeFilter==='docs')  return missingDocs(s).length>0;
@@ -1066,6 +1194,7 @@ function renderKPIs(all){
   const avgTheorie=all.length?Math.round(all.reduce((a,s)=>a+theorieP(s),0)/all.length*100):0;
   document.getElementById('kpiStrip').innerHTML=`
     <div class="kpi"><div class="kic red">${ic('users')}</div><div><b>${all.length}</b><span>Aktive Schüler</span></div></div>
+    <div class="kpi"><div class="kic gray">${ic('graduation-cap')}</div><div><b>${INSTRUCTORS.length}</b><span>Fahrlehrer</span></div></div>
     <div class="kpi"><div class="kic amber">${ic('wallet')}</div><div><b>${fmtEuro(sumOffen)}</b><span>Offene Posten</span></div></div>
     <div class="kpi"><div class="kic green">${ic('trending-up')}</div><div><b>${fmtEuro(sumEingenommen)}</b><span>Eingenommen</span></div></div>
     <div class="kpi"><div class="kic green">${ic('badge-check')}</div><div><b>${ready}</b><span>Prüfungsreif</span></div></div>
@@ -1085,7 +1214,10 @@ function render(){
     :(syncOnline?`${lives.length} App${lives.length>1?'s':''} live über Server`+(lives.length===1?`: ${live.name}`:'')
     :`Live gekoppelt: ${live.name}`);
   document.getElementById('matchBtn').style.display=live?'inline-flex':'none';
-  document.getElementById('countLine').textContent=`${list.length} von ${all.length} Schülern`;
+  if(view==='fahrlehrer'){ renderInstructorList(all); renderInstructorDetail(all); return; }
+  const fl=flFilter?flById(flFilter):null;
+  document.getElementById('countLine').innerHTML=`${list.length} von ${all.length} Schülern`+
+    (fl?`<span class="filter-pill">${esc(fl.name)}<button onclick="clearFlFilter()" aria-label="Filter entfernen">✕</button></span>`:'');
   const el=document.getElementById('studentList');
   const hint=!lives.length?`<div class="hint-card">${ic('smartphone')} <b>Keine Schüler-App gekoppelt.</b><br>
     Öffne die Schüler-App direkt hier in der Zentrale – oder starte <b>server.py</b> und öffne die App
@@ -1102,7 +1234,7 @@ function render(){
       <div class="card-top">
         <div class="avatar${s.live?' hot':''}">${initials(s.name)}</div>
         <div><div class="card-name">${esc(s.name)}</div>
-          <div class="card-meta">Klasse ${esc(s.klasse)} · ${s.besitz==='erweiterung'?'Erweiterung':'Erst-Erwerb'}</div></div>
+          <div class="card-meta">Klasse ${esc(s.klasse)} · ${s.besitz==='erweiterung'?'Erweiterung':'Erst-Erwerb'} · ${esc(instructorOf(s).name)}</div></div>
         ${badge}
       </div>
       <div class="mini-rows">
@@ -1118,7 +1250,7 @@ function render(){
           ?(new Date(s.app.naechsteFahrstunde)<=new Date()
             ?`<span class="flag bad">${ic('flag-checkered')}Fahrt bestätigen!</span>`
             :`<span class="flag ok">${ic('calendar-check')}Termin ${new Date(s.app.naechsteFahrstunde).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}</span>`)
-          :(()=>{const n=matchingSlots(s.app.verfuegbarkeit).length;return n?`<span class="flag warn">${ic('sparkles')}${n} Termin-Vorschläge – absegnen</span>`:'';})())
+          :(()=>{const n=matchingSlots(s.app.verfuegbarkeit,instructorOf(s)).length;return n?`<span class="flag warn">${ic('sparkles')}${n} Termin-Vorschläge – absegnen</span>`:'';})())
         :''}
         ${off>0?`<span class="flag ${off>=100?'bad':'warn'}">${ic('banknote')}${fmtEuro(off)} offen</span>`:`<span class="flag ok">${ic('check')}bezahlt</span>`}
         ${docs.length?`<span class="flag warn">${ic('file-warning')}${docs.length} Nachweis${docs.length>1?'e':''} offen</span>`:`<span class="flag ok">${ic('check')}Nachweise</span>`}
@@ -1139,21 +1271,34 @@ function docChip(status){
   if(status==='pruefung')   return `<span class="status-chip info">${ic('clipboard-check')}Eingereicht</span>`;
   return `<span class="status-chip bad">${ic('x')}Fehlt</span>`;
 }
-function availMatrixHTML(verf){
-  if(!verf) return '';
+function availMatrixHTML(verf,flObj){
+  if(!verf||!flObj) return '';
   const periods=['vormittag','nachmittag','abend'];
   let html='<div class="avail-grid"><div class="ah"></div>'+[1,2,3,4,5,6].map(d=>`<div class="ah">${DAY_LABELS[d]}</div>`).join('');
   periods.forEach(p=>{
     html+=`<div class="ah" style="text-align:right;padding-right:4px">${PERIOD_LABELS[p]}</div>`;
     [1,2,3,4,5,6].forEach(d=>{
       const wish=!!(verf[d]&&verf[d][p]);
-      const fl=!!(FL_PLAN[d]&&FL_PLAN[d][p]);
+      const fl=!!(flObj.plan[d]&&flObj.plan[d][p]);
       const cls=wish&&fl?'match':(wish?'wish':'');
-      html+=`<div class="avail-cell ${cls}" title="${DAY_LABELS[d]} ${PERIOD_LABELS[p]}${wish&&fl?' – passt zu '+FL_NAME:''}">${wish&&fl?ic('check'):(wish?ic('minus'):'')}</div>`;
+      html+=`<div class="avail-cell ${cls}" title="${DAY_LABELS[d]} ${PERIOD_LABELS[p]}${wish&&fl?' – passt zu '+flObj.name:''}">${wish&&fl?ic('check'):(wish?ic('minus'):'')}</div>`;
     });
   });
-  html+='</div><div class="avail-legend"><span><b style="background:var(--emerald)"></b>Wunsch trifft Dienstplan '+esc(FL_NAME)+'</span><span><b style="background:var(--amber)"></b>Wunsch ohne freien Slot</span></div>';
+  html+='</div><div class="avail-legend"><span><b style="background:var(--emerald)"></b>Wunsch trifft Dienstplan '+esc(flObj.name)+'</span><span><b style="background:var(--amber)"></b>Wunsch ohne freien Slot</span></div>';
   return html;
+}
+/* Reiner Dienstplan eines Fahrlehrers (Fahrlehrer-Ansicht) */
+function planMatrixHTML(flObj){
+  const periods=['vormittag','nachmittag','abend'];
+  let html='<div class="avail-grid"><div class="ah"></div>'+[1,2,3,4,5,6].map(d=>`<div class="ah">${DAY_LABELS[d]}</div>`).join('');
+  periods.forEach(p=>{
+    html+=`<div class="ah" style="text-align:right;padding-right:4px">${PERIOD_LABELS[p]}</div>`;
+    [1,2,3,4,5,6].forEach(d=>{
+      const on=!!(flObj.plan[d]&&flObj.plan[d][p]);
+      html+=`<div class="avail-cell ${on?'match':''}" title="${DAY_LABELS[d]} ${PERIOD_LABELS[p]}">${on?ic('check'):''}</div>`;
+    });
+  });
+  return html+'</div>';
 }
 
 function renderDetail(){
@@ -1176,9 +1321,15 @@ function renderDetail(){
   <button class="back-btn" onclick="backToList()">${ic('arrow-left')}Zur Liste</button>
   <div class="d-head">
     <div class="d-avatar">${initials(s.name)}</div>
-    <div>
+    <div style="flex:1;min-width:200px">
       <div class="d-name">${esc(s.name)} ${s.live?`<span class="badge live">${ic('zap')}LIVE aus Schüler-App</span>`:''}</div>
       <div class="d-sub">Klasse ${esc(s.klasse)} · ${s.besitz==='erweiterung'?'Erweiterung':'Erst-Erwerb'}${s.geb?' · geb. '+esc(s.geb):''}${s.email?' · '+esc(s.email):''}${s.live?' · Änderungen erscheinen sofort in der App':''}</div>
+    </div>
+    <div class="fl-pick">
+      <label>Fahrlehrer</label>
+      <select onchange="assignFL('${s.id}',this.value)">
+        ${INSTRUCTORS.filter(f=>canTeach(f,s.klasse)).map(f=>`<option value="${f.id}"${instructorOf(s).id===f.id?' selected':''}>${esc(f.name)}</option>`).join('')}
+      </select>
     </div>
   </div>
   <div class="d-grid">
@@ -1240,12 +1391,13 @@ function renderDetail(){
       ${s.app.naechsteFahrstunde?`<div class="insight-row"><span class="l">${ic('calendar-clock')} Nächste Fahrstunde</span><span class="v">${fmtDate(s.app.naechsteFahrstunde)}</span></div>`:''}
       <div class="insight-row"><span class="l">${ic('book-open')} Gebuchte Theorie-Termine</span><span class="v">${s.app.offeneTheorieTermine}</span></div>
       <div class="insight-row"><span class="l">${ic('badge-check')} Fahrlehrer-Freigabe</span><span class="v">${s.app.fahrlehrerGo?'Erteilt':'Offen'}</span></div>
-      ${s.app.verfuegbarkeit?`<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--text-dim);margin-bottom:2px">Wunschzeiten × Dienstplan</div>${availMatrixHTML(s.app.verfuegbarkeit)}</div>`:''}
+      ${s.app.verfuegbarkeit?`<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--text-dim);margin-bottom:2px">Wunschzeiten × Dienstplan</div>${availMatrixHTML(s.app.verfuegbarkeit,instructorOf(s))}</div>`:''}
     </div>
 
     <div class="panel" id="matchPanel"><h3>${ic('sparkles')}Smart-Matching – Termin bestätigen</h3>
       ${(()=>{
-        const slots=matchingSlots(s.app.verfuegbarkeit);
+        const flObj=instructorOf(s);
+        const slots=matchingSlots(s.app.verfuegbarkeit,flObj);
         const cur=s.app.naechsteFahrstunde;
         let html='';
         if(cur){
@@ -1259,7 +1411,7 @@ function renderDetail(){
             </div>
           </div>`;
         }
-        if(!slots.length) return html+`<div class="note-empty" style="margin-top:8px">Keine passenden Slots – der Schüler hat noch keine Wunschzeiten hinterlegt, die zum Dienstplan von ${esc(FL_NAME)} passen.</div>`;
+        if(!slots.length) return html+`<div class="note-empty" style="margin-top:8px">Keine passenden Slots – der Schüler hat noch keine Wunschzeiten hinterlegt, die zum Dienstplan von ${esc(flObj.name)} passen.</div>`;
         html+=`<div style="font-size:12px;font-weight:700;color:var(--text-faint);margin:${cur?'12px':'0'} 0 4px">Vorschläge aus den Wunschzeiten des Schülers:</div>`;
         html+=slots.map(sl=>`<div class="match-slot">
           <span class="ms-ic">${ic('calendar-clock')}</span>
@@ -1292,6 +1444,65 @@ function renderDetail(){
         ${openItems.length?`Noch ${openItems.length} Punkt${openItems.length>1?'e':''} offen bis zur Prüfungsreife`:'PRÜFUNGSREIF – alle Voraussetzungen erfüllt!'}
       </div>
       ${s.live?'':`<div class="danger-zone"><button onclick="removeStudent('${s.id}')">${ic('trash-2')}Schüler löschen …</button></div>`}
+    </div>
+  </div>`;
+}
+/* ── Fahrlehrer-Ansicht ─────────────────────────────────────────── */
+function renderInstructorList(all){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase().trim();
+  const list=INSTRUCTORS.filter(f=>!q||f.name.toLowerCase().includes(q)||f.klassen.join(',').toLowerCase().includes(q));
+  document.getElementById('countLine').innerHTML=`${list.length} von ${INSTRUCTORS.length} Fahrlehrern`;
+  document.getElementById('studentList').innerHTML=list.map(f=>{
+    const mine=all.filter(s=>instructorOf(s).id===f.id);
+    const sel=f.id===selectedFl;
+    const openRides=mine.filter(s=>s.live&&s.app&&s.app.naechsteFahrstunde).length;
+    return `<div class="card${sel?' sel':''}" onclick="selectFl('${f.id}')">
+      <div class="card-top">
+        <div class="avatar${sel?' hot':''}">${initials(f.name)}</div>
+        <div><div class="card-name">${esc(f.name)}</div>
+          <div class="card-meta">${slotsPerWeek(f)} Slots/Woche · ${mine.length} Schüler</div></div>
+        ${openRides?`<span class="badge crit">${ic('calendar-check')}${openRides} Termin${openRides>1?'e':''}</span>`:''}
+      </div>
+      <div class="fl-klassen">
+        ${f.klassen.map(k=>`<span class="fl-k">${k}</span>`).join('')}
+        ${f.extra?`<span class="fl-extra">${esc(f.extra)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+function renderInstructorDetail(all){
+  const el=document.getElementById('detailCol');
+  const f=selectedFl?flById(selectedFl):null;
+  if(!f){
+    el.innerHTML=`<div class="d-empty"><span class="big">${ic('graduation-cap')}</span><b style="color:var(--text-dim)">Kein Fahrlehrer ausgewählt</b>
+      <span style="max-width:300px">Wähle links einen Fahrlehrer, um Dienstplan und zugeteilte Schüler zu sehen.</span></div>`;
+    return;
+  }
+  const mine=all.filter(s=>instructorOf(s).id===f.id);
+  const ready=mine.filter(isReady).length;
+  const offenSum=mine.reduce((a,s)=>a+offen(s),0);
+  el.innerHTML=`
+  <button class="back-btn" onclick="backToList()">${ic('arrow-left')}Zur Liste</button>
+  <div class="d-head">
+    <div class="d-avatar">${initials(f.name)}</div>
+    <div style="flex:1">
+      <div class="d-name">${esc(f.name)}</div>
+      <div class="d-sub">Klassen ${f.klassen.join(', ')}${f.extra?' · '+esc(f.extra):''} · ${slotsPerWeek(f)} Slots pro Woche</div>
+    </div>
+    <button class="btn btn-primary" onclick="filterByFl('${f.id}')" style="padding:9px 14px;font-size:12.5px">${ic('users')}${mine.length} Schüler anzeigen</button>
+  </div>
+  <div class="d-grid">
+    <div class="panel"><h3>${ic('calendar-clock')}Dienstplan (Smart-Matching-Basis)</h3>
+      ${planMatrixHTML(f)}
+      <div class="fl-stat"><span><b>${mine.length}</b> Schüler</span><span><b>${ready}</b> prüfungsreif</span><span><b>${fmtEuro(offenSum)}</b> offen</span></div>
+    </div>
+    <div class="panel"><h3>${ic('users')}Zugeteilte Schüler</h3>
+      ${mine.length?mine.slice(0,14).map(s=>`<div class="fl-student-row" onclick="jumpToStudent('${s.id}')">
+        <div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(s.name)}</div>
+        <span class="n">${esc(s.name)}${s.live?' <span class="badge live" style="margin-left:4px">LIVE</span>':''}</span>
+        <span class="k">Klasse ${esc(s.klasse)} · ${Math.round(praxisP(s)*100)} %</span>
+      </div>`).join('')+(mine.length>14?`<div class="note-empty">… und ${mine.length-14} weitere – „${mine.length} Schüler anzeigen" nutzen</div>`:'')
+      :'<div class="note-empty">Noch keine Schüler zugeteilt.</div>'}
     </div>
   </div>`;
 }
