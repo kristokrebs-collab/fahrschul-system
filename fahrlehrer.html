@@ -113,6 +113,43 @@ header span{font-size:11.5px;color:var(--text-faint);font-weight:600}
 .hist-row .l span{font-size:11px;color:var(--text-faint);font-weight:600}
 .chip-ok{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:var(--emerald-hi);
   background:var(--emerald-soft);border:1px solid var(--emerald-line);border-radius:999px;padding:2px 8px;white-space:nowrap}
+/* Quick-Actions (Anruf & Navigation) */
+.qa{display:flex;gap:6px;margin-left:8px}
+.qa a{width:32px;height:32px;border-radius:10px;background:var(--surface-3);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;color:var(--text-dim);text-decoration:none;transition:all .13s}
+.qa a:hover{background:var(--emerald);border-color:transparent;color:#07110C}
+.qa a svg{width:14px;height:14px}
+
+/* Fahrstil-Bewertung (Bottom-Sheet) */
+.sheet-overlay{position:fixed;inset:0;background:rgba(7,9,14,.75);backdrop-filter:blur(5px);z-index:50;
+  display:none;align-items:flex-end;justify-content:center}
+.sheet-overlay.open{display:flex}
+.sheet{width:100%;max-width:560px;background:linear-gradient(180deg,var(--surface),var(--surface-2));
+  border:1px solid var(--border-strong);border-radius:22px 22px 0 0;padding:20px 18px 26px;
+  animation:sheetUp .3s var(--ease-out)}
+@keyframes sheetUp{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+.sheet h3{font-size:15px;font-weight:800;margin-bottom:2px}
+.sheet .sub{font-size:12px;color:var(--text-faint);font-weight:600;margin-bottom:16px}
+.slider-row{margin-bottom:15px}
+.slider-row .sl-top{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;color:var(--text-dim);margin-bottom:7px}
+.slider-row .sl-top b{color:var(--text);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:8px;border-radius:99px;
+  background:var(--surface-3);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent-hi),var(--accent));cursor:pointer;border:3px solid #fff;
+  box-shadow:0 4px 12px -3px rgba(225,29,72,.6)}
+input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--accent);cursor:pointer;border:3px solid #fff}
+
+/* Heute-nicht-Panik-Button */
+.panic{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;margin-top:12px;
+  padding:14px;border-radius:13px;font-weight:800;font-size:14px;
+  background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-hi)}
+.panic:active{transform:scale(.98)}
+.panic.armed{background:linear-gradient(135deg,var(--accent-hi),var(--accent));color:#fff;border-color:transparent}
+.absent-banner{display:flex;align-items:center;gap:9px;margin-top:12px;padding:11px 13px;border-radius:12px;
+  background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-hi);font-weight:800;font-size:12.5px}
+.absent-banner svg{width:15px;height:15px}
+
 #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
   display:flex;align-items:center;gap:8px;background:var(--surface-3);border:1px solid var(--border-strong);
   border-radius:12px;padding:11px 17px;font-weight:700;font-size:13px;opacity:0;transition:.25s var(--ease-out);z-index:60;pointer-events:none}
@@ -122,6 +159,22 @@ header span{font-size:11.5px;color:var(--text-faint);font-weight:600}
 </head>
 <body>
 <div class="wrap" id="app"></div>
+<div class="sheet-overlay" id="rateSheet">
+  <div class="sheet">
+    <h3>Fahrstil bewerten</h3>
+    <div class="sub">Fahrt mit <b id="rateName" style="color:var(--text)"></b> – kurz drüberwischen, die Telemetrie-Karte des Schülers aktualisiert sich sofort.</div>
+    <div class="slider-row"><div class="sl-top"><span>🛑 Bremsen</span><b id="vBrems">4/5</b></div>
+      <input type="range" id="rBrems" min="1" max="5" step="1" value="4" oninput="document.getElementById('vBrems').textContent=this.value+'/5'"></div>
+    <div class="slider-row"><div class="sl-top"><span>↩️ Kurven</span><b id="vKurven">4/5</b></div>
+      <input type="range" id="rKurven" min="1" max="5" step="1" value="4" oninput="document.getElementById('vKurven').textContent=this.value+'/5'"></div>
+    <div class="slider-row"><div class="sl-top"><span>⚡ Beschleunigung</span><b id="vBeschl">4/5</b></div>
+      <input type="range" id="rBeschl" min="1" max="5" step="1" value="4" oninput="document.getElementById('vBeschl').textContent=this.value+'/5'"></div>
+    <div class="t-actions">
+      <button class="btn-big" onclick="submitRate()">Bestätigen &amp; abrechnen</button>
+      <button class="btn-big ghost" onclick="closeRate()">Abbrechen</button>
+    </div>
+  </div>
+</div>
 <div id="toast"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span id="toastText"></span></div>
 
 <script>
@@ -143,7 +196,10 @@ const ICONS={
   'map-pin':'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
   'flag-checkered':'<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-7.333-2q-2 0-3.067.8"/><path d="M8 2v14"/><path d="M12 4v14"/><path d="M16 3.5v14"/><path d="M20 5v10"/>',
   'graduation-cap':'<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
-  'triangle-alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
+  'triangle-alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  phone:'<path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/>',
+  compass:'<path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"/><circle cx="12" cy="12" r="10"/>',
+  siren:'<path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/>'
 };
 function ic(n){return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]||ICONS.check}</svg>`;}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -198,7 +254,16 @@ const TREFFPUNKT='Fahrschule Krebs · Am Bahnhof 3, Fulda';
 
 /* ── Daten vom Server ──────────────────────────────────────────────── */
 const canNet=/^https?:$/.test(location.protocol);
-let me=null, netData={}, plans={}, online=false, dirtyPlan=null, selType={};
+let me=null, netData={}, plans={}, absent={}, online=false, dirtyPlan=null, selType={}, rateKey=null;
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function meAbsentToday(){return me&&absent[me.id]===todayStr();}
+/* Demo-Rufnummer, falls der Schüler keine hinterlegt hat */
+function phoneOf(s){
+  if(s.st.telefon)return String(s.st.telefon).replace(/\s+/g,'');
+  let h=0;for(const c of s.key)h=(h*31+c.charCodeAt(0))%9000;
+  return '+49661'+String(1000+h);
+}
+const MAPS_URL='https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent('Am Bahnhof 3, 36037 Fulda');
 try{me=INSTRUCTORS.find(f=>f.id===localStorage.getItem('fk_fl_me'))||null;}catch(e){}
 
 function myPlan(){
@@ -234,6 +299,7 @@ async function pull(){
     const changed=JSON.stringify(data)!==JSON.stringify(netData)||!online;
     online=true; netData=data;
     if(data.__plans&&data.__plans.state){try{plans=JSON.parse(data.__plans.state)||{};}catch(e){}}
+    if(data.__absent&&data.__absent.state){try{absent=JSON.parse(data.__absent.state)||{};}catch(e){}}
     if(changed)render();
   }catch(e){ if(online){online=false;render();} }
 }
@@ -245,6 +311,25 @@ async function pushStudent(key,st){
     await fetch('sync/admin',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({id:key,state:netData[key].state,ts:netData[key].ts})});
   }catch(e){toast('Server nicht erreichbar');}
+}
+async function pushAbsent(){
+  try{
+    await fetch('sync/push',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:'__absent',profile:null,state:JSON.stringify(absent),ts:Date.now()})});
+  }catch(e){toast('Server nicht erreichbar');}
+}
+function togglePanic(){
+  if(meAbsentToday()){
+    delete absent[me.id];
+    pushAbsent();
+    toast('Abwesenheit zurückgenommen – du bist heute wieder verfügbar');
+  } else {
+    if(!confirm('Heute spontan krank/verhindert?\n\nDer restliche Tag wird blockiert und die Zentrale bekommt sofort einen Alarm, um deine Schüler umzubuchen.'))return;
+    absent[me.id]=todayStr();
+    pushAbsent();
+    toast('Tag blockiert – Zentrale wurde alarmiert');
+  }
+  render();
 }
 async function pushPlans(){
   try{
@@ -275,11 +360,37 @@ function savePlan(){
   render();
 }
 function discardPlan(){dirtyPlan=null;render();}
-function confirmRide(key,mode){
+function openRate(key){
+  rateKey=key;
+  document.getElementById('rateName').textContent=(parseStudents().find(x=>x.key===key)||{}).name||'';
+  [['rBrems','vBrems'],['rKurven','vKurven'],['rBeschl','vBeschl']].forEach(([rid,vid])=>{
+    const el=document.getElementById(rid);el.value=4;document.getElementById(vid).textContent='4/5';
+  });
+  document.getElementById('rateSheet').classList.add('open');
+}
+function closeRate(){rateKey=null;document.getElementById('rateSheet').classList.remove('open');}
+function submitRate(){
+  if(!rateKey)return;
+  const ratings={
+    bremsen:+document.getElementById('rBrems').value,
+    kurven:+document.getElementById('rKurven').value,
+    beschleunigung:+document.getElementById('rBeschl').value
+  };
+  const key=rateKey; closeRate();
+  confirmRide(key,'done',ratings);
+}
+function confirmRide(key,mode,ratings){
   const s=parseStudents().find(x=>x.key===key); if(!s||!s.st.naechsteFahrstunde)return;
   const st=s.st, when=st.naechsteFahrstunde;
   if(mode==='done'){
     const t=selType[key]||nextRideType(st);
+    /* Fahrstil-Telemetrie des Schülers aktualisieren (Karte in der Schüler-App) */
+    if(ratings){
+      st.fahrstil=st.fahrstil||{};
+      st.fahrstil.vorausschauend=ratings.bremsen;
+      st.fahrstil.kupplung=ratings.kurven;
+      st.fahrstil.parken=ratings.beschleunigung;
+    }
     if(t==='uebung'){ st.uebungsstunden=(st.uebungsstunden||0)+2; }
     else if(st.sonderfahrten&&st.sonderfahrten[t]){ st.sonderfahrten[t].ist=Math.min(st.sonderfahrten[t].soll,st.sonderfahrten[t].ist+2); }
     if(st.history&&Array.isArray(st.history.fahr))
@@ -339,6 +450,10 @@ function render(){
         <div class="t-top">
           <div class="avatar">${initials(s.name)}</div>
           <div><div class="t-name">${esc(s.name)}</div><div class="t-meta">Klasse ${esc(s.klasse)}</div></div>
+          <div class="qa">
+            <a href="tel:${phoneOf(s)}" title="Anrufen" aria-label="${esc(s.name)} anrufen">${ic('phone')}</a>
+            <a href="${MAPS_URL}" target="_blank" rel="noopener" title="Route zum Treffpunkt" aria-label="Navigation starten">${ic('compass')}</a>
+          </div>
           <div class="t-when"><b>${when.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr</b>
             <span>${when.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}</span></div>
         </div>
@@ -348,7 +463,7 @@ function render(){
           ${Object.keys(RIDE_TYPES).map(k=>`<button class="type-chip${t===k?' sel':''}" onclick="pickType('${s.key}','${k}')">${ic(RIDE_TYPES[k].icon)}${RIDE_TYPES[k].label}</button>`).join('')}
         </div>
         <div class="t-actions">
-          <button class="btn-big" onclick="confirmRide('${s.key}','done')">${ic('check')}Stattgefunden</button>
+          <button class="btn-big" onclick="openRate('${s.key}')">${ic('check')}Stattgefunden</button>
           <button class="btn-big ghost" onclick="confirmRide('${s.key}','cancel')">${ic('x')}Ausgefallen</button>
         </div>
       </div>`;
@@ -373,6 +488,10 @@ function render(){
       <button class="btn-big" onclick="savePlan()">${ic('check')}Arbeitszeiten speichern</button>
       <button class="btn-big ghost" onclick="discardPlan()">Verwerfen</button>
     </div>`:''}
+    ${meAbsentToday()
+      ?`<div class="absent-banner">${ic('siren')}Heute blockiert – die Zentrale bucht deine Schüler um.</div>
+        <button class="panic armed" onclick="togglePanic()">${ic('check')}Wieder verfügbar melden</button>`
+      :`<button class="panic" onclick="togglePanic()">${ic('siren')}Heute spontan krank / verhindert</button>`}
   </div>
 
   <div class="card"><h2>${ic('history')}Historie meiner Schüler</h2>
@@ -396,6 +515,7 @@ function toast(msg){
   clearTimeout(toastTimer);
   toastTimer=setTimeout(()=>t.classList.remove('show'),2400);
 }
+document.getElementById('rateSheet').addEventListener('click',e=>{if(e.target.id==='rateSheet')closeRate();});
 render();
 pull();
 setInterval(()=>{ if(document.visibilityState==='visible'&&!dirtyPlan) pull(); },3000);

@@ -69,6 +69,21 @@ header{
 .live-pill.off .live-dot{animation:none;opacity:.5}
 @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,.5)}50%{opacity:.4}}
 
+/* Roter Ausfall-Alarm */
+#alarmBar{display:none}
+#alarmBar.on{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin:10px 22px 0;padding:13px 16px;border-radius:var(--radius-sm);
+  background:linear-gradient(90deg,rgba(225,29,72,.22),rgba(225,29,72,.1));
+  border:1px solid var(--accent-line);color:var(--accent-hi);
+  font-weight:800;font-size:13.5px;
+  animation:alarmPulse 1.6s ease-in-out infinite;
+}
+@keyframes alarmPulse{0%,100%{box-shadow:0 0 0 0 rgba(225,29,72,.35)}50%{box-shadow:0 0 0 6px rgba(225,29,72,0)}}
+#alarmBar svg{width:18px;height:18px;flex-shrink:0}
+#alarmBar .sub{font-weight:600;color:var(--text-dim);font-size:12px;flex-basis:100%}
+@media(max-width:640px){#alarmBar.on{margin:10px 14px 0}}
+
 /* Aktivitäts-Glocke & Feed */
 .bell-btn{
   position:relative;width:38px;height:38px;border-radius:12px;flex-shrink:0;
@@ -482,6 +497,8 @@ select.sel{
   </div>
 </header>
 
+<div id="alarmBar" role="alert"></div>
+
 <div class="kpi-strip" id="kpiStrip"></div>
 
 <div class="toolbar">
@@ -601,6 +618,7 @@ const ICONS={
   "pen-line":'<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>',
   "bell":'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   "smartphone":'<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  "siren":'<path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/>',
   "flag-checkered":'<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-7.333-2q-2 0-3.067.8"/><path d="M8 2v14"/><path d="M12 4v14"/><path d="M16 3.5v14"/><path d="M20 5v10"/>',
   "calendar-check":'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>'
 };
@@ -689,6 +707,7 @@ function matchingSlots(verf,fl){
       ['vormittag','nachmittag','abend'].forEach(p=>{
         if(verf[d]&&verf[d][p]&&fl.plan[d]&&fl.plan[d][p]){
           const date=nextDateForDow(d,PERIOD_HOURS[p],w);
+          if(isAbsentToday(fl)&&date.toDateString()===new Date().toDateString())return;
           out.push({iso:date.toISOString(),date,dow:d,period:p,
             label:`${DAY_FULL[d]} ${PERIOD_FULL[p].toLowerCase()}`,
             sub:date.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' · '+String(PERIOD_HOURS[p]).padStart(2,'0')+':00 Uhr · '+fl.name});
@@ -853,6 +872,20 @@ function buildLiveRecord(id,profile,st){
 /* ── Server-Sync (server.py): mehrere Schüler-Apps geräteübergreifend live ── */
 let netStudents={};      /* {clientId:{profile,state,ts,src}} */
 let syncOnline=false;
+let flAbsent={};         /* {flId:'YYYY-MM-DD'} – "Heute-nicht"-Meldungen der Fahrlehrer */
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function absentToday(){return INSTRUCTORS.filter(f=>flAbsent[f.id]===todayStr());}
+function isAbsentToday(fl){return !!fl&&flAbsent[fl.id]===todayStr();}
+function announceAbsences(){
+  /* jede neue Krankmeldung genau einmal als Alarm-Event melden */
+  let seen={}; try{seen=JSON.parse(localStorage.getItem('fk_admin_absent_seen')||'{}')||{};}catch(e){}
+  let dirty=false;
+  absentToday().forEach(f=>{
+    const k=f.id+'@'+todayStr();
+    if(!seen[k]){seen[k]=true;dirty=true;addEvent('siren',`⛔ ${f.name} ist heute spontan ausgefallen – Schüler umbuchen!`);}
+  });
+  if(dirty){try{localStorage.setItem('fk_admin_absent_seen',JSON.stringify(seen));}catch(e){}}
+}
 function netKey(id){return id&&id.indexOf('NET-')===0?id.slice(4):null;}
 async function netPoll(){
   try{
@@ -868,7 +901,11 @@ async function netPoll(){
           INSTRUCTORS.forEach(f=>{ if(plans[f.id]) f.plan=plans[f.id]; });
         }catch(e){}
       }
-      Object.keys(data).forEach(k=>{ if(k!=='__plans') detectChangesFor('NET-'+k,data[k].profile,data[k].state); });
+      if(data.__absent&&data.__absent.state){
+        try{flAbsent=JSON.parse(data.__absent.state)||{};}catch(e){}
+      } else flAbsent={};
+      announceAbsences();
+      Object.keys(data).forEach(k=>{ if(k.indexOf('__')!==0) detectChangesFor('NET-'+k,data[k].profile,data[k].state); });
       netStudents=data;
       render();
     }
@@ -1232,6 +1269,18 @@ function render(){
     :(syncOnline?`${lives.length} App${lives.length>1?'s':''} live über Server`+(lives.length===1?`: ${live.name}`:'')
     :`Live gekoppelt: ${live.name}`);
   document.getElementById('matchBtn').style.display=live?'inline-flex':'none';
+  /* Roter Alarm bei spontanem Fahrlehrer-Ausfall */
+  const abs=absentToday();
+  const bar=document.getElementById('alarmBar');
+  if(abs.length){
+    const affected=all.filter(s=>s.live&&s.app&&s.app.naechsteFahrstunde
+      &&new Date(s.app.naechsteFahrstunde).toDateString()===new Date().toDateString()
+      &&abs.some(f=>f.id===instructorOf(s).id));
+    bar.className='on';
+    bar.innerHTML=`${ic('siren')}<span>AUSFALL HEUTE: ${abs.map(f=>esc(f.name)).join(', ')} – Schüler für heute umbuchen!</span>
+      ${affected.length?`<button class="mini-btn" onclick="select('${affected[0].id}')" style="margin-left:auto">Betroffene öffnen</button>`:''}
+      <span class="sub">${affected.length?`${affected.length} heutige Termine betroffen: ${affected.map(s=>esc(s.name)).join(', ')}`:'Keine heutigen App-Termine betroffen – Matching für heute automatisch gesperrt.'}</span>`;
+  } else { bar.className=''; bar.innerHTML=''; }
   if(view==='fahrlehrer'){ renderInstructorList(all); renderInstructorDetail(all); return; }
   const fl=flFilter?flById(flFilter):null;
   document.getElementById('countLine').innerHTML=`${list.length} von ${all.length} Schülern`+
@@ -1479,7 +1528,7 @@ function renderInstructorList(all){
         <div class="avatar${sel?' hot':''}">${initials(f.name)}</div>
         <div><div class="card-name">${esc(f.name)}</div>
           <div class="card-meta">${slotsPerWeek(f)} Slots/Woche · ${mine.length} Schüler</div></div>
-        ${openRides?`<span class="badge crit">${ic('calendar-check')}${openRides} Termin${openRides>1?'e':''}</span>`:''}
+        ${isAbsentToday(f)?`<span class="badge crit">${ic('siren')}HEUTE KRANK</span>`:(openRides?`<span class="badge crit">${ic('calendar-check')}${openRides} Termin${openRides>1?'e':''}</span>`:'')}
       </div>
       <div class="fl-klassen">
         ${f.klassen.map(k=>`<span class="fl-k">${k}</span>`).join('')}
@@ -1505,7 +1554,7 @@ function renderInstructorDetail(all){
     <div class="d-avatar">${initials(f.name)}</div>
     <div style="flex:1">
       <div class="d-name">${esc(f.name)}</div>
-      <div class="d-sub">Klassen ${f.klassen.join(', ')}${f.extra?' · '+esc(f.extra):''} · ${slotsPerWeek(f)} Slots pro Woche</div>
+      <div class="d-sub">Klassen ${f.klassen.join(', ')}${f.extra?' · '+esc(f.extra):''} · ${slotsPerWeek(f)} Slots pro Woche${isAbsentToday(f)?' · <b style="color:var(--accent-hi)">heute ausgefallen</b>':''}</div>
     </div>
     <button class="btn btn-primary" onclick="filterByFl('${f.id}')" style="padding:9px 14px;font-size:12.5px">${ic('users')}${mine.length} Schüler anzeigen</button>
   </div>
