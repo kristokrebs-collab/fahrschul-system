@@ -465,6 +465,9 @@ select.sel{
   <div class="brand"><b>Fahrschule Krebs</b><span>Admin-Zentrale · Webseiten-Management</span></div>
   <span class="h-date" id="hDate"></span>
   <span class="live-pill off" id="livePill"><span class="live-dot"></span><span id="livePillText">Keine Schüler-App verbunden</span></span>
+  <a class="btn btn-ghost" href="fahrlehrer.html" target="_blank" style="padding:8px 13px;text-decoration:none">
+    <span data-ic="graduation-cap"></span>Fahrlehrer-App
+  </a>
   <button class="btn btn-ghost" id="appDrawerBtn" onclick="toggleAppDrawer()" style="padding:8px 13px">
     <span data-ic="smartphone"></span>Schüler-App
   </button>
@@ -779,7 +782,7 @@ let assignMap={};
 try{assignMap=JSON.parse(localStorage.getItem(ASSIGN_KEY)||'{}')||{};}catch(e){}
 function saveAssign(){try{localStorage.setItem(ASSIGN_KEY,JSON.stringify(assignMap));}catch(e){}}
 function instructorOf(s){
-  const id=s.live?assignMap[s.id]:s.fahrlehrer;
+  const id=s.live?(s.flId||assignMap[s.id]):s.fahrlehrer;
   let fl=flById(id);
   if(!fl) fl=INSTRUCTORS.find(f=>canTeach(f,s.klasse))||INSTRUCTORS[0];
   return fl;
@@ -787,7 +790,10 @@ function instructorOf(s){
 function assignFL(sid,flid){
   const s=byId(sid); if(!s)return;
   const fl=flById(flid); if(!fl)return;
-  if(s.live){assignMap[s.id]=flid;saveAssign();}
+  if(s.live){
+    assignMap[s.id]=flid;saveAssign();
+    writeLiveFor(s,st=>{st.fahrlehrerId=flid;st.fahrlehrerName=fl.name;});
+  }
   else {s.fahrlehrer=flid;persist(s);}
   addNoteSilent(s.id,'Fahrlehrer zugewiesen: '+fl.name);
   toast('Fahrlehrer: '+fl.name);
@@ -816,6 +822,7 @@ function readLiveStudent(){
 function buildLiveRecord(id,profile,st){
   return {
     id, live:true, name:profile.name, email:profile.email||'', geb:'', lastActivity:0,
+    flId:st.fahrlehrerId||null,
     klasse:st.klasse, besitz:st.besitz,
     theorie:{besucht:st.theorie.besucht,gesamt:st.theorie.gesamt},
     theoriePruefung:{bestanden:!!(st.theoriePruefung&&st.theoriePruefung.bestanden)},
@@ -854,7 +861,14 @@ async function netPoll(){
     const data=await r.json();
     const wasOnline=syncOnline; syncOnline=true;
     if(JSON.stringify(data)!==JSON.stringify(netStudents)||!wasOnline){
-      Object.keys(data).forEach(k=>detectChangesFor('NET-'+k,data[k].profile,data[k].state));
+      /* Arbeitszeiten aus der Fahrlehrer-App überschreiben die Dienstpläne */
+      if(data.__plans&&data.__plans.state){
+        try{
+          const plans=JSON.parse(data.__plans.state)||{};
+          INSTRUCTORS.forEach(f=>{ if(plans[f.id]) f.plan=plans[f.id]; });
+        }catch(e){}
+      }
+      Object.keys(data).forEach(k=>{ if(k!=='__plans') detectChangesFor('NET-'+k,data[k].profile,data[k].state); });
       netStudents=data;
       render();
     }
@@ -977,6 +991,8 @@ function snapshotFromRaw(profileRaw,stateRaw){
     reg:true, name:prof.name, klasse:st?st.klasse:(prof.klasse||''), besitz:st?st.besitz:(prof.besitz||''),
     docs:st?{sehtest:st.dokumente.sehtest.status,ersteHilfe:st.dokumente.ersteHilfe.status,passbild:st.dokumente.passbild.status}:null,
     theorie:st?st.theorie.besucht:0,
+    ueb:st?(st.uebungsstunden||0):0,
+    sfs:st?(st.sonderfahrten.ueberland.ist+st.sonderfahrten.autobahn.ist+st.sonderfahrten.nacht.ist):0,
     verf:st?JSON.stringify(st.verfuegbarkeit||null):'',
     next:st?(st.naechsteFahrstunde||''):'',
     tp:st?!!(st.theoriePruefung&&st.theoriePruefung.bestanden):false,
@@ -1025,6 +1041,8 @@ function detectChangesFor(id,profileRaw,stateRaw){
     });
     if(prev.verf!==cur.verf) addEvent('sparkles',`${who} hat die Wunschzeiten geändert – Smart-Matching prüfen`);
     if(prev.theorie!==cur.theorie) addEvent('book-open',`Theorie-Stand von ${who}: jetzt ${cur.theorie} Doppelstunden`);
+    if(prev.ueb!=null&&prev.ueb!==cur.ueb&&cur.ueb>prev.ueb) addEvent('car-front',`Fahrstunde von ${who} bestätigt & abgerechnet (jetzt ${cur.ueb} × 45 min)`);
+    if(prev.sfs!=null&&cur.sfs>prev.sfs) addEvent('route',`Sonderfahrt von ${who} bestätigt & abgerechnet`);
     if(prev.tp!==cur.tp&&cur.tp) addEvent('badge-check',`${who} hat die Theorieprüfung bestanden!`);
     if(prev.next!==cur.next&&cur.next) addEvent('calendar-check',`Fahrstunden-Termin von ${who} geändert: ${fmtDate(cur.next)}`);
     if(prev.themesOffen!==cur.themesOffen) addEvent('calendar-clock',`${who} hat Theorie-Termine angepasst (${cur.themesOffen} gebucht)`);

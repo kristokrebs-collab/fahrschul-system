@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1219">
+<title>Fahrschule Krebs · Fahrlehrer</title>
+<style>
+:root{
+  --bg-base:#0F1219; --bg-deep:#0B0E14;
+  --surface:#1A1F2C; --surface-2:#1F2536; --surface-3:#242B3D;
+  --border:rgba(248,250,252,0.07); --border-strong:rgba(248,250,252,0.13);
+  --text:#F8FAFC; --text-dim:#9AA3B4; --text-faint:#616B80;
+  --accent:#E11D48; --accent-hi:#F43F5E;
+  --accent-soft:rgba(225,29,72,0.12); --accent-line:rgba(225,29,72,0.38);
+  --emerald:#10B981; --emerald-hi:#34D399;
+  --emerald-soft:rgba(16,185,129,0.12); --emerald-line:rgba(16,185,129,0.40);
+  --amber:#F59E0B; --amber-soft:rgba(245,158,11,0.12);
+  --blue:#3B82F6; --blue-soft:rgba(59,130,246,0.12);
+  --radius:20px; --radius-sm:14px;
+  --shadow-sm:0 8px 22px -14px rgba(0,0,0,.8);
+  --ease-out:cubic-bezier(.22,1,.36,1);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:
+    radial-gradient(800px 400px at 90% -10%, rgba(225,29,72,.08), transparent 60%),
+    var(--bg-base);
+  color:var(--text);min-height:100vh;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:14.5px;line-height:1.5;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+svg.ic{width:16px;height:16px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
+.wrap{max-width:560px;margin:0 auto;padding:16px 16px 60px}
+header{display:flex;align-items:center;gap:12px;padding:14px 0 18px}
+.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--accent-hi),var(--accent));
+  display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 8px 20px -8px rgba(225,29,72,.5)}
+.logo svg{width:21px;height:21px}
+header b{font-size:16px;display:block}
+header span{font-size:11.5px;color:var(--text-faint);font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;padding:3px 10px;border-radius:999px}
+.badge.on{color:var(--emerald-hi);background:var(--emerald-soft);border:1px solid var(--emerald-line)}
+.badge.off{color:var(--text-faint);background:var(--surface-2);border:1px solid var(--border)}
+.card{
+  background:linear-gradient(180deg,var(--surface),var(--surface-2));
+  border:1px solid var(--border);border-radius:var(--radius);
+  padding:17px;margin-bottom:14px;box-shadow:var(--shadow-sm);
+}
+.card h2{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-faint);
+  margin-bottom:13px;display:flex;align-items:center;gap:8px;font-weight:800}
+.card h2 svg{width:14px;height:14px;color:var(--accent-hi)}
+.mini-btn{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;
+  padding:8px 13px;border-radius:10px;background:var(--surface-3);border:1px solid var(--border);color:var(--text-dim)}
+.mini-btn:hover{background:var(--accent);border-color:transparent;color:#fff}
+.btn-big{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px;border-radius:13px;font-weight:800;font-size:14px;margin-top:10px;
+  background:linear-gradient(135deg,var(--emerald-hi),var(--emerald));color:#07110C}
+.btn-big.ghost{background:var(--surface-3);color:var(--text-dim);border:1px solid var(--border)}
+.btn-big:active{transform:scale(.98)}
+
+/* Login */
+.fl-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.fl-tile{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:13px 12px;text-align:left;transition:border-color .15s}
+.fl-tile:hover{border-color:var(--accent-line)}
+.fl-tile b{display:block;font-size:13.5px}
+.fl-tile span{font-size:10.5px;color:var(--text-faint);font-weight:700}
+
+/* Termin-Karten */
+.termin{border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:14px;margin-bottom:11px;background:var(--bg-deep)}
+.termin.due{border-color:var(--accent-line);background:linear-gradient(180deg,#1d141c,var(--bg-deep))}
+.t-top{display:flex;align-items:center;gap:11px}
+.avatar{width:38px;height:38px;border-radius:12px;background:var(--surface-3);border:1px solid var(--border-strong);
+  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:var(--text-dim);flex-shrink:0}
+.t-name{font-weight:800;font-size:14.5px}
+.t-meta{font-size:11.5px;color:var(--text-faint);font-weight:600}
+.t-when{margin-left:auto;text-align:right}
+.t-when b{display:block;font-size:14px;font-variant-numeric:tabular-nums}
+.t-when span{font-size:11px;color:var(--text-faint);font-weight:700}
+.t-ort{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text-dim);font-weight:600;margin-top:9px}
+.t-ort svg{width:12px;height:12px;color:var(--text-faint)}
+.due-tag{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;color:var(--accent-hi);
+  background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:999px;padding:3px 9px;margin-top:9px}
+.type-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.type-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+  padding:7px 11px;border-radius:999px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim)}
+.type-chip.sel{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-hi)}
+.t-actions{display:flex;gap:8px;margin-top:11px}
+.t-actions .btn-big{margin-top:0;padding:11px;font-size:13px}
+.empty{color:var(--text-faint);font-weight:600;font-size:13px;text-align:center;padding:14px 6px}
+.wait-row{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.wait-row:last-child{border-bottom:none}
+.wait-row .n{font-weight:700;flex:1}
+.wait-row .k{font-size:11px;color:var(--text-faint);font-weight:700}
+
+/* Arbeitszeiten */
+.plan-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.plan-grid .h{font-size:10px;font-weight:800;color:var(--text-faint);text-align:center;text-transform:uppercase;padding:3px 0}
+.plan-cell{height:38px;border-radius:9px;background:var(--surface-3);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;color:var(--text-faint);transition:all .12s}
+.plan-cell svg{width:13px;height:13px}
+.plan-cell.on{background:var(--emerald-soft);border-color:var(--emerald-line);color:var(--emerald-hi)}
+.plan-hint{font-size:11.5px;color:var(--text-faint);font-weight:600;margin-top:10px}
+
+/* Historie */
+.hist-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.hist-row:last-child{border-bottom:none}
+.h-ic{width:30px;height:30px;border-radius:9px;background:var(--surface-3);display:flex;align-items:center;justify-content:center;color:var(--text-dim);flex-shrink:0}
+.h-ic svg{width:14px;height:14px}
+.hist-row .l{flex:1;min-width:0}
+.hist-row .l b{display:block;font-size:13px}
+.hist-row .l span{font-size:11px;color:var(--text-faint);font-weight:600}
+.chip-ok{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:var(--emerald-hi);
+  background:var(--emerald-soft);border:1px solid var(--emerald-line);border-radius:999px;padding:2px 8px;white-space:nowrap}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);
+  display:flex;align-items:center;gap:8px;background:var(--surface-3);border:1px solid var(--border-strong);
+  border-radius:12px;padding:11px 17px;font-weight:700;font-size:13px;opacity:0;transition:.25s var(--ease-out);z-index:60;pointer-events:none}
+#toast svg{width:14px;height:14px;color:var(--emerald-hi)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div id="toast"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><span id="toastText"></span></div>
+
+<script>
+'use strict';
+/* ── Icons (Lucide-Subset) ─────────────────────────────────────────── */
+const ICONS={
+  steering:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v7"/><path d="m4.9 17.1 4.6-4.4"/><path d="m19.1 17.1-4.6-4.4"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>', x:'<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'calendar-check':'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>',
+  'calendar-clock':'<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  'car-front':'<path d="m21 8-2 2-1.5-3.7A2 2 0 0 0 15.646 5H8.4a2 2 0 0 0-1.903 1.257L5 10 3 8"/><path d="M7 14h.01"/><path d="M17 14h.01"/><rect width="18" height="8" x="3" y="10" rx="2"/><path d="M5 18v2"/><path d="M19 18v2"/>',
+  mountain:'<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
+  route:'<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  moon:'<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  history:'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  'log-out':'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/>',
+  'map-pin':'<path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  'flag-checkered':'<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-7.333-2q-2 0-3.067.8"/><path d="M8 2v14"/><path d="M12 4v14"/><path d="M16 3.5v14"/><path d="M20 5v10"/>',
+  'graduation-cap':'<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  'triangle-alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>'
+};
+function ic(n){return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[n]||ICONS.check}</svg>`;}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function initials(n){const p=(n||'').trim().split(/\s+/).filter(Boolean);return p.length?((p[0][0]||'')+(p.length>1?p[p.length-1][0]:p[0][1]||'')).toUpperCase():'–';}
+function fmtDate(iso){try{const d=new Date(iso);return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})+' · '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})+' Uhr';}catch(e){return '';}}
+
+/* ── Fahrlehrer-Stammdaten (identisch mit der Zentrale) ────────────── */
+const P=(v,n,a)=>({vormittag:!!v,nachmittag:!!n,abend:!!a});
+const INSTRUCTORS=[
+  {id:'FL-01',name:'Björn Eifert',    klassen:['B','BE','C','CE','T'],extra:'Dozent',
+   plan:{1:P(1,1,0),2:P(1,0,1),3:P(0,1,1),4:P(1,1,0),5:P(1,0,0),6:P(1,0,0)}},
+  {id:'FL-02',name:'Bertram Feulner', klassen:['A','B','BE','C','CE','T'],extra:'',
+   plan:{1:P(0,1,1),2:P(1,1,0),3:P(1,0,0),4:P(0,1,1),5:P(1,1,0),6:P(0,0,0)}},
+  {id:'FL-03',name:'Christian Ricken',klassen:['B','BE'],extra:'',
+   plan:{1:P(1,0,0),2:P(1,1,0),3:P(1,1,0),4:P(1,0,1),5:P(0,1,1),6:P(1,0,0)}},
+  {id:'FL-04',name:'Enis Alijoski',   klassen:['B','BE'],extra:'',
+   plan:{1:P(0,1,1),2:P(0,1,1),3:P(1,1,0),4:P(1,0,0),5:P(1,1,0),6:P(0,1,0)}},
+  {id:'FL-05',name:'Harald Manger',   klassen:['A','B','BE'],extra:'Handicap-Ausbildung',
+   plan:{1:P(1,1,0),2:P(1,0,0),3:P(0,1,1),4:P(1,1,0),5:P(1,0,1),6:P(0,0,0)}},
+  {id:'FL-06',name:'Sabine Krautwald',klassen:['B','BE'],extra:'',
+   plan:{1:P(1,0,1),2:P(1,1,0),3:P(1,0,0),4:P(0,1,1),5:P(1,1,0),6:P(1,0,0)}},
+  {id:'FL-07',name:'Markus Dehler',   klassen:['B'],extra:'Automatik-Spezialist',
+   plan:{1:P(0,1,0),2:P(1,1,1),3:P(1,1,0),4:P(1,0,0),5:P(0,1,1),6:P(0,0,0)}},
+  {id:'FL-08',name:'Jutta Simon',     klassen:['B'],extra:'',
+   plan:{1:P(1,1,0),2:P(0,0,1),3:P(1,1,0),4:P(1,1,0),5:P(1,0,0),6:P(1,1,0)}},
+  {id:'FL-09',name:'Peter Wingenfeld',klassen:['B','C','CE'],extra:'',
+   plan:{1:P(1,0,0),2:P(1,1,0),3:P(0,1,1),4:P(1,1,0),5:P(1,1,0),6:P(0,0,0)}},
+  {id:'FL-10',name:'Miriam Otto',     klassen:['A','B'],extra:'',
+   plan:{1:P(0,1,1),2:P(1,0,1),3:P(1,1,0),4:P(0,1,0),5:P(1,1,0),6:P(1,0,0)}},
+  {id:'FL-11',name:'Timo Baumgart',   klassen:['B','BE','T'],extra:'',
+   plan:{1:P(1,1,0),2:P(1,1,0),3:P(1,0,0),4:P(1,0,1),5:P(0,1,1),6:P(0,1,0)}},
+  {id:'FL-12',name:'Karin Möller',    klassen:['B'],extra:'',
+   plan:{1:P(1,0,1),2:P(0,1,0),3:P(1,1,0),4:P(1,1,0),5:P(1,0,0),6:P(1,0,0)}},
+  {id:'FL-13',name:'Stefan Hohmann',  klassen:['B','BE','C'],extra:'',
+   plan:{1:P(0,1,1),2:P(1,1,0),3:P(1,0,1),4:P(0,1,0),5:P(1,1,0),6:P(0,0,0)}},
+  {id:'FL-14',name:'Aylin Kaya',      klassen:['A','B'],extra:'',
+   plan:{1:P(1,1,0),2:P(1,0,0),3:P(0,1,1),4:P(1,1,0),5:P(0,1,1),6:P(1,0,0)}},
+  {id:'FL-15',name:'Dominik Frank',   klassen:['B','BE'],extra:'',
+   plan:{1:P(1,0,0),2:P(0,1,1),3:P(1,1,0),4:P(1,0,1),5:P(1,1,0),6:P(1,1,0)}}
+];
+const DAY_LABELS={1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};
+const PERIOD_KEYS=['vormittag','nachmittag','abend'];
+const PERIOD_SHORT={vormittag:'Vorm.',nachmittag:'Nachm.',abend:'Abend'};
+const PERIOD_TIMES={vormittag:'08–12 Uhr',nachmittag:'13–17 Uhr',abend:'17–20 Uhr'};
+const RIDE_TYPES={
+  uebung:{label:'Übungsfahrt',icon:'car-front'},
+  ueberland:{label:'Überlandfahrt',icon:'mountain'},
+  autobahn:{label:'Autobahnfahrt',icon:'route'},
+  nacht:{label:'Nachtfahrt',icon:'moon'}
+};
+const TREFFPUNKT='Fahrschule Krebs · Am Bahnhof 3, Fulda';
+
+/* ── Daten vom Server ──────────────────────────────────────────────── */
+const canNet=/^https?:$/.test(location.protocol);
+let me=null, netData={}, plans={}, online=false, dirtyPlan=null, selType={};
+try{me=INSTRUCTORS.find(f=>f.id===localStorage.getItem('fk_fl_me'))||null;}catch(e){}
+
+function myPlan(){
+  if(dirtyPlan) return dirtyPlan;
+  if(plans[me.id]) return plans[me.id];
+  return me.plan;
+}
+function parseStudents(){
+  const out=[];
+  Object.keys(netData).forEach(k=>{
+    if(k==='__plans')return;
+    const rec=netData[k];
+    let prof=null,st=null;
+    try{prof=JSON.parse(rec.profile||'null');}catch(e){}
+    try{st=JSON.parse(rec.state||'null');}catch(e){}
+    if(!prof||!prof.name||!st||st.version!==3)return;
+    out.push({key:k,name:prof.name,klasse:st.klasse,st,ts:rec.ts});
+  });
+  return out;
+}
+function myStudents(){return parseStudents().filter(s=>s.st.fahrlehrerId===me.id);}
+function nextRideType(st){
+  const sf=st.sonderfahrten||{};
+  for(const t of ['ueberland','autobahn','nacht']) if(sf[t]&&sf[t].ist<sf[t].soll) return t;
+  return 'uebung';
+}
+async function pull(){
+  if(!canNet)return;
+  try{
+    const r=await fetch('sync/all',{cache:'no-store'});
+    if(!r.ok)throw 0;
+    const data=await r.json();
+    const changed=JSON.stringify(data)!==JSON.stringify(netData)||!online;
+    online=true; netData=data;
+    if(data.__plans&&data.__plans.state){try{plans=JSON.parse(data.__plans.state)||{};}catch(e){}}
+    if(changed)render();
+  }catch(e){ if(online){online=false;render();} }
+}
+async function pushStudent(key,st){
+  netData[key]=netData[key]||{};
+  netData[key].state=JSON.stringify(st);
+  netData[key].src='admin'; netData[key].ts=Date.now();
+  try{
+    await fetch('sync/admin',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:key,state:netData[key].state,ts:netData[key].ts})});
+  }catch(e){toast('Server nicht erreichbar');}
+}
+async function pushPlans(){
+  try{
+    await fetch('sync/push',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({id:'__plans',profile:null,state:JSON.stringify(plans),ts:Date.now()})});
+  }catch(e){toast('Server nicht erreichbar');}
+}
+
+/* ── Aktionen ──────────────────────────────────────────────────────── */
+function login(id){
+  me=INSTRUCTORS.find(f=>f.id===id); if(!me)return;
+  try{localStorage.setItem('fk_fl_me',id);}catch(e){}
+  render(); pull();
+}
+function logout(){me=null;dirtyPlan=null;try{localStorage.removeItem('fk_fl_me');}catch(e){} render();}
+function pickType(key,t){selType[key]=t;render();}
+function togglePlanCell(d,p){
+  const cur=myPlan();
+  dirtyPlan=JSON.parse(JSON.stringify(cur));
+  dirtyPlan[d][p]=!dirtyPlan[d][p];
+  render();
+}
+function savePlan(){
+  if(!dirtyPlan)return;
+  plans[me.id]=dirtyPlan; dirtyPlan=null;
+  pushPlans();
+  toast('Arbeitszeiten gespeichert – Matching aktualisiert');
+  render();
+}
+function discardPlan(){dirtyPlan=null;render();}
+function confirmRide(key,mode){
+  const s=parseStudents().find(x=>x.key===key); if(!s||!s.st.naechsteFahrstunde)return;
+  const st=s.st, when=st.naechsteFahrstunde;
+  if(mode==='done'){
+    const t=selType[key]||nextRideType(st);
+    if(t==='uebung'){ st.uebungsstunden=(st.uebungsstunden||0)+2; }
+    else if(st.sonderfahrten&&st.sonderfahrten[t]){ st.sonderfahrten[t].ist=Math.min(st.sonderfahrten[t].soll,st.sonderfahrten[t].ist+2); }
+    if(st.history&&Array.isArray(st.history.fahr))
+      st.history.fahr.unshift({type:t,date:when,minutes:90,focus:RIDE_TYPES[t].label+' – bestätigt von '+me.name+' · abgerechnet'});
+    st.naechsteFahrstunde=null;
+    pushStudent(key,st);
+    toast(RIDE_TYPES[t].label+' bestätigt & abgerechnet');
+  } else {
+    st.naechsteFahrstunde=null;
+    pushStudent(key,st);
+    toast('Fahrstunde als ausgefallen vermerkt');
+  }
+  delete selType[key];
+  render();
+}
+
+/* ── Rendering ─────────────────────────────────────────────────────── */
+function render(){
+  const app=document.getElementById('app');
+  if(!me){
+    app.innerHTML=`
+    <header><div class="logo">${ic('steering')}</div>
+      <div><b>Fahrschule Krebs</b><span>Fahrlehrer-App</span></div></header>
+    <div class="card"><h2>${ic('users')}Wer bist du?</h2>
+      ${canNet?'':`<div class="empty">${ic('triangle-alert')} Bitte über den Server öffnen (python3 server.py), damit Termine &amp; Schüler live geladen werden.</div>`}
+      <div class="fl-grid">
+        ${INSTRUCTORS.map(f=>`<button class="fl-tile" onclick="login('${f.id}')">
+          <b>${esc(f.name)}</b><span>${f.klassen.join(', ')}${f.extra?' · '+esc(f.extra):''}</span>
+        </button>`).join('')}
+      </div>
+    </div>`;
+    return;
+  }
+  const mine=myStudents();
+  const withTermin=mine.filter(s=>s.st.naechsteFahrstunde).sort((a,b)=>new Date(a.st.naechsteFahrstunde)-new Date(b.st.naechsteFahrstunde));
+  const waiting=mine.filter(s=>!s.st.naechsteFahrstunde);
+  const plan=myPlan();
+  /* Historie: alle Fahrten meiner Schüler, neueste zuerst */
+  const hist=[];
+  mine.forEach(s=>{(s.st.history&&s.st.history.fahr||[]).forEach(h=>hist.push({student:s.name,...h}));});
+  hist.sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  app.innerHTML=`
+  <header>
+    <div class="logo">${ic('steering')}</div>
+    <div style="flex:1"><b>${esc(me.name)}</b><span>Klassen ${me.klassen.join(', ')}${me.extra?' · '+esc(me.extra):''}</span></div>
+    <span class="badge ${online?'on':'off'}">${online?'● LIVE':'offline'}</span>
+    <button class="mini-btn" onclick="logout()" aria-label="Abmelden">${ic('log-out')}</button>
+  </header>
+
+  <div class="card"><h2>${ic('calendar-check')}Anstehende Fahrstunden</h2>
+    ${withTermin.length?withTermin.map(s=>{
+      const when=new Date(s.st.naechsteFahrstunde);
+      const due=when<=new Date();
+      const t=selType[s.key]||nextRideType(s.st);
+      return `<div class="termin${due?' due':''}">
+        <div class="t-top">
+          <div class="avatar">${initials(s.name)}</div>
+          <div><div class="t-name">${esc(s.name)}</div><div class="t-meta">Klasse ${esc(s.klasse)}</div></div>
+          <div class="t-when"><b>${when.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})} Uhr</b>
+            <span>${when.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}</span></div>
+        </div>
+        <div class="t-ort">${ic('map-pin')}${TREFFPUNKT}</div>
+        ${due?`<span class="due-tag">${ic('flag-checkered')}Fahrt vorbei – jetzt bestätigen &amp; abrechnen</span>`:''}
+        <div class="type-row">
+          ${Object.keys(RIDE_TYPES).map(k=>`<button class="type-chip${t===k?' sel':''}" onclick="pickType('${s.key}','${k}')">${ic(RIDE_TYPES[k].icon)}${RIDE_TYPES[k].label}</button>`).join('')}
+        </div>
+        <div class="t-actions">
+          <button class="btn-big" onclick="confirmRide('${s.key}','done')">${ic('check')}Stattgefunden</button>
+          <button class="btn-big ghost" onclick="confirmRide('${s.key}','cancel')">${ic('x')}Ausgefallen</button>
+        </div>
+      </div>`;
+    }).join(''):`<div class="empty">Keine bestätigten Termine.<br>Das Büro segnet Termine über das Smart-Matching ab.</div>`}
+    ${waiting.length?`<div style="margin-top:6px">
+      <div style="font-size:11px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Warten auf Termin (Matching durchs Büro)</div>
+      ${waiting.map(s=>`<div class="wait-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(s.name)}</div><span class="n">${esc(s.name)}</span><span class="k">Klasse ${esc(s.klasse)}</span></div>`).join('')}
+    </div>`:''}
+    ${!mine.length?`<div class="empty">${ic('users')} Dir sind noch keine App-Schüler zugewiesen – die Zuweisung macht das Büro in der Zentrale.</div>`:''}
+  </div>
+
+  <div class="card"><h2>${ic('clock')}Meine Arbeitszeiten</h2>
+    <div class="plan-grid">
+      <div class="h"></div>${[1,2,3,4,5,6].map(d=>`<div class="h">${DAY_LABELS[d]}</div>`).join('')}
+      ${PERIOD_KEYS.map(p=>`
+        <div class="h" style="text-align:right;padding-right:4px;align-self:center">${PERIOD_SHORT[p]}<br><span style="font-weight:600;text-transform:none;letter-spacing:0">${PERIOD_TIMES[p]}</span></div>
+        ${[1,2,3,4,5,6].map(d=>`<button class="plan-cell${plan[d][p]?' on':''}" onclick="togglePlanCell(${d},'${p}')" aria-pressed="${!!plan[d][p]}" aria-label="${DAY_LABELS[d]} ${PERIOD_SHORT[p]}">${plan[d][p]?ic('check'):''}</button>`).join('')}
+      `).join('')}
+    </div>
+    <div class="plan-hint">Diese Zeiten sind die Basis fürs Smart-Matching der Zentrale – Änderungen wirken sofort auf neue Terminvorschläge.</div>
+    ${dirtyPlan?`<div class="t-actions">
+      <button class="btn-big" onclick="savePlan()">${ic('check')}Arbeitszeiten speichern</button>
+      <button class="btn-big ghost" onclick="discardPlan()">Verwerfen</button>
+    </div>`:''}
+  </div>
+
+  <div class="card"><h2>${ic('history')}Historie meiner Schüler</h2>
+    ${hist.length?hist.slice(0,15).map(h=>{
+      const t=RIDE_TYPES[h.type]||RIDE_TYPES.uebung;
+      const billed=/abgerechnet/i.test(h.focus||'');
+      return `<div class="hist-row">
+        <span class="h-ic">${ic(t.icon)}</span>
+        <div class="l"><b>${esc(h.student)} · ${t.label}</b><span>${fmtDate(h.date)} · ${h.minutes||90} min${h.focus?' · '+esc(h.focus):''}</span></div>
+        ${billed?`<span class="chip-ok">${ic('check')}abgerechnet</span>`:''}
+      </div>`;
+    }).join(''):'<div class="empty">Noch keine Fahrten erfasst.</div>'}
+  </div>`;
+}
+
+let toastTimer=null;
+function toast(msg){
+  const t=document.getElementById('toast');
+  document.getElementById('toastText').textContent=msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2400);
+}
+render();
+pull();
+setInterval(()=>{ if(document.visibilityState==='visible'&&!dirtyPlan) pull(); },3000);
+</script>
+</body>
+</html>
