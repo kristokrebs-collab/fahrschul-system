@@ -3021,11 +3021,19 @@ document.addEventListener('DOMContentLoaded',()=>{
   };
 
   /* Fremde Änderungen übernehmen & aktuellen Screen neu zeichnen */
+  let lastNotice=0;
   function applyExternal(){
     applying=true;
     try{
       const p=getProfile();
-      if(p&&p.klasse&&loadState()){ try{ route(); }catch(e){} }
+      if(p&&p.klasse&&loadState()){
+        try{ route(); }catch(e){}
+        const now=Date.now();
+        if(authed&&now-lastNotice>4000){
+          lastNotice=now;
+          try{ toast('info','Live aktualisiert','Die Fahrschule hat deinen Ausbildungsstand aktualisiert.'); }catch(e){}
+        }
+      }
     }finally{ applying=false; }
   }
   if(bc) bc.onmessage=e=>{ if(e.data&&e.data.src==='admin') applyExternal(); };

@@ -69,6 +69,70 @@ header{
 .live-pill.off .live-dot{animation:none;opacity:.5}
 @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,.5)}50%{opacity:.4}}
 
+/* Aktivitäts-Glocke & Feed */
+.bell-btn{
+  position:relative;width:38px;height:38px;border-radius:12px;flex-shrink:0;
+  background:var(--surface-2);border:1px solid var(--border);color:var(--text-dim);
+  display:flex;align-items:center;justify-content:center;transition:all .15s;
+}
+.bell-btn:hover{color:var(--text);border-color:var(--border-strong)}
+.bell-btn.has{color:var(--accent-hi);border-color:var(--accent-line)}
+.bell-btn b{
+  position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;
+  border-radius:99px;background:var(--accent);color:#fff;font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-base);
+}
+.feed{
+  position:absolute;top:58px;right:16px;width:min(380px,calc(100vw - 24px));max-height:62vh;
+  background:linear-gradient(180deg,var(--surface),var(--surface-2));
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);
+  box-shadow:var(--shadow);z-index:60;display:none;flex-direction:column;overflow:hidden;
+}
+.feed.open{display:flex}
+.feed-head{
+  display:flex;align-items:center;gap:10px;padding:12px 15px;font-size:11px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--text-faint);
+  border-bottom:1px solid var(--border);flex-shrink:0;
+}
+#feedList{overflow-y:auto;padding:4px 0}
+.feed-item{
+  display:flex;gap:11px;padding:11px 15px;border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .12s;align-items:flex-start;
+}
+.feed-item:hover{background:var(--surface-3)}
+.feed-item:last-child{border-bottom:none}
+.feed-item .fic{
+  width:30px;height:30px;border-radius:9px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--accent-soft);color:var(--accent-hi);
+}
+.feed-item .fic svg{width:14px;height:14px}
+.feed-item.unread .ft{color:var(--text)}
+.feed-item .ft{font-size:12.5px;font-weight:600;color:var(--text-dim);line-height:1.4}
+.feed-item .fts{font-size:10.5px;color:var(--text-faint);font-weight:700;margin-top:2px}
+.feed-empty{padding:26px 16px;text-align:center;color:var(--text-faint);font-size:12.5px;font-weight:600}
+
+/* Smart-Matching Terminvorschläge */
+.match-slot{
+  display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);
+}
+.match-slot:last-of-type{border-bottom:none}
+.match-slot .ms-ic{
+  width:30px;height:30px;border-radius:9px;flex-shrink:0;
+  background:var(--emerald-soft);color:var(--emerald-hi);
+  display:flex;align-items:center;justify-content:center;
+}
+.match-slot .ms-ic svg{width:14px;height:14px}
+.match-slot .ms-l{flex:1;font-weight:700;font-size:13px}
+.match-slot .ms-l small{display:block;font-size:11px;color:var(--text-faint);font-weight:600}
+.confirmed-slot{
+  margin-top:2px;display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:11px;
+  background:var(--emerald-soft);border:1px solid var(--emerald-line);
+  color:var(--emerald-hi);font-weight:800;font-size:12.5px;
+}
+.panel.flash{animation:panelFlash 1.6s var(--ease-out)}
+@keyframes panelFlash{0%{border-color:var(--accent-hi);box-shadow:0 0 0 3px var(--accent-soft)}100%{border-color:var(--border)}}
+
 /* ── KPI-Strip ──────────────────────────────────────────────────────── */
 .kpi-strip{
   flex-shrink:0; display:grid; gap:10px; padding:12px 22px 4px;
@@ -342,6 +406,15 @@ select.sel{
   <div class="brand"><b>Fahrschule Krebs</b><span>Admin-Zentrale · Webseiten-Management</span></div>
   <span class="h-date" id="hDate"></span>
   <span class="live-pill off" id="livePill"><span class="live-dot"></span><span id="livePillText">Keine Schüler-App verbunden</span></span>
+  <button class="bell-btn" id="bellBtn" onclick="toggleFeed(event)" aria-label="Aktivitäten aus der Schüler-App">
+    <span data-ic="bell"></span><b id="bellCount" hidden>0</b>
+  </button>
+  <div class="feed" id="feedPanel">
+    <div class="feed-head">Aktivität aus der Schüler-App
+      <button class="mini-btn" onclick="clearFeed()" style="margin-left:auto">Leeren</button>
+    </div>
+    <div id="feedList"></div>
+  </div>
 </header>
 
 <div class="kpi-strip" id="kpiStrip"></div>
@@ -364,6 +437,7 @@ select.sel{
   <button class="chip-btn" data-f="docs" onclick="setFilter('docs')"><span data-ic="file-warning"></span>Nachweise</button>
   <button class="chip-btn" data-f="ready" onclick="setFilter('ready')"><span data-ic="badge-check"></span>Prüfungsreif</button>
   <button class="chip-btn" data-f="live" onclick="setFilter('live')"><span data-ic="zap"></span>Live-App</button>
+  <button class="chip-btn" id="matchBtn" onclick="gotoMatching()" style="display:none"><span data-ic="sparkles"></span>Smart-Matching</button>
   <div class="tool-right">
     <button class="btn btn-ghost" onclick="exportCSV()"><span data-ic="download"></span>Export</button>
     <button class="btn btn-primary" onclick="openAdd()"><span data-ic="user-plus"></span>Neuer Schüler</button>
@@ -445,7 +519,9 @@ const ICONS={
   "arrow-left":'<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
   "folder-open":'<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
   "steering":'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v7"/><path d="m4.9 17.1 4.6-4.4"/><path d="m19.1 17.1-4.6-4.4"/>',
-  "pen-line":'<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>'
+  "pen-line":'<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>',
+  "bell":'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  "calendar-check":'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>'
 };
 function ic(name){return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]||ICONS.check}</svg>`;}
 document.querySelectorAll('[data-ic]').forEach(el=>{el.innerHTML=ic(el.getAttribute('data-ic'));el.style.display='inline-flex';});
@@ -476,7 +552,37 @@ const FL_PLAN={1:{vormittag:true,nachmittag:true,abend:false},2:{vormittag:false
   3:{vormittag:true,nachmittag:false,abend:true},4:{vormittag:true,nachmittag:true,abend:false},
   5:{vormittag:false,nachmittag:true,abend:false},6:{vormittag:true,nachmittag:false,abend:false}};
 const DAY_LABELS={1:'Mo',2:'Di',3:'Mi',4:'Do',5:'Fr',6:'Sa'};
+const DAY_FULL={1:'Montag',2:'Dienstag',3:'Mittwoch',4:'Donnerstag',5:'Freitag',6:'Samstag'};
 const PERIOD_LABELS={vormittag:'Vorm.',nachmittag:'Nachm.',abend:'Abend'};
+const PERIOD_FULL={vormittag:'Vormittag',nachmittag:'Nachmittag',abend:'Abend'};
+const PERIOD_HOURS={vormittag:9,nachmittag:14,abend:18}; /* Startzeiten wie in app.html (PERIODS) */
+
+/* Konkrete Terminvorschläge: Wunschzeiten des Schülers × Dienstplan, nächste 14 Tage */
+function nextDateForDow(dow,hour,offsetWeeks){
+  const now=new Date(); let add=(dow-now.getDay()+7)%7;
+  const d=new Date(now); d.setHours(hour,0,0,0);
+  if(add===0&&d<=now) add=7;
+  d.setDate(now.getDate()+add+(offsetWeeks||0)*7); d.setHours(hour,0,0,0);
+  return d;
+}
+function matchingSlots(verf){
+  if(!verf) return [];
+  const out=[];
+  [0,1].forEach(w=>{
+    for(let d=1;d<=6;d++){
+      ['vormittag','nachmittag','abend'].forEach(p=>{
+        if(verf[d]&&verf[d][p]&&FL_PLAN[d]&&FL_PLAN[d][p]){
+          const date=nextDateForDow(d,PERIOD_HOURS[p],w);
+          out.push({iso:date.toISOString(),date,dow:d,period:p,
+            label:`${DAY_FULL[d]} ${PERIOD_FULL[p].toLowerCase()}`,
+            sub:date.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' · '+String(PERIOD_HOURS[p]).padStart(2,'0')+':00 Uhr · '+FL_NAME});
+        }
+      });
+    }
+  });
+  out.sort((a,b)=>a.date-b.date);
+  return out.slice(0,5);
+}
 
 /* ════════════════════════════════════════════════════════════════════
    2 · Daten: Kartei (localStorage) + Live-Schüler aus der App
@@ -589,8 +695,98 @@ function writeLive(mut){
   try{localStorage.setItem(STATE_KEY,JSON.stringify(st));}catch(e){return false;}
   try{if(bc)bc.postMessage({src:'admin',key:STATE_KEY});}catch(e){}
   try{localStorage.setItem('fk_sync_ping',String(Date.now()));}catch(e){}
+  rememberAppSnapshot(); /* eigene Änderung nicht als App-Ereignis melden */
   return true;
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   2b · Aktivitäts-Feed: Änderungen aus der Schüler-App erkennen
+════════════════════════════════════════════════════════════════════ */
+const EVENTS_KEY='fk_admin_events_v1';
+const SEEN_KEY='fk_admin_seen_v1';
+function loadEvents(){try{return JSON.parse(localStorage.getItem(EVENTS_KEY)||'[]')||[];}catch(e){return [];}}
+let events=loadEvents();
+function saveEvents(){try{localStorage.setItem(EVENTS_KEY,JSON.stringify(events.slice(0,50)));}catch(e){}}
+function addEvent(icon,text){
+  events.unshift({ts:new Date().toISOString(),icon,text,read:false});
+  events=events.slice(0,50); saveEvents(); renderFeed();
+  toast(text);
+}
+/* Kompakter Vergleichs-Schnappschuss (ohne Bild-Daten) */
+function appSnapshot(){
+  let prof=null; try{prof=JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');}catch(e){}
+  const st=readAppState();
+  if(!prof||!prof.name) return {reg:false};
+  return {
+    reg:true, name:prof.name, klasse:st?st.klasse:(prof.klasse||''), besitz:st?st.besitz:(prof.besitz||''),
+    docs:st?{sehtest:st.dokumente.sehtest.status,ersteHilfe:st.dokumente.ersteHilfe.status,passbild:st.dokumente.passbild.status}:null,
+    theorie:st?st.theorie.besucht:0,
+    verf:st?JSON.stringify(st.verfuegbarkeit||null):'',
+    next:st?(st.naechsteFahrstunde||''):'',
+    tp:st?!!(st.theoriePruefung&&st.theoriePruefung.bestanden):false,
+    themesOffen:st?(st.themeSessions||[]).filter(t=>t.status==='offen').length:0
+  };
+}
+function loadSeen(){try{return JSON.parse(localStorage.getItem(SEEN_KEY)||'null');}catch(e){return null;}}
+function rememberAppSnapshot(){try{localStorage.setItem(SEEN_KEY,JSON.stringify(appSnapshot()));}catch(e){}}
+function detectAppChanges(){
+  const prev=loadSeen(), cur=appSnapshot();
+  if(!prev){rememberAppSnapshot();return;}
+  if(JSON.stringify(prev)===JSON.stringify(cur))return;
+  const who=cur.name||prev.name||'Schüler';
+  if(!prev.reg&&cur.reg){addEvent('user-plus',`Neue Anmeldung: ${who} (Klasse ${cur.klasse})`);rememberAppSnapshot();return;}
+  else if(prev.reg&&!cur.reg) addEvent('user-round','Das Schüler-App-Konto wurde zurückgesetzt.');
+  else if(cur.reg&&!prev.docs&&cur.docs){
+    /* Erst-Anlage des Ausbildungsstands direkt nach der Anmeldung – kein Einzel-Diff */
+    if(prev.klasse!==cur.klasse) addEvent('graduation-cap',`${who} startet Ausbildung: Klasse ${cur.klasse} · ${cur.besitz==='erweiterung'?'Erweiterung':'Erst-Erwerb'}`);
+  }
+  else if(cur.reg){
+    if(prev.klasse!==cur.klasse||prev.besitz!==cur.besitz)
+      addEvent('graduation-cap',`${who} hat die Ausbildung geändert: Klasse ${cur.klasse} · ${cur.besitz==='erweiterung'?'Erweiterung':'Erst-Erwerb'}`);
+    if(prev.docs&&cur.docs) Object.keys(DOC_LABELS).forEach(k=>{
+      if(prev.docs[k]!==cur.docs[k]){
+        if(cur.docs[k]==='pruefung') addEvent(DOC_ICONS[k],`${who} hat den ${DOC_LABELS[k]} eingereicht – bitte prüfen`);
+        else if(cur.docs[k]==='verifiziert') addEvent(DOC_ICONS[k],`${DOC_LABELS[k]} von ${who} wurde verifiziert`);
+        else addEvent(DOC_ICONS[k],`${DOC_LABELS[k]} von ${who} wurde zurückgesetzt`);
+      }
+    });
+    if(prev.verf!==cur.verf) addEvent('sparkles',`${who} hat die Wunschzeiten geändert – Smart-Matching prüfen`);
+    if(prev.theorie!==cur.theorie) addEvent('book-open',`Theorie-Stand von ${who}: jetzt ${cur.theorie} Doppelstunden`);
+    if(prev.tp!==cur.tp&&cur.tp) addEvent('badge-check',`${who} hat die Theorieprüfung bestanden!`);
+    if(prev.next!==cur.next&&cur.next) addEvent('calendar-check',`Fahrstunden-Termin von ${who} geändert: ${fmtDate(cur.next)}`);
+    if(prev.themesOffen!==cur.themesOffen) addEvent('calendar-clock',`${who} hat Theorie-Termine angepasst (${cur.themesOffen} gebucht)`);
+  }
+  rememberAppSnapshot();
+}
+function renderFeed(){
+  const unread=events.filter(e=>!e.read).length;
+  const cnt=document.getElementById('bellCount');
+  cnt.hidden=!unread; cnt.textContent=unread>9?'9+':unread;
+  document.getElementById('bellBtn').classList.toggle('has',unread>0);
+  document.getElementById('feedList').innerHTML=events.length
+    ? events.map((e,i)=>`<div class="feed-item${e.read?'':' unread'}" onclick="feedClick(${i})">
+        <span class="fic">${ic(e.icon||'bell')}</span>
+        <span><span class="ft">${esc(e.text)}</span><span class="fts" style="display:block">${fmtDate(e.ts)}</span></span>
+      </div>`).join('')
+    : '<div class="feed-empty">Noch keine Aktivitäten aus der Schüler-App.</div>';
+}
+function toggleFeed(ev){
+  if(ev)ev.stopPropagation();
+  const p=document.getElementById('feedPanel');
+  const open=!p.classList.contains('open');
+  p.classList.toggle('open',open);
+  if(open){events.forEach(e=>e.read=true);saveEvents();renderFeed();p.classList.add('open');}
+}
+function clearFeed(){events=[];saveEvents();renderFeed();}
+function feedClick(i){
+  const live=readLiveStudent();
+  if(live){select(live.id);}
+  document.getElementById('feedPanel').classList.remove('open');
+}
+document.addEventListener('click',e=>{
+  const p=document.getElementById('feedPanel');
+  if(p.classList.contains('open')&&!p.contains(e.target)&&e.target.id!=='bellBtn')p.classList.remove('open');
+});
 
 /* ════════════════════════════════════════════════════════════════════
    3 · Abgeleitete Werte
@@ -700,6 +896,7 @@ function render(){
   const pill=document.getElementById('livePill');
   pill.classList.toggle('off',!live);
   document.getElementById('livePillText').textContent=live?`Live gekoppelt: ${live.name}`:'Keine Schüler-App verbunden';
+  document.getElementById('matchBtn').style.display=live?'inline-flex':'none';
   document.getElementById('countLine').textContent=`${list.length} von ${all.length} Schülern`;
   const el=document.getElementById('studentList');
   if(!list.length){el.innerHTML='<div class="no-result">Keine Schüler in dieser Auswahl.</div>';}
@@ -845,7 +1042,27 @@ function renderDetail(){
       ${s.app.naechsteFahrstunde?`<div class="insight-row"><span class="l">${ic('calendar-clock')} Nächste Fahrstunde</span><span class="v">${fmtDate(s.app.naechsteFahrstunde)}</span></div>`:''}
       <div class="insight-row"><span class="l">${ic('book-open')} Gebuchte Theorie-Termine</span><span class="v">${s.app.offeneTheorieTermine}</span></div>
       <div class="insight-row"><span class="l">${ic('badge-check')} Fahrlehrer-Freigabe</span><span class="v">${s.app.fahrlehrerGo?'Erteilt':'Offen'}</span></div>
-      ${s.app.verfuegbarkeit?`<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--text-dim);margin-bottom:2px">Smart-Matching: Wunschzeiten × Dienstplan</div>${availMatrixHTML(s.app.verfuegbarkeit)}</div>`:''}
+      ${s.app.verfuegbarkeit?`<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--text-dim);margin-bottom:2px">Wunschzeiten × Dienstplan</div>${availMatrixHTML(s.app.verfuegbarkeit)}</div>`:''}
+    </div>
+
+    <div class="panel" id="matchPanel"><h3>${ic('sparkles')}Smart-Matching – Termin bestätigen</h3>
+      ${(()=>{
+        const slots=matchingSlots(s.app.verfuegbarkeit);
+        const cur=s.app.naechsteFahrstunde;
+        const curSlot=cur?slots.find(x=>x.iso===cur):null;
+        let html='';
+        if(cur) html+=`<div class="confirmed-slot">${ic('calendar-check')}Bestätigt: ${fmtDate(cur)}</div>`;
+        if(!slots.length) return html+`<div class="note-empty" style="margin-top:8px">Keine passenden Slots – der Schüler hat noch keine Wunschzeiten hinterlegt, die zum Dienstplan von ${esc(FL_NAME)} passen.</div>`;
+        html+=`<div style="font-size:12px;font-weight:700;color:var(--text-faint);margin:${cur?'12px':'0'} 0 4px">Vorschläge aus den Wunschzeiten des Schülers:</div>`;
+        html+=slots.map(sl=>`<div class="match-slot">
+          <span class="ms-ic">${ic('calendar-clock')}</span>
+          <span class="ms-l">${sl.label}<small>${sl.sub}</small></span>
+          ${cur===sl.iso
+            ?`<span class="status-chip ok">${ic('check')}Bestätigt</span>`
+            :`<button class="mini-btn ok" onclick="confirmSlot('${sl.iso}','${esc(sl.label)}')">${ic('check')}Bestätigen</button>`}
+        </div>`).join('');
+        return html;
+      })()}
     </div>`:''}
 
     <div class="panel"><h3>${ic('pen-line')}Akte &amp; Notizen</h3>
@@ -941,6 +1158,22 @@ function addItem(id){
   toast('Posten hinzugefügt');
   render();
 }
+function confirmSlot(iso,label){
+  const ok=writeLive(st=>{st.naechsteFahrstunde=iso;});
+  if(!ok){toast('App-Daten nicht erreichbar');return;}
+  addNoteSilent(LIVE_ID,`Fahrstunde bestätigt: ${label} · ${fmtDate(iso)}`);
+  toast(`Termin bestätigt – erscheint sofort in der Schüler-App`);
+  render();
+}
+function gotoMatching(){
+  const live=readLiveStudent();
+  if(!live){toast('Keine Schüler-App verbunden');return;}
+  select(live.id);
+  requestAnimationFrame(()=>{
+    const p=document.getElementById('matchPanel');
+    if(p){p.scrollIntoView({behavior:'smooth',block:'center'});p.classList.remove('flash');void p.offsetWidth;p.classList.add('flash');}
+  });
+}
 function addNote(id){
   const inp=document.getElementById('noteInput');
   const text=(inp.value||'').trim(); if(!text){toast('Bitte Text eingeben');return;}
@@ -1019,9 +1252,9 @@ function saveAdd(){
 /* ════════════════════════════════════════════════════════════════════
    6 · Live-Sync: auf Änderungen aus der Schüler-App reagieren
 ════════════════════════════════════════════════════════════════════ */
-if(bc) bc.onmessage=e=>{if(e.data&&e.data.src==='app'){lastSnap=liveSnap();render();}};
+if(bc) bc.onmessage=e=>{if(e.data&&e.data.src==='app'){lastSnap=liveSnap();detectAppChanges();render();}};
 window.addEventListener('storage',e=>{
-  if(e.key===STATE_KEY||e.key===PROFILE_KEY){lastSnap=liveSnap();render();}
+  if(e.key===STATE_KEY||e.key===PROFILE_KEY){lastSnap=liveSnap();detectAppChanges();render();}
 });
 /* Fallback-Poll: nur neu zeichnen, wenn sich App-Daten wirklich geändert
    haben und gerade kein Eingabefeld benutzt wird. */
@@ -1033,7 +1266,7 @@ setInterval(()=>{
   const ae=document.activeElement;
   if(ae&&(ae.tagName==='INPUT'||ae.tagName==='SELECT'||ae.tagName==='TEXTAREA'))return;
   const snap=liveSnap();
-  if(snap!==lastSnap){lastSnap=snap;render();}
+  if(snap!==lastSnap){lastSnap=snap;detectAppChanges();render();}
 },3000);
 
 let toastTimer=null;
@@ -1048,6 +1281,8 @@ document.getElementById('addOverlay').addEventListener('click',e=>{if(e.target.i
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeAdd();document.getElementById('lightbox').classList.remove('open');}});
 document.getElementById('hDate').textContent=new Date().toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
+detectAppChanges(); /* Ereignisse erkennen, die passierten, während die Zentrale zu war */
+renderFeed();
 render();
 </script>
 </body>
