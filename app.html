@@ -3006,18 +3006,32 @@ document.addEventListener('DOMContentLoaded',()=>{
   let bc=null; try{ bc=new BroadcastChannel(CH_NAME); }catch(e){}
   let applying=false;
 
+  /* postMessage-Brücke: läuft die App eingebettet in der Admin-Zentrale,
+     wird der komplette Stand direkt übertragen – funktioniert auch dann,
+     wenn die Browser-Speicher getrennt sind (z. B. file://-Doppelklick). */
+  const inFrame=(function(){try{return window.parent&&window.parent!==window;}catch(e){return false;}})();
+  function pushToAdmin(){
+    if(!inFrame) return;
+    try{
+      window.parent.postMessage({fkSync:1,src:'app',
+        profile:Store.get(PROFILE_KEY),state:Store.get(STATE_KEY)},'*');
+    }catch(e){}
+  }
+
   /* Eigene Speicherungen an die Zentrale melden */
   const origSave=window.saveState;
   window.saveState=function(){
     origSave();
     if(applying) return;
     try{ if(bc) bc.postMessage({src:'app',key:STATE_KEY}); }catch(e){}
+    pushToAdmin();
   };
   const origSaveProfile=window.saveProfile;
   window.saveProfile=function(p){
     origSaveProfile(p);
     if(applying) return;
     try{ if(bc) bc.postMessage({src:'app',key:PROFILE_KEY}); }catch(e){}
+    pushToAdmin();
   };
 
   /* Fremde Änderungen übernehmen & aktuellen Screen neu zeichnen */
@@ -3040,6 +3054,25 @@ document.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('storage',e=>{
     if(e.key===STATE_KEY||e.key===PROFILE_KEY||e.key==='fk_sync_ping') applyExternal();
   });
+
+  /* Nachrichten der Zentrale (postMessage-Brücke) übernehmen */
+  window.addEventListener('message',e=>{
+    const d=e.data||{};
+    if(!d.fkSync||d.src!=='admin') return;
+    if(d.hello){ pushToAdmin(); return; }
+    applying=true;
+    try{
+      if(typeof d.state==='string'&&d.state) Store.set(STATE_KEY,d.state);
+      if(typeof d.profile==='string'&&d.profile) Store.set(PROFILE_KEY,d.profile);
+    }finally{ applying=false; }
+    applyExternal();
+  });
+  if(inFrame){
+    pushToAdmin();
+    /* Heartbeat: hält die Zentrale aktuell, auch wenn ein Save-Pfad fehlt (z. B. Konto-Reset) */
+    setInterval(pushToAdmin,2000);
+  }
+
   /* Lesezugriff für Diagnose & Tests (state ist eine lexikalische Variable) */
   window.__fkGetState=function(){ return state; };
 })();

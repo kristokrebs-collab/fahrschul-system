@@ -133,6 +133,37 @@ header{
 .panel.flash{animation:panelFlash 1.6s var(--ease-out)}
 @keyframes panelFlash{0%{border-color:var(--accent-hi);box-shadow:0 0 0 3px var(--accent-soft)}100%{border-color:var(--border)}}
 
+/* Eingebettete Schüler-App */
+.app-drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);z-index:55;
+  background:var(--bg-deep);border-left:1px solid var(--border-strong);
+  box-shadow:-24px 0 60px -30px rgba(0,0,0,.9);
+  display:none;flex-direction:column;
+  transform:translateX(14px);opacity:0;transition:transform .3s var(--ease-out),opacity .3s;
+}
+.app-drawer.open{display:flex}
+.app-drawer.in{transform:translateX(0);opacity:1}
+.app-drawer .ad-head{display:flex;align-items:center;gap:10px;padding:11px 15px;border-bottom:1px solid var(--border);flex-shrink:0;color:var(--text-dim)}
+.app-drawer iframe{flex:1;border:none;width:100%;background:#0F1219}
+/* Zentrale macht Platz, wenn das App-Panel offen ist (statt es zu überdecken) */
+@media(min-width:1100px){
+  body.drawer-open header,body.drawer-open .kpi-strip,body.drawer-open .toolbar,body.drawer-open .main{margin-right:440px}
+  body.drawer-open header{transition:margin-right .3s var(--ease-out)}
+}
+.pending-ride{
+  margin-top:10px;padding:12px 13px;border-radius:12px;
+  background:var(--blue-soft);border:1px solid rgba(59,130,246,.35);
+}
+.pending-ride .pr-t{font-weight:800;font-size:12.5px;color:var(--blue);display:flex;align-items:center;gap:7px;margin-bottom:8px}
+.pending-ride .pr-t svg{width:14px;height:14px}
+.pending-ride .pr-btns{display:flex;gap:7px;flex-wrap:wrap}
+.hint-card{
+  background:var(--accent-soft);border:1px dashed var(--accent-line);border-radius:var(--radius-sm);
+  padding:13px 15px;margin-bottom:9px;font-size:12.5px;font-weight:600;color:var(--text-dim);
+}
+.hint-card b{color:var(--text)}
+.hint-card .btn{margin-top:10px}
+
 /* ── KPI-Strip ──────────────────────────────────────────────────────── */
 .kpi-strip{
   flex-shrink:0; display:grid; gap:10px; padding:12px 22px 4px;
@@ -406,6 +437,9 @@ select.sel{
   <div class="brand"><b>Fahrschule Krebs</b><span>Admin-Zentrale · Webseiten-Management</span></div>
   <span class="h-date" id="hDate"></span>
   <span class="live-pill off" id="livePill"><span class="live-dot"></span><span id="livePillText">Keine Schüler-App verbunden</span></span>
+  <button class="btn btn-ghost" id="appDrawerBtn" onclick="toggleAppDrawer()" style="padding:8px 13px">
+    <span data-ic="smartphone"></span>Schüler-App
+  </button>
   <button class="bell-btn" id="bellBtn" onclick="toggleFeed(event)" aria-label="Aktivitäten aus der Schüler-App">
     <span data-ic="bell"></span><b id="bellCount" hidden>0</b>
   </button>
@@ -477,6 +511,16 @@ select.sel{
 </div>
 
 <div class="overlay" id="lightbox" onclick="this.classList.remove('open')"><img id="lightboxImg" alt="Dokument"></div>
+
+<!-- Eingebettete Schüler-App (Kopplung per postMessage – funktioniert überall) -->
+<div class="app-drawer" id="appDrawer">
+  <div class="ad-head">
+    <span data-ic="smartphone"></span>
+    <div><b style="font-size:13.5px">Schüler-App</b><span style="display:block;font-size:11px;color:var(--text-faint);font-weight:600">Live gekoppelt mit der Zentrale</span></div>
+    <button class="mini-btn" style="margin-left:auto" onclick="toggleAppDrawer()">Schließen</button>
+  </div>
+  <iframe id="appFrame" title="Schüler-App"></iframe>
+</div>
 <div id="toast"><span data-ic="check"></span><span id="toastText"></span></div>
 
 <script>
@@ -521,6 +565,8 @@ const ICONS={
   "steering":'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><path d="M12 2v7"/><path d="m4.9 17.1 4.6-4.4"/><path d="m19.1 17.1-4.6-4.4"/>',
   "pen-line":'<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>',
   "bell":'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  "smartphone":'<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+  "flag-checkered":'<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-7.333-2q-2 0-3.067.8"/><path d="M8 2v14"/><path d="M12 4v14"/><path d="M16 3.5v14"/><path d="M20 5v10"/>',
   "calendar-check":'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>'
 };
 function ic(name){return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]||ICONS.check}</svg>`;}
@@ -692,11 +738,54 @@ function readLiveStudent(){
 function writeLive(mut){
   const st=readAppState(); if(!st) return false;
   mut(st);
-  try{localStorage.setItem(STATE_KEY,JSON.stringify(st));}catch(e){return false;}
+  const raw=JSON.stringify(st);
+  try{localStorage.setItem(STATE_KEY,raw);}catch(e){return false;}
   try{if(bc)bc.postMessage({src:'admin',key:STATE_KEY});}catch(e){}
   try{localStorage.setItem('fk_sync_ping',String(Date.now()));}catch(e){}
+  pushToApp(raw); /* eingebettete App direkt beliefern (postMessage-Brücke) */
   rememberAppSnapshot(); /* eigene Änderung nicht als App-Ereignis melden */
   return true;
+}
+
+/* ── postMessage-Brücke zur eingebetteten Schüler-App ──
+   Die App im Panel schickt Profil + Ausbildungsstand direkt hierher;
+   die Zentrale spiegelt beides in ihren eigenen Speicher. So funktioniert
+   die Kopplung auch ohne gemeinsamen Browser-Speicher (file://). */
+let appFrameWin=null;
+function pushToApp(rawState){
+  if(!appFrameWin) return;
+  try{appFrameWin.postMessage({fkSync:1,src:'admin',state:rawState||localStorage.getItem(STATE_KEY)||''},'*');}catch(e){}
+}
+window.addEventListener('message',e=>{
+  const d=e.data||{};
+  if(!d.fkSync||d.src!=='app') return;
+  appFrameWin=e.source;
+  let changed=false;
+  const mirror=(key,val)=>{
+    const cur=localStorage.getItem(key);
+    const next=(typeof val==='string'&&val)?val:null;
+    if(next===cur) return;
+    try{ if(next==null) localStorage.removeItem(key); else localStorage.setItem(key,next); changed=true; }catch(err){}
+  };
+  if('state' in d) mirror(STATE_KEY,d.state);
+  if('profile' in d) mirror(PROFILE_KEY,d.profile);
+  if(changed){ lastSnap=liveSnap(); detectAppChanges(); render(); }
+});
+function toggleAppDrawer(){
+  const dr=document.getElementById('appDrawer');
+  const frame=document.getElementById('appFrame');
+  const open=!dr.classList.contains('open');
+  if(open){
+    if(!frame.src) frame.src='app.html';
+    dr.classList.add('open');
+    document.body.classList.add('drawer-open');
+    requestAnimationFrame(()=>dr.classList.add('in'));
+    frame.addEventListener('load',()=>{try{frame.contentWindow.postMessage({fkSync:1,src:'admin',hello:1},'*');}catch(e){}},{once:true});
+  } else {
+    dr.classList.remove('in');
+    document.body.classList.remove('drawer-open');
+    setTimeout(()=>dr.classList.remove('open'),280);
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -899,8 +988,11 @@ function render(){
   document.getElementById('matchBtn').style.display=live?'inline-flex':'none';
   document.getElementById('countLine').textContent=`${list.length} von ${all.length} Schülern`;
   const el=document.getElementById('studentList');
-  if(!list.length){el.innerHTML='<div class="no-result">Keine Schüler in dieser Auswahl.</div>';}
-  else el.innerHTML=list.map(s=>{
+  const hint=!live?`<div class="hint-card">${ic('smartphone')} <b>Keine Schüler-App gekoppelt.</b><br>
+    Öffne die Schüler-App direkt hier in der Zentrale – Anmeldung, Sehtest und Wunschzeiten erscheinen dann sofort live.
+    <br><button class="btn btn-primary" onclick="toggleAppDrawer()" style="padding:8px 14px;font-size:12.5px">${ic('smartphone')}Schüler-App öffnen</button></div>`:'';
+  if(!list.length){el.innerHTML=hint+'<div class="no-result">Keine Schüler in dieser Auswahl.</div>';}
+  else el.innerHTML=hint+list.map(s=>{
     const tp=theorieP(s),pp=praxisP(s),off=offen(s),docs=missingDocs(s);
     let badge='';
     if(s.live)badge=`<span class="badge live">${ic('zap')}LIVE</span>`;
@@ -1049,9 +1141,18 @@ function renderDetail(){
       ${(()=>{
         const slots=matchingSlots(s.app.verfuegbarkeit);
         const cur=s.app.naechsteFahrstunde;
-        const curSlot=cur?slots.find(x=>x.iso===cur):null;
         let html='';
-        if(cur) html+=`<div class="confirmed-slot">${ic('calendar-check')}Bestätigt: ${fmtDate(cur)}</div>`;
+        if(cur){
+          const past=new Date(cur)<=new Date();
+          html+=`<div class="confirmed-slot">${ic('calendar-check')}Geplant: ${fmtDate(cur)}</div>
+          <div class="pending-ride">
+            <div class="pr-t">${ic('flag-checkered')}${past?'Fahrt vorbei – bitte Ergebnis bestätigen':'Nach der Fahrt hier bestätigen'}</div>
+            <div class="pr-btns">
+              <button class="mini-btn ok" onclick="confirmRide('done')">${ic('check')}Gefahren – verbuchen (+2 × 45 min)</button>
+              <button class="mini-btn" onclick="confirmRide('cancel')">${ic('x')}Ausgefallen</button>
+            </div>
+          </div>`;
+        }
         if(!slots.length) return html+`<div class="note-empty" style="margin-top:8px">Keine passenden Slots – der Schüler hat noch keine Wunschzeiten hinterlegt, die zum Dienstplan von ${esc(FL_NAME)} passen.</div>`;
         html+=`<div style="font-size:12px;font-weight:700;color:var(--text-faint);margin:${cur?'12px':'0'} 0 4px">Vorschläge aus den Wunschzeiten des Schülers:</div>`;
         html+=slots.map(sl=>`<div class="match-slot">
@@ -1156,6 +1257,25 @@ function addItem(id){
   if(s.live) writeLive(st=>{st.finanzen.posten.push({label,betrag});});
   else {s.finanzen.posten.push({label,betrag}); persist(s);}
   toast('Posten hinzugefügt');
+  render();
+}
+function confirmRide(mode){
+  const st=readAppState(); if(!st||!st.naechsteFahrstunde){toast('Kein geplanter Termin vorhanden');return;}
+  const when=st.naechsteFahrstunde;
+  if(mode==='done'){
+    writeLive(x=>{
+      x.uebungsstunden=(x.uebungsstunden||0)+2; /* 90 min = 2 Fahrstunden à 45 min */
+      if(x.history&&Array.isArray(x.history.fahr))
+        x.history.fahr.unshift({type:'uebung',date:when,minutes:90,focus:'Übungsfahrt – bestätigt von der Fahrschule'});
+      x.naechsteFahrstunde=null;
+    });
+    addNoteSilent(LIVE_ID,`Fahrstunde bestätigt (+2 × 45 min): ${fmtDate(when)}`);
+    addEvent('car-front',`Fahrstunde absolviert & verbucht: ${fmtDate(when)}`);
+  } else {
+    writeLive(x=>{x.naechsteFahrstunde=null;});
+    addNoteSilent(LIVE_ID,`Fahrstunde ausgefallen: ${fmtDate(when)}`);
+    addEvent('x',`Fahrstunde ausgefallen: ${fmtDate(when)}`);
+  }
   render();
 }
 function confirmSlot(iso,label){
