@@ -3018,20 +3018,60 @@ document.addEventListener('DOMContentLoaded',()=>{
     }catch(e){}
   }
 
+  /* Netz-Sync über server.py: koppelt geräteübergreifend (z. B. Handy → Admin-PC).
+     Aktiv, sobald die App über http(s) ausgeliefert wird. */
+  const canNet=/^https?:$/.test(location.protocol);
+  const SYNC_ID_KEY='fk_sync_client_v1';
+  let clientId=null;
+  try{ clientId=localStorage.getItem(SYNC_ID_KEY); }catch(e){}
+  if(!clientId){
+    clientId='c'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+    try{ localStorage.setItem(SYNC_ID_KEY,clientId); }catch(e){}
+  }
+  let lastPushedSig=null, lastAdminTs=0;
+  function syncSig(){ return (Store.get(PROFILE_KEY)||'')+''+(Store.get(STATE_KEY)||''); }
+  function netPush(force){
+    if(!canNet) return;
+    const sig=syncSig();
+    if(!force&&sig===lastPushedSig) return;
+    lastPushedSig=sig;
+    try{
+      fetch('sync/push',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:clientId,profile:Store.get(PROFILE_KEY),state:Store.get(STATE_KEY),ts:Date.now()})
+      }).catch(()=>{});
+    }catch(e){}
+  }
+  function netPull(){
+    if(!canNet) return;
+    try{
+      fetch('sync/pull?id='+encodeURIComponent(clientId),{cache:'no-store'})
+        .then(r=>r.ok?r.json():null)
+        .then(d=>{
+          if(!d||d.src!=='admin'||!(d.ts>lastAdminTs)||typeof d.state!=='string'||!d.state) return;
+          lastAdminTs=d.ts;
+          applying=true;
+          try{ Store.set(STATE_KEY,d.state); }finally{ applying=false; }
+          lastPushedSig=syncSig(); /* übernommenen Stand nicht zurück-echoen */
+          applyExternal();
+        }).catch(()=>{});
+    }catch(e){}
+  }
+  if(canNet){ netPush(true); setInterval(()=>{ netPull(); netPush(); },3000); }
+
   /* Eigene Speicherungen an die Zentrale melden */
   const origSave=window.saveState;
   window.saveState=function(){
     origSave();
     if(applying) return;
     try{ if(bc) bc.postMessage({src:'app',key:STATE_KEY}); }catch(e){}
-    pushToAdmin();
+    pushToAdmin(); netPush();
   };
   const origSaveProfile=window.saveProfile;
   window.saveProfile=function(p){
     origSaveProfile(p);
     if(applying) return;
     try{ if(bc) bc.postMessage({src:'app',key:PROFILE_KEY}); }catch(e){}
-    pushToAdmin();
+    pushToAdmin(); netPush();
   };
 
   /* Fremde Änderungen übernehmen & aktuellen Screen neu zeichnen */
@@ -3065,6 +3105,15 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(typeof d.state==='string'&&d.state) Store.set(STATE_KEY,d.state);
       if(typeof d.profile==='string'&&d.profile) Store.set(PROFILE_KEY,d.profile);
     }finally{ applying=false; }
+    if(d.restore){
+      /* Konto-Wiederherstellung: die Zentrale kennt das Konto noch –
+         angemeldet bleiben, statt neu registrieren zu müssen. */
+      const p=getProfile();
+      if(p&&p.remember){ authed=true; try{ Session.set('1'); }catch(err){} }
+      try{ navReplace(defaultTarget()); route(); }catch(err){}
+      pushToAdmin();
+      return;
+    }
     applyExternal();
   });
   if(inFrame){

@@ -701,12 +701,22 @@ function saveNotes(n){try{localStorage.setItem(NOTES_KEY,JSON.stringify(n));}cat
 
 /* Live-Schüler: Profil + Ausbildungsstand direkt aus der Schüler-App */
 function readAppState(){try{const st=JSON.parse(localStorage.getItem(STATE_KEY)||'null');return (st&&st.version===3)?st:null;}catch(e){return null;}}
+function liveFromRaw(id,profileRaw,stateRaw){
+  let profile=null,st=null;
+  try{profile=JSON.parse(profileRaw||'null');}catch(e){}
+  try{st=JSON.parse(stateRaw||'null');}catch(e){}
+  if(!profile||!profile.name||!st||st.version!==3) return null;
+  return buildLiveRecord(id,profile,st);
+}
 function readLiveStudent(){
   let profile=null; try{profile=JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');}catch(e){}
   const st=readAppState();
   if(!profile||!profile.name||!st) return null;
+  return buildLiveRecord(LIVE_ID,profile,st);
+}
+function buildLiveRecord(id,profile,st){
   return {
-    id:LIVE_ID, live:true, name:profile.name, email:profile.email||'', geb:'', lastActivity:0,
+    id, live:true, name:profile.name, email:profile.email||'', geb:'', lastActivity:0,
     klasse:st.klasse, besitz:st.besitz,
     theorie:{besucht:st.theorie.besucht,gesamt:st.theorie.gesamt},
     theoriePruefung:{bestanden:!!(st.theoriePruefung&&st.theoriePruefung.bestanden)},
@@ -734,11 +744,53 @@ function readLiveStudent(){
     }
   };
 }
+/* ── Server-Sync (server.py): mehrere Schüler-Apps geräteübergreifend live ── */
+let netStudents={};      /* {clientId:{profile,state,ts,src}} */
+let syncOnline=false;
+function netKey(id){return id&&id.indexOf('NET-')===0?id.slice(4):null;}
+async function netPoll(){
+  try{
+    const r=await fetch('sync/all',{cache:'no-store'});
+    if(!r.ok) throw new Error('offline');
+    const data=await r.json();
+    const wasOnline=syncOnline; syncOnline=true;
+    if(JSON.stringify(data)!==JSON.stringify(netStudents)||!wasOnline){
+      Object.keys(data).forEach(k=>detectChangesFor('NET-'+k,data[k].profile,data[k].state));
+      netStudents=data;
+      render();
+    }
+  }catch(e){
+    if(syncOnline){syncOnline=false;netStudents={};render();}
+  }
+}
+
+/* Aktuellen App-State des gewählten Live-Schülers lesen */
+function liveStateOf(s){
+  if(!s||!s.live) return null;
+  const nk=netKey(s.id);
+  if(nk){
+    const rec=netStudents[nk]; if(!rec) return null;
+    try{const st=JSON.parse(rec.state||'null');return (st&&st.version===3)?st:null;}catch(e){return null;}
+  }
+  return readAppState();
+}
 /* Änderungen der Zentrale am Live-Schüler zurück in den App-State schreiben */
-function writeLive(mut){
-  const st=readAppState(); if(!st) return false;
+function writeLiveFor(s,mut){
+  const st=liveStateOf(s); if(!st) return false;
   mut(st);
   const raw=JSON.stringify(st);
+  const nk=netKey(s.id);
+  if(nk){ /* über den Server an das Gerät des Schülers */
+    const rec=netStudents[nk]; if(!rec) return false;
+    rec.state=raw; rec.src='admin'; rec.ts=Date.now();
+    try{
+      fetch('sync/admin',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:nk,state:raw,ts:rec.ts})}).catch(()=>{});
+    }catch(e){}
+    rememberSnapshotFor(s.id,rec.profile,raw);
+    return true;
+  }
+  /* lokal (gleicher Browser / eingebettete App) */
   try{localStorage.setItem(STATE_KEY,raw);}catch(e){return false;}
   try{if(bc)bc.postMessage({src:'admin',key:STATE_KEY});}catch(e){}
   try{localStorage.setItem('fk_sync_ping',String(Date.now()));}catch(e){}
@@ -756,10 +808,23 @@ function pushToApp(rawState){
   if(!appFrameWin) return;
   try{appFrameWin.postMessage({fkSync:1,src:'admin',state:rawState||localStorage.getItem(STATE_KEY)||''},'*');}catch(e){}
 }
+let appRestored=false;
 window.addEventListener('message',e=>{
   const d=e.data||{};
   if(!d.fkSync||d.src!=='app') return;
   appFrameWin=e.source;
+  /* Konto-Wiederherstellung: startet die eingebettete App ohne Konto,
+     obwohl die Zentrale eines kennt, wird es zurückgespielt –
+     der Schüler bleibt angemeldet und muss sich nicht neu registrieren. */
+  if(('profile' in d)&&!d.profile&&!appRestored){
+    const p=localStorage.getItem(PROFILE_KEY);
+    if(p){
+      appRestored=true;
+      try{e.source.postMessage({fkSync:1,src:'admin',restore:1,profile:p,state:localStorage.getItem(STATE_KEY)||''},'*');}catch(err){}
+      return;
+    }
+  }
+  if(d.profile) appRestored=true;
   let changed=false;
   const mirror=(key,val)=>{
     const cur=localStorage.getItem(key);
@@ -776,6 +841,7 @@ function toggleAppDrawer(){
   const frame=document.getElementById('appFrame');
   const open=!dr.classList.contains('open');
   if(open){
+    appRestored=false;
     if(!frame.src) frame.src='app.html';
     dr.classList.add('open');
     document.body.classList.add('drawer-open');
@@ -792,7 +858,7 @@ function toggleAppDrawer(){
    2b · Aktivitäts-Feed: Änderungen aus der Schüler-App erkennen
 ════════════════════════════════════════════════════════════════════ */
 const EVENTS_KEY='fk_admin_events_v1';
-const SEEN_KEY='fk_admin_seen_v1';
+const SEEN_KEY='fk_admin_seen_v2'; /* Map: App-Instanz-Id → Schnappschuss */
 function loadEvents(){try{return JSON.parse(localStorage.getItem(EVENTS_KEY)||'[]')||[];}catch(e){return [];}}
 let events=loadEvents();
 function saveEvents(){try{localStorage.setItem(EVENTS_KEY,JSON.stringify(events.slice(0,50)));}catch(e){}}
@@ -802,9 +868,11 @@ function addEvent(icon,text){
   toast(text);
 }
 /* Kompakter Vergleichs-Schnappschuss (ohne Bild-Daten) */
-function appSnapshot(){
-  let prof=null; try{prof=JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');}catch(e){}
-  const st=readAppState();
+function snapshotFromRaw(profileRaw,stateRaw){
+  let prof=null,st=null;
+  try{prof=JSON.parse(profileRaw||'null');}catch(e){}
+  try{st=JSON.parse(stateRaw||'null');}catch(e){}
+  if(st&&st.version!==3) st=null;
   if(!prof||!prof.name) return {reg:false};
   return {
     reg:true, name:prof.name, klasse:st?st.klasse:(prof.klasse||''), besitz:st?st.besitz:(prof.besitz||''),
@@ -816,14 +884,31 @@ function appSnapshot(){
     themesOffen:st?(st.themeSessions||[]).filter(t=>t.status==='offen').length:0
   };
 }
-function loadSeen(){try{return JSON.parse(localStorage.getItem(SEEN_KEY)||'null');}catch(e){return null;}}
-function rememberAppSnapshot(){try{localStorage.setItem(SEEN_KEY,JSON.stringify(appSnapshot()));}catch(e){}}
+function loadSeenMap(){try{const m=JSON.parse(localStorage.getItem(SEEN_KEY)||'{}');return (m&&typeof m==='object')?m:{};}catch(e){return {};}}
+function saveSeenMap(m){try{localStorage.setItem(SEEN_KEY,JSON.stringify(m));}catch(e){}}
+function rememberSnapshotFor(id,profileRaw,stateRaw){
+  const m=loadSeenMap(); m[id]=snapshotFromRaw(profileRaw,stateRaw); saveSeenMap(m);
+}
+function rememberAppSnapshot(){
+  rememberSnapshotFor('local',localStorage.getItem(PROFILE_KEY),localStorage.getItem(STATE_KEY));
+}
 function detectAppChanges(){
-  const prev=loadSeen(), cur=appSnapshot();
-  if(!prev){rememberAppSnapshot();return;}
-  if(JSON.stringify(prev)===JSON.stringify(cur))return;
+  /* lokale Kopplung – bei aktivem Server-Sync kommt alles über netPoll */
+  if(syncOnline) return;
+  detectChangesFor('local',localStorage.getItem(PROFILE_KEY),localStorage.getItem(STATE_KEY));
+}
+function detectChangesFor(id,profileRaw,stateRaw){
+  const m=loadSeenMap();
+  const prev=m[id], cur=snapshotFromRaw(profileRaw,stateRaw);
+  const remember=()=>{m[id]=cur;saveSeenMap(m);};
+  if(!prev){
+    /* Erster Kontakt mit dieser App-Instanz */
+    if(cur.reg) addEvent('user-plus',`Neue Anmeldung: ${cur.name} (Klasse ${cur.klasse})`);
+    remember();return;
+  }
+  if(JSON.stringify(prev)===JSON.stringify(cur)){remember();return;}
   const who=cur.name||prev.name||'Schüler';
-  if(!prev.reg&&cur.reg){addEvent('user-plus',`Neue Anmeldung: ${who} (Klasse ${cur.klasse})`);rememberAppSnapshot();return;}
+  if(!prev.reg&&cur.reg){addEvent('user-plus',`Neue Anmeldung: ${who} (Klasse ${cur.klasse})`);remember();return;}
   else if(prev.reg&&!cur.reg) addEvent('user-round','Das Schüler-App-Konto wurde zurückgesetzt.');
   else if(cur.reg&&!prev.docs&&cur.docs){
     /* Erst-Anlage des Ausbildungsstands direkt nach der Anmeldung – kein Einzel-Diff */
@@ -845,7 +930,7 @@ function detectAppChanges(){
     if(prev.next!==cur.next&&cur.next) addEvent('calendar-check',`Fahrstunden-Termin von ${who} geändert: ${fmtDate(cur.next)}`);
     if(prev.themesOffen!==cur.themesOffen) addEvent('calendar-clock',`${who} hat Theorie-Termine angepasst (${cur.themesOffen} gebucht)`);
   }
-  rememberAppSnapshot();
+  remember();
 }
 function renderFeed(){
   const unread=events.filter(e=>!e.read).length;
@@ -868,8 +953,8 @@ function toggleFeed(ev){
 }
 function clearFeed(){events=[];saveEvents();renderFeed();}
 function feedClick(i){
-  const live=readLiveStudent();
-  if(live){select(live.id);}
+  const lives=liveStudents();
+  if(lives.length){select(lives[0].id);}
   document.getElementById('feedPanel').classList.remove('open');
 }
 document.addEventListener('click',e=>{
@@ -929,9 +1014,19 @@ let notes=loadNotes();
 let selectedId=null, activeFilter='all';
 let bc=null; try{bc=new BroadcastChannel('fk_sync_v1');}catch(e){}
 
+function liveStudents(){
+  if(syncOnline){
+    /* Server-Sync aktiv: alle verbundenen Geräte (Handy, Tablet, Browser) */
+    return Object.keys(netStudents)
+      .map(k=>liveFromRaw('NET-'+k,netStudents[k].profile,netStudents[k].state))
+      .filter(Boolean)
+      .sort((a,b)=>a.name.localeCompare(b.name,'de'));
+  }
+  const l=readLiveStudent();
+  return l?[l]:[];
+}
 function allStudents(){
-  const live=readLiveStudent();
-  return live?[live].concat(students):students.slice();
+  return liveStudents().concat(students);
 }
 function byId(id){return allStudents().find(s=>s.id===id)||null;}
 
@@ -981,15 +1076,20 @@ function renderKPIs(all){
 function render(){
   const all=allStudents(), list=filteredSorted();
   renderKPIs(all);
-  const live=all.find(s=>s.live);
+  const lives=all.filter(s=>s.live);
+  const live=lives[0];
   const pill=document.getElementById('livePill');
   pill.classList.toggle('off',!live);
-  document.getElementById('livePillText').textContent=live?`Live gekoppelt: ${live.name}`:'Keine Schüler-App verbunden';
+  document.getElementById('livePillText').textContent=
+    !live?'Keine Schüler-App verbunden'
+    :(syncOnline?`${lives.length} App${lives.length>1?'s':''} live über Server`+(lives.length===1?`: ${live.name}`:'')
+    :`Live gekoppelt: ${live.name}`);
   document.getElementById('matchBtn').style.display=live?'inline-flex':'none';
   document.getElementById('countLine').textContent=`${list.length} von ${all.length} Schülern`;
   const el=document.getElementById('studentList');
-  const hint=!live?`<div class="hint-card">${ic('smartphone')} <b>Keine Schüler-App gekoppelt.</b><br>
-    Öffne die Schüler-App direkt hier in der Zentrale – Anmeldung, Sehtest und Wunschzeiten erscheinen dann sofort live.
+  const hint=!lives.length?`<div class="hint-card">${ic('smartphone')} <b>Keine Schüler-App gekoppelt.</b><br>
+    Öffne die Schüler-App direkt hier in der Zentrale – oder starte <b>server.py</b> und öffne die App
+    auf dem Handy (gleiches WLAN): Anmeldungen erscheinen dann sofort hier.
     <br><button class="btn btn-primary" onclick="toggleAppDrawer()" style="padding:8px 14px;font-size:12.5px">${ic('smartphone')}Schüler-App öffnen</button></div>`:'';
   if(!list.length){el.innerHTML=hint+'<div class="no-result">Keine Schüler in dieser Auswahl.</div>';}
   else el.innerHTML=hint+list.map(s=>{
@@ -1014,6 +1114,12 @@ function render(){
           <span class="val">${Math.round(pp*100)} %</span></div>
       </div>
       <div class="card-flags">
+        ${s.live&&s.app?(s.app.naechsteFahrstunde
+          ?(new Date(s.app.naechsteFahrstunde)<=new Date()
+            ?`<span class="flag bad">${ic('flag-checkered')}Fahrt bestätigen!</span>`
+            :`<span class="flag ok">${ic('calendar-check')}Termin ${new Date(s.app.naechsteFahrstunde).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}</span>`)
+          :(()=>{const n=matchingSlots(s.app.verfuegbarkeit).length;return n?`<span class="flag warn">${ic('sparkles')}${n} Termin-Vorschläge – absegnen</span>`:'';})())
+        :''}
         ${off>0?`<span class="flag ${off>=100?'bad':'warn'}">${ic('banknote')}${fmtEuro(off)} offen</span>`:`<span class="flag ok">${ic('check')}bezahlt</span>`}
         ${docs.length?`<span class="flag warn">${ic('file-warning')}${docs.length} Nachweis${docs.length>1?'e':''} offen</span>`:`<span class="flag ok">${ic('check')}Nachweise</span>`}
       </div>
@@ -1198,7 +1304,7 @@ function showThumb(src){
    5 · Aktionen (schreiben in Kartei bzw. live in den App-State)
 ════════════════════════════════════════════════════════════════════ */
 function persist(s){
-  if(s.live) return; /* Live-Schüler wird über writeLive() gespeichert */
+  if(s.live) return; /* Live-Schüler wird über writeLiveFor() gespeichert */
   const i=students.findIndex(x=>x.id===s.id);
   if(i>=0){students[i]=s; saveAdmin();}
 }
@@ -1210,7 +1316,7 @@ function adjust(id,what,delta){
   else if(what==='sim') s.simulator.ist=clamp(s.simulator.ist+delta,s.simulator.soll);
   else s.sonderfahrten[what].ist=clamp(s.sonderfahrten[what].ist+delta,s.sonderfahrten[what].soll);
   if(s.live){
-    writeLive(st=>{
+    writeLiveFor(s,st=>{
       if(what==='theorie') st.theorie.besucht=s.theorie.besucht;
       else if(what==='uebung') st.uebungsstunden=s.uebungsstunden;
       else if(what==='sim') st.simulator.ist=s.simulator.ist;
@@ -1222,7 +1328,7 @@ function adjust(id,what,delta){
 function toggleTP(id){
   const s=byId(id); if(!s)return;
   const v=!s.theoriePruefung.bestanden;
-  if(s.live) writeLive(st=>{if(st.theoriePruefung)st.theoriePruefung.bestanden=v;});
+  if(s.live) writeLiveFor(s,st=>{if(st.theoriePruefung)st.theoriePruefung.bestanden=v;});
   else {s.theoriePruefung.bestanden=v; persist(s);}
   toast(v?'Theorieprüfung als bestanden markiert':'Theorieprüfung zurückgesetzt');
   render();
@@ -1235,7 +1341,7 @@ function togglePP(id){
 }
 function setDoc(id,key,status){
   const s=byId(id); if(!s)return;
-  if(s.live) writeLive(st=>{st.dokumente[key].status=status; if(status==='ausstehend')st.dokumente[key].thumb=null;});
+  if(s.live) writeLiveFor(s,st=>{st.dokumente[key].status=status; if(status==='ausstehend')st.dokumente[key].thumb=null;});
   else {s.dokumente[key]=status; persist(s);}
   toast(status==='verifiziert'?`${DOC_LABELS[key]} verifiziert`:`${DOC_LABELS[key]} zurückgesetzt`);
   render();
@@ -1243,7 +1349,7 @@ function setDoc(id,key,status){
 function payItem(id,idx){
   const s=byId(id); if(!s)return;
   const p=s.finanzen.posten[idx]; if(!p)return;
-  if(s.live) writeLive(st=>{st.finanzen.posten.splice(idx,1);});
+  if(s.live) writeLiveFor(s,st=>{st.finanzen.posten.splice(idx,1);});
   else {s.finanzen.posten.splice(idx,1); s.finanzen.bezahlt=(s.finanzen.bezahlt||0)+p.betrag; persist(s);}
   addNoteSilent(id,`Zahlung verbucht: ${p.label} · ${fmtEuro(p.betrag)}`);
   toast(`${fmtEuro(p.betrag)} als bezahlt verbucht`);
@@ -1254,41 +1360,44 @@ function addItem(id){
   const label=(document.getElementById('finLabel').value||'').trim();
   const betrag=parseFloat(document.getElementById('finBetrag').value);
   if(!label||!(betrag>0)){toast('Bezeichnung und Betrag angeben');return;}
-  if(s.live) writeLive(st=>{st.finanzen.posten.push({label,betrag});});
+  if(s.live) writeLiveFor(s,st=>{st.finanzen.posten.push({label,betrag});});
   else {s.finanzen.posten.push({label,betrag}); persist(s);}
   toast('Posten hinzugefügt');
   render();
 }
 function confirmRide(mode){
-  const st=readAppState(); if(!st||!st.naechsteFahrstunde){toast('Kein geplanter Termin vorhanden');return;}
+  const s=byId(selectedId); if(!s||!s.live){toast('Kein Live-Schüler ausgewählt');return;}
+  const st=liveStateOf(s); if(!st||!st.naechsteFahrstunde){toast('Kein geplanter Termin vorhanden');return;}
   const when=st.naechsteFahrstunde;
   if(mode==='done'){
-    writeLive(x=>{
+    writeLiveFor(s,x=>{
       x.uebungsstunden=(x.uebungsstunden||0)+2; /* 90 min = 2 Fahrstunden à 45 min */
       if(x.history&&Array.isArray(x.history.fahr))
         x.history.fahr.unshift({type:'uebung',date:when,minutes:90,focus:'Übungsfahrt – bestätigt von der Fahrschule'});
       x.naechsteFahrstunde=null;
     });
-    addNoteSilent(LIVE_ID,`Fahrstunde bestätigt (+2 × 45 min): ${fmtDate(when)}`);
-    addEvent('car-front',`Fahrstunde absolviert & verbucht: ${fmtDate(when)}`);
+    addNoteSilent(s.id,`Fahrstunde bestätigt (+2 × 45 min): ${fmtDate(when)}`);
+    addEvent('car-front',`Fahrstunde von ${s.name} absolviert & verbucht: ${fmtDate(when)}`);
   } else {
-    writeLive(x=>{x.naechsteFahrstunde=null;});
-    addNoteSilent(LIVE_ID,`Fahrstunde ausgefallen: ${fmtDate(when)}`);
-    addEvent('x',`Fahrstunde ausgefallen: ${fmtDate(when)}`);
+    writeLiveFor(s,x=>{x.naechsteFahrstunde=null;});
+    addNoteSilent(s.id,`Fahrstunde ausgefallen: ${fmtDate(when)}`);
+    addEvent('x',`Fahrstunde von ${s.name} ausgefallen: ${fmtDate(when)}`);
   }
   render();
 }
 function confirmSlot(iso,label){
-  const ok=writeLive(st=>{st.naechsteFahrstunde=iso;});
+  const s=byId(selectedId); if(!s||!s.live){toast('Kein Live-Schüler ausgewählt');return;}
+  const ok=writeLiveFor(s,st=>{st.naechsteFahrstunde=iso;});
   if(!ok){toast('App-Daten nicht erreichbar');return;}
-  addNoteSilent(LIVE_ID,`Fahrstunde bestätigt: ${label} · ${fmtDate(iso)}`);
+  addNoteSilent(s.id,`Fahrstunde bestätigt: ${label} · ${fmtDate(iso)}`);
   toast(`Termin bestätigt – erscheint sofort in der Schüler-App`);
   render();
 }
-function gotoMatching(){
-  const live=readLiveStudent();
-  if(!live){toast('Keine Schüler-App verbunden');return;}
-  select(live.id);
+function gotoMatching(id){
+  const lives=liveStudents();
+  const target=id?lives.find(x=>x.id===id):lives[0];
+  if(!target){toast('Keine Schüler-App verbunden');return;}
+  select(target.id);
   requestAnimationFrame(()=>{
     const p=document.getElementById('matchPanel');
     if(p){p.scrollIntoView({behavior:'smooth',block:'center'});p.classList.remove('flash');void p.offsetWidth;p.classList.add('flash');}
@@ -1404,6 +1513,7 @@ document.getElementById('hDate').textContent=new Date().toLocaleDateString('de-D
 detectAppChanges(); /* Ereignisse erkennen, die passierten, während die Zentrale zu war */
 renderFeed();
 render();
+netPoll(); setInterval(netPoll,3000); /* Server-Sync (server.py): Handy & Co. */
 </script>
 </body>
 </html>
