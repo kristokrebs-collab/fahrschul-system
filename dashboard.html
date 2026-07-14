@@ -69,6 +69,33 @@ header{
 .live-pill.off .live-dot{animation:none;opacity:.5}
 @keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,.5)}50%{opacity:.4}}
 
+/* Zugangs-Sperre der Zentrale */
+#lockScreen{
+  position:fixed;inset:0;z-index:100;background:var(--bg-base);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+#lockScreen[hidden]{display:none}
+#lockScreen .lock-box{
+  width:100%;max-width:360px;text-align:center;
+  background:linear-gradient(180deg,var(--surface),var(--surface-2));
+  border:1px solid var(--border-strong);border-radius:var(--radius);
+  padding:30px 26px;box-shadow:var(--shadow);
+}
+#lockScreen .logo{margin:0 auto 14px;width:52px;height:52px;border-radius:16px}
+#lockScreen h1{font-size:17px;font-weight:800;margin-bottom:4px}
+#lockScreen p{font-size:12.5px;color:var(--text-faint);font-weight:600;margin-bottom:18px}
+#lockScreen input{
+  width:100%;padding:13px;border-radius:12px;text-align:center;font-size:20px;letter-spacing:.4em;
+  background:var(--bg-deep);border:1px solid var(--border);color:var(--text);outline:none;font-weight:800;
+}
+#lockScreen input:focus{border-color:var(--accent-line)}
+#lockScreen .err{color:var(--accent-hi);font-size:12px;font-weight:700;margin-top:10px;min-height:16px}
+#lockScreen button{
+  width:100%;margin-top:14px;padding:12px;border-radius:12px;font-weight:800;
+  background:linear-gradient(135deg,var(--accent-hi),var(--accent));color:#fff;
+}
+body.locked>*:not(#lockScreen){filter:blur(6px);pointer-events:none;user-select:none}
+
 /* Roter Ausfall-Alarm */
 #alarmBar{display:none}
 #alarmBar.on{
@@ -475,6 +502,18 @@ select.sel{
 </head>
 <body>
 
+<div id="lockScreen" hidden>
+  <div class="lock-box">
+    <div class="logo" id="lockLogo"></div>
+    <h1>Zentrale gesperrt</h1>
+    <p>Nur für das Büro der Fahrschule Krebs.<br>Zugangscode eingeben (Standard: 1234).</p>
+    <input id="lockPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••"
+      onkeydown="if(event.key==='Enter')tryUnlock()">
+    <div class="err" id="lockErr"></div>
+    <button onclick="tryUnlock()">Entsperren</button>
+  </div>
+</div>
+
 <header>
   <div class="logo" id="brandLogo"></div>
   <div class="brand"><b>Fahrschule Krebs</b><span>Admin-Zentrale · Webseiten-Management</span></div>
@@ -626,6 +665,32 @@ function ic(name){return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"
 document.querySelectorAll('[data-ic]').forEach(el=>{el.innerHTML=ic(el.getAttribute('data-ic'));el.style.display='inline-flex';});
 document.getElementById('brandLogo').innerHTML=ic('steering');
 
+/* ── Zugangsschutz der Zentrale ──────────────────────────────────────
+   Einfache Rollentrennung für den Demo-Betrieb: Schüler & Fahrlehrer
+   haben ihre eigenen Apps, die Zentrale verlangt diesen Code.
+   Code hier ändern: */
+const ADMIN_PIN='1234';
+function tryUnlock(){
+  const inp=document.getElementById('lockPin');
+  if(inp.value===ADMIN_PIN){
+    try{sessionStorage.setItem('fk_admin_unlocked','1');}catch(e){}
+    document.getElementById('lockScreen').hidden=true;
+    document.body.classList.remove('locked');
+  } else {
+    document.getElementById('lockErr').textContent='Falscher Code – bitte erneut versuchen.';
+    inp.value=''; inp.focus();
+  }
+}
+(function(){
+  let ok=false; try{ok=sessionStorage.getItem('fk_admin_unlocked')==='1';}catch(e){}
+  if(!ok){
+    document.getElementById('lockScreen').hidden=false;
+    document.getElementById('lockLogo').innerHTML=ic('steering');
+    document.body.classList.add('locked');
+    setTimeout(()=>{try{document.getElementById('lockPin').focus();}catch(e){}},80);
+  }
+})();
+
 /* ════════════════════════════════════════════════════════════════════
    1 · Klassen-Regeln (gespiegelt aus der Schüler-App / FahrschAusbO)
 ════════════════════════════════════════════════════════════════════ */
@@ -699,7 +764,7 @@ function nextDateForDow(dow,hour,offsetWeeks){
   d.setDate(now.getDate()+add+(offsetWeeks||0)*7); d.setHours(hour,0,0,0);
   return d;
 }
-function matchingSlots(verf,fl){
+function matchingSlots(verf,fl,taken){
   if(!verf||!fl) return [];
   const out=[];
   [0,1].forEach(w=>{
@@ -708,6 +773,7 @@ function matchingSlots(verf,fl){
         if(verf[d]&&verf[d][p]&&fl.plan[d]&&fl.plan[d][p]){
           const date=nextDateForDow(d,PERIOD_HOURS[p],w);
           if(isAbsentToday(fl)&&date.toDateString()===new Date().toDateString())return;
+          if(taken&&taken.has(date.toISOString()))return; /* Überbuchungsschutz */
           out.push({iso:date.toISOString(),date,dow:d,period:p,
             label:`${DAY_FULL[d]} ${PERIOD_FULL[p].toLowerCase()}`,
             sub:date.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'})+' · '+String(PERIOD_HOURS[p]).padStart(2,'0')+':00 Uhr · '+fl.name});
@@ -1317,7 +1383,7 @@ function render(){
           ?(new Date(s.app.naechsteFahrstunde)<=new Date()
             ?`<span class="flag bad">${ic('flag-checkered')}Fahrt bestätigen!</span>`
             :`<span class="flag ok">${ic('calendar-check')}Termin ${new Date(s.app.naechsteFahrstunde).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}</span>`)
-          :(()=>{const n=matchingSlots(s.app.verfuegbarkeit,instructorOf(s)).length;return n?`<span class="flag warn">${ic('sparkles')}${n} Termin-Vorschläge – absegnen</span>`:'';})())
+          :(()=>{const n=matchingSlots(s.app.verfuegbarkeit,instructorOf(s),takenFor(s)).length;return n?`<span class="flag warn">${ic('sparkles')}${n} Termin-Vorschläge – absegnen</span>`:'';})())
         :''}
         ${off>0?`<span class="flag ${off>=100?'bad':'warn'}">${ic('banknote')}${fmtEuro(off)} offen</span>`:`<span class="flag ok">${ic('check')}bezahlt</span>`}
         ${docs.length?`<span class="flag warn">${ic('file-warning')}${docs.length} Nachweis${docs.length>1?'e':''} offen</span>`:`<span class="flag ok">${ic('check')}Nachweise</span>`}
@@ -1464,7 +1530,7 @@ function renderDetail(){
     <div class="panel" id="matchPanel"><h3>${ic('sparkles')}Smart-Matching – Termin bestätigen</h3>
       ${(()=>{
         const flObj=instructorOf(s);
-        const slots=matchingSlots(s.app.verfuegbarkeit,flObj);
+        const slots=matchingSlots(s.app.verfuegbarkeit,flObj,takenFor(s));
         const cur=s.app.naechsteFahrstunde;
         let html='';
         if(cur){
@@ -1643,6 +1709,16 @@ function addItem(id){
   toast('Posten hinzugefügt');
   render();
 }
+/* Überbuchungsschutz: bestätigte Termine des Fahrlehrers eines Schülers,
+   die anderen Schülern gehören – diese Slots sind blockiert. */
+function takenFor(s){
+  const fl=instructorOf(s), set=new Set();
+  allStudents().forEach(o=>{
+    if(o.live&&o.id!==s.id&&o.app&&o.app.naechsteFahrstunde&&instructorOf(o).id===fl.id)
+      set.add(o.app.naechsteFahrstunde);
+  });
+  return set;
+}
 function confirmRide(mode){
   const s=byId(selectedId); if(!s||!s.live){toast('Kein Live-Schüler ausgewählt');return;}
   const st=liveStateOf(s); if(!st||!st.naechsteFahrstunde){toast('Kein geplanter Termin vorhanden');return;}
@@ -1665,6 +1741,11 @@ function confirmRide(mode){
 }
 function confirmSlot(iso,label){
   const s=byId(selectedId); if(!s||!s.live){toast('Kein Live-Schüler ausgewählt');return;}
+  const fl=instructorOf(s);
+  if(takenFor(s).has(iso)){
+    toast(`Konflikt: ${fl.name} ist zu diesem Termin bereits verplant – bitte anderen Slot wählen`);
+    render(); return;
+  }
   const ok=writeLiveFor(s,st=>{st.naechsteFahrstunde=iso;});
   if(!ok){toast('App-Daten nicht erreichbar');return;}
   addNoteSilent(s.id,`Fahrstunde bestätigt: ${label} · ${fmtDate(iso)}`);
