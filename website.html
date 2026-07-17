@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#050507">
+<title>REDLINE · APEX · TITAN — Elite-Fahrschulen</title>
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   CINEMATIC SCROLL · Off-Black + Crimson
+════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#050507; --bg2:#0A0A0E; --panel:#101014;
+  --red:#DC143C; --red-hi:#FF2D55; --red-dim:rgba(220,20,60,.16);
+  --ink:#F5F2EE; --ink-dim:#9A948E; --ink-faint:#57524E;
+  --serif:Georgia,'Times New Roman',serif;
+  --sans:-apple-system,'Segoe UI',Inter,Roboto,'Helvetica Neue',Arial,sans-serif;
+  --cond:'Arial Narrow','Segoe UI',Impact,sans-serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:auto}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;line-height:1.5}
+body.theme-redline{--brandfont:var(--serif)}
+body.theme-apex{--brandfont:var(--sans)}
+body.theme-titan{--brandfont:var(--cond)}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+a{color:inherit}
+
+/* ── Fahrzeugwahl (Gate) ─────────────────────────────────────────── */
+#gate{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 20px;position:relative;overflow:hidden}
+#gate::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(900px 500px at 50% 110%,rgba(220,20,60,.14),transparent 65%)}
+.gate-eyebrow{font-size:12px;letter-spacing:.55em;text-transform:uppercase;color:var(--red);
+  font-weight:700;margin-bottom:18px;position:relative}
+.gate-title{font-family:var(--serif);font-size:clamp(30px,5.4vw,64px);font-weight:700;
+  letter-spacing:-.01em;text-align:center;position:relative}
+.gate-sub{color:var(--ink-dim);margin:14px 0 46px;font-size:15px;text-align:center;position:relative}
+.gate-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px;
+  width:min(1080px,100%);position:relative}
+.gate-card{
+  position:relative;border:1px solid rgba(245,242,238,.09);border-radius:4px;
+  background:linear-gradient(180deg,#0C0C10,#08080B);padding:0 0 26px;text-align:center;
+  transition:transform .45s cubic-bezier(.22,1,.36,1),border-color .3s;overflow:hidden;
+}
+.gate-card:hover{transform:translateY(-8px);border-color:rgba(220,20,60,.55)}
+.gate-card:hover .gate-cv{filter:drop-shadow(0 0 26px rgba(220,20,60,.55))}
+.gate-card canvas{width:100%;height:190px;display:block;transition:filter .3s}
+.gate-brand{font-family:var(--serif);font-size:23px;font-weight:700;letter-spacing:.04em}
+.gate-brand i{font-style:normal;color:var(--red)}
+.gate-klasse{font-size:11px;letter-spacing:.4em;text-transform:uppercase;color:var(--ink-faint);
+  font-weight:700;margin:8px 0 18px}
+.gate-enter{display:inline-block;border:1px solid var(--red);color:var(--red);
+  padding:11px 30px;font-size:12px;letter-spacing:.3em;text-transform:uppercase;font-weight:700;
+  transition:all .25s}
+.gate-card:hover .gate-enter{background:var(--red);color:#fff;box-shadow:0 0 30px rgba(220,20,60,.4)}
+
+/* ── Experience-Grundgerüst ──────────────────────────────────────── */
+#experience{display:none}
+body.entered #gate{display:none}
+body.entered #experience{display:block}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;
+  padding:18px 28px;mix-blend-mode:normal;
+  background:linear-gradient(180deg,rgba(5,5,7,.85),transparent)}
+.topbar .tb-brand{font-family:var(--brandfont,var(--serif));font-weight:700;font-size:17px;letter-spacing:.06em}
+.topbar .tb-brand i{font-style:normal;color:var(--red)}
+.topbar .tb-back{margin-left:auto;font-size:11px;letter-spacing:.25em;text-transform:uppercase;
+  color:var(--ink-dim);font-weight:700;border:1px solid rgba(245,242,238,.15);padding:8px 16px;border-radius:2px}
+.topbar .tb-back:hover{color:var(--ink);border-color:var(--red)}
+.progressbar{position:fixed;top:0;left:0;height:2px;background:linear-gradient(90deg,var(--red),var(--red-hi));
+  width:0;z-index:50;box-shadow:0 0 12px rgba(220,20,60,.8)}
+
+/* Scrub-Sektionen: hohe Sektion + sticky Bühne */
+.scrub{position:relative}
+.scrub .stage{position:sticky;top:0;height:100vh;overflow:hidden;display:flex;
+  align-items:center;justify-content:center}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%}
+.stage .overlay{position:relative;z-index:5;text-align:center;padding:0 20px;pointer-events:none}
+.overlay .pill{display:inline-block;font-size:11px;letter-spacing:.5em;text-transform:uppercase;
+  color:var(--red);font-weight:700;margin-bottom:20px}
+.overlay h1{font-family:var(--brandfont,var(--serif));font-size:clamp(34px,6.5vw,86px);
+  font-weight:700;letter-spacing:.01em;line-height:1.06;text-shadow:0 0 60px rgba(0,0,0,.9)}
+.overlay h1 i{font-style:normal;color:var(--red)}
+.overlay .tag{color:var(--ink-dim);font-size:clamp(14px,1.6vw,19px);margin-top:16px;letter-spacing:.06em}
+.scroll-hint{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:6;
+  font-size:10px;letter-spacing:.45em;text-transform:uppercase;color:var(--ink-faint);font-weight:700;
+  animation:hint 2.2s ease-in-out infinite}
+@keyframes hint{0%,100%{opacity:.4;transform:translateX(-50%) translateY(0)}50%{opacity:1;transform:translateX(-50%) translateY(7px)}}
+
+/* Text-Sektion (Mission) */
+.mission{min-height:92vh;display:flex;align-items:center;justify-content:center;
+  padding:120px 22px;position:relative}
+.mission::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(700px 380px at 18% 30%,rgba(220,20,60,.08),transparent 60%)}
+.mission-inner{max-width:800px;text-align:center;position:relative}
+.mission h2{font-family:var(--brandfont,var(--serif));font-size:clamp(26px,4vw,52px);font-weight:700;
+  line-height:1.25;opacity:0;transform:translateY(36px);transition:all 1s cubic-bezier(.22,1,.36,1)}
+.mission h2 i{font-style:normal;color:var(--red)}
+.mission p{color:var(--ink-dim);font-size:16.5px;margin-top:26px;opacity:0;transform:translateY(36px);
+  transition:all 1s .18s cubic-bezier(.22,1,.36,1)}
+.mission.seen h2,.mission.seen p{opacity:1;transform:none}
+.rule{width:56px;height:1px;background:var(--red);margin:34px auto 0;opacity:0;transition:opacity 1s .4s}
+.mission.seen .rule{opacity:1}
+
+/* Dashboard-Sektion: UI-Overlay */
+.dash-ui{position:absolute;z-index:6;left:50%;bottom:9vh;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:14px;width:min(560px,92vw);
+  pointer-events:auto}
+.dash-ui .du-t{font-family:var(--brandfont,var(--serif));font-size:clamp(19px,2.6vw,30px);font-weight:700;text-align:center}
+.dash-ui .du-s{font-size:12.5px;color:var(--ink-dim);letter-spacing:.14em;text-transform:uppercase;font-weight:700}
+.btn-red{display:inline-flex;align-items:center;gap:10px;background:var(--red);color:#fff;
+  padding:15px 34px;font-size:12.5px;letter-spacing:.24em;text-transform:uppercase;font-weight:800;
+  border-radius:2px;box-shadow:0 0 34px rgba(220,20,60,.4);transition:all .25s;text-decoration:none}
+.btn-red:hover{background:var(--red-hi);box-shadow:0 0 54px rgba(255,45,85,.55);transform:translateY(-2px)}
+.btn-line{display:inline-flex;align-items:center;gap:10px;border:1px solid rgba(245,242,238,.25);color:var(--ink);
+  padding:14px 30px;font-size:12px;letter-spacing:.24em;text-transform:uppercase;font-weight:700;
+  border-radius:2px;transition:all .25s;text-decoration:none}
+.btn-line:hover{border-color:var(--red);color:var(--red)}
+
+/* Exploded: Spec-Callouts */
+.callout{position:absolute;z-index:6;max-width:250px;opacity:0;transform:translateY(18px);
+  transition:all .7s cubic-bezier(.22,1,.36,1);pointer-events:none}
+.callout.show{opacity:1;transform:none}
+.callout .cnum{font-family:var(--brandfont,var(--serif));font-size:13px;color:var(--red);
+  letter-spacing:.3em;font-weight:700}
+.callout .ct{font-family:var(--brandfont,var(--serif));font-size:clamp(17px,2vw,23px);font-weight:700;margin:5px 0 4px}
+.callout .cd{font-size:12.5px;color:var(--ink-dim)}
+.callout::before{content:'';display:block;width:34px;height:1px;background:var(--red);margin-bottom:12px;
+  box-shadow:0 0 10px rgba(220,20,60,.9)}
+.co-1{top:16vh;left:6vw}.co-2{top:16vh;right:6vw;text-align:right}
+.co-2::before{margin-left:auto}
+.co-3{bottom:14vh;left:50%;transform:translate(-50%,18px);text-align:center}
+.co-3.show{transform:translate(-50%,0)}
+.co-3::before{margin:0 auto 12px}
+@media(max-width:760px){
+  .co-1{top:10vh;left:18px}.co-2{top:10vh;right:18px}.callout{max-width:170px}
+}
+
+/* CTA */
+.cta{min-height:100vh;display:flex;align-items:center;justify-content:center;
+  padding:120px 22px;position:relative;overflow:hidden}
+.cta::before{content:'';position:absolute;inset:0;
+  background:radial-gradient(760px 460px at 50% 0%,rgba(220,20,60,.13),transparent 62%)}
+.cta-inner{max-width:620px;width:100%;text-align:center;position:relative}
+.cta h2{font-family:var(--brandfont,var(--serif));font-size:clamp(28px,4.4vw,56px);font-weight:700;line-height:1.15}
+.cta h2 i{font-style:normal;color:var(--red)}
+.cta p{color:var(--ink-dim);margin:18px 0 36px;font-size:15.5px}
+.cta-form{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.cta-form input{
+  flex:1;min-width:220px;background:rgba(255,255,255,.045);border:1px solid rgba(245,242,238,.14);
+  color:var(--ink);padding:15px 18px;font-size:14px;border-radius:2px;outline:none;font-family:var(--sans);
+}
+.cta-form input:focus{border-color:var(--red)}
+.cta-form button{white-space:nowrap}
+.cta-ok{margin-top:20px;color:var(--red-hi);font-weight:700;font-size:13.5px;letter-spacing:.08em;
+  opacity:0;transition:opacity .5s}
+.cta-ok.show{opacity:1}
+.cta-links{margin-top:44px;display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
+footer{padding:36px 20px 46px;text-align:center;color:var(--ink-faint);font-size:12px;
+  border-top:1px solid rgba(245,242,238,.06);letter-spacing:.08em}
+footer b{color:var(--ink-dim)}
+</style>
+</head>
+<body>
+
+<!-- ════════ SCHRITT 1 · FAHRZEUGWAHL ════════ -->
+<section id="gate">
+  <div class="gate-eyebrow">Elite-Fahrschulen · Fulda</div>
+  <h1 class="gate-title">Wähle deine Maschine.</h1>
+  <p class="gate-sub">Drei Marken. Eine Philosophie: Schwarz. Rot. Legendär.</p>
+  <div class="gate-grid">
+    <button class="gate-card" onclick="enter('redline')">
+      <canvas class="gate-cv" data-model="car"></canvas>
+      <div class="gate-brand">REDLINE <i>PRECISION</i></div>
+      <div class="gate-klasse">Auto · Klasse B</div>
+      <span class="gate-enter">Eintreten</span>
+    </button>
+    <button class="gate-card" onclick="enter('apex')">
+      <canvas class="gate-cv" data-model="bike"></canvas>
+      <div class="gate-brand">APEX <i>RED</i></div>
+      <div class="gate-klasse">Motorrad · Klasse A</div>
+      <span class="gate-enter">Eintreten</span>
+    </button>
+    <button class="gate-card" onclick="enter('titan')">
+      <canvas class="gate-cv" data-model="truck"></canvas>
+      <div class="gate-brand">TITAN <i>RED</i></div>
+      <div class="gate-klasse">LKW · Klasse C/CE</div>
+      <span class="gate-enter">Eintreten</span>
+    </button>
+  </div>
+</section>
+
+<!-- ════════ SCHRITT 2 · CINEMATIC EXPERIENCE ════════ -->
+<div id="experience">
+  <div class="progressbar" id="pbar"></div>
+  <div class="topbar">
+    <div class="tb-brand" id="tbBrand"></div>
+    <button class="tb-back" onclick="leave()">← Fahrzeugwahl</button>
+  </div>
+
+  <!-- 1 · HERO ORBIT (scroll-scrubbed 360°) -->
+  <section class="scrub" id="secHero" style="height:340vh">
+    <div class="stage">
+      <canvas id="cvHero"></canvas>
+      <div class="overlay">
+        <div class="pill" id="heroPill"></div>
+        <h1 id="heroTitle"></h1>
+        <div class="tag" id="heroTag"></div>
+      </div>
+      <div class="scroll-hint">Scrollen · 360°</div>
+    </div>
+  </section>
+
+  <!-- 2 · MISSION -->
+  <section class="mission" id="secMission">
+    <div class="mission-inner">
+      <h2 id="missionTitle"></h2>
+      <p id="missionText"></p>
+      <div class="rule"></div>
+    </div>
+  </section>
+
+  <!-- 3 · COCKPIT / DASHBOARD (scrubbed) -->
+  <section class="scrub" id="secDash" style="height:260vh">
+    <div class="stage">
+      <canvas id="cvDash"></canvas>
+      <div class="dash-ui">
+        <div class="du-t" id="dashTitle"></div>
+        <div class="du-s" id="dashSub"></div>
+        <a class="btn-red" id="dashBtn" href="app.html"></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · EXPLODED ASSEMBLY (scrubbed) -->
+  <section class="scrub" id="secExploded" style="height:300vh">
+    <div class="stage">
+      <canvas id="cvExp"></canvas>
+      <div class="callout co-1" id="co1"><span class="cnum">01</span><div class="ct"></div><div class="cd"></div></div>
+      <div class="callout co-2" id="co2"><span class="cnum">02</span><div class="ct"></div><div class="cd"></div></div>
+      <div class="callout co-3" id="co3"><span class="cnum">03</span><div class="ct"></div><div class="cd"></div></div>
+    </div>
+  </section>
+
+  <!-- 5 · CTA -->
+  <section class="cta" id="secCta">
+    <div class="cta-inner">
+      <h2 id="ctaTitle"></h2>
+      <p id="ctaText"></p>
+      <form class="cta-form" onsubmit="joinWaitlist(event)">
+        <input id="wlName" type="text" placeholder="Dein Name" required>
+        <input id="wlMail" type="email" placeholder="E-Mail-Adresse" required>
+        <button class="btn-red" type="submit" id="ctaBtn"></button>
+      </form>
+      <div class="cta-ok" id="ctaOk">✓ Eingetragen – wir melden uns für deinen Premium-Slot.</div>
+      <div class="cta-links">
+        <a class="btn-line" href="app.html">Zur Schüler-App</a>
+        <a class="btn-line" href="#" onclick="leave();return false">Andere Klasse wählen</a>
+      </div>
+    </div>
+  </section>
+
+  <footer><b id="footBrand"></b> · Ein Angebot der Fahrschule Krebs · Am Bahnhof 3, Fulda</footer>
+</div>
+
+<script>
+'use strict';
+/* ════════════════════════════════════════════════════════════════════
+   MARKEN-DATEN
+════════════════════════════════════════════════════════════════════ */
+const BRANDS={
+  redline:{
+    theme:'theme-redline', model:'car',
+    tb:'REDLINE <i>PRECISION</i>',
+    heroPill:'Klasse B · Elite-Ausbildung',
+    heroTitle:'REDLINE <i>PRECISION</i>',
+    heroTag:'Fahren in Perfektion.',
+    missionTitle:'Deine Ausbildung auf <i>höchstem Niveau.</i>',
+    missionText:'Schwarz. Rot. Legendär. Wir formen keine Fahranfänger – wir formen Präzision. Jede Stunde ein Statement, jede Prüfung eine Formsache.',
+    dashTitle:'Dein Cockpit. Deine Theorie.',
+    dashSub:'Digitale Theorie-Module · Live-Fortschritt',
+    dashBtn:'Theoriestunden jetzt buchen',
+    specs:[
+      ['Modernster Simulator','Trainiere Gefahrensituationen, bevor du sie erlebst – im Vollcockpit-Simulator.'],
+      ['400 PS Flotte','Elektrisch, kompromisslos, makellos gewartet. Du lernst auf dem Besten.'],
+      ['Express-Führerschein','In 14 Tagen zur Prüfung – unser Intensiv-Protokoll macht es möglich.']
+    ],
+    ctaTitle:'Privat-Termin <i>vereinbaren.</i>',
+    ctaText:'Premium-Slots sind streng limitiert. Trage dich in die Warteliste ein – wir kontaktieren dich persönlich.',
+    ctaBtn:'Auf die Warteliste'
+  },
+  apex:{
+    theme:'theme-apex', model:'bike',
+    tb:'APEX <i>RED</i>',
+    heroPill:'Klasse A & A2 · Premium',
+    heroTitle:'APEX <i>RED</i>',
+    heroTag:'Beherrsche die Maschine.',
+    missionTitle:'Vom ersten Kickstart bis zur <i>perfekten Schräglage.</i>',
+    missionText:'Exklusive Einzelausbildung. Kein Gruppenzwang, kein Kompromiss – nur du, dein Instructor und die Straße.',
+    dashTitle:'Theorie-Module: Kurventechnik & Sicherheit',
+    dashSub:'Fahrphysik · Blickführung · Grenzbereich',
+    dashBtn:'Buchen',
+    specs:[
+      ['Klasse A & A2','Vom Leichtkraftrad bis zur offenen Klasse – alle Wege auf zwei Rädern.'],
+      ['Schutzbekleidung inklusive','Helm, Protektoren, Handschuhe – Premium-Ausrüstung gehört bei uns dazu.'],
+      ['High-End Bikes','Aktuelle Maschinen mit Traktionskontrolle und Kurven-ABS.']
+    ],
+    ctaTitle:'Sichere dir deinen <i>Ride.</i>',
+    ctaText:'Premium-Buchung mit garantiertem Wunsch-Instructor. Die Saison-Plätze sind limitiert.',
+    ctaBtn:'Ride sichern'
+  },
+  titan:{
+    theme:'theme-titan', model:'truck',
+    tb:'TITAN <i>RED</i>',
+    heroPill:'Klasse C/CE · Berufskraftfahrer',
+    heroTitle:'TITAN <i>RED</i>',
+    heroTag:'Wahre Größe steuern.',
+    missionTitle:'Deine Karriere als Profi-Fahrer <i>beginnt hier.</i>',
+    missionText:'Luxus-Ausbildung für Titanen. 40 Tonnen Verantwortung, ein Beruf mit Zukunft – und wir bringen dich ans Steuer.',
+    dashTitle:'Verwalte deine Stunden im persönlichen Dashboard.',
+    dashSub:'Telematik · Fahrtenprotokoll · Prüfungs-Tracking',
+    dashBtn:'Dashboard entdecken',
+    specs:[
+      ['Klasse C/CE','Vom Solofahrzeug bis zum 40-Tonnen-Sattelzug – die komplette Profi-Lizenz.'],
+      ['Modernste Telematik','Jede Fahrt digital ausgewertet: Verbrauch, Vorausschau, Präzision.'],
+      ['Job-Garantie inkludiert','Unser Partnernetz aus Speditionen wartet auf dich – vertraglich zugesichert.']
+    ],
+    ctaTitle:'Jetzt <i>Berufsberatung</i> buchen.',
+    ctaText:'Kostenloses Erstgespräch: Förderung, Ablauf, Job-Perspektiven. Direkt mit der Ausbildungsleitung.',
+    ctaBtn:'Beratung buchen'
+  }
+};
+
+/* ════════════════════════════════════════════════════════════════════
+   3D-WIREFRAME-ENGINE (Noir: glühende Kanten auf Schwarz)
+   Ein Modell = Liste von Polylinien {p:[[x,y,z]..], c:'red'|'ink'|'dim', w, g:Explosionsgruppe}
+════════════════════════════════════════════════════════════════════ */
+function circle3(cx,cy,cz,r,seg,plane){ /* plane 'xy' (Rad seitlich) oder 'xz' */
+  const p=[];
+  for(let i=0;i<=seg;i++){
+    const a=i/seg*Math.PI*2;
+    if(plane==='xy') p.push([cx+Math.cos(a)*r, cy+Math.sin(a)*r, cz]);
+    else p.push([cx+Math.cos(a)*r, cy, cz+Math.sin(a)*r]);
+  }
+  return p;
+}
+function box3(x1,y1,z1,x2,y2,z2){
+  const c=[[x1,y1,z1],[x2,y1,z1],[x2,y2,z1],[x1,y2,z1],[x1,y1,z2],[x2,y1,z2],[x2,y2,z2],[x1,y2,z2]];
+  return [
+    [c[0],c[1],c[2],c[3],c[0]],[c[4],c[5],c[6],c[7],c[4]],
+    [c[0],c[4]],[c[1],c[5]],[c[2],c[6]],[c[3],c[7]]
+  ];
+}
+function wheelAt(x,y,z,r,g){
+  const L=[];
+  L.push({p:circle3(x,y,z,r,26,'xy'),c:'ink',w:1.6,g});
+  L.push({p:circle3(x,y,z,r*.62,22,'xy'),c:'red',w:2,g});       /* rote Felge */
+  for(let s=0;s<5;s++){const a=s/5*Math.PI*2;
+    L.push({p:[[x+Math.cos(a)*r*.15,y+Math.sin(a)*r*.15,z],[x+Math.cos(a)*r*.58,y+Math.sin(a)*r*.58,z]],c:'red',w:1.3,g});}
+  return L;
+}
+function sideProfile(pts,z1,z2,c,w,g){ /* Profil auf beiden Seiten + Querverbinder */
+  const L=[{p:pts.map(([x,y])=>[x,y,z1]),c,w,g},{p:pts.map(([x,y])=>[x,y,z2]),c,w,g}];
+  pts.forEach(([x,y],i)=>{ if(i%2===0) L.push({p:[[x,y,z1],[x,y,z2]],c:'dim',w:1,g}); });
+  return L;
+}
+
+function carModel(){
+  const L=[];
+  /* Karosserie-Profil (x nach rechts, y nach oben) */
+  const prof=[[-2.05,.34],[-2.1,.62],[-1.72,.7],[-1.28,1.06],[-.2,1.16],[.86,1.02],[1.6,.74],[2.08,.62],[2.12,.4],[1.9,.28],[1.42,.24],[-1.5,.24],[-1.94,.28],[-2.05,.34]];
+  L.push(...sideProfile(prof,-.82,.82,'ink',1.8,0));
+  /* Fenster-Linie */
+  const win=[[-1.22,.72],[-1.1,.98],[-.2,1.07],[.76,.95],[1.28,.74]];
+  L.push(...sideProfile(win,-.78,.78,'dim',1.1,0));
+  /* LED-Streifen vorn + hinten (rot) */
+  L.push({p:[[2.1,.55,-.7],[2.14,.55,0],[2.1,.55,.7]],c:'red',w:2.6,g:3});
+  L.push({p:[[-2.09,.52,-.72],[-2.12,.52,0],[-2.09,.52,.72]],c:'red',w:2.6,g:3});
+  /* Räder */
+  L.push(...wheelAt(-1.32,.34,-.84,.35,1)); L.push(...wheelAt(-1.32,.34,.84,.35,1));
+  L.push(...wheelAt(1.34,.34,-.84,.35,1));  L.push(...wheelAt(1.34,.34,.84,.35,1));
+  /* Boden-Glow-Linie */
+  L.push({p:[[-1.9,.22,0],[1.9,.22,0]],c:'red',w:1,g:2});
+  return L;
+}
+function bikeModel(){
+  const L=[];
+  L.push(...wheelAt(-1.02,.5,0,.5,1));
+  L.push(...wheelAt(1.02,.5,0,.5,1));
+  /* Rahmen (rot – "red metallic frame") */
+  L.push({p:[[-1.02,.5,0],[-.42,1.05,0],[.32,1.02,0],[.84,.72,0],[1.02,.5,0]],c:'red',w:2.4,g:0});
+  L.push({p:[[-.42,1.05,0],[-.1,.55,0],[.32,1.02,0]],c:'red',w:1.8,g:0});
+  /* Tank + Sitz */
+  L.push({p:[[-.5,1.06,0],[-.05,1.22,0],[.34,1.06,0]],c:'ink',w:2,g:2});
+  L.push({p:[[-1.15,1.02,0],[-.55,1.12,0]],c:'ink',w:2,g:2});
+  /* Gabel + Lenker */
+  L.push({p:[[1.02,.5,0],[.62,1.28,0]],c:'ink',w:2,g:3});
+  L.push({p:[[.62,1.28,-.42],[.62,1.28,.42]],c:'ink',w:2,g:3});
+  L.push({p:[[.66,1.34,-.42],[.62,1.28,-.42]],c:'dim',w:1.4,g:3});
+  L.push({p:[[.66,1.34,.42],[.62,1.28,.42]],c:'dim',w:1.4,g:3});
+  /* Scheinwerfer (rote LED) */
+  L.push({p:circle3(.9,1.12,0,.1,10,'xy'),c:'red',w:2.2,g:3});
+  /* Motorblock */
+  box3(-.42,.36,-.22,.3,.72,.22).forEach(p=>L.push({p,c:'dim',w:1.2,g:2}));
+  /* Kette (rot) */
+  L.push({p:[[-1.02,.28,.08],[-.1,.4,.08]],c:'red',w:1.4,g:1});
+  return L;
+}
+function truckModel(){
+  const L=[];
+  /* Zugmaschine */
+  box3(1.05,.42,-.85,2.2,1.72,.85).forEach(p=>L.push({p,c:'ink',w:1.8,g:0}));
+  /* Windschutzscheibe */
+  L.push({p:[[2.2,1.06,-.72],[2.2,1.5,-.72],[2.2,1.5,.72],[2.2,1.06,.72],[2.2,1.06,-.72]],c:'dim',w:1.2,g:0});
+  /* Roter Grill */
+  L.push({p:[[2.21,.62,-.7],[2.21,.62,.7]],c:'red',w:2.6,g:3});
+  L.push({p:[[2.21,.78,-.7],[2.21,.78,.7]],c:'red',w:2.2,g:3});
+  L.push({p:[[2.21,.94,-.7],[2.21,.94,.7]],c:'red',w:1.8,g:3});
+  /* Auflieger */
+  box3(-2.35,.62,-.85,.9,1.86,.85).forEach(p=>L.push({p,c:'ink',w:1.6,g:2}));
+  L.push({p:[[-2.35,1.24,-.86],[.9,1.24,-.86]],c:'red',w:1.2,g:2});
+  L.push({p:[[-2.35,1.24,.86],[.9,1.24,.86]],c:'red',w:1.2,g:2});
+  /* Räder */
+  L.push(...wheelAt(1.62,.34,-.86,.33,1)); L.push(...wheelAt(1.62,.34,.86,.33,1));
+  L.push(...wheelAt(-1.05,.34,-.86,.33,1)); L.push(...wheelAt(-1.05,.34,.86,.33,1));
+  L.push(...wheelAt(-1.78,.34,-.86,.33,1)); L.push(...wheelAt(-1.78,.34,.86,.33,1));
+  return L;
+}
+const MODELS={car:carModel(),bike:bikeModel(),truck:truckModel()};
+/* Explosions-Vektoren je Gruppe */
+const EXPL={0:[0,.0,0],1:[0,-1.1,2.1],2:[0,1.4,0],3:[1.9,.35,0]};
+
+/* Partikel (roter Staub) */
+const DUST=[];for(let i=0;i<70;i++)DUST.push({x:Math.random(),y:Math.random(),s:.4+Math.random()*1.6,v:.02+Math.random()*.06,o:.08+Math.random()*.3});
+
+function drawModel(cv,model,opts){
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=cv.clientWidth,H=cv.clientHeight;
+  if(cv.width!==W*dpr||cv.height!==H*dpr){cv.width=W*dpr;cv.height=H*dpr;}
+  const ctx=cv.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const {rotY=0,rotX=.22,scale=1,explode=0,dust=0,t=0,floor=true}=opts;
+  /* roter Bodennebel */
+  if(floor){
+    const g=ctx.createRadialGradient(W/2,H*.78,10,W/2,H*.78,W*.42);
+    g.addColorStop(0,'rgba(220,20,60,.13)');g.addColorStop(1,'rgba(220,20,60,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  }
+  if(dust>0){
+    DUST.forEach(d=>{
+      const y=(d.y+t*d.v)%1;
+      ctx.globalAlpha=d.o*dust*(0.4+0.6*Math.sin((t*2+d.x*9)));
+      ctx.fillStyle='#DC143C';
+      ctx.beginPath();ctx.arc(d.x*W,y*H,d.s,0,7);ctx.fill();
+    });
+    ctx.globalAlpha=1;
+  }
+  const S=Math.min(W,H)/5.6*scale, cx=W/2, cy=H*.56;
+  const cy0=1.1, cosY=Math.cos(rotY),sinY=Math.sin(rotY),cosX=Math.cos(rotX),sinX=Math.sin(rotX);
+  function proj(p,ex){
+    let x=p[0]+ex[0]*explode, y=p[1]-cy0+ex[1]*explode, z=p[2]+ex[2]*explode;
+    const x1=x*cosY - z*sinY, z1=x*sinY + z*cosY;
+    const y1=y*cosX - z1*sinX, z2=y*sinX + z1*cosX;
+    const per=1/(1+z2*.14);
+    return [cx+x1*S*per, cy-y1*S*per, per];
+  }
+  const COLORS={red:'#DC143C',ink:'rgba(245,242,238,.88)',dim:'rgba(245,242,238,.28)'};
+  /* zwei Durchläufe: erst Glow, dann Kern */
+  [1,0].forEach(pass=>{
+    model.forEach(line=>{
+      const ex=EXPL[line.g||0]||EXPL[0];
+      ctx.beginPath();
+      line.p.forEach((pt,i)=>{const [x,y]=proj(pt,ex); i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+      if(pass){ /* Glow */
+        if(line.c!=='red')return;
+        ctx.strokeStyle='rgba(220,20,60,.85)';
+        ctx.lineWidth=line.w+1.5;ctx.shadowColor='#FF2D55';ctx.shadowBlur=16;
+      } else {
+        ctx.shadowBlur=line.c==='red'?7:0;ctx.shadowColor='#DC143C';
+        ctx.strokeStyle=COLORS[line.c]||COLORS.ink;ctx.lineWidth=line.w;
+      }
+      ctx.stroke();
+    });
+  });
+  ctx.shadowBlur=0;
+  /* Bodenreflexions-Ellipse */
+  if(floor){
+    ctx.strokeStyle='rgba(220,20,60,.35)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.ellipse(cx,cy+S*1.18,S*2.35,S*.34,0,0,7);ctx.stroke();
+  }
+}
+
+/* Cockpit-Szene (Tacho, Nadel scrollgesteuert) */
+function drawDash(cv,p,t,brand){
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=cv.clientWidth,H=cv.clientHeight;
+  if(cv.width!==W*dpr||cv.height!==H*dpr){cv.width=W*dpr;cv.height=H*dpr;}
+  const ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  /* rotes Ambient */
+  const g=ctx.createRadialGradient(W/2,H*.45,30,W/2,H*.45,W*.6);
+  g.addColorStop(0,'rgba(220,20,60,'+(0.10+p*0.10)+')');g.addColorStop(1,'rgba(220,20,60,0)');
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const cx=W/2, cy=H*.5, R=Math.min(W,H)*.3;
+  const a0=Math.PI*.78, a1=Math.PI*2.22;
+  /* Skalenbogen */
+  ctx.lineCap='round';
+  ctx.strokeStyle='rgba(245,242,238,.14)';ctx.lineWidth=8;
+  ctx.beginPath();ctx.arc(cx,cy,R,a0,a1);ctx.stroke();
+  /* aktiver Bogen glüht mit Scroll */
+  ctx.strokeStyle='#DC143C';ctx.shadowColor='#FF2D55';ctx.shadowBlur=22;ctx.lineWidth=8;
+  ctx.beginPath();ctx.arc(cx,cy,R,a0,a0+(a1-a0)*p);ctx.stroke();
+  ctx.shadowBlur=0;
+  /* Ticks + km/h */
+  const maxV=brand==='titan'?120:260;
+  for(let i=0;i<=13;i++){
+    const a=a0+(a1-a0)*i/13, big=i%2===0;
+    const r1=R*(big?.86:.9),r2=R*.97;
+    ctx.strokeStyle=big?'rgba(245,242,238,.75)':'rgba(245,242,238,.3)';
+    ctx.lineWidth=big?2.5:1.2;
+    ctx.beginPath();
+    ctx.moveTo(cx+Math.cos(a)*r1,cy+Math.sin(a)*r1);
+    ctx.lineTo(cx+Math.cos(a)*r2,cy+Math.sin(a)*r2);ctx.stroke();
+    if(big){
+      ctx.fillStyle='rgba(245,242,238,.55)';
+      ctx.font='700 '+Math.round(R*.085)+'px Arial';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(Math.round(maxV*i/13),cx+Math.cos(a)*R*.72,cy+Math.sin(a)*R*.72);
+    }
+  }
+  /* Nadel */
+  const na=a0+(a1-a0)*Math.min(1,p*1.04);
+  ctx.strokeStyle='#FF2D55';ctx.lineWidth=3.5;ctx.shadowColor='#FF2D55';ctx.shadowBlur=18;
+  ctx.beginPath();ctx.moveTo(cx-Math.cos(na)*R*.1,cy-Math.sin(na)*R*.1);
+  ctx.lineTo(cx+Math.cos(na)*R*.8,cy+Math.sin(na)*R*.8);ctx.stroke();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#DC143C';ctx.beginPath();ctx.arc(cx,cy,R*.05,0,7);ctx.fill();
+  /* Digital-Anzeige + Logo erscheint */
+  ctx.textAlign='center';
+  ctx.fillStyle='rgba(245,242,238,.95)';
+  ctx.font='800 '+Math.round(R*.24)+'px Arial';
+  ctx.fillText(Math.round(maxV*Math.min(1,p*1.04)),cx,cy+R*.42);
+  ctx.fillStyle='rgba(245,242,238,.4)';ctx.font='700 '+Math.round(R*.07)+'px Arial';
+  ctx.fillText('km/h',cx,cy+R*.56);
+  ctx.globalAlpha=Math.max(0,Math.min(1,(p-.15)*2.2));
+  ctx.fillStyle='#DC143C';ctx.shadowColor='#FF2D55';ctx.shadowBlur=14;
+  ctx.font='700 '+Math.round(R*.13)+'px Georgia';
+  const label=brand==='redline'?'REDLINE':brand==='apex'?'APEX':'TITAN';
+  ctx.fillText(label,cx,cy-R*.34);
+  ctx.shadowBlur=0;ctx.globalAlpha=1;
+  /* Cockpit-Rahmenlinien */
+  ctx.strokeStyle='rgba(245,242,238,.08)';ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(cx,cy,R*1.16,0,7);ctx.stroke();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SEITEN-LOGIK: Gate, Scroll-Scrub, Waitlist
+════════════════════════════════════════════════════════════════════ */
+let brand=null, T0=performance.now();
+function el(id){return document.getElementById(id);}
+function enter(key){
+  brand=BRANDS[key]; brand.key=key;
+  document.body.className='entered '+brand.theme;
+  el('tbBrand').innerHTML=brand.tb;
+  el('heroPill').textContent=brand.heroPill;
+  el('heroTitle').innerHTML=brand.heroTitle;
+  el('heroTag').textContent=brand.heroTag;
+  el('missionTitle').innerHTML=brand.missionTitle;
+  el('missionText').textContent=brand.missionText;
+  el('dashTitle').textContent=brand.dashTitle;
+  el('dashSub').textContent=brand.dashSub;
+  el('dashBtn').textContent=brand.dashBtn;
+  el('ctaTitle').innerHTML=brand.ctaTitle;
+  el('ctaText').textContent=brand.ctaText;
+  el('ctaBtn').textContent=brand.ctaBtn;
+  el('footBrand').innerHTML=brand.tb;
+  brand.specs.forEach((s,i)=>{
+    const c=el('co'+(i+1));
+    c.querySelector('.ct').textContent=s[0];
+    c.querySelector('.cd').textContent=s[1];
+  });
+  try{history.replaceState(null,'','#'+key);}catch(e){}
+  window.scrollTo(0,0);
+}
+function leave(){
+  brand=null;document.body.className='';
+  try{history.replaceState(null,'','#');}catch(e){}
+  window.scrollTo(0,0);
+}
+function joinWaitlist(e){
+  e.preventDefault();
+  const list=JSON.parse(localStorage.getItem('fk_waitlist')||'[]');
+  list.push({brand:brand?brand.key:'',name:el('wlName').value,mail:el('wlMail').value,ts:new Date().toISOString()});
+  localStorage.setItem('fk_waitlist',JSON.stringify(list));
+  el('ctaOk').classList.add('show');
+  el('wlName').value='';el('wlMail').value='';
+  setTimeout(()=>el('ctaOk').classList.remove('show'),5000);
+}
+
+/* Scroll-Fortschritt innerhalb einer Scrub-Sektion (0..1) */
+function scrubP(sec){
+  const r=sec.getBoundingClientRect();
+  const total=r.height-window.innerHeight;
+  if(total<=0)return 0;
+  return Math.max(0,Math.min(1,-r.top/total));
+}
+window.__debug={hero:0,dash:0,exp:0};
+
+function frame(now){
+  const t=(now-T0)/1000;
+  /* Gate-Vorschau-Turntables laufen immer */
+  if(!document.body.classList.contains('entered')){
+    document.querySelectorAll('.gate-cv').forEach(cv=>{
+      drawModel(cv,MODELS[cv.dataset.model],{rotY:t*.5,rotX:.2,scale:.72,dust:0,floor:false,t});
+    });
+  } else if(brand){
+    /* Fortschrittsbalken */
+    const doc=document.documentElement;
+    el('pbar').style.width=(window.scrollY/(doc.scrollHeight-window.innerHeight)*100)+'%';
+    /* 1 · Hero: 360° Scrub + leichte Eigenrotation */
+    const pH=scrubP(el('secHero'));
+    window.__debug.hero=pH;
+    const heroVisible=el('secHero').getBoundingClientRect().bottom>0;
+    if(heroVisible)
+      drawModel(el('cvHero'),MODELS[brand.model],{rotY:pH*Math.PI*2 + t*.03,rotX:.24,scale:1.06,dust:.9,t});
+    /* Titel weich ausblenden beim Drehen */
+    const ov=el('secHero').querySelector('.overlay');
+    ov.style.opacity=String(Math.max(0,1-pH*2.4));
+    ov.style.transform='translateY('+(-pH*70)+'px)';
+    /* 2 · Mission Reveal */
+    const m=el('secMission');
+    if(m.getBoundingClientRect().top<window.innerHeight*.62)m.classList.add('seen');
+    /* 3 · Dashboard Scrub */
+    const dRect=el('secDash').getBoundingClientRect();
+    if(dRect.bottom>0&&dRect.top<window.innerHeight){
+      const pD=scrubP(el('secDash'));window.__debug.dash=pD;
+      drawDash(el('cvDash'),pD,t,brand.key);
+    }
+    /* 4 · Exploded Scrub: Teile fügen sich zusammen */
+    const eRect=el('secExploded').getBoundingClientRect();
+    if(eRect.bottom>0&&eRect.top<window.innerHeight){
+      const pE=scrubP(el('secExploded'));window.__debug.exp=pE;
+      drawModel(el('cvExp'),MODELS[brand.model],{
+        rotY:.7+pE*1.5, rotX:.3, scale:.94,
+        explode:Math.max(0,1-pE*1.25), dust:.35, t
+      });
+      el('co1').classList.toggle('show',pE>.22);
+      el('co2').classList.toggle('show',pE>.45);
+      el('co3').classList.toggle('show',pE>.68);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* Deep-Link: #redline / #apex / #titan */
+const h=(location.hash||'').replace('#','');
+if(BRANDS[h])enter(h);
+</script>
+</body>
+</html>

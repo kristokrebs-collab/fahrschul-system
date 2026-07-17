@@ -154,6 +154,7 @@ if __name__ == '__main__':
     print(f'  Zentrale (Admin):  http://localhost:{port}/dashboard.html')
     print(f'  Schüler-App:       http://{ip}:{port}/app.html')
     print(f'  Fahrlehrer-App:    http://{ip}:{port}/fahrlehrer.html')
+    print(f'  Cockpit-Pro-Site:  http://localhost:{port}/cockpit-pro.html')
     print('  (Handy im gleichen WLAN: die zweite Adresse öffnen)')
     print('  Beenden mit Strg+C')
     print('══════════════════════════════════════════════════════')

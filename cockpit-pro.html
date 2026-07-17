@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KREBS COCKPIT PRO</title>
+<!-- Typografie: Syne (lokal gebündelt, Google Fonts als Quelle) -->
+<style>
+@font-face{font-family:'Syne';font-weight:700;font-style:normal;font-display:swap;
+  src:url('vendor/syne-latin-700-normal.woff2') format('woff2')}
+@font-face{font-family:'Syne';font-weight:800;font-style:normal;font-display:swap;
+  src:url('vendor/syne-latin-800-normal.woff2') format('woff2')}
+</style>
+<!-- GSAP + ScrollTrigger + Lenis: lokal gebündelt, CDN als automatischer Fallback -->
+<script src="vendor/gsap.min.js"
+  onerror="document.write('<scr'+'ipt src=&quot;https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js&quot;><\/scr'+'ipt>')"></script>
+<script src="vendor/ScrollTrigger.min.js"
+  onerror="document.write('<scr'+'ipt src=&quot;https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js&quot;><\/scr'+'ipt>')"></script>
+<script src="vendor/lenis.min.js"
+  onerror="document.write('<scr'+'ipt src=&quot;https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js&quot;><\/scr'+'ipt>')"></script>
+<style>
+/* ════════════════════════════════════════════════════════════════════
+   KREBS COCKPIT PRO · Fetische-Noir
+   Tiefschwarz #030508 · Acid-Crimson · Rauchglas
+════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#030508; --red:#E60F3C; --red-hi:#FF2D55;
+  --ink:#EDEAE6; --ink-dim:#8A8580; --ink-faint:#4A4642;
+  --syne:'Syne',system-ui,sans-serif;
+  --sans:system-ui,-apple-system,'Segoe UI',Inter,sans-serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html.lenis{height:auto}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--sans);
+  overflow-x:hidden;cursor:none;-webkit-font-smoothing:antialiased;
+}
+::selection{background:var(--red);color:#fff}
+a,button{cursor:none;color:inherit;background:none;border:none;font:inherit}
+
+/* Scroll-Körper: 4 Phasen à 100vh + Auslauf */
+.spacer{height:100vh;position:relative}
+
+/* ── Fixe Ebenen ──────────────────────────────────────────────────── */
+/* Ambient-Glow-Hintergrund */
+#ambient{position:fixed;inset:0;z-index:-3;background:
+  radial-gradient(1100px 700px at 72% 30%,rgba(230,15,60,.10),transparent 62%),
+  radial-gradient(800px 600px at 15% 85%,rgba(230,15,60,.06),transparent 60%),
+  var(--bg)}
+/* Gigantischer Typografie-Loop (DOM-Ebene, zusätzlich in 3D gebrochen) */
+#marquee{position:fixed;top:50%;left:0;z-index:-2;transform:translateY(-50%);
+  white-space:nowrap;font-family:var(--syne);font-weight:800;font-size:16vw;
+  letter-spacing:.02em;color:var(--ink);opacity:.022;pointer-events:none;will-change:transform}
+/* WebGL */
+#gl{position:fixed;inset:0;z-index:1;pointer-events:none}
+/* Filmkorn */
+#grain{position:fixed;inset:0;z-index:30;pointer-events:none;opacity:.05;mix-blend-mode:overlay}
+
+/* ── Custom Cursor (Lerp + difference) ────────────────────────────── */
+#cursor{position:fixed;z-index:200;width:14px;height:14px;border-radius:50%;
+  background:#fff;mix-blend-mode:difference;pointer-events:none;
+  transform:translate(-50%,-50%);transition:width .3s cubic-bezier(.22,1,.36,1),height .3s cubic-bezier(.22,1,.36,1)}
+#cursor.hot{width:74px;height:74px}
+@media(pointer:coarse){#cursor{display:none}body,a,button{cursor:auto}}
+
+/* ── HUD (immer sichtbar) ─────────────────────────────────────────── */
+.hud{position:fixed;z-index:40;font-family:var(--syne);font-weight:700;
+  font-size:11px;letter-spacing:.42em;text-transform:uppercase;color:var(--ink-dim)}
+.hud b{color:var(--red)}
+#hudTL{top:26px;left:30px}
+#hudTR{top:26px;right:30px;text-align:right}
+#hudBL{bottom:26px;left:30px}
+#phaseNo{color:var(--ink);font-size:12px}
+.progress{position:fixed;right:30px;top:50%;transform:translateY(-50%);z-index:40;
+  width:1px;height:180px;background:rgba(237,234,230,.12)}
+.progress i{position:absolute;top:0;left:-1px;width:3px;background:var(--red);
+  box-shadow:0 0 12px var(--red);height:0%}
+
+/* ── Phasen-Overlays ─────────────────────────────────────────────── */
+.ov{position:fixed;inset:0;z-index:20;pointer-events:none;display:flex}
+/* Phase 1 · Intro */
+#ovIntro{align-items:center;justify-content:center;flex-direction:column;text-align:center}
+#ovIntro .kicker{font-family:var(--syne);font-weight:700;font-size:11.5px;letter-spacing:.55em;
+  text-transform:uppercase;color:var(--red);margin-bottom:26px}
+#ovIntro h1{font-family:var(--syne);font-weight:800;font-size:clamp(42px,8.6vw,124px);
+  line-height:.94;letter-spacing:-.015em;text-transform:uppercase}
+#ovIntro h1 em{font-style:normal;-webkit-text-stroke:1px var(--ink);color:transparent}
+#ovIntro .lesson{margin-top:30px;font-size:13px;letter-spacing:.34em;text-transform:uppercase;color:var(--ink-dim)}
+#ovIntro .lesson b{color:var(--ink);font-weight:600}
+/* Phase 2 · Telemetrie */
+#ovTele{align-items:center;padding-left:7vw}
+.tele{max-width:640px}
+.tele .t-eyebrow{font-family:var(--syne);font-weight:700;font-size:11px;letter-spacing:.5em;
+  text-transform:uppercase;color:var(--red);margin-bottom:30px}
+.metric{overflow:hidden;margin-bottom:6px}
+.metric-in{display:flex;align-items:baseline;font-family:var(--syne);font-weight:800;
+  font-size:clamp(20px,2.9vw,38px);text-transform:uppercase;letter-spacing:-.01em;flex-wrap:nowrap;
+  pointer-events:auto;transform:translateY(110%);}
+.metric em{font-style:normal;display:inline-block;max-width:0;overflow:hidden;white-space:nowrap;
+  color:var(--red);font-size:.52em;letter-spacing:.06em;vertical-align:middle;
+  transition:max-width .65s cubic-bezier(.22,1,.36,1),margin .65s cubic-bezier(.22,1,.36,1);
+  text-shadow:0 0 22px rgba(230,15,60,.8)}
+.metric-in:hover em,.metric-in.open em{max-width:340px;margin:0 .35em}
+.tele .t-note{margin-top:34px;font-size:13px;color:var(--ink-dim);max-width:380px;line-height:1.7;
+  opacity:0;transform:translateY(20px)}
+/* Phase 3 · Stealth Map */
+#ovMap{align-items:flex-end;justify-content:flex-start;padding:0 0 12vh 7vw}
+.maplabel .m-eyebrow{font-family:var(--syne);font-weight:700;font-size:11px;letter-spacing:.5em;
+  text-transform:uppercase;color:var(--red);margin-bottom:14px}
+.maplabel h3{font-family:var(--syne);font-weight:800;font-size:clamp(24px,3vw,40px);text-transform:uppercase}
+.maplabel .m-meta{margin-top:12px;font-size:12px;letter-spacing:.26em;text-transform:uppercase;color:var(--ink-dim)}
+/* Phase 4 · Signatur */
+#ovFinal{align-items:center;justify-content:center;flex-direction:column;text-align:center}
+#ovFinal h2{font-family:var(--syne);font-weight:800;font-size:clamp(30px,5.4vw,72px);
+  line-height:1.02;text-transform:uppercase;letter-spacing:-.01em}
+#ovFinal h2 em{font-style:normal;color:var(--red);text-shadow:0 0 40px rgba(230,15,60,.6)}
+#ovFinal .f-sub{margin:22px 0 44px;font-size:13px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-dim)}
+#signBtn{pointer-events:auto;position:relative;display:inline-flex;align-items:center;gap:16px;
+  font-family:var(--syne);font-weight:700;font-size:14px;letter-spacing:.36em;text-transform:uppercase;
+  color:var(--ink);border:1px solid rgba(237,234,230,.28);padding:24px 52px;border-radius:999px;
+  transition:border-color .3s,color .3s;will-change:transform}
+#signBtn::after{content:'';width:9px;height:9px;border-radius:50%;background:var(--red);
+  box-shadow:0 0 14px var(--red);animation:blink 1.6s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+#signBtn:hover{border-color:var(--red);color:#fff}
+/* FK-Monogramm unten rechts (zeichnet sich, dann Glut) */
+#fkWrap{position:fixed;right:34px;bottom:30px;z-index:40;width:92px;height:92px}
+#fkWrap svg{width:100%;height:100%;overflow:visible}
+#fkWrap path{fill:none;stroke:var(--ink);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+#fkWrap.lit path{stroke:var(--red-hi);filter:drop-shadow(0 0 10px var(--red)) drop-shadow(0 0 26px rgba(230,15,60,.7))}
+
+/* ── Signatur-Vollbild (flüssige Tinte) ───────────────────────────── */
+#signPad{position:fixed;inset:0;z-index:100;background:rgba(2,3,6,.97);display:none;
+  flex-direction:column;align-items:center;justify-content:center}
+#signPad.open{display:flex;animation:padIn .5s cubic-bezier(.22,1,.36,1)}
+@keyframes padIn{from{opacity:0}to{opacity:1}}
+#signPad .sp-head{font-family:var(--syne);font-weight:700;font-size:11px;letter-spacing:.5em;
+  text-transform:uppercase;color:var(--red);margin-bottom:16px}
+#signPad h3{font-family:var(--syne);font-weight:800;font-size:clamp(22px,3vw,36px);
+  text-transform:uppercase;margin-bottom:28px}
+#inkCanvas{background:#05070B;border:1px solid rgba(237,234,230,.14);border-radius:6px;
+  touch-action:none;pointer-events:auto;cursor:crosshair}
+#signPad .sp-line{width:min(620px,84vw);height:1px;background:rgba(237,234,230,.25);margin-top:-70px;
+  pointer-events:none;position:relative}
+#signPad .sp-x{position:absolute;left:0;top:-24px;color:var(--ink-faint);font-size:18px;font-family:var(--syne)}
+#signPad .sp-actions{margin-top:64px;display:flex;gap:14px}
+.sp-btn{pointer-events:auto;font-family:var(--syne);font-weight:700;font-size:12px;letter-spacing:.3em;
+  text-transform:uppercase;padding:16px 36px;border-radius:999px;border:1px solid rgba(237,234,230,.25);
+  color:var(--ink-dim);transition:all .25s}
+.sp-btn:hover{color:var(--ink);border-color:var(--ink)}
+.sp-btn.primary{background:var(--red);border-color:var(--red);color:#fff;
+  box-shadow:0 0 34px rgba(230,15,60,.45)}
+.sp-btn.primary:hover{background:var(--red-hi)}
+#signDone{position:fixed;left:50%;bottom:44px;transform:translateX(-50%) translateY(90px);z-index:110;
+  font-family:var(--syne);font-weight:700;font-size:12px;letter-spacing:.3em;text-transform:uppercase;
+  color:var(--red-hi);transition:transform .5s cubic-bezier(.22,1,.36,1);pointer-events:none}
+#signDone.show{transform:translateX(-50%) translateY(0)}
+
+/* Ohne WebGL/CDN trotzdem lesbar */
+#nojs{position:fixed;inset:0;z-index:5;display:none;align-items:center;justify-content:center;
+  text-align:center;color:var(--ink-dim);padding:30px;font-size:14px;line-height:1.8}
+body.no3d #nojs{display:flex}
+</style>
+</head>
+<body>
+
+<!-- Scroll-Höhe: 4 Phasen -->
+<div class="spacer" id="s1"></div>
+<div class="spacer" id="s2"></div>
+<div class="spacer" id="s3"></div>
+<div class="spacer" id="s4"></div>
+
+<!-- Fixe Ebenen -->
+<div id="ambient"></div>
+<div id="marquee">FAHRSCHULE&nbsp;KREBS&nbsp;·&nbsp;COCKPIT&nbsp;PRO&nbsp;·&nbsp;FAHRSCHULE&nbsp;KREBS&nbsp;·&nbsp;COCKPIT&nbsp;PRO&nbsp;·&nbsp;</div>
+<canvas id="gl"></canvas>
+<canvas id="grain"></canvas>
+<div id="cursor"></div>
+
+<!-- HUD -->
+<div class="hud" id="hudTL">KREBS <b>·</b> COCKPIT PRO</div>
+<div class="hud" id="hudTR"><span id="phaseNo">PHASE 01</span> / 04</div>
+<div class="hud" id="hudBL">FULDA <b>·</b> 50.55°N 9.68°O</div>
+<div class="progress"><i id="progFill"></i></div>
+
+<!-- Phase 1 · Intro -->
+<div class="ov" id="ovIntro">
+  <div class="kicker">Digitale Fahrstunden-Akte</div>
+  <h1>KREBS<br><em>COCKPIT&nbsp;PRO</em></h1>
+  <div class="lesson">Lektion 04 · <b>Nachtfahrt</b> · 21:40 Uhr</div>
+</div>
+
+<!-- Phase 2 · Telemetrie -->
+<div class="ov" id="ovTele">
+  <div class="tele">
+    <div class="t-eyebrow">Telemetrie · Fahrstunde 04</div>
+    <div class="metric"><div class="metric-in" data-hover>BREMS<em>92&nbsp;%&nbsp;PRÄZISION</em>PUNKTE</div></div>
+    <div class="metric"><div class="metric-in" data-hover>KURVEN<em>88&nbsp;%&nbsp;LINIENTREUE</em>TECHNIK</div></div>
+    <div class="metric"><div class="metric-in" data-hover>SCHULTER<em>100&nbsp;%&nbsp;ERFASST</em>BLICK</div></div>
+    <div class="t-note" id="teleNote">Mit dem Cursor über eine Metrik fahren – die Auswertung
+    schiebt sich in das Wort. Erfasst durch die Telematik der Fahrschule Krebs.</div>
+  </div>
+</div>
+
+<!-- Phase 3 · Stealth Map -->
+<div class="ov" id="ovMap">
+  <div class="maplabel">
+    <div class="m-eyebrow">Stealth Map · Route der Fahrstunde</div>
+    <h3>Nachtfahrt durch Fulda</h3>
+    <div class="m-meta">18,4 km · 47 min · 3 Gefahrenpunkte gemeistert</div>
+  </div>
+</div>
+
+<!-- Phase 4 · Signatur -->
+<div class="ov" id="ovFinal">
+  <h2>FAHRT <em>ABGESCHLOSSEN.</em></h2>
+  <div class="f-sub">Bestätige die Lektion mit deiner Unterschrift</div>
+  <button id="signBtn" data-hover>Fahrt signieren</button>
+</div>
+
+<!-- FK-Monogramm -->
+<div id="fkWrap">
+  <svg viewBox="0 0 100 100">
+    <path id="fkF" d="M18 88 V16 H52 M18 50 H44"/>
+    <path id="fkK" d="M62 16 V88 M88 16 L62 54 L88 88"/>
+  </svg>
+</div>
+
+<!-- Signatur-Pad -->
+<div id="signPad">
+  <div class="sp-head">Fahrschule Krebs · Lektion 04</div>
+  <h3>Deine Unterschrift</h3>
+  <canvas id="inkCanvas"></canvas>
+  <div class="sp-line"><span class="sp-x">✕</span></div>
+  <div class="sp-actions">
+    <button class="sp-btn" id="inkClear" data-hover>Löschen</button>
+    <button class="sp-btn" id="inkCancel" data-hover>Abbrechen</button>
+    <button class="sp-btn primary" id="inkConfirm" data-hover>Bestätigen</button>
+  </div>
+</div>
+<div id="signDone">✓ Lektion 04 signiert &amp; archiviert</div>
+
+<div id="nojs">KREBS COCKPIT PRO benötigt eine Internetverbindung<br>
+für die 3D-Engine (Three.js CDN). Bitte online öffnen.</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   BASIS-EBENE (ohne Module): Cursor, Marquee, Korn, Signatur, Magnetik
+════════════════════════════════════════════════════════════════════ */
+'use strict';
+const lerp=(a,b,t)=>a+(b-a)*t;
+
+/* Custom Cursor mit Trägheit */
+const cur=document.getElementById('cursor');
+let mx=innerWidth/2,my=innerHeight/2,cx=mx,cy=my;
+addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+document.querySelectorAll('[data-hover],a,button').forEach(el=>{
+  el.addEventListener('mouseenter',()=>cur.classList.add('hot'));
+  el.addEventListener('mouseleave',()=>cur.classList.remove('hot'));
+});
+/* Metrik-Reveal: Wort teilt sich, Wert schiebt sich hinein */
+document.querySelectorAll('.metric-in').forEach(el=>{
+  el.addEventListener('mouseenter',()=>el.classList.add('open'));
+  el.addEventListener('mouseleave',()=>el.classList.remove('open'));
+});
+
+/* Magnetic Button */
+const signBtn=document.getElementById('signBtn');
+function magnet(){
+  const r=signBtn.getBoundingClientRect();
+  const bx=r.left+r.width/2, by=r.top+r.height/2;
+  const dx=mx-bx, dy=my-by, d=Math.hypot(dx,dy);
+  const pull=d<180?(1-d/180)*.42:0;
+  signBtn.style.transform=`translate(${dx*pull}px,${dy*pull}px)`;
+}
+
+/* Marquee (DOM-Ebene) */
+const mq=document.getElementById('marquee');
+let mqW=0,mqX=0;
+function measureMq(){mqW=mq.scrollWidth/2;}
+addEventListener('resize',measureMq);measureMq();
+
+/* Filmkorn */
+const grain=document.getElementById('grain'),gctx=grain.getContext('2d');
+function drawGrain(){
+  const w=grain.width=Math.floor(innerWidth/3),h=grain.height=Math.floor(innerHeight/3);
+  const img=gctx.createImageData(w,h);
+  for(let i=0;i<img.data.length;i+=4){const v=Math.random()*255;img.data[i]=img.data[i+1]=img.data[i+2]=v;img.data[i+3]=28;}
+  gctx.putImageData(img,0,0);
+}
+setInterval(drawGrain,120);drawGrain();
+grain.style.width='100%';grain.style.height='100%';
+
+/* Basis-rAF */
+(function baseLoop(){
+  cx=lerp(cx,mx,.16);cy=lerp(cy,my,.16);
+  cur.style.left=cx+'px';cur.style.top=cy+'px';
+  mqX-=0.6; if(-mqX>=mqW)mqX+=mqW;
+  mq.style.transform=`translateY(-50%) translateX(${mqX}px)`;
+  magnet();
+  requestAnimationFrame(baseLoop);
+})();
+
+/* ── Signatur-Pad: flüssige Tinte (Geschwindigkeit + Druck → Breite) ── */
+const pad=document.getElementById('signPad'),ink=document.getElementById('inkCanvas');
+const ictx=ink.getContext('2d');
+let drawing=false,lx=0,ly=0,lw=3,strokes=0;
+function padSize(){
+  const w=Math.min(680,innerWidth*.86),h=Math.min(300,innerHeight*.42);
+  const dpr=Math.min(2,devicePixelRatio||1);
+  ink.width=w*dpr;ink.height=h*dpr;ink.style.width=w+'px';ink.style.height=h+'px';
+  ictx.setTransform(dpr,0,0,dpr,0,0);
+  ictx.lineCap=ictx.lineJoin='round';
+}
+function inkStart(e){
+  drawing=true;const p=inkPos(e);lx=p.x;ly=p.y;lw=3;
+}
+function inkPos(e){
+  const r=ink.getBoundingClientRect();
+  return {x:e.clientX-r.left,y:e.clientY-r.top,p:e.pressure&&e.pressure>0?e.pressure:.5};
+}
+function inkMove(e){
+  if(!drawing)return;
+  const p=inkPos(e);
+  const dist=Math.hypot(p.x-lx,p.y-ly);
+  /* Tinte: schnell = dünn, langsam = satt; Druck verstärkt */
+  const target=Math.max(1.2,Math.min(7,(9-dist*.32))*(.5+p.p));
+  lw=lerp(lw,target,.35);
+  ictx.strokeStyle='#EDEAE6';
+  ictx.shadowColor='rgba(230,15,60,.5)';ictx.shadowBlur=4;
+  ictx.lineWidth=lw;
+  ictx.beginPath();ictx.moveTo(lx,ly);ictx.lineTo(p.x,p.y);ictx.stroke();
+  lx=p.x;ly=p.y;strokes++;
+}
+function inkEnd(){drawing=false;}
+ink.addEventListener('pointerdown',e=>{ink.setPointerCapture(e.pointerId);inkStart(e);});
+ink.addEventListener('pointermove',inkMove);
+ink.addEventListener('pointerup',inkEnd);
+ink.addEventListener('pointerleave',inkEnd);
+signBtn.addEventListener('click',()=>{pad.classList.add('open');padSize();strokes=0;
+  ictx.clearRect(0,0,ink.width,ink.height);});
+document.getElementById('inkClear').addEventListener('click',()=>{padSize();strokes=0;});
+document.getElementById('inkCancel').addEventListener('click',()=>pad.classList.remove('open'));
+document.getElementById('inkConfirm').addEventListener('click',()=>{
+  if(strokes<4)return; /* leere Signatur nicht annehmen */
+  try{
+    const list=JSON.parse(localStorage.getItem('fk_signatures')||'[]');
+    list.push({lesson:'Lektion 04 · Nachtfahrt',ts:new Date().toISOString(),png:ink.toDataURL('image/png')});
+    localStorage.setItem('fk_signatures',JSON.stringify(list.slice(-10)));
+  }catch(e){}
+  pad.classList.remove('open');
+  const d=document.getElementById('signDone');
+  d.classList.add('show');setTimeout(()=>d.classList.remove('show'),4200);
+});
+window.__signOpen=()=>pad.classList.contains('open');
+</script>
+
+<script type="module">
+/* ════════════════════════════════════════════════════════════════════
+   3D-EBENE: Obsidian-Monolith (Rauchglas) + Marquee/Map als Textur
+   dahinter → echte Lichtbrechung durch transmission
+════════════════════════════════════════════════════════════════════ */
+/* three.js: lokal gebündelt, CDN-Kette als Fallback */
+let THREE=null;
+for(const srcUrl of ['./vendor/three.module.js',
+  'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+  'https://unpkg.com/three@0.160.0/build/three.module.js']){
+  try{ THREE=await import(srcUrl); break; }catch(e){}
+}
+/* Auf GSAP/Lenis warten (klassische Skripte) */
+for(let i=0;i<120&&!(window.gsap&&window.ScrollTrigger&&window.Lenis);i++)
+  await new Promise(r=>setTimeout(r,50));
+
+try{
+  if(!THREE||!window.gsap||!window.ScrollTrigger||!window.Lenis) throw new Error('Bibliotheken fehlen');
+  /* ── Renderer & Szene ── */
+  const canvas=document.getElementById('gl');
+  const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(1.75,devicePixelRatio||1));
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.15;
+  const scene=new THREE.Scene();
+  const cam=new THREE.PerspectiveCamera(34,1,0.1,100);
+  cam.position.set(0,0,10);
+  const pmrem=new THREE.PMREMGenerator(renderer);
+  /* Studio-Noir-Umgebung: dunkler Raum, kaltes Toplight, Crimson-Streifen */
+  const ecv=document.createElement('canvas');ecv.width=512;ecv.height=256;
+  const ec=ecv.getContext('2d');
+  const eg=ec.createLinearGradient(0,0,0,256);
+  eg.addColorStop(0,'#2A3140');eg.addColorStop(.42,'#07080C');eg.addColorStop(1,'#020304');
+  ec.fillStyle=eg;ec.fillRect(0,0,512,256);
+  ec.fillStyle='rgba(255,255,255,.85)';ec.fillRect(70,26,120,16);   /* Softbox 1 */
+  ec.fillStyle='rgba(210,225,255,.6)';ec.fillRect(330,40,90,12);    /* Softbox 2 */
+  ec.fillStyle='rgba(230,15,60,.8)';ec.fillRect(0,150,512,7);       /* Crimson-Band */
+  const envTex=new THREE.CanvasTexture(ecv);
+  envTex.mapping=THREE.EquirectangularReflectionMapping;
+  envTex.colorSpace=THREE.SRGBColorSpace;
+  scene.environment=pmrem.fromEquirectangular(envTex).texture;
+
+  /* ── Licht: kalt + Crimson-Akzent ── */
+  scene.add(new THREE.AmbientLight(0x223,0.5));
+  const key=new THREE.DirectionalLight(0xdfe8ff,2.2);key.position.set(4,6,6);scene.add(key);
+  const redA=new THREE.PointLight(0xE60F3C,26,30);redA.position.set(-5,2,3);scene.add(redA);
+  const redB=new THREE.PointLight(0xFF2D55,14,26);redB.position.set(5,-3,2);scene.add(redB);
+
+  /* ── Hintergrund-Ebene 1: Marquee-Text als Canvas-Textur ── */
+  const mcv=document.createElement('canvas');mcv.width=2048;mcv.height=512;
+  const mctx=mcv.getContext('2d');
+  function paintMarquee(){
+    mctx.clearRect(0,0,2048,512);
+    mctx.fillStyle='rgba(237,234,230,0.5)';
+    mctx.font='800 300px Syne, sans-serif';
+    mctx.textBaseline='middle';
+    mctx.fillText('FAHRSCHULE KREBS · COCKPIT PRO · FAHRSCHULE KREBS ·',0,275);
+  }
+  const mTex=new THREE.CanvasTexture(mcv);
+  mTex.wrapS=THREE.RepeatWrapping;mTex.colorSpace=THREE.SRGBColorSpace;
+  const mPlane=new THREE.Mesh(
+    new THREE.PlaneGeometry(30,7.5),
+    new THREE.MeshBasicMaterial({map:mTex,transparent:true,opacity:.16,depthWrite:false}));
+  mPlane.position.set(0,0,-4);scene.add(mPlane);
+  document.fonts?document.fonts.ready.then(()=>{paintMarquee();mTex.needsUpdate=true;}):paintMarquee();
+  paintMarquee();
+
+  /* ── Hintergrund-Ebene 2: Stealth-Map (prozedural, Route glüht) ── */
+  const kcv=document.createElement('canvas');kcv.width=kcv.height=1024;
+  const k=kcv.getContext('2d');
+  (function paintMap(){
+    k.fillStyle='#04060A';k.fillRect(0,0,1024,1024);
+    /* Straßennetz: deterministisch */
+    let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+    k.strokeStyle='rgba(140,150,165,.16)';
+    for(let i=0;i<26;i++){
+      k.lineWidth=rnd()<.25?2.4:1.1;
+      k.beginPath();
+      let x=rnd()*1024,y=rnd()*1024;k.moveTo(x,y);
+      for(let s2=0;s2<5;s2++){x+=(rnd()-.5)*440;y+=(rnd()-.5)*440;k.lineTo(x,y);}
+      k.stroke();
+    }
+    /* Ring */
+    k.strokeStyle='rgba(140,150,165,.22)';k.lineWidth=2.6;
+    k.beginPath();k.ellipse(512,512,330,260,.3,0,7);k.stroke();
+    /* Route der Fahrstunde: Neon-Crimson */
+    const route=[[150,840],[300,700],[380,720],[470,560],[620,520],[660,380],[560,300],[700,190],[880,170]];
+    k.lineCap=k.lineJoin='round';
+    k.shadowColor='#FF2D55';k.shadowBlur=26;
+    k.strokeStyle='#E60F3C';k.lineWidth=7;
+    k.beginPath();route.forEach((p,i)=>i?k.lineTo(p[0],p[1]):k.moveTo(p[0],p[1]));k.stroke();
+    k.shadowBlur=0;k.strokeStyle='#FF9DB2';k.lineWidth=2;
+    k.beginPath();route.forEach((p,i)=>i?k.lineTo(p[0],p[1]):k.moveTo(p[0],p[1]));k.stroke();
+    /* Start/Ziel */
+    k.fillStyle='#FF2D55';
+    [[150,840],[880,170]].forEach(p=>{k.beginPath();k.arc(p[0],p[1],10,0,7);k.fill();});
+  })();
+  const kTex=new THREE.CanvasTexture(kcv);kTex.colorSpace=THREE.SRGBColorSpace;
+  const kPlane=new THREE.Mesh(
+    new THREE.PlaneGeometry(13,13),
+    new THREE.MeshBasicMaterial({map:kTex,transparent:true,opacity:0,depthWrite:false}));
+  kPlane.position.set(0,-0.4,-2.4);scene.add(kPlane);
+
+  /* ── Der Obsidian-Monolith (Rauchglas, PBR) ── */
+  const glass=new THREE.MeshPhysicalMaterial({
+    color:0x0A0C12, metalness:0, roughness:0.12,
+    transmission:1.0, ior:1.6, thickness:3.0,
+    clearcoat:1, clearcoatRoughness:.08,
+    attenuationColor:new THREE.Color(0x27060F), attenuationDistance:2.6,
+    envMapIntensity:1.4, transparent:true, opacity:1
+  });
+  /* Obsidian-Slab: abgerundetes Rechteck extrudiert + Fase = geschliffener Glasblock */
+  function roundedRectShape(w,h,r){
+    const s=new THREE.Shape(),x=-w/2,y=-h/2;
+    s.moveTo(x+r,y);
+    s.lineTo(x+w-r,y);s.absarc(x+w-r,y+r,r,-Math.PI/2,0);
+    s.lineTo(x+w,y+h-r);s.absarc(x+w-r,y+h-r,r,0,Math.PI/2);
+    s.lineTo(x+r,y+h);s.absarc(x+r,y+h-r,r,Math.PI/2,Math.PI);
+    s.lineTo(x,y+r);s.absarc(x+r,y+r,r,Math.PI,Math.PI*1.5);
+    return s;
+  }
+  const monoGeo=new THREE.ExtrudeGeometry(roundedRectShape(2.5,4.1,0.42),{
+    depth:.36,bevelEnabled:true,bevelThickness:.1,bevelSize:.1,bevelSegments:5,curveSegments:14});
+  monoGeo.center();
+  const mono=new THREE.Mesh(monoGeo,glass);
+  const monoGrp=new THREE.Group();monoGrp.add(mono);scene.add(monoGrp);
+  /* rote Kante: feiner Ring im Glas */
+  const edge=new THREE.Mesh(
+    new THREE.TorusGeometry(0.5,0.018,10,60),
+    new THREE.MeshBasicMaterial({color:0xE60F3C}));
+  edge.position.z=0.29;mono.add(edge);
+
+  /* ── Responsiv ── */
+  function resize(){
+    const w=innerWidth,h=innerHeight;
+    renderer.setSize(w,h,false);
+    cam.aspect=w/h;cam.updateProjectionMatrix();
+  }
+  addEventListener('resize',resize);resize();
+
+  /* ════════════════════════════════════════════════════════════════
+     SCROLL-STORYTELLING: Lenis + GSAP ScrollTrigger
+  ════════════════════════════════════════════════════════════════ */
+  const lenis=new Lenis({lerp:.075,wheelMultiplier:1.05,smoothWheel:true});
+  lenis.on('scroll',ScrollTrigger.update);
+  gsap.ticker.add(t=>lenis.raf(t*1000));
+  gsap.ticker.lagSmoothing(0);
+  gsap.registerPlugin(ScrollTrigger);
+
+  /* Zielzustand des Monolithen, von der Timeline gescrubbt */
+  const S={x:0,y:0,rotY:0,rotX:0,scale:1,fade:1,map:0,bgDim:0};
+  const master=gsap.timeline({
+    scrollTrigger:{trigger:document.body,start:'top top',end:'bottom bottom',scrub:1.2}
+  });
+  /* PHASE 1 → 2: schwerfällig nach rechts drehen */
+  master.to(S,{x:2.6,rotY:0.8,bgDim:.35,duration:1,ease:'none'},0);
+  /* PHASE 2 → 3: zurück zur Mitte, flach nach hinten kippen, Karte einblenden */
+  master.to(S,{x:0,rotY:0.15,rotX:-1.35,y:-0.5,scale:1.12,map:1,duration:1,ease:'none'},1);
+  /* PHASE 3 → 4: nach oben in den Schatten entschwinden */
+  master.to(S,{y:3.6,fade:0,scale:.8,map:.25,duration:1,ease:'none'},2);
+
+  /* Overlays pro Phase */
+  gsap.set('#ovTele .t-note',{opacity:0});
+  gsap.to('#ovIntro',{opacity:0,y:-60,scrollTrigger:{trigger:'#s1',start:'top top',end:'80% top',scrub:true}});
+  const tl2=gsap.timeline({scrollTrigger:{trigger:'#s2',start:'top 55%',end:'top 5%',scrub:false,toggleActions:'play none none reverse'}});
+  tl2.to('.metric-in',{y:0,duration:.9,stagger:.12,ease:'power4.out'})
+     .to('#ovTele .t-note',{opacity:1,y:0,duration:.7},'-=.4');
+  gsap.fromTo('#ovTele',{opacity:0},{opacity:1,immediateRender:true,
+    scrollTrigger:{trigger:'#s2',start:'top 85%',end:'top 35%',scrub:true}});
+  gsap.to('#ovTele',{opacity:0,scrollTrigger:{trigger:'#s3',start:'top 70%',end:'top 25%',scrub:true}});
+  gsap.fromTo('#ovMap',{opacity:0,y:40},{opacity:1,y:0,scrollTrigger:{trigger:'#s3',start:'top 45%',end:'top 5%',scrub:true}});
+  gsap.to('#ovMap',{opacity:0,scrollTrigger:{trigger:'#s4',start:'top 70%',end:'top 30%',scrub:true}});
+  gsap.fromTo('#ovFinal',{opacity:0,scale:.96},{opacity:1,scale:1,scrollTrigger:{trigger:'#s4',start:'top 55%',end:'top 8%',scrub:true}});
+  gsap.set('#ovMap',{opacity:0});gsap.set('#ovFinal',{opacity:0});
+
+  /* FK-Monogramm: zeichnet sich über die ganze Reise, glüht am Ende */
+  const fkPaths=[...document.querySelectorAll('#fkWrap path')];
+  fkPaths.forEach(p=>{const L=p.getTotalLength();p.style.strokeDasharray=L;p.style.strokeDashoffset=L;});
+  gsap.to(fkPaths,{strokeDashoffset:0,ease:'none',
+    scrollTrigger:{trigger:document.body,start:'top top',end:'88% bottom',scrub:.6}});
+  ScrollTrigger.create({trigger:'#s4',start:'top 20%',
+    onEnter:()=>document.getElementById('fkWrap').classList.add('lit'),
+    onLeaveBack:()=>document.getElementById('fkWrap').classList.remove('lit')});
+
+  /* HUD: Phase + Fortschritt */
+  const phaseEl=document.getElementById('phaseNo'),prog=document.getElementById('progFill');
+  ScrollTrigger.create({trigger:document.body,start:'top top',end:'bottom bottom',
+    onUpdate:self=>{
+      const p=self.progress;window.__phase=p;
+      prog.style.height=(p*100)+'%';
+      phaseEl.textContent='PHASE 0'+Math.min(4,Math.floor(p*4)+1);
+    }});
+
+  /* Maus-Parallax (träge Neigung) */
+  let pmx=0,pmy=0;
+  addEventListener('mousemove',e=>{
+    pmx=(e.clientX/innerWidth-.5);pmy=(e.clientY/innerHeight-.5);
+  });
+
+  /* ── Render-Loop ── */
+  const clock=new THREE.Clock();
+  let tiltX=0,tiltY=0;
+  renderer.setAnimationLoop(()=>{
+    const t=clock.getElapsedTime();
+    /* Marquee in der 3D-Szene weiterschieben (wird vom Glas gebrochen) */
+    mTex.offset.x=(t*.022)%1;
+    /* Monolith: Scroll-Zustand + Schwebe-Atmung + träge Maus-Neigung */
+    tiltX=lerp3(tiltX,pmy*.22,.04);tiltY=lerp3(tiltY,pmx*.3,.04);
+    monoGrp.position.x=S.x;
+    monoGrp.position.y=S.y+Math.sin(t*.8)*.09;
+    monoGrp.rotation.y=S.rotY+tiltY+Math.sin(t*.4)*.05;
+    monoGrp.rotation.x=S.rotX+tiltX;
+    monoGrp.rotation.z=Math.sin(t*.3)*.03;
+    monoGrp.scale.setScalar(S.scale);
+    glass.opacity=S.fade;edge.material.opacity=S.fade;edge.material.transparent=true;
+    kPlane.material.opacity=S.map*.9;
+    mPlane.material.opacity=.16*(1-S.bgDim*.7)*(S.fade*.6+.4);
+    redA.intensity=26+Math.sin(t*1.7)*6;
+    renderer.render(scene,cam);
+  });
+  function lerp3(a,b,t2){return a+(b-a)*t2;}
+  window.__three=true;
+}catch(err){
+  document.body.classList.add('no3d');
+  console.error('3D-Init fehlgeschlagen:',err);
+}
+</script>
+</body>
+</html>
