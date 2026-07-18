@@ -78,117 +78,109 @@ a{text-decoration:none}
 .orbit:before,.orbit:after{content:"";position:absolute;inset:15%;border:1px solid rgba(255,255,255,.035);border-radius:50%}
 .orbit:after{inset:34%;border-color:rgba(237,21,62,.14);box-shadow:0 0 60px rgba(237,21,62,.07)}
 
-/* Morph shell */
+/* Morph shell — the card that slides in from the side and morphs */
 .morph-shell{position:absolute;left:50%;top:50%;width:320px;height:320px;z-index:8;overflow:hidden;border:1px solid var(--lineStrong);border-radius:160px;background:
-  linear-gradient(150deg,rgba(255,255,255,.09),transparent 28%),
+  linear-gradient(150deg,rgba(255,255,255,.09),transparent 30%),
   linear-gradient(160deg,#1d1f28 0%,#131521 46%,#0a0b10 100%);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 0 90px rgba(255,255,255,.018),0 50px 110px rgba(0,0,0,.6),0 0 80px rgba(237,21,62,.08);
   transform:translate3d(-50%,-50%,0);transform-origin:center;will-change:width,height,border-radius,transform;contain:layout paint;backface-visibility:hidden}
 .morph-shell:before{content:"";position:absolute;inset:-35%;z-index:40;pointer-events:none;background:linear-gradient(112deg,transparent 38%,rgba(255,255,255,.12) 48%,rgba(255,255,255,.02) 54%,transparent 64%);transform:translate3d(calc((var(--scene-x) - .5)*6%),calc((var(--scene-y) - .5)*6%),0) rotate(8deg);opacity:.32}
 .morph-shell:after{content:"";position:absolute;left:9%;right:9%;top:9px;height:1px;z-index:42;background:linear-gradient(90deg,transparent,rgba(255,255,255,.66),transparent);opacity:.38}
-.morph-panel{position:absolute;inset:0;z-index:5;padding:40px 44px;opacity:0;pointer-events:none;display:flex;flex-direction:column;justify-content:center;will-change:opacity,transform}
+.morph-panel{position:absolute;inset:0;z-index:5;padding:34px 36px;opacity:0;pointer-events:none;display:flex;flex-direction:column;justify-content:center;will-change:opacity,transform}
 .morph-panel.active{pointer-events:auto}
+
+/* Card kicker (small, contextual — the big headline lives in the side copy) */
+.card-kicker{font-size:10px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--red2);margin-bottom:2px}
 
 /* Staggered reveals */
 .rise{opacity:0;transform:translateY(13px);transition:opacity .55s var(--ease),transform .55s var(--ease)}
 .morph-panel.active .rise{opacity:1;transform:none}
-.morph-panel.active .rise:nth-child(2){transition-delay:.06s}
 .stagger>*{opacity:0;transform:translateY(15px) scale(.985);transition:opacity .55s var(--ease),transform .55s var(--ease)}
 .morph-panel.active .stagger>*{opacity:1;transform:none}
-.morph-panel.active .stagger>*:nth-child(1){transition-delay:.10s}
-.morph-panel.active .stagger>*:nth-child(2){transition-delay:.16s}
-.morph-panel.active .stagger>*:nth-child(3){transition-delay:.22s}
-.morph-panel.active .stagger>*:nth-child(4){transition-delay:.28s}
-.morph-panel.active .stagger>*:nth-child(5){transition-delay:.34s}
-.morph-panel.active .stagger>*:nth-child(6){transition-delay:.40s}
-.morph-panel.active .stagger>*:nth-child(7){transition-delay:.46s}
-.morph-panel.active .stagger>*:nth-child(8){transition-delay:.52s}
+.morph-panel.active .stagger>*:nth-child(1){transition-delay:.08s}
+.morph-panel.active .stagger>*:nth-child(2){transition-delay:.14s}
+.morph-panel.active .stagger>*:nth-child(3){transition-delay:.20s}
+.morph-panel.active .stagger>*:nth-child(4){transition-delay:.26s}
+.morph-panel.active .stagger>*:nth-child(5){transition-delay:.32s}
+.morph-panel.active .stagger>*:nth-child(6){transition-delay:.38s}
+.morph-panel.active .stagger>*:nth-child(7){transition-delay:.44s}
 
-.panel-kicker{font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--red2)}
-.panel-title{font-family:var(--display);font-size:clamp(36px,4.4vw,66px);font-weight:800;line-height:.86;letter-spacing:0;text-transform:uppercase;margin-top:14px}
-.panel-title em{font-style:normal;color:var(--red2)}
-
-/* Hero — clean FK lockup, no X */
+/* Hero — clean FK lockup */
 .panel-hero{align-items:center;text-align:center}
 .hero-fk{font-family:var(--display);font-size:clamp(72px,9vw,116px);font-weight:900;letter-spacing:-.02em;line-height:1;color:var(--ink);text-shadow:0 0 44px rgba(237,21,62,.32)}
 .hero-line{display:block;width:56px;height:3px;margin:20px auto 0;border-radius:3px;background:linear-gradient(90deg,transparent,var(--red2),transparent);box-shadow:0 0 16px rgba(237,21,62,.6)}
 .hero-system{margin-top:22px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:500}
 .hero-system i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);margin-right:8px;animation:pulse 2.4s ease-in-out infinite}
 
-/* Classes */
-.class-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
-.class-group{padding:17px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.09);transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
-.class-group:hover{border-color:rgba(237,21,62,.34);transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
-.class-group__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
-.class-group__head strong{font-family:var(--display);font-size:24px;font-weight:800;text-transform:uppercase}
-.class-group__head span{font-size:9px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;font-weight:600}
+/* Classes card — 2×2 groups */
+.class-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}
+.class-group{padding:16px;border-radius:16px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
+.class-group:hover{border-color:rgba(237,21,62,.32);transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,0,0,.32)}
+.class-group__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.class-group__head strong{font-family:var(--display);font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.01em}
+.class-group__head span{font-size:9px;letter-spacing:.13em;color:var(--faint);text-transform:uppercase;font-weight:600}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{display:inline-flex;align-items:center;min-height:29px;padding:0 12px;border-radius:999px;background:#0b0c10;border:1px solid rgba(255,255,255,.1);font-size:11px;font-weight:600;transition:background .25s,border-color .25s,color .25s}
+.chip{display:inline-flex;align-items:center;min-height:27px;padding:0 11px;border-radius:999px;background:#0b0c10;border:1px solid rgba(255,255,255,.1);font-size:11px;font-weight:600;transition:background .25s,border-color .25s,color .25s}
 .chip:hover{background:#15161d;border-color:rgba(255,255,255,.2)}
 .chip.hot{background:rgba(237,21,62,.14);border-color:rgba(237,21,62,.36);color:#fff}
 .chip.hot:hover{background:rgba(237,21,62,.22)}
-.class-foot{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,.08)}
-.class-foot span{font-size:12px;color:var(--muted);line-height:1.45}
+.class-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)}
+.class-foot span{font-size:11px;color:var(--muted);line-height:1.4}
 
-/* Digital */
-.digital-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}
-.digital-head .panel-title{font-size:clamp(38px,4vw,58px)}
-.digital-badge{flex:0 0 auto;min-width:132px;padding:14px 16px;border-radius:17px;background:rgba(237,21,62,.12);border:1px solid rgba(237,21,62,.3);text-align:right}
-.digital-badge small{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#ff9bae;font-weight:600}.digital-badge strong{font-family:var(--display);font-size:26px;font-weight:800}
-.digital-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:22px}
-.digital-card{position:relative;padding:17px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);overflow:hidden;transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2);display:flex;flex-direction:column;gap:9px}
-.digital-card:hover{border-color:rgba(255,255,255,.2);transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
+/* Digital card — 2 columns */
+.digital-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.digital-badge{flex:0 0 auto;padding:9px 14px;border-radius:13px;background:rgba(237,21,62,.12);border:1px solid rgba(237,21,62,.3);display:flex;align-items:baseline;gap:8px}
+.digital-badge small{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#ff9bae;font-weight:600}.digital-badge strong{font-family:var(--display);font-size:20px;font-weight:800}
+.digital-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.digital-card{position:relative;padding:15px 16px;border-radius:15px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);overflow:hidden;transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2);display:flex;align-items:baseline;gap:12px}
+.digital-card:hover{border-color:rgba(255,255,255,.2);transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,0,0,.32)}
 .digital-card:before{content:"";position:absolute;left:0;top:0;width:3px;height:100%;background:linear-gradient(var(--red2),transparent);opacity:.55}
-.digital-card b{font-family:var(--display);font-size:28px;font-weight:800;line-height:1;color:var(--ink)}
-.digital-card span{font-size:11px;line-height:1.45;color:var(--muted)}
+.digital-card b{flex:0 0 auto;font-family:var(--display);font-size:26px;font-weight:800;line-height:.9;color:var(--ink);min-width:44px}
+.digital-card span{font-size:11px;line-height:1.4;color:var(--muted)}
 .digital-card em{font-style:normal;color:var(--red2);font-weight:500}
 
-/* Simulator — minimal steering wheel */
-.panel-sim{display:grid;grid-template-columns:.92fr 1.08fr;gap:32px;align-items:center}
-.sim-visual{position:relative;aspect-ratio:1;display:grid;place-items:center;border-radius:34px;background:radial-gradient(circle at 50% 46%,rgba(237,21,62,.13),transparent 62%),linear-gradient(180deg,rgba(255,255,255,.03),transparent 70%);border:1px solid rgba(255,255,255,.06)}
-.sim-wheel-svg{width:74%;max-width:300px;overflow:visible;filter:drop-shadow(0 10px 28px rgba(0,0,0,.45))}
-.sim-wheel-rot{transform-origin:100px 100px;animation:spin 60s linear infinite}
+/* Simulator card — minimal wheel + 2×2 features */
+.panel-sim{align-items:stretch}
+.sim-visual{width:172px;height:172px;margin:12px auto 4px;display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle at 50% 46%,rgba(237,21,62,.14),transparent 64%)}
+.sim-wheel-svg{width:100%;overflow:visible;filter:drop-shadow(0 10px 26px rgba(0,0,0,.45))}
+.sim-wheel-rot{transform-origin:100px 100px;animation:spin 64s linear infinite}
 .sim-wheel-svg .ring{fill:none;stroke:rgba(255,255,255,.18);stroke-width:5}
 .sim-wheel-svg .accent{fill:none;stroke:var(--red2);stroke-width:5;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(237,21,62,.6))}
 .sim-wheel-svg .spoke{stroke:rgba(255,255,255,.2);stroke-width:5;stroke-linecap:round}
 .sim-wheel-svg .hub{fill:none;stroke:rgba(255,255,255,.24);stroke-width:5}
-.sim-copy h3{font-family:var(--display);font-size:clamp(40px,4.4vw,62px);font-weight:800;line-height:.86;text-transform:uppercase}
-.sim-copy h3 em{font-style:normal;color:var(--red2)}
-.sim-copy p{font-size:12px;line-height:1.6;color:var(--muted);margin-top:14px}
-.sim-list{display:grid;gap:10px;margin-top:20px}
-.sim-list li{list-style:none;display:flex;gap:11px;align-items:flex-start;font-size:12px;line-height:1.4;color:var(--ink2)}
-.sim-list i{flex:0 0 auto;width:7px;height:7px;margin-top:5px;border-radius:50%;background:var(--red);box-shadow:0 0 9px var(--red)}
+.sim-list{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:14px}
+.sim-list li{list-style:none;display:flex;gap:10px;align-items:flex-start;font-size:12px;line-height:1.35;color:var(--ink2)}
+.sim-list i{flex:0 0 auto;width:7px;height:7px;margin-top:4px;border-radius:50%;background:var(--red);box-shadow:0 0 9px var(--red)}
 
-/* Price — comparison calculator */
-.panel-price .panel-title{font-size:clamp(36px,4vw,58px)}
-.cmp{display:grid;gap:17px;margin-top:26px}
-.cmp-row{display:grid;gap:9px}
+/* Price card — comparison calculator */
+.cmp{display:grid;gap:16px;margin-top:14px}
+.cmp-row{display:grid;gap:8px}
 .cmp-head{display:flex;justify-content:space-between;align-items:center;gap:14px}
 .cmp-head span,.cmp-head label{font-size:12px;color:var(--muted);font-weight:500}
 .cmp-head em{font-style:normal;color:var(--red2);font-size:10px;font-weight:600}
-.cmp-head b{font-family:var(--display);font-size:23px;font-weight:800;color:var(--ink);white-space:nowrap}
+.cmp-head b{font-family:var(--display);font-size:22px;font-weight:800;color:var(--ink);white-space:nowrap}
 .cmp-head b.krebs{color:var(--red2)}
-.cmp-input{display:inline-flex;align-items:center;gap:6px;font-family:var(--display);font-size:20px;font-weight:700;color:var(--ink)}
-.cmp-input input{width:104px;min-height:40px;border-radius:11px;border:1px solid rgba(255,255,255,.14);background:#090a0e;padding:0 12px;text-align:right;color:#fff;font-family:var(--sans);font-size:14px;font-weight:600;transition:border-color .2s}
+.cmp-input{display:inline-flex;align-items:center;gap:6px;font-family:var(--display);font-size:18px;font-weight:700;color:var(--ink)}
+.cmp-input input{width:96px;min-height:38px;border-radius:11px;border:1px solid rgba(255,255,255,.14);background:#090a0e;padding:0 11px;text-align:right;color:#fff;font-family:var(--sans);font-size:13px;font-weight:600;transition:border-color .2s}
 .cmp-input input:focus{border-color:var(--red2);outline:none}
-.cmp-track{height:15px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);overflow:hidden}
+.cmp-track{height:14px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);overflow:hidden}
 .cmp-bar{display:block;height:100%;width:0;border-radius:999px;transition:width .65s var(--ease)}
 .cmp-bar--avg{background:linear-gradient(90deg,#43454f,#71757f)}
 .cmp-bar--krebs{background:linear-gradient(90deg,var(--red),var(--red2));box-shadow:0 0 18px rgba(237,21,62,.45)}
 .cmp-bar--user{background:linear-gradient(90deg,#2f7d5b,var(--green))}
-.cmp-foot{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:24px}
-.cmp-note{font-size:13px;line-height:1.5;color:var(--ink2);max-width:430px}
+.cmp-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.08)}
+.cmp-note{font-size:12px;line-height:1.5;color:var(--ink2);max-width:340px}
 .cmp-note b{font-weight:700}
 .cmp-note b.good{color:var(--green)}
 .cmp-note b.bad{color:var(--red2)}
 
-/* Special */
-.special-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:24px}
-.special-card{display:flex;align-items:center;gap:14px;padding:16px;border-radius:17px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
-.special-card:hover{border-color:rgba(237,21,62,.3);transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
+/* Special card */
+.special-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.special-card{display:flex;align-items:center;gap:13px;padding:14px;border-radius:15px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
+.special-card:hover{border-color:rgba(237,21,62,.3);transform:translateY(-2px);box-shadow:0 14px 30px rgba(0,0,0,.32)}
 .special-card.span2{grid-column:1 / -1}
-.special-card__icon{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;flex:0 0 auto;background:rgba(237,21,62,.13);border:1px solid rgba(237,21,62,.26);font-family:var(--display);font-size:14px;font-weight:800;color:var(--red2)}
-.special-card strong{display:block;font-family:var(--display);font-size:19px;font-weight:700}.special-card span{display:block;margin-top:3px;font-size:10px;line-height:1.35;color:var(--muted)}
+.special-card__icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto;background:rgba(237,21,62,.13);border:1px solid rgba(237,21,62,.26);font-family:var(--display);font-size:13px;font-weight:800;color:var(--red2)}
+.special-card strong{display:block;font-family:var(--display);font-size:18px;font-weight:700}.special-card span{display:block;margin-top:2px;font-size:10px;line-height:1.3;color:var(--muted)}
 
 /* Final */
 .panel-final{align-items:center;text-align:center}
@@ -197,19 +189,22 @@ a{text-decoration:none}
 .final-ring{position:absolute;inset:12%;border:1px solid rgba(255,255,255,.09);border-radius:50%}.final-ring:before{content:"";position:absolute;inset:18%;border:1px solid rgba(237,21,62,.22);border-radius:50%}
 .panel-final small{margin-top:16px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:500}
 
-/* Scene copy — only hero + final */
-.scene-copy{position:absolute;z-index:12;width:min(520px,40vw);opacity:0;will-change:transform,opacity;pointer-events:none}
+/* Scene copy — big editorial headline on the opposite side of the card */
+.scene-copy{position:absolute;z-index:12;width:min(460px,38vw);opacity:0;will-change:transform,opacity;pointer-events:none}
 .scene-copy.active{pointer-events:auto}
-.copy-left{left:6vw;top:50%;transform:translateY(-50%)}
+.copy-left{left:6vw;top:50%}
+.copy-right{right:6vw;top:50%;text-align:left}
 .copy-final{left:50%;bottom:8%;top:auto;transform:translateX(-50%);width:min(760px,80vw);text-align:center}
-.copy-label{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--red2)}
-.scene-copy h1,.scene-copy h2{font-family:var(--display);font-weight:900;text-transform:uppercase;line-height:.84;letter-spacing:0;margin-top:16px}
-.scene-copy h1{font-size:clamp(62px,7.2vw,116px)}.scene-copy h2{font-size:clamp(48px,5.5vw,84px)}
-.scene-copy h1 span,.scene-copy h2 span{display:block;color:transparent;-webkit-text-stroke:1px rgba(247,244,239,.7)}
+.copy-label{font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--red2)}
+.scene-copy h1,.scene-copy h2{font-family:var(--display);font-weight:900;text-transform:uppercase;line-height:.84;letter-spacing:0;margin-top:14px}
+.scene-copy h1{font-size:clamp(52px,5.6vw,104px)}.scene-copy h2{font-size:clamp(42px,4vw,72px)}
+.scene-copy h1 span,.scene-copy h2 span{display:block;color:transparent;-webkit-text-stroke:1px rgba(247,244,239,.68)}
 .scene-copy h2 em{font-style:normal;color:var(--red2)}
-.scene-copy p{font-size:14px;line-height:1.65;color:var(--muted);max-width:520px;margin-top:22px}
+.scene-copy p{font-size:13px;line-height:1.6;color:var(--muted);max-width:440px;margin-top:18px}
 .copy-final p{margin-left:auto;margin-right:auto}
-.copy-actions{display:flex;flex-wrap:wrap;gap:11px;margin-top:28px}
+.copy-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:18px}
+.copy-pills span{padding:8px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2)}
+.copy-actions{display:flex;flex-wrap:wrap;gap:11px;margin-top:24px}
 .copy-final .copy-actions{justify-content:center}
 
 .btn{--mx:0px;--my:0px;min-height:52px;padding:0 25px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:11px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.045);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;pointer-events:auto;transform:translate(var(--mx),var(--my));transition:background .25s,border-color .25s,box-shadow .25s,transform .25s var(--ease)}
@@ -218,7 +213,7 @@ a{text-decoration:none}
 .btn--primary{background:linear-gradient(135deg,var(--red),var(--red2));border-color:var(--red2);box-shadow:0 12px 30px rgba(237,21,62,.3),inset 0 1px 0 rgba(255,255,255,.22);color:#fff}
 .btn--primary:hover{box-shadow:0 16px 40px rgba(237,21,62,.42),inset 0 1px 0 rgba(255,255,255,.28)}
 .btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8}
-.btn--small{min-height:44px;padding:0 19px;font-size:10px}
+.btn--small{min-height:42px;padding:0 18px;font-size:10px}
 
 /* Chrome */
 .site-head{position:fixed;left:0;right:0;top:0;z-index:80;height:82px;padding:0 30px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-bottom:1px solid transparent;transition:background .35s,border-color .35s,backdrop-filter .35s}
@@ -275,37 +270,38 @@ main{position:relative;z-index:2;pointer-events:none}
 .toast{position:fixed;left:50%;bottom:32px;z-index:450;transform:translate(-50%,100px);padding:15px 23px;border-radius:999px;background:#f4f1ec;color:#090a0d;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;box-shadow:0 16px 45px rgba(0,0,0,.4);transition:transform .45s var(--ease)}.toast.show{transform:translate(-50%,0)}
 
 @media(max-width:1180px){
-  .nav{gap:19px}.nav a{font-size:10px}.scene-copy{width:min(470px,44vw)}.copy-left{left:4vw}
-  .class-grid{gap:9px}.class-group{padding:13px}.digital-card{padding:14px}.morph-panel{padding:32px}
+  .nav{gap:19px}.nav a{font-size:10px}.scene-copy{width:min(420px,42vw)}.copy-left{left:4vw}.copy-right{right:4vw}
+  .morph-panel{padding:30px}
 }
 @media(max-width:900px){
   .nav,.progress-rail,.head-cta{display:none}.site-head{height:70px;padding:0 16px;grid-template-columns:1fr}.brand__mark{width:33px;height:33px}.brand__type{font-size:14px}
   .road-plane{width:220vw;height:74vh;bottom:-29vh;opacity:.4}
   .orbit{width:126vw;top:58%}
   .kinetic-word{font-size:31vw;top:53%}
-  .scene-copy.copy-left{left:20px!important;right:20px!important;top:98px!important;width:auto!important;max-width:none;transform:none!important}
-  .scene-copy.copy-final{left:20px!important;right:20px!important;width:auto!important}
-  .scene-copy h1{font-size:clamp(56px,15vw,82px)}.scene-copy h2{font-size:clamp(46px,12.5vw,70px)}.scene-copy p{font-size:12px;line-height:1.5;margin-top:13px}.copy-actions{margin-top:16px}
-  .panel-title{font-size:42px}.morph-panel{padding:24px}
-  .class-grid{grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}.class-group{padding:12px;border-radius:14px}.class-group__head strong{font-size:18px}.chip{min-height:25px;padding:0 9px;font-size:9px}.class-foot{margin-top:16px;padding-top:14px}.class-foot span{font-size:10px}
-  .digital-head{align-items:flex-start}.digital-badge{min-width:106px;padding:11px}.digital-badge strong{font-size:20px}.digital-grid{grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.digital-card{padding:12px;border-radius:14px}.digital-card b{font-size:21px}.digital-card span{font-size:9px}
-  .panel-sim{grid-template-columns:1fr 1.1fr;gap:16px}.sim-visual{border-radius:24px}.sim-copy h3{font-size:40px}.sim-copy p{font-size:10px}.sim-list{gap:6px}.sim-list li{font-size:10px}
-  .cmp{gap:13px;margin-top:18px}.cmp-head b{font-size:19px}.cmp-input input{width:92px}.cmp-foot{margin-top:16px}.cmp-note{font-size:11px}
-  .special-grid{gap:8px;margin-top:16px}.special-card{padding:12px}.special-card__icon{width:38px;height:38px}.special-card strong{font-size:16px}.special-card span{font-size:9px}
+  .scene-copy{left:20px!important;right:20px!important;top:96px!important;bottom:auto!important;width:auto!important;max-width:none;text-align:left!important;transform:none!important}
+  .scene-copy.copy-final{top:auto!important;bottom:5%!important}
+  .scene-copy h1{font-size:clamp(50px,14vw,76px)}.scene-copy h2{font-size:clamp(42px,11.5vw,64px)}.scene-copy p{font-size:12px;line-height:1.5;margin-top:12px}.copy-actions{margin-top:15px}.copy-pills{margin-top:12px}
+  .scene-copy.copy-final{text-align:center!important}.scene-copy.copy-final p{margin-left:auto;margin-right:auto}.scene-copy.copy-final .copy-actions{justify-content:center}
+  .morph-panel{padding:22px}
+  .class-grid{gap:8px;margin-top:12px}.class-group{padding:12px;border-radius:14px}.class-group__head strong{font-size:18px}.chip{min-height:24px;padding:0 9px;font-size:9px}.class-foot{margin-top:14px;padding-top:12px}.class-foot span{font-size:10px}
+  .digital-badge{padding:8px 11px}.digital-badge strong{font-size:17px}.digital-grid{gap:8px}.digital-card{padding:11px 12px}.digital-card b{font-size:21px;min-width:38px}.digital-card span{font-size:9px}
+  .sim-visual{width:150px;height:150px}.sim-list{gap:8px}.sim-list li{font-size:10px}
+  .cmp{gap:12px;margin-top:12px}.cmp-head b{font-size:19px}.cmp-input input{width:88px}.cmp-foot{margin-top:14px;padding-top:12px}.cmp-note{font-size:11px;max-width:none}
+  .special-grid{gap:8px;margin-top:12px}.special-card{padding:11px}.special-card__icon{width:36px;height:36px}.special-card strong{font-size:15px}.special-card span{font-size:9px}
   .scene-counter{left:17px;bottom:86px}
   .mobile-dock{position:fixed;z-index:100;left:13px;right:13px;bottom:calc(10px + env(safe-area-inset-bottom));height:62px;border-radius:21px;display:flex;align-items:center;justify-content:space-around;background:rgba(11,12,16,.94);border:1px solid rgba(255,255,255,.11);box-shadow:0 14px 42px rgba(0,0,0,.42);backdrop-filter:blur(10px)}
   .mobile-dock button{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;color:var(--faint);cursor:pointer;transition:background .25s,color .25s}.mobile-dock button.active{background:rgba(237,21,62,.14);color:#fff}.mobile-dock svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7}
-  .chapter{min-height:720px;height:110vh}.chapter:first-child{height:118vh}
+  .chapter{min-height:730px;height:112vh}.chapter:first-child{height:120vh}
   .price-table{min-width:720px}.modal__card{padding:24px 18px}.calc-bottom{grid-template-columns:1fr}.contact-grid{grid-template-columns:1fr}
 }
 @media(max-width:560px){
-  .scene-copy h1{font-size:14vw}.scene-copy h2{font-size:11.5vw}.scene-copy p{font-size:11px}.btn{min-height:46px;padding:0 18px;font-size:9px}
-  .morph-panel{padding:19px}.panel-kicker{font-size:9px}.panel-title{font-size:34px;margin-top:10px}
-  .class-grid{grid-template-columns:1fr 1fr;margin-top:12px}.class-group{padding:10px}.class-group__head span{display:none}.class-group__head strong{font-size:16px}.chip{min-height:22px;font-size:8px;padding:0 8px}
-  .digital-head .panel-title{font-size:31px}.digital-badge{min-width:90px;padding:9px}.digital-badge strong{font-size:17px}.digital-grid{grid-template-columns:1fr 1fr;gap:6px}.digital-card{padding:10px}.digital-card b{font-size:18px}.digital-card span{font-size:8px}
-  .panel-sim{grid-template-columns:1fr;gap:14px}.sim-visual{max-width:220px;margin:0 auto}.sim-copy h3{font-size:34px}.sim-copy p{font-size:9px}.sim-list li{font-size:9px}
-  .cmp-head b{font-size:17px}.cmp-input{font-size:16px}.cmp-input input{width:84px;font-size:13px}.cmp-note{font-size:10px}
-  .special-grid{grid-template-columns:1fr;gap:6px}.special-card{padding:10px}.special-card.span2{grid-column:auto}.special-card__icon{width:34px;height:34px;font-size:11px}.special-card strong{font-size:14px}
+  .scene-copy h1{font-size:13.5vw}.scene-copy h2{font-size:11vw}.scene-copy p{font-size:11px}.btn{min-height:46px;padding:0 18px;font-size:9px}
+  .morph-panel{padding:18px}.card-kicker{font-size:9px}
+  .class-grid{grid-template-columns:1fr 1fr}.class-group__head span{display:none}.class-group__head strong{font-size:16px}.chip{min-height:22px;font-size:8px;padding:0 8px}
+  .digital-grid{grid-template-columns:1fr}.digital-card b{font-size:19px}.digital-card span{font-size:9px}
+  .sim-visual{width:132px;height:132px}.sim-list{grid-template-columns:1fr}.sim-list li{font-size:10px}
+  .cmp-head b{font-size:17px}.cmp-input{font-size:16px}.cmp-input input{width:82px;font-size:12px}.cmp-note{font-size:10px}
+  .special-grid{grid-template-columns:1fr}.special-card.span2{grid-column:auto}.special-card__icon{width:34px;height:34px;font-size:11px}.special-card strong{font-size:14px}
   .final-monogram{font-size:72px}
   .scene-counter{font-size:8px}.scene-counter i{width:24px}
   .modal h3{font-size:40px}.competitor-box{display:grid}.competitor-box input{margin-left:0;width:100%}.calc-total strong{font-size:44px}.modal-actions{flex-direction:column}.modal-actions .btn{width:100%}
@@ -348,23 +344,22 @@ main{position:relative;z-index:2;pointer-events:none}
     </article>
 
     <article class="morph-panel panel-classes" data-panel="1">
-      <div class="panel-kicker rise">Führerscheinklassen · Komplettangebot</div>
-      <h3 class="panel-title rise">DEINE KLASSE.<br><em>DEIN WEG.</em></h3>
+      <div class="card-kicker rise">Komplettangebot · A bis D</div>
       <div class="class-grid stagger">
         <section class="class-group"><div class="class-group__head"><strong>PKW</strong><span>Klasse B</span></div><div class="chips"><span class="chip hot">B</span><span class="chip hot">BF17</span><span class="chip">B197</span><span class="chip">B Automatik</span><span class="chip">BE</span><span class="chip">B96</span></div></section>
         <section class="class-group"><div class="class-group__head"><strong>LKW</strong><span>Klasse C</span></div><div class="chips"><span class="chip hot">C</span><span class="chip hot">CE</span><span class="chip">C1</span><span class="chip">C1E</span><span class="chip">C1 / C1E</span></div></section>
         <section class="class-group"><div class="class-group__head"><strong>Zweirad</strong><span>Klasse A</span></div><div class="chips"><span class="chip hot">A1</span><span class="chip hot">A2</span><span class="chip">A</span><span class="chip">AM</span><span class="chip">Mofa</span></div></section>
         <section class="class-group"><div class="class-group__head"><strong>Bus</strong><span>Klasse D</span></div><div class="chips"><span class="chip hot">D</span><span class="chip">DE</span></div></section>
       </div>
-      <div class="class-foot rise"><span>Von der ersten Theorie bis zur Prüfung – persönlich und digital begleitet.</span><button class="btn btn--small btn--primary" data-open-contact>Klasse wählen</button></div>
+      <div class="class-foot rise"><span>Persönlich & digital begleitet – von der Theorie bis zur Prüfung.</span><button class="btn btn--small btn--primary" data-open-contact>Klasse wählen</button></div>
     </article>
 
     <article class="morph-panel panel-digital" data-panel="2">
-      <div class="digital-head rise"><div><div class="panel-kicker">Unser Digitalpaket für dich</div><h3 class="panel-title">MEHR LERNEN.<br><em>WENIGER SUCHEN.</em></h3></div><div class="digital-badge"><small>Klassen</small><strong>A bis D</strong></div></div>
+      <div class="digital-top rise"><div class="card-kicker">Alles in einem System</div><div class="digital-badge"><small>Klassen</small><strong>A–D</strong></div></div>
       <div class="digital-grid stagger">
-        <div class="digital-card"><b>2×</b><span>Fahrsimulatoren für die Klassen <em>B · BE · C · CE</em></span></div>
-        <div class="digital-card"><b>80+</b><span>Prüfungsrelevante Videos für Fulda, Klassen <em>A bis D</em></span></div>
-        <div class="digital-card"><b>9×</b><span>Theorie pro Woche oder kompakt in <em>9 Werktagen</em> · Kl. B/BF17</span></div>
+        <div class="digital-card"><b>2×</b><span>Fahrsimulatoren für <em>B · BE · C · CE</em></span></div>
+        <div class="digital-card"><b>80+</b><span>Prüfungsrelevante Videos für Fulda, <em>Kl. A–D</em></span></div>
+        <div class="digital-card"><b>9×</b><span>Theorie pro Woche oder kompakt in <em>9 Werktagen</em></span></div>
         <div class="digital-card"><b>LIVE</b><span>Preisrechner: unsere Preise <em>vs. Mitbewerber</em></span></div>
         <div class="digital-card"><b>AUDIO</b><span>Hörbuch: Grund- & Zusatzstoff <em>Klasse B</em></span></div>
         <div class="digital-card"><b>16</b><span>E-Book: Techniken gegen <em>Prüfungsangst</em></span></div>
@@ -372,6 +367,7 @@ main{position:relative;z-index:2;pointer-events:none}
     </article>
 
     <article class="morph-panel panel-sim" data-panel="3">
+      <div class="card-kicker rise">Simulator-Ausbildung</div>
       <div class="sim-visual rise" aria-hidden="true">
         <svg class="sim-wheel-svg" viewBox="0 0 200 200">
           <g class="sim-wheel-rot">
@@ -385,12 +381,16 @@ main{position:relative;z-index:2;pointer-events:none}
           <circle cx="100" cy="100" r="5" fill="var(--red2)"/>
         </svg>
       </div>
-      <div class="sim-copy"><div class="panel-kicker rise">Simulator-Ausbildung</div><h3 class="rise">ERST ÜBEN.<br><em>DANN FAHREN.</em></h3><p class="rise">Zwei Fahrsimulatoren schaffen Wiederholbarkeit, Ruhe und einen sicheren Einstieg – bevor Verkehr, Kupplung und Nervosität gleichzeitig anklopfen.</p><ul class="sim-list stagger"><li><i></i><span>Verfügbar für B, BE, C und CE</span></li><li><i></i><span>Manöver gezielt wiederholen</span></li><li><i></i><span>Prüfungssituationen strukturiert vorbereiten</span></li><li><i></i><span>Ideal zur Ergänzung der Praxisstunden</span></li></ul></div>
+      <ul class="sim-list stagger">
+        <li><i></i><span>Verfügbar für B, BE, C und CE</span></li>
+        <li><i></i><span>Manöver gezielt wiederholen</span></li>
+        <li><i></i><span>Prüfungen strukturiert vorbereiten</span></li>
+        <li><i></i><span>Ideal zur Ergänzung der Praxis</span></li>
+      </ul>
     </article>
 
     <article class="morph-panel panel-price" data-panel="4">
-      <div class="panel-kicker rise">Preisvergleich · Klasse B / BF17</div>
-      <h3 class="panel-title rise">GÜNSTIGER ALS<br><em>DER DURCHSCHNITT.</em></h3>
+      <div class="card-kicker rise">Preisvergleich · Klasse B / BF17</div>
       <div class="cmp stagger">
         <div class="cmp-row">
           <div class="cmp-head"><span>Ø Deutschland · Klasse B</span><b>3.500 €</b></div>
@@ -405,19 +405,19 @@ main{position:relative;z-index:2;pointer-events:none}
           <div class="cmp-track"><i class="cmp-bar cmp-bar--user" id="barUser"></i></div>
         </div>
       </div>
-      <div class="cmp-foot rise"><p class="cmp-note" id="cmpNote">Fahrschule Krebs ist <b class="good">410 €</b> günstiger als der Bundesdurchschnitt.</p><button class="btn btn--primary" data-open-price>Detaillierter Rechner</button></div>
+      <div class="cmp-foot rise"><p class="cmp-note" id="cmpNote">Fahrschule Krebs ist <b class="good">410 €</b> günstiger als der Bundesdurchschnitt.</p><button class="btn btn--small btn--primary" data-open-price>Detail-Rechner</button></div>
     </article>
 
     <article class="morph-panel panel-special" data-panel="5">
-      <div class="panel-kicker rise">Spezialausbildung · Seminare · Beruf</div><h3 class="panel-title rise">MEHR ALS<br><em>FÜHRERSCHEIN.</em></h3>
+      <div class="card-kicker rise">Seminare · Beruf · Spezial</div>
       <div class="special-grid stagger">
-        <div class="special-card"><div class="special-card__icon">HA</div><div><strong>Handicap-Ausbildung</strong><span>Individuell abgestimmt und persönlich begleitet</span></div></div>
-        <div class="special-card"><div class="special-card__icon">BKF</div><div><strong>Berufskraftfahrer-Ausbildung</strong><span>Qualifizierung für den professionellen Einsatz</span></div></div>
-        <div class="special-card"><div class="special-card__icon">ST</div><div><strong>Staplerschein</strong><span>Praxisorientierte Ausbildung für den Betrieb</span></div></div>
+        <div class="special-card"><div class="special-card__icon">HA</div><div><strong>Handicap-Ausbildung</strong><span>Individuell & persönlich begleitet</span></div></div>
+        <div class="special-card"><div class="special-card__icon">BKF</div><div><strong>Berufskraftfahrer</strong><span>Qualifizierung für den Beruf</span></div></div>
+        <div class="special-card"><div class="special-card__icon">ST</div><div><strong>Staplerschein</strong><span>Praxisorientiert für den Betrieb</span></div></div>
         <div class="special-card"><div class="special-card__icon">ASF</div><div><strong>ASF-Seminar</strong><span>Aufbauseminar für Fahranfänger</span></div></div>
-        <div class="special-card"><div class="special-card__icon">FES</div><div><strong>FES-Seminar</strong><span>Fahreignungsseminar für Punkteabbau</span></div></div>
-        <div class="special-card"><div class="special-card__icon">ADR</div><div><strong>Gefahrgutschulung ADR</strong><span>Qualifikation für sichere Gefahrguttransporte</span></div></div>
-        <div class="special-card span2"><div class="special-card__icon">SIM</div><div><strong>Simulator-Ausbildung</strong><span>Digitales Training als starke Praxiserweiterung – für B, BE, C und CE</span></div></div>
+        <div class="special-card"><div class="special-card__icon">FES</div><div><strong>FES-Seminar</strong><span>Fahreignung · Punkteabbau</span></div></div>
+        <div class="special-card"><div class="special-card__icon">ADR</div><div><strong>Gefahrgut ADR</strong><span>Sichere Gefahrguttransporte</span></div></div>
+        <div class="special-card span2"><div class="special-card__icon">SIM</div><div><strong>Simulator-Ausbildung</strong><span>Digitales Training als Praxiserweiterung – für B, BE, C und CE</span></div></div>
       </div>
     </article>
 
@@ -425,8 +425,13 @@ main{position:relative;z-index:2;pointer-events:none}
   </div>
 
   <section class="scene-copy copy-left" data-copy="0">
-    <div class="copy-label">Fahrschule Krebs · Fulda</div><h1>FÜHRERSCHEIN.<span>WEITER GEDACHT.</span></h1><p>Alle Klassen, digitale Lernbegleitung, Simulatoren und berufliche Qualifikationen – verbunden in einer Ausbildung, die transparent, modern und persönlich bleibt.</p><div class="copy-actions"><button class="btn btn--primary" data-jump="klassen">Leistungen entdecken <svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg></button><button class="btn" data-open-contact>Beratung starten</button></div>
+    <div class="copy-label">Fahrschule Krebs · Fulda</div><h1>FÜHRERSCHEIN.<span>WEITER GEDACHT.</span></h1><p>Alle Klassen, digitale Lernbegleitung, Simulatoren und berufliche Qualifikationen – verbunden in einer Ausbildung, die transparent und persönlich bleibt.</p><div class="copy-actions"><button class="btn btn--primary" data-jump="klassen">Leistungen entdecken <svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg></button><button class="btn" data-open-contact>Beratung</button></div>
   </section>
+  <section class="scene-copy copy-right" data-copy="1"><div class="copy-label">01 · Führerscheinklassen</div><h2>ALLE KLASSEN.<br><em>EINE ADRESSE.</em></h2><p>Vom Mofa bis zum Bus, vom BF17 bis CE: Ausbildung ohne Umwege und mit einer klaren Empfehlung, welche Klasse zu deinem Ziel passt.</p><div class="copy-pills"><span>PKW</span><span>LKW</span><span>Zweirad</span><span>Bus</span></div></section>
+  <section class="scene-copy copy-left" data-copy="2"><div class="copy-label">02 · Digitalpaket</div><h2>DEIN LERNEN.<br><span>IMMER DABEI.</span></h2><p>Simulatoren, Videos, Hörbuch, Prüfungsangst-E-Book, intensive Theorie und transparente Preise – ein System statt sechs Baustellen.</p></section>
+  <section class="scene-copy copy-right" data-copy="3"><div class="copy-label">03 · Simulator</div><h2>SICHERHEIT<br><em>BEGINNT VORHER.</em></h2><p>Zwei Fahrsimulatoren machen komplexe Situationen wiederholbar – bevor Verkehr, Kupplung und Nervosität gleichzeitig anklopfen.</p></section>
+  <section class="scene-copy copy-left" data-copy="4"><div class="copy-label">04 · Preisvergleich</div><h2>TRANSPARENZ<br><span>STATT KLEINGEDRUCKTES.</span></h2><p>Sieh direkt, wie die Fahrschule Krebs im Vergleich zum Bundesdurchschnitt liegt – und trag dein eigenes Angebot zum Vergleich ein.</p></section>
+  <section class="scene-copy copy-right" data-copy="5"><div class="copy-label">05 · Weiterbildung</div><h2>MEHR ALS<br><em>FÜHRERSCHEIN.</em></h2><p>Handicap-Ausbildung, Berufskraftfahrer, Staplerschein, ASF, FES und ADR – mit der gleichen Sorgfalt wie beim ersten Führerschein.</p></section>
   <section class="scene-copy copy-final" data-copy="6"><div class="copy-label">Fahrschule Krebs · Fulda</div><h2>BEREIT,<br><span>LOSZUFAHREN?</span></h2><p>Wähle deine Führerscheinklasse oder lass dich beraten. Wir verbinden die passende Ausbildung mit dem digitalen Paket, das zu deinem Ziel passt.</p><div class="copy-actions"><button class="btn btn--primary" data-open-contact>Beratung anfragen</button><button class="btn" data-open-price>Preise vergleichen</button></div></section>
 </div>
 
@@ -488,28 +493,28 @@ function cache(){W=innerWidth;H=innerHeight;maxScroll=Math.max(1,document.docume
 function coordAt(y){const probe=y+H*.46;if(probe<=layout[0].center)return 0;for(let i=0;i<layout.length-1;i++){if(probe<layout[i+1].center)return i+smooth((probe-layout[i].center)/(layout[i+1].center-layout[i].center))}return layout.length-1}
 function envelope(coord,index,width=.78){return smooth(1-clamp(Math.abs(coord-index)/width))}
 function blend(a,b,t){const o={};for(const k in a)o[k]=lerp(a[k],b[k],t);return o}
-/* Keyframes: sections 1–5 centered (x:0), no rotation — clean & no overlap */
+/* Cards slide in from alternating sides (opposite the headline). No rotation. */
 function keyframes(){
   const mobile=W<=900;
   if(mobile){
     const vw=W, vh=H;
     return[
       {x:0,y:150,w:Math.min(vw*.68,310),h:Math.min(vw*.68,310),r:999,sc:1},
-      {x:0,y:150,w:Math.min(vw*.92,530),h:Math.min(vh*.54,480),r:32,sc:1},
-      {x:0,y:150,w:Math.min(vw*.93,560),h:Math.min(vh*.56,490),r:32,sc:1},
-      {x:0,y:150,w:Math.min(vw*.92,540),h:Math.min(vh*.56,500),r:32,sc:1},
-      {x:0,y:150,w:Math.min(vw*.93,560),h:Math.min(vh*.54,470),r:30,sc:1},
-      {x:0,y:150,w:Math.min(vw*.92,550),h:Math.min(vh*.58,510),r:32,sc:1},
+      {x:0,y:158,w:Math.min(vw*.92,520),h:Math.min(vh*.52,460),r:30,sc:1},
+      {x:0,y:158,w:Math.min(vw*.92,540),h:Math.min(vh*.54,470),r:30,sc:1},
+      {x:0,y:158,w:Math.min(vw*.9,510),h:Math.min(vh*.54,480),r:30,sc:1},
+      {x:0,y:158,w:Math.min(vw*.92,540),h:Math.min(vh*.5,430),r:28,sc:1},
+      {x:0,y:158,w:Math.min(vw*.92,540),h:Math.min(vh*.56,490),r:30,sc:1},
       {x:0,y:150,w:Math.min(vw*.62,300),h:Math.min(vw*.62,300),r:999,sc:1}
     ];
   }
   return[
-    {x:W*.19,y:0,w:340,h:340,r:999,sc:1},
-    {x:0,y:18,w:Math.min(1080,W*.80),h:Math.min(610,H*.74),r:44,sc:1},
-    {x:0,y:18,w:Math.min(1080,W*.80),h:Math.min(620,H*.75),r:46,sc:1},
-    {x:0,y:18,w:Math.min(980,W*.72),h:Math.min(560,H*.70),r:44,sc:1},
-    {x:0,y:18,w:Math.min(980,W*.72),h:Math.min(590,H*.72),r:44,sc:1},
-    {x:0,y:18,w:Math.min(1040,W*.78),h:Math.min(600,H*.73),r:46,sc:1},
+    {x:W*.20,y:0,w:340,h:340,r:999,sc:1},
+    {x:-W*.22,y:14,w:Math.min(600,W*.44),h:Math.min(560,H*.70),r:40,sc:1},
+    {x:W*.22,y:14,w:Math.min(600,W*.44),h:Math.min(540,H*.68),r:40,sc:1},
+    {x:-W*.22,y:14,w:Math.min(560,W*.42),h:Math.min(560,H*.70),r:40,sc:1},
+    {x:W*.22,y:14,w:Math.min(580,W*.43),h:Math.min(520,H*.66),r:40,sc:1},
+    {x:-W*.22,y:14,w:Math.min(600,W*.44),h:Math.min(560,H*.70),r:40,sc:1},
     {x:0,y:0,w:360,h:360,r:999,sc:1}
   ];
 }
@@ -521,10 +526,9 @@ function apply(){
   const parX=(pointerX-.5)*(W<=900?4:9),parY=(pointerY-.5)*(W<=900?3:6);
   shell.style.width=state.w.toFixed(2)+'px';shell.style.height=state.h.toFixed(2)+'px';shell.style.borderRadius=state.r.toFixed(2)+'px';
   shell.style.transform=`translate3d(calc(-50% + ${(state.x+parX).toFixed(2)}px),calc(-50% + ${(state.y+parY).toFixed(2)}px),0) scale(${state.sc.toFixed(3)})`;
-  /* Tighter envelope => quicker, cleaner crossfade (less text-over-text during transition) */
   panels.forEach((el,i)=>{const a=envelope(coord,i,i===0||i===6?.66:.56),shift=(i-coord)*20;el.style.opacity=a.toFixed(3);el.style.transform=`translate3d(0,${shift.toFixed(1)}px,0) scale(${(.975+a*.025).toFixed(3)})`;const was=el.classList.contains('active');el.classList.toggle('active',was?a>.5:a>.62)});
-  copies.forEach((el)=>{const idx=+el.dataset.copy,a=envelope(coord,idx,.6),y=(1-a)*16;el.style.opacity=a.toFixed(3);if(W<=900)el.style.transform='none';else if(el.classList.contains('copy-left'))el.style.transform=`translate3d(0,calc(-50% + ${y.toFixed(1)}px),0)`;else el.style.transform=`translate3d(-50%,${y.toFixed(1)}px,0)`;el.classList.toggle('active',a>.55)});
-  words.forEach((el,i)=>{const a=envelope(coord,i,.86),d=coord-i;el.style.opacity=(a*.65).toFixed(3);el.style.transform=`translate(-50%,-50%) translate3d(0,${(d*-54).toFixed(1)}px,0) scale(${(.93+a*.07).toFixed(3)})`});
+  copies.forEach((el)=>{const idx=+el.dataset.copy,a=envelope(coord,idx,.6),y=(1-a)*18;el.style.opacity=a.toFixed(3);if(el.classList.contains('copy-final'))el.style.transform=`translate3d(-50%,${y.toFixed(1)}px,0)`;else if(W<=900)el.style.transform=`translate3d(0,${y.toFixed(1)}px,0)`;else{const dir=el.classList.contains('copy-right')?1:-1;const x=(1-a)*dir*30;el.style.transform=`translate3d(${x.toFixed(1)}px,calc(-50% + ${y.toFixed(1)}px),0)`}el.classList.toggle('active',a>.55)});
+  words.forEach((el,i)=>{const a=envelope(coord,i,.86),d=coord-i;el.style.opacity=(a*.6).toFixed(3);el.style.transform=`translate(-50%,-50%) translate3d(0,${(d*-54).toFixed(1)}px,0) scale(${(.93+a*.07).toFixed(3)})`});
   roadPlane.style.transform=`translate3d(-50%,${(-global*44).toFixed(1)}px,0) perspective(700px) rotateX(66deg)`;
   orbit.style.transform=`translate(-50%,-50%) rotateX(72deg) rotateZ(${(global*36).toFixed(2)}deg)`;
   progressFill.style.height=(global*100).toFixed(2)+'%';siteHead.classList.toggle('scrolled',currentY>35);
@@ -553,7 +557,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal.open').forEach(clo
 function showToast(text){toast.textContent=text;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2800)}
 $$('[data-contact-choice]').forEach(b=>b.addEventListener('click',()=>{closeModal(contactModal);showToast(b.dataset.contactChoice+' · Beratung ausgewählt')}));
 
-/* Comparison bars in price panel */
+/* Comparison bars */
 const euro0=new Intl.NumberFormat('de-DE',{maximumFractionDigits:0});
 const AVG=3500, KREBS=3090;
 const barAvg=$('#barAvg'),barKrebs=$('#barKrebs'),barUser=$('#barUser'),cmpUser=$('#cmpUser'),cmpNote=$('#cmpNote');
@@ -567,7 +571,7 @@ function updateCmp(){
   if(hasUser){
     const diff=user-KREBS;
     if(diff>0)cmpNote.innerHTML=`Bei Fahrschule Krebs zahlst du <b class="good">${euro0.format(diff)} €</b> weniger als bei deinem aktuellen Angebot.`;
-    else if(diff<0)cmpNote.innerHTML=`Dein Angebot liegt <b class="bad">${euro0.format(-diff)} €</b> unter unserem Beispielpreis – lass uns über deine Ausbildung sprechen.`;
+    else if(diff<0)cmpNote.innerHTML=`Dein Angebot liegt <b class="bad">${euro0.format(-diff)} €</b> unter unserem Beispielpreis – sprich uns gern darauf an.`;
     else cmpNote.innerHTML=`Dein Angebot entspricht genau unserem Beispielpreis.`;
   }else{
     cmpNote.innerHTML=`Fahrschule Krebs ist <b class="good">${euro0.format(AVG-KREBS)} €</b> günstiger als der Bundesdurchschnitt.`;
