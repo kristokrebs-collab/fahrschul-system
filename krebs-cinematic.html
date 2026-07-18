@@ -75,6 +75,9 @@ a{text-decoration:none}
 .hero__reveal h1 em{font-style:normal;color:var(--red2)}
 .hero__sub{max-width:560px;font-size:14px;line-height:1.6;color:var(--muted)}
 .hero__cta{display:flex;gap:12px;justify-content:center;pointer-events:auto}
+.hero__cards{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;max-width:1000px;height:320px;pointer-events:auto;will-change:opacity;opacity:0}
+.hero__card{position:absolute;width:180px;height:130px;border-radius:18px;border:1.2px solid rgba(255,255,255,.14);background:linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.03));backdrop-filter:blur(12px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;opacity:0;transform:scale(.4) translate(-50%,-50%);will-change:opacity,transform;transition:opacity .7s var(--ease),transform .7s var(--ease),border-color .35s,box-shadow .35s;font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}.hero__card:hover{border-color:rgba(237,21,62,.28);box-shadow:0 8px 24px rgba(237,21,62,.12)}.hero__card.show{opacity:1;transform:scale(1) translate(-50%,-50%)}.hero__card i{display:block;font-size:32px;font-style:normal}
+.hero__card--1{left:6%;top:15%}.hero__card--2{left:50%;top:0%}.hero__card--3{left:94%;top:15%}.hero__card--4{left:15%;top:85%}.hero__card--5{left:85%;top:85%}
 .hero__hint{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--faint);display:flex;flex-direction:column;align-items:center;gap:9px;z-index:3}
 .hero__hint i{width:1px;height:34px;background:linear-gradient(var(--red),transparent);animation:drop 1.8s var(--ease) infinite}
 @keyframes drop{0%{transform:scaleY(0);transform-origin:top;opacity:0}40%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);transform-origin:bottom;opacity:0}}
@@ -244,6 +247,13 @@ a{text-decoration:none}
         <div class="hero__kicker">Fahrschule Krebs · Fulda</div>
         <div class="hero__tag">Digitales Ausbildungssystem</div>
       </div>
+      <div class="hero__cards" id="heroCards">
+        <div class="hero__card hero__card--1" id="card1"><i>🎓</i>Lehren</div>
+        <div class="hero__card hero__card--2" id="card2"><i>🚗</i>Sicherheit</div>
+        <div class="hero__card hero__card--3" id="card3"><i>💡</i>Wissen</div>
+        <div class="hero__card hero__card--4" id="card4"><i>⚡</i>Digital</div>
+        <div class="hero__card hero__card--5" id="card5"><i>✓</i>Erfolg</div>
+      </div>
       <div class="hero__reveal" id="heroReveal">
         <h1>ALLES.<br><em>WAS DICH ANS ZIEL BRINGT.</em></h1>
         <p class="hero__sub">Alle Klassen, digitale Lernbegleitung, Simulatoren und berufliche Qualifikationen – in einer Ausbildung, die transparent und persönlich bleibt.</p>
@@ -409,17 +419,19 @@ function buildEmblem(){
   let sh=g.createLinearGradient(x,y,x+bw,y+bh);sh.addColorStop(0,'rgba(255,255,255,.14)');sh.addColorStop(.22,'rgba(255,255,255,0)');sh.addColorStop(.7,'rgba(255,255,255,0)');sh.addColorStop(1,'rgba(237,21,62,.06)');g.fillStyle=sh;g.fillRect(x,y,bw,bh);
   /* red inner glow bottom */
   let rgd=g.createRadialGradient(cx,y+bh*.86,10,cx,y+bh*.86,bw*.7);rgd.addColorStop(0,'rgba(237,21,62,.22)');rgd.addColorStop(1,'rgba(237,21,62,0)');g.fillStyle=rgd;g.fillRect(x,y,bw,bh);
-  /* frost noise */
+  /* frost noise + micro scratches */
   for(let i=0;i<2600;i++){const px=x+Math.random()*bw,py=y+Math.random()*bh,a=Math.random()*.05;g.fillStyle='rgba(255,255,255,'+a+')';g.fillRect(px,py,1,1);}
-  /* FK engraved */
+  for(let i=0;i<180;i++){const px=x+Math.random()*bw,py=y+Math.random()*bh,len=2+Math.random()*4,a=Math.random()*.03,ang=Math.random()*Math.PI;g.strokeStyle='rgba(255,255,255,'+a+')';g.lineWidth=.3;g.beginPath();g.moveTo(px,py);g.lineTo(px+Math.cos(ang)*len,py+Math.sin(ang)*len);g.stroke();}
+  /* FK engraved with depth */
   g.textAlign='center';g.textBaseline='middle';g.font='900 210px "Saira Condensed","Arial Narrow",sans-serif';
-  g.fillStyle='rgba(0,0,0,.45)';g.fillText('FK',cx,cy+6);
-  g.fillStyle='rgba(247,244,239,.9)';g.fillText('FK',cx,cy);
-  let tg=g.createLinearGradient(x,cy-90,x,cy+90);tg.addColorStop(0,'rgba(255,255,255,.28)');tg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=tg;g.fillText('FK',cx,cy);
+  g.fillStyle='rgba(0,0,0,.55)';g.fillText('FK',cx,cy+6);g.fillStyle='rgba(0,0,0,.3)';g.fillText('FK',cx,cy+4);
+  g.fillStyle='rgba(247,244,239,.95)';g.fillText('FK',cx,cy);
+  let tg=g.createLinearGradient(x,cy-90,x,cy+90);tg.addColorStop(0,'rgba(255,255,255,.32)');tg.addColorStop(.5,'rgba(255,255,255,0)');tg.addColorStop(1,'rgba(255,255,255,.08)');g.fillStyle=tg;g.fillText('FK',cx,cy);
   g.restore();
-  /* top edge highlight + rim */
+  /* multi-layer rim + edge highlight */
   g.save();rr(x,y,bw,bh,r);g.lineWidth=1.5;g.strokeStyle='rgba(255,255,255,.22)';g.stroke();g.restore();
-  g.save();g.beginPath();g.moveTo(x+r,y+1.2);g.lineTo(x+bw-r,y+1.2);g.lineWidth=2;g.strokeStyle='rgba(255,255,255,.5)';g.lineCap='round';g.stroke();g.restore();
+  g.save();g.beginPath();g.moveTo(x+r,y+1.2);g.lineTo(x+bw-r,y+1.2);g.lineWidth=2.5;g.strokeStyle='rgba(255,255,255,.62)';g.lineCap='round';g.stroke();g.restore();
+  g.save();g.beginPath();g.moveTo(x+r,y+2.2);g.lineTo(x+bw-r,y+2.2);g.lineWidth=1;g.strokeStyle='rgba(255,255,255,.14)';g.lineCap='round';g.stroke();g.restore();
   emblem=c;
   /* blurred copy */
   const b=document.createElement('canvas');b.width=EM;b.height=EM;const bg=b.getContext('2d');bg.filter='blur(11px)';bg.drawImage(c,0,0);emblemBlur=b;
@@ -488,6 +500,18 @@ function drawHero(){
   heroReveal.style.transform=`translate(-50%,calc(-50% + ${((1-revealOp)*34).toFixed(1)}px))`;
   heroReveal.style.pointerEvents=revealOp>.5?'auto':'none';
   heroHint.style.opacity=(1-smooth(p/.1)).toFixed(3);
+
+  /* emotion cards morphing sequence during reveal */
+  const cardsPhase=smooth((p-.48)/.32);
+  const cardsOpacity=Math.max(0,1-Math.pow(cardsPhase,1.2)*1.5);
+  heroCards.style.opacity=Math.max(0,cardsOpacity).toFixed(3);
+  const cards=[card1,card2,card3,card4,card5];
+  cards.forEach((card,i)=>{
+    const delay=i*.08;
+    const cardT=smooth(Math.max(0,cardsPhase-delay)/(1-delay+.04));
+    card.style.opacity=(Math.min(1,cardT*1.3)*cardsOpacity).toFixed(3);
+    card.style.transform=`scale(${.4+cardT*.6}) translate(-50%,-50%)`;
+  });
 }
 
 let raf=0,running=false;
@@ -551,7 +575,8 @@ const lines=$$('[data-line]'),totalEl=$('#calcTotal');
 function recalc(){let total=0;lines.forEach(row=>{const q=Math.max(0,parseFloat($('[data-qty]',row).value)||0),u=Math.max(0,parseFloat($('[data-unit]',row).value)||0),s=q*u;total+=s;$('[data-sum]',row).textContent=euro.format(s)+' €'});totalEl.innerHTML=euro.format(total)+' <span>€</span>'}
 $$('#priceModal input').forEach(i=>i.addEventListener('input',recalc));
 
-/* init */
+/* init emotion cards */
+const heroCards=$('#heroCards'),card1=$('#card1'),card2=$('#card2'),card3=$('#card3'),card4=$('#card4'),card5=$('#card5');
 buildEmblem();resize();schedule();recalc();updateCmp();
 })();
 </script>
