@@ -1,0 +1,18 @@
+{
+  "_comment": "Referenz-Dependencies für dieses Kit. In ein neues Next.js/Vite-Projekt kopieren und installieren mit: npm i <alle dependencies>",
+  "dependencies": {
+    "three": "^0.170.0",
+    "@react-three/fiber": "^8.17.0",
+    "@react-three/drei": "^9.114.0",
+    "gsap": "^3.12.5",
+    "lenis": "^1.1.14",
+    "framer-motion": "^11.11.0",
+    "split-type": "^0.3.4"
+  },
+  "notes": [
+    "GSAP SplitText/ScrambleText sind Club-GreenSock-Plugins (kostenpflichtig) - split-type ist der freie Ersatz fuer Char/Word-Splitting.",
+    "@react-three/drei liefert MeshTransmissionMaterial fuer den Eis-/Glas-Look, Environment fuer HDRI-Reflexionen, Float fuer sanftes Schweben.",
+    "GLB-Modelle immer mit gltf-transform / Draco komprimieren, bevor sie ins Projekt kommen - sonst leidet die Ladezeit stark.",
+    "lenis ist der Nachfolger von @studio-freight/lenis - gleiche API, neuer Paketname."
+  ]
+}
