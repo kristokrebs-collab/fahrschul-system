@@ -379,6 +379,21 @@ function submitRate(){
   const key=rateKey; closeRate();
   confirmRide(key,'done',ratings);
 }
+/* Alle Pflicht-Sonderfahrten erreicht? -> Basis fuer das Pruefungs-GO */
+function minReached(st){
+  const sf=st.sonderfahrten||{};
+  return ['ueberland','autobahn','nacht'].every(k=>!sf[k]||sf[k].ist>=sf[k].soll);
+}
+function grantGo(key){
+  const s=parseStudents().find(x=>x.key===key); if(!s)return;
+  if(!minReached(s.st)){toast('Mindestfahrten noch nicht erreicht');return;}
+  s.st.fahrlehrerGo=true;
+  if(s.st.history&&Array.isArray(s.st.history.fahr))
+    s.st.history.fahr.unshift({type:'uebung',date:new Date().toISOString(),minutes:0,focus:'Prüfungs-GO erteilt von '+me.name});
+  pushStudent(key,s.st);
+  toast('Prüfungs-GO für '+s.name+' erteilt!');
+  render();
+}
 function confirmRide(key,mode,ratings){
   const s=parseStudents().find(x=>x.key===key); if(!s||!s.st.naechsteFahrstunde)return;
   const st=s.st, when=st.naechsteFahrstunde;
@@ -396,8 +411,15 @@ function confirmRide(key,mode,ratings){
     if(st.history&&Array.isArray(st.history.fahr))
       st.history.fahr.unshift({type:t,date:when,minutes:90,focus:RIDE_TYPES[t].label+' – bestätigt von '+me.name+' · abgerechnet'});
     st.naechsteFahrstunde=null;
+    /* Letzte Mindestfahrt erreicht? -> Prüfungs-GO automatisch erteilen */
+    let goNow=false;
+    if(minReached(st)&&!st.fahrlehrerGo){
+      st.fahrlehrerGo=true; goNow=true;
+      if(st.history&&Array.isArray(st.history.fahr))
+        st.history.fahr.unshift({type:'uebung',date:new Date().toISOString(),minutes:0,focus:'Prüfungs-GO erteilt von '+me.name+' – alle Mindestfahrten erreicht'});
+    }
     pushStudent(key,st);
-    toast(RIDE_TYPES[t].label+' bestätigt & abgerechnet');
+    toast(goNow?'Alle Mindestfahrten erreicht – PRÜFUNGS-GO erteilt!':RIDE_TYPES[t].label+' bestätigt & abgerechnet');
   } else {
     st.naechsteFahrstunde=null;
     pushStudent(key,st);
@@ -449,7 +471,7 @@ function render(){
       return `<div class="termin${due?' due':''}">
         <div class="t-top">
           <div class="avatar">${initials(s.name)}</div>
-          <div><div class="t-name">${esc(s.name)}</div><div class="t-meta">Klasse ${esc(s.klasse)}</div></div>
+          <div><div class="t-name">${esc(s.name)} ${s.st.fahrlehrerGo?'<span class="badge on" style="font-size:9px;vertical-align:2px">GO</span>':''}</div><div class="t-meta">Klasse ${esc(s.klasse)}</div></div>
           <div class="qa">
             <a href="tel:${phoneOf(s)}" title="Anrufen" aria-label="${esc(s.name)} anrufen">${ic('phone')}</a>
             <a href="${MAPS_URL}" target="_blank" rel="noopener" title="Route zum Treffpunkt" aria-label="Navigation starten">${ic('compass')}</a>
@@ -470,7 +492,7 @@ function render(){
     }).join(''):`<div class="empty">Keine bestätigten Termine.<br>Das Büro segnet Termine über das Smart-Matching ab.</div>`}
     ${waiting.length?`<div style="margin-top:6px">
       <div style="font-size:11px;font-weight:800;color:var(--text-faint);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Warten auf Termin (Matching durchs Büro)</div>
-      ${waiting.map(s=>`<div class="wait-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(s.name)}</div><span class="n">${esc(s.name)}</span><span class="k">Klasse ${esc(s.klasse)}</span></div>`).join('')}
+      ${waiting.map(s=>`<div class="wait-row"><div class="avatar" style="width:28px;height:28px;font-size:10px">${initials(s.name)}</div><span class="n">${esc(s.name)}</span><span class="k">Klasse ${esc(s.klasse)}</span>${s.st.fahrlehrerGo?('<span class="chip-ok">'+ic('check')+'GO</span>'):(minReached(s.st)?('<button class="mini-btn" onclick="grantGo(\''+s.key+'\')">'+ic('graduation-cap')+'Prüfungs-GO</button>'):'')}</div>`).join('')}
     </div>`:''}
     ${!mine.length?`<div class="empty">${ic('users')} Dir sind noch keine App-Schüler zugewiesen – die Zuweisung macht das Büro in der Zentrale.</div>`:''}
   </div>

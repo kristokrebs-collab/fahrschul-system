@@ -1478,6 +1478,15 @@ button.pill{font-family:inherit;}
 .avail-legend .lg .sw.you{background:var(--accent-soft);border:1px solid var(--accent);}
 .avail-legend .lg .sw.fl{background:var(--surface-2);box-shadow:inset 0 0 0 1.5px var(--emerald-line);}
 .match-btn{margin-top:14px;}
+
+/* Prüfungshotspot-Karte: Stealth-Look (dunkel, entsättigt, clean) */
+.leaflet-container{background:#0B0E14 !important;border-radius:16px;}
+.leaflet-tile{filter:grayscale(1) invert(.92) brightness(.86) contrast(1.15) hue-rotate(185deg) saturate(.28);}
+.leaflet-control-zoom a{background:#1A1F2C !important;color:#F8FAFC !important;border-color:rgba(248,250,252,.13) !important;}
+.leaflet-control-attribution{background:rgba(11,14,20,.7) !important;color:#616B80 !important;font-size:9px !important;}
+.leaflet-control-attribution a{color:#9AA3B4 !important;}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#1A1F2C !important;color:#F8FAFC !important;
+  box-shadow:0 12px 30px -12px rgba(0,0,0,.9) !important;border:1px solid rgba(248,250,252,.12);}
 </style>
 </head>
 <body>
@@ -1820,7 +1829,7 @@ function buildDefaultState(klasse,besitz){
       {label:'Fahrstunden '+prevMonthName()+' (2 × 90 min)',betrag:80}
     ]},
     theoriePruefung:{erforderlich:cfg.theoriePruefung,bestanden:false,angemeldet:false,terminId:null,datum:null,ort:null,time:null},
-    fahrlehrerGo:true,
+    fahrlehrerGo:false, /* wird vom Fahrlehrer erteilt, wenn alle Mindestfahrten erreicht sind */
     naechsteFahrstunde:new Date(Date.now()+(1*86400000)+(4*3600000)+(12*60000)).toISOString(),
     verfuegbarkeit:verf,
     simSlots, examTermine,
@@ -2550,17 +2559,34 @@ function renderFocus(){
   return `<section class="section reveal" id="sec-focus"><div class="section-head"><div><div class="eyebrow">Ebene B</div><h2 class="section-title">Aktueller Status</h2></div></div>${renderDocs()}${renderFinance()}${renderCountdown()}</section>`;
 }
 
-/* ---------- Terminplanung: Verfügbarkeit + Matching ---------- */
+/* ---------- Terminplanung: Verfügbarkeit für die kommenden 6 Wochen ---------- */
+let verfWeek=0;
+function weekChipLabel(w){
+  const now=new Date(); const mon=new Date(now);
+  mon.setDate(now.getDate()-((now.getDay()+6)%7)+w*7); mon.setHours(0,0,0,0);
+  return `${pad(mon.getDate())}.${pad(mon.getMonth()+1)}.`;
+}
+function verfGrid(w){
+  if(!state.verfWeeks){
+    state.verfWeeks={};
+    for(let i=0;i<6;i++) state.verfWeeks[i]=JSON.parse(JSON.stringify(state.verfuegbarkeit||{}));
+  }
+  if(!state.verfWeeks[w]) state.verfWeeks[w]={};
+  return state.verfWeeks[w];
+}
 function renderAvail(){
+  const VG=verfGrid(verfWeek);
+  const chips=[0,1,2,3,4,5].map(w=>`<button class="fchip ${w===verfWeek?'active':''}" data-action="verf-week" data-w="${w}">Wo ${w+1} · ab ${weekChipLabel(w)}</button>`).join('');
   let grid=`<div class="avail-corner"></div>`+DAYS.map(d=>`<div class="avail-day">${d.l}</div>`).join('');
   PERIODS.forEach(p=>{
     grid+=`<div class="avail-plab">${ic(p.icon)}${p.l}</div>`;
-    DAYS.forEach(d=>{ const on=state.verfuegbarkeit[d.k]&&state.verfuegbarkeit[d.k][p.k]; const plan=FL_PLAN[d.k]&&FL_PLAN[d.k][p.k]; grid+=`<div class="avail-cell ${on?'on':''} ${plan?'plan':''}" data-action="avail" data-d="${d.k}" data-p="${p.k}" role="button" tabindex="0" aria-label="${d.l} ${p.l}">${ic('check')}</div>`; });
+    DAYS.forEach(d=>{ const on=VG[d.k]&&VG[d.k][p.k]; const plan=FL_PLAN[d.k]&&FL_PLAN[d.k][p.k]; grid+=`<div class="avail-cell ${on?'on':''} ${plan?'plan':''}" data-action="avail" data-d="${d.k}" data-p="${p.k}" role="button" tabindex="0" aria-label="${d.l} ${p.l}">${ic('check')}</div>`; });
   });
   return `<section class="section reveal" id="sec-avail">
-    <div class="section-head"><div><div class="eyebrow">Terminplanung</div><h2 class="section-title">Deine Verfügbarkeit</h2></div><span class="head-note">Matching</span></div>
+    <div class="section-head"><div><div class="eyebrow">Terminplanung</div><h2 class="section-title">Deine Verfügbarkeit</h2></div><span class="head-note">6 Wochen</span></div>
     <div class="card">
       <div class="card-title"><span class="ic">${ic('calendar-clock')}</span>Wann hast du Zeit?<span class="spacer"></span><span class="meta">90-Min-Fenster</span></div>
+      <div class="fchips" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${chips}</div>
       <div class="avail-wrap"><div class="avail-grid">${grid}</div></div>
       <div class="avail-legend"><span class="lg"><span class="sw you"></span>Deine Zeit</span><span class="lg"><span class="sw fl"></span>${FL_NAME} verfügbar</span></div>
       <button class="btn btn-primary match-btn" data-action="request-lesson">${ic('wand-sparkles')}Fahrstunde anfragen</button>
@@ -2664,7 +2690,7 @@ function renderTree(){
   nodes+=`<div class="tree-node goal ${ready?'ready':''}" id="treeGoal"><div class="tree-dot">${ic('crown')}</div><div class="tn-head"><div class="tn-title">Prüfungsreife<small>Praktische Prüfung</small></div></div><div class="tn-goal" id="treeGoalText">${ready?'Alle Voraussetzungen erfüllt':'Voraussetzungen in Arbeit'}</div></div>`;
   return `<section class="section reveal" id="sec-tree"><div class="section-head"><div><div class="eyebrow">Soll / Ist</div><h2 class="section-title">Ausbildungsbaum</h2></div></div><div class="card"><div class="tree">${nodes}</div></div></section>`;
 }
-function renderFooter(){ return `<div class="foot reveal"><div class="fbrand">Fahrschule Krebs</div><div class="fnote">Cockpit · Am Bahnhof 3, Fulda</div><button class="freset" data-action="reset-training">${ic('rotate-ccw')}Ausbildungsdaten zurücksetzen</button></div>`; }
+function renderFooter(){ return `<div class="foot reveal"><div class="fbrand">Fahrschule Krebs</div><div class="fnote">Cockpit · Am Bahnhof 3, Fulda</div></div>`; }
 
 /* ---------- Cockpit-Mount ---------- */
 function renderCockpitScreen(){
@@ -2837,7 +2863,6 @@ function profileSheetHTML(){
       <div class="hot-item" style="cursor:default"><div class="hnum">${ic('database')}</div><div class="htext"><div class="ht">${Store.ok?'Lokal gespeichert':'Sitzungsspeicher'}</div><div class="hd">Konto &amp; Fortschritt bleiben auf diesem Gerät</div></div></div>
     </div>
     <button class="btn btn-ghost" data-action="change-class" style="margin-bottom:10px">${ic('arrow-left-right')}Führerscheinklasse wechseln</button>
-    <button class="btn btn-ghost" data-action="reset-training" style="margin-bottom:10px">${ic('rotate-ccw')}Ausbildungsdaten zurücksetzen</button>
     <button class="btn btn-ghost" data-action="logout" style="margin-bottom:10px">${ic('log-out')}Abmelden</button>
     <button class="btn btn-ghost" data-action="delete-account" style="color:var(--accent-hi)">${ic('trash-2')}Konto &amp; lokale Daten löschen</button>`;
 }
@@ -2866,7 +2891,13 @@ let simSelected=null;
 function pickSimSlot(chip){ if(chip.classList.contains('reserved')) return; document.querySelectorAll('#morphInner .slot-chip.selected').forEach(c=>c.classList.remove('selected')); chip.classList.add('selected'); simSelected=chip.getAttribute('data-id'); const b=el('simConfirm'); if(b) b.disabled=false; }
 function confirmSim(btnEl){
   const slot=state.simSlots.find(s=>s.id===simSelected); if(!slot||slot.reserved) return;
-  slot.reserved=true; state.simulator.ist++; saveState(); haptic('confirm'); pulseFrom(btnEl); closeMorph(); updateSimCount(); toast('ok','Simulator reserviert',`${slot.day} · ${slot.time} Uhr`); simSelected=null;
+  slot.reserved=true; state.simulator.ist++;
+  /* Bestätigung an die Fahrschule + automatische Rechnung */
+  state.simBuchungen=state.simBuchungen||[];
+  state.simBuchungen.push({label:slot.day+' · '+slot.time+' Uhr',ts:new Date().toISOString()});
+  state.finanzen.posten.push({label:'Simulator-Einheit '+slot.day+' '+slot.time,betrag:39});
+  saveState(); haptic('confirm'); pulseFrom(btnEl); closeMorph(); updateSimCount();
+  toast('ok','Simulator angefragt',`${slot.day} · ${slot.time} Uhr – Bestätigung an die Fahrschule, Rechnung (39 €) erstellt.`); simSelected=null;
 }
 let examSelected=null;
 function pickExam(row){ document.querySelectorAll('#morphInner .exam-opt.selected').forEach(c=>c.classList.remove('selected')); row.classList.add('selected'); examSelected=row.getAttribute('data-id'); const b=el('examConfirm'); if(b) b.disabled=false; }
@@ -2876,7 +2907,28 @@ function confirmExam(btnEl){
   saveState(); haptic('confirm'); pulseFrom(btnEl); closeMorph(); refreshExam(); toast('ok','Zur Theorieprüfung angemeldet',`${t.label} · ${t.ort}`); examSelected=null;
 }
 function passExam(btnEl){ state.theoriePruefung.bestanden=true; saveState(); haptic('confirm'); pulseFrom(btnEl,true); refreshExam(); refreshReady(); toast('ok','Theorieprüfung bestanden','Glückwunsch!'); }
-function toggleAvail(cell){ const d=cell.getAttribute('data-d'), p=cell.getAttribute('data-p'); const cur=!!(state.verfuegbarkeit[d]&&state.verfuegbarkeit[d][p]); if(!state.verfuegbarkeit[d]) state.verfuegbarkeit[d]={}; state.verfuegbarkeit[d][p]=!cur; cell.classList.toggle('on',!cur); saveState(); if('vibrate' in navigator) navigator.vibrate(8); }
+function toggleAvail(cell){
+  const d=cell.getAttribute('data-d'), p=cell.getAttribute('data-p');
+  const VG=verfGrid(verfWeek);
+  const cur=!!(VG[d]&&VG[d][p]);
+  if(!VG[d]) VG[d]={};
+  VG[d][p]=!cur;
+  /* Woche 1 spiegelt sich in das Alt-Feld (Kompatibilität) */
+  state.verfuegbarkeit=state.verfWeeks[0]||{};
+  cell.classList.toggle('on',!cur);
+  saveState(); if('vibrate' in navigator) navigator.vibrate(8);
+}
+function pickVerfWeek(btn){
+  verfWeek=parseInt(btn.getAttribute('data-w'),10)||0;
+  document.querySelectorAll('[data-action="verf-week"]').forEach(b=>
+    b.classList.toggle('active',parseInt(b.getAttribute('data-w'),10)===verfWeek));
+  const VG=verfGrid(verfWeek);
+  document.querySelectorAll('#sec-avail .avail-cell').forEach(c=>{
+    const d=c.getAttribute('data-d'),p=c.getAttribute('data-p');
+    c.classList.toggle('on',!!(VG[d]&&VG[d][p]));
+  });
+  saveState();
+}
 function requestLesson(btnEl){
   let selected=0, candidates=[];
   DAYS.forEach(d=>PERIODS.forEach(p=>{ const on=state.verfuegbarkeit[d.k]&&state.verfuegbarkeit[d.k][p.k]; if(on) selected++; const plan=FL_PLAN[d.k]&&FL_PLAN[d.k][p.k]; if(on&&plan) candidates.push({dt:nextDateForDow(d.k,p.hour)}); }));
@@ -2958,6 +3010,7 @@ document.addEventListener('click',e=>{
     case 'confirm-exam': confirmExam(trg); break;
     case 'exam-pass': passExam(trg); break;
     case 'avail': toggleAvail(trg); break;
+    case 'verf-week': pickVerfWeek(trg); break;
     case 'request-lesson': requestLesson(trg); break;
     case 'focus-hot': focusHotspot(parseInt(trg.getAttribute('data-idx'),10)); break;
     case 'ready-go': readyGo(trg); break;

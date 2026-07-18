@@ -563,6 +563,7 @@ select.sel{
   <button class="chip-btn" data-f="ready" onclick="setFilter('ready')"><span data-ic="badge-check"></span>Prüfungsreif</button>
   <button class="chip-btn" data-f="live" onclick="setFilter('live')"><span data-ic="zap"></span>Live-App</button>
   <button class="chip-btn" id="matchBtn" onclick="gotoMatching()" style="display:none"><span data-ic="sparkles"></span>Smart-Matching</button>
+  <button class="chip-btn" id="autoBtn" onclick="toggleAutoMatch()"><span data-ic="zap"></span><span id="autoBtnTxt">Auto: AN</span></button>
   <div class="tool-right">
     <button class="btn btn-ghost" onclick="exportCSV()"><span data-ic="download"></span>Export</button>
     <button class="btn btn-primary" onclick="openAdd()"><span data-ic="user-plus"></span>Neuer Schüler</button>
@@ -658,6 +659,7 @@ const ICONS={
   "bell":'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
   "smartphone":'<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
   "siren":'<path d="M7 18v-6a5 5 0 1 1 10 0v6"/><path d="M5 21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2z"/><path d="M21 12h1"/><path d="M18.5 4.5 18 5"/><path d="M2 12h1"/><path d="M12 2v1"/><path d="m4.929 4.929.707.707"/><path d="M12 12v6"/>',
+  "gamepad-2":'<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/>',
   "flag-checkered":'<path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-7.333-2q-2 0-3.067.8"/><path d="M8 2v14"/><path d="M12 4v14"/><path d="M16 3.5v14"/><path d="M20 5v10"/>',
   "calendar-check":'<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>'
 };
@@ -764,10 +766,15 @@ function nextDateForDow(dow,hour,offsetWeeks){
   d.setDate(now.getDate()+add+(offsetWeeks||0)*7); d.setHours(hour,0,0,0);
   return d;
 }
-function matchingSlots(verf,fl,taken){
-  if(!verf||!fl) return [];
+function matchingSlots(appOrVerf,fl,taken){
+  if(!appOrVerf||!fl) return [];
+  /* akzeptiert das App-Objekt (mit verfWeeks) oder ein Alt-Wochenraster */
+  const weeks=appOrVerf.verfWeeks||null;
+  const legacy=appOrVerf.verfuegbarkeit!==undefined?appOrVerf.verfuegbarkeit:appOrVerf;
   const out=[];
-  [0,1].forEach(w=>{
+  [0,1,2,3,4,5].forEach(w=>{
+    const verf=weeks?(weeks[w]||{}):legacy;
+    if(!verf) return;
     for(let d=1;d<=6;d++){
       ['vormittag','nachmittag','abend'].forEach(p=>{
         if(verf[d]&&verf[d][p]&&fl.plan[d]&&fl.plan[d][p]){
@@ -782,7 +789,7 @@ function matchingSlots(verf,fl,taken){
     }
   });
   out.sort((a,b)=>a.date-b.date);
-  return out.slice(0,5);
+  return out.slice(0,6);
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -930,6 +937,9 @@ function buildLiveRecord(id,profile,st){
     app:{
       naechsteFahrstunde:st.naechsteFahrstunde||null,
       verfuegbarkeit:st.verfuegbarkeit||null,
+      verfWeeks:st.verfWeeks||null,
+      simBuchungen:st.simBuchungen||[],
+      go:!!st.fahrlehrerGo,
       offeneTheorieTermine:(st.themeSessions||[]).filter(t=>t.status==='offen').length,
       fahrlehrerGo:!!st.fahrlehrerGo
     }
@@ -973,6 +983,7 @@ async function netPoll(){
       announceAbsences();
       Object.keys(data).forEach(k=>{ if(k.indexOf('__')!==0) detectChangesFor('NET-'+k,data[k].profile,data[k].state); });
       netStudents=data;
+      runAutoMatch();
       render();
     }
   }catch(e){
@@ -1095,6 +1106,8 @@ function snapshotFromRaw(profileRaw,stateRaw){
     docs:st?{sehtest:st.dokumente.sehtest.status,ersteHilfe:st.dokumente.ersteHilfe.status,passbild:st.dokumente.passbild.status}:null,
     theorie:st?st.theorie.besucht:0,
     ueb:st?(st.uebungsstunden||0):0,
+    simB:st?((st.simBuchungen||[]).length):0,
+    go:st?!!st.fahrlehrerGo:false,
     sfs:st?(st.sonderfahrten.ueberland.ist+st.sonderfahrten.autobahn.ist+st.sonderfahrten.nacht.ist):0,
     verf:st?JSON.stringify(st.verfuegbarkeit||null):'',
     next:st?(st.naechsteFahrstunde||''):'',
@@ -1115,7 +1128,32 @@ function detectAppChanges(){
   if(syncOnline) return;
   detectChangesFor('local',localStorage.getItem(PROFILE_KEY),localStorage.getItem(STATE_KEY));
 }
+/* Dokument-Scans (Sehtest, Erste Hilfe, Passbild) dauerhaft archivieren */
+let docArchive={};
+try{docArchive=JSON.parse(localStorage.getItem('fk_admin_docarchive')||'{}')||{};}catch(e){}
+function archiveDocs(id,stateRaw){
+  try{
+    const st=JSON.parse(stateRaw||'null');
+    if(!st||!st.dokumente)return;
+    let dirty=false;
+    Object.keys(DOC_LABELS).forEach(k=>{
+      const d=st.dokumente[k];
+      if(d&&d.thumb&&d.status!=='ausstehend'){
+        const key=id+'|'+k;
+        if(!docArchive[key]||docArchive[key].png!==d.thumb){
+          docArchive[key]={png:d.thumb,status:d.status,ts:new Date().toISOString()};dirty=true;
+        }
+      }
+    });
+    if(dirty){
+      const keys=Object.keys(docArchive);
+      if(keys.length>60)keys.slice(0,keys.length-60).forEach(k2=>delete docArchive[k2]);
+      localStorage.setItem('fk_admin_docarchive',JSON.stringify(docArchive));
+    }
+  }catch(e){}
+}
 function detectChangesFor(id,profileRaw,stateRaw){
+  archiveDocs(id,stateRaw);
   const m=loadSeenMap();
   const prev=m[id], cur=snapshotFromRaw(profileRaw,stateRaw);
   const remember=()=>{m[id]=cur;saveSeenMap(m);};
@@ -1146,6 +1184,8 @@ function detectChangesFor(id,profileRaw,stateRaw){
     if(prev.theorie!==cur.theorie) addEvent('book-open',`Theorie-Stand von ${who}: jetzt ${cur.theorie} Doppelstunden`);
     if(prev.ueb!=null&&prev.ueb!==cur.ueb&&cur.ueb>prev.ueb) addEvent('car-front',`Fahrstunde von ${who} bestätigt & abgerechnet (jetzt ${cur.ueb} × 45 min)`);
     if(prev.sfs!=null&&cur.sfs>prev.sfs) addEvent('route',`Sonderfahrt von ${who} bestätigt & abgerechnet`);
+    if(prev.simB!=null&&cur.simB>prev.simB) addEvent('gamepad-2',`${who} hat einen Simulator-Platz gebucht – Rechnung (39 €) automatisch erstellt`);
+    if(prev.go!=null&&!prev.go&&cur.go) addEvent('badge-check',`Prüfungs-GO für ${who} erteilt – alle Mindestfahrten erreicht!`);
     if(prev.tp!==cur.tp&&cur.tp) addEvent('badge-check',`${who} hat die Theorieprüfung bestanden!`);
     if(prev.next!==cur.next&&cur.next) addEvent('calendar-check',`Fahrstunden-Termin von ${who} geändert: ${fmtDate(cur.next)}`);
     if(prev.themesOffen!==cur.themesOffen) addEvent('calendar-clock',`${who} hat Theorie-Termine angepasst (${cur.themesOffen} gebucht)`);
@@ -1335,6 +1375,8 @@ function render(){
     :(syncOnline?`${lives.length} App${lives.length>1?'s':''} live über Server`+(lives.length===1?`: ${live.name}`:'')
     :`Live gekoppelt: ${live.name}`);
   document.getElementById('matchBtn').style.display=live?'inline-flex':'none';
+  document.getElementById('autoBtn').classList.toggle('active',autoMatch);
+  document.getElementById('autoBtnTxt').textContent=autoMatch?'Auto: AN':'Auto: AUS';
   /* Roter Alarm bei spontanem Fahrlehrer-Ausfall */
   const abs=absentToday();
   const bar=document.getElementById('alarmBar');
@@ -1383,7 +1425,7 @@ function render(){
           ?(new Date(s.app.naechsteFahrstunde)<=new Date()
             ?`<span class="flag bad">${ic('flag-checkered')}Fahrt bestätigen!</span>`
             :`<span class="flag ok">${ic('calendar-check')}Termin ${new Date(s.app.naechsteFahrstunde).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})}</span>`)
-          :(()=>{const n=matchingSlots(s.app.verfuegbarkeit,instructorOf(s),takenFor(s)).length;return n?`<span class="flag warn">${ic('sparkles')}${n} Termin-Vorschläge – absegnen</span>`:'';})())
+          :(()=>{const n=matchingSlots(s.app,instructorOf(s),takenFor(s)).length;return n?`<span class="flag warn">${ic('sparkles')}${n} Termin-Vorschläge – absegnen</span>`:'';})())
         :''}
         ${off>0?`<span class="flag ${off>=100?'bad':'warn'}">${ic('banknote')}${fmtEuro(off)} offen</span>`:`<span class="flag ok">${ic('check')}bezahlt</span>`}
         ${docs.length?`<span class="flag warn">${ic('file-warning')}${docs.length} Nachweis${docs.length>1?'e':''} offen</span>`:`<span class="flag ok">${ic('check')}Nachweise</span>`}
@@ -1512,7 +1554,8 @@ function renderDetail(){
       ${Object.keys(DOC_LABELS).map(k=>`<div class="doc-row">
         <span class="doc-ic">${ic(DOC_ICONS[k])}</span>
         <span class="doc-name">${DOC_LABELS[k]}</span>
-        ${thumbs[k]?`<img class="doc-thumb" src="${thumbs[k]}" alt="${DOC_LABELS[k]}" onclick="showThumb(this.src)">`:''}
+        ${(()=>{const img=thumbs[k]||(docArchive[s.id+'|'+k]&&docArchive[s.id+'|'+k].png);
+          return img?`<img class="doc-thumb" src="${img}" alt="${DOC_LABELS[k]}" onclick="showThumb(this.src)">`:'';})()}
         ${docChip(s.dokumente[k])}
         ${s.dokumente[k]!=='verifiziert'
           ?`<button class="mini-btn ok" onclick="setDoc('${s.id}','${k}','verifiziert')">Verifizieren</button>`
@@ -1523,14 +1566,17 @@ function renderDetail(){
     ${s.live&&s.app?`<div class="panel"><h3>${ic('zap')}App-Einblick (live)</h3>
       ${s.app.naechsteFahrstunde?`<div class="insight-row"><span class="l">${ic('calendar-clock')} Nächste Fahrstunde</span><span class="v">${fmtDate(s.app.naechsteFahrstunde)}</span></div>`:''}
       <div class="insight-row"><span class="l">${ic('book-open')} Gebuchte Theorie-Termine</span><span class="v">${s.app.offeneTheorieTermine}</span></div>
-      <div class="insight-row"><span class="l">${ic('badge-check')} Fahrlehrer-Freigabe</span><span class="v">${s.app.fahrlehrerGo?'Erteilt':'Offen'}</span></div>
-      ${s.app.verfuegbarkeit?`<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--text-dim);margin-bottom:2px">Wunschzeiten × Dienstplan</div>${availMatrixHTML(s.app.verfuegbarkeit,instructorOf(s))}</div>`:''}
+      <div class="insight-row"><span class="l">${ic('badge-check')} Prüfungs-GO</span><span class="v" style="color:${s.app.go?'var(--emerald-hi)':'var(--amber)'}">${s.app.go?'Erteilt ✓':'Offen'}</span></div>
+      ${s.app.simBuchungen&&s.app.simBuchungen.length?`
+        <div style="margin-top:10px;font-size:12px;font-weight:800;color:var(--text-dim)">${ic('gamepad-2')} Simulator-Buchungen</div>
+        ${s.app.simBuchungen.slice(-5).reverse().map(b=>`<div class="insight-row"><span class="l">${esc(b.label)}</span><span class="v" style="color:var(--text-faint);font-weight:600">gebucht ${fmtDate(b.ts)}</span></div>`).join('')}`:''}
+      ${s.app.verfuegbarkeit?`<div style="margin-top:12px"><div style="font-size:12px;font-weight:800;color:var(--text-dim);margin-bottom:2px">Wunschzeiten × Dienstplan (Woche 1 von 6)</div>${availMatrixHTML((s.app.verfWeeks&&s.app.verfWeeks[0])||s.app.verfuegbarkeit,instructorOf(s))}</div>`:''}
     </div>
 
     <div class="panel" id="matchPanel"><h3>${ic('sparkles')}Smart-Matching – Termin bestätigen</h3>
       ${(()=>{
         const flObj=instructorOf(s);
-        const slots=matchingSlots(s.app.verfuegbarkeit,flObj,takenFor(s));
+        const slots=matchingSlots(s.app,flObj,takenFor(s));
         const cur=s.app.naechsteFahrstunde;
         let html='';
         if(cur){
@@ -1709,16 +1755,88 @@ function addItem(id){
   toast('Posten hinzugefügt');
   render();
 }
+/* ── Vollautomatisches Smart-Matching ──────────────────────────────
+   Prüft für jeden App-Schüler: Klasse → passende Fahrlehrer →
+   Überschneidung der Wunschzeiten (6 Wochen) mit dem Dienstplan.
+   Weist automatisch den besten Fahrlehrer zu und bucht den frühesten
+   konfliktfreien Termin. Abschaltbar über den Toolbar-Schalter. ── */
+let autoMatch=true;
+try{autoMatch=localStorage.getItem('fk_auto_match')!=='0';}catch(e){}
+const autoTried={};
+function toggleAutoMatch(){
+  autoMatch=!autoMatch;
+  try{localStorage.setItem('fk_auto_match',autoMatch?'1':'0');}catch(e){}
+  toast(autoMatch?'Auto-Matching aktiviert':'Auto-Matching pausiert – Termine manuell absegnen');
+  render();
+}
+function overlapScore(s,fl){
+  /* Wie viele Wunsch-Zellen über 6 Wochen trifft der Dienstplan? */
+  const weeks=s.app&&s.app.verfWeeks?s.app.verfWeeks:{0:(s.app&&s.app.verfuegbarkeit)||{}};
+  let n=0;
+  Object.keys(weeks).forEach(w=>{
+    const g=weeks[w]||{};
+    for(let d=1;d<=6;d++)['vormittag','nachmittag','abend'].forEach(p=>{
+      if(g[d]&&g[d][p]&&fl.plan[d]&&fl.plan[d][p])n++;
+    });
+  });
+  return n;
+}
+function assignedCount(fl){return allStudents().filter(x=>instructorOf(x).id===fl.id).length;}
+function runAutoMatch(){
+  if(!autoMatch)return;
+  liveStudents().forEach(s=>{
+    if(!s.app)return;
+    const sig=(s.flId||'')+'|'+(s.app.naechsteFahrstunde||'')+'|'+JSON.stringify(s.app.verfWeeks||s.app.verfuegbarkeit||{});
+    if(autoTried[s.id]===sig)return;
+    autoTried[s.id]=sig;
+    /* Schritt 1: passenden Fahrlehrer zuweisen (Klasse + Zeit-Überschneidung + Auslastung) */
+    if(!s.flId){
+      const best=INSTRUCTORS.filter(f=>canTeach(f,s.klasse))
+        .map(f=>({f,score:overlapScore(s,f)*2-assignedCount(f)*0.5}))
+        .sort((a,b)=>b.score-a.score)[0];
+      if(best){
+        writeLiveFor(s,st=>{st.fahrlehrerId=best.f.id;st.fahrlehrerName=best.f.name;});
+        addNoteSilent(s.id,'Auto-Matching: Fahrlehrer '+best.f.name+' zugewiesen');
+        addEvent('sparkles',`Auto-Matching: ${s.name} (Klasse ${s.klasse}) → ${best.f.name}`);
+      }
+      return; /* Termin folgt im nächsten Durchlauf mit gesetztem Fahrlehrer */
+    }
+    /* Schritt 2: frühesten konfliktfreien Termin verbinden */
+    if(!s.app.naechsteFahrstunde){
+      const fl=instructorOf(s);
+      const slots=matchingSlots(s.app,fl,takenFor(s));
+      if(slots.length){
+        writeLiveFor(s,st=>{st.naechsteFahrstunde=slots[0].iso;});
+        addNoteSilent(s.id,'Auto-Matching: Fahrstunde '+slots[0].label+' · '+fmtDate(slots[0].iso));
+        addEvent('calendar-check',`Auto-Matching: ${s.name} ↔ ${fl.name} – ${fmtDate(slots[0].iso)}`);
+      } else {
+        /* Der eigene Fahrlehrer passt nie zu den Wunschzeiten →
+           automatisch zum frühesten passenden Kollegen wechseln */
+        const alt=INSTRUCTORS.filter(f=>canTeach(f,s.klasse)&&f.id!==fl.id)
+          .map(f=>({f,sl:matchingSlots(s.app,f,takenForFl(f,s.id))}))
+          .filter(x=>x.sl.length)
+          .sort((a,b)=>a.sl[0].date-b.sl[0].date)[0];
+        if(alt){
+          writeLiveFor(s,st=>{st.fahrlehrerId=alt.f.id;st.fahrlehrerName=alt.f.name;st.naechsteFahrstunde=alt.sl[0].iso;});
+          addNoteSilent(s.id,'Auto-Matching: Wechsel zu '+alt.f.name+' – '+alt.sl[0].label);
+          addEvent('sparkles',`Auto-Matching: ${s.name} → ${alt.f.name} (Wunschzeiten passten nicht zu ${fl.name}) – ${fmtDate(alt.sl[0].iso)}`);
+        }
+      }
+    }
+  });
+}
+
 /* Überbuchungsschutz: bestätigte Termine des Fahrlehrers eines Schülers,
    die anderen Schülern gehören – diese Slots sind blockiert. */
-function takenFor(s){
-  const fl=instructorOf(s), set=new Set();
+function takenForFl(fl,exceptId){
+  const set=new Set();
   allStudents().forEach(o=>{
-    if(o.live&&o.id!==s.id&&o.app&&o.app.naechsteFahrstunde&&instructorOf(o).id===fl.id)
+    if(o.live&&o.id!==exceptId&&o.app&&o.app.naechsteFahrstunde&&instructorOf(o).id===fl.id)
       set.add(o.app.naechsteFahrstunde);
   });
   return set;
 }
+function takenFor(s){return takenForFl(instructorOf(s),s.id);}
 function confirmRide(mode){
   const s=byId(selectedId); if(!s||!s.live){toast('Kein Live-Schüler ausgewählt');return;}
   const st=liveStateOf(s); if(!st||!st.naechsteFahrstunde){toast('Kein geplanter Termin vorhanden');return;}
