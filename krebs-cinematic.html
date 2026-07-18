@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#020304">
+<meta name="description" content="Fahrschule Krebs Fulda – alle Führerscheinklassen, Digitalpaket, Simulatorausbildung, Preisvergleich und Weiterbildung.">
+<title>Fahrschule Krebs — Cinematic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@600;700;800;900&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#020304;
+  --ink:#f7f4ef;
+  --ink2:#e6e2da;
+  --muted:#a4a099;
+  --faint:#6b675f;
+  --red:#ed153e;
+  --red2:#ff4a68;
+  --redDark:#7d0923;
+  --green:#54d99a;
+  --line:rgba(255,255,255,.1);
+  --ease:cubic-bezier(.16,1,.3,1);
+  --ease2:cubic-bezier(.22,.61,.36,1);
+  --display:"Saira Condensed","Arial Narrow",Arial,sans-serif;
+  --sans:"Archivo","Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg);scroll-behavior:auto;scrollbar-color:rgba(237,21,62,.6) #050609}
+body{min-width:320px;background:var(--bg);color:var(--ink);font-family:var(--sans);font-weight:400;overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,input,a{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer}
+a{text-decoration:none}
+::selection{background:var(--red);color:#fff}
+:focus-visible{outline:2px solid var(--red2);outline-offset:4px}
+.cap{font-family:var(--display);text-transform:uppercase}
+
+/* Loader */
+.loader{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#020304;transition:opacity .6s var(--ease),visibility .6s}
+.loader.done{opacity:0;visibility:hidden;pointer-events:none}
+.loader__inner{width:min(420px,80vw)}
+.loader__row{display:flex;justify-content:space-between;align-items:baseline;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.loader__row b{font-family:var(--display);font-weight:800;color:var(--ink);letter-spacing:.1em;font-size:15px}
+.loader__track{height:2px;margin-top:18px;background:rgba(255,255,255,.09);overflow:hidden}
+.loader__bar{width:0;height:100%;background:linear-gradient(90deg,var(--redDark),var(--red),#ff8ea3);box-shadow:0 0 18px rgba(237,21,62,.55);transition:width .4s var(--ease)}
+
+/* Header */
+.head{position:fixed;top:0;left:0;right:0;z-index:80;height:80px;padding:0 32px;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;border-bottom:1px solid transparent;transition:background .35s,border-color .35s,backdrop-filter .35s}
+.head.scrolled{background:rgba(4,5,7,.8);border-color:rgba(255,255,255,.07);backdrop-filter:blur(14px)}
+.brand{display:inline-flex;align-items:center;gap:12px;width:max-content}
+.brand__mark{width:36px;height:36px;border-radius:50%;position:relative;display:grid;place-items:center;border:1px solid rgba(255,255,255,.18);background:#0d0e12}
+.brand__mark b{font-family:var(--display);font-weight:900;font-size:15px;letter-spacing:-.02em}
+.brand__mark:after{content:"";position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:14px;height:2px;border-radius:2px;background:var(--red);box-shadow:0 0 8px rgba(237,21,62,.7)}
+.brand__type{font-family:var(--display);font-size:16px;font-weight:800;letter-spacing:.06em;line-height:1}.brand__type span{display:block;margin-top:4px;font-family:var(--sans);font-size:8px;font-weight:500;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+.nav{display:flex;gap:26px;justify-self:center}
+.nav a{position:relative;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);transition:color .2s}
+.nav a:after{content:"";position:absolute;left:0;right:100%;bottom:-8px;height:1.5px;background:var(--red);transition:right .35s var(--ease);border-radius:2px}
+.nav a:hover,.nav a.active{color:var(--ink)}.nav a.active:after{right:0}
+.head-cta{justify-self:end;min-height:40px;padding:0 18px;border-radius:999px;border:1px solid rgba(255,255,255,.14);font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;background:rgba(237,21,62,.07);transition:background .25s,border-color .25s}
+.head-cta:hover{background:rgba(237,21,62,.18);border-color:rgba(237,21,62,.4)}
+
+/* Hero — pinned canvas shatter */
+.hero{position:relative;height:320vh}
+.hero__pin{position:sticky;top:0;height:100vh;overflow:hidden}
+.hero__canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hero__glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(40vw 40vw at 50% 46%,rgba(237,21,62,.10),transparent 60%)}
+.hero__vign{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 46%,rgba(0,0,0,.5) 88%,rgba(0,0,0,.85) 120%)}
+.hero__ui{position:absolute;inset:0;pointer-events:none}
+.hero__intro{position:absolute;left:50%;top:15%;transform:translateX(-50%);text-align:center;width:min(90vw,760px)}
+.hero__kicker{font-size:11px;font-weight:600;letter-spacing:.34em;text-transform:uppercase;color:var(--red2)}
+.hero__tag{margin-top:12px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.hero__reveal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(1120px,92vw);text-align:center;opacity:0;display:flex;flex-direction:column;align-items:center;gap:22px;will-change:opacity,transform}
+.hero__reveal h1{font-family:var(--display);font-weight:900;text-transform:uppercase;line-height:.84;letter-spacing:0;font-size:clamp(46px,6.6vw,116px)}
+.hero__reveal h1 em{font-style:normal;color:var(--red2)}
+.hero__sub{max-width:560px;font-size:14px;line-height:1.6;color:var(--muted)}
+.hero__cta{display:flex;gap:12px;justify-content:center;pointer-events:auto}
+.hero__hint{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--faint);display:flex;flex-direction:column;align-items:center;gap:9px;z-index:3}
+.hero__hint i{width:1px;height:34px;background:linear-gradient(var(--red),transparent);animation:drop 1.8s var(--ease) infinite}
+@keyframes drop{0%{transform:scaleY(0);transform-origin:top;opacity:0}40%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);transform-origin:bottom;opacity:0}}
+
+/* Buttons */
+.btn{min-height:52px;padding:0 26px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:11px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.045);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .25s,border-color .25s,box-shadow .25s,transform .2s var(--ease)}
+.btn:hover{border-color:rgba(255,255,255,.36);background:rgba(255,255,255,.09)}
+.btn:active{transform:scale(.97)}
+.btn--primary{background:linear-gradient(135deg,var(--red),var(--red2));border-color:var(--red2);box-shadow:0 12px 30px rgba(237,21,62,.3),inset 0 1px 0 rgba(255,255,255,.22);color:#fff}
+.btn--primary:hover{box-shadow:0 16px 40px rgba(237,21,62,.42)}
+.btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8}
+.btn--sm{min-height:44px;padding:0 18px;font-size:10px}
+
+/* Sections */
+.section{position:relative;z-index:2;padding:130px 32px;max-width:1240px;margin:0 auto}
+.sec-head{max-width:760px;margin-bottom:54px}
+.sec-kicker{font-size:11px;font-weight:600;letter-spacing:.26em;text-transform:uppercase;color:var(--red2)}
+.sec-title{font-family:var(--display);font-size:clamp(44px,6vw,96px);font-weight:800;line-height:.9;letter-spacing:0;text-transform:uppercase;margin-top:16px}
+.sec-title em{font-style:normal;color:var(--red2)}
+.sec-title span{color:transparent;-webkit-text-stroke:1px rgba(247,244,239,.6)}
+.sec-desc{font-size:15px;line-height:1.7;color:var(--muted);margin-top:20px;max-width:560px}
+
+/* reveal on scroll (morph out) */
+.rv{opacity:0;transform:translateY(30px) scale(.97);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+.rv.in{opacity:1;transform:none}
+.rv-2{transition-delay:.08s}.rv-3{transition-delay:.16s}.rv-4{transition-delay:.24s}.rv-5{transition-delay:.32s}.rv-6{transition-delay:.40s}.rv-7{transition-delay:.48s}
+
+/* Classes */
+.class-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.class-card{padding:24px;border-radius:20px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
+.class-card:hover{border-color:rgba(237,21,62,.34);transform:translateY(-4px);box-shadow:0 22px 44px rgba(0,0,0,.4)}
+.class-card__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:16px}
+.class-card__head strong{font-family:var(--display);font-size:30px;font-weight:800;text-transform:uppercase}
+.class-card__head span{font-size:10px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:999px;background:#0b0c10;border:1px solid rgba(255,255,255,.1);font-size:12px;font-weight:600;transition:background .25s,border-color .25s,color .25s}
+.chip:hover{background:#15161d;border-color:rgba(255,255,255,.2)}
+.chip.hot{background:rgba(237,21,62,.14);border-color:rgba(237,21,62,.36);color:#fff}
+
+/* Digital */
+.digi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.digi-card{position:relative;padding:26px;border-radius:20px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);overflow:hidden;transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
+.digi-card:hover{border-color:rgba(255,255,255,.2);transform:translateY(-4px);box-shadow:0 22px 44px rgba(0,0,0,.4)}
+.digi-card:before{content:"";position:absolute;left:0;top:0;width:3px;height:100%;background:linear-gradient(var(--red2),transparent);opacity:.55}
+.digi-card b{display:block;font-family:var(--display);font-size:44px;font-weight:800;line-height:.9;color:var(--ink)}
+.digi-card span{display:block;margin-top:12px;font-size:13px;line-height:1.5;color:var(--muted)}
+.digi-card em{font-style:normal;color:var(--red2);font-weight:500}
+
+/* Simulator — refined radar HUD */
+.sim-wrap{display:grid;grid-template-columns:.85fr 1.15fr;gap:56px;align-items:center}
+.sim-radar{position:relative;aspect-ratio:1;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:radial-gradient(circle at 50% 50%,rgba(237,21,62,.08),transparent 62%);overflow:hidden}
+.sim-radar:before,.sim-radar:after{content:"";position:absolute;border:1px solid rgba(255,255,255,.06);border-radius:50%}
+.sim-radar:before{inset:16%}.sim-radar:after{inset:34%;border-color:rgba(237,21,62,.18)}
+.sim-radar .cross{position:absolute;inset:0}
+.sim-radar .cross:before,.sim-radar .cross:after{content:"";position:absolute;background:rgba(255,255,255,.06)}
+.sim-radar .cross:before{left:50%;top:8%;bottom:8%;width:1px;transform:translateX(-50%)}
+.sim-radar .cross:after{top:50%;left:8%;right:8%;height:1px;transform:translateY(-50%)}
+.sim-radar .sweep{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(237,21,62,.32),transparent 32%);animation:sweep 4.5s linear infinite;-webkit-mask:radial-gradient(circle,#000 68%,transparent 69%);mask:radial-gradient(circle,#000 68%,transparent 69%)}
+@keyframes sweep{to{transform:rotate(360deg)}}
+.sim-radar .core{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--display);font-weight:900;font-size:64px;letter-spacing:-.03em;color:var(--ink)}
+.sim-radar .core small{display:block;font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;margin-top:2px}
+.sim-radar .blip{position:absolute;width:8px;height:8px;border-radius:50%;background:var(--red2);box-shadow:0 0 12px var(--red2);animation:blip 4.5s ease-in-out infinite}
+.sim-radar .blip.b1{left:30%;top:38%;animation-delay:.4s}.sim-radar .blip.b2{left:66%;top:58%;animation-delay:1.6s}.sim-radar .blip.b3{left:58%;top:28%;animation-delay:2.8s}
+@keyframes blip{0%,100%{opacity:0;transform:scale(.5)}20%{opacity:1;transform:scale(1)}60%{opacity:0}}
+.sim-list{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+.sim-item{padding:18px 20px;border-radius:16px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08)}
+.sim-item strong{display:block;font-family:var(--display);font-size:17px;font-weight:700}
+.sim-item span{display:block;margin-top:4px;font-size:12px;color:var(--muted);line-height:1.4}
+
+/* Price comparison */
+.cmp{max-width:820px;display:grid;gap:22px}
+.cmp-row{display:grid;gap:11px}
+.cmp-head{display:flex;justify-content:space-between;align-items:center;gap:16px}
+.cmp-head span,.cmp-head label{font-size:14px;color:var(--muted);font-weight:500}
+.cmp-head em{font-style:normal;color:var(--red2);font-size:11px;font-weight:600}
+.cmp-head b{font-family:var(--display);font-size:30px;font-weight:800;color:var(--ink);white-space:nowrap}
+.cmp-head b.krebs{color:var(--red2)}
+.cmp-input{display:inline-flex;align-items:center;gap:7px;font-family:var(--display);font-size:24px;font-weight:700}
+.cmp-input input{width:130px;min-height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:#090a0e;padding:0 14px;text-align:right;color:#fff;font-family:var(--sans);font-size:15px;font-weight:600;transition:border-color .2s}
+.cmp-input input:focus{border-color:var(--red2);outline:none}
+.cmp-track{height:20px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);overflow:hidden}
+.cmp-bar{display:block;height:100%;width:0;border-radius:999px;transition:width .7s var(--ease)}
+.cmp-bar--avg{background:linear-gradient(90deg,#43454f,#71757f)}
+.cmp-bar--krebs{background:linear-gradient(90deg,var(--red),var(--red2));box-shadow:0 0 20px rgba(237,21,62,.45)}
+.cmp-bar--user{background:linear-gradient(90deg,#2f7d5b,var(--green))}
+.cmp-foot{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-top:16px;flex-wrap:wrap}
+.cmp-note{font-size:15px;line-height:1.5;color:var(--ink2);max-width:520px}
+.cmp-note b{font-weight:700}.cmp-note b.good{color:var(--green)}.cmp-note b.bad{color:var(--red2)}
+
+/* Special */
+.spec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.spec-card{display:flex;align-items:center;gap:16px;padding:22px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.015));border:1px solid rgba(255,255,255,.08);transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
+.spec-card:hover{border-color:rgba(237,21,62,.3);transform:translateY(-4px);box-shadow:0 22px 44px rgba(0,0,0,.4)}
+.spec-icon{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;flex:0 0 auto;background:rgba(237,21,62,.13);border:1px solid rgba(237,21,62,.26);font-family:var(--display);font-size:16px;font-weight:800;color:var(--red2)}
+.spec-card strong{display:block;font-family:var(--display);font-size:21px;font-weight:700}.spec-card span{display:block;margin-top:3px;font-size:12px;line-height:1.35;color:var(--muted)}
+
+/* Final */
+.final{position:relative;z-index:2;text-align:center;padding:150px 32px 170px}
+.final-mono{font-family:var(--display);font-size:clamp(90px,15vw,220px);font-weight:900;letter-spacing:-.03em;line-height:.9;text-shadow:0 0 60px rgba(237,21,62,.3)}
+.final-mono span{color:var(--red2)}
+.final h2{font-family:var(--display);font-size:clamp(40px,6vw,88px);font-weight:800;text-transform:uppercase;line-height:.9;margin-top:20px}
+.final p{max-width:520px;margin:20px auto 0;font-size:15px;line-height:1.7;color:var(--muted)}
+.final .cta{display:flex;gap:12px;justify-content:center;margin-top:34px;flex-wrap:wrap}
+.foot{border-top:1px solid rgba(255,255,255,.07);padding:34px 32px;display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;font-size:11px;letter-spacing:.06em;color:var(--faint);max-width:1240px;margin:0 auto}
+
+/* Modals */
+.modal{position:fixed;inset:0;z-index:300;display:grid;place-items:center;padding:22px;background:rgba(2,3,5,.88);opacity:0;visibility:hidden;transition:opacity .3s,visibility .3s;pointer-events:none;backdrop-filter:blur(3px)}
+.modal.open{opacity:1;visibility:visible;pointer-events:auto}
+.modal__card{position:relative;width:min(980px,95vw);max-height:90vh;overflow:auto;padding:32px;border-radius:28px;background:linear-gradient(150deg,#1b1d25,#0c0d12);border:1px solid rgba(255,255,255,.13);box-shadow:0 40px 120px rgba(0,0,0,.72);transform:translateY(22px) scale(.98);transition:transform .42s var(--ease)}
+.modal.open .modal__card{transform:none}
+.modal__close{position:absolute;right:18px;top:18px;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.12);color:var(--muted);font-size:21px;transition:background .25s,color .25s}
+.modal__close:hover{background:rgba(255,255,255,.06);color:var(--ink)}
+.modal__kicker{font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--red2)}
+.modal h3{font-family:var(--display);font-size:clamp(36px,5vw,60px);font-weight:800;line-height:.92;text-transform:uppercase;margin-top:12px}
+.modal__intro{font-size:12px;line-height:1.6;color:var(--muted);max-width:700px;margin-top:14px}
+.ptable{width:100%;border-collapse:collapse;margin-top:24px;font-size:12px}
+.ptable th{text-align:left;padding:11px 8px;color:var(--faint);font-size:9px;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08);font-weight:600}
+.ptable td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.06);color:var(--ink2)}.ptable td:last-child,.ptable th:last-child{text-align:right}
+.ptable input{width:80px;min-height:38px;border-radius:9px;border:1px solid rgba(255,255,255,.11);background:#090a0e;padding:0 10px;text-align:right;color:#fff}
+.ptable .pos{min-width:250px}.ptable .sum{font-family:var(--display);font-size:17px;font-weight:700;white-space:nowrap;color:#fff}
+.pcalc{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:end;margin-top:24px}
+.pcomp{display:flex;align-items:center;gap:12px;padding:15px;border-radius:17px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+.pcomp label{font-size:11px;color:var(--muted)}.pcomp input{margin-left:auto;width:130px;min-height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#090a0e;padding:0 13px;text-align:right;color:#fff}
+.ptotal{text-align:right}.ptotal small{display:block;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}.ptotal strong{display:block;font-family:var(--display);font-size:50px;font-weight:800;margin-top:4px}.ptotal strong span{font-size:.45em;color:var(--red2)}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:24px}.copt{padding:18px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);text-align:left;transition:border-color .25s,transform .25s var(--ease2)}.copt:hover{border-color:rgba(237,21,62,.3);transform:translateY(-3px)}.copt strong{display:block;font-family:var(--display);font-size:21px;font-weight:700}.copt span{display:block;margin-top:5px;font-size:11px;color:var(--muted);line-height:1.45}
+.toast{position:fixed;left:50%;bottom:32px;z-index:450;transform:translate(-50%,100px);padding:15px 23px;border-radius:999px;background:#f4f1ec;color:#090a0d;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;box-shadow:0 16px 45px rgba(0,0,0,.4);transition:transform .45s var(--ease)}.toast.show{transform:translate(-50%,0)}
+
+@media(max-width:1080px){
+  .class-grid{grid-template-columns:1fr 1fr}
+  .digi-grid,.spec-grid{grid-template-columns:1fr 1fr}
+  .sim-wrap{grid-template-columns:1fr;gap:32px}.sim-radar{max-width:360px;margin:0 auto}
+}
+@media(max-width:900px){
+  .nav,.head-cta{display:none}.head{height:64px;padding:0 16px;grid-template-columns:1fr}
+  .section{padding:90px 20px}.sec-head{margin-bottom:38px}
+}
+@media(max-width:640px){
+  .class-grid,.digi-grid,.spec-grid,.sim-list{grid-template-columns:1fr}
+  .cmp-head b{font-size:24px}.cmp-input input{width:110px}
+  .hero{height:300vh}
+  .pcalc{grid-template-columns:1fr}.cgrid{grid-template-columns:1fr}.ptable{min-width:640px}.modal__card{padding:22px 16px;overflow-x:auto}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*:before,*:after{animation-duration:.001ms!important;transition-duration:.001ms!important}
+  .rv{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div class="loader" id="loader"><div class="loader__inner"><div class="loader__row"><b>FAHRSCHULE KREBS</b><span>Cinematic laden</span></div><div class="loader__track"><div class="loader__bar" id="loaderBar"></div></div></div></div>
+
+<header class="head" id="head">
+  <a class="brand" href="#top"><span class="brand__mark"><b>FK</b></span><span class="brand__type">FAHRSCHULE KREBS<span>Fulda · Digital begleitet</span></span></a>
+  <nav class="nav"><a href="#klassen">Klassen</a><a href="#digital">Digitalpaket</a><a href="#simulator">Simulator</a><a href="#preise">Preise</a><a href="#weiterbildung">Weiterbildung</a></nav>
+  <button class="head-cta" data-contact>Beratung starten</button>
+</header>
+
+<!-- HERO: pinned shatter -->
+<section class="hero" id="top">
+  <div class="hero__pin">
+    <canvas class="hero__canvas" id="heroCanvas"></canvas>
+    <div class="hero__glow"></div>
+    <div class="hero__vign"></div>
+    <div class="hero__ui">
+      <div class="hero__intro" id="heroIntro">
+        <div class="hero__kicker">Fahrschule Krebs · Fulda</div>
+        <div class="hero__tag">Digitales Ausbildungssystem</div>
+      </div>
+      <div class="hero__reveal" id="heroReveal">
+        <h1>ALLES.<br><em>WAS DICH ANS ZIEL BRINGT.</em></h1>
+        <p class="hero__sub">Alle Klassen, digitale Lernbegleitung, Simulatoren und berufliche Qualifikationen – in einer Ausbildung, die transparent und persönlich bleibt.</p>
+        <div class="hero__cta"><button class="btn btn--primary" data-jump="klassen">Leistungen entdecken <svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg></button><button class="btn" data-contact>Beratung</button></div>
+      </div>
+    </div>
+    <div class="hero__hint" id="heroHint">Scrollen<i></i></div>
+  </div>
+</section>
+
+<!-- KLASSEN -->
+<section class="section" id="klassen">
+  <div class="sec-head">
+    <div class="sec-kicker rv">01 · Führerscheinklassen</div>
+    <h2 class="sec-title rv rv-2">ALLE KLASSEN.<br><span>EINE ADRESSE.</span></h2>
+    <p class="sec-desc rv rv-3">Vom Mofa bis zum Bus, vom BF17 bis CE – Ausbildung ohne Umwege, mit einer klaren Empfehlung, welche Klasse zu deinem Ziel passt.</p>
+  </div>
+  <div class="class-grid">
+    <div class="class-card rv"><div class="class-card__head"><strong>PKW</strong><span>Klasse B</span></div><div class="chips"><span class="chip hot">B</span><span class="chip hot">BF17</span><span class="chip">B197</span><span class="chip">B Automatik</span><span class="chip">BE</span><span class="chip">B96</span></div></div>
+    <div class="class-card rv rv-2"><div class="class-card__head"><strong>LKW</strong><span>Klasse C</span></div><div class="chips"><span class="chip hot">C</span><span class="chip hot">CE</span><span class="chip">C1</span><span class="chip">C1E</span><span class="chip">C1 / C1E</span></div></div>
+    <div class="class-card rv rv-3"><div class="class-card__head"><strong>Zweirad</strong><span>Klasse A</span></div><div class="chips"><span class="chip hot">A1</span><span class="chip hot">A2</span><span class="chip">A</span><span class="chip">AM</span><span class="chip">Mofa</span></div></div>
+    <div class="class-card rv rv-4"><div class="class-card__head"><strong>Bus</strong><span>Klasse D</span></div><div class="chips"><span class="chip hot">D</span><span class="chip">DE</span></div></div>
+  </div>
+</section>
+
+<!-- DIGITAL -->
+<section class="section" id="digital">
+  <div class="sec-head">
+    <div class="sec-kicker rv">02 · Digitalpaket</div>
+    <h2 class="sec-title rv rv-2">MEHR LERNEN.<br><em>WENIGER SUCHEN.</em></h2>
+    <p class="sec-desc rv rv-3">Simulatoren, Videos, Hörbuch, Prüfungsangst-E-Book, intensive Theorie und transparente Preise – ein System statt sechs Baustellen.</p>
+  </div>
+  <div class="digi-grid">
+    <div class="digi-card rv"><b>2×</b><span>Fahrsimulatoren für die Klassen <em>B · BE · C · CE</em></span></div>
+    <div class="digi-card rv rv-2"><b>80+</b><span>Prüfungsrelevante Videos für Fulda, Klassen <em>A bis D</em></span></div>
+    <div class="digi-card rv rv-3"><b>9×</b><span>Theorie pro Woche oder kompakt in <em>9 Werktagen</em> · Kl. B/BF17</span></div>
+    <div class="digi-card rv rv-4"><b>LIVE</b><span>Preisrechner: unsere Preise <em>vs. Mitbewerber</em></span></div>
+    <div class="digi-card rv rv-5"><b>AUDIO</b><span>Hörbuch: Grund- & Zusatzstoff <em>Klasse B</em></span></div>
+    <div class="digi-card rv rv-6"><b>16</b><span>E-Book: Techniken gegen <em>Prüfungsangst</em></span></div>
+  </div>
+</section>
+
+<!-- SIMULATOR -->
+<section class="section" id="simulator">
+  <div class="sim-wrap">
+    <div class="sim-radar rv" aria-hidden="true"><div class="cross"></div><div class="sweep"></div><span class="blip b1"></span><span class="blip b2"></span><span class="blip b3"></span><div class="core">2<small>Simulatoren</small></div></div>
+    <div>
+      <div class="sec-kicker rv">03 · Simulator-Ausbildung</div>
+      <h2 class="sec-title rv rv-2" style="font-size:clamp(40px,5vw,78px)">SICHERHEIT<br><em>BEGINNT VORHER.</em></h2>
+      <p class="sec-desc rv rv-3">Zwei Fahrsimulatoren machen komplexe Situationen wiederholbar – bevor Verkehr, Kupplung und Nervosität gleichzeitig anklopfen.</p>
+      <div class="sim-list">
+        <div class="sim-item rv rv-3"><strong>B · BE · C · CE</strong><span>Für alle relevanten Klassen verfügbar</span></div>
+        <div class="sim-item rv rv-4"><strong>Wiederholbar</strong><span>Manöver gezielt so oft üben wie nötig</span></div>
+        <div class="sim-item rv rv-5"><strong>Prüfungsnah</strong><span>Situationen strukturiert vorbereiten</span></div>
+        <div class="sim-item rv rv-6"><strong>Ergänzend</strong><span>Ideal zusätzlich zu den Praxisstunden</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PREISE -->
+<section class="section" id="preise">
+  <div class="sec-head">
+    <div class="sec-kicker rv">04 · Preisvergleich</div>
+    <h2 class="sec-title rv rv-2">GÜNSTIGER ALS<br><span>DER DURCHSCHNITT.</span></h2>
+    <p class="sec-desc rv rv-3">Sieh direkt, wie die Fahrschule Krebs im Vergleich zum Bundesdurchschnitt liegt – und trag dein eigenes Angebot zum Vergleich ein.</p>
+  </div>
+  <div class="cmp rv rv-3">
+    <div class="cmp-row">
+      <div class="cmp-head"><span>Ø Deutschland · Klasse B</span><b>3.500 €</b></div>
+      <div class="cmp-track"><i class="cmp-bar cmp-bar--avg" id="barAvg"></i></div>
+    </div>
+    <div class="cmp-row">
+      <div class="cmp-head"><span>Fahrschule Krebs <em>· Beispiel</em></span><b class="krebs">3.090 €</b></div>
+      <div class="cmp-track"><i class="cmp-bar cmp-bar--krebs" id="barKrebs"></i></div>
+    </div>
+    <div class="cmp-row">
+      <div class="cmp-head"><label for="cmpUser">Dein aktuelles Angebot</label><span class="cmp-input"><input id="cmpUser" type="number" min="0" step="10" placeholder="z. B. 3390" aria-label="Dein aktuelles Angebot in Euro">€</span></div>
+      <div class="cmp-track"><i class="cmp-bar cmp-bar--user" id="barUser"></i></div>
+    </div>
+    <div class="cmp-foot"><p class="cmp-note" id="cmpNote">Fahrschule Krebs ist <b class="good">410 €</b> günstiger als der Bundesdurchschnitt.</p><button class="btn btn--sm btn--primary" data-price>Detaillierter Rechner</button></div>
+  </div>
+</section>
+
+<!-- WEITERBILDUNG -->
+<section class="section" id="weiterbildung">
+  <div class="sec-head">
+    <div class="sec-kicker rv">05 · Weiterbildung & Spezial</div>
+    <h2 class="sec-title rv rv-2">MEHR ALS<br><em>FÜHRERSCHEIN.</em></h2>
+    <p class="sec-desc rv rv-3">Berufliche Qualifikationen und Seminare – mit der gleichen Sorgfalt wie beim ersten Führerschein.</p>
+  </div>
+  <div class="spec-grid">
+    <div class="spec-card rv"><div class="spec-icon">HA</div><div><strong>Handicap-Ausbildung</strong><span>Individuell & persönlich begleitet</span></div></div>
+    <div class="spec-card rv rv-2"><div class="spec-icon">BKF</div><div><strong>Berufskraftfahrer</strong><span>Qualifizierung für den Beruf</span></div></div>
+    <div class="spec-card rv rv-3"><div class="spec-icon">ST</div><div><strong>Staplerschein</strong><span>Praxisorientiert für den Betrieb</span></div></div>
+    <div class="spec-card rv rv-4"><div class="spec-icon">ASF</div><div><strong>ASF-Seminar</strong><span>Aufbauseminar für Fahranfänger</span></div></div>
+    <div class="spec-card rv rv-5"><div class="spec-icon">FES</div><div><strong>FES-Seminar</strong><span>Fahreignung · Punkteabbau</span></div></div>
+    <div class="spec-card rv rv-6"><div class="spec-icon">ADR</div><div><strong>Gefahrgut ADR</strong><span>Sichere Gefahrguttransporte</span></div></div>
+  </div>
+</section>
+
+<!-- FINAL -->
+<section class="final" id="kontakt">
+  <div class="final-mono rv">K<span>R</span></div>
+  <h2 class="rv rv-2">BEREIT, LOSZUFAHREN?</h2>
+  <p class="rv rv-3">Wähle deine Führerscheinklasse oder lass dich beraten. Wir verbinden die passende Ausbildung mit dem digitalen Paket, das zu deinem Ziel passt.</p>
+  <div class="cta rv rv-4"><button class="btn btn--primary" data-contact>Beratung anfragen</button><button class="btn" data-price>Preise vergleichen</button></div>
+</section>
+<div class="foot"><span>Fahrschule Krebs · Fulda</span><span>Digital begleitet · Persönlich · Sicher</span></div>
+
+<!-- Price modal -->
+<div class="modal" id="priceModal" role="dialog" aria-modal="true" aria-labelledby="priceTitle">
+  <div class="modal__card"><button class="modal__close" data-close aria-label="Schließen">×</button><div class="modal__kicker">Fahrschule Krebs · Preisrechner</div><h3 id="priceTitle">Beispielrechnung B / BF17</h3><p class="modal__intro">Mengen und Preise lassen sich verändern. Die Rechnung ist eine transparente Beispielkalkulation und ersetzt kein individuelles Angebot.</p>
+    <div style="overflow:auto"><table class="ptable"><thead><tr><th class="pos">Position</th><th>Anzahl</th><th>Einzelpreis (€)</th><th>Summe</th></tr></thead><tbody>
+      <tr data-line><td class="pos">Grundbetrag (Klasse B / BF17)</td><td><input type="number" min="0" value="1" data-qty></td><td><input type="number" min="0" step="0.01" value="399" data-unit></td><td class="sum" data-sum>399,00 €</td></tr>
+      <tr data-line><td class="pos">Fahrstunde à 45 Min.</td><td><input type="number" min="0" value="20" data-qty></td><td><input type="number" min="0" step="0.01" value="64" data-unit></td><td class="sum" data-sum>1.280,00 €</td></tr>
+      <tr data-line><td class="pos">Simulator-Fahrstunde à 45 Min.</td><td><input type="number" min="0" value="5" data-qty></td><td><input type="number" min="0" step="0.01" value="32" data-unit></td><td class="sum" data-sum>160,00 €</td></tr>
+      <tr data-line><td class="pos">Sonderfahrten à 45 Min.</td><td><input type="number" min="0" value="12" data-qty></td><td><input type="number" min="0" step="0.01" value="76" data-unit></td><td class="sum" data-sum>912,00 €</td></tr>
+      <tr data-line><td class="pos">Lehrmaterial</td><td><input type="number" min="0" value="1" data-qty></td><td><input type="number" min="0" step="0.01" value="99" data-unit></td><td class="sum" data-sum>99,00 €</td></tr>
+      <tr data-line><td class="pos">Vorstellung Theorieprüfung</td><td><input type="number" min="0" value="1" data-qty></td><td><input type="number" min="0" step="0.01" value="60" data-unit></td><td class="sum" data-sum>60,00 €</td></tr>
+      <tr data-line><td class="pos">Vorstellung Praxisprüfung</td><td><input type="number" min="0" value="1" data-qty></td><td><input type="number" min="0" step="0.01" value="180" data-unit></td><td class="sum" data-sum>180,00 €</td></tr>
+    </tbody></table></div>
+    <div class="pcalc"><div class="pcomp"><label for="competitor">Mitbewerber-Gesamtpreis (optional)</label><input id="competitor" type="number" min="0" placeholder="z. B. 3390"></div><div class="ptotal"><small>Gesamtsumme · inkl. 19 % MwSt.</small><strong id="calcTotal">3.090,00 <span>€</span></strong></div></div>
+    <div class="modal-actions"><button class="btn btn--sm" data-close>Schließen</button><button class="btn btn--sm btn--primary" data-contact>Beratung zur Rechnung</button></div>
+  </div>
+</div>
+
+<!-- Contact modal -->
+<div class="modal" id="contactModal" role="dialog" aria-modal="true" aria-labelledby="cTitle"><div class="modal__card" style="width:min(720px,95vw)"><button class="modal__close" data-close aria-label="Schließen">×</button><div class="modal__kicker">Fahrschule Krebs · Beratung</div><h3 id="cTitle">Worum geht es?</h3><p class="modal__intro">Wähle den passenden Bereich. In der finalen Website lassen sich diese Optionen mit Telefon, WhatsApp, Terminbuchung oder Formular verbinden.</p><div class="cgrid"><button class="copt" data-choice="PKW & Anhänger"><strong>PKW & Anhänger</strong><span>B, BF17, B197, Automatik, BE und B96</span></button><button class="copt" data-choice="LKW & Bus"><strong>LKW & Bus</strong><span>C, CE, C1, C1E, D und DE</span></button><button class="copt" data-choice="Motorrad"><strong>Motorrad</strong><span>A1, A2, A, AM und Mofa</span></button><button class="copt" data-choice="Weiterbildung"><strong>Weiterbildung</strong><span>BKF, Staplerschein, ASF, FES, ADR und Handicap</span></button></div></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite">Auswahl gespeichert</div>
+
+<script>
+(()=>{
+'use strict';
+const $=(s,p=document)=>p.querySelector(s), $$=(s,p=document)=>[...p.querySelectorAll(s)];
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smooth=t=>{t=clamp(t);return t*t*(3-2*t)};
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* Loader */
+addEventListener('load',()=>{requestAnimationFrame(()=>{$('#loaderBar').style.width='100%';setTimeout(()=>$('#loader').classList.add('done'),380)})},{once:true});
+setTimeout(()=>{$('#loaderBar').style.width='100%';$('#loader').classList.add('done')},1200);
+
+/* ---------- HERO SHATTER ---------- */
+const canvas=$('#heroCanvas'),ctx=canvas.getContext('2d');
+const heroIntro=$('#heroIntro'),heroReveal=$('#heroReveal'),heroHint=$('#heroHint');
+const DPR=Math.min(2,devicePixelRatio||1);
+let VW=innerWidth,VH=innerHeight,emblem=null,emblemBlur=null,shards=[],EM=600,heroTop=0,heroH=1;
+let mx=.5,my=.5,tmx=.5,tmy=.5,hover=0,thover=0,bob=0;
+
+/* Build the procedural frosted-glass FK emblem on an offscreen canvas */
+function buildEmblem(){
+  const c=document.createElement('canvas');c.width=EM;c.height=EM;const g=c.getContext('2d');
+  const cx=EM/2,cy=EM/2, bw=350,bh=430, x=cx-bw/2,y=cy-bh/2,r=54;
+  function rr(x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+  /* outer soft shadow */
+  g.save();rr(x,y,bw,bh,r);g.shadowColor='rgba(0,0,0,.6)';g.shadowBlur=60;g.shadowOffsetY=30;g.fillStyle='rgba(20,22,28,1)';g.fill();g.restore();
+  /* glass body gradient */
+  g.save();rr(x,y,bw,bh,r);g.clip();
+  let lg=g.createLinearGradient(x,y,x,y+bh);lg.addColorStop(0,'#2a2d38');lg.addColorStop(.45,'#191b24');lg.addColorStop(1,'#0c0d13');g.fillStyle=lg;g.fillRect(x,y,bw,bh);
+  /* diagonal sheen */
+  let sh=g.createLinearGradient(x,y,x+bw,y+bh);sh.addColorStop(0,'rgba(255,255,255,.14)');sh.addColorStop(.22,'rgba(255,255,255,0)');sh.addColorStop(.7,'rgba(255,255,255,0)');sh.addColorStop(1,'rgba(237,21,62,.06)');g.fillStyle=sh;g.fillRect(x,y,bw,bh);
+  /* red inner glow bottom */
+  let rgd=g.createRadialGradient(cx,y+bh*.86,10,cx,y+bh*.86,bw*.7);rgd.addColorStop(0,'rgba(237,21,62,.22)');rgd.addColorStop(1,'rgba(237,21,62,0)');g.fillStyle=rgd;g.fillRect(x,y,bw,bh);
+  /* frost noise */
+  for(let i=0;i<2600;i++){const px=x+Math.random()*bw,py=y+Math.random()*bh,a=Math.random()*.05;g.fillStyle='rgba(255,255,255,'+a+')';g.fillRect(px,py,1,1);}
+  /* FK engraved */
+  g.textAlign='center';g.textBaseline='middle';g.font='900 210px "Saira Condensed","Arial Narrow",sans-serif';
+  g.fillStyle='rgba(0,0,0,.45)';g.fillText('FK',cx,cy+6);
+  g.fillStyle='rgba(247,244,239,.9)';g.fillText('FK',cx,cy);
+  let tg=g.createLinearGradient(x,cy-90,x,cy+90);tg.addColorStop(0,'rgba(255,255,255,.28)');tg.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=tg;g.fillText('FK',cx,cy);
+  g.restore();
+  /* top edge highlight + rim */
+  g.save();rr(x,y,bw,bh,r);g.lineWidth=1.5;g.strokeStyle='rgba(255,255,255,.22)';g.stroke();g.restore();
+  g.save();g.beginPath();g.moveTo(x+r,y+1.2);g.lineTo(x+bw-r,y+1.2);g.lineWidth=2;g.strokeStyle='rgba(255,255,255,.5)';g.lineCap='round';g.stroke();g.restore();
+  emblem=c;
+  /* blurred copy */
+  const b=document.createElement('canvas');b.width=EM;b.height=EM;const bg=b.getContext('2d');bg.filter='blur(11px)';bg.drawImage(c,0,0);emblemBlur=b;
+  buildShards();
+}
+function buildShards(){
+  shards=[];const cx=EM/2,cy=EM/2, bw=380,bh=460, ox=cx-bw/2,oy=cy-bh/2, cols=9,rows=11;
+  const pts=[];
+  for(let r=0;r<=rows;r++)for(let c=0;c<=cols;c++){
+    let px=ox+bw*c/cols, py=oy+bh*r/rows;
+    if(c>0&&c<cols)px+=(Math.random()-.5)*(bw/cols)*.62;
+    if(r>0&&r<rows)py+=(Math.random()-.5)*(bh/rows)*.62;
+    pts.push({x:px,y:py});
+  }
+  const id=(r,c)=>r*(cols+1)+c;
+  const mk=(tri)=>{
+    const minx=Math.min(tri[0].x,tri[1].x,tri[2].x),miny=Math.min(tri[0].y,tri[1].y,tri[2].y),maxx=Math.max(tri[0].x,tri[1].x,tri[2].x),maxy=Math.max(tri[0].y,tri[1].y,tri[2].y);
+    const w=Math.max(1,Math.ceil(maxx-minx)),h=Math.max(1,Math.ceil(maxy-miny));
+    const cv=document.createElement('canvas');cv.width=w;cv.height=h;const cc=cv.getContext('2d');
+    cc.beginPath();cc.moveTo(tri[0].x-minx,tri[0].y-miny);cc.lineTo(tri[1].x-minx,tri[1].y-miny);cc.lineTo(tri[2].x-minx,tri[2].y-miny);cc.closePath();cc.clip();
+    cc.drawImage(emblem,-minx,-miny);
+    /* subtle edge light on shard */
+    cc.lineWidth=1;cc.strokeStyle='rgba(255,255,255,.14)';cc.stroke();
+    const ccx=(minx+maxx)/2,ccy=(miny+maxy)/2;
+    const dx=ccx-cx,dy=ccy-cy,dl=Math.hypot(dx,dy)||1;
+    shards.push({cv,ox:minx,oy:miny,cx:ccx,cy:ccy,dirx:dx/dl,diry:dy/dl,dist:Math.hypot(bw,bh)*.5*(.5+Math.random()*.9),spin:(Math.random()-.5)*7,delay:Math.random()*.28,depth:.5+Math.random()*.9});
+  };
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const a=pts[id(r,c)],b=pts[id(r,c+1)],d=pts[id(r+1,c)],e=pts[id(r+1,c+1)];
+    mk([a,b,d]);mk([b,e,d]);
+  }
+}
+
+function resize(){VW=innerWidth;VH=innerHeight;canvas.width=VW*DPR;canvas.height=VH*DPR;canvas.style.width=VW+'px';canvas.style.height=VH+'px';ctx.setTransform(DPR,0,0,DPR,0,0);const hero=$('#top');heroTop=hero.offsetTop;heroH=hero.offsetHeight-VH;}
+function heroProgress(){return clamp((scrollY-heroTop)/heroH)}
+
+function drawHero(){
+  if(!emblem)return;
+  ctx.clearRect(0,0,VW,VH);
+  const p=heroProgress();
+  /* phases: 0-.32 intact, .32-.68 shatter, .68-1 gone */
+  const shatterT=smooth((p-.32)/.36);
+  const cx=VW/2, cy=VH*0.46 + Math.sin(bob)*6*(1-shatterT);
+  const disp=Math.min(VW,VH), s=(disp*0.62)/EM * (1 - shatterT*0.06);
+
+  if(shatterT<=0){
+    /* intact + cursor blur/light */
+    const drawX=cx-(EM/2)*s, drawY=cy-(EM/2)*s;
+    ctx.save();ctx.globalAlpha=1;ctx.drawImage(emblem,drawX,drawY,EM*s,EM*s);ctx.restore();
+    if(hover>0.01){ctx.save();ctx.globalAlpha=hover*0.85;ctx.drawImage(emblemBlur,drawX,drawY,EM*s,EM*s);ctx.restore();
+      const gx=mx*VW,gy=my*VH;const rg=ctx.createRadialGradient(gx,gy,0,gx,gy,170);rg.addColorStop(0,'rgba(237,60,90,'+(0.16*hover)+')');rg.addColorStop(1,'rgba(237,21,62,0)');ctx.fillStyle=rg;ctx.fillRect(0,0,VW,VH);
+    }
+  }else if(shatterT<1){
+    for(let i=0;i<shards.length;i++){const sh=shards[i];
+      const t=smooth((shatterT-sh.delay)/(1-sh.delay));
+      const hx=cx+(sh.cx-EM/2)*s, hy=cy+(sh.cy-EM/2)*s;
+      const fly=t*sh.dist*s*3.4;
+      const gx=cx+sh.dirx*fly + sh.dirx*Math.random()*0, gy=cy+sh.diry*fly + t*t*180;
+      ctx.save();ctx.globalAlpha=(1-t)*Math.min(1,1.4);ctx.translate(hx+sh.dirx*fly, hy+ (sh.diry*fly + t*t*180));ctx.rotate(t*sh.spin);ctx.scale(s,s);ctx.drawImage(sh.cv,-(sh.cx-sh.ox),-(sh.cy-sh.oy));ctx.restore();
+    }
+  }
+  /* intro fades on shatter, big headline reveals after */
+  const introOp=1-smooth(p/.26), revealOp=smooth((p-.62)/.26);
+  heroIntro.style.opacity=introOp.toFixed(3);
+  heroReveal.style.opacity=revealOp.toFixed(3);
+  heroReveal.style.transform=`translate(-50%,calc(-50% + ${((1-revealOp)*34).toFixed(1)}px))`;
+  heroReveal.style.pointerEvents=revealOp>.5?'auto':'none';
+  heroHint.style.opacity=(1-smooth(p/.1)).toFixed(3);
+}
+
+let raf=0,running=false;
+function loop(){raf=0;tmx=lerp(tmx,mx,.12);tmy=lerp(tmy,my,.12);hover=lerp(hover,thover,.1);bob+=0.02;drawHero();
+  const p=heroProgress();
+  if(p<1.02){schedule()} // keep animating over hero range
+}
+function schedule(){if(!raf)raf=requestAnimationFrame(loop)}
+addEventListener('scroll',schedule,{passive:true});
+addEventListener('resize',()=>{resize();schedule()},{passive:true});
+canvas.addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;mx=e.clientX/VW;my=e.clientY/VH;const dx=(mx-.5),dy=(my-.46);thover=clamp(1-Math.hypot(dx,dy)/.32);schedule()});
+canvas.addEventListener('pointerleave',()=>{thover=0;schedule()});
+
+/* animate bob continuously while hero in view */
+const heroObs=new IntersectionObserver((es)=>{es.forEach(en=>{running=en.isIntersecting;if(running)schedule()})},{threshold:0});
+heroObs.observe($('#top'));
+
+/* ---------- Scroll reveal ---------- */
+const io=new IntersectionObserver((es)=>{es.forEach(en=>{if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target)}})},{threshold:.16,rootMargin:'0px 0px -8% 0px'});
+$$('.rv').forEach(el=>io.observe(el));
+
+/* Header + nav active */
+const head=$('#head'),navA=$$('.nav a'),secs=['klassen','digital','simulator','preise','weiterbildung'].map(id=>$('#'+id));
+addEventListener('scroll',()=>{head.classList.toggle('scrolled',scrollY>30);
+  let cur=secs.length-1;for(let i=0;i<secs.length;i++){if(secs[i].getBoundingClientRect().top>VH*.4){cur=i-1;break}}
+  navA.forEach((a,i)=>a.classList.toggle('active',i===cur));
+},{passive:true});
+
+/* Jump */
+function jump(id){const el=$('#'+id);if(el)el.scrollIntoView({behavior:reduced?'auto':'smooth'})}
+$$('[data-jump]').forEach(b=>b.addEventListener('click',()=>jump(b.dataset.jump)));
+$$('.nav a,.brand').forEach(a=>a.addEventListener('click',e=>{const id=a.getAttribute('href')?.slice(1);if(!id)return;e.preventDefault();id==='top'?scrollTo({top:0,behavior:'smooth'}):jump(id)}));
+
+/* ---------- Comparison bars ---------- */
+const euro0=new Intl.NumberFormat('de-DE',{maximumFractionDigits:0});
+const AVG=3500,KREBS=3090;
+const barAvg=$('#barAvg'),barKrebs=$('#barKrebs'),barUser=$('#barUser'),cmpUser=$('#cmpUser'),cmpNote=$('#cmpNote');
+function updateCmp(){const user=parseFloat(cmpUser.value),has=Number.isFinite(user)&&user>0,max=Math.max(AVG,KREBS,has?user:0,1)*1.06;
+  barAvg.style.width=(AVG/max*100).toFixed(1)+'%';barKrebs.style.width=(KREBS/max*100).toFixed(1)+'%';barUser.style.width=(has?user/max*100:0).toFixed(1)+'%';
+  if(has){const d=user-KREBS;cmpNote.innerHTML=d>0?`Bei Fahrschule Krebs zahlst du <b class="good">${euro0.format(d)} €</b> weniger als bei deinem aktuellen Angebot.`:d<0?`Dein Angebot liegt <b class="bad">${euro0.format(-d)} €</b> unter unserem Beispielpreis – sprich uns gern darauf an.`:`Dein Angebot entspricht genau unserem Beispielpreis.`;}
+  else cmpNote.innerHTML=`Fahrschule Krebs ist <b class="good">${euro0.format(AVG-KREBS)} €</b> günstiger als der Bundesdurchschnitt.`;}
+cmpUser.addEventListener('input',updateCmp);
+/* reveal bars when the block enters */
+new IntersectionObserver((es,ob)=>{es.forEach(en=>{if(en.isIntersecting){updateCmp();ob.disconnect()}})},{threshold:.3}).observe($('.cmp'));
+
+/* ---------- Modals ---------- */
+const priceModal=$('#priceModal'),contactModal=$('#contactModal'),toast=$('#toast');let focusBefore=null;
+function openModal(m){focusBefore=document.activeElement;m.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>m.querySelector('button,input')?.focus(),60)}
+function closeModal(m){m.classList.remove('open');document.body.style.overflow='';focusBefore?.focus()}
+$$('[data-price]').forEach(b=>b.addEventListener('click',()=>openModal(priceModal)));
+$$('[data-contact]').forEach(b=>b.addEventListener('click',()=>{const p=b.closest('.modal');if(p)closeModal(p);setTimeout(()=>openModal(contactModal),80)}));
+$$('[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.closest('.modal'))));
+$$('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal(m)}));
+addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal.open').forEach(closeModal)});
+function showToast(t){toast.textContent=t;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2800)}
+$$('[data-choice]').forEach(b=>b.addEventListener('click',()=>{closeModal(contactModal);showToast(b.dataset.choice+' · Beratung ausgewählt')}));
+
+/* Detailed calculator */
+const euro=new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const lines=$$('[data-line]'),totalEl=$('#calcTotal');
+function recalc(){let total=0;lines.forEach(row=>{const q=Math.max(0,parseFloat($('[data-qty]',row).value)||0),u=Math.max(0,parseFloat($('[data-unit]',row).value)||0),s=q*u;total+=s;$('[data-sum]',row).textContent=euro.format(s)+' €'});totalEl.innerHTML=euro.format(total)+' <span>€</span>'}
+$$('#priceModal input').forEach(i=>i.addEventListener('input',recalc));
+
+/* init */
+buildEmblem();resize();schedule();recalc();updateCmp();
+})();
+</script>
+</body>
+</html>
