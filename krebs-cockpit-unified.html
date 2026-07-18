@@ -12,7 +12,6 @@
 <style>
 :root{
   --bg:#050609;
-  --bg2:#0a0b0f;
   --ink:#f7f4ef;
   --ink2:#e6e2da;
   --muted:#b0aca4;
@@ -22,9 +21,7 @@
   --redDark:#7d0923;
   --line:rgba(255,255,255,.12);
   --lineStrong:rgba(255,255,255,.22);
-  --panelA:#1c1e26;
-  --panelB:#0a0b10;
-  --green:#8ce2b6;
+  --green:#54d99a;
   --ease:cubic-bezier(.16,1,.3,1);
   --ease2:cubic-bezier(.22,.61,.36,1);
   --scene-x:.5;
@@ -52,46 +49,47 @@ a{text-decoration:none}
 .loader__track:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent);animation:sheen 1.4s var(--ease) infinite}
 .loader__bar{width:0;height:100%;background:linear-gradient(90deg,var(--redDark),var(--red),#ff8ea3);box-shadow:0 0 18px rgba(237,21,62,.58);transition:width .42s var(--ease);position:relative;z-index:1}
 @keyframes sheen{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
 /* Fixed stage */
 .stage{position:fixed;inset:0;z-index:1;overflow:hidden;pointer-events:none;isolation:isolate;background:
-  radial-gradient(58vw 58vw at 70% 36%,rgba(237,21,62,.10),transparent 62%),
+  radial-gradient(56vw 56vw at 68% 34%,rgba(237,21,62,.09),transparent 62%),
   linear-gradient(180deg,#07080b 0%,#040508 62%,#020305 100%)}
-.stage:before{content:"";position:absolute;left:50%;top:40%;width:72vmax;height:72vmax;z-index:-4;
-  background:radial-gradient(closest-side,rgba(237,21,62,.15),rgba(120,150,255,.03) 46%,transparent 72%);
-  transform:translate(-50%,-50%) translate3d(calc((var(--scene-x) - .5)*7vw),calc((var(--scene-y) - .5)*7vw),0);
-  will-change:transform;opacity:.9;filter:blur(6px)}
+.stage:before{content:"";position:absolute;left:50%;top:42%;width:70vmax;height:70vmax;z-index:-4;
+  background:radial-gradient(closest-side,rgba(237,21,62,.13),rgba(120,150,255,.025) 46%,transparent 72%);
+  transform:translate(-50%,-50%) translate3d(calc((var(--scene-x) - .5)*6vw),calc((var(--scene-y) - .5)*6vw),0);
+  will-change:transform;opacity:.85}
 .stage:after{content:"";position:absolute;inset:0;z-index:30;pointer-events:none;background:
-  radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.30) 76%,rgba(0,0,0,.74) 120%),
-  url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E");opacity:.18;mix-blend-mode:soft-light}
+  radial-gradient(ellipse at center,transparent 44%,rgba(0,0,0,.28) 78%,rgba(0,0,0,.72) 122%),
+  url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E");opacity:.15;mix-blend-mode:soft-light}
 
 .road-plane{position:absolute;left:50%;bottom:-35vh;width:160vw;height:92vh;z-index:-2;transform-origin:50% 100%;transform:translate3d(-50%,0,0) perspective(700px) rotateX(66deg);background:
-  linear-gradient(90deg,transparent 49.85%,rgba(237,21,62,.30) 50%,transparent 50.15%),
-  repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 1px,transparent 1px 8vw),
-  repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0 1px,transparent 1px 8vh);
-  -webkit-mask-image:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.35) 18%,#000 72%);mask-image:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.35) 18%,#000 72%);will-change:transform;opacity:.6;backface-visibility:hidden}
-.road-plane:before{content:"";position:absolute;left:50%;top:0;width:28%;height:100%;transform:translateX(-50%);background:linear-gradient(90deg,transparent,rgba(237,21,62,.05),transparent)}
+  linear-gradient(90deg,transparent 49.85%,rgba(237,21,62,.24) 50%,transparent 50.15%),
+  repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 8vw),
+  repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 8vh);
+  -webkit-mask-image:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.35) 18%,#000 72%);mask-image:linear-gradient(180deg,transparent 0%,rgba(0,0,0,.35) 18%,#000 72%);will-change:transform;opacity:.5;backface-visibility:hidden}
 
 .word-layer{position:absolute;inset:0;z-index:-1;pointer-events:none}
-.kinetic-word{position:absolute;left:50%;top:50%;white-space:nowrap;font-family:var(--display);font-size:clamp(110px,18vw,300px);font-weight:900;line-height:.78;letter-spacing:-.03em;text-transform:uppercase;color:rgba(247,244,239,.04);opacity:0;transform:translate(-50%,-50%);will-change:transform,opacity;backface-visibility:hidden}
-.kinetic-word span{color:transparent;-webkit-text-stroke:1px rgba(247,244,239,.085)}
+.kinetic-word{position:absolute;left:50%;top:50%;white-space:nowrap;font-family:var(--display);font-size:clamp(110px,17vw,290px);font-weight:900;line-height:.78;letter-spacing:-.03em;text-transform:uppercase;color:rgba(247,244,239,.022);opacity:0;transform:translate(-50%,-50%);will-change:transform,opacity;backface-visibility:hidden}
+.kinetic-word span{color:transparent;-webkit-text-stroke:1px rgba(247,244,239,.05)}
 
-.orbit{position:absolute;left:50%;top:50%;width:min(76vw,1050px);aspect-ratio:1;border:1px solid rgba(255,255,255,.05);border-radius:50%;transform:translate(-50%,-50%) rotateX(72deg);opacity:.45;will-change:transform;backface-visibility:hidden}
-.orbit:before,.orbit:after{content:"";position:absolute;inset:14%;border:1px solid rgba(255,255,255,.04);border-radius:50%}
-.orbit:after{inset:33%;border-color:rgba(237,21,62,.16);box-shadow:0 0 60px rgba(237,21,62,.08)}
+.orbit{position:absolute;left:50%;top:50%;width:min(74vw,1020px);aspect-ratio:1;border:1px solid rgba(255,255,255,.045);border-radius:50%;transform:translate(-50%,-50%) rotateX(72deg);opacity:.4;will-change:transform;backface-visibility:hidden}
+.orbit:before,.orbit:after{content:"";position:absolute;inset:15%;border:1px solid rgba(255,255,255,.035);border-radius:50%}
+.orbit:after{inset:34%;border-color:rgba(237,21,62,.14);box-shadow:0 0 60px rgba(237,21,62,.07)}
 
 /* Morph shell */
 .morph-shell{position:absolute;left:50%;top:50%;width:320px;height:320px;z-index:8;overflow:hidden;border:1px solid var(--lineStrong);border-radius:160px;background:
-  linear-gradient(145deg,rgba(255,255,255,.10),transparent 26%),
-  linear-gradient(158deg,#1e2029 0%,#131520 46%,#0a0b10 100%);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 0 90px rgba(255,255,255,.02),0 50px 110px rgba(0,0,0,.6),0 0 80px rgba(237,21,62,.09);
+  linear-gradient(150deg,rgba(255,255,255,.09),transparent 28%),
+  linear-gradient(160deg,#1d1f28 0%,#131521 46%,#0a0b10 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),inset 0 0 90px rgba(255,255,255,.018),0 50px 110px rgba(0,0,0,.6),0 0 80px rgba(237,21,62,.08);
   transform:translate3d(-50%,-50%,0);transform-origin:center;will-change:width,height,border-radius,transform;contain:layout paint;backface-visibility:hidden}
-.morph-shell:before{content:"";position:absolute;inset:-35%;z-index:40;pointer-events:none;background:linear-gradient(112deg,transparent 36%,rgba(255,255,255,.15) 48%,rgba(255,255,255,.03) 54%,transparent 66%);transform:translate3d(calc((var(--scene-x) - .5)*7%),calc((var(--scene-y) - .5)*7%),0) rotate(8deg);opacity:.4}
-.morph-shell:after{content:"";position:absolute;left:9%;right:9%;top:9px;height:1px;z-index:42;background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent);opacity:.4}
-.morph-panel{position:absolute;inset:0;z-index:5;padding:38px 40px;opacity:0;pointer-events:none;display:flex;flex-direction:column;will-change:opacity,transform}
+.morph-shell:before{content:"";position:absolute;inset:-35%;z-index:40;pointer-events:none;background:linear-gradient(112deg,transparent 38%,rgba(255,255,255,.12) 48%,rgba(255,255,255,.02) 54%,transparent 64%);transform:translate3d(calc((var(--scene-x) - .5)*6%),calc((var(--scene-y) - .5)*6%),0) rotate(8deg);opacity:.32}
+.morph-shell:after{content:"";position:absolute;left:9%;right:9%;top:9px;height:1px;z-index:42;background:linear-gradient(90deg,transparent,rgba(255,255,255,.66),transparent);opacity:.38}
+.morph-panel{position:absolute;inset:0;z-index:5;padding:40px 44px;opacity:0;pointer-events:none;display:flex;flex-direction:column;justify-content:center;will-change:opacity,transform}
 .morph-panel.active{pointer-events:auto}
 
-/* Staggered reveals inside panels */
+/* Staggered reveals */
 .rise{opacity:0;transform:translateY(13px);transition:opacity .55s var(--ease),transform .55s var(--ease)}
 .morph-panel.active .rise{opacity:1;transform:none}
 .morph-panel.active .rise:nth-child(2){transition-delay:.06s}
@@ -107,113 +105,112 @@ a{text-decoration:none}
 .morph-panel.active .stagger>*:nth-child(8){transition-delay:.52s}
 
 .panel-kicker{font-size:10px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--red2)}
-.panel-title{font-family:var(--display);font-size:clamp(36px,4.6vw,70px);font-weight:800;line-height:.86;letter-spacing:0;text-transform:uppercase;margin-top:14px}
+.panel-title{font-family:var(--display);font-size:clamp(36px,4.4vw,66px);font-weight:800;line-height:.86;letter-spacing:0;text-transform:uppercase;margin-top:14px}
 .panel-title em{font-style:normal;color:var(--red2)}
-.panel-copy{font-size:13px;line-height:1.6;color:var(--muted);max-width:520px;margin-top:14px}
 
-/* Hero */
-.panel-hero{align-items:center;justify-content:center;text-align:center}
-.hero-mark{position:relative;width:150px;height:150px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.15);background:radial-gradient(circle at 50% 34%,rgba(255,255,255,.09),transparent 56%)}
-.hero-mark:before,.hero-mark:after{content:"";position:absolute;width:58px;height:8px;border-radius:8px;background:linear-gradient(90deg,var(--redDark),var(--red2));box-shadow:0 0 24px rgba(237,21,62,.6)}
-.hero-mark:before{transform:rotate(-45deg)}.hero-mark:after{transform:rotate(45deg)}
-.hero-mark b{font-family:var(--display);font-size:42px;font-weight:900;letter-spacing:0;transform:translateY(60px);color:var(--ink)}
-.hero-system{margin-top:28px;font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);font-weight:500}
+/* Hero — clean FK lockup, no X */
+.panel-hero{align-items:center;text-align:center}
+.hero-fk{font-family:var(--display);font-size:clamp(72px,9vw,116px);font-weight:900;letter-spacing:-.02em;line-height:1;color:var(--ink);text-shadow:0 0 44px rgba(237,21,62,.32)}
+.hero-line{display:block;width:56px;height:3px;margin:20px auto 0;border-radius:3px;background:linear-gradient(90deg,transparent,var(--red2),transparent);box-shadow:0 0 16px rgba(237,21,62,.6)}
+.hero-system{margin-top:22px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:500}
 .hero-system i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);margin-right:8px;animation:pulse 2.4s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
 /* Classes */
-.panel-classes{padding:34px 38px}
-.class-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:22px;min-height:0}
-.class-group{padding:16px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.09);transition:background .35s var(--ease2),border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
-.class-group:hover{border-color:rgba(237,21,62,.32);transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
-.class-group__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:13px}
-.class-group__head strong{font-family:var(--display);font-size:23px;font-weight:800;letter-spacing:0;text-transform:uppercase}
+.class-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:24px}
+.class-group{padding:17px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.09);transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
+.class-group:hover{border-color:rgba(237,21,62,.34);transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
+.class-group__head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px}
+.class-group__head strong{font-family:var(--display);font-size:24px;font-weight:800;text-transform:uppercase}
 .class-group__head span{font-size:9px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase;font-weight:600}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
-.chip{display:inline-flex;align-items:center;min-height:28px;padding:0 11px;border-radius:999px;background:#0b0c10;border:1px solid rgba(255,255,255,.1);font-size:11px;font-weight:600;letter-spacing:.01em;transition:background .25s,border-color .25s,color .25s}
+.chip{display:inline-flex;align-items:center;min-height:29px;padding:0 12px;border-radius:999px;background:#0b0c10;border:1px solid rgba(255,255,255,.1);font-size:11px;font-weight:600;transition:background .25s,border-color .25s,color .25s}
 .chip:hover{background:#15161d;border-color:rgba(255,255,255,.2)}
 .chip.hot{background:rgba(237,21,62,.14);border-color:rgba(237,21,62,.36);color:#fff}
 .chip.hot:hover{background:rgba(237,21,62,.22)}
-.class-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:auto;padding-top:18px;border-top:1px solid rgba(255,255,255,.08)}
+.class-foot{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,.08)}
 .class-foot span{font-size:12px;color:var(--muted);line-height:1.45}
 
 /* Digital */
-.panel-digital{padding:32px 38px}
 .digital-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}
-.digital-head .panel-title{font-size:clamp(38px,4vw,60px)}
+.digital-head .panel-title{font-size:clamp(38px,4vw,58px)}
 .digital-badge{flex:0 0 auto;min-width:132px;padding:14px 16px;border-radius:17px;background:rgba(237,21,62,.12);border:1px solid rgba(237,21,62,.3);text-align:right}
 .digital-badge small{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#ff9bae;font-weight:600}.digital-badge strong{font-family:var(--display);font-size:26px;font-weight:800}
-.digital-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px;min-height:0;flex:1}
-.digital-card{position:relative;padding:16px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);overflow:hidden;transition:background .35s var(--ease2),border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2);display:flex;flex-direction:column;gap:9px}
+.digital-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:22px}
+.digital-card{position:relative;padding:17px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);overflow:hidden;transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2);display:flex;flex-direction:column;gap:9px}
 .digital-card:hover{border-color:rgba(255,255,255,.2);transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
-.digital-card:before{content:"";position:absolute;left:0;top:0;width:3px;height:100%;background:linear-gradient(var(--red2),transparent);opacity:.6}
-.digital-card b{font-family:var(--display);font-size:27px;font-weight:800;line-height:1;letter-spacing:0;color:var(--ink)}
-.digital-card span{font-size:11px;line-height:1.42;color:var(--muted)}
+.digital-card:before{content:"";position:absolute;left:0;top:0;width:3px;height:100%;background:linear-gradient(var(--red2),transparent);opacity:.55}
+.digital-card b{font-family:var(--display);font-size:28px;font-weight:800;line-height:1;color:var(--ink)}
+.digital-card span{font-size:11px;line-height:1.45;color:var(--muted)}
 .digital-card em{font-style:normal;color:var(--red2);font-weight:500}
 
-/* Simulator */
-.panel-sim{display:grid;grid-template-columns:1.02fr .98fr;gap:26px;align-items:center;padding:36px}
-.sim-visual{position:relative;aspect-ratio:1;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:radial-gradient(circle at 50% 72%,rgba(237,21,62,.22),transparent 35%),linear-gradient(180deg,#181a22,#090a0e);overflow:hidden}
-.sim-visual:before{content:"";position:absolute;left:50%;bottom:-20%;width:115%;height:72%;transform:translateX(-50%) perspective(500px) rotateX(63deg);background:repeating-linear-gradient(90deg,rgba(255,255,255,.06) 0 1px,transparent 1px 42px),repeating-linear-gradient(0deg,rgba(255,255,255,.06) 0 1px,transparent 1px 42px);-webkit-mask-image:linear-gradient(180deg,transparent,#000);mask-image:linear-gradient(180deg,transparent,#000)}
-.sim-road{position:absolute;left:50%;bottom:-1%;width:36%;height:68%;transform:translateX(-50%);clip-path:polygon(43% 0,57% 0,100% 100%,0 100%);background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(237,21,62,.18))}
-.sim-road:after{content:"";position:absolute;left:50%;top:4%;width:2px;height:96%;transform:translateX(-50%);background:repeating-linear-gradient(180deg,var(--red2) 0 16px,transparent 16px 30px);opacity:.8}
-.sim-wheel{position:absolute;left:50%;bottom:11%;width:44%;aspect-ratio:1;border:8px solid #050608;border-radius:50%;transform:translateX(-50%);box-shadow:0 0 0 2px rgba(255,255,255,.08),0 12px 28px rgba(0,0,0,.6)}
-.sim-wheel:before{content:"";position:absolute;left:50%;top:50%;width:38%;height:38%;border-radius:50%;background:#101116;transform:translate(-50%,-50%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
-.sim-wheel:after{content:"FK";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:var(--display);font-size:18px;font-weight:900;color:var(--red2)}
-.sim-copy h3{font-family:var(--display);font-size:clamp(40px,4.5vw,64px);font-weight:800;line-height:.86;letter-spacing:0;text-transform:uppercase}
+/* Simulator — minimal steering wheel */
+.panel-sim{display:grid;grid-template-columns:.92fr 1.08fr;gap:32px;align-items:center}
+.sim-visual{position:relative;aspect-ratio:1;display:grid;place-items:center;border-radius:34px;background:radial-gradient(circle at 50% 46%,rgba(237,21,62,.13),transparent 62%),linear-gradient(180deg,rgba(255,255,255,.03),transparent 70%);border:1px solid rgba(255,255,255,.06)}
+.sim-wheel-svg{width:74%;max-width:300px;overflow:visible;filter:drop-shadow(0 10px 28px rgba(0,0,0,.45))}
+.sim-wheel-rot{transform-origin:100px 100px;animation:spin 60s linear infinite}
+.sim-wheel-svg .ring{fill:none;stroke:rgba(255,255,255,.18);stroke-width:5}
+.sim-wheel-svg .accent{fill:none;stroke:var(--red2);stroke-width:5;stroke-linecap:round;filter:drop-shadow(0 0 6px rgba(237,21,62,.6))}
+.sim-wheel-svg .spoke{stroke:rgba(255,255,255,.2);stroke-width:5;stroke-linecap:round}
+.sim-wheel-svg .hub{fill:none;stroke:rgba(255,255,255,.24);stroke-width:5}
+.sim-copy h3{font-family:var(--display);font-size:clamp(40px,4.4vw,62px);font-weight:800;line-height:.86;text-transform:uppercase}
 .sim-copy h3 em{font-style:normal;color:var(--red2)}
 .sim-copy p{font-size:12px;line-height:1.6;color:var(--muted);margin-top:14px}
-.sim-list{display:grid;gap:9px;margin-top:20px}
+.sim-list{display:grid;gap:10px;margin-top:20px}
 .sim-list li{list-style:none;display:flex;gap:11px;align-items:flex-start;font-size:12px;line-height:1.4;color:var(--ink2)}
 .sim-list i{flex:0 0 auto;width:7px;height:7px;margin-top:5px;border-radius:50%;background:var(--red);box-shadow:0 0 9px var(--red)}
 
-/* Price */
-.panel-price{padding:34px 38px}
-.price-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px}
-.price-total small{display:block;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:500}
-.price-total strong{display:block;font-family:var(--display);font-size:clamp(50px,6vw,86px);font-weight:800;letter-spacing:0;line-height:.95;margin-top:4px}.price-total strong span{font-size:.42em;color:var(--red2)}
-.price-total em{display:block;font-style:normal;font-size:10px;color:var(--faint);margin-top:5px}
-.price-list{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:22px}
-.price-row{display:flex;align-items:center;justify-content:space-between;gap:14px;min-height:50px;padding:0 15px;border-radius:15px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.07);transition:background .3s,border-color .3s}
-.price-row:hover{border-color:rgba(255,255,255,.15)}
-.price-row span{font-size:11px;line-height:1.3;color:var(--muted)}.price-row b{font-family:var(--display);font-size:19px;font-weight:700;white-space:nowrap}
-.price-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:auto;padding-top:18px}
-.price-note{font-size:11px;line-height:1.45;color:var(--faint);max-width:430px}
+/* Price — comparison calculator */
+.panel-price .panel-title{font-size:clamp(36px,4vw,58px)}
+.cmp{display:grid;gap:17px;margin-top:26px}
+.cmp-row{display:grid;gap:9px}
+.cmp-head{display:flex;justify-content:space-between;align-items:center;gap:14px}
+.cmp-head span,.cmp-head label{font-size:12px;color:var(--muted);font-weight:500}
+.cmp-head em{font-style:normal;color:var(--red2);font-size:10px;font-weight:600}
+.cmp-head b{font-family:var(--display);font-size:23px;font-weight:800;color:var(--ink);white-space:nowrap}
+.cmp-head b.krebs{color:var(--red2)}
+.cmp-input{display:inline-flex;align-items:center;gap:6px;font-family:var(--display);font-size:20px;font-weight:700;color:var(--ink)}
+.cmp-input input{width:104px;min-height:40px;border-radius:11px;border:1px solid rgba(255,255,255,.14);background:#090a0e;padding:0 12px;text-align:right;color:#fff;font-family:var(--sans);font-size:14px;font-weight:600;transition:border-color .2s}
+.cmp-input input:focus{border-color:var(--red2);outline:none}
+.cmp-track{height:15px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);overflow:hidden}
+.cmp-bar{display:block;height:100%;width:0;border-radius:999px;transition:width .65s var(--ease)}
+.cmp-bar--avg{background:linear-gradient(90deg,#43454f,#71757f)}
+.cmp-bar--krebs{background:linear-gradient(90deg,var(--red),var(--red2));box-shadow:0 0 18px rgba(237,21,62,.45)}
+.cmp-bar--user{background:linear-gradient(90deg,#2f7d5b,var(--green))}
+.cmp-foot{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:24px}
+.cmp-note{font-size:13px;line-height:1.5;color:var(--ink2);max-width:430px}
+.cmp-note b{font-weight:700}
+.cmp-note b.good{color:var(--green)}
+.cmp-note b.bad{color:var(--red2)}
 
 /* Special */
-.panel-special{padding:34px 38px}
-.special-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:22px;flex:1}
-.special-card{display:flex;align-items:center;gap:14px;padding:15px;border-radius:17px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);transition:background .35s var(--ease2),border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
-.special-card:hover{border-color:rgba(237,21,62,.28);transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
+.special-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:24px}
+.special-card{display:flex;align-items:center;gap:14px;padding:16px;border-radius:17px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);transition:border-color .35s var(--ease2),transform .35s var(--ease2),box-shadow .35s var(--ease2)}
+.special-card:hover{border-color:rgba(237,21,62,.3);transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.35)}
 .special-card.span2{grid-column:1 / -1}
-.special-card__icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:0 0 auto;background:rgba(237,21,62,.13);border:1px solid rgba(237,21,62,.26);font-family:var(--display);font-size:14px;font-weight:800;color:var(--red2)}
-.special-card strong{display:block;font-family:var(--display);font-size:19px;font-weight:700;letter-spacing:0}.special-card span{display:block;margin-top:3px;font-size:10px;line-height:1.35;color:var(--muted)}
+.special-card__icon{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;flex:0 0 auto;background:rgba(237,21,62,.13);border:1px solid rgba(237,21,62,.26);font-family:var(--display);font-size:14px;font-weight:800;color:var(--red2)}
+.special-card strong{display:block;font-family:var(--display);font-size:19px;font-weight:700}.special-card span{display:block;margin-top:3px;font-size:10px;line-height:1.35;color:var(--muted)}
 
 /* Final */
-.panel-final{align-items:center;justify-content:center;text-align:center}
-.final-monogram{font-family:var(--display);font-size:96px;font-weight:900;letter-spacing:-.01em;color:var(--ink);text-shadow:0 0 34px rgba(237,21,62,.28)}
+.panel-final{align-items:center;text-align:center}
+.final-monogram{font-family:var(--display);font-size:clamp(72px,9vw,100px);font-weight:900;letter-spacing:-.01em;color:var(--ink);text-shadow:0 0 34px rgba(237,21,62,.28)}
 .final-monogram span{color:var(--red2)}
-.final-ring{position:absolute;inset:11%;border:1px solid rgba(255,255,255,.1);border-radius:50%}.final-ring:before{content:"";position:absolute;inset:18%;border:1px solid rgba(237,21,62,.25);border-radius:50%}
-.panel-final small{margin-top:18px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.final-ring{position:absolute;inset:12%;border:1px solid rgba(255,255,255,.09);border-radius:50%}.final-ring:before{content:"";position:absolute;inset:18%;border:1px solid rgba(237,21,62,.22);border-radius:50%}
+.panel-final small{margin-top:16px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:500}
 
-/* Copy choreography */
+/* Scene copy — only hero + final */
 .scene-copy{position:absolute;z-index:12;width:min(520px,40vw);opacity:0;will-change:transform,opacity;pointer-events:none}
 .scene-copy.active{pointer-events:auto}
 .copy-left{left:6vw;top:50%;transform:translateY(-50%)}
-.copy-right{right:6vw;top:50%;transform:translateY(-50%);text-align:left}
-.copy-center{left:50%;top:14%;transform:translateX(-50%);width:min(760px,70vw);text-align:center}
-.copy-final{left:50%;bottom:10%;top:auto;transform:translateX(-50%);width:min(760px,80vw);text-align:center}
+.copy-final{left:50%;bottom:8%;top:auto;transform:translateX(-50%);width:min(760px,80vw);text-align:center}
 .copy-label{font-size:11px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--red2)}
 .scene-copy h1,.scene-copy h2{font-family:var(--display);font-weight:900;text-transform:uppercase;line-height:.84;letter-spacing:0;margin-top:16px}
-.scene-copy h1{font-size:clamp(62px,7.5vw,122px)}.scene-copy h2{font-size:clamp(50px,6vw,90px)}
-.scene-copy h1 span,.scene-copy h2 span{display:block;color:transparent;-webkit-text-stroke:1px rgba(247,244,239,.72)}
+.scene-copy h1{font-size:clamp(62px,7.2vw,116px)}.scene-copy h2{font-size:clamp(48px,5.5vw,84px)}
+.scene-copy h1 span,.scene-copy h2 span{display:block;color:transparent;-webkit-text-stroke:1px rgba(247,244,239,.7)}
 .scene-copy h2 em{font-style:normal;color:var(--red2)}
 .scene-copy p{font-size:14px;line-height:1.65;color:var(--muted);max-width:520px;margin-top:22px}
-.copy-center p,.copy-final p{margin-left:auto;margin-right:auto}
-.copy-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
-.copy-pills span{padding:9px 13px;border-radius:999px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.copy-final p{margin-left:auto;margin-right:auto}
 .copy-actions{display:flex;flex-wrap:wrap;gap:11px;margin-top:28px}
-.copy-center .copy-actions,.copy-final .copy-actions{justify-content:center}
+.copy-final .copy-actions{justify-content:center}
 
 .btn{--mx:0px;--my:0px;min-height:52px;padding:0 25px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;gap:11px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.045);font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;pointer-events:auto;transform:translate(var(--mx),var(--my));transition:background .25s,border-color .25s,box-shadow .25s,transform .25s var(--ease)}
 .btn:hover{border-color:rgba(255,255,255,.36);background:rgba(255,255,255,.09)}
@@ -229,8 +226,8 @@ a{text-decoration:none}
 .brand{display:inline-flex;align-items:center;gap:12px;width:max-content;pointer-events:auto}
 .brand__mark{width:37px;height:37px;border-radius:50%;position:relative;display:grid;place-items:center;border:1px solid rgba(255,255,255,.18);background:#0d0e12;transition:border-color .3s,box-shadow .3s}
 .brand:hover .brand__mark{border-color:rgba(237,21,62,.42);box-shadow:0 0 14px rgba(237,21,62,.2)}
-.brand__mark:before,.brand__mark:after{content:"";position:absolute;width:15px;height:2px;background:var(--red);box-shadow:0 0 10px rgba(237,21,62,.7)}
-.brand__mark:before{transform:rotate(-45deg)}.brand__mark:after{transform:rotate(45deg)}
+.brand__mark b{font-family:var(--display);font-size:15px;font-weight:900;color:var(--ink);letter-spacing:-.02em}
+.brand__mark:after{content:"";position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:15px;height:2px;border-radius:2px;background:var(--red);box-shadow:0 0 8px rgba(237,21,62,.7)}
 .brand__type{font-family:var(--display);font-size:16px;font-weight:800;letter-spacing:.06em;line-height:1}.brand__type span{display:block;margin-top:5px;font-family:var(--sans);font-size:8px;font-weight:500;letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
 .nav{display:flex;align-items:center;gap:27px}
 .nav a{position:relative;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);pointer-events:auto;transition:color .2s}
@@ -263,7 +260,7 @@ main{position:relative;z-index:2;pointer-events:none}
 .modal__close{position:absolute;right:18px;top:18px;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:1px solid rgba(255,255,255,.12);cursor:pointer;color:var(--muted);font-size:21px;transition:background .25s,color .25s,border-color .25s}
 .modal__close:hover{background:rgba(255,255,255,.06);color:var(--ink);border-color:rgba(255,255,255,.24)}
 .modal__kicker{font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--red2)}
-.modal h3{font-family:var(--display);font-size:clamp(38px,5vw,66px);font-weight:800;line-height:.92;letter-spacing:0;text-transform:uppercase;margin-top:12px}
+.modal h3{font-family:var(--display);font-size:clamp(38px,5vw,64px);font-weight:800;line-height:.92;text-transform:uppercase;margin-top:12px}
 .modal__intro{font-size:12px;line-height:1.6;color:var(--muted);max-width:700px;margin-top:14px}
 .price-table{width:100%;border-collapse:collapse;margin-top:24px;font-size:12px}
 .price-table th{text-align:left;padding:11px 8px;color:var(--faint);font-size:9px;letter-spacing:.12em;text-transform:uppercase;border-bottom:1px solid rgba(255,255,255,.08);font-weight:600}
@@ -272,29 +269,29 @@ main{position:relative;z-index:2;pointer-events:none}
 .calc-bottom{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:end;margin-top:24px}
 .competitor-box{display:flex;align-items:center;gap:12px;padding:15px;border-radius:17px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
 .competitor-box label{font-size:11px;line-height:1.4;color:var(--muted)}.competitor-box input{margin-left:auto;width:130px;min-height:46px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#090a0e;padding:0 13px;text-align:right;color:#fff;transition:border-color .2s}.competitor-box input:focus{border-color:var(--red2);outline:none}.comparison{min-width:150px;text-align:right}.comparison small{display:block;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:500}.comparison strong{display:block;font-family:var(--display);font-size:32px;font-weight:800;margin-top:5px}.comparison strong.good{color:var(--green)}.comparison strong.bad{color:var(--red2)}
-.calc-total{text-align:right}.calc-total small{display:block;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}.calc-total strong{display:block;font-family:var(--display);font-size:52px;font-weight:800;letter-spacing:0;margin-top:4px}.calc-total strong span{font-size:.45em;color:var(--red2)}
+.calc-total{text-align:right}.calc-total small{display:block;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:500}.calc-total strong{display:block;font-family:var(--display);font-size:52px;font-weight:800;margin-top:4px}.calc-total strong span{font-size:.45em;color:var(--red2)}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}
-.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:24px}.contact-option{padding:18px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);text-align:left;cursor:pointer;transition:background .25s,border-color .25s,transform .25s var(--ease2)}.contact-option:hover{border-color:rgba(237,21,62,.3);transform:translateY(-3px)}.contact-option strong{display:block;font-family:var(--display);font-size:21px;font-weight:700}.contact-option span{display:block;margin-top:5px;font-size:11px;color:var(--muted);line-height:1.45}
+.contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:24px}.contact-option{padding:18px;border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);text-align:left;cursor:pointer;transition:border-color .25s,transform .25s var(--ease2)}.contact-option:hover{border-color:rgba(237,21,62,.3);transform:translateY(-3px)}.contact-option strong{display:block;font-family:var(--display);font-size:21px;font-weight:700}.contact-option span{display:block;margin-top:5px;font-size:11px;color:var(--muted);line-height:1.45}
 .toast{position:fixed;left:50%;bottom:32px;z-index:450;transform:translate(-50%,100px);padding:15px 23px;border-radius:999px;background:#f4f1ec;color:#090a0d;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;box-shadow:0 16px 45px rgba(0,0,0,.4);transition:transform .45s var(--ease)}.toast.show{transform:translate(-50%,0)}
 
 @media(max-width:1180px){
-  .nav{gap:19px}.nav a{font-size:10px}.scene-copy{width:min(470px,42vw)}.copy-left{left:4vw}.copy-right{right:4vw}
-  .class-grid{gap:9px}.class-group{padding:13px}.digital-card{padding:14px}.morph-panel{padding:30px}
+  .nav{gap:19px}.nav a{font-size:10px}.scene-copy{width:min(470px,44vw)}.copy-left{left:4vw}
+  .class-grid{gap:9px}.class-group{padding:13px}.digital-card{padding:14px}.morph-panel{padding:32px}
 }
 @media(max-width:900px){
   .nav,.progress-rail,.head-cta{display:none}.site-head{height:70px;padding:0 16px;grid-template-columns:1fr}.brand__mark{width:33px;height:33px}.brand__type{font-size:14px}
-  .road-plane{width:220vw;height:74vh;bottom:-29vh;opacity:.42}
+  .road-plane{width:220vw;height:74vh;bottom:-29vh;opacity:.4}
   .orbit{width:126vw;top:58%}
   .kinetic-word{font-size:31vw;top:53%}
-  .scene-copy{left:20px!important;right:20px!important;top:101px!important;bottom:auto!important;width:auto!important;max-width:none;text-align:left!important;transform:none!important}
-  .scene-copy h1{font-size:clamp(56px,15vw,82px)}.scene-copy h2{font-size:clamp(46px,12.5vw,70px)}.scene-copy p{font-size:12px;line-height:1.5;max-width:520px;margin-top:13px}.copy-actions{margin-top:16px}.copy-pills{margin-top:13px}
-  .scene-copy.copy-center,.scene-copy.copy-final{text-align:center!important}.scene-copy.copy-center p,.scene-copy.copy-final p{margin-left:auto;margin-right:auto}.scene-copy.copy-center .copy-actions,.scene-copy.copy-final .copy-actions{justify-content:center}
+  .scene-copy.copy-left{left:20px!important;right:20px!important;top:98px!important;width:auto!important;max-width:none;transform:none!important}
+  .scene-copy.copy-final{left:20px!important;right:20px!important;width:auto!important}
+  .scene-copy h1{font-size:clamp(56px,15vw,82px)}.scene-copy h2{font-size:clamp(46px,12.5vw,70px)}.scene-copy p{font-size:12px;line-height:1.5;margin-top:13px}.copy-actions{margin-top:16px}
   .panel-title{font-size:42px}.morph-panel{padding:24px}
-  .class-grid{grid-template-columns:1fr 1fr;gap:8px;margin-top:15px}.class-group{padding:11px;border-radius:14px}.class-group__head{margin-bottom:9px}.class-group__head strong{font-size:17px}.chip{min-height:24px;padding:0 9px;font-size:9px}.class-foot{padding-top:12px}.class-foot span{font-size:10px}
-  .digital-head{align-items:flex-start}.digital-badge{min-width:106px;padding:11px}.digital-badge strong{font-size:20px}.digital-grid{grid-template-columns:1fr 1fr;gap:8px;margin-top:13px}.digital-card{padding:12px;border-radius:14px}.digital-card b{font-size:20px}.digital-card span{font-size:9px}
-  .panel-sim{grid-template-columns:1fr 1fr;gap:15px;padding:24px}.sim-copy h3{font-size:42px}.sim-copy p{font-size:10px}.sim-list{gap:6px}.sim-list li{font-size:10px}
-  .panel-price{padding:24px}.price-list{gap:7px;margin-top:14px}.price-row{min-height:44px;padding:0 11px}.price-row span{font-size:9px}.price-row b{font-size:15px}.price-note{font-size:9px}
-  .special-grid{gap:8px;margin-top:14px}.special-card{padding:11px}.special-card__icon{width:36px;height:36px}.special-card strong{font-size:16px}.special-card span{font-size:9px}
+  .class-grid{grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}.class-group{padding:12px;border-radius:14px}.class-group__head strong{font-size:18px}.chip{min-height:25px;padding:0 9px;font-size:9px}.class-foot{margin-top:16px;padding-top:14px}.class-foot span{font-size:10px}
+  .digital-head{align-items:flex-start}.digital-badge{min-width:106px;padding:11px}.digital-badge strong{font-size:20px}.digital-grid{grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.digital-card{padding:12px;border-radius:14px}.digital-card b{font-size:21px}.digital-card span{font-size:9px}
+  .panel-sim{grid-template-columns:1fr 1.1fr;gap:16px}.sim-visual{border-radius:24px}.sim-copy h3{font-size:40px}.sim-copy p{font-size:10px}.sim-list{gap:6px}.sim-list li{font-size:10px}
+  .cmp{gap:13px;margin-top:18px}.cmp-head b{font-size:19px}.cmp-input input{width:92px}.cmp-foot{margin-top:16px}.cmp-note{font-size:11px}
+  .special-grid{gap:8px;margin-top:16px}.special-card{padding:12px}.special-card__icon{width:38px;height:38px}.special-card strong{font-size:16px}.special-card span{font-size:9px}
   .scene-counter{left:17px;bottom:86px}
   .mobile-dock{position:fixed;z-index:100;left:13px;right:13px;bottom:calc(10px + env(safe-area-inset-bottom));height:62px;border-radius:21px;display:flex;align-items:center;justify-content:space-around;background:rgba(11,12,16,.94);border:1px solid rgba(255,255,255,.11);box-shadow:0 14px 42px rgba(0,0,0,.42);backdrop-filter:blur(10px)}
   .mobile-dock button{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;color:var(--faint);cursor:pointer;transition:background .25s,color .25s}.mobile-dock button.active{background:rgba(237,21,62,.14);color:#fff}.mobile-dock svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7}
@@ -302,21 +299,21 @@ main{position:relative;z-index:2;pointer-events:none}
   .price-table{min-width:720px}.modal__card{padding:24px 18px}.calc-bottom{grid-template-columns:1fr}.contact-grid{grid-template-columns:1fr}
 }
 @media(max-width:560px){
-  .copy-label{font-size:9px}.scene-copy h1{font-size:14vw}.scene-copy h2{font-size:11.5vw}.scene-copy p{font-size:11px}.copy-pills span{font-size:8px;padding:6px 9px}.btn{min-height:46px;padding:0 18px;font-size:9px}.copy-actions{gap:7px}
-  .morph-panel{padding:19px}.panel-kicker{font-size:9px}.panel-title{font-size:34px;margin-top:9px}.panel-copy{font-size:10px;margin-top:9px}
-  .class-grid{margin-top:11px}.class-group{padding:9px}.class-group__head span{display:none}.class-group__head strong{font-size:15px}.chips{gap:4px}.chip{min-height:21px;font-size:8px;padding:0 7px}.class-foot span{font-size:9px}
-  .digital-head .panel-title{font-size:31px}.digital-badge{min-width:90px;padding:9px}.digital-badge small{font-size:7px}.digital-badge strong{font-size:17px}.digital-grid{gap:6px}.digital-card{padding:9px 10px}.digital-card b{font-size:17px}.digital-card span{font-size:8px}
-  .panel-sim{padding:18px;gap:11px}.sim-copy h3{font-size:33px}.sim-copy p{font-size:9px;margin-top:9px}.sim-list{margin-top:11px}.sim-list li{font-size:8.5px}.sim-wheel{border-width:5px}
-  .price-head{gap:10px}.price-total strong{font-size:48px}.price-list{grid-template-columns:1fr 1fr}.price-row{min-height:38px;padding:0 9px}.price-row span{font-size:8px}.price-row b{font-size:13px}.price-actions{padding-top:11px}.price-note{display:none}
-  .panel-special{padding:18px}.special-grid{gap:6px;margin-top:10px}.special-card{padding:9px;gap:9px}.special-card__icon{width:31px;height:31px;border-radius:9px;font-size:10px}.special-card strong{font-size:13px}.special-card span{font-size:8px}
-  .final-monogram{font-size:76px}.panel-final small{font-size:8px}
+  .scene-copy h1{font-size:14vw}.scene-copy h2{font-size:11.5vw}.scene-copy p{font-size:11px}.btn{min-height:46px;padding:0 18px;font-size:9px}
+  .morph-panel{padding:19px}.panel-kicker{font-size:9px}.panel-title{font-size:34px;margin-top:10px}
+  .class-grid{grid-template-columns:1fr 1fr;margin-top:12px}.class-group{padding:10px}.class-group__head span{display:none}.class-group__head strong{font-size:16px}.chip{min-height:22px;font-size:8px;padding:0 8px}
+  .digital-head .panel-title{font-size:31px}.digital-badge{min-width:90px;padding:9px}.digital-badge strong{font-size:17px}.digital-grid{grid-template-columns:1fr 1fr;gap:6px}.digital-card{padding:10px}.digital-card b{font-size:18px}.digital-card span{font-size:8px}
+  .panel-sim{grid-template-columns:1fr;gap:14px}.sim-visual{max-width:220px;margin:0 auto}.sim-copy h3{font-size:34px}.sim-copy p{font-size:9px}.sim-list li{font-size:9px}
+  .cmp-head b{font-size:17px}.cmp-input{font-size:16px}.cmp-input input{width:84px;font-size:13px}.cmp-note{font-size:10px}
+  .special-grid{grid-template-columns:1fr;gap:6px}.special-card{padding:10px}.special-card.span2{grid-column:auto}.special-card__icon{width:34px;height:34px;font-size:11px}.special-card strong{font-size:14px}
+  .final-monogram{font-size:72px}
   .scene-counter{font-size:8px}.scene-counter i{width:24px}
-  .modal h3{font-size:40px}.modal__intro{font-size:10px}.competitor-box{display:grid}.competitor-box input{margin-left:0;width:100%}.calc-total strong{font-size:44px}.modal-actions{flex-direction:column}.modal-actions .btn{width:100%}
+  .modal h3{font-size:40px}.competitor-box{display:grid}.competitor-box input{margin-left:0;width:100%}.calc-total strong{font-size:44px}.modal-actions{flex-direction:column}.modal-actions .btn{width:100%}
 }
 @media(prefers-reduced-motion:reduce){
   *,*:before,*:after{animation:none!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
   .road-plane,.orbit{display:none}.stage:before{transform:translate(-50%,-50%)}.morph-shell:before{display:none}
-  .rise,.stagger>*{opacity:1!important;transform:none!important}
+  .rise,.stagger>*{opacity:1!important;transform:none!important}.sim-wheel-rot{animation:none!important}
 }
 </style>
 </head>
@@ -324,7 +321,7 @@ main{position:relative;z-index:2;pointer-events:none}
 <div class="loader" id="loader" aria-hidden="true"><div class="loader__inner"><div class="loader__row"><b>FAHRSCHULE KREBS</b><span>Experience laden</span></div><div class="loader__track"><div class="loader__bar" id="loaderBar"></div></div></div></div>
 
 <header class="site-head" id="siteHead">
-  <a class="brand" href="#start" aria-label="Fahrschule Krebs Startseite"><span class="brand__mark" aria-hidden="true"></span><span class="brand__type">FAHRSCHULE KREBS<span>Fulda · Digital begleitet</span></span></a>
+  <a class="brand" href="#start" aria-label="Fahrschule Krebs Startseite"><span class="brand__mark" aria-hidden="true"><b>FK</b></span><span class="brand__type">FAHRSCHULE KREBS<span>Fulda · Digital begleitet</span></span></a>
   <nav class="nav" aria-label="Hauptnavigation"><a href="#start" class="active">Start</a><a href="#klassen">Klassen</a><a href="#digital">Digitalpaket</a><a href="#simulator">Simulator</a><a href="#preise">Preise</a><a href="#weiterbildung">Weiterbildung</a></nav>
   <button class="head-cta" data-open-contact>Beratung starten</button>
 </header>
@@ -347,7 +344,7 @@ main{position:relative;z-index:2;pointer-events:none}
 
   <div class="morph-shell" id="morphShell">
     <article class="morph-panel panel-hero" data-panel="0">
-      <div class="hero-mark"><b>FK</b></div><div class="hero-system"><i></i>Digitales Ausbildungssystem aktiv</div>
+      <div class="hero-fk">FK</div><span class="hero-line"></span><div class="hero-system"><i></i>Digitales Ausbildungssystem aktiv</div>
     </article>
 
     <article class="morph-panel panel-classes" data-panel="1">
@@ -375,18 +372,40 @@ main{position:relative;z-index:2;pointer-events:none}
     </article>
 
     <article class="morph-panel panel-sim" data-panel="3">
-      <div class="sim-visual rise" aria-hidden="true"><div class="sim-road"></div><div class="sim-wheel"></div></div>
+      <div class="sim-visual rise" aria-hidden="true">
+        <svg class="sim-wheel-svg" viewBox="0 0 200 200">
+          <g class="sim-wheel-rot">
+            <circle class="ring" cx="100" cy="100" r="80"/>
+            <path class="accent" d="M100 20 A80 80 0 0 1 169 60"/>
+            <circle class="hub" cx="100" cy="100" r="22"/>
+            <line class="spoke" x1="100" y1="78" x2="100" y2="24"/>
+            <line class="spoke" x1="81" y1="112" x2="43" y2="152"/>
+            <line class="spoke" x1="119" y1="112" x2="157" y2="152"/>
+          </g>
+          <circle cx="100" cy="100" r="5" fill="var(--red2)"/>
+        </svg>
+      </div>
       <div class="sim-copy"><div class="panel-kicker rise">Simulator-Ausbildung</div><h3 class="rise">ERST ÜBEN.<br><em>DANN FAHREN.</em></h3><p class="rise">Zwei Fahrsimulatoren schaffen Wiederholbarkeit, Ruhe und einen sicheren Einstieg – bevor Verkehr, Kupplung und Nervosität gleichzeitig anklopfen.</p><ul class="sim-list stagger"><li><i></i><span>Verfügbar für B, BE, C und CE</span></li><li><i></i><span>Manöver gezielt wiederholen</span></li><li><i></i><span>Prüfungssituationen strukturiert vorbereiten</span></li><li><i></i><span>Ideal zur Ergänzung der Praxisstunden</span></li></ul></div>
     </article>
 
     <article class="morph-panel panel-price" data-panel="4">
-      <div class="price-head rise"><div><div class="panel-kicker">Beispielrechnung · Klasse B / BF17</div><h3 class="panel-title">KLARE PREISE.<br><em>KLARE ENTSCHEIDUNG.</em></h3></div><div class="price-total"><small>Beispielsumme</small><strong>3.090<span>€</span></strong><em>inkl. 19 % MwSt.</em></div></div>
-      <div class="price-list stagger">
-        <div class="price-row"><span>Grundbetrag</span><b>399 €</b></div><div class="price-row"><span>20 Fahrstunden à 45 Min.</span><b>1.280 €</b></div>
-        <div class="price-row"><span>5 Simulatorstunden</span><b>160 €</b></div><div class="price-row"><span>12 Sonderfahrten</span><b>912 €</b></div>
-        <div class="price-row"><span>Lehrmaterial</span><b>99 €</b></div><div class="price-row"><span>Theorie- & Praxisvorstellung</span><b>240 €</b></div>
+      <div class="panel-kicker rise">Preisvergleich · Klasse B / BF17</div>
+      <h3 class="panel-title rise">GÜNSTIGER ALS<br><em>DER DURCHSCHNITT.</em></h3>
+      <div class="cmp stagger">
+        <div class="cmp-row">
+          <div class="cmp-head"><span>Ø Deutschland · Klasse B</span><b>3.500 €</b></div>
+          <div class="cmp-track"><i class="cmp-bar cmp-bar--avg" id="barAvg"></i></div>
+        </div>
+        <div class="cmp-row">
+          <div class="cmp-head"><span>Fahrschule Krebs <em>· Beispiel</em></span><b class="krebs">3.090 €</b></div>
+          <div class="cmp-track"><i class="cmp-bar cmp-bar--krebs" id="barKrebs"></i></div>
+        </div>
+        <div class="cmp-row">
+          <div class="cmp-head"><label for="cmpUser">Dein aktuelles Angebot</label><span class="cmp-input"><input id="cmpUser" type="number" min="0" step="10" placeholder="z. B. 3390" aria-label="Dein aktuelles Angebot in Euro">€</span></div>
+          <div class="cmp-track"><i class="cmp-bar cmp-bar--user" id="barUser"></i></div>
+        </div>
       </div>
-      <div class="price-actions rise"><p class="price-note">Die tatsächlichen Gesamtkosten hängen vom individuellen Ausbildungsbedarf ab. Im Rechner lassen sich Mengen und Mitbewerberpreise direkt vergleichen.</p><button class="btn btn--primary" data-open-price>Preisrechner öffnen</button></div>
+      <div class="cmp-foot rise"><p class="cmp-note" id="cmpNote">Fahrschule Krebs ist <b class="good">410 €</b> günstiger als der Bundesdurchschnitt.</p><button class="btn btn--primary" data-open-price>Detaillierter Rechner</button></div>
     </article>
 
     <article class="morph-panel panel-special" data-panel="5">
@@ -408,12 +427,7 @@ main{position:relative;z-index:2;pointer-events:none}
   <section class="scene-copy copy-left" data-copy="0">
     <div class="copy-label">Fahrschule Krebs · Fulda</div><h1>FÜHRERSCHEIN.<span>WEITER GEDACHT.</span></h1><p>Alle Klassen, digitale Lernbegleitung, Simulatoren und berufliche Qualifikationen – verbunden in einer Ausbildung, die transparent, modern und persönlich bleibt.</p><div class="copy-actions"><button class="btn btn--primary" data-jump="klassen">Leistungen entdecken <svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg></button><button class="btn" data-open-contact>Beratung starten</button></div>
   </section>
-  <section class="scene-copy copy-left" data-copy="1"><div class="copy-label">01 · Führerscheinklassen</div><h2>ALLE KLASSEN.<br><em>EINE ADRESSE.</em></h2><p>Vom Mofa bis zum Bus, vom BF17 bis CE: Ausbildung ohne Umwege und mit einer klaren Empfehlung, welche Klasse wirklich zu deinem Ziel passt.</p><div class="copy-pills"><span>B · BF17 · B197</span><span>C · CE · C1E</span><span>A1 · A2 · A</span><span>D · DE</span></div></section>
-  <section class="scene-copy copy-center" data-copy="2"><div class="copy-label">02 · Digitalpaket</div><h2>DEIN LERNEN.<br><span>IMMER DABEI.</span></h2><p>Videos, Hörbuch, Prüfungsangst-E-Book, intensive Theorie und transparente Preise werden zu einem System – nicht zu sechs verschiedenen Baustellen.</p></section>
-  <section class="scene-copy copy-right" data-copy="3"><div class="copy-label">03 · Simulator</div><h2>SICHERHEIT<br><em>BEGINNT VORHER.</em></h2><p>Komplexe Situationen lassen sich wiederholen, bis Abläufe sitzen. Das reduziert Überforderung und macht die reale Fahrstunde wertvoller.</p></section>
-  <section class="scene-copy copy-center" data-copy="4"><div class="copy-label">04 · Preisrechner</div><h2>TRANSPARENZ<br><span>STATT KLEINGEDRUCKTES.</span></h2><p>Positionen, Mengen und Einzelpreise nachvollziehen – und die eigene Beispielrechnung direkt mit einem Mitbewerberangebot vergleichen.</p></section>
-  <section class="scene-copy copy-left" data-copy="5"><div class="copy-label">05 · Weiterbildung & Spezialausbildung</div><h2>DEIN NÄCHSTER<br><em>BERUFLICHER SCHRITT.</em></h2><p>Handicap-Ausbildung, Berufskraftfahrer-Qualifikation, Staplerschein, ASF, FES und ADR – mit der gleichen Sorgfalt wie beim ersten Führerschein.</p></section>
-  <section class="scene-copy copy-final" data-copy="6"><div class="copy-label">06 · Fahrschule Krebs</div><h2>BEREIT,<br><span>LOSZUFAHREN?</span></h2><p>Wähle deine Führerscheinklasse oder lass dich beraten. Wir verbinden die passende Ausbildung mit dem digitalen Paket, das zu deinem Ziel passt.</p><div class="copy-actions"><button class="btn btn--primary" data-open-contact>Beratung anfragen</button><button class="btn" data-open-price>Preise vergleichen</button></div></section>
+  <section class="scene-copy copy-final" data-copy="6"><div class="copy-label">Fahrschule Krebs · Fulda</div><h2>BEREIT,<br><span>LOSZUFAHREN?</span></h2><p>Wähle deine Führerscheinklasse oder lass dich beraten. Wir verbinden die passende Ausbildung mit dem digitalen Paket, das zu deinem Ziel passt.</p><div class="copy-actions"><button class="btn btn--primary" data-open-contact>Beratung anfragen</button><button class="btn" data-open-price>Preise vergleichen</button></div></section>
 </div>
 
 <main>
@@ -421,7 +435,7 @@ main{position:relative;z-index:2;pointer-events:none}
   <section class="chapter" id="klassen" data-phase="1"><h2 class="a11y-content">Führerscheinklassen B, BF17, B197, Automatik, BE, B96, C, CE, C1, C1E, A1, A2, A, AM, Mofa, D und DE</h2></section>
   <section class="chapter" id="digital" data-phase="2"><h2 class="a11y-content">Digitalpaket mit Videos, Theorie, Preisrechner, Hörbuch und E-Book</h2></section>
   <section class="chapter" id="simulator" data-phase="3"><h2 class="a11y-content">Fahrsimulator-Ausbildung für B, BE, C und CE</h2></section>
-  <section class="chapter" id="preise" data-phase="4"><h2 class="a11y-content">Preisrechner und Beispielpreise Klasse B und BF17</h2></section>
+  <section class="chapter" id="preise" data-phase="4"><h2 class="a11y-content">Preisvergleich und Beispielpreise Klasse B und BF17</h2></section>
   <section class="chapter" id="weiterbildung" data-phase="5"><h2 class="a11y-content">Handicap, Berufskraftfahrer, Staplerschein, ASF, FES und ADR</h2></section>
   <section class="chapter" id="kontakt" data-phase="6"><h2 class="a11y-content">Beratung und Kontakt</h2></section>
 </main>
@@ -464,7 +478,7 @@ const shell=$('#morphShell'),panels=$$('.morph-panel'),copies=$$('.scene-copy'),
 const dots=$$('.progress-rail__dot'),navLinks=$$('.nav a'),mobileButtons=$$('.mobile-dock button[data-jump]');
 const progressFill=$('#progressFill'),phaseText=$('#phaseText'),sceneNo=$('#sceneNo'),sceneName=$('#sceneName'),siteHead=$('#siteHead'),roadPlane=$('#roadPlane'),orbit=$('#orbit');
 const rootStyle=document.documentElement.style;
-const phaseNames=['Willkommen','Führerscheinklassen','Digitalpaket','Simulator','Preisrechner','Weiterbildung','Beratung'];
+const phaseNames=['Willkommen','Führerscheinklassen','Digitalpaket','Simulator','Preisvergleich','Weiterbildung','Beratung'];
 let W=innerWidth,H=innerHeight,maxScroll=1,layout=[],targetY=scrollY,currentY=scrollY,lastY=currentY,velocity=0,targetPX=.5,targetPY=.5,pointerX=.5,pointerY=.5,raf=0,lastTime=performance.now(),phase=-1;
 
 addEventListener('load',()=>{requestAnimationFrame(()=>{$('#loaderBar').style.width='100%';setTimeout(()=>$('#loader').classList.add('done'),360)})},{once:true});
@@ -474,29 +488,29 @@ function cache(){W=innerWidth;H=innerHeight;maxScroll=Math.max(1,document.docume
 function coordAt(y){const probe=y+H*.46;if(probe<=layout[0].center)return 0;for(let i=0;i<layout.length-1;i++){if(probe<layout[i+1].center)return i+smooth((probe-layout[i].center)/(layout[i+1].center-layout[i].center))}return layout.length-1}
 function envelope(coord,index,width=.78){return smooth(1-clamp(Math.abs(coord-index)/width))}
 function blend(a,b,t){const o={};for(const k in a)o[k]=lerp(a[k],b[k],t);return o}
-/* Keyframes: all rotations set to 0 for a clean, straight, premium feel */
+/* Keyframes: sections 1–5 centered (x:0), no rotation — clean & no overlap */
 function keyframes(){
   const mobile=W<=900;
   if(mobile){
     const vw=W, vh=H;
     return[
-      {x:0,y:165,w:Math.min(vw*.68,310),h:Math.min(vw*.68,310),r:999,sc:1},
-      {x:0,y:150,w:Math.min(vw*.92,530),h:Math.min(vh*.52,470),r:32,sc:1},
-      {x:0,y:155,w:Math.min(vw*.93,560),h:Math.min(vh*.54,480),r:32,sc:1},
-      {x:0,y:95,w:Math.min(vw*.86,390),h:Math.min(vw*.86,390),r:999,sc:1},
-      {x:0,y:145,w:Math.min(vw*.93,570),h:Math.min(vh*.51,450),r:30,sc:1},
-      {x:0,y:150,w:Math.min(vw*.92,550),h:Math.min(vh*.54,480),r:32,sc:1},
-      {x:0,y:165,w:Math.min(vw*.62,300),h:Math.min(vw*.62,300),r:999,sc:1}
+      {x:0,y:150,w:Math.min(vw*.68,310),h:Math.min(vw*.68,310),r:999,sc:1},
+      {x:0,y:150,w:Math.min(vw*.92,530),h:Math.min(vh*.54,480),r:32,sc:1},
+      {x:0,y:150,w:Math.min(vw*.93,560),h:Math.min(vh*.56,490),r:32,sc:1},
+      {x:0,y:150,w:Math.min(vw*.92,540),h:Math.min(vh*.56,500),r:32,sc:1},
+      {x:0,y:150,w:Math.min(vw*.93,560),h:Math.min(vh*.54,470),r:30,sc:1},
+      {x:0,y:150,w:Math.min(vw*.92,550),h:Math.min(vh*.58,510),r:32,sc:1},
+      {x:0,y:150,w:Math.min(vw*.62,300),h:Math.min(vw*.62,300),r:999,sc:1}
     ];
   }
   return[
-    {x:W*.19,y:0,w:330,h:330,r:999,sc:1},
-    {x:W*.20,y:16,w:Math.min(620,W*.44),h:Math.min(660,H*.78),r:44,sc:1},
-    {x:0,y:34,w:Math.min(1040,W*.78),h:Math.min(580,H*.70),r:52,sc:1},
-    {x:-W*.20,y:22,w:Math.min(640,W*.46),h:Math.min(640,H*.74),r:999,sc:1},
-    {x:0,y:26,w:Math.min(1040,W*.79),h:Math.min(610,H*.74),r:44,sc:1},
-    {x:W*.20,y:18,w:Math.min(630,W*.46),h:Math.min(670,H*.78),r:48,sc:1},
-    {x:0,y:0,w:365,h:365,r:999,sc:1}
+    {x:W*.19,y:0,w:340,h:340,r:999,sc:1},
+    {x:0,y:18,w:Math.min(1080,W*.80),h:Math.min(610,H*.74),r:44,sc:1},
+    {x:0,y:18,w:Math.min(1080,W*.80),h:Math.min(620,H*.75),r:46,sc:1},
+    {x:0,y:18,w:Math.min(980,W*.72),h:Math.min(560,H*.70),r:44,sc:1},
+    {x:0,y:18,w:Math.min(980,W*.72),h:Math.min(590,H*.72),r:44,sc:1},
+    {x:0,y:18,w:Math.min(1040,W*.78),h:Math.min(600,H*.73),r:46,sc:1},
+    {x:0,y:0,w:360,h:360,r:999,sc:1}
   ];
 }
 function shellState(coord){const K=keyframes(),i=Math.min(K.length-2,Math.max(0,Math.floor(coord))),t=smooth(coord-i);return blend(K[i],K[i+1],t)}
@@ -505,15 +519,14 @@ function apply(){
   const coord=coordAt(currentY),global=clamp(currentY/maxScroll),nearest=Math.round(coord),state=shellState(coord);
   rootStyle.setProperty('--scene-x',pointerX.toFixed(4));rootStyle.setProperty('--scene-y',pointerY.toFixed(4));rootStyle.setProperty('--scene-p',global.toFixed(4));
   const parX=(pointerX-.5)*(W<=900?4:9),parY=(pointerY-.5)*(W<=900?3:6);
-  /* Shell morph: size + radius + subtle parallax + scale — NO rotation, NO per-frame shadow (prevents flicker) */
   shell.style.width=state.w.toFixed(2)+'px';shell.style.height=state.h.toFixed(2)+'px';shell.style.borderRadius=state.r.toFixed(2)+'px';
   shell.style.transform=`translate3d(calc(-50% + ${(state.x+parX).toFixed(2)}px),calc(-50% + ${(state.y+parY).toFixed(2)}px),0) scale(${state.sc.toFixed(3)})`;
-  /* Panels: opacity + translate + gentle scale only (GPU-composited) */
-  panels.forEach((el,i)=>{const a=envelope(coord,i,i===0||i===6?.72:.69),shift=(i-coord)*22;el.style.opacity=a.toFixed(3);el.style.transform=`translate3d(0,${shift.toFixed(1)}px,0) scale(${(.97+a*.03).toFixed(3)})`;const was=el.classList.contains('active');el.classList.toggle('active',was?a>.5:a>.62)});
-  copies.forEach((el,i)=>{const a=envelope(coord,i,.66),dir=i%2?1:-1,x=(1-a)*dir*34,y=(1-a)*16;el.style.opacity=a.toFixed(3);if(W<=900)el.style.transform=`translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)`;else if(el.classList.contains('copy-left')||el.classList.contains('copy-right'))el.style.transform=`translate3d(${x.toFixed(1)}px,calc(-50% + ${y.toFixed(1)}px),0)`;else el.style.transform=`translate3d(calc(-50% + ${x.toFixed(1)}px),${y.toFixed(1)}px,0)`;const was=el.classList.contains('active');el.classList.toggle('active',was?a>.5:a>.62)});
-  words.forEach((el,i)=>{const a=envelope(coord,i,.88),d=coord-i;el.style.opacity=(a*(i===6?.78:1)).toFixed(3);el.style.transform=`translate(-50%,-50%) translate3d(0,${(d*-56).toFixed(1)}px,0) scale(${(.92+a*.08).toFixed(3)})`});
+  /* Tighter envelope => quicker, cleaner crossfade (less text-over-text during transition) */
+  panels.forEach((el,i)=>{const a=envelope(coord,i,i===0||i===6?.66:.56),shift=(i-coord)*20;el.style.opacity=a.toFixed(3);el.style.transform=`translate3d(0,${shift.toFixed(1)}px,0) scale(${(.975+a*.025).toFixed(3)})`;const was=el.classList.contains('active');el.classList.toggle('active',was?a>.5:a>.62)});
+  copies.forEach((el)=>{const idx=+el.dataset.copy,a=envelope(coord,idx,.6),y=(1-a)*16;el.style.opacity=a.toFixed(3);if(W<=900)el.style.transform='none';else if(el.classList.contains('copy-left'))el.style.transform=`translate3d(0,calc(-50% + ${y.toFixed(1)}px),0)`;else el.style.transform=`translate3d(-50%,${y.toFixed(1)}px,0)`;el.classList.toggle('active',a>.55)});
+  words.forEach((el,i)=>{const a=envelope(coord,i,.86),d=coord-i;el.style.opacity=(a*.65).toFixed(3);el.style.transform=`translate(-50%,-50%) translate3d(0,${(d*-54).toFixed(1)}px,0) scale(${(.93+a*.07).toFixed(3)})`});
   roadPlane.style.transform=`translate3d(-50%,${(-global*44).toFixed(1)}px,0) perspective(700px) rotateX(66deg)`;
-  orbit.style.transform=`translate(-50%,-50%) rotateX(72deg) rotateZ(${(global*40).toFixed(2)}deg)`;
+  orbit.style.transform=`translate(-50%,-50%) rotateX(72deg) rotateZ(${(global*36).toFixed(2)}deg)`;
   progressFill.style.height=(global*100).toFixed(2)+'%';siteHead.classList.toggle('scrolled',currentY>35);
   if(nearest!==phase){phase=nearest;phaseText.textContent=String(phase+1).padStart(2,'0')+' · '+phaseNames[phase];sceneNo.textContent=String(phase+1).padStart(2,'0');sceneName.textContent=phaseNames[phase];dots.forEach((d,i)=>d.classList.toggle('active',i===phase));navLinks.forEach((a,i)=>a.classList.toggle('active',i===Math.min(phase,5)));mobileButtons.forEach(b=>b.classList.toggle('active',$('#'+b.dataset.jump)?.dataset.phase==phase))}
 }
@@ -540,12 +553,35 @@ addEventListener('keydown',e=>{if(e.key==='Escape')$$('.modal.open').forEach(clo
 function showToast(text){toast.textContent=text;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),2800)}
 $$('[data-contact-choice]').forEach(b=>b.addEventListener('click',()=>{closeModal(contactModal);showToast(b.dataset.contactChoice+' · Beratung ausgewählt')}));
 
+/* Comparison bars in price panel */
+const euro0=new Intl.NumberFormat('de-DE',{maximumFractionDigits:0});
+const AVG=3500, KREBS=3090;
+const barAvg=$('#barAvg'),barKrebs=$('#barKrebs'),barUser=$('#barUser'),cmpUser=$('#cmpUser'),cmpNote=$('#cmpNote');
+function updateCmp(){
+  const user=parseFloat(cmpUser.value);
+  const hasUser=Number.isFinite(user)&&user>0;
+  const max=Math.max(AVG,KREBS,hasUser?user:0,1)*1.06;
+  barAvg.style.width=(AVG/max*100).toFixed(1)+'%';
+  barKrebs.style.width=(KREBS/max*100).toFixed(1)+'%';
+  barUser.style.width=(hasUser?user/max*100:0).toFixed(1)+'%';
+  if(hasUser){
+    const diff=user-KREBS;
+    if(diff>0)cmpNote.innerHTML=`Bei Fahrschule Krebs zahlst du <b class="good">${euro0.format(diff)} €</b> weniger als bei deinem aktuellen Angebot.`;
+    else if(diff<0)cmpNote.innerHTML=`Dein Angebot liegt <b class="bad">${euro0.format(-diff)} €</b> unter unserem Beispielpreis – lass uns über deine Ausbildung sprechen.`;
+    else cmpNote.innerHTML=`Dein Angebot entspricht genau unserem Beispielpreis.`;
+  }else{
+    cmpNote.innerHTML=`Fahrschule Krebs ist <b class="good">${euro0.format(AVG-KREBS)} €</b> günstiger als der Bundesdurchschnitt.`;
+  }
+}
+cmpUser.addEventListener('input',updateCmp);
+
+/* Detailed calculator (modal) */
 const euro=new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
 const lines=$$('[data-line]'),totalEl=$('#calcTotal'),competitor=$('#competitor'),difference=$('#difference');
 function recalc(){let total=0;lines.forEach(row=>{const q=Math.max(0,parseFloat($('[data-qty]',row).value)||0),u=Math.max(0,parseFloat($('[data-unit]',row).value)||0),sum=q*u;total+=sum;$('[data-sum]',row).textContent=euro.format(sum)+' €'});totalEl.innerHTML=euro.format(total)+' <span>€</span>';const other=parseFloat(competitor.value);difference.className='';if(Number.isFinite(other)&&other>0){const d=other-total;difference.textContent=(d>=0?'+ ':'− ')+euro.format(Math.abs(d))+' €';difference.classList.add(d>=0?'good':'bad')}else difference.textContent='—'}
 $$('#priceModal input').forEach(i=>i.addEventListener('input',recalc));
 
-cache();apply();schedule();recalc();
+cache();apply();schedule();recalc();updateCmp();
 })();
 </script>
 </body>
