@@ -742,7 +742,28 @@ body::before{
 }
 
 /* Interactive Particle Background – dezente Verkehrszeichen-Silhouetten */
-#fxCanvas{position:fixed;inset:0;z-index:-2;pointer-events:none;}
+#fxCanvas{position:fixed;inset:0;z-index:-2;pointer-events:none;transform:translateZ(0);}
+
+/* ============================================================
+   ANTI-FLICKER + 3D-BASIS  ·  stabile GPU-Kompositionen
+   ============================================================ */
+/* Flächen, die animiert/transformiert werden, bekommen eine eigene,
+   flimmerfreie Ebene. backface-hidden verhindert Sub-Pixel-Shimmer. */
+.card,.theme-tile,.class-tile,.mini,.stat-box,.morph-card,.hot-item,
+.tl-row,.besitz-tile,.ring-wrap svg,.cd-unit,.doc-scan,.avatar,.logo{
+  -webkit-backface-visibility:hidden;backface-visibility:hidden;
+  -webkit-transform:translateZ(0);
+}
+/* 3D-Bühne: Karten dürfen sich echt im Raum neigen */
+.tilt3d{transform-style:preserve-3d;transition:transform .55s var(--ease-out);}
+.tilt3d.tilting{transition:transform .12s linear;}
+.tilt-depth{transform:translateZ(28px);transform-style:preserve-3d;}
+.tilt-depth-sm{transform:translateZ(14px);}
+/* Glanzreflex, der beim Neigen über die Karte wandert (rein dekorativ) */
+.tilt-sheen{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;
+  background:radial-gradient(420px circle at var(--mx,50%) var(--my,0%),rgba(255,255,255,.10),transparent 60%);
+  transition:opacity .3s var(--ease-out);mix-blend-mode:screen;z-index:1;}
+.tilt3d.tilting .tilt-sheen{opacity:1;}
 
 /* Scroll-getriebener Fortschrittsbalken am oberen Rand */
 .scroll-progress{
@@ -764,15 +785,23 @@ svg.lci{width:18px;height:18px;flex:0 0 auto;}
   margin:0 auto;
   padding:20px 18px calc(48px + env(safe-area-inset-bottom));
   padding-top:calc(18px + env(safe-area-inset-top));
+  perspective:1500px;
+  perspective-origin:50% 22%;
 }
 
-/* Screen-Übergang (Anmeldung → Klassenwahl → Cockpit) */
-.screen{animation:screenIn .55s var(--ease-out);}
-@keyframes screenIn{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+/* Screen-Übergang (Anmeldung → Klassenwahl → Cockpit) · 3D-Tiefenschub */
+.screen{animation:screenIn .6s var(--ease-out);transform-origin:50% 40%;}
+@keyframes screenIn{
+  from{opacity:0;transform:perspective(1500px) translate3d(0,26px,-120px) rotateX(9deg);}
+  to{opacity:1;transform:perspective(1500px) translate3d(0,0,0) rotateX(0);}
+}
 
-/* Scroll-Animate-on-Reveal: Sektionen erscheinen beim Hereinscrollen */
-.reveal{opacity:0;transform:translate3d(0,26px,0) scale(.985);transition:opacity .8s var(--ease-out),transform .8s var(--ease-out);will-change:opacity,transform;}
-.reveal.revealed{opacity:1;transform:translate3d(0,0,0) scale(1);}
+/* Scroll-Animate-on-Reveal: Sektionen klappen leicht aus dem Raum herein.
+   Nach der Animation wird der Transform entfernt (.settled) → Text bleibt
+   gestochen scharf, kein Sub-Pixel-Flackern. */
+.reveal{opacity:0;transform:perspective(1300px) translate3d(0,32px,0) rotateX(8deg);transform-origin:50% 0;transition:opacity .7s var(--ease-out),transform .85s var(--ease-out);}
+.reveal.revealed{opacity:1;transform:perspective(1300px) translate3d(0,0,0) rotateX(0);}
+.reveal.settled{transform:none;transition:opacity .4s var(--ease-out);}
 
 /* ---------- Topbar & Branding ---------- */
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;}
@@ -814,6 +843,29 @@ svg.lci{width:18px;height:18px;flex:0 0 auto;}
   font-size:12px;font-weight:600;letter-spacing:.01em;
   background:var(--surface);border:1px solid var(--border);color:var(--text-dim);
 }
+
+/* Greeting-Kopf mit schwebendem Fortschritts-Badge */
+.greeting-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;}
+.greeting-top .gt-l{min-width:0;flex:1;}
+.hero-badge{
+  flex:0 0 auto;position:relative;width:76px;height:76px;border-radius:20px;
+  background:linear-gradient(155deg,var(--surface-2),#14192339);
+  border:1px solid var(--border-strong);display:grid;place-items:center;
+  box-shadow:var(--shadow-sm),inset 0 1px 0 rgba(255,255,255,.05);
+  overflow:hidden;
+}
+.hero-badge .hb-ring{position:absolute;inset:8px;border-radius:50%;
+  background:conic-gradient(from -90deg,var(--accent) 0turn,var(--accent-hi) var(--p,0turn),var(--surface-3) var(--p,0turn));
+  -webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));
+  mask:radial-gradient(farthest-side,transparent calc(100% - 5px),#000 calc(100% - 4px));
+  transition:--p 1.4s var(--ease-out);}
+.hero-badge .hb-core{position:relative;text-align:center;z-index:2;}
+.hero-badge .hb-pct{font-size:19px;font-weight:800;letter-spacing:-.03em;line-height:1;}
+.hero-badge .hb-lab{font-size:7.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-top:2px;}
+.hero-badge .hb-sheen{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,transparent 42%,rgba(255,255,255,.14) 50%,transparent 58%);
+  transform:translateX(-130%);animation:sweep 2.6s var(--ease-io) 1s infinite;}
+@property --p{syntax:'<angle>';inherits:false;initial-value:0turn;}
 .chip svg{width:14px;height:14px;color:var(--accent-hi);}
 .chip.accent{background:var(--accent-soft);border-color:var(--accent-line);color:#FCA5B5;}
 .chip.accent svg{color:var(--accent-hi);}
@@ -1157,10 +1209,11 @@ svg.lci{width:18px;height:18px;flex:0 0 auto;}
    ANMELDUNG  ·  Schritt 1
    ============================================================ */
 .auth-screen{
-  min-height:100vh;min-height:100svh;display:flex;flex-direction:column;justify-content:center;gap:20px;
+  min-height:100vh;min-height:100svh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:20px;
   max-width:440px;margin:0 auto;
   padding:36px 20px calc(36px + env(safe-area-inset-bottom));
   padding-top:calc(36px + env(safe-area-inset-top));
+  perspective:1400px;
 }
 .auth-hero{display:flex;align-items:center;gap:14px;}
 .logo-xl{width:56px;height:56px;flex:0 0 56px;border-radius:16px;}
@@ -1210,9 +1263,10 @@ input.txt:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accen
    KLASSENWAHL  ·  Schritt 2
    ============================================================ */
 .klasse-screen{
-  max-width:480px;margin:0 auto;min-height:100vh;min-height:100svh;display:flex;flex-direction:column;
+  max-width:480px;margin:0 auto;min-height:100vh;min-height:100svh;min-height:100dvh;display:flex;flex-direction:column;
   padding:24px 18px calc(40px + env(safe-area-inset-bottom));
   padding-top:calc(22px + env(safe-area-inset-top));
+  perspective:1400px;
 }
 .klasse-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:20px;}
 .klasse-head .icon-btn{flex:0 0 42px;margin-top:3px;}
@@ -1233,7 +1287,7 @@ input.txt:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accen
 .class-tile .ct-age{font-size:10px;color:var(--text-faint);margin-top:7px;letter-spacing:.03em;text-transform:uppercase;font-weight:700;}
 .class-tile .ct-check{position:absolute;top:12px;right:12px;width:22px;height:22px;border-radius:50%;border:1.5px solid var(--border-strong);display:grid;place-items:center;transition:background .25s,border-color .25s;}
 .class-tile .ct-check svg{width:12px;height:12px;color:transparent;transition:color .2s;}
-.class-tile.selected{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),var(--shadow-sm);}
+.class-tile.selected{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft),0 16px 30px -16px var(--accent-glow),var(--shadow-sm);transform:translateZ(0) scale(1.035);}
 .class-tile.selected .ct-ic{background:var(--accent-soft);border-color:var(--accent-line);}
 .class-tile.selected .ct-ic svg{color:var(--accent-hi);}
 .class-tile.selected .ct-check{background:var(--accent);border-color:var(--accent);}
@@ -1349,6 +1403,8 @@ button.tl-row:active{transform:scale(.99);}
   *{animation-duration:.001ms!important;transition-duration:.08s!important;}
   .hot-marker .halo{display:none;}
   .reveal{opacity:1;transform:none;}
+  .tilt3d{transform:none!important;}
+  .tilt-sheen,.hero-badge .hb-sheen,[data-fill].shimmer::after{display:none;}
   #fxCanvas{display:none;}
 }
 /* ---------- Focus states (Accessibility) ---------- */
@@ -1927,6 +1983,7 @@ function teardownScreen(){
   if(mapInstance){ try{ mapInstance.remove(); }catch(e){} mapInstance=null; }
   closeMorphInstant();
   Reveal.reset();
+  Tilt.reset();
 }
 function renderScreen(t,force){
   const app=el('app');
@@ -1978,6 +2035,7 @@ const Reveal=(()=>{
   function onRevealed(elm){
     animateFills(elm);
     if(elm.querySelector&&elm.querySelector('#ringProg')) animateRing();
+    if(elm.querySelector&&elm.querySelector('.hero-badge')) animateHeroBadge(elm);
     countUps(elm);
   }
   function ensure(){
@@ -1991,6 +2049,8 @@ const Reveal=(()=>{
         elm.style.transitionDelay=delay+'ms';
         elm.classList.add('revealed');
         setTimeout(()=>{ elm.style.transitionDelay=''; onRevealed(elm); },delay+60);
+        /* Anti-Flicker: nach der 3D-Animation Transform entfernen → Text bleibt scharf */
+        setTimeout(()=>{ elm.classList.add('settled'); },delay+920);
       });
     },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
     return io;
@@ -2032,6 +2092,87 @@ function countUps(scope){
     })(performance.now());
   });
 }
+/* Gesamt-Fortschritt (0-100) über alle Ausbildungssäulen – speist das Greeting-Badge */
+function overallPct(){
+  if(!state) return 0;
+  const parts=[];
+  if(state.theorie.gesamt>0) parts.push(pct(state.theorie.besucht,state.theorie.gesamt));
+  const sf=state.sonderfahrten, soll=sf.ueberland.soll+sf.autobahn.soll+sf.nacht.soll;
+  if(soll>0) parts.push(pct(sf.ueberland.ist+sf.autobahn.ist+sf.nacht.ist,soll));
+  parts.push(pct(state.simulator.ist,state.simulator.soll));
+  parts.push(Math.round((['sehtest','ersteHilfe','passbild'].filter(k=>state.dokumente[k].status==='verifiziert').length/3)*100));
+  parts.push(fahrstilPct());
+  const tp=state.theoriePruefung;
+  parts.push(!tp.erforderlich||tp.bestanden?100:(tp.angemeldet?50:0));
+  return Math.round(parts.reduce((a,b)=>a+b,0)/parts.length);
+}
+function animateHeroBadge(scope){
+  const badge=(scope||document).querySelector('.hero-badge'); if(!badge) return;
+  const ring=badge.querySelector('.hb-ring'), label=badge.querySelector('.hb-pct');
+  const target=parseInt(badge.getAttribute('data-pct'),10)||0;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ if(ring) ring.style.setProperty('--p',(target/100)+'turn'); }));
+  if(!label) return;
+  if(reducedMotion()){ label.textContent=target+'%'; return; }
+  const dur=1400, start=performance.now();
+  (function tick(now){ const e=Math.min(1,(now-start)/dur), eased=1-Math.pow(1-e,3); label.textContent=Math.round(target*eased)+'%'; if(e<1) requestAnimationFrame(tick); })(performance.now());
+}
+
+/* ============================================================
+   TILT-3D  ·  Karten neigen sich im Raum (Touch + Scroll)
+   Rein GPU-kompositiert, kein Neuzeichnen von Layout → flimmerfrei.
+   ============================================================ */
+const Tilt=(()=>{
+  let items=[],raf=null,scrollRaf=null,active=false;
+  const MAXP=7;   /* max. Grad durch Zeiger/Touch */
+  const MAXS=4;   /* max. Grad durch Scroll-Position */
+  function apply(it){
+    const rx=(it.ambient.x+it.pointer.x), ry=(it.ambient.y+it.pointer.y);
+    const dz=it.tilting?18:0;
+    it.el.style.transform=`translateZ(0) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateY(${dz? '-2px':'0'})`;
+  }
+  function onScroll(){
+    if(scrollRaf) return;
+    scrollRaf=requestAnimationFrame(()=>{
+      scrollRaf=null; const vh=window.innerHeight;
+      items.forEach(it=>{
+        const r=it.el.getBoundingClientRect();
+        if(r.bottom<-80||r.top>vh+80){ return; }
+        const center=r.top+r.height/2, rel=(center-vh/2)/(vh/2); /* -1..1 */
+        it.ambient.x=Math.max(-MAXS,Math.min(MAXS,rel*MAXS));   /* oben kippt nach vorn */
+        if(!it.tilting) apply(it);
+      });
+    });
+  }
+  function bind(it){
+    const el=it.el;
+    el.addEventListener('pointermove',e=>{
+      if(e.pointerType==='mouse'&&e.buttons) return;
+      const r=el.getBoundingClientRect();
+      const px=(e.clientX-r.left)/r.width-0.5, py=(e.clientY-r.top)/r.height-0.5;
+      it.pointer.y=Math.max(-MAXP,Math.min(MAXP,px*MAXP*2));
+      it.pointer.x=Math.max(-MAXP,Math.min(MAXP,-py*MAXP*2));
+      el.style.setProperty('--mx',(px*100+50)+'%'); el.style.setProperty('--my',(py*100+50)+'%');
+      if(!it.tilting){ it.tilting=true; el.classList.add('tilting'); }
+      apply(it);
+    },{passive:true});
+    const release=()=>{ it.pointer.x=0; it.pointer.y=0; it.tilting=false; el.classList.remove('tilting'); apply(it); };
+    el.addEventListener('pointerleave',release,{passive:true});
+    el.addEventListener('pointercancel',release,{passive:true});
+    el.addEventListener('pointerup',release,{passive:true});
+  }
+  return {
+    wire(root){
+      if(reducedMotion()) return;
+      const els=(root||document).querySelectorAll('.tilt3d');
+      if(!els.length) return;
+      items=[];
+      els.forEach(el=>{ const it={el,pointer:{x:0,y:0},ambient:{x:0,y:0},tilting:false}; items.push(it); bind(it); });
+      if(!active){ active=true; window.addEventListener('scroll',onScroll,{passive:true}); }
+      onScroll();
+    },
+    reset(){ items=[]; if(active){ window.removeEventListener('scroll',onScroll); active=false; } }
+  };
+})();
 
 /* Scroll-getriebener Fortschrittsbalken */
 let spTicking=false;
@@ -2385,10 +2526,20 @@ function renderTopbar(){
   </div>`;
 }
 function renderGreeting(){
-  const w=who();
+  const w=who(), op=overallPct();
   return `<div class="greeting reveal">
-    <div class="hello">Willkommen zurück</div>
-    <h1>Hallo, ${esc(firstName(w.name))}.</h1>
+    <div class="greeting-top">
+      <div class="gt-l">
+        <div class="hello">Willkommen zurück</div>
+        <h1>Hallo, ${esc(firstName(w.name))}.</h1>
+      </div>
+      <div class="hero-badge tilt3d" data-pct="${op}" role="img" aria-label="Gesamtfortschritt ${op} Prozent">
+        <div class="tilt-sheen"></div>
+        <div class="hb-ring"></div>
+        <div class="hb-sheen"></div>
+        <div class="hb-core"><div class="hb-pct">0%</div><div class="hb-lab">Gesamt</div></div>
+      </div>
+    </div>
     <div class="chips">
       <span class="chip accent">${ic('badge-check')}${w.klasseLabel}</span>
       <span class="chip">${ic('user-round')}${w.ausbildungsart}</span>
@@ -2437,8 +2588,9 @@ function renderFahrstil(){
   const r=64, C=2*Math.PI*r;
   return `<section class="section reveal" id="sec-fahrstil">
     <div class="section-head"><div><div class="eyebrow">Fahrstil</div><h2 class="section-title">Bewertung des Fahrlehrers</h2></div><span class="head-note">nach jeder Fahrstunde</span></div>
-    <div class="card fahrstil-card">
-      <div class="ring-wrap"><svg viewBox="0 0 148 148"><circle class="ring-track" cx="74" cy="74" r="${r}"></circle><circle id="ringProg" class="ring-progress" cx="74" cy="74" r="${r}" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${C.toFixed(2)}" data-target="${p}"></circle></svg><div class="ring-center"><div class="pct" id="ringPct">0<span>%</span></div><div class="rlab">Prüfungsreife</div></div></div>
+    <div class="card fahrstil-card tilt3d">
+      <div class="tilt-sheen"></div>
+      <div class="ring-wrap tilt-depth-sm"><svg viewBox="0 0 148 148"><circle class="ring-track" cx="74" cy="74" r="${r}"></circle><circle id="ringProg" class="ring-progress" cx="74" cy="74" r="${r}" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${C.toFixed(2)}" data-target="${p}"></circle></svg><div class="ring-center"><div class="pct" id="ringPct">0<span>%</span></div><div class="rlab">Prüfungsreife</div></div></div>
       <div class="fahrstil-side">
         <div class="subscore"><span class="sic">${ic('scan-eye')}</span><div class="stext"><div class="sname">Vorausschauendes Fahren</div></div>${dots(f.vorausschauend)}</div>
         <div class="subscore"><span class="sic">${ic('settings-2')}</span><div class="stext"><div class="sname">${labels.kupplung}</div></div>${dots(f.kupplung)}</div>
@@ -2673,6 +2825,7 @@ function renderCockpitScreen(){
   const app=el('app'); app.className='';
   app.innerHTML=`<div class="app screen">${renderTopbar()}${renderGreeting()}${renderProgress()}${renderFahrstil()}${renderHistorySection()}${renderFocus()}${renderAvail()}${renderFuture()}${renderTheory()}${renderMap()}${renderTree()}${renderFooter()}</div>`;
   Reveal.wire(app);
+  Tilt.wire(app);
   startCountdown(); initMap();
   prevReady=readyConditions().all;
 }
