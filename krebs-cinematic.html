@@ -32,7 +32,7 @@ body{min-width:320px;background:transparent;color:var(--ink);font-family:var(--s
 /* WebGL living background */
 #bgGL{position:fixed;inset:0;width:100%;height:100%;z-index:-2;display:block;pointer-events:none}
 .bg-tint{position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(120vw 90vh at 50% -10%,rgba(237,21,62,.05),transparent 60%),linear-gradient(180deg,rgba(1,1,4,.35),rgba(1,1,4,.55) 40%,rgba(1,1,4,.72))}
-.bg-grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.bg-grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.06;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 /* scroll progress */
 .sprog{position:fixed;top:0;left:0;height:2px;width:0;z-index:90;background:linear-gradient(90deg,var(--redDark),var(--red),#ff8ea3);box-shadow:0 0 14px rgba(237,21,62,.6);transition:width .1s linear}
 button,input,a{font:inherit;color:inherit}
@@ -82,7 +82,7 @@ a{text-decoration:none}
 .hero__sub{max-width:560px;font-size:14px;line-height:1.6;color:var(--muted)}
 .hero__cta{display:flex;gap:12px;justify-content:center;pointer-events:auto}
 .hero__cards{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;max-width:1000px;height:320px;pointer-events:auto;will-change:opacity;opacity:0}
-.hero__card{position:absolute;width:180px;height:130px;border-radius:18px;border:1.2px solid rgba(255,255,255,.14);background:linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.03));backdrop-filter:blur(12px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;opacity:0;transform:scale(.4) translate(-50%,-50%);will-change:opacity,transform;transition:opacity .7s var(--ease),transform .7s var(--ease),border-color .35s,box-shadow .35s;font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}.hero__card:hover{border-color:rgba(237,21,62,.28);box-shadow:0 8px 24px rgba(237,21,62,.12)}.hero__card.show{opacity:1;transform:scale(1) translate(-50%,-50%)}.hero__card i{display:block;font-size:32px;font-style:normal}
+.hero__card{position:absolute;width:180px;height:130px;border-radius:18px;border:1.2px solid rgba(255,255,255,.14);background:linear-gradient(145deg,rgba(255,255,255,.10),rgba(255,255,255,.03));backdrop-filter:blur(12px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;opacity:0;transform:scale(.4) translate(-50%,-50%);will-change:opacity,transform;transition:border-color .35s,box-shadow .35s;font-size:11px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}.hero__card:hover{border-color:rgba(237,21,62,.28);box-shadow:0 8px 24px rgba(237,21,62,.12)}.hero__card i{display:block;font-size:32px;font-style:normal}
 .hero__card--1{left:6%;top:15%}.hero__card--2{left:50%;top:0%}.hero__card--3{left:94%;top:15%}.hero__card--4{left:15%;top:85%}.hero__card--5{left:85%;top:85%}
 .hero__hint{position:absolute;left:50%;bottom:34px;transform:translateX(-50%);font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--faint);display:flex;flex-direction:column;align-items:center;gap:9px;z-index:3}
 .hero__hint i{width:1px;height:34px;background:linear-gradient(var(--red),transparent);animation:drop 1.8s var(--ease) infinite}
@@ -231,6 +231,12 @@ a{text-decoration:none}
   *,*:before,*:after{animation-duration:.001ms!important;transition-duration:.001ms!important}
   .rv{opacity:1;transform:none}
 }
+/* Lenis */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}
+.lenis.lenis-stopped{overflow:hidden}
+.lenis.lenis-smooth iframe{pointer-events:none}
 </style>
 </head>
 <body>
@@ -406,6 +412,7 @@ const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const smooth=t=>{t=clamp(t);return t*t*(3-2*t)};
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let lenis=null;
 
 /* Loader */
 addEventListener('load',()=>{requestAnimationFrame(()=>{$('#loaderBar').style.width='100%';setTimeout(()=>$('#loader').classList.add('done'),380)})},{once:true});
@@ -414,7 +421,7 @@ setTimeout(()=>{$('#loaderBar').style.width='100%';$('#loader').classList.add('d
 /* ---------- HERO SHATTER ---------- */
 const canvas=$('#heroCanvas'),ctx=canvas.getContext('2d');
 const heroIntro=$('#heroIntro'),heroReveal=$('#heroReveal'),heroHint=$('#heroHint');
-const DPR=Math.min(2,devicePixelRatio||1);
+const DPR=Math.min(1.75,devicePixelRatio||1);
 let VW=innerWidth,VH=innerHeight,emblem=null,emblemBlur=null,shards=[],EM=600,heroTop=0,heroH=1;
 let mx=.5,my=.5,tmx=.5,tmy=.5,hover=0,thover=0,bob=0;
 
@@ -586,8 +593,8 @@ new IntersectionObserver((es,ob)=>{es.forEach(en=>{if(en.isIntersecting){updateC
 
 /* ---------- Modals ---------- */
 const priceModal=$('#priceModal'),contactModal=$('#contactModal'),toast=$('#toast');let focusBefore=null;
-function openModal(m){focusBefore=document.activeElement;m.classList.add('open');document.body.style.overflow='hidden';setTimeout(()=>m.querySelector('button,input')?.focus(),60)}
-function closeModal(m){m.classList.remove('open');document.body.style.overflow='';focusBefore?.focus()}
+function openModal(m){focusBefore=document.activeElement;m.classList.add('open');document.body.style.overflow='hidden';if(lenis)lenis.stop();setTimeout(()=>m.querySelector('button,input')?.focus(),60)}
+function closeModal(m){m.classList.remove('open');document.body.style.overflow='';if(lenis)lenis.start();focusBefore?.focus()}
 $$('[data-price]').forEach(b=>b.addEventListener('click',()=>openModal(priceModal)));
 $$('[data-contact]').forEach(b=>b.addEventListener('click',()=>{const p=b.closest('.modal');if(p)closeModal(p);setTimeout(()=>openModal(contactModal),80)}));
 $$('[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(b.closest('.modal'))));
@@ -619,7 +626,7 @@ const heroCards=$('#heroCards'),card1=$('#card1'),card2=$('#card2'),card3=$('#ca
   'float noise(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.0-2.0*f);',
   ' return mix(mix(dot(h2(i+vec2(0.0,0.0)),f-vec2(0.0,0.0)),dot(h2(i+vec2(1.0,0.0)),f-vec2(1.0,0.0)),u.x),',
   '            mix(dot(h2(i+vec2(0.0,1.0)),f-vec2(0.0,1.0)),dot(h2(i+vec2(1.0,1.0)),f-vec2(1.0,1.0)),u.x),u.y);}',
-  'float fbm(vec2 p){float v=0.0,a=0.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);for(int i=0;i<5;i++){v+=a*noise(p);p=m*p;a*=0.5;}return v;}',
+  'float fbm(vec2 p){float v=0.0,a=0.5;mat2 m=mat2(1.6,1.2,-1.2,1.6);for(int i=0;i<4;i++){v+=a*noise(p);p=m*p;a*=0.5;}return v;}',
   'void main(){',
   ' vec2 uv=(gl_FragCoord.xy-0.5*u_res)/u_res.y;',
   ' float t=u_time*0.045; vec2 mo=(u_mouse-0.5); float sc=u_scroll;',
@@ -645,13 +652,16 @@ const heroCards=$('#heroCards'),card1=$('#card1'),card2=$('#card2'),card3=$('#ca
   const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
   const lp=gl.getAttribLocation(prog,'p');gl.enableVertexAttribArray(lp);gl.vertexAttribPointer(lp,2,gl.FLOAT,false,0,0);
   const uRes=gl.getUniformLocation(prog,'u_res'),uTime=gl.getUniformLocation(prog,'u_time'),uMouse=gl.getUniformLocation(prog,'u_mouse'),uScroll=gl.getUniformLocation(prog,'u_scroll');
-  const SCALE=.7;let bw=0,bh=0;
+  let SCALE=.66,bw=0,bh=0;
   function rs(){bw=Math.max(2,Math.floor(innerWidth*SCALE));bh=Math.max(2,Math.floor(innerHeight*SCALE));cv.width=bw;cv.height=bh;gl.viewport(0,0,bw,bh);}
   rs();addEventListener('resize',rs,{passive:true});
   let bmx=.5,bmy=.5,tbx=.5,tby=.5;
   addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;tbx=e.clientX/innerWidth;tby=1-e.clientY/innerHeight;},{passive:true});
-  const t0=performance.now();let hidden=false,bgRaf=0;
+  const t0=performance.now();let hidden=false,bgRaf=0,lastT=0,ema=16,slowFrames=0;
   function frame(now){bgRaf=0;
+    /* adaptive quality: if frames stay slow, shrink the buffer until smooth */
+    if(lastT){const d=now-lastT;ema=ema*.9+d*.1;if(ema>30){if(++slowFrames>40&&SCALE>.34){SCALE=Math.max(.34,SCALE-.12);rs();slowFrames=0;ema=16}}else slowFrames=0}
+    lastT=now;
     bmx=lerp(bmx,tbx,.05);bmy=lerp(bmy,tby,.05);
     const sc=clamp(scrollY/((document.documentElement.scrollHeight-innerHeight)||1));
     gl.uniform2f(uRes,bw,bh);gl.uniform1f(uTime,(now-t0)/1000);gl.uniform2f(uMouse,bmx,bmy);gl.uniform1f(uScroll,sc);
@@ -669,7 +679,7 @@ const heroCards=$('#heroCards'),card1=$('#card1'),card2=$('#card2'),card3=$('#ca
   function setProg(){const h=document.documentElement.scrollHeight-innerHeight;if(sprog)sprog.style.width=(clamp(scrollY/(h||1))*100).toFixed(2)+'%';}
   addEventListener('scroll',setProg,{passive:true});setProg();
   if(reduced||typeof Lenis==='undefined'){return;}
-  const lenis=new Lenis({lerp:.09,smoothWheel:true});
+  lenis=new Lenis({lerp:.09,smoothWheel:true,autoRaf:false});
   lenis.on('scroll',()=>{schedule();setProg();});
   if(typeof gsap!=='undefined'&&gsap.ticker){
     gsap.ticker.add(t=>lenis.raf(t*1000));gsap.ticker.lagSmoothing(0);
