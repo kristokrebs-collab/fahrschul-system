@@ -295,6 +295,8 @@
     <div class="nav-item" data-view="fahrlehrer"><span class="nav-icon">🧑‍🏫</span> Fahrlehrer</div>
     <div class="nav-item" data-view="leads"><span class="nav-icon">🎯</span> Leads / CRM <span class="nav-badge warn" id="nav-leads-badge">0</span></div>
     <div class="nav-item" data-view="bank"><span class="nav-icon">🏦</span> Bankabgleich <span class="nav-badge warn" id="nav-bank-badge">0</span></div>
+    <div class="sb-section-label">System</div>
+    <div class="nav-item" data-view="anbindungen"><span class="nav-icon">🔌</span> Anbindungen</div>
     <div class="sb-section-label">Verknüpft</div>
     <a class="nav-item" href="dashboard.html"><span class="nav-icon">🎓</span> Schüler-Status ↗</a>
   </nav>
@@ -333,6 +335,7 @@
     <section class="view" id="view-fahrlehrer"></section>
     <section class="view" id="view-leads"></section>
     <section class="view" id="view-bank"></section>
+    <section class="view" id="view-anbindungen"></section>
   </main>
 </div>
 
@@ -353,6 +356,42 @@
 const HEUTE = new Date('2026-07-19');
 const PREIS_FAHRSTUNDE  = 65;   // € pro reguläre Fahrstunde (45 Min)
 const PREIS_SONDERFAHRT = 78;   // € pro Sonderfahrt (Überland/Autobahn/Nacht)
+
+/* ── ANBINDUNGEN · für die spätere Live-Verbindung vorbereitet ───────────
+   Alles läuft aktuell auf realistischen Demo-Daten (CONFIG.modus='demo').
+   Zum Verbinden je Schnittstelle die markierten // ANBINDUNG:-Stellen im
+   Code auf echte fetch()-Aufrufe umstellen und CONFIG.modus='live' setzen. */
+const CONFIG = {
+  modus: 'demo',                       // 'demo' | 'live'
+  anbindungen: [
+    { id:'bank',     modul:'bank',       icon:'🏦', name:'Bank / Kontoumsätze',    tech:'FinTS·HBCI oder GoCardless', nutzen:'Überweisungen automatisch erkennen und Rechnungen auf „bezahlt" setzen.', status:'vorbereitet' },
+    { id:'kalender', modul:'fahrlehrer', icon:'📅', name:'Termin- & Stundenplan',  tech:'CalDAV / Fahrschul-Software', nutzen:'Verplante, gefahrene und ausgefallene Fahrstunden je Fahrlehrer automatisch zählen.', status:'vorbereitet' },
+    { id:'flotte',   modul:'flotte',     icon:'🔔', name:'Fahrzeug-Erinnerungen',  tech:'E-Mail (SMTP) / Web-Push',    nutzen:'TÜV- und Inspektionswarnungen automatisch an dich verschicken.', status:'vorbereitet' },
+    { id:'website',  modul:'leads',      icon:'🌐', name:'Website-Anfragen',       tech:'Webhook / Formular-POST',     nutzen:'Neue Interessenten automatisch als Lead anlegen und nachfassen.', status:'vorbereitet' },
+    { id:'schueler', modul:'—',          icon:'🎓', name:'Schüler-Cockpit',        tech:'intern (dashboard.html)',     nutzen:'Finanz-Sperre eines Schülers fällt weg, sobald seine Zahlung hier zugeordnet ist.', status:'aktiv' },
+  ],
+};
+
+/* ── Offene Rechnungen (Grundlage für den Bankabgleich) ─────────────── */
+let offeneRechnungen = [
+  { nr:'RE-2026-0412', schueler:'Tobias Maier',   betrag:420.00, faellig:'2026-07-25', bezahlt:false },
+  { nr:'RE-2026-0415', schueler:'Lisa Baumann',   betrag:390.00, faellig:'2026-07-28', bezahlt:false },
+  { nr:'RE-2026-0407', schueler:'Marco Schulze',  betrag:142.00, faellig:'2026-07-22', bezahlt:false },
+  { nr:'RE-2026-0410', schueler:'Anna Fischer',   betrag:78.00,  faellig:'2026-07-20', bezahlt:false },
+  { nr:'RE-2026-0398', schueler:'Katrin Wolf',    betrag:600.00, faellig:'2026-07-18', bezahlt:false },
+  { nr:'RE-2026-0418', schueler:'Jonas Weber',    betrag:390.00, faellig:'2026-07-30', bezahlt:false },
+  { nr:'RE-2026-0402', schueler:'David Krämer',   betrag:325.00, faellig:'2026-07-15', bezahlt:false },
+  { nr:'RE-2026-0420', schueler:'Sophie Lang',    betrag:210.00, faellig:'2026-08-02', bezahlt:false },
+  { nr:'RE-2026-0424', schueler:'Elias Hofmann',  betrag:180.00, faellig:'2026-08-05', bezahlt:false },
+];
+
+/* ── Wartungshistorie je Fahrzeug (Auszug) ──────────────────────────── */
+const wartungHistorie = {
+  F01: [ { datum:'2026-06-05', text:'Sommerreifen + Achsvermessung', kosten:520 }, { datum:'2026-02-20', text:'Inspektion + Ölwechsel', kosten:290 } ],
+  F08: [ { datum:'2026-07-10', text:'Unfallinstandsetzung Kotflügel vorn rechts', kosten:620 }, { datum:'2026-04-02', text:'Inspektion + Ölwechsel', kosten:340 }, { datum:'2025-11-15', text:'Bremsbeläge vorne', kosten:280 } ],
+  F11: [ { datum:'2026-03-09', text:'Inspektion', kosten:310 }, { datum:'2025-12-01', text:'Zahnriemenwechsel', kosten:640 } ],
+  F13: [ { datum:'2026-05-18', text:'Bremsen hinten + Scheiben', kosten:340 }, { datum:'2026-01-10', text:'Inspektion', kosten:300 } ],
+};
 
 /* ── Standorte ──────────────────────────────────────────────────────── */
 const standorte = [
@@ -408,21 +447,21 @@ const maengel = [
 /* ── Fahrlehrer (15) ────────────────────────────────────────────────── */
 /* kapazitaet = mögl. Fahrstunden/Monat · normal/sonder = gegeben · lohn = Vollkosten */
 const fahrlehrer = [
-  { id:'L01', name:'Andreas Vogt',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:118, sonder:34, lohn:4850, schueler:32 },
-  { id:'L02', name:'Sabine Kühn',     klassen:['B','BE'],   vertrag:'Vollzeit', kapazitaet:160, normal:104, sonder:30, lohn:4600, schueler:29 },
-  { id:'L03', name:'Murat Demir',     klassen:['B','B197'], vertrag:'Vollzeit', kapazitaet:160, normal:121, sonder:28, lohn:4780, schueler:31 },
-  { id:'L04', name:'Jens Bauer',      klassen:['A','A2'],   vertrag:'Vollzeit', kapazitaet:150, normal:96,  sonder:12, lohn:4950, schueler:18 },
-  { id:'L05', name:'Claudia Roth',    klassen:['B'],        vertrag:'Teilzeit', kapazitaet:110, normal:74,  sonder:18, lohn:3650, schueler:22 },
-  { id:'L06', name:'Thomas Wolf',     klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:130, sonder:36, lohn:5050, schueler:34 },
-  { id:'L07', name:'Nadine Frank',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:88,  sonder:22, lohn:4700, schueler:30 },
-  { id:'L08', name:'Kevin Schulz',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:112, sonder:30, lohn:4600, schueler:31 },
-  { id:'L09', name:'Petra Lang',      klassen:['B','BE'],   vertrag:'Teilzeit', kapazitaet:110, normal:68,  sonder:16, lohn:3500, schueler:20 },
-  { id:'L10', name:'Stefan Krause',   klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:124, sonder:33, lohn:4900, schueler:33 },
-  { id:'L11', name:'Julia Neumann',   klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:99,  sonder:25, lohn:4650, schueler:28 },
-  { id:'L12', name:'Michael Krebs',   klassen:['B'],        vertrag:'Inhaber',  kapazitaet:90,  normal:52,  sonder:14, lohn:6800, schueler:15 },
-  { id:'L13', name:'Daniel Berg',     klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:108, sonder:29, lohn:4700, schueler:30 },
-  { id:'L14', name:'Anna Fischer',    klassen:['B'],        vertrag:'Teilzeit', kapazitaet:110, normal:61,  sonder:15, lohn:3400, schueler:19 },
-  { id:'L15', name:'Ömer Yıldız',     klassen:['A','A2','B'],vertrag:'Vollzeit',kapazitaet:155, normal:90,  sonder:20, lohn:4850, schueler:24 },
+  { id:'L01', name:'Andreas Vogt',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:118, sonder:34, ausgefallen:6,  lohn:4850, schueler:32 },
+  { id:'L02', name:'Sabine Kühn',     klassen:['B','BE'],   vertrag:'Vollzeit', kapazitaet:160, normal:104, sonder:30, ausgefallen:9,  lohn:4600, schueler:29 },
+  { id:'L03', name:'Murat Demir',     klassen:['B','B197'], vertrag:'Vollzeit', kapazitaet:160, normal:121, sonder:28, ausgefallen:7,  lohn:4780, schueler:31 },
+  { id:'L04', name:'Jens Bauer',      klassen:['A','A2'],   vertrag:'Vollzeit', kapazitaet:150, normal:96,  sonder:12, ausgefallen:14, lohn:4950, schueler:18 },
+  { id:'L05', name:'Claudia Roth',    klassen:['B'],        vertrag:'Teilzeit', kapazitaet:110, normal:74,  sonder:18, ausgefallen:8,  lohn:3650, schueler:22 },
+  { id:'L06', name:'Thomas Wolf',     klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:130, sonder:36, ausgefallen:5,  lohn:5050, schueler:34 },
+  { id:'L07', name:'Nadine Frank',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:88,  sonder:22, ausgefallen:16, lohn:4700, schueler:30 },
+  { id:'L08', name:'Kevin Schulz',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:112, sonder:30, ausgefallen:8,  lohn:4600, schueler:31 },
+  { id:'L09', name:'Petra Lang',      klassen:['B','BE'],   vertrag:'Teilzeit', kapazitaet:110, normal:68,  sonder:16, ausgefallen:11, lohn:3500, schueler:20 },
+  { id:'L10', name:'Stefan Krause',   klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:124, sonder:33, ausgefallen:6,  lohn:4900, schueler:33 },
+  { id:'L11', name:'Julia Neumann',   klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:99,  sonder:25, ausgefallen:13, lohn:4650, schueler:28 },
+  { id:'L12', name:'Michael Krebs',   klassen:['B'],        vertrag:'Inhaber',  kapazitaet:90,  normal:52,  sonder:14, ausgefallen:9,  lohn:6800, schueler:15 },
+  { id:'L13', name:'Daniel Berg',     klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:108, sonder:29, ausgefallen:8,  lohn:4700, schueler:30 },
+  { id:'L14', name:'Anna Fischer',    klassen:['B'],        vertrag:'Teilzeit', kapazitaet:110, normal:61,  sonder:15, ausgefallen:15, lohn:3400, schueler:19 },
+  { id:'L15', name:'Ömer Yıldız',     klassen:['A','A2','B'],vertrag:'Vollzeit',kapazitaet:155, normal:90,  sonder:20, ausgefallen:18, lohn:4850, schueler:24 },
 ];
 
 /* ── Schüler-Kennzahlen (aktueller Monat) ───────────────────────────── */
@@ -490,6 +529,49 @@ function fahrzeugUmsatz(f) {
   return l ? lehrerUmsatz(l) : 0;
 }
 function fahrzeugGewinn(f) { return fahrzeugUmsatz(f) - fahrzeugKosten(f); }
+
+/* Fahrlehrer-Auslastung im Detail (bezahlt vs. gefahren vs. ausgefallen) */
+function lehrerGefahren(l)      { return l.normal + l.sonder; }
+function lehrerStundenlohn(l)   { return l.lohn / l.kapazitaet; }        // €-Kosten je bezahlter Stunde
+function lehrerLeerlauf(l)      { return Math.max(0, l.kapazitaet - lehrerGefahren(l)); }
+function lehrerLeerlaufkosten(l){ return Math.round(lehrerLeerlauf(l) * lehrerStundenlohn(l)); }
+/* Deterministische Wochen-Auslastung Mo–Sa (bis Live-Kalender angebunden ist) */
+function lehrerWoche(l) {
+  const base = lehrerAuslastung(l), seed = parseInt(l.id.slice(1));
+  return [0,1,2,3,4,5].map(d => {
+    const wobble = Math.sin(seed * 1.7 + d * 1.3) * 0.22 + (d === 5 ? -0.25 : 0); // Sa schwächer
+    return Math.max(0.15, Math.min(1.08, base + wobble));
+  });
+}
+
+/* Kosten je erteilter Fahrstunde (Fahrzeug) */
+function fahrzeugKostenProStunde(f) {
+  const l = fahrlehrer.find(x => x.id === f.lehrerId);
+  const std = l ? lehrerGefahren(l) : 0;
+  return std ? fahrzeugKosten(f) / std : 0;
+}
+
+/* ── Bankabgleich · Zuordnungs-Engine ───────────────────────────────────
+   Sucht im Verwendungszweck nach Rechnungsnummer, sonst Name+Betrag.
+   // ANBINDUNG: bankTx später aus der Banking-Schnittstelle (FinTS) laden. */
+function nachnameTreffer(schueler, absender) {
+  const nach = schueler.split(' ').slice(-1)[0].toLowerCase();
+  return absender.toLowerCase().includes(nach);
+}
+function findeRechnung(tx) {
+  if (tx.betrag <= 0) return null;
+  const m = tx.zweck.match(/RE-\d{4}-\d{4}/);
+  if (m) { const r = offeneRechnungen.find(x => x.nr === m[0]); if (r) return { r, art:'Rechnungsnummer', konfidenz:'hoch' }; }
+  const r2 = offeneRechnungen.find(x => !x.bezahlt && Math.abs(x.betrag - tx.betrag) < 0.005 && nachnameTreffer(x.schueler, tx.absender));
+  if (r2) return { r:r2, art:'Name + Betrag', konfidenz:'mittel' };
+  return null;
+}
+/* Auto-erkannte Zahlungen einmalig ihren Rechnungen zuordnen (Demo-Init) */
+function initBankAbgleich() {
+  bankTx.forEach(tx => {
+    if (tx.status === 'auto') { const t = findeRechnung(tx); if (t) { t.r.bezahlt = true; tx.rechnung = t.r.nr; tx.konfidenz = t.konfidenz; tx.matchArt = t.art; } }
+  });
+}
 
 function berechne() {
   const fahrstunden  = sum(fahrlehrer, l => l.normal) * PREIS_FAHRSTUNDE;
@@ -1002,11 +1084,18 @@ function openFahrzeug(id) {
       ${[['Leasingrate',f.leasing],['Sprit / Ladestrom',f.sprit],['Reparatur & Wartung',f.reparatur],['KFZ-Versicherung',f.versicherung]].map(r=>`
         <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.035)"><span style="color:var(--text-muted)">${r[0]}</span><span style="font-weight:700">${eur(r[1])}</span></div>`).join('')}
       <div style="display:flex;justify-content:space-between;padding:10px 0 0;font-weight:800"><span>Gesamtkosten</span><span style="color:var(--c-expense)">${eur(kosten)}</span></div>
+      ${f.pool ? '' : `<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-size:12px;color:var(--text-muted)"><span>Kosten je Fahrstunde</span><span style="font-weight:700">${eur(fahrzeugKostenProStunde(f),2)}</span></div>`}
+      <div style="display:flex;justify-content:space-between;padding:4px 0 0;font-size:12px;color:var(--text-muted)"><span>Kilometerstand</span><span style="font-weight:700">${num(f.km)} km</span></div>
     </div>
     <div class="modal-grid2">
       <div class="stat-box"><div class="sb-l">TÜV / HU</div><div style="margin-top:6px"><span class="pill ${tv.pill}">${tv.txt}</span></div><div style="font-size:11px;color:var(--text-dim);margin-top:6px">${fmtDatum(f.tuev)}</div></div>
       <div class="stat-box"><div class="sb-l">Nächste Inspektion</div><div style="margin-top:6px"><span class="pill ${ins.pill}">${ins.txt}</span></div><div style="font-size:11px;color:var(--text-dim);margin-top:6px">${fmtDatum(f.insp)}</div></div>
     </div>
+    ${(tv.warn || ins.warn) ? `<button class="mini-btn" style="width:100%;margin-bottom:14px" onclick="toast('🔔 Automatische E-Mail-Erinnerung für ${f.kennz} aktiviert (vorbereitet für Live-Anbindung).')">🔔 Automatische Termin-Erinnerung aktivieren</button>` : ''}
+    ${wartungHistorie[f.id] ? `<div class="stat-box" style="margin-bottom:14px">
+      <div class="sb-l" style="margin-bottom:8px">🛠️ Wartungshistorie</div>
+      ${wartungHistorie[f.id].map(w => `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:12.5px;border-bottom:1px solid rgba(255,255,255,0.035)"><span style="color:var(--text-muted)">${fmtDatum(w.datum)} · ${w.text}</span><span style="font-weight:700;white-space:nowrap">${eur(w.kosten)}</span></div>`).join('')}
+    </div>` : ''}
     <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px">
       <div class="chart-title">🔧 Gemeldete Mängel (${ms.length})</div>
       <button class="mini-btn primary" onclick="mangelForm('${f.id}')">+ Mangel melden</button>
@@ -1119,25 +1208,27 @@ function renderAnalytics() {
 ═══════════════════════════════════════════════════════════════════════ */
 function renderFahrlehrer() {
   const el = document.getElementById('view-fahrlehrer');
-  const gesGefahren = sum(fahrlehrer, l => l.normal + l.sonder);
+  const gesGefahren = sum(fahrlehrer, lehrerGefahren);
   const gesKapazitaet = sum(fahrlehrer, l => l.kapazitaet);
   const avgUtil = gesGefahren / gesKapazitaet;
   const durchschnittspreis = (PREIS_FAHRSTUNDE + PREIS_SONDERFAHRT) / 2;
   const verlorenerUmsatz = sum(fahrlehrer.filter(l => lehrerAuslastung(l) < 0.85),
-    l => Math.round((l.kapazitaet * 0.85 - (l.normal + l.sonder)) * durchschnittspreis));
+    l => Math.round((l.kapazitaet * 0.85 - lehrerGefahren(l)) * durchschnittspreis));
+  const leerlaufkosten = sum(fahrlehrer, lehrerLeerlaufkosten);
+  const gesAusfaelle = sum(fahrlehrer, l => l.ausgefallen);
 
   const rows = [...fahrlehrer].sort((a,b) => (lehrerUmsatz(b)-b.lohn) - (lehrerUmsatz(a)-a.lohn)).map(l => {
     const umsatz = lehrerUmsatz(l), u = lehrerAuslastung(l), deckung = umsatz - l.lohn;
     const veh = fahrzeuge.find(f => f.lehrerId === l.id);
     const uColor = u>=0.9?'var(--status-green)':u>=0.75?'var(--status-yellow)':'var(--status-orange)';
-    return `<tr>
+    return `<tr class="clickable" onclick="openLehrer('${l.id}')">
       <td><div class="t-strong">${l.name}</div><div style="font-size:11px;color:var(--text-dim)">${l.vertrag} · ${l.klassen.join(', ')}</div></td>
       <td>${veh ? `<span style="font-size:12px">${veh.kennz}</span>` : '<span style="color:var(--text-dim)">—</span>'}</td>
       <td class="num">${l.schueler}</td>
-      <td class="num">${l.normal + l.sonder} / ${l.kapazitaet}</td>
+      <td class="num">${lehrerGefahren(l)} / ${l.kapazitaet}</td>
+      <td class="num" style="color:${l.ausgefallen>=12?'var(--status-orange)':'var(--text-muted)'}">${l.ausgefallen}</td>
       <td><div class="util-cell"><div class="meter"><div class="meter-fill" style="width:${Math.min(100,u*100)}%;background:${uColor}"></div></div><span class="util-val" style="color:${uColor}">${pct(u)}</span></div></td>
       <td class="num t-pos">${eur(umsatz)}</td>
-      <td class="num" style="color:var(--text-muted)">${eur(l.lohn)}</td>
       <td class="num ${deckung>=0?'t-pos':'t-neg'}">${deckung>=0?'+':''}${eur(deckung)}</td>
     </tr>`;
   }).join('');
@@ -1145,24 +1236,62 @@ function renderFahrlehrer() {
   el.innerHTML = `
     <div class="grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="card kpi"><div class="kpi-label">Ø Auslastung</div><div class="kpi-value" style="color:${avgUtil>=0.85?'var(--status-green)':'var(--status-yellow)'}">${pct(avgUtil)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${gesGefahren} von ${gesKapazitaet} Std.</div></div>
-      <div class="card kpi"><div class="kpi-label">Umsatz Fahrlehrer</div><div class="kpi-value" style="color:var(--c-revenue)">${eur(sum(fahrlehrer,lehrerUmsatz))}</div></div>
-      <div class="card kpi"><div class="kpi-label">Personalkosten</div><div class="kpi-value" style="color:var(--c-expense)">${eur(K.personal.lehrer)}</div></div>
-      <div class="card kpi" style="border-color:rgba(245,158,11,0.35)"><div class="kpi-label">💡 Ungenutzt / Monat</div><div class="kpi-value" style="color:var(--status-yellow)">${eur(verlorenerUmsatz)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">bei Ziel-Auslastung 85 %</div></div>
+      <div class="card kpi"><div class="kpi-label">⏸ Ausgefallene Termine</div><div class="kpi-value" style="color:var(--status-orange)">${gesAusfaelle}</div><div class="kpi-delta muted" style="color:var(--text-dim)">Std. diesen Monat</div></div>
+      <div class="card kpi" style="border-color:rgba(239,68,68,0.3)"><div class="kpi-label">💸 Leerlaufkosten</div><div class="kpi-value" style="color:var(--status-red)">${eur(leerlaufkosten)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">bezahlt, aber nicht gefahren</div></div>
+      <div class="card kpi" style="border-color:rgba(245,158,11,0.35)"><div class="kpi-label">💡 Umsatz-Potenzial</div><div class="kpi-value" style="color:var(--status-yellow)">${eur(verlorenerUmsatz)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">bei Ziel-Auslastung 85 %</div></div>
     </div>
 
     <div class="alert orange" style="margin-top:18px"><span class="alert-ico">📊</span><div>
       <div class="alert-title">Auslastung ist die wichtigste Profitabilitäts-Kennzahl</div>
-      ${fahrlehrer.filter(l=>lehrerAuslastung(l)<0.75).length} Fahrlehrer liegen unter 75 %. Würden sie auf 85 % kommen, brächte das rund <strong>${eur(verlorenerUmsatz)}</strong> Mehrumsatz pro Monat – ohne einen einzigen neuen Mitarbeiter.
+      ${fahrlehrer.filter(l=>lehrerAuslastung(l)<0.75).length} Fahrlehrer liegen unter 75 %. Ihr zahlt aktuell rund <strong>${eur(leerlaufkosten)}</strong> für Zeit, in der nicht gefahren wird. Auf Ziel-Auslastung 85 % gebracht, wären das zusätzlich ~<strong>${eur(verlorenerUmsatz)}</strong> Umsatz pro Monat – ohne neue Mitarbeiter.
     </div></div>
 
-    <div class="row-head"><h2>🧑‍🏫 Fahrlehrer-Rentabilität</h2><span>sortiert nach Deckungsbeitrag (Umsatz − Lohn)</span></div>
+    <div class="row-head"><h2>🧑‍🏫 Fahrlehrer-Rentabilität</h2><span>Klick auf eine Zeile für Wochen-Auslastung · sortiert nach Deckungsbeitrag</span></div>
     <div class="tbl-wrap">
       <table class="tbl"><thead><tr>
         <th>Fahrlehrer</th><th>Fahrzeug</th><th class="num">Schüler</th><th class="num">Std. (gef./mögl.)</th>
-        <th>Auslastung</th><th class="num">Umsatz</th><th class="num">Lohn</th><th class="num">Deckungsbeitrag</th>
+        <th class="num">Ausfälle</th><th>Auslastung</th><th class="num">Umsatz</th><th class="num">Deckungsbeitrag</th>
       </tr></thead><tbody>${rows}</tbody></table>
     </div>
-    <div class="muted-note" style="margin-top:12px">💡 Deckungsbeitrag = vom Fahrlehrer erwirtschafteter Umsatz minus seine Lohnkosten. Fahrzeug-, Standort- und Verwaltungskosten werden separat in den Fixkosten getragen.</div>`;
+    <div class="muted-note" style="margin-top:12px">💡 Deckungsbeitrag = erwirtschafteter Umsatz minus Lohnkosten. „Leerlaufkosten" = bezahlte, aber nicht gefahrene Stunden × Stundenkosten – die stille Gewinnbremse.</div>`;
+}
+
+function openLehrer(id) {
+  const l = fahrlehrer.find(x => x.id === id);
+  const veh = fahrzeuge.find(f => f.lehrerId === l.id);
+  const u = lehrerAuslastung(l), gef = lehrerGefahren(l), leer = lehrerLeerlauf(l);
+  const uColor = u>=0.9?'var(--status-green)':u>=0.75?'var(--status-yellow)':'var(--status-orange)';
+  const tage = ['Mo','Di','Mi','Do','Fr','Sa'], woche = lehrerWoche(l);
+  const heat = woche.map((v,i) => {
+    const c = v>=0.9?'var(--status-green)':v>=0.75?'var(--status-yellow)':'var(--status-orange)';
+    const h = Math.round(18 + v*44);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
+      <div style="height:62px;display:flex;align-items:flex-end;width:100%"><div style="width:100%;height:${h}px;background:${c};border-radius:6px 6px 3px 3px" title="${pct(v)}"></div></div>
+      <div style="font-size:10.5px;color:var(--text-dim);font-weight:700">${tage[i]}</div>
+      <div style="font-size:10px;color:${c};font-weight:800">${pct(v)}</div>
+    </div>`;
+  }).join('');
+  const box = document.getElementById('modalBox');
+  box.innerHTML = `
+    <div class="modal-header"><div><div class="modal-title">${l.name}</div><div class="modal-sub">${l.vertrag} · Klassen ${l.klassen.join(', ')}${veh?' · '+veh.modell+' ('+veh.kennz+')':''}</div></div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-grid2">
+      <div class="stat-box"><div class="sb-l">Auslastung</div><div class="sb-v" style="color:${uColor}">${pct(u)}</div><div style="font-size:11px;color:var(--text-dim);margin-top:4px">${gef} von ${l.kapazitaet} Std.</div></div>
+      <div class="stat-box"><div class="sb-l">Deckungsbeitrag</div><div class="sb-v" style="color:var(--c-revenue)">+${eur(lehrerUmsatz(l)-l.lohn)}</div><div style="font-size:11px;color:var(--text-dim);margin-top:4px">Umsatz ${eur(lehrerUmsatz(l))} − Lohn ${eur(l.lohn)}</div></div>
+    </div>
+    <div class="stat-box" style="margin-bottom:14px">
+      <div class="sb-l" style="margin-bottom:10px">Bezahlt vs. gefahren (Monat)</div>
+      ${[['Bezahlte / verfügbare Stunden', l.kapazitaet, 'var(--text-main)'],
+         ['davon gefahren', gef, 'var(--status-green)'],
+         ['davon ausgefallen (Termine)', l.ausgefallen, 'var(--status-orange)'],
+         ['Leerlauf (nicht gefahren)', leer, 'var(--status-red)']].map(r=>`
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.035)"><span style="color:var(--text-muted)">${r[0]}</span><span style="font-weight:700;color:${r[2]}">${r[1]} Std.</span></div>`).join('')}
+      <div style="display:flex;justify-content:space-between;padding:10px 0 0;font-weight:800"><span>Leerlaufkosten</span><span style="color:var(--status-red)">${eur(lehrerLeerlaufkosten(l))}</span></div>
+    </div>
+    <div class="chart-title" style="margin-bottom:12px">📅 Auslastung diese Woche</div>
+    <div style="display:flex;gap:8px;align-items:flex-end">${heat}</div>
+    <div class="muted-note" style="margin-top:14px">📅 Wochenwerte kommen im Live-Betrieb automatisch aus dem Stundenplan (Modul „Anbindungen").</div>
+    <button class="mini-btn primary" style="width:100%;margin-top:16px;padding:11px" onclick="toast('📅 ${l.name}: Vorschlag zur Terminverdichtung an die Disposition gesendet.')">Freie Slots auffüllen lassen</button>`;
+  openModal();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1251,68 +1380,140 @@ function saveLead(id) {
 /* ═══════════════════════════════════════════════════════════════════════
    RENDER · PRO – BANKABGLEICH
 ═══════════════════════════════════════════════════════════════════════ */
-function bankPill(status) {
-  return {
-    auto:      { c:'green',  t:'✓ auto zugeordnet' },
-    offen:     { c:'orange', t:'⚠ nicht zugeordnet' },
-    pruefen:   { c:'yellow', t:'prüfen' },
-    ruecklauf: { c:'red',    t:'⛔ Rücklastschrift' },
-    manuell:   { c:'blue',   t:'manuell zugeordnet' },
-  }[status];
+function bankStatusPill(tx) {
+  if (tx.status === 'ruecklauf') return { c:'red',    t:'⛔ Rücklastschrift' };
+  if (tx.status === 'manuell')   return { c:'blue',   t:'✓ manuell zugeordnet' };
+  if (tx.status === 'auto')      return { c:'green',  t:'✓ auto zugeordnet' };
+  if (tx.status === 'pruefen')   return { c:'yellow', t:'prüfen' };
+  return                              { c:'orange', t:'⚠ offen' };
 }
 function renderBank() {
   const el = document.getElementById('view-bank');
-  const auto = bankTx.filter(t => t.status === 'auto' || t.status === 'manuell');
+  const zugeordnet = bankTx.filter(t => t.status === 'auto' || t.status === 'manuell');
   const eingang = sum(bankTx.filter(t => t.betrag > 0), t => t.betrag);
-  const quote = bankTx.filter(t=>t.status==='auto').length / bankTx.length;
+  const quote = bankTx.filter(t=>t.status==='auto').length / bankTx.filter(t=>t.betrag>0).length;
+  const offen = offeneRechnungen.filter(r => !r.bezahlt);
+  const offenSumme = sum(offen, r => r.betrag);
+  const optionen = offen.map(r => `<option value="${r.nr}">${r.nr} · ${r.schueler} · ${eur(r.betrag,2)}</option>`).join('');
 
   const rows = bankTx.map(t => {
-    const p = bankPill(t.status);
+    const p = bankStatusPill(t);
+    const r = t.rechnung ? offeneRechnungen.find(x => x.nr === t.rechnung) : null;
+    let matchInfo = '';
+    if (t.rechnung) matchInfo = `<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px">→ ${t.rechnung}${r?' · '+r.schueler:''}${t.matchArt&&t.matchArt!=='manuell'?' <span class="pill '+(t.konfidenz==='hoch'?'green':'yellow')+'" style="padding:1px 6px">'+t.matchArt+'</span>':''}</div>`;
+    let action = '<span style="color:var(--text-dim)">—</span>';
+    if (t.status === 'ruecklauf') action = `<button class="mini-btn" onclick="mahneRuecklauf('${t.id}')">Mahnung</button>`;
+    else if (t.status === 'offen' || t.status === 'pruefen')
+      action = `<select class="input" style="padding:6px 8px;font-size:11.5px;min-width:150px" onchange="zuordneTx('${t.id}',this.value)"><option value="">Rechnung wählen…</option>${optionen}</select>`;
     return `<tr>
-      <td style="color:var(--text-muted)">${fmtDatum(t.datum)}</td>
+      <td style="color:var(--text-muted);white-space:nowrap">${fmtDatum(t.datum)}</td>
       <td class="t-strong">${t.absender}</td>
       <td style="color:var(--text-muted)">${t.zweck}</td>
       <td class="num ${t.betrag<0?'t-neg':''}">${t.betrag<0?'−':''}${eur(Math.abs(t.betrag),2)}</td>
-      <td><span class="pill ${p.c}">${p.t}</span>${t.ref?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px">${t.ref}</div>`:''}</td>
-      <td>${(t.status!=='auto'&&t.status!=='manuell') ? `<button class="mini-btn" onclick="matchTx('${t.id}')">Zuordnen</button>` : '<span style="color:var(--text-dim)">—</span>'}</td>
+      <td><span class="pill ${p.c}">${p.t}</span>${matchInfo}</td>
+      <td>${action}</td>
     </tr>`;
   }).join('');
 
   el.innerHTML = `
     <div class="grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="card kpi"><div class="kpi-label">🏦 Zahlungseingang</div><div class="kpi-value" style="color:var(--c-revenue)">${eur(eingang)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${bankTx.filter(t=>t.betrag>0).length} Gutschriften</div></div>
-      <div class="card kpi"><div class="kpi-label">Auto-Zuordnung</div><div class="kpi-value" style="color:var(--status-green)">${pct(quote)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${auto.length} von ${bankTx.length} erkannt</div></div>
-      <div class="card kpi"><div class="kpi-label">Offen / prüfen</div><div class="kpi-value" style="color:var(--status-yellow)">${bankTx.filter(t=>t.status==='offen'||t.status==='pruefen').length}</div></div>
+      <div class="card kpi"><div class="kpi-label">Auto-Zuordnung</div><div class="kpi-value" style="color:var(--status-green)">${pct(quote)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${zugeordnet.length} von ${bankTx.filter(t=>t.betrag>0).length} zugeordnet</div></div>
+      <div class="card kpi"><div class="kpi-label">Offene Forderungen</div><div class="kpi-value" style="color:var(--status-yellow)">${eur(offenSumme)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${offen.length} Rechnungen unbezahlt</div></div>
       <div class="card kpi" style="border-color:rgba(239,68,68,0.35)"><div class="kpi-label">Rücklastschriften</div><div class="kpi-value" style="color:var(--status-red)">${bankTx.filter(t=>t.status==='ruecklauf').length}</div><div class="kpi-delta muted" style="color:var(--text-dim)">geplatzte Zahlung → nachfassen</div></div>
     </div>
 
     <div class="alert blue" style="margin-top:18px"><span class="alert-ico">🔗</span><div>
       <div class="alert-title">So funktioniert der automatische Bankabgleich</div>
-      Das System liest den Kontoumsatz (per Banking-Schnittstelle / FinTS) und gleicht <strong>Verwendungszweck</strong> und <strong>Absendername</strong> mit offenen Rechnungen ab. Bei Treffer (Rechnungsnummer oder Name) wird die Zahlung automatisch auf „bezahlt" gesetzt – im Schüler-Cockpit verschwindet die Finanz-Sperre sofort.
-      <div style="margin-top:8px"><button class="mini-btn primary" onclick="autoMatchAll()">Alle erkennbaren automatisch zuordnen</button></div>
+      Das System liest den Kontoumsatz (per FinTS/HBCI) und sucht im <strong>Verwendungszweck</strong> nach der Rechnungsnummer (z. B. „RE-2026-0412"). Fehlt sie, wird über <strong>Name + Betrag</strong> abgeglichen. Bei Treffer wird die Rechnung auf „bezahlt" gesetzt – die Finanz-Sperre im Schüler-Cockpit fällt sofort weg.
+      <div style="margin-top:8px"><button class="mini-btn primary" onclick="autoMatchAll()">Offene Posten automatisch zuordnen</button></div>
     </div></div>
 
-    <div class="row-head"><h2>🧾 Kontoumsätze Juli 2026</h2><span>live-Abgleich mit offenen Rechnungen</span></div>
-    <div class="tbl-wrap">
-      <table class="tbl"><thead><tr><th>Datum</th><th>Absender</th><th>Verwendungszweck</th><th class="num">Betrag</th><th>Status</th><th>Aktion</th></tr></thead>
-      <tbody>${rows}</tbody></table>
+    <div class="two-col" style="margin-top:8px">
+      <div>
+        <div class="row-head" style="margin-top:12px"><h2>🧾 Kontoumsätze</h2><span>Juli 2026</span></div>
+        <div class="tbl-wrap">
+          <table class="tbl" style="min-width:720px"><thead><tr><th>Datum</th><th>Absender</th><th>Verwendungszweck</th><th class="num">Betrag</th><th>Status</th><th>Aktion</th></tr></thead>
+          <tbody>${rows}</tbody></table>
+        </div>
+      </div>
+      <div>
+        <div class="row-head" style="margin-top:12px"><h2>📄 Offene Rechnungen</h2><span>${eur(offenSumme)}</span></div>
+        <div class="card">
+          ${offen.length ? offen.map(r => { const ueber = tageBis(r.faellig) < 0;
+            return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.035)">
+              <div><div class="t-strong" style="font-size:12.5px">${r.nr}</div><div style="font-size:11px;color:var(--text-dim)">${r.schueler} · fällig ${fmtDatum(r.faellig)}</div></div>
+              <div style="text-align:right"><div style="font-weight:800;font-variant-numeric:tabular-nums">${eur(r.betrag,2)}</div>${ueber?'<span class="pill red" style="padding:1px 7px;margin-top:3px">überfällig</span>':''}</div>
+            </div>`; }).join('') : '<div class="muted-note">Alle Rechnungen bezahlt. 🎉</div>'}
+        </div>
+      </div>
     </div>`;
 }
-function matchTx(id) {
-  const t = bankTx.find(x => x.id === id);
-  if (t.status === 'ruecklauf') {
-    toast('⛔ Rücklastschrift kann nicht zugeordnet werden – Schüler zur erneuten Zahlung anschreiben.');
-    return;
-  }
-  t.status = 'manuell'; t.ref = 'manuell zugeordnet';
-  toast(`🔗 Zahlung von ${t.absender} manuell einer Rechnung zugeordnet.`);
+function zuordneTx(txId, nr) {
+  if (!nr) return;
+  const tx = bankTx.find(x => x.id === txId), r = offeneRechnungen.find(x => x.nr === nr);
+  if (!tx || !r) return;
+  r.bezahlt = true; tx.status = 'manuell'; tx.rechnung = r.nr; tx.matchArt = 'manuell';
+  toast(`🔗 ${tx.absender} → ${r.nr} (${r.schueler}) zugeordnet. Finanz-Sperre aufgehoben.`);
   renderBank(); updateBadges();
+}
+function mahneRuecklauf(id) {
+  const tx = bankTx.find(x => x.id === id);
+  toast(`✉️ Zahlungserinnerung zu „${tx.absender}" (${eur(Math.abs(tx.betrag),2)}) erstellt & Schüler auf Finanz-Sperre gesetzt.`);
 }
 function autoMatchAll() {
   let n = 0;
-  bankTx.forEach(t => { if (t.status === 'offen' || t.status === 'pruefen') { t.status = 'manuell'; t.ref = 'zugeordnet'; n++; } });
-  toast(n ? `🔗 ${n} Zahlungen automatisch zugeordnet. Nur Rücklastschrift bleibt offen.` : 'Alles bereits zugeordnet.');
+  bankTx.forEach(tx => {
+    if (tx.status === 'offen' || tx.status === 'pruefen') {
+      const t = findeRechnung(tx);
+      if (t) { t.r.bezahlt = true; tx.status = 'manuell'; tx.rechnung = t.r.nr; tx.konfidenz = t.konfidenz; tx.matchArt = t.art; n++; }
+    }
+  });
+  toast(n ? `🔗 ${n} weitere Zahlung(en) automatisch zugeordnet.` : 'ℹ Keine eindeutige Auto-Zuordnung möglich – bitte manuell prüfen (fehlende Rechnungsnummer).');
   renderBank(); updateBadges();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER · SYSTEM – ANBINDUNGEN (Live-Betrieb vorbereitet)
+═══════════════════════════════════════════════════════════════════════ */
+function renderAnbindungen() {
+  const el = document.getElementById('view-anbindungen');
+  const cards = CONFIG.anbindungen.map(a => {
+    const aktiv = a.status === 'aktiv';
+    return `<div class="card" style="${aktiv?'border-color:rgba(16,185,129,0.3)':''}">
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,0.04);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${a.icon}</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div class="t-strong">${a.name}</div>
+            <span class="pill ${aktiv?'green':'yellow'}">${aktiv?'✓ aktiv':'○ vorbereitet'}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:3px">${a.tech}</div>
+        </div>
+      </div>
+      <div style="font-size:12.5px;color:var(--text-muted);line-height:1.5;margin:12px 0 14px">${a.nutzen}</div>
+      ${aktiv ? '<div class="muted-note">Läuft bereits – verlinkt mit dem Schüler-Cockpit.</div>'
+              : `<button class="mini-btn primary" style="width:100%;padding:10px" onclick="toast('🔌 ${a.name}: Für die Verbindung werden Zugangsdaten/API-Schlüssel benötigt – die Code-Stelle ist bereits vorbereitet (// ANBINDUNG:).')">Verbinden</button>`}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="alert orange"><span class="alert-ico">🔌</span><div>
+      <div class="alert-title">Aktuell im Demo-Modus – bereit für die Live-Anbindung</div>
+      Das Cockpit läuft mit realistischen Beispieldaten (${num(fahrlehrer.length)} Fahrlehrer, ${num(K.aktiveSchueler)} Schüler, ${num(fahrzeuge.length)} Fahrzeuge). Sobald ihr die Schnittstellen anbinden könnt, wird pro Bereich nur die markierte Datenquelle getauscht – Oberfläche und Berechnungen bleiben identisch. So kann jeder Bereich <strong>einzeln</strong> live gehen.
+    </div></div>
+
+    <div class="row-head"><h2>Schnittstellen</h2><span>je Modul einzeln aktivierbar</span></div>
+    <div class="grid" style="grid-template-columns:repeat(2,1fr)">${cards}</div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="chart-title" style="margin-bottom:10px">🛠️ Was beim Live-Gang passiert</div>
+      <div style="font-size:12.5px;color:var(--text-muted);line-height:1.7">
+        1. Datenquelle je Modul auf die echte Schnittstelle umstellen (im Code als <code style="color:#C7D2FE">// ANBINDUNG:</code> markiert).<br>
+        2. <strong>CONFIG.modus</strong> von <code style="color:#C7D2FE">'demo'</code> auf <code style="color:#C7D2FE">'live'</code> setzen.<br>
+        3. Alle Kennzahlen rechnen sich automatisch aus den echten Daten – nichts muss doppelt gepflegt werden.
+      </div>
+    </div>`;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1326,6 +1527,7 @@ const VIEWS = {
   fahrlehrer: { title:'Fahrlehrer',      sub:'Rentabilität & Auslastung',              render:renderFahrlehrer },
   leads:      { title:'Leads / CRM',     sub:'Interessenten & automatisches Nachfassen',render:renderLeads },
   bank:       { title:'Bankabgleich',    sub:'Automatische Zahlungszuordnung',         render:renderBank },
+  anbindungen:{ title:'Anbindungen',     sub:'Schnittstellen für den Live-Betrieb',    render:renderAnbindungen },
 };
 function showView(name) {
   const v = VIEWS[name]; if (!v) return;
@@ -1373,6 +1575,7 @@ function setBadge(id, n, warn) {
 }
 
 /* Start */
+initBankAbgleich();
 updateBadges();
 showView('dashboard');
 </script>
