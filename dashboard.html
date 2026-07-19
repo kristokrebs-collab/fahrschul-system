@@ -802,6 +802,36 @@ svg.lci{width:18px;height:18px;flex:0 0 auto;}
 .reveal{opacity:0;transform:perspective(1300px) translate3d(0,32px,0) rotateX(8deg);transform-origin:50% 0;transition:opacity .7s var(--ease-out),transform .85s var(--ease-out);}
 .reveal.revealed{opacity:1;transform:perspective(1300px) translate3d(0,0,0) rotateX(0);}
 .reveal.settled{transform:none;transition:opacity .4s var(--ease-out);}
+/* „Flieg-herein" – Sektionen kommen abwechselnd leicht von links/rechts aus dem Raum */
+.reveal.rv-l{transform:perspective(1300px) translate3d(-22px,30px,-40px) rotateX(7deg) rotateY(6deg);}
+.reveal.rv-r{transform:perspective(1300px) translate3d(22px,30px,-40px) rotateX(7deg) rotateY(-6deg);}
+.reveal.rv-l.revealed,.reveal.rv-r.revealed{transform:perspective(1300px) translate3d(0,0,0) rotateX(0) rotateY(0);}
+
+/* Premium-Sperre: Prüfgebiet-Guide (exklusive Leistung der Fahrschule) */
+.lock-card{position:relative;overflow:hidden;border-radius:var(--radius);border:1px solid var(--border-strong);
+  background:linear-gradient(180deg,var(--surface),#141824);padding:26px 20px;text-align:center;box-shadow:var(--shadow-sm);}
+.lock-card::before{content:"";position:absolute;inset:0;opacity:.45;pointer-events:none;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:28px 28px;-webkit-mask:radial-gradient(120% 82% at 50% 0,#000,transparent 72%);mask:radial-gradient(120% 82% at 50% 0,#000,transparent 72%);}
+.lock-card>*{position:relative;z-index:1;}
+.lock-glow{position:absolute;left:50%;top:-14%;width:300px;height:190px;transform:translateX(-50%);z-index:0;
+  background:radial-gradient(circle,var(--accent-soft),transparent 65%);pointer-events:none;}
+.lock-badge{width:62px;height:62px;border-radius:18px;margin:0 auto 14px;display:grid;place-items:center;position:relative;
+  background:var(--accent-soft);border:1px solid var(--accent-line);box-shadow:0 0 26px -6px var(--accent-glow);}
+.lock-badge svg{width:28px;height:28px;color:var(--accent-hi);}
+.lock-badge .lb-ping{position:absolute;inset:0;border-radius:18px;border:1px solid var(--accent-line);animation:lbping 2.6s var(--ease-out) infinite;}
+@keyframes lbping{0%{transform:scale(1);opacity:.7;}100%{transform:scale(1.5);opacity:0;}}
+.lock-eyebrow{font-size:10.5px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent-hi);font-weight:700;margin-bottom:7px;}
+.lock-title{font-size:20px;font-weight:800;letter-spacing:-.03em;margin-bottom:9px;}
+.lock-desc{font-size:13px;color:var(--text-dim);line-height:1.6;margin:0 auto 16px;max-width:340px;}
+.lock-teaser{display:inline-flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;color:var(--text-dim);
+  background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:8px 14px;margin-bottom:18px;}
+.lock-teaser svg{width:14px;height:14px;color:var(--accent-hi);}
+.lock-card .btn{max-width:280px;margin:0 auto;}
+.lock-hint{font-size:11px;color:var(--text-faint);margin-top:12px;}
+.map-unlocked-note{display:flex;align-items:center;gap:8px;justify-content:center;font-size:11px;color:var(--emerald-hi);
+  background:var(--emerald-soft);border:1px solid var(--emerald-line);border-radius:999px;padding:6px 12px;margin:0 auto 12px;width:max-content;}
+.map-unlocked-note svg{width:13px;height:13px;}
 
 /* ---------- Topbar & Branding ---------- */
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;}
@@ -1906,6 +1936,10 @@ function openAmount(){ return state.finanzen.posten.reduce((s,p)=>s+p.betrag,0);
 /* ---------- 8 · Konto & Anmeldung (lokal, Passwort als Hash) ---------- */
 function getProfile(){ const raw=Store.get(PROFILE_KEY); if(!raw) return null; try{ const p=JSON.parse(raw); return (p&&p.name&&p.hash)?p:null; }catch(e){ return null; } }
 function saveProfile(p){ Store.set(PROFILE_KEY,JSON.stringify(p)); }
+/* Prüfgebiet-Guide: exklusive Leistung der Fahrschule, vor Ort freizuschalten.
+   Freischaltcode hier zentral pflegen (Groß-/Kleinschreibung egal). */
+const HOTSPOT_ACCESS_CODE='KREBS2026';
+function hotspotsUnlocked(){ const p=getProfile(); return !!(p&&p.hotspotsUnlocked); }
 function randomSalt(){
   try{ const a=new Uint8Array(16); crypto.getRandomValues(a); return Array.from(a).map(b=>b.toString(16).padStart(2,'0')).join(''); }
   catch(e){ let s=''; for(let i=0;i<32;i++) s+='0123456789abcdef'[Math.floor(Math.random()*16)]; return s; }
@@ -2057,8 +2091,10 @@ const Reveal=(()=>{
   }
   return {
     wire(root){
+      /* Content-Sektionen wechseln „fliegend" zwischen links/rechts */
+      (root||document).querySelectorAll('.section.reveal').forEach((s,i)=>{ if(!s.classList.contains('rv-l')&&!s.classList.contains('rv-r')) s.classList.add(i%2?'rv-r':'rv-l'); });
       const els=(root||document).querySelectorAll('.reveal:not(.revealed)');
-      if(!('IntersectionObserver' in window)||reducedMotion()){ els.forEach(elm=>{ elm.classList.add('revealed'); onRevealed(elm); }); return; }
+      if(!('IntersectionObserver' in window)||reducedMotion()){ els.forEach(elm=>{ elm.classList.add('revealed','settled'); onRevealed(elm); }); return; }
       const obs=ensure(); els.forEach(elm=>obs.observe(elm));
     },
     reset(){ if(io){ io.disconnect(); io=null; } lastT=0; queue=0; }
@@ -2122,16 +2158,17 @@ function animateHeroBadge(scope){
    Rein GPU-kompositiert, kein Neuzeichnen von Layout → flimmerfrei.
    ============================================================ */
 const Tilt=(()=>{
-  let items=[],raf=null,scrollRaf=null,active=false;
+  let items=[],scrollRaf=null,active=false,gyroActive=false,gyroBound=false;
   const MAXP=7;   /* max. Grad durch Zeiger/Touch */
   const MAXS=4;   /* max. Grad durch Scroll-Position */
+  const MAXG=6;   /* max. Grad durch Gyroskop */
   function apply(it){
     const rx=(it.ambient.x+it.pointer.x), ry=(it.ambient.y+it.pointer.y);
     const dz=it.tilting?18:0;
     it.el.style.transform=`translateZ(0) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateY(${dz? '-2px':'0'})`;
   }
   function onScroll(){
-    if(scrollRaf) return;
+    if(gyroActive||scrollRaf) return;   /* bei aktivem Gyroskop treibt das Gerät die Neigung */
     scrollRaf=requestAnimationFrame(()=>{
       scrollRaf=null; const vh=window.innerHeight;
       items.forEach(it=>{
@@ -2142,6 +2179,23 @@ const Tilt=(()=>{
         if(!it.tilting) apply(it);
       });
     });
+  }
+  /* Gyroskop: Handy kippen → alle Karten neigen sich sanft im Raum */
+  function onGyro(e){
+    if(e==null||e.gamma==null||e.beta==null) return;
+    gyroActive=true;
+    const gy=Math.max(-MAXG,Math.min(MAXG,e.gamma/9));       /* links/rechts */
+    const gx=Math.max(-MAXG,Math.min(MAXG,(e.beta-42)/9));   /* vor/zurück, Ruhelage ~42° */
+    items.forEach(it=>{ it.ambient.x=gx; it.ambient.y=gy; if(!it.tilting) apply(it); });
+  }
+  function enableGyro(){ if(gyroBound||!('DeviceOrientationEvent' in window)) return; gyroBound=true; window.addEventListener('deviceorientation',onGyro,{passive:true}); }
+  function setupGyro(){
+    if(!('DeviceOrientationEvent' in window)) return;
+    if(typeof DeviceOrientationEvent.requestPermission==='function'){
+      /* iOS 13+: Erlaubnis nur nach echter Nutzergeste – bei erster Berührung anfragen, kein aufdringliches Popup beim Laden */
+      const req=()=>{ DeviceOrientationEvent.requestPermission().then(s=>{ if(s==='granted') enableGyro(); }).catch(()=>{}); };
+      window.addEventListener('pointerdown',req,{once:true,passive:true});
+    } else { enableGyro(); }
   }
   function bind(it){
     const el=it.el;
@@ -2168,6 +2222,7 @@ const Tilt=(()=>{
       items=[];
       els.forEach(el=>{ const it={el,pointer:{x:0,y:0},ambient:{x:0,y:0},tilting:false}; items.push(it); bind(it); });
       if(!active){ active=true; window.addEventListener('scroll',onScroll,{passive:true}); }
+      setupGyro();
       onScroll();
     },
     reset(){ items=[]; if(active){ window.removeEventListener('scroll',onScroll); active=false; } }
@@ -2798,10 +2853,42 @@ function renderTheory(){
 }
 function setTheoryFilter(f){ if(!['alle','offen','besucht'].includes(f)||theoryUI.filter===f) return; theoryUI.filter=f; refreshTheory(); }
 
-/* ---------- Karte · Gefahren-Hotspots Fulda ---------- */
+/* ---------- Karte · Gefahren-Hotspots Fulda (exklusive Leistung) ---------- */
 function renderMap(){
+  const head=`<div class="section-head"><div><div class="eyebrow">Prüfgebiet</div><h2 class="section-title">Gefahren-Hotspots</h2></div><span class="head-note">Fulda</span></div>`;
+  if(!hotspotsUnlocked()){
+    return `<section class="section reveal" id="sec-map">${head}
+      <div class="lock-card">
+        <div class="lock-glow"></div>
+        <div class="lock-badge">${ic('map-pin')}<span class="lb-ping"></span></div>
+        <div class="lock-eyebrow">Exklusive Leistung</div>
+        <div class="lock-title">Prüfgebiet-Guide Fulda</div>
+        <div class="lock-desc">Die realen Gefahren-Hotspots im Fuldaer Prüfgebiet – von unseren Fahrlehrern kuratiert, mit interaktiver Karte und konkreten Fahrtipps. Als Leistung der Fahrschule Krebs schalten wir sie exklusiv für unsere Fahrschüler frei.</div>
+        <div class="lock-teaser">${ic('triangle-alert')}${hotspots.length} kuratierte Hotspots · Karte · Fahrtipps</div>
+        <button class="btn btn-primary" data-action="unlock-hotspots">${ic('key-round')}Jetzt freischalten</button>
+        <div class="lock-hint">Deinen Freischaltcode erhältst du in der Fahrschule.</div>
+      </div></section>`;
+  }
   const list=hotspots.map((h,i)=>`<div class="hot-item" data-action="focus-hot" data-idx="${i}"><div class="hnum">${ic('triangle-alert')}</div><div class="htext"><div class="ht">${h.title}</div><div class="hd">${h.desc}</div></div></div>`).join('');
-  return `<section class="section reveal" id="sec-map"><div class="section-head"><div><div class="eyebrow">Prüfgebiet</div><h2 class="section-title">Gefahren-Hotspots</h2></div><span class="head-note">Fulda</span></div><div id="map"></div><div class="hot-list">${list}</div></section>`;
+  return `<section class="section reveal" id="sec-map">${head}
+    <div class="map-unlocked-note">${ic('shield-check')}Freigeschaltet · exklusiv für Fahrschüler</div>
+    <div id="map"></div><div class="hot-list">${list}</div></section>`;
+}
+function refreshMap(){
+  const n=el('sec-map'); if(!n) return;
+  n.outerHTML=renderMap();
+  const s=el('sec-map'); if(s){ s.classList.add('revealed','settled'); }
+  initMap();
+}
+function unlockSheetHTML(){
+  return `<div class="mo-num">${ic('key-round')}</div>
+    <div class="sheet-eyebrow">Exklusiv für Fahrschüler</div>
+    <div class="sheet-title">Prüfgebiet-Guide freischalten</div>
+    <div class="sheet-sub">Die kuratierten Gefahren-Hotspots im Fuldaer Prüfgebiet sind eine Leistung der Fahrschule Krebs. Gib den Freischaltcode ein, den du in der Fahrschule erhalten hast.</div>
+    <div class="field"><label for="unlockCode">Freischaltcode</label><div class="input-wrap" id="unlockWrap"><span class="fic">${ic('key-round')}</span><input class="txt" id="unlockCode" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Code aus der Fahrschule" /></div></div>
+    <div class="form-error" id="unlockError" hidden>${ic('circle-alert')}<span id="unlockErrorText"></span></div>
+    <button class="btn btn-primary" data-action="confirm-unlock">${ic('shield-check')}Freischalten</button>
+    <div class="lock-hint" style="text-align:center;margin-top:14px">${ic('map-pin')} Persönlicher Code · nur für aktive Fahrschüler</div>`;
 }
 
 /* ---------- Ausbildungsbaum ---------- */
@@ -2977,6 +3064,7 @@ function notifSheetHTML(){
   const geb=state.themeSessions.filter(s=>s.status==='gebucht').length;
   if(geb) items.push({icon:'calendar-check',t:'Theorie-Buchungen',s:`${geb===1?'Ein Platz':geb+' Plätze'} fest reserviert`});
   if(state.simulator.ist<state.simulator.soll) items.push({icon:'gamepad-2',t:'Simulator-Empfehlung',s:`Noch ${state.simulator.soll-state.simulator.ist} empfohlene Einheit${(state.simulator.soll-state.simulator.ist)>1?'en':''} offen – Slot sichern`});
+  if(!hotspotsUnlocked()) items.push({icon:'map-pin',t:'Prüfgebiet-Guide verfügbar',s:'Exklusive Fulda-Hotspots – in der Fahrschule freischalten'});
   const rows=items.map(n=>`<div class="hot-item" style="cursor:default"><div class="hnum">${ic(n.icon)}</div><div class="htext"><div class="ht">${n.t}</div><div class="hd">${n.s}</div></div></div>`).join('');
   return `<div class="mo-num">${ic('bell')}</div><div class="sheet-eyebrow">Mitteilungen</div><div class="sheet-title">Benachrichtigungen</div><div class="hot-list" style="margin-top:4px">${rows}</div>`;
 }
@@ -3039,6 +3127,21 @@ function requestLesson(btnEl){
   state.naechsteFahrstunde=m.dt.toISOString(); saveState(); refreshCountdown(); haptic('confirm'); pulseFrom(btnEl); toast('ok','Fahrstunde gematcht!',`${fmtDayTime(m.dt)} mit ${FL_NAME}`);
 }
 function focusHotspot(idx){ const h=hotspots[idx]; if(!h||!mapInstance) return; mapInstance.flyTo([h.lat,h.lng],16,{duration:.8}); if(h._marker) h._marker.openPopup(); const m=el('map'); if(m) m.scrollIntoView({behavior:'smooth',block:'center'}); }
+function openUnlock(btnEl){ openMorph(btnEl,unlockSheetHTML()); }
+function confirmUnlock(btnEl){
+  const inp=el('unlockCode'); if(!inp) return;
+  const val=(inp.value||'').trim().replace(/\s+/g,'').toUpperCase();
+  if(val!==HOTSPOT_ACCESS_CODE.toUpperCase()){
+    const box=el('unlockError'), txt=el('unlockErrorText'), wrap=el('unlockWrap');
+    if(txt) txt.textContent=val?'Dieser Code ist nicht gültig. Den Freischaltcode erhältst du in der Fahrschule.':'Bitte gib deinen Freischaltcode ein.';
+    if(box) box.hidden=false;
+    if(wrap){ wrap.classList.remove('shake'); void wrap.offsetWidth; wrap.classList.add('shake'); }
+    haptic('block'); return;
+  }
+  const p=getProfile(); if(p){ p.hotspotsUnlocked=true; saveProfile(p); }
+  haptic('confirm'); pulseFrom(btnEl,true); closeMorph(); refreshMap();
+  toast('ok','Prüfgebiet-Guide freigeschaltet','Die Fulda-Hotspots sind jetzt für dich verfügbar.');
+}
 function readyGo(btnEl){ haptic('confirm'); pulseFrom(btnEl,true); toast('ok','Prüfungsreife bestätigt','Alle Voraussetzungen sind erfüllt.'); }
 function resetTraining(){
   let go=true; try{ go=confirm('Ausbildungsdaten wirklich zurücksetzen? Buchungen, Scans und Fortschritt in diesem Cockpit werden auf den Ausgangsstand gebracht.'); }catch(e){}
@@ -3113,6 +3216,8 @@ document.addEventListener('click',e=>{
     case 'avail': toggleAvail(trg); break;
     case 'request-lesson': requestLesson(trg); break;
     case 'focus-hot': focusHotspot(parseInt(trg.getAttribute('data-idx'),10)); break;
+    case 'unlock-hotspots': openUnlock(trg); break;
+    case 'confirm-unlock': confirmUnlock(trg); break;
     case 'ready-go': readyGo(trg); break;
     case 'notifs': openMorph(trg,notifSheetHTML()); break;
     case 'profile': openMorph(trg,profileSheetHTML()); break;
@@ -3130,6 +3235,7 @@ document.addEventListener('keydown',e=>{
     if(ae.classList.contains('theme-tile')){ e.preventDefault(); handleTheme(ae.getAttribute('data-id'),ae); }
     else if(ae.classList.contains('avail-cell')){ e.preventDefault(); toggleAvail(ae); }
   }
+  if(e.key==='Enter'&&ae&&ae.id==='unlockCode'){ e.preventDefault(); confirmUnlock(document.querySelector('#morphInner [data-action="confirm-unlock"]')); }
   if(e.key==='Escape'&&morphOpen) closeMorph();
 });
 window.addEventListener('resize',()=>{ if(mapInstance) mapInstance.invalidateSize(); });
