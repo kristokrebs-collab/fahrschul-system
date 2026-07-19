@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fahrschule Krebs – Finanz- &amp; Flotten-Cockpit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ── Design-System (Enterprise Dark Mode) – identisch zum Schüler-Cockpit ── */
+    :root {
+      --bg-main:          #060813;
+      --bg-surface:       rgba(30, 41, 74, 0.45);
+      --bg-surface-solid: #131931;
+      --bg-surface-hover: rgba(42, 58, 106, 0.7);
+      --border-color:     rgba(255, 255, 255, 0.06);
+      --text-main:        #F8FAFC;
+      --text-muted:       #94A3B8;
+      --text-dim:         #64748B;
+
+      --status-red:    #EF4444;
+      --status-orange: #F97316;
+      --status-yellow: #F59E0B;
+      --status-blue:   #3B82F6;
+      --status-purple: #A855F7;
+      --status-green:  #10B981;
+      --status-gray:   #64748B;
+
+      --accent-primary:  #4F46E5;
+      --accent-gradient: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
+
+      /* Chart-Palette (dunkle Fläche, mit Legende + Direktlabels als Identität) */
+      --c-revenue:  #10B981;  /* Einnahmen  */
+      --c-expense:  #F97316;  /* Ausgaben   */
+      --c-profit:   #818CF8;  /* Gewinn     */
+      --c-personal: #6366F1;
+      --c-flotte:   #F59E0B;
+      --c-standort: #38BDF8;
+      --c-sonder:   #34D399;
+      --c-material: #A855F7;
+
+      --shadow-sm: 0 2px 8px rgba(0,0,0,0.2);
+      --shadow-md: 0 12px 32px rgba(0,0,0,0.4);
+      --shadow-lg: 0 24px 64px rgba(0,0,0,0.6);
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #111736 0%, var(--bg-main) 70%);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+      font-size: 14px;
+      letter-spacing: -0.1px;
+      -webkit-font-smoothing: antialiased;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 20px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.16); }
+
+    /* ── Sidebar ──────────────────────────────────────────────────────── */
+    .sidebar {
+      width: 244px; flex-shrink: 0;
+      background: rgba(11,15,30,0.55);
+      backdrop-filter: blur(12px);
+      border-right: 1px solid var(--border-color);
+      display: flex; flex-direction: column;
+    }
+    .sb-brand { display: flex; align-items: center; gap: 12px; padding: 20px 20px 18px; }
+    .sb-logo {
+      width: 38px; height: 38px; border-radius: 11px; background: var(--accent-gradient);
+      display: flex; align-items: center; justify-content: center; font-size: 19px;
+      box-shadow: 0 0 16px rgba(99,102,241,0.4);
+    }
+    .sb-brand-title { font-size: 15px; font-weight: 800; background: linear-gradient(to right,#FFF,#C7D2FE); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .sb-brand-sub { font-size: 10.5px; color: var(--text-muted); font-weight: 600; margin-top: 1px; }
+    .sb-nav { flex: 1; overflow-y: auto; padding: 6px 12px; }
+    .sb-section-label { font-size: 9.5px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1.2px; padding: 14px 12px 6px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px;
+      color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.16s; margin-bottom: 2px; border: 1px solid transparent; position: relative;
+      text-decoration: none;
+    }
+    .nav-item:hover { background: rgba(255,255,255,0.04); color: var(--text-main); }
+    .nav-item.active { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.28); color: #C7D2FE; box-shadow: inset 0 0 14px rgba(99,102,241,0.06); }
+    .nav-item.active::before { content: ''; position: absolute; left: 0; top: 20%; bottom: 20%; width: 3px; border-radius: 3px; background: var(--accent-primary); box-shadow: 0 0 8px var(--accent-primary); }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+    .nav-badge { margin-left: auto; font-size: 9.5px; font-weight: 800; padding: 2px 7px; border-radius: 20px; background: rgba(239,68,68,0.14); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.25); }
+    .nav-badge.warn { background: rgba(245,158,11,0.14); color: #FDE68A; border-color: rgba(245,158,11,0.25); }
+    .sb-foot { padding: 14px 16px; border-top: 1px solid var(--border-color); }
+    .sb-foot-mini { font-size: 10.5px; color: var(--text-dim); line-height: 1.5; }
+
+    /* ── Main ─────────────────────────────────────────────────────────── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar {
+      flex-shrink: 0; height: 62px; border-bottom: 1px solid var(--border-color);
+      background: rgba(11,15,30,0.4); backdrop-filter: blur(10px);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 26px;
+    }
+    .tb-title { font-size: 17px; font-weight: 800; }
+    .tb-sub { font-size: 11.5px; color: var(--text-muted); font-weight: 500; margin-top: 1px; }
+    .tb-right { display: flex; align-items: center; gap: 14px; }
+    .month-select {
+      background: rgba(5,7,16,0.6); border: 1px solid rgba(255,255,255,0.09); border-radius: 10px;
+      color: var(--text-main); font-size: 12.5px; font-weight: 700; padding: 8px 12px; outline: none;
+      font-family: inherit; cursor: pointer;
+    }
+    .tb-user { width: 36px; height: 36px; border-radius: 50%; background: var(--accent-gradient); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; box-shadow: var(--shadow-sm); }
+
+    .content { flex: 1; overflow-y: auto; padding: 24px 26px 60px; }
+    .view { display: none; animation: fade 0.28s ease; }
+    .view.active { display: block; }
+    @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    /* ── Bausteine ────────────────────────────────────────────────────── */
+    .section-title { font-size: 13px; font-weight: 800; color: var(--text-main); margin: 4px 0 14px; display: flex; align-items: center; gap: 9px; }
+    .section-title .st-sub { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+    .row-head { display: flex; align-items: baseline; justify-content: space-between; margin: 28px 0 14px; }
+    .row-head h2 { font-size: 14px; font-weight: 800; }
+    .row-head span { font-size: 11.5px; color: var(--text-muted); font-weight: 500; }
+
+    .card {
+      background: var(--bg-surface); backdrop-filter: blur(8px);
+      border: 1px solid var(--border-color); border-radius: 16px; padding: 18px;
+      box-shadow: var(--shadow-sm);
+    }
+    .grid { display: grid; gap: 14px; }
+
+    /* KPI-Kachel */
+    .kpi { position: relative; overflow: hidden; }
+    .kpi-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.6px; display: flex; align-items: center; gap: 7px; }
+    .kpi-value { font-size: 30px; font-weight: 800; margin-top: 10px; letter-spacing: -0.6px; }
+    .kpi-value.hero { font-size: 40px; }
+    .kpi-delta { font-size: 12px; font-weight: 700; margin-top: 8px; display: inline-flex; align-items: center; gap: 5px; }
+    .kpi-delta.up { color: var(--status-green); }
+    .kpi-delta.down { color: var(--status-red); }
+    .kpi-delta .muted { color: var(--text-dim); font-weight: 500; }
+    .kpi-ico { position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 19px; opacity: 0.9; }
+    .kpi-spark { margin-top: 12px; }
+
+    /* Tabelle */
+    .tbl-wrap { overflow-x: auto; border-radius: 14px; border: 1px solid var(--border-color); }
+    table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
+    table.tbl thead th {
+      text-align: left; font-size: 10px; font-weight: 800; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px; padding: 12px 14px;
+      background: rgba(11,15,30,0.4); border-bottom: 1px solid var(--border-color); white-space: nowrap;
+    }
+    table.tbl thead th.num, table.tbl tbody td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.tbl tbody td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.035); }
+    table.tbl tbody tr { transition: background 0.14s; cursor: default; }
+    table.tbl tbody tr.clickable { cursor: pointer; }
+    table.tbl tbody tr:hover { background: rgba(255,255,255,0.03); }
+    table.tbl tbody tr:last-child td { border-bottom: none; }
+    table.tbl tfoot td { padding: 12px 14px; font-weight: 800; border-top: 1px solid var(--border-color); background: rgba(11,15,30,0.3); }
+    table.tbl tfoot td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .t-strong { font-weight: 700; color: #FFF; }
+    .t-pos { color: var(--status-green); font-weight: 700; }
+    .t-neg { color: var(--status-red); font-weight: 700; }
+
+    .pill { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 20px; letter-spacing: 0.2px; white-space: nowrap; }
+    .pill.green  { background: rgba(16,185,129,0.12);  color: #A7F3D0; border: 1px solid rgba(16,185,129,0.3); }
+    .pill.red    { background: rgba(239,68,68,0.12);   color: #FCA5A5; border: 1px solid rgba(239,68,68,0.3); }
+    .pill.orange { background: rgba(249,115,22,0.12);  color: #FED7AA; border: 1px solid rgba(249,115,22,0.3); }
+    .pill.yellow { background: rgba(245,158,11,0.12);  color: #FEF08A; border: 1px solid rgba(245,158,11,0.3); }
+    .pill.blue   { background: rgba(59,130,246,0.12);  color: #BFDBFE; border: 1px solid rgba(59,130,246,0.3); }
+    .pill.purple { background: rgba(168,85,247,0.12);  color: #E9D5FF; border: 1px solid rgba(168,85,247,0.3); }
+    .pill.gray   { background: rgba(100,116,139,0.12); color: #CBD5E1; border: 1px solid rgba(100,116,139,0.25); }
+
+    /* Meter / Fortschritt */
+    .meter { height: 7px; border-radius: 5px; background: rgba(5,7,16,0.6); overflow: hidden; border: 1px solid rgba(255,255,255,0.03); min-width: 70px; }
+    .meter-fill { height: 100%; border-radius: 5px; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+    .util-cell { display: flex; align-items: center; gap: 10px; }
+    .util-val { font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 40px; text-align: right; }
+
+    /* Alerts */
+    .alert { display: flex; gap: 12px; align-items: flex-start; padding: 13px 15px; border-radius: 12px; font-size: 12.5px; line-height: 1.5; margin-bottom: 10px; }
+    .alert-ico { font-size: 16px; margin-top: 1px; }
+    .alert.red    { background: rgba(239,68,68,0.08);  border: 1px solid rgba(239,68,68,0.22); color: #FCA5A5; }
+    .alert.orange { background: rgba(249,115,22,0.08); border: 1px solid rgba(249,115,22,0.22); color: #FFE4C4; }
+    .alert.blue   { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.22); color: #C7DBFF; }
+    .alert-title { font-weight: 800; color: #FFF; }
+    .alert-act { margin-left: auto; }
+    .mini-btn {
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+      padding: 6px 12px; color: var(--text-main); font-size: 11.5px; font-weight: 700; cursor: pointer;
+      transition: all 0.15s; font-family: inherit; white-space: nowrap;
+    }
+    .mini-btn:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.2); transform: translateY(-1px); }
+    .mini-btn.primary { background: var(--accent-gradient); border-color: transparent; box-shadow: 0 2px 10px rgba(99,102,241,0.25); }
+    .mini-btn.primary:hover { filter: brightness(1.1); }
+    .mini-btn.ghost-green { background: rgba(16,185,129,0.12); border-color: rgba(16,185,129,0.3); color: #A7F3D0; }
+
+    /* Charts */
+    .chart-card { position: relative; }
+    .chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+    .chart-title { font-size: 13px; font-weight: 800; }
+    .chart-note { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 10px 0 2px; }
+    .legend-item { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
+    .legend-swatch { width: 11px; height: 11px; border-radius: 3px; }
+    .legend-line { width: 16px; height: 3px; border-radius: 3px; }
+    svg text { font-family: inherit; }
+    .grid-line { stroke: rgba(255,255,255,0.06); stroke-width: 1; }
+    .axis-txt { fill: var(--text-dim); font-size: 10.5px; font-weight: 600; }
+    .hover-rect { fill: transparent; cursor: crosshair; }
+
+    #viz-tip {
+      position: fixed; z-index: 4000; pointer-events: none; opacity: 0;
+      background: rgba(9,12,26,0.96); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 10px; padding: 10px 13px; font-size: 12px; box-shadow: var(--shadow-md);
+      transition: opacity 0.12s; min-width: 120px; backdrop-filter: blur(6px);
+    }
+    #viz-tip .tip-title { font-weight: 800; font-size: 11.5px; margin-bottom: 7px; color: #FFF; }
+    #viz-tip .tip-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; margin-top: 3px; }
+    #viz-tip .tip-key { display: flex; align-items: center; gap: 6px; color: var(--text-muted); }
+    #viz-tip .tip-dot { width: 9px; height: 9px; border-radius: 3px; }
+    #viz-tip .tip-val { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+    /* horizontale Bar-Liste */
+    .hbar-row { display: grid; grid-template-columns: 148px 1fr 88px; align-items: center; gap: 12px; padding: 7px 0; }
+    .hbar-label { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hbar-track { height: 22px; background: rgba(5,7,16,0.4); border-radius: 6px; overflow: hidden; position: relative; }
+    .hbar-fill { height: 100%; border-radius: 6px; }
+    .hbar-val { font-size: 12.5px; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Modal / Drawer */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(3,5,12,0.82); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: var(--bg-surface-solid); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 26px; width: 560px; max-width: 94vw; max-height: 86vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
+    .modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+    .modal-title { font-size: 17px; font-weight: 800; }
+    .modal-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .modal-close { background: rgba(255,255,255,0.04); border: none; color: var(--text-muted); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 13px; flex-shrink: 0; }
+    .modal-close:hover { background: rgba(255,255,255,0.1); color: #FFF; }
+    .modal-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+    .stat-box { background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 13px 15px; }
+    .stat-box .sb-l { font-size: 10.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .stat-box .sb-v { font-size: 20px; font-weight: 800; margin-top: 5px; }
+    .maengel-item { display: flex; gap: 12px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color); margin-bottom: 8px; }
+    .maengel-photo { width: 60px; height: 60px; border-radius: 10px; background: linear-gradient(135deg,#1e2a4a,#0d1226); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; border: 1px solid var(--border-color); }
+    .input, textarea.input, select.input {
+      width: 100%; background: rgba(5,7,16,0.5); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+      padding: 10px 13px; color: var(--text-main); font-size: 13px; outline: none; font-family: inherit; transition: border-color 0.15s;
+    }
+    .input:focus { border-color: var(--accent-primary); }
+    .field-label { font-size: 11px; font-weight: 700; color: var(--text-muted); margin: 12px 0 6px; display: block; }
+
+    /* Pipeline (CRM) */
+    .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; min-width: 900px; }
+    .pipe-col { background: rgba(11,15,30,0.35); border: 1px solid var(--border-color); border-radius: 14px; padding: 10px; }
+    .pipe-head { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); padding: 4px 6px 10px; display: flex; align-items: center; gap: 7px; }
+    .pipe-count { margin-left: auto; background: rgba(255,255,255,0.06); border-radius: 20px; padding: 1px 8px; font-size: 10px; }
+    .lead-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 11px; padding: 11px; margin-bottom: 8px; cursor: pointer; transition: all 0.16s; }
+    .lead-card:hover { border-color: rgba(255,255,255,0.14); transform: translateY(-2px); background: var(--bg-surface-hover); }
+    .lead-name { font-size: 13px; font-weight: 700; }
+    .lead-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .lead-follow { font-size: 10.5px; font-weight: 700; margin-top: 8px; padding: 4px 8px; border-radius: 7px; display: inline-flex; align-items: center; gap: 5px; }
+    .lead-follow.due  { background: rgba(239,68,68,0.1); color: #FCA5A5; }
+    .lead-follow.soon { background: rgba(245,158,11,0.1); color: #FDE68A; }
+    .lead-follow.ok   { background: rgba(100,116,139,0.1); color: #CBD5E1; }
+
+    #toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(20px); background: #1E1B4B; border: 1px solid #4F46E5; color: #E0E7FF; padding: 12px 22px; border-radius: 12px; font-size: 13px; font-weight: 600; z-index: 9999; box-shadow: var(--shadow-lg); pointer-events: none; opacity: 0; transition: all 0.3s cubic-bezier(0.4,0,0.2,1); max-width: 90vw; }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    .two-col { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; align-items: start; }
+    .three-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    @media (max-width: 1100px) { .two-col, .three-col { grid-template-columns: 1fr; } }
+    .muted-note { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+    .tag-src { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--border-color); }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">🚗</div>
+    <div>
+      <div class="sb-brand-title">Fahrschule Krebs</div>
+      <div class="sb-brand-sub">Finanz- &amp; Flotten-Cockpit</div>
+    </div>
+  </div>
+  <nav class="sb-nav" id="nav">
+    <div class="nav-item active" data-view="dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+    <div class="nav-item" data-view="finanzen"><span class="nav-icon">💰</span> Finanzen</div>
+    <div class="nav-item" data-view="flotte"><span class="nav-icon">🚙</span> Flotte <span class="nav-badge" id="nav-flotte-badge">0</span></div>
+    <div class="nav-item" data-view="analytics"><span class="nav-icon">📈</span> Analytics</div>
+    <div class="sb-section-label">Pro-Funktionen</div>
+    <div class="nav-item" data-view="fahrlehrer"><span class="nav-icon">🧑‍🏫</span> Fahrlehrer</div>
+    <div class="nav-item" data-view="leads"><span class="nav-icon">🎯</span> Leads / CRM <span class="nav-badge warn" id="nav-leads-badge">0</span></div>
+    <div class="nav-item" data-view="bank"><span class="nav-icon">🏦</span> Bankabgleich <span class="nav-badge warn" id="nav-bank-badge">0</span></div>
+    <div class="sb-section-label">Verknüpft</div>
+    <a class="nav-item" href="dashboard.html"><span class="nav-icon">🎓</span> Schüler-Status ↗</a>
+  </nav>
+  <div class="sb-foot">
+    <div class="sb-foot-mini">
+      <strong style="color:var(--text-muted)">15 Fahrlehrer</strong> · <span id="foot-students">0</span> Schüler aktiv<br>
+      Angemeldet: <strong style="color:var(--text-muted)">M. Krebs</strong> (Inhaber)
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main ────────────────────────────────────────────────────────────── -->
+<div class="main">
+  <header class="topbar">
+    <div>
+      <div class="tb-title" id="tb-title">Dashboard</div>
+      <div class="tb-sub" id="tb-sub">Monatsüberblick &amp; Fazit</div>
+    </div>
+    <div class="tb-right">
+      <select class="month-select" id="monthSelect" onchange="onMonthChange(this)">
+        <option value="2026-07" selected>Juli 2026</option>
+        <option value="2026-06">Juni 2026</option>
+        <option value="2026-05">Mai 2026</option>
+        <option value="2026-q2">Q2 2026</option>
+        <option value="2026">Gesamtjahr 2026</option>
+      </select>
+      <div class="tb-user">MK</div>
+    </div>
+  </header>
+
+  <main class="content">
+    <section class="view active" id="view-dashboard"></section>
+    <section class="view" id="view-finanzen"></section>
+    <section class="view" id="view-flotte"></section>
+    <section class="view" id="view-analytics"></section>
+    <section class="view" id="view-fahrlehrer"></section>
+    <section class="view" id="view-leads"></section>
+    <section class="view" id="view-bank"></section>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" id="modalBox"></div>
+</div>
+<div id="viz-tip"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════════════
+   REFERENZ-SZENARIO · Fahrschule Krebs · Juli 2026
+   15 Fahrlehrer · ~400 aktive Schüler · 17 Fahrzeuge · 3 Standorte
+   Alle Summen im System werden aus diesen Datensätzen BERECHNET
+   (synchronisiert) – nichts ist doppelt gepflegt.
+═══════════════════════════════════════════════════════════════════════ */
+const HEUTE = new Date('2026-07-19');
+const PREIS_FAHRSTUNDE  = 65;   // € pro reguläre Fahrstunde (45 Min)
+const PREIS_SONDERFAHRT = 78;   // € pro Sonderfahrt (Überland/Autobahn/Nacht)
+
+/* ── Standorte ──────────────────────────────────────────────────────── */
+const standorte = [
+  { name: 'Hauptstelle Musterstadt', miete: 4200, strom: 720, wasser: 140, internet: 180 },
+  { name: 'Zweigstelle Nord',        miete: 3100, strom: 480, wasser:  95, internet:  90 },
+  { name: 'Zweigstelle Süd',         miete: 2400, strom: 410, wasser:  80, internet:  90 },
+];
+/* Firmenweite Fixkosten */
+const fixkostenFirma = [
+  { label: 'Software-Lizenzen (Fahrschul-Suite, Buchhaltung)', value: 640 },
+  { label: 'Betriebs- & Rechtsschutzversicherung',            value: 880 },
+  { label: 'Marketing & Werbung',                             value: 1850 },
+  { label: 'Bürobedarf & Sonstiges',                          value: 520 },
+];
+
+/* ── Personal (außer Fahrlehrer) ────────────────────────────────────── */
+const personalBuero = [
+  { rolle: 'Bürokraft (Vollzeit)',        kosten: 3450 },
+  { rolle: 'Bürokraft (Teilzeit)',        kosten: 2150 },
+  { rolle: 'Buchhaltung (extern)',        kosten:  900 },
+];
+
+/* ── Fahrzeuge (17) ─────────────────────────────────────────────────── */
+/* leasing/sprit/reparatur/versicherung = € diesen Monat; tuev/insp = Datum */
+const fahrzeuge = [
+  { id:'F01', modell:'VW Golf VIII',   kennz:'MS-KB-101',  typ:'PKW',      klasse:'B',   antrieb:'Diesel',  leasing:540, sprit:420, reparatur:180, versicherung:165, tuev:'2027-03-14', insp:'2026-09-02', km:68420, lehrerId:'L01' },
+  { id:'F02', modell:'VW Golf VIII',   kennz:'MS-KB-102',  typ:'PKW',      klasse:'B',   antrieb:'Benzin',  leasing:540, sprit:460, reparatur:0,   versicherung:165, tuev:'2026-08-10', insp:'2026-08-15', km:71230, lehrerId:'L02' },
+  { id:'F03', modell:'Škoda Octavia',  kennz:'MS-KB-103',  typ:'PKW',      klasse:'B',   antrieb:'Diesel',  leasing:580, sprit:390, reparatur:320, versicherung:170, tuev:'2026-11-20', insp:'2026-07-28', km:54110, lehrerId:'L03' },
+  { id:'F04', modell:'Honda CB500F',   kennz:'MS-KB-201',  typ:'Motorrad', klasse:'A',   antrieb:'Benzin',  leasing:210, sprit:180, reparatur:90,  versicherung:140, tuev:'2026-09-30', insp:'2026-10-10', km:21540, lehrerId:'L04' },
+  { id:'F05', modell:'VW Golf VIII',   kennz:'MS-KB-104',  typ:'PKW',      klasse:'B',   antrieb:'Benzin',  leasing:540, sprit:410, reparatur:140, versicherung:165, tuev:'2027-01-08', insp:'2026-12-01', km:60300, lehrerId:'L05' },
+  { id:'F06', modell:'Ford Focus',     kennz:'MS-KB-105',  typ:'PKW',      klasse:'B',   antrieb:'Benzin',  leasing:480, sprit:470, reparatur:260, versicherung:160, tuev:'2026-08-25', insp:'2026-08-20', km:82940, lehrerId:'L06' },
+  { id:'F07', modell:'VW Golf VIII',   kennz:'MS-KB-106',  typ:'PKW',      klasse:'B',   antrieb:'Diesel',  leasing:540, sprit:360, reparatur:0,   versicherung:165, tuev:'2027-05-02', insp:'2026-11-11', km:44870, lehrerId:'L07' },
+  { id:'F08', modell:'Opel Astra',     kennz:'MS-KB-107',  typ:'PKW',      klasse:'B',   antrieb:'Benzin',  leasing:470, sprit:430, reparatur:620, versicherung:160, tuev:'2026-10-15', insp:'2026-07-05', km:90120, lehrerId:'L08', notiz:'Unfallschaden (Kotflügel) – Werkstatt' },
+  { id:'F09', modell:'VW Golf VIII',   kennz:'MS-KB-108',  typ:'PKW',      klasse:'B',   antrieb:'Benzin',  leasing:540, sprit:440, reparatur:150, versicherung:165, tuev:'2027-02-28', insp:'2026-10-05', km:57600, lehrerId:'L09' },
+  { id:'F10', modell:'VW ID.3',        kennz:'MS-KB-109E', typ:'PKW',      klasse:'B',   antrieb:'Elektro', leasing:610, sprit:150, reparatur:90,  versicherung:175, tuev:'2027-04-19', insp:'2026-12-15', km:33210, lehrerId:'L10' },
+  { id:'F11', modell:'Škoda Octavia',  kennz:'MS-KB-110',  typ:'PKW',      klasse:'B',   antrieb:'Diesel',  leasing:580, sprit:350, reparatur:210, versicherung:170, tuev:'2026-06-30', insp:'2026-09-09', km:76540, lehrerId:'L11' },
+  { id:'F12', modell:'VW Passat',      kennz:'MS-KB-111',  typ:'PKW',      klasse:'B',   antrieb:'Diesel',  leasing:620, sprit:380, reparatur:0,   versicherung:180, tuev:'2027-06-01', insp:'2027-01-20', km:40980, lehrerId:'L12' },
+  { id:'F13', modell:'Ford Focus',     kennz:'MS-KB-112',  typ:'PKW',      klasse:'B',   antrieb:'Benzin',  leasing:480, sprit:455, reparatur:340, versicherung:160, tuev:'2026-12-12', insp:'2026-08-30', km:79210, lehrerId:'L13' },
+  { id:'F14', modell:'VW ID.3',        kennz:'MS-KB-113E', typ:'PKW',      klasse:'B',   antrieb:'Elektro', leasing:610, sprit:140, reparatur:0,   versicherung:175, tuev:'2027-07-22', insp:'2027-02-10', km:18900, lehrerId:'L14' },
+  { id:'F15', modell:'Toyota Corolla', kennz:'MS-KB-114',  typ:'PKW',      klasse:'B',   antrieb:'Benzin',  leasing:450, sprit:410, reparatur:190, versicherung:155, tuev:'2026-09-18', insp:'2026-10-25', km:63450, lehrerId:'L15' },
+  { id:'F16', modell:'Honda CB500F',   kennz:'MS-KB-202',  typ:'Motorrad', klasse:'A',   antrieb:'Benzin',  leasing:210, sprit:120, reparatur:260, versicherung:140, tuev:'2027-03-01', insp:'2026-11-05', km:34200, lehrerId:null, pool:true },
+  { id:'F17', modell:'Anhänger Humbaur',kennz:'MS-KB-A17', typ:'Anhänger', klasse:'BE',  antrieb:'—',       leasing:90,  sprit:0,   reparatur:80,  versicherung:60,  tuev:'2026-08-30', insp:'2026-08-30', km:0,     lehrerId:null, pool:true },
+];
+
+/* Gemeldete Mängel je Fahrzeug */
+const maengel = [
+  { fahrzeugId:'F08', datum:'2026-07-12', melder:'K. Wolf',   text:'Kratzer + Delle vorderer Kotflügel rechts nach Parkrempler.', schwere:'hoch',   status:'In Werkstatt', foto:'📷' },
+  { fahrzeugId:'F06', datum:'2026-07-15', melder:'T. Wolf',   text:'Warnleuchte Reifendruck hinten links leuchtet sporadisch.',   schwere:'mittel', status:'Gemeldet',     foto:'📷' },
+  { fahrzeugId:'F13', datum:'2026-07-17', melder:'D. Berg',   text:'Bremsen quietschen bei Nässe – Beläge prüfen.',               schwere:'mittel', status:'Termin geplant',foto:'📷' },
+  { fahrzeugId:'F03', datum:'2026-07-09', melder:'M. Demir',  text:'Steinschlag Frontscheibe, ca. 1 cm, Fahrerseite unten.',      schwere:'niedrig',status:'Beobachten',   foto:'📷' },
+];
+
+/* ── Fahrlehrer (15) ────────────────────────────────────────────────── */
+/* kapazitaet = mögl. Fahrstunden/Monat · normal/sonder = gegeben · lohn = Vollkosten */
+const fahrlehrer = [
+  { id:'L01', name:'Andreas Vogt',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:118, sonder:34, lohn:4850, schueler:32 },
+  { id:'L02', name:'Sabine Kühn',     klassen:['B','BE'],   vertrag:'Vollzeit', kapazitaet:160, normal:104, sonder:30, lohn:4600, schueler:29 },
+  { id:'L03', name:'Murat Demir',     klassen:['B','B197'], vertrag:'Vollzeit', kapazitaet:160, normal:121, sonder:28, lohn:4780, schueler:31 },
+  { id:'L04', name:'Jens Bauer',      klassen:['A','A2'],   vertrag:'Vollzeit', kapazitaet:150, normal:96,  sonder:12, lohn:4950, schueler:18 },
+  { id:'L05', name:'Claudia Roth',    klassen:['B'],        vertrag:'Teilzeit', kapazitaet:110, normal:74,  sonder:18, lohn:3650, schueler:22 },
+  { id:'L06', name:'Thomas Wolf',     klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:130, sonder:36, lohn:5050, schueler:34 },
+  { id:'L07', name:'Nadine Frank',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:88,  sonder:22, lohn:4700, schueler:30 },
+  { id:'L08', name:'Kevin Schulz',    klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:112, sonder:30, lohn:4600, schueler:31 },
+  { id:'L09', name:'Petra Lang',      klassen:['B','BE'],   vertrag:'Teilzeit', kapazitaet:110, normal:68,  sonder:16, lohn:3500, schueler:20 },
+  { id:'L10', name:'Stefan Krause',   klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:124, sonder:33, lohn:4900, schueler:33 },
+  { id:'L11', name:'Julia Neumann',   klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:99,  sonder:25, lohn:4650, schueler:28 },
+  { id:'L12', name:'Michael Krebs',   klassen:['B'],        vertrag:'Inhaber',  kapazitaet:90,  normal:52,  sonder:14, lohn:6800, schueler:15 },
+  { id:'L13', name:'Daniel Berg',     klassen:['B'],        vertrag:'Vollzeit', kapazitaet:160, normal:108, sonder:29, lohn:4700, schueler:30 },
+  { id:'L14', name:'Anna Fischer',    klassen:['B'],        vertrag:'Teilzeit', kapazitaet:110, normal:61,  sonder:15, lohn:3400, schueler:19 },
+  { id:'L15', name:'Ömer Yıldız',     klassen:['A','A2','B'],vertrag:'Vollzeit',kapazitaet:155, normal:90,  sonder:20, lohn:4850, schueler:24 },
+];
+
+/* ── Schüler-Kennzahlen (aktueller Monat) ───────────────────────────── */
+const schuelerStat = {
+  neuAnmeldungen: 47,
+  grundbetragDurchschnitt: 395,
+  bestandenDiesenMonat: 34,
+  pruefungenPraktisch: 38,   pruefungPreis: 142,
+  pruefungenTheorie: 52,     theoriePruefPreis: 22.90,
+  lehrmaterial: 4130,
+};
+
+/* ── 12-Monats-Historie (in Tsd. €) – Aug 2025 … Jul 2026 ───────────── */
+const monate = ['Aug','Sep','Okt','Nov','Dez','Jan','Feb','Mär','Apr','Mai','Jun','Jul'];
+const hist = {
+  einnahmen: [142,138,129,118, 96,108,121,134,145,149,154,151],
+  ausgaben:  [115,114,113,112,109,110,112,113,115,116,117,112],
+  neuSchueler:      [38,41,33,26,14,29,44,52,58,61,55,47],
+  fertigeSchueler:  [30,34,36,33,22,18,25,31,38,40,42,34],
+};
+hist.gewinn = hist.einnahmen.map((e,i) => e - hist.ausgaben[i]);
+
+/* ── Leads / CRM ────────────────────────────────────────────────────── */
+let leads = [
+  { id:'LD1', name:'Lena Hoffmann',  klasse:'B',    quelle:'Website',    eingang:'2026-07-16', status:'Neu',        folge:'2026-07-20', tel:'0176 1234567' },
+  { id:'LD2', name:'Tim Bauer',      klasse:'A',    quelle:'Instagram',  eingang:'2026-07-10', status:'Kontaktiert',folge:'2026-07-18', tel:'0151 2345678' },
+  { id:'LD3', name:'Sarah Klein',    klasse:'B',    quelle:'Empfehlung', eingang:'2026-07-05', status:'Probestunde',folge:'2026-07-22', tel:'0170 3456789' },
+  { id:'LD4', name:'Jonas Weber',    klasse:'B197', quelle:'Google',     eingang:'2026-07-14', status:'Neu',        folge:'2026-07-19', tel:'0162 4567890' },
+  { id:'LD5', name:'Paul Wagner',    klasse:'BE',   quelle:'Website',    eingang:'2026-07-12', status:'Kontaktiert',folge:'2026-07-21', tel:'0157 5678901' },
+  { id:'LD6', name:'Emma Richter',   klasse:'B',    quelle:'Instagram',  eingang:'2026-07-17', status:'Neu',        folge:'2026-07-21', tel:'0176 6789012' },
+  { id:'LD7', name:'Noah Braun',     klasse:'A2',   quelle:'Empfehlung', eingang:'2026-07-08', status:'Angemeldet', folge:null,         tel:'0151 7890123' },
+  { id:'LD8', name:'Hannah Wolf',    klasse:'B',    quelle:'Google',     eingang:'2026-07-02', status:'Kontaktiert',folge:'2026-07-15', tel:'0170 8901234' },
+  { id:'LD9', name:'Felix Neumann',  klasse:'B',    quelle:'Website',    eingang:'2026-07-15', status:'Neu',        folge:'2026-07-19', tel:'0162 9012345' },
+  { id:'LD10',name:'Lea Zimmermann', klasse:'B',    quelle:'Website',    eingang:'2026-07-11', status:'Probestunde',folge:'2026-07-23', tel:'0157 0123456' },
+  { id:'LD11',name:'Mia Schäfer',    klasse:'B',    quelle:'Website',    eingang:'2026-06-28', status:'Verloren',   folge:null,         tel:'0176 1112233' },
+  { id:'LD12',name:'Ben Krüger',     klasse:'B',    quelle:'Instagram',  eingang:'2026-07-01', status:'Verloren',   folge:null,         tel:'0151 4445566' },
+];
+const LEAD_STATES = ['Neu','Kontaktiert','Probestunde','Angemeldet','Verloren'];
+
+/* ── Bankabgleich ───────────────────────────────────────────────────── */
+let bankTx = [
+  { id:'B1', datum:'2026-07-18', absender:'Tobias Maier',      betrag:420.00, zweck:'RE-2026-0412 Fahrstunden',   status:'auto',   ref:'RE-2026-0412' },
+  { id:'B2', datum:'2026-07-18', absender:'L. Baumann',        betrag:390.00, zweck:'Grundbetrag Anmeldung B',    status:'auto',   ref:'Namensabgleich' },
+  { id:'B3', datum:'2026-07-17', absender:'M. Schulze',        betrag:142.00, zweck:'Prüfungsgebühr TÜV',         status:'auto',   ref:'RE-2026-0407' },
+  { id:'B4', datum:'2026-07-17', absender:'Dauerauftrag',      betrag:65.00,  zweck:'Ratenzahlung Nr. 7 – SCH-118',status:'auto',  ref:'Ratenplan' },
+  { id:'B5', datum:'2026-07-16', absender:'Anna Fischer',      betrag:78.00,  zweck:'Lernmaterial-App',           status:'auto',   ref:'RE-2026-0410' },
+  { id:'B6', datum:'2026-07-16', absender:'DE44 5001 0517…',   betrag:250.00, zweck:'Fahrschule',                 status:'offen',  ref:null },
+  { id:'B7', datum:'2026-07-15', absender:'K. Wolf',           betrag:600.00, zweck:'RE-2026-0398',               status:'auto',   ref:'RE-2026-0398' },
+  { id:'B8', datum:'2026-07-15', absender:'Bar-Einzahlung',    betrag:180.00, zweck:'Kasse Zweigstelle Nord',     status:'pruefen',ref:null },
+  { id:'B9', datum:'2026-07-14', absender:'J. Weber',          betrag:390.00, zweck:'Anmeldung B197',             status:'auto',   ref:'Namensabgleich' },
+  { id:'B10',datum:'2026-07-14', absender:'SEPA-Rückläufer',   betrag:-65.00, zweck:'Rücklastschrift + Gebühr',   status:'ruecklauf',ref:null },
+];
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BERECHNUNGEN (die eine Quelle der Wahrheit)
+═══════════════════════════════════════════════════════════════════════ */
+const sum = (arr, f) => arr.reduce((a,b) => a + (f ? f(b) : b), 0);
+
+function lehrerUmsatz(l) { return l.normal * PREIS_FAHRSTUNDE + l.sonder * PREIS_SONDERFAHRT; }
+function lehrerAuslastung(l) { return (l.normal + l.sonder) / l.kapazitaet; }
+function fahrzeugKosten(f) { return f.leasing + f.sprit + f.reparatur + f.versicherung; }
+function fahrzeugUmsatz(f) {
+  if (!f.lehrerId) return 0;               // Pool-Fahrzeuge: Umsatz läuft übers Primärfahrzeug
+  const l = fahrlehrer.find(x => x.id === f.lehrerId);
+  return l ? lehrerUmsatz(l) : 0;
+}
+function fahrzeugGewinn(f) { return fahrzeugUmsatz(f) - fahrzeugKosten(f); }
+
+function berechne() {
+  const fahrstunden  = sum(fahrlehrer, l => l.normal) * PREIS_FAHRSTUNDE;
+  const sonderfahrten= sum(fahrlehrer, l => l.sonder) * PREIS_SONDERFAHRT;
+  const grundbetrag  = schuelerStat.neuAnmeldungen * schuelerStat.grundbetragDurchschnitt;
+  const pruefungen   = schuelerStat.pruefungenPraktisch * schuelerStat.pruefungPreis
+                     + Math.round(schuelerStat.pruefungenTheorie * schuelerStat.theoriePruefPreis);
+  const lehrmaterial = schuelerStat.lehrmaterial;
+
+  const einnahmen = {
+    fahrstunden, sonderfahrten, grundbetrag, pruefungen, lehrmaterial,
+    total: fahrstunden + sonderfahrten + grundbetrag + pruefungen + lehrmaterial,
+  };
+
+  const lehrerLohn = sum(fahrlehrer, l => l.lohn);
+  const bueroLohn  = sum(personalBuero, p => p.kosten);
+  const personal   = { lehrer: lehrerLohn, buero: bueroLohn, total: lehrerLohn + bueroLohn };
+
+  const flotte = {
+    leasing:      sum(fahrzeuge, f => f.leasing),
+    sprit:        sum(fahrzeuge, f => f.sprit),
+    reparatur:    sum(fahrzeuge, f => f.reparatur),
+    versicherung: sum(fahrzeuge, f => f.versicherung),
+  };
+  flotte.total = flotte.leasing + flotte.sprit + flotte.reparatur + flotte.versicherung;
+
+  const miete    = sum(standorte, s => s.miete);
+  const strom    = sum(standorte, s => s.strom);
+  const wasser   = sum(standorte, s => s.wasser);
+  const internet = sum(standorte, s => s.internet);
+  const firma    = sum(fixkostenFirma, f => f.value);
+  const fix = { miete, strom, wasser, internet, firma, total: miete + strom + wasser + internet + firma };
+
+  const ausgaben = { personal: personal.total, flotte: flotte.total, fix: fix.total,
+                     total: personal.total + flotte.total + fix.total };
+  const gewinn = einnahmen.total - ausgaben.total;
+
+  return { einnahmen, personal, flotte, fix, ausgaben, gewinn,
+           marge: gewinn / einnahmen.total,
+           aktiveSchueler: sum(fahrlehrer, l => l.schueler) };
+}
+const K = berechne();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FORMAT-HELFER
+═══════════════════════════════════════════════════════════════════════ */
+const eur  = (n, dec=0) => n.toLocaleString('de-DE', { minimumFractionDigits:dec, maximumFractionDigits:dec }) + ' €';
+const eurK = (n) => (n/1000).toLocaleString('de-DE', { maximumFractionDigits:1 }) + 'k €';
+const num  = (n) => n.toLocaleString('de-DE');
+const pct  = (n, dec=0) => (n*100).toLocaleString('de-DE', { maximumFractionDigits:dec }) + ' %';
+function tageBis(dateStr) { return Math.round((new Date(dateStr) - HEUTE) / 86400000); }
+function fmtDatum(dateStr) { return new Date(dateStr).toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CHART-BAUSTEINE (Inline-SVG, dunkle Fläche, Legende + Direktlabels)
+═══════════════════════════════════════════════════════════════════════ */
+let CHART_SEQ = 0;
+const LINE_REG = {};
+
+function niceMax(v) {
+  if (v <= 0) return 10;
+  const pow = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / pow;
+  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return step * pow;
+}
+
+/* Mehrlinien-Zeitreihe mit Fadenkreuz-Hover */
+function lineChart(series, labels, opts={}) {
+  const W = 860, H = 320, padL = 52, padR = 22, padT = 14, padB = 38;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const n = labels.length;
+  const allVals = series.flatMap(s => s.data);
+  const yMax = niceMax(Math.max(...allVals) * 1.08);
+  const x = i => padL + (n === 1 ? plotW/2 : i * plotW/(n-1));
+  const y = v => padT + plotH * (1 - v/yMax);
+  const id = 'lc' + (++CHART_SEQ);
+
+  let grid = '';
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const val = yMax * t/ticks, yy = y(val);
+    grid += `<line class="grid-line" x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}"/>`;
+    grid += `<text class="axis-txt" x="${padL-8}" y="${yy+3.5}" text-anchor="end">${opts.kEuro ? Math.round(val)+'k' : num(Math.round(val))}</text>`;
+  }
+  let xlabels = '';
+  labels.forEach((lb,i) => { xlabels += `<text class="axis-txt" x="${x(i)}" y="${H-14}" text-anchor="middle">${lb}</text>`; });
+
+  let lines = '';
+  series.forEach(s => {
+    const pts = s.data.map((v,i) => `${x(i)},${y(v)}`).join(' ');
+    lines += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const lastI = n-1;
+    lines += `<circle cx="${x(lastI)}" cy="${y(s.data[lastI])}" r="4.5" fill="${s.color}" stroke="var(--bg-surface-solid)" stroke-width="2"/>`;
+    lines += `<text x="${x(lastI)}" y="${y(s.data[lastI]) - 10}" text-anchor="end" fill="${s.color}" font-size="11.5" font-weight="800">${opts.kEuro ? s.data[lastI]+'k' : num(s.data[lastI])}</text>`;
+  });
+
+  /* Fadenkreuz-Overlay */
+  let cross = `<line id="${id}-cx" x1="0" y1="${padT}" x2="0" y2="${padT+plotH}" stroke="rgba(255,255,255,0.25)" stroke-width="1" style="opacity:0"/>`;
+  series.forEach((s,si) => { cross += `<circle id="${id}-d${si}" r="5" fill="${s.color}" stroke="var(--bg-surface-solid)" stroke-width="2" style="opacity:0"/>`; });
+  cross += `<rect class="hover-rect" x="${padL}" y="${padT}" width="${plotW}" height="${plotH}"
+              onmousemove="lineHover(event,'${id}')" onmouseleave="lineOut('${id}')"/>`;
+
+  LINE_REG[id] = { series, labels, x:[...Array(n)].map((_,i)=>x(i)), yfn: null, ys: series.map(s=>s.data.map(v=>y(v))), n, kEuro: !!opts.kEuro };
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block">
+    ${grid}${xlabels}${lines}${cross}</svg>`;
+}
+function lineHover(e, id) {
+  const cfg = LINE_REG[id]; if (!cfg) return;
+  const svg = e.currentTarget.ownerSVGElement;
+  const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+  const loc = pt.matrixTransform(svg.getScreenCTM().inverse());
+  let idx = 0, best = 1e9;
+  cfg.x.forEach((xx,i) => { const d = Math.abs(xx - loc.x); if (d < best) { best = d; idx = i; } });
+  const cx = document.getElementById(id+'-cx'); cx.setAttribute('x1', cfg.x[idx]); cx.setAttribute('x2', cfg.x[idx]); cx.style.opacity = 1;
+  cfg.series.forEach((s,si) => { const d = document.getElementById(id+'-d'+si); d.setAttribute('cx', cfg.x[idx]); d.setAttribute('cy', cfg.ys[si][idx]); d.style.opacity = 1; });
+  let rows = cfg.series.map(s => `<div class="tip-row"><span class="tip-key"><span class="tip-dot" style="background:${s.color}"></span>${s.name}</span><span class="tip-val">${cfg.kEuro ? s.data[idx]+'k €' : num(s.data[idx])}</span></div>`).join('');
+  showTip(e, `<div class="tip-title">${cfg.labels[idx]} 2026</div>${rows}`);
+}
+function lineOut(id) {
+  const cfg = LINE_REG[id]; if (!cfg) return;
+  document.getElementById(id+'-cx').style.opacity = 0;
+  cfg.series.forEach((s,si) => document.getElementById(id+'-d'+si).style.opacity = 0);
+  hideTip();
+}
+
+/* Donut (kategorial, 2px Flächen-Lücke, Zentrum = Hero-Zahl) */
+function donut(items, opts={}) {
+  const size = opts.size || 230, thick = opts.thickness || 30;
+  const r = (size - thick) / 2, cx = size/2, cy = size/2, C = 2*Math.PI*r;
+  const total = sum(items, i => i.value) || 1;
+  let off = 0, segs = '';
+  items.forEach(it => {
+    const len = it.value/total * C, dash = Math.max(0.5, len - 3);
+    segs += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${it.color}" stroke-width="${thick}"
+      stroke-dasharray="${dash} ${C-dash}" stroke-dashoffset="${-off}" transform="rotate(-90 ${cx} ${cy})"
+      style="cursor:pointer" onmousemove="showTip(event, '<div class=&quot;tip-row&quot;><span class=&quot;tip-key&quot;><span class=&quot;tip-dot&quot; style=&quot;background:${it.color}&quot;></span>${it.label}</span><span class=&quot;tip-val&quot;>${eur(it.value)}</span></div><div style=&quot;color:var(--text-dim);font-size:11px;margin-top:5px&quot;>${pct(it.value/total)} der Summe</div>')" onmouseleave="hideTip()"/>`;
+    off += len;
+  });
+  const center = opts.centerValue ? `
+    <text x="${cx}" y="${cy-4}" text-anchor="middle" fill="var(--text-main)" font-size="24" font-weight="800">${opts.centerValue}</text>
+    <text x="${cx}" y="${cy+16}" text-anchor="middle" fill="var(--text-dim)" font-size="11" font-weight="700">${opts.centerLabel||''}</text>` : '';
+  return `<svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" style="max-width:100%">${segs}${center}</svg>`;
+}
+function donutLegend(items) {
+  const total = sum(items, i => i.value) || 1;
+  return `<div style="display:flex;flex-direction:column;gap:9px">` + items.map(it => `
+    <div style="display:flex;align-items:center;gap:9px;font-size:12.5px">
+      <span class="legend-swatch" style="background:${it.color}"></span>
+      <span style="flex:1;font-weight:600">${it.label}</span>
+      <span style="font-weight:800;font-variant-numeric:tabular-nums">${eur(it.value)}</span>
+      <span style="color:var(--text-dim);width:44px;text-align:right;font-variant-numeric:tabular-nums">${pct(it.value/total)}</span>
+    </div>`).join('') + `</div>`;
+}
+
+/* Säulen-Chart (eine Serie, Wert auf Kappe des Maximums) */
+function columnChart(data, labels, opts={}) {
+  const W = 860, H = 300, padL = 46, padR = 18, padT = 20, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB, n = data.length;
+  const yMax = niceMax(Math.max(...data) * 1.12);
+  const y = v => padT + plotH * (1 - v/yMax);
+  const band = plotW / n, bw = Math.min(24, band * 0.55);
+  const color = opts.color || 'var(--c-personal)';
+  let grid = '';
+  for (let t = 0; t <= 4; t++) { const val = yMax*t/4, yy = y(val);
+    grid += `<line class="grid-line" x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}"/>`;
+    grid += `<text class="axis-txt" x="${padL-8}" y="${yy+3.5}" text-anchor="end">${num(Math.round(val))}</text>`; }
+  const maxV = Math.max(...data);
+  let bars = '';
+  data.forEach((v,i) => {
+    const bx = padL + band*i + (band-bw)/2, by = y(v), bh = padT+plotH - by;
+    bars += `<rect x="${bx}" y="${by}" width="${bw}" height="${Math.max(0,bh)}" rx="4" fill="${color}"
+      style="cursor:pointer" onmousemove="showTip(event,'<div class=&quot;tip-title&quot;>${labels[i]} 2026</div><div class=&quot;tip-row&quot;><span class=&quot;tip-key&quot;>${opts.serieName||'Wert'}</span><span class=&quot;tip-val&quot;>${num(v)}</span></div>')" onmouseleave="hideTip()"/>`;
+    bars += `<rect x="${bx-4}" y="${padT}" width="${bw+8}" height="${plotH}" fill="transparent"
+      onmousemove="showTip(event,'<div class=&quot;tip-title&quot;>${labels[i]} 2026</div><div class=&quot;tip-row&quot;><span class=&quot;tip-key&quot;>${opts.serieName||'Wert'}</span><span class=&quot;tip-val&quot;>${num(v)}</span></div>')" onmouseleave="hideTip()"/>`;
+    if (v === maxV) bars += `<text x="${bx+bw/2}" y="${by-7}" text-anchor="middle" fill="var(--text-main)" font-size="11" font-weight="800">${num(v)}</text>`;
+    bars += `<text class="axis-txt" x="${bx+bw/2}" y="${H-12}" text-anchor="middle">${labels[i]}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" preserveAspectRatio="xMidYMid meet" style="display:block">${grid}${bars}</svg>`;
+}
+
+/* Horizontale Bar-Liste */
+function hbarList(rows, opts={}) {
+  const maxV = Math.max(...rows.map(r => Math.abs(r.value)), 1);
+  return rows.map(r => {
+    const w = Math.abs(r.value)/maxV * 100;
+    return `<div class="hbar-row">
+      <div class="hbar-label" title="${r.label}">${r.label}</div>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${w}%;background:${r.color}"></div></div>
+      <div class="hbar-val" style="color:${r.valColor||'var(--text-main)'}">${r.display}</div>
+    </div>`;
+  }).join('');
+}
+
+/* Sparkline (12 Punkte) */
+function sparkline(data, color) {
+  const W = 160, H = 38, min = Math.min(...data), max = Math.max(...data), rng = (max-min)||1;
+  const x = i => i*(W/(data.length-1)), y = v => 4 + (H-8)*(1-(v-min)/rng);
+  const pts = data.map((v,i) => `${x(i)},${y(v)}`).join(' ');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="38" preserveAspectRatio="none" style="display:block">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${x(data.length-1)}" cy="${y(data[data.length-1])}" r="3" fill="${color}"/></svg>`;
+}
+
+/* Tooltip */
+const tip = document.getElementById('viz-tip');
+function showTip(e, html) { tip.innerHTML = html; tip.style.opacity = 1;
+  let x = e.clientX + 16, yy = e.clientY - 10;
+  if (x + tip.offsetWidth > window.innerWidth - 10) x = e.clientX - tip.offsetWidth - 16;
+  if (yy + tip.offsetHeight > window.innerHeight - 10) yy = window.innerHeight - tip.offsetHeight - 10;
+  tip.style.left = x + 'px'; tip.style.top = yy + 'px'; }
+function hideTip() { tip.style.opacity = 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FLOTTEN-STATUS (aus Datumswerten abgeleitet)
+═══════════════════════════════════════════════════════════════════════ */
+function terminStatus(dateStr) {
+  const t = tageBis(dateStr);
+  if (t < 0)   return { pill:'red',    txt:'Überfällig', kritisch:true,  warn:true,  tage:t };
+  if (t <= 30) return { pill:'orange', txt:t+' Tage',    kritisch:false, warn:true,  tage:t };
+  if (t <= 60) return { pill:'yellow', txt:t+' Tage',    kritisch:false, warn:false, tage:t };
+  return             { pill:'green',  txt:'OK',          kritisch:false, warn:false, tage:t };
+}
+function flotteWarnungen() {
+  const w = [];
+  fahrzeuge.forEach(f => {
+    const tv = terminStatus(f.tuev), ins = terminStatus(f.insp);
+    if (tv.warn)  w.push({ f, art:'TÜV/HU',      s:tv });
+    if (ins.warn) w.push({ f, art:'Inspektion',  s:ins });
+  });
+  return w.sort((a,b) => a.s.tage - b.s.tage);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER · MODUL 1 – DASHBOARD (Fazit)
+═══════════════════════════════════════════════════════════════════════ */
+function renderDashboard() {
+  const gPrev = hist.gewinn[10] * 1000;                 // Juni
+  const gDeltaPct = (K.gewinn - gPrev) / Math.abs(gPrev);
+  const ePrev = hist.einnahmen[10] * 1000;
+  const eDeltaPct = (K.einnahmen.total - ePrev) / ePrev;
+  const warn = flotteWarnungen();
+  const kritFlotte = warn.filter(w => w.s.kritisch);
+  const faelligeLeads = leads.filter(l => l.folge && tageBis(l.folge) <= 0 && l.status !== 'Angemeldet' && l.status !== 'Verloren');
+  const offeneBank = bankTx.filter(t => t.status !== 'auto');
+
+  const el = document.getElementById('view-dashboard');
+  el.innerHTML = `
+    <div class="section-title">🏁 Fazit Juli 2026 <span class="st-sub">· automatisch aus allen Modulen berechnet</span></div>
+
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card kpi">
+        <div class="kpi-label">💶 Einnahmen</div>
+        <div class="kpi-value">${eur(K.einnahmen.total)}</div>
+        <div class="kpi-delta ${eDeltaPct>=0?'up':'down'}">${eDeltaPct>=0?'▲':'▼'} ${pct(Math.abs(eDeltaPct),1)} <span class="muted">vs. Juni</span></div>
+        <div class="kpi-spark">${sparkline(hist.einnahmen, 'var(--c-revenue)')}</div>
+        <div class="kpi-ico" style="background:rgba(16,185,129,0.12);color:var(--c-revenue)">💶</div>
+      </div>
+      <div class="card kpi">
+        <div class="kpi-label">💸 Ausgaben</div>
+        <div class="kpi-value">${eur(K.ausgaben.total)}</div>
+        <div class="kpi-delta down">Personal · Flotte · Standorte</div>
+        <div class="kpi-spark">${sparkline(hist.ausgaben, 'var(--c-expense)')}</div>
+        <div class="kpi-ico" style="background:rgba(249,115,22,0.12);color:var(--c-expense)">💸</div>
+      </div>
+      <div class="card kpi" style="border-color:rgba(99,102,241,0.35);background:rgba(99,102,241,0.06)">
+        <div class="kpi-label">🏆 Gewinn</div>
+        <div class="kpi-value hero" style="color:#C7D2FE">${eur(K.gewinn)}</div>
+        <div class="kpi-delta ${gDeltaPct>=0?'up':'down'}">${gDeltaPct>=0?'▲':'▼'} ${pct(Math.abs(gDeltaPct),1)} <span class="muted">· Marge ${pct(K.marge,1)}</span></div>
+        <div class="kpi-spark">${sparkline(hist.gewinn, 'var(--c-profit)')}</div>
+      </div>
+      <div class="card kpi">
+        <div class="kpi-label">🎓 In Ausbildung</div>
+        <div class="kpi-value">${num(K.aktiveSchueler)}</div>
+        <div class="kpi-delta up">+${schuelerStat.neuAnmeldungen} neu · ${schuelerStat.bestandenDiesenMonat} bestanden</div>
+        <div class="kpi-spark">${sparkline(hist.neuSchueler, 'var(--status-blue)')}</div>
+        <div class="kpi-ico" style="background:rgba(59,130,246,0.12);color:var(--status-blue)">🎓</div>
+      </div>
+    </div>
+
+    <div class="two-col" style="margin-top:16px">
+      <div class="card chart-card">
+        <div class="chart-head"><div class="chart-title">Einnahmen · Ausgaben · Gewinn</div><div class="chart-note">letzte 12 Monate (Tsd. €)</div></div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-line" style="background:var(--c-revenue)"></span>Einnahmen</span>
+          <span class="legend-item"><span class="legend-line" style="background:var(--c-expense)"></span>Ausgaben</span>
+          <span class="legend-item"><span class="legend-line" style="background:var(--c-profit)"></span>Gewinn</span>
+        </div>
+        ${lineChart([
+          { name:'Einnahmen', color:'var(--c-revenue)', data: hist.einnahmen },
+          { name:'Ausgaben',  color:'var(--c-expense)', data: hist.ausgaben },
+          { name:'Gewinn',    color:'var(--c-profit)',  data: hist.gewinn },
+        ], monate, { kEuro:true })}
+      </div>
+
+      <div class="card">
+        <div class="chart-title" style="margin-bottom:2px">Wo geht das Geld hin?</div>
+        <div class="chart-note" style="margin-bottom:12px">Ausgaben-Verteilung Juli</div>
+        <div style="display:flex;justify-content:center;margin:8px 0 16px">
+          ${donut([
+            { label:'Personal',        value:K.personal.total, color:'var(--c-personal)' },
+            { label:'Flotte',          value:K.flotte.total,   color:'var(--c-flotte)' },
+            { label:'Standorte & Fix', value:K.fix.total,      color:'var(--c-standort)' },
+          ], { centerValue: eurK(K.ausgaben.total), centerLabel:'Ausgaben' })}
+        </div>
+        ${donutLegend([
+          { label:'Personal',        value:K.personal.total, color:'var(--c-personal)' },
+          { label:'Flotte',          value:K.flotte.total,   color:'var(--c-flotte)' },
+          { label:'Standorte & Fix', value:K.fix.total,      color:'var(--c-standort)' },
+        ])}
+      </div>
+    </div>
+
+    <div class="row-head"><h2>⚠️ Was braucht heute Aufmerksamkeit?</h2><span>automatische Frühwarnungen</span></div>
+    <div class="three-col">
+      <div class="card">
+        <div class="kpi-label" style="margin-bottom:12px">🚙 Flotte</div>
+        ${kritFlotte.length ? kritFlotte.slice(0,2).map(w => `
+          <div class="alert red"><span class="alert-ico">🔧</span><div><div class="alert-title">${w.f.modell} · ${w.art} überfällig</div>${w.f.kennz} · seit ${Math.abs(w.s.tage)} Tagen</div></div>`).join('') : ''}
+        ${warn.filter(w=>!w.s.kritisch).slice(0,2).map(w => `
+          <div class="alert orange"><span class="alert-ico">📅</span><div><div class="alert-title">${w.f.modell} · ${w.art}</div>${w.f.kennz} · fällig in ${w.s.tage} Tagen</div></div>`).join('')}
+        <button class="mini-btn" style="width:100%;margin-top:6px" onclick="showView('flotte')">Zur Flotte →</button>
+      </div>
+      <div class="card">
+        <div class="kpi-label" style="margin-bottom:12px">🎯 Leads</div>
+        <div class="alert orange"><span class="alert-ico">📞</span><div><div class="alert-title">${faelligeLeads.length} Interessenten fällig</div>Nachfassen heute überfällig – Anmeldequote sinkt sonst.</div></div>
+        <div class="muted-note" style="margin:4px 0 10px">${leads.filter(l=>l.status==='Neu').length} neue Anfragen unbearbeitet · ${leads.filter(l=>l.status==='Probestunde').length} Probestunden geplant</div>
+        <button class="mini-btn" style="width:100%" onclick="showView('leads')">Zum CRM →</button>
+      </div>
+      <div class="card">
+        <div class="kpi-label" style="margin-bottom:12px">🏦 Bank</div>
+        <div class="alert blue"><span class="alert-ico">🔗</span><div><div class="alert-title">${bankTx.filter(t=>t.status==='auto').length} Zahlungen auto-zugeordnet</div>${offeneBank.length} Posten brauchen manuelle Prüfung.</div></div>
+        <div class="muted-note" style="margin:4px 0 10px">Darunter 1 Rücklastschrift (geplatzte Zahlung).</div>
+        <button class="mini-btn" style="width:100%" onclick="showView('bank')">Zum Bankabgleich →</button>
+      </div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER · MODUL 2 – FINANZEN
+═══════════════════════════════════════════════════════════════════════ */
+function renderFinanzen() {
+  const E = K.einnahmen;
+  const einnahmeRows = [
+    ['Fahrstunden (regulär)',    E.fahrstunden,   `${sum(fahrlehrer,l=>l.normal)} Std. × ${eur(PREIS_FAHRSTUNDE)}`],
+    ['Sonderfahrten',            E.sonderfahrten, `${sum(fahrlehrer,l=>l.sonder)} Fahrten × ${eur(PREIS_SONDERFAHRT)}`],
+    ['Grundbeträge (Anmeldung)', E.grundbetrag,   `${schuelerStat.neuAnmeldungen} Anmeldungen`],
+    ['Prüfungsgebühren',         E.pruefungen,    `${schuelerStat.pruefungenPraktisch} prakt. · ${schuelerStat.pruefungenTheorie} theor.`],
+    ['Lehrmaterial & Apps',      E.lehrmaterial,  `Bücher, Lern-Apps, Fragebögen`],
+  ];
+  const fixRows = [
+    ['Miete (3 Standorte)',        K.fix.miete],
+    ['Strom',                      K.fix.strom],
+    ['Wasser',                     K.fix.wasser],
+    ['Internet & Telefon',         K.fix.internet],
+    ['Software-Lizenzen',          640],
+    ['Betriebs-/Rechtsschutzvers.',880],
+    ['Marketing & Werbung',        1850],
+    ['Bürobedarf & Sonstiges',     520],
+  ];
+  const personalRows = [
+    ['Fahrlehrer (15 Personen)', K.personal.lehrer, 'Löhne inkl. Lohnnebenkosten'],
+    ...personalBuero.map(p => [p.rolle, p.kosten, '']),
+  ];
+  const flotteRows = [
+    ['Leasingraten',        K.flotte.leasing],
+    ['Sprit & Ladestrom',   K.flotte.sprit],
+    ['Reparatur & Wartung', K.flotte.reparatur],
+    ['KFZ-Versicherung',    K.flotte.versicherung],
+  ];
+
+  const el = document.getElementById('view-finanzen');
+  el.innerHTML = `
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card kpi"><div class="kpi-label">Einnahmen</div><div class="kpi-value" style="color:var(--c-revenue)">${eur(E.total)}</div></div>
+      <div class="card kpi"><div class="kpi-label">Ausgaben</div><div class="kpi-value" style="color:var(--c-expense)">${eur(K.ausgaben.total)}</div></div>
+      <div class="card kpi"><div class="kpi-label">Gewinn</div><div class="kpi-value" style="color:#C7D2FE">${eur(K.gewinn)}</div></div>
+      <div class="card kpi"><div class="kpi-label">Gewinn / Schüler</div><div class="kpi-value">${eur(Math.round(K.gewinn/K.aktiveSchueler))}</div><div class="kpi-delta muted" style="color:var(--text-dim)">Ø über ${K.aktiveSchueler} aktive</div></div>
+    </div>
+
+    <div class="two-col" style="margin-top:20px">
+      <div>
+        <div class="row-head" style="margin-top:0"><h2>💶 Einnahmen</h2><span>${eur(E.total)}</span></div>
+        <div class="tbl-wrap">
+          <table class="tbl"><thead><tr><th>Position</th><th>Details</th><th class="num">Betrag</th></tr></thead>
+          <tbody>${einnahmeRows.map(r => `<tr><td class="t-strong">${r[0]}</td><td style="color:var(--text-muted)">${r[2]}</td><td class="num t-pos">${eur(r[1])}</td></tr>`).join('')}</tbody>
+          <tfoot><tr><td colspan="2">Summe Einnahmen</td><td class="num t-pos">${eur(E.total)}</td></tr></tfoot></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-title" style="margin-bottom:12px">Einnahme-Quellen</div>
+        <div style="display:flex;justify-content:center;margin-bottom:14px">
+          ${donut([
+            { label:'Fahrstunden', value:E.fahrstunden, color:'var(--c-revenue)' },
+            { label:'Sonderfahrten', value:E.sonderfahrten, color:'var(--c-sonder)' },
+            { label:'Grundbeträge', value:E.grundbetrag, color:'var(--c-personal)' },
+            { label:'Prüfungsgebühren', value:E.pruefungen, color:'var(--c-flotte)' },
+            { label:'Lehrmaterial', value:E.lehrmaterial, color:'var(--c-material)' },
+          ], { centerValue: eurK(E.total), centerLabel:'Einnahmen' })}
+        </div>
+        ${donutLegend([
+          { label:'Fahrstunden', value:E.fahrstunden, color:'var(--c-revenue)' },
+          { label:'Sonderfahrten', value:E.sonderfahrten, color:'var(--c-sonder)' },
+          { label:'Grundbeträge', value:E.grundbetrag, color:'var(--c-personal)' },
+          { label:'Prüfungsgebühren', value:E.pruefungen, color:'var(--c-flotte)' },
+          { label:'Lehrmaterial', value:E.lehrmaterial, color:'var(--c-material)' },
+        ])}
+      </div>
+    </div>
+
+    <div class="row-head"><h2>💸 Ausgaben</h2><span>${eur(K.ausgaben.total)}</span></div>
+    <div class="three-col">
+      ${expenseTable('👥 Personal', personalRows, K.personal.total)}
+      ${expenseTable('🚙 Flotte', flotteRows.map(r=>[r[0],r[1],'']), K.flotte.total)}
+      ${expenseTable('🏢 Standorte & Fixkosten', fixRows.map(r=>[r[0],r[1],'']), K.fix.total)}
+    </div>
+
+    <div class="card" style="margin-top:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;border-color:rgba(99,102,241,0.3);background:rgba(99,102,241,0.05)">
+      <div>
+        <div class="kpi-label">🏁 Monatsergebnis (Fazit)</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-top:8px">Einnahmen ${eur(E.total)} − Ausgaben ${eur(K.ausgaben.total)}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:34px;font-weight:800;color:#C7D2FE">${eur(K.gewinn)}</div>
+        <div class="pill green" style="margin-top:4px">Marge ${pct(K.marge,1)}</div>
+      </div>
+    </div>`;
+}
+function expenseTable(title, rows, total) {
+  return `<div class="card">
+    <div class="chart-title" style="margin-bottom:12px">${title}</div>
+    ${rows.map(r => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.035);font-size:13px">
+      <span style="color:var(--text-muted)">${r[0]}</span><span style="font-weight:700;font-variant-numeric:tabular-nums">${eur(r[1])}</span></div>`).join('')}
+    <div style="display:flex;justify-content:space-between;padding:12px 0 2px;font-weight:800"><span>Summe</span><span style="color:var(--c-expense);font-variant-numeric:tabular-nums">${eur(total)}</span></div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER · MODUL 3 – FLOTTE
+═══════════════════════════════════════════════════════════════════════ */
+function renderFlotte() {
+  const warn = flotteWarnungen();
+  const el = document.getElementById('view-flotte');
+  const rows = fahrzeuge.map(f => {
+    const umsatz = fahrzeugUmsatz(f), kosten = fahrzeugKosten(f), gewinn = umsatz - kosten;
+    const tv = terminStatus(f.tuev), ins = terminStatus(f.insp);
+    const mCount = maengel.filter(m => m.fahrzeugId === f.id).length;
+    return `<tr class="clickable" onclick="openFahrzeug('${f.id}')">
+      <td><div class="t-strong">${f.modell}</div><div style="font-size:11px;color:var(--text-dim)">${f.kennz} · ${f.antrieb}</div></td>
+      <td><span class="pill gray">${f.klasse}</span></td>
+      <td>${f.pool ? '<span style="color:var(--text-dim)">Pool</span>' : (fahrlehrer.find(l=>l.id===f.lehrerId)||{}).name}</td>
+      <td class="num">${f.pool ? '<span style="color:var(--text-dim)">—</span>' : eur(umsatz)}</td>
+      <td class="num">${eur(kosten)}</td>
+      <td class="num ${gewinn>=0?'t-pos':'t-neg'}">${gewinn>=0?'+':''}${eur(gewinn)}</td>
+      <td><span class="pill ${tv.pill}">${tv.txt}</span></td>
+      <td><span class="pill ${ins.pill}">${ins.txt}</span></td>
+      <td>${mCount ? `<span class="pill orange">${mCount} 🔧</span>` : '<span style="color:var(--text-dim)">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  const totKosten = sum(fahrzeuge, fahrzeugKosten);
+  const totUmsatz = sum(fahrzeuge, fahrzeugUmsatz);
+
+  el.innerHTML = `
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card kpi"><div class="kpi-label">🚗 Fahrzeuge</div><div class="kpi-value">${fahrzeuge.length}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${fahrzeuge.filter(f=>f.antrieb==='Elektro').length} elektrisch · ${fahrzeuge.filter(f=>f.typ==='Motorrad').length} Motorräder</div></div>
+      <div class="card kpi"><div class="kpi-label">Flottenkosten (Monat)</div><div class="kpi-value" style="color:var(--c-expense)">${eur(totKosten)}</div></div>
+      <div class="card kpi"><div class="kpi-label">Erwirtschaftet</div><div class="kpi-value" style="color:var(--c-revenue)">${eur(totUmsatz)}</div></div>
+      <div class="card kpi" style="${warn.filter(w=>w.s.kritisch).length?'border-color:rgba(239,68,68,0.4)':''}"><div class="kpi-label">⚠️ Termine offen</div><div class="kpi-value" style="color:${warn.filter(w=>w.s.kritisch).length?'var(--status-red)':'var(--status-yellow)'}">${warn.length}</div><div class="kpi-delta muted" style="color:var(--text-dim)">TÜV & Inspektion ≤ 30 Tage</div></div>
+    </div>
+
+    ${warn.length ? `<div class="row-head"><h2>🔧 TÜV- &amp; Inspektions-Frühwarnung</h2><span>automatisch aus Fälligkeitsdaten</span></div>
+    <div>${warn.slice(0,4).map(w => `<div class="alert ${w.s.kritisch?'red':'orange'}">
+      <span class="alert-ico">${w.s.kritisch?'⛔':'📅'}</span>
+      <div><div class="alert-title">${w.f.modell} (${w.f.kennz}) · ${w.art} ${w.s.kritisch?'überfällig':'fällig'}</div>
+      ${w.s.kritisch? 'Seit '+Math.abs(w.s.tage)+' Tagen überfällig – Fahrzeug sollte aus dem Einsatz!' : 'Noch '+w.s.tage+' Tage · '+fmtDatum(w.art==='TÜV/HU'?w.f.tuev:w.f.insp)}</div>
+      <div class="alert-act"><button class="mini-btn" onclick="event.stopPropagation();toast('📅 Werkstatttermin für ${w.f.kennz} angefragt.')">Termin buchen</button></div>
+    </div>`).join('')}</div>` : ''}
+
+    <div class="row-head"><h2>🚙 Fahrzeug-Rentabilität</h2><span>Klick auf ein Fahrzeug für Details, Kosten &amp; Mängel</span></div>
+    <div class="tbl-wrap">
+      <table class="tbl"><thead><tr>
+        <th>Fahrzeug</th><th>Klasse</th><th>Fahrlehrer</th>
+        <th class="num">Umsatz</th><th class="num">Kosten</th><th class="num">Ergebnis</th>
+        <th>TÜV/HU</th><th>Inspektion</th><th>Mängel</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div class="muted-note" style="margin-top:12px">💡 Pool-Fahrzeuge (Motorrad, Anhänger) sind reine Kostenträger – ihr Umsatz wird beim Primärfahrzeug des Fahrlehrers erfasst, um Doppelzählung zu vermeiden.</div>`;
+}
+
+function openFahrzeug(id) {
+  const f = fahrzeuge.find(x => x.id === id);
+  const l = fahrlehrer.find(x => x.id === f.lehrerId);
+  const umsatz = fahrzeugUmsatz(f), kosten = fahrzeugKosten(f), gewinn = umsatz - kosten;
+  const tv = terminStatus(f.tuev), ins = terminStatus(f.insp);
+  const ms = maengel.filter(m => m.fahrzeugId === f.id);
+  const box = document.getElementById('modalBox');
+  box.innerHTML = `
+    <div class="modal-header">
+      <div><div class="modal-title">${f.modell}</div><div class="modal-sub">${f.kennz} · ${f.typ} · Klasse ${f.klasse} · ${f.antrieb} · ${num(f.km)} km</div></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-grid2">
+      <div class="stat-box"><div class="sb-l">Umsatz (Monat)</div><div class="sb-v" style="color:var(--c-revenue)">${f.pool?'—':eur(umsatz)}</div>${l?`<div style="font-size:11px;color:var(--text-dim);margin-top:4px">durch ${l.name}</div>`:''}</div>
+      <div class="stat-box"><div class="sb-l">Ergebnis</div><div class="sb-v" style="color:${gewinn>=0?'var(--c-revenue)':'var(--status-red)'}">${gewinn>=0?'+':''}${eur(gewinn)}</div><div style="font-size:11px;color:var(--text-dim);margin-top:4px">${f.pool?'Kostenträger (Pool)':pct(gewinn/umsatz)+' Marge'}</div></div>
+    </div>
+    <div class="stat-box" style="margin-bottom:14px">
+      <div class="sb-l" style="margin-bottom:10px">Kostenaufstellung (Monat)</div>
+      ${[['Leasingrate',f.leasing],['Sprit / Ladestrom',f.sprit],['Reparatur & Wartung',f.reparatur],['KFZ-Versicherung',f.versicherung]].map(r=>`
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.035)"><span style="color:var(--text-muted)">${r[0]}</span><span style="font-weight:700">${eur(r[1])}</span></div>`).join('')}
+      <div style="display:flex;justify-content:space-between;padding:10px 0 0;font-weight:800"><span>Gesamtkosten</span><span style="color:var(--c-expense)">${eur(kosten)}</span></div>
+    </div>
+    <div class="modal-grid2">
+      <div class="stat-box"><div class="sb-l">TÜV / HU</div><div style="margin-top:6px"><span class="pill ${tv.pill}">${tv.txt}</span></div><div style="font-size:11px;color:var(--text-dim);margin-top:6px">${fmtDatum(f.tuev)}</div></div>
+      <div class="stat-box"><div class="sb-l">Nächste Inspektion</div><div style="margin-top:6px"><span class="pill ${ins.pill}">${ins.txt}</span></div><div style="font-size:11px;color:var(--text-dim);margin-top:6px">${fmtDatum(f.insp)}</div></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px">
+      <div class="chart-title">🔧 Gemeldete Mängel (${ms.length})</div>
+      <button class="mini-btn primary" onclick="mangelForm('${f.id}')">+ Mangel melden</button>
+    </div>
+    ${ms.length ? ms.map(m => `<div class="maengel-item">
+      <div class="maengel-photo">${m.foto}</div>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span class="pill ${m.schwere==='hoch'?'red':m.schwere==='mittel'?'orange':'yellow'}">${m.schwere}</span><span style="font-size:11px;color:var(--text-dim)">${fmtDatum(m.datum)} · ${m.melder}</span></div>
+        <div style="font-size:12.5px;margin-top:7px;line-height:1.5">${m.text}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Status: <strong>${m.status}</strong></div>
+      </div></div>`).join('') : '<div class="muted-note">Keine offenen Mängel. 👍</div>'}`;
+  openModal();
+}
+function mangelForm(fid) {
+  const f = fahrzeuge.find(x => x.id === fid);
+  const box = document.getElementById('modalBox');
+  box.innerHTML = `
+    <div class="modal-header"><div><div class="modal-title">Mangel melden</div><div class="modal-sub">${f.modell} · ${f.kennz}</div></div><button class="modal-close" onclick="openFahrzeug('${fid}')">✕</button></div>
+    <label class="field-label">Beschreibung</label>
+    <textarea class="input" id="m-text" rows="3" placeholder="z. B. Kratzer Stoßstange hinten links…"></textarea>
+    <label class="field-label">Schweregrad</label>
+    <select class="input" id="m-schwere"><option value="niedrig">niedrig</option><option value="mittel" selected>mittel</option><option value="hoch">hoch</option></select>
+    <label class="field-label">Foto</label>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="maengel-photo" style="width:70px;height:70px">📷</div>
+      <div class="muted-note">In der App tippt der Fahrlehrer direkt auf „Foto aufnehmen" – das Bild wird der Meldung angehängt und landet sofort im Backoffice.</div>
+    </div>
+    <button class="mini-btn primary" style="width:100%;margin-top:18px;padding:11px" onclick="saveMangel('${fid}')">🔧 Mangel absenden</button>`;
+}
+function saveMangel(fid) {
+  const f = fahrzeuge.find(x => x.id === fid);
+  const text = document.getElementById('m-text').value.trim() || 'Neuer Mangel gemeldet';
+  const schwere = document.getElementById('m-schwere').value;
+  maengel.unshift({ fahrzeugId:fid, datum:'2026-07-19', melder:'M. Krebs', text, schwere, status:'Gemeldet', foto:'📷' });
+  toast(`🔧 Mangel für ${f.kennz} erfasst und ans Backoffice übermittelt.`);
+  renderFlotte(); updateBadges(); openFahrzeug(fid);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER · MODUL 4 – ANALYTICS
+═══════════════════════════════════════════════════════════════════════ */
+function renderAnalytics() {
+  const el = document.getElementById('view-analytics');
+  const topFahrzeuge = fahrzeuge.filter(f=>!f.pool)
+    .map(f => ({ f, g: fahrzeugGewinn(f) })).sort((a,b) => b.g - a.g);
+  const auslastung = [...fahrlehrer].sort((a,b) => lehrerAuslastung(b) - lehrerAuslastung(a));
+
+  el.innerHTML = `
+    <div class="card chart-card">
+      <div class="chart-head"><div class="chart-title">📈 Einnahmen · Ausgaben · Gewinn</div><div class="chart-note">12-Monats-Verlauf (Tsd. €) – Maus über den Graph für Details</div></div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-line" style="background:var(--c-revenue)"></span>Einnahmen</span>
+        <span class="legend-item"><span class="legend-line" style="background:var(--c-expense)"></span>Ausgaben</span>
+        <span class="legend-item"><span class="legend-line" style="background:var(--c-profit)"></span>Gewinn</span>
+      </div>
+      ${lineChart([
+        { name:'Einnahmen', color:'var(--c-revenue)', data: hist.einnahmen },
+        { name:'Ausgaben',  color:'var(--c-expense)', data: hist.ausgaben },
+        { name:'Gewinn',    color:'var(--c-profit)',  data: hist.gewinn },
+      ], monate, { kEuro:true })}
+    </div>
+
+    <div class="two-col" style="margin-top:16px">
+      <div class="card chart-card">
+        <div class="chart-head"><div class="chart-title">🎓 Neue Anmeldungen pro Monat</div><div class="chart-note">Marketing-Wirkung</div></div>
+        ${columnChart(hist.neuSchueler, monate, { color:'var(--status-blue)', serieName:'Neue Schüler' })}
+      </div>
+      <div class="card">
+        <div class="chart-title" style="margin-bottom:2px">Ausgaben-Struktur</div>
+        <div class="chart-note" style="margin-bottom:12px">Anteil je Kostenblock</div>
+        <div style="display:flex;justify-content:center;margin-bottom:14px">
+          ${donut([
+            { label:'Personal', value:K.personal.total, color:'var(--c-personal)' },
+            { label:'Flotte', value:K.flotte.total, color:'var(--c-flotte)' },
+            { label:'Standorte & Fix', value:K.fix.total, color:'var(--c-standort)' },
+          ], { centerValue: pct(K.personal.total/K.ausgaben.total), centerLabel:'Personal' })}
+        </div>
+        ${donutLegend([
+          { label:'Personal', value:K.personal.total, color:'var(--c-personal)' },
+          { label:'Flotte', value:K.flotte.total, color:'var(--c-flotte)' },
+          { label:'Standorte & Fix', value:K.fix.total, color:'var(--c-standort)' },
+        ])}
+      </div>
+    </div>
+
+    <div class="two-col" style="margin-top:16px">
+      <div class="card">
+        <div class="chart-title" style="margin-bottom:2px">🚗 Rentabelste Fahrzeuge</div>
+        <div class="chart-note" style="margin-bottom:14px">Monatsergebnis (Umsatz − alle Kosten)</div>
+        ${hbarList(topFahrzeuge.slice(0,8).map(({f,g}) => ({
+          label: f.modell.replace('VW ','').replace('Škoda ','')+' · '+f.kennz.replace('MS-KB-',''),
+          value: g, display: '+'+eur(g), color: 'var(--c-revenue)'
+        })))}
+      </div>
+      <div class="card">
+        <div class="chart-title" style="margin-bottom:2px">🧑‍🏫 Auslastung Fahrlehrer</div>
+        <div class="chart-note" style="margin-bottom:14px">gefahrene vs. mögliche Stunden</div>
+        ${hbarList(auslastung.slice(0,8).map(l => {
+          const u = lehrerAuslastung(l);
+          return { label: l.name, value: u*100,
+            display: pct(u), valColor: u>=0.9?'var(--status-green)':u>=0.75?'var(--status-yellow)':'var(--status-orange)',
+            color: u>=0.9?'var(--status-green)':u>=0.75?'var(--status-yellow)':'var(--status-orange)' };
+        }))}
+      </div>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER · PRO – FAHRLEHRER (Rentabilität + Auslastung)
+═══════════════════════════════════════════════════════════════════════ */
+function renderFahrlehrer() {
+  const el = document.getElementById('view-fahrlehrer');
+  const gesGefahren = sum(fahrlehrer, l => l.normal + l.sonder);
+  const gesKapazitaet = sum(fahrlehrer, l => l.kapazitaet);
+  const avgUtil = gesGefahren / gesKapazitaet;
+  const durchschnittspreis = (PREIS_FAHRSTUNDE + PREIS_SONDERFAHRT) / 2;
+  const verlorenerUmsatz = sum(fahrlehrer.filter(l => lehrerAuslastung(l) < 0.85),
+    l => Math.round((l.kapazitaet * 0.85 - (l.normal + l.sonder)) * durchschnittspreis));
+
+  const rows = [...fahrlehrer].sort((a,b) => (lehrerUmsatz(b)-b.lohn) - (lehrerUmsatz(a)-a.lohn)).map(l => {
+    const umsatz = lehrerUmsatz(l), u = lehrerAuslastung(l), deckung = umsatz - l.lohn;
+    const veh = fahrzeuge.find(f => f.lehrerId === l.id);
+    const uColor = u>=0.9?'var(--status-green)':u>=0.75?'var(--status-yellow)':'var(--status-orange)';
+    return `<tr>
+      <td><div class="t-strong">${l.name}</div><div style="font-size:11px;color:var(--text-dim)">${l.vertrag} · ${l.klassen.join(', ')}</div></td>
+      <td>${veh ? `<span style="font-size:12px">${veh.kennz}</span>` : '<span style="color:var(--text-dim)">—</span>'}</td>
+      <td class="num">${l.schueler}</td>
+      <td class="num">${l.normal + l.sonder} / ${l.kapazitaet}</td>
+      <td><div class="util-cell"><div class="meter"><div class="meter-fill" style="width:${Math.min(100,u*100)}%;background:${uColor}"></div></div><span class="util-val" style="color:${uColor}">${pct(u)}</span></div></td>
+      <td class="num t-pos">${eur(umsatz)}</td>
+      <td class="num" style="color:var(--text-muted)">${eur(l.lohn)}</td>
+      <td class="num ${deckung>=0?'t-pos':'t-neg'}">${deckung>=0?'+':''}${eur(deckung)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card kpi"><div class="kpi-label">Ø Auslastung</div><div class="kpi-value" style="color:${avgUtil>=0.85?'var(--status-green)':'var(--status-yellow)'}">${pct(avgUtil)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${gesGefahren} von ${gesKapazitaet} Std.</div></div>
+      <div class="card kpi"><div class="kpi-label">Umsatz Fahrlehrer</div><div class="kpi-value" style="color:var(--c-revenue)">${eur(sum(fahrlehrer,lehrerUmsatz))}</div></div>
+      <div class="card kpi"><div class="kpi-label">Personalkosten</div><div class="kpi-value" style="color:var(--c-expense)">${eur(K.personal.lehrer)}</div></div>
+      <div class="card kpi" style="border-color:rgba(245,158,11,0.35)"><div class="kpi-label">💡 Ungenutzt / Monat</div><div class="kpi-value" style="color:var(--status-yellow)">${eur(verlorenerUmsatz)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">bei Ziel-Auslastung 85 %</div></div>
+    </div>
+
+    <div class="alert orange" style="margin-top:18px"><span class="alert-ico">📊</span><div>
+      <div class="alert-title">Auslastung ist die wichtigste Profitabilitäts-Kennzahl</div>
+      ${fahrlehrer.filter(l=>lehrerAuslastung(l)<0.75).length} Fahrlehrer liegen unter 75 %. Würden sie auf 85 % kommen, brächte das rund <strong>${eur(verlorenerUmsatz)}</strong> Mehrumsatz pro Monat – ohne einen einzigen neuen Mitarbeiter.
+    </div></div>
+
+    <div class="row-head"><h2>🧑‍🏫 Fahrlehrer-Rentabilität</h2><span>sortiert nach Deckungsbeitrag (Umsatz − Lohn)</span></div>
+    <div class="tbl-wrap">
+      <table class="tbl"><thead><tr>
+        <th>Fahrlehrer</th><th>Fahrzeug</th><th class="num">Schüler</th><th class="num">Std. (gef./mögl.)</th>
+        <th>Auslastung</th><th class="num">Umsatz</th><th class="num">Lohn</th><th class="num">Deckungsbeitrag</th>
+      </tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div class="muted-note" style="margin-top:12px">💡 Deckungsbeitrag = vom Fahrlehrer erwirtschafteter Umsatz minus seine Lohnkosten. Fahrzeug-, Standort- und Verwaltungskosten werden separat in den Fixkosten getragen.</div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER · PRO – LEADS / CRM
+═══════════════════════════════════════════════════════════════════════ */
+function leadFollowClass(l) {
+  if (!l.folge) return null;
+  const t = tageBis(l.folge);
+  if (t < 0) return { c:'due', txt:'Überfällig ('+Math.abs(t)+'d)' };
+  if (t === 0) return { c:'due', txt:'Heute fällig' };
+  if (t <= 2) return { c:'soon', txt:'in '+t+' Tagen' };
+  return { c:'ok', txt:fmtDatum(l.folge) };
+}
+function renderLeads() {
+  const el = document.getElementById('view-leads');
+  const aktiv = leads.filter(l => l.status !== 'Verloren');
+  const angemeldet = leads.filter(l => l.status === 'Angemeldet').length;
+  const bearbeitbar = leads.filter(l => l.status !== 'Angemeldet' && l.status !== 'Verloren').length + angemeldet + leads.filter(l=>l.status==='Verloren').length;
+  const quote = angemeldet / (bearbeitbar || 1);
+  const faellig = leads.filter(l => { const f = leadFollowClass(l); return f && f.c === 'due' && l.status !== 'Angemeldet' && l.status !== 'Verloren'; });
+
+  const cols = LEAD_STATES.map(st => {
+    const list = leads.filter(l => l.status === st);
+    const color = { 'Neu':'var(--status-blue)','Kontaktiert':'var(--status-yellow)','Probestunde':'var(--status-purple)','Angemeldet':'var(--status-green)','Verloren':'var(--status-gray)' }[st];
+    return `<div class="pipe-col">
+      <div class="pipe-head"><span style="width:8px;height:8px;border-radius:50%;background:${color}"></span>${st}<span class="pipe-count">${list.length}</span></div>
+      ${list.map(l => { const fc = leadFollowClass(l); return `
+        <div class="lead-card" onclick="openLead('${l.id}')">
+          <div class="lead-name">${l.name}</div>
+          <div class="lead-meta"><span class="pill gray">${l.klasse}</span><span class="tag-src">${l.quelle}</span></div>
+          <div class="lead-meta">Anfrage ${fmtDatum(l.eingang)}</div>
+          ${fc ? `<div class="lead-follow ${fc.c}">${fc.c==='due'?'🔴':fc.c==='soon'?'🟡':'📅'} ${fc.txt}</div>` : (l.status==='Angemeldet'?'<div class="lead-follow ok">✅ Konvertiert</div>':'')}
+        </div>`; }).join('') || '<div class="muted-note" style="padding:8px">—</div>'}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card kpi"><div class="kpi-label">🎯 Offene Leads</div><div class="kpi-value">${aktiv.filter(l=>l.status!=='Angemeldet').length}</div><div class="kpi-delta muted" style="color:var(--text-dim)">im Trichter</div></div>
+      <div class="card kpi" style="${faellig.length?'border-color:rgba(239,68,68,0.4)':''}"><div class="kpi-label">📞 Nachfassen fällig</div><div class="kpi-value" style="color:var(--status-red)">${faellig.length}</div><div class="kpi-delta muted" style="color:var(--text-dim)">jeder Tag senkt die Quote</div></div>
+      <div class="card kpi"><div class="kpi-label">Anmeldequote</div><div class="kpi-value">${pct(quote)}</div></div>
+      <div class="card kpi"><div class="kpi-label">Neu diese Woche</div><div class="kpi-value" style="color:var(--status-blue)">${leads.filter(l=>tageBis(l.eingang)>=-7).length}</div></div>
+    </div>
+
+    <div class="alert blue" style="margin-top:18px"><span class="alert-ico">🤖</span><div>
+      <div class="alert-title">Automatisches Nachfassen</div>
+      Jede Website-Anfrage landet sofort hier. Wird ein Lead nicht binnen 48 h kontaktiert, verschickt das System automatisch eine freundliche Erinnerung („Hallo, du hast dich für den ${''}B-Führerschein interessiert – sollen wir telefonieren?") und meldet den Fall dem Büro.
+      <div style="margin-top:8px"><button class="mini-btn primary" onclick="autoFollowUp()">${faellig.length} fällige jetzt automatisch anschreiben</button></div>
+    </div></div>
+
+    <div class="row-head"><h2>📋 Lead-Pipeline</h2><span>Klick auf eine Karte, um den Status zu ändern</span></div>
+    <div style="overflow-x:auto"><div class="pipeline">${cols}</div></div>`;
+}
+function autoFollowUp() {
+  const faellig = leads.filter(l => { const f = leadFollowClass(l); return f && f.c === 'due' && l.status === 'Neu'; });
+  faellig.forEach(l => { l.status = 'Kontaktiert'; l.folge = '2026-07-22'; });
+  toast(`🤖 ${faellig.length} Interessenten automatisch angeschrieben & auf „Kontaktiert" gesetzt.`);
+  renderLeads(); updateBadges();
+}
+function openLead(id) {
+  const l = leads.find(x => x.id === id);
+  const box = document.getElementById('modalBox');
+  box.innerHTML = `
+    <div class="modal-header"><div><div class="modal-title">${l.name}</div><div class="modal-sub">Klasse ${l.klasse} · Quelle: ${l.quelle} · ${l.tel}</div></div><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div class="modal-grid2">
+      <div class="stat-box"><div class="sb-l">Anfrage am</div><div class="sb-v" style="font-size:15px">${fmtDatum(l.eingang)}</div></div>
+      <div class="stat-box"><div class="sb-l">Nächster Kontakt</div><div class="sb-v" style="font-size:15px">${l.folge?fmtDatum(l.folge):'—'}</div></div>
+    </div>
+    <label class="field-label">Status im Trichter</label>
+    <select class="input" id="lead-status">${LEAD_STATES.map(s => `<option ${s===l.status?'selected':''}>${s}</option>`).join('')}</select>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="mini-btn" style="flex:1;padding:11px" onclick="toast('📞 Anruf bei ${l.name} vermerkt.');">📞 Anrufen</button>
+      <button class="mini-btn" style="flex:1;padding:11px" onclick="toast('✉️ E-Mail an ${l.name} gesendet.');">✉️ E-Mail</button>
+      <button class="mini-btn primary" style="flex:1;padding:11px" onclick="saveLead('${l.id}')">Speichern</button>
+    </div>`;
+  openModal();
+}
+function saveLead(id) {
+  const l = leads.find(x => x.id === id);
+  l.status = document.getElementById('lead-status').value;
+  if (l.status === 'Angemeldet' || l.status === 'Verloren') l.folge = null;
+  toast(`✅ ${l.name} → Status „${l.status}" gespeichert.`);
+  closeModal(); renderLeads(); updateBadges();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RENDER · PRO – BANKABGLEICH
+═══════════════════════════════════════════════════════════════════════ */
+function bankPill(status) {
+  return {
+    auto:      { c:'green',  t:'✓ auto zugeordnet' },
+    offen:     { c:'orange', t:'⚠ nicht zugeordnet' },
+    pruefen:   { c:'yellow', t:'prüfen' },
+    ruecklauf: { c:'red',    t:'⛔ Rücklastschrift' },
+    manuell:   { c:'blue',   t:'manuell zugeordnet' },
+  }[status];
+}
+function renderBank() {
+  const el = document.getElementById('view-bank');
+  const auto = bankTx.filter(t => t.status === 'auto' || t.status === 'manuell');
+  const eingang = sum(bankTx.filter(t => t.betrag > 0), t => t.betrag);
+  const quote = bankTx.filter(t=>t.status==='auto').length / bankTx.length;
+
+  const rows = bankTx.map(t => {
+    const p = bankPill(t.status);
+    return `<tr>
+      <td style="color:var(--text-muted)">${fmtDatum(t.datum)}</td>
+      <td class="t-strong">${t.absender}</td>
+      <td style="color:var(--text-muted)">${t.zweck}</td>
+      <td class="num ${t.betrag<0?'t-neg':''}">${t.betrag<0?'−':''}${eur(Math.abs(t.betrag),2)}</td>
+      <td><span class="pill ${p.c}">${p.t}</span>${t.ref?`<div style="font-size:10.5px;color:var(--text-dim);margin-top:3px">${t.ref}</div>`:''}</td>
+      <td>${(t.status!=='auto'&&t.status!=='manuell') ? `<button class="mini-btn" onclick="matchTx('${t.id}')">Zuordnen</button>` : '<span style="color:var(--text-dim)">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="card kpi"><div class="kpi-label">🏦 Zahlungseingang</div><div class="kpi-value" style="color:var(--c-revenue)">${eur(eingang)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${bankTx.filter(t=>t.betrag>0).length} Gutschriften</div></div>
+      <div class="card kpi"><div class="kpi-label">Auto-Zuordnung</div><div class="kpi-value" style="color:var(--status-green)">${pct(quote)}</div><div class="kpi-delta muted" style="color:var(--text-dim)">${auto.length} von ${bankTx.length} erkannt</div></div>
+      <div class="card kpi"><div class="kpi-label">Offen / prüfen</div><div class="kpi-value" style="color:var(--status-yellow)">${bankTx.filter(t=>t.status==='offen'||t.status==='pruefen').length}</div></div>
+      <div class="card kpi" style="border-color:rgba(239,68,68,0.35)"><div class="kpi-label">Rücklastschriften</div><div class="kpi-value" style="color:var(--status-red)">${bankTx.filter(t=>t.status==='ruecklauf').length}</div><div class="kpi-delta muted" style="color:var(--text-dim)">geplatzte Zahlung → nachfassen</div></div>
+    </div>
+
+    <div class="alert blue" style="margin-top:18px"><span class="alert-ico">🔗</span><div>
+      <div class="alert-title">So funktioniert der automatische Bankabgleich</div>
+      Das System liest den Kontoumsatz (per Banking-Schnittstelle / FinTS) und gleicht <strong>Verwendungszweck</strong> und <strong>Absendername</strong> mit offenen Rechnungen ab. Bei Treffer (Rechnungsnummer oder Name) wird die Zahlung automatisch auf „bezahlt" gesetzt – im Schüler-Cockpit verschwindet die Finanz-Sperre sofort.
+      <div style="margin-top:8px"><button class="mini-btn primary" onclick="autoMatchAll()">Alle erkennbaren automatisch zuordnen</button></div>
+    </div></div>
+
+    <div class="row-head"><h2>🧾 Kontoumsätze Juli 2026</h2><span>live-Abgleich mit offenen Rechnungen</span></div>
+    <div class="tbl-wrap">
+      <table class="tbl"><thead><tr><th>Datum</th><th>Absender</th><th>Verwendungszweck</th><th class="num">Betrag</th><th>Status</th><th>Aktion</th></tr></thead>
+      <tbody>${rows}</tbody></table>
+    </div>`;
+}
+function matchTx(id) {
+  const t = bankTx.find(x => x.id === id);
+  if (t.status === 'ruecklauf') {
+    toast('⛔ Rücklastschrift kann nicht zugeordnet werden – Schüler zur erneuten Zahlung anschreiben.');
+    return;
+  }
+  t.status = 'manuell'; t.ref = 'manuell zugeordnet';
+  toast(`🔗 Zahlung von ${t.absender} manuell einer Rechnung zugeordnet.`);
+  renderBank(); updateBadges();
+}
+function autoMatchAll() {
+  let n = 0;
+  bankTx.forEach(t => { if (t.status === 'offen' || t.status === 'pruefen') { t.status = 'manuell'; t.ref = 'zugeordnet'; n++; } });
+  toast(n ? `🔗 ${n} Zahlungen automatisch zugeordnet. Nur Rücklastschrift bleibt offen.` : 'Alles bereits zugeordnet.');
+  renderBank(); updateBadges();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   NAVIGATION / MODAL / TOAST / INIT
+═══════════════════════════════════════════════════════════════════════ */
+const VIEWS = {
+  dashboard:  { title:'Dashboard',       sub:'Monatsüberblick & Fazit',                render:renderDashboard },
+  finanzen:   { title:'Finanzen',        sub:'Einnahmen & Ausgaben im Detail',         render:renderFinanzen },
+  flotte:     { title:'Flottenmanagement',sub:'Fahrzeuge, Kosten, TÜV & Mängel',       render:renderFlotte },
+  analytics:  { title:'Analytics',       sub:'Diagramme & Trends',                     render:renderAnalytics },
+  fahrlehrer: { title:'Fahrlehrer',      sub:'Rentabilität & Auslastung',              render:renderFahrlehrer },
+  leads:      { title:'Leads / CRM',     sub:'Interessenten & automatisches Nachfassen',render:renderLeads },
+  bank:       { title:'Bankabgleich',    sub:'Automatische Zahlungszuordnung',         render:renderBank },
+};
+function showView(name) {
+  const v = VIEWS[name]; if (!v) return;
+  v.render();
+  document.querySelectorAll('.view').forEach(s => s.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === name));
+  document.getElementById('tb-title').textContent = v.title;
+  document.getElementById('tb-sub').textContent = v.sub;
+  document.querySelector('.content').scrollTop = 0;
+}
+document.getElementById('nav').addEventListener('click', e => {
+  const item = e.target.closest('.nav-item[data-view]');
+  if (item) showView(item.dataset.view);
+});
+
+function openModal() { document.getElementById('modalOverlay').classList.add('open'); }
+function closeModal() { document.getElementById('modalOverlay').classList.remove('open'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3800);
+}
+function onMonthChange(sel) {
+  if (sel.value !== '2026-07') { toast('ℹ Referenz-Datensatz ist Juli 2026 – andere Zeiträume folgen mit der Live-Anbindung.'); sel.value = '2026-07'; }
+}
+
+function updateBadges() {
+  const warn = flotteWarnungen().length;
+  const leadDue = leads.filter(l => { const f = leadFollowClass(l); return f && f.c === 'due' && l.status !== 'Angemeldet' && l.status !== 'Verloren'; }).length;
+  const bankOpen = bankTx.filter(t => t.status !== 'auto' && t.status !== 'manuell').length;
+  setBadge('nav-flotte-badge', warn, false);
+  setBadge('nav-leads-badge', leadDue, true);
+  setBadge('nav-bank-badge', bankOpen, true);
+  document.getElementById('foot-students').textContent = num(K.aktiveSchueler);
+}
+function setBadge(id, n, warn) {
+  const b = document.getElementById(id);
+  if (!n) { b.style.display = 'none'; return; }
+  b.style.display = ''; b.textContent = n;
+  b.className = 'nav-badge' + (warn ? ' warn' : '');
+}
+
+/* Start */
+updateBadges();
+showView('dashboard');
+</script>
+</body>
+</html>
