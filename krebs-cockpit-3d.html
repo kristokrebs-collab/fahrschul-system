@@ -298,7 +298,8 @@ main{isolation:isolate;pointer-events:none}
 .chapter__copy,.finish-card{will-change:opacity,transform,filter}
 .chapter__copy h1,.chapter__copy h2,.finish-card h2{text-wrap:balance}
 .chapter__label{position:relative}.chapter__label:after{content:"";position:absolute;left:0;bottom:-10px;width:120px;height:1px;background:linear-gradient(90deg,rgba(221,12,32,.5),transparent);transform-origin:left;transform:scaleX(var(--copy-line,1))}
-.hero-title{font-size:clamp(64px,8.6vw,140px);text-shadow:0 22px 80px rgba(0,0,0,.52)}
+.hero-title{font-size:clamp(64px,8.6vw,140px);text-shadow:0 22px 80px rgba(0,0,0,.52);animation:heroReveal 1.15s var(--ease-premium) both}
+@keyframes heroReveal{from{clip-path:inset(0 0 106% 0);transform:translateY(26px)}to{clip-path:inset(0 0 -34% 0);transform:none}}
 .hero-title span{filter:drop-shadow(0 0 28px rgba(221,12,32,.06))}
 .btn{--mag-x:0px;--mag-y:0px;--lift:0px;transform:translate3d(var(--mag-x),calc(var(--mag-y) - var(--lift)),0);transition:border-color .3s,background .3s,box-shadow .35s var(--ease-premium)}
 .btn:hover{--lift:3px;box-shadow:0 18px 44px rgba(221,12,32,.18)}
@@ -497,9 +498,9 @@ function sizeSignature(){
 /* canvas world: fluid light, curved road grid and depth particles */
 const canvas=$('#world'),ctx=canvas.getContext('2d',{alpha:true});
 let dpr=1,w=0,h=0,time=0,maxScroll=1,targetScroll=scrollY,smoothScroll=scrollY,lastSmooth=scrollY,scrollVelocity=0;
-const particles=Array.from({length:72},(_,i)=>({x:Math.random(),y:Math.random(),z:Math.random(),s:.25+Math.random()*1.5,red:i%8===0,drift:(Math.random()-.5)*.00022}));
+const particles=Array.from({length:44},(_,i)=>({x:Math.random(),y:Math.random(),z:Math.random(),s:.25+Math.random()*1.5,red:i%8===0,drift:(Math.random()-.5)*.00022}));
 function resize(){
-  dpr=Math.min(1.8,devicePixelRatio||1);w=innerWidth;h=innerHeight;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);maxScroll=Math.max(1,document.documentElement.scrollHeight-h);sizeSignature();cacheLayout();
+  dpr=Math.min(1.3,devicePixelRatio||1);w=innerWidth;h=innerHeight;canvas.width=Math.round(w*dpr);canvas.height=Math.round(h*dpr);canvas.style.width=w+'px';canvas.style.height=h+'px';ctx.setTransform(dpr,0,0,dpr,0,0);maxScroll=Math.max(1,document.documentElement.scrollHeight-h);sizeSignature();cacheLayout();
 }
 function radial(x,y,r,stops){const g=ctx.createRadialGradient(x,y,0,x,y,r);stops.forEach(s=>g.addColorStop(s[0],s[1]));return g}
 function drawRibbon(offset,width,alpha,phase){
@@ -660,8 +661,9 @@ function loop(now=performance.now()){
   dot.style.transform=`translate3d(${dx.toFixed(1)}px,${dy.toFixed(1)}px,0) translate(-50%,-50%)`;
   if(finePointer){const sx=1+clamp(pointerSpeed/65,0,.32),sy=1-clamp(pointerSpeed/120,0,.16),ang=Math.atan2(my-cy,mx-cx)*180/Math.PI;cursor.style.transform=`translate3d(${cx.toFixed(1)}px,${cy.toFixed(1)}px,0) translate(-50%,-50%) rotate(${ang.toFixed(1)}deg) scale(${sx.toFixed(3)},${sy.toFixed(3)})`}
   else cursor.style.transform=`translate3d(${cx.toFixed(1)}px,${cy.toFixed(1)}px,0) translate(-50%,-50%)`;
-  renderScene();drawWorld();requestAnimationFrame(loop);
+  renderScene();if((frameN++&1)===0)drawWorld();requestAnimationFrame(loop);
 }
+let frameN=0;
 resize();renderScene();loop(performance.now());
 })();
 </script>
