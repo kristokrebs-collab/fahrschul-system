@@ -833,6 +833,23 @@ svg.lci{width:18px;height:18px;flex:0 0 auto;}
   background:var(--emerald-soft);border:1px solid var(--emerald-line);border-radius:999px;padding:6px 12px;margin:0 auto 12px;width:max-content;}
 .map-unlocked-note svg{width:13px;height:13px;}
 
+/* Premium-Umschalter (Ruhiger Modus) */
+.switch-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin-bottom:10px;
+  padding:12px 13px;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--border);
+  font-family:inherit;color:var(--text);cursor:pointer;transition:border-color .25s,background .25s;}
+.switch-row:hover{border-color:var(--border-strong);}
+.switch-row .swic{width:34px;height:34px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);display:grid;place-items:center;flex:0 0 34px;}
+.switch-row .swic svg{width:16px;height:16px;color:var(--text-dim);}
+.switch-row .swt{flex:1;min-width:0;}
+.switch-row .swt .ht{display:block;font-size:13px;font-weight:700;}
+.switch-row .swt .hd{display:block;font-size:11px;color:var(--text-faint);line-height:1.4;margin-top:2px;}
+.sw-toggle{flex:0 0 auto;width:44px;height:26px;border-radius:999px;background:var(--surface-3);border:1px solid var(--border-strong);position:relative;transition:background .3s,border-color .3s;}
+.sw-knob{position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--text-faint);transition:transform .32s var(--ease-out),background .3s;}
+.switch-row.on .swic{background:var(--accent-soft);border-color:var(--accent-line);}
+.switch-row.on .swic svg{color:var(--accent-hi);}
+.switch-row.on .sw-toggle{background:var(--accent-soft);border-color:var(--accent-line);}
+.switch-row.on .sw-knob{transform:translateX(18px);background:var(--accent-hi);}
+
 /* ---------- Topbar & Branding ---------- */
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px;}
 .brand{display:flex;align-items:center;gap:12px;min-width:0;}
@@ -2036,6 +2053,10 @@ const el=id=>document.getElementById(id);
 const pct=(i,s)=>s<=0?100:Math.min(100,Math.round((i/s)*100));
 function haptic(t){ if(!('vibrate' in navigator)) return; if(t==='confirm') navigator.vibrate([12,45,12]); else if(t==='block') navigator.vibrate(32); }
 const reducedMotion=()=>window.matchMedia&&window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+/* Ruhiger Modus: schaltet Partikel-Hintergrund & 3D-Tilt ab (Flacker-Kill-Switch,
+   pro Gerät). Standard: automatisch an auf sehr schwachen Geräten. */
+function autoCalm(){ try{ if(navigator.deviceMemory&&navigator.deviceMemory<=2) return true; }catch(e){} return false; }
+function calmMode(){ const p=getProfile(); if(p&&typeof p.calm==='boolean') return p.calm; return autoCalm(); }
 
 let toastTimer=null;
 function toast(kind,msg,sub){
@@ -2216,7 +2237,7 @@ const Tilt=(()=>{
   }
   return {
     wire(root){
-      if(reducedMotion()) return;
+      if(reducedMotion()||calmMode()) return;
       const els=(root||document).querySelectorAll('.tilt3d');
       if(!els.length) return;
       items=[];
@@ -2293,7 +2314,7 @@ const FX=(()=>{
   }
   function seed(){
     parts=[];
-    const count=Math.max(12,Math.min(26,Math.round((W*H)/52000)));
+    const count=Math.max(9,Math.min(20,Math.round((W*H)/62000)));
     for(let i=0;i<count;i++){
       const depth=0.35+Math.random()*0.65;
       parts.push({
@@ -2316,7 +2337,7 @@ const FX=(()=>{
   }
   function size(){
     if(!canvas) return;
-    DPR=Math.min(2,window.devicePixelRatio||1);
+    DPR=Math.min(1.5,window.devicePixelRatio||1);
     W=window.innerWidth; H=window.innerHeight;
     canvas.width=Math.round(W*DPR); canvas.height=Math.round(H*DPR);
     canvas.style.width=W+'px'; canvas.style.height=H+'px';
@@ -2325,6 +2346,7 @@ const FX=(()=>{
   function tick(ts){
     raf=requestAnimationFrame(tick);
     if(document.hidden) return;
+    if(ts-lastTs<31) return;   /* ~32 fps Deckel: halbe GPU-Last, kein Flimmern auf dem Handy */
     const dt=Math.min(0.05,(ts-lastTs)/1000||0.016); lastTs=ts;
     ctx.clearRect(0,0,W,H);
     const t=ts/1000, scrollY=window.scrollY||0, wrap=H+240;
@@ -2352,8 +2374,10 @@ const FX=(()=>{
       window.addEventListener('resize',()=>{ size(); seed(); });
       window.addEventListener('pointermove',e=>{ pointer.x=e.clientX; pointer.y=e.clientY; },{passive:true});
       window.addEventListener('pointerleave',()=>{ pointer.x=-9999; pointer.y=-9999; },{passive:true});
-      raf=requestAnimationFrame(tick);
-    }
+      this.start();
+    },
+    start(){ if(reducedMotion()||calmMode()||raf) return; lastTs=0; raf=requestAnimationFrame(tick); },
+    stop(){ if(raf){ cancelAnimationFrame(raf); raf=null; } if(ctx&&W&&H) ctx.clearRect(0,0,W,H); }
   };
 })();
 </script>
@@ -3077,6 +3101,11 @@ function profileSheetHTML(){
       <div class="hot-item" style="cursor:default"><div class="hnum">${ic('car-front')}</div><div class="htext"><div class="ht">${FL_NAME}</div><div class="hd">Zugeteilter Fahrlehrer</div></div></div>
       <div class="hot-item" style="cursor:default"><div class="hnum">${ic('database')}</div><div class="htext"><div class="ht">${Store.ok?'Lokal gespeichert':'Sitzungsspeicher'}</div><div class="hd">Konto &amp; Fortschritt bleiben auf diesem Gerät</div></div></div>
     </div>
+    <button type="button" class="switch-row ${calmMode()?'on':''}" data-action="toggle-calm" role="switch" aria-checked="${calmMode()?'true':'false'}">
+      <span class="swic">${ic('sparkles')}</span>
+      <span class="swt"><span class="ht">Ruhiger Modus</span><span class="hd">Reduziert Partikel-Hintergrund &amp; 3D – falls dein Gerät flackert</span></span>
+      <span class="sw-toggle"><span class="sw-knob"></span></span>
+    </button>
     <button class="btn btn-ghost" data-action="change-class" style="margin-bottom:10px">${ic('arrow-left-right')}Führerscheinklasse wechseln</button>
     <button class="btn btn-ghost" data-action="reset-training" style="margin-bottom:10px">${ic('rotate-ccw')}Ausbildungsdaten zurücksetzen</button>
     <button class="btn btn-ghost" data-action="logout" style="margin-bottom:10px">${ic('log-out')}Abmelden</button>
@@ -3162,6 +3191,15 @@ function deleteAccountFlow(){
   setTimeout(()=>toast('info','Alle Daten gelöscht','Du kannst jederzeit ein neues Konto anlegen.'),300);
 }
 function changeClassFlow(){ closeMorphInstant(); nav('klasse'); }
+function toggleCalm(){
+  const p=getProfile(); if(!p) return;
+  const now=!calmMode(); p.calm=now; saveProfile(p);
+  if(now){ FX.stop(); } else { FX.start(); }
+  closeMorphInstant();
+  renderScreen('cockpit',true);   /* re-wired Tilt/Reveal je nach Modus */
+  haptic(now?'block':'confirm');
+  setTimeout(()=>toast('info',now?'Ruhiger Modus an':'Volle Effekte an',now?'Partikel & 3D-Neigung sind reduziert.':'Partikel-Hintergrund & 3D-Neigung aktiv.'),320);
+}
 
 /* ---------- Dokument-Scan (Kamera/Datei) ---------- */
 let pendingDoc=null;
@@ -3224,6 +3262,7 @@ document.addEventListener('click',e=>{
     case 'history-tab': setHistoryTab(trg.getAttribute('data-tab')); break;
     case 'history-toggle': toggleHistory(); break;
     case 'change-class': changeClassFlow(); break;
+    case 'toggle-calm': toggleCalm(); break;
     case 'logout': logout(); break;
     case 'delete-account': deleteAccountFlow(); break;
     case 'reset-training': resetTraining(); break;
