@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#060709">
+<meta name="description" content="Fahrschule Krebs — dein digitales Fahr-Cockpit im Handyformat.">
+<title>KREBS · Fahr-Cockpit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira+Condensed:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#060709;--bg2:#0b0d11;--panel:#0f1116;--panel2:#14161d;
+  --ink:#f4f1ec;--muted:#98948d;--faint:#5f5c57;--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.16);
+  --red:#dd0c20;--red2:#ff2636;--redsoft:rgba(221,12,32,.14);--green:#67e0a3;--cool:#7fb0ff;--amber:#ffb454;
+  --disp:"Saira Condensed","Arial Narrow",Arial,sans-serif;--sans:Inter,system-ui,Arial,sans-serif;
+  --e:cubic-bezier(.22,1,.36,1);--e2:cubic-bezier(.34,1.56,.64,1);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{background:#000;scroll-behavior:auto}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+::selection{background:var(--red);color:#fff}
+:focus-visible{outline:2px solid var(--red2);outline-offset:3px}
+.cap{font-family:var(--disp);text-transform:uppercase}
+
+/* desktop ambient stage + device frame */
+.stage{position:fixed;inset:0;display:grid;place-items:center;background:
+  radial-gradient(60vw 60vw at 72% 30%,rgba(221,12,32,.10),transparent 60%),
+  radial-gradient(50vw 50vw at 20% 80%,rgba(30,40,70,.18),transparent 62%),#040507;overflow:hidden}
+.stage:before{content:"";position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.04;pointer-events:none}
+.stage__side{position:absolute;font-family:var(--disp);font-weight:900;font-size:min(24vw,300px);letter-spacing:-.06em;color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.03);white-space:nowrap;pointer-events:none;user-select:none}
+.stage__side.l{left:-2vw;top:8%}.stage__side.r{right:-2vw;bottom:6%}
+.device{position:relative;width:min(430px,100vw);height:min(920px,100vh);background:var(--bg);overflow:hidden;
+  border-radius:0}
+@media(min-width:480px){.device{height:min(880px,94vh);border-radius:44px;border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 0 0 11px #0a0b0f,0 0 0 12px rgba(255,255,255,.06),0 50px 120px rgba(0,0,0,.65),inset 0 1px 0 rgba(255,255,255,.1)}
+  .device:before{content:"";position:absolute;z-index:40;left:50%;top:12px;transform:translateX(-50%);width:120px;height:26px;border-radius:16px;background:#050608;border:1px solid rgba(255,255,255,.06)}}
+
+/* app scroll surface */
+.app{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:none;padding:0 18px calc(96px + env(safe-area-inset-bottom))}
+.app::-webkit-scrollbar{display:none}
+.screen{display:none}.screen.active{display:block}
+
+/* status bar */
+.status{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;
+  padding:16px 4px 10px;font-size:12px;font-weight:600;letter-spacing:.02em;
+  background:linear-gradient(var(--bg) 55%,transparent)}
+.status .sig{display:flex;align-items:center;gap:5px;color:var(--muted)}
+.status .sig i{width:3px;border-radius:1px;background:currentColor;display:inline-block}
+.status .sig i:nth-child(1){height:5px}.status .sig i:nth-child(2){height:8px}.status .sig i:nth-child(3){height:11px}.status .sig .fk{margin-left:6px;font-family:var(--disp);font-weight:900;color:var(--ink);letter-spacing:0}
+
+/* header */
+.hd{display:flex;align-items:flex-end;justify-content:space-between;margin-top:6px}
+.hd small{display:block;color:var(--muted);font-size:13px;font-weight:500}
+.hd h1{font-family:var(--disp);font-weight:800;font-size:40px;line-height:.9;letter-spacing:-.01em;margin-top:2px}
+.hd h1 span{color:var(--red2)}
+.streak{display:flex;align-items:center;gap:7px;padding:8px 12px;border-radius:14px;background:var(--panel);border:1px solid var(--line)}
+.streak b{font-family:var(--disp);font-size:20px;line-height:1}.streak small{font-size:9px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.streak .fl{filter:drop-shadow(0 0 6px rgba(255,120,40,.6))}
+
+/* ── SIGNATURE: tacho gauge ── */
+.tacho{position:relative;margin:22px 0 6px;display:flex;flex-direction:column;align-items:center}
+.tacho svg{width:min(300px,78%);height:auto;overflow:visible}
+.tacho .track{fill:none;stroke:rgba(255,255,255,.07);stroke-width:14;stroke-linecap:round}
+.tacho .val{fill:none;stroke:url(#gg);stroke-width:14;stroke-linecap:round;filter:drop-shadow(0 0 10px rgba(221,12,32,.5))}
+.tacho .tick{stroke:rgba(255,255,255,.22);stroke-width:2}.tacho .tick.maj{stroke:rgba(255,255,255,.5);stroke-width:2.5}
+.tacho .needle{transform-origin:120px 120px;transition:transform .1s linear}.tacho .needle path{filter:drop-shadow(0 0 5px rgba(255,38,54,.65))}
+.tacho__hub{position:absolute;left:50%;top:62%;transform:translate(-50%,-50%);width:70px;height:70px;border-radius:50%;
+  display:grid;place-items:center;background:radial-gradient(circle at 42% 35%,#20232c,#0a0b10);border:1px solid rgba(255,255,255,.18);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 6px 20px rgba(0,0,0,.5)}
+.tacho__hub b{font-family:var(--disp);font-weight:900;font-size:22px;letter-spacing:-.02em}
+.tacho__hub b:after{content:"";display:block;height:2px;width:20px;margin:2px auto 0;background:var(--red);border-radius:2px;box-shadow:0 0 8px var(--red)}
+.tacho__read{position:absolute;left:50%;top:29%;transform:translateX(-50%);text-align:center;pointer-events:none}
+.tacho__read b{font-family:var(--disp);font-weight:800;font-size:64px;line-height:.8;letter-spacing:-.03em}
+.tacho__read b i{font-style:normal;font-size:26px;color:var(--red2);vertical-align:14px}
+.tacho__read small{display:block;font-size:10px;letter-spacing:.28em;color:var(--muted);text-transform:uppercase;margin-top:4px}
+.tacho__ends{display:flex;justify-content:space-between;width:min(300px,78%);margin-top:-14px;font-size:10px;letter-spacing:.14em;color:var(--faint);text-transform:uppercase}
+.tacho__delta{display:inline-flex;align-items:center;gap:6px;margin-top:12px;padding:7px 13px;border-radius:999px;background:var(--redsoft);border:1px solid rgba(221,12,32,.3);font-size:12px;font-weight:600;color:#ff9aa6}
+.tacho__delta b{color:var(--green);font-weight:700}
+
+/* section label */
+.lbl{display:flex;align-items:center;gap:10px;margin:26px 2px 12px;font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.lbl:before{content:"";width:16px;height:2px;background:var(--red);border-radius:2px}
+.lbl b{color:var(--faint);font-weight:600;margin-left:auto;letter-spacing:.1em}
+
+/* next-drive spotlight card */
+.drive{position:relative;border-radius:22px;padding:18px;overflow:hidden;background:
+  linear-gradient(135deg,rgba(221,12,32,.24),rgba(221,12,32,.05) 60%,var(--panel));border:1px solid rgba(255,38,54,.28)}
+.drive:after{content:"";position:absolute;right:-30px;bottom:-40px;width:150px;height:120px;
+  background:radial-gradient(circle,rgba(255,38,54,.3),transparent 70%);filter:blur(6px)}
+.drive__top{display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+.drive__top span{color:#ff9aa6;font-weight:700}.drive__top b{font-family:var(--disp);font-size:14px}
+.drive h3{font-family:var(--disp);font-weight:800;font-size:26px;margin-top:10px;letter-spacing:-.01em}
+.drive p{font-size:12px;color:#d9c9ca;margin-top:4px}
+.drive__go{position:relative;z-index:2;margin-top:14px;display:inline-flex;align-items:center;gap:9px;padding:11px 18px;border-radius:999px;background:var(--ink);color:#0a0a0c;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;transition:transform .3s var(--e2)}
+.drive__go:active{transform:scale(.94)}
+.drive__route{position:absolute;right:14px;top:16px;width:96px;height:64px;opacity:.5}
+.drive__route path{fill:none;stroke:#fff;stroke-width:1.4;stroke-dasharray:200;stroke-dashoffset:200;animation:draw 2.2s var(--e) .4s forwards}
+.drive__route circle{fill:var(--red2)}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* bento tiles — asymmetric */
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.tile{position:relative;border-radius:20px;padding:16px;background:var(--panel);border:1px solid var(--line);overflow:hidden;transition:transform .3s var(--e),border-color .3s}
+.tile:active{transform:scale(.97)}
+.tile small{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.tile b{display:block;font-family:var(--disp);font-weight:800;font-size:34px;line-height:1;margin-top:8px}
+.tile b i{font-style:normal;font-size:15px;color:var(--muted)}
+.tile.wide{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between}
+.tile.wide b{font-size:30px}
+.tile__bar{height:4px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:12px;overflow:hidden}
+.tile__bar i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,var(--red),var(--red2));box-shadow:0 0 8px rgba(221,12,32,.6);transition:width 1s var(--e)}
+.tile__spark{display:flex;align-items:flex-end;gap:3px;height:34px}
+.tile__spark i{flex:1;background:linear-gradient(var(--red2),var(--red));border-radius:2px;opacity:.85;transform:scaleY(0);transform-origin:bottom;transition:transform .6s var(--e)}
+.tile .flame{font-size:20px}
+
+/* lernspur timeline */
+.spur{display:flex;gap:0;position:relative;padding:4px 0}
+.spur:before{content:"";position:absolute;left:8%;right:8%;top:22px;height:2px;background:linear-gradient(90deg,var(--red),rgba(255,255,255,.12))}
+.spur__pt{flex:1;text-align:center;position:relative}
+.spur__pt .dot{width:14px;height:14px;border-radius:50%;margin:15px auto 0;background:var(--bg);border:2px solid var(--red2);box-shadow:0 0 0 4px rgba(221,12,32,.15);position:relative;z-index:2}
+.spur__pt.ok .dot{background:var(--red2)}
+.spur__pt strong{display:block;font-family:var(--disp);font-size:22px;margin-top:12px}
+.spur__pt small{display:block;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.spur__pt.grade strong{color:var(--green)}
+
+/* goals (adapted from 21st Activity Card, brand-fitted) */
+.goals{display:flex;flex-direction:column;gap:9px}
+.goal{display:flex;align-items:center;gap:13px;padding:14px 15px;border-radius:16px;background:var(--panel);border:1px solid var(--line);text-align:left;transition:border-color .25s,background .25s,transform .2s var(--e)}
+.goal:active{transform:scale(.98)}
+.goal .ck{width:24px;height:24px;border-radius:8px;border:2px solid var(--faint);display:grid;place-items:center;flex:0 0 auto;transition:.3s var(--e2)}
+.goal .ck svg{width:13px;height:13px;stroke:#0a0a0c;stroke-width:3.5;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:20;stroke-dashoffset:20;transition:stroke-dashoffset .3s .05s}
+.goal span{font-size:14px;font-weight:500;flex:1;transition:.3s}
+.goal .pts{font-family:var(--disp);font-size:15px;color:var(--muted)}
+.goal.done{border-color:rgba(103,224,163,.3)}
+.goal.done .ck{background:var(--green);border-color:var(--green)}
+.goal.done .ck svg{stroke-dashoffset:0}
+.goal.done span{color:var(--muted);text-decoration:line-through}
+.goal.done .pts{color:var(--green)}
+
+/* statistik screen */
+.chart{display:flex;align-items:flex-end;gap:8px;height:170px;padding:14px;border-radius:20px;background:var(--panel);border:1px solid var(--line)}
+.chart__col{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%}
+.chart__col .bar{width:100%;margin-top:auto;border-radius:6px 6px 3px 3px;background:linear-gradient(var(--red2),var(--red));transform:scaleY(0);transform-origin:bottom;transition:transform .7s var(--e)}
+.chart__col.hot .bar{background:linear-gradient(var(--ink),#c9c4bb)}
+.chart__col small{font-size:10px;color:var(--muted)}
+.recap{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-top:14px}
+.recap div{border-radius:16px;padding:15px;background:var(--panel);border:1px solid var(--line)}
+.recap small{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.recap b{display:block;font-family:var(--disp);font-size:30px;margin-top:6px}
+
+/* generic placeholder screen */
+.soon{display:grid;place-items:center;text-align:center;min-height:60vh;gap:14px}
+.soon .seal{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line2);position:relative}
+.soon .seal:before{content:"";position:absolute;inset:9px;border-radius:50%;border:1px solid rgba(221,12,32,.25)}
+.soon .seal b{font-family:var(--disp);font-weight:900;font-size:26px;color:var(--red2)}
+.soon h2{font-family:var(--disp);font-size:34px}.soon p{font-size:13px;color:var(--muted);max-width:240px}
+
+/* bottom dock */
+.dock{position:absolute;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:35;height:66px;
+  border-radius:22px;background:rgba(13,15,20,.72);border:1px solid var(--line2);backdrop-filter:blur(16px);
+  display:flex;align-items:center;justify-content:space-around;box-shadow:0 18px 44px rgba(0,0,0,.5)}
+.dock button{position:relative;width:52px;height:50px;display:grid;place-items:center;color:var(--faint);transition:color .25s}
+.dock button svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform .3s var(--e2)}
+.dock button.active{color:var(--ink)}
+.dock button.active svg{transform:translateY(-2px)}
+.dock button:active svg{transform:scale(.85)}
+.dock__pill{position:absolute;top:8px;width:44px;height:34px;border-radius:12px;background:var(--redsoft);border:1px solid rgba(221,12,32,.3);transition:transform .45s var(--e2);z-index:0}
+.dock button span{position:relative;z-index:1}
+.dock__dot{position:absolute;bottom:9px;left:50%;transform:translateX(-50%) scale(0);width:4px;height:4px;border-radius:50%;background:var(--red2);transition:transform .3s var(--e2)}
+.dock button.active .dock__dot{transform:translateX(-50%) scale(1)}
+
+/* boot / build-up */
+.boot{position:absolute;inset:0;z-index:60;background:var(--bg);display:grid;place-items:center;transition:opacity .6s var(--e),visibility .6s}
+.boot.done{opacity:0;visibility:hidden;pointer-events:none}
+.boot__seal{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line2);position:relative;animation:bootpulse 1.6s var(--e) infinite}
+.boot__seal:before{content:"";position:absolute;inset:-6px;border-radius:50%;border:2px solid transparent;border-top-color:var(--red2);animation:spin 1s linear infinite}
+.boot__seal b{font-family:var(--disp);font-weight:900;font-size:30px;color:var(--ink)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes bootpulse{50%{box-shadow:0 0 30px rgba(221,12,32,.4)}}
+
+/* build-up entrance: elements start hidden, JS deals them in */
+.rise{opacity:0;transform:translateY(16px)}
+.app.booted .rise{opacity:1;transform:none;transition:opacity .6s var(--e),transform .6s var(--e)}
+.app.booted .d1{transition-delay:.05s}.app.booted .d2{transition-delay:.13s}.app.booted .d3{transition-delay:.22s}.app.booted .d4{transition-delay:.31s}.app.booted .d5{transition-delay:.4s}.app.booted .d6{transition-delay:.5s}.app.booted .d7{transition-delay:.6s}
+
+/* screen swap transition */
+.app.swapping .screen.active>*{animation:swapOut .3s var(--e) forwards}
+.screen.entering>*{animation:swapIn .5s var(--e) backwards}
+.screen.entering>:nth-child(2){animation-delay:.04s}.screen.entering>:nth-child(3){animation-delay:.09s}.screen.entering>:nth-child(4){animation-delay:.14s}.screen.entering>:nth-child(5){animation-delay:.19s}.screen.entering>:nth-child(n+6){animation-delay:.24s}
+@keyframes swapOut{to{opacity:0;transform:translateY(-14px) scale(.98);filter:blur(3px)}}
+@keyframes swapIn{from{opacity:0;transform:translateY(22px) scale(.97);filter:blur(4px);clip-path:inset(0 0 100% 0 round 20px)}to{opacity:1;transform:none;filter:none;clip-path:inset(0 0 0 0 round 20px)}}
+
+.toast{position:absolute;left:50%;bottom:96px;z-index:50;transform:translate(-50%,20px);opacity:0;padding:12px 18px;border-radius:999px;background:var(--ink);color:#0a0a0c;font-size:11px;font-weight:700;letter-spacing:.04em;box-shadow:0 14px 40px rgba(0,0,0,.5);transition:.4s var(--e)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition-duration:.001ms!important}.rise{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="stage__side l">FAHREN</div><div class="stage__side r">KREBS</div>
+  <div class="device">
+    <div class="boot" id="boot"><div class="boot__seal"><b>FK</b></div></div>
+    <main class="app" id="app">
+      <div class="status">
+        <span id="clock">08:42</span>
+        <span class="sig"><i></i><i></i><i></i><span class="fk">FK</span></span>
+      </div>
+
+      <!-- ÜBERSICHT -->
+      <section class="screen active" id="s-home">
+        <div class="hd rise d1">
+          <div><small>Guten Morgen</small><h1>Jonas<span>.</span></h1></div>
+          <div class="streak"><span class="fl">🔥</span><div><b id="streak">12</b><small>Tage</small></div></div>
+        </div>
+
+        <div class="tacho rise d2">
+          <svg viewBox="0 0 240 210" id="gauge" aria-label="Prüfungsreife 76 Prozent">
+            <defs><linearGradient id="gg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#7a0718"/><stop offset=".55" stop-color="#dd0c20"/><stop offset="1" stop-color="#ff5560"/></linearGradient></defs>
+            <circle class="track" cx="120" cy="120" r="92"/>
+            <circle class="val" id="gval" cx="120" cy="120" r="92"/>
+            <g id="ticks"></g>
+            <g class="needle" id="needle"><path d="M120 120 L206 117 L206 123 Z" fill="#f4f1ec"/><circle cx="120" cy="120" r="6" fill="#ff2636"/></g>
+          </svg>
+          <div class="tacho__read"><b><span id="gnum">0</span><i>%</i></b><small>Prüfungsreife</small></div>
+          <div class="tacho__hub"><b>FK</b></div>
+        </div>
+        <div class="tacho__ends rise d2"><span>0 · Start</span><span>Prüfung · 100</span></div>
+        <div style="text-align:center"><span class="tacho__delta rise d3"><b>+4 %</b> diese Woche · Ziel 80 %</span></div>
+
+        <div class="lbl rise d3">Heute <b>Di · 14. Mai</b></div>
+        <div class="drive rise d3">
+          <svg class="drive__route" viewBox="0 0 96 64"><path d="M4 56C20 40 26 48 40 30S62 34 72 18 90 8 92 6"/><circle cx="4" cy="56" r="3"/><circle cx="92" cy="6" r="3"/></svg>
+          <div class="drive__top"><span>Nächste Fahrstunde</span><b>17:30</b></div>
+          <h3>Nachtfahrt · Lektion 18</h3>
+          <p>Treffpunkt: Fahrschule Krebs · Petersberger Str.</p>
+          <button class="drive__go" data-toast="Fahrstunde bestätigt · 17:30">Bestätigen →</button>
+        </div>
+
+        <div class="lbl rise d4">Ausbildungsstand</div>
+        <div class="bento">
+          <div class="tile wide rise d4"><div><small>Theorie</small><b>11<i> / 14 Einheiten</i></b><div class="tile__bar"><i data-w="78"></i></div></div>
+            <div class="tile__spark" data-spark="40,55,48,70,62,80,74"></div></div>
+          <div class="tile rise d5"><small>Praxis</small><b>18<i> / 25</i></b><div class="tile__bar"><i data-w="72"></i></div></div>
+          <div class="tile rise d5"><small>Sonderfahrten</small><b>08<i> / 12</i></b><div class="tile__bar"><i data-w="66"></i></div></div>
+          <div class="tile rise d6"><small>Theoriefragen</small><b>843<i> gelernt</i></b><div class="tile__bar"><i data-w="88"></i></div></div>
+          <div class="tile rise d6"><small>Serie</small><b>12<i> Tage</i> <span class="flame">🔥</span></b><div class="tile__bar"><i data-w="60"></i></div></div>
+        </div>
+
+        <div class="lbl rise d6">Lernspur · letzte Fahrt</div>
+        <div class="spur rise d6">
+          <div class="spur__pt ok"><div class="dot"></div><strong>96%</strong><small>Blickführung</small></div>
+          <div class="spur__pt ok"><div class="dot"></div><strong>92%</strong><small>Bremsen</small></div>
+          <div class="spur__pt grade"><div class="dot"></div><strong>A−</strong><small>Note</small></div>
+        </div>
+
+        <div class="lbl rise d7">Tagesziele <b id="goalcount">1 / 3</b></div>
+        <div class="goals rise d7">
+          <button class="goal done" data-goal><span class="ck"><svg viewBox="0 0 20 20"><path d="M4 10l4 4 8-9"/></svg></span><span>15 Theoriefragen üben</span><span class="pts">+15</span></button>
+          <button class="goal" data-goal><span class="ck"><svg viewBox="0 0 20 20"><path d="M4 10l4 4 8-9"/></svg></span><span>Kapitel „Vorfahrt" wiederholen</span><span class="pts">+20</span></button>
+          <button class="goal" data-goal><span class="ck"><svg viewBox="0 0 20 20"><path d="M4 10l4 4 8-9"/></svg></span><span>Fahrstunde vorbereiten</span><span class="pts">+10</span></button>
+        </div>
+      </section>
+
+      <!-- STATISTIK -->
+      <section class="screen" id="s-stats">
+        <div class="lbl">Fahrstunden · pro Woche</div>
+        <div class="chart" id="chart">
+          <div class="chart__col"><div class="bar" data-h="40"></div><small>KW18</small></div>
+          <div class="chart__col"><div class="bar" data-h="62"></div><small>19</small></div>
+          <div class="chart__col"><div class="bar" data-h="50"></div><small>20</small></div>
+          <div class="chart__col"><div class="bar" data-h="78"></div><small>21</small></div>
+          <div class="chart__col hot"><div class="bar" data-h="94"></div><small>22</small></div>
+        </div>
+        <div class="lbl">Bilanz</div>
+        <div class="recap">
+          <div><small>Ø Bewertung</small><b>A−</b></div>
+          <div><small>Fahrstunden</small><b>18</b></div>
+          <div><small>Km gefahren</small><b>312</b></div>
+          <div><small>Prüfungsreife</small><b style="color:var(--red2)">76%</b></div>
+        </div>
+        <div class="lbl">Prognose</div>
+        <div class="drive" style="background:linear-gradient(135deg,rgba(103,224,163,.18),var(--panel));border-color:rgba(103,224,163,.28)">
+          <div class="drive__top"><span style="color:var(--green)">Prüfungsempfehlung</span><b>≈ 3 Wochen</b></div>
+          <h3>Auf Kurs zur Prüfung</h3><p>Bei gleichem Tempo erreichst du 100 % Prüfungsreife bis KW 25.</p>
+        </div>
+      </section>
+
+      <!-- KALENDER / PROFIL placeholder -->
+      <section class="screen" id="s-cal"><div class="soon"><div class="seal"><b>FK</b></div><h2>KALENDER</h2><p>Deine Termine & Buchungen erscheinen hier – live mit dem Fahrschulbüro synchronisiert.</p></div></section>
+      <section class="screen" id="s-prof"><div class="soon"><div class="seal"><b>FK</b></div><h2>PROFIL</h2><p>Führerscheinklasse B · BF17 · Ausbildungsvertrag & Dokumente.</p></div></section>
+    </main>
+
+    <nav class="dock" id="dock">
+      <div class="dock__pill" id="pill"></div>
+      <button class="active" data-screen="s-home" aria-label="Übersicht"><span class="dock__dot"></span><span><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/><path d="M9 20v-6h6v6"/></svg></span></button>
+      <button data-screen="s-stats" aria-label="Statistik"><span class="dock__dot"></span><span><svg viewBox="0 0 24 24"><path d="M5 20V9M12 20V4M19 20v-7"/></svg></span></button>
+      <button data-screen="s-cal" aria-label="Kalender"><span class="dock__dot"></span><span><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></span></button>
+      <button data-screen="s-prof" aria-label="Profil"><span class="dock__dot"></span><span><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21c.8-4 3-6 7-6s6.2 2 7 6"/></svg></span></button>
+    </nav>
+    <div class="toast" id="toast">OK</div>
+  </div>
+</div>
+
+<script>
+(()=>{
+'use strict';
+const $=(s,p=document)=>p.querySelector(s),$$=(s,p=document)=>[...p.querySelectorAll(s)];
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t;
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const app=$('#app');
+
+/* clock */
+const clk=$('#clock');function tick(){const d=new Date();clk.textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}tick();setInterval(tick,10000);
+
+/* gauge geometry: 270° arc, opening at bottom, start 135° */
+const R=92,C=2*Math.PI*R,SWEEP=.75;/* 270/360 */
+const gval=$('#gval');gval.style.transform='rotate(135deg)';gval.style.transformOrigin='120px 120px';
+gval.style.strokeDasharray=`0 ${C}`;
+$('.track').style.transform='rotate(135deg)';$('.track').style.transformOrigin='120px 120px';
+$('.track').style.strokeDasharray=`${SWEEP*C} ${C}`;
+/* ticks */
+const tg=$('#ticks');for(let i=0;i<=10;i++){const f=i/10,a=(135+f*270)*Math.PI/180,maj=i%5===0;const r1=maj?76:80,r2=72;
+  const x1=120+Math.cos(a)*r1,y1=120+Math.sin(a)*r1,x2=120+Math.cos(a)*r2,y2=120+Math.sin(a)*r2;
+  const l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);l.setAttribute('class','tick'+(maj?' maj':''));tg.appendChild(l);}
+const needle=$('#needle'),gnum=$('#gnum');
+function setGauge(f){f=clamp(f);gval.style.strokeDasharray=`${f*SWEEP*C} ${C}`;needle.style.transform=`rotate(${135+f*270}deg)`;needle.style.transformOrigin='120px 120px';gnum.textContent=Math.round(f*100)}
+needle.style.transformOrigin='120px 120px';setGauge(0);
+
+/* animate a value 0->target with easing */
+function animate(dur,cb,done){const t0=performance.now();(function fr(now){const p=clamp((now-t0)/dur),e=1-Math.pow(1-p,3);cb(e);p<1?requestAnimationFrame(fr):done&&done()})(t0)}
+
+/* build-up boot sequence */
+function boot(){
+  app.classList.add('booted');
+  if(reduced){setGauge(.76);gnum.textContent='76';fillBars();$('#boot').classList.add('done');return}
+  setTimeout(()=>$('#boot').classList.add('done'),650);
+  setTimeout(()=>animate(1400,e=>setGauge(.76*e)),700);
+  setTimeout(fillBars,900);
+}
+function fillBars(){$$('.tile__bar i').forEach((b,i)=>setTimeout(()=>b.style.width=b.dataset.w+'%',i*70));
+  $$('.tile__spark').forEach(sp=>{sp.dataset.spark.split(',').forEach(v=>{const i=document.createElement('i');i.style.height='100%';sp.appendChild(i);requestAnimationFrame(()=>i.style.transform=`scaleY(${(+v)/100})`)})});}
+addEventListener('load',()=>setTimeout(boot,180),{once:true});
+setTimeout(()=>{if(!app.classList.contains('booted'))boot()},1500);
+
+/* goals */
+const goalcount=$('#goalcount');function refreshGoals(){const done=$$('.goal.done').length,tot=$$('.goal').length;goalcount.textContent=done+' / '+tot}
+$$('[data-goal]').forEach(g=>g.addEventListener('click',()=>{g.classList.toggle('done');refreshGoals();if(navigator.vibrate)navigator.vibrate(12);
+  if($$('.goal.done').length===$$('.goal').length)showToast('Alle Tagesziele geschafft! 🎯')}));
+
+/* chart bars animate when stats first shown */
+let chartDone=false;function fillChart(){if(chartDone)return;chartDone=true;$$('#chart .bar').forEach((b,i)=>setTimeout(()=>b.style.transform=`scaleY(${b.dataset.h/100})`,i*80))}
+
+/* screen swap with wild transition + dock pill */
+const dock=$('#dock'),pill=$('#pill'),btns=$$('.dock button');
+function movePill(btn){const r=btn.getBoundingClientRect(),dr=dock.getBoundingClientRect();pill.style.transform=`translateX(${r.left-dr.left+ (r.width-44)/2 - (pill.offsetLeft)}px)`}
+function positionPill(btn){const idx=btns.indexOf(btn);const dr=dock.getBoundingClientRect();const r=btn.getBoundingClientRect();pill.style.left='0px';pill.style.transform=`translateX(${r.left-dr.left+(r.width-44)/2}px)`}
+let cur=$('#s-home');
+function go(id,btn){const next=$('#'+id);if(next===cur)return;
+  app.classList.add('swapping');
+  positionPill(btn);btns.forEach(b=>b.classList.toggle('active',b===btn));
+  setTimeout(()=>{
+    cur.classList.remove('active');app.classList.remove('swapping');
+    next.classList.add('active','entering');cur=next;app.scrollTop=0;
+    if(id==='s-stats')fillChart();
+    setTimeout(()=>next.classList.remove('entering'),600);
+  },300);
+}
+btns.forEach(b=>b.addEventListener('click',()=>go(b.dataset.screen,b)));
+addEventListener('load',()=>requestAnimationFrame(()=>positionPill(btns[0])));
+addEventListener('resize',()=>positionPill($('.dock button.active')));
+
+/* toast */
+const toast=$('#toast');let tT;function showToast(t){toast.textContent=t;toast.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>toast.classList.remove('show'),2400)}
+$$('[data-toast]').forEach(b=>b.addEventListener('click',()=>{showToast(b.dataset.toast);if(navigator.vibrate)navigator.vibrate(10)}));
+
+/* subtle live needle jitter after boot */
+let jitter=0;function idle(){jitter+=.03;const base=.76;if(app.classList.contains('booted')&&$('#s-home').classList.contains('active')&&!reduced){setGauge(base+Math.sin(jitter)*.006)}requestAnimationFrame(idle)}
+setTimeout(idle,2300);
+})();
+</script>
+</body>
+</html>
