@@ -107,9 +107,14 @@ a{text-decoration:none}
 .sec-desc{font-size:15px;line-height:1.7;color:var(--muted);margin-top:20px;max-width:560px}
 
 /* reveal on scroll (morph out) */
-.rv{opacity:0;transform:translateY(30px) scale(.97);transition:opacity .7s var(--ease),transform .7s var(--ease)}
+/* distinctive reveals — 3D hinge (not a flat fade-up); titles wipe, kickers slice */
+.rv{opacity:0;transform:perspective(1000px) translateY(28px) rotateX(-13deg);transform-origin:50% 0;transition:opacity .7s var(--ease),transform .9s var(--ease);will-change:transform,opacity}
 .rv.in{opacity:1;transform:none}
-.rv-2{transition-delay:.08s}.rv-3{transition-delay:.16s}.rv-4{transition-delay:.24s}.rv-5{transition-delay:.32s}.rv-6{transition-delay:.40s}.rv-7{transition-delay:.48s}
+.sec-title.rv{transform:none;clip-path:inset(0 100% 0 0);transition:clip-path 1.05s var(--ease),opacity .5s var(--ease)}
+.sec-title.rv.in{clip-path:inset(0 -8% 0 0)}
+.sec-kicker.rv,.hero__kicker.rv{transform:none;clip-path:inset(0 0 0 105%);transition:clip-path .8s var(--ease),opacity .4s}
+.sec-kicker.rv.in,.hero__kicker.rv.in{clip-path:inset(0 0 0 -12%)}
+.rv-2{transition-delay:.09s}.rv-3{transition-delay:.18s}.rv-4{transition-delay:.27s}.rv-5{transition-delay:.36s}.rv-6{transition-delay:.45s}.rv-7{transition-delay:.54s}
 
 /* Classes */
 .class-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
@@ -223,6 +228,9 @@ a{text-decoration:none}
 }
 @media(max-width:640px){
   .class-grid,.digi-grid,.spec-grid,.sim-list{grid-template-columns:1fr}
+  /* grid items default to min-width:auto and can overflow — force them to shrink so chips wrap */
+  .class-card,.digi-card,.spec-card,.sim-item,.cmp{min-width:0}
+  .class-card__head{flex-wrap:wrap;gap:6px}
   .cmp-head b{font-size:24px}.cmp-input input{width:110px}
   .hero{height:300vh}
   .pcalc{grid-template-columns:1fr}.cgrid{grid-template-columns:1fr}.ptable{min-width:640px}.modal__card{padding:22px 16px;overflow-x:auto}
@@ -475,7 +483,7 @@ function buildEmblem(){
   buildShards();
 }
 function buildShards(){
-  shards=[];const cx=EM/2,cy=EM/2, bw=452,bh=452, ox=cx-bw/2,oy=cy-bh/2, cols=10,rows=10;
+  shards=[];const small=innerWidth<760;const cx=EM/2,cy=EM/2, bw=452,bh=452, ox=cx-bw/2,oy=cy-bh/2, cols=small?7:10,rows=small?7:10;
   const pts=[];
   for(let r=0;r<=rows;r++)for(let c=0;c<=cols;c++){
     let px=ox+bw*c/cols, py=oy+bh*r/rows;
