@@ -2379,7 +2379,40 @@ function klasseContinue(){
     state=buildDefaultState(code,besitz); saveState();
     haptic('confirm'); nav('cockpit');
     setTimeout(()=>toast('ok','Willkommen, '+esc(firstName(p.name))+'!','Dein Cockpit für Klasse '+code+' ('+besitzLabel(besitz)+') ist bereit.'),400);
+    setTimeout(()=>openMorph(null,onboardAvailSheetHTML()),900);
   }
+}
+
+/* ---------- Onboarding: „Wann hast du typisch Zeit?" (einmalig, seedet alle 6 Wochen) ---------- */
+let onboardTypical={};
+function onboardAvailSheetHTML(){
+  onboardTypical={};
+  let grid=`<div class="avail-corner"></div>`+DAYS.map(d=>`<div class="avail-day">${d.l}</div>`).join('');
+  PERIODS.forEach(p=>{
+    grid+=`<div class="avail-plab">${ic(p.icon)}${p.l}</div>`;
+    DAYS.forEach(d=>{ const plan=FL_PLAN[d.k]&&FL_PLAN[d.k][p.k]; grid+=`<div class="avail-cell ${plan?'plan':''}" data-action="onb-avail" data-d="${d.k}" data-p="${p.k}" role="button" tabindex="0" aria-label="${d.l} ${p.l}">${ic('check')}</div>`; });
+  });
+  return `<div class="mo-num">${ic('calendar-clock')}</div><div class="sheet-eyebrow">Terminplanung</div><div class="sheet-title">Wann hast du typisch Zeit?</div><div class="sheet-sub">Markiere dein übliches Wochenmuster – wir übernehmen es für die kommenden 6 Wochen, damit die KI schneller passende Fahrstunden findet. Du kannst später jede Woche einzeln anpassen.</div>
+    <div class="avail-wrap"><div class="avail-grid">${grid}</div></div>
+    <div class="avail-legend"><span class="lg"><span class="sw you"></span>Deine Zeit</span><span class="lg"><span class="sw fl"></span>${FL_NAME} verfügbar</span></div>
+    <button class="btn btn-primary match-btn" data-action="onb-avail-save">${ic('check')}Übernehmen</button>
+    <button class="btn btn-ghost" data-action="onb-avail-skip" style="margin-top:8px">Später festlegen</button>`;
+}
+function toggleOnbAvail(cell){
+  const d=cell.getAttribute('data-d'), p=cell.getAttribute('data-p');
+  if(!onboardTypical[d]) onboardTypical[d]={};
+  onboardTypical[d][p]=!onboardTypical[d][p];
+  cell.classList.toggle('on',!!onboardTypical[d][p]);
+  if('vibrate' in navigator) navigator.vibrate(8);
+}
+function saveOnboardAvail(btnEl){
+  const any=Object.keys(onboardTypical).some(d=>Object.values(onboardTypical[d]).some(Boolean));
+  if(!any){ haptic('block'); toast('info','Noch keine Zeiten markiert','Tippe dein übliches Wochenmuster an, oder wähle „Später festlegen".'); return; }
+  if(!state.verfWeeks) state.verfWeeks={};
+  for(let i=0;i<6;i++) state.verfWeeks[i]=JSON.parse(JSON.stringify(onboardTypical));
+  state.verfuegbarkeit=state.verfWeeks[0];
+  saveState(); haptic('confirm'); pulseFrom(btnEl,true); closeMorph();
+  toast('ok','Verfügbarkeit gespeichert','Für die kommenden 6 Wochen vorgemerkt – so findet die KI schneller passende Termine.');
 }
 
 /* ============================================================
@@ -3012,6 +3045,9 @@ document.addEventListener('click',e=>{
     case 'exam-pass': passExam(trg); break;
     case 'avail': toggleAvail(trg); break;
     case 'verf-week': pickVerfWeek(trg); break;
+    case 'onb-avail': toggleOnbAvail(trg); break;
+    case 'onb-avail-save': saveOnboardAvail(trg); break;
+    case 'onb-avail-skip': closeMorph(); break;
     case 'request-lesson': requestLesson(trg); break;
     case 'focus-hot': focusHotspot(parseInt(trg.getAttribute('data-idx'),10)); break;
     case 'ready-go': readyGo(trg); break;
