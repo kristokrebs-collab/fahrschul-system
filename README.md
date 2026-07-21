@@ -21,6 +21,10 @@ Der Server zeigt dann die drei Adressen an:
 - **Zentrale (PC/Tablet):** `http://localhost:8000/dashboard.html` – Zugangscode `1234`
 - **Schüler-App (Handy im gleichen WLAN):** `http://<IP-des-PCs>:8000/app.html`
 - **Fahrlehrer-App (Handy):** `http://<IP-des-PCs>:8000/fahrlehrer.html`
+- **Zentrale als React-Variante (Variante 2):**
+  `http://localhost:8000/react-zentrale/dist/index.html` – gleicher
+  Live-Sync, gleiches Designsystem, komplett neu in React gebaut
+  (Quellcode in `react-zentrale/`, ändern mit `npm install && npm run build`)
 
 Ohne Server funktioniert die Zentrale auch per Doppelklick – die Schüler-App
 öffnet sich dann über den Button „Schüler-App" direkt in der Zentrale.
