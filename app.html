@@ -1798,6 +1798,7 @@ function buildHistory(cfg,seed,sessions){
   theorie.sort((a,b)=>new Date(b.date)-new Date(a.date));
   return {fahr,theorie};
 }
+function fkPid(){return 'p-'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 function buildDefaultState(klasse,besitz){
   const cfg=CLASS_CONFIG[klasse]||CLASS_CONFIG.B;
   besitz=besitz||defaultBesitz(klasse);
@@ -1825,8 +1826,8 @@ function buildDefaultState(klasse,besitz){
     fahrstil:{vorausschauend:4,kupplung:3,parken:4},
     dokumente:{ sehtest:{status:'ausstehend',thumb:null}, ersteHilfe:{status:'ausstehend',thumb:null}, passbild:{status:'ausstehend',thumb:null} },
     finanzen:{posten:[
-      {label:'Grundbetrag (Restzahlung)',betrag:60},
-      {label:'Fahrstunden '+prevMonthName()+' (2 × 90 min)',betrag:80}
+      {id:fkPid(),label:'Grundbetrag (Restzahlung)',betrag:60},
+      {id:fkPid(),label:'Fahrstunden '+prevMonthName()+' (2 × 90 min)',betrag:80}
     ]},
     theoriePruefung:{erforderlich:cfg.theoriePruefung,bestanden:false,angemeldet:false,terminId:null,datum:null,ort:null,time:null},
     fahrlehrerGo:false, /* wird vom Fahrlehrer erteilt, wenn alle Mindestfahrten erreicht sind */
@@ -2895,7 +2896,7 @@ function confirmSim(btnEl){
   /* Bestätigung an die Fahrschule + automatische Rechnung */
   state.simBuchungen=state.simBuchungen||[];
   state.simBuchungen.push({label:slot.day+' · '+slot.time+' Uhr',ts:new Date().toISOString()});
-  state.finanzen.posten.push({label:'Simulator-Einheit '+slot.day+' '+slot.time,betrag:39});
+  state.finanzen.posten.push({id:fkPid(),label:'Simulator-Einheit '+slot.day+' '+slot.time,betrag:39});
   saveState(); haptic('confirm'); pulseFrom(btnEl); closeMorph(); updateSimCount();
   toast('ok','Simulator angefragt',`${slot.day} · ${slot.time} Uhr – Bestätigung an die Fahrschule, Rechnung (39 €) erstellt.`); simSelected=null;
 }
@@ -3081,35 +3082,39 @@ document.addEventListener('DOMContentLoaded',()=>{
     clientId='c'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
     try{ localStorage.setItem(SYNC_ID_KEY,clientId); }catch(e){}
   }
-  let lastPushedSig=null, lastAdminTs=0;
-  function syncSig(){ return (Store.get(PROFILE_KEY)||'')+''+(Store.get(STATE_KEY)||''); }
+  let lastPushedSig=null, lastRev=-1, pushInFlight=false;
+  function syncSig(){ return (Store.get(PROFILE_KEY)||'')+''+(Store.get(STATE_KEY)||''); }
   function netPush(force){
     if(!canNet) return;
     const sig=syncSig();
     if(!force&&sig===lastPushedSig) return;
     lastPushedSig=sig;
+    pushInFlight=true;
     try{
       fetch('sync/push',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({id:clientId,profile:Store.get(PROFILE_KEY),state:Store.get(STATE_KEY),ts:Date.now()})
-      }).catch(()=>{});
-    }catch(e){}
+      }).then(r=>r.ok?r.json():null).then(j=>{
+        if(j&&j.rev!=null) lastRev=j.rev;
+      }).catch(()=>{}).finally(()=>{pushInFlight=false;});
+    }catch(e){pushInFlight=false;}
   }
   function netPull(){
     if(!canNet) return;
+    if(pushInFlight||syncSig()!==lastPushedSig) return;
     try{
       fetch('sync/pull?id='+encodeURIComponent(clientId),{cache:'no-store'})
         .then(r=>r.ok?r.json():null)
         .then(d=>{
-          if(!d||d.src!=='admin'||!(d.ts>lastAdminTs)||typeof d.state!=='string'||!d.state) return;
-          lastAdminTs=d.ts;
+          if(!d||typeof d.state!=='string'||!d.state||d.rev==null||!(d.rev>lastRev)) return;
+          lastRev=d.rev;
           applying=true;
           try{ Store.set(STATE_KEY,d.state); }finally{ applying=false; }
-          lastPushedSig=syncSig(); /* übernommenen Stand nicht zurück-echoen */
+          lastPushedSig=syncSig();
           applyExternal();
         }).catch(()=>{});
     }catch(e){}
   }
-  if(canNet){ netPush(true); setInterval(()=>{ netPull(); netPush(); },3000); }
+  if(canNet){ netPush(true); setInterval(()=>{ netPull(); netPush(); },2000); }
 
   /* Eigene Speicherungen an die Zentrale melden */
   const origSave=window.saveState;

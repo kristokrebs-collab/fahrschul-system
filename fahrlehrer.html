@@ -304,13 +304,32 @@ async function pull(){
   }catch(e){ if(online){online=false;render();} }
 }
 async function pushStudent(key,st){
-  netData[key]=netData[key]||{};
-  netData[key].state=JSON.stringify(st);
-  netData[key].src='admin'; netData[key].ts=Date.now();
-  try{
-    await fetch('sync/admin',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({id:key,state:netData[key].state,ts:netData[key].ts})});
-  }catch(e){toast('Server nicht erreichbar');}
+  /* Direktes Schreiben (ohne Mutator) – für Kompatibilität; nutzt CAS-Loop */
+  return casWriteFl(key,cur=>{ for(const k in cur) delete cur[k]; Object.assign(cur,st); });
+}
+/* Konfliktfreier Fahrlehrer-Schreibvorgang mit Revisions-Wiederholung. */
+async function casWriteFl(key,mut){
+  for(let attempt=0;attempt<6;attempt++){
+    const rec=netData[key]; if(!rec){toast('Schüler nicht erreichbar');return;}
+    let st; try{st=JSON.parse(rec.state||'null');}catch(e){return;}
+    if(!st) return;
+    mut(st);
+    const raw=JSON.stringify(st);
+    const baseRev=rec.rev||0;
+    rec.state=raw; rec.src='admin'; rec.ts=Date.now();
+    try{
+      const r=await fetch('sync/admin',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:key,state:raw,ts:rec.ts,baseRev})});
+      if(r.status===409){
+        const j=await r.json().catch(()=>null);
+        if(j&&typeof j.state==='string'){ rec.state=j.state; rec.rev=j.rev; }
+        continue;
+      }
+      const j=await r.json().catch(()=>null);
+      if(j&&j.rev!=null) rec.rev=j.rev;
+      return;
+    }catch(e){ toast('Server nicht erreichbar'); return; }
+  }
 }
 async function pushAbsent(){
   try{
@@ -387,42 +406,43 @@ function minReached(st){
 function grantGo(key){
   const s=parseStudents().find(x=>x.key===key); if(!s)return;
   if(!minReached(s.st)){toast('Mindestfahrten noch nicht erreicht');return;}
-  s.st.fahrlehrerGo=true;
-  if(s.st.history&&Array.isArray(s.st.history.fahr))
-    s.st.history.fahr.unshift({type:'uebung',date:new Date().toISOString(),minutes:0,focus:'Prüfungs-GO erteilt von '+me.name});
-  pushStudent(key,s.st);
+  casWriteFl(key,st=>{
+    if(!minReached(st))return;
+    st.fahrlehrerGo=true;
+    if(st.history&&Array.isArray(st.history.fahr))
+      st.history.fahr.unshift({type:'uebung',date:new Date().toISOString(),minutes:0,focus:'Prüfungs-GO erteilt von '+me.name});
+  });
   toast('Prüfungs-GO für '+s.name+' erteilt!');
   render();
 }
 function confirmRide(key,mode,ratings){
   const s=parseStudents().find(x=>x.key===key); if(!s||!s.st.naechsteFahrstunde)return;
-  const st=s.st, when=st.naechsteFahrstunde;
+  const when=s.st.naechsteFahrstunde;
+  const t=selType[key]||nextRideType(s.st);
+  let goNow=false;
   if(mode==='done'){
-    const t=selType[key]||nextRideType(st);
-    /* Fahrstil-Telemetrie des Schülers aktualisieren (Karte in der Schüler-App) */
-    if(ratings){
-      st.fahrstil=st.fahrstil||{};
-      st.fahrstil.vorausschauend=ratings.bremsen;
-      st.fahrstil.kupplung=ratings.kurven;
-      st.fahrstil.parken=ratings.beschleunigung;
-    }
-    if(t==='uebung'){ st.uebungsstunden=(st.uebungsstunden||0)+2; }
-    else if(st.sonderfahrten&&st.sonderfahrten[t]){ st.sonderfahrten[t].ist=Math.min(st.sonderfahrten[t].soll,st.sonderfahrten[t].ist+2); }
-    if(st.history&&Array.isArray(st.history.fahr))
-      st.history.fahr.unshift({type:t,date:when,minutes:90,focus:RIDE_TYPES[t].label+' – bestätigt von '+me.name+' · abgerechnet'});
-    st.naechsteFahrstunde=null;
-    /* Letzte Mindestfahrt erreicht? -> Prüfungs-GO automatisch erteilen */
-    let goNow=false;
-    if(minReached(st)&&!st.fahrlehrerGo){
-      st.fahrlehrerGo=true; goNow=true;
+    casWriteFl(key,st=>{
+      if(st.naechsteFahrstunde!==when) return; /* Termin wurde inzwischen geändert – nichts tun */
+      if(ratings){
+        st.fahrstil=st.fahrstil||{};
+        st.fahrstil.vorausschauend=ratings.bremsen;
+        st.fahrstil.kupplung=ratings.kurven;
+        st.fahrstil.parken=ratings.beschleunigung;
+      }
+      if(t==='uebung'){ st.uebungsstunden=(st.uebungsstunden||0)+2; }
+      else if(st.sonderfahrten&&st.sonderfahrten[t]){ st.sonderfahrten[t].ist=Math.min(st.sonderfahrten[t].soll,st.sonderfahrten[t].ist+2); }
       if(st.history&&Array.isArray(st.history.fahr))
-        st.history.fahr.unshift({type:'uebung',date:new Date().toISOString(),minutes:0,focus:'Prüfungs-GO erteilt von '+me.name+' – alle Mindestfahrten erreicht'});
-    }
-    pushStudent(key,st);
+        st.history.fahr.unshift({type:t,date:when,minutes:90,focus:RIDE_TYPES[t].label+' – bestätigt von '+me.name+' · abgerechnet'});
+      st.naechsteFahrstunde=null;
+      if(minReached(st)&&!st.fahrlehrerGo){
+        st.fahrlehrerGo=true; goNow=true;
+        if(st.history&&Array.isArray(st.history.fahr))
+          st.history.fahr.unshift({type:'uebung',date:new Date().toISOString(),minutes:0,focus:'Prüfungs-GO erteilt von '+me.name+' – alle Mindestfahrten erreicht'});
+      }
+    });
     toast(goNow?'Alle Mindestfahrten erreicht – PRÜFUNGS-GO erteilt!':RIDE_TYPES[t].label+' bestätigt & abgerechnet');
   } else {
-    st.naechsteFahrstunde=null;
-    pushStudent(key,st);
+    casWriteFl(key,st=>{ if(st.naechsteFahrstunde===when) st.naechsteFahrstunde=null; });
     toast('Fahrstunde als ausgefallen vermerkt');
   }
   delete selType[key];

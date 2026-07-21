@@ -1003,27 +1003,50 @@ function liveStateOf(s){
 }
 /* Änderungen der Zentrale am Live-Schüler zurück in den App-State schreiben */
 function writeLiveFor(s,mut){
-  const st=liveStateOf(s); if(!st) return false;
-  mut(st);
-  const raw=JSON.stringify(st);
   const nk=netKey(s.id);
-  if(nk){ /* über den Server an das Gerät des Schülers */
-    const rec=netStudents[nk]; if(!rec) return false;
-    rec.state=raw; rec.src='admin'; rec.ts=Date.now();
-    try{
-      fetch('sync/admin',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({id:nk,state:raw,ts:rec.ts})}).catch(()=>{});
-    }catch(e){}
-    rememberSnapshotFor(s.id,rec.profile,raw);
+  if(nk){ /* über den Server an das Gerät des Schülers – mit CAS-Wiederholung */
+    if(!netStudents[nk]) return false;
+    casWriteNet(nk,mut,s);
     return true;
   }
   /* lokal (gleicher Browser / eingebettete App) */
+  const st=liveStateOf(s); if(!st) return false;
+  mut(st);
+  const raw=JSON.stringify(st);
   try{localStorage.setItem(STATE_KEY,raw);}catch(e){return false;}
   try{if(bc)bc.postMessage({src:'admin',key:STATE_KEY});}catch(e){}
   try{localStorage.setItem('fk_sync_ping',String(Date.now()));}catch(e){}
   pushToApp(raw); /* eingebettete App direkt beliefern (postMessage-Brücke) */
   rememberAppSnapshot(); /* eigene Änderung nicht als App-Ereignis melden */
   return true;
+}
+/* Konfliktfreier Büro-Schreibvorgang: mutiert den frischesten Stand,
+   sendet mit baseRev; bei 409 (paralleler Schreibvorgang) frischen Stand
+   holen und die Mutation erneut anwenden – kein Update geht verloren. */
+async function casWriteNet(nk,mut,s){
+  for(let attempt=0;attempt<6;attempt++){
+    const rec=netStudents[nk]; if(!rec) return;
+    let st; try{st=JSON.parse(rec.state||'null');}catch(e){return;}
+    if(!st) return;
+    mut(st);
+    const raw=JSON.stringify(st);
+    const baseRev=rec.rev||0;
+    /* optimistisch lokal spiegeln */
+    rec.state=raw; rec.src='admin'; rec.ts=Date.now();
+    rememberSnapshotFor(s.id,rec.profile,raw);
+    try{
+      const r=await fetch('sync/admin',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({id:nk,state:raw,ts:rec.ts,baseRev})});
+      if(r.status===409){
+        const j=await r.json().catch(()=>null);
+        if(j&&typeof j.state==='string'){ rec.state=j.state; rec.rev=j.rev; }
+        continue; /* auf frischem Stand erneut versuchen */
+      }
+      const j=await r.json().catch(()=>null);
+      if(j&&j.rev!=null) rec.rev=j.rev;
+      return;
+    }catch(e){ return; }
+  }
 }
 
 /* ── postMessage-Brücke zur eingebetteten Schüler-App ──
@@ -1750,8 +1773,9 @@ function addItem(id){
   const label=(document.getElementById('finLabel').value||'').trim();
   const betrag=parseFloat(document.getElementById('finBetrag').value);
   if(!label||!(betrag>0)){toast('Bezeichnung und Betrag angeben');return;}
-  if(s.live) writeLiveFor(s,st=>{st.finanzen.posten.push({label,betrag});});
-  else {s.finanzen.posten.push({label,betrag}); persist(s);}
+  const pid='p-'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  if(s.live) writeLiveFor(s,st=>{st.finanzen.posten.push({id:pid,label,betrag});});
+  else {s.finanzen.posten.push({id:pid,label,betrag}); persist(s);}
   toast('Posten hinzugefügt');
   render();
 }
