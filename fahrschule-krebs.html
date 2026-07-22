@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0b0d">
+<title>Fahrschule Krebs · Verkehrsbildungszentrum – Fulda & Bad Hersfeld</title>
+<meta name="description" content="Fahrschule Krebs – alle Führerscheinklassen an zwei Standorten (Fulda & Bad Hersfeld), persönlich begleitet und digital organisiert: von B & BF17 über Motorrad bis C/CE, Bus, BKF und Handicap.">
+<meta property="og:title" content="Fahrschule Krebs · Verkehrsbildungszentrum">
+<meta property="og:description" content="Alle Klassen. Zwei Standorte. Ein digitaler Weg.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Saira+Condensed:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0b0d;--bg2:#0f1114;--panel:#14161b;--panel2:#191c22;
+  --ink:#f5f2ec;--muted:#9c988f;--faint:#63605a;--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.17);
+  --red:#d81e28;--red2:#ff3b46;--redsoft:rgba(216,30,40,.13);--gold:#f4c400;--green:#5fd39a;--cool:#7fb0ff;
+  --disp:"Saira Condensed","Arial Narrow",Arial,sans-serif;--sans:Inter,system-ui,Arial,sans-serif;
+  --e:cubic-bezier(.22,1,.36,1);--e2:cubic-bezier(.34,1.4,.5,1);
+  --pad:clamp(20px,5vw,56px);--maxw:1200px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:auto;-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:clip}
+html{overflow-x:clip}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer}
+img{max-width:100%;display:block}
+::selection{background:var(--red);color:#fff}
+:focus-visible{outline:2px solid var(--red2);outline-offset:3px}
+h1,h2,h3{font-family:var(--disp);font-weight:800;line-height:.92;letter-spacing:-.01em;text-transform:uppercase}
+.wrap{max-width:var(--maxw);margin:0 auto;padding-inline:var(--pad)}
+.skip{position:absolute;left:-999px;top:0;z-index:200;background:var(--ink);color:#000;padding:10px 16px;border-radius:0 0 8px 0}
+.skip:focus{left:0}
+
+/* ── brand wordmark (reproduced logo) ── */
+.logo{display:inline-flex;align-items:center;gap:10px;line-height:1}
+.logo__k{font-family:var(--disp);font-weight:900;font-size:26px;letter-spacing:-.01em;color:var(--red)}
+.logo__flag{width:8px;height:26px;border-radius:1px;background:linear-gradient(var(--ink) 0 33%,var(--red) 33% 66%,var(--gold) 66% 100%);box-shadow:0 0 0 1px rgba(0,0,0,.3)}
+.logo__sub{display:flex;flex-direction:column;gap:1px}
+.logo__sub span{font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.26em;color:var(--muted)}
+.logo__sub b{font-family:var(--disp);font-weight:800;font-size:11.5px;letter-spacing:.02em;color:var(--ink);white-space:nowrap}
+@media(max-width:1160px){.logo__sub{display:none}}
+@media(max-width:480px){.logo__k{font-size:23px}}
+
+/* ── header ── */
+.head{position:fixed;inset:0 0 auto;z-index:90;height:72px;display:flex;align-items:center;transition:background .35s,border-color .35s,backdrop-filter .35s;border-bottom:1px solid transparent}
+.head.scrolled{background:rgba(10,11,13,.82);border-color:var(--line);backdrop-filter:blur(14px)}
+.head .wrap{display:flex;align-items:center;justify-content:space-between;width:100%}
+.nav{display:flex;align-items:center;gap:26px}
+.nav a{font-size:12.5px;font-weight:600;color:var(--muted);position:relative;transition:color .2s;padding:6px 0;white-space:nowrap}
+.nav a:after{content:"";position:absolute;left:0;right:100%;bottom:0;height:2px;background:var(--red);border-radius:2px;transition:right .3s var(--e)}
+.nav a:hover,.nav a.on{color:var(--ink)}.nav a:hover:after,.nav a.on:after{right:0}
+.head__cta{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;background:var(--red);color:#fff;font-size:12px;font-weight:700;letter-spacing:.02em;box-shadow:0 8px 24px rgba(216,30,40,.32);transition:transform .25s var(--e2),box-shadow .25s}
+.head__cta:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(216,30,40,.45)}
+.burger{display:none;width:44px;height:44px;border-radius:12px;border:1px solid var(--line2);flex-direction:column;gap:5px;align-items:center;justify-content:center}
+.burger i{width:20px;height:2px;background:var(--ink);border-radius:2px;transition:.3s var(--e)}
+.burger.x i:nth-child(1){transform:translateY(7px) rotate(45deg)}.burger.x i:nth-child(2){opacity:0}.burger.x i:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+@media(max-width:940px){.nav,.head__cta.desk{display:none}.burger{display:flex}}
+
+/* mobile menu */
+.mmenu{position:fixed;inset:0;z-index:85;background:rgba(8,9,11,.97);backdrop-filter:blur(10px);display:flex;flex-direction:column;justify-content:center;gap:6px;padding:80px var(--pad) 120px;opacity:0;visibility:hidden;transform:translateY(-8px);transition:.4s var(--e)}
+.mmenu.open{opacity:1;visibility:visible;transform:none}
+.mmenu a{font-family:var(--disp);font-weight:800;font-size:30px;text-transform:uppercase;padding:9px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.mmenu a span{color:var(--red);font-size:16px}
+@media(min-width:941px){.mmenu{display:none}}
+
+/* sticky bottom actions (mobile) */
+.dockm{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:80;display:none;gap:10px}
+.dockm a{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;height:52px;border-radius:15px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.dockm .call{background:var(--panel2);border:1px solid var(--line2);color:var(--ink)}
+.dockm .adv{background:var(--red);color:#fff}
+.dockm svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9}
+@media(max-width:940px){.dockm{display:flex}}
+
+/* ── route signature (fixed svg line) ── */
+.route{position:fixed;inset:0;z-index:1;pointer-events:none;width:100%;height:100%}
+.route path{fill:none;stroke:var(--red);stroke-width:2.5;filter:drop-shadow(0 0 8px rgba(216,30,40,.55));stroke-dasharray:1;stroke-dashoffset:1}
+.route .ghost{stroke:rgba(255,255,255,.06);filter:none;stroke-dasharray:none;stroke-dashoffset:0;stroke-width:1.5}
+
+/* ── hero ── */
+.hero{position:relative;z-index:2;min-height:100svh;display:flex;align-items:center;padding-top:72px;overflow:hidden}
+.hero__bg{position:absolute;inset:0;z-index:-1;background:
+  radial-gradient(70vw 60vh at 78% 18%,rgba(216,30,40,.16),transparent 60%),
+  radial-gradient(50vw 50vh at 12% 90%,rgba(40,54,90,.2),transparent 62%),var(--bg)}
+.hero__bg:after{content:"";position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.04}
+.hero .wrap{width:100%}
+.hero__eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--red2);margin-bottom:20px}
+.hero__eyebrow:before{content:"";width:26px;height:2px;background:var(--red);border-radius:2px}
+.hero h1{font-size:clamp(40px,8vw,104px);max-width:16ch}
+.hero h1 .kin{display:inline-block;position:relative;color:var(--red2);min-width:4.5ch}
+.hero h1 .kin b{position:absolute;left:0;top:0;white-space:nowrap;opacity:0;transform:translateY(40%);font-weight:800}
+.hero h1 .kin b.on{position:relative;opacity:1;transform:none;transition:opacity .5s var(--e),transform .5s var(--e)}
+.hero h1 .kin b.out{opacity:0;transform:translateY(-40%);transition:opacity .4s var(--e),transform .4s var(--e)}
+.hero__sub{margin-top:24px;font-size:clamp(15px,1.7vw,18px);color:var(--muted);max-width:56ch}
+.hero__cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:34px}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:15px 24px;border-radius:999px;font-size:13px;font-weight:700;letter-spacing:.02em;border:1px solid var(--line2);transition:transform .25s var(--e2),background .25s,border-color .25s,box-shadow .25s}
+.btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2}
+.btn:hover{transform:translateY(-2px)}
+.btn--pri{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 12px 30px rgba(216,30,40,.35)}
+.btn--pri:hover{box-shadow:0 16px 40px rgba(216,30,40,.5)}
+.btn--ghost:hover{background:rgba(255,255,255,.06);border-color:var(--line2)}
+.btn--text{border-color:transparent;padding-inline:8px;color:var(--muted)}.btn--text:hover{color:var(--ink)}
+.hero__scroll{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);display:flex;flex-direction:column;align-items:center;gap:8px}
+.hero__scroll i{width:1px;height:30px;background:linear-gradient(var(--red),transparent);animation:drop 1.8s var(--e) infinite}
+@keyframes drop{0%{transform:scaleY(0);transform-origin:top}45%{transform:scaleY(1)}100%{transform:scaleY(1);transform-origin:bottom;opacity:0}}
+
+/* ── trust row ── */
+.trust{position:relative;z-index:2;border-block:1px solid var(--line);background:rgba(10,11,13,.6)}
+.trust .wrap{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;padding-block:26px}
+.trust div{text-align:center}
+.trust b{display:block;font-family:var(--disp);font-size:clamp(22px,2.4vw,30px);color:var(--ink)}
+.trust span{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+@media(max-width:820px){.trust .wrap{grid-template-columns:repeat(3,1fr);gap:20px 10px}}
+
+/* ── generic section ── */
+section.blk{position:relative;z-index:2;padding-block:clamp(70px,10vw,120px)}
+.shead{max-width:64ch;margin-bottom:clamp(32px,5vw,54px)}
+.kick{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--red2);margin-bottom:14px}
+.kick i{font-family:var(--disp);color:var(--faint)}
+.shead h2{font-size:clamp(30px,5vw,60px)}
+.shead h2 em{font-style:normal;color:transparent;-webkit-text-stroke:1px rgba(245,242,236,.55)}
+.shead p{margin-top:16px;font-size:16px;color:var(--muted);max-width:56ch}
+
+/* reveal — distinctive (3D hinge / wipe), not blanket fade-up */
+.rv{opacity:0;transform:perspective(1000px) translateY(26px) rotateX(-12deg);transform-origin:50% 0;transition:opacity .7s var(--e),transform .9s var(--e)}
+.rv.in{opacity:1;transform:none}
+.shead h2.rv{transform:none;clip-path:inset(0 100% 0 0);transition:clip-path 1s var(--e),opacity .5s}
+.shead h2.rv.in{clip-path:inset(0 -8% 0 0)}
+.d2{transition-delay:.08s}.d3{transition-delay:.16s}.d4{transition-delay:.24s}.d5{transition-delay:.32s}
+
+/* ── finder ── */
+.finder{background:linear-gradient(150deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:26px;padding:clamp(22px,4vw,40px);overflow:hidden;position:relative}
+.finder__bar{display:flex;gap:6px;margin-bottom:26px}
+.finder__bar i{flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden}
+.finder__bar i.done{background:var(--red)}
+.finder__step{display:none}.finder__step.on{display:block;animation:stepIn .5s var(--e) both}
+@keyframes stepIn{from{opacity:0;transform:translateX(30px);filter:blur(4px)}to{opacity:1;transform:none;filter:none}}
+.finder h3{font-size:clamp(22px,3vw,34px);margin-bottom:6px}
+.finder__hint{color:var(--muted);font-size:14px;margin-bottom:22px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.opt{text-align:left;padding:18px;border-radius:16px;background:var(--panel2);border:1px solid var(--line);transition:border-color .25s,transform .25s var(--e2),background .25s}
+.opt:hover{transform:translateY(-3px);border-color:var(--line2)}
+.opt.sel{border-color:var(--red);background:var(--redsoft)}
+.opt b{display:block;font-family:var(--disp);font-size:21px}
+.opt span{font-size:12.5px;color:var(--muted)}
+.finder__nav{display:flex;justify-content:space-between;align-items:center;margin-top:24px;gap:12px}
+.finder__result{display:none}.finder__result.on{display:block;animation:stepIn .5s var(--e) both}
+.res-card{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center;padding:22px;border-radius:18px;background:var(--panel2);border:1px solid var(--red);margin-bottom:16px}
+.res-badge{width:92px;height:92px;border-radius:18px;display:grid;place-items:center;background:var(--redsoft);border:1px solid rgba(216,30,40,.35);font-family:var(--disp);font-weight:900;font-size:34px;color:var(--red2)}
+.res-card h4{font-family:var(--disp);font-size:26px}.res-card p{color:var(--muted);font-size:14px;margin-top:4px}
+.res-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.res-steps div{padding:14px;border-radius:14px;background:var(--panel2);border:1px solid var(--line)}
+.res-steps small{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.res-steps b{display:block;font-family:var(--disp);font-size:16px;margin-top:5px}
+
+/* ── cockpit demo (tacho) ── */
+.cock{display:grid;grid-template-columns:1.05fr 1fr;gap:clamp(24px,4vw,48px);align-items:center}
+.cock__demo{position:relative;border-radius:26px;background:radial-gradient(120% 100% at 50% 0,var(--panel2),var(--bg));border:1px solid var(--line);padding:28px;overflow:hidden}
+.cock__demo:before{content:"DEMO-DATEN";position:absolute;right:14px;top:14px;font-size:9px;letter-spacing:.16em;color:var(--faint);border:1px solid var(--line);padding:4px 8px;border-radius:6px}
+.tacho{position:relative;display:flex;flex-direction:column;align-items:center}
+.tacho svg{width:min(300px,82%);overflow:visible}
+.tacho .trk{fill:none;stroke:rgba(255,255,255,.08);stroke-width:14;stroke-linecap:round}
+.tacho .val{fill:none;stroke:url(#gg);stroke-width:14;stroke-linecap:round;filter:drop-shadow(0 0 9px rgba(216,30,40,.5))}
+.tacho .ndl{transform-origin:120px 120px;transition:transform .1s linear}.tacho .ndl path{filter:drop-shadow(0 0 5px rgba(255,59,70,.6))}
+.tacho__read{position:absolute;top:26%;left:50%;transform:translateX(-50%);text-align:center;pointer-events:none}
+.tacho__read b{font-family:var(--disp);font-weight:800;font-size:58px;line-height:.8}.tacho__read b i{font-style:normal;font-size:24px;color:var(--red2);vertical-align:12px}
+.tacho__read small{display:block;font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.tacho__hub{position:absolute;top:60%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 40% 35%,#20232c,#0a0b10);border:1px solid var(--line2)}
+.tacho__hub b{font-family:var(--disp);font-weight:900;font-size:18px}
+.cock__grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.cock__grid div{padding:12px 14px;border-radius:13px;background:var(--panel);border:1px solid var(--line)}
+.cock__grid small{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.cock__grid b{display:block;font-family:var(--disp);font-size:20px;margin-top:3px}
+.feat{display:flex;gap:13px;padding:15px 0;border-bottom:1px solid var(--line)}
+.feat:last-child{border:0}
+.feat i{width:38px;height:38px;flex:0 0 auto;border-radius:11px;display:grid;place-items:center;background:var(--redsoft);color:var(--red2)}
+.feat i svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9}
+.feat b{font-family:var(--disp);font-size:18px}.feat p{font-size:13px;color:var(--muted)}
+
+/* ── classes ── */
+.cls{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.cls a{position:relative;min-height:210px;border-radius:20px;padding:22px;background:linear-gradient(160deg,var(--panel),var(--bg2));border:1px solid var(--line);display:flex;flex-direction:column;justify-content:space-between;overflow:hidden;transition:border-color .35s var(--e),transform .35s var(--e),box-shadow .35s}
+.cls a:hover{transform:translateY(-5px);border-color:rgba(216,30,40,.4);box-shadow:0 24px 50px rgba(0,0,0,.4)}
+.cls a:before{content:"";position:absolute;right:-40px;bottom:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(216,30,40,.14),transparent 70%);opacity:0;transition:opacity .35s}
+.cls a:hover:before{opacity:1}
+.cls__ico{font-family:var(--disp);font-weight:900;font-size:30px;color:var(--red2)}
+.cls h3{font-size:26px}.cls p{font-size:12.5px;color:var(--muted);margin-top:4px}
+.cls .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.cls .chip{font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--panel2);border:1px solid var(--line)}
+.cls .go{font-size:12px;font-weight:700;color:var(--red2);display:inline-flex;gap:6px;align-items:center}
+@media(max-width:960px){.cls{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.cls{grid-template-columns:1fr}.cock{grid-template-columns:1fr}}
+
+/* ── simulator + split ── */
+.split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(22px,4vw,46px);align-items:center}
+.mediacard{aspect-ratio:4/3;border-radius:22px;background:linear-gradient(150deg,var(--panel2),var(--bg));border:1px solid var(--line);position:relative;overflow:hidden;display:grid;place-items:center;text-align:center;padding:24px}
+.mediacard span{font-size:12px;color:var(--faint);letter-spacing:.06em}
+.mediacard .sim{width:70%;opacity:.9}
+.ul-check{list-style:none;margin-top:18px;display:grid;gap:11px}
+.ul-check li{display:flex;gap:11px;font-size:14.5px;color:var(--ink)}
+.ul-check li:before{content:"";width:20px;height:20px;flex:0 0 auto;border-radius:6px;background:var(--redsoft);border:1px solid rgba(216,30,40,.4);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff3b46' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12l5 5L20 6'/%3E%3C/svg%3E");background-size:13px;background-repeat:no-repeat;background-position:center}
+@media(max-width:820px){.split{grid-template-columns:1fr}}
+
+/* ── price planner ── */
+.price{display:grid;grid-template-columns:1.4fr 1fr;gap:22px;align-items:start}
+.ptable{width:100%;border-collapse:collapse}
+.ptable th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:10px 8px;border-bottom:1px solid var(--line);font-weight:600}
+.ptable th:last-child,.ptable td:last-child{text-align:right}
+.ptable td{padding:11px 8px;border-bottom:1px solid var(--line);font-size:13.5px;color:var(--ink2,var(--ink))}
+.ptable .pos small{display:block;color:var(--faint);font-size:11px}
+.ptable input{width:64px;padding:8px;border-radius:9px;border:1px solid var(--line2);background:var(--bg);color:var(--ink);text-align:center}
+.ptable .lock{color:var(--muted);font-size:12px}
+.ptable .sum{font-family:var(--disp);font-weight:700;white-space:nowrap}
+.price__side{position:sticky;top:90px;border-radius:20px;background:linear-gradient(150deg,var(--panel),var(--bg2));border:1px solid var(--line);padding:24px}
+.price__total{font-family:var(--disp);font-weight:800;font-size:46px;line-height:1;margin:6px 0 2px}.price__total span{font-size:.5em;color:var(--red2)}
+.price__note{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5}
+.price__flag{margin-top:14px;font-size:11px;color:var(--gold);border:1px dashed rgba(244,196,0,.4);border-radius:10px;padding:9px 11px}
+@media(max-width:820px){.price{grid-template-columns:1fr}.price__side{position:static}}
+
+/* ── locations ── */
+.locs{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.loc{border-radius:20px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+.loc__map{height:150px;background:
+  linear-gradient(rgba(216,30,40,.06),transparent),
+  repeating-linear-gradient(0deg,transparent 0 22px,rgba(255,255,255,.03) 22px 23px),
+  repeating-linear-gradient(90deg,transparent 0 22px,rgba(255,255,255,.03) 22px 23px),var(--bg2);position:relative;display:grid;place-items:center}
+.loc__pin{width:16px;height:16px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--red);box-shadow:0 0 0 6px rgba(216,30,40,.2)}
+.loc__b{padding:22px}
+.loc h3{font-size:26px}.loc dl{margin-top:14px;display:grid;grid-template-columns:auto 1fr;gap:8px 14px;font-size:13.5px}
+.loc dt{color:var(--faint);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding-top:2px}
+.loc dd{color:var(--ink)}
+.ph{color:var(--gold);font-style:italic}
+@media(max-width:700px){.locs{grid-template-columns:1fr}}
+
+/* ── team ── */
+.team__photo{border-radius:22px;overflow:hidden;border:1px solid var(--line);background:linear-gradient(150deg,var(--panel2),var(--bg));aspect-ratio:1668/626;display:grid;place-items:center;text-align:center;position:relative}
+.team__photo img{width:100%;height:100%;object-fit:cover}
+.team__ph{padding:24px;color:var(--faint);font-size:13px}
+.team__ph b{display:block;font-family:var(--disp);font-size:22px;color:var(--muted);margin-bottom:6px}
+
+/* ── faq ── */
+.faq{max-width:820px;margin:0 auto}
+.qa{border-bottom:1px solid var(--line)}
+.qa button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:20px 0;text-align:left;font-family:var(--disp);font-size:19px;font-weight:700}
+.qa button i{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;transition:transform .3s var(--e),background .3s}
+.qa button i:before{content:"+";font-family:var(--sans);font-size:18px;line-height:1}
+.qa.open button i{transform:rotate(135deg);background:var(--red);border-color:var(--red);color:#fff}
+.qa__a{max-height:0;overflow:hidden;transition:max-height .4s var(--e)}
+.qa__a p{padding:0 0 20px;color:var(--muted);font-size:14.5px;max-width:66ch}
+
+/* ── final cta ── */
+.final{position:relative;z-index:2;text-align:center;padding-block:clamp(80px,12vw,150px)}
+.final:before{content:"";position:absolute;left:50%;top:0;width:2px;height:60px;transform:translateX(-50%);background:linear-gradient(var(--red),transparent)}
+.final h2{font-size:clamp(34px,6vw,80px)}
+.final p{max-width:52ch;margin:18px auto 0;color:var(--muted);font-size:16px}
+.final__cta{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:32px}
+.finishline{width:min(560px,80%);height:16px;margin:40px auto 0;border-radius:4px;background:repeating-linear-gradient(45deg,#fff 0 12px,#111 12px 24px);opacity:.16}
+
+/* ── contact form (modal) ── */
+.modal{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:20px;background:rgba(6,7,9,.86);backdrop-filter:blur(4px);opacity:0;visibility:hidden;transition:.3s}
+.modal.open{opacity:1;visibility:visible}
+.modal__card{width:min(560px,100%);max-height:92vh;overflow:auto;border-radius:24px;background:linear-gradient(150deg,var(--panel2),var(--bg2));border:1px solid var(--line2);padding:clamp(22px,4vw,34px);transform:translateY(18px) scale(.98);transition:transform .4s var(--e)}
+.modal.open .modal__card{transform:none}
+.modal__x{position:absolute;top:16px;right:16px;width:40px;height:40px;border-radius:50%;border:1px solid var(--line2);font-size:20px;color:var(--muted)}
+.field{margin-top:14px}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600}
+.field input,.field select,.field textarea{width:100%;padding:13px 14px;border-radius:12px;border:1px solid var(--line2);background:var(--bg);color:var(--ink)}
+.field textarea{min-height:88px;resize:vertical}
+.field.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.consent{display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--muted);margin-top:14px}
+.consent input{margin-top:2px}
+.formmsg{font-size:13px;margin-top:12px}
+
+/* footer */
+.foot{position:relative;z-index:2;border-top:1px solid var(--line);padding-block:40px;color:var(--muted);font-size:13px}
+.foot .wrap{display:flex;flex-wrap:wrap;gap:24px;justify-content:space-between}
+.foot a{color:var(--muted)}.foot a:hover{color:var(--ink)}
+.foot__cols{display:flex;gap:40px;flex-wrap:wrap}
+.foot__cols b{display:block;color:var(--ink);font-family:var(--disp);font-size:14px;margin-bottom:10px;letter-spacing:.04em}
+.foot__cols a{display:block;padding:3px 0}
+
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition-duration:.001ms!important}.rv{opacity:1;transform:none;clip-path:none}.route path{stroke-dashoffset:0!important}}
+/* Lenis */
+html.lenis,html.lenis body{height:auto}.lenis.lenis-smooth{scroll-behavior:auto!important}.lenis.lenis-stopped{overflow:hidden}
+</style>
+</head>
+<body>
+<a class="skip" href="#finder">Zum Inhalt springen</a>
+
+<!-- ROUTE signature -->
+<svg class="route" id="route" preserveAspectRatio="none" aria-hidden="true"><path class="ghost" id="routeGhost"/><path id="routeLine"/></svg>
+
+<header class="head" id="head">
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Fahrschule Krebs Startseite">
+      <span class="logo__k">KREBS</span><span class="logo__flag"></span>
+      <span class="logo__sub"><span>FAHRSCHULE</span><b>VERKEHRSBILDUNGSZENTRUM</b></span>
+    </a>
+    <nav class="nav" aria-label="Hauptnavigation">
+      <a href="#klassen">Klassen</a><a href="#cockpit">Cockpit</a><a href="#simulator">Simulator</a>
+      <a href="#preise">Preise</a><a href="#weiterbildung">Weiterbildung</a><a href="#standorte">Standorte</a><a href="#team">Über uns</a>
+    </nav>
+    <button class="head__cta desk" data-open="advice">Beratung starten</button>
+    <button class="burger" id="burger" aria-label="Menü" aria-expanded="false"><i></i><i></i><i></i></button>
+  </div>
+</header>
+
+<nav class="mmenu" id="mmenu" aria-label="Mobile Navigation">
+  <a href="#klassen">Klassen<span>01</span></a><a href="#cockpit">Digitales Cockpit<span>02</span></a>
+  <a href="#simulator">Simulator<span>03</span></a><a href="#preise">Preise<span>04</span></a>
+  <a href="#weiterbildung">Weiterbildung<span>05</span></a><a href="#standorte">Standorte<span>06</span></a>
+  <a href="#team">Über uns<span>07</span></a>
+</nav>
+
+<!-- HERO -->
+<main id="top">
+<section class="hero">
+  <div class="hero__bg"></div>
+  <div class="wrap">
+    <div class="hero__eyebrow">Fahrschule Krebs · Fulda &amp; Bad Hersfeld</div>
+    <h1>Alle Klassen.<br>Zwei Standorte.<br>Ein digitaler Weg zum <span class="kin" id="kin" aria-label="Ziel"><b class="on">Wählen.</b><b>Lernen.</b><b>Fahren.</b><b>Ankommen.</b></span></h1>
+    <p class="hero__sub">Von B und BF17 über Motorrad bis C/CE, Bus, BKF und Handicap – persönlich begleitet, digital organisiert und transparent geplant.</p>
+    <div class="hero__cta">
+      <a class="btn btn--pri" href="#finder">Führerschein finden <svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg></a>
+      <button class="btn btn--ghost" data-open="advice">Beratung starten</button>
+      <a class="btn btn--text" href="#cockpit">Digitales Cockpit ansehen →</a>
+    </div>
+  </div>
+  <div class="hero__scroll">Scrollen<i></i></div>
+</section>
+
+<!-- TRUST -->
+<div class="trust"><div class="wrap">
+  <div><b>2.</b><span>Generation</span></div>
+  <div><b>2</b><span>Standorte</span></div>
+  <div><b>Alle</b><span>Klassen</span></div>
+  <div><b>Digital</b><span>Ausbildungssystem</span></div>
+  <div><b>Sim</b><span>Fahrsimulator</span></div>
+  <div><b>♿</b><span>Handicap-Kompetenz</span></div>
+</div></div>
+
+<!-- FINDER -->
+<section class="blk" id="finder">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kick"><i>01</i> Führerschein-Finder</div>
+      <h2 class="rv">Finde in 30 Sekunden<br><em>deinen Weg.</em></h2>
+      <p class="rv d2">Ein paar Fragen – und du bekommst die passende Klasse, den groben Ablauf und den nächsten Schritt. Als Orientierung, nicht als verbindliche Zusage.</p>
+    </div>
+    <div class="finder rv d2" role="group" aria-label="Führerschein-Finder">
+      <div class="finder__bar" id="fbar" aria-hidden="true"><i class="done"></i><i></i><i></i><i></i></div>
+      <div class="finder__step on" data-step="0">
+        <h3>Was möchtest du fahren?</h3><p class="finder__hint">Wähle dein Ziel.</p>
+        <div class="opts" data-q="ziel">
+          <button class="opt" data-v="pkw"><b>Auto</b><span>B · BF17 · B197</span></button>
+          <button class="opt" data-v="motorrad"><b>Motorrad</b><span>A · A1 · A2 · AM</span></button>
+          <button class="opt" data-v="lkw"><b>Lkw</b><span>C · CE · C1</span></button>
+          <button class="opt" data-v="bus"><b>Bus</b><span>D · DE</span></button>
+          <button class="opt" data-v="anhaenger"><b>Anhänger</b><span>BE · B96</span></button>
+          <button class="opt" data-v="beruf"><b>Beruflich</b><span>BKF · Grundqualifikation</span></button>
+        </div>
+      </div>
+      <div class="finder__step" data-step="1">
+        <h3>Wie alt bist du – bzw. wann willst du starten?</h3><p class="finder__hint">Grobe Einordnung, exakte Voraussetzungen klären wir persönlich.</p>
+        <div class="opts" data-q="alter">
+          <button class="opt" data-v="u17"><b>Unter 17</b><span>Früh planen</span></button>
+          <button class="opt" data-v="17"><b>16–17</b><span>BF17 denkbar</span></button>
+          <button class="opt" data-v="18"><b>18+</b><span>Voller Umfang</span></button>
+        </div>
+      </div>
+      <div class="finder__step" data-step="2">
+        <h3>Hast du schon eine Fahrerlaubnis?</h3><p class="finder__hint">Das beeinflusst Umfang und Ablauf.</p>
+        <div class="opts" data-q="vorhanden">
+          <button class="opt" data-v="nein"><b>Nein</b><span>Erster Führerschein</span></button>
+          <button class="opt" data-v="b"><b>Ja, Klasse B</b><span>Erweiterung möglich</span></button>
+          <button class="opt" data-v="andere"><b>Andere Klasse</b><span>Wir prüfen es</span></button>
+        </div>
+      </div>
+      <div class="finder__step" data-step="3">
+        <h3>Welcher Standort passt dir?</h3><p class="finder__hint">Beide Standorte bilden dich aus.</p>
+        <div class="opts" data-q="standort">
+          <button class="opt" data-v="fulda"><b>Fulda</b><span>Verkehrsbildungszentrum</span></button>
+          <button class="opt" data-v="hersfeld"><b>Bad Hersfeld</b><span>Zweiter Standort</span></button>
+          <button class="opt" data-v="egal"><b>Egal / beides</b><span>Flexibel</span></button>
+        </div>
+      </div>
+      <div class="finder__nav">
+        <button class="btn btn--text" id="fback" style="visibility:hidden">← Zurück</button>
+        <button class="btn btn--pri" id="fnext" disabled>Weiter <svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg></button>
+      </div>
+      <div class="finder__result" id="fresult" aria-live="polite">
+        <div class="res-card"><div class="res-badge" id="resBadge">B</div><div><h4 id="resTitle">Klasse B</h4><p id="resWho">Dein Weg zum Auto-Führerschein.</p></div></div>
+        <div class="res-steps">
+          <div><small>Theorie</small><b>Grund- & Zusatzstoff</b></div>
+          <div><small>Praxis</small><b>Übungs- & Sonderfahrten</b></div>
+          <div><small>Simulator</small><b>Optional vorbereitend</b></div>
+          <div><small>Standort</small><b id="resLoc">Fulda / Bad Hersfeld</b></div>
+        </div>
+        <p class="finder__hint" style="margin-bottom:18px">Genaue Voraussetzungen, Mindestalter und Preise besprechen wir in einer kurzen Beratung – unverbindlich.</p>
+        <div class="hero__cta" style="margin:0">
+          <button class="btn btn--pri" data-open="advice" id="resCta">Beratung zu dieser Klasse</button>
+          <button class="btn btn--ghost" id="freset">Neu starten</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COCKPIT -->
+<section class="blk" id="cockpit">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kick"><i>02</i> Digitales Krebs-Cockpit</div>
+      <h2 class="rv">Nicht nur Fahrstunden.<br><em>Ein System, das dich führt.</em></h2>
+      <p class="rv d2">Fortschritt, Prüfungsreife, Termine, Fahrstunden-Feedback und Dokumente – an einem Ort, live mit dem Fahrschulbüro. Unten eine zugängliche Produktdemo mit klar gekennzeichneten Demo-Daten.</p>
+    </div>
+    <div class="cock">
+      <div class="cock__demo rv" aria-label="Cockpit-Demo, Beispieldaten">
+        <div class="tacho">
+          <svg viewBox="0 0 240 210" role="img" aria-label="Beispiel: Prüfungsreife 76 Prozent">
+            <defs><linearGradient id="gg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#7a0d13"/><stop offset=".55" stop-color="#d81e28"/><stop offset="1" stop-color="#ff5a63"/></linearGradient></defs>
+            <circle class="trk" cx="120" cy="120" r="92"/><circle class="val" id="gval" cx="120" cy="120" r="92"/>
+            <g id="ticks"></g><g class="ndl" id="ndl"><path d="M120 120 L206 117 L206 123 Z" fill="#f5f2ec"/><circle cx="120" cy="120" r="6" fill="#ff3b46"/></g>
+          </svg>
+          <div class="tacho__read"><b><span id="gnum">0</span><i>%</i></b><small>Prüfungsreife (Beispiel)</small></div>
+          <div class="tacho__hub"><b>FK</b></div>
+        </div>
+        <div class="cock__grid">
+          <div><small>Theorie</small><b>11 / 14</b></div><div><small>Praxis</small><b>18 / 25</b></div>
+          <div><small>Nächste Fahrt</small><b>Heute 17:30</b></div><div><small>Serie</small><b>12 Tage</b></div>
+        </div>
+      </div>
+      <div class="rv d2">
+        <div class="feat"><i><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0M12 7v5l3 2"/></svg></i><div><b>Prüfungsreife live</b><p>Sieh jederzeit, wie weit du bist – und was als Nächstes zählt.</p></div></div>
+        <div class="feat"><i><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM4 9h16M9 5v14"/></svg></i><div><b>Termine & Feedback</b><p>Nächste Fahrstunde, Rückmeldung nach jeder Fahrt, Dokumentenstatus.</p></div></div>
+        <div class="feat"><i><svg viewBox="0 0 24 24"><path d="m4 6 5-2 6 2 5-2v14l-5 2-6-2-5 2zM9 4v14M15 6v14"/></svg></i><div><b>Route & Lernspur</b><p>Deine Fahrten werden zur nachvollziehbaren Lernspur.</p></div></div>
+        <div class="hero__cta" style="margin-top:22px">
+          <button class="btn btn--pri" data-open="advice">Als Fahrschüler anmelden</button>
+          <a class="btn btn--ghost" href="#preise">Cockpit ansehen</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- KLASSEN -->
+<section class="blk" id="klassen">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kick"><i>03</i> Führerscheinklassen</div>
+      <h2 class="rv">Alle Klassen.<br><em>Eine Adresse.</em></h2>
+      <p class="rv d2">Vom Auto bis zum Bus, vom BF17 bis CE – jede Kategorie führt zur passenden Beratung.</p>
+    </div>
+    <div class="cls">
+      <a href="#finder" class="rv"><div><span class="cls__ico">B</span><h3>Auto</h3><p>Pkw &amp; Anhänger</p><div class="chips"><span class="chip">B</span><span class="chip">BF17</span><span class="chip">B197</span><span class="chip">BE</span><span class="chip">B96</span></div></div><span class="go">Weg finden →</span></a>
+      <a href="#finder" class="rv d2"><div><span class="cls__ico">A</span><h3>Motorrad</h3><p>Zweirad</p><div class="chips"><span class="chip">A</span><span class="chip">A1</span><span class="chip">A2</span><span class="chip">AM</span></div></div><span class="go">Weg finden →</span></a>
+      <a href="#finder" class="rv d3"><div><span class="cls__ico">C</span><h3>Lkw</h3><p>Güterverkehr</p><div class="chips"><span class="chip">C</span><span class="chip">CE</span><span class="chip">C1</span><span class="chip">C1E</span></div></div><span class="go">Weg finden →</span></a>
+      <a href="#finder" class="rv d4"><div><span class="cls__ico">D</span><h3>Bus</h3><p>Personenverkehr</p><div class="chips"><span class="chip">D</span><span class="chip">DE</span></div></div><span class="go">Weg finden →</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- SIMULATOR -->
+<section class="blk" id="simulator">
+  <div class="wrap">
+    <div class="split">
+      <div class="mediacard rv" aria-hidden="true">
+        <svg class="sim" viewBox="0 0 200 150" fill="none" stroke="rgba(255,59,70,.7)" stroke-width="2">
+          <rect x="20" y="30" width="160" height="80" rx="10"/><circle cx="100" cy="70" r="26"/><path d="M100 44v14M100 82v14M74 70h14M112 70h14" stroke="rgba(255,255,255,.4)"/><rect x="60" y="118" width="80" height="8" rx="4" fill="rgba(255,255,255,.08)" stroke="none"/>
+        </svg>
+        <span style="position:absolute;bottom:14px">Echte Simulatoraufnahme hier einsetzen</span>
+      </div>
+      <div>
+        <div class="kick"><i>04</i> Fahrsimulator</div>
+        <h2 class="rv">Sicherheit<br><em>beginnt vorher.</em></h2>
+        <p class="shead p rv d2" style="margin-top:14px">Am Simulator werden komplexe Situationen wiederholbar – bevor Verkehr, Kupplung und Nervosität gleichzeitig anklopfen. Als sinnvolle Ergänzung zur echten Praxis, nicht als Ersatz.</p>
+        <ul class="ul-check rv d2">
+          <li>Manöver gezielt so oft üben wie nötig</li>
+          <li>Prüfungsnahe Situationen strukturiert vorbereiten</li>
+          <li>Ideal ergänzend zu den Praxisstunden</li>
+        </ul>
+        <div class="hero__cta"><button class="btn btn--pri" data-open="advice">Simulator-Beratung</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PREISE -->
+<section class="blk" id="preise">
+  <div class="wrap">
+    <div class="shead">
+      <div class="kick"><i>05</i> Transparenter Preisplaner</div>
+      <h2 class="rv">Rechne deinen<br><em>Beispielpreis.</em></h2>
+      <p class="rv d2">Du änderst nur Mengen – die Einzelpreise sind fest. Das Ergebnis ist eine transparente Beispielspanne, keine Zusage. Amtliche Gebühren kommen getrennt hinzu.</p>
+    </div>
+    <div class="price rv d2">
+      <div>
+        <table class="ptable" aria-label="Preisplaner">
+          <thead><tr><th class="pos">Position</th><th>Menge</th><th>Einzelpreis</th><th>Summe</th></tr></thead>
+          <tbody id="ptbody"></tbody>
+        </table>
+        <p class="finder__hint" style="margin-top:14px">Einzelpreise sind Platzhalter, bis die offiziellen Preise bestätigt sind – siehe Hinweis rechts.</p>
+      </div>
+      <aside class="price__side">
+        <small style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Beispiel-Gesamtpreis</small>
+        <div class="price__total" id="ptotal">0 <span>€</span></div>
+        <small style="color:var(--faint)">zzgl. amtlicher Gebühren (Prüfung/Behörde)</small>
+        <div class="price__cta hero__cta" style="margin-top:18px"><button class="btn btn--pri" data-open="advice">Angebot anfragen</button></div>
+        <p class="price__flag">⚑ Platzhalter-Preise. Bitte offizielle Einzelpreise bestätigen – dann sind sie in Sekunden korrekt. Kein „Bundesdurchschnitt“ ohne belegte Quelle.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- WEITERBILDUNG -->
+<section class="blk" id="weiterbildung">
+  <div class="wrap">
+    <div class="shead"><div class="kick"><i>06</i> Weiterbildung &amp; Spezial</div>
+      <h2 class="rv">Mehr als<br><em>Führerschein.</em></h2>
+      <p class="rv d2">Berufliche Qualifikation und persönliche Begleitung – nur das, was tatsächlich angeboten wird, wird hier gezeigt.</p></div>
+    <div class="cls">
+      <a href="#finder" class="rv"><div><span class="cls__ico">BKF</span><h3>Berufskraftfahrer</h3><p>Grundqualifikation</p></div><span class="go">Beraten lassen →</span></a>
+      <a href="#finder" class="rv d2"><div><span class="cls__ico">♿</span><h3>Handicap</h3><p>Individuell begleitet</p></div><span class="go">Vorabcheck →</span></a>
+      <a href="#finder" class="rv d3"><div><span class="cls__ico">ASF</span><h3>ASF-Seminar</h3><p>Aufbauseminar</p></div><span class="go">Beraten lassen →</span></a>
+      <a href="#finder" class="rv d4"><div><span class="cls__ico">FES</span><h3>FES</h3><p>Fahreignungsseminar</p></div><span class="go">Beraten lassen →</span></a>
+    </div>
+    <p class="finder__hint" style="margin-top:16px">Weitere Angebote (z. B. Firmenkundenportal, Prüfungsruhe-Training) erscheinen hier erst, sobald sie bestätigt live sind.</p>
+  </div>
+</section>
+
+<!-- STANDORTE -->
+<section class="blk" id="standorte">
+  <div class="wrap">
+    <div class="shead"><div class="kick"><i>07</i> Standorte</div>
+      <h2 class="rv">Fulda &amp;<br><em>Bad Hersfeld.</em></h2>
+      <p class="rv d2">Zwei Standorte, ein System. Adressen, Zeiten und Kontakt bitte bestätigen – dann sind sie sofort korrekt und auffindbar.</p></div>
+    <div class="locs">
+      <div class="loc rv"><div class="loc__map"><div class="loc__pin"></div></div><div class="loc__b"><h3>Fulda</h3>
+        <dl><dt>Adresse</dt><dd class="ph">Straße &amp; Nr. bestätigen · 36037 Fulda</dd>
+        <dt>Telefon</dt><dd class="ph">Rufnummer bestätigen</dd>
+        <dt>Öffnungszeiten</dt><dd class="ph">Bürozeiten bestätigen</dd>
+        <dt>Theorie</dt><dd class="ph">Theoriezeiten bestätigen</dd></dl>
+        <div class="hero__cta" style="margin-top:16px"><button class="btn btn--ghost" data-open="advice">Beratung Fulda</button></div></div></div>
+      <div class="loc rv d2"><div class="loc__map"><div class="loc__pin"></div></div><div class="loc__b"><h3>Bad Hersfeld</h3>
+        <dl><dt>Adresse</dt><dd class="ph">Straße &amp; Nr. bestätigen · 36251 Bad Hersfeld</dd>
+        <dt>Telefon</dt><dd class="ph">Rufnummer bestätigen</dd>
+        <dt>Öffnungszeiten</dt><dd class="ph">Bürozeiten bestätigen</dd>
+        <dt>Theorie</dt><dd class="ph">Theoriezeiten bestätigen</dd></dl>
+        <div class="hero__cta" style="margin-top:16px"><button class="btn btn--ghost" data-open="advice">Beratung Bad Hersfeld</button></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- TEAM -->
+<section class="blk" id="team">
+  <div class="wrap">
+    <div class="shead"><div class="kick"><i>08</i> Dein Team · Das K-Team</div>
+      <h2 class="rv">Zweite Generation.<br><em>Ein starkes Team.</em></h2>
+      <p class="rv d2">Erfahrene Fahrlehrerinnen und Fahrlehrer, die dich persönlich begleiten. Setze hier euer echtes Teamfoto ein – keine erfundenen Personen.</p></div>
+    <div class="team__photo rv">
+      <img src="assets/team.jpg" alt="Das Team der Fahrschule Krebs" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <div class="team__ph" style="display:none"><b>Echtes Teamfoto einsetzen</b>Lege dein Bild als <code>assets/team.jpg</code> neben diese Datei – dann erscheint es hier automatisch (Format ~1668×626).</div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="blk">
+  <div class="wrap">
+    <div class="shead" style="text-align:center;margin-inline:auto"><div class="kick" style="justify-content:center"><i>09</i> Häufige Fragen</div><h2 class="rv">Gute Fragen,<br><em>klare Antworten.</em></h2></div>
+    <div class="faq">
+      <div class="qa"><button aria-expanded="false"><span>Wie starte ich meine Ausbildung?</span><i></i></button><div class="qa__a"><p>Am einfachsten über den Führerschein-Finder oder eine kurze Beratung. Wir klären Klasse, Standort und Ablauf – und du bekommst deinen Zugang zum digitalen Cockpit.</p></div></div>
+      <div class="qa"><button aria-expanded="false"><span>Was ist der Unterschied zwischen B197 und B?</span><i></i></button><div class="qa__a"><p>Bei B197 lernst du auf Automatik, darfst nach bestandener Prüfung aber auch Schaltwagen fahren. Details klären wir individuell – die genauen Voraussetzungen bestätigen wir aus offizieller Quelle.</p></div></div>
+      <div class="qa"><button aria-expanded="false"><span>Bietet ihr BF17 an beiden Standorten an?</span><i></i></button><div class="qa__a"><p>Beide Standorte bilden aus. Welche Klassen und Zeiten an welchem Standort verfügbar sind, bestätigen wir dir in der Beratung.</p></div></div>
+      <div class="qa"><button aria-expanded="false"><span>Was kostet der Führerschein?</span><i></i></button><div class="qa__a"><p>Der Preisplaner zeigt eine transparente Beispielspanne. Die verbindlichen Einzelpreise und amtlichen Gebühren nennen wir dir aktuell und standortbezogen.</p></div></div>
+      <div class="qa"><button aria-expanded="false"><span>Was bietet ihr für Menschen mit Handicap?</span><i></i></button><div class="qa__a"><p>Wir begleiten dich individuell. Über den Handicap-Vorabcheck in der Beratung finden wir gemeinsam den passenden Weg.</p></div></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- FINAL CTA -->
+<section class="final">
+  <div class="wrap">
+    <h2 class="rv">Bereit,<br>loszufahren?</h2>
+    <p class="rv d2">Wähle deinen Weg – wir verbinden die passende Ausbildung mit dem digitalen System, das dich ans Ziel bringt.</p>
+    <div class="final__cta">
+      <a class="btn btn--pri" href="#finder">Führerschein finden</a>
+      <button class="btn btn--ghost" data-open="advice">Beratung buchen</button>
+      <button class="btn btn--ghost" data-open="firma">Firmenangebot anfordern</button>
+    </div>
+    <div class="finishline" aria-hidden="true"></div>
+  </div>
+</section>
+
+<footer class="foot"><div class="wrap">
+  <div>
+    <a class="logo" href="#top"><span class="logo__k">KREBS</span><span class="logo__flag"></span><span class="logo__sub"><span>FAHRSCHULE</span><b>VERKEHRSBILDUNGSZENTRUM</b></span></a>
+    <p style="margin-top:14px;max-width:34ch">Fahrausbildung als präzise geführte Route – persönlich begleitet, digital organisiert.</p>
+  </div>
+  <div class="foot__cols">
+    <div><b>Klassen</b><a href="#klassen">Auto</a><a href="#klassen">Motorrad</a><a href="#klassen">Lkw</a><a href="#klassen">Bus</a></div>
+    <div><b>Mehr</b><a href="#cockpit">Cockpit</a><a href="#simulator">Simulator</a><a href="#preise">Preise</a><a href="#weiterbildung">Weiterbildung</a></div>
+    <div><b>Rechtliches</b><a href="#" data-legal="impressum">Impressum</a><a href="#" data-legal="datenschutz">Datenschutz</a><a href="#" data-legal="a11y">Barrierefreiheit</a></div>
+  </div>
+</div></footer>
+
+<!-- sticky mobile actions -->
+<div class="dockm">
+  <a class="call" href="tel:+49000000000" aria-label="Anrufen"><svg viewBox="0 0 24 24"><path d="M4 5c0 8 7 15 15 15l2-4-5-2-2 2a11 11 0 0 1-6-6l2-2-2-5z"/></svg>Anrufen</a>
+  <a class="adv" href="#finder"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg>Finder</a>
+</div>
+
+<!-- CONTACT MODAL -->
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mtitle">
+  <div class="modal__card">
+    <button class="modal__x" data-close aria-label="Schließen">×</button>
+    <div class="kick"><i>Kontakt</i></div>
+    <h2 id="mtitle" style="font-size:30px">Beratung starten</h2>
+    <p class="finder__hint" id="mintro">Wir melden uns unverbindlich. Absenden öffnet dein E-Mail-Programm mit vorausgefüllter Nachricht (echter Kontaktweg, kein Fake).</p>
+    <form id="cform" novalidate>
+      <div class="field row">
+        <div><label for="fname">Name</label><input id="fname" name="name" required autocomplete="name"></div>
+        <div><label for="fphone">Telefon</label><input id="fphone" name="tel" inputmode="tel" autocomplete="tel"></div>
+      </div>
+      <div class="field"><label for="femail">E-Mail</label><input id="femail" name="email" type="email" required autocomplete="email"></div>
+      <div class="field row">
+        <div><label for="fclass">Klasse / Bereich</label><select id="fclass" name="klasse"><option>Auto (B/BF17/B197)</option><option>Motorrad (A/A1/A2/AM)</option><option>Anhänger (BE/B96)</option><option>Lkw (C/CE)</option><option>Bus (D/DE)</option><option>BKF / Grundqualifikation</option><option>Handicap</option><option>Firmenkunden</option><option>Allgemeine Beratung</option></select></div>
+        <div><label for="floc">Standort</label><select id="floc" name="standort"><option>Fulda</option><option>Bad Hersfeld</option><option>Egal</option></select></div>
+      </div>
+      <div class="field"><label for="fmsg">Nachricht (optional)</label><textarea id="fmsg" name="nachricht"></textarea></div>
+      <label class="consent"><input type="checkbox" id="fconsent" required> Ich bin mit der Kontaktaufnahme einverstanden. Meine Daten werden ausschließlich zur Bearbeitung genutzt (Datenschutz).</label>
+      <div class="hero__cta" style="margin-top:18px"><button class="btn btn--pri" type="submit">Anfrage senden</button><button class="btn btn--ghost" type="button" data-close>Abbrechen</button></div>
+      <p class="formmsg" id="formmsg" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</div>
+
+<script>
+(()=>{
+'use strict';
+const $=(s,p=document)=>p.querySelector(s),$$=(s,p=document)=>[...p.querySelectorAll(s)];
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t;
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ══ CENTRAL BUSINESS CONFIG — bitte bestätigen, dann überall korrekt ══ */
+const BIZ={
+  name:'Fahrschule Krebs GmbH',
+  phone:'', // TODO tel: eintragen, z.B. +49661XXXXXX
+  email:'info@fahrschule-krebs.de', // TODO bestätigen
+};
+if(BIZ.phone){const c=$('.dockm .call');if(c)c.href='tel:'+BIZ.phone.replace(/\s/g,'');}
+
+/* ── header + scrollspy ── */
+const head=$('#head'),secs=['klassen','cockpit','simulator','preise','weiterbildung','standorte','team'].map(id=>$('#'+id)).filter(Boolean),navA=$$('.nav a');
+addEventListener('scroll',()=>{head.classList.toggle('scrolled',scrollY>24);
+  let cur=-1;secs.forEach((s,i)=>{if(s.getBoundingClientRect().top<innerHeight*.45)cur=i});
+  navA.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+(secs[cur]?.id)));
+},{passive:true});
+
+/* ── mobile menu ── */
+const burger=$('#burger'),mmenu=$('#mmenu');
+function menu(open){burger.classList.toggle('x',open);mmenu.classList.toggle('open',open);burger.setAttribute('aria-expanded',open);document.body.style.overflow=open?'hidden':''}
+burger.addEventListener('click',()=>menu(!mmenu.classList.contains('open')));
+$$('#mmenu a').forEach(a=>a.addEventListener('click',()=>menu(false)));
+addEventListener('keydown',e=>{if(e.key==='Escape'){menu(false);closeModal()}});
+
+/* ── smooth scroll (Lenis) ── */
+let lenis=null;
+function initLenis(){if(reduced||typeof Lenis==='undefined')return;lenis=new Lenis({lerp:.1,smoothWheel:true,autoRaf:false});
+  if(typeof gsap!=='undefined'&&gsap.ticker){gsap.ticker.add(t=>lenis.raf(t*1000));gsap.ticker.lagSmoothing(0);if(window.ScrollTrigger){lenis.on('scroll',ScrollTrigger.update);}}
+  else{function raf(t){lenis.raf(t);requestAnimationFrame(raf)}requestAnimationFrame(raf)}}
+function goTo(t){const el=typeof t==='string'?$(t):t;if(!el)return;if(lenis)lenis.scrollTo(el,{offset:-60});else el.scrollIntoView({behavior:reduced?'auto':'smooth'})}
+$$('a[href^="#"]').forEach(a=>{const id=a.getAttribute('href');if(id.length>1)a.addEventListener('click',e=>{if($(id)){e.preventDefault();menu(false);goTo(id)}})});
+
+/* ── hero kinetic word cycle ── */
+(function(){const words=$$('#kin b');if(words.length<2||reduced)return;let i=0;setInterval(()=>{const cur=words[i];i=(i+1)%words.length;const nxt=words[i];
+  cur.classList.remove('on');cur.classList.add('out');nxt.classList.remove('out');nxt.classList.add('on');
+  setTimeout(()=>cur.classList.remove('out'),450);},2200)})();
+
+/* ── reveals ── */
+const io=new IntersectionObserver((es)=>es.forEach(en=>{if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target)}}),{threshold:.14,rootMargin:'0px 0px -8% 0px'});
+$$('.rv').forEach(el=>io.observe(el));
+
+/* ── route signature (draw on scroll) ── */
+(function(){const svg=$('#route'),line=$('#routeLine'),ghost=$('#routeGhost');
+  function build(){const w=innerWidth,h=document.documentElement.scrollHeight;svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+    // a controlled S-route down the page, biased to one side
+    let d=`M ${w*.5} 0`;const n=Math.max(6,Math.floor(h/700));
+    for(let i=1;i<=n;i++){const y=h*i/n;const x=w*(.5+Math.sin(i*1.1)* .28);const cy=h*(i-.5)/n;const cx=w*(.5+Math.sin((i-.5)*1.1)*.4);d+=` Q ${cx} ${cy} ${x} ${y}`;}
+    line.setAttribute('d',d);ghost.setAttribute('d',d);const len=line.getTotalLength();line.style.strokeDasharray=len;line.style.strokeDashoffset=len;line._len=len;update();}
+  function update(){const max=document.documentElement.scrollHeight-innerHeight;const p=clamp(scrollY/(max||1));line.style.strokeDashoffset=(line._len*(1-p*1.02)).toFixed(1);}
+  addEventListener('scroll',update,{passive:true});addEventListener('resize',()=>requestAnimationFrame(build),{passive:true});
+  if(reduced){build();line.style.strokeDashoffset=0;}else build();
+})();
+
+/* ── cockpit tacho ── */
+(function(){const R=92,C=2*Math.PI*R,SW=.75,gval=$('#gval'),ndl=$('#ndl'),gnum=$('#gnum'),trk=$('.trk');
+  [trk,gval].forEach(e=>{e.style.transform='rotate(135deg)';e.style.transformOrigin='120px 120px';});
+  trk.style.strokeDasharray=`${SW*C} ${C}`;gval.style.strokeDasharray=`0 ${C}`;
+  const tg=$('#ticks');for(let i=0;i<=10;i++){const f=i/10,a=(135+f*270)*Math.PI/180,mj=i%5===0,r1=mj?76:80;const l=document.createElementNS('http://www.w3.org/2000/svg','line');l.setAttribute('x1',120+Math.cos(a)*r1);l.setAttribute('y1',120+Math.sin(a)*r1);l.setAttribute('x2',120+Math.cos(a)*72);l.setAttribute('y2',120+Math.sin(a)*72);l.setAttribute('stroke',mj?'rgba(255,255,255,.5)':'rgba(255,255,255,.22)');l.setAttribute('stroke-width',mj?2.4:1.8);tg.appendChild(l);}
+  function set(f){f=clamp(f);gval.style.strokeDasharray=`${f*SW*C} ${C}`;ndl.style.transform=`rotate(${135+f*270}deg)`;gnum.textContent=Math.round(f*100);}
+  set(0);const back=t=>1+2.4*Math.pow(t-1,3)+2.4*Math.pow(t-1,2);let done=false;
+  new IntersectionObserver((es,ob)=>es.forEach(en=>{if(en.isIntersecting&&!done){done=true;if(reduced){set(.76);return}const t0=performance.now();(function fr(n){const p=clamp((n-t0)/1400);set(.76*back(p));p<1?requestAnimationFrame(fr):set(.76)})(t0);ob.disconnect()}}),{threshold:.4}).observe($('#cockpit'));
+})();
+
+/* ── finder ── */
+(function(){const steps=$$('.finder__step'),bar=$$('#fbar i'),next=$('#fnext'),back=$('#fback'),result=$('#fresult'),answers={};let s=0;
+  const CLASS={pkw:{b:'B',t:'Klasse B / BF17 / B197',w:'Dein Weg zum Auto-Führerschein – klassisch, BF17 oder Automatik (B197).'},
+    motorrad:{b:'A',t:'Motorrad A / A1 / A2 / AM',w:'Vom Roller bis zum großen Motorrad – je nach Alter und Vorerfahrung.'},
+    lkw:{b:'C',t:'Lkw C / CE / C1',w:'Für den Güterverkehr – auch beruflich mit Grundqualifikation.'},
+    bus:{b:'D',t:'Bus D / DE',w:'Personenbeförderung – strukturiert aufgebaut.'},
+    anhaenger:{b:'BE',t:'Anhänger BE / B96',w:'Mehr Anhängelast zusätzlich zu deiner Klasse B.'},
+    beruf:{b:'BKF',t:'Berufskraftfahrer / Grundqualifikation',w:'Der berufliche Einstieg – wir begleiten dich durch die Qualifikation.'}};
+  function show(){steps.forEach(st=>st.classList.toggle('on',+st.dataset.step===s));bar.forEach((b,i)=>b.classList.toggle('done',i<=s));
+    back.style.visibility=s>0?'visible':'hidden';const q=steps[s].querySelector('.opts').dataset.q;next.disabled=!answers[q];
+    next.innerHTML=s===steps.length-1?'Ergebnis anzeigen':'Weiter <svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg>';}
+  $$('.finder .opts').forEach(g=>g.addEventListener('click',e=>{const o=e.target.closest('.opt');if(!o)return;const q=g.dataset.q;
+    [...g.children].forEach(c=>c.classList.remove('sel'));o.classList.add('sel');answers[q]=o.dataset.v;next.disabled=false;}));
+  next.addEventListener('click',()=>{if(s<steps.length-1){s++;show()}else finish()});
+  back.addEventListener('click',()=>{if(result.classList.contains('on')){result.classList.remove('on');steps[s].classList.add('on');return}if(s>0){s--;show()}});
+  function finish(){const c=CLASS[answers.ziel]||CLASS.pkw;$('#resBadge').textContent=c.b;$('#resTitle').textContent=c.t;
+    let who=c.w;if(answers.alter==='17'&&answers.ziel==='pkw')who='BF17 könnte für dich passen – begleitetes Fahren ab 17.';
+    $('#resWho').textContent=who;$('#resLoc').textContent=answers.standort==='fulda'?'Fulda':answers.standort==='hersfeld'?'Bad Hersfeld':'Fulda / Bad Hersfeld';
+    steps.forEach(st=>st.classList.remove('on'));next.parentElement.style.display='none';result.classList.add('on');
+    $('#resCta').dataset.class=c.t;}
+  $('#freset').addEventListener('click',()=>{s=0;Object.keys(answers).forEach(k=>delete answers[k]);$$('.finder .opt').forEach(o=>o.classList.remove('sel'));result.classList.remove('on');next.parentElement.style.display='';show()});
+  show();
+})();
+
+/* ── price planner (placeholder unit prices — confirm & correct) ── */
+(function(){const eur=new Intl.NumberFormat('de-DE',{minimumFractionDigits:0});
+  const LINES=[['Grundbetrag (Klasse B)',1,'—',false],['Fahrstunde (45 Min.)',20,'—',true],['Sonderfahrten (45 Min.)',12,'—',true],['Simulator-Einheit',3,'—',true],['Lehrmaterial / Zugang',1,'—',false],['Vorstellung Prüfung (Fahrschule)',1,'—',false]];
+  const body=$('#ptbody');LINES.forEach((l,i)=>{const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="pos">${l[0]}<small>Einzelpreis bestätigen</small></td>
+      <td>${l[3]?`<input type="number" min="0" value="${l[1]}" data-q="${i}" aria-label="Menge ${l[0]}">`:l[1]}</td>
+      <td class="lock">${l[2]} €</td><td class="sum" data-s="${i}">– €</td>`;body.appendChild(tr);});
+  // NOTE: unit prices intentionally 0 until confirmed → total shows structure, not invented figures
+  const UNIT=[0,0,0,0,0,0];
+  function calc(){let tot=0;LINES.forEach((l,i)=>{const q=l[3]?(+$(`[data-q="${i}"]`)?.value||0):l[1];const s=q*UNIT[i];tot+=s;$(`[data-s="${i}"]`).textContent=UNIT[i]?eur.format(s)+' €':'– €';});
+    $('#ptotal').innerHTML=(UNIT.some(u=>u)?eur.format(tot):'—')+' <span>€</span>';}
+  body.addEventListener('input',calc);calc();
+})();
+
+/* ── faq ── */
+$$('.qa button').forEach(b=>b.addEventListener('click',()=>{const qa=b.parentElement,open=qa.classList.toggle('open');b.setAttribute('aria-expanded',open);
+  const a=qa.querySelector('.qa__a');a.style.maxHeight=open?a.scrollHeight+'px':0;}));
+
+/* ── modal + honest contact (mailto) ── */
+const modal=$('#modal'),form=$('#cform'),fmsg=$('#formmsg');let lastFocus=null;
+function openModal(kind){lastFocus=document.activeElement;modal.classList.add('open');if(lenis)lenis.stop();document.body.style.overflow='hidden';
+  $('#mtitle').textContent=kind==='firma'?'Firmenangebot anfordern':'Beratung starten';
+  $('#mintro').textContent=kind==='firma'?'Für Firmenkunden (C/CE, D/DE, BKF). Absenden öffnet dein E-Mail-Programm mit vorausgefüllter Nachricht.':'Wir melden uns unverbindlich. Absenden öffnet dein E-Mail-Programm mit vorausgefüllter Nachricht.';
+  setTimeout(()=>$('#fname').focus(),80);}
+function closeModal(){modal.classList.remove('open');if(lenis)lenis.start();document.body.style.overflow='';lastFocus&&lastFocus.focus();}
+$$('[data-open]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.open)));
+$$('[data-close]').forEach(b=>b.addEventListener('click',closeModal));
+modal.addEventListener('click',e=>{if(e.target===modal)closeModal()});
+form.addEventListener('submit',e=>{e.preventDefault();
+  if(!form.name.value.trim()||!form.email.value.trim()||!$('#fconsent').checked){fmsg.style.color='var(--red2)';fmsg.textContent='Bitte Name, E-Mail und Einwilligung ausfüllen.';return;}
+  const body=`Name: ${form.name.value}%0ATelefon: ${form.tel.value}%0AE-Mail: ${form.email.value}%0AKlasse/Bereich: ${form.klasse.value}%0AStandort: ${form.standort.value}%0ANachricht: ${form.nachricht.value}`;
+  const to=BIZ.email||'info@fahrschule-krebs.de';
+  fmsg.style.color='var(--green)';fmsg.textContent='E-Mail-Programm wird geöffnet …';
+  location.href=`mailto:${to}?subject=${encodeURIComponent('Beratung: '+form.klasse.value+' ('+form.standort.value+')')}&body=${body}`;
+});
+$$('[data-legal]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();alert('Rechtstext-Seite (Impressum/Datenschutz/Barrierefreiheit) folgt mit euren bestätigten Angaben – wird nicht erfunden.')}));
+
+/* ── load GSAP/Lenis then init ── */
+function load(src){return new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=r;s.onerror=r;document.head.appendChild(s)})}
+(async()=>{if(!reduced){await load('https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js');await load('https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js');await load('https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js');if(window.gsap&&window.ScrollTrigger)gsap.registerPlugin(ScrollTrigger);}initLenis();})();
+})();
+</script>
+</body>
+</html>
