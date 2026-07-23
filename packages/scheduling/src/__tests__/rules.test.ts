@@ -89,4 +89,192 @@ describe("checkBookingConflicts", () => {
     expect(result.ok).toBe(false);
     expect(result.reasons).toContain("VEHICLE_WRONG_CLASS");
   });
+
+  it("rejects when the student already has an overlapping booking (Schüler frei)", () => {
+    const existing = [
+      {
+        id: "b1",
+        fahrlehrerId: "instructor-2",
+        fahrzeugId: "vehicle-2",
+        schuelerId: "student-1",
+        status: "confirmed",
+        beginnAt: hour(9),
+        endeAt: hour(10),
+      },
+    ];
+    const result = checkBookingConflicts(
+      {
+        fahrlehrerId: "instructor-1",
+        fahrzeugId: "vehicle-1",
+        schuelerId: "student-1",
+        klasse: "B",
+        beginnAt: hour(9, 30),
+        endeAt: hour(10, 30),
+      },
+      { existingBookings: existing, instructorQualification: qualification, vehicleClass: vehicle },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("STUDENT_DOUBLE_BOOKED");
+  });
+
+  it("rejects overlapping room bookings (Raum frei)", () => {
+    const existing = [
+      {
+        id: "b1",
+        fahrlehrerId: "instructor-2",
+        fahrzeugId: null,
+        raumId: "room-1",
+        status: "confirmed",
+        beginnAt: hour(9),
+        endeAt: hour(10),
+      },
+    ];
+    const result = checkBookingConflicts(
+      { fahrlehrerId: "instructor-1", fahrzeugId: null, raumId: "room-1", klasse: "B", beginnAt: hour(9), endeAt: hour(10) },
+      { existingBookings: existing, instructorQualification: qualification, vehicleClass: null },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("ROOM_DOUBLE_BOOKED");
+  });
+
+  it("rejects overlapping simulator bookings (Simulator frei)", () => {
+    const existing = [
+      {
+        id: "b1",
+        fahrlehrerId: "instructor-2",
+        fahrzeugId: null,
+        simulatorgeraetId: "sim-1",
+        status: "confirmed",
+        beginnAt: hour(9),
+        endeAt: hour(10),
+      },
+    ];
+    const result = checkBookingConflicts(
+      {
+        fahrlehrerId: "instructor-1",
+        fahrzeugId: null,
+        simulatorgeraetId: "sim-1",
+        klasse: "B",
+        beginnAt: hour(9, 30),
+        endeAt: hour(10, 30),
+      },
+      { existingBookings: existing, instructorQualification: qualification, vehicleClass: null },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("SIMULATOR_DOUBLE_BOOKED");
+  });
+
+  it("rejects when the vehicle is not einsatzbereit (Wartung)", () => {
+    const result = checkBookingConflicts(
+      { fahrlehrerId: "instructor-1", fahrzeugId: "vehicle-1", klasse: "B", beginnAt: hour(9), endeAt: hour(10) },
+      {
+        existingBookings: [],
+        instructorQualification: qualification,
+        vehicleClass: { ...vehicle, status: "wartung" },
+      },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("VEHICLE_NOT_READY");
+  });
+
+  it("rejects Automatik-Wunsch gegen Schaltwagen (Getriebeart-Mismatch)", () => {
+    const result = checkBookingConflicts(
+      {
+        fahrlehrerId: "instructor-1",
+        fahrzeugId: "vehicle-1",
+        klasse: "B",
+        getriebeart: "automatik",
+        beginnAt: hour(9),
+        endeAt: hour(10),
+      },
+      {
+        existingBookings: [],
+        instructorQualification: qualification,
+        vehicleClass: { ...vehicle, automatik: false },
+      },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("GEARBOX_MISMATCH");
+  });
+
+  it("rejects when required handicap equipment is missing on the vehicle", () => {
+    const result = checkBookingConflicts(
+      { fahrlehrerId: "instructor-1", fahrzeugId: "vehicle-1", klasse: "B", beginnAt: hour(9), endeAt: hour(10) },
+      {
+        existingBookings: [],
+        instructorQualification: qualification,
+        vehicleClass: { ...vehicle, handicapAusstattung: [] },
+        handicapBedarf: ["rollstuhlrampe"],
+      },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("HANDICAP_EQUIPMENT_MISSING");
+  });
+
+  it("passes when the vehicle carries the required handicap equipment", () => {
+    const result = checkBookingConflicts(
+      { fahrlehrerId: "instructor-1", fahrzeugId: "vehicle-1", klasse: "B", beginnAt: hour(9), endeAt: hour(10) },
+      {
+        existingBookings: [],
+        instructorQualification: qualification,
+        vehicleClass: { ...vehicle, handicapAusstattung: ["rollstuhlrampe"] },
+        handicapBedarf: ["rollstuhlrampe"],
+      },
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects back-to-back bookings without the minimum break (Pause/Arbeitszeit)", () => {
+    const existing = [
+      {
+        id: "b1",
+        fahrlehrerId: "instructor-1",
+        fahrzeugId: "vehicle-2",
+        status: "confirmed",
+        beginnAt: hour(8),
+        endeAt: hour(9),
+      },
+    ];
+    const result = checkBookingConflicts(
+      { fahrlehrerId: "instructor-1", fahrzeugId: "vehicle-1", klasse: "B", beginnAt: hour(9), endeAt: hour(10) },
+      { existingBookings: existing, instructorQualification: qualification, vehicleClass: vehicle },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("MIN_BREAK_VIOLATED");
+  });
+
+  it("passes when the gap between two bookings satisfies the minimum break", () => {
+    const existing = [
+      {
+        id: "b1",
+        fahrlehrerId: "instructor-1",
+        fahrzeugId: "vehicle-2",
+        status: "confirmed",
+        beginnAt: hour(8),
+        endeAt: hour(9),
+      },
+    ];
+    const result = checkBookingConflicts(
+      { fahrlehrerId: "instructor-1", fahrzeugId: "vehicle-1", klasse: "B", beginnAt: hour(9, 20), endeAt: hour(10) },
+      { existingBookings: existing, instructorQualification: qualification, vehicleClass: vehicle },
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a Sonderfahrt before the minimum number of Übungsstunden (Ausbildungsreihenfolge, unbestätigt)", () => {
+    const result = checkBookingConflicts(
+      { fahrlehrerId: "instructor-1", fahrzeugId: "vehicle-1", klasse: "B", art: "Sonderfahrt", beginnAt: hour(9), endeAt: hour(10) },
+      { existingBookings: [], instructorQualification: qualification, vehicleClass: vehicle, completedUebungsstunden: 2 },
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reasons).toContain("TRAINING_ORDER_VIOLATED");
+  });
+
+  it("allows a Sonderfahrt once the minimum number of Übungsstunden is reached", () => {
+    const result = checkBookingConflicts(
+      { fahrlehrerId: "instructor-1", fahrzeugId: "vehicle-1", klasse: "B", art: "Sonderfahrt", beginnAt: hour(9), endeAt: hour(10) },
+      { existingBookings: [], instructorQualification: qualification, vehicleClass: vehicle, completedUebungsstunden: 5 },
+    );
+    expect(result.ok).toBe(true);
+  });
 });

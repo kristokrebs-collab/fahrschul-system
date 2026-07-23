@@ -1,6 +1,33 @@
-import { boolean, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { standorte } from "./core.js";
 import { fahrlehrer, schueler } from "./people.js";
+
+/**
+ * Raum/Simulatorgerät als First-Class-Ressourcen für die Terminplanung
+ * (Prompt 2). Hier statt in office.ts definiert, damit terminangebote/
+ * terminbuchungen unten ohne zirkulären ESM-Import darauf verweisen können;
+ * office.ts re-exportiert beide.
+ */
+export const raeume = pgTable("raeume", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  standortId: uuid("standort_id").references(() => standorte.id),
+  name: text("name").notNull(),
+  ausstattung: jsonb("ausstattung").notNull().default([]),
+  status: text("status").notNull().default("verfuegbar"),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const simulatorgeraete = pgTable("simulatorgeraete", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  standortId: uuid("standort_id").references(() => standorte.id),
+  name: text("name").notNull(),
+  status: text("status").notNull().default("verfuegbar"),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const fahrzeuge = pgTable("fahrzeuge", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -9,6 +36,10 @@ export const fahrzeuge = pgTable("fahrzeuge", {
   klasse: text("klasse").notNull(),
   bezeichnung: text("bezeichnung"),
   status: text("status").notNull().default("verfuegbar"),
+  // Prompt 2: Ausstattungsmerkmale für Handicap-Matching (jsonb-Array freier
+  // Codes, Taxonomie fachlich unbestätigt, siehe docs/fachliche-bestaetigungen.md).
+  handicapAusstattung: jsonb("handicap_ausstattung").notNull().default([]),
+  automatik: boolean("automatik").notNull().default(false),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -21,6 +52,8 @@ export const terminangebote = pgTable("terminangebote", {
     .notNull()
     .references(() => fahrlehrer.id),
   fahrzeugId: uuid("fahrzeug_id").references(() => fahrzeuge.id),
+  raumId: uuid("raum_id").references(() => raeume.id),
+  simulatorgeraetId: uuid("simulatorgeraet_id").references(() => simulatorgeraete.id),
   beginnAt: timestamp("beginn_at", { withTimezone: true }).notNull(),
   endeAt: timestamp("ende_at", { withTimezone: true }).notNull(),
   klasse: text("klasse"),
@@ -53,6 +86,8 @@ export const terminbuchungen = pgTable("terminbuchungen", {
     .notNull()
     .references(() => fahrlehrer.id),
   fahrzeugId: uuid("fahrzeug_id").references(() => fahrzeuge.id),
+  raumId: uuid("raum_id").references(() => raeume.id),
+  simulatorgeraetId: uuid("simulatorgeraet_id").references(() => simulatorgeraete.id),
   beginnAt: timestamp("beginn_at", { withTimezone: true }).notNull(),
   endeAt: timestamp("ende_at", { withTimezone: true }).notNull(),
   art: text("art").notNull(),

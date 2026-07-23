@@ -82,6 +82,36 @@ Genehmigungen hinaus):
   Audit-Log, Systemadministration) und **keinen** Zugriff auf fachliche
   Schüler-/Finanzdaten – entspricht der Vorgabe "nur technische Rechte".
 
+## Prompt 2 – Erweiterungen (apps/office)
+
+Neue Berechtigungen, alle ausschließlich für die Rolle Büro (`buero`), mit
+einer Ausnahme (`exam:pipeline:advance`, siehe unten):
+
+| Berechtigung | Zweck |
+|---|---|
+| `office:dashboard:read` | Heute-Queue/Planung/Auswertungen |
+| `leads:manage` | Leads/CRM anlegen, bearbeiten, zu Schüler konvertieren |
+| `messages:manage` | Nachrichtenvorlagen + Sende-Log |
+| `resources:manage` | Räume/Simulatoren/Fahrzeugmängel/Arbeitszeitregeln |
+| `exam:pipeline:advance` | Prüfungs-Pipeline-Zustand weiterschalten |
+| `storno:manage` | Storno-Retter-Flow auslösen/steuern |
+| `audit:read:office` | Audit-Log des eigenen Standorts (enger als `audit:read`) |
+
+- **`exam:pipeline:advance`** haben sowohl Büro als auch Fahrlehrer – die
+  Matrix allein reicht hier bewusst NICHT aus: der Übergang in den Zustand
+  `fahrlehrer_go` darf laut Aufgabenstellung ausschließlich von einem
+  Akteur mit Rolle `fahrlehrer` ausgeführt werden. Das wird zusätzlich zur
+  Permission-Prüfung transition-spezifisch in
+  `packages/domain/src/pruefungspipeline.ts` (`assertTransitionAllowed`) und
+  in `apps/api/src/routes/exam-pipeline.ts` erzwungen – ein Büro-Akteur mit
+  `exam:pipeline:advance` darf alle anderen Übergänge ausführen, aber NICHT
+  diesen einen.
+- Alle übrigen neuen Berechtigungen bleiben ausschließlich Büro vorbehalten;
+  Finanzen bekommt **keine** davon (Non-Negotiable: "office should be
+  read-mostly on finance, full financial mutation authority belongs to
+  Prompt 4's Finance app" – umgekehrt bekommt Büro keine
+  `invoices:manage`/`payments:manage`/`bank:reconcile`).
+
 Diese Matrix ist die Ausgangsbasis für Prompt 0. Feingranularere Rechte
 (z. B. differenzierte Dokumenttypen, Mehr-Augen-Prinzip bei
 Prüfungsfreigaben, siehe `docs/fachliche-bestaetigungen.md` Punkt 11) werden

@@ -44,6 +44,10 @@ export const ausbildungen = pgTable("ausbildungen", {
   istErweiterung: boolean("ist_erweiterung").notNull().default(false),
   getriebeart: text("getriebeart").notNull().default("schaltung"),
   b197: boolean("b197").notNull().default(false),
+  // Prompt 2: Handicap-Ausstattungsbedarf des Schülers (jsonb-Array freier
+  // Codes, muss Teilmenge der Fahrzeug-Ausstattung sein, siehe
+  // packages/scheduling harte Regel HANDICAP_EQUIPMENT_MISSING).
+  handicapBedarf: jsonb("handicap_bedarf").notNull().default([]),
   status: text("status").notNull().default("laufend"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

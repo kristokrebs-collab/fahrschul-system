@@ -1,5 +1,5 @@
 {
-  "name": "@fahrschul/domain",
+  "name": "@fahrschul/matching",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "zod": "^3.23.8"
+    "@fahrschul/scheduling": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

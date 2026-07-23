@@ -4,3 +4,4 @@ export * from "./scheduling.js";
 export * from "./billing.js";
 export * from "./audit.js";
 export * from "./curriculum.js";
+export * from "./office.js";

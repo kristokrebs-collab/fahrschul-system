@@ -46,4 +46,32 @@ describe("role-permission matrix", () => {
     expect(hasPermission("schueler", "exam:read:own")).toBe(true);
     expect(hasPermission("schueler", "exam:clearance:set")).toBe(false);
   });
+
+  it("gives buero the office-only management permissions, never schueler/fahrlehrer/finanzen", () => {
+    for (const permission of [
+      "office:dashboard:read",
+      "leads:manage",
+      "messages:manage",
+      "resources:manage",
+      "storno:manage",
+      "audit:read:office",
+    ] as const) {
+      expect(hasPermission("buero", permission)).toBe(true);
+      expect(hasPermission("schueler", permission)).toBe(false);
+      expect(hasPermission("fahrlehrer", permission)).toBe(false);
+      expect(hasPermission("finanzen", permission)).toBe(false);
+    }
+  });
+
+  it("gives both fahrlehrer and buero exam:pipeline:advance (transition-level authz is enforced separately)", () => {
+    expect(hasPermission("fahrlehrer", "exam:pipeline:advance")).toBe(true);
+    expect(hasPermission("buero", "exam:pipeline:advance")).toBe(true);
+    expect(hasPermission("schueler", "exam:pipeline:advance")).toBe(false);
+  });
+
+  it("gives finanzen no office-management permissions (Finance owns financial mutation, not office)", () => {
+    expect(hasPermission("finanzen", "payments:manage")).toBe(true);
+    expect(hasPermission("finanzen", "storno:manage")).toBe(false);
+    expect(hasPermission("finanzen", "leads:manage")).toBe(false);
+  });
 });

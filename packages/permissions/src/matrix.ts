@@ -39,6 +39,14 @@ export const PERMISSIONS = [
   "feedback:manage:own", // Fahrlehrer erfasst Feedback zu eigenen Fahrten
   "learning:read:own", // Schüler sieht Lerninhalte/eigenen Lernfortschritt
   "flex:participate:own", // Schüler nimmt an Krebs Flex teil (Opt-in/Annahme), solange Flag != hidden
+  // Prompt 2 (apps/office) – Büro-Zentrale.
+  "office:dashboard:read", // Heute-Queue/Planung/Auswertungen-Lesezugriff
+  "leads:manage", // Leads/CRM anlegen/bearbeiten/konvertieren
+  "messages:manage", // Nachrichtenvorlagen + Sende-Log verwalten
+  "resources:manage", // Räume/Simulatoren/Fahrzeugmängel/Arbeitszeitregeln pflegen
+  "exam:pipeline:advance", // Prüfungs-Pipeline-Zustand weiterschalten (fahrlehrer_go bleibt zusätzlich rollen-geprüft, siehe pruefungspipeline.ts)
+  "storno:manage", // Storno-Retter-Flow auslösen/steuern
+  "audit:read:office", // Büro sieht das Audit-Log ihres Standorts (enger als audit:read der Geschäftsführung/Systemdienst)
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -71,6 +79,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "documents:read:own",
     "exam:clearance:set",
     "feedback:manage:own",
+    "exam:pipeline:advance", // eingeschränkt auf den Übergang "fahrlehrer_go", siehe pruefungspipeline.ts
   ],
   buero: [
     "students:read:any",
@@ -83,6 +92,13 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "documents:verify",
     "invoices:read:own",
     "exam:clearance:set",
+    "office:dashboard:read",
+    "leads:manage",
+    "messages:manage",
+    "resources:manage",
+    "exam:pipeline:advance",
+    "storno:manage",
+    "audit:read:office",
   ],
   finanzen: [
     "students:read:any",
