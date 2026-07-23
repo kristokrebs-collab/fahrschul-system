@@ -74,18 +74,26 @@ describe("appointment booking – server-side conflict check (non-negotiable)", 
     expect(second.statusCode).toBe(409);
   });
 
-  it("allows a non-overlapping booking for the same instructor right after the first ends", async () => {
+  it("allows a non-overlapping booking for the same instructor once the minimum break has passed", async () => {
     const first = await app.inject({ method: "POST", url: "/appointments", headers: { cookie }, payload: bookingPayload() });
     expect(first.statusCode).toBe(201);
 
+    // Prompt 2 ergänzt "Pause/Arbeitszeit" als harte Regel (siehe
+    // packages/scheduling MIN_BREAK_VIOLATED): unmittelbar back-to-back
+    // (10:00 direkt nach 10:00-Ende) ist seitdem KEIN gültiger Slot mehr für
+    // denselben Fahrlehrer, siehe office.test.ts
+    // "rejects a booking that violates the minimum break". Dieser Test prüft
+    // weiterhin das ursprüngliche Non-Negotiable (nicht-überschneidende
+    // Folgebuchung ist erlaubt), nur mit einem Abstand, der die neue
+    // Mindestpause einhält.
     const second = await app.inject({
       method: "POST",
       url: "/appointments",
       headers: { cookie },
       payload: bookingPayload({
         fahrzeugId: null,
-        beginnAt: "2026-08-03T10:00:00.000Z",
-        endeAt: "2026-08-03T11:00:00.000Z",
+        beginnAt: "2026-08-03T10:15:00.000Z",
+        endeAt: "2026-08-03T11:15:00.000Z",
       }),
     });
     expect(second.statusCode).toBe(201);

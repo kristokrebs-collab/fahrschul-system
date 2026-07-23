@@ -4,6 +4,7 @@ import multipart from "@fastify/multipart";
 import {
   createDocumentStorageAdapter,
   createMalwareScanAdapter,
+  createNotificationsAdapter,
   createPaymentAdapter,
 } from "@fahrschul/integrations";
 import Fastify, { type FastifyInstance } from "fastify";
@@ -12,14 +13,20 @@ import { createSessionLoader } from "./middleware/auth.js";
 import { registerAppointmentRoutes } from "./routes/appointments.js";
 import { registerAppointmentOfferRoutes } from "./routes/appointment-offers.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerCommunicationRoutes } from "./routes/communication.js";
 import { registerDocumentRoutes } from "./routes/documents.js";
 import { registerExamRoutes } from "./routes/exam.js";
+import { registerExamPipelineRoutes } from "./routes/exam-pipeline.js";
 import { registerFeedbackRoutes } from "./routes/feedback.js";
 import { registerFlagRoutes } from "./routes/flags.js";
 import { registerFlexRoutes } from "./routes/flex.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerInvoiceRoutes } from "./routes/invoices.js";
+import { registerLeadRoutes } from "./routes/leads.js";
 import { registerLearningRoutes } from "./routes/learning.js";
+import { registerOfficeDashboardRoutes } from "./routes/office-dashboard.js";
+import { registerResourceRoutes } from "./routes/resources.js";
+import { registerStornoRoutes } from "./routes/storno.js";
 import { registerStudentRoutes } from "./routes/student.js";
 
 export interface BuildAppOptions {
@@ -58,6 +65,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const storage = createDocumentStorageAdapter("mock");
   const malwareScan = createMalwareScanAdapter("mock");
   const payments = createPaymentAdapter("mock");
+  const notifications = createNotificationsAdapter("mock");
 
   registerHealthRoutes(app);
   registerAuthRoutes(app, db, options.cookieSecure ?? false);
@@ -71,6 +79,13 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   registerLearningRoutes(app, db);
   registerFlagRoutes(app, db);
   registerFlexRoutes(app, db);
+  // Prompt 2 (apps/office) – Büro-Zentrale-Routen.
+  registerOfficeDashboardRoutes(app, db);
+  registerResourceRoutes(app, db);
+  registerLeadRoutes(app, db);
+  registerCommunicationRoutes(app, db, { notifications });
+  registerExamPipelineRoutes(app, db);
+  registerStornoRoutes(app, db);
 
   return app;
 }

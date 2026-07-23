@@ -26,6 +26,14 @@ export async function truncateAll(databaseUrl: string) {
   try {
     await sql`truncate table
       audit_events,
+      storno_angebote,
+      storno_events,
+      pruefungen,
+      nachrichten,
+      nachrichten_vorlagen,
+      leads,
+      arbeitszeitregeln,
+      fahrzeugmaengel,
       flex_opt_ins,
       flex_angebote,
       pruefungsfreigaben,
@@ -43,6 +51,8 @@ export async function truncateAll(databaseUrl: string) {
       zahlungen,
       rechnungen,
       fahrzeuge,
+      raeume,
+      simulatorgeraete,
       fahrlehrer,
       schueler,
       sessions,

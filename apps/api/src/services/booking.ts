@@ -1,8 +1,12 @@
-import { auditEreignisse, fahrlehrer, fahrzeuge, terminbuchungen } from "@fahrschul/database";
+import { ausbildungen, auditEreignisse, fahrlehrer, fahrzeuge, terminbuchungen } from "@fahrschul/database";
 import type { Database } from "@fahrschul/database";
 import { buildEventRow } from "@fahrschul/events";
-import { checkBookingConflicts, type ExistingBooking } from "@fahrschul/scheduling";
-import { and, eq, ne, gt, lt } from "drizzle-orm";
+import {
+  checkBookingConflicts,
+  UNBESTAETIGT_MIN_PAUSE_MINUTEN,
+  type ExistingBooking,
+} from "@fahrschul/scheduling";
+import { and, eq, ne, gt, lt, or } from "drizzle-orm";
 import type { AuditEventType } from "@fahrschul/events";
 
 /** SQLSTATE für PostgreSQL EXCLUDE-Constraint-Verletzung bzw. unique_violation. */
@@ -23,6 +27,9 @@ export interface BookingInput {
   schuelerId: string;
   fahrlehrerId: string;
   fahrzeugId?: string | null;
+  raumId?: string | null;
+  simulatorgeraetId?: string | null;
+  getriebeart?: "schaltung" | "automatik";
   beginnAt: Date;
   endeAt: Date;
   art: string;
@@ -70,41 +77,116 @@ export async function performBooking(tx: Tx, input: BookingInput) {
   const vehicleRow = input.fahrzeugId
     ? (
         await tx
-          .select({ fahrzeugId: fahrzeuge.id, klasse: fahrzeuge.klasse })
+          .select({
+            fahrzeugId: fahrzeuge.id,
+            klasse: fahrzeuge.klasse,
+            status: fahrzeuge.status,
+            automatik: fahrzeuge.automatik,
+            handicapAusstattung: fahrzeuge.handicapAusstattung,
+          })
           .from(fahrzeuge)
           .where(eq(fahrzeuge.id, input.fahrzeugId))
           .limit(1)
       )[0] ?? null
     : null;
 
+  // Ausbildung des Schülers für diese Klasse (Handicap-Bedarf + Getriebeart-
+  // Anmerkung); optional, weil nicht jede Buchung zwingend einer Ausbildung
+  // zugeordnet sein muss (z. B. Prüfung).
+  const [ausbildungRow] = await tx
+    .select({ handicapBedarf: ausbildungen.handicapBedarf })
+    .from(ausbildungen)
+    .where(and(eq(ausbildungen.schuelerId, input.schuelerId), eq(ausbildungen.klasse, input.klasse)))
+    .limit(1);
+
+  let completedUebungsstunden: number | undefined;
+  if (input.art === "Sonderfahrt") {
+    const rows = await tx
+      .select({ id: terminbuchungen.id })
+      .from(terminbuchungen)
+      .where(
+        and(
+          eq(terminbuchungen.schuelerId, input.schuelerId),
+          eq(terminbuchungen.art, "Übungsstunde"),
+          ne(terminbuchungen.status, "cancelled"),
+        ),
+      );
+    completedUebungsstunden = rows.length;
+  }
+
+  // Breite Überschneidungsabfrage: nicht nur Fahrlehrer, sondern auch
+  // Schüler/Fahrzeug/Raum/Simulator können im selben Zeitfenster kollidieren
+  // (harte Regeln "Schüler frei"/"Raum/Simulator frei"). Die Ressourcen-
+  // spezifische Zuordnung übernimmt checkBookingConflicts unten.
   const overlapping = await tx
     .select()
     .from(terminbuchungen)
     .where(
       and(
         ne(terminbuchungen.status, "cancelled"),
-        eq(terminbuchungen.fahrlehrerId, input.fahrlehrerId),
         lt(terminbuchungen.beginnAt, input.endeAt),
         gt(terminbuchungen.endeAt, input.beginnAt),
+        or(
+          eq(terminbuchungen.fahrlehrerId, input.fahrlehrerId),
+          eq(terminbuchungen.schuelerId, input.schuelerId),
+          input.fahrzeugId ? eq(terminbuchungen.fahrzeugId, input.fahrzeugId) : undefined,
+          input.raumId ? eq(terminbuchungen.raumId, input.raumId) : undefined,
+          input.simulatorgeraetId ? eq(terminbuchungen.simulatorgeraetId, input.simulatorgeraetId) : undefined,
+        ),
       ),
     );
+
+  // Pause/Arbeitszeit (harte Regel): Buchungen desselben Fahrlehrers, die
+  // NICHT direkt überschneiden, aber innerhalb der Mindestpause an das
+  // angefragte Zeitfenster angrenzen, tauchen in der Überschneidungsabfrage
+  // oben NICHT auf (sie überschneiden sich per Definition nicht) – daher
+  // eine zweite, um den Pausen-Puffer erweiterte Abfrage NUR für diesen
+  // Fahrlehrer, damit checkBookingConflicts() den Mindestabstand prüfen kann.
+  const pauseBufferMs = UNBESTAETIGT_MIN_PAUSE_MINUTEN * 60_000;
+  const nearbyInstructorBookings = await tx
+    .select()
+    .from(terminbuchungen)
+    .where(
+      and(
+        ne(terminbuchungen.status, "cancelled"),
+        eq(terminbuchungen.fahrlehrerId, input.fahrlehrerId),
+        lt(terminbuchungen.beginnAt, new Date(input.endeAt.getTime() + pauseBufferMs)),
+        gt(terminbuchungen.endeAt, new Date(input.beginnAt.getTime() - pauseBufferMs)),
+      ),
+    );
+  const existingBookingsById = new Map<string, (typeof overlapping)[number]>();
+  for (const row of [...overlapping, ...nearbyInstructorBookings]) existingBookingsById.set(row.id, row);
+  const mergedExistingBookings = [...existingBookingsById.values()];
 
   const conflictCheck = checkBookingConflicts(
     {
       fahrlehrerId: input.fahrlehrerId,
       fahrzeugId: input.fahrzeugId ?? null,
+      schuelerId: input.schuelerId,
+      raumId: input.raumId ?? null,
+      simulatorgeraetId: input.simulatorgeraetId ?? null,
       klasse: input.klasse as never,
+      getriebeart: input.getriebeart,
+      art: input.art,
       beginnAt: input.beginnAt,
       endeAt: input.endeAt,
     },
     {
-      existingBookings: overlapping as unknown as ExistingBooking[],
+      existingBookings: mergedExistingBookings as unknown as ExistingBooking[],
       instructorQualification: qualification
         ? { fahrlehrerId: qualification.fahrlehrerId, klassen: qualification.klassen as never }
         : null,
       vehicleClass: vehicleRow
-        ? { fahrzeugId: vehicleRow.fahrzeugId, klasse: vehicleRow.klasse as never }
+        ? {
+            fahrzeugId: vehicleRow.fahrzeugId,
+            klasse: vehicleRow.klasse as never,
+            status: vehicleRow.status,
+            automatik: vehicleRow.automatik,
+            handicapAusstattung: (vehicleRow.handicapAusstattung as string[] | null) ?? [],
+          }
         : null,
+      handicapBedarf: (ausbildungRow?.handicapBedarf as string[] | null) ?? [],
+      completedUebungsstunden,
     },
   );
 
@@ -120,6 +202,8 @@ export async function performBooking(tx: Tx, input: BookingInput) {
       schuelerId: input.schuelerId,
       fahrlehrerId: input.fahrlehrerId,
       fahrzeugId: input.fahrzeugId ?? null,
+      raumId: input.raumId ?? null,
+      simulatorgeraetId: input.simulatorgeraetId ?? null,
       beginnAt: input.beginnAt,
       endeAt: input.endeAt,
       art: input.art,
