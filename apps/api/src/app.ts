@@ -1,4 +1,5 @@
 import cookie from "@fastify/cookie";
+import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import {
   createDocumentStorageAdapter,
@@ -25,6 +26,8 @@ export interface BuildAppOptions {
   databaseUrl: string;
   cookieSecure?: boolean;
   logger?: boolean;
+  /** Erlaubte Browser-Origins für die App-Frontends (Vite-Dev-Server/Prod-Hosts). */
+  corsOrigins?: string[];
 }
 
 export function buildApp(options: BuildAppOptions): FastifyInstance {
@@ -32,6 +35,16 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const db = getDb(options.databaseUrl);
 
   app.register(cookie);
+  // credentials:true ist nötig, weil apps/student httpOnly-Session-Cookies
+  // nutzt (kein Bearer-Token im JS-Zugriff) – der Origin muss deshalb
+  // explizit gelistet sein statt "*" (sonst verbieten Browser Cookies).
+  app.register(cors, {
+    origin: options.corsOrigins ?? [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+    ],
+    credentials: true,
+  });
   app.register(multipart, {
     limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   });
