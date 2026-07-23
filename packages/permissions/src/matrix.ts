@@ -47,6 +47,14 @@ export const PERMISSIONS = [
   "exam:pipeline:advance", // Prüfungs-Pipeline-Zustand weiterschalten (fahrlehrer_go bleibt zusätzlich rollen-geprüft, siehe pruefungspipeline.ts)
   "storno:manage", // Storno-Retter-Flow auslösen/steuern
   "audit:read:office", // Büro sieht das Audit-Log ihres Standorts (enger als audit:read der Geschäftsführung/Systemdienst)
+  // Prompt 3 (apps/instructor) – Fahrlehrer-App.
+  "instructor:lesson:start", // Stunde starten (serverseitig validiert, own scope)
+  "instructor:lesson:complete", // Stunde beenden (verpflichtender 8-Schritt-Fluss)
+  "instructor:voice_log:manage", // Sprachprotokoll aufnehmen/bearbeiten/bestätigen
+  "competency:write:own", // Kompetenzraster-Beobachtungen zu eigenen Schülern erfassen
+  "competency:read:own", // Kompetenzraster zu eigenen Schülern lesen (Briefing)
+  "vehicle:issue:report", // Fahrzeug-Mangelmeldung/Quick-Check (own = eigene Meldung)
+  "arbeitszeit:read:own", // eigene Arbeitszeit-Ansicht (Plan vs. Ist)
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -80,6 +88,13 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "exam:clearance:set",
     "feedback:manage:own",
     "exam:pipeline:advance", // eingeschränkt auf den Übergang "fahrlehrer_go", siehe pruefungspipeline.ts
+    "instructor:lesson:start",
+    "instructor:lesson:complete",
+    "instructor:voice_log:manage",
+    "competency:write:own",
+    "competency:read:own",
+    "vehicle:issue:report",
+    "arbeitszeit:read:own",
   ],
   buero: [
     "students:read:any",

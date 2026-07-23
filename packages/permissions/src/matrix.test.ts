@@ -74,4 +74,21 @@ describe("role-permission matrix", () => {
     expect(hasPermission("finanzen", "storno:manage")).toBe(false);
     expect(hasPermission("finanzen", "leads:manage")).toBe(false);
   });
+
+  it("gives fahrlehrer the Prompt-3 instructor-app permissions, never schueler/buero/finanzen", () => {
+    for (const permission of [
+      "instructor:lesson:start",
+      "instructor:lesson:complete",
+      "instructor:voice_log:manage",
+      "competency:write:own",
+      "competency:read:own",
+      "vehicle:issue:report",
+      "arbeitszeit:read:own",
+    ] as const) {
+      expect(hasPermission("fahrlehrer", permission)).toBe(true);
+      expect(hasPermission("schueler", permission)).toBe(false);
+      expect(hasPermission("buero", permission)).toBe(false);
+      expect(hasPermission("finanzen", permission)).toBe(false);
+    }
+  });
 });

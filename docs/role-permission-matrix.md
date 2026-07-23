@@ -112,6 +112,28 @@ einer Ausnahme (`exam:pipeline:advance`, siehe unten):
   Prompt 4's Finance app" – umgekehrt bekommt Büro keine
   `invoices:manage`/`payments:manage`/`bank:reconcile`).
 
+## Prompt 3 – Erweiterungen (apps/instructor)
+
+Neue Berechtigungen, alle ausschließlich für die Rolle Fahrlehrer:
+
+| Berechtigung | Zweck |
+|---|---|
+| `instructor:lesson:start` | Stunde starten (serverseitig validiert: Termin/Schüler/Fahrlehrer/Fahrzeug/Zeit/Status/Konflikte) |
+| `instructor:lesson:complete` | Stunde beenden (verpflichtender 8-Schritt-Fluss, siehe `lessonCompletionInputSchema`) |
+| `instructor:voice_log:manage` | Sprachprotokoll aufnehmen/bearbeiten/bestätigen |
+| `competency:write:own` | Kompetenzraster-Beobachtungen zu eigenen Schülern erfassen |
+| `competency:read:own` | Kompetenzraster/Schülerbriefing zu eigenen Schülern lesen |
+| `vehicle:issue:report` | Fahrzeug-Mangelmeldung/Quick-Check |
+| `arbeitszeit:read:own` | eigene Arbeitszeit-Ansicht (Plan vs. Ist, keine Rangliste) |
+
+Alle sieben Berechtigungen sind ausschließlich für `fahrlehrer` vergeben,
+NIE für `schueler`/`buero`/`finanzen` (siehe
+`packages/permissions/src/matrix.test.ts`). `exam:pipeline:advance` (Prompt
+2) wird unverändert wiederverwendet – der `fahrlehrer_go`-Übergang bleibt
+über `packages/domain/src/pruefungspipeline.ts` transition-spezifisch auf
+die Rolle `fahrlehrer` beschränkt; apps/instructor führt hier KEINE eigene
+Logik ein.
+
 Diese Matrix ist die Ausgangsbasis für Prompt 0. Feingranularere Rechte
 (z. B. differenzierte Dokumenttypen, Mehr-Augen-Prinzip bei
 Prüfungsfreigaben, siehe `docs/fachliche-bestaetigungen.md` Punkt 11) werden

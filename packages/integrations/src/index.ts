@@ -6,3 +6,5 @@ export * from "./storage/index.js";
 export * from "./crm/index.js";
 export * from "./malware-scan/index.js";
 export * from "./payments/index.js";
+export * from "./transcription/index.js";
+export * from "./ai-suggestions/index.js";

@@ -4,3 +4,4 @@ export * from "./entities.js";
 export * from "./events.js";
 export * from "./curriculum.js";
 export * from "./pruefungspipeline.js";
+export * from "./instructor.js";

@@ -27,6 +27,11 @@ export const EVENT_TYPES = [
   "flex.opt_in",
   "flex.offer.accepted",
   "invoice.inquiry.raised",
+  // Prompt 3 (apps/instructor)
+  "lesson.started",
+  "vehicle_issue.reported",
+  "voice_log.confirmed",
+  "competency.observed",
 ] as const;
 
 export const eventTypeSchema = z.enum(EVENT_TYPES);

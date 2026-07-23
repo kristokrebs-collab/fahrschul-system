@@ -1,4 +1,4 @@
-import { integer, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { standorte } from "./core.js";
 import { ausbildungen, fahrlehrer, schueler } from "./people.js";
 import { fahrzeuge, terminbuchungen } from "./scheduling.js";
@@ -25,6 +25,16 @@ export const fahrzeugmaengel = pgTable("fahrzeugmaengel", {
   status: text("status").notNull().default("offen"),
   gemeldetAt: timestamp("gemeldet_at", { withTimezone: true }).notNull().defaultNow(),
   behobenAt: timestamp("behoben_at", { withTimezone: true }),
+  // Prompt 3 (apps/instructor) – erweiterte Mangelmeldung (Quick-Check).
+  gemeldetVonBenutzerId: uuid("gemeldet_von_benutzer_id"),
+  kilometerstand: integer("kilometerstand"),
+  tankLadungProzent: integer("tank_ladung_prozent"),
+  warnleuchten: jsonb("warnleuchten").notNull().default([]),
+  schweregrad: text("schweregrad").notNull().default("mittel"),
+  einsatzbereit: boolean("einsatzbereit").notNull().default(true),
+  fotoReferenz: text("foto_referenz"),
+  sprachnotizReferenz: text("sprachnotiz_referenz"),
+  geroutetAn: text("geroutet_an").notNull().default("buero"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
