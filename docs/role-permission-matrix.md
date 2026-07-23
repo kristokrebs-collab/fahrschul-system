@@ -34,6 +34,34 @@ zuständigen Standort/Organisation (zusätzlich durch Datenbank-Scoping in
 | users:manage | – | – | – | – | – | ✅ |
 | audit:read | – | – | – | – | ✅ | ✅ |
 | system:admin | – | – | – | – | – | ✅ |
+| appointments:accept:own | ✅ | – | – | – | – | – |
+| wunschzeiten:write:own | ✅ | – | – | – | – | – |
+| exam:read:own | ✅ | – | – | – | – | – |
+| exam:clearance:set | – | ✅ | ✅ | – | – | – |
+| feedback:read:own | ✅ | – | – | – | – | – |
+| feedback:manage:own | – | ✅ | – | – | – | – |
+| learning:read:own | ✅ | – | – | – | – | – |
+| flex:participate:own | ✅ | – | – | – | – | – |
+
+## Prompt 1 – Erweiterungen (apps/student)
+
+Die folgenden Berechtigungen wurden für die Fahrschüler-App ergänzt. Sie
+bleiben bewusst eng geschnitten (`own`-Scope, keine Schreibrechte über
+Genehmigungen hinaus):
+
+- **appointments:accept:own** ist ausdrücklich NICHT dasselbe wie
+  `appointments:create`. Ein Schüler kann damit ausschließlich ein
+  bestehendes, offenes Terminangebot eines Fahrlehrers annehmen (serverseitig
+  erneut konfliktgeprüft, siehe `apps/api/src/routes/appointment-offers.ts`),
+  niemals selbst einen neuen Termin für sich oder andere anlegen.
+- **exam:clearance:set** haben ausschließlich Fahrlehrer und Büro. Die
+  Schüler-App ist bei der PrüfungsReady-Ansicht rein lesend
+  (`exam:read:own`); das wird serverseitig über die Rollen-Middleware
+  erzwungen, nicht nur durch das Verstecken eines Buttons im UI.
+- **feedback:read:own** liefert niemals das Feld `internalNotes` der
+  Fahrlehrer-Notizen – das wird auf Query-/Serialisierungsebene in
+  `apps/api` gefiltert, nicht nur im UI ausgeblendet (siehe
+  `docs/student-app-final-qa.md`).
 
 ## Fachliche Anmerkungen
 

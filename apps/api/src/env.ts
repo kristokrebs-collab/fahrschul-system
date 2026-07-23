@@ -14,4 +14,5 @@ export const env = {
   sessionSecret: () => required("SESSION_SECRET", "dev-only-insecure-secret-change-me"),
   cookieSecure: process.env.COOKIE_SECURE === "true",
   totpIssuer: process.env.TOTP_ISSUER ?? "Fahrschule Krebs",
+  documentStorageMode: (process.env.DOCUMENT_STORAGE_MODE ?? "mock") as "mock" | "sandbox" | "live",
 };

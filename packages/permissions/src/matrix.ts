@@ -29,6 +29,16 @@ export const PERMISSIONS = [
   "users:manage",
   "audit:read",
   "system:admin",
+  // Prompt 1 (apps/student) – konservative Erweiterungen, siehe
+  // docs/role-permission-matrix.md "Fachliche Anmerkungen".
+  "appointments:accept:own", // Schüler nimmt ein bestehendes Terminangebot an (KEIN appointments:create)
+  "wunschzeiten:write:own", // Schüler pflegt eigene Wunschzeiten (nicht die Fahrlehrer-Verfügbarkeit)
+  "exam:read:own", // Schüler sieht die eigene PrüfungsReady-Übersicht (read-only)
+  "exam:clearance:set", // NUR Fahrlehrer/Büro dürfen eine Prüfungsfreigabe setzen
+  "feedback:read:own", // Schüler sieht freigegebenes Fahrstundenfeedback (nie interne Notizen)
+  "feedback:manage:own", // Fahrlehrer erfasst Feedback zu eigenen Fahrten
+  "learning:read:own", // Schüler sieht Lerninhalte/eigenen Lernfortschritt
+  "flex:participate:own", // Schüler nimmt an Krebs Flex teil (Opt-in/Annahme), solange Flag != hidden
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -42,9 +52,15 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "students:read:own",
     "appointments:read:own",
     "appointments:cancel:own",
+    "appointments:accept:own",
+    "wunschzeiten:write:own",
     "documents:upload:own",
     "documents:read:own",
     "invoices:read:own",
+    "exam:read:own",
+    "feedback:read:own",
+    "learning:read:own",
+    "flex:participate:own",
   ],
   fahrlehrer: [
     "students:read:own",
@@ -53,6 +69,8 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "appointments:cancel:own",
     "availability:write:own",
     "documents:read:own",
+    "exam:clearance:set",
+    "feedback:manage:own",
   ],
   buero: [
     "students:read:any",
@@ -64,6 +82,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "documents:read:any",
     "documents:verify",
     "invoices:read:own",
+    "exam:clearance:set",
   ],
   finanzen: [
     "students:read:any",

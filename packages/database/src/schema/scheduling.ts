@@ -1,4 +1,4 @@
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { standorte } from "./core.js";
 import { fahrlehrer, schueler } from "./people.js";
 
@@ -24,6 +24,10 @@ export const terminangebote = pgTable("terminangebote", {
   beginnAt: timestamp("beginn_at", { withTimezone: true }).notNull(),
   endeAt: timestamp("ende_at", { withTimezone: true }).notNull(),
   klasse: text("klasse"),
+  art: text("art").notNull().default("Übungsstunde"),
+  treffpunkt: text("treffpunkt"),
+  automatik: boolean("automatik").notNull().default(false),
+  ablaufAt: timestamp("ablauf_at", { withTimezone: true }),
   status: text("status").notNull().default("offen"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

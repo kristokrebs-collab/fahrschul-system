@@ -47,8 +47,26 @@ export const dokumente = pgTable("dokumente", {
   // niemals Base64-Klartext in der Datenbank (Security-Risk #4 im Prototyp).
   speicherReferenz: text("speicher_referenz").notNull(),
   geprueft: boolean("geprueft").notNull().default(false),
+  ablehnungsgrund: text("ablehnungsgrund"),
+  gueltigBis: date("gueltig_bis"),
+  ersetztVonDokumentId: uuid("ersetzt_von_dokument_id"),
+  // Mock-Malware-Scan (packages/integrations malware-scan Adapter,
+  // "always clean" – kein echter AV-Anbieter in dieser Sandbox verfügbar).
+  scanStatus: text("scan_status").notNull().default("ausstehend"),
   status: text("status").notNull().default("eingereicht"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const rechnungspositionen = pgTable("rechnungspositionen", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  rechnungId: uuid("rechnung_id")
+    .notNull()
+    .references(() => rechnungen.id),
+  bezeichnung: text("bezeichnung").notNull(),
+  mengeCent: integer("menge_cent"),
+  einzelpreisCent: integer("einzelpreis_cent").notNull(),
+  gesamtpreisCent: integer("gesamtpreis_cent").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

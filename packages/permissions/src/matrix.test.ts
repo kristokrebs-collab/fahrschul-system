@@ -30,4 +30,20 @@ describe("role-permission matrix", () => {
     expect(hasPermission("buero", "appointments:create")).toBe(true);
     expect(hasPermission("buero", "documents:verify")).toBe(true);
   });
+
+  it("lets schueler accept an offer but not create arbitrary appointments", () => {
+    expect(hasPermission("schueler", "appointments:accept:own")).toBe(true);
+    expect(hasPermission("schueler", "appointments:create")).toBe(false);
+  });
+
+  it("only fahrlehrer/buero may set an exam clearance, never schueler", () => {
+    expect(hasPermission("fahrlehrer", "exam:clearance:set")).toBe(true);
+    expect(hasPermission("buero", "exam:clearance:set")).toBe(true);
+    expect(hasPermission("schueler", "exam:clearance:set")).toBe(false);
+  });
+
+  it("schueler is read-only on exam readiness", () => {
+    expect(hasPermission("schueler", "exam:read:own")).toBe(true);
+    expect(hasPermission("schueler", "exam:clearance:set")).toBe(false);
+  });
 });

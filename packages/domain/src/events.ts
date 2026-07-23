@@ -18,6 +18,15 @@ export const EVENT_TYPES = [
   "exam.clearance.granted",
   "invoice.issued",
   "payment.matched",
+  "lesson.offer.accepted",
+  "lesson.offer.declined",
+  "document.rejected",
+  "document.reuploaded",
+  "feedback.given",
+  "feedback.self_assessment.set",
+  "flex.opt_in",
+  "flex.offer.accepted",
+  "invoice.inquiry.raised",
 ] as const;
 
 export const eventTypeSchema = z.enum(EVENT_TYPES);

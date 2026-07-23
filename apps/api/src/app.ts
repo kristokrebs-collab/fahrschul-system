@@ -1,10 +1,25 @@
 import cookie from "@fastify/cookie";
+import multipart from "@fastify/multipart";
+import {
+  createDocumentStorageAdapter,
+  createMalwareScanAdapter,
+  createPaymentAdapter,
+} from "@fahrschul/integrations";
 import Fastify, { type FastifyInstance } from "fastify";
 import { getDb } from "./db.js";
 import { createSessionLoader } from "./middleware/auth.js";
 import { registerAppointmentRoutes } from "./routes/appointments.js";
+import { registerAppointmentOfferRoutes } from "./routes/appointment-offers.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerDocumentRoutes } from "./routes/documents.js";
+import { registerExamRoutes } from "./routes/exam.js";
+import { registerFeedbackRoutes } from "./routes/feedback.js";
+import { registerFlagRoutes } from "./routes/flags.js";
+import { registerFlexRoutes } from "./routes/flex.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerInvoiceRoutes } from "./routes/invoices.js";
+import { registerLearningRoutes } from "./routes/learning.js";
+import { registerStudentRoutes } from "./routes/student.js";
 
 export interface BuildAppOptions {
   databaseUrl: string;
@@ -17,12 +32,32 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const db = getDb(options.databaseUrl);
 
   app.register(cookie);
+  app.register(multipart, {
+    limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  });
 
   app.addHook("preHandler", createSessionLoader(db));
+
+  // Alle externen Integrationen laufen in dieser Umgebung ausschließlich im
+  // mock-Modus (siehe docs/integration-gaps.md) – assertMockOnly wirft für
+  // sandbox/live bewusst einen Fehler statt eine nicht getestete
+  // "Live-Schnittstelle" zu behaupten.
+  const storage = createDocumentStorageAdapter("mock");
+  const malwareScan = createMalwareScanAdapter("mock");
+  const payments = createPaymentAdapter("mock");
 
   registerHealthRoutes(app);
   registerAuthRoutes(app, db, options.cookieSecure ?? false);
   registerAppointmentRoutes(app, db);
+  registerAppointmentOfferRoutes(app, db);
+  registerStudentRoutes(app, db);
+  registerExamRoutes(app, db);
+  registerDocumentRoutes(app, db, { storage, malwareScan });
+  registerFeedbackRoutes(app, db);
+  registerInvoiceRoutes(app, db, { payments });
+  registerLearningRoutes(app, db);
+  registerFlagRoutes(app, db);
+  registerFlexRoutes(app, db);
 
   return app;
 }

@@ -92,6 +92,13 @@ export const terminangebotSchema = baseEntityWithStandortSchema.extend({
   beginnAt: z.coerce.date(),
   endeAt: z.coerce.date(),
   klasse: fahrerlaubnisklasseCode.nullable(),
+  art: z.string(),
+  treffpunkt: z.string().nullable(),
+  automatik: z.boolean(),
+  // Prompt 1: Terminangebote laufen ab (Anzeige mit exaktem Ablauf-Zeitpunkt
+  // statt der groben Tagesperioden aus app.html), damit "kurzfristig
+  // verfügbar" server-seitig auswertbar ist statt nur clientseitig geraten.
+  ablaufAt: z.coerce.date().nullable(),
 });
 export type Terminangebot = z.infer<typeof terminangebotSchema>;
 
@@ -114,12 +121,21 @@ export const fahrzeugSchema = baseEntityWithStandortSchema.extend({
 });
 export type Fahrzeug = z.infer<typeof fahrzeugSchema>;
 
+export const dokumentScanStatus = z.enum(["ausstehend", "sauber", "verdaechtig"]);
+
 export const dokumentSchema = baseEntityWithStandortSchema.extend({
   schuelerId: z.string().uuid(),
   typ: z.string(),
   dateiname: z.string(),
   speicherReferenz: z.string(), // Referenz auf packages/integrations Storage-Adapter, NIE Base64 im DB-Feld
   geprueft: z.boolean(),
+  ablehnungsgrund: z.string().nullable(),
+  gueltigBis: z.coerce.date().nullable(),
+  ersetztVonDokumentId: z.string().uuid().nullable(),
+  // Mock-Malware-Scan-Ergebnis (siehe packages/integrations malware-scan
+  // Adapter, "always clean" – kein echter AV-Anbieter in dieser Umgebung
+  // verfügbar, siehe docs/integration-gaps.md).
+  scanStatus: dokumentScanStatus,
 });
 export type Dokument = z.infer<typeof dokumentSchema>;
 
@@ -129,6 +145,16 @@ export const rechnungSchema = baseEntityWithStandortSchema.extend({
   faelligAm: z.coerce.date().nullable(),
 });
 export type Rechnung = z.infer<typeof rechnungSchema>;
+
+export const rechnungspositionSchema = z.object({
+  id: z.string().uuid(),
+  rechnungId: z.string().uuid(),
+  bezeichnung: z.string(),
+  mengeCent: z.number().int().nullable(),
+  einzelpreisCent: z.number().int(),
+  gesamtpreisCent: z.number().int(),
+});
+export type Rechnungsposition = z.infer<typeof rechnungspositionSchema>;
 
 export const zahlungSchema = baseEntityWithStandortSchema.extend({
   rechnungId: z.string().uuid().nullable(),
