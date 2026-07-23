@@ -1,0 +1,247 @@
+/* Design-DNA aus app.html (siehe docs/prototype-audit.md) – Farbsystem/
+   Radius/Typografie portiert, KEIN Code aus der Prototyp-Datei übernommen. */
+:root {
+  --bg-base: #0f1219;
+  --surface: #1a1f2c;
+  --surface-2: #1f2536;
+  --border: rgba(248, 250, 252, 0.07);
+  --border-strong: rgba(248, 250, 252, 0.13);
+  --text: #f8fafc;
+  --text-dim: #9aa3b4;
+  --accent: #e11d48;
+  --accent-hi: #f43f5e;
+  --emerald: #10b981;
+  --radius: 20px;
+  --radius-sm: 14px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg-base);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  padding: 20px 18px calc(88px + env(safe-area-inset-bottom));
+  flex: 1;
+}
+
+.fahrschul-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.fahrschul-card__title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.fahrschul-btn {
+  border-radius: var(--radius-sm);
+  border: none;
+  padding: 12px 18px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  margin: 4px 6px 4px 0;
+  min-height: 44px;
+  min-width: 44px;
+}
+.fahrschul-btn--primary {
+  background: var(--accent);
+  color: white;
+}
+.fahrschul-btn--secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+.fahrschul-btn--danger {
+  background: transparent;
+  color: var(--accent-hi);
+  border: 1px solid var(--accent-hi);
+}
+.fahrschul-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-around;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
+}
+
+.bottom-nav__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.7rem;
+  padding: 6px 8px;
+  min-width: 44px;
+  min-height: 44px;
+}
+.bottom-nav__item--active {
+  color: var(--accent-hi);
+}
+
+.offline-banner {
+  background: #3a2e12;
+  color: #f5d78e;
+  padding: 10px 16px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.tacho__label {
+  font-weight: 600;
+  text-align: center;
+}
+.tacho__sublabel {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.ausbildung-steps {
+  list-style: none;
+  padding: 0;
+}
+.ausbildung-step {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ausbildung-step__note {
+  width: 100%;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.offer-card {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.offer-card__actions {
+  display: flex;
+  gap: 8px;
+}
+
+form label {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+input,
+select,
+textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  margin-top: 4px;
+  min-height: 44px;
+}
+
+.form-error,
+[role="alert"] {
+  color: var(--accent-hi);
+}
+
+/* Nicht-essentielle Animation (z.B. Tacho-Nadel) wird bei
+   prefers-reduced-motion deaktiviert – siehe useReducedMotion.ts, das die
+   Transition zusätzlich inline entfernt. Diese Regel ist die
+   CSS-seitige Absicherung für alles, was rein per CSS animiert. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg-base: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #f0f1f4;
+    --text: #12141a;
+    --text-dim: #5b6272;
+    --border: rgba(15, 18, 25, 0.08);
+    --border-strong: rgba(15, 18, 25, 0.16);
+  }
+}
+
+/* Responsive Smoke-Test-Ziele: 360/390/768/1024 (siehe
+   docs/student-app-final-qa.md) – die App bleibt mobile-first mit
+   max-width, wächst auf größeren Breakpoints nicht unkontrolliert. */
+@media (min-width: 768px) {
+  .app-shell {
+    max-width: 560px;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+}
+
+/* Drive Lock Mode: bewusst KEINE Animation (Spec "no animation"),
+   großflächige Touch-Ziele, hoher Kontrast. */
+.drive-lock-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  text-align: center;
+}
+.drive-lock-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 320px;
+}
+.drive-lock-actions .fahrschul-btn {
+  font-size: 1.2rem;
+  padding: 20px;
+}

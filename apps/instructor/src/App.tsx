@@ -1,27 +1,110 @@
-import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { BottomNav } from "./components/BottomNav.js";
+import { RequireUnlocked } from "./components/RequireUnlocked.js";
+import { Dokumentieren } from "./routes/Dokumentieren.js";
+import { DriveLock } from "./routes/DriveLock.js";
+import { Fahrzeug } from "./routes/Fahrzeug.js";
+import { Heute } from "./routes/Heute.js";
+import { Login } from "./routes/Login.js";
+import { Mehr } from "./routes/Mehr.js";
+import { Schueler } from "./routes/Schueler.js";
+import { SchuelerBriefing } from "./routes/SchuelerBriefing.js";
+import { StundeBeenden } from "./routes/StundeBeenden.js";
+import { useSession } from "./state/SessionContext.js";
+
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user, loading } = useSession();
+  if (loading) {
+    return (
+      <main className="screen">
+        <p>Lädt…</p>
+      </main>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
 
 /**
- * Platzhalter-App für "Fahrlehrer-App" (Rolle: Fahrlehrer). Reale Fachlogik folgt in
- * Prompt 1-4 (siehe docs/architecture-report.md). Dieser Health-Check zeigt
- * lediglich, dass Build/Dev-Server laufen und die API erreichbar ist.
+ * Fahrlehrer-App gegen apps/api. Fünf Tabs: Heute, Schüler, Dokumentieren,
+ * Fahrzeug, Mehr. /drivelock und /dokumentieren/beenden/:id bleiben
+ * IMMER erreichbar (auch im Drive Lock Mode) – jede andere Route ist mit
+ * `RequireUnlocked` umschlossen und leitet bei aktivem Fahrmodus dorthin um
+ * (siehe components/RequireUnlocked.tsx + state/DriveLockContext.tsx).
  */
 export function App() {
-  const [apiStatus, setApiStatus] = useState<"loading" | "ok" | "error">("loading");
-
-  useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
-    fetch(`${apiBase}/health`)
-      .then((res) => (res.ok ? setApiStatus("ok") : setApiStatus("error")))
-      .catch(() => setApiStatus("error"));
-  }, []);
+  const { user } = useSession();
 
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", padding: "2rem" }}>
-      <h1>Fahrlehrer-App</h1>
-      <p>Platzhalter-App (Rolle: Fahrlehrer) – Prompt 0 Grundgerüst.</p>
-      <p>
-        API-Status: <strong>{apiStatus}</strong>
-      </p>
-    </main>
+    <div className="app-shell">
+      <Routes>
+        <Route path="/login" element={user ? <Navigate to="/heute" replace /> : <Login />} />
+        <Route
+          path="/*"
+          element={
+            <RequireAuth>
+              <>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/heute" replace />} />
+                  <Route path="/drivelock" element={<DriveLock />} />
+                  <Route path="/dokumentieren/beenden/:id" element={<StundeBeenden />} />
+                  <Route
+                    path="/heute"
+                    element={
+                      <RequireUnlocked>
+                        <Heute />
+                      </RequireUnlocked>
+                    }
+                  />
+                  <Route
+                    path="/schueler"
+                    element={
+                      <RequireUnlocked>
+                        <Schueler />
+                      </RequireUnlocked>
+                    }
+                  />
+                  <Route
+                    path="/schueler/:id/briefing"
+                    element={
+                      <RequireUnlocked>
+                        <SchuelerBriefing />
+                      </RequireUnlocked>
+                    }
+                  />
+                  <Route
+                    path="/dokumentieren"
+                    element={
+                      <RequireUnlocked>
+                        <Dokumentieren />
+                      </RequireUnlocked>
+                    }
+                  />
+                  <Route
+                    path="/fahrzeug"
+                    element={
+                      <RequireUnlocked>
+                        <Fahrzeug />
+                      </RequireUnlocked>
+                    }
+                  />
+                  <Route
+                    path="/mehr"
+                    element={
+                      <RequireUnlocked>
+                        <Mehr />
+                      </RequireUnlocked>
+                    }
+                  />
+                  <Route path="*" element={<Navigate to="/heute" replace />} />
+                </Routes>
+                <BottomNav />
+              </>
+            </RequireAuth>
+          }
+        />
+      </Routes>
+    </div>
   );
 }
