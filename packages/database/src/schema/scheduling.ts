@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, date, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { standorte } from "./core.js";
 import { fahrlehrer, schueler } from "./people.js";
 
@@ -40,6 +40,18 @@ export const fahrzeuge = pgTable("fahrzeuge", {
   // Codes, Taxonomie fachlich unbestätigt, siehe docs/fachliche-bestaetigungen.md).
   handicapAusstattung: jsonb("handicap_ausstattung").notNull().default([]),
   automatik: boolean("automatik").notNull().default(false),
+  // Prompt 4: Fahrzeug-Wirtschaftlichkeit (siehe packages/finance
+  // fahrzeug-wirtschaftlichkeit.ts für die Formeln, die diese Felder als
+  // Input nutzen).
+  kilometerstand: integer("kilometerstand").notNull().default(0),
+  finanzierungsart: text("finanzierungsart"), // 'leasing' | 'kauf' | 'miete'
+  leasingrateCent: integer("leasingrate_cent"),
+  leasingende: date("leasingende"),
+  versicherungCentJahr: integer("versicherung_cent_jahr"),
+  steuerCentJahr: integer("steuer_cent_jahr"),
+  naechsteInspektion: date("naechste_inspektion"),
+  naechsteHu: date("naechste_hu"),
+  fahrzeugStatus: text("fahrzeug_status").notNull().default("aktiv"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

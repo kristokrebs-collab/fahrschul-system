@@ -1,0 +1,216 @@
+/* Gleiche Design-DNA wie apps/office/src/styles.css (Farbsystem/Radius/
+   Card-Look aus dashboard.html portiert, siehe docs/prototype-audit.md) –
+   für Konsistenz über die vier Apps hinweg dieselben Tokens. */
+:root {
+  --bg-base: #0f1219;
+  --surface: #1a1f2c;
+  --surface-2: #1f2536;
+  --border: rgba(248, 250, 252, 0.07);
+  --border-strong: rgba(248, 250, 252, 0.13);
+  --text: #f8fafc;
+  --text-dim: #9aa3b4;
+  --accent: #e11d48;
+  --accent-hi: #f43f5e;
+  --emerald: #10b981;
+  --amber: #f59e0b;
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+body {
+  background: var(--bg-base);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2rem;
+}
+.login-card h1 {
+  font-size: 1.25rem;
+  margin: 0 0 1rem;
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+.form-field input {
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 0.5rem 0.75rem;
+}
+.form-error {
+  color: var(--accent-hi);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+.app-nav {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 1.5rem 1rem;
+}
+.app-nav h2 {
+  font-size: 1rem;
+  margin: 0 0 1.5rem;
+}
+.app-nav nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.app-nav a,
+.app-nav button {
+  color: var(--text-dim);
+  text-decoration: none;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.app-nav a.active,
+.app-nav a:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.app-main {
+  padding: 2rem;
+  overflow-y: auto;
+}
+
+.fahrschul-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+.fahrschul-card__title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.fahrschul-btn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.fahrschul-btn--primary {
+  background: var(--accent);
+  color: white;
+}
+.fahrschul-btn--secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.kpi-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0.25rem 0;
+}
+.kpi-meta {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.badge--vollstaendig {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--emerald);
+}
+.badge--teilweise {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--amber);
+}
+.badge--modelliert {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-dim);
+}
+.badge--sicher {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--emerald);
+}
+.badge--wahrscheinlich {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--amber);
+}
+.badge--unklar,
+.badge--konflikt {
+  background: rgba(225, 29, 72, 0.15);
+  color: var(--accent-hi);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+th,
+td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+th {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.dim {
+  color: var(--text-dim);
+}
+section + section {
+  margin-top: 2rem;
+}

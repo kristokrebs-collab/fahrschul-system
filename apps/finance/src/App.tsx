@@ -1,27 +1,79 @@
-import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
+import { Navigate } from "react-router-dom";
+import "./styles.css";
+import { Login } from "./routes/Login.js";
+import { Cockpit } from "./routes/Cockpit.js";
+import { SessionProvider, useSession } from "./state/SessionContext.js";
+
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user, loading } = useSession();
+  if (loading) {
+    return (
+      <main className="login-screen">
+        <p>Lädt…</p>
+      </main>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
+  // Client-seitiger Hinweis nur für UX – die eigentliche Autorisierung
+  // erfolgt ausschließlich serverseitig (finance:cockpit:read etc., siehe
+  // packages/permissions matrix.ts + apps/api/src/routes/finance.ts).
+  if (user.rolle !== "finanzen" && user.rolle !== "geschaeftsfuehrung") {
+    return (
+      <main className="login-screen">
+        <div className="login-card">
+          <h1>Kein Zugriff</h1>
+          <p className="dim">Dieses Cockpit ist auf die Rollen Finanzen/Geschäftsführung beschränkt.</p>
+        </div>
+      </main>
+    );
+  }
+  return <>{children}</>;
+}
+
+function Shell() {
+  const { user, logout } = useSession();
+  return (
+    <div className="app-shell">
+      <aside className="app-nav">
+        <h2>Finanz-Cockpit</h2>
+        <nav>
+          <span className="dim" style={{ padding: "0.5rem 0.75rem" }}>
+            {user?.vorname} {user?.nachname} ({user?.rolle})
+          </span>
+          <button onClick={() => logout()}>Abmelden</button>
+        </nav>
+      </aside>
+      <main className="app-main">
+        <Cockpit />
+      </main>
+    </div>
+  );
+}
+
+function AppRoutes() {
+  const { user } = useSession();
+  if (!user) return <Login />;
+  return (
+    <RequireAuth>
+      <Shell />
+    </RequireAuth>
+  );
+}
 
 /**
- * Platzhalter-App für "Finanzen-Cockpit" (Rolle: Finanzen/Geschäftsführung). Reale Fachlogik folgt in
- * Prompt 1-4 (siehe docs/architecture-report.md). Dieser Health-Check zeigt
- * lediglich, dass Build/Dev-Server laufen und die API erreichbar ist.
+ * apps/finance (PROMPT 4) – Finanz-/Flotten-/Geschäftsführer-Cockpit.
+ * Bewusst als Ein-Seiten-Cockpit gebaut (kein finanzen-1.html-Referenz-
+ * Prototyp existiert, siehe docs/integration-gaps.md) statt vieler Tabs, um
+ * die 7 Kern-Karten nicht künstlich zu verstreuen. Fahrlehrer-/Flotten-/
+ * Produkt-/Forecast-Detaildaten sind über /finance/* API-Routen bereits
+ * ausgebaut; die UI-Drilldowns dafür sind ein dokumentierter Gap (siehe
+ * docs/finance-final-qa.md).
  */
 export function App() {
-  const [apiStatus, setApiStatus] = useState<"loading" | "ok" | "error">("loading");
-
-  useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_URL ?? "http://localhost:4000";
-    fetch(`${apiBase}/health`)
-      .then((res) => (res.ok ? setApiStatus("ok") : setApiStatus("error")))
-      .catch(() => setApiStatus("error"));
-  }, []);
-
   return (
-    <main style={{ fontFamily: "system-ui, sans-serif", padding: "2rem" }}>
-      <h1>Finanzen-Cockpit</h1>
-      <p>Platzhalter-App (Rolle: Finanzen/Geschäftsführung) – Prompt 0 Grundgerüst.</p>
-      <p>
-        API-Status: <strong>{apiStatus}</strong>
-      </p>
-    </main>
+    <SessionProvider>
+      <AppRoutes />
+    </SessionProvider>
   );
 }

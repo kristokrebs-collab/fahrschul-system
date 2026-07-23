@@ -6,3 +6,4 @@ export * from "./audit.js";
 export * from "./curriculum.js";
 export * from "./office.js";
 export * from "./instructor.js";
+export * from "./finance.js";

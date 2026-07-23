@@ -26,6 +26,11 @@ export async function truncateAll(databaseUrl: string) {
   try {
     await sql`truncate table
       audit_events,
+      finanz_exporte,
+      fahrzeugausfalltage,
+      fahrzeugkosten,
+      produkte,
+      banktransaktionen,
       sprachprotokolle,
       kompetenzbeobachtungen,
       storno_angebote,

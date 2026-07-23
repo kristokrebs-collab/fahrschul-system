@@ -134,6 +134,28 @@ NIE für `schueler`/`buero`/`finanzen` (siehe
 die Rolle `fahrlehrer` beschränkt; apps/instructor führt hier KEINE eigene
 Logik ein.
 
+## Prompt 4 – Erweiterungen (apps/finance)
+
+Neue Berechtigungen:
+
+| Berechtigung | Rollen | Zweck |
+|---|---|---|
+| `finance:cockpit:read` | finanzen, geschaeftsfuehrung | Geschäftsführungs-/Finanz-Cockpit lesen (7 Kern-Karten) |
+| `finance:invoices:read:any` | finanzen, geschaeftsfuehrung | Rechnungen aller Schüler lesen (weiter als `invoices:read:own`) |
+| `fleet:economics:manage` | finanzen | Fahrzeug-Wirtschaftlichkeitsdaten (Leasing/Versicherung/Wartung) pflegen |
+| `products:manage` | finanzen | Produkt-/Preisliste pflegen (keine hartkodierten Preise) |
+| `finance:export` | finanzen, geschaeftsfuehrung | PDF/CSV/XLSX-Export anfordern (auditiert) |
+| `finance:data_quality:read` | finanzen, geschaeftsfuehrung | Datenqualitäts-/Review-Queue lesen |
+
+`bank:reconcile` (bereits Prompt 0) bleibt ausschließlich bei `finanzen` –
+`geschaeftsfuehrung` bekommt zwar das Cockpit, aber bewusst NICHT den
+Bankabgleich-Arbeitsschritt oder die Preispflege (`products:manage`). Das
+schließt die in Prompt 0 offen gelassene Lücke ("Geschäftsführung-Rolle
+existiert, hat aber noch keine Finance-View-Rechte"), ohne ihr operative
+Finanzrechte zu geben. `buero` bleibt unverändert bei `invoices:read:own`
+(Prompt 2) – bekommt KEINE der sechs neuen Berechtigungen (getestet in
+`apps/api/src/__tests__/finance.test.ts`).
+
 Diese Matrix ist die Ausgangsbasis für Prompt 0. Feingranularere Rechte
 (z. B. differenzierte Dokumenttypen, Mehr-Augen-Prinzip bei
 Prüfungsfreigaben, siehe `docs/fachliche-bestaetigungen.md` Punkt 11) werden

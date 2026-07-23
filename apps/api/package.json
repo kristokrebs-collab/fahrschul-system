@@ -15,6 +15,7 @@
     "@fahrschul/database": "workspace:*",
     "@fahrschul/domain": "workspace:*",
     "@fahrschul/events": "workspace:*",
+    "@fahrschul/finance-core": "workspace:*",
     "@fahrschul/integrations": "workspace:*",
     "@fahrschul/permissions": "workspace:*",
     "@fahrschul/scheduling": "workspace:*",

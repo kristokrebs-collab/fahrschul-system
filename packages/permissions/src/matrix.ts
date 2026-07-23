@@ -55,6 +55,13 @@ export const PERMISSIONS = [
   "competency:read:own", // Kompetenzraster zu eigenen Schülern lesen (Briefing)
   "vehicle:issue:report", // Fahrzeug-Mangelmeldung/Quick-Check (own = eigene Meldung)
   "arbeitszeit:read:own", // eigene Arbeitszeit-Ansicht (Plan vs. Ist)
+  // Prompt 4 (apps/finance) – Finanz-/Flotten-/Geschäftsführer-Cockpit.
+  "finance:cockpit:read", // GF-Cockpit (7 Kern-Karten), Fahrlehrer-/Flotten-Ansicht, Forecast
+  "finance:invoices:read:any", // Rechnungen aller Schüler lesen (weiter als invoices:read:own)
+  "fleet:economics:manage", // Fahrzeug-Wirtschaftlichkeitsdaten (Leasing/Versicherung/Wartung) pflegen
+  "products:manage", // Produkt-/Preisliste pflegen (keine fest codierten Preise, Non-Negotiable)
+  "finance:export", // PDF/CSV/XLSX-Exporte anfordern (auditiert, kein öffentlicher Downloadpfad)
+  "finance:data_quality:read", // Datenqualitäts-/Review-Queue (unmatched Zahlungen etc.) lesen
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -122,6 +129,12 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "payments:manage",
     "bank:reconcile",
     "reports:management",
+    "finance:cockpit:read",
+    "finance:invoices:read:any",
+    "fleet:economics:manage",
+    "products:manage",
+    "finance:export",
+    "finance:data_quality:read",
   ],
   geschaeftsfuehrung: [
     "students:read:any",
@@ -131,6 +144,15 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "invoices:manage",
     "reports:management",
     "audit:read",
+    // Prompt 0 legte die Rolle an, aber ohne Finanz-Leserechte – das war ein
+    // Lücke ("hat noch keine finance-view rights"), die hier bewusst
+    // geschlossen wird: Geschäftsführung braucht das Cockpit + Forderungs-/
+    // Flottenübersicht, aber NICHT den Bankabgleich-Arbeitsschritt selbst
+    // (bank:reconcile bleibt bei "finanzen") und keine Produktpreis-Pflege.
+    "finance:cockpit:read",
+    "finance:invoices:read:any",
+    "finance:export",
+    "finance:data_quality:read",
   ],
   systemdienst: ["users:manage", "audit:read", "system:admin"],
 };
