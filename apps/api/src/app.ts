@@ -2,10 +2,12 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import {
+  createAiSuggestionAdapter,
   createDocumentStorageAdapter,
   createMalwareScanAdapter,
   createNotificationsAdapter,
   createPaymentAdapter,
+  createTranscriptionAdapter,
 } from "@fahrschul/integrations";
 import Fastify, { type FastifyInstance } from "fastify";
 import { getDb } from "./db.js";
@@ -21,6 +23,7 @@ import { registerFeedbackRoutes } from "./routes/feedback.js";
 import { registerFlagRoutes } from "./routes/flags.js";
 import { registerFlexRoutes } from "./routes/flex.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerInstructorRoutes } from "./routes/instructor.js";
 import { registerInvoiceRoutes } from "./routes/invoices.js";
 import { registerLeadRoutes } from "./routes/leads.js";
 import { registerLearningRoutes } from "./routes/learning.js";
@@ -66,6 +69,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   const malwareScan = createMalwareScanAdapter("mock");
   const payments = createPaymentAdapter("mock");
   const notifications = createNotificationsAdapter("mock");
+  const transcription = createTranscriptionAdapter("mock");
+  const aiSuggestions = createAiSuggestionAdapter("mock");
 
   registerHealthRoutes(app);
   registerAuthRoutes(app, db, options.cookieSecure ?? false);
@@ -86,6 +91,8 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   registerCommunicationRoutes(app, db, { notifications });
   registerExamPipelineRoutes(app, db);
   registerStornoRoutes(app, db);
+  // Prompt 3 (apps/instructor) – Fahrlehrer-App-Routen.
+  registerInstructorRoutes(app, db, { transcription, aiSuggestions });
 
   return app;
 }

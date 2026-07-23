@@ -26,6 +26,8 @@ export async function truncateAll(databaseUrl: string) {
   try {
     await sql`truncate table
       audit_events,
+      sprachprotokolle,
+      kompetenzbeobachtungen,
       storno_angebote,
       storno_events,
       pruefungen,

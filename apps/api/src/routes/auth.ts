@@ -116,6 +116,36 @@ export function registerAuthRoutes(app: FastifyInstance, db: Database, cookieSec
     return reply.send({ ok: true });
   });
 
+  /**
+   * Remote-Logout ("Logout überall"): löscht ALLE Sessions des eingeloggten
+   * Benutzers, nicht nur die aktuelle (siehe /auth/logout oben). Nötig für
+   * "remote logout (session invalidation)" aus der Prompt-3-Testliste –
+   * Prompt 0 hatte nur den Einzel-Session-Logout. Löscht auch die eigene,
+   * gerade genutzte Session mit, das Cookie wird deshalb ebenfalls geleert.
+   */
+  app.post("/auth/logout-all", { preHandler: requireAuth }, async (request, reply) => {
+    const deleted = await db
+      .delete(sessions)
+      .where(eq(sessions.benutzerId, request.user!.id))
+      .returning({ id: sessions.id });
+
+    await db.insert(auditEreignisse).values(
+      buildEventRow({
+        type: "login",
+        aktion: "logout_all",
+        entitaet: "benutzer",
+        entitaetId: request.user!.id,
+        akteurBenutzerId: request.user!.id,
+        standortId: request.user!.standortId,
+        source: "apps/api:auth.logout-all",
+        payload: { revokedSessions: deleted.length },
+      }),
+    );
+
+    reply.clearCookie(SESSION_COOKIE_NAME, { path: "/" });
+    return reply.send({ ok: true, revokedSessions: deleted.length });
+  });
+
   app.get("/me", { preHandler: requireAuth }, async (request, reply) => {
     return reply.send({ user: request.user });
   });
