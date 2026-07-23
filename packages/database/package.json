@@ -1,0 +1,28 @@
+{
+  "name": "@fahrschul/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "migrate": "tsx src/migrate.ts",
+    "seed": "tsx src/seed.ts",
+    "generate": "drizzle-kit generate",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@fahrschul/auth": "workspace:*",
+    "@fahrschul/domain": "workspace:*",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.36.4",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.28.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  }
+}

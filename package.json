@@ -1,0 +1,30 @@
+{
+  "name": "fahrschul-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fahrschule Krebs – Produktionsplattform (Prompt 0: Gemeinsame Plattform)",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.9.0",
+  "scripts": {
+    "build": "pnpm -r --filter=./packages/* build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:api": "pnpm --filter @fahrschul/api test",
+    "db:migrate": "pnpm --filter @fahrschul/database migrate",
+    "db:seed": "pnpm --filter @fahrschul/database seed",
+    "dev:api": "pnpm --filter @fahrschul/api dev",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "typescript": "^5.6.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

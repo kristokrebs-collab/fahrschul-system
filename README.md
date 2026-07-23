@@ -55,3 +55,50 @@ Geräteübergreifend (Handy ↔ PC) braucht es den Server.
   Datenbank (z. B. PostgreSQL mit Row-Level-Security und
   Exclusion-Constraints gegen Doppelbuchungen) und HTTPS erforderlich –
   die Datenmodelle dieses Prototyps sind dafür bereits passend geschnitten.
+
+---
+
+## Produktionsplattform (Prompt 0 – `apps/`, `packages/`)
+
+Die Dateien oben (`app.html`, `dashboard.html`, `fahrlehrer.html`,
+`react-zentrale/`, `server.py`) bleiben als historischer Prototyp erhalten
+und werden **nicht** verändert. Die eigentliche Produktivsoftware entsteht
+im TypeScript-Monorepo unter `apps/` und `packages/` (siehe
+`docs/architecture-report.md` für die vollständige Architekturbeschreibung).
+
+### Voraussetzungen
+
+- Node.js ≥ 20, pnpm ≥ 10 (`corepack enable` oder `npm i -g pnpm`)
+- PostgreSQL 16 – entweder via `docker compose up -d` (siehe
+  `docker-compose.yml`) **oder** eine bereits lokal laufende Instanz
+
+### Setup
+
+```bash
+pnpm install
+cp .env.example .env        # anpassen, falls eigene DB-Zugangsdaten nötig
+docker compose up -d        # startet lokalen Postgres-Container
+# Alternative ohne Docker: eine lokale Postgres-Instanz mit denselben
+# Zugangsdaten aus .env (Rolle "fahrschul", DBs "fahrschul_dev"/"fahrschul_test")
+
+pnpm db:migrate              # wendet packages/database/migrations/*.sql an
+pnpm db:seed                 # NUR lokale Testdaten, siehe packages/database/src/seed.ts
+
+pnpm dev:api                 # startet apps/api auf http://localhost:4000 (/health)
+pnpm --filter @fahrschul/student dev    # Vite-Dev-Server für die Platzhalter-Apps
+pnpm --filter @fahrschul/office dev
+pnpm --filter @fahrschul/instructor dev
+pnpm --filter @fahrschul/finance dev
+```
+
+### Tests
+
+```bash
+pnpm -r test        # alle Unit-/Integrationstests (Vitest), apps/api braucht Postgres
+pnpm -r typecheck   # TypeScript-Prüfung über das gesamte Monorepo
+```
+
+`apps/api`'s Tests benötigen `DATABASE_URL_TEST` (siehe `.env.example`) und
+prüfen u. a. den Login-Flow, dass Rollen-Middleware falsche Rollen blockiert,
+und – am wichtigsten – dass eine zweite, überschneidende Terminbuchung für
+denselben Fahrlehrer serverseitig abgelehnt wird (`booking-conflict.test.ts`).
