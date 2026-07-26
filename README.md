@@ -72,14 +72,30 @@ im TypeScript-Monorepo unter `apps/` und `packages/` (siehe
 - PostgreSQL 16 – entweder via `docker compose up -d` (siehe
   `docker-compose.yml`) **oder** eine bereits lokal laufende Instanz
 
-### Setup
+### Setup in einem Befehl
+
+```bash
+./setup.sh          # macOS, Linux, oder Windows in Git Bash / WSL
+```
+
+Windows-PowerShell: `.\setup.ps1` (ungetestet – im Zweifel `setup.sh` in Git
+Bash nutzen, das ist geprüft).
+
+Das Skript legt `.env` an (mit zufällig erzeugtem `SESSION_SECRET`),
+installiert die Abhängigkeiten, startet bei Bedarf den Postgres-Container,
+erstellt beide Datenbanken, migriert sie und seedet Testdaten – jeder Schritt
+wird übersprungen, wenn er schon erledigt ist. `--reset` baut die Datenbanken
+nach Rückfrage neu auf, `--start` startet danach API und alle vier Apps.
+
+### Setup von Hand
 
 ```bash
 pnpm install
-cp .env.example .env        # anpassen, falls eigene DB-Zugangsdaten nötig
+cp .env.example .env        # SESSION_SECRET ersetzen, Platzhalter ist unsicher
 docker compose up -d        # startet lokalen Postgres-Container
 # Alternative ohne Docker: eine lokale Postgres-Instanz mit denselben
 # Zugangsdaten aus .env (Rolle "fahrschul", DBs "fahrschul_dev"/"fahrschul_test")
+# Beide Datenbanken müssen existieren, migrate legt sie nicht an.
 
 pnpm db:migrate              # wendet packages/database/migrations/*.sql an
 pnpm db:seed                 # NUR lokale Testdaten, siehe packages/database/src/seed.ts
@@ -131,9 +147,12 @@ Login absichtlich mit `mfa_required_or_invalid` – das ist kein Fehler.
   Unique-Verletzung ab, weil die Konten schon existieren. Für einen frischen
   Stand die Datenbank neu anlegen (`dropdb`/`createdb`) und `db:migrate`
   erneut ausführen.
-- **`apps/api`-Tests brauchen `DATABASE_URL_TEST`** *und* eine existierende
-  Test-Datenbank (`fahrschul_test`). Fehlt die Variable, melden alle
-  DB-Tests `DATABASE_URL_TEST/DATABASE_URL nicht gesetzt`.
+- **`apps/api`-Tests brauchen eine existierende Test-Datenbank**
+  (`fahrschul_test`, wird von `setup.sh` angelegt). `pnpm test` im Root lädt
+  `.env` selbst; wer stattdessen `pnpm -r test` oder `vitest` direkt im
+  Paketverzeichnis aufruft, muss `DATABASE_URL_TEST` selbst exportieren –
+  `dotenv` sucht relativ zum Arbeitsverzeichnis und findet die Root-`.env`
+  dort nicht.
 - **Ohne laufenden Scheduler kein Echtzeit-Sync.** `pnpm dev:api` startet die
   wiederkehrenden Jobs (Outbox-Zustellung, Angebotsablauf,
   Konsistenzprüfung); ohne sie bleiben Änderungen in der Outbox liegen. Für
