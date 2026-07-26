@@ -25,6 +25,7 @@ import { createScheduler } from "../workers/scheduler.js";
 import { getDb } from "../db.js";
 import { createNotificationsAdapter } from "@fahrschul/integrations";
 import { IDEMPOTENCY_TTL_MS } from "../lib/idempotency.js";
+import type { RateLimitConfig } from "../lib/rate-limit.js";
 
 /**
  * PROMPT -1 §20 (Phase 4) – DIE ACHTZEHN CHAOS- UND WIEDERANLAUFTESTS.
@@ -783,10 +784,10 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
     it("der Kanal trägt KEINE Nutzlast – ein Leck über den Kanal ist strukturell unmöglich", async () => {
       const sql = createRawClient(databaseUrl);
       try {
-        const spalten = await sql`
+        const spalten = await sql<Array<{ column_name: string }>>`
           select column_name from information_schema.columns
            where table_name = 'realtime_deliveries'`;
-        const namen = spalten.map((s: { column_name: string }) => s.column_name);
+        const namen = spalten.map((s) => s.column_name);
         // Kein `payload`, kein `body`, kein `data`: nur Bezug + Thema.
         expect(namen).not.toContain("payload");
         expect(namen).not.toContain("body");
@@ -1010,11 +1011,11 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
 
       const sql = createRawClient(databaseUrl);
       try {
-        const gepuffert = await sql`
+        const gepuffert = await sql<Array<{ idempotency_key: string; status: string }>>`
           select idempotency_key, status from integration_outbound_calls
            where integration = 'notifications' and status = 'buffered'`;
         expect(gepuffert.length, "es muss mindestens ein gepufferter Aufruf existieren").toBeGreaterThan(0);
-        const schluesselVorher = gepuffert.map((r: { idempotency_key: string }) => r.idempotency_key);
+        const schluesselVorher = gepuffert.map((r) => r.idempotency_key);
 
         // Der Anbieter ist zurück – nach 30 Minuten. Die Wartezeit wird
         // gestellt statt gewartet: `resumeBufferedCalls` nimmt bewusst nur
@@ -1039,14 +1040,14 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
         });
         expect(resume.statusCode, resume.body).toBe(200);
 
-        const danach = await sql`
+        const danach = await sql<Array<{ idempotency_key: string; status: string; attempts: number }>>`
           select idempotency_key, status, attempts from integration_outbound_calls
            where integration = 'notifications' and idempotency_key = any(${schluesselVorher})`;
         // KEIN zweiter Eintrag für denselben Schlüssel – dieselbe Zeile ist
         // jetzt zugestellt. Ein zweiter Anbieteraufruf ist damit ausgeschlossen.
         expect(danach.length).toBe(schluesselVorher.length);
         expect(
-          danach.map((r: { status: string }) => r.status),
+          danach.map((r) => r.status),
           JSON.stringify(danach),
         ).not.toContain("buffered");
       } finally {
@@ -1057,12 +1058,12 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
     it("ein bekannter ausgehender Schlüssel löst KEINEN zweiten Anbieteraufruf aus", async () => {
       const sql = createRawClient(databaseUrl);
       try {
-        const eindeutig = await sql`
+        const eindeutig = await sql<Array<{ indexdef: string }>>`
           select indexdef from pg_indexes
            where tablename = 'integration_outbound_calls' and indexdef ilike '%unique%'`;
         // Die Zusage hängt an einem Unique-Index, nicht an Anwendungslogik.
         expect(
-          eindeutig.some((r: { indexdef: string }) => /idempotency_key/.test(r.indexdef)),
+          eindeutig.some((r) => /idempotency_key/.test(r.indexdef)),
         ).toBe(true);
       } finally {
         await sql.end();
@@ -1372,10 +1373,10 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
         // tragen VERSCHIEDENE, aufsteigende Zeitstempel.
         const offer = await createOffer({ beginnAt: "2026-11-14T09:00:00.000Z", endeAt: "2026-11-14T10:00:00.000Z" });
         expect((await accept(offer.id, idemKey("s12-order"))).statusCode).toBe(201);
-        const uebergaenge = await sql`
+        const uebergaenge = await sql<Array<{ created_at: Date }>>`
           select created_at from state_transitions where entitaet_id = ${offer.id} order by created_at`;
         if (uebergaenge.length > 1) {
-          const stempel = uebergaenge.map((u: { created_at: Date }) => new Date(u.created_at).getTime());
+          const stempel = uebergaenge.map((u) => new Date(u.created_at).getTime());
           expect(new Set(stempel).size).toBe(stempel.length);
         }
       } finally {
@@ -1562,8 +1563,8 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
       } finally {
         await sql.end();
       }
-      const geraeumt = await cleanupAbortedUploads(getDb(databaseUrl), { storage: undefined });
-      expect(geraeumt.aufgeraeumt ?? geraeumt.entfernt ?? 0).toBeGreaterThanOrEqual(0);
+      const geraeumt = await cleanupAbortedUploads(getDb(databaseUrl));
+      expect(geraeumt.entfernt + geraeumt.abgelaufen).toBeGreaterThanOrEqual(0);
 
       const nachher = await app.inject({
         method: "GET",
@@ -1690,7 +1691,10 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
       // Der Zähler liegt im Prozessspeicher (kein Redis in dieser Umgebung).
       // Zwei Instanzen erlauben damit zusammen das DOPPELTE Kontingent. Dieser
       // Test ist der Beweis dafür – nicht eine Behauptung im Dokument.
-      const eng = { enabled: true, policies: { login: { name: "login", ratePerSecond: 0.01, burst: 2 } } } as const;
+      const eng: Partial<RateLimitConfig> = {
+        enabled: true,
+        policies: { login: { name: "login", ratePerSecond: 0.01, burst: 2 } } as RateLimitConfig["policies"],
+      };
       const a = buildApp({ databaseUrl, cookieSecure: false, logger: false, rateLimit: eng, startWorkers: false });
       const b = buildApp({ databaseUrl, cookieSecure: false, logger: false, rateLimit: eng, startWorkers: false });
       await Promise.all([a.ready(), b.ready()]);
@@ -2105,9 +2109,9 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
     it("es gibt kein Rollenfeld in der Sitzung – die Rolle KANN nicht veralten (struktureller Beweis)", async () => {
       const sql = createRawClient(databaseUrl);
       try {
-        const spalten = await sql`
+        const spalten = await sql<Array<{ column_name: string }>>`
           select column_name from information_schema.columns where table_name = 'sessions'`;
-        const namen = spalten.map((s: { column_name: string }) => s.column_name);
+        const namen = spalten.map((s) => s.column_name);
         expect(namen).not.toContain("rolle");
         expect(namen).not.toContain("role");
         expect(namen).not.toContain("permissions");
@@ -2253,10 +2257,10 @@ describe("PROMPT -1 §20 – Chaos- und Wiederanlauftests", () => {
       try {
         await sql`update banktransaktionen set zahlung_status = 'reversed' where id = ${txId}`;
         // Der Übergangstrigger schreibt `state_transitions` – auch bei Roh-SQL.
-        const uebergaenge = await sql`
+        const uebergaenge = await sql<Array<{ von_status: string; nach_status: string }>>`
           select von_status, nach_status from state_transitions
            where entitaet_id = ${txId} order by created_at`;
-        const paare = uebergaenge.map((u: { von_status: string; nach_status: string }) => `${u.von_status}->${u.nach_status}`);
+        const paare = uebergaenge.map((u) => `${u.von_status}->${u.nach_status}`);
         expect(paare).toContain("matched->reversed");
       } finally {
         await sql.end();

@@ -33,6 +33,27 @@ function transport(overrides: Partial<SyncTransport> = {}): SyncTransport {
   };
 }
 
+/**
+ * PROMPT -1 Phase 4 – Hygiene an dieser Testhülle (nicht die Ursache des Flakes,
+ * aber ein latenter Fehler derselben Datei).
+ *
+ * Die Hülle übergab `store={memoryKeyValueStore()}`, `realtimeTransport={…()}`
+ * und `syncTransport={…()}` **direkt im JSX** – also je React-Render ein NEUES
+ * Objekt. `SyncProvider` memoisiert diese drei über
+ * `useMemo(..., [injectedStore, …])`; bei wechselnder Objektidentität greift der
+ * Memo nicht und der Vorgangsspeicher wird mitten im Test ausgetauscht. Für die
+ * bestehenden Zusicherungen fiel das nicht auf, es ist aber eine Falle für jeden
+ * künftigen Test dieser Datei.
+ *
+ * Jetzt: einmal je Hülleninstanz über `useState`-Initialisierer. Bewusst NICHT
+ * modulweit geteilt – ein Test, dessen `flush()` noch läuft, während der nächste
+ * beginnt, würde sonst in dessen Speicher schreiben.
+ *
+ * **Am Produktcode wurde nichts geändert.** Die vier Apps übergeben `store` nie,
+ * sondern `storagePrefix` (stabile Zeichenkette) und bekommen
+ * `localKeyValueStore`; dort kann das nicht auftreten. Eine `useRef`-Sperre in
+ * `SyncProvider` würde einen Aufruferfehler verstecken statt ihn zu zeigen.
+ */
 function Harness({
   children,
   syncTransport,
@@ -40,14 +61,26 @@ function Harness({
   children?: React.ReactNode;
   syncTransport?: SyncTransport;
 }) {
+  /**
+   * EIN Speicher und EIN Transport je Hülleninstanz – erzeugt im
+   * `useState`-Initialisierer, also genau einmal, und NICHT je Render.
+   *
+   * Ein modulweit geteilter Speicher wäre die falsche Behebung: ein Test, dessen
+   * `flush()` noch läuft, während der nächste beginnt, schreibt sonst in dessen
+   * Speicher. Genau das war beim Ausprobieren zu beobachten. Pro Instanz stabil
+   * UND pro Test getrennt ist die Kombination, die beides ausschließt.
+   */
+  const [store] = useState(() => memoryKeyValueStore());
+  const [realtime] = useState(() => stillerRealtimeTransport());
+  const [transportStabil] = useState(() => syncTransport ?? transport());
   return (
     <SyncProvider
       apiBase="http://localhost:4000"
       benutzerId={BENUTZER}
       storagePrefix="test:"
-      store={memoryKeyValueStore()}
-      realtimeTransport={stillerRealtimeTransport()}
-      syncTransport={syncTransport ?? transport()}
+      store={store}
+      realtimeTransport={realtime}
+      syncTransport={transportStabil}
       autoStart={false}
       queueIntervalMs={0}
     >
@@ -246,17 +279,53 @@ describe("§7 kritische Vorgänge in der Anzeige", () => {
     expect(screen.getByRole("button", { name: "Verwerfen" })).toBeInTheDocument();
   });
 
+  /**
+   * PROMPT -1 Phase 4 – BEGRÜNDETE ÄNDERUNG an einem bestehenden Test.
+   *
+   * ## Der Fehler lag im TEST, nicht im Produktcode
+   *
+   * Dies war der einzige Flake im gesamten Workspace (Phase 3 notierte ihn als
+   * „UI-Timing-Flake", ohne Ursache). Die Ursache ist bestimmbar und liegt in
+   * der Konstruktion der alten Zusicherung:
+   *
+   *   1. Sie begann mit einem **negativen** `waitFor` („`Offene Vorgänge` ist
+   *      NICHT im DOM"). `Treiber` legt den Vorgang aber erst in einem
+   *      `useEffect` an. Direkt nach dem Rendern ist die Liste noch leer – das
+   *      negative `waitFor` war beim ERSTEN Tick erfüllt, **ohne dass der
+   *      Vorgang überhaupt existierte**. Der Test konnte also bestehen, ohne
+   *      das zu beobachten, was er behauptet.
+   *   2. Danach prüfte sie `data-sync-status === "synced"` **ohne** Warten.
+   *
+   * Beobachtet: `expected "synced", received "queued"`. Ursache des Wettlaufs
+   * ist, dass die Auflösung offener Vorgänge beim Start
+   * (`resolvePendingAfterRestart`, §7) und der erste `flush()` des Treibers sich
+   * überlappen können; der Zustand pendelt kurz und **konvergiert dann**. Diese
+   * Konvergenz ist die eigentliche §7-Zusage – nicht ein Zustand zu einem
+   * willkürlichen Zeitpunkt. Bestätigt: isoliert lief der Test grün, in der
+   * vollen Datei fiel er um; drei Läufe der neuen Fassung sind grün.
+   *
+   * ## Warum die neue Fassung STÄRKER ist
+   *
+   * Sie prüft **beide** Bedingungen GEMEINSAM unter `waitFor`:
+   * `data-sync-status === "synced"` UND „nichts ist gelistet". Damit kann sie
+   * nicht mehr durch den Zustand VOR dem Vorgang bestehen, und sie belegt
+   * tatsächlich den Endzustand „bestätigt und aus der Liste verschwunden".
+   * Keine Zusicherung wurde entfernt; eine ist hinzugekommen.
+   */
   it("erst die Serverbestätigung räumt den Vorgang aus der Liste", async () => {
     render(
       <Harness>
         <Treiber art="critical" path="/appointment-offers/o1/accept" />
       </Harness>,
     );
-    // Nach einer 2xx-Antwort ist nichts mehr offen (`synced` wird nicht als
-    // offener Vorgang gelistet).
-    await waitFor(() => expect(screen.queryByText(/Offene Vorgänge/)).not.toBeInTheDocument());
-    const bar = screen.getByRole("status");
-    expect(bar).toHaveAttribute("data-sync-status", "synced");
+
+    await waitFor(
+      () => {
+        expect(screen.getByRole("status")).toHaveAttribute("data-sync-status", "synced");
+        expect(screen.queryByText(/Offene Vorgänge/)).not.toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 
   it("ein offline VERBOTENER kritischer Vorgang wird gar nicht angelegt", async () => {

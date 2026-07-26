@@ -342,8 +342,8 @@ describe("PROMPT -1 §15 – der Scheduler (die von Phase 1–3 verschobene Verd
       const scheduler = bauScheduler();
       await scheduler.runScheduleTick();
 
-      const nachher = await sql`select distinct job_type from jobs order by job_type`;
-      const typen = nachher.map((r: { job_type: string }) => r.job_type);
+      const nachher = await sql<Array<{ job_type: string }>>`select distinct job_type from jobs order by job_type`;
+      const typen = nachher.map((r) => r.job_type);
       // Die Jobs, deren Fehlen ohne Scheduler am meisten weh tut.
       expect(typen).toContain("outbox.dispatch");
       expect(typen).toContain("appointment_offer.expire");

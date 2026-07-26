@@ -111,10 +111,23 @@ export interface BuildAppOptions {
   metricsToken?: string | null;
   /** §11: Breaker-/Zeitlimitparameter (Tests brauchen kleine Werte). */
   integrations?: Pick<IntegrationServiceOptions, "breaker" | "timeouts" | "now" | "sleep">;
+  /**
+   * Fastify-Option, durchgereicht für WERKZEUGE: `close()` beendet offene
+   * keep-alive-Verbindungen sofort statt auf sie zu warten.
+   *
+   * Standard bleibt bewusst `false`. Im Betrieb ist das Warten richtig – ein
+   * Rolling-Deployment soll laufende Antworten zu Ende schicken, nicht
+   * abschneiden. Nur ein Messskript (`scripts/slo-measure.mjs`, §21), das über
+   * `fetch` gemessen hat, würde am Ende sonst am undici-Verbindungspool hängen.
+   */
+  forceCloseConnections?: boolean;
 }
 
 export function buildApp(options: BuildAppOptions): FastifyInstance {
-  const app = Fastify({ logger: options.logger ?? false });
+  const app = Fastify({
+    logger: options.logger ?? false,
+    forceCloseConnections: options.forceCloseConnections ?? false,
+  });
   const db = getDb(options.databaseUrl);
 
   const corsOrigins = options.corsOrigins ?? [
@@ -224,7 +237,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   const resilience: IntegrationServiceOptions = { db, ...(options.integrations ?? {}) };
 
-  registerHealthRoutes(app, options.databaseUrl);
+  registerHealthRoutes(app, db, options.databaseUrl);
   registerObservabilityRoutes(app, db, { metricsToken: options.metricsToken });
   registerAuthRoutes(app, db, {
     cookieSecure: options.cookieSecure ?? false,
