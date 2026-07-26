@@ -45,7 +45,16 @@ interface Regel extends MutationClassification {
   pattern: RegExp;
 }
 
-const UUID = "[0-9a-fA-F-]{8,}";
+/**
+ * Ein Pfadsegment als Platzhalter für eine Kennung. Absichtlich `[^/]+` und
+ * NICHT ein UUID-Muster: die Einstufung darf am FORMAT einer ID nicht
+ * scheitern. Wäre das Muster streng, würde eine unerwartete Kennung (Testwert,
+ * Slug, künftig ein anderes ID-Format) den Endpunkt in die "unbekannt"-Regel
+ * fallen lassen – bei einer Offline-Prüfung, die fail closed arbeitet, wäre
+ * das zwar nicht unsicher, aber es würde die kritische Einstufung und den
+ * Idempotenz-Operationsnamen verlieren. Die Route-FORM ist das Kriterium.
+ */
+const UUID = "[^/]+";
 
 const REGELN: Regel[] = [
   // ---- §2: die zehn idempotenten, kritischen Schreibvorgänge --------------

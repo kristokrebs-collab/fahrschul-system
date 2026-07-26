@@ -12,7 +12,7 @@ import { useApiGet } from "../state/useApiGet.js";
  * (siehe apps/api/src/__tests__/student-app.test.ts).
  */
 export function PruefungsReady() {
-  const { data, loading, error, offline } = useApiGet<ExamReadiness>("/me/exam-readiness");
+  const { data, loading, error, offline } = useApiGet<ExamReadiness>("/me/exam-readiness", "pruefung", "dokumente", "termine");
 
   if (loading) return <main className="screen"><p>Lädt…</p></main>;
   if (offline) return <main className="screen"><p>Keine Verbindung – PrüfungsReady braucht einen aktuellen Stand.</p></main>;

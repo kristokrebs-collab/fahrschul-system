@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { SyncProvider } from "@fahrschul/ui";
 import "./styles.css";
+import { API_BASE } from "./api/client.js";
 import { Layout } from "./components/Layout.js";
 import { Login } from "./routes/Login.js";
 import { Heute } from "./routes/Heute.js";
@@ -43,12 +45,18 @@ function LoginRoute() {
  * gemeinsamen Sidebar-Layout (Layout.tsx). Kein PIN-Gate, keine
  * localStorage-Session (siehe docs/security-risks.md) – Auth läuft über das
  * httpOnly-Session-Cookie wie in apps/student.
+ *
+ * PROMPT -1 Phase 2: `SyncProvider` (§6/§7/§8) und die Statuszeile im Layout
+ * gelten hier genauso wie in den anderen drei Apps. Für das Büro ist das
+ * Datenalter besonders wichtig: die Heute-Queue und die Planung werden für
+ * Entscheidungen benutzt, und ein zwei Minuten alter Stand kann eine
+ * Doppelbelegung bedeuten.
  */
-export function App() {
+function AppInner() {
+  const { user } = useSession();
   return (
-    <BrowserRouter>
-      <SessionProvider>
-        <Routes>
+    <SyncProvider apiBase={API_BASE} benutzerId={user?.id ?? null} storagePrefix="fahrschul:office:sync:">
+      <Routes>
           <Route path="/login" element={<LoginRoute />} />
           <Route
             path="/*"
@@ -73,7 +81,16 @@ export function App() {
             <Route path="audit" element={<Audit />} />
             <Route path="*" element={<Navigate to="heute" replace />} />
           </Route>
-        </Routes>
+      </Routes>
+    </SyncProvider>
+  );
+}
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <SessionProvider>
+        <AppInner />
       </SessionProvider>
     </BrowserRouter>
   );

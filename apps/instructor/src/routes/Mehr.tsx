@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card } from "@fahrschul/ui";
+import { Card, PendingOperations } from "@fahrschul/ui";
 import { apiGet } from "../api/client.js";
 import { useSession } from "../state/SessionContext.js";
 
@@ -49,6 +49,12 @@ export function Mehr() {
         </button>
         {revoked !== null ? <p role="status">{revoked} Sitzung(en) beendet.</p> : null}
       </Card>
-    </main>
+    {/*
+        PROMPT -1 §7: Prüf-Warteschlange. Kritische Konflikte (z. B. eine
+        Fahrstunde, die inzwischen storniert wurde) werden hier vorgelegt –
+        nicht automatisch aufgelöst.
+      */}
+      <PendingOperations />
+      </main>
   );
 }

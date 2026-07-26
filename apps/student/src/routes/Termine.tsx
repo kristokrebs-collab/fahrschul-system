@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Card } from "@fahrschul/ui";
 import { apiMutate, ApiError, OfflineError } from "../api/client.js";
 import type { FlagsResponse, Terminangebot, Terminbuchung } from "../api/types.js";
+import { useSync } from "@fahrschul/ui";
 import { useApiGet } from "../state/useApiGet.js";
 import { useOnlineStatus } from "../state/useOnlineStatus.js";
 import { OfflineBanner } from "../components/OfflineBanner.js";
@@ -31,9 +32,10 @@ function buildQuery(filters: Filters): string {
  */
 export function Termine() {
   const online = useOnlineStatus();
+  const sync = useSync();
   const [filters, setFilters] = useState<Filters>({ kurzfristig: false, samstag: false, automatik: false });
-  const offers = useApiGet<{ offers: Terminangebot[]; dataAsOf: string }>(`/appointment-offers${buildQuery(filters)}`);
-  const mine = useApiGet<{ appointments: Terminbuchung[] }>("/appointments/mine");
+  const offers = useApiGet<{ offers: Terminangebot[]; dataAsOf: string }>(`/appointment-offers${buildQuery(filters)}`, "angebote");
+  const mine = useApiGet<{ appointments: Terminbuchung[] }>("/appointments/mine", "termine");
   const flags = useApiGet<FlagsResponse>("/flags");
   const [pending, setPending] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -42,9 +44,24 @@ export function Termine() {
     setActionError(null);
     setPending(offerId);
     try {
-      await apiMutate(`/appointment-offers/${offerId}/accept`, "POST", {
-        idempotencyKey: `accept-${offerId}-${Date.now()}`,
+      // PROMPT -1 §2/§7: Der Idempotenzschlüssel kommt aus der PERSISTENTEN
+      // Vorgangsliste und wird VOR dem Senden gespeichert. Vorher stand hier
+      // `accept-${offerId}-${Date.now()}` – ein bei jedem Klick NEUER
+      // Schlüssel, also genau das Gegenteil von Idempotenz: nach einem
+      // Timeout hätte ein zweiter Klick eine zweite Buchung riskiert. Jetzt
+      // gilt: ein Vorgang, ein Schlüssel, über Neustarts hinweg.
+      const vorgang = await sync.createCritical({
+        method: "POST",
+        path: `/appointment-offers/${offerId}/accept`,
+        body: {},
+        bezeichnung: "Terminangebot annehmen",
+        target: offerId,
       });
+      await apiMutate(`/appointment-offers/${offerId}/accept`, "POST", {
+        idempotencyKey: vorgang.idempotencyKey,
+      }, { idempotencyKey: vorgang.idempotencyKey });
+      // Erfolg gilt erst NACH dieser Antwort (§7).
+      sync.discard(vorgang.operationId, { force: true });
       offers.refresh();
       mine.refresh();
     } catch (err) {
@@ -68,7 +85,7 @@ export function Termine() {
   async function decline(offerId: string) {
     setPending(offerId);
     try {
-      await apiMutate(`/appointment-offers/${offerId}/decline`, "POST");
+      await apiMutate(`/appointment-offers/${offerId}/decline`, "POST", undefined);
       offers.refresh();
     } catch {
       setActionError("Ablehnen aktuell nicht möglich.");

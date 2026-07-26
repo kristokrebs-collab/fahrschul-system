@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { WithSync } from "../test/renderWithSync.js";
 import { Feedback } from "./Feedback.js";
 
 describe("Feedback – only shows what the server released", () => {
@@ -30,7 +31,15 @@ describe("Feedback – only shows what the server released", () => {
       ),
     );
 
-    render(<Feedback />);
+    // PROMPT -1 Phase 2: die Ansicht benutzt jetzt den Synchronisationskern
+    // (§8: die Selbsteinschätzung ist ein verschlüsselter lokaler Entwurf),
+    // braucht also den Provider. Der Transport im Wrapper tut nichts – geprüft
+    // wird weiterhin ausschließlich der Redaktionsvertrag.
+    render(
+      <WithSync>
+        <Feedback />
+      </WithSync>,
+    );
 
     await waitFor(() => expect(screen.getByText(/Einparken hat gut geklappt/)).toBeInTheDocument());
     expect(screen.getByText(/Autobahnauffahrt üben/)).toBeInTheDocument();

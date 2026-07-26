@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StundeBeenden } from "./StundeBeenden.js";
 import { DriveLockProvider } from "../state/DriveLockContext.js";
+import { WithSync } from "../test/renderWithSync.js";
 import { readDraft } from "../api/cache.js";
 
 /**
@@ -23,11 +24,13 @@ describe("Stunde beenden – offline behavior", () => {
 
     render(
       <MemoryRouter initialEntries={["/dokumentieren/beenden/booking-1"]}>
-        <DriveLockProvider>
-          <Routes>
-            <Route path="/dokumentieren/beenden/:id" element={<StundeBeenden />} />
-          </Routes>
-        </DriveLockProvider>
+        <WithSync>
+          <DriveLockProvider>
+            <Routes>
+              <Route path="/dokumentieren/beenden/:id" element={<StundeBeenden />} />
+            </Routes>
+          </DriveLockProvider>
+        </WithSync>
       </MemoryRouter>,
     );
 

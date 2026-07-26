@@ -15,7 +15,7 @@ const WOCHENTAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "
 /** Ersetzt die 6-Wochen-Tagesperioden-Matrix aus app.html durch exakte Zeitfenster. */
 export function WunschzeitenEditor() {
   const online = useOnlineStatus();
-  const { data, refresh } = useApiGet<{ wunschzeiten: Eintrag[] }>("/me/wunschzeiten");
+  const { data, refresh } = useApiGet<{ wunschzeiten: Eintrag[] }>("/me/wunschzeiten", "wunschzeiten");
   const [entries, setEntries] = useState<Eintrag[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

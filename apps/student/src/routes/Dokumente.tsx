@@ -26,7 +26,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 
 export function Dokumente() {
   const online = useOnlineStatus();
-  const { data, offline, refresh } = useApiGet<{ documents: Dokument[] }>("/documents/mine");
+  const { data, offline, refresh } = useApiGet<{ documents: Dokument[] }>("/documents/mine", "dokumente");
   const [typ, setTyp] = useState("sehtest");
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);

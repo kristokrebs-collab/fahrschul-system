@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Card } from "@fahrschul/ui";
-import { apiGet, apiMutate, ApiError } from "../api/client.js";
+import { Card, useSync, useSyncRevision } from "@fahrschul/ui";
+import { apiGet, apiMutate, ApiError, OfflineNotAllowedError } from "../api/client.js";
 
 function centToEuro(cent: number | null | undefined): string {
   if (cent === null || cent === undefined) return "–";
@@ -47,6 +47,10 @@ interface DataQualityIssue {
  * aus /finance/*-Endpunkten (echte Postgres-Aggregate, kein Mock im UI).
  */
 export function Cockpit() {
+  const sync = useSync();
+  // §6: der Realtime-Kanal meldet nur die Themen; hier wird daraus ein
+  // vollständiges Neuladen über die normalen, autorisierten GETs.
+  const revision = useSyncRevision("zahlungen", "rechnungen", "termine", "fahrzeuge", "exporte");
   const [kpis, setKpis] = useState<KpiResponse | null>(null);
   const [queue, setQueue] = useState<BankQueueRow[] | null>(null);
   const [issues, setIssues] = useState<DataQualityIssue[] | null>(null);
@@ -65,22 +69,43 @@ export function Cockpit() {
       setKpis(kpiRes);
       setQueue(queueRes.queue);
       setIssues(dqRes.issues);
+      // §1: Datenalter der Statuszeile = letzter bestätigter Serverstand.
+      sync.reportFresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "load_failed");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, revision]);
 
+  /**
+   * PROMPT -1 §7/§8: Der Bankabgleich ist ein KRITISCHER, nicht offline
+   * abschließbarer Vorgang. Er wird mit seinem Idempotenzschlüssel
+   * persistiert, bevor er gesendet wird – ein doppelter Import wäre ein
+   * Buchungsfehler mit Geldbezug. "Nur `sicher` wird automatisch gebucht"
+   * bleibt unverändert eine Serverentscheidung.
+   */
   async function onSync() {
     setSyncing(true);
     try {
-      await apiMutate("/finance/bank/sync", "POST", {});
+      const vorgang = await sync.createCritical({
+        method: "POST",
+        path: "/finance/bank/sync",
+        body: {},
+        bezeichnung: "Bankabgleich starten",
+      });
+      await apiMutate("/finance/bank/sync", "POST", {}, { idempotencyKey: vorgang.idempotencyKey });
+      sync.discard(vorgang.operationId, { force: true });
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "sync_failed");
+      if (err instanceof OfflineNotAllowedError) {
+        setError("Bankabgleich ist ohne Verbindung nicht möglich.");
+      } else {
+        setError(err instanceof ApiError ? err.message : "sync_failed");
+      }
     } finally {
       setSyncing(false);
     }

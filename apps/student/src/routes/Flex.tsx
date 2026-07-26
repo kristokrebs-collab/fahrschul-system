@@ -21,8 +21,8 @@ export function Flex() {
   const online = useOnlineStatus();
   const flags = useApiGet<FlagsResponse>("/flags");
   const state = flags.data?.flags.krebs_flex ?? "hidden";
-  const offers = useApiGet<{ offers: FlexOffer[]; optedIn: boolean }>(state === "hidden" ? null : "/flex/offers");
-  const metrics = useApiGet<{ acceptedOffers: number; hoursSaved: number }>(state === "hidden" ? null : "/flex/metrics");
+  const offers = useApiGet<{ offers: FlexOffer[]; optedIn: boolean }>(state === "hidden" ? null : "/flex/offers", "flex", "angebote");
+  const metrics = useApiGet<{ acceptedOffers: number; hoursSaved: number }>(state === "hidden" ? null : "/flex/metrics", "flex");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
 

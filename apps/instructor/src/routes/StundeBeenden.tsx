@@ -2,7 +2,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { KOMPETENZFELDER, KOMPETENZSTATUS } from "@fahrschul/domain";
-import { apiMutate, ApiError, OfflineError } from "../api/client.js";
+import { useSync } from "@fahrschul/ui";
+import { apiMutate, ApiError, OfflineError, OfflineNotAllowedError } from "../api/client.js";
 import { readDraft, writeDraft, clearDraft } from "../api/cache.js";
 import { useDriveLock } from "../state/DriveLockContext.js";
 
@@ -34,6 +35,7 @@ export function StundeBeenden() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { unlock } = useDriveLock();
+  const sync = useSync();
   const draftKey = `stunde-beenden:${id}`;
   const draft = readDraft<Record<string, unknown>>(draftKey)?.data ?? {};
 
@@ -67,24 +69,59 @@ export function StundeBeenden() {
     if (!id) return;
     setSubmitting(true);
     setError(null);
+    const nutzlast = {
+      tatsaechlicheDauerMinuten: Number(dauer),
+      stundenart,
+      lernziele: lernziele.split(",").map((s) => s.trim()).filter(Boolean),
+      beobachteteKompetenzfelder: [{ feld: kompetenzfeld, kompetenzstatus, beobachtung: beobachtung || null }],
+      kurznotiz,
+      naechstesZiel,
+      schuelerfeedback,
+      bestaetigung: true,
+    };
+    let vorgangId: string | null = null;
     try {
-      await apiMutate(`/instructor/lessons/${id}/complete`, "POST", {
-        tatsaechlicheDauerMinuten: Number(dauer),
-        stundenart,
-        lernziele: lernziele.split(",").map((s) => s.trim()).filter(Boolean),
-        beobachteteKompetenzfelder: [{ feld: kompetenzfeld, kompetenzstatus, beobachtung: beobachtung || null }],
-        kurznotiz,
-        naechstesZiel,
-        schuelerfeedback,
-        bestaetigung: true,
+      /**
+       * PROMPT -1 §7: "Stunde beenden" ist ein KRITISCHER Vorgang. Er wird –
+       * mit seinem Idempotenzschlüssel – zuerst persistiert und erst nach der
+       * Serverbestätigung als erfolgreich behandelt. Stirbt die App zwischen
+       * Absenden und Antwort, fragt `resolvePendingAfterRestart` beim Server
+       * mit genau diesem Schlüssel nach, statt blind zu wiederholen (was eine
+       * zweite Fahrstunde abschließen könnte) oder einen Erfolg zu behaupten.
+       */
+      const vorgang = await sync.createCritical({
+        method: "POST",
+        path: `/instructor/lessons/${id}/complete`,
+        body: nutzlast,
+        bezeichnung: "Stunde beenden",
+        target: id,
       });
+      vorgangId = vorgang.operationId;
+      await apiMutate(`/instructor/lessons/${id}/complete`, "POST", nutzlast, {
+        idempotencyKey: vorgang.idempotencyKey,
+      });
+      // Serverbestätigung liegt vor -> Vorgang ist abgeschlossen.
+      sync.discard(vorgang.operationId, { force: true });
       clearDraft(draftKey);
       unlock();
       navigate("/heute", { replace: true });
     } catch (err) {
-      if (err instanceof OfflineError) setError("Stunde beenden erfordert eine Live-Verbindung (Entwurf bleibt gespeichert).");
-      else if (err instanceof ApiError) setError("Unvollständige Angaben – bitte alle Schritte ausfüllen.");
-      else setError("Unbekannter Fehler.");
+      if (err instanceof OfflineNotAllowedError) {
+        setError("Stunde beenden ist offline nicht möglich (Entwurf bleibt gespeichert).");
+      } else if (err instanceof OfflineError) {
+        setError("Stunde beenden erfordert eine Live-Verbindung (Entwurf bleibt gespeichert).");
+      } else if (err instanceof ApiError) {
+        setError("Unvollständige Angaben – bitte alle Schritte ausfüllen.");
+      } else {
+        setError("Unbekannter Fehler.");
+      }
+      // Der Vorgang bleibt in der Liste (Zustand `retrying`/`failed`/
+      // `conflict`/`offline`) – nichts wird still verworfen. Nur ein
+      // eindeutig NICHT gewirkter Vorgang (Validierungsfehler) wird entfernt,
+      // damit die Liste nicht mit Formularfehlern volläuft.
+      if (vorgangId && err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 409) {
+        sync.discard(vorgangId, { force: true });
+      }
     } finally {
       setSubmitting(false);
     }

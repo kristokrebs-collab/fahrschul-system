@@ -1,7 +1,7 @@
-import { Card } from "@fahrschul/ui";
+import { Card, useSync } from "@fahrschul/ui";
 import { useApiGet } from "../state/useApiGet.js";
 import { DataState } from "../components/DataState.js";
-import { apiMutate, ApiError } from "../api/client.js";
+import { apiMutate, ApiError, OfflineNotAllowedError } from "../api/client.js";
 import { useSession } from "../state/SessionContext.js";
 import { useState } from "react";
 
@@ -45,16 +45,40 @@ interface Pruefung {
  */
 export function Pruefungen() {
   const { user } = useSession();
-  const { data, loading, error, reload } = useApiGet<{ pruefungen: Pruefung[] }>("/pruefungen");
+  const sync = useSync();
+  const { data, loading, error, reload } = useApiGet<{ pruefungen: Pruefung[] }>("/pruefungen", [], ["pruefung"]);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  /**
+   * PROMPT -1 §7/§8: "Prüfung-Go" gehört zu den Vorgängen, die NICHT offline
+   * abschließbar sind und erst nach Serverbestätigung als erfolgreich gelten.
+   * Der Vorgang wird deshalb mit seinem Idempotenzschlüssel persistiert,
+   * BEVOR er gesendet wird – ein Absturz zwischen Absenden und Antwort ist
+   * danach über `GET /sync/operations/...` auflösbar, statt zu einem zweiten
+   * Pipeline-Schritt zu führen.
+   *
+   * Die Rollenprüfung bleibt ausschließlich serverseitig: `fahrlehrer_go` von
+   * einem Büro-Konto liefert weiterhin 403 (Non-Negotiable).
+   */
   async function transition(id: string, to: string) {
     setActionError(null);
     try {
-      await apiMutate(`/pruefungen/${id}/transition`, "POST", { to });
+      const vorgang = await sync.createCritical({
+        method: "POST",
+        path: `/pruefungen/${id}/transition`,
+        body: { to },
+        bezeichnung: `Prüfungs-Pipeline -> ${to}`,
+        target: id,
+      });
+      await apiMutate(`/pruefungen/${id}/transition`, "POST", { to }, {
+        idempotencyKey: vorgang.idempotencyKey,
+      });
+      sync.discard(vorgang.operationId, { force: true });
       reload();
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof OfflineNotAllowedError) {
+        setActionError("Prüfungsschritte sind ohne Verbindung nicht möglich.");
+      } else if (err instanceof ApiError) {
         setActionError(`${(err.body as { error?: string })?.error ?? err.message} (${to})`);
       } else {
         setActionError("Aktion fehlgeschlagen.");

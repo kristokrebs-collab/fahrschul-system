@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Button, Card } from "@fahrschul/ui";
+import { Button, Card, PendingOperations } from "@fahrschul/ui";
 import { useSession } from "../state/SessionContext.js";
 
 export function Mehr() {
@@ -19,6 +19,12 @@ export function Mehr() {
           <li><Link to="/mehr/flex">Krebs Flex</Link></li>
         </ul>
       </nav>
+      {/*
+        PROMPT -1 §7: die Prüf-Warteschlange. Kritische Konflikte und
+        veraltete Entwürfe werden hier zur ENTSCHEIDUNG vorgelegt – nichts
+        wird automatisch aufgelöst und nichts still verworfen.
+      */}
+      <PendingOperations />
       <Button variant="secondary" onClick={() => logout()}>
         Abmelden
       </Button>

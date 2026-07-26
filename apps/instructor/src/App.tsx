@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { SyncProvider, SyncStatusBar } from "@fahrschul/ui";
+import { API_BASE } from "./api/client.js";
 import { BottomNav } from "./components/BottomNav.js";
 import { RequireUnlocked } from "./components/RequireUnlocked.js";
 import { Dokumentieren } from "./routes/Dokumentieren.js";
@@ -32,11 +34,18 @@ function RequireAuth({ children }: { children: ReactNode }) {
  * IMMER erreichbar (auch im Drive Lock Mode) – jede andere Route ist mit
  * `RequireUnlocked` umschlossen und leitet bei aktivem Fahrmodus dorthin um
  * (siehe components/RequireUnlocked.tsx + state/DriveLockContext.tsx).
+ *
+ * PROMPT -1 Phase 2: `SyncProvider` (§6/§7/§8) hält Echtzeitkanal,
+ * verschlüsselte Entwurfsliste und Synchronisationszustände;
+ * `SyncStatusBar` (§1) zeigt Datenalter, Status, Offline-Zustand und offene
+ * Entwürfe. Für den Fahrlehrer im Funkloch ist das die wichtigste Anzeige
+ * der App: er muss sehen, ob sein Bericht angekommen ist.
  */
 export function App() {
   const { user } = useSession();
 
   return (
+    <SyncProvider apiBase={API_BASE} benutzerId={user?.id ?? null} storagePrefix="fahrschul:instructor:sync:">
     <div className="app-shell">
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/heute" replace /> : <Login />} />
@@ -45,6 +54,7 @@ export function App() {
           element={
             <RequireAuth>
               <>
+                <SyncStatusBar compact />
                 <Routes>
                   <Route path="/" element={<Navigate to="/heute" replace />} />
                   <Route path="/drivelock" element={<DriveLock />} />
@@ -106,5 +116,6 @@ export function App() {
         />
       </Routes>
     </div>
+    </SyncProvider>
   );
 }

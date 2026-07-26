@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Button } from "@fahrschul/ui";
+import { Button, PendingOperations, SyncStatusBar } from "@fahrschul/ui";
 import { useSession } from "../state/SessionContext.js";
 
 const NAV: Array<{ to: string; label: string }> = [
@@ -49,7 +49,15 @@ export function Layout() {
         </div>
       </aside>
       <main className="office-main">
+        {/*
+          PROMPT -1 §1: Datenalter, Synchronisationsstatus, Offline-Status und
+          offene lokale Vorgänge – sichtbar über jeder Ansicht. Fürs Büro ist
+          das die Absicherung gegen Entscheidungen auf altem Stand.
+        */}
+        <SyncStatusBar />
         <Outlet />
+        {/* §7: kritische Konflikte werden vorgelegt, nicht automatisch aufgelöst. */}
+        <PendingOperations />
       </main>
     </div>
   );

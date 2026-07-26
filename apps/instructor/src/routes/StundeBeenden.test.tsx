@@ -3,15 +3,22 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StundeBeenden } from "./StundeBeenden.js";
 import { DriveLockProvider } from "../state/DriveLockContext.js";
+import { WithSync } from "../test/renderWithSync.js";
 
 function renderScreen() {
   return render(
+    // PROMPT -1 Phase 2: "Stunde beenden" ist ein KRITISCHER Vorgang und
+    // läuft jetzt über die persistente Vorgangsliste (§7) – die Ansicht
+    // braucht deshalb den Provider. Der Wrapper stellt einen Transport
+    // bereit, der nichts tut; geprüft wird weiterhin nur der Wizard.
     <MemoryRouter initialEntries={["/dokumentieren/beenden/booking-1"]}>
-      <DriveLockProvider>
-        <Routes>
-          <Route path="/dokumentieren/beenden/:id" element={<StundeBeenden />} />
-        </Routes>
-      </DriveLockProvider>
+      <WithSync>
+        <DriveLockProvider>
+          <Routes>
+            <Route path="/dokumentieren/beenden/:id" element={<StundeBeenden />} />
+          </Routes>
+        </DriveLockProvider>
+      </WithSync>
     </MemoryRouter>,
   );
 }

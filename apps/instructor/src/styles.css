@@ -245,3 +245,118 @@ textarea {
   font-size: 1.2rem;
   padding: 20px;
 }
+
+/* ===========================================================================
+   PROMPT -1 §1/§7 (Phase 2) – Synchronisationsanzeige.
+   Die Zustände sind über data-sync-status/data-outcome-unknown auch für
+   Tests und Screenreader ablesbar, nicht nur farblich.
+   =========================================================================== */
+.fahrschul-syncbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  align-items: baseline;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  border-bottom: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  background: var(--surface-2, #f0f1f4);
+  color: var(--text-dim, #5b6272);
+}
+.fahrschul-syncbar__state {
+  font-weight: 600;
+  color: var(--text, #12141a);
+}
+.fahrschul-syncbar__hint,
+.fahrschul-syncbar__detail {
+  flex: 1 1 auto;
+  min-width: 12rem;
+}
+.fahrschul-syncbar__warn {
+  flex: 1 1 100%;
+  font-weight: 600;
+  color: #b3261e;
+}
+.fahrschul-syncbar--ok .fahrschul-syncbar__state {
+  color: #1b6e3c;
+}
+.fahrschul-syncbar--warn {
+  background: rgba(179, 38, 30, 0.08);
+}
+.fahrschul-syncbar--warn .fahrschul-syncbar__state {
+  color: #b3261e;
+}
+.fahrschul-syncbar--compact {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+.fahrschul-syncbadge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  border: 1px solid var(--border-strong, rgba(0, 0, 0, 0.16));
+}
+.fahrschul-syncbadge--ok {
+  color: #1b6e3c;
+  border-color: rgba(27, 110, 60, 0.4);
+}
+.fahrschul-syncbadge--warn {
+  color: #b3261e;
+  border-color: rgba(179, 38, 30, 0.4);
+}
+
+.fahrschul-pending {
+  margin: 1rem 0;
+}
+.fahrschul-pending__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.fahrschul-pending__item {
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+.fahrschul-pending__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: center;
+}
+.fahrschul-pending__name {
+  font-weight: 600;
+}
+.fahrschul-pending__meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+}
+.fahrschul-pending__meta dt {
+  color: var(--text-dim, #5b6272);
+}
+.fahrschul-pending__meta dd {
+  margin: 0;
+}
+.fahrschul-pending__conflict {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border-left: 3px solid #b3261e;
+  font-size: 0.8125rem;
+}
+.fahrschul-pending__note {
+  font-weight: 600;
+}
+.fahrschul-pending__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}

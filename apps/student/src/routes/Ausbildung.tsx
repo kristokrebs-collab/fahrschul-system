@@ -19,10 +19,10 @@ interface Step {
  * "nicht_abgebildet" markiert statt eine Zahl zu erfinden.
  */
 export function Ausbildung() {
-  const profile = useApiGet<SchuelerProfil>("/me/schueler");
-  const readiness = useApiGet<ExamReadiness>("/me/exam-readiness");
-  const documents = useApiGet<{ documents: Dokument[] }>("/documents/mine");
-  const appointments = useApiGet<{ appointments: Terminbuchung[] }>("/appointments/mine");
+  const profile = useApiGet<SchuelerProfil>("/me/schueler", "schueler");
+  const readiness = useApiGet<ExamReadiness>("/me/exam-readiness", "pruefung", "dokumente", "termine");
+  const documents = useApiGet<{ documents: Dokument[] }>("/documents/mine", "dokumente");
+  const appointments = useApiGet<{ appointments: Terminbuchung[] }>("/appointments/mine", "termine");
   const learning = useApiGet<{ resources: Lernressource[] }>("/learning/resources");
 
   if (profile.loading || readiness.loading || documents.loading || appointments.loading || learning.loading) {

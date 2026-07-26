@@ -20,12 +20,12 @@ import { computeHeutePriority } from "../state/useHeutePriorities.js";
  * Priorisierung in useHeutePriorities.ts).
  */
 export function Heute() {
-  const profile = useApiGet<SchuelerProfil>("/me/schueler");
-  const readiness = useApiGet<ExamReadiness>("/me/exam-readiness");
-  const documents = useApiGet<{ documents: Dokument[] }>("/documents/mine");
-  const offers = useApiGet<{ offers: { offer: Terminangebot | null }[] }>("/appointment-offers");
-  const appointments = useApiGet<{ appointments: Terminbuchung[] }>("/appointments/mine");
-  const wunschzeiten = useApiGet<{ wunschzeiten: unknown[] }>("/me/wunschzeiten");
+  const profile = useApiGet<SchuelerProfil>("/me/schueler", "schueler");
+  const readiness = useApiGet<ExamReadiness>("/me/exam-readiness", "pruefung", "dokumente", "termine");
+  const documents = useApiGet<{ documents: Dokument[] }>("/documents/mine", "dokumente");
+  const offers = useApiGet<{ offers: { offer: Terminangebot | null }[] }>("/appointment-offers", "angebote");
+  const appointments = useApiGet<{ appointments: Terminbuchung[] }>("/appointments/mine", "termine");
+  const wunschzeiten = useApiGet<{ wunschzeiten: unknown[] }>("/me/wunschzeiten", "wunschzeiten");
   const learning = useApiGet<{ resources: Lernressource[] }>("/learning/resources");
 
   const loading =

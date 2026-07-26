@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Card } from "@fahrschul/ui";
-import { apiMutate, OfflineError } from "../api/client.js";
+import { SyncBadge, useSync } from "@fahrschul/ui";
+import { apiMutate, OfflineError, OfflineNotAllowedError } from "../api/client.js";
 import type { FeedbackEintrag } from "../api/types.js";
 import { useApiGet } from "../state/useApiGet.js";
 import { useOnlineStatus } from "../state/useOnlineStatus.js";
@@ -13,23 +14,52 @@ import { OfflineBanner } from "../components/OfflineBanner.js";
  */
 export function Feedback() {
   const online = useOnlineStatus();
-  const { data, loading, refresh } = useApiGet<{ feedback: FeedbackEintrag[] }>("/feedback/mine");
+  const sync = useSync();
+  const { data, loading, refresh } = useApiGet<{ feedback: FeedbackEintrag[] }>("/feedback/mine", "feedback");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
 
+  /**
+   * PROMPT -1 §8: Die Selbsteinschätzung ist eine der VIER offline erlaubten
+   * Entwurfsarten (`schueler_selbsteinschaetzung`). Sie wird deshalb immer
+   * zuerst als verschlüsselter lokaler Entwurf gespeichert und dann gesendet.
+   * Offline bleibt sie ein Entwurf – sichtbar in der Statuszeile – statt
+   * einen Erfolg zu behaupten oder verloren zu gehen.
+   */
   async function saveSelfAssessment(id: string) {
     const text = drafts[id];
     if (!text) return;
     setSavingId(id);
     try {
-      await apiMutate(`/feedback/${id}/self-assessment`, "PATCH", { text });
+      const entwurf = await sync.createDraft({
+        method: "PATCH",
+        path: `/feedback/${id}/self-assessment`,
+        body: { text },
+        bezeichnung: "Selbsteinschätzung",
+        target: id,
+      });
+      sync.submitDraft(entwurf.operationId);
+      if (!online) return;
+      await apiMutate(
+        `/feedback/${id}/self-assessment`,
+        "PATCH",
+        { text },
+        { idempotencyKey: entwurf.idempotencyKey },
+      );
+      sync.discard(entwurf.operationId, { force: true });
       refresh();
     } catch (err) {
-      if (!(err instanceof OfflineError)) refresh();
+      // Offline/nicht erlaubt: der Entwurf bleibt in der Warteschlange und
+      // wird nach der Wiederverbindung idempotent gesendet.
+      if (!(err instanceof OfflineError) && !(err instanceof OfflineNotAllowedError)) refresh();
     } finally {
       setSavingId(null);
     }
   }
+
+  const offeneEntwuerfe = sync.entries.filter(
+    (e) => e.draftKind === "schueler_selbsteinschaetzung" && e.status !== "synced",
+  );
 
   if (loading) return <main className="screen"><p>Lädt…</p></main>;
 
@@ -37,6 +67,17 @@ export function Feedback() {
     <main className="screen">
       <h1>Fahrstundenfeedback</h1>
       <OfflineBanner />
+      {offeneEntwuerfe.length > 0 ? (
+        <Card title="Nicht übertragene Selbsteinschätzungen">
+          <ul>
+            {offeneEntwuerfe.map((e) => (
+              <li key={e.operationId}>
+                {new Date(e.createdAt).toLocaleString("de-DE")} <SyncBadge entry={e} />
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
       {data?.feedback.length === 0 ? <p>Noch kein Feedback vorhanden.</p> : null}
       {data?.feedback.map((fb) => (
         <Card key={fb.id} title={new Date(fb.createdAt).toLocaleDateString("de-DE")}>

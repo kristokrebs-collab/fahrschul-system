@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { apiMutate, ApiError, OfflineError } from "../api/client.js";
+import { SyncBadge, useSync } from "@fahrschul/ui";
+import { apiMutate, ApiError, OfflineError, OfflineNotAllowedError } from "../api/client.js";
 import { readDraft, writeDraft, clearDraft } from "../api/cache.js";
 import { useOnlineStatus } from "../state/useOnlineStatus.js";
 
@@ -14,6 +15,7 @@ import { useOnlineStatus } from "../state/useOnlineStatus.js";
  * Regel VEHICLE_NOT_READY) erfordert eine Live-Verbindung.
  */
 export function Fahrzeug() {
+  const sync = useSync();
   const draftKey = "mangelentwurf";
   const draft = readDraft<Record<string, unknown>>(draftKey)?.data ?? {};
 
@@ -36,34 +38,79 @@ export function Fahrzeug() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    const nutzlast = {
+      fahrzeugId,
+      grund,
+      kilometerstand: kilometerstand ? Number(kilometerstand) : null,
+      tankLadungProzent: tankLadungProzent ? Number(tankLadungProzent) : null,
+      warnleuchten: warnleuchten ? warnleuchten.split(",").map((s) => s.trim()) : [],
+      schweregrad,
+      einsatzbereit,
+      geroutetAn,
+    };
+
+    /**
+     * PROMPT -1 §8: Der Fahrzeugmangel-ENTWURF ist eine der vier offline
+     * erlaubten Entwurfsarten und wird deshalb immer zuerst verschlüsselt in
+     * die Vorgangsliste geschrieben. Offline bleibt er dort (Zustand
+     * `offline`/`queued`, sichtbar in der Statuszeile) und wird nach der
+     * Wiederverbindung IDEMPOTENT gesendet – statt wie bisher nur als
+     * Klartext-Formularpuffer zu überleben, den niemand mehr abschickt.
+     *
+     * Die daraus folgende FAHRZEUGSPERRE bleibt eine Serverentscheidung und
+     * ist nicht offline abschließbar; `einsatzbereit=false` ist ein Antrag,
+     * keine Sperre.
+     */
+    const entwurf = await sync.createDraft({
+      method: "POST",
+      path: "/instructor/vehicle-issues",
+      body: nutzlast,
+      bezeichnung: "Fahrzeugmangel melden",
+      target: fahrzeugId,
+    });
+    sync.submitDraft(entwurf.operationId);
+
     if (!online) {
-      setError("Fahrzeugblockierung/Mangelmeldung erfordert eine Live-Verbindung – Entwurf wurde gespeichert.");
+      setError(
+        "Keine Verbindung – die Meldung ist als Entwurf gespeichert und wird gesendet, sobald du online bist. Eine Fahrzeugsperre entsteht erst nach Serverbestätigung.",
+      );
       saveDraft();
       return;
     }
     try {
-      await apiMutate("/instructor/vehicle-issues", "POST", {
-        fahrzeugId,
-        grund,
-        kilometerstand: kilometerstand ? Number(kilometerstand) : null,
-        tankLadungProzent: tankLadungProzent ? Number(tankLadungProzent) : null,
-        warnleuchten: warnleuchten ? warnleuchten.split(",").map((s) => s.trim()) : [],
-        schweregrad,
-        einsatzbereit,
-        geroutetAn,
+      await apiMutate("/instructor/vehicle-issues", "POST", nutzlast, {
+        idempotencyKey: entwurf.idempotencyKey,
       });
+      sync.discard(entwurf.operationId, { force: true });
       clearDraft(draftKey);
-      setResult("Mangel gemeldet.");
+      setResult("Mangel gemeldet (vom Server bestätigt).");
     } catch (err) {
-      if (err instanceof ApiError) setError("Meldung fehlgeschlagen.");
+      if (err instanceof OfflineNotAllowedError || err instanceof OfflineError) {
+        setError("Keine Verbindung – die Meldung bleibt als Entwurf gespeichert.");
+      } else if (err instanceof ApiError) {
+        setError("Meldung fehlgeschlagen. Der Vorgang bleibt mit vollem Kontext in den offenen Vorgängen.");
+      }
     }
   }
+
+  const offeneMeldungen = sync.entries.filter(
+    (e) => e.draftKind === "fahrzeugmangel_entwurf" && e.status !== "synced",
+  );
 
   return (
     <main className="screen">
       <h1>Fahrzeug</h1>
       <p>Quick-Check + Mangelmeldung</p>
       {error ? <p role="alert" className="form-error">{error}</p> : null}
+      {offeneMeldungen.length > 0 ? (
+        <ul aria-label="Nicht übertragene Mangelmeldungen">
+          {offeneMeldungen.map((e) => (
+            <li key={e.operationId}>
+              {new Date(e.createdAt).toLocaleString("de-DE")} <SyncBadge entry={e} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {result ? <p role="status">{result}</p> : null}
       <form onSubmit={onSubmit} onBlur={saveDraft}>
         <label htmlFor="fahrzeugId">Fahrzeug-ID</label>

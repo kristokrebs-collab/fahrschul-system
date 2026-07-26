@@ -21,7 +21,7 @@ function formatCent(cent: number): string {
  */
 export function Rechnungen() {
   const online = useOnlineStatus();
-  const { data, loading, offline } = useApiGet<{ invoices: Rechnung[] }>("/invoices/mine");
+  const { data, loading, offline } = useApiGet<{ invoices: Rechnung[] }>("/invoices/mine", "rechnungen", "zahlungen");
   const [inquiryFor, setInquiryFor] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<string | null>(null);

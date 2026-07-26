@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
+import { PendingOperations, SyncProvider, SyncStatusBar } from "@fahrschul/ui";
 import "./styles.css";
+import { API_BASE } from "./api/client.js";
 import { Login } from "./routes/Login.js";
 import { Cockpit } from "./routes/Cockpit.js";
 import { SessionProvider, useSession } from "./state/SessionContext.js";
@@ -31,6 +33,13 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * PROMPT -1 Phase 2: `SyncProvider` (§6/§7/§8) + `SyncStatusBar` (§1). Im
+ * Finanz-Cockpit ist das Datenalter eine fachliche Angabe, nicht Kosmetik:
+ * eine Liquiditätszahl von vor zehn Minuten kann eine falsche Entscheidung
+ * begründen, und ein Bankabgleich, der als "gebucht" erscheint, ohne dass der
+ * Server ihn bestätigt hat, wäre ein Buchungsfehler.
+ */
 function Shell() {
   const { user, logout } = useSession();
   return (
@@ -45,7 +54,11 @@ function Shell() {
         </nav>
       </aside>
       <main className="app-main">
+        <SyncStatusBar />
         <Cockpit />
+        {/* §7: kritische Konflikte (z. B. bereits zugeordnete Zahlung) werden
+            vorgelegt, nicht automatisch aufgelöst. */}
+        <PendingOperations />
       </main>
     </div>
   );
@@ -70,10 +83,19 @@ function AppRoutes() {
  * ausgebaut; die UI-Drilldowns dafür sind ein dokumentierter Gap (siehe
  * docs/finance-final-qa.md).
  */
+function AppInner() {
+  const { user } = useSession();
+  return (
+    <SyncProvider apiBase={API_BASE} benutzerId={user?.id ?? null} storagePrefix="fahrschul:finance:sync:">
+      <AppRoutes />
+    </SyncProvider>
+  );
+}
+
 export function App() {
   return (
     <SessionProvider>
-      <AppRoutes />
+      <AppInner />
     </SessionProvider>
   );
 }
