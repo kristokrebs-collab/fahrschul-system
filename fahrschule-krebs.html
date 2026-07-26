@@ -25,7 +25,7 @@ html{scroll-behavior:auto;-webkit-text-size-adjust:100%}
 body{background:transparent;color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:clip}
 html{overflow-x:clip;background:#090a0d}
 /* living background (aurora + grain) — kills the flat black */
-.bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:radial-gradient(130% 90% at 50% -12%,#14161f,#0b0c10 52%,#08090c)}
+.bgfx{position:fixed;inset:0;z-index:-2;pointer-events:none;overflow:hidden;background:radial-gradient(130% 90% at 50% -12%,#14161f,#0b0c10 52%,#08090c)}
 .bgfx b{position:absolute;border-radius:50%;filter:blur(72px);mix-blend-mode:screen;will-change:transform;opacity:.55}
 .bgfx b:nth-child(1){width:56vw;height:56vw;left:58%;top:-12%;background:radial-gradient(circle,rgba(216,30,40,.55),transparent 66%);animation:au1 24s ease-in-out infinite}
 .bgfx b:nth-child(2){width:46vw;height:46vw;left:-12%;top:48%;background:radial-gradient(circle,rgba(38,74,158,.5),transparent 68%);animation:au2 30s ease-in-out infinite}
@@ -88,15 +88,23 @@ h1,h2,h3{font-family:var(--disp);font-weight:800;line-height:.92;letter-spacing:
 
 /* ── route signature (fixed svg line) ── */
 .route{position:fixed;inset:0;z-index:1;pointer-events:none;width:100%;height:100%}
-.route .line{fill:none;stroke:url(#routeGrad);stroke-width:3.4;stroke-linecap:round;filter:url(#routeGlow);stroke-dasharray:1;stroke-dashoffset:1}
-.route .ghost{fill:none;stroke:rgba(255,255,255,.055);stroke-width:1.4;stroke-dasharray:6 13;stroke-linecap:round}
-.route .pulse{fill:#fff;filter:drop-shadow(0 0 9px rgba(255,90,99,.95)) drop-shadow(0 0 20px rgba(216,30,40,.7))}
+/* ── CINEMATIC STAGE: the film is the backbone ── */
+.stage{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:#07080b}
+.stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1.15s var(--e);will-change:opacity}
+.stage video.on{opacity:1}
+.stage__grade{position:absolute;inset:0;background:
+  linear-gradient(100deg,rgba(6,7,10,.93) 0%,rgba(6,7,10,.72) 38%,rgba(6,7,10,.28) 62%,rgba(6,7,10,.55) 100%),
+  radial-gradient(120% 90% at 50% 105%,rgba(6,7,10,.9),transparent 62%)}
+.stage__vig{position:absolute;inset:0;box-shadow:inset 0 0 190px rgba(0,0,0,.75);background:radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.5) 92%)}
+.stage__bars{position:absolute;left:0;right:0;height:5vh;background:#040507;opacity:.9}
+.stage__bars.t{top:0}.stage__bars.b{bottom:0}
+@media(max-width:820px){.stage__grade{background:linear-gradient(180deg,rgba(6,7,10,.72),rgba(6,7,10,.86) 60%,rgba(6,7,10,.95))}.stage__bars{display:none}}
 
 /* ── hero ── */
 .hero{position:relative;z-index:2;min-height:100svh;display:flex;align-items:center;padding-top:72px;overflow:hidden}
 .hero__bg{position:absolute;inset:0;z-index:-1;background:
-  radial-gradient(70vw 60vh at 78% 18%,rgba(216,30,40,.16),transparent 60%),
-  radial-gradient(50vw 50vh at 12% 90%,rgba(40,54,90,.2),transparent 62%),transparent}
+  radial-gradient(70vw 60vh at 78% 18%,rgba(216,30,40,.09),transparent 60%),
+  linear-gradient(95deg,rgba(6,7,10,.62) 0%,rgba(6,7,10,.2) 46%,transparent 70%)}
 .hero__bg:after{content:"";position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");opacity:.04}
 .hero .wrap{width:100%}
 .hero__eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--red2);margin-bottom:20px}
@@ -361,13 +369,12 @@ html.lenis,html.lenis body{height:auto}.lenis.lenis-smooth{scroll-behavior:auto!
 
 <!-- ROUTE signature -->
 <div class="bgfx" aria-hidden="true"><b></b><b></b><b></b><b></b><i></i></div>
-<svg class="route" id="route" preserveAspectRatio="none" aria-hidden="true">
-  <defs>
-    <linearGradient id="routeGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6069"/><stop offset=".5" stop-color="#d81e28"/><stop offset="1" stop-color="#7a0d13"/></linearGradient>
-    <filter id="routeGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-  </defs>
-  <path class="ghost" id="routeGhost"/><path class="line" id="routeLine"/><circle class="pulse" id="routePulse" r="4.5" opacity="0"/>
-</svg>
+<div class="stage" id="stage" aria-hidden="true">
+  <video id="vA" muted playsinline preload="metadata"></video>
+  <video id="vB" muted playsinline preload="none"></video>
+  <div class="stage__grade"></div><div class="stage__vig"></div>
+  <div class="stage__bars t"></div><div class="stage__bars b"></div>
+</div>
 
 <header class="head" id="head">
   <div class="wrap">
@@ -777,7 +784,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape'){menu(false);closeModal()}});
 
 /* ── smooth scroll (Lenis) ── */
 let lenis=null;
-function initLenis(){if(reduced||typeof Lenis==='undefined')return;lenis=new Lenis({lerp:.1,smoothWheel:true,autoRaf:false});
+function initLenis(){if(reduced||typeof Lenis==='undefined')return;lenis=new Lenis({lerp:.1,smoothWheel:true,autoRaf:false});window.__lenis=lenis;if(window.ScrollTrigger)window.__ST=ScrollTrigger;
   if(typeof gsap!=='undefined'&&gsap.ticker){gsap.ticker.add(t=>lenis.raf(t*1000));gsap.ticker.lagSmoothing(0);if(window.ScrollTrigger){lenis.on('scroll',ScrollTrigger.update);}}
   else{function raf(t){lenis.raf(t);requestAnimationFrame(raf)}requestAnimationFrame(raf)}}
 function goTo(t){const el=typeof t==='string'?$(t):t;if(!el)return;if(lenis)lenis.scrollTo(el,{offset:-60});else el.scrollIntoView({behavior:reduced?'auto':'smooth'})}
@@ -792,22 +799,52 @@ $$('a[href^="#"]').forEach(a=>{const id=a.getAttribute('href');if(id.length>1)a.
 const io=new IntersectionObserver((es)=>es.forEach(en=>{if(en.isIntersecting){en.target.classList.add('in');io.unobserve(en.target)}}),{threshold:.14,rootMargin:'0px 0px -8% 0px'});
 $$('.rv').forEach(el=>io.observe(el));
 
-/* ── route signature: smooth catmull-rom path, gradient stroke, travelling pulse ── */
-(function(){const svg=$('#route'),line=$('#routeLine'),ghost=$('#routeGhost'),pulse=$('#routePulse');
-  function build(){const w=innerWidth,h=document.documentElement.scrollHeight;svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
-    const n=Math.max(6,Math.round(h/760)),pts=[],amp=innerWidth<760?.16:.26;
-    for(let i=0;i<=n;i++){const t=i/n,y=h*t;const x=w*(.5+Math.sin(t*Math.PI*2.2+.5)*amp);pts.push([x,y]);}
-    // catmull-rom -> smooth cubic bezier for a flowing, high-quality line
-    let d=`M ${pts[0][0].toFixed(1)} 0`;
-    for(let i=0;i<pts.length-1;i++){const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
-      const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
-      d+=` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;}
-    line.setAttribute('d',d);ghost.setAttribute('d',d);const len=line.getTotalLength();line.style.strokeDasharray=len;line._len=len;update();}
-  function update(){const max=document.documentElement.scrollHeight-innerHeight,p=clamp(scrollY/(max||1)),len=line._len||1;
-    line.style.strokeDashoffset=(len*(1-clamp(p*1.03))).toFixed(1);
-    try{const pt=line.getPointAtLength(len*clamp(p*1.03));pulse.setAttribute('cx',pt.x);pulse.setAttribute('cy',pt.y);pulse.setAttribute('opacity',p>.005&&p<.995?1:0);}catch(e){}}
-  addEventListener('scroll',update,{passive:true});addEventListener('resize',()=>requestAnimationFrame(build),{passive:true});
-  if(reduced){build();line.style.strokeDashoffset=0;pulse.setAttribute('opacity',0);}else build();
+/* ── CINEMATIC CHAPTER ENGINE ──
+   The Krebs brand film is the backbone: each section owns a chapter of real
+   cinematic footage. Chapters cross-fade between two <video> layers, so there
+   is never a black flash. Mobile gets the vertical cut + fewer swaps; reduced
+   motion gets a still frame and no playback at all. */
+const CDN='https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/';
+const CHAPTERS={
+  top:      CDN+'hf_20260726_003533_f723693e-727e-4372-b7aa-c1079132bd7b.mp4', /* 4 Fahrzeuge auf Drehbühne */
+  finder:   CDN+'hf_20260725_232827_12bef6a6-4dbd-4f1d-8f37-cfe686c25c43.mp4', /* rote Lichtspur über Asphalt */
+  cockpit:  CDN+'hf_20260725_232855_747fccfe-a65b-4013-960d-5a5551d30ee5.mp4', /* Interface-Panels scrollen */
+  klassen:  CDN+'hf_20260726_001354_974cabea-b70b-4226-bf29-c80596f17679.mp4', /* Morph Pkw→Motorrad→Lkw→Bus */
+  simulator:CDN+'hf_20260725_235930_bb31526f-582e-4e22-b76e-e7823e0ac5ec.mp4', /* Push in den Simulatorschirm */
+  preise:   CDN+'hf_20260726_001620_34773992-274e-44a4-8146-3e6fb2389354.mp4', /* Bogen mit Lücke = Fortschritt */
+  weiterbildung: CDN+'hf_20260726_001611_ca580b6b-8d98-4b10-bbbf-368d837773fd.mp4', /* Handbedienung, Makro */
+  standorte:CDN+'hf_20260726_001334_5d632862-e233-4e98-b7f1-2474cd598dc4.mp4', /* Route zwischen zwei Orten */
+  team:     CDN+'hf_20260726_001405_c5e24bae-6ed2-4bd7-a7a1-e7d843e70385.mp4', /* Fahrersicht, Spiegel, Straße */
+  app:      CDN+'hf_20260725_232855_747fccfe-a65b-4013-960d-5a5551d30ee5.mp4'
+};
+const MOBILE_HERO=CDN+'hf_20260726_001657_15d67bec-f187-46b6-bfb5-98d213898b9e.mp4'; /* 9:16 Cut */
+(function film(){
+  const stage=$('#stage');if(!stage)return;
+  const small=matchMedia('(max-width:820px)').matches;
+  if(reduced){ // Reduced motion: ein ruhiges Standbild, keine Wiedergabe
+    const v=$('#vA');v.poster=CDN.replace('d8j0ntlcm91z4','d2ol7oe51mr4n9')+'80d9b773-e448-4523-b18c-2881982cb27c.jpg';
+    v.classList.add('on');v.removeAttribute('preload');return;
+  }
+  const a=$('#vA'),b=$('#vB');let front=a,back=b,curKey='';
+  [a,b].forEach(v=>{v.loop=true;v.muted=true;v.playsInline=true;});
+  function play(v){const p=v.play();if(p&&p.catch)p.catch(()=>{});}
+  function setChapter(key){
+    const src=(small&&key==='top')?MOBILE_HERO:CHAPTERS[key];
+    if(!src||key===curKey)return;curKey=key;
+    back.src=src;back.load();
+    const go=()=>{play(back);back.classList.add('on');front.classList.remove('on');
+      const t=front;front=back;back=t;setTimeout(()=>{if(!back.classList.contains('on')){back.pause();}},1300);};
+    back.readyState>=2?go():back.addEventListener('loadeddata',go,{once:true});
+  }
+  // Mobile: nur die stärksten Kapitel, damit Datenmenge und Akku geschont werden
+  const keys=small?['top','cockpit','simulator','standorte']:Object.keys(CHAPTERS);
+  const secs=keys.map(k=>({k,el:$('#'+k)})).filter(o=>o.el);
+  setChapter('top');
+  const io=new IntersectionObserver(es=>{es.forEach(en=>{if(en.isIntersecting){
+    const hit=secs.find(o=>o.el===en.target);if(hit)setChapter(hit.k);}})},{rootMargin:'-45% 0px -45% 0px'});
+  secs.forEach(o=>io.observe(o.el));
+  document.addEventListener('visibilitychange',()=>{document.hidden?front.pause():play(front)});
+  window.__bgv=()=>({chapter:curKey,small});window.__videoChapters=CHAPTERS;
 })();
 
 /* ── premium micro-interactions: magnetic buttons + card tilt (fine pointer only) ── */
