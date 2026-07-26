@@ -62,6 +62,13 @@ export const PERMISSIONS = [
   "products:manage", // Produkt-/Preisliste pflegen (keine fest codierten Preise, Non-Negotiable)
   "finance:export", // PDF/CSV/XLSX-Exporte anfordern (auditiert, kein öffentlicher Downloadpfad)
   "finance:data_quality:read", // Datenqualitäts-/Review-Queue (unmatched Zahlungen etc.) lesen
+  // PROMPT -1 (Phase 1: Zuverlässigkeitskern) – Betriebs-/Ops-Oberfläche für
+  // Outbox, Job-Store, Dead-Letter-Queue und Konsistenzprüfung. Bewusst KEINE
+  // fachlichen Leserechte: die Antworten enthalten ausschließlich technische
+  // IDs, Zustände und Fehlertexte, keine Schüler-Stammdaten – damit bleibt
+  // "systemdienst hat keinen Zugriff auf Schülerdaten" unverändert gültig.
+  "ops:reliability:read", // Outbox-/Job-/Dead-Letter-/Konsistenzberichte lesen
+  "ops:jobs:manage", // Jobs einplanen/ausführen, Outbox zustellen, Dead Letter wiederaufnehmen
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -153,8 +160,18 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "finance:invoices:read:any",
     "finance:export",
     "finance:data_quality:read",
+    // Geschäftsführung verantwortet das Release-Gate (Phase 4) und braucht
+    // deshalb Lese- und Auslösezugriff auf die Zuverlässigkeitsberichte.
+    "ops:reliability:read",
+    "ops:jobs:manage",
   ],
-  systemdienst: ["users:manage", "audit:read", "system:admin"],
+  systemdienst: [
+    "users:manage",
+    "audit:read",
+    "system:admin",
+    "ops:reliability:read",
+    "ops:jobs:manage",
+  ],
 };
 
 export function hasPermission(role: Role, permission: Permission): boolean {

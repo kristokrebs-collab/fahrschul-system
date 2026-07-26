@@ -32,6 +32,17 @@ export const EVENT_TYPES = [
   "vehicle_issue.reported",
   "voice_log.confirmed",
   "competency.observed",
+  // PROMPT -1 (Phase 1: Zuverlässigkeitskern) – Ereignisse, die die neuen
+  // State Machines / Jobs auslösen. Versionen siehe Tabelle
+  // event_schema_versions (migrations/0007_reliability_core.sql).
+  "lesson.offer.expired",
+  "document.quarantined",
+  "exam.registered",
+  "payment.reversed",
+  "vehicle.blocked",
+  "communication.message_sent",
+  "export.requested",
+  "export.downloaded",
 ] as const;
 
 export const eventTypeSchema = z.enum(EVENT_TYPES);

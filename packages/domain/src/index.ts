@@ -5,3 +5,4 @@ export * from "./events.js";
 export * from "./curriculum.js";
 export * from "./pruefungspipeline.js";
 export * from "./instructor.js";
+export * from "./statemachines.js";
