@@ -399,6 +399,25 @@ importers:
         specifier: ^2.1.4
         version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)
 
+  packages/sync:
+    dependencies:
+      '@fahrschul/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@fahrschul/events':
+        specifier: workspace:*
+        version: link:../events
+    devDependencies:
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.4
+        version: 2.1.9(@types/node@22.20.1)(jsdom@25.0.1)
+
   packages/testing:
     devDependencies:
       '@playwright/test':
