@@ -1,6 +1,7 @@
 import { boolean, integer, jsonb, numeric, pgTable, text, timestamp, uuid, date } from "drizzle-orm/pg-core";
 import { standorte } from "./core.js";
 import { schueler } from "./people.js";
+import { terminbuchungen } from "./scheduling.js";
 import { benutzer } from "./core.js";
 
 export const rechnungen = pgTable("rechnungen", {
@@ -48,6 +49,14 @@ export const banktransaktionen = pgTable("banktransaktionen", {
   rechnungIds: jsonb("rechnung_ids").notNull().default([]),
   aufteilung: jsonb("aufteilung").notNull().default({}),
   hinweis: text("hinweis"),
+  /**
+   * PROMPT -1 §10: persistierte Zahlungs-State-Machine (EXAKTE Zustandsmenge
+   * imported..failed). Sie sitzt auf der Banktransaktion, weil DORT der
+   * Zahlungseingangs-Lebenszyklus (Import -> Matching -> Zuordnung/Storno)
+   * stattfindet; `zahlungen`-Zeilen sind die daraus resultierenden
+   * Zuordnungen (siehe docs/sync-architecture.md §10).
+   */
+  zahlungStatus: text("zahlung_status").notNull().default("imported"),
   status: text("status").notNull().default("offen"),
   autoGebucht: boolean("auto_gebucht").notNull().default(false),
   bearbeitetDurchBenutzerId: uuid("bearbeitet_durch_benutzer_id").references(() => benutzer.id),
@@ -96,6 +105,15 @@ export const dokumente = pgTable("dokumente", {
   // Mock-Malware-Scan (packages/integrations malware-scan Adapter,
   // "always clean" – kein echter AV-Anbieter in dieser Sandbox verfügbar).
   scanStatus: text("scan_status").notNull().default("ausstehend"),
+  /**
+   * PROMPT -1 §10: persistierte Dokument-State-Machine (EXAKTE Zustandsmenge).
+   * Quelle der Wahrheit; `status` wird per DB-Trigger abgeleitet.
+   */
+  dokumentStatus: text("dokument_status").notNull().default("uploaded"),
+  /** §3/§19: "verified"/"rejected" sind ohne Prüfprotokoll + Prüfer DB-seitig verboten. */
+  pruefprotokoll: jsonb("pruefprotokoll"),
+  gepruefDurchBenutzerId: uuid("geprueft_durch_benutzer_id").references(() => benutzer.id),
+  gepruefAt: timestamp("geprueft_at", { withTimezone: true }),
   status: text("status").notNull().default("eingereicht"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -111,5 +129,14 @@ export const rechnungspositionen = pgTable("rechnungspositionen", {
   mengeCent: integer("menge_cent"),
   einzelpreisCent: integer("einzelpreis_cent").notNull(),
   gesamtpreisCent: integer("gesamtpreis_cent").notNull(),
+  /**
+   * PROMPT -1 §3: Leistungsbezug. Ein partieller Unique-Index verbietet eine
+   * zweite, nicht stornierte Position für dieselbe Leistung -> "keine
+   * doppelte Rechnung für dieselbe Leistung" ist eine DB-Invariante.
+   */
+  leistungTerminbuchungId: uuid("leistung_terminbuchung_id").references(() => terminbuchungen.id),
+  /** Freier Leistungsschlüssel für Nicht-Termin-Leistungen (z. B. "produkt:B197:<ausbildungId>"). */
+  leistungRef: text("leistung_ref"),
+  storniert: boolean("storniert").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -73,6 +73,13 @@ export const terminangebote = pgTable("terminangebote", {
   treffpunkt: text("treffpunkt"),
   automatik: boolean("automatik").notNull().default(false),
   ablaufAt: timestamp("ablauf_at", { withTimezone: true }),
+  /**
+   * PROMPT -1 §10: persistierte Terminangebot-State-Machine mit der EXAKTEN
+   * Zustandsmenge der Spezifikation. Quelle der Wahrheit; die Alt-Spalte
+   * `status` wird per DB-Trigger daraus abgeleitet (Expand-Contract, siehe
+   * migrations/0007_reliability_core.sql und docs/sync-architecture.md).
+   */
+  angebotStatus: text("angebot_status").notNull().default("created"),
   status: text("status").notNull().default("offen"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

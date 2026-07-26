@@ -35,6 +35,11 @@ export const fahrzeugmaengel = pgTable("fahrzeugmaengel", {
   fotoReferenz: text("foto_referenz"),
   sprachnotizReferenz: text("sprachnotiz_referenz"),
   geroutetAn: text("geroutet_an").notNull().default("buero"),
+  /**
+   * PROMPT -1 §10: persistierte Fahrzeugmangel-State-Machine (EXAKTE
+   * Zustandsmenge). Quelle der Wahrheit; `status` wird abgeleitet.
+   */
+  mangelStatus: text("mangel_status").notNull().default("reported"),
   version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
