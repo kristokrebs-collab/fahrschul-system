@@ -404,3 +404,89 @@ Sandbox-Möglichkeiten* und in *fachlicher Abnahme*, nicht in der
 Kern-Engineering-Qualität. Ein NO-GO wäre angesichts der soliden, tatsächlich
 reproduzierten Testevidenz für Auth, Konfliktfreiheit, Rollenmodell und die
 sechs Kernflüsse nicht gerechtfertigt.
+
+---
+
+# NACHTRAG (PROMPT -1, Phase 4, 2026-07-26): die sieben Bedingungen erneut bewertet
+
+Dieser Bericht entstand am **2026-07-23** auf Commit `4d58946` – also **vor**
+`PROMPT -1` und damit vor den vier Phasen (Zuverlässigkeitskern,
+Echtzeitsynchronisation, Defense in Depth, Chaos/Wiederherstellung/Deployment).
+Sein CONDITIONAL GO ist deshalb überholt: die Zahlen (223 Tests) und mehrere
+Feststellungen („kein Rate Limiting") sind nicht mehr der Stand.
+
+Dieser Nachtrag ordnet die sieben Bedingungen aus §7 neu ein. Er ist vom
+**Phase-4-Reviewer** verfasst, der weder die Prompts 0–4 noch die Phasen 1–3
+gebaut hat, und der alle Zahlen unten in seiner Sitzung selbst reproduziert hat.
+Das vollständige, aktuelle Verdikt steht in **`docs/chaos-test-report.md`,
+Abschnitt 6** – dieser Nachtrag ersetzt es nicht, er verbindet nur die alte
+Bedingungsliste mit der neuen.
+
+## Aktueller Stand statt der alten Zahlen
+
+| | Prompt-5-Review (2026-07-23) | Phase 4 (2026-07-26) |
+|---|---:|---:|
+| Automatisierte Tests | 223 | **794** |
+| Pakete typecheck-sauber | 16 | **17** |
+| Migrationen | 0006 | **0010** |
+| Chaos-/Wiederanlaufszenarien | 0 | **18** (14 PASS, 4 TEILWEISE, 0 unausgeführt) |
+| Ausgeführter Wiederherstellungstest | nein | **ja, zweifach** (logisch + PITR) |
+| Gemessene SLOs | keine | **p95 je Endpunkt, Sync-/Warteschlangenverzögerung, Fehlerquote** |
+
+## Die sieben Bedingungen
+
+| # | Bedingung aus §7 | Status | Begründung |
+|---|---|---|---|
+| **1** | Rate Limiting auf Login/Buchung/Export ergänzen und testen | **GESCHLOSSEN** (mit Einschränkung) | Von Phase 3 gebaut (Token-Bucket je IP **und** Konto, eigene Politik für den SSE-Stream, `Retry-After`, plus DB-persistenter Brute-Force-Schutz), 52 Tests. **Vom Phase-4-Reviewer nachgeprüft und in einer Hinsicht verschärft:** die bekannte Einschränkung „Zähler pro Prozess" ist jetzt **bewiesen** (`chaos.test.ts` Szenario 14) – und im Gegentest, dass der Brute-Force-Schutz das **nicht** ist. Die Sicherheitsaussage ist instanzübergreifend, die Lastbegrenzung nicht → neue Bedingung **B7**. |
+| **2** | Mindestens ein vollständiger Playwright-Lauf + ein Screenreader-Durchlauf | **OFFEN** | In Phase 4 **erneut selbst versucht**: `npx playwright install chromium` → HTTP 403 „host not permitted" für `cdn.playwright.dev`; zusätzlich ist **kein** Systembrowser installiert (`chromium`, `google-chrome`, `firefox` – alle fehlen). In sieben Sitzungen ist nie ein Browser gelaufen. **Teilweise gemildert:** die §18-Anzeige ist jetzt gerendert getestet (16 Tests, jsdom + Testing Library, Abfrage über Rollen und Text). **Nicht** gemildert: CSP im Browser, Screenreader, Viewports, und die Browseranteile der Szenarien 1, 7, 11, 13 → **B2**. |
+| **3** | Echter Sandbox-Test je externer Integration vor dem Umschalten auf `live` | **OFFEN, unverändert** | Alle zehn Integrationen sind Mock. Phase 3 hat Zeitlimit, Circuit Breaker, Retry, ausgehende Idempotenz, Puffer und Fehlerwarteschlange darum gebaut und gegen **absichtlich fehlerhafte** Adapter getestet; Phase 4 hat den 30-Minuten-Ausfall als Szenario 9 nachgestellt. Getestet ist damit der **Ausfallpfad**, nicht der Anbieter. `assertMockOnly` verhindert ein Versehen → **A5**. |
+| **4** | Die 14 Punkte in `docs/fachliche-bestaetigungen.md` bestätigen lassen | **OFFEN, unverändert – und weiterhin wirksam** | Keiner der 14 Punkte ist abgenommen. Sie sind im Code als unbestätigt markiert, aber **aktiv**: die 15-Minuten-Pausenregel blockiert heute Buchungen (`booking-conflict.test.ts` dokumentiert das ausdrücklich), das Vier-Augen-Prinzip bei der Prüfungsfreigabe ist technisch vorbereitet und **nicht erzwungen**. Keine dieser Annahmen darf als Endregel gelten → **A4**. Dies ist die einzige Bedingung, die **nur die Fahrschule Krebs** schließen kann. |
+| **5** | Docker-Registry-Zugriff einmalig verifizieren | **OFFEN, unverändert** | `docker-compose.yml` wurde nie mit einem echten `docker pull` getestet; alle Testläufe (auch die 794 dieser Sitzung) liefen gegen die im Sandbox-Image vorinstallierte Postgres-16.13-Instanz → **C7**. |
+| **6** | Kernfluss 4 (Fahrzeugmangel → Finance-Flottenansicht) per Integrationstest belegen | **OFFEN, unverändert** | Phase 4 hat diesen Test **nicht** geschrieben; er lag außerhalb von §20. Die Datenmodell-Kopplung ist unverändert real (dieselbe Spalte, dieselbe Tabelle), der Cross-App-Test fehlt weiter → **C5**. |
+| **7** | Bekannte Funktionslücken schließen oder bewusst zurückstellen | **OFFEN, unverändert** | `rankCandidates()` nicht an Storno-Retter/Planung angebunden, Fahrlehrerauslastungs-Detailkarte und Forecast-API, kein `GET /office/dokumente`-Übersichtsendpunkt, kein PDF/CSV/XLSX-Renderer, Seed-Abdeckung. Keine davon wurde in den Phasen 1–4 geschlossen (sie waren nicht Teil von `PROMPT -1`) → **C6**. Eine ausdrückliche Produktentscheidung fehlt weiterhin. |
+
+**Bilanz: eine von sieben geschlossen, sechs offen.** Das ist kein Rückschritt –
+`PROMPT -1` hat an einer anderen Achse gearbeitet (Zuverlässigkeit,
+Synchronisation, Sicherheit, Betrieb) und dort erheblich zugelegt. Die sechs
+offenen Bedingungen betreffen **Testabdeckung außerhalb der Sandbox**, **echte
+Anbieter**, **fachliche Abnahme** und **Funktionsumfang** – keine davon ist durch
+Zuverlässigkeitsarbeit lösbar.
+
+## Was seit dieser Review NEU an Bedingungen hinzugekommen ist
+
+Nicht in der alten Liste enthalten, weil die betroffenen Bausteine damals nicht
+existierten. Vollständig mit Begründung und Zuständigkeit in
+`docs/chaos-test-report.md`, Abschnitt 6:
+
+| Neu | Kurz |
+|---|---|
+| **A1** | Getrennter Sicherungsort + Secret-Store. Sicherungen liegen heute neben der Datenbank, der Schlüssel neben den Sicherungen. |
+| **A2** | Ein **Alarmkanal**. Elf Alarmarten sind definiert und feuern; empfangen wird nichts (`ALARM_WEBHOOK_URL` ist ein Seam, standardmäßig nicht registriert). |
+| **A3** | Genau **ein** Prozess mit Scheduler, verifiziert über `GET /ops/scheduler`. |
+| **A6/A7** | `METRICS_TOKEN` setzen; TLS + `COOKIE_SECURE=true`. |
+| **B1** | Wiederherstellung auf einem **anderen Host** (der Test hier lief auf derselben Maschine). |
+| **B3/B4** | Prometheus-Scraper + Dashboard; Rollback **erproben** – beides sind die zwei PARTIAL-Punkte des §22-Gates. |
+| **B5/B6** | Standby + Failover (die Datenbank ist ein Single Point of Failure); WAL-Aufbewahrung einrichten. |
+| **C1** | **Neun Abhängigkeits-Advisories in sechs Paketen.** Vom Phase-4-Reviewer eigenständig reproduziert (exakt 9 in 6) und einzeln nachgeprüft: **keines im aktuellen Code ausnutzbar**. Erforderlich sind Major-Aktualisierungen (`drizzle-orm` 0.36 → ≥ 0.45.2, React Router 6 → 7) als **eigener** Vorgang. |
+| **C4** | Idempotenzfrist (24 h) gegen das Offline-Fenster (7 Tage) entscheiden. |
+
+## Gefundene Fehler seit dieser Review
+
+| Fund | Von | Status |
+|---|---|---|
+| Deadlock (40P01) statt Konfliktantwort bei gleichzeitiger Doppelbuchung – HTTP **500 statt 409** in 9–10 von 50 Läufen, bestehend seit Phase 1 | Phase 3 | behoben; von Phase 4 **unabhängig nachgeprüft**: 90 gleichzeitige Versuche über drei Tests, **0 × 5xx** |
+| Zeichenkettengebautes SQL in `claimJobs` **plus** die Lücke im Wächter, der es verhindern sollte | **Phase 4** | behoben, Wächter erweitert und gegen das alte Muster verifiziert |
+| `scheduleRecurringJobs()` wurde von **nichts** periodisch aufgerufen – in einem echten Serverprozess lief kein wiederkehrender Job | **Phase 4** | behoben (Scheduler, getrennter Worker, `GET /ops/scheduler`, Alarm) |
+| `GET /health/ready` öffnete zwei neue DB-Verbindungen je Aufruf (p50 25 ms) | **Phase 4**, eigene Arbeit | behoben (p50 0,92 ms) |
+| Der einzige Flake des Workspace: eine vakuum-erfüllbare negative Zusicherung, danach eine unwartende Prüfung | **Phase 4** | behoben, Test verschärft; **kein** Produktcode geändert |
+
+## Verhältnis zum Verdikt dieses Berichts
+
+Das **CONDITIONAL GO** von 2026-07-23 bleibt in seiner Grundaussage richtig und
+ist durch das aktuelle Verdikt **RELIABILITY FOUNDATION CONDITIONAL**
+(`docs/chaos-test-report.md`, Abschnitt 6) ersetzt. Die Begründung hat sich
+verschoben: 2026-07-23 fehlte vor allem **Evidenz**; heute ist die Evidenz für
+Zuverlässigkeit, Konfliktfreiheit, Wiederherstellung und Sicherheit da und
+reproduziert – was fehlt, ist **Betriebsinfrastruktur** (Alarmkanal, Offsite,
+Standby, Orchestrator, Scraper), **ein Browser** und die **fachliche Abnahme**
+der 14 Regeln.

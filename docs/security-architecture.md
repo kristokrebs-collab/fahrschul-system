@@ -601,8 +601,42 @@ eine Momentaufnahme. `code-guards.test.ts` macht daraus einen Wächter:
   Benutzereingabekanal),
 - kein SQL-Schlüsselwort in einem verketteten String oder in einem
   **nicht-getaggten** Template,
+- **kein `sql.raw(` mit Interpolation oder Verkettung** (Phase 4, Befund unten),
 - kein `eval`, kein `new Function`, kein `child_process`,
 - kein `rejectUnauthorized: false`, kein `NODE_TLS_REJECT_UNAUTHORIZED`.
+
+> ### PHASE-4-BEFUND: dieser Wächter hatte eine Lücke, und sie war belegt
+>
+> Die Phase-3-Fassung ließ eine echte Zeichenketten-SQL-Konstruktion durch.
+> `apps/api/src/workers/job-store.ts` (`claimJobs`, aus Phase 1d) baute die
+> `in (…)`-Liste der Job-Typen als **Zeichenkette** mit handgeschriebenem
+> Quote-Escaping und übergab sie an `sql.raw(...)`. Die Werte kommen aus dem Body
+> von `POST /ops/jobs/run` (`jobTypes: z.array(z.string().min(1))` – beliebige
+> Zeichenketten). Damit existierte ein Eingabekanal in einen
+> **unparametrisierten** SQL-Text.
+>
+> **Warum der Wächter es nicht sah:** seine Regel lässt eine Zeile durch, wenn
+> sie das Präfix `` sql` `` enthält – weil ein *getaggtes* Template
+> parametrisiert ist. Diese Zeile enthielt es. `sql.raw()` ist aber das genaue
+> Gegenteil: sein Argument wird unverändert in den Abfragetext eingesetzt.
+>
+> **Schwere: mittel.** Der Endpunkt verlangt `ops:jobs:manage` (nur
+> `systemdienst` und `geschaeftsfuehrung`), und das Verdoppeln einfacher
+> Anführungszeichen ist bei `standard_conforming_strings = on`
+> (Postgres-Standard) die korrekte Maskierung – trivial ausnutzbar war es also
+> nicht. Es war aber genau das Muster, das dieses Projekt als Non-Negotiable
+> ausschließt, an einer Stelle mit Betriebs- und Geldbezug.
+>
+> **Behoben:** `claimJobs` parametrisiert über `sql.join` (jeder Typ ein
+> Bindeparameter), Verhalten unverändert (`jobs.test.ts` 23/23 weiter grün). Der
+> neue Wächter erlaubt `sql.raw()` nur mit einer **literalen** Zeichenkette und
+> ist gegen das alte Muster verifiziert (es wird geflaggt).
+>
+> **Was das über die frühere Aussage sagt:** die Prompt-5-Review stellte „keine
+> SQL-String-Verkettung" als Momentaufnahme fest, Phase 3 machte daraus einen
+> Wächter – und der Wächter war unvollständig. Beide Aussagen waren im Kern
+> richtig und in der Reichweite zu großzügig. Der Wächter ist eine Textanalyse;
+> das ist sein dokumentierter Preis und war hier der konkrete Grund.
 
 **Warum ein Test und keine ESLint-Regel:** es gibt in diesem Repository keine
 ESLint-Konfiguration und keinen CI-Lauf, der eine Lint-Regel ausführen würde.
@@ -696,7 +730,7 @@ Degradation einen Totalausfall.
 | Rate Limiting | **echt**, getestet | Zähler im Prozessspeicher (siehe Abschnitt 2) |
 | Brute-Force-Schutz | **echt**, persistiert, getestet | – |
 | CSRF (3 Lagen) | **echt**, getestet | – |
-| CSP | **echt** gesetzt (Kopfzeile + Meta), Kompatibilität gegen die Builds geprüft | Kein Browser-Test (Playwright ist Phase 4) |
+| CSP | **echt** gesetzt (Kopfzeile + Meta), Kompatibilität gegen die Builds geprüft | **Weiterhin kein Browser-Test.** Phase 4 hat `npx playwright install chromium` erneut versucht: HTTP 403 „host not permitted“ für `cdn.playwright.dev`, und es ist kein Systembrowser installiert. Damit ist unbelegt, ob die Anwendung unter der CSP tatsächlich läuft. |
 | Step-up + TOTP | **echt** (serverseitiges TOTP aus Phase 0) | – |
 | Append-only-Audit + Hash-Kette | **echt**, Manipulation nachweislich erkannt | Baum statt Linie (Abschnitt 8) |
 | Magic-Byte-Prüfung, Prüfsumme, Quarantäne | **echt**, getestet | – |
@@ -721,14 +755,44 @@ Degradation einen Totalausfall.
    SameSite. Bewusst, begründet, protokolliert.
 4. **Hash-Kette ist ein Baum**, das Löschen eines Blattes ist ohne Trigger
    nicht erkennbar (Abschnitt 8).
-5. **Kein Browser-Test der CSP.** Die Politik ist gegen die gebauten
-   `index.html` geprüft (keine Inline-Skripte), aber nicht in einem echten
-   Browser ausgeführt – das ist ein Playwright-Szenario und gehört zu §20
-   (Phase 4).
+5. **Kein Browser-Test der CSP.** Unverändert offen. **Phase-4-Nachtrag:**
+   erneut versucht, erneut blockiert (HTTP 403 „host not permitted" für
+   `cdn.playwright.dev`, kein Systembrowser installiert). Bleibt eine
+   Release-Bedingung (`docs/chaos-test-report.md`, Bedingung B2).
 6. **Zwei Produktionsabhängigkeiten mit offenen Advisories**
    (`drizzle-orm`, `react-router`), im aktuellen Code nicht ausnutzbar,
    Behebung nur per Major-Aktualisierung (Abschnitt 11).
+   **Phase-4-Nachtrag:** der Scan wurde vom Release-Reviewer **eigenständig
+   wiederholt** (189 aufgelöste Versionen aus `pnpm-lock.yaml` gegen die
+   npm-Bulk-API, HTTP 200): **exakt neun Advisories in sechs Paketen**, identisch
+   zur Phase-3-Liste. Die Ausnutzbarkeitsbewertungen wurden einzeln nachgeprüft
+   und **bestätigt** – eine Begründung war allerdings zu grob: „alle
+   Navigationsziele sind statisch" trifft nicht ganz. Vier der 28 Ziele sind
+   interpoliert; drei setzen eine **Server-UUID in einen festen Pfadpräfix**
+   (was die Backslash-Open-Redirect-Klasse nicht erlaubt), das vierte bezieht
+   seinen Wert aus sieben **hartkodierten Literalen** in
+   `useHeutePriorities.ts`. Kein Nutzereingabewert erreicht ein
+   Navigationsziel – die Bewertung „nicht ausnutzbar" bleibt gültig, die
+   Begründung ist jetzt präzise. Zusätzliche Bedingung daraus: **vor** der
+   Einführung dynamischer Navigationsziele muss React Router 7 da sein.
+   Details: `docs/chaos-test-report.md`, Abschnitt 2.8.
 7. **`system.security_flag.change`** ist als Step-up-Aktion definiert, hat aber
    noch keinen Endpunkt – es gibt derzeit kein Feature-Flag mit
    Sicherheitswirkung. Bewusst vorbereitet, nicht behauptet.
+   **Phase-4-Entscheidung: die Definition BLEIBT und wird dokumentiert, nicht
+   entfernt.** Begründung: `feature_flags` existiert und ist über `POST /flags`
+   schaltbar; sobald ein Flag mit Sicherheitswirkung dazukommt (naheliegend das
+   Vier-Augen-Prinzip bei der Prüfungsfreigabe, Punkt 11 in
+   `docs/fachliche-bestaetigungen.md`), ist genau diese Aktion die richtige
+   Absicherung. Entfernen und später neu einführen wäre teurer als behalten; sie
+   ist typgeprüft und kostet zur Laufzeit nichts. **Wichtig:** sie ist keine
+   Berechtigung, sondern eine ANFORDERUNG an einen künftigen Endpunkt – kein
+   Endpunkt darf sie stillschweigend beanspruchen.
 8. **Der Malware-Scanner bleibt Mock** (Abschnitt 12).
+9. **Phase-4-Nachtrag: das Rate-Limit pro Prozess ist BEWIESEN, nicht nur
+   dokumentiert.** `apps/api/src/__tests__/chaos.test.ts`, Szenario 14, zeigt an
+   zwei gleichzeitig laufenden Instanzen, dass ein Aufrufer nach Erschöpfung auf
+   Instanz A auf Instanz B wieder frei ist – und im Gegentest, dass der
+   **Brute-Force-Schutz** das NICHT tut (DB-persistiert; die Sperre gilt auf
+   beiden Instanzen). Die Sicherheitsaussage ist damit instanzübergreifend, die
+   Lastbegrenzung nicht.

@@ -1441,3 +1441,190 @@ und kein `SET NOT NULL` enthält – expand-contract ist damit nicht nur behaupt
 17 Pakete typecheck-sauber, alle vier Apps `vite build` sauber (die CSP im
 `<meta>`-Tag überlebt den Build und die Ausgabe enthält weiterhin **kein**
 Inline-Skript).
+
+---
+
+# Teil 4 – Phase 4: Chaos, Wiederherstellung, Deployment, Service-Level-Ziele
+
+Phase 4 besitzt **§14, §15, §20, §21, §22**. Sie ist zugleich die **unabhängige
+Release-Prüfung**: sie hat die Phasen 1–3 nicht gebaut und ihre Zusagen deshalb
+nachgeprüft statt übernommen. Die ausführliche Darstellung liegt in vier eigenen
+Dokumenten, weil §22 sie einzeln verlangt:
+
+- **`docs/chaos-test-report.md`** – die achtzehn §20-Szenarien mit Erwartung,
+  Ergebnis und Testnamen; die dreizehn §22-Gate-Punkte; das Verdikt samt
+  Bedingungsliste.
+- **`docs/backup-restore-report.md`** – §14 wie **ausgeführt**: verschlüsselte
+  Sicherungen, Wiederherstellung in eine isolierte Datenbank, PITR in einen
+  zweiten Cluster, RPO/RTO getrennt für Pilot und Produktion.
+- **`docs/recovery-runbook.md`** – §14/§15 im Ernstfall: Wiederanlauf,
+  Wiederherstellung, Deployment, Rollback, Lock- und Laufzeitüberwachung.
+- **`docs/slo-dashboard.md`** – §21 mit **gemessenen** Zahlen, Methode und
+  Stichprobengröße, und mit klar getrennten „braucht Telemetrie"-Posten.
+
+Dieser Teil hält nur fest, **was Phase 4 an Teil 1–3 ändert**.
+
+## Was sich an Teil 1, 2 und 3 geändert hat
+
+### §13/§15: der Scheduler existiert jetzt wirklich
+
+Alle drei Vorphasen notierten „Cron-Eintrag ist §15 und damit Phase 4". Der
+Befund war ernster als die Notiz: `scheduleRecurringJobs()` war getestet, aber
+`server.ts` setzte `startWorkers` **nicht**. In einem echten Serverprozess lief
+damit **kein einziger** wiederkehrender Job – keine Outbox-Zustellung, kein
+Angebotsablauf, keine Wiederaufnahme gepufferter Aufrufe, kein Konsistenzcheck,
+keine Audit-Kettenprüfung, kein Aufräumen.
+
+`apps/api/src/workers/scheduler.ts`:
+
+| Eigenschaft | Umsetzung und Begründung |
+| --- | --- |
+| **Zwei getrennte Takte** | Arbeit 5 s (bestimmt die Sync-Verzögerung), Einplanung 60 s. `startWorkerLoop` rief `scheduleRecurringJobs` bei **jedem** Durchlauf – idempotent, aber ~240 000 überflüssige `insert … on conflict` pro Tag. |
+| **Jitter ±20 %** | Ohne Streuung schlagen n Instanzen nach einem Rollout im Gleichschritt auf dieselben Zeilen. |
+| **Fehlerisolierung je Takt** | Ein Scheduler, der beim ersten transienten DB-Fehler stirbt, ist schlimmer als keiner – weil es niemand merkt. |
+| **Alarm `scheduler_stalled`** (kritisch) | Der elfte Alarm. Er ist der wichtigste, weil er die anderen zehn stützt: ohne Takt schweigen sie fälschlich. |
+| **Zwei Kennzahlen** | `fahrschul_scheduler_ticks_total{kind,result}` (Takt läuft und scheitert) und `fahrschul_scheduler_last_tick_age_seconds` (Takt läuft **gar nicht** – der stille, gefährliche Fall). |
+| **Testbar ohne Zeitgeber** | `runWorkTick()`/`runScheduleTick()` sind einzeln aufrufbar; Timer sind injizierbar. |
+| **Zwei Betriebsarten** | In-Process (`RUN_WORKERS=1`, Pilot) und getrennter Prozess (`apps/api/src/worker.ts`, Mehrinstanzbetrieb) – **derselbe** Code, keine zweite Job-Logik. Sicher ist beides, weil der Anspruch über Lease + `FOR UPDATE SKIP LOCKED` in der Datenbank sitzt (§13). |
+| **`GET /ops/scheduler`** | Beantwortet die Frage, die vorher unbeantwortbar war: *läuft in diesem Prozess überhaupt ein Takt, und wie alt ist der letzte?* Meldet ehrlich `aktiv: false`, statt es zu verschweigen. |
+
+### §15: Bereitschaft und Lebendigkeit sind jetzt getrennt
+
+`GET /health/deep` (Phase 3) ist eine gute **Anzeige** und eine schlechte
+**Probe**: sie zieht mehrere Aggregate und beantwortet nicht, ob das Schema zum
+Artefakt passt. Neu:
+
+| Endpunkt | Frage | Prüft | Fehlerfolge |
+| --- | --- | --- | --- |
+| `GET /health/live` | „lebt der Prozess?" | **nichts** (kein I/O) | neu starten |
+| `GET /health/ready` | „darf sie Verkehr bekommen?" | DB-Roundtrip **und** Migrationsstand | aus dem Loadbalancer nehmen, **nicht** neu starten |
+
+**Liveness prüft absichtlich nichts.** Eine DB-abhängige Liveness-Probe ist ein
+Ausfallverstärker: fällt die Datenbank aus, tötet der Orchestrator alle
+Instanzen, und beim Zurückkommen treffen sie sie als Kaltstartwelle.
+
+`/health/deep` ist unverändert und wurde **nachgeprüft**: 200 mit
+`eingeschraenkt` bei offenem Breaker, 503 nur bei unerreichbarer Datenbank.
+
+### §15: Deployment-Identität und ein globaler Fehlerbehandler
+
+`deploymentId`/`instanceId`/`releaseChannel` hängen an **jeder** Logzeile (in
+`log()`, nicht an 20 Aufrufstellen), `x-deployment-id` steht auf **jeder**
+Antwort – auch auf einer 401, weil sie im `onRequest`-Hook gesetzt wird.
+
+Neu ist außerdem ein `setErrorHandler`: vorher gab es **keinen**, eine
+unbehandelte Ausnahme lief in Fastifys Standardbehandlung und lieferte die
+**Originalmeldung** aus (Constraint-Namen, Spaltennamen, Nutzlastfetzen). Jetzt:
+`{ error: "internal_error", requestId, correlationId, deploymentId }`, Meldung
+und gekürzter Stack gehen ins Log (durch die §16-Redaktion). Die ~30 Routen mit
+eigener 500-Antwort bleiben unangetastet – dieser Handler ist das Netz für alles,
+was **niemand** behandelt hat.
+
+### §14/§15: das Tor gegen zerstörende Migrationen
+
+`packages/database/src/migrate.ts` verweigert eine Migration mit `drop table`,
+`drop column`, `drop schema`, `drop database`, `rename column`, `rename to`,
+`alter column … type`, `set not null` oder `truncate`, solange nicht **beides**
+vorliegt: `MIGRATION_APPROVED_BY` **und** ein `backup_runs`-Eintrag **mit**
+`verified_at`.
+
+Der entscheidende Punkt: das Backup wird **gegen die Datenbank geprüft**, nicht
+geglaubt. Eine Umgebungsvariable, die ein Backup behauptet, ist kein Nachweis;
+nur `scripts/restore-funktion` setzt `verified_at`, und eine CHECK-Constraint
+verhindert zusätzlich eine per Hand als „verifiziert" markierte
+**fehlgeschlagene** Sicherung. Bewusst **nicht** erkannt: `drop trigger`/
+`drop function` mit anschließendem `create` (der normale Weg, eine Definition zu
+ersetzen – 0007 bis 0009 tun das mehrfach) und `drop index if exists`.
+
+**Konkret betroffen ist die CONTRACT-Phase** aus §10: das Entfernen der
+Alt-Statusspalten ist die erste zerstörende Migration dieses Projekts, wartet auf
+genau dieses Tor und ist **nicht geschrieben**.
+
+### Der expand-contract-Wächter gilt jetzt für ALLE Migrationen
+
+Phase 3 prüfte nur `0009`. Damit war die Zusage für 0007 und 0008 eine
+Momentaufnahme. Jetzt gilt sie für **jede** Datei ab `0007` – ab dem Punkt, an
+dem vier Frontends im Feld waren (`deployment.test.ts`).
+
+### §2/§3: ein gefundener Fehler in `claimJobs`
+
+`workers/job-store.ts` baute die `in (…)`-Liste der Job-Typen als
+**Zeichenkette** und übergab sie an `sql.raw(...)`; die Werte kommen aus dem Body
+von `POST /ops/jobs/run`. Der Wächtertest, der das verhindern soll, ließ es
+durch, weil die Zeile das Präfix `` sql` `` enthält. Behoben (parametrisiert über
+`sql.join`), Wächter erweitert. Vollständige Bewertung:
+`docs/security-architecture.md` Abschnitt 11 und
+`docs/chaos-test-report.md` Abschnitt 2.1.
+
+### §18: die Anzeige ist jetzt gerendert getestet
+
+`docs/failure-modes.md` führte als Lücke 5, dass `DegradedBanner` keinen
+Rendering-Test hat. 16 Tests in
+`apps/student/src/state/degradedBanner.test.tsx` rendern die Komponente
+tatsächlich (jsdom + Testing Library) und fragen über **Rollen und Text** ab –
+nicht über CSS-Klassen. Der **Browser**anteil bleibt offen.
+
+### §7: der einzige Flake des Workspace hat eine Ursache
+
+`apps/student/src/state/syncUi.test.tsx`, „erst die Serverbestätigung räumt den
+Vorgang aus der Liste": die Zusicherung begann mit einem **negativen** `waitFor`,
+das beim ersten Tick erfüllt war, **bevor** der Vorgang überhaupt existierte –
+der Test konnte bestehen, ohne das zu beobachten, was er behauptet. Danach prüfte
+er den Status **ohne** Warten. Ursache des Pendelns: die Auflösung offener
+Vorgänge beim Start (`resolvePendingAfterRestart`) und der erste `flush()` können
+sich überlappen; der Zustand **konvergiert**. Genau diese Konvergenz ist die
+§7-Zusage und wird jetzt geprüft (beide Bedingungen gemeinsam unter `waitFor`).
+Kein Produktcode geändert.
+
+## Neue Tabellen (Migration 0010, expand-contract)
+
+| Tabelle | Zweck |
+| --- | --- |
+| `backup_runs` | §14: ausgeführte Sicherungen **samt Verifikationsnachweis**; Quelle des §15-Tors |
+| `deployments` | §15: ein Eintrag je Rollout – Migrationen, Freigabe, Backupbezug, Rollback-Spur |
+
+Rein additiv, zwei neue Tabellen, keine bestehende Spalte angefasst. Beide sind
+**Betriebsprotokoll, nicht Fachzustand**: keine `version`-Spalte (§4 gilt für
+Fachdaten), keine Outbox-Ereignisse (§5 gilt für fachliche Ereignisse), keine
+Invarianten. Eine Zeile dort macht keine Buchung gültig oder ungültig.
+
+## Non-Negotiables: nach Phase 4 erneut geprüft
+
+| Zusage | Status | Nachweis |
+| --- | --- | --- |
+| `EXCLUDE`-Constraints gegen Doppelbuchung | unangetastet, **verstärkt geprüft** | Typ `contype='x'` geprüft; **90** gleichzeitige Buchungsversuche über drei Tests, **0 × 5xx**; die Integritätsprüfung meldet ihr Fehlen als kritisch |
+| Deadlock-Fix aus Phase 3 | **hält** | Szenario 3, 20 Runden mit zwei **verschiedenen** Schülern: exakt `{201: 20, 409: 20}` |
+| Phase-1-Invarianten/Trigger/State Machines | unangetastet | `invariants.test.ts`, `state-machines.test.ts`; Szenario 18 prüft FS003 zusätzlich per Roh-SQL |
+| Phase-2 SSE-Autorisierung + dichter Cursor | unangetastet | `realtime.test.ts` grün; Szenario 7 prüft die Lückenlosigkeit (Differenz exakt 1) |
+| §2 Pflicht für alle zehn Operationen | unangetastet | statischer Wächter; Szenarien 1, 2, 5, 14 |
+| §4 Versionspflicht | unangetastet | Szenario 4 (409 mit Serverzustand, 428 ohne Version) |
+| Serverseitige Autorisierung auf jedem Request | unangetastet, **breiter geprüft** | Szenario 16: zehn Zugriffswege, alle 4xx; Szenario 17: Rechteentzug mitten in der Sitzung, instanzübergreifend |
+| Redaktionsvertrag der Fahrlehrer-Notizen | unangetastet | `code-guards.test.ts` statisch; `/metrics` ohne Personenbezug |
+| `fahrlehrer_go` nur durch Rolle `fahrlehrer` | unangetastet | statischer Wächter |
+| nur `sicher` bucht automatisch | unangetastet | statischer Wächter; Szenario 18 (Rücklastschrift = `unklar`, `autoBuchbar: false`) |
+| keine automatische Prüfungsfreigabe | unangetastet | statischer Wächter |
+| frozen Prototyp-Dateien | unangetastet | eigener Querschnittstest in `chaos.test.ts` |
+
+## Testabdeckung der Phase 4
+
+| Datei | Umfang | Tests |
+| --- | --- | ---: |
+| `apps/api/src/__tests__/chaos.test.ts` | §20: alle achtzehn Szenarien als eigene `describe`-Blöcke, plus Querschnitt (keine Dead Letter, frozen Dateien). Abstürze **echt** nachgestellt: Instanz geschlossen, Lease verwaist, Zweiinstanzbetrieb gegen dieselbe Datenbank | 79 |
+| `apps/api/src/__tests__/deployment.test.ts` | §15: Deployment-Identität, `x-deployment-id` auch auf 401, Fehlerbericht ohne Interna, Liveness ohne I/O, Readiness mit Migrationsstand, `/health/deep` bleibt 200, Scheduler-Takte mit beobachtetem DB-Effekt, Alarm ohne Sturm, `GET /ops/scheduler` rechtegeschützt, expand-contract für **alle** Migrationen, das Migrationstor in fünf Stufen | 31 |
+| `apps/student/src/state/degradedBanner.test.tsx` | §18: die Anzeige gerendert – vier Regeln, `role="status"`/`aria-live`, kein Dauerbanner, lesbare Namen, keine Aktionselemente, Realtime-Teil aus dem Client | 16 |
+| `apps/api/src/__tests__/code-guards.test.ts` (erweitert) | neuer Wächter: `sql.raw(` nur mit literaler Zeichenkette | +1 |
+
+**Gesamt Phase 4: 127 neue Tests.** Workspace: **794** (vorher 667),
+17 Pakete typecheck-sauber.
+
+### Abgrenzung (abgeschlossen)
+
+| Abschnitt | Phase |
+| --- | --- |
+| §1 (DB als Wahrheit), §2–§5, §9 (Server), §10, §13, §19 | Phase 1 |
+| §1 (Anzeigehälfte), §6, §7, §8, §9 (Client) | Phase 2 |
+| §11, §12, §16, §17, §18, §4-Pflicht vollständig | Phase 3 |
+| **§14, §15, §20, §21, §22** | **Phase 4 – dieser Teil** |
+
+Damit ist `PROMPT -1` vollständig bearbeitet. Das Verdikt und seine Bedingungen
+stehen in `docs/chaos-test-report.md`, Abschnitt 6.

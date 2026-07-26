@@ -1,6 +1,7 @@
 # Ausfallverhalten und degradierter Betrieb (PROMPT -1 §11 + §18)
 
-Stand: Phase 3. Branch `claude/driving-school-admin-tcz2cx`.
+Stand: **Phase 4** (Korrekturen gegenüber dem Phase-3-Stand sind mit
+„**Phase-4-Nachtrag**" markiert). Branch `claude/driving-school-admin-tcz2cx`.
 
 Dieses Dokument beschreibt für **jeden Ausfallmodus**: wie er **erkannt** wird,
 wie sich das System dann **verhält**, und auf welchem **Weg es zurückkommt** –
@@ -8,8 +9,11 @@ automatisch und manuell. Alles hier ist implementiert und getestet; was Mock
 ist, steht als Mock da.
 
 Begleitdokumente: `docs/security-architecture.md` (§17),
-`docs/sync-architecture.md` (§1–§10, §13, §19),
-`docs/integration-gaps.md` (kein echter Anbieter in dieser Umgebung).
+`docs/sync-architecture.md` (§1–§10, §13, §19, §14/§15/§20–§22),
+`docs/integration-gaps.md` (kein echter Anbieter in dieser Umgebung),
+`docs/recovery-runbook.md` (§14/§15 Wiederanlauf und Deployment),
+`docs/backup-restore-report.md` (§14 ausgeführt),
+`docs/chaos-test-report.md` (§20/§22 Nachweise und Release-Gate).
 
 ---
 
@@ -145,8 +149,12 @@ Abschnitte geprüft.
 2. `GET /ops/outbox` → Statusverteilung. Viele `pending` = der Outbox-Worker
    läuft nicht. Viele `in_flight` mit abgelaufenem Lease = ein Worker ist
    gestorben.
-3. Läuft der Worker? In dieser Umgebung gibt es **keinen Scheduler**
-   (§15, Phase 4): `POST /ops/workers/run` treibt einen Durchlauf von Hand.
+3. Läuft der Worker? **Phase-4-Nachtrag:** es gibt jetzt einen Scheduler
+   (`workers/scheduler.ts`, §15). `GET /ops/scheduler` sagt, ob DIESER Prozess
+   einen Takt fährt und wie alt der letzte Takt ist; der Alarm
+   `scheduler_stalled` feuert bei stehendem Takt. Zur Überbrückung treibt
+   `POST /ops/workers/run` weiterhin einen Durchlauf von Hand. Vollständiges
+   Vorgehen: `docs/recovery-runbook.md`, Abschnitt 4.
 4. `GET /ops/dead-letters` prüfen – ein blockierendes Ereignis kann die
    Zustellung stauen.
 5. Eskalation nach 30 Min. an die Geschäftsführung. Kein Datenverlust: Clients
@@ -281,7 +289,7 @@ Abschnitte geprüft.
 | **Verhalten** | Die Instanz ist nutzlos – §1: die Datenbank **ist** die Wahrheit. Dies ist der **einzige** Fall, in dem `/health/deep` 503 liefert und ein Loadbalancer die Instanz herausnehmen soll. |
 | **Clientseite** | Die vier Apps zeigen ihren letzten Stand mit Altersangabe (§1) und verweigern kritische Schreibvorgänge (§8-Offline-Vertrag, fail closed). Entwürfe bleiben lokal verschlüsselt liegen. |
 | **Rückkehr** | Sobald die Datenbank antwortet, arbeitet alles weiter. Die Clients lösen offene Vorgänge über `GET /sync/operations/:operation/:key` auf – kein blindes Wiederholen, kein falscher Erfolg. |
-| **Wiederherstellung von Daten** | §14 (Backup/PITR/Restore) ist **Phase 4**. |
+| **Wiederherstellung von Daten** | **Phase-4-Nachtrag: ausgeführt.** Logische Wiederherstellung in eine isolierte Datenbank (1518 ms) und PITR in einen zweiten Cluster (2171 ms), beide verifiziert; PITR-Genauigkeit 49,8 ms. Vorgehen: `docs/recovery-runbook.md` Abschnitt 6, Zahlen: `docs/backup-restore-report.md`. |
 
 ### Anmeldesperre, Rate-Limit-Flut, Audit-Manipulation
 
@@ -325,7 +333,7 @@ Polling zurückgefallen ist, weiß das selbst am besten.
 | Dokumentscanner | **ja** (Upload wird gespeichert) | nein | **nein** (FS009 + Quarantäne) | ja (`document.review`) | Breaker schließen + Job |
 | Outbox-Worker | **ja** | nein | nein | – (Worker starten) | `POST /ops/workers/run` |
 | Dead Letter | **ja** | nein | nein | nein (bewusst) | `resume` |
-| Datenbank | **nein** | – | nein | ja, sobald erreichbar | §14 (Phase 4) |
+| Datenbank | **nein** | – | nein | ja, sobald erreichbar | Wiederherstellung nach `docs/recovery-runbook.md` Abschnitt 6 (ausgeführt und gemessen) |
 
 ---
 
@@ -337,11 +345,20 @@ Polling zurückgefallen ist, weiß das selbst am besten.
    selbst sind Mocks (`docs/integration-gaps.md`). Ein `sandbox`/`live`-Test
    ist ohne Zugang nicht möglich, und `assertMockOnly` wirft weiterhin, damit
    niemand versehentlich eine Live-Schnittstelle behauptet.
-2. **Kein Scheduler.** `integration.resume`, `uploads.cleanup`,
-   `audit.verify` und `document.review` sind in `scheduleRecurringJobs`
-   eingeplant und über `POST /ops/jobs/run` treibbar, aber der Cron-Eintrag ist
-   §15 und damit **Phase 4**. Ohne ihn ist die „automatische" Wiederaufnahme
-   nur so automatisch wie der Auslöser.
+2. ~~**Kein Scheduler.**~~ **Phase-4-Nachtrag: GESCHLOSSEN.**
+   `workers/scheduler.ts` fährt zwei getrennte Takte (Arbeit 5 s, Einplanung
+   60 s) mit Jitter und Fehlerisolierung; `RUN_WORKERS=1` schaltet ihn im
+   API-Prozess ein, `apps/api/src/worker.ts` ist der getrennte Worker für den
+   Mehrinstanzbetrieb, und `GET /ops/scheduler` macht sichtbar, ob überhaupt ein
+   Takt läuft. Neuer Alarm `scheduler_stalled` (kritisch).
+   **Der Befund dahinter war ernster als „Cron fehlt":** `server.ts` setzte
+   `startWorkers` nicht, also lief in einem echten Serverprozess KEIN einziger
+   wiederkehrender Job – keine Outbox-Zustellung, kein Angebotsablauf, keine
+   Wiederaufnahme, kein Konsistenzcheck, keine Audit-Kettenprüfung. Die
+   „automatische Wiederaufnahme" in diesem Dokument war damit bis Phase 4 so
+   automatisch wie ein Mensch, der `POST /ops/workers/run` drückt.
+   **Offen bleibt:** genau EIN Prozess darf den Takt fahren; das ist eine
+   Betriebsvorgabe und wird über `GET /ops/scheduler` geprüft, nicht erzwungen.
 3. **Breaker-Zustand ist pro Prozess + persistiert, aber nicht koordiniert.**
    Bei mehreren API-Instanzen hat jede ihren eigenen In-Memory-Breaker;
    `integration_health` ist die gemeinsame **Sicht**, nicht die gemeinsame
@@ -351,10 +368,19 @@ Polling zurückgefallen ist, weiß das selbst am besten.
    in diesem Prozess gerade eben geöffnet hat, erscheint dort erst nach dem
    nächsten `persist()` – das ist derselbe Aufruf, also praktisch sofort, aber
    nicht transaktional garantiert.
-5. **`DegradedBanner` ist nicht in einem Browser getestet.** Die Logik
-   (Sichtbarkeit, Texte, Statusableitung) ist Code und typgeprüft, aber ein
-   Rendering-Test steht aus – React-Testing-Library-Abdeckung für die vier
-   Apps ist Phase-4-Terrain (§20).
+5. **`DegradedBanner`: Rendering-Test vorhanden, Browsertest weiterhin offen.**
+   **Phase-4-Nachtrag:** 16 Tests in
+   `apps/student/src/state/degradedBanner.test.tsx` rendern die Komponente
+   tatsächlich (jsdom + Testing Library) und fragen sie über **Rollen und Text**
+   ab, nicht über CSS-Klassen: die vier §18-Regeln, `role="status"` +
+   `aria-live="polite"`, „kein Dauerbanner im gesunden Zustand", lesbare
+   Bezeichnungen statt technischer Namen, „NICHT als versendet behandeln",
+   „Zahlungsdaten VERALTET / keine Sperren", der Zeitpunkt der letzten
+   Synchronisation, **keine** Aktionselemente im Banner, und der Realtime-Teil
+   aus `RealtimeStatus.mode`. **Weiterhin offen:** echtes Rendering in einem
+   echten Browser, echte Screenreader-Ausgabe, echte Viewports – Playwright ist
+   in dieser Umgebung nicht installierbar (in Phase 4 erneut geprüft, siehe
+   `docs/chaos-test-report.md`, Abschnitt 3).
 6. **Kein Web-Push.** Eine geschlossene App erfährt nichts, bis sie wieder
    öffnet (dann `resync`). Unverändert aus Phase 2.
 7. **`storage`-Ausfall ist nicht als eigener §18-Pfad getestet.** Die Mechanik
