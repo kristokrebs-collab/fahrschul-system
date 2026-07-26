@@ -31,6 +31,22 @@ export async function seed(databaseUrl: string) {
 
   const testPasswordHash = await hashPassword("Test-Passwort-123!");
 
+  /**
+   * Feststehendes TOTP-Secret für die Mitarbeiter-Testkonten.
+   *
+   * Ohne das könnte sich nach dem Seed KEIN Mitarbeiter einloggen: Rollen aus
+   * STAFF_ROLES_REQUIRING_MFA erhalten in routes/auth.ts ein hartes
+   * 403 mfa_setup_required, solange mfaEnabled/mfaSecret fehlen. Das Secret ist
+   * bewusst statisch, damit man es einmal in eine Authenticator-App aufnehmen
+   * kann; den aktuellen Code liefert alternativ `pnpm dev:totp`.
+   *
+   * Unkritisch, weil diese Datei nur lokale Testdaten erzeugt und mit
+   * NODE_ENV=production abbricht. Echte Konten bekommen ihr Secret über den
+   * regulären MFA-Einrichtungsweg, niemals hierüber.
+   */
+  const devTotpSecret = "KREBSDEVTOTPSECRETTESTONLYAAAAAA";
+  const staffMfa = { mfaEnabled: true, mfaSecret: devTotpSecret } as const;
+
   const [bueroBenutzer] = await db
     .insert(benutzer)
     .values({
@@ -38,6 +54,7 @@ export async function seed(databaseUrl: string) {
       email: "buero@example.test",
       passwordHash: testPasswordHash,
       rolle: "buero",
+      ...staffMfa,
       vorname: "Büro",
       nachname: "Test",
     })
@@ -50,6 +67,7 @@ export async function seed(databaseUrl: string) {
       email: "fahrlehrer@example.test",
       passwordHash: testPasswordHash,
       rolle: "fahrlehrer",
+      ...staffMfa,
       vorname: "Max",
       nachname: "Mustermann",
     })
@@ -64,6 +82,37 @@ export async function seed(databaseUrl: string) {
       rolle: "schueler",
       vorname: "Erika",
       nachname: "Musterfrau",
+    })
+    .returning();
+
+  // Rolle "finanzen": ohne dieses Konto ist apps/finance nach dem Seed nicht
+  // aufrufbar (das Cockpit verlangt finance:*-Rechte, die weder buero noch
+  // fahrlehrer besitzen).
+  const [finanzenBenutzer] = await db
+    .insert(benutzer)
+    .values({
+      standortId: standortFulda.id,
+      email: "finanzen@example.test",
+      passwordHash: testPasswordHash,
+      rolle: "finanzen",
+      ...staffMfa,
+      vorname: "Franka",
+      nachname: "Kasse",
+    })
+    .returning();
+
+  // Rolle "geschaeftsfuehrung": sieht die sieben GF-Karten, darf aber bewusst
+  // NICHT bank:reconcile/products:manage (siehe docs/role-permission-matrix.md).
+  const [gfBenutzer] = await db
+    .insert(benutzer)
+    .values({
+      standortId: standortFulda.id,
+      email: "leitung@example.test",
+      passwordHash: testPasswordHash,
+      rolle: "geschaeftsfuehrung",
+      ...staffMfa,
+      vorname: "Gerd",
+      nachname: "Leitung",
     })
     .returning();
 
@@ -105,6 +154,8 @@ export async function seed(databaseUrl: string) {
     bueroBenutzer,
     fahrlehrerBenutzer,
     schuelerBenutzer,
+    finanzenBenutzer,
+    gfBenutzer,
     testFahrlehrer,
     testSchueler,
     testFahrzeug,

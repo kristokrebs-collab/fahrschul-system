@@ -83,13 +83,65 @@ docker compose up -d        # startet lokalen Postgres-Container
 
 pnpm db:migrate              # wendet packages/database/migrations/*.sql an
 pnpm db:seed                 # NUR lokale Testdaten, siehe packages/database/src/seed.ts
-
-pnpm dev:api                 # startet apps/api auf http://localhost:4000 (/health)
-pnpm --filter @fahrschul/student dev    # Vite-Dev-Server für die Platzhalter-Apps
-pnpm --filter @fahrschul/office dev
-pnpm --filter @fahrschul/instructor dev
-pnpm --filter @fahrschul/finance dev
 ```
+
+Danach in **fünf** Terminals (die API zuerst):
+
+```bash
+pnpm dev:api                              # http://localhost:4000  (/health)
+pnpm --filter @fahrschul/student dev      # http://localhost:5173  Schüler-App
+pnpm --filter @fahrschul/office dev       # http://localhost:5174  Büro-Zentrale
+pnpm --filter @fahrschul/instructor dev   # http://localhost:5175  Fahrlehrer-App
+pnpm --filter @fahrschul/finance dev      # http://localhost:5176  Finanz-Cockpit
+```
+
+Die Ports sind in den `vite.config.ts` fest vergeben (`strictPort`), weil die
+API genau `5173`–`5176` in ihrer CORS-Allowlist führt (`apps/api/src/app.ts`).
+Auf einem anderen Port blockiert der Browser die Session-Cookies, und der
+Fehler sieht dann fälschlich wie ein Login-Bug aus.
+
+### Testkonten (nur nach `pnpm db:seed`)
+
+Passwort für **alle**: `Test-Passwort-123!`
+
+| E-Mail | Rolle | App |
+|---|---|---|
+| `schueler@example.test` | schueler | 5173 |
+| `buero@example.test` | buero | 5174 |
+| `fahrlehrer@example.test` | fahrlehrer | 5175 |
+| `finanzen@example.test` | finanzen | 5176 |
+| `leitung@example.test` | geschaeftsfuehrung | 5176 |
+
+**Mitarbeitende brauchen zusätzlich einen TOTP-Code** (alle Rollen außer
+`schueler`) – so verlangt es `STAFF_ROLES_REQUIRING_MFA`. Den aktuell gültigen
+Code liefert:
+
+```bash
+node scripts/dev-totp.mjs           # einmal ausgeben
+node scripts/dev-totp.mjs --watch   # bei jedem 30-Sekunden-Wechsel neu
+```
+
+Alternativ das statische Dev-Secret einmal in eine Authenticator-App
+aufnehmen (steht in `packages/database/src/seed.ts`). Ohne Code antwortet der
+Login absichtlich mit `mfa_required_or_invalid` – das ist kein Fehler.
+
+### Stolpersteine
+
+- **`pnpm db:seed` ist nicht wiederholbar.** Ein zweiter Lauf bricht mit einer
+  Unique-Verletzung ab, weil die Konten schon existieren. Für einen frischen
+  Stand die Datenbank neu anlegen (`dropdb`/`createdb`) und `db:migrate`
+  erneut ausführen.
+- **`apps/api`-Tests brauchen `DATABASE_URL_TEST`** *und* eine existierende
+  Test-Datenbank (`fahrschul_test`). Fehlt die Variable, melden alle
+  DB-Tests `DATABASE_URL_TEST/DATABASE_URL nicht gesetzt`.
+- **Ohne laufenden Scheduler kein Echtzeit-Sync.** `pnpm dev:api` startet die
+  wiederkehrenden Jobs (Outbox-Zustellung, Angebotsablauf,
+  Konsistenzprüfung); ohne sie bleiben Änderungen in der Outbox liegen. Für
+  einen separaten Prozess siehe `apps/api/src/worker.ts` und
+  `GET /ops/scheduler`.
+- **Alle externen Anbieter sind Mocks** (Bank, E-Mail/Push, Malware-Scanner,
+  Kalender, CRM) – siehe `docs/integration-gaps.md`. Ausfallpfade sind echt
+  und getestet, die Gegenstellen nicht.
 
 ### Tests
 

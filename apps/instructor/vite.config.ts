@@ -3,6 +3,8 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
+  // Fester Port, siehe apps/student/vite.config.ts.
+  server: { port: 5175, strictPort: true },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],

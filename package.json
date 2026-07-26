@@ -15,6 +15,11 @@
     "db:migrate": "pnpm --filter @fahrschul/database migrate",
     "db:seed": "pnpm --filter @fahrschul/database seed",
     "dev:api": "pnpm --filter @fahrschul/api dev",
+    "dev:student": "pnpm --filter @fahrschul/student dev",
+    "dev:office": "pnpm --filter @fahrschul/office dev",
+    "dev:instructor": "pnpm --filter @fahrschul/instructor dev",
+    "dev:finance": "pnpm --filter @fahrschul/finance dev",
+    "dev:totp": "node scripts/dev-totp.mjs",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },
