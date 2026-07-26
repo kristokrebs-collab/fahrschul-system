@@ -110,6 +110,20 @@ export const dokumente = pgTable("dokumente", {
    * Quelle der Wahrheit; `status` wird per DB-Trigger abgeleitet.
    */
   dokumentStatus: text("dokument_status").notNull().default("uploaded"),
+  /**
+   * PROMPT -1 §12 (Phase 3) – Upload-Härtung.
+   *
+   * `deklarierterMimeTyp` ist der VOM CLIENT BEHAUPTETE Typ,
+   * `erkannterMimeTyp` der aus den Magic Bytes bestimmte. Beide werden
+   * gespeichert, damit eine Ablehnung nachvollziehbar ist und ein späterer
+   * Abruf den ECHTEN Typ ausliefert (nie den behaupteten).
+   */
+  checksumSha256: text("checksum_sha256"),
+  groesseBytes: integer("groesse_bytes"),
+  deklarierterMimeTyp: text("deklarierter_mime_typ"),
+  erkannterMimeTyp: text("erkannter_mime_typ"),
+  quarantaeneGrund: text("quarantaene_grund"),
+  freigegebenAt: timestamp("freigegeben_at", { withTimezone: true }),
   /** §3/§19: "verified"/"rejected" sind ohne Prüfprotokoll + Prüfer DB-seitig verboten. */
   pruefprotokoll: jsonb("pruefprotokoll"),
   gepruefDurchBenutzerId: uuid("geprueft_durch_benutzer_id").references(() => benutzer.id),

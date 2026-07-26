@@ -51,6 +51,16 @@ export const sessions = pgTable("sessions", {
     .references(() => benutzer.id, { onDelete: "cascade" }),
   tokenHash: text("token_hash").notNull().unique(),
   mfaVerified: boolean("mfa_verified").notNull().default(false),
+  /**
+   * PROMPT -1 §17 (Phase 3) – Step-up-Authentisierung.
+   *
+   * Zeitpunkt der letzten FRISCHEN Wiederanmeldung innerhalb dieser Sitzung
+   * und, falls eng vergeben, für welche Aktion sie gilt. Absichtlich an der
+   * SESSION und nicht in einer eigenen Tabelle: damit endet die Freigabe
+   * zwingend mit der Sitzung und `POST /auth/logout-all` entzieht sie sofort.
+   */
+  stepUpVerifiedAt: timestamp("step_up_verified_at", { withTimezone: true }),
+  stepUpScope: text("step_up_scope"),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

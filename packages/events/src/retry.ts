@@ -64,6 +64,10 @@ export const BUSINESS_SQLSTATE: Record<string, string> = {
   FS005: "Fahrzeug gesperrt",
   FS006: "Dokumentstatus ohne Prüfprotokoll",
   FS007: "Ungültiger State-Machine-Übergang",
+  /** Phase 3 (§17): audit_events ist append-only. */
+  FS008: "Audit-Log ist append-only (UPDATE/DELETE verboten)",
+  /** Phase 3 (§12): "verified" verlangt einen sauberen Malware-Scan. */
+  FS009: "Dokument ohne sauberen Scan kann nicht geprüft werden",
   "23P01": "Terminüberschneidung (EXCLUDE-Constraint)",
   "23505": "Eindeutigkeitsverletzung",
   "23514": "CHECK-Constraint verletzt",

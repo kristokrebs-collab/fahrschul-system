@@ -34,6 +34,33 @@ export interface EventInput<TPayload extends Record<string, unknown> = Record<st
   payload?: TPayload;
 }
 
+/**
+ * PROMPT -1 §16 (Phase 3) – die Korrelations-ID muss die GANZE Kette
+ * überleben: Client -> API -> Audit -> Outbox -> Realtime -> Worker.
+ *
+ * Statt sechzig Aufrufstellen um einen zusätzlichen Parameter zu erweitern
+ * (und dabei garantiert eine zu vergessen), gibt es hier einen EINHÄNGEPUNKT:
+ * `apps/api` registriert einen Anbieter, der die ID des gerade laufenden
+ * Vorgangs liefert (AsyncLocalStorage im HTTP-Hook bzw. im Job-Runner). Eine
+ * explizit übergebene `correlationId` hat weiterhin Vorrang; ohne beides wird
+ * wie bisher eine neue erzeugt.
+ *
+ * Absichtlich als Funktionszeiger und nicht als Import: `packages/events` darf
+ * keine Abhängigkeit auf `node:async_hooks` bekommen (retry.ts wird im Browser
+ * verwendet, siehe packages/sync).
+ */
+let ambientCorrelationProvider: (() => string | null | undefined) | null = null;
+
+export function setAmbientCorrelationProvider(
+  provider: (() => string | null | undefined) | null,
+): void {
+  ambientCorrelationProvider = provider;
+}
+
+export function currentAmbientCorrelationId(): string | null {
+  return ambientCorrelationProvider?.() ?? null;
+}
+
 export function buildEventRow(input: EventInput) {
   return {
     type: input.type,
@@ -43,7 +70,7 @@ export function buildEventRow(input: EventInput) {
     akteurBenutzerId: input.akteurBenutzerId ?? null,
     standortId: input.standortId ?? null,
     source: input.source,
-    correlationId: input.correlationId ?? randomUUID(),
+    correlationId: input.correlationId ?? ambientCorrelationProvider?.() ?? randomUUID(),
     idempotencyKey: input.idempotencyKey ?? null,
     vorher: input.vorher ?? null,
     nachher: input.nachher ?? null,

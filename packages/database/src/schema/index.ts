@@ -9,3 +9,4 @@ export * from "./instructor.js";
 export * from "./finance.js";
 export * from "./reliability.js";
 export * from "./realtime.js";
+export * from "./security.js";
