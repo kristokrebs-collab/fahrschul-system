@@ -636,12 +636,18 @@ describe("PROMPT -1 §2 – Idempotenz für jeden kritischen Schreibvorgang", ()
   // (7) Dokument einreichen
   // -----------------------------------------------------------------------
   describe("7. Dokument einreichen", () => {
+    /**
+     * Phase 3 (§12): der Inhalt muss jetzt ein ECHTER PDF sein – der Server
+     * prüft die Magic Bytes und nicht mehr nur den behaupteten MIME-Typ. Die
+     * Unterscheidbarkeit der Inhalte (worauf dieser Test aufbaut) bleibt
+     * vollständig erhalten: `%PDF-1.4 ` + der jeweilige Text.
+     */
     function upload(key: string, content: string, typ = "sehtest") {
       const { body, contentType } = buildMultipartBody({
         fields: { typ },
         fileFieldName: "datei",
         fileName: "sehtest.pdf",
-        fileContent: Buffer.from(content),
+        fileContent: Buffer.from(`%PDF-1.4 ${content}`),
         mimeType: "application/pdf",
       });
       return app.inject({

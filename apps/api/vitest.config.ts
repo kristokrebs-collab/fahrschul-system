@@ -5,6 +5,9 @@ import { defineConfig } from "vitest/config";
 // Testdateien nicht gegenseitig die Tabellen leeren.
 export default defineConfig({
   test: {
+    // Phase 3 (§16): setzt einen stillen Log-Sink, damit das Zugriffsprotokoll
+    // aktiv bleibt, ohne die Testausgabe zu fluten (siehe __tests__/setup.ts).
+    setupFiles: ["./src/__tests__/setup.ts"],
     fileParallelism: false,
     hookTimeout: 30000,
     testTimeout: 15000,

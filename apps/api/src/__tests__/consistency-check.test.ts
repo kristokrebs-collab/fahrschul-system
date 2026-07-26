@@ -245,7 +245,14 @@ describe("PROMPT -1 §19 – Täglicher Konsistenzcheck", () => {
       insert into dokumente (standort_id, schueler_id, typ, dateiname, speicher_referenz, dokument_status)
       values (${fixtures.standortId}, ${fixtures.schuelerId}, 'sehtest', 'a.pdf', 'mock://a', 'in_review')
       returning id`;
+    // Phase 3 (§12): seit Migration 0009 verbietet ZUSÄTZLICH FS009
+    // ("verified" verlangt einen sauberen Scan) genau diesen künstlich
+    // erzeugten Zustand. Der Test stellt den ungültigen Zustand absichtlich
+    // her, um zu beweisen, dass der §19-Check ihn FINDET – also muss auch der
+    // zweite Wächter für die Dauer der Manipulation aus. Was der Test prüft,
+    // ist unverändert: der Befund "dokumentstatus_ohne_pruefprotokoll".
     await sql`alter table dokumente disable trigger dokumente_b_pruefprotokoll_trg`;
+    await sql`alter table dokumente disable trigger dokumente_c_scan_pflicht_trg`;
     try {
       await sql`update dokumente set dokument_status = 'verified' where id = ${doc.id}`;
       const befunde = await befundeFuer("dokumentstatus_ohne_pruefprotokoll");
@@ -253,6 +260,7 @@ describe("PROMPT -1 §19 – Täglicher Konsistenzcheck", () => {
       expect(befunde[0].entitaetId).toBe(doc.id);
     } finally {
       await sql`alter table dokumente enable trigger dokumente_b_pruefprotokoll_trg`;
+      await sql`alter table dokumente enable trigger dokumente_c_scan_pflicht_trg`;
     }
   });
 

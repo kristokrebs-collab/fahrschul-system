@@ -20,6 +20,7 @@ import {
   ensureMigrated,
   loginAs,
   seedFixtures,
+  stepUp,
   testDatabaseUrl,
   truncateAll,
   type SeededFixtures,
@@ -227,20 +228,27 @@ describe("PROMPT -1 §10 – Persistierte State Machines", () => {
   // -----------------------------------------------------------------------
   describe("Dokument: uploaded -> scanning -> submitted -> in_review -> verified", () => {
     it("records the full audited chain through the API", async () => {
+      // Phase 3 (§12): `scan_status = 'sauber'` ist neu (FS009).
       const [doc] = await sql`
-        insert into dokumente (standort_id, schueler_id, typ, dateiname, speicher_referenz, dokument_status)
-        values (${fixtures.standortId}, ${fixtures.schuelerId}, 'sehtest', 'a.pdf', 'mock://a', 'uploaded')
+        insert into dokumente (standort_id, schueler_id, typ, dateiname, speicher_referenz, dokument_status, scan_status)
+        values (${fixtures.standortId}, ${fixtures.schuelerId}, 'sehtest', 'a.pdf', 'mock://a', 'uploaded', 'sauber')
         returning id, version`;
       await sql`update dokumente set dokument_status = 'scanning' where id = ${doc.id}`;
       await sql`update dokumente set dokument_status = 'submitted' where id = ${doc.id}`;
+      const [aktuell] = await sql`select version from dokumente where id = ${doc.id}`;
 
+      // Phase 3 (§4): die Version ist bei der Dokumentprüfung jetzt PFLICHT.
       const review = await app.inject({
         method: "POST",
         url: `/documents/${doc.id}/review`,
         headers: { cookie: officeCookie },
-        payload: { entscheidung: "akzeptiert", pruefprotokoll: { geprueftePunkte: ["lesbar"] } },
+        payload: {
+          entscheidung: "akzeptiert",
+          expectedVersion: aktuell.version,
+          pruefprotokoll: { geprueftePunkte: ["lesbar"] },
+        },
       });
-      expect(review.statusCode).toBe(200);
+      expect(review.statusCode, review.body).toBe(200);
 
       const rows = await sql`
         select von_status, nach_status from state_transitions
@@ -380,12 +388,20 @@ describe("PROMPT -1 §10 – Persistierte State Machines", () => {
       expect(rows[0].mangel_status).toBe("vehicle_blocked");
       expect(rows[0].status).toBe("offen"); // Alt-Spalte
 
+      /**
+       * Phase 3 (§17): "Mangel behoben" gibt das Fahrzeug wieder frei – das ist
+       * das ENTSPERREN eines gesperrten Fahrzeugs und verlangt deshalb eine
+       * frische Wiederanmeldung (Step-up). Das SPERREN oben verlangt bewusst
+       * keine: die vorsichtige Richtung darf nie durch Reibung verzögert
+       * werden. Am geprüften Zustandsverlauf ändert sich nichts.
+       */
+      await stepUp(app, officeCookie, fixtures.password, fixtures.bueroTotpSecret);
       const behoben = await app.inject({
         method: "POST",
         url: `/resources/fahrzeugmaengel/${mangelId}/beheben`,
         headers: { cookie: officeCookie },
       });
-      expect(behoben.statusCode).toBe(200);
+      expect(behoben.statusCode, behoben.body).toBe(200);
       const nachher = await sql`select mangel_status, status, behoben_at from fahrzeugmaengel where id = ${mangelId}`;
       expect(nachher[0].mangel_status).toBe("resolved");
       expect(nachher[0].status).toBe("behoben");

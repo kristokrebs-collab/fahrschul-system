@@ -280,9 +280,12 @@ describe("PROMPT -1 §4 – Optimistische Sperren", () => {
   // -----------------------------------------------------------------------
   describe("Dokumentprüfung", () => {
     it("rejects a stale review decision and returns the current document", async () => {
+      // Phase 3 (§12): `scan_status = 'sauber'` ist neu – FS009 verbietet
+      // "verified" ohne sauberen Scan. `dokument_status = 'submitted'` ist
+      // dieselbe Absicht in der §10-Statusmenge.
       const [doc] = await sql`
-        insert into dokumente (standort_id, schueler_id, typ, dateiname, speicher_referenz, status)
-        values (${fixtures.standortId}, ${fixtures.schuelerId}, 'sehtest', 'a.pdf', 'mock://a', 'eingereicht')
+        insert into dokumente (standort_id, schueler_id, typ, dateiname, speicher_referenz, dokument_status, scan_status)
+        values (${fixtures.standortId}, ${fixtures.schuelerId}, 'sehtest', 'a.pdf', 'mock://a', 'submitted', 'sauber')
         returning id, version`;
 
       const ok = await app.inject({

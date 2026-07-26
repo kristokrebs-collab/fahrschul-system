@@ -136,9 +136,14 @@ describe("apps/office – Prompt 2", () => {
       const sql = createRawClient(databaseUrl);
       let docId: string;
       try {
+        // Phase 3 (§12): `scan_status = 'sauber'` ist neu – FS009 verbietet
+        // "verified" ohne sauberen Scan, und ein echter Upload durchläuft den
+        // Scan immer. `dokument_status = 'submitted'` ist die Neuschreibung
+        // derselben Absicht in der §10-Statusmenge (die Alt-Spalte `status`
+        // wird per Trigger daraus abgeleitet).
         const [doc] = await sql`
-          insert into dokumente (standort_id, schueler_id, typ, dateiname, speicher_referenz, status)
-          values (${fixtures.standortId}, ${fixtures.schuelerId}, 'sehtest', 'sehtest.pdf', 'mock://doc1', 'eingereicht')
+          insert into dokumente (standort_id, schueler_id, typ, dateiname, speicher_referenz, dokument_status, scan_status)
+          values (${fixtures.standortId}, ${fixtures.schuelerId}, 'sehtest', 'sehtest.pdf', 'mock://doc1', 'submitted', 'sauber')
           returning id`;
         docId = doc.id;
       } finally {
@@ -146,15 +151,29 @@ describe("apps/office – Prompt 2", () => {
       }
 
       const before = await app.inject({ method: "GET", url: "/office/heute", headers: { cookie: officeCookie } });
-      expect(before.json().items.some((i: { entitaetId: string }) => i.entitaetId === docId)).toBe(true);
+      const queueItem = before
+        .json()
+        .items.find((i: { entitaetId: string }) => i.entitaetId === docId);
+      expect(queueItem).toBeDefined();
+      /**
+       * Phase 3 (§4): die Heute-Queue liefert jetzt die VERSION je Zeile mit,
+       * und `POST /documents/:id/review` VERLANGT sie (Umschaltpunkt
+       * `readExpectedVersion` -> `requireExpectedVersion`). Genau diese
+       * Reihenfolge – Liste liefert Version, Schreibvorgang sendet sie – war
+       * Phase 2s dokumentierte Voraussetzung für die Umschaltung. Der Test
+       * beweist damit zusätzlich, dass die Büro-Oberfläche die Version
+       * überhaupt bekommen kann.
+       */
+      expect(typeof queueItem.version).toBe("number");
+      expect(queueItem.etag).toBe(`W/"${queueItem.version}"`);
 
       const review = await app.inject({
         method: "POST",
         url: `/documents/${docId}/review`,
-        headers: { cookie: officeCookie },
+        headers: { cookie: officeCookie, "if-match": queueItem.etag },
         payload: { entscheidung: "akzeptiert" },
       });
-      expect(review.statusCode).toBe(200);
+      expect(review.statusCode, review.body).toBe(200);
       expect(review.json().document.status).toBe("geprueft");
 
       const after = await app.inject({ method: "GET", url: "/office/heute", headers: { cookie: officeCookie } });

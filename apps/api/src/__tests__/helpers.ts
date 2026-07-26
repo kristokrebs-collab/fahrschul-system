@@ -34,6 +34,9 @@ export async function truncateAll(databaseUrl: string) {
     // `event_outbox` und muss deshalb VOR ihm geleert werden;
     // `realtime_audience_counters` ist der dazugehörige Cursor-Zähler.
     await sql`truncate table
+      upload_sessions,
+      integration_outbound_calls,
+      auth_throttle,
       realtime_deliveries,
       realtime_audience_counters,
       consistency_findings,
@@ -88,10 +91,59 @@ export async function truncateAll(databaseUrl: string) {
       restart identity cascade`;
     await sql`insert into feature_flags (key, state, standort_id) values ('krebs_flex', 'hidden', null)`;
     await sql`update event_cursors set last_seq = 0, last_event_id = null`;
+    // Phase 3 (§11): der Gesundheitszustand der Integrationen ist Referenzdaten
+    // (Migration 0009 legt die zehn Zeilen an) – nur die Laufzeitwerte werden
+    // zurückgesetzt, nicht die Zeilen selbst.
+    await sql`update integration_health set
+      breaker_state = 'closed', consecutive_failures = 0, consecutive_successes = 0,
+      opened_at = null, probe_after = null, last_success_at = null, last_failure_at = null,
+      last_error = null, last_error_class = null, rate_limited_until = null,
+      total_calls = 0, total_failures = 0, total_short_circuited = 0`;
   } finally {
     await sql.end();
   }
 }
+
+/**
+ * PROMPT -1 Phase 3 (§17): TESTFREUNDLICHE, aber AKTIVE Sicherheitspolitiken.
+ *
+ * Diese Konstanten sind der Grund, warum die 487 bestehenden Tests von der
+ * Ratenbegrenzung und dem Brute-Force-Schutz unberührt bleiben – und warum die
+ * Mechanismen trotzdem in JEDEM Test mitlaufen (Kopfzeilen, Kennzahlen,
+ * Korrelations-IDs, der 429-Pfad, der Sperrpfad).
+ *
+ * Ausdrücklich NICHT abgeschaltet, weil zwei Lastspitzen legitim sind und
+ * überleben MÜSSEN (Chaos-Szenario 2 "dieselbe Anfrage zehnmal" und Szenario 3
+ * "zwei Schüler nehmen gleichzeitig denselben Slot"): sie laufen hier gegen
+ * einen tatsächlich ratenbegrenzten Server, nur mit weiten Kontingenten.
+ *
+ * Die Tests, die die Grenzen BEWEISEN, bauen ihre eigene App mit engen Werten
+ * (siehe `security.test.ts`).
+ */
+export const TEST_RATE_LIMIT = {
+  enabled: true,
+  multiplier: 1,
+  policies: {
+    login: { name: "login", ratePerSecond: 200, burst: 2000 },
+    write: { name: "write", ratePerSecond: 500, burst: 5000 },
+    read: { name: "read", ratePerSecond: 1000, burst: 10000 },
+    stream: { name: "stream", ratePerSecond: 100, burst: 1000 },
+    expensive: { name: "expensive", ratePerSecond: 200, burst: 2000 },
+  },
+} as const;
+
+/** Schwellen so hoch, dass kein bestehender Test in Verzögerung oder Sperre läuft. */
+export const TEST_BRUTE_FORCE = {
+  windowMs: 15 * 60 * 1000,
+  accountDelayAfter: 100000,
+  accountDelayBaseMs: 1,
+  accountDelayMaxMs: 1,
+  accountLockAfter: 100000,
+  accountLockMs: 1000,
+  ipLockAfter: 100000,
+  ipLockBaseMs: 1000,
+  ipLockMaxMs: 1000,
+} as const;
 
 /**
  * `realtime` erlaubt dem §6-Test kurze Intervalle, damit der SSE-Kanal
@@ -99,13 +151,44 @@ export async function truncateAll(databaseUrl: string) {
  * 15 s Heartbeat (siehe routes/sync.ts) – die Intervalle sind bewusst NICHT
  * vom Client steuerbar.
  */
-export function buildTestApp(options: Pick<BuildAppOptions, "realtime"> = {}) {
+export function buildTestApp(
+  options: Pick<
+    BuildAppOptions,
+    "realtime" | "rateLimit" | "bruteForce" | "signingSecret" | "integrations" | "accessLog" | "metricsToken" | "https"
+  > = {},
+) {
   return buildApp({
     databaseUrl: testDatabaseUrl(),
     cookieSecure: false,
     logger: false,
+    rateLimit: TEST_RATE_LIMIT,
+    bruteForce: TEST_BRUTE_FORCE,
+    // §16: das Zugriffsprotokoll bleibt AN (die Redaktionstests brauchen es),
+    // schreibt aber in den Mitschnitt statt die Testausgabe zu fluten – siehe
+    // `startLogCapture` in lib/observability.ts.
     ...options,
   });
+}
+
+/**
+ * §17: Step-up-Authentisierung für einen Test durchführen. Liefert den
+ * (unveränderten) Cookie zurück, damit der Aufruf sich wie eine
+ * Fortsetzung derselben Sitzung liest.
+ */
+export async function stepUp(
+  app: FastifyInstance,
+  cookie: string,
+  password: string,
+  totpSecret?: string,
+  scope: string = "all",
+): Promise<string> {
+  const payload: Record<string, string> = { password, scope };
+  if (totpSecret) payload.totpToken = authenticator.generate(totpSecret);
+  const res = await app.inject({ method: "POST", url: "/auth/step-up", headers: { cookie }, payload });
+  if (res.statusCode !== 200) {
+    throw new Error(`stepUp failed: ${res.statusCode} ${res.body}`);
+  }
+  return cookie;
 }
 
 export interface SeededFixtures {

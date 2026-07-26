@@ -119,6 +119,50 @@ describe("appointment booking – server-side conflict check (non-negotiable)", 
     expect(statuses).toEqual([201, 409]);
   });
 
+  /**
+   * PROMPT -1 Phase 3: derselbe Fall ZWANZIGMAL.
+   *
+   * ## Warum dieser Test existiert
+   *
+   * Der Test darüber macht genau EINEN Versuch – und war deshalb blind für
+   * einen echten Fehler: `terminbuchungen` trägt ZWEI GiST-EXCLUDE-Constraints
+   * (Fahrlehrer und Fahrzeug). Kollidieren zwei gleichzeitige Einfügungen in
+   * BEIDEN, kann PostgreSQL einen **Deadlock** (40P01) melden statt der
+   * erwarteten Constraint-Verletzung (23P01) – Transaktion A wartet in Index 1
+   * auf B, B in Index 2 auf A. Der Verlierer bekam dann HTTP 500 statt 409.
+   *
+   * Gemessen vor der Behebung: **9–10 von 50** Durchläufen. Der Fehler
+   * existiert seit Phase 1 und ist gegen den Stand von Commit `1db1118`
+   * reproduziert; er war nur unauffällig, weil ein einzelner Versuch ihn in
+   * ~80 % der Fälle nicht trifft.
+   *
+   * Behoben in `lib/idempotency.ts`: ein Serialisierungsfehler wird bis zu
+   * viermal wiederholt (Klassifikation und Backoff aus §9, keine zweite
+   * Politik). Ein Deadlock-Opfer wird vollständig zurückgerollt, ein
+   * Wiederholversuch ist daher sicher und trifft den committeten Gewinner.
+   *
+   * Zwanzig Runden reichen: bei einer Fehlerquote von ~20 % je Runde wäre die
+   * Wahrscheinlichkeit, einen Rückfall NICHT zu bemerken, unter 2 %.
+   */
+  it("bleibt über 20 Runden gleichzeitiger Doppelbuchung deterministisch (kein 500 durch Deadlock)", async () => {
+    const zaehler: Record<number, number> = {};
+    for (let runde = 0; runde < 20; runde += 1) {
+      const beginn = new Date(Date.UTC(2026, 8, 1 + runde, 9, 0, 0)).toISOString();
+      const ende = new Date(Date.UTC(2026, 8, 1 + runde, 10, 0, 0)).toISOString();
+      const payload = bookingPayload({ beginnAt: beginn, endeAt: ende });
+      const [a, b] = await Promise.all([
+        app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload }),
+        app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload }),
+      ]);
+      for (const res of [a, b]) {
+        zaehler[res.statusCode] = (zaehler[res.statusCode] ?? 0) + 1;
+      }
+      expect([a.statusCode, b.statusCode].sort(), `Runde ${runde}: ${a.body} | ${b.body}`).toEqual([201, 409]);
+    }
+    // Genau ein Gewinner und genau ein Verlierer je Runde – nie ein 5xx.
+    expect(zaehler).toEqual({ 201: 20, 409: 20 });
+  }, 60000);
+
   it("idempotency key: submitting the same booking twice with the same key returns the same booking, not two", async () => {
     const idempotencyKey = "test-idempotency-key-1";
     const first = await app.inject({

@@ -447,7 +447,14 @@ describe("PROMPT -1 §3 – DB-Invarianten (direkt gegen Postgres geprüft)", ()
         () => sql`update dokumente set dokument_status = 'verified' where id = ${doc.id}`,
         "FS006",
       );
+      // Phase 3 (§12): FS009 verlangt zusätzlich einen SAUBEREN Scan, bevor ein
+      // Dokument als geprüft gelten darf. Der Zustand "geprüft, aber nie
+      // gescannt" ist seit Migration 0009 eine verbotene Kombination. Was
+      // dieser Test prüft, bleibt unverändert (FS006: Prüfprotokoll + Prüfer
+      // sind Pflicht) – die Zeile setzt nur zusätzlich die Voraussetzung, die
+      // ein echter Upload ohnehin erfüllt.
       await sql`update dokumente set dokument_status = 'verified',
+                    scan_status = 'sauber',
                     pruefprotokoll = '{"geprueftePunkte":["vollstaendig"]}'::jsonb,
                     geprueft_durch_benutzer_id = ${fixtures.bueroBenutzerId},
                     geprueft_at = now()

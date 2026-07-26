@@ -359,13 +359,15 @@ describe("apps/student – Prompt 1", () => {
       expect(doc.speicherReferenz).not.toContain("base64");
       expect(doc.scanStatus).toBe("sauber");
 
+      // Phase 3 (§4): die Version ist bei der Dokumentprüfung Pflicht. Der
+      // Upload-Response liefert sie mit (`document.version`).
       const reject = await app.inject({
         method: "POST",
         url: `/documents/${doc.id}/review`,
-        headers: { cookie: officeCookie },
+        headers: { cookie: officeCookie, "if-match": `W/"${doc.version}"` },
         payload: { entscheidung: "abgelehnt", ablehnungsgrund: "Foto unscharf" },
       });
-      expect(reject.statusCode).toBe(200);
+      expect(reject.statusCode, reject.body).toBe(200);
       expect(reject.json().document.ablehnungsgrund).toBe("Foto unscharf");
 
       const reupload = buildMultipartBody({
@@ -565,13 +567,22 @@ describe("apps/student – Prompt 1", () => {
       // workOn wurde NICHT freigegeben -> muss null sein, obwohl gespeichert.
       expect(feedback.workOn).toBeNull();
 
+      /**
+       * Phase 3 (§4): `GET /feedback/mine` liefert jetzt `version`/`etag` je
+       * Zeile, und die Selbsteinschätzung VERLANGT die gelesene Version
+       * (Umschaltpunkt `readExpectedVersion` -> `requireExpectedVersion`).
+       * Genau das war Phase 2s dokumentierte Voraussetzung für die
+       * Umschaltung – der Test beweist mit, dass der Client die Version
+       * überhaupt bekommt.
+       */
+      expect(feedback.etag).toBe(`W/"${feedback.version}"`);
       const selfAssessment = await app.inject({
         method: "PATCH",
         url: `/feedback/${feedback.id}/self-assessment`,
-        headers: { cookie: studentCookie },
+        headers: { cookie: studentCookie, "if-match": feedback.etag },
         payload: { text: "Ich fand die Stunde gut, Kreisverkehr ist noch wackelig." },
       });
-      expect(selfAssessment.statusCode).toBe(200);
+      expect(selfAssessment.statusCode, selfAssessment.body).toBe(200);
       expect(selfAssessment.json().feedback.studentSelfAssessment).toContain("Kreisverkehr");
     });
   });
