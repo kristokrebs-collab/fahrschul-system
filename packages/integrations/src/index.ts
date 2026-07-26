@@ -1,4 +1,7 @@
 export * from "./types.js";
+// PROMPT -1 Phase 3 (§11): Zeitlimit, Circuit Breaker, Retry (aus
+// @fahrschul/events), Idempotenzschlüssel, Gesundheitsstatus, Fehlerqueue.
+export * from "./resilience.js";
 export * from "./notifications/index.js";
 export * from "./calendar/index.js";
 export * from "./bank/index.js";
