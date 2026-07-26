@@ -126,9 +126,14 @@ describe("apps/instructor – Prompt 3", () => {
     });
 
     it("rejects starting a lesson whose vehicle is not einsatzbereit (conflict)", async () => {
-      const sql = createRawClient(databaseUrl);
-      await sql`update fahrzeuge set status = 'wartung' where id = ${fixtures.fahrzeugId}`;
-      await sql.end();
+      // Reihenfolge geändert wegen PROMPT -1 §3: ein GESPERRTES Fahrzeug kann
+      // seit Migration 0007 gar nicht mehr verplant werden (DB-Trigger
+      // fs_kein_gesperrtes_fahrzeug, SQLSTATE FS005) – der frühere Ablauf
+      // "erst sperren, dann Termin einfügen" ist jetzt selbst eine
+      // Invariantenverletzung. Der fachliche Fall dieses Tests ist der
+      // realistische: der Termin existiert BEREITS und das Fahrzeug fällt
+      // danach aus. Die geprüfte Aussage (Start wird mit 409
+      // VEHICLE_NOT_READY abgelehnt) ist unverändert.
       const booking = await insertBooking({
         standortId: fixtures.standortId,
         schuelerId: fixtures.schuelerId,
@@ -137,6 +142,9 @@ describe("apps/instructor – Prompt 3", () => {
         beginnAt: todayAt(9),
         endeAt: todayAt(10),
       });
+      const sql = createRawClient(databaseUrl);
+      await sql`update fahrzeuge set status = 'wartung' where id = ${fixtures.fahrzeugId}`;
+      await sql.end();
       const cookie = await loginAs(app, "fahrlehrer@test.local", fixtures.password);
       const res = await app.inject({ method: "POST", url: `/instructor/lessons/${booking.id}/start`, headers: { cookie } });
       expect(res.statusCode).toBe(409);

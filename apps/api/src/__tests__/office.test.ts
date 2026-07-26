@@ -615,14 +615,29 @@ describe("apps/office – Prompt 2", () => {
   // Zahlungen: Büro ist lesend, keine Mutationsroute
   // -------------------------------------------------------------------
   describe("payments visibility (office is read-mostly, Finance owns mutation)", () => {
-    it("office has no route to mutate an invoice/payment", async () => {
+    it("office cannot mutate an invoice/payment (403 – Finance owns financial mutation)", async () => {
+      // PROMPT -1 §2 hat POST /invoices + PATCH /invoices/:id eingeführt
+      // ("Rechnung erzeugen" ist eine der neun idempotenzpflichtigen
+      // Operationen). Die Route EXISTIERT daher jetzt – die fachliche Aussage
+      // dieses Tests ist unverändert und wird sogar schärfer geprüft: Büro
+      // wird von der Rollenmatrix abgewiesen (403 invoices:manage), nicht nur
+      // durch eine fehlende Route (404).
       const res = await app.inject({
         method: "PATCH",
         url: "/invoices/some-id",
         headers: { cookie: officeCookie },
         payload: { status: "bezahlt" },
       });
-      expect(res.statusCode).toBe(404); // keine Route registriert
+      expect(res.statusCode).toBe(403);
+      expect(res.json().requiredPermission).toBe("invoices:manage");
+
+      const create = await app.inject({
+        method: "POST",
+        url: "/invoices",
+        headers: { cookie: officeCookie, "idempotency-key": "office-darf-nicht" },
+        payload: { schuelerId: fixtures.schuelerId, positionen: [] },
+      });
+      expect(create.statusCode).toBe(403);
     });
   });
 

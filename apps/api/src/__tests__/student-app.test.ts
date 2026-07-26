@@ -456,16 +456,19 @@ describe("apps/student – Prompt 1", () => {
       });
       expect(inquiry.statusCode).toBe(200);
 
-      // Es gibt bewusst keine Mutation über die Schüler-App: die Route
-      // existiert nicht (404), keine Berechtigungslücke die es erlauben
-      // würde.
+      // Die Schüler-App bleibt bei Rechnungen strikt READ-ONLY. Seit
+      // PROMPT -1 §2 existiert PATCH /invoices/:id (Rolle finanzen), deshalb
+      // ist die Antwort 403 statt 404 – die fachliche Aussage ("Schüler kann
+      // eine Rechnung nicht verändern") ist identisch und wird jetzt von der
+      // Rollenmatrix bewiesen statt von einer fehlenden Route.
       const mutate = await app.inject({
         method: "PATCH",
         url: `/invoices/${invoiceId}`,
         headers: { cookie: studentCookie },
         payload: { status: "bezahlt" },
       });
-      expect(mutate.statusCode).toBe(404);
+      expect(mutate.statusCode).toBe(403);
+      expect(mutate.json().requiredPermission).toBe("invoices:manage");
     });
   });
 

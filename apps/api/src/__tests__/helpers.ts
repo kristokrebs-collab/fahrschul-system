@@ -24,7 +24,20 @@ export async function ensureMigrated(databaseUrl: string) {
 export async function truncateAll(databaseUrl: string) {
   const sql = createRawClient(databaseUrl);
   try {
+    // PROMPT -1: die neuen Zuverlässigkeitstabellen müssen zwischen
+    // Testdateien ebenfalls geleert werden. NICHT geleert werden die
+    // Referenzdaten aus Migration 0007 (event_schema_versions,
+    // state_machine_transitions, pruefung_transitions, event_cursors) –
+    // sie sind Teil des Schemas, nicht Testdaten.
     await sql`truncate table
+      consistency_findings,
+      consistency_check_runs,
+      dead_letters,
+      jobs,
+      state_transitions,
+      event_inbox,
+      event_outbox,
+      idempotency_keys,
       audit_events,
       finanz_exporte,
       fahrzeugausfalltage,
@@ -68,6 +81,7 @@ export async function truncateAll(databaseUrl: string) {
       organisationen
       restart identity cascade`;
     await sql`insert into feature_flags (key, state, standort_id) values ('krebs_flex', 'hidden', null)`;
+    await sql`update event_cursors set last_seq = 0, last_event_id = null`;
   } finally {
     await sql.end();
   }

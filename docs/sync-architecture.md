@@ -1,0 +1,569 @@
+# Synchronisations-, Ausfall- und Sicherheitsarchitektur – Phase 1 (Zuverlässigkeitskern)
+
+Dieses Dokument beschreibt, was in **Phase 1** von `PROMPT -1`
+(„Verbindliche Synchronisations-, Ausfall- und Sicherheitsarchitektur")
+tatsächlich gebaut wurde: **§1–§5, §10, §13, §19** sowie die **Serverseite von
+§9**. Es ist bewusst auf diesen Umfang begrenzt. Was zu welcher späteren Phase
+gehört, steht am Ende unter *Abgrenzung*.
+
+Alle Aussagen hier sind durch Tests belegt (`apps/api/src/__tests__/`,
+`packages/domain/src/__tests__/`). Wo eine Anforderung **nicht** oder nur
+teilweise erfüllt ist, steht das unter *Bekannte Lücken* – nicht versteckt im
+Fließtext.
+
+Migration: `packages/database/migrations/0007_reliability_core.sql`
+(rein additiv, expand-contract, siehe §14-Hinweis unten).
+
+---
+
+## §1 Grundhaltung: wo die Wahrheit liegt
+
+| Ebene | Rolle |
+| --- | --- |
+| **PostgreSQL** | einzige Quelle der Wahrheit. Jede Invariante, die man als Constraint/Trigger ausdrücken kann, IST einer. |
+| `packages/domain` | reine, DB-unabhängige Fachlogik (State Machines, Pipeline, Retry-Politik) – unit-testbar, und **Spiegelbild** der DB-Regeln, nicht ihr Ersatz. |
+| `apps/api` | Autorisierung, Transaktionsgrenzen, Übersetzung von DB-Fehlern in verwertbare HTTP-Antworten. |
+| `apps/{student,office,instructor,finance}` | Anzeige + Eingabe. Enthält **keine** Regel, die nicht serverseitig ebenfalls gilt. |
+
+Leitregel dieser Phase: **eine Regel, die nur im Anwendungscode steht, gilt
+nicht.** Deshalb sind sämtliche §3-Invarianten in `invariants.test.ts` mit
+**Roh-SQL** gegen die Datenbank geprüft, nicht über die API – ein Bug, eine
+neue Route oder ein Datenbank-Skript kann sie nicht umgehen.
+
+---
+
+## §2 Idempotenz für jeden kritischen Schreibvorgang
+
+**Ein** Mechanismus, kein Sonderweg pro Route:
+`apps/api/src/lib/idempotency.ts` + Tabelle `idempotency_keys`
+(`operation`, `key`, `benutzer_id`, `request_hash`, `response_status`,
+`response_body`, `expires_at`; unique auf `(operation, key)`).
+
+### Ablauf (alles in EINER Transaktion)
+
+1. Reservierung per `INSERT … ON CONFLICT DO NOTHING`. Gewinnt der Insert,
+   gehört die Ausführung uns. Eine parallele zweite Anfrage blockiert am
+   Unique-Index bis zum Commit/Rollback und sieht danach den Endzustand.
+2. Verliert der Insert → vorhandene Zeile lesen:
+   - **gleicher Hash + `completed`** → gespeicherte Antwort wird
+     zurückgegeben, der Handler läuft **nicht** erneut.
+   - **abweichender Hash** → **HTTP 409** `idempotency_key_conflict`.
+   - **gleicher Hash + `in_progress`** → HTTP 409 `idempotency_in_progress`.
+   - **abgelaufen** → Zeile wird übernommen, Ausführung wie neu.
+3. Nach Erfolg wird das Ergebnis in derselben Transaktion gespeichert →
+   Ergebnis und fachliche Änderung sind atomar.
+
+**Dokumentierte Wahl: 409, nicht 422.** Ein wiederverwendeter Schlüssel mit
+anderem Inhalt ist kein Validierungsfehler des Bodys, sondern ein Konflikt mit
+einer bereits verbuchten Anfrage – dieselbe Semantik wie alle anderen
+Konfliktantworten des Systems, und §9 klassifiziert 409 als *dauerhaft*
+(kein Auto-Retry).
+
+**Nur erfolgreiche (2xx) Ergebnisse werden gespeichert.** Schlägt der Handler
+fachlich fehl, rollt die Reservierung mit zurück – der Client darf denselben
+Schlüssel nach Behebung erneut verwenden. Ein Retry darf keinen alten Fehler
+einfrieren.
+
+**Hash-Bildung.** SHA-256 über `operation + target + kanonisierter Body`.
+Kanonisierung sortiert Objekt-Schlüssel (andere JSON-Reihenfolge ⇒ **kein**
+falscher Konflikt) und entfernt `idempotencyKey` selbst. Beim Dokumentupload
+geht der SHA-256 des **Dateiinhalts** in den Hash ein – derselbe Schlüssel mit
+anderer Datei ist ein Konflikt.
+
+### Die neun mandatierten Operationen
+
+| # | Operation | Route | Schlüssel |
+| --- | --- | --- | --- |
+| 1 | Terminangebot annehmen | `POST /appointment-offers/:id/accept` | **Pflicht** |
+| 2 | Termin buchen | `POST /appointments` | optional-aber-wirksam |
+| 3 | Termin stornieren | `POST /appointments/:id/cancel` *(neu)* | **Pflicht** |
+| 4 | Fahrstunde abschließen | `POST /instructor/lessons/:id/complete` | optional-aber-wirksam |
+| 5 | Rechnung erzeugen | `POST /invoices` *(neu)* | **Pflicht** |
+| 6 | Zahlung zuordnen | `POST /finance/bank/:id/resolve` | optional-aber-wirksam |
+| 7 | Dokument einreichen | `POST /documents` | optional-aber-wirksam |
+| 8 | Prüfung freigeben/anmelden | `POST /pruefungen/:id/transition` | optional-aber-wirksam |
+| 9 | Fahrzeug blockieren | `POST /resources/fahrzeuge/:id/block` *(neu)* | **Pflicht** |
+| 10 | Nachricht versenden | `POST /communication/send` | optional-aber-wirksam |
+
+Schlüsselquelle: Header `Idempotency-Key` **oder** Body-Feld
+`idempotencyKey` (rückwärtskompatibel).
+
+> **Bewusste, begrenzte Abweichung.** Bei den drei in dieser Phase **neu**
+> eingeführten Endpunkten (3, 5, 9) und bei dem, der ihn schon vorher verlangte
+> (1), ist der Schlüssel **verpflichtend**. Bei den übrigen ist er
+> *optional-aber-wirksam*: wird er gesendet, gilt die volle §2-Semantik; wird
+> er weggelassen, verhält sich der Endpunkt wie bisher. Grund: ein Pflichtfeld
+> auf `POST /appointments`, `/documents`, `/communication/send`,
+> `/instructor/lessons/:id/complete`, `/pruefungen/:id/transition` und
+> `/finance/bank/:id/resolve` wäre ein **brechender API-Wechsel für vier
+> bereits ausgelieferte Frontends**, was §14 (rückwärtskompatibler Rollout)
+> widerspricht. Der doppelte Vollzug ist in diesen Fällen zusätzlich durch
+> DB-Invarianten ausgeschlossen (EXCLUDE-Constraints, Unique-Indizes,
+> `FS001`/`FS003`/`FS005`) – Idempotenz ist dort Komfort, nicht die letzte
+> Verteidigungslinie.
+> **Seam für Phase 2:** `IDEMPOTENT_OPERATIONS` in
+> `apps/api/src/lib/idempotency.ts` ist die einzige Stelle, an der die
+> Pflicht-Liste hängt. Sobald die Client-Offline-Outbox (§6–§8) Schlüssel
+> unbedingt mitsendet, wird die Pflicht dort auf alle zehn erweitert.
+
+### Verhältnis zur alten, scheduling-spezifischen Idempotenz
+
+`terminbuchungen.idempotency_key` (unique, Migration 0001) **bleibt** – aber
+nicht als zweiter, konkurrierender Mechanismus, sondern als **DB-seitige
+Zweitsperre**: sie verhindert eine doppelte Buchung selbst dann, wenn der
+generische Speicher geleert wurde. Maßgeblich (Antwortwiedergabe,
+Konflikterkennung, Ablauf) ist ausschließlich `idempotency_keys`; alle fünf
+früheren Aufrufstellen (`booking.ts`, `storno-retter.ts`, `appointments.ts`,
+`appointment-offers.ts`, `flex.ts`) laufen jetzt darüber.
+
+Eine sichtbare Folge, die man kennen muss: nach **Ablauf** eines
+Idempotenzschlüssels für eine Buchung greift weiterhin die Zweitsperre auf
+`terminbuchungen.idempotency_key`. Der Ablauftest in `idempotency.test.ts` ist
+deshalb an „Nachricht versenden" geführt, wo es keine Zweitsperre gibt.
+
+Aufräumen abgelaufener Schlüssel: Job `idempotency.cleanup` (§13).
+
+---
+
+## §3 DB-Invarianten
+
+Alle mit eigenem SQLSTATE, damit `apps/api` sie präzise in HTTP übersetzt
+(`apps/api/src/lib/state-machine.ts`, `sendBusinessConstraintError`).
+
+| SQLSTATE | Invariante | Umsetzung | HTTP |
+| --- | --- | --- | --- |
+| `FS001` | Eine Fahrstunde kann nur **einmal** endgültig abgeschlossen werden | Trigger `fs_lesson_completed_once`: nach `status='abgeschlossen'` + `beendet_at` sind Abschlussfelder eingefroren, Zurücksetzen verboten (Storno bleibt erlaubt) | 409 `lesson_already_completed` |
+| `23505` | Keine doppelte Rechnung für dieselbe Leistung | `rechnungspositionen.leistung_terminbuchung_id` / `leistung_ref` + partielle Unique-Indizes `… where storniert = false`; Trigger `fs_rechnung_storno_propagiert` setzt `storniert` bei Rechnungsstorno | 409 `duplicate_invoice_for_leistung` |
+| `FS003` | Eine Banktransaktion kann nicht mehrfach vollständig zugeordnet werden | (a) Aus `matched` führt nur `reversed` heraus; (b) Trigger `fs_banktransaktion_summe` verbietet eine weitere Zahlung auf `matched` **und** ein Überbuchen der Summe | 409 `banktransaktion_already_matched` |
+| `FS004` | Prüfung nur mit gültiger Freigabekette anmeldbar | Trigger `fs_pruefung_freigabekette`: (a) Pipeline-Reihenfolge als DB-Allow-List (`pruefung_transitions`), (b) `termin_angefragt`+ verlangt `pruefungsfreigaben.status='freigegeben'` **und** `buerofreigabe_status='freigegeben'` | 409 `exam_clearance_chain_missing` |
+| `FS005` | Ein gesperrtes Fahrzeug kann nicht verplant werden | Trigger auf `terminbuchungen` **und** `terminangebote`: Insert bzw. Änderung von Fahrzeug/Zeitraum prüft `fahrzeuge.status = 'verfuegbar'` | 409 `vehicle_blocked` |
+| `FS006` | Dokumentstatus `verified`/`rejected` nur mit Prüfprotokoll | Trigger `fs_dokument_pruefprotokoll_pflicht` verlangt `pruefprotokoll` + `geprueft_durch_benutzer_id` | 409 `document_review_protocol_required` |
+| `FS007` | Dokumentstatus folgt der erlaubten State Machine | Allow-List-Tabelle `state_machine_transitions` + Trigger (siehe §10) | 409 `invalid_state_transition` |
+
+Wichtig für `FS004`: der Trigger **verweigert nur**, er erteilt niemals eine
+Freigabe. Das Non-Negotiable „keine automatische Prüfungsfreigabe" bleibt
+unangetastet.
+
+Wichtig für `FS005`: die **umgekehrte** Richtung ist absichtlich **erlaubt** –
+ein Fahrzeug mit Zukunftsterminen darf gesperrt werden. Das automatische
+Stornieren dieser Termine wäre eine riskante Reparatur; sie wird stattdessen
+als §19-Befund berichtet.
+
+### Geld
+
+Bereits vor dieser Phase durchgehend **Integer-Cent** (`*_cent`). **Verifiziert
+und testgesichert** (`invariants.test.ts`): keine einzige Spalte mit
+`double precision`, `real` oder `money` im gesamten Schema; jede `*_cent`-Spalte
+ist `integer`; `numeric` existiert ausschließlich für Nicht-Geldgrößen
+(`steuersatz`, Arbeitszeitstunden). §3s Geldanforderung war erfüllt und ist es
+weiterhin.
+
+---
+
+## §4 Optimistische Sperren
+
+Vorher existierten `version`-Spalten, aber **niemand las sie**. Jetzt:
+
+- **Fortschreibung im Trigger** (`fs_bump_version`) auf 13 Tabellen: jedes
+  `UPDATE` – auch Roh-SQL – erhöht `version` und setzt `updated_at`. Kein
+  Codepfad kann die Erkennung umgehen.
+- **Client sendet die gelesene Version**: Body-Feld `expectedVersion` **oder**
+  Header `If-Match: W/"<version>"`. Jede Antwort auf einen versionierten
+  Datensatz trägt `ETag` (+ `Last-Modified`).
+- **Konflikt = HTTP 409** mit maschinenlesbarer Antwort:
+
+```json
+{
+  "error": "version_conflict",
+  "expectedVersion": 3,
+  "currentVersion": 5,
+  "current": { "...": "vollständiger Serverzustand" },
+  "conflictFields": ["endzeit"],
+  "message": "…"
+}
+```
+
+- **HTTP 428** `precondition_required`, wenn eine Operation die Version
+  **verlangt** und keine kam.
+
+| Entität | Endpunkt | Version |
+| --- | --- | --- |
+| Verfügbarkeit | `PATCH /availability/:id` *(Route neu)* | Pflicht |
+| Termine | `POST /appointments/:id/cancel` *(neu)* | Pflicht |
+| Fahrstundenfeedback | `PATCH /feedback/:id` *(neu)*, `PATCH /feedback/:id/self-assessment` | Pflicht / geprüft-wenn-gesendet |
+| Dokumentprüfung | `POST /documents/:id/review` | geprüft-wenn-gesendet |
+| Rechnungen | `PATCH /invoices/:id` *(neu)* | Pflicht |
+| Fahrzeugstatus | `PATCH /resources/fahrzeuge/:id` *(neu)*, `POST …/block` *(neu)* | Pflicht |
+
+„geprüft-wenn-gesendet" gilt bei den beiden Endpunkten mit Altaufrufern
+(Dokumentprüfung aus `apps/office`, Selbsteinschätzung aus `apps/student`):
+wird eine Version gesendet, wird sie **hart** geprüft; fehlt sie, gilt wie
+bisher „letzter Schreibvorgang gewinnt". Auch hier ist der Grund §14
+(kein brechender Wechsel für ausgelieferte Frontends), und auch hier ist der
+Umschaltpunkt eine Zeile (`readExpectedVersion` → `requireExpectedVersion`),
+die Phase 2 mit dem Client-Sync gemeinsam umlegt.
+
+**Seam für Phase 2:** `conflictFields` + `current` sind absichtlich so
+geformt, dass der Client daraus direkt eine Diff-Ansicht bauen kann, ohne
+erneut zu fragen.
+
+**Verfügbarkeit war eine echte Lücke:** `verfuegbarkeiten` existierte seit
+Prompt 0 als Tabelle, hatte aber **keinen Schreibpfad**. Ohne Endpunkt wäre
+§4 für diese Entität nicht nachweisbar erfüllbar gewesen, deshalb ist
+`apps/api/src/routes/availability.ts` neu (mit own-Scope-Prüfung:
+`availability:write:own` nur eigene, Büro über `availability:write:any` fremde).
+
+---
+
+## §5 Transaktionaler Outbox + Consumer-Inbox
+
+### Das verbotene Muster ist strukturell ausgeschlossen
+
+Bestehend war: Audit-Ereignis via `buildEventRow()` **in derselben Transaktion**
+wie die fachliche Änderung – also schon atomar, aber ohne Zustellseite. Statt
+alle ~40 Aufrufstellen anzufassen, erzeugt jetzt ein **Trigger** die
+Outbox-Zeile:
+
+```
+audit_events  --[AFTER INSERT: fs_audit_event_to_outbox]-->  event_outbox
+```
+
+Damit gilt: **es existiert kein Codepfad, der eine fachliche Änderung
+committen kann, ohne die zugehörige Outbox-Zeile mitzucommitten.**
+Nachgewiesen in `outbox.test.ts`: bei Rollback der Geschäftstransaktion gibt es
+weder Audit- noch Outbox-Zeile.
+
+Gefiltert wird über `event_schema_versions`: nur eingetragene, **fachliche**
+Ereignistypen werden zugestellt; reine Sicherheits-Audits (`login`, `logout`)
+bleiben ausschließlich in `audit_events`.
+
+Konkret entfernt wurde das verbotene Muster in
+`POST /communication/send`: vorher wurde die Nachricht in die DB geschrieben
+und **danach** im selben Request versendet – schlug der Versand fehl oder starb
+der Prozess dazwischen, war er unwiederbringlich verloren. Jetzt landet die
+Nachricht atomar mit ihrem Ereignis in der Warteschlange; der Versand ist ein
+wiederholbarer Job. Ein Sofortversuch nach dem Commit bleibt als
+Latenz-Optimierung, ist aber **nicht** die Zustellgarantie.
+
+### Zustellung
+
+`apps/api/src/workers/outbox.ts`
+
+- **Lease statt Löschen**: `claimOutboxBatch` setzt `status='in_flight'`,
+  `lease_owner`, `lease_expires_at`, erhöht `attempts`; `FOR UPDATE SKIP
+  LOCKED` erlaubt mehrere Worker parallel.
+- **Absturz-Wiederaufnahme**: `recoverExpiredOutboxLeases()` gibt Zeilen mit
+  abgelaufenem Lease frei; wird bei **jedem** Durchlauf zuerst aufgerufen.
+- **Dedup = Inbox**: `event_inbox` mit unique `(consumer, event_id)`. Der
+  Insert ist die Reservierung; verliert er, war das Ereignis schon verarbeitet
+  → Duplikat ignoriert. Zustellung ist *at-least-once*, Verarbeitung damit
+  effektiv *exactly-once*.
+- **Cursor**: `event_cursors` je Konsument (`last_seq` über
+  `event_outbox.seq bigserial`) für Wiederaufnahme ohne Inbox-Scan.
+- **Fehlerbehandlung** nach §9 (unten): transient → Backoff; dauerhaft oder
+  erschöpft → `status='dead'` + `dead_letters` + Alarm.
+
+### Konsumenten (`apps/api/src/workers/consumers.ts`)
+
+| Konsument | Interessiert an | Wirkung |
+| --- | --- | --- |
+| `notifications` | 12 fachliche Typen | legt Nachrichten in `nachrichten` (Status `warteschlange`); Versand ist Job |
+| `projection` | `lesson.offer.created` | schaltet das Angebot `sent → delivered` (persistierter Folgezustand) |
+| `integration-sync` | `*` | protokolliert, was an ein Zielsystem ginge (**mock**, siehe *Bekannte Lücken*) |
+
+### Ereignisversionierung / Rückwärtskompatibilität
+
+`event_outbox.event_version` wird aus `event_schema_versions` gestempelt. Regel:
+
+- Ein Konsument deklariert `maxEventVersion` und **muss** alle Versionen
+  ≤ dieser Zahl verarbeiten (getestet: Konsument v3 verarbeitet Ereignis v1).
+- Eine **zu neue** Version wird **nicht stillschweigend verworfen**, sondern
+  landet in der Dead-Letter-Queue – lieber ein Alarm als Datenverlust.
+- Neue Felder gehören additiv in `payload`; eine Versionserhöhung ist nur bei
+  brechenden Änderungen nötig.
+
+---
+
+## §9 (Serverseite) Retry, Backoff, Dead-Letter-Queue
+
+`packages/events/src/retry.ts` – **absichtlich ohne Node-/DB-Abhängigkeiten**,
+damit Phase 2 dieselbe Politik im Browser nutzt.
+
+**Transient (Retry erlaubt):** `TIMEOUT`, `RATE_LIMITED` (429), `NETWORK`,
+`SERVER_UNAVAILABLE` (500/502/503/504), `SERIALIZATION_FAILURE` (40001/40P01),
+`LEASE_LOST`.
+
+**Dauerhaft (NIEMALS Auto-Retry):** `VALIDATION` (400/422), `PERMISSION`
+(401/403), `BUSINESS_CONFLICT` (409, **alle** `FS00x`), `EXPIRED_OFFER` (410),
+`STALE_VERSION` (412/428), `NOT_FOUND`, `IDEMPOTENCY_CONFLICT`,
+`UNKNOWN_PERMANENT`.
+
+Ein **unklassifizierter** Fehler gilt konservativ als dauerhaft – lieber ein
+Mensch schaut hin, als dass etwas endlos wiederholt wird.
+
+**Backoff:** exponentiell (`base·2^(n-1)`), Jitter ±30 %, Cap 5 min, `maxAttempts`
+je Job/Ereignis. Eine einzige Funktion (`decideRetry`) entscheidet für
+Outbox-Worker **und** Job-Runner – kein Auseinanderlaufen.
+
+**Dead-Letter-Queue** `dead_letters`: `source` (`job`|`outbox`), `source_id`,
+`kind`, `payload`, `attempts`, `error_class`, `last_error`, `audit_kontext`
+(Grund, Korrelations-ID, Aggregat), `alarm_emitted_at`, `resumed_*`.
+
+**Alarm-Hook:** `apps/api/src/workers/alarm.ts`, austauschbarer Sink.
+**Manueller Wiederaufnahmepfad:** `POST /ops/dead-letters/:id/resume` –
+erzeugt bei Jobs einen **neuen** Job (die Fehlerhistorie bleibt erhalten), bei
+Outbox-Ereignissen wird die Zeile auf `pending` zurückgesetzt; die Inbox
+verhindert doppelte Verarbeitung. Eine zweite Wiederaufnahme wird mit 409
+abgelehnt.
+
+---
+
+## §10 Vier persistierte State Machines
+
+Zustandsmengen **wörtlich** wie spezifiziert (zeichengenau getestet in
+`packages/domain/src/__tests__/statemachines.test.ts`):
+
+- **Terminangebot** — `created, sent, delivered, accepted, booking_pending, confirmed, rejected, expired, cancelled, failed_review`
+- **Dokument** — `uploaded, quarantined, scanning, submitted, in_review, verified, rejected, expired, deleted`
+- **Zahlung** — `imported, matching, suggested, review_required, matched, partially_matched, reversed, failed`
+- **Fahrzeugmangel** — `reported, triaged, vehicle_blocked, replacement_pending, resolved, reopened`
+
+### Die vier Pflichten
+
+| Pflicht | Umsetzung |
+| --- | --- |
+| **Allow-listed** | `STATE_TRANSITIONS` (`packages/domain`) **und** Tabelle `state_machine_transitions`; ein Test vergleicht beide Richtungen 1:1, damit sie nicht auseinanderlaufen. Verstoß = `FS007`. |
+| **Validiert** | Rolle/Eigentum/Frist in der Route; Zustandslogik im Trigger. |
+| **Auditiert** | `state_transitions` wird **per Trigger** geschrieben – auch bei Roh-SQL. Akteur/Grund kommen aus Sitzungsvariablen (`fahrschul.akteur_benutzer_id`, `fahrschul.transition_grund`), gesetzt von `setTransitionContext()`. Zusätzlich ein `audit_events`-Ereignis → Outbox. `created_at` nutzt `clock_timestamp()`, damit mehrere Übergänge in **einer** Transaktion geordnet bleiben. |
+| **Resumable** | Der Zustand steht **ausschließlich** in der Entitätsspalte, nie im Prozessspeicher. Getestet mit einer frischen App-Instanz („Neustart"). Mehrschrittprozesse laufen als Jobs, nicht als lange Requests: der Angebotsablauf ist ein Job, `sent → delivered` kommt aus dem Outbox-Worker. |
+
+### Zustandsabbildung (Datenmigration + Expand-Contract)
+
+Die neuen Spalten (`terminangebote.angebot_status`,
+`dokumente.dokument_status`, `banktransaktionen.zahlung_status`,
+`fahrzeugmaengel.mangel_status`) sind die **Quelle der Wahrheit**. Die alten
+`status`-Spalten bleiben und werden per Trigger **bidirektional** synchron
+gehalten: neuer Code schreibt die neue Spalte (Alt-Spalte wird abgeleitet),
+Alt-Code schreibt `status` (neue Spalte wird nachgezogen, **mit**
+Allow-List-Prüfung). Bestandsdaten wurden in der Migration umgeschrieben.
+
+| Maschine | neuer Zustand → Alt-`status` |
+| --- | --- |
+| Terminangebot | `created/sent/delivered → offen` · `accepted/booking_pending/confirmed → gebucht` · `rejected → abgelehnt` · `expired → abgelaufen` · `cancelled → storniert` · `failed_review → pruefung_erforderlich` |
+| Dokument | `uploaded → hochgeladen` · `quarantined → quarantaene` · `scanning → pruefung_laeuft` · `submitted → eingereicht` · `in_review → in_pruefung` · `verified → geprueft` · `rejected → abgelehnt` · `expired → abgelaufen` · `deleted → geloescht` |
+| Zahlung | `imported/matching/suggested/review_required/partially_matched → offen` · `matched → gebucht` · `reversed/failed → abgelehnt` |
+| Fahrzeugmangel | `resolved → behoben` · alle übrigen → `offen` |
+
+Technischer Hinweis: die neuen Spalten haben den DB-Default `'__legacy__'` als
+**Sentinel**. Nur so kann der `BEFORE`-Trigger unterscheiden, ob ein Schreiber
+die neue Spalte gesetzt hat oder ein Alt-Pfad nur `status` kennt. Der Sentinel
+wird nie persistiert (der Trigger ersetzt ihn, bevor die CHECK-Constraint
+greift). Im Drizzle-Schema steht aus Typkomfort ein anderer `.default(...)`;
+maßgeblich ist die DDL.
+
+**CONTRACT-Phase (Entfernen der Alt-Spalten) ist NICHT Teil dieser Migration**
+– bewusst, weil vier Frontends die Alt-Spalten noch lesen.
+
+### Zwei Anmerkungen zur Auslegung
+
+1. **„Zahlung" sitzt auf `banktransaktionen`, nicht auf `zahlungen`.** Die
+   Zustandsmenge (`imported → matching → suggested/review_required → matched/
+   partially_matched → reversed`) beschreibt den **Zahlungseingangs-Lebenszyklus**:
+   Import aus dem Bankfeed, Matching-Kaskade, Zuordnung, Rücklastschrift.
+   Genau das trägt `banktransaktionen` (inkl. `aufteilung`, `rechnung_ids`,
+   `ist_ruecklastschrift_von`). `zahlungen`-Zeilen sind die **resultierenden
+   Zuordnungen**. Eine zweite State Machine auf `zahlungen` wäre der
+   konkurrierende Mechanismus, der ausdrücklich vermieden werden soll.
+2. **`sent → accepted` ist erlaubt** (nicht nur `delivered → accepted`), weil
+   ein Schüler ein Angebot per Poll findet, bevor die Zustellbestätigung
+   eintrifft. `delivered` ist die Bestätigung des Zustellwegs, keine
+   Vorbedingung der Annahme.
+
+Flex- und Storno-Angebote (`flex_angebote`, `storno_angebote`) behalten ihre
+eigenen, älteren Statusmengen und laufen über den Angebotsablauf-Job mit –
+absichtlich **keine** fünfte State Machine, §10 nennt genau vier. Der
+zugrundeliegende `terminangebote`-Zustand ist auch bei Flex derselbe.
+
+---
+
+## §13 Absturzsicherheit für Worker und Jobs
+
+Tabelle `jobs` + `apps/api/src/workers/job-store.ts`, `runner.ts`.
+
+| Anforderung | Umsetzung |
+| --- | --- |
+| Lease/Lock + Ablauf | `lease_owner`, `lease_expires_at`; Beanspruchen per `FOR UPDATE SKIP LOCKED` |
+| Re-Claim nach Absturz | `recoverExpiredJobLeases()`: abgelaufener Lease **oder** überschrittene `max_runtime_seconds` → zurück auf `pending` (mit Backoff); `attempts` wird **nicht** zurückgesetzt, damit ein Dauerhänger irgendwann in der DLQ landet |
+| Heartbeat | `heartbeatJob(id, owner)` verlängert den Lease; nur der besitzende Worker darf das |
+| Max-Laufzeit | `max_runtime_seconds` je Job; Überschreitung = transienter Fehler |
+| Idempotente Einplanung | `dedupe_key` + partieller Unique-Index über offene Jobs |
+| Idempotente Ausführung | Handler filtern auf offene Zustände; State-Machine-No-Ops; Inbox-Dedup |
+| Ergebnis/Fehler gespeichert | `result`, `last_error`, `error_class`, `started_at`, `finished_at` |
+| DLQ + Alarm + Wiederaufnahme | siehe §9 |
+
+### Job-Arten
+
+| Job-Typ | Zweck |
+| --- | --- |
+| `notifications.dispatch` | Warteschlange versenden |
+| `bank.import` | `imported → matching → matched/suggested/review_required`; **nur `konfidenz='sicher'`** wird automatisch gebucht |
+| `document.review` | `uploaded → scanning → submitted` bzw. `quarantined`; setzt abgelaufene Dokumente auf `expired`. **Verifiziert nie automatisch** (`FS006` verlangt ein Prüfprotokoll) |
+| `reporting.daily` | Tageskennzahlen als Job-Ergebnis |
+| `integration.sync` | treibt den `integration-sync`-Konsumenten (mock) |
+| `reminders.dispatch` | Erinnerungen für Termine in 24–48 h, duplikatfrei |
+| `appointment_offer.expire` | **Ablauf von Terminangeboten** |
+| `consistency.check` | §19 |
+| `idempotency.cleanup` | §2 |
+| `outbox.dispatch` | §5 |
+
+**Zum Angebotsablauf – geprüft, wie gefordert:** das war vorher **kein Job**.
+`GET /appointment-offers` filterte abgelaufene Angebote nur beim **Lesen**
+heraus; `flex_angebote`/`storno_angebote` blieben für immer `offen`. Damit war
+der Ablauf nicht persistiert, nicht auditiert und nach einem Neustart nicht
+wiederaufnehmbar. Jetzt ist er ein echter, allow-listeter, auditierter
+Zustandsübergang mit Ereignis (`lesson.offer.expired`).
+
+Der Runner ist bewusst eine „einen Durchlauf"-Funktion (`runJobsOnce` /
+`runWorkersOnce`) statt einer Endlosschleife im HTTP-Prozess: deterministisch
+testbar (Absturz = Durchlauf abbrechen) und von außen treibbar.
+`startWorkerLoop` gibt es für den Serverbetrieb (`buildApp({ startWorkers: true })`,
+Standard **aus**). `scheduleRecurringJobs()` plant die wiederkehrenden Jobs
+idempotent je Zeitfenster ein – die **Cron-/Scheduler-Verdrahtung selbst ist
+§15 und damit Phase 4**.
+
+Was der Runner **nicht** kann: einen laufenden Job aktiv abbrechen. Ein Hänger
+wird über Lease-Ablauf + Max-Laufzeit erkannt und neu beansprucht.
+
+---
+
+## §19 Täglicher Konsistenzcheck
+
+`apps/api/src/services/consistency-check.ts`, Tabellen
+`consistency_check_runs` + `consistency_findings`.
+Lauffähig als Job `consistency.check` **und** über
+`POST /ops/consistency/run`.
+
+Alle elf geforderten Prüfungen, jede mit eigenem Test, der eine echte
+Inkonsistenz erzeugt:
+
+1. `termin_ohne_gueltige_referenz` — Termin ohne gültigen/aktiven Schüler, Fahrlehrer oder Fahrzeug
+2. `terminueberschneidung` — Überschneidungen (Neuentstehung durch EXCLUDE-Constraints ausgeschlossen; Befund = Altdaten)
+3. `bestaetigtes_angebot_ohne_termin`
+4. `leistung_ohne_rechnung`
+5. `doppelte_rechnung_fuer_leistung`
+6. `zahlung_ueber_restbetrag`
+7. `blockiertes_fahrzeug_mit_zukunftstermin`
+8. `pruefungsstatus_ohne_freigabe`
+9. `dokumentstatus_ohne_pruefprotokoll`
+10. `verwaiste_uploads`
+11. `unverarbeitete_ereignisse`
+
+**Non-Negotiable, testgesichert:** riskante Reparaturen sind
+**ausschließlich Vorschläge**. Die Datei enthält keinen einzigen
+`UPDATE`/`DELETE` auf fachliche Daten; `vorschlag_angewendet` bleibt `false`
+und **es gibt keinen Codepfad und keinen Endpunkt, der ihn setzt** (ein Test
+prüft, dass plausible „apply"-Routen 404 liefern). Bei kritischen Befunden
+feuert der Alarm-Hook.
+
+Jeder Befund trägt `schweregrad`, `vorschlag`, `vorschlag_riskant` und den
+vollen Abfragekontext. Eine fehlerhafte Einzelprüfung bricht den Bericht nicht
+ab, sondern erscheint als `fehlerhaftePruefungen` – eine Lücke wird benannt,
+nicht verschluckt.
+
+---
+
+## Betriebsoberfläche (`/ops/*`)
+
+Nötig, weil §13/§19 **lauffähige** Jobs und nachvollziehbare Ergebnisse fordern
+und ein reiner Cron-Eintrag in dieser Umgebung nicht prüfbar wäre.
+
+| Route | Zweck |
+| --- | --- |
+| `GET /ops/outbox` · `POST /ops/outbox/dispatch` | Outbox-Zustand / Zustellung anstoßen |
+| `GET /ops/jobs` · `POST /ops/jobs` · `POST /ops/jobs/run` · `POST /ops/jobs/schedule-recurring` | Jobs |
+| `POST /ops/workers/run` | kombinierter Durchlauf (auch für Phase-4-Chaos-Szenarien) |
+| `GET /ops/dead-letters` · `POST /ops/dead-letters/:id/resume` | DLQ |
+| `GET /ops/consistency/catalog` · `POST /ops/consistency/run` · `GET /ops/consistency/runs[/:id]` | §19 |
+
+Berechtigungen: neu `ops:reliability:read` und `ops:jobs:manage`, vergeben an
+**`systemdienst`** und **`geschaeftsfuehrung`**. Die Antworten enthalten
+ausschließlich technische IDs, Zustände und Fehlertexte – **keine
+Schüler-Stammdaten**, damit „systemdienst hat keinen Zugriff auf
+Schülerdaten" gültig bleibt (eigener Test).
+
+---
+
+## §14-Hinweis: Migration ist expand-contract
+
+`0007_reliability_core.sql` ist **rein additiv**: keine Spalte wird
+umbenannt, umtypisiert oder entfernt. Alle vier Frontends lesen ihre
+gewohnten Spalten unverändert weiter, während der neue Code die
+State-Machine-Spalten schreibt. Die Migration ist idempotent im Sinne des
+Migrationsläufers (ein zweiter Lauf wendet nichts an – bestehender Test).
+Die Ausführung von Backup/Restore selbst ist §14 und damit **Phase 4**.
+
+---
+
+## Bekannte Lücken dieser Phase
+
+- **Idempotenzschlüssel nicht überall Pflicht** — sechs der zehn Operationen
+  akzeptieren ihn, verlangen ihn aber nicht (Begründung + Umschaltpunkt siehe
+  §2). Genauso bei §4 für zwei Endpunkte mit Altaufrufern.
+- **Externe Integrationen bleiben `mock`** (unverändert, siehe
+  `docs/integration-gaps.md`). Konkrete Folge: der Mock-Bankfeed liefert eine
+  **leere** Fixture, daher kann `POST /finance/bank/sync` in dieser Umgebung
+  keine Transaktion erzeugen; die automatische Matching-Kaskade ist über den
+  Job `bank.import` getestet, die manuelle Zuordnung über
+  `POST /finance/bank/:id/resolve`.
+- **Alarmierung hat keinen echten Kanal** — `alarm.ts` schreibt strukturiert
+  auf stderr und sammelt Alarme im Prozess (testbar). Der echte
+  Adapter ist §16 und damit Phase 3.
+- **Kein Scheduler verdrahtet** — `scheduleRecurringJobs()` existiert und ist
+  getestet, der Cron-Eintrag ist §15 (Phase 4).
+- **Kein aktives Abbrechen hängender Jobs** — nur Lease-Ablauf + Re-Claim.
+- **`packages/events` hat kein eigenes Test-Setup** — die Tests der
+  Retry-Politik liegen deshalb in `apps/api/src/__tests__/retry-policy.test.ts`
+  und importieren über die Paketgrenze `@fahrschul/events`. Inhaltlich
+  vollständig, organisatorisch nicht am Ort des Codes.
+- **CONTRACT-Phase der Alt-Statusspalten offen** (bewusst, siehe §10).
+
+---
+
+## Abgrenzung: was welche Phase besitzt
+
+| Abschnitt | Phase |
+| --- | --- |
+| §1–§5, §9 (Server), §10, §13, §19 | **Phase 1 – dieses Dokument** |
+| §6 Realtime, §7 Client-Sync-Zustände, §8 Client-Offline-Outbox, §9 (Client) | Phase 2 |
+| §11 Circuit Breaker, §12 Upload-Quarantäne-Härtung, §16 Observability, §17 Rate-Limiting/CSRF/CSP/Step-up, §18 Degraded-Operation-UX | Phase 3 |
+| §14 Backup/Restore-Ausführung, §15 Deployment, §20 die 18 Chaos-Szenarien, §21 SLOs, §22 die sieben Dokumente + Release-Gate-Verdikt | Phase 4 |
+
+Seams, die Phase 1 dafür hinterlässt:
+
+- `packages/events/src/retry.ts` — Retry-Politik, browserfähig (Phase 2, §9-Client)
+- Konfliktantwort mit `current` + `conflictFields` (Phase 2, §7-Diff-Ansicht)
+- `IDEMPOTENT_OPERATIONS` als einziger Umschaltpunkt für die Pflicht-Liste (Phase 2)
+- `event_outbox` + `event_cursors` als Quelle für Push/Realtime (Phase 2, §6)
+- `alarm.ts` `setAlarmSink()` (Phase 3, §16)
+- `dokument`-Zustand `quarantined` existiert samt Übergängen; sein echter
+  Produzent ist die Upload-Härtung (Phase 3, §12)
+- `runIntegrationSync` als Einhängepunkt für den Circuit Breaker (Phase 3, §11)
+- `POST /ops/workers/run` + `scheduleRecurringJobs()` (Phase 4, §15/§20)
+- `consistency_check_runs`/`findings`, `openDeadLetterCount()`,
+  Outbox-Statusverteilung als Messgrößen (Phase 4, §21-SLOs)
+
+---
+
+## Testabdeckung dieser Phase
+
+| Datei | Umfang |
+| --- | --- |
+| `packages/domain/src/__tests__/statemachines.test.ts` | §10 Zustandsmengen zeichengenau, Allow-Lists, Erreichbarkeit |
+| `apps/api/src/__tests__/retry-policy.test.ts` | §9 Klassifikation, Backoff/Jitter/Cap, Retry-Entscheidung |
+| `apps/api/src/__tests__/idempotency.test.ts` | §2, alle zehn Operationen, drei Semantiken je Operation, Ablauf + Cleanup |
+| `apps/api/src/__tests__/invariants.test.ts` | §3 alle Invarianten via **Roh-SQL** + HTTP-Übersetzung, Integer-Cent-Nachweis |
+| `apps/api/src/__tests__/optimistic-concurrency.test.ts` | §4 alle sechs Entitäten, Konflikt trägt Serverzustand, `If-Match`, 428, Versions-Trigger |
+| `apps/api/src/__tests__/outbox.test.ts` | §5 Atomarität + Rollback, Dedup, Cursor, **Absturz-Wiederaufnahme**, Versionierung, DLQ + Alarm + Wiederaufnahme |
+| `apps/api/src/__tests__/jobs.test.ts` | §13 Lease/Re-Claim/Heartbeat/Max-Laufzeit, dedupe, §9-Politik, alle sieben Job-Arten lauffähig |
+| `apps/api/src/__tests__/state-machines.test.ts` | §10 DB-Constraints, auditierte Ketten, Legacy-Kompatibilität, Wiederaufnahme nach „Neustart" |
+| `apps/api/src/__tests__/consistency-check.test.ts` | §19 alle elf Prüfungen, „nur Vorschläge", Job + Ops-Route |
