@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { SyncProvider, SyncStatusBar } from "@fahrschul/ui";
+import { DegradedBanner, SyncProvider, SyncStatusBar } from "@fahrschul/ui";
 import { API_BASE } from "./api/client.js";
 import { BottomNav } from "./components/BottomNav.js";
 import { OfflineBanner } from "./components/OfflineBanner.js";
@@ -56,6 +56,13 @@ export function App() {
             <RequireAuth>
               <>
                 <SyncStatusBar />
+                {/*
+                  PROMPT -1 §18 (Phase 3): eingeschränkter Betrieb. Zeigt
+                  ausgefallene externe Schnittstellen samt Bedeutung für den
+                  Nutzer und den Zeitpunkt der letzten erfolgreichen
+                  Synchronisation. Sperrt NICHTS – der Kern bleibt nutzbar.
+                */}
+                <DegradedBanner apiBase={API_BASE} />
                 <Routes>
                   <Route path="/" element={<Navigate to="/heute" replace />} />
                   <Route path="/heute" element={<Heute />} />

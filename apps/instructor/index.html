@@ -3,6 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      PROMPT -1 §17 (Phase 3) – Content Security Policy.
+
+      Warum hier UND als HTTP-Kopfzeile? Weil diese Datei ohne Reverse Proxy
+      ausgeliefert werden kann; dann ist das Meta-Tag die einzige wirksame
+      Stelle. Die Kopfzeilenvariante (mit `frame-ancestors`, das per Meta-Tag
+      NICHT wirkt) ist die Deployment-Vorgabe – siehe
+      docs/security-architecture.md.
+
+      Kein 'unsafe-inline' und kein 'unsafe-eval' für Skripte: der Vite-Build
+      dieser App erzeugt ausschließlich externe Modul-Skripte von derselben
+      Origin. Das ist gegen `dist/index.html` geprüft, nicht vermutet.
+      `style-src-attr 'unsafe-inline'` ist die eine begründete Ausnahme
+      (React-`style={...}`-Attribute; ein Style-Attribut führt keinen Code aus).
+
+      Diese CSP ist der in docs/sync-architecture.md dokumentierte, bis Phase 2
+      offene Seam gegen XSS – die Bedrohung, gegen die die verschlüsselten
+      lokalen Entwürfe ausdrücklich NICHT schützen.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; style-src-elem 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://localhost:4000 http://127.0.0.1:4000; manifest-src 'self'; worker-src 'self' blob:; media-src 'self' blob:; object-src 'none'; frame-src 'none'; child-src 'none'; base-uri 'none'; form-action 'self'"
+    />
+    <meta name="referrer" content="no-referrer" />
     <title>Fahrlehrer-App – Fahrschule Krebs</title>
   </head>
   <body>

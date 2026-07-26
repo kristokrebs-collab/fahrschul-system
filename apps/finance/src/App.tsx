@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { PendingOperations, SyncProvider, SyncStatusBar } from "@fahrschul/ui";
+import { DegradedBanner, PendingOperations, SyncProvider, SyncStatusBar } from "@fahrschul/ui";
 import "./styles.css";
 import { API_BASE } from "./api/client.js";
 import { Login } from "./routes/Login.js";
@@ -55,6 +55,8 @@ function Shell() {
       </aside>
       <main className="app-main">
         <SyncStatusBar />
+        {/* PROMPT -1 §18 (Phase 3): "Zahlungsdaten veraltet" muss im Finanz-Cockpit sichtbar sein. */}
+        <DegradedBanner apiBase={API_BASE} />
         <Cockpit />
         {/* §7: kritische Konflikte (z. B. bereits zugeordnete Zahlung) werden
             vorgelegt, nicht automatisch aufgelöst. */}

@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Button, PendingOperations, SyncStatusBar } from "@fahrschul/ui";
+import { Button, DegradedBanner, PendingOperations, SyncStatusBar } from "@fahrschul/ui";
 import { useSession } from "../state/SessionContext.js";
+import { API_BASE } from "../api/client.js";
 
 const NAV: Array<{ to: string; label: string }> = [
   { to: "/heute", label: "Heute" },
@@ -55,6 +56,12 @@ export function Layout() {
           das die Absicherung gegen Entscheidungen auf altem Stand.
         */}
         <SyncStatusBar />
+        {/*
+          PROMPT -1 §18 (Phase 3): das Büro ist die Zielgruppe dieses Banners –
+          es muss wissen, ob eine Benachrichtigung tatsächlich raus ist und ob
+          Zahlungsdaten veraltet sind, BEVOR es danach handelt.
+        */}
+        <DegradedBanner apiBase={API_BASE} />
         <Outlet />
         {/* §7: kritische Konflikte werden vorgelegt, nicht automatisch aufgelöst. */}
         <PendingOperations />
