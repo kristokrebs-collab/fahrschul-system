@@ -8,6 +8,7 @@ import { requireAuth, requirePermission } from "../middleware/auth.js";
 import { getOwnFahrlehrerId, getOwnSchuelerId } from "../services/own-scope.js";
 import {
   assertVersion,
+  etagFor,
   readExpectedVersion,
   requireExpectedVersion,
   sendVersionConflict,
@@ -41,7 +42,19 @@ const patchFeedbackSchema = z.object({
   expectedVersion: z.number().int().nonnegative().optional(),
 });
 
-/** Felder, die eine schülerseitige Antwort MAXIMAL enthalten darf. */
+/**
+ * Felder, die eine schülerseitige Antwort MAXIMAL enthalten darf.
+ *
+ * `internalNotes` ist hier bewusst NICHT enthalten – die Spalte wird von der
+ * Datenbank gar nicht geladen, nicht nur im UI ausgeblendet. Der
+ * Redaktionsvertrag der Fahrlehrer-Notizen hängt an dieser Liste.
+ *
+ * PROMPT -1 §4 (Phase 3): `version` und `updatedAt` sind NEU dabei. Ohne sie
+ * konnte ein Client keine gelesene Version senden, und deshalb konnte §4 für
+ * `PATCH /feedback/:id/self-assessment` nicht verpflichtend werden (Phase 2s
+ * dokumentierte Lücke). Eine Version ist kein Fachinhalt und verletzt den
+ * Redaktionsvertrag nicht.
+ */
 const STUDENT_VISIBLE_COLUMNS = {
   id: fahrstundenFeedback.id,
   terminbuchungId: fahrstundenFeedback.terminbuchungId,
@@ -51,6 +64,8 @@ const STUDENT_VISIBLE_COLUMNS = {
   nextGoal: fahrstundenFeedback.nextGoal,
   resourceId: fahrstundenFeedback.resourceId,
   studentSelfAssessment: fahrstundenFeedback.studentSelfAssessment,
+  version: fahrstundenFeedback.version,
+  updatedAt: fahrstundenFeedback.updatedAt,
   createdAt: fahrstundenFeedback.createdAt,
 } as const;
 
@@ -145,6 +160,13 @@ export function registerFeedbackRoutes(app: FastifyInstance, db: Database) {
           workOn: released.includes("workOn") ? row.workOn : null,
           nextGoal: released.includes("nextGoal") ? row.nextGoal : null,
           resourceId: released.includes("resourceId") ? row.resourceId : null,
+          /**
+           * §4 (Phase 3): ETag JE ZEILE. Ein Listenendpunkt kann keinen
+           * einzelnen `ETag`-Header tragen (er beschreibt viele Datensätze),
+           * deshalb steht die Version als Feld in der Zeile. Der Client baut
+           * daraus `If-Match: W/"<version>"` für die Selbsteinschätzung.
+           */
+          etag: etagFor(row),
         };
       });
 
@@ -178,9 +200,17 @@ export function registerFeedbackRoutes(app: FastifyInstance, db: Database) {
         return reply.code(404).send({ error: "feedback_not_found" });
       }
 
-      // §4: Version optional-aber-geprüft (der Schüler-Client schickt sie,
-      // sobald Phase 2 den Client-Sync verdrahtet).
-      const expected = readExpectedVersion(request);
+      /**
+       * §4 (Phase 3): die Version ist jetzt PFLICHT.
+       *
+       * Phase 2 musste hier bei "geprüft-wenn-gesendet" bleiben, weil
+       * `GET /feedback/mine` keine Version je Zeile lieferte – ein korrekt
+       * gebauter Client hätte 428 bekommen. Genau diese Voraussetzung ist
+       * oben geschlossen (`etag` je Zeile), damit ist der Umschaltpunkt
+       * `readExpectedVersion` -> `requireExpectedVersion` erreicht.
+       */
+      const expected = requireExpectedVersion(readExpectedVersion(request), reply);
+      if (expected === null) return reply;
       try {
         assertVersion(row, expected);
       } catch (err) {
@@ -193,8 +223,20 @@ export function registerFeedbackRoutes(app: FastifyInstance, db: Database) {
       const [updated] = await db
         .update(fahrstundenFeedback)
         .set({ studentSelfAssessment: parsed.data.text })
-        .where(eq(fahrstundenFeedback.id, params.id))
+        .where(and(eq(fahrstundenFeedback.id, params.id), eq(fahrstundenFeedback.version, expected)))
         .returning(STUDENT_VISIBLE_COLUMNS);
+      if (!updated) {
+        const [fresh] = await db
+          .select(STUDENT_VISIBLE_COLUMNS)
+          .from(fahrstundenFeedback)
+          .where(eq(fahrstundenFeedback.id, params.id))
+          .limit(1);
+        return sendVersionConflict(
+          new VersionConflictError(expected, fresh),
+          reply,
+          parsed.data as Record<string, unknown>,
+        );
+      }
 
       await db.insert(auditEreignisse).values(
         buildEventRow({
@@ -208,7 +250,8 @@ export function registerFeedbackRoutes(app: FastifyInstance, db: Database) {
         }),
       );
 
-      return reply.send({ feedback: updated });
+      withVersionHeaders(reply, updated);
+      return reply.send({ feedback: { ...updated, etag: etagFor(updated) } });
     },
   );
 

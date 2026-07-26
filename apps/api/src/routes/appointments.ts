@@ -30,6 +30,7 @@ import {
   withVersionHeaders,
 } from "../lib/optimistic.js";
 import { sendBusinessConstraintError, setTransitionContext } from "../lib/state-machine.js";
+import { recordBookingConflict } from "../lib/metrics.js";
 import { getOwnSchuelerId } from "../services/own-scope.js";
 
 const bookingSchema = z.object({
@@ -136,11 +137,26 @@ export function registerAppointmentRoutes(app: FastifyInstance, db: Database) {
       } catch (err) {
         if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);
         if (err instanceof BookingConflictError) {
+          // §16.10: Buchungskonflikte sind eine eigene Kennzahl. Sie sind kein
+          // Systemfehler, sondern die erwünschte Wirkung der Konfliktprüfung –
+          // ihre HÄUFIGKEIT sagt etwas über die Planungsqualität.
+          recordBookingConflict("other");
           return reply.code(409).send({ error: "booking_conflict", reasons: err.reasons });
         }
-        if (sendBusinessConstraintError(err, reply)) return reply;
+        if (sendBusinessConstraintError(err, reply)) {
+          const code = (err as { code?: string }).code;
+          recordBookingConflict(code === "FS005" ? "vehicle_blocked" : "other");
+          return reply;
+        }
         const pgError = err as { code?: string; constraint?: string };
         if (pgError.code === EXCLUSION_VIOLATION || pgError.code === UNIQUE_VIOLATION) {
+          recordBookingConflict(
+            pgError.constraint?.includes("fahrzeug")
+              ? "fahrzeug_overlap"
+              : pgError.constraint?.includes("fahrlehrer")
+                ? "fahrlehrer_overlap"
+                : "other",
+          );
           return reply.code(409).send({
             error: "booking_conflict",
             reason: "DB_CONSTRAINT",

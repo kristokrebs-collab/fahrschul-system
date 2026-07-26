@@ -28,6 +28,7 @@ import {
   withVersionHeaders,
 } from "../lib/optimistic.js";
 import { sendBusinessConstraintError, transitionState } from "../lib/state-machine.js";
+import { stepUpBlocked, STEP_UP_ACTIONS } from "../lib/step-up.js";
 
 const raumSchema = z.object({ name: z.string().min(1), ausstattung: z.array(z.string()).default([]) });
 const simulatorSchema = z.object({ name: z.string().min(1) });
@@ -289,6 +290,26 @@ export function registerResourceRoutes(app: FastifyInstance, db: Database) {
       const expected = requireExpectedVersion(readExpectedVersion(request), reply);
       if (expected === null) return reply;
 
+      /**
+       * PROMPT -1 §17 – Step-up beim ENTSPERREN eines Fahrzeugs.
+       *
+       * Ein Fahrzeug ist gesperrt, weil es ein Sicherheitsmangel hat. Es
+       * wieder freizugeben ist die Aussage "das Fahrzeug ist verkehrssicher" –
+       * mit direkter Folge für Fahrschüler und Fahrlehrer. Das SPERREN braucht
+       * bewusst kein Step-up (es ist die vorsichtige Richtung und darf niemals
+       * durch Reibung verzögert werden).
+       */
+      if (parsed.data.status === "verfuegbar") {
+        const [vorher] = await db
+          .select({ status: fahrzeuge.status })
+          .from(fahrzeuge)
+          .where(eq(fahrzeuge.id, params.id))
+          .limit(1);
+        if (vorher && vorher.status !== "verfuegbar") {
+          if (await stepUpBlocked(db, request, reply, STEP_UP_ACTIONS.vehicleUnblock)) return reply;
+        }
+      }
+
       try {
         const updated = await db.transaction(async (tx) => {
           const [current] = await tx.select().from(fahrzeuge).where(eq(fahrzeuge.id, params.id)).limit(1);
@@ -341,6 +362,13 @@ export function registerResourceRoutes(app: FastifyInstance, db: Database) {
       const params = request.params as { id: string };
       const [mangel] = await db.select().from(fahrzeugmaengel).where(eq(fahrzeugmaengel.id, params.id)).limit(1);
       if (!mangel) return reply.code(404).send({ error: "not_found" });
+
+      /**
+       * §17: "Mangel behoben" setzt das Fahrzeug wieder auf `verfuegbar` – das
+       * IST das Entsperren und verlangt deshalb dieselbe frische
+       * Wiederanmeldung wie PATCH /resources/fahrzeuge/:id.
+       */
+      if (await stepUpBlocked(db, request, reply, STEP_UP_ACTIONS.vehicleUnblock)) return reply;
 
       const result = await db.transaction(async (tx) => {
         const done = await transitionState(tx, {

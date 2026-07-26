@@ -30,6 +30,33 @@ interface QueueItem {
   aktion: string;
   entitaet: string;
   entitaetId: string;
+  /**
+   * PROMPT -1 §4 (Phase 3): Version des referenzierten Datensatzes, wenn er
+   * versioniert ist. NEU – und die Voraussetzung dafür, dass §4 verpflichtend
+   * werden konnte.
+   *
+   * Phase 2 hat dokumentiert, warum es ohne diese Angabe nicht ging: die
+   * Büro-Oberfläche liest ihre Arbeitsliste hier, ruft danach z. B.
+   * `POST /documents/:id/review` auf und hätte ohne gelesene Version ein 428
+   * bekommen. Ein Listenendpunkt kann keinen einzelnen `ETag`-Header tragen –
+   * er beschreibt viele Datensätze –, deshalb steht die Version je Zeile im
+   * Körper, im selben Format wie ein ETag (`W/"<version>"`).
+   *
+   * `null` bedeutet: dieser Eintrag verweist auf eine Entität ohne
+   * Versionsspalte (z. B. `lead`, `nachricht`). Das ist eine ehrliche Angabe
+   * und kein Fehler – für diese Entitäten fordert §4 keine Version.
+   */
+  version: number | null;
+  etag: string | null;
+}
+
+/** Hilfsfunktion: Version -> ETag-Form, oder beides null. */
+function versionOf(row: { version?: number | null } | null | undefined): {
+  version: number | null;
+  etag: string | null;
+} {
+  const version = typeof row?.version === "number" ? row.version : null;
+  return { version, etag: version === null ? null : `W/"${version}"` };
 }
 
 /**
@@ -69,6 +96,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Betroffene Termine umbuchen / Storno-Retter auslösen",
           entitaet: "fahrlehrer",
           entitaetId: f.id,
+          ...versionOf(f),
         });
       }
 
@@ -84,6 +112,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Ersatzfahrzeug zuweisen oder betroffene Termine stornieren",
           entitaet: "fahrzeugmangel",
           entitaetId: m.id,
+          ...versionOf(m),
         });
       }
 
@@ -102,6 +131,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Fehlende Voraussetzungen klären",
           entitaet: "pruefung",
           entitaetId: p.id,
+          ...versionOf(p),
         });
       }
 
@@ -117,6 +147,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Erneut versenden oder alternativen Kanal nutzen",
           entitaet: "nachricht",
           entitaetId: n.id,
+          ...versionOf(n),
         });
       }
 
@@ -133,6 +164,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Kontaktieren",
           entitaet: "lead",
           entitaetId: l.id,
+          ...versionOf(l),
         });
       }
 
@@ -148,6 +180,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Zurückrufen",
           entitaet: "lead",
           entitaetId: l.id,
+          ...versionOf(l),
         });
       }
 
@@ -163,6 +196,9 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Prüfen/Freigeben",
           entitaet: "dokument",
           entitaetId: d.id,
+          // Die wichtigste Zeile dieser Datei für §4: die Büro-Oberfläche
+          // ruft mit dieser Version `POST /documents/:id/review` auf.
+          ...versionOf(d),
         });
       }
 
@@ -188,6 +224,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Angebot verlängern oder gezielt anbieten",
           entitaet: "terminangebot",
           entitaetId: a.id,
+          ...versionOf(a),
         });
       }
 
@@ -209,6 +246,9 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
             aktion: "Termin anbieten",
             entitaet: "schueler",
             entitaetId: s.id,
+            // `alleSchueler` selektiert nur Namensfelder – Version daher null.
+            version: null,
+            etag: null,
           });
         }
       }
@@ -231,6 +271,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Passenden Schüler zuweisen",
           entitaet: "terminangebot",
           entitaetId: a.id,
+          ...versionOf(a),
         });
       }
 
@@ -247,6 +288,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Prüfungstermin bestätigen",
           entitaet: "pruefung",
           entitaetId: p.id,
+          ...versionOf(p),
         });
       }
 
@@ -265,6 +307,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Erneuerung anfordern",
           entitaet: "dokument",
           entitaetId: d.id,
+          ...versionOf(d),
         });
       }
 
@@ -280,6 +323,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "Wartungsstatus verfolgen",
           entitaet: "fahrzeug",
           entitaetId: f.id,
+          ...versionOf(f),
         });
       }
 
@@ -304,6 +348,7 @@ export function registerOfficeDashboardRoutes(app: FastifyInstance, db: Database
           aktion: "An Finanzen weiterleiten",
           entitaet: "rechnung",
           entitaetId: r.id,
+          ...versionOf(r),
         });
       }
 

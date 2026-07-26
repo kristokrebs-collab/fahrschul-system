@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireAuth, requirePermission } from "../middleware/auth.js";
+import { stepUpBlocked, STEP_UP_ACTIONS } from "../lib/step-up.js";
 import {
   IdempotencyConflictError,
   IDEMPOTENT_OPERATIONS,
@@ -139,6 +140,29 @@ export function registerExamPipelineRoutes(app: FastifyInstance, db: Database) {
       }
       const [row] = await db.select().from(pruefungen).where(eq(pruefungen.id, params.id)).limit(1);
       if (!row) return reply.code(404).send({ error: "pruefung_not_found" });
+
+      /**
+       * PROMPT -1 §17 – Step-up für die ÜBERSTEUERUNG der Freigabekette.
+       *
+       * Nicht für jeden Pipeline-Übergang: die reguläre Freigabe ist die
+       * alltägliche Arbeit eines Fahrlehrers, und eine Wiederanmeldung an jedem
+       * Schritt würde nur dazu führen, dass Geräte entsperrt liegen bleiben.
+       *
+       * Step-up gilt für GENAU EINEN Übergang:
+       * `voraussetzungen_fehlen -> fahrlehrer_go`. Das ist der Sprung über eine
+       * unvollständige Voraussetzungskette hinweg – die einzige Stelle, an der
+       * ein Mensch bewusst gegen den geprüften Zustand entscheidet.
+       *
+       * Was sich dadurch NICHT ändert: es gibt weiterhin keine AUTOMATISCHE
+       * Prüfungsfreigabe (Non-Negotiable), die Rollenbeschränkung auf
+       * `fahrlehrer` für `fahrlehrer_go` bleibt unangetastet, und die
+       * DB-Invariante FS004 bleibt in Kraft.
+       */
+      const istUebersteuerung =
+        row.status === "voraussetzungen_fehlen" && parsed.data.to === "fahrlehrer_go";
+      if (istUebersteuerung) {
+        if (await stepUpBlocked(db, request, reply, STEP_UP_ACTIONS.examClearanceOverride)) return reply;
+      }
 
       const expected = readExpectedVersion(request);
       const istAnmeldung = ANMELDE_ZUSTAENDE.has(parsed.data.to);
