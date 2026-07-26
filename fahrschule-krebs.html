@@ -98,6 +98,12 @@ h1,h2,h3{font-family:var(--disp);font-weight:800;line-height:.92;letter-spacing:
 .stage__vig{position:absolute;inset:0;box-shadow:inset 0 0 190px rgba(0,0,0,.75);background:radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.5) 92%)}
 .stage__bars{position:absolute;left:0;right:0;height:5vh;background:#040507;opacity:.9}
 .stage__bars.t{top:0}.stage__bars.b{bottom:0}
+/* Fallback ohne Video: komponierte Lichtfläche statt schwarzem Loch */
+.stage.fallback video{display:none}
+.stage.fallback{background:
+  radial-gradient(72vw 62vh at 74% 22%,rgba(216,30,40,.20),transparent 62%),
+  radial-gradient(56vw 52vh at 14% 88%,rgba(38,60,104,.24),transparent 64%),
+  linear-gradient(180deg,#0d0f14,#07080b)}
 @media(max-width:820px){.stage__grade{background:linear-gradient(180deg,rgba(6,7,10,.72),rgba(6,7,10,.86) 60%,rgba(6,7,10,.95))}.stage__bars{display:none}}
 
 /* ── hero ── */
@@ -529,6 +535,32 @@ html.lenis,html.lenis body{height:auto}.lenis.lenis-smooth{scroll-behavior:auto!
   </div>
 </section>
 
+<!-- APP PROMO -->
+<section class="blk app-promo" id="app">
+  <div class="wrap"><div class="wrap2">
+    <div>
+      <div class="badge">● Neu · Deine Ausbildung in der Tasche</div>
+      <h2>Die Krebs&nbsp;App –<br><em style="font-style:normal;color:var(--red2)">dein Cockpit, immer dabei.</em></h2>
+      <p>Die intelligente App, die dich durch die gesamte Ausbildung führt: Prüfungsreife, Termine, Fahrstunden-Feedback und Lernspur – live mit dem Fahrschulbüro synchronisiert.</p>
+      <ul>
+        <li><em><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0M12 7v5l3 2"/></svg></em> Prüfungsreife &amp; Fortschritt in Echtzeit</li>
+        <li><em><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></em> Termine, Prüfungsstatus &amp; Fahrstunden-Feedback</li>
+        <li><em><svg viewBox="0 0 24 24"><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2zM9 4v14M15 6v14"/></svg></em> Lernspur &amp; Route jeder Fahrt</li>
+        <li><em><svg viewBox="0 0 24 24"><path d="M4 5h16v11H4zM9 20h6M12 16v4"/></svg></em> Dokumente, Verfügbarkeit &amp; Buchung</li>
+      </ul>
+      <div class="hero__cta" style="margin:0"><button class="btn btn--pri" data-open="advice">App-Zugang sichern</button><a class="btn btn--ghost" href="#cockpit">So funktioniert&rsquo;s</a></div>
+    </div>
+    <div class="app-promo__phone" aria-hidden="true"><div class="app-promo__scr">
+      <div class="aps-top"><span><b>08:42</b> · Di 14. Mai</span><span><i class="dot"></i>Sync aktiv</span></div>
+      <div class="aps-hi"><small>Guten Morgen</small><b>Jonas.</b></div>
+      <div class="aps-ring"><div class="aps-g"><b>76<i>%</i></b></div>
+        <div class="aps-st"><div><span>Theorie</span><em>11 / 14</em></div><div><span>Praxis</span><em>18 / 25</em></div><div><span>Sonderfahrten</span><em>08 / 12</em></div></div></div>
+      <div class="aps-next"><small>Nächste Fahrstunde · Heute 17:30</small><b>Nachtfahrt · Lektion 18</b><span>Treffpunkt: Petersberger Str.</span></div>
+      <div class="aps-dock"><a class="on"><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/></svg></a><a><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></a><a><svg viewBox="0 0 24 24"><path d="M5 20V9M12 20V4M19 20v-7"/></svg></a><a><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21c.8-4 3-6 7-6s6.2 2 7 6"/></svg></a></div>
+    </div></div>
+  </div></div>
+</section>
+
 <!-- KLASSEN -->
 <section class="blk" id="klassen">
   <div class="wrap">
@@ -668,34 +700,6 @@ html.lenis,html.lenis body{height:auto}.lenis.lenis-smooth{scroll-behavior:auto!
     </div>
   </div>
 </section>
-</main>
-
-<!-- APP PROMO -->
-<section class="blk app-promo" id="app">
-  <div class="wrap"><div class="wrap2">
-    <div>
-      <div class="badge">● Neu · Deine Ausbildung in der Tasche</div>
-      <h2>Die Krebs&nbsp;App –<br><em style="font-style:normal;color:var(--red2)">dein Cockpit, immer dabei.</em></h2>
-      <p>Die intelligente App, die dich durch die gesamte Ausbildung führt: Prüfungsreife, Termine, Fahrstunden-Feedback und Lernspur – live mit dem Fahrschulbüro synchronisiert.</p>
-      <ul>
-        <li><em><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0M12 7v5l3 2"/></svg></em> Prüfungsreife &amp; Fortschritt in Echtzeit</li>
-        <li><em><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></em> Termine, Prüfungsstatus &amp; Fahrstunden-Feedback</li>
-        <li><em><svg viewBox="0 0 24 24"><path d="M9 4 4 6v14l5-2 6 2 5-2V4l-5 2-6-2zM9 4v14M15 6v14"/></svg></em> Lernspur &amp; Route jeder Fahrt</li>
-        <li><em><svg viewBox="0 0 24 24"><path d="M4 5h16v11H4zM9 20h6M12 16v4"/></svg></em> Dokumente, Verfügbarkeit &amp; Buchung</li>
-      </ul>
-      <div class="hero__cta" style="margin:0"><button class="btn btn--pri" data-open="advice">App-Zugang sichern</button><a class="btn btn--ghost" href="#cockpit">So funktioniert&rsquo;s</a></div>
-    </div>
-    <div class="app-promo__phone" aria-hidden="true"><div class="app-promo__scr">
-      <div class="aps-top"><span><b>08:42</b> · Di 14. Mai</span><span><i class="dot"></i>Sync aktiv</span></div>
-      <div class="aps-hi"><small>Guten Morgen</small><b>Jonas.</b></div>
-      <div class="aps-ring"><div class="aps-g"><b>76<i>%</i></b></div>
-        <div class="aps-st"><div><span>Theorie</span><em>11 / 14</em></div><div><span>Praxis</span><em>18 / 25</em></div><div><span>Sonderfahrten</span><em>08 / 12</em></div></div></div>
-      <div class="aps-next"><small>Nächste Fahrstunde · Heute 17:30</small><b>Nachtfahrt · Lektion 18</b><span>Treffpunkt: Petersberger Str.</span></div>
-      <div class="aps-dock"><a class="on"><svg viewBox="0 0 24 24"><path d="M4 11 12 4l8 7v9H4z"/></svg></a><a><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/></svg></a><a><svg viewBox="0 0 24 24"><path d="M5 20V9M12 20V4M19 20v-7"/></svg></a><a><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21c.8-4 3-6 7-6s6.2 2 7 6"/></svg></a></div>
-    </div></div>
-  </div></div>
-</section>
-
 <!-- FINAL CTA -->
 <section class="final">
   <div class="wrap">
@@ -710,6 +714,7 @@ html.lenis,html.lenis body{height:auto}.lenis.lenis-smooth{scroll-behavior:auto!
   </div>
 </section>
 
+</main>
 <footer class="foot"><div class="wrap">
   <div>
     <a class="logo" href="#top"><span class="logo__k">KREBS</span><span class="logo__flag"></span><span class="logo__sub"><span>FAHRSCHULE</span><b>VERKEHRSBILDUNGSZENTRUM</b></span></a>
@@ -724,7 +729,7 @@ html.lenis,html.lenis body{height:auto}.lenis.lenis-smooth{scroll-behavior:auto!
 
 <!-- sticky mobile actions -->
 <div class="dockm">
-  <a class="call" href="tel:+49000000000" aria-label="Anrufen"><svg viewBox="0 0 24 24"><path d="M4 5c0 8 7 15 15 15l2-4-5-2-2 2a11 11 0 0 1-6-6l2-2-2-5z"/></svg>Anrufen</a>
+  <button class="call" id="dockCall" data-open="advice" aria-label="Kontakt aufnehmen"><svg viewBox="0 0 24 24"><path d="M4 5c0 8 7 15 15 15l2-4-5-2-2 2a11 11 0 0 1-6-6l2-2-2-5z"/></svg>Kontakt</button>
   <a class="adv" href="#finder"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 6l6 6-6 6"/></svg>Finder</a>
 </div>
 
@@ -766,13 +771,19 @@ const BIZ={
   phone:'', // TODO tel: eintragen, z.B. +49661XXXXXX
   email:'info@fahrschule-krebs.de', // TODO bestätigen
 };
-if(BIZ.phone){const c=$('.dockm .call');if(c)c.href='tel:'+BIZ.phone.replace(/\s/g,'');}
+/* Telefonnummer erst anzeigen, wenn sie bestätigt ist — keine erfundene Nummer ausliefern */
+if(BIZ.phone){const c=$('#dockCall');if(c){const a=document.createElement('a');a.className='call';a.href='tel:'+BIZ.phone.replace(/[^\d+]/g,'');a.innerHTML=c.innerHTML.replace('Kontakt','Anrufen');c.replaceWith(a);}
+  $$('[data-phone]').forEach(el=>{el.textContent=BIZ.phone;el.closest('dd')&&el.closest('dd').classList.remove('ph')});}
 
 /* ── header + scrollspy ── */
-const head=$('#head'),secs=['klassen','cockpit','simulator','preise','weiterbildung','standorte','team'].map(id=>$('#'+id)).filter(Boolean),navA=$$('.nav a');
+/* Scrollspy leitet die Reihenfolge aus dem DOM ab – bleibt korrekt, egal wie die
+   Sektionen sortiert sind, und markiert immer den Nav-Link der aktiven Sektion. */
+const head=$('#head'),navA=$$('.nav a');
+const spy=navA.map(a=>({a,el:$(a.getAttribute('href'))})).filter(o=>o.el)
+  .sort((x,y)=>x.el.offsetTop-y.el.offsetTop);
 addEventListener('scroll',()=>{head.classList.toggle('scrolled',scrollY>24);
-  let cur=-1;secs.forEach((s,i)=>{if(s.getBoundingClientRect().top<innerHeight*.45)cur=i});
-  navA.forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+(secs[cur]?.id)));
+  let cur=null;spy.forEach(o=>{if(o.el.getBoundingClientRect().top<innerHeight*.45)cur=o});
+  navA.forEach(a=>a.classList.toggle('on',!!cur&&a===cur.a));
 },{passive:true});
 
 /* ── mobile menu ── */
@@ -825,7 +836,13 @@ const MOBILE_HERO=CDN+'hf_20260726_001657_15d67bec-f187-46b6-bfb5-98d213898b9e.m
     const v=$('#vA');v.poster=CDN.replace('d8j0ntlcm91z4','d2ol7oe51mr4n9')+'80d9b773-e448-4523-b18c-2881982cb27c.jpg';
     v.classList.add('on');v.removeAttribute('preload');return;
   }
-  const a=$('#vA'),b=$('#vB');let front=a,back=b,curKey='';
+  /* Save-Data / sehr schwache Verbindung: kein Video, nur die ruhige Basisfläche */
+  const con=navigator.connection||{};
+  if(con.saveData||/(^|-)2g$/.test(con.effectiveType||'')){stage.classList.add('fallback');return;}
+  const a=$('#vA'),b=$('#vB');let front=a,back=b,curKey='',fails=0;
+  /* Ladefehler dürfen die Seite nie brechen: nach zwei Fehlversuchen bleibt die
+     komponierte Basisfläche stehen – alle Inhalte sind ohne Video vollständig. */
+  [a,b].forEach(v=>v.addEventListener('error',()=>{if(++fails>=2){stage.classList.add('fallback');a.removeAttribute('src');b.removeAttribute('src');}},true));
   [a,b].forEach(v=>{v.loop=true;v.muted=true;v.playsInline=true;});
   function play(v){const p=v.play();if(p&&p.catch)p.catch(()=>{});}
   function setChapter(key){
@@ -882,7 +899,14 @@ if(matchMedia('(pointer:fine)').matches&&!reduced){
     let who=c.w;if(answers.alter==='17'&&answers.ziel==='pkw')who='BF17 könnte für dich passen – begleitetes Fahren ab 17.';
     $('#resWho').textContent=who;$('#resLoc').textContent=answers.standort==='fulda'?'Fulda':answers.standort==='hersfeld'?'Bad Hersfeld':'Fulda / Bad Hersfeld';
     steps.forEach(st=>st.classList.remove('on'));next.parentElement.style.display='none';result.classList.add('on');
-    $('#resCta').dataset.class=c.t;}
+    $('#resCta').dataset.class=c.t;
+    /* Auswahl über den ganzen Funnel mitnehmen: Rechner + Beratungsformular */
+    const MAP={pkw:'Auto (B/BF17/B197)',motorrad:'Motorrad (A/A1/A2/AM)',anhaenger:'Anhänger (BE/B96)',lkw:'Lkw (C/CE)',bus:'Bus (D/DE)',beruf:'BKF / Grundqualifikation'};
+    window.__choice={klasse:MAP[answers.ziel]||'Allgemeine Beratung',standort:answers.standort==='fulda'?'Fulda':answers.standort==='hersfeld'?'Bad Hersfeld':'Egal',ziel:answers.ziel};
+    const fc=$('#fclass'),fl=$('#floc');
+    if(fc)[...fc.options].forEach(o=>{if(o.text===window.__choice.klasse)fc.value=o.value});
+    if(fl)[...fl.options].forEach(o=>{if(o.text===window.__choice.standort)fl.value=o.value});
+    document.dispatchEvent(new CustomEvent('krebs:choice',{detail:window.__choice}));}
   $('#freset').addEventListener('click',()=>{s=0;Object.keys(answers).forEach(k=>delete answers[k]);$$('.finder .opt').forEach(o=>o.classList.remove('sel'));result.classList.remove('on');next.parentElement.style.display='';show()});
   show();
 })();
@@ -907,22 +931,48 @@ $$('.qa button').forEach(b=>b.addEventListener('click',()=>{const qa=b.parentEle
 
 /* ── modal + honest contact (mailto) ── */
 const modal=$('#modal'),form=$('#cform'),fmsg=$('#formmsg');let lastFocus=null;
+const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+function trapKeys(e){if(e.key!=='Tab')return;const f=[...modal.querySelectorAll(FOCUSABLE)].filter(el=>el.offsetParent!==null);if(!f.length)return;
+  const first=f[0],last=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}
+function inertBg(on){['#head','main','.foot','.dockm','#stage'].forEach(s=>{const el=$(s);if(!el)return;on?el.setAttribute('inert',''):el.removeAttribute('inert')})}
 function openModal(kind){lastFocus=document.activeElement;modal.classList.add('open');if(lenis)lenis.stop();document.body.style.overflow='hidden';
+  inertBg(true);modal.addEventListener('keydown',trapKeys);
+  if(kind==='legal'){setTimeout(()=>$('.modal__x').focus(),80);return}
+  $('#cform').style.display='';$('.modal__card .kick i').textContent='Kontakt';
   $('#mtitle').textContent=kind==='firma'?'Firmenangebot anfordern':'Beratung starten';
   $('#mintro').textContent=kind==='firma'?'Für Firmenkunden (C/CE, D/DE, BKF). Absenden öffnet dein E-Mail-Programm mit vorausgefüllter Nachricht.':'Wir melden uns unverbindlich. Absenden öffnet dein E-Mail-Programm mit vorausgefüllter Nachricht.';
   setTimeout(()=>$('#fname').focus(),80);}
-function closeModal(){modal.classList.remove('open');if(lenis)lenis.start();document.body.style.overflow='';lastFocus&&lastFocus.focus();}
+function closeModal(){if(!modal.classList.contains('open'))return;modal.classList.remove('open');if(lenis)lenis.start();document.body.style.overflow='';
+  inertBg(false);modal.removeEventListener('keydown',trapKeys);lastFocus&&lastFocus.focus&&lastFocus.focus();}
 $$('[data-open]').forEach(b=>b.addEventListener('click',()=>openModal(b.dataset.open)));
 $$('[data-close]').forEach(b=>b.addEventListener('click',closeModal));
 modal.addEventListener('click',e=>{if(e.target===modal)closeModal()});
 form.addEventListener('submit',e=>{e.preventDefault();
-  if(!form.name.value.trim()||!form.email.value.trim()||!$('#fconsent').checked){fmsg.style.color='var(--red2)';fmsg.textContent='Bitte Name, E-Mail und Einwilligung ausfüllen.';return;}
+  /* echte Validierung: nativ + explizite, zugängliche Fehlermeldung */
+  [...form.elements].forEach(el=>el.setAttribute('aria-invalid','false'));
+  if(!form.checkValidity()){const bad=form.querySelector(':invalid');
+    if(bad){bad.setAttribute('aria-invalid','true');bad.focus();}
+    fmsg.style.color='var(--red2)';
+    fmsg.textContent=!form.name.value.trim()?'Bitte gib deinen Namen an.':!form.email.checkValidity()?'Bitte gib eine gültige E-Mail-Adresse an.':!$('#fconsent').checked?'Bitte bestätige die Einwilligung.':'Bitte prüfe die markierten Felder.';
+    return;}
+  const btn=form.querySelector('button[type="submit"]');btn.disabled=true;btn.dataset.t=btn.textContent;btn.textContent='Wird geöffnet …';
+  setTimeout(()=>{btn.disabled=false;btn.textContent=btn.dataset.t},2500);
   const body=`Name: ${form.name.value}%0ATelefon: ${form.tel.value}%0AE-Mail: ${form.email.value}%0AKlasse/Bereich: ${form.klasse.value}%0AStandort: ${form.standort.value}%0ANachricht: ${form.nachricht.value}`;
   const to=BIZ.email||'info@fahrschule-krebs.de';
   fmsg.style.color='var(--green)';fmsg.textContent='E-Mail-Programm wird geöffnet …';
   location.href=`mailto:${to}?subject=${encodeURIComponent('Beratung: '+form.klasse.value+' ('+form.standort.value+')')}&body=${body}`;
 });
-$$('[data-legal]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();alert('Rechtstext-Seite (Impressum/Datenschutz/Barrierefreiheit) folgt mit euren bestätigten Angaben – wird nicht erfunden.')}));
+/* Rechtsseiten: echte Route + Layout, Inhalt wird NICHT erfunden */
+const LEGAL={impressum:['Impressum','Angaben gemäß § 5 TMG – Firmierung, vertretungsberechtigte Person, Anschrift, Kontakt, Registereintrag, USt-IdNr. sowie Aufsichtsbehörde und Fahrlehrererlaubnis werden hier veröffentlicht, sobald die Angaben freigegeben sind.'],
+ datenschutz:['Datenschutzerklärung','Verantwortlicher, Zwecke und Rechtsgrundlagen der Verarbeitung, Kontaktformular, Hosting, eingesetzte Dienste, Speicherdauer sowie Betroffenenrechte werden hier veröffentlicht, sobald die Angaben freigegeben sind.'],
+ a11y:['Barrierefreiheit','Diese Website nutzt semantische Struktur, Tastaturbedienung, sichtbaren Fokus und respektiert „prefers-reduced-motion“. Eine vollständige Erklärung zur Barrierefreiheit inkl. Feedback-Mechanismus folgt.']};
+$$('[data-legal]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();const k=a.dataset.legal,d=LEGAL[k];if(!d)return;
+  history.replaceState(null,'','#'+k);
+  $('#mtitle').textContent=d[0];$('#mintro').textContent=d[1];$('#cform').style.display='none';
+  $('.modal__card .kick i').textContent='Rechtliches';openModal('legal');
+  modal.addEventListener('transitionend',function once(){modal.removeEventListener('transitionend',once)},{once:true});}));
 
 /* ── load GSAP/Lenis then init ── */
 function load(src){return new Promise(r=>{const s=document.createElement('script');s.src=src;s.onload=r;s.onerror=r;document.head.appendChild(s)})}
