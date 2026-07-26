@@ -1,11 +1,14 @@
+import { randomUUID } from "node:crypto";
 import { createRawClient } from "@fahrschul/database";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { IDEMPOTENT_OPERATIONS, isIdempotencyMandatory } from "../lib/idempotency.js";
 import {
   buildMultipartBody,
   buildTestApp,
   enableMfa,
   ensureMigrated,
+  idemKey,
   loginAs,
   seedFixtures,
   testDatabaseUrl,
@@ -14,8 +17,9 @@ import {
 } from "./helpers.js";
 
 /**
- * PROMPT -1 §2 – EIN generischer Idempotenz-Mechanismus für die neun
- * mandatierten Operationen. Für JEDE Operation wird geprüft:
+ * PROMPT -1 §2 – EIN generischer Idempotenz-Mechanismus für die zehn
+ * mandatierten Operationen (seit Phase 2 ist der Schlüssel bei ALLEN zehn
+ * PFLICHT, siehe den letzten describe-Block). Für JEDE Operation wird geprüft:
  *   (a) gleicher Schlüssel + gleicher Body -> identisches, gespeichertes
  *       Ergebnis OHNE erneute Ausführung,
  *   (b) gleicher Schlüssel + ABWEICHENDER Body -> 409
@@ -877,6 +881,154 @@ describe("PROMPT -1 §2 – Idempotenz für jeden kritischen Schreibvorgang", ()
       });
       expect(second.statusCode).toBe(409);
       expect(second.json().error).toBe("idempotency_key_conflict");
+    });
+  });
+
+
+  // -----------------------------------------------------------------------
+  // PHASE 2: die Pflicht gilt jetzt für ALLE ZEHN Operationen
+  // -----------------------------------------------------------------------
+  /**
+   * Phase 1 konnte den Schlüssel nur bei vier Operationen verpflichtend
+   * machen, weil sechs von vier ausgelieferten Frontends OHNE Schlüssel
+   * aufgerufen wurden (ein Pflichtfeld wäre ein brechender API-Wechsel
+   * gewesen, §14). Phase 2 hat diese Bedingung aufgelöst: alle vier
+   * Client-Bibliotheken senden den Header jetzt bei jeder Mutation.
+   *
+   * Dieser Test ist der Beleg, dass die Pflicht wirklich greift – und zwar
+   * über die EINE Schaltstelle `IDEMPOTENCY_MANDATORY`, nicht über zehn
+   * einzelne Handgriffe. Er prüft zusätzlich, dass die Ablehnung VOR jeder
+   * fachlichen Wirkung passiert (400, nicht 409/500) und die betroffene
+   * Operation benennt.
+   */
+  describe("Phase 2: Idempotenzschlüssel ist bei allen zehn Operationen PFLICHT", () => {
+    it("alle zehn Operationen sind in IDEMPOTENCY_MANDATORY als Pflicht eingetragen", () => {
+      const operationen = Object.values(IDEMPOTENT_OPERATIONS);
+      expect(operationen).toHaveLength(10);
+      for (const op of operationen) {
+        expect(isIdempotencyMandatory(op), `${op} muss Pflicht sein`).toBe(true);
+      }
+      // Gegenprobe: ein unbekannter Name ist NICHT automatisch Pflicht.
+      expect(isIdempotencyMandatory("irgendwas.anderes")).toBe(false);
+    });
+
+    it("die sechs zuvor optionalen Endpunkte lehnen einen Aufruf ohne Schlüssel mit 400 ab", async () => {
+      const slot = futureSlot(300);
+      const faelle: Array<{
+        name: string;
+        operation: string;
+        url: string;
+        cookie: string;
+        payload?: Record<string, unknown>;
+      }> = [
+        {
+          name: "Termin buchen",
+          operation: IDEMPOTENT_OPERATIONS.appointmentCreate,
+          url: "/appointments",
+          cookie: officeCookie,
+          payload: {
+            schuelerId: fixtures.schuelerId,
+            fahrlehrerId: fixtures.fahrlehrerId,
+            art: "Übungsstunde",
+            klasse: "B",
+            ...slot,
+          },
+        },
+        {
+          name: "Fahrstunde abschließen",
+          operation: IDEMPOTENT_OPERATIONS.lessonComplete,
+          url: `/instructor/lessons/${randomUUID()}/complete`,
+          cookie: instructorCookie,
+          payload: {
+            tatsaechlicheDauerMinuten: 45,
+            stundenart: "Übungsstunde",
+            lernziele: ["a"],
+            beobachteteKompetenzfelder: [],
+            kurznotiz: "x",
+            naechstesZiel: "y",
+            schuelerfeedback: "z",
+            bestaetigung: true,
+          },
+        },
+        {
+          name: "Zahlung zuordnen",
+          operation: IDEMPOTENT_OPERATIONS.paymentAssign,
+          url: `/finance/bank/${randomUUID()}/resolve`,
+          cookie: financeCookie,
+          payload: { rechnungId: randomUUID(), betragCent: 1000 },
+        },
+        {
+          name: "Prüfung freigeben/anmelden",
+          operation: IDEMPOTENT_OPERATIONS.examTransition,
+          url: `/pruefungen/${randomUUID()}/transition`,
+          cookie: officeCookie,
+          payload: { to: "fahrlehrer_go" },
+        },
+        {
+          name: "Nachricht versenden",
+          operation: IDEMPOTENT_OPERATIONS.messageSend,
+          url: "/communication/send",
+          cookie: officeCookie,
+          payload: { kanal: "email", to: "a@b.local", inhalt: "Hallo" },
+        },
+      ];
+
+      for (const fall of faelle) {
+        const res = await app.inject({
+          method: "POST",
+          url: fall.url,
+          headers: { cookie: fall.cookie },
+          payload: fall.payload,
+        });
+        expect(res.statusCode, `${fall.name}: ${res.body}`).toBe(400);
+        expect(res.json().error, fall.name).toBe("idempotency_key_required");
+        expect(res.json().operation, fall.name).toBe(fall.operation);
+      }
+    });
+
+    it("Dokument einreichen (multipart) verlangt den Schlüssel ebenfalls – vor der Dateiverarbeitung", async () => {
+      const { body, contentType } = buildMultipartBody({
+        fields: { typ: "fuehrerschein_antrag" },
+        fileFieldName: "datei",
+        fileName: "antrag.pdf",
+        fileContent: Buffer.from("%PDF-1.4 test"),
+        mimeType: "application/pdf",
+      });
+      const res = await app.inject({
+        method: "POST",
+        url: "/documents",
+        headers: { cookie: studentCookie, "content-type": contentType },
+        payload: body,
+      });
+      expect(res.statusCode, res.body).toBe(400);
+      expect(res.json().error).toBe("idempotency_key_required");
+      expect(res.json().operation).toBe(IDEMPOTENT_OPERATIONS.documentSubmit);
+
+      // Und es wurde KEIN Dokument angelegt.
+      const sql: ReturnType<typeof createRawClient> = createRawClient(databaseUrl);
+      try {
+        const rows = await sql`select count(*)::int as n from dokumente`;
+        expect(rows[0].n).toBe(0);
+      } finally {
+        await sql.end();
+      }
+    });
+
+    it("mit Schlüssel funktionieren dieselben Endpunkte unverändert", async () => {
+      const slot = futureSlot(320);
+      const res = await app.inject({
+        method: "POST",
+        url: "/appointments",
+        headers: { cookie: officeCookie, "idempotency-key": idemKey("phase2") },
+        payload: {
+          schuelerId: fixtures.schuelerId,
+          fahrlehrerId: fixtures.fahrlehrerId,
+          art: "Übungsstunde",
+          klasse: "B",
+          ...slot,
+        },
+      });
+      expect(res.statusCode, res.body).toBe(201);
     });
   });
 

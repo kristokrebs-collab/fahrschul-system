@@ -4,6 +4,7 @@ import { createRawClient } from "@fahrschul/database";
 import {
   buildTestApp,
   enableMfa,
+  idemKey,
   ensureMigrated,
   loginAs,
   seedFixtures,
@@ -179,7 +180,7 @@ describe("apps/office – Prompt 2", () => {
       const res = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -208,7 +209,7 @@ describe("apps/office – Prompt 2", () => {
       const res = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -246,7 +247,7 @@ describe("apps/office – Prompt 2", () => {
       const first = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -262,7 +263,7 @@ describe("apps/office – Prompt 2", () => {
       const conflicting = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schueler2Id,
           fahrlehrerId: secondInstructorId,
@@ -281,7 +282,7 @@ describe("apps/office – Prompt 2", () => {
       const first = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -297,7 +298,7 @@ describe("apps/office – Prompt 2", () => {
       const backToBack = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schueler2Id,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -329,7 +330,7 @@ describe("apps/office – Prompt 2", () => {
       const res = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -381,7 +382,7 @@ describe("apps/office – Prompt 2", () => {
       const res = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -551,7 +552,7 @@ describe("apps/office – Prompt 2", () => {
       const res = await app.inject({
         method: "POST",
         url: `/pruefungen/${id}/transition`,
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: { to: "fahrlehrer_go" },
       });
       expect(res.statusCode).toBe(403);
@@ -563,7 +564,7 @@ describe("apps/office – Prompt 2", () => {
       const go = await app.inject({
         method: "POST",
         url: `/pruefungen/${id}/transition`,
-        headers: { cookie: instructorCookie },
+        headers: { "idempotency-key": idemKey(), cookie: instructorCookie },
         payload: { to: "fahrlehrer_go" },
       });
       expect(go.statusCode).toBe(200);
@@ -573,7 +574,7 @@ describe("apps/office – Prompt 2", () => {
       const wrongActor = await app.inject({
         method: "POST",
         url: `/pruefungen/${id}/transition`,
-        headers: { cookie: instructorCookie },
+        headers: { "idempotency-key": idemKey(), cookie: instructorCookie },
         payload: { to: "bueroprüfung" },
       });
       expect(wrongActor.statusCode).toBe(403);
@@ -581,7 +582,7 @@ describe("apps/office – Prompt 2", () => {
       const advance = await app.inject({
         method: "POST",
         url: `/pruefungen/${id}/transition`,
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: { to: "bueroprüfung" },
       });
       expect(advance.statusCode).toBe(200);
@@ -592,7 +593,7 @@ describe("apps/office – Prompt 2", () => {
       const res = await app.inject({
         method: "POST",
         url: `/pruefungen/${id}/transition`,
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: { to: "ergebnis_dokumentiert" },
       });
       expect(res.statusCode).toBe(409);
@@ -604,7 +605,7 @@ describe("apps/office – Prompt 2", () => {
       const res = await app.inject({
         method: "POST",
         url: `/pruefungen/${id}/transition`,
-        headers: { cookie: studentCookie },
+        headers: { "idempotency-key": idemKey(), cookie: studentCookie },
         payload: { to: "fahrlehrer_go" },
       });
       expect(res.statusCode).toBe(403);
@@ -700,7 +701,7 @@ describe("apps/office – Prompt 2", () => {
       const res = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: officeCookie },
+        headers: { "idempotency-key": idemKey(), cookie: officeCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,

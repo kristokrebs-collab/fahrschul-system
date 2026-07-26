@@ -10,6 +10,7 @@ import {
   IdempotencyConflictError,
   IDEMPOTENT_OPERATIONS,
   readIdempotencyKey,
+  requireIdempotencyKeyFor,
   runIdempotent,
   sendIdempotencyConflict,
 } from "../lib/idempotency.js";
@@ -123,6 +124,14 @@ export function registerExamPipelineRoutes(app: FastifyInstance, db: Database) {
     "/pruefungen/:id/transition",
     { preHandler: [requireAuth, requirePermission("exam:pipeline:advance")] },
     async (request, reply) => {
+      // Phase 2: Schlüssel ist PFLICHT (IDEMPOTENCY_MANDATORY). apps/office
+      // sendet ihn seit Phase 2 aus der persistenten Vorgangsliste.
+      const idempotencyKey = requireIdempotencyKeyFor(
+        IDEMPOTENT_OPERATIONS.examTransition,
+        request,
+        reply,
+      );
+      if (!idempotencyKey) return reply;
       const params = request.params as { id: string };
       const parsed = transitionSchema.safeParse(request.body);
       if (!parsed.success) {
@@ -132,7 +141,6 @@ export function registerExamPipelineRoutes(app: FastifyInstance, db: Database) {
       if (!row) return reply.code(404).send({ error: "pruefung_not_found" });
 
       const expected = readExpectedVersion(request);
-      const idempotencyKey = readIdempotencyKey(request);
       const istAnmeldung = ANMELDE_ZUSTAENDE.has(parsed.data.to);
 
       const advance = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
@@ -145,7 +153,7 @@ export function registerExamPipelineRoutes(app: FastifyInstance, db: Database) {
          * idempotenten Handlers, damit ein Retry mit demselben Schlüssel die
          * gespeicherte Antwort erhält, statt an der Selbstübergangsprüfung
          * ("fahrlehrer_go -> fahrlehrer_go" ist kein zulässiger Übergang) zu
-         * scheitern. Ohne Idempotenzschlüssel ist die Semantik unverändert:
+         * scheitern. Die Fehlerabbildung bleibt unverändert:
          * FORBIDDEN_ROLE -> 403, INVALID_TRANSITION -> 409.
          */
         assertTransitionAllowed(current.status as never, parsed.data.to, request.user!.rolle);
@@ -180,35 +188,29 @@ export function registerExamPipelineRoutes(app: FastifyInstance, db: Database) {
       };
 
       try {
-        if (idempotencyKey) {
-          const outcome = await runIdempotent({
-            db,
-            operation: IDEMPOTENT_OPERATIONS.examTransition,
-            key: idempotencyKey,
-            benutzerId: request.user!.id,
-            standortId: request.user!.standortId,
-            target: params.id,
-            payload: { to: parsed.data.to, grund: parsed.data.grund ?? null },
-            handler: async (tx) => {
-              const updated = await advance(tx);
-              return {
-                status: 200,
-                body: { pruefung: updated },
-                entitaet: "pruefung",
-                entitaetId: updated.id,
-              };
-            },
-          });
-          const out = outcome.body as { pruefung: { id: string; version: number; updatedAt: Date | string | null } };
-          withVersionHeaders(reply, out.pruefung);
-          return reply.send(
-            outcome.replayed ? { ...(outcome.body as object), replayed: true } : (outcome.body as object),
-          );
-        }
-
-        const updated = await db.transaction(advance);
-        withVersionHeaders(reply, updated);
-        return reply.send({ pruefung: updated });
+        const outcome = await runIdempotent({
+          db,
+          operation: IDEMPOTENT_OPERATIONS.examTransition,
+          key: idempotencyKey,
+          benutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          target: params.id,
+          payload: { to: parsed.data.to, grund: parsed.data.grund ?? null },
+          handler: async (tx) => {
+            const updated = await advance(tx);
+            return {
+              status: 200,
+              body: { pruefung: updated },
+              entitaet: "pruefung",
+              entitaetId: updated.id,
+            };
+          },
+        });
+        const out = outcome.body as { pruefung: { id: string; version: number; updatedAt: Date | string | null } };
+        withVersionHeaders(reply, out.pruefung);
+        return reply.send(
+          outcome.replayed ? { ...(outcome.body as object), replayed: true } : (outcome.body as object),
+        );
       } catch (err) {
         if (err instanceof PruefungNotFoundError) {
           return reply.code(404).send({ error: "pruefung_not_found" });

@@ -70,6 +70,31 @@ export function registerDocumentRoutes(app: FastifyInstance, db: Database, deps:
       if (!file) {
         return reply.code(400).send({ error: "invalid_body", reason: "no_file" });
       }
+      /**
+       * PROMPT -1 §2 (Phase 2): Der Idempotenzschlüssel ist PFLICHT
+       * (Umschaltpunkt: IDEMPOTENCY_MANDATORY in lib/idempotency.ts).
+       *
+       * Die Prüfung steht so FRÜH wie möglich – direkt nach dem Einlesen des
+       * Multipart-Rahmens und VOR MIME-Prüfung, Größenprüfung, Malware-Scan
+       * und Ablage. Früher geht es nicht, weil der Schlüssel
+       * rückwärtskompatibel auch aus dem Formularfeld `idempotencyKey`
+       * kommen darf und das Feld erst nach `request.file()` lesbar ist. Ein
+       * `preHandler` könnte nur den Header sehen und würde ältere Aufrufer
+       * grundlos abweisen.
+       */
+      const idempotencyKey =
+        readIdempotencyKey(request) ??
+        (file.fields.idempotencyKey as { value?: string } | undefined)?.value ??
+        null;
+      if (!idempotencyKey) {
+        return reply.code(400).send({
+          error: "idempotency_key_required",
+          operation: IDEMPOTENT_OPERATIONS.documentSubmit,
+          hinweis:
+            'Header "idempotency-key" (oder Formularfeld "idempotencyKey") ist für diese Operation verpflichtend.',
+        });
+      }
+
       const typ = (file.fields.typ as { value?: string } | undefined)?.value;
       if (!typ || !(ALLOWED_DOC_TYPES as readonly string[]).includes(typ)) {
         return reply.code(400).send({ error: "invalid_body", reason: "invalid_typ" });
@@ -101,10 +126,6 @@ export function registerDocumentRoutes(app: FastifyInstance, db: Database, deps:
        * enthält den Dateiinhalt, damit derselbe Schlüssel mit einer ANDEREN
        * Datei als Konflikt erkannt wird.
        */
-      const idempotencyKey =
-        readIdempotencyKey(request) ??
-        (file.fields.idempotencyKey as { value?: string } | undefined)?.value ??
-        null;
 
       const insertDocument = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const [inserted] = await tx
@@ -144,37 +165,32 @@ export function registerDocumentRoutes(app: FastifyInstance, db: Database, deps:
       };
 
       try {
-        if (idempotencyKey) {
-          const outcome = await runIdempotent({
-            db,
-            operation: IDEMPOTENT_OPERATIONS.documentSubmit,
-            key: idempotencyKey,
-            benutzerId: request.user!.id,
-            standortId: request.user!.standortId,
-            target: typ,
-            payload: {
-              typ,
-              dateiname: file.filename,
-              mimetype: file.mimetype,
-              inhaltHash: createHash("sha256").update(buffer).digest("hex"),
-            },
-            handler: async (tx) => {
-              const document = await insertDocument(tx);
-              return {
-                status: 201,
-                body: { document },
-                entitaet: "dokument",
-                entitaetId: document.id,
-              };
-            },
-          });
-          return reply
-            .code(outcome.replayed ? 200 : outcome.status)
-            .send({ ...(outcome.body as object), replayed: outcome.replayed });
-        }
-
-        const document = await db.transaction(insertDocument);
-        return reply.code(201).send({ document });
+        const outcome = await runIdempotent({
+          db,
+          operation: IDEMPOTENT_OPERATIONS.documentSubmit,
+          key: idempotencyKey,
+          benutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          target: typ,
+          payload: {
+            typ,
+            dateiname: file.filename,
+            mimetype: file.mimetype,
+            inhaltHash: createHash("sha256").update(buffer).digest("hex"),
+          },
+          handler: async (tx) => {
+            const document = await insertDocument(tx);
+            return {
+              status: 201,
+              body: { document },
+              entitaet: "dokument",
+              entitaetId: document.id,
+            };
+          },
+        });
+        return reply
+          .code(outcome.replayed ? 200 : outcome.status)
+          .send({ ...(outcome.body as object), replayed: outcome.replayed });
       } catch (err) {
         if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);
         if (sendBusinessConstraintError(err, reply)) return reply;

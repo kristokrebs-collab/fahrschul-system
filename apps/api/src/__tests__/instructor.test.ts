@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import {
   buildTestApp,
   enableMfa,
+  idemKey,
   ensureMigrated,
   loginAs,
   seedFixtures,
@@ -207,7 +208,7 @@ describe("apps/instructor – Prompt 3", () => {
       const res = await app.inject({
         method: "POST",
         url: `/instructor/lessons/${booking.id}/complete`,
-        headers: { cookie },
+        headers: { "idempotency-key": idemKey(), cookie },
         payload: incomplete,
       });
       expect(res.statusCode).toBe(400);
@@ -226,7 +227,7 @@ describe("apps/instructor – Prompt 3", () => {
       const res = await app.inject({
         method: "POST",
         url: `/instructor/lessons/${booking.id}/complete`,
-        headers: { cookie },
+        headers: { "idempotency-key": idemKey(), cookie },
         payload: { ...fullPayload, bestaetigung: false },
       });
       expect(res.statusCode).toBe(400);
@@ -238,7 +239,7 @@ describe("apps/instructor – Prompt 3", () => {
       const res = await app.inject({
         method: "POST",
         url: `/instructor/lessons/${booking.id}/complete`,
-        headers: { cookie },
+        headers: { "idempotency-key": idemKey(), cookie },
         payload: fullPayload,
       });
       expect(res.statusCode).toBe(200);
@@ -265,7 +266,7 @@ describe("apps/instructor – Prompt 3", () => {
       const res = await app.inject({
         method: "POST",
         url: `/instructor/lessons/${booking.id}/complete`,
-        headers: { cookie },
+        headers: { "idempotency-key": idemKey(), cookie },
         payload: fullPayload,
       });
       expect(res.statusCode).toBe(409);
@@ -402,7 +403,7 @@ describe("apps/instructor – Prompt 3", () => {
       const bookingAttempt = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie },
+        headers: { "idempotency-key": idemKey(), cookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -447,7 +448,7 @@ describe("apps/instructor – Prompt 3", () => {
       const res = await app.inject({
         method: "POST",
         url: `/pruefungen/${pruefung.id}/transition`,
-        headers: { cookie: bueroCookie },
+        headers: { "idempotency-key": idemKey(), cookie: bueroCookie },
         payload: { to: "fahrlehrer_go" },
       });
       expect(res.statusCode).toBe(403);

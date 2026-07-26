@@ -17,6 +17,7 @@ import {
   IdempotencyConflictError,
   IDEMPOTENT_OPERATIONS,
   readIdempotencyKey,
+  requireIdempotencyKeyFor,
   runIdempotent,
   sendIdempotencyConflict,
 } from "../lib/idempotency.js";
@@ -69,6 +70,15 @@ export function registerAppointmentRoutes(app: FastifyInstance, db: Database) {
     "/appointments",
     { preHandler: [requireAuth, requirePermission("appointments:create")] },
     async (request, reply) => {
+      // PROMPT -1 §2 (Phase 2): Schlüssel ist jetzt PFLICHT – siehe
+      // IDEMPOTENCY_MANDATORY in lib/idempotency.ts. Alle vier Frontends
+      // senden ihn seit Phase 2 bei jeder Mutation.
+      const idempotencyKey = requireIdempotencyKeyFor(
+        IDEMPOTENT_OPERATIONS.appointmentCreate,
+        request,
+        reply,
+      );
+      if (!idempotencyKey) return reply;
       const parsed = bookingSchema.safeParse(request.body);
       if (!parsed.success) {
         return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
@@ -79,7 +89,6 @@ export function registerAppointmentRoutes(app: FastifyInstance, db: Database) {
         return reply.code(400).send({ error: "invalid_interval" });
       }
 
-      const idempotencyKey = readIdempotencyKey(request);
 
       const execute = (tx: Tx) =>
         performBooking(tx, {
@@ -101,34 +110,29 @@ export function registerAppointmentRoutes(app: FastifyInstance, db: Database) {
         });
 
       try {
-        if (idempotencyKey) {
-          const outcome = await runIdempotent({
-            db,
-            operation: IDEMPOTENT_OPERATIONS.appointmentCreate,
-            key: idempotencyKey,
-            benutzerId: request.user!.id,
-            standortId: request.user!.standortId,
-            payload: body,
-            handler: async (tx) => {
-              const result = await execute(tx);
-              return {
-                status: result.reused ? 200 : 201,
-                body: { booking: result.booking, reused: result.reused },
-                entitaet: "terminbuchung",
-                entitaetId: result.booking.id,
-              };
-            },
-          });
-          // Wiedergabe: derselbe Datensatz, aber als Retry markiert (200 +
-          // reused:true) – identische Semantik wie vor PROMPT -1.
-          const bodyOut = outcome.body as { booking: unknown; reused: boolean };
-          return reply
-            .code(outcome.replayed ? 200 : outcome.status)
-            .send(outcome.replayed ? { ...bodyOut, reused: true } : bodyOut);
-        }
-
-        const result = await db.transaction(execute);
-        return reply.code(result.reused ? 200 : 201).send(result);
+        const outcome = await runIdempotent({
+          db,
+          operation: IDEMPOTENT_OPERATIONS.appointmentCreate,
+          key: idempotencyKey,
+          benutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          payload: body,
+          handler: async (tx) => {
+            const result = await execute(tx);
+            return {
+              status: result.reused ? 200 : 201,
+              body: { booking: result.booking, reused: result.reused },
+              entitaet: "terminbuchung",
+              entitaetId: result.booking.id,
+            };
+          },
+        });
+        // Wiedergabe: derselbe Datensatz, aber als Retry markiert (200 +
+        // reused:true) – identische Semantik wie vor PROMPT -1.
+        const bodyOut = outcome.body as { booking: unknown; reused: boolean };
+        return reply
+          .code(outcome.replayed ? 200 : outcome.status)
+          .send(outcome.replayed ? { ...bodyOut, reused: true } : bodyOut);
       } catch (err) {
         if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);
         if (err instanceof BookingConflictError) {

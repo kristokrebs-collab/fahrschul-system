@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import {
   buildTestApp,
   enableMfa,
+  idemKey,
   ensureMigrated,
   loginAs,
   seedFixtures,
@@ -130,7 +131,7 @@ describe("PROMPT -1 §3 – DB-Invarianten (direkt gegen Postgres geprüft)", ()
           await app.inject({
             method: "POST",
             url: `/instructor/lessons/${booking.id}/complete`,
-            headers: { cookie: instructorCookie },
+            headers: { "idempotency-key": idemKey(), cookie: instructorCookie },
             payload,
           })
         ).statusCode,
@@ -141,7 +142,7 @@ describe("PROMPT -1 §3 – DB-Invarianten (direkt gegen Postgres geprüft)", ()
       const second = await app.inject({
         method: "POST",
         url: `/instructor/lessons/${booking.id}/complete`,
-        headers: { cookie: instructorCookie },
+        headers: { "idempotency-key": idemKey(), cookie: instructorCookie },
         payload,
       });
       expect(second.statusCode).toBe(409);
@@ -341,7 +342,7 @@ describe("PROMPT -1 §3 – DB-Invarianten (direkt gegen Postgres geprüft)", ()
           await app.inject({
             method: "POST",
             url: `/pruefungen/${id}/transition`,
-            headers: { cookie: instructor },
+            headers: { "idempotency-key": idemKey(), cookie: instructor },
             payload: { to: "fahrlehrer_go" },
           })
         ).statusCode,
@@ -352,7 +353,7 @@ describe("PROMPT -1 §3 – DB-Invarianten (direkt gegen Postgres geprüft)", ()
             await app.inject({
               method: "POST",
               url: `/pruefungen/${id}/transition`,
-              headers: { cookie: office },
+              headers: { "idempotency-key": idemKey(), cookie: office },
               payload: { to },
             })
           ).statusCode,
@@ -362,7 +363,7 @@ describe("PROMPT -1 §3 – DB-Invarianten (direkt gegen Postgres geprüft)", ()
       const anmeldung = await app.inject({
         method: "POST",
         url: `/pruefungen/${id}/transition`,
-        headers: { cookie: office },
+        headers: { "idempotency-key": idemKey(), cookie: office },
         payload: { to: "termin_angefragt" },
       });
       expect(anmeldung.statusCode).toBe(409);

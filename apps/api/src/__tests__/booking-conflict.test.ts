@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { buildTestApp, ensureMigrated, extractCookie, seedFixtures, testDatabaseUrl, truncateAll, type SeededFixtures } from "./helpers.js";
+import { buildTestApp, ensureMigrated, extractCookie, idemKey, seedFixtures, testDatabaseUrl, truncateAll, type SeededFixtures } from "./helpers.js";
 
 describe("appointment booking – server-side conflict check (non-negotiable)", () => {
   const databaseUrl = testDatabaseUrl();
@@ -43,19 +43,19 @@ describe("appointment booking – server-side conflict check (non-negotiable)", 
   }
 
   it("creates a booking when the instructor is free", async () => {
-    const res = await app.inject({ method: "POST", url: "/appointments", headers: { cookie }, payload: bookingPayload() });
+    const res = await app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload: bookingPayload() });
     expect(res.statusCode).toBe(201);
     expect(res.json().booking.fahrlehrerId).toBe(fixtures.fahrlehrerId);
   });
 
   it("REJECTS booking the same instructor for an overlapping slot a second time (the critical test)", async () => {
-    const first = await app.inject({ method: "POST", url: "/appointments", headers: { cookie }, payload: bookingPayload() });
+    const first = await app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload: bookingPayload() });
     expect(first.statusCode).toBe(201);
 
     const second = await app.inject({
       method: "POST",
       url: "/appointments",
-      headers: { cookie },
+      headers: { "idempotency-key": idemKey(), cookie },
       payload: bookingPayload({
         beginnAt: "2026-08-03T09:30:00.000Z",
         endeAt: "2026-08-03T10:30:00.000Z",
@@ -67,15 +67,15 @@ describe("appointment booking – server-side conflict check (non-negotiable)", 
   });
 
   it("REJECTS an exact duplicate double-booking attempt (same instructor, same slot)", async () => {
-    const first = await app.inject({ method: "POST", url: "/appointments", headers: { cookie }, payload: bookingPayload() });
+    const first = await app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload: bookingPayload() });
     expect(first.statusCode).toBe(201);
 
-    const second = await app.inject({ method: "POST", url: "/appointments", headers: { cookie }, payload: bookingPayload() });
+    const second = await app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload: bookingPayload() });
     expect(second.statusCode).toBe(409);
   });
 
   it("allows a non-overlapping booking for the same instructor once the minimum break has passed", async () => {
-    const first = await app.inject({ method: "POST", url: "/appointments", headers: { cookie }, payload: bookingPayload() });
+    const first = await app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload: bookingPayload() });
     expect(first.statusCode).toBe(201);
 
     // Prompt 2 ergänzt "Pause/Arbeitszeit" als harte Regel (siehe
@@ -89,7 +89,7 @@ describe("appointment booking – server-side conflict check (non-negotiable)", 
     const second = await app.inject({
       method: "POST",
       url: "/appointments",
-      headers: { cookie },
+      headers: { "idempotency-key": idemKey(), cookie },
       payload: bookingPayload({
         fahrzeugId: null,
         beginnAt: "2026-08-03T10:15:00.000Z",
@@ -103,7 +103,7 @@ describe("appointment booking – server-side conflict check (non-negotiable)", 
     const res = await app.inject({
       method: "POST",
       url: "/appointments",
-      headers: { cookie },
+      headers: { "idempotency-key": idemKey(), cookie },
       payload: bookingPayload({ klasse: "A", fahrzeugId: null }),
     });
     expect(res.statusCode).toBe(409);
@@ -112,8 +112,8 @@ describe("appointment booking – server-side conflict check (non-negotiable)", 
 
   it("allows two concurrent requests for the same slot and rejects exactly one (DB-level race safety)", async () => {
     const [a, b] = await Promise.all([
-      app.inject({ method: "POST", url: "/appointments", headers: { cookie }, payload: bookingPayload() }),
-      app.inject({ method: "POST", url: "/appointments", headers: { cookie }, payload: bookingPayload() }),
+      app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload: bookingPayload() }),
+      app.inject({ method: "POST", url: "/appointments", headers: { "idempotency-key": idemKey(), cookie }, payload: bookingPayload() }),
     ]);
     const statuses = [a.statusCode, b.statusCode].sort();
     expect(statuses).toEqual([201, 409]);

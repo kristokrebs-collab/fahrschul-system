@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { buildTestApp, ensureMigrated, extractCookie, seedFixtures, testDatabaseUrl, truncateAll, type SeededFixtures } from "./helpers.js";
+import { buildTestApp, ensureMigrated, extractCookie, idemKey, seedFixtures, testDatabaseUrl, truncateAll, type SeededFixtures } from "./helpers.js";
 
 async function loginAs(app: FastifyInstance, email: string, password: string) {
   const res = await app.inject({ method: "POST", url: "/auth/login", payload: { email, password } });
@@ -34,7 +34,7 @@ describe("role-based middleware", () => {
     const res = await app.inject({
       method: "POST",
       url: "/appointments",
-      headers: { cookie },
+      headers: { "idempotency-key": idemKey(), cookie },
       payload: {
         schuelerId: fixtures.schuelerId,
         fahrlehrerId: fixtures.fahrlehrerId,
@@ -56,7 +56,7 @@ describe("role-based middleware", () => {
     const res = await app.inject({
       method: "POST",
       url: "/appointments",
-      headers: { cookie },
+      headers: { "idempotency-key": idemKey(), cookie },
       payload: {
         schuelerId: fixtures.schuelerId,
         fahrlehrerId: fixtures.fahrlehrerId,
@@ -72,7 +72,7 @@ describe("role-based middleware", () => {
   });
 
   it("rejects unauthenticated requests to /appointments with 401, not 403", async () => {
-    const res = await app.inject({
+    const res = await app.inject({ headers: { "idempotency-key": idemKey() },
       method: "POST",
       url: "/appointments",
       payload: {

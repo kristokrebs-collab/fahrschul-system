@@ -25,6 +25,7 @@ import {
   IdempotencyConflictError,
   IDEMPOTENT_OPERATIONS,
   readIdempotencyKey,
+  requireIdempotencyKeyFor,
   runIdempotent,
   sendIdempotencyConflict,
 } from "../lib/idempotency.js";
@@ -336,6 +337,15 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
     "/finance/bank/:id/resolve",
     { preHandler: [requireAuth, requirePermission("bank:reconcile")] },
     async (request, reply) => {
+      // Phase 2: Schlüssel ist PFLICHT (IDEMPOTENCY_MANDATORY). Eine
+      // doppelt gebuchte Zahlung ist ein Fehler mit Geldbezug – es gibt
+      // keinen Grund, diesen Endpunkt ohne Schlüssel erreichbar zu lassen.
+      const idempotencyKey = requireIdempotencyKeyFor(
+        IDEMPOTENT_OPERATIONS.paymentAssign,
+        request,
+        reply,
+      );
+      if (!idempotencyKey) return reply;
       const params = request.params as { id: string };
       const body = z
         .object({ rechnungId: z.string().uuid(), betragCent: z.number().int().positive() })
@@ -351,7 +361,6 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
        *   (SQLSTATE FS003) – das ist die §3-Invariante, nicht nur eine
        *   Anwendungsprüfung.
        */
-      const idempotencyKey = readIdempotencyKey(request);
 
       const assign = async (t: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const [tx] = await t.select().from(banktransaktionen).where(eq(banktransaktionen.id, params.id)).limit(1);
@@ -398,24 +407,20 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
       };
 
       try {
-        if (idempotencyKey) {
-          const outcome = await runIdempotent({
-            db,
-            operation: IDEMPOTENT_OPERATIONS.paymentAssign,
-            key: idempotencyKey,
-            benutzerId: request.user!.id,
-            standortId: request.user!.standortId,
-            target: params.id,
-            payload: body.data,
-            handler: async (t) => {
-              const res = await assign(t);
-              return { status: 200, body: res, entitaet: "banktransaktion", entitaetId: params.id };
-            },
-          });
-          return reply.send({ ...(outcome.body as object), replayed: outcome.replayed });
-        }
-        const res = await db.transaction(assign);
-        return reply.send(res);
+        const outcome = await runIdempotent({
+          db,
+          operation: IDEMPOTENT_OPERATIONS.paymentAssign,
+          key: idempotencyKey,
+          benutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          target: params.id,
+          payload: body.data,
+          handler: async (t) => {
+            const res = await assign(t);
+            return { status: 200, body: res, entitaet: "banktransaktion", entitaetId: params.id };
+          },
+        });
+        return reply.send({ ...(outcome.body as object), replayed: outcome.replayed });
       } catch (err) {
         if (err instanceof BankTxNotFoundError) return reply.code(404).send({ error: "not_found" });
         if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);

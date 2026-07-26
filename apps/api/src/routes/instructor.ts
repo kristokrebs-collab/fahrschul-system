@@ -29,6 +29,7 @@ import {
   IdempotencyConflictError,
   IDEMPOTENT_OPERATIONS,
   readIdempotencyKey,
+  requireIdempotencyKeyFor,
   runIdempotent,
   sendIdempotencyConflict,
 } from "../lib/idempotency.js";
@@ -320,6 +321,29 @@ export function registerInstructorRoutes(app: FastifyInstance, db: Database, dep
     "/instructor/lessons/:id/complete",
     { preHandler: [requireAuth, requirePermission("instructor:lesson:complete")] },
     async (request, reply) => {
+      /**
+       * PROMPT -1 §2/§3 – "Fahrstunde abschließen".
+       *
+       * Der Idempotenzschlüssel ist seit Phase 2 PFLICHT (Umschaltpunkt:
+       * IDEMPOTENCY_MANDATORY in lib/idempotency.ts). In Phase 1 war er
+       * optional, weil apps/instructor ihn nicht sendete; das tut die App
+       * jetzt – und zwar aus ihrer persistenten Vorgangsliste, also mit einem
+       * Schlüssel, der einen App-Neustart überlebt.
+       *
+       * Die Prüfung steht ABSICHTLICH vor Rollen-, Eigentums- und
+       * Body-Prüfung: eine Anfrage, die grundsätzlich nicht sicher
+       * wiederholbar ist, wird abgelehnt, bevor irgendetwas anderes passiert.
+       *
+       * Unabhängig davon verhindert die Datenbank einen zweiten endgültigen
+       * Abschluss (Trigger fs_lesson_completed_once, SQLSTATE FS001) – die
+       * Invariante hängt NICHT am Idempotenzschlüssel.
+       */
+      const idempotencyKey = requireIdempotencyKeyFor(
+        IDEMPOTENT_OPERATIONS.lessonComplete,
+        request,
+        reply,
+      );
+      if (!idempotencyKey) return reply;
       const fahrlehrerId = await requireOwnFahrlehrer(request, reply);
       if (!fahrlehrerId) return;
       const params = request.params as { id: string };
@@ -327,16 +351,6 @@ export function registerInstructorRoutes(app: FastifyInstance, db: Database, dep
       if (!parsed.success) {
         return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
       }
-      /**
-       * PROMPT -1 §2/§3 – "Fahrstunde abschließen".
-       * Wird ein Idempotenzschlüssel mitgeschickt, läuft der Abschluss über
-       * den generischen Mechanismus (Retry liefert dieselbe Antwort statt
-       * einer zweiten Abschluss-Buchung). Unabhängig davon verhindert die
-       * Datenbank einen zweiten endgültigen Abschluss (Trigger
-       * fs_lesson_completed_once, SQLSTATE FS001) – die Invariante hängt
-       * NICHT am Idempotenzschlüssel.
-       */
-      const idempotencyKey = readIdempotencyKey(request);
 
       /**
        * Der Abschluss UND die daraus abgeleiteten Kompetenzbeobachtungen
@@ -368,29 +382,25 @@ export function registerInstructorRoutes(app: FastifyInstance, db: Database, dep
       };
 
       try {
-        const result = idempotencyKey
-          ? await (async () => {
-              const outcome = await runIdempotent({
-                db,
-                operation: IDEMPOTENT_OPERATIONS.lessonComplete,
-                key: idempotencyKey,
-                benutzerId: request.user!.id,
-                standortId: request.user!.standortId,
-                target: params.id,
-                payload: parsed.data,
-                handler: async (tx) => {
-                  const inner = await completeAll(tx);
-                  return {
-                    status: 200,
-                    body: { booking: inner.booking, lernziele: inner.lernziele },
-                    entitaet: "terminbuchung",
-                    entitaetId: inner.booking.id,
-                  };
-                },
-              });
-              return outcome.body as { booking: { id: string }; lernziele: string[] };
-            })()
-          : await db.transaction(completeAll);
+        const outcome = await runIdempotent({
+          db,
+          operation: IDEMPOTENT_OPERATIONS.lessonComplete,
+          key: idempotencyKey,
+          benutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          target: params.id,
+          payload: parsed.data,
+          handler: async (tx) => {
+            const inner = await completeAll(tx);
+            return {
+              status: 200,
+              body: { booking: inner.booking, lernziele: inner.lernziele },
+              entitaet: "terminbuchung",
+              entitaetId: inner.booking.id,
+            };
+          },
+        });
+        const result = outcome.body as { booking: { id: string }; lernziele: string[] };
 
         return reply.send({ termin: result.booking });
       } catch (err) {

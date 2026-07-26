@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
 import { runMigrations } from "@fahrschul/database";
 import { createRawClient } from "@fahrschul/database";
 import { generateTotpSecret, hashPassword } from "@fahrschul/auth";
@@ -260,6 +261,23 @@ export function buildMultipartBody(params: {
   parts.push(params.fileContent);
   parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
   return { body: Buffer.concat(parts), contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
+/**
+ * Frischer Idempotenzschlüssel je Aufruf.
+ *
+ * PROMPT -1 §2 wurde in Phase 2 auf ALLE ZEHN Operationen verpflichtend
+ * erweitert (Umschaltpunkt: `IDEMPOTENCY_MANDATORY`). Bestehende Tests, die
+ * bis dahin ohne Schlüssel aufrufen konnten, bekommen deshalb pro Aufruf einen
+ * NEUEN, EINDEUTIGEN Schlüssel. Das ist semantisch neutral: ein frischer
+ * Schlüssel bedeutet "eine genuin neue Anfrage" – exakt das Verhalten von
+ * vorher. Insbesondere bleiben die Doppelbuchungs-Tests gültig, weil ein
+ * zweiter Versuch mit einem ANDEREN Schlüssel weiterhin bis zum
+ * EXCLUDE-Constraint durchläuft und 409 liefert (ein gleicher Schlüssel würde
+ * stattdessen die gespeicherte Antwort wiedergeben und den Test entwerten).
+ */
+export function idemKey(prefix = "test"): string {
+  return `${prefix}-${randomUUID()}`;
 }
 
 export function extractCookie(setCookieHeader: string | string[] | undefined): string {

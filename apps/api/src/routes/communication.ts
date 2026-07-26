@@ -10,6 +10,7 @@ import {
   IdempotencyConflictError,
   IDEMPOTENT_OPERATIONS,
   readIdempotencyKey,
+  requireIdempotencyKeyFor,
   runIdempotent,
   sendIdempotencyConflict,
 } from "../lib/idempotency.js";
@@ -81,6 +82,15 @@ export function registerCommunicationRoutes(
     "/communication/send",
     { preHandler: [requireAuth, requirePermission("messages:manage")] },
     async (request, reply) => {
+      // PROMPT -1 §2 (Phase 2): Schlüssel ist jetzt PFLICHT – siehe
+      // IDEMPOTENCY_MANDATORY in lib/idempotency.ts. Alle vier Frontends
+      // senden ihn seit Phase 2 bei jeder Mutation.
+      const idempotencyKey = requireIdempotencyKeyFor(
+        IDEMPOTENT_OPERATIONS.messageSend,
+        request,
+        reply,
+      );
+      if (!idempotencyKey) return reply;
       const parsed = sendSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
       const body = parsed.data;
@@ -97,7 +107,6 @@ export function registerCommunicationRoutes(
        * vorher hing der Versand am HTTP-Request und war unwiederbringlich
        * verloren.
        */
-      const idempotencyKey = readIdempotencyKey(request);
 
       const queueMessage = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
         const [queued] = await tx
@@ -161,31 +170,25 @@ export function registerCommunicationRoutes(
       };
 
       try {
-        if (idempotencyKey) {
-          const outcome = await runIdempotent({
-            db,
-            operation: IDEMPOTENT_OPERATIONS.messageSend,
-            key: idempotencyKey,
-            benutzerId: request.user!.id,
-            standortId: request.user!.standortId,
-            target: body.to,
-            payload: body,
-            handler: async (tx) => {
-              const queued = await queueMessage(tx);
-              return { status: 201, body: { nachricht: queued }, entitaet: "nachricht", entitaetId: queued.id };
-            },
-          });
-          const out = outcome.body as { nachricht: { id: string } };
-          if (!outcome.replayed) {
-            const sent = await trySendNow(out.nachricht.id);
-            return reply.code(201).send({ nachricht: sent ?? out.nachricht });
-          }
-          return reply.code(200).send({ ...(outcome.body as object), replayed: true });
+        const outcome = await runIdempotent({
+          db,
+          operation: IDEMPOTENT_OPERATIONS.messageSend,
+          key: idempotencyKey,
+          benutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          target: body.to,
+          payload: body,
+          handler: async (tx) => {
+            const queued = await queueMessage(tx);
+            return { status: 201, body: { nachricht: queued }, entitaet: "nachricht", entitaetId: queued.id };
+          },
+        });
+        const out = outcome.body as { nachricht: { id: string } };
+        if (!outcome.replayed) {
+          const sent = await trySendNow(out.nachricht.id);
+          return reply.code(201).send({ nachricht: sent ?? out.nachricht });
         }
-
-        const queued = await db.transaction(queueMessage);
-        const sent = await trySendNow(queued.id);
-        return reply.code(201).send({ nachricht: sent ?? queued });
+        return reply.code(200).send({ ...(outcome.body as object), replayed: true });
       } catch (err) {
         if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);
         throw err;

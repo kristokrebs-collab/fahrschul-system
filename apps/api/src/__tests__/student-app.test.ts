@@ -5,6 +5,7 @@ import {
   buildMultipartBody,
   buildTestApp,
   enableMfa,
+  idemKey,
   ensureMigrated,
   loginAs,
   seedFixtures,
@@ -100,7 +101,7 @@ describe("apps/student – Prompt 1", () => {
       const res = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: studentCookie },
+        headers: { "idempotency-key": idemKey(), cookie: studentCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
@@ -157,7 +158,7 @@ describe("apps/student – Prompt 1", () => {
       const uploadRes = await app.inject({
         method: "POST",
         url: "/documents",
-        headers: { cookie: student2Cookie, "content-type": upload.contentType },
+        headers: { "idempotency-key": idemKey(), cookie: student2Cookie, "content-type": upload.contentType },
         payload: upload.body,
       });
       expect(uploadRes.statusCode).toBe(201);
@@ -350,7 +351,7 @@ describe("apps/student – Prompt 1", () => {
       const uploadRes = await app.inject({
         method: "POST",
         url: "/documents",
-        headers: { cookie: studentCookie, "content-type": upload.contentType },
+        headers: { "idempotency-key": idemKey(), cookie: studentCookie, "content-type": upload.contentType },
         payload: upload.body,
       });
       expect(uploadRes.statusCode).toBe(201);
@@ -404,7 +405,7 @@ describe("apps/student – Prompt 1", () => {
       const res = await app.inject({
         method: "POST",
         url: "/documents",
-        headers: { cookie: studentCookie, "content-type": badType.contentType },
+        headers: { "idempotency-key": idemKey(), cookie: studentCookie, "content-type": badType.contentType },
         payload: badType.body,
       });
       expect(res.statusCode).toBe(415);
@@ -521,7 +522,7 @@ describe("apps/student – Prompt 1", () => {
       const bookRes = await app.inject({
         method: "POST",
         url: "/appointments",
-        headers: { cookie: instructorCookie },
+        headers: { "idempotency-key": idemKey(), cookie: instructorCookie },
         payload: {
           schuelerId: fixtures.schuelerId,
           fahrlehrerId: fixtures.fahrlehrerId,
