@@ -189,8 +189,27 @@ export async function claimJobs(
   options: { owner: string; limit?: number; jobTypes?: readonly string[] },
 ) {
   const limit = options.limit ?? 5;
+  /**
+   * PROMPT -1 §17 (Phase 4, BEFUND): hier stand bis Phase 4 eine
+   * ZEICHENKETTEN-GEBAUTE `in (...)`-Liste
+   *
+   *     sql` and job_type in ${sql.raw(`(${jobTypes.map((t) => `'${t.replace(/'/g, "''")}'`).join(",")})`)}`
+   *
+   * mit handgeschriebenem Quote-Escaping. `options.jobTypes` kommt aus dem
+   * Body von `POST /ops/jobs/run` (`z.array(z.string().min(1))` – beliebige
+   * Zeichenketten, nur nicht leer), war also ein echter Eingabekanal in einen
+   * per `sql.raw` unparametrisierten SQL-Text. Der Wächtertest in
+   * `code-guards.test.ts` hat es nicht bemerkt, weil die Zeile das Präfix
+   * ``sql` `` enthält und damit als "getaggtes Template" durchgelassen wurde.
+   *
+   * Jetzt parametrisiert: jeder Typ ist ein Bindeparameter (`$n`), es gibt
+   * keinen von Eingaben abhängigen SQL-Text mehr. Verhalten unverändert.
+   */
   const typeFilter = options.jobTypes?.length
-    ? sql` and job_type in ${sql.raw(`(${options.jobTypes.map((t) => `'${t.replace(/'/g, "''")}'`).join(",")})`)}`
+    ? sql` and job_type in (${sql.join(
+        options.jobTypes.map((t) => sql`${t}`),
+        sql`, `,
+      )})`
     : sql``;
   const rows = await db.execute(sql`
     update jobs j

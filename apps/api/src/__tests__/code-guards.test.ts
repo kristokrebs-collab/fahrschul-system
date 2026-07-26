@@ -119,6 +119,39 @@ describe("PROMPT -1 §17 – Wächter gegen Regression", () => {
       expect(treffer).toEqual([]);
     });
 
+    /**
+     * PROMPT -1 Phase 4 – die Lücke, die der Wächter darüber hatte.
+     *
+     * `claimJobs` in `workers/job-store.ts` baute die `in (...)`-Liste der
+     * Job-Typen als ZEICHENKETTE und gab sie an `sql.raw(...)`:
+     *
+     *     sql` and job_type in ${sql.raw(`(${types.map((t) => `'${t}'`).join(",")})`)}`
+     *
+     * Der Test darüber hat das durchgelassen, weil die Zeile ``sql` ``
+     * enthält und damit als "getaggtes Template" (= parametrisiert) gewertet
+     * wurde. `sql.raw()` ist aber genau das Gegenteil: sein Argument wird
+     * UNVERÄNDERT in den Abfragetext eingesetzt. Die Werte kamen aus dem Body
+     * von `POST /ops/jobs/run`.
+     *
+     * Dieser Wächter schließt die Lücke: `sql.raw(` darf kein `${...}` und
+     * keine Verkettung enthalten – nur eine literale Zeichenkette.
+     */
+    it("kein `sql.raw(...)` mit interpoliertem oder verkettetem Inhalt", () => {
+      const treffer: string[] = [];
+      for (const datei of QUELLDATEIEN) {
+        for (const { nr, text } of codeZeilen(readFileSync(datei, "utf-8"))) {
+          const stelle = text.indexOf("sql.raw(");
+          if (stelle === -1) continue;
+          const rest = text.slice(stelle + "sql.raw(".length);
+          // Erlaubt: sql.raw("literal") / sql.raw('literal') / sql.raw(`literal`)
+          // ohne ${...} und ohne +-Verkettung.
+          const literal = /^\s*(["'`])(?:(?!\1)[^\\$+])*\1\s*\)/.test(rest);
+          if (!literal) treffer.push(`${relative(REPO, datei)}:${nr}`);
+        }
+      }
+      expect(treffer).toEqual([]);
+    });
+
     it("kein `eval`, kein `new Function`, kein `child_process`", () => {
       const treffer: string[] = [];
       for (const datei of QUELLDATEIEN) {
