@@ -31,7 +31,12 @@ import { emitAlarm } from "./alarm.js";
 
 export const DEFAULT_LEASE_SECONDS = 30;
 
-export type ConsumerName = "notifications" | "projection" | "integration-sync";
+export type ConsumerName =
+  | "notifications"
+  | "projection"
+  | "integration-sync"
+  /** PROMPT -1 §6 (Phase 2): autorisierter Fanout für den Realtime-Kanal. */
+  | "realtime-fanout";
 
 export interface EventConsumer {
   name: ConsumerName;

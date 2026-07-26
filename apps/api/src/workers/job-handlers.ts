@@ -17,6 +17,7 @@ import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { purgeExpiredIdempotencyKeys } from "../lib/idempotency.js";
 import { transitionState } from "../lib/state-machine.js";
 import { runConsistencyCheck } from "../services/consistency-check.js";
+import { pruneRealtimeDeliveries } from "../services/realtime.js";
 import { JOB_TYPES } from "./job-store.js";
 import { runOutboxOnce, type EventConsumer } from "./outbox.js";
 
@@ -413,8 +414,22 @@ export const dispatchOutbox: JobHandler = async (payload, { db, consumers }) => 
   return { ...result };
 };
 
+/**
+ * §6 (Phase 2): Aufbewahrung der Realtime-Zustellzeilen. Wichtig: der
+ * dichte Cursor-Zähler je Empfänger wird NICHT zurückgesetzt. Ein Client mit
+ * altem Cursor bekommt danach `resyncRequired: 'cursor_pruned'` und baut
+ * vollständig neu auf – das ist genau der geforderte "gap too large"-Pfad.
+ */
+export const pruneRealtime: JobHandler = async (payload, { db }) => {
+  const olderThanMs =
+    typeof payload.olderThanMs === "number" ? payload.olderThanMs : 7 * 24 * 60 * 60 * 1000;
+  const removed = await pruneRealtimeDeliveries(db, { olderThanMs });
+  return { entfernt: removed, olderThanMs };
+};
+
 export const JOB_HANDLERS: Record<string, JobHandler> = {
   [JOB_TYPES.notifications]: dispatchNotifications,
+  [JOB_TYPES.realtimePrune]: pruneRealtime,
   [JOB_TYPES.bankImport]: runBankImport,
   [JOB_TYPES.documentReview]: runDocumentReview,
   [JOB_TYPES.reporting]: runReporting,

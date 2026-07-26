@@ -2,6 +2,7 @@ import { nachrichten, terminangebote } from "@fahrschul/database";
 import type { NotificationsAdapter } from "@fahrschul/integrations";
 import { eq } from "drizzle-orm";
 import { transitionState } from "../lib/state-machine.js";
+import { fanoutRealtime } from "../services/realtime.js";
 import type { EventConsumer } from "./outbox.js";
 
 /**
@@ -113,6 +114,44 @@ export function integrationSyncConsumer(): EventConsumer {
   };
 }
 
+/**
+ * PROMPT -1 §6 (Phase 2) – Echtzeit-Fanout.
+ *
+ * Der Realtime-Kanal REITET auf der bestehenden transaktionalen Outbox; er ist
+ * kein zweiter Zustellpfad. Dieser Konsument übersetzt ein Outbox-Ereignis in
+ * autorisierte Zustellzeilen (`realtime_deliveries`), die ausschließlich
+ * Ereignis-ID + grobes Thema tragen – NIE die Nutzlast.
+ *
+ * Warum als Konsument und nicht im Request? Weil damit alle Phase-1-Garantien
+ * unverändert gelten: Die Zustellzeile kann nur entstehen, wenn das
+ * Outbox-Ereignis committet ist (also die fachliche Änderung), die
+ * Inbox-Dedup verhindert doppelte Ausführung, ein Absturz wird über den Lease
+ * wiederaufgenommen, und ein dauerhafter Fehler landet in der DLQ statt
+ * verloren zu gehen.
+ */
+export function realtimeFanoutConsumer(): EventConsumer {
+  return {
+    name: "realtime-fanout",
+    maxEventVersion: 1,
+    eventTypes: ["*"],
+    async handle(envelope, { db }) {
+      const result = await fanoutRealtime(db, envelope);
+      return {
+        dataType: result.dataType,
+        empfaenger: result.benutzerIds.length,
+        zugestellt: result.delivered,
+        duplikate: result.duplicates,
+        failClosed: result.fallback,
+      };
+    },
+  };
+}
+
 export function buildConsumers(notifications: NotificationsAdapter): EventConsumer[] {
-  return [notificationsConsumer(notifications), projectionConsumer(), integrationSyncConsumer()];
+  return [
+    notificationsConsumer(notifications),
+    projectionConsumer(),
+    realtimeFanoutConsumer(),
+    integrationSyncConsumer(),
+  ];
 }

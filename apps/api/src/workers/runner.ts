@@ -180,6 +180,7 @@ export async function scheduleRecurringJobs(
     { jobType: JOB_TYPES.reporting, dedupeKey: `reporting:${tag}`, maxRuntimeSeconds: 300 },
     { jobType: JOB_TYPES.consistencyCheck, dedupeKey: `consistency:${tag}`, maxRuntimeSeconds: 300 },
     { jobType: JOB_TYPES.idempotencyCleanup, dedupeKey: `idempotency-cleanup:${tag}`, maxRuntimeSeconds: 60 },
+    { jobType: JOB_TYPES.realtimePrune, dedupeKey: `realtime-prune:${tag}`, maxRuntimeSeconds: 120 },
   ];
 
   const created: string[] = [];

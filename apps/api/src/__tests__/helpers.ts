@@ -4,7 +4,7 @@ import { createRawClient } from "@fahrschul/database";
 import { generateTotpSecret, hashPassword } from "@fahrschul/auth";
 import { authenticator } from "otplib";
 import type { FastifyInstance } from "fastify";
-import { buildApp } from "../app.js";
+import { buildApp, type BuildAppOptions } from "../app.js";
 
 export function testDatabaseUrl(): string {
   const url = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL;
@@ -29,7 +29,12 @@ export async function truncateAll(databaseUrl: string) {
     // Referenzdaten aus Migration 0007 (event_schema_versions,
     // state_machine_transitions, pruefung_transitions, event_cursors) –
     // sie sind Teil des Schemas, nicht Testdaten.
+    // Phase 2 (§6): `realtime_deliveries` hat einen Fremdschlüssel auf
+    // `event_outbox` und muss deshalb VOR ihm geleert werden;
+    // `realtime_audience_counters` ist der dazugehörige Cursor-Zähler.
     await sql`truncate table
+      realtime_deliveries,
+      realtime_audience_counters,
       consistency_findings,
       consistency_check_runs,
       dead_letters,
@@ -87,8 +92,19 @@ export async function truncateAll(databaseUrl: string) {
   }
 }
 
-export function buildTestApp() {
-  return buildApp({ databaseUrl: testDatabaseUrl(), cookieSecure: false, logger: false });
+/**
+ * `realtime` erlaubt dem §6-Test kurze Intervalle, damit der SSE-Kanal
+ * deterministisch schnell prüfbar ist. Betriebsstandard bleiben 1 s Poll und
+ * 15 s Heartbeat (siehe routes/sync.ts) – die Intervalle sind bewusst NICHT
+ * vom Client steuerbar.
+ */
+export function buildTestApp(options: Pick<BuildAppOptions, "realtime"> = {}) {
+  return buildApp({
+    databaseUrl: testDatabaseUrl(),
+    cookieSecure: false,
+    logger: false,
+    ...options,
+  });
 }
 
 export interface SeededFixtures {

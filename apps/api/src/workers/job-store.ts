@@ -35,6 +35,8 @@ export const JOB_TYPES = {
   consistencyCheck: "consistency.check",
   idempotencyCleanup: "idempotency.cleanup",
   outboxDispatch: "outbox.dispatch",
+  /** PROMPT -1 §6 (Phase 2): Aufbewahrung der Realtime-Zustellzeilen. */
+  realtimePrune: "realtime.prune",
 } as const;
 
 export type JobType = (typeof JOB_TYPES)[keyof typeof JOB_TYPES];

@@ -36,6 +36,7 @@ import { registerOpsRoutes } from "./routes/ops.js";
 import { registerResourceRoutes } from "./routes/resources.js";
 import { registerStornoRoutes } from "./routes/storno.js";
 import { registerStudentRoutes } from "./routes/student.js";
+import { registerSyncRoutes, type RealtimeOptions } from "./routes/sync.js";
 
 export interface BuildAppOptions {
   databaseUrl: string;
@@ -50,6 +51,12 @@ export interface BuildAppOptions {
   logger?: boolean;
   /** Erlaubte Browser-Origins für die App-Frontends (Vite-Dev-Server/Prod-Hosts). */
   corsOrigins?: string[];
+  /**
+   * PROMPT -1 §6 (Phase 2): Intervalle des SSE-Kanals. Bewusst NICHT vom
+   * Client steuerbar (das wäre ein Lasthebel) – nur vom Betreiber und von
+   * Tests, die deterministisch schnell laufen müssen.
+   */
+  realtime?: RealtimeOptions;
 }
 
 export function buildApp(options: BuildAppOptions): FastifyInstance {
@@ -111,6 +118,9 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   // PROMPT -1 (Phase 1) – Zuverlässigkeitskern: Outbox, Job-Store,
   // Dead-Letter-Queue, Konsistenzprüfung.
   registerOpsRoutes(app, db, { notifications });
+  // PROMPT -1 (Phase 2) – Echtzeit-Synchronisation: SSE-Kanal,
+  // Polling-Fallback, Cursor und Auflösung offener Vorgänge nach Neustart.
+  registerSyncRoutes(app, db, options.realtime);
 
   if (options.startWorkers) {
     const loop = startWorkerLoop({ db, notifications }, options.workerIntervalMs ?? 5000);
