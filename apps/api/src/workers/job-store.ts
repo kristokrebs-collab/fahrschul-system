@@ -37,6 +37,12 @@ export const JOB_TYPES = {
   outboxDispatch: "outbox.dispatch",
   /** PROMPT -1 §6 (Phase 2): Aufbewahrung der Realtime-Zustellzeilen. */
   realtimePrune: "realtime.prune",
+  /** PROMPT -1 §12 (Phase 3): abgebrochene/abgelaufene Upload-Sitzungen räumen. */
+  uploadsCleanup: "uploads.cleanup",
+  /** PROMPT -1 §11 (Phase 3): gepufferte ausgehende Aufrufe wieder aufnehmen. */
+  integrationResume: "integration.resume",
+  /** PROMPT -1 §17 (Phase 3): Hash-Kette des Audit-Logs prüfen. */
+  auditVerify: "audit.verify",
 } as const;
 
 export type JobType = (typeof JOB_TYPES)[keyof typeof JOB_TYPES];

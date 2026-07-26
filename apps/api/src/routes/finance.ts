@@ -30,6 +30,9 @@ import {
   sendIdempotencyConflict,
 } from "../lib/idempotency.js";
 import { sendBusinessConstraintError, transitionState } from "../lib/state-machine.js";
+import { recordPaymentMatchFailure } from "../lib/metrics.js";
+import { stepUpBlocked, STEP_UP_ACTIONS } from "../lib/step-up.js";
+import { integrationStatus, runBuffered, type IntegrationServiceOptions } from "../services/integrations.js";
 
 const produktSchema = z.object({
   code: z.string().min(1),
@@ -40,6 +43,21 @@ const produktSchema = z.object({
   einheit: z.string().default("stueck"),
   standortId: z.string().uuid().nullable().optional(),
 });
+
+/**
+ * PROMPT -1 §17 – Berichte, deren Export personenbezogene Daten enthält und
+ * deshalb eine frische Wiederanmeldung verlangt. Geschlossene Menge; ein neuer
+ * Berichtsname ist standardmäßig NICHT sensibel und muss hier bewusst
+ * eingetragen werden (siehe docs/security-architecture.md).
+ */
+const SENSIBLE_BERICHTE = new Set([
+  "offene-posten",
+  "mahnliste",
+  "schuelerkonten",
+  "zahlungseingaenge-detail",
+  "datev-export",
+  "banktransaktionen-detail",
+]);
 
 const exportSchema = z.object({
   bericht: z.string().min(1),
@@ -55,7 +73,12 @@ const exportSchema = z.object({
  * eigene finanzen-Zuweisung) bekommen 403, damit sie nicht versehentlich
  * Finanzberechtigung erben (Aufgabenstellung: explizit gegentesten).
  */
-export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: { bankFeed: BankFeedAdapter }) {
+export function registerFinanceRoutes(
+  app: FastifyInstance,
+  db: Database,
+  deps: { bankFeed: BankFeedAdapter; resilience?: IntegrationServiceOptions },
+) {
+  const resilience = (): IntegrationServiceOptions => deps.resilience ?? { db };
   // -------------------------------------------------------------------
   // Geschäftsführungs-Cockpit: die 7 Kern-Kennzahlen, aus echten
   // Postgres-Aggregaten berechnet (kein hartkodierter Demo-Wert).
@@ -208,8 +231,71 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
     "/finance/bank/sync",
     { preHandler: [requireAuth, requirePermission("bank:reconcile")] },
     async (request, reply) => {
-      const sinceIso = (request.body as { sinceIso?: string } | undefined)?.sinceIso ?? "1970-01-01T00:00:00Z";
-      const feed = await deps.bankFeed.fetchTransactions(sinceIso);
+      /**
+       * PROMPT -1 §17 (Phase 3): `sinceIso` war der EINZIGE Schreibendpunkt-
+       * Parameter dieses Systems, der ohne Schema durchgereicht wurde – der
+       * Wächter in `__tests__/code-guards.test.ts` hat ihn gefunden. Er landet
+       * in `new Date(...)` UND im Idempotenzschlüssel des ausgehenden Aufrufs;
+       * ein beliebiger String hätte dort einen `Invalid Date` bzw. einen
+       * unbegrenzt langen Schlüssel erzeugt.
+       */
+      const syncBody = z
+        .object({ sinceIso: z.string().datetime().optional() })
+        .safeParse(request.body ?? {});
+      if (!syncBody.success) {
+        return reply.code(400).send({ error: "invalid_body", details: syncBody.error.flatten() });
+      }
+      const sinceIso = syncBody.data.sinceIso ?? "1970-01-01T00:00:00Z";
+
+      /**
+       * PROMPT -1 §11/§18-Szenario 4 – "Finanz-/Bankintegration ausgefallen".
+       *
+       * Die geforderte Zusage: *Ausbildung und Termine laufen weiter, der
+       * Zahlungsstatus wird als VERALTET markiert, es gibt KEINE automatische
+       * Sperre auf Basis veralteter Daten.*
+       *
+       * Umsetzung, in genau dieser Reihenfolge:
+       *  - Der Abruf läuft unter Breaker/Zeitlimit/Retry (`runBuffered`).
+       *  - Ist der Feed nicht erreichbar, antwortet dieser Endpunkt mit **200**
+       *    und `zahlungsstatus: "veraltet"` samt `letzteErfolgreicheSynchronisation`
+       *    – NICHT mit 5xx. Ein Fehlercode würde die Oberfläche in einen
+       *    Fehlerzustand versetzen und einen Retry-Sturm auslösen, obwohl
+       *    fachlich nichts kaputt ist.
+       *  - Es wird NICHTS gebucht und NICHTS gesperrt. Die einzige Wirkung ist
+       *    eine ehrliche Altersangabe. Damit kann keine Mahnung, keine
+       *    Terminsperre und kein Ausbildungsstopp auf veralteten Zahlungsdaten
+       *    beruhen.
+       */
+      const abruf = await runBuffered(resilience(), {
+        integration: "bank",
+        operation: "fetchTransactions",
+        // Der ausgehende Idempotenzschlüssel bindet den Abruf an sein Fenster:
+        // ein Wiederaufsetzen holt dasselbe Fenster, nicht ein zweites.
+        idempotencyKey: `bank-sync:${sinceIso}`,
+        payload: { sinceIso },
+        correlationId: request.correlationId,
+        standortId: request.user!.standortId,
+        akteurBenutzerId: request.user!.id,
+        fn: () => deps.bankFeed.fetchTransactions(sinceIso),
+      });
+
+      if (abruf.outcome !== "zugestellt") {
+        const status = (await integrationStatus(db)).find((i) => i.integration === "bank");
+        return reply.send({
+          verarbeitet: 0,
+          autoGebucht: 0,
+          inReviewQueue: 0,
+          zahlungsstatus: "veraltet" as const,
+          letzteErfolgreicheSynchronisation: status?.lastSuccessAt ?? null,
+          integrationsstatus: status?.status ?? "ausgefallen",
+          gepuffert: abruf.outcome === "gepuffert",
+          hinweis:
+            "Die Bankschnittstelle ist derzeit nicht erreichbar. Zahlungsdaten sind VERALTET und werden entsprechend gekennzeichnet. " +
+            "Ausbildung und Termine laufen unverändert weiter; es erfolgt KEINE automatische Sperre und keine Mahnung auf Basis veralteter Daten.",
+        });
+      }
+
+      const feed = (abruf.value ?? []) as Awaited<ReturnType<BankFeedAdapter["fetchTransactions"]>>;
 
       const offeneDb = await db.select().from(rechnungen).where(or(eq(rechnungen.status, "offen"), eq(rechnungen.status, "ueberfaellig")));
       const offeneRechnungen: OffeneRechnung[] = offeneDb.map((r) => ({
@@ -316,7 +402,13 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
         void row;
       }
 
-      return reply.send({ verarbeitet: results.length, autoGebucht: gebucht, inReviewQueue: inQueue });
+      return reply.send({
+        verarbeitet: results.length,
+        autoGebucht: gebucht,
+        inReviewQueue: inQueue,
+        zahlungsstatus: "aktuell" as const,
+        letzteErfolgreicheSynchronisation: new Date().toISOString(),
+      });
     },
   );
 
@@ -351,6 +443,38 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
         .object({ rechnungId: z.string().uuid(), betragCent: z.number().int().positive() })
         .safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "invalid_body", details: body.error.flatten() });
+
+      /**
+       * PROMPT -1 §17 – Step-up NUR bei einer echten UMBUCHUNG.
+       *
+       * Begründung der Abgrenzung: die Erstzuordnung einer Banktransaktion ist
+       * die Alltagsarbeit der Rolle finanzen; sie mit einer Wiederanmeldung zu
+       * belegen würde dazu führen, dass Menschen ihr Gerät entsperrt liegen
+       * lassen. Geld zwischen SCHÜLERKONTEN zu verschieben ist dagegen genau
+       * der Fall, in dem eine übernommene Sitzung Schaden anrichtet.
+       *
+       * "Umbuchung" ist deshalb präzise definiert: es existiert bereits eine
+       * nicht stornierte Zahlung dieser Banktransaktion auf eine ANDERE
+       * Rechnung. Bewusst NICHT "irgendeine Zahlung existiert schon", denn das
+       * würde zwei legitime Fälle treffen:
+       *   - den idempotenten WIEDERHOLVERSUCH desselben Aufrufs (§2) – er
+       *     würde 403 statt der gespeicherten Antwort bekommen,
+       *   - eine TEILZAHLUNG auf dieselbe Rechnung (fachlich erlaubt).
+       */
+      const [andereZuordnung] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(zahlungen)
+        .where(
+          and(
+            eq(zahlungen.banktransaktionId, params.id),
+            ne(zahlungen.status, "storniert"),
+            ne(zahlungen.rechnungId, body.data.rechnungId),
+          ),
+        );
+      const istUmbuchung = Number(andereZuordnung?.n ?? 0) > 0;
+      if (istUmbuchung && (await stepUpBlocked(db, request, reply, STEP_UP_ACTIONS.paymentReassignment))) {
+        return reply;
+      }
 
       /**
        * PROMPT -1 §2/§3/§10 – "Zahlung zuordnen".
@@ -422,9 +546,19 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
         });
         return reply.send({ ...(outcome.body as object), replayed: outcome.replayed });
       } catch (err) {
-        if (err instanceof BankTxNotFoundError) return reply.code(404).send({ error: "not_found" });
+        // §16.11: Fehler bei der Zahlungszuordnung sind eine eigene Kennzahl.
+        if (err instanceof BankTxNotFoundError) {
+          recordPaymentMatchFailure("invoice_not_found");
+          return reply.code(404).send({ error: "not_found" });
+        }
         if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);
-        if (sendBusinessConstraintError(err, reply)) return reply;
+        if (sendBusinessConstraintError(err, reply)) {
+          recordPaymentMatchFailure(
+            (err as { code?: string }).code === "FS003" ? "overbooked" : "constraint",
+          );
+          return reply;
+        }
+        recordPaymentMatchFailure("other");
         request.log.error(err);
         return reply.code(500).send({ error: "internal_error" });
       }
@@ -494,6 +628,25 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
     async (request, reply) => {
       const parsed = exportSchema.safeParse(request.body);
       if (!parsed.success) return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
+
+      /**
+       * PROMPT -1 §17 – Step-up für SENSIBLE Exporte.
+       *
+       * Sensibel ist ein Export, wenn er personenbezogene Daten aus dem System
+       * heraustransportiert. Aggregierte Betriebszahlen (Umsatz, Auslastung,
+       * Flottenkosten) sind es nicht – sie mit einer Wiederanmeldung zu
+       * belegen wäre reine Reibung. Die Liste steht in
+       * docs/security-architecture.md und ist hier Code, damit ein neuer
+       * Berichtsname bewusst eingeordnet werden muss.
+       */
+      const sensibel =
+        SENSIBLE_BERICHTE.has(parsed.data.bericht) ||
+        Object.keys(parsed.data.parameter).some((k) =>
+          ["schuelerid", "schueler", "benutzerid", "personen", "iban"].includes(k.toLowerCase()),
+        );
+      if (sensibel && (await stepUpBlocked(db, request, reply, STEP_UP_ACTIONS.sensitiveExport))) {
+        return reply;
+      }
 
       const token = randomUUID();
       const tokenHash = createHash("sha256").update(token).digest("hex");

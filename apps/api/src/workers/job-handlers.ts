@@ -12,12 +12,21 @@ import {
 } from "@fahrschul/database";
 import type { Database } from "@fahrschul/database";
 import { buildEventRow } from "@fahrschul/events";
-import type { NotificationsAdapter } from "@fahrschul/integrations";
+import type {
+  BankFeedAdapter,
+  DocumentStorageAdapter,
+  MalwareScanAdapter,
+  NotificationsAdapter,
+} from "@fahrschul/integrations";
 import { and, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { purgeExpiredIdempotencyKeys } from "../lib/idempotency.js";
 import { transitionState } from "../lib/state-machine.js";
 import { runConsistencyCheck } from "../services/consistency-check.js";
 import { pruneRealtimeDeliveries } from "../services/realtime.js";
+import { retryQuarantinedScans } from "../services/document-pipeline.js";
+import { resumeBufferedCalls } from "../services/integrations.js";
+import { verifyAuditChain } from "../services/audit-chain.js";
+import { cleanupAbortedUploads } from "../routes/uploads.js";
 import { JOB_TYPES } from "./job-store.js";
 import { runOutboxOnce, type EventConsumer } from "./outbox.js";
 
@@ -39,6 +48,12 @@ export interface JobContext {
   notifications: NotificationsAdapter;
   consumers: readonly EventConsumer[];
   heartbeat: () => Promise<void>;
+  /** §12 (Phase 3): Zugriff auf den Dokumentspeicher für den Quarantäne-Retry. */
+  storage?: DocumentStorageAdapter;
+  /** §12 (Phase 3): Malware-Scanner für den Quarantäne-Retry. */
+  malwareScan?: MalwareScanAdapter;
+  /** §11 (Phase 3): Bank-Feed für die Wiederaufnahme gepufferter Aufrufe. */
+  bankFeed?: BankFeedAdapter;
 }
 
 export type JobHandler = (
@@ -220,7 +235,8 @@ export const runBankImport: JobHandler = async (_payload, { db, heartbeat }) => 
  * automatisches "verified" – siehe §3-Invariante FS006, die ein
  * Prüfprotokoll verlangt).
  */
-export const runDocumentReview: JobHandler = async (_payload, { db }) => {
+export const runDocumentReview: JobHandler = async (_payload, ctx) => {
+  const { db } = ctx;
   const heute = new Date().toISOString().slice(0, 10);
 
   const scanning = await db
@@ -300,7 +316,25 @@ export const runDocumentReview: JobHandler = async (_payload, { db }) => {
     });
   }
 
-  return { zurPruefungEingereicht: submitted, inQuarantaene: quarantined, abgelaufen: expired };
+  /**
+   * PROMPT -1 §12/§18-Szenario 5 (Phase 3): erneuter Scanversuch für alles, was
+   * wegen eines AUSGEFALLENEN Scanners in Quarantäne liegt. Ohne diesen Zweig
+   * wäre "bleibt in Quarantäne" eine Endstation statt eines Wartezustands.
+   */
+  let quarantaeneRetry: Record<string, unknown> = { uebersprungen: "kein Scanner/Speicher im Job-Kontext" };
+  if (ctx.malwareScan && ctx.storage) {
+    quarantaeneRetry = await retryQuarantinedScans(ctx.db, {
+      malwareScan: ctx.malwareScan,
+      storageGet: (reference) => ctx.storage!.get(reference),
+    });
+  }
+
+  return {
+    zurPruefungEingereicht: submitted,
+    inQuarantaene: quarantined,
+    abgelaufen: expired,
+    quarantaeneRetry,
+  };
 };
 
 /** Reporting: einfache Tageskennzahlen, als Job-Ergebnis gespeichert. */
@@ -427,7 +461,71 @@ export const pruneRealtime: JobHandler = async (payload, { db }) => {
   return { entfernt: removed, olderThanMs };
 };
 
+/**
+ * PROMPT -1 §12 (Phase 3) – abgebrochene und abgelaufene Upload-Sitzungen
+ * räumen. Die geforderte Zusage "abgebrochene Uploads werden aufgeräumt" ist
+ * damit ein Job und keine Absicht.
+ */
+export const runUploadsCleanup: JobHandler = async (_payload, { db }) => {
+  const result = await cleanupAbortedUploads(db);
+  return { ...result };
+};
+
+/**
+ * PROMPT -1 §11 (Phase 3) – AUTOMATISCHE Wiederaufnahme gepufferter
+ * ausgehender Aufrufe. Der manuelle Weg ist
+ * `POST /ops/integrations/error-queue/:id/resume`; §11 verlangt beide.
+ */
+export const runIntegrationResume: JobHandler = async (payload, ctx) => {
+  const limit = typeof payload.limit === "number" ? payload.limit : 25;
+  const result = await resumeBufferedCalls(
+    { db: ctx.db },
+    {
+      limit,
+      execute: async (call) => {
+        if (call.integration === "notifications" && call.operation === "send") {
+          return ctx.notifications.send({
+            to: String(call.payload.to ?? "unbekannt"),
+            channel: call.payload.kanal === "email" ? "email" : "push",
+            subject: String(call.payload.betreff ?? "Nachricht"),
+            body: String(call.payload.inhalt ?? ""),
+          });
+        }
+        if (call.integration === "bank" && call.operation === "fetchTransactions" && ctx.bankFeed) {
+          return ctx.bankFeed.fetchTransactions(String(call.payload.sinceIso ?? "1970-01-01T00:00:00Z"));
+        }
+        // Ehrlich transient: ohne Anbieter bleibt der Eintrag gepuffert,
+        // statt als "erledigt" zu verschwinden.
+        throw Object.assign(
+          new Error(`Kein Wiederaufnahmepfad für ${call.integration}.${call.operation}`),
+          { errorClass: "SERVER_UNAVAILABLE" as const },
+        );
+      },
+    },
+  );
+  return { ...result };
+};
+
+/**
+ * PROMPT -1 §17 (Phase 3) – Hash-Kette des Audit-Logs prüfen. Läuft täglich;
+ * ein Befund alarmiert (`kind: "audit_tamper"`, Katalogeintrag mit Runbook).
+ */
+export const runAuditVerify: JobHandler = async (payload, { db }) => {
+  const result = await verifyAuditChain(db, {
+    limit: typeof payload.limit === "number" ? payload.limit : undefined,
+  });
+  return {
+    ok: result.ok,
+    geprueft: result.geprueft,
+    befunde: result.befunde.length,
+    appendOnlyTriggersActive: result.appendOnlyTriggersActive,
+  };
+};
+
 export const JOB_HANDLERS: Record<string, JobHandler> = {
+  [JOB_TYPES.uploadsCleanup]: runUploadsCleanup,
+  [JOB_TYPES.integrationResume]: runIntegrationResume,
+  [JOB_TYPES.auditVerify]: runAuditVerify,
   [JOB_TYPES.notifications]: dispatchNotifications,
   [JOB_TYPES.realtimePrune]: pruneRealtime,
   [JOB_TYPES.bankImport]: runBankImport,

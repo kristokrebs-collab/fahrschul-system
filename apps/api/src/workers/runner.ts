@@ -1,5 +1,10 @@
 import type { Database } from "@fahrschul/database";
-import type { NotificationsAdapter } from "@fahrschul/integrations";
+import type {
+  BankFeedAdapter,
+  DocumentStorageAdapter,
+  MalwareScanAdapter,
+  NotificationsAdapter,
+} from "@fahrschul/integrations";
 import { auditJobRun, resolveJobHandler, type JobContext } from "./job-handlers.js";
 import {
   claimJobs,
@@ -33,6 +38,11 @@ export interface JobRunnerDeps {
   db: Database;
   notifications: NotificationsAdapter;
   consumers?: readonly EventConsumer[];
+  /** §12 (Phase 3): nötig für den Quarantäne-Retry im Job `document.review`. */
+  storage?: DocumentStorageAdapter;
+  malwareScan?: MalwareScanAdapter;
+  /** §11 (Phase 3): nötig für `integration.resume`. */
+  bankFeed?: BankFeedAdapter;
 }
 
 export interface JobRunResult {
@@ -73,6 +83,9 @@ export async function runJobsOnce(
       db,
       notifications: deps.notifications,
       consumers,
+      storage: deps.storage,
+      malwareScan: deps.malwareScan,
+      bankFeed: deps.bankFeed,
       heartbeat: async () => {
         await heartbeatJob(db, job.id, owner);
       },
@@ -181,6 +194,10 @@ export async function scheduleRecurringJobs(
     { jobType: JOB_TYPES.consistencyCheck, dedupeKey: `consistency:${tag}`, maxRuntimeSeconds: 300 },
     { jobType: JOB_TYPES.idempotencyCleanup, dedupeKey: `idempotency-cleanup:${tag}`, maxRuntimeSeconds: 60 },
     { jobType: JOB_TYPES.realtimePrune, dedupeKey: `realtime-prune:${tag}`, maxRuntimeSeconds: 120 },
+    // Phase 3: §12 Upload-Hygiene, §11 automatische Wiederaufnahme, §17 Audit-Kette.
+    { jobType: JOB_TYPES.uploadsCleanup, dedupeKey: `uploads-cleanup:${stunde}`, maxRuntimeSeconds: 120 },
+    { jobType: JOB_TYPES.integrationResume, dedupeKey: `integration-resume:${fuenfMinuten}`, maxRuntimeSeconds: 180 },
+    { jobType: JOB_TYPES.auditVerify, dedupeKey: `audit-verify:${tag}`, maxRuntimeSeconds: 300 },
   ];
 
   const created: string[] = [];

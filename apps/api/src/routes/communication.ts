@@ -14,6 +14,7 @@ import {
   runIdempotent,
   sendIdempotencyConflict,
 } from "../lib/idempotency.js";
+import { runBuffered, type IntegrationServiceOptions } from "../services/integrations.js";
 
 const templateSchema = z.object({
   name: z.string().min(1),
@@ -44,7 +45,7 @@ const sendSchema = z.object({
 export function registerCommunicationRoutes(
   app: FastifyInstance,
   db: Database,
-  deps: { notifications: NotificationsAdapter },
+  deps: { notifications: NotificationsAdapter; resilience?: IntegrationServiceOptions },
 ) {
   app.get(
     "/communication/templates",
@@ -140,33 +141,76 @@ export function registerCommunicationRoutes(
       };
 
       /**
-       * Sofortversuch NACH dem Commit. Schlägt er fehl, bleibt die Nachricht
-       * in 'warteschlange' und der Job holt sie ab – es geht nichts verloren.
-       * Die Statusfortschreibung ist idempotent (nur 'warteschlange' wird
-       * angefasst).
+       * Sofortversuch NACH dem Commit – jetzt unter §11 (Zeitlimit, Circuit
+       * Breaker, Retry, Idempotenzschlüssel, Puffer).
+       *
+       * ## PROMPT -1 §18-Szenario 2: "Benachrichtigungsdienst ausgefallen"
+       *
+       * Die geforderte Zusage lautet: *der Termin bleibt gültig, der Versand
+       * bleibt in der Warteschlange, das Büro sieht eine Warnung, es gibt
+       * KEINE falsche Erfolgsmeldung.* Genau das passiert hier:
+       *
+       *  - Der Datensatz ist bereits committet (Status `warteschlange`) – der
+       *    fachliche Vorgang ist gültig, unabhängig vom Anbieter.
+       *  - `runBuffered` liefert `gepuffert`, wenn der Anbieter nicht
+       *    erreichbar ist. Der Status BLEIBT `warteschlange`; die Antwort
+       *    trägt `zustellung: "wartet_auf_externe_synchronisation"` und den
+       *    Hinweistext, den die Büro-Oberfläche anzeigt.
+       *  - Erst ein tatsächlich erfolgreicher Versand setzt `gesendet`.
+       *  - Der Job `notifications.dispatch` (§13) holt die Warteschlange
+       *    später ab – automatische Wiederaufnahme, ohne Zutun.
+       *
+       * Der Rückgabetyp von `runBuffered` lässt die falsche Aussage nicht zu:
+       * es gibt keinen Zweig, in dem "gesendet" ohne Zustellung entsteht.
        */
       const trySendNow = async (messageId: string) => {
-        try {
-          const result = await deps.notifications.send({
-            to: body.to,
-            channel: body.kanal === "sms" ? "push" : (body.kanal as "email" | "push"),
-            subject: body.betreff ?? body.kanal,
-            body: body.inhalt,
-          });
+        const resilience: IntegrationServiceOptions = deps.resilience ?? { db };
+        const result = await runBuffered(resilience, {
+          integration: "notifications",
+          operation: "send",
+          // Der Idempotenzschlüssel des AUSGEHENDEN Aufrufs ist die
+          // Nachrichten-ID: ein Wiederaufsetzen verschickt dieselbe Nachricht,
+          // nicht eine zweite.
+          idempotencyKey: `nachricht:${messageId}`,
+          payload: { nachrichtId: messageId, kanal: body.kanal, to: body.to },
+          correlationId: request.correlationId,
+          standortId: request.user!.standortId,
+          akteurBenutzerId: request.user!.id,
+          fn: () =>
+            deps.notifications.send({
+              to: body.to,
+              channel: body.kanal === "sms" ? "push" : (body.kanal as "email" | "push"),
+              subject: body.betreff ?? body.kanal,
+              body: body.inhalt,
+            }),
+        });
+
+        if (result.outcome === "zugestellt") {
+          const zugestellt = (result.value as { delivered?: boolean } | undefined)?.delivered !== false;
           const [updated] = await db
             .update(nachrichten)
-            .set({ status: result.delivered ? "gesendet" : "fehlgeschlagen", gesendetAt: new Date() })
+            .set({
+              status: zugestellt ? "gesendet" : "fehlgeschlagen",
+              gesendetAt: new Date(),
+              fehlergrund: zugestellt ? null : "Adapter meldete delivered=false",
+            })
             .where(and(eq(nachrichten.id, messageId), eq(nachrichten.status, "warteschlange")))
             .returning();
-          return updated;
-        } catch (err) {
-          const [updated] = await db
-            .update(nachrichten)
-            .set({ fehlergrund: (err as Error).message })
-            .where(and(eq(nachrichten.id, messageId), eq(nachrichten.status, "warteschlange")))
-            .returning();
-          return updated;
+          return { row: updated, outcome: result.outcome, hinweis: result.hinweis };
         }
+
+        // NICHT `fehlgeschlagen`: der Vorgang ist nicht gescheitert, er wartet.
+        // Ein `fehlgeschlagen` würde in der Heute-Queue des Büros als
+        // Handlungsbedarf erscheinen, obwohl der Job es selbst nachholt.
+        const [updated] = await db
+          .update(nachrichten)
+          .set({
+            status: result.outcome === "gepuffert" ? "warteschlange" : "fehlgeschlagen",
+            fehlergrund: result.error ?? result.hinweis,
+          })
+          .where(and(eq(nachrichten.id, messageId), eq(nachrichten.status, "warteschlange")))
+          .returning();
+        return { row: updated, outcome: result.outcome, hinweis: result.hinweis };
       };
 
       try {
@@ -186,7 +230,18 @@ export function registerCommunicationRoutes(
         const out = outcome.body as { nachricht: { id: string } };
         if (!outcome.replayed) {
           const sent = await trySendNow(out.nachricht.id);
-          return reply.code(201).send({ nachricht: sent ?? out.nachricht });
+          return reply.code(201).send({
+            nachricht: sent.row ?? out.nachricht,
+            // §18: die UI-taugliche Wahrheit über die EXTERNE Zustellung,
+            // getrennt vom fachlichen Zustand.
+            zustellung:
+              sent.outcome === "zugestellt"
+                ? "zugestellt"
+                : sent.outcome === "gepuffert"
+                  ? "wartet_auf_externe_synchronisation"
+                  : "fehlgeschlagen",
+            hinweis: sent.hinweis,
+          });
         }
         return reply.code(200).send({ ...(outcome.body as object), replayed: true });
       } catch (err) {

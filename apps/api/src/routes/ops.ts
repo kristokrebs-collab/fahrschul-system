@@ -8,7 +8,12 @@ import {
   jobs,
 } from "@fahrschul/database";
 import type { Database } from "@fahrschul/database";
-import type { NotificationsAdapter } from "@fahrschul/integrations";
+import type {
+  BankFeedAdapter,
+  DocumentStorageAdapter,
+  MalwareScanAdapter,
+  NotificationsAdapter,
+} from "@fahrschul/integrations";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -18,6 +23,18 @@ import {
   runConsistencyCheck,
 } from "../services/consistency-check.js";
 import { recentAlarms } from "../workers/alarm.js";
+import { verifyAuditChain } from "../services/audit-chain.js";
+import { listLockedThrottles, purgeExpiredThrottles } from "../lib/brute-force.js";
+import {
+  integrationRegistry,
+  integrationStatus,
+  resumeBufferedCalls,
+  resumeFailedCall,
+  type IntegrationServiceOptions,
+} from "../services/integrations.js";
+import { cleanupAbortedUploads } from "./uploads.js";
+import { requireStepUp, STEP_UP_ACTIONS } from "../lib/step-up.js";
+import { integrationOutboundCalls } from "@fahrschul/database";
 import { buildConsumers } from "../workers/consumers.js";
 import { enqueueJob, resumeDeadLetter } from "../workers/job-store.js";
 import { openDeadLetterCount, runOutboxOnce } from "../workers/outbox.js";
@@ -43,9 +60,16 @@ import { runJobsOnce, scheduleRecurringJobs } from "../workers/runner.js";
 export function registerOpsRoutes(
   app: FastifyInstance,
   db: Database,
-  deps: { notifications: NotificationsAdapter },
+  deps: {
+    notifications: NotificationsAdapter;
+    storage?: DocumentStorageAdapter;
+    malwareScan?: MalwareScanAdapter;
+    bankFeed?: BankFeedAdapter;
+    resilience?: IntegrationServiceOptions;
+  },
 ) {
   const consumers = buildConsumers(deps.notifications);
+  const resilience = (): IntegrationServiceOptions => deps.resilience ?? { db };
 
   // -----------------------------------------------------------------------
   // §5 Outbox
@@ -160,7 +184,17 @@ export function registerOpsRoutes(
         })
         .safeParse(request.body ?? {});
       const options = parsed.success ? parsed.data : {};
-      const result = await runJobsOnce({ db, notifications: deps.notifications, consumers }, options);
+      const result = await runJobsOnce(
+        {
+          db,
+          notifications: deps.notifications,
+          consumers,
+          storage: deps.storage,
+          malwareScan: deps.malwareScan,
+          bankFeed: deps.bankFeed,
+        },
+        options,
+      );
       return reply.send(result);
     },
   );
@@ -180,7 +214,17 @@ export function registerOpsRoutes(
     { preHandler: [requireAuth, requirePermission("ops:jobs:manage")] },
     async (request, reply) => {
       const outbox = await runOutboxOnce(db, consumers, { limit: 100 });
-      const jobResult = await runJobsOnce({ db, notifications: deps.notifications, consumers }, { limit: 25 });
+      const jobResult = await runJobsOnce(
+        {
+          db,
+          notifications: deps.notifications,
+          consumers,
+          storage: deps.storage,
+          malwareScan: deps.malwareScan,
+          bankFeed: deps.bankFeed,
+        },
+        { limit: 25 },
+      );
       return reply.send({ outbox, jobs: jobResult, ausgeloestVon: request.user!.id });
     },
   );
@@ -261,6 +305,146 @@ export function registerOpsRoutes(
     },
   );
 
+  // -----------------------------------------------------------------------
+  // §11 Externe Schnittstellen: Gesundheit, Puffer, Fehlerwarteschlange
+  // -----------------------------------------------------------------------
+  app.get(
+    "/ops/integrations",
+    { preHandler: [requireAuth, requirePermission("ops:reliability:read")] },
+    async (_request, reply) => {
+      const status = await integrationStatus(db);
+      return reply.send({
+        integrationen: status,
+        hinweis:
+          "Alle Integrationen laufen in dieser Umgebung im mock-Modus (docs/integration-gaps.md). Zeitlimit, Circuit Breaker, Retry, Idempotenzschlüssel und Fehlerwarteschlange sind echt und getestet; der ANBIETER ist es nicht.",
+      });
+    },
+  );
+
+  app.get(
+    "/ops/integrations/error-queue",
+    { preHandler: [requireAuth, requirePermission("ops:reliability:read")] },
+    async (request, reply) => {
+      const query = request.query as { integration?: string; status?: string; limit?: string };
+      const conditions = [];
+      if (query.integration) conditions.push(eq(integrationOutboundCalls.integration, query.integration));
+      conditions.push(eq(integrationOutboundCalls.status, query.status ?? "failed"));
+      const rows = await db
+        .select()
+        .from(integrationOutboundCalls)
+        .where(and(...conditions))
+        .orderBy(desc(integrationOutboundCalls.createdAt))
+        .limit(Math.min(200, Number(query.limit ?? 50) || 50));
+      return reply.send({ eintraege: rows });
+    },
+  );
+
+  /** §11 "manuelle Wiederaufnahme". */
+  app.post(
+    "/ops/integrations/error-queue/:id/resume",
+    { preHandler: [requireAuth, requirePermission("ops:jobs:manage")] },
+    async (request, reply) => {
+      const params = request.params as { id: string };
+      const body = z.object({ resetBreaker: z.boolean().optional() }).safeParse(request.body ?? {});
+      const result = await resumeFailedCall(db, {
+        callId: params.id,
+        akteurBenutzerId: request.user!.id,
+        standortId: request.user!.standortId,
+        correlationId: request.correlationId,
+        resetBreaker: body.success ? body.data.resetBreaker : false,
+      });
+      if (!result.ok) {
+        return reply.code(result.reason === "not_found" ? 404 : 409).send({ error: result.reason });
+      }
+      return reply.send(result);
+    },
+  );
+
+  /** §11 "automatische Wiederaufnahme", von Hand ausgelöst (Betrieb/Chaos-Tests). */
+  app.post(
+    "/ops/integrations/resume",
+    { preHandler: [requireAuth, requirePermission("ops:jobs:manage")] },
+    async (request, reply) => {
+      const body = z
+        .object({ integration: z.string().min(1).optional(), limit: z.number().int().positive().max(200).optional() })
+        .safeParse(request.body ?? {});
+      const result = await resumeBufferedCalls(resilience(), {
+        integration: body.success ? (body.data.integration as never) : undefined,
+        limit: body.success ? body.data.limit : undefined,
+        execute: async (call) => resumeOutboundCall(call, deps),
+      });
+      return reply.send(result);
+    },
+  );
+
+  /**
+   * §11: Breaker von Hand schließen bzw. öffnen. Der Betrieb muss beides
+   * können: "der Anbieter ist wieder da, versuch es sofort" und "der Anbieter
+   * hat Wartung angekündigt, hör auf zu versuchen".
+   */
+  app.post(
+    "/ops/integrations/:integration/breaker",
+    { preHandler: [requireAuth, requirePermission("ops:jobs:manage")] },
+    async (request, reply) => {
+      const params = request.params as { integration: string };
+      const body = z.object({ aktion: z.enum(["schliessen", "oeffnen"]), grund: z.string().max(300).optional() }).safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "invalid_body", details: body.error.flatten() });
+      const guard = integrationRegistry().get(params.integration);
+      if (!guard) {
+        return reply.code(404).send({
+          error: "integration_unknown_or_not_used_yet",
+          hinweis:
+            "Für diese Integration existiert in diesem Prozess noch kein Wächter (es wurde noch kein Aufruf gemacht).",
+        });
+      }
+      if (body.data.aktion === "schliessen") guard.reset();
+      else guard.trip(body.data.grund ?? "manuell geöffnet");
+      return reply.send({ integration: params.integration, zustand: guard.snapshot() });
+    },
+  );
+
+  // -----------------------------------------------------------------------
+  // §17 Manipulationssicheres Audit
+  // -----------------------------------------------------------------------
+  app.post(
+    "/ops/audit/verify",
+    {
+      preHandler: [
+        requireAuth,
+        requirePermission("audit:read"),
+      ],
+    },
+    async (request, reply) => {
+      const body = z.object({ limit: z.number().int().positive().max(1000000).optional() }).safeParse(request.body ?? {});
+      const result = await verifyAuditChain(db, { limit: body.success ? body.data.limit : undefined });
+      return reply.code(result.ok ? 200 : 409).send(result);
+    },
+  );
+
+  // -----------------------------------------------------------------------
+  // §17 Brute-Force-Sperren (Betriebsansicht) + Aufräumen
+  // -----------------------------------------------------------------------
+  app.get(
+    "/ops/auth/locks",
+    { preHandler: [requireAuth, requirePermission("ops:reliability:read")] },
+    async (_request, reply) => reply.send({ sperren: await listLockedThrottles(db) }),
+  );
+
+  app.post(
+    "/ops/auth/locks/purge",
+    { preHandler: [requireAuth, requirePermission("ops:jobs:manage"), requireStepUp(db, STEP_UP_ACTIONS.authUnlock)] },
+    async (_request, reply) => reply.send({ entfernt: await purgeExpiredThrottles(db) }),
+  );
+
+  // -----------------------------------------------------------------------
+  // §12 Abgebrochene Uploads aufräumen (auch als Job verfügbar)
+  // -----------------------------------------------------------------------
+  app.post(
+    "/ops/uploads/cleanup",
+    { preHandler: [requireAuth, requirePermission("ops:jobs:manage")] },
+    async (_request, reply) => reply.send(await cleanupAbortedUploads(db)),
+  );
+
   app.get(
     "/ops/consistency/runs/:id",
     { preHandler: [requireAuth, requirePermission("ops:reliability:read")] },
@@ -278,5 +462,48 @@ export function registerOpsRoutes(
         .where(eq(consistencyFindings.runId, run.id));
       return reply.send({ run, befunde: findings });
     },
+  );
+}
+
+/**
+ * §11: die Wiederaufnahme eines gepufferten AUSGEHENDEN Aufrufs.
+ *
+ * Der Puffer speichert `integration`, `operation`, `idempotency_key` und
+ * `payload` – bewusst NICHT eine Funktion. Diese Abbildung ist die Stelle, an
+ * der aus diesen Daten wieder ein Adapteraufruf wird. Eine unbekannte
+ * Kombination wirft absichtlich: sie darf nicht stillschweigend als "erledigt"
+ * gelten.
+ */
+async function resumeOutboundCall(
+  call: { integration: string; operation: string; idempotencyKey: string; payload: Record<string, unknown> },
+  deps: {
+    notifications: NotificationsAdapter;
+    storage?: DocumentStorageAdapter;
+    malwareScan?: MalwareScanAdapter;
+    bankFeed?: BankFeedAdapter;
+  },
+): Promise<unknown> {
+  if (call.integration === "notifications" && call.operation === "send") {
+    return deps.notifications.send({
+      to: String(call.payload.to ?? "unbekannt"),
+      channel: call.payload.kanal === "email" ? "email" : "push",
+      subject: String(call.payload.betreff ?? call.payload.kanal ?? "Nachricht"),
+      body: String(call.payload.inhalt ?? ""),
+    });
+  }
+  if (call.integration === "bank" && call.operation === "fetchTransactions" && deps.bankFeed) {
+    return deps.bankFeed.fetchTransactions(String(call.payload.sinceIso ?? "1970-01-01T00:00:00Z"));
+  }
+  if (call.integration === "fahrschulverwaltung") {
+    // Kein Zugang in dieser Umgebung (docs/integration-gaps.md). Ein
+    // Wiederaufsetzen ohne Anbieter wäre eine Lüge, deshalb ein ehrlicher,
+    // TRANSIENTER Fehler: der Eintrag bleibt gepuffert.
+    throw Object.assign(new Error("Fahrschulverwaltung: kein Zugang (mock) – Aufruf bleibt gepuffert"), {
+      errorClass: "SERVER_UNAVAILABLE" as const,
+    });
+  }
+  throw Object.assign(
+    new Error(`Kein Wiederaufnahmepfad für ${call.integration}.${call.operation}`),
+    { errorClass: "UNKNOWN_PERMANENT" as const },
   );
 }
