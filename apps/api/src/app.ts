@@ -13,9 +13,11 @@ import {
 import Fastify, { type FastifyInstance } from "fastify";
 import { getDb } from "./db.js";
 import { createSessionLoader } from "./middleware/auth.js";
+import { startWorkerLoop } from "./workers/runner.js";
 import { registerAppointmentRoutes } from "./routes/appointments.js";
 import { registerAppointmentOfferRoutes } from "./routes/appointment-offers.js";
 import { registerAuthRoutes } from "./routes/auth.js";
+import { registerAvailabilityRoutes } from "./routes/availability.js";
 import { registerCommunicationRoutes } from "./routes/communication.js";
 import { registerDocumentRoutes } from "./routes/documents.js";
 import { registerExamRoutes } from "./routes/exam.js";
@@ -30,12 +32,20 @@ import { registerInvoiceRoutes } from "./routes/invoices.js";
 import { registerLeadRoutes } from "./routes/leads.js";
 import { registerLearningRoutes } from "./routes/learning.js";
 import { registerOfficeDashboardRoutes } from "./routes/office-dashboard.js";
+import { registerOpsRoutes } from "./routes/ops.js";
 import { registerResourceRoutes } from "./routes/resources.js";
 import { registerStornoRoutes } from "./routes/storno.js";
 import { registerStudentRoutes } from "./routes/student.js";
 
 export interface BuildAppOptions {
   databaseUrl: string;
+  /**
+   * PROMPT -1 §13: Startet die Worker-Schleife im HTTP-Prozess. Standardmäßig
+   * AUS – in Tests und bei Betrieb mit separatem Worker-Prozess unerwünscht.
+   * Die Verdrahtung eines Schedulers ist §15 (Phase 4).
+   */
+  startWorkers?: boolean;
+  workerIntervalMs?: number;
   cookieSecure?: boolean;
   logger?: boolean;
   /** Erlaubte Browser-Origins für die App-Frontends (Vite-Dev-Server/Prod-Hosts). */
@@ -78,6 +88,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   registerHealthRoutes(app);
   registerAuthRoutes(app, db, options.cookieSecure ?? false);
   registerAppointmentRoutes(app, db);
+  registerAvailabilityRoutes(app, db);
   registerAppointmentOfferRoutes(app, db);
   registerStudentRoutes(app, db);
   registerExamRoutes(app, db);
@@ -97,6 +108,14 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   registerFinanceRoutes(app, db, { bankFeed });
   // Prompt 3 (apps/instructor) – Fahrlehrer-App-Routen.
   registerInstructorRoutes(app, db, { transcription, aiSuggestions });
+  // PROMPT -1 (Phase 1) – Zuverlässigkeitskern: Outbox, Job-Store,
+  // Dead-Letter-Queue, Konsistenzprüfung.
+  registerOpsRoutes(app, db, { notifications });
+
+  if (options.startWorkers) {
+    const loop = startWorkerLoop({ db, notifications }, options.workerIntervalMs ?? 5000);
+    app.addHook("onClose", async () => loop.stop());
+  }
 
   return app;
 }

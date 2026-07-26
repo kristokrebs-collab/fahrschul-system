@@ -17,10 +17,18 @@ import type { Database } from "@fahrschul/database";
 import { buildEventRow } from "@fahrschul/events";
 import type { BankFeedAdapter } from "@fahrschul/integrations";
 import { matchBatch, type OffeneRechnung } from "@fahrschul/finance-core";
-import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireAuth, requirePermission } from "../middleware/auth.js";
+import {
+  IdempotencyConflictError,
+  IDEMPOTENT_OPERATIONS,
+  readIdempotencyKey,
+  runIdempotent,
+  sendIdempotencyConflict,
+} from "../lib/idempotency.js";
+import { sendBusinessConstraintError, transitionState } from "../lib/state-machine.js";
 
 const produktSchema = z.object({
   code: z.string().min(1),
@@ -225,56 +233,86 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
         const existing = await db.select().from(banktransaktionen).where(eq(banktransaktionen.externalId, tx.id)).limit(1);
         if (existing.length > 0) continue; // bereits synchronisiert, kein erneutes Anlegen
 
-        const [row] = await db
-          .insert(banktransaktionen)
-          .values({
-            standortId: request.user!.standortId,
-            externalId: tx.id,
-            amountCent: tx.amountCent,
-            bookedAt: tx.bookedAt.toISOString().slice(0, 10),
-            reference: tx.reference,
-            counterparty: tx.counterparty,
-            konfidenz: result.konfidenz,
-            grund: result.grund,
-            rechnungIds: result.rechnungIds,
-            aufteilung: result.aufteilung ?? {},
-            hinweis: result.hinweis,
-            status: result.autoBuchbar ? "gebucht" : "offen",
-            autoGebucht: result.autoBuchbar,
-          })
-          .returning();
+        // PROMPT -1 §10: die Banktransaktion entsteht im Zustand `imported`
+        // und wird über `matching` in ihren Zielzustand geführt. NUR
+        // konfidenz='sicher' darf nach `matched` (Non-Negotiable), alles
+        // andere landet in `suggested`/`review_required` und wartet auf einen
+        // Menschen der Rolle "finanzen". Alles in EINER Transaktion, damit
+        // Zustand, Zahlung und Ereignis atomar sind.
+        const row = await db.transaction(async (t) => {
+          const [inserted] = await t
+            .insert(banktransaktionen)
+            .values({
+              standortId: request.user!.standortId,
+              externalId: tx.id,
+              amountCent: tx.amountCent,
+              bookedAt: tx.bookedAt.toISOString().slice(0, 10),
+              reference: tx.reference,
+              counterparty: tx.counterparty,
+              konfidenz: result.konfidenz,
+              grund: result.grund,
+              rechnungIds: result.rechnungIds,
+              aufteilung: result.aufteilung ?? {},
+              hinweis: result.hinweis,
+              zahlungStatus: "imported",
+              autoGebucht: result.autoBuchbar,
+            })
+            .returning();
 
-        if (result.autoBuchbar && result.rechnungIds.length === 1) {
-          await db
-            .update(rechnungen)
-            .set({ status: "bezahlt" })
-            .where(eq(rechnungen.id, result.rechnungIds[0]));
-          await db.insert(zahlungen).values({
-            standortId: request.user!.standortId,
-            rechnungId: result.rechnungIds[0],
-            betragCent: tx.amountCent,
-            eingegangenAm: tx.bookedAt.toISOString().slice(0, 10),
-            zugeordnet: true,
-            status: "zugeordnet",
-            banktransaktionId: row.id,
-          });
-          gebucht += 1;
-        } else {
-          inQueue += 1;
-        }
-
-        await db.insert(auditEreignisse).values(
-          buildEventRow({
-            type: "payment.matched",
-            aktion: "finance.bank.match",
-            entitaet: "banktransaktion",
-            entitaetId: row.id,
+          await transitionState(t, {
+            machine: "zahlung",
+            entitaetId: inserted.id,
+            to: "matching",
             akteurBenutzerId: request.user!.id,
             standortId: request.user!.standortId,
-            source: "apps/api:finance.bank.sync",
-            payload: { konfidenz: result.konfidenz, grund: result.grund, autoBuchbar: result.autoBuchbar },
-          }),
-        );
+            grund: "Matching-Kaskade angewendet",
+          });
+
+          if (result.autoBuchbar && result.rechnungIds.length === 1) {
+            await t
+              .update(rechnungen)
+              .set({ status: "bezahlt" })
+              .where(eq(rechnungen.id, result.rechnungIds[0]));
+            await t.insert(zahlungen).values({
+              standortId: request.user!.standortId,
+              rechnungId: result.rechnungIds[0],
+              betragCent: tx.amountCent,
+              eingegangenAm: tx.bookedAt.toISOString().slice(0, 10),
+              zugeordnet: true,
+              status: "zugeordnet",
+              banktransaktionId: inserted.id,
+            });
+            await transitionState(t, {
+              machine: "zahlung",
+              entitaetId: inserted.id,
+              to: "matched",
+              akteurBenutzerId: request.user!.id,
+              standortId: request.user!.standortId,
+              grund: "Konfidenz 'sicher' – automatische Buchung",
+              eventType: "payment.matched",
+              aktion: "finance.bank.match",
+              source: "apps/api:finance.bank.sync",
+              payload: { konfidenz: result.konfidenz, grund: result.grund, autoBuchbar: true },
+            });
+            gebucht += 1;
+          } else {
+            await transitionState(t, {
+              machine: "zahlung",
+              entitaetId: inserted.id,
+              to: result.konfidenz === "wahrscheinlich" ? "suggested" : "review_required",
+              akteurBenutzerId: request.user!.id,
+              standortId: request.user!.standortId,
+              grund: `Konfidenz '${result.konfidenz}' – keine Automatik`,
+              eventType: "payment.matched",
+              aktion: "finance.bank.match",
+              source: "apps/api:finance.bank.sync",
+              payload: { konfidenz: result.konfidenz, grund: result.grund, autoBuchbar: false },
+            });
+            inQueue += 1;
+          }
+          return inserted;
+        });
+        void row;
       }
 
       return reply.send({ verarbeitet: results.length, autoGebucht: gebucht, inReviewQueue: inQueue });
@@ -288,7 +326,7 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
       const rows = await db
         .select()
         .from(banktransaktionen)
-        .where(eq(banktransaktionen.status, "offen"))
+        .where(inArray(banktransaktionen.zahlungStatus, ["imported", "matching", "suggested", "review_required", "partially_matched"]))
         .orderBy(desc(banktransaktionen.createdAt));
       return reply.send({ queue: rows });
     },
@@ -304,41 +342,87 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
         .safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "invalid_body", details: body.error.flatten() });
 
-      const [tx] = await db.select().from(banktransaktionen).where(eq(banktransaktionen.id, params.id)).limit(1);
-      if (!tx) return reply.code(404).send({ error: "not_found" });
+      /**
+       * PROMPT -1 §2/§3/§10 – "Zahlung zuordnen".
+       * - Idempotenzschlüssel wird, wenn mitgeschickt, über den generischen
+       *   Mechanismus verarbeitet (Retry ordnet nicht doppelt zu).
+       * - Die Datenbank verhindert zusätzlich, dass eine bereits vollständig
+       *   zugeordnete Transaktion erneut zugeordnet oder überbucht wird
+       *   (SQLSTATE FS003) – das ist die §3-Invariante, nicht nur eine
+       *   Anwendungsprüfung.
+       */
+      const idempotencyKey = readIdempotencyKey(request);
 
-      await db.insert(zahlungen).values({
-        standortId: request.user!.standortId,
-        rechnungId: body.data.rechnungId,
-        betragCent: body.data.betragCent,
-        eingegangenAm: tx.bookedAt,
-        zugeordnet: true,
-        status: "zugeordnet",
-        banktransaktionId: tx.id,
-      });
-      await db
-        .update(banktransaktionen)
-        .set({
-          status: "gebucht",
-          bearbeitetDurchBenutzerId: request.user!.id,
-          bearbeitetAt: new Date(),
-        })
-        .where(eq(banktransaktionen.id, params.id));
+      const assign = async (t: Parameters<Parameters<typeof db.transaction>[0]>[0]) => {
+        const [tx] = await t.select().from(banktransaktionen).where(eq(banktransaktionen.id, params.id)).limit(1);
+        if (!tx) throw new BankTxNotFoundError();
 
-      await db.insert(auditEreignisse).values(
-        buildEventRow({
-          type: "payment.matched",
-          aktion: "finance.bank.resolve_manual",
-          entitaet: "banktransaktion",
+        await t.insert(zahlungen).values({
+          standortId: request.user!.standortId,
+          rechnungId: body.data.rechnungId,
+          betragCent: body.data.betragCent,
+          eingegangenAm: tx.bookedAt,
+          zugeordnet: true,
+          status: "zugeordnet",
+          banktransaktionId: tx.id,
+        });
+
+        // Vollständig ist die Transaktion, wenn die SUMME aller zugeordneten
+        // Zahlungen den Transaktionsbetrag erreicht – nicht wenn eine einzelne
+        // Zahlung ihn erreicht (Teilzahlungen sind fachlich erlaubt).
+        const [summe] = await t
+          .select({ cent: sql<number>`coalesce(sum(${zahlungen.betragCent}), 0)` })
+          .from(zahlungen)
+          .where(and(eq(zahlungen.banktransaktionId, tx.id), ne(zahlungen.status, "storniert")));
+        const zugeordnetCent = Number(summe?.cent ?? 0);
+        const vollstaendig = zugeordnetCent >= tx.amountCent;
+        await transitionState(t, {
+          machine: "zahlung",
           entitaetId: tx.id,
+          to: vollstaendig ? "matched" : "partially_matched",
           akteurBenutzerId: request.user!.id,
           standortId: request.user!.standortId,
+          grund: "Manuelle Zuordnung durch Rolle finanzen",
+          eventType: "payment.matched",
+          aktion: "finance.bank.resolve_manual",
           source: "apps/api:finance.bank.resolve",
-          payload: { rechnungId: body.data.rechnungId, betragCent: body.data.betragCent },
-        }),
-      );
+          patch: { bearbeitetDurchBenutzerId: request.user!.id, bearbeitetAt: new Date() },
+          payload: {
+            rechnungId: body.data.rechnungId,
+            betragCent: body.data.betragCent,
+            zugeordnetCent,
+            vollstaendig,
+          },
+        });
+        return { ok: true as const, vollstaendig, zugeordnetCent };
+      };
 
-      return reply.send({ ok: true });
+      try {
+        if (idempotencyKey) {
+          const outcome = await runIdempotent({
+            db,
+            operation: IDEMPOTENT_OPERATIONS.paymentAssign,
+            key: idempotencyKey,
+            benutzerId: request.user!.id,
+            standortId: request.user!.standortId,
+            target: params.id,
+            payload: body.data,
+            handler: async (t) => {
+              const res = await assign(t);
+              return { status: 200, body: res, entitaet: "banktransaktion", entitaetId: params.id };
+            },
+          });
+          return reply.send({ ...(outcome.body as object), replayed: outcome.replayed });
+        }
+        const res = await db.transaction(assign);
+        return reply.send(res);
+      } catch (err) {
+        if (err instanceof BankTxNotFoundError) return reply.code(404).send({ error: "not_found" });
+        if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);
+        if (sendBusinessConstraintError(err, reply)) return reply;
+        request.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
     },
   );
 
@@ -521,3 +605,5 @@ export function registerFinanceRoutes(app: FastifyInstance, db: Database, deps: 
     },
   );
 }
+
+class BankTxNotFoundError extends Error {}

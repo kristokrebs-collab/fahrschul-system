@@ -1,7 +1,7 @@
 import { auditEreignisse, terminangebote, terminbuchungen } from "@fahrschul/database";
 import type { Database } from "@fahrschul/database";
 import { buildEventRow } from "@fahrschul/events";
-import { and, eq, gt, gte, isNull, or } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNull, or } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireAuth, requirePermission } from "../middleware/auth.js";
@@ -12,6 +12,14 @@ import {
   UNIQUE_VIOLATION,
 } from "../services/booking.js";
 import { getOwnSchuelerId } from "../services/own-scope.js";
+import {
+  IdempotencyConflictError,
+  IDEMPOTENT_OPERATIONS,
+  readIdempotencyKey,
+  runIdempotent,
+  sendIdempotencyConflict,
+} from "../lib/idempotency.js";
+import { sendBusinessConstraintError, transitionState } from "../lib/state-machine.js";
 
 const createOfferSchema = z.object({
   fahrlehrerId: z.string().uuid(),
@@ -50,34 +58,50 @@ export function registerAppointmentOfferRoutes(app: FastifyInstance, db: Databas
       if (!(body.beginnAt < body.endeAt)) {
         return reply.code(400).send({ error: "invalid_interval" });
       }
-      const [inserted] = await db
-        .insert(terminangebote)
-        .values({
-          standortId: request.user!.standortId,
-          fahrlehrerId: body.fahrlehrerId,
-          fahrzeugId: body.fahrzeugId ?? null,
-          beginnAt: body.beginnAt,
-          endeAt: body.endeAt,
-          klasse: body.klasse ?? null,
-          art: body.art,
-          treffpunkt: body.treffpunkt ?? null,
-          automatik: body.automatik,
-          ablaufAt: body.ablaufAt ?? null,
-        })
-        .returning();
-      await db.insert(auditEreignisse).values(
-        buildEventRow({
-          type: "lesson.offer.created",
-          aktion: "appointment-offers.create",
-          entitaet: "terminangebot",
-          entitaetId: inserted.id,
-          akteurBenutzerId: request.user!.id,
-          standortId: request.user!.standortId,
-          source: "apps/api:appointment-offers.create",
-          nachher: inserted,
-        }),
-      );
-      return reply.code(201).send({ offer: inserted });
+      // PROMPT -1 §10: Das Angebot entsteht im Zustand `created` und wird in
+      // derselben Transaktion nach `sent` überführt – "veröffentlicht" IST das
+      // Senden, weil die Angebotsliste pollbar ist. Der Übergang nach
+      // `delivered` folgt aus der Outbox-Zustellung (workers/consumers.ts),
+      // ist also persistiert und nach einem Neustart wiederaufnehmbar.
+      try {
+        const offer = await db.transaction(async (tx) => {
+          const [inserted] = await tx
+            .insert(terminangebote)
+            .values({
+              standortId: request.user!.standortId,
+              fahrlehrerId: body.fahrlehrerId,
+              fahrzeugId: body.fahrzeugId ?? null,
+              beginnAt: body.beginnAt,
+              endeAt: body.endeAt,
+              klasse: body.klasse ?? null,
+              art: body.art,
+              treffpunkt: body.treffpunkt ?? null,
+              automatik: body.automatik,
+              ablaufAt: body.ablaufAt ?? null,
+              angebotStatus: "created",
+            })
+            .returning();
+
+          const sent = await transitionState(tx, {
+            machine: "terminangebot",
+            entitaetId: inserted.id,
+            to: "sent",
+            akteurBenutzerId: request.user!.id,
+            standortId: request.user!.standortId,
+            grund: "Angebot veröffentlicht",
+            eventType: "lesson.offer.created",
+            aktion: "appointment-offers.create",
+            source: "apps/api:appointment-offers.create",
+            payload: { beginnAt: inserted.beginnAt.toISOString(), art: inserted.art },
+          });
+          return (sent.row ?? inserted) as typeof inserted;
+        });
+        return reply.code(201).send({ offer });
+      } catch (err) {
+        if (sendBusinessConstraintError(err, reply)) return reply;
+        request.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
     },
   );
 
@@ -96,7 +120,7 @@ export function registerAppointmentOfferRoutes(app: FastifyInstance, db: Databas
       .from(terminangebote)
       .where(
         and(
-          eq(terminangebote.status, "offen"),
+          inArray(terminangebote.angebotStatus, ["created", "sent", "delivered"]),
           or(isNull(terminangebote.ablaufAt), gt(terminangebote.ablaufAt, now)),
           gte(terminangebote.beginnAt, now),
         ),
@@ -149,62 +173,113 @@ export function registerAppointmentOfferRoutes(app: FastifyInstance, db: Databas
       }
 
       try {
-        const result = await db.transaction(async (tx) => {
-          // Idempotenz zuerst prüfen: ein bereits gebuchtes Angebot mit
-          // DEMSELBEN idempotencyKey ist der Retry desselben Requests, kein
-          // "Angebot schon vergeben"-Fehler (siehe Prompt-0-Idempotenz-Tests).
-          const existingByKey = await tx
-            .select()
-            .from(terminbuchungen)
-            .where(eq(terminbuchungen.idempotencyKey, parsed.data.idempotencyKey))
-            .limit(1);
-          if (existingByKey[0]) {
-            return { booking: existingByKey[0], reused: true as const };
-          }
+        // PROMPT -1 §2: derselbe generische Idempotenz-Mechanismus wie bei
+        // allen anderen kritischen Schreibvorgängen. Der Unique-Index auf
+        // terminbuchungen.idempotency_key bleibt als DB-seitige Zweitsperre.
+        const outcome = await runIdempotent({
+          db,
+          operation: IDEMPOTENT_OPERATIONS.offerAccept,
+          key: parsed.data.idempotencyKey,
+          benutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          target: params.id,
+          payload: {},
+          handler: async (tx) => {
+            const existingByKey = await tx
+              .select()
+              .from(terminbuchungen)
+              .where(eq(terminbuchungen.idempotencyKey, parsed.data.idempotencyKey))
+              .limit(1);
+            if (existingByKey[0]) {
+              return {
+                status: 200,
+                body: { booking: existingByKey[0], reused: true as const },
+                entitaet: "terminbuchung",
+                entitaetId: existingByKey[0].id,
+              };
+            }
 
-          const [offer] = await tx
-            .select()
-            .from(terminangebote)
-            .where(eq(terminangebote.id, params.id))
-            .limit(1);
+            const [offer] = await tx
+              .select()
+              .from(terminangebote)
+              .where(eq(terminangebote.id, params.id))
+              .limit(1);
 
-          if (!offer) {
-            throw new OfferNotFoundError();
-          }
-          if (offer.status !== "offen") {
-            throw new OfferNotAvailableError("already_booked_or_closed");
-          }
-          if (offer.ablaufAt && new Date(offer.ablaufAt).getTime() <= Date.now()) {
-            throw new OfferNotAvailableError("expired");
-          }
+            if (!offer) {
+              throw new OfferNotFoundError();
+            }
+            // §10: annehmbar ist ein Angebot in `sent` oder `delivered`.
+            // Jeder andere Zustand ist entweder schon vergeben, abgelaufen
+            // oder zurückgezogen.
+            if (offer.angebotStatus !== "sent" && offer.angebotStatus !== "delivered") {
+              throw new OfferNotAvailableError(
+                offer.angebotStatus === "expired" ? "expired" : "already_booked_or_closed",
+              );
+            }
+            if (offer.ablaufAt && new Date(offer.ablaufAt).getTime() <= Date.now()) {
+              throw new OfferNotAvailableError("expired");
+            }
 
-          const booked = await performBooking(tx, {
-            terminangebotId: offer.id,
-            schuelerId,
-            fahrlehrerId: offer.fahrlehrerId,
-            fahrzeugId: offer.fahrzeugId,
-            beginnAt: offer.beginnAt,
-            endeAt: offer.endeAt,
-            art: offer.art,
-            klasse: offer.klasse ?? "B",
-            idempotencyKey: parsed.data.idempotencyKey,
-            standortId: request.user!.standortId,
-            akteurBenutzerId: request.user!.id,
-            eventType: "lesson.offer.accepted",
-            eventSource: "apps/api:appointment-offers.accept",
-          });
+            // Zustandskette accepted -> booking_pending -> confirmed, alles in
+            // EINER Transaktion: der Zwischenzustand ist persistiert, sodass
+            // ein Absturz nach `accepted` im Konsistenzcheck (§19,
+            // "bestaetigtes Angebot ohne Termin") sichtbar wird statt
+            // unbemerkt zu bleiben.
+            await transitionState(tx, {
+              machine: "terminangebot",
+              entitaetId: offer.id,
+              to: "accepted",
+              akteurBenutzerId: request.user!.id,
+              standortId: request.user!.standortId,
+              grund: "Schüler hat das Angebot angenommen",
+            });
+            await transitionState(tx, {
+              machine: "terminangebot",
+              entitaetId: offer.id,
+              to: "booking_pending",
+              akteurBenutzerId: request.user!.id,
+              standortId: request.user!.standortId,
+              grund: "Buchung wird angelegt",
+            });
 
-          if (!booked.reused) {
-            await tx
-              .update(terminangebote)
-              .set({ status: "gebucht", updatedAt: new Date() })
-              .where(eq(terminangebote.id, offer.id));
-          }
+            const booked = await performBooking(tx, {
+              terminangebotId: offer.id,
+              schuelerId,
+              fahrlehrerId: offer.fahrlehrerId,
+              fahrzeugId: offer.fahrzeugId,
+              beginnAt: offer.beginnAt,
+              endeAt: offer.endeAt,
+              art: offer.art,
+              klasse: offer.klasse ?? "B",
+              idempotencyKey: parsed.data.idempotencyKey,
+              standortId: request.user!.standortId,
+              akteurBenutzerId: request.user!.id,
+              eventType: "lesson.offer.accepted",
+              eventSource: "apps/api:appointment-offers.accept",
+            });
 
-          return booked;
+            await transitionState(tx, {
+              machine: "terminangebot",
+              entitaetId: offer.id,
+              to: "confirmed",
+              akteurBenutzerId: request.user!.id,
+              standortId: request.user!.standortId,
+              grund: "Terminbuchung bestätigt",
+            });
+
+            return {
+              status: booked.reused ? 200 : 201,
+              body: { booking: booked.booking, reused: booked.reused },
+              entitaet: "terminbuchung",
+              entitaetId: booked.booking.id,
+            };
+          },
         });
 
-        return reply.code(result.reused ? 200 : 201).send(result);
+        const body = outcome.body as { booking: unknown; reused: boolean };
+        return reply
+          .code(outcome.replayed ? 200 : outcome.status)
+          .send(outcome.replayed ? { ...body, reused: true } : body);
       } catch (err) {
         if (err instanceof OfferNotFoundError) {
           return reply.code(404).send({ error: "offer_not_found" });
@@ -212,6 +287,11 @@ export function registerAppointmentOfferRoutes(app: FastifyInstance, db: Databas
         if (err instanceof OfferNotAvailableError) {
           return reply.code(409).send({ error: "offer_not_available", reason: err.reason });
         }
+        if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);
+        if (err instanceof BookingConflictError) {
+          return reply.code(409).send({ error: "booking_conflict", reasons: err.reasons });
+        }
+        if (sendBusinessConstraintError(err, reply)) return reply;
         const pgError = err as { code?: string; constraint?: string };
         if (pgError.code === EXCLUSION_VIOLATION || pgError.code === UNIQUE_VIOLATION) {
           return reply.code(409).send({
@@ -219,9 +299,6 @@ export function registerAppointmentOfferRoutes(app: FastifyInstance, db: Databas
             reason: "DB_CONSTRAINT",
             constraint: pgError.constraint,
           });
-        }
-        if (err instanceof BookingConflictError) {
-          return reply.code(409).send({ error: "booking_conflict", reasons: err.reasons });
         }
         request.log.error(err);
         return reply.code(500).send({ error: "internal_error" });

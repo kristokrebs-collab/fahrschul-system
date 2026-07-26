@@ -25,8 +25,17 @@ import { and, eq, gte, lt, ne } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { requireAuth, requirePermission } from "../middleware/auth.js";
+import {
+  IdempotencyConflictError,
+  IDEMPOTENT_OPERATIONS,
+  readIdempotencyKey,
+  runIdempotent,
+  sendIdempotencyConflict,
+} from "../lib/idempotency.js";
+import { sendBusinessConstraintError } from "../lib/state-machine.js";
 import { getOwnFahrlehrerId } from "../services/own-scope.js";
 import { completeLesson, InstructorLessonError, startLesson } from "../services/instructor-lesson.js";
+import type { Tx } from "../services/booking.js";
 
 export interface InstructorRouteDeps {
   transcription: TranscriptionAdapter;
@@ -318,32 +327,75 @@ export function registerInstructorRoutes(app: FastifyInstance, db: Database, dep
       if (!parsed.success) {
         return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
       }
-      try {
-        const result = await db.transaction((tx) =>
-          completeLesson(tx, {
-            terminbuchungId: params.id,
-            fahrlehrerId,
-            akteurBenutzerId: request.user!.id,
+      /**
+       * PROMPT -1 §2/§3 – "Fahrstunde abschließen".
+       * Wird ein Idempotenzschlüssel mitgeschickt, läuft der Abschluss über
+       * den generischen Mechanismus (Retry liefert dieselbe Antwort statt
+       * einer zweiten Abschluss-Buchung). Unabhängig davon verhindert die
+       * Datenbank einen zweiten endgültigen Abschluss (Trigger
+       * fs_lesson_completed_once, SQLSTATE FS001) – die Invariante hängt
+       * NICHT am Idempotenzschlüssel.
+       */
+      const idempotencyKey = readIdempotencyKey(request);
+
+      /**
+       * Der Abschluss UND die daraus abgeleiteten Kompetenzbeobachtungen
+       * laufen in DERSELBEN Transaktion. Vorher war der Kompetenz-Insert ein
+       * Nachlauf ausserhalb der Transaktion – ein Absturz dazwischen hätte
+       * eine abgeschlossene Stunde ohne Beobachtungen hinterlassen, und ein
+       * Retry hätte sie doppelt angelegt.
+       */
+      const completeAll = async (tx: Tx) => {
+        const inner = await completeLesson(tx, {
+          terminbuchungId: params.id,
+          fahrlehrerId,
+          akteurBenutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          payload: parsed.data,
+        });
+        for (const obs of inner.beobachteteKompetenzfelder) {
+          await tx.insert(kompetenzbeobachtungen).values({
             standortId: request.user!.standortId,
-            payload: parsed.data,
-          }),
-        );
-        // Kompetenzfelder aus Schritt 4 werden zusätzlich als einzelne
-        // Beobachtungen im Kompetenzraster gespeichert (dieselbe Tabelle,
-        // die /schueler/:id/kompetenzraster liest).
-        for (const obs of result.beobachteteKompetenzfelder) {
-          await db.insert(kompetenzbeobachtungen).values({
-            standortId: request.user!.standortId,
-            schuelerId: result.booking.schuelerId,
+            schuelerId: inner.booking.schuelerId,
             fahrlehrerId,
-            terminbuchungId: result.booking.id,
+            terminbuchungId: inner.booking.id,
             feld: obs.feld,
             kompetenzstatus: obs.kompetenzstatus,
             beobachtung: obs.beobachtung,
           });
         }
+        return inner;
+      };
+
+      try {
+        const result = idempotencyKey
+          ? await (async () => {
+              const outcome = await runIdempotent({
+                db,
+                operation: IDEMPOTENT_OPERATIONS.lessonComplete,
+                key: idempotencyKey,
+                benutzerId: request.user!.id,
+                standortId: request.user!.standortId,
+                target: params.id,
+                payload: parsed.data,
+                handler: async (tx) => {
+                  const inner = await completeAll(tx);
+                  return {
+                    status: 200,
+                    body: { booking: inner.booking, lernziele: inner.lernziele },
+                    entitaet: "terminbuchung",
+                    entitaetId: inner.booking.id,
+                  };
+                },
+              });
+              return outcome.body as { booking: { id: string }; lernziele: string[] };
+            })()
+          : await db.transaction(completeAll);
+
         return reply.send({ termin: result.booking });
       } catch (err) {
+        if (err instanceof IdempotencyConflictError) return sendIdempotencyConflict(err, reply);
+        if (sendBusinessConstraintError(err, reply)) return reply;
         return sendLessonError(err, reply);
       }
     },

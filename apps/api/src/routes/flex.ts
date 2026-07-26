@@ -13,6 +13,7 @@ import {
 } from "../services/booking.js";
 import { getFlagState } from "../services/flags.js";
 import { getOwnSchuelerId } from "../services/own-scope.js";
+import { sendBusinessConstraintError, transitionState } from "../lib/state-machine.js";
 
 const createFlexOfferSchema = z.object({
   fahrlehrerId: z.string().uuid(),
@@ -85,6 +86,7 @@ export function registerFlexRoutes(app: FastifyInstance, db: Database) {
         return reply.code(400).send({ error: "invalid_body", details: parsed.error.flatten() });
       }
       const body = parsed.data;
+      try {
       const result = await db.transaction(async (tx) => {
         const [offer] = await tx
           .insert(terminangebote)
@@ -97,8 +99,24 @@ export function registerFlexRoutes(app: FastifyInstance, db: Database) {
             klasse: body.klasse ?? null,
             art: "Krebs Flex",
             ablaufAt: body.ablaufAt,
+            angebotStatus: "created",
           })
           .returning();
+        // PROMPT -1 §10: auch Flex-Angebote laufen durch die
+        // Terminangebot-State-Machine (created -> sent). Flex bleibt dabei ein
+        // eigener Aufsatz (flex_angebote), aber der Angebotszustand ist
+        // EINER – keine zweite, konkurrierende Zustandsmenge.
+        await transitionState(tx, {
+          machine: "terminangebot",
+          entitaetId: offer.id,
+          to: "sent",
+          akteurBenutzerId: request.user!.id,
+          standortId: request.user!.standortId,
+          grund: "Krebs-Flex-Angebot veröffentlicht",
+          eventType: "lesson.offer.created",
+          aktion: "flex.offers.create",
+          source: "apps/api:flex.offers.create",
+        });
         const [flex] = await tx
           .insert(flexAngebote)
           .values({
@@ -110,6 +128,11 @@ export function registerFlexRoutes(app: FastifyInstance, db: Database) {
         return { offer, flex };
       });
       return reply.code(201).send(result);
+      } catch (err) {
+        if (sendBusinessConstraintError(err, reply)) return reply;
+        request.log.error(err);
+        return reply.code(500).send({ error: "internal_error" });
+      }
     },
   );
 
@@ -184,6 +207,11 @@ export function registerFlexRoutes(app: FastifyInstance, db: Database) {
             .where(eq(terminangebote.id, flex.terminangebotId))
             .limit(1);
           if (!offer) throw new FlexNotFoundError();
+          if (offer.angebotStatus !== "sent" && offer.angebotStatus !== "delivered") {
+            throw new FlexNotAvailableError(
+              offer.angebotStatus === "expired" ? "expired" : "already_booked_or_closed",
+            );
+          }
 
           const booked = await performBooking(tx, {
             terminangebotId: offer.id,
@@ -211,10 +239,17 @@ export function registerFlexRoutes(app: FastifyInstance, db: Database) {
                 updatedAt: new Date(),
               })
               .where(eq(flexAngebote.id, flex.id));
-            await tx
-              .update(terminangebote)
-              .set({ status: "gebucht", updatedAt: new Date() })
-              .where(eq(terminangebote.id, offer.id));
+            // §10: derselbe Zustandspfad wie bei einem regulären Angebot.
+            for (const to of ["accepted", "booking_pending", "confirmed"] as const) {
+              await transitionState(tx, {
+                machine: "terminangebot",
+                entitaetId: offer.id,
+                to,
+                akteurBenutzerId: request.user!.id,
+                standortId: request.user!.standortId,
+                grund: "Krebs-Flex-Annahme",
+              });
+            }
           }
 
           return booked;
@@ -226,6 +261,7 @@ export function registerFlexRoutes(app: FastifyInstance, db: Database) {
         if (err instanceof FlexNotAvailableError) {
           return reply.code(409).send({ error: "flex_not_available", reason: err.reason });
         }
+        if (sendBusinessConstraintError(err, reply)) return reply;
         const pgError = err as { code?: string; constraint?: string };
         if (pgError.code === EXCLUSION_VIOLATION || pgError.code === UNIQUE_VIOLATION) {
           return reply.code(409).send({ error: "booking_conflict", reason: "DB_CONSTRAINT" });
