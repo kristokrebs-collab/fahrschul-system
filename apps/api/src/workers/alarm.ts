@@ -43,7 +43,11 @@ export type AlarmKind =
   | "brute_force_lockout"
   | "rate_limit_flood"
   | "document_scan_unavailable"
-  | "sync_delay";
+  | "sync_delay"
+  // Phase 4 (§15): der Scheduler selbst. Alle Alarme darüber setzen voraus,
+  // dass wiederkehrende Jobs laufen – bleibt der Takt aus, schweigen sie
+  // fälschlich (die Warteschlange wächst, aber niemand stellt zu).
+  | "scheduler_stalled";
 
 export type AlarmSeverity = "info" | "warning" | "critical";
 
@@ -173,6 +177,18 @@ export const ALARM_CATALOG: readonly AlarmDefinition[] = [
     owner: "Rolle systemdienst",
     runbook: "docs/failure-modes.md#runbook-sync-verzoegerung",
     escalation: "nach 30 Min. an Geschäftsführung; Clients fallen auf Polling zurück, keine Datenverluste",
+  },
+  {
+    kind: "scheduler_stalled",
+    severity: "critical",
+    threshold: "5 aufeinanderfolgende fehlgeschlagene Scheduler-Takte, oder kein Takt seit > 5 Min.",
+    metric: "fahrschul_scheduler_ticks_total{result=\"error\"} / fahrschul_scheduler_last_tick_age_seconds",
+    owner: "Rolle systemdienst (Bereitschaft)",
+    runbook: "docs/recovery-runbook.md#runbook-scheduler-steht",
+    escalation:
+      "sofort an Geschäftsführung, weil dieser Alarm die ÜBRIGEN Alarme entwertet: ohne Takt werden " +
+      "Ereignisse nicht zugestellt, Angebote laufen nicht ab und gepufferte Aufrufe bleiben liegen. " +
+      "Manuelle Überbrückung: POST /ops/workers/run + POST /ops/jobs/schedule-recurring",
   },
 ];
 

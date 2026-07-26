@@ -14,7 +14,14 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { getDb } from "./db.js";
 import { createSessionLoader } from "./middleware/auth.js";
 import { registerSecurity } from "./middleware/security.js";
-import { startWorkerLoop } from "./workers/runner.js";
+import {
+  createScheduler,
+  schedulerOptionsFromEnv,
+  workersEnabledFromEnv,
+  type Scheduler,
+  type SchedulerOptions,
+} from "./workers/scheduler.js";
+import { registerSchedulerRoute } from "./routes/scheduler.js";
 import { configureAlarmSinksFromEnv } from "./workers/alarm.js";
 import { bruteForceConfigFromEnv, type BruteForceConfig } from "./lib/brute-force.js";
 import {
@@ -55,12 +62,17 @@ import { registerUploadRoutes } from "./routes/uploads.js";
 export interface BuildAppOptions {
   databaseUrl: string;
   /**
-   * PROMPT -1 §13: Startet die Worker-Schleife im HTTP-Prozess. Standardmäßig
-   * AUS – in Tests und bei Betrieb mit separatem Worker-Prozess unerwünscht.
-   * Die Verdrahtung eines Schedulers ist §15 (Phase 4).
+   * PROMPT -1 §13/§15: Startet den Scheduler im HTTP-Prozess.
+   *
+   * Standard ist jetzt `RUN_WORKERS` aus der Umgebung (Phase 4 hat §15
+   * verdrahtet); ein explizites `true`/`false` hier überschreibt sie – Tests
+   * lassen ihn aus, damit sie die Takte selbst und deterministisch treiben
+   * (`scheduler.runWorkTick()` bzw. `POST /ops/workers/run`).
    */
   startWorkers?: boolean;
   workerIntervalMs?: number;
+  /** §15: abweichende Takte/Chargengrößen (Tests, Lastmessungen). */
+  scheduler?: SchedulerOptions;
   cookieSecure?: boolean;
   logger?: boolean;
   /** Erlaubte Browser-Origins für die App-Frontends (Vite-Dev-Server/Prod-Hosts). */
@@ -212,7 +224,7 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
 
   const resilience: IntegrationServiceOptions = { db, ...(options.integrations ?? {}) };
 
-  registerHealthRoutes(app);
+  registerHealthRoutes(app, options.databaseUrl);
   registerObservabilityRoutes(app, db, { metricsToken: options.metricsToken });
   registerAuthRoutes(app, db, {
     cookieSecure: options.cookieSecure ?? false,
@@ -251,13 +263,32 @@ export function buildApp(options: BuildAppOptions): FastifyInstance {
   // Polling-Fallback, Cursor und Auflösung offener Vorgänge nach Neustart.
   registerSyncRoutes(app, db, options.realtime);
 
-  if (options.startWorkers) {
-    const loop = startWorkerLoop(
-      { db, notifications, storage, malwareScan, bankFeed },
-      options.workerIntervalMs ?? 5000,
-    );
-    app.addHook("onClose", async () => loop.stop());
+  /**
+   * PROMPT -1 §15 (Phase 4) – der Scheduler, den Phase 1–3 offen gelassen haben.
+   *
+   * Standard bleibt AUS, aber jetzt aus einer bewussten Entscheidung heraus und
+   * nicht, weil niemand die Option gesetzt hat: `RUN_WORKERS=1` schaltet ihn
+   * ein, `GET /ops/scheduler` sagt jederzeit, ob er in DIESEM Prozess läuft.
+   * Genau EIN Prozess soll ihn fahren – entweder dieser (Pilot) oder der
+   * getrennte `apps/api/src/worker.ts` (Mehrinstanzbetrieb). Beides ist
+   * sicher, weil der Anspruch über Lease + `FOR UPDATE SKIP LOCKED` in der
+   * Datenbank sitzt (§13).
+   */
+  const schedulerAktiv = options.startWorkers ?? workersEnabledFromEnv();
+  const scheduler = createScheduler(
+    { db, notifications, storage, malwareScan, bankFeed },
+    {
+      ...schedulerOptionsFromEnv(),
+      ...(options.workerIntervalMs ? { workIntervalMs: options.workerIntervalMs } : {}),
+      ...(options.scheduler ?? {}),
+    },
+  );
+  registerSchedulerRoute(app, scheduler, schedulerAktiv);
+  if (schedulerAktiv) {
+    scheduler.start();
+    app.addHook("onClose", async () => scheduler.stop());
   }
+  app.decorate("scheduler", scheduler);
 
   return app;
 }

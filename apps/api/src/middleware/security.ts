@@ -13,6 +13,10 @@ import {
 } from "../lib/observability.js";
 import { NO_STORE_HEADERS, securityHeaders, type SecurityHeaderOptions } from "../lib/security-headers.js";
 import { enterCorrelation } from "../lib/correlation-context.js";
+import { deploymentIdentity } from "../lib/deployment.js";
+
+/** §15: welches Release hat geantwortet. */
+export const DEPLOYMENT_HEADER = "x-deployment-id";
 
 /**
  * PROMPT -1 §16/§17 – die Hook-Kette, die JEDE Anfrage durchläuft.
@@ -97,6 +101,11 @@ export function registerSecurity(app: FastifyInstance, options: SecurityPluginOp
 
     reply.header(REQUEST_ID_HEADER, request.requestId);
     reply.header(CORRELATION_HEADER, request.correlationId);
+    // §15 (Phase 4): welches Release hat geantwortet? Bei einem Rolling-Deploy
+    // beantwortet dieser Kopf die Frage "treffe ich die alte oder die neue
+    // Fassung?" ohne Logzugriff – und ein Fehlerbericht aus dem Browser trägt
+    // sie damit automatisch mit.
+    reply.header(DEPLOYMENT_HEADER, deploymentIdentity().deploymentId);
     for (const [name, value] of Object.entries(headers)) reply.header(name, value);
 
     if (options.rateLimiter) {
@@ -169,6 +178,63 @@ export function registerSecurity(app: FastifyInstance, options: SecurityPluginOp
       }
     }
     return payload;
+  });
+
+  /**
+   * PROMPT -1 §15/§16 (Phase 4) – der Fehlerbericht.
+   *
+   * Vorher gab es KEINEN `setErrorHandler`: eine unbehandelte Ausnahme lief in
+   * Fastifys Standardbehandlung, die `{statusCode, error, message}` mit der
+   * ORIGINALEN Fehlermeldung ausliefert. Zwei Probleme damit:
+   *
+   *  1. §15 verlangt die Deployment-ID "in Logs UND Fehlerberichten". In der
+   *     Standardantwort stand sie nicht.
+   *  2. Die Originalmeldung kann Interna enthalten (Constraint-Namen,
+   *     Spaltennamen, Ausschnitte aus Nutzlasten). Sie gehört ins Log, nicht
+   *     in die Antwort.
+   *
+   * Was bewusst NICHT geändert wird: die ~30 Routen, die selbst
+   * `reply.code(500).send({error:"internal_error"})` senden. Sie haben ihren
+   * Fehler bereits behandelt und ihre Antwort ist korrekt; dieser Handler ist
+   * das Netz für alles, was NIEMAND behandelt hat. Fehler mit einem
+   * `statusCode` < 500 (Fastifys Validierungs-/Parserfehler, z. B. 400 bei
+   * kaputtem JSON oder 415) behalten ihren Status und ihre Bedeutung.
+   */
+  app.setErrorHandler((raw: unknown, request, reply) => {
+    const err = raw as { statusCode?: unknown; code?: string; message?: string; stack?: string };
+    const status = typeof err.statusCode === "number" && err.statusCode >= 400 ? err.statusCode : 500;
+    const identity = deploymentIdentity();
+    log({
+      severity: status >= 500 ? "error" : "warn",
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+      actorBenutzerId: request.user?.id ?? null,
+      actorRole: request.user?.rolle,
+      operation: `${request.method} ${metricRouteLabel(request.url)}`,
+      httpStatus: status,
+      errorCode: err.code ?? "UNHANDLED_ERROR",
+      // Die Meldung läuft durch die §16-Redaktion (siehe `log`).
+      message: err.message ?? String(raw),
+      details: { stack: err.stack?.split("\n").slice(0, 4).join(" | ") },
+    });
+    if (status < 500) {
+      // Validierungs-/Protokollfehler behalten ihre Aussagekraft für den
+      // Client – sie beschreiben dessen Anfrage, nicht unsere Interna.
+      return reply.code(status).send({
+        error: err.code ?? "bad_request",
+        message: err.message,
+        requestId: request.requestId,
+        correlationId: request.correlationId,
+        deploymentId: identity.deploymentId,
+      });
+    }
+    return reply.code(500).send({
+      error: "internal_error",
+      requestId: request.requestId,
+      correlationId: request.correlationId,
+      deploymentId: identity.deploymentId,
+      hinweis: "Bitte requestId und deploymentId bei einer Meldung angeben.",
+    });
   });
 
   app.addHook("onResponse", async (request: FastifyRequest, reply: FastifyReply) => {

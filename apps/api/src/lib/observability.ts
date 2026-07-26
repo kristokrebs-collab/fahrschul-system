@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { deploymentLogFields } from "./deployment.js";
 
 /**
  * PROMPT -1 §16 – Beobachtbarkeit: strukturierte Logs, Korrelation, Redaktion.
@@ -306,6 +307,11 @@ export function log(input: LogInput): StructuredLogRecord {
     correlationId: input.correlationId,
     actor: pseudonymizeActor(input.actorBenutzerId ?? null),
     operation: input.operation,
+    // §15 (Phase 4): Deployment-Identität an JEDER Zeile. Sie steht hier und
+    // nicht an den ~20 Aufrufstellen, damit sie nicht bei der nächsten neuen
+    // Logzeile vergessen wird – und damit auch Job-, Alarm- und Fehlerzeilen
+    // sie tragen, nicht nur das Zugriffsprotokoll.
+    ...deploymentLogFields(),
   };
   if (input.actorRole) record.actorRole = input.actorRole;
   if (input.errorCode) record.errorCode = input.errorCode;

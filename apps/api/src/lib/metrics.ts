@@ -194,6 +194,11 @@ export const METRIC = {
   integrationBreakerOpen: "fahrschul_integration_breaker_open",
   integrationBufferDepth: "fahrschul_integration_buffer_depth",
   stepUpChallenges: "fahrschul_step_up_challenges_total",
+  // Phase 4 (§15/§21): der Scheduler ist die Voraussetzung fast aller anderen
+  // Kennzahlen. Ein stehender Takt sieht ohne diese beiden Reihen wie
+  // "alles ruhig" aus.
+  schedulerTicks: "fahrschul_scheduler_ticks_total",
+  schedulerLastTickAge: "fahrschul_scheduler_last_tick_age_seconds",
 } as const;
 
 export const LATENCY_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10] as const;
@@ -314,6 +319,37 @@ export function recordRateLimited(scope: "ip" | "account" | "global", route: str
 
 export function recordStepUpChallenge(outcome: "required" | "granted" | "rejected"): void {
   incCounter(METRIC.stepUpChallenges, "Step-up-Authentisierungen nach Ergebnis", { outcome });
+}
+
+/**
+ * §15/§21 – Scheduler-Takte. Zwei Reihen, weil sie zwei verschiedene
+ * Fehlerbilder abdecken: `ticks_total{result="error"}` steigt, wenn der Takt
+ * LÄUFT und scheitert; `last_tick_age_seconds` steigt, wenn er GAR NICHT mehr
+ * läuft. Nur der zweite Fall ist der stille, gefährliche.
+ */
+export const SCHEDULER_TICK_KINDS = ["work", "schedule"] as const;
+export const SCHEDULER_TICK_RESULTS = ["ok", "error"] as const;
+
+export function recordSchedulerTick(
+  kind: (typeof SCHEDULER_TICK_KINDS)[number],
+  result: (typeof SCHEDULER_TICK_RESULTS)[number],
+): void {
+  incCounter(METRIC.schedulerTicks, "Scheduler-Takte nach Art und Ergebnis", {
+    kind: sanitizeLabelValue(kind, SCHEDULER_TICK_KINDS),
+    result: sanitizeLabelValue(result, SCHEDULER_TICK_RESULTS),
+  });
+}
+
+export function setSchedulerTickAge(
+  kind: (typeof SCHEDULER_TICK_KINDS)[number],
+  ageSeconds: number,
+): void {
+  setGauge(
+    METRIC.schedulerLastTickAge,
+    "Alter des letzten Scheduler-Takts in Sekunden (-1 = noch kein Takt)",
+    ageSeconds,
+    { kind: sanitizeLabelValue(kind, SCHEDULER_TICK_KINDS) },
+  );
 }
 
 // ---------------------------------------------------------------------------
