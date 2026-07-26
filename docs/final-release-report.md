@@ -363,6 +363,18 @@ Bedingungen vor echtem Produktivbetrieb mit echten Nutzerdaten, in
 Prioritätsreihenfolge:
 
 1. Rate Limiting auf Login/Buchung/Export-Endpunkten ergänzen und testen.
+   > **NACHTRAG (PROMPT -1, Phase 3, 2026-07-26): ERLEDIGT.** Token-Bucket je
+   > IP **und** je Konto mit `Retry-After`, eigener Politik für den
+   > SSE-Stream, vollständig konfigurierbar
+   > (`apps/api/src/lib/rate-limit.ts`), plus persistenter Brute-Force-Schutz
+   > auf der Anmeldung mit Entsperrpfad (`apps/api/src/lib/brute-force.ts`).
+   > 52 Tests in `apps/api/src/__tests__/security.test.ts`. Begründung,
+   > Grenzen und Runbooks: `docs/security-architecture.md` Abschnitte 2 und 3.
+   > **Neue offene Bedingung aus derselben Phase:** zwei
+   > Produktionsabhängigkeiten mit Advisories (`drizzle-orm` high,
+   > `react-router` moderate) – im aktuellen Code nicht ausnutzbar, Behebung
+   > nur per Major-Aktualisierung; siehe `docs/security-architecture.md`
+   > Abschnitt 11.
 2. Mindestens einen vollständigen Playwright-Lauf (alle vier Apps, kritische
    Flows, Viewports 360-1440px) in einer Umgebung mit Netzwerkzugriff
    durchführen; mindestens einen manuellen Screenreader-Durchlauf für Login/

@@ -1196,3 +1196,248 @@ Seams, die Phase 2 hinterlässt:
 
 **Gesamt Phase 2: 108 neue Tests.** Workspace: **487** (vorher 379),
 17 Pakete typecheck-sauber (vorher 16 – `packages/sync` ist neu).
+
+---
+---
+
+# Teil 3 – Phase 3: Defense in Depth, Beobachtbarkeit, degradierter Betrieb
+
+Phase 3 besitzt §11, §12, §16, §17 und §18. Die ausführliche Darstellung liegt
+in zwei eigenen Dokumenten, weil §22 sie einzeln verlangt:
+
+- **`docs/security-architecture.md`** – §17 wie implementiert, Bedrohungsmodell,
+  die Step-up-Aktionsliste, Secret-Rotation, Abhängigkeitsscan (Ergebnis
+  unverändert), und was Mock ist.
+- **`docs/failure-modes.md`** – §11 und §18 wie implementiert: jeder
+  Ausfallmodus mit Erkennung, degradiertem Verhalten und Rückkehrpfad,
+  einschließlich der Runbooks, auf die der Alarmkatalog verweist.
+
+Dieser Teil hält nur fest, **was Phase 3 an dem ändert, was Teil 1 und 2
+beschreiben** – und was Phase 4 von hier übernimmt.
+
+## Was sich an Teil 1 und Teil 2 geändert hat
+
+### §4 ist jetzt VOLLSTÄNDIG verpflichtend – Phase 2s Lücke ist geschlossen
+
+Teil 2 hielt fest: „§4 ist nicht mit umgeschaltet", weil
+`GET /heute/queue` (real: `GET /office/heute`) und `GET /feedback/mine` keine
+Version je Datensatz lieferten – eine Pflicht wäre ein 428 für einen korrekt
+gebauten Client gewesen. Die Voraussetzung ist erfüllt:
+
+| Endpunkt | Was neu ist |
+| --- | --- |
+| `GET /office/heute` | Jeder Queue-Eintrag trägt `version` **und** `etag` (`W/"<n>"`) des referenzierten Datensatzes. `null`, wenn die Entität keine Versionsspalte hat (`lead`, `nachricht`) – eine ehrliche Angabe, kein Fehler; für diese Entitäten fordert §4 keine Version. |
+| `GET /feedback/mine` | `version`, `updatedAt` und `etag` je Zeile. `internalNotes` bleibt aus der Spaltenauswahl – der Redaktionsvertrag ist unangetastet und wird zusätzlich statisch geprüft (`code-guards.test.ts`). |
+| `GET /documents/mine`, `GET /documents` (neu, Büro) | `etag` je Zeile. |
+
+Damit sind **beide** Umschaltpunkte umgelegt:
+
+| Endpunkt | Vorher | Jetzt |
+| --- | --- | --- |
+| `POST /documents/:id/review` | geprüft-wenn-gesendet | **`requireExpectedVersion` – Pflicht** |
+| `PATCH /feedback/:id/self-assessment` | geprüft-wenn-gesendet | **`requireExpectedVersion` – Pflicht**, mit versionsgebundenem `UPDATE … WHERE version = ?` und 409 samt Serverzustand |
+
+Neu hinzugekommen und von Anfang an Pflicht: `PATCH /users/:id/role`.
+`readExpectedVersion` existiert weiter, wird in `apps/api/src/routes` aber
+nirgends mehr **allein** benutzt.
+
+**Folge für bestehende Tests:** vier Tests senden jetzt eine Version
+(`office.test.ts`, `optimistic-concurrency.test.ts`, `state-machines.test.ts`,
+`student-app.test.ts`). Jede Änderung ist an der Stelle kommentiert; keine
+Zusicherung wurde entfernt – im Gegenteil, zwei Tests prüfen jetzt
+zusätzlich, dass die Liste die Version überhaupt mitliefert.
+
+### §16: die Korrelations-ID beginnt jetzt beim Client, nicht bei der Audit-Zeile
+
+Phase 1 hatte `correlation_id` in `audit_events`, `event_outbox` und `jobs` samt
+DB-Trigger, der sie weiterträgt. Was fehlte, war die erste Stufe:
+`buildEventRow` erzeugte eine **frische** UUID, weil kein Aufrufer eine mitgab.
+Jede Audit-Zeile war damit ihr eigener Vorgang.
+
+Phase 3 schließt das ohne 60 Aufrufstellen anzufassen:
+
+- `packages/events/src/index.ts` hat einen **Anbieter-Einhängepunkt**
+  (`setAmbientCorrelationProvider`). `buildEventRow` benutzt
+  `input.correlationId ?? ambient ?? randomUUID()` – explizit gesetzte IDs
+  behalten Vorrang.
+- `apps/api/src/lib/correlation-context.ts` füllt ihn über
+  `AsyncLocalStorage`; der `onRequest`-Hook betritt den Kontext.
+- Ein vom Client gelieferter `X-Correlation-Id` wird übernommen, **wenn** er
+  eine UUID ist (sonst wäre er Log-Injection und ein DB-Typfehler), und in der
+  Antwort zurückgegeben.
+
+Getestet als Kette: Anfrage-Header → `audit_events.correlation_id` →
+`event_outbox.correlation_id` → `realtime_deliveries` (über den Fremdschlüssel).
+`packages/events` bleibt browserfähig – der Anbieter ist ein Funktionszeiger,
+keine `node:async_hooks`-Abhängigkeit.
+
+### §12: der Zustand `quarantined` hat endlich einen Produzenten
+
+Teil 1 notierte: „`dokument`-Zustand `quarantined` existiert samt Übergängen;
+sein echter Produzent ist die Upload-Härtung (Phase 3)." Er existiert:
+**jeder** Upload geht `uploaded → quarantined`, und nur
+`services/document-pipeline.ts` bringt ihn weiter. Vorher ging der Upload direkt
+nach `submitted`, und der Zustand war unerreichbar.
+
+Neue Invariante **FS009** (Migration 0009): `verified` verlangt
+`scan_status = 'sauber'`. Als Trigger, nicht als CHECK – damit der SQLSTATE
+zur bestehenden `BUSINESS_SQLSTATE`-Klassifikation passt und die
+Reihenfolge nach FS007/FS006 stimmt (der Aufrufer bekommt weiterhin den
+spezifischsten Fehler).
+
+**Folge für bestehende Tests:** drei Tests setzen jetzt `scan_status = 'sauber'`
+beim Anlegen eines Fixture-Dokuments, und `consistency-check.test.ts`
+deaktiviert für seine absichtliche Zustandsmanipulation einen zweiten Trigger.
+Auch das ist je Stelle kommentiert.
+
+### §2/§3: ein gefundener Fehler – Deadlock statt Konfliktantwort
+
+Beim Härten des Nebenläufigkeitsverhaltens ist ein **seit Phase 1 bestehender
+Fehler** aufgefallen, der nichts mit Phase 3 zu tun hat, aber eine
+Non-Negotiable-Zusage betraf:
+
+`terminbuchungen` trägt ZWEI GiST-EXCLUDE-Constraints (Fahrlehrer und
+Fahrzeug). Kollidieren zwei gleichzeitige Einfügungen in **beiden**, kann
+PostgreSQL einen echten **Deadlock (40P01)** melden statt der erwarteten
+Constraint-Verletzung (23P01) – A wartet in Index 1 auf B, B in Index 2 auf A.
+Der Verlierer bekam dann **HTTP 500 statt 409**. Gemessen: **9–10 von 50**
+gleichzeitigen Doppelbuchungsversuchen; gegen den Stand von Commit `1db1118`
+reproduziert. Unauffällig war er nur, weil der bestehende Race-Test genau EINEN
+Versuch macht.
+
+Behoben in `lib/idempotency.ts`: ein Serialisierungsfehler (40001/40P01) wird
+bis zu viermal wiederholt. Ein Deadlock-Opfer wird von PostgreSQL vollständig
+zurückgerollt – auch die Idempotenzreservierung –, ein Wiederholversuch ist
+daher sicher und trifft den bereits committeten Gewinner, der dann saubere
+23P01 → 409 liefert. Die Klassifikation kommt aus
+`packages/events/src/retry.ts` (`SERIALIZATION_FAILURE`), der Backoff aus
+`computeBackoffMs` – **keine zweite Retry-Politik**. Die Behebung sitzt am
+§2-Choke-Point und gilt damit für alle zehn kritischen Operationen, nicht nur
+für die Buchung.
+
+Nachweis: `booking-conflict.test.ts`, „bleibt über 20 Runden gleichzeitiger
+Doppelbuchung deterministisch". 20 × 2 Anfragen, Ergebnis exakt
+`{201: 20, 409: 20}`.
+
+### §11: `runIntegrationSync` war der angekündigte Einhängepunkt
+
+Teil 1 nannte ihn so. Phase 3 legt sich nicht nur um diesen einen Aufruf,
+sondern um **jeden** ausgehenden Aufruf – über `runBuffered`, das Zeitlimit,
+Breaker, Retry, ausgehende Idempotenz, Puffer und Fehlerwarteschlange in einem
+Ergebnistyp zusammenfasst, der eine falsche Erfolgsmeldung nicht zulässt.
+
+### `alarm.ts` hat den echten Sink bekommen (Teil 1, §16-Übergabe)
+
+Aus dem einen festen stderr-Sink ist eine **Sink-Kette** geworden: stderr
+(bleibt, funktioniert überall) + strukturierte §16-Logzeile + Kennzahl
+(`fahrschul_alarms_total`) + ein Webhook-Sink als dokumentierter
+Konfigurations-Seam (`ALARM_WEBHOOK_URL`, standardmäßig **nicht** registriert –
+kein Kanal in dieser Umgebung). Dazu der **Alarmkatalog** als Code: zehn
+Alarmarten mit Schwelle, Kennzahl, Zuständigem, Runbook-Anker und Eskalation,
+abrufbar über `GET /ops/alerts/catalog`. Ein Sink darf niemals werfen
+(`emitAlarm` fängt pro Sink) – eine ausgefallene Alarmierung darf kein
+Fachvorgang kippen.
+
+### §17: die Entwurfsverschlüsselung hat ihre Gegenmaßnahme bekommen
+
+Teil 2s Lücke „Entwurfsverschlüsselung schützt nicht gegen XSS – der Seam für
+§17 ist vorhanden, aber nicht verdrahtet" ist geschlossen: eine CSP ohne
+`unsafe-inline`/`unsafe-eval` für Skripte, als HTTP-Kopfzeile **und** als
+`<meta>` in allen vier `index.html`. Die Kompatibilität ist gegen die
+tatsächlich gebauten `dist/index.html` geprüft (nur externe Modul-Skripte),
+nicht vermutet.
+
+`deriveKeyFromPassphrase` (Teil 2s zweiter §17-Seam) bleibt **unbenutzt**:
+Step-up ist an der Sitzung verankert, nicht am Entwurfsschlüssel. Ein
+passphrasengeschützter Entwurfsschlüssel hätte bedeutet, dass ein Fahrlehrer
+seine Notizen nach jedem Neustart nur mit einer zusätzlichen Eingabe
+wiederbekommt – das wäre Reibung ohne Sicherheitsgewinn, solange die CSP die
+XSS-Tür schließt. Bewusst offen gelassen, nicht vergessen.
+
+### Der SSE-Stream hat seine eigene Rate-Limit-Politik
+
+Teil 2s Übergabe verlangte, dass §17 den langlebigen Stream „ausdrücklich
+anders behandelt". `policyForRequest` bildet `/sync/stream` auf die Politik
+`stream` ab (0,5/s, Stoß 12) – begrenzt wird der **Verbindungsaufbau**, nicht
+der Datenfluss. Getestet.
+
+## Neue Tabellen (Migration 0009, expand-contract)
+
+| Tabelle / Spalte | Zweck |
+| --- | --- |
+| `audit_events.chain_seq/prev_hash/row_hash` + 2 Trigger | §17 append-only + Hash-Kette |
+| `auth_throttle` | §17 Brute-Force-Zustand, persistiert |
+| `sessions.step_up_verified_at/step_up_scope` | §17 Step-up |
+| `dokumente.checksum_sha256/groesse_bytes/deklarierter_mime_typ/erkannter_mime_typ/quarantaene_grund/freigegeben_at` | §12 |
+| `upload_sessions` | §12 wiederaufnehmbare Uploads |
+| `integration_health` | §11 Breaker-Zustand + letzter Erfolg |
+| `integration_outbound_calls` | §11 Puffer + Fehlerwarteschlange |
+| Trigger `dokumente_c_scan_pflicht_trg` (FS009) | §12/§3 |
+
+Ein Wächtertest prüft, dass 0009 **kein** `DROP COLUMN`, `DROP TABLE`, `RENAME`
+und kein `SET NOT NULL` enthält – expand-contract ist damit nicht nur behauptet.
+
+## Non-Negotiables: nach Phase 3 erneut geprüft
+
+| Zusage | Status | Nachweis |
+| --- | --- | --- |
+| `EXCLUDE`-Constraint gegen Doppelbuchung | unangetastet | statischer Wächter + `booking-conflict.test.ts` unverändert grün |
+| Phase-1-Invarianten/Trigger/State Machines | unangetastet, **um FS009 erweitert** | `invariants.test.ts`, `state-machines.test.ts` |
+| Phase-2 SSE-Autorisierung + dichter Cursor | unangetastet | `realtime.test.ts` (28 Tests) unverändert grün |
+| §2 Pflicht für alle zehn Operationen | unangetastet | statischer Wächter (`IDEMPOTENCY_MANDATORY` = 10 × `true`) |
+| Serverseitige Autorisierung auf jedem Request | **verstärkt** | Wächter: jede Schreibroute hat `requireAuth`; neu: Standortfilter in `GET /documents`, `POST /documents/:id/review`, `GET /users` |
+| Redaktionsvertrag der Fahrlehrer-Notizen | unangetastet, **auf Logs/Metriken ausgeweitet** | `internalNotes`/`pruefprotokoll` auf der Redaktionsliste; `/metrics` enthält sie nicht (getestet) |
+| `fahrlehrer_go` nur durch Rolle `fahrlehrer` | unangetastet | statischer Wächter über `PRUEFUNG_TRANSITIONS` |
+| nur `sicher` bucht automatisch | unangetastet | statischer Wächter |
+| keine automatische Prüfungsfreigabe | unangetastet | statischer Wächter (kein `to: "fahrlehrer_go"` im Servercode) |
+| frozen Prototyp-Dateien | unangetastet | Wächter: kein `PROMPT -1` in den sieben Dateien |
+
+## Was Phase 4 von hier übernimmt
+
+- **`GET /metrics`** (Prometheus-Textformat) – die Messgrundlage für §21-SLOs.
+  Latenzhistogramm, Fehlerquote je Statusklasse, `sync_delay_seconds`,
+  `dead_letters_open`, Warteschlangentiefen, Breaker-Zustände.
+- **`GET /ops/alerts/catalog`** – Schwelle, Zuständiger, Runbook, Eskalation
+  maschinenlesbar. §21 kann daraus SLOs ableiten, ohne sie neu zu erfinden.
+- **`GET /health/deep`** – ein Aufruf, der den Gesamtzustand samt
+  Integrationen liefert. Für die Chaos-Szenarien der ideale Beobachtungspunkt.
+- **`POST /ops/audit/verify`** – Chaos-Szenarien, die Daten manipulieren, können
+  damit prüfen, ob die Spur intakt ist.
+- **`POST /ops/integrations/:integration/breaker`** – ein Ausfall ist für §20
+  deterministisch **herstellbar**, ohne Produktionscode zu ändern.
+- **`buildTestApp({ rateLimit, bruteForce, integrations })`** – die
+  Chaos-Tests laufen gegen einen tatsächlich ratenbegrenzten Server mit weiten
+  Kontingenten (`TEST_RATE_LIMIT`), können aber jederzeit enge Werte setzen.
+- **`stepUp(app, cookie, …)`** in den Testhelfern – jedes Szenario, das eine
+  Step-up-Aktion braucht, ist eine Zeile.
+- **Offene Bedingung für das Release-Gate:** zwei Produktionsabhängigkeiten mit
+  Advisories (`drizzle-orm` high, `react-router` moderate ×2), im aktuellen Code
+  nicht ausnutzbar, Behebung nur per Major-Aktualisierung. Details und
+  Bewertung in `docs/security-architecture.md`, Abschnitt 11. **Das gehört in
+  die Bedingungsliste, nicht in einen stillen Fix.**
+
+### Abgrenzung (aktualisiert)
+
+| Abschnitt | Phase |
+| --- | --- |
+| §1 (DB als Wahrheit), §2–§5, §9 (Server), §10, §13, §19 | Phase 1 |
+| §1 (Anzeigehälfte), §6, §7, §8, §9 (Client) | Phase 2 |
+| §11, §12, §16, §17, §18, §4-Pflicht vollständig | **Phase 3 – dieser Teil** |
+| §14 Backup/PITR/Restore, §15 Deployment/Scheduler, §20 die 18 Chaos-Szenarien, §21 SLOs, §22 die sieben Dokumente + Release-Gate-Verdikt | Phase 4 |
+
+## Testabdeckung der Phase 3
+
+| Datei | Umfang | Tests |
+| --- | --- | --- |
+| `apps/api/src/__tests__/security.test.ts` | §17: Rate Limiting (IP-Dimension mit `Retry-After`, Kontodimension, eigene Stream-Politik, legitimer Zehnfach-Stoß, Abschaltbarkeit), Brute-Force (progressive Verzögerung, Kontosperre, kein Enumerationsorakel, Erfolg löscht den Zähler, Entsperrpfad mit Rollen- und Step-up-Prüfung samt Audit ohne Klartext-E-Mail), CSRF (fremder Origin, `Sec-Fetch-Site: cross-site`, erlaubter Origin, Double-Submit, fremdsitzungsgebundener Token, Cookie/Header-Abweichung, GET-Ausnahme, `logout-all` entzieht), CSP (kein `unsafe-inline`/`unsafe-eval`, Style-Attribut vs. Style-Element, Vite-Kompatibilität, `<meta>`-Variante, Kopfzeilen auf Fehlerantworten, HSTS nur bei HTTPS, `no-referrer`, `no-store`), Step-up (die sieben Aktionen, Passwort+TOTP, Fahrzeug entsperren vs. sperren, Prüfungs-Übersteuerung vs. reguläre Freigabe, sensibler vs. aggregierter Export, TTL, enger Geltungsbereich, Rollenänderung mit allen sechs Schranken), Cookie-Flags, **Mandantentrennung** (Schüler B sieht/ändert nichts von A, fremder Standort sieht nichts), manipulationssicheres Audit (FS008 für UPDATE/DELETE, intakte Kette, erkannte Inhaltsmanipulation, erkannte Löschung, Ops-Route mit Rechteprüfung), sensible Exporte (Ablauf 410, keine öffentliche Route), Least Privilege | 52 |
+| `apps/api/src/__tests__/observability.test.ts` | §16: alle Pflichtfelder der Logzeile, keine rohe Benutzer-ID/E-Mail, stabile Pseudonymisierung, Fehlercode, Korrelations-ID (Übernahme, Verwerfen ungültiger Werte, **ganze Kette bis `realtime_deliveries`**), Tracing (Spanne, Fehlerstatus), Redaktion (Feldnamen, IBAN in Freitext, Buffer, **adversarial: Dokument-Upload, abgewiesene Datei, Bankimport**, `details`), Kennzahlen (Fehlerquote je Statusklasse, Latenzhistogramm, ID-freies Routen-Label, fehlgeschlagene Logins, Buchungskonflikte, Scanfehler, Rate-Limit, DB-Verbindungen/Warteschlangen/Dead Letters/Sync-Verzögerung, SSE-Verbindungen, `/metrics`-Format mit allen Namen, Token-Schutz, **kein Personenbezug in Labels**, geschlossene Label-Menge), Alarmierung (Katalogvollständigkeit, Ops-Route, Sink-Kette überlebt kaputten Sink, Schwere aus dem Katalog, Alarmkennzahl, Webhook-Seam wirft nie, keine Registrierung ohne URL) | 35 |
+| `apps/api/src/__tests__/uploads.test.ts` | §12: Magic-Byte-Erkennung, benannte gefährliche Typen, **Datei die über ihren Typ lügt**, nicht erlaubter behaupteter Typ, leer/zu groß, Prüfsumme gespeichert und geprüft, Quarantäne-zuerst-Kette, Scanner schlägt an, Büro kann Quarantäne nicht freigeben (+ FS009 per Roh-SQL), signierter Zugriff (nur für Freigegebenes, **A-Signatur nutzt B nicht**, Ablauf 410, manipuliert 403, ohne Sitzung 401, auditiert ohne Inhalt, zweckgebunden, Quarantäne 409), resumable (Zusammensetzen, Fortschritt, idempotentes Teilstück, Konflikt, Lücke, Größenüberschreitung, Magic Bytes am Ende, Prüfsumme, fremde Sitzung, zweites `complete`, Aufräumen, abgelaufene Sitzung), kein Inhalt in der DB, §2 unverändert, Re-Upload-Härtung | 33 |
+| `apps/api/src/__tests__/degraded.test.ts` | §11: Puffern ohne Erfolgsmeldung, automatische Wiederaufnahme mit demselben Schlüssel, bekannter Schlüssel ohne zweiten Aufruf, Fehlerwarteschlange + Alarm, manuelle Wiederaufnahme auditiert, Persistenz über den „Neustart", Kennzahlen, Ops-Route über alle zehn. §18: alle **fünf** Szenarien (Realtime aus, Benachrichtigungen aus, Fahrschulverwaltung aus inkl. Doppelimport-Schutz und Quelle-der-Wahrheit-Regel, Bank aus mit `veraltet`/kein Block, Scanner aus mit Quarantäne/Retry/nicht in der Büro-Queue) + `/health/deep` als gemeinsame Anzeige | 21 |
+| `apps/api/src/__tests__/code-guards.test.ts` | §16/§17-Wächter: jeder Runbook-Anker des Alarmkatalogs löst auf, die beiden §22-Dokumente existieren; : kein `.unsafe(`, keine SQL-Verkettung, kein `eval`/`Function`/`child_process`, kein TLS-Abschalter; Validierungsabdeckung **aller** Schreibrouten mit geschlossener Body-freier Liste (die selbst geprüft wird); `requireAuth` auf jeder Schreibroute; Redaktionsvertrag statisch; Non-Negotiables statisch (EXCLUDE, expand-contract in 0009, §2-Pflicht, keine automatische Freigabe, nur `sicher` bucht, `fahrlehrer_go`, frozen Dateien) | 19 |
+| `apps/api/src/__tests__/booking-conflict.test.ts` (erweitert) | **20 Runden** gleichzeitiger Doppelbuchung – deckt einen seit Phase 1 bestehenden Fehler ab (zwei GiST-EXCLUDE-Constraints können statt 23P01 einen **Deadlock** 40P01 melden; der Verlierer bekam dann HTTP 500 statt 409, in 9–10 von 50 Durchläufen). Behoben durch bounded Retry auf Serialisierungsfehler in `lib/idempotency.ts` – Klassifikation und Backoff aus §9, keine zweite Politik. | +1 |
+| `packages/integrations/src/resilience.test.ts` | §11-Mechanik ohne DB: geschlossen bleibt geschlossen, Öffnen nach Schwelle + Kurzschluss, `half_open` mit **genau einer** Sondierung, Erholung, erneutes Öffnen mit verdoppelter Zeit, Zeitlimit, dauerhafte Fehler öffnen nicht, Rate Limit ist keine Störung, `Retry-After` (Sekunden + Datum), geteilte §9-Politik, Schlüsseldurchleitung, Zustandswechsel-Haken, Fehlerwarteschlange erst nach Erschöpfung, manuelles Öffnen/Schließen, `withTimeout` ohne unbehandelten Fehler; Registry (ein Wächter je Integration, alle zehn mit Zeitlimit, Schnappschuss mit `mock`) | 19 |
+
+**Gesamt Phase 3: 180 neue Tests.** Workspace: **667** (vorher 487),
+17 Pakete typecheck-sauber, alle vier Apps `vite build` sauber (die CSP im
+`<meta>`-Tag überlebt den Build und die Ausgabe enthält weiterhin **kein**
+Inline-Skript).
