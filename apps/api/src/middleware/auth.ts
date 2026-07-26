@@ -90,3 +90,23 @@ export function requirePermission(permission: Permission) {
     }
   };
 }
+
+/**
+ * Erlaubt den Zugriff, wenn der Akteur MINDESTENS EINE der genannten
+ * Berechtigungen besitzt. Nötig für Operationen, die es in einer own- und
+ * einer any-Variante gibt (z. B. Terminstorno: Schüler storniert eigene
+ * Termine über `appointments:cancel:own`, Büro fremde über
+ * `appointments:cancel:any`) – die Scope-Prüfung selbst erfolgt weiterhin in
+ * der Route gegen die Datenbank, nicht hier.
+ */
+export function requireAnyPermission(...permissions: Permission[]) {
+  return async function (request: FastifyRequest, reply: FastifyReply) {
+    if (!request.user) {
+      return reply.code(401).send({ error: "unauthenticated" });
+    }
+    const erlaubt = permissions.some((p) => hasPermission(request.user!.rolle, p));
+    if (!erlaubt) {
+      return reply.code(403).send({ error: "forbidden", requiredPermission: permissions.join("|") });
+    }
+  };
+}
