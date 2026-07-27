@@ -1,0 +1,29 @@
+{
+  "name": "jarvis-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@jarvis/server & npm run dev --workspace=@jarvis/web",
+    "dev:server": "npm run dev --workspace=@jarvis/server",
+    "dev:web": "npm run dev --workspace=@jarvis/web",
+    "build": "npm run build --workspace=@jarvis/web && npm run build --workspace=@jarvis/server",
+    "start": "node packages/server/dist/main.js",
+    "test": "npm run test --workspace=@jarvis/server",
+    "typecheck": "npm run typecheck --workspace=@jarvis/shared && npm run typecheck --workspace=@jarvis/server && npm run typecheck --workspace=@jarvis/web",
+    "jarvis": "node packages/server/dist/cli.js",
+    "seed": "npm run seed --workspace=@jarvis/server",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
+  }
+}

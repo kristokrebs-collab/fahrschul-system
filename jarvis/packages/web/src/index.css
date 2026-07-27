@@ -1,0 +1,64 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink-950: #070a14;
+  --color-ink-900: #0a0e1a;
+  --color-ink-850: #0f1424;
+  --color-ink-800: #141b2e;
+  --color-ink-700: #1e2740;
+  --color-ink-600: #2b3654;
+  --color-mist-400: #8b97b8;
+  --color-mist-200: #c8d0e4;
+  --color-accent: #6366f1;
+  --color-accent-soft: #818cf8;
+  --font-sans: 'Inter var', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: radial-gradient(ellipse 90% 60% at 50% -10%, #16204a 0%, var(--color-ink-950) 60%);
+  background-attachment: fixed;
+  color: var(--color-mist-200);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
+}
+
+/* Slim, unobtrusive scrollbars that still work on a trackpad-less tablet. */
+* { scrollbar-width: thin; scrollbar-color: var(--color-ink-600) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--color-ink-600); border-radius: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.5); }
+  70%  { box-shadow: 0 0 0 14px rgba(99, 102, 241, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+.listening { animation: pulse-ring 1.6s infinite; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.fade-up { animation: fade-up 0.22s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .listening, .fade-up { animation: none; }
+}
+
+/* Markdown-ish rendering for assistant text */
+.prose-jarvis { line-height: 1.65; }
+.prose-jarvis strong { color: #fff; font-weight: 600; }
+.prose-jarvis code {
+  background: var(--color-ink-800); padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem; font-size: 0.875em;
+}
+.prose-jarvis a { color: var(--color-accent-soft); text-decoration: underline; }
