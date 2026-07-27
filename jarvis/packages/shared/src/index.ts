@@ -359,6 +359,7 @@ export type SessionUser = z.infer<typeof SessionUser>
 /** Capabilities gated by role. `owner` gets everything; `guest` is read-only. */
 export const ROLE_CAPS: Record<Role, string[]> = {
   owner: ['*'],
+  // A guest may look, never touch — and never see the key panel.
   guest: ['chat.read', 'sources.read', 'projects.read', 'memory.read', 'status.read'],
 }
 

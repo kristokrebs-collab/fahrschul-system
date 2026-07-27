@@ -56,6 +56,9 @@ npm run jarvis -- index
 
 # 5) Starten
 npm start
+
+# 6) Claude als Denkapparat verbinden
+npm run jarvis -- llm:connect sk-ant-…
 ```
 
 Öffne **http://127.0.0.1:8787**.
@@ -69,15 +72,39 @@ npm run dev:web      # Vite auf :5173, proxied /api → :8787
 
 ---
 
-## Ohne API-Schlüssel nutzbar
+## Claude als Denkapparat verbinden
 
-Ohne `ANTHROPIC_API_KEY` läuft JARVIS im **Quellen-Modus**: Suche, Zitate,
-Widerspruchserkennung, Erinnerungen, Aufgaben, Briefing und alle Freigaben
-funktionieren vollständig. Was fehlt, ist die frei formulierte Antwort — und
-genau das sagt JARVIS dann auch, statt etwas zu erfinden.
+JARVIS denkt mit **Claude** (`claude-opus-5`). Der Schlüssel stammt von
+[console.anthropic.com](https://console.anthropic.com) → *API Keys*. Drei Wege,
+alle gleichwertig — **kein** Codeeingriff, **kein** Neubau:
 
-Mit Schlüssel: `ANTHROPIC_API_KEY=sk-ant-…` in `.env`, Neustart.
-Standardmodell ist `claude-opus-5`.
+| Weg | Vorgehen | Neustart nötig? |
+|---|---|---|
+| **Oberfläche** | System → Zustand → „Claude als Denkapparat“ → Schlüssel einfügen → **Verbinden** | nein |
+| **Kommandozeile** | `npm run jarvis -- llm:connect sk-ant-…` | nein |
+| **Umgebung** | `ANTHROPIC_API_KEY=sk-ant-…` in `.env` | ja |
+
+Was dabei passiert:
+
+1. Das Format wird lokal geprüft (kostenlos, auch offline).
+2. Der Schlüssel wird gegen die echte API validiert — erst wenn Anthropic ihn
+   akzeptiert, wird er gespeichert. Ein ungültiger Schlüssel landet **nie** auf
+   der Platte.
+3. Gespeichert wird **AES-256-GCM-verschlüsselt** unter `JARVIS_MASTER_KEY`.
+   Ohne Master-Key wird die Speicherung verweigert statt ein Geheimnis im
+   Klartext abzulegen.
+4. Zurückgelesen wird er nie: die Oberfläche zeigt nur `sk-ant-…KJ8s`.
+5. Der Client wird sofort neu aufgebaut — der nächste Chatzug denkt bereits mit.
+
+Kommt der Schlüssel aus der Umgebung, hat er Vorrang und die Oberfläche ist
+schreibgeschützt (`editable: false`) — damit es genau eine Wahrheit gibt.
+
+### Ohne Schlüssel
+
+JARVIS läuft im **Quellen-Modus**: Suche, Zitate, Widerspruchserkennung,
+Erinnerungen, Aufgaben, Projekte, Briefing und alle Freigaben funktionieren
+vollständig. Was fehlt, ist die frei formulierte Antwort — und genau das sagt
+JARVIS dann auch, statt etwas zu erfinden.
 
 ---
 
@@ -100,6 +127,10 @@ bewusst als **„degraded“**, weil es kein neuronales Modell ist.
 ## Verwaltung über die Kommandozeile
 
 ```bash
+npm run jarvis -- llm:connect sk-ant-…   # Claude verbinden (prüft, dann verschlüsselt)
+npm run jarvis -- llm:status     # verbunden? welches Modell? woher der Schlüssel?
+npm run jarvis -- llm:test       # echten Aufruf gegen die API machen
+npm run jarvis -- llm:disconnect # Schlüssel entfernen, Quellen-Modus
 npm run jarvis -- status         # Systemzustand aller Komponenten
 npm run jarvis -- briefing       # Tagesbriefing im Terminal
 npm run jarvis -- index --force  # alles neu indexieren
@@ -115,7 +146,7 @@ npm run jarvis -- retention      # Aufbewahrungsregeln anwenden
 ## Tests
 
 ```bash
-npm test          # 104 Tests: Sicherheit, Suche, Zuverlässigkeit, Gedächtnis, Auth
+npm test          # 120 Tests: Sicherheit, Suche, Zuverlässigkeit, Gedächtnis, Auth, Denkapparat
 npm run typecheck # alle drei Pakete
 ```
 
@@ -123,6 +154,14 @@ Abgedeckt sind unter anderem: Prompt-Injection-Erkennung **und** -Gating,
 Blockade von Geheimnis-Leaks in Nutzlasten, Wiederherstellung nach Absturz
 (Jobs und Aktionen), Verschlüsselung ruhender Daten, Kontosperrung,
 Manipulationserkennung im Audit-Log, Enthaltung bei fehlender Abdeckung.
+
+`test/brain.test.ts` prüft die Claude-Anbindung gegen einen SDK-förmigen
+Doppelgänger — ohne Netz und ohne Kosten: Prompt-Aufbau samt `cache_control`,
+Nonce-Rahmen um unvertrauenswürdiges Material, Werkzeugschleife, dass ein
+Schreibwerkzeug **nichts** schreibt bevor freigegeben wurde, dass ein
+Versandwerkzeug unter Injektion abgelehnt statt nachgefragt wird,
+`pause_turn`-Fortsetzung, `refusal`-Behandlung und dass ein Modellausfall die
+Zitate trotzdem liefert.
 
 ---
 

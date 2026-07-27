@@ -64,6 +64,11 @@ Injektionsdruck erlaubt“.
 * **Ruhende Daten.** Erinnerungen mit `private`/`secret` und TOTP-Geheimnisse
   liegen als `v1:iv:tag:ciphertext` (AES-256-GCM). Ohne `JARVIS_MASTER_KEY`
   wird eine solche Erinnerung **abgelehnt** — niemals im Klartext gespeichert.
+* **Modellschlüssel.** Ein zur Laufzeit hinterlegter Anthropic-Schlüssel liegt im
+  selben Format in `settings` (`llm.api_key`). Ohne Master-Key wird er **nicht**
+  gespeichert. Es gibt keinen Endpunkt, der ihn zurückgibt: API, Oberfläche, Logs
+  und Audit sehen ausschließlich die Maske `sk-ant-…KJ8s`. Setzen und Entfernen
+  sind auditierte `financial_security`-Ereignisse.
 * **Suchbarkeit.** `recall` entschlüsselt im Arbeitsspeicher, damit auch
   verschlüsselte Inhalte auffindbar bleiben. SQL-Filter greifen dort nur auf das
   Thema; die Inhaltsprüfung passiert nach dem Entschlüsseln.

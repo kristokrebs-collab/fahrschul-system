@@ -162,7 +162,7 @@ export function buildBriefing(db: DB, now = Date.now()): Briefing {
   }
 
   const degraded: string[] = []
-  if (!llmConfigured()) degraded.push('Kein Sprachmodell konfiguriert – freie Antworten nicht möglich.')
+  if (!llmConfigured(db)) degraded.push('Kein Sprachmodell konfiguriert – freie Antworten nicht möglich.')
   if (config.offline) degraded.push('Offline-Modus aktiv – keine Live-Recherche.')
   const emb = embeddings()
   if (emb.quality === 'none') degraded.push('Semantische Suche deaktiviert – nur Volltextsuche.')

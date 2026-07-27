@@ -96,7 +96,7 @@ export async function runTurn(ctx: TurnContext): Promise<{ messageId: string }> 
   }
 
   /* 5 ─ Degraded path: no model key */
-  if (!llmConfigured() || config.offline && !llmConfigured()) {
+  if (!llmConfigured(db)) {
     return degradedAnswer(ctx, { conversationId, assistantMessageId, retrieval, started })
   }
 
@@ -140,7 +140,7 @@ export async function runTurn(ctx: TurnContext): Promise<{ messageId: string }> 
     ...(allowWeb ? webTools() : []),
   ]
 
-  const client = llm()!
+  const client = llm(db)!
   let finalText = ''
   let stopReason: string | null = null
   const usage = { input: 0, output: 0, cacheRead: 0 }

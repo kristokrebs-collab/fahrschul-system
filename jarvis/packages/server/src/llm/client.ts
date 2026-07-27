@@ -1,26 +1,37 @@
 import Anthropic from '@anthropic-ai/sdk'
+import type { DB } from '../db/index.js'
 import { config } from '../config.js'
 import type { ComponentHealth } from '@jarvis/shared'
 import { nowIso } from '../util/time.js'
 import { errText } from '../core/logger.js'
+import { getLlmKey, llmKeySource } from './credentials.js'
 
 /**
- * Anthropic client wrapper.
+ * Anthropic client.
  *
- * The one rule: when no key is configured, this returns null rather than a
- * stub. Callers must handle the null and degrade visibly — a fake client that
- * returns canned text would let JARVIS appear to answer when it cannot.
+ * Two rules:
+ *  - With no key this returns `null` rather than a stub. Callers must handle
+ *    the null and degrade visibly; a fake client that returns canned text would
+ *    let JARVIS appear to answer when it cannot.
+ *  - The client is rebuilt when the key changes, so entering a key in the UI
+ *    takes effect immediately — no restart.
  */
 
 let client: Anthropic | null = null
-let checked = false
+let cachedKey: string | null = null
+/** Set by tests via `setLlmClient`; bypasses key resolution entirely. */
+let forced: Anthropic | null = null
 
-export function llm(): Anthropic | null {
-  if (checked) return client
-  checked = true
-  if (!config.llm.apiKey) return (client = null)
+export function llm(db: DB): Anthropic | null {
+  if (forced) return forced
+
+  const key = getLlmKey(db)
+  if (!key) { client = null; cachedKey = null; return null }
+  if (client && cachedKey === key) return client
+
+  cachedKey = key
   client = new Anthropic({
-    apiKey: config.llm.apiKey,
+    apiKey: key,
     ...(config.llm.baseUrl ? { baseURL: config.llm.baseUrl } : {}),
     maxRetries: 2,
     timeout: 10 * 60 * 1000,
@@ -28,52 +39,54 @@ export function llm(): Anthropic | null {
   return client
 }
 
-export function llmConfigured(): boolean {
-  return !!config.llm.apiKey
+export function llmConfigured(db: DB): boolean {
+  return !!forced || !!getLlmKey(db)
 }
 
-/** Test hook so the orchestrator can be exercised without a network call. */
+/** Test hook: inject a client without touching credentials. */
 export function setLlmClient(c: Anthropic | null): void {
-  client = c
-  checked = true
+  forced = c
+  if (!c) { client = null; cachedKey = null }
 }
 
-export async function llmHealth(): Promise<ComponentHealth> {
+export async function llmHealth(db: DB): Promise<ComponentHealth> {
   const at = nowIso()
-  if (!llmConfigured()) {
+  const name = 'Sprachmodell (Anthropic)'
+
+  if (!llmConfigured(db)) {
     return {
-      name: 'Sprachmodell (Anthropic)', status: 'not_configured', checked_at: at,
-      detail_de: 'ANTHROPIC_API_KEY fehlt. Quellen-Suche und Erinnerungen funktionieren, ' +
-                 'freie Antworten nicht.',
+      name, status: 'not_configured', checked_at: at,
+      detail_de: 'Kein Anthropic-Schlüssel hinterlegt. Quellen-Suche, Zitate, Erinnerungen und ' +
+                 'Aufgaben funktionieren; freie Antworten nicht. Verbinden unter „System → Zustand“.',
     }
   }
   if (config.offline) {
-    return {
-      name: 'Sprachmodell (Anthropic)', status: 'degraded', checked_at: at,
-      detail_de: 'Offline-Modus aktiv – keine Modellaufrufe.',
-    }
+    return { name, status: 'degraded', checked_at: at, detail_de: 'Offline-Modus aktiv – keine Modellaufrufe.' }
   }
-  const c = llm()
-  if (!c) return { name: 'Sprachmodell (Anthropic)', status: 'down', checked_at: at, detail_de: 'Client nicht initialisiert' }
+
+  const c = llm(db)
+  if (!c) return { name, status: 'down', checked_at: at, detail_de: 'Client nicht initialisiert' }
+
   try {
-    // Cheapest possible liveness probe: count tokens, no generation.
+    // Cheapest liveness probe: count tokens, no generation, no cost.
     await c.messages.countTokens({
       model: config.llm.model,
       messages: [{ role: 'user', content: 'ping' }],
     })
-    return {
-      name: 'Sprachmodell (Anthropic)', status: 'ok', checked_at: at,
-      detail_de: `${config.llm.model} erreichbar`,
-    }
+    const src = llmKeySource(db) === 'env' ? 'Umgebungsvariable' : 'verschlüsselt gespeichert'
+    return { name, status: 'ok', checked_at: at, detail_de: `${config.llm.model} erreichbar (Schlüssel: ${src})` }
   } catch (e) {
-    return {
-      name: 'Sprachmodell (Anthropic)', status: 'down', checked_at: at,
-      detail_de: `Nicht erreichbar: ${errText(e)}`,
-    }
+    const status = (e as { status?: number }).status
+    const hint = status === 401 || status === 403
+      ? 'Der Schlüssel wurde abgelehnt – bitte neu verbinden.'
+      : status === 404
+        ? `Modell „${config.llm.model}“ ist für diesen Schlüssel nicht verfügbar.`
+        : errText(e)
+    return { name, status: 'down', checked_at: at, detail_de: `Nicht erreichbar: ${hint}` }
   }
 }
 
-/** Server-side research tools. Only attached when the turn is allowed to go online. */
+/** Server-side research tools. Only attached when the turn may go online. */
 export function webTools() {
   return [
     { type: 'web_search_20260209' as const, name: 'web_search' as const, max_uses: 6 },

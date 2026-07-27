@@ -38,6 +38,7 @@ import {
 } from '../eval/outcomes.js'
 import { runEval, listEvalRuns, getEvalRun } from '../eval/runner.js'
 import { listPromptVersions, createPromptVersion, activatePromptVersion } from '../llm/prompts.js'
+import { llmKeyInfo, llmKeySource, setLlmKey, clearLlmKey, getLlmKey, checkLlmKey } from '../llm/credentials.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -537,6 +538,53 @@ export async function buildServer(): Promise<FastifyInstance> {
 
   /** Unauthenticated liveness probe. Deliberately reveals nothing. */
   app.get('/api/health', async () => ({ ok: true, version: config.version }))
+
+  /* ── Sprachmodell verbinden ────────────────────────────────────────────── */
+
+  app.get('/api/llm', async (req, reply) => {
+    if (!requireCap(req, reply, 'status.read')) return
+    return { llm: llmKeyInfo(db) }
+  })
+
+  /**
+   * Stores an Anthropic key after validating it against the real API.
+   *
+   * The key is never echoed back — the response carries only the masked hint
+   * and the resolved model. Owner-only, and refused outright when no master key
+   * is present, so a credential is never written in cleartext.
+   */
+  app.post('/api/llm/key', { config: { rateLimit: { max: 10, timeWindow: '10 minutes' } } }, async (req, reply) => {
+    const u = requireCap(req, reply, 'integrations.write'); if (!u) return
+    const body = z.object({ key: z.string().min(20) }).safeParse(req.body)
+    if (!body.success) {
+      return reply.code(400).send({ error: 'bad_request', message_de: 'Bitte einen vollständigen Schlüssel eingeben.' })
+    }
+    if (llmKeySource(db) === 'env') {
+      return reply.code(409).send({
+        error: 'env_managed',
+        message_de: 'Der Schlüssel kommt aus ANTHROPIC_API_KEY. Ändere ihn dort oder entferne die Variable, ' +
+                    'um ihn hier verwalten zu können.',
+      })
+    }
+    const result = await setLlmKey(db, body.data.key, actorOf(u))
+    if (!result.ok) return reply.code(400).send({ error: result.code ?? 'invalid', message_de: result.detail_de })
+    return { ok: true, message_de: result.detail_de, llm: llmKeyInfo(db) }
+  })
+
+  app.delete('/api/llm/key', async (req, reply) => {
+    const u = requireCap(req, reply, 'integrations.write'); if (!u) return
+    const removed = clearLlmKey(db, actorOf(u))
+    return { ok: removed, llm: llmKeyInfo(db) }
+  })
+
+  /** Re-checks the stored key against the API without changing anything. */
+  app.post('/api/llm/test', { config: { rateLimit: { max: 20, timeWindow: '10 minutes' } } }, async (req, reply) => {
+    if (!requireCap(req, reply, 'status.read')) return
+    const key = getLlmKey(db)
+    if (!key) return reply.code(400).send({ error: 'not_configured', message_de: 'Kein Schlüssel hinterlegt.' })
+    const r = await checkLlmKey(key)
+    return { ok: r.ok, message_de: r.detail_de, model: r.model ?? null, code: r.code ?? null }
+  })
 
   app.get('/api/audit', async (req, reply) => {
     if (!requireCap(req, reply, 'audit.read')) return

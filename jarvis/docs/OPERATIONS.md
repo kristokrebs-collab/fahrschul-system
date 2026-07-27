@@ -6,7 +6,8 @@
 Schlüssel erzeugen (`keygen`), `.env` füllen, `npm run build`, Konto anlegen,
 20–50 wirklich relevante Dokumente nach `./sources/` kopieren, `index` laufen
 lassen. Danach **System → Zustand** öffnen und jede Zeile lesen: dort steht,
-was funktioniert und was nicht.
+was funktioniert und was nicht. Im selben Panel Claude verbinden (siehe unten) —
+ohne das bleibt JARVIS ein Suchsystem.
 
 **Tag 2 — Suche kalibrieren.**
 Stelle im Reiter **Suche** zehn Fragen, deren Antwort du kennst. Achte auf die
@@ -52,6 +53,43 @@ npm run jarvis -- eval           # Regression offline, kostenlos
 npm run jarvis -- audit:verify   # Integrität der Kette
 npm run jarvis -- index          # nach größeren Änderungen an den Quellen
 ```
+
+---
+
+## Claude verbinden, prüfen, trennen
+
+Der Denkapparat ist zur Laufzeit umschaltbar — kein Codeeingriff, kein Neubau.
+
+```bash
+npm run jarvis -- llm:status                # verbunden? Modell? Herkunft des Schlüssels?
+npm run jarvis -- llm:connect sk-ant-…      # prüft gegen die API, speichert dann verschlüsselt
+npm run jarvis -- llm:test                  # echter Aufruf, sagt was schiefging
+npm run jarvis -- llm:disconnect            # zurück in den Quellen-Modus
+```
+
+In der Oberfläche: **System → Zustand → „Claude als Denkapparat“**.
+Über HTTP: `GET /api/llm`, `POST /api/llm/key`, `POST /api/llm/test`,
+`DELETE /api/llm/key` — alle nur für die Rolle `owner`.
+
+Wissenswertes für den Betrieb:
+
+* **Vorrang.** `ANTHROPIC_API_KEY` aus der Umgebung schlägt den gespeicherten
+  Schlüssel. Ist die Variable gesetzt, lehnt `POST /api/llm/key` mit `409` ab
+  und die Oberfläche zeigt das Feld schreibgeschützt. Damit es genau eine
+  Wahrheit gibt.
+* **Master-Key nötig.** Ohne `JARVIS_MASTER_KEY` wird das Speichern **verweigert**
+  statt den Schlüssel im Klartext abzulegen. Erst `keygen`, dann verbinden.
+* **Mitsichern heißt: Master-Key mitsichern.** Eine Sicherung enthält den
+  verschlüsselten Schlüssel, aber nicht den Master-Key. Nach einer
+  Wiederherstellung auf einem Rechner ohne `JARVIS_MASTER_KEY` ist die
+  Verbindung weg und muss neu gesetzt werden.
+* **Nie im Klartext lesbar.** Kein Endpunkt und kein Log gibt den Wert zurück;
+  überall steht nur `sk-ant-…KJ8s`. Verlorener Schlüssel = neuer Schlüssel in
+  der Anthropic-Konsole.
+* **Offline-Modus sticht.** Bei `JARVIS_OFFLINE=true` wird kein Modellaufruf
+  gemacht, auch mit gültigem Schlüssel. Die Oberfläche weist darauf hin.
+* **Wechseln** ist Trennen + Verbinden; der Client wird beim nächsten Zug
+  automatisch mit dem neuen Schlüssel neu gebaut, ohne Neustart.
 
 ---
 
@@ -125,7 +163,11 @@ Erst mit HTTPS funktioniert die Spracheingabe außerhalb von `localhost`.
 
 | Symptom | Ursache | Abhilfe |
 |---|---|---|
-| „Kein Anthropic-API-Schlüssel konfiguriert“ | erwartet ohne Schlüssel | `ANTHROPIC_API_KEY` setzen, Neustart |
+| „Kein Anthropic-API-Schlüssel konfiguriert“ | erwartet ohne Schlüssel | `llm:connect` oder System → Zustand → Verbinden |
+| Verbinden schlägt fehl mit „Schlüssel ungültig“ | 401/403 von der API | Schlüssel in der Anthropic-Konsole prüfen; ganze Zeile kopieren, ohne Leerzeichen |
+| Verbinden schlägt fehl mit „Modell nicht verfügbar“ | 404 auf `JARVIS_LLM_MODEL` | Modellnamen prüfen; Konto braucht Zugriff auf `claude-opus-5` |
+| Verbunden, aber keine freien Antworten | `JARVIS_OFFLINE=true` | Variable auf `false`, Neustart |
+| Nach Wiederherstellung ist Claude getrennt | Master-Key fehlt auf dem Zielrechner | `JARVIS_MASTER_KEY` aus der alten `.env` übernehmen, sonst neu verbinden |
 | Erinnerung mit `private` wird abgelehnt | kein Master-Key | `keygen`, `JARVIS_MASTER_KEY` setzen |
 | Embeddings zeigen „degraded“ | `local-lexical` aktiv | Ollama einrichten für echte Semantik |
 | Suche findet nichts | nichts indexiert oder Datei außerhalb der Wurzeln | `index:stats`, `JARVIS_SOURCE_ROOTS` prüfen |

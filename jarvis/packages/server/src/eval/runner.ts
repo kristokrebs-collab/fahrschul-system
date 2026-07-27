@@ -44,7 +44,7 @@ export interface EvalRunResult {
 export async function runEval(
   db: DB, opts: { tier?: EvalTier; label?: string; actor?: string } = {},
 ): Promise<EvalRunResult> {
-  const tier: EvalTier = opts.tier ?? (llmConfigured() ? 'full' : 'retrieval')
+  const tier: EvalTier = opts.tier ?? (llmConfigured(db) ? 'full' : 'retrieval')
   const label = opts.label ?? `${tier}-${nowIso().slice(0, 19)}`
   const cases = listRegressionCases(db)
   const results: CaseResult[] = []

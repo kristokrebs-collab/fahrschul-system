@@ -50,7 +50,7 @@ export async function systemStatus(db: DB): Promise<SystemStatus> {
     components.push({ name: `Embeddings (${emb.name})`, status: 'down', checked_at: at, detail_de: errText(e) })
   }
 
-  components.push(await llmHealth())
+  components.push(await llmHealth(db))
   components.push(await siblingHealth('social-autopilot'))
   components.push(await siblingHealth('finance-crypto'))
 

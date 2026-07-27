@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api, type EvalRun } from '../api'
 import { Badge, Btn, Card, Empty, Field, Spinner, StatusDot, cx, inputCls, relTime, useAsync } from '../components/ui'
+import { LlmConnect } from '../components/LlmConnect'
 
 type Notify = (m: string, t?: 'info' | 'bad' | 'good') => void
 
@@ -37,6 +38,9 @@ function StatusPanel({ notify }: { notify: Notify }) {
 
   return (
     <div className="space-y-3">
+      {/* Connecting the brain is the first thing an owner needs, so it leads. */}
+      <LlmConnect notify={notify} onChange={reload} />
+
       <Card className="flex flex-wrap items-center gap-3 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-white">JARVIS {s.version}</p>

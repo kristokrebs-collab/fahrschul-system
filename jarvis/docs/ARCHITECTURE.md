@@ -137,7 +137,7 @@ editierbar; das macht Korrektur billiger als Reue.
 wird der Zustand benannt und die betroffene Funktion verweigert.
 
 **Beispiele.**
-* Kein `ANTHROPIC_API_KEY` → echte Quellensuche mit Zitaten, keine erfundene Prosa.
+* Kein Anthropic-Schlüssel → echte Quellensuche mit Zitaten, keine erfundene Prosa.
 * Kein `JARVIS_MASTER_KEY` → eine `private`-Erinnerung wird **abgelehnt**, nicht
   im Klartext gespeichert.
 * Kein SMTP → `send_email` wird blockiert; ein Versand wird nie gemeldet.
@@ -149,6 +149,38 @@ Domänentrennung sind Code, der unabhängig vom Modellverhalten hält.
 
 **Begründung.** Ein Systemprompt ist eine Bitte. Der Action Safety Reviewer läuft
 regelbasiert nach dem Planer und kann durch nichts im Gespräch umgestimmt werden.
+
+### ADR-8 — Der Modellschlüssel gehört in die Datenbank, nicht in eine Datei
+
+**Kontext.** Claude ist der Denkapparat. Ohne Schlüssel ist JARVIS ein
+Suchsystem. Der Weg vom „installiert“ zum „denkt“ darf keine Codeänderung,
+keinen Editor und keinen Neubau erfordern — sonst bleibt er ungegangen.
+
+**Entscheidung.** `ANTHROPIC_API_KEY` aus der Umgebung hat weiterhin Vorrang.
+Fehlt sie, kann der Besitzer den Schlüssel zur Laufzeit hinterlegen; er landet
+AES-256-GCM-verschlüsselt in `settings` unter `llm.api_key` und der
+Anthropic-Client wird bei Schlüsselwechsel neu gebaut (`client.ts` merkt sich den
+zuletzt benutzten Schlüssel und vergleicht ihn bei jedem Zug).
+
+**Begründung und Randbedingungen.**
+* **Erst prüfen, dann speichern.** `checkLlmKey` macht einen echten Aufruf
+  (`models.retrieve`). Ein ungültiger Schlüssel wird nie persistiert — sonst
+  hätte man einen stillen Ausfall, der erst im nächsten Gespräch auffällt.
+  Die Formatprüfung läuft davor, weil sie lokal, kostenlos und offline möglich
+  ist: ein offensichtlich falscher Wert bekommt eine nützliche Antwort statt
+  „kann ich gerade nicht prüfen“.
+* **Ohne Master-Key: Verweigerung.** Ein API-Schlüssel im Klartext in einer
+  Datenbankdatei ist schlimmer als kein Schlüssel. Gleiche Haltung wie ADR-6.
+* **Einbahnstraße.** Es gibt keinen Endpunkt, der den Schlüssel zurückgibt.
+  Die Oberfläche kennt nur die Maske `sk-ant-…KJ8s` und die Herkunft.
+* **Genau eine Wahrheit.** Kommt der Schlüssel aus der Umgebung, antwortet
+  `POST /api/llm/key` mit `409` statt eine zweite, unwirksame Quelle anzulegen.
+* Setzen und Entfernen sind `financial_security`-Ereignisse im Audit-Log —
+  mit Herkunft und Maske, nie mit dem Wert.
+
+**Preis.** Der Schlüssel liegt in derselben Datei wie die Daten und ist an
+`JARVIS_MASTER_KEY` gebunden: eine Sicherung ohne diesen Master-Key stellt die
+Verbindung nicht wieder her. Das ist gewollt — siehe `docs/OPERATIONS.md`.
 
 ---
 

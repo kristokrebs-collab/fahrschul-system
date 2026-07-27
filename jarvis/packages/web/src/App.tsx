@@ -97,7 +97,7 @@ export default function App() {
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto pb-[calc(4rem+var(--safe-b))] sm:pb-0">
-        {tab === 'chat' && <ChatView notify={notify} />}
+        {tab === 'chat' && <ChatView notify={notify} onOpenSystem={() => setTab('system')} />}
         {tab === 'search' && <SearchView notify={notify} />}
         {tab === 'sources' && <SourcesView notify={notify} />}
         {tab === 'projects' && <ProjectsView notify={notify} />}

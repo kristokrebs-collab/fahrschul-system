@@ -10,6 +10,7 @@ import { verifyAuditChain } from './core/audit.js'
 import { applyRetention } from './memory/service.js'
 import { seedPrompts } from './llm/prompts.js'
 import { errText } from './core/logger.js'
+import { setLlmKey, checkLlmKey, getLlmKey, clearLlmKey, llmKeyInfo } from './llm/credentials.js'
 
 /**
  * Operator CLI. Everything an owner needs to run the system without the UI —
@@ -34,6 +35,11 @@ JARVIS – Verwaltung
   backup                                        Sicherung erstellen
   restore <datei>                               Sicherung einspielen (Server vorher stoppen!)
   keygen                                        Master-Key erzeugen
+
+  llm:connect <sk-ant-...>                      Claude verbinden (prüft und speichert verschlüsselt)
+  llm:test                                      Verbindung zu Claude prüfen
+  llm:status                                    Zeigt, ob und woher ein Schlüssel kommt
+  llm:disconnect                                Gespeicherten Schlüssel entfernen
 
 `)
 }
@@ -95,6 +101,33 @@ async function main() {
       process.exitCode = run.failed > 0 ? 1 : 0
       break
     }
+    case 'llm:connect': {
+      const key = args[0]
+      if (!key) { process.stderr.write('Aufruf: llm:connect <sk-ant-...>\n'); process.exitCode = 1; break }
+      const r = await setLlmKey(db, key, 'cli')
+      process.stdout.write(`${r.ok ? '✓' : '✗'} ${r.detail_de}\n`)
+      if (r.ok) process.stdout.write('JARVIS denkt ab sofort mit Claude. Kein Neustart nötig.\n')
+      process.exitCode = r.ok ? 0 : 1
+      break
+    }
+    case 'llm:test': {
+      const key = getLlmKey(db)
+      if (!key) { process.stdout.write('Kein Schlüssel hinterlegt. Verbinden mit: llm:connect <sk-ant-...>\n'); process.exitCode = 1; break }
+      const r = await checkLlmKey(key)
+      process.stdout.write(`${r.ok ? '✓' : '✗'} ${r.detail_de}\n`)
+      process.exitCode = r.ok ? 0 : 1
+      break
+    }
+    case 'llm:status': {
+      const info = llmKeyInfo(db)
+      process.stdout.write(info.configured
+        ? `Verbunden: ${info.masked} (Quelle: ${info.source === 'env' ? 'Umgebungsvariable' : 'verschlüsselt gespeichert'}), Modell ${info.model}\n`
+        : 'Nicht verbunden. JARVIS läuft im Quellen-Modus (Suche und Zitate, keine freien Antworten).\n')
+      break
+    }
+    case 'llm:disconnect':
+      process.stdout.write(clearLlmKey(db, 'cli') ? 'Schlüssel entfernt.\n' : 'Es war kein Schlüssel gespeichert.\n')
+      break
     case 'audit:verify': {
       const r = verifyAuditChain(db)
       process.stdout.write(r.valid

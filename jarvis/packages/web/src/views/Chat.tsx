@@ -3,6 +3,7 @@ import type { ChatEvent, AnswerMode, ActionPreview, MemoryProposal, RetrievalRes
 import { api, streamChat, type ChatMessage } from '../api'
 import { Badge, Btn, Card, Empty, Markdown, RiskBadge, Spinner, cx, inputCls, relTime } from '../components/ui'
 import { createListener, speak, stopSpeaking, voiceCapabilities, type ListenState } from '../voice'
+import { LlmBanner } from '../components/LlmConnect'
 
 /**
  * The conversation view.
@@ -40,7 +41,10 @@ const MODES: Array<{ id: AnswerMode; label: string; hint: string }> = [
   { id: 'deep', label: 'Gründlich', hint: 'Mehr Quellen, Widersprüche, Risiken' },
 ]
 
-export function ChatView({ notify }: { notify: (m: string, tone?: 'info' | 'bad' | 'good') => void }) {
+export function ChatView({ notify, onOpenSystem }: {
+  notify: (m: string, tone?: 'info' | 'bad' | 'good') => void
+  onOpenSystem: () => void
+}) {
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [mode, setMode] = useState<AnswerMode>('standard')
@@ -151,6 +155,7 @@ export function ChatView({ notify }: { notify: (m: string, tone?: 'info' | 'bad'
 
   return (
     <div className="flex h-full flex-col">
+      <LlmBanner onGoToSystem={onOpenSystem} />
       <div className="flex items-center gap-2 border-b border-white/6 px-3 py-2">
         <div className="flex rounded-lg border border-white/8 bg-ink-900/60 p-0.5">
           {MODES.map((m) => (

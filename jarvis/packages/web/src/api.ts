@@ -99,6 +99,12 @@ export const api = {
     post<{ action: ActionPreview; result: { ok: boolean; summary: string } | null }>(`/api/actions/${id}/decide`, { approve }),
   tools: () => get<{ tools: ToolDescriptor[] }>('/api/tools'),
 
+  /* Sprachmodell (Claude) */
+  llm: () => get<{ llm: LlmInfo }>('/api/llm'),
+  connectLlm: (key: string) => post<{ ok: boolean; message_de: string; llm: LlmInfo }>('/api/llm/key', { key }),
+  disconnectLlm: () => del<{ ok: boolean; llm: LlmInfo }>('/api/llm/key'),
+  testLlm: () => post<{ ok: boolean; message_de: string; model: string | null }>('/api/llm/test'),
+
   /* System */
   status: () => get<{ status: SystemStatus; config: Record<string, unknown> }>('/api/status'),
   audit: (action?: string, limit = 100) => get<{ entries: AuditEntry[]; chain: { valid: boolean; entries: number } }>(
@@ -166,6 +172,17 @@ export async function streamChat(
 }
 
 /* ── Response shapes not covered by @jarvis/shared ───────────────────────── */
+
+export interface LlmInfo {
+  configured: boolean
+  source: 'env' | 'database' | null
+  /** Masked hint only — the key itself is never returned by the API. */
+  masked: string | null
+  model: string
+  editable: boolean
+  offline: boolean
+  master_key_present: boolean
+}
 
 export interface ChatMessage {
   id: string
