@@ -1,0 +1,61 @@
+# systemd-Einheit fuer den Betrieb ohne Docker.
+#
+# Installation:
+#   sudo cp ops/fahrschul-autopilot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now fahrschul-autopilot
+#
+# Anpassen: User, WorkingDirectory und ExecStart-Pfad.
+
+[Unit]
+Description=Fahrschule Krebs Social Autopilot
+Documentation=file:///opt/fahrschul-autopilot/docs/BETRIEB.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fkautopilot
+Group=fkautopilot
+WorkingDirectory=/opt/fahrschul-autopilot
+
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/fahrschul-autopilot/.env
+
+ExecStart=/usr/bin/node --experimental-sqlite dist/server.js
+
+# Neustart bei Absturz - der Zeitplan laeuft im selben Prozess.
+Restart=always
+RestartSec=5s
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# Sauberes Herunterfahren: der Dienst behandelt SIGTERM selbst.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# --- Haertung ---------------------------------------------------------
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+# Einzig beschreibbarer Pfad: das Datenverzeichnis.
+ReadWritePaths=/opt/fahrschul-autopilot/data
+
+# Die .env enthaelt Secrets - Leserechte nur fuer den Dienstnutzer.
+# chmod 600 /opt/fahrschul-autopilot/.env
+
+[Install]
+WantedBy=multi-user.target

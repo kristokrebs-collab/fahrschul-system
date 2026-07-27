@@ -1,0 +1,85 @@
+# Betrieb mit Docker Compose.
+#
+#   cd ops && docker compose up -d
+#
+# Voraussetzung: eine .env im Projektstammverzeichnis (siehe .env.example).
+# Secrets werden ueber env_file eingelesen und tauchen nicht in dieser Datei auf.
+
+services:
+  autopilot:
+    build:
+      context: ..
+      dockerfile: ops/Dockerfile
+    image: fahrschul-krebs/social-autopilot:1.0.0
+    container_name: fk-autopilot
+    restart: unless-stopped
+
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8080"
+      DATABASE_PATH: /app/data/autopilot.db
+      BACKUP_DIR: /app/data/backups
+      ENABLE_WORKERS: "true"
+
+    ports:
+      # Nur lokal binden. Nach aussen gehoert ein Reverse-Proxy mit TLS davor.
+      - "127.0.0.1:8080:8080"
+
+    volumes:
+      - autopilot-data:/app/data
+
+    # Haertung
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Taegliche Sicherung um 03:15. Laeuft im selben Image, teilt das Volume.
+  backup:
+    image: fahrschul-krebs/social-autopilot:1.0.0
+    container_name: fk-autopilot-backup
+    restart: unless-stopped
+    depends_on:
+      - autopilot
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+      DATABASE_PATH: /app/data/autopilot.db
+      BACKUP_DIR: /app/data/backups
+      ENABLE_WORKERS: "false"
+    volumes:
+      - autopilot-data:/app/data
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          # bis 03:15 des naechsten Tages schlafen
+          now=$$(date +%s)
+          target=$$(date -d "tomorrow 03:15" +%s 2>/dev/null || echo $$((now + 86400)))
+          sleep $$((target - now))
+          node --experimental-sqlite dist/cli/backup.js || echo "Sicherung fehlgeschlagen"
+        done
+
+volumes:
+  autopilot-data:
+    driver: local

@@ -1,0 +1,15 @@
+node_modules/
+dist/
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/backups/
+data/media-cache/
+data/sandbox-posts/
+data/test/
+data/*.pre-restore-*
+.env
+.env.local
+*.log
+coverage/
+.DS_Store
