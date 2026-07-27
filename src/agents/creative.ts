@@ -90,6 +90,15 @@ export interface OpportunityDraft {
   scores: OpportunityScores;
   shelfLifeDays: number;
   requiresVerification: boolean;
+  /**
+   * Bindung an Saeule, Zielgruppe und den konkreten Einwand. Ohne diese
+   * Bindung vergibt der Wochenplan Aufhaenger, Thema und Adressat unabhaengig
+   * voneinander - das Ergebnis sind Beitraege, die drei verschiedene Dinge
+   * gleichzeitig sagen wollen.
+   */
+  pillarKey?: string | null;
+  segmentKey?: string | null;
+  objection?: string | null;
 }
 
 const OPPORTUNITY_SCHEMA = {
@@ -196,6 +205,9 @@ function deterministicOpportunities(limit: number): OpportunityDraft[] {
         },
         shelfLifeDays: 365,
         requiresVerification: false,
+        pillarKey: pillar.pillar_key,
+        segmentKey: segment.segment_key,
+        objection,
       });
     }
   }
@@ -251,8 +263,9 @@ export async function researchOpportunities(
     run(
       `INSERT INTO opportunities
         (id, title, kind, summary, evidence_json, scores_json, total_score, shelf_life_days,
-         requires_verification, status, source, discovered_at, expires_at)
-       VALUES (?,?,?,?,?,?,?,?,?,'new',?,?,?)`,
+         requires_verification, status, source, discovered_at, expires_at,
+         pillar_key, segment_key, objection)
+       VALUES (?,?,?,?,?,?,?,?,?,'new',?,?,?,?,?,?)`,
       newId('opp'),
       d.title,
       d.kind,
@@ -265,6 +278,9 @@ export async function researchOpportunities(
       mode === 'anthropic' ? 'claude_research' : 'deterministic_derivation',
       nowIso(),
       new Date(Date.now() + (d.shelfLifeDays ?? 30) * 86400_000).toISOString(),
+      d.pillarKey ?? null,
+      d.segmentKey ?? null,
+      d.objection ?? null,
     );
     created++;
   }
@@ -368,12 +384,22 @@ export function buildWeeklyPlan(count: number, actor: string): PlanItemDraft[] {
   const now = new Date();
 
   for (let i = 0; i < count; i++) {
-    const pillar = ranked[i % ranked.length];
-    const segment = segments[i % Math.max(segments.length, 1)];
     const mix = FORMAT_MIX[i % FORMAT_MIX.length];
     const opportunity = opportunities[i] ?? null;
 
-    const objection = segment?.objections?.[0] ?? 'Unsicherheit vor dem ersten Termin';
+    // Stammt der Aufhaenger aus einer Themenchance, bestimmen deren Saeule und
+    // Zielgruppe auch den Rest des Beitrags. Nur wenn keine Chance vorliegt,
+    // greift der Saettigungsausgleich als Ersatzauswahl. Sonst entstuenden
+    // Beitraege, deren Hook, Thema und Adressat auseinanderlaufen.
+    const pillar =
+      (opportunity?.pillar_key && pillars.find((p) => p.pillar_key === opportunity.pillar_key)) ||
+      ranked[i % ranked.length];
+    const segment =
+      (opportunity?.segment_key && segments.find((s) => s.segment_key === opportunity.segment_key)) ||
+      segments[i % Math.max(segments.length, 1)];
+
+    const objection =
+      opportunity?.objection ?? segment?.objections?.[0] ?? 'Unsicherheit vor dem ersten Termin';
     const hook = opportunity
       ? String(opportunity.title).slice(0, 110)
       : `${objection} - so laeuft es bei uns wirklich`;
@@ -395,7 +421,9 @@ export function buildWeeklyPlan(count: number, actor: string): PlanItemDraft[] {
       requiredMedia: ['reel', 'short', 'story'].includes(mix.format)
         ? ['video hochkant']
         : ['bild hochkant'],
-      script: { structure: ['Hook', 'Problem', 'Konkrete Antwort', 'Beleg', 'CTA'] },
+      // Der Einwand wird mitgefuehrt, damit die Produktion denselben
+      // beantwortet, den die Planung gemeint hat.
+      script: { structure: ['Hook', 'Problem', 'Konkrete Antwort', 'Beleg', 'CTA'], objection },
       cta:
         i % 4 === 3
           ? 'Schreib uns eine Nachricht mit deiner Wunschklasse - wir melden uns mit einem Termin.'
@@ -669,40 +697,61 @@ function srtFrom(lines: string[], perLine = 3): string {
 function composePackage(plan: any, assets: SearchHit[]): ProductionPackage {
   const segment = listSegments().find((s) => s.segment_key === plan.audience_segment);
   const pillar = listPillars().find((p) => p.pillar_key === plan.pillar);
-  const objection = segment?.objections?.[0] ?? 'Unsicherheit vor dem ersten Fahrtermin';
+  // Den Einwand nehmen, den die Planung gemeint hat - nicht irgendeinen der
+  // Zielgruppe. Sonst beantwortet der Bildtext eine andere Frage als der Hook.
+  const planned = parseJson<{ objection?: string }>(plan.script_json, {});
+  const objection =
+    planned.objection ?? segment?.objections?.[0] ?? 'Unsicherheit vor dem ersten Fahrtermin';
   const isVideo = ['reel', 'short', 'story', 'video'].includes(plan.format);
 
+  // Der Einwand als Frage, ohne doppeltes Fragezeichen.
+  const question = objection.replace(/[?.!]+$/, '');
+
   const hookVariants = [
-    plan.hook,
-    `${objection}? Der ehrliche Ablauf bei uns in Fulda.`,
-    `Was in der ersten Fahrstunde wirklich passiert - Klasse ${plan.pillar === 'motorrad' ? 'A' : 'B'}.`,
+    `${question}? Die ehrliche Antwort.`,
+    `Diese Frage bekommen wir in Fulda fast jede Woche: ${question}?`,
+    `${question} - wir sagen es dir, bevor du fragst.`,
   ];
 
   const onScreenText = [
-    objection,
-    'So laeuft es bei uns ab',
-    pillar?.name ?? 'Fahrschule Krebs',
-    'Fulda und Bad Hersfeld',
+    `${question}?`,
+    'Die ehrliche Antwort',
+    'Fahrschule Krebs · Fulda und Bad Hersfeld',
   ];
+
+  // Handlungsaufruf passend zur Zielgruppe. Ein Betrieb speichert keinen
+  // Beitrag - er will einen Ansprechpartner.
+  const ctaBySegment: Record<string, string> = {
+    betriebe: 'Schreib uns, wie viele Mitarbeitende es betrifft und welche Klasse - wir melden uns mit einem Terminvorschlag.',
+    berufskraftfahrer: 'Schreib uns deine Klasse und ab wann du starten koenntest - wir sagen dir, was geht.',
+    eltern: 'Schreib uns, welche Klasse fuer Ihr Kind infrage kommt - wir erklaeren den Ablauf in Ruhe.',
+    adaptiert: 'Schreib uns, welche Anpassung du brauchst - wir klaeren vorab, was bei uns moeglich ist.',
+    motorrad: 'Schreib uns deine Wunschklasse (A1, A2 oder A) - wir sagen dir, was du mitbringen musst.',
+    quereinsteiger: 'Schreib uns, wann du Zeit hast - Abend und Samstag gehen bei uns auch.',
+    fahranfaenger: 'Schreib uns deine Wunschklasse und ob Fulda oder Bad Hersfeld besser passt.',
+  };
+  const cta = ctaBySegment[plan.audience_segment] ?? plan.cta;
+
+  // Der Begleittext beantwortet den Einwand - er beschreibt nicht den Beitrag.
+  // `plan.angle` ist interne Planungssprache und bleibt bewusst draussen.
+  const caption = [
+    `${question}?`,
+    '',
+    'Diese Frage hoeren wir oft - und die ehrliche Antwort haengt davon ab, was du ' +
+      'genau brauchst. Deshalb erklaeren wir dir den Ablauf lieber konkret, statt eine ' +
+      'Zahl in den Raum zu stellen, die am Ende nicht stimmt.',
+    '',
+    'Wir bilden in Fulda und Bad Hersfeld aus.',
+    '',
+    cta,
+  ].join('\n');
 
   const lines = [
     hookVariants[0],
-    `Viele fragen uns genau das: ${objection}`,
-    plan.angle?.slice(0, 160) ?? 'Wir erklaeren den Ablauf Schritt fuer Schritt.',
-    plan.cta,
+    `Diese Frage hoeren wir oft: ${question}?`,
+    'Die ehrliche Antwort haengt davon ab, was du genau brauchst - deshalb erklaeren wir den Ablauf konkret.',
+    cta,
   ];
-
-  const caption = [
-    `${objection}`,
-    '',
-    plan.angle?.slice(0, 400) ?? '',
-    '',
-    'Standorte: Fulda und Bad Hersfeld.',
-    '',
-    plan.cta,
-  ]
-    .filter((l) => l !== undefined)
-    .join('\n');
 
   return {
     title: plan.hook.slice(0, 120),
@@ -728,7 +777,7 @@ function composePackage(plan: any, assets: SearchHit[]): ProductionPackage {
     altText:
       `${plan.format === 'carousel' ? 'Bildstrecke' : 'Aufnahme'} aus dem Alltag der Fahrschule Krebs in Fulda: ` +
       `${assets[0]?.asset.search_text?.slice(0, 120) || 'Fahrzeug und Ausbildungssituation'}.`,
-    cta: plan.cta,
+    cta,
     hashtags: ['#fahrschulekrebs', '#fulda', '#badhersfeld', '#führerschein', '#fahrschule'],
     storyFollowup: [
       { step: 1, type: 'frage', content: `Was haelt dich gerade noch ab? (${objection})` },

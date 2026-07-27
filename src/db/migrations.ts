@@ -719,4 +719,18 @@ BEGIN
 END;
 `,
   },
+
+  {
+    version: 11,
+    name: 'opportunity_topic_binding',
+    sql: `
+-- Eine Themenchance entsteht immer aus einer bestimmten Saeule und fuer eine
+-- bestimmte Zielgruppe. Ohne diese Bindung hat der Wochenplan Hook, Saeule und
+-- Zielgruppe unabhaengig voneinander vergeben - das ergab Beitraege, deren
+-- Aufhaenger, Thema und Adressat nicht zusammenpassten.
+ALTER TABLE opportunities ADD COLUMN pillar_key TEXT;
+ALTER TABLE opportunities ADD COLUMN segment_key TEXT;
+ALTER TABLE opportunities ADD COLUMN objection TEXT;
+`,
+  },
 ];
