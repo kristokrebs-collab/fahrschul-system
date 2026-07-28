@@ -159,22 +159,34 @@ export function MarkSeminar({ className, title }: MarkProps) {
 }
 
 /**
- * Wordmark. Text-based so it stays crisp, selectable and translatable; the
- * signal bar is the constant element that also appears as the chapter marker.
+ * Wordmark — faithful to the real Fahrschule Krebs logo: "KREBS" in brand red,
+ * the yellow-and-red double bar, then the two-line block "FAHRSCHULE"
+ * (outlined, letterspaced) over "VERKEHRSBILDUNGSZENTRUM" (solid). Rebuilt as
+ * type rather than embedded as raster so it stays crisp, recolourable for the
+ * dark surface, and readable by assistive technology.
  */
-export function KrebsWordmark({ className }: { className?: string }) {
+export function KrebsWordmark({ className, compact = false }: { className?: string; compact?: boolean }) {
   return (
-    <span className={`inline-flex items-baseline gap-2 ${className ?? ''}`}>
-      <span
-        aria-hidden
-        className="relative top-[-0.12em] inline-block h-[0.72em] w-[0.24em] shrink-0 bg-signal-500"
-        style={{ boxShadow: '0 0 14px color-mix(in oklab, var(--color-signal-500) 75%, transparent)' }}
-      />
-      <span className="font-display font-extrabold tracking-[-0.03em]">
+    <span className={`inline-flex items-center gap-[0.42em] ${className ?? ''}`}>
+      <span className="font-display text-[1.35em] font-extrabold leading-none tracking-[-0.01em] text-signal-500">
         KREBS
-        <span className="ml-1.5 font-sans text-[0.42em] font-semibold uppercase tracking-[0.22em] text-chalk-dim">
+      </span>
+      <span aria-hidden className="flex h-[1.15em] shrink-0 gap-[0.09em]">
+        <span className="w-[0.1em] bg-amber-500" />
+        <span className="w-[0.1em] bg-signal-500" />
+      </span>
+      <span className="flex flex-col justify-center leading-none">
+        <span
+          className="font-display text-[0.52em] font-bold uppercase tracking-[0.34em] text-transparent"
+          style={{ WebkitTextStroke: '0.035em var(--color-chalk-soft)' }}
+        >
           Fahrschule
         </span>
+        {!compact && (
+          <span className="mt-[0.16em] font-display text-[0.36em] font-bold uppercase tracking-[0.083em] text-chalk">
+            Verkehrsbildungszentrum
+          </span>
+        )}
       </span>
     </span>
   )

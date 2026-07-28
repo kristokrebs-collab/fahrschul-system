@@ -14,7 +14,7 @@ export function TrainingGuide() {
   const sources = publicValue(guideSources)
 
   return (
-    <section className="chapter relative" aria-labelledby="ausbildungsweg">
+    <section className="chapter relative" aria-labelledby="ausbildungsweg" data-atmo="34/50">
       <div className="shell relative">
         <ChapterHeading
           marker="Kapitel 08 — Dein Weg"

@@ -117,3 +117,23 @@ Vor dem Livegang zu prüfen:
 | Übungsplatz „Werk 2" (Bellingerstr. 6, ca. 2.000 m²) | Adresse nur aus einem Verzeichnis |
 | Fax Fulda 0661 90190906 | Nur Verzeichnisse — **nicht veröffentlicht** |
 | Fotos von Team, Fahrzeugen, Standorten, Simulator | **Fehlen vollständig** — siehe `missing-assets.md` |
+
+---
+
+# Aktualisierung 28.07. — nach Sichtung des Higgsfield-Archivs
+
+Das Archiv enthielt echtes Material, das mehrere offene Punkte **teilweise**
+klärt:
+
+| Punkt | Neuer Stand |
+| --- | --- |
+| Schüler-Cockpit | **Existiert als Prototyp** — drei Screenshots der echten App liegen vor (docs/app-reference/). Die Website zeigt jetzt einen originalgetreuen Nachbau, weiterhin als „In Entwicklung" gerahmt. Startdatum bitte bestätigen. |
+| Teamfoto | **Liegt vor** („Das K-TEAM", ~20 Personen) und ist eingebunden. Einzelporträts mit Namen/Klassen fehlen weiter. |
+| Logo | **Liegt vor** und ist als Typografie nachgebaut. Eine Vektor-Fassung (SVG/AI) wäre für Druck und Favicon besser als das JPEG. |
+| Simulator-Marke | Widersprüchliche Hinweise: eigenes YouTube-Video nennt VOGEL (2016), die Referenzsammlung des Inhabers zeigt **DEGENER 360° simdrive**. Anzahl und Klassen weiter unbelegt — bitte klären. |
+| Fahrstil-Bewertung | Die echte App zeigt einen Prüfungsreife-Ring („Bewertung des Fahrlehrers", 73 %). So übernommen — ausdrücklich als menschliche Einschätzung, nicht als Prognose. |
+
+Die im Auftrag genannten Punkte **Hörbuch, E-Book (16 Techniken), 80+
+Lernvideos, „neun Theorietermine pro Woche für B/BF17", zwei Simulatoren und
+die Preisliste** bleiben unbelegt und damit unveröffentlicht. Die kursierende
+Preisliste gehört weiterhin nachweislich zum namensgleichen Fremdunternehmen.

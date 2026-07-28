@@ -1,5 +1,26 @@
 # Spezifikation: Schüler-Cockpit
 
+> **Stand 2 (28.07.):** Das Kapitel wurde auf Basis dreier Screenshots der
+> **echten Cockpit-App** neu gebaut (docs/app-reference/). Es ist jetzt eine
+> scroll-gesteuerte Produktpräsentation: ~450 vh normale Scroll-Strecke, ein
+> `sticky`-Bühnenbereich, ein Fortschrittswert treibt synchron (1) das
+> Eintauchen des Geräts, (2) das Scrollen des App-Inhalts zu Ebene A →
+> Fahrstil → Protokoll, (3) Zähler, Balken und den Prüfungsreife-Ring,
+> (4) die Meilensteinleiste der Ausbildung und (5) die Routenlinie, die am
+> Ende aus dem Gerät zur nächsten Station zeichnet. React rendert dabei
+> höchstens einmal pro Prozent; kontinuierliche Transformationen gehen als
+> direkte Style-Writes am Frame vorbei. Mobil und bei reduzierter Bewegung:
+> gestapelte Vollbreiten-Panels derselben echten Oberfläche, ohne Pinning.
+> Übernommene Original-Elemente: „Hallo, Michael." · Klasse B · Erst-Erwerb ·
+> Herr Schäfer · Ebene A/Fahrstil/Protokoll · 11/14 Pflichtthemen ·
+> Sonderfahrten 3/5·2/4·0/3 · 22 Übungsstunden · Simulator 5/6 ·
+> Prüfungsreife 73 % („Bewertung des Fahrlehrers") · Historie mit
+> Prüfungsstrecken-Training Fulda und A7/A66.
+
+---
+
+## Ursprüngliche Spezifikation (Stand 1)
+
 ## Ehrlichkeitsrahmen
 
 Öffentlich ließ sich **keine** Schüler-App der Fahrschule nachweisen. Das

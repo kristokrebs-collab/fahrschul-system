@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { business, locations, practiceGround } from '@/content/business'
 import { publicValue } from '@/content/truth'
@@ -25,7 +26,7 @@ export function LocationsChapter() {
   const groundAddress = publicValue(practiceGround.address)
 
   return (
-    <section className="chapter relative" aria-labelledby="standorte">
+    <section className="chapter relative" aria-labelledby="standorte" data-atmo="46/35">
       <div className="atmos-lanes" />
       <div className="shell relative">
         <ChapterHeading
@@ -109,6 +110,27 @@ export function LocationsChapter() {
           })}
         </div>
 
+        {/* The real K-Team — the photograph the whole chapter was waiting for */}
+        {team && (
+          <figure className="relative mt-6 overflow-hidden rounded-2xl border border-chalk/10">
+            <Image
+              src="/team/k-team-strip.avif"
+              alt="Das Team der Fahrschule Krebs — rund zwanzig Fahrlehrerinnen, Fahrlehrer und Büromitarbeitende in schwarzen Krebs-Jacken"
+              width={1640}
+              height={254}
+              sizes="(min-width: 1280px) 1152px, 100vw"
+              className="w-full object-cover"
+            />
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink-950/70 via-transparent to-transparent" />
+            <figcaption className="absolute bottom-3 left-4 right-4 flex flex-wrap items-baseline justify-between gap-2">
+              <span className="font-display text-lg font-extrabold text-chalk drop-shadow">Das K-Team</span>
+              <Link href="/team" className="text-sm font-semibold text-signal-400 hover:text-signal-500">
+                Team und Fahrzeuge ansehen
+              </Link>
+            </figcaption>
+          </figure>
+        )}
+
         <div className="mt-6 grid gap-6 sm:grid-cols-2">
           {team && (
             <div className="rounded-2xl border border-chalk/10 bg-ink-850/50 p-7">
@@ -117,9 +139,6 @@ export function LocationsChapter() {
                 {team}
                 {scope ? ` unterrichten in den Klassen ${scope}.` : '.'} {fleetNote}
               </p>
-              <Link href="/team" className="mt-4 inline-block text-sm font-semibold text-signal-400 hover:text-signal-500">
-                Team und Fahrzeuge ansehen
-              </Link>
             </div>
           )}
 

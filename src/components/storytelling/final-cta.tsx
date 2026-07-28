@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import { locations } from '@/content/business'
 import { publicValue } from '@/content/truth'
@@ -12,10 +13,19 @@ import { Roadway } from '@/components/brand/roadway'
  */
 export function FinalCta() {
   return (
-    <section className="relative isolate overflow-hidden border-t border-chalk/8 py-24 md:py-32">
+    <section className="relative isolate overflow-hidden border-t border-chalk/8 py-24 md:py-32" data-atmo="80/75">
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 opacity-45">
         <Roadway className="absolute inset-x-0 bottom-0 h-full w-full" />
       </div>
+      {/* The crab from the real logo, as a faint watermark over the finish line */}
+      <Image
+        src="/brand/krebs-crab.png"
+        alt=""
+        aria-hidden
+        width={700}
+        height={254}
+        className="pointer-events-none absolute left-1/2 top-6 -z-10 w-[34rem] max-w-[90vw] -translate-x-1/2 opacity-[0.05]"
+      />
       <div className="atmos-falloff" />
 
       <div className="shell relative text-center">

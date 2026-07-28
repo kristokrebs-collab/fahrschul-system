@@ -22,7 +22,7 @@ const ELEMENT_MARK: Record<string, (props: { className?: string }) => React.Reac
  */
 export function DigitalSystem() {
   return (
-    <section className="chapter relative" aria-labelledby="digitalsystem">
+    <section className="chapter relative" aria-labelledby="digitalsystem" data-atmo="40/40">
       <div className="atmos-lanes" />
       <div className="shell relative">
         <ChapterHeading

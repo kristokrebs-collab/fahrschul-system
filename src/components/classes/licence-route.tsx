@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { useState } from 'react'
 import { categories, classCategoryOrder, classesByCategory, sonderfahrtenTotal, type ClassCategory } from '@/content/classes'
@@ -12,6 +13,20 @@ const CATEGORY_MARK: Record<ClassCategory, (props: { className?: string }) => Re
   lkw: MarkProfessional,
   bus: MarkBus,
   spezial: MarkClasses,
+}
+
+/**
+ * Studio visuals from the approved Higgsfield archive — each category's
+ * vehicle staged on the red-ring turntable, matching the site's material
+ * language. They are staged product illustrations, not photographs of the
+ * training fleet, and are captioned accordingly.
+ */
+const CATEGORY_IMAGE: Record<ClassCategory, { src: string; alt: string } | null> = {
+  pkw: { src: '/vehicles/pkw-1600.avif', alt: 'Schwarzer Kombi im dunklen Studio auf rot beleuchteter Drehscheibe' },
+  zweirad: { src: '/vehicles/motorrad-1600.avif', alt: 'Sportmotorrad im dunklen Studio auf rot beleuchteter Drehscheibe' },
+  lkw: { src: '/vehicles/lkw-1600.avif', alt: 'Rote Sattelzugmaschine im dunklen Studio auf rot beleuchteter Drehscheibe' },
+  bus: { src: '/vehicles/bus-1600.avif', alt: 'Stadtbus im dunklen Studio auf rot beleuchteter Drehscheibe' },
+  spezial: null,
 }
 
 /**
@@ -85,6 +100,26 @@ export function LicenceRoute() {
         tabIndex={0}
         className="mt-7 focus:outline-none"
       >
+        {CATEGORY_IMAGE[active] && (
+          <figure className="relative mb-8 overflow-hidden rounded-2xl border border-chalk/10">
+            <Image
+              key={active}
+              src={CATEGORY_IMAGE[active].src}
+              alt={CATEGORY_IMAGE[active].alt}
+              width={1600}
+              height={900}
+              sizes="(min-width: 1280px) 1152px, 100vw"
+              className="lane-stage-in h-52 w-full object-cover object-center sm:h-64 md:h-80"
+              priority={false}
+            />
+            {/* Blend the studio floor into the page surface */}
+            <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink-950 via-transparent to-ink-950/40" />
+            <figcaption className="absolute bottom-3 left-4 flex items-baseline gap-3">
+              <span className="font-display text-xl font-extrabold text-chalk drop-shadow">{categories[active].label}</span>
+              <span className="text-[0.65rem] uppercase tracking-widest text-chalk-dim">Studio-Darstellung</span>
+            </figcaption>
+          </figure>
+        )}
         <p className="max-w-2xl text-[0.9375rem] text-chalk-dim">{categories[active].blurb}</p>
 
         {/* The lane: classes strung along one continuous line. */}

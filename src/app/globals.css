@@ -343,3 +343,55 @@
     border: 1px solid CanvasText;
   }
 }
+
+/* Cockpit narrative: the incoming scene title rises a touch. Removed for
+   reduced motion by the global rule above. */
+@keyframes cockpit-scene-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.cockpit-scene-in {
+  animation: cockpit-scene-in 0.45s var(--ease-route) both;
+}
+
+/* Lane stage: the category vehicle glides in when the lane changes. */
+@keyframes lane-stage-in {
+  from { opacity: 0; transform: scale(1.04); }
+  to { opacity: 1; transform: none; }
+}
+.lane-stage-in {
+  animation: lane-stage-in 0.6s var(--ease-route) both;
+}
+
+/* Chapter atmosphere: registered properties so the travelling light glides
+   between chapters instead of jumping. */
+@property --atmo-intensity {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.55;
+}
+@property --atmo-y {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 22%;
+}
+.atmos-chapter {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: calc(var(--atmo-intensity) * 0.9);
+  background: radial-gradient(
+    90% 55% at 50% var(--atmo-y),
+    color-mix(in oklab, var(--color-signal-700) 26%, transparent),
+    transparent 70%
+  );
+  transition:
+    --atmo-intensity 1.2s var(--ease-route),
+    --atmo-y 1.2s var(--ease-route);
+}
+@media (prefers-reduced-motion: reduce) {
+  .atmos-chapter {
+    transition: none;
+  }
+}

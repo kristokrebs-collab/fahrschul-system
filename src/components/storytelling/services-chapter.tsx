@@ -21,7 +21,7 @@ const GROUP_MARK: Record<ServiceGroup, (props: { className?: string }) => React.
  */
 export function ServicesChapter() {
   return (
-    <section className="chapter relative" aria-labelledby="leistungen">
+    <section className="chapter relative" aria-labelledby="leistungen" data-atmo="42/40">
       <div className="shell relative">
         <ChapterHeading
           marker="Kapitel 09 — Beruf & Spezial"

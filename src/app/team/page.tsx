@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import { business, locations, practiceGround, yearsInBusiness } from '@/content/business'
 import { publicValue } from '@/content/truth'
 import { PageHeader } from '@/components/brand/page-header'
@@ -72,15 +73,25 @@ export default function TeamPage() {
 
         {team && (
           <section aria-labelledby="team-heading">
-            <h2 id="team-heading" className="font-display text-2xl font-bold text-chalk">Das Team</h2>
+            <h2 id="team-heading" className="font-display text-2xl font-bold text-chalk">Das K-Team</h2>
             <p className="mt-4 max-w-3xl text-[0.9375rem] leading-relaxed text-chalk-soft">
               Bei uns unterrichten {team}
               {scope ? ` in den Klassen ${scope}` : ''}. Wer bei welcher Klasse dein Ansprechpartner ist, klären wir bei
               der Anmeldung — es kommt darauf an, was du vorhast und wann du kannst.
             </p>
+            <figure className="mt-6 overflow-hidden rounded-2xl border border-chalk/10">
+              <Image
+                src="/team/k-team-banner.avif"
+                alt="Das K-Team der Fahrschule Krebs — das gesamte Team in schwarzen Krebs-Jacken vor dunklem Hintergrund"
+                width={1640}
+                height={624}
+                sizes="(min-width: 1280px) 1152px, 100vw"
+                className="w-full"
+              />
+            </figure>
             <Disclosure>
-              Wir zeigen hier bewusst keine erfundenen Profile. Sobald aktuelle Fotos und Kurzporträts des Teams
-              vorliegen, stehen sie an dieser Stelle.
+              Einzelporträts mit Klassen und Schwerpunkten folgen, sobald sie freigegeben sind — erfundene Profile
+              zeigen wir nicht.
             </Disclosure>
           </section>
         )}

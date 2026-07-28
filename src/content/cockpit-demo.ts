@@ -1,125 +1,162 @@
 /**
- * Demo data for the Schüler-Cockpit showcase.
+ * Content model for the Cockpit showcase — reconstructed from screenshots of
+ * the real "Fahrschule Krebs Cockpit" app prototype (docs/app-reference/).
  *
- * Every figure here is invented for illustration — no real student data is
- * used, and the UI labels the whole chapter as a demonstration. The *rules*
- * behind it, however, are the genuine ones the driving school works to:
+ * Everything below mirrors the actual product: its section names (EBENE A /
+ * FAHRSTIL / PROTOKOLL), its wording ("Besuchte Pflichtthemen", "empfohlene
+ * Einheiten", "Bewertung des Fahrlehrers", "automatisch geführt"), its demo
+ * identity ("Hallo, Michael." · Klasse B · Erst-Erwerb · Herr Schäfer) and its
+ * figures (11/14 theory topics, Sonderfahrten 3/5 · 2/4 · 0/3, 22 practice
+ * hours, simulator 5/6, 73 % Prüfungsreife, 17 units / 26,3 h history).
  *
- *   · 12 Doppelstunden Grundstoff, reduced to 6 with an existing licence
- *   · Sonderfahrten for class B: 5 Überland, 4 Autobahn, 3 Nacht
- *   · Simulator units before the first lessons in real traffic
- *   · Basic training completed before Sonderfahrten begin
- *   · Documents and open invoices gate the exam registration
- *
- * "PrüfungsReady" is therefore an explainable checklist, never a predicted
- * probability of passing.
+ * The Prüfungsreife ring is the *instructor's* running assessment — the real
+ * app labels it "Bewertung des Fahrlehrers", and so do we. It is not an
+ * algorithmic pass prediction, and the copy must never present it as one.
  */
 
-export type StepState = 'done' | 'active' | 'open'
+export const appIdentity = {
+  appName: 'Cockpit',
+  brand: 'Fahrschule Krebs',
+  greetingSmall: 'Willkommen zurück',
+  greeting: 'Hallo, Michael.',
+  initials: 'MK',
+  chips: ['Klasse B', 'Erst-Erwerb', 'Herr Schäfer'],
+} as const
 
-export interface CockpitStep {
-  readonly id: string
-  readonly label: string
-  readonly state: StepState
-  readonly detail: string
-}
+export const theory = {
+  title: 'Theorieunterricht',
+  metric: 'Besuchte Pflichtthemen',
+  done: 11,
+  required: 14,
+} as const
 
-export interface CockpitState {
-  readonly id: string
-  readonly tab: string
+export const sonderfahrten = [
+  { key: 'ueberland', label: 'Überland', done: 3, required: 5 },
+  { key: 'autobahn', label: 'Autobahn', done: 2, required: 4 },
+  { key: 'nacht', label: 'Nacht', done: 0, required: 3 },
+] as const
+
+export const practice = {
+  hours: 22,
+  hoursLabel: 'reguläre Fahrten absolviert',
+  simulatorDone: 5,
+  simulatorRequired: 6,
+  simulatorLabel: 'empfohlene Einheiten',
+  simulatorCta: 'Platz wählen',
+} as const
+
+export const fahrstil = {
+  section: 'Fahrstil',
+  title: 'Bewertung des Fahrlehrers',
+  cadence: 'nach jeder Fahrstunde',
+  readiness: 73,
+  readinessLabel: 'Prüfungsreife',
+  note: 'Solide Fortschritte – dranbleiben',
+  skills: [
+    { label: 'Vorausschauendes Fahren', score: 4 },
+    { label: 'Kupplung & Schaltung', score: 3 },
+    { label: 'Parken & Rangieren', score: 4 },
+  ],
+} as const
+
+export const protokoll = {
+  section: 'Protokoll',
+  title: 'Deine Historie',
+  cadence: 'automatisch geführt',
+  tabs: ['Fahrstunden', 'Theorie'],
+  stats: ['17 Einheiten', '26,3 Std. gesamt'],
+  entries: [
+    {
+      kind: 'Übungsfahrt',
+      detail: 'Prüfungsstrecken-Training Fulda',
+      date: 'Mi, 15.07.',
+      time: '15:00–16:30 Uhr',
+      instructor: 'Herr Schäfer',
+      duration: '90 min',
+    },
+    {
+      kind: 'Autobahnfahrt',
+      detail: 'A7 / A66 – Auffahren, Überholen, Abstand halten',
+      date: 'Mo, 13.07.',
+      time: '10:00–11:30 Uhr',
+      instructor: 'Herr Schäfer',
+      duration: '90 min',
+    },
+    {
+      kind: 'Überlandfahrt',
+      detail: 'Landstraßen & Ortsdurchfahrten in der Rhön',
+      date: 'Do, 09.07.',
+      time: '14:00–16:15 Uhr',
+      instructor: 'Herr Schäfer',
+      duration: '135 min',
+    },
+  ],
+} as const
+
+/**
+ * The training route milestones as the app's onboarding presents them —
+ * used by the scroll narrative to show where the demo student stands.
+ */
+export const routeMilestones = [
+  { label: 'Anmeldung', state: 'done' },
+  { label: 'Unterlagen', state: 'done' },
+  { label: 'Theorie', state: 'active' },
+  { label: 'Theorieprüfung', state: 'open' },
+  { label: 'Simulator', state: 'active' },
+  { label: 'Übungsfahrten', state: 'active' },
+  { label: 'Sonderfahrten', state: 'active' },
+  { label: 'Prüfungsreife', state: 'open' },
+  { label: 'Praxisprüfung', state: 'open' },
+] as const
+
+/** The narrative beats of the scroll sequence, in order. */
+export interface CockpitScene {
+  readonly id: 'entry' | 'fortschritt' | 'fahrstil' | 'protokoll' | 'finale'
+  readonly eyebrow: string
   readonly title: string
-  readonly narrative: string
+  readonly body: string
   readonly bullets: readonly string[]
 }
 
-export const demoStudent = {
-  greeting: 'Hallo Lena',
-  classCode: 'B',
-  trainingType: 'B197',
-  location: 'Fulda',
-  instructor: 'Fahrlehrer M.',
-} as const
-
-export const trainingSteps: readonly CockpitStep[] = [
-  { id: 'anmeldung', label: 'Anmeldung', state: 'done', detail: 'Abgeschlossen' },
-  { id: 'unterlagen', label: 'Unterlagen', state: 'done', detail: 'Vollständig' },
-  { id: 'theorie', label: 'Theorieunterricht', state: 'done', detail: '14 von 14 Doppelstunden' },
-  { id: 'theoriepruefung', label: 'Theorieprüfung', state: 'done', detail: 'Bestanden' },
-  { id: 'simulator', label: 'Simulator', state: 'done', detail: 'Abgeschlossen' },
-  { id: 'uebungsfahrten', label: 'Übungsfahrten', state: 'done', detail: 'Grundausbildung abgeschlossen' },
-  { id: 'sonderfahrten', label: 'Sonderfahrten', state: 'active', detail: '9 von 12 absolviert' },
-  { id: 'freigabe', label: 'Freigabe zur Prüfung', state: 'open', detail: 'Durch die Fahrschule' },
-  { id: 'praxispruefung', label: 'Praktische Prüfung', state: 'open', detail: 'Noch kein Termin' },
-]
-
-export const sonderfahrtenProgress = [
-  { label: 'Überlandfahrten', done: 5, required: 5 },
-  { label: 'Autobahnfahrten', done: 3, required: 4 },
-  { label: 'Nachtfahrten', done: 1, required: 3 },
-] as const
-
-export const documents = [
-  { label: 'Sehtest', state: 'done' as const, detail: 'Geprüft' },
-  { label: 'Erste Hilfe', state: 'done' as const, detail: 'Geprüft' },
-  { label: 'Passbild', state: 'done' as const, detail: 'Geprüft' },
-  { label: 'Antrag bei der Behörde', state: 'active' as const, detail: 'Genehmigt' },
-]
-
-export const readinessChecks = [
-  { label: 'Theorieprüfung bestanden', ok: true },
-  { label: 'Unterlagen vollständig', ok: true },
-  { label: 'Keine offenen Rechnungen', ok: true },
-  { label: 'Alle Sonderfahrten absolviert', ok: false, missing: '3 Fahrten offen' },
-  { label: 'Freigabe der Fahrschule', ok: false, missing: 'Erfolgt nach den Sonderfahrten' },
-]
-
-export const cockpitStates: readonly CockpitState[] = [
+export const cockpitScenes: readonly CockpitScene[] = [
   {
-    id: 'heute',
-    tab: 'Heute',
-    title: 'Was heute ansteht',
-    narrative:
-      'Statt „Wie weit bin ich eigentlich?" beginnt der Tag mit einer klaren Antwort: der nächste Termin, die nächste offene Aufgabe, der aktuelle Stand.',
-    bullets: ['Nächster Termin und Treffpunkt', 'Eine konkrete nächste Aufgabe', 'Fortschritt auf einen Blick'],
+    id: 'entry',
+    eyebrow: 'Die echte App',
+    title: 'Dein Cockpit macht auf',
+    body:
+      'Kein Rätselraten mehr, wo du stehst. Das Cockpit begrüßt dich mit deinem Stand — Klasse, Ausbildungsart und wer dich unterrichtet.',
+    bullets: ['Persönlicher Stand beim Öffnen', 'Klasse, Ausbildungsart, Fahrlehrer', 'Ein Blick statt Nachfragen'],
   },
   {
-    id: 'ausbildung',
-    tab: 'Ausbildung',
-    title: 'Der ganze Weg auf einen Blick',
-    narrative:
-      'Die Ausbildung ist keine Blackbox. Jede Station — von der Anmeldung bis zur praktischen Prüfung — ist sichtbar, mit dem Stand, an dem sie gerade steht.',
-    bullets: ['Neun Stationen von der Anmeldung bis zur Prüfung', 'Erledigt, läuft, offen', 'Keine Nachfragen im Büro nötig'],
+    id: 'fortschritt',
+    eyebrow: 'Ebene A — Fortschritt',
+    title: 'Jede Pflicht, exakt gezählt',
+    body:
+      'Theoriethemen, gesetzliche Sonderfahrten, Übungsstunden, Simulatoreinheiten: Das Cockpit zählt mit — du siehst live, was erledigt ist und was noch fehlt.',
+    bullets: ['Besuchte Pflichtthemen im Soll-Ist-Vergleich', 'Überland, Autobahn, Nacht einzeln gezählt', 'Simulatorplatz direkt aus der App wählen'],
   },
   {
-    id: 'praxis',
-    tab: 'Praxis',
-    title: 'Rückmeldung nach jeder Fahrstunde',
-    narrative:
-      'Nach der Fahrstunde bleibt oft nur ein Gefühl. Hier steht, was gut lief, woran ihr arbeitet und was das Ziel der nächsten Stunde ist — in Worten, nicht in Noten.',
-    bullets: ['Das lief gut', 'Daran arbeiten wir', 'Ziel der nächsten Fahrstunde'],
+    id: 'fahrstil',
+    eyebrow: 'Fahrstil — nach jeder Fahrstunde',
+    title: 'Deine Fahrlehrerin bewertet, du siehst es',
+    body:
+      'Nach jeder Fahrstunde fließt die Einschätzung ein: Vorausschau, Kupplung und Schaltung, Parken und Rangieren. Die Prüfungsreife ist die Bewertung deines Fahrlehrers — kein Algorithmus, ein Mensch.',
+    bullets: ['Bewertung nach jeder Fahrstunde', 'Stärken und Baustellen benannt', 'Prüfungsreife als ehrliche Einschätzung'],
   },
   {
-    id: 'sonderfahrten',
-    tab: 'Sonderfahrten',
-    title: 'Pflichtfahrten, exakt gezählt',
-    narrative:
-      'Überland, Autobahn und Nacht sind gesetzlich vorgeschrieben und nicht verhandelbar. Wie viele noch fehlen, muss niemand schätzen.',
-    bullets: ['Fünf Überlandfahrten', 'Vier Autobahnfahrten', 'Drei Nachtfahrten'],
+    id: 'protokoll',
+    eyebrow: 'Protokoll — automatisch geführt',
+    title: 'Deine Historie schreibt sich selbst',
+    body:
+      'Jede Fahrt, jede Theoriestunde, jede Strecke: automatisch protokolliert, mit Datum, Dauer und Inhalt. Prüfungsstrecken-Training in Fulda, Autobahnfahrten auf A7 und A66 — alles nachlesbar.',
+    bullets: ['Jede Einheit mit Datum und Dauer', 'Echte Strecken, echte Inhalte', 'Gesamtstunden immer aktuell'],
   },
   {
-    id: 'dokumente',
-    tab: 'Unterlagen',
-    title: 'Papierkram ohne Rückfragen',
-    narrative:
-      'Sehtest, Erste Hilfe, Passbild, Antrag bei der Behörde: Jedes Dokument hat einen Status. Wer etwas nachreichen muss, sieht es sofort — und wer nichts tun muss, auch.',
-    bullets: ['Status je Dokument', 'Offene Beträge transparent', 'Kein Stapel im Büro'],
-  },
-  {
-    id: 'pruefungsready',
-    tab: 'PrüfungsReady',
-    title: 'Bereit — und zwar nachvollziehbar',
-    narrative:
-      'Kein Prozentwert, keine Prognose. Eine Liste von Bedingungen, die erfüllt sein müssen, und die Freigabe kommt am Ende von einem Menschen, nicht von einem Algorithmus.',
-    bullets: ['Was erfüllt ist', 'Was noch fehlt', 'Wer die Freigabe erteilt'],
+    id: 'finale',
+    eyebrow: 'Ein System',
+    title: 'Und alles greift ineinander',
+    body:
+      'Theorie, Simulator, Fahrstunden, Bewertung, Protokoll — das Cockpit verbindet sie zu einem Weg. Deinem Weg zur Prüfung.',
+    bullets: ['Ein Stand statt fünf Zettel', 'Nächster Schritt immer sichtbar', 'Vom ersten Tag bis zur Prüfung'],
   },
 ]

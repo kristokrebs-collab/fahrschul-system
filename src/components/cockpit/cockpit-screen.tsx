@@ -1,266 +1,307 @@
-import type { CockpitStep, StepState } from '@/content/cockpit-demo'
-
 /**
- * The cockpit interface itself — real HTML and CSS, not a screenshot, so it is
- * sharp at any density, selectable, translatable and readable by assistive
- * technology. Every state renders the same chrome so the device feels like one
- * product rather than six unrelated images.
+ * The Cockpit interface, rebuilt as crisp HTML from screenshots of the real
+ * app prototype (docs/app-reference/). One tall screen — the scroll narrative
+ * moves a viewport across it, exactly like scrolling the real app.
+ *
+ * Visual language of the original: near-black surface, red/rose accents, soft
+ * cards, uppercase micro-labels (EBENE A, FAHRSTIL, PROTOKOLL), the FK block
+ * with the red bar, chip row under the greeting, dot-scale skill ratings and
+ * the red Prüfungsreife ring.
+ *
+ * `progress` (0..1) drives the counters and the ring so the app visibly fills
+ * up while the page scrolls. All animated numbers derive from it — there is no
+ * timer, so reduced-motion users simply see the final values.
  */
 
-interface Props {
-  stateId: string
-  student: { greeting: string; classCode: string; trainingType: string; location: string; instructor: string }
-  steps: readonly CockpitStep[]
-  sonderfahrten: readonly { label: string; done: number; required: number }[]
-  documents: readonly { label: string; state: StepState; detail: string }[]
-  readiness: readonly { label: string; ok: boolean; missing?: string }[]
+import { appIdentity, fahrstil, practice, protokoll, sonderfahrten, theory } from '@/content/cockpit-demo'
+
+/** Eases a global progress value into a per-section 0..1 window. */
+function window01(p: number, from: number, to: number): number {
+  if (p <= from) return 0
+  if (p >= to) return 1
+  return (p - from) / (to - from)
 }
 
-const STATE_TONE: Record<StepState, string> = {
-  done: 'bg-state-done',
-  active: 'bg-signal-500',
-  open: 'bg-ink-600',
-}
+export type CockpitSection = 'intro' | 'fortschritt' | 'fahrstil' | 'protokoll'
 
-export function CockpitScreen({ stateId, student, steps, sonderfahrten, documents, readiness }: Props) {
-  return (
-    <div className="flex h-[34rem] flex-col bg-ink-900 text-chalk">
-      <Chrome student={student} />
-
-      <div className="no-scrollbar flex-1 overflow-hidden px-4 pb-4">
-        {stateId === 'heute' && <Today steps={steps} student={student} />}
-        {stateId === 'ausbildung' && <Journey steps={steps} />}
-        {stateId === 'praxis' && <Feedback />}
-        {stateId === 'sonderfahrten' && <Sonderfahrten items={sonderfahrten} />}
-        {stateId === 'dokumente' && <Documents items={documents} />}
-        {stateId === 'pruefungsready' && <Readiness items={readiness} />}
-      </div>
-
-      <p className="border-t border-chalk/8 px-4 py-2 text-center text-[0.625rem] font-semibold uppercase tracking-[0.16em] text-chalk-faint">
-        Demo-Ansicht mit Beispieldaten
-      </p>
-    </div>
-  )
-}
-
-function Chrome({ student }: { student: Props['student'] }) {
-  return (
-    <div className="flex items-center justify-between px-4 pb-3 pt-9">
-      <div>
-        <p className="text-[0.6875rem] text-chalk-faint">Schüler-Cockpit</p>
-        <p className="font-display text-lg font-bold leading-tight">{student.greeting}</p>
-      </div>
-      <span className="rounded-lg border border-signal-500/35 bg-signal-500/12 px-2.5 py-1 text-[0.6875rem] font-bold text-signal-400">
-        Klasse {student.classCode} · {student.trainingType}
-      </span>
-    </div>
-  )
-}
-
-function Today({ steps, student }: { steps: Props['steps']; student: Props['student'] }) {
-  const done = steps.filter((s) => s.state === 'done').length
-  const percent = Math.round((done / steps.length) * 100)
+export function CockpitScreen({
+  progress = 1,
+  sections,
+}: {
+  progress?: number
+  /** Render only these blocks — used by the stacked mobile narrative. */
+  sections?: readonly CockpitSection[]
+}) {
+  // Windows are aligned to the narrative scenes (5 equal segments): the
+  // counters fill while their scene is on screen, not before or after.
+  const pTheory = window01(progress, 0.22, 0.34)
+  const pSf = window01(progress, 0.24, 0.4)
+  const pRing = window01(progress, 0.44, 0.58)
+  const has = (s: CockpitSection) => !sections || sections.includes(s)
 
   return (
-    <div className="space-y-3">
-      <Card>
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-[0.6875rem] text-chalk-faint">Ausbildungsfortschritt</p>
-            <p className="tabular font-display text-3xl font-extrabold leading-none">{percent} %</p>
+    <div className="w-full bg-[#0b0a10] font-sans text-chalk">
+      {has('intro') && (<>
+      {/* ── App header ─────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-5 pb-4 pt-6">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#151320]">
+            <span aria-hidden className="mr-1 inline-block h-4 w-[3px] rounded-full bg-[#ff2e63]" />
+            <span className="font-display text-sm font-extrabold">FK</span>
+          </span>
+          <div className="leading-tight">
+            <p className="text-[0.6rem] font-bold uppercase tracking-[0.22em]">{appIdentity.brand}</p>
+            <p className="text-[0.55rem] uppercase tracking-[0.3em] text-chalk-dim">{appIdentity.appName}</p>
           </div>
-          <p className="tabular text-[0.6875rem] text-chalk-dim">
-            {done} von {steps.length} Stationen
-          </p>
         </div>
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-750">
-          <div className="h-full rounded-full bg-signal-500" style={{ width: `${percent}%` }} />
+        <div className="flex items-center gap-2">
+          <span className="relative grid h-8 w-8 place-items-center rounded-lg bg-[#151320]">
+            <BellGlyph />
+            <span aria-hidden className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#ff2e63]" />
+          </span>
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#151320] text-[0.65rem] font-bold">
+            {appIdentity.initials}
+          </span>
         </div>
-      </Card>
+      </header>
 
-      <Card>
-        <p className="text-[0.6875rem] text-chalk-faint">Nächster Termin</p>
-        <p className="mt-1 text-sm font-bold">Autobahnfahrt · 14:30 Uhr</p>
-        <p className="mt-0.5 text-xs text-chalk-dim">
-          {student.location} · {student.instructor}
-        </p>
-      </Card>
-
-      <Card tone="signal">
-        <p className="text-[0.6875rem] font-semibold text-signal-400">Deine nächste Aufgabe</p>
-        <p className="mt-1 text-sm font-bold">Noch drei Sonderfahrten einplanen</p>
-        <p className="mt-0.5 text-xs text-chalk-dim">Eine Autobahnfahrt und zwei Nachtfahrten fehlen.</p>
-      </Card>
-    </div>
-  )
-}
-
-function Journey({ steps }: { steps: Props['steps'] }) {
-  return (
-    <ol className="relative space-y-0 pl-5">
-      <span aria-hidden className="absolute bottom-2 left-[3px] top-2 w-px bg-ink-700" />
-      {steps.map((step) => (
-        <li key={step.id} className="relative py-[0.4375rem]">
-          <span
-            aria-hidden
-            className={`absolute -left-5 top-[0.8125rem] h-[7px] w-[7px] rounded-full ring-4 ring-ink-900 ${STATE_TONE[step.state]}`}
-          />
-          <div className="flex items-baseline justify-between gap-2">
-            <p className={`text-[0.8125rem] font-semibold ${step.state === 'open' ? 'text-chalk-dim' : 'text-chalk'}`}>
-              {step.label}
-            </p>
-            <p className="shrink-0 text-[0.6875rem] text-chalk-faint">{step.detail}</p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  )
-}
-
-function Feedback() {
-  return (
-    <div className="space-y-3">
-      <Card>
-        <p className="text-[0.6875rem] text-chalk-faint">Fahrstunde 24 · Überlandfahrt</p>
-        <p className="mt-1 text-sm font-bold">Rückmeldung</p>
-      </Card>
-
-      <Card tone="done">
-        <p className="text-[0.6875rem] font-semibold text-state-done">Das lief gut</p>
-        <p className="mt-1 text-[0.8125rem] leading-relaxed text-chalk-soft">
-          Spurführung in Kurven war sicher, Blick weit voraus, Geschwindigkeit sauber angepasst.
-        </p>
-      </Card>
-
-      <Card tone="signal">
-        <p className="text-[0.6875rem] font-semibold text-signal-400">Daran arbeiten wir</p>
-        <p className="mt-1 text-[0.8125rem] leading-relaxed text-chalk-soft">
-          Schulterblick beim Überholvorgang noch etwas früher — und den Blinker vor dem Ausscheren.
-        </p>
-      </Card>
-
-      <Card>
-        <p className="text-[0.6875rem] text-chalk-faint">Ziel der nächsten Stunde</p>
-        <p className="mt-1 text-[0.8125rem] font-semibold">Auffahren und Einfädeln auf der Autobahn</p>
-      </Card>
-    </div>
-  )
-}
-
-function Sonderfahrten({ items }: { items: Props['sonderfahrten'] }) {
-  const done = items.reduce((n, i) => n + i.done, 0)
-  const required = items.reduce((n, i) => n + i.required, 0)
-
-  return (
-    <div className="space-y-3">
-      <Card>
-        <div className="flex items-end justify-between">
-          <div>
-            <p className="text-[0.6875rem] text-chalk-faint">Pflichtfahrten</p>
-            <p className="tabular font-display text-3xl font-extrabold leading-none">
-              {done}
-              <span className="text-lg text-chalk-dim">/{required}</span>
-            </p>
-          </div>
-          <p className="text-[0.6875rem] text-chalk-dim">à 45 Minuten</p>
-        </div>
-      </Card>
-
-      {items.map((item) => (
-        <Card key={item.label}>
-          <div className="flex items-baseline justify-between">
-            <p className="text-[0.8125rem] font-semibold">{item.label}</p>
-            <p className="tabular text-[0.6875rem] font-bold text-chalk-dim">
-              {item.done}/{item.required}
-            </p>
-          </div>
-          <div className="mt-2 flex gap-1" aria-hidden>
-            {Array.from({ length: item.required }, (_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 flex-1 rounded-full ${i < item.done ? 'bg-signal-500' : 'bg-ink-750'}`}
-              />
-            ))}
-          </div>
-        </Card>
-      ))}
-    </div>
-  )
-}
-
-function Documents({ items }: { items: Props['documents'] }) {
-  return (
-    <div className="space-y-2">
-      {items.map((item) => (
-        <Card key={item.label}>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[0.8125rem] font-semibold">{item.label}</p>
-            <span className="flex items-center gap-1.5 text-[0.6875rem] text-chalk-dim">
-              <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${STATE_TONE[item.state]}`} />
-              {item.detail}
-            </span>
-          </div>
-        </Card>
-      ))}
-      <Card tone="done">
-        <div className="flex items-center justify-between">
-          <p className="text-[0.8125rem] font-semibold">Offene Rechnungen</p>
-          <p className="text-[0.8125rem] font-bold text-state-done">keine</p>
-        </div>
-      </Card>
-    </div>
-  )
-}
-
-function Readiness({ items }: { items: Props['readiness'] }) {
-  const open = items.filter((i) => !i.ok).length
-
-  return (
-    <div className="space-y-3">
-      <Card tone={open === 0 ? 'done' : 'signal'}>
-        <p className="text-[0.6875rem] text-chalk-faint">PrüfungsReady</p>
-        <p className="mt-1 font-display text-xl font-extrabold leading-tight">
-          {open === 0 ? 'Alle Bedingungen erfüllt' : `Noch ${open} Punkte offen`}
-        </p>
-        <p className="mt-1 text-[0.6875rem] leading-relaxed text-chalk-dim">
-          Kein Prognosewert — die Freigabe erteilt deine Fahrlehrerin oder dein Fahrlehrer.
-        </p>
-      </Card>
-
-      <ul className="space-y-1.5">
-        {items.map((item) => (
-          <li key={item.label} className="flex items-start gap-2.5 rounded-lg bg-ink-850/70 px-3 py-2.5">
+      {/* ── Greeting ───────────────────────────────────────────────── */}
+      <section className="px-5 pb-5">
+        <p className="text-[0.8rem] text-chalk-dim">{appIdentity.greetingSmall}</p>
+        <p className="font-display text-[1.6rem] font-extrabold leading-tight">{appIdentity.greeting}</p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {appIdentity.chips.map((chip, i) => (
             <span
-              aria-hidden
-              className={`mt-1 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full ${
-                item.ok ? 'bg-state-done' : 'border border-chalk/25'
+              key={chip}
+              className={`rounded-full border px-2.5 py-1 text-[0.62rem] font-semibold ${
+                i === 0 ? 'border-[#ff2e63]/50 text-[#ff5d84]' : 'border-chalk/15 text-chalk-soft'
               }`}
             >
-              {item.ok && (
-                <svg width="8" height="8" viewBox="0 0 12 12" fill="none" stroke="var(--color-ink-950)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2.5 6.5 5 9l4.5-5.5" />
-                </svg>
-              )}
+              {chip}
             </span>
-            <span className="min-w-0">
-              <span className={`block text-[0.8125rem] ${item.ok ? 'text-chalk-soft' : 'font-semibold text-chalk'}`}>
-                {item.label}
+          ))}
+        </div>
+      </section>
+      </>)}
+
+      {has('fortschritt') && (
+      <section data-scene="fortschritt" className="px-5 pb-5 pt-2">
+        <SectionLabel small="Ebene A" title="Ausbildungs-Fortschritt" />
+
+        <div className="mt-3 rounded-2xl bg-[#12101a] p-4">
+          <div className="flex items-baseline justify-between">
+            <p className="text-[0.85rem] font-bold">{theory.title}</p>
+            <p className="text-[0.6rem] uppercase tracking-wider text-chalk-dim">Ist / Soll</p>
+          </div>
+          <div className="mt-2 flex items-baseline justify-between text-[0.75rem]">
+            <p className="text-chalk-dim">{theory.metric}</p>
+            <p className="tabular font-bold">
+              <span className="text-[#ff5d84]">{Math.round(theory.done * pTheory)}</span>
+              <span className="text-chalk-dim"> / {theory.required}</span>
+            </p>
+          </div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#201d2c]">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#a3001f] to-[#e11431]"
+              style={{ width: `${(theory.done / theory.required) * 100 * pTheory}%` }}
+            />
+          </div>
+        </div>
+
+        <p className="mt-4 text-[0.6rem] font-bold uppercase tracking-[0.24em] text-chalk-dim">
+          Gesetzliche Sonderfahrten
+        </p>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {sonderfahrten.map((sf) => {
+            const shown = Math.round(sf.done * pSf)
+            return (
+              <div key={sf.key} className="rounded-xl bg-[#12101a] px-2 py-3 text-center">
+                <SfGlyph kind={sf.key} />
+                <p className="tabular mt-1.5 text-[1.05rem] font-extrabold leading-none">
+                  <span className={shown > 0 ? 'text-[#ff5d84]' : 'text-chalk-soft'}>{shown}</span>
+                  <span className="text-[0.8rem] text-chalk-dim">/{sf.required}</span>
+                </p>
+                <p className="mt-1 text-[0.55rem] font-semibold uppercase tracking-widest text-chalk-dim">{sf.label}</p>
+                <div className="mx-auto mt-1.5 h-0.5 w-3/4 overflow-hidden rounded-full bg-[#201d2c]">
+                  <div className="h-full bg-[#b40922]" style={{ width: `${(sf.done / sf.required) * 100 * pSf}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-[#12101a] p-3.5">
+            <p className="text-[0.6rem] font-bold uppercase tracking-[0.18em] text-chalk-dim">Übungsstunden</p>
+            <p className="tabular mt-1 font-display text-[1.5rem] font-extrabold leading-none">
+              {Math.round(practice.hours * pSf)}
+              <span className="ml-1 text-[0.8rem] font-bold text-chalk-dim">Std.</span>
+            </p>
+            <p className="mt-1 text-[0.62rem] leading-snug text-chalk-dim">{practice.hoursLabel}</p>
+          </div>
+          <div className="rounded-xl bg-[#12101a] p-3.5">
+            <p className="text-[0.6rem] font-bold uppercase tracking-[0.18em] text-chalk-dim">Simulator</p>
+            <p className="tabular mt-1 font-display text-[1.5rem] font-extrabold leading-none">
+              {Math.round(practice.simulatorDone * pSf)}
+              <span className="text-[0.8rem] font-bold text-chalk-dim">/{practice.simulatorRequired}</span>
+            </p>
+            <p className="mt-1 text-[0.62rem] leading-snug text-chalk-dim">{practice.simulatorLabel}</p>
+            <span className="mt-2 inline-block rounded-lg bg-[#1c1927] px-2.5 py-1.5 text-[0.62rem] font-bold">
+              + {practice.simulatorCta}
+            </span>
+          </div>
+        </div>
+      </section>
+      )}
+
+      {has('fahrstil') && (
+      <section data-scene="fahrstil" className="px-5 pb-5 pt-2">
+        <SectionLabel small={fahrstil.section} title={fahrstil.title} right={fahrstil.cadence} />
+
+        <div className="mt-3 rounded-2xl bg-[#12101a] p-4">
+          <div className="flex items-center gap-4">
+            <ReadinessRing value={Math.round(fahrstil.readiness * pRing)} label={fahrstil.readinessLabel} />
+            <ul className="min-w-0 flex-1 space-y-2.5">
+              {fahrstil.skills.map((skill) => (
+                <li key={skill.label} className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[0.7rem] font-semibold text-chalk-soft">{skill.label}</span>
+                  <span className="flex shrink-0 gap-1" aria-label={`${skill.score} von 5`}>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          i < Math.round(skill.score * pRing) ? 'bg-[#ff5d84]' : 'bg-[#252131]'
+                        }`}
+                      />
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <p className="mt-2 flex items-center gap-2 rounded-xl border border-[#ff2e63]/25 bg-[#ff2e63]/[0.06] px-3 py-2.5 text-[0.7rem] font-semibold text-[#ff8aa5]">
+          <TrendGlyph />
+          {fahrstil.note}
+        </p>
+      </section>
+      )}
+
+      {has('protokoll') && (
+      <section data-scene="protokoll" className="px-5 pb-6 pt-2">
+        <SectionLabel small={protokoll.section} title={protokoll.title} right={protokoll.cadence} />
+
+        <div className="mt-3 rounded-2xl bg-[#12101a] p-3">
+          <div className="flex gap-1.5">
+            {protokoll.tabs.map((tab, i) => (
+              <span
+                key={tab}
+                className={`flex-1 rounded-lg py-2 text-center text-[0.68rem] font-bold ${
+                  i === 0 ? 'bg-[#221f30] text-chalk' : 'text-chalk-dim'
+                }`}
+              >
+                {tab}
               </span>
-              {item.missing && <span className="block text-[0.6875rem] text-signal-400">{item.missing}</span>}
-            </span>
-          </li>
-        ))}
-      </ul>
+            ))}
+          </div>
+          <div className="mt-2 flex gap-1.5">
+            {protokoll.stats.map((stat) => (
+              <span key={stat} className="tabular rounded-full bg-[#1a1725] px-2.5 py-1 text-[0.6rem] font-semibold text-[#ff8aa5]">
+                {stat}
+              </span>
+            ))}
+          </div>
+
+          <ul className="mt-2 space-y-2">
+            {protokoll.entries.map((entry) => (
+              <li key={entry.kind + entry.date} className="rounded-xl bg-[#161322] p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-[0.78rem] font-bold">{entry.kind}</p>
+                  <span className="tabular shrink-0 rounded-md bg-[#221f30] px-1.5 py-0.5 text-[0.6rem] font-bold text-chalk-soft">
+                    {entry.duration}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[0.68rem] leading-snug text-chalk-dim">{entry.detail}</p>
+                <p className="tabular mt-1.5 text-[0.62rem] text-chalk-faint">
+                  {entry.date} · {entry.time} · {entry.instructor}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="mt-4 pb-1 text-center text-[0.55rem] font-bold uppercase tracking-[0.2em] text-chalk-faint">
+          Demo-Ansicht mit Beispieldaten
+        </p>
+      </section>
+      )}
     </div>
   )
 }
 
-function Card({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'signal' | 'done' }) {
-  const tones = {
-    neutral: 'border-chalk/8 bg-ink-850/80',
-    signal: 'border-signal-500/25 bg-signal-500/[0.08]',
-    done: 'border-state-done/25 bg-state-done/[0.07]',
-  }[tone]
+function SectionLabel({ small, title, right }: { small: string; title: string; right?: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <div>
+        <p className="text-[0.58rem] font-bold uppercase tracking-[0.26em] text-[#ff5d84]">{small}</p>
+        <p className="mt-0.5 font-display text-[1.05rem] font-extrabold leading-tight">{title}</p>
+      </div>
+      {right && <p className="shrink-0 text-[0.6rem] text-chalk-dim">{right}</p>}
+    </div>
+  )
+}
 
-  return <div className={`rounded-xl border p-3.5 ${tones}`}>{children}</div>
+/** The red Prüfungsreife ring — conic sweep driven by the scroll progress. */
+function ReadinessRing({ value, label }: { value: number; label: string }) {
+  return (
+    <div
+      className="relative grid h-24 w-24 shrink-0 place-items-center rounded-full"
+      style={{
+        background: `conic-gradient(from 220deg, #b40922 0deg, #e11431 ${value * 3.05}deg, #241f2e ${value * 3.05}deg)`,
+      }}
+      role="img"
+      aria-label={`${label}: ${value} Prozent — Bewertung des Fahrlehrers`}
+    >
+      <div className="grid h-[4.7rem] w-[4.7rem] place-items-center rounded-full bg-[#12101a] text-center">
+        <div>
+          <p className="tabular font-display text-[1.35rem] font-extrabold leading-none">
+            {value}
+            <span className="text-[0.7rem]">%</span>
+          </p>
+          <p className="mt-0.5 text-[0.42rem] font-bold uppercase tracking-[0.18em] text-chalk-dim">{label}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BellGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" />
+    </svg>
+  )
+}
+
+function TrendGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
+      <path d="m3 17 6-6 4 4 8-8" />
+      <path d="M14 7h7v7" />
+    </svg>
+  )
+}
+
+function SfGlyph({ kind }: { kind: string }) {
+  const paths: Record<string, React.ReactElement> = {
+    ueberland: <path d="m3 18 5-8 4 5 3-4 6 7" />,
+    autobahn: <><path d="M5 20 9 4M19 20 15 4" /><path d="M12 7v2M12 12v2M12 17v2" strokeWidth={1.6} /></>,
+    nacht: <path d="M20 13A8 8 0 1 1 11 4a6.5 6.5 0 0 0 9 9Z" />,
+  }
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ff5d84" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="mx-auto">
+      {paths[kind]}
+    </svg>
+  )
 }

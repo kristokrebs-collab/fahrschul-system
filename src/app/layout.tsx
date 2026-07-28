@@ -3,6 +3,7 @@ import { Archivo, Instrument_Sans } from 'next/font/google'
 import { SiteHeader } from '@/components/navigation/site-header'
 import { SiteFooter } from '@/components/navigation/site-footer'
 import { Atmosphere } from '@/components/brand/atmosphere'
+import { ChapterAtmosphere } from '@/components/brand/chapter-atmosphere'
 import { MotionPreferenceProbe } from '@/components/brand/motion-preference-probe'
 import { business } from '@/content/business'
 import { organizationJsonLd } from '@/lib/structured-data'
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Zum Inhalt springen
         </a>
         <Atmosphere />
+        <ChapterAtmosphere />
         <SiteHeader />
         <main id="inhalt" className="relative z-10">
           {children}

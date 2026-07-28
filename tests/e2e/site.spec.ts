@@ -238,25 +238,32 @@ test.describe('accessibility', () => {
 })
 
 test.describe('reduced motion', () => {
-  test.use({ reducedMotion: 'reduce' })
-
+  // Note: test.use({ reducedMotion }) silently fails to reach the context in
+  // this config — verified empirically (matchMedia still reported
+  // no-preference). page.emulateMedia() is applied per page and works.
   test('cockpit content remains complete and ordered', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/schueler-cockpit')
 
-    // All six narrative passages must still be present and readable.
+    // Reduced motion gets the stacked narrative: every scene present, in order.
     for (const heading of [
-      'Was heute ansteht',
-      'Der ganze Weg auf einen Blick',
-      'Rückmeldung nach jeder Fahrstunde',
-      'Pflichtfahrten, exakt gezählt',
-      'Papierkram ohne Rückfragen',
-      'Bereit — und zwar nachvollziehbar',
+      'Dein Cockpit macht auf',
+      'Jede Pflicht, exakt gezählt',
+      'Deine Fahrlehrerin bewertet, du siehst es',
+      'Deine Historie schreibt sich selbst',
+      'Und alles greift ineinander',
     ]) {
       await expect(page.getByRole('heading', { name: heading })).toBeVisible()
     }
+
+    // The real app content is there too — not just captions.
+    await expect(page.getByText('Hallo, Michael.')).toBeVisible()
+    await expect(page.getByText('Bewertung des Fahrlehrers')).toBeVisible()
+    await expect(page.getByText('Prüfungsstrecken-Training Fulda')).toBeVisible()
   })
 
   test('homepage still reaches the final call to action', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/')
     await expect(page.getByRole('heading', { name: /Der erste Schritt ist der kleinste/ })).toBeAttached()
   })
@@ -297,7 +304,8 @@ test.describe('mobile', () => {
 
   test('the cockpit is shown full width, never inside a device frame', async ({ page }) => {
     await page.goto('/schueler-cockpit')
-    // The sticky desktop device column is hidden below lg.
-    await expect(page.locator('.sticky').first()).toBeHidden()
+    // Mobile gets the stacked variant: no sticky stage, no scroll runway.
+    await expect(page.locator('.sticky')).toHaveCount(0)
+    await expect(page.getByRole('heading', { name: 'Dein Cockpit macht auf' })).toBeVisible()
   })
 })

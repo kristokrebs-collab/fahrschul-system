@@ -71,3 +71,53 @@ durch eine grüne Testsuite rutschen.
   Kapitel vertretbar, weil das Cockpit dort sechs vollwertige Karten zeigt statt
   einer synchronisierten Sequenz — ließe sich später zu einem Wischkarussell
   verdichten.
+
+---
+
+# Durchgang 4 — Ausbau mit echten Assets (28.07.)
+
+## Was sich geändert hat
+
+- **Echte Wortmarke** in Header und Footer (KREBS ‖ Fahrschule /
+  Verkehrsbildungszentrum), als Typografie nachgebaut.
+- **Cockpit-Kapitel komplett neu**: scroll-gesteuerte Produktpräsentation auf
+  Basis der echten App-Screenshots. Das Gerät kippt beim Eintritt in die
+  Ruhelage, der App-Inhalt scrollt synchron zur Erzählung zu Ebene A →
+  Fahrstil → Protokoll, Zähler und der Prüfungsreife-Ring füllen sich in
+  ihren Szenenfenstern, die Meilensteinleiste wandert mit, am Ende zeichnet
+  sich die Routenlinie aus dem Gerät zur nächsten Station. Kein Scroll-Hijacking:
+  gepinnt wird per `position: sticky`, das Rad wird nie abgefangen.
+- **Studio-Fahrzeuge** (Audi/Actros/Citaro/Suzuki auf rotem Leuchtring) als
+  Kategorie-Bühnen im Klassen-Kapitel, beschriftet als „Studio-Darstellung".
+- **Echtes K-TEAM-Foto** in Kapitel 10 und auf /team.
+- **Kapitel-Atmosphäre**: eine feste Lichtebene wandert mit der Geschichte
+  (registrierte CSS-Properties, 1,2-s-Übergänge, kein Animationsloop).
+- **Simulator-Schema** jetzt als Dreischirm-Trainingsplatz mit Sitz und
+  Konsole — angelehnt an die reale Bauform aus der Referenz des Inhabers.
+
+## Gefunden und behoben in diesem Durchgang
+
+| Befund | Schwere | Behebung |
+| --- | --- | --- |
+| `test.use({ reducedMotion })` kam im Test-Setup nie im Browser an — die Reduced-Motion-Tests testeten in Wahrheit die volle Animation | hoch (Testlücke) | Umstellung auf `page.emulateMedia()`, empirisch verifiziert |
+| Zähler/Ring füllten sich außerhalb ihrer Erzählszene | mittel | Fenster an die Szenensegmente ausgerichtet |
+| Krebs-Silhouette aus dem Logo ließ sich nicht sauber freistellen (Text überlappt) | gering | Zuschnitt auf Scheren-und-Panzer-Region oberhalb der Textzeile |
+
+## Belege
+
+`docs/screenshots/desktop-cockpit-v2.png`, `mobile-cockpit-v2.png` sowie zwei
+Bildschirmaufnahmen (Hero-Einstieg, Cockpit-Sequenz) — an den Auftraggeber
+übergeben.
+
+## Benchmark-Selbsttest (gegen die stärksten recherchierten Referenzen)
+
+- *Erster Bildschirm ebenso beeindruckend?* Ja — Perspektiv-Fahrbahn plus
+  echte Marke; kein Template-Muster erkennbar.
+- *Cockpit-Sequenz einzigartig?* Ja — sie zeigt die **echte** App des
+  Betriebs, nicht ein generisches Mockup; die Inhalte (A7/A66,
+  Prüfungsstrecken-Training Fulda, Bewertung des Fahrlehrers) kann keine
+  andere Fahrschule übernehmen.
+- *Logo-Tausch-Test:* Klassen-Bühnen, Cockpit, Team-Kapitel und Wortmarke
+  bestehen ihn jetzt erst recht — die Inhalte gehören nachweislich Krebs.
+- *Schwächste Stellen jetzt:* /team ohne Einzelporträts (Material fehlt),
+  Simulator weiter ohne echtes Foto des eigenen Geräts.

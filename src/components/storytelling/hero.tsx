@@ -19,7 +19,7 @@ export function Hero() {
   const cities = locations.map((l) => l.name).join(' und ')
 
   return (
-    <section className="relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden pt-[var(--header-h)]">
+    <section className="relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden pt-[var(--header-h)]" data-atmo="72/22">
       <HeroParallax>
         <Roadway className="absolute inset-x-0 bottom-0 h-[78%] w-full" />
       </HeroParallax>

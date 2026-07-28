@@ -28,7 +28,7 @@ export default function HomePage() {
       <Hero />
 
       {/* Chapter 2 — the junction */}
-      <section className="chapter relative" aria-labelledby="finder-heading" id="finder">
+      <section className="chapter relative" aria-labelledby="finder-heading" id="finder" data-atmo="30/18">
         <div className="shell">
           <div className="grid gap-10 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-16">
             <ChapterHeading
@@ -43,7 +43,7 @@ export default function HomePage() {
       </section>
 
       {/* Chapter 3 — the lane system */}
-      <section className="chapter relative" aria-labelledby="klassen-heading">
+      <section className="chapter relative" aria-labelledby="klassen-heading" data-atmo="45/45">
         <div className="atmos-lanes" />
         <div className="shell relative">
           <ChapterHeading
@@ -61,7 +61,7 @@ export default function HomePage() {
       <DigitalSystem />
 
       {/* Chapter 5 — the cockpit */}
-      <section className="chapter relative" aria-labelledby="cockpit-heading">
+      <section className="chapter relative" aria-labelledby="cockpit-heading" data-atmo="55/55">
         <div className="shell">
           <ChapterHeading
             marker="Kapitel 05 — Cockpit"
@@ -78,7 +78,7 @@ export default function HomePage() {
       <SimulatorChapter />
 
       {/* Chapter 7 — costs */}
-      <section className="chapter relative" aria-labelledby="preise-heading">
+      <section className="chapter relative" aria-labelledby="preise-heading" data-atmo="28/30">
         <div className="shell">
           <ChapterHeading
             marker="Kapitel 07 — Kosten"
