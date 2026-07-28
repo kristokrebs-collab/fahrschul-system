@@ -23,6 +23,19 @@ out.archivoLoaded = await p.evaluate(() => document.fonts.check('700 48px Archiv
 out.instrumentLoaded = await p.evaluate(() => document.fonts.check('400 16px "Instrument Sans"'))
 out.h1 = (await p.locator('h1').textContent()).replace(/\s+/g, ' ').trim()
 
+// Photographs: proof the pixels really decoded, not just that an <img> exists.
+await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+await p.waitForTimeout(1500)
+out.images = await p.evaluate(() =>
+  [...document.images].map((i) => ({
+    ok: i.complete && i.naturalWidth > 0,
+    inline: i.currentSrc.startsWith('data:'),
+    w: i.naturalWidth,
+    alt: i.alt.slice(0, 40),
+  })),
+)
+await p.evaluate(() => window.scrollTo(0, 0))
+
 // Navigate: home → class page → back to overview, using only real clicks.
 await p.getByRole('link', { name: /Klasse B ansehen/ }).first().click()
 await p.waitForTimeout(600)

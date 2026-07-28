@@ -6,10 +6,11 @@
  * without hydration `next/link` degrades to a plain anchor, so ordinary
  * page-to-page navigation works from the file system with no server at all.
  *
- * Each page therefore becomes one self-contained HTML file: stylesheet and all
- * five font faces embedded as data URIs (fonts over file:// are otherwise
- * blocked by CORS), scripts removed, and internal links rewritten to relative
- * .html filenames.
+ * Each page therefore becomes one self-contained HTML file: stylesheet, all five
+ * font faces and every photograph embedded as data URIs (fonts over file:// are
+ * otherwise blocked by CORS, and next/image serves through a route that only
+ * exists on the server), scripts removed, and internal links rewritten to
+ * relative .html filenames.
  *
  * Usage: node scripts/build-offline-preview.mjs [outDir]
  */
@@ -65,6 +66,26 @@ for (const ref of fontRefs) {
 
 const icon = Buffer.from(await (await get('/icon.svg')).text()).toString('base64')
 
+// --- Photographs ---
+// One width for everyone: the responsive candidate list is dropped, because a
+// data URI per breakpoint would multiply the page weight for no benefit on a
+// preview. 1200px covers the widest slot on the site (the 1152px shell).
+const IMAGE_WIDTH = 1200
+const imageCache = new Map()
+
+async function inlineImage(encodedSource) {
+  const cached = imageCache.get(encodedSource)
+  if (cached) return cached
+  const res = await fetch(`${ORIGIN}/_next/image?url=${encodedSource}&w=${IMAGE_WIDTH}&q=75`, {
+    headers: { Accept: 'image/webp,*/*' },
+  })
+  if (!res.ok) throw new Error(`Bild ${decodeURIComponent(encodedSource)} → ${res.status}`)
+  const buffer = Buffer.from(await res.arrayBuffer())
+  const uri = `data:${res.headers.get('content-type') ?? 'image/webp'};base64,${buffer.toString('base64')}`
+  imageCache.set(encodedSource, uri)
+  return uri
+}
+
 const NOTE = `<div id="vorschau-hinweis" style="position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:200;max-width:min(40rem,94vw);display:flex;gap:.7rem;align-items:flex-start;padding:.7rem .9rem;border-radius:.7rem;border:1px solid rgba(243,241,236,.14);background:rgba(10,12,14,.95);color:#9d9a92;font:400 11.5px/1.5 system-ui,sans-serif">
 <span style="color:#e10a17;font-weight:700;white-space:nowrap">Offline-Vorschau</span>
 <span style="flex:1">${STANDALONE ? 'Einzeldatei der Startseite — Links auf Unterseiten sind hier inaktiv, die vollständige Fassung liegt im ZIP.' : 'Alle 40 Seiten sind vollständig und untereinander verlinkt.'} Führerschein-Finder, Kostenrechner und die Cockpit-Animation brauchen den laufenden Server (<code style="color:#d8d5cd">npm run dev</code>).</span>
@@ -85,6 +106,15 @@ for (const route of (STANDALONE ? ['/'] : ROUTES)) {
     .replace(/<script>self\.__next_f[\s\S]*?<\/script>/g, '')
     .replace(/<script[^>]*id="__NEXT_DATA__"[\s\S]*?<\/script>/g, '')
 
+  for (const tag of new Set([...html.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]))) {
+    const source = tag.match(/\ssrc="\/_next\/image\?url=([^"&]+)(?:&amp;|&)[^"]*"/)
+    if (!source) continue
+    const rebuilt = tag
+      .replace(/\s(?:srcSet|sizes)="[^"]*"/gi, '')
+      .replace(/\ssrc="[^"]*"/, ` src="${await inlineImage(source[1])}"`)
+    html = html.replaceAll(tag, () => rebuilt)
+  }
+
   // Internal links → relative filenames, so navigation works from disk.
   html = html.replace(/href="(\/[^"#?]*)(#[^"]*)?"/g, (match, path, hash = '') => {
     if (path.startsWith('/_next') || path.startsWith('/icon')) return match
@@ -103,4 +133,4 @@ for (const route of (STANDALONE ? ['/'] : ROUTES)) {
 }
 
 console.log(`${written} Seiten → ${OUT}/  (Start: index.html)`)
-console.log(`eingebettet: 1 Stylesheet, ${fontRefs.length} Schriften`)
+console.log(`eingebettet: 1 Stylesheet, ${fontRefs.length} Schriften, ${imageCache.size} Bilder`)
