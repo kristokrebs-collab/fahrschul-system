@@ -64,6 +64,11 @@ jobs:
                   -vf "scale=-2:1080" -c:v libx264 -preset medium -crf 25 \
                   -pix_fmt yuv420p "assets/video/$name-1080.mp4"
               fi
+              # VP9 fallback: Chromium builds without proprietary codecs
+              # (and our Playwright QA browser) cannot decode H.264 at all.
+              ffmpeg -y -v error -i "raw/$name.mp4" -an \
+                -vf "scale=-2:720" -c:v libvpx-vp9 -crf 34 -b:v 0 \
+                -row-mt 1 -cpu-used 4 -pix_fmt yuv420p "assets/video/$name-720.webm"
               # Poster: first frame, ready for the <video poster> attribute.
               ffmpeg -y -v error -i "raw/$name.mp4" -frames:v 1 \
                 -vf "scale=-2:720" -q:v 3 "assets/poster/$name.jpg"
