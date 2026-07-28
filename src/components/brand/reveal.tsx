@@ -29,7 +29,17 @@ function splitWords(node: ReactNode, index: { i: number }): ReactNode {
     })
   }
   if (isValidElement(node)) {
-    const el = node as React.ReactElement<{ children?: ReactNode }>
+    const el = node as React.ReactElement<{ children?: ReactNode; className?: string }>
+    // An element that styles its own text (the hero's red line) stays whole:
+    // one mask around it, so its own background-clip effects keep working.
+    if (typeof el.type === 'string' && el.props.className) {
+      const i = index.i++
+      return (
+        <span key={`a${i}`} className="reveal-word">
+          <span style={{ ['--reveal-i' as string]: i }}>{el}</span>
+        </span>
+      )
+    }
     if (el.type === Fragment || typeof el.type === 'string') {
       const kids = el.props.children
       if (kids == null) return node

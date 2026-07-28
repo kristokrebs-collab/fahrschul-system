@@ -606,6 +606,20 @@
     color: transparent;
   }
 
+  /* background-clip: text does not reach through the inline-block word masks
+     of the kinetic reveal — children inherit only the transparent fill and
+     the glyphs vanish. Each word therefore re-clips its own copy of the
+     gradient; the gradient is vertical, so restarting it per word (which
+     spans the full line height) is visually identical. */
+  .text-gradient-chalk .reveal-word > span {
+    background: linear-gradient(180deg, var(--color-chalk) 30%, color-mix(in oklab, var(--color-chalk) 55%, var(--color-ink-700)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+
+  /* Elements with their own text treatment (the hero's red line) are kept
+     atomic by the splitter and re-clip their own background over this one. */
+
   .sr-only-focusable:not(:focus):not(:focus-within) {
     position: absolute;
     width: 1px;
