@@ -78,7 +78,7 @@ export function SimulatorChapter() {
                 Simulator kennenlernen
               </Link>
               <Link
-                href="/kontakt"
+                href="/kontakt?thema=fuehrerschein&von=/"
                 className="inline-flex min-h-12 items-center rounded-xl border border-chalk/18 px-6 text-sm font-semibold text-chalk transition-colors hover:border-chalk/35"
               >
                 Nach Simulatorterminen fragen

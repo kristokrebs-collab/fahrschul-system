@@ -26,7 +26,7 @@ export default function DigitalPage() {
         title="Nicht nur Fahrstunden"
         lead="Theorie, Simulator und Praxis sind keine getrennten Baustellen. Sie greifen ineinander — und du siehst an jedem Punkt, wo du stehst."
         trail={trail}
-        actions={<ActionLink href="/kontakt">Beratung starten</ActionLink>}
+        actions={<ActionLink href="/kontakt?thema=fuehrerschein&von=/digitalpaket">Beratung starten</ActionLink>}
       />
       <section className="shell pb-4">
         <ScenePanel

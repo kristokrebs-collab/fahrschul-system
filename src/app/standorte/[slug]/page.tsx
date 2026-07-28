@@ -53,7 +53,7 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
         trail={trail}
         actions={
           <>
-            <ActionLink href="/kontakt">Beratung starten</ActionLink>
+            <ActionLink href={`/kontakt?standort=${location.slug}&von=/standorte/${location.slug}`}>Beratung starten</ActionLink>
             {phone && phoneHref && (
               <a
                 href={`tel:${phoneHref}`}

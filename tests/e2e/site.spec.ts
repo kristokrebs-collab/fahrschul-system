@@ -15,11 +15,15 @@ function watchForErrors(page: Page): string[] {
   })
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
   page.on('requestfailed', (r) => {
-    // Only navigation aborts are benign (they happen when a test navigates
-    // away mid-flight). An aborted stylesheet or script is a real failure and
-    // must not be filtered out — that is exactly how a page that renders
+    // Only aborted navigations and aborted speculative prefetches are benign.
+    // A navigation aborts when a test moves on mid-flight; Next cancels its own
+    // RSC prefetches (marked by the _rsc query parameter) whenever a link
+    // scrolls out of view. An aborted stylesheet or script is a real failure
+    // and must not be filtered out — that is exactly how a page that renders
     // completely unstyled slips through a green test run.
-    if (r.resourceType() === 'document' && r.failure()?.errorText === 'net::ERR_ABORTED') return
+    const aborted = r.failure()?.errorText === 'net::ERR_ABORTED'
+    if (aborted && r.resourceType() === 'document') return
+    if (aborted && new URL(r.url()).searchParams.has('_rsc')) return
     errors.push(`requestfailed: ${r.url()} ${r.failure()?.errorText ?? ''}`)
   })
   return errors

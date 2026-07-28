@@ -73,6 +73,11 @@ async function deliver(input: ContactInput): Promise<boolean> {
         topic: input.topic,
         location: input.location,
         message: input.message,
+        // Where the enquiry started: which class or service was on screen,
+        // and which page the button was on. The office needs this to answer
+        // without asking the obvious question back.
+        reference: input.reference || null,
+        source: input.source || null,
         receivedAt: new Date().toISOString(),
       }),
     })

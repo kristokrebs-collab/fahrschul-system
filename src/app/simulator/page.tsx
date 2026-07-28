@@ -27,7 +27,7 @@ export default function SimulatorPage() {
         title="Die ersten Meter ohne Verkehr"
         lead="Am Anfang ist alles gleichzeitig neu: Kupplung, Spiegel, Schilder, Blick, andere Autos. Im Simulator nimmst du einen Teil davon vorweg — in deinem Tempo."
         trail={trail}
-        actions={<ActionLink href="/kontakt">Nach Simulatorterminen fragen</ActionLink>}
+        actions={<ActionLink href="/kontakt?thema=fuehrerschein&von=/simulator">Nach Simulatorterminen fragen</ActionLink>}
       />
 
       {/* The whole idea of simulator training in one shot: the rendered road

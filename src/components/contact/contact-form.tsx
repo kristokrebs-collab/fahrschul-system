@@ -14,7 +14,18 @@ const initial: ContactState = { status: 'idle' }
  * from the server, are tied to their inputs with aria-describedby, and are
  * announced through a live region.
  */
-export function ContactForm() {
+export type RequestContext = {
+  /** Slug of the class or service the visitor was reading. */
+  reference: string
+  /** Path they came from. */
+  source: string
+  /** Human-readable name of the reference, when one was recognised. */
+  label?: string
+  topic: string
+  location: string
+}
+
+export function ContactForm({ context }: { context: RequestContext }) {
   const [state, action, pending] = useActionState(submitContact, initial)
 
   if (state.status === 'success') {
@@ -28,6 +39,18 @@ export function ContactForm() {
 
   return (
     <form action={action} noValidate className="surface p-6 sm:p-8">
+      {/* What the visitor was reading when they pressed the button, carried
+          in from the link and sent along with the request so nobody has to
+          retype "Ich interessiere mich für Klasse B". */}
+      <input type="hidden" name="reference" value={context.reference} />
+      <input type="hidden" name="source" value={context.source} />
+      {context.label && (
+        <p className="mb-6 flex flex-wrap items-baseline gap-x-2 rounded-xl border border-signal-500/25 bg-signal-500/[0.06] px-4 py-3 text-sm">
+          <span className="text-chalk-dim">Deine Anfrage bezieht sich auf</span>
+          <strong className="font-semibold text-chalk">{context.label}</strong>
+        </p>
+      )}
+
       {/* One element that is both seen and announced. A separate visually
           hidden live region would duplicate the message for screen-reader
           users and read it twice. */}
@@ -80,7 +103,7 @@ export function ContactForm() {
         </Field>
 
         <Field id="location" label="Standort" error={state.fieldErrors?.location} required>
-          <select id="location" name="location" required defaultValue="egal" className={inputClass(!!state.fieldErrors?.location)}>
+          <select id="location" name="location" required defaultValue={context.location} className={inputClass(!!state.fieldErrors?.location)}>
             {LOCATION_CHOICES.map((choice) => (
               <option key={choice.value} value={choice.value}>
                 {choice.label}
@@ -91,7 +114,7 @@ export function ContactForm() {
 
         <div className="sm:col-span-2">
           <Field id="topic" label="Worum geht es?" error={state.fieldErrors?.topic} required>
-            <select id="topic" name="topic" required defaultValue="fuehrerschein" className={inputClass(!!state.fieldErrors?.topic)}>
+            <select id="topic" name="topic" required defaultValue={context.topic} className={inputClass(!!state.fieldErrors?.topic)}>
               {TOPICS.map((topic) => (
                 <option key={topic.value} value={topic.value}>
                   {topic.label}

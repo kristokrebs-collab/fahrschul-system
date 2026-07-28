@@ -38,7 +38,7 @@ export default function TeamPage() {
         title="Ein Familienbetrieb, kein Franchise"
         lead={founded ? `Seit ${founded} bilden wir in Fulda aus — inzwischen ${yearsInBusiness()} Jahre, in zweiter Generation.` : undefined}
         trail={trail}
-        actions={<ActionLink href="/kontakt">Lern uns kennen</ActionLink>}
+        actions={<ActionLink href="/kontakt?thema=sonstiges&von=/team">Lern uns kennen</ActionLink>}
       />
 
       <div className="shell space-y-16 pb-24">

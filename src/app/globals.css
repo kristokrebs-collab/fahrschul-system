@@ -26,6 +26,15 @@
   --color-chalk-dim: #9d9a92;
   --color-chalk-faint: #6e6c66;
 
+  /* --- Dawn: the daylight end of the arc. The page starts at night and
+         arrives in daylight, so the palette needs real light values, not
+         only shades of near-black. Warm, never a clinical white. ------- */
+  --color-dawn-50: #f6f3ec;
+  --color-dawn-100: #ece8de;
+  --color-dawn-200: #e0dbcf;
+  --color-dawn-300: #cfc9bb;
+  --color-dawn-400: #b3aca0;
+
   /* --- Signal: derived from Verkehrsrot / brake light ------------------- */
   --color-signal-400: #ff3b45;
   --color-signal-500: #e10a17;
@@ -136,6 +145,123 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
   }
+}
+
+/* ============================================================================
+   THE DAYLIGHT ARC
+   ---------------------------------------------------------------------------
+   The page is a day. It starts at night, before the first driving lesson, and
+   arrives in daylight at the licence. One scroll-driven value, --daylight
+   (0..1), drives every layer that has to agree on the time of day: the fixed
+   sky behind the document, the WebGL route's fog, and the chapter surfaces.
+
+   Two chapters step fully into the light and invert to dark type on a warm
+   ground. That is deliberate: a page that can only do near-black is a page
+   that is dark out of habit.
+   ========================================================================== */
+
+:root {
+  --daylight: 0;
+}
+
+.daylight-sky {
+  position: fixed;
+  inset: 0;
+  z-index: -30;
+  pointer-events: none;
+  background-color: color-mix(in oklab, var(--color-ink-950), var(--color-dawn-400) calc(var(--daylight) * 100%));
+}
+
+/* A low sun that rises with the scroll — the light has a direction. */
+.daylight-sky::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 70% at 50% calc(118% - var(--daylight) * 46%),
+    color-mix(in oklab, #ffdcb8 calc(18% + var(--daylight) * 34%), transparent),
+    transparent 68%
+  );
+  opacity: calc(0.25 + var(--daylight) * 0.75);
+}
+
+/* ---------------------------------------------------------------------------
+   Daylight chapters.
+
+   Every colour token flips inside this block. Because the utilities compile
+   to var(--color-…), each existing component inverts without touching a
+   single component file — the same panels, borders and dividers, read in
+   daylight. Signal red is the one colour that does not move: it is the brand,
+   and it carries on both grounds.
+   ------------------------------------------------------------------------ */
+.chapter-day {
+  --color-ink-950: #f6f3ec;
+  --color-ink-900: #efebe2;
+  --color-ink-850: #e7e2d8;
+  --color-ink-800: #ded9cd;
+  --color-ink-750: #d3cdc0;
+  --color-ink-700: #c5beaf;
+  --color-ink-600: #a9a294;
+  --color-ink-500: #8c857a;
+  --color-ink-400: #6f6961;
+
+  --color-chalk: #14181c;
+  --color-chalk-soft: #2c3238;
+  --color-chalk-dim: #4d545c;
+  --color-chalk-faint: #6f7680;
+
+  /* Slightly deeper red: the brand tone needs more weight on a light ground */
+  --color-signal-400: #c00711;
+  --color-signal-500: #c00711;
+  --color-signal-600: #8f050c;
+
+  color: var(--color-chalk);
+  /* Welded edges, not a colour switch: the daylight rises out of the dark
+     over a band and falls back the same way, so the chapter reads as coming
+     out of a tunnel rather than as a different page. */
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    var(--color-ink-950) 9rem,
+    var(--color-ink-950) calc(100% - 7rem),
+    transparent 100%
+  );
+}
+
+/* The odometer rail is fixed outside the flow, so it cannot inherit a
+   chapter's tokens — it reads the daylight value directly instead and stays
+   legible on both grounds. */
+.route-tick {
+  background-color: color-mix(in oklab, var(--color-chalk) 40%, var(--color-ink-950) calc(var(--daylight) * 78%));
+}
+
+.route-station {
+  border: 1px solid color-mix(in oklab, var(--color-chalk) 45%, var(--color-ink-950) calc(var(--daylight) * 85%));
+  background-color: color-mix(in oklab, var(--color-ink-900), var(--color-chalk) calc(var(--daylight) * 88%));
+}
+
+/* A thin warm horizon exactly where the light breaks. */
+.chapter-day::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 9rem;
+  pointer-events: none;
+  background: radial-gradient(80% 100% at 50% 100%, color-mix(in oklab, #ffd9ac 42%, transparent), transparent 72%);
+}
+
+/* Gradient display type would be near-invisible against a light ground. */
+.chapter-day .text-gradient-chalk,
+.chapter-day .text-gradient-chalk .reveal-word > span {
+  background: none;
+  color: var(--color-chalk);
+  -webkit-text-fill-color: currentColor;
+}
+
+/* The dark-surface atmosphere layers have no business in daylight. */
+.chapter-day .atmos-falloff,
+.chapter-day .atmos-lanes {
+  display: none;
 }
 
 /* ============================================================================
@@ -286,59 +412,162 @@
     transition: transform 0.12s ease-out;
   }
 
-  /* --- Velocity marquee: lane markings made of type ---------------------- */
-  .marquee-band {
-    transform: skewY(var(--marquee-skew, 0deg));
+  /* --- The loupe over staged vehicle detail ------------------------------ */
+  .magnifier {
+    cursor: zoom-in;
   }
 
-  .marquee-row {
-    display: flex;
-    white-space: nowrap;
-    width: max-content;
+  .magnifier-lens {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 11rem;
+    height: 11rem;
+    margin: -5.5rem 0 0 -5.5rem;
+    border-radius: 9999px;
+    pointer-events: none;
+    background-repeat: no-repeat;
+    border: 1px solid color-mix(in oklab, var(--color-chalk) 22%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--color-ink-950) 60%, transparent),
+      0 18px 44px -12px rgb(0 0 0 / 0.7);
+    transition: opacity 0.28s ease;
   }
 
-  .marquee-text {
-    font-family: var(--font-display);
-    font-weight: 800;
-    font-size: clamp(2.6rem, 6vw, 4.8rem);
-    line-height: 1.1;
-    letter-spacing: -0.01em;
-    color: transparent;
-    -webkit-text-stroke: 1px color-mix(in oklab, var(--color-chalk) 26%, transparent);
-    padding-right: 0.4em;
+  /* --- Hero haze: a slow drift of night air over the footage -------------
+     The shader-background idea, rebuilt as two very large, very slow
+     radial fields. No GPU program, no library, and it never competes with
+     the type because it only moves at the edges. --------------------- */
+  .hero-haze {
+    pointer-events: none;
+    background:
+      radial-gradient(46% 38% at 22% 68%, color-mix(in oklab, var(--color-signal-500) 9%, transparent), transparent 70%),
+      radial-gradient(52% 44% at 78% 42%, color-mix(in oklab, #9fb4c8 7%, transparent), transparent 72%);
+    animation: haze-drift 26s ease-in-out infinite alternate;
   }
 
-  .marquee-dim {
-    -webkit-text-stroke-color: color-mix(in oklab, var(--color-chalk) 13%, transparent);
-  }
-
-  .marquee-solid {
-    color: var(--color-signal-500);
-    -webkit-text-stroke: 0;
-    text-shadow: 0 0 34px color-mix(in oklab, var(--color-signal-500) 55%, transparent);
-  }
-
-  .marquee-left {
-    animation: marquee-drift 46s linear infinite;
-  }
-
-  .marquee-right {
-    animation: marquee-drift 58s linear infinite reverse;
-  }
-
-  @keyframes marquee-drift {
+  @keyframes haze-drift {
     from {
-      transform: translateX(0);
+      transform: translate3d(-2.5%, 1.5%, 0) scale(1.04);
     }
     to {
-      transform: translateX(-50%);
+      transform: translate3d(2.5%, -1.5%, 0) scale(1.1);
     }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .marquee-left,
-    .marquee-right {
+    .hero-haze {
       animation: none;
+    }
+  }
+
+  /* --- Footer that reacts to approach ------------------------------------
+     Columns lift and the links ahead of the pointer brighten, so the
+     footer feels like a place rather than a sitemap dump. -------------- */
+  .footer-col {
+    transition:
+      transform 0.5s var(--ease-route),
+      opacity 0.4s ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .footer-grid:hover .footer-col {
+      opacity: 0.55;
+    }
+
+    .footer-grid .footer-col:hover {
+      opacity: 1;
+      transform: translateY(-4px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .footer-col {
+      transition: opacity 0.2s ease;
+      transform: none !important;
+    }
+  }
+
+  /* --- Headlight following the pointer through the dark chapters --------- */
+  .headlight {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 5;
+    width: 34rem;
+    height: 34rem;
+    margin: -17rem 0 0 -17rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklab, #ffe6c8 9%, transparent),
+      transparent 72%
+    );
+    /* Pointless in daylight: a headlight you cannot see is just a smudge. */
+    mix-blend-mode: screen;
+    filter: opacity(calc(1 - var(--daylight) * 0.85));
+  }
+
+  /* --- Shiny CTA: a conic sweep reading as a light passing over metal ----- */
+  .cta-shine {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .cta-shine::after {
+    content: '';
+    position: absolute;
+    inset: -60%;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    background: conic-gradient(
+      from var(--orbit, 0deg),
+      transparent 0deg,
+      transparent 296deg,
+      color-mix(in oklab, #fff 70%, transparent) 330deg,
+      transparent 360deg
+    );
+    transition: opacity 0.35s ease;
+  }
+
+  .cta-shine:hover::after,
+  .cta-shine:focus-visible::after {
+    opacity: 0.5;
+    animation: orbit-lap 2.2s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cta-shine::after {
+      animation: none !important;
+    }
+  }
+
+  /* --- One light sliding between tabs, instead of tabs lighting up ------- */
+  .tab-indicator {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 0;
+    opacity: 0;
+    border-radius: 0.75rem;
+    pointer-events: none;
+    background: color-mix(in oklab, var(--color-signal-500) 12%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-signal-500) 48%, transparent);
+    box-shadow: 0 8px 26px -14px color-mix(in oklab, var(--color-signal-500) 85%, transparent);
+    transition:
+      transform 0.52s var(--ease-route),
+      width 0.52s var(--ease-route),
+      height 0.52s var(--ease-route),
+      opacity 0.3s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tab-indicator {
+      transition: opacity 0.2s ease;
     }
   }
 
@@ -435,6 +664,43 @@
     border-color: var(--color-signal-500);
     background-color: var(--color-signal-500);
     box-shadow: 0 0 16px color-mix(in oklab, var(--color-signal-500) 70%, transparent);
+  }
+
+  /* --- The single typographic outlier -----------------------------------
+     Per-glyph springs, then one pass of light. Used exactly once on the
+     site; anything that needs a second one is a design failure. --------- */
+  .outlier {
+    display: inline-block;
+    position: relative;
+  }
+
+  .outlier-glyph {
+    display: inline-block;
+    white-space: pre;
+    transform-origin: 50% 100%;
+  }
+
+  [data-outlier='armed'] .outlier-glyph {
+    opacity: 0;
+    transform: translateY(0.42em) scaleY(0.82);
+  }
+
+  [data-outlier='go'] .outlier-glyph {
+    opacity: 1;
+    transform: none;
+    /* Overshoot on the way up — a spring settling, not a fade. */
+    transition:
+      opacity 0.42s ease-out,
+      transform 0.82s cubic-bezier(0.2, 1.42, 0.32, 1);
+    transition-delay: calc(var(--g, 0) * 42ms);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .outlier-glyph {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
   }
 
   /* --- Headlight sweep across the hero's red line, once, on arrival ------ */

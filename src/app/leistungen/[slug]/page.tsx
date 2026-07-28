@@ -4,7 +4,7 @@ import { serviceBySlug, serviceGroups, services } from '@/content/services'
 import { publicValue } from '@/content/truth'
 import { PageHeader } from '@/components/brand/page-header'
 import { ActionLink, Disclosure } from '@/components/brand/section'
-import { PageMedia } from '@/components/media/page-media'
+import { PageMediaLoupe } from '@/components/media/page-media'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
 
 export function generateStaticParams() {
@@ -45,7 +45,11 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
         title={service.name}
         lead={service.summary}
         trail={trail}
-        actions={<ActionLink href="/kontakt">{service.nextStep}</ActionLink>}
+        actions={
+          <ActionLink href={`/kontakt?bezug=${service.slug}&von=/leistungen/${service.slug}`}>
+            {service.nextStep}
+          </ActionLink>
+        }
       />
 
       <div className="shell grid gap-12 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-16">
@@ -102,7 +106,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
         </div>
 
         <aside className="space-y-6">
-          <PageMedia routeKey={`leistungen/${service.slug}`} />
+          <PageMediaLoupe routeKey={`leistungen/${service.slug}`} />
           {format && (
             <div className="surface p-6">
               <h2 className="font-display text-base font-bold text-chalk">Umfang und Ablauf</h2>
@@ -112,7 +116,9 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
           <div className="surface edge-signal p-6">
             <h2 className="font-display text-base font-bold text-chalk">Nächster Schritt</h2>
             <p className="mt-2 text-sm leading-relaxed text-chalk-dim">{service.nextStep}.</p>
-            <ActionLink href="/kontakt" className="mt-4 w-full">Anfrage senden</ActionLink>
+            <ActionLink href={`/kontakt?bezug=${service.slug}&von=/leistungen/${service.slug}`} className="mt-4 w-full">
+              Anfrage senden
+            </ActionLink>
           </div>
         </aside>
       </div>

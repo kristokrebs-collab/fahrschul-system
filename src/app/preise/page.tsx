@@ -27,7 +27,7 @@ export default function PricesPage() {
         title="Was der Führerschein wirklich kostet"
         lead="Der ehrlichste Satz zuerst: Niemand kann dir vorher den Endpreis nennen. Er hängt davon ab, wie viele Übungsfahrstunden du brauchst — und das weiß am Anfang niemand. Was wir tun können, ist die Rechnung transparent machen."
         trail={trail}
-        actions={<ActionLink href="/kontakt">Konkretes Angebot anfragen</ActionLink>}
+        actions={<ActionLink href="/kontakt?von=/preise">Konkretes Angebot anfragen</ActionLink>}
       />
 
       <section className="chapter pt-0" aria-labelledby="rechner">
@@ -61,7 +61,7 @@ export default function PricesPage() {
           <p className="mt-8 max-w-3xl text-sm leading-relaxed text-chalk-dim">
             Unsere aktuellen Preise bekommst du auf Anfrage und im Beratungsgespräch — schriftlich, aufgeschlüsselt und
             ohne Kleingedrucktes.{' '}
-            <Link href="/kontakt" className="font-semibold text-signal-400 underline-offset-4 hover:underline">
+            <Link href="/kontakt?von=/preise" className="font-semibold text-signal-400 underline-offset-4 hover:underline">
               Preisliste anfordern
             </Link>
             .

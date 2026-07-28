@@ -14,7 +14,6 @@ import { PriceCalculator } from '@/components/pricing/price-calculator'
 import { ChapterHeading } from '@/components/brand/section'
 import { RouteMount } from '@/components/route3d/route-mount'
 import { RouteRail } from '@/components/route3d/route-rail'
-import { RouteMarquee } from '@/components/storytelling/route-marquee'
 import { SceneVideo } from '@/components/media/scene-video'
 import { sceneClips } from '@/content/media'
 
@@ -34,7 +33,6 @@ export default function HomePage() {
       <RouteMount />
       <RouteRail />
       <Hero />
-      <RouteMarquee />
 
       {/* Chapter 2 — the junction */}
       <section className="chapter relative" aria-labelledby="finder-heading" id="finder" data-atmo="30/18">
@@ -100,10 +98,13 @@ export default function HomePage() {
 
       <SimulatorChapter />
 
-      {/* Chapter 7 — costs */}
-      <section className="chapter relative overflow-hidden" aria-labelledby="preise-heading" data-atmo="28/30">
-        {/* Asphalt drifting quietly beneath the numbers */}
-        <SceneVideo name={sceneClips.asphaltLoop.name} className="media-weld-y opacity-30" />
+      {/* Chapter 7 — costs. The page steps into daylight here: a price
+          comparison is a document, and documents belong on paper. */}
+      <section
+        className="chapter chapter-day relative overflow-hidden"
+        aria-labelledby="preise-heading"
+        data-atmo="28/30"
+      >
         <div className="shell relative">
           <ChapterHeading
             marker="Kapitel 07 — Kosten"
@@ -116,7 +117,7 @@ export default function HomePage() {
           </div>
           <p className="mt-6 text-sm text-chalk-dim">
             Du willst einfach wissen, was deine Ausbildung kostet?{' '}
-            <Link href="/kontakt" className="font-semibold text-signal-400 underline-offset-4 hover:underline">
+            <Link href="/kontakt?von=/" className="font-semibold text-signal-400 underline-offset-4 hover:underline">
               Frag uns nach einem konkreten Angebot
             </Link>
             .

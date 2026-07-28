@@ -55,6 +55,27 @@ export const contactSchema = z.object({
     .max(4000, 'Die Nachricht ist zu lang.'),
   consent: z.literal('on', { message: 'Ohne deine Einwilligung dürfen wir die Anfrage nicht verarbeiten.' }),
   /**
+   * Context carried in from wherever the visitor pressed the button: which
+   * licence class or service they were reading, and which page they came from.
+   * Both are optional — someone who types the contact URL by hand still gets a
+   * valid form — and both are length-capped so they cannot be used to smuggle
+   * a payload into whatever reads the submission.
+   */
+  reference: z
+    .string()
+    .trim()
+    .max(80)
+    .regex(/^[a-z0-9äöüß/-]*$/i, 'Ungültiger Bezug.')
+    .optional()
+    .or(z.literal('')),
+  source: z
+    .string()
+    .trim()
+    .max(120)
+    .regex(/^\/[a-z0-9/-]*$/i, 'Ungültige Quelle.')
+    .optional()
+    .or(z.literal('')),
+  /**
    * Honeypot. Real users never see this field, so anything in it is a bot.
    * Named innocuously because scrapers look for "honeypot".
    */

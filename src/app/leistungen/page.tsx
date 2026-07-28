@@ -25,7 +25,7 @@ export default function ServicesPage() {
         title="Mehr als ein Führerschein"
         lead="Ein großer Teil unserer Arbeit beginnt erst, wenn der Führerschein längst da ist — Qualifikationen für den Beruf, Schulungen für Betriebe und Seminare, wenn es einmal eng wird."
         trail={trail}
-        actions={<ActionLink href="/kontakt">Anfrage für Unternehmen</ActionLink>}
+        actions={<ActionLink href="/kontakt?thema=seminar&von=/leistungen">Anfrage für Unternehmen</ActionLink>}
       />
       <ServicesChapter />
     </>

@@ -6,7 +6,7 @@
    useMemo — the established R3F idiom. The React-Compiler rules cannot see
    that these objects never flow back into React state. */
 
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -32,11 +32,22 @@ export type RouteDriver = {
 }
 
 const INK = '#060708'
-const SIGNAL = '#e11d48'
+const SIGNAL = '#e10a17'
 const CHALK = '#f3f1ec'
+/** Where the daylight arc ends — the same warm haze the CSS sky mixes to. */
+const DAWN = '#b3aca0'
 
 /** How far along the curve the camera travels over the full scroll. */
 const TRAVEL = 0.86
+
+/**
+ * The daylight curve, identical to the one the CSS sky uses. Both layers have
+ * to describe the same time of day, so the easing lives in one shape and is
+ * written twice rather than read back from the DOM every frame.
+ */
+function daylightAt(p: number) {
+  return p < 0.18 ? p * 0.28 : 0.05 + Math.pow((p - 0.18) / 0.82, 0.78) * 0.95
+}
 
 /* ── The route itself ─────────────────────────────────────────────── */
 
@@ -330,6 +341,23 @@ function Scene({ driver, fractions }: { driver: RefObject<RouteDriver>; fraction
   }, [scene, driver])
 
   const smooth = useRef({ t: 0, mx: 0, my: 0 })
+  const fogRef = useRef<THREE.FogExp2>(null)
+  const groundRef = useRef<THREE.MeshBasicMaterial>(null)
+  const roadRef = useRef<THREE.MeshBasicMaterial>(null)
+
+  // Scratch colours, reused every frame so the loop allocates nothing.
+  const palette = useMemo(
+    () => ({
+      ink: new THREE.Color(INK),
+      dawn: new THREE.Color(DAWN),
+      ground: new THREE.Color('#08090b'),
+      groundDay: new THREE.Color('#8f897d'),
+      road: new THREE.Color('#101114'),
+      roadDay: new THREE.Color('#6d675d'),
+      work: new THREE.Color(),
+    }),
+    [],
+  )
 
   useFrame((state, dt) => {
     const k = 1 - Math.exp(-dt * 3.2)
@@ -348,19 +376,29 @@ function Scene({ driver, fractions }: { driver: RefObject<RouteDriver>; fraction
 
     filament.uniforms.uTime!.value = state.clock.elapsedTime
     filament.uniforms.uCam!.value = t
+
+    // Dawn breaks over the route in step with the CSS sky behind it.
+    const day = daylightAt(d.p)
+    if (fogRef.current) {
+      fogRef.current.color.copy(palette.ink).lerp(palette.dawn, day)
+      // Daylight also clears the air: you can see further down the road.
+      fogRef.current.density = 0.0105 - day * 0.0042
+    }
+    if (groundRef.current) groundRef.current.color.copy(palette.ground).lerp(palette.groundDay, day)
+    if (roadRef.current) roadRef.current.color.copy(palette.road).lerp(palette.roadDay, day)
   })
 
   return (
     <>
-      <fogExp2 attach="fog" args={[INK, 0.0105]} />
+      <fogExp2 ref={fogRef} attach="fog" args={[INK, 0.0105]} />
       {/* Ground: keeps the road from floating in a void */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, -260]}>
         <planeGeometry args={[900, 900]} />
-        <meshBasicMaterial color="#08090b" />
+        <meshBasicMaterial ref={groundRef} color="#08090b" />
       </mesh>
       {/* Road bed, slightly lighter than the void */}
       <mesh geometry={roadGeo} position={[0, 0.01, 0]}>
-        <meshBasicMaterial color="#101114" />
+        <meshBasicMaterial ref={roadRef} color="#101114" />
       </mesh>
       {/* Edge lines, chalk at low opacity */}
       <mesh geometry={edgeLeftGeo} position={[0, 0.02, 0]}>
@@ -381,9 +419,45 @@ function Scene({ driver, fractions }: { driver: RefObject<RouteDriver>; fraction
 }
 
 export default function RouteCanvas({ driver, fractions }: { driver: RefObject<RouteDriver>; fractions: number[] }) {
+  // A scene nobody is looking at must not cost a frame. The loop stops when
+  // the tab goes to the background and when the visitor is deep inside a
+  // daylight chapter, which is opaque and covers the route completely.
+  const [running, setRunning] = useState(true)
+
+  useEffect(() => {
+    const decide = () => {
+      if (document.hidden) return setRunning(false)
+      const covered = [...document.querySelectorAll<HTMLElement>('.chapter-day')].some((el) => {
+        const r = el.getBoundingClientRect()
+        return r.top <= 0 && r.bottom >= window.innerHeight
+      })
+      setRunning(!covered)
+    }
+
+    let frame = 0
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(() => {
+        frame = 0
+        decide()
+      })
+    }
+
+    decide()
+    document.addEventListener('visibilitychange', decide)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll, { passive: true })
+    return () => {
+      document.removeEventListener('visibilitychange', decide)
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [])
+
   return (
     <Canvas
       dpr={[1, 1.75]}
+      frameloop={running ? 'always' : 'never'}
       gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       camera={{ fov: 58, near: 0.1, far: 320 }}
       style={{ pointerEvents: 'none' }}

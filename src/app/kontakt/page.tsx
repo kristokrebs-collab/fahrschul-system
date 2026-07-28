@@ -5,6 +5,7 @@ import { ContactForm } from '@/components/contact/contact-form'
 import { locations } from '@/content/business'
 import { publicValue } from '@/content/truth'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
+import { resolveRequestContext } from '@/lib/request-context'
 
 export const metadata: Metadata = {
   title: 'Kontakt und Beratung',
@@ -18,7 +19,13 @@ const trail = [
   { name: 'Kontakt', href: '/kontakt' },
 ]
 
-export default function ContactPage() {
+export default async function ContactPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const context = resolveRequestContext(await searchParams)
+
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(trail)) }} />
@@ -30,7 +37,7 @@ export default function ContactPage() {
       />
 
       <div className="shell grid gap-12 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] lg:gap-16">
-        <ContactForm />
+        <ContactForm context={context} />
 
         <aside className="space-y-6">
           <figure className="relative overflow-hidden rounded-2xl border border-chalk/10">

@@ -99,7 +99,7 @@ export function RouteRail() {
     >
       <div className="relative flex h-[46vh] flex-col justify-between">
         {Array.from({ length: TICKS }, (_, i) => (
-          <span key={i} data-tick className="block h-px w-4 origin-right bg-chalk/40 transition-none" />
+          <span key={i} data-tick className="route-tick block h-px w-4 origin-right transition-none" />
         ))}
         {stations.map((st) => (
           <button
@@ -111,7 +111,7 @@ export function RouteRail() {
               const range = document.documentElement.scrollHeight - window.innerHeight
               window.scrollTo({ top: st.f * range, behavior: 'smooth' })
             }}
-            className="absolute -right-1.5 h-2 w-2 -translate-y-1/2 cursor-pointer rounded-full border border-chalk/40 bg-ink-900 transition-colors hover:border-signal-400 hover:bg-signal-500"
+            className="route-station absolute -right-1.5 h-2 w-2 -translate-y-1/2 cursor-pointer rounded-full transition-colors hover:!border-signal-400 hover:!bg-signal-500"
             style={{ top: `${st.f * 100}%` }}
           />
         ))}

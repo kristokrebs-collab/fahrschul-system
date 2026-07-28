@@ -26,7 +26,7 @@ export default function GuidePage() {
         title="Kein Behördenlabyrinth"
         lead="Der Führerschein wirkt kompliziert, weil niemand die Reihenfolge erklärt. Hier ist sie — mit dem Hinweis, wer bei jedem Schritt handeln muss."
         trail={trail}
-        actions={<ActionLink href="/kontakt">Beratung starten</ActionLink>}
+        actions={<ActionLink href="/kontakt?thema=fuehrerschein&von=/ausbildungsablauf">Beratung starten</ActionLink>}
       />
       <section className="shell pb-4">
         <ScenePanel

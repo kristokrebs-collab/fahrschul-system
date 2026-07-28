@@ -164,7 +164,7 @@ export function PriceCalculator() {
                               [item.id]: sanitiseQuantity(e.target.value, assumption.min, assumption.max),
                             }))
                           }
-                          className="tabular h-11 w-20 rounded-lg border border-chalk/12 bg-ink-950/60 px-2 text-center text-chalk focus:border-signal-500 focus:outline-none"
+                          className="tabular h-11 w-20 rounded-lg border border-chalk/12 bg-ink-950/60 px-2 text-center text-chalk focus:border-signal-500"
                         />
                       </label>
                     )}
@@ -279,7 +279,7 @@ function EuroInput({
           onChange={(e) => onChange(e.target.value)}
           placeholder="0,00"
           aria-label={label}
-          className={`tabular h-11 w-full rounded-lg border bg-ink-950/60 pl-3 pr-7 text-right text-chalk placeholder:text-chalk-faint focus:outline-none ${
+          className={`tabular h-11 w-full rounded-lg border bg-ink-950/60 pl-3 pr-7 text-right text-chalk placeholder:text-chalk-faint ${
             accent ? 'border-signal-500/30 focus:border-signal-500' : 'border-chalk/12 focus:border-chalk/40'
           }`}
         />

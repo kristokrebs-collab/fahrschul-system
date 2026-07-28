@@ -26,7 +26,7 @@ export default function CockpitPage() {
         title="Schluss mit „Wie weit bin ich eigentlich?“"
         lead="Wir bauen gerade ein digitales Cockpit für unsere Fahrschülerinnen und Fahrschüler. Die folgenden Ansichten zeigen mit Beispieldaten, wie es aussehen wird."
         trail={trail}
-        actions={<ActionLink href="/kontakt" variant="secondary">Sag uns, was dir fehlen würde</ActionLink>}
+        actions={<ActionLink href="/kontakt?thema=sonstiges&von=/schueler-cockpit" variant="secondary">Sag uns, was dir fehlen würde</ActionLink>}
       />
       <section className="shell pb-10">
         <ScenePanel

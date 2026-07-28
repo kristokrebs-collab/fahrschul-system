@@ -32,16 +32,16 @@ export function SiteFooter() {
                 : 'Fahrausbildung in Fulda und Bad Hersfeld.'}
             </p>
             <Link
-              href="/kontakt"
+              href="/kontakt?von=/"
               className="mt-6 inline-flex min-h-11 items-center rounded-xl bg-signal-500 px-5 text-sm font-semibold text-chalk transition-colors hover:bg-signal-600"
             >
               Beratung starten
             </Link>
           </div>
 
-          <nav aria-label="Footer" className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <nav aria-label="Footer" className="footer-grid grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {footerLinks.map((column) => (
-              <div key={column.title}>
+              <div key={column.title} className="footer-col">
                 <p className="type-eyebrow mb-3 text-chalk-faint">{column.title}</p>
                 <ul className="space-y-2">
                   {column.links.map((link) => (

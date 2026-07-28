@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { categories, classCategoryOrder, classesByCategory, sonderfahrtenTotal, type ClassCategory } from '@/content/classes'
 import { publicValue } from '@/content/truth'
 import { MarkBus, MarkClasses, MarkProfessional, MarkTwoWheel } from '@/components/brand/marks'
+import { TabIndicator } from '@/components/brand/tab-indicator'
 
 const CATEGORY_MARK: Record<ClassCategory, (props: { className?: string }) => React.ReactElement> = {
   pkw: MarkClasses,
@@ -61,7 +62,8 @@ export function LicenceRoute() {
 
   return (
     <div>
-      <div
+      <TabIndicator
+        selectedId={`lane-tab-${active}`}
         role="tablist"
         aria-label="Fahrzeugarten"
         onKeyDown={onKeyDown}
@@ -80,10 +82,8 @@ export function LicenceRoute() {
               aria-controls={`lane-panel-${category}`}
               tabIndex={selected ? 0 : -1}
               onClick={() => setActive(category)}
-              className={`flex min-h-12 shrink-0 items-center gap-2.5 rounded-xl border px-4 text-sm font-semibold transition-colors ${
-                selected
-                  ? 'border-signal-500/50 bg-signal-500/10 text-chalk'
-                  : 'border-chalk/10 text-chalk-dim hover:border-chalk/25 hover:text-chalk'
+              className={`relative z-10 flex min-h-12 shrink-0 items-center gap-2.5 rounded-xl border px-4 text-sm font-semibold transition-colors ${
+                selected ? 'border-transparent text-chalk' : 'border-chalk/10 text-chalk-dim hover:border-chalk/25 hover:text-chalk'
               }`}
             >
               <Mark className={`h-4.5 w-4.5 ${selected ? 'text-signal-400' : 'text-chalk-faint'}`} />
@@ -91,14 +91,14 @@ export function LicenceRoute() {
             </button>
           )
         })}
-      </div>
+      </TabIndicator>
 
       <div
         role="tabpanel"
         id={`lane-panel-${active}`}
         aria-labelledby={`lane-tab-${active}`}
         tabIndex={0}
-        className="mt-7 focus:outline-none"
+        className="mt-7 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal-400"
       >
         {CATEGORY_IMAGE[active] && (
           <figure className="relative mb-8 overflow-hidden rounded-2xl border border-chalk/10">

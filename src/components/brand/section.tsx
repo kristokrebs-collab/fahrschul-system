@@ -1,15 +1,30 @@
 import Link from 'next/link'
-import type { ReactNode } from 'react'
-import { RevealBlock, RevealWords } from './reveal'
+import { Children, isValidElement, type ReactNode } from 'react'
+import { RevealWords } from './reveal'
+
+/** Flatten a heading's text so its length can decide how it is presented. */
+function textOf(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return Children.toArray(node).map(textOf).join(' ')
+  if (isValidElement(node)) return textOf((node.props as { children?: ReactNode }).children)
+  return ''
+}
+
+/** Short enough to read as one gesture rather than as animated prose. */
+const REVEAL_WORD_LIMIT = 4
 
 /**
  * Chapter framing.
  *
  * Every chapter of the route is introduced the same way — a kilometre marker,
  * a heading and a lead. Consistency here is what makes the page feel like one
- * journey rather than a stack of unrelated sections. The heading words rise
- * out of a mask as the chapter arrives; without JavaScript they are simply
- * there, fully visible.
+ * journey rather than a stack of unrelated sections.
+ *
+ * The word reveal is rationed on purpose. Applied to every heading it stops
+ * being a gesture and becomes the site's tic — the single most recognisable
+ * tell of a generated page. Only headings of four words or fewer get it; long
+ * headings and every lead simply appear, because animating running text is
+ * something this site does not do.
  */
 export function ChapterHeading({
   marker,
@@ -24,17 +39,15 @@ export function ChapterHeading({
   id?: string
   align?: 'left' | 'center'
 }) {
+  const short = textOf(title).trim().split(/\s+/).filter(Boolean).length <= REVEAL_WORD_LIMIT
+
   return (
     <header className={align === 'center' ? 'mx-auto max-w-3xl text-center' : 'max-w-3xl'}>
       <p className={`kapitel-label ${align === 'center' ? 'justify-center' : ''}`}>{marker}</p>
       <h2 id={id} className="type-chapter mt-5 text-gradient-chalk">
-        <RevealWords>{title}</RevealWords>
+        {short ? <RevealWords>{title}</RevealWords> : title}
       </h2>
-      {lead && (
-        <RevealBlock delay={220}>
-          <p className="type-lead mt-5">{lead}</p>
-        </RevealBlock>
-      )}
+      {lead && <p className="type-lead mt-5">{lead}</p>}
     </header>
   )
 }

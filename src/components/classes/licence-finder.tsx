@@ -172,7 +172,7 @@ export function LicenceFinder() {
                       {top.licenceClass.name} ansehen
                     </Link>
                     <Link
-                      href="/kontakt"
+                      href={`/kontakt?bezug=${top.licenceClass.slug}&von=/fuehrerschein`}
                       className="inline-flex min-h-12 items-center justify-center rounded-xl border border-chalk/18 px-6 text-sm font-semibold text-chalk transition-colors hover:border-chalk/35"
                     >
                       Beratung dazu anfragen
@@ -212,7 +212,7 @@ export function LicenceFinder() {
               ) : (
                 <p className="text-chalk-soft">
                   Dazu können wir keine automatische Empfehlung geben —{' '}
-                  <Link href="/kontakt" className="font-semibold text-signal-400 underline-offset-4 hover:underline">
+                  <Link href="/kontakt?von=/fuehrerschein" className="font-semibold text-signal-400 underline-offset-4 hover:underline">
                     frag uns direkt
                   </Link>
                   .

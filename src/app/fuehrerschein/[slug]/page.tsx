@@ -7,7 +7,7 @@ import { publicValue } from '@/content/truth'
 import { breadcrumbJsonLd, courseJsonLd } from '@/lib/structured-data'
 import { ActionLink, Disclosure } from '@/components/brand/section'
 import { Roadway } from '@/components/brand/roadway'
-import { PageMedia } from '@/components/media/page-media'
+import { PageMediaLoupe } from '@/components/media/page-media'
 
 export function generateStaticParams() {
   return licenceClasses.map((c) => ({ slug: c.slug }))
@@ -83,7 +83,9 @@ export default async function ClassPage({ params }: { params: Promise<{ slug: st
           <p className="type-lead mt-6 max-w-[54ch]">{licenceClass.summary}</p>
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-            <ActionLink href="/kontakt">Beratung zu {licenceClass.code} starten</ActionLink>
+            <ActionLink href={`/kontakt?bezug=${licenceClass.slug}&von=/fuehrerschein/${licenceClass.slug}`}>
+              Beratung zu {licenceClass.code} starten
+            </ActionLink>
             {licenceClass.calculatorSupported && (
               <ActionLink href="/preise" variant="secondary">
                 Kosten vergleichen
@@ -129,7 +131,7 @@ export default async function ClassPage({ params }: { params: Promise<{ slug: st
         </div>
 
         <aside className="space-y-6">
-          <PageMedia routeKey={`fuehrerschein/${licenceClass.slug}`} />
+          <PageMediaLoupe routeKey={`fuehrerschein/${licenceClass.slug}`} />
           <div className="surface p-6">
             <h2 className="font-display text-base font-bold text-chalk">Wo du ausgebildet wirst</h2>
             <ul className="mt-3 space-y-2">

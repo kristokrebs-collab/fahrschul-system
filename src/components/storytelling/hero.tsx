@@ -6,7 +6,7 @@ import { Roadway } from '@/components/brand/roadway'
 import { HeroParallax } from './hero-parallax'
 import { SceneVideo } from '@/components/media/scene-video'
 import { sceneClips } from '@/content/media'
-import { RevealWords } from '@/components/brand/reveal'
+import { Outlier } from '@/components/brand/outlier'
 
 /**
  * Chapter 1 — Dein Weg beginnt hier.
@@ -29,16 +29,26 @@ export function Hero() {
             the SVG roadway underlies both. Everything retires the moment the
             3D scene takes the stage. */}
         <div className="route3d-retire absolute inset-0">
-          <Roadway className="absolute inset-x-0 bottom-0 h-[78%] w-full" />
+          <Roadway className="absolute inset-x-0 bottom-0 h-[64%] w-full opacity-70" />
+          {/* Full strength, not a dimmed loop: the footage is the picture, and
+              legibility is bought with a measured scrim below, not by fading
+              the image until it reads as texture. */}
           <SceneVideo
             name={sceneClips.heroFilament.name}
             hd={sceneClips.heroFilament.hd}
-            className="media-weld-y opacity-55"
+            className="media-weld-y"
             videoClassName="object-bottom"
           />
+          <div aria-hidden className="hero-haze absolute inset-0" />
         </div>
       </HeroParallax>
 
+      {/* The scrim the type sits on — strongest at the left, where the words
+          are, and clearing to the right, where the road is. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(100deg,var(--color-ink-950)_8%,color-mix(in_oklab,var(--color-ink-950)_72%,transparent)_38%,transparent_72%)]"
+      />
       <div className="atmos-falloff" />
 
       <div className="shell relative z-10 pb-16 pt-24 md:pb-24">
@@ -47,14 +57,14 @@ export function Hero() {
           {founded && <span className="text-chalk-faint">· seit {founded}</span>}
         </p>
 
+        {/* Two lines that simply stand there, and one that performs. That
+            ratio is the whole typographic policy of the site. */}
         <h1 className="type-hero mt-6 max-w-[16ch] text-gradient-chalk">
-          <RevealWords>
-            Alle Klassen.
-            <br />
-            Zwei Standorte.
-            <br />
-            <span className="text-signal-500 shine-sweep">Ein Weg.</span>
-          </RevealWords>
+          Alle Klassen.
+          <br />
+          Zwei Standorte.
+          <br />
+          <Outlier text="Ein Weg." className="text-signal-500 shine-sweep" />
         </h1>
 
         <p className="type-lead mt-7 max-w-[52ch]">
@@ -65,12 +75,12 @@ export function Hero() {
         <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <Link
             href="/fuehrerschein#finder"
-            className="inline-flex min-h-13 items-center justify-center rounded-xl bg-signal-500 px-7 py-3.5 text-base font-semibold text-chalk shadow-[0_16px_48px_-16px_color-mix(in_oklab,var(--color-signal-500)_75%,transparent)] transition-colors hover:bg-signal-600"
+            className="cta-shine inline-flex min-h-13 items-center justify-center rounded-xl bg-signal-500 px-7 py-3.5 text-base font-semibold text-chalk shadow-[0_16px_48px_-16px_color-mix(in_oklab,var(--color-signal-500)_75%,transparent)] transition-colors hover:bg-signal-600"
           >
             Führerschein finden
           </Link>
           <Link
-            href="/kontakt"
+            href="/kontakt?von=/"
             className="inline-flex min-h-13 items-center justify-center rounded-xl border border-chalk/18 bg-chalk/[0.04] px-7 py-3.5 text-base font-semibold text-chalk transition-colors hover:border-chalk/35 hover:bg-chalk/[0.08]"
           >
             Beratung starten

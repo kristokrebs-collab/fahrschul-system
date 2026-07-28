@@ -2,10 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { locations } from '@/content/business'
 import { publicValue } from '@/content/truth'
-import { Roadway } from '@/components/brand/roadway'
 import { Magnetic } from '@/components/brand/magnetic'
-import { SceneVideo } from '@/components/media/scene-video'
-import { sceneClips } from '@/content/media'
 
 /**
  * Chapter 11 — the finish line.
@@ -16,26 +13,20 @@ import { sceneClips } from '@/content/media'
  */
 export function FinalCta() {
   return (
-    <section className="relative isolate overflow-hidden border-t border-chalk/8 py-24 md:py-32" data-atmo="80/75">
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 opacity-45">
-        <Roadway className="absolute inset-x-0 bottom-0 h-full w-full" />
-      </div>
-      {/* The route's light arrives and comes to rest — the journey's last shot */}
-      <SceneVideo
-        name={sceneClips.lineArrives.name}
-        hd={sceneClips.lineArrives.hd}
-        className="-z-10 media-weld-y opacity-60"
-      />
-      {/* The crab from the real logo, as a faint watermark over the finish line */}
+    <section
+      className="chapter-day relative isolate overflow-hidden border-t border-chalk/8 py-28 md:py-36"
+      data-atmo="80/75"
+    >
+      {/* The crab from the real logo, printed into the daylight like a
+          watermark on paper */}
       <Image
         src="/brand/krebs-crab.png"
         alt=""
         aria-hidden
         width={700}
         height={254}
-        className="pointer-events-none absolute left-1/2 top-6 -z-10 w-[34rem] max-w-[90vw] -translate-x-1/2 opacity-[0.05]"
+        className="pointer-events-none absolute left-1/2 top-8 -z-10 w-[34rem] max-w-[90vw] -translate-x-1/2 opacity-[0.07] mix-blend-multiply"
       />
-      <div className="atmos-falloff" />
 
       <div className="shell relative text-center">
         <p className="kapitel-label justify-center">Letztes Kapitel — Ankommen</p>
@@ -51,13 +42,13 @@ export function FinalCta() {
           <Magnetic className="w-full sm:w-auto">
             <Link
               href="/fuehrerschein#finder"
-              className="inline-flex min-h-13 w-full items-center justify-center rounded-xl bg-signal-500 px-8 text-base font-semibold text-chalk shadow-[0_18px_50px_-18px_color-mix(in_oklab,var(--color-signal-500)_80%,transparent)] transition-colors hover:bg-signal-600 sm:w-auto"
+              className="cta-shine inline-flex min-h-13 w-full items-center justify-center rounded-xl bg-signal-500 px-8 text-base font-semibold text-chalk shadow-[0_18px_50px_-18px_color-mix(in_oklab,var(--color-signal-500)_80%,transparent)] transition-colors hover:bg-signal-600 sm:w-auto"
             >
               Führerschein finden
             </Link>
           </Magnetic>
           <Link
-            href="/kontakt"
+            href="/kontakt?von=/"
             className="inline-flex min-h-13 w-full items-center justify-center rounded-xl border border-chalk/18 bg-chalk/[0.04] px-8 text-base font-semibold text-chalk transition-colors hover:border-chalk/35 sm:w-auto"
           >
             Beratung starten

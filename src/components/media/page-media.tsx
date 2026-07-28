@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { pageMedia, sceneClips, type SceneClipKey } from '@/content/media'
 import { SceneVideo } from './scene-video'
+import { Magnifier } from './magnifier'
 
 /** A captioned cinematic clip panel — the standard way footage appears in a page flow. */
 export function ScenePanel({
@@ -63,5 +64,24 @@ export function PageMedia({ routeKey, className = '' }: { routeKey: string; clas
         {entry.caption}
       </figcaption>
     </figure>
+  )
+}
+
+/** The same still, but readable up close — used where the detail is the point. */
+export function PageMediaLoupe({ routeKey, className = '' }: { routeKey: string; className?: string }) {
+  const entry = pageMedia[routeKey]
+  if (!entry || entry.kind !== 'still') return <PageMedia routeKey={routeKey} className={className} />
+
+  const tall = entry.aspect !== 'aspect-video'
+  return (
+    <Magnifier
+      src={`/stills/${entry.ref}-1600.avif`}
+      alt={entry.alt}
+      width={1600}
+      height={tall ? 2133 : 900}
+      caption={entry.caption}
+      className={className}
+      imgClassName={`${entry.aspect ?? 'aspect-video'} w-full object-cover`}
+    />
   )
 }
