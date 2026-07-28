@@ -26,14 +26,38 @@ function progress(){var d=document.documentElement,r=d.scrollHeight-innerHeight;
 /* ══ Header ═════════════════════════════════════════════ */
 (function(){
   var h=$('.hdr'); if(!h) return;
-  var on=raf(function(){ if(scrollY>16) h.setAttribute('data-solid',''); else h.removeAttribute('data-solid') });
+  var on=raf(function(){
+    if(scrollY>16) h.setAttribute('data-solid',''); else h.removeAttribute('data-solid');
+    // Whatever sits behind the bar decides whether the bar is ink or paper.
+    var under=document.elementsFromPoint(innerWidth/2, h.offsetHeight+4)
+      .filter(function(e){return e.classList&&e.classList.contains('day')})[0];
+    h.toggleAttribute('data-light', !!under);
+  });
   on(); addEventListener('scroll',on,{passive:true});
+  // The mobile sheet covers the page, so it has to behave like one: Escape
+  // closes it, focus goes in and comes back, Tab stays inside while it is up,
+  // and a link that only moves to an anchor on this page closes it too.
   var b=$('.burger'), m=$('.mnav');
-  if(b&&m){ b.addEventListener('click',function(){
-    var open=m.hasAttribute('data-open');
-    if(open){m.removeAttribute('data-open');document.body.style.overflow='';b.setAttribute('aria-expanded','false')}
-    else{m.setAttribute('data-open','');document.body.style.overflow='hidden';b.setAttribute('aria-expanded','true')}
-  })}
+  if(b&&m){
+    var loop=function(){ return [b].concat([].slice.call(m.querySelectorAll('a,button'))) };
+    var setOpen=function(open){
+      m.toggleAttribute('data-open',open);
+      document.body.style.overflow=open?'hidden':'';
+      b.setAttribute('aria-expanded',open?'true':'false');
+      var f=open ? m.querySelector('a,button') : b;
+      if(f) f.focus();
+    };
+    b.addEventListener('click',function(){ setOpen(!m.hasAttribute('data-open')) });
+    m.addEventListener('click',function(e){ if(e.target.closest('a')) setOpen(false) });
+    addEventListener('keydown',function(e){
+      if(!m.hasAttribute('data-open')) return;
+      if(e.key==='Escape'){ e.preventDefault(); setOpen(false); return }
+      if(e.key!=='Tab') return;
+      var f=loop(), i=f.indexOf(document.activeElement);
+      if(e.shiftKey && i<=0){ e.preventDefault(); f[f.length-1].focus() }
+      else if(!e.shiftKey && i===f.length-1){ e.preventDefault(); f[0].focus() }
+    });
+  }
 })();
 
 /* ══ Daylight clock — one value everything else agrees on ══ */
@@ -545,50 +569,60 @@ function progress(){var d=document.documentElement,r=d.scrollHeight-innerHeight;
   render();
 })();
 
-/* ══ PRICE COMPARISON ══════════════════════════════════ */
+/* ══ PRICE COMPARISON ══════════════════════════════════
+   The engine from src/lib/pricing.ts, in plain JS: money is
+   kept in integer cents so no total is ever off by a rounding
+   cent, and German decimal notation is parsed properly —
+   "2.000" is two thousand, "2,00" is two. */
 (function(){
-  var root=$('#rechner'); if(!root||!window.KREBS) return;
-  var rows=KREBS.prices.items;
-  function parse(v){
-    v=String(v).trim(); if(!v) return null;
-    v=v.replace(/[^0-9.,-]/g,'');
-    var lastC=v.lastIndexOf(','), lastD=v.lastIndexOf('.');
-    if(lastC>-1&&lastD>-1){ if(lastC>lastD){v=v.replace(/\\./g,'').replace(',','.')} else {v=v.replace(/,/g,'')} }
-    else if(lastC>-1){ var d=v.length-lastC-1; v = d===3 ? v.replace(/,/g,'') : v.replace(',','.') }
-    else if(lastD>-1){ var d2=v.length-lastD-1; if(d2===3) v=v.replace(/\\./g,'') }
-    var n=parseFloat(v); return isFinite(n)?Math.round(n*100):null;
-  }
+  var blocks=$$('[data-calc]'); if(!blocks.length||!window.KREBS) return;
   var fmt=new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'});
   function money(c){ return fmt.format(c/100) }
-
-  function recalc(){
-    var a=0,b=0,anyA=false,anyB=false;
-    rows.forEach(function(r){
-      var q=Math.max(0,parseInt($('#q-'+r.id,root).value,10)||0);
-      var pa=parse($('#a-'+r.id,root).value), pb=parse($('#b-'+r.id,root).value);
-      var sa=pa===null?null:pa*q, sb=pb===null?null:pb*q;
-      if(sa!==null){a+=sa;anyA=true} if(sb!==null){b+=sb;anyB=true}
-      $('#sa-'+r.id,root).textContent = sa===null?'—':money(sa);
-      $('#sb-'+r.id,root).textContent = sb===null?'—':money(sb);
-      var d=$('#d-'+r.id,root);
-      if(sa!==null&&sb!==null){ var diff=sa-sb;
-        d.textContent = diff===0?'gleich':(diff>0?'+':'−')+money(Math.abs(diff)).replace('-','');
-        d.style.color = diff>0?'var(--signal)':(diff<0?'var(--ok)':'var(--chalk-dim)');
-      } else { d.textContent='—'; d.style.color='' }
-    });
-    $('[data-total-a]',root).textContent = anyA?money(a):'—';
-    $('[data-total-b]',root).textContent = anyB?money(b):'—';
-    var out=$('[data-verdict]',root);
-    if(anyA&&anyB){
-      var diff=a-b;
-      out.hidden=false;
-      out.innerHTML = diff===0
-        ? '<b>Gleichstand.</b> Beide Angebote kosten bei diesen Mengen exakt dasselbe — entscheide nach Terminen, Fahrzeugen und Bauchgefühl.'
-        : '<b>Differenz: '+money(Math.abs(diff))+'</b> — '+(diff>0?'das Vergleichsangebot':'dein Angebot')+' ist bei <em>denselben Mengen</em> günstiger. Wichtig: Ein niedriger Grundbetrag sagt nichts, wenn die Fahrstunden teurer sind.';
-    } else out.hidden=true;
+  function parse(v){
+    v=String(v).trim(); if(!v) return null;
+    v=v.replace(/[^0-9.,-]/g,''); if(!v) return null;
+    var lc=v.lastIndexOf(','), ld=v.lastIndexOf('.');
+    if(lc>-1&&ld>-1){ v = lc>ld ? v.replace(/\./g,'').replace(',','.') : v.replace(/,/g,'') }
+    else if(lc>-1){ v = (v.length-lc-1)===3 ? v.replace(/,/g,'') : v.replace(',','.') }
+    else if(ld>-1&&(v.length-ld-1)===3){ v=v.replace(/\./g,'') }
+    var n=parseFloat(v);
+    return isFinite(n) ? Math.round(n*100) : null;
   }
-  $$('input',root).forEach(function(i){ i.addEventListener('input',recalc) });
-  recalc();
+  blocks.forEach(function(block){
+    var slug=block.dataset.calc;
+    var variant=KREBS.prices.variants.filter(function(v){return v.slug===slug})[0];
+    if(!variant) return;
+    var panel=block.parentElement;
+    var out=$('[data-verdict]',panel);
+    function id(pre,r){ return pre+'-'+slug+'-'+r.id }
+    function recalc(){
+      var a=0,b=0,anyA=false,anyB=false;
+      variant.rows.forEach(function(r){
+        var q=Math.max(0,parseInt($('#'+id('q',r),panel).value,10)||0);
+        var pa=parse($('#'+id('a',r),panel).value), pb=parse($('#'+id('b',r),panel).value);
+        var sa=pa===null?null:pa*q, sb=pb===null?null:pb*q;
+        if(sa!==null){a+=sa;anyA=true} if(sb!==null){b+=sb;anyB=true}
+        $('#'+id('sa',r),panel).textContent = sa===null?'—':money(sa);
+        $('#'+id('sb',r),panel).textContent = sb===null?'—':money(sb);
+        var d=$('#'+id('d',r),panel);
+        if(sa!==null&&sb!==null){
+          var diff=sa-sb;
+          d.textContent = diff===0?'gleich':(diff>0?'+ ':'− ')+money(Math.abs(diff));
+          d.style.color = diff>0?'var(--signal)':(diff<0?'var(--ok)':'var(--chalk-dim)');
+        } else { d.textContent='—'; d.style.color='' }
+      });
+      $('[data-total-a]',panel).textContent = anyA?money(a):'—';
+      $('[data-total-b]',panel).textContent = anyB?money(b):'—';
+      if(anyA&&anyB){
+        var diff=a-b; out.hidden=false;
+        out.innerHTML = diff===0
+          ? '<b>Gleichstand.</b> Beide Angebote kosten bei diesen Mengen exakt dasselbe — entscheide nach Terminen, Fahrzeugen und Bauchgefühl.'
+          : '<b>Differenz: '+money(Math.abs(diff))+'</b> — '+(diff>0?'das Vergleichsangebot':'dein Angebot')+' ist bei <em>denselben Mengen</em> günstiger. Ein niedriger Grundbetrag sagt wenig, wenn die Fahrstunden teurer sind.';
+      } else out.hidden=true;
+    }
+    $$('input',panel).forEach(function(i){ i.addEventListener('input',recalc) });
+    recalc();
+  });
 })();
 
 /* ══ Contact form: a real mailto, never a demo toast ════ */

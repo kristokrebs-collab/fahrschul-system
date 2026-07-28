@@ -94,6 +94,21 @@ Akzent, auf hellem Grund von `#e10a17` auf `#c00711` vertieft.
 Neue Token: eine `dawn`-Skala (warmes Papierweiß bis Nebelgrau), damit helle
 Flächen nicht als kaltes Weiß, sondern als Tageslicht lesen.
 
+**Bewegtbild in der hellen Hälfte.** Aus derselben Regel folgt eine zweite:
+dunkles Studiomaterial ist hinter einem Tageslicht-Kapitel abgeschaltet
+(`.chapter-day > .media-weld-y { display:none }`), weil es auf hellem Grund als
+Schmierfleck liest. Damit hatte die helle Hälfte gar keine Bewegung mehr — also
+wurde für sie eigenes Material erzeugt: eine Landstraße bei Tageslicht, die im
+Schlusskapitel formatfüllend läuft und an beiden Kanten in die Seitenfarbe
+eingeschweißt ist. Die Karte davor steht auf 90 % Deckkraft; gegen das dunkelste
+denkbare Einzelbild des Clips gemessen hält der Fließtext dort **5,76 : 1**.
+
+Die Messung hat zusätzlich einen echten Fehler in der Morgendämmerung
+aufgedeckt: Das Kapitel-Label saß mitten im Verlauf und kam auf den
+zusammengesetzten Pixeln nur auf **2,9 : 1**. Korrektur: Die Kapitelfläche
+beginnt ihren Text unterhalb des Verlaufs und das Label geht dort auf volles
+Ink — jetzt 13,2 : 1.
+
 ## Typografie
 
 Unverändert Archivo (Display) + Instrument Sans (Fließtext) — sitzt bereits.
@@ -166,13 +181,18 @@ oder einem Kapitel dient — nie als Fremdkörper im Originallook.
 
 ## Prüfliste „fertig"
 
-- [ ] Fünf Sekunden: Angebot, Standort, nächste Aktion erkennbar
-- [ ] Route ist mindestens einmal Hauptdarsteller, nicht nur Hintergrund
-- [ ] Sichtbare Helligkeitsspannweite über die Kapitel, zwei helle Kapitel
-- [ ] Genau ein typografischer Ausreißer
-- [ ] Keine neun Leistungskarten auf der Startseite
-- [ ] Kein Marquee ohne Informationswert
-- [ ] ≥ 11 Bookmark-Techniken eingesetzt und umgefärbt
-- [ ] Keine dauerhafte GPU-Last (Render pausiert außerhalb des Sichtfelds)
-- [ ] Alle CTAs übertragen Klasse, Standort, Anliegen, Quelle
-- [ ] Tastatur, Fokus, Kontrast, `prefers-reduced-motion`, Mobile geprüft
+Abgehakt heißt: gemessen, nicht behauptet. Die Belege stehen in
+`docs/release-gate.md`.
+
+- [x] Fünf Sekunden: Angebot, Standort, nächste Aktion erkennbar
+- [x] Route ist mindestens einmal Hauptdarsteller, nicht nur Hintergrund
+- [x] Sichtbare Helligkeitsspannweite über die Kapitel, zwei helle Kapitel
+      — gemessen 28 → 239 von 255 mittlerer Bildhelligkeit, fünf helle Kapitel
+- [x] Genau ein typografischer Ausreißer
+- [x] Keine neun Leistungskarten auf der Startseite — kuratierte Auswahl
+- [x] Kein Marquee ohne Informationswert — die Laufzeile trägt die Klassencodes
+- [x] ≥ 11 Bookmark-Techniken eingesetzt und umgefärbt — **20** gezählt
+- [x] Keine dauerhafte GPU-Last (Render pausiert außerhalb des Sichtfelds)
+- [x] Alle CTAs übertragen Klasse, Standort, Anliegen, Quelle
+- [x] Tastatur, Fokus, Kontrast, `prefers-reduced-motion`, Mobile geprüft
+- [x] Jede Seite läuft per Doppelklick, ohne Server und ohne Internet

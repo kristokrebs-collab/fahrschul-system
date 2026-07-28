@@ -57,7 +57,8 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ── Layout ─────────────────────────────────────────────── */
 .shell{width:var(--shell);margin-inline:auto;position:relative}
-.chapter{padding:clamp(5rem,10vw,8.5rem) 0;position:relative}
+.chapter{padding:clamp(4.5rem,8vw,7rem) 0;position:relative}
+.day + .day{padding-top:0}
 .eyebrow{display:flex;align-items:center;gap:.75rem;font-size:.6875rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--chalk-dim)}
 .eyebrow::before{content:'';width:2rem;height:2px;background:var(--signal);flex:none}
 .h-chapter{font-size:clamp(2rem,4.4vw,3.4rem);margin-top:1.15rem}
@@ -78,9 +79,14 @@ button,input,select,textarea{font:inherit;color:inherit}
   --signal:#c00711; --signal-400:#c00711; --signal-600:#8f050c;
   background-color:var(--ink-950); color:var(--chalk);
 }
-/* The sunrise: exactly one chapter crosses from night into day. */
+/* The sunrise: exactly one chapter crosses from night into day. Its copy
+   starts below the gradient's midpoint and its eyebrow drops to full ink —
+   measured on the composited pixels, --chalk-dim inside the weld only
+   reaches 2.9:1, which is not a contrast anyone should have to squint past. */
 .dawn{background-color:transparent;
   background-image:linear-gradient(to bottom,transparent 0,var(--ink-950) 11rem)}
+.chapter.dawn{padding-top:9.5rem}
+.dawn .eyebrow{color:var(--chalk)}
 .dawn::before{content:'';position:absolute;inset:0 0 auto 0;height:11rem;pointer-events:none;
   background:radial-gradient(85% 100% at 50% 100%,color-mix(in oklab,#ffd2a0 55%,transparent),transparent 74%)}
 .day .atmo-lanes{display:none}
@@ -89,7 +95,16 @@ button,input,select,textarea{font:inherit;color:inherit}
 .hdr{position:fixed;inset:0 0 auto 0;z-index:60;height:var(--header-h);display:flex;align-items:center;
   transition:background-color .35s,border-color .35s;border-bottom:1px solid transparent}
 .hdr[data-solid]{background:color-mix(in oklab,#12171e 88%,transparent);border-bottom-color:rgb(255 255 255/.09);backdrop-filter:blur(14px)}
-.hdr .shell{display:flex;align-items:center;gap:1.5rem}
+/* Over the daylight half the bar turns to paper, or it reads as a foreign object */
+.hdr[data-light]{color:#141a20}
+.hdr[data-light][data-solid]{background:color-mix(in oklab,#f7f4ee 90%,transparent);border-bottom-color:rgb(0 0 0/.1)}
+.hdr[data-light] .nav a{color:#4e5762}
+.hdr[data-light] .nav a:hover,.hdr[data-light] .nav a[aria-current]{color:#141a20;background:rgb(0 0 0/.06)}
+.hdr[data-light] .brand b{color:#c00711}
+.hdr[data-light] .brand small{color:#2c343c}
+.hdr[data-light] .burger{border-color:rgb(0 0 0/.16);background:rgb(0 0 0/.04)}
+.hdr[data-light] .burger span{background:#141a20;box-shadow:0 -5px 0 #141a20,0 5px 0 #141a20}
+.hdr .shell{display:flex;align-items:center;gap:1.1rem}
 .brand{display:flex;align-items:center;gap:.6rem;text-decoration:none;flex:none}
 .brand b{font-family:var(--font-display);font-weight:900;font-size:1.5rem;letter-spacing:-.03em;color:var(--signal-400)}
 .brand .bars{display:flex;gap:2px;height:1.5rem}
@@ -98,20 +113,20 @@ button,input,select,textarea{font:inherit;color:inherit}
 .brand .bars i:last-child{background:var(--signal-400)}
 .brand small{display:block;font-family:var(--font-display);font-weight:800;font-size:.5rem;letter-spacing:.22em;line-height:1.35;color:var(--chalk-soft)}
 .nav{display:none;gap:.25rem;margin-left:auto}
-.nav a{padding:.55rem .8rem;border-radius:.6rem;font-size:.9rem;font-weight:600;text-decoration:none;color:var(--chalk-dim);transition:color .2s,background-color .2s}
+.nav a{padding:.5rem .7rem;border-radius:.6rem;font-size:.86rem;font-weight:600;white-space:nowrap;text-decoration:none;color:var(--chalk-dim);transition:color .2s,background-color .2s}
 .nav a:hover,.nav a[aria-current]{color:var(--chalk);background:rgb(255 255 255/.06)}
 .hdr .tel{display:none;font-weight:700;text-decoration:none;white-space:nowrap}
 .hdr .cta{display:none}
-@media(min-width:1080px){.nav{display:flex}.hdr .tel,.hdr .cta{display:inline-flex}}
+@media(min-width:1200px){.nav{display:flex}.hdr .tel,.hdr .cta{display:inline-flex}}
 .burger{margin-left:auto;width:2.75rem;height:2.75rem;display:grid;place-items:center;border:1px solid rgb(255 255 255/.14);border-radius:.7rem;background:rgb(255 255 255/.04);cursor:pointer}
-@media(min-width:1080px){.burger{display:none}}
+@media(min-width:1200px){.burger{display:none}}
 .burger span{display:block;width:1.05rem;height:2px;background:var(--chalk);box-shadow:0 -5px 0 var(--chalk),0 5px 0 var(--chalk)}
 .mnav{position:fixed;inset:var(--header-h) 0 0 0;z-index:55;background:color-mix(in oklab,#12171e 97%,transparent);padding:1.5rem;overflow-y:auto;display:none}
 .mnav[data-open]{display:block}
 .mnav a{display:block;padding:.85rem .25rem;border-bottom:1px solid rgb(255 255 255/.08);font-size:1.05rem;font-weight:600;text-decoration:none}
 
 /* ── Buttons ────────────────────────────────────────────── */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:3.1rem;padding:0 1.65rem;
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:3.1rem;padding:0 1.65rem;white-space:nowrap;
   border-radius:.8rem;font-weight:650;font-size:.98rem;text-decoration:none;cursor:pointer;border:1px solid transparent;
   transition:background-color .25s,border-color .25s,color .25s}
 .btn-primary{background:var(--signal);color:#fff;box-shadow:0 16px 44px -18px color-mix(in oklab,var(--signal) 85%,transparent)}
@@ -183,7 +198,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 .stats span{display:block;margin-top:.45rem;font-size:.78rem;color:var(--chalk-dim);line-height:1.35}
 
 /* ── The route canvas ───────────────────────────────────── */
-#route{position:fixed;inset:0;z-index:-20;pointer-events:none;opacity:0;transition:opacity 1.2s ease}
+#route{position:fixed;inset:0;width:100%;height:100%;z-index:-20;pointer-events:none;opacity:0;transition:opacity 1.2s ease}
 #route[data-on]{opacity:1}
 
 /* 21st.dev #3226 Minimal Dock — the chapter rail, with reflection */
@@ -264,6 +279,23 @@ button,input,select,textarea{font:inherit;color:inherit}
 .bgvid{position:absolute;inset:0;z-index:-1;pointer-events:none;overflow:hidden;
   mask-image:linear-gradient(to bottom,transparent,#000 14%,#000 86%,transparent)}
 .bgvid video,.bgvid img{width:100%;height:100%;object-fit:cover}
+.day .figure{border-color:rgb(20 26 32/.14)}
+
+/* Closing chapter — the daylight payoff. The arc has been climbing towards
+   light all the way down the page; it ends on footage shot in daylight, not
+   on another dark panel. The card carries 90% opacity so the copy keeps AA
+   contrast even over the darkest frame the clip could ever show. */
+.arrive{position:relative;overflow:hidden;isolation:isolate}
+.day + .day.arrive{padding:clamp(6rem,11vw,9rem) 0 clamp(4rem,7vw,6rem)}
+.arrive-film{position:absolute;inset:0;z-index:0;pointer-events:none}
+.arrive-film video,.arrive-film img{width:100%;height:100%;object-fit:cover;transform:scale(1.04)}
+.arrive-film::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom,
+  var(--ink-950) 0,color-mix(in srgb,var(--ink-950) 20%,transparent) 20%,
+  color-mix(in srgb,var(--ink-950) 20%,transparent) 78%,var(--ink-950) 100%)}
+.arrive-body{position:relative;z-index:1}
+.arrive-card{max-width:46rem;margin-inline:auto;padding:clamp(1.8rem,4vw,3rem);border-radius:1.4rem;
+  background:color-mix(in srgb,var(--ink-950) 90%,transparent);backdrop-filter:blur(18px) saturate(1.08);
+  border:1px solid rgb(20 26 32/.10);box-shadow:0 34px 80px -46px rgb(20 26 32/.55)}
 
 /* 21st.dev #4559 View Magnifier */
 .loupe{position:relative;cursor:zoom-in;overflow:hidden}
@@ -329,9 +361,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .carousel{position:relative;overflow:hidden;border-radius:1rem;border:1px solid rgb(255 255 255/.12)}
 .carousel-track{display:flex;transition:transform .6s var(--ease-route)}
 .carousel-track>*{flex:0 0 100%;padding:1.9rem}
-.carousel-nav{display:flex;gap:.4rem;justify-content:center;padding:0 0 1.2rem}
-.carousel-nav button{width:2.1rem;height:.28rem;border:0;border-radius:2px;background:rgb(255 255 255/.2);cursor:pointer;transition:background-color .3s}
-.carousel-nav button[aria-current="true"]{background:var(--signal-400)}
+.carousel-nav{display:flex;gap:.4rem;justify-content:center;padding:0 0 .6rem}
+/* The bar stays 4px; the target around it is 24px, which is what a thumb
+   actually hits. background-clip keeps the paint on the bar alone. */
+.carousel-nav button{width:2.1rem;height:1.5rem;padding:.61rem 0;box-sizing:border-box;border:0;border-radius:2px;
+  background:rgb(255 255 255/.2);background-clip:content-box;cursor:pointer;transition:background-color .3s}
+.carousel-nav button[aria-current="true"]{background:var(--signal-400);background-clip:content-box}
 
 /* ── Slider (21st.dev #2497 auto slider), carrying real class codes ── */
 .slider{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);

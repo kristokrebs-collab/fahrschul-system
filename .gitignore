@@ -17,4 +17,5 @@ blob-report/
 *.log
 
 offline-preview/
+standalone-site/
 *.zip

@@ -109,6 +109,25 @@ export const sceneClips = {
     hd: false,
     beschreibung: 'Ein roter Lichtbogen schließt sich langsam — fast, nicht ganz',
   },
+  /* Die drei Tageslicht-Aufnahmen brechen bewusst mit der Studio-Regel oben:
+     Die Seite steigt über ihre Kapitel ins Licht, und die helle Hälfte braucht
+     Material, das dort auch gedreht wurde. Sie stehen deshalb nur in den
+     Tageslicht-Kapiteln, nie im nächtlichen Teil. */
+  dayRoad: {
+    name: 'day-road',
+    hd: false,
+    beschreibung: 'Landstraße bei Tageslicht, Frühlingsgrün am Rand — der Ankommen-Abschluss',
+  },
+  dayTrainingArea: {
+    name: 'day-training-area',
+    hd: false,
+    beschreibung: 'Übungsplatz mit Pylonen bei Tageslicht, weiter Blick über die Fläche',
+  },
+  rollerTurntable: {
+    name: 'roller-turntable',
+    hd: false,
+    beschreibung: 'Roller auf heller Drehbühne, eine ruhige Runde bei Tageslicht',
+  },
 } as const satisfies Record<string, SceneClip>
 
 export type SceneClipKey = keyof typeof sceneClips

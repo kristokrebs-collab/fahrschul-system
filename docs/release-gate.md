@@ -106,3 +106,80 @@ Alle Werte werden serverseitig gegen den echten Katalog geprüft — eine von Ha
 gebaute URL kann weder ein nicht existierendes Thema vorwählen noch freien Text
 auf die Seite bringen. `reference` und `source` gehen mit an den Webhook, damit
 im Büro niemand die offensichtliche Rückfrage stellen muss.
+
+## Der eigenständige Build — Abnahme gegen `file://`
+
+Der zweite Auslieferungsweg ist eine Datei pro Seite, die per Doppelklick läuft:
+kein Server, kein Netz, keine Bibliothek von einem CDN. Erzeugt wird er mit
+`node scripts/standalone/build.mjs <ordner>` — aus **denselben** TypeScript-
+Inhaltsdateien, die auch Next.js rendert (ein Resolver-Hook lädt sie direkt in
+Node). Zwei Kopien derselben Fakten kann es damit nicht geben.
+
+Geprüft wird mit `node scripts/standalone/gate.mjs <ordner>`. Das Skript öffnet
+die Dateien über `file://` und **bricht jede Anfrage ab**, die nicht
+`file:`, `data:` oder `blob:` ist. Was trotzdem noch funktioniert, funktioniert
+wirklich offline.
+
+| Prüfung | Ergebnis |
+|---|---|
+| Seiten geladen | **40 / 40**, jede mit `h1` und Titel |
+| Externe Requests über alle Seiten | **0** |
+| Konsolen- und Laufzeitfehler | **0** |
+| Bookmark-Techniken im Markup gefunden | **20 / 20** |
+| Fokus sichtbar über 45 Tab-Stationen | **45**, keine unsichtbare, keine außerhalb des Bildes |
+| Tap-Ziele unter 24 px (außerhalb von Fließtext) | **0** |
+| Horizontaler Overflow bei 390 px | **0 px** |
+
+### Gemessene Helligkeit über den Scroll
+
+Mittlere Bildhelligkeit des sichtbaren Fensters, zwölf Positionen, 0–255:
+
+```
+28  39  32  43  44  50  36  239  230  203  193  109
+└───────── Nacht ─────────┘  └──── Tag ────┘  Footer
+```
+
+Spannweite **211 von 255**. Der Sprung zwischen Position 7 und 8 ist der
+Sonnenaufgang in Kapitel 07 — genau eine Stelle, nicht ein Verlauf über alles.
+
+### Kontrast, auf den zusammengesetzten Pixeln gemessen
+
+Wo Text auf einem Verlauf, einer durchscheinenden Fläche oder auf Video sitzt,
+lügt die Berechnung aus der Kaskade. Gemessen wird deshalb der **gerenderte
+Bildschirm**: Screenshot in ein Canvas, Histogramm über die Textbox, der
+häufigste Helligkeitswert ist der Grund.
+
+| Element | Verhältnis | WCAG |
+|---|---|---|
+| Kapitel-Label in der Morgendämmerung | 13,23 : 1 | AA |
+| Kapitelüberschrift Morgendämmerung | 15,96 : 1 | AA |
+| Fließtext Morgendämmerung | 6,68 : 1 | AA |
+| Label auf der Tageslicht-Karte (über Video) | 6,52 : 1 | AA |
+| Fließtext auf der Tageslicht-Karte (über Video) | 5,76 : 1 | AA |
+| Überschrift auf der Tageslicht-Karte | 15,82 : 1 | AA |
+| Fließtext im Hero (über Video) | 8,09 : 1 | AA |
+
+Zwei Befunde stammen erst aus dieser Messung: Das Label der Morgendämmerung kam
+im Verlauf auf 2,9 : 1, die Punkte der Simulator-Galerie waren 34 × 4 px groß.
+Beides ist korrigiert — Text beginnt unterhalb des Verlaufs, und die Punkte
+behalten ihre 4 px Strich in einem 24 px hohen Ziel (`background-clip`).
+
+### `prefers-reduced-motion` offline
+
+| Prüfung | Ergebnis |
+|---|---|
+| Route zeichnet noch | nein — Standbild, zwei Messungen identisch |
+| Videos mit geladener Quelle | **0** (nur Poster, kein Byte Video dekodiert) |
+| Poster vorhanden | 4 / 4 |
+| Führerschein-Finder | 6 Schritte → „Klasse B" |
+
+### Was der Nutzer tatsächlich anfassen kann (offline nachgespielt)
+
+| Interaktion | Ergebnis |
+|---|---|
+| Finder, sechs Fragen | Empfehlung „Klasse B" mit Begründung |
+| Preisrechner, deutsche Eingabe `62,50` | 20 × 62,50 € = 1.250,00 €, Summen 1.600,00 € vs. 1.670,00 € |
+| Klassen-Tabs | Auswahl wechselt, nur ein Panel sichtbar |
+| Cockpit-Scroll | App bewegt sich (−223 px → −595 px) |
+| Mobiles Menü | öffnet, Fokus wandert hinein, `Esc` schließt und gibt Fokus zurück |
+| Video | spielt aus der Datei heraus (VP9/WebM als `data:`-URI) |

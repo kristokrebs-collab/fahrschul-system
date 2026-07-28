@@ -230,6 +230,38 @@
   display: none;
 }
 
+/* …which leaves the daylight half without moving image — unless the footage
+   was shot in daylight. The closing chapter runs one such clip full-bleed and
+   welds it into the page colour at both edges. The card in front holds 90%
+   opacity: measured against the darkest frame the clip could ever show, the
+   lead copy still clears 5.7:1. */
+.arrival-film {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.arrival-film::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--color-ink-950) 0,
+    color-mix(in srgb, var(--color-ink-950) 20%, transparent) 20%,
+    color-mix(in srgb, var(--color-ink-950) 20%, transparent) 78%,
+    var(--color-ink-950) 100%
+  );
+}
+
+.arrival-card {
+  background: color-mix(in srgb, var(--color-ink-950) 90%, transparent);
+  backdrop-filter: blur(18px) saturate(1.08);
+  border: 1px solid color-mix(in srgb, var(--color-chalk) 10%, transparent);
+  box-shadow: 0 34px 80px -46px color-mix(in srgb, var(--color-chalk) 55%, transparent);
+}
+
 /* The odometer rail is fixed outside the flow, so it cannot inherit a
    chapter's tokens — it reads the daylight value directly instead and stays
    legible on both grounds. */
