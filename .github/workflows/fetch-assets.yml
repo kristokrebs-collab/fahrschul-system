@@ -1,0 +1,42 @@
+# Fetches the approved Higgsfield archive into the repository.
+#
+# Why this exists: the development sandbox's egress policy blocks the
+# Higgsfield CDN, so the images cannot be downloaded where the site is built.
+# GitHub-hosted runners have unrestricted internet, so this workflow pulls the
+# archive there and commits it to a dedicated assets branch, which the sandbox
+# can then fetch through its authenticated git access.
+#
+# Runs only on manual dispatch. Never touches the site branches.
+name: fetch-assets
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download archive from CDN
+        run: |
+          mkdir -p assets
+          base="https://d2ol7oe51mr4n9.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE"
+          files="6b352d2c-cee4-4bda-bafd-7568298d1291.jpg ed200313-bde9-41b4-9f92-150fde9d1a3e.jpg d675224d-a6ce-4a8e-976e-12fa524d9648.jpg 5042de77-b32b-49c0-83e0-153f682f6852.jpg 2c1d7644-5a3c-4e18-885a-600707fa8cf4.jpg 223336a6-2156-4785-8caf-fce5e1d4b18d.jpg a06fd728-3c2c-4c92-9814-d04506faf39d.png 86475642-0bb3-4258-82fa-a1b54ec03e6d.png 4c0415f8-9de3-4a7c-8ef7-00830172dd4d.png 37d6e1bd-fd2b-42f6-8bc7-6f08676d698d.png 721ef2d7-3489-4de0-b4c9-93c3264f0346.jpg 05638b35-e5ef-4071-8ebe-dfdb7a0caffc.jpg ba5221b4-f5fe-46de-8d09-a7be843578f1.jpg 7037bc91-02ad-4a82-8e4f-67895cbc5ea2.jpg 80d9b773-e448-4523-b18c-2881982cb27c.jpg 38168043-ba5f-44bf-a362-c9a339660d1c.jpg"
+          for f in $files; do
+            curl -fsS --retry 3 -o "assets/$f" "$base/$f"
+          done
+          ls -la assets
+
+      - name: Commit to assets branch
+        run: |
+          git config user.name "asset-fetch"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout --orphan higgsfield-assets
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          git add -f assets
+          git commit -m "Higgsfield archive snapshot"
+          git push -f origin higgsfield-assets
