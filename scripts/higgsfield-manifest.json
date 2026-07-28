@@ -415,5 +415,29 @@
     "name": "still-suv-concept",
     "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260715_222148_4dc6dadb-2aad-4568-89ad-1ab64d05874b.png",
     "ar": "16:9"
+  },
+  {
+    "kind": "video",
+    "name": "day-road",
+    "hd": true,
+    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260728_225741_aa0e4279-13ca-46bb-bf79-040e68c27567.mp4",
+    "ar": "16:9",
+    "dur": 8
+  },
+  {
+    "kind": "video",
+    "name": "day-training-area",
+    "hd": true,
+    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260728_225755_5002b6b3-24e3-48fe-b626-6963c670e4df.mp4",
+    "ar": "16:9",
+    "dur": 8
+  },
+  {
+    "kind": "video",
+    "name": "roller-turntable",
+    "hd": false,
+    "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260728_225810_d03c5085-14a1-4244-80e0-b35a9dd9446c.mp4",
+    "ar": "16:9",
+    "dur": 8
   }
 ]
