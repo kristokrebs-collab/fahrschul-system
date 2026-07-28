@@ -1,0 +1,345 @@
+@import 'tailwindcss';
+
+/* ============================================================================
+   FAHRSCHULE KREBS — DESIGN SYSTEM  "Die Krebs-Route"
+   ---------------------------------------------------------------------------
+   The interface speaks the language of road infrastructure: lane geometry,
+   marking paint, signal red, night asphalt. Colour is used for meaning
+   (route, state, priority) — never for decoration.
+   ========================================================================== */
+
+@theme {
+  /* --- Ink: warm near-black asphalt scale ------------------------------- */
+  --color-ink-950: #060708;
+  --color-ink-900: #0a0c0e;
+  --color-ink-850: #101316;
+  --color-ink-800: #16191d;
+  --color-ink-750: #1c2026;
+  --color-ink-700: #242930;
+  --color-ink-600: #333a43;
+  --color-ink-500: #4a525d;
+  --color-ink-400: #6b7480;
+
+  /* --- Chalk: road-marking paint, warm off-white ------------------------ */
+  --color-chalk: #f3f1ec;
+  --color-chalk-soft: #d8d5cd;
+  --color-chalk-dim: #9d9a92;
+  --color-chalk-faint: #6e6c66;
+
+  /* --- Signal: derived from Verkehrsrot / brake light ------------------- */
+  --color-signal-400: #ff3b45;
+  --color-signal-500: #e10a17;
+  --color-signal-600: #c00711;
+  --color-signal-700: #8f050c;
+
+  /* --- Amber: retained from the Krebs brand mark, used only for
+         warning/in-progress states — never as a second interface accent -- */
+  --color-amber-400: #f5c451;
+  --color-amber-500: #e0a11a;
+
+  /* --- Semantic status (training progress) ------------------------------ */
+  --color-state-done: #4ba97a;
+  --color-state-active: #e10a17;
+  --color-state-wait: #e0a11a;
+  --color-state-open: #4a525d;
+
+  /* --- Typography ------------------------------------------------------- */
+  --font-display: var(--font-archivo), 'Archivo', system-ui, sans-serif;
+  --font-sans: var(--font-instrument), 'Instrument Sans', system-ui, sans-serif;
+
+  /* --- Motion ----------------------------------------------------------- */
+  --ease-route: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-signal: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* --- Layout ----------------------------------------------------------- */
+  --spacing-gutter: 1.5rem;
+  --breakpoint-xs: 26.875rem;
+}
+
+/* ============================================================================
+   BASE
+   ========================================================================== */
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --header-h: 4.5rem;
+    /* Lane rhythm: the repeating unit of the whole layout grid */
+    --lane: 5.5rem;
+  }
+
+  * {
+    border-color: color-mix(in oklab, var(--color-chalk) 8%, transparent);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: calc(var(--header-h) + 1rem);
+  }
+
+  /* Smooth scrolling only where the user has not asked for less motion,
+     and never forced on users who navigate by keyboard jump links. */
+  @media (prefers-reduced-motion: no-preference) {
+    html:not([data-reduced]) {
+      scroll-behavior: smooth;
+    }
+  }
+
+  body {
+    background-color: var(--color-ink-950);
+    color: var(--color-chalk);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* German copy contains long compounds — allow them to break rather than
+     overflow on narrow viewports. */
+  h1, h2, h3, h4, p, li {
+    hyphens: auto;
+    overflow-wrap: break-word;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-signal-400);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--color-signal-500);
+    color: var(--color-chalk);
+  }
+
+  /* Numeric material: prices, progress, counts */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum' 1;
+  }
+}
+
+/* ============================================================================
+   ATMOSPHERE — code-native materials, no external assets
+   ========================================================================== */
+
+@layer components {
+  /* --- Asphalt grain. One fixed layer for the whole document, so it costs
+         a single composited element rather than one per section. --------- */
+  /* Exactly the viewport, never larger: a position:fixed element is not
+     clipped by an ancestor's overflow, so any bleed here becomes real
+     horizontal page overflow on narrow screens. */
+  .atmos-grain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.5;
+    mix-blend-mode: overlay;
+    background-image: var(--grain-url);
+    background-size: 180px 180px;
+  }
+
+  /* --- Light falloff from a single overhead source (street lamp logic) --- */
+  .atmos-falloff {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgb(255 255 255 / 0.07), transparent 60%),
+      radial-gradient(90% 60% at 50% 120%, rgb(6 7 8 / 0.9), transparent 70%);
+  }
+
+  /* --- Lane surface: the faint longitudinal geometry of a carriageway ---- */
+  .atmos-lanes {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent calc(var(--lane) - 1px),
+      color-mix(in oklab, var(--color-chalk) 4%, transparent) calc(var(--lane) - 1px),
+      color-mix(in oklab, var(--color-chalk) 4%, transparent) var(--lane)
+    );
+    mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+  }
+
+  /* --- Dark automotive glass. backdrop-filter is expensive on mobile, so
+         it is opt-in per surface and disabled on coarse pointers. -------- */
+  .surface {
+    background: color-mix(in oklab, var(--color-ink-850) 88%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-chalk) 7%, transparent);
+    border-radius: 0.875rem;
+  }
+
+  .surface-glass {
+    background: color-mix(in oklab, var(--color-ink-850) 72%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-chalk) 8%, transparent);
+    border-radius: 0.875rem;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .surface-glass {
+      backdrop-filter: blur(14px) saturate(1.2);
+      -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    }
+  }
+
+  /* --- Signal edge: the brand red reading as a reflected light source ---- */
+  .edge-signal {
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--color-chalk) 10%, transparent),
+      0 0 0 1px color-mix(in oklab, var(--color-signal-500) 32%, transparent),
+      0 12px 40px -12px color-mix(in oklab, var(--color-signal-500) 45%, transparent);
+  }
+
+  /* --- Section rhythm --------------------------------------------------- */
+  .chapter {
+    position: relative;
+    padding-block: clamp(4.5rem, 10vw, 9rem);
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 84rem;
+    margin-inline: auto;
+    padding-inline: clamp(1.25rem, 4vw, 3rem);
+  }
+
+  .shell-narrow {
+    width: 100%;
+    max-width: 62rem;
+    margin-inline: auto;
+    padding-inline: clamp(1.25rem, 4vw, 3rem);
+  }
+
+  /* --- Chapter marker: the route's kilometre stone ---------------------- */
+  .kapitel-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-family: var(--font-display);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-chalk-dim);
+  }
+
+  .kapitel-label::before {
+    content: '';
+    width: 1.75rem;
+    height: 2px;
+    background: var(--color-signal-500);
+    box-shadow: 0 0 12px color-mix(in oklab, var(--color-signal-500) 70%, transparent);
+  }
+}
+
+/* ============================================================================
+   UTILITIES
+   ========================================================================== */
+
+@layer utilities {
+  /* Engineered display type: Archivo's width axis is the lever, not tracking */
+  .type-hero {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-stretch: 92%;
+    font-size: clamp(2.5rem, 9vw, 6.5rem);
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+  }
+
+  .type-chapter {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-stretch: 95%;
+    font-size: clamp(1.875rem, 5vw, 3.5rem);
+    line-height: 1.02;
+    letter-spacing: -0.028em;
+  }
+
+  .type-lead {
+    font-size: clamp(1.0625rem, 1.6vw, 1.3125rem);
+    line-height: 1.55;
+    color: var(--color-chalk-soft);
+  }
+
+  .type-eyebrow {
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .text-gradient-chalk {
+    background: linear-gradient(180deg, var(--color-chalk) 30%, color-mix(in oklab, var(--color-chalk) 55%, var(--color-ink-700)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ============================================================================
+   REDUCED MOTION — content must remain complete and ordered
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .atmos-grain {
+    display: none;
+  }
+}
+
+/* Forced-colors / high contrast: keep structure legible */
+@media (forced-colors: active) {
+  .surface,
+  .surface-glass {
+    border: 1px solid CanvasText;
+  }
+}
