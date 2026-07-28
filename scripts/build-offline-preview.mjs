@@ -88,7 +88,7 @@ async function inlineImage(encodedSource) {
 
 const NOTE = `<div id="vorschau-hinweis" style="position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:200;max-width:min(40rem,94vw);display:flex;gap:.7rem;align-items:flex-start;padding:.7rem .9rem;border-radius:.7rem;border:1px solid rgba(243,241,236,.14);background:rgba(10,12,14,.95);color:#9d9a92;font:400 11.5px/1.5 system-ui,sans-serif">
 <span style="color:#e10a17;font-weight:700;white-space:nowrap">Offline-Vorschau</span>
-<span style="flex:1">${STANDALONE ? 'Einzeldatei der Startseite — Links auf Unterseiten sind hier inaktiv, die vollständige Fassung liegt im ZIP.' : 'Alle 40 Seiten sind vollständig und untereinander verlinkt.'} Führerschein-Finder, Kostenrechner und die Cockpit-Animation brauchen den laufenden Server (<code style="color:#d8d5cd">npm run dev</code>).</span>
+<span style="flex:1">${STANDALONE ? 'Einzeldatei der Startseite — Links auf Unterseiten sind hier inaktiv, die vollständige Fassung liegt im ZIP.' : 'Alle 40 Seiten sind vollständig und untereinander verlinkt.'} Videos erscheinen hier als Standbilder; Finder, Rechner, 3D-Route und Cockpit-Animation brauchen den laufenden Server (<code style="color:#d8d5cd">npm run dev</code>).</span>
 <button onclick="this.parentNode.remove()" style="background:none;border:0;color:#6e6c66;cursor:pointer;font:400 15px/1 system-ui;padding:0 2px" aria-label="Hinweis schließen">&times;</button>
 </div>`
 
@@ -107,11 +107,17 @@ for (const route of (STANDALONE ? ['/'] : ROUTES)) {
     .replace(/<script[^>]*id="__NEXT_DATA__"[\s\S]*?<\/script>/g, '')
 
   for (const tag of new Set([...html.matchAll(/<img\b[^>]*>/g)].map((m) => m[0]))) {
-    const source = tag.match(/\ssrc="\/_next\/image\?url=([^"&]+)(?:&amp;|&)[^"]*"/)
-    if (!source) continue
+    // next/image sources go through the optimizer route…
+    const optimized = tag.match(/\ssrc="\/_next\/image\?url=([^"&]+)(?:&amp;|&)[^"]*"/)
+    // …while video posters and other direct assets reference /public paths.
+    const direct = tag.match(/\ssrc="(\/(?:media|stills|team|vehicles|brand)\/[^"]+)"/)
+    if (!optimized && !direct) continue
+    const uri = optimized
+      ? await inlineImage(optimized[1])
+      : await inlineImage(encodeURIComponent(direct[1]))
     const rebuilt = tag
       .replace(/\s(?:srcSet|sizes)="[^"]*"/gi, '')
-      .replace(/\ssrc="[^"]*"/, ` src="${await inlineImage(source[1])}"`)
+      .replace(/\ssrc="[^"]*"/, ` src="${uri}"`)
     html = html.replaceAll(tag, () => rebuilt)
   }
 
