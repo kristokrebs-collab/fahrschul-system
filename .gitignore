@@ -15,3 +15,6 @@ blob-report/
 
 .DS_Store
 *.log
+
+offline-preview/
+*.zip
