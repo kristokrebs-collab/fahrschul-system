@@ -14,7 +14,7 @@ import { Magnetic } from '@/components/brand/magnetic'
 export function FinalCta() {
   return (
     <section
-      className="chapter-day relative isolate overflow-hidden border-t border-chalk/8 py-28 md:py-36"
+      className="chapter-day relative isolate overflow-hidden py-28 md:py-36"
       data-atmo="80/75"
     >
       {/* The crab from the real logo, printed into the daylight like a

@@ -20,7 +20,9 @@ Führerschein-Finders, Mobile-Menü, und das Cockpit in der gestapelten Variante
 
 ## Kontrast in den Tageslicht-Kapiteln
 
-Die beiden hellen Kapitel kehren die komplette Farbskala um. Gemessen wurde die
+Die **fünf** hellen Kapitel (Kosten, Weg, Beruf, Orte, Ankommen) kehren die
+komplette Farbskala um. Gemessen in jedem einzelnen: Überschriften durchgehend
+**16,1 : 1**, Fließtext durchgehend **6,92 : 1**. Gemessen wurde die
 tatsächlich berechnete Textfarbe gegen den hellen Grund `#f6f3ec`:
 
 | Element | Farbe | Verhältnis | WCAG |
@@ -36,8 +38,8 @@ für Fließtext) auf 5,78 : 1.
 
 ## Tastatur und Fokus
 
-Vierzig Tab-Schritte ab Seitenanfang durchlaufen; **jedes** fokussierbare
-Element trägt einen sichtbaren Ring.
+45 Tab-Schritte ab Seitenanfang durchlaufen; **null** Elemente ohne sichtbaren
+Fokusring.
 
 Dabei zwei echte Fehler gefunden und behoben:
 

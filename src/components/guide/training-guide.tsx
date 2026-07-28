@@ -17,7 +17,7 @@ export function TrainingGuide() {
   const sources = publicValue(guideSources)
 
   return (
-    <section className="chapter relative overflow-hidden" aria-labelledby="ausbildungsweg" data-atmo="34/50">
+    <section className="chapter chapter-day relative overflow-hidden" aria-labelledby="ausbildungsweg" data-atmo="34/50">
       {/* Paperwork aligning into a road — exactly what this chapter explains */}
       <SceneVideo
         name={sceneClips.documentsRoad.name}

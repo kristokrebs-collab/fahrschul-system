@@ -377,8 +377,12 @@ function Scene({ driver, fractions }: { driver: RefObject<RouteDriver>; fraction
     filament.uniforms.uTime!.value = state.clock.elapsedTime
     filament.uniforms.uCam!.value = t
 
-    // Dawn breaks over the route in step with the CSS sky behind it.
-    const day = daylightAt(d.p)
+    // Dawn breaks over the route in step with the CSS sky behind it — and to
+    // the same capped extent. The route is only ever visible during the dark
+    // half of the page (the daylight chapters are opaque and cover it), so a
+    // full lerp to dawn would only turn the asphalt grey while it is still
+    // night. It warms; it does not become day.
+    const day = daylightAt(d.p) * 0.4
     if (fogRef.current) {
       fogRef.current.color.copy(palette.ink).lerp(palette.dawn, day)
       // Daylight also clears the air: you can see further down the road.

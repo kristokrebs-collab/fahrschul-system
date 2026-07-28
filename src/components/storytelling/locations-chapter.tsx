@@ -28,7 +28,7 @@ export function LocationsChapter() {
   const groundAddress = publicValue(practiceGround.address)
 
   return (
-    <section className="chapter relative overflow-hidden" aria-labelledby="standorte" data-atmo="46/35">
+    <section className="chapter chapter-day relative overflow-hidden" aria-labelledby="standorte" data-atmo="46/35">
       <div className="atmos-lanes" />
       {/* Blue hour over Osthessen: one glowing route between two towns */}
       <SceneVideo
@@ -130,7 +130,7 @@ export function LocationsChapter() {
               sizes="(min-width: 1280px) 1152px, 100vw"
               className="w-full object-cover"
             />
-            <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink-950/70 via-transparent to-transparent" />
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink-950/85 via-ink-950/10 to-transparent" />
             <figcaption className="absolute bottom-3 left-4 right-4 flex flex-wrap items-baseline justify-between gap-2">
               <span className="font-display text-lg font-extrabold text-chalk drop-shadow">Das K-Team</span>
               <Link href="/team" className="text-sm font-semibold text-signal-400 hover:text-signal-500">

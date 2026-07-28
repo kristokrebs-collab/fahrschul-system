@@ -28,7 +28,7 @@ export function ServicesChapter() {
   const rest = services.filter((s) => !featuredSlugs.has(s.slug as (typeof FEATURED)[number]['slug']))
 
   return (
-    <section className="chapter relative" aria-labelledby="leistungen" data-atmo="42/40">
+    <section className="chapter chapter-day relative" aria-labelledby="leistungen" data-atmo="42/40">
       <div className="shell relative">
         <ChapterHeading
           marker="Kapitel 09 — Beruf & Spezial"

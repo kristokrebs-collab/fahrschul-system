@@ -78,10 +78,18 @@ Overlay. Gemessen als Helligkeit der Kapitelfläche:
 | 10 Orte | Nachmittag | `dawn-750` | warmes Streiflicht |
 | 11 Ankommen | **volles Licht** | `dawn-100` | Ziel erreicht, hell |
 
-Zwei Kapitel (Kosten, Ankommen) kippen bewusst ganz ins Helle mit **dunkler
-Schrift auf hellem Grund** — das ist der Bruch, der beweist, dass die Seite
-Helligkeit kann und nicht aus Bequemlichkeit dunkel ist. Rot bleibt in beiden
-Modi der einzige Akzent.
+**Korrektur nach der ersten Umsetzung.** Ein durchlaufender Verlauf über alle
+elf Kapitel wurde gebaut, gemessen und wieder verworfen: In der Seitenmitte
+saßen die dunklen Kapitel dann auf einem grauen Himmel, die Überschriften
+verloren ihren Grund und der Kontrast fiel sichtbar ab — grauer Matsch ist
+schlimmer als jedes der beiden Extreme.
+
+Die Seite ist deshalb **ein Sonnenaufgang, kein Verlauf**: Kapitel 01–06 sind
+Nacht (dort ist die Route sichtbar und trägt), Kapitel 07 ist der Horizont, an
+dem die Straße ins Licht fährt, und Kapitel 07–11 sind Tag — deckend hell, mit
+dunkler Schrift. Der Himmel hinter allem wärmt nur gedeckelt mit (34 %), damit
+er die dunkle Hälfte nie aufweicht. Rot bleibt in beiden Hälften der einzige
+Akzent, auf hellem Grund von `#e10a17` auf `#c00711` vertieft.
 
 Neue Token: eine `dawn`-Skala (warmes Papierweiß bis Nebelgrau), damit helle
 Flächen nicht als kaltes Weiß, sondern als Tageslicht lesen.

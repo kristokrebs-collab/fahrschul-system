@@ -101,7 +101,7 @@ export default function HomePage() {
       {/* Chapter 7 — costs. The page steps into daylight here: a price
           comparison is a document, and documents belong on paper. */}
       <section
-        className="chapter chapter-day relative overflow-hidden"
+        className="chapter chapter-day chapter-dawn relative overflow-hidden"
         aria-labelledby="preise-heading"
         data-atmo="28/30"
       >

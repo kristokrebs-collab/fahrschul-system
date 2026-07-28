@@ -169,7 +169,10 @@
   inset: 0;
   z-index: -30;
   pointer-events: none;
-  background-color: color-mix(in oklab, var(--color-ink-950), var(--color-dawn-400) calc(var(--daylight) * 100%));
+  /* Capped deliberately. The real brightness of the page comes from the
+     daylight chapters below, which are opaque; if the sky went the whole way
+     it would only turn the dark chapters grey and cost their contrast. */
+  background-color: color-mix(in oklab, var(--color-ink-950), var(--color-dawn-400) calc(var(--daylight) * 34%));
 }
 
 /* A low sun that rises with the scroll — the light has a direction. */
@@ -216,16 +219,15 @@
   --color-signal-600: #8f050c;
 
   color: var(--color-chalk);
-  /* Welded edges, not a colour switch: the daylight rises out of the dark
-     over a band and falls back the same way, so the chapter reads as coming
-     out of a tunnel rather than as a different page. */
-  background-image: linear-gradient(
-    to bottom,
-    transparent 0,
-    var(--color-ink-950) 9rem,
-    var(--color-ink-950) calc(100% - 7rem),
-    transparent 100%
-  );
+  background-color: var(--color-ink-950);
+}
+
+/* Dark ambient footage has no business behind a daylight chapter: on a light
+   ground it reads as a smudge, which is precisely the anti-pattern this
+   rebuild set out to remove. */
+.chapter-day > .media-weld-y,
+.chapter-day > .media-weld {
+  display: none;
 }
 
 /* The odometer rail is fixed outside the flow, so it cannot inherit a
@@ -240,14 +242,22 @@
   background-color: color-mix(in oklab, var(--color-ink-900), var(--color-chalk) calc(var(--daylight) * 88%));
 }
 
-/* A thin warm horizon exactly where the light breaks. */
-.chapter-day::before {
+/* The sunrise. Exactly one chapter crosses from night into day, and it does it
+   as a horizon: the road drives up out of the dark and the light takes over.
+   Every chapter after it is simply already in daylight, so only this one gets
+   the weld — repeating it would turn a moment into a pattern. */
+.chapter-dawn {
+  background-color: transparent;
+  background-image: linear-gradient(to bottom, transparent 0, var(--color-ink-950) 11rem);
+}
+
+.chapter-dawn::before {
   content: '';
   position: absolute;
   inset: 0 0 auto 0;
-  height: 9rem;
+  height: 11rem;
   pointer-events: none;
-  background: radial-gradient(80% 100% at 50% 100%, color-mix(in oklab, #ffd9ac 42%, transparent), transparent 72%);
+  background: radial-gradient(85% 100% at 50% 100%, color-mix(in oklab, #ffd2a0 52%, transparent), transparent 74%);
 }
 
 /* Gradient display type would be near-invisible against a light ground. */
