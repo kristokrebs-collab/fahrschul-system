@@ -4,6 +4,9 @@ import { licenceClasses } from '@/content/classes'
 import { publicValue } from '@/content/truth'
 import { Roadway } from '@/components/brand/roadway'
 import { HeroParallax } from './hero-parallax'
+import { SceneVideo } from '@/components/media/scene-video'
+import { sceneClips } from '@/content/media'
+import { RevealWords } from '@/components/brand/reveal'
 
 /**
  * Chapter 1 — Dein Weg beginnt hier.
@@ -21,8 +24,19 @@ export function Hero() {
   return (
     <section className="relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden pt-[var(--header-h)]" data-atmo="72/22">
       <HeroParallax>
-        {/* The 2D roadway retires when the WebGL route takes over behind it */}
-        <Roadway className="route3d-retire absolute inset-x-0 bottom-0 h-[78%] w-full" />
+        {/* Cinematic layer, in order of capability: devices without the WebGL
+            route get the filament footage; reduced motion gets its poster;
+            the SVG roadway underlies both. Everything retires the moment the
+            3D scene takes the stage. */}
+        <div className="route3d-retire absolute inset-0">
+          <Roadway className="absolute inset-x-0 bottom-0 h-[78%] w-full" />
+          <SceneVideo
+            name={sceneClips.heroFilament.name}
+            hd={sceneClips.heroFilament.hd}
+            className="media-weld-y opacity-55"
+            videoClassName="object-bottom"
+          />
+        </div>
       </HeroParallax>
 
       <div className="atmos-falloff" />
@@ -34,11 +48,13 @@ export function Hero() {
         </p>
 
         <h1 className="type-hero mt-6 max-w-[16ch] text-gradient-chalk">
-          Alle Klassen.
-          <br />
-          Zwei Standorte.
-          <br />
-          <span className="text-signal-500">Ein Weg.</span>
+          <RevealWords>
+            Alle Klassen.
+            <br />
+            Zwei Standorte.
+            <br />
+            <span className="text-signal-500 shine-sweep">Ein Weg.</span>
+          </RevealWords>
         </h1>
 
         <p className="type-lead mt-7 max-w-[52ch]">

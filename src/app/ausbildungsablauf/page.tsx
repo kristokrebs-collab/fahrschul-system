@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/brand/page-header'
 import { ActionLink } from '@/components/brand/section'
 import { TrainingGuide } from '@/components/guide/training-guide'
+import { ScenePanel } from '@/components/media/page-media'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
 
 export const metadata: Metadata = {
@@ -27,6 +28,13 @@ export default function GuidePage() {
         trail={trail}
         actions={<ActionLink href="/kontakt">Beratung starten</ActionLink>}
       />
+      <section className="shell pb-4">
+        <ScenePanel
+          clip="documentsRoad"
+          caption="Studio-Inszenierung — aus Unterlagen wird eine Straße"
+        />
+      </section>
+
       <TrainingGuide />
     </>
   )

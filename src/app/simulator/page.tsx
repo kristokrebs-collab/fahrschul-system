@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/brand/page-header'
 import { ActionLink } from '@/components/brand/section'
 import { SimulatorChapter } from '@/components/simulator/simulator-chapter'
+import { SceneVideo } from '@/components/media/scene-video'
+import { sceneClips } from '@/content/media'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
 
 export const metadata: Metadata = {
@@ -27,6 +29,23 @@ export default function SimulatorPage() {
         trail={trail}
         actions={<ActionLink href="/kontakt">Nach Simulatorterminen fragen</ActionLink>}
       />
+
+      {/* The whole idea of simulator training in one shot: the rendered road
+          becomes the real one, without a cut. */}
+      <section className="shell pb-4">
+        <figure className="relative overflow-hidden rounded-2xl border border-chalk/10">
+          <SceneVideo
+            name={sceneClips.simToReal.name}
+            hd={sceneClips.simToReal.hd}
+            variant="panel"
+            className="aspect-video w-full"
+          />
+          <figcaption className="pointer-events-none absolute bottom-3 right-4 text-xs text-chalk-faint drop-shadow">
+            Studio-Inszenierung — aus dem Simulator auf die echte Straße
+          </figcaption>
+        </figure>
+      </section>
+
       <SimulatorChapter />
     </>
   )

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import { PageHeader } from '@/components/brand/page-header'
 import { ContactForm } from '@/components/contact/contact-form'
 import { locations } from '@/content/business'
@@ -32,6 +33,19 @@ export default function ContactPage() {
         <ContactForm />
 
         <aside className="space-y-6">
+          <figure className="relative overflow-hidden rounded-2xl border border-chalk/10">
+            <Image
+              src="/stills/anmeldung-buero-1600.avif"
+              alt="Dunkler, ruhiger Empfangstresen mit einer Leuchte — Symbolbild für die Anmeldung"
+              width={1600}
+              height={2133}
+              sizes="(min-width: 1024px) 20rem, 100vw"
+              className="aspect-[3/4] w-full object-cover"
+            />
+            <figcaption className="pointer-events-none absolute bottom-2.5 right-3.5 text-[0.6875rem] text-chalk-faint drop-shadow">
+              Studio-Inszenierung
+            </figcaption>
+          </figure>
           {locations.map((location) => {
             const street = publicValue(location.street)
             const postal = publicValue(location.postalCode)

@@ -137,7 +137,7 @@ export function LicenceRoute() {
               <li key={licenceClass.slug}>
                 <Link
                   href={`/fuehrerschein/${licenceClass.slug}`}
-                  className="group relative flex h-full flex-col rounded-2xl border border-chalk/10 bg-ink-850/60 p-6 transition-all duration-300 hover:border-signal-500/45 hover:bg-ink-800/70"
+                  className="orbit-card group relative flex h-full flex-col rounded-2xl border border-chalk/10 bg-ink-850/60 p-6 transition-all duration-300 hover:border-signal-500/45 hover:bg-ink-800/70"
                 >
                   <span
                     aria-hidden

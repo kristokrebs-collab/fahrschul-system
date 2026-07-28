@@ -1,6 +1,12 @@
 'use client'
 
-import { useMemo, useRef } from 'react'
+/* eslint-disable react-hooks/purity, react-hooks/immutability --
+   Imperative three.js scene construction: geometries, canvas textures and
+   materials are heap resources built once per stable dependency set inside
+   useMemo — the established R3F idiom. The React-Compiler rules cannot see
+   that these objects never flow back into React state. */
+
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
@@ -217,7 +223,7 @@ function Waypoints({ curve, fractions }: { curve: THREE.CatmullRomCurve3; fracti
   const labelMats = useRef<(THREE.SpriteMaterial | null)[]>([])
 
   useFrame((state) => {
-    const p = (state.scene.userData.driver as RouteDriver | undefined)?.p ?? 0
+    const p = (state.scene.userData.driver as RefObject<RouteDriver> | undefined)?.current?.p ?? 0
     const camT = p * TRAVEL
     materials.forEach((m, i) => {
       const t = group[i]!.t
@@ -273,7 +279,7 @@ function DestinationGlow({ curve, tex }: { curve: THREE.CatmullRomCurve3; tex: T
   const mat = useRef<THREE.SpriteMaterial>(null)
   const end = useMemo(() => curve.getPointAt(0.999), [curve])
   useFrame((state) => {
-    const p = (state.scene.userData.driver as RouteDriver | undefined)?.p ?? 0
+    const p = (state.scene.userData.driver as RefObject<RouteDriver> | undefined)?.current?.p ?? 0
     if (mat.current) mat.current.opacity = 0.35 + Math.pow(p, 2.5) * 0.55
   })
   return (
@@ -310,25 +316,28 @@ function Dust() {
   )
 }
 
-function Scene({ driver, fractions }: { driver: RouteDriver; fractions: number[] }) {
-  const curve = useMemo(buildCurve, [])
+function Scene({ driver, fractions }: { driver: RefObject<RouteDriver>; fractions: number[] }) {
+  const curve = useMemo(() => buildCurve(), [])
   const roadGeo = useMemo(() => ribbonGeometry(curve, 5.4), [curve])
   const filamentGeo = useMemo(() => ribbonGeometry(curve, 0.32), [curve])
   const edgeLeftGeo = useMemo(() => ribbonGeometry(curve, 0.07, -5.1), [curve])
   const edgeRightGeo = useMemo(() => ribbonGeometry(curve, 0.07, 5.1), [curve])
-  const filament = useMemo(filamentMaterial, [])
+  const filament = useMemo(() => filamentMaterial(), [])
   const townTex = useMemo(() => glowTexture('rgba(255,214,170,0.85)', 128), [])
   const scene = useThree((s) => s.scene)
-  scene.userData.driver = driver
+  useEffect(() => {
+    scene.userData.driver = driver
+  }, [scene, driver])
 
   const smooth = useRef({ t: 0, mx: 0, my: 0 })
 
   useFrame((state, dt) => {
     const k = 1 - Math.exp(-dt * 3.2)
     const s = smooth.current
-    s.t += (driver.p * TRAVEL - s.t) * k
-    s.mx += (driver.mx - s.mx) * (1 - Math.exp(-dt * 2.2))
-    s.my += (driver.my - s.my) * (1 - Math.exp(-dt * 2.2))
+    const d = driver.current
+    s.t += (d.p * TRAVEL - s.t) * k
+    s.mx += (d.mx - s.mx) * (1 - Math.exp(-dt * 2.2))
+    s.my += (d.my - s.my) * (1 - Math.exp(-dt * 2.2))
 
     const t = THREE.MathUtils.clamp(s.t, 0, 0.995)
     const pos = curve.getPointAt(t)
@@ -371,7 +380,7 @@ function Scene({ driver, fractions }: { driver: RouteDriver; fractions: number[]
   )
 }
 
-export default function RouteCanvas({ driver, fractions }: { driver: RouteDriver; fractions: number[] }) {
+export default function RouteCanvas({ driver, fractions }: { driver: RefObject<RouteDriver>; fractions: number[] }) {
   return (
     <Canvas
       dpr={[1, 1.75]}

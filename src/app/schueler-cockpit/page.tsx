@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/brand/page-header'
 import { ActionLink } from '@/components/brand/section'
 import { CockpitShowcase } from '@/components/cockpit/cockpit-showcase'
+import { ScenePanel } from '@/components/media/page-media'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
 
 export const metadata: Metadata = {
@@ -27,6 +28,13 @@ export default function CockpitPage() {
         trail={trail}
         actions={<ActionLink href="/kontakt" variant="secondary">Sag uns, was dir fehlen würde</ActionLink>}
       />
+      <section className="shell pb-10">
+        <ScenePanel
+          clip="phoneScroll"
+          caption="Studio-Inszenierung — so bewegt sich das Cockpit"
+        />
+      </section>
+
       <section className="chapter pt-0">
         <div className="shell">
           <CockpitShowcase />

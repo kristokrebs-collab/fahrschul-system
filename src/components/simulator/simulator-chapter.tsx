@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { ChapterHeading, Disclosure } from '@/components/brand/section'
+import { SceneVideo } from '@/components/media/scene-video'
+import { sceneClips } from '@/content/media'
 
 /**
  * Chapter 6 — the simulator.
@@ -92,77 +94,23 @@ export function SimulatorChapter() {
 }
 
 /**
- * The simulator station: a triple-screen training rig with seat and console,
- * drawn as geometry rather than photographed. The road scene on the centre
- * screen is the same carriageway language used everywhere on the site; the
- * side screens continue it at an angle, which is what visually separates a
- * professional training rig from a gaming setup.
+ * The simulator station, staged like the rest of the fleet: a camera orbit
+ * around a triple-screen training rig on a dark stage. Reduced-motion and
+ * Save-Data visitors get the poster frame — same rig, same light.
  */
 function DriverView() {
   return (
     <div className="relative mx-auto w-full max-w-md">
-      <div className="overflow-hidden rounded-2xl border border-chalk/12 bg-ink-900">
-        <svg viewBox="0 0 440 330" className="block w-full" aria-hidden focusable="false">
-          <defs>
-            <linearGradient id="sim-screen" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-ink-800)" />
-              <stop offset="100%" stopColor="var(--color-ink-950)" />
-            </linearGradient>
-            <radialGradient id="sim-glow2" cx="50%" cy="30%" r="45%">
-              <stop offset="0%" stopColor="var(--color-signal-500)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="var(--color-signal-500)" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-
-          <rect width="440" height="330" fill="var(--color-ink-900)" />
-          <rect width="440" height="330" fill="url(#sim-glow2)" />
-
-          {/* ── Side screens, angled toward the seat ── */}
-          <g>
-            <path d="M28 52 L128 66 L128 176 L28 196 Z" fill="url(#sim-screen)" stroke="var(--color-ink-600)" strokeWidth="2" />
-            <path d="M412 52 L312 66 L312 176 L412 196 Z" fill="url(#sim-screen)" stroke="var(--color-ink-600)" strokeWidth="2" />
-            {/* side-screen road edges continuing the centre scene */}
-            <path d="M52 178 L116 118" stroke="var(--color-chalk)" strokeOpacity="0.18" strokeWidth="3" />
-            <path d="M388 178 L324 118" stroke="var(--color-chalk)" strokeOpacity="0.18" strokeWidth="3" />
-          </g>
-
-          {/* ── Centre screen with the carriageway ── */}
-          <g>
-            <rect x="132" y="58" width="176" height="122" rx="4" fill="url(#sim-screen)" stroke="var(--color-ink-600)" strokeWidth="2.5" />
-            <path d="M164 176 L212 92 L228 92 L276 176 Z" fill="var(--color-ink-750)" opacity="0.7" />
-            <path d="M164 176 L212 92" stroke="var(--color-chalk)" strokeOpacity="0.3" strokeWidth="1.5" />
-            <path d="M276 176 L228 92" stroke="var(--color-chalk)" strokeOpacity="0.3" strokeWidth="1.5" />
-            {[[172, 6], [152, 4.4], [136, 3.2], [124, 2.2], [115, 1.5]].map(([y, w], i) => (
-              <rect key={i} x={220 - (w as number) / 2} y={y} width={w as number} height={(w as number) * 1.4} fill="var(--color-signal-500)" opacity={0.9 - i * 0.16} />
-            ))}
-            <line x1="140" y1="92" x2="300" y2="92" stroke="var(--color-chalk)" strokeOpacity="0.1" />
-          </g>
-
-          {/* ── Instructor side monitor ── */}
-          <rect x="366" y="210" width="52" height="34" rx="3" fill="var(--color-ink-850)" stroke="var(--color-ink-600)" strokeWidth="2" />
-          <line x1="392" y1="244" x2="392" y2="270" stroke="var(--color-ink-600)" strokeWidth="4" />
-
-          {/* ── Console: wheel and dash ── */}
-          <path d="M150 208 H290 L282 232 H158 Z" fill="var(--color-ink-800)" stroke="var(--color-ink-600)" strokeWidth="2" />
-          <circle cx="220" cy="216" r="26" fill="none" stroke="var(--color-ink-500)" strokeWidth="7" />
-          <circle cx="220" cy="216" r="26" fill="none" stroke="var(--color-chalk)" strokeOpacity="0.1" strokeWidth="1.5" />
-
-          {/* ── Seat in profile ── */}
-          <g>
-            <path d="M96 176 q-10 -4 -12 8 l-6 66 q-1 12 10 12 h34 q10 0 12 -10 l4 -22 q2 -10 12 -10 h28 v-14 h-34 q-14 0 -18 12 l-3 10" fill="var(--color-ink-750)" stroke="var(--color-ink-600)" strokeWidth="2" />
-            <rect x="78" y="262" width="180" height="10" rx="4" fill="var(--color-ink-800)" />
-          </g>
-
-          {/* ── Base plate ── */}
-          <rect x="48" y="286" width="344" height="10" rx="5" fill="var(--color-ink-800)" />
-          <rect x="48" y="286" width="344" height="10" rx="5" fill="none" stroke="var(--color-signal-500)" strokeOpacity="0.35" strokeWidth="1" />
-
-          {/* pedal block */}
-          <path d="M126 262 l18 -18 h22 l-14 18 Z" fill="var(--color-ink-700)" />
-        </svg>
-      </div>
+      <figure className="overflow-hidden rounded-2xl border border-chalk/12 bg-ink-900">
+        <SceneVideo
+          name={sceneClips.simOrbit.name}
+          hd={sceneClips.simOrbit.hd}
+          variant="panel"
+          className="aspect-video w-full"
+        />
+      </figure>
       <p className="mt-3 text-center text-xs text-chalk-faint">
-        Schematische Darstellung eines Simulatorplatzes mit drei Bildschirmen
+        Studio-Inszenierung eines Simulatorplatzes mit drei Bildschirmen
       </p>
     </div>
   )

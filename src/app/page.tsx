@@ -13,6 +13,10 @@ import { CockpitShowcase } from '@/components/cockpit/cockpit-showcase'
 import { PriceCalculator } from '@/components/pricing/price-calculator'
 import { ChapterHeading } from '@/components/brand/section'
 import { RouteMount } from '@/components/route3d/route-mount'
+import { RouteRail } from '@/components/route3d/route-rail'
+import { RouteMarquee } from '@/components/storytelling/route-marquee'
+import { SceneVideo } from '@/components/media/scene-video'
+import { sceneClips } from '@/content/media'
 
 export const metadata: Metadata = {
   alternates: { canonical: '/' },
@@ -28,7 +32,9 @@ export default function HomePage() {
     <>
       {/* The Krebs Route in WebGL, fixed behind every chapter (desktop only) */}
       <RouteMount />
+      <RouteRail />
       <Hero />
+      <RouteMarquee />
 
       {/* Chapter 2 — the junction */}
       <section className="chapter relative" aria-labelledby="finder-heading" id="finder" data-atmo="30/18">
@@ -55,7 +61,21 @@ export default function HomePage() {
             title="Vom Roller bis zum Sattelzug"
             lead="Wir bilden in jeder Fahrerlaubnisklasse aus — auf eigenen Fahrzeugen, mit eigenen LKW und einem eigenen Bus. Wähle die Spur, die dich interessiert."
           />
-          <div className="mt-12">
+
+          {/* The whole fleet on one turntable — the chapter's establishing shot */}
+          <figure className="relative mt-12 overflow-hidden rounded-2xl border border-chalk/10">
+            <SceneVideo
+              name={sceneClips.turntableStops.name}
+              hd={sceneClips.turntableStops.hd}
+              variant="panel"
+              className="aspect-video w-full"
+            />
+            <figcaption className="pointer-events-none absolute bottom-3 right-4 text-xs text-chalk-faint drop-shadow">
+              Studio-Inszenierung — Pkw, Motorrad, Sattelzugmaschine, Bus
+            </figcaption>
+          </figure>
+
+          <div className="mt-10">
             <LicenceRoute />
           </div>
         </div>
@@ -81,8 +101,10 @@ export default function HomePage() {
       <SimulatorChapter />
 
       {/* Chapter 7 — costs */}
-      <section className="chapter relative" aria-labelledby="preise-heading" data-atmo="28/30">
-        <div className="shell">
+      <section className="chapter relative overflow-hidden" aria-labelledby="preise-heading" data-atmo="28/30">
+        {/* Asphalt drifting quietly beneath the numbers */}
+        <SceneVideo name={sceneClips.asphaltLoop.name} className="media-weld-y opacity-30" />
+        <div className="shell relative">
           <ChapterHeading
             marker="Kapitel 07 — Kosten"
             id="preise-heading"

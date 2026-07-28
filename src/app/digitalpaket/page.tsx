@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/brand/page-header'
 import { ActionLink } from '@/components/brand/section'
 import { DigitalSystem } from '@/components/storytelling/digital-system'
+import { ScenePanel } from '@/components/media/page-media'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
 
 export const metadata: Metadata = {
@@ -27,6 +28,13 @@ export default function DigitalPage() {
         trail={trail}
         actions={<ActionLink href="/kontakt">Beratung starten</ActionLink>}
       />
+      <section className="shell pb-4">
+        <ScenePanel
+          clip="phoneScroll"
+          caption="Studio-Inszenierung — das Cockpit-Interface in Bewegung"
+        />
+      </section>
+
       <DigitalSystem />
     </>
   )

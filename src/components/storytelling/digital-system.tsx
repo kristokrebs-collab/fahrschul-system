@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { publishableElements } from '@/content/digital-package'
 import { ChapterHeading } from '@/components/brand/section'
 import { MarkDigital, MarkRoute, MarkSimulator } from '@/components/brand/marks'
+import { SceneVideo } from '@/components/media/scene-video'
+import { sceneClips } from '@/content/media'
 
 const ELEMENT_MARK: Record<string, (props: { className?: string }) => React.ReactElement> = {
   theorie: MarkRoute,
@@ -22,8 +24,10 @@ const ELEMENT_MARK: Record<string, (props: { className?: string }) => React.Reac
  */
 export function DigitalSystem() {
   return (
-    <section className="chapter relative" aria-labelledby="digitalsystem" data-atmo="40/40">
+    <section className="chapter relative overflow-hidden" aria-labelledby="digitalsystem" data-atmo="40/40">
       <div className="atmos-lanes" />
+      {/* Scattered points settle into an interface — order emerging from parts */}
+      <SceneVideo name={sceneClips.pointsToCard.name} className="media-weld-y opacity-35" />
       <div className="shell relative">
         <ChapterHeading
           marker="Kapitel 04 — Das System"

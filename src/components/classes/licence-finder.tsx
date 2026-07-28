@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo, useRef, useState } from 'react'
 import { finderQuestions, recommend, type FinderAnswers } from '@/lib/licence-finder'
 import { publicValue } from '@/content/truth'
+import { SpotlightGroup } from '@/components/brand/spotlight'
 
 /**
  * Chapter 2 — the licence finder.
@@ -74,11 +75,11 @@ export function LicenceFinder() {
             </div>
             {current.hint && <p className="mt-2 text-sm text-chalk-dim">{current.hint}</p>}
 
-            <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
+            <SpotlightGroup className="mt-6 grid gap-2.5 sm:grid-cols-2">
               {current.options.map((option) => (
                 <label
                   key={option.value}
-                  className="group relative flex cursor-pointer items-start gap-3 rounded-xl border border-chalk/10 bg-chalk/[0.02] p-4 transition-colors hover:border-signal-500/50 hover:bg-signal-500/[0.06] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal-400"
+                  className="spot-card group relative flex cursor-pointer items-start gap-3 rounded-xl border border-chalk/10 bg-chalk/[0.02] p-4 transition-colors hover:border-signal-500/50 hover:bg-signal-500/[0.06] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal-400"
                 >
                   <input
                     type="radio"
@@ -99,7 +100,7 @@ export function LicenceFinder() {
                   </span>
                 </label>
               ))}
-            </div>
+            </SpotlightGroup>
 
             {step > 0 && (
               <button

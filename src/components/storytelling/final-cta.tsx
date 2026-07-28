@@ -3,6 +3,9 @@ import Link from 'next/link'
 import { locations } from '@/content/business'
 import { publicValue } from '@/content/truth'
 import { Roadway } from '@/components/brand/roadway'
+import { Magnetic } from '@/components/brand/magnetic'
+import { SceneVideo } from '@/components/media/scene-video'
+import { sceneClips } from '@/content/media'
 
 /**
  * Chapter 11 — the finish line.
@@ -17,6 +20,12 @@ export function FinalCta() {
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 opacity-45">
         <Roadway className="absolute inset-x-0 bottom-0 h-full w-full" />
       </div>
+      {/* The route's light arrives and comes to rest — the journey's last shot */}
+      <SceneVideo
+        name={sceneClips.lineArrives.name}
+        hd={sceneClips.lineArrives.hd}
+        className="-z-10 media-weld-y opacity-60"
+      />
       {/* The crab from the real logo, as a faint watermark over the finish line */}
       <Image
         src="/brand/krebs-crab.png"
@@ -39,12 +48,14 @@ export function FinalCta() {
         </p>
 
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
-          <Link
-            href="/fuehrerschein#finder"
-            className="inline-flex min-h-13 w-full items-center justify-center rounded-xl bg-signal-500 px-8 text-base font-semibold text-chalk shadow-[0_18px_50px_-18px_color-mix(in_oklab,var(--color-signal-500)_80%,transparent)] transition-colors hover:bg-signal-600 sm:w-auto"
-          >
-            Führerschein finden
-          </Link>
+          <Magnetic className="w-full sm:w-auto">
+            <Link
+              href="/fuehrerschein#finder"
+              className="inline-flex min-h-13 w-full items-center justify-center rounded-xl bg-signal-500 px-8 text-base font-semibold text-chalk shadow-[0_18px_50px_-18px_color-mix(in_oklab,var(--color-signal-500)_80%,transparent)] transition-colors hover:bg-signal-600 sm:w-auto"
+            >
+              Führerschein finden
+            </Link>
+          </Magnetic>
           <Link
             href="/kontakt"
             className="inline-flex min-h-13 w-full items-center justify-center rounded-xl border border-chalk/18 bg-chalk/[0.04] px-8 text-base font-semibold text-chalk transition-colors hover:border-chalk/35 sm:w-auto"

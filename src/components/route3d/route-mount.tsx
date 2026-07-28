@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type RefObject } from 'react'
 import type { RouteDriver } from './route-canvas'
 
-type CanvasComponent = ComponentType<{ driver: RouteDriver; fractions: number[] }>
+type CanvasComponent = ComponentType<{ driver: RefObject<RouteDriver>; fractions: number[] }>
 
 /**
  * Gate and driver for the 3D route scene.
@@ -25,6 +25,8 @@ export function RouteMount() {
   const [active, setActive] = useState(false)
   const [Canvas, setCanvas] = useState<CanvasComponent | null>(null)
   const [fractions, setFractions] = useState<number[] | null>(null)
+  // A mutable channel between scroll handlers and the render loop; only
+  // event handlers and frame callbacks ever touch .current.
   const driver = useRef<RouteDriver>({ p: 0, mx: 0, my: 0 })
 
   useEffect(() => {
@@ -117,7 +119,7 @@ export function RouteMount() {
 
   return (
     <div aria-hidden className="route3d-stage pointer-events-none fixed inset-0 -z-10">
-      <Canvas driver={driver.current} fractions={fractions} />
+      <Canvas driver={driver} fractions={fractions} />
     </div>
   )
 }

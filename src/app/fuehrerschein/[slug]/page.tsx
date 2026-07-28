@@ -7,6 +7,7 @@ import { publicValue } from '@/content/truth'
 import { breadcrumbJsonLd, courseJsonLd } from '@/lib/structured-data'
 import { ActionLink, Disclosure } from '@/components/brand/section'
 import { Roadway } from '@/components/brand/roadway'
+import { PageMedia } from '@/components/media/page-media'
 
 export function generateStaticParams() {
   return licenceClasses.map((c) => ({ slug: c.slug }))
@@ -128,6 +129,7 @@ export default async function ClassPage({ params }: { params: Promise<{ slug: st
         </div>
 
         <aside className="space-y-6">
+          <PageMedia routeKey={`fuehrerschein/${licenceClass.slug}`} />
           <div className="surface p-6">
             <h2 className="font-display text-base font-bold text-chalk">Wo du ausgebildet wirst</h2>
             <ul className="mt-3 space-y-2">

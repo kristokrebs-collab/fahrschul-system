@@ -4,6 +4,7 @@ import { serviceBySlug, serviceGroups, services } from '@/content/services'
 import { publicValue } from '@/content/truth'
 import { PageHeader } from '@/components/brand/page-header'
 import { ActionLink, Disclosure } from '@/components/brand/section'
+import { PageMedia } from '@/components/media/page-media'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
 
 export function generateStaticParams() {
@@ -101,6 +102,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
         </div>
 
         <aside className="space-y-6">
+          <PageMedia routeKey={`leistungen/${service.slug}`} />
           {format && (
             <div className="surface p-6">
               <h2 className="font-display text-base font-bold text-chalk">Umfang und Ablauf</h2>

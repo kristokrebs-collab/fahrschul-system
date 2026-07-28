@@ -1,12 +1,15 @@
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import { RevealBlock, RevealWords } from './reveal'
 
 /**
  * Chapter framing.
  *
  * Every chapter of the route is introduced the same way — a kilometre marker,
  * a heading and a lead. Consistency here is what makes the page feel like one
- * journey rather than a stack of unrelated sections.
+ * journey rather than a stack of unrelated sections. The heading words rise
+ * out of a mask as the chapter arrives; without JavaScript they are simply
+ * there, fully visible.
  */
 export function ChapterHeading({
   marker,
@@ -25,9 +28,13 @@ export function ChapterHeading({
     <header className={align === 'center' ? 'mx-auto max-w-3xl text-center' : 'max-w-3xl'}>
       <p className={`kapitel-label ${align === 'center' ? 'justify-center' : ''}`}>{marker}</p>
       <h2 id={id} className="type-chapter mt-5 text-gradient-chalk">
-        {title}
+        <RevealWords>{title}</RevealWords>
       </h2>
-      {lead && <p className="type-lead mt-5">{lead}</p>}
+      {lead && (
+        <RevealBlock delay={220}>
+          <p className="type-lead mt-5">{lead}</p>
+        </RevealBlock>
+      )}
     </header>
   )
 }

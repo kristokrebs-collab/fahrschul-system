@@ -4,6 +4,7 @@ import { ActionLink, ChapterHeading } from '@/components/brand/section'
 import { LicenceFinder } from '@/components/classes/licence-finder'
 import { LicenceRoute } from '@/components/classes/licence-route'
 import { licenceClasses } from '@/content/classes'
+import { ScenePanel } from '@/components/media/page-media'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
 
 export const metadata: Metadata = {
@@ -29,6 +30,14 @@ export default function LicenceIndexPage() {
         trail={trail}
         actions={<ActionLink href="#finder">Führerschein finden</ActionLink>}
       />
+
+      {/* One silhouette flowing through all four vehicle families */}
+      <section className="shell pb-10">
+        <ScenePanel
+          clip="vehicleMorph"
+          caption="Studio-Inszenierung — vom Pkw übers Motorrad und den Lkw zum Bus"
+        />
+      </section>
 
       <section className="chapter pt-0" aria-labelledby="finder-heading" id="finder">
         <div className="shell">

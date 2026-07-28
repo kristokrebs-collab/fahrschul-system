@@ -1,6 +1,9 @@
 import { costCategories, guideSources, guideStages, whoLabels } from '@/content/guide'
 import { publicValue } from '@/content/truth'
 import { ChapterHeading } from '@/components/brand/section'
+import { SceneVideo } from '@/components/media/scene-video'
+import { sceneClips } from '@/content/media'
+import { GuideBeam } from './guide-beam'
 
 /**
  * Chapter 8 — the route to the licence.
@@ -14,7 +17,13 @@ export function TrainingGuide() {
   const sources = publicValue(guideSources)
 
   return (
-    <section className="chapter relative" aria-labelledby="ausbildungsweg" data-atmo="34/50">
+    <section className="chapter relative overflow-hidden" aria-labelledby="ausbildungsweg" data-atmo="34/50">
+      {/* Paperwork aligning into a road — exactly what this chapter explains */}
+      <SceneVideo
+        name={sceneClips.documentsRoad.name}
+        hd={sceneClips.documentsRoad.hd}
+        className="media-weld-y opacity-30"
+      />
       <div className="shell relative">
         <ChapterHeading
           marker="Kapitel 08 — Dein Weg"
@@ -23,18 +32,20 @@ export function TrainingGuide() {
           lead="Der Führerschein ist kein Behördenlabyrinth, wenn man die Reihenfolge kennt. Hier ist sie — mit dem Hinweis, wer jeweils am Zug ist."
         />
 
-        <ol className="relative mt-14 space-y-2">
-          {/* The route line the milestones sit on */}
+        <GuideBeam className="relative mt-14 space-y-2">
+          {/* The route line the milestones sit on… */}
           <span
             aria-hidden
-            className="pointer-events-none absolute bottom-6 left-[7px] top-6 w-px bg-gradient-to-b from-signal-500/70 via-chalk/12 to-transparent"
+            className="pointer-events-none absolute bottom-6 left-[7px] top-6 w-px bg-gradient-to-b from-signal-500/40 via-chalk/12 to-transparent"
           />
+          {/* …and the beam the reader draws along it by scrolling */}
+          <span aria-hidden className="guide-beam-fill" />
 
           {guideStages.map((stage, index) => (
             <li key={stage.id} className="relative pl-9">
               <span
                 aria-hidden
-                className="absolute left-0 top-[1.375rem] h-3.5 w-3.5 rounded-full border-2 border-signal-500/60 bg-ink-950"
+                className="guide-dot absolute left-0 top-[1.375rem] h-3.5 w-3.5 rounded-full border-2 border-signal-500/60 bg-ink-950"
               />
               <div className="rounded-xl border border-chalk/8 bg-ink-900/40 p-5 transition-colors hover:border-chalk/16">
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -62,7 +73,7 @@ export function TrainingGuide() {
               </div>
             </li>
           ))}
-        </ol>
+        </GuideBeam>
 
         <div className="mt-14">
           <h3 className="font-display text-xl font-bold text-chalk">Wer bekommt eigentlich welches Geld?</h3>

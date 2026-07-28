@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { business, locations, practiceGround } from '@/content/business'
 import { publicValue } from '@/content/truth'
 import { ChapterHeading } from '@/components/brand/section'
+import { SceneVideo } from '@/components/media/scene-video'
+import { sceneClips } from '@/content/media'
 
 /**
  * Chapter 10 — people and places.
@@ -26,8 +28,15 @@ export function LocationsChapter() {
   const groundAddress = publicValue(practiceGround.address)
 
   return (
-    <section className="chapter relative" aria-labelledby="standorte" data-atmo="46/35">
+    <section className="chapter relative overflow-hidden" aria-labelledby="standorte" data-atmo="46/35">
       <div className="atmos-lanes" />
+      {/* Blue hour over Osthessen: one glowing route between two towns */}
+      <SceneVideo
+        name={sceneClips.aerialRoute.name}
+        hd={sceneClips.aerialRoute.hd}
+        className="media-weld-y opacity-40"
+        videoClassName="object-top"
+      />
       <div className="shell relative">
         <ChapterHeading
           marker="Kapitel 10 — Menschen & Orte"

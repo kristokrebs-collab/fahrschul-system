@@ -4,6 +4,7 @@ import { business, locations, practiceGround, yearsInBusiness } from '@/content/
 import { publicValue } from '@/content/truth'
 import { PageHeader } from '@/components/brand/page-header'
 import { ActionLink, Disclosure } from '@/components/brand/section'
+import { ScenePanel } from '@/components/media/page-media'
 import { breadcrumbJsonLd } from '@/lib/structured-data'
 
 export const metadata: Metadata = {
@@ -89,6 +90,12 @@ export default function TeamPage() {
                 className="w-full"
               />
             </figure>
+            {/* The same photograph, hung in a dark gallery and swept by light */}
+            <ScenePanel
+              clip="teamGallery"
+              caption="Studio-Inszenierung — das K-Team-Foto als Galerieabzug"
+              className="mt-6"
+            />
             <Disclosure>
               Einzelporträts mit Klassen und Schwerpunkten folgen, sobald sie freigegeben sind — erfundene Profile
               zeigen wir nicht.
