@@ -21,7 +21,8 @@ export function Hero() {
   return (
     <section className="relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden pt-[var(--header-h)]" data-atmo="72/22">
       <HeroParallax>
-        <Roadway className="absolute inset-x-0 bottom-0 h-[78%] w-full" />
+        {/* The 2D roadway retires when the WebGL route takes over behind it */}
+        <Roadway className="route3d-retire absolute inset-x-0 bottom-0 h-[78%] w-full" />
       </HeroParallax>
 
       <div className="atmos-falloff" />

@@ -13,6 +13,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  // The QA browser drives the dev server via 127.0.0.1; without this Next
+  // blocks its dev-resource requests as cross-origin and hydration stalls.
+  allowedDevOrigins: ['127.0.0.1'],
   images: {
     formats: ['image/avif', 'image/webp'],
   },

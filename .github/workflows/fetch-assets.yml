@@ -34,11 +34,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg > /dev/null
+          ffmpeg -version | head -1
+
       - name: Download and transcode
         run: |
           set -euo pipefail
           mkdir -p assets/video assets/poster assets/still raw
-          ffmpeg -version | head -1
 
           count=$(jq length scripts/higgsfield-manifest.json)
           for i in $(seq 0 $((count - 1))); do

@@ -12,6 +12,7 @@ import { LicenceRoute } from '@/components/classes/licence-route'
 import { CockpitShowcase } from '@/components/cockpit/cockpit-showcase'
 import { PriceCalculator } from '@/components/pricing/price-calculator'
 import { ChapterHeading } from '@/components/brand/section'
+import { RouteMount } from '@/components/route3d/route-mount'
 
 export const metadata: Metadata = {
   alternates: { canonical: '/' },
@@ -25,6 +26,8 @@ export const metadata: Metadata = {
 export default function HomePage() {
   return (
     <>
+      {/* The Krebs Route in WebGL, fixed behind every chapter (desktop only) */}
+      <RouteMount />
       <Hero />
 
       {/* Chapter 2 — the junction */}

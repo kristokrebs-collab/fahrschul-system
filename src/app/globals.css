@@ -95,6 +95,10 @@
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
     text-rendering: optimizeLegibility;
+    /* Explicit blend-isolation root: with a WebGL canvas on the page,
+       Chromium otherwise composites the fixed grain overlay against a white
+       fallback backdrop and washes out everything beneath it. */
+    isolation: isolate;
   }
 
   h1, h2, h3, h4 {
@@ -179,6 +183,39 @@
       color-mix(in oklab, var(--color-chalk) 4%, transparent) var(--lane)
     );
     mask-image: linear-gradient(to bottom, transparent, black 18%, black 82%, transparent);
+  }
+
+  /* --- WebGL route handover: when the 3D scene is live it owns the road
+         imagery, so the 2D stand-ins step back rather than doubling up. -- */
+  html[data-route3d] .route3d-retire {
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+
+  html[data-route3d] .atmos-lanes {
+    opacity: 0.22;
+  }
+
+  /* Chromium composites mix-blend-mode against a white fallback once a WebGL
+     canvas is in the backdrop chain, bleaching whole sections. With the 3D
+     stage active the grain therefore drops its blend mode — plain low-alpha
+     noise reads almost identically on these dark surfaces. */
+  html[data-route3d] .atmos-grain {
+    mix-blend-mode: normal;
+    opacity: 0.14;
+  }
+
+  .route3d-stage {
+    animation: route3d-in 1.4s ease-out both;
+  }
+
+  @keyframes route3d-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   /* --- Dark automotive glass. backdrop-filter is expensive on mobile, so
