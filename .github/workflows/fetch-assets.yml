@@ -6,11 +6,18 @@
 # archive there and commits it to a dedicated assets branch, which the sandbox
 # can then fetch through its authenticated git access.
 #
-# Runs only on manual dispatch. Never touches the site branches.
+# Trigger: workflow_dispatch only works for workflows registered on the
+# default branch, which belongs to a different session. A push trigger runs
+# from the pushed ref itself, so it works from this branch — path-filtered so
+# it only fires when this file changes, not on every site commit.
+# Never touches the site branches.
 name: fetch-assets
 
 on:
   workflow_dispatch:
+  push:
+    branches: ['claude/fahrschule-krebs-website-hge31m']
+    paths: ['.github/workflows/fetch-assets.yml']
 
 permissions:
   contents: write
