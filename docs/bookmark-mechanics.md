@@ -107,15 +107,12 @@ vorbehalten. **Die Motion-Werte bleiben unverändert.**
 
 ---
 
-## ⏳ Noch ausstehend (vom Auftraggeber angekündigt)
-`view-magnifier` (4559) · `reveal-text` (2491) · `container-scroll-animation` (1081)
-
 ## ⏳ Noch nicht geliefert
-2520 Gradient Selector · 10443 Liquid Metal Button · 13966 MarkerPopup · 990 Dock ·
-2591 Glowing Search Bar · 1825 Hero Section 2 · 5508 Shiny Button · 5649 Paper-Shader-Hero ·
-2049 Sign In Flow · 3226 Minimal Dock · 1913 Section With Mockup · 8687 Hover Footer ·
+13966 MarkerPopup · 990 Dock · 1825 Hero Section 2 · 5508 Shiny Button ·
+5649 Paper-Shader-Hero · 2049 Sign In Flow · 3226 Minimal Dock · 8687 Hover Footer ·
 2497 Image Auto Slider · 3052 Feature Carousel · 525 Animated Tabs · 9643 Morphing Cursor ·
-5625 Shader Animation · 8341 Animated Profile Card
+5625 Shader Animation · 8341 Animated Profile Card · 4559 View Magnifier ·
+2491 Reveal Text · 1081 Container Scroll Animation
 
 ---
 
@@ -151,3 +148,69 @@ Schattenlage  translateZ(0)      Button-Hit   translateZ(25px)
 **Einbauort:** Primär-CTAs
 **Hüllen-Mapping:** Beschriftung `#666` → `--chalk`; Metall-Shader bleibt, bekommt aber
 den Krebs-Rotstich über einen Overlay-Tint statt eigener Shader-Farbe (Mechanik unverändert).
+
+---
+
+## ⚠️ #2591 · #1913 · #2520 — aus dem CLI-Befehl gebaut, nicht aus dem Quellcode
+
+Du hast am 29.07. sechs `npx shadcn@latest add …`-Befehle geschickt. Drei davon
+waren bereits verbaut (Hero Scrub, Liquid Metal Button, Image Accordion), drei
+nicht. Für diese drei **liegt mir der Originalcode nicht vor**:
+
+| Weg | Ergebnis |
+|---|---|
+| `npx shadcn add` ausführen | ruft `21st.dev` auf → aus dieser Umgebung 403 (Proxy-Policy) |
+| MCP `get_component` | Free-Tier: 2 Abrufe/Tag, heute 0 übrig (`get_usage` bestätigt) |
+| Direkter Abruf (curl/WebFetch) | 403 |
+
+**Konsequenz, klar benannt:** Die drei folgenden Komponenten sind
+**nachgebaut**, nicht 1:1 portiert. Mechanik und Maße stammen aus dem
+dokumentierten Verhalten der Komponenten, nicht aus ihrem Quelltext. Sobald der
+Originalcode vorliegt (Copy-Code aus dem Browser oder ein 21st.dev-Upgrade),
+gleiche ich die Zahlenwerte an — der Einbauort bleibt derselbe.
+
+### #2591 — Animated Glowing Search Bar (`minhxthanh`)
+**Einbauort:** Kapitel 02, Klassen-Finder über dem Accordion
+```
+Ring      conic-gradient(from 0deg, transparent 0 52%, red 66%, gold 76%, red-lit 86%, transparent 97%)
+          Element 210% breit, aspect-ratio 1, zentriert, rotate 1turn / 4.6s linear infinite
+Halo      identische Kopie, inset -9px, blur(15px), opacity .42
+Fokus     Halo opacity .9, Umlaufzeit 1.9s
+Feld      Höhe 60px, radius 100px, Grund var(--ink2)
+Liste     max. 6 Treffer, radius 16px, Zeilen 14/20px, Trennlinie var(--line)
+```
+**Funktion:** Der Finder ist nicht dekorativ — Eingabe filtert 13 echte Klassen
+(B, BF17, B197, BE/B96, Mofa/AM/A1, A2/A, C1/C1E, C/CE, D/DE, BKF, ADR, Stapler,
+Handicap) und springt bei Auswahl auf die passende Kachel im Accordion.
+Tastatur: `Enter` = erster Treffer, `↓` = in die Liste, `Esc` = schließen.
+
+### #1913 — Section With Mockup (`aghasisahakyan1`)
+**Einbauort:** Kapitel 03, Schaufenster für das Krebs-Cockpit
+```
+Grundriss   Text 1.02fr / Bühne .98fr, gap clamp(30px,6vw,86px), ab 900px einspaltig
+Rückebene   min(360px,80%) × 440px, radius 26px, Verlauf rot→transparent
+            Scroll: xPercent 14 konstant, yPercent 10 → −20, rotation 9° → 3°, scrub .6
+Gerät       min(310px,74vw), aspect 310/634, radius 42px, gegenläufig yPercent 7 → −7
+Glow        min(420px,92%) Kreis, blur(26px), rot 24 %
+```
+**Bewusste Abweichung:** Das Original setzt zwei **Bilder** übereinander. Hier ist
+das Gerät echtes Markup (Rahmen, Notch, Fortschrittsring 78 %, fünf Balken,
+Statuszeile). Gründe: bleibt bei jeder Auflösung scharf, braucht keine Bilddatei,
+funktioniert offline. Die Bewegungsmechanik der beiden Ebenen bleibt erhalten.
+Die Balken füllen sich einmalig bei Sichtbarkeit (IntersectionObserver, 1.1s).
+
+### #2520 — Gradient Selector Card (`isaiahbjork`)
+**Einbauort:** Kapitel 04, Wahl des Ausbildungswegs
+```
+Raster      4 Spalten → 2 ab 1080px → 1 ab 560px, gap 14px
+Karte       radius 18px, padding 26/24/30, Grund var(--ink2), border var(--line)
+Zeiger      --x/--y aus pointermove → radial-gradient(240px circle at var(--x) var(--y),
+            rgba(225,10,23,.26), transparent 72%), opacity 0→1 in .4s
+Gewählt     Verlaufsrand über mask-composite: linear-gradient(140deg, red, gold 46%, red-lit),
+            padding 1px, opacity .45s; Punkt rechts oben rot mit 12px Glow
+Hover       translateY(−4px), .5s
+```
+**Semantik:** `role="radiogroup"` mit vier `role="radio"`-Karten, Roving-Tabindex,
+Pfeiltasten wechseln. Die Wahl filtert das Leistungsband darunter
+(Erster Führerschein · Erweiterung · Beruf & Gewerbe · Seminare & Individuell) —
+19 echte Leistungen, keine erfundenen Preise.

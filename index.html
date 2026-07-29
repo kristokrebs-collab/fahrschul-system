@@ -1,0 +1,829 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#07080a">
+<title>Fahrschule Krebs · Verkehrsbildungszentrum — Fulda &amp; Bad Hersfeld</title>
+<meta name="description" content="Fahrschule Krebs seit 1964 – alle Klassen von B und BF17 über Motorrad bis C/CE und Bus, dazu Berufskraftfahrer, ADR, Stapler, ASF, FES und Handicap-Ausbildung. Fulda und Bad Hersfeld.">
+<meta property="og:title" content="Fahrschule Krebs · Verkehrsbildungszentrum">
+<meta property="og:description" content="Eine Linie. Eine Nacht. Ein Morgen. Alle Klassen, zwei Standorte, seit 1964.">
+<meta property="og:type" content="website">
+<style>
+/* ══ Schriften: lokal eingebettet, kein CDN, kein externer Font-Link ══ */
+@font-face{font-family:"Anton";src:url("assets/fonts/anton-latin-400-normal.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Archivo";src:url("assets/fonts/archivo-latin-400-normal.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Archivo";src:url("assets/fonts/archivo-latin-800-normal.woff2") format("woff2");font-weight:800;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");font-weight:400;font-display:swap}
+
+:root{
+  --red:#e10a17; --red-lit:#ff2b36; --gold:#f5c400;
+  --ink:#07080a; --ink2:#0d0f13; --panel:#12151b;
+  --chalk:#f2efe9; --ash:#8e8a84; --faint:#5d5a55;
+  --line:rgba(242,239,233,.10); --line2:rgba(242,239,233,.20);
+  --e:cubic-bezier(0.16,1,0.3,1);
+  --display:"Anton","Arial Narrow",sans-serif;
+  --text:"Archivo",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --pad:clamp(20px,5vw,64px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--ink);scroll-behavior:auto}
+body{background:var(--ink);color:var(--chalk);font-family:var(--text);line-height:1.6;
+  -webkit-font-smoothing:antialiased;overflow-x:clip}
+a{color:inherit;text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+img{display:block;max-width:100%}
+::selection{background:var(--red);color:#fff}
+:focus-visible{outline:2px solid var(--red-lit);outline-offset:3px}
+h1,h2,h3{font-family:var(--display);font-weight:400;text-transform:uppercase;line-height:.86;letter-spacing:-.02em}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:var(--pad)}
+.skip{position:absolute;left:-9999px;z-index:200;background:var(--chalk);color:#000;padding:12px 18px}
+.skip:focus{left:0;top:0}
+
+/* Filmkorn + Vignette über der ganzen Seite — bindet alle Kapitel zusammen */
+.grain{position:fixed;inset:0;z-index:90;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.vig{position:fixed;inset:0;z-index:89;pointer-events:none;
+  background:radial-gradient(ellipse at center,transparent 58%,rgba(0,0,0,.5) 100%)}
+
+/* ══ HUD: Mono-Mikrolabels an den Rändern ══ */
+.hud{position:fixed;inset:0;z-index:80;pointer-events:none;font-family:var(--mono);
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(242,239,233,.4)}
+.hud span{position:absolute}
+.hud .tl{left:var(--pad);top:24px}.hud .tr{right:var(--pad);top:24px}
+.hud .bl{left:var(--pad);bottom:24px}.hud .br{right:var(--pad);bottom:24px}
+.tick{display:inline-block;width:3px;height:11px;vertical-align:-1px;margin-right:8px;
+  background:linear-gradient(var(--gold) 0 50%,var(--red) 50% 100%)}
+@media(max-width:820px){.hud .tr,.hud .br{display:none}}
+/* Fortschrittslinie unten — entspringt der Krebs-Kontur */
+.prog{position:fixed;left:0;bottom:0;height:2px;width:0;z-index:88;background:var(--red);
+  box-shadow:0 0 12px var(--red)}
+
+/* ══ Navigation ══ */
+.nav{position:fixed;top:0;left:0;right:0;z-index:85;height:76px;display:flex;align-items:center;
+  transition:background .4s var(--e),backdrop-filter .4s}
+.nav.solid{background:rgba(7,8,10,.82);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;width:100%}
+.brand{display:flex;align-items:center;gap:11px;opacity:0}
+.brand.on{opacity:1;transition:opacity .8s var(--e)}
+.brand svg{width:34px;height:auto}
+.brand svg path{fill:none;stroke:var(--red);stroke-width:14;stroke-linecap:round;stroke-linejoin:round}
+.brand b{font-family:var(--display);font-size:19px;letter-spacing:.01em;color:var(--red)}
+.brand .sep{width:6px;height:19px;background:linear-gradient(var(--chalk) 0 33%,var(--red) 33% 66%,var(--gold) 66% 100%)}
+.brand i{font-style:normal;font-family:var(--display);font-size:9px;letter-spacing:.24em;color:var(--ash);line-height:1.25}
+.nav ul{display:flex;gap:30px;list-style:none}
+.nav ul a{font-size:12px;font-weight:500;letter-spacing:.04em;color:var(--ash);transition:color .25s}
+.nav ul a:hover,.nav ul a.on{color:var(--chalk)}
+@media(max-width:960px){.nav ul{display:none}}
+
+/* ══ Liquid-Metal-CTA — Mechanik aus #10443, Hülle Krebs ══ */
+.lm{position:relative;display:inline-block;perspective:1000px}
+.lm__box{position:relative;width:172px;height:46px;transform-style:preserve-3d;
+  transition:all .8s cubic-bezier(.34,1.56,.64,1)}
+.lm__label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:6px;
+  transform:translateZ(20px);z-index:30;pointer-events:none;font-size:12px;letter-spacing:.04em;
+  color:var(--chalk);text-shadow:0 1px 2px rgba(0,0,0,.5);white-space:nowrap;
+  transition:all .8s cubic-bezier(.34,1.56,.64,1)}
+.lm__inner{position:absolute;inset:0;transform:translateZ(10px);z-index:20;
+  transition:all .8s cubic-bezier(.34,1.56,.64,1)}
+.lm__inner div{width:168px;height:42px;margin:2px;border-radius:100px;
+  background:linear-gradient(180deg,#2a1114 0%,#0a0406 100%);
+  transition:box-shadow .15s cubic-bezier(.4,0,.2,1)}
+.lm__shell{position:absolute;inset:0;transform:translateZ(0);z-index:10;border-radius:100px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(0,0,0,.3),0 36px 14px rgba(0,0,0,.02),0 20px 12px rgba(0,0,0,.08),0 9px 9px rgba(0,0,0,.12),0 2px 5px rgba(0,0,0,.15);
+  transition:box-shadow .15s cubic-bezier(.4,0,.2,1)}
+.lm__shell canvas{width:100%;height:100%;display:block}
+.lm__hit{position:absolute;inset:0;transform:translateZ(25px);z-index:40;border-radius:100px;overflow:hidden}
+.lm:hover .lm__shell{box-shadow:0 0 0 1px rgba(0,0,0,.4),0 12px 6px rgba(0,0,0,.05),0 8px 5px rgba(0,0,0,.1),0 4px 4px rgba(0,0,0,.15),0 1px 2px rgba(0,0,0,.2)}
+.lm.press .lm__inner,.lm.press .lm__shell{transform:translateZ(10px) translateY(1px) scale(.98)}
+.lm.press .lm__shell{transform:translateZ(0) translateY(1px) scale(.98)}
+@keyframes ripple-animation{0%{transform:translate(-50%,-50%) scale(0);opacity:.6}100%{transform:translate(-50%,-50%) scale(4);opacity:0}}
+.lm__rip{position:absolute;width:20px;height:20px;border-radius:50%;pointer-events:none;
+  background:radial-gradient(circle,rgba(255,255,255,.4) 0%,rgba(255,255,255,0) 70%);
+  animation:ripple-animation .6s ease-out}
+.btn2{display:inline-flex;align-items:center;gap:9px;height:46px;padding:0 22px;border-radius:100px;
+  border:1px solid var(--line2);font-size:12px;letter-spacing:.04em;transition:border-color .3s,background .3s}
+.btn2:hover{border-color:var(--chalk);background:rgba(242,239,233,.05)}
+
+/* ══ HERO — Hero Scrub #12213, Werte unverändert ══ */
+.hero{position:relative;width:100%;overflow:clip;height:420vh}
+.hero__pin{position:sticky;top:0;display:flex;height:100svh;width:100%;flex-direction:column;
+  align-items:center;justify-content:center;overflow:hidden;gap:.75rem}
+@media(min-width:768px){.hero__pin{gap:1rem}}
+.hero__bg{position:absolute;inset:0;z-index:0;background:radial-gradient(120% 80% at 50% 8%,#16181f,#0a0b0e 55%,#07080a)}
+.hero__glow{position:absolute;inset:0;z-index:0;background:radial-gradient(ellipse at 50% 35%,rgba(255,255,255,.08),rgba(0,0,0,0) 55%)}
+.t{font-family:var(--display);text-transform:uppercase;line-height:.85;letter-spacing:-.04em;
+  font-size:clamp(2.9rem,9.4vw,8.4rem);position:relative;z-index:10;opacity:0;will-change:transform,opacity}
+.t--fill{color:var(--chalk)}
+.t--out{color:transparent;-webkit-text-stroke:1.5px var(--chalk)}
+.card{position:relative;z-index:10;overflow:hidden;border-radius:12px;opacity:0;
+  box-shadow:0 20px 80px rgba(0,0,0,.55);outline:1px solid rgba(255,255,255,.1);outline-offset:-1px;will-change:transform}
+@media(min-width:768px){.card{border-radius:16px}}
+.card__sh{position:absolute;inset:0;z-index:20;pointer-events:none;box-shadow:inset 0 0 120px rgba(0,0,0,.45)}
+.card canvas,.card video,.card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.fr{position:absolute;left:var(--pad);bottom:74px;z-index:12;font-family:var(--display);
+  font-size:clamp(30px,4vw,58px);line-height:1;color:transparent;-webkit-text-stroke:1px rgba(242,239,233,.2);pointer-events:none}
+/* Ouvertüre: die Linie zeichnet den Krebs */
+.mark{position:absolute;inset:0;z-index:40;display:grid;place-items:center;pointer-events:none}
+.mark svg{width:min(46vw,480px);height:auto;overflow:visible}
+.mark path{fill:none;stroke:var(--red);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 0 7px rgba(225,10,23,.55))}
+.word{position:absolute;z-index:41;left:50%;transform:translateX(-50%);
+  bottom:calc(50% - min(23vw,240px) - 84px);display:flex;align-items:center;gap:13px;opacity:0}
+.word b{font-family:var(--display);font-size:clamp(28px,4.6vw,52px);color:var(--red);line-height:1}
+.word .sep{width:8px;height:clamp(28px,4.6vw,52px);
+  background:linear-gradient(var(--chalk) 0 33%,var(--red) 33% 66%,var(--gold) 66% 100%)}
+.word div{display:flex;flex-direction:column;gap:3px;line-height:1}
+.word em{font-style:normal;font-family:var(--display);font-size:clamp(10px,1.4vw,15px);
+  letter-spacing:.3em;color:transparent;-webkit-text-stroke:.8px var(--chalk)}
+.word s{text-decoration:none;font-family:var(--display);font-size:clamp(11px,1.6vw,17px);color:var(--chalk)}
+
+/* ══ Kapitel-Grundriss ══ */
+.ch{position:relative;z-index:2;padding-block:clamp(90px,13vw,180px)}
+.ch__no{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--red-lit);display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.ch__no s{text-decoration:none;color:var(--faint)}
+/* Anton zeichnet über die Metrik hinaus — mehrzeilige Überschriften brauchen
+   mehr Durchschuss als der Hero-Einzeiler, sonst greifen die Zeilen ineinander. */
+.ch h2{font-size:clamp(2.4rem,6.4vw,6rem);max-width:16ch;line-height:1.0}
+.ch h2 em{font-style:normal;color:transparent;-webkit-text-stroke:1.5px var(--chalk)}
+.lead{margin-top:24px;max-width:52ch;font-size:clamp(15px,1.5vw,17px);color:var(--ash)}
+.rv{opacity:0;transform:translateY(26px)}
+.rv.in{opacity:1;transform:none;transition:opacity .8s var(--e),transform .9s var(--e)}
+.d2{transition-delay:.09s}.d3{transition-delay:.18s}.d4{transition-delay:.27s}
+
+/* ══ Fahrzeugwelten — Accordion #5189, Werte unverändert ══ */
+.acc{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:16px;
+  margin-top:56px;overflow-x:auto;padding:4px;scrollbar-width:none}
+.acc::-webkit-scrollbar{display:none}
+.acc__i{position:relative;height:450px;width:60px;flex:0 0 auto;border-radius:16px;overflow:hidden;
+  cursor:pointer;transition:width 700ms ease-in-out;background:var(--panel);border:0}
+.acc__i.on{width:400px}
+.acc__i img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.acc__i .ov{position:absolute;inset:0;background:rgba(0,0,0,.4)}
+.acc__i .cap{position:absolute;left:50%;bottom:96px;transform:translateX(-50%) rotate(90deg);
+  white-space:nowrap;font-family:var(--display);font-size:19px;letter-spacing:.03em;color:#fff;
+  transition:all 300ms ease-in-out}
+.acc__i.on .cap{bottom:24px;transform:translateX(-50%) rotate(0deg)}
+.acc__i .meta{position:absolute;left:22px;right:22px;bottom:62px;opacity:0;transition:opacity .4s var(--e) .2s;
+  font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.75)}
+.acc__i.on .meta{opacity:1}
+@media(max-width:820px){.acc{flex-direction:column}.acc__i{width:100%;height:110px}.acc__i.on{width:100%;height:340px}
+  .acc__i .cap{transform:translateX(-50%) rotate(0deg);bottom:24px}}
+
+/* ══ Klassen-Finder — Animated Glowing Search Bar (minhxthanh) ══
+   Mechanik: rotierender Conic-Gradient-Ring hinter einem dunklen Pill-Feld,
+   zweite unscharfe Kopie als Halo. Bei Fokus wird der Halo stärker und dreht schneller. */
+.gsb{position:relative;max-width:560px;margin-top:52px;z-index:3}
+.gsb__ring,.gsb__halo{position:absolute;inset:-2px;border-radius:100px;overflow:hidden;pointer-events:none}
+.gsb__halo{inset:-9px;filter:blur(15px);opacity:.42;transition:opacity .45s var(--e)}
+.gsb__ring::before,.gsb__halo::before{content:"";position:absolute;left:50%;top:50%;
+  width:210%;aspect-ratio:1;transform:translate(-50%,-50%);
+  background:conic-gradient(from 0deg,transparent 0 52%,var(--red) 66%,var(--gold) 76%,var(--red-lit) 86%,transparent 97%);
+  animation:gsb-spin 4.6s linear infinite}
+@keyframes gsb-spin{to{transform:translate(-50%,-50%) rotate(1turn)}}
+.gsb.hot .gsb__halo{opacity:.9}
+.gsb.hot .gsb__ring::before,.gsb.hot .gsb__halo::before{animation-duration:1.9s}
+.gsb__field{position:relative;display:flex;align-items:center;gap:14px;height:60px;padding:0 22px;
+  border-radius:100px;background:var(--ink2);z-index:2}
+.gsb__field svg{width:17px;height:17px;flex:0 0 auto;stroke:var(--ash);fill:none;stroke-width:2}
+.gsb input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--chalk);
+  font-family:var(--text);font-size:15px}
+.gsb input::placeholder{color:var(--faint)}
+.gsb__hint{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--faint);white-space:nowrap}
+@media(max-width:560px){.gsb__hint{display:none}}
+.gsb__out{position:absolute;left:0;right:0;top:calc(100% + 10px);z-index:5;border-radius:16px;
+  background:var(--panel);border:1px solid var(--line2);overflow:hidden;display:none;
+  box-shadow:0 26px 60px rgba(0,0,0,.6)}
+.gsb__out.on{display:block}
+.gsb__out button{display:flex;width:100%;align-items:baseline;gap:14px;padding:14px 20px;text-align:left;
+  border-bottom:1px solid var(--line);transition:background .2s}
+.gsb__out button:last-child{border-bottom:0}
+.gsb__out button:hover,.gsb__out button:focus-visible{background:rgba(225,10,23,.12)}
+.gsb__out b{font-family:var(--display);font-size:15px;letter-spacing:.02em;font-weight:400}
+.gsb__out s{text-decoration:none;font-family:var(--mono);font-size:10px;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--faint)}
+.gsb__none{padding:14px 20px;font-family:var(--mono);font-size:11px;color:var(--faint)}
+
+/* ══ Cockpit-Schaufenster — Section With Mockup (aghasisahakyan1) ══
+   Mechanik: Text links, zwei gestapelte Ebenen rechts (versetzte Rückebene +
+   Gerät davor), beide über den Scroll gegenläufig versetzt. Das Gerät ist hier
+   kein Bild, sondern echtes Markup — bleibt gestochen scharf und offline-fähig. */
+.mockwrap{display:grid;grid-template-columns:1.02fr .98fr;gap:clamp(30px,6vw,86px);
+  align-items:center;margin-top:60px}
+@media(max-width:900px){.mockwrap{grid-template-columns:1fr}}
+.mockstage{position:relative;display:grid;place-items:center;min-height:600px;perspective:1400px}
+@media(max-width:900px){.mockstage{min-height:520px}
+  .mock__back{width:min(300px,66%)!important;height:380px}}
+.mock__back{position:absolute;width:min(360px,80%);height:440px;border-radius:26px;
+  background:linear-gradient(160deg,rgba(225,10,23,.30),rgba(225,10,23,.04) 58%,transparent);
+  border:1px solid var(--line);will-change:transform}
+.mock__glow{position:absolute;width:min(420px,92%);aspect-ratio:1;border-radius:50%;
+  background:radial-gradient(circle,rgba(225,10,23,.24),transparent 66%);filter:blur(26px)}
+.phone{position:relative;width:min(310px,74vw);aspect-ratio:310/634;border-radius:42px;
+  background:linear-gradient(150deg,#23262d,#0a0b0e 55%,#16181d);padding:9px;
+  box-shadow:0 44px 90px rgba(0,0,0,.72),0 0 0 1px rgba(242,239,233,.09),
+             inset 0 1px 1px rgba(255,255,255,.14);will-change:transform}
+.phone__scr{position:relative;height:100%;border-radius:34px;overflow:hidden;
+  background:linear-gradient(180deg,#0c0e12,#07080a);padding:22px 18px}
+.phone__notch{position:absolute;left:50%;top:9px;transform:translateX(-50%);width:88px;height:20px;
+  border-radius:100px;background:#000;z-index:3}
+.phone__top{display:flex;justify-content:space-between;align-items:center;margin-top:26px;
+  font-family:var(--mono);font-size:8px;letter-spacing:.17em;text-transform:uppercase;color:var(--faint)}
+.phone h4{font-family:var(--display);font-size:23px;line-height:1;margin-top:16px;
+  text-transform:uppercase;letter-spacing:-.01em;font-weight:400}
+.ring{position:relative;width:120px;height:120px;margin:20px auto 4px}
+.ring svg{transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:7;stroke-linecap:round}
+.ring .bg{stroke:rgba(242,239,233,.09)}
+.ring .fg{stroke:var(--red);filter:drop-shadow(0 0 5px rgba(225,10,23,.6))}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);
+  font-size:29px;font-weight:400;line-height:1}
+.ring i{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-style:normal;
+  font-family:var(--mono);font-size:8px;letter-spacing:.16em;color:var(--faint)}
+.bars{margin-top:16px;display:grid;gap:11px}
+.bar s{text-decoration:none;display:flex;justify-content:space-between;font-family:var(--mono);
+  font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ash);margin-bottom:5px}
+.bar u{display:block;text-decoration:none;height:3px;border-radius:3px;background:rgba(242,239,233,.10)}
+.bar u em{display:block;height:100%;border-radius:3px;background:var(--red);width:0;
+  transition:width 1.1s var(--e)}
+.mockstage.in .bar u em{width:var(--w)}
+.phone__foot{position:absolute;left:18px;right:18px;bottom:20px;display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:8px;letter-spacing:.15em;text-transform:uppercase;color:var(--faint)}
+
+/* ══ Ausbildungswege — Gradient Selector Card #2520 (isaiahbjork) ══
+   Mechanik laut Original: Meilenstein-Punkte auf einer Verlaufslinie, der
+   gewählte Punkt glüht, bekommt einen radialen Hintergrund und zwei
+   umkreisende Punkte. Kein Kartenraster — ein Fortschritts-Picker. */
+.ms{margin-top:56px}
+.ms__track{position:relative;display:flex;align-items:center;justify-content:space-between;
+  padding:46px 0 34px}
+.ms__rail,.ms__fill{position:absolute;left:0;right:0;top:50%;height:2px;border-radius:2px;translate:0 -1px}
+.ms__rail{background:rgba(242,239,233,.12)}
+.ms__fill{right:auto;width:0;background:linear-gradient(90deg,var(--red),var(--gold));
+  box-shadow:0 0 14px rgba(225,10,23,.6);transition:width .8s var(--e)}
+.ms__b{position:relative;z-index:2;width:auto;background:none;padding:0}
+.ms__dot{position:relative;display:block;width:19px;height:19px;border-radius:50%;margin:0 auto;
+  background:var(--ink);border:2px solid rgba(242,239,233,.22);transition:.5s var(--e)}
+.ms__b:hover .ms__dot{border-color:var(--red-lit);transform:scale(1.18)}
+.ms__b[aria-checked="true"] .ms__dot{border-color:var(--red);background:var(--red);
+  box-shadow:0 0 0 6px rgba(225,10,23,.16),0 0 26px rgba(225,10,23,.85)}
+.ms__halo{position:absolute;left:50%;top:50%;width:150px;height:150px;translate:-50% -50%;
+  border-radius:50%;pointer-events:none;opacity:0;transition:opacity .6s var(--e);
+  background:radial-gradient(circle,rgba(225,10,23,.30),transparent 66%)}
+.ms__b[aria-checked="true"] .ms__halo{opacity:1}
+.ms__orb{position:absolute;left:50%;top:50%;width:64px;height:64px;translate:-50% -50%;
+  pointer-events:none;opacity:0;transition:opacity .5s var(--e)}
+.ms__b[aria-checked="true"] .ms__orb{opacity:1;animation:orb 5.5s linear infinite}
+.ms__orb i,.ms__orb u{position:absolute;width:5px;height:5px;border-radius:50%;text-decoration:none}
+.ms__orb i{left:50%;top:-2px;translate:-50% 0;background:var(--gold);box-shadow:0 0 8px var(--gold)}
+.ms__orb u{left:50%;bottom:-2px;translate:-50% 0;background:var(--red-lit);box-shadow:0 0 8px var(--red-lit)}
+@keyframes orb{to{rotate:1turn}}
+.ms__k{position:absolute;left:50%;top:-2px;translate:-50% -100%;white-space:nowrap;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--faint);transition:color .4s}
+.ms__b[aria-checked="true"] .ms__k{color:var(--red-lit)}
+.ms__t{position:absolute;left:50%;bottom:-6px;translate:-50% 100%;white-space:nowrap;
+  font-family:var(--display);font-size:clamp(12px,1.35vw,17px);text-transform:uppercase;
+  letter-spacing:.01em;color:var(--ash);transition:color .4s}
+.ms__b[aria-checked="true"] .ms__t{color:var(--chalk)}
+@media(max-width:760px){.ms__t{font-size:0}
+  .ms__t::first-line{font-size:0}
+  .ms__b[aria-checked="true"] .ms__t{font-size:13px}}
+.ms__panel{margin-top:64px;border-top:1px solid var(--line);padding-top:34px}
+.ms__panel h3{font-family:var(--display);font-size:clamp(1.5rem,3vw,2.4rem);text-transform:uppercase;
+  font-weight:400;line-height:1}
+.ms__panel p{margin-top:12px;max-width:56ch;color:var(--ash);font-size:15px}
+.svc span[hidden]{display:none}
+
+/* ══ Standorte / Kontakt ══ */
+.locs{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-top:56px;background:var(--line)}
+.loc{background:var(--ink);padding:clamp(26px,4vw,46px)}
+.loc h3{font-size:clamp(1.8rem,3.4vw,3rem)}
+.loc dl{margin-top:22px;display:grid;grid-template-columns:auto 1fr;gap:10px 20px;font-size:15px}
+.loc dt{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);padding-top:4px}
+.loc a:hover{color:var(--red-lit)}
+@media(max-width:760px){.locs{grid-template-columns:1fr}}
+
+/* ══ Leistungsband ══ */
+.svc{display:flex;flex-wrap:wrap;gap:10px;margin-top:44px}
+.svc span{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  padding:10px 16px;border:1px solid var(--line);border-radius:100px;color:var(--ash);transition:.3s var(--e)}
+.svc span:hover{border-color:var(--red);color:var(--chalk)}
+
+/* ══ Ziellinie ══ */
+.fin{position:relative;z-index:2;text-align:center;padding-block:clamp(110px,16vw,220px)}
+.fin h2{font-size:clamp(2.8rem,9vw,8rem);line-height:1.0}
+.fin .cta{display:flex;gap:14px;justify-content:center;margin-top:44px;flex-wrap:wrap}
+.fin__line{width:min(620px,84%);height:14px;margin:64px auto 0;opacity:.14;
+  background:repeating-linear-gradient(45deg,#fff 0 12px,#000 12px 24px)}
+.foot{border-top:1px solid var(--line);padding-block:36px;font-size:12px;color:var(--faint)}
+.foot .wrap{display:flex;flex-wrap:wrap;gap:18px;justify-content:space-between}
+
+@media(prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+  .rv,.t,.card,.word,.brand{opacity:1!important;transform:none!important}
+  .mark path{stroke-dasharray:none!important;stroke-dashoffset:0!important}
+  .bar u em{width:var(--w)!important}
+  .phone{transform:none!important}
+  .mock__back{transform:translate(14%,-6%) rotate(6deg)!important}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#klassen">Zum Inhalt springen</a>
+<div class="grain" aria-hidden="true"></div><div class="vig" aria-hidden="true"></div>
+<div class="prog" id="prog" aria-hidden="true"></div>
+<div class="hud" aria-hidden="true">
+  <span class="tl"><i class="tick"></i>Fahrschule Krebs</span>
+  <span class="tr">Fulda · Bad Hersfeld</span>
+  <span class="bl" id="hudCh">Kapitel 01 — Impuls</span>
+  <span class="br">Seit 1964</span>
+</div>
+
+<nav class="nav" id="nav" aria-label="Hauptnavigation">
+  <div class="wrap">
+    <a class="brand" id="brand" href="#top" aria-label="Startseite">
+      <svg viewBox="0 0 1000 640" aria-hidden="true"><path d="M296 372C300 340 314 314 338 296C356 282 372 288 388 276C404 264 418 272 436 264C454 255 470 263 486 259C494 257 496 253 500 253C504 253 506 257 514 259C530 263 546 255 564 264C582 272 596 264 612 276C628 288 644 282 662 296C686 314 700 340 704 372C712 412 706 452 690 484C674 514 648 534 616 544C580 555 542 552 512 540C505 537 500 530 500 530C500 530 495 537 488 540C458 552 420 555 384 544C352 534 326 514 310 484C294 452 288 412 296 372Z"/></svg>
+      <b>KREBS</b><span class="sep"></span>
+      <i>FAHRSCHULE<br>VERKEHRSBILDUNGSZENTRUM</i>
+    </a>
+    <ul>
+      <li><a href="#klassen">Klassen</a></li><li><a href="#system">System</a></li>
+      <li><a href="#leistungen">Leistungen</a></li><li><a href="#standorte">Standorte</a></li>
+    </ul>
+    <a class="btn2" href="#standorte">Beratung</a>
+  </div>
+</nav>
+
+<main id="top">
+<!-- ══ KAPITEL 01 — der Impuls ══ -->
+<section class="hero" id="hero">
+  <div class="hero__pin">
+    <div class="hero__bg" id="heroBg"></div><div class="hero__glow"></div>
+    <h2 class="t t--fill" id="tTop" aria-hidden="true">Krebs</h2>
+    <div class="card" id="card">
+      <div class="card__sh"></div>
+      <canvas id="cv" aria-hidden="true"></canvas>
+      <video id="vid" muted playsinline preload="metadata" aria-hidden="true"></video>
+    </div>
+    <h2 class="t t--out" id="tBot" aria-hidden="true">Fahrschule</h2>
+    <div class="fr" id="fr" aria-hidden="true">FR 000</div>
+    <div class="mark" id="mark" aria-hidden="true">
+      <svg viewBox="0 0 1000 640">
+        <path class="p" d="M352 470C318 486 286 508 262 538C246 558 240 578 246 592C252 578 266 562 288 546C312 528 340 512 366 502Z"/>
+        <path class="p" d="M376 508C348 528 322 552 304 582C290 604 286 624 292 636C296 620 308 602 328 584C350 564 376 548 398 540Z"/>
+        <path class="p" d="M412 538C392 562 374 590 364 618C356 638 356 654 362 662C364 646 372 630 388 612C406 592 428 578 446 572Z"/>
+        <path class="p" d="M648 470C682 486 714 508 738 538C754 558 760 578 754 592C748 578 734 562 712 546C688 528 660 512 634 502Z"/>
+        <path class="p" d="M624 508C652 528 678 552 696 582C710 604 714 624 708 636C704 620 692 602 672 584C650 564 624 548 602 540Z"/>
+        <path class="p" d="M588 538C608 562 626 590 636 618C644 638 644 654 638 662C636 646 628 630 612 612C594 592 572 578 554 572Z"/>
+        <path class="p" d="M340 300C310 290 284 276 264 258C256 250 250 242 252 234L278 246C294 262 316 276 344 288Z"/>
+        <path class="p" d="M252 234C234 208 232 178 248 158C264 138 292 136 306 154C318 170 312 190 296 200C288 204 278 202 274 194C284 188 286 176 278 168C268 158 254 164 250 178C246 194 246 216 254 230Z"/>
+        <path class="p" d="M254 230C268 246 290 256 310 252C330 248 342 230 338 212C334 194 316 186 302 194C292 200 290 212 298 218C306 210 316 214 318 224C320 236 310 244 296 244C280 244 264 240 254 234Z"/>
+        <path class="p" d="M660 300C690 290 716 276 736 258C744 250 750 242 748 234L722 246C706 262 684 276 656 288Z"/>
+        <path class="p" d="M748 234C766 208 768 178 752 158C736 138 708 136 694 154C682 170 688 190 704 200C712 204 722 202 726 194C716 188 714 176 722 168C732 158 746 164 750 178C754 194 754 216 746 230Z"/>
+        <path class="p" d="M746 230C732 246 710 256 690 252C670 248 658 230 662 212C666 194 684 186 698 194C708 200 710 212 702 218C694 210 684 214 682 224C680 236 690 244 704 244C720 244 736 240 746 234Z"/>
+        <path class="p" d="M296 372C300 340 314 314 338 296C356 282 372 288 388 276C404 264 418 272 436 264C454 255 470 263 486 259C494 257 496 253 500 253C504 253 506 257 514 259C530 263 546 255 564 264C582 272 596 264 612 276C628 288 644 282 662 296C686 314 700 340 704 372C712 412 706 452 690 484C674 514 648 534 616 544C580 555 542 552 512 540C505 537 500 530 500 530C500 530 495 537 488 540C458 552 420 555 384 544C352 534 326 514 310 484C294 452 288 412 296 372Z"/>
+      </svg>
+    </div>
+    <div class="word" id="word" aria-hidden="true">
+      <b>KREBS</b><span class="sep"></span>
+      <div><em>FAHRSCHULE</em><s>VERKEHRSBILDUNGSZENTRUM</s></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ KAPITEL 02 — die Fahrzeugwelten ══ -->
+<section class="ch" id="klassen" data-ch="02 — Klassen">
+  <div class="wrap">
+    <div class="ch__no rv"><s>02</s> — Fahrzeugwelten</div>
+    <h2 class="rv d2">Vom ersten Meter<br><em>bis zum Beruf.</em></h2>
+    <p class="lead rv d3">Seit 1964 bilden wir alle Klassen aus — vom begleiteten Fahren ab 17 bis zum Bus. An zwei Standorten, mit denselben Fahrlehrern, die dich vom Anfang bis zur Prüfung kennen.</p>
+
+    <!-- Animated Glowing Search Bar (minhxthanh) — hier als Klassen-Finder -->
+    <div class="gsb rv d3" id="gsb">
+      <div class="gsb__halo" aria-hidden="true"></div><div class="gsb__ring" aria-hidden="true"></div>
+      <div class="gsb__field">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+        <label class="skip" for="finder">Führerscheinklasse suchen</label>
+        <input id="finder" type="text" role="combobox" autocomplete="off" spellcheck="false"
+               aria-autocomplete="list" aria-expanded="false" aria-controls="finderOut"
+               aria-describedby="finderHint"
+               placeholder="Welche Klasse suchst du? B, BF17, A1, C, D …">
+        <span class="gsb__hint" id="finderHint">Enter = anzeigen</span>
+      </div>
+      <div class="gsb__out" id="finderOut" role="listbox" aria-label="Treffer"></div>
+    </div>
+
+    <div class="acc" id="acc" role="tablist" aria-label="Fahrzeugwelten"></div>
+  </div>
+</section>
+
+<!-- ══ KAPITEL 03 — das System ══ -->
+<section class="ch" id="system" data-ch="03 — System">
+  <div class="wrap">
+    <div class="ch__no rv"><s>03</s> — Digitales Ausbildungssystem</div>
+    <h2 class="rv d2">Nicht nur eine App.<br><em>Dein Cockpit.</em></h2>
+    <!-- Section With Mockup (aghasisahakyan1): Text links, zwei versetzte Ebenen rechts -->
+    <div class="mockwrap">
+      <div>
+        <p class="lead rv d3" style="margin-top:0">Theoriefortschritt, Sonderfahrten, Simulatoreinheiten, Prüfungsreife und die Rückmeldung deines Fahrlehrers — an einer Stelle, statt auf sechs Zetteln.</p>
+        <div class="svc rv d3">
+          <span>Theoriefortschritt</span><span>Überland · Autobahn · Nacht</span><span>Simulatoreinheiten</span>
+          <span>Prüfungsreife</span><span>Fahrlehrer-Rückmeldung</span><span>Termine &amp; Historie</span>
+        </div>
+      </div>
+      <div class="mockstage rv d3" id="mockstage">
+        <div class="mock__glow" aria-hidden="true"></div>
+        <div class="mock__back" id="mockBack" aria-hidden="true"></div>
+        <div class="phone" id="mockPhone" role="img"
+             aria-label="Ansicht des Krebs-Cockpits: Theorie 78 Prozent, Sonderfahrten und Prüfungsreife im Überblick">
+          <div class="phone__notch" aria-hidden="true"></div>
+          <div class="phone__scr" aria-hidden="true">
+            <div class="phone__top"><span>Krebs Cockpit</span><span>Fulda</span></div>
+            <h4>Dein Stand</h4>
+            <div class="ring">
+              <svg viewBox="0 0 120 120" width="120" height="120">
+                <circle class="bg" cx="60" cy="60" r="52"/>
+                <circle class="fg" cx="60" cy="60" r="52" stroke-dasharray="326.7" stroke-dashoffset="71.9"/>
+              </svg>
+              <b>78%</b><i>Theorie</i>
+            </div>
+            <div class="bars">
+              <div class="bar"><s><span>Überland</span><span>4 / 5</span></s><u><em style="--w:80%"></em></u></div>
+              <div class="bar"><s><span>Autobahn</span><span>3 / 4</span></s><u><em style="--w:75%"></em></u></div>
+              <div class="bar"><s><span>Nacht</span><span>2 / 3</span></s><u><em style="--w:66%"></em></u></div>
+              <div class="bar"><s><span>Simulator</span><span>5 / 5</span></s><u><em style="--w:100%"></em></u></div>
+              <div class="bar"><s><span>Prüfungsreife</span><span>bald</span></s><u><em style="--w:62%"></em></u></div>
+            </div>
+            <div class="phone__foot"><span>Seit 1964</span><span>FR 128</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ KAPITEL 04 — Leistungen ══ -->
+<section class="ch" id="leistungen" data-ch="04 — Leistungen">
+  <div class="wrap">
+    <div class="ch__no rv"><s>04</s> — Mehr als Führerschein</div>
+    <h2 class="rv d2">Verkehrsbildungs&shy;zentrum.<br><em>Nicht nur Fahrschule.</em></h2>
+    <p class="lead rv d3">Berufliche Qualifikation, Seminare und individuelle Ausbildung — mit derselben Sorgfalt wie beim ersten Führerschein. Wähle deinen Weg, dann zeigen wir dir, was dazugehört.</p>
+
+    <!-- Gradient Selector Card #2520 (isaiahbjork) — Meilenstein-Picker -->
+    <div class="ms rv d3">
+      <div class="ms__track" id="ms" role="radiogroup" aria-label="Ausbildungsweg wählen">
+        <div class="ms__rail" aria-hidden="true"></div><div class="ms__fill" id="msFill" aria-hidden="true"></div>
+      </div>
+      <div class="ms__panel" id="msPanel"></div>
+    </div>
+
+    <div class="svc rv d3" id="svcOut">
+      <span data-p="erst">Klasse B</span><span data-p="erst">BF17 · Begleitetes Fahren</span>
+      <span data-p="erst">B197 · Automatik</span><span data-p="erst">Mofa · AM · A1</span>
+      <span data-p="erst">Ferienfahrschule</span><span data-p="erst sem">Simulatorstunden</span>
+      <span data-p="erw">A2 · A</span><span data-p="erw">BE · Anhänger</span>
+      <span data-p="erw">B96</span><span data-p="erw beruf">C1 · C1E</span>
+      <span data-p="beruf">C · CE</span><span data-p="beruf">D · DE · Bus</span>
+      <span data-p="beruf">Berufskraftfahrer</span><span data-p="beruf">Gefahrgut ADR</span>
+      <span data-p="beruf">Staplerschein</span><span data-p="beruf">Ladungssicherung</span>
+      <span data-p="sem">ASF-Seminar</span><span data-p="sem">FES-Seminar</span>
+      <span data-p="sem">Handicap-Ausbildung</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ KAPITEL 05 — Standorte ══ -->
+<section class="ch" id="standorte" data-ch="05 — Standorte">
+  <div class="wrap">
+    <div class="ch__no rv"><s>05</s> — Zwei Standorte</div>
+    <h2 class="rv d2">Fulda &amp;<br><em>Bad Hersfeld.</em></h2>
+    <div class="locs rv d3">
+      <div class="loc">
+        <h3>Fulda</h3>
+        <dl>
+          <dt>Adresse</dt><dd>Am Bahnhof 3<br>36037 Fulda</dd>
+          <dt>Telefon</dt><dd><a href="tel:+4966122670">0661 22670</a></dd>
+          <dt>E-Mail</dt><dd><a href="mailto:info@fahrschule-krebs.de">info@fahrschule-krebs.de</a></dd>
+        </dl>
+      </div>
+      <div class="loc">
+        <h3>Bad Hersfeld</h3>
+        <dl>
+          <dt>Telefon</dt><dd><a href="tel:+4966217991929">06621 7991929</a></dd>
+          <dt>E-Mail</dt><dd><a href="mailto:info@fahrschule-krebs.de">info@fahrschule-krebs.de</a></dd>
+          <dt>Hinweis</dt><dd>Adresse und Öffnungszeiten werden ergänzt.</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ══ KAPITEL 06 — die Ziellinie ══ -->
+<section class="fin" data-ch="06 — Ziellinie">
+  <div class="wrap">
+    <div class="ch__no rv" style="justify-content:center"><s>06</s> — Dein nächster Schritt</div>
+    <h2 class="rv d2">Dein Führerschein<br>beginnt nicht<br><em>mit Warten.</em></h2>
+    <div class="cta rv d3">
+      <span class="lm" data-lm="Beratung starten"></span>
+      <a class="btn2" href="tel:+4966122670">0661 22670 anrufen</a>
+    </div>
+    <div class="fin__line" aria-hidden="true"></div>
+  </div>
+</section>
+
+<footer class="foot"><div class="wrap">
+  <span>Fahrschule Krebs GmbH · Am Bahnhof 3 · 36037 Fulda</span>
+  <span>Seit 1964 · Fulda &amp; Bad Hersfeld</span>
+</div></footer>
+
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/ScrollTrigger.min.js"></script>
+<script>
+(()=>{
+'use strict';
+gsap.registerPlugin(ScrollTrigger);
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+
+/* ── Medien: lokal bevorzugt, CDN als Rückfall bis assets/download.sh lief ── */
+const CDN='https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/';
+const MEDIA={
+  hero:{local:'assets/media/hero-nightdrive.mp4', cdn:CDN+'hf_20260729_015111_86ae101f-876c-41a4-83d4-8a1ca4bb4019.mp4'},
+  pkw:{local:'assets/media/welt-pkw.png',      cdn:CDN+'hf_20260729_020837_046605f4-58a0-4762-9a69-e91a6ade33b1.png'},
+  moto:{local:'assets/media/welt-motorrad.png',cdn:CDN+'hf_20260729_020850_fa197d6e-68bb-4068-a594-cbd01090e5ab.png'},
+  lkw:{local:'assets/media/welt-lkw.png',      cdn:CDN+'hf_20260729_021826_9dc7f665-9452-4553-af3b-e1954f25a6d7.png'},
+  bus:{local:'assets/media/welt-bus.png',      cdn:CDN+'hf_20260729_021819_523b9900-d299-4828-9099-6a785246e1ae.png'},
+  hand:{local:'assets/media/handicap.png',     cdn:CDN+'hf_20260729_021023_9f6849a1-7f62-41c9-879c-322e5a89bf6c.png'}
+};
+const src=k=>MEDIA[k].local, fallback=k=>MEDIA[k].cdn;
+
+/* ══ Fahrzeugwelten — Accordion #5189: 450px / 400px / 60px / 700ms ease-in-out ══ */
+const WELTEN=[
+  {k:'pkw', t:'Pkw & Anhänger', m:'B · BF17 · B197 · BE · B96'},
+  {k:'moto',t:'Zweirad',        m:'Mofa · AM · A1 · A2 · A'},
+  {k:'lkw', t:'Lkw',            m:'C · CE · C1 · C1E'},
+  {k:'bus', t:'Bus',            m:'D · DE'},
+  {k:'hand',t:'Handicap & Beruf',m:'Individuell begleitet · BKF · ADR'}
+];
+const acc=$('#acc'),activators={};
+WELTEN.forEach((w,i)=>{
+  const b=document.createElement('button');
+  b.className='acc__i'+(i===4?' on':''); /* Start-Index 4 wie im Original */
+  b.setAttribute('role','tab');b.setAttribute('aria-selected',i===4);
+  b.innerHTML=`<img alt="${w.t}" src="${src(w.k)}" onerror="this.onerror=null;this.src='${fallback(w.k)}'">
+    <span class="ov"></span><span class="cap">${w.t}</span><span class="meta">${w.m}</span>`;
+  const activate=()=>{$$('.acc__i').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-selected','false')});
+    b.classList.add('on');b.setAttribute('aria-selected','true')};
+  b.addEventListener('mouseenter',activate);
+  b.addEventListener('focus',activate);   /* Tastaturbedienung ergänzt */
+  b.addEventListener('click',activate);
+  activators[w.k]=()=>{activate();b.focus({preventScroll:true})};
+  acc.appendChild(b);
+});
+
+/* ══ Klassen-Finder — Animated Glowing Search Bar (minhxthanh) ══
+   Ring/Halo laufen in CSS; hier nur Fokus-Zustand und die Trefferliste. */
+const KAT=[
+  {t:'Klasse B',        m:'Pkw · ab 18',                w:'pkw',  q:'b pkw auto wagen klasse b'},
+  {t:'BF17',            m:'Begleitetes Fahren ab 17',   w:'pkw',  q:'bf17 17 siebzehn begleitet begleitetes fahren'},
+  {t:'B197',            m:'Automatik mit Schaltnachweis',w:'pkw', q:'b197 197 automatik schaltung'},
+  {t:'BE · B96',        m:'Pkw mit Anhänger',           w:'pkw',  q:'be b96 96 anhänger anhaenger caravan wohnwagen'},
+  {t:'Mofa · AM · A1',  m:'Roller & Leichtkraftrad',    w:'moto', q:'mofa am a1 roller moped 125 leichtkraftrad zweirad'},
+  {t:'A2 · A',          m:'Motorrad',                   w:'moto', q:'a2 a motorrad bike zweirad maschine'},
+  {t:'C1 · C1E',        m:'Kleiner Lkw',                w:'lkw',  q:'c1 c1e kleiner lkw 7,5 transporter'},
+  {t:'C · CE',          m:'Lkw & Lastzug',              w:'lkw',  q:'c ce lkw laster truck lastzug sattelzug'},
+  {t:'D · DE',          m:'Bus',                        w:'bus',  q:'d de bus omnibus personenbeförderung'},
+  {t:'Berufskraftfahrer',m:'BKF-Qualifikation',         w:'hand', q:'bkf berufskraftfahrer beruf qualifikation weiterbildung 95'},
+  {t:'Gefahrgut ADR',   m:'Gefahrgutschein',            w:'hand', q:'adr gefahrgut gefahrgutschein'},
+  {t:'Stapler',         m:'Flurförderzeuge',            w:'hand', q:'stapler gabelstapler flurförder'},
+  {t:'Handicap',        m:'Individuell begleitet',      w:'hand', q:'handicap behinderung inklusion individuell umbau'}
+];
+const gsb=$('#gsb'),finder=$('#finder'),fout=$('#finderOut');
+const closeOut=()=>{fout.classList.remove('on');fout.innerHTML='';finder.setAttribute('aria-expanded','false')};
+const jumpTo=k=>{closeOut();$('#klassen .acc').scrollIntoView({behavior:reduced?'auto':'smooth',block:'center'});
+  setTimeout(()=>activators[k]&&activators[k](),reduced?0:520)};
+function runFinder(){
+  const v=finder.value.trim().toLowerCase();
+  if(!v){closeOut();return}
+  const hits=KAT.filter(k=>(k.q+' '+k.t.toLowerCase()).includes(v)).slice(0,6);
+  fout.innerHTML=hits.length
+    ? hits.map(h=>`<button type="button" role="option" data-w="${h.w}"><b>${h.t}</b><s>${h.m}</s></button>`).join('')
+    : '<div class="gsb__none">Kein Treffer — ruf uns an: 0661 22670</div>';
+  fout.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>jumpTo(b.dataset.w)));
+  fout.classList.add('on');finder.setAttribute('aria-expanded','true');
+}
+finder.addEventListener('input',runFinder);
+finder.addEventListener('focus',()=>{gsb.classList.add('hot');runFinder()});
+finder.addEventListener('blur',()=>{gsb.classList.remove('hot');setTimeout(closeOut,160)});
+finder.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();const f=fout.querySelector('button');if(f)jumpTo(f.dataset.w)}
+  if(e.key==='Escape')closeOut();
+  if(e.key==='ArrowDown'){const f=fout.querySelector('button');if(f){e.preventDefault();f.focus()}}
+});
+
+/* ══ Ausbildungswege — Gradient Selector Card (isaiahbjork) ══
+   Zeigerposition wandert als --x/--y in den Radialverlauf; gewählte Karte
+   behält den Verlaufsrand. Die Leistungen darunter filtern sich mit. */
+const WEGE=[
+  {k:'erst', n:'01',t:'Erster Führerschein', d:'Von der Anmeldung bis zur praktischen Prüfung — Auto, Roller, Leichtkraftrad.'},
+  {k:'erw',  n:'02',t:'Erweiterung',         d:'Du fährst schon und willst mehr: Motorrad, Anhänger, kleiner Lkw.'},
+  {k:'beruf',n:'03',t:'Beruf & Gewerbe',     d:'Lkw, Bus, Berufskraftfahrer-Qualifikation, Gefahrgut, Stapler, Ladung.'},
+  {k:'sem',  n:'04',t:'Seminare & Individuell',d:'ASF und FES sowie Ausbildung mit Handicap — individuell begleitet.'}
+];
+const gsc=$('#gsc'),svcOut=$('#svcOut');
+const filterSvc=k=>$$('#svcOut span').forEach(s=>{s.hidden=!s.dataset.p.split(' ').includes(k)});
+WEGE.forEach((w,i)=>{
+  const c=document.createElement('button');
+  c.type='button';c.className='gsc__c';c.setAttribute('role','radio');
+  c.setAttribute('aria-checked',i===0);c.tabIndex=i===0?0:-1;
+  c.innerHTML=`<span class="gsc__dot" aria-hidden="true"></span><span class="gsc__k">Weg ${w.n}</span>
+    <h3>${w.t}</h3><p>${w.d}</p>`;
+  const pick=()=>{$$('.gsc__c').forEach(x=>{x.setAttribute('aria-checked','false');x.tabIndex=-1});
+    c.setAttribute('aria-checked','true');c.tabIndex=0;filterSvc(w.k)};
+  c.addEventListener('click',pick);
+  c.addEventListener('pointermove',e=>{const r=c.getBoundingClientRect();
+    c.style.setProperty('--x',(e.clientX-r.left)+'px');c.style.setProperty('--y',(e.clientY-r.top)+'px')});
+  c.addEventListener('keydown',e=>{
+    const d=e.key==='ArrowRight'||e.key==='ArrowDown'?1:e.key==='ArrowLeft'||e.key==='ArrowUp'?-1:0;
+    if(!d)return;e.preventDefault();
+    const all=$$('.gsc__c'),n=all[(all.indexOf(c)+d+all.length)%all.length];n.focus();n.click()});
+  gsc.appendChild(c);
+});
+filterSvc('erst');
+
+/* ══ Cockpit-Schaufenster — Section With Mockup (aghasisahakyan1) ══
+   Rückebene und Gerät laufen gegenläufig durch den Sichtbereich. */
+const stage=$('#mockstage');
+if(!reduced){
+  gsap.fromTo('#mockBack',{xPercent:14,yPercent:10,rotation:9},
+    {yPercent:-20,rotation:3,ease:'none',
+     scrollTrigger:{trigger:stage,start:'top bottom',end:'bottom top',scrub:.6}});
+  gsap.fromTo('#mockPhone',{yPercent:7},
+    {yPercent:-7,ease:'none',
+     scrollTrigger:{trigger:stage,start:'top bottom',end:'bottom top',scrub:.6}});
+}
+new IntersectionObserver((es,o)=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');o.unobserve(e.target)}}),
+  {threshold:.3}).observe(stage);
+
+/* ══ Liquid-Metal-CTA — Mechanik #10443 (Geschwindigkeit 0.6 / 1 / 2.4, Ripple 600ms) ══ */
+$$('[data-lm]').forEach(host=>{
+  host.innerHTML=`<div class="lm__box"><div class="lm__label">${host.dataset.lm}</div>
+    <div class="lm__inner"><div></div></div>
+    <div class="lm__shell"><canvas></canvas></div><button class="lm__hit" aria-label="${host.dataset.lm}"></button></div>`;
+  const cv=host.querySelector('canvas'),hit=host.querySelector('.lm__hit');
+  const ctx=cv.getContext('2d');let speed=.6,t=0,raf=0;
+  const W=172,H=46;cv.width=W*2;cv.height=H*2;ctx.scale(2,2);
+  function paint(){ /* Metallfluss: Angle 45°, Scale 8, Repetition 4 — Parameter aus dem Original */
+    const g=ctx.createLinearGradient(0,0,W*.7,H);
+    const p=(t*.06)%1;
+    for(let i=0;i<=4;i++){const s=(i/4+p)%1;
+      const v=Math.sin(s*Math.PI*2)*.5+.5;
+      g.addColorStop(s,`rgba(${Math.round(120+v*135)},${Math.round(20+v*40)},${Math.round(26+v*44)},1)`);}
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(255,255,255,.10)';ctx.fillRect(0,0,W,H*.45);
+  }
+  function loop(){t+=speed;paint();raf=requestAnimationFrame(loop)}
+  const io=new IntersectionObserver(e=>{e[0].isIntersecting?(raf||loop()):(cancelAnimationFrame(raf),raf=0)});
+  io.observe(host);
+  host.addEventListener('mouseenter',()=>speed=1);
+  host.addEventListener('mouseleave',()=>{speed=.6;host.classList.remove('press')});
+  hit.addEventListener('mousedown',()=>host.classList.add('press'));
+  hit.addEventListener('mouseup',()=>host.classList.remove('press'));
+  hit.addEventListener('click',e=>{
+    speed=2.4;setTimeout(()=>speed=host.matches(':hover')?1:.6,300);
+    const r=hit.getBoundingClientRect(),rip=document.createElement('span');
+    rip.className='lm__rip';rip.style.left=(e.clientX-r.left)+'px';rip.style.top=(e.clientY-r.top)+'px';
+    hit.appendChild(rip);setTimeout(()=>rip.remove(),600);
+    location.href='#standorte';
+  });
+});
+
+/* ══ HERO — Hero Scrub #12213, Konstanten unverändert ══ */
+const PIN_VH_MULTIPLE=3.2, IMMERSE_OVERFILL=1.04, ENTRY_DELAY=0.2;
+const CARD_START_SCALE_DESKTOP=0.6, CARD_START_SCALE_MOBILE=0.82;
+const FRAME_COUNT=180, frameUrl=i=>`assets/hero-frames/${String(i+1).padStart(4,'0')}.jpg`;
+
+const card=$('#card'),cv=$('#cv'),vid=$('#vid'),tTop=$('#tTop'),tBot=$('#tBot'),
+      heroBg=$('#heroBg'),mark=$('#mark'),word=$('#word'),fr=$('#fr'),brand=$('#brand');
+let aspect=16/9,framesOk=true,lastDrawn=-1,useVideo=false,ready=false;
+const images=new Array(FRAME_COUNT);
+
+function sizeCard(){card.style.width=`min(96vw, calc(72svh * ${aspect}))`;
+  card.style.height=`min(72svh, 96vw / ${aspect})`;card.style.aspectRatio=aspect;}
+sizeCard();
+
+/* Ouvertüre: drei Akte nacheinander — nie gleichzeitig */
+function overture(){
+  const paths=$$('#mark .p');
+  paths.forEach(p=>{const L=p.getTotalLength();p.style.strokeDasharray=L;p.style.strokeDashoffset=L});
+  if(reduced){paths.forEach(p=>p.style.strokeDashoffset=0);
+    gsap.set([word,card,tTop,tBot,brand],{opacity:1});return}
+  const tl=gsap.timeline({delay:.3});
+  tl.to(paths,{strokeDashoffset:0,duration:1.15,ease:'power2.inOut',stagger:.075},0)
+    .to(word,{opacity:1,duration:.7,ease:'power2.out'},'-=0.30')
+    .to({},{duration:.4})
+    /* Übergabe — Werte der Entry-Timeline aus #12213 unverändert */
+    .to([mark,word],{opacity:0,duration:.75,ease:'power2.inOut'},'ov')
+    .to(mark,{scale:.9,duration:.75,ease:'power2.inOut'},'ov')
+    .to(heroBg,{opacity:1,duration:1.4,ease:'power2.out'},'ov')
+    .to(card,{opacity:1,duration:1.1,ease:'power3.out'},'ov+=0.35')
+    .fromTo(tTop,{y:30},{opacity:1,y:0,duration:1,ease:'expo.out'},'ov+=0.5')
+    .fromTo(tBot,{y:-30},{opacity:1,y:0,duration:1,ease:'expo.out'},'ov+=0.62')
+    .to(brand,{opacity:1,duration:.6,ease:'power2.out'},'ov+=0.7');
+  brand.classList.add('on');
+}
+
+/* Frames laden — Reihenfolge/Timings aus dem Original; Video als Rückfall */
+function loadMedia(){
+  if(reduced)return boot();
+  let errored=0;
+  const first=img=>{cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+    cv.getContext('2d').drawImage(img,0,0);lastDrawn=0;
+    aspect=img.naturalWidth/img.naturalHeight;sizeCard();ready=true;boot()};
+  const err=()=>{if(++errored>=5&&framesOk){framesOk=false;videoFallback()}};
+  const one=i=>{const im=new Image();im.decoding='async';if(i<4)im.fetchPriority='high';
+    im.onerror=err;if(i===0)im.onload=()=>first(im);im.src=frameUrl(i);images[i]=im};
+  for(let i=0;i<Math.min(20,FRAME_COUNT);i++)one(i);
+  let cur=20;const next=()=>{const end=Math.min(FRAME_COUNT,cur+20);
+    for(let i=cur;i<end;i++)one(i);cur=end;if(cur<FRAME_COUNT)setTimeout(next,80)};
+  setTimeout(next,200);
+  setTimeout(()=>{if(!images[0]||!images[0].complete){framesOk=false;videoFallback()}},4500);
+}
+/* Kein Frame-Ordner? Dann wird dasselbe Video über currentTime gescrubbt. */
+function videoFallback(){
+  useVideo=true;cv.style.display='none';
+  vid.src=src('hero');vid.onerror=()=>{vid.src=fallback('hero')};
+  vid.addEventListener('loadedmetadata',()=>{aspect=vid.videoWidth/vid.videoHeight||16/9;
+    sizeCard();ready=true;boot()},{once:true});
+}
+let built=false;
+function boot(){
+  if(built||reduced)return;built=true;
+  const startScale=()=>innerWidth<768?CARD_START_SCALE_MOBILE:CARD_START_SCALE_DESKTOP;
+  const immerseScale=()=>{const vw=innerWidth,vh=innerHeight;
+    const bW=Math.min(vw*.96,vh*.72*aspect),bH=Math.min(vh*.72,(vw*.96)/aspect);
+    if(bW<=0||bH<=0)return 1.5;return Math.max(vw/bW,vh/bH)*IMMERSE_OVERFILL};
+  const isLoaded=i=>{const im=images[i];return !!im&&im.complete&&im.naturalWidth>0};
+  const draw=idx=>{
+    if(useVideo){if(vid.readyState>=1&&isFinite(vid.duration)){
+        const t=clamp(idx/FRAME_COUNT*vid.duration,0,vid.duration-.05);
+        if(Math.abs(vid.currentTime-t)>.03)vid.currentTime=t}
+      fr.textContent='FR '+String(idx).padStart(3,'0');return}
+    if(!framesOk)return;let u=idx;
+    if(!isLoaded(u)){let f=-1;for(let d=1;d<FRAME_COUNT;d++){
+        if(u-d>=0&&isLoaded(u-d)){f=u-d;break}if(u+d<FRAME_COUNT&&isLoaded(u+d)){f=u+d;break}}
+      if(f===-1)return;u=f}
+    if(lastDrawn===u)return;
+    cv.getContext('2d').drawImage(images[u],0,0,cv.width,cv.height);lastDrawn=u;
+    fr.textContent='FR '+String(u).padStart(3,'0');
+  };
+  gsap.set(card,{scale:startScale(),transformOrigin:'50% 50%'});
+  const m=gsap.timeline({scrollTrigger:{trigger:'#hero',start:'top top',end:'bottom bottom',
+    scrub:0.4,invalidateOnRefresh:true,
+    onUpdate:s=>{const p=s.progress;
+      draw(Math.min(FRAME_COUNT-1,Math.floor(gsap.utils.clamp(0,1,(p-0.15)/0.63)*FRAME_COUNT)));}}});
+  m.to(card,{scale:1,ease:'power2.out',duration:0.15},0)
+   .to(tTop,{x:()=>innerWidth<768?'-70vw':'-60vw',letterSpacing:'0.02em',ease:'power2.inOut',duration:0.15},0)
+   .to(tBot,{x:()=>innerWidth<768?'70vw':'60vw',letterSpacing:'0.02em',ease:'power2.inOut',duration:0.15},0)
+   .to(card,{scale:immerseScale(),ease:'power2.in',duration:0.63},0.15)
+   .to(tTop,{opacity:0,ease:'power1.in',duration:0.22},0.15)
+   .to(tBot,{opacity:0,ease:'power1.in',duration:0.22},0.15)
+   .to(card,{scale:startScale(),ease:'power3.inOut',duration:0.22},0.78)
+   .to(tTop,{x:0,opacity:1,letterSpacing:'-0.04em',ease:'power2.inOut',duration:0.22},0.78)
+   .to(tBot,{x:0,opacity:1,letterSpacing:'-0.04em',ease:'power2.inOut',duration:0.22},0.78);
+  ScrollTrigger.refresh();
+}
+
+/* ── Kapitel-Reveals, HUD-Kapitel, Fortschrittslinie, Navigation ── */
+const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),
+  {threshold:.15,rootMargin:'0px 0px -8% 0px'});
+$$('.rv').forEach(el=>io.observe(el));
+
+const chapters=$$('[data-ch]'),nav=$('#nav'),prog=$('#prog'),hudCh=$('#hudCh'),links=$$('.nav ul a');
+addEventListener('scroll',()=>{
+  const max=document.documentElement.scrollHeight-innerHeight;
+  prog.style.width=(clamp(scrollY/(max||1),0,1)*100).toFixed(2)+'%';
+  nav.classList.toggle('solid',scrollY>60);
+  let cur=null;chapters.forEach(c=>{if(c.getBoundingClientRect().top<innerHeight*.5)cur=c});
+  if(cur){hudCh.textContent='Kapitel '+cur.dataset.ch;
+    const id='#'+cur.id;links.forEach(a=>a.classList.toggle('on',a.getAttribute('href')===id));}
+  else hudCh.textContent='Kapitel 01 — Impuls';
+},{passive:true});
+
+$$('a[href^="#"]').forEach(a=>a.addEventListener('click',e=>{
+  const t=$(a.getAttribute('href'));if(!t)return;e.preventDefault();
+  t.scrollIntoView({behavior:reduced?'auto':'smooth'})}));
+
+overture();loadMedia();
+addEventListener('resize',()=>{sizeCard();ScrollTrigger.refresh()},{passive:true});
+window.__krebs={frames:FRAME_COUNT,get mode(){return useVideo?'video-scrub':'frame-sequence'},get ready(){return ready}};
+})();
+</script>
+</body>
+</html>
