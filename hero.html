@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fahrschule Krebs — Hero</title>
+<style>
+/* ── Schriften: lokal, kein CDN ── */
+@font-face{font-family:"Anton";src:url("assets/fonts/anton-latin-400-normal.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Archivo";src:url("assets/fonts/archivo-latin-400-normal.woff2") format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Archivo";src:url("assets/fonts/archivo-latin-800-normal.woff2") format("woff2");font-weight:800;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");font-weight:400;font-display:swap}
+
+:root{
+  --red:#e10a17; --red-lit:#ff2b36; --gold:#f5c400;
+  --ink:#07080a; --ink-2:#0d0f13; --chalk:#f2efe9; --ash:#8e8a84;
+  --e:cubic-bezier(0.16,1,0.3,1);
+  --display:"Anton","Arial Narrow",sans-serif;
+  --text:"Archivo",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--ink)}
+body{background:var(--ink);color:var(--chalk);font-family:var(--text);overflow-x:hidden}
+
+/* ── HERO: Höhe = (PIN_VH_MULTIPLE + 1) × 100vh — exakt wie Original #12213 ── */
+.hero{position:relative;width:100%;overflow:clip;height:420vh}
+.sticky{position:sticky;top:0;display:flex;height:100svh;width:100%;flex-direction:column;
+  align-items:center;justify-content:center;overflow:hidden;gap:.75rem}
+@media(min-width:768px){.sticky{gap:1rem}}
+
+/* Bühne */
+.bg{position:absolute;inset:0;z-index:0;background:
+  radial-gradient(120% 80% at 50% 8%,#16181f 0%,#0a0b0e 55%,#07080a 100%)}
+.bg-glow{position:absolute;inset:0;z-index:0;
+  background:radial-gradient(ellipse at 50% 35%,rgba(255,255,255,.08) 0%,rgba(0,0,0,0) 55%)}
+.bg-vig{position:absolute;inset:0;z-index:0;
+  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+.grain{position:fixed;inset:0;z-index:60;pointer-events:none;opacity:.055;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ── HUD: Mono-Mikrolabels an den Rändern (Referenz: "FR 159", "03 — ENGINEERING") ── */
+.hud{position:absolute;inset:0;z-index:30;pointer-events:none;font-family:var(--mono);
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(242,239,233,.42)}
+.hud>span{position:absolute}
+.hud .tl{left:24px;top:22px}
+.hud .tr{right:24px;top:22px;text-align:right}
+.hud .bl{left:24px;bottom:22px}
+.hud .br{right:24px;bottom:22px;text-align:right}
+.hud i{font-style:normal;color:var(--red-lit)}
+/* gelb-roter Doppelstrich aus dem Logo — Mikrodetail */
+.tick{display:inline-block;width:3px;height:11px;vertical-align:-1px;margin-right:7px;
+  background:linear-gradient(var(--gold) 0 50%,var(--red) 50% 100%)}
+/* Frame-Counter wie "217" in der Referenz */
+.fr{position:absolute;left:24px;bottom:52px;z-index:30;font-family:var(--display);
+  font-size:clamp(34px,4.4vw,64px);line-height:1;letter-spacing:.01em;
+  color:transparent;-webkit-text-stroke:1px rgba(242,239,233,.22);pointer-events:none}
+
+/* ── Typo-Sandwich: eine Zeile gefüllt, eine Outline ── */
+.t{font-family:var(--display);text-transform:uppercase;line-height:.85;letter-spacing:-.04em;
+  font-size:clamp(2.9rem,9.4vw,8.4rem);position:relative;z-index:10;will-change:transform,opacity;opacity:0}
+.t-top{color:var(--chalk)}
+.t-bot{color:transparent;-webkit-text-stroke:1.5px var(--chalk)}
+
+/* ── Scrub-Karte ── */
+.card{position:relative;z-index:10;overflow:hidden;border-radius:12px;
+  box-shadow:0 20px 80px rgba(0,0,0,.55);outline:1px solid rgba(255,255,255,.1);outline-offset:-1px;
+  will-change:transform;opacity:0}
+@media(min-width:768px){.card{border-radius:16px}}
+.card .inner-sh{position:absolute;inset:0;z-index:20;pointer-events:none;
+  box-shadow:inset 0 0 120px rgba(0,0,0,.45)}
+.card canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+/* Fallback, solange keine Frames vorhanden sind */
+.card .plate{position:absolute;inset:0;background:
+  radial-gradient(80% 60% at 72% 46%,rgba(225,10,23,.20),transparent 62%),
+  linear-gradient(180deg,#15171d,#08090c);
+  display:grid;place-items:center}
+.card .plate span{font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  text-transform:uppercase;color:rgba(242,239,233,.3)}
+
+/* ── AKT 1+2: die Krebs-Linie ── */
+.mark{position:absolute;z-index:40;inset:0;display:grid;place-items:center;pointer-events:none}
+.mark svg{width:min(52vw,560px);height:auto;overflow:visible}
+.mark path{fill:none;stroke:var(--red);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;
+  filter:drop-shadow(0 0 6px rgba(225,10,23,.5))}
+.word{position:absolute;z-index:41;display:flex;align-items:center;gap:14px;
+  bottom:calc(50% - min(26vw,280px) - 78px);opacity:0}
+.word b{font-family:var(--display);font-size:clamp(30px,5vw,58px);letter-spacing:.005em;
+  color:var(--red);line-height:1}
+.word .sep{width:9px;height:clamp(30px,5vw,58px);
+  background:linear-gradient(var(--chalk) 0 33%,var(--red) 33% 66%,var(--gold) 66% 100%)}
+.word .sub{display:flex;flex-direction:column;gap:3px;line-height:1}
+.word .sub em{font-style:normal;font-family:var(--display);font-size:clamp(11px,1.5vw,17px);
+  letter-spacing:.3em;color:transparent;-webkit-text-stroke:.8px var(--chalk)}
+.word .sub s{text-decoration:none;font-family:var(--display);
+  font-size:clamp(12px,1.7vw,19px);letter-spacing:.02em;color:var(--chalk)}
+
+@media(prefers-reduced-motion:reduce){
+  .mark path{stroke-dasharray:none!important;stroke-dashoffset:0!important}
+  .word{opacity:1!important}
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="grain" aria-hidden="true"></div>
+
+<section class="hero" id="hero" aria-label="Fahrschule Krebs">
+  <div class="sticky">
+    <div class="bg" id="bg" aria-hidden="true"></div>
+    <div class="bg-glow" aria-hidden="true"></div>
+    <div class="bg-vig" aria-hidden="true"></div>
+
+    <div class="hud" aria-hidden="true">
+      <span class="tl"><i class="tick"></i>Fahrschule Krebs</span>
+      <span class="tr">Fulda 50.55°N · Bad&nbsp;Hersfeld</span>
+      <span class="bl">Kapitel 01 — Impuls</span>
+      <span class="br">Seit 1964</span>
+    </div>
+    <div class="fr" id="fr" aria-hidden="true">FR 000</div>
+
+    <h2 class="t t-top" id="tTop" aria-hidden="true">Krebs</h2>
+
+    <div class="card" id="card">
+      <div class="inner-sh"></div>
+      <div class="plate" id="plate"><span>Frame-Sequenz wird geladen</span></div>
+      <canvas id="cv" aria-hidden="true"></canvas>
+    </div>
+
+    <h2 class="t t-bot" id="tBot" aria-hidden="true">Fahrschule</h2>
+
+    <!-- AKT 1: Kontur zeichnet sich. PLATZHALTER — wird gegen euren echten Pfad getauscht. -->
+    <div class="mark" id="mark">
+      <svg viewBox="0 0 1000 640" id="crab" role="img" aria-label="Fahrschule Krebs Markenzeichen">
+        <!-- Beine links: geschlossene, sich verjüngende Klingen -->
+        <path class="p" d="M352 470C318 486 286 508 262 538C246 558 240 578 246 592C252 578 266 562 288 546C312 528 340 512 366 502Z"/>
+        <path class="p" d="M376 508C348 528 322 552 304 582C290 604 286 624 292 636C296 620 308 602 328 584C350 564 376 548 398 540Z"/>
+        <path class="p" d="M412 538C392 562 374 590 364 618C356 638 356 654 362 662C364 646 372 630 388 612C406 592 428 578 446 572Z"/>
+        <!-- Beine rechts -->
+        <path class="p" d="M648 470C682 486 714 508 738 538C754 558 760 578 754 592C748 578 734 562 712 546C688 528 660 512 634 502Z"/>
+        <path class="p" d="M624 508C652 528 678 552 696 582C710 604 714 624 708 636C704 620 692 602 672 584C650 564 624 548 602 540Z"/>
+        <path class="p" d="M588 538C608 562 626 590 636 618C644 638 644 654 638 662C636 646 628 630 612 612C594 592 572 578 554 572Z"/>
+        <!-- Schere links: Arm + zwei Zangenschenkel mit offenem Spalt -->
+        <path class="p" d="M340 300C310 290 284 276 264 258C256 250 250 242 252 234L278 246C294 262 316 276 344 288Z"/>
+        <path class="p" d="M252 234C234 208 232 178 248 158C264 138 292 136 306 154C318 170 312 190 296 200C288 204 278 202 274 194C284 188 286 176 278 168C268 158 254 164 250 178C246 194 246 216 254 230Z"/>
+        <path class="p" d="M254 230C268 246 290 256 310 252C330 248 342 230 338 212C334 194 316 186 302 194C292 200 290 212 298 218C306 210 316 214 318 224C320 236 310 244 296 244C280 244 264 240 254 234Z"/>
+        <!-- Schere rechts (gespiegelt) -->
+        <path class="p" d="M660 300C690 290 716 276 736 258C744 250 750 242 748 234L722 246C706 262 684 276 656 288Z"/>
+        <path class="p" d="M748 234C766 208 768 178 752 158C736 138 708 136 694 154C682 170 688 190 704 200C712 204 722 202 726 194C716 188 714 176 722 168C732 158 746 164 750 178C754 194 754 216 746 230Z"/>
+        <path class="p" d="M746 230C732 246 710 256 690 252C670 248 658 230 662 212C666 194 684 186 698 194C708 200 710 212 702 218C694 210 684 214 682 224C680 236 690 244 704 244C720 244 736 240 746 234Z"/>
+        <!-- Panzer: breite Schale mit gewellter Oberkante, Kerbe unten -->
+        <path class="p" d="M296 372C300 340 314 314 338 296C356 282 372 288 388 276C404 264 418 272 436 264C454 255 470 263 486 259C494 257 496 253 500 253C504 253 506 257 514 259C530 263 546 255 564 264C582 272 596 264 612 276C628 288 644 282 662 296C686 314 700 340 704 372C712 412 706 452 690 484C674 514 648 534 616 544C580 555 542 552 512 540C505 537 500 530 500 530C500 530 495 537 488 540C458 552 420 555 384 544C352 534 326 514 310 484C294 452 288 412 296 372Z"/>
+      </svg>
+    </div>
+
+    <div class="word" id="word">
+      <b>KREBS</b><span class="sep"></span>
+      <span class="sub"><em>FAHRSCHULE</em><s>VERKEHRSBILDUNGSZENTRUM</s></span>
+    </div>
+  </div>
+</section>
+
+<script src="vendor/gsap.min.js"></script>
+<script src="vendor/ScrollTrigger.min.js"></script>
+<script>
+(()=>{
+'use strict';
+gsap.registerPlugin(ScrollTrigger);
+
+/* ══ Werte 1:1 aus dem Originalcode Hero Scrub #12213 ══ */
+const PIN_VH_MULTIPLE=3.2, IMMERSE_OVERFILL=1.04, ENTRY_DELAY=0.2;
+const CARD_START_SCALE_DESKTOP=0.6, CARD_START_SCALE_MOBILE=0.82;
+
+const FRAME_COUNT=180;
+const frameUrl=i=>`assets/hero-frames/${String(i+1).padStart(4,'0')}.jpg`;
+
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const $=s=>document.querySelector(s);
+const section=$('#hero'), card=$('#card'), cv=$('#cv'), plate=$('#plate'),
+      tTop=$('#tTop'), tBot=$('#tBot'), bg=$('#bg'), mark=$('#mark'), word=$('#word'), fr=$('#fr');
+
+let aspect=16/9, ready=false, framesOk=true, lastDrawn=-1;
+const images=new Array(FRAME_COUNT);
+
+/* ── AKT 1: Kontur zeichnet sich wie von einer Hand ── */
+/* Drei Akte laufen NACHEINANDER — nie gleichzeitig. Ein Fokusobjekt pro Moment. */
+function overture(){
+  const paths=[...document.querySelectorAll('#crab .p')];
+  paths.forEach(p=>{const L=p.getTotalLength();p.style.strokeDasharray=L;p.style.strokeDashoffset=L;});
+  if(reduced){ /* Reduced Motion: Logo steht fertig, Bühne steht fertig */
+    paths.forEach(p=>p.style.strokeDashoffset=0);
+    gsap.set([word],{opacity:1});gsap.set([card,tTop,tBot],{opacity:1});
+    gsap.set(mark,{scale:.42,yPercent:-6});return;
+  }
+  const tl=gsap.timeline({delay:.3});
+  /* AKT 1 — die Linie zeichnet den Krebs */
+  tl.to(paths,{strokeDashoffset:0,duration:1.15,ease:'power2.inOut',stagger:.085},0);
+  /* AKT 2 — die Wortmarke setzt sich darunter */
+  tl.to(word,{opacity:1,duration:.7,ease:'power2.out'},'-=0.30');
+  tl.to({},{duration:.45});
+  /* AKT 3 — Übergabe: Markenzeichen tritt zurück, die Bühne öffnet sich */
+  tl.to([mark,word],{opacity:0,duration:.75,ease:'power2.inOut'},'ov')
+    .to(mark,{scale:.9,duration:.75,ease:'power2.inOut'},'ov')
+    .to(bg,{opacity:1,duration:1.4,ease:'power2.out'},'ov')
+    .to(card,{opacity:1,duration:1.1,ease:'power3.out'},'ov+=0.35')
+    .fromTo(tTop,{y:30},{opacity:1,y:0,duration:1,ease:'expo.out'},'ov+=0.5')
+    .fromTo(tBot,{y:-30},{opacity:1,y:0,duration:1,ease:'expo.out'},'ov+=0.62');
+  return tl;
+}
+
+/* ── Frames laden: Reihenfolge und Timings 1:1 aus dem Original ── */
+function loadFrames(){
+  if(reduced)return;
+  let errored=0;
+  const onFirstReady=img=>{
+    if(img.naturalWidth&&img.naturalHeight){
+      cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+      cv.getContext('2d').drawImage(img,0,0);lastDrawn=0;
+      aspect=img.naturalWidth/img.naturalHeight;sizeCard();
+      plate.style.display='none';
+    }
+    ready=true;boot();
+  };
+  const onErr=()=>{if(++errored>=5){framesOk=false;boot();}};
+  const loadOne=i=>{
+    const img=new Image();img.decoding='async';
+    if(i<4)img.fetchPriority='high';
+    img.onerror=onErr;
+    if(i===0)img.onload=()=>onFirstReady(img);
+    img.src=frameUrl(i);images[i]=img;
+  };
+  const INITIAL=Math.min(20,FRAME_COUNT);
+  for(let i=0;i<INITIAL;i++)loadOne(i);
+  const BATCH=20;let cursor=INITIAL;
+  const loadNext=()=>{
+    const end=Math.min(FRAME_COUNT,cursor+BATCH);
+    for(let i=cursor;i<end;i++)loadOne(i);
+    cursor=end;
+    if(cursor<FRAME_COUNT)setTimeout(loadNext,80);
+  };
+  setTimeout(loadNext,200);
+  setTimeout(()=>{if(!images[0]||!images[0].complete){framesOk=false;boot();}},4500);
+}
+
+function sizeCard(){
+  card.style.width=`min(96vw, calc(72svh * ${aspect}))`;
+  card.style.height=`min(72svh, 96vw / ${aspect})`;
+  card.style.aspectRatio=aspect;
+}
+sizeCard();
+
+/* Entry-Werte (1.4/1.1/1.0 · power2.out/power3.out/expo.out · Offsets .35/.5/.62)
+   sind unverändert in AKT 3 der Ouvertüre eingebettet. */
+
+/* ── Scroll-Choreografie 1:1 ── */
+let built=false;
+function boot(){
+  if(built||reduced)return;built=true;
+  const startScale=()=>innerWidth<768?CARD_START_SCALE_MOBILE:CARD_START_SCALE_DESKTOP;
+  const immerseScale=()=>{
+    const vw=innerWidth,vh=innerHeight;
+    const baseW=Math.min(vw*0.96,vh*0.72*aspect);
+    const baseH=Math.min(vh*0.72,(vw*0.96)/aspect);
+    if(baseW<=0||baseH<=0)return 1.5;
+    return Math.max(vw/baseW,vh/baseH)*IMMERSE_OVERFILL;
+  };
+  const isLoaded=i=>{const im=images[i];return !!im&&im.complete&&im.naturalWidth>0;};
+  const drawFrame=index=>{
+    if(!framesOk)return;
+    let useIdx=index;
+    if(!isLoaded(useIdx)){
+      let found=-1;
+      for(let d=1;d<FRAME_COUNT;d++){
+        if(useIdx-d>=0&&isLoaded(useIdx-d)){found=useIdx-d;break;}
+        if(useIdx+d<FRAME_COUNT&&isLoaded(useIdx+d)){found=useIdx+d;break;}
+      }
+      if(found===-1)return;useIdx=found;
+    }
+    if(lastDrawn===useIdx)return;
+    const ctx=cv.getContext('2d');ctx.drawImage(images[useIdx],0,0,cv.width,cv.height);
+    lastDrawn=useIdx;
+    fr.textContent='FR '+String(useIdx).padStart(3,'0');
+  };
+
+  gsap.set(card,{scale:startScale(),transformOrigin:'50% 50%'});
+
+  const master=gsap.timeline({scrollTrigger:{
+    trigger:section,start:'top top',end:'bottom bottom',scrub:0.4,invalidateOnRefresh:true,
+    onUpdate:self=>{
+      const p=self.progress;
+      const mapped=gsap.utils.clamp(0,1,(p-0.15)/0.63);
+      drawFrame(Math.min(FRAME_COUNT-1,Math.floor(mapped*FRAME_COUNT)));
+      /* AKT 3: Markenzeichen übergibt an den Scrub */
+      gsap.set(mark,{opacity:gsap.utils.clamp(0,1,1-p/0.12)});
+      gsap.set(word,{opacity:gsap.utils.clamp(0,1,1-p/0.10)});
+    }
+  }});
+
+  master.to(card,{scale:1,ease:'power2.out',duration:0.15},0);
+  master.to(tTop,{x:()=>innerWidth<768?'-70vw':'-60vw',letterSpacing:'0.02em',ease:'power2.inOut',duration:0.15},0);
+  master.to(tBot,{x:()=>innerWidth<768?'70vw':'60vw',letterSpacing:'0.02em',ease:'power2.inOut',duration:0.15},0);
+
+  master.to(card,{scale:immerseScale(),ease:'power2.in',duration:0.63},0.15);
+  master.to(tTop,{opacity:0,ease:'power1.in',duration:0.22},0.15);
+  master.to(tBot,{opacity:0,ease:'power1.in',duration:0.22},0.15);
+
+  master.to(card,{scale:startScale(),ease:'power3.inOut',duration:0.22},0.78);
+  master.to(tTop,{x:0,opacity:1,letterSpacing:'-0.04em',ease:'power2.inOut',duration:0.22},0.78);
+  master.to(tBot,{x:0,opacity:1,letterSpacing:'-0.04em',ease:'power2.inOut',duration:0.22},0.78);
+
+  ScrollTrigger.refresh();
+}
+
+drawMark();entry();loadFrames();
+addEventListener('resize',()=>{sizeCard();ScrollTrigger.refresh();},{passive:true});
+window.__hero={frames:FRAME_COUNT,get ready(){return ready},get framesOk(){return framesOk}};
+})();
+</script>
+</body>
+</html>
