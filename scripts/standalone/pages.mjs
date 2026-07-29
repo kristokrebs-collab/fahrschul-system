@@ -193,13 +193,15 @@ function bgVideo(ctx, name) {
 
 /* ── Pages ──────────────────────────────────────────────────────────── */
 
-export function page(ctx, OUT) {
-  const files = []
-  const emit = (name, html) => {
-    writeFileSync(join(OUT, name), html)
-    files.push(name)
-    process.stdout.write('.')
-  }
+/**
+ * Every page as a string, in navigation order.
+ *
+ * Kept separate from writing them out so the single-file build can take the
+ * same markup and stitch it into one document instead of forty.
+ */
+export function renderAll(ctx) {
+  const pages = []
+  const emit = (name, html) => pages.push({ name, html })
 
   emit('index.html', home(ctx))
   emit('fuehrerschein.html', licenceIndex(ctx))
@@ -216,7 +218,16 @@ export function page(ctx, OUT) {
   emit('kontakt.html', contactPage(ctx))
   emit('impressum.html', legalPage(ctx, 'impressum'))
   emit('datenschutz.html', legalPage(ctx, 'datenschutz'))
-  return files
+  return pages
+}
+
+/** Write every page into a directory; returns the file names. */
+export function page(ctx, OUT) {
+  return renderAll(ctx).map(({ name, html }) => {
+    writeFileSync(join(OUT, name), html)
+    process.stdout.write('.')
+    return name
+  })
 }
 
 /* — Homepage — */

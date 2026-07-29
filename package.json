@@ -16,6 +16,8 @@
     "verify": "npm run typecheck && npm run lint && npm run test && npm run build",
     "preview:offline": "node scripts/build-offline-preview.mjs offline-preview",
     "standalone": "node scripts/standalone/build.mjs standalone-site",
+    "standalone:single": "node scripts/standalone/single.mjs standalone-site/fahrschule-krebs-komplett.html",
+    "standalone:single:verify": "node scripts/standalone/verify-single.mjs standalone-site/fahrschule-krebs-komplett.html",
     "standalone:gate": "node scripts/standalone/gate.mjs standalone-site",
     "standalone:verify": "node scripts/standalone/verify.mjs standalone-site"
   },

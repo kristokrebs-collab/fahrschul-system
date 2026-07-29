@@ -183,3 +183,68 @@ behalten ihre 4 px Strich in einem 24 px hohen Ziel (`background-clip`).
 | Cockpit-Scroll | App bewegt sich (−223 px → −595 px) |
 | Mobiles Menü | öffnet, Fokus wandert hinein, `Esc` schließt und gibt Fokus zurück |
 | Video | spielt aus der Datei heraus (VP9/WebM als `data:`-URI) |
+
+## Die Ein-Datei-Fassung
+
+Dieselbe Seite noch einmal als **eine** Datei (`npm run standalone:single`) —
+zum Weitergeben als einzelner Anhang. Sie enthält alle 40 Seiten und wechselt
+zwischen ihnen über den Anker in der Adresse (`#/preise`); ein Anker *innerhalb*
+einer Seite (`#finder`) funktioniert weiter so, wie Browser das immer gemacht
+haben.
+
+| | Einzeldateien | Eine Datei |
+|---|---|---|
+| Dateien | 40 | 1 |
+| Größe gesamt | 92,9 MB | **21,3 MB** |
+| Medien | 140-mal eingebettet | 41-mal, einmal je Datei |
+| Ohne JavaScript lesbar | ja | nein (dafür gibt es die Einzeldateien) |
+
+Der Größenunterschied ist der eigentliche Grund für diese Fassung: Wenn jede
+Seite ihr eigenes Dokument ist, trägt jede auch ihre eigene Kopie des Logos,
+des Hintergrundclips und der Poster. In der Ein-Datei-Fassung liegt jedes
+Medium genau einmal in einer Tabelle, und jede Verwendung ist ein Index.
+
+### Was dafür gelöst werden musste
+
+**Gleiche IDs.** Vierzig Seitenkörper in einem Dokument hieße vierzig `#finder`,
+und jedes `document.querySelector` fände den falschen. Deshalb steht immer nur
+die aktive Seite im Dokument; die anderen warten als Zeichenketten. Weder das
+Markup noch das Runtime muss wissen, dass es so betrieben wird.
+
+**Das Runtime läuft jetzt oft.** Es war für genau einen Lauf geschrieben. Bei
+jedem Seitenwechsel läuft es erneut, also wird protokolliert, was ein Lauf
+registriert — Listener, Timer, Observer, Animationsframes — und beim Wechsel
+zurückgenommen.
+
+Der erste Versuch hat dabei einen echten Fehler produziert, den erst die Messung
+gezeigt hat: Eine sich selbst nachplanende Animationsschleife fordert ihr
+nächstes Bild lange nach dem Lauf an, der sie gestartet hat. Der Scheduler nur
+*während* des Laufs zu umhüllen fing das erste Bild und verpasste alle weiteren
+— die Route zeichnete auf einer Leinwand weiter, die längst nicht mehr im
+Dokument war, einmal pro je besuchter Seite. Gemessen:
+
+| | vor der Korrektur | danach |
+|---|---|---|
+| Seite 27 aufrufen | 37 s | 0,16 s |
+| Seite 29 aufrufen | 48 s | 0,16 s |
+| Alle 40 Seiten durchlaufen | > 200 s, weiter steigend | **6,4 s** |
+
+Die Hüllen sind jetzt dauerhaft installiert, und ein Bild trägt die Generation,
+in der es angefordert wurde: Eine Schleife, deren Seite fort ist, wird nicht
+noch einmal aufgerufen — die Kette endet von selbst.
+
+### Abnahme (`npm run standalone:single:verify`)
+
+| Prüfung | Ergebnis |
+|---|---|
+| Alle 40 Seiten aufgerufen | fehlerfrei, jede mit `h1` und Titel |
+| Offene Medien-Platzhalter | **0** |
+| Externe Anfragen | **0** |
+| Link im Dokument geklickt | `#/preise`, „Angebote ehrlich vergleichen" |
+| Zurück-Taste | zurück auf der Startseite |
+| Finder **nach** allen 40 Wechseln | 6 Schritte → „Klasse B" |
+| Cockpit-Scroll nach allen Wechseln | bewegt sich |
+| Bookmark-Techniken über alle Seiten | **20 / 20** |
+| Fokus über 40 Tab-Stationen | durchgehend sichtbar |
+| Mobiles Menü, auch nach Seitenwechsel | öffnet, `Esc` schließt |
+| `prefers-reduced-motion` | kein Video geladen, Poster vorhanden, Finder läuft |
