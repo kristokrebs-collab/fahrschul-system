@@ -1,0 +1,95 @@
+<div class="grain" aria-hidden="true"></div>
+<div class="rail" aria-hidden="true"><i></i></div>
+
+<!-- ── Galerie ─────────────────────────────────────────────────────────── -->
+<div class="shell">
+  <header class="shell-bar">
+    <div class="wordmark"><i></i> Krebs <span>Premium</span></div>
+    <div class="spacer"></div>
+    <div class="bar-meta">
+      <span>Fulda · Bad Hersfeld</span>
+      <span data-clock>–:–</span>
+      <span><span data-credit-count>24</span> Bausteine</span>
+    </div>
+    <button class="icon-btn" data-theme-toggle type="button" aria-label="Hell oder dunkel umschalten">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.4 5.4l1.5 1.5M17.1 17.1l1.5 1.5M18.6 5.4l-1.5 1.5M6.9 17.1l-1.5 1.5"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Filmebene hinter dem Kopf: die Sammlung zeigt sofort, worum es geht -->
+  <div class="shell-film" aria-hidden="true">
+    <div class="film-wrap" data-vignette="off">
+      <canvas class="film" id="shell-bg"></canvas>
+    </div>
+    <div class="shell-film-scrim"></div>
+  </div>
+
+  <div class="shell-head">
+    <p class="eyebrow" data-reveal><b>Kollektion</b> &nbsp;Fünf Vorlagen · eine Datei</p>
+    <h1 data-reveal style="--d:60ms">Premium&#8209;Vorlagen mit <em>Film</em> am Scrollbalken</h1>
+    <p class="lede" data-reveal style="--d:140ms">
+      Fünf fertige Website-Vorlagen für die Fahrschule Krebs — jede mit eigenem Grund,
+      eigener Typografie und eigener Bewegungssprache. Filmhintergründe hängen Bild für Bild
+      am Scrollbalken, nicht an einem Abspielknopf. Kein Framework, keine Zuladung, offline lauffähig.
+    </p>
+    <div class="finder" data-reveal style="--d:200ms">
+      <div class="finder-inner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="11" cy="11" r="6.4"/><path d="M15.8 15.8L21 21"/>
+        </svg>
+        <input type="search" placeholder="Vorlage suchen — Bento, WebGL, hell, Kapitel …"
+               aria-label="Vorlagen durchsuchen" spellcheck="false">
+        <kbd>/</kbd>
+      </div>
+    </div>
+    <!-- Zahlen aus der Datei selbst gezählt, nicht aus dem Text behauptet -->
+    <dl class="telemetry" data-reveal style="--d:260ms"></dl>
+  </div>
+
+  <!-- Laufband der 24 Bausteine (Image Auto Slider · waleedkibhen) -->
+  <div class="bausteine" data-marquee aria-hidden="true">
+    <div class="mq-track"></div>
+  </div>
+
+  <div class="rack-head">
+    <p class="eyebrow"><b data-hits>5 Vorlagen</b></p>
+  </div>
+
+  <div class="rack"><!-- wird aus dem Register erzeugt --></div>
+
+  <footer class="shell-foot">
+    <div class="inner">
+      <div>
+        <h4>Diese Sammlung</h4>
+        <p class="measure" style="color:var(--fg-mut);font-size:var(--t-sm)">
+          Eine einzige HTML-Datei. Schriften, Filmsequenzen und Bilder liegen als
+          Base64 in der Datei — ohne Netz, ohne CDN, ohne Nachladen. Bewegung
+          respektiert <span class="mono">prefers-reduced-motion</span>. Bedienbar mit
+          <span class="mono">1–5</span>, <span class="mono">/</span> und
+          <span class="mono">Esc</span>.
+        </p>
+      </div>
+      <div>
+        <h4><span data-credit-count>24</span> Bausteine aus 21st.dev, in reinem HTML nachgebaut</h4>
+        <div class="credit-list"></div>
+        <p style="color:var(--fg-dim);font-size:var(--t-xs);margin-top:1rem" class="mono">
+          Mechanik nach Komponentenbeschreibung — Autorschaft der Vorlagen liegt bei den genannten Personen.
+        </p>
+      </div>
+    </div>
+  </footer>
+</div>
+
+<!-- ── Bühne ──────────────────────────────────────────────────────────── -->
+<div class="stage-bar" hidden>
+  <button class="back" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 6l-6 6 6 6"/></svg>
+    Galerie
+  </button>
+  <span class="name"></span>
+</div>
+<main id="stage" tabindex="-1" aria-label="Vorlagen-Vorschau"></main>
+
+<nav class="dock" aria-label="Vorlagen wechseln"></nav>

@@ -1,0 +1,2 @@
+app-cockpit-desktop.jpg:app-desktop:900:0.7
+app-cockpit-mobile.jpg:app-mobile:380:0.72

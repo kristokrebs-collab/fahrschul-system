@@ -1,0 +1,235 @@
+<template id="tpl-fahrbahn">
+<article class="t-bahn">
+
+  <!-- 01 · Redaktioneller Kopf: Schrift links, Film eingefasst rechts -->
+  <section class="scene fb-hero" data-scene>
+    <div class="fb-hero-grid">
+      <div class="fb-hero-copy">
+        <p class="eyebrow"><b>Fahrschule Krebs</b> &nbsp;Zwei Standorte in Hessen</p>
+        <h1>
+          <span class="w1" data-split>Kreide</span>
+          <span class="w2">auf Asphalt.</span>
+        </h1>
+        <p class="fb-lede">
+          Führerschein in Fulda und Bad Hersfeld — vom Mofa bis zum Gelenkbus.
+          Theorie in festen Themenblöcken, Praxis auf dem eigenen Übungsplatz,
+          Prüfungsvorbereitung am Simulator.
+        </p>
+        <div class="fb-meta">
+          <div><dt class="mono">Klassen</dt><dd>AM · A1 · A2 · A · B · BE · B96 · C · CE · D</dd></div>
+          <div><dt class="mono">Seit</dt><dd>1964, zweite Generation</dd></div>
+        </div>
+      </div>
+
+      <figure class="fb-hero-film">
+        <div class="film-wrap" data-vignette="off">
+          <canvas class="film" data-film="roadday" data-mode="loop" data-fps="2.2"></canvas>
+        </div>
+        <figcaption class="mono">Überlandfahrt · Sonderfahrt 1 von 12</figcaption>
+      </figure>
+    </div>
+    <hr class="lane-rule">
+  </section>
+
+  <!-- 02 · Klassen als Reiter (Animated Tabs · chetanverma16) -->
+  <section class="scene fb-classes" data-scene>
+    <div class="wrap">
+      <p class="eyebrow" data-reveal><b>01</b> &nbsp;Klassen</p>
+      <h2 data-reveal style="--d:60ms">Was der Gesetzgeber verlangt.</h2>
+
+      <div class="tabs" data-tabs data-reveal style="--d:120ms">
+        <div class="tab-strip" role="tablist" aria-label="Führerscheinklassen">
+          <span class="tab-pill" aria-hidden="true"></span>
+          <button role="tab" data-tab="b" aria-selected="true">Klasse B</button>
+          <button role="tab" data-tab="a" aria-selected="false">Klasse A</button>
+          <button role="tab" data-tab="be" aria-selected="false">BE / B96</button>
+          <button role="tab" data-tab="c" aria-selected="false">C / CE</button>
+          <button role="tab" data-tab="d" aria-selected="false">Klasse D</button>
+        </div>
+
+        <div class="tab-panel" data-panel="b" role="tabpanel">
+          <div class="tp-grid">
+            <div>
+              <h3>Auto — Klasse B</h3>
+              <p>Ab 18, als BF17 mit Begleitung ab 17. Die Begleitperson ist mindestens
+                 30 Jahre alt, besitzt seit fünf Jahren Klasse B und hat höchstens einen Punkt.</p>
+              <dl class="spec">
+                <div><dt>Theorie</dt><dd>12 Doppelstunden Grundstoff + 2 Zusatzstoff</dd></div>
+                <div><dt>Sonderfahrten</dt><dd>5 Überland · 4 Autobahn · 3 Nacht</dd></div>
+                <div><dt>Varianten</dt><dd>B197 · B Automatik (78) · BF17</dd></div>
+              </dl>
+            </div>
+            <figure class="mag" data-magnifier="2.2">
+              <img data-img="kl-b" alt="Kombi der Fahrschule auf der Drehbühne">
+              <figcaption class="mono">Zeigen zum Vergrößern</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="a" role="tabpanel" hidden>
+          <div class="tp-grid">
+            <div>
+              <h3>Motorrad — Klasse A</h3>
+              <p>Direkteinstieg ab 24, im Aufstieg nach zwei Jahren A2 ab 20.
+                 A1 ab 16, A2 ab 18, AM ab 15.</p>
+              <dl class="spec">
+                <div><dt>Theorie</dt><dd>12 Doppelstunden Grundstoff + 4 Zusatzstoff</dd></div>
+                <div><dt>Sonderfahrten</dt><dd>5 Überland · 4 Autobahn · 3 Nacht</dd></div>
+                <div><dt>Unterricht</dt><dd>Fulda, mittwochs zweiwöchentlich 16:30–19:30</dd></div>
+              </dl>
+            </div>
+            <figure class="mag" data-magnifier="2.2">
+              <img data-img="kl-a" alt="Motorrad im Studiolicht">
+              <figcaption class="mono">Zeigen zum Vergrößern</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="be" role="tabpanel" hidden>
+          <div class="tp-grid">
+            <div>
+              <h3>Anhänger — BE und B96</h3>
+              <p>B96 ist keine eigene Klasse, sondern eine Schlüsselzahl: sieben Zeitstunden,
+                 keine Prüfung, Kombination bis 4.250 kg. BE wird geprüft.</p>
+              <dl class="spec">
+                <div><dt>B96</dt><dd>2,5 h Theorie · 3,5 h Übungsplatz · 1 h Verkehr</dd></div>
+                <div><dt>BE Sonderfahrten</dt><dd>3 Überland · 1 Autobahn · 1 Nacht</dd></div>
+                <div><dt>Übungsplatz</dt><dd>Werk 2, Bellingerstraße 6, Fulda</dd></div>
+              </dl>
+            </div>
+            <figure class="mag" data-magnifier="2.2">
+              <img data-img="kl-be" alt="Kombi mit Anhängerkupplung">
+              <figcaption class="mono">Zeigen zum Vergrößern</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="c" role="tabpanel" hidden>
+          <div class="tp-grid">
+            <div>
+              <h3>Lkw — C und CE</h3>
+              <p>Ab 21, mit vollständiger Grundqualifikation ab 18. Die beschleunigte
+                 Grundqualifikation senkt das Mindestalter hier ausdrücklich nicht.</p>
+              <dl class="spec">
+                <div><dt>Sonderfahrten C/CE</dt><dd>5 Überland · 2 Autobahn · 3 Nacht</dd></div>
+                <div><dt>Berufskraftfahrer</dt><dd>140 Unterrichtsstunden · IHK-Prüfung 90 Minuten</dd></div>
+                <div><dt>Unterricht</dt><dd>Fulda, montags und donnerstags 16:30–19:30</dd></div>
+              </dl>
+            </div>
+            <figure class="mag" data-magnifier="2.2">
+              <img data-img="kl-c" alt="Sattelzug im Studio">
+              <figcaption class="mono">Zeigen zum Vergrößern</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="tab-panel" data-panel="d" role="tabpanel" hidden>
+          <div class="tp-grid">
+            <div>
+              <h3>Bus — Klasse D</h3>
+              <p>Ab 24, mit Berufskraftfahrer-Qualifikation abgestuft niedriger.
+                 Der Umfang richtet sich nach Anlage 5 FahrschAusbO.</p>
+              <dl class="spec">
+                <div><dt>Sonderfahrten</dt><dd>abhängig von Vorbesitz und Vorbesitzdauer</dd></div>
+                <div><dt>Klassen</dt><dd>D · D1 · DE · D1E</dd></div>
+                <div><dt>Fuhrpark</dt><dd>eigener Bus, keine Fremdanmietung</dd></div>
+              </dl>
+            </div>
+            <figure class="mag" data-magnifier="2.2">
+              <img data-img="kl-d" alt="Bus im Studio">
+              <figcaption class="mono">Zeigen zum Vergrößern</figcaption>
+            </figure>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 · Der Weg als Meilensteine (Gradient Selector Card · isaiahbjork) -->
+  <section class="scene fb-way" data-scene>
+    <div class="wrap">
+      <p class="eyebrow" data-reveal><b>02</b> &nbsp;Der Weg</p>
+      <h2 data-reveal style="--d:60ms">Sechs Stationen bis zur Prüfung.</h2>
+
+      <div class="sel" data-selector data-reveal style="--d:120ms">
+        <div class="sel-track">
+          <span class="sel-line"><i class="sel-fill"></i></span>
+          <button data-step tabindex="0" data-name="Anmeldung"
+                  data-meta="Du · im Büro"
+                  data-text="Antrag, Sehtest und Erste-Hilfe-Bescheinigung. Der Sehtest darf bei Antragstellung höchstens zwei Jahre alt sein."><span>1</span></button>
+          <button data-step tabindex="0" data-name="Theorie"
+                  data-meta="Wir · 12 Doppelstunden"
+                  data-text="Grundstoff in zwölf Doppelstunden, mit Vorbesitz sechs. Dazu der Zusatzstoff der gewählten Klasse. Höchstens zwei Einheiten am Tag."><span>2</span></button>
+          <button data-step tabindex="0" data-default data-name="Übungsplatz"
+                  data-meta="Wir · Werk 2"
+                  data-text="Grundfahraufgaben auf 2.000 m² eigenem Platz: Anfahren am Berg, Rangieren, Gefahrenbremsung — ohne fremden Verkehr."><span>3</span></button>
+          <button data-step tabindex="0" data-name="Theorieprüfung"
+                  data-meta="TÜV · Fulda"
+                  data-text="Erst nach der Theorieprüfung sind die Sonderfahrten sinnvoll. Termin über uns, Prüfung beim TÜV."><span>4</span></button>
+          <button data-step tabindex="0" data-name="Sonderfahrten"
+                  data-meta="Wir · 12 × 45 min"
+                  data-text="Fünf Überland, vier Autobahn, drei bei Nacht — die gesetzliche Mindestzahl für B, A, A2 und A1."><span>5</span></button>
+          <button data-step tabindex="0" data-name="Praktische Prüfung"
+                  data-meta="TÜV · mit unserem Fahrzeug"
+                  data-text="Geprüft wird im Fahrzeug, in dem ausgebildet wurde. Danach der Führerschein — bei BF17 mit Begleitregelung."><span>6</span></button>
+        </div>
+        <div class="sel-out" data-selout>
+          <p class="mono sel-meta" data-selmeta></p>
+          <h3 data-selname></h3>
+          <p data-seltext></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · Angebot im Schaufenster (Section With Mockup · aghasisahakyan1) -->
+  <section class="scene fb-mock" data-scene>
+    <div class="fb-mock-grid">
+      <div class="fb-mock-copy">
+        <p class="eyebrow" data-reveal><b>03</b> &nbsp;Weiterbildung</p>
+        <h2 data-reveal style="--d:60ms">Nicht nur der<br>erste Führerschein.</h2>
+        <p data-reveal style="--d:120ms">
+          Berufskraftfahrer-Weiterbildung in fünf Modulen, montags bis freitags von
+          08:00 bis 16:00 mit sieben Einheiten à 60 Minuten. Gefahrgut ADR als Basiskurs
+          mit IHK-Prüfung und Aufbaukurs Tank. Dazu Gabelstaplerschein, Ladungssicherung
+          und die Ausbildung für Menschen mit Handicap.
+        </p>
+        <ul class="fb-chips" data-reveal style="--d:180ms">
+          <li>BKF-Grundqualifikation</li><li>BKF-Weiterbildung</li><li>ADR Basis + Tank</li>
+          <li>Gabelstapler</li><li>Ladungssicherung</li><li>Handicap Klasse B</li>
+          <li>ASF</li><li>Ferienfahrschule</li>
+        </ul>
+      </div>
+      <div class="fb-mock-stack">
+        <figure data-parallax="0.1"><img data-img="adr" alt="Verschluss eines Gefahrgutbehälters"><figcaption class="mono">ADR</figcaption></figure>
+        <figure data-parallax="0.22"><img data-img="kl-stapler" alt="Gabelstapler in der Halle"><figcaption class="mono">Stapler</figcaption></figure>
+        <figure data-parallax="0.05"><img data-img="handicap" alt="Handbedienung, Makroaufnahme"><figcaption class="mono">Handicap</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <footer class="fb-foot">
+    <div class="wrap">
+      <hr class="lane-rule">
+      <div class="fb-foot-grid">
+        <div>
+          <h3>Fahrschule Krebs GmbH</h3>
+          <p class="mono">HRB 5374 · Amtsgericht Fulda · Geschäftsführer Michael Krebs</p>
+        </div>
+        <div>
+          <h4 class="mono">Fulda</h4>
+          <p>Am Bahnhof 3 · 36037 Fulda<br>
+             <button class="link-btn" data-copy="0661 22670">0661 22670</button><br>
+             Mo–Do 09:00–18:00 · Fr 09:00–17:00</p>
+        </div>
+        <div>
+          <h4 class="mono">Bad Hersfeld</h4>
+          <p>Bahnhofstraße 18A · 36251 Bad Hersfeld<br>
+             <button class="link-btn" data-copy="06621 7991929">06621 7991929</button><br>
+             Theorie Di–Do 17:00–18:30 · 18:30–20:00</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+</article>
+</template>

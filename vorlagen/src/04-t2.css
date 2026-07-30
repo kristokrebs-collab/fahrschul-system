@@ -1,0 +1,241 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   02 · FAHRBAHN — heller Grund, redaktionelles Raster, breit laufende Archivo.
+   Der Gegenentwurf zu 01: dort verdichtet, hier gedehnt.
+   ───────────────────────────────────────────────────────────────────────── */
+.t-bahn {
+  /* Lokale Token: alle geteilten Bausteine drehen damit ins Helle */
+  --fg:        #101316;
+  --fg-mut:    #46505a;
+  --fg-dim:    #5d6772;
+  --line:      rgba(6, 7, 8, .14);
+  --line-firm: rgba(6, 7, 8, .3);
+  background: var(--chalk);
+  color: #101316;
+}
+.t-bahn .wrap { width: var(--mid); margin-inline: auto; }
+.t-bahn .scene { position: relative; }
+.t-bahn h2 {
+  font-size: var(--t-xl);
+  font-variation-settings: 'wdth' 108;
+  letter-spacing: -.022em;
+  margin: .9rem 0 1.5rem;
+  max-width: 26ch;
+}
+.t-bahn h3 { font-size: var(--t-lg); font-variation-settings: 'wdth' 104; margin-bottom: .6rem; }
+.t-bahn p { color: #2c343c; }
+
+/* ── Kopf ────────────────────────────────────────────────────────────────── */
+.t-bahn .fb-hero { padding: clamp(4rem, 11vh, 7rem) var(--pad) 0; }
+.t-bahn .fb-hero-grid {
+  width: var(--wide); margin-inline: auto;
+  display: grid; gap: clamp(1.8rem, 4vw, 3.4rem);
+  align-items: center;
+  min-height: min(78svh, 720px);
+}
+@media (min-width: 980px) { .t-bahn .fb-hero-grid { grid-template-columns: 1.04fr .96fr; } }
+
+.t-bahn .fb-hero h1 {
+  font-size: clamp(2.9rem, .6rem + 8.4vw, 8.2rem);
+  line-height: .88;
+  letter-spacing: -.032em;
+  margin: 1.1rem 0 1.4rem;
+  display: grid;
+}
+.t-bahn .fb-hero h1 > span { display: block; }
+.t-bahn .fb-hero h1 .w1 { font-variation-settings: 'wdth' 124; font-weight: 800; }
+.t-bahn .fb-hero h1 .w2 {
+  font-variation-settings: 'wdth' 92; font-weight: 400;
+  color: #4a545e; padding-left: .04em;
+}
+.t-bahn .fb-lede {
+  max-width: 46ch; font-size: var(--t-md); color: #333c45;
+}
+.t-bahn .fb-meta {
+  display: grid; gap: 1.1rem; margin-top: 1.9rem;
+  padding-top: 1.2rem; border-top: 1px solid var(--line);
+}
+@media (min-width: 620px) { .t-bahn .fb-meta { grid-template-columns: 1fr 1fr; } }
+.t-bahn .fb-meta dt {
+  font-size: var(--t-xs); letter-spacing: .16em; text-transform: uppercase;
+  color: #5d6772; margin-bottom: .3rem;
+}
+.t-bahn .fb-meta dd { font-size: var(--t-sm); }
+
+/* Film eingefasst statt vollflächig — Passepartout wie im Bilderrahmen */
+.t-bahn .fb-hero-film { position: relative; }
+.t-bahn .fb-hero-film .film-wrap {
+  position: relative; inset: auto;
+  /* Seitenverhältnis folgt dem Filmmaterial (16:9) — sonst wird hochskaliert */
+  aspect-ratio: 3 / 2;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #d8d4cb;
+  box-shadow: 0 30px 70px -34px rgba(6, 7, 8, .55);
+  outline: 1px solid rgba(6, 7, 8, .12);
+  outline-offset: 10px;
+}
+@media (max-width: 979px) { .t-bahn .fb-hero-film .film-wrap { aspect-ratio: 16 / 10; } }
+.t-bahn .fb-hero-film figcaption {
+  margin-top: 1.5rem; font-size: var(--t-xs);
+  letter-spacing: .12em; text-transform: uppercase; color: #5d6772;
+}
+.t-bahn .fb-hero .lane-rule { margin-top: clamp(3rem, 8vh, 5rem); }
+
+/* ── Reiter ──────────────────────────────────────────────────────────────── */
+.t-bahn .fb-classes { padding: var(--sect) 0; }
+.t-bahn .tab-strip {
+  position: relative; display: flex; flex-wrap: wrap; gap: .2rem;
+  padding: .3rem; border-radius: 12px;
+  background: rgba(6, 7, 8, .05);
+  border: 1px solid var(--line);
+  width: max-content; max-width: 100%;
+  margin-bottom: 2.2rem;
+}
+.t-bahn .tab-strip button {
+  position: relative; z-index: 2;
+  padding: .6rem 1.05rem; border-radius: 9px;
+  font-size: var(--t-sm); font-weight: 600; color: #4a545e;
+  transition: color var(--fast) var(--ease);
+  white-space: nowrap;
+}
+.t-bahn .tab-strip button[aria-selected="true"] { color: var(--chalk); }
+.t-bahn .tab-pill {
+  position: absolute; z-index: 1; top: .3rem; left: 0; height: calc(100% - .6rem);
+  border-radius: 9px; background: #14171a;
+  transition: transform var(--mid-t) var(--ease), width var(--mid-t) var(--ease);
+}
+.t-bahn .tab-panel { opacity: 0; transition: opacity .4s var(--ease); }
+.t-bahn .tab-panel.in { opacity: 1; }
+.t-bahn .tp-grid { display: grid; gap: clamp(1.6rem, 4vw, 3rem); align-items: start; }
+@media (min-width: 860px) { .t-bahn .tp-grid { grid-template-columns: 1.15fr .85fr; } }
+.t-bahn .spec { display: grid; gap: .1rem; margin-top: 1.4rem; }
+.t-bahn .spec > div {
+  display: grid; gap: .1rem; padding: .8rem 0;
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 520px) { .t-bahn .spec > div { grid-template-columns: 11rem 1fr; gap: 1rem; align-items: baseline; } }
+.t-bahn .spec dt {
+  font-family: var(--mono); font-size: var(--t-xs);
+  letter-spacing: .1em; text-transform: uppercase; color: #5d6772;
+}
+.t-bahn .spec dd { font-size: var(--t-sm); }
+
+/* Lupe (21st.dev · bucharitesh) */
+.t-bahn .mag { position: relative; }
+.t-bahn .mag img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+  border-radius: 3px; background: #ddd9d0;
+  outline: 1px solid rgba(6, 7, 8, .12); outline-offset: 8px;
+}
+.t-bahn .mag figcaption {
+  margin-top: 1.4rem; font-size: var(--t-xs);
+  letter-spacing: .12em; text-transform: uppercase; color: #6b7480;
+}
+.lens {
+  position: absolute; width: 136px; height: 136px; border-radius: 50%;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(243, 241, 236, .8);
+  box-shadow: 0 12px 34px -8px rgba(6, 7, 8, .6);
+  background-repeat: no-repeat;
+  pointer-events: none; opacity: 0;
+  transition: opacity var(--fast) var(--ease);
+  z-index: 5;
+}
+.lensing .lens { opacity: 1; }
+@media (hover: none) { .lens { display: none; } }
+
+/* ── Weg / Meilensteine ─────────────────────────────────────────────────── */
+.t-bahn .fb-way { padding: 0 0 var(--sect); }
+.t-bahn .sel {
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: clamp(1.5rem, 4vw, 2.6rem);
+  background: linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.25));
+}
+.t-bahn .sel-track {
+  position: relative;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: .4rem; padding: 1.4rem .2rem 1.1rem;
+}
+.t-bahn .sel-line {
+  position: absolute; left: 3%; right: 3%; top: 50%; height: 2px;
+  background: rgba(6, 7, 8, .13);
+  transform: translateY(-50%);
+}
+.t-bahn .sel-fill {
+  display: block; height: 100%; width: 0;
+  background: linear-gradient(90deg, var(--sig-600), var(--sig-400));
+  transition: width var(--slow) var(--ease);
+}
+.t-bahn .sel-track button {
+  position: relative; z-index: 2;
+  width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--chalk);
+  border: 2px solid rgba(6, 7, 8, .18);
+  font-family: var(--mono); font-size: var(--t-sm); color: #5d6772;
+  transition: border-color var(--mid-t) var(--ease), color var(--mid-t) var(--ease),
+              box-shadow var(--mid-t) var(--ease), transform var(--fast) var(--ease);
+  flex-shrink: 0;
+}
+.t-bahn .sel-track button.on { border-color: var(--sig-500); color: #101316; }
+.t-bahn .sel-track button.cur {
+  box-shadow: 0 0 0 6px rgba(var(--sig-glow), .16);
+  transform: scale(1.1);
+}
+.t-bahn .sel-out { padding-top: 1.4rem; border-top: 1px solid var(--line); min-height: 9.5rem; }
+.t-bahn .sel-meta {
+  font-size: var(--t-xs); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--sig-600); margin-bottom: .5rem;
+}
+.t-bahn .sel-out h3 { margin-bottom: .5rem; }
+.t-bahn .sel-out p { max-width: 62ch; }
+
+/* ── Weiterbildung ───────────────────────────────────────────────────────── */
+.t-bahn .fb-mock { padding: 0 var(--pad) var(--sect); }
+.t-bahn .fb-mock-grid {
+  width: var(--wide); margin-inline: auto;
+  display: grid; gap: clamp(1.8rem, 4vw, 3.4rem); align-items: center;
+}
+@media (min-width: 940px) { .t-bahn .fb-mock-grid { grid-template-columns: .95fr 1.05fr; } }
+.t-bahn .fb-chips { list-style: none; display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1.6rem; }
+.t-bahn .fb-chips li {
+  font-family: var(--mono); font-size: var(--t-xs);
+  letter-spacing: .04em;
+  padding: .38rem .68rem; border-radius: 7px;
+  border: 1px solid rgba(6, 7, 8, .16);
+  background: rgba(255, 255, 255, .5);
+  color: #333c45;
+}
+.t-bahn .fb-mock-stack {
+  display: grid; gap: var(--gutter);
+  grid-template-columns: repeat(2, 1fr);
+}
+.t-bahn .fb-mock-stack figure:first-child { grid-column: span 2; }
+.t-bahn .fb-mock-stack img {
+  width: 100%; aspect-ratio: 16 / 11; object-fit: cover;
+  border-radius: 3px; background: #ddd9d0;
+  will-change: transform;
+}
+.t-bahn .fb-mock-stack figure:not(:first-child) img { aspect-ratio: 4 / 5; }
+.t-bahn .fb-mock-stack figcaption {
+  font-family: var(--mono); font-size: var(--t-xs);
+  letter-spacing: .14em; text-transform: uppercase; color: #6b7480;
+  padding-top: .5rem;
+}
+
+/* ── Fuß ─────────────────────────────────────────────────────────────────── */
+.t-bahn .fb-foot { padding: 0 0 7rem; }
+.t-bahn .fb-foot-grid { display: grid; gap: 1.8rem; padding-top: 2.4rem; }
+@media (min-width: 820px) { .t-bahn .fb-foot-grid { grid-template-columns: 1.3fr 1fr 1fr; } }
+.t-bahn .fb-foot h3 { font-size: var(--t-md); font-variation-settings: 'wdth' 100; }
+.t-bahn .fb-foot h4 {
+  font-size: var(--t-xs); letter-spacing: .16em; text-transform: uppercase;
+  color: #5d6772; margin-bottom: .55rem; font-family: var(--mono); font-weight: 400;
+}
+.t-bahn .fb-foot p { font-size: var(--t-sm); line-height: 1.85; }
+.t-bahn .link-btn {
+  font: inherit; color: #101316; text-decoration: underline;
+  text-decoration-color: var(--sig-500); text-underline-offset: 3px;
+  text-decoration-thickness: 2px;
+}
+.t-bahn .link-btn:hover { color: var(--sig-600); }

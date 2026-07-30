@@ -1,0 +1,267 @@
+<template id="tpl-route">
+<article class="t-route">
+
+  <!-- Vollflächiger Filmhintergrund: die Ebenen blenden kapitelweise über.
+       Nach docs/film-chapters.md — kein Scroll-Hijacking, nur Überblendung. -->
+  <div class="rt-bg" aria-hidden="true">
+    <div class="rt-layer on" data-chapter-layer="start">
+      <div class="film-wrap" data-vignette="off">
+        <canvas class="film" data-film="cabin" data-mode="loop" data-fps="2.1" data-poster="4"></canvas>
+      </div>
+    </div>
+    <div class="rt-layer" data-chapter-layer="weg">
+      <div class="film-wrap" data-vignette="off">
+        <canvas class="film" data-film="roadday" data-mode="loop" data-fps="2" data-poster="6"></canvas>
+      </div>
+    </div>
+    <div class="rt-layer" data-chapter-layer="orte">
+      <div class="film-wrap" data-vignette="off">
+        <canvas class="film" data-film="turntable" data-mode="loop" data-fps="2.4" data-poster="17"></canvas>
+      </div>
+    </div>
+    <div class="rt-scrim"></div>
+  </div>
+
+  <!-- 01 · Kopf (Hero Section 2 · meschacirung): zentriert, ruhig, ein Versprechen -->
+  <section class="scene rt-hero" data-chapter="start">
+    <div class="rt-hero-inner">
+      <p class="eyebrow"><b>Fahrschule Krebs</b> &nbsp;Fulda &amp; Bad Hersfeld</p>
+      <h1><span data-split>Deine Route</span><span class="thin">beginnt hier.</span></h1>
+      <p class="rt-lede">
+        Ganzjährige Ferienfahrschule, Theorie in festen Blöcken, Prüfungsfahrzeug
+        aus dem eigenen Fuhrpark. Wähle unten deine Klasse — der Assistent nennt dir
+        die gesetzlichen Mindestwerte, ohne Preise zu erfinden.
+      </p>
+      <div class="rt-cta">
+        <a class="shiny" href="#route" data-cursor="Anfrage">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+          Anfrage starten
+        </a>
+        <a class="rt-ghost" href="tel:066122670" data-cursor="anrufen">0661 22670</a>
+      </div>
+      <div class="rt-scrollcue mono" aria-hidden="true"><i></i>Der Hintergrund wechselt mit dem Kapitel</div>
+    </div>
+  </section>
+
+  <!-- 02 · Die Route als Rückgrat -->
+  <section class="scene rt-way" data-chapter="weg">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal><b>01</b> &nbsp;Die Route</p>
+      <h2 data-reveal style="--d:60ms">Vier Etappen,<br>keine Überraschungen.</h2>
+
+      <ol class="spine">
+        <li data-reveal>
+          <span class="st-dot" aria-hidden="true"></span>
+          <div class="st-body">
+            <p class="mono st-who">Du · im Büro</p>
+            <h3>Anmelden</h3>
+            <p>Antrag, Sehtest und Erste-Hilfe-Bescheinigung. Der Sehtest darf bei
+               Antragstellung höchstens zwei Jahre alt sein, die Erste Hilfe gilt
+               danach unbefristet.</p>
+          </div>
+        </li>
+        <li data-reveal style="--d:80ms">
+          <span class="st-dot" aria-hidden="true"></span>
+          <div class="st-body">
+            <p class="mono st-who">Wir · 12 Doppelstunden</p>
+            <h3>Theorie hören</h3>
+            <p>Grundstoff in zwölf Doppelstunden, mit Vorbesitz sechs, dazu der
+               Zusatzstoff der Klasse. Höchstens zwei Einheiten am Tag —
+               das schreibt die FahrschAusbO vor, nicht wir.</p>
+          </div>
+        </li>
+        <li data-reveal style="--d:160ms">
+          <span class="st-dot" aria-hidden="true"></span>
+          <div class="st-body">
+            <p class="mono st-who">Wir · Werk 2 und Straße</p>
+            <h3>Fahren üben</h3>
+            <p>Grundfahraufgaben auf dem eigenen Übungsplatz, danach Übungsstunden
+               im Verkehr und die zwölf Sonderfahrten: fünf Überland, vier Autobahn,
+               drei bei Nacht.</p>
+          </div>
+        </li>
+        <li data-reveal style="--d:240ms">
+          <span class="st-dot done" aria-hidden="true"></span>
+          <div class="st-body">
+            <p class="mono st-who">TÜV · mit unserem Fahrzeug</p>
+            <h3>Prüfung ablegen</h3>
+            <p>Theorie zuerst, dann die praktische Prüfung — im Fahrzeug, in dem
+               ausgebildet wurde. Bei BF17 folgt die Begleitphase.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 03 · Assistent: mehrstufig, geprüft, mit ehrlichem Ergebnis -->
+  <section class="scene rt-wiz" data-chapter="weg">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal><b>02</b> &nbsp;Anfrage</p>
+      <h2 data-reveal style="--d:60ms">Drei Schritte.</h2>
+
+      <div class="wiz" data-wizard data-reveal style="--d:120ms">
+        <div class="wz-head">
+          <div class="wz-dots">
+            <span data-wdot></span><span data-wdot></span><span data-wdot></span><span data-wdot></span>
+          </div>
+          <span class="wz-bar"><i class="wz-fill"></i></span>
+        </div>
+
+        <div data-step-panel>
+          <h3>Welche Klasse?</h3>
+          <div class="wz-picks">
+            <button type="button" data-pick="klasse" data-value="B"  aria-pressed="false">Auto <span class="mono">B</span></button>
+            <button type="button" data-pick="klasse" data-value="A"  aria-pressed="false">Motorrad <span class="mono">A</span></button>
+            <button type="button" data-pick="klasse" data-value="BE" aria-pressed="false">Anhänger <span class="mono">BE</span></button>
+            <button type="button" data-pick="klasse" data-value="C"  aria-pressed="false">Lkw <span class="mono">C/CE</span></button>
+            <button type="button" data-pick="klasse" data-value="D"  aria-pressed="false">Bus <span class="mono">D</span></button>
+          </div>
+          <div class="wz-rules" data-rules hidden></div>
+        </div>
+
+        <div data-step-panel hidden>
+          <h3>Wo und ab wann?</h3>
+          <div class="wz-picks">
+            <button type="button" data-pick="ort" data-value="Fulda, Am Bahnhof 3" aria-pressed="false">
+              Fulda <span class="mono">Am Bahnhof 3</span></button>
+            <button type="button" data-pick="ort" data-value="Bad Hersfeld, Bahnhofstraße 18A" aria-pressed="false">
+              Bad Hersfeld <span class="mono">Bahnhofstraße 18A</span></button>
+          </div>
+          <label class="wz-field">
+            <span class="mono">Beginn</span>
+            <select name="wstart">
+              <option value="">nächstmöglich</option>
+              <option value="in den Ferien">in den Ferien</option>
+              <option value="in vier Wochen">in vier Wochen</option>
+              <option value="im nächsten Quartal">im nächsten Quartal</option>
+            </select>
+          </label>
+          <p class="fine">Die Ferienfahrschule läuft ganzjährig und ist nicht an Schulferien gebunden.</p>
+        </div>
+
+        <div data-step-panel hidden>
+          <h3>Wie erreichen wir dich?</h3>
+          <div class="wz-fields">
+            <label class="wz-field"><span class="mono">Name</span>
+              <input name="wname" type="text" autocomplete="name" placeholder="Vor- und Nachname"></label>
+            <label class="wz-field"><span class="mono">E-Mail</span>
+              <input name="wmail" type="email" autocomplete="email" placeholder="name@beispiel.de" spellcheck="false"></label>
+            <label class="wz-field"><span class="mono">Telefon <i>optional</i></span>
+              <input name="wtel" type="tel" autocomplete="tel" placeholder="0661 …"></label>
+          </div>
+        </div>
+
+        <div data-step-panel hidden>
+          <div class="wz-sum" data-wsum></div>
+        </div>
+
+        <div class="wz-foot">
+          <button class="wz-back" type="button" data-wprev>Zurück</button>
+          <p class="wz-note mono" data-wnote aria-live="polite"></p>
+          <button class="liquid" type="button" data-wnext><span>Weiter</span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · Standorte (MarkerPopup · mapcn) -->
+  <section class="scene rt-map" data-chapter="orte">
+    <div class="wrap">
+      <p class="eyebrow" data-reveal><b>03</b> &nbsp;Standorte</p>
+      <h2 data-reveal style="--d:60ms">Zwei Orte, ein Postfach.</h2>
+
+      <div class="mapbox" data-map data-reveal style="--d:120ms">
+        <svg class="map-grid" viewBox="0 0 800 420" aria-hidden="true" preserveAspectRatio="none">
+          <defs>
+            <pattern id="rt-mesh" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M40 0H0v40" fill="none" stroke="rgba(243,241,236,.055)" stroke-width="1"/>
+            </pattern>
+          </defs>
+          <rect width="800" height="420" fill="url(#rt-mesh)"/>
+          <!-- A7 / A4 als Schema, keine Landkarte: die Route zwischen den Orten -->
+          <path d="M170 300 C 300 250, 360 180, 560 130" fill="none"
+                stroke="rgba(225,10,23,.5)" stroke-width="2" stroke-dasharray="7 6"/>
+          <text x="330" y="215" fill="rgba(243,241,236,.4)" font-size="12"
+                font-family="monospace" letter-spacing="2">≈ 45 KM</text>
+        </svg>
+
+        <div class="pin pin-fd" data-pin>
+          <button class="pin-dot" type="button" aria-label="Standort Fulda anzeigen"><span></span></button>
+          <div class="pin-pop">
+            <img data-img="office" alt="Büro der Fahrschule">
+            <div class="pop-body">
+              <h4>Fulda <span class="mono">Hauptsitz</span></h4>
+              <p class="mono">Am Bahnhof 3 · 36037 Fulda</p>
+              <dl>
+                <div><dt>Büro</dt><dd>Mo–Do 09:00–18:00 · Fr 09:00–17:00</dd></div>
+                <div><dt>Theorie</dt><dd>Mo–Do drei Themen pro Tag</dd></div>
+                <div><dt>Lage</dt><dd>direkt am ICE-Bahnhof</dd></div>
+              </dl>
+              <button class="pop-btn" data-copy="0661 22670" type="button">0661 22670</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pin pin-bh" data-pin>
+          <button class="pin-dot" type="button" aria-label="Standort Bad Hersfeld anzeigen"><span></span></button>
+          <div class="pin-pop">
+            <img data-img="branch-city" alt="Straße am Standort Bad Hersfeld">
+            <div class="pop-body">
+              <h4>Bad Hersfeld <span class="mono">Filiale</span></h4>
+              <p class="mono">Bahnhofstraße 18A · 36251 Bad Hersfeld</p>
+              <dl>
+                <div><dt>Eröffnet</dt><dd>2009 — erste und einzige Filiale</dd></div>
+                <div><dt>Theorie</dt><dd>Di–Do 17:00–18:30 · 18:30–20:00</dd></div>
+                <div><dt>Büro</dt><dd>Zeiten auf Anfrage</dd></div>
+              </dl>
+              <button class="pop-btn" data-copy="06621 7991929" type="button">06621 7991929</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bereichskarten (Animated Profile Card · aghasisahakyan1) — Bereiche
+           statt erfundener Personen: es liegen keine Porträts vor. -->
+      <div class="areas">
+        <article class="area" data-reveal>
+          <img data-img="kl-b" alt="Kombi der Fahrschule">
+          <div class="area-body"><span class="mono">Klassen B · BE · B96</span><h4>Pkw und Anhänger</h4>
+            <p>Audi, BMW, Mercedes-Benz, VW — eigener Fuhrpark.</p></div>
+        </article>
+        <article class="area" data-reveal style="--d:80ms">
+          <img data-img="kl-c" alt="Sattelzug">
+          <div class="area-body"><span class="mono">C · CE · BKF</span><h4>Berufskraftfahrer</h4>
+            <p>Grundqualifikation, Weiterbildung, ADR, Ladungssicherung.</p></div>
+        </article>
+        <article class="area" data-reveal style="--d:160ms">
+          <img data-img="handicap" alt="Handbedienung im Fahrzeug">
+          <div class="area-body"><span class="mono">Klasse B</span><h4>Handicap</h4>
+            <p>Ausbildung mit angepasster Bedienung.</p></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <footer class="rt-foot">
+    <div class="wrap">
+      <div class="rt-foot-grid">
+        <div>
+          <div class="wordmark"><i></i> Fahrschule Krebs <span>GmbH</span></div>
+          <p class="mono fine">HRB 5374 · Amtsgericht Fulda · Geschäftsführer Michael Krebs<br>
+             Aufsichtsbehörde: Regierungspräsidium Kassel</p>
+        </div>
+        <nav aria-label="Fußzeile">
+          <a class="credit" href="#route">Klassen</a>
+          <a class="credit" href="#route">Weiterbildung</a>
+          <a class="credit" href="#route">Standorte</a>
+          <a class="credit" href="#route">Impressum</a>
+        </nav>
+      </div>
+      <p class="mono fine rt-truth">
+        Preise, Bewertungen und Simulator-Zahlen erscheinen hier bewusst nicht —
+        sie sind im Projekt als unbelegt markiert.
+      </p>
+    </div>
+  </footer>
+</article>
+</template>

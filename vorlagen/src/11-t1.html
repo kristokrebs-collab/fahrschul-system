@@ -1,0 +1,136 @@
+<template id="tpl-nachtfahrt">
+<article class="t-nacht">
+
+  <!-- 01 · Gepinnter Scroll-Film: die Flotte dreht sich am Scrollbalken -->
+  <section class="scene hero" data-pin style="--vh:340">
+    <div class="pin-inner">
+      <div class="film-wrap">
+        <canvas class="film" data-film="turntable" data-mode="scrub" data-ease="0.2"></canvas>
+      </div>
+
+      <div class="hero-grid">
+        <header class="hero-top">
+          <p class="eyebrow"><b>Fahrschule Krebs</b> &nbsp;Fulda &amp; Bad Hersfeld · seit 1964</p>
+        </header>
+
+        <h1 class="hero-h">
+          <span class="l1" data-split>Eine Fahrschule</span>
+          <span class="l2" data-kinetic data-from="58" data-to="104">für alles,</span>
+          <span class="l3">was fährt</span>
+        </h1>
+
+        <div class="hero-foot">
+          <div class="hud" data-hud>
+            <span class="hud-k mono">Drehbühne</span>
+            <span class="hud-v mono">Pkw · Motorrad · Lkw · Bus</span>
+            <span class="hud-d mono" data-hud-deg>0°</span>
+          </div>
+          <p class="hero-sub measure">
+            Pkw, Motorrad, Lkw und Bus — vier Klassenwelten, ein Fuhrpark,
+            zwei Standorte in Hessen. Seit 1964 in zweiter Generation.
+          </p>
+          <div class="scroll-hint mono" aria-hidden="true">
+            <span>Scrollen dreht die Bühne</span>
+            <i></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 · Das Versprechen, in Zahlen die belegt sind -->
+  <section class="scene manifest" data-scene>
+    <div class="wrap">
+      <p class="eyebrow" data-reveal><b>02</b> &nbsp;Der Betrieb</p>
+      <h2 class="big" data-reveal style="--d:80ms">
+        Zwei Generationen,<br>ein Anspruch.
+      </h2>
+      <p class="lede measure" data-reveal style="--d:160ms">
+        Günter Krebs beginnt 1964 in Fulda als Ein-Mann-Betrieb. Michael Krebs führt
+        die Fahrschule seit 1999 in zweiter Generation weiter — mit eigenem Fuhrpark,
+        eigenen Lkw, eigenem Bus und einem 2.000 m² großen Übungsplatz.
+      </p>
+
+      <!-- Jahreszahlen laufen nicht hoch — ein Jahr ist keine Menge. -->
+      <dl class="figures">
+        <div data-reveal><dt>gegründet</dt><dd>1964</dd></div>
+        <div data-reveal style="--d:70ms"><dt>Generation</dt><dd>zwei</dd></div>
+        <div data-reveal style="--d:140ms"><dt>Fahrlehrer</dt><dd>~<span data-count="20">0</span></dd></div>
+        <div data-reveal style="--d:210ms"><dt>Übungsplatz m²</dt><dd><span data-count="2000" data-sep>0</span></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 03 · Laufband der Flotte (Image Auto Slider · waleedkibhen) -->
+  <section class="scene belt" data-scene>
+    <p class="eyebrow wrap" data-reveal><b>03</b> &nbsp;Der Fuhrpark</p>
+    <div class="mq" data-marquee>
+      <div class="mq-track">
+        <figure><img data-img="kl-b" alt="Kombi auf der Drehbühne"><figcaption class="mono">Klasse B</figcaption></figure>
+        <figure><img data-img="kl-a" alt="Motorrad im Studio"><figcaption class="mono">Klasse A</figcaption></figure>
+        <figure><img data-img="kl-c" alt="Sattelzug im Studio"><figcaption class="mono">Klasse CE</figcaption></figure>
+        <figure><img data-img="kl-d" alt="Bus im Studio"><figcaption class="mono">Klasse D</figcaption></figure>
+        <figure><img data-img="kl-be" alt="Kombi mit Anhängerkupplung"><figcaption class="mono">Klasse BE</figcaption></figure>
+        <figure><img data-img="kl-stapler" alt="Gabelstapler"><figcaption class="mono">Gabelstapler</figcaption></figure>
+      </div>
+    </div>
+    <p class="belt-note wrap mono">Audi · BMW · Mercedes-Benz · VW — eigener Fuhrpark, eigene Lkw, eigener Bus</p>
+  </section>
+
+  <!-- 04 · Übungsplatz Werk 2 mit Parallaxe -->
+  <section class="scene werk" data-scene>
+    <div class="werk-media">
+      <img data-img="werk2" alt="Übungsplatz mit Fahrbahnmarkierungen" data-parallax="0.16">
+    </div>
+    <div class="werk-copy">
+      <p class="eyebrow" data-reveal><b>04</b> &nbsp;Werk 2</p>
+      <h2 data-reveal style="--d:70ms">2.000 m²,<br>die niemandem<br>im Weg sind.</h2>
+      <p class="measure" data-reveal style="--d:140ms">
+        Der eigene Übungsplatz in der Bellingerstraße 6 in Fulda. Anfahren, Rangieren,
+        Gefahrenbremsung und die Grundfahraufgaben für B96 — ohne fremden Verkehr,
+        ohne Zeitdruck, ohne Publikum.
+      </p>
+      <ul class="ticks" data-reveal style="--d:210ms">
+        <li>Grundfahraufgaben aller Klassen</li>
+        <li>B96 — 3,5 Stunden Übungsplatz nach Vorgabe</li>
+        <li>Rangieren mit Anhänger und Sattelzug</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 05 · Abschluss mit Flüssigmetall-Knopf (Liquid Metal Button · johuniq) -->
+  <section class="scene close" data-scene>
+    <div class="wrap center">
+      <p class="eyebrow center-eb" data-reveal><b>05</b> &nbsp;Ziellinie</p>
+      <h2 class="huge" data-reveal data-split style="--d:60ms">Losfahren</h2>
+      <p class="measure" data-reveal style="--d:140ms">
+        Theorie in Fulda montags bis donnerstags in drei Themen pro Tag,
+        in Bad Hersfeld dienstags bis donnerstags in sechs Terminen pro Woche.
+        Anmeldung erforderlich, höchstens zwei Einheiten am Tag.
+      </p>
+      <div class="cta-row" data-reveal style="--d:210ms">
+        <button class="liquid" type="button" data-cursor="Termin">
+          <span>Beratung vereinbaren</span>
+        </button>
+        <a class="ghost" href="tel:066122670" data-cursor="anrufen">0661 22670</a>
+      </div>
+      <p class="fine">Demo-Ansicht — es wird nichts versendet.</p>
+    </div>
+  </section>
+
+  <footer class="t-foot">
+    <div class="wrap foot-grid">
+      <div>
+        <div class="wordmark"><i></i> Fahrschule Krebs <span>GmbH</span></div>
+        <p class="mono fine">Am Bahnhof 3 · 36037 Fulda<br>Bahnhofstraße 18A · 36251 Bad Hersfeld</p>
+      </div>
+      <nav aria-label="Fußzeile">
+        <a class="credit" href="#nachtfahrt">Klassen</a>
+        <a class="credit" href="#nachtfahrt">Theorie</a>
+        <a class="credit" href="#nachtfahrt">Standorte</a>
+        <a class="credit" href="#nachtfahrt">Kontakt</a>
+      </nav>
+    </div>
+  </footer>
+</article>
+</template>

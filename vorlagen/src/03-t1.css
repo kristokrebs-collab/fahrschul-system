@@ -1,0 +1,243 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   01 · NACHTFAHRT — gepinnter Scroll-Film, Kino, sehr wenig auf viel Schwarz
+   ───────────────────────────────────────────────────────────────────────── */
+.t-nacht {
+  --bg: var(--ink-950);
+  background: var(--ink-950);
+  color: var(--chalk);
+}
+.t-nacht .wrap { width: var(--mid); margin-inline: auto; }
+.t-nacht .scene { position: relative; }
+.t-nacht .fine { color: var(--ink-400); font-size: var(--t-xs); }
+
+/* Gepinnte Szene: die Höhe gibt den Scrollweg, innen klebt ein Vollbild */
+.t-nacht [data-pin] { height: calc(var(--vh, 300) * 1svh); }
+.t-nacht .pin-inner {
+  position: sticky; top: 0;
+  height: 100svh; overflow: hidden;
+}
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.t-nacht .hero-grid {
+  position: relative; z-index: 2;
+  height: 100%;
+  width: var(--wide); margin-inline: auto;
+  padding: calc(3.4rem + env(safe-area-inset-top)) 0 clamp(4.5rem, 12vh, 7rem);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(1rem, 3vh, 2rem);
+}
+/* Schleier, damit Schrift auf bewegtem Licht lesbar bleibt */
+.t-nacht .hero .pin-inner::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(6,7,8,.72) 0%, rgba(6,7,8,.08) 22%, rgba(6,7,8,.34) 58%, rgba(6,7,8,.94) 88%),
+    linear-gradient(to right, rgba(6,7,8,.66), transparent 52%);
+}
+.t-nacht .hero-top { align-self: start; }
+
+/* Tief gesetzt: die Fahrzeuge behalten das obere Bilddrittel, die Schrift
+   liegt auf dem dunklen Boden statt auf den Silhouetten. */
+.t-nacht .hero-h {
+  align-self: end;
+  font-size: clamp(2.5rem, .4rem + 8.2vw, 8rem);
+  text-transform: uppercase;
+  line-height: .84;
+  letter-spacing: -.018em;
+  display: grid;
+  text-shadow: 0 4px 40px rgba(0, 0, 0, .8);
+}
+/* Nur die direkten Zeilen werden Blöcke — sonst zerlegt die Regel
+   die Zeichen-Spans des Auftritts in Einzelzeilen. */
+.t-nacht .hero-h > span { display: block; }
+.t-nacht .hero-h .l1 { font-variation-settings: 'wdth' 62; font-weight: 800; }
+.t-nacht .hero-h .l2 {
+  font-weight: 400; color: var(--chalk-dim);
+  padding-left: .06em;
+}
+.t-nacht .hero-h .l3 { font-variation-settings: 'wdth' 88; font-weight: 800; }
+/* Kein Rot in der Überschrift: der Lichtring der Drehbühne ist das rote
+   Signal dieses Bildschirms. Zwei wären eines zu viel. */
+
+.t-nacht .hero-foot {
+  align-self: end;
+  display: grid; gap: clamp(1rem, 2.4vh, 1.6rem);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 900px) {
+  .t-nacht .hero-foot { grid-template-columns: auto 1fr auto; align-items: end; gap: 2.4rem; }
+}
+.t-nacht .hero-sub { color: var(--chalk-dim); font-size: var(--t-sm); }
+
+/* Anzeige der Drehbühne */
+.t-nacht .hud {
+  display: inline-grid; grid-auto-flow: column; align-items: center; gap: .85rem;
+  padding: .5rem .8rem; border-radius: 9px;
+  border: 1px solid rgba(243, 241, 236, .16);
+  background: rgba(6, 7, 8, .55);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  font-size: var(--t-xs); letter-spacing: .1em; text-transform: uppercase;
+  width: max-content;
+}
+.t-nacht .hud-k { color: var(--ink-400); }
+.t-nacht .hud-v { color: var(--chalk); min-width: 8ch; }
+.t-nacht .hud-d { color: var(--sig-400); min-width: 5ch; text-align: right; }
+
+.t-nacht .scroll-hint {
+  display: flex; align-items: center; gap: .7rem;
+  font-size: var(--t-xs); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-400);
+}
+.t-nacht .scroll-hint i {
+  width: 54px; height: 1px; background: var(--ink-600); position: relative; overflow: hidden;
+}
+.t-nacht .scroll-hint i::after {
+  content: ''; position: absolute; inset: 0; width: 40%;
+  background: var(--sig-400);
+  animation: hint-run 2.4s var(--ease-in) infinite;
+}
+@keyframes hint-run { 0% { transform: translateX(-110%); } 60%, 100% { transform: translateX(280%); } }
+
+/* ── Manifest ────────────────────────────────────────────────────────────── */
+.t-nacht .manifest { padding: var(--sect) 0; }
+.t-nacht .big {
+  font-size: var(--t-2xl); text-transform: uppercase;
+  font-variation-settings: 'wdth' 72; margin: 1rem 0 1.4rem;
+}
+.t-nacht .lede { color: var(--chalk-dim); font-size: var(--t-md); }
+
+.t-nacht .figures {
+  margin-top: clamp(2.4rem, 6vh, 4rem);
+  display: grid; gap: 1px;
+  grid-template-columns: repeat(2, 1fr);
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+@media (min-width: 780px) { .t-nacht .figures { grid-template-columns: repeat(4, 1fr); } }
+.t-nacht .figures > div {
+  background: var(--ink-950);
+  padding: clamp(1.1rem, 3vw, 1.8rem);
+  display: grid; gap: .3rem;
+}
+.t-nacht .figures dt {
+  font-family: var(--mono); font-size: var(--t-xs);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink-400);
+}
+.t-nacht .figures dd {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(2rem, 5vw, 3.2rem); line-height: 1;
+  font-variation-settings: 'wdth' 78;
+}
+
+/* ── Laufband ────────────────────────────────────────────────────────────── */
+.t-nacht .belt { padding: var(--sect) 0; overflow: hidden; }
+.t-nacht .mq { margin: 1.8rem 0 1.1rem; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); }
+.t-nacht .mq-track {
+  display: flex; gap: var(--gutter); width: max-content;
+  animation: belt-run 42s linear infinite;
+}
+.t-nacht .mq:hover .mq-track { animation-play-state: paused; }
+@keyframes belt-run { to { transform: translateX(-50%); } }
+.t-nacht .mq figure { width: clamp(210px, 26vw, 340px); flex-shrink: 0; }
+.t-nacht .mq img {
+  width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+  border: 1px solid var(--line); border-radius: 10px;
+  filter: saturate(.85);
+}
+.t-nacht .mq figcaption {
+  font-size: var(--t-xs); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-400); padding-top: .55rem;
+}
+.t-nacht .belt-note { color: var(--ink-400); font-size: var(--t-xs); letter-spacing: .1em; }
+
+/* ── Werk 2 ──────────────────────────────────────────────────────────────── */
+.t-nacht .werk {
+  display: grid; align-items: center;
+  gap: clamp(1.6rem, 5vw, 4rem);
+  padding: var(--sect) var(--pad);
+  width: var(--wide); margin-inline: auto;
+}
+@media (min-width: 940px) { .t-nacht .werk { grid-template-columns: 1.05fr .95fr; } }
+.t-nacht .werk-media {
+  position: relative; overflow: hidden; border-radius: 14px;
+  border: 1px solid var(--line); aspect-ratio: 5 / 4;
+}
+.t-nacht .werk-media img { width: 100%; height: 118%; object-fit: cover; will-change: transform; }
+.t-nacht .werk-copy h2 {
+  font-size: var(--t-xl); text-transform: uppercase;
+  font-variation-settings: 'wdth' 74; margin: 1rem 0 1.1rem;
+}
+.t-nacht .werk-copy p { color: var(--chalk-dim); }
+.t-nacht .ticks { list-style: none; margin-top: 1.4rem; display: grid; gap: .6rem; }
+.t-nacht .ticks li {
+  position: relative; padding-left: 1.5rem;
+  font-size: var(--t-sm); color: var(--chalk-dim);
+}
+.t-nacht .ticks li::before {
+  content: ''; position: absolute; left: 0; top: .62em;
+  width: 10px; height: 2px; background: var(--sig-500);
+}
+
+/* ── Ziellinie ───────────────────────────────────────────────────────────── */
+.t-nacht .close { padding: var(--sect) 0 calc(var(--sect) + 3rem); }
+.t-nacht .center { text-align: center; display: grid; justify-items: center; gap: 1.2rem; }
+.t-nacht .center-eb { justify-self: center; }
+.t-nacht .center-eb::after { display: none; }
+.t-nacht .huge {
+  font-size: var(--t-3xl); text-transform: uppercase;
+  font-variation-settings: 'wdth' 66;
+}
+.t-nacht .close p { color: var(--chalk-dim); }
+.t-nacht .cta-row { display: flex; flex-wrap: wrap; gap: .8rem; justify-content: center; align-items: center; }
+
+/* Flüssigmetall-Knopf (21st.dev · johuniq) */
+.t-nacht .liquid {
+  position: relative; isolation: isolate; overflow: hidden;
+  padding: .95rem 1.8rem; border-radius: 12px;
+  font-weight: 600; font-size: var(--t-sm); letter-spacing: .01em;
+  color: var(--chalk);
+  background:
+    linear-gradient(180deg, rgba(243,241,236,.16), rgba(243,241,236,.02) 42%, rgba(0,0,0,.28)),
+    linear-gradient(96deg, #1a1e23, #33393f 32%, #191d21 62%, #2c3237);
+  border: 1px solid rgba(243, 241, 236, .2);
+  box-shadow:
+    inset 0 1px 0 rgba(243, 241, 236, .3),
+    inset 0 -1px 0 rgba(0, 0, 0, .5),
+    0 12px 34px -12px rgba(0, 0, 0, .9);
+  transition: transform var(--fast) var(--ease), box-shadow var(--mid-t) var(--ease);
+}
+.t-nacht .liquid::before { /* wandernder Glanz */
+  content: ''; position: absolute; inset: -60%; z-index: -1;
+  background: conic-gradient(from 0deg,
+    transparent 0deg, rgba(243,241,236,.34) 24deg, transparent 62deg,
+    rgba(var(--sig-glow), .5) 168deg, transparent 214deg, transparent 360deg);
+  animation: liquid-turn 5.5s linear infinite;
+}
+.t-nacht .liquid::after { /* Glaskante */
+  content: ''; position: absolute; inset: 1px; border-radius: 11px; z-index: -1;
+  background: linear-gradient(178deg, rgba(38,43,49,.94), rgba(14,17,20,.97));
+}
+@keyframes liquid-turn { to { transform: rotate(360deg); } }
+.t-nacht .liquid:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(243, 241, 236, .4),
+    0 16px 40px -12px rgba(var(--sig-glow), .5);
+}
+.t-nacht .liquid:active { transform: translateY(0); }
+
+.t-nacht .ghost {
+  padding: .95rem 1.4rem; border-radius: 12px;
+  border: 1px solid var(--line-firm);
+  font-family: var(--mono); font-size: var(--t-sm); letter-spacing: .06em;
+  color: var(--chalk-dim);
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+.t-nacht .ghost:hover { color: var(--chalk); border-color: rgba(255, 59, 69, .55); }
+
+/* ── Fuß ─────────────────────────────────────────────────────────────────── */
+.t-nacht .t-foot { border-top: 1px solid var(--line); padding: 2.6rem 0 7rem; }
+.t-nacht .foot-grid { display: grid; gap: 1.6rem; }
+@media (min-width: 760px) { .t-nacht .foot-grid { grid-template-columns: 1fr auto; align-items: start; } }
+.t-nacht .t-foot nav { display: flex; flex-wrap: wrap; gap: .3rem .9rem; }
+.t-nacht .t-foot .wordmark { margin-bottom: .7rem; }

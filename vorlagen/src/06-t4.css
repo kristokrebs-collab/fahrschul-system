@@ -1,0 +1,231 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   04 · SIMULATOR — drei Ebenen übereinander: WebGL-Wellen, Regenfilm, Glas.
+   Der Akzent ist hier das Instrumentenglühen, nicht eine Fläche.
+   ───────────────────────────────────────────────────────────────────────── */
+.t-sim {
+  background: var(--ink-950);
+  color: var(--chalk);
+}
+.t-sim .wrap { width: var(--mid); margin-inline: auto; }
+.t-sim .scene { position: relative; }
+.t-sim .fine { color: var(--ink-400); font-size: var(--t-xs); }
+.t-sim h2 {
+  font-size: var(--t-xl); text-transform: uppercase;
+  font-variation-settings: 'wdth' 78; margin: .9rem 0 1.2rem;
+}
+.t-sim p { color: var(--chalk-mut); }
+
+/* Glasfläche — hoch deckend, damit Schrift auf Bewegung lesbar bleibt */
+.t-sim .glass {
+  background: rgba(12, 15, 18, .74);
+  backdrop-filter: blur(26px) saturate(1.25);
+  -webkit-backdrop-filter: blur(26px) saturate(1.25);
+  border: 1px solid rgba(243, 241, 236, .14);
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0 rgba(243, 241, 236, .12),
+    0 40px 90px -40px rgba(0, 0, 0, .95);
+}
+
+/* ── Kopf mit drei Ebenen ────────────────────────────────────────────────── */
+.t-sim .sm-hero {
+  min-height: 100svh;
+  display: grid; align-items: center;
+  padding: clamp(5rem, 12vh, 8rem) var(--pad) clamp(4rem, 10vh, 6rem);
+  overflow: hidden;
+}
+.t-sim .shader {
+  position: absolute; inset: 0; z-index: 0;
+  width: 100%; height: 100%;
+}
+/* Regen liegt nur als Textur darüber — entsättigt, damit sein rotes Bokeh
+   nicht mit dem Instrumentenglühen des Shaders um Aufmerksamkeit kämpft. */
+.t-sim .sm-rain {
+  position: absolute; inset: 0; z-index: 1;
+  mix-blend-mode: screen; opacity: .26;
+  filter: saturate(.42) contrast(1.1);
+}
+/* Papierverlauf: weiche Bahn über den Wellen (Hero Paper Shader · reuno-ui) */
+.t-sim .sm-paper {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background:
+    radial-gradient(90% 60% at 20% 16%, rgba(225, 10, 23, .07), transparent 58%),
+    radial-gradient(72% 52% at 84% 80%, rgba(120, 140, 168, .1), transparent 62%),
+    linear-gradient(to bottom, rgba(6, 7, 8, .62), rgba(6, 7, 8, .34) 42%, rgba(6, 7, 8, .9));
+}
+.t-sim .sm-hero-inner {
+  position: relative; z-index: 3;
+  width: var(--wide); margin-inline: auto;
+  display: grid; gap: clamp(1.4rem, 3vw, 2.4rem);
+  align-items: center;
+}
+@media (min-width: 1000px) { .t-sim .sm-hero-inner { grid-template-columns: 1.35fr .65fr; } }
+
+.t-sim .sm-card { padding: clamp(1.5rem, 4vw, 2.8rem); }
+.t-sim .sm-card h1 {
+  font-size: clamp(2.5rem, .5rem + 7.4vw, 6.6rem);
+  text-transform: uppercase; line-height: .87;
+  letter-spacing: -.028em; margin: .9rem 0 1.2rem;
+  display: grid;
+}
+.t-sim .sm-card h1 > span { display: block; }
+.t-sim .sm-card h1 > span:first-child { font-variation-settings: 'wdth' 70; font-weight: 800; }
+.t-sim .sm-card h1 .dim {
+  font-variation-settings: 'wdth' 96; font-weight: 400; color: var(--ink-300);
+}
+.t-sim .sm-lede { max-width: 48ch; font-size: var(--t-md); color: var(--chalk-dim); }
+.t-sim .sm-row { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1.7rem; }
+.t-sim .sm-note {
+  font-size: var(--t-xs); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-400);
+}
+
+/* Flüssigmetall-Knopf, hier auf Glas */
+.t-sim .liquid {
+  position: relative; isolation: isolate; overflow: hidden;
+  padding: .92rem 1.7rem; border-radius: 12px;
+  font-weight: 600; font-size: var(--t-sm); color: var(--chalk);
+  background: linear-gradient(96deg, #1b1f24, #343a41 34%, #1a1e22 66%, #2d3339);
+  border: 1px solid rgba(243, 241, 236, .2);
+  box-shadow: inset 0 1px 0 rgba(243, 241, 236, .3), 0 12px 30px -12px rgba(0, 0, 0, .9);
+  transition: box-shadow var(--mid-t) var(--ease), transform var(--fast) var(--ease);
+}
+.t-sim .liquid::before {
+  content: ''; position: absolute; inset: -60%; z-index: -1;
+  background: conic-gradient(from 0deg, transparent 0deg, rgba(243,241,236,.3) 26deg,
+    transparent 64deg, rgba(var(--sig-glow), .55) 172deg, transparent 218deg, transparent 360deg);
+  animation: liquid-turn 5.5s linear infinite;
+}
+.t-sim .liquid::after {
+  content: ''; position: absolute; inset: 1px; border-radius: 11px; z-index: -1;
+  background: linear-gradient(178deg, rgba(40,45,51,.95), rgba(15,18,21,.97));
+}
+.t-sim .liquid:hover { transform: translateY(-1px); box-shadow: 0 16px 38px -12px rgba(var(--sig-glow), .5); }
+.t-sim .liquid:disabled { opacity: .6; cursor: wait; }
+
+.t-sim .sm-facts { list-style: none; display: grid; gap: .6rem; }
+.t-sim .sm-facts li {
+  display: grid; grid-template-columns: auto 1fr; column-gap: .9rem;
+  align-items: baseline;
+  padding: .95rem 1.1rem; border-radius: 13px;
+  background: rgba(12, 15, 18, .62);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(243, 241, 236, .1);
+}
+.t-sim .sm-facts span {
+  grid-column: 1 / -1;
+  font-size: var(--t-xs); letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-400); margin-bottom: .2rem;
+}
+.t-sim .sm-facts b {
+  font-family: var(--display); font-weight: 800; font-size: 2.1rem; line-height: 1;
+  font-variation-settings: 'wdth' 76; color: var(--sig-400);
+}
+.t-sim .sm-facts i { font-style: normal; font-size: var(--t-xs); color: var(--chalk-mut); }
+
+/* ── Kippender Rahmen ────────────────────────────────────────────────────── */
+.t-sim .sm-tilt { padding: var(--sect) 0 0; }
+.t-sim .tilt-head { text-align: center; display: grid; justify-items: center; }
+.t-sim .tilt-head .eyebrow { justify-self: center; }
+.t-sim .tilt-head .eyebrow::after { display: none; }
+.t-sim .frame-outer {
+  position: relative;
+  width: var(--wide); margin: clamp(2.4rem, 6vh, 4rem) auto 0;
+  padding: 0 var(--pad) clamp(3rem, 8vh, 5rem);
+  perspective: 1400px;
+}
+.t-sim .frame {
+  position: relative;
+  border-radius: 16px; overflow: hidden;
+  border: 1px solid rgba(243, 241, 236, .16);
+  background: var(--ink-850);
+  box-shadow: 0 60px 120px -50px rgba(0, 0, 0, .98), 0 0 0 1px rgba(0,0,0,.5);
+  transform-origin: 50% 0%;
+  will-change: transform;
+}
+.t-sim .frame-bar {
+  display: flex; align-items: center; gap: .4rem;
+  padding: .7rem .95rem;
+  background: rgba(243, 241, 236, .045);
+  border-bottom: 1px solid rgba(243, 241, 236, .1);
+}
+.t-sim .frame-bar .dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--ink-600);
+}
+.t-sim .frame-bar .dot:first-child { background: var(--sig-600); }
+.t-sim .frame-url {
+  margin-left: .8rem; font-size: var(--t-xs);
+  color: var(--ink-400); letter-spacing: .04em;
+}
+.t-sim .frame img { width: 100%; height: auto; display: block; }
+.t-sim .app-dock {
+  position: absolute; bottom: 1.1rem; left: 50%; transform: translateX(-50%);
+  display: flex; gap: .35rem; padding: .35rem;
+  border-radius: 12px;
+  background: rgba(6, 7, 8, .74);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(243, 241, 236, .14);
+}
+.t-sim .ad-item {
+  width: 26px; height: 26px; border-radius: 8px;
+  background: rgba(243, 241, 236, .13);
+}
+.t-sim .ad-item.on { background: var(--sig-500); box-shadow: 0 0 12px rgba(var(--sig-glow), .8); }
+.t-sim .frame-phone {
+  position: absolute; z-index: 3;
+  right: calc(var(--pad) - .4rem); bottom: clamp(1rem, 4vh, 2.4rem);
+  width: clamp(96px, 13vw, 172px);
+  border-radius: 16px;
+  border: 1px solid rgba(243, 241, 236, .2);
+  box-shadow: 0 30px 60px -22px rgba(0, 0, 0, .95);
+  will-change: transform;
+}
+@media (max-width: 700px) { .t-sim .frame-phone { display: none; } }
+
+/* ── Zugang ──────────────────────────────────────────────────────────────── */
+.t-sim .sm-access { padding: var(--sect) var(--pad); }
+.t-sim .sm-access-grid {
+  width: var(--wide); margin-inline: auto;
+  display: grid; gap: clamp(1.8rem, 4vw, 3.4rem); align-items: center;
+}
+@media (min-width: 900px) { .t-sim .sm-access-grid { grid-template-columns: 1.1fr .9fr; } }
+.t-sim .sm-hours { display: grid; gap: .1rem; margin-top: 1.6rem; }
+.t-sim .sm-hours > div {
+  display: grid; grid-template-columns: 7rem 1fr; gap: 1rem;
+  padding: .7rem 0; border-top: 1px solid var(--line);
+  font-size: var(--t-sm);
+}
+.t-sim .sm-hours dt { color: var(--ink-400); font-size: var(--t-xs); letter-spacing: .1em; text-transform: uppercase; }
+.t-sim .sm-hours dd { color: var(--chalk-dim); }
+
+.t-sim .sm-form { padding: clamp(1.5rem, 4vw, 2.4rem); display: grid; gap: 1rem; }
+.t-sim .sm-form h3 {
+  font-size: var(--t-md); text-transform: uppercase;
+  font-variation-settings: 'wdth' 84; margin-bottom: .3rem;
+}
+.t-sim .sm-form label { display: grid; gap: .4rem; }
+.t-sim .sm-form label > span {
+  font-family: var(--mono); font-size: var(--t-xs);
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-300);
+}
+.t-sim .sm-form input {
+  padding: .8rem .95rem; border-radius: 10px;
+  background: rgba(6, 7, 8, .6);
+  border: 1px solid rgba(243, 241, 236, .16);
+  color: var(--chalk); font-size: var(--t-base);
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.t-sim .sm-form input::placeholder { color: var(--ink-500); }
+.t-sim .sm-form input:focus { outline: none; border-color: var(--sig-400); background: rgba(6, 7, 8, .8); }
+.t-sim .sm-form.err-mail input[name=mail],
+.t-sim .sm-form.err-code input[name=code] { border-color: var(--sig-500); background: rgba(225, 10, 23, .08); }
+.t-sim .sm-form button { margin-top: .3rem; justify-self: start; }
+.t-sim .sm-msg { font-size: var(--t-xs); letter-spacing: .04em; min-height: 1.2em; }
+.t-sim .sm-msg[data-tone="bad"]  { color: var(--sig-400); }
+.t-sim .sm-msg[data-tone="wait"] { color: var(--amber); }
+.t-sim .sm-msg[data-tone="good"] { color: var(--done); }
+
+/* ── Fuß ─────────────────────────────────────────────────────────────────── */
+.t-sim .sm-foot { border-top: 1px solid var(--line); padding: 2.4rem 0 7rem; }
+.t-sim .sm-foot .wordmark { margin-bottom: .6rem; }
+.t-sim .sm-foot .fine { max-width: 60ch; }

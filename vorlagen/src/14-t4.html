@@ -1,0 +1,107 @@
+<template id="tpl-simulator">
+<article class="t-sim">
+
+  <!-- 01 · Drei Ebenen: WebGL-Wellen, Regenfilm, Glas
+       (Shader Animation · designali-in  +  Hero Paper Shader · reuno-ui) -->
+  <section class="scene sm-hero" data-scene>
+    <canvas class="shader" data-shader aria-hidden="true"></canvas>
+    <div class="film-wrap sm-rain" data-vignette="off">
+      <canvas class="film" data-film="rain" data-mode="loop" data-fps="2" data-poster="6"></canvas>
+    </div>
+    <div class="sm-paper" aria-hidden="true"></div>
+
+    <div class="sm-hero-inner">
+      <div class="glass sm-card">
+        <p class="eyebrow"><b>Simulator</b> &nbsp;Prüfungsvorbereitung</p>
+        <h1><span data-split>Erst üben.</span><span class="dim">Dann fahren.</span></h1>
+        <p class="sm-lede">
+          Ausbildung am Fahrsimulator, bevor es in den echten Verkehr geht.
+          Gefahrenbremsung, Nachtfahrt und Nässe ohne Risiko — beliebig oft wiederholbar.
+        </p>
+        <div class="sm-row">
+          <button class="liquid" type="button" data-cursor="Termin"><span>Termin am Simulator</span></button>
+          <span class="mono sm-note">Bewegung im Hintergrund läuft live in WebGL</span>
+        </div>
+      </div>
+
+      <ul class="sm-facts">
+        <li><span class="mono">Nachtfahrt</span><b>3</b><i>Sonderfahrten bei Nacht, Klasse B</i></li>
+        <li><span class="mono">Autobahn</span><b>4</b><i>Sonderfahrten Autobahn, Klasse B</i></li>
+        <li><span class="mono">Überland</span><b>5</b><i>Sonderfahrten Überland, Klasse B</i></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 02 · Der Rahmen kippt beim Scrollen nach vorn
+       (Container Scroll Animation · manuarora700) -->
+  <section class="scene sm-tilt" data-scene>
+    <div class="wrap tilt-head">
+      <p class="eyebrow" data-reveal><b>01</b> &nbsp;Cockpit</p>
+      <h2 data-reveal style="--d:60ms">Dein Fortschritt,<br>nicht unsere Ablage.</h2>
+      <p class="measure" data-reveal style="--d:120ms">
+        Was erledigt ist, was als Nächstes ansteht, welche Sonderfahrten noch fehlen —
+        für Schüler und Büro dieselbe Wahrheit, ohne Nachfragen.
+      </p>
+    </div>
+
+    <div class="frame-outer">
+      <div class="frame" data-tilt>
+        <div class="frame-bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="frame-url mono">fahrschule-krebs.de/cockpit</span>
+        </div>
+        <img data-img="app-desktop" alt="Cockpit-Oberfläche mit Fortschritt und Terminen">
+        <!-- Minimal Dock · jatin-yadav05 — die Navigation der App selbst -->
+        <div class="app-dock" aria-hidden="true">
+          <span class="ad-item on"></span><span class="ad-item"></span>
+          <span class="ad-item"></span><span class="ad-item"></span>
+        </div>
+      </div>
+      <img class="frame-phone" data-img="app-mobile" alt="Cockpit auf dem Telefon" data-parallax="0.1">
+    </div>
+  </section>
+
+  <!-- 03 · Zugang (Sign In Flow · aghasisahakyan1) — mit echter Prüfung -->
+  <section class="scene sm-access" data-scene>
+    <div class="sm-access-grid">
+      <div>
+        <p class="eyebrow" data-reveal><b>02</b> &nbsp;Zugang</p>
+        <h2 data-reveal style="--d:60ms">Anmelden.</h2>
+        <p class="measure" data-reveal style="--d:120ms">
+          Der Zugangscode kommt aus dem Büro — sechs Ziffern, gültig für dein Konto.
+          Die Prüfung unten läuft echt: unvollständige Eingaben werden benannt,
+          nicht kommentarlos verschluckt.
+        </p>
+        <dl class="sm-hours" data-reveal style="--d:180ms">
+          <div><dt class="mono">Fulda</dt><dd>Mo–Do 09:00–18:00 · Fr 09:00–17:00</dd></div>
+          <div><dt class="mono">Telefon</dt><dd>0661 22670</dd></div>
+          <div><dt class="mono">E-Mail</dt><dd>info@fahrschule-krebs.de</dd></div>
+        </dl>
+      </div>
+
+      <form class="glass sm-form" data-signin novalidate data-reveal style="--d:120ms">
+        <h3>Cockpit-Zugang</h3>
+        <label>
+          <span>E-Mail</span>
+          <input name="mail" type="email" autocomplete="email" placeholder="name@beispiel.de" spellcheck="false">
+        </label>
+        <label>
+          <span>Zugangscode</span>
+          <input name="code" type="text" inputmode="numeric" maxlength="6" placeholder="6 Ziffern" spellcheck="false">
+        </label>
+        <button type="submit" class="liquid"><span>Anmelden</span></button>
+        <p class="sm-msg mono" data-note aria-live="polite"></p>
+        <p class="fine">Demo-Ansicht — es wird nichts gesendet und nichts gespeichert.</p>
+      </form>
+    </div>
+  </section>
+
+  <footer class="sm-foot">
+    <div class="wrap">
+      <div class="wordmark"><i></i> Simulator <span>Fahrschule Krebs</span></div>
+      <p class="mono fine">Ausbildung mit Fahrsimulator ist belegt. Anzahl, Standort und
+        abgedeckte Klassen werden nicht behauptet, weil sie nicht belegt sind.</p>
+    </div>
+  </footer>
+</article>
+</template>

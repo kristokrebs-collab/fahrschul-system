@@ -1,0 +1,185 @@
+<template id="tpl-werk2">
+<article class="t-werk">
+
+  <!-- 01 · Minimalistischer Kopf (Minimalist Hero · ravikatiyar162):
+       harter Schwarzweiß-Ausschnitt, ein einziger Farbkreis, sehr große Schrift -->
+  <section class="scene wk-hero" data-scene>
+    <div class="wk-hero-grid">
+      <div class="wk-hero-copy">
+        <p class="eyebrow"><b>Werk 2</b> &nbsp;Bellingerstraße 6 · Fulda</p>
+        <h1 data-kinetic data-from="64" data-to="112">Übungs&shy;platz</h1>
+        <p class="wk-lede">
+          2.000 Quadratmeter, die keinem im Weg sind. Anfahren, Rangieren,
+          Gefahrenbremsung — ohne fremden Verkehr, ohne Publikum, ohne Zeitdruck.
+        </p>
+        <div class="wk-cta">
+          <button class="shiny" type="button" data-cursor="ansehen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            Platz besichtigen
+          </button>
+          <span class="mono wk-hint">Kacheln unten reagieren auf den Zeiger</span>
+        </div>
+      </div>
+      <div class="wk-hero-shape">
+        <span class="disc" aria-hidden="true"></span>
+        <img data-img="cockpit-wheel" alt="Lenkrad mit rot leuchtender Instrumentenanzeige">
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 · Bento: jede Kachel trägt ihren eigenen Film und startet ihn bei Bedarf -->
+  <section class="scene wk-bento" data-scene>
+    <div class="wrap">
+      <p class="eyebrow" data-reveal><b>01</b> &nbsp;Der Betrieb in Kacheln</p>
+
+      <div class="bento">
+        <article class="tile tile-film" data-bento-tile tabindex="0" data-reveal data-cursor="Film">
+          <canvas class="film" data-film="morph" data-fps="3.4" data-poster="11"></canvas>
+          <div class="tile-body">
+            <h3>Vom Pkw zum Bus</h3>
+            <p>Ein Fuhrpark, vier Klassenwelten — ohne Schnitt.</p>
+          </div>
+          <span class="tile-flag mono">Film</span>
+        </article>
+
+        <article class="tile tile-num" data-reveal style="--d:60ms">
+          <span class="num mono"><span data-count="2000" data-sep>0</span> m²</span>
+          <h3>Eigener Platz</h3>
+          <p>Werk 2, keine Anmietung, jederzeit verfügbar.</p>
+        </article>
+
+        <article class="tile tile-film sm" data-bento-tile tabindex="0" data-reveal style="--d:120ms" data-cursor="Film">
+          <canvas class="film" data-film="ring" data-fps="5" data-poster="9"></canvas>
+          <div class="tile-body">
+            <h3>Fortschritt</h3>
+            <p>Jede Station im Blick.</p>
+          </div>
+          <span class="tile-flag mono">Film</span>
+        </article>
+
+        <article class="tile tile-img" data-reveal style="--d:180ms">
+          <img data-img="werk2" alt="Übungsplatz mit Fahrbahnmarkierungen">
+          <div class="tile-body">
+            <h3>Grundfahraufgaben</h3>
+            <p>Alle Klassen, markierte Bahnen.</p>
+          </div>
+        </article>
+
+        <article class="tile tile-list" data-reveal style="--d:240ms">
+          <h3>Theorie in Fulda</h3>
+          <dl>
+            <div><dt class="mono">Mo–Do</dt><dd>drei Themen pro Tag</dd></div>
+            <div><dt class="mono">Lkw</dt><dd>Mo + Do · 16:30–19:30</dd></div>
+            <div><dt class="mono">Motorrad</dt><dd>Mi zweiwöchentlich · 16:30–19:30</dd></div>
+          </dl>
+          <p class="fine">Anmeldung erforderlich · höchstens zwei Einheiten am Tag</p>
+        </article>
+
+        <article class="tile tile-img" data-reveal style="--d:300ms">
+          <img data-img="lasi" alt="Ladefläche eines Lkw an der Rampe">
+          <div class="tile-body">
+            <h3>Ladungssicherung</h3>
+            <p>Beratung im LaSi-Portal registriert.</p>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 · Fahrzeugwelten als Akkordeon (Interactive Image Accordion · minhxthanh) -->
+  <section class="scene wk-acc" data-scene>
+    <div class="wrap">
+      <p class="eyebrow" data-reveal><b>02</b> &nbsp;Fahrzeugwelten</p>
+      <h2 data-reveal style="--d:60ms">Fünf Welten, ein Fuhrpark.</h2>
+      <div class="acc" data-accordion data-reveal style="--d:120ms">
+        <article class="pane" data-pane tabindex="0" role="button" aria-expanded="true">
+          <img data-img="kl-b" alt="Kombi auf der Drehbühne">
+          <div class="pane-label"><span class="mono">B</span><h3>Auto</h3></div>
+          <div class="pane-more"><p>Audi, BMW, Mercedes-Benz und VW. B197, Automatik 78 und BF17.</p></div>
+        </article>
+        <article class="pane" data-pane tabindex="0" role="button" aria-expanded="false">
+          <img data-img="kl-a" alt="Motorrad im Studiolicht">
+          <div class="pane-label"><span class="mono">A</span><h3>Motorrad</h3></div>
+          <div class="pane-more"><p>AM ab 15, A1 ab 16, A2 ab 18, A ab 24 im Direkteinstieg.</p></div>
+        </article>
+        <article class="pane" data-pane tabindex="0" role="button" aria-expanded="false">
+          <img data-img="kl-c" alt="Sattelzug im Studio">
+          <div class="pane-label"><span class="mono">CE</span><h3>Lkw</h3></div>
+          <div class="pane-more"><p>Eigene Lkw. Grundqualifikation und Weiterbildung im Haus.</p></div>
+        </article>
+        <article class="pane" data-pane tabindex="0" role="button" aria-expanded="false">
+          <img data-img="kl-d" alt="Bus im Studio">
+          <div class="pane-label"><span class="mono">D</span><h3>Bus</h3></div>
+          <div class="pane-more"><p>Eigener Bus. D, D1, DE und D1E nach Anlage 5.</p></div>
+        </article>
+        <article class="pane" data-pane tabindex="0" role="button" aria-expanded="false">
+          <img data-img="kl-stapler" alt="Gabelstapler in der Halle">
+          <div class="pane-label"><span class="mono">FS</span><h3>Stapler</h3></div>
+          <div class="pane-more"><p>Gabelstaplerschein nach DGUV — Theorie und Praxis am Gerät.</p></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 · Digitalpaket als Stapel-Karussell (Feature Carousel · cult-ui) -->
+  <!-- data-carousel umfasst auch die Pfeile im Kopf — sonst findet die
+       Verdrahtung sie nicht, weil sie außerhalb des Stapels stehen. -->
+  <section class="scene wk-car" data-scene>
+    <div class="wrap" data-carousel>
+      <p class="eyebrow" data-reveal><b>03</b> &nbsp;Digitalpaket</p>
+      <div class="car-head">
+        <h2 data-reveal style="--d:60ms">Was digital läuft.</h2>
+        <div class="car-nav">
+          <button data-prev type="button" aria-label="Vorherige Karte" class="rnd">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 6l-6 6 6 6"/></svg>
+          </button>
+          <button data-next type="button" aria-label="Nächste Karte" class="rnd">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="car" data-reveal style="--d:120ms">
+        <div class="car-stack">
+          <article class="cslide" data-slide="Fahrschul-Cockpit">
+            <img data-img="devices" alt="Tablet und Telefon mit Oberfläche">
+            <div class="cs-body"><h3>Fahrschul-Cockpit</h3>
+              <p>Fortschritt, nächste Termine, offene Aufgaben — für Schüler und Büro dieselbe Wahrheit.</p></div>
+          </article>
+          <article class="cslide" data-slide="Simulator">
+            <img data-img="simulator" alt="Fahrsimulator im Schulungsraum">
+            <div class="cs-body"><h3>Simulator</h3>
+              <p>Ausbildung am Fahrsimulator, bevor es in den echten Verkehr geht.</p></div>
+          </article>
+          <article class="cslide" data-slide="Unterlagen">
+            <img data-img="documents" alt="Antragsunterlagen">
+            <div class="cs-body"><h3>Unterlagen</h3>
+              <p>Antrag, Sehtest, Erste Hilfe — was wann gebraucht wird, ohne Rätselraten.</p></div>
+          </article>
+          <article class="cslide" data-slide="Standorte">
+            <img data-img="office" alt="Büro der Fahrschule">
+            <div class="cs-body"><h3>Standorte</h3>
+              <p>Fulda direkt am ICE-Bahnhof, Bad Hersfeld in der Bahnhofstraße.</p></div>
+          </article>
+        </div>
+        <div class="car-foot">
+          <p class="mono" data-cap></p>
+          <div class="car-dots">
+            <button data-dot type="button" aria-label="Karte 1"></button>
+            <button data-dot type="button" aria-label="Karte 2"></button>
+            <button data-dot type="button" aria-label="Karte 3"></button>
+            <button data-dot type="button" aria-label="Karte 4"></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="wk-foot">
+    <div class="wrap">
+      <div class="wordmark"><i></i> Werk 2 <span>Fahrschule Krebs</span></div>
+      <p class="mono fine">Bellingerstraße 6 · 36043 Fulda · ca. 2.000 m² · eigener Übungsplatz</p>
+    </div>
+  </footer>
+</article>
+</template>
