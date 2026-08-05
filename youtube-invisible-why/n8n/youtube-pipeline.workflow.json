@@ -703,6 +703,8 @@
     {
       "parameters": {
         "resume": "form",
+        "formTitle": "Invisible Why — Script Approval",
+        "formDescription": "Final human sign-off before packaging/rendering continue (editorial-rules.md §9).",
         "formFields": {
           "values": [
             {
@@ -946,12 +948,12 @@
     },
     {
       "parameters": {
-        "command": "npx remotion render {{$env.INVISIBLE_WHY_ROOT}}/remotion-engine/src/index.ts MainVideo {{$env.INVISIBLE_WHY_ROOT}}/renders/{{$json.id}}.mp4 --props={{$env.INVISIBLE_WHY_ROOT}}/storyboards/{{$json.id}}.json"
+        "jsCode": "const { execSync } = require('child_process');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map(item => {\n  const command = `npx remotion render ${PROJECT_ROOT}/remotion-engine/src/index.ts MainVideo ${PROJECT_ROOT}/renders/${item.json.id}.mp4 --props=${PROJECT_ROOT}/storyboards/${item.json.id}.json`;\n  let stdout = '';\n  let stderr = '';\n  let commandFailed = false;\n  try {\n    stdout = execSync(command, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 20 });\n  } catch (e) {\n    commandFailed = true;\n    stdout = e.stdout ? e.stdout.toString() : '';\n    stderr = e.stderr ? e.stderr.toString() : String(e.message || e);\n  }\n  return { json: { ...item.json, stdout, stderr, commandFailed } };\n});"
       },
       "id": "trigger-remotion-render-46",
       "name": "Trigger Remotion Render",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         10400,
         300
@@ -959,12 +961,12 @@
     },
     {
       "parameters": {
-        "command": "ffprobe -v error -show_entries format=duration,size -of json {{$env.INVISIBLE_WHY_ROOT}}/renders/{{$json.id}}.mp4"
+        "jsCode": "const { execSync } = require('child_process');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map(item => {\n  const command = `ffprobe -v error -show_entries format=duration,size -of json ${PROJECT_ROOT}/renders/${item.json.id}.mp4`;\n  let stdout = '';\n  let stderr = '';\n  let commandFailed = false;\n  try {\n    stdout = execSync(command, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 20 });\n  } catch (e) {\n    commandFailed = true;\n    stdout = e.stdout ? e.stdout.toString() : '';\n    stderr = e.stderr ? e.stderr.toString() : String(e.message || e);\n  }\n  return { json: { ...item.json, stdout, stderr, commandFailed } };\n});"
       },
       "id": "probe-rendered-video-ffprobe--47",
       "name": "Probe Rendered Video (ffprobe)",
-      "type": "n8n-nodes-base.executeCommand",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         10660,
         300

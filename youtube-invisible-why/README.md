@@ -18,7 +18,7 @@ that was actually built. Start here, then follow the links.
 | `channel-bible/` | Audience, editorial rules, visual style, voice style, source policy — the constitution every agent is built against | Written |
 | `agents/` | 8 full Claude agent specs (system prompts), one per pipeline stage | Written |
 | `scoring/` | Deterministic idea-scoring rubric + a tested Node script implementing it | Written & tested |
-| `n8n/` | The full production pipeline as an importable n8n workflow, plus a weekly analytics workflow | Written, structurally self-validated, **not test-imported into a live n8n instance** |
+| `n8n/` | The full production pipeline as an importable n8n workflow, plus a weekly analytics workflow, plus `docker-compose.yml` to stand it up | Written **and tested**: imported into a real local n8n 2.33.3 and executed through 6 real nodes (2 bugs found and fixed in the process) |
 | `remotion-engine/` | A hand-drawing explainer video engine (React/Remotion) — storyboard JSON in, MP4 out | Written **and verified**: installs, typechecks, and renders real MP4s |
 | `pilots/` | 3 complete video packages (script, research, storyboard, titles/thumbnails) ready to run through the pipeline | Written, storyboards render-tested |
 | `ideas/`, `research/`, `scripts/`, `storyboards/` | Empty working directories the live pipeline writes into | Scaffolded, empty until you run the pipeline |
@@ -36,11 +36,15 @@ This is not a slide deck of a plan — most of it was actually run:
   correctly, and gracefully skipping a deliberately-missing icon
   (`NEW_ASSET_NEEDED`) without crashing.
 - `n8n/generate-workflow.js` self-validates the workflow JSON it produces
-  (no orphan nodes, no dangling connections) — but n8n itself wasn't
-  available to actually import and click through, so treat that one
-  workflow as "structurally correct, verify against your n8n version,"
-  not "guaranteed zero-touch import." See `n8n/README.md` for exactly what
-  to check.
+  (no orphan nodes, no dangling connections), and beyond that, the
+  generated workflow was actually installed (`npm install n8n`), imported
+  into a real local instance, and run: it correctly read a real agent
+  prompt file off disk, built a request, and made a real HTTPS call to
+  `api.anthropic.com` that failed with exactly the expected error (401,
+  no API key configured) — not a structural or parsing error. That test
+  caught two real bugs (a removed n8n node type, a missing required
+  parameter), both fixed. See `n8n/README.md` for the full account of what
+  was and wasn't exercised.
 
 ## Where to start
 
@@ -67,9 +71,9 @@ This is not a slide deck of a plan — most of it was actually run:
    replace `remotion-engine/src/components/AnimatedHand.tsx`'s
    placeholder — this is the single highest-leverage visual upgrade,
    since it's reused in every scene of every video.
-3. Stand up self-hosted n8n per `n8n/README.md`, wire the 4 credentials,
-   and manually step through the pipeline once on Pilot 1 before trusting
-   it to run on a schedule.
+3. Stand up self-hosted n8n (`cd n8n && cp .env.example .env && docker
+   compose up`), wire the 4 credentials, and manually step through the
+   pipeline once on Pilot 1 before trusting it to run on a schedule.
 4. Run all three pilots through fact-check and real voiceover generation,
    compare retention once published (private → a small trusted-tester
    pass is reasonable before fully public), then commit to Phase 2 (10

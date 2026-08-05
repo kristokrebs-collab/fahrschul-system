@@ -1,0 +1,32 @@
+# Self-hosted n8n for The Invisible Why pipeline. Run from this directory:
+#   cp .env.example .env   # fill in the values you have so far
+#   docker compose up
+# Then open http://localhost:5678, create the 4 credentials listed in
+# README.md, and import both *.workflow.json files (Workflows > Import from
+# File). See README.md for exactly what each variable/credential is for —
+# this file just wires up what that document describes so you don't have to
+# hand-assemble the docker run command yourself.
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,child_process
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - INVISIBLE_WHY_ROOT=/data/youtube-invisible-why
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
+      - ELEVENLABS_VOICE_ID=${ELEVENLABS_VOICE_ID:-}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE:-UTC}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      # ".." = the youtube-invisible-why/ repo root, one level up from this
+      # compose file — everything the pipeline reads/writes (agents/,
+      # research/, scripts/, storyboards/, renders/, published/, analytics/)
+      # lives under here, mounted read-write into the container.
+      - ..:/data/youtube-invisible-why
+
+volumes:
+  n8n_data:

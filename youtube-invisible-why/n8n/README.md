@@ -17,23 +17,29 @@ all live as files in this repo, per the folder structure in the top-level
 `README.md`). That means:
 
 - **n8n Cloud will not work** for the Code-node steps (no arbitrary
-  filesystem access). You need **self-hosted n8n** (Docker is easiest) with
-  this repository's `youtube-invisible-why/` folder mounted into the
-  container, e.g.:
+  filesystem access). You need **self-hosted n8n**. Easiest path: `cd n8n
+  && cp .env.example .env && docker compose up` (see `docker-compose.yml`
+  — it wires up everything below automatically). Or by hand:
 
   ```bash
   docker run -it --rm \
     -p 5678:5678 \
-    -e NODE_FUNCTION_ALLOW_BUILTIN=fs,path \
+    -e NODE_FUNCTION_ALLOW_BUILTIN=fs,path,child_process \
+    -e N8N_BLOCK_ENV_ACCESS_IN_NODE=false \
     -e INVISIBLE_WHY_ROOT=/data/youtube-invisible-why \
     -v ~/.n8n:/home/node/.n8n \
     -v /absolute/path/to/youtube-invisible-why:/data/youtube-invisible-why \
     n8nio/n8n
   ```
 
-- `NODE_FUNCTION_ALLOW_BUILTIN=fs,path` is required — n8n's Code node
-  sandboxes Node's built-in modules by default, and every agent-call node
-  in this pipeline reads a prompt file and writes an output file directly.
+- `NODE_FUNCTION_ALLOW_BUILTIN=fs,path,child_process` is required — n8n's
+  Code node sandboxes Node's built-in modules by default. Every agent-call
+  node reads a prompt file and writes an output file (`fs`, `path`); the
+  render/QA nodes shell out to Remotion/ffprobe (`child_process`).
+- `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` is required — recent n8n blocks
+  `$env` access from inside Code nodes by default, and this pipeline reads
+  `$env.INVISIBLE_WHY_ROOT` in nearly every Code node. Without this, every
+  Code node fails with `access to env vars denied`.
 - `INVISIBLE_WHY_ROOT` must point at the mounted `youtube-invisible-why/`
   folder inside the container.
 
@@ -64,17 +70,43 @@ all live as files in this repo, per the folder structure in the top-level
    the JSON ships with placeholder credential IDs (`REPLACE_ME`) since
    credential IDs are per-instance and can't be pre-filled.
 4. Repeat import for `analytics-report.workflow.json`.
-5. **This JSON was authored to n8n's 1.x schema but not test-imported
-   against a live instance** (none was available while building this). Walk
-   each node once after import — if your n8n version renamed an HTTP
-   Request or Code node parameter, the node will show a small warning
-   badge; the fix is almost always re-picking the same option from a
-   dropdown, not restructuring the node. The node order, connections, and
-   all JS logic are the real deliverable and don't depend on n8n version.
-6. Before the first real run, do a manual test with `Execute Node` on
+5. Before the first real run, do a manual test with `Execute Node` on
    "Weekly Research Trigger" → step through node by node rather than
    running the whole pipeline live end to end, since a mistake before the
    private-upload step is cheap and after it isn't.
+
+### This has actually been tested against a live n8n instance
+
+Both workflow files were imported into a real, locally-run n8n 2.33.3 and
+executed — not just structurally self-validated. That surfaced (and fixed)
+two real bugs that a "the JSON looks right" review would have missed:
+
+1. **`n8n-nodes-base.executeCommand` doesn't exist in current n8n** — it's
+   been removed, not deprecated. `generate-workflow.js`'s `shellCommand()`
+   now uses a Code node with `require('child_process').execSync(...)`
+   instead (the "Trigger Remotion Render" and "Probe Rendered Video"
+   nodes) — same trust model as the existing fs-based nodes, just one more
+   allowed builtin (see `NODE_FUNCTION_ALLOW_BUILTIN` above).
+2. **The Wait node's form-resume mode requires a `formTitle` parameter**
+   that wasn't being set — "Human Script Approval Gate" now sets it.
+
+With both fixes applied, a full run was executed end-to-end through 6 real
+nodes — trigger → trend-signal collection → merge → prompt building (a
+real `fs.readFileSync` of `agents/01-trend-scout.md`) → an actual HTTPS
+call to `api.anthropic.com` — and it stopped exactly where it should with
+no real API key configured: a genuine `401` from Anthropic itself
+(`"x-api-key header is required"`), not a network or parsing error. That
+confirms the request-building Code node → httpRequest node pattern (used
+identically for all 8 agent calls) actually works end-to-end; the only
+thing standing between that test and a real Trend Scout response is a
+real Anthropic API key in the credential. The remaining ~47 nodes weren't
+each individually executed (that needs real credentials for ElevenLabs,
+YouTube, etc.), but they're built from the same validated node types and
+the same generator patterns.
+
+Given all of that, the practical remaining risk is low — but still walk
+each node once after import, since a specific parameter default can still
+drift between n8n point releases.
 
 ## Regenerating the main pipeline
 

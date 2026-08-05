@@ -144,15 +144,35 @@ function noOp(name, notes, rowY) {
   return { parameters: {}, id: nodeId(name), name, type: "n8n-nodes-base.noOp", typeVersion: 1, position: nextPos(rowY), notes };
 }
 
-function executeCommand(name, command, rowY) {
-  return {
-    parameters: { command },
-    id: nodeId(name),
+// n8n-nodes-base.executeCommand does not exist in current n8n (verified
+// against a live n8n 2.33.3 instance's /types/nodes.json registry — it's
+// been removed, not just deprecated). A Code node with require('child_
+// process') is the direct replacement, and fits the pipeline's existing
+// trust model: it already requires self-hosted n8n with NODE_FUNCTION_
+// ALLOW_BUILTIN=fs,path for the agent-call nodes, so allowing child_
+// process there too is a small extension, not a new class of requirement.
+function shellCommand(name, buildCommandJs, rowY) {
+  return code(
     name,
-    type: "n8n-nodes-base.executeCommand",
-    typeVersion: 1,
-    position: nextPos(rowY),
-  };
+    `const { execSync } = require('child_process');
+const PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';
+
+return $input.all().map(item => {
+${buildCommandJs}
+  let stdout = '';
+  let stderr = '';
+  let commandFailed = false;
+  try {
+    stdout = execSync(command, { encoding: 'utf8', maxBuffer: 1024 * 1024 * 20 });
+  } catch (e) {
+    commandFailed = true;
+    stdout = e.stdout ? e.stdout.toString() : '';
+    stderr = e.stderr ? e.stderr.toString() : String(e.message || e);
+  }
+  return { json: { ...item.json, stdout, stderr, commandFailed } };
+});`,
+    rowY
+  );
 }
 
 function splitOut(name, fieldToSplit, rowY) {
@@ -168,7 +188,12 @@ function splitOut(name, fieldToSplit, rowY) {
 
 function wait(name, rowY) {
   return {
-    parameters: { resume: "form", formFields: { values: [{ fieldLabel: "Approve script?", fieldType: "dropdown", fieldOptions: { values: [{ option: "approve" }, { option: "reject" }] } }] } },
+    parameters: {
+      resume: "form",
+      formTitle: "Invisible Why — Script Approval",
+      formDescription: "Final human sign-off before packaging/rendering continue (editorial-rules.md §9).",
+      formFields: { values: [{ fieldLabel: "Approve script?", fieldType: "dropdown", fieldOptions: { values: [{ option: "approve" }, { option: "reject" }] } }] },
+    },
     id: nodeId(name),
     name,
     type: "n8n-nodes-base.wait",
@@ -546,16 +571,16 @@ return $input.all().map((item, i) => {
 );
 
 push(
-  executeCommand(
+  shellCommand(
     "Trigger Remotion Render",
-    "npx remotion render {{$env.INVISIBLE_WHY_ROOT}}/remotion-engine/src/index.ts MainVideo {{$env.INVISIBLE_WHY_ROOT}}/renders/{{$json.id}}.mp4 --props={{$env.INVISIBLE_WHY_ROOT}}/storyboards/{{$json.id}}.json"
+    `  const command = \`npx remotion render \${PROJECT_ROOT}/remotion-engine/src/index.ts MainVideo \${PROJECT_ROOT}/renders/\${item.json.id}.mp4 --props=\${PROJECT_ROOT}/storyboards/\${item.json.id}.json\`;`
   )
 );
 
 push(
-  executeCommand(
+  shellCommand(
     "Probe Rendered Video (ffprobe)",
-    "ffprobe -v error -show_entries format=duration,size -of json {{$env.INVISIBLE_WHY_ROOT}}/renders/{{$json.id}}.mp4"
+    `  const command = \`ffprobe -v error -show_entries format=duration,size -of json \${PROJECT_ROOT}/renders/\${item.json.id}.mp4\`;`
   )
 );
 
