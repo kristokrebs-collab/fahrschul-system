@@ -87,6 +87,16 @@ pricing pages change more often than legal terms do. Decide up front:
 Whichever you pick, commit to *one* voice ID for the whole channel
 (`channel-bible/voice-style.md`) and put it in `ELEVENLABS_VOICE_ID`.
 
+**Alternative that needed no new signup:** the 3 pilots' actual narration
+(`voiceovers/`) was generated through the Higgsfield MCP connector's
+`generate_audio` tool (model `seed_audio`, voice "Arthur"), paid from an
+existing Higgsfield credit balance rather than a new ElevenLabs account —
+worth checking whether you already have a Higgsfield (or similar
+already-connected) plan before paying for a second TTS service. The n8n
+pipeline's ElevenLabs node is still the documented default since it's the
+most portable/standard choice for a fully headless pipeline, but it isn't
+the only option.
+
 ### A YouTube channel + Google Cloud project for the Data API
 1. Create the YouTube channel itself (branding, banner, etc. — not
    scripted here, it's a few minutes in YouTube Studio).

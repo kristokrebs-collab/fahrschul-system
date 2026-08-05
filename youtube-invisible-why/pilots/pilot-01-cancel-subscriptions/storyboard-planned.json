@@ -5,7 +5,7 @@
     {
       "scene": 1,
       "start": 0,
-      "duration": 8.72,
+      "duration": 11,
       "narration": "Somewhere on your card statement right now, there's a charge you forgot you agreed to.",
       "visual": "A credit card is drawn in the center of the page",
       "drawing_elements": [
@@ -17,8 +17,8 @@
     },
     {
       "scene": 2,
-      "start": 8.72,
-      "duration": 8.72,
+      "start": 11,
+      "duration": 11,
       "narration": "Not a scam. Not a mistake. Something you signed up for on purpose, meant to cancel, and just... didn't.",
       "visual": "A small looping recurring-charge icon is drawn next to the card, pulsing",
       "drawing_elements": [
@@ -30,8 +30,8 @@
     },
     {
       "scene": 3,
-      "start": 17.44,
-      "duration": 7.81,
+      "start": 22,
+      "duration": 11,
       "narration": "That's not a willpower problem. It's not because you're lazy or bad with money.",
       "visual": "A brain is drawn faintly beside the card and icon",
       "drawing_elements": [
@@ -43,8 +43,8 @@
     },
     {
       "scene": 4,
-      "start": 25.25,
-      "duration": 8.52,
+      "start": 33,
+      "duration": 12,
       "narration": "By the end of this video, you'll know exactly which parts of your brain a cancel button is designed to fight — and win.",
       "visual": "Text stamps down over the existing drawing, then the frame widens",
       "drawing_elements": [],
@@ -54,8 +54,8 @@
     },
     {
       "scene": 5,
-      "start": 33.77,
-      "duration": 16.61,
+      "start": 45,
+      "duration": 12,
       "narration": "Picture the moment you signed up. It took maybe ninety seconds. One page, one button, done.",
       "visual": "A phone is drawn with a single simple button",
       "drawing_elements": [
@@ -68,8 +68,8 @@
     },
     {
       "scene": 6,
-      "start": 50.38,
-      "duration": 17.99,
+      "start": 57,
+      "duration": 13,
       "narration": "Now picture the last time you tried to cancel something. A settings menu with no cancel option — just 'pause,' or a suspiciously cheerful 'are you sure?' screen.",
       "visual": "A maze-like wall with a small door is drawn next to the phone",
       "drawing_elements": [
@@ -81,8 +81,8 @@
     },
     {
       "scene": 7,
-      "start": 68.37,
-      "duration": 17.99,
+      "start": 70,
+      "duration": 13,
       "narration": "You're not imagining that asymmetry. Researchers who studied thousands of shopping and subscription sites found this pattern used on purpose.",
       "visual": "A small person icon stands in front of the wall, studying it",
       "drawing_elements": [
@@ -94,8 +94,8 @@
     },
     {
       "scene": 8,
-      "start": 86.36,
-      "duration": 16.61,
+      "start": 83,
+      "duration": 12,
       "narration": "Sign-up in one click. Cancellation in five, ten, sometimes a phone call. It even has a name in the research: the Roach Motel. Easy in. Hard out.",
       "visual": "Text draws itself across the wall and door",
       "drawing_elements": [],
@@ -105,8 +105,8 @@
     },
     {
       "scene": 9,
-      "start": 102.97,
-      "duration": 8.75,
+      "start": 95,
+      "duration": 12,
       "narration": "The obvious explanation is: companies want your money, so they make leaving annoying. True, but incomplete.",
       "visual": "A calendar is drawn with several small recurring-charge icons scattered across it",
       "drawing_elements": [
@@ -119,8 +119,8 @@
     },
     {
       "scene": 10,
-      "start": 111.72,
-      "duration": 9.48,
+      "start": 107,
+      "duration": 13,
       "narration": "Because friction alone doesn't explain why you don't cancel even when nothing is stopping you. Plenty of subscriptions you could kill in two taps, right now, and still won't.",
       "visual": "An arrow-up icon appears over one of the calendar's charges, unclicked",
       "drawing_elements": [
@@ -132,8 +132,8 @@
     },
     {
       "scene": 11,
-      "start": 121.2,
-      "duration": 9.48,
+      "start": 120,
+      "duration": 13,
       "narration": "So there's something happening before you even reach the cancel button. Something that decides, quietly, that today isn't the day.",
       "visual": "A brain is drawn again, a faint question mark hovering beside it",
       "drawing_elements": [
@@ -146,8 +146,8 @@
     },
     {
       "scene": 12,
-      "start": 130.68,
-      "duration": 8.75,
+      "start": 133,
+      "duration": 12,
       "narration": "What is it, exactly? It has a name — actually, three names.",
       "visual": "Camera holds on the brain and question mark",
       "drawing_elements": [],
@@ -157,8 +157,8 @@
     },
     {
       "scene": 13,
-      "start": 139.43,
-      "duration": 10.35,
+      "start": 145,
+      "duration": 14,
       "narration": "Economists call the first one status quo bias — a well-documented tendency to stick with whatever is already happening, even when switching would clearly be better for you.",
       "visual": "An arrow-up icon representing the current plan stays fixed at center",
       "drawing_elements": [
@@ -170,8 +170,8 @@
     },
     {
       "scene": 14,
-      "start": 149.78,
-      "duration": 10.35,
+      "start": 159,
+      "duration": 14,
       "narration": "Not because switching is hard. Just because it's not the current state.",
       "visual": "Smaller alternative-option icons fade in and out around the fixed arrow, none of them chosen",
       "drawing_elements": [
@@ -183,8 +183,8 @@
     },
     {
       "scene": 15,
-      "start": 160.13,
-      "duration": 10.35,
+      "start": 173,
+      "duration": 14,
       "narration": "Pair that with something called loss aversion: losing something you already have feels worse, psychologically, than an equal-sized gain feels good.",
       "visual": "A coin icon is drawn on one side of a simple scale layout",
       "drawing_elements": [
@@ -196,8 +196,8 @@
     },
     {
       "scene": 16,
-      "start": 170.48,
-      "duration": 10.35,
+      "start": 187,
+      "duration": 14,
       "narration": "So when your brain weighs 'cancel and save a little money' against 'lose access to something I already own' — even something you never use — the losing side gets weighted more heavily.",
       "visual": "An x-mark is drawn on the other side of the scale, which visibly tips toward it",
       "drawing_elements": [
@@ -209,8 +209,8 @@
     },
     {
       "scene": 17,
-      "start": 180.83,
-      "duration": 10.35,
+      "start": 201,
+      "duration": 14,
       "narration": "It's not a fair fight, and it isn't supposed to be one.",
       "visual": "Camera zooms out to reveal both sides of the scale at once",
       "drawing_elements": [],
@@ -220,8 +220,8 @@
     },
     {
       "scene": 18,
-      "start": 191.18,
-      "duration": 11.45,
+      "start": 215,
+      "duration": 13,
       "narration": "Then there's the money you already spent. If you paid for the annual plan to get a discount, cancelling in month four means something more.",
       "visual": "A coin icon is drawn beside a calendar",
       "drawing_elements": [
@@ -234,8 +234,8 @@
     },
     {
       "scene": 19,
-      "start": 202.63,
-      "duration": 11.45,
+      "start": 228,
+      "duration": 13,
       "narration": "It means admitting the yearly payment was, in part, wasted. That's the sunk cost fallacy: weighing money you can never get back as if it were still a reason to keep going.",
       "visual": "The calendar's months tick by, the coin fading slightly with each tick",
       "drawing_elements": [
@@ -247,8 +247,8 @@
     },
     {
       "scene": 20,
-      "start": 214.08,
-      "duration": 11.45,
+      "start": 241,
+      "duration": 13,
       "narration": "None of these are new tricks. Behavioral economists have been mapping them for decades.",
       "visual": "Camera holds, both icons fully drawn and faded slightly",
       "drawing_elements": [],
@@ -258,8 +258,8 @@
     },
     {
       "scene": 21,
-      "start": 225.53,
-      "duration": 11.45,
+      "start": 254,
+      "duration": 13,
       "narration": "What's new is that modern subscription products are the first products in history precisely engineered, tested, and optimized against exactly these biases.",
       "visual": "A phone icon is redrawn, larger, connecting lines to the earlier icons",
       "drawing_elements": [
@@ -271,8 +271,8 @@
     },
     {
       "scene": 22,
-      "start": 236.98,
-      "duration": 11.45,
+      "start": 267,
+      "duration": 13,
       "narration": "At scale, on millions of people, continuously.",
       "visual": "Camera pulls back further to reveal the card, calendar, brain, and scale all connected on the same page",
       "drawing_elements": [
@@ -284,8 +284,8 @@
     },
     {
       "scene": 23,
-      "start": 248.43,
-      "duration": 5.12,
+      "start": 280,
+      "duration": 13,
       "narration": "So who's actually deciding you should stay? Not one villain.",
       "visual": "A person icon is drawn, small, standing in front of a much larger wall structure",
       "drawing_elements": [
@@ -298,8 +298,8 @@
     },
     {
       "scene": 24,
-      "start": 253.55,
-      "duration": 5.52,
+      "start": 293,
+      "duration": 14,
       "narration": "A retention team, running experiments most users never notice. They test which exit screens make people change their minds.",
       "visual": "Several small doors are drawn along the wall",
       "drawing_elements": [
@@ -311,8 +311,8 @@
     },
     {
       "scene": 25,
-      "start": 259.07,
-      "duration": 5.12,
+      "start": 307,
+      "duration": 13,
       "narration": "They test how many steps a cancellation flow can have before people give up partway through.",
       "visual": "An arrow moves through the doors and stops partway",
       "drawing_elements": [
@@ -324,8 +324,8 @@
     },
     {
       "scene": 26,
-      "start": 264.19,
-      "duration": 5.12,
+      "start": 320,
+      "duration": 13,
       "narration": "They test which discount offer, shown at exactly the right moment of doubt, gets you to click 'keep my plan' instead.",
       "visual": "A coin icon appears at one of the doors, tempting",
       "drawing_elements": [
@@ -337,8 +337,8 @@
     },
     {
       "scene": 27,
-      "start": 269.31,
-      "duration": 5.52,
+      "start": 333,
+      "duration": 14,
       "narration": "This isn't a conspiracy theory — it's closer to a job description.",
       "visual": "Brain icon redrawn at center",
       "drawing_elements": [
@@ -350,8 +350,8 @@
     },
     {
       "scene": 28,
-      "start": 274.83,
-      "duration": 5.12,
+      "start": 347,
+      "duration": 13,
       "narration": "And it works precisely because it's not fighting your logic. It's fighting your defaults, your aversion to loss, and your reluctance to waste what you already paid.",
       "visual": "The three earlier icons — arrow-up, coin, x-mark — orbit the brain briefly before settling",
       "drawing_elements": [
@@ -365,8 +365,8 @@
     },
     {
       "scene": 29,
-      "start": 279.95,
-      "duration": 9.96,
+      "start": 360,
+      "duration": 14,
       "narration": "Three biases that exist in every human brain, whether or not you've ever heard their names.",
       "visual": "Camera holds on the settled brain and orbiting icons",
       "drawing_elements": [],
@@ -376,8 +376,8 @@
     },
     {
       "scene": 30,
-      "start": 289.91,
-      "duration": 10.67,
+      "start": 374,
+      "duration": 15,
       "narration": "It's worth being fair here: not all of this is malicious. Some of that friction is genuinely there to stop fraud, verify it's really you.",
       "visual": "A checkmark and a wall are drawn together, more neutrally this time",
       "drawing_elements": [
@@ -390,8 +390,8 @@
     },
     {
       "scene": 31,
-      "start": 300.58,
-      "duration": 9.96,
+      "start": 389,
+      "duration": 14,
       "narration": "Or — sometimes — to make a real offer that actually helps. A retention discount isn't automatically a trick.",
       "visual": "A coin is drawn beside the checkmark",
       "drawing_elements": [
@@ -403,8 +403,8 @@
     },
     {
       "scene": 32,
-      "start": 310.54,
-      "duration": 9.96,
+      "start": 403,
+      "duration": 14,
       "narration": "The problem isn't that companies want to keep customers. The problem is when the flow is built to exploit a bias instead of to earn a decision.",
       "visual": "Two paths diverge on screen from the same wall — one to a checkmark, one to an x-mark",
       "drawing_elements": [
@@ -417,8 +417,8 @@
     },
     {
       "scene": 33,
-      "start": 320.5,
-      "duration": 9.96,
+      "start": 417,
+      "duration": 14,
       "narration": "Regulators have started drawing that line too. In the US, the Federal Trade Commission moved to require that cancelling has to be at least as easy as signing up.",
       "visual": "A simple courthouse-like wall icon appears briefly",
       "drawing_elements": [
@@ -430,8 +430,8 @@
     },
     {
       "scene": 34,
-      "start": 330.46,
-      "duration": 10.67,
+      "start": 431,
+      "duration": 15,
       "narration": "A rule the industry has been fighting in court since. Whatever happens to that specific rule, the fact that it exists tells you the pattern was real and common enough to legislate against.",
       "visual": "The courthouse icon fades as the camera slowly zooms out",
       "drawing_elements": [],
@@ -441,8 +441,8 @@
     },
     {
       "scene": 35,
-      "start": 341.13,
-      "duration": 9.96,
+      "start": 446,
+      "duration": 14,
       "narration": "So what actually works, if the trick is aimed at your defaults, not your intelligence?",
       "visual": "A phone icon is redrawn, a small lightbulb appears beside it",
       "drawing_elements": [
@@ -455,8 +455,8 @@
     },
     {
       "scene": 36,
-      "start": 351.09,
-      "duration": 10.71,
+      "start": 460,
+      "duration": 14,
       "narration": "Not 'try harder to remember.' You already know you should cancel that one thing. Remembering isn't the problem.",
       "visual": "Camera holds on the phone and lightbulb",
       "drawing_elements": [],
@@ -466,8 +466,8 @@
     },
     {
       "scene": 37,
-      "start": 361.8,
-      "duration": 10.71,
+      "start": 474,
+      "duration": 14,
       "narration": "What works is changing what the default is. Put every subscription on a calendar the day you sign up, with a reminder before the renewal.",
       "visual": "Calendar redrawn with a checkmark stamped near a renewal date",
       "drawing_elements": [
@@ -480,8 +480,8 @@
     },
     {
       "scene": 38,
-      "start": 372.51,
-      "duration": 9.94,
+      "start": 488,
+      "duration": 13,
       "narration": "So cancelling becomes the thing that happens automatically unless you actively choose to keep paying. That flips status quo bias to work for you instead of against you.",
       "visual": "Camera holds on the stamped calendar",
       "drawing_elements": [],
@@ -491,8 +491,8 @@
     },
     {
       "scene": 39,
-      "start": 382.45,
-      "duration": 10.71,
+      "start": 501,
+      "duration": 14,
       "narration": "And when you do hit a cancellation flow that fights you — multiple screens, a guilt-trip pop-up, a hidden phone number — that's useful information.",
       "visual": "Wall icon with the small door redrawn",
       "drawing_elements": [
@@ -504,8 +504,8 @@
     },
     {
       "scene": 40,
-      "start": 393.16,
-      "duration": 7.56,
+      "start": 515,
+      "duration": 15,
       "narration": "It's not you being difficult. It's the company confirming, in the design of its own product, that it doesn't expect to win you back on value alone.",
       "visual": "A checkmark draws itself through the door",
       "drawing_elements": [
@@ -517,8 +517,8 @@
     },
     {
       "scene": 41,
-      "start": 400.72,
-      "duration": 7.56,
+      "start": 530,
+      "duration": 15,
       "narration": "You're not bad at money.",
       "visual": "Brain icon redrawn one final time, simply",
       "drawing_elements": [
@@ -530,8 +530,8 @@
     },
     {
       "scene": 42,
-      "start": 408.28,
-      "duration": 7.56,
+      "start": 545,
+      "duration": 15,
       "narration": "You're a person with a normal, well-documented brain, sitting across from a product built by people whose job is to out-think exactly that brain.",
       "visual": "The person icon from earlier is redrawn beside the brain",
       "drawing_elements": [
@@ -543,8 +543,8 @@
     },
     {
       "scene": 43,
-      "start": 415.84,
-      "duration": 7.56,
+      "start": 560,
+      "duration": 15,
       "narration": "Now you know which parts they're aiming at. That's most of the fight, right there.",
       "visual": "Final wide shot — camera zooms out to reveal the full page: card, calendar, brain, scale, wall, all together",
       "drawing_elements": [
@@ -558,8 +558,8 @@
     },
     {
       "scene": 44,
-      "start": 423.4,
-      "duration": 7.56,
+      "start": 575,
+      "duration": 15,
       "narration": "The Invisible Why.",
       "visual": "The accent-colored underline draws itself beneath the channel's closing frame",
       "drawing_elements": [

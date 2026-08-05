@@ -1,0 +1,63 @@
+{
+  "video_id": "pilot-01-cancel-subscriptions",
+  "voice": {
+    "id": "30fc8796-ceb6-4a66-b3a7-4a145ef7f346",
+    "name": "Arthur",
+    "type": "preset"
+  },
+  "model": "seed_audio",
+  "total_duration_sec": 430.936,
+  "note": "result_url points at Higgsfield's CDN (d8j0ntlcm91z4.cloudfront.net), which this sandbox's egress policy blocks (403) — durations were still obtained via the API without downloading bytes. Fetch these URLs directly (they work fine from a normal browser/machine) to assemble the real narration track.",
+  "segments": [
+    {
+      "index": 0,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_c7ff3bf3-d696-4dab-8dd6-9ebf6b04e268.wav",
+      "duration_sec": 17.435
+    },
+    {
+      "index": 1,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_b2743b46-932b-4be1-a53c-06025db8e3e1.wav",
+      "duration_sec": 16.326
+    },
+    {
+      "index": 2,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_7c1282df-a2b8-4908-96f6-8eb1402946f9.wav",
+      "duration_sec": 69.2
+    },
+    {
+      "index": 3,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_234624f4-b293-4497-9378-d0be77b6e520.wav",
+      "duration_sec": 36.45
+    },
+    {
+      "index": 4,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012355_08e766a1-3ced-4ff9-b482-a335d11ba724.wav",
+      "duration_sec": 51.73
+    },
+    {
+      "index": 5,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_8fdd59ca-8b8f-4624-9818-8b01598ae612.wav",
+      "duration_sec": 57.27
+    },
+    {
+      "index": 6,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_a6b11ca7-cc90-48e9-b82b-affbc6a1af7b.wav",
+      "duration_sec": 31.53
+    },
+    {
+      "index": 7,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_48b66042-247f-4613-aa15-90890e83eb95.wav",
+      "duration_sec": 71.115
+    },
+    {
+      "index": 8,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_c4975ea8-6e7f-4245-8f2d-865ea9abe581.wav",
+      "duration_sec": 42.068
+    },
+    {
+      "index": 9,
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012354_cbda0890-5b64-4253-a3ce-4e892daac945.wav",
+      "duration_sec": 37.812
+    }
+  ]
+}
