@@ -82,11 +82,20 @@ This is exactly what the n8n pipeline's "Trigger Remotion Render" node runs
   Storyboard Agent (or a human) set them, or (b) accept the auto-layout
   look for pilots and revisit after seeing what actually needs art
   direction.
-- **The hand is a placeholder illustration**, not the professionally
-  illustrated, channel-defining asset described in `channel-bible/visual-
-  style.md`. It's structurally wired correctly (tip-tracking, rotation,
-  entry direction) — swap `components/AnimatedHand.tsx`'s `HandSVG` for a
-  real illustration and everything downstream keeps working unchanged.
+- **The hand is drawn, not commissioned.** `components/AnimatedHand.tsx`
+  is a proper hand holding a pen — one continuous silhouette plus crease
+  lines, with the index finger and thumb on opposite sides of the barrel.
+  It reads correctly and matches the icon line weight, but a professional
+  illustrator would still do better, and it's reused in every scene of
+  every video so it stays the highest-leverage visual upgrade. Swapping
+  `HandSVG` for a commissioned illustration needs nothing else to change,
+  as long as the new art keeps its pen tip at `HAND_TIP` (25, 24 in the
+  200×200 viewBox).
+
+  Worth knowing if you edit it: building the hand from separate capsule
+  shapes per finger does *not* work — it reads as sausages resting on a
+  ball no matter how the anatomy is tuned. The single-silhouette approach
+  is what makes it look like a grip.
 - **No sound.** `scene.sound_effect` and the voiceover audio aren't wired
   into the composition yet — the n8n pipeline generates and saves the
   voiceover MP3 separately (`voiceovers/<id>.mp3`); mixing narration +
@@ -96,9 +105,15 @@ This is exactly what the n8n pipeline's "Trigger Remotion Render" node runs
 - **No custom fonts.** `TextOverlay` uses a system font stack. Loading a
   licensed display font via `@remotion/fonts` or `@remotion/google-fonts`
   is a small, well-documented addition once you've picked one.
-- **Icon set is generic**, not hand-illustrated for this channel's exact
-  style. It's intentionally simple/geometric so it's easy to extend — treat
-  it as a working placeholder library, not the final asset set.
+- **Icon set covers ~20 shapes**, enough for the three pilots and no more.
+  They're drawn to a consistent line weight with real interior detail and
+  ordered so the stroke reveal draws them the way a person would, but any
+  new topic will need new icons — that's the main recurring cost per
+  video. Two conventions worth keeping when you add to
+  `src/icons/index.ts`: order paths outline-first (the reveal follows that
+  order, so bad ordering animates wrong even when the final frame is
+  fine), and prefer slightly-off beziers to exact arcs — a geometrically
+  perfect circle reads as clip-art, a slightly wrong one reads as ink.
 - **Elements don't persist across scene boundaries.** `visual-style.md`
   describes the whole video as "one continuous drawing" that the camera
   pans across; the current engine clears the paper at every `<Sequence>`
