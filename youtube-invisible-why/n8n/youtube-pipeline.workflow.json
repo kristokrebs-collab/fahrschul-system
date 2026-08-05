@@ -1,0 +1,1628 @@
+{
+  "name": "The Invisible Why — Production Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 1. Research & Ideation (weekly)\nCollect trend/competitor signals, run the Trend Scout agent, score every idea, and route pass/maybe/reject.\n\nSee agents/01-trend-scout.md and agents/02-idea-scorer.md.",
+        "height": 220,
+        "width": 300,
+        "color": 4
+      },
+      "id": "section-research-ideation-1",
+      "name": "Section: Research & Ideation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "weekly-research-trigger-2",
+      "name": "Weekly Research Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://serpapi.com/search.json?engine=google_trends_trending_now&geo=US",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": false,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "collect-google-trends-signal-3",
+      "name": "Collect Google Trends Signal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        300
+      ],
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "REPLACE_ME",
+          "name": "SerpApi Key"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.googleapis.com/youtube/v3/search?part=snippet&order=date&maxResults=10&channelId={{$json.channelId}}&key={{$env.YOUTUBE_API_KEY}}",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": false,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "collect-competitor-uploads-4",
+      "name": "Collect Competitor Uploads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst trends = $('Collect Google Trends Signal').all().map(i => i.json);\nconst competitors = $('Collect Competitor Uploads').all().map(i => i.json);\nconst batchDate = new Date().toISOString().slice(0, 10);\n\nreturn [{\n  json: {\n    batch_date: batchDate,\n    sources_available: { google_trends: trends, competitor_uploads: competitors },\n  },\n}];"
+      },
+      "id": "merge-trend-signals-5",
+      "name": "Merge Trend Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst systemPrompt = fs.readFileSync(path.join(PROJECT_ROOT, 'agents/01-trend-scout.md'), 'utf8');\n\nreturn $input.all().map(item => {\n  const userPayload = { sources_available: item.json.sources_available, batch_date: item.json.batch_date };\n  const meta = { batch_date: item.json.batch_date };\n  return {\n    json: {\n      requestBody: {\n        model: 'claude-sonnet-5',\n        max_tokens: 8000,\n        system: systemPrompt,\n        messages: [{ role: 'user', content: JSON.stringify(userPayload) }],\n      },\n      meta,\n    },\n  };\n});"
+      },
+      "id": "trend-scout-build-prompt-6",
+      "name": "Trend Scout: Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "trend-scout-call-claude-7",
+      "name": "Trend Scout: Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const meta = $('Trend Scout: Build Prompt').all()[i].json.meta;\n  const text = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  let ideas = [];\n  try { ideas = JSON.parse(text); } catch (e) { ideas = []; }\n  const outPath = path.join(PROJECT_ROOT, 'ideas/inbox/' + meta.batch_date + '-batch.json');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  fs.writeFileSync(outPath, JSON.stringify(ideas, null, 2));\n  return { json: { ideas, outPath } };\n});"
+      },
+      "id": "trend-scout-save-output-8",
+      "name": "Trend Scout: Save Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "ideas",
+        "options": {}
+      },
+      "id": "split-out-ideas-9",
+      "name": "Split Out Ideas",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1820,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Idea Scoring\nEach idea gets qualitative sub-scores from Claude (Idea Scorer agent), then a deterministic weighted total from scoring/rubric.json — same logic as scoring/score_idea.js.",
+        "height": 260,
+        "width": 280,
+        "color": 4
+      },
+      "id": "section-scoring-10",
+      "name": "Section: Scoring",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst systemPrompt = fs.readFileSync(path.join(PROJECT_ROOT, 'agents/02-idea-scorer.md'), 'utf8');\n\nreturn $input.all().map(item => {\n  const userPayload = item.json;\n  const meta = { id: item.json.id || item.json.working_title };\n  return {\n    json: {\n      requestBody: {\n        model: 'claude-sonnet-5',\n        max_tokens: 8000,\n        system: systemPrompt,\n        messages: [{ role: 'user', content: JSON.stringify(userPayload) }],\n      },\n      meta,\n    },\n  };\n});"
+      },
+      "id": "idea-scorer-build-prompt-11",
+      "name": "Idea Scorer: Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "idea-scorer-call-claude-12",
+      "name": "Idea Scorer: Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2340,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const meta = $('Idea Scorer: Build Prompt').all()[i].json.meta;\n  const text = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  let scored = {};\n  try { scored = JSON.parse(text); } catch (e) { scored = { id: meta.id, verdict: 'incomplete', raw: text }; }\n  return { json: scored };\n});"
+      },
+      "id": "idea-scorer-save-output-13",
+      "name": "Idea Scorer: Save Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst { scoreOne, loadRubric } = require(path.join(PROJECT_ROOT, 'scoring/score_idea.js'));\nconst rubric = loadRubric();\n\nreturn $input.all().map(item => {\n  const result = scoreOne(item.json, rubric);\n  const dir = result.verdict === 'pass' ? 'scored' : result.verdict === 'maybe' ? 'scored' : 'rejected';\n  const outPath = path.join(PROJECT_ROOT, 'ideas', dir, (result.id || 'unknown') + '.json');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  fs.writeFileSync(outPath, JSON.stringify(result, null, 2));\n  return { json: result };\n});"
+      },
+      "id": "compute-weighted-score-14",
+      "name": "Compute Weighted Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.verdict === 'pass' }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-idea-passes-15",
+      "name": "If Idea Passes",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        3120,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "idea-rejected-or-maybe-stop-16",
+      "name": "Idea Rejected or Maybe — Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        3380,
+        300
+      ],
+      "notes": "Routed to ideas/scored or ideas/rejected by the previous node. Nothing further happens automatically — the Trend Scout will not resurface it (checks ideas/rejected/)."
+    },
+    {
+      "parameters": {
+        "content": "## 3. Research -> Draft -> Fact-Check -> Language Edit\nOnly ideas with verdict=pass reach here. A FAIL fact-check or a re-score recommendation stops the pipeline for human triage.",
+        "height": 260,
+        "width": 280,
+        "color": 4
+      },
+      "id": "section-research-script-17",
+      "name": "Section: Research & Script",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3640,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst systemPrompt = fs.readFileSync(path.join(PROJECT_ROOT, 'agents/03-research-agent.md'), 'utf8');\n\nreturn $input.all().map(item => {\n  const userPayload = item.json;\n  const meta = { id: item.json.id };\n  return {\n    json: {\n      requestBody: {\n        model: 'claude-sonnet-5',\n        max_tokens: 8000,\n        system: systemPrompt,\n        messages: [{ role: 'user', content: JSON.stringify(userPayload) }],\n      },\n      meta,\n    },\n  };\n});"
+      },
+      "id": "research-agent-build-prompt-18",
+      "name": "Research Agent: Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "research-agent-call-claude-19",
+      "name": "Research Agent: Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3900,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const meta = $('Research Agent: Build Prompt').all()[i].json.meta;\n  const text = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  const outPath = path.join(PROJECT_ROOT, 'research', meta.id + '-dossier.md');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  fs.writeFileSync(outPath, text);\n  return { json: { id: meta.id, dossier: text, recommendReScore: text.includes('RECOMMEND RE-SCORE') } };\n});"
+      },
+      "id": "research-agent-save-output-20",
+      "name": "Research Agent: Save Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.recommendReScore === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-research-recommends-re-score-21",
+      "name": "If Research Recommends Re-score",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4420,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "weak-topic-notify-human-22",
+      "name": "Weak Topic — Notify Human",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4680,
+        300
+      ],
+      "notes": "Research Agent flagged RECOMMEND RE-SCORE. A human should re-evaluate before any further automated work is spent on this idea."
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst systemPrompt = fs.readFileSync(path.join(PROJECT_ROOT, 'agents/05-story-writer.md'), 'utf8');\n\nreturn $input.all().map(item => {\n  const userPayload = { id: item.json.id, dossier: item.json.dossier };\n  const meta = { id: item.json.id };\n  return {\n    json: {\n      requestBody: {\n        model: 'claude-sonnet-5',\n        max_tokens: 8000,\n        system: systemPrompt,\n        messages: [{ role: 'user', content: JSON.stringify(userPayload) }],\n      },\n      meta,\n    },\n  };\n});"
+      },
+      "id": "story-writer-build-prompt-23",
+      "name": "Story Writer: Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "story-writer-call-claude-24",
+      "name": "Story Writer: Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5200,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const meta = $('Story Writer: Build Prompt').all()[i].json.meta;\n  const text = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  const outPath = path.join(PROJECT_ROOT, 'scripts', meta.id + '-draft.md');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  fs.writeFileSync(outPath, text);\n  return { json: { id: meta.id, script: text } };\n});"
+      },
+      "id": "story-writer-save-output-25",
+      "name": "Story Writer: Save Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst systemPrompt = fs.readFileSync(path.join(PROJECT_ROOT, 'agents/04-fact-checker.md'), 'utf8');\n\nreturn $input.all().map(item => {\n  const dossierPath = path.join(PROJECT_ROOT, 'research', item.json.id + '-dossier.md');\n  const dossier = fs.readFileSync(dossierPath, 'utf8');\n  const userPayload = { id: item.json.id, script: item.json.script, dossier };\n  const meta = { id: item.json.id, script: item.json.script };\n  return {\n    json: {\n      requestBody: {\n        model: 'claude-sonnet-5',\n        max_tokens: 8000,\n        system: systemPrompt,\n        messages: [{ role: 'user', content: JSON.stringify(userPayload) }],\n      },\n      meta,\n    },\n  };\n});"
+      },
+      "id": "fact-checker-build-prompt-26",
+      "name": "Fact Checker: Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "fact-checker-call-claude-27",
+      "name": "Fact Checker: Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5980,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const meta = $('Fact Checker: Build Prompt').all()[i].json.meta;\n  const text = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  const outPath = path.join(PROJECT_ROOT, 'research', meta.id + '-factcheck.md');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  fs.writeFileSync(outPath, text);\n  const failed = /Verdict:\\s*FAIL/i.test(text);\n  return { json: { id: meta.id, script: meta.script, factcheck: text, failed } };\n});"
+      },
+      "id": "fact-checker-save-output-28",
+      "name": "Fact Checker: Save Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.failed === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-fact-check-failed-29",
+      "name": "If Fact Check Failed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6500,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "script-failed-fact-check-notify-human-30",
+      "name": "Script Failed Fact-Check — Notify Human",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        6760,
+        300
+      ],
+      "notes": "Fact Checker verdict was FAIL on a load-bearing claim. Revise via Story Writer manually or re-run after fixing the research dossier."
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst systemPrompt = fs.readFileSync(path.join(PROJECT_ROOT, 'agents/08-native-english-editor.md'), 'utf8');\n\nreturn $input.all().map(item => {\n  const userPayload = { id: item.json.id, script: item.json.script };\n  const meta = { id: item.json.id };\n  return {\n    json: {\n      requestBody: {\n        model: 'claude-sonnet-5',\n        max_tokens: 8000,\n        system: systemPrompt,\n        messages: [{ role: 'user', content: JSON.stringify(userPayload) }],\n      },\n      meta,\n    },\n  };\n});"
+      },
+      "id": "native-english-editor-build-prompt-31",
+      "name": "Native English Editor: Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7020,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "native-english-editor-call-claude-32",
+      "name": "Native English Editor: Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7280,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const meta = $('Native English Editor: Build Prompt').all()[i].json.meta;\n  const text = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  const outPath = path.join(PROJECT_ROOT, 'scripts', meta.id + '-final.md');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  fs.writeFileSync(outPath, text);\n  return { json: { id: meta.id, finalScript: text } };\n});"
+      },
+      "id": "native-english-editor-save-output-33",
+      "name": "Native English Editor: Save Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4. Human Sign-off -> Title/Thumbnail -> Storyboard\nFinal script sign-off is a mandatory human gate (editorial-rules.md §9) before any rendering cost is spent.",
+        "height": 260,
+        "width": 280,
+        "color": 4
+      },
+      "id": "section-human-sign-off-packaging-34",
+      "name": "Section: Human Sign-off + Packaging",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        7800,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "resume": "form",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Approve script?",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "approve"
+                  },
+                  {
+                    "option": "reject"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "human-script-approval-gate-35",
+      "name": "Human Script Approval Gate",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        7800,
+        300
+      ],
+      "notes": "MVP human gate. Configure a form/webhook resume in n8n UI per editorial-rules.md §9 (final script sign-off is never automated)."
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst systemPrompt = fs.readFileSync(path.join(PROJECT_ROOT, 'agents/07-title-thumbnail-agent.md'), 'utf8');\n\nreturn $input.all().map(item => {\n  const userPayload = { id: item.json.id, finalScript: item.json.finalScript };\n  const meta = { id: item.json.id, finalScript: item.json.finalScript };\n  return {\n    json: {\n      requestBody: {\n        model: 'claude-sonnet-5',\n        max_tokens: 8000,\n        system: systemPrompt,\n        messages: [{ role: 'user', content: JSON.stringify(userPayload) }],\n      },\n      meta,\n    },\n  };\n});"
+      },
+      "id": "title-thumbnail-agent-build-prompt-36",
+      "name": "Title Thumbnail Agent: Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "title-thumbnail-agent-call-claude-37",
+      "name": "Title Thumbnail Agent: Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8320,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const meta = $('Title Thumbnail Agent: Build Prompt').all()[i].json.meta;\n  const text = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  const outPath = path.join(PROJECT_ROOT, 'scripts', meta.id + '-packaging.md');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  fs.writeFileSync(outPath, text);\n  return { json: { id: meta.id, finalScript: meta.finalScript, packaging: text } };\n});"
+      },
+      "id": "title-thumbnail-agent-save-output-38",
+      "name": "Title Thumbnail Agent: Save Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8580,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst systemPrompt = fs.readFileSync(path.join(PROJECT_ROOT, 'agents/06-storyboard-agent.md'), 'utf8');\n\nreturn $input.all().map(item => {\n  const userPayload = { id: item.json.id, finalScript: item.json.finalScript };\n  const meta = { id: item.json.id };\n  return {\n    json: {\n      requestBody: {\n        model: 'claude-sonnet-5',\n        max_tokens: 8000,\n        system: systemPrompt,\n        messages: [{ role: 'user', content: JSON.stringify(userPayload) }],\n      },\n      meta,\n    },\n  };\n});"
+      },
+      "id": "storyboard-agent-build-prompt-39",
+      "name": "Storyboard Agent: Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.requestBody) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "storyboard-agent-call-claude-40",
+      "name": "Storyboard Agent: Call Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9100,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "Anthropic API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const meta = $('Storyboard Agent: Build Prompt').all()[i].json.meta;\n  const text = item.json.content && item.json.content[0] ? item.json.content[0].text : '';\n  let storyboard = {};\n  try { storyboard = JSON.parse(text); } catch (e) { storyboard = { video_id: meta.id, scenes: [], parseError: true, raw: text }; }\n  const outPath = path.join(PROJECT_ROOT, 'storyboards', meta.id + '.json');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  fs.writeFileSync(outPath, JSON.stringify(storyboard, null, 2));\n  return { json: { id: meta.id, storyboardPath: outPath, scenes: storyboard.scenes || [] } };\n});"
+      },
+      "id": "storyboard-agent-save-output-41",
+      "name": "Storyboard Agent: Save Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 5. Voiceover -> Remotion Render -> QA -> Private Upload\nRequires: ElevenLabs API key, a rendering machine with Remotion + ffmpeg/ffprobe installed, and a verified YouTube Data API OAuth app. See docs/SETUP.md.",
+        "height": 260,
+        "width": 280,
+        "color": 4
+      },
+      "id": "section-voice-render-qa-upload-42",
+      "name": "Section: Voice, Render, QA, Upload",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        9620,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nreturn $input.all().map(item => {\n  const narration = (item.json.scenes || []).map(s => s.narration).join(' ');\n  return { json: { id: item.json.id, narration, storyboardPath: item.json.storyboardPath } };\n});"
+      },
+      "id": "build-voiceover-script-text-43",
+      "name": "Build Voiceover Script Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.elevenlabs.io/v1/text-to-speech/{{$env.ELEVENLABS_VOICE_ID}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.narration, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.75 } }) }}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "generate-voiceover-elevenlabs--44",
+      "name": "Generate Voiceover (ElevenLabs)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9880,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "ElevenLabs API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\n\nreturn $input.all().map((item, i) => {\n  const id = $('Build Voiceover Script Text').all()[i].json.id;\n  const outPath = path.join(PROJECT_ROOT, 'voiceovers', id + '.mp3');\n  fs.mkdirSync(path.dirname(outPath), { recursive: true });\n  if (item.binary && item.binary.data) {\n    fs.writeFileSync(outPath, Buffer.from(item.binary.data.data, 'base64'));\n  }\n  return { json: { id, audioPath: outPath } };\n});"
+      },
+      "id": "save-voiceover-audio-45",
+      "name": "Save Voiceover Audio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10140,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "npx remotion render {{$env.INVISIBLE_WHY_ROOT}}/remotion-engine/src/index.ts MainVideo {{$env.INVISIBLE_WHY_ROOT}}/renders/{{$json.id}}.mp4 --props={{$env.INVISIBLE_WHY_ROOT}}/storyboards/{{$json.id}}.json"
+      },
+      "id": "trigger-remotion-render-46",
+      "name": "Trigger Remotion Render",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        10400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "ffprobe -v error -show_entries format=duration,size -of json {{$env.INVISIBLE_WHY_ROOT}}/renders/{{$json.id}}.mp4"
+      },
+      "id": "probe-rendered-video-ffprobe--47",
+      "name": "Probe Rendered Video (ffprobe)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        10660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  let probe = {};\n  try { probe = JSON.parse(item.json.stdout); } catch (e) { probe = {}; }\n  const duration = parseFloat((probe.format || {}).duration || '0');\n  const minOk = duration >= 8 * 60;   // monetization-relevant minimum\n  const maxOk = duration <= 16 * 60;  // sanity ceiling for this format\n  return { json: { ...item.json, duration, qaPassed: minOk && maxOk } };\n});"
+      },
+      "id": "validate-render-qa-48",
+      "name": "Validate Render QA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.qaPassed === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-qa-passed-49",
+      "name": "If QA Passed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        11180,
+        300
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "render-qa-failed-notify-human-50",
+      "name": "Render QA Failed — Notify Human",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        11440,
+        300
+      ],
+      "notes": "Rendered video duration is outside the 8-16 minute expected range, or ffprobe failed. Check the render manually before uploading."
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $json.title }}",
+        "regionCode": "US",
+        "options": {
+          "description": "={{ $json.description }}",
+          "privacyStatus": "private",
+          "categoryId": "27"
+        }
+      },
+      "id": "upload-to-youtube-private--51",
+      "name": "Upload to YouTube (Private)",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        11700,
+        300
+      ],
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "REPLACE_ME",
+          "name": "YouTube OAuth2 (Invisible Why channel)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SLACK_WEBHOOK_URL}}",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: 'New Invisible Why video uploaded privately and ready for title/thumbnail/publish review: https://studio.youtube.com/video/' + $json.id + '/edit' }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "notify-human-ready-for-review-52",
+      "name": "Notify Human — Ready for Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        11960,
+        300
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst logPath = path.join(PROJECT_ROOT, 'published/status-log.json');\n\nreturn $input.all().map(item => {\n  let log = [];\n  try { log = JSON.parse(fs.readFileSync(logPath, 'utf8')); } catch (e) { log = []; }\n  log.push({ id: item.json.id, uploadedAt: new Date().toISOString(), status: 'private-uploaded-pending-review' });\n  fs.mkdirSync(path.dirname(logPath), { recursive: true });\n  fs.writeFileSync(logPath, JSON.stringify(log, null, 2));\n  return { json: item.json };\n});"
+      },
+      "id": "log-production-status-53",
+      "name": "Log Production Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12220,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Weekly Research Trigger": {
+      "main": [
+        [
+          {
+            "node": "Collect Google Trends Signal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Google Trends Signal": {
+      "main": [
+        [
+          {
+            "node": "Collect Competitor Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Competitor Uploads": {
+      "main": [
+        [
+          {
+            "node": "Merge Trend Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Trend Signals": {
+      "main": [
+        [
+          {
+            "node": "Trend Scout: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trend Scout: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Trend Scout: Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trend Scout: Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Trend Scout: Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trend Scout: Save Output": {
+      "main": [
+        [
+          {
+            "node": "Split Out Ideas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Ideas": {
+      "main": [
+        [
+          {
+            "node": "Idea Scorer: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idea Scorer: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Idea Scorer: Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idea Scorer: Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Idea Scorer: Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Idea Scorer: Save Output": {
+      "main": [
+        [
+          {
+            "node": "Compute Weighted Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Weighted Score": {
+      "main": [
+        [
+          {
+            "node": "If Idea Passes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Idea Passes": {
+      "main": [
+        [
+          {
+            "node": "Research Agent: Build Prompt",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Research Agent: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Idea Rejected or Maybe — Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Agent: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Research Agent: Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Agent: Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Research Agent: Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Research Agent: Save Output": {
+      "main": [
+        [
+          {
+            "node": "If Research Recommends Re-score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Research Recommends Re-score": {
+      "main": [
+        [
+          {
+            "node": "Weak Topic — Notify Human",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Story Writer: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Story Writer: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Story Writer: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Story Writer: Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Story Writer: Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Story Writer: Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Story Writer: Save Output": {
+      "main": [
+        [
+          {
+            "node": "Fact Checker: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fact Checker: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Fact Checker: Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fact Checker: Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Fact Checker: Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fact Checker: Save Output": {
+      "main": [
+        [
+          {
+            "node": "If Fact Check Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Fact Check Failed": {
+      "main": [
+        [
+          {
+            "node": "Script Failed Fact-Check — Notify Human",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Native English Editor: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Native English Editor: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Native English Editor: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Native English Editor: Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Native English Editor: Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Native English Editor: Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Native English Editor: Save Output": {
+      "main": [
+        [
+          {
+            "node": "Human Script Approval Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Human Script Approval Gate": {
+      "main": [
+        [
+          {
+            "node": "Title Thumbnail Agent: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Title Thumbnail Agent: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Title Thumbnail Agent: Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Title Thumbnail Agent: Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Title Thumbnail Agent: Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Title Thumbnail Agent: Save Output": {
+      "main": [
+        [
+          {
+            "node": "Storyboard Agent: Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Storyboard Agent: Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Storyboard Agent: Call Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Storyboard Agent: Call Claude": {
+      "main": [
+        [
+          {
+            "node": "Storyboard Agent: Save Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Storyboard Agent: Save Output": {
+      "main": [
+        [
+          {
+            "node": "Build Voiceover Script Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Voiceover Script Text": {
+      "main": [
+        [
+          {
+            "node": "Generate Voiceover (ElevenLabs)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Voiceover (ElevenLabs)": {
+      "main": [
+        [
+          {
+            "node": "Save Voiceover Audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Voiceover Audio": {
+      "main": [
+        [
+          {
+            "node": "Trigger Remotion Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Remotion Render": {
+      "main": [
+        [
+          {
+            "node": "Probe Rendered Video (ffprobe)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe Rendered Video (ffprobe)": {
+      "main": [
+        [
+          {
+            "node": "Validate Render QA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Render QA": {
+      "main": [
+        [
+          {
+            "node": "If QA Passed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If QA Passed": {
+      "main": [
+        [
+          {
+            "node": "Render QA Failed — Notify Human",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upload to YouTube (Private)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Upload to YouTube (Private)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to YouTube (Private)": {
+      "main": [
+        [
+          {
+            "node": "Notify Human — Ready for Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Human — Ready for Review": {
+      "main": [
+        [
+          {
+            "node": "Log Production Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": "invisible-why-pipeline"
+  },
+  "id": "invisible-why-production-pipeline",
+  "tags": []
+}

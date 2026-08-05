@@ -1,0 +1,98 @@
+{
+  "name": "The Invisible Why — Weekly Analytics Report",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Weekly Analytics Import\nPulls last 7 days of channel performance from the YouTube Analytics API, saves a raw JSON snapshot plus an appended CSV summary row under analytics/, and posts a short summary to Slack.\n\nRequires the same YouTube OAuth2 credential used for uploads (needs the youtube.readonly / yt-analytics.readonly scopes in addition to youtube.upload) and SLACK_WEBHOOK_URL. See docs/SETUP.md.",
+        "height": 260,
+        "width": 320,
+        "color": 4
+      },
+      "id": "analytics-sticky-1",
+      "name": "Section: Weekly Analytics",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [0, -260]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "cronExpression", "expression": "0 7 * * 1" }] }
+      },
+      "id": "analytics-trigger-1",
+      "name": "Weekly Analytics Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const end = new Date();\nconst start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);\nconst fmt = (d) => d.toISOString().slice(0, 10);\nreturn [{ json: { startDate: fmt(start), endDate: fmt(end) } }];"
+      },
+      "id": "analytics-daterange-1",
+      "name": "Compute Date Range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://youtubeanalytics.googleapis.com/v2/reports?ids=channel%3D%3DMINE&startDate={{$json.startDate}}&endDate={{$json.endDate}}&metrics=views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained,likes,comments&dimensions=day",
+        "sendHeaders": false,
+        "headerParameters": { "parameters": [] },
+        "sendBody": false,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": { "timeout": 60000 }
+      },
+      "id": "analytics-fetch-1",
+      "name": "Fetch YouTube Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300],
+      "credentials": {
+        "youTubeOAuth2Api": { "id": "REPLACE_ME", "name": "YouTube OAuth2 (Invisible Why channel)" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst path = require('path');\nconst PROJECT_ROOT = $env.INVISIBLE_WHY_ROOT || '/data/youtube-invisible-why';\nconst range = $('Compute Date Range').item.json;\nconst report = $json;\n\nconst snapshotPath = path.join(PROJECT_ROOT, 'analytics', range.endDate + '-snapshot.json');\nfs.mkdirSync(path.dirname(snapshotPath), { recursive: true });\nfs.writeFileSync(snapshotPath, JSON.stringify(report, null, 2));\n\nconst rows = report.rows || [];\nconst totals = rows.reduce((acc, r) => {\n  const [day, views, minutesWatched, avgDuration, avgPct, subsGained, likes, comments] = r;\n  acc.views += views || 0;\n  acc.minutesWatched += minutesWatched || 0;\n  acc.subsGained += subsGained || 0;\n  acc.likes += likes || 0;\n  acc.comments += comments || 0;\n  return acc;\n}, { views: 0, minutesWatched: 0, subsGained: 0, likes: 0, comments: 0 });\n\nconst csvPath = path.join(PROJECT_ROOT, 'analytics', 'weekly-summary.csv');\nconst header = 'week_ending,views,minutes_watched,subscribers_gained,likes,comments\\n';\nif (!fs.existsSync(csvPath)) fs.writeFileSync(csvPath, header);\nconst line = [range.endDate, totals.views, totals.minutesWatched, totals.subsGained, totals.likes, totals.comments].join(',') + '\\n';\nfs.appendFileSync(csvPath, line);\n\nreturn [{ json: { ...totals, weekEnding: range.endDate } }];"
+      },
+      "id": "analytics-parse-1",
+      "name": "Save Snapshot + Append CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.SLACK_WEBHOOK_URL}}",
+        "sendHeaders": false,
+        "headerParameters": { "parameters": [] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: 'Invisible Why — week ending ' + $json.weekEnding + ': ' + $json.views + ' views, ' + Math.round($json.minutesWatched/60) + ' hours watched, +' + $json.subsGained + ' subscribers.' }) }}",
+        "options": {}
+      },
+      "id": "analytics-notify-1",
+      "name": "Post Weekly Summary to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 300],
+      "continueOnFail": true
+    }
+  ],
+  "connections": {
+    "Weekly Analytics Trigger": { "main": [[{ "node": "Compute Date Range", "type": "main", "index": 0 }]] },
+    "Compute Date Range": { "main": [[{ "node": "Fetch YouTube Analytics", "type": "main", "index": 0 }]] },
+    "Fetch YouTube Analytics": { "main": [[{ "node": "Save Snapshot + Append CSV", "type": "main", "index": 0 }]] },
+    "Save Snapshot + Append CSV": { "main": [[{ "node": "Post Weekly Summary to Slack", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "meta": { "instanceId": "invisible-why-analytics" },
+  "id": "invisible-why-weekly-analytics",
+  "tags": []
+}

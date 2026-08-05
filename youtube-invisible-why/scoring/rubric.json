@@ -1,0 +1,58 @@
+{
+  "$schema": "internal://invisible-why/scoring-rubric-v1",
+  "description": "Weighted 0-100 idea scoring rubric for The Invisible Why. The Idea Scorer agent fills in the 0-10 sub-scores; score_idea.js computes the weighted total deterministically so scoring stays auditable and reproducible.",
+  "pass_threshold": 75,
+  "maybe_threshold": 60,
+  "factors": [
+    {
+      "key": "curiosity",
+      "label": "Curiosity / click potential",
+      "weight": 0.25,
+      "description": "Does the one-line hook alone create a need-to-know gap?"
+    },
+    {
+      "key": "retention",
+      "label": "Expected retention",
+      "weight": 0.20,
+      "description": "Does the topic naturally escalate (mechanism -> twist -> deeper cause) across 9-14 minutes?"
+    },
+    {
+      "key": "demand",
+      "label": "Demand / trend",
+      "weight": 0.15,
+      "description": "Is there a real search/competitor/discussion signal, or is this purely an editorial hunch?"
+    },
+    {
+      "key": "evergreen",
+      "label": "Evergreen potential",
+      "weight": 0.15,
+      "description": "Will this still be true and searched-for in 5 years?"
+    },
+    {
+      "key": "ad_friendliness",
+      "label": "Ad / sponsor friendliness",
+      "weight": 0.10,
+      "description": "Does this fit finance, productivity, health, or learning sponsor categories and YouTube's advertiser-friendly guidelines?"
+    },
+    {
+      "key": "visual_explainability",
+      "label": "Visual explainability",
+      "weight": 0.10,
+      "description": "Is there a clear system, process, or before/after that a hand-drawn explainer can actually show?"
+    },
+    {
+      "key": "differentiation",
+      "label": "Competitive differentiation",
+      "weight": 0.05,
+      "description": "Is this under-covered, or does our angle meaningfully differ from existing coverage?"
+    }
+  ],
+  "hard_reject_flags": [
+    "out_of_scope",
+    "unverifiable_causal_premise",
+    "requires_advice_framing",
+    "advertiser_unfriendly",
+    "requires_synthetic_real_person_depiction",
+    "no_tier1_or_tier2_source_available"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "video_id": "sample-preview",
+  "accent_color": "#2E9E5B",
+  "scenes": [
+    {
+      "scene": 1,
+      "start": 0,
+      "duration": 6,
+      "narration": "Somewhere on your card statement right now, there's a charge you forgot you agreed to.",
+      "visual": "A credit card is drawn, then a small looping recurring-charge icon appears next to it",
+      "drawing_elements": ["credit-card", "recurring-icon"],
+      "on_screen_text": "STILL PAYING?",
+      "camera": "slow zoom in",
+      "sound_effect": "pen scratch, soft"
+    },
+    {
+      "scene": 2,
+      "start": 6,
+      "duration": 6,
+      "narration": "A calendar appears, and a clock, ticking past the date you meant to cancel.",
+      "visual": "A calendar and a clock are drawn side by side",
+      "drawing_elements": ["calendar", "clock"],
+      "on_screen_text": null,
+      "camera": "pan right",
+      "sound_effect": null
+    },
+    {
+      "scene": 3,
+      "start": 12,
+      "duration": 8,
+      "narration": "Zoom out, and you can see the whole system was built around you never getting here.",
+      "visual": "Camera pulls back to reveal the full scene: card, recurring icon, calendar, clock, and a brain thinking it over",
+      "drawing_elements": ["brain", "question-mark"],
+      "on_screen_text": "BY DESIGN",
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    }
+  ]
+}
