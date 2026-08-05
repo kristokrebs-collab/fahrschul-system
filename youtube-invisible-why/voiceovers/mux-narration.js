@@ -16,7 +16,14 @@
 //
 // Equivalent one-liner if you'd rather not run this:
 //   ffmpeg -i renders/<video-id>.mp4 -i narration.mp3 \
-//          -c:v copy -c:a aac -b:a 160k -shortest renders/<video-id>-final.mp4
+//          -map 0:v:0 -map 1:a:0 -c:v copy -c:a aac -b:a 160k \
+//          -movflags +faststart renders/<video-id>-final.mp4
+//
+// Do NOT add -shortest here. Combined with -c:v copy it silently truncated
+// the audio to ~6 seconds while ffprobe still reported the full duration
+// and both streams present — the kind of failure you only catch by
+// summing packet sizes per stream. The durations already match within
+// 0.05s, so it buys nothing anyway.
 
 const fs = require("fs");
 const path = require("path");
@@ -72,7 +79,7 @@ async function muxOne(pilotId) {
   }
 
   const finalPath = path.join(ROOT, "renders", `${manifest.video_id}-final.mp4`);
-  execFileSync("ffmpeg", ["-y", "-i", videoPath, "-i", narrationPath, "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", finalPath], { stdio: "inherit" });
+  execFileSync("ffmpeg", ["-y", "-i", videoPath, "-i", narrationPath, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", finalPath], { stdio: "inherit" });
   console.log(`[${pilotId}] wrote ${finalPath}`);
 }
 

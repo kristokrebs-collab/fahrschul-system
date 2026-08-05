@@ -18,7 +18,13 @@ Each is the full script, all 10 sections concatenated in order, 160 kbps
 mono MP3. These same URLs are in each pilot's `segments-manifest.json` as
 `narration_url`.
 
-## Getting to a finished video
+## The finished videos already exist
+
+Video and narration are already combined — see the download table in
+`docs/PUBLISH-CHECKLIST.md`. You only need what follows if you change a
+script and have to rebuild.
+
+## Rebuilding a finished video
 
 ```bash
 cd voiceovers

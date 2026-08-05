@@ -18,22 +18,25 @@ the exact remaining path to three public videos.
 Download links for narration and thumbnails are in `voiceovers/README.md`
 and each pilot's `youtube-metadata.md`.
 
-## Step 1 — Combine video + audio (~2 minutes)
+## Step 1 — Nothing. The finished videos already exist.
 
-The rendered videos are silent; the narration is a separate file. Both are
-already timed to match within ~0.05s, so this is a pure mux, no syncing.
+Video and narration are already combined. Download and go:
 
-```bash
-cd voiceovers
-node mux-narration.js all
-```
+| Video | Runtime | Size | Download |
+|---|---|---|---|
+| 1 — Why Your Brain Refuses to Cancel Subscriptions | 7:11 | 15.8 MB | [MP4](https://d2ol7oe51mr4n9.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/b7cbe5ff-e671-43be-a07e-1f093b88ab20.mp4) |
+| 2 — What 36 Hours Without Sleep Does to Your Decisions | 5:52 | 12.6 MB | [MP4](https://d2ol7oe51mr4n9.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/2b7378f2-eee4-492d-a568-e6f82220ec17.mp4) |
+| 3 — The Hidden Psychology Behind Every Supermarket | 4:49 | 10.1 MB | [MP4](https://d2ol7oe51mr4n9.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/e922839f-2ce5-4f2a-ac07-fa53f97bcc63.mp4) |
 
-Produces `renders/<video-id>-final.mp4` for each pilot. Needs `ffmpeg` on
-PATH. (This step couldn't run in the environment that built everything —
-its network policy blocks the media host. It works normally anywhere else.)
+1920×1080, H.264 video + 160 kbps AAC narration, `+faststart` so they
+begin playing before the whole file has downloaded.
 
-If you'd rather not run the script, download each narration MP3 from
-`voiceovers/README.md` and drop it onto the video in any editor.
+If you ever need to rebuild them (after a script edit, say): render the
+silent video with Remotion, then `cd voiceovers && node mux-narration.js
+all`. One caveat learned the hard way — do **not** pass ffmpeg's
+`-shortest` alongside `-c:v copy`. It silently truncated the audio to six
+seconds while still reporting the full duration and both streams present.
+`mux-narration.js` no longer uses it.
 
 ## Step 2 — Watch them (do not skip)
 
