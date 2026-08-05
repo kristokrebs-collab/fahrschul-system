@@ -2,18 +2,38 @@
 
 Everything in this repo automates the *work*. It cannot create accounts,
 accept terms of service, pay for API usage, or make legal/creative
-judgment calls on your behalf. This is the complete list of what's on you,
-organized by how soon you'll hit it.
+judgment calls on your behalf — those require your identity, your payment
+method, and your legal signature, so they have to happen in your browser,
+not in an agent session. This is the complete list of what's on you,
+organized by how soon you'll hit it. Every fact below was checked against
+live web search on 2026-08-05, not just training knowledge — dated
+so you know how fresh it is.
 
-## 1. Before you can render anything
+## API keys — where to get every one, in the order you'll need them
 
-### A Claude API key (Anthropic Console)
-Every agent in `agents/` is a system prompt meant to be sent to the Claude
-API (`https://api.anthropic.com/v1/messages`, model `claude-sonnet-5` in
-the n8n workflow — change the model string in `n8n/generate-workflow.js`
-if you want a different one). Get a key from the Anthropic Console and
-budget for usage — 8 agent calls per video, most with several thousand
-input/output tokens (dossiers and scripts are long).
+| # | Service | Get it at | Needed for |
+|---|---|---|---|
+| 1 | **Anthropic (Claude)** | [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys) | Every one of the 8 agents — this is the one you need first |
+| 2 | **ElevenLabs** | [elevenlabs.io](https://elevenlabs.io) → sign up → Profile → API Keys | Voiceover generation |
+| 3 | **Google Cloud / YouTube Data API** | [console.cloud.google.com](https://console.cloud.google.com) → new project → enable "YouTube Data API v3" → Credentials → OAuth client ID | Private upload + analytics |
+| 4 | **SerpApi** (optional) | [serpapi.com](https://serpapi.com) | Google Trends signal only — pipeline works without it |
+| 5 | **Slack incoming webhook** (optional) | your Slack workspace → Apps → Incoming Webhooks | Review/analytics notifications — swap for email/Telegram if you don't use Slack |
+
+### 1. Anthropic — do this one first
+1. Go to **console.anthropic.com**, sign up or log in.
+2. **Settings → Billing → add a payment method.** Requests are rejected
+   until the account can be billed — do this before generating a key or
+   you'll just get confused 400s later.
+3. **Settings → API Keys → Create Key.** Name it something like
+   "invisible-why-pipeline". The key is shown exactly once — copy it
+   immediately, it isn't stored anywhere you can retrieve later (you'd
+   have to revoke and make a new one).
+4. Keys look like `sk-ant-...`. Put it in n8n as the `Anthropic API Key`
+   credential (n8n/README.md) — **don't paste it into a chat with me or
+   any other AI assistant**; treat it like a password.
+5. Budget for usage: 8 agent calls per video, several thousand input/
+   output tokens each (dossiers and scripts are long). Watch usage in the
+   Console's Usage tab for the first few videos to calibrate real cost.
 
 ### Node.js + npm (for `remotion-engine/` and `scoring/`)
 Already verified to work with the versions in this environment
@@ -50,10 +70,14 @@ Same key as above, added as a Header Auth credential named exactly
 `Anthropic API Key` (n8n/README.md has the full table).
 
 ### ElevenLabs account + API key
-For the voiceover step. Needs a **paid** plan for commercial use/
-monetization rights on the generated audio (their free tier's output
-isn't cleared for that) — check ElevenLabs' current commercial terms
-before you rely on this, pricing/terms pages change. Decide up front:
+For the voiceover step. As of 2026, ElevenLabs' **Free plan is explicitly
+non-commercial** (attribution required, no commercial rights) — you need
+at least the **Starter plan (~$5/month)**, which is the tier where
+commercial usage rights and instant voice cloning both switch on. Higher
+tiers (Creator/Pro/Scale) add more monthly characters and better voice
+models, not different rights — Starter is enough to legally start.
+Confirm current terms at elevenlabs.io/pricing before relying on this;
+pricing pages change more often than legal terms do. Decide up front:
 - **Clone your own voice** (with your own consent/ownership — don't clone
   anyone else's voice without clear rights to do so), or
 - **Use their Voice Design tool** to create a unique synthetic voice, or
@@ -89,15 +113,19 @@ less trend source feeding the Trend Scout agent.
 
 ## 3. Before you publish anything publicly
 
-### YouTube Partner Program eligibility
-Standard ad-revenue tier currently requires **1,000 subscribers** and
-either **4,000 valid public watch hours in the trailing 12 months** or
-**10 million valid Shorts views in the trailing 90 days**. A separate,
-lower "Fan Funding" tier exists in eligible countries starting around 500
-subscribers / 3 public uploads / 3,000 watch hours or 3M Shorts views.
-**Verify current numbers on YouTube's own Partner Program page before
-planning around them — these thresholds have changed before and could
-again.**
+### YouTube Partner Program eligibility (verified current as of 2026-08-05)
+Standard ad-revenue tier requires **1,000 subscribers** and either
+**4,000 valid public watch hours in the trailing 12 months** or **10
+million valid Shorts views in the trailing 90 days** (Shorts watch time
+does not count toward the 4,000-hour figure — they're separate paths, not
+combinable). A lower **"Early Access" fan-funding tier** (Super Thanks,
+Memberships, etc., not ads) now has two entry points: 500 subscribers +
+3,000 watch hours (or 3M Shorts views in 90 days), or 1,000 subscribers on
+the Shorts-views path. Both tiers additionally require **two-factor
+authentication enabled on the channel's Google account** and no active
+Community Guidelines strikes. Always re-check
+[support.google.com/youtube/answer/72851](https://support.google.com/youtube/answer/72851)
+before planning around exact numbers — they've moved before.
 
 ### YouTube's synthetic/altered content disclosure
 If a video contains realistic synthetic media of real people, places, or
@@ -118,12 +146,20 @@ YouTube's current altered-content policy before publishing, not after.
 - [ ] Sources section written into the video description
   (`editorial-rules.md` §10)
 
-### FTC "click-to-cancel" rule status (relevant specifically to Pilot 1)
-`pilots/pilot-01-cancel-subscriptions/research-dossier.md` cites a 2024
-FTC rule that's faced legal challenges since. **Check its current status
-before publishing that specific video** — the dossier's phrasing was
-written to be true regardless of outcome ("regulators moved to require
-X"), but verify nothing has changed enough to need a script update.
+### FTC "click-to-cancel" rule status (relevant specifically to Pilot 1) — updated 2026-08-05
+The dossier and script have been updated with the current, verified
+timeline: the Eighth Circuit **vacated** the FTC's Negative Option
+("click-to-cancel") Rule on July 8, 2025 on procedural grounds (the FTC
+skipped a required economic-impact analysis) — not because regulators
+changed their mind on the substance. The FTC has since **restarted**
+rulemaking: it sent a draft ANPRM to OIRA in January 2026 and issued the
+Advance Notice of Proposed Rulemaking in March 2026, aimed at curing the
+procedural defect rather than rewriting the policy. Separately, the FTC's
+underlying enforcement authority against deceptive cancellation practices
+under ROSCA (a different, older statute) was never affected by the
+vacatur and continues. Re-check this before publishing — rulemaking
+timelines move, and this could easily be further along (or resolved) by
+the time you actually render this video.
 
 ## 4. Ongoing / creative decisions nothing here can make for you
 

@@ -42,7 +42,7 @@ BEAT: Brain icon redrawn, with the three earlier icons (arrow-up, coin, x-mark) 
 ## [06:00] DEEPER CAUSE (continued)
 NARRATION: It's worth being fair here: not all of this is malicious. Some of that friction is genuinely there to stop fraud, verify it's really you, or — sometimes — to make a real offer that actually helps. A retention discount isn't automatically a trick. The problem isn't that companies want to keep customers. The problem is when the flow is built to exploit a bias instead of to earn a decision.
 BEAT: Two paths diverge on screen — one leads to a checkmark, one to an x-mark, both starting from the same wall.
-NARRATION (cont.): Regulators have started drawing that line too. In the US, the Federal Trade Commission moved to require that cancelling has to be at least as easy as signing up — a rule the industry has been fighting in court since. Whatever happens to that specific rule, the fact that it exists tells you the pattern was real enough, and common enough, to legislate against.
+NARRATION (cont.): Regulators have started drawing that line too. In the US, the Federal Trade Commission tried to make cancelling as easy as signing up — a court sent the rule back over a paperwork technicality, and regulators are now redoing it properly. Whatever happens to that specific rule, the fact that regulators keep trying tells you the pattern was real enough, and common enough, to legislate against.
 BEAT: A simple courthouse-like wall icon appears briefly, then fades, camera slow zoom out.
 
 ## [07:40] PAYOFF SETUP
@@ -71,4 +71,4 @@ BEAT: Final wide shot — camera zooms out to reveal the full page: card, calend
 - Kahneman, Knetsch & Thaler (1991) — loss aversion
 - Arkes & Blumer (1985) — sunk cost fallacy
 - Mathur, Kshirsagar & Mayer (2021) / Mathur et al. (2019) — dark patterns / Roach Motel
-- FTC Negative Option Rule, 16 CFR Part 425 (2024)
+- FTC Negative Option Rule, 16 CFR Part 425 (2024); vacated by 8th Cir. July 2025; FTC ANPRM Jan-Mar 2026 (see dossier Finding 5 for the full, current timeline — verify status again before publishing)

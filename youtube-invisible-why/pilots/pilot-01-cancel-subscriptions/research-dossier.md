@@ -46,16 +46,29 @@ how much is the product being deliberately built that way?
    Shopping Websites." (Tier 1 — peer-reviewed, large-scale empirical
    measurement)
 
-5. **Regulators have explicitly responded to this pattern.** The U.S.
-   Federal Trade Commission finalized amendments to its Negative Option
-   Rule in 2024 (the "click-to-cancel" rule), which would require
-   cancellation to be at least as easy as sign-up.
-   Source: Federal Trade Commission, "Negative Option Rule" final rule,
-   16 CFR Part 425 (2024). (Tier 2 — regulatory primary source)
-   Caveat: the rule has faced legal challenges since finalization and its
-   enforcement status may have changed by the time this video is published
-   — state this as "regulators moved to require X" rather than "it is now
-   the law everywhere," and verify current status before publishing.
+5. **Regulators have explicitly responded to this pattern — though the
+   specific rule has had a rocky legal history.** The FTC finalized
+   amendments to its Negative Option Rule in 2024 (the "click-to-cancel"
+   rule), which would have required cancellation to be at least as easy as
+   sign-up. The Eighth Circuit **vacated** that rule on July 8, 2025, on
+   procedural grounds — the FTC had skipped a required economic-impact
+   analysis, a process failure, not a rejection of the underlying policy.
+   The FTC restarted rulemaking in early 2026 (a draft sent to OIRA in
+   January 2026, an Advance Notice of Proposed Rulemaking issued in March
+   2026) aimed at curing that defect. Separately, and unaffected by any of
+   this, the FTC's authority to pursue deceptive cancellation practices
+   under the older ROSCA statute continued the entire time.
+   Sources: Federal Trade Commission, "Negative Option Rule" final rule,
+   16 CFR Part 425 (2024) (Tier 2); *Consumers' Research v. FTC*, 8th Cir.,
+   vacatur issued July 8, 2025 (Tier 1 — primary legal record, reported by
+   e.g. Sidley Austin and Gibson Dunn client alerts); FTC ANPRM on
+   Negative Option practices, January–March 2026 (Tier 2).
+   Caveat (last verified 2026-08-05, re-check before publishing): this is
+   a live regulatory process. The correct framing for the script is
+   "regulators tried to mandate this, got sent back to redo the paperwork,
+   and are trying again" — not "it is now the law" and not "the effort is
+   dead." Re-verify the ANPRM's status before the video goes public, since
+   rulemaking timelines move.
 
 ## Surprising facts (candidates for the hook/cold open)
 - The average number of forgotten/unused subscriptions per person is
