@@ -20,7 +20,8 @@ that was actually built. Start here, then follow the links.
 | `scoring/` | Deterministic idea-scoring rubric + a tested Node script implementing it | Written & tested |
 | `n8n/` | The full production pipeline as an importable n8n workflow, plus a weekly analytics workflow, plus `docker-compose.yml` to stand it up | Written **and tested**: imported into a real local n8n 2.33.3 and executed through 6 real nodes (2 bugs found and fixed in the process) |
 | `remotion-engine/` | A hand-drawing explainer video engine (React/Remotion) — storyboard JSON in, MP4 out | Written **and verified**: installs, typechecks, and renders real MP4s |
-| `pilots/` | 3 complete video packages (script, research, storyboard, titles/thumbnails) ready to run through the pipeline | Written, storyboards render-tested |
+| `pilots/` | 3 complete video packages (script, research, storyboard, titles/thumbnails) ready to run through the pipeline | **Rendered**: all 3 have real generated narration (`voiceovers/`) and a real silent MP4 delivered to the user; storyboards re-timed to match real speech |
+| `voiceovers/` | Real per-pilot narration audio (Higgsfield `seed_audio`, voice "Arthur") + a script to mux it onto the renders | Generated for real (98 credits) — bytes couldn't be downloaded from inside this sandbox (CDN blocked by egress policy), so muxing happens via `mux-narration.js` from a normal machine |
 | `ideas/`, `research/`, `scripts/`, `storyboards/` | Empty working directories the live pipeline writes into | Scaffolded, empty until you run the pipeline |
 | `docs/SETUP.md` | Exactly what you need to create/configure to make any of this actually run | Written |
 
@@ -45,6 +46,18 @@ This is not a slide deck of a plan — most of it was actually run:
   caught two real bugs (a removed n8n node type, a missing required
   parameter), both fixed. See `n8n/README.md` for the full account of what
   was and wasn't exercised.
+- All 3 pilots were **actually rendered to MP4 and delivered** — not a
+  hypothetical. Real narration audio was generated via the Higgsfield MCP
+  connector (no ElevenLabs signup needed — paid from an existing credit
+  balance), which also gave real per-section speech durations; every
+  storyboard was re-timed against those real numbers (each pilot ran
+  noticeably shorter than its originally planned runtime — see
+  `pilots/README.md`). The three silent, correctly-timed videos were sent
+  to the user directly. The one step that couldn't run in this sandbox was
+  muxing the narration onto the video, because the sandbox's network
+  policy blocks the CDN host the audio lives on — `voiceovers/README.md`
+  and `voiceovers/mux-narration.js` cover finishing that from a normal
+  machine.
 
 ## Where to start
 
