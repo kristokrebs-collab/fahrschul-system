@@ -33,9 +33,24 @@
 
 | Content type | Target pace |
 |---|---|
-| Explainer narration (default) | 150–165 wpm |
-| Tension / escalation beats | 160–175 wpm |
+| Explainer narration (default) | 150–160 wpm |
+| Tension / escalation beats | 160–170 wpm |
 | Key insight / payoff line | slow down ~20%, add a beat of silence before and after |
+
+**Measure the output, don't trust the target.** The first three pilots
+were written to this table and still shipped at 122–145 wpm, because the
+generated voice delivers considerably slower than the written target and
+nobody checked until three videos existed. Every render: count words,
+divide by minutes, compare. `seed_audio`'s `speech_rate` (channel default
+**20**) is the correction — but the right value depends on how dense the
+script is, so re-measure after any significant rewrite. Full diagnosis and
+the measured rate table: `channel-bible/retention-playbook.md`.
+
+**Voice: Arthur** (`30fc8796-ceb6-4a66-b3a7-4a145ef7f346`), one voice for
+the whole channel. Tested alternatives at identical settings: Skye is
+equivalent on pace and would differentiate more in a niche full of calm
+male narrators; **Brooks delivers at ~93 wpm and must not be used** for
+this format regardless of how it sounds in isolation.
 
 ## Pronunciation & terminology
 

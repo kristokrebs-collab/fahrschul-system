@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+  @page { margin: 0 }
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { width:1280px; height:720px; background:#F3EDE1; overflow:hidden;
+         font-family: "Arial Black", Arial, Helvetica, sans-serif; position:relative;
+         background-image:
+           radial-gradient(circle at 1px 1px, rgba(20,20,20,0.055) 1px, transparent 0),
+           radial-gradient(circle at 68% 30%, rgba(0,0,0,0) 52%, rgba(0,0,0,0.10) 100%);
+         background-size: 15px 15px, cover; }
+  .band { position:absolute; left:0; bottom:0; width:100%; height:14px; background:#F0A202 }
+  .kicker { position:absolute; top:38px; left:52px; font-size:26px; letter-spacing:3px;
+            color:#141414; opacity:.55; font-family:Arial,sans-serif; font-weight:700 }
+  .txt { position:absolute; font-weight:900; color:#141414; line-height:.92;
+         letter-spacing:-1.5px; text-transform:uppercase }
+  .hl { color:#F0A202 }
+  svg { position:absolute }
+  .ink { fill:none; stroke:#141414; stroke-width:9; stroke-linecap:round; stroke-linejoin:round }
+  .inkf { fill:#F3EDE1; stroke:#141414; stroke-width:9; stroke-linejoin:round }
+  .acc { fill:none; stroke:#F0A202; stroke-width:11; stroke-linecap:round; stroke-linejoin:round }
+  .accf { fill:#F0A202; stroke:#141414; stroke-width:8; stroke-linejoin:round }
+</style></head><body><div class="kicker">THE INVISIBLE WHY</div>
+   <svg width="1280" height="720" viewBox="0 0 1280 720" style="left:0; top:0">
+     <path d="M215,520 C330,440 275,338 425,306 C570,276 560,196 700,168"
+           fill="none" stroke="#141414" stroke-width="10" stroke-dasharray="4 26"
+           stroke-linecap="round" opacity=".62"/>
+     <path d="M688,146 L730,168 L688,190 Z" fill="#F0A202" stroke="#141414" stroke-width="7" stroke-linejoin="round"/>
+   </svg>
+   <svg width="350" height="350" viewBox="0 0 100 100" style="left:52px; top:330px">
+     <path class="ink" d="M4,14 L18,14 C21,14 23,17 24,20 L35,58 L80,58 L91,25 L28,25"/>
+     <circle class="inkf" cx="45" cy="75" r="9"/>
+     <circle class="inkf" cx="76" cy="75" r="9"/>
+   </svg>
+   <!-- the one item at the end of the detour, clear of the headline -->
+   <svg width="180" height="180" viewBox="0 0 100 100" style="left:748px; top:52px">
+     <path class="inkf" d="M32,30 L68,30 L74,86 C74,92 69,95 63,95 L37,95 C31,95 26,92 26,86 Z"/>
+     <path class="inkf" d="M40,10 L60,10 L60,30 L40,30 Z"/>
+     <path d="M38,58 L62,58" fill="none" stroke="#F0A202" stroke-width="11" stroke-linecap="round"/>
+   </svg>
+   <div class="txt" style="right:52px; top:288px; font-size:126px; text-align:right">JUST FOR<br><span class="hl">MILK?</span></div>
+   <div style="position:absolute; right:56px; top:562px; font-size:33px; font-weight:700;
+               font-family:Arial,sans-serif; color:#141414; opacity:.72; text-align:right; line-height:1.25">
+     Your route was<br>mapped years ago</div><div class="band"></div></body></html>
