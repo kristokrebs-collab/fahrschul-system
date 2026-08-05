@@ -6,8 +6,8 @@
     "type": "preset"
   },
   "model": "seed_audio",
-  "total_duration_sec": 351.648,
-  "note": "result_url points at Higgsfield's CDN (d8j0ntlcm91z4.cloudfront.net), which this sandbox's egress policy blocks (403) — durations were still obtained via the API without downloading bytes. Fetch these URLs directly (they work fine from a normal browser/machine) to assemble the real narration track.",
+  "total_duration_sec": 351.687,
+  "note": "narration_url is the finished, concatenated narration track for this pilot (all 10 segments in order, MP3 160kbps mono). Use it directly — see mux-narration.js. The per-segment URLs below are kept for reference and regeneration; note they live on a different CDN host that some restricted networks block.",
   "segments": [
     {
       "index": 0,
@@ -59,5 +59,6 @@
       "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260805_012628_191586b9-80ed-454d-b454-f46790b74ba9.wav",
       "duration_sec": 54.59
     }
-  ]
+  ],
+  "narration_url": "https://d2ol7oe51mr4n9.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/1a148507-063c-4eaf-afd9-12be24e20dc2.mp3"
 }

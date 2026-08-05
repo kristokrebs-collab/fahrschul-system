@@ -1,40 +1,42 @@
 #!/usr/bin/env node
-// Downloads a pilot's per-segment narration audio (see segments-manifest.json),
-// concatenates it into one track, and muxes it onto that pilot's rendered
-// silent video (renders/<video_id>.mp4).
+// Downloads a pilot's finished narration track and muxes it onto that
+// pilot's rendered silent video, producing the publish-ready MP4.
 //
-// This exists because the sandbox that generated these voiceovers couldn't
-// reach Higgsfield's asset CDN (d8j0ntlcm91z4.cloudfront.net) due to an
-// egress policy — the durations were fetched via the API and used to
-// re-time each storyboard.json, but the actual audio bytes were never
-// downloaded there. Run this from a machine that CAN reach that CDN
-// (any normal machine/browser can — it's a public policy on that one
-// sandbox, not a restriction on the files themselves).
+// The narration for all three pilots was generated (Higgsfield seed_audio,
+// voice "Arthur"), concatenated, and uploaded to a hosted URL — one file
+// per pilot, already in the right order. `narration_url` in each pilot's
+// segments-manifest.json points at it. (The per-segment URLs are still
+// listed there for reference / regeneration.)
 //
 // Usage:
 //   node mux-narration.js pilot-01-cancel-subscriptions
+//   node mux-narration.js all
 //
-// Requires: ffmpeg on PATH (a full build — the tools/ffmpeg-1011 build
-// bundled in some sandboxes is a minimal capture-only build and won't
-// decode these files; use a normal system ffmpeg).
+// Requires: ffmpeg on PATH.
+//
+// Equivalent one-liner if you'd rather not run this:
+//   ffmpeg -i renders/<video-id>.mp4 -i narration.mp3 \
+//          -c:v copy -c:a aac -b:a 160k -shortest renders/<video-id>-final.mp4
 
 const fs = require("fs");
 const path = require("path");
 const https = require("https");
 const { execFileSync } = require("child_process");
 
-const pilotId = process.argv[2];
-if (!pilotId) {
-  console.error("Usage: node mux-narration.js <pilot-id>");
+const PILOTS = [
+  "pilot-01-cancel-subscriptions",
+  "pilot-02-sleep-deprivation",
+  "pilot-03-supermarket-psychology",
+];
+
+const arg = process.argv[2];
+if (!arg) {
+  console.error(`Usage: node mux-narration.js <pilot-id|all>\n\nPilots:\n  ${PILOTS.join("\n  ")}`);
   process.exit(1);
 }
+const targets = arg === "all" ? PILOTS : [arg];
 
 const ROOT = path.join(__dirname, "..");
-const manifestPath = path.join(__dirname, pilotId, "segments-manifest.json");
-const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-
-const segmentsDir = path.join(__dirname, pilotId, "segments");
-fs.mkdirSync(segmentsDir, { recursive: true });
 
 function download(url, dest) {
   return new Promise((resolve, reject) => {
@@ -52,43 +54,31 @@ function download(url, dest) {
   });
 }
 
-async function main() {
-  console.log(`Downloading ${manifest.segments.length} segments for ${pilotId}...`);
-  const files = [];
-  for (const seg of manifest.segments) {
-    const dest = path.join(segmentsDir, `${String(seg.index).padStart(2, "0")}.wav`);
-    await download(seg.url, dest);
-    files.push(dest);
-    console.log(`  [${seg.index}] ${dest} (${seg.duration_sec.toFixed(1)}s)`);
+async function muxOne(pilotId) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, pilotId, "segments-manifest.json"), "utf8"));
+  const narrationPath = path.join(__dirname, pilotId, "narration.mp3");
+
+  if (!fs.existsSync(narrationPath)) {
+    console.log(`[${pilotId}] downloading narration (${manifest.total_duration_sec.toFixed(1)}s)...`);
+    await download(manifest.narration_url, narrationPath);
   }
-
-  const concatListPath = path.join(segmentsDir, "concat-list.txt");
-  fs.writeFileSync(concatListPath, files.map((f) => `file '${f}'`).join("\n"));
-
-  const narrationPath = path.join(__dirname, pilotId, "narration.wav");
-  execFileSync("ffmpeg", ["-y", "-f", "concat", "-safe", "0", "-i", concatListPath, "-c", "copy", narrationPath]);
-  console.log(`Wrote ${narrationPath}`);
+  console.log(`[${pilotId}] narration: ${narrationPath}`);
 
   const videoPath = path.join(ROOT, "renders", `${manifest.video_id}.mp4`);
-  const finalPath = path.join(ROOT, "renders", `${manifest.video_id}-final.mp4`);
   if (!fs.existsSync(videoPath)) {
-    console.log(`No rendered video found at ${videoPath} — skipping mux. Run the Remotion render first (remotion-engine/README.md).`);
+    console.log(`[${pilotId}] no rendered video at ${videoPath} — render it first:`);
+    console.log(`  cd remotion-engine && npx remotion render src/index.ts MainVideo ../renders/${manifest.video_id}.mp4 --props=../pilots/${pilotId}/storyboard.json`);
     return;
   }
-  execFileSync("ffmpeg", [
-    "-y",
-    "-i", videoPath,
-    "-i", narrationPath,
-    "-c:v", "copy",
-    "-c:a", "aac",
-    "-b:a", "160k",
-    "-shortest",
-    finalPath,
-  ]);
-  console.log(`Wrote ${finalPath}`);
+
+  const finalPath = path.join(ROOT, "renders", `${manifest.video_id}-final.mp4`);
+  execFileSync("ffmpeg", ["-y", "-i", videoPath, "-i", narrationPath, "-c:v", "copy", "-c:a", "aac", "-b:a", "160k", "-shortest", finalPath], { stdio: "inherit" });
+  console.log(`[${pilotId}] wrote ${finalPath}`);
 }
 
-main().catch((err) => {
-  console.error(err);
+(async () => {
+  for (const p of targets) await muxOne(p);
+})().catch((err) => {
+  console.error(err.message);
   process.exit(1);
 });
