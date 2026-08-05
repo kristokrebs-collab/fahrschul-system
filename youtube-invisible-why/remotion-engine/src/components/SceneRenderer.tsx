@@ -24,18 +24,41 @@ interface LayoutSlot {
 // human) supply explicit per-element x/y — see remotion-engine/README.md
 // "Known limitations." Keeping layout here (not in the storyboard schema)
 // means today's storyboards render immediately without needing that pass.
+// The row is biased left of centre rather than centred: the hand reaches
+// roughly 260px right and below its own pen tip, so a centred row puts the
+// hand half off-canvas whenever it draws the rightmost element. The bias
+// also reads better compositionally — the drawing sits in frame with the
+// hand entering the space it left.
+const HAND_CLEARANCE = 150;
+
 function layoutElements(n: number): LayoutSlot[] {
   if (n === 0) return [];
-  const usableWidth = CANVAS_WIDTH * 0.68;
-  const startX = CANVAS_WIDTH / 2 - usableWidth / 2;
+  const usableWidth = CANVAS_WIDTH * 0.58;
+  const centreX = CANVAS_WIDTH / 2 - HAND_CLEARANCE / 2;
+  const startX = centreX - usableWidth / 2;
   const spacing = n > 1 ? usableWidth / (n - 1) : 0;
   const size = n === 1 ? 460 : Math.max(200, 420 - n * 28);
   return Array.from({ length: n }).map((_, i) => ({
-    x: n === 1 ? CANVAS_WIDTH / 2 : startX + spacing * i,
-    y: CANVAS_HEIGHT / 2 - 30,
+    x: n === 1 ? centreX : startX + spacing * i,
+    y: CANVAS_HEIGHT / 2 - 40,
     size,
   }));
 }
+
+// How much of an element's time slot is spent actually drawing. The rest
+// is hold time — the finished drawing sitting on the page while the
+// narration catches up. Below ~0.6 the pen reads as confident and quick;
+// at 1.0 (the old behaviour) it crawls for the entire scene and the hand
+// never leaves frame.
+const DRAW_FRACTION = 0.58;
+// Consecutive elements overlap slightly so the pen keeps moving between
+// them instead of pausing dead.
+const SLOT_OVERLAP = 0.78;
+
+// Mild ease-out: the stroke leaves the nib fast and settles at the end,
+// which is how a real pen stroke lands and reads noticeably quicker than
+// a linear reveal even at the same duration.
+const easeOut = (t: number) => 1 - Math.pow(1 - t, 1.7);
 
 export const SceneRenderer: React.FC<SceneRendererProps> = ({
   scene,
@@ -55,16 +78,17 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
   const tipCandidates: Array<Tip | null> = [];
 
   const iconRenders = elements.map((name, i) => {
-    // 30% overlap between consecutive elements keeps the hand moving
-    // continuously instead of pausing dead between icons.
-    const slotStart = i * perSlot * 0.7;
-    const slotDuration = perSlot * 1.4;
+    const slotStart = i * perSlot * SLOT_OVERLAP;
+    const slotDuration = perSlot * DRAW_FRACTION;
     const rawProgress = (localFrame - slotStart) / slotDuration;
-    const progress = Math.max(0, Math.min(1, rawProgress));
+    const progress = easeOut(Math.max(0, Math.min(1, rawProgress)));
     const pos = positions[i];
 
     let tipForThisIcon: Tip | null = null;
-    if (rawProgress >= 0 && rawProgress < 1.1) {
+    // The hand is only on screen while this element is genuinely being
+    // drawn — once the stroke lands it lifts away instead of hovering
+    // over finished art for the rest of the scene.
+    if (rawProgress >= 0 && rawProgress < 1) {
       const tip = getIconTipPoint(name, progress);
       if (tip) {
         tipForThisIcon = {
@@ -98,7 +122,12 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
     <AbsoluteFill>
       {iconRenders}
       {handTip && (
-        <AnimatedHand tipX={handTip.canvasX} tipY={handTip.canvasY} visible angle={-38} />
+        <AnimatedHand
+          tipX={handTip.canvasX}
+          tipY={handTip.canvasY}
+          visible
+          accent={accentColor}
+        />
       )}
       {scene.on_screen_text && (
         <TextOverlay
