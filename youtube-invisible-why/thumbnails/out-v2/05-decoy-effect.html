@@ -1,0 +1,79 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+  @page { margin: 0 }
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { width:1280px; height:720px; overflow:hidden; position:relative;
+         background:#F2EBDD;
+         font-family:"Arial Black", Arial, Helvetica, sans-serif; }
+
+  /* Key light sits UNDER the art (z-index:0) so it never washes the ink out.
+     A white radial painted over the subject turns black line work grey —
+     that is exactly what v2's first render did. Light below, shadow above. */
+  .light { position:absolute; inset:0; z-index:0;
+           background: radial-gradient(circle at 36% 52%,
+             rgba(255,253,247,1) 0%, rgba(250,244,231,.55) 30%, rgba(0,0,0,0) 62%); }
+
+  /* Vignette rides on top but only ever darkens, and never reaches the middle. */
+  .vig { position:absolute; inset:0; z-index:3; pointer-events:none;
+         background: radial-gradient(ellipse at 50% 46%,
+           rgba(0,0,0,0) 48%, rgba(26,20,12,.20) 84%, rgba(18,13,6,.42) 100%); }
+
+  /* paper fibre — feTurbulence, kept light enough to texture but not to fog */
+  .grain { position:absolute; inset:0; z-index:4; opacity:.11;
+           mix-blend-mode:multiply; pointer-events:none; }
+
+  .art { position:relative; z-index:2 }
+
+  .kicker { position:absolute; z-index:2; top:34px; left:48px; font-size:23px; letter-spacing:4px;
+            color:#141414; opacity:.42; font-family:Arial,sans-serif; font-weight:700 }
+  .band { position:absolute; z-index:5; left:0; bottom:0; width:100%; height:12px; background:#C62828 }
+
+  .txt { position:absolute; z-index:2; font-weight:900; color:#141414; line-height:.88;
+         letter-spacing:-3px; text-transform:uppercase;
+         text-shadow: 0 3px 0 rgba(242,235,221,.9), 0 6px 22px rgba(0,0,0,.20); }
+  .hl { color:#C62828 }
+  .sub { position:absolute; z-index:2; font-size:31px; font-weight:700; font-family:Arial,sans-serif;
+         color:#141414; opacity:.68; line-height:1.22 }
+
+  svg { position:absolute; z-index:2 }
+  .drop { filter: drop-shadow(0 16px 26px rgba(30,22,10,.34)) drop-shadow(0 3px 5px rgba(30,22,10,.22)); }
+  .back { opacity:.26; z-index:1 }
+</style></head><body>
+<div class="light"></div>
+<div class="kicker">THE INVISIBLE WHY</div>
+   <svg width="640" height="470" viewBox="0 0 640 470" style="left:34px; top:196px">
+     <!-- outer tiers sit flat and dull; the middle one is raised and lit -->
+     
+  <rect x="10" y="150" width="170" height="250" rx="14"
+        fill="#E7DFCE" stroke="#141414" stroke-width="8" opacity="0.58"/>
+  <text x="95" y="212" text-anchor="middle" font-family="Arial Black, Arial"
+        font-size="46" fill="#141414" opacity="0.55">$59</text>
+     
+  <rect x="452" y="150" width="170" height="250" rx="14"
+        fill="#E7DFCE" stroke="#141414" stroke-width="8" opacity="0.58"/>
+  <text x="537" y="212" text-anchor="middle" font-family="Arial Black, Arial"
+        font-size="46" fill="#141414" opacity="0.55">$125</text>
+     <g class="drop">
+       <rect x="212" y="86" width="208" height="314" rx="16" fill="#FFFDF6" stroke="#141414" stroke-width="10"/>
+       <rect x="212" y="86" width="208" height="52" rx="16" fill="#C62828"/>
+       <rect x="212" y="126" width="208" height="14" fill="#C62828"/>
+       <text x="316" y="126" text-anchor="middle" font-family="Arial Black, Arial" font-size="30" fill="#FFFDF6">BEST VALUE</text>
+       <text x="316" y="222" text-anchor="middle" font-family="Arial Black, Arial" font-size="58" fill="#141414">$125</text>
+       <path d="M258,268 L374,268 M258,306 L374,306 M258,344 L336,344" stroke="#141414" stroke-width="9" stroke-linecap="round" opacity=".72"/>
+     </g>
+     <!-- the wire: it is bait, and the wire is the only clue -->
+     <path d="M316,400 L316,446" stroke="#C62828" stroke-width="6" stroke-dasharray="3 13" stroke-linecap="round"/>
+     <path d="M266,452 L366,452" stroke="#141414" stroke-width="9" stroke-linecap="round" opacity=".8"/>
+   </svg>
+   <div class="txt" style="right:50px; top:126px; font-size:132px; text-align:right; letter-spacing:-4px">
+     ONE IS<br><span class="hl">BAIT</span></div>
+   <div class="sub" style="right:54px; top:456px; text-align:right">
+     It isn't there to<br>be bought.</div>
+<div class="vig"></div>
+<svg class="grain" width="1280" height="720">
+  <filter id="fbm"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/></filter>
+  <rect width="1280" height="720" filter="url(#fbm)"/>
+</svg>
+<div class="band"></div>
+</body></html>

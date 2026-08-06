@@ -1,0 +1,81 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+  @page { margin: 0 }
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { width:1280px; height:720px; overflow:hidden; position:relative;
+         background:#F2EBDD;
+         font-family:"Arial Black", Arial, Helvetica, sans-serif; }
+
+  /* Key light sits UNDER the art (z-index:0) so it never washes the ink out.
+     A white radial painted over the subject turns black line work grey —
+     that is exactly what v2's first render did. Light below, shadow above. */
+  .light { position:absolute; inset:0; z-index:0;
+           background: radial-gradient(circle at 30% 46%,
+             rgba(255,253,247,1) 0%, rgba(250,244,231,.55) 30%, rgba(0,0,0,0) 62%); }
+
+  /* Vignette rides on top but only ever darkens, and never reaches the middle. */
+  .vig { position:absolute; inset:0; z-index:3; pointer-events:none;
+         background: radial-gradient(ellipse at 50% 46%,
+           rgba(0,0,0,0) 48%, rgba(26,20,12,.20) 84%, rgba(18,13,6,.42) 100%); }
+
+  /* paper fibre — feTurbulence, kept light enough to texture but not to fog */
+  .grain { position:absolute; inset:0; z-index:4; opacity:.11;
+           mix-blend-mode:multiply; pointer-events:none; }
+
+  .art { position:relative; z-index:2 }
+
+  .kicker { position:absolute; z-index:2; top:34px; left:48px; font-size:23px; letter-spacing:4px;
+            color:#141414; opacity:.42; font-family:Arial,sans-serif; font-weight:700 }
+  .band { position:absolute; z-index:5; left:0; bottom:0; width:100%; height:12px; background:#00A99A }
+
+  .txt { position:absolute; z-index:2; font-weight:900; color:#141414; line-height:.88;
+         letter-spacing:-3px; text-transform:uppercase;
+         text-shadow: 0 3px 0 rgba(242,235,221,.9), 0 6px 22px rgba(0,0,0,.20); }
+  .hl { color:#00A99A }
+  .sub { position:absolute; z-index:2; font-size:31px; font-weight:700; font-family:Arial,sans-serif;
+         color:#141414; opacity:.68; line-height:1.22 }
+
+  svg { position:absolute; z-index:2 }
+  .drop { filter: drop-shadow(0 16px 26px rgba(30,22,10,.34)) drop-shadow(0 3px 5px rgba(30,22,10,.22)); }
+  .back { opacity:.26; z-index:1 }
+</style></head><body>
+<div class="light"></div>
+<div class="kicker">THE INVISIBLE WHY</div>
+   <svg class="drop" width="430" height="646" viewBox="0 0 400 600" style="left:74px; top:40px">
+     <rect x="24" y="18" width="352" height="564" rx="46" fill="#151515"/>
+     <rect x="36" y="30" width="328" height="540" rx="38" fill="#FFFDF6" stroke="#141414" stroke-width="8"/>
+     <rect x="150" y="46" width="100" height="13" rx="6" fill="#141414" opacity=".55"/>
+     <g transform="translate(48,62) scale(0.86)">
+       
+  <rect x="28" y="150" width="86" height="300" rx="9" fill="#FFFDF6" stroke="#141414" stroke-width="7"/>
+  <!-- blurred neighbours above/below sell the spin without motion -->
+  <g opacity=".22"><circle cx="60" cy="213" r="15" fill="#00A99A" stroke="#141414" stroke-width="6"/><circle cx="85" cy="217" r="12" fill="none" stroke="#141414" stroke-width="6"/><path d="M60,198 C67,179 81,181 85,205" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/><circle cx="60" cy="403" r="15" fill="#00A99A" stroke="#141414" stroke-width="6"/><circle cx="85" cy="407" r="12" fill="none" stroke="#141414" stroke-width="6"/><path d="M60,388 C67,369 81,371 85,395" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/></g>
+  <g opacity=".55"><circle cx="60" cy="254" r="15" fill="#00A99A" stroke="#141414" stroke-width="6"/><circle cx="85" cy="258" r="12" fill="none" stroke="#141414" stroke-width="6"/><path d="M60,239 C67,220 81,222 85,246" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/><circle cx="60" cy="362" r="15" fill="#00A99A" stroke="#141414" stroke-width="6"/><circle cx="85" cy="366" r="12" fill="none" stroke="#141414" stroke-width="6"/><path d="M60,347 C67,328 81,330 85,354" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/></g>
+  <circle cx="60" cy="308" r="15" fill="#00A99A" stroke="#141414" stroke-width="6"/><circle cx="85" cy="312" r="12" fill="none" stroke="#141414" stroke-width="6"/><path d="M60,293 C67,274 81,276 85,300" fill="none" stroke="#141414" stroke-width="6" stroke-linecap="round"/>
+  <rect x="140" y="150" width="86" height="300" rx="9" fill="#FFFDF6" stroke="#141414" stroke-width="7"/>
+  <!-- blurred neighbours above/below sell the spin without motion -->
+  <g opacity=".22"><rect x="157" y="192" width="52" height="26" rx="5" fill="#00A99A" stroke="#141414" stroke-width="6"/><rect x="157" y="382" width="52" height="26" rx="5" fill="#00A99A" stroke="#141414" stroke-width="6"/></g>
+  <g opacity=".55"><rect x="157" y="233" width="52" height="26" rx="5" fill="#00A99A" stroke="#141414" stroke-width="6"/><rect x="157" y="341" width="52" height="26" rx="5" fill="#00A99A" stroke="#141414" stroke-width="6"/></g>
+  <rect x="157" y="287" width="52" height="26" rx="5" fill="#00A99A" stroke="#141414" stroke-width="6"/>
+  <rect x="252" y="150" width="86" height="300" rx="9" fill="#FFFDF6" stroke="#141414" stroke-width="7"/>
+  <!-- blurred neighbours above/below sell the spin without motion -->
+  <g opacity=".22"><path d="M279,185 L311,185 L291,227" fill="none" stroke="#141414" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M279,375 L311,375 L291,417" fill="none" stroke="#141414" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <g opacity=".55"><path d="M279,226 L311,226 L291,268" fill="none" stroke="#141414" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/><path d="M279,334 L311,334 L291,376" fill="none" stroke="#141414" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></g>
+  <path d="M279,280 L311,280 L291,322" fill="none" stroke="#141414" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+     </g>
+     <!-- payline: the one thing on the page that is not ink-black -->
+     <path d="M56,320 L344,320" fill="none" stroke="#00A99A" stroke-width="11" stroke-linecap="round"/>
+     <rect x="132" y="516" width="136" height="12" rx="6" fill="#141414" opacity=".38"/>
+   </svg>
+   <div class="txt" style="right:54px; top:136px; font-size:130px; text-align:right">
+     <span class="hl">NOT</span><br>A<br>PHONE</div>
+   <div class="sub" style="right:58px; top:536px; text-align:right">
+     Same machine.<br>Different casing.</div>
+<div class="vig"></div>
+<svg class="grain" width="1280" height="720">
+  <filter id="fbm"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/></filter>
+  <rect width="1280" height="720" filter="url(#fbm)"/>
+</svg>
+<div class="band"></div>
+</body></html>

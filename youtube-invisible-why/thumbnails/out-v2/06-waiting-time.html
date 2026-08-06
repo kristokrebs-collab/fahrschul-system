@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+  @page { margin: 0 }
+  * { margin:0; padding:0; box-sizing:border-box }
+  body { width:1280px; height:720px; overflow:hidden; position:relative;
+         background:#F2EBDD;
+         font-family:"Arial Black", Arial, Helvetica, sans-serif; }
+
+  /* Key light sits UNDER the art (z-index:0) so it never washes the ink out.
+     A white radial painted over the subject turns black line work grey —
+     that is exactly what v2's first render did. Light below, shadow above. */
+  .light { position:absolute; inset:0; z-index:0;
+           background: radial-gradient(circle at 38% 40%,
+             rgba(255,253,247,1) 0%, rgba(250,244,231,.55) 30%, rgba(0,0,0,0) 62%); }
+
+  /* Vignette rides on top but only ever darkens, and never reaches the middle. */
+  .vig { position:absolute; inset:0; z-index:3; pointer-events:none;
+         background: radial-gradient(ellipse at 50% 46%,
+           rgba(0,0,0,0) 48%, rgba(26,20,12,.20) 84%, rgba(18,13,6,.42) 100%); }
+
+  /* paper fibre — feTurbulence, kept light enough to texture but not to fog */
+  .grain { position:absolute; inset:0; z-index:4; opacity:.11;
+           mix-blend-mode:multiply; pointer-events:none; }
+
+  .art { position:relative; z-index:2 }
+
+  .kicker { position:absolute; z-index:2; top:34px; left:48px; font-size:23px; letter-spacing:4px;
+            color:#141414; opacity:.42; font-family:Arial,sans-serif; font-weight:700 }
+  .band { position:absolute; z-index:5; left:0; bottom:0; width:100%; height:12px; background:#6A3FB5 }
+
+  .txt { position:absolute; z-index:2; font-weight:900; color:#141414; line-height:.88;
+         letter-spacing:-3px; text-transform:uppercase;
+         text-shadow: 0 3px 0 rgba(242,235,221,.9), 0 6px 22px rgba(0,0,0,.20); }
+  .hl { color:#6A3FB5 }
+  .sub { position:absolute; z-index:2; font-size:31px; font-weight:700; font-family:Arial,sans-serif;
+         color:#141414; opacity:.68; line-height:1.22 }
+
+  svg { position:absolute; z-index:2 }
+  .drop { filter: drop-shadow(0 16px 26px rgba(30,22,10,.34)) drop-shadow(0 3px 5px rgba(30,22,10,.22)); }
+  .back { opacity:.26; z-index:1 }
+</style></head><body>
+<div class="light"></div>
+<div class="kicker">THE INVISIBLE WHY</div>
+   <!-- floor lines converge hard: the corridor is longer than it should be -->
+   <svg class="back" width="1280" height="720" viewBox="0 0 1280 720" style="left:0; top:0">
+     <path d="M-60,720 L470,372 M210,720 L512,372 M520,720 L556,372 M900,720 L604,372 M1240,720 L648,372"
+           stroke="#141414" stroke-width="6" stroke-linecap="round"/>
+     <path d="M300,470 L760,470 M232,530 L812,530 M140,614 L884,614"
+           stroke="#141414" stroke-width="5" stroke-linecap="round" opacity=".5"/>
+   </svg>
+   <svg class="drop" width="520" height="520" viewBox="0 0 200 200" style="left:56px; top:56px">
+     <circle cx="100" cy="100" r="82" fill="#FFFDF6" stroke="#141414" stroke-width="9"/>
+     <circle cx="100" cy="100" r="82" fill="none" stroke="#141414" stroke-width="3" opacity=".35"/>
+     <path d="M100,38 L100,48 M162,100 L152,100 M100,162 L100,152 M38,100 L48,100"
+           stroke="#141414" stroke-width="7" stroke-linecap="round"/>
+     <!-- hands stretched like elastic: time is being pulled, not measured -->
+     <path d="M100,100 C112,74 128,62 150,54" fill="none" stroke="#141414" stroke-width="10" stroke-linecap="round"/>
+     <path d="M100,100 C92,124 84,146 74,168" fill="none" stroke="#6A3FB5" stroke-width="11" stroke-linecap="round"/>
+     <circle cx="100" cy="100" r="10" fill="#141414"/>
+   </svg>
+   <!-- the figure: small, alone, at the far end -->
+   <svg width="120" height="200" viewBox="0 0 60 100" style="left:498px; top:300px">
+     <circle cx="30" cy="17" r="12" fill="#141414"/>
+     <path d="M30,31 L30,66 M30,42 L16,56 M30,42 L44,56 M30,66 L19,92 M30,66 L41,92"
+           stroke="#141414" stroke-width="8" stroke-linecap="round"/>
+   </svg>
+   <div class="txt" style="right:48px; top:132px; font-size:126px; text-align:right; letter-spacing:-4px">
+     <span class="hl">SAME</span><br>EIGHT<br>MINUTES</div>
+   <div class="sub" style="right:52px; top:498px; text-align:right">
+     One of them feels<br>like forty.</div>
+<div class="vig"></div>
+<svg class="grain" width="1280" height="720">
+  <filter id="fbm"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="4" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/></filter>
+  <rect width="1280" height="720" filter="url(#fbm)"/>
+</svg>
+<div class="band"></div>
+</body></html>
