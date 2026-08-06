@@ -1,0 +1,523 @@
+{
+  "video_id": "pilot-06-waiting-time",
+  "accent_color": "#6A3FB5",
+  "scenes": [
+    {
+      "scene": 1,
+      "start": 0,
+      "duration": 4.512,
+      "narration": "An airport got so many complaints about baggage delays that it hired more staff.",
+      "visual": "carousel, person, bar-chart — drawn in order, pen only",
+      "drawing_elements": [
+        "carousel",
+        "person",
+        "bar-chart"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 2,
+      "start": 4.512,
+      "duration": 5.156,
+      "narration": "Bags came out faster. The complaints didn't stop. So they tried something that shouldn't have worked.",
+      "visual": "carousel, arrow-up, question-mark, person — drawn in order, pen only",
+      "drawing_elements": [
+        "carousel",
+        "arrow-up",
+        "question-mark",
+        "person"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 3,
+      "start": 9.668,
+      "duration": 4.834,
+      "narration": "The fix took no extra staff, no new equipment, and made the wait objectively longer.",
+      "visual": "clock, arrow-up, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "clock",
+        "arrow-up",
+        "checkmark"
+      ],
+      "on_screen_text": "LONGER",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 4,
+      "start": 14.502,
+      "duration": 6.123,
+      "narration": "Start with the thing everyone gets wrong about waiting. You don't experience a wait as a length of time.",
+      "visual": "clock, hourglass, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "clock",
+        "hourglass",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 5,
+      "start": 20.625,
+      "duration": 2.578,
+      "narration": "You experience it as a length of attention.",
+      "visual": "brain, eye, hourglass — drawn in order, pen only",
+      "drawing_elements": [
+        "brain",
+        "eye",
+        "hourglass"
+      ],
+      "on_screen_text": "ATTENTION",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 6,
+      "start": 23.204,
+      "duration": 7.735,
+      "narration": "Researchers have measured this repeatedly. People asked to wait with nothing to do consistently overestimate how long they waited — often by a lot.",
+      "visual": "empty-room, clock, person, bar-chart — drawn in order, pen only",
+      "drawing_elements": [
+        "empty-room",
+        "clock",
+        "person",
+        "bar-chart"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 7,
+      "start": 30.938,
+      "duration": 3.545,
+      "narration": "Give them something to occupy attention and the same wait shrinks.",
+      "visual": "clock, checkmark, brain, hourglass — drawn in order, pen only",
+      "drawing_elements": [
+        "clock",
+        "checkmark",
+        "brain",
+        "hourglass"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 8,
+      "start": 34.483,
+      "duration": 8.701,
+      "narration": "This is why the wait for a lift feels endless and the walk to a further lift doesn't, even when the walk takes more of your life.",
+      "visual": "person, corridor, clock, exit-door — drawn in order, pen only",
+      "drawing_elements": [
+        "person",
+        "corridor",
+        "clock",
+        "exit-door"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 9,
+      "start": 43.184,
+      "duration": 6.319,
+      "narration": "There's a second layer, and it's the reason a wait can feel unfair rather than just long.",
+      "visual": "queue, question-mark, scale — drawn in order, pen only",
+      "drawing_elements": [
+        "queue",
+        "question-mark",
+        "scale"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 10,
+      "start": 49.504,
+      "duration": 5.947,
+      "narration": "Waits feel worse when you can't see the end, when you don't know why you're waiting.",
+      "visual": "queue, corridor, question-mark, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "queue",
+        "corridor",
+        "question-mark",
+        "x-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 11,
+      "start": 55.451,
+      "duration": 5.204,
+      "narration": "And — most powerfully — when someone who arrived after you gets served first.",
+      "visual": "queue, person, arrow-up, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "queue",
+        "person",
+        "arrow-up",
+        "x-mark"
+      ],
+      "on_screen_text": "UNFAIR",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 12,
+      "start": 60.655,
+      "duration": 9.293,
+      "narration": "That last one is why a single winding queue feeding several tills feels fairer than separate lines, even though the average wait is the same.",
+      "visual": "queue, queue, scale, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "queue",
+        "queue",
+        "scale",
+        "checkmark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 13,
+      "start": 69.948,
+      "duration": 3.345,
+      "narration": "The single queue removes the possibility of picking wrong.",
+      "visual": "queue, checkmark, exit-door — drawn in order, pen only",
+      "drawing_elements": [
+        "queue",
+        "checkmark",
+        "exit-door"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 14,
+      "start": 73.293,
+      "duration": 3.717,
+      "narration": "The airport looked at the numbers and found something strange.",
+      "visual": "carousel, bar-chart, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "carousel",
+        "bar-chart",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 15,
+      "start": 77.01,
+      "duration": 7.063,
+      "narration": "Passengers walked about one minute from the gate to baggage claim, then stood at the carousel for about seven.",
+      "visual": "corridor, carousel, clock, person — drawn in order, pen only",
+      "drawing_elements": [
+        "corridor",
+        "carousel",
+        "clock",
+        "person"
+      ],
+      "on_screen_text": "1 + 7",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 16,
+      "start": 84.073,
+      "duration": 4.461,
+      "narration": "Roughly eight minutes total. But only one of those minutes was occupied.",
+      "visual": "clock, bar-chart, hourglass — drawn in order, pen only",
+      "drawing_elements": [
+        "clock",
+        "bar-chart",
+        "hourglass"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 17,
+      "start": 88.534,
+      "duration": 5.947,
+      "narration": "Seven were spent doing nothing but waiting, which is exactly the kind of time that stretches.",
+      "visual": "empty-room, hourglass, person, clock — drawn in order, pen only",
+      "drawing_elements": [
+        "empty-room",
+        "hourglass",
+        "person",
+        "clock"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 18,
+      "start": 94.481,
+      "duration": 7.063,
+      "narration": "So they moved the arrival gates further from the terminal, and routed the bags to the most distant carousel.",
+      "visual": "corridor, carousel, arrow-up, exit-door — drawn in order, pen only",
+      "drawing_elements": [
+        "corridor",
+        "carousel",
+        "arrow-up",
+        "exit-door"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 19,
+      "start": 101.544,
+      "duration": 3.717,
+      "narration": "Passengers now walked about six minutes and waited about two.",
+      "visual": "corridor, person, clock, carousel — drawn in order, pen only",
+      "drawing_elements": [
+        "corridor",
+        "person",
+        "clock",
+        "carousel"
+      ],
+      "on_screen_text": "6 + 2",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 20,
+      "start": 105.261,
+      "duration": 1.859,
+      "narration": "Complaints dropped to near zero.",
+      "visual": "bar-chart, arrow-down, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "bar-chart",
+        "arrow-down",
+        "checkmark"
+      ],
+      "on_screen_text": "ZERO",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 21,
+      "start": 107.119,
+      "duration": 4.461,
+      "narration": "Nothing got faster. The total journey was the same or slightly worse.",
+      "visual": "clock, scale, hourglass — drawn in order, pen only",
+      "drawing_elements": [
+        "clock",
+        "scale",
+        "hourglass"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 22,
+      "start": 111.58,
+      "duration": 5.703,
+      "narration": "They simply converted empty waiting into occupied walking, and the experience of the wait collapsed.",
+      "visual": "corridor, empty-room, checkmark, person — drawn in order, pen only",
+      "drawing_elements": [
+        "corridor",
+        "empty-room",
+        "checkmark",
+        "person"
+      ],
+      "on_screen_text": null,
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    },
+    {
+      "scene": 23,
+      "start": 117.283,
+      "duration": 6.464,
+      "narration": "Which raises the obvious objection: isn't this just manipulation? You're not being served faster. You're being managed.",
+      "visual": "person, question-mark, x-mark, scale — drawn in order, pen only",
+      "drawing_elements": [
+        "person",
+        "question-mark",
+        "x-mark",
+        "scale"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 24,
+      "start": 123.747,
+      "duration": 4.563,
+      "narration": "Sometimes, yes. A progress bar that lies about progress is a lie.",
+      "visual": "progress-bar, x-mark, clock — drawn in order, pen only",
+      "drawing_elements": [
+        "progress-bar",
+        "x-mark",
+        "clock"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 25,
+      "start": 128.31,
+      "duration": 5.703,
+      "narration": "And a made-up your call is important to us queue position is worse than silence.",
+      "visual": "phone, queue, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "queue",
+        "x-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 26,
+      "start": 134.013,
+      "duration": 8.745,
+      "narration": "But a wait with a visible end, a stated reason, and something to do is genuinely a better experience — not a trick.",
+      "visual": "progress-bar, checkmark, clock, eye — drawn in order, pen only",
+      "drawing_elements": [
+        "progress-bar",
+        "checkmark",
+        "clock",
+        "eye"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 27,
+      "start": 142.758,
+      "duration": 9.886,
+      "narration": "Just a design that accounts for the fact that a person is standing there. The line is whether the design respects the wait or disguises it.",
+      "visual": "person, scale, checkmark, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "person",
+        "scale",
+        "checkmark",
+        "x-mark"
+      ],
+      "on_screen_text": "RESPECT vs DISGUISE",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 28,
+      "start": 152.644,
+      "duration": 7.604,
+      "narration": "Two useful things. The first is diagnostic. When a wait feels unbearable, check whether it's actually long or merely empty.",
+      "visual": "hourglass, empty-room, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "hourglass",
+        "empty-room",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 29,
+      "start": 160.248,
+      "duration": 5.323,
+      "narration": "Because those have completely different fixes, and you've probably been applying the wrong one.",
+      "visual": "hourglass, empty-room, x-mark, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "hourglass",
+        "empty-room",
+        "x-mark",
+        "checkmark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 30,
+      "start": 165.571,
+      "duration": 9.125,
+      "narration": "The second is that you can do to yourself what the airport did to its passengers. Not distraction for its own sake — occupation.",
+      "visual": "person, corridor, checkmark, brain — drawn in order, pen only",
+      "drawing_elements": [
+        "person",
+        "corridor",
+        "checkmark",
+        "brain"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 31,
+      "start": 174.697,
+      "duration": 6.084,
+      "narration": "Deciding in advance what the wait is for turns dead time into something with a shape.",
+      "visual": "clock, calendar, checkmark, hourglass — drawn in order, pen only",
+      "drawing_elements": [
+        "clock",
+        "calendar",
+        "checkmark",
+        "hourglass"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 32,
+      "start": 180.78,
+      "duration": 8.745,
+      "narration": "And when a company makes you wait in a blank room with no information and no estimate, now you know that's a choice.",
+      "visual": "empty-room, person, x-mark, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "empty-room",
+        "person",
+        "x-mark",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 33,
+      "start": 189.525,
+      "duration": 9.125,
+      "narration": "Every one of those is fixable, cheaply, and they've decided not to. The wait was never the problem. It was the emptiness inside it.",
+      "visual": "empty-room, clock, carousel, queue, corridor, bar-chart — drawn in order, pen only",
+      "drawing_elements": [
+        "empty-room",
+        "clock",
+        "carousel",
+        "queue",
+        "corridor",
+        "bar-chart"
+      ],
+      "on_screen_text": null,
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    }
+  ]
+}

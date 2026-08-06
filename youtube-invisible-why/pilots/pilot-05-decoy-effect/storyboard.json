@@ -1,0 +1,502 @@
+{
+  "video_id": "pilot-05-decoy-effect",
+  "accent_color": "#C62828",
+  "scenes": [
+    {
+      "scene": 1,
+      "start": 0,
+      "duration": 5.692,
+      "narration": "There's a price on this page that exists only to make you pick a different one.",
+      "visual": "price-box, price-box, price-box — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "price-box"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 2,
+      "start": 5.692,
+      "duration": 3.913,
+      "narration": "It isn't there to be bought. It's there to be rejected.",
+      "visual": "price-box, x-mark, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "x-mark",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 3,
+      "start": 9.605,
+      "duration": 7.115,
+      "narration": "Once you can see it, you can't stop seeing it. It's in almost every pricing page you've ever looked at.",
+      "visual": "price-tag, grid, eye — drawn in order, pen only",
+      "drawing_elements": [
+        "price-tag",
+        "grid",
+        "eye"
+      ],
+      "on_screen_text": "THE DECOY",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 4,
+      "start": 16.719,
+      "duration": 8.182,
+      "narration": "In two thousand eight, the behavioural economist Dan Ariely found a subscription offer from The Economist and thought it looked like a mistake.",
+      "visual": "person, price-box, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "person",
+        "price-box",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 5,
+      "start": 24.901,
+      "duration": 4.269,
+      "narration": "Three options. Web only, fifty-nine dollars. Print only, one hundred and twenty-five.",
+      "visual": "price-box, price-box, coin — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "coin"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 6,
+      "start": 29.17,
+      "duration": 4.625,
+      "narration": "Print and web — also one hundred and twenty-five dollars. Read that again.",
+      "visual": "price-box, price-box, price-box, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "price-box",
+        "question-mark"
+      ],
+      "on_screen_text": "$125 = $125",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 7,
+      "start": 33.795,
+      "duration": 7.826,
+      "narration": "Print alone cost exactly the same as print plus web. Nobody would choose print alone. It's strictly worse for the identical price.",
+      "visual": "price-box, x-mark, scale — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "x-mark",
+        "scale"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 8,
+      "start": 41.621,
+      "duration": 7.115,
+      "narration": "So Ariely ran it on a hundred students. Sixteen chose web only. Zero chose print only. Eighty-four chose the combo.",
+      "visual": "bar-chart, person, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "bar-chart",
+        "person",
+        "checkmark"
+      ],
+      "on_screen_text": "16 / 0 / 84",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 9,
+      "start": 48.735,
+      "duration": 4.98,
+      "narration": "Then he deleted the useless option and ran it again on a fresh hundred.",
+      "visual": "price-box, x-mark, person, bar-chart — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "x-mark",
+        "person",
+        "bar-chart"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 10,
+      "start": 53.716,
+      "duration": 7.115,
+      "narration": "Logically, nothing should change. Nobody wanted it. Removing it should just leave the same two choices and the same split.",
+      "visual": "price-box, price-box, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 11,
+      "start": 60.83,
+      "duration": 5.692,
+      "narration": "The result flipped. Without the decoy, sixty-eight chose web only and just thirty-two chose the combo.",
+      "visual": "bar-chart, arrow-down, arrow-up — drawn in order, pen only",
+      "drawing_elements": [
+        "bar-chart",
+        "arrow-down",
+        "arrow-up"
+      ],
+      "on_screen_text": "68 / 32",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 12,
+      "start": 66.522,
+      "duration": 7.115,
+      "narration": "The expensive option lost more than half its buyers — because a product nobody bought stopped standing next to it.",
+      "visual": "bar-chart, price-box, x-mark, arrow-down — drawn in order, pen only",
+      "drawing_elements": [
+        "bar-chart",
+        "price-box",
+        "x-mark",
+        "arrow-down"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 13,
+      "start": 73.637,
+      "duration": 7.826,
+      "narration": "Because you are very bad at judging what something is worth, and very good at judging which of two things is better.",
+      "visual": "brain, scale, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "brain",
+        "scale",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 14,
+      "start": 81.463,
+      "duration": 7.826,
+      "narration": "Ask someone what a hundred and twenty-five dollars of journalism is worth and they have no idea. There's no internal price list.",
+      "visual": "coin, question-mark, brain — drawn in order, pen only",
+      "drawing_elements": [
+        "coin",
+        "question-mark",
+        "brain"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 15,
+      "start": 89.289,
+      "duration": 6.047,
+      "narration": "But put print-only next to print-plus-web and the comparison is trivial: same money, more stuff. Obviously better.",
+      "visual": "price-box, price-box, checkmark, arrow-up — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "checkmark",
+        "arrow-up"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 16,
+      "start": 95.336,
+      "duration": 6.047,
+      "narration": "That comparison feels like a judgement about value. It isn't. It's a judgement about those two options.",
+      "visual": "scale, price-box, price-box, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "scale",
+        "price-box",
+        "price-box",
+        "x-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 17,
+      "start": 101.384,
+      "duration": 3.202,
+      "narration": "And someone chose which two options you'd be comparing.",
+      "visual": "person, price-box, price-box, grid — drawn in order, pen only",
+      "drawing_elements": [
+        "person",
+        "price-box",
+        "price-box",
+        "grid"
+      ],
+      "on_screen_text": null,
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    },
+    {
+      "scene": 18,
+      "start": 104.585,
+      "duration": 4.98,
+      "narration": "The recipe is precise. You need a target — the thing you want sold.",
+      "visual": "price-box, spotlight, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "spotlight",
+        "checkmark"
+      ],
+      "on_screen_text": "TARGET",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 19,
+      "start": 109.565,
+      "duration": 7.115,
+      "narration": "Then you add a decoy that is clearly worse than the target, but not clearly worse than the third option.",
+      "visual": "price-box, price-box, arrow-down — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "arrow-down"
+      ],
+      "on_screen_text": "DECOY",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 20,
+      "start": 116.68,
+      "duration": 4.876,
+      "narration": "The decoy's whole job is to be dominated by exactly one option.",
+      "visual": "price-box, spotlight, arrow-up, price-box — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "spotlight",
+        "arrow-up",
+        "price-box"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 21,
+      "start": 121.556,
+      "duration": 8.127,
+      "narration": "It makes the target look like a win, and a win is much easier to choose than a value judgement.",
+      "visual": "checkmark, scale, brain, spotlight — drawn in order, pen only",
+      "drawing_elements": [
+        "checkmark",
+        "scale",
+        "brain",
+        "spotlight"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 22,
+      "start": 129.683,
+      "duration": 4.47,
+      "narration": "Popcorn sizes work this way. Phone storage tiers work this way.",
+      "visual": "price-box, phone, grid — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "phone",
+        "grid"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 23,
+      "start": 134.153,
+      "duration": 6.502,
+      "narration": "So does almost every three-tier software page where the middle plan is mysteriously the best deal.",
+      "visual": "price-box, price-box, price-box, spotlight — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "price-box",
+        "spotlight"
+      ],
+      "on_screen_text": "MIDDLE = BEST?",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 24,
+      "start": 140.654,
+      "duration": 5.282,
+      "narration": "Worth being careful here. A three-tier pricing page is not automatically a trick.",
+      "visual": "price-box, checkmark, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "checkmark",
+        "x-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 25,
+      "start": 145.937,
+      "duration": 7.721,
+      "narration": "Sometimes the middle plan genuinely is the best fit for most people, and saying so is helpful, not manipulative.",
+      "visual": "price-box, checkmark, person, scale — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "checkmark",
+        "person",
+        "scale"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 26,
+      "start": 153.657,
+      "duration": 10.565,
+      "narration": "And the effect is smaller in the wild than in the lab. Real buyers have budgets, brand loyalty, and a habit of leaving the page entirely.",
+      "visual": "bar-chart, person, exit-door, coin — drawn in order, pen only",
+      "drawing_elements": [
+        "bar-chart",
+        "person",
+        "exit-door",
+        "coin"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 27,
+      "start": 164.222,
+      "duration": 8.94,
+      "narration": "The Economist study is a clean demonstration of a real mechanism — not a promise that it works on everyone, every time.",
+      "visual": "bar-chart, question-mark, scale — drawn in order, pen only",
+      "drawing_elements": [
+        "bar-chart",
+        "question-mark",
+        "scale"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 28,
+      "start": 173.162,
+      "duration": 8.127,
+      "narration": "The defence is almost annoyingly simple, because the effect only works while all the options sit next to each other.",
+      "visual": "price-box, price-box, price-box, eye — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "price-box",
+        "eye"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 29,
+      "start": 181.289,
+      "duration": 8.533,
+      "narration": "Before you look at the tiers, decide what you actually need. Write the number down if you have to. Then look.",
+      "visual": "coin, checkmark, price-tag — drawn in order, pen only",
+      "drawing_elements": [
+        "coin",
+        "checkmark",
+        "price-tag"
+      ],
+      "on_screen_text": "DECIDE FIRST",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 30,
+      "start": 189.822,
+      "duration": 7.314,
+      "narration": "The decoy can only move you if you arrive without a position, because it works by supplying one.",
+      "visual": "price-box, arrow-up, x-mark, brain — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "arrow-up",
+        "x-mark",
+        "brain"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 31,
+      "start": 197.136,
+      "duration": 9.752,
+      "narration": "And when one option is transparently worse than another at the same price, that's not a bad deal you're being offered. That's a signpost.",
+      "visual": "price-box, signpost, arrow-up — drawn in order, pen only",
+      "drawing_elements": [
+        "price-box",
+        "signpost",
+        "arrow-up"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 32,
+      "start": 206.889,
+      "duration": 12.597,
+      "narration": "Pointing at the option someone would like you to take. You're not being fooled about value. You're being handed a comparison, and comparisons are the one thing your brain never refuses.",
+      "visual": "signpost, price-box, price-box, scale, brain, bar-chart — drawn in order, pen only",
+      "drawing_elements": [
+        "signpost",
+        "price-box",
+        "price-box",
+        "scale",
+        "brain",
+        "bar-chart"
+      ],
+      "on_screen_text": null,
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    }
+  ]
+}

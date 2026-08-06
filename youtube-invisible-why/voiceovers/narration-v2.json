@@ -1,0 +1,104 @@
+{
+  "pilot-04-phone-variable-reward": {
+    "video_id": "pilot-04-phone-variable-reward",
+    "total_duration_sec": 204.919,
+    "measured_wpm": 184,
+    "voice": {
+      "id": "30fc8796-ceb6-4a66-b3a7-4a145ef7f346",
+      "name": "Arthur",
+      "type": "preset"
+    },
+    "model": "seed_audio",
+    "segments": [
+      {
+        "scenes": [
+          1,
+          18
+        ],
+        "speech_rate": 20,
+        "duration_sec": 98.50441666666667,
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260806_130423_6ec4d2bf-0110-4021-bbf7-d2ba43ca9d84.wav"
+      },
+      {
+        "scenes": [
+          19,
+          32
+        ],
+        "speech_rate": 0,
+        "duration_sec": 106.415,
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260806_131149_348c2915-2d62-4697-89d1-938b2d540ee8.wav"
+      }
+    ]
+  },
+  "pilot-05-decoy-effect": {
+    "video_id": "pilot-05-decoy-effect",
+    "total_duration_sec": 219.485,
+    "measured_wpm": 159,
+    "voice": {
+      "id": "30fc8796-ceb6-4a66-b3a7-4a145ef7f346",
+      "name": "Arthur",
+      "type": "preset"
+    },
+    "model": "seed_audio",
+    "segments": [
+      {
+        "scenes": [
+          1,
+          19
+        ],
+        "speech_rate": 0,
+        "duration_sec": 116.680125,
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260806_130927_44d71fbf-678e-4381-b937-fa7909defa5a.wav"
+      },
+      {
+        "scenes": [
+          20,
+          32
+        ],
+        "speech_rate": 0,
+        "duration_sec": 102.80516666666666,
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260806_130927_1f4721d2-6085-4a1a-8dec-aca07e82e5c1.wav"
+      }
+    ]
+  },
+  "pilot-06-waiting-time": {
+    "video_id": "pilot-06-waiting-time",
+    "total_duration_sec": 198.651,
+    "measured_wpm": 165,
+    "voice": {
+      "id": "30fc8796-ceb6-4a66-b3a7-4a145ef7f346",
+      "name": "Arthur",
+      "type": "preset"
+    },
+    "model": "seed_audio",
+    "segments": [
+      {
+        "scenes": [
+          1,
+          8
+        ],
+        "speech_rate": 20,
+        "duration_sec": 43.18445833333333,
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260806_130628_95a31810-f4ed-483c-b2c5-c29cabd5f4bb.wav"
+      },
+      {
+        "scenes": [
+          9,
+          21
+        ],
+        "speech_rate": 20,
+        "duration_sec": 68.395375,
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260806_130628_65db7bbd-f511-441d-9629-e94f56b68a85.wav"
+      },
+      {
+        "scenes": [
+          22,
+          33
+        ],
+        "speech_rate": 20,
+        "duration_sec": 87.07075,
+        "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260806_130121_b8832020-a017-4f18-8aa8-944764f55c0c.wav"
+      }
+    ]
+  }
+}

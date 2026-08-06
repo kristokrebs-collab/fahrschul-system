@@ -1,0 +1,507 @@
+{
+  "video_id": "pilot-04-phone-variable-reward",
+  "accent_color": "#00A99A",
+  "scenes": [
+    {
+      "scene": 1,
+      "start": 0,
+      "duration": 3.324,
+      "narration": "You just picked up your phone. You don't remember deciding to.",
+      "visual": "phone, person, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "person",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 2,
+      "start": 3.324,
+      "duration": 5.439,
+      "narration": "Your hand moved, the screen lit up, and somewhere in that half-second, a decision got made without you.",
+      "visual": "phone, notification-dot, brain, arrow-down — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "notification-dot",
+        "brain",
+        "arrow-down"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 3,
+      "start": 8.763,
+      "duration": 6.043,
+      "narration": "That gap — between your hand moving and you noticing — is engineered. And the blueprint is eighty years old.",
+      "visual": "clock, brain, grid — drawn in order, pen only",
+      "drawing_elements": [
+        "clock",
+        "brain",
+        "grid"
+      ],
+      "on_screen_text": "1948",
+      "camera": "slow zoom out",
+      "sound_effect": null
+    },
+    {
+      "scene": 4,
+      "start": 14.806,
+      "duration": 6.043,
+      "narration": "In the nineteen-forties, a psychologist named B.F. Skinner put pigeons in boxes with a lever. Press the lever, get food.",
+      "visual": "wall, lever, pellet — drawn in order, pen only",
+      "drawing_elements": [
+        "wall",
+        "lever",
+        "pellet"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 5,
+      "start": 20.849,
+      "duration": 3.626,
+      "narration": "The pigeons learned fast, pressed when hungry, stopped when full. Predictable. Boring.",
+      "visual": "lever, pellet, checkmark, clock — drawn in order, pen only",
+      "drawing_elements": [
+        "lever",
+        "pellet",
+        "checkmark",
+        "clock"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 6,
+      "start": 24.475,
+      "duration": 4.835,
+      "narration": "Then he changed one thing. The food stopped coming every time. Now it came sometimes. Randomly.",
+      "visual": "lever, pellet, question-mark, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "lever",
+        "pellet",
+        "question-mark",
+        "x-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 7,
+      "start": 29.31,
+      "duration": 5.741,
+      "narration": "The pigeon couldn't tell which press would pay. The pigeons didn't press less. They pressed more. A lot more.",
+      "visual": "lever, bar-chart, arrow-up, pellet — drawn in order, pen only",
+      "drawing_elements": [
+        "lever",
+        "bar-chart",
+        "arrow-up",
+        "pellet"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 8,
+      "start": 35.051,
+      "duration": 3.324,
+      "narration": "Some kept pressing thousands of times after the food stopped entirely.",
+      "visual": "lever, line-graph, arrow-up — drawn in order, pen only",
+      "drawing_elements": [
+        "lever",
+        "line-graph",
+        "arrow-up"
+      ],
+      "on_screen_text": "2,800 PRESSES",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 9,
+      "start": 38.374,
+      "duration": 5.439,
+      "narration": "The obvious answer is that the pigeon is confused. It isn't. It's doing something rational under bad information.",
+      "visual": "brain, x-mark, checkmark, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "brain",
+        "x-mark",
+        "checkmark",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 10,
+      "start": 43.813,
+      "duration": 4.23,
+      "narration": "When a reward is reliable, you learn when to stop. Full stomach, stop pressing.",
+      "visual": "pellet, checkmark, clock — drawn in order, pen only",
+      "drawing_elements": [
+        "pellet",
+        "checkmark",
+        "clock"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 11,
+      "start": 48.044,
+      "duration": 6.043,
+      "narration": "But when a reward is random, there's no signal that says not now. Every press is a fresh coin flip.",
+      "visual": "coin-flip, coin, question-mark, lever — drawn in order, pen only",
+      "drawing_elements": [
+        "coin-flip",
+        "coin",
+        "question-mark",
+        "lever"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 12,
+      "start": 54.087,
+      "duration": 4.835,
+      "narration": "And the only way to lose the flip you might have won is to stop flipping.",
+      "visual": "coin-flip, arrow-down, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "coin-flip",
+        "arrow-down",
+        "x-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 13,
+      "start": 58.921,
+      "duration": 6.648,
+      "narration": "Skinner called it a variable ratio schedule. It is the most persistent pattern of behavior psychology has ever produced in a laboratory.",
+      "visual": "bar-chart, line-graph, brain — drawn in order, pen only",
+      "drawing_elements": [
+        "bar-chart",
+        "line-graph",
+        "brain"
+      ],
+      "on_screen_text": "VARIABLE RATIO",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 14,
+      "start": 65.569,
+      "duration": 6.95,
+      "narration": "And it did not stay in the laboratory. Slot machines run on it. That's not a metaphor — it's the actual design principle.",
+      "visual": "slot-reel, lever, coin — drawn in order, pen only",
+      "drawing_elements": [
+        "slot-reel",
+        "lever",
+        "coin"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 15,
+      "start": 72.519,
+      "duration": 5.137,
+      "narration": "It's why a slot machine pays out constantly in small amounts instead of rarely in large ones.",
+      "visual": "slot-reel, coin, coin, bar-chart — drawn in order, pen only",
+      "drawing_elements": [
+        "slot-reel",
+        "coin",
+        "coin",
+        "bar-chart"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 16,
+      "start": 77.655,
+      "duration": 6.043,
+      "narration": "Now look at the gesture you make to refresh a feed. Pull down. Release. Wait for the reels to stop.",
+      "visual": "phone, slot-reel, arrow-down, lever — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "slot-reel",
+        "arrow-down",
+        "lever"
+      ],
+      "on_screen_text": "SAME MOTION",
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    },
+    {
+      "scene": 17,
+      "start": 83.699,
+      "duration": 7.554,
+      "narration": "Here's where it gets more careful than the usual version of this story. Nobody sat in a meeting and said let's build a slot machine.",
+      "visual": "person, wall, x-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "person",
+        "wall",
+        "x-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 18,
+      "start": 91.253,
+      "duration": 7.252,
+      "narration": "They didn't have to. What actually happened is that thousands of design variations got tested against a single number: how often people come back.",
+      "visual": "grid, phone, bar-chart, clock — drawn in order, pen only",
+      "drawing_elements": [
+        "grid",
+        "phone",
+        "bar-chart",
+        "clock"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 19,
+      "start": 98.504,
+      "duration": 6.673,
+      "narration": "Variations that produced unpredictable rewards kept people coming back more. So those variations survived. Nobody needed to know why.",
+      "visual": "grid, arrow-up, checkmark, slot-reel — drawn in order, pen only",
+      "drawing_elements": [
+        "grid",
+        "arrow-up",
+        "checkmark",
+        "slot-reel"
+      ],
+      "on_screen_text": null,
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    },
+    {
+      "scene": 20,
+      "start": 105.177,
+      "duration": 8.078,
+      "narration": "That's the uncomfortable part. This isn't a conspiracy that requires villains. It's a selection process that produces the same result as a conspiracy.",
+      "visual": "grid, wall, lever, brain — drawn in order, pen only",
+      "drawing_elements": [
+        "grid",
+        "wall",
+        "lever",
+        "brain"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom out",
+      "sound_effect": null
+    },
+    {
+      "scene": 21,
+      "start": 113.255,
+      "duration": 6.322,
+      "narration": "It's worth saying what this doesn't mean. Your phone isn't a slot machine, and you aren't a pigeon.",
+      "visual": "phone, checkmark, person — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "checkmark",
+        "person"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 22,
+      "start": 119.577,
+      "duration": 8.078,
+      "narration": "Most of what arrives on it is genuinely wanted — messages from people you love, work you're waiting on, news you asked for.",
+      "visual": "phone, notification-dot, person, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "notification-dot",
+        "person",
+        "checkmark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 23,
+      "start": 127.654,
+      "duration": 5.97,
+      "narration": "And the popular claim that every notification gives you a dopamine hit oversimplifies what dopamine actually does.",
+      "visual": "brain, x-mark, question-mark — drawn in order, pen only",
+      "drawing_elements": [
+        "brain",
+        "x-mark",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 24,
+      "start": 133.625,
+      "duration": 7.375,
+      "narration": "The honest version is narrower and more interesting: dopamine tracks anticipation more than reward. It spikes before you look, not after.",
+      "visual": "line-graph, brain, arrow-up, eye — drawn in order, pen only",
+      "drawing_elements": [
+        "line-graph",
+        "brain",
+        "arrow-up",
+        "eye"
+      ],
+      "on_screen_text": "BEFORE, NOT AFTER",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 25,
+      "start": 141,
+      "duration": 5.619,
+      "narration": "That's the thing to sit with. The pull isn't the reward. The pull is the maybe.",
+      "visual": "coin-flip, question-mark, brain — drawn in order, pen only",
+      "drawing_elements": [
+        "coin-flip",
+        "question-mark",
+        "brain"
+      ],
+      "on_screen_text": "THE MAYBE",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 26,
+      "start": 146.619,
+      "duration": 6.322,
+      "narration": "You check, there's nothing there, you feel briefly flat — and then you check again nine minutes later.",
+      "visual": "phone, x-mark, clock, person — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "x-mark",
+        "clock",
+        "person"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 27,
+      "start": 152.941,
+      "duration": 10.536,
+      "narration": "If the reward were the point, an empty check would teach you to stop. It doesn't, because the empty check isn't a failure of the system. It's the system working.",
+      "visual": "phone, x-mark, lever, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "x-mark",
+        "lever",
+        "checkmark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 28,
+      "start": 163.477,
+      "duration": 8.429,
+      "narration": "If the mechanism runs on unpredictability, then willpower is the wrong tool. You can't out-discipline a coin flip — you can only stop flipping.",
+      "visual": "coin-flip, x-mark, brain — drawn in order, pen only",
+      "drawing_elements": [
+        "coin-flip",
+        "x-mark",
+        "brain"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 29,
+      "start": 171.906,
+      "duration": 6.673,
+      "narration": "What works is making the reward predictable again. Not use your phone less — that's the pigeon pressing harder.",
+      "visual": "phone, arrow-down, x-mark, lever — drawn in order, pen only",
+      "drawing_elements": [
+        "phone",
+        "arrow-down",
+        "x-mark",
+        "lever"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 30,
+      "start": 178.579,
+      "duration": 9.834,
+      "narration": "Instead: check on a schedule you choose, not on a feeling. Turn off the notifications that arrive at random and keep the ones that arrive for a reason.",
+      "visual": "clock, calendar, notification-dot, checkmark — drawn in order, pen only",
+      "drawing_elements": [
+        "clock",
+        "calendar",
+        "notification-dot",
+        "checkmark"
+      ],
+      "on_screen_text": "ON A SCHEDULE",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 31,
+      "start": 188.413,
+      "duration": 5.97,
+      "narration": "Both do the same thing — they take the randomness out, and randomness was the whole engine.",
+      "visual": "pellet, clock, checkmark, lever — drawn in order, pen only",
+      "drawing_elements": [
+        "pellet",
+        "clock",
+        "checkmark",
+        "lever"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 32,
+      "start": 194.383,
+      "duration": 10.536,
+      "narration": "You're not weak. You're running correct software on a problem it was never built for, against a system that found the exploit by accident and kept it because it worked.",
+      "visual": "brain, phone, slot-reel, lever, coin-flip, line-graph — drawn in order, pen only",
+      "drawing_elements": [
+        "brain",
+        "phone",
+        "slot-reel",
+        "lever",
+        "coin-flip",
+        "line-graph"
+      ],
+      "on_screen_text": null,
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    }
+  ]
+}
