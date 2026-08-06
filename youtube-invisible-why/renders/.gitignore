@@ -1,3 +1,7 @@
 *.mp4
 *.mov
 *.webm
+# Renders are build output. They were committed once, deliberately, to hand
+# them to an off-box mux (the narration CDN is unreachable from the build
+# environment but reachable from the sandbox that did the join). That is
+# done; the finished videos are hosted. Do not commit renders again.
