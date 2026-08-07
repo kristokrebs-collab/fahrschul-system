@@ -289,13 +289,22 @@ export const ICONS: Record<string, IconDef> = {
     ],
   },
 
+  // Deliberately dense: this shape carries whole beats in the pricing video,
+  // so it needs to read as a real offer card — header band, a price with a
+  // currency mark, feature rows with bullets, and a call-to-action bar —
+  // not as a rectangle with two lines through it.
   "price-box": {
     viewBox: VB,
     paths: [
-      "M16,20 L84,20 C87,20 89,22 89,25 L89,84 C89,87 87,89 84,89 L16,89 C13,89 11,87 11,84 L11,25 C11,22 13,20 16,20 Z",
-      "M11,38 L89,38",
-      "M28,54 L72,54",
-      "M28,68 L58,68",
+      "M16,12 L84,12 C87,12 89,14 89,17 L89,88 C89,91 87,93 84,93 L16,93 C13,93 11,91 11,88 L11,17 C11,14 13,12 16,12 Z",
+      "M11,30 L89,30",
+      "M26,23 L48,23",
+      "M30,39 L30,61",
+      "M36,45 C36,41 24,41 24,46 C24,50 36,50 36,55 C36,60 24,60 24,55",
+      "M40,42 L64,42 M40,52 L58,52",
+      "M25,64 C26,64 27,65 27,66 C27,67 26,68 25,68 C24,68 23,67 23,66 C23,65 24,64 25,64 Z M33,66 L71,66",
+      "M25,74 C26,74 27,75 27,76 C27,77 26,78 25,78 C24,78 23,77 23,76 C23,75 24,74 25,74 Z M33,76 L63,76",
+      "M23,84 L77,84",
     ],
   },
 

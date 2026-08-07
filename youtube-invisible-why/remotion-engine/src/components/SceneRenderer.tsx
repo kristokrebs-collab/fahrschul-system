@@ -11,6 +11,13 @@ interface SceneRendererProps {
   accentColor: string;
   localFrame: number;
   durationInFrames: number;
+  /**
+   * Render this scene as a finished, silent backdrop: every element fully
+   * drawn, no pen, no text overlay. MainVideo stacks the previous scenes
+   * this way so the page keeps filling up instead of being wiped clean at
+   * every cut — the "one continuous drawing" visual-style.md asks for.
+   */
+  ghost?: boolean;
 }
 
 interface LayoutSlot {
@@ -89,6 +96,7 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
   accentColor,
   localFrame,
   durationInFrames,
+  ghost = false,
 }) => {
   const elements = scene.drawing_elements.filter((e) => !e.startsWith("NEW_ASSET_NEEDED"));
   const positions = layoutElements(elements.length);
@@ -101,15 +109,16 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
   const iconRenders = elements.map((name, i) => {
     const slotStart = i * perSlot * SLOT_OVERLAP;
     const slotDuration = perSlot * DRAW_FRACTION;
-    const rawProgress = (localFrame - slotStart) / slotDuration;
-    const progress = easeOut(Math.max(0, Math.min(1, rawProgress)));
+    // A ghost is already-finished work, so it skips the reveal entirely.
+    const rawProgress = ghost ? 1 : (localFrame - slotStart) / slotDuration;
+    const progress = ghost ? 1 : easeOut(Math.max(0, Math.min(1, rawProgress)));
     const pos = positions[i];
 
     let tipForThisIcon: Tip | null = null;
     // The pen is on screen only while this element is genuinely being drawn;
     // once the stroke lands it lifts away rather than hovering over finished
     // art for the rest of the scene.
-    if (rawProgress >= 0 && rawProgress < 1) {
+    if (!ghost && rawProgress >= 0 && rawProgress < 1) {
       const tip = getIconTipPoint(name, progress);
       if (tip) {
         tipForThisIcon = {
@@ -129,7 +138,9 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
         size={pos.size}
         progress={progress}
         accentColor={accentColor}
-        useAccent={i === n - 1}
+        // Ghosts stay pure ink: a dimmed accent in the backdrop competes
+        // with the accent on the element currently being drawn.
+        useAccent={!ghost && i === n - 1}
       />
     );
   });
@@ -142,7 +153,7 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
     <AbsoluteFill>
       {iconRenders}
       {penTip && <Pen tipX={penTip.canvasX} tipY={penTip.canvasY} visible accent={accentColor} />}
-      {scene.on_screen_text && (
+      {!ghost && scene.on_screen_text && (
         <TextOverlay
           text={scene.on_screen_text}
           localFrame={localFrame - textStartFrame}
