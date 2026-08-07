@@ -1,0 +1,162 @@
+{
+  "video_id": "proof-45s",
+  "accent_color": "#C62828",
+  "scenes": [
+    {
+      "scene": 1,
+      "start": 0,
+      "duration": 6.314,
+      "narration": "There's a price on this page that exists only to make you pick a different one.",
+      "visual": "price-box, price-box, price-box, eye, question-mark — pen only, page persists across scenes",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "price-box",
+        "eye",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom in",
+      "sound_effect": null,
+      "open_prehydrated": true
+    },
+    {
+      "scene": 2,
+      "start": 6.314,
+      "duration": 4.341,
+      "narration": "It isn't there to be bought. It's there to be rejected.",
+      "visual": "price-box, x-mark, signpost, arrow-up, brain — pen only, page persists across scenes",
+      "drawing_elements": [
+        "price-box",
+        "x-mark",
+        "signpost",
+        "arrow-up",
+        "brain"
+      ],
+      "on_screen_text": "NOT FOR SALE",
+      "camera": "pan right",
+      "sound_effect": null
+    },
+    {
+      "scene": 3,
+      "start": 10.655,
+      "duration": 5.92,
+      "narration": "In two thousand eight, an economist found a subscription offer that looked like a mistake.",
+      "visual": "person, price-tag, question-mark, calendar, grid — pen only, page persists across scenes",
+      "drawing_elements": [
+        "person",
+        "price-tag",
+        "question-mark",
+        "calendar",
+        "grid"
+      ],
+      "on_screen_text": null,
+      "camera": "slow zoom out",
+      "sound_effect": null
+    },
+    {
+      "scene": 4,
+      "start": 16.575,
+      "duration": 3.946,
+      "narration": "Web only, fifty-nine dollars. Print only, one hundred and twenty-five.",
+      "visual": "price-box, price-box, coin, coin, scale — pen only, page persists across scenes",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "coin",
+        "coin",
+        "scale"
+      ],
+      "on_screen_text": "$59 vs $125",
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 5,
+      "start": 20.521,
+      "duration": 5.13,
+      "narration": "Print and web — also one hundred and twenty-five dollars. Read that again.",
+      "visual": "price-box, price-box, price-box, coin, question-mark, scale — pen only, page persists across scenes",
+      "drawing_elements": [
+        "price-box",
+        "price-box",
+        "price-box",
+        "coin",
+        "question-mark",
+        "scale"
+      ],
+      "on_screen_text": "$125 = $125",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 6,
+      "start": 25.652,
+      "duration": 5.525,
+      "narration": "Print alone cost the same as print plus web. Nobody would ever choose it.",
+      "visual": "price-box, x-mark, scale, arrow-down, brain — pen only, page persists across scenes",
+      "drawing_elements": [
+        "price-box",
+        "x-mark",
+        "scale",
+        "arrow-down",
+        "brain"
+      ],
+      "on_screen_text": null,
+      "camera": "pan left",
+      "sound_effect": null
+    },
+    {
+      "scene": 7,
+      "start": 31.177,
+      "duration": 4.341,
+      "narration": "So he ran it on a hundred students. Sixteen. Zero. Eighty-four.",
+      "visual": "bar-chart, person, checkmark, price-box, grid — pen only, page persists across scenes",
+      "drawing_elements": [
+        "bar-chart",
+        "person",
+        "checkmark",
+        "price-box",
+        "grid"
+      ],
+      "on_screen_text": "16 / 0 / 84",
+      "camera": "slow zoom in",
+      "sound_effect": null
+    },
+    {
+      "scene": 8,
+      "start": 35.518,
+      "duration": 4.341,
+      "narration": "Then he deleted the option nobody wanted, and ran it again.",
+      "visual": "price-box, x-mark, bar-chart, person, question-mark — pen only, page persists across scenes",
+      "drawing_elements": [
+        "price-box",
+        "x-mark",
+        "bar-chart",
+        "person",
+        "question-mark"
+      ],
+      "on_screen_text": null,
+      "camera": "static",
+      "sound_effect": null
+    },
+    {
+      "scene": 9,
+      "start": 39.859,
+      "duration": 4.341,
+      "narration": "Sixty-eight. Thirty-two. The expensive plan lost more than half its buyers.",
+      "visual": "bar-chart, arrow-down, coin, price-box, scale, brain — pen only, page persists across scenes",
+      "drawing_elements": [
+        "bar-chart",
+        "arrow-down",
+        "coin",
+        "price-box",
+        "scale",
+        "brain"
+      ],
+      "on_screen_text": "68 / 32",
+      "camera": "zoom out to reveal",
+      "sound_effect": null
+    }
+  ]
+}

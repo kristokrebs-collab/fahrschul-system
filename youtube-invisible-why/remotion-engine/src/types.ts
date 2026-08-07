@@ -16,6 +16,13 @@ export interface Scene {
   on_screen_text: string | null;
   camera: CameraMove;
   sound_effect?: string | null;
+  /**
+   * Start this scene with its first element already largely drawn instead of
+   * on blank paper. Set on the opening scene: a cold open that begins with an
+   * empty page spends its most valuable second showing nothing, and the hook
+   * on the channels that win this format is always visual.
+   */
+  open_prehydrated?: boolean;
 }
 
 export interface Storyboard {

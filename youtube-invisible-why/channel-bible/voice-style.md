@@ -46,11 +46,27 @@ divide by minutes, compare. `seed_audio`'s `speech_rate` (channel default
 script is, so re-measure after any significant rewrite. Full diagnosis and
 the measured rate table: `channel-bible/retention-playbook.md`.
 
-**Voice: Arthur** (`30fc8796-ceb6-4a66-b3a7-4a145ef7f346`), one voice for
-the whole channel. Tested alternatives at identical settings: Skye is
-equivalent on pace and would differentiate more in a niche full of calm
-male narrators; **Brooks delivers at ~93 wpm and must not be used** for
-this format regardless of how it sounds in isolation.
+**Voice: Sterling** (`dc382508-c8bd-443c-8cb2-46e57b8d2e6f`), one voice for
+the whole channel. Chosen in a blind A–F casting: six voices, one identical
+30-second audition, identical settings, names withheld until after the pick.
+
+| | Voice | Audition | Pace |
+|---|---|---|---|
+| A | Cillian | 28.7s | 157 wpm |
+| **B** | **Sterling** | **28.0s** | **161 wpm ← chosen** |
+| C | Harrison | 29.4s | 153 wpm |
+| D | Roxie | 26.0s | 173 wpm |
+| E | Skye | 31.5s | 143 wpm |
+| F | Arthur *(the voice used for pilots 1–6)* | 25.4s | 177 wpm |
+
+Arthur was in the test unlabelled and was not chosen. Two things had been
+wrong with it: it is the **History** narrator in the source catalogue, not
+the Explainer one, and it read the audition at 177 wpm — above the
+comprehension ceiling for dense material. Neither was visible while it was
+simply the default.
+
+**Brooks delivers at ~93 wpm and must not be used** for this format
+regardless of how it sounds in isolation.
 
 ## Pronunciation & terminology
 

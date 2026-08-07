@@ -63,19 +63,29 @@ const LAYOUTS: Record<number, LayoutSlot[]> = {
   4: [px(0.19, 0.31, 540), px(0.56, 0.27, 620), px(0.81, 0.53, 500), px(0.36, 0.63, 520)],
   5: [px(0.15, 0.3, 470), px(0.43, 0.25, 560), px(0.76, 0.3, 500), px(0.27, 0.63, 470), px(0.64, 0.64, 500)],
   6: [px(0.14, 0.28, 430), px(0.4, 0.24, 500), px(0.69, 0.28, 450), px(0.19, 0.61, 430), px(0.47, 0.64, 470), px(0.77, 0.59, 420)],
+  // 7 and 8 used to fall through to the generic two-row grid, which reads as
+  // a contact sheet. Hand-placed with a hero and staggered rows instead.
+  7: [
+    px(0.13, 0.26, 390), px(0.36, 0.22, 460), px(0.62, 0.26, 400), px(0.85, 0.35, 350),
+    px(0.18, 0.6, 390), px(0.45, 0.64, 430), px(0.73, 0.6, 380),
+  ],
+  8: [
+    px(0.12, 0.25, 360), px(0.33, 0.21, 420), px(0.56, 0.25, 380), px(0.8, 0.29, 350),
+    px(0.16, 0.59, 360), px(0.4, 0.63, 400), px(0.63, 0.59, 360), px(0.86, 0.63, 330),
+  ],
 };
 
 function layoutElements(n: number): LayoutSlot[] {
   if (n === 0) return [];
   const preset = LAYOUTS[n];
   if (preset) return preset;
-  // 7+: two rows, alternating size so it still reads as composed, not tiled.
+  // 9+: two rows, alternating size so it still reads as composed, not tiled.
   const perRow = Math.ceil(n / 2);
   return Array.from({ length: n }).map((_, i) => {
     const row = Math.floor(i / perRow);
     const col = i % perRow;
     const fx = 0.1 + (col / Math.max(1, perRow - 1)) * 0.8;
-    return px(fx, row === 0 ? 0.29 : 0.62, i % 2 === 0 ? 430 : 380);
+    return px(fx, row === 0 ? 0.29 : 0.62, i % 2 === 0 ? 400 : 350);
   });
 }
 
@@ -111,7 +121,12 @@ export const SceneRenderer: React.FC<SceneRendererProps> = ({
     const slotDuration = perSlot * DRAW_FRACTION;
     // A ghost is already-finished work, so it skips the reveal entirely.
     const rawProgress = ghost ? 1 : (localFrame - slotStart) / slotDuration;
-    const progress = ghost ? 1 : easeOut(Math.max(0, Math.min(1, rawProgress)));
+    let progress = ghost ? 1 : easeOut(Math.max(0, Math.min(1, rawProgress)));
+    // On a pre-hydrated opening the first element starts mostly complete, so
+    // frame 1 already carries a drawing and the pen visibly finishes it.
+    if (!ghost && scene.open_prehydrated && i === 0) {
+      progress = 0.62 + progress * 0.38;
+    }
     const pos = positions[i];
 
     let tipForThisIcon: Tip | null = null;
