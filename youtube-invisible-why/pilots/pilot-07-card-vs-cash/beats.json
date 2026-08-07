@@ -1,0 +1,915 @@
+{
+  "video_id": "pilot-07-card-vs-cash",
+  "accent_color": "#E4A62E",
+  "scenes": [
+    {
+      "index": 0,
+      "narration": "There's a version of you that spends more money.",
+      "camera": "push-in",
+      "image_prompt": "a silhouetted figure standing at a dark counter, single spotlight from above, reaching a hand forward into the light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 0,
+      "duration": 2.684,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_b661e2dd-69ff-4929-91a7-ca23c9253566.png"
+    },
+    {
+      "index": 1,
+      "narration": "It has the same income, the same self-control, the same intentions.",
+      "camera": "pan-right",
+      "image_prompt": "two identical wallets side by side on a dark reflective table, one leather one unopened, dramatic side light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 2.684,
+      "duration": 3.28,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142838_01a9e2a8-5186-40bb-aaa8-32b529f1afc3.png"
+    },
+    {
+      "index": 2,
+      "narration": "The only difference is what's in your hand when you pay.",
+      "camera": "zoom-in",
+      "image_prompt": "extreme close-up of a hand, one side holding folded cash, other side a credit card, dramatic split lighting, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 5.963,
+      "duration": 3.28,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_63fd26e0-04d3-4cc4-a08d-848822a923c2.png"
+    },
+    {
+      "index": 3,
+      "narration": "Researchers have now measured this so many times that the number isn't really in question anymore:",
+      "camera": "push-in",
+      "image_prompt": "a glowing bar chart made of light hovering in dark space, two bars, one twice the height of the other, amber glow, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 9.243,
+      "duration": 4.771,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_4b4479cb-5415-4eed-bd07-e9e7c680b308.png"
+    },
+    {
+      "index": 4,
+      "narration": "people bidding with a credit card will pay close to double what they'll pay in cash, for the exact same item,",
+      "camera": "zoom-out",
+      "image_prompt": "extreme macro of a credit card corner tapping a payment terminal, blue NFC glow radiating outward, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 14.014,
+      "duration": 6.262,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142838_cc14811f-34c8-48f4-bb4c-7badafcf5ef9.png"
+    },
+    {
+      "index": 5,
+      "narration": "in the exact same room, minutes apart.",
+      "camera": "static",
+      "image_prompt": "a single ticket stub glowing under a spotlight on black velvet, dust particles floating in the light beam, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 20.275,
+      "duration": 2.087,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_addf0c04-6ea4-40b6-ac41-e0dc6e55ba6d.png"
+    },
+    {
+      "index": 6,
+      "narration": "This isn't a metaphor about discipline.",
+      "camera": "push-in",
+      "image_prompt": "a closed fist over a dark table, dramatic top light, tension in the knuckles, shallow depth of field, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 22.363,
+      "duration": 1.789,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_78629462-d8d3-4f73-93da-a2f540eb317d.png"
+    },
+    {
+      "index": 7,
+      "narration": "It's a measurable gap in how your brain processes a plastic tap versus watching bills leave your hand.",
+      "camera": "zoom-in",
+      "image_prompt": "a stylized glowing human brain floating in dark space, one region pulsing bright amber, rest dim blue, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 24.152,
+      "duration": 5.367,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_4bec3648-540a-461b-85b8-8b6f795e4838.png"
+    },
+    {
+      "index": 8,
+      "narration": "By the end of this, you'll know exactly where that gap lives \u2014 and the one change that closes it without you having to feel virtuous about it.",
+      "camera": "push-in",
+      "image_prompt": "a single door glowing faintly at the end of a long dark corridor, warm light spilling from underneath, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 29.519,
+      "duration": 8.349,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_850cedad-15b9-4ea2-901e-dece21656e24.png"
+    },
+    {
+      "index": 9,
+      "narration": "In 2001, two researchers ran an auction at MIT.",
+      "camera": "pan-left",
+      "image_prompt": "a dim university lecture hall at night, empty wooden seats lit by a single podium lamp, dust in the light shaft, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 37.867,
+      "duration": 2.684,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_14b6dc77-d8f6-416e-87a3-17f464a09f6e.png"
+    },
+    {
+      "index": 10,
+      "narration": "Real students, real money, bidding on real tickets to a sold-out basketball game \u2014 something they actually wanted.",
+      "camera": "zoom-out",
+      "image_prompt": "a basketball ticket stub spinning slowly in mid-air under a spotlight, dark background, motion blur trail, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 40.551,
+      "duration": 5.367,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142838_2f8d0679-2034-4cff-a0cb-61f9bb56efef.png"
+    },
+    {
+      "index": 11,
+      "narration": "Half the room was told: if you win, you pay in cash, right now, out of your wallet.",
+      "camera": "zoom-in",
+      "image_prompt": "a worn leather wallet opening under dramatic light, folded bills visible inside, dust motes, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 45.918,
+      "duration": 5.367,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_142839_b3cddec9-2d50-495d-9257-ce53d68dbc72.png"
+    },
+    {
+      "index": 12,
+      "narration": "The other half was told: if you win, it goes on your card.",
+      "camera": "static",
+      "image_prompt": "a single credit card resting on black glass, sharp reflection, cold blue rim light from behind, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 51.285,
+      "duration": 3.876,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143002_8eee393a-508e-4d90-a9f6-7b082398eaaa.png"
+    },
+    {
+      "index": 13,
+      "narration": "Same tickets. Same room. Same students, on average, with the same money in the bank.",
+      "camera": "pan-right",
+      "image_prompt": "two identical spotlight beams crossing on an empty dark stage, symmetrical composition, haze, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 55.161,
+      "duration": 4.473,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143002_72699b05-d3de-4a27-b6b8-bc0d7bc1b6c1.png"
+    },
+    {
+      "index": 14,
+      "narration": "The card bidders didn't bid a little more.",
+      "camera": "push-in",
+      "image_prompt": "close-up of anonymous hands raising a paddle in a dim auction room, warm rim light from one side, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 59.634,
+      "duration": 2.385,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143002_1097f471-f6c2-4be3-bc2f-451960d00f8d.png"
+    },
+    {
+      "index": 15,
+      "narration": "They bid, on average, more than double what the cash bidders were willing to pay for the identical seat.",
+      "camera": "zoom-in",
+      "image_prompt": "a glowing amber number counting upward rapidly in dark space, motion blur on the digits, volumetric light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 62.019,
+      "duration": 5.665,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143019_c3a83e3d-310e-4ad1-b297-33f462c3dec7.png"
+    },
+    {
+      "index": 16,
+      "narration": "Nobody told them to bid more, and nobody made the tickets worth more to one group than the other.",
+      "camera": "static",
+      "image_prompt": "a scale balancing perfectly in dark space, two identical glowing orbs on each side, teal light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 67.684,
+      "duration": 5.665,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143019_90041b60-5f59-4087-b533-3ea10a13ae08.png"
+    },
+    {
+      "index": 17,
+      "narration": "The only variable that changed was the motion their hand was about to make.",
+      "camera": "zoom-in",
+      "image_prompt": "extreme macro of a hand mid-motion reaching toward a card reader, blue glow, shallow focus, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 73.349,
+      "duration": 4.174,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143019_aef7f1d3-2c25-4cb9-8c1d-54fe79028919.png"
+    },
+    {
+      "index": 18,
+      "narration": "The obvious explanation is that a card just feels abstract \u2014",
+      "camera": "push-in",
+      "image_prompt": "a translucent glass credit card floating and slowly dissolving into particles of light, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 77.524,
+      "duration": 3.28,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143034_db467ea4-8173-4153-9390-479e4f354ac7.png"
+    },
+    {
+      "index": 19,
+      "narration": "you're not \"really\" spending until the bill arrives.",
+      "camera": "pan-left",
+      "image_prompt": "a stack of unopened envelopes on a dark table lit by one hard light, one envelope glowing faintly, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 80.804,
+      "duration": 2.385,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143034_07245c0e-222c-4017-a28e-aaa628c52cb8.png"
+    },
+    {
+      "index": 20,
+      "narration": "True, but incomplete, because it doesn't explain the size of the gap.",
+      "camera": "zoom-out",
+      "image_prompt": "a wide crack of light splitting across a dark wall, dramatic single beam, volumetric dust, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 83.189,
+      "duration": 3.578,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143156_2c62761d-5e02-4208-9cb6-f34b8fbd7dfa.png"
+    },
+    {
+      "index": 21,
+      "narration": "A vague sense of abstraction should shave a little off your caution.",
+      "camera": "static",
+      "image_prompt": "a small dim candle flame in a dark room, barely illuminating a coin beside it, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 86.767,
+      "duration": 3.578,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143156_0e4cfa35-764b-471a-8acc-ed46b9114b8c.png"
+    },
+    {
+      "index": 22,
+      "narration": "It shouldn't double what you're willing to pay.",
+      "camera": "pan-right",
+      "image_prompt": "two identical candle flames, one twice the size and brightness of the other, dark symmetrical composition, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 90.345,
+      "duration": 2.385,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143156_298e5e40-5074-4ab0-8406-cb9bb26944f1.png"
+    },
+    {
+      "index": 23,
+      "narration": "Something more specific is happening in the half-second before you commit to a cash payment that simply does not happen with a card.",
+      "camera": "push-in",
+      "image_prompt": "extreme macro of a fingertip an inch above a single banknote on black glass, tension, dramatic side light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 92.73,
+      "duration": 6.858,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143156_050a1be3-fb1b-439d-8392-834f21e900e5.png"
+    },
+    {
+      "index": 24,
+      "narration": "And it turns out neuroscientists can actually watch it happen.",
+      "camera": "zoom-in",
+      "image_prompt": "a glowing translucent brain scan floating in dark space, cross-section visible, cold blue light with one warm spot, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 99.588,
+      "duration": 2.479,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143156_2590a04b-c96b-4454-a38a-9740cb134a5a.png"
+    },
+    {
+      "index": 25,
+      "narration": "Researchers have scanned people's brains while they made purchase decisions,",
+      "camera": "zoom-out",
+      "image_prompt": "a dark medical scanning room, a soft blue ring of light glowing in the center, clinical and cold, haze, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 102.067,
+      "duration": 2.479,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143156_18c821e0-7f42-4005-b6ca-a060faaadb6b.png"
+    },
+    {
+      "index": 26,
+      "narration": "and they found that looking at a price and deciding to pay it in cash activates the insula \u2014",
+      "camera": "push-in",
+      "image_prompt": "a glowing human brain in dark space, deep central region pulsing bright red-amber like a heartbeat, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 104.546,
+      "duration": 4.71,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143304_c0e01e5a-b648-40e9-b400-e1a96f9f92f4.png"
+    },
+    {
+      "index": 27,
+      "narration": "the same brain region that lights up when you experience physical pain or something viscerally unpleasant \u2014",
+      "camera": "zoom-in",
+      "image_prompt": "a single drop of red-amber light falling in slow motion into dark water, rippling outward, macro, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 109.256,
+      "duration": 4.214,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143304_8e22649f-43d6-4d01-bffc-70e15fd68eb2.png"
+    },
+    {
+      "index": 28,
+      "narration": "not a metaphor, an overlapping neural signature you can actually see on a scan.",
+      "camera": "push-in",
+      "image_prompt": "two translucent glowing brain shapes overlapping precisely in dark space, one red one amber, shared core, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 113.471,
+      "duration": 3.471,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143304_b385c65b-6ede-49b5-bd49-a1aa4002654a.png"
+    },
+    {
+      "index": 29,
+      "narration": "Behavioral economists have a name for this: the pain of paying.",
+      "camera": "zoom-in",
+      "image_prompt": "a single banknote crumpling slowly in mid-air, dramatic top light, dark background, dust particles, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 116.941,
+      "duration": 2.727,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143304_190301bc-a60c-41ec-9242-0a42508399ec.png"
+    },
+    {
+      "index": 30,
+      "narration": "And it turns out the pain isn't really about the money leaving.",
+      "camera": "pan-left",
+      "image_prompt": "a wallet lying open and empty on a dark table, single spotlight, long dramatic shadow, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 119.668,
+      "duration": 2.975,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143304_10146328-c780-43af-bd38-bae5cdea9d05.png"
+    },
+    {
+      "index": 31,
+      "narration": "It's about noticing the money leaving.",
+      "camera": "zoom-in",
+      "image_prompt": "extreme close-up of an eye reflecting a small glowing amber light, sharp focus on the iris, dark surroundings, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 122.643,
+      "duration": 1.487,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143304_7f76a547-c279-4d56-a491-8d5bf332f43f.png"
+    },
+    {
+      "index": 32,
+      "narration": "Cash makes you notice, every single time, because you physically hand over a diminishing, countable object.",
+      "camera": "push-in",
+      "image_prompt": "a hand slowly counting out banknotes one by one under a warm spotlight, dark background, each bill catching light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 124.131,
+      "duration": 3.966,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_816fd597-d3a6-4f36-931d-3a0d2824f303.png"
+    },
+    {
+      "index": 33,
+      "narration": "A card tap produces almost no sensory trace at all \u2014",
+      "camera": "static",
+      "image_prompt": "a credit card tapping a terminal in complete silence, a faint blue pulse of light, everything else pitch black, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 128.097,
+      "duration": 2.727,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_e538e07b-ce61-43dc-80e1-e6ee18b3ad5e.png"
+    },
+    {
+      "index": 34,
+      "narration": "same amount of money, a completely different amount of noticing.",
+      "camera": "pan-right",
+      "image_prompt": "two identical stacks of glowing light-coins, one sharply in focus and detailed, one blurred into a soft haze, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 130.824,
+      "duration": 2.479,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_bd8de95a-ff8a-4e76-95a4-ef879e771268.png"
+    },
+    {
+      "index": 35,
+      "narration": "This is where casinos come in, and it is not a coincidence.",
+      "camera": "pan-left",
+      "image_prompt": "a dim casino floor at night, rows of empty tables lit by low hanging lamps, red and gold ambient glow, haze, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 133.303,
+      "duration": 2.975,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_bf09e177-3272-4fad-82a6-b9602accd1e1.png"
+    },
+    {
+      "index": 36,
+      "narration": "Casinos replace your cash with chips at the door \u2014",
+      "camera": "zoom-in",
+      "image_prompt": "a stack of casino chips glowing under a single spotlight on green felt, dramatic shadow, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 136.278,
+      "duration": 2.479,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_6096b576-01d4-4ee3-9f0d-de1e8d08c4ff.png"
+    },
+    {
+      "index": 37,
+      "narration": "and researchers studying gambling behavior have found that people wager more, and lose track of losses more easily,",
+      "camera": "push-in",
+      "image_prompt": "casino chips sliding across a dark table in slow motion, motion blur trail, dramatic low angle light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 138.757,
+      "duration": 4.462,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_75a4e7db-eb5d-4491-8c5d-f9df02a2dac8.png"
+    },
+    {
+      "index": 38,
+      "narration": "when they're playing with chips instead of cash, even though a chip has an identical, printed dollar value.",
+      "camera": "static",
+      "image_prompt": "extreme macro of a single casino chip's engraved value number, sharp focus, dark reflective surface, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 143.219,
+      "duration": 4.462,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_e583f62b-3c1e-4982-8b1f-a8dfc1f3a693.png"
+    },
+    {
+      "index": 39,
+      "narration": "The chip is doing exactly what the credit card does.",
+      "camera": "push-in",
+      "image_prompt": "a casino chip and a credit card resting side by side on black glass, matched dramatic lighting, symmetrical, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 147.681,
+      "duration": 2.479,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_66045360-dbca-4b36-87ad-3b29314fbdbb.png"
+    },
+    {
+      "index": 40,
+      "narration": "It's a token that represents money without triggering the physical loss signal that real cash produces.",
+      "camera": "zoom-in",
+      "image_prompt": "a glowing translucent token hovering above an open hand, casting no visible weight or shadow, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 150.16,
+      "duration": 3.966,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_02e957dc-bf8f-44f9-a7b6-f79a53b903ee.png"
+    },
+    {
+      "index": 41,
+      "narration": "You are, in a very real sense, gambling in chips every time you tap a card at a coffee shop.",
+      "camera": "pan-right",
+      "image_prompt": "a steaming coffee cup beside a credit card on a dark cafe counter, warm spotlight, shallow depth of field, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 154.127,
+      "duration": 4.958,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143416_b7085567-4003-431b-8903-569ccf96b22e.png"
+    },
+    {
+      "index": 42,
+      "narration": "So who benefits from this gap, and did anyone design it on purpose?",
+      "camera": "zoom-out",
+      "image_prompt": "an empty dark boardroom table lit by a single overhead light, no people, long shadows, tension, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 159.085,
+      "duration": 3.223,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_87f7dde5-47db-4c5b-8039-20fd0e517b27.png"
+    },
+    {
+      "index": 43,
+      "narration": "Card networks didn't invent the pain of paying \u2014 it's a real, old feature of how human brains process loss.",
+      "camera": "static",
+      "image_prompt": "an old brass scale in a dark archive room, dust falling through a single shaft of light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 162.307,
+      "duration": 4.958,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143415_2577ccbf-7073-467f-a5e8-35ec91824a75.png"
+    },
+    {
+      "index": 44,
+      "narration": "But once it was documented, it became something you could build a business around.",
+      "camera": "push-in",
+      "image_prompt": "a weathered antique coin resting in an open palm, dramatic warm side light, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 167.265,
+      "duration": 3.471,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143535_98c188f7-fa77-41be-94bb-626365101e16.png"
+    },
+    {
+      "index": 45,
+      "narration": "Contactless payment wasn't made faster because faster is inherently better.",
+      "camera": "push-in",
+      "image_prompt": "a payment terminal's screen glowing green in an otherwise pitch black room, dramatic isolated light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 170.736,
+      "duration": 2.479,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143535_c0f8e340-4e12-4074-8d7f-bb94198929a8.png"
+    },
+    {
+      "index": 46,
+      "narration": "It was made faster because every extra second of friction \u2014 a signature, a PIN, counting change \u2014",
+      "camera": "static",
+      "image_prompt": "a hand counting loose coins on a dark wooden table, warm low light, shallow depth of field, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 173.215,
+      "duration": 4.462,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143534_fb8b6538-5c20-4dd2-935e-6258f31b07aa.png"
+    },
+    {
+      "index": 47,
+      "narration": "is a second in which your brain has a chance to notice what's happening and reconsider.",
+      "camera": "zoom-in",
+      "image_prompt": "a single grain of sand falling in an hourglass, macro, dramatic rim light, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 177.677,
+      "duration": 3.966,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143534_0a12abf4-3a6c-461b-9629-eade3bc49d29.png"
+    },
+    {
+      "index": 48,
+      "narration": "You can watch this being engineered on purpose, in public, with a patent number attached.",
+      "camera": "push-in",
+      "image_prompt": "an old patent document glowing under a desk lamp in a dark archive, dust motes, sepia light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 181.644,
+      "duration": 3.98,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143535_91a32aba-c61a-4520-8b3c-97e268f386f8.png"
+    },
+    {
+      "index": 49,
+      "narration": "In 1999, Amazon patented \"1-Click\" checkout \u2014 a system whose entire stated purpose was removing every remaining step",
+      "camera": "zoom-in",
+      "image_prompt": "a single glowing button floating in dark space, a finger approaching it, dramatic blue light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 185.623,
+      "duration": 4.776,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143534_d05e1193-c31d-4ba4-ac5a-fd61ed59a960.png"
+    },
+    {
+      "index": 50,
+      "narration": "between wanting something and having bought it \u2014",
+      "camera": "zoom-out",
+      "image_prompt": "a glowing shopping cart icon dissolving instantly into a single point of light, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 190.399,
+      "duration": 2.123,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143534_30fbb518-64b5-4ec1-9604-7b9a83f4d7b8.png"
+    },
+    {
+      "index": 51,
+      "narration": "not making the product better, not making the price lower, just making the moment of paying disappear.",
+      "camera": "static",
+      "image_prompt": "a credit card fading to transparent and vanishing entirely against a dark background, slow dissolve, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 192.522,
+      "duration": 4.51,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143534_beedd1a0-f7e4-4a66-b5c6-cb6ff59d75ad.png"
+    },
+    {
+      "index": 52,
+      "narration": "It worked well enough that Amazon licensed the patent to Apple for its own checkout,",
+      "camera": "push-in",
+      "image_prompt": "two glowing interlocking rings of light in dark space, representing a licensing handoff, cold blue tone, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 197.032,
+      "duration": 3.98,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143534_3ebaaabf-69ce-4f6c-bf68-c80da6eb9dd0.png"
+    },
+    {
+      "index": 53,
+      "narration": "and the entire e-commerce industry spent the next decade building toward the same idea under different names.",
+      "camera": "push-in",
+      "image_prompt": "a long dark corridor of glowing arches receding into the distance, each one dimmer than the last, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 201.012,
+      "duration": 4.51,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143535_8463e1f7-4d51-4b4d-b899-48f8f647023a.png"
+    },
+    {
+      "index": 54,
+      "narration": "The newest version of this is buy-now-pay-later.",
+      "camera": "zoom-in",
+      "image_prompt": "a single banknote splitting apart into four smaller glowing fragments drifting in dark space, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 205.522,
+      "duration": 1.857,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143534_cb4186a5-ed82-41ef-94aa-b5ca5db6efdd.png"
+    },
+    {
+      "index": 55,
+      "narration": "Instead of one payment you'd feel once, the price gets split into four smaller ones, spread across weeks,",
+      "camera": "pan-right",
+      "image_prompt": "four small glowing coins arranged in a row, each dimmer than a single large one beside them, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 207.38,
+      "duration": 4.776,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143535_b3bb6853-a2f2-4d0a-b39c-1723c82d12a8.png"
+    },
+    {
+      "index": 56,
+      "narration": "each individually too small to trigger much of a pain response at all.",
+      "camera": "static",
+      "image_prompt": "a tiny spark of light fading almost instantly against total darkness, barely visible, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 212.155,
+      "duration": 3.449,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_f451b087-d478-457e-a328-47124fb8813e.png"
+    },
+    {
+      "index": 57,
+      "narration": "The total amount you owe doesn't change.",
+      "camera": "static",
+      "image_prompt": "a glowing total number holding perfectly steady in dark space, unmoving, quiet emphasis, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 215.604,
+      "duration": 1.857,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143757_911103a7-385b-4eab-b697-26752f456213.png"
+    },
+    {
+      "index": 58,
+      "narration": "What changes is how many separate moments of noticing you'd have to sit through to feel the whole thing.",
+      "camera": "zoom-out",
+      "image_prompt": "a calendar page glowing faintly with four small marked dates, dark background, soft warm light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 217.462,
+      "duration": 5.041,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_06927515-2b03-4896-83f5-f1f7ae4067b1.png"
+    },
+    {
+      "index": 59,
+      "narration": "The entire design history of payment technology \u2014 tap to pay, one-click checkout, saved card details, stored balances in an app, installments \u2014",
+      "camera": "zoom-in",
+      "image_prompt": "a smartphone glowing in a dark room, a single payment icon pulsing softly, shallow depth of field, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 222.503,
+      "duration": 6.102,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143655_57812ebf-bc42-4b3c-a967-9591ec610242.png"
+    },
+    {
+      "index": 60,
+      "narration": "moves in exactly one direction: removing the moments where you'd feel the money leave.",
+      "camera": "zoom-out",
+      "image_prompt": "a hand releasing a glowing coin that dissolves into light particles before it lands, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 228.605,
+      "duration": 3.714,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_4a48d678-8345-4c7a-ac5c-f62caf9b5862.png"
+    },
+    {
+      "index": 61,
+      "narration": "This isn't a conspiracy with a villain in a room.",
+      "camera": "static",
+      "image_prompt": "a single empty chair in a vast dark boardroom, spotlight from above, nobody present, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 232.32,
+      "duration": 2.653,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_69ea86f8-80cf-46ff-aa9f-e5f65a07d18c.png"
+    },
+    {
+      "index": 62,
+      "narration": "It's thousands of independent product decisions, each one tested against a single number \u2014 completed transactions \u2014",
+      "camera": "push-in",
+      "image_prompt": "hundreds of tiny glowing dots of light scattered in dark space, slowly converging toward one bright point, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 234.973,
+      "duration": 4.51,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_3d2b5e67-6351-469a-8b75-6b16a75efa50.png"
+    },
+    {
+      "index": 63,
+      "narration": "that all happened to point the same way.",
+      "camera": "zoom-in",
+      "image_prompt": "a glowing arrow made of light, formed from many small converging particles, pointing forward in darkness, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 239.483,
+      "duration": 2.123,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_d1b757bf-66d4-4ad5-9212-ea3589f40039.png"
+    },
+    {
+      "index": 64,
+      "narration": "The system didn't need to understand your insula to exploit it.",
+      "camera": "zoom-out",
+      "image_prompt": "a translucent glowing brain silhouette dissolving into abstract light particles, dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 241.606,
+      "duration": 2.919,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_ae092f65-2ee9-4d80-a12e-127311634f2d.png"
+    },
+    {
+      "index": 65,
+      "narration": "It only needed to notice that friction loses money.",
+      "camera": "static",
+      "image_prompt": "a single drop of liquid light sliding down a dark pane of glass, leaving a faint glowing trail, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 244.524,
+      "duration": 2.388,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_c363a96c-d63c-4825-8079-62db59243d2d.png"
+    },
+    {
+      "index": 66,
+      "narration": "It's worth being fair to the technology here.",
+      "camera": "zoom-out",
+      "image_prompt": "two hands open and empty, facing upward under soft even light, dark neutral background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 246.912,
+      "duration": 2.123,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_f14f732f-e6a4-4c91-aee1-7cb38aaeb7f0.png"
+    },
+    {
+      "index": 67,
+      "narration": "Cards and contactless payment solved real problems \u2014 carrying cash is genuinely unsafe in some places,",
+      "camera": "static",
+      "image_prompt": "a dark alley at night, a single dropped coin catching a sliver of streetlight, tension, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 249.035,
+      "duration": 4.245,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143654_fc282ff0-75e4-411c-8047-6f3de12f2543.png"
+    },
+    {
+      "index": 68,
+      "narration": "splitting a bill is genuinely easier,",
+      "camera": "pan-left",
+      "image_prompt": "several credit cards fanned out neatly on a restaurant table, warm ambient light, shallow depth of field, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 253.28,
+      "duration": 1.592,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143757_d6892c17-bcc4-4ecf-9bef-5fb8266f1c49.png"
+    },
+    {
+      "index": 69,
+      "narration": "and for a lot of purchases the convenience is a real, legitimate benefit, not a trick.",
+      "camera": "zoom-in",
+      "image_prompt": "a smartphone tapping a payment terminal with a warm green checkmark glow, clean and simple lighting, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 254.872,
+      "duration": 4.245,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143757_53745af4-d616-4ae4-b285-33b584f1a2d7.png"
+    },
+    {
+      "index": 70,
+      "narration": "And the effect isn't infinite or uniform.",
+      "camera": "pan-right",
+      "image_prompt": "a glowing gradient bar fading smoothly from bright amber to dim blue in dark space, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 259.117,
+      "duration": 1.857,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143757_93e1d2db-1a47-43f0-9c00-f38cf1fce71d.png"
+    },
+    {
+      "index": 71,
+      "narration": "It's strongest for discretionary, in-the-moment purchases \u2014 the coffee, the impulse buy, the extra round \u2014",
+      "camera": "push-in",
+      "image_prompt": "a hand impulsively grabbing a small glowing object off a shelf in a dim store aisle, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 260.974,
+      "duration": 4.245,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143757_7b7e8b4c-b96f-418e-b6a1-6149ac9eacfd.png"
+    },
+    {
+      "index": 72,
+      "narration": "and weaker for large, planned purchases where you've already done the mental math before you ever reach the counter.",
+      "camera": "zoom-out",
+      "image_prompt": "a large stack of paper documents and a calculator under a focused desk lamp, deep dark background, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 265.219,
+      "duration": 5.925,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143757_dea32874-5978-4f44-85c0-be95867848b5.png"
+    },
+    {
+      "index": 73,
+      "narration": "This is a bias in the margins of your spending, not a hypnosis that doubles your mortgage.",
+      "camera": "static",
+      "image_prompt": "a house key resting heavily on a dark table under a single grounded, steady light, no glow, solid and real, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 271.144,
+      "duration": 5.301,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143757_c103eff0-7c13-4eb8-9015-dd99790c6932.png"
+    },
+    {
+      "index": 74,
+      "narration": "It's also worth saying that the doubled bid from that one MIT auction is a striking headline number, not a universal constant \u2014",
+      "camera": "zoom-in",
+      "image_prompt": "a single bright number slowly dimming to a more modest glow in dark space, honest correction, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 276.445,
+      "duration": 7.172,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143757_3e26b684-f524-4a3e-a425-f919e6269203.png"
+    },
+    {
+      "index": 75,
+      "narration": "the size of the gap moves with the product, the price range, and who's buying.",
+      "camera": "pan-right",
+      "image_prompt": "several glowing bars of varying, uneven heights hovering in dark space, irregular and real, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 283.617,
+      "duration": 4.677,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143854_a6a2b52f-063a-49af-8958-c4cf6603f5ab.png"
+    },
+    {
+      "index": 76,
+      "narration": "What researchers studying this have found consistently, across many separate studies using different purchases and different methods,",
+      "camera": "zoom-out",
+      "image_prompt": "many small glowing data points scattered across dark space, loosely aligned in one general direction, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 288.294,
+      "duration": 5.301,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143854_8b066e0d-b4dc-46d2-b14b-b17ab0ab3a0e.png"
+    },
+    {
+      "index": 77,
+      "narration": "is the direction, not a fixed multiplier: cash payment reliably produces more caution than card payment, for the same person, buying the same thing.",
+      "camera": "push-in",
+      "image_prompt": "a single steady compass needle glowing faintly, pointing consistently in one direction in dark space, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 293.595,
+      "duration": 7.484,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143854_0d0569c4-50bb-4191-bc7a-049f15cd7020.png"
+    },
+    {
+      "index": 78,
+      "narration": "Treat \"double\" as a real, measured result from a real study \u2014 not as the number you should expect on every purchase you make.",
+      "camera": "static",
+      "image_prompt": "a glowing asterisk symbol floating quietly beside a large number in dark space, careful and precise, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 301.079,
+      "duration": 7.484,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143854_d534b07f-9ad6-4208-bf88-d82d362119ed.png"
+    },
+    {
+      "index": 79,
+      "narration": "So if the mechanism is \"less noticing equals more spending,\" the fix isn't willpower.",
+      "camera": "push-in",
+      "image_prompt": "a clenched fist slowly opening under dramatic light, releasing into an open, relaxed hand, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 308.563,
+      "duration": 4.366,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143854_c1be9f75-183f-4835-8e92-913956b476bb.png"
+    },
+    {
+      "index": 80,
+      "narration": "Telling yourself to \"be more careful with the card\" asks you to manually override a gap in sensory feedback, every single time, forever \u2014",
+      "camera": "zoom-in",
+      "image_prompt": "a glowing warning icon flickering weakly and fading out in dark space, losing intensity over time, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 312.929,
+      "duration": 7.484,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_bacb1db7-9364-49af-9019-54032df51804.png"
+    },
+    {
+      "index": 81,
+      "narration": "that's not a plan, that's a New Year's resolution.",
+      "camera": "zoom-out",
+      "image_prompt": "an old clock with no hands, glowing faintly, suspended in dark space, quietly useless, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 320.413,
+      "duration": 2.806,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_2e5653cb-ba85-490b-b8a2-6a202ab7f94a.png"
+    },
+    {
+      "index": 82,
+      "narration": "What actually works is putting the noticing back in, deliberately, somewhere you'll actually encounter it.",
+      "camera": "push-in",
+      "image_prompt": "a single candle being relit in total darkness, the flame catching and steadily growing brighter, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 323.219,
+      "duration": 4.677,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_8831c0b2-ef9b-41a8-b076-9bd22ea1698a.png"
+    },
+    {
+      "index": 83,
+      "narration": "Some people do this by paying cash for exactly the categories where they overspend most \u2014",
+      "camera": "static",
+      "image_prompt": "a hand deliberately placing folded cash into a small labeled dark envelope, warm focused light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 327.896,
+      "duration": 4.989,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_57589184-2533-4551-a051-64c8a7aecb94.png"
+    },
+    {
+      "index": 84,
+      "narration": "the ones this effect hits hardest \u2014 and leaving cards for the planned, deliberate purchases where the bias barely applies anyway.",
+      "camera": "pan-left",
+      "image_prompt": "a credit card resting calmly in a drawer, soft even light, orderly and deliberate composition, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 332.886,
+      "duration": 6.548,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_b742f11c-e298-4db7-8f0e-15551d204e97.png"
+    },
+    {
+      "index": 85,
+      "narration": "That alone tends to shrink the gap without you white-knuckling your way through every single transaction.",
+      "camera": "static",
+      "image_prompt": "an open hand simply resting, relaxed, under soft warm light, nothing forced or tense, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 339.434,
+      "duration": 4.989,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_5769e089-715a-4e6c-9504-6985bd68d977.png"
+    },
+    {
+      "index": 86,
+      "narration": "Others go a step further and use a spending app that shows a running total every time they tap,",
+      "camera": "zoom-in",
+      "image_prompt": "a smartphone screen glowing softly with a rising numeric total, warm ambient light, shallow focus, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 344.423,
+      "duration": 5.925,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_23199131-aec4-4ac9-a5b5-ab3cd61444a9.png"
+    },
+    {
+      "index": 87,
+      "narration": "or a card that sends an instant notification with the new balance the moment it's charged.",
+      "camera": "push-in",
+      "image_prompt": "a phone screen lighting up in a dark room with a single soft notification glow, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 350.348,
+      "duration": 4.989,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_eb431cab-896b-4686-999c-4100090c8dcd.png"
+    },
+    {
+      "index": 88,
+      "narration": "Neither of those is a gimmick \u2014 they're rebuilding, on purpose, a version of the same signal cash used to give you for free:",
+      "camera": "push-in",
+      "image_prompt": "a glowing digital counter ticking downward steadily in dark space, each digit change catching light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 355.337,
+      "duration": 7.484,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_e00cc1fe-04df-4846-a56f-1202c9c20a71.png"
+    },
+    {
+      "index": 89,
+      "narration": "a number, changing, that you actually saw.",
+      "camera": "zoom-in",
+      "image_prompt": "a single eye slowly opening in extreme close-up, catching a warm point of light in the iris, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 362.821,
+      "duration": 2.183,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_f204b0bc-8de8-491e-a37d-53043074f7e5.png"
+    },
+    {
+      "index": 90,
+      "narration": "A weekly ritual works too \u2014 sitting down once a week and looking at exactly what left your account",
+      "camera": "static",
+      "image_prompt": "a calm desk lit by a single warm lamp at night, a notebook open, quiet and deliberate, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 365.004,
+      "duration": 6.169,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_143956_64a59425-6851-4628-94bc-527fc82db4fb.png"
+    },
+    {
+      "index": 91,
+      "narration": "produces a smaller version of the same effect as handing over bills, just delayed by a few days instead of happening in real time.",
+      "camera": "zoom-out",
+      "image_prompt": "a warm lamp slowly dimming and steadying into a calm, constant glow, dark room, peaceful, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 371.173,
+      "duration": 7.792,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144057_54be43da-fd0d-4c2f-ba93-a4a426e6b7c2.png"
+    },
+    {
+      "index": 92,
+      "narration": "Neither of those requires more discipline.",
+      "camera": "static",
+      "image_prompt": "a steady, calm open hand under warm even light, dark background, nothing dramatic, simply present, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 378.965,
+      "duration": 1.948,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144057_50dc85f0-e009-40a1-a78c-21de2b4dfa98.png"
+    },
+    {
+      "index": 93,
+      "narration": "They just put a form of noticing back into a system that was specifically engineered to remove it.",
+      "camera": "zoom-out",
+      "image_prompt": "a single warm light steadily illuminating a plain wooden table, honest and unadorned, dark surroundings, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 380.913,
+      "duration": 5.844,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144057_5908acec-5020-476e-8552-0e28ca6306b3.png"
+    },
+    {
+      "index": 94,
+      "narration": "Here's the part worth sitting with.",
+      "camera": "zoom-out",
+      "image_prompt": "a single spotlight slowly widening to reveal more of a dark room, quiet and deliberate reveal, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 386.757,
+      "duration": 1.948,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144154_95a5af16-8ee2-4e8a-bb35-dd5dd5246aa0.png"
+    },
+    {
+      "index": 95,
+      "narration": "You didn't imagine that spending felt different with a card. It is different \u2014",
+      "camera": "static",
+      "image_prompt": "a credit card and folded cash side by side, one glowing faintly, one solid and matte, dramatic split light, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 388.705,
+      "duration": 4.545,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144154_42234243-d4bb-4a52-8747-d6ffb7afaa88.png"
+    },
+    {
+      "index": 96,
+      "narration": "measurably, at the level of which part of your brain lights up.",
+      "camera": "push-in",
+      "image_prompt": "a glowing human brain silhouette in dark space, one clear region pulsing warm and bright, rest calm, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 393.25,
+      "duration": 3.896,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144154_d9132711-3124-42dc-b094-41924f7959d7.png"
+    },
+    {
+      "index": 97,
+      "narration": "You're not bad at money.",
+      "camera": "static",
+      "image_prompt": "a steady, calm open hand under warm even light, dark background, nothing dramatic, simply present, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 397.146,
+      "duration": 1.623,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144154_196c725b-23d6-487e-823e-e0dafe85a716.png"
+    },
+    {
+      "index": 98,
+      "narration": "You're a person with a normal, well-documented brain, tapping a piece of plastic",
+      "camera": "zoom-out",
+      "image_prompt": "a single warm light steadily illuminating a plain wooden table, honest and unadorned, dark surroundings, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 398.77,
+      "duration": 4.221,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144244_1947760a-aa36-432f-93de-e25d2d63fa9d.png"
+    },
+    {
+      "index": 99,
+      "narration": "that was engineered, gradually and mostly by accident, to feel like nothing at all.",
+      "camera": "zoom-in",
+      "image_prompt": "a credit card tap fading into pure silence and darkness, the blue glow dimming completely to black, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 402.99,
+      "duration": 4.545,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144244_62d08eec-8ac3-4d85-9acf-fda7d03aa987.png"
+    },
+    {
+      "index": 100,
+      "narration": "Now you know exactly what that nothing is standing in for.",
+      "camera": "zoom-out",
+      "image_prompt": "a wide, slow reveal of a dark room where a single spotlight now clearly illuminates an open wallet full of cash and a credit card together, calm, resolved, cinematic final composition, cinematic 3D render, dramatic single-source spotlight or rim lighting, shallow depth of field, volumetric haze, teal and amber color grade, heavy film grain, anamorphic lens character, photoreal materials, moody, high contrast, 35mm film look, no text, no watermark, no logos",
+      "start": 407.536,
+      "duration": 3.571,
+      "image_url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144244_f994bc08-a5e4-4543-a365-b27134b04292.png"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "chunks": [
+    {
+      "from": 0,
+      "to": 23,
+      "dur": 99.58833333333334,
+      "f": "hf_20260807_144432_92e245e4-fa6b-4a84-a932-c99793544603.wav",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144432_92e245e4-fa6b-4a84-a932-c99793544603.wav"
+    },
+    {
+      "from": 24,
+      "to": 47,
+      "dur": 82.05525,
+      "f": "hf_20260807_144807_5981d84e-0bb9-4dad-8fa7-07554bb46ee7.wav",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144807_5981d84e-0bb9-4dad-8fa7-07554bb46ee7.wav"
+    },
+    {
+      "from": 48,
+      "to": 71,
+      "dur": 83.575625,
+      "f": "hf_20260807_144432_075255fd-f56d-4c2c-a99d-c483edc50dcf.wav",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144432_075255fd-f56d-4c2c-a99d-c483edc50dcf.wav"
+    },
+    {
+      "from": 72,
+      "to": 89,
+      "dur": 99.78454166666667,
+      "f": "hf_20260807_144432_a0aac8a9-29ce-4fe2-b326-4885833c63c3.wav",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144432_a0aac8a9-29ce-4fe2-b326-4885833c63c3.wav"
+    },
+    {
+      "from": 90,
+      "to": 100,
+      "dur": 46.10341666666667,
+      "f": "hf_20260807_144432_15097aac-65eb-45db-af29-6230bc3c265c.wav",
+      "url": "https://d8j0ntlcm91z4.cloudfront.net/user_3GXtk2iVh7ppwEX0NgoGQBMd3aE/hf_20260807_144432_15097aac-65eb-45db-af29-6230bc3c265c.wav"
+    }
+  ]
+}
