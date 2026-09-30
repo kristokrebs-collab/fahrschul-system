@@ -25,6 +25,7 @@ export const spring = {
   bar: { type: "spring", stiffness: 200, damping: 26 }, // checklist bar in editor
   smooth: { type: "spring", stiffness: 158, damping: 25 }, // NEW: status changes, scenario box, page-x (Apple .smooth)
   tooltip: { type: "spring", stiffness: 500, damping: 40 }, // NEW: chart tooltip MotionValues
+  pill: { type: "spring", stiffness: 224, damping: 30 }, // NEW: StatusPill dot ↔ pill (0.42 s response, critically damped, one spring per state)
 } as const satisfies Record<string, Transition>;
 
 export const ease = {
@@ -46,9 +47,29 @@ export const tween = {
   verdict: { duration: 0.5, delay: 0.15, ease: ease.out },
   cardHover: { duration: 0.5, ease: ease.out }, // CSS, not Motion
   chartIn: { duration: 0.55, ease: ease.out }, // chart mount entrance
+  sheetBody: { duration: 0.3, ease: ease.out }, // NEW: sheet body after onLayoutAnimationComplete (Bundle Nhe 0.3 s)
+  check: { duration: 0.25, ease: "easeOut" }, // NEW: CheckboxRow pathLength (Bundle Ff 0.25 s)
+  checkToast: { duration: 0.35, delay: 0.15, ease: "easeOut" }, // NEW: toast check-mark pathLength (Bundle 0.35 s delay 0.15)
+  toastExit: { duration: 0.22, ease: "easeOut" }, // NEW: toast island exit (Bundle 0.22 s)
+  hoverPill: { duration: 0.15, ease: "easeOut" }, // NEW: HoverPill opacity in/out (Bundle Rg 0.15 s)
+  shimmer: { delay: 0.7, duration: 1.1, ease: "easeInOut" }, // NEW: SplitText shimmer sweep (Bundle p2)
+  tooltipIn: { duration: 0.2, ease: "easeOut" }, // NEW: dock tooltip (Bundle Kw 0.2 s)
+  beam: { duration: 9, ease: "linear", repeat: Infinity }, // NEW: BorderBeam loop (Bundle a2 default 9 s)
+  skeleton: { duration: 1.6, ease: "linear", repeat: Infinity }, // NEW: Skeleton shimmer (CSS keyframes shimmer-x, 1.6 s)
 } as const satisfies Record<string, Transition>;
 
 export const stagger = { rows: 0.02, cards: 0.03, letters: 0.035, particles: 0.03, max: 12 } as const;
 
 /** Border radii that every `layout`/`layoutId` element must set via `style`, never only via class. */
-export const radius = { card: 16, dialog: 28, sheet: 28, pill: 9999, input: 12 } as const;
+export const radius = {
+  card: 16,
+  dialog: 28,
+  sheet: 28,
+  pill: 9999,
+  input: 12,
+  hover: 12, // NEW: HoverPill (rounded-xl)
+  thumb: 8, // NEW: Segmented thumb (rounded-lg)
+  toastStart: 22, // NEW: toast island collapsed (declared exception, see Toast.tsx)
+  toastEnd: 25, // NEW: toast island expanded
+  fab: 999, // NEW: FAB disc (`new-trade` source)
+} as const;
