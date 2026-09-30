@@ -1,0 +1,2 @@
+This product includes TradingView Lightweight Charts (https://github.com/tradingview/lightweight-charts),
+licensed under the Apache License, Version 2.0. Charting is powered by TradingView.
