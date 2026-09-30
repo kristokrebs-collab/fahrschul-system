@@ -87,4 +87,11 @@ interface TradeDetailProps {
 | `uiStore.toasts` | `ToastIsland` | see toast note above |
 | FAB / setup card sources | `visibility:hidden` while the sheet with the matching `layoutId` is open | Plan 3.2 rule 9 |
 
-Other overlays in this folder (`SetupEditor`, `ImportDialog`, …) are documented by their owners.
+## Other overlays (owned by the setups / settings / overview agents – summary of their exported props)
+
+- **`SetupEditor`** (`SetupEditor.tsx`, bundle `Z$`, Plan 6.3): `{ open?; setupId?; fromTrade?; onClose?; onSaved?(setup) }` – every prop overrides the
+  matching `uiStore.setupEditor` field; morphs from `setup-card-{id}` unless `fromTrade`. Helpers `finalizeSetup`, `upsertSetup`, `removeSetup`, `moveItem`,
+  `SETUP_EDITOR_STRINGS`, `SETUP_ACCOUNT_OPTIONS`.
+- **`HyblockForm`** / **`HyblockReadingsList`** (`HyblockForm.tsx`, bundle `tK`): `{ last?; live?: LiveHyblockValues; onClose?; onSave?; now?; className? }`
+  (lives in the `hyblock-new` morph dialog; `live` renders `Live-Werte übernehmen`) / `{ readings?; limit? (5); onDelete?; className? }`. `HYBLOCK_FORM_STRINGS`.
+- **`ImportDialog`** (`ImportDialog.tsx`, Plan 8.5): `{ open; onClose; onDone?(result); readFile? }` – Sheet 540 px, `IMPORT_STRINGS`, `IMPORT_MODES`.
