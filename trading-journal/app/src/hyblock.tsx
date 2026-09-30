@@ -30,10 +30,10 @@ function Spark({ data }: { data: number[] }) {
   const last = pts[pts.length - 1];
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="h-12 w-full" preserveAspectRatio="none" aria-hidden="true">
-      <defs><linearGradient id="hbf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#8fb3c9" stopOpacity="0.35" /><stop offset="1" stopColor="#8fb3c9" stopOpacity="0" /></linearGradient></defs>
+      <defs><linearGradient id="hbf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f2f2f2" stopOpacity="0.35" /><stop offset="1" stopColor="#f2f2f2" stopOpacity="0" /></linearGradient></defs>
       <motion.path d={d + `L${w},${h}L0,${h}Z`} fill="url(#hbf)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} />
-      <motion.path d={d} fill="none" stroke="#8fb3c9" strokeWidth="1.6" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }} />
-      <circle cx={last[0]} cy={last[1]} r="3" fill="#a8d5c5" />
+      <motion.path d={d} fill="none" stroke="#f2f2f2" strokeWidth="1.6" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }} />
+      <circle cx={last[0]} cy={last[1]} r="3" fill="#e5202e" />
     </svg>
   );
 }
@@ -82,10 +82,10 @@ export function HyblockCard({ list, market, settings, onSave, onDelete }: { list
   return (
     <Card title="Top Trader · Hyblock" action={
       <Morph id="hyblock-new" title="Hyblock-Ablesung" body={() => <HyblockForm onSave={onSave} last={h} />}
-        className="!w-auto rounded-full border border-steel/40 bg-steel/10 px-3 py-1 hover:bg-steel/20"><span className="text-[12px] font-semibold text-steel">+ Ablesung</span></Morph>}>
+        className="!w-auto rounded-full border border-line-2 bg-white/[0.04] px-3 py-1 hover:bg-white/[0.08]"><span className="text-[12px] font-semibold text-fg">+ Ablesung</span></Morph>}>
       {!h ? (
         <Empty title="Noch keine Ablesung" text="Trag Top-Trader-Long-% und Whale-Delta aus Hyblock ein. Mit dem Live-Kurs prüft das Journal dann deinen Falling-Knife-Filter."
-          action={<a href={HYBLOCK_URL} target="_blank" rel="noreferrer" className="label mt-2 !text-steel hover:underline">Hyblock öffnen ↗</a>} />
+          action={<a href={HYBLOCK_URL} target="_blank" rel="noreferrer" className="label mt-2 !text-fg hover:underline">Hyblock öffnen ↗</a>} />
       ) : (
         <div className="grid gap-4">
           <div className="grid grid-cols-[auto_1fr] items-end gap-5">
@@ -103,7 +103,7 @@ export function HyblockCard({ list, market, settings, onSave, onDelete }: { list
               <div key={l} className="rounded-xl border border-line bg-ink-950/30 px-3 py-2"><div className="label !text-[9.5px]">{l}</div><div className={cn('num mt-0.5 font-mono text-[14px]', c)}>{v}</div></div>
             ))}
           </div>
-          <Morph id="falling-knife" title="Falling-Knife-Filter" className="rounded-2xl border border-line-2 bg-ink-950/25 p-3.5 hover:border-steel/40"
+          <Morph id="falling-knife" title="Falling-Knife-Filter" className="rounded-2xl border border-line-2 bg-ink-950/25 p-3.5 hover:border-white/30"
             body={() => <Detail bare d={{
               title: 'Falling-Knife-Filter',
               what: 'Ein steigender Top-Trader-Long-% allein ist kein Kaufsignal: Top-Trader akkumulieren oft gestaffelt, während der Preis noch fällt. Ein Makro-Long ist nur valide, wenn alle 4 Punkte erfüllt sind.',
@@ -130,7 +130,7 @@ export function HyblockCard({ list, market, settings, onSave, onDelete }: { list
               {armed
                 ? <><button type="button" className="text-loss" onClick={() => { setArmed(false); onDelete(h.id); }}>Wirklich löschen</button><button type="button" onClick={() => setArmed(false)}>Nein</button></>
                 : <button type="button" className="hover:text-loss" onClick={() => setArmed(true)}>Letzte löschen</button>}
-              <a href={HYBLOCK_URL} target="_blank" rel="noreferrer" className="text-steel hover:underline">Hyblock ↗</a>
+              <a href={HYBLOCK_URL} target="_blank" rel="noreferrer" className="text-fg hover:underline">Hyblock ↗</a>
             </span>
           </div>
         </div>

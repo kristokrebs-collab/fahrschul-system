@@ -316,6 +316,8 @@ export type MarketState = {
   price?: number; change?: number; rsiW?: number;
   close4h?: number; close4hAt?: number; closeW?: number; closeWAt?: number;
   updatedAt?: number;
+  refreshing?: boolean;
+  refresh?: () => void;
 };
 const TV = 'TradingView';
 const ERR_TEXT: Record<string, string> = {
@@ -334,8 +336,10 @@ function lastClosed(bars: any[], sec: number) {
   return b ? { c: b.c as number, t: (b.t + sec) * 1000 } : null;
 }
 
+export const PRICE_EVERY = 30_000;
 export function useMarket(symbol: string): MarketState {
   const [st, setSt] = useState<MarketState>({ status: 'connecting' });
+  const mcpRef = useRef<any>(null);
   useEffect(() => {
     let alive = true;
     const offs: Array<() => void> = [];
@@ -343,6 +347,7 @@ export function useMarket(symbol: string): MarketState {
       const mcp = await useCap('mcp');
       if (!alive) return;
       if (!mcp) { setSt({ status: 'unavailable', message: 'Live-Kurs gibt es nur, wenn das Journal auf claude.ai geöffnet ist.' }); return; }
+      mcpRef.current = mcp;
       const onErr = (e: any) => {
         const code = e?.code || 'upstream_error';
         const hard = ['needs_reauth', 'server_not_connected', 'not_in_manifest', 'blocked_by_policy', 'approval_required', 'not_granted', 'capability_disabled'].includes(code);
@@ -358,26 +363,32 @@ export function useMarket(symbol: string): MarketState {
             if (ev.type === 'error') return onErr(ev.error);
             const p = payloadOf(ev.result);
             if (!p) return;
-            setSt((s) => ({ ...s, ...apply(p, ev.result), status: 'live', message: undefined, updatedAt: Math.max(s.updatedAt || 0, stamp(ev.result)) }));
+            setSt((s) => ({ ...s, ...apply(p, ev.result), status: 'live', message: undefined, refreshing: false, updatedAt: Math.max(s.updatedAt || 0, stamp(ev.result)) }));
           }, { refetchInterval: every, cache: { staleTime: every / 2 } }));
         } catch (e) { onErr(e); }
       };
-      watch('mcp-tv-get-symbol-data', { symbol, columns: ['close', 'change', 'RSI|1W'] }, 60_000, (p) => {
+      watch('mcp-tv-get-symbol-data', { symbol, columns: ['close', 'change', 'RSI|1W'] }, PRICE_EVERY, (p) => {
         const d = p.data || p;
         return { price: num(d.close) ?? undefined, change: num(d.change) ?? undefined, rsiW: num(d['RSI|1W']) ?? undefined };
       });
-      watch('mcp-tv-get-ohlcv', { symbol, interval: '4h', count: 4 }, 300_000, (p) => {
+      watch('mcp-tv-get-ohlcv', { symbol, interval: '4h', count: 4 }, 120_000, (p) => {
         const b = lastClosed(p.bars, 4 * 3600);
         return b ? { close4h: b.c, close4hAt: b.t } : {};
       });
-      watch('mcp-tv-get-ohlcv', { symbol, interval: '1W', count: 3 }, 1_800_000, (p) => {
+      watch('mcp-tv-get-ohlcv', { symbol, interval: '1W', count: 3 }, 900_000, (p) => {
         const b = lastClosed(p.bars, 7 * 86400);
         return b ? { closeW: b.c, closeWAt: b.t } : {};
       });
     })();
     return () => { alive = false; offs.forEach((o) => { try { o(); } catch { /* egal */ } }); };
   }, [symbol]);
-  return st;
+  const refresh = useMemo(() => () => {
+    const mcp = mcpRef.current;
+    if (!mcp?.invalidate) return;
+    setSt((s) => ({ ...s, refreshing: true }));
+    mcp.invalidate(TV).catch(() => {}).finally(() => setTimeout(() => setSt((s) => ({ ...s, refreshing: false })), 4000));
+  }, []);
+  return { ...st, refresh };
 }
 
 export type Scenario = { key: 'bear' | 'long' | 'short' | 'range'; title: string; detail: string; tone: 'win' | 'loss' | 'warn' | 'mute' };

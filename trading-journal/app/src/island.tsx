@@ -47,20 +47,20 @@ function Island({ note, dismiss }: { market: MarketState; settings: Settings; no
       <AnimatePresence>
         {note && (
           <motion.button key={note.id} type="button" onClick={dismiss}
-            className="pointer-events-auto flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-750/95 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)] backdrop-blur-xl"
+            className="pointer-events-auto flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800/95 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)] backdrop-blur-xl"
             style={{ maxWidth: 'calc(100vw - 32px)' }}
             initial={{ width: 44, height: 44, borderRadius: 22, opacity: 0, y: 24, scale: 0.6 }}
             animate={{ width: 'auto', height: 50, borderRadius: 25, opacity: 1, y: 0, scale: 1 }}
             exit={{ width: 44, opacity: 0, y: 16, scale: 0.7, transition: { duration: 0.22 } }}
             transition={reduce ? { duration: 0 } : SPRING}>
             <span className={cn('grid size-8 shrink-0 place-items-center rounded-full',
-              note.kind === 'success' ? 'bg-win/20 text-win' : note.kind === 'error' ? 'bg-loss/20 text-loss' : note.kind === 'signal' ? 'bg-steel/25 text-steel' : 'bg-white/10 text-fg')}>
+              note.kind === 'success' ? 'bg-win/20 text-win' : note.kind === 'error' ? 'bg-loss/20 text-loss' : note.kind === 'signal' ? 'bg-signal/25 text-signal' : 'bg-white/10 text-fg')}>
               <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 {note.kind === 'success' ? <motion.path d="M3.5 8.5l3 3 6-7" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.35, delay: 0.15 }} />
                   : note.kind === 'error' ? <path d="M4 4l8 8M12 4l-8 8" /> : <path d="M8 3v6M8 12.5v.5" />}
               </svg>
             </span>
-            <motion.span className="flex items-center gap-3 whitespace-nowrap" initial={{ opacity: 0, filter: 'blur(6px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} transition={{ delay: 0.12 }}>
+            <motion.span className="flex items-center gap-3 whitespace-nowrap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.12 }}>
               <span className="text-[13px] font-medium text-fg">{note.title}</span>
               {note.value && <span className={cn('dot-num text-[15px]', note.valueTone === 'win' ? 'text-win' : note.valueTone === 'loss' ? 'text-loss' : 'text-mute')}>{note.value}</span>}
             </motion.span>
@@ -98,7 +98,7 @@ export function TradeQuickView({ trade, settings, onClose, onEdit }: { trade: ET
                   </div>
                   <motion.div layoutId={`trade-pnl-${trade.id}`} className={cn('dot-num text-[30px] leading-none', tone(trade.pnl))}>{trade.pnl == null ? 'offen' : fmt.signed(trade.pnl)}</motion.div>
                 </div>
-                <motion.div className="grid gap-4 px-5 pb-5" initial={{ opacity: 0, y: 8, filter: 'blur(4px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={{ delay: 0.12 }}>
+                <motion.div className="grid gap-4 px-5 pb-5" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.1 } }} transition={{ delay: 0.12 }}>
                   <div className="grid grid-cols-4 gap-2">
                     {([['Einstieg', fmt.price(trade.entry)], ['Ausstieg', trade.result === 'open' ? '–' : fmt.price(trade.exit)], ['R', fmt.r(trade.r)], ['Bewegung', fmt.pct(trade.move)]] as const).map(([l, v]) => (
                       <div key={l} className="rounded-xl border border-line bg-ink-950/60 px-2.5 py-2"><div className="label !text-[9.5px]">{l}</div><div className="num mt-0.5 truncate font-mono text-[12.5px]">{v}</div></div>
@@ -131,13 +131,13 @@ export function TradeQuickView({ trade, settings, onClose, onEdit }: { trade: ET
 
 /** Progressive Blur (21st.dev · ibelick): gestaffelte Blur-Ebenen mit Masken, hinter dem Dock. */
 export function ProgressiveBlur({ className }: { className?: string }) {
-  const layers = 6;
+  const layers = 3;
   return (
     <div className={cn('pointer-events-none fixed inset-x-0 bottom-0 z-[45] h-32', className)} aria-hidden="true">
       {Array.from({ length: layers }, (_, i) => {
         const a = (i / layers) * 100, b = ((i + 1) / layers) * 100;
         return <div key={i} className="absolute inset-0" style={{
-          backdropFilter: `blur(${i * 1.4}px)`, WebkitBackdropFilter: `blur(${i * 1.4}px)`,
+          backdropFilter: `blur(${(i + 1) * 2}px)`, WebkitBackdropFilter: `blur(${(i + 1) * 2}px)`,
           maskImage: `linear-gradient(to bottom, transparent ${Math.max(0, a - 16)}%, black ${a}%, black ${b}%, transparent ${Math.min(100, b + 16)}%)`,
           WebkitMaskImage: `linear-gradient(to bottom, transparent ${Math.max(0, a - 16)}%, black ${a}%, black ${b}%, transparent ${Math.min(100, b + 16)}%)`,
         }} />;

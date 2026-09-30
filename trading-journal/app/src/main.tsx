@@ -109,13 +109,13 @@ function App() {
         <Dock className="border border-line-2 bg-ink-850/85 shadow-[0_18px_40px_rgb(0_0_0/0.5)] backdrop-blur-xl">
           {VIEWS.map((v) => (
             <DockItem key={v} label={LABEL[v]} active={view === v} onClick={() => go(v)}
-              className={view === v ? 'bg-steel text-ink-950' : 'bg-white/[0.05] text-mute hover:text-fg'}>
+              className={view === v ? 'bg-white text-ink-950' : 'bg-white/[0.05] text-mute hover:text-fg'}>
               {{ overview: Icon.grid, trades: Icon.list, setups: Icon.target, settings: Icon.sliders }[v]}
             </DockItem>
           ))}
           <span className="mb-2.5 h-7 w-px self-end bg-line-2" aria-hidden="true" />
           <DockItem label="Trade eintragen" onClick={openNew} className="text-ink-950">
-            {!(tradeOpen.open && !tradeOpen.trade) && <motion.span layoutId="new-trade" className="absolute inset-0 -z-10 rounded-full bg-gradient-to-br from-teal to-steel" style={{ borderRadius: 999 }} />}
+            {!(tradeOpen.open && !tradeOpen.trade) && <motion.span layoutId="new-trade" className="absolute inset-0 -z-10 rounded-full bg-gradient-to-br from-[#ff3b47] to-signal" style={{ borderRadius: 999 }} />}
             {Icon.plus}
           </DockItem>
         </Dock>

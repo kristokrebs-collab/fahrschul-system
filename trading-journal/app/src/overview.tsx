@@ -1,10 +1,10 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import {
-  ACCOUNT_LABEL, WEEKDAYS, cn, fmt, group, scenario, tDate, tone,
+  ACCOUNT_LABEL, PRICE_EVERY, WEEKDAYS, cn, fmt, group, scenario, tDate, tone,
   type AccountFilter, type ETrade, type Hyblock, type MarketState, type Settings, type Stats,
 } from './lib';
-import { BlurFade, BorderBeam, Btn, Card, CircularProgress, Detail, Empty, Expand, InfoToggle, MeshBackdrop, NumberTicker, Pill, Segmented, SlidingNumber } from './ui';
+import { BlurFade, BorderBeam, Btn, Card, CircularProgress, Detail, Empty, Expand, HoverSlide, InfoToggle, MeshBackdrop, NumberTicker, Pill, Segmented, SlidingNumber, useHoverSlide } from './ui';
 import { backtestDetail, metricDetail, setupDetail, type MetricKey } from './explain';
 import { Morph, useMorph } from './morph';
 import { HyblockCard } from './hyblock';
@@ -50,6 +50,7 @@ export function Overview(p: Props) {
 function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
   const g = st.g, cur = settings.currency;
   const ret = st.start ? g.net / st.start : null;
+  const [hov, setHov] = useState<number | null>(null);
   const facts: [string, ReactNode, MetricKey][] = [
     ['Trades', <>{g.n}{st.open.length ? <span className="text-faint"> +{st.open.length} offen</span> : null}</>, 'trades'],
     ['Win-Rate', fmt.pct0(g.winRate), 'winRate'],
@@ -69,7 +70,7 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
             </div>
             <div>
               <div className="mb-3 flex items-center gap-3"><span className="label">Netto-P&L · {ACCOUNT_LABEL[acc]}</span>
-                <Morph id="fact-net" title="Netto-P&L" body={() => <Detail bare d={metricDetail('net', st, settings)} />} className="!w-auto rounded-full border border-line-2 px-2.5 py-0.5 hover:border-steel/60"><span className="label !text-[9.5px] group-hover:!text-steel">Details +</span></Morph></div>
+                <Morph id="fact-net" title="Netto-P&L" body={() => <Detail bare d={metricDetail('net', st, settings)} />} className="!w-auto rounded-full border border-line-2 px-2.5 py-0.5 hover:border-white/50"><span className="label !text-[9.5px] group-hover:!text-fg">Details +</span></Morph></div>
               <div className={cn('dot-num flex flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none', tone(g.net))}>
                 {loaded ? <NumberTicker key={acc} value={g.net} decimals={2} signed /> : <span className="text-faint">0,00</span>}
                 <span className="font-sans text-lg font-medium text-mute">{cur}</span>
@@ -79,16 +80,27 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
                 <span>{g.n ? `${g.wins} gewonnen · ${g.losses} verloren${g.be ? ` · ${g.be} Break-even` : ''}` : 'Noch keine abgeschlossenen Trades. Alle Werte starten bei null.'}</span>
               </div>
             </div>
-            <dl className="grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:grid-cols-5">
-              {facts.map(([l, v, k], i) => (
-                <Morph key={l} id={`fact-${k}`} title={l} body={() => <Detail bare d={metricDetail(k, st, settings)} />}
-                  className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 transition-colors hover:border-steel/40 hover:bg-steel/[0.07]">
-                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + i * 0.05 }}>
-                    <dt className="label flex items-center justify-between gap-1">{l}<span className="font-mono text-[13px] leading-none text-faint transition-all duration-300 group-hover:rotate-90 group-hover:text-steel">+</span></dt>
-                    <dd className="num mt-1.5 font-mono text-[17px] font-medium text-fg">{v}</dd>
-                  </motion.div>
-                </Morph>
-              ))}
+            <dl className="grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:flex" onMouseLeave={() => setHov(null)}>
+              {facts.map(([l, v, k], i) => {
+                const hint = metricDetail(k, st, settings).verdict;
+                const big = hov === i;
+                return (
+                  <div key={l} onMouseEnter={() => setHov(i)} className="min-w-0 transition-[flex-grow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:basis-0"
+                    style={{ flexGrow: big ? 2 : 1 }}>
+                    <Morph id={`fact-${k}`} title={l} body={() => <Detail bare d={metricDetail(k, st, settings)} />}
+                      className={cn('h-full overflow-hidden rounded-2xl border px-3 py-2.5 transition-colors duration-300', big ? 'border-white/30 bg-white/[0.07]' : 'border-white/[0.06] bg-white/[0.03]')}>
+                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + i * 0.05 }}>
+                        <dt className="label flex items-center justify-between gap-1 whitespace-nowrap"><span className="truncate">{l}</span><span className={cn('font-mono text-[13px] leading-none transition-all duration-300', big ? 'rotate-90 text-fg' : 'text-faint')}>+</span></dt>
+                        <dd className="num mt-1.5 truncate whitespace-nowrap font-mono text-[17px] font-medium text-fg">{v}</dd>
+                        <p className={cn('hidden overflow-hidden text-[11.5px] leading-snug transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:block',
+                          big ? 'mt-1.5 max-h-16 translate-y-0 opacity-100 delay-150' : 'max-h-0 translate-y-1 opacity-0',
+                          hint?.tone === 'win' ? 'text-win' : hint?.tone === 'loss' ? 'text-loss' : hint?.tone === 'warn' ? 'text-warn' : 'text-mute')}
+                          style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{hint?.text}</p>
+                      </motion.div>
+                    </Morph>
+                  </div>
+                );
+              })}
             </dl>
           </div>
           <MarketPanel market={market} settings={settings} />
@@ -111,9 +123,7 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
       {m.status === 'live' && <BorderBeam size={110} duration={10} />}
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-mute">{settings.pair} · TradingView</span>
-        {m.status === 'live'
-          ? <Pill tone="teal"><span className="relative flex size-1.5"><span className="absolute inset-0 animate-ping rounded-full bg-signal/70" /><span className="relative size-1.5 rounded-full bg-signal" /></span>Live · {tm(m.updatedAt)}</Pill>
-          : m.status === 'connecting' ? <Pill>Verbinde …</Pill> : <Pill tone="warn">Kein Live-Kurs</Pill>}
+        {m.status === 'live' ? <LiveBadge m={m} /> : m.status === 'connecting' ? <Pill>Verbinde …</Pill> : <Pill tone="warn">Kein Live-Kurs</Pill>}
       </div>
 
       {m.price != null ? (
@@ -144,7 +154,7 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
           <AutoCheck ok={rOk} label={`Weekly RSI über ${fmt.n2(cfg.rsiWeekly)}`} value={m.rsiW != null ? fmt.n1(m.rsiW) : '–'} />
           {m.rsiW != null && (
             <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-              <motion.div className="h-full rounded-full bg-gradient-to-r from-denim via-steel to-teal" initial={{ width: 0 }}
+              <motion.div className="h-full rounded-full bg-gradient-to-r from-[#3a3a3a] via-[#bdbdbd] to-white" initial={{ width: 0 }}
                 animate={{ width: `${Math.min(100, (m.rsiW / cfg.rsiWeekly) * 100)}%` }} transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }} />
             </div>
           )}
@@ -153,6 +163,26 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
       {inZone && <p className="rounded-xl border border-warn/30 bg-warn/[0.07] p-3 text-[12.5px] text-warn">Preis liegt in der Makro-Long-Zone {fmt.n0(cfg.zoneLow)}–{fmt.n0(cfg.zoneHigh)}. Falling-Knife-Filter prüfen, bevor du kaufst.</p>}
       {m.status === 'error' && m.price != null && m.message && <p className="text-[11.5px] text-warn">{m.message}</p>}
     </div>
+  );
+}
+
+/** Live-Anzeige: Sekunden seit dem letzten Kurs, Ring bis zum nächsten Abruf, Klick holt sofort neu. */
+function LiveBadge({ m }: { m: MarketState }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, []);
+  const age = m.updatedAt ? Math.max(0, Math.round((now - m.updatedAt) / 1000)) : null;
+  const frac = age == null ? 0 : Math.min(1, age / (PRICE_EVERY / 1000));
+  const stale = age != null && age > 120;
+  return (
+    <button type="button" onClick={m.refresh} title="Jetzt aktualisieren"
+      className={cn('group inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors', stale ? 'border-warn/40 text-warn' : 'border-line-2 text-fg hover:border-white/40')}>
+      <svg viewBox="0 0 16 16" className={cn('size-3.5 -rotate-90', m.refreshing && 'animate-spin')} aria-hidden="true">
+        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeOpacity="0.2" strokeWidth="2" />
+        <circle cx="8" cy="8" r="6" fill="none" stroke={stale ? 'currentColor' : '#e5202e'} strokeWidth="2" strokeLinecap="round"
+          strokeDasharray={2 * Math.PI * 6} strokeDashoffset={2 * Math.PI * 6 * (1 - (m.refreshing ? 0.25 : frac))} style={{ transition: 'stroke-dashoffset 1s linear' }} />
+      </svg>
+      {m.refreshing ? 'Aktualisiert …' : age == null ? 'Live' : age < 60 ? `Live · vor ${age}s` : `vor ${Math.round(age / 60)} min`}
+    </button>
   );
 }
 
@@ -174,6 +204,7 @@ function useToggle() { const [o, setO] = useState(false); return [o, () => setO(
 // ── Backtest-Vergleich ─────────────────────────────────
 function BacktestCard({ all, settings }: { all: ETrade[]; settings: Settings }) {
   const [only, setOnly] = useState<'all' | 'bt'>('all');
+  const hs = useHoverSlide();
   const bt = settings.backtest;
   const list = only === 'bt' ? all.filter((t) => (t.setups || []).includes('s_bt')) : all;
   const g = group(list);
@@ -203,14 +234,15 @@ function BacktestCard({ all, settings }: { all: ETrade[]; settings: Settings }) 
         <div className="label grid grid-cols-[1fr_auto_auto_auto] gap-x-5 pb-2 !text-faint">
           <span>Kennzahl</span><span className="text-right">Du</span><span className="text-right">Backtest</span><span className="w-16 text-right">Δ</span>
         </div>
-        {rows.map((r) => {
+        {rows.map((r, ri) => {
           const d = r.you == null ? null : r.you - r.ref;
           const good = d != null && r.better(d);
           return (
-            <div key={r.l} className="border-t border-line py-1">
+            <div key={r.l} className="relative border-t border-line py-1" {...hs.bind(ri)}>
+            <HoverSlide show={hs.hovered === ri} group="bt" className="inset-y-1" />
             <Morph id={`bt-${r.k}-${only}`} title={`Backtest · ${r.l}`} body={() => <Detail bare d={backtestDetail(r.k, g, settings)} />}
-              className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 px-2 py-2 text-[13px] transition-colors hover:bg-steel/[0.07]">
-              <span className="flex items-center gap-2 text-mute"><span className="font-mono text-[13px] leading-none text-faint transition-all duration-300 group-hover:rotate-90 group-hover:text-steel">+</span>{r.l}</span>
+              className="relative z-10 grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 px-2 py-2 text-[13px]">
+              <span className="flex items-center gap-2 text-mute"><span className="font-mono text-[13px] leading-none text-faint transition-all duration-300 group-hover:rotate-90 group-hover:text-fg">+</span>{r.l}</span>
               <span className={cn('num text-right font-mono font-medium', r.you == null ? 'text-faint' : r.kind === 'pp' ? 'text-fg' : tone(r.you))}>{r.kind === 'pp' ? fmt.pct0(r.you) : fmt.pct(r.you)}</span>
               <span className="num text-right font-mono text-mute">{r.kind === 'pp' ? fmt.n2(r.ref * 100) + ' %' : fmt.pct(r.ref)}</span>
               <span className="w-16 text-right">{d == null ? <span className="text-faint">–</span> : <Pill tone={good ? 'win' : 'loss'} className="px-2">{good ? '▲' : '▼'} {fmt.n1(Math.abs(d * 100))}</Pill>}</span>
@@ -231,7 +263,7 @@ function WinRateCard({ st, settings }: { st: Stats; settings: Settings }) {
   return (
     <Card title="Win-Rate" action={<InfoToggle open={o} onClick={t} label="Win-Rate" />}>
       <div className="flex h-full flex-col items-center justify-between gap-4">
-        <CircularProgress value={g.winRate} marker={bt} color={g.winRate != null && g.winRate >= bt ? '#6fd39b' : '#8fb3c9'} track="#434d58">
+        <CircularProgress value={g.winRate} marker={bt} color={g.winRate != null && g.winRate >= bt ? '#3ddc84' : '#f2f2f2'} track="#222">
           <div>
             <div className="dot-num text-[34px] leading-none">{g.winRate == null ? '0' : Math.round(g.winRate * 100)}<span className="text-base text-mute"> %</span></div>
             <div className="mt-1 text-[11px] text-mute">Marke = Backtest {fmt.pct0(bt)}</div>
@@ -344,6 +376,7 @@ export const SORT_OPTS: { v: SortKey; label: string }[] = [{ v: 'winRate', label
 function Ranking({ st, onSetup, cur }: { st: Stats; onSetup: (id: string) => void; cur: string }) {
   const [key, setKey] = useState<SortKey>('winRate');
   const { close } = useMorph();
+  const hs = useHoverSlide();
   const list = sortSetups(st.setups.map((s) => ({ ...s, id: s.setup.id })), key);
   const used = list.filter((s) => s.n > 0), unused = list.filter((s) => !s.n);
   return (
@@ -356,11 +389,12 @@ function Ranking({ st, onSetup, cur }: { st: Stats; onSetup: (id: string) => voi
           </div>
         )}
         {used.map((s, i) => (
-          <motion.div layout key={s.id} transition={{ type: 'spring', stiffness: 380, damping: 34 }} className="border-t border-line">
+          <motion.div layout key={s.id} transition={{ type: 'spring', stiffness: 380, damping: 34 }} className="relative border-t border-line" {...hs.bind(i)}>
+          <HoverSlide show={hs.hovered === i} group="rank" className="inset-y-0.5" />
           <Morph id={`setup-rank-${s.id}`} title={s.setup.name} body={() => <><Detail bare d={setupDetail(s, st.closed, cur)} /><Btn size="sm" className="mt-3" onClick={() => { close(); onSetup(s.id); }}>Alle Trades mit dieser Grundlage →</Btn></>}
-            className="grid w-full grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] items-center gap-3 px-2 py-2.5 transition-colors hover:bg-steel/[0.07] sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
+            className="relative z-10 grid w-full grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] items-center gap-3 px-2 py-2.5 sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
             <span className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium">
-              <span className={cn('num w-4 shrink-0 font-mono text-[11px] transition-colors', 'text-faint group-hover:text-steel')}>{String(i + 1).padStart(2, '0')}</span>
+              <span className={cn('num w-4 shrink-0 font-mono text-[11px] transition-colors', 'text-faint group-hover:text-fg')}>{String(i + 1).padStart(2, '0')}</span>
               <span className="size-2 shrink-0 rounded-full" style={{ background: s.setup.color }} />
               <span className="truncate">{s.setup.name}</span>
             </span>
@@ -452,13 +486,16 @@ export function SetupChips({ ids, settings, max = 2 }: { ids: string[]; settings
 
 function Recent({ st, settings, onEdit, onNew, goTrades }: { st: Stats; settings: Settings; onEdit: (t: ETrade) => void; onNew: () => void; goTrades: () => void }) {
   const list = [...st.list].sort((a, b) => +tDate(b) - +tDate(a)).slice(0, 6);
+  const hs = useHoverSlide();
   return (
     <Card title="Letzte Trades" action={list.length ? <button type="button" onClick={goTrades} className="label !text-fg hover:!text-signal">Alle ansehen →</button> : undefined}>
       {!list.length ? <Empty title="Noch keine Trades" text="Trag deinen ersten Trade ein. Alle Zahlen im Journal rechnen sich dann automatisch." action={<Btn variant="primary" size="sm" onClick={onNew} className="mt-2">Ersten Trade eintragen</Btn>} /> : (
         <div className="grid">
           {list.map((t, i) => (
-            <motion.button key={t.id} layoutId={`trade-${t.id}`} type="button" onClick={() => onEdit(t)} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05, layout: { type: 'spring', bounce: 0.08, duration: 0.45 } }} whileTap={{ scale: 0.985 }}
-              className={cn('grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.03]', i && 'border-t border-line')}>
+            <div key={t.id} className={cn('relative', i && 'border-t border-line')} {...hs.bind(i)}>
+            <HoverSlide show={hs.hovered === i} group="recent" className="inset-y-0.5" />
+            <motion.button layoutId={`trade-${t.id}`} layoutDependency={t.id} type="button" onClick={() => onEdit(t)} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05, layout: { type: 'spring', stiffness: 340, damping: 34 } }}
+              className="relative z-10 grid w-full grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-2 py-2.5 text-left">
               <span className="num font-mono text-[11px] leading-tight text-mute">{fmt.date(tDate(t))}<br />{fmt.time(tDate(t))}</span>
               <span className="grid min-w-0 gap-1">
                 <span className="flex items-center gap-2 text-xs">
@@ -472,6 +509,7 @@ function Recent({ st, settings, onEdit, onNew, goTrades }: { st: Stats; settings
                 <ResultPill t={t} />
               </span>
             </motion.button>
+            </div>
           ))}
         </div>
       )}

@@ -2,7 +2,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ReferenceLine, Res
 import { fmt, tDate, type Stats } from './lib';
 import { Empty } from './ui';
 
-const axis = { fill: '#7c8792', fontSize: 11, fontFamily: 'IBM Plex Mono, monospace' };
+const axis = { fill: '#5f5f5f', fontSize: 11, fontFamily: 'IBM Plex Mono, monospace' };
 const tipBox = 'rounded-xl border border-line-2 bg-ink-850/95 px-3 py-2 text-xs shadow-[0_12px_32px_rgb(0_0_0/0.45)] backdrop-blur-sm';
 const axNum = (v: number) => Math.abs(v) >= 1e6 ? fmt.n1(v / 1e6) + ' Mio' : fmt.n0(v);
 
@@ -14,7 +14,7 @@ export function EquityChart({ st, cur }: { st: Stats; cur: string }) {
   if (!st.closed.length) return <Empty title="Noch keine Kurve" text="Deine Equity-Kurve startet beim Startkapital und bewegt sich mit jedem abgeschlossenen Trade." />;
   const data = st.equity;
   const up = st.balance >= st.start;
-  const c = up ? '#8fb3c9' : '#f07a6e';
+  const c = up ? '#f2f2f2' : '#ff4d4f';
   return (
     <div className="h-[268px] w-full">
       <ResponsiveContainer>
@@ -25,15 +25,15 @@ export function EquityChart({ st, cur }: { st: Stats; cur: string }) {
               <stop offset="100%" stopColor={c} stopOpacity={0} />
             </linearGradient>
             <linearGradient id="eqStroke" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#7fb8a4" />
+              <stop offset="0%" stopColor="#5f5f5f" />
               <stop offset="100%" stopColor={c} />
             </linearGradient>
           </defs>
-          <CartesianGrid stroke="#3c4550" strokeDasharray="0" vertical={false} />
+          <CartesianGrid stroke="#1c1c1c" strokeDasharray="0" vertical={false} />
           <XAxis dataKey="i" tick={axis} tickLine={false} axisLine={false} tickFormatter={(i) => (i === 0 ? 'Start' : '#' + i)} minTickGap={28} />
           <YAxis tick={axis} tickLine={false} axisLine={false} width={62} tickFormatter={axNum} domain={['auto', 'auto']} />
-          <ReferenceLine y={st.start} stroke="#56626e" strokeDasharray="3 4" />
-          <Tooltip cursor={{ stroke: '#7c8792', strokeWidth: 1 }} content={({ active, payload }) => {
+          <ReferenceLine y={st.start} stroke="#3a3a3a" strokeDasharray="3 4" />
+          <Tooltip cursor={{ stroke: '#5f5f5f', strokeWidth: 1 }} content={({ active, payload }) => {
             if (!active || !payload?.length) return null;
             const p = payload[0].payload as Stats['equity'][number];
             return (
@@ -45,7 +45,7 @@ export function EquityChart({ st, cur }: { st: Stats; cur: string }) {
             );
           }} />
           <Area type="linear" dataKey="v" stroke="url(#eqStroke)" strokeWidth={2} fill="url(#eqFill)" animationDuration={1100} animationEasing="ease-out"
-            dot={false} activeDot={{ r: 5, fill: c, stroke: '#2b3138', strokeWidth: 2 }} />
+            dot={false} activeDot={{ r: 5, fill: c, stroke: '#0a0a0a', strokeWidth: 2 }} />
         </AreaChart>
       </ResponsiveContainer>
     </div>
@@ -70,11 +70,11 @@ export function MonthlyChart({ st, cur }: { st: Stats; cur: string }) {
     <div className="h-[240px] w-full">
       <ResponsiveContainer>
         <BarChart data={st.months} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
-          <CartesianGrid stroke="#3c4550" vertical={false} />
+          <CartesianGrid stroke="#1c1c1c" vertical={false} />
           <XAxis dataKey="label" tick={axis} tickLine={false} axisLine={false} />
           <YAxis tick={axis} tickLine={false} axisLine={false} width={56} tickFormatter={axNum} />
-          <ReferenceLine y={0} stroke="#56626e" />
-          <Tooltip cursor={{ fill: 'rgb(143 179 201 / 0.08)' }} content={({ active, payload }) => {
+          <ReferenceLine y={0} stroke="#3a3a3a" />
+          <Tooltip cursor={{ fill: 'rgb(255 255 255 / 0.04)' }} content={({ active, payload }) => {
             if (!active || !payload?.length) return null;
             const m = payload[0].payload as Stats['months'][number];
             return (
@@ -87,7 +87,7 @@ export function MonthlyChart({ st, cur }: { st: Stats; cur: string }) {
             );
           }} />
           <Bar dataKey="net" shape={roundedBar} maxBarSize={36} animationDuration={900}>
-            {st.months.map((m) => <Cell key={m.key} fill={m.net >= 0 ? '#6fd39b' : '#f07a6e'} />)}
+            {st.months.map((m) => <Cell key={m.key} fill={m.net >= 0 ? '#3ddc84' : '#ff4d4f'} />)}
           </Bar>
         </BarChart>
       </ResponsiveContainer>
