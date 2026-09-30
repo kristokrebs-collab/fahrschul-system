@@ -44,7 +44,7 @@ export function EquityChart({ st, cur }: { st: Stats; cur: string }) {
               </div>
             );
           }} />
-          <Area type="linear" dataKey="v" stroke="url(#eqStroke)" strokeWidth={2} fill="url(#eqFill)" animationDuration={1100} animationEasing="ease-out"
+          <Area type="linear" dataKey="v" stroke="url(#eqStroke)" strokeWidth={2} fill="url(#eqFill)" isAnimationActive={false}
             dot={false} activeDot={{ r: 5, fill: c, stroke: '#0a0a0a', strokeWidth: 2 }} />
         </AreaChart>
       </ResponsiveContainer>
@@ -86,7 +86,7 @@ export function MonthlyChart({ st, cur }: { st: Stats; cur: string }) {
               </div>
             );
           }} />
-          <Bar dataKey="net" shape={roundedBar} maxBarSize={36} animationDuration={900}>
+          <Bar dataKey="net" shape={roundedBar} maxBarSize={36} isAnimationActive={false}>
             {st.months.map((m) => <Cell key={m.key} fill={m.net >= 0 ? '#3ddc84' : '#ff4d4f'} />)}
           </Bar>
         </BarChart>

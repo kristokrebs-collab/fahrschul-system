@@ -10,7 +10,6 @@ import {
   type ReactElement, type ReactNode,
 } from 'react';
 import useMeasure from 'react-use-measure';
-import { MeshGradient } from '@paper-design/shaders-react';
 import { cn } from './lib';
 
 // ── Dock (21st.dev · ibelick / motion-primitives) ──────
@@ -77,7 +76,7 @@ export function DockItem({ children, className, onClick, active, label }: { chil
           >{label}</motion.span>
         )}
       </AnimatePresence>
-      <motion.span style={{ width: iconW }} className="flex items-center justify-center [&>svg]:size-full">{children}</motion.span>
+      <motion.span style={{ width: iconW }} className="relative z-10 flex items-center justify-center"><Magnetic intensity={0.5} range={60} className="size-full items-center justify-center [&_svg]:size-full">{children}</Magnetic></motion.span>
       {active && <motion.span layoutId="dock-dot" className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-signal" />}
     </motion.button>
   );
@@ -185,14 +184,13 @@ export function SlidingNumber({ value, decimals = 0 }: { value: number; decimals
 // ── Number Ticker (21st.dev · magicui) ─────────────────
 export function NumberTicker({ value, decimals = 0, className, prefix = '', signed = false }: { value: number; decimals?: number; className?: string; prefix?: string; signed?: boolean }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const mv = useMotionValue(0);
-  const spring = useSpring(mv, { damping: 60, stiffness: 100 });
-  const inView = useInView(ref, { once: true, margin: '0px' });
+  const mv = useMotionValue(value);
+  const spring = useSpring(mv, { damping: 40, stiffness: 140 });
   const f = useMemo(() => new Intl.NumberFormat('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }), [decimals]);
   const render = (v: number) => { const n = Number(v.toFixed(decimals)); return prefix + (signed && n > 0 ? '+' : '') + f.format(n).replace('-', '−'); };
-  useEffect(() => { if (inView) mv.set(value); }, [mv, inView, value]);
+  useEffect(() => { mv.set(value); }, [mv, value]);
   useEffect(() => spring.on('change', (v) => { if (ref.current) ref.current.textContent = render(v); }), [spring, f]);
-  return <span ref={ref} className={cn('inline-block tabular-nums', className)}>{render(0)}</span>;
+  return <span ref={ref} className={cn('inline-block tabular-nums', className)}>{render(value)}</span>;
 }
 
 // ── Border Beam (21st.dev · magicui) ───────────────────
@@ -222,7 +220,7 @@ export function MagicCard({ children, className, gradientSize = 240, gradientCol
   const glow = useMotionTemplate`radial-gradient(${gradientSize}px circle at ${mouseX}px ${mouseY}px, ${gradientColor}, transparent 100%)`;
   return (
     <motion.div
-      className={cn('group relative isolate overflow-hidden rounded-2xl border border-transparent', className)}
+      className={cn('group relative isolate overflow-hidden rounded-2xl border border-transparent transition-[transform,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgb(0_0_0/0.35)]', className)}
       onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); mouseX.set(e.clientX - r.left); mouseY.set(e.clientY - r.top); }}
       onPointerLeave={reset}
       style={{ background: border }}
@@ -235,17 +233,8 @@ export function MagicCard({ children, className, gradientSize = 240, gradientCol
 }
 
 // ── Blur Fade (21st.dev · magicui) ─────────────────────
-export function BlurFade({ children, className, delay = 0, duration = 0.45, offset = 8, blur = '6px' }:
-  { children: ReactNode; className?: string; delay?: number; duration?: number; offset?: number; blur?: string }) {
-  const variants: Variants = {
-    hidden: { y: offset, opacity: 0 },
-    visible: { y: 0, opacity: 1 },
-  };
-  return (
-    <motion.div initial="hidden" animate="visible" variants={variants} transition={{ delay: 0.04 + delay, duration, ease: 'easeOut' }} className={className}>
-      {children}
-    </motion.div>
-  );
+export function BlurFade({ children, className }: { children: ReactNode; className?: string; delay?: number; duration?: number; offset?: number; blur?: string }) {
+  return <div className={className}>{children}</div>;
 }
 
 // ── Transition Panel (21st.dev · ibelick) ──────────────
@@ -276,7 +265,7 @@ export function CircularProgress({ value, marker, size = 148, stroke = 9, color 
       <svg viewBox="0 0 100 100" className="size-full -rotate-90">
         <circle cx="50" cy="50" r={r} fill="none" stroke={track} strokeWidth={stroke} />
         <motion.circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-          strokeDasharray={c} initial={{ strokeDashoffset: c }} animate={{ strokeDashoffset: c * (1 - pct) }}
+          strokeDasharray={c} initial={false} animate={{ strokeDashoffset: c * (1 - pct) }}
           transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }} />
       </svg>
       {mAngle != null && (
@@ -397,20 +386,10 @@ export function RevealText({ text, className }: { text: string; className?: stri
 
 // ── Mesh Gradient Hero-Hintergrund (21st.dev · paper-design) ─
 export function MeshBackdrop({ className }: { className?: string }) {
-  const host = useRef<HTMLDivElement>(null);
-  const visible = useInView(host, { margin: '0px' });
-  const [webgl] = useState(() => { try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; } });
-  const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   return (
-    <div ref={host} className={cn('absolute inset-0 overflow-hidden', className)} aria-hidden="true">
-      <div className="absolute inset-0" style={{ background: 'radial-gradient(120% 90% at 0% 0%, #2a2a2a 0%, transparent 60%), radial-gradient(90% 80% at 100% 100%, #1d1d1d 0%, transparent 60%), #101010' }} />
-      {webgl && (
-        <MeshGradient className="absolute inset-0 size-full" style={{ width: '100%', height: '100%' }}
-          colors={['#0b0b0b', '#262626', '#3a3a3a', '#141414', '#1f1f1f']}
-          distortion={0.8} swirl={0.1} grainMixer={0.25} grainOverlay={0.35} speed={reduced || !visible ? 0 : 0.12} />
-      )}
+    <div className={cn('absolute inset-0 overflow-hidden', className)} aria-hidden="true">
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(110% 90% at 0% 0%, #2c2c2c 0%, transparent 55%), radial-gradient(80% 70% at 100% 100%, #222 0%, transparent 60%), linear-gradient(160deg, #151515, #0d0d0d)' }} />
       <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.07) 1px, transparent 0) 0 0 / 18px 18px' }} />
-      <div className="absolute inset-0 bg-gradient-to-b from-ink-900/10 via-ink-900/40 to-ink-900/85" />
     </div>
   );
 }
@@ -579,8 +558,43 @@ export function HoverSlide({ show, group, className }: { show: boolean; group: s
         <motion.span layoutId={`hover-${group}`} aria-hidden="true"
           className={cn('pointer-events-none absolute inset-0 -z-0 rounded-xl bg-white/[0.055] ring-1 ring-white/[0.08]', className)}
           initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { duration: 0.15 } }} exit={{ opacity: 0, transition: { duration: 0.15, delay: 0.15 } }}
-          transition={{ type: 'spring', stiffness: 420, damping: 36 }} />
+          transition={{ type: 'spring', stiffness: 260, damping: 22, mass: 0.8 }} />
       )}
     </AnimatePresence>
+  );
+}
+
+// ── Magnetic (21st.dev · ibelick / motion-primitives) ──
+/** Element folgt dem Cursor mit weicher, nachschwingender Feder (Wassertropfen-Gefühl). Nur bei Hover aktiv. */
+export function Magnetic({ children, intensity = 0.35, range = 90, className }: { children: ReactNode; intensity?: number; range?: number; className?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const x = useMotionValue(0), y = useMotionValue(0);
+  const sx = useSpring(x, { stiffness: 26.7, damping: 4.1, mass: 0.2 }), sy = useSpring(y, { stiffness: 26.7, damping: 4.1, mass: 0.2 });
+  const move = (e: React.PointerEvent) => {
+    const r = ref.current?.getBoundingClientRect(); if (!r) return;
+    const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const k = Math.max(0, 1 - Math.hypot(dx, dy) / range);
+    x.set(dx * intensity * k); y.set(dy * intensity * k);
+  };
+  return (
+    <motion.span ref={ref} className={cn('inline-flex', className)} style={{ x: sx, y: sy }}
+      onPointerMove={(e) => e.pointerType === 'mouse' && move(e)} onPointerLeave={() => { x.set(0); y.set(0); }}>
+      {children}
+    </motion.span>
+  );
+}
+
+// ── Tilt (21st.dev · ibelick / motion-primitives) ──────
+/** Leichte 3D-Neigung zur Maus, federnd zurück beim Verlassen. */
+export function Tilt({ children, className, factor = 6 }: { children: ReactNode; className?: string; factor?: number }) {
+  const x = useMotionValue(0.5), y = useMotionValue(0.5);
+  const sx = useSpring(x, { stiffness: 220, damping: 18 }), sy = useSpring(y, { stiffness: 220, damping: 18 });
+  const rx = useTransform(sy, [0, 1], [factor, -factor]), ry = useTransform(sx, [0, 1], [-factor, factor]);
+  return (
+    <motion.div className={cn('[transform-style:preserve-3d]', className)} style={{ rotateX: rx, rotateY: ry, transformPerspective: 900 }}
+      onPointerMove={(e) => { if (e.pointerType !== 'mouse') return; const r = e.currentTarget.getBoundingClientRect(); x.set((e.clientX - r.left) / r.width); y.set((e.clientY - r.top) / r.height); }}
+      onPointerLeave={() => { x.set(0.5); y.set(0.5); }}>
+      {children}
+    </motion.div>
   );
 }

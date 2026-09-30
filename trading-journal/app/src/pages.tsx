@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { useIsland } from './island';
+import { HB_SERVER, hbSeries } from './hyblock';
 import {
   ACCOUNT_LABEL, cn, fmt, group, num, tDate, tone, toInput,
-  type AccountFilter, type ETrade, type Settings, type Setup, type Stats,
+  useCap, type AccountFilter, type ETrade, type Settings, type Setup, type Stats,
 } from './lib';
-import { BlurFade, Btn, Card, Empty, Field, Icon, MagicCard, Pill, Segmented, inputCls } from './ui';
+import { BlurFade, Btn, Card, Empty, Field, Icon, MagicCard, Pill, Segmented, Tilt, inputCls } from './ui';
 import { ResultPill, SORT_OPTS, SetupChips, sortSetups } from './overview';
 
 export type Filters = { q: string; setup: string; result: 'all' | 'win' | 'loss' | 'open'; side: 'all' | 'long' | 'short'; acc: AccountFilter };
@@ -116,8 +117,8 @@ export function SetupsView({ st, settings, onEdit, onNew, onTrades }: { st: Stat
         action={<div className="flex flex-wrap gap-2"><Segmented size="sm" value={acc} onChange={setAcc} options={(['all', 'makro', 'scalp'] as const).map((v) => ({ v, label: ACCOUNT_LABEL[v] }))} /><Segmented size="sm" value={key} onChange={setKey} options={SORT_OPTS} /></div>} />
       <motion.div layout className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))]">
         {list.map((s, i) => (
-          <motion.div layout layoutId={`setup-card-${s.id}`} style={{ borderRadius: 16 }} key={s.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03, type: 'spring', stiffness: 300, damping: 30 }} whileHover={{ y: -3 }}>
-            <MagicCard className="h-full" gradientFrom={s.setup.color}>
+          <motion.div layout layoutId={`setup-card-${s.id}`} style={{ borderRadius: 16 }} key={s.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03, type: 'spring', stiffness: 300, damping: 30 }}>
+            <Tilt className="h-full" factor={4}><MagicCard className="h-full" gradientFrom={s.setup.color}>
               <article className="flex h-full flex-col gap-4 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <h3 className="flex items-center gap-2.5 text-[15px] font-semibold leading-snug"><span className="size-2.5 shrink-0 rounded-full" style={{ background: s.setup.color }} />{s.setup.name}</h3>
@@ -143,7 +144,7 @@ export function SetupsView({ st, settings, onEdit, onNew, onTrades }: { st: Stat
                   <Btn size="sm" disabled={!s.n} onClick={() => onTrades(s.id)}>Trades ansehen</Btn>
                 </div>
               </article>
-            </MagicCard>
+            </MagicCard></Tilt>
           </motion.div>
         ))}
         <motion.button layout type="button" onClick={onNew}
@@ -165,6 +166,8 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
       makro: toInput(settings.capital.makro), scalp: toInput(settings.capital.scalp), currency: settings.currency, pair: settings.pair, startDate: settings.startDate,
       symbol: m.symbol, longTrigger: toInput(m.longTrigger), longStop: toInput(m.longStop), shortTrigger: toInput(m.shortTrigger), lowerHigh: toInput(m.lowerHigh),
       rsiWeekly: toInput(m.rsiWeekly), invalidation: toInput(m.invalidation), zoneLow: toInput(m.zoneLow), zoneHigh: toInput(m.zoneHigh),
+      hbLong: settings.hyblock.longEndpoint, hbLongField: settings.hyblock.longField, hbDelta: settings.hyblock.deltaEndpoint, hbDeltaField: settings.hyblock.deltaField,
+      hbCoin: settings.hyblock.coin, hbExchange: settings.hyblock.exchange, hbTf: settings.hyblock.timeframe,
       winRate: toInput(+(b.winRate * 100).toFixed(2)), avgWin: toInput(+(b.avgWin * 100).toFixed(2)), avgLoss: toInput(+(b.avgLoss * 100).toFixed(2)), expectancy: toInput(+(b.expectancy * 100).toFixed(2)), label: b.label,
     });
   }, [settings]);
@@ -181,6 +184,7 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
       ...settings, currency: v.currency || 'USDT', pair: (v.pair || '').trim() || 'BTC/USDT', startDate: v.startDate || '',
       capital: { makro: n('makro')!, scalp: n('scalp')! },
       market: { symbol: (v.symbol || '').trim() || 'BINANCE:BTCUSDT', longTrigger: n('longTrigger')!, longStop: n('longStop')!, shortTrigger: n('shortTrigger')!, lowerHigh: n('lowerHigh')!, rsiWeekly: n('rsiWeekly')!, invalidation: n('invalidation')!, zoneLow: n('zoneLow')!, zoneHigh: n('zoneHigh')! },
+      hyblock: { longEndpoint: (v.hbLong || '').trim(), longField: (v.hbLongField || '').trim(), deltaEndpoint: (v.hbDelta || '').trim(), deltaField: (v.hbDeltaField || '').trim(), coin: (v.hbCoin || 'BTC').trim(), exchange: (v.hbExchange || '').trim(), timeframe: (v.hbTf || '1h').trim() },
       backtest: { winRate: n('winRate')! / 100, avgWin: n('avgWin')! / 100, avgLoss: n('avgLoss')! / 100, expectancy: n('expectancy')! / 100, label: (v.label || '').trim() || 'Backtest' },
     };
     try { await onSave(next); notify({ kind: 'success', title: 'Einstellungen gespeichert' }); } catch { notify({ kind: 'error', title: 'Speichern fehlgeschlagen' }); }
@@ -229,6 +233,15 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
             {inp('zoneLow', 'Makro-Zone von')}{inp('zoneHigh', 'Makro-Zone bis')}
           </div>
         </Card></BlurFade>
+        <BlurFade delay={0.12} className="lg:col-span-2"><Card title="Hyblock-Connector">
+          <p className="mb-4 max-w-[80ch] text-[13px] text-mute">Endpunkte und Feldnamen aus der Hyblock-API-Doku (v2, ohne <span className="font-mono">/v2</span>). Leeres Feld = automatisch erkennen. „Testen“ zeigt, welche Felder die Antwort enthält.</p>
+          <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
+            {inp('hbLong', 'Endpunkt Top-Trader Long', undefined, false)}{inp('hbLongField', 'Feld Long %', 'z. B. longPercentage', false)}
+            {inp('hbDelta', 'Endpunkt Whale-Delta', undefined, false)}{inp('hbDeltaField', 'Feld Delta', 'z. B. delta', false)}
+            {inp('hbCoin', 'Coin', undefined, false)}{inp('hbExchange', 'Exchange', undefined, false)}{inp('hbTf', 'Timeframe', undefined, false)}
+          </div>
+          <HyblockTest endpoints={[v.hbLong, v.hbDelta]} params={{ coin: v.hbCoin, exchange: v.hbExchange, timeframe: v.hbTf, limit: 3 }} />
+        </Card></BlurFade>
         <BlurFade delay={0.15}><Card title="Daten">
           <p className="mb-4 text-[13px] text-mute">Sichere dein Journal als Datei. CSV öffnet sich direkt in Excel oder Numbers.</p>
           {downloads ? (
@@ -239,6 +252,34 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
           </div>
         </Card></BlurFade>
       </div>
+    </div>
+  );
+}
+
+function HyblockTest({ endpoints, params }: { endpoints: string[]; params: Record<string, any> }) {
+  const [out, setOut] = useState<string[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function run() {
+    setBusy(true);
+    const mcp = await useCap('mcp');
+    if (!mcp) { setOut(['Nur auf claude.ai verfügbar.']); setBusy(false); return; }
+    const lines: string[] = [];
+    for (const ep of endpoints.filter(Boolean)) {
+      try {
+        const r = await mcp.callTool(HB_SERVER, 'hyblock_get', { endpoint: ep.trim(), params: Object.fromEntries(Object.entries(params).filter(([, x]) => x !== '' && x != null)) }, { cache: false });
+        const series = hbSeries(r?.payload ?? r?.structuredContent);
+        const last = series[series.length - 1];
+        lines.push(`${ep}: ${series.length} Werte · Felder: ${last && typeof last === 'object' ? Object.entries(last).map(([k, x]) => `${k}=${typeof x === 'number' ? x : String(x).slice(0, 16)}`).join(', ') : '–'}`);
+      } catch (e: any) {
+        lines.push(`${ep}: ${e?.code === 'server_not_connected' ? `Connector „${HB_SERVER}“ nicht verbunden` : e?.code === 'tool_error' ? String(e?.message || 'Fehler').slice(0, 200) : e?.code || 'Fehler'}`);
+      }
+    }
+    setOut(lines); setBusy(false);
+  }
+  return (
+    <div className="mt-4 grid gap-2">
+      <Btn size="sm" className="justify-self-start" onClick={run} disabled={busy}>{busy ? 'Teste …' : 'Verbindung testen'}</Btn>
+      {out && <pre className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-line bg-ink-950/60 p-3 font-mono text-[11.5px] text-mute">{out.join('\n')}</pre>}
     </div>
   );
 }

@@ -24,11 +24,12 @@ export type Market = {
   symbol: string; longTrigger: number; longStop: number; shortTrigger: number;
   lowerHigh: number; rsiWeekly: number; invalidation: number; zoneLow: number; zoneHigh: number;
 };
+export type HyblockCfg = { longEndpoint: string; longField: string; deltaEndpoint: string; deltaField: string; coin: string; exchange: string; timeframe: string };
 export type Backtest = { winRate: number; avgWin: number; avgLoss: number; expectancy: number; label: string };
 export type Settings = {
   currency: string; pair: string; startDate: string;
   capital: Record<Account, number>;
-  setups: Setup[]; rules: CheckItem[]; backtest: Backtest; market: Market;
+  setups: Setup[]; rules: CheckItem[]; backtest: Backtest; market: Market; hyblock: HyblockCfg;
 };
 
 // ── Deine Regeln als Startkonfiguration ────────────────
@@ -84,6 +85,7 @@ export const DEFAULT_SETTINGS: Settings = {
   capital: { makro: 20000, scalp: 5000 },
   setups: DEFAULT_SETUPS, rules: DEFAULT_RULES,
   backtest: { winRate: 0.6215, avgWin: 0.1664, avgLoss: -0.0931, expectancy: 0.0682, label: '214 Signale' },
+  hyblock: { longEndpoint: 'topTraderAccountsLongShort', longField: '', deltaEndpoint: 'whaleRetailDelta', deltaField: '', coin: 'BTC', exchange: 'binance_perp_stable', timeframe: '1h' },
   market: { symbol: 'BINANCE:BTCUSDT', longTrigger: 85900, longStop: 85300, shortTrigger: 84500, lowerHigh: 82829, rsiWeekly: 62.09, invalidation: 75500, zoneLow: 81500, zoneHigh: 82200 },
 };
 
@@ -96,6 +98,7 @@ export function normalizeSettings(raw: any): Settings {
     rules: Array.isArray(r.rules) ? r.rules : d.rules,
     backtest: { ...d.backtest, ...(r.backtest || {}) },
     market: { ...d.market, ...(r.market || {}) },
+    hyblock: { ...d.hyblock, ...(r.hyblock || {}) },
   };
 }
 
@@ -337,57 +340,65 @@ function lastClosed(bars: any[], sec: number) {
 }
 
 export const PRICE_EVERY = 30_000;
+const HARD_ERRORS = ['needs_reauth', 'server_not_connected', 'not_in_manifest', 'blocked_by_policy', 'approval_required', 'not_granted', 'capability_disabled', 'capability_removed', 'selection_required'];
+
+/**
+ * Live-Markt über den TradingView-Connector. Eigenes Polling mit `callTool` und `cache: false`,
+ * damit jeder Abruf wirklich frisch ausgeführt wird: Kurs alle 30 s, 4H-Kerze alle 2 min,
+ * Wochenkerze alle 15 min. Pausiert im Hintergrund-Tab und holt beim Zurückkehren sofort nach.
+ */
 export function useMarket(symbol: string): MarketState {
   const [st, setSt] = useState<MarketState>({ status: 'connecting' });
-  const mcpRef = useRef<any>(null);
+  const runRef = useRef<(force?: boolean) => void>(() => {});
   useEffect(() => {
     let alive = true;
-    const offs: Array<() => void> = [];
+    let mcp: any = null;
+    const last: Record<string, number> = {};
+    const busy: Record<string, boolean> = {};
+    const jobs: { key: string; tool: string; input: any; every: number; apply: (p: any) => Partial<MarketState> }[] = [
+      { key: 'price', tool: 'mcp-tv-get-symbol-data', input: { symbol, columns: ['close', 'change', 'RSI|1W'] }, every: PRICE_EVERY,
+        apply: (p) => { const d = p?.data || p || {}; return { price: num(d.close) ?? undefined, change: num(d.change) ?? undefined, rsiW: num(d['RSI|1W']) ?? undefined }; } },
+      { key: 'h4', tool: 'mcp-tv-get-ohlcv', input: { symbol, interval: '4h', count: 4 }, every: 120_000,
+        apply: (p) => { const b = lastClosed(p?.bars, 4 * 3600); return b ? { close4h: b.c, close4hAt: b.t } : {}; } },
+      { key: 'w', tool: 'mcp-tv-get-ohlcv', input: { symbol, interval: '1W', count: 3 }, every: 900_000,
+        apply: (p) => { const b = lastClosed(p?.bars, 7 * 86400); return b ? { closeW: b.c, closeWAt: b.t } : {}; } },
+    ];
+    const run = async (force = false) => {
+      if (!alive || !mcp || document.hidden) return;
+      const now = Date.now();
+      const due = jobs.filter((j) => !busy[j.key] && (force || !last[j.key] || now - last[j.key] >= j.every));
+      if (!due.length) return;
+      if (force) setSt((s) => ({ ...s, refreshing: true }));
+      await Promise.all(due.map(async (j) => {
+        busy[j.key] = true;
+        try {
+          const res = await mcp.callTool(TV, j.tool, j.input, { cache: false });
+          last[j.key] = Date.now();
+          const patch = j.apply(payloadOf(res));
+          if (alive) setSt((s) => ({ ...s, ...patch, status: 'live', message: undefined, updatedAt: j.key === 'price' ? Date.now() : s.updatedAt ?? Date.now() }));
+        } catch (e: any) {
+          const code = e?.code || 'upstream_error';
+          last[j.key] = Date.now() - j.every + 15_000; // bei Fehler in 15 s erneut versuchen
+          if (alive) setSt((s) => HARD_ERRORS.includes(code)
+            ? { status: 'error', message: ERR_TEXT[code] || 'TradingView ist in dieser Ansicht nicht verfügbar.' }
+            : { ...s, status: s.price != null ? s.status : 'error', message: 'TradingView antwortet gerade nicht. Nächster Versuch in 15 Sekunden.' });
+        } finally { busy[j.key] = false; }
+      }));
+      if (alive && force) setSt((s) => ({ ...s, refreshing: false }));
+    };
+    runRef.current = run;
+    const tick = setInterval(() => run(), 5_000);
+    const onVis = () => { if (!document.hidden) run(); };
+    document.addEventListener('visibilitychange', onVis);
     (async () => {
-      const mcp = await useCap('mcp');
+      mcp = await useCap('mcp');
       if (!alive) return;
       if (!mcp) { setSt({ status: 'unavailable', message: 'Live-Kurs gibt es nur, wenn das Journal auf claude.ai geöffnet ist.' }); return; }
-      mcpRef.current = mcp;
-      const onErr = (e: any) => {
-        const code = e?.code || 'upstream_error';
-        const hard = ['needs_reauth', 'server_not_connected', 'not_in_manifest', 'blocked_by_policy', 'approval_required', 'not_granted', 'capability_disabled'].includes(code);
-        setSt((s) => hard
-          ? { status: 'error', message: ERR_TEXT[code] || 'TradingView ist in dieser Ansicht nicht verfügbar.' }
-          : { ...s, status: s.price != null ? s.status : 'error', message: 'TradingView antwortet gerade nicht. Letzter Stand bleibt sichtbar.' });
-      };
-      const stamp = (res: any) => res?.cache?.storedAt ?? Date.now();
-      const watch = (tool: string, input: any, every: number, apply: (p: any, res: any) => Partial<MarketState>) => {
-        try {
-          offs.push(mcp.watchTool(TV, tool, input, (ev: any) => {
-            if (!alive) return;
-            if (ev.type === 'error') return onErr(ev.error);
-            const p = payloadOf(ev.result);
-            if (!p) return;
-            setSt((s) => ({ ...s, ...apply(p, ev.result), status: 'live', message: undefined, refreshing: false, updatedAt: Math.max(s.updatedAt || 0, stamp(ev.result)) }));
-          }, { refetchInterval: every, cache: { staleTime: every / 2 } }));
-        } catch (e) { onErr(e); }
-      };
-      watch('mcp-tv-get-symbol-data', { symbol, columns: ['close', 'change', 'RSI|1W'] }, PRICE_EVERY, (p) => {
-        const d = p.data || p;
-        return { price: num(d.close) ?? undefined, change: num(d.change) ?? undefined, rsiW: num(d['RSI|1W']) ?? undefined };
-      });
-      watch('mcp-tv-get-ohlcv', { symbol, interval: '4h', count: 4 }, 120_000, (p) => {
-        const b = lastClosed(p.bars, 4 * 3600);
-        return b ? { close4h: b.c, close4hAt: b.t } : {};
-      });
-      watch('mcp-tv-get-ohlcv', { symbol, interval: '1W', count: 3 }, 900_000, (p) => {
-        const b = lastClosed(p.bars, 7 * 86400);
-        return b ? { closeW: b.c, closeWAt: b.t } : {};
-      });
+      run(true);
     })();
-    return () => { alive = false; offs.forEach((o) => { try { o(); } catch { /* egal */ } }); };
+    return () => { alive = false; clearInterval(tick); document.removeEventListener('visibilitychange', onVis); };
   }, [symbol]);
-  const refresh = useMemo(() => () => {
-    const mcp = mcpRef.current;
-    if (!mcp?.invalidate) return;
-    setSt((s) => ({ ...s, refreshing: true }));
-    mcp.invalidate(TV).catch(() => {}).finally(() => setTimeout(() => setSt((s) => ({ ...s, refreshing: false })), 4000));
-  }, []);
+  const refresh = useMemo(() => () => runRef.current(true), []);
   return { ...st, refresh };
 }
 

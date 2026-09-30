@@ -26,7 +26,7 @@ export function MorphProvider({ children }: { children: ReactNode }) {
         <AnimatePresence>
           {open && (
             <>
-              <motion.div key="bg" className="fixed inset-0 z-[70] bg-ink-950/55 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close} />
+              <motion.div key="bg" className="fixed inset-0 z-[70] bg-ink-950/75" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={close} />
               <div key="wrap" className="pointer-events-none fixed inset-0 z-[71] grid place-items-center p-4">
                 <motion.div layoutId={`morph-${open.id}`} role="dialog" aria-modal="true" aria-label={open.title}
                   className="pointer-events-auto relative max-h-[86vh] w-full max-w-[620px] overflow-y-auto border border-line-2 bg-gradient-to-b from-ink-750 to-ink-800 shadow-[0_40px_90px_rgb(0_0_0/0.45)]"

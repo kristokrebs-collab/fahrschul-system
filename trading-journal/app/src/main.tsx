@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { MotionConfig } from 'motion/react';
 import { fmt, stats, useCap, useJournal, useMarket, type Account, type AccountFilter, type ETrade, type Setup, type Settings, type Trade } from './lib';
-import { Dock, DockItem, Icon, RevealText, ShinyButton, TextHoverEffect, TransitionPanel } from './ui';
+import { Dock, DockItem, Icon, Magnetic, RevealText, ShinyButton, TextHoverEffect, TransitionPanel } from './ui';
 import { Overview } from './overview';
 import { NO_FILTER, SettingsView, SetupsView, TradesView, type Filters } from './pages';
 import { SetupSheet, TradeSheet } from './forms';
@@ -63,7 +63,7 @@ function App() {
     <MotionConfig reducedMotion="user">
     <IslandProvider market={market} settings={j.settings} onNew={openNew} bind={(fn) => { notifyRef.current = fn; }}>
     <MorphProvider>
-      <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-line/80 bg-ink-900/75 backdrop-blur-xl">
+      <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-line/80 bg-ink-900/[0.97]">
         <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-3 px-4 sm:px-6">
           <button type="button" onClick={() => go('overview')} className="flex min-w-0 items-center gap-3 text-left">
             <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 bg-gradient-to-br from-ink-700 to-ink-900 font-mono text-[15px] font-semibold text-fg">₿</span>
@@ -76,7 +76,7 @@ function App() {
             <span className="hidden items-center gap-2 text-[11.5px] text-mute md:inline-flex" title={sync[0]}>
               <span className={`size-1.5 rounded-full ${sync[1]}`} />{sync[0]}
             </span>
-            <ShinyButton onClick={openNew} className="max-sm:!px-3"><span className="size-3.5 [&>svg]:size-full">{Icon.plus}</span><span className="max-sm:sr-only">Trade eintragen</span></ShinyButton>
+            <Magnetic intensity={0.25} range={120}><ShinyButton onClick={openNew} className="max-sm:!px-3"><span className="size-3.5 [&>svg]:size-full">{Icon.plus}</span><span className="max-sm:sr-only">Trade eintragen</span></ShinyButton></Magnetic>
           </div>
         </div>
       </header>
@@ -106,7 +106,7 @@ function App() {
 
       <ProgressiveBlur />
       <nav className="fixed inset-x-0 bottom-[calc(12px+env(safe-area-inset-bottom,0px))] z-50 flex justify-center" aria-label="Navigation">
-        <Dock className="border border-line-2 bg-ink-850/85 shadow-[0_18px_40px_rgb(0_0_0/0.5)] backdrop-blur-xl">
+        <Dock className="border border-line-2 bg-ink-850/[0.97] shadow-[0_18px_40px_rgb(0_0_0/0.5)]">
           {VIEWS.map((v) => (
             <DockItem key={v} label={LABEL[v]} active={view === v} onClick={() => go(v)}
               className={view === v ? 'bg-white text-ink-950' : 'bg-white/[0.05] text-mute hover:text-fg'}>
@@ -115,7 +115,7 @@ function App() {
           ))}
           <span className="mb-2.5 h-7 w-px self-end bg-line-2" aria-hidden="true" />
           <DockItem label="Trade eintragen" onClick={openNew} className="text-ink-950">
-            {!(tradeOpen.open && !tradeOpen.trade) && <motion.span layoutId="new-trade" className="absolute inset-0 -z-10 rounded-full bg-gradient-to-br from-[#ff3b47] to-signal" style={{ borderRadius: 999 }} />}
+            {!(tradeOpen.open && !tradeOpen.trade) && <motion.span layoutId="new-trade" className="absolute inset-0 rounded-full bg-gradient-to-br from-[#ff3b47] to-signal" style={{ borderRadius: 999 }} />}
             {Icon.plus}
           </DockItem>
         </Dock>

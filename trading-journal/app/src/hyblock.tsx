@@ -1,7 +1,7 @@
 // Top-Trader-Panel (Hyblock) mit Falling-Knife-Filter aus den eigenen Regeln (Abschnitt 13).
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { cn, fmt, nowLocal, num, type Hyblock, type MarketState, type Settings } from './lib';
+import { cn, fmt, nowLocal, num, useCap, type Hyblock, type MarketState, type Settings } from './lib';
 import { Btn, Card, CheckRow, Detail, Empty, Field, inputCls } from './ui';
 import { Morph, useMorph } from './morph';
 
@@ -31,8 +31,8 @@ function Spark({ data }: { data: number[] }) {
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="h-12 w-full" preserveAspectRatio="none" aria-hidden="true">
       <defs><linearGradient id="hbf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f2f2f2" stopOpacity="0.35" /><stop offset="1" stopColor="#f2f2f2" stopOpacity="0" /></linearGradient></defs>
-      <motion.path d={d + `L${w},${h}L0,${h}Z`} fill="url(#hbf)" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} />
-      <motion.path d={d} fill="none" stroke="#f2f2f2" strokeWidth="1.6" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }} />
+      <motion.path d={d + `L${w},${h}L0,${h}Z`} fill="url(#hbf)"  />
+      <motion.path d={d} fill="none" stroke="#f2f2f2" strokeWidth="1.6" strokeLinejoin="round"  />
       <circle cx={last[0]} cy={last[1]} r="3" fill="#e5202e" />
     </svg>
   );
@@ -75,12 +75,18 @@ function HyblockForm({ onSave, last }: { onSave: (h: Hyblock) => Promise<void>; 
 }
 
 export function HyblockCard({ list, market, settings, onSave, onDelete }: { list: Hyblock[]; market: MarketState; settings: Settings; onSave: (h: Hyblock) => Promise<void>; onDelete: (id: string) => Promise<void> }) {
-  const h = list[list.length - 1], prev = list[list.length - 2];
+  const live = useHyblockLive(settings.hyblock);
+  const manual = list[list.length - 1], prevManual = list[list.length - 2];
+  // Live-Werte (Long-%, Delta, Kerzen) + deine letzten manuellen Struktur-/RSI-Punkte
+  const h: Hyblock | undefined = live.status === 'live' && live.longPct != null
+    ? { id: manual?.id || '', at: new Date(live.at!).toISOString(), longPct: live.longPct, delta: live.delta ?? 0, deltaCandles: live.deltaCandles ?? 0, structure: !!manual?.structure, rsi: !!manual?.rsi, note: 'Live von Hyblock' }
+    : manual;
+  const prev = live.status === 'live' ? manual : prevManual;
   const f = filterState(h, prev, market, settings);
   const age = h ? (Date.now() - +new Date(h.at)) / 36e5 : null;
   const [armed, setArmed] = useState(false);
   return (
-    <Card title="Top Trader · Hyblock" action={
+    <Card title="Top Trader · Hyblock" note={live.status === 'live' ? 'Live · alle 5 min' : undefined} action={
       <Morph id="hyblock-new" title="Hyblock-Ablesung" body={() => <HyblockForm onSave={onSave} last={h} />}
         className="!w-auto rounded-full border border-line-2 bg-white/[0.04] px-3 py-1 hover:bg-white/[0.08]"><span className="text-[12px] font-semibold text-fg">+ Ablesung</span></Morph>}>
       {!h ? (
@@ -117,7 +123,7 @@ export function HyblockCard({ list, market, settings, onSave, onDelete }: { list
             <div className="grid grid-cols-4 gap-1.5">
               {f.pts.map((p, i) => (
                 <motion.span key={p.k} className={cn('h-1.5 rounded-full', p.ok ? 'bg-win' : p.ok === false ? 'bg-loss/60' : 'bg-white/10')}
-                  initial={{ scaleX: 0 }} animate={{ scaleX: 1 }} transition={{ delay: 0.2 + i * 0.08, type: 'spring', stiffness: 300, damping: 24 }} style={{ originX: 0 }} />
+                  />
               ))}
             </div>
             <p className={cn('mt-2.5 text-[12px]', f.all ? 'text-win' : f.knife ? 'text-loss' : 'text-mute')}>
@@ -125,7 +131,7 @@ export function HyblockCard({ list, market, settings, onSave, onDelete }: { list
             </p>
           </Morph>
           <div className="flex items-center justify-between gap-2 text-[11.5px] text-faint">
-            <span>{list.length} Ablesung{list.length === 1 ? '' : 'en'}{h.note ? ` · ${h.note}` : ''}</span>
+            <span>{live.status === 'live' ? 'Live von Hyblock' : live.message ? live.message : `${list.length} Ablesung${list.length === 1 ? '' : 'en'}`}</span>
             <span className="flex gap-3">
               {armed
                 ? <><button type="button" className="text-loss" onClick={() => { setArmed(false); onDelete(h.id); }}>Wirklich löschen</button><button type="button" onClick={() => setArmed(false)}>Nein</button></>
@@ -137,4 +143,58 @@ export function HyblockCard({ list, market, settings, onSave, onDelete }: { list
       )}
     </Card>
   );
+}
+
+// ── Live-Abruf über den eigenen Hyblock-Connector (Netlify) ─────────────
+export const HB_SERVER = 'Hyblock';
+const HB_EVERY = 300_000;
+type HbLive = { status: 'off' | 'connecting' | 'live' | 'error'; message?: string; longPct?: number; delta?: number; deltaCandles?: number; at?: number };
+
+/** Findet die Zeitreihe in einer Hyblock-Antwort (Array direkt oder unter data/result/items). */
+export function hbSeries(p: any): any[] {
+  if (Array.isArray(p)) return p;
+  for (const k of ['data', 'result', 'items', 'values']) if (Array.isArray(p?.[k])) return p[k];
+  if (p?.data && typeof p.data === 'object') return hbSeries(p.data);
+  return p && typeof p === 'object' ? [p] : [];
+}
+/** Liest den Wert aus einem Datenpunkt: konfiguriertes Feld, sonst übliche Namen, sonst erste Zahl. */
+export function hbValue(row: any, field: string, guesses: string[]): number | null {
+  if (!row || typeof row !== 'object') return null;
+  if (field && num(row[field]) != null) return num(row[field]);
+  for (const g of guesses) for (const k of Object.keys(row)) if (k.toLowerCase() === g.toLowerCase() && num(row[k]) != null) return num(row[k]);
+  for (const [k, v] of Object.entries(row)) if (!/time|date|ts|open|close_?time/i.test(k) && typeof v === 'number') return v;
+  return null;
+}
+const LONG_KEYS = ['longPercentage', 'longPct', 'long_percent', 'longAccount', 'longRatio', 'long', 'value'];
+const DELTA_KEYS = ['delta', 'whaleRetailDelta', 'value'];
+
+export function useHyblockLive(cfg: Settings['hyblock']): HbLive & { refresh: () => void } {
+  const [st, setSt] = useState<HbLive>({ status: 'connecting' });
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => {
+    let alive = true, mcp: any = null;
+    const params = { coin: cfg.coin, exchange: cfg.exchange, timeframe: cfg.timeframe, limit: 50 };
+    const load = async () => {
+      if (!mcp || document.hidden) return;
+      try {
+        const call = (endpoint: string) => mcp.callTool(HB_SERVER, 'hyblock_get', { endpoint, params }, { cache: false }).then((r: any) => r?.payload ?? r?.structuredContent);
+        const [lp, dp] = await Promise.all([call(cfg.longEndpoint), call(cfg.deltaEndpoint)]);
+        const ls = hbSeries(lp), ds = hbSeries(dp);
+        const longPct = hbValue(ls[ls.length - 1], cfg.longField, LONG_KEYS);
+        const deltas = ds.map((r) => hbValue(r, cfg.deltaField, DELTA_KEYS)).filter((v): v is number => v != null);
+        let candles = 0; for (let i = deltas.length - 1; i >= 0 && deltas[i] > 0; i--) candles++;
+        if (alive) setSt({ status: 'live', longPct: longPct ?? undefined, delta: deltas[deltas.length - 1], deltaCandles: candles, at: Date.now() });
+      } catch (e: any) {
+        const code = e?.code;
+        const msg = code === 'server_not_connected' ? `Connector „${HB_SERVER}“ ist noch nicht in claude.ai verbunden.`
+          : code === 'not_in_manifest' ? 'Hyblock ist für diese Seite nicht freigegeben.'
+          : code === 'tool_error' ? `Hyblock meldet einen Fehler: ${e?.message || ''}`.slice(0, 160) : 'Hyblock gerade nicht erreichbar.';
+        if (alive) setSt((s) => ({ ...s, status: code === 'server_not_connected' || code === 'not_in_manifest' ? 'off' : 'error', message: msg }));
+      }
+    };
+    const id = setInterval(load, HB_EVERY);
+    (async () => { mcp = await useCap('mcp'); if (!alive) return; if (!mcp) { setSt({ status: 'off', message: 'Nur auf claude.ai verfügbar.' }); return; } load(); })();
+    return () => { alive = false; clearInterval(id); };
+  }, [cfg.longEndpoint, cfg.deltaEndpoint, cfg.longField, cfg.deltaField, cfg.coin, cfg.exchange, cfg.timeframe, nonce]);
+  return { ...st, refresh: () => setNonce((n) => n + 1) };
 }

@@ -72,7 +72,7 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
               <div className="mb-3 flex items-center gap-3"><span className="label">Netto-P&L · {ACCOUNT_LABEL[acc]}</span>
                 <Morph id="fact-net" title="Netto-P&L" body={() => <Detail bare d={metricDetail('net', st, settings)} />} className="!w-auto rounded-full border border-line-2 px-2.5 py-0.5 hover:border-white/50"><span className="label !text-[9.5px] group-hover:!text-fg">Details +</span></Morph></div>
               <div className={cn('dot-num flex flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none', tone(g.net))}>
-                {loaded ? <NumberTicker key={acc} value={g.net} decimals={2} signed /> : <span className="text-faint">0,00</span>}
+                {loaded ? <NumberTicker value={g.net} decimals={2} signed /> : <span className="text-faint">0,00</span>}
                 <span className="font-sans text-lg font-medium text-mute">{cur}</span>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-mute">
@@ -89,7 +89,7 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
                     style={{ flexGrow: big ? 2 : 1 }}>
                     <Morph id={`fact-${k}`} title={l} body={() => <Detail bare d={metricDetail(k, st, settings)} />}
                       className={cn('h-full overflow-hidden rounded-2xl border px-3 py-2.5 transition-colors duration-300', big ? 'border-white/30 bg-white/[0.07]' : 'border-white/[0.06] bg-white/[0.03]')}>
-                      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + i * 0.05 }}>
+                      <motion.div>
                         <dt className="label flex items-center justify-between gap-1 whitespace-nowrap"><span className="truncate">{l}</span><span className={cn('font-mono text-[13px] leading-none transition-all duration-300', big ? 'rotate-90 text-fg' : 'text-faint')}>+</span></dt>
                         <dd className="num mt-1.5 truncate whitespace-nowrap font-mono text-[17px] font-medium text-fg">{v}</dd>
                         <p className={cn('hidden overflow-hidden text-[11.5px] leading-snug transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:block',
@@ -119,8 +119,8 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
   const tm = (ms?: number) => ms ? new Date(ms).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '';
   const dm = (ms?: number) => ms ? new Date(ms).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
   return (
-    <div className="relative flex min-w-0 flex-col gap-4 overflow-hidden rounded-2xl border border-white/10 bg-ink-900/55 p-5 backdrop-blur-md">
-      {m.status === 'live' && <BorderBeam size={110} duration={10} />}
+    <div className="relative flex min-w-0 flex-col gap-4 overflow-hidden group/market rounded-2xl border border-white/10 bg-ink-900/80 p-5">
+      {m.status === 'live' && <div className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-opacity duration-500 group-hover/market:opacity-100"><BorderBeam size={110} duration={6} /></div>}
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-mute">{settings.pair} · TradingView</span>
         {m.status === 'live' ? <LiveBadge m={m} /> : m.status === 'connecting' ? <Pill>Verbinde …</Pill> : <Pill tone="warn">Kein Live-Kurs</Pill>}
@@ -136,7 +136,7 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
       )}
 
       {sc && (
-        <motion.div key={sc.key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+        <motion.div key={sc.key}
           className={cn('rounded-xl border p-3.5', { win: 'border-win/30 bg-win/[0.07]', loss: 'border-loss/30 bg-loss/[0.07]', warn: 'border-warn/30 bg-warn/[0.07]', mute: 'border-line-2 bg-white/[0.03]' }[sc.tone])}>
           <div className="flex items-center justify-between gap-2">
             <strong className={cn('text-[14px] font-semibold', { win: 'text-win', loss: 'text-loss', warn: 'text-warn', mute: 'text-fg' }[sc.tone])}>{sc.title}</strong>
@@ -154,7 +154,7 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
           <AutoCheck ok={rOk} label={`Weekly RSI über ${fmt.n2(cfg.rsiWeekly)}`} value={m.rsiW != null ? fmt.n1(m.rsiW) : '–'} />
           {m.rsiW != null && (
             <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-              <motion.div className="h-full rounded-full bg-gradient-to-r from-[#3a3a3a] via-[#bdbdbd] to-white" initial={{ width: 0 }}
+              <motion.div className="h-full rounded-full bg-gradient-to-r from-[#3a3a3a] via-[#bdbdbd] to-white" initial={false}
                 animate={{ width: `${Math.min(100, (m.rsiW / cfg.rsiWeekly) * 100)}%` }} transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }} />
             </div>
           )}
@@ -272,8 +272,8 @@ function WinRateCard({ st, settings }: { st: Stats; settings: Settings }) {
         <div className="grid w-full gap-2">
           <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-white/[0.06]">
             {g.n > 0 && <>
-              <motion.span className="h-full bg-win" initial={{ width: 0 }} animate={{ width: `${(g.wins / tot) * 100}%` }} transition={{ duration: 0.8 }} />
-              <motion.span className="h-full bg-loss" initial={{ width: 0 }} animate={{ width: `${(g.losses / tot) * 100}%` }} transition={{ duration: 0.8, delay: 0.1 }} />
+              <motion.span className="h-full bg-win" initial={false} animate={{ width: `${(g.wins / tot) * 100}%` }} transition={{ duration: 0.8 }} />
+              <motion.span className="h-full bg-loss" initial={false} animate={{ width: `${(g.losses / tot) * 100}%` }} transition={{ duration: 0.8, delay: 0.1 }} />
               {g.be > 0 && <span className="h-full bg-faint" style={{ width: `${(g.be / tot) * 100}%` }} />}
             </>}
           </div>
@@ -401,7 +401,7 @@ function Ranking({ st, onSetup, cur }: { st: Stats; onSetup: (id: string) => voi
             <span className="num font-mono text-[13px] text-mute">{s.n}</span>
             <span className="grid gap-1">
               <span className="flex justify-between text-xs"><b className="num font-mono font-medium">{fmt.pct0(s.winRate)}</b><span className="num font-mono text-faint">{s.wins}/{s.losses}</span></span>
-              <span className="h-1.5 overflow-hidden rounded-full bg-loss/25"><motion.span className="block h-full rounded-full bg-win" initial={{ width: 0 }} animate={{ width: `${(s.winRate || 0) * 100}%` }} transition={{ duration: 0.8 }} /></span>
+              <span className="h-1.5 overflow-hidden rounded-full bg-loss/25"><motion.span className="block h-full rounded-full bg-win" initial={false} animate={{ width: `${(s.winRate || 0) * 100}%` }} transition={{ duration: 0.8 }} /></span>
             </span>
             <span className={cn('num text-right font-mono text-[13px] font-medium', tone(s.net))}>{fmt.signed(s.net, 0)}</span>
             <span className={cn('num hidden text-right font-mono text-[13px] sm:block', tone(s.avgR))}>{s.avgR == null ? '–' : fmt.signed(s.avgR)}</span>
@@ -424,7 +424,7 @@ function Side({ label, g }: { label: string; g: ReturnType<typeof group> }) {
     <div className="grid min-w-0 gap-1.5">
       <div className="flex justify-between gap-2 text-[13px]"><span className="truncate font-medium">{label}</span><span className="num font-mono">{g.n ? fmt.pct0(g.winRate) : '–'}</span></div>
       <div className="h-1.5 overflow-hidden rounded-full" style={{ background: g.n ? 'rgb(212 108 106 / 0.25)' : 'rgb(255 255 255 / 0.06)' }}>
-        <motion.div className="h-full rounded-full bg-win" initial={{ width: 0 }} animate={{ width: `${(g.winRate || 0) * 100}%` }} transition={{ duration: 0.8 }} />
+        <motion.div className="h-full rounded-full bg-win" initial={false} animate={{ width: `${(g.winRate || 0) * 100}%` }} transition={{ duration: 0.8 }} />
       </div>
       <div className="num text-[11px] text-faint">{g.n ? <>{g.n} Trades · <span className={tone(g.net)}>{fmt.signed(g.net, 0)}</span></> : 'keine Trades'}</div>
     </div>
@@ -458,7 +458,7 @@ function Patterns({ st }: { st: Stats }) {
     <Card title="Muster in deinen Trades">
       <div className="grid gap-x-10 md:grid-cols-2 xl:grid-cols-3">
         {rows.map(([l, v, a, b], i) => (
-          <motion.div key={l} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }} className="grid grid-cols-2 gap-x-5 gap-y-2.5 border-t border-line py-3.5">
+          <motion.div key={l} className="grid grid-cols-2 gap-x-5 gap-y-2.5 border-t border-line py-3.5">
             <div className="col-span-2 flex justify-between gap-2 text-xs font-semibold text-mute"><span>{l}</span><span className="text-fg">{v}</span></div>
             {a}{b}
           </motion.div>
@@ -494,7 +494,7 @@ function Recent({ st, settings, onEdit, onNew, goTrades }: { st: Stats; settings
           {list.map((t, i) => (
             <div key={t.id} className={cn('relative', i && 'border-t border-line')} {...hs.bind(i)}>
             <HoverSlide show={hs.hovered === i} group="recent" className="inset-y-0.5" />
-            <motion.button layoutId={`trade-${t.id}`} layoutDependency={t.id} type="button" onClick={() => onEdit(t)} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05, layout: { type: 'spring', stiffness: 340, damping: 34 } }}
+            <motion.button layoutId={`trade-${t.id}`} layoutDependency={t.id} type="button" onClick={() => onEdit(t)} transition={{ layout: { type: 'spring', stiffness: 340, damping: 34 } }}
               className="relative z-10 grid w-full grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-2 py-2.5 text-left">
               <span className="num font-mono text-[11px] leading-tight text-mute">{fmt.date(tDate(t))}<br />{fmt.time(tDate(t))}</span>
               <span className="grid min-w-0 gap-1">

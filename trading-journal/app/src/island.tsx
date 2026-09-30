@@ -47,7 +47,7 @@ function Island({ note, dismiss }: { market: MarketState; settings: Settings; no
       <AnimatePresence>
         {note && (
           <motion.button key={note.id} type="button" onClick={dismiss}
-            className="pointer-events-auto flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800/95 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)] backdrop-blur-xl"
+            className="pointer-events-auto flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)]"
             style={{ maxWidth: 'calc(100vw - 32px)' }}
             initial={{ width: 44, height: 44, borderRadius: 22, opacity: 0, y: 24, scale: 0.6 }}
             animate={{ width: 'auto', height: 50, borderRadius: 25, opacity: 1, y: 0, scale: 1 }}
@@ -85,7 +85,7 @@ export function TradeQuickView({ trade, settings, onClose, onEdit }: { trade: ET
       <AnimatePresence>
         {trade && (
           <>
-            <motion.div key="bg" className="fixed inset-0 z-[58] bg-black/60 backdrop-blur-sm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
+            <motion.div key="bg" className="fixed inset-0 z-[58] bg-black/70" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
             <div key="wrap" className="pointer-events-none fixed inset-0 z-[59] grid place-items-center p-4">
               <motion.div layoutId={`trade-${trade.id}`} initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} role="dialog" aria-modal="true" aria-label="Trade-Details"
                 className="pointer-events-auto w-full max-w-[460px] overflow-hidden rounded-[28px] border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 shadow-[0_30px_80px_rgb(0_0_0/0.6)]">
@@ -129,20 +129,7 @@ export function TradeQuickView({ trade, settings, onClose, onEdit }: { trade: ET
   );
 }
 
-/** Progressive Blur (21st.dev · ibelick): gestaffelte Blur-Ebenen mit Masken, hinter dem Dock. */
+/** Weicher Auslauf hinter dem Dock: nur Verlauf, kein Backdrop-Filter (scrollt ruckelfrei). */
 export function ProgressiveBlur({ className }: { className?: string }) {
-  const layers = 3;
-  return (
-    <div className={cn('pointer-events-none fixed inset-x-0 bottom-0 z-[45] h-32', className)} aria-hidden="true">
-      {Array.from({ length: layers }, (_, i) => {
-        const a = (i / layers) * 100, b = ((i + 1) / layers) * 100;
-        return <div key={i} className="absolute inset-0" style={{
-          backdropFilter: `blur(${(i + 1) * 2}px)`, WebkitBackdropFilter: `blur(${(i + 1) * 2}px)`,
-          maskImage: `linear-gradient(to bottom, transparent ${Math.max(0, a - 16)}%, black ${a}%, black ${b}%, transparent ${Math.min(100, b + 16)}%)`,
-          WebkitMaskImage: `linear-gradient(to bottom, transparent ${Math.max(0, a - 16)}%, black ${a}%, black ${b}%, transparent ${Math.min(100, b + 16)}%)`,
-        }} />;
-      })}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-ink-900/70" />
-    </div>
-  );
+  return <div className={cn('pointer-events-none fixed inset-x-0 bottom-0 z-[45] h-28 bg-gradient-to-b from-transparent via-ink-900/70 to-ink-900', className)} aria-hidden="true" />;
 }

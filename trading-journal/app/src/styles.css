@@ -105,7 +105,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
 }
 .shiny-cta span { z-index: 1; display: inline-flex; align-items: center; gap: 8px; }
 .shiny-cta span::before { --size: calc(100% + 1rem); width: var(--size); height: var(--size); box-shadow: inset 0 -1ex 2rem 4px var(--shiny-cta-highlight); opacity: 0; transition: opacity var(--transition); animation: calc(var(--duration) * 1.5) breathe linear infinite; }
-.shiny-cta, .shiny-cta::before, .shiny-cta::after { animation: var(--animation) var(--duration), var(--animation) calc(var(--duration) / 0.4) reverse paused; animation-composition: add; }
+.shiny-cta, .shiny-cta::before, .shiny-cta::after { animation: var(--animation) var(--duration) paused, var(--animation) calc(var(--duration) / 0.4) reverse paused; animation-composition: add; }
 .shiny-cta:is(:hover, :focus-visible) { --gradient-percent: 20%; --gradient-angle-offset: 95deg; --gradient-shine: var(--shiny-cta-highlight-subtle); }
 .shiny-cta:is(:hover, :focus-visible), .shiny-cta:is(:hover, :focus-visible)::before, .shiny-cta:is(:hover, :focus-visible)::after { animation-play-state: running; }
 .shiny-cta:is(:hover, :focus-visible) span::before { opacity: 0.8; }
