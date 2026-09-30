@@ -29,6 +29,11 @@ export interface Candle {
   volume: number;
   /** true when the candle is closed */
   closed: boolean;
+  /** close time, ms UTC (additive; `time + intervalMs − 1` when the source does not report it) */
+  closeTime?: number;
+  quoteVolume?: number;
+  trades?: number;
+  takerBuyBase?: number;
 }
 export interface MarkPrice {
   markPrice: number;
@@ -145,7 +150,9 @@ export type FailureReason =
   | "offline"
   | "bad_symbol"
   | "bad_period"
-  | "beyond_retention";
+  | "beyond_retention"
+  /** additive: the current source has no equivalent for this feed (e.g. Bybit top-trader ratios) */
+  | "unsupported";
 
 export interface FeedHealth {
   feed: FeedId;
@@ -155,16 +162,37 @@ export interface FeedHealth {
   nextRefreshAt?: number;
   consecutiveFailures: number;
   reason?: FailureReason;
+  /** additive: human-readable German detail for tooltips (e.g. "Bybit: 2h → 1h") */
+  detail?: string;
 }
 
 export interface ProviderHealth {
   overall: HealthState;
   online: boolean;
   primary: { source: "binance"; reachable: boolean | "unknown"; blocked: boolean; lastProbeAt?: number };
-  proxy: { usable: boolean | "unknown" };
+  proxy: { usable: boolean | "unknown"; blocked?: boolean };
   ws: { state: HealthState; connectedAt?: number; lastMessageAt?: number; attempt: number; nextRetryAt?: number };
   feeds: Record<FeedId, FeedHealth>;
 }
+
+/** Additive: events consumed by the pure health reducer in `market/health.ts`. */
+export type HealthEvent =
+  | { type: "start"; now: number }
+  | { type: "stop"; now: number }
+  | { type: "online"; online: boolean; now: number }
+  | { type: "tick"; now: number }
+  | { type: "ws_open"; now: number }
+  | { type: "ws_message"; now: number; feeds: FeedId[]; asOf?: number }
+  | { type: "ws_close"; code: number; now: number; failedAttempts: number }
+  | { type: "ws_silent"; now: number }
+  | { type: "ws_retry"; now: number; attempt: number; nextRetryAt: number }
+  | { type: "rest_ok"; feed: FeedId; source: Source; asOf: number; now: number; nextRefreshAt?: number }
+  | { type: "rest_fail"; feed: FeedId; source: Source; kind: FailureReason; now: number; detail?: string }
+  | { type: "schedule"; feed: FeedId; nextRefreshAt: number }
+  | { type: "probe"; source: "binance" | "proxy" | "bybit" | "okx"; ok: boolean; now: number; blocked?: boolean }
+  | { type: "unsupported"; feed: FeedId; source: Source; now: number; detail?: string }
+  | { type: "bad_period"; feeds: FeedId[]; detail: string; now: number }
+  | { type: "bad_symbol"; now: number };
 
 export interface StatusLabel {
   tone: "live" | "warn" | "error" | "muted";
