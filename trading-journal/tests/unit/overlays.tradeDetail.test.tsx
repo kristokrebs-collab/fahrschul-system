@@ -84,10 +84,10 @@ describe("TradeDetail", () => {
     expect(within(dialog).queryByRole("link", { name: "Chart öffnen ↗" })).not.toBeInTheDocument();
   });
 
-  it("renders the MiniTradeChart slot only with candles", () => {
+  it("renders the MiniTradeChart slot only with candles (lazy chunk → resolves asynchronously)", async () => {
     const candles: Candle[] = [{ time: 1, open: 1, high: 2, low: 0.5, close: 1.5, volume: 1, closed: true }];
     mount({ candles });
-    expect(screen.getByTestId("mini-chart")).toBeInTheDocument();
+    expect(await screen.findByTestId("mini-chart")).toBeInTheDocument();
     expect(miniChart.mock.calls[0]?.[0].candles).toBe(candles);
   });
 

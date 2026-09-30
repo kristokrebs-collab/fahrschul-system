@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { SCENARIO_TOAST_MS, SCENARIO_TOAST_TITLE, SCENARIO_TOAST_VALUE, scenario, type ScenarioKey } from "@/domain/trigger";
 import { lastClosed4h, useFeed } from "@/market";
 import { useJournal } from "@/store/journalStore";
@@ -21,21 +21,32 @@ export function ScenarioWatcher() {
   const levels = useJournal((s) => s.settings.market);
   const pushToast = useUi((s) => s.pushToast);
 
+  // The feed object changes on every WS tick of the forming bar; only the last CLOSED bar matters.
+  const closed = k4 ? lastClosed4h(k4.data) : null;
+  const closedT = closed?.t ?? null;
+  const closedC = closed?.c ?? null;
+  const sc = closedC != null ? scenario(closedC, levels) : null;
+  const key = sc?.key ?? null;
+  // last persisted value, read once and kept here (no localStorage read per tick)
+  const last = useRef<TriggerLast | null | undefined>(undefined);
+
   useEffect(() => {
-    if (!k4) return;
-    const closed = lastClosed4h(k4.data);
-    if (!closed) return;
-    const sc = scenario(closed.c, levels);
-    if (!sc) return;
-    const last = readJson<TriggerLast | null>(TRIGGER_LAST_KEY, null);
-    if (!last) {
-      writeJson(TRIGGER_LAST_KEY, { key: sc.key, close4hAt: closed.t } satisfies TriggerLast);
+    if (closedT == null || closedC == null || !sc || key == null) return;
+    if (last.current === undefined) last.current = readJson<TriggerLast | null>(TRIGGER_LAST_KEY, null);
+    const prev = last.current;
+    const next: TriggerLast = { key, close4hAt: closedT };
+    if (!prev) {
+      last.current = next;
+      writeJson(TRIGGER_LAST_KEY, next);
       return;
     }
-    if (last.key === sc.key || closed.t <= last.close4hAt) return;
-    pushToast({ kind: "signal", title: SCENARIO_TOAST_TITLE(sc), value: SCENARIO_TOAST_VALUE(closed.c), duration: SCENARIO_TOAST_MS });
-    writeJson(TRIGGER_LAST_KEY, { key: sc.key, close4hAt: closed.t } satisfies TriggerLast);
-  }, [k4, levels, pushToast]);
+    if (prev.key === key || closedT <= prev.close4hAt) return;
+    pushToast({ kind: "signal", title: SCENARIO_TOAST_TITLE(sc), value: SCENARIO_TOAST_VALUE(closedC), duration: SCENARIO_TOAST_MS });
+    last.current = next;
+    writeJson(TRIGGER_LAST_KEY, next);
+    // `sc` is derived from (closedC, levels) → keyed on the scenario key and the close time only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, closedT, closedC, pushToast]);
 
   return null;
 }

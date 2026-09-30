@@ -28,11 +28,11 @@ Font hints (`document.fonts.load` for Doto / IBM Plex Mono / Sans) run before th
   </main>
   <BottomFade/> <Dock/> <ToastIsland toasts={uiStore.toasts → toIslandToast} onDismiss={dismissToast}/>
   <TradeDetail candles={useDetailCandles()}/>            always mounted – the overlays own their AnimatePresence
-  <TradeEditor livePrice={price} livePriceLabel={…}/>    price = usePriceSnapshot(); label `Live-Preis (Bybit) übernehmen` on fallback
+  <EditorHost/>   → `<TradeEditor livePrice livePriceLabel/>`; the price is read from `priceMv` only while the editor is open (`useLivePriceWhile`), label `Live-Preis (Bybit) übernehmen` on fallback
   <SetupEditor/>
 </MorphDialogProvider>
 ```
-`restoreScroll(page)` runs after every page mount (scroll memory per tab, top on first visit / deep link).
+Scroll memory lives in the router only (`navigate` / `applyRoute` → `restoreScroll`, top on first visit / deep link); `PageSwitch` gets `rememberScroll={false}` so a `#trades?…` deep link is never overridden a frame later.
 
 | file | export | notes |
 |---|---|---|

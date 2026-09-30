@@ -16,8 +16,8 @@ export interface PageHeaderProps {
 export function PageHeader({ title, lead, action, className }: PageHeaderProps) {
   return (
     <div className={cn("flex flex-wrap items-end justify-between gap-4", className)}>
-      <div>
-        <h1 className="text-[28px] font-semibold tracking-tight [text-wrap:balance]">
+      <div className="min-w-0">
+        <h1 className="text-[clamp(22px,7.2vw,28px)] font-semibold tracking-tight [text-wrap:balance] [overflow-wrap:anywhere]">
           <span className="mr-2 inline-block size-2 -translate-y-1 rounded-full bg-signal align-middle" aria-hidden="true" />
           {title}
         </h1>

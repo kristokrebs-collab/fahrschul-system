@@ -83,6 +83,28 @@ export function createMainSeries(chart: IChartApi, opts?: { volume?: boolean; pu
   return { volume, candles, pulse };
 }
 
+/**
+ * Snaps a series onto the candle grid: lightweight-charts shares ONE time scale across panes, so an hourly
+ * ratio/OI series on a 4h chart would insert three whitespace slots per candle (sparse candles on the
+ * right, dense on the left). Every point moves to the latest candle time ≤ its own time (last point per
+ * candle wins); points before the first candle are dropped. Without a grid the rows pass through unchanged.
+ */
+export function alignToGrid<T extends { time: UTCTimestamp }>(rows: T[], grid: readonly UTCTimestamp[] | null | undefined): T[] {
+  if (!grid || grid.length === 0) return rows;
+  const out: T[] = [];
+  let g = 0;
+  for (const row of rows) {
+    if (row.time < (grid[0] as UTCTimestamp)) continue;
+    while (g + 1 < grid.length && (grid[g + 1] as UTCTimestamp) <= row.time) g++;
+    const time = grid[g] as UTCTimestamp;
+    const last = out[out.length - 1];
+    const snapped = { ...row, time };
+    if (last && last.time === time) out[out.length - 1] = snapped;
+    else out.push(snapped);
+  }
+  return out;
+}
+
 export interface PaneData {
   ratio?: RatioPoint[];
   oi?: OpenInterestPoint[];
@@ -94,8 +116,15 @@ export class PaneController {
   private line: ISeriesApi<"Line"> | null = null;
   private baseline: IPriceLine | null = null;
   private data: PaneData = {};
+  private grid: UTCTimestamp[] = [];
 
   constructor(private readonly chart: IChartApi) {}
+
+  /** Candle times (seconds, ascending) the pane series snaps onto; call after every `setData` of the candles. */
+  setGrid(times: readonly UTCTimestamp[]): void {
+    this.grid = [...times];
+    this.apply();
+  }
 
   current(): PaneKind {
     return this.kind;
@@ -140,8 +169,8 @@ export class PaneController {
 
   private apply(): void {
     if (!this.line) return;
-    if (this.kind === "ratio") this.line.setData(normalizeSeries((this.data.ratio ?? []).map(toRatioData)));
-    else if (this.kind === "oi") this.line.setData(normalizeSeries((this.data.oi ?? []).map(toOiData)));
+    if (this.kind === "ratio") this.line.setData(alignToGrid(normalizeSeries((this.data.ratio ?? []).map(toRatioData)), this.grid));
+    else if (this.kind === "oi") this.line.setData(alignToGrid(normalizeSeries((this.data.oi ?? []).map(toOiData)), this.grid));
   }
 
   private remove(): void {

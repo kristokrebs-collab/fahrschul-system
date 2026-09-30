@@ -6,4 +6,5 @@
 export { OverviewView } from "@/views/overview";
 export { TradesView } from "@/views/trades";
 export { SetupsView } from "@/views/setups";
-export { SettingsView } from "@/views/settings";
+// `SettingsView` needs the market wiring (health, labels, refresh/reconnect/cache) → `SettingsPage` provides it.
+export { SettingsPage as SettingsView } from "@/app/SettingsPage";

@@ -1,9 +1,10 @@
 import { AnimatePresence, motion, type HTMLMotionProps, type PanInfo } from "motion/react";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDialogBehaviour } from "@/motion/a11y";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useIsDesktop } from "@/motion/useMediaQuery";
+import { useReducedFx } from "@/motion/useReducedFx";
 
 export interface SheetProps {
   open: boolean;
@@ -25,6 +26,8 @@ export interface SheetProps {
 
 const DISMISS_OFFSET = 120;
 const DISMISS_VELOCITY = 800;
+/** Safety net: the body mounts at the latest after this delay even when no layout animation ran (no source in the DOM). */
+const MORPH_FALLBACK_MS = 600;
 
 /**
  * Bottom sheet on mobile / centred dialog from `sm` (Bundle `Y$`, Plan 2.5 "Sheet"). Portal-less,
@@ -36,10 +39,33 @@ const DISMISS_VELOCITY = 800;
  */
 export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra, footer, children, className, onOpened }: SheetProps) {
   const desktop = useIsDesktop();
+  const reduced = useReducedFx();
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useDialogBehaviour(panelRef, open, onClose);
-  const morph = Boolean(layoutId);
+  // reduced motion → no morph, the body mounts immediately
+  const morph = Boolean(layoutId) && !reduced;
+
+  // Body readiness lives on the PANEL (the element that owns the `layoutId` animation): `onLayoutAnimationComplete`
+  // only fires on layout elements, so the body itself could never observe the morph. Fallback timer for the case
+  // that no layout animation runs at all (source already unmounted, first paint, …).
+  const [readiness, setReadiness] = useState({ open, ready: !morph });
+  // state-from-props: every open/close toggle starts a fresh readiness cycle
+  if (readiness.open !== open) setReadiness({ open, ready: !morph });
+  const bodyReady = readiness.ready;
+  const setBodyReady = () => setReadiness((r) => (r.ready ? r : { ...r, ready: true }));
+  const openedRef = useRef(onOpened);
+  useEffect(() => {
+    openedRef.current = onOpened;
+  }, [onOpened]);
+  useEffect(() => {
+    if (!open || bodyReady) return;
+    const t = setTimeout(() => setReadiness((r) => (r.ready ? r : { ...r, ready: true })), MORPH_FALLBACK_MS);
+    return () => clearTimeout(t);
+  }, [open, bodyReady]);
+  useEffect(() => {
+    if (open && bodyReady && morph) openedRef.current?.();
+  }, [open, bodyReady, morph]);
 
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (info.offset.y > DISMISS_OFFSET || info.velocity.y > DISMISS_VELOCITY) onClose();
@@ -83,6 +109,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
             )}
             {...enterExit}
             {...dragProps}
+            onLayoutAnimationComplete={morph ? setBodyReady : undefined}
           >
             <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
               <h2 id={titleId} className="text-[17px] font-semibold">
@@ -102,7 +129,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                 </button>
               </div>
             </div>
-            <SheetBody morph={morph} onOpened={onOpened}>
+            <SheetBody morph={morph} ready={bodyReady}>
               {children}
             </SheetBody>
             {footer && (
@@ -119,21 +146,12 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
 
 /**
  * Sheet body (`min-h-[40vh] overflow-y-auto px-6 py-5`, `layoutScroll`). With `morph` the content
- * mounts after the panel's layout animation completes (replaces the Bundle's 380 ms timeout `Nhe`).
+ * mounts once the panel reports `ready` (its layout animation completed, or the fallback timer fired;
+ * replaces the Bundle's 380 ms timeout `Nhe`).
  */
-function SheetBody({ children, morph, onOpened }: { children: ReactNode; morph: boolean; onOpened?: () => void }) {
-  const [ready, setReady] = useState(!morph);
+function SheetBody({ children, morph, ready }: { children: ReactNode; morph: boolean; ready: boolean }) {
   return (
-    <motion.div
-      layoutScroll
-      className="min-h-[40vh] overflow-y-auto px-6 py-5"
-      onLayoutAnimationComplete={() => {
-        if (!ready) {
-          setReady(true);
-          onOpened?.();
-        }
-      }}
-    >
+    <motion.div layoutScroll className="min-h-[40vh] overflow-y-auto px-6 py-5">
       {ready && (
         <motion.div initial={morph ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} transition={tween.sheetBody}>
           {children}

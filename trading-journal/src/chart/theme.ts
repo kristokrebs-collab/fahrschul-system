@@ -17,27 +17,14 @@ import {
   type Time,
 } from "lightweight-charts";
 import { fmt } from "./format";
+import { ink } from "./ink";
 
 /** Display time zone for axis and crosshair labels. Data stays in UTC seconds. */
 export const CHART_TIME_ZONE = "Europe/Berlin";
 export const CHART_FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 export const CHART_FONT_LOAD = '11px "IBM Plex Mono"';
 
-/** Grey ramp shared by theme, levels and panes. */
-export const ink = {
-  bg: "#0a0a0a",
-  grid: "#1c1c1c",
-  ref: "#3a3a3a",
-  tick: "#5f5f5f",
-  mute: "#9b9b9b",
-  fg: "#f2f2f2",
-  separator: "#1f1f1f",
-  labelBg: "#161616",
-  signal: "#e5202e",
-  /** journal semantics for trade overlays (declared exception, Plan 5.5) */
-  win: "#3ddc84",
-  loss: "#ff4d4f",
-} as const;
+export { ink };
 
 /** Background decision 7: start transparent (body dot grid shows through). */
 export const CHART_BACKGROUND_TRANSPARENT = "transparent";

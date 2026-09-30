@@ -1,6 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useRef, useState, type ReactNode } from "react";
-import { MiniTradeChart } from "@/chart/MiniTradeChart";
+import { lazy, Suspense, useCallback, useRef, useState, type ReactNode } from "react";
 import { CONVICTION_LEVELS } from "@/domain/defaults";
 import type { EnrichedTrade, Setup } from "@/domain/types";
 import { cn } from "@/lib/cn";
@@ -11,9 +10,13 @@ import { useDialogBehaviour } from "@/motion/a11y";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { Button } from "@/primitives";
+import { Button, Skeleton } from "@/primitives";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { pushToast, useUi } from "@/store/uiStore";
+
+/** Lazy: keeps `lightweight-charts` in its own chunk (loaded the first time a detail with candles opens). */
+const MiniTradeChart = lazy(() => import("@/chart/MiniTradeChart").then((m) => ({ default: m.MiniTradeChart })));
+const MINI_CHART_HEIGHT = 160;
 
 export interface TradeDetailProps {
   /**
@@ -240,7 +243,11 @@ function DetailContent({ trade: e, setups, currency, candles, onClose, onEdit, o
           </div>
         )}
 
-        {candles && candles.length > 0 && <MiniTradeChart candles={candles} trade={e} />}
+        {candles && candles.length > 0 && (
+          <Suspense fallback={<Skeleton height={MINI_CHART_HEIGHT} />}>
+            <MiniTradeChart candles={candles} trade={e} height={MINI_CHART_HEIGHT} />
+          </Suspense>
+        )}
 
         <div className="flex items-center justify-between gap-2">
           {e.chart ? (

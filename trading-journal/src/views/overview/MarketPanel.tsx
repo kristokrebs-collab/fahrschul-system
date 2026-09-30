@@ -153,7 +153,7 @@ export function MarketPanel() {
         {view.fundingLine && (
           <motion.div key="funding" {...fadeIn} className="grid gap-2">
             <p className="num font-mono text-[11px] text-faint">{view.fundingLine.text}</p>
-            <div className="hidden grid-cols-4 gap-2 sm:grid">
+            <div className="hidden grid-cols-2 gap-2 sm:grid">
               {(
                 [
                   ["Funding", view.fundingLine.fundingText.replace("Funding ", "")],

@@ -82,7 +82,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   }
 
   return (
-    <div className={className ?? "grid gap-5"}>
+    <div className={className ?? "grid grid-cols-1 gap-5"}>
       <PageHeader title="Alle Trades" lead={TRADES_LEAD} count={all.length} />
       <Card>
         <TradeFilters filter={filter} onChange={setTradeFilter} setups={settings.setups} count={rows.length} closed={closed} />

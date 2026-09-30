@@ -56,7 +56,7 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
   const morphOpenId = setupEditor.open && !setupEditor.fromTrade ? setupEditor.setupId : undefined;
 
   return (
-    <div className={cn("grid gap-5", className)}>
+    <div className={cn("grid grid-cols-1 gap-5", className)}>
       <PageHeader
         title={SETUPS_TITLE}
         lead={SETUPS_LEAD}

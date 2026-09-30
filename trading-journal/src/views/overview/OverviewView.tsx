@@ -21,7 +21,7 @@ import { WinRateCard } from "./WinRateCard";
 export function OverviewView({ className }: { className?: string }) {
   useCloseMorphDialogOnUnmount();
   return (
-    <div className={["grid gap-5 lg:grid-cols-12", className].filter(Boolean).join(" ")}>
+    <div className={["grid grid-cols-1 gap-5 lg:grid-cols-12", className].filter(Boolean).join(" ")}>
       <div className="lg:col-span-12">
         <Hero />
       </div>

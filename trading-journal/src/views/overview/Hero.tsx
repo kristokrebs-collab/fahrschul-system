@@ -16,7 +16,7 @@ import { ExplanationView } from "./explainer";
 import { MarketPanel } from "./MarketPanel";
 
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
-/** NEW (Plan 6.1): sixth/seventh tile on `xl` only – both explainers existed in `Jl` but were never wired. */
+/** NEW (Plan 6.1): sixth/seventh tile – both explainers existed in `Jl` but were never wired. */
 const XL_TILES: readonly { key: ExplainKey; label: string }[] = [
   { key: "exp", label: "Erwartungswert" },
   { key: "streak", label: "Serie" },
@@ -24,7 +24,8 @@ const XL_TILES: readonly { key: ExplainKey; label: string }[] = [
 
 /**
  * Hero (Bundle `yhe`, Plan 6.1): account Segmented → `uiStore.acc`, `Startkapital`, Netto-P&L `MotionNumber`
- * (shared MotionValue with the `Details +` fact dialog), subline, KPI strip of `StatTile`s (`morph-fact-{key}`),
+ * (shared MotionValue with the `Details +` fact dialog), subline, KPI tiles (`StatTile`, `morph-fact-{key}`) wrapping
+ * into rows of 2 / 3 / 4 so every label and value stays readable,
  * right column `MarketPanel`.
  */
 export function Hero() {
@@ -39,7 +40,7 @@ export function Hero() {
   const [active, setActive] = useState<number | null>(null);
   const net = useAnimatedNumber(loaded ? g.net : 0);
 
-  const tiles = useMemo(() => [...HERO_TILES.map((t) => ({ ...t, xl: false })), ...XL_TILES.map((t) => ({ ...t, xl: true }))], []);
+  const tiles = useMemo(() => [...HERO_TILES, ...XL_TILES], []);
 
   return (
     <section className="relative overflow-hidden rounded-[28px] border border-line" aria-labelledby="hero-net-label">
@@ -83,7 +84,7 @@ export function Hero() {
               <span>{heroSubline(view)}</span>
             </div>
           </div>
-          <dl className="grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:flex" onMouseLeave={() => setActive(null)}>
+          <dl className="flex flex-wrap gap-2 border-t border-white/10 pt-5" onMouseLeave={() => setActive(null)}>
             {tiles.map((t, i) => {
               const d = explain(t.key, view, settings);
               const value =
@@ -109,7 +110,6 @@ export function Hero() {
                   active={active === i}
                   onActivate={() => setActive(i)}
                   body={() => <ExplanationView bare d={d} />}
-                  className={t.xl ? "hidden xl:block" : undefined}
                 />
               );
             })}

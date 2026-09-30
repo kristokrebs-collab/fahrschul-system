@@ -61,7 +61,8 @@ export function DockItem({ label, onClick, active = false, tab = false, classNam
       style={{ width: size, height: size }}
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
-      onFocus={() => setHovered(true)}
+      // keyboard focus only: a tap / click also focuses the button, and on touch devices nothing would ever hide the tooltip
+      onFocus={(e) => setHovered(e.currentTarget.matches(":focus-visible"))}
       onBlur={() => setHovered(false)}
       onClick={onClick}
       aria-label={label}

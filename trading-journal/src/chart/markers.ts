@@ -3,16 +3,13 @@
  * one-accent rule), exit ● toned by result. Marker ids are `e:{tradeId}` / `x:{tradeId}`.
  * Trades outside the loaded history are dropped silently and counted (`outside`).
  */
-import {
-  MismatchDirection,
-  type ISeriesApi,
-  type SeriesMarker,
-  type Time,
-  type UTCTimestamp,
-} from "lightweight-charts";
+import type { ISeriesApi, MismatchDirection, SeriesMarker, Time, UTCTimestamp } from "lightweight-charts";
 import type { EnrichedTrade, Side, TradeResult } from "@/domain/types";
 import { fmt, tradeTime } from "./format";
-import { ink } from "./theme";
+import { ink } from "./ink";
+
+/** `MismatchDirection.NearestLeft` as a literal: type-only import keeps `lightweight-charts` out of the main chunk. */
+const NEAREST_LEFT: MismatchDirection = -1;
 
 export interface TradeMarker {
   id: string;
@@ -58,7 +55,7 @@ export interface SnapSource {
 export function snapTime(src: SnapSource, timeSec: number): UTCTimestamp | null {
   const idx = src.timeToIndex(timeSec as UTCTimestamp, true);
   if (idx == null) return null;
-  const item = src.dataByIndex(idx, MismatchDirection.NearestLeft);
+  const item = src.dataByIndex(idx, NEAREST_LEFT);
   const t = item?.time;
   return typeof t === "number" ? (t as UTCTimestamp) : null;
 }

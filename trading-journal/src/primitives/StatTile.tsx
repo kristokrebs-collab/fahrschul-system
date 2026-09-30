@@ -24,13 +24,22 @@ export interface StatTileProps {
 const VERDICT_TEXT: Record<VerdictTone, string> = { win: "text-win", loss: "text-loss", warn: "text-warn", mute: "text-mute" };
 
 /**
- * Hero KPI tile (Plan 2.5 "StatTile", Plan 3.3 "KPI-Tile Hover"): `motion.div layout style={{flexGrow}}`
+ * Hero KPI tile (Plan 2.5 "StatTile", Plan 3.3 "KPI-Tile Hover"): `motion.div layout style={{flexGrow}}` in a wrapping
+ * flex row (2 per row on phones, 3 per row from `sm`, 4 per row from `xl`),
  * on `spring.layout`, `MorphCard id="fact-{key}"` (→ fact dialog), `+` glyph rotates 90°, verdict text
  * revealed with `clip-path: inset(0 0 100% 0) → inset(0)` + opacity + y on `tween.verdict`.
  */
 export function StatTile({ fact, label, value, verdict, active, onActivate, body, className }: StatTileProps) {
   return (
-    <motion.div layout transition={{ layout: spring.layout }} style={{ flexGrow: active ? 2 : 1 }} onMouseEnter={onActivate} onFocus={onActivate} className={cn("min-w-0 sm:basis-0", className)}>
+    <motion.div
+      layout
+      transition={{ layout: spring.layout }}
+      style={{ flexGrow: active ? 2 : 1 }}
+      onMouseEnter={onActivate}
+      onFocus={onActivate}
+      // wraps into rows of 2 (phone) / 3 (≥ sm) / 4 (≥ xl) so that label + value stay fully readable at every width; the active tile grows within its row
+      className={cn("min-w-0 basis-[calc(50%-4px)] sm:basis-[30%] xl:basis-[22%]", className)}
+    >
       <MorphCard
         id={`fact-${fact}`}
         title={label}
@@ -38,7 +47,7 @@ export function StatTile({ fact, label, value, verdict, active, onActivate, body
         className={cn("h-full overflow-hidden rounded-2xl border px-3 py-2.5 transition-colors duration-300", active ? "border-white/30 bg-white/[0.07]" : "border-white/[0.06] bg-white/[0.03]")}
       >
         <motion.div layout="position">
-          <MorphTitle id={`fact-${fact}`} as="dt" className="label flex items-center justify-between gap-1 whitespace-nowrap">
+          <MorphTitle id={`fact-${fact}`} as="dt" className="label flex items-center justify-between gap-1 whitespace-nowrap max-sm:tracking-[0.08em]">
             <span className="truncate">{label}</span>
             <span
               aria-hidden="true"

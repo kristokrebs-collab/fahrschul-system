@@ -58,10 +58,20 @@ interface HistoryExtra {
 }
 interface HistoryState {
   feed: KlineFeed;
-  /** the stamped feed value last folded in */
-  seen: Stamped<Candle[]> | undefined;
+  /** `feedKey()` of the feed value last folded in (length + last open time, NOT the object identity) */
+  seen: string | undefined;
   extra: HistoryExtra | null;
   candles: Candle[];
+}
+
+/**
+ * Change signal of a kline feed value: the stamped object is new on EVERY publish (live ticks of the forming
+ * bar included), but the history only changes when a bar is appended or the bootstrap arrives.
+ */
+export function feedKey(feed: Stamped<Candle[]> | undefined): string | undefined {
+  if (!feed) return undefined;
+  const last = feed.data[feed.data.length - 1];
+  return `${feed.data.length}:${last?.time ?? 0}`;
 }
 
 /** Folds a new feed value / history() result into the loaded history; keeps the array identity when nothing new arrived. */
@@ -79,7 +89,7 @@ export function nextHistory(prev: HistoryState, feedId: KlineFeed, feed: Stamped
     const extraFirst = extra.candles[0];
     if (!first || (extraFirst && extraFirst.time < first.time)) next = mergeCandles(extra.candles, next);
   }
-  return { feed: feedId, seen: feed, extra, candles: next };
+  return { feed: feedId, seen: feedKey(feed), extra, candles: next };
 }
 
 function toRange(days: number): RangeDays {
@@ -146,7 +156,8 @@ export function ChartCard() {
   const [extra, setExtra] = useState<HistoryExtra | null>(null);
   const [hist, setHist] = useState<HistoryState>(() => ({ feed: feedId, seen: undefined, extra: null, candles: [] }));
   let candles = hist.candles;
-  if (hist.feed !== feedId || hist.seen !== feed || hist.extra !== extra) {
+  // state-from-props: compare on the bar key, not on the stamped object (a live tick must not call setState in render)
+  if (hist.feed !== feedId || hist.seen !== feedKey(feed) || hist.extra !== extra) {
     const next = nextHistory(hist, feedId, feed, extra);
     setHist(next);
     candles = next.candles;
@@ -196,7 +207,9 @@ export function ChartCard() {
   }, [detail.id, ghost]);
 
   const feedHealth = health.feeds[feedId];
-  const empty = candles.length === 0 && (feedHealth.state === "offline" || feedHealth.consecutiveFailures >= 3);
+  // Empty state instead of an endless skeleton: no bars, the history request has settled and the feed is not
+  // (yet) delivering (offline / fallback that failed / at least one REST failure). First paint keeps the skeleton.
+  const empty = candles.length === 0 && (feedHealth.state === "offline" || feedHealth.consecutiveFailures >= 3 || (!loading && (feedHealth.consecutiveFailures >= 1 || feedHealth.state === "fallback")));
   const sym = settings.market.symbol.split(":").pop() ?? "BTCUSDT";
   const note = [label.text, outside > 0 ? outsideNote(outside) : null, loading ? CHART_LOADING : null].filter(Boolean).join(" · ");
 

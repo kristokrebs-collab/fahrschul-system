@@ -1,1 +1,1 @@
-{"root":["./vite.config.ts","./playwright.config.ts","./tests/e2e/mocks/market.ts"],"version":"5.9.3"}
+{"root":["./vite.config.ts","./playwright.config.ts","./tests/e2e/helpers.ts","./tests/e2e/motion.spec.ts","./tests/e2e/overview.spec.ts","./tests/e2e/settings.spec.ts","./tests/e2e/smoke.spec.ts","./tests/e2e/trades.spec.ts","./tests/e2e/mocks/market.ts"],"version":"5.9.3"}

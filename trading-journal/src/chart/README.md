@@ -66,7 +66,7 @@ Props (`NothingCandleChartProps`): `candles: Candle[]`, `interval: ChartInterval
 |---|---|
 | `toCandleData / toVolumeData / toRatioData / toOiData`, `normalizeSeries`, `sec`, `INTERVAL_SECONDS` | `Candle`/`RatioPoint`/`OpenInterestPoint` → lightweight-charts data, sorted & de-duplicated |
 | `createMainSeries(chart)` → `{ volume, candles, pulse }` | pane-0 series in draw order |
-| `PaneController` (`set(kind)`, `setData({ratio, oi})`, `dispose()`) | pane 1 line (`longPct` + 50 % baseline, or OI), stretch 3:1 (~25 %) |
+| `PaneController` (`set(kind)`, `setData({ratio, oi})`, `setGrid(candleTimes)`, `dispose()`), `alignToGrid(rows, grid)` | pane 1 line (`longPct` + 50 % baseline, or OI), stretch 3:1 (~25 %); points are snapped onto the candle grid because panes share one time scale (an hourly series on a 4h chart would otherwise add whitespace slots) |
 | `setLevels(series, levels, prev, opts)`, `clearLevels`, `LEVEL_STYLES`, `levelColor`, `levelWidth` | price lines (`longTrigger` LONG `#f2f2f2`, `longStop` INVAL `#9b9b9b`, `shortTrigger` SHORT `#f2f2f2`, `invalidation` HART **`#e5202e`**, `lowerHigh` LH W `#5f5f5f`) + `ZonePrimitive`; updates in place |
 | `ZonePrimitive` (`primitives/ZonePrimitive.ts`) | band `zoneLow–zoneHigh`, fill `#ffffff0e`, dashed edges, `zOrder 'bottom'`, axis labels `Zone`, `autoscaleInfo`, `hitTest → 'zone'`, `fadeIn(ms)` |
 | `toTradeMarkers(trades)`, `buildMarkers(markers, snap, bounds)` → `{ markers, outside, byId }`, `snapTime`, `boundsOf`, `markerTradeId`, `hitMarker` | entry ▲/▼ (`#3ddc84`/`#ff4d4f`, journal exception), exit ● toned win/loss/be; ids `e:{id}` / `x:{id}`; exit sits on the entry candle (model has no exit time) |

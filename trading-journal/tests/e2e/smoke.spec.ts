@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { collectErrors } from "./helpers";
 import { mockMarket } from "./mocks/market";
 
 const fixture = JSON.parse(readFileSync(new URL("../fixtures/tj2-v0.json", import.meta.url), "utf8"));
@@ -15,9 +16,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("overview renders without console errors", async ({ page }, info) => {
-  const errors: string[] = [];
-  page.on("pageerror", (e) => errors.push(String(e)));
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  const errors = collectErrors(page);
   await page.goto("/#overview");
   await expect(page.getByText("Netto-P&L").first()).toBeVisible();
   await page.waitForTimeout(2500);

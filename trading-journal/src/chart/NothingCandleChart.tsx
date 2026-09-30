@@ -333,6 +333,8 @@ export function NothingCandleChart({
       i.data = data;
       i.lastInterval = interval;
       i.bounds = boundsOf(data, INTERVAL_SECONDS[interval]);
+      // sub pane shares the time scale → snap its points onto the candle grid (no whitespace slots)
+      i.panes.setGrid(data.map((d) => d.time));
 
       if (first || intervalChanged) {
         const target = rangeForDays(
@@ -408,7 +410,10 @@ export function NothingCandleChart({
       cur.main.pulse.update({ time, value: bar.close });
       if (time > lastTime) {
         const last = cur.data[cur.data.length - 1];
-        if (last && last.time === lastTime) cur.data = [...cur.data, toCandleData(bar)];
+        if (last && last.time === lastTime) {
+          cur.data = [...cur.data, toCandleData(bar)];
+          cur.panes.setGrid(cur.data.map((d) => d.time));
+        }
         if (cur.bounds) cur.bounds = { ...cur.bounds, last: time };
       }
     });

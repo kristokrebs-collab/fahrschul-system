@@ -28,7 +28,7 @@ export function ChecklistCard() {
         <ExplanationView d={explainChecklist(ev)} className="!mt-0" />
       </Collapse>
       {ev.withList.length ? (
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="grid grid-cols-2 gap-3">
             {tiles.map(([label, g, tone]) => (
               <div key={label} className="rounded-xl border border-line bg-ink-950/50 p-3">

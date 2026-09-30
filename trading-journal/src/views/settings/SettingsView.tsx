@@ -88,18 +88,27 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
 
   const [draft, setDraft] = useState<SettingsDraft>(() => settingsToDraft(settings));
   const [hydratedFrom, setHydratedFrom] = useState(settings);
+  /** true once the user touched the draft; a pristine draft follows external settings changes */
+  const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
-  // Re-hydrate the draft whenever the stored settings change (bundle `useEffect(..., [settings])`),
-  // done during render (React "adjusting state on prop change") instead of an effect.
+  // Re-hydrate the draft when the stored settings change (bundle `useEffect(..., [settings])`), done during
+  // render (React "adjusting state on prop change"). Only a PRISTINE draft follows: a cloud snapshot or a
+  // SetupEditor save (new `settings` identity) must not wipe unsaved edits.
   if (hydratedFrom !== settings) {
     setHydratedFrom(settings);
-    setDraft(settingsToDraft(settings));
+    if (!dirty) setDraft(settingsToDraft(settings));
   }
 
-  const set = (key: DraftTextKey, value: string) => setDraft((d) => ({ ...d, [key]: value }));
-  const setRules = (rules: Rule[]) => setDraft((d) => ({ ...d, rules }));
+  const set = (key: DraftTextKey, value: string) => {
+    setDirty(true);
+    setDraft((d) => ({ ...d, [key]: value }));
+  };
+  const setRules = (rules: Rule[]) => {
+    setDirty(true);
+    setDraft((d) => ({ ...d, rules }));
+  };
 
   async function save() {
     const res = draftToSettings(draft, useJournal.getState().settings);
@@ -111,6 +120,7 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
     setSaving(true);
     try {
       await saveSettings(res.settings);
+      setDirty(false);
       pushToast({ kind: "success", title: SETTINGS_STRINGS.toastSaved });
     } catch {
       pushToast({ kind: "error", title: SETTINGS_STRINGS.toastFailed });
@@ -126,11 +136,11 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
   );
 
   return (
-    <div className={cn("grid gap-5", className)}>
+    <div className={cn("grid grid-cols-1 gap-5", className)}>
       <PageHeader title={SETTINGS_STRINGS.title} lead={SETTINGS_STRINGS.lead} action={saveButton} />
 
       <form
-        className="grid gap-5 lg:grid-cols-2"
+        className="grid grid-cols-1 gap-5 lg:grid-cols-2"
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
