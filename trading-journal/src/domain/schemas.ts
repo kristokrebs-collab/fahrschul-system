@@ -3,7 +3,10 @@
  */
 import { z } from "zod";
 
-const numOrNull = z.union([z.number(), z.null()]).optional().nullable();
+/** Legacy records store numbers as numbers, form strings ("100", "1,5") or null; `normalizeTrade` parses them. */
+const numOrNull = z.union([z.number(), z.string(), z.null()]).optional();
+/** Legacy text fields may be `null` (old forms wrote `null` for empty inputs). */
+const textOrNull = z.string().nullable().optional();
 
 export const ChecklistItemSchema = z.object({ id: z.string(), text: z.string() }).passthrough();
 export const RuleSchema = z.object({ id: z.string(), text: z.string() }).passthrough();
@@ -88,15 +91,20 @@ export const SettingsSchema = z
   })
   .passthrough();
 
+/**
+ * Trade record as persisted. Deliberately no stricter than `normalizeTrade`: validate AFTER normalising
+ * (`TradeSchema.safeParse(normalizeTrade(raw))`, see `validateTrades`) so only truly broken records (no id,
+ * not an object) are quarantined. Enumerations are `string` because the normaliser coerces them.
+ */
 export const TradeSchema = z
   .object({
-    id: z.string(),
-    account: z.enum(["makro", "scalp"]).optional(),
-    side: z.enum(["long", "short"]).optional(),
-    status: z.string().optional(),
-    date: z.string().optional(),
-    pair: z.string().optional(),
-    timeframe: z.string().optional(),
+    id: z.string().min(1),
+    account: z.string().nullable().optional(),
+    side: z.string().nullable().optional(),
+    status: z.string().nullable().optional(),
+    date: textOrNull,
+    pair: textOrNull,
+    timeframe: textOrNull,
     entry: numOrNull,
     stop: numOrNull,
     target: numOrNull,
@@ -105,40 +113,45 @@ export const TradeSchema = z
     leverage: numOrNull,
     fees: numOrNull,
     pnlManual: numOrNull,
-    setups: z.array(z.string()).optional(),
-    checks: z.record(z.boolean()).optional(),
+    setups: z.array(z.unknown()).nullable().optional(),
+    checks: z.record(z.unknown()).nullable().optional(),
     conviction: numOrNull,
     followedPlan: z.boolean().nullable().optional(),
-    emotion: z.string().optional(),
-    reason: z.string().optional(),
-    notes: z.string().optional(),
-    chart: z.string().optional(),
+    emotion: textOrNull,
+    reason: textOrNull,
+    notes: textOrNull,
+    chart: textOrNull,
     pnl: numOrNull,
     r: numOrNull,
-    createdAt: z.string().optional(),
-    updatedAt: z.string().optional(),
+    createdAt: textOrNull,
+    updatedAt: textOrNull,
   })
   .passthrough();
 
+/** Hyblock reading as persisted; like `TradeSchema` validated after `normalizeReading` (only `id`/`at` are required). */
 export const HyblockReadingSchema = z
   .object({
-    id: z.string(),
-    at: z.string(),
-    longPct: z.number(),
-    delta: z.number(),
-    deltaCandles: z.number(),
-    structure: z.boolean(),
-    rsi: z.boolean(),
-    note: z.string().optional(),
+    id: z.string().min(1),
+    at: z.string().min(1),
+    longPct: numOrNull,
+    delta: numOrNull,
+    deltaCandles: numOrNull,
+    structure: z.unknown().optional(),
+    rsi: z.unknown().optional(),
+    note: textOrNull,
   })
   .passthrough();
 
+/**
+ * Backup envelope. `exportedAt` and `settings` are required; records are validated one by one
+ * (`validateTrades` / `validateReadings` in `@/store/backup`) so a single broken record does not reject the file.
+ */
 export const JsonBackupSchema = z
   .object({
     exportedAt: z.string(),
     settings: RawSettingsSchema,
-    trades: z.array(TradeSchema),
-    hyblock: z.array(HyblockReadingSchema).optional(),
+    trades: z.array(z.unknown()),
+    hyblock: z.array(z.unknown()).optional(),
     schemaVersion: z.number().optional(),
   })
   .passthrough();

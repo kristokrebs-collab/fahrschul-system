@@ -257,7 +257,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         return;
       }
       const now = new Date().toISOString();
+      // Spread the stored trade first so passthrough/unknown fields (legacy extras) survive an edit.
       const record: TradeRecord = {
+        ...(trade ?? {}),
         ...rec,
         checks: pruneChecks(t.checks, items),
         pnl: x.pnl,
@@ -266,6 +268,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         createdAt: trade?.createdAt || now,
       };
       if (trade?.id) record.id = trade.id;
+      else delete record.id;
       setErr("");
       setSaving(true);
       try {

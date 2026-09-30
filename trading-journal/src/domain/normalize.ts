@@ -4,7 +4,7 @@
  */
 import type { HyblockReading, Rule, Settings, Setup, Trade } from "./types";
 import { DEFAULT_BACKTEST, DEFAULT_HYBLOCK, DEFAULT_MARKET, defaultSettings } from "./defaults";
-import { parseNumber } from "@/lib/parse";
+import { parseNumber, sanitizeUrl } from "@/lib/parse";
 
 type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -44,7 +44,7 @@ const str = (v: unknown, fallback = ""): string => (typeof v === "string" ? v : 
 /**
  * Normalises a persisted trade record into the `Trade` shape (legacy records may miss fields).
  * `account` stays absent when missing (read path treats it as "scalp"); `pnl`/`r` are kept as stored —
- * `enrichTrade` recomputes them.
+ * `enrichTrade` recomputes them. `chart` goes through `sanitizeUrl` (only `http(s)://` links survive).
  */
 export function normalizeTrade(raw: unknown): Trade {
   const r: Raw = isObj(raw) ? raw : {};
@@ -76,7 +76,7 @@ export function normalizeTrade(raw: unknown): Trade {
     emotion: str(r.emotion),
     reason: str(r.reason),
     notes: str(r.notes),
-    chart: str(r.chart),
+    chart: sanitizeUrl(r.chart),
     pnl: numOrNull(r.pnl),
     r: numOrNull(r.r),
     createdAt: str(r.createdAt),

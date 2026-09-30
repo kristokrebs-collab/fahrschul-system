@@ -59,7 +59,26 @@ export {
 } from "./mapping";
 export { createMarketProvider, type MarketProvider, type ProviderOptions, type ProviderDeps } from "./provider";
 export { priceMv, bidMv, askMv, markMv, fundingMv, nextFundingMv, priceReceivedAtMv, bindMotionValues, flushMotionValues } from "./motionValues";
-export { startMarket, stopMarket, setSymbol, setPeriod, setBookTop, getProvider, useProvider, useFeed, useHealth, useStatusLabel, useMarketView, useTopTrader, useMarketVersion } from "./marketStore";
+export {
+  startMarket,
+  stopMarket,
+  setSymbol,
+  setPeriod,
+  setBookTop,
+  getProvider,
+  useProvider,
+  useFeed,
+  useHealth,
+  useStatusLabel,
+  useMarketView,
+  useTopTrader,
+  useMarketVersion,
+  usePriceSnapshot,
+  getPriceSnapshot,
+  HIGH_FREQUENCY_FEEDS,
+  PRICE_SNAPSHOT_INTERVAL_MS,
+  type PriceSnapshot,
+} from "./marketStore";
 export { parseWsMessage, buildStreamUrl, binanceRest, BINANCE_REST, BINANCE_WS, type WsEvent, type BinanceRest } from "./sources/binance";
 export { bybitRest, BYBIT_REST, type BybitRest } from "./sources/bybit";
 export { okxRest, OKX_REST, type OkxRest } from "./sources/okx";

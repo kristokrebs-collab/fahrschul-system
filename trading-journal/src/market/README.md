@@ -37,9 +37,24 @@ setBookTop(true);                     // subscribe bookTicker only while the Bid
 | `useFeed(feed)` | `Stamped<FeedValue[F]> \| undefined` | when that feed changes (aggTrade ≈ 10 Hz — use MotionValues for the price!) |
 | `useHealth()` | `ProviderHealth` | on health change (≤ 1/s per WS feed, tick every 5 s only when something changed) |
 | `useStatusLabel(feed)` | `StatusLabel { tone, text, detail? }` | with health / feed |
-| `useMarketView({ rsiWOverride?, retryInSec? })` | `MarketView` — legacy panel fields | on any change |
-| `useTopTrader(base)` | `TopTraderView` — Long %, delta, deltaCandles, sparkline, `onlyBinance` | on any change |
+| `useMarketView({ rsiWOverride?, retryInSec? })` | `MarketView` — legacy panel fields | on any **slow** change |
+| `useTopTrader(base)` | `TopTraderView` — Long %, delta, deltaCandles, sparkline, `onlyBinance` | on any **slow** change |
+| `useMarketVersion()` | slow-change counter | on any **slow** change |
+| `usePriceSnapshot(intervalMs = 250)` | `PriceSnapshot { price: number \| null (rounded), source }` | only when the rounded price or the source changes, ≤ 1/`intervalMs` |
 | `useProvider()` / `getProvider()` | the provider or null | |
+
+**Two notification channels.** `HIGH_FREQUENCY_FEEDS` (`aggTrade`, `bookTop`, `markPrice`) publish on the *fast*
+channel: they never bump `useMarketVersion()` and never re-render `useMarketView` / `useTopTrader` / `useHealth`
+subscribers. Everything else (lifecycle, health, REST feeds, klines) is the *slow* channel. `useFeed(fastFeed)` still
+re-renders per publish — that is what the MotionValues are for.
+
+`usePriceSnapshot()` is the primitive-returning getter for places that need the price as a number but must not
+re-render per tick (e.g. `App.tsx` → `TradeEditor.livePrice`): the returned object is stable while
+`Math.round(price)` and `source` are unchanged; `getPriceSnapshot()` is the non-hook variant.
+
+```ts
+const { price, source } = usePriceSnapshot();     // { price: 84206, source: "binance" } | { price: null, source: null }
+```
 
 `Stamped<T> = { data, asOf, receivedAt, source, comparable }` — every value carries provenance.
 

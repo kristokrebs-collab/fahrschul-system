@@ -65,9 +65,14 @@ export function useScrollLock(active: boolean): void {
   }, [active]);
 }
 
+/** Elements that must stay live behind a dialog: the toast island and any other live region. */
+export const INERT_EXEMPT_SELECTOR = "[aria-live],[data-toast-island]";
+
 /**
  * Marks everything outside `ref` as `inert` (siblings of every ancestor up to `<body>`), so the
  * page behind a portal-less dialog is neither focusable nor read by screen readers.
+ * Live regions (`[aria-live]`, `data-toast-island`) are exempt: a subtree that contains one is descended
+ * into instead of being inerted as a whole, so toasts keep announcing while a sheet is open.
  */
 export function useInertOutside(ref: RefObject<HTMLElement | null>, active: boolean): void {
   useEffect(() => {
@@ -75,16 +80,24 @@ export function useInertOutside(ref: RefObject<HTMLElement | null>, active: bool
     const el = ref.current;
     if (!el) return;
     const touched: HTMLElement[] = [];
+    const inertChildren = (parent: HTMLElement, skip: HTMLElement | null) => {
+      for (const child of Array.from(parent.children)) {
+        if (child === skip || !(child instanceof HTMLElement)) continue;
+        if (child.hasAttribute("inert")) continue;
+        if (child.tagName === "SCRIPT" || child.tagName === "STYLE") continue;
+        if (child.matches(INERT_EXEMPT_SELECTOR)) continue;
+        if (child.querySelector(INERT_EXEMPT_SELECTOR)) {
+          inertChildren(child, null);
+          continue;
+        }
+        child.setAttribute("inert", "");
+        touched.push(child);
+      }
+    };
     let node: HTMLElement | null = el;
     while (node && node !== document.body && node.parentElement) {
       const parent: HTMLElement = node.parentElement;
-      for (const sibling of Array.from(parent.children)) {
-        if (sibling === node || !(sibling instanceof HTMLElement)) continue;
-        if (sibling.hasAttribute("inert")) continue;
-        if (sibling.tagName === "SCRIPT" || sibling.tagName === "STYLE") continue;
-        sibling.setAttribute("inert", "");
-        touched.push(sibling);
-      }
+      inertChildren(parent, node);
       node = parent;
     }
     return () => {

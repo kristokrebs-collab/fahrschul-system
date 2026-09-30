@@ -5,19 +5,24 @@
  *   stopMarket()           → stops and releases it
  *   setSymbol(symbol)      → stop → new cache namespace → start (bundle effect with deps `[symbol]`)
  *
- * Hooks re-render only when the subscribed feed / health snapshot changes. High-frequency ticks
- * (aggTrade at 10 Hz) should be consumed through `motionValues.ts`; `useFeed("aggTrade")` is throttled
- * to one render per animation frame.
+ * Hooks re-render only when the subscribed feed / health snapshot changes. Two notification channels:
+ * - slow: health changes + every feed except the high-frequency ones → `useMarketVersion`, `useMarketView`,
+ *   `useTopTrader`, `useHealth`, `useFeed(slow feed)`
+ * - fast: `aggTrade` (≈10 Hz), `bookTop`, `markPrice` (1 Hz) → only `useFeed(fast feed)` and `usePriceSnapshot`
+ * The live price itself should be rendered from `motionValues.ts` (no React render per tick).
  */
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import type { Settings } from "@/domain/types";
-import type { FeedId, FeedValue, ProviderHealth, Stamped, StatusLabel } from "./types";
+import type { FeedId, FeedValue, ProviderHealth, Source, Stamped, StatusLabel } from "./types";
 import { createMarketProvider, type MarketProvider, type ProviderDeps } from "./provider";
 import { bindMotionValues } from "./motionValues";
-import { deriveMarket, deriveTopTrader, type DeriveOptions, type MarketView, type TopTraderBase, type TopTraderView } from "./mapping";
+import { deriveMarket, deriveTopTrader, lastPrice, type DeriveOptions, type MarketView, type TopTraderBase, type TopTraderView } from "./mapping";
 import { initialHealth } from "./health";
-import { buildFeedSpecs } from "./feeds";
+import { buildFeedSpecs, FEED_IDS } from "./feeds";
 import { STRINGS } from "./statusLabel";
+
+/** Feeds that publish several times per second; they never bump the slow version counter. */
+export const HIGH_FREQUENCY_FEEDS: ReadonlySet<FeedId> = new Set<FeedId>(["aggTrade", "bookTop", "markPrice"]);
 
 export interface StartOptions {
   sources?: MarketProvider["specs"][FeedId]["sources"];
@@ -35,18 +40,28 @@ interface StoreState {
 
 const state: StoreState = { provider: null, unbind: null, symbol: "", period: "", opts: {} };
 const listeners = new Set<() => void>();
+const fastListeners = new Set<() => void>();
 let version = 0;
 let offProvider: (() => void) | null = null;
 
+/** Slow channel: bumps `version` (lifecycle, health, slow feeds). */
 function emit(): void {
   version += 1;
   for (const l of listeners) l();
 }
 
+/** Fast channel: high-frequency feeds only; does not touch `version`. */
+function emitFast(): void {
+  for (const l of fastListeners) l();
+}
+
 function attach(p: MarketProvider): void {
   offProvider?.();
-  const offChange = p.onChange(emit);
-  offProvider = () => offChange();
+  const offs: Array<() => void> = [p.onHealth(emit)];
+  for (const feed of FEED_IDS) offs.push(p.subscribe(feed, HIGH_FREQUENCY_FEEDS.has(feed) ? emitFast : emit));
+  offProvider = () => {
+    for (const off of offs) off();
+  };
   state.unbind = bindMotionValues(p);
 }
 
@@ -106,16 +121,29 @@ function subscribe(cb: () => void): () => void {
   return () => void listeners.delete(cb);
 }
 
+/** Lifecycle (start/stop) + the fast channel: what a high-frequency feed hook needs. */
+function subscribeFast(cb: () => void): () => void {
+  listeners.add(cb);
+  fastListeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+    fastListeners.delete(cb);
+  };
+}
+
 const EMPTY_HEALTH = initialHealth(buildFeedSpecs("1h"));
 
 export function useProvider(): MarketProvider | null {
   return useSyncExternalStore(subscribe, () => state.provider, () => null);
 }
 
-/** Latest stamped value of a feed (undefined until the first datum / cache hydration). */
+/**
+ * Latest stamped value of a feed (undefined until the first datum / cache hydration).
+ * High-frequency feeds (`HIGH_FREQUENCY_FEEDS`) re-render per publish — prefer the MotionValues for those.
+ */
 export function useFeed<F extends FeedId>(feed: F): Stamped<FeedValue[F]> | undefined {
   const get = useCallback(() => state.provider?.get(feed), [feed]);
-  return useSyncExternalStore(subscribe, get, () => undefined);
+  return useSyncExternalStore(HIGH_FREQUENCY_FEEDS.has(feed) ? subscribeFast : subscribe, get, () => undefined);
 }
 
 export function useHealth(): ProviderHealth {
@@ -135,9 +163,73 @@ function labelFor(feed: FeedId, _health: ProviderHealth, _value: unknown): Statu
   return state.provider?.statusLabel(feed) ?? CONNECTING;
 }
 
-/** Snapshot version counter — re-renders on any change; use sparingly (e.g. settings page diagnostics). */
+/**
+ * Snapshot version counter — re-renders on any slow change (lifecycle, health, REST feeds, klines).
+ * `aggTrade` / `bookTop` / `markPrice` publishes do NOT bump it. Use sparingly (settings page diagnostics).
+ */
 export function useMarketVersion(): number {
   return useSyncExternalStore(subscribe, () => version, () => 0);
+}
+
+// ------------------------------------------------------------ price snapshot
+
+/** Rounded last price + its source: primitives only, so consumers re-render just when the integer changes. */
+export interface PriceSnapshot {
+  /** `Math.round(lastPrice)` or `null` before the first datum. */
+  price: number | null;
+  source: Source | null;
+}
+
+const NO_PRICE: PriceSnapshot = { price: null, source: null };
+let priceSnapshot: PriceSnapshot = NO_PRICE;
+
+/** Current rounded price + source from the provider snapshot (stable object while both are unchanged). */
+export function getPriceSnapshot(): PriceSnapshot {
+  const p = state.provider;
+  const lp = p ? lastPrice(p.snapshot()) : null;
+  const price = lp ? Math.round(lp.price) : null;
+  const source = lp ? lp.provenance.source : null;
+  if (price !== priceSnapshot.price || source !== priceSnapshot.source) priceSnapshot = { price, source };
+  return priceSnapshot;
+}
+
+/** Default throttle for `usePriceSnapshot` (≤ 4 renders per second even when the integer price flickers). */
+export const PRICE_SNAPSHOT_INTERVAL_MS = 250;
+
+function subscribePriceSnapshot(intervalMs: number): (cb: () => void) => () => void {
+  return (cb) => {
+    let last = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const fire = () => {
+      last = Date.now();
+      cb();
+    };
+    const throttled = () => {
+      const wait = intervalMs - (Date.now() - last);
+      if (wait <= 0) fire();
+      else if (!timer) {
+        timer = setTimeout(() => {
+          timer = null;
+          fire();
+        }, wait);
+      }
+    };
+    const off = subscribeFast(throttled);
+    return () => {
+      off();
+      if (timer) clearTimeout(timer);
+    };
+  };
+}
+
+/**
+ * Rounded live price + source for consumers that need a primitive (e.g. `App.tsx` → `TradeEditor.livePrice`).
+ * Re-renders only when the rounded price or the source changes, throttled to `intervalMs` (default 250 ms);
+ * the odometer / chart price line should keep reading `priceMv` instead.
+ */
+export function usePriceSnapshot(intervalMs: number = PRICE_SNAPSHOT_INTERVAL_MS): PriceSnapshot {
+  const sub = useMemo(() => subscribePriceSnapshot(intervalMs), [intervalMs]);
+  return useSyncExternalStore(sub, getPriceSnapshot, () => NO_PRICE);
 }
 
 /** Legacy market panel fields (price, change, close4h, closeW, rsiW, status, funding line …). */

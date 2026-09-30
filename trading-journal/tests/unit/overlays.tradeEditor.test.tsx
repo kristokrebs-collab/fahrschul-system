@@ -189,6 +189,39 @@ describe("TradeEditor – edit mode", () => {
     expect(useUi.getState().toasts[0]?.title).toBe("Trade aktualisiert");
   });
 
+  it("finding 10: keeps passthrough/unknown fields of the stored trade on edit", async () => {
+    const withExtra = SAMPLE.map((t) => (t.id === "A" ? ({ ...t, legacyExtra: "keep-me", nested: { a: 1 } } as typeof t) : t));
+    useJournal.setState({ trades: withExtra });
+    mount();
+    type("Learnings & Notizen", "edited");
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
+    const saved = saveTrade.mock.calls[0]?.[0] as unknown as Record<string, unknown>;
+    expect(saved).toMatchObject({ id: "A", createdAt: "2026-01-01T00:00:00.000Z", legacyExtra: "keep-me", nested: { a: 1 }, notes: "edited" });
+    expect(saved.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("finding 18: the toast island stays live (not inert) behind the open sheet", () => {
+    const island = document.createElement("div");
+    island.setAttribute("aria-live", "polite");
+    island.setAttribute("data-toast-island", "");
+    const wrapper = document.createElement("div");
+    wrapper.appendChild(island);
+    const other = document.createElement("div");
+    document.body.appendChild(wrapper);
+    document.body.appendChild(other);
+    try {
+      mount();
+      expect(screen.getByRole("dialog", { name: "Trade bearbeiten" })).toBeInTheDocument();
+      expect(other.hasAttribute("inert")).toBe(true);
+      expect(wrapper.hasAttribute("inert")).toBe(false); // contains a live region → descended into
+      expect(island.hasAttribute("inert")).toBe(false);
+    } finally {
+      wrapper.remove();
+      other.remove();
+    }
+  });
+
   it("inline delete confirmation `Wirklich löschen?` → deletes, toasts `Trade gelöscht`", async () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));

@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { bootJournal, getAccountView, getEnriched, MODE_LABELS, resetJournal, useJournal } from "@/store/journalStore";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { bootJournal, getAccountView, getEnriched, MODE_LABELS, PROBE_TIMEOUT_MS, resetJournal, useJournal } from "@/store/journalStore";
+import { readMeta } from "@/store/migrate";
 import { useUi } from "@/store/uiStore";
 import { BROKEN_TRADE, loadV0Fixture, seedV0 } from "./store.fixture";
 
@@ -52,6 +53,39 @@ describe("bootJournal", () => {
     await p;
     expect(useJournal.getState().mode).toBe("local");
     expect(useJournal.getState().loaded).toBe(true);
+  });
+
+  it("finding 9: a probe that never settles falls back to local after PROBE_TIMEOUT_MS", async () => {
+    vi.useFakeTimers();
+    try {
+      setClaude({ use: () => new Promise(() => {}) });
+      const p = bootJournal({ autoBackup: false });
+      await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS - 1);
+      expect(useJournal.getState().mode).toBe("connecting");
+      await vi.advanceTimersByTimeAsync(1);
+      await p;
+      expect(useJournal.getState().mode).toBe("local");
+      expect(useJournal.getState().loaded).toBe(true);
+      expect(PROBE_TIMEOUT_MS).toBe(8000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("finding 12: an aborted migration toasts and keeps schemaVersion 0", async () => {
+    const original = Storage.prototype.setItem;
+    const spy = vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, k: string, v: string) {
+      if (k.startsWith("tj2-backup-")) throw new Error("blocked");
+      original.call(this, k, v);
+    });
+    try {
+      await bootJournal({ autoBackup: false });
+      expect(readMeta().schemaVersion).toBe(0);
+      expect(useUi.getState().toasts[0]).toMatchObject({ kind: "error", title: "Snapshot konnte nicht angelegt werden" });
+      expect(useJournal.getState().trades).toHaveLength(2); // still readable
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("Fall B with a db handle: cloud snapshot REPLACES local state, loaded after trades AND settings", async () => {

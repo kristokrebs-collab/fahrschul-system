@@ -109,5 +109,23 @@ export function seedV0(fixture: V0Fixture = loadV0Fixture()): V0Fixture {
   return fixture;
 }
 
-/** A broken record: `side` is not a string, `setups` is not an array. */
-export const BROKEN_TRADE = { id: "t_broken", side: 42, status: "closed", date: "2026-01-01T00:00", setups: "nope" };
+/** A truly broken record: no `id` (the normaliser cannot invent one). Odd field types alone are NOT broken. */
+export const BROKEN_TRADE = { side: 42, status: "closed", date: "2026-01-01T00:00", setups: "nope", marker: "t_broken" };
+
+/** A legacy record the old app read fine: numbers as strings, `null` text, junk chart link. */
+export const LEGACY_LOOSE_TRADE = {
+  id: "t_loose000001",
+  side: "long",
+  status: "closed",
+  date: "2026-02-01T09:00",
+  pair: "BTC/USDT",
+  entry: "100",
+  stop: "90,5",
+  exit: "110",
+  size: "1000",
+  notes: null,
+  reason: null,
+  chart: "javascript:alert(1)",
+  setups: null,
+  checks: null,
+};

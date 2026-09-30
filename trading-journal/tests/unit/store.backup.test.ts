@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { applyBackup, autoBackup, importBackup, lastAutoBackup, listBackups, parseBackup, previewText, restoreBackup, writeSnapshot, AUTO_BACKUP_KEEP } from "@/store/backup";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { applyBackup, autoBackup, importBackup, lastAutoBackup, listBackups, parseBackup, previewText, restoreBackup, skippedText, writeSnapshot, AUTO_BACKUP_KEEP } from "@/store/backup";
 import { bootJournal, resetJournal, useJournal } from "@/store/journalStore";
+import { readQuarantine, SNAPSHOT_FAILED_TITLE } from "@/store/migrate";
 import { useUi } from "@/store/uiStore";
 import type { JsonBackup, Trade } from "@/domain/types";
-import { loadV0Fixture, seedV0 } from "./store.fixture";
+import { LEGACY_LOOSE_TRADE, loadV0Fixture, seedV0 } from "./store.fixture";
 
 async function bootLocal() {
   resetJournal();
@@ -16,11 +17,24 @@ function backupOf(trades: Trade[], extra: Partial<JsonBackup> = {}): string {
 }
 
 describe("parseBackup", () => {
-  it("rejects invalid JSON and reports the zod path", () => {
+  it("rejects invalid JSON and reports the zod path of the envelope", () => {
     expect(parseBackup("{")).toMatchObject({ ok: false });
-    const bad = parseBackup(JSON.stringify({ exportedAt: "x", settings: {}, trades: [{ id: 1 }] }));
+    const bad = parseBackup(JSON.stringify({ exportedAt: "x", settings: "nope", trades: [] }));
     expect(bad.ok).toBe(false);
-    if (!bad.ok) expect(bad.path).toBe("trades.0.id");
+    if (!bad.ok) expect(bad.path).toBe("settings");
+    const noTrades = parseBackup(JSON.stringify({ exportedAt: "x", settings: {}, trades: "nope" }));
+    expect(noTrades.ok).toBe(false);
+    if (!noTrades.ok) expect(noTrades.path).toBe("trades");
+  });
+
+  it("finding 1: validates per record – broken records are counted, loose legacy records pass", () => {
+    const p = parseBackup(JSON.stringify({ exportedAt: "x", settings: {}, trades: [LEGACY_LOOSE_TRADE, { notes: "no id" }, "junk"], hyblock: [{ at: "2026" }] }));
+    expect(p.ok).toBe(true);
+    if (!p.ok) return;
+    expect(p.preview).toMatchObject({ trades: 1, readings: 0, invalid: 3 });
+    expect(p.backup.trades[0]).toMatchObject({ id: "t_loose000001", entry: 100, notes: "", chart: "" });
+    expect(p.invalid.map((i) => i.kind)).toEqual(["trade", "trade", "hyblock"]);
+    expect(skippedText(3)).toBe("3 Einträge übersprungen");
   });
 
   it("previews counts and date", () => {
@@ -106,6 +120,56 @@ describe("importBackup / restoreBackup", () => {
     const restored = await restoreBackup("import-2026-09-30T00:00:00.000Z");
     expect(restored.ok).toBe(true);
     expect(useJournal.getState().trades).toHaveLength(2);
+  });
+
+  it("finding 1: restoreBackup accepts a legacy snapshot with entry:\"100\" / notes:null", async () => {
+    localStorage.setItem(
+      "tj2-backup-2026-09-01",
+      JSON.stringify({ settings: useJournal.getState().settings, trades: [LEGACY_LOOSE_TRADE], hyblock: [], at: "2026-09-01T00:00:00.000Z" }),
+    );
+    const res = await restoreBackup("2026-09-01", new Date("2026-09-30T00:00:00.000Z"));
+    expect(res.ok).toBe(true);
+    expect(res.preview).toMatchObject({ trades: 1, invalid: 0 });
+    expect(useJournal.getState().trades).toHaveLength(1);
+    expect(useJournal.getState().trades[0]).toMatchObject({ id: "t_loose000001", entry: 100, notes: "" });
+  });
+
+  it("finding 1: import skips and quarantines broken records instead of failing the file", async () => {
+    const t0 = useJournal.getState().trades[0]!;
+    const before = readQuarantine().length;
+    const res = await importBackup(backupOf([{ ...t0, id: "t_ok" }, { notes: "no id" } as unknown as Trade]), { mode: "replace", now: new Date("2026-09-30T00:00:00.000Z") });
+    expect(res.ok).toBe(true);
+    expect(res.preview?.invalid).toBe(1);
+    expect(useJournal.getState().trades.map((t) => t.id)).toEqual(["t_ok"]);
+    expect(readQuarantine()).toHaveLength(before + 1);
+    expect(readQuarantine().at(-1)).toMatchObject({ kind: "trade", key: "import", raw: { notes: "no id" } });
+    expect(useJournal.getState().quarantined).toBe(before + 1);
+    expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "success", title: "Backup importiert", detail: "1 Einträge übersprungen" });
+  });
+
+  describe("finding 2: snapshot could not be stored", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("fails with `Snapshot konnte nicht angelegt werden` and writes nothing", async () => {
+      const t0 = useJournal.getState().trades[0]!;
+      const rawBefore = localStorage.getItem("tj2-trades");
+      const original = Storage.prototype.setItem;
+      vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (this: Storage, k: string, v: string) {
+        if (k.startsWith("tj2-backup-import-")) throw new Error("blocked");
+        original.call(this, k, v);
+      });
+      const res = await importBackup(backupOf([{ ...t0, id: "t_imported" }]), { mode: "replace", now: new Date("2026-09-30T00:00:00.000Z") });
+      expect(res).toMatchObject({ ok: false, snapshotTag: null, error: SNAPSHOT_FAILED_TITLE });
+      expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "error", title: "Snapshot konnte nicht angelegt werden" });
+      expect(localStorage.getItem("tj2-trades")).toBe(rawBefore);
+      expect(useJournal.getState().trades).toHaveLength(2);
+
+      // restore goes through the same guard
+      localStorage.setItem("tj2-backup-2026-09-01", JSON.stringify({ settings: {}, trades: [t0], hyblock: [], at: "2026-09-01T00:00:00.000Z" }));
+      const restored = await restoreBackup("2026-09-01");
+      expect(restored.ok).toBe(false);
+      expect(useJournal.getState().trades).toHaveLength(2);
+    });
   });
 
   it("accepts a File", async () => {

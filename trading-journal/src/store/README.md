@@ -6,6 +6,9 @@ keeps `uiStore.page`/`tradeFilter` and `location.hash` in sync.
 
 ## Boot (app shell)
 
+`bootJournal({ probeCloud?, autoBackup?, now?, probeTimeoutMs? })` – the `use("db")` probe is raced against
+`PROBE_TIMEOUT_MS` (8 s); when it does not settle the store goes local.
+
 ```ts
 import { bootJournal } from "@/store/journalStore";
 import { installRouter } from "@/store/router";
@@ -87,26 +90,43 @@ getScroll(page); currentRoute(); PAGES; PAGE_KEYS ({ overview:"o", trades:"t", s
 - `adapters/StoreApi.ts`: `StoreApi`, `StorageSnapshot { trades, settings, hyblock }`, `StorageAdapter { mode, load(), api, subscribe(ev), replaceAll(), dispose() }`, `AdapterEvent` (`patch` | `error` | `quarantine`).
 - `adapters/localAdapter.ts`: `createLocalAdapter()`, `readLocalSnapshot()`. Keys `tj2-trades`, `tj2-settings`, `tj2-hyblock`; upsert `filter(id≠).concat`; normalisation on read only; readings sorted by `at.localeCompare`.
 - `adapters/claudeDbAdapter.ts`: `probeClaudeDb()` (`null` outside claude.ai), `createClaudeDbAdapter(db)` – collections `trades`/`hyblock`, doc `config/settings`, `onSnapshot`; `saveTrade` strips `id` → `set`/`add`. `ClaudeDb` interface is deliberately loose.
-- `storage.ts`: `KEYS`, `readJson`/`writeJson` (bundle `g`/`h`), `writeJsonStrict`, `listKeys(prefix)`, `removeKey`, `isQuotaError`, `StorageWriteError`.
+- `storage.ts`: `KEYS`, `readJson`/`writeJson` (bundle `g`/`h`), `readJsonDetailed(key)` → `{ status: "missing" | "ok" | "corrupt" }`,
+  `writeJsonStrict`, `writeRaw`, `listKeys(prefix)`, `removeKey`, `isQuotaError`, `StorageWriteError`.
+  **Corrupt keys**: `readJson` copies an unparseable value to `tj2-quarantine` as `{ kind:"blob", key, raw, error:"invalid JSON", at }`
+  (`quarantineRaw`, once per key+raw) before returning the fallback; `assertWritable(key)` (used by every local write) throws
+  `StorageWriteError` while the raw string is not quarantined, so the first save can never destroy the only copy.
+- `localAdapter.replaceAll` is atomic: all three keys are written, on failure the already written keys are rolled back to their
+  previous raw strings and the error rethrown; memory changes only after all three succeeded.
+- `claudeDbAdapter.replaceAll` upserts first and deletes leftovers last; a rejected upsert aborts before any delete. Invalid
+  cloud documents are recorded in `tj2-quarantine` as `{ kind:"cloud", collection, id, raw }` (`recordCloudQuarantine`, idempotent per doc).
 - `capability.ts`: `requestCapability<T>(name)` (bundle `oa`), `hasClaudeRuntime()`.
 
 ## `migrate.ts`
 
-`migrate(now?)` → `{ from, to, changed, quarantined, snapshotTag }`. Meta key `tj2-meta` `{ schemaVersion: 1, migratedAt, appVersion }`.
-v0→v1: snapshot `tj2-backup-v0-{ISO}` (max 3 kept), `TradeSchema.passthrough()` / `HyblockReadingSchema.passthrough()`,
-unknown fields kept, invalid records → `tj2-quarantine` (never deleted), `pnl`/`r` recomputed via `computePnlR`,
-settings written through `normalizeSettings`. Helpers: `validateTrades(raw)`, `validateReadings(raw)` (pure; the cloud
-adapter uses them on read), `readMeta()`, `readQuarantine()`, `quarantineToastTitle(n)`.
+`migrate(now?)` → `{ from, to, changed, quarantined, snapshotTag, aborted? }`. Meta key `tj2-meta` `{ schemaVersion: 1, migratedAt, appVersion }`.
+v0→v1: snapshot `tj2-backup-v0-{ISO}` (max 3 kept; an unparseable key is stored as its raw string). **If the snapshot cannot be
+written the migration aborts** (`aborted: true`, schemaVersion stays 0, nothing touched, toast `Snapshot konnte nicht angelegt werden`).
+Records are **normalised first, validated after** (`TradeSchema.safeParse(normalizeTrade(item))`): everything the old app read
+(`entry:"100"`, `notes:null`, missing fields) stays valid; only records without `id` / not an object go to `tj2-quarantine`
+(never deleted). Unknown fields kept, `pnl`/`r` recomputed via `computePnlR`, settings written through `normalizeSettings`.
+Helpers: `validateTrades(raw)`, `validateReadings(raw)` (pure; migration, import/restore and the cloud adapter use them),
+`appendQuarantine(entries)`, `recordCloudQuarantine(collection, invalid)`, `readMeta()`, `readQuarantine()`,
+`quarantineToastTitle(n)`, `SNAPSHOT_FAILED_TITLE`. `QuarantineEntry.kind`: `trade | hyblock | blob | cloud`.
 
 ## `backup.ts`
 
 ```ts
 await exportJson();                    // trade-journal-YYYY-MM-DD.json  ({ exportedAt, settings, trades, hyblock, schemaVersion })
 await exportCsv();                     // trade-journal-YYYY-MM-DD.csv   (via @/domain/csv)
-parseBackup(text)                      // { ok, backup, preview } | { ok:false, error, path }
+parseBackup(text)                      // { ok, backup, preview, invalid } | { ok:false, error, path }
+                                       // envelope (exportedAt, settings) required; trades/readings validated PER RECORD
+                                       // (normalise first) – broken ones are counted in preview.invalid, not fatal
 previewText(preview)                   // "{n} Trades, {m} Grundlagen, {k} Ablesungen · exportiert am dd.MM.yy"
+skippedText(n)                         // "{n} Einträge übersprungen" (toast detail when preview.invalid > 0)
 applyBackup(current, backup, "merge"|"replace")   // pure merge rules (newer updatedAt wins, setups by id)
-await importBackup(fileOrText, { mode })          // snapshot tj2-backup-import-{ISO}, write, toasts
+await importBackup(fileOrText, { mode })          // snapshot tj2-backup-import-{ISO} – when it cannot be stored the import
+                                                  // FAILS (`Snapshot konnte nicht angelegt werden`) and nothing is written;
+                                                  // skipped records go to tj2-quarantine (key "import")
 listBackups()                          // [{ tag, key, kind: "auto"|"import"|"v0", at, trades }] newest first
 lastAutoBackup()                       // "Letztes Backup {date}"
 await restoreBackup(tag)               // = import flow with replace

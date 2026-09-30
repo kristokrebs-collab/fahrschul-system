@@ -1,11 +1,12 @@
 import type { HyblockReading, JsonBackup, Settings, Setup, Trade } from "@/domain/types";
 import { JsonBackupSchema } from "@/domain/schemas";
 import { toJsonBackup, tradesToCsv } from "@/domain/csv";
-import { normalizeReading, normalizeSettings, normalizeTrade } from "@/domain/normalize";
+import { normalizeSettings } from "@/domain/normalize";
 import { fmt } from "@/lib/format";
 import { download } from "./download";
 import { getEnriched, useJournal } from "./journalStore";
 import type { StorageSnapshot } from "./adapters/StoreApi";
+import { appendQuarantine, readQuarantine, SNAPSHOT_FAILED_TITLE, validateReadings, validateTrades, type QuarantineEntry } from "./migrate";
 import { isQuotaError, KEYS, listKeys, readJson, removeKey, writeJsonStrict } from "./storage";
 import { pushToast } from "./uiStore";
 
@@ -139,9 +140,24 @@ export interface ImportPreview {
   readings: number;
   exportedAt: string;
   schemaVersion: number | null;
+  /** Records (trades + readings) that failed validation even after normalising; they are skipped and quarantined on import. */
+  invalid: number;
 }
 
-export type ParsedBackup = { ok: true; backup: JsonBackup; preview: ImportPreview } | { ok: false; error: string; path: string };
+export interface InvalidImportRecord {
+  kind: "trade" | "hyblock";
+  raw: unknown;
+  error: string;
+}
+
+export type ParsedBackup =
+  | { ok: true; backup: JsonBackup; preview: ImportPreview; invalid: InvalidImportRecord[] }
+  | { ok: false; error: string; path: string };
+
+/** `{n} Einträge übersprungen` – detail line for a partially valid backup. */
+export function skippedText(n: number): string {
+  return `${n} Einträge übersprungen`;
+}
 
 /** `{n} Trades, {m} Grundlagen, {k} Ablesungen · exportiert am {date}` */
 export function previewText(p: ImportPreview): string {
@@ -149,7 +165,11 @@ export function previewText(p: ImportPreview): string {
   return `${p.trades} Trades, ${p.setups} Grundlagen, ${p.readings} Ablesungen · exportiert am ${date}`;
 }
 
-/** Parses backup text with `JsonBackupSchema` (passthrough). Never throws. */
+/**
+ * Parses backup text: the envelope (`exportedAt`, `settings`) must be valid; trades and readings are validated
+ * per record (`validateTrades` / `validateReadings`, normalise first) and broken ones are counted in
+ * `preview.invalid` instead of rejecting the whole file. Never throws.
+ */
 export function parseBackup(text: string): ParsedBackup {
   let json: unknown;
   try {
@@ -163,24 +183,32 @@ export function parseBackup(text: string): ParsedBackup {
     const path = issue ? issue.path.map(String).join(".") : "";
     return { ok: false, error: issue?.message ?? "Ungültiges Backup", path };
   }
-  const data = parsed.data as unknown as JsonBackup;
+  const data = parsed.data as unknown as Omit<JsonBackup, "trades" | "hyblock"> & { trades: unknown[]; hyblock?: unknown[] };
   const settings = normalizeSettings(data.settings);
+  const trades = validateTrades(data.trades);
+  const readings = Array.isArray(data.hyblock) ? validateReadings(data.hyblock) : null;
   const backup: JsonBackup = {
     ...data,
     exportedAt: typeof data.exportedAt === "string" ? data.exportedAt : "",
     settings,
-    trades: Array.isArray(data.trades) ? data.trades.map((t) => normalizeTrade(t)) : [],
-    hyblock: Array.isArray(data.hyblock) ? data.hyblock.map((r) => normalizeReading(r)) : undefined,
+    trades: trades.valid,
+    hyblock: readings ? readings.valid : undefined,
   };
+  const invalid: InvalidImportRecord[] = [
+    ...trades.invalid.map((i) => ({ kind: "trade" as const, ...i })),
+    ...(readings?.invalid ?? []).map((i) => ({ kind: "hyblock" as const, ...i })),
+  ];
   return {
     ok: true,
     backup,
+    invalid,
     preview: {
       trades: backup.trades.length,
       setups: settings.setups.length,
       readings: backup.hyblock?.length ?? 0,
       exportedAt: backup.exportedAt,
       schemaVersion: typeof data.schemaVersion === "number" ? data.schemaVersion : null,
+      invalid: invalid.length,
     },
   };
 }
@@ -268,29 +296,50 @@ export async function importBackup(
   const store = useJournal.getState();
   const current: StorageSnapshot = { trades: store.trades, settings: store.settings, hyblock: store.hyblock };
   const snapshotTag = `import-${now.toISOString()}`;
-  writeSnapshot(snapshotTag, { ...current, at: now.toISOString() });
+  // The snapshot is the only way back – without it nothing is written.
+  if (!writeSnapshot(snapshotTag, { ...current, at: now.toISOString() })) {
+    if (!opts.silent) pushToast({ kind: "error", title: SNAPSHOT_FAILED_TITLE, detail: "Import abgebrochen" });
+    return { ok: false, mode: opts.mode, preview: parsed.preview, snapshotTag: null, error: SNAPSHOT_FAILED_TITLE };
+  }
 
   try {
     await store.replaceAll(applyBackup(current, parsed.backup, opts.mode));
   } catch (e) {
     return fail(e instanceof Error ? e.message : "Speichern fehlgeschlagen", "", parsed.preview);
   }
-  if (!opts.silent) pushToast({ kind: "success", title: "Backup importiert", value: `${parsed.preview.trades} Trades` });
+  if (parsed.invalid.length) {
+    const at = now.toISOString();
+    const entries: QuarantineEntry[] = parsed.invalid.map((i) => ({ kind: i.kind, key: "import", raw: i.raw, error: i.error, at }));
+    appendQuarantine(entries);
+    useJournal.setState({ quarantined: readQuarantine().length });
+  }
+  if (!opts.silent) {
+    pushToast({
+      kind: "success",
+      title: "Backup importiert",
+      value: `${parsed.preview.trades} Trades`,
+      detail: parsed.invalid.length ? skippedText(parsed.invalid.length) : undefined,
+    });
+  }
   return { ok: true, mode: opts.mode, preview: parsed.preview, snapshotTag };
 }
 
-/** `Wiederherstellen`: restore = import flow with `Ersetzen` (Plan 8.6). */
+/**
+ * `Wiederherstellen`: restore = import flow with `Ersetzen` (Plan 8.6). Records are normalised before
+ * validation (legacy snapshots with `entry:"100"` / `notes:null` restore fine); a snapshot whose keys were
+ * stored as raw strings (unparseable at migration time) has no readable records and restores none.
+ */
 export async function restoreBackup(tag: string, now: Date = new Date()): Promise<ImportResult> {
   const snap = readBackup(tag);
   if (!snap) {
     pushToast({ kind: "error", title: "Import fehlgeschlagen", detail: `Backup ${tag} nicht gefunden` });
     return { ok: false, mode: "replace", preview: null, snapshotTag: null, error: "not found" };
   }
-  const asBackup: JsonBackup = {
-    exportedAt: snap.at,
+  const asBackup = {
+    exportedAt: typeof snap.at === "string" ? snap.at : now.toISOString(),
     settings: normalizeSettings(snap.settings),
-    trades: Array.isArray(snap.trades) ? (snap.trades as Trade[]) : [],
-    hyblock: Array.isArray(snap.hyblock) ? (snap.hyblock as HyblockReading[]) : undefined,
+    trades: Array.isArray(snap.trades) ? snap.trades : [],
+    hyblock: Array.isArray(snap.hyblock) ? snap.hyblock : undefined,
     schemaVersion: 1,
   };
   return importBackup(JSON.stringify(asBackup), { mode: "replace", now });

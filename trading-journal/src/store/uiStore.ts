@@ -67,7 +67,7 @@ export interface UiPrefs {
 /** Bundle `y0`. */
 export const DEFAULT_TRADE_FILTER: TradeFilter = { q: "", setup: "all", result: "all", side: "all", acc: "all" };
 export const DEFAULT_TRADE_SORT: TradeSort = { k: "date", dir: -1 };
-export const DEFAULT_CHART: ChartPrefs = { interval: "4h", rangeDays: 90, pane: "ratio", open: true };
+export const DEFAULT_CHART: ChartPrefs = { interval: "4h", rangeDays: 30, pane: "ratio", open: true };
 export const DEFAULT_PREFS: UiPrefs = {
   theme: "dark",
   hideLocalBanner: false,

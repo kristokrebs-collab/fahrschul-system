@@ -1,7 +1,7 @@
 import type { HyblockReading, Settings, StoreApi, Trade } from "@/domain/types";
 import { normalizeSettings } from "@/domain/normalize";
 import { requestCapability } from "../capability";
-import { validateReadings, validateTrades } from "../migrate";
+import { recordCloudQuarantine, validateReadings, validateTrades } from "../migrate";
 import type { AdapterEvent, StorageAdapter, StorageSnapshot } from "./StoreApi";
 
 /* ---- Loose typing of the claude.ai `db` capability (only the methods the bundle uses) ---- */
@@ -76,14 +76,22 @@ export function createClaudeDbAdapter(db: ClaudeDb): StorageAdapter {
           const raw = snap.docs.map((d) => ({ id: d.id, ...clone<Record<string, unknown>>(d.data()) }));
           const v = validateTrades(raw);
           trades = v.valid;
-          if (v.invalid.length) emit({ type: "quarantine", count: v.invalid.length });
+          if (v.invalid.length) {
+            recordCloudQuarantine("trades", v.invalid);
+            emit({ type: "quarantine", count: v.invalid.length });
+          }
           emit({ type: "patch", patch: { trades } });
         }, onError),
       );
       unsubs.push(
         db.collection("hyblock").onSnapshot((snap) => {
           const raw = snap.docs.map((d) => ({ id: d.id, ...clone<Record<string, unknown>>(d.data()) }));
-          hyblock = validateReadings(raw).valid.sort((a, b) => a.at.localeCompare(b.at));
+          const v = validateReadings(raw);
+          if (v.invalid.length) {
+            recordCloudQuarantine("hyblock", v.invalid);
+            emit({ type: "quarantine", count: v.invalid.length });
+          }
+          hyblock = v.valid.sort((a, b) => a.at.localeCompare(b.at));
           emit({ type: "patch", patch: { hyblock } });
         }, onError),
       );
@@ -131,18 +139,18 @@ export function createClaudeDbAdapter(db: ClaudeDb): StorageAdapter {
       start();
       return () => listeners.delete(listener);
     },
+    /** Upserts first, deletes leftovers last; a rejected upsert aborts before anything is deleted. */
     async replaceAll(snapshot) {
       const keepTrades = new Set(snapshot.trades.map((t) => t.id));
       const keepReadings = new Set(snapshot.hyblock.map((r) => r.id));
-      await Promise.all([
-        ...trades.filter((t) => !keepTrades.has(t.id)).map((t) => api.deleteTrade(t.id)),
-        ...hyblock.filter((r) => !keepReadings.has(r.id)).map((r) => api.deleteHyblock(r.id)),
-      ]);
+      const staleTrades = trades.filter((t) => !keepTrades.has(t.id)).map((t) => t.id);
+      const staleReadings = hyblock.filter((r) => !keepReadings.has(r.id)).map((r) => r.id);
       await Promise.all([
         ...snapshot.trades.map((t) => api.saveTrade(t)),
         ...snapshot.hyblock.map((r) => api.saveHyblock(r)),
         api.saveSettings(snapshot.settings),
       ]);
+      await Promise.all([...staleTrades.map((id) => api.deleteTrade(id)), ...staleReadings.map((id) => api.deleteHyblock(id))]);
     },
     dispose() {
       for (const u of unsubs) {

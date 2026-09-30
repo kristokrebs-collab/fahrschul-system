@@ -8,7 +8,7 @@ import { hasClaudeRuntime } from "./capability";
 import { createLocalAdapter } from "./adapters/localAdapter";
 import { createClaudeDbAdapter, probeClaudeDb } from "./adapters/claudeDbAdapter";
 import type { AdapterEvent, StorageAdapter, StorageSnapshot } from "./adapters/StoreApi";
-import { migrate, quarantineToastTitle, readQuarantine } from "./migrate";
+import { migrate, quarantineToastTitle, readQuarantine, SNAPSHOT_FAILED_TITLE } from "./migrate";
 import { autoBackup } from "./backup";
 import { pushToast } from "./uiStore";
 
@@ -141,6 +141,22 @@ export interface BootOptions {
   /** Skip the daily auto-backup. */
   autoBackup?: boolean;
   now?: () => Date;
+  /** How long `use("db")` may take before the app falls back to local mode (default `PROBE_TIMEOUT_MS`). */
+  probeTimeoutMs?: number;
+}
+
+/** `window.claude.use("db")` has no timeout of its own; after this the store goes local. */
+export const PROBE_TIMEOUT_MS = 8000;
+
+/** Resolves with `null` when `probe` has not settled within `ms` (the timer is cleared when it does). */
+function withTimeout<T>(probe: Promise<T | null>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([probe, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 let booting: Promise<void> | null = null;
@@ -177,6 +193,7 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
     if (e.type === "patch") set(e.patch);
   });
   set({ ...snapshot, api: local.api, mode: "connecting", loaded: false, quarantined });
+  if (migration.aborted) pushToast({ kind: "error", title: SNAPSHOT_FAILED_TITLE, detail: "Migration wird beim nächsten Start erneut versucht" });
   if (migration.quarantined > 0) pushToast({ kind: "error", title: quarantineToastTitle(migration.quarantined) });
 
   const goLocal = () => {
@@ -190,7 +207,8 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
     }
   };
 
-  const probe = opts.probeCloud === false || !hasClaudeRuntime() ? Promise.resolve(null) : probeClaudeDb();
+  const probe =
+    opts.probeCloud === false || !hasClaudeRuntime() ? Promise.resolve(null) : withTimeout(probeClaudeDb(), opts.probeTimeoutMs ?? PROBE_TIMEOUT_MS);
 
   booting = probe
     .then((db) => {
@@ -208,7 +226,8 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
         } else if (e.type === "error") {
           set({ mode: "error" });
         } else if (e.type === "quarantine") {
-          set({ quarantined: e.count });
+          // The adapter recorded the documents in `tj2-quarantine`; show what `Quarantäne ansehen` will list.
+          set({ quarantined: Math.max(e.count, readQuarantine().length) });
         }
       });
       // Replace, never merge: locally hydrated data is not shown or uploaded in cloud mode.

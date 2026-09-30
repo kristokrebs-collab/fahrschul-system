@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tradesToCsv, csvCell, CSV_HEADER, CSV_BOM, toJsonBackup, jsonBackupText, exportFilename, stripEnrichment } from "@/domain/csv";
+import { tradesToCsv, csvCell, csvTextCell, CSV_COLUMN_KINDS, CSV_HEADER, CSV_BOM, toJsonBackup, jsonBackupText, exportFilename, stripEnrichment } from "@/domain/csv";
 import { A, B, C, D, E, F, enriched, settings } from "./domain.fixtures";
 
 describe("tradesToCsv (bundle K$)", () => {
@@ -32,6 +32,30 @@ describe("tradesToCsv (bundle K$)", () => {
     expect(csvCell('say "hi"')).toBe('"say ""hi"""');
     expect(csvCell("line\nbreak")).toBe('"line\nbreak"');
     expect(csvCell("plain")).toBe("plain");
+  });
+  it("finding 13: free-text cells starting with a formula character are prefixed with ', numbers are not", () => {
+    expect(csvTextCell("=HYPERLINK(\"http://x\")")).toBe("\"'=HYPERLINK(\"\"http://x\"\")\"");
+    expect(csvTextCell("+1")).toBe("'+1");
+    expect(csvTextCell("-cmd")).toBe("'-cmd");
+    expect(csvTextCell("@SUM")).toBe("'@SUM");
+    expect(csvTextCell("\tx")).toBe("'\tx");
+    expect(csvTextCell("\rx")).toBe("'\rx");
+    expect(csvTextCell("plain")).toBe("plain");
+    expect(csvTextCell(null)).toBe("");
+    expect(csvCell(-100)).toBe("-100");
+    expect(CSV_COLUMN_KINDS.Notizen).toBe("text");
+    expect(CSV_COLUMN_KINDS["P&L"]).toBe("value");
+
+    const evil = { ...B, notes: "=1+1", reason: "@cmd", pair: "-BTC", emotion: "+x", timeframe: "=4h", chart: "" };
+    const line = tradesToCsv(enriched([evil]), s).slice(1).split("\n")[1]!.split(";");
+    const col = (name: (typeof CSV_HEADER)[number]) => line[CSV_HEADER.indexOf(name)];
+    expect(col("Notizen")).toBe("'=1+1");
+    expect(col("Begründung")).toBe("'@cmd");
+    expect(col("Paar")).toBe("'-BTC");
+    expect(col("Gefühl")).toBe("'+x");
+    expect(col("Timeframe")).toBe("'=4h");
+    expect(col("P&L")).toBe("-100"); // numeric column untouched
+    expect(col("R")).toBe("-0,67");
   });
   it("json backup", () => {
     const en = enriched([A]);

@@ -15,6 +15,22 @@ const FIX = JSON.parse(readFileSync(resolve(process.cwd(), "tests/fixtures/tj2-v
   "tj2-hyblock": unknown[];
 };
 
+describe("normalizeTrade chart link (finding 14)", () => {
+  it("keeps http(s) links and drops everything else", () => {
+    expect(normalizeTrade({ id: "a", chart: " https://www.tradingview.com/x/abc " }).chart).toBe("https://www.tradingview.com/x/abc");
+    expect(normalizeTrade({ id: "a", chart: "javascript:alert(1)" }).chart).toBe("");
+    expect(normalizeTrade({ id: "a", chart: "tradingview.com/x" }).chart).toBe("");
+    expect(normalizeTrade({ id: "a", chart: null }).chart).toBe("");
+  });
+  it("loose legacy values validate after normalising (schema no stricter than the normaliser)", () => {
+    const t = normalizeTrade({ id: "a", entry: "100", stop: "90,5", notes: null, setups: null, checks: null, side: 42, status: 7 });
+    expect(TradeSchema.safeParse(t).success).toBe(true);
+    expect(t).toMatchObject({ entry: 100, stop: 90.5, notes: "", setups: [], checks: {}, side: "long", status: "closed" });
+    expect(TradeSchema.safeParse(normalizeTrade({ notes: "no id" })).success).toBe(false);
+    expect(TradeSchema.safeParse({ id: "raw", entry: "100", notes: null }).success).toBe(true); // raw form also accepted
+  });
+});
+
 describe("normalizeSettings (bundle qM)", () => {
   it("null/undefined/garbage → full defaults", () => {
     for (const raw of [null, undefined, "x", 3, []]) {

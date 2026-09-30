@@ -42,6 +42,55 @@ export function csvCell(h: unknown): string {
   return /[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
+/** Characters a spreadsheet interprets as the start of a formula (`=`, `+`, `-`, `@`, tab, CR). */
+const FORMULA_LEAD = /^[=+\-@\t\r]/;
+
+/**
+ * `csvCell` for free-text columns: a value starting with a formula character is prefixed with `'` so
+ * Excel / Sheets / Numbers show it as text (CSV formula injection). Numeric columns keep `csvCell` because
+ * negative `,`-decimal numbers legitimately start with `-`.
+ */
+export function csvTextCell(h: unknown): string {
+  const v = h == null ? "" : String(h);
+  return csvCell(FORMULA_LEAD.test(v) ? `'${v}` : v);
+}
+
+export type CsvColumnKind = "text" | "value";
+
+/**
+ * Per-column escaping, index-aligned with `CSV_HEADER`. `text` = user-entered free text (formula-escaped),
+ * `value` = numbers, dates, enumerations and computed fields (written as-is).
+ */
+export const CSV_COLUMN_KINDS: Readonly<Record<(typeof CSV_HEADER)[number], CsvColumnKind>> = {
+  Datum: "value",
+  Konto: "value",
+  Paar: "text",
+  Richtung: "value",
+  Status: "value",
+  Einstieg: "value",
+  Stop: "value",
+  Ziel: "value",
+  Ausstieg: "value",
+  Größe: "value",
+  Hebel: "value",
+  Gebühren: "value",
+  "P&L": "value",
+  R: "value",
+  "Kursbewegung %": "value",
+  Ergebnis: "value",
+  Grundlagen: "text",
+  Checkliste: "value",
+  Überzeugung: "value",
+  "Plan befolgt": "value",
+  Gefühl: "text",
+  Timeframe: "text",
+  Begründung: "text",
+  Notizen: "text",
+  Chart: "text",
+};
+
+const CELL_FORMATTERS: ReadonlyArray<(h: unknown) => string> = CSV_HEADER.map((name) => (CSV_COLUMN_KINDS[name] === "text" ? csvTextCell : csvCell));
+
 export function tradeToCsvRow(t: EnrichedTrade, setupNames: ReadonlyMap<string, string>): string {
   return [
     t.date,
@@ -73,7 +122,7 @@ export function tradeToCsvRow(t: EnrichedTrade, setupNames: ReadonlyMap<string, 
     t.notes,
     t.chart,
   ]
-    .map(csvCell)
+    .map((cell, i) => (CELL_FORMATTERS[i] ?? csvCell)(cell))
     .join(";");
 }
 

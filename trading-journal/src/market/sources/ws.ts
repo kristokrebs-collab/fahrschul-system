@@ -108,7 +108,11 @@ export class WsClient {
     this.connect();
   }
 
-  /** `visibilitychange → visible` / `online`: reconnect when the stream went silent meanwhile. */
+  /**
+   * `visibilitychange → visible` / `online`: reconnect when the stream went silent meanwhile — including when the
+   * silent timer already fired while the tab was hidden (`state === "silent"`, no timer armed any more). An open,
+   * healthy socket gets its silent timer re-armed (timers may have been throttled while hidden).
+   */
   nudge(): void {
     if (this.stopped) return;
     const now = this.host.now();
@@ -118,10 +122,12 @@ export class WsClient {
       this.connect();
       return;
     }
-    if (this.state === "open" && now - this.lastMessageAt > this.silentMs) {
+    if (this.state === "silent" || (this.state === "open" && now - this.lastMessageAt > this.silentMs)) {
       this.opts.onSilent?.(now);
       this.reconnect();
+      return;
     }
+    if (this.state === "open") this.armSilent(Math.max(1, this.lastMessageAt + this.silentMs - now));
   }
 
   private timers: { silent?: unknown; rollover?: unknown; stable?: unknown; retry?: unknown } = {};
@@ -225,7 +231,8 @@ export class WsClient {
     this.timers.retry = this.host.setTimeout(() => this.connect(), delay);
   }
 
-  private armSilent(): void {
+  /** Arms the silence check `delayMs` from now (default: the full window; `nudge()` passes the remaining part). */
+  private armSilent(delayMs: number = this.silentMs): void {
     if (this.timers.silent != null) this.host.clearTimeout(this.timers.silent);
     this.timers.silent = this.host.setTimeout(() => {
       if (this.stopped || !this.ws) return;
@@ -238,7 +245,7 @@ export class WsClient {
       } else {
         this.armSilent();
       }
-    }, this.silentMs);
+    }, delayMs);
   }
 
   private armStable(): void {
