@@ -5,7 +5,7 @@
 import type { Settings, Trade } from "./types";
 import type { AccountView, SetupStats } from "./account";
 import type { EnrichedTrade } from "./types";
-import { DASH, INFINITY_SIGN, date, n0, n1, n2, pct, pct0, r as fmtR, signed, toneClass } from "@/lib/format";
+import { colorClass, DASH, INFINITY_SIGN, date, n0, n1, n2, pct, pct0, r as fmtR, signed, toneClass } from "@/lib/format";
 import { tradeTime } from "@/lib/dates";
 
 export type Tone = "win" | "loss" | "warn" | "mute";
@@ -73,8 +73,8 @@ export function explain(key: ExplainKey, view: AccountView, settings: Pick<Setti
         rows: [
           ["Rendite aufs Startkapital", view.start ? pct(n.net / view.start) : DASH, toneClass(n.net)],
           ["Kontostand jetzt", `${n0(view.balance)} ${cur}`],
-          ["Bester Trade", tradeLine(n.best, cur), "text-win"],
-          ["Schlechtester Trade", tradeLine(n.worst, cur), "text-loss"],
+          ["Bester Trade", tradeLine(n.best, cur), colorClass(n.best?.pnl)],
+          ["Schlechtester Trade", tradeLine(n.worst, cur), colorClass(n.worst?.pnl)],
           ["Gezahlte Gebühren", `${n2(n.fees)} ${cur}`],
           ["Offene Positionen", String(view.open.length)],
         ],
@@ -311,8 +311,8 @@ export function explainSetup(e: SetupStats, trades: readonly EnrichedTrade[], cu
     rows: [
       ["Profit-Faktor", pfText(e.pf)],
       ["Ø Gewinn / Ø Verlust", `${n0(e.avgWin)} / ${n0(e.avgLoss)}`],
-      ["Bester Trade", tradeLine(e.best, cur), "text-win"],
-      ["Schlechtester Trade", tradeLine(e.worst, cur), "text-loss"],
+      ["Bester Trade", tradeLine(e.best, cur), colorClass(e.best?.pnl)],
+      ["Schlechtester Trade", tradeLine(e.worst, cur), colorClass(e.worst?.pnl)],
       ["Checkliste komplett", withSetup.length ? `${complete} von ${withSetup.length}` : DASH],
       ["Ø Kursbewegung", pct(e.moveExp), toneClass(e.moveExp)],
     ],
