@@ -459,11 +459,11 @@ export function Btn({ children, onClick, variant = 'ghost', size = 'md', classNa
     danger: 'border-signal/40 bg-signal/10 text-[#ff8a90] hover:bg-signal/20',
   }[variant];
   return (
-    <button type={type} disabled={disabled} onClick={onClick}
-      className={cn('inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-semibold transition-all duration-200 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50',
+    <motion.button type={type} disabled={disabled} onClick={onClick} whileTap={disabled ? undefined : { scale: 0.96 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+      className={cn('inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50',
         size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-[13px]', v, className)}>
       {children}
-    </button>
+    </motion.button>
   );
 }
 

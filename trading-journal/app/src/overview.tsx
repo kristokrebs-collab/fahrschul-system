@@ -464,7 +464,7 @@ function Recent({ st, settings, onEdit, onNew, goTrades }: { st: Stats; settings
       {!list.length ? <Empty title="Noch keine Trades" text="Trag deinen ersten Trade ein. Alle Zahlen im Journal rechnen sich dann automatisch." action={<Btn variant="primary" size="sm" onClick={onNew} className="mt-2">Ersten Trade eintragen</Btn>} /> : (
         <div className="grid">
           {list.map((t, i) => (
-            <motion.button key={t.id} type="button" onClick={() => onEdit(t)} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05 }}
+            <motion.button key={t.id} layoutId={`trade-${t.id}`} type="button" onClick={() => onEdit(t)} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.05, layout: { type: 'spring', bounce: 0.08, duration: 0.45 } }} whileTap={{ scale: 0.985 }}
               className={cn('grid grid-cols-[52px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.03]', i && 'border-t border-line')}>
               <span className="num font-mono text-[11px] leading-tight text-mute">{fmt.date(tDate(t))}<br />{fmt.time(tDate(t))}</span>
               <span className="grid min-w-0 gap-1">
@@ -475,7 +475,7 @@ function Recent({ st, settings, onEdit, onNew, goTrades }: { st: Stats; settings
                 <SetupChips ids={t.setups} settings={settings} />
               </span>
               <span className="grid justify-items-end gap-1">
-                <span className={cn('num font-mono text-[13.5px] font-medium', tone(t.pnl))}>{t.pnl == null ? '–' : fmt.signed(t.pnl)}</span>
+                <motion.span layoutId={`trade-pnl-${t.id}`} className={cn('num font-mono text-[13.5px] font-medium', tone(t.pnl))}>{t.pnl == null ? '–' : fmt.signed(t.pnl)}</motion.span>
                 <ResultPill t={t} />
               </span>
             </motion.button>

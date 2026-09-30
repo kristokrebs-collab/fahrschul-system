@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { toast } from 'sonner';
+import { useIsland } from './island';
 import {
   ACCOUNT_LABEL, cn, fmt, group, num, tDate, tone, toInput,
   type AccountFilter, type ETrade, type Settings, type Setup, type Stats,
@@ -157,6 +157,7 @@ export function SetupsView({ st, settings, onEdit, onNew, onTrades }: { st: Stat
 
 // ── Einstellungen ──────────────────────────────────────
 export function SettingsView({ settings, trades, onSave, downloads }: { settings: Settings; trades: ETrade[]; onSave: (s: Settings) => Promise<void>; downloads: any }) {
+  const notify = useIsland();
   const [v, setV] = useState<Record<string, string>>({});
   useEffect(() => {
     const m = settings.market, b = settings.backtest;
@@ -175,14 +176,14 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
     const n = (k: string) => num(v[k]);
     const req = ['makro', 'scalp', 'longTrigger', 'longStop', 'shortTrigger', 'lowerHigh', 'rsiWeekly', 'invalidation', 'zoneLow', 'zoneHigh', 'winRate', 'avgWin', 'avgLoss', 'expectancy'];
     const bad = req.find((k) => n(k) == null);
-    if (bad) return toast.error('Bitte alle Zahlenfelder ausfüllen.');
+    if (bad) return notify({ kind: 'error', title: 'Bitte alle Zahlenfelder ausfüllen' });
     const next: Settings = {
       ...settings, currency: v.currency || 'USDT', pair: (v.pair || '').trim() || 'BTC/USDT', startDate: v.startDate || '',
       capital: { makro: n('makro')!, scalp: n('scalp')! },
       market: { symbol: (v.symbol || '').trim() || 'BINANCE:BTCUSDT', longTrigger: n('longTrigger')!, longStop: n('longStop')!, shortTrigger: n('shortTrigger')!, lowerHigh: n('lowerHigh')!, rsiWeekly: n('rsiWeekly')!, invalidation: n('invalidation')!, zoneLow: n('zoneLow')!, zoneHigh: n('zoneHigh')! },
       backtest: { winRate: n('winRate')! / 100, avgWin: n('avgWin')! / 100, avgLoss: n('avgLoss')! / 100, expectancy: n('expectancy')! / 100, label: (v.label || '').trim() || 'Backtest' },
     };
-    try { await onSave(next); toast.success('Einstellungen gespeichert'); } catch { toast.error('Speichern fehlgeschlagen.'); }
+    try { await onSave(next); notify({ kind: 'success', title: 'Einstellungen gespeichert' }); } catch { notify({ kind: 'error', title: 'Speichern fehlgeschlagen' }); }
   }
   async function exportFile(kind: 'csv' | 'json') {
     if (!downloads) return;
@@ -196,7 +197,7 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
       const rows = [...trades].sort((a, b) => +tDate(a) - +tDate(b)).map((t) => [t.date, t.account === 'makro' ? 'Makro' : 'Scalp', t.pair, t.side, t.status, t.entry, t.stop, t.target, t.exit, t.size, t.leverage, t.fees, t.pnl != null ? +t.pnl.toFixed(2) : '', t.r != null ? +t.r.toFixed(2) : '', t.move != null ? +(t.move * 100).toFixed(2) : '', { win: 'Gewinn', loss: 'Verlust', be: 'Break-even', open: 'Offen' }[t.result], (t.setups || []).map((id) => names.get(id)).filter(Boolean).join(' | '), `${t.checked}/${t.items.length}`, t.conviction, t.followedPlan == null ? '' : t.followedPlan ? 'Ja' : 'Nein', t.emotion, t.timeframe, t.reason, t.notes, t.chart].map(q).join(';'));
       data = '﻿' + [head.join(';'), ...rows].join('\n');
     }
-    try { await downloads.save({ filename: `trade-journal-${day}.${kind}`, data }); } catch (e: any) { if (e?.code !== 'declined') toast.error('Export fehlgeschlagen.'); }
+    try { await downloads.save({ filename: `trade-journal-${day}.${kind}`, data }); } catch (e: any) { if (e?.code !== 'declined') notify({ kind: 'error', title: 'Export fehlgeschlagen' }); }
   }
   return (
     <div className="grid gap-5">
