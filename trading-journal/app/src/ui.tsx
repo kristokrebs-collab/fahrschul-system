@@ -78,7 +78,7 @@ export function DockItem({ children, className, onClick, active, label }: { chil
         )}
       </AnimatePresence>
       <motion.span style={{ width: iconW }} className="flex items-center justify-center [&>svg]:size-full">{children}</motion.span>
-      {active && <motion.span layoutId="dock-dot" className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-aqua" />}
+      {active && <motion.span layoutId="dock-dot" className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-signal" />}
     </motion.button>
   );
 }
@@ -196,7 +196,7 @@ export function NumberTicker({ value, decimals = 0, className, prefix = '', sign
 }
 
 // ── Border Beam (21st.dev · magicui) ───────────────────
-export function BorderBeam({ size = 80, duration = 9, delay = 0, colorFrom = '#46a6a0', colorTo = '#6f9dc9', borderWidth = 1, className }:
+export function BorderBeam({ size = 80, duration = 9, delay = 0, colorFrom = '#e5202e', colorTo = '#ffffff', borderWidth = 1, className }:
   { size?: number; duration?: number; delay?: number; colorFrom?: string; colorTo?: string; borderWidth?: number; className?: string }) {
   return (
     <div className="pointer-events-none absolute inset-0 rounded-[inherit] border-transparent [mask-clip:padding-box,border-box] [mask-composite:intersect] [mask-image:linear-gradient(transparent,transparent),linear-gradient(#000,#000)]"
@@ -213,7 +213,7 @@ export function BorderBeam({ size = 80, duration = 9, delay = 0, colorFrom = '#4
 }
 
 // ── Magic Card (21st.dev · magicui), Spotlight-Rand ────
-export function MagicCard({ children, className, gradientSize = 240, gradientColor = 'rgba(111,157,201,0.07)', gradientFrom = '#46a6a0', gradientTo = '#2e5680' }:
+export function MagicCard({ children, className, gradientSize = 240, gradientColor = 'rgba(255,255,255,0.045)', gradientFrom = '#9b9b9b', gradientTo = '#2c2c2c' }:
   { children?: ReactNode; className?: string; gradientSize?: number; gradientColor?: string; gradientFrom?: string; gradientTo?: string }) {
   const mouseX = useMotionValue(-gradientSize);
   const mouseY = useMotionValue(-gradientSize);
@@ -227,6 +227,7 @@ export function MagicCard({ children, className, gradientSize = 240, gradientCol
       onPointerLeave={reset}
       style={{ background: border }}
     >
+      <div className="pointer-events-none absolute inset-px z-0 rounded-[inherit] bg-gradient-to-b from-white/[0.035] via-white/[0.01] to-transparent" />
       <motion.div className="pointer-events-none absolute inset-px z-0 rounded-[inherit] opacity-0 transition-opacity duration-300 group-hover:opacity-100" style={{ background: glow }} />
       <div className="relative z-10 h-full">{children}</div>
     </motion.div>
@@ -364,7 +365,7 @@ export function TextHoverEffect({ text }: { text: string }) {
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onMouseMove={(e) => setCursor({ x: e.clientX, y: e.clientY })} aria-hidden="true">
       <defs>
         <linearGradient id={`tg${id}`} gradientUnits="userSpaceOnUse">
-          {hovered && <><stop offset="0%" stopColor="#6f9dc9" /><stop offset="35%" stopColor="#46a6a0" /><stop offset="70%" stopColor="#86cbc4" /><stop offset="100%" stopColor="#4c7ba8" /></>}
+          {hovered && <><stop offset="0%" stopColor="#8a8a8a" /><stop offset="40%" stopColor="#ffffff" /><stop offset="65%" stopColor="#e5202e" /><stop offset="100%" stopColor="#8a8a8a" /></>}
         </linearGradient>
         <motion.radialGradient id={`rm${id}`} gradientUnits="userSpaceOnUse" r="22%" initial={{ cx: '50%', cy: '50%' }} animate={mask} transition={{ duration: 0.1, ease: 'easeOut' }}>
           <stop offset="0%" stopColor="white" /><stop offset="100%" stopColor="black" />
@@ -388,7 +389,7 @@ export function RevealText({ text, className }: { text: string; className?: stri
           initial={{ y: '110%', opacity: 0, scale: 0.9 }} animate={{ y: 0, opacity: 1, scale: 1 }}
           transition={{ type: 'spring', stiffness: 260, damping: 22, delay: 0.1 + i * 0.035 }}>{ch}</motion.span>
       ))}
-      <motion.span aria-hidden="true" className="pointer-events-none absolute inset-y-0 w-10 bg-gradient-to-r from-transparent via-aqua/25 to-transparent"
+      <motion.span aria-hidden="true" className="pointer-events-none absolute inset-y-0 w-10 bg-gradient-to-r from-transparent via-white/30 to-transparent"
         initial={{ left: '-20%' }} animate={{ left: '120%' }} transition={{ delay: 0.7, duration: 1.1, ease: 'easeInOut' }} />
     </span>
   );
@@ -400,13 +401,14 @@ export function MeshBackdrop({ className }: { className?: string }) {
   const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   return (
     <div className={cn('absolute inset-0 overflow-hidden', className)} aria-hidden="true">
-      <div className="absolute inset-0" style={{ background: 'radial-gradient(120% 90% at 0% 0%, #1e4466 0%, transparent 60%), radial-gradient(90% 80% at 100% 100%, #1f5e62 0%, transparent 60%), #0e1a28' }} />
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(120% 90% at 0% 0%, #2a2a2a 0%, transparent 60%), radial-gradient(90% 80% at 100% 100%, #1d1d1d 0%, transparent 60%), #101010' }} />
       {webgl && (
         <MeshGradient className="absolute inset-0 size-full" style={{ width: '100%', height: '100%' }}
-          colors={['#0c1826', '#1d3f5f', '#24606a', '#122638', '#2c5a82']}
-          distortion={0.85} swirl={0.12} grainMixer={0.18} grainOverlay={0.22} speed={reduced ? 0 : 0.12} />
+          colors={['#0b0b0b', '#262626', '#3a3a3a', '#141414', '#1f1f1f']}
+          distortion={0.8} swirl={0.1} grainMixer={0.25} grainOverlay={0.35} speed={reduced ? 0 : 0.12} />
       )}
-      <div className="absolute inset-0 bg-gradient-to-b from-ink-900/25 via-ink-900/45 to-ink-900/85" />
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.07) 1px, transparent 0) 0 0 / 18px 18px' }} />
+      <div className="absolute inset-0 bg-gradient-to-b from-ink-900/10 via-ink-900/40 to-ink-900/85" />
     </div>
   );
 }
@@ -418,7 +420,7 @@ export function Card({ children, className, title, action, note }: { children: R
       <div className="flex h-full flex-col p-5">
         {(title || action || note) && (
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            {title && <h2 className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-mute">{title}</h2>}
+            {title && <h2 className="label flex items-center gap-2"><span className="size-1.5 rounded-full bg-signal" aria-hidden="true" />{title}</h2>}
             {note && <span className="text-xs text-faint">{note}</span>}
             {action}
           </div>
@@ -453,8 +455,8 @@ export function Btn({ children, onClick, variant = 'ghost', size = 'md', classNa
   { children: ReactNode; onClick?: () => void; variant?: 'ghost' | 'primary' | 'danger'; size?: 'sm' | 'md'; className?: string; type?: 'button' | 'submit'; disabled?: boolean }) {
   const v = {
     ghost: 'border-line-2 bg-white/[0.03] text-fg hover:bg-white/[0.07] hover:border-steel/40',
-    primary: 'border-transparent bg-gradient-to-b from-steel-2 to-denim text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.15)] hover:from-steel hover:to-steel-2',
-    danger: 'border-loss/30 bg-loss/10 text-[#e8a3a2] hover:bg-loss/20',
+    primary: 'border-transparent bg-gradient-to-b from-white to-[#d6d6d6] text-ink-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.6)] hover:to-white',
+    danger: 'border-signal/40 bg-signal/10 text-[#ff8a90] hover:bg-signal/20',
   }[variant];
   return (
     <button type={type} disabled={disabled} onClick={onClick}
@@ -487,13 +489,13 @@ export function CheckRow({ checked, onToggle, children, sub }: { checked: boolea
 export function Field({ label, children, help, className, htmlFor }: { label: ReactNode; children: ReactNode; help?: ReactNode; className?: string; htmlFor?: string }) {
   return (
     <div className={cn('grid min-w-0 content-start gap-1.5', className)}>
-      <label htmlFor={htmlFor} className="text-[11px] font-semibold uppercase tracking-[0.1em] text-mute">{label}</label>
+      <label htmlFor={htmlFor} className="label">{label}</label>
       {children}
       {help && <span className="text-[11px] text-faint">{help}</span>}
     </div>
   );
 }
-export const inputCls = 'w-full rounded-xl border border-line bg-ink-950/70 px-3 py-2 text-[13.5px] text-fg outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-faint focus:border-steel/60 focus:shadow-[0_0_0_3px_rgb(111_157_201/0.15)] disabled:opacity-40';
+export const inputCls = 'w-full rounded-xl border border-line bg-ink-950/70 px-3 py-2 text-[13.5px] text-fg outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-faint focus:border-white/40 focus:shadow-[0_0_0_3px_rgb(255_255_255/0.07)] disabled:opacity-40';
 
 export const Icon = {
   grid: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>,
@@ -504,3 +506,59 @@ export const Icon = {
   x: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>,
   search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>,
 };
+
+// ── Aufklappbare Statistik-Details (21st.dev · ibelick / motion-primitives Disclosure) ─
+/** Runder Plus-Knopf, der sich beim Öffnen zum Kreuz dreht. */
+export function InfoToggle({ open, onClick, label, className }: { open: boolean; onClick: () => void; label: string; className?: string }) {
+  return (
+    <button type="button" onClick={onClick} aria-expanded={open} aria-label={`${open ? 'Details schließen' : 'Details zeigen'}: ${label}`}
+      className={cn('grid size-6 shrink-0 place-items-center rounded-full border transition-colors duration-200',
+        open ? 'border-white bg-white text-ink-950' : 'border-line-2 text-mute hover:border-white/50 hover:text-fg', className)}>
+      <motion.svg viewBox="0 0 12 12" className="size-2.5" animate={{ rotate: open ? 45 : 0 }} transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+        fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 1.5v9M1.5 6h9" /></motion.svg>
+    </button>
+  );
+}
+
+export function Expand({ open, children, className }: { open: boolean; children: ReactNode; className?: string }) {
+  return (
+    <AnimatePresence initial={false}>
+      {open && (
+        <motion.div key="x" className={cn('overflow-hidden', className)}
+          initial={{ height: 0, opacity: 0, filter: 'blur(4px)' }} animate={{ height: 'auto', opacity: 1, filter: 'blur(0px)' }}
+          exit={{ height: 0, opacity: 0, filter: 'blur(4px)' }} transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}>
+          {children}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export type DetailData = {
+  title: string;
+  what: string;
+  formula?: ReactNode;
+  rows?: [string, ReactNode, string?][];
+  verdict?: { tone: 'win' | 'loss' | 'warn' | 'mute'; text: string };
+};
+/** Einheitlicher Erklär-Block: was misst die Zahl, wie wird sie berechnet, deine Werte, Einordnung. */
+export function Detail({ d }: { d: DetailData }) {
+  const vt = d.verdict && { win: 'border-win/30 text-win', loss: 'border-loss/30 text-loss', warn: 'border-warn/30 text-warn', mute: 'border-line-2 text-mute' }[d.verdict.tone];
+  return (
+    <div className="mt-3 grid gap-3 rounded-2xl border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 p-4">
+      <div className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-signal" /><span className="label !text-fg">{d.title}</span></div>
+      <p className="max-w-[70ch] text-[13px] leading-relaxed text-mute">{d.what}</p>
+      {d.formula && <div className="rounded-xl border border-line bg-ink-950/70 px-3 py-2 font-mono text-[12px] leading-relaxed text-fg/90">{d.formula}</div>}
+      {d.rows && d.rows.length > 0 && (
+        <dl className="grid gap-x-6 sm:grid-cols-2">
+          {d.rows.map(([l, v, c]) => (
+            <div key={l} className="flex justify-between gap-3 border-t border-line py-1.5 text-[12.5px]">
+              <dt className="text-mute">{l}</dt><dd className={cn('num text-right font-mono', c || 'text-fg')}>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {d.verdict && <p className={cn('rounded-xl border px-3 py-2 text-[12.5px]', vt)}>{d.verdict.text}</p>}
+    </div>
+  );
+}

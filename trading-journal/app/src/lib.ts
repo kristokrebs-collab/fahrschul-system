@@ -174,20 +174,28 @@ export function enrich(t: Trade, settings: Settings): ETrade {
 export type Group = ReturnType<typeof group>;
 export function group(list: ETrade[]) {
   const n = list.length;
-  let wins = 0, losses = 0, net = 0, gw = 0, gl = 0, rs = 0, rn = 0, mw = 0, mwn = 0, ml = 0, mln = 0, ms = 0, mn = 0;
+  let wins = 0, losses = 0, net = 0, gw = 0, gl = 0, fees = 0, rs = 0, rn = 0, r2 = 0, mw = 0, mwn = 0, ml = 0, mln = 0, ms = 0, mn = 0;
+  let best: ETrade | null = null, worst: ETrade | null = null, bestR: number | null = null, worstR: number | null = null;
   for (const t of list) {
     const p = t.pnl || 0;
-    net += p;
+    net += p; fees += t.fees || 0;
     if (p > 0) { wins++; gw += p; } else if (p < 0) { losses++; gl += p; }
-    if (ok(t.r)) { rs += t.r; rn++; }
+    if (!best || p > (best.pnl || 0)) best = t;
+    if (!worst || p < (worst.pnl || 0)) worst = t;
+    if (ok(t.r)) { rs += t.r; rn++; if (t.r >= 2) r2++; bestR = bestR == null ? t.r : Math.max(bestR, t.r); worstR = worstR == null ? t.r : Math.min(worstR, t.r); }
     if (ok(t.move)) { ms += t.move; mn++; if (p > 0) { mw += t.move; mwn++; } else if (p < 0) { ml += t.move; mln++; } }
   }
+  const avgWin = wins ? gw / wins : null, avgLoss = losses ? gl / losses : null;
   return {
-    n, wins, losses, be: n - wins - losses, net,
+    n, wins, losses, be: n - wins - losses, net, gw, gl, fees,
     winRate: n ? wins / n : null,
     pf: gl < 0 ? gw / -gl : gw > 0 ? Infinity : null,
-    avgWin: wins ? gw / wins : null, avgLoss: losses ? gl / losses : null,
-    avgR: rn ? rs / rn : null, exp: n ? net / n : null,
+    avgWin, avgLoss,
+    /** Win-Rate, ab der das Verhältnis Ø Gewinn zu Ø Verlust profitabel ist */
+    beWinRate: avgWin != null && avgLoss != null ? -avgLoss / (avgWin - avgLoss) : null,
+    payoff: avgWin != null && avgLoss != null ? avgWin / -avgLoss : null,
+    avgR: rn ? rs / rn : null, rN: rn, r2, bestR, worstR, exp: n ? net / n : null,
+    best: n ? best : null, worst: n ? worst : null,
     moveWin: mwn ? mw / mwn : null, moveLoss: mln ? ml / mln : null, moveExp: mn ? ms / mn : null, moveN: mn,
   };
 }
@@ -200,8 +208,15 @@ export function stats(all: ETrade[], settings: Settings, filter: AccountFilter) 
   const g = group(closed);
 
   const equity: { i: number; v: number; t: ETrade | null }[] = [{ i: 0, v: start, t: null }];
-  let bal = start, peak = start, maxDD = 0;
-  closed.forEach((t, i) => { bal += t.pnl || 0; equity.push({ i: i + 1, v: bal, t }); peak = Math.max(peak, bal); if (peak > 0) maxDD = Math.min(maxDD, (bal - peak) / peak); });
+  let bal = start, peak = start, maxDD = 0, peakAt = 0;
+  const dd = { peak: start, trough: start, peakI: 0, troughI: 0 };
+  closed.forEach((t, i) => {
+    bal += t.pnl || 0; equity.push({ i: i + 1, v: bal, t });
+    if (bal > peak) { peak = bal; peakAt = i + 1; }
+    const cur = peak > 0 ? (bal - peak) / peak : 0;
+    if (cur < maxDD) { maxDD = cur; Object.assign(dd, { peak, trough: bal, peakI: peakAt, troughI: i + 1 }); }
+  });
+  const curDD = peak > 0 ? (bal - peak) / peak : 0;
 
   let streak = 0, streakType: string | null = null;
   for (let i = closed.length - 1; i >= 0; i--) { const ty = closed[i].result; if (!streakType) streakType = ty; if (ty !== streakType) break; streak++; }
@@ -224,7 +239,7 @@ export function stats(all: ETrade[], settings: Settings, filter: AccountFilter) 
   const setups = settings.setups.map((s) => ({ setup: s, ...group(closed.filter((t) => (t.setups || []).includes(s.id))) }));
   const none = closed.filter((t) => !(t.setups || []).some((id) => known.has(id)));
 
-  return { start, list, closed, open, g, equity, balance: bal, maxDD, streak, streakType, months, proj, setups, none: group(none) };
+  return { start, list, closed, open, g, equity, balance: bal, maxDD, dd, curDD, peak, streak, streakType, months, proj, setups, none: group(none) };
 }
 export type Stats = ReturnType<typeof stats>;
 

@@ -1,39 +1,41 @@
 @import "tailwindcss";
 @source "./";
 
-/* Matte Ink-Palette: gestufte Blautöne + Türkis, keine Neon-Glows.
-   Dark-only: das Journal ist bewusst ein Nacht-Terminal. */
+/* Nothing-Stil: matte Grautöne, weißer Primärakzent, Rot nur als Signal.
+   Gewinn/Verlust in klaren Kontrastfarben. Dark-only, bewusst. */
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-dot: "Doto", "IBM Plex Mono", ui-monospace, monospace;
 
-  --color-ink-950: #070b10;
-  --color-ink-900: #0a1018;
-  --color-ink-850: #0d151f;
-  --color-ink-800: #111b27;
-  --color-ink-750: #16222f;
-  --color-ink-700: #1c2a3a;
-  --color-line: #1a2634;
-  --color-line-2: #243446;
+  --color-ink-950: #040404;
+  --color-ink-900: #0a0a0a;
+  --color-ink-850: #111111;
+  --color-ink-800: #161616;
+  --color-ink-750: #1c1c1c;
+  --color-ink-700: #242424;
+  --color-line: #1f1f1f;
+  --color-line-2: #2c2c2c;
 
-  --color-fg: #e3e9f0;
-  --color-mute: #8c9bae;
-  --color-faint: #5d6c7f;
+  --color-fg: #f2f2f2;
+  --color-mute: #9b9b9b;
+  --color-faint: #5f5f5f;
 
-  --color-steel: #6f9dc9;
-  --color-steel-2: #4c7ba8;
-  --color-denim: #2e5680;
-  --color-navy: #1c3552;
-  --color-teal: #46a6a0;
-  --color-aqua: #86cbc4;
+  /* früher Blau/Türkis, jetzt Graustufen bis Weiß */
+  --color-steel: #e6e6e6;
+  --color-steel-2: #bdbdbd;
+  --color-denim: #3a3a3a;
+  --color-navy: #262626;
+  --color-teal: #d9d9d9;
+  --color-aqua: #ffffff;
 
-  --color-win: #55b68a;
-  --color-loss: #d46c6a;
-  --color-warn: #d6a55e;
+  --color-signal: #e5202e;
+  --color-win: #3ddc84;
+  --color-loss: #ff4d4f;
+  --color-warn: #ffb020;
 
-  /* für MagicCard */
-  --color-background: #0d151f;
-  --color-border: #1a2634;
+  --color-background: #111111;
+  --color-border: #1f1f1f;
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -47,8 +49,8 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   background:
-    radial-gradient(1100px 520px at 12% -8%, rgb(46 86 128 / 0.22), transparent 70%),
-    radial-gradient(900px 480px at 100% 0%, rgb(70 166 160 / 0.10), transparent 70%),
+    radial-gradient(1200px 600px at 50% -10%, rgb(255 255 255 / 0.045), transparent 70%),
+    radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.055) 1px, transparent 0) 0 0 / 22px 22px,
     var(--color-ink-900);
   background-attachment: fixed;
 }
@@ -61,20 +63,20 @@ body::before {
 }
 #root { position: relative; z-index: 1; }
 [hidden] { display: none !important; }
-::selection { background: rgb(111 157 201 / 0.35); }
+::selection { background: rgb(229 32 46 / 0.4); }
 :focus-visible { outline: 2px solid var(--color-steel); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
 input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
 
-/* Shiny Button (21st.dev · designali-in), auf matte Blau/Türkis umgefärbt */
+/* Shiny Button (21st.dev · designali-in), Nothing-Rot als Lichtkante */
 @property --gradient-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 @property --gradient-angle-offset { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 @property --gradient-percent { syntax: "<percentage>"; initial-value: 5%; inherits: false; }
 @property --gradient-shine { syntax: "<color>"; initial-value: white; inherits: false; }
 .shiny-cta {
-  --shiny-cta-bg: #0c1622; --shiny-cta-bg-subtle: #1d2c3d; --shiny-cta-fg: #eaf1f7;
-  --shiny-cta-highlight: #46a6a0; --shiny-cta-highlight-subtle: #86cbc4;
+  --shiny-cta-bg: #0e0e0e; --shiny-cta-bg-subtle: #2a2a2a; --shiny-cta-fg: #f5f5f5;
+  --shiny-cta-highlight: #e5202e; --shiny-cta-highlight-subtle: #ffffff;
   --animation: gradient-angle linear infinite; --duration: 3s; --shadow-size: 2px;
   --transition: 800ms cubic-bezier(0.25, 1, 0.5, 1);
   isolation: isolate; position: relative; overflow: hidden; cursor: pointer; outline-offset: 4px;
@@ -118,3 +120,7 @@ input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
 }
+
+/* Punktmatrix-Ziffern: leicht gesperrt, wie auf einem Nothing-Display */
+.dot-num { font-family: var(--font-dot); font-weight: 800; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.label { font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-mute); }

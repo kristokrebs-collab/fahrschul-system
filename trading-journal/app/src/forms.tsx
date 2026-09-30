@@ -49,8 +49,8 @@ function Section({ title, sub, children }: { title: string; sub?: string; childr
 }
 
 const CONVICTION: GradOption[] = [
-  { v: 1, label: 'Schwach', color: '#2e5680' }, { v: 2, label: 'Gering', color: '#4c7ba8' },
-  { v: 3, label: 'Mittel', color: '#6f9dc9' }, { v: 4, label: 'Hoch', color: '#46a6a0' }, { v: 5, label: 'Top', color: '#86cbc4' },
+  { v: 1, label: 'Schwach', color: '#4a4a4a' }, { v: 2, label: 'Gering', color: '#767676' },
+  { v: 3, label: 'Mittel', color: '#a8a8a8' }, { v: 4, label: 'Hoch', color: '#dedede' }, { v: 5, label: 'Top', color: '#ffffff' },
 ];
 
 type Draft = Record<string, string>;
@@ -127,10 +127,10 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
     <Sheet open={open} onClose={onClose} title={trade ? 'Trade bearbeiten' : 'Trade eintragen'}
       footer={<>
         {trade && (armed
-          ? <span className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#e8a3a2]">Wirklich löschen?<Btn size="sm" variant="danger" onClick={async () => { try { await onDelete(trade.id); onClose(); } catch { setErr('Löschen fehlgeschlagen.'); } }}>Ja, löschen</Btn><Btn size="sm" onClick={() => setArmed(false)}>Nein</Btn></span>
+          ? <span className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]">Wirklich löschen?<Btn size="sm" variant="danger" onClick={async () => { try { await onDelete(trade.id); onClose(); } catch { setErr('Löschen fehlgeschlagen.'); } }}>Ja, löschen</Btn><Btn size="sm" onClick={() => setArmed(false)}>Nein</Btn></span>
           : <Btn variant="danger" onClick={() => setArmed(true)}>Löschen</Btn>)}
         <span className="flex-1" />
-        {err && <span role="alert" className="text-[12.5px] font-medium text-[#e8a3a2]">{err}</span>}
+        {err && <span role="alert" className="text-[12.5px] font-medium text-[#ff8a90]">{err}</span>}
         <Btn onClick={onClose}>Abbrechen</Btn>
         <Btn variant="primary" disabled={busy} className="min-w-[110px]" onClick={() => (document.getElementById('trade-form') as HTMLFormElement)?.requestSubmit()}>{busy ? 'Speichert …' : 'Speichern'}</Btn>
       </>}>
@@ -189,7 +189,7 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
                 <button key={s.id} type="button" aria-pressed={on}
                   onClick={() => setT((x) => ({ ...x, setups: on ? (x.setups || []).filter((i) => i !== s.id) : [...(x.setups || []), s.id] }))}
                   className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-all duration-200',
-                    on ? 'text-fg' : fits ? 'border-line-2 text-fg/85 hover:border-steel/40' : 'border-line text-faint hover:text-mute')}
+                    on ? 'text-fg' : fits ? 'border-line-2 text-fg/85 hover:border-white/40' : 'border-line text-faint hover:text-mute')}
                   style={on ? { borderColor: s.color + 'aa', background: s.color + '22' } : undefined}>
                   <span className="size-2 rounded-full" style={{ background: s.color }} />{s.name}
                 </button>
@@ -202,7 +202,7 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
 
         <Section title="Checkliste" sub={items.length ? `${done} von ${items.length} erfüllt` : undefined}>
           <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-            <motion.div className="h-full rounded-full bg-gradient-to-r from-steel-2 to-aqua" animate={{ width: items.length ? `${(done / items.length) * 100}%` : '0%' }} transition={{ type: 'spring', stiffness: 200, damping: 26 }} />
+            <motion.div className="h-full rounded-full bg-gradient-to-r from-[#5f5f5f] to-white" animate={{ width: items.length ? `${(done / items.length) * 100}%` : '0%' }} transition={{ type: 'spring', stiffness: 200, damping: 26 }} />
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             {items.map((it) => {
@@ -224,7 +224,7 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
               <div className="flex flex-wrap gap-1.5">
                 {EMOTIONS.map((e) => (
                   <button key={e} type="button" aria-pressed={t.emotion === e} onClick={() => setT((x) => ({ ...x, emotion: x.emotion === e ? '' : e }))}
-                    className={cn('rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors', t.emotion === e ? 'border-steel/60 bg-steel/15 text-fg' : 'border-line-2 text-mute hover:text-fg')}>{e}</button>
+                    className={cn('rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors', t.emotion === e ? 'border-white/60 bg-white/10 text-fg' : 'border-line-2 text-mute hover:text-fg')}>{e}</button>
                 ))}
               </div>
             </Field>
@@ -264,10 +264,10 @@ export function SetupSheet({ open, setup, settings, onClose, onSave, onDelete, u
     <Sheet open={open} onClose={onClose} wide={false} title={setup ? 'Grundlage bearbeiten' : 'Neue Entscheidungsgrundlage'}
       footer={<>
         {setup && (armed
-          ? <span className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#e8a3a2]">{usedBy ? `${usedBy} Trades verlieren die Zuordnung.` : 'Löschen?'}<Btn size="sm" variant="danger" onClick={async () => { try { await onDelete(setup.id); onClose(); } catch { setErr('Löschen fehlgeschlagen.'); } }}>Ja</Btn><Btn size="sm" onClick={() => setArmed(false)}>Nein</Btn></span>
+          ? <span className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]">{usedBy ? `${usedBy} Trades verlieren die Zuordnung.` : 'Löschen?'}<Btn size="sm" variant="danger" onClick={async () => { try { await onDelete(setup.id); onClose(); } catch { setErr('Löschen fehlgeschlagen.'); } }}>Ja</Btn><Btn size="sm" onClick={() => setArmed(false)}>Nein</Btn></span>
           : <Btn variant="danger" onClick={() => setArmed(true)}>Löschen</Btn>)}
         <span className="flex-1" />
-        {err && <span role="alert" className="text-[12.5px] font-medium text-[#e8a3a2]">{err}</span>}
+        {err && <span role="alert" className="text-[12.5px] font-medium text-[#ff8a90]">{err}</span>}
         <Btn onClick={onClose}>Abbrechen</Btn>
         <Btn variant="primary" onClick={submit}>Speichern</Btn>
       </>}>

@@ -15,7 +15,7 @@ function PageHead({ title, lead, action }: { title: string; lead: string; action
   return (
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-[26px] font-semibold tracking-tight [text-wrap:balance]">{title}</h1>
+        <h1 className="text-[28px] font-semibold tracking-tight [text-wrap:balance]"><span className="mr-2 inline-block size-2 -translate-y-1 rounded-full bg-signal align-middle" aria-hidden="true" />{title}</h1>
         <p className="mt-1 max-w-[62ch] text-[13.5px] text-mute">{lead}</p>
       </div>
       {action}
@@ -47,7 +47,7 @@ export function TradesView({ all, settings, f, setF, onEdit, onNew }: { all: ETr
   const th = (k: typeof sort.k, l: string, right = false) => (
     <th className={cn('px-3 pb-3 font-semibold', right && 'text-right')}>
       <button type="button" onClick={() => setSort((s) => (s.k === k ? { k, dir: (s.dir * -1) as 1 | -1 } : { k, dir: k === 'setup' ? 1 : -1 }))}
-        className={cn('inline-flex items-center gap-1 uppercase tracking-[0.1em] transition-colors hover:text-steel', sort.k === k && 'text-steel')}>
+        className={cn('inline-flex items-center gap-1 uppercase tracking-[0.1em] transition-colors hover:text-fg', sort.k === k && 'text-signal')}>
         {l}{sort.k === k && (sort.dir === 1 ? ' ↑' : ' ↓')}
       </button>
     </th>
@@ -90,7 +90,7 @@ export function TradesView({ all, settings, f, setF, onEdit, onNew }: { all: ETr
                       <td className="px-3 py-3"><div className={cn('text-xs font-semibold uppercase tracking-wide', t.side === 'short' ? 'text-loss' : 'text-win')}>{t.side === 'short' ? '▼ Short' : '▲ Long'}</div><div className="text-[11.5px] text-faint">{t.account === 'makro' ? 'Makro' : 'Scalp'}{t.leverage ? ` · ${fmt.n1(t.leverage).replace(',0', '')}x` : ''}</div></td>
                       <td className="max-w-[260px] px-3 py-3"><SetupChips ids={t.setups} settings={settings} /></td>
                       <td className="num px-3 py-3 font-mono text-[12.5px]">{fmt.price(t.entry)} → {t.result === 'open' ? <span className="text-faint">offen</span> : fmt.price(t.exit)}</td>
-                      <td className="num px-3 py-3 text-right font-mono text-xs"><span className={t.complete ? 'text-aqua' : 'text-mute'}>{t.checked}/{t.items.length}</span></td>
+                      <td className="num px-3 py-3 text-right font-mono text-xs"><span className={t.complete ? 'text-win' : 'text-mute'}>{t.checked}/{t.items.length}</span></td>
                       <td className={cn('num px-3 py-3 text-right font-mono font-medium', tone(t.pnl))}>{t.pnl == null ? '–' : fmt.signed(t.pnl)}</td>
                       <td className={cn('num px-3 py-3 text-right font-mono', tone(t.r))}>{t.r == null ? '–' : fmt.signed(t.r)}</td>
                       <td className="px-3 py-3"><ResultPill t={t} /></td>
@@ -147,7 +147,7 @@ export function SetupsView({ st, settings, onEdit, onNew, onTrades }: { st: Stat
           </motion.div>
         ))}
         <motion.button layout type="button" onClick={onNew}
-          className="grid min-h-[220px] place-items-center rounded-2xl border border-dashed border-line-2 text-mute transition-colors hover:border-teal/50 hover:bg-teal/[0.04] hover:text-fg">
+          className="grid min-h-[220px] place-items-center rounded-2xl border border-dashed border-line-2 text-mute transition-colors hover:border-white/40 hover:bg-white/[0.03] hover:text-fg">
           <span className="grid justify-items-center gap-2 text-[13.5px] font-semibold"><span className="grid size-10 place-items-center rounded-full border border-line-2 [&>svg]:size-4">{Icon.plus}</span>Neue Entscheidungsgrundlage</span>
         </motion.button>
       </motion.div>

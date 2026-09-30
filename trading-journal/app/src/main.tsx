@@ -50,14 +50,14 @@ function App() {
   const defaultAccount: Account = acc === 'makro' ? 'makro' : 'scalp';
   const usedBy = setupOpen.setup ? j.trades.filter((t) => (t.setups || []).includes(setupOpen.setup!.id)).length : 0;
 
-  const sync = { cloud: ['Synchronisiert', 'bg-aqua'], local: ['Nur dieser Browser', 'bg-warn'], error: ['Offline', 'bg-loss'], connecting: ['Verbinde …', 'bg-faint'] }[j.mode];
+  const sync = { cloud: ['Synchronisiert', 'bg-win'], local: ['Nur dieser Browser', 'bg-warn'], error: ['Offline', 'bg-loss'], connecting: ['Verbinde …', 'bg-faint'] }[j.mode];
 
   return (
     <MotionConfig reducedMotion="user">
       <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-line/80 bg-ink-900/75 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-3 px-4 sm:px-6">
           <button type="button" onClick={() => go('overview')} className="flex min-w-0 items-center gap-3 text-left">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 bg-gradient-to-br from-navy to-ink-800 font-mono text-[15px] font-semibold text-aqua">₿</span>
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 bg-gradient-to-br from-ink-700 to-ink-900 font-mono text-[15px] font-semibold text-fg">₿</span>
             <span className="min-w-0">
               <RevealText text="Trade Journal" className="text-[15px] font-semibold tracking-tight" />
               <span className="hidden truncate text-[11px] text-faint sm:block">Makro & Scalp · Entscheidungen, Win-Rate, Backtest</span>
@@ -97,12 +97,12 @@ function App() {
         <Dock className="border border-line-2 bg-ink-850/85 shadow-[0_18px_40px_rgb(0_0_0/0.5)] backdrop-blur-xl">
           {VIEWS.map((v) => (
             <DockItem key={v} label={LABEL[v]} active={view === v} onClick={() => go(v)}
-              className={view === v ? 'bg-navy text-fg' : 'bg-white/[0.05] text-mute hover:text-fg'}>
+              className={view === v ? 'bg-white text-ink-950' : 'bg-white/[0.05] text-mute hover:text-fg'}>
               {{ overview: Icon.grid, trades: Icon.list, setups: Icon.target, settings: Icon.sliders }[v]}
             </DockItem>
           ))}
           <span className="mb-2.5 h-7 w-px self-end bg-line-2" aria-hidden="true" />
-          <DockItem label="Trade eintragen" onClick={openNew} className="bg-gradient-to-br from-teal to-denim text-white">{Icon.plus}</DockItem>
+          <DockItem label="Trade eintragen" onClick={openNew} className="bg-signal text-white">{Icon.plus}</DockItem>
         </Dock>
       </nav>
 
@@ -112,7 +112,7 @@ function App() {
       <SetupSheet open={setupOpen.open} setup={setupOpen.setup} settings={j.settings} usedBy={usedBy}
         onClose={() => setSetupOpen({ open: false, setup: null })} onSave={saveSetup} onDelete={deleteSetup} />
       <Toaster theme="dark" position="bottom-center" offset={100}
-        toastOptions={{ style: { background: '#111b27', border: '1px solid #243446', color: '#e3e9f0', fontFamily: 'IBM Plex Sans, sans-serif' } }} />
+        toastOptions={{ style: { background: '#161616', border: '1px solid #2c2c2c', color: '#f2f2f2', fontFamily: 'IBM Plex Sans, sans-serif' } }} />
     </MotionConfig>
   );
 }

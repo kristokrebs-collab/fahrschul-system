@@ -4,7 +4,8 @@ import {
   ACCOUNT_LABEL, WEEKDAYS, cn, fmt, group, scenario, tDate, tone,
   type AccountFilter, type ETrade, type MarketState, type Settings, type Stats,
 } from './lib';
-import { BlurFade, BorderBeam, Btn, Card, CircularProgress, Empty, MeshBackdrop, NumberTicker, Pill, Segmented, SlidingNumber } from './ui';
+import { BlurFade, BorderBeam, Btn, Card, CircularProgress, Detail, Empty, Expand, InfoToggle, MeshBackdrop, NumberTicker, Pill, Segmented, SlidingNumber } from './ui';
+import { backtestDetail, metricDetail, setupDetail, type MetricKey } from './explain';
 import { EquityChart, MonthlyChart } from './charts';
 
 type Props = {
@@ -21,7 +22,7 @@ export function Overview(p: Props) {
       <div className="grid gap-5 lg:grid-cols-12">
         <BlurFade delay={0.1} className="lg:col-span-5"><BacktestCard all={st.closed} settings={settings} /></BlurFade>
         <BlurFade delay={0.15} className="lg:col-span-3"><WinRateCard st={st} settings={settings} /></BlurFade>
-        <BlurFade delay={0.2} className="lg:col-span-4"><ProjectionCard st={st} cur={cur} /></BlurFade>
+        <BlurFade delay={0.2} className="lg:col-span-4"><ProjectionCard st={st} cur={cur} settings={settings} /></BlurFade>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
         <BlurFade delay={0.25} className="lg:col-span-8">
@@ -30,7 +31,7 @@ export function Overview(p: Props) {
         <BlurFade delay={0.3} className="lg:col-span-4"><ChecklistCard st={st} /></BlurFade>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
-        <BlurFade delay={0.35} className="lg:col-span-7"><Ranking st={st} onSetup={p.onSetup} /></BlurFade>
+        <BlurFade delay={0.35} className="lg:col-span-7"><Ranking st={st} onSetup={p.onSetup} cur={cur} /></BlurFade>
         <BlurFade delay={0.4} className="lg:col-span-5"><Card title="P&L pro Monat"><MonthlyChart st={st} cur={cur} /></Card></BlurFade>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
@@ -45,12 +46,14 @@ export function Overview(p: Props) {
 function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
   const g = st.g, cur = settings.currency;
   const ret = st.start ? g.net / st.start : null;
-  const facts: [string, ReactNode][] = [
-    ['Trades', <>{g.n}{st.open.length ? <span className="text-faint"> +{st.open.length} offen</span> : null}</>],
-    ['Win-Rate', fmt.pct0(g.winRate)],
-    ['Profit-Faktor', g.pf == null ? '–' : g.pf === Infinity ? '∞' : fmt.n2(g.pf)],
-    ['Ø R', fmt.r(g.avgR)],
-    ['Max. Drawdown', g.n ? fmt.pct(st.maxDD) : '–'],
+  const [open, setOpen] = useState<MetricKey | null>(null);
+  const tog = (k: MetricKey) => setOpen((o) => (o === k ? null : k));
+  const facts: [string, ReactNode, MetricKey][] = [
+    ['Trades', <>{g.n}{st.open.length ? <span className="text-faint"> +{st.open.length} offen</span> : null}</>, 'trades'],
+    ['Win-Rate', fmt.pct0(g.winRate), 'winRate'],
+    ['Profit-Faktor', g.pf == null ? '–' : g.pf === Infinity ? '∞' : fmt.n2(g.pf), 'pf'],
+    ['Ø R', fmt.r(g.avgR), 'avgR'],
+    ['Max. Drawdown', g.n ? fmt.pct(st.maxDD) : '–', 'maxDD'],
   ];
   return (
     <BlurFade>
@@ -63,8 +66,8 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
               <span className="text-xs text-mute">Startkapital {fmt.n0(st.start)} {cur}</span>
             </div>
             <div>
-              <div className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.14em] text-mute">Netto-P&L · {ACCOUNT_LABEL[acc]}</div>
-              <div className={cn('flex flex-wrap items-baseline gap-x-3 font-mono text-[clamp(40px,7vw,68px)] font-medium leading-none tracking-tight', tone(g.net))}>
+              <div className="mb-3 flex items-center gap-3"><span className="label">Netto-P&L · {ACCOUNT_LABEL[acc]}</span><InfoToggle open={open === 'net'} onClick={() => tog('net')} label="Netto-P&L" /></div>
+              <div className={cn('dot-num flex flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none', tone(g.net))}>
                 {loaded ? <NumberTicker key={acc} value={g.net} decimals={2} signed /> : <span className="text-faint">0,00</span>}
                 <span className="font-sans text-lg font-medium text-mute">{cur}</span>
               </div>
@@ -73,14 +76,19 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
                 <span>{g.n ? `${g.wins} gewonnen · ${g.losses} verloren${g.be ? ` · ${g.be} Break-even` : ''}` : 'Noch keine abgeschlossenen Trades. Alle Werte starten bei null.'}</span>
               </div>
             </div>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t border-white/10 pt-5 sm:grid-cols-5">
-              {facts.map(([l, v]) => (
-                <div key={l} className="min-w-0">
-                  <dt className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-mute">{l}</dt>
-                  <dd className="num mt-1 font-mono text-[17px] font-medium text-fg">{v}</dd>
-                </div>
-              ))}
-            </dl>
+            <div>
+              <dl className="grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:grid-cols-5">
+                {facts.map(([l, v, k]) => (
+                  <button key={l} type="button" onClick={() => tog(k)} aria-expanded={open === k}
+                    className={cn('group min-w-0 rounded-xl border px-3 py-2.5 text-left transition-all duration-200',
+                      open === k ? 'border-white/40 bg-white/[0.06]' : 'border-transparent hover:border-line-2 hover:bg-white/[0.03]')}>
+                    <dt className="label flex items-center justify-between gap-1">{l}<span className={cn('font-mono text-[13px] leading-none transition-transform duration-200', open === k ? 'rotate-45 text-fg' : 'text-faint group-hover:text-fg')}>+</span></dt>
+                    <dd className="num mt-1.5 font-mono text-[17px] font-medium text-fg">{v}</dd>
+                  </button>
+                ))}
+              </dl>
+              <Expand open={open != null}>{open && <Detail d={metricDetail(open, st, settings)} />}</Expand>
+            </div>
           </div>
           <MarketPanel market={market} settings={settings} />
         </div>
@@ -103,13 +111,13 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11.5px] font-semibold uppercase tracking-[0.14em] text-mute">{settings.pair} · TradingView</span>
         {m.status === 'live'
-          ? <Pill tone="teal"><span className="relative flex size-1.5"><span className="absolute inset-0 animate-ping rounded-full bg-aqua/70" /><span className="relative size-1.5 rounded-full bg-aqua" /></span>Live · {tm(m.updatedAt)}</Pill>
+          ? <Pill tone="teal"><span className="relative flex size-1.5"><span className="absolute inset-0 animate-ping rounded-full bg-signal/70" /><span className="relative size-1.5 rounded-full bg-signal" /></span>Live · {tm(m.updatedAt)}</Pill>
           : m.status === 'connecting' ? <Pill>Verbinde …</Pill> : <Pill tone="warn">Kein Live-Kurs</Pill>}
       </div>
 
       {m.price != null ? (
         <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-          <span className="font-mono text-[40px] font-medium leading-none tracking-tight text-fg"><SlidingNumber value={Math.round(m.price)} /></span>
+          <span className="dot-num text-[42px] leading-none text-fg"><SlidingNumber value={Math.round(m.price)} /></span>
           {m.change != null && <span className={cn('pb-1 font-mono text-sm', tone(m.change))}>{fmt.signed(m.change, 2)} % 24h</span>}
         </div>
       ) : (
@@ -135,13 +143,13 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
           <AutoCheck ok={rOk} label={`Weekly RSI über ${fmt.n2(cfg.rsiWeekly)}`} value={m.rsiW != null ? fmt.n1(m.rsiW) : '–'} />
           {m.rsiW != null && (
             <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-              <motion.div className="h-full rounded-full bg-gradient-to-r from-denim via-steel to-aqua" initial={{ width: 0 }}
+              <motion.div className="h-full rounded-full bg-gradient-to-r from-[#3a3a3a] via-[#bdbdbd] to-white" initial={{ width: 0 }}
                 animate={{ width: `${Math.min(100, (m.rsiW / cfg.rsiWeekly) * 100)}%` }} transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }} />
             </div>
           )}
         </div>
       )}
-      {inZone && <p className="rounded-xl border border-steel/30 bg-steel/[0.08] p-3 text-[12.5px] text-steel">Preis liegt in der Makro-Long-Zone {fmt.n0(cfg.zoneLow)}–{fmt.n0(cfg.zoneHigh)}. Falling-Knife-Filter prüfen, bevor du kaufst.</p>}
+      {inZone && <p className="rounded-xl border border-warn/30 bg-warn/[0.07] p-3 text-[12.5px] text-warn">Preis liegt in der Makro-Long-Zone {fmt.n0(cfg.zoneLow)}–{fmt.n0(cfg.zoneHigh)}. Falling-Knife-Filter prüfen, bevor du kaufst.</p>}
       {m.status === 'error' && m.price != null && m.message && <p className="text-[11.5px] text-warn">{m.message}</p>}
     </div>
   );
@@ -159,17 +167,21 @@ function AutoCheck({ ok, label, value }: { ok: boolean | null; label: string; va
   );
 }
 
+/** Karte mit Plus-Knopf oben rechts, der eine Detail-Erklärung unter dem Inhalt aufklappt. */
+function useToggle() { const [o, setO] = useState(false); return [o, () => setO((x) => !x)] as const; }
+
 // ── Backtest-Vergleich ─────────────────────────────────
 function BacktestCard({ all, settings }: { all: ETrade[]; settings: Settings }) {
   const [only, setOnly] = useState<'all' | 'bt'>('all');
+  const [openRow, setOpenRow] = useState<string | null>(null);
   const bt = settings.backtest;
   const list = only === 'bt' ? all.filter((t) => (t.setups || []).includes('s_bt')) : all;
   const g = group(list);
-  const rows: { l: string; you: number | null; ref: number; better: (d: number) => boolean; kind: 'pct' | 'pp' }[] = [
-    { l: 'Win-Rate', you: g.winRate, ref: bt.winRate, better: (d) => d >= 0, kind: 'pp' },
-    { l: 'Ø Gewinner', you: g.moveWin, ref: bt.avgWin, better: (d) => d >= 0, kind: 'pct' },
-    { l: 'Ø Verlierer', you: g.moveLoss, ref: bt.avgLoss, better: (d) => d >= 0, kind: 'pct' },
-    { l: 'Erwartung pro Trade', you: g.moveExp, ref: bt.expectancy, better: (d) => d >= 0, kind: 'pct' },
+  const rows: { l: string; k: 'winRate' | 'avgWin' | 'avgLoss' | 'exp'; you: number | null; ref: number; better: (d: number) => boolean; kind: 'pct' | 'pp' }[] = [
+    { l: 'Win-Rate', k: 'winRate', you: g.winRate, ref: bt.winRate, better: (d) => d >= 0, kind: 'pp' },
+    { l: 'Ø Gewinner', k: 'avgWin', you: g.moveWin, ref: bt.avgWin, better: (d) => d >= 0, kind: 'pct' },
+    { l: 'Ø Verlierer', k: 'avgLoss', you: g.moveLoss, ref: bt.avgLoss, better: (d) => d >= 0, kind: 'pct' },
+    { l: 'Erwartung pro Trade', k: 'exp', you: g.moveExp, ref: bt.expectancy, better: (d) => d >= 0, kind: 'pct' },
   ];
   const diff = g.moveExp != null ? g.moveExp - bt.expectancy : null;
   const verdict = diff == null ? null : diff >= 0 ? 'over' : 'under';
@@ -188,18 +200,22 @@ function BacktestCard({ all, settings }: { all: ETrade[]; settings: Settings }) 
         {g.moveN > 0 && g.moveN < 30 && <Pill tone="warn">ab 30 Trades belastbar</Pill>}
       </div>
       <div className="grid">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-5 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-faint">
+        <div className="label grid grid-cols-[1fr_auto_auto_auto] gap-x-5 pb-2 !text-faint">
           <span>Kennzahl</span><span className="text-right">Du</span><span className="text-right">Backtest</span><span className="w-16 text-right">Δ</span>
         </div>
         {rows.map((r) => {
           const d = r.you == null ? null : r.you - r.ref;
           const good = d != null && r.better(d);
           return (
-            <div key={r.l} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 border-t border-line py-2.5 text-[13px]">
-              <span className="text-mute">{r.l}</span>
+            <div key={r.l} className="border-t border-line">
+            <button type="button" onClick={() => setOpenRow((o) => (o === r.k ? null : r.k))} aria-expanded={openRow === r.k}
+              className="group grid w-full grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 rounded-lg py-2.5 text-left text-[13px] transition-colors hover:bg-white/[0.025]">
+              <span className="flex items-center gap-2 text-mute"><span className={cn('font-mono text-[13px] leading-none transition-transform duration-200', openRow === r.k ? 'rotate-45 text-fg' : 'text-faint group-hover:text-fg')}>+</span>{r.l}</span>
               <span className={cn('num text-right font-mono font-medium', r.you == null ? 'text-faint' : r.kind === 'pp' ? 'text-fg' : tone(r.you))}>{r.kind === 'pp' ? fmt.pct0(r.you) : fmt.pct(r.you)}</span>
               <span className="num text-right font-mono text-mute">{r.kind === 'pp' ? fmt.n2(r.ref * 100) + ' %' : fmt.pct(r.ref)}</span>
               <span className="w-16 text-right">{d == null ? <span className="text-faint">–</span> : <Pill tone={good ? 'win' : 'loss'} className="px-2">{good ? '▲' : '▼'} {fmt.n1(Math.abs(d * 100))}</Pill>}</span>
+            </button>
+            <Expand open={openRow === r.k}><div className="pb-3"><Detail d={backtestDetail(r.k, g, settings)} /></div></Expand>
             </div>
           );
         })}
@@ -210,14 +226,15 @@ function BacktestCard({ all, settings }: { all: ETrade[]; settings: Settings }) 
 }
 
 function WinRateCard({ st, settings }: { st: Stats; settings: Settings }) {
+  const [o, t] = useToggle();
   const g = st.g, tot = g.n || 1;
   const bt = settings.backtest.winRate;
   return (
-    <Card title="Win-Rate">
+    <Card title="Win-Rate" action={<InfoToggle open={o} onClick={t} label="Win-Rate" />}>
       <div className="flex h-full flex-col items-center justify-between gap-4">
-        <CircularProgress value={g.winRate} marker={bt} color={g.winRate != null && g.winRate >= bt ? '#46a6a0' : '#6f9dc9'}>
+        <CircularProgress value={g.winRate} marker={bt} color={g.winRate != null && g.winRate >= bt ? '#3ddc84' : '#f2f2f2'} track="#222">
           <div>
-            <div className="num font-mono text-[30px] font-medium leading-none">{g.winRate == null ? '0' : Math.round(g.winRate * 100)}<span className="text-base text-mute"> %</span></div>
+            <div className="dot-num text-[34px] leading-none">{g.winRate == null ? '0' : Math.round(g.winRate * 100)}<span className="text-base text-mute"> %</span></div>
             <div className="mt-1 text-[11px] text-mute">Marke = Backtest {fmt.pct0(bt)}</div>
           </div>
         </CircularProgress>
@@ -236,14 +253,16 @@ function WinRateCard({ st, settings }: { st: Stats; settings: Settings }) {
           <div className="text-center text-[11.5px] text-faint">{st.streak ? `Aktuelle Serie: ${st.streak}× ${st.streakType === 'win' ? 'Gewinn' : st.streakType === 'loss' ? 'Verlust' : 'Break-even'}` : 'Noch keine Serie'}</div>
         </div>
       </div>
+      <Expand open={o}><Detail d={metricDetail('winRate', st, settings)} /></Expand>
     </Card>
   );
 }
 
-function ProjectionCard({ st, cur }: { st: Stats; cur: string }) {
+function ProjectionCard({ st, cur, settings }: { st: Stats; cur: string; settings: Settings }) {
+  const [o, t] = useToggle();
   const p = st.proj;
   return (
-    <Card title="Hochrechnung aufs Jahr" note={p ? `${fmt.n0(p.days)} Tage Basis` : undefined}>
+    <Card title="Hochrechnung aufs Jahr" action={<InfoToggle open={o} onClick={t} label="Hochrechnung" />}>
       {!p ? <Empty title="Noch nichts hochzurechnen" text="Mit dem ersten abgeschlossenen Trade rechne ich deine Rendite auf 12 Monate hoch." /> : (
         <div className="flex h-full flex-col">
           <div className={cn('font-mono text-[38px] font-medium leading-none tracking-tight', tone(p.linear))}><NumberTicker value={p.linear * 100} decimals={1} signed /><span className="text-xl text-mute"> %</span></div>
@@ -262,12 +281,14 @@ function ProjectionCard({ st, cur }: { st: Stats; cur: string }) {
           {p.weak && <p className="mt-2 rounded-lg bg-warn/10 px-3 py-2 text-[11.5px] text-warn">Wenig Daten. Belastbar ab etwa 30 Tagen und 10 Trades.</p>}
         </div>
       )}
+      <Expand open={o}><Detail d={metricDetail('projection', st, settings)} /></Expand>
     </Card>
   );
 }
 
 // ── Checklisten-Auswertung ─────────────────────────────
 function ChecklistCard({ st }: { st: Stats }) {
+  const [o, t] = useToggle();
   const c = st.closed.filter((t) => t.items.length);
   const full = group(c.filter((t) => t.complete)), part = group(c.filter((t) => !t.complete));
   const misses = useMemo(() => {
@@ -280,14 +301,20 @@ function ChecklistCard({ st }: { st: Stats }) {
     return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 3);
   }, [c]);
   return (
-    <Card title="Checkliste">
+    <Card title="Checkliste" action={<InfoToggle open={o} onClick={t} label="Checkliste" />}>
+      <Expand open={o}><div className="mb-4"><Detail d={{
+        title: 'Checklisten-Auswertung',
+        what: 'Vergleicht Trades, bei denen du alle Punkte (Grundregeln plus Punkte der gewählten Grundlagen) abgehakt hast, mit Trades, bei denen etwas gefehlt hat. So siehst du schwarz auf weiß, ob sich Disziplin auszahlt.',
+        rows: [['Trades mit Checkliste', String(c.length)], ['Alles erfüllt', `${full.n} · ${fmt.pct0(full.winRate)} Win-Rate`], ['Mit Lücken', `${part.n} · ${fmt.pct0(part.winRate)} Win-Rate`], ['Differenz', full.n && part.n ? `${fmt.signed(((full.winRate || 0) - (part.winRate || 0)) * 100, 0)} Prozentpunkte` : '–']],
+        verdict: !full.n || !part.n ? { tone: 'mute', text: 'Für einen Vergleich brauchst du Trades mit und ohne vollständige Checkliste.' } : (full.winRate || 0) >= (part.winRate || 0) ? { tone: 'win', text: 'Mit voller Checkliste gewinnst du öfter. Die Regeln wirken.' } : { tone: 'warn', text: 'Mit Lücken läuft es bisher besser. Prüfe, ob die Checklisten-Punkte zu deinem Stil passen.' },
+      }} /></div></Expand>
       {!c.length ? <Empty title="Noch keine Auswertung" text="Hake beim Eintragen ab, welche Regeln erfüllt waren. Hier siehst du dann, ob sich Disziplin auszahlt." /> : (
         <div className="grid gap-4">
           <div className="grid grid-cols-2 gap-3">
-            {([['Alles erfüllt', full, 'teal'], ['Lücken', part, 'loss']] as const).map(([l, g, t]) => (
+            {([['Alles erfüllt', full, 'win'], ['Lücken', part, 'loss']] as const).map(([l, g, t]) => (
               <div key={l} className="rounded-xl border border-line bg-ink-950/50 p-3">
                 <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{l}</div>
-                <div className={cn('num mt-1 font-mono text-2xl font-medium', g.n ? (t === 'teal' ? 'text-aqua' : 'text-loss') : 'text-faint')}>{fmt.pct0(g.winRate)}</div>
+                <div className={cn('num mt-1 font-mono text-2xl font-medium', g.n ? (t === 'win' ? 'text-win' : 'text-loss') : 'text-faint')}>{fmt.pct0(g.winRate)}</div>
                 <div className="num mt-0.5 text-[11.5px] text-mute">{g.n} Trades · <span className={tone(g.net)}>{fmt.signed(g.net, 0)}</span></div>
               </div>
             ))}
@@ -299,7 +326,7 @@ function ChecklistCard({ st }: { st: Stats }) {
                 <span className="min-w-0 truncate text-fg">{m.text}</span>
                 <span className="num shrink-0 font-mono text-xs text-mute">{m.n}× · {Math.round((m.loss / m.n) * 100)} % Verlust</span>
               </div>
-            )) : <p className="text-[12.5px] text-aqua">Bisher alles abgehakt.</p>}
+            )) : <p className="text-[12.5px] text-win">Bisher alles abgehakt.</p>}
           </div>
         </div>
       )}
@@ -315,8 +342,9 @@ export function sortSetups<T extends { n: number; winRate: number | null; net: n
 }
 export const SORT_OPTS: { v: SortKey; label: string }[] = [{ v: 'winRate', label: 'Win-Rate' }, { v: 'net', label: 'P&L' }, { v: 'n', label: 'Trades' }, { v: 'avgR', label: 'Ø R' }];
 
-function Ranking({ st, onSetup }: { st: Stats; onSetup: (id: string) => void }) {
+function Ranking({ st, onSetup, cur }: { st: Stats; onSetup: (id: string) => void; cur: string }) {
   const [key, setKey] = useState<SortKey>('winRate');
+  const [openId, setOpenId] = useState<string | null>(null);
   const list = sortSetups(st.setups.map((s) => ({ ...s, id: s.setup.id })), key);
   const used = list.filter((s) => s.n > 0), unused = list.filter((s) => !s.n);
   return (
@@ -324,15 +352,16 @@ function Ranking({ st, onSetup }: { st: Stats; onSetup: (id: string) => void }) 
       {!used.length && <p className="mb-3 text-[13px] text-mute">Noch keine Trades zugeordnet. Sobald du Trades mit Grundlage einträgst, erscheint hier das Ranking.</p>}
       <div className="grid">
         {used.length > 0 && (
-          <div className="grid grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] gap-3 px-2 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-faint sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
+          <div className="label grid grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] gap-3 px-2 pb-2 !text-faint sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
             <span>Grundlage</span><span>Trades</span><span>Win-Rate</span><span className="text-right">P&L</span><span className="hidden text-right sm:block">Ø R</span>
           </div>
         )}
         {used.map((s, i) => (
-          <motion.button layout key={s.id} type="button" onClick={() => onSetup(s.id)} transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-            className="grid grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] items-center gap-3 rounded-xl border-t border-line px-2 py-2.5 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
+          <motion.div layout key={s.id} transition={{ type: 'spring', stiffness: 380, damping: 34 }} className="border-t border-line">
+          <button type="button" onClick={() => setOpenId((o) => (o === s.id ? null : s.id))} aria-expanded={openId === s.id}
+            className="grid w-full grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
             <span className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium">
-              <span className="num w-4 shrink-0 font-mono text-[11px] text-faint">{i + 1}</span>
+              <span className={cn('num w-4 shrink-0 font-mono text-[11px] transition-colors', openId === s.id ? 'text-signal' : 'text-faint')}>{String(i + 1).padStart(2, '0')}</span>
               <span className="size-2 shrink-0 rounded-full" style={{ background: s.setup.color }} />
               <span className="truncate">{s.setup.name}</span>
             </span>
@@ -343,7 +372,14 @@ function Ranking({ st, onSetup }: { st: Stats; onSetup: (id: string) => void }) 
             </span>
             <span className={cn('num text-right font-mono text-[13px] font-medium', tone(s.net))}>{fmt.signed(s.net, 0)}</span>
             <span className={cn('num hidden text-right font-mono text-[13px] sm:block', tone(s.avgR))}>{s.avgR == null ? '–' : fmt.signed(s.avgR)}</span>
-          </motion.button>
+          </button>
+          <Expand open={openId === s.id}>
+            <div className="px-2 pb-3">
+              <Detail d={setupDetail(s, st.closed, cur)} />
+              <Btn size="sm" className="mt-2" onClick={() => onSetup(s.id)}>Alle Trades mit dieser Grundlage →</Btn>
+            </div>
+          </Expand>
+          </motion.div>
         ))}
       </div>
       {unused.length > 0 && (
@@ -396,7 +432,7 @@ function Patterns({ st }: { st: Stats }) {
       <div className="grid">
         {rows.map(([l, v, a, b], i) => (
           <div key={l} className={cn('grid grid-cols-2 gap-x-5 gap-y-2.5 py-3', i && 'border-t border-line')}>
-            <div className="col-span-2 flex justify-between gap-2 text-xs font-semibold text-mute"><span>{l}</span><span className="text-steel">{v}</span></div>
+            <div className="col-span-2 flex justify-between gap-2 text-xs font-semibold text-mute"><span>{l}</span><span className="text-fg">{v}</span></div>
             {a}{b}
           </div>
         ))}
@@ -424,7 +460,7 @@ export function SetupChips({ ids, settings, max = 2 }: { ids: string[]; settings
 function Recent({ st, settings, onEdit, onNew, goTrades }: { st: Stats; settings: Settings; onEdit: (t: ETrade) => void; onNew: () => void; goTrades: () => void }) {
   const list = [...st.list].sort((a, b) => +tDate(b) - +tDate(a)).slice(0, 6);
   return (
-    <Card title="Letzte Trades" action={list.length ? <button type="button" onClick={goTrades} className="text-xs font-semibold text-steel hover:text-aqua">Alle ansehen →</button> : undefined}>
+    <Card title="Letzte Trades" action={list.length ? <button type="button" onClick={goTrades} className="label !text-fg hover:!text-signal">Alle ansehen →</button> : undefined}>
       {!list.length ? <Empty title="Noch keine Trades" text="Trag deinen ersten Trade ein. Alle Zahlen im Journal rechnen sich dann automatisch." action={<Btn variant="primary" size="sm" onClick={onNew} className="mt-2">Ersten Trade eintragen</Btn>} /> : (
         <div className="grid">
           {list.map((t, i) => (
