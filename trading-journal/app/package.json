@@ -1,0 +1,24 @@
+{
+  "name": "trade-journal",
+  "private": true,
+  "version": "2.0.0",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@paper-design/shaders-react": "^0.0.81",
+    "clsx": "^2.1.1",
+    "motion": "^11.18.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-use-measure": "^2.1.7",
+    "recharts": "^2.15.4",
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "esbuild": "^0.28.2",
+    "tailwindcss": "^4.3.3"
+  }
+}
