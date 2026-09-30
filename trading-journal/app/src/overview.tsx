@@ -2,15 +2,18 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { motion } from 'motion/react';
 import {
   ACCOUNT_LABEL, WEEKDAYS, cn, fmt, group, scenario, tDate, tone,
-  type AccountFilter, type ETrade, type MarketState, type Settings, type Stats,
+  type AccountFilter, type ETrade, type Hyblock, type MarketState, type Settings, type Stats,
 } from './lib';
 import { BlurFade, BorderBeam, Btn, Card, CircularProgress, Detail, Empty, Expand, InfoToggle, MeshBackdrop, NumberTicker, Pill, Segmented, SlidingNumber } from './ui';
 import { backtestDetail, metricDetail, setupDetail, type MetricKey } from './explain';
+import { Morph, useMorph } from './morph';
+import { HyblockCard } from './hyblock';
 import { EquityChart, MonthlyChart } from './charts';
 
 type Props = {
   st: Stats; settings: Settings; acc: AccountFilter; setAcc: (a: AccountFilter) => void; market: MarketState;
   loaded: boolean; onNew: () => void; onEdit: (t: ETrade) => void; onSetup: (id: string) => void; goTrades: () => void;
+  hyblock: Hyblock[]; onSaveHyblock: (h: Hyblock) => Promise<void>; onDeleteHyblock: (id: string) => Promise<void>;
 };
 
 export function Overview(p: Props) {
@@ -25,19 +28,20 @@ export function Overview(p: Props) {
         <BlurFade delay={0.2} className="lg:col-span-4"><ProjectionCard st={st} cur={cur} settings={settings} /></BlurFade>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
-        <BlurFade delay={0.25} className="lg:col-span-8">
-          <Card title="Kontostand" note={st.closed.length ? `${st.closed.length} abgeschlossene Trades · jetzt ${fmt.n0(st.balance)} ${cur}` : undefined}><EquityChart st={st} cur={cur} /></Card>
+        <BlurFade delay={0.25} className="lg:col-span-7">
+          <Card title="Kontostand" note={st.closed.length ? `${st.closed.length} Trades · jetzt ${fmt.n0(st.balance)} ${cur}` : undefined}><EquityChart st={st} cur={cur} /></Card>
         </BlurFade>
-        <BlurFade delay={0.3} className="lg:col-span-4"><ChecklistCard st={st} /></BlurFade>
+        <BlurFade delay={0.3} className="lg:col-span-5"><HyblockCard list={p.hyblock} market={p.market} settings={settings} onSave={p.onSaveHyblock} onDelete={p.onDeleteHyblock} /></BlurFade>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
         <BlurFade delay={0.35} className="lg:col-span-7"><Ranking st={st} onSetup={p.onSetup} cur={cur} /></BlurFade>
-        <BlurFade delay={0.4} className="lg:col-span-5"><Card title="P&L pro Monat"><MonthlyChart st={st} cur={cur} /></Card></BlurFade>
+        <BlurFade delay={0.4} className="lg:col-span-5"><ChecklistCard st={st} /></BlurFade>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
-        <BlurFade delay={0.45} className="lg:col-span-6"><Patterns st={st} /></BlurFade>
-        <BlurFade delay={0.5} className="lg:col-span-6"><Recent st={st} settings={settings} onEdit={p.onEdit} onNew={p.onNew} goTrades={p.goTrades} /></BlurFade>
+        <BlurFade delay={0.45} className="lg:col-span-5"><Card title="P&L pro Monat"><MonthlyChart st={st} cur={cur} /></Card></BlurFade>
+        <BlurFade delay={0.5} className="lg:col-span-7"><Recent st={st} settings={settings} onEdit={p.onEdit} onNew={p.onNew} goTrades={p.goTrades} /></BlurFade>
       </div>
+      <BlurFade delay={0.55}><Patterns st={st} /></BlurFade>
     </div>
   );
 }
@@ -46,8 +50,6 @@ export function Overview(p: Props) {
 function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
   const g = st.g, cur = settings.currency;
   const ret = st.start ? g.net / st.start : null;
-  const [open, setOpen] = useState<MetricKey | null>(null);
-  const tog = (k: MetricKey) => setOpen((o) => (o === k ? null : k));
   const facts: [string, ReactNode, MetricKey][] = [
     ['Trades', <>{g.n}{st.open.length ? <span className="text-faint"> +{st.open.length} offen</span> : null}</>, 'trades'],
     ['Win-Rate', fmt.pct0(g.winRate), 'winRate'],
@@ -66,7 +68,8 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
               <span className="text-xs text-mute">Startkapital {fmt.n0(st.start)} {cur}</span>
             </div>
             <div>
-              <div className="mb-3 flex items-center gap-3"><span className="label">Netto-P&L · {ACCOUNT_LABEL[acc]}</span><InfoToggle open={open === 'net'} onClick={() => tog('net')} label="Netto-P&L" /></div>
+              <div className="mb-3 flex items-center gap-3"><span className="label">Netto-P&L · {ACCOUNT_LABEL[acc]}</span>
+                <Morph id="fact-net" title="Netto-P&L" body={() => <Detail bare d={metricDetail('net', st, settings)} />} className="!w-auto rounded-full border border-line-2 px-2.5 py-0.5 hover:border-steel/60"><span className="label !text-[9.5px] group-hover:!text-steel">Details +</span></Morph></div>
               <div className={cn('dot-num flex flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none', tone(g.net))}>
                 {loaded ? <NumberTicker key={acc} value={g.net} decimals={2} signed /> : <span className="text-faint">0,00</span>}
                 <span className="font-sans text-lg font-medium text-mute">{cur}</span>
@@ -76,19 +79,17 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
                 <span>{g.n ? `${g.wins} gewonnen · ${g.losses} verloren${g.be ? ` · ${g.be} Break-even` : ''}` : 'Noch keine abgeschlossenen Trades. Alle Werte starten bei null.'}</span>
               </div>
             </div>
-            <div>
-              <dl className="grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:grid-cols-5">
-                {facts.map(([l, v, k]) => (
-                  <button key={l} type="button" onClick={() => tog(k)} aria-expanded={open === k}
-                    className={cn('group min-w-0 rounded-xl border px-3 py-2.5 text-left transition-all duration-200',
-                      open === k ? 'border-white/40 bg-white/[0.06]' : 'border-transparent hover:border-line-2 hover:bg-white/[0.03]')}>
-                    <dt className="label flex items-center justify-between gap-1">{l}<span className={cn('font-mono text-[13px] leading-none transition-transform duration-200', open === k ? 'rotate-45 text-fg' : 'text-faint group-hover:text-fg')}>+</span></dt>
+            <dl className="grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:grid-cols-5">
+              {facts.map(([l, v, k], i) => (
+                <Morph key={l} id={`fact-${k}`} title={l} body={() => <Detail bare d={metricDetail(k, st, settings)} />}
+                  className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 transition-colors hover:border-steel/40 hover:bg-steel/[0.07]">
+                  <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 + i * 0.05 }}>
+                    <dt className="label flex items-center justify-between gap-1">{l}<span className="font-mono text-[13px] leading-none text-faint transition-all duration-300 group-hover:rotate-90 group-hover:text-steel">+</span></dt>
                     <dd className="num mt-1.5 font-mono text-[17px] font-medium text-fg">{v}</dd>
-                  </button>
-                ))}
-              </dl>
-              <Expand open={open != null}>{open && <Detail d={metricDetail(open, st, settings)} />}</Expand>
-            </div>
+                  </motion.div>
+                </Morph>
+              ))}
+            </dl>
           </div>
           <MarketPanel market={market} settings={settings} />
         </div>
@@ -143,7 +144,7 @@ function MarketPanel({ market: m, settings }: { market: MarketState; settings: S
           <AutoCheck ok={rOk} label={`Weekly RSI über ${fmt.n2(cfg.rsiWeekly)}`} value={m.rsiW != null ? fmt.n1(m.rsiW) : '–'} />
           {m.rsiW != null && (
             <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
-              <motion.div className="h-full rounded-full bg-gradient-to-r from-[#3a3a3a] via-[#bdbdbd] to-white" initial={{ width: 0 }}
+              <motion.div className="h-full rounded-full bg-gradient-to-r from-denim via-steel to-teal" initial={{ width: 0 }}
                 animate={{ width: `${Math.min(100, (m.rsiW / cfg.rsiWeekly) * 100)}%` }} transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }} />
             </div>
           )}
@@ -173,7 +174,6 @@ function useToggle() { const [o, setO] = useState(false); return [o, () => setO(
 // ── Backtest-Vergleich ─────────────────────────────────
 function BacktestCard({ all, settings }: { all: ETrade[]; settings: Settings }) {
   const [only, setOnly] = useState<'all' | 'bt'>('all');
-  const [openRow, setOpenRow] = useState<string | null>(null);
   const bt = settings.backtest;
   const list = only === 'bt' ? all.filter((t) => (t.setups || []).includes('s_bt')) : all;
   const g = group(list);
@@ -207,15 +207,14 @@ function BacktestCard({ all, settings }: { all: ETrade[]; settings: Settings }) 
           const d = r.you == null ? null : r.you - r.ref;
           const good = d != null && r.better(d);
           return (
-            <div key={r.l} className="border-t border-line">
-            <button type="button" onClick={() => setOpenRow((o) => (o === r.k ? null : r.k))} aria-expanded={openRow === r.k}
-              className="group grid w-full grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 rounded-lg py-2.5 text-left text-[13px] transition-colors hover:bg-white/[0.025]">
-              <span className="flex items-center gap-2 text-mute"><span className={cn('font-mono text-[13px] leading-none transition-transform duration-200', openRow === r.k ? 'rotate-45 text-fg' : 'text-faint group-hover:text-fg')}>+</span>{r.l}</span>
+            <div key={r.l} className="border-t border-line py-1">
+            <Morph id={`bt-${r.k}-${only}`} title={`Backtest · ${r.l}`} body={() => <Detail bare d={backtestDetail(r.k, g, settings)} />}
+              className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 px-2 py-2 text-[13px] transition-colors hover:bg-steel/[0.07]">
+              <span className="flex items-center gap-2 text-mute"><span className="font-mono text-[13px] leading-none text-faint transition-all duration-300 group-hover:rotate-90 group-hover:text-steel">+</span>{r.l}</span>
               <span className={cn('num text-right font-mono font-medium', r.you == null ? 'text-faint' : r.kind === 'pp' ? 'text-fg' : tone(r.you))}>{r.kind === 'pp' ? fmt.pct0(r.you) : fmt.pct(r.you)}</span>
               <span className="num text-right font-mono text-mute">{r.kind === 'pp' ? fmt.n2(r.ref * 100) + ' %' : fmt.pct(r.ref)}</span>
               <span className="w-16 text-right">{d == null ? <span className="text-faint">–</span> : <Pill tone={good ? 'win' : 'loss'} className="px-2">{good ? '▲' : '▼'} {fmt.n1(Math.abs(d * 100))}</Pill>}</span>
-            </button>
-            <Expand open={openRow === r.k}><div className="pb-3"><Detail d={backtestDetail(r.k, g, settings)} /></div></Expand>
+            </Morph>
             </div>
           );
         })}
@@ -232,7 +231,7 @@ function WinRateCard({ st, settings }: { st: Stats; settings: Settings }) {
   return (
     <Card title="Win-Rate" action={<InfoToggle open={o} onClick={t} label="Win-Rate" />}>
       <div className="flex h-full flex-col items-center justify-between gap-4">
-        <CircularProgress value={g.winRate} marker={bt} color={g.winRate != null && g.winRate >= bt ? '#3ddc84' : '#f2f2f2'} track="#222">
+        <CircularProgress value={g.winRate} marker={bt} color={g.winRate != null && g.winRate >= bt ? '#6fd39b' : '#8fb3c9'} track="#434d58">
           <div>
             <div className="dot-num text-[34px] leading-none">{g.winRate == null ? '0' : Math.round(g.winRate * 100)}<span className="text-base text-mute"> %</span></div>
             <div className="mt-1 text-[11px] text-mute">Marke = Backtest {fmt.pct0(bt)}</div>
@@ -344,7 +343,7 @@ export const SORT_OPTS: { v: SortKey; label: string }[] = [{ v: 'winRate', label
 
 function Ranking({ st, onSetup, cur }: { st: Stats; onSetup: (id: string) => void; cur: string }) {
   const [key, setKey] = useState<SortKey>('winRate');
-  const [openId, setOpenId] = useState<string | null>(null);
+  const { close } = useMorph();
   const list = sortSetups(st.setups.map((s) => ({ ...s, id: s.setup.id })), key);
   const used = list.filter((s) => s.n > 0), unused = list.filter((s) => !s.n);
   return (
@@ -358,10 +357,10 @@ function Ranking({ st, onSetup, cur }: { st: Stats; onSetup: (id: string) => voi
         )}
         {used.map((s, i) => (
           <motion.div layout key={s.id} transition={{ type: 'spring', stiffness: 380, damping: 34 }} className="border-t border-line">
-          <button type="button" onClick={() => setOpenId((o) => (o === s.id ? null : s.id))} aria-expanded={openId === s.id}
-            className="grid w-full grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-white/[0.03] sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
+          <Morph id={`setup-rank-${s.id}`} title={s.setup.name} body={() => <><Detail bare d={setupDetail(s, st.closed, cur)} /><Btn size="sm" className="mt-3" onClick={() => { close(); onSetup(s.id); }}>Alle Trades mit dieser Grundlage →</Btn></>}
+            className="grid w-full grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] items-center gap-3 px-2 py-2.5 transition-colors hover:bg-steel/[0.07] sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
             <span className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium">
-              <span className={cn('num w-4 shrink-0 font-mono text-[11px] transition-colors', openId === s.id ? 'text-signal' : 'text-faint')}>{String(i + 1).padStart(2, '0')}</span>
+              <span className={cn('num w-4 shrink-0 font-mono text-[11px] transition-colors', 'text-faint group-hover:text-steel')}>{String(i + 1).padStart(2, '0')}</span>
               <span className="size-2 shrink-0 rounded-full" style={{ background: s.setup.color }} />
               <span className="truncate">{s.setup.name}</span>
             </span>
@@ -372,13 +371,7 @@ function Ranking({ st, onSetup, cur }: { st: Stats; onSetup: (id: string) => voi
             </span>
             <span className={cn('num text-right font-mono text-[13px] font-medium', tone(s.net))}>{fmt.signed(s.net, 0)}</span>
             <span className={cn('num hidden text-right font-mono text-[13px] sm:block', tone(s.avgR))}>{s.avgR == null ? '–' : fmt.signed(s.avgR)}</span>
-          </button>
-          <Expand open={openId === s.id}>
-            <div className="px-2 pb-3">
-              <Detail d={setupDetail(s, st.closed, cur)} />
-              <Btn size="sm" className="mt-2" onClick={() => onSetup(s.id)}>Alle Trades mit dieser Grundlage →</Btn>
-            </div>
-          </Expand>
+          </Morph>
           </motion.div>
         ))}
       </div>
@@ -429,12 +422,12 @@ function Patterns({ st }: { st: Stats }) {
   if (wd.length >= 2) rows.push(['Wochentag', 'bester / schlechtester', <Side label={wd[0].k} g={wd[0]} />, <Side label={wd[wd.length - 1].k} g={wd[wd.length - 1]} />]);
   return (
     <Card title="Muster in deinen Trades">
-      <div className="grid">
+      <div className="grid gap-x-10 md:grid-cols-2 xl:grid-cols-3">
         {rows.map(([l, v, a, b], i) => (
-          <div key={l} className={cn('grid grid-cols-2 gap-x-5 gap-y-2.5 py-3', i && 'border-t border-line')}>
+          <motion.div key={l} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.05 }} className="grid grid-cols-2 gap-x-5 gap-y-2.5 border-t border-line py-3.5">
             <div className="col-span-2 flex justify-between gap-2 text-xs font-semibold text-mute"><span>{l}</span><span className="text-fg">{v}</span></div>
             {a}{b}
-          </div>
+          </motion.div>
         ))}
       </div>
     </Card>

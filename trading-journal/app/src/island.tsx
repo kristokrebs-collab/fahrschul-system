@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion, MotionConfig, useReducedMotion } from 'motion/react';
 import { cn, fmt, scenario, tDate, tone, type ETrade, type MarketState, type Settings } from './lib';
-import { Btn, SlidingNumber } from './ui';
+import { Btn } from './ui';
 
 const SPRING = { type: 'spring' as const, stiffness: 400, damping: 30 };
 
@@ -39,124 +39,35 @@ export function IslandProvider({ children, market, settings, onNew, bind }: { ch
   );
 }
 
-type Mode = 'compact' | 'expanded' | 'note';
-const SIZES: Record<Mode, { w: number; h: number; r: number }> = {
-  compact: { w: 212, h: 38, r: 19 },
-  note: { w: 330, h: 54, r: 27 },
-  expanded: { w: 392, h: 206, r: 30 },
-};
-
-function Island({ market: m, settings, note, onNew, dismiss }: { market: MarketState; settings: Settings; note: IslandNote | null; onNew: () => void; dismiss: () => void }) {
-  const [open, setOpen] = useState(false);
+/** Meldungs-Pille: federt über dem Dock aus einem Punkt auf (Dynamic-Island-Prinzip), statt oben Platz zu belegen. */
+function Island({ note, dismiss }: { market: MarketState; settings: Settings; note: IslandNote | null; onNew: () => void; dismiss: () => void }) {
   const reduce = useReducedMotion();
-  const mode: Mode = note ? 'note' : open ? 'expanded' : 'compact';
-  const size = SIZES[mode];
-  const cfg = settings.market;
-  const sc = scenario(m.close4h, cfg);
-  const scTone = sc ? { win: 'bg-win', loss: 'bg-loss', warn: 'bg-warn', mute: 'bg-mute' }[sc.tone] : 'bg-faint';
-
-  // Kurs-Tick: kurz grün/rot aufblitzen, wenn sich der Preis bewegt
-  const prev = useRef<number | undefined>();
-  const [tick, setTick] = useState<'up' | 'down' | null>(null);
-  useEffect(() => {
-    if (m.price != null && prev.current != null && m.price !== prev.current) {
-      setTick(m.price > prev.current ? 'up' : 'down');
-      const id = setTimeout(() => setTick(null), 900);
-      prev.current = m.price;
-      return () => clearTimeout(id);
-    }
-    prev.current = m.price;
-  }, [m.price]);
-
-  useEffect(() => {
-    if (!open) return;
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('keydown', k);
-    return () => document.removeEventListener('keydown', k);
-  }, [open]);
-
-  const content = {
-    compact: (
-      <button type="button" onClick={() => setOpen(true)} aria-expanded={false} aria-label="Markt-Status öffnen"
-        className="flex h-full w-full items-center justify-between gap-2 px-4">
-        <span className="flex items-center gap-2">
-          <span className={cn('size-2 rounded-full', m.status === 'live' ? scTone : 'bg-faint')} />
-          <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-white/60">{sc ? { long: 'Long', short: 'Short', range: 'Range', bear: 'Bär' }[sc.key] : 'BTC'}</span>
-        </span>
-        <span className={cn('dot-num text-[16px] transition-colors duration-700', tick === 'up' ? 'text-win' : tick === 'down' ? 'text-loss' : 'text-white')}>
-          {m.price != null ? <SlidingNumber value={Math.round(m.price)} /> : '—'}
-        </span>
-      </button>
-    ),
-    note: note && (
-      <button type="button" onClick={dismiss} className="flex h-full w-full items-center gap-3 px-3.5 text-left" aria-live="polite">
-        <span className={cn('grid size-8 shrink-0 place-items-center rounded-full',
-          note.kind === 'success' ? 'bg-win/20 text-win' : note.kind === 'error' ? 'bg-loss/20 text-loss' : note.kind === 'signal' ? 'bg-signal/25 text-signal' : 'bg-white/10 text-white')}>
-          <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            {note.kind === 'success' ? <motion.path d="M3.5 8.5l3 3 6-7" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.35, delay: 0.1 }} />
-              : note.kind === 'error' ? <path d="M4 4l8 8M12 4l-8 8" /> : <path d="M8 3v6M8 12.5v.5" />}
-          </svg>
-        </span>
-        <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-white">{note.title}</span>
-        {note.value && <span className={cn('dot-num shrink-0 text-[15px]', note.valueTone === 'win' ? 'text-win' : note.valueTone === 'loss' ? 'text-loss' : 'text-white/80')}>{note.value}</span>}
-      </button>
-    ),
-    expanded: (
-      <div className="flex h-full w-full flex-col gap-3 p-4 text-left">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/50">{settings.pair} · live</div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="dot-num text-[30px] leading-none text-white">{m.price != null ? <SlidingNumber value={Math.round(m.price)} /> : '—'}</span>
-              {m.change != null && <span className={cn('font-mono text-xs', tone(m.change))}>{fmt.signed(m.change, 2)} %</span>}
-            </div>
-          </div>
-          <button type="button" onClick={() => setOpen(false)} aria-label="Schließen" className="grid size-7 place-items-center rounded-full bg-white/10 text-white/70 hover:text-white">
-            <svg viewBox="0 0 12 12" className="size-2.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M2 2l8 8M10 2 2 10" /></svg>
-          </button>
-        </div>
-        {sc ? (
-          <div className="rounded-2xl bg-white/[0.06] px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2 text-[13px] font-semibold text-white"><span className={cn('size-2 rounded-full', scTone)} />{sc.title}</span>
-              <span className="font-mono text-[11px] text-white/50">4H {fmt.n0(m.close4h)}</span>
-            </div>
-            <p className="mt-1 text-[11.5px] leading-snug text-white/60">{sc.detail}</p>
-          </div>
-        ) : <p className="text-[12px] text-white/60">{m.message || 'Warte auf TradingView …'}</p>}
-        <div className="mt-auto flex items-center justify-between gap-3">
-          <span className="font-mono text-[11px] text-white/50">W-RSI {m.rsiW != null ? fmt.n1(m.rsiW) : '–'} / {fmt.n2(cfg.rsiWeekly)}</span>
-          <button type="button" onClick={() => { setOpen(false); onNew(); }} className="rounded-full bg-white px-3.5 py-1.5 text-[12px] font-semibold text-black transition-transform active:scale-95">Trade eintragen</button>
-        </div>
-      </div>
-    ),
-  }[mode];
-
   return (
-    <>
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(92px+env(safe-area-inset-bottom,0px))] z-[56] flex justify-center px-4" aria-live="polite">
       <AnimatePresence>
-        {open && !note && <motion.div className="fixed inset-0 z-[55] bg-black/30 backdrop-blur-[2px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpen(false)} />}
+        {note && (
+          <motion.button key={note.id} type="button" onClick={dismiss}
+            className="pointer-events-auto flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-750/95 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)] backdrop-blur-xl"
+            style={{ maxWidth: 'calc(100vw - 32px)' }}
+            initial={{ width: 44, height: 44, borderRadius: 22, opacity: 0, y: 24, scale: 0.6 }}
+            animate={{ width: 'auto', height: 50, borderRadius: 25, opacity: 1, y: 0, scale: 1 }}
+            exit={{ width: 44, opacity: 0, y: 16, scale: 0.7, transition: { duration: 0.22 } }}
+            transition={reduce ? { duration: 0 } : SPRING}>
+            <span className={cn('grid size-8 shrink-0 place-items-center rounded-full',
+              note.kind === 'success' ? 'bg-win/20 text-win' : note.kind === 'error' ? 'bg-loss/20 text-loss' : note.kind === 'signal' ? 'bg-steel/25 text-steel' : 'bg-white/10 text-fg')}>
+              <svg viewBox="0 0 16 16" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                {note.kind === 'success' ? <motion.path d="M3.5 8.5l3 3 6-7" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.35, delay: 0.15 }} />
+                  : note.kind === 'error' ? <path d="M4 4l8 8M12 4l-8 8" /> : <path d="M8 3v6M8 12.5v.5" />}
+              </svg>
+            </span>
+            <motion.span className="flex items-center gap-3 whitespace-nowrap" initial={{ opacity: 0, filter: 'blur(6px)' }} animate={{ opacity: 1, filter: 'blur(0px)' }} transition={{ delay: 0.12 }}>
+              <span className="text-[13px] font-medium text-fg">{note.title}</span>
+              {note.value && <span className={cn('dot-num text-[15px]', note.valueTone === 'win' ? 'text-win' : note.valueTone === 'loss' ? 'text-loss' : 'text-mute')}>{note.value}</span>}
+            </motion.span>
+          </motion.button>
+        )}
       </AnimatePresence>
-      <div className="pointer-events-none fixed inset-x-0 top-[calc(12px+env(safe-area-inset-top,0px))] z-[56] flex justify-center px-4">
-        <motion.div
-          className="pointer-events-auto overflow-hidden bg-black text-white shadow-[0_12px_40px_rgb(0_0_0/0.55)] ring-1 ring-white/[0.07]"
-          style={{ maxWidth: 'calc(100vw - 32px)' }}
-          initial={false}
-          animate={{ width: size.w, height: size.h, borderRadius: size.r }}
-          transition={reduce ? { duration: 0 } : SPRING}
-        >
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.div key={mode + (note?.id ?? '')} className="h-full w-full"
-              initial={{ opacity: 0, scale: 0.9, y: 5, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.9, filter: 'blur(6px)', transition: { duration: 0.12 } }}
-              transition={{ ...SPRING, delay: 0.06 }}>
-              {content}
-            </motion.div>
-          </AnimatePresence>
-        </motion.div>
-      </div>
-    </>
+    </div>
   );
 }
 

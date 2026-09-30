@@ -1,41 +1,40 @@
 @import "tailwindcss";
 @source "./";
 
-/* Nothing-Stil: matte Grautöne, weißer Primärakzent, Rot nur als Signal.
-   Gewinn/Verlust in klaren Kontrastfarben. Dark-only, bewusst. */
+/* Schiefer · Eisblau · Jade: mattes Mittelgrau statt Schwarz, zwei kühle Akzente,
+   klare Kontrastfarben für Gewinn/Verlust. Dark-only, bewusst. */
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --font-dot: "Doto", "IBM Plex Mono", ui-monospace, monospace;
 
-  --color-ink-950: #040404;
-  --color-ink-900: #0a0a0a;
-  --color-ink-850: #111111;
-  --color-ink-800: #161616;
-  --color-ink-750: #1c1c1c;
-  --color-ink-700: #242424;
-  --color-line: #1f1f1f;
-  --color-line-2: #2c2c2c;
+  --color-ink-950: #1d2227;
+  --color-ink-900: #2b3138;
+  --color-ink-850: #313840;
+  --color-ink-800: #353d46;
+  --color-ink-750: #3b444e;
+  --color-ink-700: #434d58;
+  --color-line: #3c4550;
+  --color-line-2: #4a5561;
 
-  --color-fg: #f2f2f2;
-  --color-mute: #9b9b9b;
-  --color-faint: #5f5f5f;
+  --color-fg: #eef2f5;
+  --color-mute: #aab4be;
+  --color-faint: #7c8792;
 
-  /* früher Blau/Türkis, jetzt Graustufen bis Weiß */
-  --color-steel: #e6e6e6;
-  --color-steel-2: #bdbdbd;
-  --color-denim: #3a3a3a;
-  --color-navy: #262626;
-  --color-teal: #d9d9d9;
-  --color-aqua: #ffffff;
+  --color-steel: #8fb3c9;
+  --color-steel-2: #6f97b0;
+  --color-denim: #4d6b80;
+  --color-navy: #3a4a58;
+  --color-teal: #7fb8a4;
+  --color-aqua: #a8d5c5;
 
-  --color-signal: #e5202e;
-  --color-win: #3ddc84;
-  --color-loss: #ff4d4f;
-  --color-warn: #ffb020;
+  --color-signal: #7fb8a4;
+  --color-win: #6fd39b;
+  --color-loss: #f07a6e;
+  --color-warn: #e6be72;
 
-  --color-background: #111111;
-  --color-border: #1f1f1f;
+  --color-background: #313840;
+  --color-border: #3c4550;
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -49,8 +48,9 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   background:
-    radial-gradient(1200px 600px at 50% -10%, rgb(255 255 255 / 0.045), transparent 70%),
-    radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.055) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(1100px 560px at 15% -10%, rgb(143 179 201 / 0.14), transparent 70%),
+    radial-gradient(900px 500px at 100% 10%, rgb(127 184 164 / 0.09), transparent 70%),
+    radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.05) 1px, transparent 0) 0 0 / 22px 22px,
     var(--color-ink-900);
   background-attachment: fixed;
 }
@@ -63,20 +63,20 @@ body::before {
 }
 #root { position: relative; z-index: 1; }
 [hidden] { display: none !important; }
-::selection { background: rgb(229 32 46 / 0.4); }
+::selection { background: rgb(143 179 201 / 0.4); }
 :focus-visible { outline: 2px solid var(--color-steel); outline-offset: 2px; }
 .num { font-variant-numeric: tabular-nums; }
 input[type="datetime-local"]::-webkit-calendar-picker-indicator,
 input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.7); }
 
-/* Shiny Button (21st.dev · designali-in), Nothing-Rot als Lichtkante */
+/* Shiny Button (21st.dev · designali-in), Eisblau als Lichtkante */
 @property --gradient-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 @property --gradient-angle-offset { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
 @property --gradient-percent { syntax: "<percentage>"; initial-value: 5%; inherits: false; }
 @property --gradient-shine { syntax: "<color>"; initial-value: white; inherits: false; }
 .shiny-cta {
-  --shiny-cta-bg: #0e0e0e; --shiny-cta-bg-subtle: #2a2a2a; --shiny-cta-fg: #f5f5f5;
-  --shiny-cta-highlight: #e5202e; --shiny-cta-highlight-subtle: #ffffff;
+  --shiny-cta-bg: #2f363e; --shiny-cta-bg-subtle: #4a5561; --shiny-cta-fg: #eef2f5;
+  --shiny-cta-highlight: #8fb3c9; --shiny-cta-highlight-subtle: #a8d5c5;
   --animation: gradient-angle linear infinite; --duration: 3s; --shadow-size: 2px;
   --transition: 800ms cubic-bezier(0.25, 1, 0.5, 1);
   isolation: isolate; position: relative; overflow: hidden; cursor: pointer; outline-offset: 4px;

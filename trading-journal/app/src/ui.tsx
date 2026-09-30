@@ -196,7 +196,7 @@ export function NumberTicker({ value, decimals = 0, className, prefix = '', sign
 }
 
 // ── Border Beam (21st.dev · magicui) ───────────────────
-export function BorderBeam({ size = 80, duration = 9, delay = 0, colorFrom = '#e5202e', colorTo = '#ffffff', borderWidth = 1, className }:
+export function BorderBeam({ size = 80, duration = 9, delay = 0, colorFrom = '#7fb8a4', colorTo = '#8fb3c9', borderWidth = 1, className }:
   { size?: number; duration?: number; delay?: number; colorFrom?: string; colorTo?: string; borderWidth?: number; className?: string }) {
   return (
     <div className="pointer-events-none absolute inset-0 rounded-[inherit] border-transparent [mask-clip:padding-box,border-box] [mask-composite:intersect] [mask-image:linear-gradient(transparent,transparent),linear-gradient(#000,#000)]"
@@ -213,7 +213,7 @@ export function BorderBeam({ size = 80, duration = 9, delay = 0, colorFrom = '#e
 }
 
 // ── Magic Card (21st.dev · magicui), Spotlight-Rand ────
-export function MagicCard({ children, className, gradientSize = 240, gradientColor = 'rgba(255,255,255,0.045)', gradientFrom = '#9b9b9b', gradientTo = '#2c2c2c' }:
+export function MagicCard({ children, className, gradientSize = 240, gradientColor = 'rgba(143,179,201,0.07)', gradientFrom = '#8fb3c9', gradientTo = '#4a5561' }:
   { children?: ReactNode; className?: string; gradientSize?: number; gradientColor?: string; gradientFrom?: string; gradientTo?: string }) {
   const mouseX = useMotionValue(-gradientSize);
   const mouseY = useMotionValue(-gradientSize);
@@ -365,7 +365,7 @@ export function TextHoverEffect({ text }: { text: string }) {
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} onMouseMove={(e) => setCursor({ x: e.clientX, y: e.clientY })} aria-hidden="true">
       <defs>
         <linearGradient id={`tg${id}`} gradientUnits="userSpaceOnUse">
-          {hovered && <><stop offset="0%" stopColor="#8a8a8a" /><stop offset="40%" stopColor="#ffffff" /><stop offset="65%" stopColor="#e5202e" /><stop offset="100%" stopColor="#8a8a8a" /></>}
+          {hovered && <><stop offset="0%" stopColor="#6f97b0" /><stop offset="40%" stopColor="#8fb3c9" /><stop offset="65%" stopColor="#7fb8a4" /><stop offset="100%" stopColor="#a8d5c5" /></>}
         </linearGradient>
         <motion.radialGradient id={`rm${id}`} gradientUnits="userSpaceOnUse" r="22%" initial={{ cx: '50%', cy: '50%' }} animate={mask} transition={{ duration: 0.1, ease: 'easeOut' }}>
           <stop offset="0%" stopColor="white" /><stop offset="100%" stopColor="black" />
@@ -401,14 +401,14 @@ export function MeshBackdrop({ className }: { className?: string }) {
   const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   return (
     <div className={cn('absolute inset-0 overflow-hidden', className)} aria-hidden="true">
-      <div className="absolute inset-0" style={{ background: 'radial-gradient(120% 90% at 0% 0%, #2a2a2a 0%, transparent 60%), radial-gradient(90% 80% at 100% 100%, #1d1d1d 0%, transparent 60%), #101010' }} />
+      <div className="absolute inset-0" style={{ background: 'radial-gradient(120% 90% at 0% 0%, #4d6b80 0%, transparent 60%), radial-gradient(90% 80% at 100% 100%, #3f6b5f 0%, transparent 60%), #2f363e' }} />
       {webgl && (
         <MeshGradient className="absolute inset-0 size-full" style={{ width: '100%', height: '100%' }}
-          colors={['#0b0b0b', '#262626', '#3a3a3a', '#141414', '#1f1f1f']}
+          colors={['#2b3138', '#4d6b80', '#3f6b5f', '#353d46', '#6f97b0']}
           distortion={0.8} swirl={0.1} grainMixer={0.25} grainOverlay={0.35} speed={reduced ? 0 : 0.12} />
       )}
       <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 1px 1px, rgb(255 255 255 / 0.07) 1px, transparent 0) 0 0 / 18px 18px' }} />
-      <div className="absolute inset-0 bg-gradient-to-b from-ink-900/10 via-ink-900/40 to-ink-900/85" />
+      <div className="absolute inset-0 bg-gradient-to-b from-ink-900/0 via-ink-900/35 to-ink-900/80" />
     </div>
   );
 }
@@ -455,8 +455,8 @@ export function Btn({ children, onClick, variant = 'ghost', size = 'md', classNa
   { children: ReactNode; onClick?: () => void; variant?: 'ghost' | 'primary' | 'danger'; size?: 'sm' | 'md'; className?: string; type?: 'button' | 'submit'; disabled?: boolean }) {
   const v = {
     ghost: 'border-line-2 bg-white/[0.03] text-fg hover:bg-white/[0.07] hover:border-steel/40',
-    primary: 'border-transparent bg-gradient-to-b from-white to-[#d6d6d6] text-ink-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.6)] hover:to-white',
-    danger: 'border-signal/40 bg-signal/10 text-[#ff8a90] hover:bg-signal/20',
+    primary: 'border-transparent bg-gradient-to-b from-[#b3cfdf] to-steel text-ink-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.5)] hover:from-[#c4dbe8]',
+    danger: 'border-loss/40 bg-loss/10 text-[#f6a79e] hover:bg-loss/20',
   }[variant];
   return (
     <motion.button type={type} disabled={disabled} onClick={onClick} whileTap={disabled ? undefined : { scale: 0.96 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }}
@@ -495,7 +495,7 @@ export function Field({ label, children, help, className, htmlFor }: { label: Re
     </div>
   );
 }
-export const inputCls = 'w-full rounded-xl border border-line bg-ink-950/70 px-3 py-2 text-[13.5px] text-fg outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-faint focus:border-white/40 focus:shadow-[0_0_0_3px_rgb(255_255_255/0.07)] disabled:opacity-40';
+export const inputCls = 'w-full rounded-xl border border-line bg-ink-950/70 px-3 py-2 text-[13.5px] text-fg outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-faint focus:border-steel/70 focus:shadow-[0_0_0_3px_rgb(143_179_201/0.18)] disabled:opacity-40';
 
 export const Icon = {
   grid: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></svg>,
@@ -513,7 +513,7 @@ export function InfoToggle({ open, onClick, label, className }: { open: boolean;
   return (
     <button type="button" onClick={onClick} aria-expanded={open} aria-label={`${open ? 'Details schließen' : 'Details zeigen'}: ${label}`}
       className={cn('grid size-6 shrink-0 place-items-center rounded-full border transition-colors duration-200',
-        open ? 'border-white bg-white text-ink-950' : 'border-line-2 text-mute hover:border-white/50 hover:text-fg', className)}>
+        open ? 'border-steel bg-steel text-ink-950' : 'border-line-2 text-mute hover:border-white/50 hover:text-fg', className)}>
       <motion.svg viewBox="0 0 12 12" className="size-2.5" animate={{ rotate: open ? 45 : 0 }} transition={{ type: 'spring', stiffness: 400, damping: 26 }}
         fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 1.5v9M1.5 6h9" /></motion.svg>
     </button>
@@ -542,11 +542,11 @@ export type DetailData = {
   verdict?: { tone: 'win' | 'loss' | 'warn' | 'mute'; text: string };
 };
 /** Einheitlicher Erklär-Block: was misst die Zahl, wie wird sie berechnet, deine Werte, Einordnung. */
-export function Detail({ d }: { d: DetailData }) {
+export function Detail({ d, bare }: { d: DetailData; bare?: boolean }) {
   const vt = d.verdict && { win: 'border-win/30 text-win', loss: 'border-loss/30 text-loss', warn: 'border-warn/30 text-warn', mute: 'border-line-2 text-mute' }[d.verdict.tone];
   return (
-    <div className="mt-3 grid gap-3 rounded-2xl border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 p-4">
-      <div className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-signal" /><span className="label !text-fg">{d.title}</span></div>
+    <div className={cn('grid gap-3', !bare && 'mt-3 rounded-2xl border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 p-4')}>
+      {!bare && <div className="flex items-center gap-2"><span className="size-1.5 rounded-full bg-signal" /><span className="label !text-fg">{d.title}</span></div>}
       <p className="max-w-[70ch] text-[13px] leading-relaxed text-mute">{d.what}</p>
       {d.formula && <div className="rounded-xl border border-line bg-ink-950/70 px-3 py-2 font-mono text-[12px] leading-relaxed text-fg/90">{d.formula}</div>}
       {d.rows && d.rows.length > 0 && (

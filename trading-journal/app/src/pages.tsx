@@ -116,7 +116,7 @@ export function SetupsView({ st, settings, onEdit, onNew, onTrades }: { st: Stat
         action={<div className="flex flex-wrap gap-2"><Segmented size="sm" value={acc} onChange={setAcc} options={(['all', 'makro', 'scalp'] as const).map((v) => ({ v, label: ACCOUNT_LABEL[v] }))} /><Segmented size="sm" value={key} onChange={setKey} options={SORT_OPTS} /></div>} />
       <motion.div layout className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))]">
         {list.map((s, i) => (
-          <motion.div layout key={s.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03, type: 'spring', stiffness: 300, damping: 30 }}>
+          <motion.div layout layoutId={`setup-card-${s.id}`} style={{ borderRadius: 16 }} key={s.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03, type: 'spring', stiffness: 300, damping: 30 }} whileHover={{ y: -3 }}>
             <MagicCard className="h-full" gradientFrom={s.setup.color}>
               <article className="flex h-full flex-col gap-4 p-5">
                 <div className="flex items-start justify-between gap-3">

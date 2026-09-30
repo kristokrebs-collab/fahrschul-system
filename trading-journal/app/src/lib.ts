@@ -248,10 +248,14 @@ declare global { interface Window { claude?: { use: (n: string) => Promise<any> 
 export const useCap = (name: string) => window.claude?.use ? window.claude.use(name).catch(() => null) : Promise.resolve(null);
 
 export type Mode = 'connecting' | 'cloud' | 'local' | 'error';
+/** Hyblock-Ablesung: Top-Trader Long-%, Whale-vs-Retail-Delta und die manuellen Filterpunkte. */
+export type Hyblock = { id: string; at: string; longPct: number; delta: number; deltaCandles: number; structure: boolean; rsi: boolean; note: string };
 export type Api = {
   saveTrade: (t: Trade) => Promise<void>;
   deleteTrade: (id: string) => Promise<void>;
   saveSettings: (s: Settings) => Promise<void>;
+  saveHyblock: (h: Hyblock) => Promise<void>;
+  deleteHyblock: (id: string) => Promise<void>;
 };
 
 export function useJournal() {
@@ -259,6 +263,7 @@ export function useJournal() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [mode, setMode] = useState<Mode>('connecting');
   const [loaded, setLoaded] = useState({ t: false, s: false });
+  const [hyblock, setHyblock] = useState<Hyblock[]>([]);
   const api = useRef<Api | null>(null);
 
   useEffect(() => {
@@ -272,29 +277,36 @@ export function useJournal() {
         const write = (k: string, v: any) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ohne Speicher */ } };
         let local: Trade[] = read('tj2-trades', []);
         let localS = normalizeSettings(read('tj2-settings', null));
-        setTrades(local); setSettings(localS); setMode('local'); setLoaded({ t: true, s: true });
+        let localH: Hyblock[] = read('tj2-hyblock', []);
+        setTrades(local); setSettings(localS); setHyblock(localH); setMode('local'); setLoaded({ t: true, s: true });
         api.current = {
           async saveTrade(t) { const id = t.id || uid('t_'); local = local.filter((x) => x.id !== id).concat([{ ...t, id }]); write('tj2-trades', local); setTrades(local); },
           async deleteTrade(id) { local = local.filter((x) => x.id !== id); write('tj2-trades', local); setTrades(local); },
           async saveSettings(s) { localS = s; write('tj2-settings', s); setSettings(s); },
+          async saveHyblock(h) { const id = h.id || uid('h_'); localH = localH.filter((x) => x.id !== id).concat([{ ...h, id }]); write('tj2-hyblock', localH); setHyblock(localH); },
+          async deleteHyblock(id) { localH = localH.filter((x) => x.id !== id); write('tj2-hyblock', localH); setHyblock(localH); },
         };
         return;
       }
       setMode('cloud');
       const fail = () => setMode('error');
       unsubs.push(db.collection('trades').onSnapshot((snap: any) => { setTrades(snap.docs.map((d: any) => ({ id: d.id, ...JSON.parse(JSON.stringify(d.data())) }))); setLoaded((l) => ({ ...l, t: true })); }, fail));
+      unsubs.push(db.collection('hyblock').onSnapshot((snap: any) => { setHyblock(snap.docs.map((d: any) => ({ id: d.id, ...JSON.parse(JSON.stringify(d.data())) }))); }, fail));
       unsubs.push(db.doc('config/settings').onSnapshot((snap: any) => { setSettings(normalizeSettings(snap.exists ? JSON.parse(JSON.stringify(snap.data())) : null)); setLoaded((l) => ({ ...l, s: true })); }, fail));
       api.current = {
         async saveTrade(t) { const { id, ...data } = t; if (id) await db.collection('trades').doc(id).set(data); else await db.collection('trades').add(data); },
         async deleteTrade(id) { await db.collection('trades').doc(id).delete(); },
         async saveSettings(s) { await db.doc('config/settings').set(s); },
+        async saveHyblock(h) { const { id, ...data } = h; if (id) await db.collection('hyblock').doc(id).set(data); else await db.collection('hyblock').add(data); },
+        async deleteHyblock(id) { await db.collection('hyblock').doc(id).delete(); },
       };
     })();
     return () => { alive = false; unsubs.forEach((u) => u()); };
   }, []);
 
   const enriched = useMemo(() => trades.map((t) => enrich(t, settings)), [trades, settings]);
-  return { trades, enriched, settings, mode, loaded: loaded.t && loaded.s, api };
+  const hyblockSorted = useMemo(() => [...hyblock].sort((a, b) => a.at.localeCompare(b.at)), [hyblock]);
+  return { trades, enriched, settings, hyblock: hyblockSorted, mode, loaded: loaded.t && loaded.s, api };
 }
 
 // ── Live-Markt über den TradingView-Connector ──────────

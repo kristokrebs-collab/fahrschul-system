@@ -7,6 +7,8 @@ import { Overview } from './overview';
 import { NO_FILTER, SettingsView, SetupsView, TradesView, type Filters } from './pages';
 import { SetupSheet, TradeSheet } from './forms';
 import { IslandProvider, ProgressiveBlur, TradeQuickView, type IslandNote } from './island';
+import { MorphProvider } from './morph';
+import { motion } from 'motion/react';
 
 const VIEWS = ['overview', 'trades', 'setups', 'settings'] as const;
 type View = (typeof VIEWS)[number];
@@ -60,6 +62,7 @@ function App() {
   return (
     <MotionConfig reducedMotion="user">
     <IslandProvider market={market} settings={j.settings} onNew={openNew} bind={(fn) => { notifyRef.current = fn; }}>
+    <MorphProvider>
       <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 border-b border-line/80 bg-ink-900/75 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-3 px-4 sm:px-6">
           <button type="button" onClick={() => go('overview')} className="flex min-w-0 items-center gap-3 text-left">
@@ -70,8 +73,8 @@ function App() {
             </span>
           </button>
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-[11.5px] text-mute" title={sync[0]}>
-              <span className={`size-1.5 rounded-full ${sync[1]}`} /><span className="hidden sm:inline">{sync[0]}</span>
+            <span className="hidden items-center gap-2 text-[11.5px] text-mute md:inline-flex" title={sync[0]}>
+              <span className={`size-1.5 rounded-full ${sync[1]}`} />{sync[0]}
             </span>
             <ShinyButton onClick={openNew} className="max-sm:!px-3"><span className="size-3.5 [&>svg]:size-full">{Icon.plus}</span><span className="max-sm:sr-only">Trade eintragen</span></ShinyButton>
           </div>
@@ -87,7 +90,9 @@ function App() {
         <TransitionPanel activeIndex={VIEWS.indexOf(view)}>
           {[
             <Overview key="o" st={st} settings={j.settings} acc={acc} setAcc={setAcc} market={market} loaded={j.loaded}
-              onNew={openNew} onEdit={setQuick} onSetup={showSetupTrades} goTrades={() => go('trades')} />,
+              onNew={openNew} onEdit={setQuick} onSetup={showSetupTrades} goTrades={() => go('trades')}
+              hyblock={j.hyblock} onSaveHyblock={async (h) => { await j.api.current!.saveHyblock(h); notify({ kind: 'success', title: 'Ablesung gespeichert', value: `${fmt.n1(h.longPct)} %` }); }}
+              onDeleteHyblock={async (id) => { await j.api.current!.deleteHyblock(id); notify({ kind: 'info', title: 'Ablesung gelöscht' }); }} />,
             <TradesView key="t" all={j.enriched} settings={j.settings} f={filters} setF={setFilters} onEdit={setQuick} onNew={openNew} />,
             <SetupsView key="s" st={stats(j.enriched, j.settings, 'all')} settings={j.settings} onEdit={(s) => setSetupOpen({ open: true, setup: s })} onNew={() => setSetupOpen({ open: true, setup: null })} onTrades={showSetupTrades} />,
             <SettingsView key="e" settings={j.settings} trades={j.enriched} onSave={saveSettings} downloads={downloads} />,
@@ -104,21 +109,25 @@ function App() {
         <Dock className="border border-line-2 bg-ink-850/85 shadow-[0_18px_40px_rgb(0_0_0/0.5)] backdrop-blur-xl">
           {VIEWS.map((v) => (
             <DockItem key={v} label={LABEL[v]} active={view === v} onClick={() => go(v)}
-              className={view === v ? 'bg-white text-ink-950' : 'bg-white/[0.05] text-mute hover:text-fg'}>
+              className={view === v ? 'bg-steel text-ink-950' : 'bg-white/[0.05] text-mute hover:text-fg'}>
               {{ overview: Icon.grid, trades: Icon.list, setups: Icon.target, settings: Icon.sliders }[v]}
             </DockItem>
           ))}
           <span className="mb-2.5 h-7 w-px self-end bg-line-2" aria-hidden="true" />
-          <DockItem label="Trade eintragen" onClick={openNew} className="bg-signal text-white">{Icon.plus}</DockItem>
+          <DockItem label="Trade eintragen" onClick={openNew} className="text-ink-950">
+            {!(tradeOpen.open && !tradeOpen.trade) && <motion.span layoutId="new-trade" className="absolute inset-0 -z-10 rounded-full bg-gradient-to-br from-teal to-steel" style={{ borderRadius: 999 }} />}
+            {Icon.plus}
+          </DockItem>
         </Dock>
       </nav>
 
-      <TradeSheet open={tradeOpen.open} trade={tradeOpen.trade} settings={j.settings} defaultAccount={defaultAccount}
+      <TradeSheet layoutId={tradeOpen.trade ? undefined : 'new-trade'} open={tradeOpen.open} trade={tradeOpen.trade} settings={j.settings} defaultAccount={defaultAccount}
         onClose={() => setTradeOpen({ open: false, trade: null })} onSave={saveTrade} onDelete={deleteTrade}
         onNewSetup={() => setSetupOpen({ open: true, setup: null, fromTrade: true })} />
-      <SetupSheet open={setupOpen.open} setup={setupOpen.setup} settings={j.settings} usedBy={usedBy}
+      <SetupSheet layoutId={setupOpen.setup && !setupOpen.fromTrade ? `setup-card-${setupOpen.setup.id}` : undefined} open={setupOpen.open} setup={setupOpen.setup} settings={j.settings} usedBy={usedBy}
         onClose={() => setSetupOpen({ open: false, setup: null })} onSave={saveSetup} onDelete={deleteSetup} />
       <TradeQuickView trade={quick} settings={j.settings} onClose={() => setQuick(null)} onEdit={(t) => { setQuick(null); openEdit(t); }} />
+    </MorphProvider>
     </IslandProvider>
     </MotionConfig>
   );
