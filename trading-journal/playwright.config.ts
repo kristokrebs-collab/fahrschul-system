@@ -7,6 +7,8 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
+    // The container ships a pinned Chromium; keep Playwright from downloading its own.
+    launchOptions: { executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" },
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",
     colorScheme: "dark",
