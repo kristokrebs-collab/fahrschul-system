@@ -13,24 +13,26 @@
   /* Buehne + Text */
   --tps-stage:    #1f1f1f;   /* Buehnenhintergrund (gemessen) */
   --tps-ink:      #fafafa;   /* Schriftfarbe ausserhalb der Linse */
-  --tps-size:     48px;      /* Schriftgroesse; Linse/Versatz skalieren in em mit */
+  --tps-size:     clamp(30px, 10.5vw, 48px); /* Schriftgroesse (48px ab ~460px Breite); Linse skaliert in em mit */
   --tps-weight:   600;       /* semibold */
-  --tps-tracking: -0.05em;   /* enge Laufweite (bei Inter ~288px Breite) */
+  --tps-tracking: -0.05em;   /* enge Laufweite (Wort ~285-290px breit bei 48px) */
   --tps-line:     1.04;      /* Zeilenhoehe = Hoehe der Linse (~50px) */
-  --tps-font:     Inter, Geist, Roboto, ui-sans-serif, system-ui, "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+  --tps-font:     Inter, Geist, Roboto, "Helvetica Neue", Arial, "Liberation Sans", ui-sans-serif, system-ui, sans-serif;
 
   /* Linse (Prisma-Fenster) */
   --tps-lens-bg:    #050505; /* fast schwarz, deckt den Basistext darunter ab */
   --tps-lens-w:     2.5em;   /* Linsenbreite (~120px bei 48px) */
   --tps-feather:    0.25em;  /* weicher Rand links/rechts (~12px) */
-  --tps-lens-ink:   #ffffff; /* Rest-Weiss: alle 3 Kanal-Ebenen summieren sich zu #fff */
+  --tps-lens-ink:   #ffffff; /* Text in der Linse im Ruhezustand (reines Weiss) */
   --tps-magnify:    1.06;    /* Vergroesserung des Textes IN der Linse */
   --tps-lift:       -0.105em;/* Text in der Linse sitzt ~5px hoeher */
 
-  /* Prisma-Ebenen (mix-blend-mode: screen). Im Ruhezustand = Weiss */
-  --tps-c1: #ff8080;         /* lachsrot   (haengt bei Bewegung nach rechts hinterher) */
+  /* Prisma-Ebenen (mix-blend-mode: screen). Ruhe = alle drei weiss; je groesser der Nachlauf der Linse
+     hinter dem Zeiger, desto staerker faerben sie sich zu c1/c2/c3 ein und rutschen auseinander.
+     Ueberlagert ergeben die drei Farben exakt Weiss. */
+  --tps-c1: #ff8080;         /* lachsrot   (haengt hinter der Bewegungsrichtung her) */
   --tps-c2: #00ff00;         /* reines Gruen (Mitte, bleibt auf der Stelle) */
-  --tps-c3: #ccccff;         /* lavendel   (eilt voraus) */
+  --tps-c3: #ccccff;         /* lavendel   (eilt in Bewegungsrichtung voraus) */
 }
 html, body { margin: 0; height: 100%; }
 body {
@@ -72,10 +74,8 @@ body {
   transform-origin: 0 0;
   will-change: transform;
   mix-blend-mode: screen;
+  color: var(--tps-lens-ink);         /* Ruhe: alle 3 Ebenen weiss (JS faerbt per Nachlauf ein) */
 }
-.tps__layer--1 { color: var(--tps-c1); }
-.tps__layer--2 { color: var(--tps-c2); }
-.tps__layer--3 { color: var(--tps-c3); }
 @media (prefers-reduced-motion: reduce) { .tps__lens, .tps__layer { will-change: auto; } }
 /* ===== /COMPONENT CSS ===== */
 </style>
@@ -92,10 +92,12 @@ body {
    ========================================================================== */
 const TEXT_PRISM_SPLIT_CONFIG = {
   restAt: 0.5,                 // Ruheposition der Linse (0..1 der Textbreite) - Mitte
-  spring: { stiffness: 500, damping: 40, mass: 1 }, // Linse folgt dem Zeiger federnd (~0.25s Nachlauf, minimaler Overshoot)
+  spring: { stiffness: 350, damping: 30, mass: 1 }, // Linse folgt dem Zeiger federnd (zeta~0.8: ~0.2s Nachlauf, ~1.5% Overshoot)
   split: {
-    gain: 0.013,               // px Versatz pro px/s Linsengeschwindigkeit (0 = kein RGB-Split)
-    max: 26,                   // max. Versatz der aeusseren Ebenen in px (bei 48px Schrift)
+    gain: 0.4,                 // px Ebenen-Versatz pro px "Nachlauf" (Zeiger minus Linse); 0 = kein RGB-Split
+    max: 40,                   // max. Versatz der aeusseren Ebenen in px (bei 48px Schrift)
+    full: 16,                  // ab diesem Nachlauf (px) sind die Ebenen voll eingefaerbt (darunter anteilig, 0 = reines Weiss)
+    release: 0.04,             // s: so schnell klingt der Split nach dem Nachlauf ab (Einsatz ist sofort)
   },
   keyboardStep: 0.1,           // Pfeiltasten: Schrittweite (Anteil der Textbreite)
   keyboard: true,              // Element fokussierbar, Pfeiltasten schieben die Linse
@@ -107,7 +109,7 @@ const TEXT_PRISM_SPLIT_CONFIG = {
    Zusaetzlich lesbar per opts: magnify, lift (em) - sonst aus CSS --tps-magnify / --tps-lift. */
 function initTextPrismSplit(root, opts) {
   const base = (typeof TEXT_PRISM_SPLIT_CONFIG !== 'undefined') ? TEXT_PRISM_SPLIT_CONFIG
-    : { restAt: .5, spring: { stiffness: 500, damping: 40, mass: 1 }, split: { gain: .013, max: 26 }, keyboardStep: .1, keyboard: true };
+    : { restAt: .5, spring: { stiffness: 350, damping: 30, mass: 1 }, split: { gain: .4, max: 40, full: 16, release: .04 }, keyboardStep: .1, keyboard: true };
   const o = Object.assign({}, base, opts || {});
   o.spring = Object.assign({}, base.spring, (opts && opts.spring) || {});
   o.split  = Object.assign({}, base.split,  (opts && opts.split)  || {});
@@ -137,50 +139,70 @@ function initTextPrismSplit(root, opts) {
     lens.style.height = H + 'px';
     layers.forEach(l => { l.style.height = H + 'px'; });
   }
-  measure();
+  // Farben der Prisma-Ebenen aus CSS lesen (#rgb, #rrggbb oder rgb())
+  const parseRGB = str => {
+    str = (str || '').trim(); let m;
+    if ((m = /^#([0-9a-f]{3})$/i.exec(str))) return m[1].split('').map(h => parseInt(h + h, 16));
+    if ((m = /^#([0-9a-f]{6})$/i.exec(str))) return [0, 2, 4].map(i => parseInt(m[1].substr(i, 2), 16));
+    if ((m = /rgba?\(([^)]+)\)/i.exec(str))) return m[1].split(',').slice(0, 3).map(n => parseFloat(n));
+    return null;
+  };
+  let tints = [[255, 128, 128], [0, 255, 0], [204, 204, 255]];
+  function readColors() {
+    const cs = getComputedStyle(root);
+    tints = tints.map((d, i) => parseRGB(cs.getPropertyValue('--tps-c' + (i + 1))) || d);
+  }
+  measure(); readColors();
 
   // --- Zustand ---
   const mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   let frac = o.restAt;                 // Ziel (0..1)
   let x = frac * W, v = 0;             // Linsenmitte in px (Textkoordinaten) + Geschwindigkeit
+  let u = 0;                           // geglaetteter Nachlauf (px, mit Vorzeichen) -> steuert den RGB-Split
   let raf = 0, last = 0, active = false;
 
   function render() {
     const s = magnify;
-    const d = mq.matches ? 0 : Math.max(-o.split.max, Math.min(o.split.max, v * o.split.gain));
+    const d = mq.matches ? 0 : Math.max(-o.split.max, Math.min(o.split.max, u * o.split.gain));
+    const a = (mq.matches || !o.split.full) ? 0 : Math.min(1, Math.abs(u) / o.split.full); // Farb-Anteil 0..1
     const offs = [-d, 0, d];           // lachsrot hinten, gruen Mitte, lavendel vorn (Bewegungsrichtung)
     lens.style.transform = 'translate3d(' + (x - LW / 2) + 'px,0,0)';
     const ty = (H / 2) * (1 - s) + lift;
     for (let i = 0; i < 3; i++) {
+      const t = tints[i];               // Weiss -> Tint, anteilig a
+      layers[i].style.color = 'rgb(' + Math.round(255 + (t[0] - 255) * a) + ',' + Math.round(255 + (t[1] - 255) * a) + ',' + Math.round(255 + (t[2] - 255) * a) + ')';
       layers[i].style.transform = 'translate3d(' + (LW / 2 - s * x + offs[i]) + 'px,' + ty + 'px,0) scale(' + s + ')';
     }
   }
   function tick(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
     const target = frac * W, k = o.spring.stiffness, c = o.spring.damping, m = o.spring.mass;
-    if (mq.matches) { x = target; v = 0; }
+    if (mq.matches) { x = target; v = 0; u = 0; }
     else {
       const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;   // Substeps: stabiler Solver
       for (let i = 0; i < n; i++) { v += ((-k * (x - target) - c * v) / m) * h; x += v * h; }
     }
-    if (Math.abs(x - target) < 0.03 && Math.abs(v) < 0.5) { x = target; v = 0; raf = 0; render(); return; }
+    const lag = target - x;            // Nachlauf der Linse hinter dem Zeiger: sofort hoch, danach weich runter
+    if (Math.abs(lag) >= Math.abs(u)) u = lag; else u += (lag - u) * (1 - Math.exp(-dt / Math.max(1e-3, o.split.release)));
+    if (Math.abs(lag) < 0.03 && Math.abs(v) < 0.5 && Math.abs(u) < 0.05) { x = target; v = 0; u = 0; raf = 0; render(); return; }
     render(); raf = requestAnimationFrame(tick);
   }
   function kick() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); } }
   function setFrac(f) { frac = Math.max(0, Math.min(1, f)); kick(); }
 
   // --- Eingabe: Zeiger (Maus/Touch/Stift) ---
+  const ac = new AbortController(), L = { signal: ac.signal };   // ein abort() raeumt alle Listener auf
   let rect = null;
   const fracAt = e => { rect = rect || root.getBoundingClientRect(); return (e.clientX - rect.left) / (rect.width || 1); };
   const enter = e => { rect = root.getBoundingClientRect(); active = true; setFrac(fracAt(e)); };
   const move  = e => { if (!active) { enter(e); return; } setFrac(fracAt(e)); };
   const leave = () => { active = false; rect = null; setFrac(o.restAt); };
-  root.addEventListener('pointerenter', enter);
-  root.addEventListener('pointermove', move);
-  root.addEventListener('pointerdown', enter);
-  root.addEventListener('pointerleave', leave);
-  root.addEventListener('pointercancel', leave);
-  root.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') leave(); });
+  root.addEventListener('pointerenter', enter, L);
+  root.addEventListener('pointermove', move, L);
+  root.addEventListener('pointerdown', enter, L);
+  root.addEventListener('pointerleave', leave, L);
+  root.addEventListener('pointercancel', leave, L);
+  root.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') leave(); }, L);
 
   // --- Eingabe: Tastatur ---
   function key(e) {
@@ -193,8 +215,8 @@ function initTextPrismSplit(root, opts) {
     if (f == null) return; e.preventDefault(); setFrac(f);
   }
   if (o.keyboard) {
-    root.addEventListener('keydown', key);
-    root.addEventListener('blur', () => { if (!active) setFrac(o.restAt); });
+    root.addEventListener('keydown', key, L);
+    root.addEventListener('blur', () => { if (!active) setFrac(o.restAt); }, L);
   }
 
   // --- Resize / Schrift geladen ---
@@ -204,13 +226,13 @@ function initTextPrismSplit(root, opts) {
     ro.observe(root);
   }
   const onMq = () => { if (mq.matches) { v = 0; } kick(); };
-  if (mq.addEventListener) mq.addEventListener('change', onMq);
+  if (mq.addEventListener) mq.addEventListener('change', onMq, L);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); x = frac * W; render(); });
 
   render();
   return {
     setPosition(f) { setFrac(f == null ? o.restAt : f); },
-    destroy() { cancelAnimationFrame(raf); ro && ro.disconnect(); root.textContent = text; }
+    destroy() { ac.abort(); cancelAnimationFrame(raf); ro && ro.disconnect(); root.textContent = text; root.removeAttribute('tabindex'); }
   };
 }
 /* ===== /COMPONENT JS ===== */
