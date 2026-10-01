@@ -46,12 +46,40 @@ export interface ToastInput {
   value?: string;
   valueTone?: "win" | "loss";
   detail?: string;
-  /** Override auto-dismiss (ms); `0` keeps the toast until dismissed. */
+  /** Override the visible time (ms, counted by the island while the toast is in front); `0` keeps it until dismissed. */
   duration?: number;
 }
 export interface Toast extends ToastInput {
   id: number;
 }
+
+/** `win`: saved winning trade · `streak`: win streak (bigger burst) · `record`: new equity high (+ one red record dot). */
+export type CelebrateKind = "win" | "streak" | "record";
+/** `win`: mostly win-green dots · `fg`: mostly white dots. */
+export type CelebrateTone = "win" | "fg";
+export interface CelebrateInput {
+  /** Burst origin in viewport (client) px, e.g. the centre of the Save button. */
+  x: number;
+  y: number;
+  tone?: CelebrateTone;
+  kind?: CelebrateKind;
+}
+/** A queued burst; the `Celebrate` overlay plays it and calls `endCelebration(id)`. */
+export interface Celebration {
+  id: number;
+  x: number;
+  y: number;
+  tone: CelebrateTone;
+  kind: CelebrateKind;
+  /** PRNG seed – the overlay derives every particle from it, so rendering stays pure. */
+  seed: number;
+  /** `Date.now()` when queued. */
+  at: number;
+}
+/** At most this many bursts play at once; a new one drops the oldest. */
+export const MAX_CELEBRATIONS = 3;
+/** Bursts the overlay never picked up (overlay not mounted) are pruned after this. */
+export const CELEBRATION_TTL_MS = 4000;
 
 /** Non-journal preferences, persisted in `tj2-ui` (never part of a backup). */
 export interface UiPrefs {
@@ -78,7 +106,11 @@ export const DEFAULT_PREFS: UiPrefs = {
   flags: {},
 };
 
-/** Auto-dismiss durations of the bundle toast island. */
+/**
+ * Visible-time durations of the bundle toast island (ms). The store never dismisses a toast on its own: the
+ * `ToastIsland` runs the countdown once a toast reaches the front of the queue and pauses it on hover / focus / drag
+ * (`toIslandToast` in `@/app/toasts` passes these on as the island toast's `duration`).
+ */
 export const TOAST_MS = { default: 2800, signal: 5200 } as const;
 
 export interface UiState extends UiPrefs {
@@ -88,9 +120,17 @@ export interface UiState extends UiPrefs {
   tradeSort: TradeSort;
   detail: DetailState;
   editor: EditorState;
+  /**
+   * FAB editor cycle: bumped when a FAB-opened editor closes. The FAB disc and the FAB sheet share the layoutId
+   * `new-trade-{fabCycle}`, so the disc that remounts on close registers under a fresh id and can never resume from the
+   * still-exiting sheet (one-way morph FAB → sheet; the next open morphs out of the new disc again).
+   */
+  fabCycle: number;
   setupEditor: SetupEditorState;
   transitioning: boolean;
   toasts: Toast[];
+  /** Confetti bursts waiting for / playing in the `Celebrate` overlay (oldest first). */
+  celebrations: Celebration[];
 
   setPage(page: Page): void;
   setAcc(acc: AccFilter): void;
@@ -108,6 +148,10 @@ export interface UiState extends UiPrefs {
   setTransitioning(v: boolean): void;
   pushToast(t: ToastInput): number;
   dismissToast(id: number): void;
+  /** Queues a confetti burst at `{x, y}` (defaults: tone `win`, kind `win`); returns its id. */
+  celebrate(c: CelebrateInput): number;
+  /** Removes a finished burst (no-op for unknown ids). */
+  endCelebration(id: number): void;
   setPref<K extends keyof UiPrefs>(key: K, value: UiPrefs[K]): void;
   setChart(patch: Partial<ChartPrefs>): void;
   setFlag(name: string, value: boolean): void;
@@ -174,7 +218,9 @@ export function persistSlice<S, T extends object>(
 /* ------------------------------------------------------------------ store */
 
 let toastSeq = 0;
-const toastTimers = new Map<number, ReturnType<typeof setTimeout>>();
+let celebrationSeq = 0;
+
+const finiteOr = (v: number, fallback: number) => (Number.isFinite(v) ? v : fallback);
 
 export const useUi = create<UiState>()((set, get) => ({
   ...loadPrefs(),
@@ -184,9 +230,11 @@ export const useUi = create<UiState>()((set, get) => ({
   tradeSort: DEFAULT_TRADE_SORT,
   detail: { id: null, source: null },
   editor: { open: false, fromFab: false },
+  fabCycle: 0,
   setupEditor: { open: false, fromTrade: false },
   transitioning: false,
   toasts: [],
+  celebrations: [],
 
   setPage: (page) => set({ page }),
   setAcc: (acc) => set({ acc }),
@@ -203,24 +251,31 @@ export const useUi = create<UiState>()((set, get) => ({
   },
   closeDetail: () => set({ detail: { id: null, source: null } }),
   openEditor: (opts = {}) => set({ editor: { open: true, tradeId: opts.tradeId, fromFab: opts.fromFab === true } }),
-  closeEditor: () => set((s) => ({ editor: { ...s.editor, open: false } })),
+  closeEditor: () =>
+    set((s) => ({
+      editor: { ...s.editor, open: false },
+      fabCycle: s.editor.open && s.editor.fromFab ? s.fabCycle + 1 : s.fabCycle,
+    })),
   openSetupEditor: (opts = {}) =>
     set({ setupEditor: { open: true, setupId: opts.setupId, fromTrade: opts.fromTrade === true } }),
   closeSetupEditor: () => set((s) => ({ setupEditor: { ...s.setupEditor, open: false } })),
   setTransitioning: (transitioning) => set({ transitioning }),
+  // no store timer: the island owns the visible-time countdown (starts at the front of the queue, pausable)
   pushToast: (t) => {
     const id = ++toastSeq;
     set((s) => ({ toasts: [...s.toasts, { ...t, id }] }));
-    const ms = t.duration ?? (t.kind === "signal" ? TOAST_MS.signal : TOAST_MS.default);
-    if (ms > 0) toastTimers.set(id, setTimeout(() => get().dismissToast(id), ms));
     return id;
   },
-  dismissToast: (id) => {
-    const timer = toastTimers.get(id);
-    if (timer) clearTimeout(timer);
-    toastTimers.delete(id);
-    set((s) => (s.toasts.some((t) => t.id === id) ? { toasts: s.toasts.filter((t) => t.id !== id) } : s));
+  dismissToast: (id) => set((s) => (s.toasts.some((t) => t.id === id) ? { toasts: s.toasts.filter((t) => t.id !== id) } : s)),
+  celebrate: ({ x, y, tone = "win", kind = "win" }) => {
+    const id = ++celebrationSeq;
+    const at = Date.now();
+    const burst: Celebration = { id, x: finiteOr(x, 0), y: finiteOr(y, 0), tone, kind, seed: Math.floor(Math.random() * 0x7fffffff), at };
+    set((s) => ({ celebrations: [...s.celebrations.filter((c) => at - c.at < CELEBRATION_TTL_MS), burst].slice(-MAX_CELEBRATIONS) }));
+    return id;
   },
+  endCelebration: (id) =>
+    set((s) => (s.celebrations.some((c) => c.id === id) ? { celebrations: s.celebrations.filter((c) => c.id !== id) } : s)),
   setPref: (key, value) => set({ [key]: value } as Pick<UiPrefs, typeof key>),
   setChart: (patch) => set((s) => ({ chart: { ...s.chart, ...patch } })),
   setFlag: (name, value) => set((s) => ({ flags: { ...s.flags, [name]: value } })),
@@ -231,6 +286,11 @@ persistSlice(useUi.subscribe, KEYS.ui, pickPrefs);
 /** Convenience for non-React code (`pushToast({ kind: "error", title: "Export fehlgeschlagen" })`). */
 export function pushToast(t: ToastInput): number {
   return useUi.getState().pushToast(t);
+}
+
+/** Convenience for non-React code; prefer `celebrateFrom(el)` (`@/motion/Celebrate`) to burst from an element. */
+export function celebrate(c: CelebrateInput): number {
+  return useUi.getState().celebrate(c);
 }
 
 export { PREF_KEYS };

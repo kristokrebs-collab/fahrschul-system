@@ -14,13 +14,17 @@ export interface TooltipProps {
   delayDuration?: number;
 }
 
-/** Wrapper over `@/ui/tooltip` with the bundle tooltip class string. The child must accept a ref (button, span). */
+/**
+ * Wrapper over `@/ui/tooltip` with the bundle tooltip class string. The child must accept a ref (button, span).
+ * Enters with `.fx-pop` (opacity + 4 px nudge away from the trigger + scale .96 → 1, 0.2 s `ease.out`, origin at the
+ * trigger) and leaves in 0.12 s – CSS keyframes on transform/opacity, so Radix' presence waits for the exit.
+ */
 export function Tooltip({ content, children, side = "top", sideOffset = 6, className, delayDuration = 150 }: TooltipProps) {
   return (
     <TooltipProvider delayDuration={delayDuration}>
       <UiTooltip>
         <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent side={side} sideOffset={sideOffset} className={cn(tooltipClass, className)}>
+        <TooltipContent side={side} sideOffset={sideOffset} className={cn(tooltipClass, "fx-pop", className)}>
           {content}
         </TooltipContent>
       </UiTooltip>

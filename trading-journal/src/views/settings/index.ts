@@ -1,5 +1,6 @@
 export { SettingsView, SETTINGS_STRINGS, type SettingsViewProps } from "./SettingsView";
-export { settingsToDraft, draftToSettings, NUMERIC_FIELDS, CURRENCIES, FALLBACKS, type SettingsDraft, type DraftTextKey, type DraftResult } from "./draft";
+export { settingsToDraft, draftToSettings, changedKeys, NUMERIC_FIELDS, CURRENCIES, FALLBACKS, type SettingsDraft, type DraftTextKey, type DraftKey, type DraftResult } from "./draft";
+export { SaveButton, ActionButton, PhaseGlyph, ChangedDot, useActionPhase, DONE_HOLD_MS, SAVE_LABELS, type ActionPhase, type SaveButtonProps, type ActionButtonProps } from "./fx";
 export { DraftField, type DraftFieldProps } from "./fields";
 export {
   HyblockConnectorCard,

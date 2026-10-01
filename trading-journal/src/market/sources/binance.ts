@@ -181,17 +181,10 @@ export function binanceRest(opts: BinanceRestOptions = {}) {
 export type BinanceRest = ReturnType<typeof binanceRest>;
 
 // ------------------------------------------------------------------ WebSocket messages
-
-export const wsKlineSchema = z.object({
-  e: z.literal("kline"),
-  E: z.number(),
-  s: z.string(),
-  k: z.object({ t: z.number(), T: z.number(), i: z.string(), o: num, c: num, h: num, l: num, v: num, n: z.number(), x: z.boolean(), q: num, V: num }),
-});
-export const wsMarkPriceSchema = z.object({ e: z.literal("markPriceUpdate"), E: z.number(), s: z.string(), p: num, i: num, r: num, T: z.number() });
-export const wsAggTradeSchema = z.object({ e: z.literal("aggTrade"), E: z.number(), s: z.string(), a: z.number(), p: num, q: num, T: z.number(), m: z.boolean() });
-export const wsBookTickerSchema = z.object({ e: z.literal("bookTicker").optional(), u: z.number(), E: z.number().optional(), T: z.number().optional(), s: z.string(), b: num, a: num });
-export const wsEnvelopeSchema = z.object({ stream: z.string(), data: z.unknown() });
+//
+// Hot path (aggTrade at tens of frames per second, bookTicker faster): no zod here. The combined-stream name
+// selects exactly ONE hand-written guard; a raw payload (no envelope) is dispatched by its event type `e`.
+// Numbers arrive as strings and must be finite, otherwise the frame is reported as `unknown`.
 
 export type WsEvent =
   | { kind: "kline"; interval: KlineInterval; candle: Candle; eventTime: number }
@@ -200,7 +193,98 @@ export type WsEvent =
   | { kind: "bookTop"; value: BookTop }
   | { kind: "unknown"; stream?: string };
 
+type WsKind = "kline" | "markPrice" | "aggTrade" | "bookTop";
+type Rec = Record<string, unknown>;
+
 const INTERVALS = new Set<string>(["1m", "1h", "4h", "1w"]);
+
+const isRec = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
+/** Binance number field (string or number) → finite number, else `NaN`. */
+const toNum = (v: unknown): number => (typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : NaN);
+const isInt = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+/** `btcusdt@kline_1h` → kline, `@markPrice@1s` → markPrice, `@aggTrade`, `@bookTicker`; anything else → null. */
+export function wsStreamKind(stream: string): WsKind | null {
+  const at = stream.indexOf("@");
+  if (at < 0) return null;
+  const rest = stream.slice(at + 1);
+  if (rest.startsWith("kline_")) return "kline";
+  if (rest === "aggTrade") return "aggTrade";
+  if (rest === "bookTicker") return "bookTop";
+  if (rest === "markPrice" || rest.startsWith("markPrice@")) return "markPrice";
+  return null;
+}
+
+function payloadKind(d: Rec): WsKind | null {
+  switch (d.e) {
+    case "kline":
+      return "kline";
+    case "aggTrade":
+      return "aggTrade";
+    case "markPriceUpdate":
+      return "markPrice";
+    case "bookTicker":
+      return "bookTop";
+    case undefined:
+      // raw bookTicker frames may omit `e`
+      return "u" in d && "b" in d && "a" in d ? "bookTop" : null;
+    default:
+      return null;
+  }
+}
+
+function parseKline(d: Rec): WsEvent | null {
+  const k = d.k;
+  if (d.e !== "kline" || !isInt(d.E) || !isRec(k) || !isInt(k.t) || !isInt(k.T) || typeof k.i !== "string" || typeof k.x !== "boolean" || !isInt(k.n)) return null;
+  if (!INTERVALS.has(k.i)) return null;
+  const open = toNum(k.o);
+  const close = toNum(k.c);
+  const high = toNum(k.h);
+  const low = toNum(k.l);
+  const volume = toNum(k.v);
+  const quoteVolume = toNum(k.q);
+  const takerBuyBase = toNum(k.V);
+  if (![open, close, high, low, volume, quoteVolume, takerBuyBase].every(Number.isFinite)) return null;
+  return {
+    kind: "kline",
+    interval: k.i as KlineInterval,
+    eventTime: d.E,
+    candle: { time: k.t, open, high, low, close, volume, closed: k.x, closeTime: k.T, quoteVolume, trades: k.n, takerBuyBase },
+  };
+}
+
+function parseMarkPrice(d: Rec): WsEvent | null {
+  if (d.e !== "markPriceUpdate" || !isInt(d.E) || !isInt(d.T)) return null;
+  const markPrice = toNum(d.p);
+  const indexPrice = toNum(d.i);
+  const fundingRate = toNum(d.r);
+  if (!Number.isFinite(markPrice) || !Number.isFinite(indexPrice) || !Number.isFinite(fundingRate)) return null;
+  return { kind: "markPrice", value: { markPrice, indexPrice, fundingRate, nextFundingTime: d.T, time: d.E } };
+}
+
+function parseAggTrade(d: Rec): WsEvent | null {
+  if (d.e !== "aggTrade" || !isInt(d.T) || typeof d.m !== "boolean") return null;
+  const price = toNum(d.p);
+  const qty = toNum(d.q);
+  if (!Number.isFinite(price) || !Number.isFinite(qty)) return null;
+  return { kind: "aggTrade", value: { price, qty, isBuyerMaker: d.m, time: d.T } };
+}
+
+function parseBookTicker(d: Rec): WsEvent | null {
+  if ((d.e !== undefined && d.e !== "bookTicker") || !isInt(d.u)) return null;
+  const bid = toNum(d.b);
+  const ask = toNum(d.a);
+  if (!Number.isFinite(bid) || !Number.isFinite(ask)) return null;
+  const time = isInt(d.T) ? d.T : isInt(d.E) ? d.E : 0;
+  return { kind: "bookTop", value: { bid, ask, time } };
+}
+
+const PARSERS: Record<WsKind, (d: Rec) => WsEvent | null> = {
+  kline: parseKline,
+  markPrice: parseMarkPrice,
+  aggTrade: parseAggTrade,
+  bookTop: parseBookTicker,
+};
 
 /** Parses one combined-stream frame (`{stream, data}`) or a raw payload. Returns `null` for invalid JSON. */
 export function parseWsMessage(raw: string): WsEvent | null {
@@ -210,36 +294,15 @@ export function parseWsMessage(raw: string): WsEvent | null {
   } catch {
     return null;
   }
-  const env = wsEnvelopeSchema.safeParse(json);
-  const payload = env.success ? env.data.data : json;
-  const stream = env.success ? env.data.stream : undefined;
-  const k = wsKlineSchema.safeParse(payload);
-  if (k.success) {
-    const d = k.data.k;
-    if (!INTERVALS.has(d.i)) return { kind: "unknown", stream };
-    return {
-      kind: "kline",
-      interval: d.i as KlineInterval,
-      eventTime: k.data.E,
-      candle: { time: d.t, open: d.o, high: d.h, low: d.l, close: d.c, volume: d.v, closed: d.x, closeTime: d.T, quoteVolume: d.q, trades: d.n, takerBuyBase: d.V },
-    };
+  let stream: string | undefined;
+  let payload: unknown = json;
+  if (isRec(json) && typeof json.stream === "string") {
+    stream = json.stream;
+    payload = json.data;
   }
-  const m = wsMarkPriceSchema.safeParse(payload);
-  if (m.success) {
-    const d = m.data;
-    return { kind: "markPrice", value: { markPrice: d.p, indexPrice: d.i, fundingRate: d.r, nextFundingTime: d.T, time: d.E } };
-  }
-  const a = wsAggTradeSchema.safeParse(payload);
-  if (a.success) {
-    const d = a.data;
-    return { kind: "aggTrade", value: { price: d.p, qty: d.q, isBuyerMaker: d.m, time: d.T } };
-  }
-  const b = wsBookTickerSchema.safeParse(payload);
-  if (b.success) {
-    const d = b.data;
-    return { kind: "bookTop", value: { bid: d.b, ask: d.a, time: d.T ?? d.E ?? 0 } };
-  }
-  return { kind: "unknown", stream };
+  if (!isRec(payload)) return { kind: "unknown", stream };
+  const kind = stream !== undefined ? wsStreamKind(stream) : payloadKind(payload);
+  return (kind && PARSERS[kind](payload)) ?? { kind: "unknown", stream };
 }
 
 /** Static combined-stream URL: no SUBSCRIBE frames are ever sent. */

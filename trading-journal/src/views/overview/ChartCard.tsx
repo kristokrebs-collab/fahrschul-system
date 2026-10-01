@@ -1,13 +1,32 @@
 import { AnimatePresence, motion } from "motion/react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
 import { toTradeMarkers } from "@/chart/markers";
 import { ChartSkeleton } from "@/chart/ChartSkeleton";
-import type { ChartHandle, MarkerRect, RangeDays } from "@/chart/NothingCandleChart";
+import type { BarsListener, MarkerRect, RangeDays } from "@/chart/NothingCandleChart";
 import { scenario } from "@/domain/trigger";
 import { cn } from "@/lib/cn";
-import { getProvider, lastClosed4h, useFeed, useHealth, useStatusLabel, type Candle, type KlineFeed, type Stamped } from "@/market";
+import {
+  getProvider,
+  KLINE_FEEDS,
+  lastClosed4h,
+  priceMv,
+  subscribeFeed,
+  tickDirMv,
+  tradeTimeMv,
+  useFeed,
+  useFeedSelect,
+  useHealthSelect,
+  useStatusLabel,
+  volAccumMv,
+  type Candle,
+  type FeedId,
+  type KlineFeed,
+  type ProviderHealth,
+  type Stamped,
+} from "@/market";
+import { TextShimmer } from "@/motion/TextShimmer";
 import { radius, spring, tween } from "@/motion/tokens";
-import { Button } from "@/primitives/Button";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Expander } from "@/primitives/Expander";
@@ -54,10 +73,13 @@ export function mergeCandles(history: readonly Candle[], incoming: readonly Cand
 
 interface HistoryExtra {
   feed: KlineFeed;
+  /** market symbol the bars belong to */
+  symbol: string;
   candles: Candle[];
 }
 interface HistoryState {
   feed: KlineFeed;
+  symbol: string;
   /** `feedKey()` of the feed value last folded in (length + last open time, NOT the object identity) */
   seen: string | undefined;
   extra: HistoryExtra | null;
@@ -74,9 +96,12 @@ export function feedKey(feed: Stamped<Candle[]> | undefined): string | undefined
   return `${feed.data.length}:${last?.time ?? 0}`;
 }
 
-/** Folds a new feed value / history() result into the loaded history; keeps the array identity when nothing new arrived. */
-export function nextHistory(prev: HistoryState, feedId: KlineFeed, feed: Stamped<Candle[]> | undefined, extra: HistoryExtra | null): HistoryState {
-  const base = prev.feed === feedId ? prev.candles : [];
+/**
+ * Folds a new feed value / history() result into the loaded history; keeps the array identity when nothing new
+ * arrived. Another feed or symbol starts over (never mixes two markets' bars).
+ */
+export function nextHistory(prev: HistoryState, feedId: KlineFeed, feed: Stamped<Candle[]> | undefined, extra: HistoryExtra | null, symbol: string): HistoryState {
+  const base = prev.feed === feedId && prev.symbol === symbol ? prev.candles : [];
   let next = base;
   if (feed) {
     const last = base[base.length - 1];
@@ -84,26 +109,36 @@ export function nextHistory(prev: HistoryState, feedId: KlineFeed, feed: Stamped
     if (base.length === 0) next = feed.data;
     else if (incomingLast && (!last || incomingLast.time > last.time)) next = mergeCandles(base, feed.data);
   }
-  if (extra && extra.feed === feedId && extra.candles.length) {
+  if (extra && extra.feed === feedId && extra.symbol === symbol && extra.candles.length) {
     const first = next[0];
     const extraFirst = extra.candles[0];
     if (!first || (extraFirst && extraFirst.time < first.time)) next = mergeCandles(extra.candles, next);
   }
-  return { feed: feedId, seen: feedKey(feed), extra, candles: next };
+  return { feed: feedId, symbol, seen: feedKey(feed), extra, candles: next };
 }
+
+/** The kline value as of its last bar-key change: the card re-renders once per new bar, never per forming-bar tick. */
+const selectBars = (v: Stamped<Candle[]> | undefined): Stamped<Candle[]> | undefined => v;
+const sameBarKey = (a: Stamped<Candle[]> | undefined, b: Stamped<Candle[]> | undefined): boolean => feedKey(a) === feedKey(b);
+/** Close of the last closed 4h bar; the closed bar is always among the last few, so only the tail is scanned. */
+export const selectClosed4hClose = (v: Stamped<Candle[]> | undefined): number | null => (v ? (lastClosed4h(v.data.slice(-4))?.c ?? null) : null);
+
+/** Only the label dips while pressed, so the shared `chart-range` thumb is never measured mid-press. */
+const LABEL_PRESS = { press: { scale: 0.97 } };
 
 function toRange(days: number): RangeDays {
   return days <= 7 ? 7 : days <= 30 ? 30 : 90;
 }
 
-/** Range pills `1W | 1M | 3M` with the shared `chart-range` thumb (Plan 3.3). */
+/** Range pills `1W | 1M | 3M` with the shared `chart-range` thumb (Plan 3.3); only the label squashes on press. */
 function RangePills({ value, onChange, disabledAbove }: { value: RangeDays; onChange: (d: RangeDays) => void; disabledAbove?: number }) {
+  const reduced = useReducedFx();
   return (
     <div role="radiogroup" aria-label="Zeitraum" className="inline-flex gap-0.5 rounded-xl border border-line bg-ink-950/60 p-1">
       {RANGES.map((r) => {
         const disabled = disabledAbove != null && r.v > disabledAbove;
         return (
-          <button
+          <motion.button
             key={r.v}
             type="button"
             role="radio"
@@ -111,21 +146,70 @@ function RangePills({ value, onChange, disabledAbove }: { value: RangeDays; onCh
             disabled={disabled}
             title={disabled ? CHART_ONLY_7D : undefined}
             onClick={() => onChange(r.v)}
+            whileTap={disabled || reduced ? undefined : "press"}
             className={cn("relative rounded-lg px-2.5 py-1 text-xs font-medium transition-colors", value === r.v ? "text-fg" : "text-mute hover:text-fg", disabled && "cursor-not-allowed opacity-40")}
           >
-            {value === r.v && <motion.span layoutId="chart-range" aria-hidden="true" className="absolute inset-0 rounded-lg border border-line-2 bg-ink-750" style={{ borderRadius: radius.thumb }} transition={spring.layout} />}
-            <span className="relative z-10">{r.label}</span>
-          </button>
+            {value === r.v && (
+              <motion.span
+                layoutId="chart-range"
+                layoutDependency={value}
+                aria-hidden="true"
+                className="absolute inset-0 rounded-lg border border-line-2 bg-ink-750"
+                style={{ borderRadius: radius.thumb }}
+                transition={spring.layout}
+              />
+            )}
+            <motion.span className="relative z-10 inline-block" variants={LABEL_PRESS} transition={spring.press}>
+              {r.label}
+            </motion.span>
+          </motion.button>
         );
       })}
     </div>
   );
 }
 
+/** Status label · outside count · loading shimmer. Follows health on its own, so the card never re-renders for it. */
+function ChartNote({ feedId, outside, loading }: { feedId: KlineFeed; outside: number; loading: boolean }) {
+  const label = useStatusLabel(feedId);
+  const text = [label.text, outside > 0 ? outsideNote(outside) : null].filter(Boolean).join(" · ");
+  return (
+    <>
+      {text}
+      {loading ? (
+        <>
+          {text ? " · " : null}
+          <TextShimmer baseColor="var(--color-faint)" bandColor="var(--color-mute)">
+            {CHART_LOADING}
+          </TextShimmer>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+type FeedHealth = ProviderHealth["feeds"][FeedId];
+/** Per-feed health selectors of the gate (module constants, so `useHealthSelect` never re-memoises). */
+const GATE_HEALTH = Object.fromEntries(KLINE_FEEDS.map((f) => [f, (h: ProviderHealth): FeedHealth => h.feeds[f]])) as Record<KlineFeed, (h: ProviderHealth) => FeedHealth>;
+/** The gate reads only the state and the failure count: `lastDataAt` ticks (once a second while live) never re-render it. */
+const sameGateHealth = (a: FeedHealth, b: FeedHealth): boolean => a.state === b.state && a.consecutiveFailures === b.consecutiveFailures;
+
 /**
- * `Chart · {sym} Perp` (Plan 6.1 "Chart-Karte", Plan 5): collapsible card (chart stays mounted), interval /
- * range / pane controls, lazy `NothingCandleChart` fed by `useFeed("kline_*")` (history identity stable,
- * live bar via `live`), trigger levels, trade markers → `openDetail(id, "marker")` with a ghost
+ * Empty state instead of an endless skeleton: no bars, the history request has settled and the feed is not (yet)
+ * delivering (offline / failed fallback / at least one REST failure). First paint keeps the skeleton. Health changes
+ * several times per second while live; only this gate follows them and hands back the same `chart` element.
+ */
+function ChartBodyGate({ feedId, hasCandles, loading, chart }: { feedId: KlineFeed; hasCandles: boolean; loading: boolean; chart: ReactElement }) {
+  const h = useHealthSelect(GATE_HEALTH[feedId], sameGateHealth);
+  const empty = !hasCandles && (h.state === "offline" || h.consecutiveFailures >= 3 || (!loading && (h.consecutiveFailures >= 1 || h.state === "fallback")));
+  return empty ? <EmptyState title={CHART_EMPTY_TITLE} text={CHART_EMPTY_TEXT} /> : chart;
+}
+
+/**
+ * `Chart · {sym} Perp` (Plan 6.1 "Chart-Karte", Plan 5): collapsible card (chart stays mounted), interval / range /
+ * pane controls, lazy `NothingCandleChart`. The card renders on bar changes only: history through a bar-key
+ * selector, the forming candle straight into the chart (`priceMv` per trade, `subscribeFeed` per kline), status
+ * and empty state in their own leaves. Trigger levels, trade markers → `openDetail(id, "marker")` with a ghost
  * `layoutId="trade-{id}"` at the marker rect.
  */
 export function ChartCard() {
@@ -133,32 +217,30 @@ export function ChartCard() {
   const trades = useEnriched();
   const chart = useUi((s) => s.chart);
   const setChart = useUi((s) => s.setChart);
-  const flags = useUi((s) => s.flags);
+  const paneOff = useUi((s) => s.flags[PANE_OFF_FLAG] === true);
   const setFlag = useUi((s) => s.setFlag);
-  const detail = useUi((s) => s.detail);
+  const detailId = useUi((s) => s.detail.id);
+  const detailSource = useUi((s) => s.detail.source);
   const openDetail = useUi((s) => s.openDetail);
 
   const interval = chart.interval;
   const rangeDays = toRange(interval === "1m" ? Math.min(chart.rangeDays, 7) : chart.rangeDays);
-  const pane: PaneChoice = flags[PANE_OFF_FLAG] ? "none" : chart.pane === "cvd" ? "none" : chart.pane;
+  const pane: PaneChoice = paneOff ? "none" : chart.pane === "cvd" ? "none" : chart.pane;
   const feedId: KlineFeed = `kline_${interval}`;
+  const symbol = settings.market.symbol;
 
-  const feed = useFeed(feedId);
-  const k4 = useFeed("kline_4h");
+  const feed = useFeedSelect(feedId, selectBars, sameBarKey);
+  const close4h = useFeedSelect("kline_4h", selectClosed4hClose);
   const ratio = useFeed("topAccountRatio");
   const oi = useFeed("openInterestHist");
-  const health = useHealth();
-  const label = useStatusLabel(feedId);
-  const ref = useRef<ChartHandle>(null);
 
   // history: stable identity per load, extended only when a NEW bar arrives or `history()` returns (state-from-props,
-  // no effect, no ref in render); live: the forming bar
+  // no effect, no ref in render)
   const [extra, setExtra] = useState<HistoryExtra | null>(null);
-  const [hist, setHist] = useState<HistoryState>(() => ({ feed: feedId, seen: undefined, extra: null, candles: [] }));
+  const [hist, setHist] = useState<HistoryState>(() => ({ feed: feedId, symbol, seen: undefined, extra: null, candles: [] }));
   let candles = hist.candles;
-  // state-from-props: compare on the bar key, not on the stamped object (a live tick must not call setState in render)
-  if (hist.feed !== feedId || hist.seen !== feedKey(feed) || hist.extra !== extra) {
-    const next = nextHistory(hist, feedId, feed, extra);
+  if (hist.feed !== feedId || hist.symbol !== symbol || hist.seen !== feedKey(feed) || hist.extra !== extra) {
+    const next = nextHistory(hist, feedId, feed, extra, symbol);
     setHist(next);
     candles = next.candles;
   }
@@ -167,7 +249,7 @@ export function ChartCard() {
   const [ghost, setGhost] = useState<{ id: string; rect: MarkerRect } | null>(null);
 
   // range beyond the bootstrap window → `history()` (missing edge only, ≤ 30 days retention)
-  const requestKey = `${feedId}:${rangeDays}`;
+  const requestKey = `${symbol}:${feedId}:${rangeDays}`;
   useEffect(() => {
     const p = getProvider();
     if (!p) return;
@@ -175,7 +257,7 @@ export function ChartCard() {
     const now = Date.now();
     p.history(feedId, { from: now - rangeDays * 86_400_000, to: now })
       .then((res) => {
-        if (!cancelled && res.data.length) setExtra({ feed: feedId, candles: res.data });
+        if (!cancelled && res.data.length) setExtra({ feed: feedId, symbol, candles: res.data });
       })
       .catch(() => undefined)
       .finally(() => {
@@ -184,13 +266,20 @@ export function ChartCard() {
     return () => {
       cancelled = true;
     };
-  }, [feedId, rangeDays, requestKey]);
+  }, [feedId, symbol, rangeDays, requestKey]);
   const loading = loadedKey !== requestKey;
-  const live = feed?.data[feed.data.length - 1];
   const markers = useMemo(() => toTradeMarkers(trades), [trades]);
-  const closed4h = k4 ? lastClosed4h(k4.data) : null;
-  const active = closed4h ? scenario(closed4h.c, settings.market) : null;
+  const active = close4h != null ? scenario(close4h, settings.market) : null;
   const activeScenario = active?.key === "long" || active?.key === "short" ? active.key : null;
+
+  // forming candle: kline frames go straight into the chart (≤ 1 per frame), never through a render
+  const subscribeBars = useCallback(
+    (listener: BarsListener) =>
+      subscribeFeed(feedId, (v) => {
+        if (v) listener(v.data, v.asOf);
+      }),
+    [feedId],
+  );
 
   const onMarkerClick = useCallback(
     (id: string, rect: MarkerRect) => {
@@ -201,23 +290,44 @@ export function ChartCard() {
   );
   // keep the ghost until the detail closed (reverse morph target)
   useEffect(() => {
-    if (!ghost || detail.id === ghost.id) return;
+    if (!ghost || detailId === ghost.id) return;
     const t = setTimeout(() => setGhost(null), 500);
     return () => clearTimeout(t);
-  }, [detail.id, ghost]);
+  }, [detailId, ghost]);
 
-  const feedHealth = health.feeds[feedId];
-  // Empty state instead of an endless skeleton: no bars, the history request has settled and the feed is not
-  // (yet) delivering (offline / fallback that failed / at least one REST failure). First paint keeps the skeleton.
-  const empty = candles.length === 0 && (feedHealth.state === "offline" || feedHealth.consecutiveFailures >= 3 || (!loading && (feedHealth.consecutiveFailures >= 1 || feedHealth.state === "fallback")));
-  const sym = settings.market.symbol.split(":").pop() ?? "BTCUSDT";
-  const note = [label.text, outside > 0 ? outsideNote(outside) : null, loading ? CHART_LOADING : null].filter(Boolean).join(" · ");
+  const sym = symbol.split(":").pop() ?? "BTCUSDT";
+  const body = (
+    <Suspense fallback={<ChartSkeleton className="h-[300px] md:h-[420px]" />}>
+      {/* a new market gets a fresh chart: no bar, pulse or print of the previous symbol survives the switch */}
+      <NothingCandleChart
+        key={symbol}
+        candles={candles}
+        interval={interval}
+        levels={settings.market}
+        activeScenario={activeScenario}
+        markers={markers}
+        pane={pane}
+        ratio={ratio?.data}
+        oi={oi?.data}
+        rangeDays={rangeDays}
+        price={priceMv}
+        tradeTime={tradeTimeMv}
+        tickDir={tickDirMv}
+        tradeVolume={volAccumMv}
+        subscribeBars={subscribeBars}
+        paused={!chart.open}
+        followLabel={CHART_FOLLOW}
+        onMarkerClick={onMarkerClick}
+        onOutsideCount={setOutside}
+      />
+    </Suspense>
+  );
 
   return (
     <div id={CHART_CARD_ID} className="scroll-mt-20">
       <Card
         title={`Chart · ${sym} Perp`}
-        note={note}
+        note={<ChartNote feedId={feedId} outside={outside} loading={loading} />}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Segmented<ChartInterval> size="sm" aria-label="Intervall" options={INTERVALS} value={interval} onChange={(v) => setChart({ interval: v, rangeDays: v === "1m" ? 7 : chart.rangeDays })} />
@@ -235,38 +345,15 @@ export function ChartCard() {
                 }
               }}
             />
-            <Button size="sm" onClick={() => ref.current?.follow()} disabled={!chart.open}>
-              {CHART_FOLLOW}
-            </Button>
             <Expander open={chart.open} onToggle={() => setChart({ open: !chart.open })} label="Chart" controls={`${CHART_CARD_ID}-body`} />
           </div>
         }
       >
         {/* Collapse without unmount (Plan 3.3 "Chart-Karte einklappen"): height animates like the Collapsible-Explainer, the chart instance stays. */}
         <motion.div id={`${CHART_CARD_ID}-body`} className="relative overflow-hidden" initial={false} animate={{ height: chart.open ? "auto" : 0, opacity: chart.open ? 1 : 0 }} transition={tween.collapse} aria-hidden={!chart.open}>
-          {empty ? (
-            <EmptyState title={CHART_EMPTY_TITLE} text={CHART_EMPTY_TEXT} />
-          ) : (
-            <Suspense fallback={<ChartSkeleton className="h-[300px] md:h-[420px]" />}>
-              <NothingCandleChart
-                ref={ref}
-                candles={candles}
-                interval={interval}
-                live={live}
-                levels={settings.market}
-                activeScenario={activeScenario}
-                markers={markers}
-                pane={pane}
-                ratio={ratio?.data}
-                oi={oi?.data}
-                rangeDays={rangeDays}
-                onMarkerClick={onMarkerClick}
-                onOutsideCount={setOutside}
-              />
-            </Suspense>
-          )}
+          <ChartBodyGate feedId={feedId} hasCandles={candles.length > 0} loading={loading} chart={body} />
           <AnimatePresence>
-            {ghost && detail.source === "marker" && (
+            {ghost && detailSource === "marker" && (
               <motion.div
                 key={ghost.id}
                 layoutId={`trade-${ghost.id}`}

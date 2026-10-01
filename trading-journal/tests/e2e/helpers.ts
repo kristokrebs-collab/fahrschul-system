@@ -2,7 +2,7 @@
  * Shared e2e helpers: legacy fixture seeding, console-error collection (ignoring the container's blocked
  * Google-Fonts certificate) and screenshot paths under `/tmp/shots/`.
  */
-import { expect, type Page, type TestInfo } from "@playwright/test";
+import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { mockMarket, type MarketScenario, type MockMarketOptions } from "./mocks/market";
 
@@ -47,7 +47,7 @@ export function collectErrors(page: Page): string[] {
   return errors;
 }
 
-/** The toast island (`role="status" aria-live="polite"`); status pills also carry `role="status"`, hence the attribute pair. */
+/** The toast island (`role="status" aria-live="polite"`); the attribute pair keeps it apart from other `role="status"` nodes (e.g. WarnBanner). */
 export const toast = (page: Page) => page.locator('[role="status"][aria-live="polite"]');
 
 export const shot = (info: TestInfo, name: string): string => `/tmp/shots/${info.project.name}-${name}.png`;
@@ -56,10 +56,23 @@ export async function screenshot(page: Page, info: TestInfo, name: string, fullP
   await page.screenshot({ path: shot(info, name), fullPage, animations: "disabled" as const });
 }
 
-/** Asserts that the document never scrolls horizontally (mobile layouts). */
+/**
+ * Asserts that the document never scrolls horizontally (mobile layouts). Compares against the root's `clientWidth`
+ * too: under mobile emulation an overflowing page widens the layout viewport itself (`innerWidth` grows with the
+ * content), so `scrollWidth <= innerWidth` alone would never fail.
+ */
 export async function expectNoHorizontalScroll(page: Page): Promise<void> {
-  const [scrollWidth, innerWidth] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
-  expect(scrollWidth, `scrollWidth ${scrollWidth} > innerWidth ${innerWidth}`).toBeLessThanOrEqual(innerWidth);
+  const [scrollWidth, width] = await page.evaluate(() => [document.documentElement.scrollWidth, Math.min(window.innerWidth, document.documentElement.clientWidth)]);
+  expect(scrollWidth, `scrollWidth ${scrollWidth} > viewport width ${width}`).toBeLessThanOrEqual(width);
+}
+
+/** Asserts that a dialog's footer actions are on screen without scrolling (a sheet taller than the viewport hides them). */
+export async function expectInViewport(page: Page, locator: Locator, what: string): Promise<void> {
+  const box = await locator.boundingBox();
+  const vp = await page.evaluate(() => ({ w: window.visualViewport?.width ?? window.innerWidth, h: window.visualViewport?.height ?? window.innerHeight }));
+  expect(box, `${what}: no box`).not.toBeNull();
+  if (!box) return;
+  expect(box.y >= 0 && box.y + box.height <= vp.h + 1 && box.x >= 0 && box.x + box.width <= vp.w + 1, `${what} at ${JSON.stringify(box)} outside ${vp.w}×${vp.h}`).toBe(true);
 }
 
 export const isMobile = (info: TestInfo): boolean => info.project.name === "mobile";

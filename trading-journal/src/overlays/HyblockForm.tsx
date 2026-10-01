@@ -6,13 +6,16 @@ import { nowLocalInput } from "@/lib/dates";
 import { n1, signed } from "@/lib/format";
 import { parseNumber, toInputString, toNonNegativeInt } from "@/lib/parse";
 import { useMorphDialog } from "@/motion/MorphDialog";
+import { StaggerItem } from "@/motion/Stagger";
 import { radius, spring, tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { CheckboxRow } from "@/primitives/CheckboxRow";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { useJournal, useReadings } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
+import { revealInvalid } from "@/primitives/fieldFx";
 
 export const HYBLOCK_FORM_STRINGS = {
   title: "Hyblock-Ablesung",
@@ -79,6 +82,7 @@ interface FormState {
  * Manual `Ablesung` form (Bundle `tK`, Plan 6.5): `Zeitpunkt`, `Top Trader Long %`, `Whale-vs-Retail-Delta`,
  * `Delta positiv seit Kerzen`, `Notiz`, toggles `Struktur` / `RSI`. Validation and record shape are 1:1;
  * saves via `useJournal().saveHyblock`, toast `Ablesung gespeichert` with value `{n1(longPct)} %`.
+ * Motion: the blocks cascade in with the dialog body (`StaggerItem`); a refused value shakes its field into view.
  */
 export function HyblockForm({ last, live, onClose, onSave, now, className }: HyblockFormProps) {
   const readings = useReadings();
@@ -99,8 +103,16 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
   const [rsi, setRsi] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const reduced = useReducedFx();
 
-  const set = (k: keyof FormState) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof FormState) => (v: string) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    if ((k === "longPct" && error === HYBLOCK_FORM_STRINGS.errLong) || (k === "delta" && error === HYBLOCK_FORM_STRINGS.errDelta)) setError("");
+  };
+  const refuse = (message: string, field: string) => {
+    setError(message);
+    revealInvalid(field, { reduced });
+  };
 
   function takeLive() {
     if (!live) return;
@@ -116,8 +128,8 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
     const longPct = parseNumber(form.longPct);
     const delta = parseNumber(form.delta);
     const candles = parseNumber(form.deltaCandles);
-    if (longPct == null || longPct < 0 || longPct > 100) return setError(HYBLOCK_FORM_STRINGS.errLong);
-    if (delta == null) return setError(HYBLOCK_FORM_STRINGS.errDelta);
+    if (longPct == null || longPct < 0 || longPct > 100) return refuse(HYBLOCK_FORM_STRINGS.errLong, "hb-long");
+    if (delta == null) return refuse(HYBLOCK_FORM_STRINGS.errDelta, "hb-delta");
     const reading = { id: "", at: form.at, longPct, delta, deltaCandles: toNonNegativeInt(candles), structure, rsi, note: form.note.trim() };
     setBusy(true);
     try {
@@ -140,16 +152,18 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
         void save();
       }}
     >
-      <p className="text-[13px] text-mute">{HYBLOCK_FORM_STRINGS.intro}</p>
-      <div className="grid grid-cols-2 gap-3">
+      <StaggerItem>
+        <p className="text-[13px] text-mute">{HYBLOCK_FORM_STRINGS.intro}</p>
+      </StaggerItem>
+      <StaggerItem className="grid grid-cols-2 gap-3">
         <Field label={HYBLOCK_FORM_STRINGS.at} htmlFor="hb-at" className="col-span-2">
           <Input id="hb-at" type="datetime-local" value={form.at} onChange={(e) => set("at")(e.target.value)} />
         </Field>
         <Field label={HYBLOCK_FORM_STRINGS.longPct} htmlFor="hb-long">
-          <Input id="hb-long" numeric value={form.longPct} onChange={(e) => set("longPct")(e.target.value)} placeholder={HYBLOCK_FORM_STRINGS.longPlaceholder} />
+          <Input id="hb-long" numeric value={form.longPct} onChange={(e) => set("longPct")(e.target.value)} placeholder={HYBLOCK_FORM_STRINGS.longPlaceholder} invalid={error === HYBLOCK_FORM_STRINGS.errLong} />
         </Field>
         <Field label={HYBLOCK_FORM_STRINGS.delta} htmlFor="hb-delta">
-          <Input id="hb-delta" numeric value={form.delta} onChange={(e) => set("delta")(e.target.value)} placeholder={HYBLOCK_FORM_STRINGS.deltaPlaceholder} />
+          <Input id="hb-delta" numeric value={form.delta} onChange={(e) => set("delta")(e.target.value)} placeholder={HYBLOCK_FORM_STRINGS.deltaPlaceholder} invalid={error === HYBLOCK_FORM_STRINGS.errDelta} />
         </Field>
         <Field label={HYBLOCK_FORM_STRINGS.candles} htmlFor="hb-c" help={HYBLOCK_FORM_STRINGS.candlesHelp}>
           <Input id="hb-c" inputMode="numeric" className="font-mono" value={form.deltaCandles} onChange={(e) => set("deltaCandles")(e.target.value)} />
@@ -157,16 +171,16 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
         <Field label={HYBLOCK_FORM_STRINGS.note} htmlFor="hb-note">
           <Input id="hb-note" value={form.note} onChange={(e) => set("note")(e.target.value)} placeholder={HYBLOCK_FORM_STRINGS.notePlaceholder} />
         </Field>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      </StaggerItem>
+      <StaggerItem className="grid gap-2 sm:grid-cols-2">
         <CheckboxRow checked={structure} onToggle={() => setStructure((v) => !v)} sub={HYBLOCK_FORM_STRINGS.structureSub}>
           {HYBLOCK_FORM_STRINGS.structure}
         </CheckboxRow>
         <CheckboxRow checked={rsi} onToggle={() => setRsi((v) => !v)} sub={HYBLOCK_FORM_STRINGS.rsiSub}>
           {HYBLOCK_FORM_STRINGS.rsi}
         </CheckboxRow>
-      </div>
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      </StaggerItem>
+      <StaggerItem className="flex flex-wrap items-center justify-end gap-2">
         {error && (
           <span role="alert" className="mr-auto text-[12.5px] text-loss">
             {error}
@@ -181,7 +195,7 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
         <Button variant="primary" type="submit" disabled={busy}>
           {HYBLOCK_FORM_STRINGS.save}
         </Button>
-      </div>
+      </StaggerItem>
     </form>
   );
 }

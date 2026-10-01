@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectErrors, fixture, isMobile, screenshot, seed, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, fixture, isMobile, screenshot, seed, toast } from "./helpers";
 
 async function gotoSettings(page: import("@playwright/test").Page) {
   await page.goto("/#settings");
@@ -98,7 +98,28 @@ test("`Backup importieren` (merge) shows the preview and toasts `Backup importie
   await expect(toast(page)).toContainText("Backup importiert");
   await expect(dialog).toBeHidden();
   await page.goto("/#trades");
-  await expect(page.getByLabel("16 Trades")).toBeVisible();
+  await expect(page.getByText("16 Trades", { exact: true })).toBeVisible();
   if (!isMobile(info)) await screenshot(page, info, "trades-after-import");
+  expect(errors, errors.join("\n")).toEqual([]);
+});
+
+test("the unsaved bar fits the phone width after an in-app navigation (no horizontal scroll, Speichern inside the pill)", async ({ page }, info) => {
+  test.skip(!isMobile(info), "phone width only");
+  const errors = collectErrors(page);
+  await seed(page);
+  // reached through the page transition (the entered page layer must not keep a transform – containing block)
+  await page.goto("/#overview");
+  await expect(page.getByTestId("market-panel")).toBeVisible();
+  await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Einstellungen" }).click();
+  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await page.locator("#s-makro").fill("12345");
+  const discard = page.getByRole("button", { name: "Verwerfen" });
+  await expect(discard).toBeVisible();
+  await expectNoHorizontalScroll(page);
+  const pill = discard.locator("xpath=ancestor::div[contains(@class,'rounded-full')][1]");
+  const save = pill.getByRole("button", { name: "Speichern" });
+  const [pillBox, saveBox] = [await pill.boundingBox(), await save.boundingBox()];
+  expect(pillBox && saveBox, "pill / Speichern boxes").toBeTruthy();
+  if (pillBox && saveBox) expect(saveBox.x + saveBox.width).toBeLessThanOrEqual(pillBox.x + pillBox.width + 0.5);
   expect(errors, errors.join("\n")).toEqual([]);
 });

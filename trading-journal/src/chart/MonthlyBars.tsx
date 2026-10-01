@@ -3,11 +3,19 @@
  * Data shape = `stats.months` (last 12): `{ key: "2026-09", label: "Sep 26", net, n, winRate }`.
  * Bars are `#f2f2f2` for net ≥ 0 and `#5f5f5f` below zero (monochrome per the lead's brief;
  * the bundle used win/loss green/red – switch `MONTH_COLORS` if the 1:1 look wins).
+ *
+ * Motion: the first time the chart is in view every bar grows out of the zero line (`scaleY` on `spring.cards`,
+ * staggered by `stagger.cards`); hovering a month dims its siblings (CSS opacity, toggled through data attributes –
+ * no React render). Reduced motion: static bars, instant dim.
  */
-import { memo, type ReactElement } from "react";
+import { motion } from "motion/react";
+import { memo, useEffect, useRef, useState, type ReactElement } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartContainer, type ChartConfig } from "@/ui/chart";
 import { cn } from "@/lib/cn";
+import { canObserveInView, observeInView } from "@/motion/inView";
+import { spring, stagger } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { fmt } from "./format";
 import { TOOLTIP_CLASS } from "./tooltip";
 import { EQUITY_COLORS, TICK_STYLE } from "./EquityChart";
@@ -62,6 +70,15 @@ export function roundedBarPath(g: RoundedBarGeometry): string | null {
   return `M${x},${top} L${x + w},${top} L${x + w},${bottom - r} Q${x + w},${bottom} ${x + w - r},${bottom} L${x + r},${bottom} Q${x},${bottom} ${x},${bottom - r} Z`;
 }
 
+/** Grow delay of bar `index` (capped like every stagger in the app). */
+export const barDelay = (index: number): number => Math.min(Math.max(0, index), stagger.max) * stagger.cards;
+
+/** Recharts' `activeTooltipIndex` (number, numeric string or nothing) → bar index, `-1` for none. */
+export function toBarIndex(v: unknown): number {
+  const n = typeof v === "number" ? v : typeof v === "string" && v !== "" ? Number(v) : Number.NaN;
+  return Number.isInteger(n) && n >= 0 ? n : -1;
+}
+
 interface ShapeProps {
   x?: number;
   y?: number;
@@ -69,13 +86,36 @@ interface ShapeProps {
   height?: number;
   fill?: string;
   payload?: unknown;
+  index?: number;
 }
 
-function RoundedBar(props: ShapeProps): ReactElement | null {
-  const { x = 0, y = 0, width = 0, height = 0, fill } = props;
-  const net = (props.payload as MonthBucket | undefined)?.net ?? 0;
-  const d = roundedBarPath({ x, y, width, height, positive: net >= 0 });
-  return d ? <path d={d} fill={fill} /> : null;
+interface GrowProps {
+  /** animate the entrance at all (off under reduced motion / without IntersectionObserver) */
+  grow: boolean;
+  /** the chart has been in view */
+  revealed: boolean;
+}
+
+const BAR_CLASS = "transition-opacity duration-200 [[data-hovering]_&:not([data-hot])]:opacity-40";
+
+function RoundedBar({ x = 0, y = 0, width = 0, height = 0, fill, payload, index = 0, grow, revealed }: ShapeProps & GrowProps): ReactElement | null {
+  const positive = ((payload as MonthBucket | undefined)?.net ?? 0) >= 0;
+  const d = roundedBarPath({ x, y, width, height, positive });
+  if (!d) return null;
+  if (!grow) return <path d={d} fill={fill} data-bar={index} className={BAR_CLASS} />;
+  return (
+    <motion.path
+      d={d}
+      fill={fill}
+      data-bar={index}
+      className={BAR_CLASS}
+      // grow out of the zero line: the bottom edge of a gain, the top edge of a loss
+      style={{ originY: positive ? 1 : 0 }}
+      initial={{ scaleY: 0 }}
+      animate={{ scaleY: revealed ? 1 : 0 }}
+      transition={{ ...spring.cards, delay: barDelay(index) }}
+    />
+  );
 }
 
 interface TipProps {
@@ -109,29 +149,60 @@ function MonthTip({ active, payload, currency }: TipProps) {
 }
 
 export const MonthlyBars = memo(function MonthlyBars({ months, currency, height = 240, className }: MonthlyBarsProps) {
+  const reduced = useReducedFx();
+  const wrap = useRef<HTMLDivElement>(null);
+  const hot = useRef(-1);
+  const [grow] = useState(() => canObserveInView());
+  const [revealed, setRevealed] = useState(false);
+  const animateIn = grow && !reduced;
+
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el || !animateIn || revealed) return;
+    const off = observeInView(el, (inView) => {
+      if (inView) setRevealed(true);
+    });
+    return off;
+  }, [animateIn, revealed]);
+
+  // sibling dim: one data attribute on the wrapper and one on the hovered bar, CSS does the rest
+  const setHot = (i: number) => {
+    const el = wrap.current;
+    if (!el || i === hot.current) return;
+    if (hot.current >= 0) el.querySelector(`[data-bar="${hot.current}"]`)?.removeAttribute("data-hot");
+    hot.current = i;
+    if (i < 0) {
+      el.removeAttribute("data-hovering");
+      return;
+    }
+    el.setAttribute("data-hovering", "");
+    el.querySelector(`[data-bar="${i}"]`)?.setAttribute("data-hot", "");
+  };
+
   return (
-    <ChartContainer
-      config={config}
-      className={cn("aspect-auto w-full", className)}
-      style={{ height }}
-      role="img"
-      aria-label="P&L pro Monat"
-    >
-      <BarChart data={months} margin={{ top: 8, right: 4, bottom: 0, left: 0 }}>
-        <CartesianGrid stroke={EQUITY_COLORS.grid} vertical={false} />
-        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK_STYLE} />
-        <YAxis width={56} tickLine={false} axisLine={false} tick={TICK_STYLE} tickFormatter={fmt.mio} />
-        <ReferenceLine y={0} stroke={EQUITY_COLORS.ref} />
-        <Tooltip
-          cursor={{ fill: "rgb(255 255 255 / 0.04)" }}
-          content={(p) => <MonthTip active={p.active} payload={p.payload} currency={currency} />}
-        />
-        <Bar dataKey="net" maxBarSize={36} isAnimationActive={false} shape={<RoundedBar />}>
-          {months.map((m) => (
-            <Cell key={m.key} fill={monthFill(m.net)} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ChartContainer>
+    <div ref={wrap} className={cn("w-full", className)}>
+      <ChartContainer config={config} className="aspect-auto w-full" style={{ height }} role="img" aria-label="P&L pro Monat">
+        <BarChart
+          data={months}
+          margin={{ top: 8, right: 4, bottom: 0, left: 0 }}
+          onMouseMove={(s) => setHot(toBarIndex(s.activeTooltipIndex))}
+          onMouseLeave={() => setHot(-1)}
+        >
+          <CartesianGrid stroke={EQUITY_COLORS.grid} vertical={false} />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK_STYLE} />
+          <YAxis width={56} tickLine={false} axisLine={false} tick={TICK_STYLE} tickFormatter={fmt.mio} />
+          <ReferenceLine y={0} stroke={EQUITY_COLORS.ref} />
+          <Tooltip
+            cursor={{ fill: "rgb(255 255 255 / 0.04)" }}
+            content={(p) => <MonthTip active={p.active} payload={p.payload} currency={currency} />}
+          />
+          <Bar dataKey="net" maxBarSize={36} isAnimationActive={false} shape={(p: ShapeProps) => <RoundedBar {...p} grow={animateIn} revealed={revealed} />}>
+            {months.map((m) => (
+              <Cell key={m.key} fill={monthFill(m.net)} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ChartContainer>
+    </div>
   );
 });

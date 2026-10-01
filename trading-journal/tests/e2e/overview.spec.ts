@@ -162,7 +162,7 @@ test.describe("editor from the FAB", () => {
 
     await page.goto("/#trades");
     await expect(page.getByRole("heading", { name: /Alle Trades/ })).toBeVisible();
-    await expect(page.getByLabel(/15 Trades/)).toBeVisible();
+    await expect(page.getByText("15 Trades", { exact: true })).toBeVisible();
     expect(errors, errors.join("\n")).toEqual([]);
   });
 });

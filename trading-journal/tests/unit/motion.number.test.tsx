@@ -1,5 +1,6 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetInViewObserverForTests } from "@/motion/inView";
 import { MotionNumber, formatNumber, toneOf } from "@/motion/MotionNumber";
 
 describe("formatNumber", () => {
@@ -41,5 +42,85 @@ describe("MotionNumber", () => {
     expect(visible).toHaveLength(1);
     expect(visible[0]?.className).toContain("text-loss");
     expect(visible[0]?.textContent).toBe("−42");
+  });
+});
+
+describe("MotionNumber flash", () => {
+  it("pre-renders two hidden tint layers and keeps a single accessible label", () => {
+    render(<MotionNumber value={10} flash />);
+    const el = screen.getByLabelText("10");
+    const layers = el.querySelectorAll("[aria-hidden='true'].text-win, [aria-hidden='true'].text-loss");
+    expect(layers).toHaveLength(2);
+    layers.forEach((l) => expect(l.className).toContain("opacity-0"));
+  });
+
+  it("an up-move lights the win layer, a down-move the loss layer", async () => {
+    const { rerender } = render(<MotionNumber value={10} flash />);
+    const up = () => screen.getByLabelText(/./).querySelector<HTMLElement>(".text-win[aria-hidden='true']");
+    const down = () => screen.getByLabelText(/./).querySelector<HTMLElement>(".text-loss[aria-hidden='true']");
+    rerender(<MotionNumber value={12} flash />);
+    await waitFor(() => expect(Number(up()?.style.opacity || 0)).toBeGreaterThan(0));
+    expect(Number(down()?.style.opacity || 0)).toBe(0);
+    rerender(<MotionNumber value={5} flash />);
+    await waitFor(() => expect(Number(down()?.style.opacity || 0)).toBeGreaterThan(0));
+    expect(up()?.style.opacity).toBe("0");
+  });
+
+  it("does not flash on mount", () => {
+    render(<MotionNumber value={10} flash />);
+    const up = screen.getByLabelText("10").querySelector<HTMLElement>(".text-win[aria-hidden='true']");
+    expect(up?.style.opacity ?? "").toBe("");
+  });
+});
+
+describe("MotionNumber gate / countOnReveal (shared IntersectionObserver)", () => {
+  type Cb = (entries: { target: Element; isIntersecting: boolean }[]) => void;
+  let created = 0;
+  let cb: Cb = () => {};
+  beforeEach(() => {
+    created = 0;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(c: Cb) {
+          created += 1;
+          cb = c;
+        }
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    );
+    resetInViewObserverForTests();
+  });
+  afterEach(() => {
+    resetInViewObserverForTests();
+    vi.unstubAllGlobals();
+  });
+
+  it("gated numbers share one observer", () => {
+    render(
+      <>
+        <MotionNumber value={1} gate />
+        <MotionNumber value={2} gate />
+        <MotionNumber value={3} gate />
+      </>,
+    );
+    expect(created).toBe(1);
+  });
+
+  it("countOnReveal holds 0 until in view, then counts up to the value (label is final throughout)", async () => {
+    render(<MotionNumber value={1234} countOnReveal />);
+    const el = screen.getByLabelText("1.234");
+    expect(el.textContent).toBe("0");
+    act(() => cb([{ target: el, isIntersecting: true }]));
+    await waitFor(() => expect(el.textContent).toBe("1.234"), { timeout: 3000 });
+  });
+});
+
+describe("MotionNumber countOnReveal without IntersectionObserver", () => {
+  it("renders the final value right away", () => {
+    render(<MotionNumber value={1234} countOnReveal />);
+    expect(screen.getByLabelText("1.234").textContent).toBe("1.234");
   });
 });

@@ -19,7 +19,7 @@ test("list renders 13 fixture trades as table (desktop) or cards (mobile)", asyn
   const errors = collectErrors(page);
   await seed(page);
   await gotoTrades(page);
-  await expect(page.getByLabel("13 Trades")).toBeVisible();
+  await expect(page.getByText("13 Trades", { exact: true })).toBeVisible();
   if (isMobile(info)) {
     await expect(page.getByRole("list", { name: "Trades" })).toBeVisible();
     await expect(page.locator("table")).toHaveCount(0);
@@ -77,7 +77,9 @@ test("`Löschen` asks inline, `Ja, löschen` removes the trade and toasts", asyn
   await detail.getByRole("button", { name: "Ja, löschen" }).click();
   await expect(detail).toBeHidden();
   await expect(toast(page)).toContainText("Trade gelöscht");
-  await expect(page.getByLabel("12 Trades")).toBeVisible();
+  await expect(page.getByText("12 Trades", { exact: true })).toBeVisible();
+  // the row that opened the detail is gone: focus lands on its neighbour, never on <body>
+  await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-trade-id") ?? document.activeElement?.tagName)).not.toBe("BODY");
   expect(errors, errors.join("\n")).toEqual([]);
 });
 

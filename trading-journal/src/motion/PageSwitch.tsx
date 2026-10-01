@@ -1,13 +1,29 @@
-import { AnimatePresence, motion, type Variants } from "motion/react";
+import { AnimatePresence, motion, type Transition, type Variants } from "motion/react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { spring, tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 
-const variants: Variants = {
-  enter: (dir: number) => ({ x: dir * 16, opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: -dir * 12, opacity: 0, transition: { x: spring.smooth, opacity: tween.exit } }),
-};
+// x/scale on the critically damped `spring.enter` (settles ≈ 0.42 s): the switch – and with it `transitioning`,
+// which locks the trade detail – is over well inside the 600 ms budget
+const ENTER_TRANSITION: Transition = { x: spring.enter, scale: spring.enter, opacity: tween.page, filter: tween.page };
+
+/**
+ * `depth`: the entering page also comes up from scale .985 + blur 4px (a "focus pull"); off under reduced motion,
+ * where `MotionConfig reducedMotion="user"` already turns x/scale into instant changes and only the opacity
+ * crossfade remains. The page always ends at `transform: none` / `filter: none` (no containing block for the
+ * chart's fixed marker ghost or the table ghost).
+ */
+function pageVariants(depth: boolean): Variants {
+  return {
+    enter: (dir: number) => ({ x: dir * 16, opacity: 0, scale: 0.985, ...(depth ? { filter: "blur(4px)" } : {}) }),
+    center: { x: 0, opacity: 1, scale: 1, ...(depth ? { filter: "blur(0px)", transitionEnd: { filter: "none" } } : {}) },
+    // the leaving page only has to get out of the way: one short linear tween for every value
+    exit: (dir: number) => ({ x: -dir * 12, opacity: 0, transition: tween.exit }),
+  };
+}
+const DEPTH = pageVariants(true);
+const FLAT = pageVariants(false);
 
 export interface PageSwitchProps {
   /** Index of the active page (tab order) – the sign of the difference decides the slide direction. */
@@ -24,11 +40,13 @@ export interface PageSwitchProps {
 
 /**
  * Direction-aware page transition (Plan 3.3 "Seitenwechsel"): `AnimatePresence mode="popLayout"
- * initial={false}`, enter `{x: dir·16, opacity: 0}`, exit `{x: −dir·12, opacity: 0}`; `x` on
- * `spring.smooth`, opacity on `tween.page` in / `tween.exit` out. The container is a `layout`
- * element with `position: relative` and the page is `layout="position"` so the footer does not jump.
+ * initial={false}`; enter `{x: dir·16, opacity 0, scale .985, blur 4px}` (x/scale on `spring.enter`,
+ * opacity/blur on `tween.page`), exit `{x: −dir·12, opacity 0}` on `tween.exit` (≈ 120 ms). The whole switch
+ * settles in ≈ 0.45 s. No `layout` here: the container is a plain `relative` box (popLayout pins the leaving page
+ * absolutely inside it), so a page switch never runs a full-page layout projection.
  */
 export function PageSwitch({ index, pageKey, children, onTransitioning, rememberScroll = true, className }: PageSwitchProps) {
+  const reduced = useReducedFx();
   // direction derived from the previous index (state-from-props pattern, no refs during render)
   const [nav, setNav] = useState({ index, dir: 1 });
   if (nav.index !== index) setNav({ index, dir: index > nav.index ? 1 : -1 });
@@ -65,17 +83,16 @@ export function PageSwitch({ index, pageKey, children, onTransitioning, remember
   };
 
   return (
-    <motion.div layout className={cn("relative", className)}>
+    <div className={cn("relative", className)}>
       <AnimatePresence mode="popLayout" initial={false} custom={dir} onExitComplete={settle}>
         <motion.div
           key={pageKey ?? index}
-          layout="position"
           custom={dir}
-          variants={variants}
+          variants={reduced ? FLAT : DEPTH}
           initial="enter"
           animate="center"
           exit="exit"
-          transition={{ x: spring.smooth, opacity: tween.page }}
+          transition={ENTER_TRANSITION}
           onAnimationComplete={(def) => {
             if (def === "center") settle();
           }}
@@ -83,6 +100,6 @@ export function PageSwitch({ index, pageKey, children, onTransitioning, remember
           {children}
         </motion.div>
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }

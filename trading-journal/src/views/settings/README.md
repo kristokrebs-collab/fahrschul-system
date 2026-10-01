@@ -28,7 +28,7 @@ symbol help `BINANCE:BTCUSDT → Binance Perp; …`) · `Live-Daten` (NEW) · `H
 | `settingsToDraft(s)` / `draftToSettings(draft, base)` | pure | `→ { ok: true, settings } \| { ok: false, error: "numeric", field }`; percentages ×100 ↔ ÷100; fallbacks `USDT`, `BTC/USDT`, `BINANCE:BTCUSDT`, `BTC`, `1h`, `Backtest`; rules trimmed, empty dropped; `setups` untouched. `NUMERIC_FIELDS`, `CURRENCIES`, `FALLBACKS`. |
 | `DraftField` | `{ id; label; help?; numeric? (true); draft; onChange(key, value); placeholder? }` | Bundle helper `l`: `Field` + `Input#s-{id}` (`inputMode=decimal font-mono`). |
 | `HyblockConnectorCard` | `{ draft; onChange; onTest?; className? }` | Intro (verbatim) + NEW note that live values come from Binance without a key; 7 fields; `Verbindung testen` / `Teste …` → `<pre role="status">`. `runHyblockTest(cfg)` = bundle `Che` 1:1 (`window.claude.use("mcp")`, `hyblock_get`, `limit: 3`, empty params removed; `Nur auf claude.ai verfügbar.` without MCP). Helpers `unwrapRows` (`Wf`), `describeRows`, `describeError`, `testConfigFromDraft`; `HyblockTestConfig = { endpoints: string[]; params: Record<string, string \| number> }`. Netlify path: integrator passes `onTestHyblock` returning `[HYBLOCK_STRINGS.proxyMissing]`. |
-| `LiveDataCard` | `{ health?; statusLabels?; onRefresh?; onReconnect?; onClearCache?; className? }` | Overall `StatusPill` + `Online/Offline` + `WS-Reconnects: n`; table `Feed \| Quelle \| Stand \| Status` (`FEED_LABELS`, `STATE_LABELS`, `toneOfState`); buttons disabled without handler; Segmented `Top-Trader-Basis: Konten \| Positionen` → `useUi.setPref("topTraderBase")` (never `settings.hyblock`), `Sparkline: Ablesungen \| Live` → `setPref("sparkline")`; `EU-Proxy verwenden` (CheckboxRow) only when `health.proxy.usable === true` → `setPref("useProxy")`. Without `health`: placeholder text. |
+| `LiveDataCard` | `{ health?; statusLabels?; onRefresh?; onReconnect?; onClearCache?; className? }` | Overall `StatusPill` + `Online/Offline` + `WS-Reconnects: n`; table `Feed \| Quelle \| Stand \| Status` (`FEED_LABELS`, `STATE_LABELS`, `toneOfState`); buttons disabled without handler; Segmented `Top-Trader-Basis: Konten \| Positionen` → `useUi.setPref("topTraderBase")` (never `settings.hyblock`), `Sparkline: Ablesungen \| Live` → `setPref("sparkline")`; `EU-Proxy verwenden` (`Switch`) only when `health.proxy.usable === true` → `setPref("useProxy")`. Without `health`: placeholder text. |
 | `DataCard` | `{ onImport(); className? }` | `CSV exportieren` / `Backup (JSON)` (`exportCsv`/`exportJson`; `DOWNLOAD_UNAVAILABLE` text when `!canDownload()`), `Backup importieren`, mode pill `MODE_LABELS[mode]`, `Letztes Backup {date}`, `Wiederherstellen` list (`listBackups()`, 5 rows + `Alle anzeigen`, popLayout rows, inline `Alles ersetzen? Ja/Nein` → `restoreBackup(tag)`), `Quarantäne ansehen` (`readQuarantine()` JSON) when `quarantined > 0`, footer `{n} Trades gespeichert · {m} Grundlagen · {k} Grundregeln`. |
 | `RulesCard` | `{ rules; onChange(rules); trades; className? }` | `Reorder.Group` (drag handle `Regel {n} verschieben` + ArrowUp/Down), inputs `Regel {n}`, `+ Regel hinzufügen` (`newRuleId()` → `g…`), `Regel entfernen` with inline `{n} Trades verlieren den Haken` when used (`ruleUsage`). `moveRule` helper. |
 
@@ -38,4 +38,18 @@ const health = useHealth(); // market layer
 <SettingsView health={health} onRefresh={() => provider.refresh("markPrice", { force: true })} onTestHyblock={runHyblockTest} />
 ```
 
-Tests: `tests/unit/views.settings.konten.test.tsx`, `tests/unit/views.settings.rules.test.tsx`.
+## Motion & feedback (`fx.tsx`)
+| export | notes |
+|---|---|
+| `useActionPhase()` → `{ phase: "idle"\|"busy"\|"done", run(fn) }` | `run` resolves `true`/`false`; `done` holds `DONE_HOLD_MS` (= `dwell.done` · 1000 = 1.2 s) |
+| `SaveButton { phase, …ButtonProps }` | `Speichern` → spinner + `Speichert …` → drawn ✓ + `Gespeichert` on a win wash → back; `TextRoll` labels, fixed width, glyph left of the centred label. Name = current label. |
+| `ActionButton { icon?, spinIcon?, onRun? }` | icon → spinner (refresh: the icon spins) → ✓, label unchanged; disabled without `onRun` |
+| `PhaseGlyph`, `Spinner`, `DrawnCheck`, `ChangedDot`, `GlyphRefresh/Link/Trash/Download` | building blocks |
+
+- `changedKeys(draft, saved)` (draft.ts): entries whose saved meaning differs (numbers by value, text trimmed, rules without empty rows). Drives the signal dots after field labels (`DraftField changed`) and the `Ungespeicherte Änderungen` bar (fixed under the header, `spring.sheet`, `Verwerfen` is a `HoldButton`, its own `Speichern` after the page's buttons in DOM order).
+- A refused save marks the field (`DraftField invalid` → `aria-invalid`) and `revealInvalid`s it (`@/primitives/fieldFx`: scroll, then `shakeField` – shake + border pulse).
+- Cards are memoised (`DraftField` compares only its own value), so the Live-Daten health updates never re-render the form. `SettingsPage` no longer ticks every second: labels follow the health snapshot.
+- LiveDataCard: rows cascade on first view, `Stand` cells flash on every delivery, proxy preference is a `Switch` (`#live-proxy`, labelled `EU-Proxy verwenden`).
+- DataCard: export buttons end on ✓, mode badge `dot` (+ `ping` when synchronised), restore rows use `HoldConfirm` (`@/motion/HoldConfirm`). RulesCard: drag lift (scale 1.02 + shadow layer), changed dot in the title.
+
+Tests: `tests/unit/views.settings.konten.test.tsx`, `tests/unit/views.settings.rules.test.tsx`, `tests/unit/views.settings.motion.test.tsx`.

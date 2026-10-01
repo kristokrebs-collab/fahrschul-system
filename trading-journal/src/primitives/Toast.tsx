@@ -1,24 +1,47 @@
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect } from "react";
+import { AnimatePresence, animate, motion, useMotionValue, useTransform, type PanInfo, type Variants } from "motion/react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
-import { radius, spring, tween } from "@/motion/tokens";
+import { gesture, radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { GlyphCheck, GlyphCross, GlyphInfo } from "@/primitives/icons";
+import { formatRoll, parseRollValue } from "@/primitives/rollValue";
 import { toastDuration, useToastStore, type Toast, type ToastKind } from "@/primitives/toastStore";
 
 const KIND_DISC: Record<ToastKind, string> = { ok: "bg-win/20 text-win", error: "bg-loss/20 text-loss", warn: "bg-signal/25 text-signal" };
+const KIND_BAR: Record<ToastKind, string> = { ok: "bg-win/70", error: "bg-loss/70", warn: "bg-signal/80" };
+
+/** Swipe distance / speed that dismisses the island sideways (`gesture.toastSwipe` / `gesture.toastFlick`). */
+export const TOAST_SWIPE_PX = gesture.toastSwipe;
+export const TOAST_SWIPE_VELOCITY = gesture.toastFlick;
+
+/** A toast as the island renders it; `duration` (ms) overrides the kind default, `0` keeps it until dismissed. */
+export interface IslandToast extends Toast {
+  duration?: number;
+}
 
 export interface ToastIslandProps {
-  /** Override the store (tests, storybook). */
-  toasts?: Toast[];
+  /** Override the store (tests, storybook, the app's ui store adapter). */
+  toasts?: IslandToast[];
   onDismiss?: (id: number) => void;
   className?: string;
 }
 
+interface Fling {
+  id: number;
+  dir: number;
+}
+
 /**
- * Toast island (Bundle `Ehe`, Plan 3.3 "Toast-Insel"): fixed above the dock, `aria-live="polite"`,
- * one toast at a time. Grows 44×44 → auto×50 with `spring.toast`; exit `tween.toastExit`;
- * text `delay .12`; check mark `pathLength` on `tween.checkToast`. Reduced motion → `{duration:0}`.
+ * Toast island (Bundle `Ehe`, Plan 3.3 "Toast-Insel", 21st.dev "Dynamic Island"): fixed above the dock, the ONLY
+ * `role="status" aria-live="polite"` region, one toast at a time (the next one waits in the queue).
+ * - grows 44×44 → auto×50 on `spring.toast` (declared exception), exit `tween.toastExit`, text `delay .12`,
+ *   check mark `pathLength` on `tween.checkToast`;
+ * - remaining-time bar: compositor `scaleX` loop (`.fx-countdown`), paused together with the dismiss timer while
+ *   hovered, focused or dragged;
+ * - drag-x to dismiss (±80 px or a flick) – the island flies out the way it was thrown;
+ * - win toasts (`ok` + `valueTone: "win"`) roll their value up (`spring.number`) under a green glow;
+ * - `+n` queue badge pops (`spring.pop`) and rolls when the queue changes.
+ * Reduced motion: no roll, glow or bar; instant transitions.
  */
 export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) {
   const storeToasts = useToastStore((s) => s.toasts);
@@ -26,52 +49,244 @@ export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) 
   const list = toasts ?? storeToasts;
   const dismiss = onDismiss ?? storeDismiss;
   const reduced = useReducedFx();
+  const [fling, setFling] = useState<Fling | null>(null);
   const note = list[0];
 
-  useEffect(() => {
-    if (!note) return;
-    const t = setTimeout(() => dismiss(note.id), toastDuration(note.kind));
-    return () => clearTimeout(t);
-  }, [note, dismiss]);
-
   return (
-    <div className={cn("pointer-events-none fixed inset-x-0 bottom-[calc(92px+env(safe-area-inset-bottom,0px))] z-[56] flex justify-center px-4", className)} aria-live="polite" role="status">
-      <AnimatePresence>
+    <div
+      data-toast-island=""
+      className={cn("pointer-events-none fixed inset-x-0 bottom-[calc(92px+env(safe-area-inset-bottom,0px))] z-[56] grid items-end justify-items-center px-4", className)}
+      aria-live="polite"
+      role="status"
+    >
+      <AnimatePresence custom={fling}>
         {note && (
-          <motion.button
+          <IslandCard
             key={note.id}
-            type="button"
-            onClick={() => dismiss(note.id)}
-            layoutRoot
-            className="pointer-events-auto flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)]"
-            style={{ maxWidth: "calc(100vw - 32px)" }}
-            // motion-exception: toast-island — width/height/borderRadius animate as in the bundle (44×44 → auto×50), Plan 3.2 rule 1.
-            initial={{ width: 44, height: 44, borderRadius: radius.toastStart, opacity: 0, y: 24, scale: 0.6 }}
-            animate={{ width: "auto", height: 50, borderRadius: radius.toastEnd, opacity: 1, y: 0, scale: 1 }}
-            exit={{ width: 44, opacity: 0, y: 16, scale: 0.7, transition: reduced ? { duration: 0 } : tween.toastExit }}
-            transition={reduced ? { duration: 0 } : spring.toast}
-          >
-            <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", KIND_DISC[note.kind])} aria-hidden="true">
-              {note.kind === "ok" ? (
-                <GlyphCheck className="size-3.5" strokeWidth="2.2" drawn transition={reduced ? { duration: 0 } : tween.checkToast} />
-              ) : note.kind === "error" ? (
-                <GlyphCross className="size-3.5" />
-              ) : (
-                <GlyphInfo className="size-3.5" />
-              )}
-            </span>
-            <motion.span className="flex items-center gap-3 whitespace-nowrap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={reduced ? { duration: 0 } : { ...tween.fade, delay: 0.12 }}>
-              <span className="grid">
-                <span className="text-[13px] font-medium text-fg">{note.title}</span>
-                {note.detail && <span className="text-[11px] text-mute">{note.detail}</span>}
-              </span>
-              {note.value && (
-                <span className={cn("dot-num text-[15px]", note.valueTone === "win" ? "text-win" : note.valueTone === "loss" ? "text-loss" : "text-mute")}>{note.value}</span>
-              )}
-            </motion.span>
-          </motion.button>
+            note={note}
+            queued={list.length - 1}
+            reduced={reduced}
+            onDismiss={(dir) => {
+              setFling(dir ? { id: note.id, dir } : null);
+              dismiss(note.id);
+            }}
+          />
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+interface IslandCardProps {
+  note: IslandToast;
+  queued: number;
+  reduced: boolean;
+  /** `dir` ±1 when swiped away, 0 for a tap or the timeout. */
+  onDismiss: (dir: number) => void;
+}
+
+function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
+  const wrapper = useRef<HTMLDivElement>(null);
+  const dragged = useRef(false);
+  const dismissRef = useRef(onDismiss);
+  const hold = useRef<{ reasons: Set<string>; pause: () => void; resume: () => void } | null>(null);
+  const ms = note.duration ?? toastDuration(note.kind);
+  const win = note.kind === "ok" && note.valueTone === "win";
+  const instant = { duration: 0 };
+
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  }, [onDismiss]);
+
+  // visible-time countdown: starts when the toast reaches the front, pauses while held (hover / focus / drag)
+  useEffect(() => {
+    if (ms <= 0) return;
+    const reasons = new Set<string>();
+    let remaining = ms;
+    let startedAt = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = () => {
+      startedAt = Date.now();
+      timer = setTimeout(() => dismissRef.current(0), remaining);
+    };
+    hold.current = {
+      reasons,
+      pause: () => {
+        if (timer === undefined) return;
+        clearTimeout(timer);
+        timer = undefined;
+        remaining = Math.max(0, remaining - (Date.now() - startedAt));
+        wrapper.current?.setAttribute("data-held", "");
+      },
+      resume: () => {
+        if (timer !== undefined) return;
+        wrapper.current?.removeAttribute("data-held");
+        run();
+      },
+    };
+    run();
+    return () => {
+      clearTimeout(timer);
+      hold.current = null;
+    };
+  }, [ms]);
+
+  const holdOn = (reason: string) => {
+    const h = hold.current;
+    if (!h) return;
+    h.reasons.add(reason);
+    h.pause();
+  };
+  const holdOff = (reason: string) => {
+    const h = hold.current;
+    if (!h) return;
+    h.reasons.delete(reason);
+    if (h.reasons.size === 0) h.resume();
+  };
+
+  const onDragEnd = (_: unknown, info: PanInfo) => {
+    holdOff("drag");
+    const { x } = info.offset;
+    const vx = info.velocity.x;
+    if (Math.abs(x) > TOAST_SWIPE_PX || Math.abs(vx) > TOAST_SWIPE_VELOCITY) onDismiss(Math.sign(x || vx) || 1);
+  };
+
+  const exitTransition = reduced ? instant : tween.toastExit;
+  const flung = (c: Fling | null | undefined) => c?.id === note.id;
+  const wrapperVariants: Variants = {
+    exit: (c: Fling | null | undefined) => (flung(c) && c ? { x: c.dir * gesture.toastFling, opacity: 0, transition: exitTransition } : { opacity: 1, transition: exitTransition }),
+  };
+  const islandVariants: Variants = {
+    exit: (c: Fling | null | undefined) =>
+      flung(c) ? { opacity: 0, transition: exitTransition } : { width: 44, opacity: 0, y: 16, scale: 0.7, transition: exitTransition },
+  };
+
+  return (
+    <motion.div
+      ref={wrapper}
+      className="pointer-events-auto relative isolate [grid-area:1/1]"
+      drag="x"
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.6}
+      onPointerDown={() => {
+        dragged.current = false;
+      }}
+      onDragStart={() => {
+        dragged.current = true;
+        holdOn("drag");
+      }}
+      onDragEnd={onDragEnd}
+      onPointerEnter={(e) => e.pointerType === "mouse" && holdOn("hover")}
+      onPointerLeave={(e) => e.pointerType === "mouse" && holdOff("hover")}
+      onFocus={() => holdOn("focus")}
+      onBlur={() => holdOff("focus")}
+      variants={wrapperVariants}
+      exit="exit"
+    >
+      {win && !reduced && (
+        <motion.span
+          aria-hidden="true"
+          className="pointer-events-none absolute -inset-2 -z-10 rounded-[32px] bg-win/25 blur-xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: [0, 0.9, 0.4] }}
+          transition={tween.burst}
+        />
+      )}
+      <motion.button
+        type="button"
+        onClick={() => {
+          if (dragged.current) {
+            dragged.current = false;
+            return;
+          }
+          onDismiss(0);
+        }}
+        layoutRoot
+        className="relative flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)]"
+        style={{ maxWidth: "calc(100vw - 32px)" }}
+        // motion-exception: toast-island — width/height/borderRadius animate as in the bundle (44×44 → auto×50), Plan 3.2 rule 1.
+        initial={{ width: 44, height: 44, borderRadius: radius.toastStart, opacity: 0, y: 24, scale: 0.6 }}
+        animate={{ width: "auto", height: 50, borderRadius: radius.toastEnd, opacity: 1, y: 0, scale: 1 }}
+        variants={islandVariants}
+        exit="exit"
+        transition={reduced ? instant : spring.toast}
+      >
+        <span className={cn("grid size-8 shrink-0 place-items-center rounded-full", KIND_DISC[note.kind])} aria-hidden="true">
+          {note.kind === "ok" ? (
+            <GlyphCheck className="size-3.5" strokeWidth="2.2" drawn transition={reduced ? instant : tween.checkToast} />
+          ) : note.kind === "error" ? (
+            <GlyphCross className="size-3.5" />
+          ) : (
+            <GlyphInfo className="size-3.5" />
+          )}
+        </span>
+        <motion.span className="flex items-center gap-3 whitespace-nowrap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={reduced ? instant : tween.toastText}>
+          <span className="grid">
+            <span className="text-[13px] font-medium text-fg">{note.title}</span>
+            {note.detail && <span className="text-[11px] text-mute">{note.detail}</span>}
+          </span>
+          {note.value &&
+            (win && !reduced ? (
+              <RollingValue value={note.value} />
+            ) : (
+              <span className={cn("dot-num text-[15px]", note.valueTone === "win" ? "text-win" : note.valueTone === "loss" ? "text-loss" : "text-mute")}>{note.value}</span>
+            ))}
+        </motion.span>
+        {ms > 0 && !reduced && (
+          <span aria-hidden="true" className="pointer-events-none absolute inset-x-5 bottom-[3px] h-[2px] overflow-hidden rounded-full bg-white/[0.06]">
+            <span className={cn("fx-countdown absolute inset-0 rounded-full", KIND_BAR[note.kind])} style={{ "--fx-countdown": `${ms}ms` } as CSSProperties} />
+          </span>
+        )}
+      </motion.button>
+      <AnimatePresence>{queued > 0 && <QueueBadge count={queued} reduced={reduced} />}</AnimatePresence>
+    </motion.div>
+  );
+}
+
+/** Win value counting up from zero; screen readers get the final string once (the rolling digits are hidden). */
+function RollingValue({ value }: { value: string }) {
+  const [spec] = useState(() => parseRollValue(value));
+  const n = useMotionValue(0);
+  const text = useTransform(n, (v) => (spec && v !== spec.value ? formatRoll(spec, v) : value));
+
+  useEffect(() => {
+    if (!spec) return;
+    // the island needs one beat to grow before the value starts rolling: the same delay as the text fade
+    const controls = animate(n, spec.value, { ...spring.number, delay: tween.toastText.delay });
+    return () => controls.stop();
+  }, [n, spec]);
+
+  return (
+    <span className="relative dot-num text-[15px] text-win">
+      <span className="sr-only">{value}</span>
+      <motion.span aria-hidden="true">{spec ? text : value}</motion.span>
+    </span>
+  );
+}
+
+/** `+n` waiting toasts: pops in, rolls vertically when the count changes. Decorative (each toast is announced itself). */
+function QueueBadge({ count, reduced }: { count: number; reduced: boolean }) {
+  return (
+    <motion.span
+      aria-hidden="true"
+      className="pointer-events-none absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center overflow-hidden rounded-full border border-line-2 bg-ink-750 px-1.5 font-mono text-[10px] font-semibold text-fg shadow-[0_4px_12px_rgb(0_0_0/0.4)]"
+      initial={reduced ? false : { scale: 0, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      exit={{ scale: 0, opacity: 0, transition: reduced ? { duration: 0 } : tween.exit }}
+      transition={reduced ? { duration: 0 } : spring.pop}
+    >
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={count}
+          className="block"
+          initial={reduced ? false : { y: "-110%", opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: "110%", opacity: 0, transition: reduced ? { duration: 0 } : tween.exit }}
+          transition={reduced ? { duration: 0 } : spring.pop}
+        >
+          +{count}
+        </motion.span>
+      </AnimatePresence>
+    </motion.span>
   );
 }

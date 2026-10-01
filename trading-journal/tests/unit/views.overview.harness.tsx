@@ -70,7 +70,8 @@ export interface FakeMarket {
 
 /**
  * Overrides for `vi.mock("@/market", …)`: hooks read the fixture snapshot, the provider is a fake with a spied
- * `refresh`, lifecycle functions are no-ops. `priceMv` is the real MotionValue set to the fixture price.
+ * `refresh`, lifecycle functions are no-ops. The live MotionValues (`priceMv`, `markMv`, `open24hMv` …) are the real
+ * ones, seeded from the fixture snapshot.
  */
 export function fakeMarket(actual: typeof import("@/market"), fixture: MarketFixture = DEFAULT_FIXTURE): FakeMarket {
   const snapshot = makeSnapshot(fixture);
@@ -96,6 +97,17 @@ export function fakeMarket(actual: typeof import("@/market"), fixture: MarketFix
     dispatch: () => undefined,
   } as unknown as MarketProvider;
   actual.priceMv.set(fixture.price);
+  // seed the other live MotionValues (mark, funding, 24 h open, trade time …) from the snapshot, like the real store
+  actual.bindMotionValues(provider)();
+  actual.flushMotionValues();
+  // `useFeedSelect` memoises per selector, like the real hook (the snapshot never changes here)
+  const selected = new WeakMap<object, Map<FeedId, unknown>>();
+  const feedSelect = (f: FeedId, select: (v: unknown) => unknown): unknown => {
+    let byFeed = selected.get(select);
+    if (!byFeed) selected.set(select, (byFeed = new Map()));
+    if (!byFeed.has(f)) byFeed.set(f, select(snapshot[f]));
+    return byFeed.get(f);
+  };
   const overrides = {
     startMarket: vi.fn(() => provider),
     stopMarket: vi.fn(),
@@ -105,7 +117,12 @@ export function fakeMarket(actual: typeof import("@/market"), fixture: MarketFix
     getProvider: () => provider,
     useProvider: () => provider,
     useFeed: (f: FeedId) => snapshot[f],
+    useFeedSelect: feedSelect,
+    getFeed: (f: FeedId) => snapshot[f],
+    subscribeFeed: () => () => undefined,
+    flushMarketNotifications: () => undefined,
     useHealth: () => health,
+    useHealthSelect: (select: (h: ProviderHealth) => unknown) => select(health),
     useStatusLabel: (f: FeedId) => label(f),
     useMarketVersion: () => 1,
     useMarketView: () => actual.deriveMarket(snapshot, health, { now: fixture.now }),

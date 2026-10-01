@@ -2,9 +2,16 @@
  * Number/date formatting – 1:1 port of the bundle's `V` formatter (bundle.pretty.js 21160–21209).
  * Locale de-DE, hyphen-minus rendered as U+2212 "−" (first occurrence), non-finite → "–" (U+2013).
  */
+// Every formatter is built once at module level: these run inside live re-renders, and constructing an
+// `Intl` formatter (or calling `toLocale*String` with options, which does the same internally) per call dominated.
 const f0 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
 const f1 = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 const f2 = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fPriceSmall = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 4 });
+const fPrice = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
+const fDate = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+const fTime = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+const fDateTime = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 export const DASH = "–";
 export const MINUS = "−";
@@ -35,19 +42,13 @@ export const pct0 = (e: number | null | undefined): string => (isFin(e) ? f0.for
 export const r = (e: number | null | undefined): string =>
   isFin(e) ? minus((e > 0 ? "+" : "") + f2.format(e)) + " R" : DASH;
 /** Price: 4 fraction digits below 10, else 2 (no U+2212 replacement, like the bundle). */
-export const price = (e: number | null | undefined): string =>
-  isFin(e) ? new Intl.NumberFormat("de-DE", { maximumFractionDigits: e < 10 ? 4 : 2 }).format(e) : DASH;
+export const price = (e: number | null | undefined): string => (isFin(e) ? (e < 10 ? fPriceSmall : fPrice).format(e) : DASH);
 /** "dd.MM.yy" */
-export const date = (d: Date): string =>
-  isNaN(+d) ? DASH : d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" });
+export const date = (d: Date): string => (isNaN(+d) ? DASH : fDate.format(d));
 /** "HH:mm" ("" for invalid dates, like the bundle). */
-export const time = (d: Date): string =>
-  isNaN(+d) ? "" : d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+export const time = (d: Date): string => (isNaN(+d) ? "" : fTime.format(d));
 /** Market-card style "dd.MM. HH:mm" (bundle `toLocaleString("de-DE", {day, month, hour, minute})`). */
-export const dateTime = (d: Date): string =>
-  isNaN(+d)
-    ? DASH
-    : d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+export const dateTime = (d: Date): string => (isNaN(+d) ? DASH : fDateTime.format(d));
 /** Profit factor cell: "–" | "∞" | n2. */
 export const pf = (e: number | null | undefined): string =>
   e == null ? DASH : e === Infinity ? INFINITY_SIGN : n2(e);

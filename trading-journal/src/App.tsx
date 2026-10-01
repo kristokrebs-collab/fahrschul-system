@@ -1,25 +1,27 @@
 import { motion } from "motion/react";
-import { useCallback } from "react";
+import { useDeferredValue, useMemo, type ReactNode } from "react";
 import { BottomFade } from "@/app/BottomFade";
 import { Dock } from "@/app/Dock";
+import { EditorHost } from "@/app/EditorHost";
 import { Footer } from "@/app/Footer";
 import { Header } from "@/app/Header";
 import { LocalModeBanner, useLocalBannerOpen } from "@/app/LocalModeBanner";
-import { EditorHost } from "@/app/EditorHost";
 import { SetupEditor, TradeDetail } from "@/app/overlays";
+import { PageHost } from "@/app/PageHost";
 import { OverviewView, SettingsView, SetupsView, TradesView } from "@/app/pages";
 import { ScenarioWatcher } from "@/app/ScenarioWatcher";
 import { toIslandToast } from "@/app/toasts";
 import { useDetailCandles } from "@/app/useDetailCandles";
+import { Celebrate } from "@/motion/Celebrate";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
-import { PageSwitch } from "@/motion/PageSwitch";
 import { spring } from "@/motion/tokens";
 import { ToastIsland } from "@/primitives/Toast";
-import { PAGES, useUi, type Page } from "@/store/uiStore";
+import { useUi, type Page } from "@/store/uiStore";
 
-const PAGE_INDEX: Record<Page, number> = { overview: 0, trades: 1, setups: 2, settings: 3 };
+/** Pages that stay mounted (hidden) while another tab is shown: the overview keeps its state, DOM and chart data. */
+const KEEP_ALIVE: readonly Page[] = ["overview"];
 
-function CurrentPage({ page }: { page: Page }) {
+function renderPage(page: Page): ReactNode {
   switch (page) {
     case "trades":
       return <TradesView />;
@@ -33,42 +35,61 @@ function CurrentPage({ page }: { page: Page }) {
 }
 
 /**
- * App shell (Plan 6.6): header, `main` container, `PageSwitch` keyed `o|t|s|e`, footer, dock, local banner,
- * toast island and the app-level overlays (no portal, inside the group-less `LayoutGroup` of `MotionRoot`).
- * `PageSwitch.onTransitioning` drives `uiStore.transitioning` (detail opening is locked meanwhile). The live
- * price for the editor is read by `EditorHost` only while the editor is open, so ticks never re-render the shell.
+ * The page switch. Zustand updates always render synchronously (`useSyncExternalStore`), so wrapping `setPage` in
+ * `startTransition` would not help; instead the page is read through `useDeferredValue`: the dock (which reads the
+ * store directly) reacts in the click's own frame, and the new page renders afterwards in an interruptible, time-sliced
+ * background render. `PageHost` is memoised, so the urgent pass re-renders nothing here.
  */
-export default function App() {
+function Pages() {
   const page = useUi((s) => s.page);
   const setTransitioning = useUi((s) => s.setTransitioning);
+  const shown = useDeferredValue(page);
+  return <PageHost page={shown} renderPage={renderPage} keepAlive={KEEP_ALIVE} onTransitioning={setTransitioning} />;
+}
+
+/** Toast island fed from `uiStore.toasts` (its own subscription, so a toast never re-renders the shell). */
+function Toasts() {
   const toasts = useUi((s) => s.toasts);
-  const dismissToast = useUi((s) => s.dismissToast);
+  const dismiss = useUi((s) => s.dismissToast);
+  const island = useMemo(() => toasts.map(toIslandToast), [toasts]);
+  return <ToastIsland toasts={island} onDismiss={dismiss} />;
+}
+
+/** Trade detail with the 1h candle slice around the open trade (re-renders on detail / journal changes only). */
+function Detail() {
+  const candles = useDetailCandles();
+  return <TradeDetail candles={candles} />;
+}
+
+/**
+ * App shell (Plan 6.6): header, `main` container, page host (keep-alive overview), footer, dock, local banner, toast
+ * island, the app-level overlays and the celebration layer (no portal, inside the group-less `LayoutGroup` of
+ * `MotionRoot`). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
+ * banner opens or closes; the page, toasts, detail and editor each re-render on their own.
+ */
+export default function App() {
   const bannerOpen = useLocalBannerOpen();
-  const detailCandles = useDetailCandles();
-
-  const onTransitioning = useCallback((t: boolean) => setTransitioning(t), [setTransitioning]);
-
   return (
     <MorphDialogProvider>
       <ScenarioWatcher />
       <Header />
       <main className="mx-auto max-w-[1320px] px-4 pb-40 pt-6 sm:px-6">
         <LocalModeBanner />
-        <motion.div layout="position" layoutDependency={bannerOpen} transition={{ layout: spring.layout }}>
-          {/* scroll memory lives in the router (`navigate` / `applyRoute` → `restoreScroll`), so PageSwitch must not restore a second time (it would override `#trades?…` deep links a frame later) */}
-          <PageSwitch index={PAGE_INDEX[page]} pageKey={PAGES.indexOf(page) >= 0 ? page : "o"} onTransitioning={onTransitioning} rememberScroll={false}>
-            <CurrentPage page={page} />
-          </PageSwitch>
+        {/* moves only when the banner enters / leaves (strict dependency: page switches never measure this subtree);
+            scroll memory lives in the router, applied by the page host at the commit that shows a page */}
+        <motion.div layout="position" layoutDependency={bannerOpen} transition={{ layout: spring.layout }} style={{ borderRadius: 0 }}>
+          <Pages />
           <Footer />
         </motion.div>
       </main>
       <BottomFade />
       <Dock />
-      <ToastIsland toasts={toasts.map(toIslandToast)} onDismiss={dismissToast} />
+      <Toasts />
       {/* always mounted: the overlays own their AnimatePresence / open state (uiStore.detail | editor | setupEditor) */}
-      <TradeDetail candles={detailCandles} />
+      <Detail />
       <EditorHost />
       <SetupEditor />
+      <Celebrate />
     </MorphDialogProvider>
   );
 }

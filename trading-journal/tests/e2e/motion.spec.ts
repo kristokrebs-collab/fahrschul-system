@@ -4,7 +4,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { existsSync } from "node:fs";
-import { collectErrors, expectNoHorizontalScroll, isMobile, screenshot, seed } from "./helpers";
+import { collectErrors, expectInViewport, expectNoHorizontalScroll, isMobile, screenshot, seed } from "./helpers";
 
 test("reduced motion: every page and overlay renders, nothing stays invisible", async ({ page }, info) => {
   const errors = collectErrors(page);
@@ -81,10 +81,43 @@ test("mobile 390×844: dock reachable, bottom sheet, cards, readable hero, no ho
   await expectNoHorizontalScroll(page);
   await screenshot(page, info, "mobile-trades");
 
+  await dock.getByRole("button", { name: "Entscheidungsgrundlagen" }).click();
+  await expect(page.getByRole("heading", { name: "Entscheidungsgrundlagen" })).toBeVisible();
+  await page.waitForTimeout(600);
+  await expectNoHorizontalScroll(page);
+
   await dock.getByRole("button", { name: "Einstellungen" }).click();
   await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
   await expectNoHorizontalScroll(page);
   await screenshot(page, info, "mobile-settings");
+  expect(errors, errors.join("\n")).toEqual([]);
+});
+
+test("sheets keep header and footer on screen: morph (FAB editor) and slide-in (setup editor)", async ({ page }, info) => {
+  const errors = collectErrors(page);
+  await seed(page);
+  await page.goto("/#overview");
+  await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+  await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" }).click();
+  const editor = page.getByRole("dialog", { name: "Trade eintragen" });
+  await expect(editor.locator("#f-entry")).toBeVisible();
+  await page.waitForTimeout(700);
+  await expectInViewport(page, editor.getByRole("button", { name: "Schließen", exact: true }), "editor close button");
+  await expectInViewport(page, editor.getByRole("button", { name: "Speichern", exact: true }), "editor `Speichern`");
+  await expectInViewport(page, editor.getByRole("button", { name: "Speichern & neu" }), "editor `Speichern & neu`");
+  await page.keyboard.press("Escape");
+  await expect(editor).toBeHidden();
+
+  await page.goto("/#setups");
+  await expect(page.getByRole("heading", { name: "Entscheidungsgrundlagen" })).toBeVisible();
+  await page.waitForTimeout(500);
+  await page.getByRole("button", { name: "Neue Entscheidungsgrundlage" }).click();
+  const setup = page.getByRole("dialog", { name: "Neue Entscheidungsgrundlage" });
+  await expect(setup.locator("#sf-name")).toBeVisible();
+  await page.waitForTimeout(700);
+  await expectInViewport(page, setup.getByRole("button", { name: "Schließen", exact: true }), "setup editor close button");
+  await expectInViewport(page, setup.getByRole("button", { name: "Speichern", exact: true }), "setup editor `Speichern`");
+  await screenshot(page, info, "sheet-footer-on-screen");
   expect(errors, errors.join("\n")).toEqual([]);
 });
 

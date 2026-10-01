@@ -26,14 +26,85 @@ export function cacheKey(source: Source, symbol: string, feed: FeedId): string {
   return `${source}:${symbol}:${feed}`;
 }
 
-/** Sorted upsert by `time`, trimmed to `cap` from the front (oldest dropped). */
+function trim<T>(arr: T[], cap: number): T[] {
+  return arr.length > cap ? arr.slice(arr.length - cap) : arr;
+}
+
+function isStrictlyAscending(arr: readonly { time: number }[]): boolean {
+  for (let i = 1; i < arr.length; i++) if (!(arr[i - 1]!.time < arr[i]!.time)) return false;
+  return true;
+}
+
+/** Ascending by time, one point per time (the LAST occurrence wins). */
+function sortedUnique<T extends { time: number }>(points: readonly T[]): T[] {
+  if (isStrictlyAscending(points)) return points.slice();
+  const map = new Map<number, T>();
+  for (const p of points) map.set(p.time, p);
+  return [...map.values()].sort((a, b) => a.time - b.time);
+}
+
+/** First index whose time is ≥ `time` (binary search on an ascending series). */
+function lowerBound(arr: readonly { time: number }[], time: number): number {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (arr[mid]!.time < time) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * Sorted upsert by `time` (incoming wins on equal times), trimmed to `cap` from the front (oldest dropped).
+ * Polls and live updates touch the tail: the untouched prefix is copied as-is and only the overlap is merged,
+ * so no hashing or re-sorting of the whole ring happens.
+ */
 export function upsertSeries<T extends { time: number }>(existing: readonly T[], incoming: readonly T[], cap: number): T[] {
   if (incoming.length === 0) return existing.slice(-cap);
-  const map = new Map<number, T>();
-  for (const p of existing) map.set(p.time, p);
-  for (const p of incoming) map.set(p.time, p);
-  const merged = [...map.values()].sort((a, b) => a.time - b.time);
-  return merged.length > cap ? merged.slice(merged.length - cap) : merged;
+  const inc = sortedUnique(incoming);
+  // a ring that is not strictly ascending (never produced here, but cached data is external input) is rebuilt
+  if (!isStrictlyAscending(existing)) return trim(sortedUnique([...existing, ...inc]), cap);
+  const from = lowerBound(existing, inc[0]!.time);
+  const out = existing.slice(0, from);
+  let i = from;
+  let j = 0;
+  while (i < existing.length && j < inc.length) {
+    const a = existing[i]!;
+    const b = inc[j]!;
+    if (a.time < b.time) {
+      out.push(a);
+      i++;
+    } else {
+      out.push(b);
+      j++;
+      if (a.time === b.time) i++;
+    }
+  }
+  while (i < existing.length) out.push(existing[i++]!);
+  while (j < inc.length) out.push(inc[j++]!);
+  return trim(out, cap);
+}
+
+/**
+ * Upsert of ONE point at the tail (the live kline path, several times per second per interval): replaces the last
+ * point when the time matches, appends a newer one, and falls back to `upsertSeries` for an out-of-order point.
+ * Always returns a new array (consumers detect history changes by identity), trimmed to `cap`.
+ */
+export function upsertBar<T extends { time: number }>(series: readonly T[], point: T, cap: number): T[] {
+  const n = series.length;
+  const last = series[n - 1];
+  if (!last || point.time > last.time) {
+    const out = n + 1 > cap ? series.slice(n + 1 - cap) : series.slice();
+    out.push(point);
+    return out;
+  }
+  if (point.time === last.time) {
+    const out = trim(series.slice(), cap);
+    out[out.length - 1] = point;
+    return out;
+  }
+  return upsertSeries(series, [point], cap);
 }
 
 /** Minimal async KV interface so tests can inject a Map-backed store. */

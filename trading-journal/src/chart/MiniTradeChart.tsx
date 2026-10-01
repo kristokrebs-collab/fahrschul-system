@@ -53,7 +53,7 @@ export function MiniTradeChart({ candles, trade, interval = "1h", height = 160, 
     const node = host.current;
     if (!node) return;
     const chart = createChart(node, NOTHING_MINI);
-    const main = createMainSeries(chart, { volume: false, pulse: false });
+    const main = createMainSeries(chart, { volume: false });
     main.candles.applyOptions({ priceLineVisible: false, lastValueVisible: false });
     const markers = createSeriesMarkers(main.candles, [], { zOrder: "aboveSeries" });
     const instance: Instance = { chart, main, lines: {}, detach: () => markers.detach() };

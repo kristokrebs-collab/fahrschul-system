@@ -50,9 +50,10 @@ interface TradeEditorProps {
 - **Footer**: `Löschen` (edit only → `Wirklich löschen?` `Ja, löschen` / `Nein`, toast `Trade gelöscht`, error `Löschen fehlgeschlagen.`), `Abbrechen`,
   `Speichern & neu` (new only: saves, keeps the sheet open, resets entry/stop/target/exit/size/fees/pnlManual/setups/checks/conviction/plan/emotion/reason/notes/chart,
   keeps date (renewed)/pair/account/side/leverage/timeframe, scrolls the body to top and focuses `Einstieg`), `Speichern` (`type="submit" form="trade-form"`, `Speichert …` while saving).
-- **Toasts** go through `uiStore.pushToast` (kinds `success | error | info`). The integrator renders them with `ToastIsland`
-  (map `success → ok`, `error → error`, `info → ok`) or bridges `useUi().toasts` into `primitives/toastStore`.
-- Exports for reuse/tests: `defaultForm`, `formFromTrade`, `resetForNext`, `toRecord`, `validateRecord`, `livePriceInput`, `Section`, `LivePriceButton`,
+- **Toasts** go through `uiStore.pushToast` (kinds `success | error | info`); the shell renders them with `ToastIsland`
+  (`src/app/toasts.ts`: `success → ok`, `error → error`, `signal`/`info → warn` glyph with the 2.8 s / 5.2 s `TOAST_MS` lifetime). The
+  store never auto-dismisses: the island counts the visible time (from the front of the queue, paused on hover / focus / drag).
+- Exports for reuse/tests: `defaultForm`, `formFromTrade`, `resetForNext`, `toRecord`, `validateRecord`, `livePriceInput`, `freshLivePrice`, `Section`, `LivePriceButton`,
   `EDITOR_MESSAGES`, `LIVE_PRICE_LABEL`, `LIVE_PRICE_CONFIRM_MS`, types `TradeFormStrings`, `TradeFormTyped`, `TradeRecord`.
 
 ## `TradeDetail` (`TradeDetail.tsx`) – bundle `q$`, Plan 6.2 / 2.5
@@ -77,11 +78,31 @@ interface TradeDetailProps {
   toast `Trade gelöscht`), `Schließen`, `Bearbeiten`.
 - `MiniTradeChart` is imported from `@/chart/MiniTradeChart` (mock that path in tests).
 
+## Motion (premium pass)
+
+| piece | effect |
+|---|---|
+| `TradeEditor` sections | `Section` is a `StaggerItem` → the six sections cascade in after the sheet body mounts (`stagger.sections`). |
+| validation | the footer `role="alert"` (always mounted, `id="trade-form-error"`, empty when fine) shakes; the field behind the message (`invalidFieldOf`) gets `aria-invalid` + `aria-describedby`, is focused, scrolled into view and then shaken + pulsed (`revealInvalid`). Cleared on edit. |
+| live strip | `MotionNumber flash` (win/loss tint per change). Checklist bar crossfades to win at 100 %, the `{x} von {n} erfüllt` label rolls (`TextRoll`). |
+| chips | emotion chips share one thumb (`layoutId="emotion-{useId}"`, `spring.segment`, `style.borderRadius` pill, label-only press); setup chips pop their dot into a check disc (`spring.pop`) and glide to their new order on an account switch (`layout="position"`, `layoutDependency={account}`). |
+| `LivePriceButton` | aria-hidden mini `RollingDigits source={priceMv}` next to the label while a live price exists (container query: only when label + digits fit). The name stays exactly the label; a click applies the freshest trade (`freshLivePrice`: `priceMv`, full precision) and falls back to the `livePrice` prop (re-read once a second, rounded) until a trade has arrived. |
+| celebration | a save that realises a win calls `celebrateFrom(button, { kind })` – `winCelebration(tradesBefore, record, before)`: `record` = new equity high, `streak` = R ≥ 2 or third win in a row, `win` otherwise; edits of an existing win stay quiet. |
+| `TradeDetail` | like `MorphDialog`: the fixed wrapper is the backdrop click target (the dim layer is decorative, never the target – it would be `inert`), the drop shadow sits on an unscaled sibling and fades in after the morph, and `useDialogBehaviour(…, { settled })` keeps `inert` / the focus return out of the morph and exit frames. The body is a stagger parent: fact tiles one by one (`stagger.cards`) → more facts → setups → checklist (bar fills, discs pop `spring.pop` · `stagger.rows`) → meta → notes → chart → actions. |
+| delete / destructive | `HoldConfirm` (`@/motion/HoldConfirm`, built on `HoldButton`'s `onRelease`): tap/click/quick key/AT → `onAsk` (the existing inline `Wirklich löschen? Ja, löschen / Nein` flow, unchanged names); a completed hold → `onConfirm` at once. `useConfirmFocus(confirming)` moves focus to `Nein` and back. Used by TradeEditor, TradeDetail (delete after the drawn check), SetupEditor, ImportDialog (`Ersetzen`), Settings `Wiederherstellen`. |
+| `SetupEditor` | fields cascade (`StaggerItem`), checklist rows enter/leave and lift while dragged (scale 1.02 + pre-rendered shadow layer), colour ring glides (`layoutId="sf-color-{useId}"`), a missing name shakes into view. |
+| `ImportDialog` | blocks cascade, preview counts up (`countOnReveal`), progress bar (`role="progressbar"`) glides on `spring.bar` with a shimmer band inside the fill and turns win at 100 %. |
+| `HyblockForm` | blocks cascade with the MorphDialog body; a refused value shakes its field into view. |
+
+Helpers: `winCelebration` (`celebration.ts`), `BIG_WIN_R`, `STREAK_WINS`, `invalidFieldOf`. Shared with the views (moved out of this
+folder): `revealInvalid(idOrEl, { reduced })` → `@/primitives/fieldFx` (focus without jump → smooth scroll if needed → shake once
+visible); `HoldConfirm`, `useConfirmFocus`, `HOLD_CONFIRM_TITLE` → `@/motion/HoldConfirm`.
+
 ## What the integrator wires
 
 | prop | source | notes |
 |---|---|---|
-| `TradeEditor.livePrice` | market store last price (`price` of the market card, health `live`/`stale`) | pass `null` when unavailable → button not rendered |
+| `TradeEditor.livePrice` | `EditorHost`: the rounded last price, read once a second on `nowMv` only while the editor is open | pass `null` when unavailable → button not rendered; a click applies `priceMv` first (full precision) |
 | `TradeEditor.livePriceLabel` | `"Live-Preis (Bybit) übernehmen"` on the Bybit fallback | |
 | `TradeDetail.candles` | `provider.history("kline_1h", …)` / cache slice ±3 days around `tradeTime(trade)` | stable array identity per load |
 | `uiStore.toasts` | `ToastIsland` | see toast note above |

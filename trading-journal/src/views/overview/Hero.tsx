@@ -1,15 +1,20 @@
-import { useMemo, useState } from "react";
+import { animate } from "motion/react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { explain, HERO_TILES, heroSubline, heroTileValue, type ExplainKey } from "@/domain/explain";
+import type { AccountView } from "@/domain/account";
 import { cn } from "@/lib/cn";
 import { colorClass, n0, pct } from "@/lib/format";
 import { MorphCard } from "@/motion/MorphCard";
 import { MotionNumber, useAnimatedNumber } from "@/motion/MotionNumber";
-import { radius } from "@/motion/tokens";
+import { TextRoll } from "@/motion/TextRoll";
+import { radius, tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { HeroBackdrop } from "@/primitives/HeroBackdrop";
 import { Segmented } from "@/primitives/Segmented";
-import { StatTile } from "@/primitives/StatTile";
+import { Skeleton, SkeletonSwap } from "@/primitives/Skeleton";
+import { rollDirection, StatTile } from "@/primitives/StatTile";
 import { useAccountView, useJournal } from "@/store/journalStore";
 import { useUi, type AccFilter } from "@/store/uiStore";
 import { ExplanationView } from "./explainer";
@@ -21,12 +26,65 @@ const XL_TILES: readonly { key: ExplainKey; label: string }[] = [
   { key: "exp", label: "Erwartungswert" },
   { key: "streak", label: "Serie" },
 ];
+const TILES = [...HERO_TILES, ...XL_TILES];
+/** Peak opacity of the Netto-P&L glow when the figure changes. */
+const GLOW_PEAK = 0.55;
+
+/** Tile value as one string (rolls / counts as a unit); `trades` carries its open count as a separate suffix. */
+function tileText(key: ExplainKey, view: AccountView, cur: string): string {
+  const g = view.g;
+  if (key === "trades") return String(g.n);
+  if (key === "exp") return `${heroTileValue("exp", view)}${g.exp == null ? "" : ` ${cur}`}`;
+  if (key === "streak") return view.streak ? `${view.streak}× ${view.streakType === "win" ? "Gewinn" : view.streakType === "loss" ? "Verlust" : "Break-even"}` : "–";
+  return heroTileValue(key, view);
+}
+
+/**
+ * Value-change glow behind the Netto-P&L: a pre-rendered blurred wash (green when the figure rose, red when it fell)
+ * whose opacity decays on `tween.flash`. Only for changes within the same account after loading – switching the
+ * account is not a gain or a loss. Off under reduced motion.
+ */
+function NetGlow({ net, acc, loaded }: { net: number; acc: AccFilter; loaded: boolean }) {
+  const reduced = useReducedFx();
+  const up = useRef<HTMLSpanElement>(null);
+  const down = useRef<HTMLSpanElement>(null);
+  const last = useRef<{ acc: AccFilter; net: number } | null>(null);
+  useEffect(() => {
+    const prev = last.current;
+    last.current = loaded ? { acc, net } : null;
+    if (!prev || reduced || prev.acc !== acc || prev.net === net) return;
+    const rising = net > prev.net;
+    const on = rising ? up.current : down.current;
+    const off = rising ? down.current : up.current;
+    if (off) animate(off, { opacity: 0 }, { duration: 0 });
+    if (on) animate(on, { opacity: [GLOW_PEAK, 0] }, tween.flash);
+  }, [net, acc, loaded, reduced]);
+  return (
+    <>
+      <span ref={up} aria-hidden="true" className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 rounded-full bg-win/30 opacity-0 blur-3xl" />
+      <span ref={down} aria-hidden="true" className="pointer-events-none absolute -inset-x-10 -inset-y-8 -z-10 rounded-full bg-loss/30 opacity-0 blur-3xl" />
+    </>
+  );
+}
+
+/** Return badge (`+12,3 %`): the figure rolls in the direction of the change, the tone follows the sign. */
+const ReturnBadge = memo(function ReturnBadge({ ret }: { ret: number }) {
+  const text = pct(ret);
+  const [state, setState] = useState({ text, dir: "up" as "up" | "down" });
+  if (state.text !== text) setState({ text, dir: rollDirection(state.text, text) });
+  return (
+    <Badge tone={ret >= 0 ? "win" : "loss"}>
+      <TextRoll text={text} mode="roll" direction={state.dir} />
+    </Badge>
+  );
+});
 
 /**
  * Hero (Bundle `yhe`, Plan 6.1): account Segmented → `uiStore.acc`, `Startkapital`, Netto-P&L `MotionNumber`
- * (shared MotionValue with the `Details +` fact dialog), subline, KPI tiles (`StatTile`, `morph-fact-{key}`) wrapping
- * into rows of 2 / 3 / 4 so every label and value stays readable,
- * right column `MarketPanel`.
+ * (shared MotionValue with the `Details +` fact dialog, tone crossfades with the sign, green/red glow on change,
+ * shimmering placeholder until the journal is loaded), return badge roll, subline, KPI tiles (`StatTile`,
+ * `morph-fact-{key}`, count-up on reveal, roll on change) wrapping into rows of 2 / 3 / 4 so every label and value
+ * stays readable, living dot-matrix backdrop, right column `MarketPanel`.
  */
 export function Hero() {
   const acc = useUi((s) => s.acc);
@@ -40,13 +98,31 @@ export function Hero() {
   const [active, setActive] = useState<number | null>(null);
   const net = useAnimatedNumber(loaded ? g.net : 0);
 
-  const tiles = useMemo(() => [...HERO_TILES, ...XL_TILES], []);
+  // stable per data change, so hovering re-renders only the two tiles whose `active` flips
+  const tiles = useMemo(
+    () =>
+      TILES.map((t, i) => {
+        const d = explain(t.key, view, settings);
+        return {
+          key: t.key,
+          label: t.label,
+          value: tileText(t.key, view, cur),
+          suffix: t.key === "trades" && view.open.length ? <span className="text-faint"> +{view.open.length} offen</span> : undefined,
+          verdict: d.verdict,
+          body: () => <ExplanationView bare d={d} />,
+          activate: () => setActive(i),
+        };
+      }),
+    [view, settings, cur],
+  );
 
   return (
     <section className="relative overflow-hidden rounded-[28px] border border-line" aria-labelledby="hero-net-label">
       <HeroBackdrop />
       <div className="relative grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.3fr_1fr] lg:gap-8 lg:p-8">
-        <div className="flex min-w-0 flex-col justify-between gap-7">
+        {/* top-anchored (no justify-between): later MarketPanel growth only adds space above the tiles (`mt-auto`), it
+            never moves the P&L headline */}
+        <div className="flex min-w-0 flex-col gap-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Segmented<AccFilter> aria-label="Konto" options={ACC_OPTIONS} value={acc} onChange={setAcc} />
             <span className="text-xs text-mute">
@@ -75,44 +151,33 @@ export function Hero() {
                 <span className="label !text-[9.5px] group-hover:!text-fg">Details +</span>
               </MorphCard>
             </div>
-            <div className={cn("dot-num flex flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none", colorClass(g.net))} data-testid="hero-net">
-              {loaded ? <MotionNumber source={net} decimals={2} signed aria-label={heroTileValue("net", view)} /> : <span className="text-faint">0,00</span>}
+            <div className="dot-num relative isolate flex flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none" data-testid="hero-net" data-celebrate-anchor="hero-net">
+              <NetGlow net={g.net} acc={acc} loaded={loaded} />
+              <SkeletonSwap ready={loaded} skeleton={<Skeleton className="h-[0.78em] w-[5.2ch] rounded-2xl" />}>
+                <MotionNumber source={net} decimals={2} signed tone="auto" aria-label={heroTileValue("net", view)} />
+              </SkeletonSwap>
               <span className="font-sans text-lg font-medium text-mute">{cur}</span>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-mute">
-              {ret != null && g.n > 0 && <Badge tone={ret >= 0 ? "win" : "loss"}>{pct(ret)}</Badge>}
+              {ret != null && g.n > 0 && <ReturnBadge ret={ret} />}
               <span>{heroSubline(view)}</span>
             </div>
           </div>
-          <dl className="flex flex-wrap gap-2 border-t border-white/10 pt-5" onMouseLeave={() => setActive(null)}>
-            {tiles.map((t, i) => {
-              const d = explain(t.key, view, settings);
-              const value =
-                t.key === "trades" ? (
-                  <>
-                    {g.n}
-                    {view.open.length ? <span className="text-faint"> +{view.open.length} offen</span> : null}
-                  </>
-                ) : t.key === "exp" ? (
-                  `${heroTileValue("exp", view)}${g.exp == null ? "" : ` ${cur}`}`
-                ) : t.key === "streak" ? (
-                  view.streak ? `${view.streak}× ${view.streakType === "win" ? "Gewinn" : view.streakType === "loss" ? "Verlust" : "Break-even"}` : "–"
-                ) : (
-                  heroTileValue(t.key, view)
-                );
-              return (
-                <StatTile
-                  key={t.key}
-                  fact={t.key}
-                  label={t.label}
-                  value={value}
-                  verdict={d.verdict}
-                  active={active === i}
-                  onActivate={() => setActive(i)}
-                  body={() => <ExplanationView bare d={d} />}
-                />
-              );
-            })}
+          <dl className="mt-auto flex flex-wrap gap-2 border-t border-white/10 pt-5" onMouseLeave={() => setActive(null)}>
+            {tiles.map((t, i) => (
+              <StatTile
+                key={t.key}
+                fact={t.key}
+                label={t.label}
+                value={t.value}
+                suffix={t.suffix}
+                verdict={t.verdict}
+                active={active === i}
+                onActivate={t.activate}
+                body={t.body}
+                loading={!loaded}
+              />
+            ))}
           </dl>
         </div>
         <MarketPanel />

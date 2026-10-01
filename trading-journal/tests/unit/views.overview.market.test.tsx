@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Profiler } from "react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootFixtureJournal, installDomPolyfills, type FakeMarket } from "./views.overview.harness";
 
 const fake = vi.hoisted(() => ({ current: null as FakeMarket | null }));
@@ -17,6 +18,8 @@ vi.mock("@/app/overlays", () => ({
   HyblockForm: () => null,
 }));
 
+import { LONG_IN_REACH_LABEL } from "@/domain/trigger";
+import { askMv, bidMv, buyVolMv, flowImbalanceMv, markMv, priceMv, priceReceivedAtMv, sellVolMv, tradeCountMv, volAccumMv } from "@/market";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MarketPanel, TopTraderCard, WEEKLY_TITLE } from "@/views/overview";
@@ -45,9 +48,9 @@ describe("MarketPanel", () => {
     expect(screen.getByText("BTC/USDT · Binance")).toBeInTheDocument();
     // status: live pill (age < 2 s → "Live"), refresh via title
     const pill = screen.getByRole("button", { name: "Jetzt aktualisieren" });
-    expect(within(pill).getByRole("status").textContent).toContain("Live");
+    expect(pill.querySelector("[data-status-pill]")?.textContent).toContain("Live");
     // price 86.100 (RollingDigits) + 24h change
-    expect(screen.getByRole("text", { name: "86.100" })).toBeInTheDocument();
+    expect(screen.getByText("86.100")).toBeInTheDocument();
     expect(screen.getByText("+1,20 % 24h")).toBeInTheDocument();
     // scenario: close4h 86.200 > longTrigger 85.900 → long
     const box = screen.getByTestId("scenario-box");
@@ -79,6 +82,80 @@ describe("MarketPanel", () => {
       fireEvent.click(pill);
     });
     expect(fake.current!.refresh).toHaveBeenCalledTimes(5);
+  });
+});
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+describe("MarketPanel live leaves", () => {
+  beforeAll(() => installDomPolyfills());
+  beforeEach(async () => {
+    await bootFixtureJournal();
+    priceReceivedAtMv.jump(Date.now());
+  });
+  afterEach(() => {
+    priceMv.jump(86_100);
+    for (const mv of [bidMv, askMv, markMv, tradeCountMv, buyVolMv, sellVolMv, volAccumMv, flowImbalanceMv, priceReceivedAtMv]) mv.jump(0);
+  });
+
+  it("trade, book, mark and order-flow ticks update the numbers without a single React render", async () => {
+    let commits = 0;
+    wrap(
+      <Profiler id="panel" onRender={() => commits++}>
+        <MarketPanel />
+      </Profiler>,
+    );
+    await act(() => sleep(50));
+    const mounted = commits;
+    await act(async () => {
+      for (let i = 1; i <= 30; i++) {
+        const p = 86_100 + i * 0.7;
+        priceMv.set(p);
+        bidMv.set(p - 0.1);
+        askMv.set(p);
+        markMv.set(86_112 + i);
+        tradeCountMv.set(i);
+        buyVolMv.set(i);
+        sellVolMv.set(i / 2);
+        volAccumMv.set(i * 1.5);
+        flowImbalanceMv.set(0.3);
+        priceReceivedAtMv.set(Date.now());
+        await sleep(4);
+      }
+    });
+    await waitFor(() => expect(screen.getByText("86.120,9 / 86.121,0")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Käufe 65 %")).toBeInTheDocument(), { timeout: 2000 });
+    await waitFor(() => expect(screen.getByText(/^Mark 86\.142 · Funding /)).toBeInTheDocument(), { timeout: 2000 });
+    expect(commits).toBe(mounted);
+  });
+
+  it("re-renders only when a trigger comes into reach, and pops the badge", async () => {
+    const m = useJournal.getState().settings.market;
+    let commits = 0;
+    wrap(
+      <Profiler id="panel" onRender={() => commits++}>
+        <MarketPanel />
+      </Profiler>,
+    );
+    await act(() => sleep(50));
+    expect(screen.queryByText(LONG_IN_REACH_LABEL)).not.toBeInTheDocument();
+    const before = commits;
+    await act(async () => {
+      priceMv.set(m.longTrigger * 0.999);
+      await sleep(20);
+    });
+    expect(screen.getByText(LONG_IN_REACH_LABEL)).toBeInTheDocument();
+    expect(commits).toBeGreaterThan(before);
+    const inReach = commits;
+    await act(async () => {
+      priceMv.set(m.longTrigger * 0.9995);
+      await sleep(20);
+    });
+    expect(commits).toBe(inReach);
+    await act(async () => {
+      priceMv.set(86_100);
+    });
+    await waitFor(() => expect(screen.queryByText(LONG_IN_REACH_LABEL)).not.toBeInTheDocument());
   });
 });
 

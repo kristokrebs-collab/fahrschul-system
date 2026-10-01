@@ -4,30 +4,26 @@
  * `Jetzt neu verbinden` restarts the provider (stop → start, new WebSocket) and `Cache leeren` empties the
  * IndexedDB cache of the current symbol.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { FEED_IDS, getProvider, startMarket, stopMarket, useHealth, type FeedId, type StatusLabel } from "@/market";
 import { useJournal } from "@/store/journalStore";
 import { SettingsView } from "@/views/settings";
 
 export function SettingsPage() {
   const health = useHealth();
-  // The `Stand` column and the `Zuletzt HH:mm` labels move with the clock, not with every datum: a 1-s tick
-  // instead of the market version counter (aggTrade would otherwise recompute 15 labels at 10 Hz).
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
 
+  // A label depends on the feed's health and on its data's `HH:mm` only (never on the clock), and every datum that
+  // moves `asOf` also moves the health snapshot (WS feeds ≥ 1 s apart) – so the labels follow `health` alone. The
+  // form itself is memoised in `SettingsView`, so these updates re-render the Live-Daten card, not the page.
   const statusLabels = useMemo(() => {
     const p = getProvider();
     const labels: Partial<Record<FeedId, StatusLabel>> = {};
     if (!p) return labels;
     for (const f of FEED_IDS) labels[f] = p.statusLabel(f);
     return labels;
-    // the label of a feed changes with the health snapshot and with the clock (`tick`)
+    // the provider is read fresh; the snapshot identity is the trigger
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [health, tick]);
+  }, [health]);
 
   const onRefresh = useCallback(async () => {
     const p = getProvider();

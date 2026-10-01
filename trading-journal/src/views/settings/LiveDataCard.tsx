@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { animate, motion } from "motion/react";
+import { useEffect, useRef } from "react";
 import type { FeedId, HealthState, ProviderHealth, Source, StatusLabel } from "@/market/types";
-import { cn } from "@/lib/cn";
 import { time } from "@/lib/format";
+import { canObserveInView, useFirstInView } from "@/motion/inView";
 import { StatusPill, type StatusTone } from "@/motion/StatusPill";
-import { Button } from "@/primitives/Button";
+import { Switch } from "@/motion/Switch";
+import { spring, stagger, tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
-import { CheckboxRow } from "@/primitives/CheckboxRow";
 import { Segmented } from "@/primitives/Segmented";
 import { useUi } from "@/store/uiStore";
+import { ActionButton, GlyphLink, GlyphRefresh, GlyphTrash } from "./fx";
 
 export const LIVE_STRINGS = {
   title: "Live-Daten",
@@ -80,26 +83,47 @@ export interface LiveDataCardProps {
 }
 
 /**
+ * One `Stand` cell: whenever the feed delivers (`lastDataAt` moves) a soft white wash flashes behind the time and
+ * decays on `tween.flash` – live feeds visibly tick about once a second. Opacity of a pre-rendered layer only;
+ * off under reduced motion.
+ */
+function StandCell({ at }: { at?: number }) {
+  const reduced = useReducedFx();
+  const wash = useRef<HTMLSpanElement>(null);
+  const last = useRef(at);
+  useEffect(() => {
+    if (last.current === at) return;
+    last.current = at;
+    if (reduced || at === undefined || !wash.current) return;
+    const controls = animate(wash.current, { opacity: [1, 0] }, tween.flash);
+    return () => controls.stop();
+  }, [at, reduced]);
+  return (
+    <span className="relative inline-block">
+      <span ref={wash} aria-hidden="true" className="pointer-events-none absolute -inset-x-1.5 -inset-y-0.5 rounded-md bg-white/[0.1] opacity-0" />
+      <span className="relative">{at ? time(new Date(at)) : "–"}</span>
+    </span>
+  );
+}
+
+/**
  * NEW `Live-Daten` card (Plan 6.4): feed table `Feed | Quelle | Stand | Status` from the health
  * snapshot, `Jetzt aktualisieren` / `Jetzt neu verbinden` / `Cache leeren`, and the `tj2-ui`
  * preferences `topTraderBase` (never `settings.hyblock.longEndpoint`, Plan 4.8), `sparkline`, `useProxy`.
+ *
+ * Motion: the feed rows cascade in the first time the table is on screen (`stagger.rows`), every `Stand` cell
+ * flashes when its feed delivers, the actions turn their icon into a spinner (refresh: the arrow itself spins)
+ * and then a drawn ✓, and the proxy preference is an elastic `Switch`.
  */
 export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onClearCache, className }: LiveDataCardProps) {
   const topTraderBase = useUi((s) => s.topTraderBase);
   const sparkline = useUi((s) => s.sparkline);
   const useProxy = useUi((s) => s.useProxy);
   const setPref = useUi((s) => s.setPref);
-  const [refreshing, setRefreshing] = useState(false);
-
-  async function run(fn?: () => void | Promise<void>) {
-    if (!fn) return;
-    setRefreshing(true);
-    try {
-      await fn();
-    } finally {
-      setRefreshing(false);
-    }
-  }
+  const reduced = useReducedFx();
+  const reveal = !reduced && canObserveInView();
+  const tableRef = useRef<HTMLDivElement>(null);
+  const seen = useFirstInView(tableRef, reveal);
 
   const feeds = health ? (Object.values(health.feeds) as ProviderHealth["feeds"][FeedId][]) : [];
 
@@ -115,7 +139,7 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
             <span>{health.online ? LIVE_STRINGS.online : LIVE_STRINGS.offline}</span>
             <span className="font-mono text-[11.5px] text-faint">{LIVE_STRINGS.reconnects(health.ws.attempt)}</span>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-line">
+          <div ref={tableRef} className="overflow-x-auto rounded-xl border border-line">
             <table className="w-full text-left text-[12.5px]">
               <thead>
                 <tr className="border-b border-line">
@@ -127,17 +151,26 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
                 </tr>
               </thead>
               <tbody>
-                {feeds.map((f) => {
+                {feeds.map((f, i) => {
                   const label = statusLabels?.[f.feed];
+                  const delay = Math.min(i, stagger.max) * stagger.rows;
                   return (
-                    <tr key={f.feed} className="border-b border-line/60 last:border-b-0">
+                    <motion.tr
+                      key={f.feed}
+                      className="border-b border-line/60 last:border-b-0"
+                      initial={reveal ? { opacity: 0, y: 4 } : false}
+                      animate={seen ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
+                      transition={{ default: { ...tween.reveal, delay }, y: { ...spring.enter, delay } }}
+                    >
                       <td className="px-3 py-1.5 text-fg/90">{FEED_LABELS[f.feed]}</td>
                       <td className="px-3 py-1.5 text-mute">{SOURCE_LABELS[f.source]}</td>
-                      <td className="num px-3 py-1.5 font-mono text-mute">{f.lastDataAt ? time(new Date(f.lastDataAt)) : "–"}</td>
+                      <td className="num px-3 py-1.5 font-mono text-mute">
+                        <StandCell at={f.lastDataAt} />
+                      </td>
                       <td className="px-3 py-1.5" title={label?.detail ?? f.detail}>
                         <StatusPill tone={label?.tone ?? toneOfState(f.state)} label={label?.text ?? STATE_LABELS[f.state]} expanded />
                       </td>
-                    </tr>
+                    </motion.tr>
                   );
                 })}
               </tbody>
@@ -149,15 +182,15 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => run(onRefresh)} disabled={!onRefresh || refreshing} aria-busy={refreshing || undefined}>
+        <ActionButton size="sm" icon={<GlyphRefresh />} spinIcon onRun={onRefresh}>
           {LIVE_STRINGS.refresh}
-        </Button>
-        <Button size="sm" onClick={() => run(onReconnect)} disabled={!onReconnect}>
+        </ActionButton>
+        <ActionButton size="sm" icon={<GlyphLink />} onRun={onReconnect}>
           {LIVE_STRINGS.reconnect}
-        </Button>
-        <Button size="sm" onClick={() => run(onClearCache)} disabled={!onClearCache}>
+        </ActionButton>
+        <ActionButton size="sm" icon={<GlyphTrash />} onRun={onClearCache}>
           {LIVE_STRINGS.clearCache}
-        </Button>
+        </ActionButton>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -194,10 +227,16 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
       </div>
 
       {health?.proxy.usable === true && (
-        <div className={cn("mt-3")}>
-          <CheckboxRow checked={useProxy} onToggle={() => setPref("useProxy", !useProxy)} sub={LIVE_STRINGS.proxyHelp}>
-            {LIVE_STRINGS.proxy}
-          </CheckboxRow>
+        <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5">
+          <span className="grid gap-0.5">
+            <label htmlFor="live-proxy" className="cursor-pointer text-[13px] text-fg">
+              {LIVE_STRINGS.proxy}
+            </label>
+            <span id="live-proxy-help" className="text-[11px] text-faint">
+              {LIVE_STRINGS.proxyHelp}
+            </span>
+          </span>
+          <Switch id="live-proxy" checked={useProxy} onCheckedChange={(on) => setPref("useProxy", on)} aria-describedby="live-proxy-help" />
         </div>
       )}
 

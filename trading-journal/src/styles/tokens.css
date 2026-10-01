@@ -43,6 +43,12 @@
       transform: rotate(360deg);
     }
   }
+
+  /* fx kit utilities (keyframes below, outside @theme so plain classes can use them too).
+     Durations mirror src/motion/tokens.ts: tween.ping 1.6 s, tween.skeleton 1.6 s, tween.beam 9 s. */
+  --animate-fx-ping: fx-ping 1.6s ease-out infinite;
+  --animate-fx-shimmer: fx-shimmer-x 1.6s linear infinite;
+  --animate-fx-spin: fx-spin 9s linear infinite;
 }
 
 /* Local fallback face for Doto so the dot-matrix numerals keep their box while the webfont loads (no CLS). */
@@ -75,6 +81,10 @@
   --color-hero-d: #0d0d0d;
   --shadow-btn-sheen: inset 0 1px 0 rgb(255 255 255 / 0.6);
   --ring-focus-input: 0 0 0 3px rgb(255 255 255 / 0.07);
+  /* pre-rendered focus/invalid rings (Input), faded by opacity instead of transitioning box-shadow */
+  --ring-glow-input: 0 0 0 3px rgb(255 255 255 / 0.07), 0 0 24px rgb(255 255 255 / 0.05);
+  --ring-glow-invalid: 0 0 0 3px rgb(255 77 79 / 0.16), 0 0 22px rgb(255 77 79 / 0.12);
+  --ring-pulse-invalid: 0 0 0 3px rgb(255 77 79 / 0.24), 0 0 26px rgb(255 77 79 / 0.2);
 
   --palette-1: #6f9dc9;
   --palette-2: #46a6a0;
@@ -145,4 +155,231 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
+}
+
+/* ---------------------------------------------------------------------------------------------------
+ * fx kit – compositor-only effect building blocks shared by primitives and views.
+ * Every keyframe animates transform/opacity only (the strike draw wipes by clip-path): marching ants and the text
+ * shimmer move a PRE-RENDERED layer by transform, rings are pre-rendered and only scale/fade, so nothing repaints
+ * per frame.
+ * Reduced motion: base.css collapses every animation to one ~0 ms iteration, so each class's resting
+ * style is its static fallback (ping rings invisible, sweeps parked off-screen, ants still).
+ * ------------------------------------------------------------------------------------------------- */
+
+@keyframes fx-ping {
+  0% {
+    transform: scale(1);
+    opacity: var(--fx-ping-opacity, 0.6);
+  }
+  100% {
+    transform: scale(var(--fx-ping-scale, 2.4));
+    opacity: 0;
+  }
+}
+
+@keyframes fx-shimmer-x {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes fx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fx-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes fx-ants {
+  to {
+    transform: translateX(var(--fx-ants-shift));
+  }
+}
+
+@keyframes fx-band {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes fx-band-counter {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes fx-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--fx-pop-x, 0), var(--fx-pop-y, 0)) scale(0.96);
+  }
+}
+
+@keyframes fx-pop-out {
+  to {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* Ring mask: only the padding band of the element stays visible (ring width = padding). Children moved by
+   transform underneath it (spotlight blob, rotating conic arc/beam) light up the border without repainting it. */
+@utility fx-ring {
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+}
+
+@layer components {
+  /* Expanding ring behind a status dot: <span class="relative size-1.5 rounded-full bg-win"><span class="fx-ping bg-win" /></span>.
+     --fx-ping-scale (2.4) · --fx-ping-opacity (.6) · stagger a second ring with [animation-delay:.8s].
+     Finite (3 pings = tween.pingFew, each time it mounts), so an idle page goes fully at rest (perf review perf-05). */
+  .fx-ping {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    animation: fx-ping 1.6s ease-out 3;
+  }
+
+  /* Remaining-time bar (toast island): linear scaleX 1 → 0 over --fx-countdown (the toast's duration in ms), paused
+     under any [data-held] ancestor. */
+  .fx-countdown {
+    transform-origin: left center;
+    animation: fx-countdown var(--fx-countdown, 2800ms) linear forwards;
+  }
+  [data-held] .fx-countdown {
+    animation-play-state: paused;
+  }
+
+  /* Marching ants border: put it inside a `relative rounded-*` box. --fx-ants-color · --fx-ants-dash (6px, dash = gap)
+     · --fx-ants-width (1px) · --fx-ants-speed (.9s per period). A diagonal stripe sheet slides by exactly one
+     period under the ring mask, so the dashes march without any repaint. */
+  .fx-ants {
+    --fx-ants-color: rgb(255 255 255 / 0.22);
+    --fx-ants-dash: 6px;
+    --fx-ants-width: 1px;
+    --fx-ants-speed: 0.9s;
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    /* the oversized stripe sheet (::before, inset −6 dashes) is hidden by the mask but would still count as
+       scrollable overflow: on a full-width box it widened the page (and the mobile layout viewport) by 36 px */
+    overflow: clip;
+    padding: var(--fx-ants-width);
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+  }
+  .fx-ants::before {
+    --fx-ants-shift: calc(2 * var(--fx-ants-dash) * 1.41421356);
+    content: "";
+    position: absolute;
+    inset: calc(-6 * var(--fx-ants-dash));
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--fx-ants-color) 0 var(--fx-ants-dash),
+      transparent var(--fx-ants-dash) calc(2 * var(--fx-ants-dash))
+    );
+    animation: fx-ants var(--fx-ants-speed) linear infinite;
+  }
+
+  /* Compositor-only text shimmer (static label, a bright copy revealed through a moving masked band; the copy is
+     counter-translated so it never moves relative to the base text):
+       <span class="fx-shimmer-text">Verbinde …<span class="fx-shimmer-text__band" aria-hidden="true">
+         <span class="fx-shimmer-text__copy">Verbinde …</span></span></span>
+     --fx-shimmer-duration (2s = tween.shimmerText) · --fx-shimmer-base (mute) · --fx-shimmer-band (fg). */
+  .fx-shimmer-text {
+    position: relative;
+    display: inline-block;
+    color: var(--fx-shimmer-base, var(--color-mute));
+  }
+  .fx-shimmer-text__band {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    transform: translateX(-100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 30%, #000 50%, transparent 70%);
+    mask-image: linear-gradient(90deg, transparent 30%, #000 50%, transparent 70%);
+    animation: fx-band var(--fx-shimmer-duration, 2s) linear infinite;
+  }
+  .fx-shimmer-text__copy {
+    display: block;
+    white-space: inherit;
+    color: var(--fx-shimmer-band, var(--color-fg));
+    transform: translateX(100%);
+    animation: fx-band-counter var(--fx-shimmer-duration, 2s) linear infinite;
+  }
+
+  /* Strike-through draw for plain-text labels (CheckboxRow `strike`): <span class="fx-strike" data-strike="Text"
+     data-struck="true|false">Text</span>. A transparent copy carrying only the line-through (so it follows every
+     wrapped line) is revealed left → right by clip-path (0.32 s ease.out = tween.collapse); `/ ""` keeps the copy out
+     of the accessible name. --fx-strike-color. */
+  .fx-strike {
+    position: relative;
+  }
+  .fx-strike::after {
+    content: attr(data-strike) / "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    color: transparent;
+    text-decoration-line: line-through;
+    text-decoration-thickness: 1px;
+    text-decoration-color: var(--fx-strike-color, rgb(242 242 242 / 0.75));
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .fx-strike[data-struck="true"]::after {
+    clip-path: inset(0 0 0 0);
+  }
+
+  /* Radix popper entrance/exit (Tooltip): opacity + a 4 px nudge away from the trigger + scale .96 → 1 in 0.2 s ease.out
+     (tween.tooltipIn), out in 0.12 s linear (tween.exit). Radix presence waits for the exit animation. */
+  .fx-pop[data-state="delayed-open"],
+  .fx-pop[data-state="instant-open"] {
+    animation: fx-pop-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .fx-pop[data-state="closed"] {
+    animation: fx-pop-out 0.12s linear forwards;
+  }
+  .fx-pop[data-side="top"] {
+    --fx-pop-y: 4px;
+  }
+  .fx-pop[data-side="bottom"] {
+    --fx-pop-y: -4px;
+  }
+  .fx-pop[data-side="left"] {
+    --fx-pop-x: 4px;
+  }
+  .fx-pop[data-side="right"] {
+    --fx-pop-x: -4px;
+  }
 }

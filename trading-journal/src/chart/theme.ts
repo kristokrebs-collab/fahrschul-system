@@ -6,7 +6,6 @@
 import {
   ColorType,
   CrosshairMode,
-  LastPriceAnimationMode,
   LineStyle,
   TickMarkType,
   type CandlestickSeriesPartialOptions,
@@ -25,6 +24,11 @@ export const CHART_FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo,
 export const CHART_FONT_LOAD = '11px "IBM Plex Mono"';
 
 export { ink };
+
+/** Empty bar slots right of the last candle (the live edge); `follow()` restores it. */
+export const CHART_RIGHT_OFFSET = 8;
+/** Price grid of the candle series (axis label precision 1). */
+export const CHART_PRICE_MIN_MOVE = 0.1;
 
 /** Background decision 7: start transparent (body dot grid shows through). */
 export const CHART_BACKGROUND_TRANSPARENT = "transparent";
@@ -114,7 +118,7 @@ export function makeNothingTheme(background: string = CHART_BACKGROUND_TRANSPARE
       borderVisible: false,
       timeVisible: true,
       secondsVisible: false,
-      rightOffset: 8,
+      rightOffset: CHART_RIGHT_OFFSET,
       barSpacing: 9,
       minBarSpacing: 3,
       lockVisibleTimeRangeOnResize: true,
@@ -145,7 +149,7 @@ export const NOTHING_CANDLES: CandlestickSeriesPartialOptions = {
   priceLineColor: ink.signal,
   priceLineStyle: LineStyle.Dotted,
   lastValueVisible: true,
-  priceFormat: { type: "price", precision: 1, minMove: 0.1 },
+  priceFormat: { type: "price", precision: 1, minMove: CHART_PRICE_MIN_MOVE },
 };
 
 export const NOTHING_VOLUME: HistogramSeriesPartialOptions = {
@@ -157,16 +161,6 @@ export const NOTHING_VOLUME: HistogramSeriesPartialOptions = {
 };
 /** Overlay scale margins for the volume histogram (bottom 18 % of pane 0). */
 export const VOLUME_SCALE_MARGINS = { top: 0.82, bottom: 0 } as const;
-
-/** Hidden line holding only the last close → native pulsing last-price dot. */
-export const NOTHING_PULSE: LineSeriesPartialOptions = {
-  color: ink.fg,
-  lineVisible: false,
-  lastValueVisible: false,
-  priceLineVisible: false,
-  crosshairMarkerVisible: false,
-  lastPriceAnimation: LastPriceAnimationMode.Continuous,
-};
 
 export const NOTHING_RATIO_LINE: LineSeriesPartialOptions = {
   color: ink.fg,

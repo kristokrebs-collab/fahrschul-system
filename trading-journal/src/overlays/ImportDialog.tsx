@@ -3,11 +3,14 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { fmt } from "@/lib/format";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { Sheet } from "@/motion/Sheet";
+import { StaggerItem } from "@/motion/Stagger";
+import { TextRoll } from "@/motion/TextRoll";
 import { spring, tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
 import { importBackup, parseBackup, previewText, type ImportMode, type ImportPreview, type ImportResult } from "@/store/backup";
-import { Progress } from "@/ui/progress";
+import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
 
 export const IMPORT_STRINGS = {
   title: "Backup importieren",
@@ -55,6 +58,10 @@ export interface ImportDialogProps {
  * (`{n} Trades, {m} Grundlagen, {k} Ablesungen · exportiert am {date}`, counts as `MotionNumber`) →
  * mode `Zusammenführen | Ersetzen` → inline `Alles ersetzen? Ja / Nein` → `importBackup` with a
  * progress bar. Toasts (`Backup importiert` / `Import fehlgeschlagen`) come from the store.
+ *
+ * Motion: the body blocks cascade in (`StaggerItem`), the preview counts up from 0, the progress bar glides on
+ * `spring.bar` with a shimmer band while busy and turns win-green at 100 %, and `Importieren` in `Ersetzen` mode is
+ * a `HoldConfirm` (a click still asks `Alles ersetzen?`, holding it imports right away).
  */
 export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogProps) {
   const [fileName, setFileName] = useState("");
@@ -63,6 +70,8 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
   const [confirm, setConfirm] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const reduced = useReducedFx();
+  const { trigger: runTrigger, no: confirmNo } = useConfirmFocus(confirm);
 
   // Reset on open (render-phase state adjustment instead of an effect).
   const [wasOpen, setWasOpen] = useState(open);
@@ -129,33 +138,49 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
             {IMPORT_STRINGS.cancel}
           </Button>
           {mode === "replace" && confirm ? (
-            <span className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]" role="alert">
+            <motion.span
+              className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
+              role="alert"
+              initial={reduced ? false : { opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ default: tween.fade, scale: spring.pop }}
+            >
               {IMPORT_STRINGS.confirm}
               <Button size="sm" variant="danger" onClick={run} disabled={!canRun}>
                 {IMPORT_STRINGS.yes}
               </Button>
-              <Button size="sm" onClick={() => setConfirm(false)}>
+              <Button ref={confirmNo} size="sm" onClick={() => setConfirm(false)}>
                 {IMPORT_STRINGS.no}
               </Button>
-            </span>
-          ) : (
-            <Button variant="primary" disabled={!canRun} onClick={() => (mode === "replace" ? setConfirm(true) : run())} aria-busy={busy || undefined}>
+            </motion.span>
+          ) : mode === "replace" ? (
+            <HoldConfirm ref={runTrigger} variant="primary" disabled={!canRun} onAsk={() => setConfirm(true)} onConfirm={() => void run()} aria-busy={busy || undefined}>
               {busy ? IMPORT_STRINGS.running : IMPORT_STRINGS.run}
+            </HoldConfirm>
+          ) : (
+            <Button variant="primary" disabled={!canRun} onClick={() => void run()} aria-busy={busy || undefined}>
+              <TextRoll mode="roll" text={busy ? IMPORT_STRINGS.running : IMPORT_STRINGS.run} />
             </Button>
           )}
         </>
       }
     >
       <div className="grid gap-4">
-        <p className="text-[13px] text-mute">{IMPORT_STRINGS.intro}</p>
+        <StaggerItem>
+          <p className="text-[13px] text-mute">{IMPORT_STRINGS.intro}</p>
+        </StaggerItem>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <StaggerItem className="flex flex-wrap items-center gap-3">
           <input ref={inputRef} type="file" accept=".json,application/json" aria-label={IMPORT_STRINGS.file} onChange={onFile} className="sr-only" />
           <Button onClick={() => inputRef.current?.click()} disabled={busy}>
             {IMPORT_STRINGS.choose}
           </Button>
-          {fileName && <span className="truncate font-mono text-[12px] text-mute">{IMPORT_STRINGS.chosen(fileName)}</span>}
-        </div>
+          {fileName && (
+            <motion.span key={fileName} className="truncate font-mono text-[12px] text-mute" initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade}>
+              {IMPORT_STRINGS.chosen(fileName)}
+            </motion.span>
+          )}
+        </StaggerItem>
 
         <AnimatePresence mode="popLayout" initial={false}>
           {parsed?.ok && (
@@ -181,7 +206,7 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
                   <div key={label}>
                     <dt className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-faint">{label}</dt>
                     <dd className="num font-mono text-[17px] font-medium">
-                      <MotionNumber value={n} decimals={0} />
+                      <MotionNumber value={n} decimals={0} countOnReveal />
                     </dd>
                   </div>
                 ))}
@@ -209,7 +234,7 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
           )}
         </AnimatePresence>
 
-        <div className="grid gap-1.5">
+        <StaggerItem className="grid gap-1.5">
           <span id="import-mode-label" className="label">
             {IMPORT_STRINGS.mode}
           </span>
@@ -222,15 +247,53 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
             }}
             options={IMPORT_MODES}
           />
-          <span className="text-[11px] text-faint">{mode === "merge" ? IMPORT_STRINGS.mergeHelp : IMPORT_STRINGS.replaceHelp}</span>
-        </div>
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.span
+              key={mode}
+              className="text-[11px] text-faint"
+              initial={reduced ? false : { opacity: 0, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: tween.exit }}
+              transition={tween.fade}
+            >
+              {mode === "merge" ? IMPORT_STRINGS.mergeHelp : IMPORT_STRINGS.replaceHelp}
+            </motion.span>
+          </AnimatePresence>
+        </StaggerItem>
 
-        {progress != null && (
-          <div className="grid gap-1.5" aria-live="polite">
-            <Progress value={progress} className="h-1.5 bg-white/[0.06] [&>[data-slot=progress-indicator]]:bg-fg" aria-label={IMPORT_STRINGS.running} />
-          </div>
-        )}
+        {progress != null && <ImportProgress value={progress} />}
       </div>
     </Sheet>
+  );
+}
+
+/**
+ * Import progress (`role="progressbar"`): the fill glides to each new value on `spring.bar` (transform only), a
+ * pre-rendered shimmer band sweeps across the filled part while the import runs (it lives inside the fill, so it
+ * never runs ahead of the progress), and the fill crossfades to win-green when complete.
+ * Reduced motion: the fill jumps, no band.
+ */
+function ImportProgress({ value }: { value: number }) {
+  const reduced = useReducedFx();
+  const done = value >= 100;
+  return (
+    <div
+      role="progressbar"
+      aria-label={IMPORT_STRINGS.running}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(value)}
+      className="relative h-1.5 overflow-hidden rounded-full bg-white/[0.06]"
+    >
+      <motion.div
+        className="absolute inset-0 origin-left rounded-full bg-fg"
+        initial={reduced ? false : { scaleX: 0 }}
+        animate={{ scaleX: value / 100 }}
+        transition={reduced ? { duration: 0 } : spring.bar}
+      >
+        {!reduced && !done && <span aria-hidden="true" className="pointer-events-none absolute inset-0 animate-fx-shimmer bg-gradient-to-r from-transparent via-ink-950/35 to-transparent" />}
+        <motion.span className="absolute inset-0 rounded-full bg-win" initial={false} animate={{ opacity: done ? 1 : 0 }} transition={reduced ? { duration: 0 } : tween.crossfade} />
+      </motion.div>
+    </div>
   );
 }

@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { radius, spring } from "@/motion/tokens";
-import { usePressable } from "@/motion/usePressable";
+import { radius, spring, tween } from "@/motion/tokens";
+import { useCanHover } from "@/motion/useMediaQuery";
+import { useReducedFx } from "@/motion/useReducedFx";
 
 export interface SegmentedOption<T extends string> {
   v: T;
@@ -22,14 +23,23 @@ export interface SegmentedProps<T extends string> {
   "aria-labelledby"?: string;
 }
 
+/** The label (not the item, so the shared thumb is never measured mid-press) dips to .97 while pressed. */
+const LABEL_PRESS = { pressed: { scale: 0.97 } };
+
 /**
- * Bundle `or`/`YG`: `role="radiogroup"` with a shared-layout thumb (`layoutId="bg-{useId}"`,
- * `spring.segment`), roving tabindex + arrow/Home/End keys, `whileTap {scale:.97}` on items.
+ * Bundle `or`/`YG`: `role="radiogroup"` with a shared-layout thumb (`layoutId="bg-{useId}"`, `spring.segment`),
+ * roving tabindex + arrow/Home/End keys. NEW (21st.dev "Segmented Tabs with hover ghost"): a faint ghost
+ * (`layoutId="seg-hover-{useId}"`, `spring.hover`, opacity `tween.hoverPill`) glides under the hovered segment and
+ * fades out when the pointer leaves the control; the pressed label scales to .97 (`spring.press`).
+ * Hover devices only; no ghost under reduced motion. z-order: ghost < thumb < label.
  */
 export function Segmented<T extends string>({ options, value, onChange, size = "md", tones, className, ...aria }: SegmentedProps<T>) {
   const id = useId();
   const refs = useRef<Map<T, HTMLButtonElement>>(new Map());
-  const press = usePressable({ scale: 0.97 });
+  const reduced = useReducedFx();
+  const canHover = useCanHover();
+  const [hovered, setHovered] = useState<T | null>(null);
+  const ghost = canHover && !reduced;
 
   const enabled = options.filter((o) => !o.disabled);
   const move = (from: T | null | undefined, step: number) => {
@@ -74,9 +84,12 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
   };
 
   const hasValue = options.some((o) => o.v === value);
+  const hoverIn = (v: T, disabled?: boolean) => (e: PointerEvent<HTMLButtonElement>) => {
+    if (ghost && e.pointerType === "mouse" && !disabled) setHovered(v);
+  };
 
   return (
-    <div role="radiogroup" onKeyDown={onKeyDown} className={cn("inline-flex flex-wrap gap-0.5 rounded-xl border border-line bg-ink-950/60 p-1", className)} {...aria}>
+    <div role="radiogroup" onKeyDown={onKeyDown} onPointerLeave={() => setHovered(null)} className={cn("inline-flex flex-wrap gap-0.5 rounded-xl border border-line bg-ink-950/60 p-1", className)} {...aria}>
       {options.map((o, i) => {
         const checked = o.v === value;
         return (
@@ -93,7 +106,8 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
             tabIndex={checked || (!hasValue && i === 0) ? 0 : -1}
             disabled={o.disabled}
             onClick={() => onChange(o.v)}
-            {...press}
+            onPointerEnter={hoverIn(o.v, o.disabled)}
+            whileTap={o.disabled ? undefined : "pressed"}
             className={cn(
               "relative inline-flex rounded-lg font-medium text-mute transition-colors hover:text-fg data-[checked=true]:text-fg disabled:opacity-40",
               size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-1.5 text-[13px]",
@@ -103,8 +117,9 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
               {checked && (
                 <motion.span
                   layoutId={`bg-${id}`}
+                  layoutDependency={value}
                   aria-hidden="true"
-                  className={cn("absolute inset-0 rounded-lg border border-line-2 bg-ink-750", tones?.[o.v])}
+                  className={cn("absolute inset-0 rounded-lg border border-line-2 bg-ink-750 z-[1]", tones?.[o.v])}
                   style={{ borderRadius: radius.thumb }}
                   transition={spring.segment}
                   initial={{ opacity: 0 }}
@@ -113,7 +128,24 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
                 />
               )}
             </AnimatePresence>
-            <span className="relative z-10 inline-flex items-center gap-1.5">{o.label}</span>
+            <AnimatePresence>
+              {ghost && hovered === o.v && (
+                <motion.span
+                  layoutId={`seg-hover-${id}`}
+                  layoutDependency={hovered}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 z-0 rounded-lg bg-white/[0.06]"
+                  style={{ borderRadius: radius.thumb }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1, transition: tween.hoverPill }}
+                  exit={{ opacity: 0, transition: tween.hoverPill }}
+                  transition={spring.hover}
+                />
+              )}
+            </AnimatePresence>
+            <motion.span variants={LABEL_PRESS} transition={spring.press} className="relative z-10 inline-flex items-center gap-1.5">
+              {o.label}
+            </motion.span>
           </motion.button>
         );
       })}

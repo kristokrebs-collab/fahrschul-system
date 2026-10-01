@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildHash, installRouter, navigate, parseHash, Q_DEBOUNCE_MS } from "@/store/router";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildHash, detachShell, getScroll, installRouter, navigate, parseHash, Q_DEBOUNCE_MS, showPage } from "@/store/router";
 import { DEFAULT_TRADE_FILTER, useUi } from "@/store/uiStore";
 import { useJournal } from "@/store/journalStore";
 
@@ -112,5 +112,58 @@ describe("navigate / installRouter", () => {
     window.dispatchEvent(new HashChangeEvent("hashchange"));
     expect(useUi.getState().page).toBe("setups");
     uninstall();
+  });
+});
+
+describe("scroll handoff to the shell", () => {
+  const setScrollY = (y: number) => Object.defineProperty(window, "scrollY", { value: y, configurable: true });
+  let scrollTo: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    history.replaceState(null, "", "#overview");
+    useUi.setState({ page: "overview", tradeFilter: y0 });
+    setScrollY(0);
+    scrollTo = vi.spyOn(window, "scrollTo").mockImplementation((opts?: ScrollToOptions | number) => {
+      if (typeof opts === "object" && typeof opts.top === "number") setScrollY(opts.top);
+    });
+  });
+  afterEach(() => {
+    detachShell();
+    scrollTo.mockRestore();
+    setScrollY(0);
+  });
+
+  it("parks the restore until the shell shows the page, then returns the distance scrolled", () => {
+    showPage("overview");
+    setScrollY(500);
+    navigate("trades", { setup: "s_bo" });
+    expect(useUi.getState().page).toBe("trades");
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(getScroll("overview")).toBe(500);
+    expect(showPage("trades")).toBe(-500);
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
+    // a second commit of the same page does not scroll again
+    expect(showPage("trades")).toBe(0);
+    expect(scrollTo).toHaveBeenCalledTimes(1);
+  });
+
+  it("a page that never reached the screen keeps no scroll position; the last restore wins", () => {
+    showPage("overview");
+    const before = getScroll("trades");
+    setScrollY(320);
+    navigate("trades");
+    navigate("settings"); // before the deferred trades render committed
+    expect(getScroll("trades")).toBe(before);
+    expect(showPage("trades")).toBe(0);
+    expect(showPage("settings")).toBe(-320);
+  });
+
+  it("without a shell the restore runs in the next animation frame", async () => {
+    setScrollY(200);
+    navigate("setups");
+    expect(scrollTo).not.toHaveBeenCalled();
+    await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
   });
 });

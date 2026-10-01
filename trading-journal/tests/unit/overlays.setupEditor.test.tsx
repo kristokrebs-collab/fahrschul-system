@@ -81,4 +81,13 @@ describe("SetupEditor", () => {
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Grundlage gelöscht");
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("a completed hold on a setup in use opens the usage warning instead of deleting", async () => {
+    render(<SetupEditor open setupId="s_bo" fromTrade onClose={vi.fn()} />);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Löschen" }), { button: 0 });
+    await screen.findByText("1 Trades verlieren die Zuordnung.", undefined, { timeout: 4000 });
+    expect(useJournal.getState().settings.setups).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Ja" }));
+    await waitFor(() => expect(useJournal.getState().settings.setups).toHaveLength(0));
+  });
 });

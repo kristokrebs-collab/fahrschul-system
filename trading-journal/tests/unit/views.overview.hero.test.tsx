@@ -14,6 +14,7 @@ vi.mock("@/app/overlays", () => ({
   HyblockForm: () => null,
 }));
 
+import { heroTileValue } from "@/domain/explain";
 import { getAccountView, getEnriched, useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { signed } from "@/lib/format";
@@ -70,5 +71,33 @@ describe("Hero", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText(/Summe aller realisierten Gewinne und Verluste/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Schließen" })).toBeInTheDocument();
+  });
+
+  it("KPI tiles expose the final value while counting up and switch values without re-mounting", async () => {
+    const { trades, settings } = useJournal.getState();
+    const enriched = getEnriched(trades, settings);
+    renderHero();
+    const tile = screen.getByRole("button", { name: /^Win-Rate/ });
+    const srValue = () => tile.querySelector("dd .sr-only")?.textContent;
+    expect(srValue()).toBe(heroTileValue("winRate", getAccountView(enriched, settings, "all")));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("radio", { name: "Makro" }));
+    });
+    expect(screen.getByRole("button", { name: /^Win-Rate/ })).toBe(tile);
+    expect(srValue()).toBe(heroTileValue("winRate", getAccountView(enriched, settings, "makro")));
+  });
+
+  it("shows shimmering placeholders until the journal is loaded", async () => {
+    useJournal.setState({ loaded: false });
+    renderHero();
+    const hero = screen.getByTestId("hero-net");
+    expect(within(hero).queryByLabelText(/^[+−]?\d/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Win-Rate/ }).querySelector("dd [aria-hidden]")).not.toBeNull();
+    await act(async () => {
+      useJournal.setState({ loaded: true });
+    });
+    const { trades, settings } = useJournal.getState();
+    const view = getAccountView(getEnriched(trades, settings), settings, "all");
+    expect(within(screen.getByTestId("hero-net")).getByLabelText(signed(view.g.net, 2))).toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useState, type FocusEvent } from "react";
 import { cn } from "@/lib/cn";
+import { isScrolling } from "@/motion/scrollGate";
 import { radius, spring, tween } from "@/motion/tokens";
 
 export interface HoverPillProps {
@@ -37,13 +38,17 @@ export function HoverPill({ show, group, className }: HoverPillProps) {
 
 export interface HoverGroupBinding {
   onMouseEnter: () => void;
+  /** Self-heal after a scroll: the first real move over a row claims the pill (React bails out when it is already set). */
+  onMouseMove: () => void;
   onMouseLeave: () => void;
   onFocus: (e: FocusEvent<HTMLElement>) => void;
   onBlur: () => void;
 }
 
 /**
- * Tracks the hovered/focused row id of one group (Bundle `Dg`, NEW: also `:focus-visible`).
+ * Tracks the hovered/focused row id of one group (Bundle `Dg`, NEW: also `:focus-visible`). Pointer hover is ignored
+ * while the page scrolls (`isScrolling()`, rows passing under a resting pointer fire `mouseenter`); the next real
+ * `mousemove` picks the row up.
  * ```tsx
  * const { hovered, bind } = useHoverGroup();
  * <button className="relative" {...bind(id)}><HoverPill show={hovered === id} group="recent" />…</button>
@@ -53,7 +58,12 @@ export function useHoverGroup<T extends string | number = string>() {
   const [hovered, setHovered] = useState<T | null>(null);
   const bind = useCallback(
     (id: T): HoverGroupBinding => ({
-      onMouseEnter: () => setHovered(id),
+      onMouseEnter: () => {
+        if (!isScrolling()) setHovered(id);
+      },
+      onMouseMove: () => {
+        if (!isScrolling()) setHovered(id);
+      },
       onMouseLeave: () => setHovered((h) => (h === id ? null : h)),
       onFocus: (e) => {
         let visible = true;

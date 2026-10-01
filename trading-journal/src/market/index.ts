@@ -27,7 +27,7 @@ export {
 export { FEED_IDS, KLINE_FEEDS, RATIO_FEEDS, FUTURES_DATA_FEEDS, SERIES_FEEDS, WS_FEEDS, BYBIT_UNSUPPORTED, DEFAULT_SOURCE_CHAIN, buildFeedSpecs, effectiveSpec, klineFeedInterval, klineFeedFor, isKlineFeed, isSeriesFeed } from "./feeds";
 export { Budget, TokenBucket, BUCKETS, klineWeight, RATE_LIMIT_BACKOFF_MS } from "./budget";
 export { nextAlignedAt, currentBoundary, wsBackoffMs, probeBackoffMs, Scheduler, realTimerHost, WS_SILENT_MS, WS_ROLLOVER_MS, WS_MAX_FAILED, type TimerHost, type AlignSpec } from "./schedule";
-export { MarketCache, upsertSeries, cacheKey, memoryKV, idbKV, RING_CAPACITY, type KVStore } from "./cache";
+export { MarketCache, upsertSeries, upsertBar, cacheKey, memoryKV, idbKV, RING_CAPACITY, type KVStore } from "./cache";
 export { initialHealth, reduceHealth, aggregate, worst, feedsBySource, RANK, FAILURES_BEFORE_FALLBACK } from "./health";
 export { statusLabel, statusLabelFor, liveAgeLabel, refreshRingProgress, fallbackBadge, STRINGS, SOURCE_NAME, COHORT_HINT } from "./statusLabel";
 export { closedBar, lastClosed4h, weeklyClose, currentBar, rsiWilder, weeklyRsi, type ClosedBar } from "./indicators";
@@ -58,7 +58,28 @@ export {
   type LegacyMarketStatus,
 } from "./mapping";
 export { createMarketProvider, type MarketProvider, type ProviderOptions, type ProviderDeps } from "./provider";
-export { priceMv, bidMv, askMv, markMv, fundingMv, nextFundingMv, priceReceivedAtMv, bindMotionValues, flushMotionValues } from "./motionValues";
+export {
+  priceMv,
+  bidMv,
+  askMv,
+  markMv,
+  fundingMv,
+  nextFundingMv,
+  priceReceivedAtMv,
+  tradeTimeMv,
+  tickDirMv,
+  open24hMv,
+  volAccumMv,
+  buyVolMv,
+  sellVolMv,
+  flowImbalanceMv,
+  tradeCountMv,
+  ORDER_FLOW_HALF_LIFE_MS,
+  flowImbalance,
+  open24hFrom,
+  bindMotionValues,
+  flushMotionValues,
+} from "./motionValues";
 export {
   startMarket,
   stopMarket,
@@ -66,10 +87,17 @@ export {
   setPeriod,
   setBookTop,
   getProvider,
+  getFeed,
+  subscribeFeed,
+  flushMarketNotifications,
+  klineBarKey,
   useProvider,
   useFeed,
+  useFeedSelect,
   useHealth,
+  useHealthSelect,
   useStatusLabel,
+  useStatusTone,
   useMarketView,
   useTopTrader,
   useMarketVersion,
@@ -79,7 +107,7 @@ export {
   PRICE_SNAPSHOT_INTERVAL_MS,
   type PriceSnapshot,
 } from "./marketStore";
-export { parseWsMessage, buildStreamUrl, binanceRest, BINANCE_REST, BINANCE_WS, type WsEvent, type BinanceRest } from "./sources/binance";
+export { parseWsMessage, wsStreamKind, buildStreamUrl, binanceRest, BINANCE_REST, BINANCE_WS, type WsEvent, type BinanceRest } from "./sources/binance";
 export { bybitRest, BYBIT_REST, type BybitRest } from "./sources/bybit";
 export { okxRest, OKX_REST, type OkxRest } from "./sources/okx";
 export { probeProxy, proxyRest, PROXY_BASE, type ProxyProbe } from "./sources/proxy";

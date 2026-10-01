@@ -26,7 +26,7 @@ export interface SplitTextProps {
 /**
  * Bundle `p2` wordmark reveal: letters `y:110%→0` on `spring.reveal` (`delay .1 + i·.035`), shimmer band
  * sweeps `x` (transform only, NOT `left`) on `tween.shimmer`. Runs once per session (`sessionStorage`
- * `tj2-intro`) and never under reduced motion – then it renders static.
+ * `tj2-intro`) and never under reduced motion – then it renders static. Accessible text: a leading `.sr-only` span.
  */
 export function SplitText({ text, className, force = false }: SplitTextProps) {
   const reduced = useReducedFx();
@@ -34,7 +34,10 @@ export function SplitText({ text, className, force = false }: SplitTextProps) {
   const [fresh] = useState(() => force || !seenIntro());
   const animateIn = fresh && !reduced;
   return (
-    <span className={cn("relative inline-flex overflow-hidden", className)} aria-label={text} role="text">
+    // the real text is an sr-only span; the per-letter visual layer is aria-hidden (no `role="text"` / aria-label on a
+    // generic element, which NVDA/JAWS do not read)
+    <span className={cn("relative inline-flex overflow-hidden", className)}>
+      <span className="sr-only">{text}</span>
       {text.split("").map((ch, i) =>
         animateIn ? (
           <motion.span

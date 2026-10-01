@@ -68,26 +68,72 @@ export function buildHash(page: Page, filter?: Partial<TradeFilter>): string {
 const scroll: Partial<Record<Page, number>> = {};
 const visited = new Set<Page>();
 
+/**
+ * Shell handoff. The shell renders the page from a deferred value, so the store's `page` can run ahead of what is on
+ * screen. While a shell is attached (`shownPage !== null`) a restore for a page that is not on screen yet is parked in
+ * `pending` and applied by `showPage()` in the commit that puts that page on screen, before paint. Without a shell
+ * (router tests, boot before the first render) the restore runs in the next animation frame as before.
+ */
+let shownPage: Page | null = null;
+let pending: { page: Page; top: number } | null = null;
+
 export function getScroll(page: Page): number | undefined {
   return scroll[page];
 }
 
 function rememberScroll(page: Page): void {
   if (typeof window === "undefined") return;
+  // a page that never reached the screen (switched past before its deferred render committed) has no position of its own
+  if (shownPage !== null && shownPage !== page) return;
   scroll[page] = window.scrollY;
 }
 
+function scrollToTop(top: number): void {
+  try {
+    window.scrollTo({ top, behavior: "instant" as ScrollBehavior });
+  } catch {
+    /* engines without ScrollToOptions / jsdom: the restore is a convenience only */
+  }
+}
+
 /**
- * Restores the remembered position of `page` (after mount, in `requestAnimationFrame`);
- * first visit or `forceTop` → top 0 with `behavior:"auto"` (page switch already animates).
+ * Restores the remembered position of `page`; first visit or `forceTop` → top 0. Applied instantly (the page switch
+ * itself animates): at the shell commit that shows `page` (see `showPage`), or in the next animation frame when the
+ * page is already on screen or no shell is attached.
  */
 export function restoreScroll(page: Page, forceTop = false): void {
   if (typeof window === "undefined") return;
   const top = forceTop || !visited.has(page) ? 0 : (scroll[page] ?? 0);
   visited.add(page);
-  const run = () => window.scrollTo({ top, behavior: "auto" });
+  if (shownPage !== null && shownPage !== page) {
+    pending = { page, top };
+    return;
+  }
+  pending = null;
+  const run = () => scrollToTop(top);
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(run);
   else run();
+}
+
+/**
+ * Shell hook, called in the layout effect of the commit that puts `page` on screen (and on mount). Applies a restore
+ * that `navigate` / a hash change queued for `page` – before paint, so neither page visibly jumps – and returns how far
+ * the window scrolled (px), which lets the outgoing page be held in place while it fades out.
+ */
+export function showPage(page: Page): number {
+  shownPage = page;
+  const p = pending;
+  if (!p || p.page !== page || typeof window === "undefined") return 0;
+  pending = null;
+  const before = window.scrollY;
+  scrollToTop(p.top);
+  return window.scrollY - before;
+}
+
+/** Shell unmount: restores fall back to the animation-frame path. */
+export function detachShell(): void {
+  shownPage = null;
+  pending = null;
 }
 
 /* -------------------------------------------------------------- navigation */

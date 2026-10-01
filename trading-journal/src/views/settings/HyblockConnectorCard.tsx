@@ -1,9 +1,14 @@
+import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
+import { TextRoll } from "@/motion/TextRoll";
+import { tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { requestCapability } from "@/store/capability";
 import type { DraftTextKey, SettingsDraft } from "./draft";
 import { DraftField } from "./fields";
+import { GlyphLink, PhaseGlyph } from "./fx";
 
 /** MCP server name of the bundle (`Vf`). */
 export const HYBLOCK_SERVER = "Hyblock";
@@ -115,13 +120,19 @@ export interface HyblockConnectorCardProps {
   className?: string;
 }
 
-/** `Hyblock-Connector` card (Plan 6.4): config fields + `Verbindung testen` output in a `<pre>`. */
+/**
+ * `Hyblock-Connector` card (Plan 6.4): config fields + `Verbindung testen` output in a `<pre>`. The button spins
+ * while the test runs (label morphs to `Teste …`); each new result fades up in place.
+ */
 export function HyblockConnectorCard({ draft, onChange, onTest = runHyblockTest, className }: HyblockConnectorCardProps) {
   const [lines, setLines] = useState<string[] | null>(null);
   const [testing, setTesting] = useState(false);
+  const [run, setRun] = useState(0);
+  const reduced = useReducedFx();
 
   async function test() {
     setTesting(true);
+    setRun((n) => n + 1);
     try {
       setLines(await onTest(testConfigFromDraft(draft)));
     } catch (err) {
@@ -150,11 +161,16 @@ export function HyblockConnectorCard({ draft, onChange, onTest = runHyblockTest,
       </div>
       <div className="mt-4 grid gap-2">
         <Button size="sm" className="justify-self-start" onClick={test} disabled={testing} aria-busy={testing || undefined}>
-          {testing ? HYBLOCK_STRINGS.testing : HYBLOCK_STRINGS.test}
+          <PhaseGlyph phase={testing ? "busy" : "idle"} icon={<GlyphLink />} />
+          <TextRoll mode="roll" text={testing ? HYBLOCK_STRINGS.testing : HYBLOCK_STRINGS.test} />
         </Button>
         {lines && (
           <pre role="status" className="overflow-x-auto whitespace-pre-wrap rounded-xl border border-line bg-ink-950/60 p-3 font-mono text-[11.5px] text-mute">
-            {lines.join("\n")}
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span key={run} className="block" initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: tween.exit }} transition={tween.fade}>
+                {lines.join("\n")}
+              </motion.span>
+            </AnimatePresence>
           </pre>
         )}
       </div>

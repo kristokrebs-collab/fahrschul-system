@@ -9,7 +9,7 @@ import { normalizePeriod, INTERVAL_MS, type PeriodResult, type KlineInterval } f
 import { BOOTSTRAP_LIMIT, BYBIT_UNSUPPORTED, DEFAULT_SOURCE_CHAIN, FEED_IDS, FUTURES_DATA_FEEDS, FUTURES_DATA_RETENTION_MS, HISTORY_MAX_CALLS, HISTORY_PAGE_LIMIT, KLINE_FEEDS, OKX_UNSUPPORTED, POLL_LIMIT_FUTURES_DATA, RATIO_FEEDS, WS_FEEDS, WS_REST_FALLBACK_MS, buildFeedSpecs, effectiveSpec, isKlineFeed, klineFeedInterval, isSeriesFeed } from "./feeds";
 import { Budget, klineWeight } from "./budget";
 import { NON_ADVANCE_RETRY_MS, Scheduler, nextAlignedAt, probeBackoffMs, realTimerHost, type TimerHost } from "./schedule";
-import { MarketCache, upsertSeries, RING_CAPACITY, type KVStore } from "./cache";
+import { MarketCache, upsertBar, upsertSeries, RING_CAPACITY, type KVStore } from "./cache";
 import { initialHealth, reduceHealth } from "./health";
 import { statusLabelFor, STRINGS } from "./statusLabel";
 import { binanceRest, buildStreamUrl, parseWsMessage, type BinanceRest } from "./sources/binance";
@@ -522,7 +522,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
         case "kline": {
           const feed = `kline_${ev.interval}` as const;
           const prev = cache.get(feed);
-          const merged = upsertSeries(prev && prev.source === "binance" ? prev.data : [], [ev.candle], RING_CAPACITY[feed]);
+          // tail update (replace the forming bar / append the next one) instead of a full-ring merge per tick
+          const merged = upsertBar(prev && prev.source === "binance" ? prev.data : [], ev.candle, RING_CAPACITY[feed]);
           publish(feed, { data: merged, asOf: ev.eventTime, receivedAt: t, source: "binance", comparable: true }, { replace: true });
           noteWs(feed, ev.eventTime, t);
           if (ev.candle.closed) void cache.persist(feed);

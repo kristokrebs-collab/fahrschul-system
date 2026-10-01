@@ -10,6 +10,16 @@ body {
   background: var(--color-ink-900);
 }
 
+/* The dialog scroll lock (body overflow:hidden) must not make the scrollbar vanish and reflow the page
+   under a running morph: keep its gutter reserved. */
+html {
+  scrollbar-gutter: stable;
+  /* keyboard focus scrolls controls clear of the sticky header (top) and the bottom fade + dock (bottom); this also
+     lets the focused control's Reveal cell cross its in-view threshold, so a focus ring never sits at opacity 0 */
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 72px);
+  scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px);
+}
+
 body {
   margin: 0;
   min-height: 100dvh;
@@ -91,12 +101,21 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   color: var(--color-mute);
 }
 
+/* Reduced motion: every CSS transition/animation completes at once. Infinite loops (spinners, pings, shimmers,
+   beams) run a single ~0 ms iteration and stop, so nothing keeps the page animating; delays are dropped so nothing
+   pops in late. They are deliberately not `paused`: a paused animation would freeze on its first keyframe, which is
+   often invisible (opacity 0). */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
   *,
   *::before,
   *::after {
     transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
     animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
   }
 }

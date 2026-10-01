@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
@@ -46,7 +46,7 @@ describe("App shell", () => {
   it("renders header, dock and hero", async () => {
     renderApp();
     expect(screen.getByText("Makro & Scalp · Entscheidungen, Win-Rate, Backtest")).toBeInTheDocument();
-    expect(screen.getByRole("text", { name: "Trade Journal" })).toBeInTheDocument();
+    expect(screen.getByText("Trade Journal")).toBeInTheDocument(); // SplitText: sr-only text, letters aria-hidden
     const dock = screen.getByRole("toolbar", { name: "Navigation" });
     for (const label of ["Übersicht", "Trades", "Entscheidungsgrundlagen", "Einstellungen", "Trade eintragen"]) {
       expect(within(dock).getByRole("button", { name: label })).toBeInTheDocument();
@@ -83,12 +83,43 @@ describe("App shell", () => {
     expect(JSON.parse(localStorage.getItem("tj2-ui") ?? "{}").hideLocalBanner).toBe(true);
   });
 
+  it("keeps the overview mounted but hidden on other tabs and shows the same instance again", async () => {
+    renderApp();
+    const hero = screen.getByTestId("hero-net");
+    const dock = screen.getByRole("toolbar", { name: "Navigation" });
+    await act(async () => {
+      fireEvent.click(within(dock).getByRole("button", { name: "Trades" }));
+    });
+    expect(await screen.findByTestId("page-trades")).toBeInTheDocument();
+    // same DOM node, parked behind React Activity (display:none) once its exit played, instead of unmounted
+    await waitFor(() => expect(hero).not.toBeVisible(), { timeout: 1500 });
+    expect(screen.getByTestId("hero-net")).toBe(hero);
+    expect(screen.queryByText("Netto-P&L · Gesamt")).not.toBeVisible();
+    await act(async () => {
+      fireEvent.click(within(dock).getByRole("button", { name: "Übersicht" }));
+    });
+    expect(screen.getByTestId("hero-net")).toBe(hero);
+    await waitFor(() => expect(hero).toBeVisible(), { timeout: 1500 });
+  });
+
+  it("mounts the celebration layer and a decorative live ticker in the header", () => {
+    renderApp();
+    expect(document.querySelector("[data-celebrate]")).toBeNull();
+    act(() => {
+      useUi.getState().celebrate({ x: 40, y: 40 });
+    });
+    const layer = document.querySelector("[data-celebrate]");
+    expect(layer).toHaveAttribute("aria-hidden", "true");
+    const ticker = within(screen.getByRole("banner")).getByText("BTC").closest("[data-header-ticker]");
+    expect(ticker).toHaveAttribute("aria-hidden", "true");
+  });
+
   it("FAB and header CTA open the trade editor", () => {
     renderApp();
     const dock = screen.getByRole("toolbar", { name: "Navigation" });
     fireEvent.click(within(dock).getByRole("button", { name: "Trade eintragen" }));
     expect(useUi.getState().editor).toEqual({ open: true, tradeId: undefined, fromFab: true });
-    useUi.getState().closeEditor();
+    act(() => useUi.getState().closeEditor());
     const header = screen.getByRole("banner");
     fireEvent.click(within(header).getByRole("button", { name: /Trade eintragen/ }));
     expect(useUi.getState().editor.open).toBe(true);

@@ -95,16 +95,17 @@ export function ChartTooltip({ ref, className }: ChartTooltipProps) {
     tone: null,
   });
   const shown = useRef(false);
+  // the box has a fixed width and row count: measure once instead of forcing a layout read on every move
+  const size = useRef<{ width: number; height: number } | null>(null);
+  const tone = useRef<TooltipText["tone"] | null>(null);
 
   useImperativeHandle(
     ref,
     () => ({
       move(point, data, bounds) {
         const text = formatTooltip(data);
-        const size = box.current
-          ? { width: box.current.offsetWidth || TOOLTIP_WIDTH, height: box.current.offsetHeight || 108 }
-          : undefined;
-        const pos = placeTooltip(point, bounds, size);
+        if (!size.current && box.current?.offsetHeight) size.current = { width: box.current.offsetWidth || TOOLTIP_WIDTH, height: box.current.offsetHeight };
+        const pos = placeTooltip(point, bounds, size.current ?? undefined);
         if (!shown.current) {
           // first show: no fly-in from the previous position
           rawX.jump(pos.x);
@@ -124,7 +125,10 @@ export function ChartTooltip({ ref, className }: ChartTooltipProps) {
         if (e.close) e.close.textContent = text.close;
         if (e.delta) {
           e.delta.textContent = text.delta;
-          e.delta.className = cn("num font-mono font-medium", TONE_CLASS[text.tone]);
+          if (tone.current !== text.tone) {
+            tone.current = text.tone;
+            e.delta.className = cn("num text-right font-mono font-medium", TONE_CLASS[text.tone]);
+          }
         }
         visible.set(1);
       },

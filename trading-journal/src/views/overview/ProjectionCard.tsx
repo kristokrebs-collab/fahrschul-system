@@ -4,6 +4,8 @@ import { explain } from "@/domain/explain";
 import { cn } from "@/lib/cn";
 import { colorClass, n0, n1, pct } from "@/lib/format";
 import { MotionNumber } from "@/motion/MotionNumber";
+import { Reveal } from "@/motion/Reveal";
+import { stagger, tween } from "@/motion/tokens";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Collapse, Expander } from "@/primitives/Expander";
@@ -16,7 +18,10 @@ export const PROJECTION_EMPTY_TITLE = "Noch nichts hochzurechnen";
 export const PROJECTION_EMPTY_TEXT = "Mit dem ersten abgeschlossenen Trade rechne ich deine Rendite auf 12 Monate hoch.";
 export const PROJECTION_WEAK = "Wenig Daten. Belastbar ab etwa 30 Tagen und 10 Trades.";
 
-/** `Hochrechnung aufs Jahr` (Bundle `She`, Plan 6.1): linear `MotionNumber` %, dl rows, weak-data warning, expander → `explain("projection")`. */
+/**
+ * `Hochrechnung aufs Jahr` (Bundle `She`, Plan 6.1): linear `MotionNumber` % that counts up from 0 the first time
+ * the card is in view, dl rows cascading in under it, weak-data warning last, expander → `explain("projection")`.
+ */
 export function ProjectionCard() {
   const settings = useJournal((s) => s.settings);
   const acc = useUi((s) => s.acc);
@@ -41,19 +46,23 @@ export function ProjectionCard() {
       {p ? (
         <div className="flex h-full flex-col">
           <div className={cn("font-mono text-[38px] font-medium leading-none tracking-tight", colorClass(p.linear))}>
-            <MotionNumber value={p.linear * 100} decimals={1} signed />
+            <MotionNumber value={p.linear * 100} decimals={1} signed countOnReveal transition={tween.gauge} />
             <span className="text-xl text-mute"> %</span>
           </div>
           <div className="mt-1.5 text-xs text-mute">in 12 Monaten bei gleicher Performance, linear</div>
           <dl className="mt-4 grid text-[13px]">
-            {rows.map(([l, v, cls]) => (
-              <div key={l} className="flex justify-between gap-3 border-t border-line py-2">
+            {rows.map(([l, v, cls], i) => (
+              <Reveal key={l} index={i} delay={stagger.lead} className="flex justify-between gap-3 border-t border-line py-2">
                 <dt className="text-mute">{l}</dt>
                 <dd className={cn("num font-mono font-medium", cls)}>{v}</dd>
-              </div>
+              </Reveal>
             ))}
           </dl>
-          {p.weak && <p className="mt-2 rounded-lg bg-warn/10 px-3 py-2 text-[11.5px] text-warn">{PROJECTION_WEAK}</p>}
+          {p.weak && (
+            <Reveal index={rows.length} delay={stagger.lead} className="mt-2 rounded-lg bg-warn/10 px-3 py-2 text-[11.5px] text-warn">
+              {PROJECTION_WEAK}
+            </Reveal>
+          )}
         </div>
       ) : (
         <EmptyState title={PROJECTION_EMPTY_TITLE} text={PROJECTION_EMPTY_TEXT} />

@@ -5,8 +5,7 @@ import type { EnrichedTrade, Setup } from "@/domain/types";
 import { RESULT_LABELS, RESULT_TONES } from "@/domain/defaults";
 import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
-import { date, n1, price, signed, time } from "@/lib/format";
-import { MotionNumber } from "@/motion/MotionNumber";
+import { colorClass, date, n1, price, signed, time } from "@/lib/format";
 import { Badge, SetupChips } from "@/primitives";
 
 export function sideLabel(t: Pick<EnrichedTrade, "side">): string {
@@ -65,14 +64,21 @@ export function CheckCount({ t }: { t: Pick<EnrichedTrade, "checked" | "items" |
   );
 }
 
-/** Table P&L: `MotionNumber` (animates only while visible) or `–`; `aria-label` keeps the exact bundle string. */
-export function PnlCell({ value, gate = true, className }: { value: number | null; gate?: boolean; className?: string }) {
-  if (value == null) return <span className={cn("text-fg", className)}>–</span>;
-  return <MotionNumber value={value} decimals={2} signed tone="auto" gate={gate} aria-label={signed(value)} className={className} />;
+/**
+ * Signed two-decimal figure in its tone colour (`+12,50` win, `−3,20` loss, `–` for open trades). A trade's P&L and R
+ * only change on an edit, so the table renders plain text: no MotionValue, observer or tone layers per cell, and
+ * the text is its own accessible name.
+ */
+function SignedCell({ value, className }: { value: number | null; className?: string }) {
+  return <span className={cn("tabular-nums", colorClass(value), className)}>{signed(value)}</span>;
 }
 
-/** Table R: `V.signed(r)` | `–`. */
-export function RCell({ value, gate = true }: { value: number | null; gate?: boolean }) {
-  if (value == null) return <span className="text-fg">–</span>;
-  return <MotionNumber value={value} decimals={2} signed tone="auto" gate={gate} aria-label={signed(value)} />;
+/** Table/card P&L: `V.signed(pnl)` | `–`. */
+export function PnlCell({ value, className }: { value: number | null; className?: string }) {
+  return <SignedCell value={value} className={className} />;
+}
+
+/** Table/card R: `V.signed(r)` | `–`. */
+export function RCell({ value, className }: { value: number | null; className?: string }) {
+  return <SignedCell value={value} className={className} />;
 }

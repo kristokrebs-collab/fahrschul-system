@@ -1,10 +1,12 @@
-import { AnimatePresence, motion } from "motion/react";
-import { useMemo, useState } from "react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { DEFAULT_RANK_KEY, RANK_KEYS, rankSetupStats, setupVisibleFor, type RankKey } from "@/domain/rank";
 import type { AccountId } from "@/domain/types";
 import { cn } from "@/lib/cn";
+import { RevealGroup, RevealItem } from "@/motion/Reveal";
 import { radius, spring } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
 import { Icon } from "@/primitives/icons";
 import { Segmented } from "@/primitives/Segmented";
@@ -34,10 +36,20 @@ export const RULES_NOTE = "Gelten für jeden Trade und stehen in jeder Checklist
 
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
 
+const setupUnit = (n: number) => (n === 1 ? "Grundlage" : "Grundlagen");
+
+/** New-setup tile: the tile dips on press, the plus turns a quarter on hover and press (`spring.plus`). */
+const TILE: Variants = { press: { scale: 0.98 } };
+const PLUS: Variants = { hover: { rotate: 90 }, press: { rotate: 90 } };
+
 /**
  * `Entscheidungsgrundlagen` page (Bundle `G$`, Plan 6.3). Stats always come from `accountView(…, "all")`;
  * the account filter only hides cards (`setupVisibleFor`). Grid `motion.div layout` with
  * `AnimatePresence mode="popLayout"`; the last item is the dashed `Neue Entscheidungsgrundlage` tile.
+ *
+ * Motion: the header counts the visible setups (rolling digits); the new tile turns its plus, swaps its dashed
+ * border for marching ants (`.fx-ants`, compositor-only, running only while hovered/focused) and dips on press;
+ * the `Grundregeln` lines blur-fade in one after another when they scroll into view (`RevealGroup`).
  */
 export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewProps) {
   const settings = useJournal((s) => s.settings);
@@ -54,12 +66,15 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
   const create = onNew ?? (() => openSetupEditor());
   const trades = onTrades ?? ((id: string) => navigate("trades", { setup: id }));
   const morphOpenId = setupEditor.open && !setupEditor.fromTrade ? setupEditor.setupId : undefined;
+  const reduced = useReducedFx();
 
   return (
     <div className={cn("grid grid-cols-1 gap-5", className)}>
       <PageHeader
         title={SETUPS_TITLE}
         lead={SETUPS_LEAD}
+        count={ranked.length}
+        countUnit={setupUnit}
         action={
           <div className="flex flex-wrap gap-2">
             <Segmented aria-label="Konto" size="sm" value={acc} onChange={setAcc} options={ACC_OPTIONS} />
@@ -77,16 +92,25 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
             key="__new"
             layout
             layoutDependency={layoutDependency}
-            transition={{ layout: spring.layout }}
+            transition={{ layout: spring.layout, default: spring.press }}
             style={{ borderRadius: radius.card }}
             type="button"
             onClick={create}
-            className="grid min-h-[220px] place-items-center rounded-2xl border border-dashed border-line-2 text-mute transition-colors hover:border-white/40 hover:bg-white/[0.03] hover:text-fg"
+            variants={TILE}
+            whileHover={reduced ? undefined : "hover"}
+            whileFocus={reduced ? undefined : "hover"}
+            whileTap={reduced ? undefined : "press"}
+            className="group relative grid min-h-[220px] place-items-center rounded-2xl border border-dashed border-line-2 text-mute outline-none transition-colors hover:border-transparent hover:bg-white/[0.03] hover:text-fg focus-visible:border-transparent focus-visible:text-fg"
           >
+            <span
+              aria-hidden="true"
+              className="fx-ants -inset-px opacity-0 transition-opacity duration-200 before:[animation-play-state:paused] group-hover:opacity-100 group-hover:before:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:before:[animation-play-state:running]"
+              style={{ "--fx-ants-color": "rgb(255 255 255 / 0.38)" } as CSSProperties}
+            />
             <span className="grid justify-items-center gap-2 text-[13.5px] font-semibold">
-              <span className="grid size-10 place-items-center rounded-full border border-line-2 [&>svg]:size-4">
+              <motion.span variants={PLUS} transition={spring.plus} className="grid size-10 place-items-center rounded-full border border-line-2 transition-colors group-hover:border-white/40 [&>svg]:size-4">
                 <Icon name="plus" />
-              </span>
+              </motion.span>
               {NEW_SETUP_LABEL}
             </span>
           </motion.button>
@@ -94,14 +118,14 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
       </motion.div>
 
       <Card title={RULES_TITLE} note={RULES_NOTE}>
-        <ol className="grid gap-2" aria-label={RULES_TITLE}>
+        <RevealGroup as="ol" className="grid gap-2" aria-label={RULES_TITLE}>
           {settings.rules.map((rule, i) => (
-            <li key={rule.id} className="flex items-start gap-3 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 text-[13px]">
+            <RevealItem as="li" key={rule.id} className="flex items-start gap-3 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 text-[13px]">
               <span className="mt-px font-mono text-[11px] text-faint">{String(i + 1).padStart(2, "0")}</span>
               <span className="text-fg/90">{rule.text}</span>
-            </li>
+            </RevealItem>
           ))}
-        </ol>
+        </RevealGroup>
       </Card>
     </div>
   );

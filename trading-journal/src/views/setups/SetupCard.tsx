@@ -1,10 +1,11 @@
 import { motion } from "motion/react";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import type { SetupStats } from "@/domain/account";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import type { SetupAccount } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { colorClass, pct0 } from "@/lib/format";
+import { canObserveInView, useFirstInView } from "@/motion/inView";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -44,12 +45,22 @@ export const TRADES_BUTTON_LABEL = "Alle Trades mit dieser Grundlage →";
  * `borderRadius 16` → `Tilt` (factor 4) → spotlight `Card` (`gradientFrom` = setup colour) → article.
  * Enter `{opacity:0,y:8}` on `spring.cards` staggered, exit `{opacity:0,scale:.96}` (popLayout).
  * Numbers are `MotionNumber`s; the win bar animates `scaleX` only.
+ *
+ * Reveal (first time the card is on screen, after its enter): the tiles count up from 0 (`countOnReveal`, once per
+ * session and setup via `revealKey`), the
+ * checklist bullets pop one after another and their lines light up (`stagger.rows`), the win bar fills from 0
+ * (`tween.bar`). Later stat changes flash the tiles win/loss. Reduced motion / no `IntersectionObserver`: static.
  */
 export function SetupCard({ stats, index, onEdit, onTrades, hidden, layoutDependency, className }: SetupCardProps) {
   const reduced = useReducedFx();
   const { setup, n, winRate, net, avgR } = stats;
   const badge = SETUP_BADGE[setup.account] ?? SETUP_BADGE.both;
   const delay = reduced ? 0 : Math.min(index, stagger.max) * stagger.cards;
+  const reveal = !reduced && canObserveInView();
+  const articleRef = useRef<HTMLElement>(null);
+  const seen = useFirstInView(articleRef, reveal);
+  // details start once the card itself has (mostly) arrived
+  const detailDelay = delay + 0.15;
 
   return (
     <motion.div
@@ -67,7 +78,7 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden, layoutDepend
     >
       <Tilt className="h-full" factor={4}>
         <Card bare className="h-full" gradientFrom={setup.color}>
-          <article className="flex h-full flex-col gap-4 p-5" aria-label={setup.name}>
+          <article ref={articleRef} className="flex h-full flex-col gap-4 p-5" aria-label={setup.name}>
             <div className="flex items-start justify-between gap-3">
               <h3 className="flex items-center gap-2.5 text-[15px] font-semibold leading-snug">
                 <motion.span
@@ -88,27 +99,42 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden, layoutDepend
 
             {setup.checklist.length > 0 && (
               <ul className="grid gap-1.5" aria-label={`Checkliste, ${setup.checklist.length} Punkte`}>
-                {setup.checklist.map((item) => (
-                  <li key={item.id} className="flex gap-2 text-[12px] text-fg/80">
-                    <span className="mt-[7px] size-1 shrink-0 rounded-full bg-aqua/70" aria-hidden="true" />
-                    {item.text}
-                  </li>
-                ))}
+                {setup.checklist.map((item, i) => {
+                  const at = detailDelay + Math.min(i, stagger.max) * stagger.rows;
+                  return (
+                    <motion.li
+                      key={item.id}
+                      className="flex gap-2 text-[12px] text-fg/80"
+                      initial={reveal ? { opacity: 0.35 } : false}
+                      animate={{ opacity: seen ? 1 : 0.35 }}
+                      transition={{ ...tween.fade, delay: at }}
+                    >
+                      <motion.span
+                        className="mt-[7px] size-1 shrink-0 rounded-full bg-aqua/70"
+                        aria-hidden="true"
+                        initial={reveal ? { scale: 0 } : false}
+                        animate={{ scale: seen ? 1 : 0 }}
+                        transition={{ ...spring.pop, delay: at }}
+                      />
+                      {item.text}
+                    </motion.li>
+                  );
+                })}
               </ul>
             )}
 
             <dl className="mt-auto grid grid-cols-4 gap-2">
               <Tile label="Trades">
-                <MotionNumber value={n} decimals={0} />
+                <MotionNumber value={n} decimals={0} countOnReveal revealKey={`setup-${setup.id}-n`} flash />
               </Tile>
               <Tile label="Win-Rate">
-                <MotionNumber value={winRate} format={(v) => pct0(v)} aria-label={pct0(winRate)} />
+                <MotionNumber value={winRate} format={(v) => pct0(v)} aria-label={pct0(winRate)} countOnReveal revealKey={`setup-${setup.id}-wr`} flash />
               </Tile>
               <Tile label="P&L" className={colorClass(n ? net : null)}>
-                <MotionNumber value={n ? net : null} decimals={0} signed />
+                <MotionNumber value={n ? net : null} decimals={0} signed countOnReveal revealKey={`setup-${setup.id}-net`} flash />
               </Tile>
               <Tile label="Ø R" className={colorClass(avgR)}>
-                <MotionNumber value={avgR} decimals={2} signed />
+                <MotionNumber value={avgR} decimals={2} signed countOnReveal revealKey={`setup-${setup.id}-avgr`} flash />
               </Tile>
             </dl>
 
@@ -117,9 +143,9 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden, layoutDepend
                 <motion.div
                   className="h-full rounded-full bg-win"
                   style={{ transformOrigin: "left" }}
-                  initial={false}
-                  animate={{ scaleX: winRate ?? 0 }}
-                  transition={tween.bar}
+                  initial={reveal ? { scaleX: 0 } : false}
+                  animate={{ scaleX: seen ? (winRate ?? 0) : 0 }}
+                  transition={{ ...tween.bar, delay: detailDelay }}
                 />
               </div>
             )}

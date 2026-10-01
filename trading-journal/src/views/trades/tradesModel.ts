@@ -60,6 +60,26 @@ export function listKey(f: TradeFilter, sort: TradeSort): string {
   return [f.acc, f.setup, f.result, f.side, f.q.trim().toLowerCase(), sort.k, sort.dir].join("|");
 }
 
+/**
+ * `layoutDependency` of the rendered rows: `listKey` plus the count and an FNV-1a hash of the visible ids in order,
+ * so a set or order change that keeps filter and sort (a trade deleted from the detail, added from the FAB, or
+ * re-sorted by an edit) still lets the remaining rows glide instead of snapping. Short on purpose: every row
+ * compares it on every table render.
+ */
+export function rowsKey(key: string, rows: readonly Pick<EnrichedTrade, "id">[]): string {
+  let h = 0x811c9dc5;
+  for (const t of rows) {
+    for (let i = 0; i < t.id.length; i++) h = Math.imul(h ^ t.id.charCodeAt(i), 0x01000193);
+    h = Math.imul(h ^ 0x2c, 0x01000193); // id separator, so ["ab","c"] ≠ ["a","bc"]
+  }
+  return `${key}#${rows.length}:${(h >>> 0).toString(36)}`;
+}
+
+/** Sort direction as text (kept in the header for screen readers and the `Datum ↓` / `P&L ↑` selectors). */
+export function sortArrow(dir: TradeSort["dir"]): " ↑" | " ↓" {
+  return dir === 1 ? " ↑" : " ↓";
+}
+
 /** `{n} Trade(s)` (bundle count pill). */
 export function countLabel(n: number): string {
   return `${n} Trade${n === 1 ? "" : "s"}`;

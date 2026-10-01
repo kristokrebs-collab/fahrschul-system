@@ -1,5 +1,8 @@
-import type { CSSProperties } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 
 export interface SkeletonProps {
   className?: string;
@@ -9,13 +12,14 @@ export interface SkeletonProps {
 }
 
 /**
- * Placeholder (Plan 3.3 "Skeleton"): `rounded-xl bg-white/[0.04] relative overflow-hidden` + a transform-only
- * shimmer layer (`@keyframes shimmer-x` in shiny-cta.css). Under reduced motion the layer is hidden → static tint.
+ * Placeholder (Plan 3.3 "Skeleton"): `rounded-xl bg-white/[0.04] relative overflow-hidden` + a PRE-RENDERED gradient
+ * band that only moves by `transform` (`animate-fx-shimmer` = `@keyframes fx-shimmer-x`, 1.6 s linear = `tween.skeleton`).
+ * It rests parked off-screen, so under reduced motion the placeholder is a static tint.
  */
 export function Skeleton({ className, style, height }: SkeletonProps) {
   return (
     <div className={cn("relative overflow-hidden rounded-xl bg-white/[0.04]", className)} style={{ height, ...style }} aria-hidden="true">
-      <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/[0.04] to-transparent animate-[shimmer-x_1.6s_linear_infinite] motion-reduce:hidden" />
+      <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_25%,rgb(255_255_255/0.055)_50%,transparent_75%)] [transform:translateX(-100%)] will-change-transform animate-fx-shimmer motion-reduce:hidden" />
     </div>
   );
 }
@@ -35,6 +39,46 @@ export function ChartSkeleton({ height = 268, className }: { height?: number; cl
           <Skeleton key={i} className="h-2 w-8 rounded" />
         ))}
       </div>
+    </div>
+  );
+}
+
+export interface SkeletonSwapProps {
+  /** `false` shows `skeleton`, `true` the children. */
+  ready: boolean;
+  /** Placeholder holding the exact final box (e.g. `<Skeleton height={40} />`). */
+  skeleton: ReactNode;
+  children: ReactNode;
+  className?: string;
+}
+
+/**
+ * Zero-shift crossfade (21st.dev "Skeleton Swap"): placeholder and content share one grid cell, so the swap never
+ * moves the layout. The skeleton fades out (`tween.exit`), the content fades + de-blurs in (`tween.fade`) and ends at
+ * `filter: none` (no containing block for fixed descendants). Content already ready on mount appears without animation;
+ * reduced motion: the content appears at once while the skeleton fades away.
+ */
+export function SkeletonSwap({ ready, skeleton, children, className }: SkeletonSwapProps) {
+  const reduced = useReducedFx();
+  return (
+    <div className={cn("grid", className)}>
+      <AnimatePresence initial={false}>
+        {ready ? (
+          <motion.div
+            key="content"
+            className="[grid-area:1/1] min-w-0"
+            initial={reduced ? false : { opacity: 0, filter: "blur(4px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)", transitionEnd: { filter: "none" } }}
+            transition={tween.fade}
+          >
+            {children}
+          </motion.div>
+        ) : (
+          <motion.div key="skeleton" className="[grid-area:1/1] min-w-0" initial={false} exit={{ opacity: 0, transition: tween.exit }}>
+            {skeleton}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

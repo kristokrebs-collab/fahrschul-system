@@ -27,9 +27,12 @@ export const spring = {
   tooltip: { type: "spring", stiffness: 500, damping: 40 }, // NEW: chart tooltip MotionValues
   pill: { type: "spring", stiffness: 224, damping: 30 }, // NEW: StatusPill dot ↔ pill (0.42 s response, critically damped, one spring per state)
   price: { type: "spring", stiffness: 260, damping: 34, mass: 0.6 }, // NEW: live price glide (odometer, live text), follows every trade
-  candle: { type: "spring", stiffness: 420, damping: 42, mass: 0.5 }, // NEW: forming-candle close + pulse overlay glide
+  candle: { type: "spring", stiffness: 420, damping: 42, mass: 0.5 }, // NEW: LiveCandle close glide (off on the live chart: the canvas jumps per print) + pulse overlay glide
   pop: { type: "spring", stiffness: 520, damping: 22, mass: 0.7 }, // NEW: check pop, icon bounce, badge pop
   enter: { type: "spring", stiffness: 240, damping: 30, mass: 0.9 }, // NEW: Reveal / list item enter
+  // NEW: PageHost slide = spring.enter on a string transform keyframe pair, which Motion springs over 0…100; these rest
+  // thresholds are 0.5 px / 2 px·s⁻¹ on the 16 px slide (PAGE_ENTER_X), so it settles in ≈ 0.42 s, not ≈ 0.55 s
+  pageEnter: { type: "spring", stiffness: 240, damping: 30, mass: 0.9, restDelta: 3.125, restSpeed: 12.5 },
   island: { type: "spring", stiffness: 400, damping: 30 }, // NEW: dynamic-island size morph
 } as const satisfies Record<string, Transition>;
 
@@ -64,15 +67,61 @@ export const tween = {
   reveal: { duration: 0.45, ease: ease.out }, // NEW: blur-fade reveal (opacity/filter)
   flash: { duration: 0.7, ease: ease.out }, // NEW: value flash decay (up/down tint)
   draw: { duration: 1.1, ease: ease.out }, // NEW: line/sparkline/equity draw-in (clip-path / pathLength)
-  ping: { duration: 1.6, ease: "easeOut", repeat: Infinity }, // NEW: live ping ring loop
+  ping: { duration: 1.6, ease: "easeOut", repeat: Infinity }, // NEW: live ping ring loop (only where a ring is explicitly wanted forever)
+  pingFew: { duration: 1.6, ease: "easeOut", repeat: 2 }, // NEW: a ring that pings 3× when it appears, then rests (no endless loop at idle)
   shake: { duration: 0.35, ease: "easeInOut" }, // NEW: invalid field / error shake (x keyframes)
   ripple: { duration: 0.55, ease: ease.out }, // NEW: press ripple
   hold: { duration: 1.2, ease: "linear" }, // NEW: hold-to-confirm fill
   shimmerText: { duration: 2, ease: "linear", repeat: Infinity }, // NEW: text shimmer sweep loop
   burst: { duration: 1.2, ease: ease.out }, // NEW: confetti particle life
+  toastText: { duration: 0.2, ease: "easeOut", delay: 0.12 }, // NEW: toast island text fade (= tween.fade one beat in); the win value starts rolling on the same delay
+  debounce: { duration: 0.15, ease: "linear" }, // NEW: search debounce made visible (hairline fill); its duration IS the debounce (SEARCH_DEBOUNCE_MS)
 } as const satisfies Record<string, Transition>;
 
-export const stagger = { rows: 0.02, cards: 0.03, letters: 0.035, particles: 0.03, max: 12, sections: 0.04, words: 0.03, reveal: 0.04 } as const;
+export const stagger = {
+  rows: 0.02,
+  cards: 0.03,
+  letters: 0.035,
+  particles: 0.03,
+  max: 12,
+  sections: 0.04,
+  words: 0.03,
+  reveal: 0.04,
+  lead: 0.12, // NEW: beat between a surface's reveal and its content starting (bar fills, Hochrechnung rows, bar/counter pairs)
+  insert: 0.2, // NEW: rows inserted into a shown list wait this long (≈ spring.layout 90 % settled), so siblings make room first
+} as const;
+
+/**
+ * NEW: dwell times (s) – how long a transient state stays before it reverts. They drive timers, not transitions
+ * (`setTimeout(…, dwell.done * 1000)`).
+ */
+export const dwell = {
+  done: 1.2, // a finished settings action keeps its drawn ✓ before going back to idle (save, export, refresh)
+  holdCheck: 0.9, // HoldButton shows its ✓ after a completed hold
+  armed: 4, // HoldButton's assistive-tech fallback waits this long for the confirming second activation
+  heroFlicker: 4, // HeroBackdrop ambient flicker runs this long after mount / the last pointer activity on the hero, then the canvas rests (perf-05)
+  scrollSettle: 0.15, // scroll gate (`scrollGate.ts`): hover tracking stays off until this long after the last scroll event
+} as const;
+
+/** NEW: imperative dot / glyph effects – exponential approaches and step rates, not Motion transitions. */
+export const fxTiming = {
+  phosphorRise: 0.04, // s – DotMatrix cell time constant towards brighter (fast rise)
+  phosphorFall: 0.12, // s – … towards darker (slow trailing fall)
+  matrixFps: 12, // dot-matrix step rate: DotMatrix frame player default and the HeroBackdrop ambient flicker
+  fieldEase: 0.45, // HeroBackdrop per-step phosphor easing of a dot towards its target brightness
+  scrambleReroll: 0.033, // s – TextScramble glyph re-roll (~30 fps)
+  scrambleBase: 0.25, // s – TextScramble duration = base + length · stagger.letters …
+  scrambleMin: 0.35, // s – … clamped to [min, max]
+  scrambleMax: 0.8,
+  liveFlashGap: 0.5, // s – live price / book washes (odometer, header ticker, Bid/Ask, chart pulse tint): minimum gap between two flashes, direction flips included
+} as const;
+
+/** NEW: gesture distances / speeds (px, px·s⁻¹). */
+export const gesture = {
+  toastSwipe: 80, // drag-x past this dismisses the toast island …
+  toastFlick: 500, // … or a flick faster than this
+  toastFling: 360, // a swiped toast flies out this far (exit timing: tween.toastExit)
+} as const;
 
 /** Border radii that every `layout`/`layoutId` element must set via `style`, never only via class. */
 export const radius = {
@@ -87,3 +136,10 @@ export const radius = {
   toastEnd: 25, // NEW: toast island expanded
   fab: 999, // NEW: FAB disc (`new-trade` source)
 } as const;
+
+/*
+ * CSS mirrors (src/styles/tokens.css cannot import TS – keep these in sync by hand):
+ * - `.fx-strike` 0.32 s ease.out = tween.collapse · `.fx-pop` 0.2 s ease-out / 0.12 s linear = tween.tooltipIn / tween.exit
+ * - `fx-ping` 1.6 s ease-out × 3 = tween.pingFew · `fx-shimmer` 1.6 s linear = tween.skeleton · `fx-spin` 9 s = tween.beam
+ * - `.fx-ants` 0.9 s per dash period (CSS only, `--fx-ants-speed`) · dock tooltip `duration-200 ease-out` = tween.tooltipIn
+ */

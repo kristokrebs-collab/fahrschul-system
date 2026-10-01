@@ -1,4 +1,4 @@
-import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
+import { AnimatePresence, Reorder, motion, useDragControls, type Variants } from "motion/react";
 import { useState, type KeyboardEvent } from "react";
 import type { Rule, Trade } from "@/domain/types";
 import { newRuleId } from "@/lib/ids";
@@ -7,6 +7,7 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { Icon } from "@/primitives/icons";
 import { Input } from "@/primitives/Input";
+import { ChangedDot } from "./fx";
 
 export const RULES_STRINGS = {
   title: "Grundregeln",
@@ -39,6 +40,8 @@ export interface RulesCardProps {
   rules: Rule[];
   onChange: (rules: Rule[]) => void;
   trades: readonly Trade[];
+  /** The rules differ from the saved settings → signal dot after the title. */
+  changed?: boolean;
   className?: string;
 }
 
@@ -47,8 +50,9 @@ export interface RulesCardProps {
  * arrow keys), `+ Regel hinzufügen` (ids `newRuleId()`), `Regel entfernen` with the hint
  * `{n} Trades verlieren den Haken` as inline confirm. Built-in ids stay stable. Rows enter/exit via
  * `AnimatePresence mode="popLayout"` (Plan 3.3). Saved with the page's `Speichern`.
+ * A dragged rule lifts (scale 1.02 + a pre-rendered shadow layer fading in, never an animated box-shadow).
  */
-export function RulesCard({ rules, onChange, trades, className }: RulesCardProps) {
+export function RulesCard({ rules, onChange, trades, changed = false, className }: RulesCardProps) {
   const [confirm, setConfirm] = useState<string | null>(null);
   const ids = rules.map((r) => r.id).join();
 
@@ -58,7 +62,16 @@ export function RulesCard({ rules, onChange, trades, className }: RulesCardProps
   };
 
   return (
-    <Card title={RULES_STRINGS.title} note={RULES_STRINGS.note} className={className}>
+    <Card
+      title={
+        <>
+          {RULES_STRINGS.title}
+          <ChangedDot show={changed} />
+        </>
+      }
+      note={RULES_STRINGS.note}
+      className={className}
+    >
       <Reorder.Group axis="y" values={rules} onReorder={onChange} className="grid gap-2" aria-label={RULES_STRINGS.title}>
         <AnimatePresence mode="popLayout" initial={false}>
           {rules.map((rule, i) => {
@@ -88,6 +101,9 @@ export function RulesCard({ rules, onChange, trades, className }: RulesCardProps
     </Card>
   );
 }
+
+const LIFT: Variants = { lifted: { scale: 1.02 } };
+const LIFT_SHADOW: Variants = { lifted: { opacity: 1 } };
 
 interface RuleRowProps {
   rule: Rule;
@@ -124,11 +140,20 @@ function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, on
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98, transition: tween.exit }}
+      whileDrag="lifted"
+      variants={LIFT}
       transition={{ ...spring.layout, layout: spring.layout }}
       style={{ borderRadius: radius.input }}
-      className="grid gap-2"
+      className="relative isolate grid gap-2"
       data-testid={`rule-${rule.id}`}
     >
+      <motion.span
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-1 -z-10 rounded-[14px] bg-ink-850 shadow-[0_16px_36px_rgb(0_0_0/0.55)]"
+        style={{ opacity: 0 }}
+        variants={LIFT_SHADOW}
+        transition={tween.fade}
+      />
       <div className="flex gap-2">
         <button
           type="button"
@@ -148,14 +173,16 @@ function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, on
           </svg>
         </button>
         <Input value={rule.text} aria-label={RULES_STRINGS.rule(index + 1)} onChange={(e) => onText(e.target.value)} autoComplete="off" />
-        <button
+        <motion.button
           type="button"
           aria-label={RULES_STRINGS.remove}
           onClick={onRemove}
-          className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 text-mute hover:text-loss [&>svg]:size-4"
+          whileTap={{ scale: 0.92 }}
+          transition={spring.press}
+          className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:border-loss/40 hover:text-loss [&>svg]:size-4"
         >
           <Icon name="x" />
-        </button>
+        </motion.button>
       </div>
       <AnimatePresence initial={false}>
         {confirming && (

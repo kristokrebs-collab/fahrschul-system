@@ -98,6 +98,15 @@ describe("TradeDetail", () => {
     act(() => useUi.getState().openDetail("A", "recent"));
     fireEvent.keyDown(document, { key: "Escape" });
     expect(useUi.getState().detail.id).toBeNull();
+    // backdrop: the fixed wrapper around the panel is the click target; clicks inside the panel never close
+    act(() => useUi.getState().openDetail("A", "recent"));
+    const dialog = screen.getByRole("dialog", { name: "Trade-Details" });
+    fireEvent.click(dialog);
+    expect(useUi.getState().detail.id).toBe("A");
+    const wrap = dialog.closest(".fixed");
+    expect(wrap).not.toBeNull();
+    fireEvent.click(wrap!);
+    expect(useUi.getState().detail.id).toBeNull();
   });
 
   it("`Löschen` asks inline, then deletes and toasts `Trade gelöscht`", async () => {

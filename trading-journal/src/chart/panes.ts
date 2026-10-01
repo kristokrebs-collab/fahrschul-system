@@ -1,6 +1,7 @@
 /**
- * Series & panes (Plan 5.3): pane 0 = volume (overlay) + candles + hidden pulse line,
- * pane 1 (optional, ~25 % height) = Long/Short ratio (`longPct` + 50 % baseline) or Open Interest.
+ * Series & panes (Plan 5.3): pane 0 = volume (overlay) + candles, pane 1 (optional, ~25 % height) =
+ * Long/Short ratio (`longPct` + 50 % baseline) or Open Interest. The live price pulse is a DOM overlay
+ * (`overlays.tsx`), not a series, so the canvas only redraws when data changes.
  */
 import {
   CandlestickSeries,
@@ -16,15 +17,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { Candle, OpenInterestPoint, RatioPoint } from "@/market/types";
-import {
-  NOTHING_CANDLES,
-  NOTHING_OI_LINE,
-  NOTHING_PULSE,
-  NOTHING_RATIO_LINE,
-  NOTHING_VOLUME,
-  VOLUME_SCALE_MARGINS,
-  ink,
-} from "./theme";
+import { NOTHING_CANDLES, NOTHING_OI_LINE, NOTHING_RATIO_LINE, NOTHING_VOLUME, VOLUME_SCALE_MARGINS, ink } from "./theme";
 
 export type PaneKind = "none" | "ratio" | "oi";
 export type ChartInterval = "1m" | "1h" | "4h" | "1w";
@@ -39,12 +32,11 @@ export const sec = (ms: number): UTCTimestamp => Math.floor(ms / 1000) as UTCTim
 export function toCandleData(c: Candle): CandlestickData<UTCTimestamp> {
   return { time: sec(c.time), open: c.open, high: c.high, low: c.low, close: c.close };
 }
+/** Volume bar tint: brighter under rising candles. */
+export const volumeColor = (open: number, close: number): string => (close >= open ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)");
+
 export function toVolumeData(c: Candle): HistogramData<UTCTimestamp> {
-  return {
-    time: sec(c.time),
-    value: c.volume,
-    color: c.close >= c.open ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)",
-  };
+  return { time: sec(c.time), value: c.volume, color: volumeColor(c.open, c.close) };
 }
 export function toRatioData(p: RatioPoint): LineData<UTCTimestamp> {
   return { time: sec(p.time), value: p.longPct };
@@ -68,19 +60,17 @@ export function normalizeSeries<T extends { time: UTCTimestamp }>(rows: T[]): T[
 export interface MainSeries {
   volume: ISeriesApi<"Histogram">;
   candles: ISeriesApi<"Candlestick">;
-  pulse: ISeriesApi<"Line">;
 }
 
 /** Creates the pane-0 series in draw order (volume below candles). */
-export function createMainSeries(chart: IChartApi, opts?: { volume?: boolean; pulse?: boolean }): MainSeries {
+export function createMainSeries(chart: IChartApi, opts?: { volume?: boolean }): MainSeries {
   const volume = chart.addSeries(HistogramSeries, {
     ...NOTHING_VOLUME,
     visible: opts?.volume !== false,
   });
   volume.priceScale().applyOptions({ scaleMargins: VOLUME_SCALE_MARGINS });
   const candles = chart.addSeries(CandlestickSeries, NOTHING_CANDLES);
-  const pulse = chart.addSeries(LineSeries, { ...NOTHING_PULSE, visible: opts?.pulse !== false });
-  return { volume, candles, pulse };
+  return { volume, candles };
 }
 
 /**

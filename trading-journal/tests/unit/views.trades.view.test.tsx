@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { useJournal } from "@/store/journalStore";
 import { DEFAULT_TRADE_FILTER, DEFAULT_TRADE_SORT, useUi } from "@/store/uiStore";
-import { TradesView } from "@/views/trades";
-import { SAMPLE, settings } from "./domain.fixtures";
+import { TradesCards, TradesView } from "@/views/trades";
+import { SAMPLE, enriched, settings } from "./domain.fixtures";
 
 function seed(trades = SAMPLE) {
   useJournal.setState({ trades, settings: settings(), loaded: true, mode: "local" });
@@ -18,7 +18,11 @@ function seed(trades = SAMPLE) {
   });
 }
 
-const rowIds = () => Array.from(document.querySelectorAll<HTMLElement>("tbody tr")).map((tr) => tr.dataset.tradeId);
+/** Present rows only: a filtered-out row stays in the DOM for its exit animation, marked `data-exiting`. */
+const rowIds = () => Array.from(document.querySelectorAll<HTMLElement>("tbody tr:not([data-exiting])")).map((tr) => tr.dataset.tradeId);
+/** Waits until the crossfaded-out `Keine Treffer` body has finished its exit (keeps state updates inside RTL). */
+const bodySettled = () => waitFor(() => expect(screen.queryByText("Keine Treffer")).toBeNull(), { timeout: 2000 });
+const exitingIds = () => Array.from(document.querySelectorAll<HTMLElement>("tbody tr[data-exiting]")).map((tr) => tr.dataset.tradeId);
 
 function mount() {
   return render(
@@ -46,7 +50,7 @@ describe("TradesView", () => {
     expect(screen.getAllByText("offen").length).toBeGreaterThan(0);
   });
 
-  it("segmented filters write to uiStore and filter the rows", () => {
+  it("segmented filters write to uiStore and filter the rows", async () => {
     mount();
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Richtung" })).getByRole("radio", { name: "Long" }));
     expect(useUi.getState().tradeFilter.side).toBe("long");
@@ -61,6 +65,7 @@ describe("TradesView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
     expect(useUi.getState().tradeFilter).toEqual(DEFAULT_TRADE_FILTER);
     expect(rowIds()).toHaveLength(6);
+    await bodySettled();
   });
 
   it("setup select incl. `Ohne Grundlage`", () => {
@@ -122,6 +127,86 @@ describe("TradesView", () => {
     expect(within(strip).getByText("+1 offen")).toBeInTheDocument();
   });
 
+  it("filtered-out rows exit: leave the tab order and hit-testing at once, then unmount", async () => {
+    mount();
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Richtung" })).getByRole("radio", { name: "Short" }));
+    expect(rowIds()).toEqual(["B"]);
+    expect(exitingIds().sort()).toEqual(["A", "C", "D", "E", "F"]);
+    for (const tr of document.querySelectorAll<HTMLElement>("tbody tr[data-exiting]")) {
+      expect(tr).toHaveAttribute("tabindex", "-1");
+      expect(tr).toHaveAttribute("inert");
+    }
+    // the e2e row selector counts present rows only
+    expect(document.querySelectorAll("tbody tr[tabindex='0']")).toHaveLength(1);
+    await waitFor(() => expect(exitingIds()).toEqual([]), { timeout: 2000 });
+    expect(document.querySelectorAll("tbody tr")).toHaveLength(1);
+  });
+
+  it("a row that comes back while exiting is reused, not duplicated", () => {
+    mount();
+    const radios = within(screen.getByRole("radiogroup", { name: "Richtung" }));
+    fireEvent.click(radios.getByRole("radio", { name: "Short" }));
+    fireEvent.click(radios.getByRole("radio", { name: "Beide" }));
+    expect(rowIds()).toEqual(["F", "E", "D", "C", "B", "A"]);
+    expect(exitingIds()).toEqual([]);
+    expect(document.querySelectorAll("tbody tr")).toHaveLength(6);
+  });
+
+  it("sort headers keep the arrow as screen-reader text next to an aria-hidden chevron", () => {
+    mount();
+    const date = screen.getByRole("button", { name: /^Datum/ });
+    expect(date.querySelector(".sr-only")).toHaveTextContent("↓");
+    expect(date.querySelector('[aria-hidden="true"]')).not.toBeNull();
+    // inactive sortable columns: no arrow text, only the decorative hint
+    const r = screen.getByRole("button", { name: /^R/ });
+    expect(r.textContent).toBe("R");
+    expect(r.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it("a hovered row gets the gliding highlight; leaving the rows hides it", async () => {
+    mount();
+    const row = document.querySelector<HTMLElement>('tr[data-trade-id="C"]')!;
+    fireEvent.pointerEnter(row);
+    await waitFor(() => expect(document.querySelector("[data-row-highlight]")).toHaveAttribute("data-row-highlight", "hover"));
+    expect(document.querySelector("[data-row-highlight]")).toHaveAttribute("aria-hidden", "true");
+    fireEvent.pointerLeave(document.querySelector("tbody")!);
+    await waitFor(() => expect(document.querySelector("[data-row-highlight]")).toBeNull(), { timeout: 2000 });
+  });
+
+  it("header count keeps the `{n} Trades` label and follows deletions", () => {
+    mount();
+    expect(screen.getByText("6 Trades")).toBeInTheDocument();
+    act(() => useJournal.setState({ trades: SAMPLE.filter((t) => t.id !== "A") }));
+    expect(screen.getByText("5 Trades")).toBeInTheDocument();
+    expect(screen.queryByText("6 Trades")).toBeNull();
+    expect(screen.getByTestId("trade-count")).toHaveTextContent("5 Trades");
+  });
+
+  it("search shows its pending state only while the debounce runs", () => {
+    vi.useFakeTimers();
+    mount();
+    const field = screen.getByRole("searchbox", { name: "Trades durchsuchen" });
+    const label = field.closest("label")!;
+    expect(label).not.toHaveAttribute("data-pending");
+    fireEvent.change(field, { target: { value: "FOMO" } });
+    expect(label).toHaveAttribute("data-pending");
+    act(() => {
+      vi.advanceTimersByTime(160);
+    });
+    expect(label).not.toHaveAttribute("data-pending");
+  });
+
+  it("`Keine Treffer` replaces the table in the same commit and `Filter zurücksetzen` brings it back", async () => {
+    mount();
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Ergebnis" })).getByRole("radio", { name: "Break-even" }));
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Richtung" })).getByRole("radio", { name: "Short" }));
+    expect(screen.getByText("Keine Treffer")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
+    expect(rowIds()).toEqual(["F", "E", "D", "C", "B", "A"]);
+    expect(document.querySelectorAll("table")).toHaveLength(1);
+    await bodySettled();
+  });
+
   it("empty journal → `Noch keine Trades` with the `Trade eintragen` CTA opening the editor", () => {
     seed([]);
     mount();
@@ -129,5 +214,42 @@ describe("TradesView", () => {
     expect(screen.getByText("Klick auf „Trade eintragen“, um loszulegen.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Trade eintragen" }));
     expect(useUi.getState().editor.open).toBe(true);
+  });
+});
+
+describe("TradesCards (mobile)", () => {
+  beforeEach(() => seed());
+
+  it("a removed card leaves the flow at once (inert, `data-exiting`), the list keeps the first card a button", async () => {
+    const rows = enriched();
+    const s = settings();
+    const view = render(
+      <MotionRoot>
+        <TradesCards rows={rows} setups={s.setups} listKey="a" />
+      </MotionRoot>,
+    );
+    const list = screen.getByRole("list", { name: "Trades" });
+    expect(list.querySelectorAll("li")).toHaveLength(6);
+    view.rerender(
+      <MotionRoot>
+        <TradesCards rows={rows.slice(1)} setups={s.setups} listKey="b" />
+      </MotionRoot>,
+    );
+    const leaving = list.querySelectorAll("li[data-exiting]");
+    expect(leaving).toHaveLength(1);
+    expect(leaving[0]).toHaveAttribute("inert");
+    expect(list.querySelectorAll("li:not([data-exiting])")).toHaveLength(5);
+    await waitFor(() => expect(list.querySelectorAll("li")).toHaveLength(5), { timeout: 2000 });
+    expect(within(list.querySelector("li")!).getAllByRole("button")[0]).toBeInTheDocument();
+  });
+
+  it("a card opens the detail from the table source", () => {
+    render(
+      <MotionRoot>
+        <TradesCards rows={enriched()} setups={settings().setups} listKey="a" />
+      </MotionRoot>,
+    );
+    fireEvent.click(within(screen.getByRole("list", { name: "Trades" })).getAllByRole("button")[0]!);
+    expect(useUi.getState().detail).toEqual({ id: "A", source: "table" });
   });
 });

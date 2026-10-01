@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_TRADE_FILTER } from "@/store/uiStore";
-import { countLabel, filterTrades, listKey, setupNameOf, sortTrades } from "@/views/trades/tradesModel";
+import { countLabel, filterTrades, listKey, rowsKey, setupNameOf, sortArrow, sortTrades } from "@/views/trades/tradesModel";
 import { enriched, settings } from "./domain.fixtures";
 
 const s = settings();
@@ -68,5 +68,20 @@ describe("helpers", () => {
     expect(countLabel(1)).toBe("1 Trade");
     expect(countLabel(0)).toBe("0 Trades");
     expect(countLabel(6)).toBe("6 Trades");
+  });
+  it("rowsKey changes with the visible set and order, not only with filter/sort", () => {
+    const key = listKey(DEFAULT_TRADE_FILTER, { k: "date", dir: -1 });
+    const base = rowsKey(key, all);
+    expect(base.startsWith(`${key}#6:`)).toBe(true);
+    expect(rowsKey(key, all.slice(1))).not.toBe(base); // deleted from the detail
+    expect(rowsKey(key, [...all].reverse())).not.toBe(base); // re-sorted by an edit
+    expect(rowsKey(key, [...all])).toBe(base); // same rows, new array → same key
+    expect(rowsKey(key, [{ id: "ab" }, { id: "c" }])).not.toBe(rowsKey(key, [{ id: "a" }, { id: "bc" }])); // id boundaries count
+    expect(rowsKey(key, [])).toBe(rowsKey(key, []));
+    expect(rowsKey("x", all)).not.toBe(base);
+  });
+  it("sortArrow", () => {
+    expect(sortArrow(1)).toBe(" ↑");
+    expect(sortArrow(-1)).toBe(" ↓");
   });
 });

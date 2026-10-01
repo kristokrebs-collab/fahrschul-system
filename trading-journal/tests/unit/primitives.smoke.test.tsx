@@ -79,8 +79,9 @@ describe("smoke: motion kit renders and behaves in jsdom", () => {
   });
 
   it("StatusPill toggles between dot and labelled pill", () => {
-    const { rerender } = render(<StatusPill tone="live" expanded={false} label="Live · alle 5 min" />);
-    const pill = screen.getByRole("status");
+    const { container, rerender } = render(<StatusPill tone="live" expanded={false} label="Live · alle 5 min" />);
+    // no role="status" any more (not a live region); the root carries `data-status-pill`
+    const pill = container.querySelector<HTMLElement>("[data-status-pill]") as HTMLElement;
     expect(pill.style.borderRadius).toBe("9999px");
     expect(screen.queryByText("Live · alle 5 min")).toBeNull();
     rerender(<StatusPill tone="warn" expanded label="Kein Live-Kurs" ring={0.5} spinning />);
@@ -89,12 +90,14 @@ describe("smoke: motion kit renders and behaves in jsdom", () => {
   });
 
   it("RollingDigits formats de-DE and keeps digit columns", () => {
+    // accessible text = an sr-only span (a11y review: no aria-label on a generic element); separators are aria-hidden
     const { rerender } = render(<RollingDigits value={61234.5} decimals={1} className="dot-num" />);
-    const el = screen.getByLabelText("61.234,5");
-    expect(el.textContent).toContain(".");
-    expect(el.textContent).toContain(",");
+    const el = screen.getByText("61.234,5").closest("[data-rolling-digits]") as HTMLElement;
+    const visual = () => Array.from(el.querySelectorAll("[aria-hidden='true']")).map((e) => e.textContent).join("");
+    expect(visual()).toContain(".");
+    expect(visual()).toContain(",");
     rerender(<RollingDigits value={-61250} className="dot-num" />);
-    expect(screen.getByLabelText("−61.250")).toBeInTheDocument();
+    expect(screen.getByText("−61.250")).toBeInTheDocument();
   });
 
   it("Sparkline resamples to 20 points and renders path + end dot", () => {
@@ -173,7 +176,7 @@ describe("smoke: motion kit renders and behaves in jsdom", () => {
     expect(screen.getByText("+1")).toBeInTheDocument();
     expect(screen.getByText("ohne Grundlage")).toBeInTheDocument();
     expect(screen.getByText("Lokaler Modus").closest("[role=status]")?.className).toContain("border-warn/30 bg-warn/[0.07]");
-    expect(screen.getByLabelText("Trade Journal")).toBeInTheDocument();
+    expect(screen.getByText("Trade Journal")).toBeInTheDocument(); // SplitText: sr-only text, letters aria-hidden
     expect(screen.getByRole("heading", { level: 2, name: "Übersicht" }).className).toContain("label");
     expect(screen.getByRole("heading", { level: 2, name: "Kursverlauf" })).toBeInTheDocument();
     expect(screen.getByText("Binance · 4H").className).toContain("text-xs text-faint");

@@ -155,3 +155,42 @@ export function draftToSettings(d: SettingsDraft, base: Settings): DraftResult {
     },
   };
 }
+
+/** A draft entry that can differ from the saved settings (`rules` as a whole). */
+export type DraftKey = DraftTextKey | "rules";
+
+const NUMERIC = new Set<DraftTextKey>(NUMERIC_FIELDS);
+
+function sameText(key: DraftTextKey, a: string | undefined, b: string | undefined): boolean {
+  if (a === b) return true;
+  if (NUMERIC.has(key)) {
+    const x = parseNumber(a ?? "");
+    const y = parseNumber(b ?? "");
+    if (x != null && y != null) return Math.abs(x - y) < 1e-9;
+  }
+  return (a ?? "").trim() === (b ?? "").trim();
+}
+
+/** Rules as saved: trimmed, empty ones dropped (exactly what `draftToSettings` keeps). */
+function savedRules(rules: readonly Rule[]): string {
+  return rules
+    .map((r) => [r.id, r.text.trim()] as const)
+    .filter(([, text]) => text)
+    .map(([id, text]) => `${id}\u0000${text}`)
+    .join("\u0001");
+}
+
+/**
+ * Entries of `draft` whose SAVED meaning differs from `saved` (normally `settingsToDraft(settings)`): numbers
+ * compare by value (`25.000` = `25000`), text trimmed, rules by id + trimmed text ignoring empty rows – so a draft
+ * that would save to the same settings reports nothing, and a successful save clears every mark.
+ */
+export function changedKeys(draft: SettingsDraft, saved: SettingsDraft): Set<DraftKey> {
+  const out = new Set<DraftKey>();
+  for (const key of Object.keys(saved) as (keyof SettingsDraft)[]) {
+    if (key === "rules") continue;
+    if (!sameText(key, draft[key], saved[key])) out.add(key);
+  }
+  if (savedRules(draft.rules) !== savedRules(saved.rules)) out.add("rules");
+  return out;
+}

@@ -1,4 +1,6 @@
-/* Shiny CTA (FAB "Neuer Trade"): rotating conic border + shimmer + breathe. Ported 1:1 from the bundle by the primitives owner. */
+/* Shiny CTA (FAB "Neuer Trade"): rotating conic border + shimmer + breathe. Ported 1:1 from the bundle by the primitives owner.
+   Every loop (conic angle, shimmer, breathe) is paused at rest and only runs on :hover / :focus-visible, so an idle page
+   has no running animation. */
 @property --gradient-angle {
   syntax: "<angle>";
   initial-value: 0deg;
@@ -130,7 +132,7 @@
   box-shadow: inset 0 -1ex 2rem 4px var(--shiny-cta-highlight);
   opacity: 0;
   transition: opacity var(--transition);
-  animation: calc(var(--duration) * 1.5) breathe linear infinite;
+  animation: calc(var(--duration) * 1.5) breathe linear infinite paused;
 }
 .shiny-cta,
 .shiny-cta:before,
@@ -152,6 +154,7 @@
 }
 .shiny-cta:is(:hover, :focus-visible) span:before {
   opacity: 0.8;
+  animation-play-state: running;
 }
 @keyframes gradient-angle {
   to {
@@ -191,7 +194,8 @@
     linear-gradient(160deg, #151515, #0d0d0d);
 }
 
-/* Skeleton shimmer (Plan 3.3 "Skeleton"): transform-only sweep used by `animate-[shimmer-x_1.6s_linear_infinite]`. */
+/* Legacy alias of the Skeleton sweep (pair with `-translate-x-full`). Skeleton itself now uses `fx-shimmer-x` from
+   tokens.css (single transform keyframe from −100 % to 100 %). */
 @keyframes shimmer-x {
   to {
     transform: translateX(200%);
