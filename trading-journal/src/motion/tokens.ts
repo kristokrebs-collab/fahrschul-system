@@ -26,6 +26,11 @@ export const spring = {
   smooth: { type: "spring", stiffness: 158, damping: 25 }, // NEW: status changes, scenario box, page-x (Apple .smooth)
   tooltip: { type: "spring", stiffness: 500, damping: 40 }, // NEW: chart tooltip MotionValues
   pill: { type: "spring", stiffness: 224, damping: 30 }, // NEW: StatusPill dot ↔ pill (0.42 s response, critically damped, one spring per state)
+  price: { type: "spring", stiffness: 260, damping: 34, mass: 0.6 }, // NEW: live price glide (odometer, live text), follows every trade
+  candle: { type: "spring", stiffness: 420, damping: 42, mass: 0.5 }, // NEW: forming-candle close + pulse overlay glide
+  pop: { type: "spring", stiffness: 520, damping: 22, mass: 0.7 }, // NEW: check pop, icon bounce, badge pop
+  enter: { type: "spring", stiffness: 240, damping: 30, mass: 0.9 }, // NEW: Reveal / list item enter
+  island: { type: "spring", stiffness: 400, damping: 30 }, // NEW: dynamic-island size morph
 } as const satisfies Record<string, Transition>;
 
 export const ease = {
@@ -56,9 +61,18 @@ export const tween = {
   tooltipIn: { duration: 0.2, ease: "easeOut" }, // NEW: dock tooltip (Bundle Kw 0.2 s)
   beam: { duration: 9, ease: "linear", repeat: Infinity }, // NEW: BorderBeam loop (Bundle a2 default 9 s)
   skeleton: { duration: 1.6, ease: "linear", repeat: Infinity }, // NEW: Skeleton shimmer (CSS keyframes shimmer-x, 1.6 s)
+  reveal: { duration: 0.45, ease: ease.out }, // NEW: blur-fade reveal (opacity/filter)
+  flash: { duration: 0.7, ease: ease.out }, // NEW: value flash decay (up/down tint)
+  draw: { duration: 1.1, ease: ease.out }, // NEW: line/sparkline/equity draw-in (clip-path / pathLength)
+  ping: { duration: 1.6, ease: "easeOut", repeat: Infinity }, // NEW: live ping ring loop
+  shake: { duration: 0.35, ease: "easeInOut" }, // NEW: invalid field / error shake (x keyframes)
+  ripple: { duration: 0.55, ease: ease.out }, // NEW: press ripple
+  hold: { duration: 1.2, ease: "linear" }, // NEW: hold-to-confirm fill
+  shimmerText: { duration: 2, ease: "linear", repeat: Infinity }, // NEW: text shimmer sweep loop
+  burst: { duration: 1.2, ease: ease.out }, // NEW: confetti particle life
 } as const satisfies Record<string, Transition>;
 
-export const stagger = { rows: 0.02, cards: 0.03, letters: 0.035, particles: 0.03, max: 12 } as const;
+export const stagger = { rows: 0.02, cards: 0.03, letters: 0.035, particles: 0.03, max: 12, sections: 0.04, words: 0.03, reveal: 0.04 } as const;
 
 /** Border radii that every `layout`/`layoutId` element must set via `style`, never only via class. */
 export const radius = {
