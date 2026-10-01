@@ -90,12 +90,12 @@ body { background: var(--sp-stage); display: grid; place-items: center; overflow
 const SPREAD_CONFIG = {
   autoplay: true,
   delay: 1500,          // ms nach Init bis zum Auffaechern (Video: Stapel ~1.5 s sichtbar, dann Spread)
-  spring: { stiffness: 26, damping: 10.2 }, // ~kritisch gedaempft: weiches ease-out, ~1.7 s, kein Overshoot (damping=2*sqrt(k) ist kritisch)
+  spring: { stiffness: 14, damping: 7.5 }, // leicht ueberkritisch gedaempft: weiches ease-out, ~1.8 s, kein Overshoot (kritisch = 2*sqrt(k) = 7.48)
   textFrom: 0.10,       // ab welchem Fortschritt Headline/Untertext einblenden
   textTo: 0.80,         // ab hier voll sichtbar (Headline faded grau -> weiss)
   subLag: 0.12,         // Untertext kommt etwas spaeter als Headline
   rotate: -13,          // Grad, Neigung des ganzen Faechers
-  collapsed: { scale: 0.60, stepX: 21, stepY: -8, rot: -13 },   // Stapel (u)
+  collapsed: { scale: 0.68, stepX: 20, stepY: -8, rot: -13 },   // Stapel (u)
   spread:    { scale: 1.00, stepX: 112, stepY: -54.4, rot: -13, offX: -32, offY: 9 }, // Faecher (u)
   tiltJitter: [ -1.5, 1.5, -2, 2.5, -2, 1.5, -1, 2 ], // kleine Eigenrotation pro Karte im Faecher (Grad)
   tiltAmount: 1,        // Multiplikator fuer tiltJitter
