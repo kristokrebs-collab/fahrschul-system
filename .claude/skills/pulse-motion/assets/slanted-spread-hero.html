@@ -31,7 +31,7 @@ body { background: var(--sp-stage); display: grid; place-items: center; overflow
 
 /* ===== COMPONENT CSS ===== */
 .sp {
-  --u: calc(min(100vw / 1234, 100vh / 673) * 1px * 1);
+  --u: min(calc(100vw / 1234), calc(100vh / 673));
   position: relative; width: 100vw; height: 100vh; height: 100svh;
   overflow: hidden; contain: layout paint; background: var(--sp-stage);
   font-family: var(--sp-font); color: var(--sp-ink);
@@ -131,7 +131,7 @@ function initSlantedSpreadHero(root, opts) {
   const cards = Array.from(cardsEl.children), n = cards.length;
   let u = 1, open = false, target = 0, x = 0, v = 0, acc = 0, last = 0, raf = 0, delayT = 0;
   const STEP = 1 / 240;
-  const measure = () => { u = root.clientWidth / 1234 * 1; u = Math.min(root.clientWidth / 1234, root.clientHeight / 673); };
+  const measure = () => { u = Math.min(root.clientWidth / 1234, root.clientHeight / 673); };
   const cl = (a, lo, hi) => a < lo ? lo : a > hi ? hi : a;
   const ease = t => t * t * (3 - 2 * t);
 
