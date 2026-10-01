@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Prism Split</title>
+<style>
+/* ==========================================================================
+   CONFIG (CSS) - alle Look-Werte zum "Hochdrehen". Referenz-Viewport 1234x673.
+   Motion-Werte (Spring, Split-Staerke) stehen im CONFIG (JS) weiter unten.
+   ========================================================================== */
+:root {
+  /* Buehne + Text */
+  --tps-stage:    #1f1f1f;   /* Buehnenhintergrund (gemessen) */
+  --tps-ink:      #fafafa;   /* Schriftfarbe ausserhalb der Linse */
+  --tps-size:     48px;      /* Schriftgroesse; Linse/Versatz skalieren in em mit */
+  --tps-weight:   600;       /* semibold */
+  --tps-tracking: -0.05em;   /* enge Laufweite (bei Inter ~288px Breite) */
+  --tps-line:     1.04;      /* Zeilenhoehe = Hoehe der Linse (~50px) */
+  --tps-font:     Inter, Geist, Roboto, ui-sans-serif, system-ui, "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+
+  /* Linse (Prisma-Fenster) */
+  --tps-lens-bg:    #050505; /* fast schwarz, deckt den Basistext darunter ab */
+  --tps-lens-w:     2.5em;   /* Linsenbreite (~120px bei 48px) */
+  --tps-feather:    0.25em;  /* weicher Rand links/rechts (~12px) */
+  --tps-lens-ink:   #ffffff; /* Rest-Weiss: alle 3 Kanal-Ebenen summieren sich zu #fff */
+  --tps-magnify:    1.06;    /* Vergroesserung des Textes IN der Linse */
+  --tps-lift:       -0.105em;/* Text in der Linse sitzt ~5px hoeher */
+
+  /* Prisma-Ebenen (mix-blend-mode: screen). Im Ruhezustand = Weiss */
+  --tps-c1: #ff8080;         /* lachsrot   (haengt bei Bewegung nach rechts hinterher) */
+  --tps-c2: #00ff00;         /* reines Gruen (Mitte, bleibt auf der Stelle) */
+  --tps-c3: #ccccff;         /* lavendel   (eilt voraus) */
+}
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--tps-stage);
+  display: grid; place-items: center;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== COMPONENT CSS ===== */
+.tps {
+  position: relative;
+  display: inline-block;
+  margin: 0; padding: 0;
+  font: var(--tps-weight) var(--tps-size)/var(--tps-line) var(--tps-font);
+  letter-spacing: var(--tps-tracking);
+  color: var(--tps-ink);
+  white-space: nowrap;
+  touch-action: pan-y;               /* horizontal ziehen steuert die Linse, vertikal scrollt */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+.tps:focus-visible { outline: 2px solid rgba(255,255,255,.55); outline-offset: .18em; border-radius: .12em; }
+.tps__text { display: block; }
+.tps__lens {
+  position: absolute; left: 0; top: 0;
+  width: var(--tps-lens-w); height: 100%;
+  overflow: hidden;
+  background: var(--tps-lens-bg);
+  isolation: isolate;                 /* screen-Blending nur innerhalb der Linse */
+  pointer-events: none; user-select: none; -webkit-user-select: none;
+  will-change: transform;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--tps-feather), #000 calc(100% - var(--tps-feather)), transparent 100%);
+          mask-image: linear-gradient(90deg, transparent 0, #000 var(--tps-feather), #000 calc(100% - var(--tps-feather)), transparent 100%);
+}
+.tps__layer {
+  position: absolute; left: 0; top: 0;
+  display: block; white-space: nowrap;
+  transform-origin: 0 0;
+  will-change: transform;
+  mix-blend-mode: screen;
+}
+.tps__layer--1 { color: var(--tps-c1); }
+.tps__layer--2 { color: var(--tps-c2); }
+.tps__layer--3 { color: var(--tps-c3); }
+@media (prefers-reduced-motion: reduce) { .tps__lens, .tps__layer { will-change: auto; } }
+/* ===== /COMPONENT CSS ===== */
+</style>
+</head>
+<body>
+
+<!-- COMPONENT:START -->
+<h1 class="tps" data-tps>REFRACTION</h1>
+<!-- COMPONENT:END -->
+
+<script>
+/* ==========================================================================
+   CONFIG (JS) - Motion-Werte zum "Hochdrehen"
+   ========================================================================== */
+const TEXT_PRISM_SPLIT_CONFIG = {
+  restAt: 0.5,                 // Ruheposition der Linse (0..1 der Textbreite) - Mitte
+  spring: { stiffness: 500, damping: 40, mass: 1 }, // Linse folgt dem Zeiger federnd (~0.25s Nachlauf, minimaler Overshoot)
+  split: {
+    gain: 0.013,               // px Versatz pro px/s Linsengeschwindigkeit (0 = kein RGB-Split)
+    max: 26,                   // max. Versatz der aeusseren Ebenen in px (bei 48px Schrift)
+  },
+  keyboardStep: 0.1,           // Pfeiltasten: Schrittweite (Anteil der Textbreite)
+  keyboard: true,              // Element fokussierbar, Pfeiltasten schieben die Linse
+};
+
+/* ===== COMPONENT JS ===== */
+/* initTextPrismSplit(root, opts) -> { setPosition(frac|null), destroy() }
+   root: Element mit dem Text (z.B. <h1>). opts ueberschreibt TEXT_PRISM_SPLIT_CONFIG (tief gemerged).
+   Zusaetzlich lesbar per opts: magnify, lift (em) - sonst aus CSS --tps-magnify / --tps-lift. */
+function initTextPrismSplit(root, opts) {
+  const base = (typeof TEXT_PRISM_SPLIT_CONFIG !== 'undefined') ? TEXT_PRISM_SPLIT_CONFIG
+    : { restAt: .5, spring: { stiffness: 500, damping: 40, mass: 1 }, split: { gain: .013, max: 26 }, keyboardStep: .1, keyboard: true };
+  const o = Object.assign({}, base, opts || {});
+  o.spring = Object.assign({}, base.spring, (opts && opts.spring) || {});
+  o.split  = Object.assign({}, base.split,  (opts && opts.split)  || {});
+
+  // --- DOM aufbauen: Basistext + Linse mit 3 Prisma-Ebenen (alle aria-hidden) ---
+  const text = root.textContent;
+  root.textContent = '';
+  const mk = (cls, txt, hidden) => {
+    const el = document.createElement('span'); el.className = cls; el.textContent = txt;
+    if (hidden) el.setAttribute('aria-hidden', 'true'); return el;
+  };
+  const baseEl = mk('tps__text', text, false);
+  const lens = mk('tps__lens', '', true);
+  const layers = [1, 2, 3].map(i => mk('tps__layer tps__layer--' + i, text, true));
+  layers.forEach(l => lens.appendChild(l));
+  root.append(baseEl, lens);
+  if (o.keyboard) root.tabIndex = 0;
+
+  // --- Metriken (bei Resize neu) ---
+  let W = 0, H = 0, LW = 0, magnify = 1.06, lift = -5;
+  const num = (v, d) => { const n = parseFloat(v); return isFinite(n) ? n : d; };
+  function measure() {
+    const cs = getComputedStyle(root), fs = num(cs.fontSize, 48);
+    W = root.offsetWidth; H = root.offsetHeight; LW = lens.offsetWidth;
+    magnify = o.magnify != null ? o.magnify : num(cs.getPropertyValue('--tps-magnify'), 1.06);
+    lift = (o.lift != null ? o.lift : num(cs.getPropertyValue('--tps-lift'), -0.105)) * fs;
+    lens.style.height = H + 'px';
+    layers.forEach(l => { l.style.height = H + 'px'; });
+  }
+  measure();
+
+  // --- Zustand ---
+  const mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+  let frac = o.restAt;                 // Ziel (0..1)
+  let x = frac * W, v = 0;             // Linsenmitte in px (Textkoordinaten) + Geschwindigkeit
+  let raf = 0, last = 0, active = false;
+
+  function render() {
+    const s = magnify;
+    const d = mq.matches ? 0 : Math.max(-o.split.max, Math.min(o.split.max, v * o.split.gain));
+    const offs = [-d, 0, d];           // lachsrot hinten, gruen Mitte, lavendel vorn (Bewegungsrichtung)
+    lens.style.transform = 'translate3d(' + (x - LW / 2) + 'px,0,0)';
+    const ty = (H / 2) * (1 - s) + lift;
+    for (let i = 0; i < 3; i++) {
+      layers[i].style.transform = 'translate3d(' + (LW / 2 - s * x + offs[i]) + 'px,' + ty + 'px,0) scale(' + s + ')';
+    }
+  }
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const target = frac * W, k = o.spring.stiffness, c = o.spring.damping, m = o.spring.mass;
+    if (mq.matches) { x = target; v = 0; }
+    else {
+      const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;   // Substeps: stabiler Solver
+      for (let i = 0; i < n; i++) { v += ((-k * (x - target) - c * v) / m) * h; x += v * h; }
+    }
+    if (Math.abs(x - target) < 0.03 && Math.abs(v) < 0.5) { x = target; v = 0; raf = 0; render(); return; }
+    render(); raf = requestAnimationFrame(tick);
+  }
+  function kick() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); } }
+  function setFrac(f) { frac = Math.max(0, Math.min(1, f)); kick(); }
+
+  // --- Eingabe: Zeiger (Maus/Touch/Stift) ---
+  let rect = null;
+  const fracAt = e => { rect = rect || root.getBoundingClientRect(); return (e.clientX - rect.left) / (rect.width || 1); };
+  const enter = e => { rect = root.getBoundingClientRect(); active = true; setFrac(fracAt(e)); };
+  const move  = e => { if (!active) { enter(e); return; } setFrac(fracAt(e)); };
+  const leave = () => { active = false; rect = null; setFrac(o.restAt); };
+  root.addEventListener('pointerenter', enter);
+  root.addEventListener('pointermove', move);
+  root.addEventListener('pointerdown', enter);
+  root.addEventListener('pointerleave', leave);
+  root.addEventListener('pointercancel', leave);
+  root.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') leave(); });
+
+  // --- Eingabe: Tastatur ---
+  function key(e) {
+    const st = o.keyboardStep; let f = null;
+    if (e.key === 'ArrowLeft')  f = frac - st;
+    else if (e.key === 'ArrowRight') f = frac + st;
+    else if (e.key === 'Home') f = 0;
+    else if (e.key === 'End') f = 1;
+    else if (e.key === 'Escape') f = o.restAt;
+    if (f == null) return; e.preventDefault(); setFrac(f);
+  }
+  if (o.keyboard) {
+    root.addEventListener('keydown', key);
+    root.addEventListener('blur', () => { if (!active) setFrac(o.restAt); });
+  }
+
+  // --- Resize / Schrift geladen ---
+  let ro = null;
+  if (window.ResizeObserver) {
+    ro = new ResizeObserver(() => { const f = W ? x / W : o.restAt; measure(); x = f * W; render(); });
+    ro.observe(root);
+  }
+  const onMq = () => { if (mq.matches) { v = 0; } kick(); };
+  if (mq.addEventListener) mq.addEventListener('change', onMq);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); x = frac * W; render(); });
+
+  render();
+  return {
+    setPosition(f) { setFrac(f == null ? o.restAt : f); },
+    destroy() { cancelAnimationFrame(raf); ro && ro.disconnect(); root.textContent = text; }
+  };
+}
+/* ===== /COMPONENT JS ===== */
+
+/* ===== DEMO ===== */
+initTextPrismSplit(document.querySelector('[data-tps]'));
+</script>
+</body>
+</html>
