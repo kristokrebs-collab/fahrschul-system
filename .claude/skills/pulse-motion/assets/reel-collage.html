@@ -18,10 +18,10 @@
   --headline-track:-0.045em;   /* enge Laufweite */
   --media-opacity:.64;         /* Reels/Karten wirken gedimmt (weiss -> #AEAEAE) */
   --blue:#2f76e8;              /* snapcn-Reel */
-  --glow:rgba(150,40,14,.34);  /* roter Rand-Schimmer waehrend der Karten-Phase */
+  --glow:rgba(150,40,14,.2);  /* roter Rand-Schimmer waehrend der Karten-Phase */
   --reel-w:490px; --reel-h:337px;  /* Reel-Fenster (Referenz 1234x673) */
-  --line-gap:11px;             /* halber Abstand der zwei Zeilen im Zusammenschnitt */
-  --line-off:191px;            /* Zeilenabstand zur Reel-Mitte = gap + --line-off*scaleY */
+  --line-gap:20px;             /* halber Abstand der zwei Zeilen im Zusammenschnitt */
+  --line-off:182px;            /* Zeilenabstand zur Reel-Mitte = gap + --line-off*scaleY */
 }
 /* Zeitleiste (ms) - JS liest diese Werte aus CONFIG unten */
 </style>
@@ -36,7 +36,7 @@
   font-size:var(--headline-size);font-weight:var(--headline-weight);letter-spacing:var(--headline-track);white-space:nowrap}
 .rc-line span{display:none}.rc-line span.on{display:inline}
 .rc-media{position:absolute;left:372px;top:168px;width:var(--reel-w);height:var(--reel-h);opacity:var(--media-opacity);transform-origin:50% 50%;overflow:hidden}
-.rc-reel{position:absolute;inset:0;display:none;overflow:hidden}.rc-reel.on{display:block}
+.rc-reel{position:absolute;inset:0;display:none;overflow:hidden}.rc-reel.on{display:block}.rc-reel.r-snap.on{display:flex}
 .rc-card{position:absolute;opacity:0;overflow:hidden;opacity:0}
 /* --- Reel-Motive (vereinfachte Nachbauten) --- */
 .r-universe{background:#050506}
@@ -73,7 +73,7 @@
 .r-fan .d{left:80px;top:60px;background:linear-gradient(135deg,#243a9a,#e8a060 70%,#3a2a6a);transform:rotate(-2deg)}
 /* --- Karten --- */
 .c1{left:201px;top:174px;width:176px;height:196px;background:#cfd0d2;border-radius:10px 22px 4px 4px}
-.c1::before{content:"";position:absolute;left:3px;top:20px;right:3px;bottom:0;border-radius:6px 20px 0 0;background:radial-gradient(circle at 50% 45%,#d9d57a 0 6%,transparent 8%),radial-gradient(#3a5a2a,#0c1a0a)}
+.c1::before{content:"";position:absolute;left:3px;top:20px;right:3px;bottom:0;border-radius:6px 20px 0 0;background:radial-gradient(circle at 50% 45%,#b9b66a 0 3%,transparent 5%),radial-gradient(#3a5a2a,#0c1a0a)}
 .c2{left:387px;top:254px;width:237px;height:161px;background:#020202;font:13px ui-monospace,Menlo,monospace;color:#b6b9c8}
 .c2::before{content:"m install One Tool";position:absolute;left:0;top:0;width:100%;height:48px;line-height:48px;background:#101012;white-space:pre}
 .c3{left:661px;top:93px;width:270px;height:180px;background:#dbe0e6;font:500 9px var(--font);color:#222}
@@ -134,9 +134,9 @@ const REEL_CONFIG = {
   collapseAt: 906, collapseDur: 340,            // Reel klappt per scaleY zu (ease-out cubic), Zeilen laufen zusammen
   swapAt: 1531,                                 // Textwechsel "Especially on / Launch day"
   spreadAt: 1690, spreadDur: 440,               // Zeilen + Karten fliegen auseinander (ease-out cubic)
-  cardFade: 260, cardStagger: 22,               // Karten-Einblendung
+  cardFade: 260, cardStagger: 22, cardOpacity: 0.7,               // Karten-Einblendung
   cardStartK: 0.72, cardStartScale: 0.86,       // Startabstand zur Mitte (Faktor) und Startgroesse der Karten
-  lineGap: 11, lineOff: 191,                    // Zeilen-Geometrie (px, Referenz 1234x673)
+  lineGap: 20, lineOff: 182,                    // Zeilen-Geometrie (px, Referenz 1234x673)
   spreadTop: [-118, -173], spreadBot: [70, 162],// Endposition der Zeilen (dx, dy) relativ zur Mitte
   autoplay: true, pauseOnTap: true
 };
@@ -212,7 +212,7 @@ function initReelCollage(root, opts){
       const key = o.toFixed(3)+'|'+x.toFixed(2)+'|'+y.toFixed(2)+'|'+sc.toFixed(3);
       if (key !== c.key){
         c.key = key;
-        c.el.style.opacity = (o*0.9).toFixed(3);
+        c.el.style.opacity = (o*C.cardOpacity).toFixed(3);
         c.el.style.transform = 'translate3d('+x+'px,'+y+'px,0) scale('+sc+')';
       }
     }

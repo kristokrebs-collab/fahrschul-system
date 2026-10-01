@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Trace</title>
+<style>
+/* ==================== CONFIG (alles hier hochdrehen) ==================== */
+:root{
+  /* --- Farben (gemessen aus dem Video) --- */
+  --stage-bg:#1f1f1f;          /* Buehne = Kartenflaeche */
+  --card-border:#424242;       /* Kartenrahmen */
+  --grid:#353535;              /* Raster-/Trennlinien */
+  --text:#f0f0f0;              /* Labels */
+  --text-dim:#9a9a9a;          /* Meta, Ruler, Zeit */
+  --bar:#030303;               /* fertiger Balken (fast schwarz auf #1f1f1f) */
+  --bar-light:#666666;         /* "leichte" Balken (cache/kurze Tools) */
+  --bar-fail:#a90001;          /* fehlgeschlagener Balken */
+  --fail-text:#e5575b;         /* Fehlertext/Icon */
+  --ghost:rgba(0,0,0,.16);      /* Geisterbalken laufender Spans */
+  --ghost-pending:rgba(0,0,0,.28); /* Geisterbalken noch nicht gestarteter Spans */
+  --row-active:rgba(0,0,0,.06);   /* Band hinter laufenden Zeilen */
+  --hover-pill:rgba(255,255,255,.13);
+  --play-bg:#282828;
+  --playhead:#eeeeee;
+  /* --- Masse --- */
+  --card-w:892px;              /* Kartenbreite (max) */
+  --radius:12px;
+  --row-h:34.7px;              /* "Row Height" */
+  --label-w:200px;             /* "Label Width" */
+  --meta-w:150px;              /* Spalte rechts (Tokens/Dauer) */
+  --bar-h:8px;
+  --domain:10.6;               /* sichtbare Sekunden der Zeitachse (nur fuer Referenz, JS nutzt opts.domain) */
+  --font-ui:Inter,Geist,ui-sans-serif,system-ui,sans-serif;
+  --font-mono:ui-monospace,"Geist Mono","SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  /* --- Motion --- */
+  --dur-dim:160ms;             /* Zeile "wacht auf" (Opacity) */
+  --dur-hover:120ms;           /* Hover-Pille */
+  --ease-out:cubic-bezier(.22,.8,.3,1);
+}
+/* ==================== /CONFIG ==================== */
+
+html,body{margin:0;height:100%}
+body{background:var(--stage-bg);color:var(--text);font-family:var(--font-ui);
+  display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;
+  -webkit-font-smoothing:antialiased}
+
+/* COMPONENT CSS */
+.at{position:relative;width:min(100%,var(--card-w));box-sizing:border-box;border:1px solid var(--card-border);
+  border-radius:var(--radius);background:var(--stage-bg);overflow:hidden;contain:layout paint;
+  font-size:13px;user-select:none;-webkit-user-select:none}
+.at-head{display:flex;align-items:center;gap:10px;height:44px;padding:0 12px 0 16px;box-sizing:border-box}
+.at-dot{width:6px;height:6px;border-radius:50%;background:var(--text);flex:none}
+.at-run{font:13px var(--font-mono);color:var(--text)}
+.at-sub{font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.at-badge{margin-left:auto;font:11px var(--font-mono);color:#bdbdbd;border:1px solid #444;border-radius:12px;
+  padding:0 10px;height:22px;line-height:20px;box-sizing:border-box;flex:none}
+.at-ruler{position:relative;height:27px;border-bottom:1px solid var(--grid)}
+.at-ruler-in{position:absolute;top:0;bottom:0;left:calc(var(--label-w) + 17px);right:var(--meta-w)}
+.at-tick{position:absolute;top:0;transform:translateX(-50%);font:11px/27px var(--font-mono);color:var(--text-dim)}
+.at-body{position:relative;padding:3px 0 4px}
+.at-overlay{position:absolute;top:0;bottom:0;left:calc(var(--label-w) + 17px);right:var(--meta-w);pointer-events:none}
+.at-grid{position:absolute;top:-4px;bottom:0;width:1px;background:var(--grid)}
+.at-tree{position:absolute;width:1px;background:#444}
+.at-playhead{position:absolute;top:-4px;bottom:0;left:0;width:1px;background:rgba(255,255,255,.17)}
+.at-diamond{position:absolute;top:-4px;left:-3.5px;width:7px;height:7px;background:var(--playhead);transform:rotate(45deg)}
+.at-row{position:relative;display:flex;align-items:center;height:var(--row-h)}
+.at-row.is-active::before{content:"";position:absolute;inset:0;background:var(--row-active)}
+.at-label{position:relative;display:flex;align-items:center;gap:6px;width:var(--label-w);margin-left:6px;height:22px;
+  padding-left:11px;box-sizing:border-box;border-radius:6px;font:13px var(--font-mono);color:var(--text);
+  white-space:nowrap;transition:background var(--dur-hover) var(--ease-out),opacity var(--dur-dim) var(--ease-out);
+  flex:none;margin-right:11px;cursor:default}
+.at-row:hover .at-label{background:var(--hover-pill)}
+.at-row.d1 .at-label{padding-left:23px}
+.at-ic{width:14px;height:14px;flex:none;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+.at-x2{font:10px var(--font-mono);border:1px solid #444;border-radius:8px;padding:0 5px;color:var(--text-dim);line-height:14px}
+.at-track{position:relative;flex:1;height:100%}
+.at-bar{position:absolute;top:50%;height:var(--bar-h);margin-top:calc(var(--bar-h) / -2);border-radius:4px;overflow:hidden;background:var(--ghost-pending)}
+.at-bar.is-started{background:var(--ghost)}
+.at-fill{position:absolute;inset:0;border-radius:4px;background:var(--bar);transform:scaleX(0);transform-origin:0 50%}
+.at-bar.light .at-fill{background:var(--bar-light)}
+.at-bar.fail .at-fill{background:var(--bar-fail)}
+.at-bar.is-done{background:transparent}
+.at-meta{width:var(--meta-w);box-sizing:border-box;padding-right:13px;text-align:right;white-space:nowrap;
+  font:11.5px var(--font-mono);color:var(--text-dim);display:flex;justify-content:flex-end;align-items:center;gap:6px;
+  transition:opacity var(--dur-dim) var(--ease-out)}
+.at-meta.fail.is-done,.at-meta.fail.is-done .at-ic{color:var(--fail-text)}
+.at-meta .at-ic{width:12px;height:12px}
+.at-row.pending .at-label,.at-row.pending .at-meta{opacity:.45}
+.at-foot{display:flex;align-items:center;gap:16px;height:55px;padding:0 13px 0 18px;box-sizing:border-box;border-top:1px solid var(--grid)}
+.at-play{width:28px;height:28px;border-radius:50%;border:0;background:var(--play-bg);color:var(--text);display:grid;place-items:center;cursor:pointer;padding:0;flex:none}
+.at-play:focus-visible,.at-scrub:focus-visible{outline:2px solid #7aa7ff;outline-offset:2px}
+.at-play svg{width:12px;height:12px;fill:currentColor}
+.at-scrub{position:relative;flex:1;height:28px;touch-action:none;cursor:pointer;border-radius:6px}
+.at-rail{position:absolute;left:0;right:0;top:12px;height:4px;border-radius:2px;background:#1b1b1b;overflow:hidden}
+.at-rail-fill{position:absolute;inset:0;background:var(--bar);transform:scaleX(0);transform-origin:0 50%}
+.at-thumb{position:absolute;left:0;will-change:auto;top:8px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:#eee;box-shadow:0 0 0 1px rgba(0,0,0,.5),0 1px 3px rgba(0,0,0,.5)}
+.at-time{font:11.5px var(--font-mono);color:var(--text-dim);min-width:92px;text-align:right}
+.at.is-moving .at-fill,.at.is-moving .at-playhead,.at.is-moving .at-thumb,.at.is-moving .at-rail-fill{will-change:transform}
+.at.no-ruler .at-ruler,.at.no-ruler .at-grid{display:none}
+.at.no-tokens .at-tk{display:none}
+.at.no-transport .at-foot{display:none}
+@media (max-width:640px){
+  :root{--label-w:132px;--meta-w:96px}
+  .at-meta .at-tk{display:none}
+  .at-sub{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+  .at-label,.at-meta{transition:none}
+}
+</style>
+</head>
+<body>
+
+<!-- COMPONENT:START -->
+<div id="agent-trace"></div>
+<!-- COMPONENT:END -->
+
+<script>
+/* ==================== CONFIG (JS) ==================== */
+const AT_CONFIG = {
+  loop: true,          // Loop an Ende (Control "Loop")
+  speed: 1,            // Wiedergabe-Tempo (Control "Speed")
+  startAt: 0.498,      // Startposition als Anteil 0..1 (Video zeigt 5.18s / 10.40s)
+  autoPlay: false,     // Control "Auto Play"
+  rowHeight: 34.7,     // px
+  labelWidth: 200,     // px
+  showRuler: true,
+  showTokens: true,
+  showTransport: true,
+  follow: 0,           // 0 = Playhead folgt dem Finger 1:1 (wie im Video); >0 = exp. Glaettung (1/s), z.B. 30
+  domain: 10.6,        // Sekunden der sichtbaren Zeitachse (Plot-Breite)
+  total: 10.4,         // Laufzeit der Trace in s
+  title: 'run_7c41f2',
+  subline: 'claude-opus-5 · 12 spans'
+};
+/* Spans: start/dur in Sekunden. kind: model|tool|file|agent */
+const AT_SPANS = [
+  {l:'model.plan',    k:'model', d:0, s:0.00, u:0.74, tk:1240},
+  {l:'search_docs',   k:'tool',  d:0, s:0.79, u:1.18, r:'12 matches'},
+  {l:'read_file',     k:'file',  d:0, s:1.13, u:0.36, r:'session.ts', light:1, cache:1},
+  {l:'read_file',     k:'file',  d:0, s:1.19, u:0.43, r:'token.ts'},
+  {l:'agent.reviewer',k:'agent', d:0, s:2.00, u:3.40, tk:4820},
+  {l:'grep',          k:'tool',  d:1, s:2.06, u:0.28, r:'9 hits', light:1},
+  {l:'model.review',  k:'model', d:1, s:2.38, u:2.52, tk:3480},
+  {l:'write_note',    k:'file',  d:1, s:4.95, u:0.38, r:'notes.md', light:1},
+  {l:'run_tests',     k:'tool',  d:0, s:5.47, u:1.72, r:'2 failing', fail:1},
+  {l:'model.repair',  k:'model', d:0, s:7.23, u:1.38, tk:2110},
+  {l:'run_tests',     k:'tool',  d:0, s:8.67, u:1.26, r:'42 passed', badge:'×2'},
+  {l:'commit',        k:'file',  d:0, s:9.94, u:0.46, r:'3 files'}
+];
+/* ==================== /CONFIG (JS) ==================== */
+
+/* COMPONENT JS */
+function initAgentTrace(root, opts){
+  const o = Object.assign({}, AT_CONFIG, opts || {});
+  const spans = (o.spans || AT_SPANS).map(s => Object.assign({}, s));
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const NS = 'http://www.w3.org/2000/svg';
+  const ICONS = {
+    model:'<rect x="4" y="4" width="8" height="8" rx="1.5"/><path d="M6.5 1.5v2.5M9.5 1.5v2.5M6.5 12v2.5M9.5 12v2.5M1.5 6.5H4M1.5 9.5H4M12 6.5h2.5M12 9.5h2.5"/>',
+    tool:'<path d="M10.5 2.2a3.3 3.3 0 0 0-3 4.5L2.4 11.8a1.2 1.2 0 0 0 1.8 1.8l5.1-5.1a3.3 3.3 0 0 0 4.5-3l-2 2-1.8-.5-.5-1.8z"/>',
+    file:'<path d="M4 1.8h5l3 3v8.4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-10.4a1 1 0 0 1 1-1z"/><path d="M9 1.8v3h3"/>',
+    agent:'<rect x="2.5" y="5.5" width="11" height="8" rx="2"/><path d="M8 5.5V3M6 9v.5M10 9v.5"/><circle cx="8" cy="2.4" r=".6"/>',
+    cache:'<path d="M9 1.5L3.5 8.5H8l-1 6 5.5-7H8z"/>',
+    fail:'<circle cx="8" cy="8" r="6"/><path d="M8 4.8V8.3M8 10.7v.1"/>'
+  };
+  const ic = n => '<svg class="at-ic" viewBox="0 0 16 16" aria-hidden="true">' + ICONS[n] + '</svg>';
+  const fmtMs = s => { const ms = Math.round(s * 1000); return ms < 1000 ? ms + 'ms' : (ms / 1000).toFixed(2) + 's'; };
+  const fmtTk = n => Math.round(n).toLocaleString('en-US') + ' tk';
+
+  root.classList.add('at');
+  root.classList.toggle('no-ruler', !o.showRuler);
+  root.classList.toggle('no-tokens', !o.showTokens);
+  root.classList.toggle('no-transport', !o.showTransport);
+  root.style.setProperty('--row-h', o.rowHeight + 'px');
+  root.style.setProperty('--label-w', o.labelWidth + 'px');
+
+  const dom = o.domain, pct = t => (t / dom * 100);
+  let h = '<div class="at-head"><span class="at-dot"></span><span class="at-run">' + o.title + '</span><span class="at-sub">' + o.subline +
+    '</span><span class="at-badge" data-badge>Running</span></div>';
+  h += '<div class="at-ruler"><div class="at-ruler-in">';
+  for (let s = 2; s < o.total; s += 2) h += '<span class="at-tick" style="left:' + pct(s) + '%">' + s + 's</span>';
+  h += '</div></div><div class="at-body">';
+  h += '<div class="at-overlay" aria-hidden="true">';
+  for (let s = 2; s < o.total; s += 2) h += '<i class="at-grid" style="left:' + pct(s) + '%"></i>';
+  h += '<i class="at-tree" data-tree></i><i class="at-playhead" data-ph style="left:0"><i class="at-diamond"></i></i></div>';
+  spans.forEach((s, i) => {
+    h += '<div class="at-row d' + s.d + ' pending" data-i="' + i + '"><div class="at-label">' + ic(s.k) + '<span>' + s.l + '</span>' +
+      (s.badge ? '<span class="at-x2">' + s.badge + '</span>' : '') + '</div>' +
+      '<div class="at-track"><div class="at-bar ' + (s.light ? 'light ' : '') + (s.fail ? 'fail' : '') + '" style="left:' + pct(s.s) + '%;width:' + pct(s.u) + '%"><i class="at-fill"></i></div></div>' +
+      '<div class="at-meta' + (s.fail ? ' fail' : '') + '"></div></div>';
+  });
+  h += '</div><div class="at-foot"><button class="at-play" type="button" aria-label="Wiedergabe"><svg viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z"/></svg></button>' +
+    '<div class="at-scrub" role="slider" tabindex="0" aria-label="Zeitleiste" aria-valuemin="0" aria-valuemax="' + o.total + '" aria-valuenow="0"><div class="at-rail"><i class="at-rail-fill"></i></div><i class="at-thumb"></i></div>' +
+    '<span class="at-time" aria-live="off"></span></div>';
+  root.innerHTML = h;
+
+  const $ = q => root.querySelector(q);
+  const ph = $('[data-ph]'), badge = $('[data-badge]'), scrub = $('.at-scrub'), thumb = $('.at-thumb'),
+        railFill = $('.at-rail-fill'), timeEl = $('.at-time'), playBtn = $('.at-play'), tree = $('[data-tree]');
+  const rows = [...root.querySelectorAll('.at-row')];
+  const R = spans.map((s, i) => ({
+    row: rows[i], bar: rows[i].querySelector('.at-bar'), fill: rows[i].querySelector('.at-fill'),
+    meta: rows[i].querySelector('.at-meta'), p: -1, txt: null, state: ''
+  }));
+
+  /* Baumlinie (einmal gemessen, nur Layout-Setup, nicht pro Frame) */
+  function layoutTree(){
+    const first = spans.findIndex(s => s.d === 1);
+    if (first < 0) return;
+    let last = first; while (spans[last + 1] && spans[last + 1].d === 1) last++;
+    const top = rows[first].offsetTop + 6, bottom = rows[last].offsetTop + rows[last].offsetHeight - 8;
+    tree.style.left = '-' + (o.labelWidth + 17 - 28) + 'px';
+    tree.style.top = (top - 3) + 'px';
+    tree.style.height = Math.max(0, bottom - top) + 'px';
+  }
+  layoutTree();
+
+  let t = o.startAt * o.total, target = t, shown = null, playing = false, dragging = false, last = 0, raf = 0;
+  let plotW = 0, scrubW = 0;
+  const overlay = $('.at-overlay');
+  function measure(){ plotW = overlay.offsetWidth; scrubW = scrub.offsetWidth; render(); }
+  if (window.ResizeObserver) new ResizeObserver(measure).observe(root);
+  let trackLeft = 0, trackW = 1, pendingX = null;
+
+  function metaHTML(s, p){
+    if (p <= 0) return '';
+    const el = s.u * Math.min(p, 1);
+    if (p >= 1){
+      if (s.tk) return '<span class="at-tk">' + fmtTk(s.tk) + '</span><span>' + fmtMs(s.u) + '</span>';
+      return (s.cache ? ic('cache') : s.fail ? ic('fail') : '') + '<span>' + s.r + '</span><span>' + fmtMs(s.u) + '</span>';
+    }
+    return (s.tk ? '<span class="at-tk">' + fmtTk(s.tk * p) + '</span>' : '') + '<span>' + fmtMs(el) + '</span>';
+  }
+
+  function render(){
+    ph.style.transform = 'translate3d(' + (t / dom * plotW) + 'px,0,0)';
+    const f = t / o.total;
+    thumb.style.transform = 'translate3d(' + (f * scrubW) + 'px,0,0)';
+    railFill.style.transform = 'scaleX(' + f + ')';
+    for (let i = 0; i < spans.length; i++){
+      const s = spans[i], r = R[i];
+      const p = Math.min(Math.max((t - s.s) / s.u, 0), 1);
+      if (p !== r.p){
+        r.p = p;
+        r.fill.style.transform = 'scaleX(' + p + ')';
+        const st = p <= 0 ? 'pending' : p >= 1 ? 'done' : 'active';
+        if (st !== r.state){
+          r.state = st;
+          r.row.classList.toggle('pending', st === 'pending');
+          r.row.classList.toggle('is-active', st === 'active');
+          r.bar.classList.toggle('is-started', st !== 'pending');
+          r.bar.classList.toggle('is-done', st === 'done');
+          r.meta.classList.toggle('is-done', st === 'done');
+        }
+        const m = metaHTML(s, p);
+        if (m !== r.txt){ r.txt = m; r.meta.innerHTML = m; }
+      }
+    }
+    const tx = t.toFixed(2) + 's / ' + o.total.toFixed(2) + 's';
+    if (tx !== shown){
+      shown = tx; timeEl.textContent = tx;
+      scrub.setAttribute('aria-valuenow', t.toFixed(2));
+      scrub.setAttribute('aria-valuetext', tx);
+      badge.textContent = t >= o.total - 1e-6 ? 'Completed' : 'Running';
+    }
+  }
+
+  function setMoving(on){ root.classList.toggle('is-moving', on); }
+
+  function frame(now){
+    raf = 0;
+    const dt = Math.min(now - last, 50); last = now;
+    let changed = false;
+    if (pendingX !== null){   /* pointermove wird hier genau einmal angewendet */
+      target = Math.min(Math.max((pendingX - trackLeft) / trackW, 0), 1) * o.total;
+      pendingX = null;
+    }
+    if (dragging){
+      if (o.follow > 0){
+        const a = 1 - Math.exp(-o.follow * dt / 1000);
+        const nt = t + (target - t) * a;
+        t = Math.abs(target - nt) < 1e-4 ? target : nt;
+      } else t = target;
+      changed = true;
+    } else if (playing){
+      t += dt / 1000 * o.speed;
+      if (t >= o.total){ if (o.loop) t = t % o.total; else { t = o.total; playing = false; syncBtn(); } }
+      target = t; changed = true;
+    }
+    if (changed) render();
+    if (playing || dragging || Math.abs(target - t) > 1e-4){
+      if (!dragging && !playing){ t = target; render(); }
+      raf = requestAnimationFrame(frame);
+    } else setMoving(false);
+  }
+  function kick(){ if (!raf){ last = performance.now(); setMoving(true); raf = requestAnimationFrame(frame); } }
+
+  function syncBtn(){
+    playBtn.setAttribute('aria-label', playing ? 'Pause' : 'Wiedergabe');
+    playBtn.innerHTML = playing
+      ? '<svg viewBox="0 0 12 12"><rect x="2.5" y="2" width="2.6" height="8" rx=".6"/><rect x="6.9" y="2" width="2.6" height="8" rx=".6"/></svg>'
+      : '<svg viewBox="0 0 12 12"><path d="M3 1.5v9l7.5-4.5z"/></svg>';
+  }
+  function seek(x){
+    const r = scrub.getBoundingClientRect();   /* nur bei Eingabe-Start gemessen */
+    trackLeft = r.left; trackW = Math.max(r.width, 1);
+    pendingX = x; kick();
+  }
+  scrub.addEventListener('pointerdown', e => {
+    dragging = true; playing = false; syncBtn();
+    scrub.setPointerCapture(e.pointerId);
+    seek(e.clientX);
+  });
+  scrub.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const ev = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
+    pendingX = ev && ev.length ? ev[ev.length - 1].clientX : e.clientX;
+    kick();
+  }, {passive:true});
+  const end = () => { dragging = false; kick(); };
+  scrub.addEventListener('pointerup', end);
+  scrub.addEventListener('pointercancel', end);
+  scrub.addEventListener('keydown', e => {
+    const st = e.shiftKey ? 1 : 0.1;
+    let nt = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') nt = t + st;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') nt = t - st;
+    else if (e.key === 'Home') nt = 0; else if (e.key === 'End') nt = o.total;
+    if (nt === null) return;
+    e.preventDefault(); target = Math.min(Math.max(nt, 0), o.total); t = target; render();
+  });
+  playBtn.addEventListener('click', () => {
+    if (t >= o.total - 1e-6) t = 0;
+    playing = !playing; syncBtn();
+    if (playing) kick();
+  });
+  measure(); syncBtn();
+  if (o.autoPlay && !reduce){ playing = true; syncBtn(); kick(); }
+
+  return {
+    seek: s => { target = t = Math.min(Math.max(s, 0), o.total); render(); },
+    play: () => { playing = true; syncBtn(); kick(); },
+    pause: () => { playing = false; syncBtn(); },
+    get time(){ return t; }
+  };
+}
+
+/* ==================== DEMO (exakt der Video-Inhalt) ==================== */
+window.agentTrace = initAgentTrace(document.getElementById('agent-trace'), {});
+</script>
+</body>
+</html>
