@@ -13,6 +13,7 @@ import { ScenarioWatcher } from "@/app/ScenarioWatcher";
 import { toIslandToast } from "@/app/toasts";
 import { useDetailCandles } from "@/app/useDetailCandles";
 import { Celebrate } from "@/motion/Celebrate";
+import { IntroHost } from "@/intro/IntroHost";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { spring } from "@/motion/tokens";
 import { ToastIsland } from "@/primitives/Toast";
@@ -90,6 +91,7 @@ export default function App() {
       <EditorHost />
       <SetupEditor />
       <Celebrate />
+      <IntroHost />
     </MorphDialogProvider>
   );
 }
