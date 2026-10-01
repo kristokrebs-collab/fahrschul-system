@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel Collage</title>
+<style>
+/* =====================================================================
+   CONFIG - alle Look-/Motion-Werte hier (Zeiten in ms, Loop-Zeit ab Reel-Start)
+   ===================================================================== */
+:root{
+  /* Look */
+  --stage-bg:#1d1d1a;          /* Buehnenfarbe (gemessen) */
+  --text:#f3f3f3;              /* Headline-Weiss (gemessen ~243) */
+  --font:Inter,Geist,ui-sans-serif,system-ui,sans-serif;
+  --headline-size:36px;        /* Schriftgroesse der zwei Zeilen */
+  --headline-weight:500;
+  --headline-track:-0.045em;   /* enge Laufweite */
+  --media-opacity:.64;         /* Reels/Karten wirken gedimmt (weiss -> #AEAEAE) */
+  --blue:#2f76e8;              /* snapcn-Reel */
+  --glow:rgba(150,40,14,.2);  /* roter Rand-Schimmer waehrend der Karten-Phase */
+  --reel-w:490px; --reel-h:337px;  /* Reel-Fenster (Referenz 1234x673) */
+  --line-gap:20px;             /* halber Abstand der zwei Zeilen im Zusammenschnitt */
+  --line-off:182px;            /* Zeilenabstand zur Reel-Mitte = gap + --line-off*scaleY */
+}
+/* Zeitleiste (ms) - JS liest diese Werte aus CONFIG unten */
+</style>
+<style>
+/* COMPONENT CSS */
+.rc{position:relative;width:100%;height:100%;overflow:hidden;background:var(--stage-bg);contain:layout paint;
+  font-family:var(--font);color:var(--text);touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;cursor:pointer;outline:none}
+.rc:focus-visible{box-shadow:inset 0 0 0 2px #6aa2ff}
+.rc-canvas{position:absolute;left:0;top:0;width:1234px;height:673px;transform-origin:0 0}
+.rc-glow{position:absolute;inset:0;opacity:0;background:radial-gradient(ellipse 62% 60% at 50% 50%,transparent 55%,var(--glow) 100%)}
+.rc-line{position:absolute;left:0;top:318px;width:1234px;height:36px;line-height:36px;text-align:center;
+  font-size:var(--headline-size);font-weight:var(--headline-weight);letter-spacing:var(--headline-track);white-space:nowrap}
+.rc-line span{display:none}.rc-line span.on{display:inline}
+.rc-media{position:absolute;left:372px;top:168px;width:var(--reel-w);height:var(--reel-h);opacity:var(--media-opacity);transform-origin:50% 50%;overflow:hidden}
+.rc-reel{position:absolute;inset:0;display:none;overflow:hidden}.rc-reel.on{display:block}.rc-reel.r-snap.on{display:flex}
+.rc-card{position:absolute;opacity:0;overflow:hidden;opacity:0}
+/* --- Reel-Motive (vereinfachte Nachbauten) --- */
+.r-universe{background:#050506}
+.r-universe i{position:absolute;width:26px;height:20px;border-radius:3px;background:linear-gradient(135deg,#bbb,#556);opacity:.8}
+.r-universe b{position:absolute;left:0;right:0;top:48%;text-align:center;font:500 22px var(--font);color:#ddd;letter-spacing:-.02em}
+.r-universe u{position:absolute;left:0;right:0;top:63%;text-align:center;font:9px var(--font);color:#777;text-decoration:none}
+.r-browse{background:linear-gradient(#92b2e2,#4a74bd 55%,#3d66ad)}
+.r-browse em{position:absolute;left:0;right:0;top:12%;text-align:center;font:500 12px var(--font);color:#d9e4f7;font-style:normal}
+.r-browse i{position:absolute;bottom:0;height:62%;background:#f1f4fa;border-radius:3px}
+.r-browse i.m{left:30%;width:40%;height:68%;background:#fff}
+.r-browse i.m::before{content:"";position:absolute;left:30%;top:8%;width:42%;height:40%;border-radius:8px;background:radial-gradient(#8a9a52,#1c2a14)}
+.r-sunset{background:#0a0807}
+.r-sunset::before{content:"";position:absolute;left:3%;top:2%;width:74%;height:94%;border-radius:46% 54% 40% 60%;background:radial-gradient(ellipse at 60% 35%,#f6b04a,#d9622b 55%,#7a2a18)}
+.r-sunset::after{content:"";position:absolute;right:6%;top:8%;width:22%;height:78%;border-radius:50% 10% 30% 60%;background:#0b0907}
+.r-laptop{background:#000}
+.r-laptop i{position:absolute;left:18%;top:10%;width:64%;height:70%;background:#d9d9d9;transform:perspective(300px) rotateX(8deg);border:3px solid #1a1a1a;border-radius:4px}
+.r-laptop i::after{content:"";position:absolute;left:12%;right:12%;top:14%;height:46%;background:repeating-linear-gradient(#bbb 0 2px,transparent 2px 9px);opacity:.7}
+.r-laptop b{position:absolute;left:12%;right:12%;bottom:8%;height:6px;background:#2a2a2a;border-radius:3px}
+.r-clips{background:#fff}
+.r-clips i{position:absolute;width:96px;border-radius:3px}
+.r-clips .a{left:150px;top:0;height:108px;background:linear-gradient(#e8a85a,#c25a2c 60%,#1a1210)}
+.r-clips .b{left:251px;top:0;height:108px;background:linear-gradient(135deg,#7a2a14,#e8582a)}
+.r-clips .c{left:150px;top:114px;height:116px;background:linear-gradient(135deg,#2b3e9a,#e0a63c)}
+.r-clips .d{left:251px;top:114px;height:116px;background:linear-gradient(#9cc6d8,#5a7fa8 60%,#7a5a8a)}
+.r-clips .e{left:251px;top:236px;height:101px;background:linear-gradient(120deg,#0b1b2c,#23506f 50%,#d8742a)}
+.r-clips s{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:3px 13px;border-radius:7px;background:rgba(255,255,255,.88);color:#3a6a9a;font:500 22px var(--font);text-decoration:none}
+.r-snap{background:var(--blue);display:flex;align-items:center;justify-content:center;font:500 30px var(--font);color:#0a1730;letter-spacing:-.02em}
+.r-snap span{background:#0a0a0c;color:#f3f3f3;border-radius:6px;padding:0 8px;margin-left:8px;line-height:36px}
+.r-fan{background:#121212}
+.r-fan i{position:absolute;width:112px;height:150px;border-radius:2px}
+.r-fan .a{left:40px;top:100px;background:linear-gradient(160deg,#2b3a96,#d68a50);transform:rotate(-5deg)}
+.r-fan .b{left:120px;top:20px;background:linear-gradient(#6aa0d8,#e0b098);transform:rotate(3deg)}
+.r-fan .c{left:160px;top:60px;background:linear-gradient(135deg,#d8662e,#8a3a22)}
+.r-fan .d{left:80px;top:60px;background:linear-gradient(135deg,#243a9a,#e8a060 70%,#3a2a6a);transform:rotate(-2deg)}
+/* --- Karten --- */
+.c1{left:201px;top:174px;width:176px;height:196px;background:#cfd0d2;border-radius:10px 22px 4px 4px}
+.c1::before{content:"";position:absolute;left:3px;top:20px;right:3px;bottom:0;border-radius:6px 20px 0 0;background:radial-gradient(circle at 50% 45%,#b9b66a 0 3%,transparent 5%),radial-gradient(#3a5a2a,#0c1a0a)}
+.c2{left:387px;top:254px;width:237px;height:161px;background:#020202;font:13px ui-monospace,Menlo,monospace;color:#b6b9c8}
+.c2::before{content:"m install One Tool";position:absolute;left:0;top:0;width:100%;height:48px;line-height:48px;background:#101012;white-space:pre}
+.c3{left:661px;top:93px;width:270px;height:180px;background:#dbe0e6;font:500 9px var(--font);color:#222}
+.c3 i{position:absolute;height:34px;border-radius:7px;background:#e4e2de}
+.c3 .t1{left:-10px;top:24px;width:60px}.c3 .t2{left:65px;top:24px;width:130px}.c3 .t3{left:215px;top:24px;width:70px}
+.c3 .t4{left:-10px;top:72px;width:60px}.c3 .t5{left:215px;top:72px;width:70px}
+.c3 .t6{left:18px;top:122px;width:130px}.c3 .t7{left:165px;top:122px;width:120px}
+.c3 b{position:absolute;left:85px;top:82px;width:100px;height:19px;border-radius:3px;background:#2f6fd8;color:#fff;text-align:center;line-height:19px;font-weight:500}
+.c4{left:637px;top:301px;width:233px;height:162px;background:#f1f1f1;font:500 10px var(--font);color:#333}
+.c4::before{content:"";position:absolute;left:0;right:0;top:56px;height:34px;background:radial-gradient(circle,#7a6a5a 0 55%,transparent 60%) 0 0/12px 12px repeat-x;filter:none;transform:skewY(-2deg)}
+.c4 span{position:absolute;left:16px;top:98px}
+.c5{left:235px;top:432px;width:251px;height:171px;background:#0c0d11;font:13px var(--font);color:#9a9ca4}
+.c5 p{position:absolute;margin:0;left:68px;white-space:nowrap}
+.c5 i{position:absolute;left:30px;width:34px;height:34px;border-radius:3px;background:#7a6a60}
+.c5 b{color:#e8e8ea}
+.c6{left:834px;top:419px;width:238px;height:162px;background:#07080b}
+.c6::before{content:"";position:absolute;left:0;top:50px;width:78px;height:112px;background:linear-gradient(90deg,#c9ccd0,#8a9096);border-radius:4px 0 0 0}
+.c6::after{content:"";position:absolute;left:129px;top:0;width:109px;height:162px;background:radial-gradient(circle at 50% 45%,#2c3a2a,#0a0c0a 70%);border-radius:10px 0 0 0}
+@media (prefers-reduced-motion:reduce){.rc{cursor:default}}
+</style>
+</head>
+<body style="margin:0;background:var(--stage-bg);height:100vh;height:100dvh;overflow:hidden">
+
+<div id="app" style="position:fixed;inset:0">
+<!-- COMPONENT:START -->
+<div class="rc" tabindex="0" role="img" aria-label="Reel Collage: Zwei Headline-Zeilen rahmen wechselnde Video-Reels ein, die Reels kollabieren, dann fliegen Karten ein. Tippen pausiert.">
+  <div class="rc-canvas">
+    <div class="rc-glow"></div>
+    <div class="rc-media" data-media>
+      <div class="rc-reel r-universe"><i style="left:60px;top:18px"></i><i style="left:200px;top:6px"></i><i style="left:350px;top:22px"></i><i style="left:430px;top:80px"></i><i style="left:20px;top:110px"></i><i style="left:430px;top:250px"></i><i style="left:30px;top:270px"></i><i style="left:150px;top:300px"></i><i style="left:300px;top:296px"></i><i style="left:390px;top:200px"></i><b>A whole new universe</b><u>Article - The Design Process</u></div>
+      <div class="rc-reel r-browse"><em>Browse scenes</em><i style="left:-6%;width:30%"></i><i class="m"></i><i style="right:-6%;width:30%"></i></div>
+      <div class="rc-reel r-sunset"></div>
+      <div class="rc-reel r-laptop"><i></i><b></b></div>
+      <div class="rc-reel r-clips"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i><s>5 clips</s></div>
+      <div class="rc-reel r-snap">snapcn is<span>installed</span></div>
+      <div class="rc-reel r-fan"><i class="a"></i><i class="b"></i><i class="d"></i><i class="c"></i></div>
+    </div>
+    <div class="rc-card c1" data-cx="289" data-cy="272"></div>
+    <div class="rc-card c2" data-cx="505" data-cy="334"></div>
+    <div class="rc-card c3" data-cx="796" data-cy="183"><i class="t1"></i><i class="t2"></i><i class="t3"></i><i class="t4"></i><i class="t5"></i><i class="t6"></i><i class="t7"></i><b>Install all</b></div>
+    <div class="rc-card c4" data-cx="753" data-cy="382"><span><b>Hazar</b> and 5,000 others followed you</span></div>
+    <div class="rc-card c5" data-cx="360" data-cy="517"><i style="top:6px"></i><p style="top:8px"><b>rhea</b> 9:41 AM</p><p style="top:26px">Launch video by Thursday?</p><p style="top:46px;color:#c6c8d0">We have nothing shot.</p><i style="top:74px"></i><p style="top:78px"><b>sam</b> 9:42 AM</p><p style="top:96px;color:#e0e0e4">Already done.</p></div>
+    <div class="rc-card c6" data-cx="953" data-cy="500"></div>
+    <div class="rc-line" data-top><span class="on">The videos</span><span>Especially on</span></div>
+    <div class="rc-line" data-bot><span class="on">That you ship</span><span>Launch day</span></div>
+  </div>
+</div>
+<!-- COMPONENT:END -->
+</div>
+
+<script>
+/* =====================================================================
+   CONFIG (JS) - Timing in ms, gemessen aus dem Video (3,2-s-Loop)
+   ===================================================================== */
+const REEL_CONFIG = {
+  loop: 3200,                                   // Gesamtdauer eines Durchlaufs
+  reelStarts: [0, 95, 205, 335, 468, 630, 835], // Schnittzeiten der 7 Reels (Universe, Browse, Sunset, Laptop, 5 clips, snapcn, Fan)
+  collapseAt: 906, collapseDur: 340,            // Reel klappt per scaleY zu (ease-out cubic), Zeilen laufen zusammen
+  swapAt: 1531,                                 // Textwechsel "Especially on / Launch day"
+  spreadAt: 1690, spreadDur: 440,               // Zeilen + Karten fliegen auseinander (ease-out cubic)
+  cardFade: 260, cardStagger: 22, cardOpacity: 0.7,               // Karten-Einblendung
+  cardStartK: 0.72, cardStartScale: 0.86,       // Startabstand zur Mitte (Faktor) und Startgroesse der Karten
+  lineGap: 20, lineOff: 182,                    // Zeilen-Geometrie (px, Referenz 1234x673)
+  spreadTop: [-118, -173], spreadBot: [70, 162],// Endposition der Zeilen (dx, dy) relativ zur Mitte
+  autoplay: true, pauseOnTap: true
+};
+
+/* COMPONENT JS */
+function initReelCollage(root, opts){
+  const C = Object.assign({}, REEL_CONFIG, opts||{});
+  const canvas = root.querySelector('.rc-canvas');
+  const media = root.querySelector('[data-media]');
+  const reels = Array.from(root.querySelectorAll('.rc-reel'));
+  const cards = Array.from(root.querySelectorAll('.rc-card')).map(el=>({el, cx:+el.dataset.cx, cy:+el.dataset.cy, o:-1, key:''}));
+  const glow = root.querySelector('.rc-glow');
+  const top = root.querySelector('[data-top]'), bot = root.querySelector('[data-bot]');
+  const topS = top.querySelectorAll('span'), botS = bot.querySelectorAll('span');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const cache = {reel:-1, swap:-1, media:'', top:'', bot:'', glow:-1};
+  let scale = 1, elapsed = 0, last = 0, raf = 0, running = false;
+
+  // einmal messen (nicht pro Frame): Skalierung der 1234x673-Buehne
+  function fit(){
+    const w = root.clientWidth, h = root.clientHeight;
+    scale = Math.min(w/1234, h/673);
+    const x = (w - 1234*scale)/2, y = (h - 673*scale)/2;
+    canvas.style.transform = 'translate3d('+x+'px,'+y+'px,0) scale('+scale+')';
+  }
+  const ro = new ResizeObserver(fit); ro.observe(root); fit();
+
+  const clamp = v => v<0?0:v>1?1:v;
+  const easeOut = p => 1 - Math.pow(1-clamp(p), 3);
+
+  function render(t){
+    const T = C.loop;
+    // 1) Reel-Auswahl (nur bei Wechsel DOM anfassen)
+    let reel = -1;
+    if (t < C.collapseAt + C.collapseDur){
+      reel = 0; for (let i=0;i<C.reelStarts.length;i++) if (t >= C.reelStarts[i]) reel = i;
+    }
+    if (reel !== cache.reel){
+      cache.reel = reel;
+      reels.forEach((r,i)=>r.classList.toggle('on', i===reel));
+      media.style.visibility = reel<0 ? 'hidden' : 'visible';
+    }
+    // 2) Kollaps: scaleY 1 -> 0, Zeilen ruecken an die Mitte
+    const cp = easeOut((t - C.collapseAt)/C.collapseDur);
+    const s = 1 - cp;
+    const off = C.lineGap + C.lineOff * s;
+    let tx = 0, ty = -off, bx = 0, by = off;
+    // 3) Textwechsel + Ausbreiten
+    const swap = t >= C.swapAt ? 1 : 0;
+    if (swap !== cache.swap){
+      cache.swap = swap;
+      topS[0].classList.toggle('on', !swap); topS[1].classList.toggle('on', !!swap);
+      botS[0].classList.toggle('on', !swap); botS[1].classList.toggle('on', !!swap);
+    }
+    const e = easeOut((t - C.spreadAt)/C.spreadDur);
+    if (t >= C.spreadAt - 1){
+      tx = C.spreadTop[0]*e; ty = -C.lineGap + (C.spreadTop[1] + C.lineGap)*e;
+      bx = C.spreadBot[0]*e; by =  C.lineGap + (C.spreadBot[1] - C.lineGap)*e;
+    }
+    const mk = 'translate3d(0,0,0) scale(1,'+(s<0.002?0.002:s).toFixed(4)+')';
+    if (mk !== cache.media){ cache.media = mk; media.style.transform = mk; media.style.opacity = s<0.05 ? '' : ''; }
+    const tk = tx.toFixed(2)+','+ty.toFixed(2), bk = bx.toFixed(2)+','+by.toFixed(2);
+    if (tk !== cache.top){ cache.top = tk; top.style.transform = 'translate3d('+tx+'px,'+ty+'px,0)'; }
+    if (bk !== cache.bot){ cache.bot = bk; bot.style.transform = 'translate3d('+bx+'px,'+by+'px,0)'; }
+    // 4) Karten
+    for (let i=0;i<cards.length;i++){
+      const c = cards[i];
+      const lt = t - C.spreadAt - i*C.cardStagger;
+      const o = t < C.spreadAt ? 0 : clamp(lt/C.cardFade);
+      const p = easeOut(lt/C.spreadDur);
+      const f = C.cardStartK + (1-C.cardStartK)*p, sc = C.cardStartScale + (1-C.cardStartScale)*p;
+      const x = (f-1)*(c.cx-617), y = (f-1)*(c.cy-336.5);
+      const key = o.toFixed(3)+'|'+x.toFixed(2)+'|'+y.toFixed(2)+'|'+sc.toFixed(3);
+      if (key !== c.key){
+        c.key = key;
+        c.el.style.opacity = (o*C.cardOpacity).toFixed(3);
+        c.el.style.transform = 'translate3d('+x+'px,'+y+'px,0) scale('+sc+')';
+      }
+    }
+    const g = clamp((t - C.spreadAt)/300);
+    if (g !== cache.glow){ cache.glow = g; glow.style.opacity = g.toFixed(3); }
+  }
+
+  function frame(now){
+    if (!running) return;
+    const dt = Math.min(now - last, 50); last = now;     // dt-Deckel, bildratenunabhaengig
+    elapsed = (elapsed + dt) % C.loop;
+    render(elapsed);
+    raf = requestAnimationFrame(frame);
+  }
+  function setHint(on){ const w = on ? 'transform, opacity' : 'auto'; [media, top, bot, glow].concat(cards.map(c=>c.el)).forEach(el=>{ el.style.willChange = w; }); }
+  function play(){ if (running) return; running = true; setHint(true); last = performance.now(); raf = requestAnimationFrame(frame); }
+  function pause(){ running = false; cancelAnimationFrame(raf); setHint(false); }
+  function toggle(){ running ? pause() : play(); root.setAttribute('aria-pressed', String(!running)); }
+
+  if (reduce){ elapsed = C.spreadAt + C.spreadDur + 100; render(elapsed); }   // statisches Endbild
+  else {
+    render(0);
+    root.addEventListener('pointerup', e=>{ if (C.pauseOnTap) toggle(); }, {passive:true});
+    root.addEventListener('keydown', e=>{ if (e.key===' '||e.key==='Enter'){ e.preventDefault(); toggle(); } });
+    document.addEventListener('visibilitychange', ()=>{ document.hidden ? pause() : (C.autoplay && play()); });
+    if (C.autoplay) play();
+  }
+  return { play, pause, toggle, seek(ms){ elapsed = ms % C.loop; render(elapsed); }, destroy(){ pause(); ro.disconnect(); } };
+}
+
+/* Demo: exakt der Video-Inhalt */
+initReelCollage(document.querySelector('.rc'));
+</script>
+</body>
+</html>
