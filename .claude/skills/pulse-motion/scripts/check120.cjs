@@ -46,7 +46,11 @@ async function run(html, actions, w, h, throttle) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console.error: ' + m.text()); });
   await page.addInitScript(() => {
     window.__ft = []; window.__on = false;
-    const loop = (t) => { if (window.__on) window.__ft.push(t); requestAnimationFrame(loop); };
+    // Dummy-Layer: erzwingt pro rAF einen Compositor-Frame, damit auch Leerlauf-Phasen ungedrosselt rendern
+    // (Headless-Chromium taktet sonst im Leerlauf mit 60 Hz und verfaelscht die Frame-Zeit-Statistik).
+    let dummy = null, n = 0;
+    const mk = () => { dummy = document.createElement('div'); dummy.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:.01;pointer-events:none;will-change:transform'; document.documentElement.appendChild(dummy); };
+    const loop = (t) => { if (!dummy && document.documentElement) mk(); if (dummy) dummy.style.transform = 'translate3d(' + (++n % 2) + 'px,0,0)'; if (window.__on) window.__ft.push(t); requestAnimationFrame(loop); };
     requestAnimationFrame(loop);
   });
   await page.goto('file://' + path.resolve(html));
