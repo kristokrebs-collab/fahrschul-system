@@ -28,8 +28,8 @@
   --tps-lift:       -0.105em;/* Text in der Linse sitzt ~5px hoeher */
 
   /* Prisma-Ebenen (mix-blend-mode: screen). Ruhe = alle drei weiss; je groesser der Nachlauf der Linse
-     hinter dem Zeiger, desto staerker faerben sie sich zu c1/c2/c3 ein und rutschen auseinander.
-     Ueberlagert ergeben die drei Farben exakt Weiss. */
+     hinter dem Zeiger, desto staerker blenden sie zu c1/c2/c3 ein (per opacity, compositor-only) und rutschen
+     auseinander. Ueberlagert ergeben die drei Farben exakt Weiss. */
   --tps-c1: #ff8080;         /* lachsrot   (haengt hinter der Bewegungsrichtung her) */
   --tps-c2: #00ff00;         /* reines Gruen (Mitte, bleibt auf der Stelle) */
   --tps-c3: #ccccff;         /* lavendel   (eilt in Bewegungsrichtung voraus) */
@@ -46,12 +46,13 @@ body {
 .tps {
   position: relative;
   display: inline-block;
-  margin: 0; padding: 0;
+  margin: 0 calc(-1 * var(--tps-tracking)) 0 0; padding: 0; /* rechter Rand gleicht das negative Nach-Letter-Spacing aus => Tinte exakt mittig */
   font: var(--tps-weight) var(--tps-size)/var(--tps-line) var(--tps-font);
   letter-spacing: var(--tps-tracking);
   color: var(--tps-ink);
   white-space: nowrap;
   touch-action: pan-y;               /* horizontal ziehen steuert die Linse, vertikal scrollt */
+  contain: layout style;             /* kein "paint": die Linse darf ueber das Textende hinausragen */
   -webkit-font-smoothing: antialiased;
   text-rendering: geometricPrecision;
 }
@@ -61,22 +62,25 @@ body {
   position: absolute; left: 0; top: 0;
   width: var(--tps-lens-w); height: 100%;
   overflow: hidden;
+  contain: layout paint style;       /* Linse klippt/rastert nur sich selbst */
   background: var(--tps-lens-bg);
-  isolation: isolate;                 /* screen-Blending nur innerhalb der Linse */
+  isolation: isolate;                /* screen-Blending nur innerhalb der Linse */
   pointer-events: none; user-select: none; -webkit-user-select: none;
-  will-change: transform;
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--tps-feather), #000 calc(100% - var(--tps-feather)), transparent 100%);
           mask-image: linear-gradient(90deg, transparent 0, #000 var(--tps-feather), #000 calc(100% - var(--tps-feather)), transparent 100%);
+  transform: translate3d(0,0,0);
 }
-.tps__layer {
+.tps__layer {                        /* Wrapper: bewegt/skaliert (transform) + blendet (screen) */
   position: absolute; left: 0; top: 0;
   display: block; white-space: nowrap;
   transform-origin: 0 0;
-  will-change: transform;
   mix-blend-mode: screen;
-  color: var(--tps-lens-ink);         /* Ruhe: alle 3 Ebenen weiss (JS faerbt per Nachlauf ein) */
+  transform: translate3d(0,0,0);
 }
-@media (prefers-reduced-motion: reduce) { .tps__lens, .tps__layer { will-change: auto; } }
+.tps__ink  { display: block; color: var(--tps-lens-ink); }                 /* weisse Basis der Ebene */
+.tps__tint { position: absolute; left: 0; top: 0; opacity: 0; }           /* Farb-Kopie, nur opacity wird animiert */
+/* will-change nur waehrend die Linse sich bewegt (JS setzt .is-live) */
+.tps.is-live .tps__lens, .tps.is-live .tps__layer, .tps.is-live .tps__tint { will-change: transform, opacity; }
 /* ===== /COMPONENT CSS ===== */
 </style>
 </head>
@@ -92,13 +96,14 @@ body {
    ========================================================================== */
 const TEXT_PRISM_SPLIT_CONFIG = {
   restAt: 0.5,                 // Ruheposition der Linse (0..1 der Textbreite) - Mitte
-  spring: { stiffness: 350, damping: 30, mass: 1 }, // Linse folgt dem Zeiger federnd (zeta~0.8: ~0.2s Nachlauf, ~1.5% Overshoot)
+  spring: { stiffness: 350, damping: 30, mass: 1 }, // Linse folgt dem Zeiger federnd (zeta~0.8: ~0.2s Nachlauf, ~1.5% Overshoot); exakt analytisch geloest
   split: {
     gain: 0.4,                 // px Ebenen-Versatz pro px "Nachlauf" (Zeiger minus Linse); 0 = kein RGB-Split
     max: 40,                   // max. Versatz der aeusseren Ebenen in px (bei 48px Schrift)
     full: 16,                  // ab diesem Nachlauf (px) sind die Ebenen voll eingefaerbt (darunter anteilig, 0 = reines Weiss)
     release: 0.04,             // s: so schnell klingt der Split nach dem Nachlauf ab (Einsatz ist sofort)
   },
+  maxDt: 50,                   // ms: laengster Zeitschritt pro Frame (Tab-Wechsel/Ruckler) - Rest wird verworfen
   keyboardStep: 0.1,           // Pfeiltasten: Schrittweite (Anteil der Textbreite)
   keyboard: true,              // Element fokussierbar, Pfeiltasten schieben die Linse
 };
@@ -106,103 +111,123 @@ const TEXT_PRISM_SPLIT_CONFIG = {
 /* ===== COMPONENT JS ===== */
 /* initTextPrismSplit(root, opts) -> { setPosition(frac|null), destroy() }
    root: Element mit dem Text (z.B. <h1>). opts ueberschreibt TEXT_PRISM_SPLIT_CONFIG (tief gemerged).
-   Zusaetzlich lesbar per opts: magnify, lift (em) - sonst aus CSS --tps-magnify / --tps-lift. */
+   Zusaetzlich lesbar per opts: magnify, lift (em) - sonst aus CSS --tps-magnify / --tps-lift.
+   120 Hz: alles zeitbasiert (rAF-Zeitstempel, dt <= maxDt), Feder = exakte analytische Loesung (bildratenunabhaengig),
+   Split-Abklingen = 1 - exp(-dt/release), pro Frame nur transform/opacity, Zeigerposition wird nur gespeichert
+   und im naechsten rAF einmal angewendet, Layout wird nur bei Init/Resize gemessen. */
 function initTextPrismSplit(root, opts) {
   const base = (typeof TEXT_PRISM_SPLIT_CONFIG !== 'undefined') ? TEXT_PRISM_SPLIT_CONFIG
-    : { restAt: .5, spring: { stiffness: 350, damping: 30, mass: 1 }, split: { gain: .4, max: 40, full: 16, release: .04 }, keyboardStep: .1, keyboard: true };
+    : { restAt: .5, spring: { stiffness: 350, damping: 30, mass: 1 }, split: { gain: .4, max: 40, full: 16, release: .04 }, maxDt: 50, keyboardStep: .1, keyboard: true };
   const o = Object.assign({}, base, opts || {});
   o.spring = Object.assign({}, base.spring, (opts && opts.spring) || {});
   o.split  = Object.assign({}, base.split,  (opts && opts.split)  || {});
 
-  // --- DOM aufbauen: Basistext + Linse mit 3 Prisma-Ebenen (alle aria-hidden) ---
+  // --- DOM aufbauen (einmal): Basistext + Linse mit 3 Prisma-Ebenen (je weisse Basis + Farb-Kopie, alle aria-hidden) ---
   const text = root.textContent;
   root.textContent = '';
-  const mk = (cls, txt, hidden) => {
-    const el = document.createElement('span'); el.className = cls; el.textContent = txt;
+  const mk = (tag, cls, txt, hidden) => {
+    const el = document.createElement(tag); el.className = cls; if (txt) el.textContent = txt;
     if (hidden) el.setAttribute('aria-hidden', 'true'); return el;
   };
-  const baseEl = mk('tps__text', text, false);
-  const lens = mk('tps__lens', '', true);
-  const layers = [1, 2, 3].map(i => mk('tps__layer tps__layer--' + i, text, true));
-  layers.forEach(l => lens.appendChild(l));
+  const baseEl = mk('span', 'tps__text', text, false);
+  const lens = mk('span', 'tps__lens', '', true);
+  const layers = [], tintEls = [];
+  for (let i = 1; i <= 3; i++) {
+    const layer = mk('span', 'tps__layer tps__layer--' + i, '', true);
+    const ink = mk('span', 'tps__ink', text, false), tint = mk('span', 'tps__tint', text, false);
+    layer.append(ink, tint); lens.appendChild(layer); layers.push(layer); tintEls.push(tint);
+  }
   root.append(baseEl, lens);
   if (o.keyboard) root.tabIndex = 0;
 
-  // --- Metriken (bei Resize neu) ---
-  let W = 0, H = 0, LW = 0, magnify = 1.06, lift = -5;
+  // --- Metriken (nur bei Init / Resize / Font geladen - nie pro Frame) ---
+  let W = 0, BW = 0, H = 0, LW = 0, magnify = 1.06, lift = -5;   // W = Tintenbreite (Box minus Nach-Letter-Spacing), BW = Boxbreite
   const num = (v, d) => { const n = parseFloat(v); return isFinite(n) ? n : d; };
   function measure() {
     const cs = getComputedStyle(root), fs = num(cs.fontSize, 48);
-    W = root.offsetWidth; H = root.offsetHeight; LW = lens.offsetWidth;
+    BW = root.offsetWidth; W = BW - num(cs.letterSpacing, 0); H = root.offsetHeight; LW = lens.offsetWidth;
     magnify = o.magnify != null ? o.magnify : num(cs.getPropertyValue('--tps-magnify'), 1.06);
     lift = (o.lift != null ? o.lift : num(cs.getPropertyValue('--tps-lift'), -0.105)) * fs;
-    lens.style.height = H + 'px';
-    layers.forEach(l => { l.style.height = H + 'px'; });
   }
-  // Farben der Prisma-Ebenen aus CSS lesen (#rgb, #rrggbb oder rgb())
-  const parseRGB = str => {
-    str = (str || '').trim(); let m;
-    if ((m = /^#([0-9a-f]{3})$/i.exec(str))) return m[1].split('').map(h => parseInt(h + h, 16));
-    if ((m = /^#([0-9a-f]{6})$/i.exec(str))) return [0, 2, 4].map(i => parseInt(m[1].substr(i, 2), 16));
-    if ((m = /rgba?\(([^)]+)\)/i.exec(str))) return m[1].split(',').slice(0, 3).map(n => parseFloat(n));
-    return null;
-  };
-  let tints = [[255, 128, 128], [0, 255, 0], [204, 204, 255]];
-  function readColors() {
-    const cs = getComputedStyle(root);
-    tints = tints.map((d, i) => parseRGB(cs.getPropertyValue('--tps-c' + (i + 1))) || d);
+  measure();
+  // Farben der Prisma-Ebenen kommen aus CSS (--tps-c1..3) und werden nur einmal gesetzt
+  tintEls.forEach((el, i) => { el.style.color = 'var(--tps-c' + (i + 1) + ')'; });
+
+  // --- Feder: exakte analytische Loesung der gedaempften Feder fuer beliebiges dt (bildratenunabhaengig) ---
+  const S = { x: 0, v: 0 };
+  function springStep(x, v, target, dt) {
+    const k = o.spring.stiffness, m = o.spring.mass || 1, c = o.spring.damping;
+    const w0 = Math.sqrt(k / m), z = c / (2 * Math.sqrt(k * m)), d0 = x - target;
+    let d, vv;
+    if (z < 1 - 1e-4) {                                   // unterkritisch (Normalfall, zeta~0.8)
+      const wd = w0 * Math.sqrt(1 - z * z), e = Math.exp(-z * w0 * dt), cs = Math.cos(wd * dt), sn = Math.sin(wd * dt);
+      const B = (v + z * w0 * d0) / wd;
+      d = e * (d0 * cs + B * sn);
+      vv = e * ((B * wd - z * w0 * d0) * cs - (z * w0 * B + d0 * wd) * sn);
+    } else if (z <= 1 + 1e-4) {                           // kritisch
+      const e = Math.exp(-w0 * dt), q = v + w0 * d0;
+      d = e * (d0 + q * dt); vv = e * (v - w0 * dt * q);
+    } else {                                              // ueberkritisch
+      const s = w0 * Math.sqrt(z * z - 1), r1 = -z * w0 + s, r2 = -z * w0 - s;
+      const c2 = (v - r1 * d0) / (r2 - r1), c1 = d0 - c2, e1 = Math.exp(r1 * dt), e2 = Math.exp(r2 * dt);
+      d = c1 * e1 + c2 * e2; vv = c1 * r1 * e1 + c2 * r2 * e2;
+    }
+    S.x = target + d; S.v = vv;
   }
-  measure(); readColors();
 
   // --- Zustand ---
   const mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
   let frac = o.restAt;                 // Ziel (0..1)
+  let pendingX = null;                 // zuletzt gemeldete Zeiger-clientX (wird im naechsten rAF angewendet)
   let x = frac * W, v = 0;             // Linsenmitte in px (Textkoordinaten) + Geschwindigkeit
   let u = 0;                           // geglaetteter Nachlauf (px, mit Vorzeichen) -> steuert den RGB-Split
-  let raf = 0, last = 0, active = false;
+  let raf = 0, last = 0, active = false, rect = null, rectDirty = true;
 
   function render() {
     const s = magnify;
     const d = mq.matches ? 0 : Math.max(-o.split.max, Math.min(o.split.max, u * o.split.gain));
     const a = (mq.matches || !o.split.full) ? 0 : Math.min(1, Math.abs(u) / o.split.full); // Farb-Anteil 0..1
-    const offs = [-d, 0, d];           // lachsrot hinten, gruen Mitte, lavendel vorn (Bewegungsrichtung)
     lens.style.transform = 'translate3d(' + (x - LW / 2) + 'px,0,0)';
     const ty = (H / 2) * (1 - s) + lift;
-    for (let i = 0; i < 3; i++) {
-      const t = tints[i];               // Weiss -> Tint, anteilig a
-      layers[i].style.color = 'rgb(' + Math.round(255 + (t[0] - 255) * a) + ',' + Math.round(255 + (t[1] - 255) * a) + ',' + Math.round(255 + (t[2] - 255) * a) + ')';
-      layers[i].style.transform = 'translate3d(' + (LW / 2 - s * x + offs[i]) + 'px,' + ty + 'px,0) scale(' + s + ')';
+    for (let i = 0; i < 3; i++) {       // lachsrot hinten (-d), gruen Mitte, lavendel vorn (+d, Bewegungsrichtung)
+      layers[i].style.transform = 'translate3d(' + (LW / 2 - s * x + (i - 1) * d) + 'px,' + ty + 'px,0) scale(' + s + ')';
+      tintEls[i].style.opacity = a;
     }
   }
   function tick(now) {
-    const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    const target = frac * W, k = o.spring.stiffness, c = o.spring.damping, m = o.spring.mass;
-    if (mq.matches) { x = target; v = 0; u = 0; }
-    else {
-      const n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;   // Substeps: stabiler Solver
-      for (let i = 0; i < n; i++) { v += ((-k * (x - target) - c * v) / m) * h; x += v * h; }
+    raf = 0;
+    // dt aus dem rAF-Zeitstempel, begrenzt (Tab-Wechsel, GC-Pause); erster Frame nach Ruhe startet ab Eingabezeitpunkt (kick)
+    const dt = Math.min(o.maxDt, Math.max(0, now - last)) / 1000; last = now;
+    if (pendingX !== null) {            // Zeigerposition aus pointermove genau einmal pro Frame uebernehmen
+      if (rectDirty || !rect) { rect = root.getBoundingClientRect(); rectDirty = false; }
+      frac = Math.max(0, Math.min(1, (pendingX - rect.left) * (BW / (rect.width || BW)) / W)); pendingX = null;
     }
-    const lag = target - x;            // Nachlauf der Linse hinter dem Zeiger: sofort hoch, danach weich runter
+    const target = frac * W;
+    if (mq.matches) { x = target; v = 0; u = 0; }
+    else { springStep(x, v, target, dt); x = S.x; v = S.v; }
+    const lag = target - x;             // Nachlauf der Linse hinter dem Zeiger: sofort hoch, danach weich runter
     if (Math.abs(lag) >= Math.abs(u)) u = lag; else u += (lag - u) * (1 - Math.exp(-dt / Math.max(1e-3, o.split.release)));
-    if (Math.abs(lag) < 0.03 && Math.abs(v) < 0.5 && Math.abs(u) < 0.05) { x = target; v = 0; u = 0; raf = 0; render(); return; }
+    if (pendingX === null && Math.abs(lag) < 0.03 && Math.abs(v) < 0.5 && Math.abs(u) < 0.05) {
+      x = target; v = 0; u = 0; render(); root.classList.remove('is-live'); return;   // Ruhe: Loop + will-change aus
+    }
     render(); raf = requestAnimationFrame(tick);
   }
-  function kick() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(tick); } }
-  function setFrac(f) { frac = Math.max(0, Math.min(1, f)); kick(); }
+  function kick() { if (!raf) { last = performance.now(); root.classList.add('is-live'); raf = requestAnimationFrame(tick); } }
+  function setFrac(f) { frac = Math.max(0, Math.min(1, f)); pendingX = null; kick(); }
 
-  // --- Eingabe: Zeiger (Maus/Touch/Stift) ---
+  // --- Eingabe: Zeiger (Maus/Touch/Stift) - Handler speichern nur, angewendet wird im rAF ---
   const ac = new AbortController(), L = { signal: ac.signal };   // ein abort() raeumt alle Listener auf
-  let rect = null;
-  const fracAt = e => { rect = rect || root.getBoundingClientRect(); return (e.clientX - rect.left) / (rect.width || 1); };
-  const enter = e => { rect = root.getBoundingClientRect(); active = true; setFrac(fracAt(e)); };
-  const move  = e => { if (!active) { enter(e); return; } setFrac(fracAt(e)); };
-  const leave = () => { active = false; rect = null; setFrac(o.restAt); };
-  root.addEventListener('pointerenter', enter, L);
-  root.addEventListener('pointermove', move, L);
-  root.addEventListener('pointerdown', enter, L);
-  root.addEventListener('pointerleave', leave, L);
-  root.addEventListener('pointercancel', leave, L);
-  root.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') leave(); }, L);
+  const P = { signal: ac.signal, passive: true };
+  const point = e => { active = true; pendingX = e.clientX; kick(); };
+  const enter = e => { rectDirty = true; point(e); };
+  const leave = () => { active = false; pendingX = null; setFrac(o.restAt); };
+  root.addEventListener('pointerenter', enter, P);
+  root.addEventListener('pointermove', point, P);
+  root.addEventListener('pointerdown', enter, P);
+  root.addEventListener('pointerleave', leave, P);
+  root.addEventListener('pointercancel', leave, P);
+  root.addEventListener('pointerup', e => { if (e.pointerType !== 'mouse') leave(); }, P);
+  window.addEventListener('scroll', () => { rectDirty = true; }, { signal: ac.signal, passive: true, capture: true });
 
   // --- Eingabe: Tastatur ---
   function key(e) {
@@ -219,20 +244,18 @@ function initTextPrismSplit(root, opts) {
     root.addEventListener('blur', () => { if (!active) setFrac(o.restAt); }, L);
   }
 
-  // --- Resize / Schrift geladen ---
+  // --- Resize / Schrift geladen: einmal neu messen, Position prozentual halten ---
   let ro = null;
-  if (window.ResizeObserver) {
-    ro = new ResizeObserver(() => { const f = W ? x / W : o.restAt; measure(); x = f * W; render(); });
-    ro.observe(root);
-  }
+  const remeasure = () => { const f = W ? x / W : o.restAt; measure(); rectDirty = true; x = f * W; render(); };
+  if (window.ResizeObserver) { ro = new ResizeObserver(remeasure); ro.observe(root); }
   const onMq = () => { if (mq.matches) { v = 0; } kick(); };
   if (mq.addEventListener) mq.addEventListener('change', onMq, L);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); x = frac * W; render(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); rectDirty = true; x = frac * W; render(); });
 
   render();
   return {
     setPosition(f) { setFrac(f == null ? o.restAt : f); },
-    destroy() { ac.abort(); cancelAnimationFrame(raf); ro && ro.disconnect(); root.textContent = text; root.removeAttribute('tabindex'); }
+    destroy() { ac.abort(); cancelAnimationFrame(raf); ro && ro.disconnect(); root.classList.remove('is-live'); root.textContent = text; root.removeAttribute('tabindex'); }
   };
 }
 /* ===== /COMPONENT JS ===== */
