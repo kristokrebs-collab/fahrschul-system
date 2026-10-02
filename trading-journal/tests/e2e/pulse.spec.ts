@@ -136,15 +136,23 @@ test("page end: the last overview card and the footer's back-to-top sit fully ab
       { timeout: 8000 },
     )
     .toBe("true");
-  await page.waitForTimeout(400);
-  const geo = await page.evaluate(() => {
-    const dock = document.querySelector('[role="toolbar"][aria-label="Navigation"]')!.getBoundingClientRect();
-    const cells = Array.from(document.querySelectorAll("[data-intro-cell]")).map((c) => c.getBoundingClientRect()).filter((r) => r.height > 0);
-    const last = cells.reduce((a, b) => (b.bottom > a.bottom ? b : a));
-    const top = document.querySelector('footer button[aria-label="Nach oben"]')!.getBoundingClientRect();
-    return { dockTop: dock.top, lastBottom: last.bottom, topBtnBottom: top.bottom, atEnd: Math.abs(window.scrollY + innerHeight - document.documentElement.scrollHeight) < 2 };
-  });
-  expect(geo.atEnd).toBe(true);
+  // the page can still grow while deferred cells mount: settle at the true end before measuring
+  const measure = () =>
+    page.evaluate(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" });
+      const dock = document.querySelector('[role="toolbar"][aria-label="Navigation"]')!.getBoundingClientRect();
+      const cells = Array.from(document.querySelectorAll("[data-intro-cell]")).map((c) => c.getBoundingClientRect()).filter((r) => r.height > 0);
+      const last = cells.reduce((a, b) => (b.bottom > a.bottom ? b : a));
+      const top = document.querySelector('footer button[aria-label="Nach oben"]')!.getBoundingClientRect();
+      const root = document.documentElement;
+      return { dockTop: dock.top, lastBottom: last.bottom, topBtnBottom: top.bottom, atEnd: root.scrollHeight - (window.scrollY + root.clientHeight) < 2 };
+    });
+  let geo = await measure();
+  for (let i = 0; i < 10 && !geo.atEnd; i++) {
+    await page.waitForTimeout(250);
+    geo = await measure();
+  }
+  expect(geo.atEnd, JSON.stringify(geo)).toBe(true);
   expect(geo.lastBottom, JSON.stringify(geo)).toBeLessThanOrEqual(geo.dockTop);
   expect(geo.topBtnBottom, JSON.stringify(geo)).toBeLessThanOrEqual(geo.dockTop);
 });
