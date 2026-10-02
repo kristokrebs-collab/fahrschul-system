@@ -1,6 +1,7 @@
 import { animate, AnimatePresence, motion, type AnimationPlaybackControls } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
+import { canObserveInView, observeInView } from "@/motion/inView";
 import { springSettleTime } from "@/motion/pulse/engine";
 import { TextMorph } from "@/motion/pulse/TextMorph";
 import { radius, spring, tween } from "@/motion/tokens";
@@ -216,10 +217,22 @@ function MorphLabel({ text, reduced, onSettle }: { text: string; reduced: boolea
     onSettle();
   }, [onSettle]);
 
+  // nobody sees a morph off screen (and its timeline sleeps there): a label that changes while the pill is out of
+  // view – or leaves the view mid-morph – takes its new word at once
+  const gridRef = useRef<HTMLSpanElement>(null);
+  const morphing = s.phase !== "rest" && s.next !== null;
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+    if (!morphing || !el || !canObserveInView()) return;
+    return observeInView(el, (inView) => {
+      if (!inView) settle();
+    });
+  }, [morphing, settle]);
+
   if (s.phase === "rest" || s.next === null) return <>{s.text}</>;
   const cell = "[grid-area:1/1] whitespace-nowrap";
   return (
-    <span className="inline-grid" data-label-phase={s.phase}>
+    <span ref={gridRef} className="inline-grid" data-label-phase={s.phase}>
       <span ref={oldRef} aria-hidden="true" className={cn("invisible", cell)}>
         {s.text}
       </span>
