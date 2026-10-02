@@ -27,8 +27,8 @@ export interface MarqueeProps {
   /** Edge fade width in px (0 = none). */
   fade?: number;
   /**
-   * Holds the drift where it is (the loop sleeps). For hosts the IntersectionObserver cannot judge, e.g. a sticky
-   * footer that always intersects the viewport while covered by the page.
+   * Holds the drift where it is (the loop sleeps), on top of the built-in offscreen pause – e.g. a host's own reveal
+   * state (the footer band pauses with the footer's hide hysteresis).
    */
   paused?: boolean;
 }

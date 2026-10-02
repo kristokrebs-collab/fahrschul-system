@@ -234,7 +234,7 @@ written, never React state; reduced motion shows the final state at once. Every 
 | `NotchedFrame` | notched-project-card | setup cards (CSS in `@layer components`, utilities win) |
 | `WidgetGrid` · `useLift` | draggable-widget-grid | MarketPanel mini tiles (order in `tj2-ui-market-tiles`); RulesCard / SetupEditor checklist lift |
 | `StripWipe` · `playStripWipe` | parallax-strip-slider | chart interval switch (10 strips from an opaque snapshot) |
-| `Marquee` (`paused`) | motion-footer | footer stats band; `paused` while the curtain covers the sticky footer (the IntersectionObserver cannot see that) |
+| `Marquee` (`paused`) | motion-footer | footer stats band; `paused` follows the footer's reveal hysteresis (hidden at ≤ 50 % in view), so it resumes where it stopped |
 
 Built on the same engine outside this folder: the intro (`src/intro`, glyph-portal / reel-collage / slanted-spread /
 cinematic-orbit / product-launch), the dock labels + magnification and the command navigation (`src/app`), the

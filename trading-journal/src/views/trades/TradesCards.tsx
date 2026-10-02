@@ -33,7 +33,7 @@ function cardTransition(i: number): Transition {
 
 /**
  * Mobile card list below `md` (NEW, Plan 6.2 / 3.3 "TradesCards"): one card per trade with the table's data.
- * Cards are `motion.button layout` with `layoutId="trade-{id}"` (source of the detail morph; not while the detail
+ * Cards are `motion.button layout`; a childless surface span inside carries `layoutId="trade-{id}"` (source of the detail morph; not while the detail
  * comes from a chart marker), enter `{opacity:0, y:6}` staggered `min(i, 12) · .02`, press `scale .98`
  * (`spring.press`). No x offset (390 px must not scroll).
  *
@@ -100,7 +100,6 @@ const TradeCard = memo(function TradeCard({ t, index, insert, setups, listKey, s
       <motion.button
         type="button"
         layout
-        layoutId={shareLayout ? `trade-${t.id}` : undefined}
         layoutDependency={listKey}
         style={{ borderRadius: radius.card }}
         initial={reduced ? false : CARD_FROM}
@@ -109,8 +108,19 @@ const TradeCard = memo(function TradeCard({ t, index, insert, setups, listKey, s
         transition={reduced ? CARD_TRANSITION_REDUCED : cardTransition(index)}
         onClick={() => onOpen(t.id, "table")}
         data-trade-id={t.id}
-        className="grid w-full gap-2.5 rounded-2xl border border-line bg-ink-950/40 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
+        className="relative grid w-full gap-2.5 rounded-2xl border border-line bg-ink-950/40 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
       >
+        {/* the detail morph source is this childless surface, not the card: on close the (emptied) panel flies back
+            into it, the card's own text never scales up over its neighbours */}
+        {shareLayout && (
+          <motion.span
+            aria-hidden="true"
+            layoutId={`trade-${t.id}`}
+            className="pointer-events-none absolute inset-0"
+            style={{ borderRadius: radius.card }}
+            transition={{ layout: spring.detail }}
+          />
+        )}
         <div className="flex items-start justify-between gap-3">
           <div>
             <SideTag t={t} />

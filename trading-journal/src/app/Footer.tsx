@@ -46,8 +46,7 @@ function part(shown: boolean, reduced: boolean, t: { ms: number; delay: number; 
   const on = shown || reduced;
   return {
     opacity: on ? 1 : 0,
-    // 2D transforms: at rest (hidden or shown) no part is promoted to its own layer – a composited layer in the sticky
-    // footer part would stay promoted for no reason
+    // 2D transforms: at rest (hidden or shown) no part keeps its own compositor layer
     transform: on ? (extra?.to ?? "none") : (extra?.from ?? `translate(0,${t.rise}px)`),
     transition: shown && !reduced ? `opacity ${t.ms}ms ${CONFIG.ease} ${t.delay}ms, transform ${t.ms}ms ${CONFIG.ease} ${t.delay}ms` : "none",
   };
@@ -159,7 +158,7 @@ export function FooterOutline({ text = FOOTER_TEXT, draw = true }: { text?: stri
   );
 }
 
-/** The footer shell re-renders when it turns sticky / is revealed; the wordmark only cares about `draw`. */
+/** The footer shell re-renders when it is revealed / hidden; the wordmark only cares about `draw`. */
 const FooterOutlineMemo = memo(FooterOutline);
 
 /* ------------------------------------------------------------------ ticker */

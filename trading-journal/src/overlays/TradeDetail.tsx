@@ -146,22 +146,27 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
               style={{ borderRadius: radius.dialog }}
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98, transition: tween.exit }}
+              variants={PANEL_VARIANTS}
+              exit="exit"
               transition={{ ...spring.detail, layout: spring.detail }}
               onAnimationComplete={() => markSettled(trade.id)}
               onLayoutAnimationComplete={() => markSettled(trade.id)}
               className="pointer-events-auto relative max-h-[92vh] w-full overflow-y-auto rounded-[28px] border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 outline-none"
             >
-              <DetailContent
-                trade={trade}
-                setups={settings.setups}
-                currency={settings.currency}
-                candles={candles}
-                settled={phase.settled && phase.id === trade.id}
-                onClose={close}
-                onEdit={() => edit(trade.id)}
-                onDelete={() => remove(trade.id)}
-              />
+              {/* close: the contents fade first, then the (now empty, opaque) surface – page text never shows through
+                  the panel's text while it fades (390 cards have no morph target) */}
+              <motion.div exit={{ opacity: 0, transition: tween.exit }}>
+                <DetailContent
+                  trade={trade}
+                  setups={settings.setups}
+                  currency={settings.currency}
+                  candles={candles}
+                  settled={phase.settled && phase.id === trade.id}
+                  onClose={close}
+                  onEdit={() => edit(trade.id)}
+                  onDelete={() => remove(trade.id)}
+                />
+              </motion.div>
             </motion.div>
           </div>
         </motion.div>
@@ -173,6 +178,11 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
 /** Dim level the editor's sheet dim starts from on a hand-off (black/70 ≈ ink-950/80 × .875). */
 export const DETAIL_DIM_HANDOFF = 0.875;
 /** On a hand-off the dim leaves at once (the sheet's dim has taken over its level) … */
+/** Panel exit: after the contents (tween.exit) – except on the hand-off to the editor, which takes over at once. */
+const PANEL_VARIANTS = {
+  exit: (handoff: boolean) => ({ opacity: 0, scale: 0.98, transition: handoff ? tween.exit : { ...tween.exit, delay: tween.exit.duration } }),
+};
+
 const DIM_VARIANTS: Variants = {
   exit: (handoff: boolean) => ({ opacity: 0, transition: handoff ? { duration: 0 } : tween.exit }),
 };

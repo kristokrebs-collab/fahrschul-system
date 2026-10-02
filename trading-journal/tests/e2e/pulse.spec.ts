@@ -122,3 +122,29 @@ test("market tiles: keyboard reorder persists across a reload", async ({ page },
   const second = page.getByRole("list", { name: "Markt-Kacheln" }).getByRole("listitem").nth(1);
   await expect(second).toContainText(firstText);
 });
+
+test("page end: the last overview card and the footer's back-to-top sit fully above the dock", async ({ page }) => {
+  await seed(page);
+  await gotoOverview(page);
+  const footer = page.locator("footer");
+  await expect
+    .poll(
+      async () => {
+        await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+        return footer.getAttribute("data-shown");
+      },
+      { timeout: 8000 },
+    )
+    .toBe("true");
+  await page.waitForTimeout(400);
+  const geo = await page.evaluate(() => {
+    const dock = document.querySelector('[role="toolbar"][aria-label="Navigation"]')!.getBoundingClientRect();
+    const cells = Array.from(document.querySelectorAll("[data-intro-cell]")).map((c) => c.getBoundingClientRect()).filter((r) => r.height > 0);
+    const last = cells.reduce((a, b) => (b.bottom > a.bottom ? b : a));
+    const top = document.querySelector('footer button[aria-label="Nach oben"]')!.getBoundingClientRect();
+    return { dockTop: dock.top, lastBottom: last.bottom, topBtnBottom: top.bottom, atEnd: Math.abs(window.scrollY + innerHeight - document.documentElement.scrollHeight) < 2 };
+  });
+  expect(geo.atEnd).toBe(true);
+  expect(geo.lastBottom, JSON.stringify(geo)).toBeLessThanOrEqual(geo.dockTop);
+  expect(geo.topBtnBottom, JSON.stringify(geo)).toBeLessThanOrEqual(geo.dockTop);
+});
