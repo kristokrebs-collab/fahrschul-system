@@ -109,10 +109,10 @@ test.describe("ranking", () => {
     await dialog.getByRole("button", { name: "Alle Trades mit dieser Grundlage →" }).click();
     await expect(page).toHaveURL(/#trades\?setup=/);
     await expect(page.getByRole("heading", { name: /Alle Trades/ })).toBeVisible();
-    const select = page.getByLabel("Entscheidungsgrundlage", { exact: true });
-    await expect(select).not.toHaveValue("all");
-    const selected = await select.evaluate((el: HTMLSelectElement) => el.selectedOptions[0]?.textContent ?? "");
-    expect(selected).toContain("BSL/EQL Liquidity Sweep");
+    // the setup filter is a MorphSelect (button trigger carrying the value)
+    const select = page.getByRole("button", { name: "Entscheidungsgrundlage", exact: true });
+    await expect(select).not.toHaveAttribute("data-value", "all");
+    await expect(select).toContainText("BSL/EQL Liquidity Sweep");
     // deep link is not overridden by a second scroll restore: the page starts at the top
     expect(await page.evaluate(() => window.scrollY)).toBeLessThan(40);
     await screenshot(page, info, "trades-filtered-by-setup");

@@ -211,18 +211,44 @@ export function Autocomplete({
     };
   }, [open, present, reduced]);
 
-  // the panel was placed from one measurement: outside scroll / resize closes it
+  // outside scroll / resize (focus scroll-into-view, a phone's keyboard opening, page scrolling): the panel follows
+  // the field – one rect read per frame, written straight to the panel's style – and closes only once the field has
+  // left the viewport
   useEffect(() => {
     if (!open) return;
-    const onScroll = (e: Event) => {
-      if (e.target instanceof Node && panelRef.current?.contains(e.target)) return;
-      hide();
+    let raf = 0;
+    const follow = () => {
+      raf = 0;
+      const el = inputRef.current;
+      const panel = panelRef.current;
+      if (!el || !panel) return;
+      const r = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      if (r.bottom < 0 || r.top > vh) {
+        hide();
+        return;
+      }
+      const g = place(r, vw, vh);
+      const st = panel.style;
+      st.left = `${g.left}px`;
+      st.width = `${g.width}px`;
+      st.top = g.top === undefined ? "" : `${g.top}px`;
+      st.bottom = g.bottom === undefined ? "" : `${g.bottom}px`;
+      st.maxHeight = `${g.maxH}px`;
+      st.transformOrigin = g.up ? "50% 100%" : "50% 0";
+      panel.dataset.placement = g.up ? "top" : "bottom";
     };
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", hide);
+    const schedule = (e: Event) => {
+      if (e.target instanceof Node && panelRef.current?.contains(e.target)) return;
+      if (!raf) raf = requestAnimationFrame(follow);
+    };
+    window.addEventListener("scroll", schedule, true);
+    window.addEventListener("resize", schedule);
     return () => {
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", hide);
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("resize", schedule);
     };
   }, [open, hide]);
 

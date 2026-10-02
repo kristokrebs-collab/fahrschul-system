@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { collectErrors, fixture } from "./helpers";
+import { collectErrors, fixture, seed } from "./helpers";
 import { mockMarket } from "./mocks/market";
 
 /**
@@ -113,5 +113,42 @@ test.describe("intro", () => {
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
     await page.waitForTimeout(500);
     await expect(stage(page)).toHaveCount(0);
+  });
+
+  test("header logo replays the intro from another page and lands on the overview top", async ({ page }) => {
+    const errors = collectErrors(page);
+    await seed(page); // session flag set: no autoplay
+    await page.goto("/#trades");
+    await expect(page.getByRole("heading", { name: /Alle Trades/ })).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 400));
+    await page.locator("header").getByRole("button", { name: "Übersicht" }).click();
+    await expect(stage(page)).toBeVisible();
+    await expect(page).toHaveURL(/#overview/);
+    await page.keyboard.press("Escape");
+    await expect(stage(page)).toHaveCount(0, { timeout: 2000 });
+    await page.waitForTimeout(900);
+    await expectSettled(page);
+    expect(await page.evaluate(() => window.scrollY)).toBeLessThan(4);
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  test("Settings: the intro switch writes tj2-ui-intro, \"Intro jetzt abspielen\" replays on the overview", async ({ page }) => {
+    await seed(page);
+    await page.goto("/#settings");
+    await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+    const sw = page.getByRole("switch", { name: "Intro beim Start abspielen" });
+    await sw.scrollIntoViewIfNeeded();
+    await sw.click();
+    expect(await page.evaluate(() => localStorage.getItem("tj2-ui-intro"))).toBe("off");
+    await sw.click();
+    expect(await page.evaluate(() => localStorage.getItem("tj2-ui-intro"))).toBe("on");
+    await page.getByRole("button", { name: "Intro jetzt abspielen" }).click();
+    await expect(stage(page)).toBeVisible();
+    await expect(page).toHaveURL(/#overview/);
+    await page.getByRole("button", { name: "Überspringen" }).click();
+    await expect(stage(page)).toHaveCount(0, { timeout: 2000 });
+    await page.waitForTimeout(900);
+    await expectSettled(page);
+    expect(await page.evaluate(() => window.scrollY)).toBeLessThan(4);
   });
 });

@@ -111,4 +111,13 @@ describe("Autocomplete", () => {
     expect(matchRange("Long", "x")).toBeNull();
     expect(matchRange("Long", "  ")).toBeNull();
   });
+
+  it("an outside scroll (focus scroll-into-view, phone keyboard) keeps the list open while the field is on screen", async () => {
+    render(<Harness />);
+    fireEvent.change(input(), { target: { value: "e" } });
+    fireEvent.scroll(window);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(input()).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+  });
 });
