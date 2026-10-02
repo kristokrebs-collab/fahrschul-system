@@ -1,0 +1,128 @@
+@import "./tokens.css";
+@import "./shiny-cta.css";
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-ink-900);
+}
+
+/* The dialog scroll lock (body overflow:hidden) must not make the scrollbar vanish and reflow the page
+   under a running morph: keep its gutter reserved. */
+html {
+  scrollbar-gutter: stable;
+  /* keyboard focus scrolls controls clear of the sticky header (top) and the bottom fade + dock (bottom); this also
+     lets the focused control's Reveal cell cross its in-view threshold, so a focus ring never sits at opacity 0 */
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 72px);
+  scroll-padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 120px);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  background-color: var(--color-ink-900);
+  background-image:
+    radial-gradient(1200px 600px at 50% -10%, #ffffff0b, transparent 70%),
+    radial-gradient(circle at 1px 1px, #ffffff0e 1px, transparent 0);
+  background-size:
+    auto,
+    22px 22px;
+  background-position:
+    0 0,
+    0 0;
+}
+
+/* fractal noise film */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: #e5202e66;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-steel);
+  outline-offset: 2px;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.recharts-wrapper svg,
+.recharts-surface {
+  outline: none;
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility dot-num {
+  font-family: var(--font-dot);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+}
+
+/* Reduced motion: every CSS transition/animation completes at once. Infinite loops (spinners, pings, shimmers,
+   beams) run a single ~0 ms iteration and stop, so nothing keeps the page animating; delays are dropped so nothing
+   pops in late. They are deliberately not `paused`: a paused animation would freeze on its first keyframe, which is
+   often invisible (opacity 0). */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Command navigation (pack immersive-full-screen-navigation): hovering one link dims the others to 45 % */
+@media (hover: hover) {
+  .cmdnav-links:hover .cmdnav-link:not(:hover) {
+    opacity: 0.45;
+  }
+}

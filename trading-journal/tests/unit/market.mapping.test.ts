@@ -1,0 +1,237 @@
+import { describe, expect, it } from "vitest";
+import topPos from "../fixtures/binance-topLongShortPositionRatio.json";
+import topAcc from "../fixtures/binance-topLongShortAccountRatio.json";
+import globalAcc from "../fixtures/binance-globalLongShortAccountRatio.json";
+import taker from "../fixtures/binance-takerlongshortRatio.json";
+import klines4h from "../fixtures/binance-klines-4h.json";
+import klines1w from "../fixtures/binance-klines-1w.json";
+import { mapRatio, mapTaker, mapKline, ratioSchema, takerSchema, klinesSchema } from "@/market/sources/binance";
+import { deltaSeries, deltaCandles, topTraderLongPct, takerDelta, fundingLine, fundingPct, lastPrice, deriveMarket, deriveTopTrader, virtualReading, openInterestChange24h, triggerDistances, legacyStatus } from "@/market/mapping";
+import { closedBar, rsiWilder, lastClosed4h, weeklyClose, currentBar } from "@/market/indicators";
+import { statusLabel, liveAgeLabel, refreshRingProgress, fallbackBadge, STRINGS } from "@/market/statusLabel";
+import { initialHealth, reduceHealth } from "@/market/health";
+import { buildFeedSpecs } from "@/market/feeds";
+import type { FeedHealth, ProviderHealth, Stamped } from "@/market/types";
+
+const T0 = 1790762400000;
+const specs = buildFeedSpecs("1h");
+const pos = mapRatio(ratioSchema.parse(topPos));
+const acc = mapRatio(ratioSchema.parse(topAcc));
+const glob = mapRatio(ratioSchema.parse(globalAcc));
+const tk = mapTaker(takerSchema.parse(taker));
+const k4 = klinesSchema.parse(klines4h).map((r) => mapKline(r, T0));
+const kw = klinesSchema.parse(klines1w).map((r) => mapKline(r, T0));
+const st = <T>(data: T, asOf = T0, source: Stamped<T>["source"] = "binance", comparable = true): Stamped<T> => ({ data, asOf, receivedAt: asOf + 100, source, comparable });
+
+describe("mapping numbers", () => {
+  it("Top Trader Long % follows the base setting", () => {
+    expect(topTraderLongPct(acc, pos, "accounts")).toBeCloseTo(Number(topAcc.at(-1)!.longAccount) * 100, 6);
+    expect(topTraderLongPct(acc, pos, "positions")).toBeCloseTo(Number(topPos.at(-1)!.longAccount) * 100, 6);
+    expect(topTraderLongPct(undefined, pos, "accounts")).toBeNull();
+  });
+  it("delta = top-position long % − global long %, joined by timestamp", () => {
+    const ds = deltaSeries(pos, glob);
+    expect(ds).toHaveLength(30);
+    const last = ds.at(-1)!;
+    const expected = (Number(topPos.at(-1)!.longAccount) - Number(globalAcc.at(-1)!.longAccount)) * 100;
+    expect(last.delta).toBeCloseTo(expected, 6);
+    expect(last.time).toBe(Number(topPos.at(-1)!.timestamp));
+    // unmatched timestamps are dropped
+    expect(deltaSeries(pos.slice(0, 5), glob.slice(3))).toHaveLength(2);
+    expect(deltaSeries(undefined, glob)).toEqual([]);
+  });
+  it("deltaCandles counts trailing positive deltas (fixture: exactly 3)", () => {
+    const ds = deltaSeries(pos, glob).map((d) => d.delta);
+    expect(ds.at(-1)).toBeGreaterThan(0);
+    expect(ds.at(-4)).toBeLessThanOrEqual(0);
+    expect(deltaCandles(ds)).toBe(3);
+    expect(deltaCandles([1, 2, -1])).toBe(0);
+    expect(deltaCandles([-1, 0.1, 0.2])).toBe(2);
+    expect(deltaCandles([])).toBe(0);
+  });
+  it("takerDelta is buy share minus sell share in percentage points", () => {
+    expect(takerDelta({ time: 1, buyVol: 150, sellVol: 50, buySellRatio: 3 })).toBeCloseTo(50);
+    expect(takerDelta({ time: 1, buyVol: 100, sellVol: 100, buySellRatio: 1 })).toBe(0);
+    expect(takerDelta({ time: 1, buyVol: 0, sellVol: 0, buySellRatio: 0 })).toBeNull();
+    expect(takerDelta(tk.at(-1))).not.toBeNull();
+  });
+  it("funding line uses 4 decimals, U+2212 and a HH:mm:ss countdown", () => {
+    expect(fundingPct(0.0001)).toBe("+0,0100 %");
+    expect(fundingPct(-0.00025)).toBe("\u22120,0250 %");
+    const line = fundingLine({ markPrice: 84212.3, indexPrice: 0, fundingRate: 0.0001, nextFundingTime: T0 + 6 * 3_600_000, time: T0 }, T0);
+    expect(line!.text).toBe("Mark 84.212 · Funding +0,0100 % · nächstes Funding in 06:00:00");
+    expect(fundingLine(undefined, T0)).toBeNull();
+  });
+  it("last price prefers aggTrade, then book mid, then ticker – never the mark price", () => {
+    const mark = st({ markPrice: 1, indexPrice: 1, fundingRate: 0, nextFundingTime: 0, time: T0 });
+    expect(lastPrice({ markPrice: mark })).toBeNull();
+    expect(lastPrice({ markPrice: mark, ticker24h: st({ lastPrice: 3, priceChangePercent: 0, high: 0, low: 0, volume: 0, quoteVolume: 0, time: T0 }) })!.price).toBe(3);
+    expect(lastPrice({ bookTop: st({ bid: 4, ask: 6, time: T0 }), ticker24h: st({ lastPrice: 3, priceChangePercent: 0, high: 0, low: 0, volume: 0, quoteVolume: 0, time: T0 }) })!.price).toBe(5);
+    const lp = lastPrice({ aggTrade: st({ price: 2, qty: 1, isBuyerMaker: false, time: T0 }, T0, "bybit"), bookTop: st({ bid: 4, ask: 6, time: T0 }) })!;
+    expect(lp.price).toBe(2);
+    expect(lp.provenance.source).toBe("bybit");
+  });
+  it("OI 24h change uses the point ≥ 24 h before the last", () => {
+    const hist = Array.from({ length: 30 }, (_, i) => ({ time: T0 - (29 - i) * 3_600_000, openInterest: 100 + i, openInterestValue: 0 }));
+    expect(openInterestChange24h(hist)).toBeCloseTo(((129 - 105) / 105) * 100);
+    expect(openInterestChange24h(hist.slice(-5))).toBeNull();
+  });
+  it("trigger distances", () => {
+    const d = triggerDistances(85_700, { longTrigger: 85_900, shortTrigger: 84_500 })!;
+    expect(d.toLong).toBeCloseTo(200 / 85_700);
+    expect(d.longInReach).toBe(true);
+    expect(d.shortInReach).toBe(false);
+    expect(triggerDistances(null, { longTrigger: 1, shortTrigger: 1 })).toBeNull();
+  });
+});
+
+describe("indicators", () => {
+  it("closedBar picks the last bar whose end is ≤ now + 60 s (bundle UM)", () => {
+    const cb = closedBar(k4, 14_400, T0)!;
+    const running = k4.at(-1)!;
+    expect(cb.bar.time).toBe(running.time - 14_400_000);
+    expect(cb.t).toBe(running.time);
+    expect(cb.c).toBe(k4.at(-2)!.close);
+    // 30 s before the running candle closes it still does not count …
+    expect(closedBar(k4, 14_400, running.time + 14_400_000 - 61_000)!.bar.time).toBe(cb.bar.time);
+    // … 59 s before it does (now + 60 s tolerance)
+    expect(closedBar(k4, 14_400, running.time + 14_400_000 - 59_000)!.bar.time).toBe(running.time);
+    expect(closedBar([], 14_400, T0)).toBeNull();
+    expect(lastClosed4h(k4, T0)!.t).toBe(running.time);
+    expect(weeklyClose(kw, T0)!.bar.time).toBe(kw.at(-2)!.time);
+    expect(currentBar(k4, 14_400, T0)).toBe(running);
+  });
+  it("Wilder RSI matches a hand-computed reference", () => {
+    const closes = [44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.1, 45.42, 45.84, 46.08, 45.89, 46.03, 45.61, 46.28, 46.28, 46.0, 46.03, 46.41, 46.22, 45.64];
+    const rsi = rsiWilder(closes, 14)!;
+    expect(rsi).toBeGreaterThan(50);
+    expect(rsi).toBeLessThan(70);
+    expect(rsiWilder(closes.slice(0, 15), 14)).toBeCloseTo(70.46, 1); // classic textbook seed value
+    expect(rsiWilder([1, 2, 3], 14)).toBeNull();
+    expect(rsiWilder(Array.from({ length: 20 }, (_, i) => 100 + i), 14)).toBe(100);
+    expect(rsiWilder(Array.from({ length: 20 }, () => 5), 14)).toBe(50);
+  });
+});
+
+describe("status labels", () => {
+  const fh = (patch: Partial<FeedHealth>): FeedHealth => ({ feed: "topAccountRatio", state: "live", source: "binance", consecutiveFailures: 0, ...patch });
+  const spec = specs.topAccountRatio;
+  const tz = "Europe/Berlin";
+  it("live → Live · {cadence} from the point cadence", () => {
+    expect(statusLabel({ health: fh({}), spec })).toEqual({ tone: "live", text: "Live · stündlich", detail: undefined });
+    expect(statusLabel({ health: fh({}), spec: buildFeedSpecs("5m").topAccountRatio }).text).toBe("Live · alle 5 min");
+    expect(statusLabel({ health: fh({ feed: "markPrice" }), spec: specs.markPrice }).text).toBe("Live · 1 s");
+    expect(statusLabel({ health: fh({ feed: "kline_1m" }), spec: specs.kline_1m }).text).toBe("Live · Echtzeit");
+    expect(statusLabel({ health: fh({ feed: "ticker24h" }), spec: specs.ticker24h }).text).toBe("Live · alle 30 s");
+  });
+  it("stale → Zuletzt HH:mm · veraltet from asOf", () => {
+    const l = statusLabel({ health: fh({ state: "stale", lastDataAt: T0 }), spec, value: st([], T0), timeZone: tz });
+    expect(l).toEqual({ tone: "warn", text: "Zuletzt 12:00 · veraltet", detail: undefined });
+  });
+  it("fallback → {Source}-Daten · cadence with detail", () => {
+    const l = statusLabel({ health: fh({ state: "fallback", source: "bybit", feed: "globalAccountRatio" }), spec: specs.globalAccountRatio });
+    expect(l).toEqual({ tone: "warn", text: "Bybit-Daten · stündlich", detail: "Binance nicht erreichbar (451/CORS)" });
+    expect(statusLabel({ health: fh({ state: "fallback", source: "bybit", feed: "markPrice" }), spec: specs.markPrice }).text).toBe("Bybit-Daten · alle 5 s");
+    expect(statusLabel({ health: fh({ state: "fallback", source: "binance", feed: "markPrice", reason: "ws_closed" }), spec: specs.markPrice })).toEqual({ tone: "warn", text: "Binance-Daten · alle 10 s", detail: "WebSocket getrennt, REST-Abfrage" });
+    expect(fallbackBadge("bybit")).toBe("Ersatzquelle Bybit");
+  });
+  it("offline / connecting / bad_symbol / unsupported", () => {
+    expect(statusLabel({ health: fh({ state: "offline", lastDataAt: T0 }), spec, timeZone: tz })).toEqual({ tone: "error", text: "Offline · Stand 12:00", detail: undefined });
+    expect(statusLabel({ health: fh({ state: "offline" }), spec }).text).toBe("Offline");
+    expect(statusLabel({ health: fh({ state: "connecting" }), spec })).toEqual({ tone: "muted", text: "Verbinde …", detail: undefined });
+    // first paint from the cache snapshot: never blank
+    expect(statusLabel({ health: fh({ state: "connecting" }), spec, value: st([], T0), timeZone: tz }).text).toBe("Zuletzt 12:00 · veraltet");
+    expect(statusLabel({ health: fh({ reason: "bad_symbol" }), spec }).text).toBe("Kein Live-Kurs");
+    expect(statusLabel({ health: fh({ state: "fallback", source: "bybit", reason: "unsupported" }), spec })).toEqual({ tone: "muted", text: "Nur mit Binance", detail: "Bybit: alle Konten, keine Top-Trader-Kohorte." });
+  });
+  it("carries the bad_period detail as tooltip", () => {
+    const l = statusLabel({ health: fh({ reason: "bad_period", detail: "Timeframe 1w wird von Binance nicht unterstützt, Ratios nutzen 1h" }), spec });
+    expect(l.text).toBe("Live · stündlich");
+    expect(l.detail).toContain("Ratios nutzen 1h");
+  });
+  it("LivePill age label rules", () => {
+    expect(liveAgeLabel(T0, T0 + 1400)).toEqual({ text: "Live", warn: false, ageSec: 1 });
+    expect(liveAgeLabel(T0, T0 + 1500).text).toBe("Live · vor 2s");
+    expect(liveAgeLabel(T0, T0 + 900).text).toBe("Live");
+    expect(liveAgeLabel(T0, T0 + 12_000).text).toBe("Live · vor 12s");
+    expect(liveAgeLabel(T0, T0 + 65_000).text).toBe("vor 1 min");
+    expect(liveAgeLabel(T0, T0 + 130_000)).toMatchObject({ text: "vor 2 min", warn: true });
+    expect(liveAgeLabel(T0, T0, true).text).toBe(STRINGS.refreshing);
+    expect(liveAgeLabel(undefined, T0).text).toBe("Live");
+    expect(refreshRingProgress(T0 + 15_000, T0)).toBeCloseTo(0.5);
+    expect(refreshRingProgress(undefined, T0)).toBe(0);
+  });
+});
+
+describe("derived views", () => {
+  const live = (h: ProviderHealth, feeds: Parameters<typeof reduceHealth>[1][]) => feeds.reduce((a, ev) => reduceHealth(a, ev, specs), h);
+  const health = live(initialHealth(specs), [
+    { type: "ws_message", feeds: ["aggTrade", "markPrice", "kline_4h", "kline_1w"], asOf: T0, now: T0 },
+    { type: "rest_ok", feed: "ticker24h", source: "binance", asOf: T0, now: T0, nextRefreshAt: T0 + 30_000 },
+    { type: "rest_ok", feed: "topAccountRatio", source: "binance", asOf: T0, now: T0 },
+    { type: "rest_ok", feed: "topPositionRatio", source: "binance", asOf: T0, now: T0 },
+    { type: "rest_ok", feed: "globalAccountRatio", source: "binance", asOf: T0, now: T0 },
+  ]);
+  const snap = {
+    aggTrade: st({ price: 84206.1, qty: 0.1, isBuyerMaker: false, time: T0 }),
+    markPrice: st({ markPrice: 84212.3, indexPrice: 84198, fundingRate: 0.0001, nextFundingTime: T0 + 6 * 3_600_000, time: T0 }),
+    ticker24h: st({ lastPrice: 84205.9, priceChangePercent: -1.316, high: 0, low: 0, volume: 0, quoteVolume: 0, time: T0 }),
+    kline_4h: st(k4),
+    kline_1w: st(kw),
+    topAccountRatio: st(acc),
+    topPositionRatio: st(pos),
+    globalAccountRatio: st(glob),
+    takerRatio: st(tk),
+  };
+
+  it("deriveMarket maps the legacy fields", () => {
+    const m = deriveMarket(snap, health, { now: T0 + 500 });
+    expect(m.status).toBe("live");
+    expect(m.price).toBe(84206);
+    expect(m.change).toBeCloseTo(-1.316);
+    expect(m.close4h).toBe(k4.at(-2)!.close);
+    expect(m.close4hAt).toBe(k4.at(-1)!.time);
+    expect(m.closeW).toBe(kw.at(-2)!.close);
+    expect(m.rsiW).not.toBeNull();
+    expect(m.live4hClose).toBe(k4.at(-1)!.close);
+    expect(m.fundingLine!.text).toContain("Mark 84.212 · Funding +0,0100 %");
+    expect(m.updatedAt).toBe(T0 + 100);
+    expect(m.nextTickerRefreshAt).toBe(T0 + 30_000);
+    expect(m.taker).not.toBeNull();
+    expect(m.sourceBadge).toBeUndefined();
+    expect(deriveMarket(snap, health, { now: T0, rsiWOverride: 62.09 }).rsiW).toBe(62.09);
+  });
+  it("legacy status: stale price > 120 s → error with Zuletzt message; Bybit price → live with badge", () => {
+    const stale = legacyStatus(health, { provenance: { source: "binance", comparable: true, asOf: T0, receivedAt: T0 } }, T0 + 121_000);
+    expect(stale.status).toBe("error");
+    expect(stale.message).toMatch(/^Zuletzt \d\d:\d\d · veraltet$/);
+    const bybit = legacyStatus(health, { provenance: { source: "bybit", comparable: true, asOf: T0, receivedAt: T0 } }, T0 + 1000);
+    expect(bybit).toEqual({ status: "live", sourceBadge: "Ersatzquelle Bybit", message: "Binance nicht erreichbar (451/CORS)" });
+    expect(legacyStatus(initialHealth(specs), null, T0)).toEqual({ status: "connecting", message: undefined });
+    const off = reduceHealth(health, { type: "online", online: false, now: T0 }, specs);
+    expect(legacyStatus(off, null, T0).status).toBe("error");
+    expect(legacyStatus(off, null, T0).message).toMatch(/^Offline · Stand \d\d:\d\d$/);
+    expect(legacyStatus(reduceHealth(initialHealth(specs), { type: "online", online: false, now: T0 }, specs), null, T0).message).toBe("Offline");
+    const bad = reduceHealth(health, { type: "bad_symbol", now: T0 }, specs);
+    expect(legacyStatus(bad, null, T0)).toEqual({ status: "error", message: "Kein Live-Kurs" });
+  });
+  it("deriveTopTrader + virtual reading", () => {
+    const tt = deriveTopTrader(snap, health, "accounts");
+    expect(tt.longPct).toBeCloseTo(Number(topAcc.at(-1)!.longAccount) * 100, 6);
+    expect(tt.deltaCandles).toBe(3);
+    expect(tt.delta).toBeGreaterThan(0);
+    expect(tt.sparkline).toHaveLength(20);
+    expect(tt.onlyBinance).toBe(false);
+    expect(tt.liveReadingOk).toBe(true);
+    const vr = virtualReading(tt, { id: "r1", structure: true, rsi: false })!;
+    expect(vr).toMatchObject({ id: "r1", longPct: tt.longPct, delta: tt.delta, deltaCandles: 3, structure: true, rsi: false, note: "Live von Binance" });
+    expect(vr.at).toBe(new Date(T0).toISOString());
+    // Bybit fallback: no top-trader series → no virtual reading, `Nur mit Binance`
+    const hb = live(health, [{ type: "unsupported", feed: "topAccountRatio", source: "bybit", now: T0 }, { type: "unsupported", feed: "topPositionRatio", source: "bybit", now: T0 }]);
+    const ttb = deriveTopTrader(snap, hb, "accounts");
+    expect(ttb.onlyBinance).toBe(true);
+    expect(ttb.liveReadingOk).toBe(false);
+    expect(virtualReading(ttb, undefined)).toBeNull();
+    expect(deriveTopTrader(snap, health, "positions").longPct).toBeCloseTo(Number(topPos.at(-1)!.longAccount) * 100, 6);
+  });
+});
