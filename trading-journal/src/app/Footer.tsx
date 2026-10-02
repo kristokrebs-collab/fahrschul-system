@@ -9,7 +9,7 @@
  * Reduced motion: everything visible at once, the band stands still.
  */
 import { motion, useMotionValue, useSpring, type MotionValue } from "motion/react";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { memo, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { shellStatTexts, useLivePriceText, useShellStats } from "@/app/shellStats";
 import { ChartAttribution } from "@/chart/Attribution";
 import { cn } from "@/lib/cn";
@@ -47,7 +47,9 @@ function part(shown: boolean, reduced: boolean, t: { ms: number; delay: number; 
   const on = shown || reduced;
   return {
     opacity: on ? 1 : 0,
-    transform: on ? (extra?.to ?? "translate3d(0,0,0)") : (extra?.from ?? `translate3d(0,${t.rise}px,0)`),
+    // 2D transforms: at rest (hidden or shown) no part is promoted to its own layer – a composited layer in the sticky
+    // footer under the curtain would force every page cell overlapping it into a layer too ("Overlap")
+    transform: on ? (extra?.to ?? "none") : (extra?.from ?? `translate(0,${t.rise}px)`),
     transition: shown && !reduced ? `opacity ${t.ms}ms ${CONFIG.ease} ${t.delay}ms, transform ${t.ms}ms ${CONFIG.ease} ${t.delay}ms` : "none",
   };
 }
@@ -158,6 +160,9 @@ export function FooterOutline({ text = FOOTER_TEXT, draw = true }: { text?: stri
   );
 }
 
+/** The footer shell re-renders when it turns sticky / is revealed; the wordmark only cares about `draw`. */
+const FooterOutlineMemo = memo(FooterOutline);
+
 /* ------------------------------------------------------------------ ticker */
 
 function Stat({ label, children, tone }: { label: string; children: React.ReactNode; tone?: string }) {
@@ -172,7 +177,7 @@ function Stat({ label, children, tone }: { label: string; children: React.ReactN
   );
 }
 
-function StatsBand({ paused }: { paused: boolean }) {
+const StatsBand = memo(function StatsBand({ paused }: { paused: boolean }) {
   const stats = useShellStats();
   const t = shellStatTexts(stats);
   const price = useLivePriceText();
@@ -192,9 +197,34 @@ function StatsBand({ paused }: { paused: boolean }) {
       </span>
     </Marquee>
   );
-}
+});
 
 /* ------------------------------------------------------------------ footer */
+
+/**
+ * true while the curtain edge (`sentinel`) is within a footer height (+ a margin) of the viewport bottom. Only then is
+ * the footer sticky: a sticky footer sits composited under the viewport bottom all the time, which forces every page
+ * cell overlapping it onto its own layer and keeps it rasterised behind the opaque curtain. Far from the end it is a
+ * plain block at the page end (same box, off screen), so the switch is invisible.
+ */
+function useFooterNear(sentinel: React.RefObject<HTMLElement | null>, footer: React.RefObject<HTMLElement | null>): boolean {
+  const [near, setNear] = useState(() => typeof IntersectionObserver !== "function");
+  useEffect(() => {
+    const el = sentinel.current;
+    const f = footer.current;
+    if (!el || !f || typeof IntersectionObserver !== "function") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[entries.length - 1];
+        if (e) setNear(e.isIntersecting || e.boundingClientRect.top < (e.rootBounds?.top ?? 0));
+      },
+      { rootMargin: `0px 0px ${Math.round(f.offsetHeight + window.innerHeight * 0.5)}px 0px` },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [sentinel, footer]);
+  return near;
+}
 
 /** Watches the curtain edge (`sentinel`) against the footer height: `true` once ≥ `revealAt` of the footer is uncovered. */
 function useFooterShown(sentinel: React.RefObject<HTMLElement | null>, footer: React.RefObject<HTMLElement | null>): boolean {
@@ -250,6 +280,7 @@ export function Footer() {
   const sentinel = useRef<HTMLDivElement>(null);
   const footer = useRef<HTMLElement>(null);
   const shown = useFooterShown(sentinel, footer);
+  const near = useFooterNear(sentinel, footer);
   const [drawn, setDrawn] = useState(false);
   if (shown && !drawn) setDrawn(true);
 
@@ -257,8 +288,8 @@ export function Footer() {
   return (
     <>
       <div ref={sentinel} aria-hidden="true" className="h-px" />
-      <footer ref={footer} data-shown={shown || undefined} className="sticky bottom-0 -z-10 overflow-x-clip pb-[calc(92px+env(safe-area-inset-bottom,0px))] pt-10">
-        <div className="relative h-14" style={{ marginInline: "-6%", ...part(shown, reduced, band, { from: `rotate(${band.tiltFrom}deg) translate3d(0,${band.rise}px,0)`, to: `rotate(${band.tilt}deg) translate3d(0,0,0)` }) }}>
+      <footer ref={footer} data-shown={shown || undefined} className={cn(near || shown ? "sticky bottom-0" : "relative", "-z-10 overflow-x-clip pb-[calc(92px+env(safe-area-inset-bottom,0px))] pt-10")}>
+        <div className="relative h-14" style={{ marginInline: "-6%", ...part(shown, reduced, band, { from: `rotate(${band.tiltFrom}deg) translate(0,${band.rise}px)`, to: `rotate(${band.tilt}deg)` }) }}>
           <div className="h-full border-y border-white/[0.06] bg-black/20">
             {/* the sticky footer always intersects the viewport (under the curtain), so the IntersectionObserver never
                 sleeps the marquee: it mounts on the first reveal and is paused while covered (hiding happens at ≤ 50 %,
@@ -267,7 +298,7 @@ export function Footer() {
           </div>
         </div>
         <div className="mx-auto mt-6 h-28 max-w-[1320px] px-4 sm:h-36 sm:px-6" style={part(shown, reduced, CONFIG.headline)}>
-          <FooterOutline draw={drawn} />
+          <FooterOutlineMemo draw={drawn} />
         </div>
         <div className="mx-auto flex max-w-[1320px] items-end justify-between gap-4 px-4 sm:px-6">
           <div style={part(shown, reduced, CONFIG.bar)}>

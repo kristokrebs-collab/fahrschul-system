@@ -36,13 +36,19 @@ export function AutoHeight({ children, className, transition = spring.layout }: 
     const box = outer.current;
     const content = inner.current;
     if (!box || !content || reduced || typeof ResizeObserver !== "function") return;
-    let last = content.offsetHeight;
-    let shown = last;
+    // the observer's first report (right after layout) is the baseline: no layout read in the mount commit, which
+    // would force a synchronous layout inside the click that opens a sheet
+    let last = -1;
+    let shown = 0;
     let anim: AnimationPlaybackControls | null = null;
     let shownPad = 0;
     const ro = new ResizeObserver((entries) => {
       const entry = entries[entries.length - 1];
       const next = entry?.borderBoxSize?.[0]?.blockSize ?? content.offsetHeight;
+      if (last < 0) {
+        last = shown = next;
+        return;
+      }
       if (Math.abs(next - last) < 0.5) return;
       last = next;
       // outer padding / border (e.g. room for focus rings at the clip edge) rides on top of the content height

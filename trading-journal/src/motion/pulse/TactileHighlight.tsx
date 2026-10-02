@@ -103,6 +103,8 @@ function createEngine(root: HTMLElement, bar: HTMLElement, tab: HTMLElement | nu
     last = { p: np, tab: ntab };
   };
   const live = (on: boolean) => {
+    // at rest a 2D transform: a static scale3d would keep the bar on its own compositor layer for good
+    if (!on) bar.style.transform = `scale(${p.toFixed(4)},1)`;
     const wc = on ? "transform" : "";
     bar.style.willChange = wc;
     if (tab) tab.style.willChange = wc;
@@ -148,8 +150,8 @@ function createEngine(root: HTMLElement, bar: HTMLElement, tab: HTMLElement | nu
     },
     set(np) {
       timeline.stop();
-      live(false);
       paint(np, 0);
+      live(false);
     },
     destroy() {
       timeline.stop();

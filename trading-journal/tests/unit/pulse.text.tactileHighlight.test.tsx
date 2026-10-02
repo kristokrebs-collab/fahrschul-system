@@ -46,7 +46,7 @@ describe("<TactileHighlight>", () => {
       </p>,
     );
     const { bar, lit, tab } = parts(container);
-    expect(bar.style.transform).toBe("scale3d(1.0000,1,1)");
+    expect(bar.style.transform).toBe("scale(1.0000,1)");
     expect(lit.style.clipPath).toBe("inset(0 0.000% 0 0)");
     expect(lit.getAttribute("aria-hidden")).toBe("true");
     expect(tab.getAttribute("aria-hidden")).toBe("true");
@@ -57,7 +57,7 @@ describe("<TactileHighlight>", () => {
     const onDone = vi.fn();
     const { container, rerender } = render(<TactileHighlight active={false} onDone={onDone}>Long</TactileHighlight>);
     const { bar, lit, tab } = parts(container);
-    expect(bar.style.transform).toBe("scale3d(0.0000,1,1)");
+    expect(bar.style.transform).toBe("scale(0.0000,1)");
     rerender(<TactileHighlight active onDone={onDone}>Long</TactileHighlight>);
     act(() => void vi.advanceTimersByTime(32));
     expect(tab.style.opacity).toBe("1");
@@ -69,18 +69,18 @@ describe("<TactileHighlight>", () => {
     const clipRight = parseFloat(lit.style.clipPath.split(" ")[1]!);
     expect(clipRight).toBeCloseTo((1 - scale) * 100, 1);
     act(() => void vi.advanceTimersByTime(1200));
-    expect(bar.style.transform).toBe("scale3d(1.0000,1,1)");
+    expect(bar.style.transform).toBe("scale(1.0000,1)");
     expect(onDone).toHaveBeenCalledTimes(1);
     rerender(<TactileHighlight active={false} onDone={onDone}>Long</TactileHighlight>);
     act(() => void vi.advanceTimersByTime(1500));
-    expect(bar.style.transform).toBe("scale3d(0.0000,1,1)");
+    expect(bar.style.transform).toBe("scale(0.0000,1)");
   });
 
   it("playOnView: plays once (jsdom has no IntersectionObserver → plays on mount)", () => {
     const onDone = vi.fn();
     const { container } = render(<TactileHighlight playOnView onDone={onDone}>Long</TactileHighlight>);
     act(() => void vi.advanceTimersByTime(1500));
-    expect(parts(container).bar.style.transform).toBe("scale3d(1.0000,1,1)");
+    expect(parts(container).bar.style.transform).toBe("scale(1.0000,1)");
     expect(onDone).toHaveBeenCalledTimes(1);
   });
 
@@ -88,7 +88,7 @@ describe("<TactileHighlight>", () => {
     reducedState.value = true;
     const onDone = vi.fn();
     const { container } = render(<TactileHighlight playOnView onDone={onDone} tone="signal">Long</TactileHighlight>);
-    expect(parts(container).bar.style.transform).toBe("scale3d(1.0000,1,1)");
+    expect(parts(container).bar.style.transform).toBe("scale(1.0000,1)");
     expect(parts(container).root.dataset.tone).toBe("signal");
     expect(onDone).toHaveBeenCalledTimes(1);
   });
@@ -103,6 +103,6 @@ describe("<TactileHighlight>", () => {
     expect(root.querySelectorAll("i")).toHaveLength(1);
     expect(root.style.padding).toBe("0px 0em");
     act(() => void vi.advanceTimersByTime(1500));
-    expect((root.querySelector("i") as HTMLElement).style.transform).toBe("scale3d(1.0000,1,1)");
+    expect((root.querySelector("i") as HTMLElement).style.transform).toBe("scale(1.0000,1)");
   });
 });
