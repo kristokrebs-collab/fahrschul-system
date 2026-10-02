@@ -15,11 +15,14 @@ export const CONFIG = {
   statement: { text: "Disziplin schlägt Gefühl.", delay: 560, speed: 1.4 },
   /** Typewriter of the real data line (pack 65 ms/char is tuned down so the line lands before the reels). */
   type: { at: 1000, msPerChar: 24, waitMax: 1200 },
-  /** reel-collage: window opens between the rows, hard cuts at the measured reel starts, scaleY collapse. */
+  /**
+   * reel-collage: window opens between the rows right after the wordmark resolved (cascade resolve 1870 ms), hard cuts
+   * at the measured reel starts, scaleY collapse.
+   */
   reels: {
-    openAt: 1700,
+    openAt: 1880,
     openDur: 340,
-    startAt: 2040,
+    startAt: 2220,
     starts: [0, 95, 205, 335, 468, 630, 835] as const,
     collapseAt: 906,
     collapseDur: 340,
@@ -31,7 +34,11 @@ export const CONFIG = {
     statementOut: 260,
   },
   /** glyph-portal: dive into the "O" (zoom/roll keys in curves.ts), hole = the counter, reveals the real app. */
-  portal: { gap: 40, dur: 1000, roll: -5, textFade: 120, openDur: 260, rimPx: 1.5, gridFadeScale: 2.5, squareOut: 160, maxDpr: 2 },
+  /**
+   * `preroll`: the measured zoom curve is ~0 for its first 14 % (g(.142) = .006) – the dive starts there, so the camera
+   * leaves the resting wordmark without a dead pause (duration shortened by the same share, speed unchanged).
+   */
+  portal: { gap: 0, preroll: 0.14, dur: 1000, roll: -5, textFade: 120, openDur: 260, rimPx: 1.5, gridFadeScale: 2.5, squareOut: 160, maxDpr: 2 },
   /**
    * product-launch zoom-out of the app seen through the hole (over portal progress u). No blur: the overview grid is
    * page-tall, a filter on it costs a full re-raster per frame (hard rule: blur only on small areas).
@@ -40,9 +47,11 @@ export const CONFIG = {
   /** slanted-spread compact deck (cinematic-orbit fan angle) at the viewport centre. */
   deck: { scale: 0.6, fitH: 0.5, fitW: 0.74, rot: -12, stepX: 20, stepY: -8, tilt: [0, -0.9, 0.9, -1.2, 1.5, -1.2, 0.9, -0.6] as const },
   /** cinematic-orbit travel (ORBIT_KEYS, 2.8 s) sped up, staggered in reading order; starts at portal start + startAt. */
-  flight: { startAt: 560, speed: 2.1, stagger: 90, landAt: 0.9, fold: 1.6 },
+  flight: { startAt: 480, speed: 2.1, stagger: 90, landAt: 0.9, fold: 1.6 },
   skip: { ms: 260, overlayMs: 200 },
   pillIn: [400, 700] as const,
+  /** the skip pill fades out when the build starts (ms) – it must not float over the landing cards. */
+  pillOut: 180,
 } as const;
 
 export const DEG = Math.PI / 180;

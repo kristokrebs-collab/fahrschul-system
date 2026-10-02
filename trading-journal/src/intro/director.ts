@@ -49,7 +49,14 @@ const T_PORTAL = T_COLLAPSE + R.collapseDur + CONFIG.portal.gap;
 const T_FLIGHT = T_PORTAL + CONFIG.flight.startAt;
 
 /** Beat boundaries (ms) – exported for tests and the e2e timing. */
-export const BEATS = { collapse: T_COLLAPSE, portal: T_PORTAL, flight: T_FLIGHT, portalEnd: T_PORTAL + CONFIG.portal.dur } as const;
+const PORTAL_MS = CONFIG.portal.dur * (1 - CONFIG.portal.preroll);
+export const BEATS = { collapse: T_COLLAPSE, portal: T_PORTAL, flight: T_FLIGHT, portalEnd: T_PORTAL + PORTAL_MS } as const;
+
+/** Portal progress u at `t` ms (starts at the preroll point of the measured zoom curve). */
+export function portalProgress(t: number): number {
+  const k = clamp01((t - T_PORTAL) / PORTAL_MS);
+  return CONFIG.portal.preroll + (1 - CONFIG.portal.preroll) * k;
+}
 
 /** Window scale (open × collapse, both ease-out cubic) and the reel shown at `t`; -1 = window closed. */
 export function reelState(t: number): { scale: number; reel: number; collapse: number } {
@@ -94,17 +101,30 @@ interface RowGeo {
 }
 
 function rowGeo(row: HTMLElement, fm: { asc: number; desc: number; cap: number }): { geo: RowGeo; cells: DOMRect[] } {
-  const cells = cellsOf(row).map((c) => c.getBoundingClientRect());
+  const els = cellsOf(row);
+  const cells = els.map((c) => c.getBoundingClientRect());
   const box = cells[0] ?? row.getBoundingClientRect();
-  // CSS baseline of an inline-block cell: half-leading above the font's ascent
-  const baseline = box.top + (box.height - (fm.asc + fm.desc)) / 2 + fm.asc;
+  // the cell's real baseline: a zero-size inline-block sits exactly on it (font-metric formulas are off by a few px
+  // for Doto, which shows as a doubled wordmark when the canvas takes over)
+  let baseline = box.top + (box.height - (fm.asc + fm.desc)) / 2 + fm.asc;
+  const first = els[0];
+  if (first) {
+    const probe = document.createElement("span");
+    probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+    first.appendChild(probe);
+    baseline = probe.getBoundingClientRect().top;
+    probe.remove();
+  }
   return { geo: { left: box.left, baseline, inkTop: baseline - fm.cap }, cells };
 }
 
 export function createDirector(refs: StageRefs, ev: DirectorEvents): Director {
   const put = cache();
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  // the fixed overlay's box, not innerWidth: with classic scrollbars innerWidth includes the gutter, the canvas (100 %
+  // of the overlay) would be squeezed horizontally and the canvas wordmark would sit off the DOM one it replaces
+  const box = refs.overlay.getBoundingClientRect();
+  const vw = box.width || window.innerWidth;
+  const vh = box.height || window.innerHeight;
 
   // ---- one-off geometry (fonts are loaded; nothing is transformed yet) ----
   const cs = getComputedStyle(refs.textBottom.querySelector('[data-pulse="ascii-cascade"]') ?? refs.textBottom);
@@ -147,6 +167,8 @@ export function createDirector(refs: StageRefs, ev: DirectorEvents): Director {
   let finished = false;
   let portalDone = false;
   let skipAt = -1;
+  /** wall-clock time the stage handed over to the build (the skip pill fades out there: it would float over cards). */
+  let builtAt = -1;
   let skipFrom = { overlay: 1, scale: 1, blur: 0 };
   let appNow = { scale: 1, blur: 0 };
   const t0 = performance.now();
@@ -200,6 +222,8 @@ export function createDirector(refs: StageRefs, ev: DirectorEvents): Director {
   function endStage() {
     if (built) return;
     built = true;
+    builtAt = performance.now();
+    refs.pill.style.pointerEvents = "none";
     put(refs.overlay, "visibility", "hidden");
     portal?.destroy();
     portal = null;
@@ -234,7 +258,8 @@ export function createDirector(refs: StageRefs, ev: DirectorEvents): Director {
       put(p, "opacity", on ? (0.7 * (1 - q)).toFixed(3) : "0");
       if (on) put(p, "transform", `translate(-50%,-50%) scale(${(1 + (CONFIG.signal.pingScale - 1) * easeOutCubic(q)).toFixed(3)})`);
     });
-    put(refs.pill, "opacity", clamp01((t - CONFIG.pillIn[0]) / (CONFIG.pillIn[1] - CONFIG.pillIn[0])).toFixed(3));
+    const pillOut = builtAt < 0 ? 1 : 1 - clamp01((performance.now() - builtAt) / CONFIG.pillOut);
+    put(refs.pill, "opacity", (clamp01((t - CONFIG.pillIn[0]) / (CONFIG.pillIn[1] - CONFIG.pillIn[0])) * pillOut).toFixed(3));
 
     if (!typed && t >= CONFIG.type.at) {
       typed = true;
@@ -256,7 +281,7 @@ export function createDirector(refs: StageRefs, ev: DirectorEvents): Director {
     // portal: canvas takes over the stage, the dive opens the counter onto the real app
     if (t >= T_PORTAL && !portalDone) {
       if (!portal && !built) startPortal();
-      const u = clamp01((t - T_PORTAL) / CONFIG.portal.dur);
+      const u = portalProgress(t);
       // the canvas wordmark is registered on the DOM one: it is fully there at once, the DOM layer fades off it
       const textA = 1;
       put(refs.scene, "opacity", (1 - clamp01((t - T_PORTAL) / CONFIG.portal.textFade)).toFixed(3));
@@ -283,7 +308,9 @@ export function createDirector(refs: StageRefs, ev: DirectorEvents): Director {
 
   function settle(now: number) {
     const e = clamp01((now - skipAt) / CONFIG.skip.ms);
-    put(refs.overlay, "opacity", (skipFrom.overlay * (1 - clamp01((now - skipAt) / CONFIG.skip.overlayMs))).toFixed(3));
+    const fade = 1 - clamp01((now - skipAt) / CONFIG.skip.overlayMs);
+    put(refs.overlay, "opacity", (skipFrom.overlay * fade).toFixed(3));
+    put(refs.pill, "opacity", Math.min(fade, Number(refs.pill.style.opacity || 1)).toFixed(3));
     flight?.settle(e);
     const k = easeOutCubic(e);
     setApp(lerp(skipFrom.scale, 1, k), lerp(skipFrom.blur, 0, k));
@@ -302,6 +329,7 @@ export function createDirector(refs: StageRefs, ev: DirectorEvents): Director {
     skip() {
       if (finished || skipAt >= 0) return;
       skipAt = performance.now();
+      refs.pill.style.pointerEvents = "none";
       skipFrom = { overlay: built ? 0 : 1, scale: appNow.scale, blur: appNow.blur };
       if (!built) {
         built = true;

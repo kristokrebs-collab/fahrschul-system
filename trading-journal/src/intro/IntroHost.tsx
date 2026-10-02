@@ -52,10 +52,11 @@ export function IntroHost() {
           return;
         }
         const phase = getIntroPhase();
-        if (phase === "stage" || phase === "build" || !canReplay(readIntroEnv())) return;
+        if (phase === "stage" || phase === "build") return;
+        // header logo and Settings both land on the top of the overview, with or without the replay
         navigate("overview");
         restoreScroll("overview", true);
-        start();
+        if (canReplay(readIntroEnv())) start();
       }),
     [start],
   );

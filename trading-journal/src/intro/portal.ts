@@ -37,10 +37,19 @@ export function portalEndScale(r0: number, ox: number, oy: number, vw: number, v
   return Math.max(2, (far / Math.max(1, r0)) * 1.04);
 }
 
-/** Camera at portal progress u (0..1): scale e^(span · g(u)), roll · h(u) degrees. */
-export function portalCamera(u: number, endScale: number): { scale: number; rot: number } {
+/**
+ * Camera at portal progress u (0..1): scale e^(span · g(u)), roll · h(u) degrees. Both curves are renormalised from
+ * `from` (the preroll point), so the camera starts exactly at scale 1 / roll 0 – registered on the DOM wordmark it
+ * replaces – and still ends at `endScale` / the full roll.
+ */
+export function portalCamera(u: number, endScale: number, from = 0): { scale: number; rot: number } {
   const span = Math.log(endScale);
-  return { scale: Math.exp(span * zoomCurve(clamp01(u))), rot: CONFIG.portal.roll * rollCurve(clamp01(u)) };
+  const norm = (f: (x: number) => number) => {
+    const f0 = f(from);
+    return (f(clamp01(u)) - f0) / (1 - f0);
+  };
+  const roll = norm(rollCurve);
+  return { scale: Math.exp(span * Math.max(0, norm(zoomCurve))), rot: roll > 0 ? CONFIG.portal.roll * roll : 0 };
 }
 
 /**
@@ -113,7 +122,7 @@ export function createPortal(canvas: HTMLCanvasElement, s: PortalSetup): Portal 
   return {
     endScale,
     draw(u, open, textAlpha, rimAlpha) {
-      const cam = portalCamera(u, endScale);
+      const cam = portalCamera(u, endScale, CONFIG.portal.preroll);
       const r = s.r0 * easeOutCubic(open);
       ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
       ctx.globalCompositeOperation = "source-over";

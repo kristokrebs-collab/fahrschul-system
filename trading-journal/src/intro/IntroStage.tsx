@@ -191,7 +191,7 @@ export function IntroStage({ covering, directorRef, onBuild, onDone, onSkip }: I
             <div ref={groupRef} className="relative flex flex-col items-center will-change-transform">
               <div ref={topRef} className="relative will-change-transform">
                 <div ref={textTopRef}>
-                  <AsciiCascade text={CONFIG.wordmark.top} drop={CONFIG.wordmark.drop} seed={11} className={WORDMARK_FONT} />
+                  <AsciiCascade text={CONFIG.wordmark.top} drop={CONFIG.wordmark.drop} seed={11} scrambled className={WORDMARK_FONT} />
                 </div>
               </div>
               <div ref={winRef} className="pointer-events-none absolute overflow-hidden rounded-[18px] border border-line-2 bg-ink-900 [container-type:size]" style={{ visibility: "hidden", transform: "scale(1,0.002)" }}>
@@ -210,7 +210,7 @@ export function IntroStage({ covering, directorRef, onBuild, onDone, onSkip }: I
                       </span>
                     </div>
                     <div className="flex flex-wrap items-baseline gap-x-3">
-                      <span className={`font-dot font-extrabold leading-none tracking-[-0.03em] text-[min(12cqw,30cqh)] ${reel.tone === "win" ? "text-win" : reel.tone === "loss" ? "text-loss" : "text-fg"}`}>
+                      <span className={`font-dot font-extrabold leading-none tracking-[-0.03em] text-[min(13cqw,32cqh)] ${reel.tone === "win" ? "text-win" : reel.tone === "loss" ? "text-loss" : "text-fg"}`}>
                         {reel.value}
                       </span>
                       {reel.unit && <span className="font-sans text-[clamp(13px,1.4vw,17px)] font-medium text-mute">{reel.unit}</span>}
@@ -221,7 +221,7 @@ export function IntroStage({ covering, directorRef, onBuild, onDone, onSkip }: I
               </div>
               <div ref={bottomRef} className="relative flex flex-col items-center will-change-transform">
                 <div ref={textBottomRef} className="relative">
-                  <AsciiCascade text={CONFIG.wordmark.bottom} drop={CONFIG.wordmark.drop} seed={23} className={WORDMARK_FONT} />
+                  <AsciiCascade text={CONFIG.wordmark.bottom} drop={CONFIG.wordmark.drop} seed={23} scrambled className={WORDMARK_FONT} />
                   <div ref={markerRef} className="absolute h-0 w-0">
                     <span ref={squareRef} className="absolute left-0 top-0 block" style={{ opacity: 0, border: `${CONFIG.square.border}px solid ${CONFIG.square.color}` }} />
                     {CONFIG.signal.pings.map((_, i) => (

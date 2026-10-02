@@ -42,9 +42,10 @@ describe("css curves from the pack's measured motion", () => {
 
 describe("intro choreography of the shell", () => {
   it("dock: parked during the stage, soft-bounce rise on build, always ends at y 0 / opacity 1", () => {
-    expect(dockEntrance("stage", false, false).animate).toEqual({ y: DOCK_CONFIG.introRise, opacity: 0 });
+    // the session entrance's blur (mounted before the intro started) is dropped in the stage, never animated in the build
+    expect(dockEntrance("stage", false, false).animate).toEqual({ y: DOCK_CONFIG.introRise, opacity: 0, filter: "none" });
     const build = dockEntrance("build", true, false);
-    expect(build.animate).toEqual({ y: 0, opacity: 1 });
+    expect(build.animate).toEqual({ y: 0, opacity: 1, filter: "none" });
     expect(build.transition.y).toBe(spring.reveal);
     for (const p of ["off", "done"] as const) {
       expect(dockEntrance(p, false, false).animate).toEqual({ y: 0, opacity: 1 });

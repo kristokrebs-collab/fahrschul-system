@@ -101,12 +101,13 @@ describe("IntroHost", () => {
     expect(getIntroPhase()).toBe("stage");
   });
 
-  it("replay is refused where it may not play (reduced motion / jsdom)", () => {
+  it("replay is refused where it may not play (reduced motion / jsdom), but still lands on the overview top", () => {
     boot.autoplay = false;
     boot.replay = false;
     mount();
     act(() => replayIntro());
-    expect(nav.navigate).not.toHaveBeenCalled();
+    expect(nav.navigate).toHaveBeenCalledWith("overview");
+    expect(nav.restoreScroll).toHaveBeenCalledWith("overview", true);
     expect(getIntroPhase()).toBe("off");
   });
 });

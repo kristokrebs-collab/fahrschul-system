@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { replayIntro } from "@/intro/introStore";
+import { INTRO_PREF_KEY, replayIntro } from "@/intro/introStore";
 import { Switch } from "@/motion/Switch";
 import { Button } from "@/primitives/Button";
 
 /** localStorage key read by the intro host: `"off"` disables the start intro, anything else (or nothing) keeps it on. */
-export const INTRO_PREF_KEY = "tj2-ui-intro";
+export { INTRO_PREF_KEY };
 
 export const INTRO_STRINGS = {
   label: "Intro beim Start abspielen",

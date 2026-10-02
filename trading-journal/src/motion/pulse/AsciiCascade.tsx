@@ -65,7 +65,14 @@ export function cascadeAt(e: number, cfg: Pick<typeof CONFIG, "fall" | "hold" | 
  * Deterministic glyph scrambler (seeded PRNG, never Math.random): `step(e)` re-rolls on each new 70 ms tick and
  * returns true when any glyph changed. Whitespace stays whitespace so the word shape stays readable.
  */
-export function createScrambler(text: string, seed: number, cfg: Pick<typeof CONFIG, "tick" | "changeProb" | "onsetJitter" | "chars"> = CONFIG) {
+export interface ScrambleConfig {
+  tick: number;
+  changeProb: number;
+  onsetJitter: number;
+  chars: string;
+}
+
+export function createScrambler(text: string, seed: number, cfg: ScrambleConfig = CONFIG) {
   const rnd = seeded(seed);
   const chars = splitChars(text);
   const pool = splitChars(cfg.chars);
@@ -119,6 +126,15 @@ export interface AsciiCascadeProps {
   reserve?: boolean;
   /** PRNG seed (default: hash of the text + play count) – fixed seeds give identical scrambles. */
   seed?: number;
+  /**
+   * Start from the scramble instead of the readable text: the very first paint already shows the first glyph roll
+   * (no per-letter onset), so a decode never flashes its answer first. Use only with a play pending (intro wordmark).
+   */
+  scrambled?: boolean;
+  /** Resolved colour (default fg white). The glow layer follows it. */
+  color?: string;
+  /** Scramble colour while falling (default mute grey). */
+  scrambleColor?: string;
 }
 
 interface Engine {
@@ -127,13 +143,23 @@ interface Engine {
   destroy(): void;
 }
 
-function createEngine(root: HTMLElement, row: HTMLElement, layers: [HTMLElement, HTMLElement, HTMLElement], text: string, dropEm: number, seedBase: number | undefined): Engine {
+const NO_ONSET: ScrambleConfig = { ...CONFIG, onsetJitter: 0 };
+
+/** The glyphs of the first roll of a `scrambled` cascade (same PRNG sequence as the engine's first play). */
+export function firstRoll(text: string, seed: number): string[] {
+  const s = createScrambler(text, seed, NO_ONSET);
+  s.step(0);
+  return s.cur.slice();
+}
+
+function createEngine(root: HTMLElement, row: HTMLElement, layers: [HTMLElement, HTMLElement, HTMLElement], text: string, dropEm: number, seedBase: number | undefined, scrambled: boolean): Engine {
   const [lo, hi, glow] = layers;
   const glyphs = layers.map((layer) => Array.from(layer.querySelectorAll<HTMLElement>("[data-g]")));
   let count = 0;
-  let scr = createScrambler(text, seedBase ?? hashString(text));
+  const cfgFor = (n: number): ScrambleConfig => (scrambled && n === 0 ? NO_ONSET : CONFIG);
+  let scr = createScrambler(text, seedBase ?? hashString(text), cfgFor(0));
   /** Per-layer glyphs currently in the DOM; invisible layers are not written (synced when they become visible). */
-  const shown = glyphs.map(() => scr.chars.slice());
+  const shown = glyphs.map(() => (scrambled ? firstRoll(text, seedBase ?? hashString(text)) : scr.chars.slice()));
   let resolvedFired = false;
   let doneCb: (() => void) | undefined;
   let last = { y: -1, o: -1, w: -1, g: -1 };
@@ -199,8 +225,8 @@ function createEngine(root: HTMLElement, row: HTMLElement, layers: [HTMLElement,
   return {
     play(delay, onDone) {
       timeline.stop();
+      scr = createScrambler(text, (seedBase ?? hashString(text)) + count, cfgFor(count));
       count += 1;
-      scr = createScrambler(text, (seedBase ?? hashString(text)) + count - 1);
       resolvedFired = false;
       doneCb = onDone;
       lo.style.opacity = "1";
@@ -223,7 +249,7 @@ function createEngine(root: HTMLElement, row: HTMLElement, layers: [HTMLElement,
 
 const GLYPH: CSSProperties = { position: "absolute", left: "50%", top: 0, transform: "translateX(-50%)" };
 
-function Layer({ chars, style, refEl, className }: { chars: string[]; style?: CSSProperties; refEl: (el: HTMLSpanElement | null) => void; className?: string }) {
+function Layer({ chars, glyphs, style, refEl, className }: { chars: string[]; glyphs: string[]; style?: CSSProperties; refEl: (el: HTMLSpanElement | null) => void; className?: string }) {
   return (
     <span ref={refEl} className={className} style={style}>
       {chars.map((ch, i) => (
@@ -231,7 +257,7 @@ function Layer({ chars, style, refEl, className }: { chars: string[]; style?: CS
         <span key={i} className="relative inline-block">
           <span className="invisible">{ch}</span>
           <span data-g="" style={GLYPH}>
-            {ch}
+            {glyphs[i] ?? ch}
           </span>
         </span>
       ))}
@@ -245,7 +271,7 @@ function Layer({ chars, style, refEl, className }: { chars: string[]; style?: CS
  * the row's transform/opacity and two layer opacities change; glyph text nodes change only on 70 ms ticks.
  * Reduced motion: the plain text, no scramble. Note: the fall overflows `drop` em below the box unless `reserve`.
  */
-export function AsciiCascade({ text, play, playOnMount = true, onDone, className, as = "span", delay = 0, drop = CONFIG.dropEm, reserve = false, seed }: AsciiCascadeProps) {
+export function AsciiCascade({ text, play, playOnMount = true, onDone, className, as = "span", delay = 0, drop = CONFIG.dropEm, reserve = false, seed, scrambled = false, color = CONFIG.hiColor, scrambleColor = CONFIG.loColor }: AsciiCascadeProps) {
   const reduced = useReducedFx();
   const rootRef = useRef<HTMLElement | null>(null);
   const rowRef = useRef<HTMLSpanElement | null>(null);
@@ -261,13 +287,15 @@ export function AsciiCascade({ text, play, playOnMount = true, onDone, className
     const hi = hiRef.current;
     const glow = glowRef.current;
     if (!root || !row || !lo || !hi || !glow) return;
-    const e = createEngine(root, row, [lo, hi, glow], text, drop, seed);
+    const e = createEngine(root, row, [lo, hi, glow], text, drop, seed, scrambled && !reduced);
     engine.current = e;
     return () => {
       e.destroy();
       engine.current = null;
     };
-  }, [text, drop, seed]);
+    // `reduced` is read once: a later change is handled by the finish() effect below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, drop, seed, scrambled]);
 
   useLayoutEffect(() => {
     if (reduced) engine.current?.finish();
@@ -282,6 +310,7 @@ export function AsciiCascade({ text, play, playOnMount = true, onDone, className
   });
 
   const chars = splitChars(text);
+  const initial = scrambled && !reduced ? firstRoll(text, seed ?? hashString(text)) : chars;
   const Root = as as "span";
   return (
     <Root
@@ -292,9 +321,9 @@ export function AsciiCascade({ text, play, playOnMount = true, onDone, className
     >
       <span className="sr-only">{text}</span>
       <span key={text} ref={rowRef} aria-hidden="true" className="relative block whitespace-pre">
-        <Layer chars={chars} refEl={(el) => void (loRef.current = el)} className="block" style={{ color: CONFIG.loColor, opacity: 0 }} />
-        <Layer chars={chars} refEl={(el) => void (hiRef.current = el)} className="absolute inset-0" style={{ color: CONFIG.hiColor }} />
-        <Layer chars={chars} refEl={(el) => void (glowRef.current = el)} className="absolute inset-0" style={{ color: CONFIG.hiColor, textShadow: CONFIG.glowShadow, opacity: 0 }} />
+        <Layer chars={chars} glyphs={initial} refEl={(el) => void (loRef.current = el)} className="block" style={{ color: scrambleColor, opacity: 0 }} />
+        <Layer chars={chars} glyphs={initial} refEl={(el) => void (hiRef.current = el)} className="absolute inset-0" style={{ color }} />
+        <Layer chars={chars} glyphs={initial} refEl={(el) => void (glowRef.current = el)} className="absolute inset-0" style={{ color, textShadow: CONFIG.glowShadow, opacity: 0 }} />
       </span>
     </Root>
   );

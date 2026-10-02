@@ -114,6 +114,11 @@ describe("reels and portal", () => {
     expect(Math.abs(portalCamera(0, end).rot)).toBe(0);
     expect(portalCamera(1, end).scale).toBeCloseTo(end, 6);
     expect(portalCamera(1, end).rot).toBe(CONFIG.portal.roll);
+    // renormalised from the preroll point: registered on the DOM wordmark at the start, same end
+    const p = CONFIG.portal.preroll;
+    expect(portalCamera(p, end, p).scale).toBe(1);
+    expect(portalCamera(p, end, p).rot).toBe(0);
+    expect(portalCamera(1, end, p).scale).toBeCloseTo(end, 6);
   });
 
   it("types the real data line", () => {

@@ -311,9 +311,12 @@ interface TrayEntrance {
  */
 export function dockEntrance(phase: IntroPhase, sessionIntro: boolean, reduced: boolean): TrayEntrance {
   if (reduced) return { initial: false, animate: { y: 0, opacity: 1 }, transition: { duration: 0 } };
-  if (phase === "stage") return { initial: false, animate: { y: DOCK_CONFIG.introRise, opacity: 0 }, transition: { y: { duration: 0 }, opacity: { duration: 0 } } };
-  if (phase === "build") return { initial: false, animate: { y: 0, opacity: 1 }, transition: { y: spring.reveal, opacity: tween.fade } };
-  if (sessionIntro)
+  // the tray mounts before the intro starts (phase "off" → the session entrance's blurred `initial`): "stage" drops
+  // that blur at once, so the build rise is crisp
+  if (phase === "stage") return { initial: false, animate: { y: DOCK_CONFIG.introRise, opacity: 0, filter: "none" }, transition: { duration: 0 } };
+  if (phase === "build") return { initial: false, animate: { y: 0, opacity: 1, filter: "none" }, transition: { y: spring.reveal, opacity: tween.fade, filter: { duration: 0 } } };
+  // the blurred session entrance only without an intro: after a played intro ("done") the tray is already in place
+  if (sessionIntro && phase === "off")
     return {
       initial: { y: 72, opacity: 0, filter: "blur(8px)" },
       animate: { y: 0, opacity: 1, filter: "blur(0px)", transitionEnd: { filter: "none" } },
