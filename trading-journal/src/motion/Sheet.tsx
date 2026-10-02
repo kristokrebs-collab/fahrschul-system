@@ -65,6 +65,11 @@ interface Readiness {
   exiting: boolean;
 }
 
+/** Close order: contents fade out first … */
+const CONTENT_EXIT = { opacity: 0, transition: tween.exit };
+/** … then the (emptied, opaque) panel. */
+const PANEL_EXIT = { ...tween.exit, delay: tween.exit.duration };
+
 /**
  * Bottom sheet on mobile / centred dialog from `sm` (Bundle `Y$`, Plan 2.5 "Sheet"). Portal-less,
  * with focus trap + scroll lock + inert siblings + Escape/overlay close. With `layoutId` the panel
@@ -118,13 +123,15 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
     if (info.offset.y > DISMISS_OFFSET || info.velocity.y > DISMISS_VELOCITY) onClose();
   };
 
+  // close: head, body and footer fade first (CONTENT_EXIT), the panel – by then an empty opaque surface – after them,
+  // so a fading panel never shows its text over the page's text
   const enterExit: HTMLMotionProps<"div"> = morph
-    ? { exit: { opacity: 0, scale: 0.98, transition: tween.exit }, transition: { layout: spring.sheet } }
+    ? { exit: { opacity: 0, scale: 0.98, transition: PANEL_EXIT }, transition: { layout: spring.sheet } }
     : desktop
       ? {
           initial: { y: 40, opacity: 0, scale: 0.98 },
           animate: { y: 0, opacity: 1, scale: 1 },
-          exit: { y: 30, opacity: 0, scale: 0.98, transition: tween.exit },
+          exit: { y: 30, opacity: 0, scale: 0.98, transition: PANEL_EXIT },
           transition: { ...spring.sheet, delay: enterDelay, opacity: { ...tween.fade, delay: enterDelay } },
         }
       : { initial: { y: "100%" }, animate: { y: 0 }, exit: { y: "100%", transition: tween.sheetIos }, transition: { ...tween.sheetIos, delay: enterDelay } };
@@ -193,6 +200,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                 // a morphing panel starts at the source's size: head and footer (not scale-corrected) appear with the body
                 initial={morph ? { opacity: 0 } : false}
                 animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
+                exit={CONTENT_EXIT}
                 transition={tween.fade}
               >
                 <h2 id={titleId} className="text-[17px] font-semibold">
@@ -220,6 +228,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                   className="flex flex-wrap items-center gap-2.5 border-t border-line bg-ink-900/60 px-6 py-3.5 pb-[calc(14px+env(safe-area-inset-bottom,0px))]"
                   initial={morph ? { opacity: 0 } : false}
                   animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
+                  exit={CONTENT_EXIT}
                   transition={tween.fade}
                 >
                   {footer}
@@ -247,6 +256,7 @@ function SheetBody({ children, morph, ready }: { children: ReactNode; morph: boo
         variants={morph ? BODY_MORPH : BODY_SLIDE}
         initial={STAGGER_HIDDEN}
         animate={ready ? STAGGER_SHOWN : STAGGER_HIDDEN}
+        exit={CONTENT_EXIT}
         inert={!ready || undefined}
       >
         {children}
