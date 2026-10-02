@@ -172,12 +172,12 @@ function Stat({ label, children, tone }: { label: string; children: React.ReactN
   );
 }
 
-function StatsBand() {
+function StatsBand({ paused }: { paused: boolean }) {
   const stats = useShellStats();
   const t = shellStatTexts(stats);
   const price = useLivePriceText();
   return (
-    <Marquee aria-label={FOOTER_TICKER_LABEL} gap={0} fade={64} className="h-full font-mono text-[11.5px] font-medium uppercase tracking-[0.24em]">
+    <Marquee aria-label={FOOTER_TICKER_LABEL} gap={0} fade={64} paused={paused} className="h-full font-mono text-[11.5px] font-medium uppercase tracking-[0.24em]">
       <Stat label="Netto-P&L" tone={stats.net > 0 ? "text-win" : stats.net < 0 ? "text-loss" : undefined}>
         {t.net}
       </Stat>
@@ -260,9 +260,10 @@ export function Footer() {
       <footer ref={footer} data-shown={shown || undefined} className="sticky bottom-0 -z-10 overflow-x-clip pb-[calc(92px+env(safe-area-inset-bottom,0px))] pt-10">
         <div className="relative h-14" style={{ marginInline: "-6%", ...part(shown, reduced, band, { from: `rotate(${band.tiltFrom}deg) translate3d(0,${band.rise}px,0)`, to: `rotate(${band.tilt}deg) translate3d(0,0,0)` }) }}>
           <div className="h-full border-y border-white/[0.06] bg-black/20">
-            {/* the sticky footer always intersects the viewport (under the curtain), so the marquee would never sleep:
-                it only exists while uncovered (hiding happens at ≤ 50 %, when the band at the top is covered again) */}
-            {(shown || reduced) && <StatsBand />}
+            {/* the sticky footer always intersects the viewport (under the curtain), so the IntersectionObserver never
+                sleeps the marquee: it mounts on the first reveal and is paused while covered (hiding happens at ≤ 50 %,
+                when the band at the top is covered again), so it resumes where it stopped */}
+            {(drawn || reduced) && <StatsBand paused={!shown} />}
           </div>
         </div>
         <div className="mx-auto mt-6 h-28 max-w-[1320px] px-4 sm:h-36 sm:px-6" style={part(shown, reduced, CONFIG.headline)}>

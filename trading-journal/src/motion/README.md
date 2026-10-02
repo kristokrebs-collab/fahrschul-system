@@ -11,6 +11,13 @@ Declared exceptions (Plan 3.2 rule 1):
 - `// motion-exception: text-shimmer` (`TextShimmer.tsx`) – `background-position` sweep on a short label (a paint, on a
   native WAAPI loop that pauses off-screen).
 
+- `AutoHeight` (`views/trades/AutoHeight.tsx`) and `Collapse` (Expander) – the height of ONE box springs so the
+  content below is pushed smoothly instead of jumping (no-overlap rule 5); the moving content itself only translates.
+- `MorphSelect` (`pulse/MorphSelect.tsx`) – the pack's 140 ms ease-out radius ease (field 12 → panel 16 px) at open,
+  on the floating panel only.
+- Intro stage (`src/intro/portal.ts`) – the glyph-portal camera is a 2D canvas redraw per frame (the pack's technique:
+  the wordmark stays a crisp vector at 30×+); one clear + three fills, no layout reads.
+
 The dock no longer animates layout (transform-only magnification, see `src/app/README.md`), so the former
 `dock-magnify` exception is gone.
 
@@ -47,7 +54,7 @@ seconds unless noted. Additions over the bundle set:
 | `dwell.heroFlicker` | `4` | `HeroBackdrop` flicker sleeps this long after mount / the last pointer activity on the hero |
 | `fxTiming.*` | phosphor rise/fall `.04/.12`, `matrixFps 12`, `fieldEase .45`, scramble `reroll .033 · base .25 · min .35 · max .8` | `DotMatrix`, `HeroBackdrop` (`heroField.ts`), `TextScramble` |
 | `gesture.toastSwipe / toastFlick / toastFling` | `80 px / 500 px·s⁻¹ / 360 px` | toast island drag dismiss + fling-out |
-| `radius.hover 12`, `radius.thumb 8`, `radius.toastStart 22`, `radius.toastEnd 25`, `radius.fab 999` | | `HoverPill`, `Segmented`, `Toast`, FAB |
+| `radius.hover 12`, `radius.thumb 8`, `radius.toastStart 22`, `radius.toastEnd 25`, `radius.fab 22` (h/2 of the 44 px disc) | | `HoverPill`, `Segmented`, `Toast`, FAB |
 
 CSS mirrors (`src/styles/tokens.css` cannot import TS; listed at the end of `tokens.ts`): `.fx-strike` = `tween.collapse`,
 `.fx-pop` = `tween.tooltipIn` / `tween.exit`, `fx-ping` = `tween.pingFew` (3 iterations), `fx-shimmer` = `tween.skeleton`, `fx-spin` = `tween.beam`;
@@ -203,6 +210,38 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
 ### `base.css`
 `html { scrollbar-gutter: stable }` (the scroll lock never reflows); under reduced motion transition/animation delays are zeroed and
 `scroll-behavior` is `auto`.
+
+## pulse-motion (`src/motion/pulse/*`, barrel `@/motion/pulse`)
+
+Ports of the pulse-motion pack (timings/curves/springs measured from the recordings, Nothing palette), all on the
+shared 120 Hz engine (`engine.ts`: exact `springAt`, `smoothing(k, dt)`, `cubicBezier`, `createFrameLoop` that sleeps
+when idle, coalesced `latestPointer`, seeded PRNG; `springStep.ts`: the one retargetable exact spring step, wrapped by
+`textKit.springStep`; `textKit.ts`: `createTimeline` – rAF clock that pauses offscreen / in a hidden tab –,
+`usePlayTrigger`, `watchActivity`). Per frame only transform / opacity / clip-path (filter during a morph) are
+written, never React state; reduced motion shows the final state at once. Every file keeps its tokens in `CONFIG`.
+
+| Component | Pack effect | Where it is used |
+| --- | --- | --- |
+| `AsciiCascade` (`color`, `scrambleColor`, `scrambled`, `reserve`, `drop`) | text-ascii-cascade | intro wordmark (starts `scrambled` – never flashes the answer first); header logo click (decode after the replay); MarketPanel scenario lead on a scenario change (`color="inherit"` keeps the tone) |
+| `PixelTextFill` | pixel-text-fill | intro statement; page subtitles once per session (`LeadFill`: Trades, Entscheidungsgrundlagen, Einstellungen) |
+| `Typewriter` | text-animate | intro data line (real counts + live price); `EmptyState` line (`line` prop, "Keine Treffer": "Filter lockern oder zurücksetzen.") |
+| `TextMorph` | text-morphing | every string `StatusPill` label; MarketPanel scenario key word |
+| `TextPrism` (`colors`) | text-prism-split | Hero Netto-P&L; lens and copies only on hover devices (touch renders the plain figure, no copies); copies always take their layer colour |
+| `DancingLetters` · `DancingSvgWord` | dancing-letters | header wordmark (hover); footer outline wordmark |
+| `TactileHighlight` (`padX`, `tab`) | tactile-highlight | verdict key words (`VerdictPanel`), scenario key word, `LeadFill` key word – inline places pass `tab={false}` (the 90 ms tab would cross the preceding text) |
+| `MorphSelect` | morphing-language-selector | `#f-tf` timeframe, Trades setup filter, `#s-currency` |
+| `Autocomplete` | autocomplete | Trades search (grouped suggestions); `#s-symbol` (Binance futures symbols → `BINANCE:…`) |
+| `NotchedFrame` | notched-project-card | setup cards (CSS in `@layer components`, utilities win) |
+| `WidgetGrid` · `useLift` | draggable-widget-grid | MarketPanel mini tiles (order in `tj2-ui-market-tiles`); RulesCard / SetupEditor checklist lift |
+| `StripWipe` · `playStripWipe` | parallax-strip-slider | chart interval switch (10 strips from an opaque snapshot) |
+| `Marquee` (`paused`) | motion-footer | footer stats band; `paused` while the curtain covers the sticky footer (the IntersectionObserver cannot see that) |
+
+Built on the same engine outside this folder: the intro (`src/intro`, glyph-portal / reel-collage / slanted-spread /
+cinematic-orbit / product-launch), the dock labels + magnification and the command navigation (`src/app`), the
+equity replay scrubber (`src/chart/EquityChart.tsx`) and the Hochrechnung milestone rail (`views/overview`).
+
+Intro gating: first-view effects inside an overview cell wait for `useIntroLanded()` / `useIntroGate()`
+(`src/intro/introStore.ts`); `TactileHighlight playOnView` does this itself.
 
 ## Feature notes
 

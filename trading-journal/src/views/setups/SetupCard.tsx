@@ -185,7 +185,7 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
             notchSize={CONFIG.notch}
             outline="var(--color-line)"
             media={wash}
-            mediaClassName="pointer-events-none absolute! inset-x-0 top-0 overflow-hidden rounded-t-2xl"
+            mediaClassName="pointer-events-none absolute inset-x-0 top-0 overflow-hidden rounded-t-2xl"
             className="bg-ink-850"
             wrapperClassName="h-full"
           >

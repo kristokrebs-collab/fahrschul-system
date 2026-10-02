@@ -10,7 +10,6 @@ import { TextPrism } from "@/motion/pulse/TextPrism";
 import { MotionNumber, useAnimatedNumber } from "@/motion/MotionNumber";
 import { TextRoll } from "@/motion/TextRoll";
 import { radius, tween } from "@/motion/tokens";
-import { useCanHover } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { HeroBackdrop } from "@/primitives/HeroBackdrop";
@@ -30,11 +29,10 @@ const XL_TILES: readonly { key: ExplainKey; label: string }[] = [
 ];
 const TILES = [...HERO_TILES, ...XL_TILES];
 /**
- * Inside the prism lens every copy takes its layer colour (signal / white / grey): the number's own win/loss tone
- * classes are overridden below the layer spans (the base figure outside the lens keeps its tone). The lens box clips:
- * 0.12 em of padding (cancelled by a negative margin, no layout change) keeps the glyphs inside it at `leading-none`.
+ * The prism lens box clips: 0.12 em of padding (cancelled by a negative margin, no layout change) keeps the glyphs
+ * inside it at `leading-none`. (TextPrism itself gives every copy its layer colour over the number's win/loss tone.)
  */
-const PRISM_COPY_TONE = "[&>span:last-child>span_*]:![color:inherit] -my-[0.12em] py-[0.12em]";
+const PRISM_PAD = "-my-[0.12em] py-[0.12em]";
 /** Peak opacity of the Netto-P&L glow when the figure changes. */
 const GLOW_PEAK = 0.55;
 
@@ -105,7 +103,6 @@ export function Hero() {
   const ret = view.start ? g.net / view.start : null;
   const [active, setActive] = useState<number | null>(null);
   const net = useAnimatedNumber(loaded ? g.net : 0);
-  const canHover = useCanHover();
 
   // stable per data change, so hovering re-renders only the two tiles whose `active` flips
   const tiles = useMemo(
@@ -165,13 +162,9 @@ export function Hero() {
               <NetGlow net={g.net} acc={acc} loaded={loaded} />
               <SkeletonSwap ready={loaded} skeleton={<Skeleton className="h-[0.78em] w-[5.2ch] rounded-2xl" />}>
                 {/* prism lens over the figure on hover devices (its copies count with the same MotionValue); touch: plain */}
-                {canHover ? (
-                  <TextPrism className={PRISM_COPY_TONE}>
-                    <MotionNumber source={net} decimals={2} signed tone="auto" aria-label={heroTileValue("net", view)} />
-                  </TextPrism>
-                ) : (
+                <TextPrism className={PRISM_PAD}>
                   <MotionNumber source={net} decimals={2} signed tone="auto" aria-label={heroTileValue("net", view)} />
-                )}
+                </TextPrism>
               </SkeletonSwap>
               <span className="font-sans text-lg font-medium text-mute">{cur}</span>
             </div>

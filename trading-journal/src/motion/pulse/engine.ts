@@ -70,6 +70,10 @@ export function cubicBezier(x1: number, y1: number, x2: number, y2: number): (t:
 }
 
 /**
+ * Timestamp caveat: in a browser the rAF timestamp and `performance.now()` share one origin, so absolute times set in
+ * event handlers (`performance.now()`) can be compared with `now`. jsdom's rAF timestamps use a different origin –
+ * code that compares absolute times reads `performance.now()` inside the frame instead of trusting `now` there.
+ *
  * rAF loop that only runs while `update` returns true. `update(dt, now)` gets dt in seconds (clamped to 50 ms so
  * tab switches never jump) and the rAF timestamp. Call `wake()` whenever something should animate again.
  */

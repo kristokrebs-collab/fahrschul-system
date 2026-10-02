@@ -99,18 +99,11 @@ export function scenarioTitleParts(title: string): { lead: string; key: string }
   return { lead: "", key: title };
 }
 
-/** Keeps a marker (incl. its tab) inside the word's box (+ 3 px for the glow; nothing on the left, where the tab pops). */
-export const MARKER_CLIP = "inline-block [clip-path:inset(-3px_-3px_-3px_0)]";
 /** Marker wipe-out (τ 150 ms) is visually gone after ~2 τ: then the key word starts its morph. */
 const KEY_SWAP_MS = 320;
 
 /** Fall depth of the title decode: the glyphs stay inside the free band above the detail line (no overlap). */
 const CASCADE_DROP = 0.5;
-/**
- * The cascade's resolved layer is white by design; the scenario title keeps its tone colour, so the resolved (2nd)
- * layer inherits it (the grey scramble layer and the white resolve glow stay as designed).
- */
-const CASCADE_TONE = "[&>span:last-child>span:nth-child(2)]:![color:inherit]";
 
 /**
  * Verdict key word of the scenario title: a marker (pulse `tactile-highlight`) wipes in the first time the box is
@@ -137,13 +130,11 @@ function ScenarioKey({ text, settled, onMorphEnd, box }: { text: string; settled
       if (inView) setSeen(true);
     });
   }, [seen, landed, box]);
-  // the marker's ~90 ms "tab" pops 1.38 em LEFT of the word – over the lead text; clipped to the word's own box
+  // no tab: its ~90 ms pop 1.38 em LEFT of the word would cross the lead text
   return (
-    <span className={MARKER_CLIP}>
-      <TactileHighlight active={visible && settled}>
-        <TextMorph text={shown} onMorphEnd={onMorphEnd} />
-      </TactileHighlight>
-    </span>
+    <TactileHighlight active={visible && settled} tab={false}>
+      <TextMorph text={shown} onMorphEnd={onMorphEnd} />
+    </TactileHighlight>
   );
 }
 
@@ -186,7 +177,7 @@ const ScenarioBox = memo(function ScenarioBox({ sc, close4h, close4hAt, sweep }:
         <strong data-scenario-title={sc.title} className={cn("min-w-0 text-[14px] font-semibold transition-colors duration-300", TONE_TITLE[sc.tone])}>
           {lead && (
             <>
-              <AsciiCascade text={lead} play={sweep} playOnMount={false} drop={CASCADE_DROP} className={CASCADE_TONE} onDone={settle} />{" "}
+              <AsciiCascade text={lead} play={sweep} playOnMount={false} drop={CASCADE_DROP} color="inherit" onDone={settle} />{" "}
             </>
           )}
           <ScenarioKey text={key} settled={settled === sweep} onMorphEnd={lead ? undefined : settle} box={box} />

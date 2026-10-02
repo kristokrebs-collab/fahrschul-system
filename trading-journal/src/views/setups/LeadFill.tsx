@@ -9,10 +9,11 @@ export const LEAD_FILL = {
   /** The fill ends in the lead's own colour (`text-mute`), so the hand-off to the plain paragraph is invisible. */
   fillVar: "[--color-fg:var(--color-mute)]",
   /**
-   * The marker's 0.16em side padding (and its coloured copy's) is removed: the bar hugs the word, the word keeps its
-   * exact advance (identical wrapping at the hand-off) and never covers a neighbouring glyph such as a comma.
+   * Marker side padding (em), cancelled by an equal negative margin: the word keeps its exact advance (identical
+   * wrapping at the hand-off), the bar reaches a little into the spaces around it but never a neighbouring glyph.
    */
-  markerClass: "px-0! [&>span:last-child]:px-0!",
+  markerPad: 0.1,
+  markerClass: "-mx-[0.1em]",
 } as const;
 
 export interface LeadFillProps {
@@ -67,7 +68,7 @@ export function LeadFill({ text, storageKey, highlight, delayMs = 0, className }
   return (
     <p className={className}>
       {text.slice(0, at)}
-      <TactileHighlight tone="invert" active={phase === "marker" ? true : undefined} className={LEAD_FILL.markerClass}>
+      <TactileHighlight tone="invert" active={phase === "marker" ? true : undefined} padX={LEAD_FILL.markerPad} tab={false} className={LEAD_FILL.markerClass}>
         {highlight}
       </TactileHighlight>
       {text.slice(at + highlight.length)}

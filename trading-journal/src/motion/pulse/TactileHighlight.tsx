@@ -68,6 +68,13 @@ export interface TactileHighlightProps {
   active?: boolean;
   onDone?: () => void;
   className?: string;
+  /** Side padding of the bar in em (default 0.16). 0 hugs the word: same advance as plain text, never covers a comma. */
+  padX?: number;
+  /**
+   * The ~90 ms tab that pops 1.38 em LEFT of the word (default true, the pack's look). false for inline places where
+   * that would cross the preceding text or a panel edge.
+   */
+  tab?: boolean;
 }
 
 interface Engine {
@@ -77,7 +84,7 @@ interface Engine {
   destroy(): void;
 }
 
-function createEngine(root: HTMLElement, bar: HTMLElement, tab: HTMLElement, lit: HTMLElement): Engine {
+function createEngine(root: HTMLElement, bar: HTMLElement, tab: HTMLElement | null, lit: HTMLElement): Engine {
   let p = 0;
   let mode: "in" | "out" = "in";
   let from = 0;
@@ -89,7 +96,7 @@ function createEngine(root: HTMLElement, bar: HTMLElement, tab: HTMLElement, lit
       bar.style.transform = `scale3d(${np.toFixed(4)},1,1)`;
       lit.style.clipPath = `inset(0 ${((1 - np) * 100).toFixed(3)}% 0 0)`;
     }
-    if (ntab !== last.tab) {
+    if (tab && ntab !== last.tab) {
       tab.style.opacity = ntab > 0 ? "1" : "0";
       if (ntab > 0) tab.style.transform = `scale3d(${ntab.toFixed(4)},1,1)`;
     }
@@ -98,7 +105,7 @@ function createEngine(root: HTMLElement, bar: HTMLElement, tab: HTMLElement, lit
   const live = (on: boolean) => {
     const wc = on ? "transform" : "";
     bar.style.willChange = wc;
-    tab.style.willChange = wc;
+    if (tab) tab.style.willChange = wc;
     lit.style.willChange = on ? "clip-path" : "";
     if (on) root.setAttribute("data-playing", "");
     else root.removeAttribute("data-playing");
@@ -159,7 +166,7 @@ function createEngine(root: HTMLElement, bar: HTMLElement, tab: HTMLElement, lit
  * word to the left only for ~90 ms (aria-hidden, no layout). Without `playOnView`/`active` the marker is static.
  * Reduced motion: final state at once.
  */
-export function TactileHighlight({ children, tone = "invert", playOnView = false, active, onDone, className }: TactileHighlightProps) {
+export function TactileHighlight({ children, tone = "invert", playOnView = false, active, onDone, className, padX = CONFIG.padXEm, tab: withTab = true }: TactileHighlightProps) {
   const reduced = useReducedFx();
   const landed = useIntroLanded();
   const rootRef = useRef<HTMLSpanElement | null>(null);
@@ -178,7 +185,7 @@ export function TactileHighlight({ children, tone = "invert", playOnView = false
     const bar = barRef.current;
     const tab = tabRef.current;
     const lit = litRef.current;
-    if (!root || !bar || !tab || !lit) return;
+    if (!root || !bar || !lit) return;
     const e = createEngine(root, bar, tab, lit);
     engine.current = e;
     e.set(initialRef.current);
@@ -186,7 +193,7 @@ export function TactileHighlight({ children, tone = "invert", playOnView = false
       e.destroy();
       engine.current = null;
     };
-  }, []);
+  }, [withTab]);
 
   // the engine is rebuilt after a (StrictMode / keep-alive) remount, so an on-view wipe may run again
   useEffect(
@@ -246,13 +253,15 @@ export function TactileHighlight({ children, tone = "invert", playOnView = false
   const t = CONFIG.tones[tone];
   const box: CSSProperties = { borderRadius: CONFIG.radius };
   return (
-    <span ref={rootRef} className={cn("relative inline-block whitespace-nowrap", className)} style={{ padding: `0 ${CONFIG.padXEm}em`, ...box }} data-pulse="tactile-highlight" data-tone={tone}>
-      <i
-        ref={tabRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 bottom-0"
-        style={{ ...box, right: "100%", width: `${CONFIG.tabWidthEm}em`, background: t.bar, transformOrigin: "100% 50%", opacity: 0 }}
-      />
+    <span ref={rootRef} className={cn("relative inline-block whitespace-nowrap", className)} style={{ padding: `0 ${padX}em`, ...box }} data-pulse="tactile-highlight" data-tone={tone}>
+      {withTab && (
+        <i
+          ref={tabRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 bottom-0"
+          style={{ ...box, right: "100%", width: `${CONFIG.tabWidthEm}em`, background: t.bar, transformOrigin: "100% 50%", opacity: 0 }}
+        />
+      )}
       <i
         ref={barRef}
         aria-hidden="true"
@@ -264,7 +273,7 @@ export function TactileHighlight({ children, tone = "invert", playOnView = false
         ref={litRef}
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 select-none"
-        style={{ padding: `0 ${CONFIG.padXEm}em`, color: t.text, clipPath: "inset(0 100% 0 0)" }}
+        style={{ padding: `0 ${padX}em`, color: t.text, clipPath: "inset(0 100% 0 0)" }}
       >
         {children}
       </span>

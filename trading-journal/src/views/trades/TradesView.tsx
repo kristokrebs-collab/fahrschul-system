@@ -97,6 +97,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
       <EmptyState
         title="Keine Treffer"
         text="Kein Trade passt zu diesen Filtern."
+        line="Filter lockern oder zurücksetzen."
         action={
           <Button size="sm" className="mt-2" onClick={() => resetTradeFilter()} {...ctaMotion}>
             Filter zurücksetzen

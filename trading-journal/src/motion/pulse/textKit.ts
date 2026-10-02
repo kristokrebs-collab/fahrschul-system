@@ -6,6 +6,7 @@
 import { createFrameLoop } from "@/motion/pulse/engine";
 import { useEffect, useEffectEvent, useRef } from "react";
 import { canObserveInView, observeInView } from "@/motion/inView";
+import { stepSpring, type SpringState } from "@/motion/pulse/springStep";
 
 /** Calls `cb(active)` when the element enters/leaves the viewport or the tab is hidden/shown. jsdom: always active. */
 export function watchActivity(el: Element, cb: (active: boolean) => void): () => void {
@@ -149,35 +150,14 @@ export function usePlayTrigger(play: number | boolean | undefined, playOnMount: 
   }, [key, mountPlay]);
 }
 
-export interface SpringState {
-  x: number;
-  v: number;
-}
+export type { SpringState } from "@/motion/pulse/springStep";
 
-/** Exact damped-spring step towards `target` over `dt` seconds (all damping regimes), carrying velocity. */
-export function springStep(x: number, v: number, target: number, dt: number, { stiffness, damping, mass }: { stiffness: number; damping: number; mass: number } = { stiffness: 350, damping: 30, mass: 1 }): SpringState {
-  const w0 = Math.sqrt(stiffness / mass);
-  const z = damping / (2 * Math.sqrt(stiffness * mass));
-  const d0 = x - target;
-  if (z < 1 - 1e-4) {
-    const wd = w0 * Math.sqrt(1 - z * z);
-    const e = Math.exp(-z * w0 * dt);
-    const cs = Math.cos(wd * dt);
-    const sn = Math.sin(wd * dt);
-    const B = (v + z * w0 * d0) / wd;
-    return { x: target + e * (d0 * cs + B * sn), v: e * ((B * wd - z * w0 * d0) * cs - (z * w0 * B + d0 * wd) * sn) };
-  }
-  if (z <= 1 + 1e-4) {
-    const e = Math.exp(-w0 * dt);
-    const q = v + w0 * d0;
-    return { x: target + e * (d0 + q * dt), v: e * (v - w0 * dt * q) };
-  }
-  const s = w0 * Math.sqrt(z * z - 1);
-  const r1 = -z * w0 + s;
-  const r2 = -z * w0 - s;
-  const c2 = (v - r1 * d0) / (r2 - r1);
-  const c1 = d0 - c2;
-  const e1 = Math.exp(r1 * dt);
-  const e2 = Math.exp(r2 * dt);
-  return { x: target + c1 * e1 + c2 * e2, v: c1 * r1 * e1 + c2 * r2 * e2 };
+/**
+ * Exact damped-spring step towards `target` over `dt` seconds (all damping regimes), carrying velocity. Immutable
+ * wrapper over springStep.ts `stepSpring` (one implementation for every pulse component).
+ */
+export function springStep(x: number, v: number, target: number, dt: number, cfg: { stiffness: number; damping: number; mass: number } = { stiffness: 350, damping: 30, mass: 1 }): SpringState {
+  const s = { x, v };
+  stepSpring(s, target, cfg, dt);
+  return s;
 }

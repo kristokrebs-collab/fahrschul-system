@@ -134,7 +134,7 @@ export const radius = {
   thumb: 8, // NEW: Segmented thumb (rounded-lg)
   toastStart: 22, // NEW: toast island collapsed (declared exception, see Toast.tsx)
   toastEnd: 25, // NEW: toast island expanded
-  fab: 999, // NEW: FAB disc (`new-trade` source)
+  fab: 22, // FAB disc (`new-trade` source): h/2 of the 44 px disc – a 999 radius morphs through an oval into the sheet (OV-05)
 } as const;
 
 /*

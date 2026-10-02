@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { createFrameLoop, latestPointer } from "@/motion/pulse/engine";
 import { canHoverNow, springStep, watchActivity } from "@/motion/pulse/textKit";
+import { useCanHover } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 
 /**
@@ -37,7 +38,12 @@ export interface TextPrismProps {
   /** Lens width in em (default 2.5). */
   lensSize?: number;
   as?: "span" | "div" | "h1" | "h2" | "p";
+  /** Copy colours inside the lens (leading, middle, trailing). Descendant colour classes (e.g. P&L tones) are overridden. */
+  colors?: readonly [string, string, string];
 }
+
+// copies are single-toned by design: tone classes inside the content (text-win / text-loss …) must not leak into them
+const COPY_CSS = "[data-prism-copy] *{color:inherit!important}";
 
 const layerStyle = (color: string): CSSProperties => ({
   position: "absolute",
@@ -57,8 +63,10 @@ const layerStyle = (color: string): CSSProperties => ({
  * the real (accessible, selectable) text; lens + copies are aria-hidden. The lens is clipped to the element's box.
  * Reduced motion: the lens jumps to the pointer without spring or split.
  */
-export function TextPrism({ children, text, className, lensSize = CONFIG.lensWidthEm, as = "span" }: TextPrismProps) {
+export function TextPrism({ children, text, className, lensSize = CONFIG.lensWidthEm, as = "span", colors = CONFIG.colors }: TextPrismProps) {
   const reduced = useReducedFx();
+  // touch-only devices never get a lens: no copies are rendered at all (and none re-render with live content)
+  const canHover = useCanHover();
   const rootRef = useRef<HTMLSpanElement | null>(null);
   const lensRef = useRef<HTMLSpanElement | null>(null);
   const content = children ?? text;
@@ -66,7 +74,7 @@ export function TextPrism({ children, text, className, lensSize = CONFIG.lensWid
   useEffect(() => {
     const root = rootRef.current;
     const lens = lensRef.current;
-    if (!root || !lens || !canHoverNow()) return;
+    if (!root || !lens || !canHover || !canHoverNow()) return;
     const layers = Array.from(lens.children) as HTMLElement[];
     let W = 0;
     let H = 0;
@@ -172,7 +180,10 @@ export function TextPrism({ children, text, className, lensSize = CONFIG.lensWid
     root.addEventListener("pointermove", onMove, { passive: true });
     root.addEventListener("pointerleave", onLeave, { passive: true });
     root.addEventListener("pointercancel", onLeave, { passive: true });
-    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    window.addEventListener("scroll", onScroll, {
+      passive: true,
+      capture: true,
+    });
     const unwatch = watchActivity(root, (a) => {
       active = a;
       if (!a) loop.stop();
@@ -188,7 +199,7 @@ export function TextPrism({ children, text, className, lensSize = CONFIG.lensWid
       setLive(false);
       lens.style.opacity = "0";
     };
-  }, [reduced]);
+  }, [reduced, canHover]);
 
   const feather = `${CONFIG.featherEm}em`;
   const mask = `linear-gradient(90deg, transparent 0, #000 ${feather}, #000 calc(100% - ${feather}), transparent 100%)`;
@@ -196,27 +207,34 @@ export function TextPrism({ children, text, className, lensSize = CONFIG.lensWid
   return (
     <Root ref={rootRef} className={cn("relative inline-block whitespace-nowrap", className)} style={{ overflow: "clip" }} data-pulse="text-prism">
       <span className="block">{content}</span>
-      <span
-        ref={lensRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute top-0 left-0 h-full select-none overflow-hidden"
-        style={{
-          width: `${lensSize}em`,
-          background: CONFIG.lensBg,
-          isolation: "isolate",
-          contain: "layout paint style",
-          WebkitMaskImage: mask,
-          maskImage: mask,
-          opacity: 0,
-          transition: `opacity ${CONFIG.fadeMs}ms ease-out`,
-        }}
-      >
-        {CONFIG.colors.map((c) => (
-          <span key={c} style={layerStyle(c)}>
-            {content}
-          </span>
-        ))}
-      </span>
+      {canHover && (
+        <style href="pulse-text-prism" precedence="default">
+          {COPY_CSS}
+        </style>
+      )}
+      {canHover && (
+        <span
+          ref={lensRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 left-0 h-full select-none overflow-hidden"
+          style={{
+            width: `${lensSize}em`,
+            background: CONFIG.lensBg,
+            isolation: "isolate",
+            contain: "layout paint style",
+            WebkitMaskImage: mask,
+            maskImage: mask,
+            opacity: 0,
+            transition: `opacity ${CONFIG.fadeMs}ms ease-out`,
+          }}
+        >
+          {colors.map((c, i) => (
+            <span key={i} data-prism-copy="" style={layerStyle(c)}>
+              {content}
+            </span>
+          ))}
+        </span>
+      )}
     </Root>
   );
 }

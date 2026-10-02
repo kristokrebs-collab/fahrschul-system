@@ -26,6 +26,11 @@ export interface MarqueeProps {
   className?: string;
   /** Edge fade width in px (0 = none). */
   fade?: number;
+  /**
+   * Holds the drift where it is (the loop sleeps). For hosts the IntersectionObserver cannot judge, e.g. a sticky
+   * footer that always intersects the viewport while covered by the page.
+   */
+  paused?: boolean;
 }
 
 /** Wrapped offset in [0, loop) for `elapsed` ms of running time at `speed` px/s. */
@@ -46,13 +51,13 @@ export function marqueeCopies(viewport: number, loop: number): number {
  * measured width requires. Pauses on hover (real hover devices), focus-within, offscreen (IntersectionObserver)
  * and hidden tab; reduced motion shows the first copy static.
  */
-export function Marquee({ children, speed = CONFIG.speed, gap = CONFIG.gap, direction = "left", pauseOnHover = true, "aria-label": ariaLabel, className, fade = CONFIG.fade }: MarqueeProps) {
+export function Marquee({ children, speed = CONFIG.speed, gap = CONFIG.gap, direction = "left", pauseOnHover = true, "aria-label": ariaLabel, className, fade = CONFIG.fade, paused = false }: MarqueeProps) {
   const reduced = useReducedFx();
   const rootRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const firstRef = useRef<HTMLDivElement>(null);
   const [copies, setCopies] = useState(2);
-  const st = useRef({ loop: 0, elapsed: 0, since: 0, running: false, hover: false, focus: false, visible: true, hidden: false, speed, dir: direction, reduced });
+  const st = useRef({ loop: 0, elapsed: 0, since: 0, running: false, hover: false, focus: false, visible: true, hidden: false, paused, speed, dir: direction, reduced });
   const loopRef = useRef<ReturnType<typeof createFrameLoop> | null>(null);
 
   const apply = (x: number) => {
@@ -65,7 +70,7 @@ export function Marquee({ children, speed = CONFIG.speed, gap = CONFIG.gap, dire
 
   const sync = () => {
     const s = st.current;
-    const should = !s.reduced && !prefersReducedMotion() && s.loop > 0 && !s.hover && !s.focus && s.visible && !s.hidden;
+    const should = !s.reduced && !prefersReducedMotion() && s.loop > 0 && !s.hover && !s.focus && s.visible && !s.hidden && !s.paused;
     if (should === s.running) return;
     const now = performance.now();
     if (should) {
@@ -110,6 +115,13 @@ export function Marquee({ children, speed = CONFIG.speed, gap = CONFIG.gap, dire
     // sync/apply only touch refs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speed, direction, reduced]);
+
+  useEffect(() => {
+    st.current.paused = paused;
+    sync();
+    // sync only touches refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused]);
 
   // measure one copy (+ gap) once and on resize; derive the copy count
   useLayoutEffect(() => {

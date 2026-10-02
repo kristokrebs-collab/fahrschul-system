@@ -77,8 +77,9 @@ function maskUrl(w: number, h: number, radius: number, notch: number): string {
 }
 
 // State lives in one custom property per frame (hover only on real hover devices → no sticky touch hover);
-// the transitions run on filter / opacity / transform, never on the variable itself.
-const CSS = `
+// the transitions run on filter / opacity / transform, never on the variable itself. Inside `@layer components`, so
+// Tailwind utilities on the same elements (e.g. `absolute` on the media slot) win.
+const CSS = `@layer components{
 .pn-frame{--pn-on:0}
 @media (hover:hover){.pn-frame:hover{--pn-on:1}}
 .pn-frame:has(:focus-visible),.pn-frame[data-active]{--pn-on:1}
@@ -88,7 +89,7 @@ const CSS = `
 .pn-disc-hot{opacity:var(--pn-on);transition:opacity ${CONFIG.discMs}ms ${CONFIG.discEase}}
 .pn-icon{transform:translate(calc(var(--pn-on) * ${CONFIG.iconShift}px),calc(var(--pn-on) * -${CONFIG.iconShift}px));transition:transform ${CONFIG.discMs}ms ${CONFIG.discEase}}
 @media (prefers-reduced-motion:reduce){.pn-color,.pn-disc-hot,.pn-icon{transition-duration:.01ms}}
-`;
+}`;
 
 /**
  * Card surface with the pack's notch: the outline (rounded corners + notch + ears) is ONE SVG mask, built once per

@@ -92,4 +92,17 @@ describe("<TactileHighlight>", () => {
     expect(parts(container).root.dataset.tone).toBe("signal");
     expect(onDone).toHaveBeenCalledTimes(1);
   });
+
+  it("tab={false} renders no tab and still wipes; padX sets the bar and copy padding", () => {
+    const { container } = render(
+      <TactileHighlight active tab={false} padX={0}>
+        Long
+      </TactileHighlight>,
+    );
+    const root = container.querySelector('[data-pulse="tactile-highlight"]') as HTMLElement;
+    expect(root.querySelectorAll("i")).toHaveLength(1);
+    expect(root.style.padding).toBe("0px 0em");
+    act(() => void vi.advanceTimersByTime(1500));
+    expect((root.querySelector("i") as HTMLElement).style.transform).toBe("scale3d(1.0000,1,1)");
+  });
 });

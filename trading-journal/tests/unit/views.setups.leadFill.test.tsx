@@ -26,8 +26,10 @@ describe("LeadFill (page subtitle recipe)", () => {
     const marker = container.querySelector('[data-pulse="tactile-highlight"]') as HTMLElement;
     expect(marker).not.toBeNull();
     expect(marker.dataset.tone).toBe("invert");
-    // no side padding: the word keeps its advance (no reflow at the hand-off) and the bar never covers a neighbour
-    expect(marker.className).toContain("px-0!");
+    // padding cancelled by an equal negative margin: the word keeps its advance (no reflow at the hand-off); no tab
+    expect(marker.style.padding).toBe("0px 0.1em");
+    expect(marker.className).toContain("-mx-[0.1em]");
+    expect(marker.querySelectorAll("i")).toHaveLength(1);
   });
 
   it("without a matching key word it renders the plain lead", () => {

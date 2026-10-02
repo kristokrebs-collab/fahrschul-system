@@ -108,9 +108,11 @@ function VerdictKey({ children }: { children: string }) {
     };
   }, [on, landed, reduced]);
   return (
-    // clipped to the word's box: the marker's ~90 ms tab pops 1.38 em to the left, over the panel's padding and border
-    <span ref={ref} className="inline-block [clip-path:inset(-3px_-3px_-3px_0)]">
-      <TactileHighlight active={on}>{children}</TactileHighlight>
+    // no tab: its ~90 ms pop 1.38 em to the left would cross the panel's padding and border
+    <span ref={ref} className="inline-block">
+      <TactileHighlight active={on} tab={false}>
+        {children}
+      </TactileHighlight>
     </span>
   );
 }

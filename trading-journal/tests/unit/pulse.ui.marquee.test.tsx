@@ -43,4 +43,19 @@ describe("<Marquee>", () => {
     }
     expect(screen.getAllByText("13 Trades", { ignore: "[aria-hidden] *" })).toHaveLength(1);
   });
+
+  it("paused holds the drift (loop asleep, no will-change) and resumes when released", () => {
+    const ui = (paused: boolean) => (
+      <Marquee aria-label="Band" paused={paused}>
+        <span>Win-Rate</span>
+      </Marquee>
+    );
+    const { rerender } = render(ui(true));
+    const track = screen.getByRole("marquee", { name: "Band" }).firstElementChild as HTMLElement;
+    expect(track.style.willChange).toBe("");
+    rerender(ui(false));
+    expect(track.style.willChange).toBe("transform");
+    rerender(ui(true));
+    expect(track.style.willChange).toBe("");
+  });
 });

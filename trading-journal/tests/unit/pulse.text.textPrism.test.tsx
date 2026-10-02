@@ -1,5 +1,8 @@
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const hover = vi.hoisted(() => ({ value: true }));
+vi.mock("@/motion/useMediaQuery", async (orig) => ({ ...(await orig<typeof import("@/motion/useMediaQuery")>()), useCanHover: () => hover.value }));
 import { springAt } from "@/motion/pulse/engine";
 import { CONFIG, TextPrism, splitOffset } from "@/motion/pulse/TextPrism";
 import { springStep } from "@/motion/pulse/textKit";
@@ -51,5 +54,17 @@ describe("<TextPrism>", () => {
       </TextPrism>,
     );
     expect(getAllByText("42")).toHaveLength(4);
+  });
+  it("touch-only devices: the plain content, no lens and no copies", () => {
+    hover.value = false;
+    const { container, getAllByText } = render(<TextPrism text="+1.240 €" />);
+    expect(getAllByText("+1.240 €")).toHaveLength(1);
+    expect(container.querySelector('[data-pulse="text-prism"] [aria-hidden="true"]')).toBeNull();
+    hover.value = true;
+  });
+  it("copies take the given layer colours", () => {
+    const { container } = render(<TextPrism text="7" colors={["red", "white", "gray"]} />);
+    const copies = container.querySelectorAll<HTMLElement>("[data-prism-copy]");
+    expect([...copies].map((c) => c.style.color)).toEqual(["red", "white", "gray"]);
   });
 });
