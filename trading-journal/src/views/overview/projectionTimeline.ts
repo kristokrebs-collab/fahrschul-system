@@ -113,7 +113,26 @@ export function useMilestoneRail(root: RefObject<HTMLElement | null>, enabled: b
       computeTargets();
       loop.wake();
     };
+    // scrollY is only read while the rail is near the viewport: a scroll read forces a style recalc whenever the page
+    // is dirty, which is wasted work for every frame of a long scroll that never reaches the card
+    let near = typeof IntersectionObserver !== "function";
+    const io =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(
+            (entries) => {
+              const e = entries[entries.length - 1];
+              if (!e) return;
+              near = e.isIntersecting;
+              // settle on the true state when it enters or leaves (fast flings skip intermediate scroll events)
+              computeTargets();
+              loop.wake();
+            },
+            { rootMargin: "50% 0px 50% 0px" },
+          )
+        : null;
+    io?.observe(el);
     const onScroll = () => {
+      if (!near) return;
       computeTargets();
       loop.wake();
     };
@@ -125,6 +144,7 @@ export function useMilestoneRail(root: RefObject<HTMLElement | null>, enabled: b
     window.addEventListener("resize", measure, { passive: true });
     return () => {
       loop.stop();
+      io?.disconnect();
       ro?.disconnect();
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", measure);
