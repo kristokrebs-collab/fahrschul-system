@@ -8,7 +8,7 @@ import { HoverPill, useHoverGroup, type HoverGroupBinding } from "@/motion/Hover
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
 import { StaggerItem, useMorphDialog } from "@/motion/MorphDialog";
 import { TextRoll } from "@/motion/TextRoll";
-import { spring, tween } from "@/motion/tokens";
+import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
@@ -22,7 +22,11 @@ import { ExplanationView } from "./explainer";
 export const RANKING_TITLE = "Entscheidungsgrundlagen";
 export const RANKING_TRADES_BUTTON = "Alle Trades mit dieser Grundlage →";
 const HEAD = ["Grundlage", "Trades", "Win-Rate", "P&L", "Ø R"] as const;
-const GRID = "grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]";
+/**
+ * Phones: the name takes its own line and the figures sit in a row under it (a 34 px name column cut every name,
+ * MO-01); from `sm` the five-column grid. Names wrap instead of ellipsizing; figures never wrap.
+ */
+const GRID = "grid-cols-[52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]";
 
 /** Pure: slot-roll direction of a rank change – a row that climbs counts down (`01` arrives from above). */
 export function rankRollDirection(prev: number, next: number): "up" | "down" {
@@ -44,15 +48,24 @@ interface RankRowProps {
   dep: string;
   hovered: boolean;
   bind: HoverGroupBinding;
+  /** sort switch: `out` = rows fade in place, `in` = new order placed instantly and fading in by rank */
+  phase: SortPhase;
   children: ReactNode;
   ref?: Ref<HTMLDivElement>;
 }
+
+type SortPhase = "rest" | "out" | "in";
+
+/** Sort switch timing: rows fade out in place (`tween.exit`), jump to their new slots unseen, then fade in by rank. */
+const SORT_OUT_MS = tween.exit.duration * 1000;
+const sortInDelay = (rank: number) => Math.min(rank - 1, stagger.max) * stagger.reveal;
+const SORT_IN_MS = (stagger.max * stagger.reveal + tween.fade.duration) * 1000;
 
 /**
  * One ranking row: `layout` reorder (`spring.layout`), enter/exit fade, and a soft white wash (`tween.flash`,
  * opacity only) whenever its rank changes – the eye can follow which rows moved. No flash on mount / reduced motion.
  */
-function RankRow({ rank, dep, hovered, bind, children, ref }: RankRowProps) {
+function RankRow({ rank, dep, hovered, bind, phase, children, ref }: RankRowProps) {
   const reduced = useReducedFx();
   const wash = useRef<HTMLSpanElement>(null);
   const { moves } = useRankMove(rank);
@@ -66,9 +79,15 @@ function RankRow({ rank, dep, hovered, bind, children, ref }: RankRowProps) {
       ref={ref}
       layout
       layoutDependency={dep}
-      transition={{ layout: spring.layout }}
+      // a re-sort permutes every row: FLIPping them through each other piled names and numbers into one slot (OV-08),
+      // so the new order is placed while the rows are invisible; data / account changes keep the layout spring
+      transition={{ layout: phase === "in" ? { duration: 0 } : spring.layout }}
       initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={
+        phase === "out"
+          ? { opacity: 0, y: 0, transition: tween.exit }
+          : { opacity: 1, y: 0, transition: phase === "in" ? { ...tween.fade, delay: sortInDelay(rank) } : undefined }
+      }
       exit={{ opacity: 0, transition: tween.exit }}
       className="relative border-t border-line"
       {...bind}
@@ -90,18 +109,41 @@ function RankNumber({ rank }: { rank: number }) {
  * `Entscheidungsgrundlagen` ranking (Bundle `Phe`, Plan 6.1): sort Segmented, ranking grid rows (`layout`,
  * `layoutDependency={sortKey+acc}`, `AnimatePresence popLayout`), hover pill `rank`, MorphCard
  * `setup-rank-{id}` (press feedback) → `explainSetup` + `Alle Trades mit dieser Grundlage →`, unused setups as chips.
- * On a re-sort the rank numbers slot-roll and the rows that moved flash once; win-rate bars fill on first view.
+ * On a re-sort the rows fade out in place, take their new slots unseen and fade back in by rank (no rows sliding
+ * through each other); the rank numbers slot-roll and the rows that moved flash once; win-rate bars fill on first view.
  */
 export function RankingCard() {
   const settings = useJournal((s) => s.settings);
   const acc = useUi((s) => s.acc);
   const view = useAccountView(acc);
+  const reduced = useReducedFx();
   const [key, setKey] = useState<RankKey>(DEFAULT_RANK_KEY);
+  // the order on screen follows the Segmented after the rows faded out (`shown`); `entering` while they fade back in
+  const [shown, setShown] = useState<RankKey>(key);
+  const [entering, setEntering] = useState(false);
   const { close } = useMorphDialog();
   const hover = useHoverGroup<string>();
+  const sortTo = (k: RankKey) => {
+    setKey(k);
+    if (reduced) setShown(k);
+  };
+  useEffect(() => {
+    if (key === shown) return;
+    const id = setTimeout(() => {
+      setShown(key);
+      setEntering(true);
+    }, SORT_OUT_MS);
+    return () => clearTimeout(id);
+  }, [key, shown]);
+  useEffect(() => {
+    if (!entering) return;
+    const id = setTimeout(() => setEntering(false), SORT_IN_MS);
+    return () => clearTimeout(id);
+  }, [entering]);
+  const phase: SortPhase = key !== shown ? "out" : entering ? "in" : "rest";
 
-  const { used, unused } = useMemo(() => splitRanked(rankSetupStats(view.setups, key)), [view.setups, key]);
-  const dep = `${key}:${acc}:${used.map((c) => c.id).join(",")}`;
+  const { used, unused } = useMemo(() => splitRanked(rankSetupStats(view.setups, shown)), [view.setups, shown]);
+  const dep = `${shown}:${acc}:${used.map((c) => c.id).join(",")}`;
 
   const goTrades = (id: string) => {
     close();
@@ -109,12 +151,12 @@ export function RankingCard() {
   };
 
   return (
-    <Card title={RANKING_TITLE} action={<Segmented<RankKey> size="sm" aria-label="Sortierung" options={RANK_KEYS} value={key} onChange={setKey} />}>
+    <Card title={RANKING_TITLE} action={<Segmented<RankKey> size="sm" aria-label="Sortierung" options={RANK_KEYS} value={key} onChange={sortTo} />}>
       {used.length === 0 && <p className="mb-3 text-[13px] text-mute">{RANKING_EMPTY_TEXT}</p>}
       {used.length > 0 && (
         <div className="relative grid">
           <div className={cn("label grid gap-3 px-2 pb-2 !text-faint", GRID)}>
-            <span>{HEAD[0]}</span>
+            <span className="max-sm:sr-only">{HEAD[0]}</span>
             <span>{HEAD[1]}</span>
             <span>{HEAD[2]}</span>
             <span className="text-right">{HEAD[3]}</span>
@@ -122,7 +164,7 @@ export function RankingCard() {
           </div>
           <AnimatePresence mode="popLayout" initial={false}>
             {used.map((c, i) => (
-              <RankRow key={c.id} rank={i + 1} dep={dep} hovered={hover.hovered === c.id} bind={hover.bind(c.id)}>
+              <RankRow key={c.id} rank={i + 1} dep={dep} hovered={hover.hovered === c.id} bind={hover.bind(c.id)} phase={phase}>
                 <MorphCard
                   id={`setup-rank-${c.id}`}
                   title={c.setup.name}
@@ -136,12 +178,12 @@ export function RankingCard() {
                       </StaggerItem>
                     </>
                   )}
-                  className={cn("relative z-10 grid w-full items-center gap-3 px-2 py-2.5", GRID)}
+                  className={cn("relative z-10 grid w-full items-center gap-x-3 gap-y-1.5 px-2 py-2.5", GRID)}
                 >
-                  <span className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium">
+                  <span className="flex min-w-0 items-center gap-2.5 text-[13px] font-medium max-sm:col-span-full">
                     <RankNumber rank={i + 1} />
                     <motion.span layoutId={`morph-dot-${c.id}`} className="size-2 shrink-0 rounded-full" style={{ background: c.setup.color, borderRadius: 9999 }} aria-hidden="true" />
-                    <MorphTitle id={`setup-rank-${c.id}`} as="span" className="truncate">
+                    <MorphTitle id={`setup-rank-${c.id}`} as="span" className="min-w-0 hyphens-auto break-words">
                       {c.setup.name}
                     </MorphTitle>
                   </span>
@@ -155,7 +197,7 @@ export function RankingCard() {
                     </span>
                     <Bar value={c.winRate ?? 0} index={i} track="bg-loss/25" />
                   </span>
-                  <span className={cn("num text-right font-mono text-[13px] font-medium", colorClass(c.net))}>{signed(c.net, 0)}</span>
+                  <span className={cn("num whitespace-nowrap text-right font-mono text-[13px] font-medium", colorClass(c.net))}>{signed(c.net, 0)}</span>
                   <span className={cn("num hidden text-right font-mono text-[13px] sm:block", colorClass(c.avgR))}>{c.avgR == null ? "–" : signed(c.avgR)}</span>
                 </MorphCard>
               </RankRow>

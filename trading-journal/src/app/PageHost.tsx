@@ -7,7 +7,7 @@
  *   page, so the first switch to them only reconnects effects instead of mounting ~1 500 components.
  * - Other pages mount when shown and unmount once their exit has played.
  * - Transition (the PageSwitch spec): the entering page comes in from `x dir·16`, scale .985 and blur 4 px (transform on
- *   `spring.enter`, opacity/filter on `tween.page`), the leaving page leaves to `x −dir·12` and fades on `tween.exit`
+ *   `spring.enter`, opacity/filter on `tween.page` delayed by the exit, SH-02), the leaving page leaves to `x −dir·12` and fades on `tween.exit`
  *   while pinned absolutely in place, so the new page lays out immediately. Everything is a single `transform` / `opacity`
  *   / `filter` animation per layer, which Motion hands to WAAPI: the slide keeps running on the compositor while React
  *   reconnects the page's effects. Layers always end at `transform: none` / `filter: none` (no containing block for the
@@ -42,6 +42,11 @@ const BLUR_TO = "blur(0px)";
  * 0.5 px / 2 px·s⁻¹ on the `PAGE_ENTER_X` slide, so the transform settles as early as the old `x` spring (≈ 0.42 s).
  */
 const ENTER_SPRING = spring.pageEnter;
+/**
+ * SH-02: the entering page stays invisible until the leaving page has fully faded (`tween.exit`), so two pages are
+ * never drawn over each other; its slide and scale start at once (invisible at opacity 0) and still settle on time.
+ */
+export const ENTER_FADE = { ...tween.page, delay: tween.exit.duration };
 
 /** Pure: slide direction of a switch in tab order (`+1` → the new page comes from the right). */
 export function pageDirection(from: Page, to: Page): 1 | -1 {
@@ -175,12 +180,12 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
         enterEl.style.transform = ENTER_FROM(dir);
         enterEl.style.filter = BLUR_FROM;
         enter.push(animate(enterEl, { transform: [ENTER_FROM(dir), ENTER_TO] }, ENTER_SPRING));
-        enter.push(animate(enterEl, { opacity: [0, 1], filter: [BLUR_FROM, BLUR_TO] }, tween.page));
+        enter.push(animate(enterEl, { opacity: [0, 1], filter: [BLUR_FROM, BLUR_TO] }, ENTER_FADE));
       } else {
         // a parked page may still carry its last exit offset
         enterEl.style.transform = "none";
         enterEl.style.filter = "none";
-        enter.push(animate(enterEl, { opacity: [0, 1] }, tween.page));
+        enter.push(animate(enterEl, { opacity: [0, 1] }, ENTER_FADE));
       }
     }
     running.current = [...enter, ...exit];

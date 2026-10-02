@@ -1,10 +1,11 @@
-import { AnimatePresence, Reorder, motion, useDragControls, type Variants } from "motion/react";
+import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
 import { useId, useMemo, useState, type KeyboardEvent } from "react";
 import { nextSetupColor, SETUP_PALETTE } from "@/domain/defaults";
 import type { ChecklistItem, Setup, SetupAccount, Settings } from "@/domain/types";
 import { newChecklistItemId, newSetupId } from "@/lib/ids";
 import { Sheet } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
+import { CONFIG as LIFT_CONFIG, useLift } from "@/motion/pulse/WidgetGrid";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
@@ -355,8 +356,8 @@ function ColorRadios({ value, onChange }: { value: string; onChange: (hex: strin
 }
 
 /** Drag lift: the dragged row scales up a touch while a pre-rendered shadow layer fades in (no box-shadow animation). */
-const LIFT: Variants = { lifted: { scale: 1.02 } };
-const LIFT_SHADOW: Variants = { lifted: { opacity: 1 } };
+/** Row lift for the pulse `useLift` physics (scale spring 900/40 + glow τ 70 ms); 1.02 instead of the tile's 1.06 – a full-width row must stay inside the card padding. */
+const LIFT_SCALE = 1.02;
 
 interface ChecklistRowProps {
   item: ChecklistItem;
@@ -372,6 +373,7 @@ interface ChecklistRowProps {
 /** One checklist line: drag handle (pointer) / arrow keys (keyboard), input `Punkt {n}`, remove `Punkt entfernen`. */
 function ChecklistRow({ item, index, count, ids, onChange, onRemove, onMove }: ChecklistRowProps) {
   const controls = useDragControls();
+  const lift = useLift({ scale: LIFT_SCALE });
   const onHandleKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === "ArrowUp" && index > 0) {
       e.preventDefault();
@@ -391,19 +393,17 @@ function ChecklistRow({ item, index, count, ids, onChange, onRemove, onMove }: C
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98, transition: tween.exit }}
-      whileDrag="lifted"
-      variants={LIFT}
+      onDragStart={lift.lift}
+      onDragEnd={lift.settle}
       transition={{ ...spring.layout, layout: spring.layout }}
-      style={{ borderRadius: radius.input }}
+      style={{ borderRadius: radius.input, scale: lift.scale }}
       className="relative isolate flex gap-2"
       data-testid={`checklist-item-${item.id}`}
     >
       <motion.span
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-1 -z-10 rounded-[14px] bg-ink-850 shadow-[0_16px_36px_rgb(0_0_0/0.55)]"
-        style={{ opacity: 0 }}
-        variants={LIFT_SHADOW}
-        transition={tween.fade}
+        className="pointer-events-none absolute -inset-1 -z-10 rounded-[14px] bg-ink-850"
+        style={{ opacity: lift.glow, boxShadow: LIFT_CONFIG.glowShadow }}
       />
       <button
         type="button"

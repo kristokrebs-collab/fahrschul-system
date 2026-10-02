@@ -55,7 +55,8 @@ describe("App shell", () => {
     expect(screen.getByText("Netto-P&L · Gesamt")).toBeInTheDocument();
     expect(screen.getByText("BTC/USDT · Binance")).toBeInTheDocument();
     expect(screen.getByText("Nur dieser Browser")).toBeInTheDocument();
-  });
+    // first (cold) mount of the whole app: transforms + overview render exceed 5 s when the workers run in parallel
+  }, 20_000);
 
   it("dock navigation changes the page and the hash", async () => {
     renderApp();
@@ -112,6 +113,23 @@ describe("App shell", () => {
     expect(layer).toHaveAttribute("aria-hidden", "true");
     const ticker = within(screen.getByRole("banner")).getByText("BTC").closest("[data-header-ticker]");
     expect(ticker).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("logo click decodes the wordmark (the real text stays single) and the menu button opens the command navigation", async () => {
+    renderApp();
+    const header = screen.getByRole("banner");
+    expect(header.querySelector('[data-pulse="dancing-letters"]')).not.toBeNull();
+    fireEvent.click(within(header).getByRole("button", { name: "Übersicht" }));
+    expect(header.querySelector('[data-pulse="ascii-cascade"]')).not.toBeNull();
+    expect(screen.getAllByText("Trade Journal")).toHaveLength(1);
+    // no new focusables in the dock; the menu button lives in the header
+    const menu = within(header).getByRole("button", { name: "Navigation öffnen" });
+    expect(menu).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(menu);
+    expect(screen.getByRole("dialog", { name: "Navigation" })).toBeInTheDocument();
+    expect(menu).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull(), { timeout: 2500 });
   });
 
   it("FAB and header CTA open the trade editor", () => {

@@ -6,7 +6,10 @@ import { DEFAULT_TRADE_FILTER, DEFAULT_TRADE_SORT, useUi } from "@/store/uiStore
 import { TradesCards, TradesView } from "@/views/trades";
 import { SAMPLE, enriched, settings } from "./domain.fixtures";
 
-function seed(trades = SAMPLE) {
+function seed(trades = SAMPLE, { fillSeen = true } = {}) {
+  // the subtitle's pixel fill plays once per session; most tests read the settled paragraph
+  if (fillSeen) sessionStorage.setItem("tj2-fill-trades", "1");
+  else sessionStorage.removeItem("tj2-fill-trades");
   useJournal.setState({ trades, settings: settings(), loaded: true, mode: "local" });
   useUi.setState({
     tradeFilter: DEFAULT_TRADE_FILTER,
@@ -61,26 +64,58 @@ describe("TradesView", () => {
     expect(screen.getByTestId("trade-count")).toHaveTextContent("1 Trade");
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Ergebnis" })).getByRole("radio", { name: "Break-even" }));
     expect(useUi.getState().tradeFilter.result).toBe("be");
-    expect(screen.getByText("Keine Treffer")).toBeInTheDocument();
+    expect(await screen.findByText("Keine Treffer")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
     expect(useUi.getState().tradeFilter).toEqual(DEFAULT_TRADE_FILTER);
-    expect(rowIds()).toHaveLength(6);
+    await waitFor(() => expect(rowIds()).toHaveLength(6));
     await bodySettled();
   });
 
-  it("setup select incl. `Ohne Grundlage`", () => {
+  it("setup select (morph select) incl. `Ohne Grundlage`", () => {
     mount();
-    const select = screen.getByRole("combobox", { name: "Entscheidungsgrundlage" });
-    expect(within(select).getByRole("option", { name: "Alle Grundlagen" })).toBeInTheDocument();
-    fireEvent.change(select, { target: { value: "__none" } });
+    const select = screen.getByRole("button", { name: "Entscheidungsgrundlage" });
+    expect(select).toHaveAttribute("aria-haspopup", "listbox");
+    expect(select).toHaveTextContent("Alle Grundlagen");
+    fireEvent.click(select);
+    const list = screen.getByRole("listbox", { name: "Entscheidungsgrundlage" });
+    expect(within(list).getByRole("option", { name: "Alle Grundlagen" })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(within(list).getByRole("option", { name: "Ohne Grundlage" }));
     expect(useUi.getState().tradeFilter.setup).toBe("__none");
+    expect(select).toHaveTextContent("Ohne Grundlage");
     expect(rowIds()).toEqual(["E", "C"]);
+  });
+
+  it("search suggestions: a side is a filter shortcut, an emotion searches at once", () => {
+    mount();
+    const field = screen.getByRole("combobox", { name: "Trades durchsuchen" });
+    fireEvent.change(field, { target: { value: "Sho" } });
+    const list = screen.getByRole("listbox", { name: "Trades durchsuchen" });
+    fireEvent.click(within(list).getByRole("option", { name: "Short" }));
+    expect(useUi.getState().tradeFilter).toMatchObject({ side: "short", q: "" });
+    expect(field).toHaveValue("");
+    expect(rowIds()).toEqual(["B"]);
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Richtung" })).getByRole("radio", { name: "Beide" }));
+    fireEvent.change(field, { target: { value: "fom" } });
+    fireEvent.click(within(screen.getByRole("listbox", { name: "Trades durchsuchen" })).getByRole("option", { name: "FOMO" }));
+    expect(useUi.getState().tradeFilter.q).toBe("FOMO");
+    expect(field).toHaveValue("FOMO");
+  });
+
+  it("the subtitle fills once per session (real text stays readable), then keeps the marker on `Klick`", () => {
+    seed(SAMPLE, { fillSeen: false });
+    const view = mount();
+    expect(document.querySelector('[data-pulse="pixel-text-fill"]')).not.toBeNull();
+    view.unmount();
+    seed(SAMPLE, { fillSeen: true });
+    mount();
+    expect(document.querySelector('[data-pulse="pixel-text-fill"]')).toBeNull();
+    expect(document.querySelector('[data-pulse="tactile-highlight"]')).toHaveTextContent("Klick");
   });
 
   it("search is debounced 150 ms and matches emotion", () => {
     vi.useFakeTimers();
     mount();
-    fireEvent.change(screen.getByRole("searchbox", { name: "Trades durchsuchen" }), { target: { value: "FOMO" } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Trades durchsuchen" }), { target: { value: "FOMO" } });
     expect(useUi.getState().tradeFilter.q).toBe("");
     act(() => {
       vi.advanceTimersByTime(160);
@@ -185,7 +220,7 @@ describe("TradesView", () => {
   it("search shows its pending state only while the debounce runs", () => {
     vi.useFakeTimers();
     mount();
-    const field = screen.getByRole("searchbox", { name: "Trades durchsuchen" });
+    const field = screen.getByRole("combobox", { name: "Trades durchsuchen" });
     const label = field.closest("label")!;
     expect(label).not.toHaveAttribute("data-pending");
     fireEvent.change(field, { target: { value: "FOMO" } });
@@ -196,13 +231,16 @@ describe("TradesView", () => {
     expect(label).not.toHaveAttribute("data-pending");
   });
 
-  it("`Keine Treffer` replaces the table in the same commit and `Filter zurücksetzen` brings it back", async () => {
+  it("`Keine Treffer` follows the table in sequence (never drawn over it) and `Filter zurücksetzen` brings it back", async () => {
     mount();
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Ergebnis" })).getByRole("radio", { name: "Break-even" }));
     fireEvent.click(within(screen.getByRole("radiogroup", { name: "Richtung" })).getByRole("radio", { name: "Short" }));
-    expect(screen.getByText("Keine Treffer")).toBeInTheDocument();
+    // the table leaves first; the empty state is never mounted while the table is still there
+    expect(screen.queryByText("Keine Treffer")).toBeNull();
+    expect(await screen.findByText("Keine Treffer")).toBeInTheDocument();
+    expect(document.querySelectorAll("table")).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
-    expect(rowIds()).toEqual(["F", "E", "D", "C", "B", "A"]);
+    await waitFor(() => expect(rowIds()).toEqual(["F", "E", "D", "C", "B", "A"]));
     expect(document.querySelectorAll("table")).toHaveLength(1);
     await bodySettled();
   });
@@ -220,7 +258,7 @@ describe("TradesView", () => {
 describe("TradesCards (mobile)", () => {
   beforeEach(() => seed());
 
-  it("a removed card leaves the flow at once (inert, `data-exiting`), the list keeps the first card a button", async () => {
+  it("a removed card fades out in place (inert, `data-exiting`) before the rest glide shut; the first card stays a button", async () => {
     const rows = enriched();
     const s = settings();
     const view = render(

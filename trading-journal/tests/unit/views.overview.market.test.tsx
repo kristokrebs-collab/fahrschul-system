@@ -54,7 +54,10 @@ describe("MarketPanel", () => {
     expect(screen.getByText("+1,20 % 24h")).toBeInTheDocument();
     // scenario: close4h 86.200 > longTrigger 85.900 → long
     const box = screen.getByTestId("scenario-box");
-    expect(within(box).getByText("Long-Trigger aktiv")).toBeInTheDocument();
+    // the title is split into decode lead + marked key word (glyph layers aria-hidden); its full text is on the hook
+    expect(box.querySelector("[data-scenario-title]")?.getAttribute("data-scenario-title")).toBe("Long-Trigger aktiv");
+    expect(within(box).getByText("Long-Trigger", { selector: ".sr-only" })).toBeInTheDocument();
+    expect(within(box).getAllByText("aktiv", { selector: ".sr-only" }).length).toBeGreaterThan(0);
     expect(within(box).getByText(`4H-Schluss über ${n0(m.longTrigger)}. Ziel 87.200, dann 89.000–90.000. Invalidierung unter ${n0(m.longStop)}.`)).toBeInTheDocument();
     expect(within(box).getByText("4H 86.200")).toBeInTheDocument();
     expect(within(box).getByText(/Letzter geschlossener 4H-Schluss · /)).toBeInTheDocument();

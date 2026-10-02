@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useMotionValueEvent } from "motion/react";
+import { AnimatePresence, motion, useMotionValueEvent, type Variants } from "motion/react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
 import { deriveTrade } from "@/domain/derive";
 import { checklistItemsFor, pruneChecks } from "@/domain/enrich";
@@ -15,14 +15,17 @@ import { RollingDigits } from "@/motion/RollingDigits";
 import { Sheet } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
 import { TextRoll } from "@/motion/TextRoll";
-import { radius, spring, tween } from "@/motion/tokens";
+import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { Button, CheckboxRow, ConvictionRadio, Field, Input, Segmented, Textarea, inputClass, revealInvalid, shakeField } from "@/primitives";
+import { MorphSelect, type MorphSelectOption } from "@/motion/pulse/MorphSelect";
+import { Button, CheckboxRow, ConvictionRadio, Field, Input, Segmented, Textarea, revealInvalid, shakeField } from "@/primitives";
 import { useJournal } from "@/store/journalStore";
 import { pushToast, useUi, type AccFilter } from "@/store/uiStore";
 import { winCelebration } from "./celebration";
 import { FAB_LABEL } from "@/app/Dock";
-import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
+import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
+import { AutoHeight } from "@/views/trades/AutoHeight";
+import { DETAIL_DIM_HANDOFF } from "./TradeDetail";
 
 /* ------------------------------------------------------------------ types */
 
@@ -217,6 +220,12 @@ export function invalidFieldOf(problem: string): InvalidField | null {
   }
 }
 
+/** `Timeframe` options of the morph select (`–` = none). */
+const TIMEFRAME_OPTIONS: readonly MorphSelectOption[] = [{ value: "", label: "–" }, ...TIMEFRAMES.map((tf) => ({ value: tf, label: tf }))];
+
+/** Detail → editor hand-off: the sheet's dim starts at the detail's level, the panel enters after the detail's exit. */
+const DETAIL_HANDOFF = { backdropFrom: DETAIL_DIM_HANDOFF, enterDelay: tween.exit.duration };
+
 /** Id of the footer alert; an invalid control points at it via `aria-describedby`. */
 const ERROR_ID = "trade-form-error";
 
@@ -295,6 +304,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     () => [...settings.setups].sort((a, b) => +(b.account === account || b.account === "both") - +(a.account === account || a.account === "both")),
     [settings.setups, account],
   );
+  const chipOrder = sortedSetups.map((s) => s.id).join("|");
   const cur = settings.currency;
   const isOpen = t.status === "open";
   const hasLive = livePrice != null && Number.isFinite(livePrice);
@@ -404,35 +414,45 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
 
   const footer = (
     <>
-      {trade &&
-        (confirmDelete ? (
-          <motion.span
-            key="confirm"
-            className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
-            initial={reduced ? false : { opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ default: tween.fade, scale: spring.pop }}
-          >
-            Wirklich löschen?
-            <Button size="sm" variant="danger" onClick={() => void onDelete()}>
-              Ja, löschen
-            </Button>
-            <Button ref={deleteNo} size="sm" onClick={() => setConfirmDelete(false)}>
-              Nein
-            </Button>
-          </motion.span>
-        ) : (
-          <HoldConfirm ref={deleteTrigger} onAsk={() => setConfirmDelete(true)} onConfirm={() => void onDelete()}>
-            Löschen
-          </HoldConfirm>
-        ))}
+      {trade && (
+        <span className="flex min-h-10 items-center">
+          <AnimatePresence mode="wait" initial={false}>
+            {confirmDelete ? (
+              <motion.span key="confirm" className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]" {...confirmSwapMotion(reduced)}>
+                Wirklich löschen?
+                <Button size="sm" variant="danger" onClick={() => void onDelete()}>
+                  Ja, löschen
+                </Button>
+                <Button ref={deleteNo} size="sm" onClick={() => setConfirmDelete(false)}>
+                  Nein
+                </Button>
+              </motion.span>
+            ) : (
+              <motion.span key="ask" className="inline-flex" {...confirmSwapMotion(reduced)}>
+                <HoldConfirm ref={deleteTrigger} onAsk={() => setConfirmDelete(true)} onConfirm={() => void onDelete()}>
+                  Löschen
+                </HoldConfirm>
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </span>
+      )}
       <span className="flex-1" />
       <span ref={alertRef} id={ERROR_ID} role="alert" className="text-[12.5px] font-medium text-[#ff8a90]">
-        {err && (
-          <motion.span key={err} className="inline-block" initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade}>
-            {err}
-          </motion.span>
-        )}
+        <AnimatePresence mode="wait" initial={false}>
+          {err && (
+            <motion.span
+              key={err}
+              className="inline-block"
+              initial={reduced ? false : { opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: reduced ? { duration: 0 } : tween.exit }}
+              transition={tween.fade}
+            >
+              {err}
+            </motion.span>
+          )}
+        </AnimatePresence>
       </span>
       <Button onClick={closeEditor}>Abbrechen</Button>
       <span className="inline-flex gap-1.5">
@@ -490,7 +510,15 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   ];
 
   return (
-    <Sheet open={editor.open} onClose={closeEditor} title={trade ? "Trade bearbeiten" : "Trade eintragen"} size="lg" layoutId={editor.fromFab && !trade ? `new-trade-${fabCycle}` : undefined} footer={footer}>
+    <Sheet
+      open={editor.open}
+      onClose={closeEditor}
+      title={trade ? "Trade bearbeiten" : "Trade eintragen"}
+      size="lg"
+      layoutId={editor.fromFab && !trade ? `new-trade-${fabCycle}` : undefined}
+      handoff={editor.fromDetail ? DETAIL_HANDOFF : undefined}
+      footer={footer}
+    >
       <form id="trade-form" ref={formRef} onSubmit={onSubmit} noValidate>
         <Section title="Eckdaten">
           <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
@@ -524,14 +552,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               <Input id="f-pair" value={d.pair} onChange={setStr("pair")} autoComplete="off" />
             </Field>
             <Field label="Timeframe" htmlFor="f-tf">
-              <select id="f-tf" className={inputClass} value={d.timeframe} onChange={setStr("timeframe")}>
-                <option value="">–</option>
-                {TIMEFRAMES.map((tf) => (
-                  <option key={tf} value={tf}>
-                    {tf}
-                  </option>
-                ))}
-              </select>
+              <MorphSelect id="f-tf" value={d.timeframe} options={TIMEFRAME_OPTIONS} onChange={(timeframe) => setD((o) => ({ ...o, timeframe }))} />
             </Field>
             <Field label="Status" className="col-span-2">
               <Segmented<TradeStatus>
@@ -577,20 +598,34 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         </Section>
 
         <Section title="Entscheidungsgrundlage" sub="Warum bist du eingestiegen?">
-          <div className="flex flex-wrap gap-2">
-            {sortedSetups.map((s) => (
-              <SetupToggle key={s.id} setup={s} account={account} selected={t.setups.includes(s.id)} onToggle={() => patchT({ setups: t.setups.includes(s.id) ? t.setups.filter((id) => id !== s.id) : [...t.setups, s.id] })} />
-            ))}
-            <motion.button
-              type="button"
-              onClick={() => (onNewSetup ? onNewSetup() : openSetupEditor({ fromTrade: true }))}
-              whileTap={{ scale: 0.96 }}
-              transition={spring.press}
-              className="rounded-full border border-dashed border-line-2 px-3 py-1.5 text-[12.5px] text-mute transition-colors hover:border-white/40 hover:text-fg"
-            >
-              + Neue Grundlage
-            </motion.button>
-          </div>
+          {/* a new chip order (Konto switch) never FLIPs the transparent chips through each other (ED-01): the group
+              fades out, re-orders, the chips cascade back in; the row height follows on a spring */}
+          <AutoHeight className="-my-1.5 py-1.5">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={chipOrder}
+                className="flex flex-wrap gap-2"
+                variants={CHIP_GROUP}
+                initial={reduced ? false : "hidden"}
+                animate="shown"
+                exit={reduced ? undefined : "exit"}
+              >
+                {sortedSetups.map((s) => (
+                  <SetupToggle key={s.id} setup={s} account={account} selected={t.setups.includes(s.id)} onToggle={() => patchT({ setups: t.setups.includes(s.id) ? t.setups.filter((id) => id !== s.id) : [...t.setups, s.id] })} />
+                ))}
+                <motion.button
+                  type="button"
+                  onClick={() => (onNewSetup ? onNewSetup() : openSetupEditor({ fromTrade: true }))}
+                  variants={CHIP}
+                  whileTap={{ scale: 0.96 }}
+                  transition={spring.press}
+                  className="rounded-full border border-dashed border-line-2 px-3 py-1.5 text-[12.5px] text-mute transition-colors hover:border-white/40 hover:text-fg"
+                >
+                  + Neue Grundlage
+                </motion.button>
+              </motion.div>
+            </AnimatePresence>
+          </AutoHeight>
           <Field label="Begründung" htmlFor="f-reason">
             <Textarea id="f-reason" rows={3} className="leading-relaxed" value={d.reason} onChange={setStr("reason")} placeholder="z. B. 4H-Schluss unter 84.500, Delta rot, S&P lehnt ab" />
           </Field>
@@ -728,10 +763,21 @@ function EmotionChips({ value, onChange }: { value: string; onChange: (emotion: 
   );
 }
 
+/** Chip group of `Entscheidungsgrundlage`: chips cascade in (`stagger.rows`), the whole group leaves on `tween.exit`. */
+const CHIP_GROUP: Variants = {
+  hidden: {},
+  shown: { transition: { delayChildren: (i: number) => Math.min(i, stagger.max) * stagger.rows } },
+  exit: { opacity: 0, transition: tween.exit },
+};
+const CHIP: Variants = {
+  hidden: { opacity: 0, y: 4 },
+  shown: { opacity: 1, y: 0, transition: { opacity: tween.fade, y: spring.enter } },
+};
+
 /**
  * Setup chip toggle (`aria-pressed`; account-matching setups bright, others dimmed). The colour dot pops into a
- * check disc when selected (`spring.pop`, check drawn on `tween.check`); chips glide to their new order when the
- * account changes (account-matching setups first).
+ * check disc when selected (`spring.pop`, check drawn on `tween.check`); when the account re-orders the chips
+ * (account-matching setups first) the group crossfades instead of FLIP-sliding (ED-01).
  */
 function SetupToggle({ setup, account, selected, onToggle }: { setup: Setup; account: AccountId; selected: boolean; onToggle: () => void }) {
   const reduced = useReducedFx();
@@ -741,10 +787,9 @@ function SetupToggle({ setup, account, selected, onToggle }: { setup: Setup; acc
       type="button"
       aria-pressed={selected}
       onClick={onToggle}
-      layout="position"
-      layoutDependency={account}
+      variants={CHIP}
       whileTap={reduced ? undefined : { scale: 0.96 }}
-      transition={{ layout: spring.layout, default: spring.press }}
+      transition={spring.press}
       className={cn(
         "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-200",
         selected ? "text-fg" : fits ? "border-line-2 text-fg/85 hover:border-white/40" : "border-line text-faint hover:text-mute",

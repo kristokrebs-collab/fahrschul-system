@@ -1,6 +1,8 @@
 import { animate, AnimatePresence, motion, type AnimationPlaybackControls } from "motion/react";
-import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
+import { springSettleTime } from "@/motion/pulse/engine";
+import { TextMorph } from "@/motion/pulse/TextMorph";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -69,7 +71,8 @@ const RING_REDUCED_STEP_MS = 5_000;
  * spring (`spring.pill`, 0.42 s response) – interruptible, retargets with velocity, no width tween – and every
  * layout node carries a `layoutDependency`, so the many re-renders of a live header never measure.
  * Tone changes crossfade four pre-rendered layers (`tween.crossfade`); the label wipes in with
- * `tween.fade` and out with `tween.exit` (`AnimatePresence mode="popLayout"`).
+ * `tween.fade` and out with `tween.exit` (`AnimatePresence mode="popLayout"`); a string label that changes words
+ * morphs (pulse `text-morphing`) after the pill has grown to fit it (`MorphLabel`).
  * Liveness: `tone="live"` breathes a heartbeat ring three times when it turns live (`tween.pingFew`, then it rests –
  * no endless loop on an idle page), `pingKey` / `pingOn` fire a brighter ping per event; the countdown `ring` is drawn
  * by two rotating half-rings (compositor transforms, no SVG repaint). All of it is static under reduced motion.
@@ -79,7 +82,10 @@ export function StatusPill({ tone, label, expanded, ring, spinning, feed, classN
   const reduced = useReducedFx();
   const hasRing = ring != null;
   const labelKey = typeof label === "string" || typeof label === "number" ? label : "";
-  const dependency = `${tone}|${expanded}|${hasRing}|${labelKey}|${layoutKey ?? ""}`;
+  // a morphing string label settles in a second React commit (box: max(old, new) → new) that must animate too
+  const [settles, setSettles] = useState(0);
+  const onLabelSettle = useCallback(() => setSettles((n) => n + 1), []);
+  const dependency = `${tone}|${expanded}|${hasRing}|${labelKey}|${layoutKey ?? ""}|${settles}`;
   const pings = useRef<(HTMLSpanElement | null)[]>([]);
   usePings(pings, pingKey, pingOn, hasRing ? PING_SCALE_BRIGHT.ring : PING_SCALE_BRIGHT.dot, reduced);
 
@@ -154,11 +160,74 @@ export function StatusPill({ tone, label, expanded, ring, spinning, feed, classN
             animate={{ opacity: 1, y: 0, transition: tween.fade }}
             exit={{ opacity: 0, y: -4, transition: tween.exit }}
           >
-            {label}
+            {typeof label === "string" ? <MorphLabel text={label} reduced={reduced} onSettle={onLabelSettle} /> : label}
           </motion.span>
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+/** Time the pill's width spring needs to come within 3 % of a new, wider size – the longer label morphs in after it. */
+const GROW_MS = Math.round(springSettleTime(spring.pill, 0.03) * 1000);
+
+/** Only digits changed (`Zuletzt 01:39` → `01:40`, a countdown): a morph per tick would never rest – swap instead. */
+export function digitsOnlyChange(a: string, b: string): boolean {
+  return a.length === b.length && a.replace(/\d/g, "#") === b.replace(/\d/g, "#");
+}
+
+type LabelState = { text: string; next: string | null; phase: "rest" | "grow" | "morph" };
+
+/**
+ * String label of an expanded pill: word changes (`Live` ↔ `Verzögert` ↔ `Offline` …) morph through the gooey
+ * `TextMorph`, sequenced so the text NEVER clips (ST-02):
+ * 1. grow – two invisible sizers (old + new) put the box at max(old, new) in the same commit as the new label, so
+ *    the pill's layout spring widens first; a longer word waits `GROW_MS` until the pill has room;
+ * 2. morph – the words melt into each other inside the max box;
+ * 3. rest – sizers drop to the new word in a React commit (`onSettle` → layout dependency), so a shorter pill
+ *    shrinks on the same spring instead of snapping.
+ * At rest the label is plain text (no filter, no extra nodes). Digit-only changes and reduced motion swap at once.
+ */
+function MorphLabel({ text, reduced, onSettle }: { text: string; reduced: boolean; onSettle: () => void }) {
+  const [s, setS] = useState<LabelState>({ text, next: null, phase: "rest" });
+  const target = s.next ?? s.text;
+  if (text !== target) {
+    // an interrupted morph continues from the word it was heading to
+    const from = s.next ?? s.text;
+    setS(reduced || digitsOnlyChange(from, text) ? { text, next: null, phase: "rest" } : { text: from, next: text, phase: "grow" });
+  }
+  const oldRef = useRef<HTMLSpanElement>(null);
+  const newRef = useRef<HTMLSpanElement>(null);
+
+  useLayoutEffect(() => {
+    if (s.phase !== "grow") return;
+    const wider = (newRef.current?.offsetWidth ?? 0) > (oldRef.current?.offsetWidth ?? 0) + 0.5;
+    const go = () => setS((p) => (p.phase === "grow" ? { ...p, phase: "morph" } : p));
+    if (!wider) {
+      go();
+      return;
+    }
+    const id = setTimeout(go, GROW_MS);
+    return () => clearTimeout(id);
+  }, [s.phase, s.next]);
+
+  const settle = useCallback(() => {
+    setS((p) => (p.next === null ? p : { text: p.next, next: null, phase: "rest" }));
+    onSettle();
+  }, [onSettle]);
+
+  if (s.phase === "rest" || s.next === null) return <>{s.text}</>;
+  const cell = "[grid-area:1/1] whitespace-nowrap";
+  return (
+    <span className="inline-grid" data-label-phase={s.phase}>
+      <span ref={oldRef} aria-hidden="true" className={cn("invisible", cell)}>
+        {s.text}
+      </span>
+      <span ref={newRef} aria-hidden="true" className={cn("invisible", cell)}>
+        {s.next}
+      </span>
+      <TextMorph text={s.phase === "morph" ? s.next : s.text} onMorphEnd={settle} className={cell} />
+    </span>
   );
 }
 

@@ -65,7 +65,9 @@ export function WinRateCard() {
 
   return (
     <Card title="Win-Rate" action={<Expander open={open} onToggle={() => setOpen((o) => !o)} label="Win-Rate" controls={regionId} />}>
-      <div className="flex h-full flex-col items-center justify-between gap-4">
+      {/* top-anchored (no h-full / justify-between): opening the explainer below must not slide the legend up and
+          back down while the stretched grid row re-balances (OV-01) */}
+      <div className="flex flex-col items-center gap-4">
         <RingGauge value={g.winRate} marker={bt} color={FG} passColor={WIN} track="#222" aria-label={`Win-Rate ${label}`}>
           {(progress) => (
             <div>
@@ -73,7 +75,10 @@ export function WinRateCard() {
                 <GaugeCentre progress={progress} label={label} />
                 <span className="text-base text-mute"> %</span>
               </div>
-              <div className="mt-1 text-[11px] text-mute">Marke = Backtest {pct0(bt)}</div>
+              {/* two lines inside the ring's inner circle (one line was ~2 px wider than the circle at that height: OV-02) */}
+              <div className="mx-auto mt-1 max-w-[96px] text-[11px] leading-[1.3] text-mute">
+                Marke = Backtest <span className="whitespace-nowrap">{pct0(bt)}</span>
+              </div>
             </div>
           )}
         </RingGauge>

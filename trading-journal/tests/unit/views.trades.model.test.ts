@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_TRADE_FILTER } from "@/store/uiStore";
-import { countLabel, filterTrades, listKey, rowsKey, setupNameOf, sortArrow, sortTrades } from "@/views/trades/tradesModel";
+import { countLabel, filterTrades, frequentWords, listKey, rowsKey, searchSuggestions, setupNameOf, sortArrow, sortTrades } from "@/views/trades/tradesModel";
 import { enriched, settings } from "./domain.fixtures";
 
 const s = settings();
@@ -83,5 +83,31 @@ describe("helpers", () => {
   it("sortArrow", () => {
     expect(sortArrow(1)).toBe(" ↑");
     expect(sortArrow(-1)).toBe(" ↓");
+  });
+});
+
+describe("tradesModel search suggestions", () => {
+  const notes = (reason: string, notes = "") => ({ reason, notes });
+
+  it("frequentWords: ≥ 4 letters, no stop words, counted once per trade, most frequent first, common spelling kept", () => {
+    const words = frequentWords([notes("Liquidity Sweep über dem Hoch", "sweep sauber"), notes("Sweep am Tief, Delta rot"), notes("Delta grün, Sweep"), notes("nichts")]);
+    expect(words[0]).toBe("Sweep");
+    expect(words).toContain("Delta");
+    expect(words).not.toContain("über");
+    expect(words.filter((w) => w.toLowerCase() === "sweep")).toHaveLength(1);
+  });
+
+  it("frequentWords falls back to the top words of a small journal", () => {
+    expect(frequentWords([notes("Breakout Retest")])).toEqual(["Breakout", "Retest"]);
+  });
+
+  it("searchSuggestions: setups and sides are filter shortcuts, emotions and words fill the search (grouped, in order)", () => {
+    const out = searchSuggestions(all, s.setups, ["FOMO", "Ruhig"]);
+    const groups = [...new Set(out.map((o) => o.group))];
+    expect(groups.slice(0, 3)).toEqual(["Grundlagen", "Richtung", "Gefühl"]);
+    expect(out.filter((o) => o.kind === "setup").map((o) => o.target)).toEqual(s.setups.map((x) => x.id));
+    expect(out.find((o) => o.label === "Short")).toMatchObject({ kind: "side", target: "short" });
+    expect(out.find((o) => o.label === "FOMO")).toMatchObject({ kind: "emotion" });
+    expect(new Set(out.map((o) => o.value)).size).toBe(out.length);
   });
 });

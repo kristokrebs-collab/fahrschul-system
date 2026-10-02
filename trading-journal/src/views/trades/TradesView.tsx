@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, type TargetAndTransition, type Transition } from "motion/react";
-import { Fragment, useCallback, useMemo, type ReactNode } from "react";
+import { Fragment, useCallback, useDeferredValue, useMemo, type ReactNode } from "react";
 import { aggregate } from "@/domain/agg";
+import { EMOTIONS } from "@/domain/defaults";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useMediaQuery } from "@/motion/useMediaQuery";
@@ -8,11 +9,13 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Button, Card, EmptyState } from "@/primitives";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { useUi, type SortKey } from "@/store/uiStore";
+import { LeadFill } from "@/views/setups/LeadFill";
+import { AutoHeight } from "./AutoHeight";
 import { KpiStrip } from "./KpiStrip";
 import { TradeFilters } from "./TradeFilters";
 import { TradesCards } from "./TradesCards";
 import { TradesTable } from "./TradesTable";
-import { filterTrades, listKey, rowsKey, sortTrades } from "./tradesModel";
+import { filterTrades, listKey, rowsKey, searchSuggestions, sortTrades } from "./tradesModel";
 
 export interface TradesViewProps {
   /** Override of the `Trade eintragen` CTA (default: `useUi().openEditor()`). */
@@ -23,6 +26,8 @@ export interface TradesViewProps {
 }
 
 export const TRADES_LEAD = "Filtere nach Konto, Entscheidungsgrundlage, Ergebnis oder Richtung. Ein Klick auf eine Zeile öffnet den Trade.";
+/** Subtitle recipe (same as the setups / settings pages): pixel fill once per session, then the marker on the key word. */
+export const TRADES_LEAD_FILL = { storageKey: "tj2-fill-trades", highlight: "Klick" } as const;
 
 /** Which body the card shows; the key of the crossfade. */
 type BodyState = "list" | "none" | "empty";
@@ -42,14 +47,18 @@ const CTA_SHOWN: TargetAndTransition = { opacity: 1, scale: 1, transition: { sca
  * table (≥ `md`) or the card list (< `md`; JS breakpoint so only one `trade-{id}` source is mounted at a time).
  * Filter + sort state come from `uiStore` (`tradeFilter` is mirrored into `#trades?…` by the router).
  *
- * The card body crossfades between the list, `Keine Treffer` and the empty journal (`AnimatePresence
- * mode="popLayout"`: the leaving body is lifted out of the flow, the new one mounts in the same commit – never
- * `wait`), `opacity` + `scale .98`, origin top. Reduced motion: no scale, the new body is there at once.
+ * The card body switches between the list, `Keine Treffer` and the empty journal in sequence (TR-01): the leaving
+ * body fades out in place (`tween.exit`), then the new one fades / scales in (`AnimatePresence mode="wait"`) while
+ * the card's height follows on a spring (`AutoHeight`) – the two bodies are never drawn over each other. Reduced
+ * motion: no scale, plain fades, no height spring. The text search runs on a deferred value (PF-01): typing stays
+ * responsive while the list re-filters at lower priority.
  */
 export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   const all = useEnriched();
   const settings = useJournal((s) => s.settings);
-  const filter = useUi((s) => s.tradeFilter);
+  const liveFilter = useUi((s) => s.tradeFilter);
+  const deferredQ = useDeferredValue(liveFilter.q);
+  const filter = useMemo(() => (deferredQ === liveFilter.q ? liveFilter : { ...liveFilter, q: deferredQ }), [liveFilter, deferredQ]);
   const setTradeFilter = useUi((s) => s.setTradeFilter);
   const resetTradeFilter = useUi((s) => s.resetTradeFilter);
   const sort = useUi((s) => s.tradeSort);
@@ -63,6 +72,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   const key = listKey(filter, sort);
   const layoutKey = useMemo(() => rowsKey(key, rows), [key, rows]);
 
+  const suggestions = useMemo(() => searchSuggestions(all, settings.setups, EMOTIONS), [all, settings.setups]);
   const onSort = useCallback((k: SortKey) => toggleSort(k), [toggleSort]);
   const newTrade = () => (onNew ? onNew() : openEditor());
 
@@ -101,7 +111,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
         {wide ? (
           <TradesTable rows={rows} setups={settings.setups} sort={sort} onSort={onSort} listKey={layoutKey} onOpen={onOpen} />
         ) : (
-          <TradesCards rows={rows} setups={settings.setups} listKey={layoutKey} onOpen={onOpen} />
+          <TradesCards rows={rows} setups={settings.setups} listKey={layoutKey} sortKey={`${sort.k}:${sort.dir}`} onOpen={onOpen} />
         )}
       </>
     );
@@ -109,11 +119,11 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
 
   return (
     <div className={className ?? "grid grid-cols-1 gap-5"}>
-      <PageHeader title="Alle Trades" lead={TRADES_LEAD} count={all.length} />
+      <PageHeader title="Alle Trades" lead={TRADES_LEAD} count={all.length} leadFill={TRADES_LEAD_FILL} />
       <Card>
-        <TradeFilters filter={filter} onChange={setTradeFilter} setups={settings.setups} count={rows.length} closed={closed} />
-        <div className="relative">
-          <AnimatePresence mode="popLayout" initial={false}>
+        <TradeFilters filter={liveFilter} onChange={setTradeFilter} setups={settings.setups} count={rows.length} closed={closed} suggestions={suggestions} />
+        <AutoHeight className="relative">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={state}
               className="origin-top"
@@ -125,7 +135,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
               {body}
             </motion.div>
           </AnimatePresence>
-        </div>
+        </AutoHeight>
       </Card>
     </div>
   );
@@ -137,9 +147,13 @@ const WORD_SHOWN = { opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { fil
 const DOT_FROM = { scale: 0 };
 const DOT_SHOWN = { scale: 1 };
 
+/** The ember starts once the lead has faded in (same beat as the setups / settings headers). */
+const FILL_AFTER_LEAD_S = 0.25;
+const leadDelay = (i: number) => Math.min(i, stagger.max) * stagger.words;
+
 /** `i`-th word of the title (count and lead follow as the next steps): blur-fade up, `stagger.words` apart. */
 function wordTransition(i: number): Transition {
-  const delay = Math.min(i, stagger.max) * stagger.words;
+  const delay = leadDelay(i);
   return { default: { ...tween.reveal, delay }, y: { ...spring.enter, delay } };
 }
 
@@ -149,9 +163,10 @@ function wordTransition(i: number): Transition {
  *
  * Page enter (21st.dev "Words Stagger"): the signal dot pops (`spring.pop`), the words rise 10 px out of a 4 px blur
  * 30 ms apart, the count and the lead follow. Only the inner spans animate – the `h1` itself is never transparent,
- * and under reduced motion everything renders in place (`initial={false}`).
+ * and under reduced motion everything renders in place (`initial={false}`). With `leadFill` the lead is the shared
+ * pulse subtitle recipe (`LeadFill`: pixel fill with a signal-red ember once per session, then the marker wipe).
  */
-export function PageHeader({ title, lead, count, action }: { title: string; lead: string; count?: number; action?: ReactNode }) {
+export function PageHeader({ title, lead, count, action, leadFill }: { title: string; lead: string; count?: number; action?: ReactNode; leadFill?: { storageKey: string; highlight?: string } }) {
   const reduced = useReducedFx();
   const words = title.split(" ");
   const from = <T,>(target: T): T | false => (reduced ? false : target);
@@ -180,9 +195,13 @@ export function PageHeader({ title, lead, count, action }: { title: string; lead
             </motion.span>
           )}
         </h1>
-        <motion.p className="mt-1 max-w-[62ch] text-[13.5px] text-mute" initial={from(WORD_FROM)} animate={WORD_SHOWN} transition={wordTransition(words.length + 1)}>
-          {lead}
-        </motion.p>
+        <motion.div className="mt-1 max-w-[62ch] text-[13.5px] text-mute" initial={from(WORD_FROM)} animate={WORD_SHOWN} transition={wordTransition(words.length + 1)}>
+          {leadFill ? (
+            <LeadFill text={lead} storageKey={leadFill.storageKey} highlight={leadFill.highlight} delayMs={Math.round((leadDelay(words.length + 1) + FILL_AFTER_LEAD_S) * 1000)} />
+          ) : (
+            <p>{lead}</p>
+          )}
+        </motion.div>
       </div>
       {action}
     </div>

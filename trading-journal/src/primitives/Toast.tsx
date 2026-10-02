@@ -1,11 +1,11 @@
 import { AnimatePresence, animate, motion, useMotionValue, useTransform, type PanInfo, type Variants } from "motion/react";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/cn";
 import { gesture, radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { GlyphCheck, GlyphCross, GlyphInfo } from "@/primitives/icons";
 import { formatRoll, parseRollValue } from "@/primitives/rollValue";
-import { toastDuration, useToastStore, type Toast, type ToastKind } from "@/primitives/toastStore";
+import { toastDuration, toastLane, useToastStore, type Toast, type ToastKind, type ToastLane } from "@/primitives/toastStore";
 
 const KIND_DISC: Record<ToastKind, string> = { ok: "bg-win/20 text-win", error: "bg-loss/20 text-loss", warn: "bg-signal/25 text-signal" };
 const KIND_BAR: Record<ToastKind, string> = { ok: "bg-win/70", error: "bg-loss/70", warn: "bg-signal/80" };
@@ -31,9 +31,14 @@ interface Fling {
   dir: number;
 }
 
+/** Above every overlay: Sheet 60, MorphDialog 70, pulse select panels 75, Celebrate 80. */
+export const TOAST_Z = 95;
+
 /**
  * Toast island (Bundle `Ehe`, Plan 3.3 "Toast-Insel", 21st.dev "Dynamic Island"): fixed above the dock, the ONLY
- * `role="status" aria-live="polite"` region, one toast at a time (the next one waits in the queue).
+ * `role="status" aria-live="polite"` region, one toast at a time (the next one waits in the queue). It floats above
+ * every overlay (`TOAST_Z`); a toast that appears while a modal overlay is open takes the `top` lane (under the top
+ * edge) so it never covers – or hides under – a sheet footer, and keeps that lane until it leaves.
  * - grows 44×44 → auto×50 on `spring.toast` (declared exception), exit `tween.toastExit`, text `delay .12`,
  *   check mark `pathLength` on `tween.checkToast`;
  * - remaining-time bar: compositor `scaleX` loop (`.fx-countdown`), paused together with the dismiss timer while
@@ -55,7 +60,11 @@ export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) 
   return (
     <div
       data-toast-island=""
-      className={cn("pointer-events-none fixed inset-x-0 bottom-[calc(92px+env(safe-area-inset-bottom,0px))] z-[56] grid items-end justify-items-center px-4", className)}
+      className={cn(
+        "pointer-events-none fixed inset-0 grid justify-items-center px-4 pb-[calc(92px+env(safe-area-inset-bottom,0px))] pt-[calc(10px+env(safe-area-inset-top,0px))]",
+        className,
+      )}
+      style={{ zIndex: TOAST_Z }}
       aria-live="polite"
       role="status"
     >
@@ -93,6 +102,15 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
   const ms = note.duration ?? toastDuration(note.kind);
   const win = note.kind === "ok" && note.valueTone === "win";
   const instant = { duration: 0 };
+  // lane latched per toast: read at mount (render guess, corrected before paint – an overlay closing in this very
+  // commit has released its lane by then) and kept until the toast leaves
+  const [initialLane] = useState<ToastLane>(toastLane);
+  const lane = useRef(initialLane);
+  useLayoutEffect(() => {
+    lane.current = toastLane();
+    wrapper.current?.setAttribute("data-lane", lane.current);
+  }, []);
+  const rise = (dist: number) => (lane.current === "top" ? -dist : dist);
 
   useEffect(() => {
     dismissRef.current = onDismiss;
@@ -158,13 +176,14 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
   };
   const islandVariants: Variants = {
     exit: (c: Fling | null | undefined) =>
-      flung(c) ? { opacity: 0, transition: exitTransition } : { width: 44, opacity: 0, y: 16, scale: 0.7, transition: exitTransition },
+      flung(c) ? { opacity: 0, transition: exitTransition } : { width: 44, opacity: 0, y: rise(16), scale: 0.7, transition: exitTransition },
   };
 
   return (
     <motion.div
       ref={wrapper}
-      className="pointer-events-auto relative isolate [grid-area:1/1]"
+      data-lane={initialLane}
+      className="pointer-events-auto relative isolate self-end [grid-area:1/1] data-[lane=top]:self-start"
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.6}
@@ -205,7 +224,7 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
         className="relative flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)]"
         style={{ maxWidth: "calc(100vw - 32px)" }}
         // motion-exception: toast-island — width/height/borderRadius animate as in the bundle (44×44 → auto×50), Plan 3.2 rule 1.
-        initial={{ width: 44, height: 44, borderRadius: radius.toastStart, opacity: 0, y: 24, scale: 0.6 }}
+        initial={{ width: 44, height: 44, borderRadius: radius.toastStart, opacity: 0, y: initialLane === "top" ? -24 : 24, scale: 0.6 }}
         animate={{ width: "auto", height: 50, borderRadius: radius.toastEnd, opacity: 1, y: 0, scale: 1 }}
         variants={islandVariants}
         exit="exit"

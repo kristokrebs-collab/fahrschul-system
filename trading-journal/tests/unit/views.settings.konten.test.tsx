@@ -57,14 +57,19 @@ describe("SettingsView · Konten", () => {
     expect(makro.value).toBe("20000");
     expect(makro).toHaveAttribute("inputmode", "decimal");
     fireEvent.change(makro, { target: { value: "25.000,5" } });
-    fireEvent.change(screen.getByLabelText("Währung"), { target: { value: "EUR" } });
+    // MorphSelect (#s-currency): the label names the trigger, the option list opens in a portal
+    const currency = screen.getByLabelText("Währung");
+    expect(currency).toHaveAttribute("aria-haspopup", "listbox");
+    fireEvent.click(currency);
+    fireEvent.click(screen.getByRole("option", { name: "EUR" }));
+    expect(currency).toHaveAttribute("data-value", "EUR");
     fireEvent.change(screen.getByLabelText("Journal-Start"), { target: { value: "2026-01-15" } });
     fireEvent.click(screen.getAllByRole("button", { name: "Speichern" })[0] as HTMLElement);
     await waitFor(() => expect(useJournal.getState().settings.capital.makro).toBe(25000.5));
     expect(useJournal.getState().settings.currency).toBe("EUR");
     expect(useJournal.getState().settings.startDate).toBe("2026-01-15");
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Einstellungen gespeichert");
-  });
+  }, 15_000); // full page render + portal select: slow on a loaded CI box
 
   it("refuses to save with an unparsable number", async () => {
     render(<SettingsView />);

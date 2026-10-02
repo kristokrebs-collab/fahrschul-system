@@ -6,9 +6,11 @@ import type { AccountView } from "@/domain/account";
 import { cn } from "@/lib/cn";
 import { colorClass, n0, pct } from "@/lib/format";
 import { MorphCard } from "@/motion/MorphCard";
+import { TextPrism } from "@/motion/pulse/TextPrism";
 import { MotionNumber, useAnimatedNumber } from "@/motion/MotionNumber";
 import { TextRoll } from "@/motion/TextRoll";
 import { radius, tween } from "@/motion/tokens";
+import { useCanHover } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { HeroBackdrop } from "@/primitives/HeroBackdrop";
@@ -27,6 +29,12 @@ const XL_TILES: readonly { key: ExplainKey; label: string }[] = [
   { key: "streak", label: "Serie" },
 ];
 const TILES = [...HERO_TILES, ...XL_TILES];
+/**
+ * Inside the prism lens every copy takes its layer colour (signal / white / grey): the number's own win/loss tone
+ * classes are overridden below the layer spans (the base figure outside the lens keeps its tone). The lens box clips:
+ * 0.12 em of padding (cancelled by a negative margin, no layout change) keeps the glyphs inside it at `leading-none`.
+ */
+const PRISM_COPY_TONE = "[&>span:last-child>span_*]:![color:inherit] -my-[0.12em] py-[0.12em]";
 /** Peak opacity of the Netto-P&L glow when the figure changes. */
 const GLOW_PEAK = 0.55;
 
@@ -82,7 +90,7 @@ const ReturnBadge = memo(function ReturnBadge({ ret }: { ret: number }) {
 /**
  * Hero (Bundle `yhe`, Plan 6.1): account Segmented → `uiStore.acc`, `Startkapital`, Netto-P&L `MotionNumber`
  * (shared MotionValue with the `Details +` fact dialog, tone crossfades with the sign, green/red glow on change,
- * shimmering placeholder until the journal is loaded), return badge roll, subline, KPI tiles (`StatTile`,
+ * shimmering placeholder until the journal is loaded, pulse `text-prism-split` lens on hover devices), return badge roll, subline, KPI tiles (`StatTile`,
  * `morph-fact-{key}`, count-up on reveal, roll on change) wrapping into rows of 2 / 3 / 4 so every label and value
  * stays readable, living dot-matrix backdrop, right column `MarketPanel`.
  */
@@ -97,6 +105,7 @@ export function Hero() {
   const ret = view.start ? g.net / view.start : null;
   const [active, setActive] = useState<number | null>(null);
   const net = useAnimatedNumber(loaded ? g.net : 0);
+  const canHover = useCanHover();
 
   // stable per data change, so hovering re-renders only the two tiles whose `active` flips
   const tiles = useMemo(
@@ -108,6 +117,7 @@ export function Hero() {
           label: t.label,
           value: tileText(t.key, view, cur),
           suffix: t.key === "trades" && view.open.length ? <span className="text-faint"> +{view.open.length} offen</span> : undefined,
+          suffixLength: t.key === "trades" && view.open.length ? ` +${view.open.length} offen`.length : 0,
           verdict: d.verdict,
           body: () => <ExplanationView bare d={d} />,
           activate: () => setActive(i),
@@ -154,7 +164,14 @@ export function Hero() {
             <div className="dot-num relative isolate flex flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none" data-testid="hero-net" data-celebrate-anchor="hero-net">
               <NetGlow net={g.net} acc={acc} loaded={loaded} />
               <SkeletonSwap ready={loaded} skeleton={<Skeleton className="h-[0.78em] w-[5.2ch] rounded-2xl" />}>
-                <MotionNumber source={net} decimals={2} signed tone="auto" aria-label={heroTileValue("net", view)} />
+                {/* prism lens over the figure on hover devices (its copies count with the same MotionValue); touch: plain */}
+                {canHover ? (
+                  <TextPrism className={PRISM_COPY_TONE}>
+                    <MotionNumber source={net} decimals={2} signed tone="auto" aria-label={heroTileValue("net", view)} />
+                  </TextPrism>
+                ) : (
+                  <MotionNumber source={net} decimals={2} signed tone="auto" aria-label={heroTileValue("net", view)} />
+                )}
               </SkeletonSwap>
               <span className="font-sans text-lg font-medium text-mute">{cur}</span>
             </div>
@@ -171,6 +188,7 @@ export function Hero() {
                 label={t.label}
                 value={t.value}
                 suffix={t.suffix}
+                suffixLength={t.suffixLength}
                 verdict={t.verdict}
                 active={active === i}
                 onActivate={t.activate}

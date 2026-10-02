@@ -1,5 +1,6 @@
 import { animate, useMotionValue, type AnimationPlaybackControls, type MotionValue, type Transition } from "motion/react";
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { useIntroGate } from "@/intro/introStore";
 import { canObserveInView, observeInView, useFirstInView } from "@/motion/inView";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -28,7 +29,8 @@ export function canRevealOnView(reduced: boolean): boolean {
 
 /**
  * The value shown by a fill-on-view element. Reduced motion or no `IntersectionObserver` (jsdom/SSR): it starts at
- * `target` and follows changes instantly, so nothing ever rests empty.
+ * `target` and follows changes instantly, so nothing ever rests empty. The first reveal also waits for the intro
+ * (`useIntroGate`): not while the stage covers the app, not before the surrounding intro cell has landed.
  */
 export function useRevealValue(ref: RefObject<Element | null>, target: number, { transition, from = 0, delay = 0, enabled = true, onReveal }: RevealValueOptions): MotionValue<number> {
   const reduced = useReducedFx();
@@ -37,13 +39,14 @@ export function useRevealValue(ref: RefObject<Element | null>, target: number, {
   const seen = useRef(!armed);
   const running = useRef<AnimationPlaybackControls | null>(null);
   const latest = useRef({ target, transition, delay, onReveal });
+  const gate = useIntroGate();
 
   useEffect(() => {
     latest.current = { target, transition, delay, onReveal };
   });
 
   useEffect(() => {
-    if (!armed) return;
+    if (!armed || !gate) return;
     const el = ref.current;
     if (!el) return;
     const off = observeInView(el, (inView) => {
@@ -56,7 +59,7 @@ export function useRevealValue(ref: RefObject<Element | null>, target: number, {
       l.onReveal?.();
     });
     return off;
-  }, [armed, ref, mv]);
+  }, [armed, gate, ref, mv]);
 
   useEffect(() => {
     if (!seen.current) {

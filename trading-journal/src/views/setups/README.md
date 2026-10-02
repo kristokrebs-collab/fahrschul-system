@@ -23,3 +23,8 @@ Motion: the header counts the visible setups; cards reveal their details on firs
 Cards gate their first-view reveal with `useFirstInView` from `@/motion/inView` (shared observer, one update; formerly `src/views/setups/useFirstInView.ts`).
 
 Tests: `tests/unit/views.setups.card.test.tsx`, `tests/unit/views.settings.motion.test.tsx` (PageHeader, useFirstInView).
+
+## pulse-motion pass
+- `SetupCard` = `NotchedFrame` (notch bottom right + arrow disc ink → signal red on hover/focus, setup-colour wash greyed at rest → colour on hover, hairline `outline`) inside `Tilt` (factor 4); the spotlight `Card` is no longer used here. Tiles: 2 × 2 below a 22rem card body (`@container`), never ellipsized (MO-01).
+- OV-07: `layoutId="setup-card-{id}"` sits on an empty opaque surface (ink-850, clipped to the notched outline via `clip-path: path()`); `Bearbeiten` fades the contents out first and opens the editor when that fade completes (fallback 400 ms), so only the surface morphs into the sheet; on close the contents fade back after 0.24 s. The `data-testid` stays on the card wrapper; `setup-dot-{id}` / `setup-name-{id}` unchanged. `hidden` → contents opacity 0 + `inert` + `aria-hidden`.
+- `LeadFill` (`./LeadFill.tsx`, shared page subtitle recipe): `PixelTextFill` (signal-red ember, ends in `text-mute`) once per session (`sessionStorage` key), waits for the intro to settle, then hands off to the plain paragraph in the identical layout and wipes a `TactileHighlight` (tone invert, no side padding) over the key word. Seen / reduced motion: static marker. `PageHeader leadFill={{ storageKey, highlight }}`; setups: `tj2-fill-setups` / `funktioniert`.

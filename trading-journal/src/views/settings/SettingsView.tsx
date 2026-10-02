@@ -1,9 +1,10 @@
-import { AnimatePresence, motion } from "motion/react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { animate, motion, useMotionValue, useTransform } from "motion/react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Rule } from "@/domain/types";
 import type { FeedId, ProviderHealth, StatusLabel } from "@/market/types";
 import { cn } from "@/lib/cn";
 import { HoldButton } from "@/motion/HoldButton";
+import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { PulseDot } from "@/motion/PulseDot";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -11,7 +12,7 @@ import { ImportDialog } from "@/overlays/ImportDialog";
 import { revealInvalid } from "@/primitives/fieldFx";
 import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
-import { Input, inputClass } from "@/primitives/Input";
+import { Input } from "@/primitives/Input";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { PageHeader } from "@/views/setups/PageHeader";
@@ -22,6 +23,7 @@ import { ChangedDot, SaveButton, useActionPhase, type ActionPhase } from "./fx";
 import { HyblockConnectorCard, type HyblockTestConfig } from "./HyblockConnectorCard";
 import { LiveDataCard } from "./LiveDataCard";
 import { RulesCard } from "./RulesCard";
+import { SymbolField } from "./SymbolField";
 
 export const SETTINGS_STRINGS = {
   title: "Einstellungen",
@@ -73,6 +75,9 @@ export const SETTINGS_STRINGS = {
   discardTitle: "Gedrückt halten, um alle ungespeicherten Änderungen zu verwerfen",
 } as const;
 
+/** Subtitle recipe: pixel fill once per session, then the marker on the key word. */
+export const SETTINGS_LEAD_FILL = { storageKey: "tj2-fill-settings", highlight: "Startkapital" } as const;
+
 export interface SettingsViewProps {
   /** Live-Daten card: health snapshot + labels from the market provider (integrator wiring). */
   health?: ProviderHealth | null;
@@ -95,8 +100,9 @@ const NO_CHANGES: ReadonlySet<DraftKey> = new Set();
  * NEW `Grundregeln` card edits `settings.rules` inside the same draft.
  *
  * Motion: every `Speichern` morphs idle → spinner → drawn ✓ `Gespeichert` (`SaveButton`); fields whose value
- * differs from the saved settings carry a signal dot, and an `Ungespeicherte Änderungen` bar slides in under the
- * header (`spring.sheet`) with `Verwerfen` (hold to confirm) and its own `Speichern`; a refused save brings the
+ * differs from the saved settings carry a signal dot, and an in-flow sticky `Ungespeicherte Änderungen` bar opens
+ * under the page header (clip reveal synced with the form's push on `spring.sheet`, ST-01) with `Verwerfen` (hold to
+ * confirm) and its own `Speichern`; `Währung` is a pulse `MorphSelect`, `TradingView-Symbol` a pulse `Autocomplete`; a refused save brings the
  * offending field into view, then shakes and pulses it. Cards are memoised, so the 1-Hz health updates of the
  * Live-Daten card never re-render the form.
  */
@@ -176,15 +182,34 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
     void save();
   };
   const barOpen = changed.size > 0 || (holdBar && phase !== "idle");
+  // ST-01: the bar is IN FLOW under the header (sticky) and pushes the form down. It stays mounted through its exit;
+  // the form FLIPs (`layout="position"`) only when the bar's slot is on screen – scrolled past it, the browser's scroll
+  // anchoring keeps the content still and the bar simply appears at its sticky spot.
+  const [barPresent, setBarPresent] = useState(barOpen);
+  const [push, setPush] = useState(0);
+  const [observeSlot, slotVisible] = useSlotInView();
+  if (barOpen && !barPresent) {
+    setBarPresent(true);
+    if (slotVisible) setPush((k) => k + 1);
+  }
+  const onBarExited = useCallback(() => {
+    setBarPresent(false);
+    if (slotVisible) setPush((k) => k + 1);
+  }, [slotVisible]);
   const pagePhase = buttonPhase(phase, origin === "page");
   const barButtonPhase = buttonPhase(phase, origin === "bar");
 
   return (
     <div className={cn("grid grid-cols-1 gap-5", className)}>
-      <PageHeader title={SETTINGS_STRINGS.title} lead={SETTINGS_STRINGS.lead} action={<SaveButton phase={pagePhase} onClick={onSave} />} />
+      <PageHeader title={SETTINGS_STRINGS.title} lead={SETTINGS_STRINGS.lead} leadFill={SETTINGS_LEAD_FILL} action={<SaveButton phase={pagePhase} onClick={onSave} />} />
 
-      <form
-        className="grid grid-cols-1 gap-5 lg:grid-cols-2"
+      {barPresent && <UnsavedBar open={barOpen} phase={phase} buttonPhase={barButtonPhase} onSave={onSaveBar} onDiscard={discard} onExited={onBarExited} />}
+
+      <motion.form
+        layout={reduced ? false : "position"}
+        layoutDependency={push}
+        transition={{ layout: spring.sheet }}
+        className="relative grid grid-cols-1 gap-5 lg:grid-cols-2"
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
@@ -206,11 +231,11 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
         <div className="flex justify-end lg:col-span-2">
           <SaveButton phase={pagePhase} onClick={onSave} />
         </div>
-      </form>
+        <span ref={observeSlot} aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px" />
+      </motion.form>
 
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
 
-      <UnsavedBar open={barOpen} phase={phase} buttonPhase={barButtonPhase} onSave={onSaveBar} onDiscard={discard} />
     </div>
   );
 }
@@ -231,6 +256,7 @@ function DraftFields({ fields, draft, onChange, changed, invalid }: DraftCardPro
 }
 
 const S = SETTINGS_STRINGS;
+const CURRENCY_OPTIONS = CURRENCIES.map((c) => ({ value: c, label: c }));
 const BACKTEST_FIELDS: readonly FieldSpec[] = [
   { id: "winRate", label: S.winRate },
   { id: "expectancy", label: S.expectancy },
@@ -239,7 +265,6 @@ const BACKTEST_FIELDS: readonly FieldSpec[] = [
   { id: "label", label: S.label, numeric: false },
 ];
 const TRIGGER_FIELDS: readonly FieldSpec[] = [
-  { id: "symbol", label: S.symbol, help: S.symbolHelp, numeric: false },
   { id: "longTrigger", label: S.longTrigger, help: S.longTriggerHelp },
   { id: "longStop", label: S.longStop, help: S.longStopHelp },
   { id: "shortTrigger", label: S.shortTrigger, help: S.shortTriggerHelp },
@@ -273,11 +298,7 @@ const AccountsCard = memo(function AccountsCard({ draft, onChange, changed, inva
           }
           htmlFor="s-currency"
         >
-          <select id="s-currency" className={inputClass} value={draft.currency || "USDT"} onChange={(e) => onChange("currency", e.target.value)}>
-            {CURRENCIES.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
+          <MorphSelect id="s-currency" value={draft.currency || "USDT"} onChange={(v) => onChange("currency", v)} options={CURRENCY_OPTIONS} />
         </Field>
         <DraftField id="pair" label={S.pair} numeric={false} draft={draft} onChange={onChange} changed={changed.has("pair")} invalid={invalid === "pair"} />
         <Field
@@ -311,6 +332,7 @@ const TriggerCard = memo(function TriggerCard(props: DraftCardProps) {
   return (
     <Card title={S.trigger}>
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
+        <SymbolField label={S.symbol} help={S.symbolHelp} value={props.draft.symbol ?? ""} onChange={props.onChange} changed={props.changed.has("symbol")} />
         <DraftFields fields={TRIGGER_FIELDS} {...props} />
       </div>
     </Card>
@@ -337,67 +359,117 @@ const BAR_LABELS: readonly { phase: ActionPhase; long: string; short: string }[]
   { phase: "done", long: S.saved, short: S.saved },
 ];
 
+/** Sticky offset of the bar: under the 64 px header + 8 px. */
+const BAR_TOP = "calc(env(safe-area-inset-top,0px) + 72px)";
+const BAR_TOP_PX = 72;
+
 /**
- * `Ungespeicherte Änderungen` (fixed under the header, centred pill): slides down on `spring.sheet` while the draft
- * differs from the saved settings, and stays through `Speichert …` / `Gespeichert` when the save started there – its
- * leading text crossfades to that phase (`tween.crossfade`; the three labels share one grid cell, so the pill never
- * changes width) and `Verwerfen` fades out once saved. Its own `Speichern` comes after the page's buttons in DOM order;
- * `Verwerfen` must be held (it drops every edit). Narrow screens: the label is the part that gives way (`min-w-0`
- * + truncate), the buttons keep their size, so the pill always fits a 360 px viewport.
+ * Whether the top of the form (= just under the bar's slot) is below the sticky line – one IntersectionObserver on a
+ * 1 px sentinel, React state only when it crosses. Without IntersectionObserver: assume visible (push animates).
+ */
+function useSlotInView(): [observe: (el: HTMLElement | null) => void, visible: boolean] {
+  const [visible, setVisible] = useState(true);
+  const stop = useRef<(() => void) | null>(null);
+  const observe = useCallback((el: HTMLElement | null) => {
+    stop.current?.();
+    stop.current = null;
+    if (!el || typeof IntersectionObserver !== "function") return;
+    const io = new IntersectionObserver(([e]) => setVisible(!!e?.isIntersecting), { rootMargin: `-${BAR_TOP_PX}px 0px 0px 0px` });
+    io.observe(el);
+    stop.current = () => io.disconnect();
+  }, []);
+  return [observe, visible];
+}
+
+/**
+ * `Ungespeicherte Änderungen` (ST-01): an in-flow, sticky row right under the page header – it takes its own space
+ * (the form below is pushed down, never covered) and sticks under the app header while scrolling. The centred pill is
+ * opaque from the first frame: it is revealed by a top-down clip on `spring.sheet`, the same spring and start frame
+ * as the form's push, so the revealed part is always above the moving content; the exit closes the clip
+ * (`tween.exit`) before the slot is removed. Stays through `Speichert …` / `Gespeichert` when the save started here –
+ * its leading text crossfades to that phase (`tween.crossfade`; the labels share one grid cell) and `Verwerfen`
+ * fades out once saved. Below `sm` the label is `Ungespeichert`. `Verwerfen` must be held (it drops every edit).
  * No live region: the dot and the field marks carry the state, the save result is announced by the toast.
  */
-function UnsavedBar({ open, phase, buttonPhase, onSave, onDiscard }: { open: boolean; phase: ActionPhase; buttonPhase: ActionPhase; onSave: () => void; onDiscard: () => void }) {
+function UnsavedBar({
+  open,
+  phase,
+  buttonPhase,
+  onSave,
+  onDiscard,
+  onExited,
+}: {
+  open: boolean;
+  phase: ActionPhase;
+  buttonPhase: ActionPhase;
+  onSave: () => void;
+  onDiscard: () => void;
+  onExited: () => void;
+}) {
   const reduced = useReducedFx();
   const fade = reduced ? { duration: 0 } : tween.crossfade;
   const saved = phase === "done";
+  const reveal = useMotionValue(reduced ? 1 : 0);
+  const clipPath = useTransform(reveal, (v) => (v >= 1 ? "none" : `inset(0% 0% ${((1 - v) * 100).toFixed(2)}% 0% round 999px)`));
+  const exited = useRef(onExited);
+  useLayoutEffect(() => {
+    exited.current = onExited;
+  }, [onExited]);
+
+  useLayoutEffect(() => {
+    if (reduced) {
+      reveal.jump(open ? 1 : 0);
+      if (!open) exited.current();
+      return;
+    }
+    const controls = animate(reveal, open ? 1 : 0, open ? spring.sheet : { ...tween.exit, onComplete: () => exited.current() });
+    return () => controls.stop();
+  }, [open, reduced, reveal]);
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+72px)] z-[41] flex justify-center px-4">
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="unsaved"
-            className="pointer-events-auto flex min-w-0 max-w-full items-center gap-3 rounded-full border border-line-2 bg-ink-850/95 py-1.5 pl-4 pr-1.5 shadow-[0_18px_48px_rgb(0_0_0/0.55)] backdrop-blur-md"
-            initial={reduced ? false : { opacity: 0, y: -16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.98, transition: tween.exit }}
-            transition={{ default: spring.sheet, opacity: tween.fade }}
-          >
-            <PulseDot tone="signal" size={6} rings={1} active={phase === "idle"} />
-            <span className="grid min-w-0 text-[12.5px] font-medium text-fg">
-              {BAR_LABELS.map((l) => {
-                const on = l.phase === phase;
-                return (
-                  <motion.span
-                    key={l.phase}
-                    aria-hidden={on ? undefined : true}
-                    className="col-start-1 row-start-1 min-w-0 truncate whitespace-nowrap"
-                    initial={false}
-                    animate={{ opacity: on ? 1 : 0 }}
-                    transition={fade}
-                  >
-                    {l.short === l.long ? (
-                      l.long
-                    ) : (
-                      <>
-                        <span className="sm:hidden">{l.short}</span>
-                        <span className="max-sm:hidden">{l.long}</span>
-                      </>
-                    )}
-                  </motion.span>
-                );
-              })}
-            </span>
-            <span className="flex shrink-0 items-center gap-1.5">
-              <motion.span className={cn("inline-flex", saved && "pointer-events-none")} aria-hidden={saved || undefined} initial={false} animate={{ opacity: saved ? 0 : 1 }} transition={fade}>
-                <HoldButton variant="ghost" size="sm" holdLabel={S.discardHold} title={S.discardTitle} onConfirm={onDiscard} disabled={phase !== "idle"}>
-                  {S.discard}
-                </HoldButton>
-              </motion.span>
-              <SaveButton phase={buttonPhase} size="sm" onClick={onSave} className="min-w-[8.25rem]" />
-            </span>
-          </motion.div>
+    <div className="sticky z-[41] flex justify-center" style={{ top: BAR_TOP }} data-unsaved-bar="">
+      <motion.div
+        className={cn(
+          "flex min-w-0 max-w-full items-center gap-2 rounded-full border border-line-2 bg-ink-850 py-1.5 pl-3 pr-1.5 shadow-[0_18px_48px_rgb(0_0_0/0.55)] sm:gap-3 sm:pl-4",
+          !open && "pointer-events-none",
         )}
-      </AnimatePresence>
+        style={{ clipPath }}
+        inert={!open || undefined}
+      >
+        <PulseDot tone="signal" size={6} rings={1} active={phase === "idle"} />
+        <span className="grid min-w-0 text-[12.5px] font-medium text-fg">
+          {BAR_LABELS.map((l) => {
+            const on = l.phase === phase;
+            return (
+              <motion.span
+                key={l.phase}
+                aria-hidden={on ? undefined : true}
+                className="col-start-1 row-start-1 min-w-0 truncate whitespace-nowrap"
+                initial={false}
+                animate={{ opacity: on ? 1 : 0 }}
+                transition={fade}
+              >
+                {l.short === l.long ? (
+                  l.long
+                ) : (
+                  <>
+                    <span className="sm:hidden">{l.short}</span>
+                    <span className="max-sm:hidden">{l.long}</span>
+                  </>
+                )}
+              </motion.span>
+            );
+          })}
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <motion.span className={cn("inline-flex", saved && "pointer-events-none")} aria-hidden={saved || undefined} initial={false} animate={{ opacity: saved ? 0 : 1 }} transition={fade}>
+            <HoldButton variant="ghost" size="sm" holdLabel={S.discardHold} title={S.discardTitle} onConfirm={onDiscard} disabled={phase !== "idle"}>
+              {S.discard}
+            </HoldButton>
+          </motion.span>
+          <SaveButton phase={buttonPhase} size="sm" onClick={onSave} className="min-w-[8.25rem]" />
+        </span>
+      </motion.div>
     </div>
   );
 }

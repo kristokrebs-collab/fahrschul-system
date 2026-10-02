@@ -10,9 +10,14 @@ import { INTRO_KEY } from "@/primitives/SplitText";
 import { TOAST_MS, useUi } from "@/store/uiStore";
 
 describe("dock magnification model", () => {
-  it("raised-cosine bell: 1 under the pointer, ½ halfway, 0 from `distance` on, symmetric", () => {
+  it("windowed Gaussian bell (pack remix): 1 under the pointer, e^(−d²/2σ²) shape, 0 from `distance` on, symmetric", () => {
     expect(dockBell(0)).toBe(1);
-    expect(dockBell(DOCK.distance / 2)).toBeCloseTo(0.5, 10);
+    const g = (d: number) => Math.exp(-(d * d) / (2 * DOCK.sigma * DOCK.sigma));
+    expect(dockBell(DOCK.sigma)).toBeCloseTo((g(DOCK.sigma) - g(DOCK.distance)) / (1 - g(DOCK.distance)), 12);
+    // continuous at the window edge (no step when the pointer leaves the range)
+    expect(dockBell(DOCK.distance - 0.01)).toBeLessThan(1e-4);
+    // pack magnification amplitude: scale 1 + 0.8 under the pointer
+    expect(DOCK.magnification / DOCK.base).toBeCloseTo(1.8, 12);
     expect(dockBell(DOCK.distance)).toBe(0);
     expect(dockBell(DOCK.distance + 50)).toBe(0);
     expect(dockBell(-37)).toBeCloseTo(dockBell(37), 12);

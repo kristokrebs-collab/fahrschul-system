@@ -84,10 +84,10 @@ describe("TradeDetail", () => {
     expect(within(dialog).queryByRole("link", { name: "Chart öffnen ↗" })).not.toBeInTheDocument();
   });
 
-  it("renders the MiniTradeChart slot only with candles (lazy chunk → resolves asynchronously)", async () => {
+  it("renders the MiniTradeChart slot only with candles (mounted once the open morph settled; lazy chunk)", async () => {
     const candles: Candle[] = [{ time: 1, open: 1, high: 2, low: 0.5, close: 1.5, volume: 1, closed: true }];
     mount({ candles });
-    expect(await screen.findByTestId("mini-chart")).toBeInTheDocument();
+    expect(await screen.findByTestId("mini-chart", {}, { timeout: 3000 })).toBeInTheDocument();
     expect(miniChart.mock.calls[0]?.[0].candles).toBe(candles);
   });
 
@@ -112,22 +112,24 @@ describe("TradeDetail", () => {
   it("`Löschen` asks inline, then deletes and toasts `Trade gelöscht`", async () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
-    expect(screen.getByText("Wirklich löschen?")).toBeInTheDocument();
+    // sequenced swap (TR-06): the actions leave, then the confirmation arrives – never both at once
+    expect(await screen.findByText("Wirklich löschen?")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Bearbeiten" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Nein" }));
-    expect(screen.getByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Bearbeiten" })).toBeInTheDocument();
+    expect(screen.queryByText("Wirklich löschen?")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Ja, löschen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ja, löschen" }));
     await waitFor(() => expect(deleteTrade).toHaveBeenCalledWith("A"));
     await waitFor(() => expect(useUi.getState().detail.id).toBeNull());
     expect(useUi.getState().toasts.map((t) => [t.kind, t.title])).toEqual([["info", "Trade gelöscht"]]);
   });
 
-  it("`Bearbeiten` closes the detail and opens the editor for the trade", async () => {
+  it("`Bearbeiten` hands off to the editor in the same update (no bare page in between)", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Bearbeiten" }));
     expect(useUi.getState().detail.id).toBeNull();
-    await waitFor(() => expect(useUi.getState().editor).toEqual({ open: true, tradeId: "A", fromFab: false }));
+    expect(useUi.getState().editor).toEqual({ open: true, tradeId: "A", fromFab: false, fromDetail: true });
   });
 
   it("`onEdit` override wins", () => {

@@ -8,14 +8,46 @@ function focusables(root: HTMLElement): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.closest("[inert]"));
 }
 
-/** Elements that must stay live behind a dialog: the toast island and any other live region. */
-export const INERT_EXEMPT_SELECTOR = "[aria-live],[data-toast-island]";
+/**
+ * Elements that must stay live behind a dialog: the toast island and any other live region, plus the floating
+ * layers of pulse selects / autocompletes (portalled to `<body>`, they belong to the field inside the dialog).
+ */
+export const INERT_EXEMPT_SELECTOR = "[aria-live],[data-toast-island],[data-pulse-select],[data-pulse-autocomplete]";
 
 /**
  * Upper bound for the morph-aware deferrals: a dialog whose `settled` signal never arrives (no layout animation
  * ran, source gone) still inerts the page / releases it after this long – a little over the slowest morph spring.
  */
 export const SETTLE_FALLBACK_MS = 700;
+
+/**
+ * Reference counts of the `inert` attributes set by dialog sessions. Two sessions can overlap (detail → editor
+ * hand-off: the editor opens while the detail is still exiting); the element stays inert until the LAST session that
+ * marked it releases it. Elements inert for other reasons (an exiting list row) are never touched.
+ */
+const inertRefs = new Map<HTMLElement, number>();
+
+function acquireInert(el: HTMLElement): boolean {
+  const n = inertRefs.get(el);
+  if (n) {
+    inertRefs.set(el, n + 1);
+    return true;
+  }
+  if (el.hasAttribute("inert")) return false;
+  el.setAttribute("inert", "");
+  inertRefs.set(el, 1);
+  return true;
+}
+
+function releaseInert(el: HTMLElement): void {
+  const n = inertRefs.get(el);
+  if (!n) return;
+  if (n > 1) inertRefs.set(el, n - 1);
+  else {
+    inertRefs.delete(el);
+    el.removeAttribute("inert");
+  }
+}
 
 /**
  * Marks everything outside `el` as `inert` (siblings of every ancestor up to `<body>`); live regions are descended
@@ -26,15 +58,13 @@ function inertOutside(el: HTMLElement): () => void {
   const inertChildren = (parent: HTMLElement, skip: HTMLElement | null) => {
     for (const child of Array.from(parent.children)) {
       if (child === skip || !(child instanceof HTMLElement)) continue;
-      if (child.hasAttribute("inert")) continue;
       if (child.tagName === "SCRIPT" || child.tagName === "STYLE") continue;
       if (child.matches(INERT_EXEMPT_SELECTOR)) continue;
       if (child.querySelector(INERT_EXEMPT_SELECTOR)) {
         inertChildren(child, null);
         continue;
       }
-      child.setAttribute("inert", "");
-      touched.push(child);
+      if (acquireInert(child)) touched.push(child);
     }
   };
   let node: HTMLElement | null = el;
@@ -44,7 +74,7 @@ function inertOutside(el: HTMLElement): () => void {
     node = parent;
   }
   return () => {
-    for (const t of touched) t.removeAttribute("inert");
+    for (const t of touched) releaseInert(t);
   };
 }
 

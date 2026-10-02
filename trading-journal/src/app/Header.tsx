@@ -1,12 +1,16 @@
 import { motion, useScroll, useSpring, useTransform, type Variants } from "motion/react";
+import { useState } from "react";
 import { EdgeBlur, type BlurBand } from "@/app/BottomFade";
+import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/CommandNav";
 import { HeaderTicker } from "@/app/HeaderTicker";
 import type { StoreMode } from "@/domain/types";
+import { replayIntro, useIntroPhase, useIntroSettled, type IntroPhase } from "@/intro/introStore";
+import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
+import { DancingLetters } from "@/motion/pulse/DancingLetters";
 import { StatusPill, type StatusTone } from "@/motion/StatusPill";
-import { spring } from "@/motion/tokens";
+import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Magnetic } from "@/primitives/Magnetic";
-import { SplitText } from "@/primitives/SplitText";
 import { Icon } from "@/primitives/icons";
 import { MODE_LABELS, useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
@@ -15,6 +19,7 @@ import { useUi } from "@/store/uiStore";
 export const WORDMARK = "Trade Journal";
 export const SUBTITLE = "Makro & Scalp · Entscheidungen, Win-Rate, Backtest";
 export const HEADER_CTA = "Trade eintragen";
+export const MENU_LABEL = "Navigation öffnen";
 
 const MODE_TONE: Record<StoreMode, StatusTone> = { cloud: "live", local: "warn", error: "error", connecting: "muted" };
 
@@ -71,9 +76,64 @@ function HeaderEdge() {
   );
 }
 
+/** Pure: header position for the intro phase – parked above the edge while the stage covers the app, else in place. */
+export function headerIntroTarget(phase: IntroPhase): { y: string; opacity: number } {
+  return phase === "stage" ? { y: "-110%", opacity: 0 } : { y: "0%", opacity: 1 };
+}
+
 /**
- * Sticky app header (Plan 2.5 "Header", 6.6): logo tile `₿` → overview (3D flip on hover, press squash), `SplitText`
- * wordmark (once per session), subtitle, live market ticker, sync pill (`hidden md:inline-flex`), Magnetic →
+ * Wordmark: dancing letters on hover (hover devices, pack `dancing-letters`, off while an intro runs); `decode` > 0
+ * swaps in the ASCII cascade (pack `text-ascii-cascade`) for one play – after the intro stage when the click replayed
+ * the intro – then the dancing word comes back. Exactly one
+ * of the two is mounted, so the real text "Trade Journal" exists once (sr-only). The subtitle below fades out while
+ * the cascade's glyphs fall past it (they never overlap readable text), and back in on the resolve.
+ */
+function Wordmark({ decode, onDecoded }: { decode: number; onDecoded: () => void }) {
+  const settled = useIntroSettled();
+  const phase = useIntroPhase();
+  // a replayed intro covers the header first: the decode waits for the "build", when the header slides back in
+  const decoding = decode > 0 && phase !== "stage";
+  return (
+    <span className="min-w-0">
+      <span className="hidden text-[15px] font-semibold leading-snug tracking-tight sm:block">
+        {decoding ? <AsciiCascade key={decode} text={WORDMARK} onDone={onDecoded} /> : <DancingLetters text={WORDMARK} disabled={!settled} />}
+      </span>
+      <span
+        className="hidden truncate text-[11px] text-faint transition-opacity sm:block"
+        style={{ opacity: decoding ? 0 : 1, transitionDuration: `${(decoding ? tween.exit : tween.fade).duration}s` }}
+      >
+        {SUBTITLE}
+      </span>
+    </span>
+  );
+}
+
+/** Three short bars (pack hamburger, Nothing grey); opens the full-screen command navigation (⌘K / Ctrl+K). */
+function MenuButton() {
+  const open = useCommandNavOpen();
+  return (
+    <button
+      type="button"
+      onClick={() => openCommandNav()}
+      aria-label={MENU_LABEL}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-controls={open ? COMMAND_NAV_ID : undefined}
+      title="Navigation (⌘K / Strg+K)"
+      className="group/menu relative grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
+    >
+      <span aria-hidden="true" className="flex w-4 flex-col gap-[3px]">
+        <span className="h-px w-full bg-current transition-transform duration-200 ease-out group-hover/menu:translate-x-[2px]" />
+        <span className="h-px w-full bg-current" />
+        <span className="h-px w-2/3 bg-current transition-transform duration-200 ease-out group-hover/menu:translate-x-[3px]" />
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Sticky app header (Plan 2.5 "Header", 6.6): logo tile `₿` → overview + ASCII-cascade decode of the wordmark +
+ * `replayIntro()` (3D flip on hover, press squash), dancing-letters wordmark, subtitle, command-nav menu button, live market ticker, sync pill (`hidden md:inline-flex`), Magnetic →
  * `.shiny-cta` `Trade eintragen` (label `max-sm:sr-only`) opening the editor without a morph source. Scroll-linked
  * hairline / shade (edge blur off, `TOP_BANDS`) and the red reading-progress bar sit on its bottom edge.
  */
@@ -81,13 +141,27 @@ export function Header() {
   const mode = useJournal((s) => s.mode);
   const openEditor = useUi((s) => s.openEditor);
   const reduced = useReducedFx();
+  const phase = useIntroPhase();
+  const [decode, setDecode] = useState(0);
   const label = MODE_LABELS[mode];
+  const onLogo = () => {
+    navigate("overview");
+    // the intro (when it may replay) switches to "stage" synchronously, so the decode below is held until "build"
+    replayIntro();
+    if (!reduced) setDecode((n) => n + 1);
+  };
   return (
-    <header className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-ink-900/[0.97]">
+    <motion.header
+      className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-ink-900/[0.97]"
+      initial={false}
+      animate={reduced ? { y: "0%", opacity: 1 } : headerIntroTarget(phase)}
+      // stage: parked at once (covered by the intro); build / skip / done: slides down on `spring.sheet`
+      transition={phase === "stage" ? { duration: 0 } : { y: spring.sheet, opacity: tween.fade }}
+    >
       <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-3 px-4 sm:px-6">
         <motion.button
           type="button"
-          onClick={() => navigate("overview")}
+          onClick={onLogo}
           className="flex min-w-0 items-center gap-3 text-left"
           aria-label="Übersicht"
           initial={false}
@@ -110,16 +184,14 @@ export function Header() {
               <span className="absolute right-1.5 top-1.5 size-1 rounded-full bg-signal" />
             </span>
           </motion.span>
-          <span className="min-w-0">
-            <SplitText text={WORDMARK} className="hidden text-[15px] font-semibold tracking-tight sm:inline-flex" />
-            <span className="hidden truncate text-[11px] text-faint sm:block">{SUBTITLE}</span>
-          </span>
+          <Wordmark decode={decode} onDecoded={() => setDecode(0)} />
         </motion.button>
         <div className="flex shrink-0 items-center gap-3">
           <HeaderTicker />
           <span className="hidden md:inline-flex" title={label.text}>
             <StatusPill tone={MODE_TONE[mode]} expanded label={label.text} feed="sync" />
           </span>
+          <MenuButton />
           <Magnetic intensity={0.25} range={120}>
             <button type="button" onClick={() => openEditor()} className="shiny-cta inline-flex items-center gap-2 max-sm:!px-3">
               <span className="size-3.5 [&>svg]:size-full" aria-hidden="true">
@@ -131,6 +203,6 @@ export function Header() {
         </div>
       </div>
       <HeaderEdge />
-    </header>
+    </motion.header>
   );
 }

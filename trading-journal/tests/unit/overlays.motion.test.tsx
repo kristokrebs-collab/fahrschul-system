@@ -148,7 +148,7 @@ describe("TradeEditor motion", () => {
   const input = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
   const type = (label: string, value: string) => fireEvent.change(input(label), { target: { value } });
 
-  it("a refused save marks the offending field until it is edited", () => {
+  it("a refused save marks the offending field until it is edited", async () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
     const alert = screen.getByRole("alert");
@@ -159,7 +159,8 @@ describe("TradeEditor motion", () => {
     type("Einstieg", "80000");
     expect(input("Einstieg")).not.toHaveAttribute("aria-invalid");
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
-    expect(screen.getByRole("alert")).toHaveTextContent(EDITOR_MESSAGES.exit);
+    // the old message leaves first, then the new one comes in (never two messages drawn over each other)
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(EDITOR_MESSAGES.exit));
     expect(input("Ausstieg")).toHaveAttribute("aria-invalid", "true");
   });
 
@@ -226,10 +227,14 @@ describe("TradeDetail hold-to-delete", () => {
       </MotionRoot>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
+    // the actions leave first, then the confirmation pops in (sequenced swap, TR-06); focus lands on `Nein`
+    const no = await screen.findByRole("button", { name: "Nein" });
     expect(screen.getByText("Wirklich löschen?")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Nein" }));
+    await waitFor(() => expect(document.activeElement).toBe(no));
+    fireEvent.click(no);
 
-    const del = screen.getByRole("button", { name: "Löschen" });
+    const del = await screen.findByRole("button", { name: "Löschen" });
+    await waitFor(() => expect(document.activeElement).toBe(del));
     expect(del).toHaveAttribute("data-state", "idle");
     fireEvent.pointerDown(del, { button: 0 });
     expect(del).toHaveAttribute("data-state", "holding");

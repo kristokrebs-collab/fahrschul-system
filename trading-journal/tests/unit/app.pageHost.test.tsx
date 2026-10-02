@@ -95,6 +95,19 @@ describe("PageHost", () => {
     await waitFor(() => expect(screen.queryByRole("heading", { name: "trades" })).toBeNull());
   });
 
+  it("SH-02: the entering page stays invisible while the leaving page fades (never two pages over each other)", async () => {
+    const onT = vi.fn();
+    const { rerender } = render(host("overview", onT));
+    act(() => rerender(host("settings", onT)));
+    const entering = document.querySelector<HTMLElement>("[data-page='settings']");
+    expect(entering?.style.opacity).toBe("0");
+    await new Promise((r) => setTimeout(r, 60));
+    // halfway through the 120 ms exit: the new page has not started to fade in
+    expect(Number(entering?.style.opacity || 0)).toBe(0);
+    await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
+    expect(entering?.style.opacity).toBe("");
+  });
+
   it("ends every switch at transform/filter none (no containing block for fixed ghosts)", async () => {
     const onT = vi.fn();
     const { rerender } = render(host("overview", onT));

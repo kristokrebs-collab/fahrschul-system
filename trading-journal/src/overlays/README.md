@@ -52,7 +52,9 @@ interface TradeEditorProps {
   keeps date (renewed)/pair/account/side/leverage/timeframe, scrolls the body to top and focuses `Einstieg`), `Speichern` (`type="submit" form="trade-form"`, `Speichert …` while saving).
 - **Toasts** go through `uiStore.pushToast` (kinds `success | error | info`); the shell renders them with `ToastIsland`
   (`src/app/toasts.ts`: `success → ok`, `error → error`, `signal`/`info → warn` glyph with the 2.8 s / 5.2 s `TOAST_MS` lifetime). The
-  store never auto-dismisses: the island counts the visible time (from the front of the queue, paused on hover / focus / drag).
+  store never auto-dismisses: the island counts the visible time (from the front of the queue, paused on hover / focus / drag). The island
+  floats above every overlay (`TOAST_Z` 95); a toast pushed while a Sheet / MorphDialog / TradeDetail is open takes the `top` lane
+  (overlays register via `useOverlayLane(open)` from `@/primitives/toastStore`), so `Speichern & neu` confirms visibly (TO-01).
 - Exports for reuse/tests: `defaultForm`, `formFromTrade`, `resetForNext`, `toRecord`, `validateRecord`, `livePriceInput`, `freshLivePrice`, `Section`, `LivePriceButton`,
   `EDITOR_MESSAGES`, `LIVE_PRICE_LABEL`, `LIVE_PRICE_CONFIRM_MS`, types `TradeFormStrings`, `TradeFormTyped`, `TradeRecord`.
 
@@ -75,7 +77,9 @@ interface TradeDetailProps {
   `Einstieg | Ausstieg (– open) | R | Bewegung`, facts `Stop | Ziel | Größe | Hebel | Gebühren | CRV`, setup chips, `Checkliste {checked}/{items}` + bar
   (`scaleX`, win when complete) + `CheckRow` discs ✓/✕/· (· for open trades), `Überzeugung | Plan befolgt | Gefühl`, `Warum` → reason, `Learning` → notes,
   `MiniTradeChart` slot, `Chart öffnen ↗` (`target=_blank rel=noreferrer`), buttons `Löschen` (inline `Wirklich löschen?` `Ja, löschen` / `Nein` → `deleteTrade`,
-  toast `Trade gelöscht`), `Schließen`, `Bearbeiten`.
+  toast `Trade gelöscht`), `Schließen`, `Bearbeiten`. The footer swaps actions ↔ confirmation in sequence (`confirmSwapMotion`,
+  `AnimatePresence mode="wait"`). `Bearbeiten` = `uiStore.editFromDetail(id)`: detail closes and editor opens in one update; the editor
+  sheet gets `handoff` (dim starts at the detail's level, panel enters after the detail's exit) – no bare page in between (TR-05).
 - `MiniTradeChart` is imported from `@/chart/MiniTradeChart` (mock that path in tests).
 
 ## Motion (premium pass)

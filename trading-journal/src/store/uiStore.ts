@@ -24,6 +24,8 @@ export interface EditorState {
   open: boolean;
   tradeId?: string;
   fromFab: boolean;
+  /** Opened by `Bearbeiten` in the trade detail, which leaves in the same commit (one shared dim, no bare page). */
+  fromDetail?: boolean;
 }
 export interface SetupEditorState {
   open: boolean;
@@ -142,6 +144,8 @@ export interface UiState extends UiPrefs {
   openDetail(id: string, source: Exclude<DetailSource, null>): void;
   closeDetail(): void;
   openEditor(opts?: { tradeId?: string; fromFab?: boolean }): void;
+  /** Detail → editor hand-off in ONE update: the detail closes while the editor opens over its fading dim. */
+  editFromDetail(tradeId: string): void;
   closeEditor(): void;
   openSetupEditor(opts?: { setupId?: string; fromTrade?: boolean }): void;
   closeSetupEditor(): void;
@@ -251,6 +255,7 @@ export const useUi = create<UiState>()((set, get) => ({
   },
   closeDetail: () => set({ detail: { id: null, source: null } }),
   openEditor: (opts = {}) => set({ editor: { open: true, tradeId: opts.tradeId, fromFab: opts.fromFab === true } }),
+  editFromDetail: (tradeId) => set({ detail: { id: null, source: null }, editor: { open: true, tradeId, fromFab: false, fromDetail: true } }),
   closeEditor: () =>
     set((s) => ({
       editor: { ...s.editor, open: false },

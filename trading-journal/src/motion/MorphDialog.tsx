@@ -2,9 +2,10 @@ import { AnimatePresence, motion, type Variants } from "motion/react";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDialogBehaviour } from "@/motion/a11y";
-import { STAGGER_HIDDEN, STAGGER_SHOWN, withSectionStagger } from "@/motion/Stagger";
+import { STAGGER_HIDDEN, STAGGER_SHOWN, bodyRevealDelay, withSectionStagger } from "@/motion/Stagger";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { useOverlayLane } from "@/primitives/toastStore";
 
 export { StaggerItem } from "@/motion/Stagger";
 
@@ -18,19 +19,26 @@ export interface MorphDialogRequest {
   body: ReactNode | (() => ReactNode);
   /** Optional width override for the dialog column, default `max-w-[620px]`. */
   className?: string;
+  /**
+   * Set by pill sources (`MorphCard` with a pill radius): there is no title source to travel from, so the head fades in
+   * with the body instead of riding scale-corrected on a panel that is still pill-sized.
+   */
+  pill?: boolean;
 }
 
 interface MorphDialogState {
   open: MorphDialogRequest | null;
   /** id whose open morph has completed → its source is `visibility:hidden` (Plan 3.2 rule 9). */
   settled: string | null;
+  /** id whose dialog is closing and whose source has not reported its reverse morph back yet. */
+  closing: string | null;
   show: (req: MorphDialogRequest) => void;
   close: () => void;
   /** Called by the source `MorphCard` when its reverse morph has finished (releases inert + focus). */
   returned: (id: string) => void;
 }
 
-const Ctx = createContext<MorphDialogState>({ open: null, settled: null, show: () => {}, close: () => {}, returned: () => {} });
+const Ctx = createContext<MorphDialogState>({ open: null, settled: null, closing: null, show: () => {}, close: () => {}, returned: () => {} });
 
 /** `{ open, show, close }` – `show({ id, title, body })` opens the dialog morphing out of `MorphCard id`. */
 export function useMorphDialog(): MorphDialogState {
@@ -43,9 +51,16 @@ const CLOSE_GLYPH = (
   </svg>
 );
 
+/** Body (and a pill source's head) start revealing ≈ 65 % into the morph, no extra delay (OV-06). */
+export const MORPH_BODY_DELAY = bodyRevealDelay(spring.morph);
+const BODY_IN = { duration: 0.25, ease: tween.body.ease, delay: MORPH_BODY_DELAY };
 const BODY: Variants = {
   [STAGGER_HIDDEN]: { opacity: 0, y: 10 },
-  [STAGGER_SHOWN]: { opacity: 1, y: 0, transition: withSectionStagger(tween.body, tween.body.delay) },
+  [STAGGER_SHOWN]: { opacity: 1, y: 0, transition: withSectionStagger(BODY_IN, MORPH_BODY_DELAY) },
+};
+const HEAD: Variants = {
+  [STAGGER_HIDDEN]: { opacity: 0 },
+  [STAGGER_SHOWN]: { opacity: 1, transition: BODY_IN },
 };
 
 /**
@@ -58,6 +73,10 @@ const BODY: Variants = {
  * Paint budget: the 90-px drop shadow lives on an unscaled sibling of the panel and only fades in once the morph
  * has settled, so the per-frame radius correction repaints the panel alone. `inert` and the focus return wait
  * for the morph (open) / the source's reverse morph (close).
+ *
+ * Fluidity (OV-04/05/06): the panel is opaque from its first frame (`layoutCrossfade={false}` – the source hides the
+ * moment the panel takes over, nothing shows through a half-transparent pair); the body starts revealing at ≈ 65 % of
+ * the morph (`MORPH_BODY_DELAY`); the backdrop fades on `tween.fade`, in step with the panel.
  */
 export function MorphDialogProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState<MorphDialogRequest | null>(null);
@@ -90,7 +109,9 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
   const morphDone = open !== null && settled === open.id;
   useDialogBehaviour(panelRef, open !== null, close, { settled: open ? morphDone : closing === null });
 
-  const value = useMemo<MorphDialogState>(() => ({ open, settled, show, close, returned }), [open, settled, show, close, returned]);
+  useOverlayLane(open !== null);
+
+  const value = useMemo<MorphDialogState>(() => ({ open, settled, closing, show, close, returned }), [open, settled, closing, show, close, returned]);
 
   return (
     <Ctx.Provider value={value}>
@@ -134,10 +155,16 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                 aria-labelledby={titleId}
                 className="pointer-events-auto relative max-h-[86vh] w-full overflow-y-auto border border-line-2 bg-gradient-to-b from-ink-750 to-ink-800 outline-none"
                 style={{ borderRadius: radius.dialog }}
+                layoutCrossfade={false}
                 transition={{ layout: spring.morph }}
                 onLayoutAnimationComplete={() => setSettled(open.id)}
               >
-                <div className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-ink-750 via-ink-750/95 to-transparent px-6 pb-3 pt-5">
+                <motion.div
+                  className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-ink-750 via-ink-750/95 to-transparent px-6 pb-3 pt-5"
+                  variants={open.pill && !reduced ? HEAD : undefined}
+                  initial={STAGGER_HIDDEN}
+                  animate={STAGGER_SHOWN}
+                >
                   <motion.h2 id={titleId} layoutId={`morph-title-${open.id}`} layout="position" className="label !text-fg flex items-center gap-2">
                     <span className="size-1.5 rounded-full bg-signal" />
                     {open.title}
@@ -150,7 +177,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                   >
                     {CLOSE_GLYPH}
                   </button>
-                </div>
+                </motion.div>
                 <motion.div className="px-6 pb-6" variants={BODY} initial={STAGGER_HIDDEN} animate={STAGGER_SHOWN} exit={{ opacity: 0, transition: tween.exit }}>
                   {body}
                 </motion.div>

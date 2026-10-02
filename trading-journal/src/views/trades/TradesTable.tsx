@@ -3,6 +3,7 @@ import { AnimatePresence, frame, motion, useIsPresent, type TargetAndTransition,
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type PointerEvent, type RefObject } from "react";
 import type { EnrichedTrade, Setup } from "@/domain/types";
 import { cn } from "@/lib/cn";
+import { springSettleTime } from "@/motion/pulse/engine";
 import { isScrolling } from "@/motion/scrollGate";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -55,9 +56,37 @@ const ROW_EXIT_REDUCED: TargetAndTransition = { opacity: 0, transition: tween.ex
 const ROW_PRESS = { scale: 0.995 };
 const ROW_TRANSITION_REDUCED: Transition = { layout: spring.layout };
 
-/** `enterDelay`: 0 for the rows of a freshly shown list, `stagger.insert` for rows inserted while it is shown. */
-function rowTransition(i: number, enterDelay: number): Transition {
-  const delay = enterDelay + Math.min(i, stagger.max) * stagger.rows;
+/**
+ * Rows inserted into a shown list (a widened filter, a new trade) wait until their siblings' FLIP has settled
+ * (`spring.layout` within 1 %), so a surviving row never slides through a row that is already fading in (TR-03).
+ */
+export const INSERT_DELAY = Math.max(stagger.insert, Math.round(springSettleTime(spring.layout, 0.01) * 1000) / 1000);
+
+/**
+ * Holds an inserted row / card hidden for `INSERT_DELAY` (no-op for rows of a freshly shown list, `insert` is read at
+ * mount). The wait starts on the first animation frame after the commit – the same frame the siblings' layout springs
+ * start on – so a long first frame (the widened list mounting) can never let the insert fade in while the siblings
+ * are still gliding (a WAAPI `delay` would count from the commit, through the jank). Returns `true` while held.
+ */
+export function useInsertHold(insert: boolean): boolean {
+  const [held, setHeld] = useState(insert);
+  useEffect(() => {
+    if (!held) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const raf = requestAnimationFrame(() => {
+      timer = setTimeout(() => setHeld(false), INSERT_DELAY * 1000);
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [held]);
+  return held;
+}
+
+/** Enter of the `i`-th row (staggered); inserted rows are additionally held by `useInsertHold`. */
+function rowTransition(i: number): Transition {
+  const delay = Math.min(i, stagger.max) * stagger.rows;
   return { layout: spring.layout, opacity: { ...tween.fade, delay }, y: { ...spring.enter, delay }, x: spring.enter, scale: spring.press };
 }
 
@@ -72,7 +101,8 @@ function rowTransition(i: number, enterDelay: number): Transition {
  *   remaining rows glide shut (the settle tick feeds their `layoutDependency`).
  * - The rows are transparent, so they must never slide through each other: a sort (a pure permutation) re-keys the
  *   `AnimatePresence` – the rows remount in their new order and re-run the staggered enter instead of FLIP-crossing –
- *   and rows inserted into the shown list (a widened filter) wait `stagger.insert` so their siblings make room first.
+ *   and rows inserted into the shown list (a widened filter) wait `INSERT_DELAY` so their siblings make room first.
+ *   The height change itself is animated by the card body's `AutoHeight` (TR-03).
  * - One `RowHighlight` glides between hovered/focused rows; rows dip to `.995` on press.
  * - Sort headers carry a rotating chevron that slides between columns (`layoutId="sort-indicator-{useId}"`).
  * - Rule 13: the detail morph runs over an absolutely positioned ghost `motion.div layoutId="trade-{id}"` measured with
@@ -136,7 +166,7 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
     const id = requestAnimationFrame(() => setReadyGroup(groupKey));
     return () => cancelAnimationFrame(id);
   }, [groupKey]);
-  const enterDelay = readyGroup === groupKey ? stagger.insert : 0;
+  const inserting = readyGroup === groupKey;
 
   const showGhost = ghost != null && detail.source === "table" && detail.id === ghost.id;
 
@@ -210,7 +240,7 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
         <tbody data-trade-list="" onPointerLeave={() => highlight.current?.hover(null)}>
           <AnimatePresence key={groupKey} onExitComplete={onExitComplete}>
             {table.getRowModel().rows.map((row, i) => (
-              <TradeRow key={row.id} row={row} index={i} enterDelay={enterDelay} layoutKey={rowLayoutKey} reduced={reduced} onActivate={activate} highlight={highlight} />
+              <TradeRow key={row.id} row={row} index={i} insert={inserting} layoutKey={rowLayoutKey} reduced={reduced} onActivate={activate} highlight={highlight} />
             ))}
           </AnimatePresence>
         </tbody>
@@ -237,8 +267,8 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
 interface TradeRowProps {
   row: Row<EnrichedTrade>;
   index: number;
-  /** Base delay of this row's enter (only read at mount): 0 in a fresh list, `stagger.insert` for an insert. */
-  enterDelay: number;
+  /** Mounted into a list that was already shown (read at mount): held by `useInsertHold` before it enters. */
+  insert: boolean;
   layoutKey: string;
   reduced: boolean;
   onActivate: (id: string, el: HTMLElement) => void;
@@ -258,16 +288,17 @@ function isFocusVisible(el: Element): boolean {
  * trade, position or layout key change. While exiting it leaves the tab order and hit-testing at once
  * (`tbody tr[tabindex='0']` counts present rows only).
  */
-const TradeRow = memo(function TradeRow({ row, index, enterDelay, layoutKey, reduced, onActivate, highlight }: TradeRowProps) {
+const TradeRow = memo(function TradeRow({ row, index, insert, layoutKey, reduced, onActivate, highlight }: TradeRowProps) {
   const present = useIsPresent();
+  const held = useInsertHold(insert && !reduced);
   return (
     <motion.tr
       layout="position"
       layoutDependency={layoutKey}
       initial={reduced ? false : ROW_FROM}
-      animate={ROW_SHOWN}
+      animate={held ? ROW_FROM : ROW_SHOWN}
       exit={reduced ? ROW_EXIT_REDUCED : ROW_EXIT}
-      transition={reduced ? ROW_TRANSITION_REDUCED : rowTransition(index, enterDelay)}
+      transition={reduced ? ROW_TRANSITION_REDUCED : rowTransition(index)}
       whileTap={present && !reduced ? ROW_PRESS : undefined}
       tabIndex={present ? 0 : -1}
       inert={!present || undefined}

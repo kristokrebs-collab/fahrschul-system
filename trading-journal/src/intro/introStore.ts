@@ -9,6 +9,11 @@ import { createContext, useContext, useSyncExternalStore } from "react";
  */
 export type IntroPhase = "off" | "stage" | "build" | "done";
 
+/** sessionStorage flag: set when the intro starts (and by the e2e / perf harness to keep the intro out). */
+export const INTRO_KEY = "tj2-intro";
+/** localStorage switch: "off" disables the intro at start (Settings "Intro beim Start abspielen"). */
+export const INTRO_PREF_KEY = "tj2-ui-intro";
+
 type Listener = () => void;
 const listeners = new Set<Listener>();
 let phase: IntroPhase = "off";
@@ -60,4 +65,24 @@ export const IntroLandContext = createContext(true);
 
 export function useIntroLanded(): boolean {
   return useContext(IntroLandContext);
+}
+
+/**
+ * true when first-view effects may start: the surrounding intro cell has landed and the full-screen stage is not
+ * covering the app. Always true while the intro is "off" (no intro this session), so behaviour is then unchanged.
+ */
+export function useIntroGate(): boolean {
+  const landed = useIntroLanded();
+  // subscribes to the boolean only: build → done re-renders none of the (many) gated first-view consumers
+  const covered = useSyncExternalStore(subscribe, isStage, isStage);
+  return !covered && landed;
+}
+
+const isStage = () => phase === "stage";
+
+/** true while the surrounding intro cell is carried into place by the build beat (its own entrance replaces reveals). */
+export const IntroFlightContext = createContext(false);
+
+export function useIntroFlown(): boolean {
+  return useContext(IntroFlightContext);
 }

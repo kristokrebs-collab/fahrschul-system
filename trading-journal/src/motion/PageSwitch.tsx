@@ -6,7 +6,9 @@ import { useReducedFx } from "@/motion/useReducedFx";
 
 // x/scale on the critically damped `spring.enter` (settles ≈ 0.42 s): the switch – and with it `transitioning`,
 // which locks the trade detail – is over well inside the 600 ms budget
-const ENTER_TRANSITION: Transition = { x: spring.enter, scale: spring.enter, opacity: tween.page, filter: tween.page };
+// opacity/blur wait for the exit (SH-02: the two pages are never visible over each other); x/scale start at once
+const ENTER_FADE: Transition = { ...tween.page, delay: tween.exit.duration };
+const ENTER_TRANSITION: Transition = { x: spring.enter, scale: spring.enter, opacity: ENTER_FADE, filter: ENTER_FADE };
 
 /**
  * `depth`: the entering page also comes up from scale .985 + blur 4px (a "focus pull"); off under reduced motion,

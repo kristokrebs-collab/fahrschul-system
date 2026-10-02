@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { LeadFill } from "./LeadFill";
 
 export interface PageHeaderProps {
   title: string;
@@ -14,11 +15,15 @@ export interface PageHeaderProps {
   count?: number;
   /** Unit after the count (visible and in the pill's accessible label), e.g. `n => n === 1 ? "Grundlage" : "Grundlagen"`. */
   countUnit?: (n: number) => string;
+  /** Subtitle recipe (`LeadFill`): pixel fill once per session (`storageKey`), then the marker on `highlight`. */
+  leadFill?: { storageKey: string; highlight?: string };
   className?: string;
 }
 
 // px, not em: a unit change (em → 0) would make motion measure every word before animating
 const WORD_FROM = { opacity: 0, y: 10, filter: "blur(4px)" };
+/** The ember starts once the lead has faded in. */
+const FILL_AFTER_LEAD_S = 0.25;
 const WORD_TO = { opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter: "none" } };
 
 /**
@@ -29,8 +34,9 @@ const WORD_TO = { opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter
  * y on `spring.enter`, opacity/blur on `tween.reveal`), the signal dot pops (`spring.pop`) and sends out one ring
  * (`tween.ripple`), the lead follows. Everything ends at `transform: none` / `filter: none`. Reduced motion: static.
  * The `h1`'s text stays the plain title (word spans, real spaces), so its accessible name never changes.
+ * With `leadFill` the lead is the pulse subtitle recipe (`LeadFill`: pixel fill once per session, then a marker).
  */
-export function PageHeader({ title, lead, action, count, countUnit, className }: PageHeaderProps) {
+export function PageHeader({ title, lead, action, count, countUnit, leadFill, className }: PageHeaderProps) {
   const reduced = useReducedFx();
   const words = title.split(" ");
   // same beat as the trades PageHeader: the first word starts with the page enter
@@ -83,14 +89,18 @@ export function PageHeader({ title, lead, action, count, countUnit, className }:
             </motion.span>
           )}
         </div>
-        <motion.p
+        <motion.div
           className="mt-1 max-w-[62ch] text-[13.5px] text-mute"
           initial={reduced ? false : { opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ default: { ...tween.reveal, delay: wordDelay(words.length) }, y: { ...spring.enter, delay: wordDelay(words.length) } }}
         >
-          {lead}
-        </motion.p>
+          {leadFill ? (
+            <LeadFill text={lead} storageKey={leadFill.storageKey} highlight={leadFill.highlight} delayMs={Math.round((wordDelay(words.length) + FILL_AFTER_LEAD_S) * 1000)} />
+          ) : (
+            <p>{lead}</p>
+          )}
+        </motion.div>
       </div>
       {action}
     </div>

@@ -2,10 +2,11 @@ import { AnimatePresence, motion, type HTMLMotionProps, type PanInfo, type Varia
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDialogBehaviour } from "@/motion/a11y";
-import { STAGGER_HIDDEN, STAGGER_SHOWN, sectionDelay, withSectionStagger } from "@/motion/Stagger";
+import { STAGGER_HIDDEN, STAGGER_SHOWN, bodyRevealDelay, sectionDelay, withSectionStagger } from "@/motion/Stagger";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useIsDesktop } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { useOverlayLane } from "@/primitives/toastStore";
 
 export { StaggerItem } from "@/motion/Stagger";
 
@@ -24,22 +25,28 @@ export interface SheetProps {
   /** Body content. Wrap its top-level sections in `StaggerItem` to cascade them in (`stagger.sections`). */
   children: ReactNode;
   className?: string;
-  /** Called after the open morph (layoutId) has finished – the body (laid out at once, hidden and inert) fades in then. */
+  /** Called once the morphed body is revealed (≈ 65 % into the layoutId morph). */
   onOpened?: () => void;
+  /**
+   * Hand-off from another overlay that is still leaving (detail → editor): the backdrop starts at this opacity instead
+   * of 0 (the leaving overlay's dim level, so the page never brightens in between) and the panel waits `enterDelay`
+   * seconds (the leaving panel's exit) before it enters.
+   */
+  handoff?: { backdropFrom: number; enterDelay: number };
 }
 
 const DISMISS_OFFSET = 120;
 const DISMISS_VELOCITY = 800;
-/** Safety net: the body is revealed at the latest after this delay even when no layout animation ran (no source in the DOM). */
-const MORPH_FALLBACK_MS = 600;
+/** The morphed body starts revealing ≈ 65 % into the morph (OV-06): never a blank panel landing, never a body over a small one. */
+const BODY_REVEAL_MS = bodyRevealDelay(spring.sheet) * 1000;
 
 const SHADOW = "shadow-[0_30px_80px_rgb(0_0_0/0.6)]";
 const WIDTH: Record<NonNullable<SheetProps["size"]>, string> = { md: "sm:max-w-[540px]", lg: "sm:max-w-[860px]" };
 
-/** Morph body: fades up after the morph and cascades its `StaggerItem`s. */
+/** Morph body: fades up from ≈ 65 % of the morph (no extra delay) and cascades its `StaggerItem`s. */
 const BODY_MORPH: Variants = {
   [STAGGER_HIDDEN]: { opacity: 0, y: 8 },
-  [STAGGER_SHOWN]: { opacity: 1, y: 0, transition: withSectionStagger(tween.sheetBody) },
+  [STAGGER_SHOWN]: { opacity: 1, y: 0, transition: withSectionStagger({ duration: 0.25, ease: tween.sheetBody.ease }) },
 };
 /**
  * Slide-in body: the panel itself moves, the body only orchestrates its `StaggerItem`s – they start a beat
@@ -62,7 +69,9 @@ interface Readiness {
  * Bottom sheet on mobile / centred dialog from `sm` (Bundle `Y$`, Plan 2.5 "Sheet"). Portal-less,
  * with focus trap + scroll lock + inert siblings + Escape/overlay close. With `layoutId` the panel
  * morphs out of its source (FAB, setup card) on `spring.sheet` straight to its final box: the body is laid out at
- * once (hidden and inert) and fades in after `onLayoutAnimationComplete` (`tween.sheetBody`); otherwise desktop
+ * once (hidden and inert) and fades in ≈ 65 % into the morph (`bodyRevealDelay`, or `onLayoutAnimationComplete` if
+ * that comes first); the dim layer fades with the panel (never the wrapper, so the panel is opaque from frame 1);
+ * otherwise desktop
  * `{y:40,opacity:0,scale:.98}`
  * on `spring.sheet`, mobile `y:100%→0` on `tween.sheetIos` with drag-to-dismiss
  * (`offset.y > 120 || velocity.y > 800`). Body sections wrapped in `StaggerItem` cascade in.
@@ -72,7 +81,7 @@ interface Readiness {
  * lifted – with the focus return – after the exit. `layoutRoot` sits on the fixed overlay, never on the morphing
  * panel (Motion forces a layoutRoot node's own layout animation to `type: false`, which killed the morph).
  */
-export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra, footer, children, className, onOpened }: SheetProps) {
+export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra, footer, children, className, onOpened, handoff }: SheetProps) {
   const desktop = useIsDesktop();
   const reduced = useReducedFx();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -94,7 +103,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
   }, [onOpened]);
   useEffect(() => {
     if (!open || bodyReady) return;
-    const t = setTimeout(() => setReadiness((r) => (r.ready ? r : { ...r, ready: true })), MORPH_FALLBACK_MS);
+    const t = setTimeout(() => setReadiness((r) => (r.ready ? r : { ...r, ready: true })), BODY_REVEAL_MS);
     return () => clearTimeout(t);
   }, [open, bodyReady]);
   useEffect(() => {
@@ -102,16 +111,23 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
   }, [open, bodyReady, morph]);
 
   useDialogBehaviour(panelRef, open, onClose, { settled: open ? bodyReady : !readiness.exiting });
+  useOverlayLane(open);
+  const enterDelay = handoff && !reduced ? handoff.enterDelay : 0;
 
   const onDragEnd = (_: unknown, info: PanInfo) => {
     if (info.offset.y > DISMISS_OFFSET || info.velocity.y > DISMISS_VELOCITY) onClose();
   };
 
   const enterExit: HTMLMotionProps<"div"> = morph
-    ? { transition: { layout: spring.sheet } }
+    ? { exit: { opacity: 0, scale: 0.98, transition: tween.exit }, transition: { layout: spring.sheet } }
     : desktop
-      ? { initial: { y: 40, opacity: 0, scale: 0.98 }, animate: { y: 0, opacity: 1, scale: 1 }, exit: { y: 30, opacity: 0, scale: 0.98, transition: tween.exit }, transition: spring.sheet }
-      : { initial: { y: "100%" }, animate: { y: 0 }, exit: { y: "100%", transition: tween.sheetIos }, transition: tween.sheetIos };
+      ? {
+          initial: { y: 40, opacity: 0, scale: 0.98 },
+          animate: { y: 0, opacity: 1, scale: 1 },
+          exit: { y: 30, opacity: 0, scale: 0.98, transition: tween.exit },
+          transition: { ...spring.sheet, delay: enterDelay, opacity: { ...tween.fade, delay: enterDelay } },
+        }
+      : { initial: { y: "100%" }, animate: { y: 0 }, exit: { y: "100%", transition: tween.sheetIos }, transition: { ...tween.sheetIos, delay: enterDelay } };
   const dragProps: HTMLMotionProps<"div"> = desktop
     ? {}
     : { drag: "y", dragConstraints: { top: 0, bottom: 0 }, dragElastic: 0.05, dragSnapToOrigin: true, onDragEnd };
@@ -119,18 +135,24 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
   return (
     <AnimatePresence onExitComplete={() => setReadiness((r) => (r.exiting ? { ...r, exiting: false } : r))}>
       {open && (
+        // the wrapper itself never fades (a fading parent would make the morphing panel translucent, OV-04): the dim
+        // layer is a decorative sibling under the panel that fades with it; the wrapper stays the close target
         <motion.div
           key="overlay"
           layoutRoot
-          className="fixed inset-0 z-[60] grid items-end justify-items-center bg-ink-950/80 sm:place-items-center sm:p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: tween.exit }}
-          transition={tween.fade}
+          className="fixed inset-0 z-[60] grid items-end justify-items-center sm:place-items-center sm:p-4"
           onPointerDown={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
         >
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-ink-950/80"
+            initial={{ opacity: handoff && !reduced ? handoff.backdropFrom : 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: tween.exit }}
+            transition={tween.fade}
+          />
           {/* `min-h-0` is load-bearing: as a grid item with `overflow: visible` the column's automatic minimum height
               would be its full content height, which stretches the overlay's single row past the viewport – the
               percentage max-height then resolves against that oversized row and the footer ends up off-screen. */}
@@ -162,9 +184,17 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
               )}
               {...enterExit}
               {...dragProps}
+              // opaque from the first frame: the source hides when the panel takes over instead of both crossfading
+              layoutCrossfade={morph ? false : undefined}
               onLayoutAnimationComplete={morph ? setBodyReady : undefined}
             >
-              <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
+              <motion.div
+                className="flex items-center justify-between gap-3 border-b border-line px-6 py-4"
+                // a morphing panel starts at the source's size: head and footer (not scale-corrected) appear with the body
+                initial={morph ? { opacity: 0 } : false}
+                animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
+                transition={tween.fade}
+              >
                 <h2 id={titleId} className="text-[17px] font-semibold">
                   {title}
                 </h2>
@@ -181,14 +211,19 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                     </svg>
                   </button>
                 </div>
-              </div>
+              </motion.div>
               <SheetBody morph={morph} ready={bodyReady}>
                 {children}
               </SheetBody>
               {footer && (
-                <div className="flex flex-wrap items-center gap-2.5 border-t border-line bg-ink-900/60 px-6 py-3.5 pb-[calc(14px+env(safe-area-inset-bottom,0px))]">
+                <motion.div
+                  className="flex flex-wrap items-center gap-2.5 border-t border-line bg-ink-900/60 px-6 py-3.5 pb-[calc(14px+env(safe-area-inset-bottom,0px))]"
+                  initial={morph ? { opacity: 0 } : false}
+                  animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
+                  transition={tween.fade}
+                >
                   {footer}
-                </div>
+                </motion.div>
               )}
             </motion.div>
           </div>

@@ -3,7 +3,7 @@
  * (Plan 5.1–5.6). Creates the chart once (StrictMode-safe), `setData` per history load (newer bars on the right are
  * appended in place instead), a live forming candle that moves with every trade (`liveCandle.ts`), a DOM price pulse,
  * price lines + zone for `levels`, trade markers with a new-trade ripple, optional ratio/OI pane, range morph,
- * interval / pane crossfade, a "Folgen" pill away from the live edge, spring tooltip and a skeleton → entrance.
+ * interval strip wipe / pane crossfade, a "Folgen" pill away from the live edge, spring tooltip and a skeleton → entrance.
  */
 import { memo, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { AnimatePresence, animate, motion, useReducedMotion, type MotionValue } from "motion/react";
@@ -21,6 +21,7 @@ import {
 import type { Candle, OpenInterestPoint, RatioPoint } from "@/market/types";
 import type { MarketLevels } from "@/domain/types";
 import { observeInView } from "@/motion/inView";
+import { playStripWipe } from "@/motion/pulse/StripWipe";
 import { tween } from "@/motion/tokens";
 import { cn } from "@/lib/cn";
 import { CHART_FONT, CHART_FONT_LOAD, CHART_PRICE_MIN_MOVE, CHART_RIGHT_OFFSET, NOTHING_DARK, ink } from "./theme";
@@ -153,6 +154,8 @@ interface Instance {
   pane: PaneKind | null;
   fontReady: Promise<void>;
   overlay: HTMLCanvasElement | null;
+  /** cancels a running interval strip wipe (removes its overlay) */
+  cancelWipe: (() => void) | null;
   /** host size from a ResizeObserver (tooltip bounds without a layout read per move) */
   size: { width: number; height: number };
   /** ready, on screen and not collapsed */
@@ -221,9 +224,60 @@ function pointInPane(i: Instance, time: Time, price: number): PulsePoint | null 
   return x >= 0 && x <= ts.width() && y >= 0 && y <= height ? { x, y } : null;
 }
 
-/** Screenshot of the current canvas faded out on top of the new state (interval or pane switch). */
+/** First opaque background colour behind `el` (one style read per wipe). */
+function surfaceColor(el: HTMLElement): string {
+  for (let n: HTMLElement | null = el; n; n = n.parentElement) {
+    const c = getComputedStyle(n).backgroundColor;
+    if (c && c !== "transparent" && !/rgba\([^)]*,\s*0\)$/.test(c)) return c;
+  }
+  return "#0a0a0a";
+}
+
+/**
+ * The chart canvas is transparent (the card shows through): a strip of the OLD chart must hide the new one beneath it,
+ * so the snapshot gets the card surface painted under it.
+ */
+function opaque(snap: HTMLCanvasElement, wrap: HTMLElement): HTMLCanvasElement {
+  const out = document.createElement("canvas");
+  out.width = snap.width;
+  out.height = snap.height;
+  const ctx = out.getContext("2d");
+  if (!ctx) return snap;
+  ctx.fillStyle = surfaceColor(wrap);
+  ctx.fillRect(0, 0, out.width, out.height);
+  ctx.drawImage(snap, 0, 0);
+  return out;
+}
+
+/**
+ * Interval switch (pulse `parallax-strip-slider`): the old chart, as a screenshot over the new one, gives way in 10
+ * vertical strips left → right, so the new interval grows in strip by strip. Compositor-only; a new switch cancels
+ * the running wipe.
+ */
+function stripWipe(i: Instance, wrap: HTMLElement | null): void {
+  if (!wrap) return;
+  i.cancelWipe?.();
+  i.cancelWipe = null;
+  i.overlay?.remove();
+  i.overlay = null;
+  try {
+    const snap = opaque(i.chart.takeScreenshot(true, false), wrap);
+    snap.setAttribute("aria-hidden", "true");
+    i.cancelWipe = playStripWipe(wrap, snap, {
+      onDone: () => {
+        i.cancelWipe = null;
+      },
+    });
+  } catch {
+    /* screenshot unavailable (e.g. tainted canvas) */
+  }
+}
+
+/** Screenshot of the current canvas faded out on top of the new state (sub-pane switch). */
 function crossfade(i: Instance, wrap: HTMLElement | null): void {
   if (!wrap) return;
+  i.cancelWipe?.();
+  i.cancelWipe = null;
   try {
     const snap = i.chart.takeScreenshot(true, false);
     snap.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5";
@@ -347,6 +401,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       pane: null,
       fontReady: loadChartFont(),
       overlay: null,
+      cancelWipe: null,
       size: { width: 0, height: 0 },
       isActive,
       syncActive: () => {
@@ -448,6 +503,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       placeRaf = 0;
       live.dispose();
       instance.overlay?.remove();
+      instance.cancelWipe?.();
       range.dispose();
       markersApi.detach();
       clearLevels(main.candles, instance.levels);
@@ -460,7 +516,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     };
   }, []);
 
-  // 2. history → setData (once per array identity); newer bars on the right → live engine; interval → crossfade
+  // 2. history → setData (once per array identity); newer bars on the right → live engine; interval → strip wipe
   useEffect(() => {
     const i = inst.current;
     if (!i || candles.length === 0) return;
@@ -484,7 +540,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
 
       const prevRange = i.chart.timeScale().getVisibleLogicalRange();
       const prevFirst = i.data[0]?.time;
-      if (intervalChanged && readyRef.current && !reduceRef.current) crossfade(i, wrap.current);
+      if (intervalChanged && readyRef.current && !reduceRef.current) stripWipe(i, wrap.current);
 
       const volume = normalizeSeries(candles.map(toVolumeData));
       const last = data[data.length - 1];

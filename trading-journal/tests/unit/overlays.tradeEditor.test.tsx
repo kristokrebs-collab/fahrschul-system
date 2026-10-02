@@ -82,6 +82,33 @@ describe("TradeEditor – sheet", () => {
     expect(screen.queryByRole("button", { name: /Live-Preis/ })).not.toBeInTheDocument();
   });
 
+  it("Timeframe is a morph select: click the field, pick an option, the record carries it", async () => {
+    mount();
+    const tf = screen.getByLabelText("Timeframe");
+    expect(tf).toHaveAttribute("aria-haspopup", "listbox");
+    expect(tf).toHaveTextContent("–");
+    fireEvent.click(tf);
+    const list = screen.getByRole("listbox", { name: "Timeframe" });
+    fireEvent.click(within(list).getByRole("option", { name: "4h" }));
+    expect(tf).toHaveTextContent("4h");
+    expect(tf).toHaveAttribute("data-value", "4h");
+    type("Einstieg", "80000");
+    type("Ausstieg", "81000");
+    type("Größe (USDT)", "1000");
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
+    expect(saveTrade.mock.calls[0]?.[0].timeframe).toBe("4h");
+  });
+
+  it("opened from the detail (`Bearbeiten`), the sheet hands off: dim starts at the detail's level", () => {
+    useUi.setState({ editor: { open: true, tradeId: "A", fromFab: false, fromDetail: true } });
+    mount();
+    const dialog = screen.getByRole("dialog", { name: "Trade bearbeiten" });
+    const dim = dialog.closest(".fixed")?.querySelector<HTMLElement>(":scope > [aria-hidden='true']");
+    expect(dim).toBeTruthy();
+    expect(Number(dim!.style.opacity)).toBeGreaterThan(0.8);
+  });
+
   it("validates before saving and shows the error in the footer", () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
@@ -225,11 +252,11 @@ describe("TradeEditor – edit mode", () => {
   it("inline delete confirmation `Wirklich löschen?` → deletes, toasts `Trade gelöscht`", async () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
-    expect(screen.getByText("Wirklich löschen?")).toBeInTheDocument();
+    expect(await screen.findByText("Wirklich löschen?")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Nein" }));
-    expect(screen.queryByText("Wirklich löschen?")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
-    fireEvent.click(screen.getByRole("button", { name: "Ja, löschen" }));
+    await waitFor(() => expect(screen.queryByText("Wirklich löschen?")).not.toBeInTheDocument());
+    fireEvent.click(await screen.findByRole("button", { name: "Löschen" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ja, löschen" }));
     await waitFor(() => expect(deleteTrade).toHaveBeenCalledWith("A"));
     await waitFor(() => expect(useUi.getState().editor.open).toBe(false));
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Trade gelöscht");

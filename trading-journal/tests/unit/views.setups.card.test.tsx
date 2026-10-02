@@ -12,7 +12,7 @@ async function bootLocal() {
 }
 
 describe("SetupCard", () => {
-  it("renders colour dot, name, account badge, checklist, stats and the bar", () => {
+  it("renders colour dot, name, account badge, checklist, stats and the bar", async () => {
     const stats = {
       setup: { id: "s_x", name: "Test-Setup", account: "makro" as const, color: "#6f9dc9", desc: "", checklist: [{ id: "c1", text: "Punkt eins" }] },
       n: 4,
@@ -48,6 +48,8 @@ describe("SetupCard", () => {
     render(<SetupCard stats={stats as never} index={0} onEdit={onEdit} onTrades={onTrades} />);
     const card = screen.getByTestId("setup-card-s_x");
     expect(card.style.borderRadius).toBe("16px");
+    // morph source: an empty surface carries the layout id; notch frame + disc are present
+    expect(card.querySelector('[data-active], .pn-frame')).not.toBeNull();
     expect(within(card).getByRole("heading", { level: 3 })).toHaveTextContent("Test-Setup");
     expect(within(card).getByText("Makro")).toBeInTheDocument();
     expect(within(card).getByText(NO_RULES_TEXT)).toBeInTheDocument();
@@ -58,7 +60,9 @@ describe("SetupCard", () => {
     expect(within(card).getByLabelText("+1,25")).toBeInTheDocument(); // Ø R
     expect(within(card).getByRole("img", { name: "Win-Rate 75 %" })).toBeInTheDocument();
     fireEvent.click(within(card).getByRole("button", { name: "Bearbeiten" }));
-    expect(onEdit).toHaveBeenCalledWith("s_x");
+    // OV-07: the contents fade out first, the editor opens once they are gone
+    expect(onEdit).not.toHaveBeenCalled();
+    await waitFor(() => expect(onEdit).toHaveBeenCalledWith("s_x"));
     fireEvent.click(within(card).getByRole("button", { name: TRADES_BUTTON_LABEL }));
     expect(onTrades).toHaveBeenCalledWith("s_x");
   });
@@ -101,7 +105,9 @@ describe("SetupsView", () => {
     render(<SetupsView />);
     expect(screen.getByTestId("setup-card-s_m")).toBeInTheDocument();
     fireEvent.click(within(screen.getByTestId("setup-card-s_bo")).getByRole("button", { name: "Bearbeiten" }));
-    expect(useUi.getState().setupEditor).toEqual({ open: true, setupId: "s_bo", fromTrade: false });
+    await waitFor(() => expect(useUi.getState().setupEditor).toEqual({ open: true, setupId: "s_bo", fromTrade: false }));
+    // the card whose surface became the sheet keeps its slot but is inert and hidden from AT
+    await waitFor(() => expect(screen.getByTestId("setup-card-s_bo").querySelector("[inert]")).not.toBeNull());
     fireEvent.click(screen.getByRole("radio", { name: "Makro" }));
     await waitFor(() => expect(screen.queryByTestId("setup-card-s_bo")).toBeNull()); // popLayout exit
     expect(screen.getByTestId("setup-card-s_m")).toBeInTheDocument();

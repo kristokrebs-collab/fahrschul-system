@@ -1,9 +1,14 @@
 import { AnimatePresence, motion, useTransform } from "motion/react";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { checkGlyph, evaluateTrigger, LONG_IN_REACH_LABEL, LONG_INVALIDATION_LABEL, scenario, SHORT_IN_REACH_LABEL, TRIGGER_FOOTER, type CheckRow, type Scenario, type ScenarioTone } from "@/domain/trigger";
 import { cn } from "@/lib/cn";
 import { dateTime, n0, n1 } from "@/lib/format";
 import { priceMv, setBookTop, SOURCE_NAME, STRINGS } from "@/market";
+import { useIntroLanded } from "@/intro/introStore";
+import { canObserveInView, observeInView } from "@/motion/inView";
+import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
+import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
+import { TextMorph } from "@/motion/pulse/TextMorph";
 import { TextScramble } from "@/motion/TextScramble";
 import { TextShimmer } from "@/motion/TextShimmer";
 import { StatusPill } from "@/motion/StatusPill";
@@ -15,7 +20,7 @@ import { BorderBeam } from "@/primitives/BorderBeam";
 import { Skeleton } from "@/primitives/Skeleton";
 import { useJournal } from "@/store/journalStore";
 import { Bar } from "./Bar";
-import { ChangeChip, ConnectingPill, FundingBlock, LivePill, LivePrice, OrderFlow, PreviewLine, TriggerDistances } from "./MarketLive";
+import { ChangeChip, FundingBlock, LivePill, LivePrice, OrderFlow, PreviewLine, TriggerDistances } from "./MarketLive";
 import { orFallback, triggerFlagsKey } from "./marketMath";
 import { jumpFromUnknownPrice, useForceRefresh, useGlide, useMarketPanelView, usePriceClass } from "./useMarket";
 
@@ -77,19 +82,86 @@ interface ScenarioBoxProps {
   sc: Scenario;
   close4h: number | null;
   close4hAt: number | null;
-  /** count of scenario CHANGES since mount (0 = never changed → no sweep) */
+  /** count of scenario CHANGES since mount (0 = never changed → no sweep, no decode) */
   sweep: number;
 }
 
 /**
- * Scenario box: tone layers crossfade (`tween.crossfade`); the content swaps with a short y slide. On a scenario
- * change (never on mount) the new tone sweeps across the box (clip-path wipe, `tween.reveal`) and the title pops
- * (`spring.pop`). Reduced motion: crossfade only.
+ * Title split for the scenario choreography: `lead` decodes (AsciiCascade), `key` is the verdict key word (marker +
+ * gooey morph). Splits after the first comma (`Range,` · `kein Trigger`), else before the last word
+ * (`Long-Trigger` · `aktiv`, `Volles` · `Bär-Szenario`); a one-word title is all key.
+ */
+export function scenarioTitleParts(title: string): { lead: string; key: string } {
+  const comma = title.indexOf(", ");
+  if (comma > 0) return { lead: title.slice(0, comma + 1), key: title.slice(comma + 2) };
+  const space = title.lastIndexOf(" ");
+  if (space > 0) return { lead: title.slice(0, space), key: title.slice(space + 1) };
+  return { lead: "", key: title };
+}
+
+/** Keeps a marker (incl. its tab) inside the word's box (+ 3 px for the glow; nothing on the left, where the tab pops). */
+export const MARKER_CLIP = "inline-block [clip-path:inset(-3px_-3px_-3px_0)]";
+/** Marker wipe-out (τ 150 ms) is visually gone after ~2 τ: then the key word starts its morph. */
+const KEY_SWAP_MS = 320;
+
+/** Fall depth of the title decode: the glyphs stay inside the free band above the detail line (no overlap). */
+const CASCADE_DROP = 0.5;
+/**
+ * The cascade's resolved layer is white by design; the scenario title keeps its tone colour, so the resolved (2nd)
+ * layer inherits it (the grey scramble layer and the white resolve glow stay as designed).
+ */
+const CASCADE_TONE = "[&>span:last-child>span:nth-child(2)]:![color:inherit]";
+
+/**
+ * Verdict key word of the scenario title: a marker (pulse `tactile-highlight`) wipes in the first time the box is
+ * seen (after the intro cell landed); on a scenario change it wipes out, the word morphs (pulse `text-morphing`) and
+ * the marker wipes back in once the change has `settled` (the lead's decode resolved, or the morph ended).
+ */
+function ScenarioKey({ text, settled, onMorphEnd, box }: { text: string; settled: boolean; onMorphEnd?: () => void; box: RefObject<HTMLElement | null> }) {
+  const landed = useIntroLanded();
+  const reduced = useReducedFx();
+  const [seen, setSeen] = useState(false);
+  // the word morphs only after the old marker has wiped out (else the bar stretches over the max(old, new) box)
+  const [shown, setShown] = useState(text);
+  useEffect(() => {
+    if (text === shown) return;
+    const id = setTimeout(() => setShown(text), reduced ? 0 : KEY_SWAP_MS);
+    return () => clearTimeout(id);
+  }, [text, shown, reduced]);
+  // without IntersectionObserver (jsdom, old engines) the marker counts as seen once the intro cell landed
+  const visible = landed && (seen || !canObserveInView());
+  useEffect(() => {
+    const el = box.current;
+    if (seen || !landed || !el || !canObserveInView()) return;
+    return observeInView(el, (inView) => {
+      if (inView) setSeen(true);
+    });
+  }, [seen, landed, box]);
+  // the marker's ~90 ms "tab" pops 1.38 em LEFT of the word – over the lead text; clipped to the word's own box
+  return (
+    <span className={MARKER_CLIP}>
+      <TactileHighlight active={visible && settled}>
+        <TextMorph text={shown} onMorphEnd={onMorphEnd} />
+      </TactileHighlight>
+    </span>
+  );
+}
+
+/**
+ * Scenario box: tone layers crossfade (`tween.crossfade`); the detail swaps with a short y slide. On a scenario
+ * change (never on mount) the new tone sweeps across the box (clip-path wipe, `tween.reveal`), the title's lead
+ * decodes (pulse `text-ascii-cascade`, falling only into the free band under it) and its key word morphs under a
+ * re-wiping marker (`ScenarioKey`). Reduced motion: crossfade only, text swaps at once.
  */
 const ScenarioBox = memo(function ScenarioBox({ sc, close4h, close4hAt, sweep }: ScenarioBoxProps) {
   const reduced = useReducedFx();
+  const box = useRef<HTMLDivElement>(null);
+  const { lead, key } = scenarioTitleParts(sc.title);
+  // the marker returns when the change has played out: at the decode's resolve frame (one-word titles: morph end)
+  const [settled, setSettled] = useState(sweep);
+  const settle = useCallback(() => setSettled(sweep), [sweep]);
   return (
-    <div className="relative rounded-xl border border-transparent p-3.5" data-testid="scenario-box">
+    <div ref={box} className="relative rounded-xl border border-transparent p-3.5" data-testid="scenario-box">
       {TONES.map((k) => (
         <motion.span
           key={k}
@@ -110,19 +182,19 @@ const ScenarioBox = memo(function ScenarioBox({ sc, close4h, close4hAt, sweep }:
           transition={{ clipPath: tween.reveal, opacity: { ...tween.flash, times: SWEEP_TIMES } }}
         />
       )}
+      <div className="relative flex items-start justify-between gap-2">
+        <strong data-scenario-title={sc.title} className={cn("min-w-0 text-[14px] font-semibold transition-colors duration-300", TONE_TITLE[sc.tone])}>
+          {lead && (
+            <>
+              <AsciiCascade text={lead} play={sweep} playOnMount={false} drop={CASCADE_DROP} className={CASCADE_TONE} onDone={settle} />{" "}
+            </>
+          )}
+          <ScenarioKey text={key} settled={settled === sweep} onMorphEnd={lead ? undefined : settle} box={box} />
+        </strong>
+        <span className="num shrink-0 font-mono text-xs leading-[21px] text-mute">4H {n0(close4h)}</span>
+      </div>
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.div key={sc.key} className="relative" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0, transition: spring.smooth }} exit={{ opacity: 0, y: -6, transition: tween.exit }}>
-          <div className="flex items-center justify-between gap-2">
-            <motion.strong
-              className={cn("origin-left text-[14px] font-semibold", TONE_TITLE[sc.tone])}
-              initial={{ scale: 0.92 }}
-              animate={{ scale: 1 }}
-              transition={spring.pop}
-            >
-              {sc.title}
-            </motion.strong>
-            <span className="num font-mono text-xs text-mute">4H {n0(close4h)}</span>
-          </div>
           <p className="mt-1 text-[12.5px] leading-relaxed text-mute">{sc.detail}</p>
           <p className="mt-1 text-[11px] text-faint">
             {TRIGGER_FOOTER}
@@ -211,10 +283,15 @@ export function MarketPanel() {
           </AnimatePresence>
           {live ? (
             <LivePill receivedAt={view.updatedAt} ringEndsAt={view.nextTickerRefreshAt} />
-          ) : connecting ? (
-            <ConnectingPill />
           ) : (
-            <StatusPill tone={view.status === "unavailable" ? "muted" : "error"} expanded label={STRINGS.noPrice} feed="markPrice" title={view.statusDetail} />
+            // one pill for every non-live state, so `Verbinde …` → `Kein Live-Kurs` morphs (grows first, never clips)
+            <StatusPill
+              tone={connecting || view.status === "unavailable" ? "muted" : "error"}
+              expanded
+              label={connecting ? STRINGS.connecting : STRINGS.noPrice}
+              feed="markPrice"
+              title={connecting ? undefined : view.statusDetail}
+            />
           )}
         </span>
       </div>

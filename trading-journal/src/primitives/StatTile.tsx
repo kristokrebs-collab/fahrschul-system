@@ -24,6 +24,8 @@ export interface StatTileProps {
   value: ReactNode;
   /** Static trailing node after the value (outside the roll), e.g. `+2 offen`. */
   suffix?: ReactNode;
+  /** Characters of `suffix` (incl. its leading space) – lets a string value + suffix fit the tile (`fitValue`). */
+  suffixLength?: number;
   verdict?: { tone: VerdictTone; text: string } | null;
   /** Hovered/expanded tile: lifts (transform only), `+` rotates 90°, verdict revealed. */
   active: boolean;
@@ -45,6 +47,19 @@ const LIFT = { scale: 1.03, y: -2 } as const;
  */
 const LABEL_FIT = "max-sm:tracking-[0.08em] @max-[11rem]:tracking-[0.08em]";
 const REST = { scale: 1, y: 0 } as const;
+/** Value type: 17 px, IBM Plex Mono advance 0.6 em; the tile's horizontal padding + border (px-3 + 2 × 1 px). */
+const VALUE_PX = 17;
+const MONO_ADVANCE = 0.6;
+const TILE_INSET_PX = 26;
+
+/**
+ * Value font size that never ellipsizes a number (MO-01): 17 px, or smaller when `chars` monospace characters would
+ * not fit the tile's own width (container units of the `@container` wrapper) – e.g. `−15.977,56 USDT` at 390 px.
+ */
+export function fitValue(chars: number): string | undefined {
+  if (chars <= 0) return undefined;
+  return `min(${VALUE_PX}px, calc((100cqw - ${TILE_INSET_PX}px) / ${(chars * MONO_ADVANCE).toFixed(2)}))`;
+}
 
 type RollDirection = "up" | "down";
 
@@ -115,7 +130,7 @@ function TileValue({ text }: { text: string }) {
  * `clip-path: inset(0 0 100% 0) → inset(0)` + opacity + y on `tween.verdict` – hovering never re-lays out the row or
  * moves the hero headline. Memoised: hovering re-renders only the two tiles whose `active` flips.
  */
-export const StatTile = memo(function StatTile({ fact, label, value, suffix, verdict, active, onActivate, body, loading = false, className }: StatTileProps) {
+export const StatTile = memo(function StatTile({ fact, label, value, suffix, suffixLength = 0, verdict, active, onActivate, body, loading = false, className }: StatTileProps) {
   const reduced = useReducedFx();
   const canHover = useCanHover();
   const lifted = active && canHover;
@@ -144,7 +159,10 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, ver
                 <GlyphPlus className="size-3" />
               </span>
             </MorphTitle>
-            <dd className="num mt-1.5 truncate whitespace-nowrap font-mono text-[17px] font-medium text-fg">
+            <dd
+              className="num mt-1.5 truncate whitespace-nowrap font-mono text-[17px] font-medium text-fg"
+              style={typeof value === "string" ? { fontSize: fitValue(value.length + suffixLength) } : undefined}
+            >
               {loading ? (
                 <Skeleton className="my-[0.2em] h-[0.95em] w-14 rounded-md" />
               ) : (
@@ -163,13 +181,15 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, ver
             <motion.p
               key="verdict"
               className={cn(
-                "pointer-events-none absolute inset-x-0 bottom-full z-20 mb-1.5 line-clamp-3 rounded-xl border border-white/10 bg-ink-850/95 px-3 py-2 text-[11.5px] leading-snug max-sm:hidden",
+                "pointer-events-none absolute inset-x-0 bottom-full z-20 mb-1.5 rounded-xl border border-white/10 bg-ink-850 px-3 py-2 text-[11.5px] leading-snug max-sm:hidden",
                 VERDICT_TEXT[verdict.tone],
               )}
               initial={{ clipPath: "inset(0 0 100% 0)", opacity: 0, y: 4 }}
               animate={{ clipPath: "inset(0 0 0% 0)", opacity: 1, y: 0, transition: tween.verdict }}
               exit={{ opacity: 0, transition: tween.exit }}
             >
+              {/* no line clamp: on the padded surface it painted the 4th line into the padding and over the border
+                  (OV-03); the popover grows upward instead and shows the whole verdict */}
               {verdict.text}
             </motion.p>
           )}

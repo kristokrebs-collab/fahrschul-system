@@ -39,6 +39,7 @@ const NothingCandleChart = lazy(() => import("@/chart/NothingCandleChart").then(
 
 export const CHART_EMPTY_TITLE = "Noch keine Kerzen";
 export const CHART_EMPTY_TEXT = "Sobald Binance erreichbar ist, erscheinen hier die Kerzen. Bis dahin zeigt die Karte den letzten Stand aus dem Cache.";
+export const CHART_EMPTY_LINE = "Wartet auf Kursdaten …";
 export const CHART_LOADING = "Lade Historie …";
 export const CHART_FOLLOW = "Folgen";
 export const CHART_ONLY_7D = "Im 1m-Intervall nur 7 Tage";
@@ -202,7 +203,7 @@ const sameGateHealth = (a: FeedHealth, b: FeedHealth): boolean => a.state === b.
 function ChartBodyGate({ feedId, hasCandles, loading, chart }: { feedId: KlineFeed; hasCandles: boolean; loading: boolean; chart: ReactElement }) {
   const h = useHealthSelect(GATE_HEALTH[feedId], sameGateHealth);
   const empty = !hasCandles && (h.state === "offline" || h.consecutiveFailures >= 3 || (!loading && (h.consecutiveFailures >= 1 || h.state === "fallback")));
-  return empty ? <EmptyState title={CHART_EMPTY_TITLE} text={CHART_EMPTY_TEXT} /> : chart;
+  return empty ? <EmptyState title={CHART_EMPTY_TITLE} text={CHART_EMPTY_TEXT} line={CHART_EMPTY_LINE} /> : chart;
 }
 
 /**

@@ -31,12 +31,13 @@ import { DotMatrix } from "@/motion/DotMatrix";
 import { formatNumber, MotionNumber } from "@/motion/MotionNumber";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { StatusPill } from "@/motion/StatusPill";
-import { TextShimmer } from "@/motion/TextShimmer";
 import { spring, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { FLASH_MIN_INTERVAL_MS, useValueFlash } from "@/motion/ValueFlash";
+import { WidgetGrid } from "@/motion/pulse/WidgetGrid";
 import { buyShare, change24h, distanceLabel, orFallback, priceDecimals, priceFlashStep, priceTick, triggerProximity } from "./marketMath";
+import { useMarketTileOrder } from "./marketTiles";
 import { jumpFromNaN, jumpFromUnknownPrice, useForceRefresh, useGlide, useMotionSelect, useOrderFlowMeter } from "./useMarket";
 
 /** Formats a live price with the panel's precision (`86.100,4`). */
@@ -167,13 +168,14 @@ export const OrderFlow = memo(function OrderFlow() {
  * Mini tile; `flashOn` washes the whole tile green/red when that value moves by at least `minMove`, at most once per
  * `cooldownMs`.
  */
-function MiniTile({ label, flashOn, minMove, cooldownMs, children }: { label: string; flashOn?: MotionValue<number>; minMove?: number; cooldownMs?: number; children: ReactNode }) {
+function MiniTile({ label, flashOn, minMove, cooldownMs, chars = 0, children }: { label: string; flashOn?: MotionValue<number>; minMove?: number; cooldownMs?: number; chars?: number; children: ReactNode }) {
   const reduced = useReducedFx();
   const up = useRef<HTMLSpanElement>(null);
   const down = useRef<HTMLSpanElement>(null);
   useValueFlash({ source: flashOn }, up, down, { minMove, cooldownMs, enabled: !!flashOn && !reduced });
   return (
-    <div className="relative isolate min-w-0 overflow-hidden rounded-xl border border-line bg-ink-950/30 px-2.5 py-1.5">
+    // opaque surface (same tint as the former bg-ink-950/30 over the panel): a lifted tile glides over its neighbours
+    <div className="@container relative isolate min-w-0 overflow-hidden rounded-xl border border-line bg-ink-900 bg-[linear-gradient(rgb(4_4_4/0.3),rgb(4_4_4/0.3))] px-2.5 py-1.5">
       {flashOn && (
         <>
           <span ref={up} aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-win/[0.09] opacity-0" />
@@ -181,10 +183,15 @@ function MiniTile({ label, flashOn, minMove, cooldownMs, children }: { label: st
         </>
       )}
       <div className="label !text-[9.5px]">{label}</div>
-      <div className="num truncate font-mono text-[12.5px] text-fg">{children}</div>
+      {/* long values (Bid/Ask at ~1024 px) shrink to the tile instead of ellipsizing (MO-01): 0.6 em mono advance */}
+      <div className="num truncate font-mono text-[12.5px] text-fg" style={chars > 0 ? { fontSize: `min(12.5px, calc(100cqw / ${(chars * 0.6).toFixed(2)}))` } : undefined}>
+        {children}
+      </div>
     </div>
   );
 }
+
+export const TILES_LABEL = "Markt-Kacheln";
 
 /** One displayed step of the funding rate (`0,0001 %`): finer estimate updates are not worth a flash. */
 const FUNDING_DISPLAY_STEP = 1e-6;
@@ -202,7 +209,8 @@ export interface FundingBlockProps {
 
 /**
  * `Mark {n0} · Funding {±0,0100 %} · nächstes Funding in {hh:mm:ss}` as ONE text node (the mark glides, the
- * countdown follows the shared second clock) plus the Funding / OI / Taker / Bid-Ask tiles (`sm+`).
+ * countdown follows the shared second clock) plus the Funding / OI / Taker / Bid-Ask tiles (`sm+`), which the user can
+ * reorder by press-and-hold (or keyboard); the order persists in `tj2-ui-market-tiles`.
  */
 export const FundingBlock = memo(function FundingBlock({ mark, fundingRate, nextFundingTime, price, openInterest, takerDelta }: FundingBlockProps) {
   const reduced = useReducedFx();
@@ -227,24 +235,60 @@ export const FundingBlock = memo(function FundingBlock({ mark, fundingRate, next
   });
   // a book wash only for moves that matter (≈ 10 ppm), not for every one-tick flicker of the queue
   const bookMinMove = price != null && price > 0 ? price * 1e-5 : 0;
+  const [order, setOrder] = useMarketTileOrder();
+  // `84.205,9 / 84.206,0`: two prices + separator (+1 for a digit more while the price moves)
+  const bookChars = price != null && price > 0 ? 2 * formatNumber(price, { decimals }).length + 4 : 0;
+  // stable nodes (values are MotionValues); no item `label`: the tile content (label + live value) names the tile
+  const tiles = useMemo(
+    () => [
+      {
+        id: "funding",
+        node: (
+          <MiniTile label="Funding" flashOn={rate} minMove={FUNDING_DISPLAY_STEP}>
+            <motion.span>{fundingText}</motion.span>
+          </MiniTile>
+        ),
+      },
+      {
+        id: "oi",
+        node: (
+          <MiniTile label="OI">
+            <MotionNumber value={openInterest} format={n0} flash />
+          </MiniTile>
+        ),
+      },
+      {
+        id: "taker",
+        node: (
+          <MiniTile label="Taker">
+            <MotionNumber value={takerDelta} decimals={1} signed suffix=" %" flash />
+          </MiniTile>
+        ),
+      },
+      {
+        id: "book",
+        node: (
+          <MiniTile label="Bid/Ask" flashOn={bidMv} minMove={bookMinMove} cooldownMs={FLASH_MIN_INTERVAL_MS} chars={bookChars}>
+            <motion.span>{bidAsk}</motion.span>
+          </MiniTile>
+        ),
+      },
+    ],
+    [rate, fundingText, openInterest, takerDelta, bookMinMove, bidAsk, bookChars],
+  );
 
   return (
     <>
       <motion.p className="num font-mono text-[11px] text-faint [contain:layout_paint]">{line}</motion.p>
-      <div className="hidden grid-cols-2 gap-2 sm:grid">
-        <MiniTile label="Funding" flashOn={rate} minMove={FUNDING_DISPLAY_STEP}>
-          <motion.span>{fundingText}</motion.span>
-        </MiniTile>
-        <MiniTile label="OI">
-          <MotionNumber value={openInterest} format={n0} flash />
-        </MiniTile>
-        <MiniTile label="Taker">
-          <MotionNumber value={takerDelta} decimals={1} signed suffix=" %" flash />
-        </MiniTile>
-        <MiniTile label="Bid/Ask" flashOn={bidMv} minMove={bookMinMove} cooldownMs={FLASH_MIN_INTERVAL_MS}>
-          <motion.span>{bidAsk}</motion.span>
-        </MiniTile>
-      </div>
+      {/* hold → lift → reorder (pulse `draggable-widget-grid`); the order is a per-browser preference */}
+      <WidgetGrid
+        items={tiles}
+        order={order}
+        onOrderChange={setOrder}
+        aria-label={TILES_LABEL}
+        className="hidden grid-cols-2 gap-2 sm:grid"
+        itemClassName="rounded-xl"
+      />
     </>
   );
 });
@@ -302,10 +346,6 @@ export const LivePill = memo(function LivePill({ receivedAt, ringEndsAt }: LiveP
   );
 });
 
-/** `Verbinde …` pill: the label shimmers while the first data is on its way. */
-export function ConnectingPill() {
-  return <StatusPill tone="muted" expanded label={<TextShimmer>{STRINGS.connecting}</TextShimmer>} layoutKey="connecting" feed="markPrice" />;
-}
 
 /* ------------------------------------------------------------------ preview + distances */
 

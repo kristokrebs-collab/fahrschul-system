@@ -30,6 +30,8 @@ export interface SetupsViewProps {
 
 export const SETUPS_TITLE = "Entscheidungsgrundlagen";
 export const SETUPS_LEAD = "Deine Setups aus der MegaWhale-Methodik und deinen eigenen Regeln. Jede Karte zeigt, wie oft die Grundlage funktioniert hat.";
+/** Subtitle recipe: pixel fill once per session, then the marker on the key word. */
+export const SETUPS_LEAD_FILL = { storageKey: "tj2-fill-setups", highlight: "funktioniert" } as const;
 export const NEW_SETUP_LABEL = "Neue Entscheidungsgrundlage";
 export const RULES_TITLE = "Grundregeln";
 export const RULES_NOTE = "Gelten für jeden Trade und stehen in jeder Checkliste. Bearbeiten unter Einstellungen.";
@@ -73,6 +75,7 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
       <PageHeader
         title={SETUPS_TITLE}
         lead={SETUPS_LEAD}
+        leadFill={SETUPS_LEAD_FILL}
         count={ranked.length}
         countUnit={setupUnit}
         action={

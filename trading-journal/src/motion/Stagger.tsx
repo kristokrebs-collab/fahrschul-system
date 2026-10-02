@@ -1,5 +1,6 @@
 import { motion, type HTMLMotionProps, type Transition, type Variants } from "motion/react";
 import type { ReactNode } from "react";
+import { springSettleTime, type SpringConfig } from "@/motion/pulse/engine";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -13,6 +14,17 @@ export const STAGGER_SHOWN = "shown";
  */
 export function sectionDelay(base = 0): (i: number) => number {
   return (i) => base + Math.min(i, stagger.max) * stagger.sections;
+}
+
+/** Share of an overlay morph after which its body starts to reveal (the panel already covers most of its box). */
+export const BODY_REVEAL_AT = 0.65;
+
+/**
+ * Seconds into a morph on spring `cfg` at which the overlay body starts revealing: `BODY_REVEAL_AT` of the spring's
+ * settle time (0.5 % band). A blank panel never lands; the body never fades in over a panel that is still small.
+ */
+export function bodyRevealDelay(cfg: SpringConfig, at = BODY_REVEAL_AT): number {
+  return Math.round(springSettleTime(cfg, 0.005) * at * 1000) / 1000;
 }
 
 /** Parent transition helper: `{ ...t, delayChildren: sectionDelay(base) }`. */

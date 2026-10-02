@@ -1,6 +1,7 @@
 import { animate, motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import type { FeedId, HealthState, ProviderHealth, Source, StatusLabel } from "@/market/types";
+import { cn } from "@/lib/cn";
 import { time } from "@/lib/format";
 import { canObserveInView, useFirstInView } from "@/motion/inView";
 import { StatusPill, type StatusTone } from "@/motion/StatusPill";
@@ -133,7 +134,10 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
         <>
           <div className="mb-3 flex flex-wrap items-center gap-3 text-[12.5px] text-mute">
             <span className="inline-flex items-center gap-2">
-              <StatusPill tone={toneOfState(health.overall)} label={STATE_LABELS[health.overall]} expanded />
+              {/* reserves the longest overall label (`Ersatzquelle`), so the texts after it never jump when it changes */}
+              <span className="inline-flex min-w-[7.25rem]">
+                <StatusPill tone={toneOfState(health.overall)} label={STATE_LABELS[health.overall]} expanded />
+              </span>
               <span className="label !text-[9.5px]">{LIVE_STRINGS.overall}</span>
             </span>
             <span>{health.online ? LIVE_STRINGS.online : LIVE_STRINGS.offline}</span>
@@ -144,7 +148,9 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
               <thead>
                 <tr className="border-b border-line">
                   {(["feed", "source", "asOf", "status"] as const).map((c) => (
-                    <th key={c} scope="col" className="label !text-faint px-3 py-2 tracking-[0.1em]">
+                    // ST-02: the status column reserves the longest pill (`Zuletzt 01:39 · veraltet`), so a label that
+                    // grows never re-flows the table mid-morph (the other columns stay put)
+                    <th key={c} scope="col" className={cn("label !text-faint px-3 py-2 tracking-[0.1em]", c === "status" && "min-w-[12rem]")}>
                       {LIVE_STRINGS.columns[c]}
                     </th>
                   ))}

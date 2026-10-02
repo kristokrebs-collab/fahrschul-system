@@ -1,4 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
+import { useIntroGate } from "@/intro/introStore";
 
 /**
  * One shared `IntersectionObserver` (threshold .1) for every motion helper that only needs a cheap
@@ -59,13 +60,15 @@ export function observeInView(el: Element, listener: InViewListener): () => void
 /**
  * `true` from the first moment `ref` is at least 10 % on screen (shared observer, one React update per element,
  * ever). `true` whenever `enabled` is false (reduced motion: nothing waits for a reveal) and from the start when no
- * `IntersectionObserver` exists (jsdom / SSR).
+ * `IntersectionObserver` exists (jsdom / SSR). While the intro stage covers the app, or the surrounding intro cell
+ * has not landed yet, nothing is observed – the first view starts when the cell lands.
  */
 export function useFirstInView<T extends Element>(ref: RefObject<T | null>, enabled = true): boolean {
   const [seen, setSeen] = useState(() => !enabled || !canObserveInView());
+  const gate = useIntroGate();
   useEffect(() => {
     const el = ref.current;
-    if (seen || !enabled || !el) return;
+    if (seen || !enabled || !gate || !el) return;
     let live = true;
     const stop = observeInView(el, (inView) => {
       if (!inView || !live) return;
@@ -77,7 +80,7 @@ export function useFirstInView<T extends Element>(ref: RefObject<T | null>, enab
       live = false;
       stop();
     };
-  }, [ref, seen, enabled]);
+  }, [ref, seen, enabled, gate]);
   return seen || !enabled;
 }
 

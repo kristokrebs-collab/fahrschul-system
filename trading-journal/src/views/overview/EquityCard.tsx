@@ -11,7 +11,8 @@ export const EQUITY_EMPTY_TEXT = "Deine Equity-Kurve startet beim Startkapital u
 
 /**
  * `Kontostand` (Plan 6.1): note `{n} Trades · jetzt {balance} {cur}` (the balance rolls and flashes when a trade
- * changes it), Recharts `EquityChart` with draw-in and a live "jetzt" endpoint, empty state.
+ * changes it), Recharts `EquityChart` with draw-in, a live "jetzt" endpoint and the replay scrub row (pulse
+ * `agent-trace`: drag or arrow keys replay the curve, release returns to live), empty state.
  */
 export function EquityCard() {
   const settings = useJournal((s) => s.settings);

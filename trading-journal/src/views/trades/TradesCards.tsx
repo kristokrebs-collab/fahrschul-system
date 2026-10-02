@@ -1,10 +1,11 @@
 import { AnimatePresence, motion, useIsPresent, type TargetAndTransition, type Transition } from "motion/react";
-import { memo, type Ref } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { EnrichedTrade, Setup } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useUi } from "@/store/uiStore";
+import { useInsertHold } from "./TradesTable";
 import { CheckCount, EntryExit, PnlCell, RCell, ResultBadge, SideTag, TradeSetupChips, accountLine, dateLines } from "./tradeCells";
 
 export interface TradesCardsProps {
@@ -12,6 +13,8 @@ export interface TradesCardsProps {
   setups: readonly Setup[];
   /** `layoutDependency` (`rowsKey(listKey(filter, sort), rows)`). */
   listKey: string;
+  /** Sort identity (`{k}:{dir}`): a new order re-keys the list (remount + staggered enter instead of crossing FLIPs). */
+  sortKey?: string;
   onOpen?: (id: string) => void;
   className?: string;
 }
@@ -32,25 +35,40 @@ function cardTransition(i: number): Transition {
  * Mobile card list below `md` (NEW, Plan 6.2 / 3.3 "TradesCards"): one card per trade with the table's data.
  * Cards are `motion.button layout` with `layoutId="trade-{id}"` (source of the detail morph; not while the detail
  * comes from a chart marker), enter `{opacity:0, y:6}` staggered `min(i, 12) · .02`, press `scale .98`
- * (`spring.press`). Removed cards pop out of the flow (`AnimatePresence mode="popLayout"`), fade and shrink to .98
- * while the rest glide shut; an exiting card is `inert` and `data-exiting`. No x offset (390 px must not scroll).
+ * (`spring.press`). No x offset (390 px must not scroll).
+ *
+ * Same choreography as the table (TR-02): removed cards fade out IN PLACE (sync `AnimatePresence`, `tween.exit`,
+ * `inert`, `data-exiting`) and only then do the survivors glide shut (the settle tick feeds their
+ * `layoutDependency`); inserted cards are held (`useInsertHold`) until their siblings made room; a new sort order re-keys
+ * the list (staggered re-enter instead of crossing FLIPs). The card's height follows on the body's `AutoHeight`.
  */
-export function TradesCards({ rows, setups, listKey, onOpen, className }: TradesCardsProps) {
+export function TradesCards({ rows, setups, listKey, sortKey = "", onOpen, className }: TradesCardsProps) {
   const detailSource = useUi((s) => s.detail.source);
   const openDetail = useUi((s) => s.openDetail);
   const reduced = useReducedFx();
   const shareLayout = detailSource !== "marker";
+  const [settled, setSettled] = useState(0);
+  const onExitComplete = useCallback(() => setSettled((n) => n + 1), []);
+  const layoutKey = useMemo(() => `${listKey}~${settled}`, [listKey, settled]);
+  // cards mounted after the group's first frame are inserts
+  const [readyGroup, setReadyGroup] = useState<string | null>(null);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setReadyGroup(sortKey));
+    return () => cancelAnimationFrame(id);
+  }, [sortKey]);
+  const inserting = readyGroup === sortKey;
 
   return (
     <ul className={cn("relative grid gap-2", className)} aria-label="Trades" data-trade-list="">
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence key={sortKey} onExitComplete={onExitComplete}>
         {rows.map((t, i) => (
           <TradeCard
             key={t.id}
             t={t}
             index={i}
+            insert={inserting}
             setups={setups}
-            listKey={listKey}
+            listKey={layoutKey}
             shareLayout={shareLayout}
             reduced={reduced}
             onOpen={onOpen ?? openDetail}
@@ -64,20 +82,21 @@ export function TradesCards({ rows, setups, listKey, onOpen, className }: Trades
 interface TradeCardProps {
   t: EnrichedTrade;
   index: number;
+  /** Mounted into a list that was already shown (read at mount): held by `useInsertHold` before it enters. */
+  insert: boolean;
   setups: readonly Setup[];
   listKey: string;
   shareLayout: boolean;
   reduced: boolean;
   onOpen: (id: string, source: "table") => void;
-  /** Set by `AnimatePresence mode="popLayout"` to measure the exiting item. */
-  ref?: Ref<HTMLLIElement>;
 }
 
-const TradeCard = memo(function TradeCard({ t, index, setups, listKey, shareLayout, reduced, onOpen, ref }: TradeCardProps) {
+const TradeCard = memo(function TradeCard({ t, index, insert, setups, listKey, shareLayout, reduced, onOpen }: TradeCardProps) {
   const present = useIsPresent();
+  const held = useInsertHold(insert && !reduced);
   const { day, clock } = dateLines(t);
   return (
-    <motion.li ref={ref} exit={reduced ? ITEM_EXIT_REDUCED : ITEM_EXIT} inert={!present || undefined} data-exiting={present ? undefined : ""}>
+    <motion.li exit={reduced ? ITEM_EXIT_REDUCED : ITEM_EXIT} inert={!present || undefined} data-exiting={present ? undefined : ""}>
       <motion.button
         type="button"
         layout
@@ -85,7 +104,7 @@ const TradeCard = memo(function TradeCard({ t, index, setups, listKey, shareLayo
         layoutDependency={listKey}
         style={{ borderRadius: radius.card }}
         initial={reduced ? false : CARD_FROM}
-        animate={CARD_SHOWN}
+        animate={held ? CARD_FROM : CARD_SHOWN}
         whileTap={present && !reduced ? CARD_PRESS : undefined}
         transition={reduced ? CARD_TRANSITION_REDUCED : cardTransition(index)}
         onClick={() => onOpen(t.id, "table")}

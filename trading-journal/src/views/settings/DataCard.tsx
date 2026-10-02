@@ -13,6 +13,7 @@ import { canDownload, DOWNLOAD_UNAVAILABLE } from "@/store/download";
 import { MODE_LABELS, useJournal } from "@/store/journalStore";
 import { readQuarantine } from "@/store/migrate";
 import { ActionButton, GlyphDownload } from "./fx";
+import { IntroPref } from "./IntroPref";
 
 export const DATA_STRINGS = {
   title: "Daten",
@@ -158,6 +159,8 @@ export function DataCard({ onImport, className }: DataCardProps) {
           )}
         </div>
       )}
+
+      <IntroPref />
 
       <div className="mt-5 grid gap-1 border-t border-line pt-4 text-[12.5px] text-mute">
         <span>{DATA_STRINGS.footer(trades.length, settings.setups.length, settings.rules.length)}</span>

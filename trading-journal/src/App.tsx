@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useDeferredValue, useMemo, type ReactNode } from "react";
 import { BottomFade } from "@/app/BottomFade";
+import { CommandNav } from "@/app/CommandNav";
 import { Dock } from "@/app/Dock";
 import { EditorHost } from "@/app/EditorHost";
 import { Footer } from "@/app/Footer";
@@ -63,8 +64,8 @@ function Detail() {
 }
 
 /**
- * App shell (Plan 6.6): header, `main` container, page host (keep-alive overview), footer, dock, local banner, toast
- * island, the app-level overlays and the celebration layer (no portal, inside the group-less `LayoutGroup` of
+ * App shell (Plan 6.6): curtain (header, `main` container, page host with the keep-alive overview, local banner) over
+ * the sticky curtain-reveal footer, dock, command navigation (⌘K), toast island, the app-level overlays and the celebration layer (no portal, inside the group-less `LayoutGroup` of
  * `MotionRoot`). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
  * banner opens or closes; the page, toasts, detail and editor each re-render on their own.
  */
@@ -73,18 +74,25 @@ export default function App() {
   return (
     <MorphDialogProvider>
       <ScenarioWatcher />
-      <Header />
-      <main className="mx-auto max-w-[1320px] px-4 pb-40 pt-6 sm:px-6">
-        <LocalModeBanner />
-        {/* moves only when the banner enters / leaves (strict dependency: page switches never measure this subtree);
-            scroll memory lives in the router, applied by the page host at the commit that shows a page */}
-        <motion.div layout="position" layoutDependency={bannerOpen} transition={{ layout: spring.layout }} style={{ borderRadius: 0 }}>
-          <Pages />
-          <Footer />
-        </motion.div>
-      </main>
+      {/* the curtain (pack motion-footer): opaque, rounded bottom corners, scrolls off the sticky footer below it.
+          No z-index / transform on it: it must not become a stacking context or a containing block for the fixed
+          layers inside the pages (chart marker ghost, table ghost, unsaved bar) */}
+      <div className="app-curtain relative min-h-dvh rounded-b-[22px]" data-curtain="">
+        <Header />
+        <main className="mx-auto max-w-[1320px] px-4 pb-20 pt-6 sm:px-6">
+          <LocalModeBanner />
+          {/* moves only when the banner enters / leaves (strict dependency: page switches never measure this subtree);
+              scroll memory lives in the router, applied by the page host at the commit that shows a page */}
+          <motion.div layout="position" layoutDependency={bannerOpen} transition={{ layout: spring.layout }} style={{ borderRadius: 0 }}>
+            <Pages />
+          </motion.div>
+        </main>
+      </div>
+      <Footer />
       <BottomFade />
       <Dock />
+      {/* before the overlays: a quick action's close runs before the editor takes focus */}
+      <CommandNav />
       <Toasts />
       {/* always mounted: the overlays own their AnimatePresence / open state (uiStore.detail | editor | setupEditor) */}
       <Detail />

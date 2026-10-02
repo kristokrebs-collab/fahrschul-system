@@ -84,3 +84,63 @@ export function sortArrow(dir: TradeSort["dir"]): " ↑" | " ↓" {
 export function countLabel(n: number): string {
   return `${n} Trade${n === 1 ? "" : "s"}`;
 }
+
+/* ----------------------------------------------------------- search suggestions */
+
+/** One trades-search suggestion; `kind` decides what choosing it does (filter shortcut or search text). */
+export interface SearchSuggestion {
+  value: string;
+  label: string;
+  group: string;
+  kind: "setup" | "side" | "emotion" | "word";
+  /** Setup id / side for the filter shortcuts. */
+  target?: string;
+}
+
+export const SUGGESTION_GROUPS = { setup: "Grundlagen", side: "Richtung", emotion: "Gefühl", word: "Begriffe" } as const;
+
+/** Function words that never make a useful search term (German + the odd English one in notes). */
+const STOPWORDS = new Set(
+  "aber alle allem allen aller alles also auch auf aus bei beim bin bis bist dann darum dass dein deine dem den denn der des die dies diese diesem diesen dieser doch dort durch eine einem einen einer eines etwas euch für gegen hab habe haben hatte hier hinter ich ihr ihre immer jetzt kann kein keine man mehr mein meine mich mit muss nach nicht noch nur oder ohne schon sehr sein seine sich sind soll über unter vom von vor war waren warum was weil wenn wer wie wieder wir wird zum zur zwischen with that this from have the and"
+    .split(" "),
+);
+
+/**
+ * Frequent words of the trades' `reason` + `notes` (≥ 4 letters, no stop words, seen in ≥ 2 trades – or the top
+ * ones when the journal is small), most frequent first; the most common spelling of each word is kept.
+ */
+export function frequentWords(trades: readonly Pick<EnrichedTrade, "reason" | "notes">[], max = 12): string[] {
+  const count = new Map<string, { n: number; forms: Map<string, number> }>();
+  for (const t of trades) {
+    const seen = new Set<string>();
+    for (const raw of `${t.reason ?? ""} ${t.notes ?? ""}`.match(/[\p{L}][\p{L}\p{N}-]*[\p{L}\p{N}]/gu) ?? []) {
+      const key = raw.toLowerCase();
+      if (key.length < 4 || STOPWORDS.has(key) || seen.has(key)) continue;
+      seen.add(key);
+      const e = count.get(key) ?? { n: 0, forms: new Map<string, number>() };
+      e.n += 1;
+      e.forms.set(raw, (e.forms.get(raw) ?? 0) + 1);
+      count.set(key, e);
+    }
+  }
+  const ranked = [...count.entries()].sort((a, b) => b[1].n - a[1].n || a[0].localeCompare(b[0], "de"));
+  const frequent = ranked.filter(([, e]) => e.n >= 2);
+  return (frequent.length >= 3 ? frequent : ranked)
+    .slice(0, max)
+    .map(([, e]) => [...e.forms.entries()].sort((a, b) => b[1] - a[1])[0]![0]);
+}
+
+/**
+ * Grouped suggestions of the trades search: setups and sides are filter shortcuts (the search field cannot match
+ * them – it searches pair / reason / notes / emotion / timeframe), emotions and frequent note words become the text.
+ */
+export function searchSuggestions(trades: readonly EnrichedTrade[], setups: readonly Pick<Setup, "id" | "name">[], emotions: readonly string[]): SearchSuggestion[] {
+  const out: SearchSuggestion[] = [];
+  for (const s of setups) out.push({ value: `setup:${s.id}`, label: s.name, group: SUGGESTION_GROUPS.setup, kind: "setup", target: s.id });
+  out.push({ value: "side:long", label: "Long", group: SUGGESTION_GROUPS.side, kind: "side", target: "long" });
+  out.push({ value: "side:short", label: "Short", group: SUGGESTION_GROUPS.side, kind: "side", target: "short" });
+  for (const e of emotions) out.push({ value: `emotion:${e}`, label: e, group: SUGGESTION_GROUPS.emotion, kind: "emotion" });
+  const taken = new Set(out.map((o) => o.label.toLowerCase()));
+  for (const w of frequentWords(trades)) if (!taken.has(w.toLowerCase())) out.push({ value: `word:${w.toLowerCase()}`, label: w, group: SUGGESTION_GROUPS.word, kind: "word" });
+  return out;
+}

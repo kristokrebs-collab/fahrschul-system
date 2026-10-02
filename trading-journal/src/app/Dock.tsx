@@ -1,5 +1,7 @@
 import { AnimatePresence, animate, cancelFrame, frame, motion, motionValue, useMotionValue, useSpring, useTransform, type MotionValue } from "motion/react";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type Ref } from "react";
+import { expoCurve, springCurve } from "@/app/cssEasing";
+import { useIntroPhase, type IntroPhase } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
@@ -15,8 +17,49 @@ export const PAGE_LABELS: Record<Page, string> = { overview: "Übersicht", trade
 export const FAB_LABEL = "Trade eintragen";
 const PAGE_ICON: Record<Page, IconName> = { overview: "grid", trades: "list", setups: "target", settings: "sliders" };
 
-/** Bundle `i2` defaults: items rest at `base`, the item under the pointer magnifies to `magnification` (px). */
-export const DOCK = { magnification: 64, distance: 140, panelHeight: 60, base: 44 } as const;
+/**
+ * pulse-motion `dock` (measured) + its magnification remix. Label: opacity `1 − e^(−t/τ)` in 38 ms / out 35 ms, rises
+ * from +6 px on a 1000/38 spring (≈ 0.6 px overshoot), position does not return on hover-out; pill: in 40 ms after a
+ * 25 ms delay, out 45 ms. Magnification: `scale = 1 + 0.8 · bell(d)`, Gaussian bell (σ), amount on a 400/20 spring.
+ */
+export const DOCK_CONFIG = {
+  tipInTauMs: 38,
+  tipOutTauMs: 35,
+  tipRiseFrom: 6,
+  tipSpring: { stiffness: 1000, damping: 38 },
+  pillInTauMs: 40,
+  pillOutTauMs: 45,
+  pillDelayMs: 25,
+  magnify: 0.8,
+  sigma: 48,
+  magnifySpring: { type: "spring", stiffness: 400, damping: 20 },
+  /** gap between the label and the top of the (magnified) icon, px (SH-03: clear of the page text above the dock) */
+  tipGap: 14,
+  /** intro build: the tray rises from this far below on a soft-bounce spring */
+  introRise: 96,
+} as const;
+
+/** Items rest at `base`; the item under the pointer magnifies to `magnification` (px); the bell ends at `distance`. */
+export const DOCK = { magnification: 44 * (1 + DOCK_CONFIG.magnify), distance: 140, panelHeight: 60, base: 44, sigma: DOCK_CONFIG.sigma } as const;
+
+const TIP_IN = expoCurve(DOCK_CONFIG.tipInTauMs);
+const TIP_OUT = expoCurve(DOCK_CONFIG.tipOutTauMs);
+const TIP_RISE = springCurve(DOCK_CONFIG.tipSpring);
+const PILL_IN = expoCurve(DOCK_CONFIG.pillInTauMs);
+const PILL_OUT = expoCurve(DOCK_CONFIG.pillOutTauMs);
+/** CSS transitions of label and pill (set once on the nav; hover/focus swap the in/out variant – compositor only). */
+const DOCK_FX_VARS = {
+  // surface: an opaque plate uncovered bottom-up by clip-path on the label's opacity curve (never translucent over the
+  // page text behind it, SH-03); it rises on the spring. Hover-out: the plate closes, the position resets once hidden
+  "--dock-tip-in": `clip-path ${TIP_IN.ms}ms ${TIP_IN.easing}, translate ${TIP_RISE.ms}ms ${TIP_RISE.easing}`,
+  "--dock-tip-out": `clip-path ${TIP_OUT.ms}ms ${TIP_OUT.easing}, translate 0s linear ${TIP_OUT.ms}ms`,
+  // label text: the pack's exponential fade (τ 38 ms in / 35 ms out) on top of the opaque plate
+  "--dock-tiptext-in": `opacity ${TIP_IN.ms}ms ${TIP_IN.easing}`,
+  "--dock-tiptext-out": `opacity ${TIP_OUT.ms}ms ${TIP_OUT.easing}`,
+  "--dock-pill-in": `opacity ${PILL_IN.ms}ms ${PILL_IN.easing} ${DOCK_CONFIG.pillDelayMs}ms`,
+  "--dock-pill-out": `opacity ${PILL_OUT.ms}ms ${PILL_OUT.easing}`,
+  "--dock-tip-rise": `${DOCK_CONFIG.tipRiseFrom}px`,
+} as CSSProperties;
 
 /** Session flag of the dock entrance (its own key: the wordmark's `tj2-intro` must stay untouched). */
 export const DOCK_INTRO_KEY = "tj2-dock-intro";
@@ -37,10 +80,16 @@ const FAB_PING_STYLE = {
 
 /* ------------------------------------------------------------------ magnification model (pure) */
 
-/** Raised-cosine bell (21st.dev macOS dock): 1 under the pointer, easing smoothly to 0 at `distance`. */
-export function dockBell(d: number, distance: number = DOCK.distance): number {
+/**
+ * Gaussian bell `e^(−d²/2σ²)` (pack remix), windowed so it reaches exactly 0 at `distance`: 1 under the pointer,
+ * no step where the pointer leaves the range.
+ */
+export function dockBell(d: number, distance: number = DOCK.distance, sigma: number = DOCK.sigma): number {
   const a = Math.abs(d);
-  return a >= distance ? 0 : 0.5 * (1 + Math.cos((Math.PI * a) / distance));
+  if (a >= distance) return 0;
+  const g = (x: number) => Math.exp(-(x * x) / (2 * sigma * sigma));
+  const floor = g(distance);
+  return (g(a) - floor) / (1 - floor);
 }
 
 /**
@@ -56,13 +105,13 @@ export function dockLayout(
   amount: number,
   scale: number[],
   shift: number[],
-  cfg: { magnification: number; base: number; distance: number } = DOCK,
+  cfg: { magnification: number; base: number; distance: number; sigma: number } = DOCK,
 ): number {
   const growth = (cfg.magnification - cfg.base) * Math.max(0, Math.min(1, amount));
   let spread = 0;
   for (let k = 0; k < centres.length; k++) {
     const c = centres[k] ?? NaN;
-    const extra = scalable[k] && Number.isFinite(c) ? growth * dockBell(pointer - c, cfg.distance) : 0;
+    const extra = scalable[k] && Number.isFinite(c) ? growth * dockBell(pointer - c, cfg.distance, cfg.sigma) : 0;
     scale[k] = 1 + extra / cfg.base;
     shift[k] = spread + extra / 2;
     spread += extra;
@@ -109,6 +158,10 @@ export interface DockItemProps {
   layer?: ReactNode;
   /** Once-per-session entrance: the icon pops in at `index` in the stagger. */
   intro?: boolean;
+  /** Intro stage: the icon waits hidden and pops in (same stagger) when the dock rises on "build". */
+  waiting?: boolean;
+  /** Changes whenever the shared-layout markers must re-measure (page / editor); see SH-01 in the Dock doc. */
+  layoutKey?: string;
   index?: number;
   ref?: Ref<HTMLButtonElement>;
   className?: string;
@@ -122,7 +175,7 @@ export interface DockItemProps {
  * (CSS `:hover` / `:focus-visible`, no React state). On activation the icon hops (`spring.pop` with an upward launch);
  * `whileTap .94`.
  */
-export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, index = 0, ref, className, children }: DockItemProps) {
+export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, waiting = false, layoutKey, index = 0, ref, className, children }: DockItemProps) {
   const reduced = useReducedFx();
   const press = usePressable({ scale: 0.94 });
   const hop = useMotionValue(0);
@@ -156,14 +209,17 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
     >
       <motion.span aria-hidden="true" className="absolute inset-0 rounded-full" style={{ scale: fx.scale, originY: 1 }}>
         {tab && <span className="absolute inset-0 rounded-full bg-white/[0.05]" />}
+        {/* pack hover pill: fades in 25 ms after the label (τ 40 ms), out a little slower (τ 45 ms) */}
+        <span className="absolute inset-0 rounded-full bg-line-2 opacity-0 [transition:var(--dock-pill-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-pill-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-pill-in)]" />
         {tab && (
           <AnimatePresence initial={false}>
             {active && (
-              // no `layoutDependency` on the two markers: their willUpdate on a Dock re-render is what snapshots the
-              // layout group when the editor opens, so the unmounting `new-trade` disc has a box to morph from
+              // `layoutKey` includes the editor state: the markers' willUpdate when the editor opens is what snapshots the
+              // layout group, so the unmounting `new-trade` disc has a box to morph from
               <motion.span
                 key="bg"
                 layoutId="dock-bg"
+                layoutDependency={layoutKey}
                 className="absolute inset-0 rounded-full bg-white"
                 style={{ borderRadius: radius.pill }}
                 transition={spring.layout}
@@ -176,7 +232,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
           className="absolute inset-0 grid place-items-center"
           style={{ y: hop }}
           initial={intro ? { opacity: 0, scale: 0.5 } : false}
-          animate={{ opacity: 1, scale: 1 }}
+          animate={waiting ? { opacity: 0, scale: 0.5 } : { opacity: 1, scale: 1 }}
           transition={{ scale: { ...spring.pop, delay: iconDelay }, opacity: { ...tween.fade, delay: iconDelay } }}
         >
           <Magnetic intensity={0.5} range={60} remeasure className="size-5 items-center justify-center [&_svg]:size-full">
@@ -190,6 +246,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
             <motion.span
               key="dot"
               layoutId="dock-dot"
+              layoutDependency={layoutKey}
               aria-hidden="true"
               className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-signal"
               style={{ borderRadius: radius.pill }}
@@ -198,10 +255,14 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
           )}
         </AnimatePresence>
       )}
-      <motion.span aria-hidden="true" className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2.5 -translate-x-1/2" style={{ y: tipY }}>
-        {/* 0.2 s ease-out = tween.tooltipIn (CSS transition, compositor: opacity + translate) */}
-        <span className="block translate-y-1 whitespace-pre rounded-md border border-line-2 bg-ink-800 px-2 py-0.5 text-xs text-fg opacity-0 shadow-tooltip transition-[opacity,translate] duration-200 ease-out group-hover/dock:translate-y-0 group-hover/dock:opacity-100 group-focus-visible/dock:translate-y-0 group-focus-visible/dock:opacity-100">
-          {label}
+      <motion.span aria-hidden="true" className="pointer-events-none absolute bottom-full left-1/2 z-10 -translate-x-1/2" style={{ y: tipY, marginBottom: DOCK_CONFIG.tipGap }}>
+        {/* pack label (fades in, rising from +6 px on the 1000/38 spring) on an opaque Nothing plate that is uncovered by
+            clip-path instead of fading, so page text behind it is either fully covered or untouched (SH-03).
+            CSS transitions with the measured curves as linear() (compositor: clip-path, opacity, translate) */}
+        <span className="block translate-y-[var(--dock-tip-rise)] whitespace-pre rounded-md border border-white/15 bg-ink-700 px-2 py-0.5 text-xs font-medium text-fg [clip-path:inset(100%_0_0_0_round_6px)] [transition:var(--dock-tip-out)] group-hover/dock:translate-y-0 group-hover/dock:[clip-path:inset(0_0_0_0_round_6px)] group-hover/dock:[transition:var(--dock-tip-in)] group-focus-visible/dock:translate-y-0 group-focus-visible/dock:[clip-path:inset(0_0_0_0_round_6px)] group-focus-visible/dock:[transition:var(--dock-tip-in)]">
+          <span className="block opacity-0 [transition:var(--dock-tiptext-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-tiptext-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-tiptext-in)]">
+            {label}
+          </span>
         </span>
       </motion.span>
     </motion.button>
@@ -237,11 +298,35 @@ function DockTray({ left, right, mid }: { left: MotionValue<number>; right: Moti
   );
 }
 
+interface TrayEntrance {
+  initial: false | { y: number; opacity: number; filter?: string };
+  animate: undefined | { y: number; opacity: number; filter?: string; transitionEnd?: { filter: string } };
+  transition: Record<string, unknown>;
+}
+
+/**
+ * Pure: the tray's entrance for the intro phase. "stage": parked below the edge (the intro covers the app); "build":
+ * rises with a soft bounce (`spring.reveal`, ζ ≈ 0.68); otherwise the once-per-session entrance (`spring.sheet` + blur)
+ * or nothing. Always ends at y 0 / opacity 1, whatever phase sequence arrives (skip → "done" straight from "stage").
+ */
+export function dockEntrance(phase: IntroPhase, sessionIntro: boolean, reduced: boolean): TrayEntrance {
+  if (reduced) return { initial: false, animate: { y: 0, opacity: 1 }, transition: { duration: 0 } };
+  if (phase === "stage") return { initial: false, animate: { y: DOCK_CONFIG.introRise, opacity: 0 }, transition: { y: { duration: 0 }, opacity: { duration: 0 } } };
+  if (phase === "build") return { initial: false, animate: { y: 0, opacity: 1 }, transition: { y: spring.reveal, opacity: tween.fade } };
+  if (sessionIntro)
+    return {
+      initial: { y: 72, opacity: 0, filter: "blur(8px)" },
+      animate: { y: 0, opacity: 1, filter: "blur(0px)", transitionEnd: { filter: "none" } },
+      transition: { y: spring.sheet, opacity: tween.reveal, filter: tween.reveal },
+    };
+  return { initial: false, animate: { y: 0, opacity: 1 }, transition: { y: spring.reveal, opacity: tween.fade } };
+}
+
 /**
  * macOS-style dock (Bundle `i2`, Plan 2.5 "Dock", 6.6): four tabs + divider + FAB, `role="toolbar"
  * aria-label="Navigation"`. Magnification (mouse pointers only, never under reduced motion) is compositor-only: slot
  * centres are measured once per `pointerenter` in `frame.read`, one smoothed pointer and one smoothed amount
- * (`spring.dock`) drive a raised-cosine bell, and each frame writes item `x` / `scale` and the tray's caps and middle –
+ * (pointer `spring.dock`, amount on the pack's 400/20 spring) drive a windowed Gaussian bell, and each frame writes item `x` / `scale` and the tray's caps and middle –
  * no width, height or layout read per move. Once per session the dock rises in (`spring.sheet`, blur, icon pop), and
  * the FAB pings a red ring three times whenever it (re)appears with the editor closed (hover devices, not under
  * reduced motion), then rests. The `new-trade-{fabCycle}` disc morphs one way into the editor sheet; on the way back
@@ -255,6 +340,7 @@ export function Dock() {
   const reduced = useReducedFx();
   const canHover = useCanHover();
   const magnify = canHover && !reduced;
+  const phase = useIntroPhase();
 
   // read once per mount, written after commit (a StrictMode double render must not consume the flag)
   const [introFresh] = useState(() => !dockIntroSeen());
@@ -277,7 +363,7 @@ export function Dock() {
   const pointerTarget = useMotionValue(0);
   const amountTarget = useMotionValue(0);
   const pointer = useSpring(pointerTarget, spring.dock);
-  const amount = useSpring(amountTarget, spring.dock);
+  const amount = useSpring(amountTarget, DOCK_CONFIG.magnifySpring);
 
   // one layout pass per frame, after the springs stepped (preRender), straight into the slot MotionValues
   useEffect(() => {
@@ -357,10 +443,19 @@ export function Dock() {
   const onPointerLeave = () => amountTarget.set(0);
 
   const fabVisible = !(editor.open && editor.fromFab);
-  const breathing = fabVisible && !editor.open && canHover && !reduced;
+  const breathing = fabVisible && !editor.open && canHover && !reduced && phase !== "stage";
+  const layoutKey = `${page}|${editor.open ? 1 : 0}`;
+  const entrance = dockEntrance(phase, intro, reduced);
 
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-[calc(12px+env(safe-area-inset-bottom,0px))] z-50 flex justify-center" aria-label="Navigation">
+    // layoutRoot (SH-01): the nav is position:fixed, so Motion must never read a page-scroll clamp (the document got
+    // shorter while scrolled) as movement of the dock-bg / dock-dot / new-trade markers inside it
+    <motion.nav
+      layoutRoot
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(12px+env(safe-area-inset-bottom,0px))] z-50 flex justify-center"
+      aria-label="Navigation"
+      style={DOCK_FX_VARS}
+    >
       <motion.div
         ref={panelRef}
         role="toolbar"
@@ -368,9 +463,9 @@ export function Dock() {
         onPointerEnter={onPointerEnter}
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
-        initial={intro ? { y: 72, opacity: 0, filter: "blur(8px)" } : false}
-        animate={intro ? { y: 0, opacity: 1, filter: "blur(0px)", transitionEnd: { filter: "none" } } : undefined}
-        transition={{ y: spring.sheet, opacity: tween.reveal, filter: tween.reveal }}
+        initial={entrance.initial}
+        animate={entrance.animate}
+        transition={entrance.transition}
         style={{ height: DOCK.panelHeight }}
         className="pointer-events-auto relative mx-2 flex max-w-full items-end gap-3 px-3 pb-2"
       >
@@ -382,6 +477,8 @@ export function Dock() {
             tab
             fx={slots[k] as DockSlotFx}
             intro={intro}
+            waiting={phase === "stage"}
+            layoutKey={layoutKey}
             index={k}
             label={PAGE_LABELS[p]}
             active={page === p}
@@ -396,6 +493,7 @@ export function Dock() {
           ref={slotRefs[FAB_SLOT]}
           fx={slots[FAB_SLOT] as DockSlotFx}
           intro={intro}
+          waiting={phase === "stage"}
           index={FAB_SLOT}
           label={FAB_LABEL}
           onClick={() => openEditor({ fromFab: true })}
@@ -407,6 +505,7 @@ export function Dock() {
               {fabVisible && (
                 <motion.span
                   layoutId={`new-trade-${fabCycle}`}
+                  layoutDependency={layoutKey}
                   className="absolute inset-0 rounded-full bg-gradient-to-br from-[#ff3b47] to-signal"
                   style={{ borderRadius: radius.fab }}
                   initial={fabCycle > 0 && !reduced ? { scale: 0.9 } : false}
@@ -420,6 +519,6 @@ export function Dock() {
           <Icon name="plus" />
         </DockItem>
       </motion.div>
-    </nav>
+    </motion.nav>
   );
 }

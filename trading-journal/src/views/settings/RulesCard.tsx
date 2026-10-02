@@ -1,7 +1,8 @@
-import { AnimatePresence, Reorder, motion, useDragControls, type Variants } from "motion/react";
+import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
 import { useState, type KeyboardEvent } from "react";
 import type { Rule, Trade } from "@/domain/types";
 import { newRuleId } from "@/lib/ids";
+import { CONFIG as LIFT_CONFIG, useLift } from "@/motion/pulse/WidgetGrid";
 import { radius, spring, tween } from "@/motion/tokens";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
@@ -102,8 +103,8 @@ export function RulesCard({ rules, onChange, trades, changed = false, className 
   );
 }
 
-const LIFT: Variants = { lifted: { scale: 1.02 } };
-const LIFT_SHADOW: Variants = { lifted: { opacity: 1 } };
+/** Row lift for the pulse `useLift` physics (scale spring 900/40 + glow τ 70 ms); 1.02 instead of the tile's 1.06 – a full-width row must stay inside the card padding. */
+const LIFT_SCALE = 1.02;
 
 interface RuleRowProps {
   rule: Rule;
@@ -121,6 +122,7 @@ interface RuleRowProps {
 
 function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, onRemove, onConfirm, onCancel }: RuleRowProps) {
   const controls = useDragControls();
+  const lift = useLift({ scale: LIFT_SCALE });
   const onHandleKey = (e: KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === "ArrowUp" && index > 0) {
       e.preventDefault();
@@ -140,19 +142,17 @@ function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, on
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98, transition: tween.exit }}
-      whileDrag="lifted"
-      variants={LIFT}
+      onDragStart={lift.lift}
+      onDragEnd={lift.settle}
       transition={{ ...spring.layout, layout: spring.layout }}
-      style={{ borderRadius: radius.input }}
+      style={{ borderRadius: radius.input, scale: lift.scale }}
       className="relative isolate grid gap-2"
       data-testid={`rule-${rule.id}`}
     >
       <motion.span
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-1 -z-10 rounded-[14px] bg-ink-850 shadow-[0_16px_36px_rgb(0_0_0/0.55)]"
-        style={{ opacity: 0 }}
-        variants={LIFT_SHADOW}
-        transition={tween.fade}
+        className="pointer-events-none absolute -inset-1 -z-10 rounded-[14px] bg-ink-850"
+        style={{ opacity: lift.glow, boxShadow: LIFT_CONFIG.glowShadow }}
       />
       <div className="flex gap-2">
         <button

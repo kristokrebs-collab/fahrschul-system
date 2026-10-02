@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+import { IntroCell, useIntroRoot } from "@/intro/IntroCell";
+import { useIntroFlown } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
@@ -34,11 +36,24 @@ interface CellProps {
 
 /**
  * One grid cell below the hero: blur-fades in the first time it is in view, staggered by its column. The reveal
- * ends at `transform: none` / `filter: none`, so a settled cell never becomes a containing block.
+ * ends at `transform: none` / `filter: none`, so a settled cell never becomes a containing block. The grid item is
+ * the intro cell (build beat); the reveal inside keeps the deferral classes. Deferred cells never fly (they are far
+ * below the fold and paint-contained); a cell the intro carried into place skips its reveal (`settled`).
  */
 function Cell({ col, span, defer, children }: CellProps) {
   return (
-    <Reveal index={col} className={cn(span, defer != null && DEFER)} style={defer != null ? { containIntrinsicBlockSize: `auto ${defer}px` } : undefined}>
+    <IntroCell className={span} fly={defer == null}>
+      <CellReveal col={col} defer={defer}>
+        {children}
+      </CellReveal>
+    </IntroCell>
+  );
+}
+
+function CellReveal({ col, defer, children }: Omit<CellProps, "span">) {
+  const flown = useIntroFlown();
+  return (
+    <Reveal index={col} settled={flown} className={cn(defer != null && DEFER)} style={defer != null ? { containIntrinsicBlockSize: `auto ${defer}px` } : undefined}>
       {children}
     </Reveal>
   );
@@ -51,17 +66,22 @@ function Cell({ col, span, defer, children }: CellProps) {
  * 6 Muster (12). Every card reads `uiStore.acc` through `useAccountView`.
  * Hero and chart render as they are (the chart has its own entrance, and its body hosts a `position: fixed` marker
  * ghost and the canvas – no reveal transform/filter around it); every card below cascades in per row.
+ * Intro: every cell is an `IntroCell` – the on-screen ones start as a slanted deck and travel to their slots, and
+ * their first-view effects start when they land (transforms end at `none`, so the chart's fixed ghost is unaffected
+ * once settled); the grid itself is the element the portal zooms out of.
  */
 export function OverviewView({ className }: { className?: string }) {
   useCloseMorphDialogOnUnmount();
+  const root = useRef<HTMLDivElement>(null);
+  useIntroRoot(root);
   return (
-    <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)}>
-      <div className="lg:col-span-12">
+    <div ref={root} className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)}>
+      <IntroCell className="lg:col-span-12">
         <Hero />
-      </div>
-      <div className="lg:col-span-12">
+      </IntroCell>
+      <IntroCell className="lg:col-span-12">
         <ChartCard />
-      </div>
+      </IntroCell>
       <Cell col={0} span="lg:col-span-5">
         <BacktestCompare />
       </Cell>

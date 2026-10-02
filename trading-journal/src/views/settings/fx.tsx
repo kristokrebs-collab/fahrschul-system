@@ -157,24 +157,29 @@ export function SaveButton({ phase, className, disabled, ...rest }: SaveButtonPr
   );
 }
 
-/** Small signal dot that pops in next to a label whose value differs from the saved settings. */
+/**
+ * Small signal dot that pops in next to a label whose value differs from the saved settings. It sits in a zero-width
+ * inline box (the dot itself is absolutely placed after the text), so a label that fills its column never wraps
+ * when the dot appears – the field below does not jump.
+ */
 export function ChangedDot({ show }: { show: boolean }) {
   const reduced = useReducedFx();
   return (
-    <AnimatePresence initial={false}>
-      {show && (
-        <motion.span
-          key="dot"
-          aria-hidden="true"
-          title="Ungespeichert"
-          className="ml-1.5 inline-block size-1.5 rounded-full bg-signal align-middle"
-          initial={reduced ? false : { scale: 0 }}
-          animate={{ scale: 1 }}
-          exit={{ scale: 0, transition: tween.exit }}
-          transition={spring.pop}
-        />
-      )}
-    </AnimatePresence>
+    <span aria-hidden="true" className="relative inline-block h-[1em] w-0 align-middle">
+      <AnimatePresence initial={false}>
+        {show && (
+          <motion.span
+            key="dot"
+            title="Ungespeichert"
+            className="absolute left-1.5 top-1/2 -mt-[3px] block size-1.5 rounded-full bg-signal"
+            initial={reduced ? false : { scale: 0 }}
+            animate={{ scale: 1 }}
+            exit={{ scale: 0, transition: tween.exit }}
+            transition={spring.pop}
+          />
+        )}
+      </AnimatePresence>
+    </span>
   );
 }
 
