@@ -1,11 +1,10 @@
 /**
- * Curtain-reveal footer (pulse-motion `motion-footer`, exact timings): the app above is the curtain (rounded bottom
- * corners, static shadow, see `Curtain` in App) and scrolls natively off this footer, which sits `position: sticky;
- * bottom: 0` underneath it. Once ≥ 72 % of the footer is uncovered (hysteresis: hidden again at ≤ 50 %) its parts fade
+ * Reveal footer (pulse-motion `motion-footer` timings, in normal flow so it never covers page content): once ≥ 72 %
+ * of the footer has scrolled into view (hysteresis: hidden again at ≤ 50 %) its parts fade
  * up in the pack's stagger: wordmark 450 ms / 27 px, bar 1100 ms at 380 / 460 ms, the tilted ticker band 700 ms at
  * 800 ms (−3.6° → −1.8°, 50 px), all on cubic-bezier(.16,1,.3,1). The band is an endless marquee of live journal
  * figures; the price is a MotionValue text (no React render per tick). The uncovered fraction comes from two
- * IntersectionObservers on a sentinel at the curtain's edge (no scroll listener, no layout read per frame).
+ * IntersectionObservers on a sentinel at the footer's top edge (no scroll listener, no layout read per frame).
  * Reduced motion: everything visible at once, the band stands still.
  */
 import { motion, useMotionValue, useSpring, type MotionValue } from "motion/react";
@@ -48,7 +47,7 @@ function part(shown: boolean, reduced: boolean, t: { ms: number; delay: number; 
   return {
     opacity: on ? 1 : 0,
     // 2D transforms: at rest (hidden or shown) no part is promoted to its own layer – a composited layer in the sticky
-    // footer under the curtain would force every page cell overlapping it into a layer too ("Overlap")
+    // footer part would stay promoted for no reason
     transform: on ? (extra?.to ?? "none") : (extra?.from ?? `translate(0,${t.rise}px)`),
     transition: shown && !reduced ? `opacity ${t.ms}ms ${CONFIG.ease} ${t.delay}ms, transform ${t.ms}ms ${CONFIG.ease} ${t.delay}ms` : "none",
   };
@@ -201,32 +200,7 @@ const StatsBand = memo(function StatsBand({ paused }: { paused: boolean }) {
 
 /* ------------------------------------------------------------------ footer */
 
-/**
- * true while the curtain edge (`sentinel`) is within a footer height (+ a margin) of the viewport bottom. Only then is
- * the footer sticky: a sticky footer sits composited under the viewport bottom all the time, which forces every page
- * cell overlapping it onto its own layer and keeps it rasterised behind the opaque curtain. Far from the end it is a
- * plain block at the page end (same box, off screen), so the switch is invisible.
- */
-function useFooterNear(sentinel: React.RefObject<HTMLElement | null>, footer: React.RefObject<HTMLElement | null>): boolean {
-  const [near, setNear] = useState(() => typeof IntersectionObserver !== "function");
-  useEffect(() => {
-    const el = sentinel.current;
-    const f = footer.current;
-    if (!el || !f || typeof IntersectionObserver !== "function") return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        const e = entries[entries.length - 1];
-        if (e) setNear(e.isIntersecting || e.boundingClientRect.top < (e.rootBounds?.top ?? 0));
-      },
-      { rootMargin: `0px 0px ${Math.round(f.offsetHeight + window.innerHeight * 0.5)}px 0px` },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [sentinel, footer]);
-  return near;
-}
-
-/** Watches the curtain edge (`sentinel`) against the footer height: `true` once ≥ `revealAt` of the footer is uncovered. */
+/** Watches the footer's top edge (`sentinel`) against the footer height: `true` once ≥ `revealAt` of the footer is uncovered. */
 function useFooterShown(sentinel: React.RefObject<HTMLElement | null>, footer: React.RefObject<HTMLElement | null>): boolean {
   // engines without IntersectionObserver show the footer at once
   const [shown, setShown] = useState(() => typeof IntersectionObserver !== "function");
@@ -280,7 +254,6 @@ export function Footer() {
   const sentinel = useRef<HTMLDivElement>(null);
   const footer = useRef<HTMLElement>(null);
   const shown = useFooterShown(sentinel, footer);
-  const near = useFooterNear(sentinel, footer);
   const [drawn, setDrawn] = useState(false);
   if (shown && !drawn) setDrawn(true);
 
@@ -288,12 +261,10 @@ export function Footer() {
   return (
     <>
       <div ref={sentinel} aria-hidden="true" className="h-px" />
-      <footer ref={footer} data-shown={shown || undefined} className={cn(near || shown ? "sticky bottom-0" : "relative", "-z-10 overflow-x-clip pb-[calc(92px+env(safe-area-inset-bottom,0px))] pt-10")}>
+      <footer ref={footer} data-shown={shown || undefined} className="relative overflow-x-clip pb-[calc(112px+env(safe-area-inset-bottom,0px))] pt-10">
         <div className="relative h-14" style={{ marginInline: "-6%", ...part(shown, reduced, band, { from: `rotate(${band.tiltFrom}deg) translate(0,${band.rise}px)`, to: `rotate(${band.tilt}deg)` }) }}>
           <div className="h-full border-y border-white/[0.06] bg-black/20">
-            {/* the sticky footer always intersects the viewport (under the curtain), so the IntersectionObserver never
-                sleeps the marquee: it mounts on the first reveal and is paused while covered (hiding happens at ≤ 50 %,
-                when the band at the top is covered again), so it resumes where it stopped */}
+            {/* mounts on the first reveal, paused while the footer is mostly off screen, resumes where it stopped */}
             {(drawn || reduced) && <StatsBand paused={!shown} />}
           </div>
         </div>

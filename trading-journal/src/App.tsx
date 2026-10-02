@@ -64,8 +64,8 @@ function Detail() {
 }
 
 /**
- * App shell (Plan 6.6): curtain (header, `main` container, page host with the keep-alive overview, local banner) over
- * the sticky curtain-reveal footer, dock, command navigation (⌘K), toast island, the app-level overlays and the celebration layer (no portal, inside the group-less `LayoutGroup` of
+ * App shell (Plan 6.6): header, `main` container (page host with the keep-alive overview, local banner), the
+ * in-flow footer with its staggered reveal, dock, command navigation (⌘K), toast island, the app-level overlays and the celebration layer (no portal, inside the group-less `LayoutGroup` of
  * `MotionRoot`). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
  * banner opens or closes; the page, toasts, detail and editor each re-render on their own.
  */
@@ -74,12 +74,9 @@ export default function App() {
   return (
     <MorphDialogProvider>
       <ScenarioWatcher />
-      {/* the curtain (pack motion-footer): opaque, rounded bottom corners, scrolls off the sticky footer below it.
-          No z-index / transform on it: it must not become a stacking context or a containing block for the fixed
-          layers inside the pages (chart marker ghost, table ghost, unsaved bar) */}
-      <div className="app-curtain relative min-h-dvh rounded-b-[22px]" data-curtain="">
+      <div className="relative min-h-dvh">
         <Header />
-        <main className="mx-auto max-w-[1320px] px-4 pb-20 pt-6 sm:px-6">
+        <main className="mx-auto max-w-[1320px] px-4 pb-10 pt-6 sm:px-6">
           <LocalModeBanner />
           {/* moves only when the banner enters / leaves (strict dependency: page switches never measure this subtree);
               scroll memory lives in the router, applied by the page host at the commit that shows a page */}
