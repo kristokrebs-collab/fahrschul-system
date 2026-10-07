@@ -2,26 +2,35 @@
  * Long/Short-Tendenz ("Bias") of the Einstiegs-Check (ours, additive; user request 2026-10-07: "alle Bedingungen
  * abgleichen und an einem waagerechten Balken zeigen, ob eher Short oder eher Long").
  *
- * Every condition of the check votes in BOTH directions on −1 (fully short) … +1 (fully long):
+ * Every condition of the check votes in BOTH directions on −1 (fully short) … +1 (fully long), read the way the check
+ * itself reads it (`verdict.ts`):
  * - MCB per ladder rung (30m → 45m → 1h → 4h): the strongest event of each direction inside the lookback window
  *   (Bottom/Top 1, Kauf/Verkauf ⅔, the small zero-line crosses ⅓ — `WT_RANK / 3`), each decayed by its age in bars
  *   (half-life = `signalLookback` bars), long minus short, plus a mild wave vote (`BIAS_WAVE_SHARE` of: wt1 position
- *   — oversold → long, overbought → short — and wt1 − wt2 slope — curling up → long).
- * - RSI 14 per rung: ≤ `rsiOs + rsiNear` (near oversold) +1, ≥ `rsiOb − rsiNear` (near overbought) −1, linear in
- *   between (0 at the middle, 50 with the defaults); one row, the rungs weighted like the MCB rungs.
- * - Premium/Discount (LuxAlgo, `zoneTf`): by the position in the range — bottom +1, equilibrium band 0, top −1.
+ *   — oversold → long, overbought → short — and wt1 − wt2 slope — curling up → long). LADDER GATE: like the check
+ *   ("Leiter muss von unten durchgehend bestätigen"), an event counts fully only when every rung below confirms the
+ *   same direction; an unconfirmed higher-rung event counts `BIAS_UNCONFIRMED` (¼).
+ * - RSI 14 on the HEAD rungs (the check's `head`: the base plus the rungs the ladder confirms, either direction): per
+ *   rung ≤ `rsiOs + rsiNear` (near oversold) +1, ≥ `rsiOb − rsiNear` (near overbought) −1, linear in between; the row
+ *   votes the strongest long reading minus the strongest short reading (the check: "some head rung near OS/OB").
+ * - Premium/Discount (LuxAlgo): the check's reference — the `zoneTf` check, or the 30m base when that timeframe has too
+ *   few bars — by the position in the range: bottom +1, equilibrium band 0, top −1.
  * - "Top-Trader kaufen · Retail rot": per period, top-trader long % up AND all-accounts long % down → +1 when the
  *   run holds (≥ `minRun`), ±0.75 when both point the same way over the window without a full run, ±0.5 when only one
  *   side does; short mirrored; the periods averaged.
  *
- * Weights reuse the check's grading: the score's points (ladder 55 + Bottom/Top 10 = MCB 65, RSI 20, zone 15) and the
- * whale condition's own `settings.signals.whale.weight` (default 10; 0 = shown, never counted). The MCB points are
- * split over the rungs by 1 : 2 : 3 : 4 … (the strength grading adds one level per further rung: higher rungs weigh
- * more). Override: `settings.signals.bias = { mcb, rsi, zone, whale }` (optional; `sanitizeSignalCfg` keeps the
- * unknown key, `sanitizeBiasCfg` reads it; no settings UI yet).
+ * Weights = the check's score points: MCB 65 (ladder 55 + Bottom/Top 10) split EQUALLY over the rungs (the score's
+ * 55 / n per confirmed rung), RSI 20, zone 15, and the whale condition's own `settings.signals.whale.weight` (default
+ * 10; 0 = shown, never counted). Override: `settings.signals.bias = { mcb, rsi, zone, whale }` (optional;
+ * `sanitizeSignalCfg` keeps the unknown key, `sanitizeBiasCfg` reads it; no settings UI yet).
  *
  * Missing data (a rung with too few bars, no zone, whale off / no Binance data) is EXCLUDED from the weighted mean —
  * never counted as a neutral vote. Nothing left → `null` ("Keine Daten").
+ *
+ * Consistency with the check's verdict (`sig.long` / `sig.short`, recomputed when absent):
+ * - never against a valid entry: when only one side is a valid entry, a sum pointing the other way is shown as 0;
+ * - "Stark" only with a valid entry on that side: otherwise the score stops at `BIAS_STRONG_CAP` (74 %) and the
+ *   label at "Eher". `Bias.sum` keeps the unlimited weighted mean (= Σ `contributionImpact`), `Bias.limit` says why.
  *
  * Labels: |score| < 0.15 Neutral, < 0.5 Eher Long/Short, else Stark Long/Short (symmetric). `biasLevel(score, prev)`
  * adds a ±0.05 hysteresis around the boundaries so the label does not flicker while the score hovers there.
@@ -30,7 +39,7 @@
 import { whaleCfgOf, type Side, type SignalCfg, type WhaleCfg } from "./config";
 import { ageText, kindText, roleText, ZONE_TEXT } from "./copy";
 import { WT_RANK, type WtEvent } from "./mcb";
-import type { Signals, TfCheck } from "./verdict";
+import { verdict, type Signals, type TfCheck } from "./verdict";
 import { WHALE_TITLE, type WhalePeriod, type WhaleReading } from "./whale";
 import type { ZoneInfo } from "./zones";
 
@@ -40,17 +49,23 @@ export type BiasLevel = -2 | -1 | 0 | 1 | 2;
 export const BIAS_TITLE = "Long/Short-Tendenz";
 export const BIAS_NO_DATA = "Keine Daten";
 export const BIAS_LABEL: Readonly<Record<BiasLevel, string>> = { [-2]: "Stark Short", [-1]: "Eher Short", 0: "Neutral", 1: "Eher Long", 2: "Stark Long" };
+/** Row title of the whale condition while it points nowhere (vote 0) or has no data. */
+export const WHALE_NEUTRAL_TITLE = "Top-Trader vs. Retail";
 
 /** |score| below this = Neutral (the neutral zone of the bar: ±0.15 = the middle 15 % of its width). */
 export const BIAS_LEAN = 0.15;
-/** |score| from this = Stark Long / Stark Short. */
+/** |score| from this = Stark Long / Stark Short (only with a valid entry on that side). */
 export const BIAS_STRONG = 0.5;
+/** Without a valid entry on its side the score stops here (74 %), just short of "Stark". */
+export const BIAS_STRONG_CAP = BIAS_STRONG - 0.02;
 /** A label changes only once the score is this far past the boundary of the current level. */
 export const BIAS_HYSTERESIS = 0.05;
 /** Share of the wave vote (wt1 position + slope) in a rung's MCB vote: mild next to an event. */
 export const BIAS_WAVE_SHARE = 0.3;
 /** wt1 − wt2 (= half the last wt1 step, wt2 is SMA 2) at which the slope vote is full. */
 export const BIAS_SLOPE_FULL = 6;
+/** Factor of an MCB event on a rung the ladder below does not confirm (the check ignores it; we keep a trace). */
+export const BIAS_UNCONFIRMED = 0.25;
 /** Equilibrium band of the zone vote (0 inside), the same 47.5 … 52.5 % as `zoneOf`. */
 const EQ_LO = 0.475;
 const EQ_HI = 0.525;
@@ -110,10 +125,31 @@ export function waveVote(wt1: number, wt2: number, cfg: Pick<SignalCfg, "wtObStr
   return clamp1(0.5 * clamp1(pos) + 0.5 * clamp1(slope));
 }
 
-/** MCB vote of one rung: long event − short event (both decayed) + `BIAS_WAVE_SHARE` × wave, clamped. */
-export function mcbVote(c: Pick<TfCheck, "wt">, cfg: Pick<SignalCfg, "signalLookback" | "wtObStrong" | "wtOsStrong">): number {
-  const ev = mcbEventVote(c.wt.long, cfg.signalLookback) - mcbEventVote(c.wt.short, cfg.signalLookback);
-  return clamp1(ev + BIAS_WAVE_SHARE * waveVote(c.wt.wt1, c.wt.wt2, cfg));
+/** Per direction: does the ladder below this rung confirm it (every lower rung has a signal of that direction)? */
+export interface RungGate {
+  long: boolean;
+  short: boolean;
+}
+const OPEN_GATE: Readonly<RungGate> = Object.freeze({ long: true, short: true });
+
+/**
+ * MCB vote of one rung: long event − short event (both decayed; an event the ladder below does not confirm counts
+ * `BIAS_UNCONFIRMED`) + `BIAS_WAVE_SHARE` × wave, clamped.
+ */
+export function mcbVote(c: Pick<TfCheck, "wt">, cfg: Pick<SignalCfg, "signalLookback" | "wtObStrong" | "wtOsStrong">, gate: RungGate = OPEN_GATE): number {
+  const long = mcbEventVote(c.wt.long, cfg.signalLookback) * (gate.long ? 1 : BIAS_UNCONFIRMED);
+  const short = mcbEventVote(c.wt.short, cfg.signalLookback) * (gate.short ? 1 : BIAS_UNCONFIRMED);
+  return clamp1(long - short + BIAS_WAVE_SHARE * waveVote(c.wt.wt1, c.wt.wt2, cfg));
+}
+
+/** Rungs the ladder confirms for `side`, counted from the base and stopping at the first gap (= `verdict().tiers`). */
+export function ladderTiers(checks: readonly (Pick<TfCheck, "longSignal" | "shortSignal"> | null)[], side: Side): number {
+  let t = 0;
+  for (const c of checks) {
+    if (c && (side === "long" ? c.longSignal : c.shortSignal)) t++;
+    else break;
+  }
+  return t;
 }
 
 /** RSI vote: ≤ near-oversold +1, ≥ near-overbought −1, linear in between (0 in the middle). */
@@ -224,6 +260,23 @@ const pp = (x: number): string => {
   const r = Math.round(x * 10) / 10;
   return `${r > 0 ? "+" : r < 0 ? "−" : "±"}${Math.abs(r).toFixed(1).replace(".", ",")} pp`;
 };
+/** `57,5 %` — the share of one side at |score| `a`. */
+const sidePct = (a: number): string => `${String(Math.round((50 + 50 * Math.abs(a)) * 10) / 10).replace(".", ",")} %`;
+
+/**
+ * Why the label holds although the score sits past its boundary (hysteresis), e.g. `gehalten: wechselt erst unter
+ * 55 %`; `""` when the label is the plain level of the score.
+ */
+export function biasHoldText(score: number, level: BiasLevel): string {
+  if (!Number.isFinite(score) || rawBiasLevel(score) === level) return "";
+  const [lo, hi] = levelRange(level);
+  // the boundary the score has crossed, seen from the leading side (|score|)
+  const inner = level === 0 ? null : level > 0 ? lo : hi;
+  const a = Math.abs(score);
+  if (inner != null && a < Math.abs(inner)) return `gehalten: wechselt erst unter ${sidePct(Math.abs(inner) - BIAS_HYSTERESIS)}`;
+  const outer = level === 0 ? BIAS_LEAN : level > 0 ? hi : lo;
+  return `gehalten: wechselt erst ab ${sidePct(Math.abs(outer) + BIAS_HYSTERESIS)}`;
+}
 
 // ------------------------------------------------------------------ the bias
 
@@ -245,9 +298,23 @@ export interface BiasContribution {
   detail: string;
 }
 
+/** Why the shown score differs from the weighted sum. */
+export interface BiasLimit {
+  /** `entry`: the sum pointed against the only valid entry → 0; `strong`: no valid entry on its side → `BIAS_STRONG_CAP` */
+  kind: "entry" | "strong";
+  /** the side of the valid entry (`entry`) or of the capped lean (`strong`) */
+  side: Side;
+  /** German note (explainer) */
+  text: string;
+}
+
 export interface Bias {
-  /** −1 = fully short … +1 = fully long (weighted mean of the votes) */
+  /** −1 = fully short … +1 = fully long (the weighted mean, limited by the check's verdict — see `limit`) */
   score: number;
+  /** the weighted mean of the votes before the limits (= Σ `contributionImpact`) */
+  sum: number;
+  /** set when `score` ≠ `sum` */
+  limit: BiasLimit | null;
   level: BiasLevel;
   /** `Stark Short` · `Eher Short` · `Neutral` · `Eher Long` · `Stark Long` */
   label: string;
@@ -258,24 +325,31 @@ export interface Bias {
   percent: string;
   /** `Eher Long, 64 %` (meter text alternative) */
   valueText: string;
+  /** hysteresis note (`gehalten: wechselt erst unter 55 %`), `""` when the label is the plain level */
+  hold: string;
+  /** valid entry per side, from the check's verdict */
+  valid: Readonly<Record<Side, boolean>>;
   contributions: BiasContribution[];
   /** conditions that voted / all conditions */
   used: number;
   total: number;
 }
 
-/** MCB rung weights: the group's points split 1 : 2 : 3 : 4 … over the ladder (higher timeframe = more). */
+/** What the bias reads: the checks, the zone and the whale reading; the verdicts when at hand (else recomputed). */
+export type BiasInput = Pick<Signals, "checks" | "zone" | "whale"> & Partial<Pick<Signals, "long" | "short">>;
+
+/** MCB rung weights: the group's points split equally over the ladder (the check's score: 55 / n per rung). */
 export function rungWeights(n: number, total: number): number[] {
-  const sum = (n * (n + 1)) / 2;
-  return Array.from({ length: n }, (_, i) => (sum > 0 ? (total * (i + 1)) / sum : 0));
+  return Array.from({ length: n }, () => (n > 0 ? total / n : 0));
 }
 
-function mcbDetail(c: TfCheck): string {
+function mcbDetail(c: TfCheck, gate: RungGate): string {
   const long = c.wt.long;
   const short = c.wt.short;
   const ev = long && short ? (long.barsAgo <= short.barsAgo ? long : short) : (long ?? short);
-  const head = ev ? `${kindText(ev.kind)} · ${ageText(ev.barsAgo)}` : kindText(null);
-  const both = long && short ? ` (+ ${kindText(ev === long ? short.kind : long.kind)})` : "";
+  const tag = (e: NonNullable<WtEvent>): string => `${kindText(e.kind)}${(e === long ? gate.long : gate.short) ? "" : " (unbestätigt)"}`;
+  const head = ev ? `${tag(ev)} · ${ageText(ev.barsAgo)}` : kindText(null);
+  const both = long && short ? ` (+ ${tag(ev === long ? short : long)})` : "";
   return `${head}${both} · WT ${n1(c.wt.wt1)} ${c.wt.wt1 >= c.wt.wt2 ? "↑" : "↓"}`;
 }
 
@@ -284,67 +358,76 @@ function zoneDetail(z: ZoneInfo): string {
 }
 
 function whaleDetail(reading: WhaleReading, w: WhaleCfg, vote: number): string {
-  const side: Side = vote < 0 ? "short" : "long";
-  const best = reading.periods.reduce((a, b) => {
-    const ra = side === "long" ? a.runLong : a.runShort;
-    const rb = side === "long" ? b.runLong : b.runShort;
-    return rb > ra ? b : a;
-  });
-  const run = side === "long" ? best.runLong : best.runShort;
   const missing = reading.missing.length ? ` · ${reading.missing.join(", ")}: keine Daten` : "";
-  return `Top-Trader ${pp(best.topChg)} · Retail ${pp(best.retailChg)} · ${run}× in Folge (${best.period}, mind. ${w.minRun})${missing}`;
+  const runOf = (p: WhalePeriod): number => (vote > 0 ? p.runLong : vote < 0 ? p.runShort : Math.max(p.runLong, p.runShort));
+  const best = reading.periods.reduce((a, b) => (runOf(b) > runOf(a) ? b : a));
+  const runs = vote === 0 ? `Long ${best.runLong}× · Short ${best.runShort}×` : `${runOf(best)}×`;
+  return `Top-Trader ${pp(best.topChg)} · Retail ${pp(best.retailChg)} · ${runs} in Folge (${best.period}, mind. ${w.minRun})${missing}`;
 }
+
+const SIDE_WORD: Readonly<Record<Side, string>> = { long: "Long", short: "Short" };
+const OTHER: Readonly<Record<Side, Side>> = { long: "short", short: "long" };
 
 /**
  * The bias of an evaluation (both directions, every condition). `prevLevel` applies the label hysteresis
  * (`biasLevel`). `null` when no condition has data ("Keine Daten").
  */
-export function computeBias(sig: Pick<Signals, "checks" | "zone" | "whale"> | null | undefined, cfg: SignalCfg, prevLevel?: BiasLevel | null): Bias | null {
+export function computeBias(sig: BiasInput | null | undefined, cfg: SignalCfg, prevLevel?: BiasLevel | null): Bias | null {
   if (!sig) return null;
   const bc = biasCfgOf(cfg);
   const w = whaleCfgOf(cfg);
   const out: Omit<BiasContribution, "share">[] = [];
-  const n = Math.max(sig.checks.length, cfg.ladder.length);
+  const checks = sig.checks;
+  const n = Math.max(checks.length, cfg.ladder.length);
   const rw = rungWeights(n, bc.mcb);
+  const tiers: Record<Side, number> = { long: ladderTiers(checks, "long"), short: ladderTiers(checks, "short") };
 
   for (let i = 0; i < n; i++) {
-    const c = sig.checks[i] ?? null;
+    const c = checks[i] ?? null;
     const tf = c?.tf ?? cfg.ladder[i] ?? `#${i + 1}`;
+    // an event counts fully only when every rung below confirms its direction (the check's ladder)
+    const gate: RungGate = { long: i <= tiers.long, short: i <= tiers.short };
     out.push({
       id: `mcb-${tf}`,
       group: "mcb",
       label: `MCB ${tf} · ${roleText(i, cfg.required)}`,
-      vote: c ? mcbVote(c, cfg) : null,
+      vote: c ? mcbVote(c, cfg, gate) : null,
       weight: rw[i]!,
-      detail: c ? mcbDetail(c) : "Zu wenig Kerzen",
+      detail: c ? mcbDetail(c, gate) : "Zu wenig Kerzen",
     });
   }
 
-  // RSI: one row, the rungs weighted like the MCB rungs (1 : 2 : 3 : 4)
-  let rs = 0;
-  let rwSum = 0;
+  // RSI on the check's head rungs (the base + the rungs the ladder confirms): strongest long − strongest short reading
+  const headN = Math.max(1, tiers.long, tiers.short);
+  let rLong = 0;
+  let rShort = 0;
+  let rAny = false;
   const rsiParts: string[] = [];
-  for (let i = 0; i < n; i++) {
-    const c = sig.checks[i];
+  for (let i = 0; i < headN; i++) {
+    const c = checks[i];
     if (!c || !Number.isFinite(c.rsi)) continue;
-    rs += (i + 1) * rsiVote(c.rsi, cfg);
-    rwSum += i + 1;
+    const v = rsiVote(c.rsi, cfg);
+    rLong = Math.max(rLong, v);
+    rShort = Math.max(rShort, -v);
+    rAny = true;
     rsiParts.push(`${c.tf} ${n1(c.rsi)}`);
   }
   out.push({
     id: "rsi",
     group: "rsi",
     label: `RSI ${cfg.rsiLen}`,
-    vote: rwSum > 0 ? clamp1(rs / rwSum) : null,
+    vote: rAny ? clamp1(rLong - rShort) : null,
     weight: bc.rsi,
-    detail: rwSum > 0 ? `${rsiParts.join(" · ")} (≤ ${cfg.rsiOs + cfg.rsiNear} Long, ≥ ${cfg.rsiOb - cfg.rsiNear} Short)` : "Zu wenig Kerzen",
+    detail: rAny ? `${rsiParts.join(" · ")} (≤ ${cfg.rsiOs + cfg.rsiNear} Long, ≥ ${cfg.rsiOb - cfg.rsiNear} Short)` : "Zu wenig Kerzen",
   });
 
-  const z = sig.zone?.zone ?? null;
+  // the check's zone reference: the zoneTf check, or the base when that timeframe has too few bars
+  const zc = sig.zone ?? checks.find((c) => c?.tf === cfg.zoneTf) ?? checks[0] ?? null;
+  const z = zc?.zone ?? null;
   out.push({
     id: "zone",
     group: "zone",
-    label: `Premium/Discount · ${sig.zone?.tf ?? cfg.zoneTf}`,
+    label: `Premium/Discount · ${zc?.tf ?? cfg.zoneTf}`,
     vote: z && Number.isFinite(z.pos) ? zoneVote(z.pos) : null,
     weight: bc.zone,
     detail: z ? zoneDetail(z) : "Zu wenig Kerzen",
@@ -355,7 +438,7 @@ export function computeBias(sig: Pick<Signals, "checks" | "zone" | "whale"> | nu
     out.push({
       id: "whale",
       group: "whale",
-      label: WHALE_TITLE[v != null && v < 0 ? "short" : "long"],
+      label: v == null || v === 0 ? WHALE_NEUTRAL_TITLE : WHALE_TITLE[v < 0 ? "short" : "long"],
       vote: v,
       weight: bc.whale ?? w.weight,
       detail: v == null || !sig.whale ? "keine Daten" : `${whaleDetail(sig.whale, w, v)}${(bc.whale ?? w.weight) > 0 ? "" : " · zählt nicht"}`,
@@ -370,27 +453,67 @@ export function computeBias(sig: Pick<Signals, "checks" | "zone" | "whale"> | nu
     s += c.weight * c.vote;
   }
   if (!(sw > 0)) return null;
-  const score = clamp1(s / sw);
-  const level = biasLevel(score, prevLevel);
+  const sum = clamp1(s / sw);
+
+  // the check's verdict per side (the live snapshot carries it; hand-built inputs get it recomputed)
+  const valid: Record<Side, boolean> = {
+    long: (sig.long ?? verdict("long", checks, cfg, sig.zone)).valid,
+    short: (sig.short ?? verdict("short", checks, cfg, sig.zone)).valid,
+  };
+  let score = sum;
+  let limit: BiasLimit | null = null;
+  const only: Side | null = valid.long !== valid.short ? (valid.long ? "long" : "short") : null;
+  if (only && (only === "long" ? score < 0 : score > 0)) {
+    score = 0;
+    limit = { kind: "entry", side: only, text: `gültiger ${SIDE_WORD[only]}-Einstieg im Check: zeigt nicht ${SIDE_WORD[OTHER[only]]}` };
+  }
+  const lean: Side | null = score > 0 ? "long" : score < 0 ? "short" : null;
+  if (lean && Math.abs(score) > BIAS_STRONG_CAP && !valid[lean]) {
+    score = Math.sign(score) * BIAS_STRONG_CAP;
+    limit = { kind: "strong", side: lean, text: `„Stark“ nur mit gültigem ${SIDE_WORD[lean]}-Einstieg` };
+  }
+  let level = biasLevel(score, prevLevel);
+  if (Math.abs(level) === 2 && !valid[level > 0 ? "long" : "short"]) level = (level > 0 ? 1 : -1) as BiasLevel;
+
   const contributions: BiasContribution[] = out.map((c) => ({ ...c, share: c.vote != null && c.weight > 0 ? c.weight / sw : 0 }));
   return {
     score,
+    sum,
+    limit,
     level,
     label: BIAS_LABEL[level],
     side: biasSide(score),
     pct: biasPct(score),
     percent: biasPercentText(score),
     valueText: biasValueText(score, level),
+    hold: biasHoldText(score, level),
+    valid,
     contributions,
     used: contributions.filter((c) => c.vote != null).length,
     total: contributions.length,
   };
 }
 
-/** Weighted vote of one row in score units (−1 … +1 of the whole bar): `share × vote`. */
+/** Weighted vote of one row in score units (−1 … +1 of the whole bar): `share × vote`. Σ over the rows = `Bias.sum`. */
 export const contributionImpact = (c: Pick<BiasContribution, "share" | "vote">): number => (c.vote == null ? 0 : c.share * c.vote);
 
-const pctText = (score: number): string => `${String(50 + 50 * score).replace(".", ",")} %`;
+/**
+ * Largest-remainder rounding: `xs` rounded to integers that add up to `Math.round(Σ xs)` (shares in % → exactly 100,
+ * impacts in hundredths → exactly the rounded sum). Signed values work too.
+ */
+export function roundToSum(xs: readonly number[]): number[] {
+  const fl = xs.map((x) => (Number.isFinite(x) ? Math.floor(x) : 0));
+  const total = Math.round(xs.reduce((a, x) => a + (Number.isFinite(x) ? x : 0), 0));
+  let k = total - fl.reduce((a, x) => a + x, 0);
+  const order = xs.map((x, i) => ({ i, f: Number.isFinite(x) ? x - fl[i]! : 0 })).sort((a, b) => b.f - a.f || a.i - b.i);
+  for (const o of order) {
+    if (k <= 0) break;
+    if (o.f <= 0) break;
+    fl[o.i]!++;
+    k--;
+  }
+  return fl;
+}
 
 /** German one-paragraph method note (explainer). */
 export function biasMethodText(cfg: SignalCfg): string {
@@ -398,8 +521,11 @@ export function biasMethodText(cfg: SignalCfg): string {
   const w = whaleCfgOf(cfg);
   const whale = w.on ? `, Top-Trader · Retail ${bc.whale ?? w.weight}` : "";
   return (
-    `Jede Bedingung des Checks stimmt zwischen −1 (Short) und +1 (Long) ab, in beide Richtungen. Gewichtet mit den Score-Punkten: ` +
-    `MCB ${bc.mcb} (auf ${cfg.ladder.join(" · ")} im Verhältnis ${cfg.ladder.map((_, i) => i + 1).join(" : ")} verteilt), RSI ${bc.rsi}, Zone ${bc.zone}${whale}. ` +
-    `Fehlende Daten zählen nicht mit. Neutral bis ${pctText(BIAS_LEAN)} einer Seite, „Eher“ darüber, „Stark“ ab ${pctText(BIAS_STRONG)}.`
+    `Jede Bedingung stimmt zwischen −1 (Short) und +1 (Long) ab; Stimme × Gewicht = Beitrag, die Beiträge ergeben die Summe. ` +
+    `Gewichte wie die Score-Punkte des Checks: MCB ${bc.mcb} (zu gleichen Teilen auf ${cfg.ladder.join(" · ")}), RSI ${bc.rsi}, Zone ${bc.zone}${whale}. ` +
+    `Ein MCB-Signal einer höheren Stufe zählt nur voll, wenn alle Stufen darunter dieselbe Richtung bestätigen (sonst ¼); RSI zählt ` +
+    `auf der Basis und den bestätigten Stufen. Fehlende Daten zählen nicht. Neutral bis ${sidePct(BIAS_LEAN)} einer Seite, „Eher“ darüber, ` +
+    `„Stark“ ab ${sidePct(BIAS_STRONG)} und nur mit gültigem Einstieg; nie gegen einen gültigen Einstieg. ` +
+    `Die Stufe wechselt erst ${String(BIAS_HYSTERESIS * 50).replace(".", ",")} % hinter der Grenze.`
   );
 }

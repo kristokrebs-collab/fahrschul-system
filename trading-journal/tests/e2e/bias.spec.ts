@@ -3,7 +3,9 @@
  * every rung, so the bar must lean right of the centre with the label the pure model computes from the same data
  * (`mocks/synthOracle.ts` → `computeBias`). The SHORT setup is the same price path mirrored around the live price
  * (`p' = 2·84 200 − p`: a blow-off top that turns down) — WaveTrend, RSI and the premium/discount range mirror exactly,
- * so the bar must lean left. Also: the explainer (tap / Enter), the hero strip line, no overlap at the user's sizes.
+ * so the bar must lean left — never against the check's valid Short-Einstieg. Also: the explainer (tap / Enter; the
+ * weights add up to 100 %, the contributions to the shown sum, no row text overlaps), the hero strip line, no overlap
+ * at the user's sizes.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { computeBias } from "../../src/domain/signals/bias";
@@ -64,6 +66,28 @@ async function needleAt(bias: Locator): Promise<number> {
 
 function overlaps(a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }): boolean {
   return a.x < b.x + b.width - 0.5 && b.x < a.x + a.width - 0.5 && a.y < b.y + b.height - 0.5 && b.y < a.y + a.height - 0.5;
+}
+
+/** `+0,16` / `−0,05` / `±0,00` → number */
+const deNum = (t: string): number => Number(t.replace("±", "").replace("−", "-").replace(",", "."));
+
+/** Explainer rows: `Gewicht 16 % → +0,16` add up to 100 % and to the sum line; no row's texts overlap each other. */
+async function expectRowsAddUp(dialog: Locator): Promise<void> {
+  const texts = (await dialog.getByTestId("bias-row-weight").allTextContents()).filter((t) => t.startsWith("Gewicht"));
+  const parts = texts.map((t) => /^Gewicht (\d+) % → ([+−±][\d,]+)$/.exec(t.trim()));
+  expect(parts.every(Boolean), texts.join(" | ")).toBe(true);
+  expect(parts.reduce((a, m) => a + Number(m![1]), 0), "weights add up to 100 %").toBe(100);
+  const sumLine = (await dialog.getByTestId("bias-sum").textContent()) ?? "";
+  const sum = deNum(/^Summe ([+−±][\d,]+)/.exec(sumLine)![1]!);
+  expect(parts.reduce((a, m) => a + Math.round(deNum(m![2]!) * 100), 0), `contributions add up to ${sumLine}`).toBe(Math.round(sum * 100));
+  const rows = dialog.getByTestId("bias-row");
+  for (let i = 0; i < (await rows.count()); i++) {
+    const row = rows.nth(i);
+    const spans = row.locator(":scope > span:not([aria-hidden]) > span"); // name × vote, detail × weight (not the bar)
+    const boxes = [];
+    for (let j = 0; j < (await spans.count()); j++) boxes.push(await spans.nth(j).boundingBox());
+    for (let a = 0; a < boxes.length; a++) for (let b = a + 1; b < boxes.length; b++) if (boxes[a] && boxes[b]) expect(overlaps(boxes[a]!, boxes[b]!), `row ${i}: text ${a} × ${b}`).toBe(false);
+  }
 }
 
 test.describe("Long/Short-Tendenz", () => {
@@ -131,6 +155,8 @@ test.describe("Long/Short-Tendenz", () => {
     }
     await expect(dialog.getByText("Top-Trader kaufen · Retail rot", { exact: true })).toBeVisible();
     await page.waitForTimeout(700);
+    await expectRowsAddUp(dialog);
+    await expect(dialog.getByTestId("bias-sum")).toContainText("→ Stark Long");
     await page.screenshot({ path: info.outputPath("bias-explainer.png"), animations: "disabled" });
     await dialog.getByRole("button", { name: "Schließen" }).click();
     await expect(dialog).toHaveCount(0);
@@ -159,6 +185,18 @@ test.describe("Long/Short-Tendenz", () => {
     await expectNoHorizontalScroll(page);
     await card.screenshot({ path: info.outputPath("bias-short-card-only.png"), animations: "disabled" });
     if ((page.viewportSize()?.width ?? 0) >= 1024) await expect(page.getByTestId("signal-strip-bias")).toHaveAttribute("data-level", /^-[12]$/);
+
+    // explainer: rows add up; the flat top-trader reading is not titled "kaufen · Retail rot" on the short side
+    await bias.getByRole("button", { name: /Bedingungen ansehen$/ }).click();
+    const dialog = page.getByRole("dialog", { name: "Long/Short-Tendenz" });
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(700);
+    await expectRowsAddUp(dialog);
+    await expect(dialog.getByTestId("bias-sum")).toContainText(/→ (Stark|Eher) Short/);
+    const whale = dialog.locator("[data-testid=bias-row][data-id=whale]");
+    const vote = await whale.getAttribute("data-vote");
+    if (vote === "none" || Number(vote) <= 0) await expect(whale).not.toContainText("Top-Trader kaufen · Retail rot");
+    await page.screenshot({ path: info.outputPath("bias-short-explainer.png"), animations: "disabled" });
     expect(errors, errors.join("\n")).toEqual([]);
   });
 });

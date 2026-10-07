@@ -14,9 +14,25 @@
  * Compact variant (`SignalStrip`, which is itself a button): visual only, `aria-hidden`.
  */
 import { motion, useTransform, type MotionValue } from "motion/react";
-import { memo, useRef, useState, type RefObject } from "react";
-import { DEFAULT_SIGNAL_CFG, type SignalCfg, type Signals } from "@/domain/signals";
-import { BIAS_LABEL, BIAS_LEAN, BIAS_NO_DATA, BIAS_STRONG, BIAS_TITLE, biasMethodText, computeBias, type Bias, type BiasContribution, type BiasLevel } from "@/domain/signals/bias";
+import { memo, useMemo, useRef, useState, type RefObject } from "react";
+import { DEFAULT_SIGNAL_CFG, sanitizeWhaleCfg, whaleCfgOf, type SignalCfg } from "@/domain/signals";
+import {
+  BIAS_LABEL,
+  BIAS_LEAN,
+  BIAS_NO_DATA,
+  BIAS_STRONG,
+  BIAS_TITLE,
+  biasMethodText,
+  computeBias,
+  contributionImpact,
+  roundToSum,
+  sanitizeBiasCfg,
+  type Bias,
+  type BiasCfg,
+  type BiasContribution,
+  type BiasInput as BiasSignals,
+  type BiasLevel,
+} from "@/domain/signals/bias";
 import { cn } from "@/lib/cn";
 import { useSignalCheck } from "@/market";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
@@ -26,11 +42,12 @@ import { TextRoll } from "@/motion/TextRoll";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useRevealValue } from "@/primitives/revealValue";
+import { useJournal } from "@/store/journalStore";
 
 export const BIAS_CARD_ID = "signal-bias";
 export const BIAS_DETAILS = "Bedingungen ansehen";
 
-type BiasInput = Pick<Signals, "checks" | "zone" | "whale"> | null | undefined;
+type BiasInput = BiasSignals | null | undefined;
 
 /** Score jumps below this glide on `spring.smooth` itself; from `BIAS_JUMP_FAST` on the context spring is at full tempo. */
 const BIAS_JUMP_SLOW = 0.08;
@@ -57,6 +74,28 @@ export function useBias(sig: BiasInput, cfg: SignalCfg, seed?: BiasLevel | null)
     return { bias: next.bias, prev: next.prev };
   }
   return { bias: st.bias, prev: st.prev };
+}
+
+/** The weights the bias reads from `settings.signals` (`bias` override + the whale weight) as a stable key; `null` without a signals object. */
+function liveWeightsKey(settings: unknown): string | null {
+  const sg = settings && typeof settings === "object" ? (settings as { signals?: unknown }).signals : undefined;
+  if (!sg || typeof sg !== "object") return null;
+  const r = sg as { bias?: unknown; whale?: unknown };
+  return JSON.stringify({ bias: sanitizeBiasCfg(r.bias), whale: sanitizeWhaleCfg(r.whale).weight });
+}
+
+/**
+ * `cfg` (the published evaluation's) with the bias weights read LIVE from the journal settings: the engine keeps its
+ * config — and re-uses the snapshot — while only weights change (they do not change the evaluation), so an override
+ * from a backup import or another tab would otherwise wait for a reload. Same identity while nothing differs.
+ */
+export function useLiveBiasCfg(cfg: SignalCfg): SignalCfg {
+  const key = useJournal((s) => liveWeightsKey(s.settings));
+  return useMemo(() => {
+    if (key == null || key === liveWeightsKey({ signals: cfg })) return cfg;
+    const live = JSON.parse(key) as { bias: BiasCfg; whale: number };
+    return { ...cfg, bias: live.bias, whale: { ...whaleCfgOf(cfg), weight: live.whale } } as SignalCfg;
+  }, [cfg, key]);
 }
 
 /** Needle spring for a score jump of `jump` (0 … 2): `spring.smooth` for a drift, livelier and direct for a swing. */
@@ -178,7 +217,8 @@ export function BiasBar({ compact = false, ...props }: BiasBarProps) {
 }
 
 /** Compact one-liner of the hero strip (`Tendenz` · bar · label + %), visual only (the strip is the button). */
-function BiasStripBar({ sig, cfg, className }: Omit<BiasBarProps, "compact">) {
+function BiasStripBar({ sig, cfg: snapCfg, className }: Omit<BiasBarProps, "compact">) {
+  const cfg = useLiveBiasCfg(snapCfg);
   const { bias, prev } = useBias(sig, cfg);
   const ref = useRef<HTMLSpanElement>(null);
   const needle = useNeedle(ref, bias, prev);
@@ -210,7 +250,8 @@ function BiasStripBar({ sig, cfg, className }: Omit<BiasBarProps, "compact">) {
 }
 
 /** Full bar of the card: a `MorphCard` (tap / click / Enter / Space → explainer) plus the sibling meter. */
-function BiasCardBar({ sig, cfg, className }: Omit<BiasBarProps, "compact">) {
+function BiasCardBar({ sig, cfg: snapCfg, className }: Omit<BiasBarProps, "compact">) {
+  const cfg = useLiveBiasCfg(snapCfg);
   const { bias, prev } = useBias(sig, cfg);
   const ref = useRef<HTMLDivElement>(null);
   const needle = useNeedle(ref, bias, prev);
@@ -286,8 +327,11 @@ export function voteWord(v: number | null): string {
   return v > 0 ? "Long" : "Short";
 }
 
-/** One condition: name, vote word + number, a diverging bar (left Short, right Long, from the centre), detail, weight. */
-const ContributionRow = memo(function ContributionRow({ c }: { c: BiasContribution }) {
+/**
+ * One condition: name, vote word + number, a diverging bar (left Short, right Long, from the centre), detail, and
+ * `Gewicht 16 % → +0,16` (weight share and the row's contribution to the sum, both rounded so the rows add up exactly).
+ */
+const ContributionRow = memo(function ContributionRow({ c, pct, cents }: { c: BiasContribution; pct: number; cents: number }) {
   const reduced = useReducedFx();
   const v = c.vote;
   const side = v == null || Math.abs(v) < 0.05 ? null : v > 0 ? "long" : "short";
@@ -314,7 +358,9 @@ const ContributionRow = memo(function ContributionRow({ c }: { c: BiasContributi
       </span>
       <span className="flex items-baseline justify-between gap-3 text-[11px] leading-snug">
         <span className="min-w-0 text-mute">{c.detail}</span>
-        <span className="num shrink-0 whitespace-nowrap font-mono text-faint">{c.vote == null ? "zählt nicht" : `Gewicht ${Math.round(c.share * 100)} %`}</span>
+        <span className="num shrink-0 whitespace-nowrap font-mono text-faint" data-testid="bias-row-weight">
+          {c.vote == null ? "zählt nicht" : `Gewicht ${pct} % → ${fmtVote(cents / 100)}`}
+        </span>
       </span>
     </li>
   );
@@ -326,13 +372,17 @@ const ContributionRow = memo(function ContributionRow({ c }: { c: BiasContributi
  */
 export function BiasExplain({ seed }: { seed?: BiasLevel | null }) {
   const snap = useSignalCheck().snapshot;
-  const cfg = snap?.cfg;
-  const { bias, prev } = useBias(snap, cfg ?? DEFAULT_SIGNAL_CFG, seed);
+  const cfg = useLiveBiasCfg(snap?.cfg ?? DEFAULT_SIGNAL_CFG);
+  const { bias, prev } = useBias(snap, cfg, seed);
   const ref = useRef<HTMLDivElement>(null);
   const needle = useNeedle(ref, bias, prev);
   const dir = pctRoll(bias, prev);
   const tone = toneOf(bias);
-  if (!snap || !cfg || !bias) return <p className="text-[13px] text-mute">{BIAS_NO_DATA}</p>;
+  // shares in whole % adding up to 100, contributions in hundredths adding up to the shown sum (largest remainder)
+  const pcts = useMemo(() => (bias ? roundToSum(bias.contributions.map((c) => c.share * 100)) : []), [bias]);
+  const cents = useMemo(() => (bias ? roundToSum(bias.contributions.map((c) => contributionImpact(c) * 100)) : []), [bias]);
+  if (!snap || !bias) return <p className="text-[13px] text-mute">{BIAS_NO_DATA}</p>;
+  const sumCents = cents.reduce((a, x) => a + x, 0);
   return (
     <div className="grid gap-5" data-testid="bias-explain">
       <StaggerItem>
@@ -352,15 +402,22 @@ export function BiasExplain({ seed }: { seed?: BiasLevel | null }) {
       </StaggerItem>
       <StaggerItem>
         <ul className="grid gap-4" aria-label="Beiträge der Bedingungen">
-          {bias.contributions.map((c) => (
-            <ContributionRow key={c.id} c={c} />
+          {bias.contributions.map((c, i) => (
+            <ContributionRow key={c.id} c={c} pct={pcts[i] ?? 0} cents={cents[i] ?? 0} />
           ))}
         </ul>
       </StaggerItem>
       <StaggerItem>
-        <p className="rounded-xl border border-line-2 bg-white/[0.03] px-3 py-2 text-[12.5px] text-mute">
-          Summe <span className="num font-mono text-fg">{fmtVote(bias.score)}</span> → <span className={cn("font-semibold", LEVEL_TEXT[tone])}>{BIAS_LABEL[bias.level]}</span> ·{" "}
-          {bias.percent} · {bias.used} von {bias.total} Bedingungen mit Daten
+        <p className="rounded-xl border border-line-2 bg-white/[0.03] px-3 py-2 text-[12.5px] leading-relaxed text-mute" data-testid="bias-sum">
+          Summe <span className="num font-mono text-fg">{fmtVote(sumCents / 100)}</span>
+          {bias.limit && (
+            <>
+              {" "}
+              · begrenzt auf <span className="num font-mono text-fg">{fmtVote(bias.score)}</span> ({bias.limit.text})
+            </>
+          )}{" "}
+          → <span className={cn("font-semibold", LEVEL_TEXT[tone])}>{BIAS_LABEL[bias.level]}</span>
+          {bias.hold && ` (${bias.hold})`} · {bias.percent} · {bias.used} von {bias.total} Bedingungen mit Daten
         </p>
       </StaggerItem>
     </div>

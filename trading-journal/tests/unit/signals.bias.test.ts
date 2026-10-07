@@ -1,7 +1,8 @@
 /**
- * Long/Short-Tendenz (`src/domain/signals/bias.ts`): every condition's vote, the weights, missing data, thresholds,
- * hysteresis and long/short symmetry — on hand-built checks and on the e2e synthetic market (long setup) and its
- * mirror image (short setup).
+ * Long/Short-Tendenz (`src/domain/signals/bias.ts`): every condition's vote, the weights, the ladder gate, missing
+ * data, the consistency with the check's verdict (never against a valid entry, "Stark" only with one), thresholds,
+ * hysteresis and long/short symmetry — on hand-built checks, on random markets of the engine fixtures and on the e2e
+ * synthetic market (long setup) and its mirror image (short setup).
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -9,8 +10,12 @@ import {
   BIAS_LABEL,
   BIAS_LEAN,
   BIAS_STRONG,
+  BIAS_STRONG_CAP,
+  BIAS_UNCONFIRMED,
   DEFAULT_BIAS_CFG,
+  WHALE_NEUTRAL_TITLE,
   ageDecay,
+  biasHoldText,
   biasLevel,
   biasMethodText,
   biasPercentText,
@@ -18,8 +23,10 @@ import {
   computeBias,
   contributionImpact,
   mcbEventVote,
+  ladderTiers,
   mcbVote,
   rawBiasLevel,
+  roundToSum,
   rsiVote,
   rungWeights,
   sanitizeBiasCfg,
@@ -34,7 +41,9 @@ import {
   computeSignals,
   resampleBars,
   sanitizeSignalCfg,
+  signalsAt,
   SIGNAL_BARS,
+  verdict,
   tfSeconds,
   withLivePrice,
   type Bar,
@@ -48,6 +57,7 @@ import {
 } from "@/domain/signals";
 import { SYNTH_LAST, synthKlines } from "../e2e/mocks/synth";
 import { expectedSignals } from "../e2e/mocks/synthOracle";
+import { synthBars } from "./signals.fixtures";
 
 const CFG: SignalCfg = sanitizeSignalCfg(DEFAULT_SIGNAL_CFG);
 const NO_WHALE: SignalCfg = sanitizeSignalCfg({ whale: { on: false } });
@@ -172,15 +182,17 @@ describe("votes", () => {
 });
 
 describe("weights and the weighted mean", () => {
-  it("reuses the check's grading: MCB 65 split 1 : 2 : 3 : 4, RSI 20, zone 15, whale = its weight", () => {
+  it("reuses the check's score points: MCB 65 split equally over the rungs (55 / n like the score), RSI 20, zone 15, whale = its weight", () => {
     expect(DEFAULT_BIAS_CFG).toEqual({ mcb: 65, rsi: 20, zone: 15, whale: null });
-    expect(rungWeights(4, 65)).toEqual([6.5, 13, 19.5, 26]);
-    const b = computeBias(sig([check("30m"), check("45m"), check("1h"), check("4h")], { periods: [period("30m")], missing: [] }), CFG)!;
+    expect(rungWeights(4, 65)).toEqual([16.25, 16.25, 16.25, 16.25]);
+    expect(rungWeights(3, 60)).toEqual([20, 20, 20]);
+    expect(rungWeights(0, 65)).toEqual([]);
+    const b = computeBias(sig([check("30m"), check("45m"), check("1h"), check("4h")], { periods: [period("30m", { topChg: 1, retailChg: -1 })], missing: [] }), CFG)!;
     expect(b.contributions.map((c) => [c.id, c.weight])).toEqual([
-      ["mcb-30m", 6.5],
-      ["mcb-45m", 13],
-      ["mcb-1h", 19.5],
-      ["mcb-4h", 26],
+      ["mcb-30m", 16.25],
+      ["mcb-45m", 16.25],
+      ["mcb-1h", 16.25],
+      ["mcb-4h", 16.25],
       ["rsi", 20],
       ["zone", 15],
       ["whale", 10],
@@ -189,7 +201,7 @@ describe("weights and the weighted mean", () => {
     expect(b.contributions.map((c) => c.label)).toEqual(["MCB 30m · Basis", "MCB 45m · Bestätigung", "MCB 1h · stärker", "MCB 4h · stärker", "RSI 14", "Premium/Discount · 1h", "Top-Trader kaufen · Retail rot"]);
   });
 
-  it("score = Σ weight · vote / Σ weight", () => {
+  it("score = Σ weight · vote / Σ weight, with the ladder gate and RSI on the head rungs", () => {
     const checks = [
       check("30m", { long: { kind: "bottom", barsAgo: 0 }, rsi: 30 }),
       check("45m", { long: { kind: "buy", barsAgo: 1 }, rsi: 45 }),
@@ -198,13 +210,41 @@ describe("weights and the weighted mean", () => {
     ];
     const whale: WhaleReading = { periods: [period("30m", { topChg: 1, retailChg: 0.5 })], missing: [] };
     const b = computeBias(sig(checks, whale), CFG)!;
-    const w = [6.5, 13, 19.5, 26];
-    const mcb = checks.map((c) => mcbVote(c, CFG));
-    const rsi = (1 * rsiVote(30, CFG) + 2 * rsiVote(45, CFG) + 3 * rsiVote(52, CFG) + 4 * rsiVote(64, CFG)) / 10;
-    const expected = (w.reduce((s, x, i) => s + x * mcb[i]!, 0) + 20 * rsi + 15 * zoneVote(0.3) + 10 * 0) / 110;
-    expect(b.score).toBeCloseTo(expected, 12);
-    expect(b.contributions.find((c) => c.id === "rsi")!.vote).toBeCloseTo(rsi, 12);
-    expect(b.contributions.reduce((s, c) => s + contributionImpact(c), 0)).toBeCloseTo(b.score, 12);
+    expect(ladderTiers(checks, "long")).toBe(2);
+    expect(ladderTiers(checks, "short")).toBe(0);
+    // the 4h Verkauf is not confirmed by the rungs below it (no short signal on 30m) → counts ¼
+    const gates = [{ long: true, short: true }, { long: true, short: false }, { long: true, short: false }, { long: false, short: false }];
+    const mcb = checks.map((c, i) => mcbVote(c, CFG, gates[i]));
+    expect(mcb[3]).toBeCloseTo(-BIAS_UNCONFIRMED * mcbEventVote({ kind: "sell", barsAgo: 2 }, 3) + 0.3 * waveVote(30, 31, CFG), 12);
+    // RSI: the head = base + the rungs the ladder confirms (30m, 45m): strongest long − strongest short reading
+    const rsi = Math.max(0, rsiVote(30, CFG), rsiVote(45, CFG)) - Math.max(0, -rsiVote(30, CFG), -rsiVote(45, CFG));
+    expect(rsi).toBe(1);
+    const expected = (16.25 * mcb.reduce((s, x) => s + x, 0) + 20 * rsi + 15 * zoneVote(0.3) + 10 * 0) / 110;
+    expect(b.sum).toBeCloseTo(expected, 12);
+    expect(b.score).toBe(b.sum); // a valid long, the sum leans long: no limit
+    expect(b.limit).toBeNull();
+    expect(b.valid).toEqual({ long: true, short: false });
+    expect(b.contributions.find((c) => c.id === "rsi")).toMatchObject({ vote: 1, detail: "30m 30,0 · 45m 45,0 (≤ 40 Long, ≥ 60 Short)" });
+    expect(b.contributions.find((c) => c.id === "mcb-4h")!.detail).toBe("Verkaufssignal (unbestätigt) · vor 2 · WT 30,0 ↓");
+    expect(b.contributions.reduce((s, c) => s + contributionImpact(c), 0)).toBeCloseTo(b.sum, 12);
+  });
+
+  it("ladder gate: a higher rung's event counts fully only when every rung below confirms it (like the check)", () => {
+    const open = { long: true, short: true };
+    const c4h = check("4h", { long: { kind: "bottom", barsAgo: 0 } });
+    expect(mcbVote(c4h, CFG)).toBe(1);
+    expect(mcbVote(c4h, CFG, open)).toBe(1);
+    expect(mcbVote(c4h, CFG, { long: false, short: true })).toBeCloseTo(BIAS_UNCONFIRMED, 12);
+    expect(ladderTiers([check("30m", { long: { kind: "bull", barsAgo: 0 } }), null, check("1h", { long: { kind: "bottom", barsAgo: 0 } })], "long")).toBe(1);
+    expect(ladderTiers([null, check("45m", { short: { kind: "top", barsAgo: 0 } })], "short")).toBe(0);
+    // the same 4h Bottom: confirmed by 30m · 45m · 1h it counts fully, alone it is a trace
+    const up = (tf: string) => check(tf, { long: { kind: "buy", barsAgo: 0 } });
+    const chain = computeBias(sig([up("30m"), up("45m"), up("1h"), c4h]), NO_WHALE)!;
+    const alone = computeBias(sig([check("30m"), check("45m"), check("1h"), c4h]), NO_WHALE)!;
+    expect(chain.contributions.find((c) => c.id === "mcb-4h")!.vote).toBe(1);
+    expect(alone.contributions.find((c) => c.id === "mcb-4h")!.vote).toBeCloseTo(BIAS_UNCONFIRMED, 12);
+    expect(alone.contributions.find((c) => c.id === "mcb-4h")!.detail).toMatch(/^Bottom \(unbestätigt\) · jetzt/);
+    expect(chain.contributions.find((c) => c.id === "mcb-4h")!.detail).toMatch(/^Bottom · jetzt/);
   });
 
   it("missing data is excluded, never a neutral vote; nothing left → null", () => {
@@ -221,9 +261,12 @@ describe("weights and the weighted mean", () => {
     expect(nd.score).toBe(1);
     // switched off → no row at all
     expect(computeBias(sig([allLong("30m")]), NO_WHALE)!.contributions.some((c) => c.id === "whale")).toBe(false);
-    // no zone check → zone excluded
-    const noZone = computeBias({ checks: [allLong("30m")], zone: null }, NO_WHALE)!;
-    expect(noZone.contributions.find((c) => c.id === "zone")!.vote).toBeNull();
+    // no zone check → the base's zone, like the check; no base either → zone excluded
+    const baseZone = computeBias({ checks: [allLong("30m")], zone: null }, NO_WHALE)!;
+    expect(baseZone.contributions.find((c) => c.id === "zone")).toMatchObject({ vote: 1, label: "Premium/Discount · 30m" });
+    const noZone = computeBias({ checks: [null, allLong("45m")], zone: null }, NO_WHALE)!;
+    expect(noZone.contributions.find((c) => c.id === "zone")).toMatchObject({ vote: null, share: 0, detail: "Zu wenig Kerzen" });
+    expect(noZone.contributions.find((c) => c.id === "rsi")!.vote).toBeNull(); // the head is the missing base
     // nothing with data / weight
     expect(computeBias(null, CFG)).toBeNull();
     expect(computeBias({ checks: [null, null, null, null], zone: null }, CFG)).toBeNull();
@@ -247,7 +290,158 @@ describe("weights and the weighted mean", () => {
     expect(c2.contributions.find((c) => c.id === "whale")!.weight).toBe(25);
     expect(c2.contributions.find((c) => c.id === "zone")!.share).toBe(0);
     expect(biasMethodText(custom)).toContain("MCB 40");
-    expect(biasMethodText(CFG)).toContain("MCB 65 (auf 30m · 45m · 1h · 4h im Verhältnis 1 : 2 : 3 : 4 verteilt), RSI 20, Zone 15, Top-Trader · Retail 10");
+    expect(biasMethodText(CFG)).toContain("MCB 65 (zu gleichen Teilen auf 30m · 45m · 1h · 4h), RSI 20, Zone 15, Top-Trader · Retail 10");
+    expect(biasMethodText(CFG)).toContain("nur voll, wenn alle Stufen darunter dieselbe Richtung bestätigen (sonst ¼)");
+    expect(biasMethodText(CFG)).toContain("„Stark“ ab 75 % und nur mit gültigem Einstieg");
+    expect(biasMethodText(CFG)).toContain("Die Stufe wechselt erst 2,5 % hinter der Grenze.");
+  });
+
+  it("zone: the check's reference — the base when the zone timeframe has too few bars", () => {
+    const cfg1d = sanitizeSignalCfg({ whale: { on: false }, zoneTf: "1D" });
+    const checks = [check("30m", { short: { kind: "top", barsAgo: 0 }, rsi: 66, pos: 0.69 }), check("45m"), check("1h", { pos: 0.14 }), check("4h")];
+    const b = computeBias({ checks, zone: null }, cfg1d)!;
+    const row = b.contributions.find((c) => c.id === "zone")!;
+    expect(row).toMatchObject({ label: "Premium/Discount · 30m", detail: "Premium · 69 % der Range" });
+    expect(row.vote).toBeCloseTo(zoneVote(0.69), 12);
+    expect(row.share).toBeGreaterThan(0);
+    // the verdict grades the same reference
+    const v = verdict("short", checks, cfg1d, null);
+    expect(v.zoneOk).toBe(true);
+    expect(v.reasons.at(-1)!.text).toBe("Preis im Premium (30m)");
+  });
+});
+
+describe("consistency with the check's verdict", () => {
+  it("never against a valid entry: a sum pointing the other way is shown as 0 (Neutral)", () => {
+    // valid short: 30m + 45m confirm (old small crosses), RSI 60 on the base — everything else leans long
+    const up = { wt1: -60, wt2: -66 };
+    const checks = [
+      check("30m", { short: { kind: "bear", barsAgo: 2 }, rsi: 60, ...up }),
+      check("45m", { short: { kind: "bear", barsAgo: 2 }, rsi: 30, ...up }),
+      check("1h", { ...up, pos: 0 }),
+      check("4h", up),
+    ];
+    const b = computeBias(sig(checks, { periods: [period("30m", { runLong: 3, topChg: 2, retailChg: -2 })], missing: [] }), CFG)!;
+    expect(b.valid).toEqual({ long: false, short: true });
+    expect(b.sum).toBeGreaterThan(BIAS_LEAN);
+    expect(b.score).toBe(0);
+    expect(b.level).toBe(0);
+    expect(b.label).toBe("Neutral");
+    expect(b.percent).toBe("50 %");
+    expect(b.limit).toEqual({ kind: "entry", side: "short", text: "gültiger Short-Einstieg im Check: zeigt nicht Long" });
+    // hysteresis cannot carry an opposite label either
+    expect(computeBias(sig(checks), CFG, 1)!.level).toBe(0);
+    // the mirror image: a valid long is never shown short
+    const m = computeBias(sig(checks.map(mirror), { periods: [period("30m", { runShort: 3, topChg: -2, retailChg: 2 })], missing: [] }), CFG)!;
+    expect(m.score).toBe(0);
+    expect(m.limit).toMatchObject({ kind: "entry", side: "long" });
+  });
+
+  it("\"Stark\" only with a valid entry on that side: the score stops at 74 %, the label at \"Eher\"", () => {
+    // 30m Bottom alone (ladder not confirmed → no valid entry), everything else long
+    const checks = [check("30m", { long: { kind: "bottom", barsAgo: 0 }, rsi: 25, wt1: -60, wt2: -66 }), check("45m", { rsi: 30, wt1: -60, wt2: -66 }), check("1h", { wt1: -60, wt2: -66, pos: 0 }), check("4h", { wt1: -60, wt2: -66 })];
+    const whale: WhaleReading = { periods: [period("30m", { runLong: 3, topChg: 2, retailChg: -2 })], missing: [] };
+    const b = computeBias(sig(checks, whale), CFG)!;
+    expect(b.valid.long).toBe(false);
+    expect(b.sum).toBeGreaterThan(BIAS_STRONG);
+    expect(b.score).toBe(BIAS_STRONG_CAP);
+    expect(b).toMatchObject({ level: 1, label: "Eher Long", pct: 74, percent: "74 % Long" });
+    expect(b.limit).toEqual({ kind: "strong", side: "long", text: "„Stark“ nur mit gültigem Long-Einstieg" });
+    expect(computeBias(sig(checks, whale), CFG, 2)!.level).toBe(1); // a held "Stark" drops to "Eher" too
+    // confirmed by 45m → a valid long: Stark, no limit
+    const ok = computeBias(sig([checks[0]!, check("45m", { long: { kind: "buy", barsAgo: 0 }, rsi: 30, wt1: -60, wt2: -66 }), checks[2]!, checks[3]!], whale), CFG)!;
+    expect(ok.valid.long).toBe(true);
+    expect(ok).toMatchObject({ level: 2, label: "Stark Long", limit: null });
+    expect(ok.score).toBe(ok.sum);
+  });
+
+  it("uses the verdicts of the snapshot when present", () => {
+    const checks = [check("30m", { long: { kind: "bottom", barsAgo: 0 }, rsi: 25, wt1: -60, wt2: -66 }), check("45m", { rsi: 30 }), check("1h", { pos: 0 }), check("4h")];
+    const s = { ...sig(checks), long: { ...verdict("long", checks, CFG, null), valid: true }, short: verdict("short", checks, CFG, null) };
+    expect(computeBias(s, NO_WHALE)!.valid.long).toBe(true);
+    expect(computeBias(sig(checks), NO_WHALE)!.valid.long).toBe(false);
+  });
+
+  it("random markets (engine fixtures): a valid entry is never shown opposite, \"Stark\" never without one", () => {
+    const cfg = sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, whale: { on: false } });
+    const SEC: Record<string, number> = { "30m": 1800, "45m": 2700, "1h": 3600, "4h": 14_400 };
+    let valid = 0;
+    let evals = 0;
+    for (const seed of [2, 3]) {
+      const src = synthBars(6000, seed, { sec: 900 });
+      const bars: Record<string, Bar[]> = {};
+      for (const tf of cfg.ladder) bars[tf] = resampleBars(src, 900, SEC[tf]!);
+      const t0 = src[0]!.t;
+      const tEnd = src[src.length - 1]!.t + 900;
+      for (let at = (t0 + 170 * 14_400) * 1000; at < tEnd * 1000; at += 2 * 3600 * 1000) {
+        const cut: Record<string, Bar[]> = {};
+        for (const tf of cfg.ladder) cut[tf] = bars[tf]!.filter((x) => (x.t + SEC[tf]!) * 1000 <= at).slice(-500);
+        const s = signalsAt(cut, cfg, at, at + 10 * 864e5);
+        const b = s && computeBias(s, cfg);
+        if (!s || !b) continue;
+        evals++;
+        if (Math.abs(b.level) === 2) expect(s[b.level > 0 ? "long" : "short"].valid, new Date(at).toISOString()).toBe(true);
+        if (!s.best.valid || s.long.valid === s.short.valid) continue;
+        valid++;
+        const want = s.best.side === "long" ? 1 : -1;
+        expect(Math.sign(b.score) * want, new Date(at).toISOString()).toBeGreaterThanOrEqual(0);
+        expect(Math.sign(b.level) * want).toBeGreaterThanOrEqual(0);
+      }
+    }
+    expect(evals).toBeGreaterThan(300);
+    expect(valid).toBeGreaterThan(20);
+  }, 60_000);
+
+  it("review case (seed 3, 2025-12-18 11:15Z): a valid Short-Einstieg is not read \"Eher Long\"", () => {
+    const cfg = sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, whale: { on: false } });
+    const src = synthBars(9000, 3, { sec: 900 });
+    const at = Date.parse("2025-12-18T11:15:00Z");
+    const SEC: Record<string, number> = { "30m": 1800, "45m": 2700, "1h": 3600, "4h": 14_400 };
+    const cut: Record<string, Bar[]> = {};
+    for (const tf of cfg.ladder) cut[tf] = resampleBars(src, 900, SEC[tf]!).filter((x) => (x.t + SEC[tf]!) * 1000 <= at).slice(-500);
+    const s = signalsAt(cut, cfg, at, at + 10 * 864e5)!;
+    expect(s.best).toMatchObject({ side: "short", valid: true, label: "Short-Einstieg" });
+    const b = computeBias(s, cfg)!;
+    expect(b.level).toBeLessThanOrEqual(0);
+    expect(b.sum).toBeLessThan(0); // the gate alone fixes it: the unconfirmed 4h Bottom is a trace now
+    expect(b.limit).toBeNull();
+    const r4h = b.contributions.find((c) => c.id === "mcb-4h")!;
+    expect(r4h.detail).toMatch(/^Bottom \(unbestätigt\)/);
+    expect(Math.abs(contributionImpact(r4h))).toBeLessThan(0.1);
+  });
+});
+
+describe("whale row", () => {
+  it("a zero vote or no data reads neutral, not \"kaufen · Retail rot\"; zero shows both runs", () => {
+    const flat: WhaleReading = { periods: [period("30m", { runLong: 1, runShort: 1, topChg: 1, retailChg: 1 })], missing: ["1h"] };
+    const b = computeBias(sig([check("30m"), check("45m"), check("1h"), check("4h")], flat), CFG)!;
+    const row = b.contributions.find((c) => c.id === "whale")!;
+    expect(row.vote).toBe(0);
+    expect(row.label).toBe(WHALE_NEUTRAL_TITLE);
+    expect(row.detail).toBe("Top-Trader +1,0 pp · Retail +1,0 pp · Long 1× · Short 1× in Folge (30m, mind. 2) · 1h: keine Daten");
+    expect(computeBias(sig([check("30m")]), CFG)!.contributions.find((c) => c.id === "whale")!.label).toBe(WHALE_NEUTRAL_TITLE);
+    const short = computeBias(sig([check("30m")], { periods: [period("30m", { runShort: 2, topChg: -1, retailChg: 1 })], missing: [] }), CFG)!;
+    expect(short.contributions.find((c) => c.id === "whale")).toMatchObject({ label: "Top-Trader verkaufen · Retail grün", vote: -1 });
+    expect(short.contributions.find((c) => c.id === "whale")!.detail).toMatch(/· 2× in Folge \(30m, mind\. 2\)$/);
+  });
+});
+
+describe("rounding", () => {
+  it("largest remainder: shares add up to 100, contributions to the rounded sum", () => {
+    expect(roundToSum([100 / 3, 100 / 3, 100 / 3])).toEqual([34, 33, 33]);
+    expect(roundToSum([16.25, 16.25, 16.25, 16.25, 20, 15])).toEqual([17, 16, 16, 16, 20, 15]);
+    expect(roundToSum([-5.2, 3.7])).toEqual([-5, 4]);
+    expect(roundToSum([0, 0, 0])).toEqual([0, 0, 0]);
+    expect(roundToSum([])).toEqual([]);
+    // the review's long setup: weights 6+12+18+24+18+14+9 = 101 → now always 100
+    const shares = [5.9, 11.8, 17.7, 23.6, 17.7, 14.4, 8.9];
+    expect(roundToSum(shares).reduce((a, x) => a + x, 0)).toBe(Math.round(shares.reduce((a, x) => a + x, 0)));
+    // a real bias: the rows' rounded contributions add up to the rounded sum
+    const b = computeBias(expectedSignals(Date.now(), Date.now(), 84_199, "whale-long"), CFG)!;
+    const pct = roundToSum(b.contributions.map((c) => c.share * 100));
+    expect(pct.reduce((a, x) => a + x, 0)).toBe(100);
+    const cents = roundToSum(b.contributions.map((c) => contributionImpact(c) * 100));
+    expect(cents.reduce((a, x) => a + x, 0)).toBe(Math.round(b.sum * 100));
   });
 });
 
@@ -294,6 +488,18 @@ describe("labels, percent, hysteresis", () => {
     const s17 = 0.475 - 0.17 * 0.475; // zone vote 0.17
     expect(computeBias(z(s17), zoneOnly)!.label).toBe("Eher Long");
     expect(computeBias(z(s17), zoneOnly, 0)!.label).toBe("Neutral");
+    expect(computeBias(z(s17), zoneOnly, 0)!.hold).toBe("gehalten: wechselt erst ab 60 %");
+    expect(computeBias(z(s17), zoneOnly)!.hold).toBe("");
+  });
+
+  it("hold text: says where a held label changes (the explainer shows it next to the sum)", () => {
+    expect(biasHoldText(0.12, 1)).toBe("gehalten: wechselt erst unter 55 %");
+    expect(biasHoldText(-0.12, -1)).toBe("gehalten: wechselt erst unter 55 %");
+    expect(biasHoldText(0.53, 1)).toBe("gehalten: wechselt erst ab 77,5 %");
+    expect(biasHoldText(0.47, 2)).toBe("gehalten: wechselt erst unter 72,5 %");
+    expect(biasHoldText(-0.18, 0)).toBe("gehalten: wechselt erst ab 60 %");
+    expect(biasHoldText(0.3, 1)).toBe("");
+    expect(biasHoldText(0.05, 0)).toBe("");
   });
 
   it("percent and text alternative", () => {
