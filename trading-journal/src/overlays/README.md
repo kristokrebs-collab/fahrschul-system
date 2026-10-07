@@ -103,7 +103,9 @@ interface TradeDetailProps {
   sheet gets `handoff` (dim starts at the detail's level, panel enters after the detail's exit) – no bare page in between (TR-05).
 - `MiniTradeChart` is imported from `@/chart/MiniTradeChart` (mock that path in tests).
 - NEW: `Einstiegs-Check` (`SignalSummary` of `trade.signal`: score, label, `{Stärke} · {tiers} von {n} Timeframes`, timeframe + zone pills,
-  where it came from) and `Fehler` chips (`trade.mistakes`), after the checklist.
+  the stored "Top-Trader kaufen · Retail rot" pill when the snapshot carries `whale` (`{run}× {period}`, toned when it held;
+  `whale: null` → `Top-Trader · keine Daten`; the other version's snapshots have none), where it came from) and `Fehler` chips
+  (`trade.mistakes`), after the checklist.
 - NEW (physics): swipe to dismiss on touch / pen (`useSwipeDismiss` mode "zoom"): handle = the header row + a sticky opaque 20 px grabber
   strip (coarse pointers). The column follows 1:1 down, ½ sideways, scales to .88, the dim lifts; a slow pull springs back, a projected
   flick closes: with a source that stays mounted (`hasMorphBack`: recent row, trade card `[data-trade-morph]`) via `dismissDetail(tempo)` –

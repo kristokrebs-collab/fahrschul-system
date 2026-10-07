@@ -71,6 +71,9 @@ test("new trade: the live check snapshot and the mistake tags are stored and sho
   const detail = page.getByRole("dialog", { name: "Trade-Details" });
   await expect(detail).toBeVisible();
   await expect(detail.getByTestId("signal-summary")).toHaveAttribute("data-strength", "4");
+  // the stored "Top-Trader kaufen · Retail rot" reading
+  await expect(detail.getByTestId("signal-summary-whale")).toHaveAttribute("data-state", "ok");
+  await expect(detail.getByTestId("signal-summary-whale")).toContainText("Top-Trader kaufen · Retail rot · 4× 30m");
   await expect(detail).toContainText("Zu früh raus");
   await expect(detail).toContainText("Nachgekauft");
   await screenshot(page, info, "detail-signal-mistakes");

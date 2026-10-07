@@ -5,7 +5,7 @@
  */
 import { motion } from "motion/react";
 import { memo } from "react";
-import { isStrongKind, kindText, parseSignalSnapshot, snapshotLadderLength, strengthLine, strengthText, ZONE_TEXT, type SignalSnapshot } from "@/domain/signals";
+import { isStrongKind, kindText, parseSignalSnapshot, snapshotLadderLength, strengthLine, strengthText, WHALE_NO_DATA, WHALE_NO_DATA_HINT, WHALE_TITLE, ZONE_TEXT, type SignalSnapshot } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { dateTime, n1 } from "@/lib/format";
 import { spring, stagger, tween } from "@/motion/tokens";
@@ -80,7 +80,8 @@ export interface SignalSummaryProps {
 
 /**
  * Score, verdict label, strength (`{Stärke} · {tiers} von {n} Timeframes`), one pill per timeframe
- * (`30m · Bottom · RSI 38,2`, toned while it confirms the ladder) and the zone pill; the source line says whether the
+ * (`30m · Bottom · RSI 38,2`, toned while it confirms the ladder), the zone pill and – for our snapshots – the
+ * "Top-Trader kaufen · Retail rot" pill; the source line says whether the
  * check was taken live, recomputed from history or comes from the other journal version.
  */
 export function SignalSummary({ snap, side, className }: SignalSummaryProps) {
@@ -127,6 +128,7 @@ export function SignalSummary({ snap, side, className }: SignalSummaryProps) {
           <li className={cn("inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[11px]", snap.zoneOk ? cn(tone.on, "text-fg") : "border-line text-mute")}>
             Zone {snap.zone ? ZONE_TEXT[snap.zone] : "–"}
           </li>
+          {snap.whale !== undefined && <WhalePill snap={snap} on={tone.on} />}
         </ul>
       )}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-faint">
@@ -134,6 +136,32 @@ export function SignalSummary({ snap, side, className }: SignalSummaryProps) {
         {otherSide && <span className="text-mute">· geprüft für {snap.side === "long" ? "Long" : "Short"}</span>}
       </div>
     </div>
+  );
+}
+
+/**
+ * "Top-Trader kaufen · Retail rot" (short: "verkaufen · Retail grün") as stored with the check: toned with its run
+ * when it held, muted when open, "keine Daten" when Binance had no top-trader data for that moment (never a fail).
+ * Only our snapshots carry the field; the other version's have no pill.
+ */
+function WhalePill({ snap, on }: { snap: SignalSnapshot; on: string }) {
+  const w = snap.whale;
+  const title = WHALE_TITLE[snap.side];
+  if (!w)
+    return (
+      <li className="inline-flex items-center rounded-full border border-line px-2.5 py-1 font-mono text-[11px] text-faint" title={WHALE_NO_DATA_HINT} data-testid="signal-summary-whale" data-state="none">
+        Top-Trader · {WHALE_NO_DATA}
+      </li>
+    );
+  return (
+    <li
+      className={cn("inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[11px]", w.ok ? cn(on, "text-fg") : "border-line text-mute")}
+      data-testid="signal-summary-whale"
+      data-state={w.ok ? "ok" : "open"}
+    >
+      <span className="sr-only">{w.ok ? "erfüllt: " : "offen: "}</span>
+      {title} · {w.run}× {w.period}
+    </li>
   );
 }
 

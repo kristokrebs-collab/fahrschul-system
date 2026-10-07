@@ -139,6 +139,24 @@ describe("SignalSummary / StrengthBars", () => {
     expect(screen.getByText("· geprüft für Short")).toBeInTheDocument();
   });
 
+  it("Top-Trader kaufen · Retail rot: held (toned, run · period), open, `keine Daten`; no pill without the field", () => {
+    const whale = { ok: true, run: 3, need: 2, period: "30m", topChg: 2.7, retailChg: -2.5, points: 10, periods: [] };
+    const { rerender } = render(<SignalSummary snap={{ ...SNAP, whale }} side="long" />);
+    const pill = () => screen.getByTestId("signal-summary-whale");
+    expect(pill()).toHaveAttribute("data-state", "ok");
+    expect(pill()).toHaveTextContent("erfüllt: Top-Trader kaufen · Retail rot · 3× 30m");
+    rerender(<SignalSummary snap={{ ...SNAP, whale: { ...whale, ok: false, run: 1, points: 0 } }} side="long" />);
+    expect(pill()).toHaveAttribute("data-state", "open");
+    expect(pill()).toHaveTextContent("offen: Top-Trader kaufen · Retail rot · 1× 30m");
+    rerender(<SignalSummary snap={{ ...SNAP, whale: null }} side="long" />);
+    expect(pill()).toHaveAttribute("data-state", "none");
+    expect(pill()).toHaveTextContent("Top-Trader · keine Daten");
+    rerender(<SignalSummary snap={{ ...SNAP, side: "short", whale: { ...whale, period: "1h" } }} side="short" />);
+    expect(pill()).toHaveTextContent("Top-Trader verkaufen · Retail grün · 3× 1h");
+    rerender(<SignalSummary snap={SNAP} side="long" />);
+    expect(screen.queryByTestId("signal-summary-whale")).toBeNull();
+  });
+
   it("strength bars name the strength; without a check they say so", () => {
     const { rerender } = render(<StrengthBars snap={SNAP} />);
     expect(screen.getByRole("img", { name: "Signal-Stärke 2 von 4 (Stark)" })).toBeInTheDocument();
