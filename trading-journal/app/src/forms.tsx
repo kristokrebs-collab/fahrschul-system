@@ -57,7 +57,7 @@ function SignalSection({ snap, saved, canRecheck, onRecheck, market }: { snap: S
   return (
     <Section title="Einstiegs-Check" sub={snap ? (saved ? 'gespeichert beim Eintragen' : 'automatisch aus TradingView') : undefined}>
       {!snap ? (
-        <p className="text-[12.5px] text-mute">{market.status === 'live' ? 'Für diesen Zeitpunkt liegen keine Kerzen vor (Check reicht etwa 5 Tage zurück).' : 'Ohne TradingView-Verbindung kein automatischer Check.'}</p>
+        <p className="text-[12.5px] text-mute">{market.status === 'live' ? 'Für diesen Zeitpunkt liegen keine Kerzen vor (Check reicht etwa 10 Tage zurück).' : 'Ohne TradingView-Verbindung kein automatischer Check.'}</p>
       ) : (
         <div className="grid gap-3 rounded-2xl border border-line bg-ink-950/50 p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
