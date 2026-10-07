@@ -8,7 +8,7 @@
  * byte for byte (absent stays absent, unknown keys survive), so a save from this page never invents data.
  */
 import { disciplineLimits } from "@/domain/insights/discipline";
-import { DEFAULT_SIGNAL_CFG, SIGNAL_TFS, sanitizeSignalCfg, tfSeconds } from "@/domain/signals";
+import { DEFAULT_SIGNAL_CFG, SIGNAL_TFS, parseWhalePeriods, sanitizeSignalCfg, tfSeconds, whaleFromDraft, whaleToDraft } from "@/domain/signals";
 import type { Rule, Settings } from "@/domain/types";
 import { fractionToPercentInput, parseNumber, percentInputToFraction, toInputString } from "@/lib/parse";
 
@@ -64,6 +64,14 @@ export interface SettingsDraft {
   sgNotify: string;
   /** Notify (toast + system) only from this strength on, `1`..`4`. */
   sgNotifyMin: string;
+  /** "Top-Trader kaufen · Retail rot" (`settings.signals.whale`, see `@/domain/signals` whaleDraft.ts): `"on"` | `""`. */
+  sgWhale: string;
+  /** its Binance periods, comma separated (`30m,1h`) */
+  sgWhalePeriods: string;
+  /** consecutive closed periods, `1`..`6` */
+  sgWhaleMin: string;
+  /** score points, `0`..`30` */
+  sgWhaleWeight: string;
   /** Mistake tags (`settings.mistakes`). */
   mistakes: MistakeRow[];
   /** Discipline limits (`settings.discipline`): % per trade / day, max trades per day and account. */
@@ -94,9 +102,9 @@ export const NUMERIC_FIELDS = [
 ] as const satisfies readonly DraftTextKey[];
 
 /** `Einstiegs-Check` numbers: must parse when the signal part is saved; compared by value. */
-export const SIGNAL_NUMERIC_FIELDS = ["sgReq", "sgLook", "sgRsiOs", "sgRsiOb", "sgRsiNear", "sgWtOs", "sgWtOb", "sgSwing", "sgCh", "sgAvg", "sgSig", "sgNotifyMin"] as const satisfies readonly DraftTextKey[];
+export const SIGNAL_NUMERIC_FIELDS = ["sgReq", "sgLook", "sgRsiOs", "sgRsiOb", "sgRsiNear", "sgWtOs", "sgWtOb", "sgSwing", "sgCh", "sgAvg", "sgSig", "sgNotifyMin", "sgWhaleMin", "sgWhaleWeight"] as const satisfies readonly DraftTextKey[];
 /** Every draft key of the signal part (written together, only when one of them changed). */
-export const SIGNAL_KEYS = [...SIGNAL_NUMERIC_FIELDS, "sgLadder", "sgZoneTf", "sgNotify"] as const satisfies readonly DraftTextKey[];
+export const SIGNAL_KEYS = [...SIGNAL_NUMERIC_FIELDS, "sgLadder", "sgZoneTf", "sgNotify", "sgWhale", "sgWhalePeriods"] as const satisfies readonly DraftTextKey[];
 /** Discipline limits: must parse when the part is saved. */
 export const DISCIPLINE_FIELDS = ["dlTrade", "dlDay", "dlMakro", "dlScalp"] as const satisfies readonly DraftTextKey[];
 
@@ -187,6 +195,7 @@ export function signalsToDraft(raw: unknown): SignalDraft {
     sgSig: toInputString(c.wtSignal),
     sgNotify: c.notify ? "on" : "",
     sgNotifyMin: String(min),
+    ...whaleToDraft(raw),
   };
 }
 
@@ -232,6 +241,8 @@ export function draftToSettings(d: SettingsDraft, base: Settings): DraftResult {
     const ladder = parseLadder(d.sgLadder);
     if (!ladder.length) return { ok: false, error: "numeric", field: "sgLadder" };
     const g = (k: (typeof SIGNAL_NUMERIC_FIELDS)[number]): number => sg[k] as number;
+    const whale = whaleFromDraft(d, base.signals);
+    if (!whale.ok) return { ok: false, error: "numeric", field: whale.field };
     signals = {
       ...objectOr(base.signals),
       ladder,
@@ -249,6 +260,7 @@ export function draftToSettings(d: SettingsDraft, base: Settings): DraftResult {
       wtSignal: clampInt(g("sgSig"), 1),
       notify: d.sgNotify === "on",
       notifyMinStrength: clampInt(g("sgNotifyMin"), 1, 4),
+      whale: whale.whale,
     };
   }
 
@@ -328,6 +340,7 @@ const NUMERIC = new Set<DraftTextKey>([...NUMERIC_FIELDS, ...SIGNAL_NUMERIC_FIEL
 function sameText(key: DraftTextKey, a: string | undefined, b: string | undefined): boolean {
   if (a === b) return true;
   if (key === "sgLadder") return parseLadder(a ?? "").join() === parseLadder(b ?? "").join();
+  if (key === "sgWhalePeriods") return parseWhalePeriods(a ?? "").join() === parseWhalePeriods(b ?? "").join();
   if (NUMERIC.has(key)) {
     const x = parseNumber(a ?? "");
     const y = parseNumber(b ?? "");
