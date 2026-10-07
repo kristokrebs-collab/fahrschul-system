@@ -21,6 +21,33 @@ import { computeSignals, sanitizeSignalCfg, parseSignalSnapshot, toSignalSnapsho
 | Ladder `verdict` | `tiers` = consecutive confirming rungs from the base (30m → 45m → 1h → 4h); `valid = tiers ≥ required (2) && rsiOk` (RSI mandatory); `strength = valid ? min(4, 1 + min(2, tiers − required) + zoneOk) : 0`; `score = round(min(100, tiers/n·55 + rsiOk·20 + zoneOk·15 + strongSignal·10))` |
 | Labels | `STRENGTH_LABEL = Kein Signal · Einstieg · Stark · Sehr stark · Maximal`; verdict labels and reasons exactly as the other journal (`Starker Long-Einstieg`, `Long-Signal, RSI noch nicht überverkauft`, `Long: nur 30m bestätigt`, …) |
 
+## "Top-Trader kaufen · Retail rot" (ours, `whale.ts`)
+
+Additive condition (user requirement 2026-10-07): for a long, Binance top traders buy while retail is red; short mirrored.
+
+| Piece | Rule |
+|---|---|
+| Inputs | per Binance futures-data period: `topLongShortPositionRatio` (top traders, positions) and `globalLongShortAccountRatio` (all accounts = retail) — the pair behind the Top-Trader card's `Top vs. Alle` delta |
+| Period step | change between two consecutive snapshots = one closed period; joined by time, gaps break a run; newest snapshot older than 2 periods + 5 min → no data |
+| Run | long: top-trader long % ↑ AND all-accounts long % ↓; short: top ↓ AND retail ↑; counted backwards from the newest period (like `Δ+ Kerzen`) |
+| Holds | run ≥ `minRun` (default 2) on ANY configured period (default `30m`, `1h`) |
+| Grading (`applyWhale`) | holds and `weight > 0` (default 10): score + weight (max 100) and a VALID entry + 1 strength (max 4, label follows); weight 0 = shown and stored only; the reason line `Top-Trader kaufen · Retail rot (2× 30m/1h)` is appended |
+| No data | (off, source without top traders, older than Binance's ~30-day window) → no reading: the verdict is exactly the other journal's; the trade snapshot stores `whale: null` ("keine Daten") — never a fail |
+| Settings | `settings.signals.whale = { on, periods, minRun 1…6, weight 0…30 }` (nested, so `DEFAULT_SIGNAL_CFG` stays the other journal's; `sanitizeSignalCfg` fills it, unknown keys kept; part of `signalCfgKey`). Draft strings for the settings page: `whaleDraft.ts` (`sgWhale`, `sgWhalePeriods`, `sgWhaleMin`, `sgWhaleWeight`) |
+| Snapshot | `trade.signal.whale = { ok, run, need, period, topChg, retailChg, points, periods[{ period, top, retail, topChg, retailChg, run }] }` for the snapshot's side; old snapshots without the field stay valid |
+
+Market side (live series, polling, retro ≤ 30 days): `src/market/signals/whale.ts`.
+
+## TradingView calibration (2026-10-07)
+
+`tests/unit/signals.tvCalibration.test.ts` + `tests/unit/fixtures/tv-bitstamp-btcusd.json` (BITSTAMP:BTCUSD, the user's screenshots):
+RSI 14 / MA 14 and wt1 at the last bar (1h 34.95 / 29.61 / −49, 30m 42.86 / 30.53 / −28), every Bottom/Top label of the visible
+windows, the cross dots (wt2 = SMA **2** of wt1; 3 or 4 shift them) and the LuxAlgo zone boxes match with the defaults (MCB
+WeloTrades "close 9 1 21 1 60 53 2 −60 −53 2 28 …" = close source, channel 9, average 21, levels ±53/±60, reversal range 28).
+The "Bull"/"Bear" labels with the cow / bear icons are WaveTrend divergences (not part of the check). Binance BTCUSDT perp vs Bitstamp
+spot on the same windows: 30m 27 of 28 Bottom/Top/Kauf/Verkauf events on the same bar (signal flags differ on 6.4 % of bars, RSI-near
+1.3 %, zone 1.7 %), 1h 35 of 36 (1.7 % / 0.8 % / 1.3 %).
+
 ## Deliberate differences (bug fixes)
 
 1. **Back-dated check** — `signalsAt(bars, cfg, atMs, now)` returns `null` when any ladder rung or the zone timeframe has fewer than
@@ -64,6 +91,7 @@ German strings of the card / form: `KIND_TEXT`, `kindText`, `isStrongKind`, `rol
 
 ## Tests
 
-`tests/unit/signals.engine.test.ts` (parity with the reference: indicators, every `wtSignal` prefix, zones, verdicts over 7 config
+`tests/unit/signals.whale.test.ts` (the whale condition on synthetic ratio series, grading, config, snapshots, draft strings),
+`tests/unit/signals.whaleMarket.test.ts` (live / polled / retro on a fake provider), `tests/unit/signals.engine.test.ts` (parity with the reference: indicators, every `wtSignal` prefix, zones, verdicts over 7 config
 variants × 6 seeds, snapshots, the retro fix), `tests/unit/signals.resample.test.ts` (alignment, aggregation, config, snapshot
 parsing), fixtures in `tests/unit/signals.fixtures.ts`.
