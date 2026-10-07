@@ -294,6 +294,7 @@ export function useJournal() {
   const [loaded, setLoaded] = useState({ t: false, s: false });
   const [hyblock, setHyblock] = useState<Hyblock[]>([]);
   const api = useRef<Api | null>(null);
+  const [stash, setStash] = useState<Trade[]>([]); // Trades, die nur im Browser-Speicher liegen (z. B. aus dem lokalen Modus)
 
   useEffect(() => {
     let unsubs: Array<() => void> = [];
@@ -318,6 +319,7 @@ export function useJournal() {
         return;
       }
       setMode('cloud');
+      try { const l = JSON.parse(localStorage.getItem('tj2-trades') || '[]'); if (Array.isArray(l)) setStash(l.filter((t: any) => t && t.date)); } catch { /* kein Speicher */ }
       const fail = () => setMode('error');
       unsubs.push(db.collection('trades').onSnapshot((snap: any) => { setTrades(snap.docs.map((d: any) => ({ id: d.id, ...JSON.parse(JSON.stringify(d.data())) }))); setLoaded((l) => ({ ...l, t: true })); }, fail));
       unsubs.push(db.collection('hyblock').onSnapshot((snap: any) => { setHyblock(snap.docs.map((d: any) => ({ id: d.id, ...JSON.parse(JSON.stringify(d.data())) }))); }, fail));
@@ -335,7 +337,13 @@ export function useJournal() {
 
   const enriched = useMemo(() => trades.map((t) => enrich(t, settings)), [trades, settings]);
   const hyblockSorted = useMemo(() => [...hyblock].sort((a, b) => a.at.localeCompare(b.at)), [hyblock]);
-  return { trades, enriched, settings, hyblock: hyblockSorted, mode, loaded: loaded.t && loaded.s, api };
+  // Lokal gespeicherte Trades, die in der Cloud fehlen (gleiche ID oder gleicher Zeitpunkt + Einstieg)
+  const pending = useMemo(() => {
+    if (mode !== 'cloud' || !stash.length) return [];
+    const ids = new Set(trades.map((t) => t.id)), keys = new Set(trades.map((t) => `${t.date}|${t.entry}|${t.side}`));
+    return stash.filter((t) => !ids.has(t.id) && !keys.has(`${t.date}|${t.entry}|${t.side}`));
+  }, [mode, stash, trades]);
+  return { trades, enriched, settings, hyblock: hyblockSorted, mode, loaded: loaded.t && loaded.s, api, pending };
 }
 
 // ── Live-Markt über den TradingView-Connector ──────────

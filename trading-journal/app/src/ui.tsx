@@ -125,7 +125,7 @@ export function Segmented<T extends string>({ options, value, onChange, classNam
     <div className={cn('inline-flex flex-wrap gap-0.5 rounded-xl border border-line bg-ink-950/60 p-1', className)} role="group">
       <AnimatedBackground value={value ?? undefined} onValueChange={(id) => onChange(id as T)}
         className={cn('rounded-lg border border-line-2 bg-ink-750', value && tones?.[value])}
-        transition={contextSpring()}>
+        transition={contextSpring({ bounce: 0.18, duration: 0.45 })}>
         {options.map((o) => (
           <button key={o.v} data-id={o.v} type="button"
             className={cn('rounded-lg font-medium text-mute transition-colors hover:text-fg data-[checked=true]:text-fg',
@@ -249,12 +249,12 @@ export function TransitionPanel({ children, activeIndex, className }: { children
       <AnimatePresence initial={false} mode="popLayout" custom={dir}>
         <motion.div key={activeIndex} custom={dir}
           variants={{
-            enter: (d: number) => ({ opacity: 0, x: d * 36, scale: 0.995 }),
-            center: { opacity: 1, x: 0, scale: 1 },
-            exit: (d: number) => ({ opacity: 0, x: d * -24, scale: 0.995, transition: { duration: 0.18 } }),
+            enter: (d: number) => ({ opacity: 0, y: 14, x: d * 14 }),
+            center: { opacity: 1, y: 0, x: 0 },
+            exit: (d: number) => ({ opacity: 0, y: -10, x: d * -10 }),
           }}
           initial="enter" animate="center" exit="exit"
-          transition={{ ...spring('snappy'), opacity: { duration: 0.22 } }}>
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}>
           {children[activeIndex]}
         </motion.div>
       </AnimatePresence>
@@ -448,7 +448,7 @@ export function Btn({ children, onClick, variant = 'ghost', size = 'md', classNa
     danger: 'border-signal/40 bg-signal/10 text-[#ff8a90] hover:bg-signal/20',
   }[variant];
   return (
-    <motion.button type={type} disabled={disabled} onClick={onClick} whileTap={disabled ? undefined : { scale: 0.96, transition: spring('interactive') }} transition={spring('bouncy')}
+    <motion.button type={type} disabled={disabled} onClick={onClick} whileTap={disabled ? undefined : { scale: 0.96 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }}
       className={cn('inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50',
         size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-[13px]', v, className)}>
       {children}
@@ -503,7 +503,7 @@ export function InfoToggle({ open, onClick, label, className }: { open: boolean;
     <button type="button" onClick={onClick} aria-expanded={open} aria-label={`${open ? 'Details schließen' : 'Details zeigen'}: ${label}`}
       className={cn('grid size-6 shrink-0 place-items-center rounded-full border transition-colors duration-200',
         open ? 'border-white bg-white text-ink-950' : 'border-line-2 text-mute hover:border-white/50 hover:text-fg', className)}>
-      <motion.svg viewBox="0 0 12 12" className="size-2.5" animate={{ rotate: open ? 45 : 0 }} transition={spring('bouncy')}
+      <motion.svg viewBox="0 0 12 12" className="size-2.5" animate={{ rotate: open ? 45 : 0 }} transition={{ type: 'spring', stiffness: 400, damping: 26 }}
         fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 1.5v9M1.5 6h9" /></motion.svg>
     </button>
   );

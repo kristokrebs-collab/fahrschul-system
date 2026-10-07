@@ -98,9 +98,16 @@ function App() {
       </header>
 
       <main className="mx-auto max-w-[1320px] px-4 pb-40 pt-6 sm:px-6">
+        {j.pending.length > 0 && j.loaded && (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-win/30 bg-win/[0.07] px-4 py-3 text-[13px] text-win">
+            <span><strong className="font-semibold">{j.pending.length} Trades gefunden,</strong> die nur in diesem Browser gespeichert sind. Übernimm sie in die Cloud, dann sind sie überall da.</span>
+            <button type="button" className="rounded-xl border border-win/40 px-3 py-1.5 font-semibold hover:bg-win/10"
+              onClick={async () => { const n = await importTrades(j.pending); notify({ kind: 'success', title: `${n} Trades übernommen` }); }}>Übernehmen</button>
+          </div>
+        )}
         {j.mode === 'local' && (
           <div className="mb-5 rounded-2xl border border-warn/30 bg-warn/[0.07] px-4 py-3 text-[13px] text-warn">
-            <strong className="font-semibold">Lokaler Modus.</strong> Die Datenbank ist hier nicht erreichbar, Trades bleiben nur in diesem Browser. Öffne das Journal über claude.ai, damit es auf allen Geräten synchron ist.
+            <strong className="font-semibold">Lokaler Modus.</strong> Die Datenbank ist hier nicht erreichbar, Trades bleiben nur in diesem Browser und in genau dieser Datei. Sichere sie unter Einstellungen → Backup, oder öffne das Journal über den claude.ai-Link, damit es überall synchron ist.
           </div>
         )}
         <TransitionPanel activeIndex={VIEWS.indexOf(view)}>

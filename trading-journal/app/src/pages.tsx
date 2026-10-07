@@ -206,7 +206,6 @@ export function SettingsView({ settings, trades, onSave, downloads, onImport }: 
     try { await onSave(next); notify({ kind: 'success', title: 'Einstellungen gespeichert' }); } catch { notify({ kind: 'error', title: 'Speichern fehlgeschlagen' }); }
   }
   async function exportFile(kind: 'csv' | 'json') {
-    if (!downloads) return;
     const day = new Date().toISOString().slice(0, 10);
     let data: string;
     if (kind === 'json') data = JSON.stringify({ exportedAt: new Date().toISOString(), settings, trades: trades.map(({ items, checked, complete, move, risk, rr, result, ...t }) => t) }, null, 2);
@@ -217,7 +216,14 @@ export function SettingsView({ settings, trades, onSave, downloads, onImport }: 
       const rows = [...trades].sort((a, b) => +tDate(a) - +tDate(b)).map((t) => [t.date, t.account === 'makro' ? 'Makro' : 'Scalp', t.pair, t.side, t.status, t.entry, t.stop, t.target, t.exit, t.size, t.leverage, t.fees, t.pnl != null ? +t.pnl.toFixed(2) : '', t.r != null ? +t.r.toFixed(2) : '', t.move != null ? +(t.move * 100).toFixed(2) : '', { win: 'Gewinn', loss: 'Verlust', be: 'Break-even', open: 'Offen' }[t.result], (t.setups || []).map((id) => names.get(id)).filter(Boolean).join(' | '), `${t.checked}/${t.items.length}`, t.conviction, t.followedPlan == null ? '' : t.followedPlan ? 'Ja' : 'Nein', t.emotion, t.timeframe, t.reason, t.notes, t.chart].map(q).join(';'));
       data = '﻿' + [head.join(';'), ...rows].join('\n');
     }
-    try { await downloads.save({ filename: `trade-journal-${day}.${kind}`, data }); } catch (e: any) { if (e?.code !== 'declined') notify({ kind: 'error', title: 'Export fehlgeschlagen' }); }
+    const filename = `trade-journal-${day}.${kind}`;
+    if (!downloads) { // lokal geöffnete Datei: normaler Browser-Download
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: kind === 'json' ? 'application/json' : 'text/csv' }));
+      a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
+    try { await downloads.save({ filename, data }); } catch (e: any) { if (e?.code !== 'declined') notify({ kind: 'error', title: 'Export fehlgeschlagen' }); }
   }
   return (
     <div className="grid gap-5">
@@ -283,9 +289,7 @@ export function SettingsView({ settings, trades, onSave, downloads, onImport }: 
         </Card></BlurFade>
         <BlurFade delay={0.15}><Card title="Daten">
           <p className="mb-4 text-[13px] text-mute">Sichere dein Journal als Datei. CSV öffnet sich direkt in Excel oder Numbers.</p>
-          {downloads ? (
-            <div className="flex flex-wrap gap-2"><Btn onClick={() => exportFile('csv')}>CSV exportieren</Btn><Btn onClick={() => exportFile('json')}>Backup (JSON)</Btn></div>
-          ) : <p className="text-[12.5px] text-faint">Export gibt es nur, wenn das Journal auf claude.ai geöffnet ist.</p>}
+          <div className="flex flex-wrap gap-2"><Btn onClick={() => exportFile('csv')}>CSV exportieren</Btn><Btn onClick={() => exportFile('json')}>Backup (JSON)</Btn></div>
           <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line-2 px-3.5 py-2 text-[12.5px] text-mute transition-colors hover:text-fg">
             Backup einspielen (JSON)
             <input type="file" accept="application/json,.json" className="sr-only" onChange={async (e) => {

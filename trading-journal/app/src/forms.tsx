@@ -35,7 +35,7 @@ export function Sheet({ open, onClose, title, children, footer, wide = true, lay
             dragTransition={{ bounceStiffness: 420, bounceDamping: 32 }} onDragEnd={onDragEnd}
             className={cn('flex max-h-[94%] w-full flex-col overflow-hidden rounded-t-3xl border border-line-2 bg-ink-850 shadow-[0_30px_80px_rgb(0_0_0/0.6)] sm:max-h-[calc(100%-16px)] sm:rounded-3xl', wide ? 'sm:max-w-[860px]' : 'sm:max-w-[540px]')}
             initial={layoutId ? undefined : { y: 60, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={layoutId ? undefined : { y: 80, opacity: 0, scale: 0.98 }}
-            transition={spring('sheet')}>
+            transition={{ type: 'spring', stiffness: 320, damping: 32, bounce: 0.1 }}>
             <div className="relative flex cursor-grab touch-none items-center justify-between gap-3 border-b border-line px-6 pb-4 pt-5 active:cursor-grabbing"
               onPointerDown={(e) => { if (!(e.target as HTMLElement).closest('button')) drag.start(e); }}>
               <span className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-white/15" aria-hidden="true" />

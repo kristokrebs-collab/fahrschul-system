@@ -11,12 +11,12 @@ export function appleSpring(response: number, dampingFraction: number, delay = 0
 }
 
 const SPRINGS = {
-  smooth: [0.5, 1],          // .smooth
-  snappy: [0.4, 0.85],       // .snappy
-  bouncy: [0.5, 0.7],        // .bouncy
-  soft: [0.65, 1],           // ruhige Werte-Änderungen
+  smooth: [0.35, 0.9],
+  snappy: [0.3, 0.78],
+  bouncy: [0.38, 0.6],       // Wassertropfen: kurzes Nachschwingen
+  soft: [0.45, 0.82],
   interactive: [0.15, 0.86], // folgt dem Finger (.interactiveSpring)
-  sheet: [0.45, 0.88],       // Sheets und Morph
+  sheet: [0.36, 0.84],
 } as const;
 export type SpringKind = keyof typeof SPRINGS;
 export const spring = (kind: SpringKind, delay = 0) => appleSpring(SPRINGS[kind][0], SPRINGS[kind][1], delay);
@@ -37,10 +37,15 @@ export function pointerSpeed() {
   return idle > 160 ? speed * Math.max(0, 1 - idle / 600) : speed;
 }
 
-/** Feder passend zur Geste: 0,15 px/ms (langsam) bis 1,8 px/ms (schnell). */
-export function contextSpring(v = pointerSpeed()): Transition {
-  const t = Math.max(0, Math.min(1, (v - 0.15) / 1.65));
-  return appleSpring(0.6 - 0.28 * t, 1 - 0.4 * t);
+type Base = { stiffness: number; damping: number; mass?: number } | { bounce: number; duration: number };
+/**
+ * Feder passend zur Geste. Ruhige Bewegung = die bewährte Grundfeder unverändert,
+ * schnelle Bewegung = direkter und elastischer (mehr Bounce). Nie träger als die Grundfeder.
+ */
+export function contextSpring(base: Base = { stiffness: 260, damping: 22, mass: 0.8 }, v = pointerSpeed()): Transition {
+  const t = Math.max(0, Math.min(1, (v - 0.4) / 1.4));
+  if ('bounce' in base) return { type: 'spring', bounce: Math.min(0.5, base.bounce + 0.2 * t), duration: base.duration * (1 - 0.15 * t) };
+  return { type: 'spring', stiffness: base.stiffness * (1 + 0.4 * t), damping: base.damping * (1 - 0.3 * t), mass: base.mass ?? 1 };
 }
 
 /** Wohin ein Wurf ausrollen würde (UIScrollView-Verzögerung), Geschwindigkeit in px/s. */

@@ -3,12 +3,11 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
 import { cn } from './lib';
-import { spring } from './physics';
 
 type Open = { id: string; title: string; body: ReactNode } | null;
 const Ctx = createContext<{ open: Open; show: (o: NonNullable<Open>) => void; close: () => void }>({ open: null, show: () => {}, close: () => {} });
 export const useMorph = () => useContext(Ctx);
-const T = spring('sheet');
+const T = { type: 'spring' as const, stiffness: 340, damping: 34, mass: 0.9 };
 
 export function MorphProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState<Open>(null);
