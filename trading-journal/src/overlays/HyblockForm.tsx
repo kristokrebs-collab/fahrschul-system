@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { nowLocalInput } from "@/lib/dates";
 import { n1, signed } from "@/lib/format";
 import { parseNumber, toInputString, toNonNegativeInt } from "@/lib/parse";
-import { useMorphDialog } from "@/motion/MorphDialog";
+import { useMorphDialog, useMorphDialogGuard } from "@/motion/MorphDialog";
 import { StaggerItem } from "@/motion/Stagger";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -117,6 +117,11 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
   };
   const dirty = structure || rsi || (Object.keys(initial) as (keyof FormState)[]).some((k) => form[k].trim() !== initial[k].trim());
   const cancel = () => (dirty ? setAsking(true) : close());
+  // Escape, backdrop, × and swipe ask too (no silent discard of typed values)
+  useMorphDialogGuard(
+    () => dirty,
+    () => setAsking(true),
+  );
   const refuse = (message: string, field: string) => {
     setError(message);
     revealInvalid(field, { reduced });

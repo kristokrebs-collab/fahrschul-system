@@ -28,6 +28,10 @@ export interface CardProps extends Omit<HTMLMotionProps<"div">, "children" | "ti
   gradientColor?: string;
   /** Proximity border arc that points at a nearby pointer (default true). */
   edgeGlow?: boolean;
+  /**
+   * Classes of the card SURFACE (the inner `motion.div`), not of the outer wrapper: grid placement such as
+   * `lg:col-span-*` does nothing here – put it on the cell that wraps the card.
+   */
   className?: string;
   innerClassName?: string;
 }

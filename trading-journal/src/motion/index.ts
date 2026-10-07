@@ -1,7 +1,7 @@
 export * from "@/motion/tokens";
 export { MotionRoot } from "@/motion/MotionRoot";
 export { PageSwitch, type PageSwitchProps } from "@/motion/PageSwitch";
-export { MorphDialogProvider, useMorphDialog, useCloseMorphDialogOnUnmount, type MorphDialogRequest } from "@/motion/MorphDialog";
+export { MorphDialogProvider, useMorphDialog, useMorphDialogGuard, useCloseMorphDialogOnUnmount, type MorphDialogGuard, type MorphDialogRequest } from "@/motion/MorphDialog";
 export { MorphCard, MorphTitle, type MorphCardProps, type MorphTitleProps } from "@/motion/MorphCard";
 export { Sheet, type SheetProps } from "@/motion/Sheet";
 export { HoverPill, useHoverGroup, type HoverPillProps, type HoverGroupBinding } from "@/motion/HoverPill";

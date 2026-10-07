@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, type Variants } from "motion/react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import {
   addMonths,
   calendarMonth,
@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/cn";
 import { isoWeek } from "@/lib/dates";
 import { pct, pct0, signed } from "@/lib/format";
+import { useTouchMoveGuard } from "@/motion/a11y";
 import { flickDecision, rubberBand, useAxisDrag } from "@/motion/physics";
 import { spring, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
@@ -160,6 +161,19 @@ function MonthGrid({ month, unit, capital, currency, dir, armed, focusKey, canPr
       else if (d === -1 && canNext) onGo(1);
     },
   });
+  // native non-passive touchmove guard while swiping: an unconsumed fast swipe makes Chrome swallow the next tap
+  const touchGuard = useTouchMoveGuard(drag.isDragging);
+  const rootRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      root.current = el;
+      const off = touchGuard(el);
+      return () => {
+        root.current = null;
+        off?.();
+      };
+    },
+    [touchGuard],
+  );
 
   const inMonth = month.weeks.flatMap((w) => w.cells).filter((c) => c.inMonth);
   const tabKey = focusKey && inMonth.some((c) => c.key === focusKey) ? focusKey : (inMonth.find((c) => c.isToday) ?? inMonth.find((c) => c.g) ?? inMonth[0])?.key;
@@ -198,7 +212,7 @@ function MonthGrid({ month, unit, capital, currency, dir, armed, focusKey, canPr
         ))}
         <div className="hidden text-center text-[10px] font-semibold uppercase tracking-[0.1em] text-faint @min-[420px]/cal:block">Woche</div>
       </div>
-      <div ref={root} className="relative overflow-hidden" {...drag.handlers} style={drag.style as CSSProperties}>
+      <div ref={rootRef} className="relative overflow-hidden" {...drag.handlers} style={drag.style as CSSProperties}>
         <motion.div style={{ x }}>
           <AnimatePresence mode="popLayout" initial={false} custom={dir}>
             <motion.div

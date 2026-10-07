@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useId, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useTouchMoveGuard } from "@/motion/a11y";
 import { contextSpring, contextSpringAt, haptic, physics, pointerSpeed, pointerTempo, snapIndex, tempoOf, useAxisDrag, type AxisDragMove, type AxisDragRelease } from "@/motion/physics";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useCanHover } from "@/motion/useMediaQuery";
@@ -193,6 +194,8 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
     },
     onCancel: () => showPreview(null, 0),
   });
+  // native non-passive touchmove guard while sliding: an unconsumed fast slide makes Chrome swallow the next tap
+  const touchGuard = useTouchMoveGuard(drag.isDragging);
 
   const shown = preview ?? value;
   const hasValue = options.some((o) => o.v === value);
@@ -204,6 +207,7 @@ export function Segmented<T extends string>({ options, value, onChange, size = "
 
   return (
     <div
+      ref={touchGuard}
       role="radiogroup"
       onKeyDown={onKeyDown}
       onPointerLeave={() => setHovered(null)}

@@ -1,8 +1,9 @@
 import { AnimatePresence, animate, cancelFrame, frame, motion, motionValue, useMotionValue, useSpring, useTransform, type MotionValue, type Transition } from "motion/react";
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
 import { expoCurve, springCurve } from "@/app/cssEasing";
 import { useIntroPhase, type IntroPhase } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
+import { useTouchMoveGuard } from "@/motion/a11y";
 import { flickStep, haptic, lastPressMs, mixSpring, physics, pressTempo, rubberClamp, setNavTempo, useAxisDrag, type AxisDragRelease } from "@/motion/physics";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
@@ -640,6 +641,20 @@ export function Dock() {
       if (scrub.current.longPress) scrub.current.swallow = true;
     },
   });
+  // native non-passive touchmove guard while scrubbing / flicking: an unconsumed fast flick makes Chrome swallow the
+  // next tap (e.g. the + right after a flick to the next page)
+  const touchGuard = useTouchMoveGuard(drag.isDragging);
+  const panelCallbackRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      panelRef.current = el;
+      const off = touchGuard(el);
+      return () => {
+        panelRef.current = null;
+        off?.();
+      };
+    },
+    [touchGuard],
+  );
   const onToolbarPointerUp = (e: PointerEvent<HTMLDivElement>) => {
     drag.handlers.onPointerUp(e);
     if (!scrub.current.on) {
@@ -681,7 +696,7 @@ export function Dock() {
       style={DOCK_FX_VARS}
     >
       <motion.div
-        ref={panelRef}
+        ref={panelCallbackRef}
         role="toolbar"
         aria-label="Navigation"
         onPointerEnter={onPointerEnter}

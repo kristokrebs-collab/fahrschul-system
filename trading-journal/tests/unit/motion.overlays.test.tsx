@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
-import { MorphDialogProvider, StaggerItem } from "@/motion/MorphDialog";
+import { MorphDialogProvider, StaggerItem, useMorphDialog, useMorphDialogGuard } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { PageSwitch } from "@/motion/PageSwitch";
 import { Sheet } from "@/motion/Sheet";
@@ -129,6 +129,56 @@ describe("MorphDialog backdrop", () => {
     expect(card).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(overlay);
     // (jsdom never finishes the shared-layout exit, so assert the close itself rather than the unmount)
+    expect(card).toHaveAttribute("aria-expanded", "false");
+  });
+});
+
+/** A dialog body with an unsaved-input guard (like HyblockForm). */
+function GuardedBody({ onAttempt }: { onAttempt: () => void }) {
+  const [dirty, setDirty] = useState(false);
+  const { close } = useMorphDialog();
+  useMorphDialogGuard(() => dirty, onAttempt);
+  return (
+    <>
+      <button type="button" onClick={() => setDirty(true)}>
+        Tippen
+      </button>
+      <button type="button" onClick={close}>
+        Verwerfen
+      </button>
+    </>
+  );
+}
+
+describe("MorphDialog unsaved-input guard", () => {
+  it("Escape, backdrop and × ask a dirty body instead of closing; the body's own close is never guarded", async () => {
+    const onAttempt = vi.fn();
+    render(
+      <MotionRoot>
+        <MorphDialogProvider>
+          <MorphCard id="guarded" title="Ablesung" body={() => <GuardedBody onAttempt={onAttempt} />}>
+            <MorphTitle id="guarded">Ablesung</MorphTitle>
+          </MorphCard>
+        </MorphDialogProvider>
+      </MotionRoot>,
+    );
+    const card = screen.getByRole("button", { name: /Ablesung/ });
+    fireEvent.click(card);
+    await waitFor(() => expect(card).toHaveAttribute("inert"), { timeout: 1500 });
+    // clean body: Escape closes at once (and the card reopens it)
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(card).toHaveAttribute("aria-expanded", "false");
+    expect(onAttempt).not.toHaveBeenCalled();
+    await waitFor(() => expect(card).not.toHaveAttribute("inert"), { timeout: 1500 });
+    fireEvent.click(card);
+    await waitFor(() => expect(card).toHaveAttribute("inert"), { timeout: 1500 });
+    fireEvent.click(screen.getByRole("button", { name: "Tippen" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getByRole("dialog").closest(".fixed") as HTMLElement);
+    fireEvent.click(screen.getByRole("button", { name: "Schließen" }));
+    expect(onAttempt).toHaveBeenCalledTimes(3);
+    expect(card).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Verwerfen" }));
     expect(card).toHaveAttribute("aria-expanded", "false");
   });
 });

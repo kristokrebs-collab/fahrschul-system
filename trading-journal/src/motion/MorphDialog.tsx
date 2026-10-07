@@ -27,6 +27,16 @@ export interface MorphDialogRequest {
   pill?: boolean;
 }
 
+/**
+ * Unsaved-input guard of the open dialog's body (`useMorphDialogGuard`): while `guard()` is true, Escape, the backdrop,
+ * the × button and the swipe do not close – `onAttempt` runs instead (the body shows its "Änderungen verwerfen?").
+ * The body's own `close()` (after saving, or "Verwerfen") is never guarded.
+ */
+export interface MorphDialogGuard {
+  guard: () => boolean;
+  onAttempt: () => void;
+}
+
 interface MorphDialogState {
   open: MorphDialogRequest | null;
   /** id whose open morph has completed → its source is `visibility:hidden` (Plan 3.2 rule 9). */
@@ -43,13 +53,38 @@ interface MorphDialogState {
   close: () => void;
   /** Called by the source `MorphCard` when its reverse morph has finished (releases inert + focus). */
   returned: (id: string) => void;
+  /** Registers the body's unsaved-input guard; returns the unregister function (`useMorphDialogGuard`). */
+  registerGuard: (g: MorphDialogGuard) => () => void;
 }
 
-const Ctx = createContext<MorphDialogState>({ open: null, settled: null, closing: null, closeTempo: 0, show: () => {}, close: () => {}, returned: () => {} });
+const Ctx = createContext<MorphDialogState>({
+  open: null,
+  settled: null,
+  closing: null,
+  closeTempo: 0,
+  show: () => {},
+  close: () => {},
+  returned: () => {},
+  registerGuard: () => () => {},
+});
 
 /** `{ open, show, close }` – `show({ id, title, body })` opens the dialog morphing out of `MorphCard id`. */
 export function useMorphDialog(): MorphDialogState {
   return useContext(Ctx);
+}
+
+/**
+ * Dirty-form guard for a dialog body (like `Sheet`'s `dismissGuard` / `onDismissAttempt`): while `guard()` returns
+ * true, Escape, backdrop, × and swipe call `onAttempt` instead of closing. Both are read at the moment of the attempt.
+ * Outside a `MorphDialogProvider` it does nothing.
+ */
+export function useMorphDialogGuard(guard: () => boolean, onAttempt: () => void): void {
+  const { registerGuard } = useContext(Ctx);
+  const latest = useRef({ guard, onAttempt });
+  useEffect(() => {
+    latest.current = { guard, onAttempt };
+  });
+  useEffect(() => registerGuard({ guard: () => latest.current.guard(), onAttempt: () => latest.current.onAttempt() }), [registerGuard]);
 }
 
 const CLOSE_GLYPH = (
@@ -90,6 +125,9 @@ const HEAD: Variants = {
  * axis at half speed, and shrinks to 0.88 while the dim lifts; a slow drag springs back, a projected flick closes and
  * the source card zooms the shrunk panel back in (`closeTempo` → context spring). The panel scrolls with
  * `overscroll-contain` (no scroll chaining into the page or pull-to-refresh).
+ *
+ * Unsaved input (`useMorphDialogGuard` in the body): Escape, backdrop, × and swipe ask the body instead of closing
+ * (the swipe is resisted with a rubber band and never commits).
  */
 export function MorphDialogProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState<MorphDialogRequest | null>(null);
@@ -100,6 +138,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
   const openRef = useRef<MorphDialogRequest | null>(null);
+  const guardRef = useRef<MorphDialogGuard | null>(null);
   const titleId = useId();
   const reduced = useReducedFx();
 
@@ -123,9 +162,22 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
     setOpen(req);
   }, []);
   const returned = useCallback((id: string) => setClosing((c) => (c === id ? null : c)), []);
+  const registerGuard = useCallback((g: MorphDialogGuard) => {
+    guardRef.current = g;
+    return () => {
+      if (guardRef.current === g) guardRef.current = null;
+    };
+  }, []);
+  const isGuarded = useCallback(() => guardRef.current?.guard() ?? false, []);
+  /** User-initiated close (Escape, backdrop, ×): asks a dirty body first. */
+  const dismiss = useCallback(() => {
+    const g = guardRef.current;
+    if (g?.guard()) g.onAttempt();
+    else close();
+  }, [close]);
 
   const morphDone = open !== null && settled === open.id;
-  useDialogBehaviour(panelRef, open !== null, close, { settled: open ? morphDone : closing === null });
+  useDialogBehaviour(panelRef, open !== null, dismiss, { settled: open ? morphDone : closing === null });
 
   useOverlayLane(open !== null);
 
@@ -134,11 +186,16 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
     enabled: morphDone,
     open: open !== null,
     target: columnRef,
+    guard: isGuarded,
+    onAttempt: () => guardRef.current?.onAttempt(),
     onDismiss: (info) => closeWith(info.tempo),
   });
   const touchGuard = useTouchMoveGuard(swipe.isDragging);
 
-  const value = useMemo<MorphDialogState>(() => ({ open, settled, closing, closeTempo, show, close, returned }), [open, settled, closing, closeTempo, show, close, returned]);
+  const value = useMemo<MorphDialogState>(
+    () => ({ open, settled, closing, closeTempo, show, close, returned, registerGuard }),
+    [open, settled, closing, closeTempo, show, close, returned, registerGuard],
+  );
 
   return (
     <Ctx.Provider value={value}>
@@ -154,7 +211,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
             layoutRoot
             className="fixed inset-0 z-[70] grid place-items-center p-4"
             onClick={(e) => {
-              if (e.target === e.currentTarget) close();
+              if (e.target === e.currentTarget) dismiss();
             }}
           >
             <motion.div
@@ -206,7 +263,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                   </motion.h2>
                   <button
                     type="button"
-                    onClick={close}
+                    onClick={dismiss}
                     aria-label="Schließen"
                     className="touch-hit grid size-8 place-items-center rounded-full border border-line-2 text-mute transition-colors hover:text-fg"
                   >
