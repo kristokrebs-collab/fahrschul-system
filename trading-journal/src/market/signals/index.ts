@@ -22,3 +22,4 @@ export { useSignalCheck } from "./hooks";
 export { checkTradeAt, retroCheck, RETRO_PAGE_MAX, type RetroResult, type RetroStatus } from "./retro";
 export { requestSignalNotifyPermission, signalNotifyPermission, SIGNAL_LAST_KEY, SIGNAL_HOLD_MS, SIGNAL_TOAST_MS, type NotifyPermission } from "./notify";
 export { tfSource, type TfSource } from "./bars";
+export { whaleAt, liveWhaleSeries, WHALE_POLL_LIMIT, WHALE_POLL_LAG_MS, type WhaleClient } from "./whale";

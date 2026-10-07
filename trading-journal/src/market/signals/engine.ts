@@ -14,7 +14,8 @@ import type { MarketProvider } from "../provider";
 import type { Candle, FeedId, KlineFeed, ProviderHealth, Source, Stamped } from "../types";
 import { priceMv, priceReceivedAtMv, tradeTimeMv } from "../motionValues";
 import { BarConverter, neededTfs, rungBars, tfSource } from "./bars";
-import { noteSignals, resetSignalNotifier } from "./notify";
+import { noteSignals, resetSignalNotifier, signalNotifyMinStrength } from "./notify";
+import { startWhale, stopWhale, whaleInputKey, withLiveWhale } from "./whale";
 
 export type SignalCheckStatus = "loading" | "ok" | "stale" | "offline";
 
@@ -154,6 +155,7 @@ function inputKeyOf(p: MarketProvider, cfg: SignalCfg, price: { price: number } 
     ids.push(`${f}:${v ? objectId(v.data) : 0}`);
   }
   if (needsDaily(cfg)) ids.push(`d:${objectId(eng.daily.candles)}`);
+  ids.push(whaleInputKey());
   return ids.join("|");
 }
 
@@ -211,6 +213,12 @@ export function signalsKey(s: Signals | null): string {
   const z = s.zone;
   parts.push(z ? `z:${z.tf},${z.zone.zone},${r2(z.zone.pos)},${r1(z.zone.hi)},${r1(z.zone.lo)},${z.zone.deep ? 1 : 0},${z.zone.brk ? `${z.zone.brk.kind}${z.zone.brk.dir}` : "-"},${z.zone.lux ? 1 : 0}` : "z:-");
   for (const v of [s.long, s.short]) parts.push([v.score, v.strength, v.tiers, v.valid ? 1 : 0, v.rsiOk ? 1 : 0, v.zoneOk ? 1 : 0, v.label, v.reasons.map((r) => (r.ok ? 1 : 0)).join("")].join(","));
+  // top-trader / retail readings (rounded like the rest: a re-render only when a shown digit changes)
+  if (s.whale) {
+    for (const w of s.whale.periods) parts.push(`w:${w.period},${w.at},${r1(w.top)},${r1(w.retail)},${r1(w.topChg)},${r1(w.retailChg)},${w.runLong},${w.runShort}`);
+    parts.push(`wm:${s.whale.missing.join(",")}`);
+  }
+  for (const v of [s.long, s.short]) if (v.whale) parts.push(`wv:${v.whale.ok ? 1 : 0},${v.whale.run},${v.whale.period},${v.whale.points}`);
   return parts.join(";");
 }
 
@@ -242,7 +250,9 @@ export function runSignalCheck(now: number = Date.now()): SignalCheckState {
     eng.inputKey = key;
     stats.computes++;
     const bars = buildBars(p, cfg, price);
-    const s = computeSignals(bars, cfg, now);
+    const raw = computeSignals(bars, cfg, now);
+    // "Top-Trader kaufen · Retail rot": graded on top of the 1:1 evaluation (unchanged without a reading)
+    const s = raw ? withLiveWhale(raw, cfg, now) : null;
     if (s) {
       const live: LiveSignals = { ...s, symbol: p.symbol, source: p.getHealth().feeds[liveFeeds(cfg)[0] ?? "kline_1h"].source, cfg, price: price?.price ?? null };
       const k = signalsKey(live);
@@ -316,6 +326,7 @@ export function attachSignalEngine(p: MarketProvider): void {
   eng.provider = p;
   subscribeInputs(p);
   if (needsDaily(eng.cfg)) pollDaily();
+  startWhale(p, eng.cfg, schedule);
   schedule();
 }
 
@@ -328,6 +339,7 @@ export function detachSignalEngine(): void {
   if (eng.daily.timer) clearTimeout(eng.daily.timer);
   eng.daily = { candles: [], fetchedAt: 0, timer: null, inflight: false };
   eng.converters.clear();
+  stopWhale();
   eng.provider = null;
   eng.inputKey = "";
   eng.snapKey = "∅";
@@ -340,7 +352,8 @@ export function detachSignalEngine(): void {
 export function setSignalConfig(raw: unknown): SignalCfg {
   const cfg = sanitizeSignalCfg(raw);
   const key = signalCfgKey(cfg);
-  const notifyChanged = cfg.notify !== eng.cfg.notify;
+  // notification-only settings (switch, minimum strength) do not change the evaluation, but the notifier reads them
+  const notifyChanged = cfg.notify !== eng.cfg.notify || signalNotifyMinStrength(cfg) !== signalNotifyMinStrength(eng.cfg);
   if (key === eng.cfgKey) {
     if (notifyChanged) eng.cfg = cfg;
     return eng.cfg;
@@ -352,6 +365,7 @@ export function setSignalConfig(raw: unknown): SignalCfg {
   if (eng.provider) {
     subscribeInputs(eng.provider);
     if (needsDaily(cfg)) pollDaily();
+    startWhale(eng.provider, cfg, schedule);
     schedule();
   }
   return cfg;

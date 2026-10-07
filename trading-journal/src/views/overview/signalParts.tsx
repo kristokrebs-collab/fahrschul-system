@@ -9,7 +9,7 @@
  */
 import { animate, AnimatePresence, motion, useTransform } from "motion/react";
 import { memo, useEffect, useRef, useState } from "react";
-import { ageText, strengthLine, TOO_FEW_BARS, ZONE_TEXT, zoneFooterText, zonePillText, type Side, type SignalCfg, type TfCheck, type Verdict } from "@/domain/signals";
+import { ageText, strengthLine, TOO_FEW_BARS, WHALE_NO_DATA, WHALE_NO_DATA_HINT, ZONE_TEXT, zoneFooterText, zonePillText, type Side, type SignalCfg, type TfCheck, type Verdict } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { n0, n1 } from "@/lib/format";
 import { priceMv } from "@/market";
@@ -20,7 +20,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { RingGauge } from "@/primitives/RingGauge";
 import { rollDirection } from "@/primitives/StatTile";
-import { meterPct, rsiBands, verdictColor, verdictText, zonePosition, type RungView } from "./signalView";
+import { meterPct, rsiBands, verdictColor, verdictText, zonePosition, type RungView, type WhaleRowView } from "./signalView";
 
 const TONE_ON: Record<Side, string> = { long: "border-win/35 bg-win/[0.06]", short: "border-loss/35 bg-loss/[0.06]" };
 const SIDE_TEXT: Record<Side, string> = { long: "text-win", short: "text-loss" };
@@ -270,6 +270,96 @@ export const RungTile = memo(function RungTile({ rung, side, cfg, fresh }: RungT
             sub={`Ø ${n1(c.rsiMa)}`}
           />
         </>
+      )}
+    </div>
+  );
+});
+
+/* ------------------------------------------------------------------ top traders vs retail */
+
+/** One reading of the whale row: label + `±x,x pp`, in the side colour when it points the way the side needs. */
+function WhaleReadingCell({ label, value, fits, side }: { label: string; value: string; fits: boolean; side: Side }) {
+  return (
+    <span className="grid min-w-0 gap-0.5">
+      <span className="text-[10px] uppercase tracking-[0.1em] text-faint">{label}</span>
+      <span className={cn("num whitespace-nowrap font-mono text-[13px] transition-colors duration-300", fits ? SIDE_TEXT[side] : "text-mute")}>{value}</span>
+    </span>
+  );
+}
+
+/**
+ * "Top-Trader kaufen · Retail rot" (short: "verkaufen · Retail grün"): one row in the ladder's visual language – tone
+ * layer and glowing dot when the condition holds, the two readings (top-trader / all-accounts long % change over the
+ * last `need` closed periods) and a chip per period with its run. No data → "keine Daten" (never shown as a fail).
+ * The halo flashes once when the row lights up (not on mount); everything else is opacity / colour crossfades.
+ */
+export const WhaleRow = memo(function WhaleRow({ w, side }: { w: WhaleRowView; side: Side }) {
+  const reduced = useReducedFx();
+  const lit = w.state === "ok";
+  const glow = useRef<HTMLSpanElement>(null);
+  const was = useRef(lit);
+  useEffect(() => {
+    const rose = lit && !was.current;
+    was.current = lit;
+    if (!rose || reduced || !glow.current) return;
+    const a = animate(glow.current, { opacity: [1, 0] }, tween.flash);
+    return () => a.stop();
+  }, [lit, reduced]);
+  const tone = side === "long" ? "win" : "loss";
+  const dot = lit ? (tone === "win" ? "bg-win" : "bg-loss") : w.state === "open" && w.run > 0 ? (tone === "win" ? "border border-win" : "border border-loss") : "bg-line-2";
+  return (
+    <div className="relative isolate min-w-0 overflow-hidden rounded-xl border border-line bg-ink-950/50 p-3" data-testid="signal-whale" data-lit={lit || undefined} data-state={w.state}>
+      {(["long", "short"] as const).map((s) => (
+        <motion.span
+          key={s}
+          aria-hidden="true"
+          className={cn("pointer-events-none absolute -inset-px -z-10 rounded-xl border", TONE_ON[s])}
+          initial={false}
+          animate={{ opacity: lit && side === s ? 1 : 0 }}
+          transition={tween.crossfade}
+        />
+      ))}
+      <span ref={glow} aria-hidden="true" className={cn("pointer-events-none absolute inset-0 -z-10 opacity-0", side === "long" ? "bg-win/15" : "bg-loss/15")} />
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <span className="inline-flex min-w-0 items-center gap-2">
+          <span
+            aria-hidden="true"
+            className={cn("size-2 shrink-0 rounded-full transition-colors duration-300", dot)}
+            style={lit ? { boxShadow: `0 0 8px 1px ${tone === "win" ? "rgb(61 220 132 / 0.55)" : "rgb(255 77 79 / 0.55)"}` } : undefined}
+          />
+          <span className={cn("text-[12.5px] font-semibold leading-snug transition-colors duration-300", lit ? SIDE_TEXT[side] : w.state === "none" ? "text-mute" : "text-fg")}>
+            <span className="sr-only">{lit ? "erfüllt: " : w.state === "none" ? "keine Daten: " : "offen: "}</span>
+            {w.title}
+          </span>
+        </span>
+        <span className="num shrink-0 text-[10.5px] text-faint">{lit ? (w.points > 0 ? `+${w.points} Score · +1 Stärke` : "zählt nicht") : `mind. ${w.need}× in Folge`}</span>
+      </div>
+      {w.state === "none" ? (
+        <p className="mt-2 text-[11.5px] leading-snug text-faint" title={WHALE_NO_DATA_HINT}>
+          {WHALE_NO_DATA} · {w.missing.join(", ")}
+        </p>
+      ) : (
+        <div className="mt-2.5 flex flex-wrap items-end justify-between gap-x-5 gap-y-2">
+          <span className="flex flex-wrap gap-x-5 gap-y-2">
+            <WhaleReadingCell label="Top-Trader" value={w.top} fits={w.topFits} side={side} />
+            <WhaleReadingCell label="Retail" value={w.retail} fits={w.retailFits} side={side} />
+          </span>
+          <span className="flex flex-wrap justify-end gap-1.5" aria-label="Perioden in Folge">
+            {w.periods.map((p) => (
+              <span
+                key={p.period}
+                className={cn("num whitespace-nowrap rounded-md border px-1.5 py-0.5 font-mono text-[10.5px] transition-colors duration-300", p.ok ? cn(TONE_ON[side], SIDE_TEXT[side]) : "border-line text-faint")}
+              >
+                {p.period} · {p.run}×
+              </span>
+            ))}
+            {w.missing.map((m) => (
+              <span key={m} className="num whitespace-nowrap rounded-md border border-line px-1.5 py-0.5 font-mono text-[10.5px] text-faint" title={WHALE_NO_DATA_HINT}>
+                {m} · –
+              </span>
+            ))}
+          </span>
+        </div>
       )}
     </div>
   );

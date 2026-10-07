@@ -3,7 +3,7 @@
  * (`signals.ts:292-306`) field for field, so trades move between both apps without loss; our extra fields are
  * optional and additive (the other app ignores them).
  */
-import { STRENGTH_LABEL, type Side, type SignalCfg } from "./config";
+import { STRENGTH_LABEL, whaleCfgOf, type Side, type SignalCfg } from "./config";
 import type { WtKind } from "./mcb";
 import type { Signals } from "./verdict";
 import type { Zone } from "./zones";
@@ -46,6 +46,32 @@ export interface SignalSnapshotTf extends SignalSnapTf {
   rsiNear?: boolean;
 }
 
+/** One period of the stored "Top-Trader kaufen · Retail rot" reading. */
+export interface SignalSnapshotWhalePeriod {
+  period: string;
+  /** top-trader position long % / all-accounts long % at the check, rounded to 0.01 */
+  top: number;
+  retail: number;
+  /** change over the last `need` periods, pp, rounded to 0.01 */
+  topChg: number;
+  retailChg: number;
+  /** trailing closed periods that fit the snapshot's side */
+  run: number;
+}
+
+/** The stored condition (`WhaleVerdict` + the per-period readings), for the snapshot's side. */
+export interface SignalSnapshotWhale {
+  ok: boolean;
+  run: number;
+  need: number;
+  period: string;
+  topChg: number;
+  retailChg: number;
+  /** score points it added (0 = did not hold or weight 0) */
+  points: number;
+  periods: SignalSnapshotWhalePeriod[];
+}
+
 /** Stored on `trade.signal`. A superset of `SignalSnap`; every extra field is optional. */
 export interface SignalSnapshot extends SignalSnap {
   tfs: SignalSnapshotTf[];
@@ -63,6 +89,12 @@ export interface SignalSnapshot extends SignalSnap {
   symbol?: string;
   /** data source, e.g. `binance` */
   source?: string;
+  /**
+   * "Top-Trader kaufen · Retail rot" at check time. `null` = the condition was on but no Binance top-trader data
+   * existed for that time (older than ~30 days, other source) — never a fail; absent = snapshot from before the
+   * condition, or switched off.
+   */
+  whale?: SignalSnapshotWhale | null;
 }
 
 const r1 = (x: number): number => Math.round(x * 10) / 10;
@@ -93,7 +125,7 @@ export interface SnapshotMeta {
 }
 
 /** Snapshot to store on a trade: `snapshot()` plus our additive fields. */
-export function toSignalSnapshot(sig: Signals, side: Side, cfg: Pick<SignalCfg, "ladder" | "required" | "zoneTf">, meta: SnapshotMeta = {}): SignalSnapshot {
+export function toSignalSnapshot(sig: Signals, side: Side, cfg: Pick<SignalCfg, "ladder" | "required" | "zoneTf" | "whale">, meta: SnapshotMeta = {}): SignalSnapshot {
   const base = snapshot(sig, side);
   const v = side === "long" ? sig.long : sig.short;
   const present = sig.checks.map((c, i) => ({ c, i })).filter((x): x is { c: NonNullable<typeof x.c>; i: number } => !!x.c);
@@ -107,6 +139,20 @@ export function toSignalSnapshot(sig: Signals, side: Side, cfg: Pick<SignalCfg, 
   if (meta.mode) out.mode = meta.mode;
   if (meta.symbol) out.symbol = meta.symbol;
   if (meta.source) out.source = meta.source;
+  const w = v.whale;
+  if (w && sig.whale) {
+    const r2 = (x: number): number => Math.round(x * 100) / 100;
+    out.whale = {
+      ok: w.ok,
+      run: w.run,
+      need: w.need,
+      period: w.period,
+      topChg: r2(w.topChg),
+      retailChg: r2(w.retailChg),
+      points: w.points,
+      periods: sig.whale.periods.map((p) => ({ period: p.period, top: r2(p.top), retail: r2(p.retail), topChg: r2(p.topChg), retailChg: r2(p.retailChg), run: side === "long" ? p.runLong : p.runShort })),
+    };
+  } else if (whaleCfgOf(cfg).on) out.whale = null;
   return out;
 }
 
@@ -190,7 +236,36 @@ export function parseSignalSnapshot(raw: unknown): SignalSnapshot | null {
     if (typeof raw[k] === "string") out[k] = raw[k] as string;
     else delete out[k];
   }
+  if (raw.whale !== undefined) {
+    const w = raw.whale === null ? null : parseWhale(raw.whale);
+    if (raw.whale === null || w) out.whale = w;
+    else delete out.whale;
+  }
   return out;
+}
+
+function parseWhale(raw: unknown): SignalSnapshotWhale | null {
+  if (!isRec(raw) || typeof raw.ok !== "boolean") return null;
+  const n = (v: unknown): number => {
+    const x = toNum(v);
+    return Number.isFinite(x) ? x : 0;
+  };
+  const periods = Array.isArray(raw.periods)
+    ? raw.periods
+        .filter((p): p is Record<string, unknown> => isRec(p) && typeof p.period === "string")
+        .map((p) => ({ ...p, period: p.period as string, top: n(p.top), retail: n(p.retail), topChg: n(p.topChg), retailChg: n(p.retailChg), run: Math.max(0, Math.round(n(p.run))) }))
+    : [];
+  return {
+    ...raw,
+    ok: raw.ok,
+    run: Math.max(0, Math.round(n(raw.run))),
+    need: Math.max(1, Math.round(n(raw.need) || 1)),
+    period: typeof raw.period === "string" ? raw.period : (periods[0]?.period ?? ""),
+    topChg: n(raw.topChg),
+    retailChg: n(raw.retailChg),
+    points: Math.max(0, n(raw.points)),
+    periods,
+  };
 }
 
 /** Checklist item ids of the multi-timeframe setup `s_mtf` (other journal `MTF_SETUP`). */

@@ -7,6 +7,7 @@
 import { MIN_SIGNAL_BARS, tfSeconds, type Side, type SignalCfg } from "./config";
 import { rsi, sma, waveTrend, type Bar } from "./indicators";
 import { wtSignal, type WtSignal } from "./mcb";
+import type { WhaleReading, WhaleVerdict } from "./whale";
 import { luxZone, pdZone, PD_FALLBACK_BARS, type ZoneInfo } from "./zones";
 
 export interface TfCheck {
@@ -68,6 +69,8 @@ export interface Verdict {
   /** 0..100 */
   score: number;
   reasons: VerdictReason[];
+  /** "Top-Trader kaufen · Retail rot" (ours, `applyWhale`); absent without data or when switched off */
+  whale?: WhaleVerdict;
 }
 
 /** Rates one direction: signal ladder + RSI + zone. */
@@ -132,6 +135,8 @@ export interface Signals extends BestVerdict {
   zone: TfCheck | null;
   /** evaluation time, ms */
   at: number;
+  /** top-trader / retail readings the verdicts were graded with (`applyWhale`); absent = none */
+  whale?: WhaleReading;
 }
 
 export type BarsByTf = Readonly<Record<string, readonly Bar[] | undefined>>;

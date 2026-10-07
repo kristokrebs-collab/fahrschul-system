@@ -1,6 +1,9 @@
 import { motion } from "motion/react";
 import { useMemo, useRef, useState } from "react";
-import { conditionEffects, EMPTY, explainSignal, snapOf, strengthRows, TITLES, type StrengthKey } from "@/domain/insights";
+import { aggregate } from "@/domain/agg";
+import { conditionEffects, EMPTY, explainSignal, snapOf, strengthRows, TITLES, type ConditionEffect, type StrengthKey } from "@/domain/insights";
+import { WHALE_TITLE } from "@/domain/signals";
+import type { EnrichedTrade } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { pct0, r as fmtR, signed } from "@/lib/format";
 import { HoverPill, useHoverGroup } from "@/motion/HoverPill";
@@ -39,15 +42,55 @@ function EffectBar({ d, index }: { d: number | null; index: number }) {
   );
 }
 
+/** Effect row of "Top-Trader kaufen · Retail rot" (ours): the condition is stored per snapshot side. */
+export type WhaleEffect = Omit<ConditionEffect, "key"> & { key: "whale"; /** trades with a check but no top-trader data (old / other source) */ noData: number };
+
+/**
+ * Win rate with vs without "Top-Trader kaufen · Retail rot" among the closed trades whose snapshot carries a reading;
+ * snapshots without data (`whale: null`, older than ~30 days) or from before the condition are left out, never counted
+ * as "not met". `null` when no trade has a reading.
+ */
+export function whaleEffect(closed: readonly EnrichedTrade[]): WhaleEffect | null {
+  const met: EnrichedTrade[] = [];
+  const missed: EnrichedTrade[] = [];
+  let noData = 0;
+  for (const t of closed) {
+    const s = snapOf(t);
+    if (!s) continue;
+    if (!s.whale) {
+      noData++;
+      continue;
+    }
+    (s.whale.ok ? met : missed).push(t);
+  }
+  if (!met.length && !missed.length) return null;
+  const a = aggregate(met);
+  const b = aggregate(missed);
+  const both = a.n > 0 && b.n > 0;
+  return {
+    key: "whale",
+    label: `${WHALE_TITLE.long} (Short: verkaufen · grün)`,
+    met: a,
+    missed: b,
+    dWin: both ? (a.winRate ?? 0) - (b.winRate ?? 0) : null,
+    dR: a.avgR != null && b.avgR != null ? a.avgR - b.avgR : null,
+    dExp: both ? (a.exp ?? 0) - (b.exp ?? 0) : null,
+    noData,
+  };
+}
+
 /**
  * `Ergebnis nach Signal-Stärke` (other journal `insights.tsx:13-59`) plus the effect of each entry condition: rows
  * Stärke 4…0 and "Ohne Check" (n, win rate, P&L bar, Ø R; a row unfolds its trades), then "Wirkung der Bedingungen"
- * – win rate with vs without each condition among the trades that carry a check.
+ * – win rate with vs without each condition among the trades that carry a check, plus "Top-Trader kaufen · Retail rot"
+ * among the trades whose check has top-trader data (`whaleEffect`; "keine Daten" trades are listed, not counted).
  */
 export function SignalStrengthCard() {
   const { view, cur } = useInsightsBase();
   const res = useMemo(() => strengthRows(view.closed), [view.closed]);
   const effects = useMemo(() => conditionEffects(view.closed), [view.closed]);
+  const whale = useMemo(() => whaleEffect(view.closed), [view.closed]);
+  const rows: (ConditionEffect | WhaleEffect)[] = whale ? [...effects, whale] : effects;
   const hover = useHoverGroup<string>();
   const [open, setOpen] = useState<string | null>(null);
   const max = Math.max(1, ...res.rows.map((r) => Math.abs(r.g.net)));
@@ -107,12 +150,12 @@ export function SignalStrengthCard() {
               })}
             </ul>
           </div>
-          {effects.length > 0 && (
+          {rows.length > 0 && (
             <div className="grid gap-2">
               <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">Wirkung der Bedingungen</span>
               <ul className="grid gap-2.5">
-                {effects.map((e, i) => (
-                  <li key={e.key} className="grid gap-1">
+                {rows.map((e, i) => (
+                  <li key={e.key} className="grid gap-1" data-testid={e.key === "whale" ? "insights-signal-whale" : undefined}>
                     <span className="flex items-baseline justify-between gap-3 text-[12.5px]">
                       <span className="min-w-0 truncate text-fg">{e.label}</span>
                       <span className={cn("num shrink-0 font-mono text-[12px]", softTone(e.dWin))}>{e.dWin == null ? "–" : `${signed(e.dWin * 100, 0)} pp`}</span>
@@ -130,6 +173,7 @@ export function SignalStrengthCard() {
                           Ø {signed(e.dExp, 0)} {cur} je Trade
                         </span>
                       )}
+                      {"noData" in e && e.noData > 0 && <span className="whitespace-nowrap">keine Daten {e.noData}</span>}
                     </span>
                   </li>
                 ))}

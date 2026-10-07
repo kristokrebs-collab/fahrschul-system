@@ -38,7 +38,32 @@ export interface SignalCfg {
   zoneTf: string;
   /** Additive (ours): also show a system notification (Notification API) on a new valid entry. Default off. */
   notify?: boolean;
+  /**
+   * Additive (ours): "Top-Trader kaufen · Retail rot" — Binance top traders buy (top-trader position long % rising)
+   * while retail is red (all-accounts long % falling) over the last closed periods; short mirrored. Absent = the
+   * defaults (`DEFAULT_WHALE_CFG`, on); `sanitizeSignalCfg` always fills it. See `whale.ts`.
+   */
+  whale?: WhaleCfg;
 }
+
+/** Settings of the "Top-Trader kaufen · Retail rot" condition (`settings.signals.whale`). */
+export interface WhaleCfg {
+  /** evaluate and show the condition */
+  on: boolean;
+  /** Binance futures-data periods to read (sorted small → large), e.g. `['30m', '1h']` */
+  periods: string[];
+  /** consecutive closed periods with top ↑ and retail ↓ (short: top ↓, retail ↑) needed, 1 … 6 */
+  minRun: number;
+  /** score points when it holds (0 = shown only, never counted); a valid entry also gets +1 strength when > 0 */
+  weight: number;
+}
+
+/** Periods offered for the condition (Binance `/futures/data/*` periods that fit the ladder). */
+export const WHALE_PERIODS: readonly string[] = ["15m", "30m", "1h", "2h", "4h"];
+export const WHALE_MIN_RUN_MAX = 6;
+export const WHALE_WEIGHT_MAX = 30;
+
+export const DEFAULT_WHALE_CFG: Readonly<WhaleCfg> = Object.freeze({ on: true, periods: ["30m", "1h"], minRun: 2, weight: 10 });
 
 export const DEFAULT_SIGNAL_CFG: SignalCfg = {
   ladder: ["30m", "45m", "1h", "4h"],
@@ -146,10 +171,35 @@ export function sanitizeSignalCfg(raw: unknown): SignalCfg {
   out.required = Math.min(out.ladder.length, Math.max(1, Math.round(out.required)));
   out.zoneTf = typeof r.zoneTf === "string" && SIGNAL_TFS.includes(r.zoneTf) ? r.zoneTf : DEFAULT_SIGNAL_CFG.zoneTf;
   out.notify = r.notify === true;
+  out.whale = sanitizeWhaleCfg(r.whale);
   return out;
 }
 
+/**
+ * `settings.signals.whale` (raw) → a usable `WhaleCfg`: unknown periods dropped, sorted and de-duplicated (none left →
+ * the defaults), `minRun` 1 … 6, `weight` 0 … 30, non-finite → default. Unknown keys of the stored object are kept.
+ */
+export function sanitizeWhaleCfg(raw: unknown): WhaleCfg {
+  const r = (raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+  const num = (v: unknown, d: number): number => {
+    const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+    return Number.isFinite(n) ? n : d;
+  };
+  const periods = Array.isArray(r.periods) ? [...new Set(r.periods.filter((p): p is string => typeof p === "string" && WHALE_PERIODS.includes(p)))].sort((a, b) => tfSeconds(a) - tfSeconds(b)) : [];
+  return {
+    ...(r as Partial<WhaleCfg>),
+    on: typeof r.on === "boolean" ? r.on : DEFAULT_WHALE_CFG.on,
+    periods: periods.length ? periods : [...DEFAULT_WHALE_CFG.periods],
+    minRun: Math.min(WHALE_MIN_RUN_MAX, Math.max(1, Math.round(num(r.minRun, DEFAULT_WHALE_CFG.minRun)))),
+    weight: Math.min(WHALE_WEIGHT_MAX, Math.max(0, Math.round(num(r.weight, DEFAULT_WHALE_CFG.weight)))),
+  };
+}
+
+/** The whale settings a config runs with (the defaults for a config without the key, e.g. `DEFAULT_SIGNAL_CFG`). */
+export const whaleCfgOf = (cfg: Pick<SignalCfg, "whale">): WhaleCfg => cfg.whale ?? sanitizeWhaleCfg(undefined);
+
 /** Stable key of the parts of a config that change the evaluation (cache key for retro checks). */
 export function signalCfgKey(cfg: SignalCfg): string {
-  return [cfg.ladder.join(","), cfg.zoneTf, cfg.wtSource, ...NUM_KEYS.map((k) => cfg[k])].join("|");
+  const w = whaleCfgOf(cfg);
+  return [cfg.ladder.join(","), cfg.zoneTf, cfg.wtSource, ...NUM_KEYS.map((k) => cfg[k]), `w${w.on ? 1 : 0}:${w.periods.join(",")}:${w.minRun}:${w.weight}`].join("|");
 }

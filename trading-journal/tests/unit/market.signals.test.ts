@@ -13,7 +13,7 @@ import type { MarketProvider } from "@/market/provider";
 import type { Candle, FeedId, ProviderHealth, Stamped } from "@/market/types";
 import { __resetSignalEngine, __signalStats, attachSignalEngine, getMcbSeries, getSignalCandles, getSignalSnapshot, runSignalCheck, setSignalConfig, subscribeSignalCheck, type LiveSignals } from "@/market/signals/engine";
 import { __clearRetroMemo, checkTradeAt, retroCheck } from "@/market/signals/retro";
-import { noteSignals, resetSignalNotifier, SIGNAL_HOLD_MS, SIGNAL_LAST_KEY } from "@/market/signals/notify";
+import { noteSignals, resetSignalNotifier, SIGNAL_HOLD_MS, SIGNAL_LAST_KEY, signalNotifyMinStrength } from "@/market/signals/notify";
 import { useUi } from "@/store/uiStore";
 import { benchAgg, synthBars } from "./signals.fixtures";
 
@@ -437,6 +437,23 @@ describe("notification on a new valid entry", () => {
     vi.setSystemTime(NOW + 40_000);
     await vi.advanceTimersByTimeAsync(SIGNAL_HOLD_MS + 10);
     expect(useUi.getState().toasts).toEqual([expect.objectContaining({ valueTone: "loss" })]);
+  });
+
+  it("notifyMinStrength: weaker entries stay silent, the edge fires once the minimum is reached", () => {
+    resetSignalNotifier();
+    const bar = 1_790_007_300;
+    const cfg = { ...DEFAULT_SIGNAL_CFG, notifyMinStrength: 3 } as SignalCfg;
+    const s = (valid: boolean, strength: number) => ({ ...sig({ long: valid, short: false }, bar, strength), cfg });
+    noteSignals(s(false, 0), NOW); // baseline
+    noteSignals(s(true, 2), NOW + 1000); // valid, but below the minimum → no edge
+    noteSignals(s(true, 2), NOW + 1000 + SIGNAL_HOLD_MS);
+    expect(useUi.getState().toasts).toHaveLength(0);
+    noteSignals(s(true, 3), NOW + 100_000); // reaches the minimum → edge
+    noteSignals(s(true, 3), NOW + 100_000 + SIGNAL_HOLD_MS);
+    expect(useUi.getState().toasts).toEqual([expect.objectContaining({ valueTone: "win" })]);
+    expect(signalNotifyMinStrength(DEFAULT_SIGNAL_CFG)).toBe(1);
+    expect(signalNotifyMinStrength({ ...DEFAULT_SIGNAL_CFG, notifyMinStrength: 9 } as SignalCfg)).toBe(4);
+    expect(signalNotifyMinStrength({ ...DEFAULT_SIGNAL_CFG, notifyMinStrength: "2" } as unknown as SignalCfg)).toBe(1);
   });
 
   it("system notification only when enabled, granted and the page is not in front", () => {

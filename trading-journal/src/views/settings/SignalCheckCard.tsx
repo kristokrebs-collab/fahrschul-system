@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import { memo, useState, type ReactNode } from "react";
-import { roleText, SIGNAL_TFS, STRENGTH_LABEL } from "@/domain/signals";
+import { parseWhalePeriods, roleText, SIGNAL_TFS, STRENGTH_LABEL, WHALE_MIN_RUN_MAX, WHALE_PERIODS, WHALE_TITLE, WHALE_WEIGHTS, whaleToDraft, type WhaleDraft, type WhaleDraftKey } from "@/domain/signals";
 import { IS_SHARE } from "@/edition";
 import { cn } from "@/lib/cn";
 import { parseNumber } from "@/lib/parse";
@@ -13,6 +13,7 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
 import { Segmented } from "@/primitives/Segmented";
+import { useJournal } from "@/store/journalStore";
 import { defaultSignalDraft, parseLadder, type DraftKey, type DraftTextKey, type SettingsDraft } from "./draft";
 import { DraftField } from "./fields";
 import { ChangedDot } from "./fx";
@@ -55,6 +56,16 @@ export const SIGNAL_STRINGS = {
     unsupported: "Dieser Browser kann hier keine Systembenachrichtigungen zeigen (z. B. als Datei geöffnet). Der Hinweis in der App bleibt.",
     default: "Fragt beim Einschalten nach der Erlaubnis des Browsers.",
   } satisfies Record<NotifyPermission, string>,
+  whale: "Top-Trader · Retail",
+  whaleSwitch: `Check „${WHALE_TITLE.long}“`,
+  whaleHelp: "Binance-Top-Trader kaufen (Long-Anteil ihrer Positionen steigt), während Retail rot ist (Long-Anteil aller Konten fällt) – über abgeschlossene Perioden in Folge. Short spiegelbildlich: Top-Trader verkaufen, Retail grün. Nur mit Binance-Futures-Daten, die ~30 Tage zurückreichen; ältere Trades zeigen „keine Daten“.",
+  whalePeriods: "Perioden",
+  whalePeriodsHelp: "Gilt, wenn eine der Perioden passt. Mindestens eine bleibt aktiv.",
+  whalePeriodToggle: (p: string) => `Periode ${p}`,
+  whaleMin: "In Folge (mind.)",
+  whaleMinHelp: (n: number) => `${n} abgeschlossene ${n === 1 ? "Periode" : "Perioden"} hintereinander`,
+  whaleWeight: "Gewicht (Score)",
+  whaleWeightHelp: (w: number) => (w > 0 ? `+${w} Score, ein gültiger Einstieg wird eine Stärke höher (bis ${STRENGTH_LABEL[4]})` : "0 = nur anzeigen und speichern, zählt nicht"),
   defaults: "Standardwerte setzen",
   defaultsHelp: "Setzt die Check-Werte auf die Standardwerte der Datei-Version zurück (erst mit „Speichern“ übernommen).",
 } as const;
@@ -77,7 +88,8 @@ export interface SignalCheckCardProps {
  * NEW `Einstiegs-Check` card (`settings.signals`, the other journal's `SignalCfg` 1:1 + `notify` / `notifyMinStrength`):
  * ladder toggles per timeframe (sorted small → large, ≥ 30m), `Pflicht-Stufen` (1 … ladder length), RSI thresholds +
  * nearness, MCB zones, signal window, WaveTrend lengths, zone timeframe + swing length, the system-notification switch
- * (asks the browser for permission in the same click) and the minimum strength for a notice. Values shown are the ones
+ * (asks the browser for permission in the same click) and the minimum strength for a notice, plus the "Top-Trader
+ * kaufen · Retail rot" condition (`settings.signals.whale`: switch, periods, consecutive periods, weight). Values shown are the ones
  * the engine runs with (`sanitizeSignalCfg`); the part is written only when changed (see `draft.ts`), merged over the
  * stored object so unknown keys of either app survive. `Standardwerte setzen` = the other journal's defaults.
  */
@@ -89,6 +101,8 @@ export const SignalCheckCard = memo(function SignalCheckCard({ draft, onChange, 
   const near = parseNumber(draft.sgRsiNear);
   const nearHelp = os != null && ob != null && near != null ? S.rsiNearHelp(fmt(os + near), fmt(ob - near)) : undefined;
   const minStrength = Math.min(4, Math.max(1, Math.round(parseNumber(draft.sgNotifyMin) ?? 1)));
+  // "Top-Trader kaufen · Retail rot": draft strings when the draft carries them, else what is stored (see WhaleGroup)
+  const storedSignals = useJournal((st) => st.settings.signals);
 
   const toggleTf = (tf: string) => {
     const on = ladder.includes(tf);
@@ -194,6 +208,8 @@ export const SignalCheckCard = memo(function SignalCheckCard({ draft, onChange, 
         </div>
       </Group>
 
+      <WhaleGroup draft={draft} stored={storedSignals} onChange={onChange} changed={changed} invalid={invalid} />
+
       <Group title={S.alerts}>
         <div className="grid gap-3.5 md:grid-cols-2">
           <NotifyRow on={draft.sgNotify === "on"} changed={changed.has("sgNotify")} onChange={(on) => onChange("sgNotify", on ? "on" : "")} />
@@ -219,7 +235,130 @@ export const SignalCheckCard = memo(function SignalCheckCard({ draft, onChange, 
 });
 
 /** Draft keys of this card (title dot). */
-const SIGNAL_DIRTY_KEYS: readonly DraftKey[] = ["sgLadder", "sgReq", "sgLook", "sgRsiOs", "sgRsiOb", "sgRsiNear", "sgWtOs", "sgWtOb", "sgZoneTf", "sgSwing", "sgCh", "sgAvg", "sgSig", "sgNotify", "sgNotifyMin"];
+const SIGNAL_DIRTY_KEYS: readonly DraftKey[] = [
+  "sgLadder",
+  "sgReq",
+  "sgLook",
+  "sgRsiOs",
+  "sgRsiOb",
+  "sgRsiNear",
+  "sgWtOs",
+  "sgWtOb",
+  "sgZoneTf",
+  "sgSwing",
+  "sgCh",
+  "sgAvg",
+  "sgSig",
+  "sgNotify",
+  "sgNotifyMin",
+  ...(["sgWhale", "sgWhalePeriods", "sgWhaleMin", "sgWhaleWeight"] as unknown as DraftKey[]),
+];
+
+/**
+ * The whale draft keys (`sgWhale`, `sgWhalePeriods`, `sgWhaleMin`, `sgWhaleWeight`, see `@/domain/signals`
+ * `whaleDraft.ts`) go through the same `onChange` / `changed` / `invalid` channel as the other `sg*` strings; the
+ * casts keep this card compiling whether or not `SettingsDraft` lists them yet.
+ */
+const asDraftKey = (k: WhaleDraftKey): DraftTextKey => k as unknown as DraftTextKey;
+const WEIGHT_OPTIONS = WHALE_WEIGHTS.map((w) => ({ v: String(w), label: String(w) }));
+const MIN_OPTIONS = Array.from({ length: WHALE_MIN_RUN_MAX }, (_, i) => ({ v: String(i + 1), label: String(i + 1) }));
+
+/**
+ * `Top-Trader · Retail` group: switch, period chips (≥ 1 stays on), consecutive periods (1 … 6) and the weight in score
+ * points (0 = shown only). All choices are segmented / toggles, so a value can never be invalid.
+ */
+function WhaleGroup({
+  draft,
+  stored,
+  onChange,
+  changed,
+  invalid,
+}: {
+  draft: SettingsDraft;
+  stored: unknown;
+  onChange: (key: DraftTextKey, value: string) => void;
+  changed: ReadonlySet<DraftKey>;
+  invalid: DraftTextKey | null;
+}) {
+  const base = whaleToDraft(stored);
+  const d = draft as SettingsDraft & Partial<WhaleDraft>;
+  const val = (k: WhaleDraftKey): string => d[k] ?? base[k];
+  const isChanged = (k: WhaleDraftKey): boolean => changed.has(asDraftKey(k) as DraftKey);
+  const on = val("sgWhale") === "on";
+  const periods = parseWhalePeriods(val("sgWhalePeriods"));
+  const min = Math.min(WHALE_MIN_RUN_MAX, Math.max(1, Math.round(parseNumber(val("sgWhaleMin")) ?? 2)));
+  const weight = Math.max(0, Math.round(parseNumber(val("sgWhaleWeight")) ?? 10));
+  const togglePeriod = (p: string) => {
+    const has = periods.includes(p);
+    if (has && periods.length <= 1) return;
+    const next = parseWhalePeriods((has ? periods.filter((x) => x !== p) : [...periods, p]).join(","));
+    onChange(asDraftKey("sgWhalePeriods"), next.join(","));
+  };
+  return (
+    <Group title={S.whale}>
+      <div className="grid gap-3.5" data-testid="settings-whale">
+        <div className="flex items-start justify-between gap-4 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5">
+          <span className="grid min-w-0 gap-0.5">
+            <label htmlFor="s-sgWhale" className="cursor-pointer text-[13px] text-fg">
+              {S.whaleSwitch}
+              <ChangedDot show={isChanged("sgWhale")} />
+            </label>
+            <span id="s-sgWhale-help" className="max-w-[80ch] text-[11px] text-faint">
+              {S.whaleHelp}
+            </span>
+          </span>
+          <Switch id="s-sgWhale" checked={on} onCheckedChange={(v) => onChange(asDraftKey("sgWhale"), v ? "on" : "")} aria-describedby="s-sgWhale-help" className="touch-hit mt-0.5 shrink-0" />
+        </div>
+        <div className={cn("grid gap-3.5 transition-opacity duration-300 md:grid-cols-3", !on && "opacity-60")}>
+          <div className="grid content-start gap-1.5">
+            <span id="s-sgWhalePeriods-label" className="label">
+              {S.whalePeriods}
+              <ChangedDot show={isChanged("sgWhalePeriods")} />
+            </span>
+            <div
+              id="s-sgWhalePeriods"
+              tabIndex={-1}
+              role="group"
+              aria-labelledby="s-sgWhalePeriods-label"
+              aria-describedby="s-sgWhalePeriods-help"
+              className={cn("flex flex-wrap gap-2 rounded-xl outline-none", invalid === asDraftKey("sgWhalePeriods") && "ring-1 ring-loss/60")}
+            >
+              {WHALE_PERIODS.map((p) => (
+                <TfChip key={p} tf={p} label={S.whalePeriodToggle(p)} on={periods.includes(p)} last={periods.length <= 1 && periods.includes(p)} onToggle={() => togglePeriod(p)} />
+              ))}
+            </div>
+            <span id="s-sgWhalePeriods-help" className="text-[11px] text-faint">
+              {S.whalePeriodsHelp}
+            </span>
+          </div>
+          <div className="grid content-start gap-1.5">
+            <span id="s-sgWhaleMin-label" className="label">
+              {S.whaleMin}
+              <ChangedDot show={isChanged("sgWhaleMin")} />
+            </span>
+            <Segmented aria-labelledby="s-sgWhaleMin-label" size="sm" className="justify-self-start" value={String(min)} onChange={(v) => onChange(asDraftKey("sgWhaleMin"), v)} options={MIN_OPTIONS} />
+            <span className="text-[11px] text-faint">{S.whaleMinHelp(min)}</span>
+          </div>
+          <div className="grid content-start gap-1.5">
+            <span id="s-sgWhaleWeight-label" className="label">
+              {S.whaleWeight}
+              <ChangedDot show={isChanged("sgWhaleWeight")} />
+            </span>
+            <Segmented
+              aria-labelledby="s-sgWhaleWeight-label"
+              size="sm"
+              className="justify-self-start"
+              value={String(weight)}
+              onChange={(v) => onChange(asDraftKey("sgWhaleWeight"), v)}
+              options={WHALE_WEIGHTS.includes(weight) ? WEIGHT_OPTIONS : [...WHALE_WEIGHTS, weight].sort((a, b) => a - b).map((w) => ({ v: String(w), label: String(w) }))}
+            />
+            <span className="text-[11px] text-faint">{S.whaleWeightHelp(weight)}</span>
+          </div>
+        </div>
+      </div>
+    </Group>
+  );
+}
 
 const fmt = (v: number): string => String(Math.round(v * 10) / 10).replace(".", ",");
 
@@ -236,13 +375,13 @@ function Group({ title, showTitle = true, children }: { title: string; showTitle
  * One ladder rung toggle (`aria-pressed`): mono label, white when on; ≥ 44 px tall on coarse pointers. The last
  * active rung cannot be switched off (aria-disabled, a short shake-free no-op).
  */
-function TfChip({ tf, on, last, onToggle }: { tf: string; on: boolean; last: boolean; onToggle: () => void }) {
+function TfChip({ tf, on, last, onToggle, label }: { tf: string; on: boolean; last: boolean; onToggle: () => void; label?: string }) {
   const reduced = useReducedFx();
   return (
     <motion.button
       type="button"
       aria-pressed={on}
-      aria-label={S.tfToggle(tf)}
+      aria-label={label ?? S.tfToggle(tf)}
       aria-disabled={last || undefined}
       onClick={onToggle}
       whileTap={reduced || last ? undefined : { scale: 0.94 }}

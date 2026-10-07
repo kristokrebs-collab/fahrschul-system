@@ -2,7 +2,7 @@
  * German copy of the "Einstiegs-Check" (other journal `signalpanel.tsx` / `forms.tsx`), adapted to Binance data.
  * Pure strings and formatters; the UI agents render them.
  */
-import { STRENGTH_LABEL, type SignalCfg } from "./config";
+import { STRENGTH_LABEL, whaleCfgOf, type SignalCfg } from "./config";
 import type { WtKind } from "./mcb";
 import type { Zone, ZoneInfo } from "./zones";
 
@@ -53,6 +53,21 @@ export const DATA_SOURCE_NOTE = "aus Binance-Kerzen (BTCUSDT Perp) nachgerechnet
 export const RETRO_LOADING = "Kerzen für diesen Zeitpunkt werden geladen …";
 export const RETRO_EMPTY = "Keine Kerzen für diesen Zeitpunkt.";
 
+/** Top-Trader / Retail condition without data (older than ~30 days, no Binance futures data). */
+export const WHALE_NO_DATA = "keine Daten";
+export const WHALE_NO_DATA_HINT = "Binance-Futures-Daten (Top-Trader / alle Konten) fehlen für diesen Zeitpunkt; sie reichen ~30 Tage zurück und gibt es nur bei Binance.";
+
+/** `+1,2 pp` / `−0,8 pp` (U+2212). */
+export function ppText(x: number): string {
+  if (!Number.isFinite(x)) return "–";
+  const r = (Math.sign(x) * Math.round(Math.abs(x) * 10)) / 10; // symmetric: −0,85 → −0,9 like +0,85 → +0,9
+  const abs = Math.abs(r).toFixed(1).replace(".", ",");
+  return `${r > 0 ? "+" : r < 0 ? "−" : "±"}${abs} pp`;
+}
+
+/** `2 Perioden` / `1 Periode`. */
+export const periodsText = (n: number): string => `${n} ${n === 1 ? "Periode" : "Perioden"}`;
+
 /** "{Stärke} · {tiers} von {n} Timeframes". */
 export function strengthLine(strength: number, tiers: number, ladderLength: number): string {
   return `${strengthText(strength)} · ${tiers} von ${ladderLength} Timeframes`;
@@ -61,6 +76,17 @@ export function strengthLine(strength: number, tiers: number, ladderLength: numb
 /** Info panel ("So prüft das Journal"), adapted to Binance. */
 export function signalInfo(cfg: SignalCfg, symbol = "BTCUSDT") {
   const ladder = cfg.ladder;
+  const w = whaleCfgOf(cfg);
+  const whaleRows = w.on
+    ? [
+        {
+          k: "Top-Trader · Retail",
+          v: `${w.minRun} abgeschlossene Perioden in Folge (${w.periods.join(" oder ")}): Top-Trader-Long % (Positionen) steigt, Long % aller Konten fällt; Short umgekehrt. ${
+            w.weight > 0 ? `+${w.weight} Score, gültiger Einstieg +1 Stärke` : "Nur Anzeige"
+          }. Binance-Futures-Daten reichen ~30 Tage zurück.`,
+        },
+      ]
+    : [];
   return {
     title: "So prüft das Journal",
     what:
@@ -68,8 +94,8 @@ export function signalInfo(cfg: SignalCfg, symbol = "BTCUSDT") {
       `RSI ${cfg.rsiLen} mit gleitendem Durchschnitt ${cfg.rsiMaLen} und Premium/Discount nach LuxAlgo (Swing-Pivots mit Länge ${cfg.swingLookback}) auf ${cfg.zoneTf}. ` +
       `45m entsteht exakt aus drei 15m-Kerzen. Die laufende Kerze wird mit dem Live-Kurs ergänzt, wie im Chart. Werte können vom Bitstamp-Chart leicht abweichen; private Indikator-Skripte selbst sind nicht lesbar.`,
     formula: [
-      `Long: MCB Bottom/Einstieg auf ${ladder.slice(0, cfg.required).join(" + ")} (Pflicht)${ladder.length > cfg.required ? ` · ${ladder.slice(cfg.required).join(", ")} = stärker` : ""} · RSI ≤ ${cfg.rsiOs + cfg.rsiNear} (Pflicht) · Discount = Bonus`,
-      `Short: spiegelbildlich mit Top, RSI ≥ ${cfg.rsiOb - cfg.rsiNear} und Premium`,
+      `Long: MCB Bottom/Einstieg auf ${ladder.slice(0, cfg.required).join(" + ")} (Pflicht)${ladder.length > cfg.required ? ` · ${ladder.slice(cfg.required).join(", ")} = stärker` : ""} · RSI ≤ ${cfg.rsiOs + cfg.rsiNear} (Pflicht) · Discount = Bonus${w.on && w.weight > 0 ? " · Top-Trader kaufen + Retail rot = Bonus" : ""}`,
+      `Short: spiegelbildlich mit Top, RSI ≥ ${cfg.rsiOb - cfg.rsiNear} und Premium${w.on && w.weight > 0 ? ", Top-Trader verkaufen + Retail grün" : ""}`,
     ],
     rows: [
       { k: "Signal gilt", v: `${cfg.signalLookback} Kerzen` },
@@ -78,6 +104,7 @@ export function signalInfo(cfg: SignalCfg, symbol = "BTCUSDT") {
       { k: "Einstieg", v: "Kreuzung unter (Short: über) der Nulllinie" },
       { k: "Stärke", v: "Basis + Bestätigung = 1, jede weitere Stufe +1, Discount +1" },
       { k: "Score", v: "Leiter 55 · RSI 20 · Zone 15 · Bottom/Top 10" },
+      ...whaleRows,
     ],
     verdict: "Einstellbar unter Einstellungen → Einstiegs-Check. Beim Eintragen eines Trades wird der Check mitgespeichert, so siehst du später, welche Signal-Stärke wirklich Geld bringt.",
   } as const;

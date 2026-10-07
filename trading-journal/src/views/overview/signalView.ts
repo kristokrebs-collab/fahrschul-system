@@ -4,7 +4,7 @@
  * it the published `SignalCheckState` (≤ 1/s), so every helper here is cheap and deterministic (tested in
  * `tests/unit/views.overview.signal.test.tsx`).
  */
-import { isLongKind, isStrongKind, kindText, roleText, type Side, type SignalCfg, type Signals, type TfCheck, type Verdict, type WtKind, type ZoneInfo } from "@/domain/signals";
+import { isLongKind, isStrongKind, kindText, periodsText, ppText, roleText, whaleCfgOf, WHALE_TITLE, type Side, type SignalCfg, type Signals, type TfCheck, type Verdict, type WtKind, type ZoneInfo } from "@/domain/signals";
 import type { SignalCheckState } from "@/market";
 import type { StatusTone } from "@/motion/StatusPill";
 
@@ -117,4 +117,69 @@ export const verdictText = (v: Pick<Verdict, "valid" | "side">): string => (v.va
 /** RSI meter bands: near (≤ rsiOs + rsiNear / ≥ rsiOb − rsiNear) and the extreme itself (≤ rsiOs / ≥ rsiOb). */
 export function rsiBands(cfg: Pick<SignalCfg, "rsiOs" | "rsiOb" | "rsiNear">): { nearLo: number; lo: number; nearHi: number; hi: number } {
   return { nearLo: cfg.rsiOs + cfg.rsiNear, lo: cfg.rsiOs, nearHi: cfg.rsiOb - cfg.rsiNear, hi: cfg.rsiOb };
+}
+
+/** One period chip of the top-trader / retail row. */
+export interface WhalePeriodView {
+  period: string;
+  /** trailing periods that fit the side */
+  run: number;
+  ok: boolean;
+}
+
+/** View model of the "Top-Trader kaufen · Retail rot" row (card) and line (strip). */
+export interface WhaleRowView {
+  /** the condition is switched on (otherwise the row is not shown) */
+  on: boolean;
+  title: string;
+  /** `ok` = holds (lit), `open` = data but not (yet) held, `none` = no data ("keine Daten") */
+  state: "ok" | "open" | "none";
+  run: number;
+  need: number;
+  /** period of the shown readings */
+  period: string | null;
+  /** `+1,2 pp` / `−0,8 pp` over the last `need` periods */
+  top: string;
+  retail: string;
+  /** the reading points the way the side needs (long: top ↑ / retail ↓) */
+  topFits: boolean;
+  retailFits: boolean;
+  periods: WhalePeriodView[];
+  /** score points it adds now */
+  points: number;
+  weight: number;
+  /** configured periods without data */
+  missing: string[];
+  /** `3 Perioden · 30m` / `keine Daten` */
+  runText: string;
+}
+
+/** Row view for `side` from a published evaluation (works without a reading: `state: "none"`). */
+export function whaleView(sig: Pick<Signals, "whale" | "long" | "short">, side: Side, cfg: Pick<SignalCfg, "whale">): WhaleRowView {
+  const w = whaleCfgOf(cfg);
+  const v = sig[side].whale;
+  const reading = sig.whale;
+  const base = { on: w.on, title: WHALE_TITLE[side], need: w.minRun, weight: w.weight };
+  if (!v || !reading) {
+    return { ...base, state: "none", run: 0, period: null, top: "–", retail: "–", topFits: false, retailFits: false, periods: [], points: 0, missing: w.periods, runText: "keine Daten" };
+  }
+  const sign = side === "long" ? 1 : -1;
+  const periods = reading.periods.map((p) => {
+    const run = side === "long" ? p.runLong : p.runShort;
+    return { period: p.period, run, ok: run >= w.minRun };
+  });
+  return {
+    ...base,
+    state: v.ok ? "ok" : "open",
+    run: v.run,
+    period: v.period,
+    top: ppText(v.topChg),
+    retail: ppText(v.retailChg),
+    topFits: v.topChg * sign > 0,
+    retailFits: v.retailChg * sign < 0,
+    periods,
+    points: v.points,
+    missing: reading.missing,
+    runText: `${periodsText(v.run)} · ${v.period}`,
+  };
 }
