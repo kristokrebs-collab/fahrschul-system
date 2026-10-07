@@ -126,3 +126,20 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     opacity: 0.45;
   }
 }
+
+/* Touch hit area: on coarse pointers the element's tap target grows to at least 44 × 44 CSS px without changing
+   layout (an invisible centred ::after). Opt-in; the element becomes a positioning context. */
+@media (pointer: coarse) {
+  .touch-hit {
+    position: relative;
+  }
+  .touch-hit::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
