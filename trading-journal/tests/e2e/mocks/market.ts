@@ -14,6 +14,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page, Route } from "@playwright/test";
+import { synthKlines, synthRatios, type RatioKind, type RatioScript } from "./synth";
 
 export type MarketScenario = "live" | "stale" | "blocked_451" | "offline" | "reconnect";
 
@@ -76,7 +77,24 @@ export interface MockMarketOptions {
    * bar so the chart renders at realistic density. `0` serves the raw fixture.
    */
   klineBars?: number;
+  /**
+   * Generated market instead of the kline / long-short-ratio fixtures (`synth.ts`): one price path for every interval
+   * (open times aligned like Binance) that yields a KNOWN Einstiegs-Check result, and ratio series per requested
+   * `period`. `ratios: "whale-long"` = top traders buy while retail is red over the last 4 periods. The WS replay
+   * then drops its (unaligned) `kline_1h` message. Time anchor = the moment `mockMarket` runs.
+   */
+  synth?: { ratios?: RatioScript; /** time anchor of the price path (default: now) – pass it to `expectedSignals` too */ anchor?: number };
+  /** called with every REST URL the page requests from Binance (request log for assertions) */
+  onRequest?: (url: URL) => void;
 }
+
+const SYNTH_RATIO_KIND: Record<string, RatioKind> = {
+  "/futures/data/topLongShortPositionRatio": "top-position",
+  "/futures/data/topLongShortAccountRatio": "top-account",
+  "/futures/data/globalLongShortAccountRatio": "global",
+};
+const BYBIT_INTERVAL: Record<string, string> = { "1": "1m", "15": "15m", "30": "30m", "60": "1h", "240": "4h", D: "1d", W: "1w" };
+const num = (v: string | null): number | undefined => (v === null || v === "" || !Number.isFinite(Number(v)) ? undefined : Number(v));
 
 type KlineRow = [number, string, string, string, string, string, number, string, number, string, string, string];
 const INTERVAL_MS: Record<string, number> = { "1m": 60_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000 };
@@ -157,6 +175,12 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
   // Exact shift (no 5-min flooring): the REST `asOf` stamps must read as fresh, otherwise the legacy panel flips
   // to `Zuletzt HH:mm · veraltet` whenever the wall clock is > 2 min past a 5-min boundary.
   const delta = opts.shiftToNow === false ? 0 : Date.now() - file.baseTime;
+  const synth = opts.synth;
+  const anchor = synth?.anchor ?? Date.now();
+  if (synth) {
+    const drop = (steps: WsStep[] | undefined) => steps?.filter((st) => st.fixture !== "binance-ws-kline.json");
+    file.ws = { ...file.ws, steps: drop(file.ws.steps) ?? [], reconnectSteps: drop(file.ws.reconnectSteps) };
+  }
   const json = async (route: Route, name: string, status = 200) => {
     if (opts.latencyMs) await new Promise((r) => setTimeout(r, opts.latencyMs));
     await route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(shiftTimes(readJson(name), delta)) });
@@ -166,6 +190,17 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
     const u = new URL(route.request().url());
     if (file.rest.mode === "offline") return route.abort("failed");
     if (file.rest.mode === "blocked_451") return route.abort("failed"); // 451 without CORS headers surfaces as TypeError
+    opts.onRequest?.(u);
+    const q = { limit: num(u.searchParams.get("limit")), startTime: num(u.searchParams.get("startTime")), endTime: num(u.searchParams.get("endTime")) };
+    if (synth && u.pathname === "/fapi/v1/klines") {
+      const rows = synthKlines(u.searchParams.get("interval") ?? "1h", q, anchor);
+      return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(rows) });
+    }
+    const ratioKind = SYNTH_RATIO_KIND[u.pathname];
+    if (synth && ratioKind) {
+      const rows = synthRatios(ratioKind, u.searchParams.get("period") ?? "1h", q, synth.ratios ?? "flat");
+      return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(rows) });
+    }
     if (u.pathname === "/fapi/v1/klines") {
       const iv = u.searchParams.get("interval") ?? "1h";
       const limit = Number(u.searchParams.get("limit") ?? 500);
@@ -187,6 +222,13 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
   await page.route("https://api.bybit.com/**", async (route) => {
     const u = new URL(route.request().url());
     if ((file.rest.bybit ?? file.rest.mode) === "offline") return route.abort("failed");
+    if (synth && u.pathname === "/v5/market/kline") {
+      // Bybit: interval codes, `start` / `end`, newest row first, strings
+      const iv = BYBIT_INTERVAL[u.searchParams.get("interval") ?? "60"] ?? "1h";
+      const rows = synthKlines(iv, { limit: num(u.searchParams.get("limit")) ?? 200, startTime: num(u.searchParams.get("start")), endTime: num(u.searchParams.get("end")) }, anchor);
+      const list = rows.map((r) => [String(r[0]), r[1], r[2], r[3], r[4], r[5], r[7]]).reverse();
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ retCode: 0, retMsg: "OK", result: { category: "linear", symbol: "BTCUSDT", list }, time: Date.now() }) });
+    }
     const hit = BYBIT_ROUTES[u.pathname];
     if (!hit) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ retCode: 10001, retMsg: "not mocked", result: {} }) });
     return json(route, hit);

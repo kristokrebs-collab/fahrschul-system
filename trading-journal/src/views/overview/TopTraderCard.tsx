@@ -213,7 +213,8 @@ export function TopTraderCard() {
                   Delta
                 </button>
               </TapTooltip>
-              <div className={cn("num mt-0.5 font-mono text-[14px] transition-colors duration-300", current.delta > 0 ? "text-win" : current.delta < 0 ? "text-loss" : "")}>
+              {/* display only: the label's 44 px tap area reaches over the value (a tap on the value explains it too) */}
+              <div className={cn("pointer-events-none num mt-0.5 font-mono text-[14px] transition-colors duration-300", current.delta > 0 ? "text-win" : current.delta < 0 ? "text-loss" : "")}>
                 <MotionNumber value={current.delta} decimals={1} signed flash />
               </div>
               <div className="text-[10px] text-faint">Top vs. Alle</div>

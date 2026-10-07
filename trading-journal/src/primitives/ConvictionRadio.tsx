@@ -85,7 +85,7 @@ export function ConvictionRadio({ value, onChange, options = convictionOptions, 
                 aria-checked={checked}
                 aria-label={o.label}
                 onClick={() => onChange(checked ? null : o.v)}
-                className="relative grid size-7 shrink-0 place-items-center"
+                className="touch-hit relative grid size-7 shrink-0 place-items-center"
               >
                 <span
                   className="rounded-full transition-all duration-300 hover:scale-110"

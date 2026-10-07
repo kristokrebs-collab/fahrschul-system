@@ -753,7 +753,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
                   variants={CHIP}
                   whileTap={{ scale: 0.96 }}
                   transition={spring.press}
-                  className="rounded-full border border-dashed border-line-2 px-3 py-1.5 text-[12.5px] text-mute transition-colors hover:border-white/40 hover:text-fg"
+                  className="rounded-full border border-dashed border-line-2 px-3 py-1.5 text-[12.5px] text-mute transition-colors hover:border-white/40 hover:text-fg pointer-coarse:min-h-11"
                 >
                   + Neue Grundlage
                 </motion.button>
@@ -878,7 +878,7 @@ function EmotionChips({ value, onChange }: { value: string; onChange: (emotion: 
             aria-pressed={on}
             onClick={() => onChange(on ? "" : e)}
             whileTap={reduced ? undefined : "pressed"}
-            className={cn("relative rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] font-medium transition-colors", on ? "text-fg" : "text-mute hover:text-fg")}
+            className={cn("relative rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] font-medium transition-colors pointer-coarse:min-h-11", on ? "text-fg" : "text-mute hover:text-fg")}
           >
             <AnimatePresence initial={false}>
               {on && (
@@ -1020,7 +1020,7 @@ function SetupToggle({ setup, account, selected, onToggle }: { setup: Setup; acc
       whileTap={reduced ? undefined : { scale: 0.96 }}
       transition={spring.press}
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-200",
+        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-200 pointer-coarse:min-h-11",
         selected ? "text-fg" : fits ? "border-line-2 text-fg/85 hover:border-white/40" : "border-line text-faint hover:text-mute",
       )}
       style={{ borderRadius: radius.pill, ...(selected ? { borderColor: setup.color + "aa", background: setup.color + "22" } : null) }}
@@ -1085,7 +1085,7 @@ export function LivePriceButton({ price, label, disabled, onApply, className }: 
       whileTap={disabled ? undefined : { scale: 0.97 }}
       transition={spring.press}
       className={cn(
-        "@container inline-flex h-7 w-full items-center justify-center overflow-hidden rounded-lg border border-line-2 px-2 text-[11px] font-medium text-mute transition-colors hover:border-white/30 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40",
+        "@container inline-flex h-7 w-full items-center justify-center overflow-hidden rounded-lg border border-line-2 px-2 text-[11px] font-medium text-mute transition-colors hover:border-white/30 hover:text-fg disabled:cursor-not-allowed disabled:opacity-40 pointer-coarse:h-11",
         className,
       )}
     >

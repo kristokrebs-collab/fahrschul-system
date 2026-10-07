@@ -76,3 +76,98 @@ export async function expectInViewport(page: Page, locator: Locator, what: strin
 }
 
 export const isMobile = (info: TestInfo): boolean => info.project.name === "mobile";
+
+/** Touch projects (`mobile`, `tablet`, `tablet-1280`): touch events and a coarse pointer. */
+export const hasTouch = (info: TestInfo): boolean => !!info.project.use.hasTouch;
+
+/** The touch tablets in landscape (`tablet` = the user's Galaxy Tab 1692×978, `tablet-1280`). */
+export const isTouchTablet = (info: TestInfo): boolean => hasTouch(info) && info.project.name.startsWith("tablet");
+
+/** Seeds an empty journal (no fixture) for specs that build their own data. */
+export async function seedRaw(page: Page, entries: Record<string, unknown>, opts: SeedOptions = {}): Promise<void> {
+  await seed(page, { ...opts, empty: true, extra: { ...entries, ...(opts.extra ?? {}) } });
+}
+
+/** Parsed `localStorage[key]` of the page (null when absent). */
+export async function stored<T = unknown>(page: Page, key: string): Promise<T | null> {
+  return page.evaluate((k) => {
+    const raw = localStorage.getItem(k);
+    return raw === null ? null : (JSON.parse(raw) as unknown);
+  }, key) as Promise<T | null>;
+}
+
+/** Scrolls the document until `locator` is rendered (deferred / content-visibility cells mount while scrolling). */
+export async function scrollUntilVisible(page: Page, locator: Locator, timeout = 10_000): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        if ((await locator.count()) > 0 && (await locator.first().isVisible())) return true;
+        await page.evaluate(() => window.scrollBy({ top: Math.round(window.innerHeight * 0.7), behavior: "instant" }));
+        return false;
+      },
+      { timeout, intervals: [150] },
+    )
+    .toBe(true);
+  await locator.first().scrollIntoViewIfNeeded();
+}
+
+export interface TouchKit {
+  /** one finger from `from` to `to` in `ms` (moves every ~8 ms, a 120 Hz digitiser), optional hold before release */
+  drag(from: { x: number; y: number }, to: { x: number; y: number }, ms: number, opts?: { holdMs?: number; startHoldMs?: number }): Promise<void>;
+  /** a fast throw: 110 px in ~48 ms (≈ 2300 px/s) */
+  flick(from: { x: number; y: number }, dx: number, dy: number): Promise<void>;
+  /** a slow pull: `dy` px over 640 ms, held 150 ms before release (velocity ≈ 0) */
+  slowPull(from: { x: number; y: number }, dx: number, dy: number): Promise<void>;
+  tap(at: { x: number; y: number }): Promise<void>;
+}
+
+/**
+ * CDP touch gestures (`Input.dispatchTouchEvent`) with EXPLICIT timestamps: headless CDP round trips space the
+ * events 30–60 ms apart, so without them every flick reads as a slow drag (the physics hooks compute velocity from
+ * event time stamps).
+ */
+export async function touchKit(page: Page): Promise<TouchKit> {
+  const cdp = await page.context().newCDPSession(page);
+  let t = 0;
+  const send = (type: "touchStart" | "touchMove" | "touchEnd", x: number, y: number) =>
+    cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }], timestamp: t });
+  const drag: TouchKit["drag"] = async (from, to, ms, opts = {}) => {
+    t = Math.max(t, Date.now() / 1000);
+    await send("touchStart", from.x, from.y);
+    if (opts.startHoldMs) {
+      await page.waitForTimeout(opts.startHoldMs);
+      t += opts.startHoldMs / 1000;
+    }
+    const steps = Math.max(2, Math.round(ms / 8.33));
+    for (let i = 1; i <= steps; i++) {
+      const k = i / steps;
+      t += ms / 1000 / steps;
+      await send("touchMove", from.x + (to.x - from.x) * k, from.y + (to.y - from.y) * k);
+    }
+    if (opts.holdMs) {
+      await page.waitForTimeout(opts.holdMs);
+      t += opts.holdMs / 1000;
+      await send("touchMove", to.x, to.y);
+    }
+    t += 0.004;
+    await send("touchEnd", to.x, to.y);
+  };
+  return {
+    drag,
+    flick: (from, dx, dy) => drag(from, { x: from.x + dx, y: from.y + dy }, 48),
+    slowPull: (from, dx, dy) => drag(from, { x: from.x + dx, y: from.y + dy }, 640, { holdMs: 150 }),
+    tap: async (at) => {
+      t = Math.max(t, Date.now() / 1000);
+      await send("touchStart", at.x, at.y);
+      t += 0.06;
+      await send("touchEnd", at.x, at.y);
+    },
+  };
+}
+
+/** Centre of a locator's box (throws when it has none). */
+export async function centre(locator: Locator): Promise<{ x: number; y: number }> {
+  const b = await locator.boundingBox();
+  if (!b) throw new Error("no bounding box");
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+}

@@ -365,7 +365,8 @@ export function CalendarCard() {
             >
               {monthTitle(shown)}
             </button>
-            <span className={cn("num font-mono text-[12.5px]", unit === "money" ? undefined : monthValue == null || monthValue === 0 ? "text-mute" : monthValue > 0 ? "text-win" : "text-loss")}>
+            {/* display only: the month button's 44 px tap area reaches over the total */}
+            <span className={cn("pointer-events-none num font-mono text-[12.5px]", unit === "money" ? undefined : monthValue == null || monthValue === 0 ? "text-mute" : monthValue > 0 ? "text-win" : "text-loss")}>
               {unit === "money" ? <MotionNumber value={month.g.net} signed suffix={` ${cur}`} tone="auto" aria-label={`Monat ${signed(month.g.net, 0)} ${cur}`} /> : totalText(unit, monthValue, cur)}
             </span>
           </div>

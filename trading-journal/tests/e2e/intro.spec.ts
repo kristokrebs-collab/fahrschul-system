@@ -15,14 +15,18 @@ async function seedWithIntro(page: Page): Promise<void> {
 
 const stage = (page: Page) => page.getByRole("dialog", { name: "Intro" });
 
-/** Settled app: no stage, app root not inert, every overview cell at transform none, cells on screen (and their reveal wrapper) fully opaque. */
+/**
+ * Settled app: no stage, app root not inert, every overview cell at transform none, cells on screen (and their reveal
+ * wrapper) fully opaque. "On screen" uses the Reveal's own viewport (`src/motion/Reveal.tsx` REVEAL_VIEWPORT margin
+ * −50 px): a cell whose top edge peeks less than 50 px above the fold reveals on the first scroll, like every reveal.
+ */
 async function expectSettled(page: Page): Promise<void> {
   await expect(stage(page)).toHaveCount(0);
   await expect(page.locator("#root")).not.toHaveAttribute("inert", /.*/);
   const cells = await page.locator("[data-intro-cell]").evaluateAll((els) =>
     els.map((el) => {
       const r = el.getBoundingClientRect();
-      const inView = r.top < innerHeight && r.bottom > 0;
+      const inView = r.top < innerHeight - 50 && r.bottom > 50;
       const chain: number[] = [];
       for (let n: Element | null = el.firstElementChild; n && chain.length < 2; n = n.firstElementChild) chain.push(+getComputedStyle(n).opacity);
       return { transform: getComputedStyle(el).transform, opacity: +getComputedStyle(el).opacity, inView, chain };

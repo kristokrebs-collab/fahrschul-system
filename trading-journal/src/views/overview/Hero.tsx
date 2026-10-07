@@ -162,9 +162,10 @@ export function Hero() {
               </MorphCard>
             </div>
             {/* `w-fit`: the row hugs the figure, so the dot mask follows its width; one line from lg (the figure shrinks
-                with the column instead of pushing `USDT` under it at ~1024 px) */}
+                with the column instead of pushing `USDT` under it at ~1024 px). Touch: the figure takes no taps (its
+                lens is mouse-only), so its tall line box never cuts into the 44 px area of `Details +` above it */}
             <div
-              className="dot-num relative isolate flex w-fit max-w-full flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none lg:flex-nowrap lg:text-[clamp(44px,calc(5.6vw+14px),78px)]"
+              className="dot-num relative isolate flex w-fit max-w-full flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none pointer-coarse:pointer-events-none lg:flex-nowrap lg:text-[clamp(44px,calc(5.6vw+14px),78px)]"
               data-testid="hero-net"
               data-celebrate-anchor="hero-net"
               data-hero-mask="text"

@@ -231,7 +231,9 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
   const rowLayoutKey = useMemo(() => `${listKey}~${settled}`, [listKey, settled]);
 
   return (
-    <motion.div ref={wrapRef} layoutScroll className={cn("relative -mx-2 overflow-x-auto px-2", className)}>
+    // touch: the scroll box (its overflow clips the children's tap areas) reaches 14 px up into the KPI strip's 16 px
+    // margin, so the 16 px sort headers keep their full 44 px tap area (same position on screen)
+    <motion.div ref={wrapRef} layoutScroll className={cn("relative -mx-2 overflow-x-auto px-2 pointer-coarse:-mt-3.5 pointer-coarse:pt-3.5", className)}>
       <RowHighlight ref={highlight} root={wrapRef} id={uid} />
       <table className="relative w-full border-collapse text-[13px] lg:min-w-[900px]">
         <thead className="text-left text-[10.5px] text-faint">

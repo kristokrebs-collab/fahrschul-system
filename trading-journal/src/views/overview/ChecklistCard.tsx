@@ -21,8 +21,9 @@ function Tile({ label, g, tone, index, open, controls, onOpen }: { label: string
   const fill = useBarFill(ref, g.winRate, index);
   return (
     <RevealItem ref={ref} className="relative rounded-xl border border-line bg-ink-950/50 p-3 transition-colors hover:border-white/20">
-      {/* the whole tile is the hit area; the button's box covers it (its label is the tile text) */}
-      <button type="button" onClick={onOpen} aria-expanded={open} aria-controls={controls} className="absolute inset-0 rounded-[inherit]" aria-label={`${label}: Auswertung zeigen`} />
+      {/* the whole tile is the hit area; the button's box covers it (its label is the tile text) and stacks above the
+          tile's content – the bar fill (a scaleX layer) and the count-up figure would otherwise take part of the taps */}
+      <button type="button" onClick={onOpen} aria-expanded={open} aria-controls={controls} className="absolute inset-0 z-10 rounded-[inherit]" aria-label={`${label}: Auswertung zeigen`} />
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{label}</div>
       <div className={cn("num mt-1 font-mono text-2xl font-medium", g.n ? (tone === "win" ? "text-win" : "text-loss") : "text-faint")}>
         {g.winRate == null ? pct0(g.winRate) : <BarPercent fill={fill} label={pct0(g.winRate)} />}

@@ -67,8 +67,10 @@ function CellReveal({ col, defer, children }: Omit<CellProps, "span">) {
  * Win-Rate (3) | Hochrechnung (4) · 3 Kontostand (7) | Top Trader (5) · 4 Entscheidungsgrundlagen (7) |
  * Checkliste (5) · 5 P&L pro Monat (5) | Letzte Trades (7) · 6 Muster (12) · 7 Auswertung (12, `InsightsSection`,
  * mounted bare: its cards bring their own reveal / deferral). Every card reads `uiStore.acc` through `useAccountView`.
- * Hero and chart render as they are (the chart has its own entrance, and its body hosts a `position: fixed` marker
- * ghost and the canvas – no reveal transform/filter around it); every card below cascades in per row.
+ * Hero, Einstiegs-Check and chart render as they are (the chart has its own entrance, and its body hosts a
+ * `position: fixed` marker ghost and the canvas – no reveal transform/filter around it; the check sits right under
+ * the hero, where a reveal would leave its first ~130 px blank above the fold on landscape tablets, e.g. 1692×978,
+ * until the first scroll); every card below cascades in per row.
  * Intro: every cell is an `IntroCell` – the on-screen ones start as a slanted deck and travel to their slots, and
  * their first-view effects start when they land (transforms end at `none`, so the chart's fixed ghost is unaffected
  * once settled); the grid itself is the element the portal zooms out of.
@@ -82,9 +84,9 @@ export function OverviewView({ className }: { className?: string }) {
       <IntroCell className="lg:col-span-12">
         <Hero />
       </IntroCell>
-      <Cell col={0} span="lg:col-span-12">
+      <IntroCell className="lg:col-span-12">
         <SignalCard />
-      </Cell>
+      </IntroCell>
       <IntroCell className="lg:col-span-12">
         <ChartCard />
       </IntroCell>
