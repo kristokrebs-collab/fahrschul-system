@@ -21,14 +21,19 @@ export interface SeedOptions extends MockMarketOptions {
   empty?: boolean;
 }
 
-/** Seeds localStorage with the legacy fixture, marks the intro as seen and mocks the market. */
+/**
+ * Seeds localStorage with the legacy fixture, marks the intro as seen and mocks the market. The data is written ONCE
+ * per browser context (marker `__e2e-seeded`), so a reload or a second tab sees what the app saved, never the seed again.
+ */
 export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
   await mockMarket(page, opts.scenario ?? "live", opts);
   await page.addInitScript(
     ({ fx, extra }) => {
+      sessionStorage.setItem("tj2-intro", "1");
+      if (localStorage.getItem("__e2e-seeded")) return;
       for (const [k, v] of Object.entries(fx)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
       for (const [k, v] of Object.entries(extra)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
-      sessionStorage.setItem("tj2-intro", "1");
+      localStorage.setItem("__e2e-seeded", "1");
     },
     { fx: opts.empty ? {} : fixture, extra: opts.extra ?? {} },
   );
@@ -170,4 +175,16 @@ export async function centre(locator: Locator): Promise<{ x: number; y: number }
   const b = await locator.boundingBox();
   if (!b) throw new Error("no bounding box");
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+}
+
+/**
+ * Opens `Trade eintragen` from the dock and waits until the form takes input: during the open morph the sheet body is
+ * `inert` for a frame or two, and a `fill` in that window types into nothing (a click waits until the field is hittable).
+ */
+export async function openTradeEditor(page: Page): Promise<Locator> {
+  await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" }).click();
+  const editor = page.getByRole("dialog", { name: "Trade eintragen" });
+  await expect(editor).toBeVisible();
+  await editor.locator("#f-entry").click();
+  return editor;
 }

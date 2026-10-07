@@ -92,6 +92,7 @@ test("unsaved input: Escape and Abbrechen ask `Änderungen verwerfen?`; keep edi
 
   await fab(page).click();
   await expect(editor.locator("#f-entry")).toBeVisible();
+  await editor.locator("#f-entry").click(); // takes input once the open morph lifted `inert`
   await editor.locator("#f-entry").fill("80123");
   await page.keyboard.press("Escape");
   const confirm = editor.getByTestId("discard-confirm");
