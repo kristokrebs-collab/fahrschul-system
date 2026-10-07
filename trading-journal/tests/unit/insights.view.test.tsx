@@ -75,7 +75,7 @@ describe("InsightsSection", () => {
       await act(async () => {
         fireEvent.click(row);
       });
-      expect(useUi.getState().detail.source).toBe("marker");
+      expect(useUi.getState().detail.source).toBe("insights");
     }
     await act(async () => {
       fireEvent.click(within(panel).getByRole("button", { name: "Zurück zum Monat" }));

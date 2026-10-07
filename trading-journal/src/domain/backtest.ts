@@ -6,6 +6,7 @@ import type { BacktestReference, EnrichedTrade, Settings } from "./types";
 import { aggregate, type Agg } from "./agg";
 import { n1, n2, pct, pct0, signed } from "@/lib/format";
 import { BACKTEST_SETUP_ID } from "./defaults";
+import { ED } from "./edition";
 import type { Explanation, Verdict } from "./explain";
 
 export type BacktestRowKey = "winRate" | "avgWin" | "avgLoss" | "exp";
@@ -52,7 +53,7 @@ export const BACKTEST_HEADLINE_OVER = "Du überperformst den Backtest";
 export const BACKTEST_HEADLINE_UNDER = "Du liegst unter dem Backtest";
 export const BACKTEST_HEADLINE_NONE = "Noch kein Vergleich möglich";
 /** Decision 14: shown when `s_bt` was deleted by the user. */
-export const BACKTEST_SETUP_DELETED = "Grundlage „Backtest-Signal (214er)“ wurde gelöscht – Vergleich nur über alle Trades.";
+export const BACKTEST_SETUP_DELETED: string = ED.COPY.backtestDeleted;
 
 const ROW_LABELS: Record<BacktestRowKey, string> = {
   winRate: "Win-Rate",

@@ -4,6 +4,7 @@
  */
 import type { MarketLevels } from "./types";
 import { n0, n2, pct, signed } from "@/lib/format";
+import { ED } from "./edition";
 
 export type ScenarioKey = "bear" | "long" | "short" | "range";
 export type ScenarioTone = "win" | "loss" | "mute" | "warn";
@@ -20,20 +21,20 @@ export function scenario(close4h: number | null | undefined, m: MarketLevels): S
   if (close4h == null) return null;
   const f = n0;
   if (close4h < m.invalidation)
-    return { key: "bear", tone: "loss", title: "Volles Bär-Szenario", detail: `4H-Schluss unter ${f(m.invalidation)}. Ziel 66.000–70.000.` };
+    return { key: "bear", tone: "loss", title: "Volles Bär-Szenario", detail: `4H-Schluss unter ${f(m.invalidation)}.${ED.COPY.scenarioTargets.bear}` };
   if (close4h > m.longTrigger)
     return {
       key: "long",
       tone: "win",
       title: "Long-Trigger aktiv",
-      detail: `4H-Schluss über ${f(m.longTrigger)}. Ziel 87.200, dann 89.000–90.000. Invalidierung unter ${f(m.longStop)}.`,
+      detail: `4H-Schluss über ${f(m.longTrigger)}.${ED.COPY.scenarioTargets.long} Invalidierung unter ${f(m.longStop)}.`,
     };
   if (close4h < m.shortTrigger)
     return {
       key: "short",
       tone: "loss",
       title: "Short-Trigger aktiv",
-      detail: `4H-Schluss unter ${f(m.shortTrigger)}. Ziel 82.000–81.500, Stop über ${f(m.longStop)}.`,
+      detail: `4H-Schluss unter ${f(m.shortTrigger)}.${ED.COPY.scenarioTargets.short} Stop über ${f(m.longStop)}.`,
     };
   return { key: "range", tone: "mute", title: "Range, kein Trigger", detail: `4H-Schluss zwischen ${f(m.shortTrigger)} und ${f(m.longTrigger)}. Abwarten.` };
 }

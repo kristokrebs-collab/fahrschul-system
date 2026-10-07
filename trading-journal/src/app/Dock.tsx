@@ -11,6 +11,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Icon, type IconName } from "@/primitives/icons";
 import { Magnetic } from "@/primitives/Magnetic";
 import { navigate } from "@/store/router";
+import { storageKey } from "@/store/storage";
 import { PAGES, useUi, type Page } from "@/store/uiStore";
 
 /** Bundle `Dhe`. */
@@ -62,8 +63,8 @@ const DOCK_FX_VARS = {
   "--dock-tip-rise": `${DOCK_CONFIG.tipRiseFrom}px`,
 } as CSSProperties;
 
-/** Session flag of the dock entrance (its own key: the wordmark's `tj2-intro` must stay untouched). */
-export const DOCK_INTRO_KEY = "tj2-dock-intro";
+/** Session flag of the dock entrance (its own key: the wordmark's `tj2-intro` must stay untouched; share edition `tj2share-dock-intro`). */
+export const DOCK_INTRO_KEY: string = storageKey("dock-intro");
 /** Upward launch speed of the icon hop on activation (px/s); `spring.pop` brings it back with one small rebound. */
 const HOP_VELOCITY = -600;
 /** A deliberate press (≥ `physics.holdMs`) launches at half the speed on `spring.smooth`: a calm lift, no rebound. */

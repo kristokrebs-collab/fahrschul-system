@@ -374,7 +374,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
               </AnimatePresence>
               {footer && (
                 <motion.div
-                  className="flex flex-wrap items-center gap-2.5 border-t border-line bg-ink-900/60 px-6 py-3.5 pb-[calc(14px+env(safe-area-inset-bottom,0px))]"
+                  className="flex flex-wrap items-center gap-2.5 border-t border-line bg-ink-900/60 px-6 py-3.5 pb-[calc(14px+var(--safe-bottom,env(safe-area-inset-bottom,0px)))]"
                   initial={morph ? { opacity: 0 } : false}
                   animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
                   variants={CONTENT_VARIANTS}

@@ -56,11 +56,10 @@ export const outsideNote = (n: number): string => `+${n} Trades außerhalb des Z
 export const PANE_OFF_FLAG = "chartPaneOff";
 
 /**
- * Chart intervals. `30m` has no stream of its own: it is resampled from `kline_15m` (the entry check's base rung), so
- * the candles match the check's 30m bars. `uiStore.ChartInterval` gains "30m" through a request; until then the value
- * is cast (and a reload falls back to the default 4h).
+ * Chart intervals (`uiStore.ChartInterval`, persisted in `tj2-ui`). `30m` has no stream of its own: it is resampled
+ * from `kline_15m` (the entry check's base rung), so the candles match the check's 30m bars.
  */
-type ChartIv = "1m" | "30m" | "1h" | "4h";
+type ChartIv = ChartInterval;
 const INTERVALS: readonly { v: ChartIv; label: string }[] = [
   { v: "1m", label: "1m" },
   { v: "30m", label: "30m" },
@@ -177,8 +176,8 @@ function RangePills({ value, onChange, maxDays, hint, onBeyond }: { value: Range
             onClick={() => (beyond ? onBeyond(r.v) : onChange(r.v))}
             whileTap={reduced ? undefined : "press"}
             className={cn(
-              // coarse pointers: the hit area grows 10 px up and down (44 px), never sideways into the neighbouring pill
-              "relative rounded-lg px-2.5 py-1 text-xs font-medium transition-colors pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2.5 pointer-coarse:after:content-['']",
+              // coarse pointers: at least 44 px wide, and the hit area grows 10 px up and down (44 px), never sideways into the neighbouring pill
+              "relative rounded-lg px-2.5 py-1 text-center text-xs font-medium transition-colors pointer-coarse:min-w-11 pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2.5 pointer-coarse:after:content-['']",
               value === r.v ? "text-fg" : beyond ? "text-faint hover:text-mute" : "text-mute hover:text-fg",
             )}
           >
@@ -316,7 +315,7 @@ export function ChartCard() {
   const openDetail = useUi((s) => s.openDetail);
   const pushToast = useUi((s) => s.pushToast);
 
-  const interval = chart.interval as ChartIv;
+  const interval = chart.interval;
   const maxRange = MAX_RANGE[interval];
   const rangeDays = toRange(maxRange != null ? Math.min(chart.rangeDays, maxRange) : chart.rangeDays);
   const pane: PaneChoice = paneOff ? "none" : chart.pane === "cvd" ? "none" : chart.pane;
@@ -447,7 +446,7 @@ export function ChartCard() {
               aria-label="Intervall"
               options={INTERVALS}
               value={interval}
-              onChange={(v) => setChart({ interval: v as ChartInterval, rangeDays: v === "1m" ? 7 : Math.min(chart.rangeDays, MAX_RANGE[v] ?? chart.rangeDays) })}
+              onChange={(v) => setChart({ interval: v, rangeDays: v === "1m" ? 7 : Math.min(chart.rangeDays, MAX_RANGE[v] ?? chart.rangeDays) })}
             />
             <RangePills value={rangeDays} onChange={(d) => setChart({ rangeDays: d })} maxDays={maxRange} hint={RANGE_HINT[interval]} onBeyond={onBeyond} />
             <Segmented<PaneChoice>

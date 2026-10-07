@@ -12,6 +12,7 @@ import { exportCsv, exportJson, lastAutoBackup, listBackups, restoreBackup, type
 import { canDownload, DOWNLOAD_UNAVAILABLE } from "@/store/download";
 import { modeLabelFor, useJournal } from "@/store/journalStore";
 import { readQuarantine } from "@/store/migrate";
+import { KEYS } from "@/store/storage";
 import { ActionButton, GlyphDownload } from "./fx";
 import { IntroPref } from "./IntroPref";
 
@@ -32,7 +33,7 @@ export const DATA_STRINGS = {
   no: "Nein",
   quarantine: "Quarantäne ansehen",
   quarantineHide: "Quarantäne ausblenden",
-  quarantineNote: (n: number) => `${n} Einträge konnten nicht gelesen werden und liegen unverändert in tj2-quarantine.`,
+  quarantineNote: (n: number) => `${n} Einträge konnten nicht gelesen werden und liegen unverändert in ${KEYS.quarantine}.`,
   footer: (trades: number, setups: number, rules: number) => `${trades} Trades gespeichert · ${setups} Grundlagen · ${rules} Grundregeln`,
   trades: (n: number) => `${n} Trades`,
   showAll: "Alle anzeigen",

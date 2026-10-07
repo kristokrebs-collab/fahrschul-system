@@ -120,7 +120,9 @@ const STRINGS = [
   "Tief bei",
   "Unter 5 %: sehr kontrolliertes Risiko.",
   "Zwischen 5 und 15 %: vertretbar, aber im Blick behalten.",
-  "Über 15 %: Positionsgrößen oder Hebel prüfen (Regel: Scalp 4x, Makro höchstens 5x).",
+  // composed from the edition copy (`ED.COPY.leverageRuleSentence`); the rendered sentence is pinned in domain.explain.test.ts
+  "Über 15 %: Positionsgrößen oder Hebel prüfen (",
+  "Regel: Scalp 4x, Makro höchstens 5x",
   "Erwartungswert",
   "Pro Trade in Kursbewegung",
   "Positiv: Mit jedem weiteren Trade nach diesem Muster wächst das Konto im Schnitt.",
@@ -194,7 +196,9 @@ const STRINGS = [
   "Short-Trigger aktiv",
   "Range, kein Trigger",
   "Ziel 66.000–70.000.",
-  "Ziel 87.200, dann 89.000–90.000. Invalidierung unter",
+  // scenario targets come from the edition copy (`ED.COPY.scenarioTargets`); the rendered detail is pinned in domain.trigger.test.ts
+  " Ziel 87.200, dann 89.000–90.000.",
+  "Invalidierung unter",
   "Ziel 82.000–81.500, Stop über",
   "Abwarten.",
   "Neues Szenario: ",

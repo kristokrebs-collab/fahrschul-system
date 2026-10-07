@@ -6,6 +6,7 @@ import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { colorClass, date as fmtDate, signed, time as fmtTime } from "@/lib/format";
 import { HoverPill, useHoverGroup, type HoverGroupBinding } from "@/motion/HoverPill";
+import { contextSpringAt } from "@/motion/physics";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -17,7 +18,7 @@ import { useSeenOnce } from "@/primitives/revealValue";
 import { SetupChips } from "@/primitives/SetupChip";
 import { useAccountView, useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
-import { useUi } from "@/store/uiStore";
+import { DETACHED_DETAIL_SOURCES, useUi } from "@/store/uiStore";
 
 export const RECENT_TITLE = "Letzte Trades";
 export const RECENT_ALL = "Alle ansehen →";
@@ -102,6 +103,8 @@ interface RowProps {
   seen: boolean;
   listKey: string;
   shareIds: boolean;
+  /** layout transition of the `trade-{id}` morph: `spring.detail`, or its context spring after a swipe-dismissed detail */
+  morphLayout: typeof spring.detail;
   pressing: boolean;
   hovered: boolean;
   bind: HoverGroupBinding;
@@ -115,7 +118,7 @@ interface RowProps {
  * close the gap (`popLayout`), first-view cascade, new rows drop in with the fresh sweep. The button keeps the
  * conditional `trade-{id}` / `trade-side-{id}` / `trade-pnl-{id}` morph ids into the detail.
  */
-function Row({ t, index, count, seen, listKey, shareIds, pressing, hovered, bind, setups, onOpen, ref }: RowProps) {
+function Row({ t, index, count, seen, listKey, shareIds, morphLayout, pressing, hovered, bind, setups, onOpen, ref }: RowProps) {
   const reduced = useReducedFx();
   const present = useIsPresent();
   const presence = useContext(PresenceContext);
@@ -148,7 +151,7 @@ function Row({ t, index, count, seen, listKey, shareIds, pressing, hovered, bind
         layoutId={shareIds ? `trade-${t.id}` : undefined}
         layoutDependency={t.id}
         whileTap={press.whileTap}
-        transition={{ ...press.transition, layout: spring.detail }}
+        transition={{ ...press.transition, layout: morphLayout }}
         style={{ borderRadius: radius.hover }}
         onClick={() => onOpen(t.id)}
         data-trade-id={t.id}
@@ -184,12 +187,14 @@ function Row({ t, index, count, seen, listKey, shareIds, pressing, hovered, bind
  * in the first time the card is seen, a newly saved trade drops in from the top with a win/loss highlight sweep,
  * removed rows fade while the rest close up, rows give press feedback. Hover pill `recent`; row =
  * `motion.button layoutId="trade-{id}"` (+ `trade-side-{id}`, `trade-pnl-{id}`) → `openDetail(id, "recent")`.
- * The shared ids are dropped while a detail opened from a chart marker or the table is shown (Plan 3.3 rule "Quelle").
+ * The shared ids are dropped while a detail opened from a chart marker, the Auswertung or the table is shown (Plan 3.3
+ * rule "Quelle", `DETACHED_DETAIL_SOURCES`).
  */
 export function RecentTrades() {
   const settings = useJournal((s) => s.settings);
   const acc = useUi((s) => s.acc);
   const detail = useUi((s) => s.detail);
+  const detailTempo = useUi((s) => s.detailTempo);
   const openDetail = useUi((s) => s.openDetail);
   const openEditor = useUi((s) => s.openEditor);
   const view = useAccountView(acc);
@@ -198,7 +203,10 @@ export function RecentTrades() {
   const body = useRef<HTMLDivElement>(null);
   const seen = useSeenOnce(body);
   const animateFirst = useAnimateFirstInsert(acc, rows.length);
-  const shareIds = detail.source !== "marker" && detail.source !== "table";
+  // detached sources (chart marker, Auswertung) and the table own no morph target here → no shared ids
+  const shareIds = !DETACHED_DETAIL_SOURCES.includes(detail.source) && detail.source !== "table";
+  // a swipe-dismissed detail zooms back on its release tempo (the token itself at tempo 0)
+  const morphLayout = useMemo(() => (detailTempo > 0 ? contextSpringAt(spring.detail, detailTempo) : spring.detail), [detailTempo]);
   const listKey = rows.map((t) => t.id).join(",");
   const open = (id: string) => openDetail(id, "recent");
 
@@ -230,6 +238,7 @@ export function RecentTrades() {
                   seen={seen}
                   listKey={listKey}
                   shareIds={shareIds}
+                  morphLayout={morphLayout}
                   pressing={detail.id === t.id}
                   hovered={hover.hovered === t.id}
                   bind={hover.bind(t.id)}

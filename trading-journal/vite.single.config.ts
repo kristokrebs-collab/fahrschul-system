@@ -84,6 +84,8 @@ function singleFile(edition: FileEdition): Plugin {
         }
         html = html
           .replace(/\s*<link rel="modulepreload"[^>]*>/g, "")
+          // a file opened from disk has no manifest / touch icon next to it (the favicon is a data: URI and stays)
+          .replace(/\s*<link rel="(?:manifest|apple-touch-icon)"[^>]*>/g, "")
           .replace(/\s*<link rel="preconnect" href="https:\/\/fonts\.g[^>]*>/g, "")
           .replace(/<link\s+href="https:\/\/fonts\.googleapis\.com[^>]*>/, () => fontStyle())
           .replace(/<title>[^<]*<\/title>/, `<title>${TITLES[edition]}</title>`)

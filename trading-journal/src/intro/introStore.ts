@@ -1,4 +1,5 @@
 import { createContext, useContext, useSyncExternalStore } from "react";
+import { storageKey } from "@/store/storage";
 
 /**
  * Intro phases:
@@ -9,10 +10,10 @@ import { createContext, useContext, useSyncExternalStore } from "react";
  */
 export type IntroPhase = "off" | "stage" | "build" | "done";
 
-/** sessionStorage flag: set when the intro starts (and by the e2e / perf harness to keep the intro out). */
-export const INTRO_KEY = "tj2-intro";
+/** sessionStorage flag: set when the intro starts (and by the e2e / perf harness to keep the intro out). `tj2-intro` (share: `tj2share-intro`). */
+export const INTRO_KEY: string = storageKey("intro");
 /** localStorage switch: "off" disables the intro at start (Settings "Intro beim Start abspielen"). */
-export const INTRO_PREF_KEY = "tj2-ui-intro";
+export const INTRO_PREF_KEY: string = storageKey("ui-intro");
 
 type Listener = () => void;
 const listeners = new Set<Listener>();

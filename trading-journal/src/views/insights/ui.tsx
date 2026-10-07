@@ -15,10 +15,11 @@ import { useUi } from "@/store/uiStore";
 import { ExplanationView } from "@/views/overview/explainer";
 
 /**
- * Detail source for trades opened from the Auswertung. `"marker"` = no shared `trade-{id}` morph source on the page
- * (the recent-trades list drops its ids), so the detail enters on its own instead of flying out of an unrelated row.
+ * Detail source for trades opened from the Auswertung. `"insights"` is a detached source (`DETACHED_DETAIL_SOURCES`):
+ * the recent-trades list drops its shared `trade-{id}` ids, so the detail enters on its own instead of flying out of
+ * an unrelated row.
  */
-export const DETAIL_SOURCE = "marker" as const;
+export const DETAIL_SOURCE = "insights" as const;
 
 /** Opens the trade detail dialog. */
 export function openTrade(id: string): void {

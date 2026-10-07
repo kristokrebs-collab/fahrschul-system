@@ -7,6 +7,7 @@ import type { AccountView, SetupStats } from "./account";
 import type { EnrichedTrade } from "./types";
 import { colorClass, DASH, INFINITY_SIGN, date, n0, n1, n2, pct, pct0, r as fmtR, signed, toneClass } from "@/lib/format";
 import { tradeTime } from "@/lib/dates";
+import { ED } from "./edition";
 
 export type Tone = "win" | "loss" | "warn" | "mute";
 export interface Verdict {
@@ -223,7 +224,7 @@ export function explain(key: ExplainKey, view: AccountView, settings: Pick<Setti
             ? { tone: "win", text: "Unter 5 %: sehr kontrolliertes Risiko." }
             : view.maxDD > -0.15
               ? { tone: "warn", text: "Zwischen 5 und 15 %: vertretbar, aber im Blick behalten." }
-              : { tone: "loss", text: "Über 15 %: Positionsgrößen oder Hebel prüfen (Regel: Scalp 4x, Makro höchstens 5x)." }
+              : { tone: "loss", text: `Über 15 %: Positionsgrößen oder Hebel prüfen (${ED.COPY.leverageRuleSentence}).` }
           : EMPTY_VERDICT,
       };
     case "exp":

@@ -13,7 +13,7 @@ import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Magnetic } from "@/primitives/Magnetic";
 import { Icon } from "@/primitives/icons";
-import { MODE_LABELS, useJournal } from "@/store/journalStore";
+import { modeLabelFor, useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
 
@@ -141,11 +141,13 @@ function MenuButton() {
  */
 export function Header() {
   const mode = useJournal((s) => s.mode);
+  const storage = useJournal((s) => s.storage);
   const openEditor = useUi((s) => s.openEditor);
   const reduced = useReducedFx();
   const phase = useIntroPhase();
   const [decode, setDecode] = useState(0);
-  const label = MODE_LABELS[mode];
+  // "Nicht gespeichert" (loss) when nothing persists, else the mode label
+  const label = modeLabelFor(mode, storage);
   const onLogo = () => {
     navigate("overview");
     // the intro (when it may replay) switches to "stage" synchronously, so the decode below is held until "build"

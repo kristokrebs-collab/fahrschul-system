@@ -149,7 +149,7 @@ export function TopTraderCard() {
         id="hyblock-new"
         title={READING_DIALOG_TITLE}
         borderRadius={radius.pill}
-        className="!w-auto rounded-full border border-line-2 bg-white/[0.04] px-3 py-1 hover:bg-white/[0.08]"
+        className="touch-hit !w-auto rounded-full border border-line-2 bg-white/[0.04] px-3 py-1 hover:bg-white/[0.08]"
         body={() => <HyblockForm last={last ?? null} live={tt.liveReadingOk ? { longPct: tt.longPct, delta: tt.delta, deltaCandles: tt.deltaCandles } : null} onClose={close} />}
       >
         <span className="text-[12px] font-semibold text-fg">+ Ablesung</span>

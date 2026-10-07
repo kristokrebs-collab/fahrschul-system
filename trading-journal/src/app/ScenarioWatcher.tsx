@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
 import { SCENARIO_TOAST_MS, SCENARIO_TOAST_TITLE, SCENARIO_TOAST_VALUE, scenario, type ScenarioKey } from "@/domain/trigger";
 import { lastClosed4h, useFeedSelect, type Candle, type Stamped } from "@/market";
+import { levelsConfigured } from "@/domain/defaults";
 import { useJournal } from "@/store/journalStore";
-import { readJson, writeJson } from "@/store/storage";
+import { KEYS, readJson, writeJson } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
 
-/** `tj2-trigger-last` (Plan 4.9): no duplicate toast after a reload. */
-export const TRIGGER_LAST_KEY = "tj2-trigger-last";
+/** `tj2-trigger-last` (Plan 4.9): no duplicate toast after a reload (share edition: `tj2share-trigger-last`). */
+export const TRIGGER_LAST_KEY: string = KEYS.triggerLast;
 interface TriggerLast {
   key: ScenarioKey;
   close4hAt: number;
@@ -38,11 +39,13 @@ export const sameClosed4h = (a: Closed4h | null, b: Closed4h | null): boolean =>
 export function ScenarioWatcher() {
   const closed = useFeedSelect("kline_4h", selectClosed4h, sameClosed4h);
   const levels = useJournal((s) => s.settings.market);
+  // trigger levels 0 = not set (share edition): no scenario, no toast
+  const configured = useJournal((s) => levelsConfigured(s.settings));
   const pushToast = useUi((s) => s.pushToast);
 
   const closedT = closed?.t ?? null;
   const closedC = closed?.c ?? null;
-  const sc = closedC != null ? scenario(closedC, levels) : null;
+  const sc = closedC != null && configured ? scenario(closedC, levels) : null;
   const key = sc?.key ?? null;
   // last persisted value, read once and kept here (no localStorage read per render)
   const last = useRef<TriggerLast | null | undefined>(undefined);

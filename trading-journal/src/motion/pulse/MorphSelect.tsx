@@ -655,10 +655,11 @@ export function MorphSelect<T extends string = string>({
         className={cn(
           "group/ms relative flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-line bg-ink-950/70 text-left text-fg outline-none transition-[border-color] duration-200 focus-visible:border-white/40 disabled:cursor-not-allowed disabled:opacity-40 aria-expanded:border-white/40 select-none [-webkit-touch-callout:none]",
           SIZE[size],
-          // coarse pointers: a ≥ 44 px tall tap area without changing the field's height (it lines up with the inputs)
+          // coarse pointers: md is 44 px tall like the inputs (`Input` has `pointer-coarse:min-h-11`), so a select lines up
+          // with the fields in its row; sm keeps its height and gets a ≥ 44 px tap area from the ::after instead
+          // (it sits in the padding box, inside the 1 px border: 32 + 2·6 → 44)
           "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:content-['']",
-          // the ::after sits in the padding box (inside the 1 px border): md 36 + 2·4, sm 32 + 2·6 → 44
-          size === "sm" ? "pointer-coarse:after:-inset-y-1.5" : "pointer-coarse:after:-inset-y-1",
+          size === "sm" ? "pointer-coarse:after:-inset-y-1.5" : "pointer-coarse:min-h-11 pointer-coarse:after:inset-y-0",
           className,
         )}
       >

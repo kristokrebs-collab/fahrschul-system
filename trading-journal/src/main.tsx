@@ -8,12 +8,13 @@ import { bootJournal } from "@/store/journalStore";
 import { installRouter } from "@/store/router";
 
 // Font hints: the numerals (Doto) and the mono axis font are needed for the first paint of the hero /
-// charts; requesting them early avoids a late swap (Plan 9.4). Fire-and-forget, never blocks.
+// charts; requesting them early avoids a late swap (Plan 9.4). Fire-and-forget, never blocks; a blocked font host
+// (offline file, egress filter) rejects the load, which is caught here instead of surfacing as an unhandled NetworkError.
 try {
   const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
-  void fonts?.load('800 1em "Doto"');
-  void fonts?.load('500 11px "IBM Plex Mono"');
-  void fonts?.load('600 14px "IBM Plex Sans"');
+  for (const font of ['800 1em "Doto"', '500 11px "IBM Plex Mono"', '600 14px "IBM Plex Sans"']) {
+    fonts?.load(font)?.catch(() => undefined);
+  }
 } catch {
   /* no Font Loading API */
 }

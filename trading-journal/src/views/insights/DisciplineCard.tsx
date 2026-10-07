@@ -1,5 +1,5 @@
 import { useTransform, type MotionValue } from "motion/react";
-import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import { disciplineSummary, EMPTY, explainDiscipline, heatMap, RULE_HINTS, STREAK_MIN, TITLES, type DisciplineDay, type HeatCell, type RuleKey } from "@/domain/insights";
 import { cn } from "@/lib/cn";
 import { date as fmtDate } from "@/lib/format";
@@ -19,6 +19,29 @@ const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 const WEEKS = 26;
 /** Below this heat-map width only the last 13 weeks are shown, so a cell stays tappable (≈ 22 px on a phone). */
 const NARROW = "@max-[480px]/heat:hidden";
+/**
+ * Fat-finger radius (px) of a heat-map tap: a tap that misses every traded cell picks the nearest traded cell whose
+ * centre lies within it (cells are 15–22 px, a 44 px tap area per cell would overlap the neighbours).
+ */
+const TAP_RADIUS = 24;
+
+/** The traded cell (`data-key`) nearest to a tap point within `TAP_RADIUS`; one rect read per cell, at tap time only. */
+function nearestTraded(host: HTMLElement, x: number, y: number): string | null {
+  let best: string | null = null;
+  let bestD = TAP_RADIUS * TAP_RADIUS;
+  for (const el of host.querySelectorAll<HTMLElement>("[data-key]")) {
+    const r = el.getBoundingClientRect();
+    if (!r.width) continue; // hidden (narrow layout)
+    const dx = x - (r.left + r.width / 2);
+    const dy = y - (r.top + r.height / 2);
+    const d = dx * dx + dy * dy;
+    if (d <= bestD) {
+      bestD = d;
+      best = el.dataset.key ?? null;
+    }
+  }
+  return best;
+}
 
 function RingCentre({ progress }: { progress: MotionValue<number> }) {
   const v = useTransform(progress, (p) => p * 100);
@@ -51,6 +74,12 @@ function HeatMap({ cols, selected, onSelect, onOpen }: { cols: HeatCell[][]; sel
     const next = traded[i < 0 ? traded.length - 1 : Math.max(0, Math.min(traded.length - 1, i + dir))];
     if (next) onSelect(next.key);
   };
+  // one handler for the whole map: an exact hit on a traded cell wins, a near miss snaps to the nearest traded cell
+  const keyAt = (e: MouseEvent<HTMLDivElement>): string | null => {
+    const own = (e.target as HTMLElement).closest<HTMLElement>("[data-key]");
+    if (own) return own.dataset.key ?? null;
+    return root.current ? nearestTraded(root.current, e.clientX, e.clientY) : null;
+  };
   return (
     <div className="@container/heat grid min-w-0 gap-1.5">
       <div className="flex gap-1.5">
@@ -68,6 +97,14 @@ function HeatMap({ cols, selected, onSelect, onOpen }: { cols: HeatCell[][]; sel
           aria-label="Disziplin der letzten Wochen, Pfeiltasten wählen einen Handelstag, Enter öffnet ihn im Kalender"
           aria-activedescendant={selected ? `heat-${selected}` : undefined}
           onKeyDown={onKeyDown}
+          onClick={(e) => {
+            const key = keyAt(e);
+            if (key) onSelect(key);
+          }}
+          onDoubleClick={(e) => {
+            const key = keyAt(e);
+            if (key) onOpen(key);
+          }}
           className="grid min-w-0 flex-1 touch-manipulation grid-flow-col grid-rows-7 gap-[2px] rounded-sm outline-offset-4 [--heat-cols:26] @max-[480px]/heat:[--heat-cols:13]"
           style={{ gridTemplateColumns: `repeat(var(--heat-cols), minmax(0, 1fr))` } as CSSProperties}
         >
@@ -82,8 +119,7 @@ function HeatMap({ cols, selected, onSelect, onOpen }: { cols: HeatCell[][]; sel
                   role="option"
                   aria-selected={on}
                   aria-label={cellLabel(c)}
-                  onClick={() => has && onSelect(c.key)}
-                  onDoubleClick={() => has && onOpen(c.key)}
+                  data-key={has ? c.key : undefined}
                   className={cn(
                     "aspect-square min-h-0 rounded-[2px] transition-opacity duration-300",
                     ci < WEEKS / 2 && NARROW,

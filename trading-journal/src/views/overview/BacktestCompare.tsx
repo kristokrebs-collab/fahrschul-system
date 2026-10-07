@@ -136,7 +136,7 @@ export function BacktestCompare() {
               id={`bt-${r.key}-${cmp.scope}`}
               title={`Backtest · ${r.l}`}
               body={() => <ExplanationView bare d={explainBacktest(r.key, cmp.stats, settings)} />}
-              className="relative z-10 grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 px-2 py-2 text-[13px]"
+              className="touch-hit-y relative z-10 grid grid-cols-[1fr_auto_auto_auto] items-center gap-x-5 px-2 py-2 text-[13px]"
             >
               <span className="flex items-center gap-2 text-mute">
                 <span className="font-mono text-[13px] leading-none text-faint transition-[rotate,color] duration-300 group-hover:rotate-90 group-hover:text-fg" aria-hidden="true">
