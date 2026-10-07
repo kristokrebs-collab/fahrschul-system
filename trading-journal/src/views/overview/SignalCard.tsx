@@ -13,6 +13,7 @@ import { Collapse, Expander } from "@/primitives/Expander";
 import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
 import { Explainer, type ExplainerData } from "@/primitives/VerdictPanel";
+import { BiasBar } from "./BiasBar";
 import { Reasons, RungTile, VerdictRow, WhaleRow, ZoneGauge } from "./signalParts";
 import { entryLevels, freshEntry, ladderText, rungViews, statusPill, whaleView, type EntryLevels, type RungView } from "./signalView";
 import { useForceRefresh } from "./useMarket";
@@ -180,6 +181,7 @@ export function SignalCard() {
           </div>
         ) : (
           <div className={cn("grid gap-5 transition-opacity duration-300", check.state === "stale" && "opacity-80")}>
+            <BiasBar sig={snap} cfg={cfg} />
             <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_2fr] xl:items-center">
               <div className="grid min-w-0 gap-3">
                 <VerdictRow v={v} ladderLength={n} flash={fresh.n[cur]} />

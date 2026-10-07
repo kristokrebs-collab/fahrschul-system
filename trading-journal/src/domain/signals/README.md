@@ -95,3 +95,38 @@ German strings of the card / form: `KIND_TEXT`, `kindText`, `isStrongKind`, `rol
 `tests/unit/signals.whaleMarket.test.ts` (live / polled / retro on a fake provider), `tests/unit/signals.engine.test.ts` (parity with the reference: indicators, every `wtSignal` prefix, zones, verdicts over 7 config
 variants × 6 seeds, snapshots, the retro fix), `tests/unit/signals.resample.test.ts` (alignment, aggregation, config, snapshot
 parsing), fixtures in `tests/unit/signals.fixtures.ts`.
+
+## Long/Short-Tendenz (ours, `bias.ts`)
+
+Additive (user request 2026-10-07: "alle Bedingungen abgleichen … waagerechter Balken, ob eher Short oder eher Long").
+`computeBias(signals, cfg, prevLevel?)` → `{ score −1 … +1, level, label, side, pct, percent ("64 % Long"), valueText
+("Eher Long, 64 %"), contributions[{ id, group, label, vote, weight, share, detail }], used, total }` or `null` ("Keine
+Daten"). Imported directly (`@/domain/signals/bias`, not re-exported from the barrel). UI: `views/overview/BiasBar.tsx`
+(top of the `SignalCard`, compact line in the `SignalStrip`, explainer on tap).
+
+| Condition | Vote (−1 Short … +1 Long), both directions |
+|---|---|
+| MCB per rung | strongest event per direction in the lookback: `WT_RANK / 3` (Bottom/Top 1, Kauf/Verkauf ⅔, crosses ⅓) × `0.5^(barsAgo / signalLookback)`, long − short, + `0.3 ×` wave (½ wt1 position: −`wtOsStrong` … +`wtObStrong` → +1 … −1; ½ slope: wt1 − wt2 = ±6 → ±1), clamped |
+| RSI 14 | per rung ≤ `rsiOs + rsiNear` (40) +1, ≥ `rsiOb − rsiNear` (60) −1, linear in between (0 at 50); one row, rungs weighted 1 : 2 : 3 : 4 |
+| Premium/Discount (`zoneTf`) | position in the range: 0 → +1, 47.5 … 52.5 % → 0, 1 → −1 (linear) |
+| Top-Trader kaufen · Retail rot | per period: run ≥ `minRun` → ±1, both readings the same way over the window without a full run → ±0.75, one side only → ±0.5, opposite → 0; mean over the periods |
+
+- Weights = the check's own grading: MCB 65 (ladder 55 + Bottom/Top 10) split 1 : 2 : 3 : 4 over the rungs (higher
+  timeframe = more), RSI 20, zone 15, whale = `settings.signals.whale.weight` (10; 0 = row shown, never counted).
+  Optional override `settings.signals.bias = { mcb, rsi, zone, whale }` (0 … 100; `sanitizeSignalCfg` keeps the unknown
+  key, `sanitizeBiasCfg` reads it; `DEFAULT_BIAS_CFG`). No settings UI yet — the settings page would add the group.
+- Missing data (rung "Zu wenig Kerzen", no zone, whale off / no Binance data) is EXCLUDED from the weighted mean, never
+  a neutral vote; nothing left (or all weights 0) → `null`.
+- Labels: |score| < 0.15 Neutral, < 0.5 Eher, else Stark (symmetric; = 57.5 % / 75 % of one side). `biasLevel(score,
+  prev)` holds the previous level while the score stays within ±0.05 of its interval (no label flicker at a boundary);
+  `computeBias(…, prevLevel)` applies it, the bar carries the previous level from one published evaluation to the next.
+- Symmetry: a mirrored evaluation gives exactly the negated score (unit test). On the mirrored synthetic market the
+  MCB and RSI votes mirror exactly; the zone does not quite (the ported LuxAlgo swing logic finds no pivot on the
+  mirror image and falls back to the 120-bar range).
+- Bar (`BiasBar`): one MotionValue (`useRevealValue`: springs out of the centre on first view) drives needle, gradient
+  fill (centre → needle, scaleX) and halo; the spring is `contextSpringAt(spring.smooth, smoothstep(0.08, 0.6, |Δscore|))`
+  (drift: the token itself; swing: shorter with a little bounce); renders ≤ 1/s (published check); reduced motion: jumps.
+  `role="meter"` (−100 … 100, `aria-valuetext`) beside the `MorphCard` button (`Long/Short-Tendenz: … Bedingungen
+  ansehen`); the strip line is `aria-hidden` (the strip itself is a button; its accessible name is unchanged).
+- Tests: `tests/unit/signals.bias.test.ts`, `tests/unit/views.overview.bias.test.tsx`, `tests/e2e/bias.spec.ts` (long
+  setup from `mocks/synth.ts`, short setup = the same price path mirrored around the live price).

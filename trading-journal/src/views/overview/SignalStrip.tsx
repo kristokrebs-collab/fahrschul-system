@@ -9,6 +9,7 @@ import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Skeleton } from "@/primitives/Skeleton";
 import { rollDirection } from "@/primitives/StatTile";
+import { BiasBar } from "./BiasBar";
 import { SIGNAL_CARD_ID } from "./SignalCard";
 import { rungViews, statusPill, verdictColor, verdictText, whaleView, type RungView, type WhaleRowView } from "./signalView";
 
@@ -142,6 +143,7 @@ export function SignalStrip({ className }: { className?: string }) {
               </span>
             </span>
           </span>
+          <BiasBar sig={snap} cfg={snap.cfg} compact />
           {/* one row of chips when the strip is wide enough for the words, two rows below ~30 rem (lg at 1024 px) */}
           <span
             className="grid grid-cols-2 gap-1.5 @min-[30rem]/strip:grid-cols-[repeat(var(--rungs),minmax(0,1fr))]"
