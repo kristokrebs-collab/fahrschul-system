@@ -96,22 +96,43 @@ test("toast: a half swipe springs back, a sideways flick dismisses it before its
   await seed(page);
   await page.goto("/#settings");
   await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
-  await page.locator("#s-makro").fill("30000");
-  await page.getByRole("button", { name: "Speichern", exact: true }).first().tap();
   const island = toast(page);
-  await expect(island).toContainText("Einstellungen gespeichert");
   const card = island.getByRole("button").first();
-  await page.waitForTimeout(450); // island grown to its full width
   const kit = await touchKit(page);
+  const saveWith = async (makro: string) => {
+    await page.locator("#s-makro").fill(makro);
+    await page.getByRole("button", { name: "Speichern", exact: true }).first().tap();
+    await expect(island).toContainText("Einstellungen gespeichert");
+  };
+
+  // a slow half swipe springs back (the toast's 2.8 s countdown pauses from the moment the finger lands)
+  await saveWith("30000");
   const at = await centre(card);
   await kit.slowPull(at, 60, 0);
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(350);
   await expect(island).toContainText("Einstellungen gespeichert");
   expect(Math.abs((await centre(card)).x - at.x), "springs back").toBeLessThan(3);
-  const t0 = Date.now();
-  await kit.flick(await centre(card), 170, 0);
-  await expect(island).not.toContainText("Einstellungen gespeichert", { timeout: 1500 });
-  expect(Date.now() - t0, "dismissed by the flick, not by the 2.8 s timeout").toBeLessThan(1500);
+
+  // a fresh toast, thrown sideways: it rides the finger and flies out that way (a timed-out toast shrinks in place)
+  await expect(island).not.toContainText("Einstellungen gespeichert", { timeout: 6000 });
+  await saveWith("31000");
+  const from = await centre(card);
+  await kit.flick(from, 170, 0);
+  const offsets = await page.evaluate(async (x0) => {
+    const out: number[] = [];
+    for (let i = 0; i < 16; i++) {
+      const b = document.querySelector("[data-toast-island] button");
+      if (!b) break;
+      const r = b.getBoundingClientRect();
+      out.push(r.left + r.width / 2 - x0);
+      await new Promise((res) => setTimeout(res, 25));
+    }
+    return out;
+  }, from.x);
+  // flung: the offset keeps growing until the island is gone (a half swipe would spring back towards 0)
+  const last = offsets[offsets.length - 1] ?? Infinity;
+  expect(last > 100 && last >= (offsets[0] ?? 0) - 5, `island x offsets after the flick: ${offsets.map(Math.round).join(", ")}`).toBe(true);
+  await expect(island).not.toContainText("Einstellungen gespeichert", { timeout: 3000 });
 });
 
 test("dock: tapping the active tab again scrolls back to the top", async ({ page }, info) => {

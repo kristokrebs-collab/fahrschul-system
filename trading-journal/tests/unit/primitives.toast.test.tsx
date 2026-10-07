@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastIsland } from "@/primitives/Toast";
 import { toast, toastDuration, useToastStore } from "@/primitives/toastStore";
@@ -41,6 +41,35 @@ describe("toastStore", () => {
     expect(screen.getByText("4H 61.200").className).toContain("dot-num text-[15px]");
     act(() => {
       vi.advanceTimersByTime(5200);
+    });
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+  });
+
+  it("a finger resting on the island holds its countdown; lifting it resumes the rest", () => {
+    toast.ok("Halten");
+    render(<ToastIsland />);
+    const card = screen.getByRole("button");
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    act(() => {
+      fireEvent.pointerDown(card, { pointerType: "touch", pointerId: 1, isPrimary: true, button: 0, clientX: 100, clientY: 100 });
+    });
+    expect(card.closest("[data-held]")).not.toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+    act(() => {
+      fireEvent.pointerUp(card, { pointerType: "touch", pointerId: 1, isPrimary: true, button: 0, clientX: 100, clientY: 100 });
+    });
+    expect(card.closest("[data-held]")).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(1700);
+    });
+    expect(useToastStore.getState().toasts).toHaveLength(1);
+    act(() => {
+      vi.advanceTimersByTime(200);
     });
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });

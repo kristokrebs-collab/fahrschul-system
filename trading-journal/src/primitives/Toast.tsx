@@ -59,7 +59,7 @@ export const TOAST_Z = 95;
  * - grows 44×44 → auto×50 on `spring.toast` (declared exception), exit `tween.toastExit`, text `delay .12`,
  *   check mark `pathLength` on `tween.checkToast`;
  * - remaining-time bar: compositor `scaleX` loop (`.fx-countdown`), paused together with the dismiss timer while
- *   hovered, focused or dragged;
+ *   hovered, focused, dragged or pressed by a finger / pen;
  * - swipe-x to dismiss (Apple physics, `useSwipeDismiss` axis x, either way): it tracks the finger 1:1, commits on
  *   the projected throw (`|x + project(vx)| > 80`, ≥ 12 px travel, a flick back cancels) and flies out the way it was
  *   thrown, keeping the finger's velocity; a released half-swipe springs back with that velocity (gentle when slow,
@@ -204,10 +204,16 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
     },
     [touchGuard],
   );
-  // the countdown pauses while a finger / the mouse drags the island (the hook owns the gesture; zero state per move)
+  // the countdown pauses while a finger / the mouse drags the island (the hook owns the gesture; zero state per move),
+  // and while a finger or pen rests on it (the touch counterpart of the mouse's hover hold: a toast being read or
+  // about to be swiped never times out under the finger)
   const h = swipe.handle;
   const handle = {
     ...h,
+    onPointerDown: (e: ReactPointerEvent<Element>) => {
+      h.onPointerDown(e);
+      if (e.pointerType !== "mouse") holdOn("press");
+    },
     onPointerMove: (e: ReactPointerEvent<Element>) => {
       h.onPointerMove(e);
       if (swipe.isDragging()) holdOn("drag");
@@ -215,10 +221,12 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
     onPointerUp: (e: ReactPointerEvent<Element>) => {
       h.onPointerUp(e);
       holdOff("drag");
+      holdOff("press");
     },
     onPointerCancel: (e: ReactPointerEvent<Element>) => {
       h.onPointerCancel(e);
       holdOff("drag");
+      holdOff("press");
     },
   };
 

@@ -52,7 +52,7 @@ interface TradeEditorProps {
   keeps date (renewed)/pair/account/side/leverage/timeframe, scrolls the body to top and focuses `Einstieg`), `Speichern` (`type="submit" form="trade-form"`, `Speichert …` while saving).
 - **Toasts** go through `uiStore.pushToast` (kinds `success | error | info`); the shell renders them with `ToastIsland`
   (`src/app/toasts.ts`: `success → ok`, `error → error`, `signal`/`info → warn` glyph with the 2.8 s / 5.2 s `TOAST_MS` lifetime). The
-  store never auto-dismisses: the island counts the visible time (from the front of the queue, paused on hover / focus / drag). The island
+  store never auto-dismisses: the island counts the visible time (from the front of the queue, paused on hover / focus / drag / touch press). The island
   floats above every overlay (`TOAST_Z` 95); a toast pushed while a Sheet / MorphDialog / TradeDetail is open takes the `top` lane
   (overlays register via `useOverlayLane(open)` from `@/primitives/toastStore`), so `Speichern & neu` confirms visibly (TO-01).
 - Exports for reuse/tests: `defaultForm`, `formFromTrade`, `resetForNext`, `toRecord`, `validateRecord`, `livePriceInput`, `freshLivePrice`, `Section`, `LivePriceButton`,
