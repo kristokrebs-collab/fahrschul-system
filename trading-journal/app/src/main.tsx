@@ -8,6 +8,7 @@ import { NO_FILTER, SettingsView, SetupsView, TradesView, type Filters } from '.
 import { SetupSheet, TradeSheet } from './forms';
 import { IslandProvider, ProgressiveBlur, TradeQuickView, type IslandNote } from './island';
 import { MorphProvider } from './morph';
+import { computeSignals } from './signals';
 import { motion } from 'motion/react';
 
 const VIEWS = ['overview', 'trades', 'setups', 'settings'] as const;
@@ -16,7 +17,8 @@ const LABEL: Record<View, string> = { overview: 'Übersicht', trades: 'Trades', 
 
 function App() {
   const j = useJournal();
-  const market = useMarket(j.settings.market.symbol);
+  const market = useMarket(j.settings.market.symbol, [...j.settings.signals.ladder, j.settings.signals.zoneTf]);
+  const sig = useMemo(() => computeSignals(market.bars, j.settings.signals), [market.bars, j.settings.signals]);
   const [view, setView] = useState<View>(() => { const h = location.hash.slice(1) as View; return VIEWS.includes(h) ? h : 'overview'; });
   const [acc, setAcc] = useState<AccountFilter>('all');
   const [filters, setFilters] = useState<Filters>(NO_FILTER);
@@ -51,6 +53,20 @@ function App() {
     notify({ kind: 'success', title: exists ? 'Grundlage aktualisiert' : 'Grundlage angelegt' });
   };
   const deleteSetup = async (id: string) => { await saveSettings({ ...j.settings, setups: j.settings.setups.filter((x) => x.id !== id) }); notify({ kind: 'info', title: 'Grundlage gelöscht' }); };
+  // Backup einspielen: nur Trades, die noch nicht da sind (gleiche ID oder gleicher Zeitpunkt + Einstieg)
+  const importTrades = async (list: any[]) => {
+    const ids = new Set(j.trades.map((t) => t.id));
+    const sig = new Set(j.trades.map((t) => `${t.date}|${t.entry}|${t.side}`));
+    let n = 0;
+    for (const raw of list) {
+      if (!raw || typeof raw !== 'object' || !raw.date || raw.entry == null) continue;
+      if ((raw.id && ids.has(raw.id)) || sig.has(`${raw.date}|${raw.entry}|${raw.side}`)) continue;
+      const { items, checked, complete, move, risk, rr, result, ...t } = raw;
+      await j.api.current!.saveTrade(t as Trade);
+      n++;
+    }
+    return n;
+  };
   const openNew = () => setTradeOpen({ open: true, trade: null });
   const openEdit = (t: ETrade) => setTradeOpen({ open: true, trade: j.trades.find((x) => x.id === t.id) || null });
   const showSetupTrades = (id: string) => { setFilters({ ...NO_FILTER, setup: id }); go('trades'); };
@@ -89,13 +105,13 @@ function App() {
         )}
         <TransitionPanel activeIndex={VIEWS.indexOf(view)}>
           {[
-            <Overview key="o" st={st} settings={j.settings} acc={acc} setAcc={setAcc} market={market} loaded={j.loaded}
+            <Overview key="o" sig={sig} st={st} settings={j.settings} acc={acc} setAcc={setAcc} market={market} loaded={j.loaded}
               onNew={openNew} onEdit={setQuick} onSetup={showSetupTrades} goTrades={() => go('trades')}
               hyblock={j.hyblock} onSaveHyblock={async (h) => { await j.api.current!.saveHyblock(h); notify({ kind: 'success', title: 'Ablesung gespeichert', value: `${fmt.n1(h.longPct)} %` }); }}
               onDeleteHyblock={async (id) => { await j.api.current!.deleteHyblock(id); notify({ kind: 'info', title: 'Ablesung gelöscht' }); }} />,
             <TradesView key="t" all={j.enriched} settings={j.settings} f={filters} setF={setFilters} onEdit={setQuick} onNew={openNew} />,
             <SetupsView key="s" st={stats(j.enriched, j.settings, 'all')} settings={j.settings} onEdit={(s) => setSetupOpen({ open: true, setup: s })} onNew={() => setSetupOpen({ open: true, setup: null })} onTrades={showSetupTrades} />,
-            <SettingsView key="e" settings={j.settings} trades={j.enriched} onSave={saveSettings} downloads={downloads} />,
+            <SettingsView key="e" settings={j.settings} trades={j.enriched} onSave={saveSettings} downloads={downloads} onImport={importTrades} />,
           ]}
         </TransitionPanel>
 
@@ -121,7 +137,7 @@ function App() {
         </Dock>
       </nav>
 
-      <TradeSheet layoutId={tradeOpen.trade ? undefined : 'new-trade'} open={tradeOpen.open} trade={tradeOpen.trade} settings={j.settings} defaultAccount={defaultAccount}
+      <TradeSheet market={market} layoutId={tradeOpen.trade ? undefined : 'new-trade'} open={tradeOpen.open} trade={tradeOpen.trade} settings={j.settings} defaultAccount={defaultAccount}
         onClose={() => setTradeOpen({ open: false, trade: null })} onSave={saveTrade} onDelete={deleteTrade}
         onNewSetup={() => setSetupOpen({ open: true, setup: null, fromTrade: true })} />
       <SetupSheet layoutId={setupOpen.setup && !setupOpen.fromTrade ? `setup-card-${setupOpen.setup.id}` : undefined} open={setupOpen.open} setup={setupOpen.setup} settings={j.settings} usedBy={usedBy}

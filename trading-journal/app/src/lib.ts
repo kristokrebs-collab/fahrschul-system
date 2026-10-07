@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { rsi, tfSeconds, withLivePrice, DEFAULT_SIGNAL_CFG, type Bar, type SignalCfg, type SignalSnap } from './signals';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -19,6 +20,8 @@ export type Trade = {
   setups: string[]; checks: Record<string, boolean>; reason: string; conviction: number | null;
   followedPlan: boolean | null; emotion: string; notes: string; chart: string;
   pnl?: number | null; r?: number | null; createdAt?: string; updatedAt?: string;
+  signal?: SignalSnap | null; // Signal-Check zum Zeitpunkt des Eintrags
+  mistakes?: string[];         // Fehler-Tags (z. B. zu früh, Stop verschoben)
 };
 export type Market = {
   symbol: string; longTrigger: number; longStop: number; shortTrigger: number;
@@ -29,14 +32,26 @@ export type Backtest = { winRate: number; avgWin: number; avgLoss: number; expec
 export type Settings = {
   currency: string; pair: string; startDate: string;
   capital: Record<Account, number>;
-  setups: Setup[]; rules: CheckItem[]; backtest: Backtest; market: Market; hyblock: HyblockCfg;
+  setups: Setup[]; rules: CheckItem[]; backtest: Backtest; market: Market; hyblock: HyblockCfg; signals: SignalCfg;
+  mistakes: string[];
 };
 
 // ── Deine Regeln als Startkonfiguration ────────────────
 export const SETUP_COLORS = ['#6f9dc9', '#46a6a0', '#8c83cf', '#c9975b', '#c7768f', '#5fb0d6', '#9aa9bb', '#a0b56b'];
 const ck = (...texts: string[]): CheckItem[] => texts.map((text, i) => ({ id: 'c' + (i + 1), text }));
 
+export const MTF_SETUP: Setup = { id: 's_mtf', name: 'Multi-TF Signal (MCB + RSI + Discount)', account: 'both', color: '#9aa9bb',
+  desc: 'Ab 30m: MCB zeigt Bottom/Einstieg (Short: Top), die nächst höhere Timeframe bestätigt, die dritte macht den Einstieg stärker. RSI nahe überverkauft/überkauft, Discount (Short: Premium) ist Bonus. Wird live geprüft.',
+  checklist: [
+    { id: 'mtf_base', text: 'MCB-Signal auf der Basis-Timeframe (mind. 30m)' },
+    { id: 'mtf_next', text: 'Nächst höhere Timeframe bestätigt' },
+    { id: 'mtf_third', text: 'Dritte Timeframe bestätigt (stärker)' },
+    { id: 'mtf_rsi', text: 'RSI nahe überverkauft (Short: überkauft)' },
+    { id: 'mtf_zone', text: 'Preis im Discount (Short: Premium)' },
+  ] };
+
 export const DEFAULT_SETUPS: Setup[] = [
+  MTF_SETUP,
   { id: 's_p1', name: 'Früher Makro-Trendbruch', account: 'makro', color: '#6f9dc9',
     desc: 'Philosophie 1: Diagonale Downtrend-Linie und RSI-Trendlinie brechen. Höchstes Risiko, bester Preis.',
     checklist: ck('Diagonale Downtrend-Linie gebrochen', 'RSI-Trendlinie gebrochen', 'Top-down geprüft (W → 3D → D → 4H → 1H)') },
@@ -86,11 +101,13 @@ export const DEFAULT_SETTINGS: Settings = {
   setups: DEFAULT_SETUPS, rules: DEFAULT_RULES,
   backtest: { winRate: 0.6215, avgWin: 0.1664, avgLoss: -0.0931, expectancy: 0.0682, label: '214 Signale' },
   hyblock: { longEndpoint: 'topTraderAccountsLongShort', longField: '', deltaEndpoint: 'whaleRetailDelta', deltaField: '', coin: 'BTC', exchange: 'binance_perp_stable', timeframe: '1h' },
-  market: { symbol: 'BINANCE:BTCUSDT', longTrigger: 85900, longStop: 85300, shortTrigger: 84500, lowerHigh: 82829, rsiWeekly: 62.09, invalidation: 75500, zoneLow: 81500, zoneHigh: 82200 },
+  signals: DEFAULT_SIGNAL_CFG,
+  mistakes: ['Zu früh rein', 'Kein Stop', 'Stop verschoben', 'Zu großer Hebel', 'FOMO-Einstieg', 'Gegen den Plan', 'Zu früh raus', 'Revenge-Trade'],
+  market: { symbol: 'BITSTAMP:BTCUSD', longTrigger: 85900, longStop: 85300, shortTrigger: 84500, lowerHigh: 82829, rsiWeekly: 62.09, invalidation: 75500, zoneLow: 81500, zoneHigh: 82200 },
 };
 
 export function normalizeSettings(raw: any): Settings {
-  const d = DEFAULT_SETTINGS, r = raw || {};
+  const d = DEFAULT_SETTINGS, r = migrateSettings(raw) || {};
   return {
     currency: r.currency || d.currency, pair: r.pair || d.pair, startDate: r.startDate || '',
     capital: { makro: num(r.capital?.makro) ?? d.capital.makro, scalp: num(r.capital?.scalp) ?? d.capital.scalp },
@@ -99,10 +116,19 @@ export function normalizeSettings(raw: any): Settings {
     backtest: { ...d.backtest, ...(r.backtest || {}) },
     market: { ...d.market, ...(r.market || {}) },
     hyblock: { ...d.hyblock, ...(r.hyblock || {}) },
+    signals: { ...d.signals, ...(r.signals || {}) },
+    mistakes: Array.isArray(r.mistakes) ? r.mistakes : d.mistakes,
   };
 }
+/** Einmalige Umstellung älterer Einstellungen: Signal-Check-Grundlage ergänzen, Chart-Symbol (Bitstamp) übernehmen. */
+function migrateSettings(raw: any): any {
+  if (!raw || raw.signals) return raw;
+  const setups = Array.isArray(raw.setups) && !raw.setups.some((x: any) => x?.id === MTF_SETUP.id) ? [MTF_SETUP, ...raw.setups] : raw.setups;
+  const market = raw.market?.symbol === 'BINANCE:BTCUSDT' ? { ...raw.market, symbol: 'BITSTAMP:BTCUSD' } : raw.market;
+  return { ...raw, setups, market };
+}
 
-export const TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1D', '3D', '1W'];
+export const TIMEFRAMES = ['1m', '5m', '15m', '30m', '45m', '1h', '2h', '4h', '1D', '3D', '1W'];
 export const EMOTIONS = ['Ruhig', 'Fokussiert', 'Unsicher', 'FOMO', 'Gierig', 'Revenge'];
 export const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 export const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
@@ -318,7 +344,9 @@ export type MarketState = {
   message?: string;
   price?: number; change?: number; rsiW?: number;
   close4h?: number; close4hAt?: number; closeW?: number; closeWAt?: number;
-  updatedAt?: number;
+  updatedAt?: number;      // letzter erfolgreicher Abruf
+  quoteLive?: boolean;     // Kurs aus dem Echtzeit-Quote (sonst letzte Kerze, ggf. verzögert)
+  bars?: Record<string, Bar[]>; // Kerzen je Timeframe, letzte Kerze mit Live-Kurs ergänzt
   refreshing?: boolean;
   refresh?: () => void;
 };
@@ -332,58 +360,75 @@ const ERR_TEXT: Record<string, string> = {
   approval_required: 'TradingView braucht eine Freigabe pro Abfrage, das geht in dieser Ansicht nicht.',
 };
 const payloadOf = (res: any) => res?.payload ?? res?.structuredContent ?? null;
-function lastClosed(bars: any[], sec: number) {
+function lastClosed(bars: Bar[] | undefined, sec: number) {
   const now = Date.now() / 1000;
-  const done = (bars || []).filter((b) => b && ok(b.c) && b.t + sec <= now + 60);
+  const done = (bars || []).filter((b) => b.t + sec <= now + 60);
   const b = done[done.length - 1];
-  return b ? { c: b.c as number, t: (b.t + sec) * 1000 } : null;
+  return b ? { c: b.c, t: (b.t + sec) * 1000 } : null;
 }
+const cleanBars = (raw: any): Bar[] => (Array.isArray(raw) ? raw : [])
+  .filter((b) => b && ok(b.t) && ok(b.o) && ok(b.h) && ok(b.l) && ok(b.c))
+  .map((b) => ({ t: b.t, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v }));
 
-export const PRICE_EVERY = 30_000;
+export const PRICE_EVERY = 60_000;
 const HARD_ERRORS = ['needs_reauth', 'server_not_connected', 'not_in_manifest', 'blocked_by_policy', 'approval_required', 'not_granted', 'capability_disabled', 'capability_removed', 'selection_required'];
+/** Abrufintervall je Timeframe: kleine Kerzen öfter, Wochenkerze selten. */
+const barsEvery = (sec: number) => (sec <= 1800 ? 60_000 : sec <= 3600 ? 90_000 : sec <= 14400 ? 180_000 : 900_000);
 
 /**
- * Live-Markt über den TradingView-Connector. Eigenes Polling mit `callTool` und `cache: false`,
- * damit jeder Abruf wirklich frisch ausgeführt wird: Kurs alle 30 s, 4H-Kerze alle 2 min,
- * Wochenkerze alle 15 min. Pausiert im Hintergrund-Tab und holt beim Zurückkehren sofort nach.
+ * Live-Markt über den TradingView-Connector. Alles wird aus Kerzen (get-ohlcv) berechnet, weil der
+ * Screener-Abruf schnell ins Rate-Limit läuft. Zusätzlich holt ein seltener Quote-Abruf den echten
+ * Live-Kurs; damit wird die laufende Kerze jedes Timeframes ergänzt, so wie der Chart sie zeigt.
+ * Abrufe laufen nacheinander (kein Burst), pausieren im Hintergrund-Tab und weichen bei Fehlern aus.
  */
-export function useMarket(symbol: string): MarketState {
-  const [st, setSt] = useState<MarketState>({ status: 'connecting' });
+export function useMarket(symbol: string, tfs: string[]): MarketState {
+  const [st, setSt] = useState<{ status: MarketState['status']; message?: string; quote?: { price: number; change?: number; at: number }; raw: Record<string, Bar[]>; updatedAt?: number; refreshing?: boolean }>({ status: 'connecting', raw: {} });
   const runRef = useRef<(force?: boolean) => void>(() => {});
+  const tfKey = [...new Set([...tfs, '4h', '1W'])].filter((tf) => tfSeconds(tf)).join(',');
   useEffect(() => {
     let alive = true;
     let mcp: any = null;
-    const last: Record<string, number> = {};
-    const busy: Record<string, boolean> = {};
-    const jobs: { key: string; tool: string; input: any; every: number; apply: (p: any) => Partial<MarketState> }[] = [
-      { key: 'price', tool: 'mcp-tv-get-symbol-data', input: { symbol, columns: ['close', 'change', 'RSI|1W'] }, every: PRICE_EVERY,
-        apply: (p) => { const d = p?.data || p || {}; return { price: num(d.close) ?? undefined, change: num(d.change) ?? undefined, rsiW: num(d['RSI|1W']) ?? undefined }; } },
-      { key: 'h4', tool: 'mcp-tv-get-ohlcv', input: { symbol, interval: '4h', count: 4 }, every: 120_000,
-        apply: (p) => { const b = lastClosed(p?.bars, 4 * 3600); return b ? { close4h: b.c, close4hAt: b.t } : {}; } },
-      { key: 'w', tool: 'mcp-tv-get-ohlcv', input: { symbol, interval: '1W', count: 3 }, every: 900_000,
-        apply: (p) => { const b = lastClosed(p?.bars, 7 * 86400); return b ? { closeW: b.c, closeWAt: b.t } : {}; } },
+    const next: Record<string, number> = {};
+    const fails: Record<string, number> = {};
+    let running = false;
+    setSt({ status: 'connecting', raw: {} });
+    type Job = { key: string; tool: string; input: any; every: number; apply: (p: any) => void };
+    const jobs: Job[] = [
+      ...tfKey.split(',').map((tf): Job => ({
+        key: tf, tool: 'mcp-tv-get-ohlcv', input: { symbol, interval: tf, count: tf === '1W' ? 260 : 500 }, every: barsEvery(tfSeconds(tf)),
+        apply: (p) => { const bars = cleanBars(p?.bars); if (bars.length) setSt((s) => ({ ...s, raw: { ...s.raw, [tf]: bars } })); },
+      })),
+      { key: 'quote', tool: 'mcp-tv-get-symbol-data', input: { symbol, columns: ['close', 'change'] }, every: PRICE_EVERY,
+        apply: (p) => { const d = p?.data || p || {}; const price = num(d.close); if (price != null) setSt((s) => ({ ...s, quote: { price, change: num(d.change) ?? undefined, at: Date.now() } })); } },
     ];
     const run = async (force = false) => {
-      if (!alive || !mcp || document.hidden) return;
+      if (!alive || !mcp || running || document.hidden) return;
       const now = Date.now();
-      const due = jobs.filter((j) => !busy[j.key] && (force || !last[j.key] || now - last[j.key] >= j.every));
+      const due = jobs.filter((j) => force || !next[j.key] || now >= next[j.key]);
       if (!due.length) return;
+      running = true;
       if (force) setSt((s) => ({ ...s, refreshing: true }));
-      await Promise.all(due.map(async (j) => {
-        busy[j.key] = true;
+      for (const j of due) {
+        if (!alive) break;
         try {
           const res = await mcp.callTool(TV, j.tool, j.input, { cache: false });
-          last[j.key] = Date.now();
-          const patch = j.apply(payloadOf(res));
-          if (alive) setSt((s) => ({ ...s, ...patch, status: 'live', message: undefined, updatedAt: j.key === 'price' ? Date.now() : s.updatedAt ?? Date.now() }));
+          fails[j.key] = 0;
+          next[j.key] = Date.now() + j.every;
+          j.apply(payloadOf(res));
+          if (alive) setSt((s) => ({ ...s, status: 'live', message: undefined, updatedAt: Date.now() }));
         } catch (e: any) {
           const code = e?.code || 'upstream_error';
-          last[j.key] = Date.now() - j.every + 15_000; // bei Fehler in 15 s erneut versuchen
-          if (alive) setSt((s) => HARD_ERRORS.includes(code)
-            ? { status: 'error', message: ERR_TEXT[code] || 'TradingView ist in dieser Ansicht nicht verfügbar.' }
-            : { ...s, status: s.price != null ? s.status : 'error', message: 'TradingView antwortet gerade nicht. Nächster Versuch in 15 Sekunden.' });
-        } finally { busy[j.key] = false; }
-      }));
+          if (HARD_ERRORS.includes(code)) {
+            if (alive) setSt((s) => ({ ...s, status: 'error', message: ERR_TEXT[code] || 'TradingView ist in dieser Ansicht nicht verfügbar.' }));
+            running = false; return;
+          }
+          // Rate-Limit oder kurzer Ausfall: exponentiell länger warten (15 s, 30 s, 60 s … max. 5 min)
+          fails[j.key] = (fails[j.key] || 0) + 1;
+          next[j.key] = Date.now() + Math.min(300_000, 15_000 * 2 ** (fails[j.key] - 1));
+          if (alive && j.key !== 'quote') setSt((s) => ({ ...s, status: Object.keys(s.raw).length ? s.status : 'error', message: 'TradingView antwortet gerade nicht, neuer Versuch gleich.' }));
+        }
+      }
+      running = false;
       if (alive && force) setSt((s) => ({ ...s, refreshing: false }));
     };
     runRef.current = run;
@@ -393,13 +438,35 @@ export function useMarket(symbol: string): MarketState {
     (async () => {
       mcp = await useCap('mcp');
       if (!alive) return;
-      if (!mcp) { setSt({ status: 'unavailable', message: 'Live-Kurs gibt es nur, wenn das Journal auf claude.ai geöffnet ist.' }); return; }
+      if (!mcp) { setSt({ status: 'unavailable', raw: {}, message: 'Live-Kurs gibt es nur, wenn das Journal auf claude.ai geöffnet ist.' }); return; }
       run(true);
     })();
     return () => { alive = false; clearInterval(tick); document.removeEventListener('visibilitychange', onVis); };
-  }, [symbol]);
+  }, [symbol, tfKey]);
+
   const refresh = useMemo(() => () => runRef.current(true), []);
-  return { ...st, refresh };
+  return useMemo(() => {
+    const q = st.quote && Date.now() - st.quote.at < 5 * 60_000 ? st.quote : undefined;
+    const bars: Record<string, Bar[]> = {};
+    for (const [tf, b] of Object.entries(st.raw) as [string, Bar[]][]) bars[tf] = q ? withLivePrice(b, tfSeconds(tf), q.price, q.at) : b;
+    const base = bars['30m'] || bars[tfs[0]] || bars['1h'] || bars['4h'];
+    const price = q?.price ?? base?.[base.length - 1]?.c;
+    let change = q?.change;
+    if (change == null && base?.length) {
+      const sec = tfSeconds(base === bars['30m'] ? '30m' : tfs[0]) || 1800;
+      const ref = base[base.length - 1 - Math.round(86400 / sec)];
+      if (ref && price != null) change = (price / ref.c - 1) * 100;
+    }
+    const w = bars['1W'];
+    const rw = w && w.length > 20 ? rsi(w.map((b) => b.c), 14) : null;
+    const c4 = lastClosed(st.raw['4h'], 4 * 3600), cw = lastClosed(st.raw['1W'], 7 * 86400);
+    return {
+      status: st.status, message: st.message, updatedAt: st.updatedAt, refreshing: st.refreshing, refresh,
+      price, change, quoteLive: !!q, bars,
+      rsiW: rw ? rw[rw.length - 1] : undefined,
+      close4h: c4?.c, close4hAt: c4?.t, closeW: cw?.c, closeWAt: cw?.t,
+    } as MarketState;
+  }, [st, refresh, tfs.join(',')]);
 }
 
 export type Scenario = { key: 'bear' | 'long' | 'short' | 'range'; title: string; detail: string; tone: 'win' | 'loss' | 'warn' | 'mute' };

@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useDragControls, type PanInfo } from 'motion/react';
 import {
   EMOTIONS, SETUP_COLORS, TIMEFRAMES, calc, checkItems, cn, fmt, nowLocal, num, safeUrl, toInput, tone, uid,
   type Account, type CheckItem, type Settings, type Setup, type Trade,
 } from './lib';
 import { Btn, CheckRow, Field, GradientSelector, Icon, Pill, Segmented, inputCls, type GradOption } from './ui';
+import { MTF_SETUP, type MarketState } from './lib';
+import { signalsAt, snapshot, STRENGTH_LABEL, type SignalSnap } from './signals';
+import { project, spring } from './physics';
 
 // ── Modal / Bottom-Sheet ───────────────────────────────
 export function Sheet({ open, onClose, title, children, footer, wide = true, layoutId }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer: ReactNode; wide?: boolean; layoutId?: string }) {
+  const drag = useDragControls();
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -16,6 +20,10 @@ export function Sheet({ open, onClose, title, children, footer, wide = true, lay
     document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', k); document.body.style.overflow = prev; };
   }, [open, onClose]);
+  // Wisch nach unten schließt: Strecke + Wurfweite (wie iOS) entscheiden, nicht nur die Strecke
+  const onDragEnd = (_: unknown, info: PanInfo) => {
+    if (info.offset.y + project(info.velocity.y) > 220 || info.velocity.y > 900) onClose();
+  };
   return (
     <AnimatePresence>
       {open && (
@@ -23,10 +31,14 @@ export function Sheet({ open, onClose, title, children, footer, wide = true, lay
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
           onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
           <motion.div role="dialog" aria-modal="true" aria-label={title} layoutId={layoutId} style={{ borderRadius: 28 }}
+            drag="y" dragListener={false} dragControls={drag} dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0.04, bottom: 0.9 }}
+            dragTransition={{ bounceStiffness: 420, bounceDamping: 32 }} onDragEnd={onDragEnd}
             className={cn('flex max-h-[94%] w-full flex-col overflow-hidden rounded-t-3xl border border-line-2 bg-ink-850 shadow-[0_30px_80px_rgb(0_0_0/0.6)] sm:max-h-[calc(100%-16px)] sm:rounded-3xl', wide ? 'sm:max-w-[860px]' : 'sm:max-w-[540px]')}
-            initial={layoutId ? undefined : { y: 40, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={layoutId ? undefined : { y: 30, opacity: 0, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 32, bounce: 0.1 }}>
-            <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
+            initial={layoutId ? undefined : { y: 60, opacity: 0, scale: 0.98 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={layoutId ? undefined : { y: 80, opacity: 0, scale: 0.98 }}
+            transition={spring('sheet')}>
+            <div className="relative flex cursor-grab touch-none items-center justify-between gap-3 border-b border-line px-6 pb-4 pt-5 active:cursor-grabbing"
+              onPointerDown={(e) => { if (!(e.target as HTMLElement).closest('button')) drag.start(e); }}>
+              <span className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-white/15" aria-hidden="true" />
               <h2 className="text-[17px] font-semibold">{title}</h2>
               <button type="button" onClick={onClose} aria-label="Schließen" className="grid size-9 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:text-fg [&>svg]:size-4">{Icon.x}</button>
             </div>
@@ -36,6 +48,38 @@ export function Sheet({ open, onClose, title, children, footer, wide = true, lay
         </motion.div>
       )}
     </AnimatePresence>
+  );
+}
+
+/** Einstiegs-Check im Formular: zeigt, was die Kerzen zum Einstiegszeitpunkt sagen. */
+function SignalSection({ snap, saved, canRecheck, onRecheck, market }: { snap: SignalSnap | null; saved: boolean; canRecheck: boolean; onRecheck: () => void; market: MarketState }) {
+  const kindText: Record<string, string> = { bottom: 'Bottom', buy: 'Kaufsignal', bull: 'Einstieg', top: 'Top', sell: 'Verkaufssignal', bear: 'Einstieg Short' };
+  return (
+    <Section title="Einstiegs-Check" sub={snap ? (saved ? 'gespeichert beim Eintragen' : 'automatisch aus TradingView') : undefined}>
+      {!snap ? (
+        <p className="text-[12.5px] text-mute">{market.status === 'live' ? 'Für diesen Zeitpunkt liegen keine Kerzen vor (Check reicht etwa 5 Tage zurück).' : 'Ohne TradingView-Verbindung kein automatischer Check.'}</p>
+      ) : (
+        <div className="grid gap-3 rounded-2xl border border-line bg-ink-950/50 p-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="dot-num text-[26px] leading-none text-fg">{snap.score}</span>
+              <div>
+                <div className={cn('text-[14px] font-semibold', snap.valid ? (snap.side === 'long' ? 'text-win' : 'text-loss') : 'text-fg')}>{snap.label}</div>
+                <div className="text-[11.5px] text-faint">Stärke: {STRENGTH_LABEL[snap.strength]} · {snap.tiers} TF bestätigt</div>
+              </div>
+            </div>
+            {canRecheck && saved && <Btn size="sm" onClick={onRecheck}>Neu prüfen</Btn>}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {snap.tfs.map((x, i) => {
+              const ok = i < snap.tiers;
+              return <Pill key={x.tf} tone={ok ? (snap.side === 'long' ? 'win' : 'loss') : 'mute'}>{x.tf} · {x.kind ? kindText[x.kind] : '–'} · RSI {fmt.n1(x.rsi)}</Pill>;
+            })}
+            <Pill tone={snap.zoneOk ? (snap.side === 'long' ? 'win' : 'loss') : 'mute'}>{snap.zone ? { premium: 'Premium', equilibrium: 'Equilibrium', discount: 'Discount' }[snap.zone] + (snap.deep ? '-Zone' : '') : 'Zone –'}</Pill>
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -70,20 +114,21 @@ const blank = (s: Settings, acc: Account): { d: Draft; t: Partial<Trade> } => ({
   t: { account: acc, side: 'long', status: 'closed', setups: [], checks: {}, conviction: null, followedPlan: null, emotion: '' },
 });
 
-export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onSave, onDelete, onNewSetup, layoutId }:
-  { layoutId?: string; open: boolean; trade: Trade | null; settings: Settings; defaultAccount: Account; onClose: () => void; onSave: (t: Trade) => Promise<void>; onDelete: (id: string) => Promise<void>; onNewSetup: () => void }) {
+export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onSave, onDelete, onNewSetup, layoutId, market }:
+  { market: MarketState; layoutId?: string; open: boolean; trade: Trade | null; settings: Settings; defaultAccount: Account; onClose: () => void; onSave: (t: Trade) => Promise<void>; onDelete: (id: string) => Promise<void>; onNewSetup: () => void }) {
   const [d, setD] = useState<Draft>({});
   const [t, setT] = useState<Partial<Trade>>({});
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [armed, setArmed] = useState(false);
-
+  const [recheck, setRecheck] = useState(false);
+  const [manualMtf, setManualMtf] = useState(false);
   useEffect(() => {
     if (!open) return;
-    setErr(''); setArmed(false); setBusy(false);
+    setErr(''); setArmed(false); setBusy(false); setRecheck(false); setManualMtf(!!trade);
     if (trade) {
       setD({ date: (trade.date || '').slice(0, 16), pair: trade.pair || '', timeframe: trade.timeframe || '', entry: toInput(trade.entry), stop: toInput(trade.stop), target: toInput(trade.target), exit: toInput(trade.exit), size: toInput(trade.size), leverage: toInput(trade.leverage), fees: toInput(trade.fees), pnlManual: toInput(trade.pnlManual), reason: trade.reason || '', notes: trade.notes || '', chart: trade.chart || '' });
-      setT({ account: trade.account || 'scalp', side: trade.side, status: trade.status, setups: [...(trade.setups || [])], checks: { ...(trade.checks || {}) }, conviction: trade.conviction, followedPlan: trade.followedPlan, emotion: trade.emotion });
+      setT({ account: trade.account || 'scalp', side: trade.side, status: trade.status, setups: [...(trade.setups || [])], checks: { ...(trade.checks || {}) }, conviction: trade.conviction, followedPlan: trade.followedPlan, emotion: trade.emotion, mistakes: [...(trade.mistakes || [])] });
     } else {
       const b = blank(settings, defaultAccount); setD(b.d); setT(b.t);
     }
@@ -103,6 +148,19 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
   const done = items.filter((i) => t.checks?.[i.id]).length;
   const lev = merged.leverage;
   const levWarn = lev != null && (acc === 'scalp' ? lev > 4 : lev > 5);
+  // Einstiegs-Check zum Einstiegszeitpunkt (live oder aus den Kerzen nachgerechnet)
+  const atMs = d.date ? new Date(d.date).getTime() : NaN;
+  const sigAt = useMemo(() => (open ? signalsAt(market.bars, settings.signals, atMs) : null), [open, market.bars, settings.signals, atMs]);
+  const liveSnap: SignalSnap | null = sigAt ? snapshot(sigAt, (t.side || 'long') as 'long' | 'short') : null;
+  const savedSnap = trade?.signal && !recheck ? trade.signal : null;
+  const snap = savedSnap || liveSnap;
+  const mtfOn = (t.setups || []).includes(MTF_SETUP.id);
+  const mtfAuto: Record<string, boolean> | null = snap ? {
+    [`${MTF_SETUP.id}:mtf_base`]: snap.tiers >= 1, [`${MTF_SETUP.id}:mtf_next`]: snap.tiers >= 2, [`${MTF_SETUP.id}:mtf_third`]: snap.tiers >= 3,
+    [`${MTF_SETUP.id}:mtf_rsi`]: snap.rsiOk, [`${MTF_SETUP.id}:mtf_zone`]: snap.zoneOk,
+  } : null;
+  const autoKey = mtfAuto ? JSON.stringify(mtfAuto) : '';
+  useEffect(() => { if (open && mtfOn && mtfAuto && !manualMtf) setT((x) => ({ ...x, checks: { ...(x.checks || {}), ...mtfAuto } })); }, [open, mtfOn, autoKey, manualMtf]);
   const setups = [...settings.setups].sort((a, b) => Number(b.account === acc || b.account === 'both') - Number(a.account === acc || a.account === 'both'));
 
   async function submit(e: React.FormEvent) {
@@ -118,7 +176,7 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
     const known = new Set(items.map((i) => i.id));
     const checks = Object.fromEntries(Object.entries(t.checks || {}).filter(([k, v]) => v && known.has(k)));
     const now = new Date().toISOString();
-    const doc = { ...(m as Trade), checks, pnl: c.pnl, r: c.r, updatedAt: now, createdAt: trade?.createdAt || now, id: trade?.id || '' };
+    const doc = { ...(m as Trade), checks, pnl: c.pnl, r: c.r, updatedAt: now, createdAt: trade?.createdAt || now, id: trade?.id || '', signal: snap ?? trade?.signal ?? null, mistakes: t.mistakes || [] };
     if (!doc.id) delete (doc as any).id;
     setErr(''); setBusy(true);
     try { await onSave(doc as Trade); onClose(); }
@@ -167,6 +225,8 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
             </Field>
           </div>
         </Section>
+
+        <SignalSection snap={snap} saved={!!savedSnap} canRecheck={!!trade?.signal && !!liveSnap} onRecheck={() => { setRecheck(true); setManualMtf(false); }} market={market} />
 
         <Section title="Preise & Größe" sub="Komma oder Punkt, beides geht">
           <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
@@ -218,7 +278,9 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
           <div className="grid gap-2 md:grid-cols-2">
             {items.map((it) => {
               const src = it.id.startsWith('g:') ? 'Grundregel' : settings.setups.find((s) => it.id.startsWith(s.id + ':'))?.name;
-              return <CheckRow key={it.id} checked={!!t.checks?.[it.id]} sub={src} onToggle={() => setT((x) => ({ ...x, checks: { ...(x.checks || {}), [it.id]: !x.checks?.[it.id] } }))}>{it.text}</CheckRow>;
+              const auto = mtfAuto && it.id in mtfAuto && !manualMtf;
+              return <CheckRow key={it.id} checked={!!t.checks?.[it.id]} sub={auto ? `${src} · automatisch` : src}
+                onToggle={() => { if (it.id.startsWith(MTF_SETUP.id + ':')) setManualMtf(true); setT((x) => ({ ...x, checks: { ...(x.checks || {}), [it.id]: !x.checks?.[it.id] } })); }}>{it.text}</CheckRow>;
             })}
           </div>
         </Section>
@@ -239,6 +301,19 @@ export function TradeSheet({ open, trade, settings, defaultAccount, onClose, onS
                 ))}
               </div>
             </Field>
+          </div>
+        </Section>
+
+        <Section title="Fehler" sub="Was lief schief? Kostet dich messbar Geld">
+          <div className="flex flex-wrap gap-1.5">
+            {settings.mistakes.map((m) => {
+              const on = (t.mistakes || []).includes(m);
+              return (
+                <motion.button key={m} type="button" aria-pressed={on} whileTap={{ scale: 0.94, transition: spring('interactive') }} transition={spring('bouncy')}
+                  onClick={() => setT((x) => ({ ...x, mistakes: on ? (x.mistakes || []).filter((y) => y !== m) : [...(x.mistakes || []), m] }))}
+                  className={cn('rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors', on ? 'border-loss/50 bg-loss/12 text-[#ff8a90]' : 'border-line-2 text-mute hover:text-fg')}>{m}</motion.button>
+              );
+            })}
           </div>
         </Section>
 

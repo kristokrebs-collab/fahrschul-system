@@ -8,6 +8,7 @@ import {
 } from './lib';
 import { BlurFade, Btn, Card, Empty, Field, Icon, MagicCard, Pill, Segmented, Tilt, inputCls } from './ui';
 import { ResultPill, SORT_OPTS, SetupChips, sortSetups } from './overview';
+import { SIGNAL_TFS } from './signals';
 
 export type Filters = { q: string; setup: string; result: 'all' | 'win' | 'loss' | 'open'; side: 'all' | 'long' | 'short'; acc: AccountFilter };
 export const NO_FILTER: Filters = { q: '', setup: 'all', result: 'all', side: 'all', acc: 'all' };
@@ -157,7 +158,7 @@ export function SetupsView({ st, settings, onEdit, onNew, onTrades }: { st: Stat
 }
 
 // ── Einstellungen ──────────────────────────────────────
-export function SettingsView({ settings, trades, onSave, downloads }: { settings: Settings; trades: ETrade[]; onSave: (s: Settings) => Promise<void>; downloads: any }) {
+export function SettingsView({ settings, trades, onSave, downloads, onImport }: { settings: Settings; trades: ETrade[]; onSave: (s: Settings) => Promise<void>; downloads: any; onImport: (list: any[]) => Promise<number> }) {
   const notify = useIsland();
   const [v, setV] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -168,6 +169,11 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
       rsiWeekly: toInput(m.rsiWeekly), invalidation: toInput(m.invalidation), zoneLow: toInput(m.zoneLow), zoneHigh: toInput(m.zoneHigh),
       hbLong: settings.hyblock.longEndpoint, hbLongField: settings.hyblock.longField, hbDelta: settings.hyblock.deltaEndpoint, hbDeltaField: settings.hyblock.deltaField,
       hbCoin: settings.hyblock.coin, hbExchange: settings.hyblock.exchange, hbTf: settings.hyblock.timeframe,
+      ...Object.fromEntries(settings.signals.ladder.map((tf, i) => ['sgL' + i, tf])),
+      sgReq: String(settings.signals.required), sgRsiOs: toInput(settings.signals.rsiOs), sgRsiOb: toInput(settings.signals.rsiOb), sgRsiNear: toInput(settings.signals.rsiNear),
+      sgWtOs: toInput(settings.signals.wtOs), sgWtOb: toInput(settings.signals.wtOb), sgLook: toInput(settings.signals.signalLookback),
+      sgCh: toInput(settings.signals.wtChannel), sgAvg: toInput(settings.signals.wtAverage), sgSig: toInput(settings.signals.wtSignal),
+      sgZoneTf: settings.signals.zoneTf, sgSwing: toInput(settings.signals.swingLookback), mistakes: settings.mistakes.join('\n'),
       winRate: toInput(+(b.winRate * 100).toFixed(2)), avgWin: toInput(+(b.avgWin * 100).toFixed(2)), avgLoss: toInput(+(b.avgLoss * 100).toFixed(2)), expectancy: toInput(+(b.expectancy * 100).toFixed(2)), label: b.label,
     });
   }, [settings]);
@@ -183,8 +189,18 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
     const next: Settings = {
       ...settings, currency: v.currency || 'USDT', pair: (v.pair || '').trim() || 'BTC/USDT', startDate: v.startDate || '',
       capital: { makro: n('makro')!, scalp: n('scalp')! },
-      market: { symbol: (v.symbol || '').trim() || 'BINANCE:BTCUSDT', longTrigger: n('longTrigger')!, longStop: n('longStop')!, shortTrigger: n('shortTrigger')!, lowerHigh: n('lowerHigh')!, rsiWeekly: n('rsiWeekly')!, invalidation: n('invalidation')!, zoneLow: n('zoneLow')!, zoneHigh: n('zoneHigh')! },
+      market: { symbol: (v.symbol || '').trim() || 'BITSTAMP:BTCUSD', longTrigger: n('longTrigger')!, longStop: n('longStop')!, shortTrigger: n('shortTrigger')!, lowerHigh: n('lowerHigh')!, rsiWeekly: n('rsiWeekly')!, invalidation: n('invalidation')!, zoneLow: n('zoneLow')!, zoneHigh: n('zoneHigh')! },
       hyblock: { longEndpoint: (v.hbLong || '').trim(), longField: (v.hbLongField || '').trim(), deltaEndpoint: (v.hbDelta || '').trim(), deltaField: (v.hbDeltaField || '').trim(), coin: (v.hbCoin || 'BTC').trim(), exchange: (v.hbExchange || '').trim(), timeframe: (v.hbTf || '1h').trim() },
+      signals: {
+        ...settings.signals,
+        ladder: [0, 1, 2, 3].map((i) => v['sgL' + i]).filter((tf, i, a) => tf && SIGNAL_TFS.includes(tf) && a.indexOf(tf) === i) as string[],
+        required: Math.max(1, Math.min(3, Math.round(n('sgReq') ?? 2))),
+        rsiOs: n('sgRsiOs') ?? 30, rsiOb: n('sgRsiOb') ?? 70, rsiNear: n('sgRsiNear') ?? 10,
+        wtOs: n('sgWtOs') ?? -53, wtOb: n('sgWtOb') ?? 53, signalLookback: Math.max(1, Math.round(n('sgLook') ?? 3)),
+        wtChannel: Math.max(2, Math.round(n('sgCh') ?? 10)), wtAverage: Math.max(2, Math.round(n('sgAvg') ?? 21)), wtSignal: Math.max(1, Math.round(n('sgSig') ?? 4)),
+        zoneTf: SIGNAL_TFS.includes(v.sgZoneTf) ? v.sgZoneTf : '1h', swingLookback: Math.max(20, Math.round(n('sgSwing') ?? 120)),
+      },
+      mistakes: (v.mistakes || '').split('\n').map((x) => x.trim()).filter(Boolean),
       backtest: { winRate: n('winRate')! / 100, avgWin: n('avgWin')! / 100, avgLoss: n('avgLoss')! / 100, expectancy: n('expectancy')! / 100, label: (v.label || '').trim() || 'Backtest' },
     };
     try { await onSave(next); notify({ kind: 'success', title: 'Einstellungen gespeichert' }); } catch { notify({ kind: 'error', title: 'Speichern fehlgeschlagen' }); }
@@ -233,6 +249,29 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
             {inp('zoneLow', 'Makro-Zone von')}{inp('zoneHigh', 'Makro-Zone bis')}
           </div>
         </Card></BlurFade>
+        <BlurFade delay={0.11} className="lg:col-span-2"><Card title="Einstiegs-Check">
+          <p className="mb-4 max-w-[80ch] text-[13px] text-mute">Timeframe-Leiter von klein nach groß (ab 30m). Die ersten Stufen sind Pflicht, jede weitere macht den Einstieg stärker. Die Standardwerte sind auf deinen Chart (Bitstamp, MCB, RSI 14) abgeglichen.</p>
+          <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Field key={i} label={`Stufe ${i + 1}${i === 0 ? ' (Basis)' : ''}`} htmlFor={'s-sgL' + i}>
+                <select id={'s-sgL' + i} className={inputCls} value={v['sgL' + i] || ''} onChange={set('sgL' + i)}>
+                  {i > 0 && <option value="">–</option>}{SIGNAL_TFS.map((tf) => <option key={tf}>{tf}</option>)}
+                </select>
+              </Field>
+            ))}
+            {inp('sgReq', 'Pflicht-Stufen', '2 = Basis + nächst höhere')}{inp('sgLook', 'Signal gilt (Kerzen)')}
+            {inp('sgRsiOs', 'RSI überverkauft')}{inp('sgRsiOb', 'RSI überkauft')}
+            {inp('sgRsiNear', 'RSI-Nähe (Punkte)', 'z. B. 10 → Long ab ≤ 40')}{inp('sgWtOs', 'MCB Bottom-Zone')}
+            {inp('sgWtOb', 'MCB Top-Zone')}
+            <Field label="Zone auf" htmlFor="s-sgZoneTf">
+              <select id="s-sgZoneTf" className={inputCls} value={v.sgZoneTf || '1h'} onChange={set('sgZoneTf')}>{SIGNAL_TFS.map((tf) => <option key={tf}>{tf}</option>)}</select>
+            </Field>
+            {inp('sgSwing', 'Kerzen für Zone')}{inp('sgCh', 'WaveTrend Kanal')}{inp('sgAvg', 'WaveTrend Schnitt')}{inp('sgSig', 'WaveTrend Signal')}
+          </div>
+          <Field label="Fehler-Tags (eine Zeile pro Tag)" htmlFor="s-mistakes" className="mt-4">
+            <textarea id="s-mistakes" rows={4} className={cn(inputCls, 'resize-y leading-relaxed')} value={v.mistakes || ''} onChange={set('mistakes')} />
+          </Field>
+        </Card></BlurFade>
         <BlurFade delay={0.12} className="lg:col-span-2"><Card title="Hyblock-Connector">
           <p className="mb-4 max-w-[80ch] text-[13px] text-mute">Endpunkte und Feldnamen aus der Hyblock-API-Doku (v2, ohne <span className="font-mono">/v2</span>). Leeres Feld = automatisch erkennen. „Testen“ zeigt, welche Felder die Antwort enthält.</p>
           <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
@@ -247,6 +286,20 @@ export function SettingsView({ settings, trades, onSave, downloads }: { settings
           {downloads ? (
             <div className="flex flex-wrap gap-2"><Btn onClick={() => exportFile('csv')}>CSV exportieren</Btn><Btn onClick={() => exportFile('json')}>Backup (JSON)</Btn></div>
           ) : <p className="text-[12.5px] text-faint">Export gibt es nur, wenn das Journal auf claude.ai geöffnet ist.</p>}
+          <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-line-2 px-3.5 py-2 text-[12.5px] text-mute transition-colors hover:text-fg">
+            Backup einspielen (JSON)
+            <input type="file" accept="application/json,.json" className="sr-only" onChange={async (e) => {
+              const f = e.target.files?.[0]; e.target.value = '';
+              if (!f) return;
+              try {
+                const j = JSON.parse(await f.text());
+                const list = Array.isArray(j) ? j : j?.trades;
+                if (!Array.isArray(list)) throw new Error('format');
+                const added = await onImport(list);
+                notify({ kind: 'success', title: added ? `${added} Trades übernommen` : 'Alles schon vorhanden' });
+              } catch { notify({ kind: 'error', title: 'Datei nicht lesbar' }); }
+            }} />
+          </label>
           <div className="mt-5 grid gap-1 border-t border-line pt-4 text-[12.5px] text-mute">
             <span>{trades.length} Trades gespeichert · {settings.setups.length} Grundlagen · {settings.rules.length} Grundregeln</span>
           </div>

@@ -8,11 +8,16 @@ import { BlurFade, BorderBeam, Btn, Card, CircularProgress, Detail, Empty, Expan
 import { backtestDetail, metricDetail, setupDetail, type MetricKey } from './explain';
 import { Morph, useMorph } from './morph';
 import { HyblockCard } from './hyblock';
+import { contextSpring, spring } from './physics';
 import { EquityChart, MonthlyChart } from './charts';
+import { SignalPanel } from './signalpanel';
+import { CalendarCard, EdgeScoreCard, MistakesCard, SignalStrengthCard } from './insights';
+import type { Signals } from './signals';
 
 type Props = {
   st: Stats; settings: Settings; acc: AccountFilter; setAcc: (a: AccountFilter) => void; market: MarketState;
   loaded: boolean; onNew: () => void; onEdit: (t: ETrade) => void; onSetup: (id: string) => void; goTrades: () => void;
+  sig: Signals | null;
   hyblock: Hyblock[]; onSaveHyblock: (h: Hyblock) => Promise<void>; onDeleteHyblock: (id: string) => Promise<void>;
 };
 
@@ -22,6 +27,7 @@ export function Overview(p: Props) {
   return (
     <div className="grid gap-5">
       <Hero {...p} />
+      <BlurFade delay={0.05}><SignalPanel sig={p.sig} market={p.market} settings={settings} /></BlurFade>
       <div className="grid gap-5 lg:grid-cols-12">
         <BlurFade delay={0.1} className="lg:col-span-5"><BacktestCard all={st.closed} settings={settings} /></BlurFade>
         <BlurFade delay={0.15} className="lg:col-span-3"><WinRateCard st={st} settings={settings} /></BlurFade>
@@ -34,8 +40,16 @@ export function Overview(p: Props) {
         <BlurFade delay={0.3} className="lg:col-span-5"><HyblockCard list={p.hyblock} market={p.market} settings={settings} onSave={p.onSaveHyblock} onDelete={p.onDeleteHyblock} /></BlurFade>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
+        <BlurFade delay={0.32} className="lg:col-span-7"><CalendarCard st={st} cur={cur} onEdit={p.onEdit} /></BlurFade>
+        <BlurFade delay={0.34} className="lg:col-span-5"><EdgeScoreCard st={st} /></BlurFade>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-12">
         <BlurFade delay={0.35} className="lg:col-span-7"><Ranking st={st} onSetup={p.onSetup} cur={cur} /></BlurFade>
         <BlurFade delay={0.4} className="lg:col-span-5"><ChecklistCard st={st} /></BlurFade>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-12">
+        <BlurFade delay={0.42} className="lg:col-span-6"><SignalStrengthCard st={st} /></BlurFade>
+        <BlurFade delay={0.43} className="lg:col-span-6"><MistakesCard st={st} cur={cur} /></BlurFade>
       </div>
       <div className="grid gap-5 lg:grid-cols-12">
         <BlurFade delay={0.45} className="lg:col-span-5"><Card title="P&L pro Monat"><MonthlyChart st={st} cur={cur} /></Card></BlurFade>
@@ -85,8 +99,8 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
                 const hint = metricDetail(k, st, settings).verdict;
                 const big = hov === i;
                 return (
-                  <div key={l} onMouseEnter={() => setHov(i)} className="min-w-0 transition-[flex-grow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] sm:basis-0"
-                    style={{ flexGrow: big ? 2 : 1 }}>
+                  <motion.div key={l} onMouseEnter={() => setHov(i)} className="min-w-0 sm:basis-0"
+                    initial={false} animate={{ flexGrow: big ? 2 : 1 }} transition={contextSpring()}>
                     <Morph id={`fact-${k}`} title={l} body={() => <Detail bare d={metricDetail(k, st, settings)} />}
                       className={cn('h-full overflow-hidden rounded-2xl border px-3 py-2.5 transition-colors duration-300', big ? 'border-white/30 bg-white/[0.07]' : 'border-white/[0.06] bg-white/[0.03]')}>
                       <motion.div>
@@ -98,7 +112,7 @@ function Hero({ st, settings, acc, setAcc, market, loaded }: Props) {
                           style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }}>{hint?.text}</p>
                       </motion.div>
                     </Morph>
-                  </div>
+                  </motion.div>
                 );
               })}
             </dl>
@@ -389,7 +403,7 @@ function Ranking({ st, onSetup, cur }: { st: Stats; onSetup: (id: string) => voi
           </div>
         )}
         {used.map((s, i) => (
-          <motion.div layout key={s.id} transition={{ type: 'spring', stiffness: 380, damping: 34 }} className="relative border-t border-line" {...hs.bind(i)}>
+          <motion.div layout key={s.id} transition={spring('snappy')} className="relative border-t border-line" {...hs.bind(i)}>
           <HoverSlide show={hs.hovered === i} group="rank" className="inset-y-0.5" />
           <Morph id={`setup-rank-${s.id}`} title={s.setup.name} body={() => <><Detail bare d={setupDetail(s, st.closed, cur)} /><Btn size="sm" className="mt-3" onClick={() => { close(); onSetup(s.id); }}>Alle Trades mit dieser Grundlage →</Btn></>}
             className="relative z-10 grid w-full grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)] items-center gap-3 px-2 py-2.5 sm:grid-cols-[minmax(0,1.6fr)_52px_minmax(90px,1.2fr)_minmax(0,0.9fr)_56px]">
