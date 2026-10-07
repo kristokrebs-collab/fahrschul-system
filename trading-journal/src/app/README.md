@@ -11,7 +11,28 @@ installRouter();         // hash grammar #{page}[?query], hashchange, filter mir
 bootMarket();            // startMarket(settings); follows settings.market.symbol → setSymbol, hyblock.timeframe → setPeriod
 createRoot(#root).render(<StrictMode><MotionRoot><App/></MotionRoot></StrictMode>)
 ```
-Font hints (`document.fonts.load` for Doto / IBM Plex Mono / Sans) run before the first render; they never block.
+Font hints (`document.fonts.load` for Doto / IBM Plex Mono / Sans) run before the first render; they never block, and a
+rejected load (offline file, blocked font host) is caught – no unhandled `NetworkError`.
+
+## Editions and builds
+
+Two editions × two targets, chosen at build time (`src/edition.ts`: `__TJ_EDITION__` personal | share, `__TJ_TARGET__`
+web | file → `EDITION`, `IS_SHARE`, `BUILD_TARGET`, `IS_FILE_BUILD`, `isFileProtocol()`):
+
+| command | output | edition |
+|---|---|---|
+| `npm run build` | `dist/` (web root; the legacy `/dashboard.html` is copied along) | personal – the user's setups, levels, capital, `tj2-*` storage (same keys as the other journal version) |
+| `npm run build:share` | `dist/teilen/` (base `/teilen/`) | share – empty journal, neutral setups (`s_mtf`, `s_bt`), levels unset, `tj2share-*` storage; manifest / app name "Trade Journal (Teilen)" |
+| `npm run build:single` | `release/trade-journal-persoenlich.html`, `release/trade-journal-teilen.html` (`scripts/build-single.mjs [outDir]`, `vite.single.config.ts`) | both, each ONE self-contained HTML file (JS, CSS, fonts and favicon inline; manifest / touch-icon links dropped – they cannot work under `file://`) that opens from disk |
+
+- Privacy guard (`scripts/privacyGuard.ts`, Vite plugin in `generateBundle`): every share build (web and file) fails when a
+  personal string or number from `src/domain/edition/personal.ts` ends up in the bundle. Edition data and copy go through
+  `ED` (`@/domain/edition`), never `edition/personal` directly; storage keys through `storageKey()` / `KEYS`.
+- Netlify (repo root `netlify.toml`): `npm ci && npm run build && npm run build:share`; `/teilen/*` → `/teilen/index.html` before the
+  catch-all, so the personal app is the site root and the share edition is `/teilen/`.
+- Dev: `vite` serves the personal edition, `vite --mode share` the share edition at `/teilen/`. Vitest runs as personal.
+- File builds: `LocalModeBanner` says `Datei-Version.`; with no usable storage (Android `content://` opens) the journal runs in
+  memory and the header pill says `Nicht gespeichert` (`modeLabelFor`); Settings → Live-Daten hides the EU-proxy switch.
 
 ## Display: installable, fullscreen, bottom inset (grey-bar fix, tablet audit §1)
 
@@ -126,7 +147,7 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 
 | file | export | notes |
 |---|---|---|
-| `Header.tsx` | `Header`, `WORDMARK`, `SUBTITLE`, `HEADER_CTA`, `MENU_LABEL`, `headerIntroTarget` | sticky, parked above the edge during intro "stage", slides down (`spring.sheet`) otherwise; logo tile `₿` → `navigate("overview")` + `replayIntro()` + AsciiCascade decode of the wordmark (held until "build" when the intro replays), DancingLetters wordmark on hover, menu button `Navigation öffnen` → CommandNav, sync `StatusPill` (`hidden md:inline-flex`, tones cloud→live, local→warn, error→error, connecting→muted), `Magnetic` → `.shiny-cta` `Trade eintragen` (`max-sm:sr-only`) → `openEditor()` |
+| `Header.tsx` | `Header`, `WORDMARK`, `SUBTITLE`, `HEADER_CTA`, `MENU_LABEL`, `headerIntroTarget` | sticky, parked above the edge during intro "stage", slides down (`spring.sheet`) otherwise; logo tile `₿` → `navigate("overview")` + `replayIntro()` + AsciiCascade decode of the wordmark (held until "build" when the intro replays), DancingLetters wordmark on hover, menu button `Navigation öffnen` → CommandNav, sync `StatusPill` (`hidden md:inline-flex`, label `modeLabelFor(mode, storage)` – `Nicht gespeichert` (tone loss) when nothing persists; tones cloud→live, local→warn, error→error, connecting→muted), `Magnetic` → `.shiny-cta` `Trade eintragen` (`max-sm:sr-only`) → `openEditor()` |
 | `Dock.tsx` | `Dock`, `DockItem`, `PAGE_LABELS`, `FAB_LABEL`, `DOCK`, `DOCK_INTRO_KEY`, `dockBell`, `dockLayout` | `role="toolbar" aria-label="Navigation"`, 4 tabs (`Übersicht | Trades | Entscheidungsgrundlagen | Einstellungen`, icons `grid|list|target|sliders`), `aria-current="page"`, `dock-bg` + `dock-dot` `layoutId`s (`spring.layout`, `AnimatePresence initial={false}`), `whileTap .94`; transform-only magnification (`spring.dock`, mouse only, off under reduced motion, see "Dock"); FAB disc `layoutId="new-trade-{fabCycle}"` `borderRadius 999`, unmounted while `editor.open && editor.fromFab` |
 | `Footer.tsx` | `Footer`, `FooterOutline`, `FOOTER_TEXT`, `CONFIG`, `nextFooterShown` | pulse-motion `motion-footer`, in normal flow (never covers page content): a sentinel at the footer's top edge + 2 IntersectionObservers reveal at ≥ 72 % of the footer in view / hide at ≤ 50 %; staggered fade-up (pack timings), tilted Marquee band of live stats (mounted on the first reveal, `paused` while hidden; BTC price = MotionValue text), DancingSvgWord outline wordmark (stroke draw 4 s on first reveal, hover gradient + radial mask `userSpaceOnUse`), attribution, `Nach oben`; bottom padding clears the dock |
 | `CommandNav.tsx` | `CommandNav`, `openCommandNav`, `closeCommandNav`, `toggleCommandNav`, `useCommandNavOpen`, `isCommandNavShortcut`, `rovingIndex`, `CONFIG` | pulse-motion `immersive-full-screen-navigation`: ⌘K / Ctrl+K (ignored while another modal is open) or the header button; black panel wipes in from the left (WAAPI transform, 800 ms), brand, page links with live counts, quick actions (`Trade eintragen` → `openEditor()`, `CSV-Export`, `Backup herunterladen` via `@/store/backup`, `Vollbild` / `App installieren` where offered, then the install / Samsung dark-mode hints), staggered; close wipes right. `useDialogBehaviour` (inert after the wipe), arrows/Home/End/1–4; unmounted while closed. Single grid column `minmax(0,1fr)` + page names `clamp(22px,4.6vw,64px)`: nothing overflows at 390 |

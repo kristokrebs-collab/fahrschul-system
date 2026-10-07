@@ -2,12 +2,16 @@
 
 Pure TypeScript, no React, no I/O. Every function is a 1:1 port of the original bundle (alias in parentheses;
 aliases are also exported, e.g. `wn`, `Hw`, `qM`). German UI strings are verbatim (Anhang A/B) and checked by
-`tests/unit/domain.strings.test.ts`.
+`tests/unit/domain.strings.test.ts` (edition copy is checked as its fragments; the composed sentences are pinned by the
+explain / trigger tests).
 
 ```
-types.ts      Trade, EnrichedTrade, Settings, Setup, Rule, HyblockReading, JsonBackup, TradeFilter, StoreApi … (lead)
-defaults.ts   DEFAULT_SETTINGS (HM), DEFAULT_SETUPS (jG, 11), DEFAULT_RULES (LG, 5), palette + constants
-normalize.ts  normalizeSettings (qM), normalizeTrade, normalizeReading, sortReadings
+types.ts      Trade, EnrichedTrade, Settings, Setup, Rule, HyblockReading, DayNote, JsonBackup, TradeFilter, StoreApi … (lead)
+defaults.ts   DEFAULT_SETTINGS (HM), DEFAULT_SETUPS (edition setups + s_mtf), DEFAULT_RULES (LG, 5), DEFAULT_MISTAKES, palette,
+              levelsConfigured / weeklyConfigured / zoneConfigured
+edition/      personal.ts, share.ts, mtf.ts (pure literals) + index.ts (`ED`, picked at build time)
+normalize.ts  normalizeSettings (qM), normalizeTrade, normalizeReading, sortReadings, normalizeDayNote(s), isEmptyDayNote,
+              mapToBinanceSymbol
 schemas.ts    zod: TradeSchema, HyblockReadingSchema, RawSettingsSchema, SettingsSchema, JsonBackupSchema (all passthrough)
 derive.ts     deriveTrade (qw), computePnlR, leverageOverRule
 enrich.ts     checklistItemsFor (Uw), enrichTrade / enrichTrades (FG), pruneChecks
@@ -21,7 +25,35 @@ fallingKnife.ts fallingKnife (JG), knifeCardLine, knifeVerdict, explainFallingKn
 explain.ts    explain (Jl), explainSetup (g2), EMPTY_VERDICT (Ql), tradeLine (Ig), heroTileValue, heroSubline
 backtest.ts   backtestCompare (bhe), explainBacktest (h2), hasBacktestSetup, isBacktestTrade
 csv.ts        tradesToCsv, csvCell, toJsonBackup, jsonBackupText, exportFilename, stripEnrichment
+insights/     Auswertung metrics (Tradezella-style: calendar, discipline, mistakes, risk, edge, R distribution, recap …),
+              see src/domain/insights/README.md
+signals/      multi-timeframe entry check (MCB + RSI + Premium/Discount, strength score), see src/domain/signals/README.md
 ```
+
+## Editions (`edition/`)
+- `ED` (`@/domain/edition`) is the data of the build's edition: `RULES, SETUPS, BACKTEST, MARKET, CAPITAL, LEVERAGE_RULE, COPY`.
+  `__TJ_EDITION__` is a build-time constant, so the other module is dropped from the bundle. Personal = the user's setups, levels,
+  capital and copy; share = neutral setups, levels 0 ("nicht gesetzt"), no personal texts.
+- `personal.ts`, `share.ts` and `mtf.ts` are PURE LITERALS: `scripts/privacyGuard.ts` reads them as text and fails a share build
+  that contains any personal string. Never import `edition/personal` directly – go through `ED`. Copy that differs per edition
+  (`COPY.backtestDeleted`, `COPY.leverageRuleSentence`, `COPY.scenarioTargets`, `COPY.setupNamePlaceholder`, …) lives in `COPY`.
+- `MTF_SETUP` (`s_mtf`, checklist ids `mtf_base|mtf_next|mtf_third|mtf_rsi|mtf_zone`) exists in both editions and 1:1 in the other
+  journal version, so `checks["s_mtf:mtf_base"]` round-trips.
+- `levelsConfigured(settings)` (both 4H triggers > 0), `weeklyConfigured` (`lowerHigh` > 0), `zoneConfigured` (`zoneLow`/`zoneHigh` set):
+  the share edition starts unset – the market panel, scenario texts and the scenario toast stay hidden until levels are entered.
+
+## Fields shared with the other journal version (never dropped)
+- `Trade.mistakes?: string[]` (normalised to `[]`), `Trade.signal?: unknown` (a `SignalSnapshot`, parsed by the signal module, passed
+  through verbatim everywhere).
+- `Settings.mistakes: string[]` (default `DEFAULT_MISTAKES`), `Settings.signals?: unknown` (absent until saved), plus passthrough keys
+  such as `settings.discipline` (Disziplin-Grenzen, read by `insights/discipline.ts`).
+- `s_mtf` append guard (`normalizeSettings`): settings from before the multi-TF era – non-empty `setups`, and neither a `mistakes` nor a
+  `signals` key – get `s_mtf` appended ONCE; after the first save `mistakes` is persisted, so a deleted `s_mtf` never comes back.
+- `TIMEFRAMES` = `1m 5m 15m 30m 45m 1h 2h 4h 1D 3D 1W` (30m / 45m / 2h from the other version).
+- `mapToBinanceSymbol(raw)`: a USD pair from another exchange (`BYBIT:BTCUSD`, `XBTUSD`) maps to the Binance USDⓈ-M symbol
+  (`BINANCE:BTCUSDT`); the original stays in `market.sourceSymbol`.
+- `DayNote` (`tj2-days`, `{ "YYYY-MM-DD": { note, plan?, review?, mood? 1–5, updatedAt } }`): `normalizeDayNote(s)` keeps unknown fields,
+  `isEmptyDayNote` → the entry is removed instead of stored.
 
 ## Pipeline
 ```ts

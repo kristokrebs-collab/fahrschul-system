@@ -83,7 +83,14 @@ Card → 620 px dialog morph (Plan 2.5 "Morph-Dialog"), portal-less, with focus 
   `borderRadius 28` on `spring.morph`; sticky head `motion.h2 layoutId="morph-title-{id}"`; the body is a stagger parent (`StaggerItem`
   sections). The big drop shadow sits on an unscaled sibling and fades in (`tween.fade`) after the morph, so the per-frame radius
   correction repaints the panel alone.
-- `useMorphDialog()` → `{ open, settled, show({ id, title, body, className? }), close(), returned(id) }`; `className` sizes the column.
+- `useMorphDialog()` → `{ open, settled, closing, closeTempo, show({ id, title, body, className? }), close(), returned(id), registerGuard }`;
+  `className` sizes the column. `close()` is the programmatic close (after saving, "Verwerfen") and is never guarded.
+- Swipe to dismiss (iOS 18 zoom, `useSwipeDismiss` mode "zoom", touch / pen once the open morph has settled): handle = the sticky head
+  `[data-dialog-handle]` (grabber pill on coarse pointers, `useTouchMoveGuard`); the column follows 1:1 and shrinks to 0.88 while the dim
+  lifts; a flick closes with `closeTempo` = the release tempo and the source `MorphCard` zooms back on
+  `contextSpringAt(spring.morph, closeTempo)` (the token itself for every other close).
+- `useMorphDialogGuard(guard, onAttempt)` (a dialog body with input, e.g. `HyblockForm`): while `guard()` is true, Escape, backdrop, × and
+  swipe call `onAttempt` (show "Änderungen verwerfen?") instead of closing; the swipe is resisted with a rubber band and never commits.
 - `MorphCard { id; title; body; children; className?; as?; borderRadius? (16); dialogClassName?; motionProps? }` – the source,
   `layoutDependency={isOpen}`; hidden (`visibility`) once the morph settled, visible again on close; `whileTap` scale .985 on
   `spring.press` (off while its dialog is open); reports `returned(id)` when its reverse morph ends or it unmounts.
@@ -91,11 +98,19 @@ Card → 620 px dialog morph (Plan 2.5 "Morph-Dialog"), portal-less, with focus 
   when its dialog opens/closes (default `layoutDependency` = this card's dialog open), so value/hover re-renders never force a layout read.
 
 ### `Sheet`
-`{ open; onClose; title; size?: "md"|"lg"; layoutId?; headerExtra?; footer?; children; className?; onOpened? }` – overlay
-`z-[60]`, panel `role="dialog"` `layoutRoot` `borderRadius 28`, body `layoutScroll`, focus trap, scroll lock, `inert`, Escape.
-With `layoutId` (`new-trade`, `setup-card-{id}`) the panel morphs on `spring.sheet`; without, desktop `{y 40, scale .98}` on
-`spring.sheet`, mobile `y 100%` on `tween.sheetIos` with drag-to-dismiss. The body is a stagger parent (`StaggerItem`). A sliding
-sheet keeps its shadow on the panel (it only moves by transform). The source must be `visibility:hidden` while open.
+`{ open; onClose; title; size?: "md"|"lg"; layoutId?; headerExtra?; footer?; children; className?; onOpened?; handoff?; dismissGuard?;
+onDismissAttempt? }` – overlay `z-[60]`, panel `role="dialog"` `layoutRoot` `borderRadius 28`, body `layoutScroll`, focus trap, scroll
+lock, `inert`, Escape. With `layoutId` (`new-trade`, `setup-card-{id}`) the panel morphs on `spring.sheet`; without, desktop
+`{y 40, scale .98}` on `spring.sheet`, mobile `y 100%` on `tween.sheetIos`. The body is a stagger parent (`StaggerItem`). A sliding
+sheet keeps its shadow on the panel (it only moves by transform). The source must be `visibility:hidden` while open. The footer pads by
+`var(--safe-bottom, env(safe-area-inset-bottom))`, so it clears a browser bar laid over the page bottom.
+- Swipe to dismiss (`useSwipeDismiss`, touch / pen at every width): handle = the header row + grabber `[data-sheet-handle]`
+  (`useTouchMoveGuard`); the opaque COLUMN moves (never the `layoutId` panel); a flick leaves on the release velocity with its contents
+  inside (`<AnimatePresence custom={flung}>` + `flingExit`), a slow drag springs back.
+- Unsaved input: `dismissGuard={() => dirty}` + `onDismissAttempt(via)` (`via` = `escape|backdrop|close|swipe`) – Escape, backdrop, ✕ and
+  swipe ask instead of closing (swipe resisted). Omitted: the sheet guards itself once any field inside received input and asks with its
+  own inline strip (`SHEET_DISCARD_COPY`); `false` opts out (ImportDialog).
+- `handoff { backdropFrom, enterDelay }`: detail → editor without the page brightening in between.
 
 ### `Stagger.tsx` – `StaggerItem` · `sectionDelay` · `withSectionStagger`
 `<StaggerItem as="div|section|li">` fades up from `{opacity 0, y 8, blur 4px}` (`tween.reveal`, y on `spring.enter`) and ends at
@@ -172,7 +187,8 @@ Store: `useUi.celebrate({x,y,tone,kind})` / `endCelebration(id)`, at most 3 burs
   `onAsk` (inline confirmation), hold → act immediately. `useConfirmFocus` moves focus to the safe answer and back to the button.
   e2e: a Playwright `click()` is a short press (asks); a hold needs `mouse.down()` + ≈ 1.3 s or a held Enter.
 - `Switch { checked; onCheckedChange; size?; tone? }` – `role="switch"` + `aria-checked` on a native button; elastic thumb (x spring
-  with velocity stretch), whileTap squash. `spring.press`, `tween.crossfade`.
+  with velocity stretch), whileTap squash. `spring.press`, `tween.crossfade`. `touch-hit`: a 44 × 44 tap area on coarse pointers
+  (the track is 42 × 24) without a layout change.
 
 ### `clock.ts` – shared wall clock (`nowMv`)
 One ref-counted timer for the whole app replaces per-card `useNow(1000)` state.
@@ -206,6 +222,10 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
   - each deferral is bounded by `SETTLE_FALLBACK_MS` (700); omitting `settled` gives immediate behaviour; focus is not returned if the
     user focused something else meanwhile; `INERT_EXEMPT_SELECTOR` (`[aria-live]`, the toast island) is never made inert.
   - `MorphDialog`, `Sheet` and `TradeDetail` pass `settled`.
+  - `useTouchMoveGuard(isDragging)` → ref callback: a native NON-passive `touchmove` listener that `preventDefault`s while a drag is
+    engaged. React's touch listeners are passive; an unconsumed fast touch sequence lets Chrome treat the next tap (≈ 1 s) as a fling
+    cancel and swallow its click. Every swipe / drag surface carries it: sheet header, dialog head, detail grabber + header, toast,
+    dock, `Segmented`, calendar month swipe.
 
 ### `base.css`
 `html { scrollbar-gutter: stable }` (the scroll lock never reflows); under reduced motion transition/animation delays are zeroed and
@@ -242,6 +262,65 @@ equity replay scrubber (`src/chart/EquityChart.tsx`) and the Hochrechnung milest
 
 Intro gating: first-view effects inside an overview cell wait for `useIntroLanded()` / `useIntroGate()`
 (`src/intro/introStore.ts`); `TactileHighlight playOnView` does this itself.
+
+## Physics (`src/motion/physics`)
+
+Apple-style physics, strictly ADDITIVE: every tuned token in `tokens.ts` stays as it is, and taps, keyboard and
+programmatic animations keep using them. Physics only (a) drives direct manipulation 1:1 under the finger with an
+iOS rubber band at the limits, (b) hands the finger's velocity to a spring on release (slow → gentle, no overshoot;
+fast → short and up to 0.3 bounce), and (c) gives layout-driven targets (pills, thumbs, morphs — Motion starts layout
+animations at velocity 0) a slightly shorter, bouncier *context spring* only when the input was fast. Import from
+`@/motion/physics`. Tuning lives in `physics` (`physics/constants.ts`, an extension of `gesture`; sources: WWDC18 803,
+WWDC23 10158, UIKit, Android/Flutter VelocityTracker).
+
+Motion 13 facts this relies on: time-defined springs (`bounce`/`duration`/`visualDuration`) drop the initial
+velocity → anything that carries velocity is physics-defined (stiffness/damping/mass); `layout`/`layoutId` animations
+always start at velocity 0 → only context springs there.
+
+| export | what |
+|---|---|
+| `appleSpring(duration, bounce)` / `appleParams(spring)` / `appleParamsOf(token)` | WWDC23 conversion: k = (2π/d)², c = 4π(1−b)/d (b ≥ 0) or 4π/(d(1+b)); `appleSpring(.5, 0)` = `spring.smooth` |
+| `physicsOf(token)` / `motionTimeSpring` / `isTimeDefined` / `isSpring` | the exact physics Motion runs for any spring token (port of Motion's `findSpring`) |
+| `tempoOf(speed)` | 0 at ≤ 400 px/s … 1 at ≥ 1800 px/s (smoothstep) |
+| `releaseSpring(v, speed?)` | Apple(.5, 0) when slow → Apple(.36, .3) when fast, `velocity: v` included |
+| `contextSpring(token, speedPxS)` / `contextSpringAt(token, tempo)` | the token ITSELF at ≤ 400 px/s / tempo 0; at full tempo duration × 0.8, bounce + 0.15 (cap 0.4) |
+| `mixSpring(a, b, t)` / `pressTempo(ms)` | Apple-space blend (identity at both ends) / tap ≤ 150 ms → 0 … press ≥ 400 ms → 1 |
+| `flingSpring(dir, v)` | critically damped exit, ≥ 900 px/s, coarse rest thresholds |
+| `project(v, rate)` / `projectPoint` / `decayInertia(rate)` | UIScrollView deceleration (0.998 normal: 1000 px/s → 499 px; 0.99 fast → 99 px) / Motion `inertia` equivalent |
+| `rubberBand(x, d)` / `rubberBandInverse` / `rubberClamp(v, min, max, d)` | iOS (1 − 1/(x·0.55/d + 1))·d |
+| `swipeDecision` / `flickDecision` / `dismissThreshold` / `snapIndex` / `flickStep` / `nearestIndex` / `axisLock` | commit rules on the PROJECTED position; flick-back > 300 px/s cancels; 16 px minimum; 10 px hysteresis + 1.2 axis ratio |
+| `createVelocityTracker()` | weighted LSQ over 100 ms of coalesced samples, 0 after 40 ms at rest |
+| `inputSpeed` (MotionValue) / `pointerSpeed()` / `pointerTempo()` / `lastPressMs()` / `installTempo()` / `useTempoProbe()` / `setNavTempo`/`consumeNavTempo` / `haptic()` | passive global tempo probe (3 passive listeners, no loop, no React state) |
+| `useAxisDrag(opts)` / `springTo(mv, to, v)` | generic 1-/2-axis drag on MotionValues |
+| `useSwipeDismiss(opts)` / `flingExit(info)` / `flingValue(mv, info)` | overlay / toast swipe-to-dismiss |
+
+Rules: sample tempo IN THE EVENT HANDLER and store it with the state change (never read it in render); keyboard /
+focus / programmatic paths pass 0. Drag the opaque column wrapper, never a `layoutId` panel. Reduced motion: tracking
+stays 1:1 and rubber bands stay (feedback, not decoration); releases jump; flung exits fade (`tween.fade`); no zoom
+scale. 120 Hz: zero React state per move, one layout read per gesture (pointerdown), transform/opacity only,
+`will-change` only from engagement until the value is home.
+
+The physics tuning is the `physics` object (`physics/constants.ts`), not `tokens.ts`: the tuned tokens stay untouched and every
+consumer below falls back to the token itself at tempo 0. `src/motion/index.ts` deliberately does NOT re-export the physics module
+(`clamp`, `physics`, `haptic` would be generic names in the main barrel) – import from `@/motion/physics`. `MotionRoot` installs the
+tempo probe (`useTempoProbe()`), so `pointerSpeed()` has data from the first interaction.
+
+### Where it is used (context springs, swipe-dismiss, throws)
+
+| surface | physics |
+|---|---|
+| `Sheet` (TradeEditor, SetupEditor, ImportDialog) | `useSwipeDismiss` on the column, handle `[data-sheet-handle]` + header row; flung exit via `custom` + `flingExit`; `dismissGuard` resists with a rubber band (see `Sheet`) |
+| `MorphDialog` | zoom dismiss from `[data-dialog-handle]`; `closeTempo` → source `MorphCard` on `contextSpringAt(spring.morph, closeTempo)`; `useMorphDialogGuard` |
+| `TradeDetail` | zoom dismiss from `[data-detail-grabber]` + header row; `uiStore.dismissDetail(tempo)` stores `detailTempo`; the source (recent row, trade card `[data-trade-morph]`) zooms back on `contextSpringAt(spring.detail, detailTempo)`; `DETACHED_DETAIL_SOURCES` (`marker`, `insights`) own no `trade-{id}` target, so those details enter on their own |
+| Toast island | horizontal swipe either way (`direction: 0`, mouse too), fling out on the release velocity, the click after a drag is swallowed |
+| Dock (`src/app/README.md`) | tap hop by press length (`hopFor(lastPressMs())`: `spring.pop` → `spring.smooth`), touch scrub (`data-scrub`), flick-to-switch (`flickStep` → `setNavTempo` → PageHost `contextSpringAt(spring.pageEnter, consumeNavTempo())`, faster `flickHop`), re-tap = scroll to top + dip; `dock-bg` / `dock-dot` keep `spring.layout` |
+| `Segmented` | iOS press-slide-release (preview under the finger + haptic, ONE `onChange` on release, a flick > 600 px/s snaps to the projected segment); thumb `contextSpringAt(spring.segment, tempo)`, ghost `contextSpring(spring.hover, speed)` |
+| `HoverPill` · `RowHighlight` | `contextSpring(spring.hover, pointerSpeed())` sampled when a row claims the pill (focus: 0); `isRealHover()` (last pointer was a mouse) gates `HoverPill`, the table only hovers for non-touch pointers – nothing stays lit after a tap |
+| `WidgetGrid` (market tiles, checklist lift) | throw: velocity tracker per drag, a release ≥ `CONFIG.throwMinSpeed` lands on the slot at `throwTarget` (projection with `CONFIG.throwRate`), tilt `CONFIG.tiltPerSpeed` (≤ `tiltMax`°, `tiltSpring`), drop `mixSpring(spring.layout, CONFIG.dropFast, tempo)` |
+| `MorphSelect` · `Autocomplete` | press-drag-release (mouse: a vertical drag opens the menu; touch: hold still `CONFIG.pressHoldMs` and it opens under the finger, the page scroll blocked for that gesture only; the row under the finger by arithmetic `rowAtPoint`, release selects, the trigger click is swallowed), fling-to-close with `progressVelocity`; coarse rows `CONFIG.rowHCoarse` (`placePanel(…, rowH)`) |
+| Calendar month (`views/insights`) | `useAxisDrag` x with a rubber band at the first / last month, `flickDecision` on release |
+
+Every drag surface also carries `useTouchMoveGuard` (see Hooks), so a tap right after a fast swipe is never swallowed.
 
 ## Feature notes
 
@@ -293,6 +372,22 @@ Every live number is a MotionValue leaf, so the panel commits only on structural
   (`tween.draw`) on first view and per tone change. `EmptyState`: `.fx-ants`, a `DotMatrix` ∅ glyph (`EMPTY_GLYPH_FRAMES`), CTA sheen.
   `Expander` press .88 + disc pop; `Collapse` content settles from y −6; `WarnBanner` enter wipe + 3 soft warn-dot pulses.
 
+### Einstiegs-Check (`SignalCard`, `views/overview`)
+- The card re-renders at most once per second (the engine publishes only real changes, `useSignalCheck()`); the zone marker follows
+  the live price as a MotionValue. Meters and zone markers move by `transform` only (never `left` / `width`); the zone labels sit
+  outside the bar, so a marker never crosses text.
+- A NEW valid entry (never on load): one `<BorderBeam fire>` lap, a halo on the score ring, the rung dots that lit up pop
+  (`spring.pop`), `.fx-ping` on the running bar, and a `TactileHighlight` "Neuer … Einstieg" marker held for `SIGNAL_HOLD_MS`.
+  Reduced motion: the final state at once.
+
+### `HeroBackdrop` text mask
+Elements marked `data-hero-mask="text"` (their text lines) or `"box"` (their border box) keep the dot field away: the canvas skips the
+blocked cells and the static / spotlight grids get an SVG CSS mask. Re-measured on resize only (≤ 1 per 150 ms), never per frame.
+
+### Market tiles
+The four mini tiles (Funding, OI, Taker, Bid / Ask) are `MorphCard`s rendered as `div` inside `WidgetGrid`: a tap opens the explainer
+(`morph-market-tile-{id}`), a press-and-hold lifts the tile for reordering. The weekly check is `morph-weekly-check`.
+
 ### Chart (`src/chart`, full contract in `src/chart/README.md`)
 `spring.candle` (forming close), `tween.ping` (price-pulse rings, second ring delayed `tween.ping.duration/2`), `tween.flash` /
 `tween.ripple` (tick tint, per-print ping, marker ripple), `spring.pop` / `tween.exit` (`Folgen` pill), `tween.crossfade` (interval /
@@ -318,9 +413,9 @@ and MotionValue text may show its last value for one tick after the page is show
 | `seg-hover-{useId}` | `Segmented` hover ghost between items | `spring.hover`, opacity `tween.hoverPill` | unique per instance, `borderRadius 8`, below the thumb; hover devices only, none under reduced motion |
 | `emotion-{useId}` | TradeEditor "Gefühl beim Einstieg" chip thumb | `spring.segment` | `borderRadius radius.pill`, `layoutDependency=value`, inside `AnimatePresence` (fades out on clear); only the chip label dips on press |
 | `sf-color-{useId}` | SetupEditor colour selection ring | `spring.segment` | `borderRadius radius.pill`, `layoutDependency=value`; a sibling of the swatch button, so the hover scale is never measured |
-| `morph-{id}` / `morph-title-{id}` (`fact-*`, `bt-{k}-{filter}`, `setup-rank-{id}`, `hyblock-new`, `falling-knife`) | `MorphCard` → `MorphDialogProvider` panel | `spring.morph` | source hidden after the morph; both carry `layoutDependency` (dialog open) |
+| `morph-{id}` / `morph-title-{id}` (`fact-*`, `bt-{k}-{filter}`, `setup-rank-{id}`, `hyblock-new`, `falling-knife`, `market-tile-{funding\|oi\|taker\|book}`, `weekly-check`) | `MorphCard` → `MorphDialogProvider` panel | `spring.morph`; after a swipe-dismiss `contextSpringAt(spring.morph, closeTempo)` | source hidden after the morph; both carry `layoutDependency` (dialog open) |
 | `morph-fk-count`, `morph-dot-{id}` | Falling-Knife count / ranking dot inside their `MorphCard` | `spring.morph` | `morph-fk-count`: `layoutDependency={fk.n|open}`, `borderRadius 0`; `morph-dot`: `borderRadius 9999` |
-| `trade-{id}`, `trade-pnl-{id}`, `trade-side-{id}` | recent row / table ghost / mobile card / chart-marker ghost → Trade-Detail | `spring.detail` | set conditionally by `uiStore.detail.source` (`recent`/`table`/`marker`) |
+| `trade-{id}`, `trade-pnl-{id}`, `trade-side-{id}` | recent row / table ghost / mobile card / chart-marker ghost → Trade-Detail | `spring.detail`; back after a swipe-dismiss on `contextSpringAt(spring.detail, detailTempo)` | set conditionally by `uiStore.detail.source` (`recent`/`table`/`marker`/`insights`; `DETACHED_DETAIL_SOURCES` drop the list's ids) |
 | `setup-card-{id}`, `setup-name-{id}`, `setup-dot-{id}` | setup card → `Sheet` (540 px) | `spring.sheet` | card `visibility:hidden` while open |
 | `new-trade` | FAB disc (`borderRadius 999`, inside the FAB's scaled visual) → `Sheet size="lg"` | `spring.sheet` | disc unmounted while `editor.open && fromFab` |
 | `dock-dot`, `dock-bg` | active dock item (inside the magnified item) | `spring.layout` | singletons, `borderRadius 9999`, intentionally NO `layoutDependency` (see `src/app/README.md`) |

@@ -31,7 +31,11 @@ probe `window.claude?.use("db")`.
 The build edition (`src/edition.ts`, Vite `define`) picks the key prefix: personal (web root, "persönlich" file)
 `tj2-*` – the same keys as the other journal version; share (`/teilen/`, "zum Teilen" file) `tj2share-*`, so the
 share edition never reads or writes the personal journal on the same origin / browser. Build every key of your own
-module with `storageKey("name")` (`@/store/storage`) instead of a `"tj2-…"` literal.
+module with `storageKey("name")` (`@/store/storage`) instead of a `"tj2-…"` literal, or use `KEYS.*` for the shared ones
+(`KEYS.triggerLast`, `KEYS.quarantine`, …). UI flags follow the same rule, so the two editions on one origin never share
+them: `tj2-ui`, `tj2-ui-market-tiles`, `tj2-ui-intro`, the session flags `tj2-intro` / `tj2-dock-intro` and the lead-fill
+flags `tj2-fill-{setups|trades|settings}` are `tj2share-…` in the share edition. The personal keys stay byte-identical
+(`tests/unit/store.namespace.test.ts`).
 
 ## Data safety (two tabs, the other journal version)
 
@@ -80,7 +84,9 @@ const page = useUi((s) => s.page);                    // "overview" | "trades" |
 acc: "all"|"makro"|"scalp"; setAcc(acc)
 tradeFilter: TradeFilter (default DEFAULT_TRADE_FILTER = y0); setTradeFilter(patch); resetTradeFilter()
 tradeSort: { k: "date"|"pnl"|"r"|"setup", dir: -1|1 }; setTradeSort(sort); toggleSort(k)
-detail: { id, source: "recent"|"table"|"marker"|null }; openDetail(id, source) (no-op while transitioning); closeDetail()
+detail: { id, source: "recent"|"table"|"marker"|"insights"|null }; openDetail(id, source) (no-op while transitioning); closeDetail()
+DETACHED_DETAIL_SOURCES = ["marker", "insights"]   // no list row owns the `trade-{id}` morph target → lists drop their shared ids
+detailTempo: number; dismissDetail(tempo)           // swipe-dismissed detail: the source zooms back on contextSpringAt(spring.detail, detailTempo)
 editor: { open, tradeId?, fromFab }; openEditor({ tradeId?, fromFab? }); closeEditor()
 setupEditor: { open, setupId?, fromTrade }; openSetupEditor(...); closeSetupEditor()
 transitioning: boolean; setTransitioning(v)
@@ -89,7 +95,8 @@ dismissToast(id)            // auto-dismiss 2800 ms, `signal` 5200 ms (TOAST_MS)
 
 // persisted prefs (localStorage `tj2-ui`, never in a backup):
 theme, hideLocalBanner, sparkline ("readings"|"live"), topTraderBase ("accounts"|"positions"), useProxy,
-chart { interval: "1m"|"1h"|"4h", rangeDays, pane: "ratio"|"oi"|"cvd", open }, flags: Record<string, boolean>
+chart { interval: "1m"|"30m"|"1h"|"4h", rangeDays, pane: "ratio"|"oi"|"cvd", open }, flags: Record<string, boolean>
+// (30m is resampled from kline_15m by ChartCard; an unknown stored interval falls back to 4h)
 setPref("hideLocalBanner", true); setChart({ pane: "oi" }); setFlag("trLayout", true)
 ```
 

@@ -19,7 +19,9 @@ An account view without any trade shows only the calendar (day notes work withou
 ## Shared pieces
 - `ui.tsx`: `useInsightsBase()` (Hero's `uiStore.acc` → `useAccountView`), `InsightCard` (Card + `+` explainer
   toggle, explainer built lazily), `Stat`, `TradeRows` / `TradeList` (rows open the trade detail via
-  `openTrade(id)` = `openDetail(id, "marker")`: no foreign `trade-{id}` morph source), `SEG_TOUCH` (≥ 44 px segments
+  `openTrade(id)` = `openDetail(id, DETAIL_SOURCE)` with `DETAIL_SOURCE = "insights"`, a detached source
+  (`uiStore.DETACHED_DETAIL_SOURCES`): the recent-trades list drops its shared `trade-{id}` ids, so the detail enters on its
+  own instead of flying out of an unrelated row), `SEG_TOUCH` (≥ 44 px segments
   on coarse pointers), `softTone`.
 - `insightsStore.ts`: `useInsightsUi` – `focusDay(key)` (Disziplin / Rückblick open a day in the calendar, which
   switches month, opens the day view and scrolls itself into view), `unit` (€ | R | %). View state only.
@@ -27,7 +29,8 @@ An account view without any trade shows only the calendar (day notes work withou
 
 ## Motion / 120 Hz
 - Calendar: month change slides (`spring.segment` x + fade); touch swipe via `useAxisDrag` (velocity hand-off,
-  rubber band at the first / current month, `flickDecision`); day cell → day view is a shared-layout morph
+  rubber band at the first / current month, `flickDecision`; a native touchmove guard, `useTouchMoveGuard`, so the tap after a fast
+  swipe is never swallowed); day cell → day view is a shared-layout morph
   (`layoutId="cal-day-{key}"` on the cell's tinted surface and the panel surface, `spring.detail`), both ways. The
   grid stays mounted (faded, `inert`, out of flow) under the day view – it is the morph source and keeps state. Motion
   registers a `layoutId` only at mount, so the armed surface (hover / pointerdown / focus) remounts; cell children are
@@ -36,6 +39,9 @@ An account view without any trade shows only the calendar (day notes work withou
   switch crossfades; score counts up (`MotionNumber countOnReveal`).
 - Bars: `Bar` / `useRevealValue` (scaleX), columns scaleY on `spring.enter`, under-water curve and intraday curve wipe
   in by clip-path (`tween.draw`), heat map cells fade column by column (CSS opacity, 8 ms stagger).
+- Disziplin heat map: cells are 15–22 px (a 44 px hit area per cell would overlap the neighbours), so ONE click handler on the
+  grid takes an exact hit on a traded day, else the nearest traded day whose centre lies within 24 px (`TAP_RADIUS`; one rect
+  read per cell, at tap time only). Double-click / Enter opens the day in the calendar.
 - Drawdown scrub and Zeit scrub read one rect per press and write transforms / text directly – no React state per move.
 - Height changes only through `AutoHeight` / `Collapse` (declared exceptions). Reduced motion: no slides / draws.
 
@@ -44,4 +50,5 @@ An account view without any trade shows only the calendar (day notes work withou
   pause, on blur and when the day view closes (unmount flush) – input is never dropped; other stored fields of the day
   survive (`saveDay` merges).
 - `trade.signal` read with `parseSignalSnapshot` (other version's `SignalSnap` and ours); `trade.mistakes` + automatic
-  mistakes; `settings.discipline` (optional, passthrough) for the discipline limits.
+  mistakes; `settings.discipline` (optional, passthrough) for the discipline limits – edited in Einstellungen →
+  `Disziplin-Grenzen` (`views/settings/LimitsCard.tsx`); without it 2 % per trade / 4 % per day / Makro 2 · Scalp 5 trades.

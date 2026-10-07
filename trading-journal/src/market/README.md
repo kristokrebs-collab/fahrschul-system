@@ -94,7 +94,7 @@ effect built on them with `useReducedFx()`. Countdowns and ages combine them wit
 | Feed | Transport | Cadence | `staleAfterMs` | Notes |
 |---|---|---|---|---|
 | `kline_1m/1h/4h` | WS `kline_*` (+ REST bootstrap 499) | 250 ms | 2·interval + 60 s | upsert by open time; `closed` = final |
-| `kline_15m` | WS `kline_15m` (+ REST bootstrap 1500 = 500 × 45m, weight 10 once) | 250 ms | 31 min | feeds the signal check (30m = 2 × 15m, 45m = 3 × 15m); ring 3000 |
+| `kline_15m` | WS `kline_15m` (+ REST bootstrap 1500 = 500 × 45m, weight 10 once) | 250 ms | 31 min | feeds the signal check (30m = 2 × 15m, 45m = 3 × 15m); ring 3000. Also the chart's `30m` interval: `ChartCard` resamples history and live tail with `@/chart/resample` (`resampleCandles` / `resampleTail`), so the chart's 30m bars are the check's 30m rung. Settings → Live-Daten lists it as `Kerzen 15m` |
 | `kline_1w` | WS `kline_1w` (+ REST 200) | weekly | 7 d + 1 h | `closeW` via `weeklyClose()` |
 | `markPrice` | WS `markPrice@1s` (bootstrap `premiumIndex`) | 1 s | 5 s | heartbeat; funding rate + next funding |
 | `aggTrade` | WS `aggTrade` | 100 ms | 5 s | **the** last price (never mark) |

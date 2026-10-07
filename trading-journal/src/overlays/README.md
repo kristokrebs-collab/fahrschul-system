@@ -147,8 +147,16 @@ visible); `HoldConfirm`, `useConfirmFocus`, `HOLD_CONFIRM_TITLE` → `@/motion/H
 - **`SetupEditor`** (`SetupEditor.tsx`, bundle `Z$`, Plan 6.3): `{ open?; setupId?; fromTrade?; onClose?; onSaved?(setup) }` – every prop overrides the
   matching `uiStore.setupEditor` field; morphs from `setup-card-{id}` unless `fromTrade`. Helpers `finalizeSetup`, `upsertSetup`, `removeSetup`, `moveItem`,
   `SETUP_EDITOR_STRINGS`, `SETUP_ACCOUNT_OPTIONS`.
+  - Dirty guard: `dismissGuard` = the form differs from how it opened (exported `sameForm`: trimmed, empty checklist rows ignored);
+    `onDismissAttempt` (Escape, backdrop, ✕, swipe) and `Abbrechen` show the footer confirm (`data-testid="setup-discard-confirm"`,
+    words from `SHEET_DISCARD_COPY`) instead of closing.
+  - `s_mtf` (Multi-TF Signal): the checklist help adds `SETUP_EDITOR_STRINGS.mtfAuto` (the entry check ticks these items when a trade is
+    entered; renaming keeps the link, a deleted item is no longer ticked).
 - **`HyblockForm`** / **`HyblockReadingsList`** (`HyblockForm.tsx`, bundle `tK`): `{ last?; live?: LiveHyblockValues; onClose?; onSave?; now?; className? }`
   (lives in the `hyblock-new` morph dialog; `live` renders `Live-Werte übernehmen`) / `{ readings?; limit? (5); onDelete?; className? }`. `HYBLOCK_FORM_STRINGS`.
+  - Unsaved input: `Abbrechen` with typed values shows the confirm `HYBLOCK_FORM_STRINGS.discardAsk` `[Verwerfen]` `[Weiter bearbeiten]`
+    (`data-testid="hyblock-discard-confirm"`); the dialog's Escape, backdrop, ✕ and swipe ask the same way through
+    `useMorphDialogGuard(() => dirty, () => setAsking(true))` (`@/motion/MorphDialog`). Saving and `Verwerfen` close unguarded.
 - **`ImportDialog`** (`ImportDialog.tsx`, Plan 8.5): `{ open; onClose; onDone?(result); readFile? }` – Sheet 540 px, `IMPORT_STRINGS`, `IMPORT_MODES`.
   `dismissGuard={false}` (nothing typed to lose).
 - **Sheet guard for other editors**: pass `dismissGuard={() => dirty}` + `onDismissAttempt={() => showConfirm()}`. Without
