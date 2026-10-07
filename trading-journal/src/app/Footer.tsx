@@ -260,7 +260,7 @@ export function Footer() {
   return (
     <>
       <div ref={sentinel} aria-hidden="true" className="h-px" />
-      <footer ref={footer} data-shown={shown || undefined} className="relative overflow-x-clip pb-[calc(112px+env(safe-area-inset-bottom,0px))] pt-10">
+      <footer ref={footer} data-shown={shown || undefined} className="relative overflow-x-clip pb-[calc(112px+var(--safe-bottom,env(safe-area-inset-bottom,0px)))] pt-10">
         <div className="relative h-14" style={{ marginInline: "-6%", ...part(shown, reduced, band, { from: `rotate(${band.tiltFrom}deg) translate(0,${band.rise}px)`, to: `rotate(${band.tilt}deg)` }) }}>
           <div className="h-full border-y border-white/[0.06] bg-black/20">
             {/* mounts on the first reveal, paused while the footer is mostly off screen, resumes where it stopped */}
@@ -272,14 +272,14 @@ export function Footer() {
         </div>
         <div className="mx-auto flex max-w-[1320px] items-end justify-between gap-4 px-4 sm:px-6">
           <div style={part(shown, reduced, CONFIG.bar)}>
-            <ChartAttribution />
+            <ChartAttribution className="touch-hit-links" />
           </div>
           <div style={part(shown, reduced, CONFIG.links)}>
             <button
               type="button"
               aria-label={FOOTER_TOP_LABEL}
               onClick={() => window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" })}
-              className="grid size-10 place-items-center rounded-full border border-line-2 bg-ink-850 text-mute transition-[translate,color] duration-[250ms] [transition-timing-function:cubic-bezier(.16,1,.3,1)] hover:-translate-y-0.5 hover:text-fg"
+              className="touch-hit grid size-10 place-items-center rounded-full border border-line-2 bg-ink-850 text-mute transition-[translate,color] duration-[250ms] [transition-timing-function:cubic-bezier(.16,1,.3,1)] hover:-translate-y-0.5 hover:text-fg"
             >
               <svg viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M8 13V3.5M4.5 7 8 3.5 11.5 7" />

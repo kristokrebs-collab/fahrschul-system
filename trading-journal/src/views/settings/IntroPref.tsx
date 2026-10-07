@@ -44,6 +44,7 @@ export function IntroPref() {
         </span>
         <Switch
           id="s-intro"
+          className="touch-hit shrink-0"
           checked={on}
           aria-describedby="s-intro-help"
           onCheckedChange={(next) => {

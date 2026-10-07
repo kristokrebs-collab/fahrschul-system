@@ -13,10 +13,49 @@ createRoot(#root).render(<StrictMode><MotionRoot><App/></MotionRoot></StrictMode
 ```
 Font hints (`document.fonts.load` for Doto / IBM Plex Mono / Sans) run before the first render; they never block.
 
+## Display: installable, fullscreen, bottom inset (grey-bar fix, tablet audit §1)
+
+The grey strip above the One UI taskbar in the user's screenshot is HOST UI (the browser's bottom toolbar / sheet, most likely
+Samsung Internet's), drawn outside web content: no page z-index can cover it. The app offers the two ways out and follows it:
+- **Installable**: `public/manifest.webmanifest` (`display: standalone`, `start_url`/`scope` `./` – works under `/` and `/teilen/`,
+  ink theme/background `#0a0a0a`, Nothing icons in `public/icons/`: dot-matrix ₿ + one signal dot, `any` + `maskable` PNG 192/512,
+  SVG, `apple-touch-icon` 180; the PNGs are Chromium renders of the dot-matrix SVG design in `public/icons/icon.svg`), linked in `index.html` with
+  `mobile-web-app-capable` / `apple-mobile-web-app-*`; the favicon is an inline `data:` SVG (works in the single files too).
+  `beforeinstallprompt` is kept (no mini-infobar over the dock) → CommandNav action `App installieren`; where no prompt exists
+  (iOS, Firefox, before the prompt fires) on a touch device a hint says how to add it to the home screen. Not in file:// builds.
+- **Fullscreen**: `Vollbild` / `Vollbild beenden` (`requestFullscreen({ navigationUI: "hide" })`, webkit fallback) in the header
+  (lg+) and in the CommandNav; hidden where the API is missing (iPhone Safari).
+- **Bottom inset**: `installViewportInset()` (App effect) writes `--vv-bottom` = host UI laid over the layout viewport's bottom
+  (`innerHeight − (visualViewport.offsetTop + height)`, rAF-coalesced, written only on change, 0 while pinch-zoomed and for
+  keyboard-sized gaps ≥ 120 px – the dock stays behind the keyboard as on iOS). `--safe-bottom` (base.css) feeds the dock,
+  footer padding, bottom fade and focus scroll padding.
+- **Forced darkening**: `color-scheme: only dark` (meta + CSS + `prefers-color-scheme` block). Chromium Auto Dark / WebView
+  force-dark leave the page alone; Samsung Internet's night mode re-colours pages unless the user enables Settings → Labs →
+  "Use website dark theme" – the CommandNav shows that hint in Samsung Internet only. No page-side opt-out exists beyond this.
+- **Header**: opaque `bg-ink-900` (no 97 % alpha: scrolled text ghosted through under the pills).
+
+| file | export | notes |
+|---|---|---|
+| `pwa.ts` | `canInstall`, `promptInstall`, `useCanInstall`, `isStandalone`, `useStandalone`, `isSamsungInternet`, `isIosSafari`, `fullscreenSupported`, `isFullscreen`, `toggleFullscreen`, `useFullscreen`, `useFullscreenSupported`, `bottomInset`, `installViewportInset`, `VV_KEYBOARD_MIN`, `DISPLAY_STRINGS` | listeners installed on import (guarded for jsdom / file://) |
+| `DisplayActions.tsx` | `FullscreenButton`, `GlyphFullscreen` | header button (`aria-pressed`), renders nothing without the API; the Settings owner can mount `FullscreenButton` too |
+
+## Dock: touch physics (additive, `@/motion/physics`)
+- **Tap hop by press length**: `hopFor(lastPressMs())` – a tap ≤ 150 ms, keyboard (click `detail 0`) and programmatic switches get
+  EXACTLY `{ ...spring.pop, velocity: −600 }`; a press ≥ 400 ms a calm `spring.smooth` lift at −300 px/s; blended between.
+- **Re-tap the active tab** → native smooth scroll to the top (instant under reduced motion) + a `spring.pop` dip of the icon.
+- **Touch scrub** (touch / pen, toolbar `touch-action: none`): after 10 px horizontal the magnification runs under the finger
+  (amount 0.45, the pointer rubber-banded past the row ends), the item under the finger shows its label (`data-scrub`, written only
+  on change, CSS mirrors the hover variants) with a selection haptic; release over an item activates it (not when released > 40 px
+  above / below the press). **Flick** (< 250 ms, > 600 px/s, > 24 px): one tab per flick, finger right = next tab; the new icon hops
+  faster (`flickHop`, ≤ −750 px/s) and PageHost takes the tempo (`setNavTempo` → `contextSpringAt(spring.pageEnter, tempo)`); at the
+  row's end the active icon dips instead.
+- **Long press** (400 ms still) shows the item's label; releasing then does nothing (Android tooltip behaviour).
+- Mouse magnification, tooltips, FAB, intro entrance: unchanged.
+
 ## `App.tsx`
 
 ```
-<MorphDialogProvider>
+<MorphDialogProvider>                     (effect: installViewportInset() → --vv-bottom, see "Display")
   <ScenarioWatcher/>                       toast `Neues Szenario: …` when a 4h bar closes into a new scenario key (tj2-trigger-last)
   <Header/>                                HeaderEdge (hairline / shade / edge blur / red reading progress) + HeaderTicker
   <main class="mx-auto max-w-[1320px] px-4 pb-40 pt-6 sm:px-6">
@@ -39,7 +78,8 @@ Every store subscription lives in a leaf host, so the shell itself only re-rende
 new page renders afterwards in an interruptible background render.
 
 ### Page host (`PageHost.tsx`) – replaces `PageSwitch` in the shell
-`<PageHost page renderPage keepAlive onTransitioning>`: the PageSwitch visual spec (enter `x dir·16` + scale .985 + blur 4 px → none,
+`<PageHost page renderPage keepAlive onTransitioning>`: the PageSwitch visual spec (enter `x dir·16` + scale .985 + blur 4 px → none
+– after a fast dock flick the slide runs on `contextSpringAt(spring.pageEnter, consumeNavTempo())`, otherwise the token itself –
 exit `−dir·12` + fade). Each property is a single `transform` / `opacity` / `filter` animation via `animate(el, …)`, so Motion runs it
 on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyframes, see `src/motion/README.md`), opacity/filter on
 `tween.page`, exit `tween.exit`. Layers end at `transform: none` / `filter: none`.
@@ -89,7 +129,7 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 | `Header.tsx` | `Header`, `WORDMARK`, `SUBTITLE`, `HEADER_CTA`, `MENU_LABEL`, `headerIntroTarget` | sticky, parked above the edge during intro "stage", slides down (`spring.sheet`) otherwise; logo tile `₿` → `navigate("overview")` + `replayIntro()` + AsciiCascade decode of the wordmark (held until "build" when the intro replays), DancingLetters wordmark on hover, menu button `Navigation öffnen` → CommandNav, sync `StatusPill` (`hidden md:inline-flex`, tones cloud→live, local→warn, error→error, connecting→muted), `Magnetic` → `.shiny-cta` `Trade eintragen` (`max-sm:sr-only`) → `openEditor()` |
 | `Dock.tsx` | `Dock`, `DockItem`, `PAGE_LABELS`, `FAB_LABEL`, `DOCK`, `DOCK_INTRO_KEY`, `dockBell`, `dockLayout` | `role="toolbar" aria-label="Navigation"`, 4 tabs (`Übersicht | Trades | Entscheidungsgrundlagen | Einstellungen`, icons `grid|list|target|sliders`), `aria-current="page"`, `dock-bg` + `dock-dot` `layoutId`s (`spring.layout`, `AnimatePresence initial={false}`), `whileTap .94`; transform-only magnification (`spring.dock`, mouse only, off under reduced motion, see "Dock"); FAB disc `layoutId="new-trade-{fabCycle}"` `borderRadius 999`, unmounted while `editor.open && editor.fromFab` |
 | `Footer.tsx` | `Footer`, `FooterOutline`, `FOOTER_TEXT`, `CONFIG`, `nextFooterShown` | pulse-motion `motion-footer`, in normal flow (never covers page content): a sentinel at the footer's top edge + 2 IntersectionObservers reveal at ≥ 72 % of the footer in view / hide at ≤ 50 %; staggered fade-up (pack timings), tilted Marquee band of live stats (mounted on the first reveal, `paused` while hidden; BTC price = MotionValue text), DancingSvgWord outline wordmark (stroke draw 4 s on first reveal, hover gradient + radial mask `userSpaceOnUse`), attribution, `Nach oben`; bottom padding clears the dock |
-| `CommandNav.tsx` | `CommandNav`, `openCommandNav`, `closeCommandNav`, `toggleCommandNav`, `useCommandNavOpen`, `isCommandNavShortcut`, `rovingIndex`, `CONFIG` | pulse-motion `immersive-full-screen-navigation`: ⌘K / Ctrl+K (ignored while another modal is open) or the header button; black panel wipes in from the left (WAAPI transform, 800 ms), brand, page links with live counts, quick actions (`Trade eintragen` → `openEditor()`, `CSV-Export`, `Backup herunterladen` via `@/store/backup`), staggered; close wipes right. `useDialogBehaviour` (inert after the wipe), arrows/Home/End/1–4; unmounted while closed |
+| `CommandNav.tsx` | `CommandNav`, `openCommandNav`, `closeCommandNav`, `toggleCommandNav`, `useCommandNavOpen`, `isCommandNavShortcut`, `rovingIndex`, `CONFIG` | pulse-motion `immersive-full-screen-navigation`: ⌘K / Ctrl+K (ignored while another modal is open) or the header button; black panel wipes in from the left (WAAPI transform, 800 ms), brand, page links with live counts, quick actions (`Trade eintragen` → `openEditor()`, `CSV-Export`, `Backup herunterladen` via `@/store/backup`, `Vollbild` / `App installieren` where offered, then the install / Samsung dark-mode hints), staggered; close wipes right. `useDialogBehaviour` (inert after the wipe), arrows/Home/End/1–4; unmounted while closed. Single grid column `minmax(0,1fr)` + page names `clamp(22px,4.6vw,64px)`: nothing overflows at 390 |
 | `shellStats.ts` / `cssEasing.ts` | `useShellStats`, `shellStatTexts`, `useLivePriceText` / `expoCurve`, `springCurve` | journal figures for footer + nav; pack curves as CSS `linear()` |
 | `LocalModeBanner.tsx` | `LocalModeBanner`, `useLocalBannerOpen`, `LOCAL_BANNER_*` | `WarnBanner` (exit `tween.exit`), text 1:1 + Netlify sentence when `!hasClaudeRuntime()`, close `aria-label="Hinweis schließen"` → `setPref("hideLocalBanner", true)` |
 | `BottomFade.tsx` | `BottomFade`, `EdgeBlur`, `BOTTOM_BANDS`, `bandMask`, `bandBox` | `fixed z-[45] h-28` gradient (`BOTTOM_BANDS = []`, no blur) |

@@ -1,4 +1,4 @@
-import type { HyblockReading, Settings, StoreApi, StoreMode, Trade } from "@/domain/types";
+import type { DayNotes, HyblockReading, Settings, StoreApi, StoreMode, Trade } from "@/domain/types";
 
 export type { StoreApi, StoreMode };
 
@@ -7,6 +7,8 @@ export interface StorageSnapshot {
   trades: Trade[];
   settings: Settings;
   hyblock: HyblockReading[];
+  /** Day journal (`tj2-days`). Optional: absent = "not part of this snapshot" (replaceAll then leaves it alone). */
+  days?: DayNotes;
 }
 
 export type SnapshotPatch = Partial<StorageSnapshot>;
@@ -21,6 +23,8 @@ export interface StorageAdapter {
   readonly mode: Extract<StoreMode, "local" | "cloud">;
   /** Synchronous view of the currently known data (local: reads localStorage; cloud: last snapshots). */
   load(): StorageSnapshot;
+  /** The data as stored right now, without touching adapter state (local: re-reads localStorage; cloud: = load()). */
+  fresh(): StorageSnapshot;
   /** Write API identical to the original bundle. */
   api: StoreApi;
   /** Emits patches after writes (local) or after remote snapshots (cloud), plus errors. */

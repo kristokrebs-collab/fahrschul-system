@@ -4,7 +4,7 @@ import { HyblockReadingSchema, TradeSchema } from "@/domain/schemas";
 import { computePnlR } from "@/domain/derive";
 import { hasKey, KEYS, listKeys, readJson, readJsonDetailed, removeKey, writeJson } from "./storage";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 export const APP_VERSION = "0.1.0";
 export const MIGRATION_SNAPSHOT_PREFIX = `${KEYS.backupPrefix}v0-`;
 export const MAX_MIGRATION_SNAPSHOTS = 3;
@@ -243,8 +243,24 @@ function migrate_0_1(now: Date): { quarantined: number; snapshotTag: string | nu
 }
 
 /**
+ * v1 → v2 (multi-TF / other-version interop), purely ADDITIVE – no snapshot needed, nothing is removed or rewritten
+ * except the market symbol, whose original stays in `market.sourceSymbol`:
+ * - settings: `s_mtf` setup appended when settings predate it, `mistakes` default list, a non-Binance
+ *   `market.symbol` (`BITSTAMP:BTCUSD`) mapped to `BINANCE:BTCUSDT` – all via `normalizeSettings`, persisted as
+ *   `{ ...raw, ...normalizeSettings(raw) }` so unknown keys (`signals`, …) survive verbatim.
+ * Trades, readings and `tj2-days` are untouched (their new fields are defaulted on read).
+ * A key that is absent, unparseable or not an object is left alone (the v0 → v1 rules already preserved it).
+ */
+function migrate_1_2(): void {
+  const legacy = readLegacy(KEYS.settings);
+  const raw = legacy.value;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
+  writeJson(KEYS.settings, { ...(raw as Record<string, unknown>), ...normalizeSettings(raw) });
+}
+
+/**
  * Runs all pending migrations on localStorage (synchronous, idempotent) and writes `tj2-meta`.
- * Version 0 = legacy data without meta. Later versions add `migrate_1_2(...)` etc.
+ * Version 0 = legacy data without meta; 1 = validated (v0 → v1); 2 = multi-TF additions (v1 → v2).
  * `aborted: true` (snapshot could not be stored) leaves everything untouched; the next start retries.
  */
 export function migrate(now: Date = new Date()): MigrationResult {
@@ -262,6 +278,11 @@ export function migrate(now: Date = new Date()): MigrationResult {
     quarantined += r.quarantined;
     snapshotTag = r.snapshotTag;
     version = 1;
+  }
+
+  if (version === 1) {
+    migrate_1_2();
+    version = 2;
   }
 
   writeMeta({ schemaVersion: version, migratedAt: now.toISOString(), appVersion: APP_VERSION });

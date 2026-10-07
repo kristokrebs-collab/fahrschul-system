@@ -1,7 +1,8 @@
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { useDialogBehaviour } from "@/motion/a11y";
+import { useDialogBehaviour, useTouchMoveGuard } from "@/motion/a11y";
+import { useSwipeDismiss } from "@/motion/physics";
 import { STAGGER_HIDDEN, STAGGER_SHOWN, bodyRevealDelay, withSectionStagger } from "@/motion/Stagger";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -32,13 +33,19 @@ interface MorphDialogState {
   settled: string | null;
   /** id whose dialog is closing and whose source has not reported its reverse morph back yet. */
   closing: string | null;
+  /**
+   * Release tempo (0 … 1) of the swipe that closed the dialog, 0 for every other close. The source `MorphCard` runs
+   * its reverse morph on `contextSpringAt(spring.morph, closeTempo)`: a hard flick zooms back a little faster and
+   * livelier, everything else keeps the tuned token (layout animations cannot take the finger's velocity).
+   */
+  closeTempo: number;
   show: (req: MorphDialogRequest) => void;
   close: () => void;
   /** Called by the source `MorphCard` when its reverse morph has finished (releases inert + focus). */
   returned: (id: string) => void;
 }
 
-const Ctx = createContext<MorphDialogState>({ open: null, settled: null, closing: null, show: () => {}, close: () => {}, returned: () => {} });
+const Ctx = createContext<MorphDialogState>({ open: null, settled: null, closing: null, closeTempo: 0, show: () => {}, close: () => {}, returned: () => {} });
 
 /** `{ open, show, close }` – `show({ id, title, body })` opens the dialog morphing out of `MorphCard id`. */
 export function useMorphDialog(): MorphDialogState {
@@ -77,13 +84,21 @@ const HEAD: Variants = {
  * Fluidity (OV-04/05/06): the panel is opaque from its first frame (`layoutCrossfade={false}` – the source hides the
  * moment the panel takes over, nothing shows through a half-transparent pair); the body starts revealing at ≈ 65 % of
  * the morph (`MORPH_BODY_DELAY`); the backdrop fades on `tween.fade`, in step with the panel.
+ *
+ * Swipe to dismiss (iOS 18 zoom, `useSwipeDismiss` mode "zoom"): on touch and pen, from the sticky head (with a
+ * grabber pill on coarse pointers) once the open morph has settled. The column follows the finger 1:1 down, the cross
+ * axis at half speed, and shrinks to 0.88 while the dim lifts; a slow drag springs back, a projected flick closes and
+ * the source card zooms the shrunk panel back in (`closeTempo` → context spring). The panel scrolls with
+ * `overscroll-contain` (no scroll chaining into the page or pull-to-refresh).
  */
 export function MorphDialogProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState<MorphDialogRequest | null>(null);
   const [settled, setSettled] = useState<string | null>(null);
   const [closing, setClosing] = useState<string | null>(null);
+  const [closeTempo, setCloseTempo] = useState(0);
   const [body, setBody] = useState<ReactNode>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
   const openRef = useRef<MorphDialogRequest | null>(null);
   const titleId = useId();
   const reduced = useReducedFx();
@@ -92,16 +107,19 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
     openRef.current = open;
   }, [open]);
 
-  const close = useCallback(() => {
+  const closeWith = useCallback((tempo: number) => {
     const current = openRef.current;
     if (current) setClosing(current.id);
+    setCloseTempo(tempo);
     setOpen(null);
     setSettled(null);
   }, []);
+  const close = useCallback(() => closeWith(0), [closeWith]);
   const show = useCallback((req: MorphDialogRequest) => {
     setBody(typeof req.body === "function" ? req.body() : req.body);
     setSettled(null);
     setClosing(null);
+    setCloseTempo(0);
     setOpen(req);
   }, []);
   const returned = useCallback((id: string) => setClosing((c) => (c === id ? null : c)), []);
@@ -111,12 +129,22 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
 
   useOverlayLane(open !== null);
 
-  const value = useMemo<MorphDialogState>(() => ({ open, settled, closing, show, close, returned }), [open, settled, closing, show, close, returned]);
+  const swipe = useSwipeDismiss({
+    mode: "zoom",
+    enabled: morphDone,
+    open: open !== null,
+    target: columnRef,
+    onDismiss: (info) => closeWith(info.tempo),
+  });
+  const touchGuard = useTouchMoveGuard(swipe.isDragging);
+
+  const value = useMemo<MorphDialogState>(() => ({ open, settled, closing, closeTempo, show, close, returned }), [open, settled, closing, closeTempo, show, close, returned]);
 
   return (
     <Ctx.Provider value={value}>
       {children}
-      <AnimatePresence>
+      {/* the swiped column was left transformed for the zoom back: rest again once the dialog is gone */}
+      <AnimatePresence onExitComplete={() => swipe.reset({ instant: true })}>
         {open && (
           // The click target for "close on backdrop" is this wrapper – an ancestor of the panel, so it is never made
           // inert; the dimming layer itself is decorative and lets clicks through. The fixed wrapper (not the panel)
@@ -131,13 +159,16 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
           >
             <motion.div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-ink-950/75"
+              className="pointer-events-none absolute inset-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, transition: tween.exit }}
               transition={tween.fade}
-            />
-            <div className={cn("pointer-events-none relative w-full max-w-[620px]", open.className)}>
+            >
+              <motion.div className="absolute inset-0 bg-ink-950/75" style={{ opacity: swipe.dim }} />
+            </motion.div>
+            {/* the swipe moves this column (shadow sibling + panel together), never the `layoutId` panel itself */}
+            <motion.div ref={columnRef} className={cn("pointer-events-none relative w-full max-w-[620px]", open.className)} style={swipe.style}>
               <motion.div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 shadow-[0_40px_90px_rgb(0_0_0/0.45)]"
@@ -153,18 +184,22 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby={titleId}
-                className="pointer-events-auto relative max-h-[86vh] w-full overflow-y-auto border border-line-2 bg-gradient-to-b from-ink-750 to-ink-800 outline-none"
+                className="pointer-events-auto relative max-h-[86vh] w-full overflow-y-auto overscroll-contain border border-line-2 bg-gradient-to-b from-ink-750 to-ink-800 outline-none"
                 style={{ borderRadius: radius.dialog }}
                 layoutCrossfade={false}
                 transition={{ layout: spring.morph }}
                 onLayoutAnimationComplete={() => setSettled(open.id)}
               >
                 <motion.div
-                  className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-ink-750 via-ink-750/95 to-transparent px-6 pb-3 pt-5"
+                  ref={touchGuard}
+                  data-dialog-handle=""
+                  className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-ink-750 via-ink-750/95 to-transparent px-6 pb-3 pt-5 pointer-coarse:cursor-grab pointer-coarse:active:cursor-grabbing"
                   variants={open.pill && !reduced ? HEAD : undefined}
                   initial={STAGGER_HIDDEN}
                   animate={STAGGER_SHOWN}
+                  {...swipe.handle}
                 >
+                  <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1.5 hidden h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15 pointer-coarse:block" />
                   <motion.h2 id={titleId} layoutId={`morph-title-${open.id}`} layout="position" className="label !text-fg flex items-center gap-2">
                     <span className="size-1.5 rounded-full bg-signal" />
                     {open.title}
@@ -173,7 +208,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                     type="button"
                     onClick={close}
                     aria-label="Schließen"
-                    className="grid size-8 place-items-center rounded-full border border-line-2 text-mute transition-colors hover:text-fg"
+                    className="touch-hit grid size-8 place-items-center rounded-full border border-line-2 text-mute transition-colors hover:text-fg"
                   >
                     {CLOSE_GLYPH}
                   </button>
@@ -182,7 +217,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                   {body}
                 </motion.div>
               </motion.div>
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

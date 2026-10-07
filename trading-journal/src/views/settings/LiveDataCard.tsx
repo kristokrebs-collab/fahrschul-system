@@ -1,6 +1,7 @@
 import { animate, motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import type { FeedId, HealthState, ProviderHealth, Source, StatusLabel } from "@/market/types";
+import { IS_FILE_BUILD } from "@/edition";
 import { cn } from "@/lib/cn";
 import { time } from "@/lib/format";
 import { canObserveInView, useFirstInView } from "@/motion/inView";
@@ -31,6 +32,8 @@ export const LIVE_STRINGS = {
   noHealth: "Noch keine Statusdaten. Der Provider startet mit der Übersicht.",
   reconnects: (n: number) => `WS-Reconnects: ${n}`,
   netlifyHint: "Auf Netlify laufen die Live-Daten ohne Key vom Browser zu Binance. Blockiert Binance die Region, springt der Provider auf Bybit/OKX oder den EU-Proxy und zeigt es an.",
+  /** Single-file builds: no Netlify function, so no EU proxy. */
+  fileHint: "In dieser Datei laufen die Live-Daten ohne Key direkt vom Browser zu Binance. Blockiert Binance die Region, springt der Provider auf Bybit/OKX.",
   overall: "Gesamtstatus",
   online: "Online",
   offline: "Offline",
@@ -38,6 +41,7 @@ export const LIVE_STRINGS = {
 
 export const FEED_LABELS: Record<FeedId, string> = {
   kline_1m: "Kerzen 1m",
+  kline_15m: "Kerzen 15m",
   kline_1h: "Kerzen 1h",
   kline_4h: "Kerzen 4h",
   kline_1w: "Kerzen 1W",
@@ -143,9 +147,10 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
             <span>{health.online ? LIVE_STRINGS.online : LIVE_STRINGS.offline}</span>
             <span className="font-mono text-[11.5px] text-faint">{LIVE_STRINGS.reconnects(health.ws.attempt)}</span>
           </div>
-          <div ref={tableRef} className="overflow-x-auto rounded-xl border border-line">
-            <table className="w-full text-left text-[12.5px]">
-              <thead>
+          {/* below sm the rows stack (feed + status, then source · Stand) – no sideways scroll on phones */}
+          <div ref={tableRef} className="rounded-xl border border-line sm:overflow-x-auto">
+            <table className="w-full text-left text-[12.5px] max-sm:block">
+              <thead className="max-sm:hidden">
                 <tr className="border-b border-line">
                   {(["feed", "source", "asOf", "status"] as const).map((c) => (
                     // ST-02: the status column reserves the longest pill (`Zuletzt 01:39 · veraltet`), so a label that
@@ -156,24 +161,24 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="max-sm:block">
                 {feeds.map((f, i) => {
                   const label = statusLabels?.[f.feed];
                   const delay = Math.min(i, stagger.max) * stagger.rows;
                   return (
                     <motion.tr
                       key={f.feed}
-                      className="border-b border-line/60 last:border-b-0"
+                      className="border-b border-line/60 last:border-b-0 max-sm:grid max-sm:grid-cols-[auto_minmax(0,1fr)_auto] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:px-3 max-sm:py-2"
                       initial={reveal ? { opacity: 0, y: 4 } : false}
                       animate={seen ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
                       transition={{ default: { ...tween.reveal, delay }, y: { ...spring.enter, delay } }}
                     >
-                      <td className="px-3 py-1.5 text-fg/90">{FEED_LABELS[f.feed]}</td>
-                      <td className="px-3 py-1.5 text-mute">{SOURCE_LABELS[f.source]}</td>
-                      <td className="num px-3 py-1.5 font-mono text-mute">
+                      <td className="px-3 py-1.5 text-fg/90 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-w-0 max-sm:p-0">{FEED_LABELS[f.feed]}</td>
+                      <td className="px-3 py-1.5 text-mute max-sm:col-start-1 max-sm:row-start-2 max-sm:min-w-0 max-sm:p-0 max-sm:text-[11.5px]">{SOURCE_LABELS[f.source]}</td>
+                      <td className="num px-3 py-1.5 font-mono text-mute max-sm:col-start-2 max-sm:row-start-2 max-sm:p-0 max-sm:text-[11.5px]">
                         <StandCell at={f.lastDataAt} />
                       </td>
-                      <td className="px-3 py-1.5" title={label?.detail ?? f.detail}>
+                      <td className="px-3 py-1.5 max-sm:col-start-3 max-sm:row-span-2 max-sm:row-start-1 max-sm:justify-self-end max-sm:p-0" title={label?.detail ?? f.detail}>
                         <StatusPill tone={label?.tone ?? toneOfState(f.state)} label={label?.text ?? STATE_LABELS[f.state]} expanded />
                       </td>
                     </motion.tr>
@@ -187,7 +192,7 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
         <p className="rounded-xl border border-dashed border-line-2 p-4 text-[12.5px] text-mute">{LIVE_STRINGS.noHealth}</p>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2 pointer-coarse:gap-3.5">
         <ActionButton size="sm" icon={<GlyphRefresh />} spinIcon onRun={onRefresh}>
           {LIVE_STRINGS.refresh}
         </ActionButton>
@@ -232,7 +237,7 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
         </div>
       </div>
 
-      {health?.proxy.usable === true && (
+      {!IS_FILE_BUILD && health?.proxy.usable === true && (
         <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5">
           <span className="grid gap-0.5">
             <label htmlFor="live-proxy" className="cursor-pointer text-[13px] text-fg">
@@ -242,11 +247,11 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
               {LIVE_STRINGS.proxyHelp}
             </span>
           </span>
-          <Switch id="live-proxy" checked={useProxy} onCheckedChange={(on) => setPref("useProxy", on)} aria-describedby="live-proxy-help" />
+          <Switch id="live-proxy" className="touch-hit shrink-0" checked={useProxy} onCheckedChange={(on) => setPref("useProxy", on)} aria-describedby="live-proxy-help" />
         </div>
       )}
 
-      <p className="mt-4 text-[12px] text-faint">{LIVE_STRINGS.netlifyHint}</p>
+      <p className="mt-4 text-[12px] text-faint">{IS_FILE_BUILD ? LIVE_STRINGS.fileHint : LIVE_STRINGS.netlifyHint}</p>
     </Card>
   );
 }

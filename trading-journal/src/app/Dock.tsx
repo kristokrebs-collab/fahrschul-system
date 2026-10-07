@@ -1,8 +1,9 @@
-import { AnimatePresence, animate, cancelFrame, frame, motion, motionValue, useMotionValue, useSpring, useTransform, type MotionValue } from "motion/react";
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type Ref } from "react";
+import { AnimatePresence, animate, cancelFrame, frame, motion, motionValue, useMotionValue, useSpring, useTransform, type MotionValue, type Transition } from "motion/react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
 import { expoCurve, springCurve } from "@/app/cssEasing";
 import { useIntroPhase, type IntroPhase } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
+import { flickStep, haptic, lastPressMs, mixSpring, physics, pressTempo, rubberClamp, setNavTempo, useAxisDrag, type AxisDragRelease } from "@/motion/physics";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useCanHover } from "@/motion/useMediaQuery";
@@ -65,6 +66,35 @@ const DOCK_FX_VARS = {
 export const DOCK_INTRO_KEY = "tj2-dock-intro";
 /** Upward launch speed of the icon hop on activation (px/s); `spring.pop` brings it back with one small rebound. */
 const HOP_VELOCITY = -600;
+/** A deliberate press (≥ `physics.holdMs`) launches at half the speed on `spring.smooth`: a calm lift, no rebound. */
+const HOP_VELOCITY_PRESSED = -300;
+/** Flick-to-switch: the new icon launches faster with the flick (−600 − 0.1·(|v| − 600)), never past this (peak ≤ 14 px, SH-03). */
+const HOP_VELOCITY_MAX = -750;
+/** Touch scrub: the magnification amount under the finger (44 → ~60 px; the mouse dock uses 1). */
+const SCRUB_AMOUNT = 0.45;
+/** Touch scrub: a release this far above / below the press point does not activate the item under the finger (px). */
+const SCRUB_RELEASE_Y = 40;
+/** Re-tap on the active tab: the visual dips (scale velocity per s on `spring.pop`, ≈ 0.93) and springs back. */
+const BUMP_VELOCITY = -3;
+
+/** A hop: a spring transition carrying the launch velocity (px/s). */
+export type HopTransition = Transition & { velocity: number };
+
+/**
+ * Pure: the icon hop for a press of `pressMs` (tap tempo, `@/motion/physics`). A quick tap (≤ 150 ms), a keyboard
+ * activation (NaN) or any programmatic switch gets EXACTLY the tuned hop (`{ ...spring.pop, velocity: −600 }`); a
+ * deliberate press (≥ 400 ms) a calm `spring.smooth` lift at −300 px/s; in between both blend in Apple space.
+ */
+export function hopFor(pressMs: number): HopTransition {
+  const t = pressTempo(pressMs);
+  return { ...mixSpring(spring.pop, spring.smooth, t), velocity: HOP_VELOCITY + (HOP_VELOCITY_PRESSED - HOP_VELOCITY) * t };
+}
+
+/** Pure: the hop after a flick-to-switch at `speed` px/s (faster launch, capped – the glyph stays clear of the page text). */
+export function flickHop(speed: number): HopTransition {
+  const v = Math.max(HOP_VELOCITY_MAX, HOP_VELOCITY - 0.1 * Math.max(0, Math.abs(speed) - 600));
+  return { ...spring.pop, velocity: v };
+}
 /** Entrance: icons start popping once the tray has risen about halfway (s), then follow `stagger.cards`. */
 const ICON_INTRO_DELAY = 0.14;
 /** Tray caps: width of the rounded end pieces and how far the stretchable middle reaches under them (px). */
@@ -120,6 +150,11 @@ export function dockLayout(
   return spread;
 }
 
+/** Event-time stamp (ms) for the hop hand-off; only ever called from event handlers / effects. */
+function stamp(): number {
+  return performance.now();
+}
+
 /* ------------------------------------------------------------------ session flag */
 
 function dockIntroSeen(): boolean {
@@ -144,11 +179,13 @@ function markDockIntroSeen(): void {
 export interface DockSlotFx {
   x: MotionValue<number>;
   scale: MotionValue<number>;
+  /** Re-tap dip of the visual (1 at rest); optional – the item falls back to its own value. */
+  bump?: MotionValue<number>;
 }
 
 export interface DockItemProps {
   label: string;
-  onClick: () => void;
+  onClick: (e: MouseEvent<HTMLButtonElement>) => void;
   active?: boolean;
   /** Renders the `dock-bg` / `dock-dot` shared-layout markers when active (the four tabs). */
   tab?: boolean;
@@ -163,6 +200,8 @@ export interface DockItemProps {
   /** Changes whenever the shared-layout markers must re-measure (page / editor); see SH-01 in the Dock doc. */
   layoutKey?: string;
   index?: number;
+  /** The hop to play when this item becomes active (press tempo / flick); `undefined` → the tuned tap hop. */
+  takeHop?: () => HopTransition | undefined;
   ref?: Ref<HTMLButtonElement>;
   className?: string;
   children: ReactNode;
@@ -175,18 +214,27 @@ export interface DockItemProps {
  * (CSS `:hover` / `:focus-visible`, no React state). On activation the icon hops (`spring.pop` with an upward launch);
  * `whileTap .94`.
  */
-export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, waiting = false, layoutKey, index = 0, ref, className, children }: DockItemProps) {
+export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, waiting = false, layoutKey, index = 0, takeHop, ref, className, children }: DockItemProps) {
   const reduced = useReducedFx();
   const press = usePressable({ scale: 0.94 });
   const hop = useMotionValue(0);
+  const ownBump = useMotionValue(1);
+  const bump = fx.bump ?? ownBump;
   const tipY = useTransform(fx.scale, (s) => -DOCK.base * (s - 1));
 
   const wasActive = useRef(active);
+  const take = useRef(takeHop);
+  useEffect(() => {
+    take.current = takeHop;
+  });
   useEffect(() => {
     const was = wasActive.current;
     wasActive.current = active;
-    if (!active || was || reduced) return;
-    const c = animate(hop, 0, { ...spring.pop, velocity: HOP_VELOCITY });
+    if (!active || was) return;
+    // consumed even under reduced motion, so a stale press never leaks into a later switch
+    const transition = take.current?.() ?? hopFor(Number.NaN);
+    if (reduced) return;
+    const c = animate(hop, 0, transition);
     return () => c.stop();
   }, [active, reduced, hop]);
 
@@ -210,7 +258,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
       <motion.span aria-hidden="true" className="absolute inset-0 rounded-full" style={{ scale: fx.scale, originY: 1 }}>
         {tab && <span className="absolute inset-0 rounded-full bg-white/[0.05]" />}
         {/* pack hover pill: fades in 25 ms after the label (τ 40 ms), out a little slower (τ 45 ms) */}
-        <span className="absolute inset-0 rounded-full bg-line-2 opacity-0 [transition:var(--dock-pill-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-pill-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-pill-in)]" />
+        <span className="absolute inset-0 rounded-full bg-line-2 opacity-0 [transition:var(--dock-pill-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-pill-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-pill-in)] group-data-[scrub]/dock:opacity-100 group-data-[scrub]/dock:[transition:var(--dock-pill-in)]" />
         {tab && (
           <AnimatePresence initial={false}>
             {active && (
@@ -235,9 +283,11 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
           animate={waiting ? { opacity: 0, scale: 0.5 } : { opacity: 1, scale: 1 }}
           transition={{ scale: { ...spring.pop, delay: iconDelay }, opacity: { ...tween.fade, delay: iconDelay } }}
         >
-          <Magnetic intensity={0.5} range={60} remeasure className="size-5 items-center justify-center [&_svg]:size-full">
-            {children}
-          </Magnetic>
+          <motion.span className="grid place-items-center" style={{ scale: bump }}>
+            <Magnetic intensity={0.5} range={60} remeasure className="size-5 items-center justify-center [&_svg]:size-full">
+              {children}
+            </Magnetic>
+          </motion.span>
         </motion.span>
       </motion.span>
       {tab && (
@@ -259,8 +309,8 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
         {/* pack label (fades in, rising from +6 px on the 1000/38 spring) on an opaque Nothing plate that is uncovered by
             clip-path instead of fading, so page text behind it is either fully covered or untouched (SH-03).
             CSS transitions with the measured curves as linear() (compositor: clip-path, opacity, translate) */}
-        <span className="block translate-y-[var(--dock-tip-rise)] whitespace-pre rounded-md border border-white/15 bg-ink-700 px-2 py-0.5 text-xs font-medium text-fg [clip-path:inset(100%_0_0_0_round_6px)] [transition:var(--dock-tip-out)] group-hover/dock:translate-y-0 group-hover/dock:[clip-path:inset(0_0_0_0_round_6px)] group-hover/dock:[transition:var(--dock-tip-in)] group-focus-visible/dock:translate-y-0 group-focus-visible/dock:[clip-path:inset(0_0_0_0_round_6px)] group-focus-visible/dock:[transition:var(--dock-tip-in)]">
-          <span className="block opacity-0 [transition:var(--dock-tiptext-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-tiptext-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-tiptext-in)]">
+        <span className="block translate-y-[var(--dock-tip-rise)] whitespace-pre rounded-md border border-white/15 bg-ink-700 px-2 py-0.5 text-xs font-medium text-fg [clip-path:inset(100%_0_0_0_round_6px)] [transition:var(--dock-tip-out)] group-hover/dock:translate-y-0 group-hover/dock:[clip-path:inset(0_0_0_0_round_6px)] group-hover/dock:[transition:var(--dock-tip-in)] group-focus-visible/dock:translate-y-0 group-focus-visible/dock:[clip-path:inset(0_0_0_0_round_6px)] group-focus-visible/dock:[transition:var(--dock-tip-in)] group-data-[scrub]/dock:translate-y-0 group-data-[scrub]/dock:[clip-path:inset(0_0_0_0_round_6px)] group-data-[scrub]/dock:[transition:var(--dock-tip-in)]">
+          <span className="block opacity-0 [transition:var(--dock-tiptext-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-tiptext-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-tiptext-in)] group-data-[scrub]/dock:opacity-100 group-data-[scrub]/dock:[transition:var(--dock-tiptext-in)]">
             {label}
           </span>
         </span>
@@ -352,7 +402,7 @@ export function Dock() {
     markDockIntroSeen();
   }, []);
 
-  const [slots] = useState<DockSlotFx[]>(() => Array.from({ length: SLOT_COUNT }, () => ({ x: motionValue(0), scale: motionValue(1) })));
+  const [slots] = useState<DockSlotFx[]>(() => Array.from({ length: SLOT_COUNT }, () => ({ x: motionValue(0), scale: motionValue(1), bump: motionValue(1) })));
   const [tray] = useState(() => ({ left: motionValue(0), right: motionValue(0), mid: motionValue(1) }));
   const slotEls = useRef<(HTMLElement | null)[]>([]);
   const [slotRefs] = useState(() =>
@@ -443,7 +493,176 @@ export function Dock() {
     }
     pointerTarget.set(e.clientX);
   };
-  const onPointerLeave = () => amountTarget.set(0);
+  const onPointerLeave = () => {
+    if (!scrub.current.on) amountTarget.set(0);
+  };
+
+  /* ---------------------------------------------------------------- touch: tempo hop, re-tap, scrub, flick, long press */
+
+  // the hop the next activated item plays (press tempo / flick), consumed once by that item within a second
+  const hopIntent = useRef<{ slot: number; at: number; transition: HopTransition } | null>(null);
+  const [takeHop] = useState(() =>
+    Array.from({ length: SLOT_COUNT }, (_, k) => () => {
+      const h = hopIntent.current;
+      hopIntent.current = null;
+      return h && h.slot === k && stamp() - h.at < 1000 ? h.transition : undefined;
+    }),
+  );
+  const intendHop = (slot: number, transition: HopTransition) => {
+    hopIntent.current = { slot, at: stamp(), transition };
+  };
+
+  /** Re-tap feedback: the visual dips and springs back (iOS tab bar). */
+  const bumpSlot = (slot: number) => {
+    const mv = slots[slot]?.bump;
+    if (!mv || reduced) return;
+    animate(mv, 1, { ...spring.pop, velocity: BUMP_VELOCITY });
+  };
+
+  /** Tab activation (tap, keyboard, scrub release). The active tab again → back to the top of the page (iOS). */
+  const activateTab = (k: number, pressMs: number) => {
+    const p = PAGES[k];
+    if (!p) return;
+    if (p === useUi.getState().page) {
+      // native smooth scroll (compositor), instant under reduced motion
+      window.scrollTo({ top: 0, behavior: reduced ? "instant" : "smooth" });
+      bumpSlot(k);
+    } else intendHop(k, hopFor(pressMs));
+    navigate(p);
+  };
+  const onTabClick = (k: number) => (e: MouseEvent<HTMLButtonElement>) => activateTab(k, e.detail === 0 ? Number.NaN : lastPressMs());
+  const activateSlot = (k: number) => {
+    if (k === FAB_SLOT) openEditor({ fromFab: true });
+    else activateTab(k, Number.NaN);
+  };
+
+  const scrub = useRef({ on: false, item: -1, longPress: false, swallow: false, timer: 0 as ReturnType<typeof setTimeout> | 0, startY: 0 });
+  const markScrub = (k: number) => {
+    const st = scrub.current;
+    if (k === st.item) return;
+    slotEls.current[st.item]?.removeAttribute("data-scrub");
+    st.item = k;
+    if (k >= 0) {
+      slotEls.current[k]?.setAttribute("data-scrub", "");
+      haptic();
+    }
+  };
+  /** Index of the scalable slot (tabs + FAB) nearest to `clientX` (resting centres; the magnified row is symmetric about the finger). */
+  const slotAtX = (clientX: number): number => {
+    const g = geometry.current;
+    if (!g) return -1;
+    let best = -1;
+    let bestD = Infinity;
+    g.centres.forEach((c, k) => {
+      if (!SCALABLE[k] || !Number.isFinite(c)) return;
+      const d = Math.abs(clientX - c);
+      if (d < bestD) {
+        bestD = d;
+        best = k;
+      }
+    });
+    return best;
+  };
+  const clearPress = () => {
+    const st = scrub.current;
+    if (st.timer) clearTimeout(st.timer);
+    st.timer = 0;
+  };
+  const endScrub = () => {
+    clearPress();
+    scrub.current.on = false;
+    markScrub(-1);
+    amountTarget.set(0);
+  };
+
+  const drag = useAxisDrag({
+    axis: "x",
+    pointerTypes: ["touch", "pen"],
+    // the dock never scrolls the page (iOS tab bar); vertical drags simply do nothing
+    touchAction: "none",
+    enabled: phase !== "stage",
+    onPress: (e) => {
+      // one layout read per gesture
+      if (!geometry.current) measure();
+      const st = scrub.current;
+      st.longPress = false;
+      st.startY = e.clientY;
+      clearPress();
+      const x = e.clientX;
+      // long press without moving: show the label of the item under the finger (Android tooltip); release then does nothing
+      st.timer = setTimeout(() => {
+        st.timer = 0;
+        st.longPress = true;
+        markScrub(slotAtX(x));
+      }, physics.holdMs);
+    },
+    onStart: (s) => {
+      clearPress();
+      scrub.current.on = true;
+      scrub.current.longPress = false;
+      if (!reduced) {
+        pointerTarget.jump(s.startX);
+        pointer.jump(s.startX);
+        amountTarget.set(SCRUB_AMOUNT);
+      }
+      markScrub(slotAtX(s.startX));
+    },
+    onMove: (m) => {
+      const g = geometry.current;
+      if (!g) return;
+      const first = g.centres[0] ?? m.clientX;
+      const last = g.centres[FAB_SLOT] ?? m.clientX;
+      // the bell follows the finger 1:1 inside the row and rubber-bands past its ends (iOS)
+      if (!reduced) pointerTarget.set(rubberClamp(m.clientX, first - DOCK.base / 2, last + DOCK.base / 2, DOCK.base));
+      markScrub(slotAtX(m.clientX));
+    },
+    onRelease: (r: AxisDragRelease) => {
+      const item = scrub.current.item;
+      endScrub();
+      // fast and short → one tab per flick (finger right = next tab), slow → the item under the finger
+      const step = flickStep({ offset: r.dx, velocity: r.vx, durationMs: r.durationMs });
+      if (step !== 0) {
+        const at = PAGES.indexOf(useUi.getState().page);
+        const to = at + step;
+        if (at >= 0 && to >= 0 && to < PAGES.length) {
+          setNavTempo(r.tempo);
+          intendHop(to, flickHop(r.speed));
+          navigate(PAGES[to] as Page);
+        } else if (at >= 0) bumpSlot(at); // at the end of the row: a dip instead of a switch
+        return "none";
+      }
+      if (item >= 0 && Math.abs(r.clientY - scrub.current.startY) <= SCRUB_RELEASE_Y) activateSlot(item);
+      return "none";
+    },
+    onCancel: endScrub,
+    onTap: () => {
+      if (scrub.current.longPress) scrub.current.swallow = true;
+    },
+  });
+  const onToolbarPointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    drag.handlers.onPointerUp(e);
+    if (!scrub.current.on) {
+      clearPress();
+      markScrub(-1);
+    }
+  };
+  const onToolbarPointerCancel = (e: PointerEvent<HTMLDivElement>) => {
+    drag.handlers.onPointerCancel(e);
+    endScrub();
+  };
+  const onToolbarClickCapture = (e: MouseEvent<HTMLDivElement>) => {
+    drag.handlers.onClickCapture(e);
+    if (!scrub.current.swallow) return;
+    scrub.current.swallow = false;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  useEffect(() => {
+    const st = scrub.current;
+    return () => {
+      if (st.timer) clearTimeout(st.timer);
+    };
+  }, []);
 
   const fabVisible = !(editor.open && editor.fromFab);
   const breathing = fabVisible && !editor.open && canHover && !reduced && phase !== "stage";
@@ -455,7 +674,8 @@ export function Dock() {
     // shorter while scrolled) as movement of the dock-bg / dock-dot / new-trade markers inside it
     <motion.nav
       layoutRoot
-      className="pointer-events-none fixed inset-x-0 bottom-[calc(12px+env(safe-area-inset-bottom,0px))] z-50 flex justify-center"
+      // grey-bar fix: above the taskbar safe area AND any host UI laid over the page bottom (`--safe-bottom`, base.css)
+      className="pointer-events-none fixed inset-x-0 bottom-[calc(12px+var(--safe-bottom,env(safe-area-inset-bottom,0px)))] z-50 flex justify-center"
       aria-label="Navigation"
       style={DOCK_FX_VARS}
     >
@@ -464,13 +684,25 @@ export function Dock() {
         role="toolbar"
         aria-label="Navigation"
         onPointerEnter={onPointerEnter}
-        onPointerMove={onPointerMove}
+        onPointerDown={drag.handlers.onPointerDown}
+        onPointerMove={(e) => {
+          drag.handlers.onPointerMove(e);
+          onPointerMove(e);
+        }}
+        onPointerUp={onToolbarPointerUp}
+        onPointerCancel={onToolbarPointerCancel}
+        onLostPointerCapture={drag.handlers.onLostPointerCapture}
+        onClickCapture={onToolbarClickCapture}
         onPointerLeave={onPointerLeave}
+        onContextMenu={(e) => {
+          // a long press shows the label; no system menu over it
+          if (scrub.current.longPress || scrub.current.on) e.preventDefault();
+        }}
         initial={entrance.initial}
         animate={entrance.animate}
         transition={entrance.transition}
-        style={{ height: DOCK.panelHeight }}
-        className="pointer-events-auto relative mx-2 flex max-w-full items-end gap-3 px-3 pb-2"
+        style={{ ...drag.style, height: DOCK.panelHeight }}
+        className="pointer-events-auto relative mx-2 flex max-w-full items-end gap-3 px-3 pb-2 [-webkit-touch-callout:none]"
       >
         <DockTray left={tray.left} right={tray.right} mid={tray.mid} />
         {PAGES.map((p, k) => (
@@ -483,9 +715,10 @@ export function Dock() {
             waiting={phase === "stage"}
             layoutKey={layoutKey}
             index={k}
+            takeHop={takeHop[k]}
             label={PAGE_LABELS[p]}
             active={page === p}
-            onClick={() => navigate(p)}
+            onClick={onTabClick(k)}
             className={page === p ? "text-ink-950" : "text-mute hover:text-fg"}
           >
             <Icon name={PAGE_ICON[p]} />

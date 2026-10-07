@@ -35,7 +35,7 @@ describe("ImportDialog", () => {
 
     const file = new File([text], "trade-journal-2026-09-29.json", { type: "application/json" });
     fireEvent.change(screen.getByLabelText("Backup-Datei"), { target: { files: [file] } });
-    await waitFor(() => expect(screen.getByTestId("import-preview-text")).toHaveTextContent("1 Trades, 1 Grundlagen, 0 Ablesungen · exportiert am 29.09.26"));
+    await waitFor(() => expect(screen.getByTestId("import-preview-text")).toHaveTextContent("1 Trades, 2 Grundlagen, 0 Ablesungen · exportiert am 29.09.26"));
     expect(screen.getByText("Datei: trade-journal-2026-09-29.json")).toBeInTheDocument();
 
     expect(screen.getByRole("radio", { name: "Zusammenführen" })).toHaveAttribute("aria-checked", "true");

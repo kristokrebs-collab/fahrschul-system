@@ -11,6 +11,7 @@ export const CACHE_STORE = "kv";
 
 export const RING_CAPACITY: Record<SeriesFeed, number> = {
   kline_1m: 10_080, // 7 days
+  kline_15m: 3_000, // ≈ 31 days (1500 = 500 × 45m are evaluated)
   kline_1h: 2_200, // ≈ 90 days
   kline_4h: 600,
   kline_1w: 260,

@@ -161,7 +161,7 @@ function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, on
           title="Ziehen oder Pfeiltasten"
           onPointerDown={(e) => controls.start(e)}
           onKeyDown={onHandleKey}
-          className="grid size-10 shrink-0 cursor-grab touch-none place-items-center rounded-xl border border-line-2 text-faint hover:text-fg active:cursor-grabbing"
+          className="grid size-10 shrink-0 cursor-grab touch-none place-items-center rounded-xl border border-line-2 text-faint hover:text-fg active:cursor-grabbing pointer-coarse:size-11"
         >
           <svg viewBox="0 0 12 12" className="size-3" fill="currentColor" aria-hidden="true">
             <circle cx="4" cy="2.5" r="1" />
@@ -179,7 +179,7 @@ function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, on
           onClick={onRemove}
           whileTap={{ scale: 0.92 }}
           transition={spring.press}
-          className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:border-loss/40 hover:text-loss [&>svg]:size-4"
+          className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:border-loss/40 hover:text-loss pointer-coarse:size-11 [&>svg]:size-4"
         >
           <Icon name="x" />
         </motion.button>
@@ -191,7 +191,7 @@ function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, on
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, transition: tween.exit }}
             transition={tween.fade}
-            className="flex flex-wrap items-center gap-2 pl-12 text-[12.5px] text-[#ff8a90]"
+            className="flex flex-wrap items-center gap-2 pl-12 text-[12.5px] text-[#ff8a90] pointer-coarse:pl-[3.25rem]"
             role="alert"
           >
             {RULES_STRINGS.removeHint(used)}

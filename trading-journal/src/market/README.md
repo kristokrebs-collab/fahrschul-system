@@ -94,6 +94,7 @@ effect built on them with `useReducedFx()`. Countdowns and ages combine them wit
 | Feed | Transport | Cadence | `staleAfterMs` | Notes |
 |---|---|---|---|---|
 | `kline_1m/1h/4h` | WS `kline_*` (+ REST bootstrap 499) | 250 ms | 2·interval + 60 s | upsert by open time; `closed` = final |
+| `kline_15m` | WS `kline_15m` (+ REST bootstrap 1500 = 500 × 45m, weight 10 once) | 250 ms | 31 min | feeds the signal check (30m = 2 × 15m, 45m = 3 × 15m); ring 3000 |
 | `kline_1w` | WS `kline_1w` (+ REST 200) | weekly | 7 d + 1 h | `closeW` via `weeklyClose()` |
 | `markPrice` | WS `markPrice@1s` (bootstrap `premiumIndex`) | 1 s | 5 s | heartbeat; funding rate + next funding |
 | `aggTrade` | WS `aggTrade` | 100 ms | 5 s | **the** last price (never mark) |
@@ -138,6 +139,67 @@ The **market card** status (`connecting|live|error|unavailable`) is driven only 
 that runs itself (`refreshRingProgress(nextTickerRefreshAt, now)` remains for a static progress).
 Non-comparable values (`comparable:false`) show the `andere Kohorte` badge with `COHORT_HINT[source]`.
 
+Kline gap fill: a non-bootstrap kline poll (WS reconnect, REST fallback) requests every bar since the newest cached one
+(`ceil(gap / interval) + 1`, at least 2, at most 1500), so a long outage leaves no holes in the series.
+
+`provider.fetchKlines(interval, { endTime?, startTime?, limit?, maxWaitMs? })` — one kline page (`FetchInterval` = the live
+intervals + `1d`) from the source the kline feeds currently use, charged to the same budget (waits ≤ 15 s for tokens, then
+`RestError("rate_limited")`), never published into the live cache. Used by the retro signal check and the lazily polled `1d` rung.
+
+Opened from disk (`file:`/`content:`, `isFileProtocol()` from `@/edition`) the proxy source is dropped from the chain (no Netlify
+function; no `file:///api/…` CORS noise).
+
+## Signal check (`signals/`) — live "Einstiegs-Check", retro check, chart markers
+
+The pure engine is `@/domain/signals` (1:1 port of the other journal, see its README). This layer feeds it:
+
+| Rung | Built from | |
+|---|---|---|
+| 30m, 45m | `kline_15m` × 2 / × 3 | exact, UTC-session aligned like TradingView |
+| 1h, 2h, 3h | `kline_1h` × 1 / 2 / 3 | |
+| 4h | `kline_4h` | |
+| 1D | REST `1d` (polled every 5 min, only when a ladder uses it) | |
+
+Every rung evaluates its last 500 bars (the other journal's `count: 500`); the running candle is completed with the live price
+(`priceMv` / `tradeTimeMv`, only while younger than 5 min). `startMarket` starts it (`signals/boot.ts` follows
+`settings.signals` from the journal store), `stopMarket` stops it — nothing to mount.
+
+**Cadence (120 Hz rule):** a kline publish, a price frame or a health change only marks the engine dirty; one timer evaluates at
+most once per second (5 s in a hidden tab) and sleeps while no data arrives. A full evaluation costs ≈ 1 ms (test budget 3 ms).
+The published state changes identity only when the rounded result changes.
+
+```ts
+import { useSignalCheck, getSignalSnapshot, subscribeSignalCheck, toTradeSnapshot, checkTradeAt, retroCheck, getMcbSeries, getSignalCandles } from "@/market";
+
+const { state, snapshot, updatedAt, message } = useSignalCheck();
+// state: "loading" | "ok" | "stale" | "offline"; snapshot: LiveSignals | null (may be set while loading/stale)
+// snapshot.long / .short / .best: Verdict { tiers, strength 0–4, label, valid, rsiOk, zoneOk, score, reasons[] }
+// snapshot.checks[i]: TfCheck | null per ladder rung (null = "Zu wenig Kerzen"); snapshot.zone: check of cfg.zoneTf
+// snapshot.cfg (sanitised settings.signals), .symbol, .source, .price, .at
+const tradeSignal = toTradeSnapshot(snapshot, "long");          // → trade.signal (SignalSnapshot, mode "live")
+const snap = await checkTradeAt(trade.date, trade.side);         // live within 5 min, else rebuilt from history at T; null = not covered
+const r = await retroCheck(date);                                // { status: ok|live|no-history|error|unavailable, signals, message }
+getMcbSeries("45m");                                             // [{ time (ms), kind: bottom|top|buy|sell, live }]; { minor: true } adds bull/bear
+getSignalCandles("45m");                                         // Candle[] of a signal timeframe (chart)
+```
+
+| State | message |
+|---|---|
+| `loading` | `Kerzen werden geladen …` / `Zu wenig Kerzen für den Check.` (feeds delivered, < 150 bars) |
+| `ok` | `null` |
+| `stale` | `Marktdaten veraltet, der Check zeigt den letzten Stand.` (a kline feed stale / offline) |
+| `offline` | `Keine Marktdaten (Binance).` / `Kein Live-Kurs für dieses Symbol.` |
+
+**Retro check** (`checkTradeAt(date, side)`): within 5 min of now the live snapshot; otherwise every source interval is fetched
+as ONE `endTime = T` page (1500 × 15m, 499 × 1h, 499 × 4h ≈ weight 20) unless the live ring already holds enough contiguous bars
+before T; only bars closed at T count. Too little history → `null` (never a fake "strength 0"). Memoised per symbol, config and
+minute; network errors resolve `null` (status `error`, retried on the next call). Debounce date inputs in the form (≈ 300 ms).
+
+**Notification:** a NEW valid entry (edge after the first evaluation, held ≥ 60 s against repaint) → toast (`pushToast`, kind
+`signal`, 5.2 s: label, `Score n`, strength line) once per base bar and side, persisted in `storageKey("signal-last")`
+(`tj2-signal-last`). With `settings.signals.notify` and a granted permission also a system notification while the page is not
+in front. `requestSignalNotifyPermission()` must be called from the click that enables the switch; `signalNotifyPermission()`.
+
 ## Mapping (`mapping.ts`)
 
 - `deriveMarket(snapshot, health, { now, rsiWOverride })` → `price` (rounded last price), `change`, `close4h/At`
@@ -152,7 +214,9 @@ Non-comparable values (`comparable:false`) show the `andere Kohorte` badge with 
 
 ## Other modules
 
-`symbol.ts` (`tvSymbolToBinance`, `resolveSymbol` → Bybit/OKX symbols, `Fallback nur für USDT-Perps`),
+`symbol.ts` (`tvSymbolToBinance`, `resolveSymbol` → Bybit/OKX symbols, `Fallback nur für USDT-Perps`; a USD symbol of another
+venue — the other journal's `BITSTAMP:BTCUSD` — or a bare `BTCUSD` maps to the USDT perp `BTCUSDT`, TradingView's `.P` suffix is
+dropped),
 `period.ts` (Binance/Bybit/OKX period tables, `cadenceLabel`), `feeds.ts` (spec table), `budget.ts` (token
 buckets at 10 % reserve), `schedule.ts` (`nextAlignedAt`, `wsBackoffMs`, `probeBackoffMs`, pausable `Scheduler`),
 `cache.ts` (`MarketCache`, `upsertSeries`, key `${source}:${symbol}:${feed}`, DB `tj-market`), `health.ts`
@@ -166,6 +230,9 @@ Notifications and MotionValues are frame-coalesced: after dispatching WS message
 `flushMarketNotifications()` and `flushMotionValues()` before asserting. Views mocked through
 `tests/unit/views.overview.harness.tsx` (`fakeMarket(actual)`) get fixture-backed `useFeed` / `useFeedSelect` / `getFeed` /
 `useHealth` / `useHealthSelect`, a no-op `subscribeFeed`, and real MotionValues seeded from the snapshot.
+Signal check: `tests/unit/market.signals.test.ts` (fake provider: live parity with the other journal's pipeline, ≤ 1/s cadence,
+stable identity, status texts, 2h/3h/1D rungs, markers, retro history incl. null-not-0, notifications, < 3 ms per check); the
+pure engine in `tests/unit/signals.*.test.ts`. Kline fixtures: `binance-klines-{1m,15m,1h,4h,1w}.json`.
 E2E: `await mockMarket(page, "live")` (`tests/e2e/mocks/market.ts`) routes REST to fixtures and replays the
 WS scenario through a fake `window.WebSocket`. Unit tests: `tests/unit/market.*.test.ts`.
 

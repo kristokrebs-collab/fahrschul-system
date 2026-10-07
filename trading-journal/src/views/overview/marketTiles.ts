@@ -1,11 +1,12 @@
 import { useCallback, useState } from "react";
+import { storageKey } from "@/store/storage";
 
 /** The four MarketPanel mini tiles in their default order. */
 export const MARKET_TILE_IDS = ["funding", "oi", "taker", "book"] as const;
 export type MarketTileId = (typeof MARKET_TILE_IDS)[number];
 
-/** Per-browser UI preference (not journal data): the user's tile order after a drag. */
-export const MARKET_TILES_KEY = "tj2-ui-market-tiles";
+/** Per-browser UI preference (not journal data): the user's tile order after a drag (`tj2-ui-market-tiles`; own namespace in the share edition). */
+export const MARKET_TILES_KEY = storageKey("ui-market-tiles");
 
 const isTileId = (v: unknown): v is MarketTileId => typeof v === "string" && (MARKET_TILE_IDS as readonly string[]).includes(v);
 

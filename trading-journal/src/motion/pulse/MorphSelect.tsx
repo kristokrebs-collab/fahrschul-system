@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
+import { axisLock, haptic, physics, progressVelocity, createVelocityTracker } from "@/motion/physics";
 import { clamp01, createFrameLoop, easeOutCubic, prefersReducedMotion } from "@/motion/pulse/engine";
 import { springRests, stepSpring, type SpringState } from "@/motion/pulse/springStep";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -19,6 +20,10 @@ export const CONFIG = {
   thumbIdleMs: 1400, // scroll thumb fades this long after the last scroll
   closeFadeFrom: 0.35, // spring progress below which the retracting ghost fades out (it ends under the field)
   rowH: 40,
+  /** Coarse pointers: 44 px rows (tap targets ≥ 44 × 44). */
+  rowHCoarse: 44,
+  /** Touch / pen press-drag-release: holding this long (ms, still) opens the panel under the finger. */
+  pressHoldMs: 300,
   rowGap: 3,
   headH: 36,
   listPad: 6,
@@ -73,6 +78,8 @@ interface Geo {
   sy0: number;
   ox: number;
   scrollable: boolean;
+  /** row height (px): `CONFIG.rowH`, `CONFIG.rowHCoarse` on coarse pointers */
+  rowH: number;
 }
 
 interface Anim {
@@ -99,22 +106,46 @@ const SIZE = {
 const fold = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 /** Panel placement from ONE measurement of the trigger: below (or flipped above), clamped to the viewport. */
-export function placePanel(r: { left: number; top: number; width: number; height: number }, rows: number, heading: boolean, vw: number, vh: number): Geo {
+export function placePanel(r: { left: number; top: number; width: number; height: number }, rows: number, heading: boolean, vw: number, vh: number, rowH: number = CONFIG.rowH): Geo {
   const C = CONFIG;
-  const needed = (heading ? C.headH : 0) + C.listPad * 2 + rows * C.rowH + Math.max(0, rows - 1) * C.rowGap + 2;
+  const needed = (heading ? C.headH : 0) + C.listPad * 2 + rows * rowH + Math.max(0, rows - 1) * C.rowGap + 2;
   const w = Math.min(Math.max(r.width, C.panelMinW), vw - C.edge * 2);
   const left = Math.min(Math.max(r.left, C.edge), Math.max(C.edge, vw - C.edge - w));
   const below = vh - (r.top + r.height) - C.gap - C.edge;
   const above = r.top - C.gap - C.edge;
   const up = below < Math.min(needed, C.minBelow) && above > below;
-  const room = Math.max(C.rowH + C.listPad * 2 + 2, up ? above : below);
+  const room = Math.max(rowH + C.listPad * 2 + 2, up ? above : below);
   const h = Math.min(needed, C.panelMaxH, room);
   const top = up ? r.top - C.gap - h : r.top + r.height + C.gap;
   const sx0 = Math.min(1, r.width / w);
   const sy0 = Math.min(1, r.height / h);
   // transform-origin x so the scaled box starts exactly under the field even when the panel was shifted left
   const ox = sx0 < 1 ? (r.left - left) / (1 - sx0) : 0;
-  return { left, top, w, h, up, sx0, sy0, ox, scrollable: needed > h };
+  return { left, top, w, h, up, sx0, sy0, ox, scrollable: needed > h, rowH };
+}
+
+/**
+ * Pure: the option row under a client point while the panel is open (press-drag-release, arithmetic only – no layout
+ * reads): -1 outside the panel's list, in the gap between rows or past the last row.
+ */
+export function rowAtPoint(g: Pick<Geo, "left" | "top" | "w" | "h" | "rowH">, heading: boolean, scrollTop: number, count: number, x: number, y: number): number {
+  const C = CONFIG;
+  if (x < g.left || x > g.left + g.w || y < g.top || y > g.top + g.h) return -1;
+  const listTop = g.top + 1 + (heading ? C.headH : 0);
+  const off = y - listTop - C.listPad + scrollTop;
+  if (off < 0) return -1;
+  const pitch = g.rowH + C.rowGap;
+  const i = Math.floor(off / pitch);
+  if (off - i * pitch > g.rowH || i >= count) return -1;
+  return i;
+}
+
+function coarsePointer(): boolean {
+  try {
+    return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  } catch {
+    return false;
+  }
 }
 
 /** Next option index for a typeahead buffer (cycles from the current one for repeated single letters). */
@@ -132,6 +163,11 @@ export function typeaheadIndex(labels: readonly string[], buffer: string, from: 
 }
 
 /**
+ * Physics / touch (additive): UIMenu press-drag-release – press the field and drag (mouse: 10 px vertical; touch / pen:
+ * hold 300 ms still, then drag) and the panel opens under the pointer; the row under it is highlighted (arithmetic hit
+ * test, selection haptic on touch) and releasing on a row picks it; releasing elsewhere keeps the panel open, a fling
+ * away (≥ 600 px/s) dismisses it with the throw's speed. A plain tap still toggles. Rows are 44 px on coarse pointers.
+ *
  * Drop-in replacement for a native `<select>` (WAI-ARIA listbox popup): trigger `button[aria-haspopup=listbox]`
  * shows the selected label; the panel lives in a fixed layer (escapes clipping/scroll containers, positioned from
  * one measurement at open, flips up when there is no room) and grows out of the field without covering it.
@@ -173,6 +209,10 @@ export function MorphSelect<T extends string = string>({
   const thumbRef = useRef<HTMLDivElement>(null);
   const loopRef = useRef<ReturnType<typeof createFrameLoop> | null>(null);
   const typeRef = useRef({ buffer: "", timer: 0 as ReturnType<typeof setTimeout> | 0 });
+  const geoRef = useRef<Geo | null>(null);
+  // press-drag-release on the trigger (UIMenu): armed on pointerdown, "drag" once the panel opened under the pointer
+  const pressRef = useRef({ mode: "idle" as "idle" | "armed" | "drag", pid: -1, touch: false, sx: 0, sy: 0, timer: 0 as ReturnType<typeof setTimeout> | 0, row: -1, suppressClick: false });
+  const tracker = useRef(createVelocityTracker());
   const anim = useRef<Anim>({ mode: "idle", s: { x: 0, v: 0 }, t0: 0, startAt: 0, sx0: 1, sy0: 1, scrollTop: 0, scrollH: 0, clientH: 0, scrollDirty: false, lastScroll: -1e9, thumbOn: false, radiusDone: true });
 
   const selectedIndex = options.findIndex((o) => o.value === value);
@@ -272,13 +312,15 @@ export function MorphSelect<T extends string = string>({
     const t = triggerRef.current;
     if (!t || disabled || options.length === 0) return;
     const r = t.getBoundingClientRect();
-    setGeo(placePanel(r, options.length, !!heading, window.innerWidth, window.innerHeight));
+    const g = placePanel(r, options.length, !!heading, window.innerWidth, window.innerHeight, coarsePointer() ? CONFIG.rowHCoarse : CONFIG.rowH);
+    geoRef.current = g;
+    setGeo(g);
     setActive(selectedIndex >= 0 ? selectedIndex : 0);
     setPhase("open");
   }, [disabled, options.length, heading, selectedIndex]);
 
   const close = useCallback(
-    (choose?: T, focusTrigger = true) => {
+    (choose?: T, focusTrigger = true, flingVelocity = 0) => {
       const a = anim.current;
       if (a.mode === "idle" || a.mode === "closing") return;
       if (choose !== undefined && choose !== value) onChange(choose);
@@ -291,7 +333,9 @@ export function MorphSelect<T extends string = string>({
       }
       const box = boxRef.current;
       a.mode = "closing";
-      a.startAt = performance.now() + CONFIG.closeDelay;
+      // a fling retracts at once and keeps the throw's speed (progress units / s); a choice holds 40 ms first
+      a.startAt = performance.now() + (flingVelocity ? 0 : CONFIG.closeDelay);
+      if (flingVelocity) a.s.v = flingVelocity;
       a.thumbOn = false;
       if (contentRef.current) contentRef.current.style.opacity = "0";
       const rx = CONFIG.fieldRadius / a.sx0;
@@ -318,8 +362,8 @@ export function MorphSelect<T extends string = string>({
     a.scrollH = list.scrollHeight;
     a.clientH = list.clientHeight;
     if (selectedIndex >= 0) {
-      const rowTop = CONFIG.listPad + selectedIndex * (CONFIG.rowH + CONFIG.rowGap);
-      list.scrollTop = Math.max(0, rowTop - (a.clientH - CONFIG.rowH) / 2);
+      const rowTop = CONFIG.listPad + selectedIndex * (geo.rowH + CONFIG.rowGap);
+      list.scrollTop = Math.max(0, rowTop - (a.clientH - geo.rowH) / 2);
     }
     a.scrollTop = list.scrollTop;
     if (thumbRef.current) thumbRef.current.style.height = `${Math.max(24, (a.clientH * a.clientH) / Math.max(1, a.scrollH) - 8).toFixed(1)}px`;
@@ -353,10 +397,11 @@ export function MorphSelect<T extends string = string>({
     const list = listRef.current;
     if (!list) return;
     const a = anim.current;
-    const top = CONFIG.listPad + active * (CONFIG.rowH + CONFIG.rowGap);
+    const rowH = geoRef.current?.rowH ?? CONFIG.rowH;
+    const top = CONFIG.listPad + active * (rowH + CONFIG.rowGap);
     const st = list.scrollTop;
     if (top - CONFIG.listPad < st) list.scrollTop = top - CONFIG.listPad;
-    else if (top + CONFIG.rowH + CONFIG.listPad > st + a.clientH) list.scrollTop = top + CONFIG.rowH + CONFIG.listPad - a.clientH;
+    else if (top + rowH + CONFIG.listPad > st + a.clientH) list.scrollTop = top + rowH + CONFIG.listPad - a.clientH;
   }, [active, phase]);
 
   // outside press / outside scroll / resize close (the panel was placed from one measurement)
@@ -390,9 +435,115 @@ export function MorphSelect<T extends string = string>({
   };
 
   const onTriggerClick = () => {
+    // the click that ends a press-drag-release (pointerup lands on the trigger, which holds the capture)
+    if (pressRef.current.suppressClick) {
+      pressRef.current.suppressClick = false;
+      return;
+    }
     if (phase === "open") close();
     else open();
   };
+
+  /* ---------------------------------------------------------------- press-drag-release (UIMenu) */
+
+  const blockTouch = useCallback((e: TouchEvent) => {
+    if (e.cancelable) e.preventDefault();
+  }, []);
+  const endPress = () => {
+    const p = pressRef.current;
+    if (p.timer) clearTimeout(p.timer);
+    p.timer = 0;
+    p.mode = "idle";
+    p.row = -1;
+    window.removeEventListener("touchmove", blockTouch, true);
+  };
+  const beginDragOpen = (target: HTMLElement, pid: number) => {
+    const p = pressRef.current;
+    p.mode = "drag";
+    p.row = -1;
+    if (phase !== "open") open();
+    // the moves keep coming to the trigger while the pointer travels over the portal panel (touch: implicit capture)
+    try {
+      target.setPointerCapture(pid);
+    } catch {
+      /* pointer gone */
+    }
+    if (p.touch) {
+      // the page must not start scrolling under a held menu (non-passive only for this gesture)
+      window.addEventListener("touchmove", blockTouch, { passive: false, capture: true });
+      haptic();
+    }
+  };
+  const onTriggerPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (disabled || options.length === 0 || (e.pointerType === "mouse" && e.button !== 0)) return;
+    endPress();
+    const p = pressRef.current;
+    p.mode = "armed";
+    p.pid = e.pointerId;
+    p.touch = e.pointerType !== "mouse";
+    p.sx = e.clientX;
+    p.sy = e.clientY;
+    p.suppressClick = false;
+    tracker.current.reset();
+    tracker.current.add(e.timeStamp, e.clientX, e.clientY);
+    if (p.touch && phase !== "open") {
+      const el = e.currentTarget;
+      const pid = e.pointerId;
+      // touch: hold still to open under the finger (a plain move is the page scroll)
+      p.timer = setTimeout(() => {
+        p.timer = 0;
+        if (p.mode === "armed") beginDragOpen(el, pid);
+      }, CONFIG.pressHoldMs);
+    }
+  };
+  const onTriggerPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const p = pressRef.current;
+    if (e.pointerId !== p.pid || p.mode === "idle") return;
+    tracker.current.addEvent(e.nativeEvent);
+    if (p.mode === "armed") {
+      const lock = axisLock(e.clientX - p.sx, e.clientY - p.sy, "y", physics.hysteresis, physics.axisRatio);
+      if (lock === "pending") return;
+      // mouse: a vertical drag opens the menu; touch before the hold: the browser scrolls, give up
+      if (lock === "engage" && !p.touch && phase !== "open") beginDragOpen(e.currentTarget, e.pointerId);
+      else endPress();
+      return;
+    }
+    const g = geoRef.current;
+    if (!g) return;
+    const i = rowAtPoint(g, !!heading, anim.current.scrollTop, options.length, e.clientX, e.clientY);
+    if (i !== p.row) {
+      p.row = i;
+      if (i >= 0) {
+        setActive(i);
+        if (p.touch) haptic();
+      }
+    }
+  };
+  const onTriggerPointerUp = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    const p = pressRef.current;
+    if (e.pointerId !== p.pid) return;
+    const wasDrag = p.mode === "drag";
+    const g = geoRef.current;
+    const v = tracker.current.velocity(e.timeStamp);
+    endPress();
+    if (!wasDrag) return;
+    p.suppressClick = true;
+    // a capture-less browser fires the click elsewhere: never let the flag swallow a later, unrelated click
+    setTimeout(() => {
+      p.suppressClick = false;
+    }, physics.clickSwallowMs);
+    const i = g ? rowAtPoint(g, !!heading, anim.current.scrollTop, options.length, e.clientX, e.clientY) : -1;
+    const o = i >= 0 ? options[i] : undefined;
+    if (o) {
+      close(o.value);
+      return;
+    }
+    // released outside the rows: a fling away dismisses (the retract keeps its speed), a slow release keeps it open
+    const speed = Math.hypot(v.x, v.y);
+    if (g && speed >= physics.flickMinSpeed) close(undefined, true, Math.min(-0.5, progressVelocity(-speed, Math.max(1, g.h * (1 - g.sy0)))));
+  };
+  const onTriggerPointerCancel = () => endPress();
+  useEffect(() => endPress, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onListKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const n = options.length;
@@ -467,7 +618,7 @@ export function MorphSelect<T extends string = string>({
 
   const isOpen = phase === "open";
   const mounted = phase !== "closed" || warm;
-  const g: Geo = geo ?? { left: 0, top: 0, w: CONFIG.panelMinW, h: CONFIG.panelMaxH, up: false, sx0: 1, sy0: 1, ox: 0, scrollable: false };
+  const g: Geo = geo ?? { left: 0, top: 0, w: CONFIG.panelMinW, h: CONFIG.panelMaxH, up: false, sx0: 1, sy0: 1, ox: 0, scrollable: false, rowH: CONFIG.rowH };
   const cool = () => {
     if (phase === "closed" && document.activeElement !== triggerRef.current) setWarm(false);
   };
@@ -489,14 +640,25 @@ export function MorphSelect<T extends string = string>({
         data-state={phase}
         data-testid={testId}
         onClick={onTriggerClick}
+        onPointerDown={onTriggerPointerDown}
+        onPointerMove={onTriggerPointerMove}
+        onPointerUp={onTriggerPointerUp}
+        onPointerCancel={onTriggerPointerCancel}
+        onContextMenu={(e) => {
+          if (pressRef.current.mode !== "idle") e.preventDefault();
+        }}
         onPointerEnter={() => setWarm(true)}
         onFocus={() => setWarm(true)}
         onPointerLeave={cool}
         onBlur={cool}
         onKeyDown={onTriggerKey}
         className={cn(
-          "group/ms relative flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-line bg-ink-950/70 text-left text-fg outline-none transition-[border-color] duration-200 focus-visible:border-white/40 disabled:cursor-not-allowed disabled:opacity-40 aria-expanded:border-white/40",
+          "group/ms relative flex w-full min-w-0 cursor-pointer items-center gap-2 rounded-xl border border-line bg-ink-950/70 text-left text-fg outline-none transition-[border-color] duration-200 focus-visible:border-white/40 disabled:cursor-not-allowed disabled:opacity-40 aria-expanded:border-white/40 select-none [-webkit-touch-callout:none]",
           SIZE[size],
+          // coarse pointers: a ≥ 44 px tall tap area without changing the field's height (it lines up with the inputs)
+          "pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:content-['']",
+          // the ::after sits in the padding box (inside the 1 px border): md 36 + 2·4, sm 32 + 2·6 → 44
+          size === "sm" ? "pointer-coarse:after:-inset-y-1.5" : "pointer-coarse:after:-inset-y-1",
           className,
         )}
       >
@@ -548,7 +710,7 @@ export function MorphSelect<T extends string = string>({
               {heading && (
                 <div className="relative flex shrink-0 items-center justify-between pl-4 pr-1.5 after:absolute after:inset-x-2 after:bottom-0 after:h-px after:bg-line-2" style={{ height: CONFIG.headH }}>
                   <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.08em] text-faint">{heading}</span>
-                  <button type="button" tabIndex={-1} aria-label="Schließen" onClick={() => close()} className="grid size-7 place-items-center rounded-lg text-faint hover:text-fg">
+                  <button type="button" tabIndex={-1} aria-label="Schließen" onClick={() => close()} className="touch-hit grid size-7 place-items-center rounded-lg text-faint hover:text-fg">
                     <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
                       <path d="M1.5 1.5l9 9M10.5 1.5l-9 9" />
                     </svg>
@@ -583,7 +745,7 @@ export function MorphSelect<T extends string = string>({
                         isSel ? "bg-ink-700 font-medium text-fg" : "text-fg/80 data-[active]:bg-ink-750 data-[active]:text-fg",
                         i === active && "shadow-[inset_0_0_0_1px_rgb(255_255_255/0.14)]",
                       )}
-                      style={{ height: CONFIG.rowH }}
+                      style={{ height: g.rowH }}
                     >
                       <span className="min-w-0 flex-1 truncate">{o.label}</span>
                       {o.hint && <span className="shrink-0 font-mono text-[11px] text-faint">{o.hint}</span>}

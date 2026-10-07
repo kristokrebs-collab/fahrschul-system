@@ -191,7 +191,7 @@ describe("binance WS messages", () => {
     expect(parseWsMessage(JSON.stringify({ result: null, id: 1 }))).toEqual({ kind: "unknown", stream: undefined });
   });
   it("builds the static combined-stream URL", () => {
-    expect(buildStreamUrl("BTCUSDT")).toBe("wss://fstream.binance.com/stream?streams=btcusdt@kline_1m/btcusdt@kline_1h/btcusdt@kline_4h/btcusdt@kline_1w/btcusdt@markPrice@1s/btcusdt@aggTrade");
+    expect(buildStreamUrl("BTCUSDT")).toBe("wss://fstream.binance.com/stream?streams=btcusdt@kline_1m/btcusdt@kline_15m/btcusdt@kline_1h/btcusdt@kline_4h/btcusdt@kline_1w/btcusdt@markPrice@1s/btcusdt@aggTrade");
     expect(buildStreamUrl("BTCUSDT", { bookTop: true })).toContain("/btcusdt@bookTicker");
   });
 });

@@ -73,6 +73,9 @@ export const RawSettingsSchema = z
     backtest: BacktestReferenceSchema.partial().optional(),
     market: MarketLevelsSchema.partial().optional(),
     hyblock: HyblockConfigSchema.partial().optional(),
+    /** Other version / NEW: mistake tags and the entry-check config (both passthrough, defaulted on read). */
+    mistakes: z.array(z.unknown()).optional(),
+    signals: z.unknown().optional(),
   })
   .passthrough();
 
@@ -88,6 +91,8 @@ export const SettingsSchema = z
     backtest: BacktestReferenceSchema,
     market: MarketLevelsSchema,
     hyblock: HyblockConfigSchema,
+    mistakes: z.array(z.string()),
+    signals: z.unknown().optional(),
   })
   .passthrough();
 
@@ -125,6 +130,9 @@ export const TradeSchema = z
     r: numOrNull,
     createdAt: textOrNull,
     updatedAt: textOrNull,
+    /** Other version / NEW: mistake tags (strings kept by `normalizeTrade`) and the opaque entry-check snapshot. */
+    mistakes: z.array(z.unknown()).nullable().optional(),
+    signal: z.unknown().optional(),
   })
   .passthrough();
 
@@ -143,16 +151,21 @@ export const HyblockReadingSchema = z
   .passthrough();
 
 /**
- * Backup envelope. `exportedAt` and `settings` are required; records are validated one by one
+ * Backup envelope – tolerant, so every backup the two journal versions ever wrote imports:
+ * ours `{ exportedAt, settings, trades, hyblock, schemaVersion, days? }`, the other version's
+ * `{ exportedAt, settings, trades }` and `{ trades }` (a bare `[...]` array is wrapped by `parseBackup`).
+ * Each part is optional, but present parts must have the right type (`settings` an object, `trades` an array), and
+ * `parseBackup` rejects an envelope with neither `trades` nor `settings`. Records are validated one by one
  * (`validateTrades` / `validateReadings` in `@/store/backup`) so a single broken record does not reject the file.
  */
 export const JsonBackupSchema = z
   .object({
-    exportedAt: z.string(),
-    settings: RawSettingsSchema,
-    trades: z.array(z.unknown()),
+    exportedAt: z.string().optional(),
+    settings: RawSettingsSchema.optional(),
+    trades: z.array(z.unknown()).optional(),
     hyblock: z.array(z.unknown()).optional(),
     schemaVersion: z.number().optional(),
+    days: z.record(z.unknown()).optional(),
   })
   .passthrough();
 

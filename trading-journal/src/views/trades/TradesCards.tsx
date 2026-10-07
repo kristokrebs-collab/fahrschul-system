@@ -2,11 +2,12 @@ import { AnimatePresence, motion, useIsPresent, type TargetAndTransition, type T
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { EnrichedTrade, Setup } from "@/domain/types";
 import { cn } from "@/lib/cn";
+import { contextSpringAt } from "@/motion/physics";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { useUi } from "@/store/uiStore";
+import { DETACHED_DETAIL_SOURCES, useUi } from "@/store/uiStore";
 import { useInsertHold } from "./TradesTable";
-import { CheckCount, EntryExit, PnlCell, RCell, ResultBadge, SideTag, TradeSetupChips, accountLine, dateLines } from "./tradeCells";
+import { CheckCount, EntryExit, PnlCell, RCell, ResultBadge, SideTag, SignalBadge, TradeSetupChips, accountLine, dateLines } from "./tradeCells";
 
 export interface TradesCardsProps {
   rows: readonly EnrichedTrade[];
@@ -44,9 +45,12 @@ function cardTransition(i: number): Transition {
  */
 export function TradesCards({ rows, setups, listKey, sortKey = "", onOpen, className }: TradesCardsProps) {
   const detailSource = useUi((s) => s.detail.source);
+  const detailTempo = useUi((s) => s.detailTempo);
   const openDetail = useUi((s) => s.openDetail);
   const reduced = useReducedFx();
-  const shareLayout = detailSource !== "marker";
+  const shareLayout = !DETACHED_DETAIL_SOURCES.includes(detailSource);
+  // a swipe-dismissed detail zooms back on a context spring of its release tempo (the tuned token otherwise)
+  const morphTransition = useMemo(() => ({ layout: detailTempo > 0 ? contextSpringAt(spring.detail, detailTempo) : spring.detail }), [detailTempo]);
   const [settled, setSettled] = useState(0);
   const onExitComplete = useCallback(() => setSettled((n) => n + 1), []);
   const layoutKey = useMemo(() => `${listKey}~${settled}`, [listKey, settled]);
@@ -70,6 +74,7 @@ export function TradesCards({ rows, setups, listKey, sortKey = "", onOpen, class
             setups={setups}
             listKey={layoutKey}
             shareLayout={shareLayout}
+            morphTransition={morphTransition}
             reduced={reduced}
             onOpen={onOpen ?? openDetail}
           />
@@ -87,11 +92,13 @@ interface TradeCardProps {
   setups: readonly Setup[];
   listKey: string;
   shareLayout: boolean;
+  /** Layout transition of the detail morph source. */
+  morphTransition: Transition;
   reduced: boolean;
   onOpen: (id: string, source: "table") => void;
 }
 
-const TradeCard = memo(function TradeCard({ t, index, insert, setups, listKey, shareLayout, reduced, onOpen }: TradeCardProps) {
+const TradeCard = memo(function TradeCard({ t, index, insert, setups, listKey, shareLayout, morphTransition, reduced, onOpen }: TradeCardProps) {
   const present = useIsPresent();
   const held = useInsertHold(insert && !reduced);
   const { day, clock } = dateLines(t);
@@ -116,9 +123,10 @@ const TradeCard = memo(function TradeCard({ t, index, insert, setups, listKey, s
           <motion.span
             aria-hidden="true"
             layoutId={`trade-${t.id}`}
+            data-trade-morph={t.id}
             className="pointer-events-none absolute inset-0"
             style={{ borderRadius: radius.card }}
-            transition={{ layout: spring.detail }}
+            transition={morphTransition}
           />
         )}
         <div className="flex items-start justify-between gap-3">
@@ -145,9 +153,10 @@ const TradeCard = memo(function TradeCard({ t, index, insert, setups, listKey, s
               <span className="text-faint">R </span>
               <RCell value={t.r} />
             </span>
-            <span>
+            <span className="inline-flex items-center gap-1.5">
               <span className="text-faint">Check </span>
               <CheckCount t={t} />
+              <SignalBadge t={t} />
             </span>
           </span>
         </div>

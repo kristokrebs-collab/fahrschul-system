@@ -26,10 +26,29 @@ probe `window.claude?.use("db")`.
 - Local mode runs the daily auto-backup (`tj2-backup-YYYY-MM-DD`, keeps 14).
 - Quarantined records from the migration toast `{n} Einträge konnten nicht gelesen werden`.
 
+## Editions and storage namespaces
+
+The build edition (`src/edition.ts`, Vite `define`) picks the key prefix: personal (web root, "persönlich" file)
+`tj2-*` – the same keys as the other journal version; share (`/teilen/`, "zum Teilen" file) `tj2share-*`, so the
+share edition never reads or writes the personal journal on the same origin / browser. Build every key of your own
+module with `storageKey("name")` (`@/store/storage`) instead of a `"tj2-…"` literal.
+
+## Data safety (two tabs, the other journal version)
+
+- **Read-modify-write**: every local write re-reads its key first and upserts into the fresh list (a trade, reading or
+  day note another tab – or the other journal file – saved meanwhile is never overwritten).
+- **Settings** are three-way merged (`merge3(lastKnown, mine, stored)`, `merge3.ts`): keys/setups another tab changed
+  survive; a key only one side has is always kept; id lists (setups, rules) merge per id (an edit beats a delete).
+- **`storage` events** reload the changed key (`tj2-trades|settings|hyblock|days`, `null` = all) and patch the store.
+- **No usable storage** (Android `content://` file opens, sandboxed frames): `storageStatus()` → `"unavailable"`, the
+  journal runs on a session-only in-memory store, `useJournal.storage === "unavailable"`, `LocalModeBanner` shows the
+  red `Speichern nicht möglich.` banner with `Backup importieren` / `Backup exportieren`, `modeLabelFor()` gives the
+  header pill `Nicht gespeichert`.
+
 ## `journalStore.ts`
 
 ```ts
-const { trades, settings, hyblock, mode, loaded, api, quarantined } = useJournal();   // zustand hook
+const { trades, settings, hyblock, days, mode, loaded, storage, api, quarantined } = useJournal();   // zustand hook
 useJournal((s) => s.mode);                                   // selector form
 const enriched = useEnriched();                              // EnrichedTrade[], memoised (WeakMap on trades+settings)
 const view = useAccountView("all" | "makro" | "scalp");      // AccountView from @/domain/account, memoised
@@ -42,9 +61,15 @@ await useJournal.getState().deleteTrade(id);
 await useJournal.getState().saveSettings(s);     // whole object replaced, written verbatim
 await useJournal.getState().saveHyblock(r);      // upsert, h_… ids
 await useJournal.getState().deleteHyblock(id);
-await useJournal.getState().replaceAll({ trades, settings, hyblock }); // bulk (import/restore)
+await useJournal.getState().saveDay("2026-10-07", { note, plan?, review?, mood? }); // day journal (tj2-days), merged
+                                                 // over the stored entry; an entry left empty is removed
+await useJournal.getState().deleteDay("2026-10-07");
+useDayNote("2026-10-07")                          // DayNote | undefined (hook)
+await useJournal.getState().replaceAll({ trades, settings, hyblock, days? }); // bulk (import/restore)
+freshSnapshot()                                   // the journal as stored right now (local: re-read; cloud: snapshots)
 
 MODE_LABELS[mode]   // { text: "Synchronisiert" | "Nur dieser Browser" | "Offline" | "Verbinde …", tone }
+modeLabelFor(mode, storage)  // UNSAVED_LABEL ("Nicht gespeichert", loss) in local mode without storage, else MODE_LABELS
 resetJournal()      // tests / HMR
 ```
 
@@ -88,9 +113,10 @@ getScroll(page); currentRoute(); PAGES; PAGE_KEYS ({ overview:"o", trades:"t", s
 ## Persistence
 
 - `adapters/StoreApi.ts`: `StoreApi`, `StorageSnapshot { trades, settings, hyblock }`, `StorageAdapter { mode, load(), api, subscribe(ev), replaceAll(), dispose() }`, `AdapterEvent` (`patch` | `error` | `quarantine`).
-- `adapters/localAdapter.ts`: `createLocalAdapter()`, `readLocalSnapshot()`. Keys `tj2-trades`, `tj2-settings`, `tj2-hyblock`; upsert `filter(id≠).concat`; normalisation on read only; readings sorted by `at.localeCompare`.
-- `adapters/claudeDbAdapter.ts`: `probeClaudeDb()` (`null` outside claude.ai), `createClaudeDbAdapter(db)` – collections `trades`/`hyblock`, doc `config/settings`, `onSnapshot`; `saveTrade` strips `id` → `set`/`add`. `ClaudeDb` interface is deliberately loose.
-- `storage.ts`: `KEYS`, `readJson`/`writeJson` (bundle `g`/`h`), `readJsonDetailed(key)` → `{ status: "missing" | "ok" | "corrupt" }`,
+- `adapters/localAdapter.ts`: `createLocalAdapter()`, `readLocalSnapshot()`. Keys `tj2-trades`, `tj2-settings`, `tj2-hyblock`, `tj2-days`; upsert `filter(id≠).concat` on a FRESH read; settings via `merge3`; `storage`-event sync (attached on subscribe, removed on dispose); normalisation on read only; readings sorted by `at.localeCompare`; a list key holding a non-array is quarantined before it is replaced.
+- `adapters/claudeDbAdapter.ts`: `probeClaudeDb()` (`null` outside claude.ai), `createClaudeDbAdapter(db)` – collections `trades`/`hyblock`, docs `config/settings` and `config/days` (day journal), `onSnapshot`; `saveTrade` strips `id` → `set`/`add`. `ClaudeDb` interface is deliberately loose.
+- `StorageAdapter.fresh()`: data as stored right now without touching adapter state (backup import merges onto it).
+- `storage.ts`: `KEYS` (incl. `days`), `KEY_PREFIX`, `storageKey(name)`, `DATA_KEYS`, `storageStatus()`, `readJson`/`writeJson` (bundle `g`/`h`), `readJsonDetailed(key)` → `{ status: "missing" | "ok" | "corrupt" }`,
   `writeJsonStrict`, `writeRaw`, `listKeys(prefix)`, `removeKey`, `isQuotaError`, `StorageWriteError`.
   **Corrupt keys**: `readJson` copies an unparseable value to `tj2-quarantine` as `{ kind:"blob", key, raw, error:"invalid JSON", at }`
   (`quarantineRaw`, once per key+raw) before returning the fallback; `assertWritable(key)` (used by every local write) throws
@@ -103,7 +129,10 @@ getScroll(page); currentRoute(); PAGES; PAGE_KEYS ({ overview:"o", trades:"t", s
 
 ## `migrate.ts`
 
-`migrate(now?)` → `{ from, to, changed, quarantined, snapshotTag, aborted? }`. Meta key `tj2-meta` `{ schemaVersion: 1, migratedAt, appVersion }`.
+`migrate(now?)` → `{ from, to, changed, quarantined, snapshotTag, aborted? }`. Meta key `tj2-meta` `{ schemaVersion: 2, migratedAt, appVersion }`.
+v1→v2 (additive, no snapshot): settings persisted as `{ ...raw, ...normalizeSettings(raw) }` – `s_mtf` appended to
+settings that predate it, `mistakes` default list, a non-Binance `market.symbol` (`BITSTAMP:BTCUSD`) mapped to
+`BINANCE:BTCUSDT` with the original in `market.sourceSymbol`; `signals` and unknown keys verbatim; trades untouched.
 v0→v1: snapshot `tj2-backup-v0-{ISO}` (max 3 kept; an unparseable key is stored as its raw string). **If the snapshot cannot be
 written the migration aborts** (`aborted: true`, schemaVersion stays 0, nothing touched, toast `Snapshot konnte nicht angelegt werden`).
 Records are **normalised first, validated after** (`TradeSchema.safeParse(normalizeTrade(item))`): everything the old app read
@@ -116,14 +145,22 @@ Helpers: `validateTrades(raw)`, `validateReadings(raw)` (pure; migration, import
 ## `backup.ts`
 
 ```ts
-await exportJson();                    // trade-journal-YYYY-MM-DD.json  ({ exportedAt, settings, trades, hyblock, schemaVersion })
+await exportJson();                    // trade-journal-YYYY-MM-DD.json  ({ exportedAt, settings, trades, hyblock, schemaVersion, days })
 await exportCsv();                     // trade-journal-YYYY-MM-DD.csv   (via @/domain/csv)
-parseBackup(text)                      // { ok, backup, preview, invalid } | { ok:false, error, path }
-                                       // envelope (exportedAt, settings) required; trades/readings validated PER RECORD
-                                       // (normalise first) – broken ones are counted in preview.invalid, not fatal
+parseBackup(text)                      // { ok, backup, preview, invalid, parts } | { ok:false, error, path }
+                                       // accepts ours, the other version's { exportedAt, settings, trades }, { trades }
+                                       // and a bare [trade…] array; present parts must have the right type; neither
+                                       // trades nor settings → NOT_A_BACKUP; trades/readings validated PER RECORD
+                                       // (normalise first) – broken ones are counted in preview.invalid, not fatal;
+                                       // parts = what the file carries (+ raw settingsKeys / setupIds)
 previewText(preview)                   // "{n} Trades, {m} Grundlagen, {k} Ablesungen · exportiert am dd.MM.yy"
 skippedText(n)                         // "{n} Einträge übersprungen" (toast detail when preview.invalid > 0)
-applyBackup(current, backup, "merge"|"replace")   // pure merge rules (newer updatedAt wins, setups by id)
+applyBackup(current, backup, "merge"|"replace", parts?)   // pure; a part the file lacks keeps the current data
+  // merge: trades upsert by id (newer updatedAt wins, the winner keeps keys only the loser had); an unknown id
+  //        matching ONE current trade by date|entry|side that adds nothing is a pure duplicate (skipped);
+  //        settings: own scalars stay, setups by id (file wins), rules add-only, mistakes united, keys only the
+  //        file carries (signals, …) adopted (deep); readings by id; days per date (newer wins)
+  // replace: everything the file carries
 await importBackup(fileOrText, { mode })          // snapshot tj2-backup-import-{ISO} – when it cannot be stored the import
                                                   // FAILS (`Snapshot konnte nicht angelegt werden`) and nothing is written;
                                                   // skipped records go to tj2-quarantine (key "import")

@@ -1,16 +1,21 @@
 import { AnimatePresence, motion } from "motion/react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactElement } from "react";
 import { toTradeMarkers } from "@/chart/markers";
 import { ChartSkeleton } from "@/chart/ChartSkeleton";
 import type { BarsListener, MarkerRect, RangeDays } from "@/chart/NothingCandleChart";
+import { resampleCandles, resampleTail } from "@/chart/resample";
+import { signalMarkersKey, type SignalMarker } from "@/chart/signalMarkers";
+import { levelsConfigured } from "@/domain/defaults";
 import { scenario } from "@/domain/trigger";
 import { cn } from "@/lib/cn";
 import {
+  getMcbSeries,
   getProvider,
   KLINE_FEEDS,
   lastClosed4h,
   priceMv,
   subscribeFeed,
+  subscribeSignalCheck,
   tickDirMv,
   tradeTimeMv,
   useFeed,
@@ -43,15 +48,34 @@ export const CHART_EMPTY_LINE = "Wartet auf Kursdaten …";
 export const CHART_LOADING = "Lade Historie …";
 export const CHART_FOLLOW = "Folgen";
 export const CHART_ONLY_7D = "Im 1m-Intervall nur 7 Tage";
+export const CHART_ONLY_30D = "Im 30m-Intervall nur 1 Monat";
+/** Toast after a range pill beyond the interval's history switched the interval. */
+export const CHART_SWITCHED = "Auf 1h gewechselt";
 export const outsideNote = (n: number): string => `+${n} Trades außerhalb des Zeitraums`;
 /** `tj2-ui.flags` key that hides the second pane (`–`). */
 export const PANE_OFF_FLAG = "chartPaneOff";
 
-const INTERVALS: readonly { v: ChartInterval; label: string }[] = [
+/**
+ * Chart intervals. `30m` has no stream of its own: it is resampled from `kline_15m` (the entry check's base rung), so
+ * the candles match the check's 30m bars. `uiStore.ChartInterval` gains "30m" through a request; until then the value
+ * is cast (and a reload falls back to the default 4h).
+ */
+type ChartIv = "1m" | "30m" | "1h" | "4h";
+const INTERVALS: readonly { v: ChartIv; label: string }[] = [
   { v: "1m", label: "1m" },
+  { v: "30m", label: "30m" },
   { v: "1h", label: "1h" },
   { v: "4h", label: "4h" },
 ];
+/** Longest range (days) an interval's history covers: 1m 7 days (REST cap), 30m one month (15m ring ≈ 31 days). */
+const MAX_RANGE: Partial<Record<ChartIv, RangeDays>> = { "1m": 7, "30m": 30 };
+const RANGE_HINT: Partial<Record<ChartIv, string>> = { "1m": CHART_ONLY_7D, "30m": CHART_ONLY_30D };
+const MS_15M = 900_000;
+const MS_30M = 1_800_000;
+/** Intervals with MCB dots from the entry check (1m has no check timeframe). */
+const MCB_INTERVALS: ReadonlySet<ChartIv> = new Set(["30m", "1h", "4h"]);
+const IV_SECONDS: Record<ChartIv, number> = { "1m": 60, "30m": 1800, "1h": 3600, "4h": 14400 };
+const NO_SIGNALS: SignalMarker[] = [];
 const RANGES: readonly { v: RangeDays; label: string }[] = [
   { v: 7, label: "1W" },
   { v: 30, label: "1M" },
@@ -131,24 +155,32 @@ function toRange(days: number): RangeDays {
   return days <= 7 ? 7 : days <= 30 ? 30 : 90;
 }
 
-/** Range pills `1W | 1M | 3M` with the shared `chart-range` thumb (Plan 3.3); only the label squashes on press. */
-function RangePills({ value, onChange, disabledAbove }: { value: RangeDays; onChange: (d: RangeDays) => void; disabledAbove?: number }) {
+/**
+ * Range pills `1W | 1M | 3M` with the shared `chart-range` thumb (Plan 3.3); only the label squashes on press. A range
+ * beyond the interval's history (`maxDays`) stays tappable (dimmed): the tap calls `onBeyond`, which switches to 1h
+ * and says so – a disabled pill did nothing on touch and explained itself only by a hover title (tablet audit 2a.1).
+ */
+function RangePills({ value, onChange, maxDays, hint, onBeyond }: { value: RangeDays; onChange: (d: RangeDays) => void; maxDays?: number; hint?: string; onBeyond: (d: RangeDays) => void }) {
   const reduced = useReducedFx();
   return (
     <div role="radiogroup" aria-label="Zeitraum" className="inline-flex gap-0.5 rounded-xl border border-line bg-ink-950/60 p-1">
       {RANGES.map((r) => {
-        const disabled = disabledAbove != null && r.v > disabledAbove;
+        const beyond = maxDays != null && r.v > maxDays;
         return (
           <motion.button
             key={r.v}
             type="button"
             role="radio"
             aria-checked={value === r.v}
-            disabled={disabled}
-            title={disabled ? CHART_ONLY_7D : undefined}
-            onClick={() => onChange(r.v)}
-            whileTap={disabled || reduced ? undefined : "press"}
-            className={cn("relative rounded-lg px-2.5 py-1 text-xs font-medium transition-colors", value === r.v ? "text-fg" : "text-mute hover:text-fg", disabled && "cursor-not-allowed opacity-40")}
+            aria-description={beyond ? `${hint}: wechselt auf 1h` : undefined}
+            title={beyond ? `${hint} – tippen wechselt auf 1h` : undefined}
+            onClick={() => (beyond ? onBeyond(r.v) : onChange(r.v))}
+            whileTap={reduced ? undefined : "press"}
+            className={cn(
+              // coarse pointers: the hit area grows 10 px up and down (44 px), never sideways into the neighbouring pill
+              "relative rounded-lg px-2.5 py-1 text-xs font-medium transition-colors pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-2.5 pointer-coarse:after:content-['']",
+              value === r.v ? "text-fg" : beyond ? "text-faint hover:text-mute" : "text-mute hover:text-fg",
+            )}
           >
             {value === r.v && (
               <motion.span
@@ -170,13 +202,72 @@ function RangePills({ value, onChange, disabledAbove }: { value: RangeDays; onCh
   );
 }
 
+/**
+ * External store of the MCB events of one chart interval: re-read when the entry check publishes (≤ 1/s, only on a real
+ * change) and memoised by content, so the chart re-sets its dots only when one appears, moves or disappears.
+ */
+function createMcbStore(interval: ChartIv, enabled: boolean, bars: number): { read: () => SignalMarker[]; subscribe: (cb: () => void) => () => void } {
+  let dirty = true;
+  let key = "";
+  let value: SignalMarker[] = NO_SIGNALS;
+  const read = (): SignalMarker[] => {
+    if (!enabled || !MCB_INTERVALS.has(interval)) return NO_SIGNALS;
+    if (dirty) {
+      dirty = false;
+      const next = getMcbSeries(interval, { bars });
+      const k = signalMarkersKey(next);
+      if (k !== key) {
+        key = k;
+        value = next.length ? next : NO_SIGNALS;
+      }
+    }
+    return value;
+  };
+  const subscribe = (cb: () => void) =>
+    subscribeSignalCheck(() => {
+      dirty = true;
+      cb();
+    });
+  return { read, subscribe };
+}
+
+/** MCB dots for the chart (`createMcbStore`); none while collapsed or on 1m. */
+function useMcbMarkers(interval: ChartIv, enabled: boolean, bars: number): SignalMarker[] {
+  const store = useMemo(() => createMcbStore(interval, enabled, bars), [interval, enabled, bars]);
+  return useSyncExternalStore(store.subscribe, store.read, () => NO_SIGNALS);
+}
+
+/** Legend of the MCB dots (the canvas draws dots only, no words that could collide). */
+export const MCB_LEGEND = { long: "MCB Bottom/Kauf", short: "MCB Top/Verkauf" } as const;
+
+function McbLegend() {
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2" data-testid="mcb-legend">
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-win" />
+        {MCB_LEGEND.long}
+      </span>
+      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-loss" />
+        {MCB_LEGEND.short}
+      </span>
+    </span>
+  );
+}
+
 /** Status label · outside count · loading shimmer. Follows health on its own, so the card never re-renders for it. */
-function ChartNote({ feedId, outside, loading }: { feedId: KlineFeed; outside: number; loading: boolean }) {
+function ChartNote({ feedId, outside, loading, mcb }: { feedId: KlineFeed; outside: number; loading: boolean; mcb: boolean }) {
   const label = useStatusLabel(feedId);
   const text = [label.text, outside > 0 ? outsideNote(outside) : null].filter(Boolean).join(" · ");
   return (
     <>
       {text}
+      {mcb ? (
+        <>
+          {text ? " · " : null}
+          <McbLegend />
+        </>
+      ) : null}
       {loading ? (
         <>
           {text ? " · " : null}
@@ -223,12 +314,16 @@ export function ChartCard() {
   const detailId = useUi((s) => s.detail.id);
   const detailSource = useUi((s) => s.detail.source);
   const openDetail = useUi((s) => s.openDetail);
+  const pushToast = useUi((s) => s.pushToast);
 
-  const interval = chart.interval;
-  const rangeDays = toRange(interval === "1m" ? Math.min(chart.rangeDays, 7) : chart.rangeDays);
+  const interval = chart.interval as ChartIv;
+  const maxRange = MAX_RANGE[interval];
+  const rangeDays = toRange(maxRange != null ? Math.min(chart.rangeDays, maxRange) : chart.rangeDays);
   const pane: PaneChoice = paneOff ? "none" : chart.pane === "cvd" ? "none" : chart.pane;
-  const feedId: KlineFeed = `kline_${interval}`;
+  // 30m is resampled from the 15m stream (history, live tail and the check's 30m rung share it)
+  const feedId: KlineFeed = interval === "30m" ? "kline_15m" : `kline_${interval}`;
   const symbol = settings.market.symbol;
+  const levelsOn = levelsConfigured(settings);
 
   const feed = useFeedSelect(feedId, selectBars, sameBarKey);
   const close4h = useFeedSelect("kline_4h", selectClosed4hClose);
@@ -239,12 +334,15 @@ export function ChartCard() {
   // no effect, no ref in render)
   const [extra, setExtra] = useState<HistoryExtra | null>(null);
   const [hist, setHist] = useState<HistoryState>(() => ({ feed: feedId, symbol, seen: undefined, extra: null, candles: [] }));
-  let candles = hist.candles;
+  let source = hist.candles;
   if (hist.feed !== feedId || hist.symbol !== symbol || hist.seen !== feedKey(feed) || hist.extra !== extra) {
     const next = nextHistory(hist, feedId, feed, extra, symbol);
     setHist(next);
-    candles = next.candles;
+    source = next.candles;
   }
+  // stable identity per history change (the chart keys `setData` on it)
+  const resampled = useMemo(() => (interval === "30m" ? resampleCandles(source, MS_15M, MS_30M) : null), [interval, source]);
+  const candles = resampled ?? source;
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [outside, setOutside] = useState(0);
   const [ghost, setGhost] = useState<{ id: string; rect: MarkerRect } | null>(null);
@@ -270,16 +368,28 @@ export function ChartCard() {
   }, [feedId, symbol, rangeDays, requestKey]);
   const loading = loadedKey !== requestKey;
   const markers = useMemo(() => toTradeMarkers(trades), [trades]);
-  const active = close4h != null ? scenario(close4h, settings.market) : null;
+  const signals = useMcbMarkers(interval, chart.open, Math.min(1500, Math.ceil((rangeDays * 86_400) / IV_SECONDS[interval]) + 60));
+  const active = levelsOn && close4h != null ? scenario(close4h, settings.market) : null;
   const activeScenario = active?.key === "long" || active?.key === "short" ? active.key : null;
 
   // forming candle: kline frames go straight into the chart (≤ 1 per frame), never through a render
   const subscribeBars = useCallback(
     (listener: BarsListener) =>
       subscribeFeed(feedId, (v) => {
-        if (v) listener(v.data, v.asOf);
+        if (!v) return;
+        listener(interval === "30m" ? resampleTail(v.data, MS_15M, MS_30M) : v.data, v.asOf);
       }),
-    [feedId],
+    [feedId, interval],
+  );
+
+  /** A range pill beyond the interval's history: switch to 1h with that range and say so. */
+  const onBeyond = useCallback(
+    (d: RangeDays) => {
+      const hint = RANGE_HINT[interval];
+      setChart({ interval: "1h", rangeDays: d });
+      pushToast({ kind: "info", title: CHART_SWITCHED, detail: hint ? `${hint}.` : undefined });
+    },
+    [interval, setChart, pushToast],
   );
 
   const onMarkerClick = useCallback(
@@ -307,6 +417,7 @@ export function ChartCard() {
         levels={settings.market}
         activeScenario={activeScenario}
         markers={markers}
+        signals={signals}
         pane={pane}
         ratio={ratio?.data}
         oi={oi?.data}
@@ -328,11 +439,17 @@ export function ChartCard() {
     <div id={CHART_CARD_ID} className="scroll-mt-20">
       <Card
         title={`Chart · ${sym} Perp`}
-        note={<ChartNote feedId={feedId} outside={outside} loading={loading} />}
+        note={<ChartNote feedId={feedId} outside={outside} loading={loading} mcb={signals.length > 0} />}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <Segmented<ChartInterval> size="sm" aria-label="Intervall" options={INTERVALS} value={interval} onChange={(v) => setChart({ interval: v, rangeDays: v === "1m" ? 7 : chart.rangeDays })} />
-            <RangePills value={rangeDays} onChange={(d) => setChart({ rangeDays: d })} disabledAbove={interval === "1m" ? 7 : undefined} />
+            <Segmented<ChartIv>
+              size="sm"
+              aria-label="Intervall"
+              options={INTERVALS}
+              value={interval}
+              onChange={(v) => setChart({ interval: v as ChartInterval, rangeDays: v === "1m" ? 7 : Math.min(chart.rangeDays, MAX_RANGE[v] ?? chart.rangeDays) })}
+            />
+            <RangePills value={rangeDays} onChange={(d) => setChart({ rangeDays: d })} maxDays={maxRange} hint={RANGE_HINT[interval]} onBeyond={onBeyond} />
             <Segmented<PaneChoice>
               size="sm"
               aria-label="Pane"

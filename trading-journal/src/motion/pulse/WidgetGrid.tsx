@@ -1,7 +1,8 @@
 import { useMotionValue, type MotionValue } from "motion/react";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { createFrameLoop, latestPointer, prefersReducedMotion, smoothing } from "@/motion/pulse/engine";
+import { appleSpring, clamp, createVelocityTracker, mixSpring, physics, projectPoint, tempoOf } from "@/motion/physics";
+import { createFrameLoop, latestPointer, prefersReducedMotion, smoothing, type SpringConfig } from "@/motion/pulse/engine";
 import { springRests, stepSpring, type SpringState } from "@/motion/pulse/springStep";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -22,6 +23,15 @@ export const CONFIG = {
   reorderDelay: 10, // ms the centre must stay in a slot
   reorderCooldown: 90, // ms between two reorders
   hitInset: 10, // px
+  /** Throw (physics, additive): a release at ≥ this speed (px/s) projects the centre (UIScrollView fast rate) to pick the slot. */
+  throwMinSpeed: physics.throwMinSpeed,
+  throwRate: physics.decelFast,
+  /** Tilt while carried: degrees per px/s of horizontal speed, capped; swings back on its own spring (ζ ≈ .7). */
+  tiltPerSpeed: 0.003,
+  tiltMax: 4,
+  tiltSpring: { stiffness: 400, damping: 28, mass: 1 },
+  /** Drop of a thrown tile: `springLayout` for a slow release, blending to this short, slightly bouncy spring when fast. */
+  dropFast: appleSpring(0.33, 0.26),
   /** Nothing palette (pack: light glow 0 20px 40px rgba(255,255,255,.075)). */
   glowShadow: "0 20px 40px rgb(255 255 255 / 0.075), 0 18px 36px rgb(0 0 0 / 0.45)",
   roleDescription: "verschiebbare Kachel",
@@ -60,10 +70,14 @@ interface Tile {
   x: SpringState;
   y: SpringState;
   s: SpringState;
+  /** tilt (deg) */
+  r: SpringState;
   g: number;
   tx: number;
   ty: number;
   active: boolean;
+  /** drop spring of a released tile (context spring from the release speed); `undefined` → `springLayout` */
+  drop?: SpringConfig;
 }
 
 /** Normalised order: known ids from `order` first, then every item not mentioned. */
@@ -102,6 +116,46 @@ export function slotAt(slots: readonly Slot[], cx: number, cy: number, self: num
   return -1;
 }
 
+/**
+ * Pure (throw-to-slot): the slot a tile released at `centre` with velocity `v` (px/s) lands in – the slot (other than
+ * `self`) under the centre projected with UIScrollView's fast deceleration; between slots, the slot whose centre is
+ * nearest to the projection (unless that is `self`). -1 when the release was slower than `minSpeed` or the projection
+ * leaves the grid by more than half a slot (then the centre's own slot decides, as before).
+ */
+export function throwTarget(
+  slots: readonly Slot[],
+  centre: { x: number; y: number },
+  v: { x: number; y: number },
+  self: number,
+  inset: number = CONFIG.hitInset,
+  rate: number = CONFIG.throwRate,
+  minSpeed: number = CONFIG.throwMinSpeed,
+): number {
+  if (!(Math.hypot(v.x, v.y) >= minSpeed) || slots.length === 0) return -1;
+  const p = projectPoint(centre, v, rate);
+  const hit = slotAt(slots, p.x, p.y, self, inset);
+  if (hit >= 0) return hit;
+  let left = Infinity;
+  let top = Infinity;
+  let right = -Infinity;
+  let bottom = -Infinity;
+  let best = -1;
+  let bestD = Infinity;
+  slots.forEach((s, j) => {
+    left = Math.min(left, s.x - s.w / 2);
+    top = Math.min(top, s.y - s.h / 2);
+    right = Math.max(right, s.x + s.w * 1.5);
+    bottom = Math.max(bottom, s.y + s.h * 1.5);
+    const d = Math.hypot(p.x - (s.x + s.w / 2), p.y - (s.y + s.h / 2));
+    if (d < bestD) {
+      bestD = d;
+      best = j;
+    }
+  });
+  if (p.x < left || p.x > right || p.y < top || p.y > bottom || best === self) return -1;
+  return best;
+}
+
 const sameOrder = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
 const isInteractive = (t: EventTarget | null) => t instanceof Element && !!t.closest("a,button,input,select,textarea,[data-no-drag]");
 
@@ -110,6 +164,8 @@ const isInteractive = (t: EventTarget | null) => t instanceof Element && !!t.clo
  * their working slots (slots measured once at grab), the commit (`onOrderChange`) reorders the DOM and a FLIP
  * keeps every tile where it is, so the springs just continue. Keyboard: Space/Enter grab, arrows move
  * (Up/Down by a row), Home/End, Space/Enter drop, Escape cancels. Touch scrolls normally until a tile is lifted.
+ * Physics (additive): a carried tile leans up to 4° into its horizontal motion; a thrown release (≥ 400 px/s) lands in
+ * the slot under its projected centre on a drop spring that blends from `springLayout` (slow) to `dropFast` (fast).
  */
 export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs, className, itemClassName, "aria-label": ariaLabel }: WidgetGridProps) {
   const reduced = useReducedFx();
@@ -151,6 +207,8 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
     startOrder: [] as string[],
     moved: false,
   });
+  // coalesced pointer samples of the current press → release velocity for the throw (reset per press)
+  const tracker = useRef(createVelocityTracker());
 
   useEffect(() => {
     reducedRef.current = reduced;
@@ -159,7 +217,7 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
   const tile = (id: string): Tile => {
     let t = tiles.current.get(id);
     if (!t) {
-      t = { el: null, glow: null, x: { x: 0, v: 0 }, y: { x: 0, v: 0 }, s: { x: 1, v: 0 }, g: 0, tx: 0, ty: 0, active: false };
+      t = { el: null, glow: null, x: { x: 0, v: 0 }, y: { x: 0, v: 0 }, s: { x: 1, v: 0 }, r: { x: 0, v: 0 }, g: 0, tx: 0, ty: 0, active: false };
       tiles.current.set(id, t);
     }
     return t;
@@ -195,7 +253,8 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
     const C = CONFIG;
     const paint = (t: Tile) => {
       if (!t.el) return;
-      t.el.style.transform = `translate3d(${t.x.x.toFixed(2)}px,${t.y.x.toFixed(2)}px,0) scale(${t.s.x.toFixed(4)})`;
+      const tilt = Math.abs(t.r.x) >= 0.005 ? ` rotate(${t.r.x.toFixed(3)}deg)` : "";
+      t.el.style.transform = `translate3d(${t.x.x.toFixed(2)}px,${t.y.x.toFixed(2)}px,0)${tilt} scale(${t.s.x.toFixed(4)})`;
       if (t.glow) t.glow.style.opacity = Math.max(0, Math.min(1, t.g)).toFixed(3);
     };
     const tick = (dt: number): boolean => {
@@ -237,10 +296,13 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
         if (!isDrag && !t.active) continue;
         const ts = isDrag ? C.liftScale : 1;
         const tg = isDrag ? 1 : 0;
+        // carried by the pointer: lean into the horizontal motion (the follower's velocity, px/s), upright otherwise
+        const tr = isDrag && !d.kbd ? clamp(t.x.v * C.tiltPerSpeed, -C.tiltMax, C.tiltMax) : 0;
         if (red) {
           t.x = { x: t.tx, v: 0 };
           t.y = { x: t.ty, v: 0 };
           t.s = { x: 1, v: 0 };
+          t.r = { x: 0, v: 0 };
           t.g = tg;
         } else {
           if (isDrag && !d.kbd) {
@@ -254,17 +316,22 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
             t.x.x = nx;
             t.y.x = ny;
           } else {
-            stepSpring(t.x, t.tx, C.springLayout, dt);
-            stepSpring(t.y, t.ty, C.springLayout, dt);
+            const drop = t.drop ?? C.springLayout;
+            stepSpring(t.x, t.tx, drop, dt);
+            stepSpring(t.y, t.ty, drop, dt);
           }
           stepSpring(t.s, ts, C.springScale, dt);
+          stepSpring(t.r, tr, C.tiltSpring, dt);
           t.g += (tg - t.g) * smoothing(1000 / C.glowTau, dt);
         }
-        const rest = springRests(t.x, t.tx, 0.05, 0.5) && springRests(t.y, t.ty, 0.05, 0.5) && springRests(t.s, ts, 0.0005, 0.01) && Math.abs(t.g - tg) < 0.004;
+        const rest =
+          springRests(t.x, t.tx, 0.05, 0.5) && springRests(t.y, t.ty, 0.05, 0.5) && springRests(t.s, ts, 0.0005, 0.01) && springRests(t.r, tr, 0.01, 0.1) && Math.abs(t.g - tg) < 0.004;
         if (rest && !isDrag) {
           t.x = { x: t.tx, v: 0 };
           t.y = { x: t.ty, v: 0 };
           t.s = { x: 1, v: 0 };
+          t.r = { x: 0, v: 0 };
+          t.drop = undefined;
           t.g = 0;
           paint(t);
           t.active = false;
@@ -334,7 +401,11 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
     wake();
   };
 
-  const endDrag = (cancel: boolean) => {
+  /**
+   * `release` (pointer drops only): the release time for the velocity read. A throw (≥ `throwMinSpeed`) moves the tile
+   * to the slot under its projected centre, and its drop spring blends from `springLayout` to `dropFast` with the speed.
+   */
+  const endDrag = (cancel: boolean, release?: number) => {
     const d = drag.current;
     if (d.timer) clearTimeout(d.timer);
     d.timer = 0;
@@ -355,6 +426,17 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
     d.kbd = false;
     if (!wasDrag) return;
     if (cancel) work.current = d.startOrder.slice();
+    else if (!wasKbd && release !== undefined && t) {
+      const v = tracker.current.velocity(release);
+      const speed = Math.hypot(v.x, v.y);
+      const sl = slots.current;
+      const home = sl[committed.current.indexOf(id)];
+      if (home && speed > 0) {
+        const hit = throwTarget(sl, { x: home.x + t.x.x + home.w / 2, y: home.y + t.y.x + home.h / 2 }, v, work.current.indexOf(id));
+        if (hit >= 0) work.current = moveId(work.current, id, hit);
+        t.drop = mixSpring(CONFIG.springLayout, CONFIG.dropFast, tempoOf(speed));
+      }
+    }
     retarget();
     wake();
     setLive(null);
@@ -440,6 +522,8 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
     d.scrollX = window.scrollX;
     d.scrollY = window.scrollY;
     d.cand = -1;
+    tracker.current.reset();
+    tracker.current.add(e.timeStamp, e.clientX, e.clientY);
     const gx = e.clientX - r.left;
     const gy = e.clientY - r.top;
     // grab point relative to the tile centre (kept for the whole drag)
@@ -455,6 +539,7 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
     const p = latestPointer(e.nativeEvent);
     d.px = p.x;
     d.py = p.y;
+    tracker.current.addEvent(e.nativeEvent);
     if (d.phase === "hold") {
       const tol = CONFIG.holdTolerance[d.ptype] ?? 10;
       if (Math.hypot(d.px - d.sx, d.py - d.sy) > tol) endDrag(true);
@@ -463,7 +548,7 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
 
   const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
     const d = drag.current;
-    if (e.pointerId === d.pid && !d.kbd) endDrag(e.type === "pointercancel");
+    if (e.pointerId === d.pid && !d.kbd) endDrag(e.type === "pointercancel", e.type === "pointercancel" ? undefined : e.timeStamp);
   };
 
   const onKeyDown = (id: string) => (e: KeyboardEvent<HTMLDivElement>) => {

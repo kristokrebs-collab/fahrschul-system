@@ -10,6 +10,8 @@ Bundle `H$` (Plan 6.2). Import from `@/views/trades`.
 | `TradesCards` | mobile cards (`layoutId="trade-{id}"` source of the detail morph, not while the detail is open). |
 | `KpiStrip`, `RowHighlight`, `rowGeometry` (`offsetWithin`, `measureRow`, `insetBox`, `sameBox`) | |
 | `tradesModel` (`filterTrades`, `sortTrades`, `listKey`, `rowsKey`, `sortArrow`, `countLabel`, `setupNameOf`, `NO_SETUP`, `searchSuggestions`, `frequentWords`) | pure |
+| NEW `tradesModel` (`filterExtra`, `signalOf` (parsed once per trade object), `mistakesOf`, `strengthKey`, `mistakeFilterTags`, `STRENGTH_OPTIONS`, `NO_MISTAKE`, `ANY_MISTAKE`) | additive filters `Fehler-Tag` / `Signal-Stärke` (`uiStore.tradeExtra`, session only, reset with `Filter zurücksetzen`); the selects show once the journal has tags / stored checks (or while set). `listKey(f, sort, extra?)` is unchanged while no extra filter is set. |
+| NEW `SignalBadge` (`tradeCells`) | four strength bars of the stored `trade.signal` (`Signal-Stärke n von 4 (…)`, `·` without one) in the table's `Check` cell and on the cards. |
 | `AutoHeight` | box that springs to its content's height (ResizeObserver, `spring.layout`, `overflow-y: clip`); declared height exception like `Collapse`. Used by the card body and the editor's setup chips. |
 | `tradeCells` (`SideTag`, `ResultBadge`, `PnlCell`, `RCell`, …) | `PnlCell` / `RCell` animate through `MotionNumber gate` (shared observer, no state – cheap). |
 
@@ -29,10 +31,22 @@ Bundle `H$` (Plan 6.2). Import from `@/views/trades`.
   marker on "Klick".
 - `content-visibility: auto` is intentionally NOT used on table rows: it is a no-op on `<tr>`, and on cell content it breaks auto column sizing.
 
+## Tablet / touch
+
+- 768–1023 px (tablet portrait) keeps the table but drops its 900 px minimum (`lg:min-w-[900px]`): 6 px cell padding, setup chips in a
+  130 px column (they wrap, never truncate – `SetupChips` is `flex-wrap`, chip names wrap inside the chip), entry / exit stacked
+  (`EntryExit stack`). Measured: no sideways scroll at 768 / 820 / 900 (scrollWidth = clientWidth), every column incl. P&L and R visible.
+- Sort headers carry `.touch-hit` (≥ 44 px tap area on coarse pointers, no layout change).
+- `KpiStrip` tiles are `MorphCard`s (`kpi-net`, `kpi-trades`, `kpi-wr`): a tap opens how the figure of THIS selection comes about.
+- `RowHighlight` glides on `contextSpring(spring.hover, pointerSpeed())` sampled in the hover event (the token itself below 400 px/s, 0 for focus).
+- Trade cards: the morph surface carries `data-trade-morph="{id}"` (the detail's swipe checks it to zoom back) and runs on
+  `contextSpringAt(spring.detail, uiStore.detailTempo)` after a swipe-dismiss; shared ids are dropped for `DETACHED_DETAIL_SOURCES`
+  (`marker`, `insights`).
+
 layoutIds (contracts in `src/motion/README.md`):
 - `hover-trades-{useId}` – `RowHighlight` between hovered/focused rows; `spring.hover`, opacity `tween.hoverPill` (exit delay .15 s);
   one per table, `borderRadius radius.hover`, inside the table's `layoutScroll` wrapper, measured with transform-free offsets.
 - `sort-indicator-{useId}` – the active sort-column chip in `SortHeader`; `spring.layout`, chevron rotate `spring.plus`; one per table,
   `borderRadius radius.pill`, `aria-hidden` (the direction stays as sr-only ` ↑` / ` ↓` text).
 
-Tests: `tests/unit/views.trades.{view,model,geometry}.test.*`.
+Tests: `tests/unit/views.trades.{view,model,geometry,filters}.test.*`.

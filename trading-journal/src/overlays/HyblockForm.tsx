@@ -47,6 +47,10 @@ export const HYBLOCK_FORM_STRINGS = {
   del: "Löschen",
   readings: (n: number) => `${n} Ablesung${n === 1 ? "" : "en"}`,
   empty: "Noch keine Ablesung",
+  /** NEW: `Abbrechen` with typed values asks first (no silent discard). */
+  discardAsk: "Änderungen verwerfen?",
+  discard: "Verwerfen",
+  keep: "Weiter bearbeiten",
 } as const;
 
 /** Live values (Binance / Hyblock) that `Live-Werte übernehmen` copies into the form. */
@@ -92,13 +96,15 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
   const close = onClose ?? dialog.close;
   const prev = last === undefined ? readings[readings.length - 1] : last;
 
-  const [form, setForm] = useState<FormState>({
+  const [initial] = useState<FormState>(() => ({
     at: nowLocalInput(now),
     longPct: prev ? toInputString(prev.longPct) : "",
     delta: "",
     deltaCandles: "0",
     note: "",
-  });
+  }));
+  const [form, setForm] = useState<FormState>(initial);
+  const [asking, setAsking] = useState(false);
   const [structure, setStructure] = useState(false);
   const [rsi, setRsi] = useState(false);
   const [error, setError] = useState("");
@@ -109,6 +115,8 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
     setForm((f) => ({ ...f, [k]: v }));
     if ((k === "longPct" && error === HYBLOCK_FORM_STRINGS.errLong) || (k === "delta" && error === HYBLOCK_FORM_STRINGS.errDelta)) setError("");
   };
+  const dirty = structure || rsi || (Object.keys(initial) as (keyof FormState)[]).some((k) => form[k].trim() !== initial[k].trim());
+  const cancel = () => (dirty ? setAsking(true) : close());
   const refuse = (message: string, field: string) => {
     setError(message);
     revealInvalid(field, { reduced });
@@ -181,20 +189,34 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
         </CheckboxRow>
       </StaggerItem>
       <StaggerItem className="flex flex-wrap items-center justify-end gap-2">
-        {error && (
-          <span role="alert" className="mr-auto text-[12.5px] text-loss">
-            {error}
+        {asking ? (
+          <span role="group" aria-label={HYBLOCK_FORM_STRINGS.discardAsk} className="flex w-full flex-wrap items-center justify-end gap-2" data-testid="hyblock-discard-confirm">
+            <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{HYBLOCK_FORM_STRINGS.discardAsk}</span>
+            <Button variant="danger" onClick={close}>
+              {HYBLOCK_FORM_STRINGS.discard}
+            </Button>
+            <Button variant="primary" autoFocus onClick={() => setAsking(false)}>
+              {HYBLOCK_FORM_STRINGS.keep}
+            </Button>
           </span>
+        ) : (
+          <>
+            {error && (
+              <span role="alert" className="mr-auto text-[12.5px] text-loss">
+                {error}
+              </span>
+            )}
+            {live && (live.longPct != null || live.delta != null) && (
+              <Button size="sm" onClick={takeLive} className="mr-auto">
+                {HYBLOCK_FORM_STRINGS.live}
+              </Button>
+            )}
+            <Button onClick={cancel}>{HYBLOCK_FORM_STRINGS.cancel}</Button>
+            <Button variant="primary" type="submit" disabled={busy}>
+              {HYBLOCK_FORM_STRINGS.save}
+            </Button>
+          </>
         )}
-        {live && (live.longPct != null || live.delta != null) && (
-          <Button size="sm" onClick={takeLive} className="mr-auto">
-            {HYBLOCK_FORM_STRINGS.live}
-          </Button>
-        )}
-        <Button onClick={close}>{HYBLOCK_FORM_STRINGS.cancel}</Button>
-        <Button variant="primary" type="submit" disabled={busy}>
-          {HYBLOCK_FORM_STRINGS.save}
-        </Button>
       </StaggerItem>
     </form>
   );

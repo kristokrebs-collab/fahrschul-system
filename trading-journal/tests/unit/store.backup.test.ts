@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { applyBackup, autoBackup, importBackup, lastAutoBackup, listBackups, parseBackup, previewText, restoreBackup, skippedText, writeSnapshot, AUTO_BACKUP_KEEP } from "@/store/backup";
+import { applyBackup, autoBackup, importBackup, lastAutoBackup, listBackups, NOT_A_BACKUP, parseBackup, previewText, restoreBackup, skippedText, writeSnapshot, AUTO_BACKUP_KEEP } from "@/store/backup";
 import { bootJournal, resetJournal, useJournal } from "@/store/journalStore";
 import { readQuarantine, SNAPSHOT_FAILED_TITLE } from "@/store/migrate";
 import { useUi } from "@/store/uiStore";
@@ -72,7 +72,8 @@ describe("applyBackup merge/replace", () => {
     let out = applyBackup(cur, backup, "merge");
     expect(out.trades.map((t) => t.notes)).toEqual(["", "newer", "fresh"]);
     expect(out.settings.currency).toBe("USDT");
-    expect(out.settings.setups.map((x) => x.name)).toEqual(["renamed", "new"]);
+    expect(out.settings.setups.map((x) => x.id)).toEqual(["s_bo", "s_mtf", "s_new"]); // s_mtf: appended to the legacy settings on read
+    expect(out.settings.setups.map((x) => x.name)).toEqual(["renamed", "Multi-TF Signal (MCB + RSI + Discount)", "new"]);
     expect(out.hyblock.find((r) => r.id === "h_2")?.longPct).toBe(99);
     expect(out.hyblock).toHaveLength(2);
 
@@ -114,7 +115,8 @@ describe("importBackup / restoreBackup", () => {
     const bad = await importBackup("{}", { mode: "merge" });
     expect(bad.ok).toBe(false);
     expect(useUi.getState().toasts.at(-1)).toMatchObject({ kind: "error", title: "Import fehlgeschlagen" });
-    expect(useUi.getState().toasts.at(-1)?.detail).toContain("exportedAt");
+    // the envelope is tolerant now (other version's `{ trades }`); an object without trades AND settings is no backup
+    expect(useUi.getState().toasts.at(-1)?.detail).toBe(`trades: ${NOT_A_BACKUP}`);
     expect(useJournal.getState().trades).toHaveLength(1); // untouched
 
     const restored = await restoreBackup("import-2026-09-30T00:00:00.000Z");
@@ -174,7 +176,8 @@ describe("importBackup / restoreBackup", () => {
 
   it("accepts a File", async () => {
     const t0 = useJournal.getState().trades[0]!;
-    const file = new File([backupOf([{ ...t0, id: "t_file" }])], "b.json", { type: "application/json" });
+    // (an exact copy under a new id would be skipped as a pure duplicate – see the compat tests)
+    const file = new File([backupOf([{ ...t0, id: "t_file", notes: "from file" }])], "b.json", { type: "application/json" });
     const res = await importBackup(file, { mode: "merge", silent: true });
     expect(res.ok).toBe(true);
     expect(useJournal.getState().trades.some((t) => t.id === "t_file")).toBe(true);

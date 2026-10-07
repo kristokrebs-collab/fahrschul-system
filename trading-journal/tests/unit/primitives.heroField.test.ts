@@ -99,3 +99,26 @@ describe("hero flicker field", () => {
     expect(stepField(f, quiet, null, new Int32Array(100))).toBe(100);
   });
 });
+
+describe("hero flicker field – text mask", () => {
+  it("never lights blocked cells (seed, re-rolls, pointer focus) and darkens newly blocked cells at once", async () => {
+    const { setBlocked } = await import("@/primitives/heroField");
+    const f = createField(30, 12);
+    seedField(f, lcg(3));
+    // a text line across the top-left area
+    const rect = { x: 0, y: 0, w: 300, h: 80 };
+    const changed = setBlocked(f, [rect]);
+    expect(changed).toBeGreaterThan(0);
+    const blocked = (i: number) => f.blocked[i] === 1;
+    for (let i = 0; i < f.cols * f.rows; i++) if (blocked(i)) expect(f.level[i]).toBe(0);
+    const dirty = new Int32Array(f.cols * f.rows);
+    const rand = lcg(9);
+    for (let s = 0; s < 200; s++) stepField(f, rand, { x: 60, y: 40 }, dirty);
+    for (let i = 0; i < f.cols * f.rows; i++) if (blocked(i)) expect(f.target[i]).toBe(0);
+    // cells outside still twinkle
+    expect(Array.from(f.target).some((v, i) => v > 0 && !blocked(i))).toBe(true);
+    // unblocking frees them again; re-applying the same rects changes nothing
+    expect(setBlocked(f, [rect])).toBe(0);
+    expect(setBlocked(f, [])).toBe(changed);
+  });
+});

@@ -4,8 +4,8 @@
  */
 import { z } from "zod";
 import type { AggTrade, BookTop, Candle, FundingPoint, MarkPrice, OpenInterest, OpenInterestPoint, RatioPoint, Source, Stamped, TakerPoint, Ticker24h } from "../types";
-import type { KlineInterval, Period } from "../period";
-import { INTERVAL_MS } from "../period";
+import type { FetchInterval, KlineInterval, Period } from "../period";
+import { FETCH_INTERVAL_MS } from "../period";
 import { fetchJson, qs, type FetchLike } from "./http";
 
 export const BINANCE_REST = "https://fapi.binance.com";
@@ -137,12 +137,12 @@ export function binanceRest(opts: BinanceRestOptions = {}) {
     async serverTime(): Promise<number> {
       return (await fetchJson(url("/fapi/v1/time", {}), serverTimeSchema, io)).serverTime;
     },
-    async klines(symbol: string, interval: KlineInterval, p: { limit?: number; startTime?: number; endTime?: number } = {}): Promise<Stamped<Candle[]>> {
+    async klines(symbol: string, interval: FetchInterval, p: { limit?: number; startTime?: number; endTime?: number } = {}): Promise<Stamped<Candle[]>> {
       const rows = await fetchJson(url("/fapi/v1/klines", { symbol, interval, limit: p.limit ?? 499, startTime: p.startTime, endTime: p.endTime }), klinesSchema, io);
       const t = now();
       const data = rows.map((r) => mapKline(r, t));
       const last = data[data.length - 1];
-      return stamp(data, last ? Math.min(t, last.closeTime ?? last.time + INTERVAL_MS[interval]) : t, t, source);
+      return stamp(data, last ? Math.min(t, last.closeTime ?? last.time + FETCH_INTERVAL_MS[interval]) : t, t, source);
     },
     async premiumIndex(symbol: string): Promise<Stamped<MarkPrice>> {
       const p = await fetchJson(url("/fapi/v1/premiumIndex", { symbol }), premiumIndexSchema, io);
@@ -196,7 +196,7 @@ export type WsEvent =
 type WsKind = "kline" | "markPrice" | "aggTrade" | "bookTop";
 type Rec = Record<string, unknown>;
 
-const INTERVALS = new Set<string>(["1m", "1h", "4h", "1w"]);
+const INTERVALS = new Set<string>(["1m", "15m", "1h", "4h", "1w"]);
 
 const isRec = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
 /** Binance number field (string or number) → finite number, else `NaN`. */
@@ -308,7 +308,7 @@ export function parseWsMessage(raw: string): WsEvent | null {
 /** Static combined-stream URL: no SUBSCRIBE frames are ever sent. */
 export function buildStreamUrl(symbol: string, opts: { bookTop?: boolean; base?: string } = {}): string {
   const s = symbol.toLowerCase();
-  const streams = [`${s}@kline_1m`, `${s}@kline_1h`, `${s}@kline_4h`, `${s}@kline_1w`, `${s}@markPrice@1s`, `${s}@aggTrade`];
+  const streams = [`${s}@kline_1m`, `${s}@kline_15m`, `${s}@kline_1h`, `${s}@kline_4h`, `${s}@kline_1w`, `${s}@markPrice@1s`, `${s}@aggTrade`];
   if (opts.bookTop) streams.push(`${s}@bookTicker`);
   return `${opts.base ?? BINANCE_WS}${streams.join("/")}`;
 }

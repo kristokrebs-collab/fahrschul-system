@@ -1,8 +1,10 @@
 import { AnimatePresence, motion, useMotionValueEvent, type Variants } from "motion/react";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { ED } from "@/domain/edition";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { deriveTrade } from "@/domain/derive";
 import { checklistItemsFor, pruneChecks } from "@/domain/enrich";
-import { EMOTIONS, LEVERAGE_HELP, LEVERAGE_WARNING, TIMEFRAMES } from "@/domain/defaults";
+import { DEFAULT_MISTAKES, EMOTIONS, LEVERAGE_HELP, LEVERAGE_WARNING, MTF_SETUP_ID, TIMEFRAMES } from "@/domain/defaults";
+import { parseSignalSnapshot } from "@/domain/signals";
 import type { AccountId, Conviction, Settings, Setup, Side, Trade, TradeStatus } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { nowLocalInput } from "@/lib/dates";
@@ -20,12 +22,14 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { MorphSelect, type MorphSelectOption } from "@/motion/pulse/MorphSelect";
 import { Button, CheckboxRow, ConvictionRadio, Field, Input, Segmented, Textarea, revealInvalid, shakeField } from "@/primitives";
 import { useJournal } from "@/store/journalStore";
+import { jsonEqual } from "@/store/merge3";
 import { pushToast, useUi, type AccFilter } from "@/store/uiStore";
 import { winCelebration } from "./celebration";
 import { FAB_LABEL } from "@/app/Dock";
 import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { AutoHeight } from "@/views/trades/AutoHeight";
 import { DETAIL_DIM_HANDOFF } from "./TradeDetail";
+import { SIGNAL_SECTION_TITLE, SignalSection, resolveTradeSignal, signalSectionSub, type MtfAuto } from "./SignalSection";
 
 /* ------------------------------------------------------------------ types */
 
@@ -57,6 +61,8 @@ export interface TradeFormTyped {
   conviction: Conviction | null;
   followedPlan: boolean | null;
   emotion: string;
+  /** Mistake tags (`trade.mistakes`, other journal version): chips from `settings.mistakes` plus own tags. */
+  mistakes: string[];
 }
 
 export type TradeRecord = Omit<Trade, "id"> & { id?: string };
@@ -87,6 +93,11 @@ export const EDITOR_MESSAGES = {
   deleteFailed: "Löschen fehlgeschlagen.",
 } as const;
 
+/** Unsaved-input guard (Escape, backdrop, close button, swipe, `Abbrechen` on a changed form). */
+export const DISCARD_COPY = { ask: "Änderungen verwerfen?", discard: "Verwerfen", keep: "Weiter bearbeiten" } as const;
+/** `Fehler` section (other journal version, verbatim sub). */
+export const MISTAKES_COPY = { title: "Fehler", sub: "Was lief schief? Kostet dich messbar Geld", add: "+ Eigener Fehler", placeholder: "Eigener Fehler", group: "Fehler-Tags" } as const;
+
 /* --------------------------------------------------------------- defaults */
 
 /** Bundle `Mhe`: defaults for a new trade (`leverage 4` on scalp, `date = now`, `pair = settings.pair`). */
@@ -108,7 +119,7 @@ export function defaultForm(settings: Pick<Settings, "pair">, account: AccountId
       notes: "",
       chart: "",
     },
-    t: { account, side: "long", status: "closed", setups: [], checks: {}, conviction: null, followedPlan: null, emotion: "" },
+    t: { account, side: "long", status: "closed", setups: [], checks: {}, conviction: null, followedPlan: null, emotion: "", mistakes: [] },
   };
 }
 
@@ -140,6 +151,7 @@ export function formFromTrade(t: Trade): { d: TradeFormStrings; t: TradeFormType
       conviction: t.conviction ?? null,
       followedPlan: t.followedPlan ?? null,
       emotion: t.emotion || "",
+      mistakes: [...(t.mistakes ?? [])],
     },
   };
 }
@@ -148,8 +160,59 @@ export function formFromTrade(t: Trade): { d: TradeFormStrings; t: TradeFormType
 export function resetForNext(d: TradeFormStrings, t: TradeFormTyped): { d: TradeFormStrings; t: TradeFormTyped } {
   return {
     d: { ...d, date: nowLocalInput(), entry: "", stop: "", target: "", exit: "", size: "", fees: "", pnlManual: "", reason: "", notes: "", chart: "" },
-    t: { ...t, status: "closed", setups: [], checks: {}, conviction: null, followedPlan: null, emotion: "" },
+    t: { ...t, status: "closed", setups: [], checks: {}, conviction: null, followedPlan: null, emotion: "", mistakes: [] },
   };
+}
+
+/** Comparable form state: unchecked boxes, chip order and whitespace-only differences are not "changes". */
+function formKey(d: TradeFormStrings, t: TradeFormTyped) {
+  const checks = Object.keys(t.checks)
+    .filter((k) => t.checks[k])
+    .sort();
+  return { d, t: { ...t, checks, setups: [...t.setups].sort(), mistakes: [...t.mistakes].sort() } };
+}
+
+/** True when the form differs from the state it was opened (or last reset) with. */
+export function isFormDirty(cur: { d: TradeFormStrings; t: TradeFormTyped }, base: { d: TradeFormStrings; t: TradeFormTyped }): boolean {
+  return !jsonEqual(formKey(cur.d, cur.t), formKey(base.d, base.t));
+}
+
+/**
+ * Mistake chips: the settings list first, then own tags used on other trades (so a tag typed once is offered again;
+ * a default tag removed from the settings stays removed), then tags only this trade carries – each once.
+ */
+export function mistakeOptions(settingsTags: readonly string[] | undefined, tradeTags: readonly string[], usedTags: readonly string[] = []): string[] {
+  const out: string[] = [];
+  for (const m of [...(settingsTags ?? []), ...usedTags, ...tradeTags]) {
+    const v = m.trim();
+    if (v && !out.includes(v)) out.push(v);
+  }
+  return out;
+}
+
+/** Own (non-default) mistake tags used in the journal, newest trades first, at most `max`. */
+export function usedOwnMistakes(trades: readonly Pick<Trade, "mistakes" | "date">[], max = 12): string[] {
+  const out: string[] = [];
+  const sorted = [...trades].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  for (const t of sorted) {
+    for (const m of t.mistakes ?? []) {
+      const v = typeof m === "string" ? m.trim() : "";
+      if (v && !DEFAULT_MISTAKES.includes(v) && !out.includes(v)) out.push(v);
+      if (out.length >= max) return out;
+    }
+  }
+  return out;
+}
+
+/**
+ * `s_mtf` auto-ticks applied over the form's own checks (other journal: only while `s_mtf` is selected, a snapshot
+ * exists and the user has not touched an `s_mtf:*` item; existing trades start "manual").
+ */
+export function withMtfAuto(checks: Record<string, boolean>, auto: MtfAuto | null, apply: boolean): Record<string, boolean> {
+  if (!apply || !auto) return checks;
+  const out = { ...checks };
+  for (const [k, v] of Object.entries(auto)) out[`${MTF_SETUP_ID}:${k}`] = v;
+  return out;
 }
 
 /** Bundle `S`: the typed record the form would save (before pnl/r/timestamps). */
@@ -220,8 +283,11 @@ export function invalidFieldOf(problem: string): InvalidField | null {
   }
 }
 
-/** `Timeframe` options of the morph select (`–` = none). */
+/** `Timeframe` options of the morph select (`–` = none); a stored value outside the list is offered too (never shown as "–"). */
 const TIMEFRAME_OPTIONS: readonly MorphSelectOption[] = [{ value: "", label: "–" }, ...TIMEFRAMES.map((tf) => ({ value: tf, label: tf }))];
+export function timeframeOptions(current: string): readonly MorphSelectOption[] {
+  return current && !TIMEFRAME_OPTIONS.some((o) => o.value === current) ? [...TIMEFRAME_OPTIONS, { value: current, label: current }] : TIMEFRAME_OPTIONS;
+}
 
 /** Detail → editor hand-off: the sheet's dim starts at the detail's level, the panel enters after the detail's exit. */
 const DETAIL_HANDOFF = { backdropFrom: DETAIL_DIM_HANDOFF, enterDelay: tween.exit.duration };
@@ -269,12 +335,21 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const [invalid, setInvalid] = useState<InvalidField | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  /** The form as opened (or last reset by `Speichern & neu`): "dirty" = differs from it. */
+  const [baseline, setBaseline] = useState<{ d: TradeFormStrings; t: TradeFormTyped } | null>(null);
+  /** `Prüfen` / `Neu prüfen` pressed on an existing trade. */
+  const [checkReq, setCheckReq] = useState(false);
+  /** The user toggled an `s_mtf:*` item (existing trades start manual): auto-ticks stop. */
+  const [manualMtf, setManualMtf] = useState(false);
+  const [autoMtf, setAutoMtf] = useState<MtfAuto | null>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const entryRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const alertRef = useRef<HTMLSpanElement>(null);
   const saveRef = useRef<HTMLButtonElement>(null);
   const againRef = useRef<HTMLButtonElement>(null);
   const { trigger: deleteTrigger, no: deleteNo } = useConfirmFocus(confirmDelete);
+  const { trigger: discardTrigger, no: discardNo } = useConfirmFocus(confirmDiscard);
 
   // Reset once per open session (bundle effect on `[open, trade]`), before paint.
   useLayoutEffect(() => {
@@ -288,9 +363,14 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     setInvalid(null);
     setSaving(false);
     setConfirmDelete(false);
+    setConfirmDiscard(false);
+    setCheckReq(false);
+    setManualMtf(Boolean(trade));
+    setAutoMtf(null);
     const init = trade ? formFromTrade(trade) : defaultForm(settings, defaultAccount(acc));
     setD(init.d);
     setT(init.t);
+    setBaseline(init);
   }, [session, trade, settings, acc]);
 
   const rec = useMemo(() => toRecord(d, t), [d, t]);
@@ -298,7 +378,18 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const account = t.account;
   const capital = settings.capital[account] || 0;
   const items = useMemo(() => checklistItemsFor(t.setups, settings), [t.setups, settings]);
-  const checked = items.filter((it) => t.checks[it.id]).length;
+  // Einstiegs-Check: new trades always, existing ones on request or when date / side moved away from the stored check
+  const stored = useMemo(() => (trade ? parseSignalSnapshot(trade.signal) : null), [trade]);
+  const timingChanged = stored != null && baseline != null && (d.date !== baseline.d.date || t.side !== baseline.t.side);
+  const checking = !trade || checkReq || timingChanged;
+  const mtfSetup = settings.setups.find((s) => s.id === MTF_SETUP_ID);
+  const autoApplies = Boolean(mtfSetup) && t.setups.includes(MTF_SETUP_ID) && !manualMtf && autoMtf != null;
+  const checks = useMemo(() => withMtfAuto(t.checks, autoMtf, autoApplies), [t.checks, autoMtf, autoApplies]);
+  const checked = items.filter((it) => checks[it.id]).length;
+  const dirty = baseline != null && (checkReq || isFormDirty({ d, t }, baseline));
+  const usedTags = useMemo(() => usedOwnMistakes(trades), [trades]);
+  const tags = useMemo(() => mistakeOptions(settings.mistakes, t.mistakes, usedTags), [settings.mistakes, t.mistakes, usedTags]);
+  const tfOptions = useMemo(() => timeframeOptions(d.timeframe), [d.timeframe]);
   const leverageOver = rec.leverage != null && (account === "scalp" ? rec.leverage > 4 : rec.leverage > 5);
   const sortedSetups = useMemo(
     () => [...settings.setups].sort((a, b) => +(b.account === account || b.account === "both") - +(a.account === account || a.account === "both")),
@@ -315,6 +406,20 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     if (k === invalid) setInvalid(null);
   };
   const patchT = useCallback((patch: Partial<TradeFormTyped>) => setT((o) => ({ ...o, ...patch })), []);
+  const toggleCheck = (id: string) => {
+    if (id.startsWith(`${MTF_SETUP_ID}:`)) {
+      // from here on the user owns the s_mtf items: the current (auto) state becomes the manual one
+      setManualMtf(true);
+      patchT({ checks: { ...checks, [id]: !checks[id] } });
+    } else patchT({ checks: { ...t.checks, [id]: !t.checks[id] } });
+  };
+  const recheck = () => {
+    setCheckReq(true);
+    setManualMtf(false);
+  };
+  const onAuto = useCallback((auto: MtfAuto | null) => setAutoMtf(auto), []);
+  /** Implicit and explicit closes of a changed form ask first ("alle eingetragenen Werte bleiben"). */
+  const cancel = () => (dirty ? setConfirmDiscard(true) : closeEditor());
 
   const save = useCallback(
     async (mode: "close" | "again") => {
@@ -327,12 +432,18 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         if (field) revealInvalid(`f-${field}`, { reduced });
         return;
       }
+      setErr("");
+      setInvalid(null);
+      setSaving(true);
+      // the check at save time: live within 5 min of now, else the (memoised) history check; none → keep the stored one
+      const signal = checking ? await resolveTradeSignal(d.date, t.side) : undefined;
       const now = new Date().toISOString();
-      // Spread the stored trade first so passthrough/unknown fields (legacy extras) survive an edit.
+      // Spread the stored trade first so passthrough/unknown fields (legacy extras, `signal`, `mistakes`) survive an edit.
       const record: TradeRecord = {
         ...(trade ?? {}),
         ...rec,
-        checks: pruneChecks(t.checks, items),
+        checks: pruneChecks(checks, items),
+        ...(signal ? { signal } : null),
         pnl: x.pnl,
         r: x.r,
         updatedAt: now,
@@ -340,9 +451,6 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       };
       if (trade?.id) record.id = trade.id;
       else delete record.id;
-      setErr("");
-      setInvalid(null);
-      setSaving(true);
       try {
         await saveTrade(record);
         pushToast({
@@ -371,6 +479,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           const next = resetForNext(d, t);
           setD(next.d);
           setT(next.t);
+          setBaseline(next);
+          setManualMtf(false);
           const scroller = formRef.current?.closest<HTMLElement>(".overflow-y-auto");
           if (scroller && typeof scroller.scrollTo === "function") scroller.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
           entryRef.current?.focus({ preventScroll: true });
@@ -383,7 +493,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         setSaving(false);
       }
     },
-    [rec, d, t, items, x, trade, trades, saveTrade, closeEditor, reduced],
+    [rec, d, t, items, checks, checking, x, trade, trades, saveTrade, closeEditor, reduced],
   );
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -413,17 +523,31 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   };
 
   const footer = (
-    <>
+    <AnimatePresence mode="wait" initial={false}>
+      {confirmDiscard ? (
+        <motion.div key="discard" role="group" aria-label={DISCARD_COPY.ask} className="flex w-full flex-wrap items-center justify-end gap-2.5" data-testid="discard-confirm" {...confirmSwapMotion(reduced)}>
+          <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{DISCARD_COPY.ask}</span>
+          <span className="inline-flex gap-2">
+            <Button variant="danger" className="pointer-coarse:min-h-11" onClick={closeEditor}>
+              {DISCARD_COPY.discard}
+            </Button>
+            <Button ref={discardNo} variant="primary" className="pointer-coarse:min-h-11" onClick={() => setConfirmDiscard(false)}>
+              {DISCARD_COPY.keep}
+            </Button>
+          </span>
+        </motion.div>
+      ) : (
+        <motion.div key="actions" className="flex w-full flex-wrap items-center gap-2.5" {...confirmSwapMotion(reduced)}>
       {trade && (
         <span className="flex min-h-10 items-center">
           <AnimatePresence mode="wait" initial={false}>
             {confirmDelete ? (
               <motion.span key="confirm" className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]" {...confirmSwapMotion(reduced)}>
                 Wirklich löschen?
-                <Button size="sm" variant="danger" onClick={() => void onDelete()}>
+                <Button size="sm" variant="danger" className="pointer-coarse:min-h-11" onClick={() => void onDelete()}>
                   Ja, löschen
                 </Button>
-                <Button ref={deleteNo} size="sm" onClick={() => setConfirmDelete(false)}>
+                <Button ref={deleteNo} size="sm" className="pointer-coarse:min-h-11" onClick={() => setConfirmDelete(false)}>
                   Nein
                 </Button>
               </motion.span>
@@ -454,18 +578,22 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           )}
         </AnimatePresence>
       </span>
-      <Button onClick={closeEditor}>Abbrechen</Button>
+      <Button ref={discardTrigger} className="pointer-coarse:min-h-11" onClick={cancel}>
+        Abbrechen
+      </Button>
       <span className="inline-flex gap-1.5">
         {!trade && (
-          <Button ref={againRef} disabled={saving} onClick={() => void save("again")}>
+          <Button ref={againRef} disabled={saving} className="pointer-coarse:min-h-11" onClick={() => void save("again")}>
             Speichern & neu
           </Button>
         )}
-        <Button ref={saveRef} variant="primary" type="submit" form="trade-form" disabled={saving} aria-busy={saving || undefined} className="min-w-[110px]">
+        <Button ref={saveRef} variant="primary" type="submit" form="trade-form" disabled={saving} aria-busy={saving || undefined} className="min-w-[110px] pointer-coarse:min-h-11">
           <TextRoll mode="roll" text={saving ? "Speichert …" : "Speichern"} />
         </Button>
       </span>
-    </>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 
   const fieldInvalid = (k: InvalidField) => (invalid === k ? { invalid: true, "aria-describedby": ERROR_ID } : {});
@@ -518,6 +646,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       layoutId={editor.fromFab && !trade ? `new-trade-${fabCycle}` : undefined}
       handoff={editor.fromDetail ? DETAIL_HANDOFF : undefined}
       footer={footer}
+      dismissGuard={() => dirty}
+      onDismissAttempt={() => setConfirmDiscard(true)}
     >
       <form id="trade-form" ref={formRef} onSubmit={onSubmit} noValidate>
         <Section title="Eckdaten">
@@ -552,7 +682,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               <Input id="f-pair" value={d.pair} onChange={setStr("pair")} autoComplete="off" />
             </Field>
             <Field label="Timeframe" htmlFor="f-tf">
-              <MorphSelect id="f-tf" value={d.timeframe} options={TIMEFRAME_OPTIONS} onChange={(timeframe) => setD((o) => ({ ...o, timeframe }))} />
+              <MorphSelect id="f-tf" value={d.timeframe} options={tfOptions} onChange={(timeframe) => setD((o) => ({ ...o, timeframe }))} />
             </Field>
             <Field label="Status" className="col-span-2">
               <Segmented<TradeStatus>
@@ -566,6 +696,10 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               />
             </Field>
           </div>
+        </Section>
+
+        <Section title={SIGNAL_SECTION_TITLE} sub={signalSectionSub({ checking, stored })}>
+          <SignalSection date={d.date} side={t.side} checking={checking} stored={stored} changed={timingChanged && !checkReq} onCheck={recheck} onAuto={onAuto} />
         </Section>
 
         <Section title="Preise & Größe" sub="Komma oder Punkt, beides geht">
@@ -627,18 +761,22 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
             </AnimatePresence>
           </AutoHeight>
           <Field label="Begründung" htmlFor="f-reason">
-            <Textarea id="f-reason" rows={3} className="leading-relaxed" value={d.reason} onChange={setStr("reason")} placeholder="z. B. 4H-Schluss unter 84.500, Delta rot, S&P lehnt ab" />
+            <Textarea id="f-reason" rows={3} className="leading-relaxed" value={d.reason} onChange={setStr("reason")} placeholder={ED.COPY.reasonPlaceholder} />
           </Field>
         </Section>
 
         <Section title="Checkliste" sub={items.length ? <CountRoll checked={checked} total={items.length} /> : undefined}>
           <ChecklistBar ratio={items.length ? checked / items.length : 0} complete={items.length > 0 && checked === items.length} />
           <div className="grid gap-2 md:grid-cols-2">
-            {items.map((it) => (
-              <CheckboxRow key={it.id} checked={Boolean(t.checks[it.id])} sub={it.id.startsWith("g:") ? "Grundregel" : settings.setups.find((s) => it.id.startsWith(s.id + ":"))?.name} onToggle={() => patchT({ checks: { ...t.checks, [it.id]: !t.checks[it.id] } })}>
-                {it.text}
-              </CheckboxRow>
-            ))}
+            {items.map((it) => {
+              const setupName = it.id.startsWith("g:") ? "Grundregel" : settings.setups.find((s) => it.id.startsWith(s.id + ":"))?.name;
+              const auto = autoApplies && it.id.startsWith(`${MTF_SETUP_ID}:`);
+              return (
+                <CheckboxRow key={it.id} checked={Boolean(checks[it.id])} sub={auto ? `${setupName} · automatisch` : setupName} onToggle={() => toggleCheck(it.id)}>
+                  {it.text}
+                </CheckboxRow>
+              );
+            })}
           </div>
         </Section>
 
@@ -662,6 +800,10 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               <EmotionChips value={t.emotion} onChange={(emotion) => patchT({ emotion })} />
             </Field>
           </div>
+        </Section>
+
+        <Section title={MISTAKES_COPY.title} sub={MISTAKES_COPY.sub}>
+          <MistakeChips options={tags} value={t.mistakes} onChange={(mistakes) => patchT({ mistakes })} />
         </Section>
 
         <Section title="Review">
@@ -759,6 +901,93 @@ function EmotionChips({ value, onChange }: { value: string; onChange: (emotion: 
           </motion.button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * `Fehler` chips (other journal version): multi-select toggles (`aria-pressed`) over the settings tags plus own ones;
+ * `+ Eigener Fehler` turns into a small field (Enter adds the tag to this trade and selects it, Escape cancels).
+ * On: loss-tinted (`border-loss/50 bg-loss/12`); the chip dips on press (`spring.press`).
+ */
+function MistakeChips({ options, value, onChange }: { options: readonly string[]; value: readonly string[]; onChange: (next: string[]) => void }) {
+  const reduced = useReducedFx();
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  /** Escape cancelled the field: the blur that follows must not add the draft. */
+  const cancelled = useRef(false);
+  const toggle = (m: string) => onChange(value.includes(m) ? value.filter((x) => x !== m) : [...value, m]);
+  const commit = () => {
+    if (cancelled.current) {
+      cancelled.current = false;
+      return;
+    }
+    const v = draft.trim();
+    setDraft("");
+    setAdding(false);
+    if (v && !value.includes(v)) onChange([...value, v]);
+  };
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commit();
+    } else if (e.key === "Escape") {
+      // only the field: the sheet's Escape must not fire for it
+      e.preventDefault();
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
+      cancelled.current = true;
+      setDraft("");
+      setAdding(false);
+    }
+  };
+  return (
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label={MISTAKES_COPY.group}>
+      {options.map((m) => {
+        const on = value.includes(m);
+        return (
+          <motion.button
+            key={m}
+            type="button"
+            aria-pressed={on}
+            onClick={() => toggle(m)}
+            whileTap={reduced ? undefined : { scale: 0.94 }}
+            transition={spring.press}
+            className={cn(
+              "rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-200 pointer-coarse:min-h-11",
+              on ? "border-loss/50 bg-loss/[0.12] text-[#ff8a90]" : "border-line-2 text-mute hover:border-white/40 hover:text-fg",
+            )}
+          >
+            {m}
+          </motion.button>
+        );
+      })}
+      {adding ? (
+        <Input
+          autoFocus
+          aria-label={MISTAKES_COPY.placeholder}
+          placeholder={MISTAKES_COPY.placeholder}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={onKey}
+          onBlur={commit}
+          wrapperClassName="!w-48"
+          className="rounded-full !py-1.5 text-[12.5px]"
+        />
+      ) : (
+        <motion.button
+          type="button"
+          onClick={() => {
+            cancelled.current = false;
+            setAdding(true);
+          }}
+          whileTap={reduced ? undefined : { scale: 0.96 }}
+          transition={spring.press}
+          className="rounded-full border border-dashed border-line-2 px-3 py-1.5 text-[12.5px] text-mute transition-colors hover:border-white/40 hover:text-fg pointer-coarse:min-h-11"
+        >
+          {MISTAKES_COPY.add}
+        </motion.button>
+      )}
     </div>
   );
 }

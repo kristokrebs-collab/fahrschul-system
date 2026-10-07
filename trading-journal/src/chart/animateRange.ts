@@ -19,10 +19,27 @@ export const lerpRange = (a: Range, b: Range, t: number): Range => ({ from: lerp
 /** Bars per day at a given interval (1w → 1/7). */
 export const barsPerDay = (interval: ChartInterval): number => 86400 / INTERVAL_SECONDS[interval];
 
+/** Free space (px) right of the last bar: the price-line titles (`LONG`, `SHORT` …) and the live pulse sit there. */
+export const RIGHT_FREE_PX = 72;
+
+/**
+ * Right offset in bars that leaves at least `minPx` empty right of the last bar for a window of `bars` bars on a
+ * `width` px time scale (never fewer than `minBars`). A fixed 8 bars shrank to ~6 px on a dense 30m / 1M window, so the
+ * live pulse sat on the `SHORT` / `LONG` titles.
+ */
+export function rightOffsetBars(bars: number, width: number, minPx = RIGHT_FREE_PX, minBars = 8): number {
+  if (!(width > minPx * 1.5) || !(bars > 0)) return minBars;
+  return Math.max(minBars, Math.ceil((minPx * bars) / (width - minPx)));
+}
+
+/** A fixed right offset in bars, or one computed from the window's bar count (`rightOffsetBars`). */
+export type RightOffset = number | ((bars: number) => number);
+const offsetOf = (o: RightOffset, bars: number): number => (typeof o === "number" ? o : o(bars));
+
 /** Index-based range for the last `days` days ending at `lastIndex` (+ right offset in bars). */
-export function rangeIndices(lastIndex: number, days: number, interval: ChartInterval, rightOffset = 8): Range {
+export function rangeIndices(lastIndex: number, days: number, interval: ChartInterval, rightOffset: RightOffset = 8): Range {
   const bars = Math.max(1, Math.round(days * barsPerDay(interval)));
-  return { from: Math.max(-0.5, lastIndex - bars + 0.5), to: lastIndex + rightOffset };
+  return { from: Math.max(-0.5, lastIndex - bars + 0.5), to: lastIndex + offsetOf(rightOffset, bars) };
 }
 
 export interface RangeSource {
@@ -34,12 +51,12 @@ export interface RangeSource {
 }
 
 /** Time-aware range for the last `days` days (falls back to index math when `timeToIndex` fails). */
-export function rangeForDays(src: RangeSource, days: number, interval: ChartInterval, rightOffset = 8): Range | null {
+export function rangeForDays(src: RangeSource, days: number, interval: ChartInterval, rightOffset: RightOffset = 8): Range | null {
   if (src.length === 0 || src.lastTime == null) return null;
   const lastIndex = src.length - 1;
   const fromIdx = src.timeToIndex((src.lastTime - days * 86400) as Time, true);
   if (fromIdx == null) return rangeIndices(lastIndex, days, interval, rightOffset);
-  return { from: Math.max(-0.5, fromIdx - 0.5), to: lastIndex + rightOffset };
+  return { from: Math.max(-0.5, fromIdx - 0.5), to: lastIndex + offsetOf(rightOffset, lastIndex - fromIdx + 1) };
 }
 
 export const sameRange = (a: LogicalRange | Range | null, b: Range, eps = 0.01): boolean =>

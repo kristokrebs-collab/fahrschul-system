@@ -20,6 +20,8 @@ export const CONFIG = {
   edge: 8,
   pad: 7,
   rowH: 39,
+  /** Coarse pointers: 44 px suggestion rows (tap targets ≥ 44 × 44). */
+  rowHCoarse: 44,
   emptyH: 43,
   groupH: 26,
   maxResults: 8,
@@ -91,17 +93,28 @@ interface Geo {
   bottom?: number;
   maxH: number;
   up: boolean;
+  rowH: number;
+}
+
+/** Row height for this device: `rowH`, or `rowHCoarse` on coarse pointers (read when the panel is placed). */
+function rowHeight(): number {
+  try {
+    return typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? CONFIG.rowHCoarse : CONFIG.rowH;
+  } catch {
+    return CONFIG.rowH;
+  }
 }
 
 function place(r: DOMRect, vw: number, vh: number): Geo {
   const C = CONFIG;
+  const rowH = rowHeight();
   const below = vh - r.bottom - C.gap - C.edge;
   const above = r.top - C.gap - C.edge;
   const up = below < C.minBelow && above > below;
   const width = Math.min(r.width, vw - C.edge * 2);
   const left = Math.min(Math.max(r.left, C.edge), vw - C.edge - width);
-  const maxH = Math.min(C.pad * 2 + C.maxResults * C.rowH + 2, Math.max(C.emptyH + 2, up ? above : below));
-  return up ? { left, width, bottom: vh - r.top + C.gap, maxH, up } : { left, width, top: r.bottom + C.gap, maxH, up };
+  const maxH = Math.min(C.pad * 2 + C.maxResults * rowH + 2, Math.max(C.emptyH + 2, up ? above : below));
+  return up ? { left, width, bottom: vh - r.top + C.gap, maxH, up, rowH } : { left, width, top: r.bottom + C.gap, maxH, up, rowH };
 }
 
 function Highlight({ label, query }: { label: string; query: string }) {
@@ -365,7 +378,7 @@ export function Autocomplete({
                         if (e.pointerType === "mouse" && i !== active) setActive(i);
                       }}
                       className="flex cursor-pointer select-none items-center truncate rounded-lg px-3 text-[13.5px] text-mute aria-selected:bg-ink-700"
-                      style={{ height: CONFIG.rowH }}
+                      style={{ height: geo.rowH }}
                     >
                       <span className="min-w-0 truncate">
                         <Highlight label={it.label} query={query} />

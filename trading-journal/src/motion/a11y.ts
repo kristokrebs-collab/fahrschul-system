@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type RefObject } from "react";
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
@@ -281,4 +281,27 @@ export function useDialogBehaviour(ref: RefObject<HTMLElement | null>, active: b
   useModalSession(ref, active, settled, { focus: true, inert: true }, fallbackFocus);
   useScrollLock(active);
   useEscape(active, onClose);
+}
+
+/**
+ * Ref callback for a swipe handle (sheet header, dialog head, detail grabber, toast): a native, NON-passive
+ * `touchmove` listener that `preventDefault`s the moves while `isDragging()` – React's touch listeners are passive,
+ * and an unconsumed fast touch sequence lets Chrome treat the next tap (within ~1 s) as a fling cancel and swallow its
+ * click, so the FAB or a button tapped right after a swipe would not react. Engagement itself stays with the pointer
+ * events (the first moves before the 10 px hysteresis are never touched). Stable identity; React 19 runs the
+ * returned cleanup when the element detaches.
+ */
+export function useTouchMoveGuard(isDragging: () => boolean): (el: HTMLElement | null) => (() => void) | undefined {
+  const fn = useRef(isDragging);
+  useEffect(() => {
+    fn.current = isDragging;
+  }, [isDragging]);
+  return useCallback((el: HTMLElement | null) => {
+    if (!el) return undefined;
+    const onMove = (e: TouchEvent) => {
+      if (e.cancelable && fn.current()) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
 }

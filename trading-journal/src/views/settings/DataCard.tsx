@@ -10,7 +10,7 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { exportCsv, exportJson, lastAutoBackup, listBackups, restoreBackup, type BackupEntry, type BackupKind } from "@/store/backup";
 import { canDownload, DOWNLOAD_UNAVAILABLE } from "@/store/download";
-import { MODE_LABELS, useJournal } from "@/store/journalStore";
+import { modeLabelFor, useJournal } from "@/store/journalStore";
 import { readQuarantine } from "@/store/migrate";
 import { ActionButton, GlyphDownload } from "./fx";
 import { IntroPref } from "./IntroPref";
@@ -21,6 +21,8 @@ export const DATA_STRINGS = {
   csv: "CSV exportieren",
   json: "Backup (JSON)",
   import: "Backup importieren",
+  /** NEW (merge): the import takes the other version's files as well (`parseBackup`: ours, `{exportedAt, settings, trades}`, `{trades}`, a bare list). */
+  importHint: "Nimmt auch Backups der Datei-Version an: JSON mit Trades und Einstellungen oder nur eine Trade-Liste. „Zusammenführen“ behält alles, was schon da ist, und übernimmt Fehler-Tags und Check-Einstellungen.",
   lastBackup: (d: string) => `Letztes Backup ${d}`,
   noBackup: "Noch kein Backup",
   restoreTitle: "Wiederherstellen",
@@ -39,6 +41,7 @@ export const DATA_STRINGS = {
 export const BACKUP_KIND_LABELS: Record<BackupKind, string> = { auto: "Automatisch", import: "Vor Import", v0: "Migration" };
 
 const MODE_TONE: Record<StoreMode, BadgeTone> = { cloud: "win", local: "warn", error: "loss", connecting: "mute" };
+const LABEL_TONE: Record<"win" | "warn" | "loss" | "faint", BadgeTone> = { win: "win", warn: "warn", loss: "loss", faint: "mute" };
 
 const VISIBLE_BACKUPS = 5;
 
@@ -62,6 +65,7 @@ export function DataCard({ onImport, className }: DataCardProps) {
   const trades = useJournal((s) => s.trades);
   const settings = useJournal((s) => s.settings);
   const mode = useJournal((s) => s.mode);
+  const storage = useJournal((s) => s.storage);
   const quarantined = useJournal((s) => s.quarantined);
 
   const [version, setVersion] = useState(0);
@@ -78,7 +82,9 @@ export function DataCard({ onImport, className }: DataCardProps) {
   const last = useMemo(() => lastAutoBackup(), [backups]); // eslint-disable-line react-hooks/exhaustive-deps
   const visible = showAll ? backups : backups.slice(0, VISIBLE_BACKUPS);
   const ids = visible.map((b) => b.tag).join();
-  const modeLabel = MODE_LABELS[mode];
+  // "Nicht gespeichert" when nothing persists (local mode without usable storage), else the mode label
+  const modeLabel = modeLabelFor(mode, storage);
+  const modeTone = storage === "unavailable" && mode === "local" ? LABEL_TONE[modeLabel.tone] : MODE_TONE[mode];
 
   async function restore(tag: string) {
     setBusy(true);
@@ -95,7 +101,7 @@ export function DataCard({ onImport, className }: DataCardProps) {
     <Card
       title={DATA_STRINGS.title}
       action={
-        <Badge tone={MODE_TONE[mode]} title={modeLabel.text} dot ping={mode === "cloud"}>
+        <Badge tone={modeTone} title={modeLabel.text} dot ping={mode === "cloud"}>
           {modeLabel.text}
         </Badge>
       }
@@ -117,6 +123,7 @@ export function DataCard({ onImport, className }: DataCardProps) {
         )}
         <Button onClick={onImport}>{DATA_STRINGS.import}</Button>
       </div>
+      <p className="mt-2.5 text-[11.5px] leading-relaxed text-faint">{DATA_STRINGS.importHint}</p>
 
       <div className="mt-5 grid gap-3 border-t border-line pt-4">
         <div className="flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-mute">

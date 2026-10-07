@@ -5,8 +5,8 @@
  */
 import type { Candle, FeedId, FeedSpec, FeedValue, HealthEvent, ProviderHealth, SeriesFeed, Source, Stamped, StatusLabel, MarketDataProvider, AggTrade } from "./types";
 import { resolveSymbol, type SymbolInfo } from "./symbol";
-import { normalizePeriod, INTERVAL_MS, type PeriodResult, type KlineInterval } from "./period";
-import { BOOTSTRAP_LIMIT, BYBIT_UNSUPPORTED, DEFAULT_SOURCE_CHAIN, FEED_IDS, FUTURES_DATA_FEEDS, FUTURES_DATA_RETENTION_MS, HISTORY_MAX_CALLS, HISTORY_PAGE_LIMIT, KLINE_FEEDS, OKX_UNSUPPORTED, POLL_LIMIT_FUTURES_DATA, RATIO_FEEDS, WS_FEEDS, WS_REST_FALLBACK_MS, buildFeedSpecs, effectiveSpec, isKlineFeed, klineFeedInterval, isSeriesFeed } from "./feeds";
+import { normalizePeriod, INTERVAL_MS, type FetchInterval, type PeriodResult, type KlineInterval } from "./period";
+import { BOOTSTRAP_LIMIT, GAP_FILL_MAX, klineBootstrapLimit, BYBIT_UNSUPPORTED, DEFAULT_SOURCE_CHAIN, FEED_IDS, FUTURES_DATA_FEEDS, FUTURES_DATA_RETENTION_MS, HISTORY_MAX_CALLS, HISTORY_PAGE_LIMIT, KLINE_FEEDS, OKX_UNSUPPORTED, POLL_LIMIT_FUTURES_DATA, RATIO_FEEDS, WS_FEEDS, WS_REST_FALLBACK_MS, buildFeedSpecs, effectiveSpec, isKlineFeed, klineFeedInterval, isSeriesFeed } from "./feeds";
 import { Budget, klineWeight } from "./budget";
 import { NON_ADVANCE_RETRY_MS, Scheduler, nextAlignedAt, probeBackoffMs, realTimerHost, type TimerHost } from "./schedule";
 import { MarketCache, upsertBar, upsertSeries, RING_CAPACITY, type KVStore } from "./cache";
@@ -16,7 +16,8 @@ import { binanceRest, buildStreamUrl, parseWsMessage, type BinanceRest } from ".
 import { bybitRest, type BybitRest } from "./sources/bybit";
 import { okxRest, type OkxRest } from "./sources/okx";
 import { probeProxy, proxyRest } from "./sources/proxy";
-import { toRestError, type FetchLike } from "./sources/http";
+import { RestError, toRestError, type FetchLike } from "./sources/http";
+import { isFileProtocol } from "@/edition";
 import { WsClient, type WsFactory } from "./sources/ws";
 import type { FeedSnapshot } from "./mapping";
 
@@ -62,6 +63,12 @@ export interface MarketProvider extends MarketDataProvider {
   clearCache(): Promise<void>;
   /** advanced: feed an event into the health reducer (tests, adapters) */
   dispatch(ev: HealthEvent): void;
+  /**
+   * One kline page from the source the kline feeds currently use (Binance → proxy → Bybit), charged to the same
+   * budget, WITHOUT touching the live cache (retro signal checks, the lazily polled `1d` rung). Waits up to
+   * `maxWaitMs` (default 15 s) for budget tokens, then throws `RestError("rate_limited")`.
+   */
+  fetchKlines(interval: FetchInterval, p?: { endTime?: number; startTime?: number; limit?: number; maxWaitMs?: number }): Promise<Stamped<Candle[]>>;
 }
 
 type Batch = FeedSnapshot & { detail?: string };
@@ -74,6 +81,8 @@ class Unsupported extends Error {
 
 const RETRY_MS = 15_000;
 const BLOCK_PROBE_MEMO_MS = 30_000;
+/** Default wait for budget tokens in `fetchKlines`. */
+const FETCH_KLINES_MAX_WAIT_MS = 15_000;
 
 export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   const deps = opts.deps ?? {};
@@ -87,6 +96,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     // Bybit/OKX only for USDT perps
     if (s === "bybit") return symbolInfo.bybit !== null;
     if (s === "okx") return symbolInfo.okx !== null;
+    // opened from disk (single-file build) there is no Netlify function: `/api/binance` would be file:///api/…
+    if (s === "proxy") return !isFileProtocol();
     return true;
   });
   const specs = buildFeedSpecs(period.period, chain);
@@ -159,12 +170,28 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     return { data: { price: t.data.lastPrice, qty: 0, isBuyerMaker: false, time: t.asOf }, asOf: t.asOf, receivedAt: t.receivedAt, source, comparable: t.comparable };
   }
 
+  /**
+   * Rows a non-bootstrap kline poll requests: the forming + last closed bar (2), or – after a WS gap – every bar
+   * since the newest cached one (+1), capped at `GAP_FILL_MAX`, so the series has no holes (the signal check
+   * resamples 15m into 30m/45m and must not see missing bars).
+   */
+  function klinePollLimit(feed: FeedId): number {
+    if (!isKlineFeed(feed)) return 2;
+    const newest = newestTime(feed);
+    if (newest === undefined) return 2;
+    const missing = Math.ceil((now() - newest) / INTERVAL_MS[klineFeedInterval(feed)]) + 1;
+    return Math.max(2, Math.min(GAP_FILL_MAX, missing));
+  }
+
+  function klineLimit(feed: FeedId, bootstrap: boolean): number {
+    return isKlineFeed(feed) && bootstrap ? klineBootstrapLimit(klineFeedInterval(feed)) : klinePollLimit(feed);
+  }
+
   async function fetchBinanceLike(client: BinanceRest, feed: FeedId, bootstrap: boolean): Promise<Batch> {
     const b: Batch = {};
     if (isKlineFeed(feed)) {
       const iv = klineFeedInterval(feed);
-      const limit = bootstrap ? (iv === "1w" ? BOOTSTRAP_LIMIT.kline1w : BOOTSTRAP_LIMIT.kline) : 2;
-      set(b, feed, await client.klines(sym, iv, { limit }));
+      set(b, feed, await client.klines(sym, iv, { limit: klineLimit(feed, bootstrap) }));
       return b;
     }
     switch (feed) {
@@ -206,7 +233,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (BYBIT_UNSUPPORTED.includes(feed)) throw new Unsupported("Bybit: alle Konten, keine Top-Trader-Kohorte.");
     const b: Batch = {};
     if (isKlineFeed(feed)) {
-      set(b, feed, await bybit.klines(s, klineFeedInterval(feed), { limit: bootstrap ? 1000 : 2 }));
+      set(b, feed, await bybit.klines(s, klineFeedInterval(feed), { limit: bootstrap ? 1000 : Math.min(1000, klinePollLimit(feed)) }));
       return b;
     }
     switch (feed) {
@@ -250,7 +277,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (OKX_UNSUPPORTED.includes(feed)) throw new Unsupported();
     const b: Batch = {};
     if (isKlineFeed(feed)) {
-      set(b, feed, await okx.candles(inst, klineFeedInterval(feed), { limit: bootstrap ? 300 : 2 }));
+      set(b, feed, await okx.candles(inst, klineFeedInterval(feed), { limit: bootstrap ? 300 : Math.min(300, klinePollLimit(feed)) }));
       return b;
     }
     switch (feed) {
@@ -349,7 +376,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (feed === "bookTop" && !bookTop) return;
     if (WS_FEEDS.includes(feed) && !o.bootstrap && !o.force && wsCovers(feed)) return; // WS delivers
     const spec = specs[feed];
-    const units = isKlineFeed(feed) ? klineWeight(o.bootstrap ? BOOTSTRAP_LIMIT.kline : 2) : spec.cost.units;
+    const units = isKlineFeed(feed) ? klineWeight(klineLimit(feed, !!o.bootstrap)) : spec.cost.units;
     const cost = bucketFor(feed, source, units);
     if (!o.force && !budget.take(cost.bucket, cost.units, now())) {
       schedulePoll(feed, now() + Math.max(1000, budget.waitFor(cost.bucket, cost.units, now())), o.bootstrap);
@@ -719,6 +746,40 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     return { data, asOf: finalV?.asOf ?? t, receivedAt: finalV?.receivedAt ?? t, source: finalV?.source ?? "cache", comparable: finalV?.comparable ?? true };
   }
 
+  // ------------------------------------------------------------ one-off kline pages (signal check)
+
+  async function waitBudget(bucket: FeedSpec["cost"]["bucket"], units: number, maxWaitMs: number): Promise<void> {
+    const deadline = now() + maxWaitMs;
+    while (!budget.take(bucket, units, now())) {
+      const wait = Math.max(50, budget.waitFor(bucket, units, now()));
+      if (now() + wait > deadline) throw new RestError("rate_limited", "Abfrage-Budget erschöpft, gleich nochmal versuchen");
+      await new Promise<void>((resolve) => host.setTimeout(resolve, wait));
+    }
+  }
+
+  async function fetchKlines(interval: FetchInterval, p: { endTime?: number; startTime?: number; limit?: number; maxWaitMs?: number } = {}): Promise<Stamped<Candle[]>> {
+    if (!symbolInfo.valid) throw new RestError("bad_symbol", "Ungültiges Symbol");
+    const fh = health.feeds.kline_1h;
+    let source: Source = fh.source === "cache" || fh.source === "tradingview" ? "binance" : fh.source;
+    // OKX candles have no end time in this adapter: use Bybit (USDT perps) or Binance
+    if (source === "okx") source = symbolInfo.bybit ? "bybit" : "binance";
+    const limit = Math.max(1, Math.min(HISTORY_PAGE_LIMIT, Math.round(p.limit ?? 500)));
+    const cost = bucketFor("kline_1h", source, klineWeight(limit));
+    await waitBudget(cost.bucket, cost.units, p.maxWaitMs ?? FETCH_KLINES_MAX_WAIT_MS);
+    try {
+      if (source === "bybit") {
+        if (!symbolInfo.bybit) throw new RestError("bad_symbol", STRINGS.fallbackOnlyUsdt);
+        return await bybit.klines(symbolInfo.bybit, interval, { limit: Math.min(1000, limit), end: p.endTime, start: p.startTime });
+      }
+      const client = source === "proxy" ? proxy : binance;
+      return await client.klines(sym, interval, { limit, endTime: p.endTime, startTime: p.startTime });
+    } catch (err) {
+      const e = toRestError(err);
+      if (e.kind === "rate_limited") budget.backoff(cost.bucket, now());
+      throw e;
+    }
+  }
+
   // ------------------------------------------------------------ public
 
   const provider: MarketProvider = {
@@ -770,6 +831,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     },
     clearCache: () => cache.clear(),
     dispatch,
+    fetchKlines,
   };
   return provider;
 }

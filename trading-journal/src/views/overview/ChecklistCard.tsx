@@ -12,12 +12,17 @@ import { useUi } from "@/store/uiStore";
 import { Bar, BarPercent, useBarFill } from "./Bar";
 import { ExplanationView } from "./explainer";
 
-/** One `Alles erfüllt` / `Lücken` tile: the percent counts up frame-synced with its bar on first view. */
-function Tile({ label, g, tone, index }: { label: string; g: Agg; tone: "win" | "loss"; index: number }) {
+/**
+ * One `Alles erfüllt` / `Lücken` tile: the percent counts up frame-synced with its bar on first view. The tile is a
+ * button that opens the checklist evaluation (a tile-looking block that did nothing on tap, tablet audit 2a.7).
+ */
+function Tile({ label, g, tone, index, open, controls, onOpen }: { label: string; g: Agg; tone: "win" | "loss"; index: number; open: boolean; controls: string; onOpen: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const fill = useBarFill(ref, g.winRate, index);
   return (
-    <RevealItem ref={ref} className="rounded-xl border border-line bg-ink-950/50 p-3">
+    <RevealItem ref={ref} className="relative rounded-xl border border-line bg-ink-950/50 p-3 transition-colors hover:border-white/20">
+      {/* the whole tile is the hit area; the button's box covers it (its label is the tile text) */}
+      <button type="button" onClick={onOpen} aria-expanded={open} aria-controls={controls} className="absolute inset-0 rounded-[inherit]" aria-label={`${label}: Auswertung zeigen`} />
       <div className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{label}</div>
       <div className={cn("num mt-1 font-mono text-2xl font-medium", g.n ? (tone === "win" ? "text-win" : "text-loss") : "text-faint")}>
         {g.winRate == null ? pct0(g.winRate) : <BarPercent fill={fill} label={pct0(g.winRate)} />}
@@ -54,7 +59,7 @@ export function ChecklistCard() {
         <RevealGroup className="grid grid-cols-1 gap-4">
           <div className="grid grid-cols-2 gap-3">
             {tiles.map(([label, g, tone], i) => (
-              <Tile key={label} label={label} g={g} tone={tone} index={i} />
+              <Tile key={label} label={label} g={g} tone={tone} index={i} open={open} controls={regionId} onOpen={() => setOpen(true)} />
             ))}
           </div>
           <div>
@@ -62,7 +67,8 @@ export function ChecklistCard() {
             {ev.missed.length ? (
               ev.missed.map((m) => (
                 <RevealItem key={m.text} className="flex items-center justify-between gap-3 border-t border-line py-2 text-[12.5px]">
-                  <span className="min-w-0 truncate text-fg">{m.text}</span>
+                  {/* two lines instead of an ellipsis: "Hebel im Rahmen (Scalp 4x, Makro …" hid the rule (tablet audit 3.4) */}
+                  <span className="line-clamp-2 min-w-0 text-fg">{m.text}</span>
                   <span className="num shrink-0 font-mono text-xs text-mute">{missedLabel(m)}</span>
                 </RevealItem>
               ))

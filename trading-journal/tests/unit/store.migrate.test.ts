@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { migrate, readMeta, readQuarantine, validateTrades, quarantineToastTitle, MAX_MIGRATION_SNAPSHOTS } from "@/store/migrate";
+import { migrate, readMeta, readQuarantine, validateTrades, quarantineToastTitle, MAX_MIGRATION_SNAPSHOTS, SCHEMA_VERSION } from "@/store/migrate";
 import { BROKEN_TRADE, LEGACY_LOOSE_TRADE, loadV0Fixture, seedV0 } from "./store.fixture";
 
 describe("migrate v0 → v1", () => {
@@ -7,8 +7,8 @@ describe("migrate v0 → v1", () => {
 
   it("fresh install: writes meta only, no snapshot", () => {
     const r = migrate(new Date("2026-09-30T10:00:00Z"));
-    expect(r).toMatchObject({ from: 0, to: 1, changed: true, quarantined: 0, snapshotTag: null });
-    expect(readMeta().schemaVersion).toBe(1);
+    expect(r).toMatchObject({ from: 0, to: SCHEMA_VERSION, changed: true, quarantined: 0, snapshotTag: null });
+    expect(readMeta().schemaVersion).toBe(SCHEMA_VERSION);
     expect(Object.keys(localStorage).filter((k) => k.startsWith("tj2-backup-"))).toEqual([]);
   });
 
@@ -42,7 +42,7 @@ describe("migrate v0 → v1", () => {
     const settings = JSON.parse(localStorage.getItem("tj2-settings")!);
     expect(settings.customFlag).toBe(true);
     expect(settings.capital.makro).toBe(20000);
-    expect(readMeta()).toMatchObject({ schemaVersion: 1, migratedAt: now.toISOString() });
+    expect(readMeta()).toMatchObject({ schemaVersion: SCHEMA_VERSION, migratedAt: now.toISOString() });
 
     // idempotent
     const again = migrate(new Date("2026-10-01T00:00:00Z"));
@@ -83,7 +83,7 @@ describe("migrate v0 → v1", () => {
     const snap = JSON.parse(localStorage.getItem("tj2-backup-v0-2026-09-30T10:00:00.000Z")!);
     expect(snap.trades).toBe('[{"id":"t_1",'); // raw string, not null
     expect(localStorage.getItem("tj2-trades")).toBe('[{"id":"t_1",'); // key untouched
-    expect(readMeta().schemaVersion).toBe(1);
+    expect(readMeta().schemaVersion).toBe(SCHEMA_VERSION);
   });
 
   describe("finding 12: snapshot write failure", () => {

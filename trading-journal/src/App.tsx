@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useDeferredValue, useMemo, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, type ReactNode } from "react";
 import { BottomFade } from "@/app/BottomFade";
 import { CommandNav } from "@/app/CommandNav";
 import { Dock } from "@/app/Dock";
@@ -9,6 +9,7 @@ import { Header } from "@/app/Header";
 import { LocalModeBanner, useLocalBannerOpen } from "@/app/LocalModeBanner";
 import { SetupEditor, TradeDetail } from "@/app/overlays";
 import { PageHost } from "@/app/PageHost";
+import { installViewportInset } from "@/app/pwa";
 import { OverviewView, SettingsView, SetupsView, TradesView } from "@/app/pages";
 import { ScenarioWatcher } from "@/app/ScenarioWatcher";
 import { toIslandToast } from "@/app/toasts";
@@ -65,12 +66,15 @@ function Detail() {
 
 /**
  * App shell (Plan 6.6): header, `main` container (page host with the keep-alive overview, local banner), the
+ * visual-viewport bottom inset (`--vv-bottom`, `@/app/pwa`), the
  * in-flow footer with its staggered reveal, dock, command navigation (⌘K), toast island, the app-level overlays and the celebration layer (no portal, inside the group-less `LayoutGroup` of
  * `MotionRoot`). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
  * banner opens or closes; the page, toasts, detail and editor each re-render on their own.
  */
 export default function App() {
   const bannerOpen = useLocalBannerOpen();
+  // grey-bar fix: `--vv-bottom` follows host UI laid over the bottom of the page (visualViewport, event driven)
+  useEffect(() => installViewportInset(), []);
   return (
     <MorphDialogProvider>
       <ScenarioWatcher />

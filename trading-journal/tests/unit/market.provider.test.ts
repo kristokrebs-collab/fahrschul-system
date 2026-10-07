@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import klines1m from "../fixtures/binance-klines-1m.json";
+import klines15m from "../fixtures/binance-klines-15m.json";
 import klines1h from "../fixtures/binance-klines-1h.json";
 import klines4h from "../fixtures/binance-klines-4h.json";
 import klines1w from "../fixtures/binance-klines-1w.json";
@@ -93,7 +94,7 @@ function makeFetch(state: { binance: Mode; bybit: Mode; log: string[] }) {
       if (u.pathname === "/fapi/v1/klines") {
         const iv = u.searchParams.get("interval");
         const limit = Number(u.searchParams.get("limit") ?? 500);
-        const src = iv === "1m" ? klines1m : iv === "1h" ? klines1h : iv === "4h" ? klines4h : klines1w;
+        const src = iv === "1m" ? klines1m : iv === "15m" ? klines15m : iv === "1h" ? klines1h : iv === "4h" ? klines4h : klines1w;
         if (u.searchParams.get("symbol") !== "BTCUSDT") return json({ code: -1121, msg: "Invalid symbol." }, 400);
         const endTime = u.searchParams.get("endTime");
         const rows = endTime ? src.filter((r) => (r[0] as number) <= Number(endTime)) : src;
@@ -167,11 +168,16 @@ describe("createMarketProvider", () => {
     expect(provider.get("topAccountRatio")!.data).toHaveLength(30);
     expect(state.log.some((u) => u.includes("topLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=500"))).toBe(true);
     expect(state.log.some((u) => u.includes("interval=1w&limit=200"))).toBe(true);
+    // the signal check's 15m feed bootstraps 1500 bars (= 500 × 45m), the other klines 499
+    expect(state.log.some((u) => u.includes("interval=15m&limit=1500"))).toBe(true);
+    expect(state.log.some((u) => u.includes("interval=1h&limit=499"))).toBe(true);
+    expect(h.feeds.kline_15m.state).toBe("live");
+    expect(provider.get("kline_15m")!.data).toHaveLength(30);
     expect(provider.statusLabel("topAccountRatio").text).toBe("Live · stündlich");
 
     // WebSocket: one combined-stream socket, no bookTicker by default
     const ws = sockets()[0]!;
-    expect(ws.url).toBe("wss://fstream.binance.com/stream?streams=btcusdt@kline_1m/btcusdt@kline_1h/btcusdt@kline_4h/btcusdt@kline_1w/btcusdt@markPrice@1s/btcusdt@aggTrade");
+    expect(ws.url).toBe("wss://fstream.binance.com/stream?streams=btcusdt@kline_1m/btcusdt@kline_15m/btcusdt@kline_1h/btcusdt@kline_4h/btcusdt@kline_1w/btcusdt@markPrice@1s/btcusdt@aggTrade");
     ws.open();
     const seen: number[] = [];
     provider.subscribe("aggTrade", (v) => seen.push(v.data.price));
@@ -235,8 +241,8 @@ describe("createMarketProvider", () => {
     const klineCallsBefore = state.log.filter((u) => u.includes("/fapi/v1/klines") && u.includes("limit=2")).length;
     ws2.open();
     await flush();
-    // reconnect: last 2 candles per interval are re-fetched
-    expect(state.log.filter((u) => u.includes("/fapi/v1/klines") && u.includes("limit=2")).length).toBe(klineCallsBefore + 4);
+    // reconnect: last 2 candles per interval are re-fetched (5 kline feeds)
+    expect(state.log.filter((u) => u.includes("/fapi/v1/klines") && u.includes("limit=2")).length).toBe(klineCallsBefore + 5);
     ws2.send({ ...wsMark, data: { ...wsMark.data, E: Date.now() } });
     expect(provider.getHealth().feeds.markPrice.state).toBe("live");
   });
@@ -331,6 +337,48 @@ describe("createMarketProvider", () => {
     await flush();
     expect(second.get("kline_4h")!.data).toHaveLength(30);
     expect(second.statusLabel("kline_4h").text).toMatch(/^Zuletzt \d\d:\d\d · veraltet$/);
+  });
+
+  it("gap-fills a long WS outage with as many bars as are missing (no holes for the signal check)", async () => {
+    const { provider, state, sockets } = setup();
+    p = provider;
+    provider.start();
+    await flush();
+    sockets()[0]!.open();
+    // 3 h 10 min without data, then the socket reconnects
+    vi.setSystemTime(T0 + 3 * 3_600_000 + 600_000);
+    sockets()[0]!.serverClose(1006);
+    await vi.advanceTimersByTimeAsync(31_000);
+    const ws2 = sockets().at(-1)!;
+    const before = state.log.length;
+    ws2.open();
+    await flush();
+    const calls = state.log.slice(before).filter((u) => u.includes("/fapi/v1/klines"));
+    const limitOf = (iv: string) => Number(new URL(calls.find((u) => u.includes(`interval=${iv}&`))!).searchParams.get("limit"));
+    expect(limitOf("15m")).toBe(Math.ceil((Date.now() - T0) / 900_000) + 1);
+    expect(limitOf("1h")).toBe(Math.ceil((Date.now() - T0) / 3_600_000) + 1);
+    expect(limitOf("1m")).toBe(Math.min(1500, Math.ceil((Date.now() - 1790762400000) / 60_000) + 1));
+    expect(limitOf("1w")).toBe(2);
+  });
+
+  it("fetchKlines() pages by endTime through the budget without touching the live cache", async () => {
+    const { provider, state } = setup();
+    p = provider;
+    provider.start();
+    await flush();
+    const live = provider.get("kline_1h");
+    const page = await provider.fetchKlines("1h", { endTime: T0 - 10 * 3_600_000, limit: 5 });
+    expect(page.data).toHaveLength(5);
+    expect(page.data.at(-1)!.time).toBeLessThanOrEqual(T0 - 10 * 3_600_000);
+    expect(state.log.at(-1)).toContain("interval=1h&limit=5&endTime=");
+    expect(provider.get("kline_1h")).toBe(live);
+    // 1d is REST-only (signal ladder rung 1D)
+    await provider.fetchKlines("1d", { limit: 3 }).catch(() => undefined);
+    expect(state.log.at(-1)).toContain("interval=1d&limit=3");
+    // budget exhausted → rate_limited instead of hammering the exchange
+    const many = Array.from({ length: 40 }, () => provider.fetchKlines("1h", { limit: 1500, maxWaitMs: 0 }).then(() => "ok", (e: { kind?: string }) => e.kind));
+    const results = await Promise.all(many);
+    expect(results).toContain("rate_limited");
   });
 
   it("history() pages backwards with limit=1500 and serves from the cache afterwards", async () => {

@@ -15,7 +15,10 @@ export interface TradeSort {
   k: SortKey;
   dir: -1 | 1;
 }
-export type DetailSource = "recent" | "table" | "marker" | null;
+/** `marker` (chart) and `insights` (calendar / day view) have no list element to morph from: the detail enters on its own. */
+export type DetailSource = "recent" | "table" | "marker" | "insights" | null;
+/** Sources without a shared-layout predecessor (lists must not register `trade-{id}` for them). */
+export const DETACHED_DETAIL_SOURCES: readonly DetailSource[] = ["marker", "insights"];
 export interface DetailState {
   id: string | null;
   source: DetailSource;
@@ -32,7 +35,7 @@ export interface SetupEditorState {
   setupId?: string;
   fromTrade: boolean;
 }
-export type ChartInterval = "1m" | "1h" | "4h";
+export type ChartInterval = "1m" | "30m" | "1h" | "4h";
 export type ChartPane = "ratio" | "oi" | "cvd";
 export interface ChartPrefs {
   interval: ChartInterval;
@@ -94,6 +97,17 @@ export interface UiPrefs {
   flags: Record<string, boolean>;
 }
 
+/**
+ * Additive trade filters (NEW, not part of the bundle's `TradeFilter` / URL): mistake tag and stored signal strength.
+ * `mistake`: `all` | `__none` (no tag) | `__any` (any tag) | a tag. `strength`: `all` | `none` (no stored check) |
+ * `0`…`4` (exact strength of the stored `trade.signal`).
+ */
+export interface TradeExtraFilter {
+  mistake: string;
+  strength: "all" | "none" | "0" | "1" | "2" | "3" | "4";
+}
+export const DEFAULT_TRADE_EXTRA: TradeExtraFilter = { mistake: "all", strength: "all" };
+
 /** Bundle `y0`. */
 export const DEFAULT_TRADE_FILTER: TradeFilter = { q: "", setup: "all", result: "all", side: "all", acc: "all" };
 export const DEFAULT_TRADE_SORT: TradeSort = { k: "date", dir: -1 };
@@ -119,8 +133,15 @@ export interface UiState extends UiPrefs {
   page: Page;
   acc: AccFilter;
   tradeFilter: TradeFilter;
+  /** Mistake / signal-strength filter of `Alle Trades` (session only, reset together with `tradeFilter`). */
+  tradeExtra: TradeExtraFilter;
   tradeSort: TradeSort;
   detail: DetailState;
+  /**
+   * Release tempo (0 … 1) of the swipe that dismissed the detail, 0 for every other close (reset on open). Morph-back
+   * sources run their layout transition on `contextSpringAt(spring.detail, detailTempo)` – the token itself at 0.
+   */
+  detailTempo: number;
   editor: EditorState;
   /**
    * FAB editor cycle: bumped when a FAB-opened editor closes. The FAB disc and the FAB sheet share the layoutId
@@ -137,12 +158,16 @@ export interface UiState extends UiPrefs {
   setPage(page: Page): void;
   setAcc(acc: AccFilter): void;
   setTradeFilter(patch: Partial<TradeFilter>): void;
+  /** Resets `tradeFilter` and `tradeExtra`. */
   resetTradeFilter(): void;
+  setTradeExtra(patch: Partial<TradeExtraFilter>): void;
   setTradeSort(sort: TradeSort): void;
   /** Same column flips direction; a new column starts with `setup → 1`, everything else `−1` (bundle). */
   toggleSort(k: SortKey): void;
   openDetail(id: string, source: Exclude<DetailSource, null>): void;
   closeDetail(): void;
+  /** Close by swipe: like `closeDetail`, remembering the release tempo for the morph back. */
+  dismissDetail(tempo: number): void;
   openEditor(opts?: { tradeId?: string; fromFab?: boolean }): void;
   /** Detail → editor hand-off in ONE update: the detail closes while the editor opens over its fading dim. */
   editFromDetail(tradeId: string): void;
@@ -189,7 +214,7 @@ export function loadPrefs(): UiPrefs {
     topTraderBase: raw.topTraderBase === "positions" ? "positions" : "accounts",
     useProxy: raw.useProxy === true,
     chart: {
-      interval: chart.interval === "1m" || chart.interval === "1h" ? chart.interval : DEFAULT_CHART.interval,
+      interval: chart.interval === "1m" || chart.interval === "30m" || chart.interval === "1h" ? chart.interval : DEFAULT_CHART.interval,
       rangeDays: typeof chart.rangeDays === "number" && chart.rangeDays > 0 ? chart.rangeDays : DEFAULT_CHART.rangeDays,
       pane: chart.pane === "oi" || chart.pane === "cvd" ? chart.pane : DEFAULT_CHART.pane,
       open: chart.open !== false,
@@ -231,8 +256,10 @@ export const useUi = create<UiState>()((set, get) => ({
   page: "overview",
   acc: "all",
   tradeFilter: DEFAULT_TRADE_FILTER,
+  tradeExtra: DEFAULT_TRADE_EXTRA,
   tradeSort: DEFAULT_TRADE_SORT,
   detail: { id: null, source: null },
+  detailTempo: 0,
   editor: { open: false, fromFab: false },
   fabCycle: 0,
   setupEditor: { open: false, fromTrade: false },
@@ -243,7 +270,8 @@ export const useUi = create<UiState>()((set, get) => ({
   setPage: (page) => set({ page }),
   setAcc: (acc) => set({ acc }),
   setTradeFilter: (patch) => set((s) => ({ tradeFilter: { ...s.tradeFilter, ...patch } })),
-  resetTradeFilter: () => set({ tradeFilter: DEFAULT_TRADE_FILTER }),
+  resetTradeFilter: () => set({ tradeFilter: DEFAULT_TRADE_FILTER, tradeExtra: DEFAULT_TRADE_EXTRA }),
+  setTradeExtra: (patch) => set((s) => ({ tradeExtra: { ...s.tradeExtra, ...patch } })),
   setTradeSort: (tradeSort) => set({ tradeSort }),
   toggleSort: (k) =>
     set((s) => ({
@@ -251,9 +279,10 @@ export const useUi = create<UiState>()((set, get) => ({
     })),
   openDetail: (id, source) => {
     if (get().transitioning) return;
-    set({ detail: { id, source } });
+    set({ detail: { id, source }, detailTempo: 0 });
   },
-  closeDetail: () => set({ detail: { id: null, source: null } }),
+  closeDetail: () => set({ detail: { id: null, source: null }, detailTempo: 0 }),
+  dismissDetail: (tempo) => set({ detail: { id: null, source: null }, detailTempo: Number.isFinite(tempo) ? Math.min(1, Math.max(0, tempo)) : 0 }),
   openEditor: (opts = {}) => set({ editor: { open: true, tradeId: opts.tradeId, fromFab: opts.fromFab === true } }),
   editFromDetail: (tradeId) => set({ detail: { id: null, source: null }, editor: { open: true, tradeId, fromFab: false, fromDetail: true } }),
   closeEditor: () =>

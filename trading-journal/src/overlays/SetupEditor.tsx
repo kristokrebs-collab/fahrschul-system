@@ -1,9 +1,10 @@
 import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
+import { ED } from "@/domain/edition";
 import { useId, useMemo, useState, type KeyboardEvent } from "react";
-import { nextSetupColor, SETUP_PALETTE } from "@/domain/defaults";
+import { MTF_SETUP_ID, nextSetupColor, SETUP_PALETTE } from "@/domain/defaults";
 import type { ChecklistItem, Setup, SetupAccount, Settings } from "@/domain/types";
 import { newChecklistItemId, newSetupId } from "@/lib/ids";
-import { Sheet } from "@/motion/Sheet";
+import { Sheet, SHEET_DISCARD_COPY } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
 import { CONFIG as LIFT_CONFIG, useLift } from "@/motion/pulse/WidgetGrid";
 import { radius, spring, tween } from "@/motion/tokens";
@@ -42,7 +43,7 @@ export const SETUP_EDITOR_STRINGS = {
   titleNew: "Neue Entscheidungsgrundlage",
   titleEdit: "Grundlage bearbeiten",
   name: "Name",
-  namePlaceholder: "z. B. 4H-Breakout über 85.900",
+  namePlaceholder: ED.COPY.setupNamePlaceholder,
   account: "Konto",
   rules: "Regeln",
   rulesPlaceholder: "Woran erkenne ich das Setup? Wo liegt der Stop? Was ist das Ziel?",
@@ -65,6 +66,11 @@ export const SETUP_EDITOR_STRINGS = {
   toastCreated: "Grundlage angelegt",
   toastUpdated: "Grundlage aktualisiert",
   toastDeleted: "Grundlage gelöscht",
+  /** NEW: the `Multi-TF Signal` setup's checklist is ticked by the automatic entry check. */
+  mtfAuto: "Der Einstiegs-Check hakt diese Punkte beim Eintragen automatisch ab (Basis, nächste und dritte Timeframe, RSI, Zone). Umbenennen behält die Zuordnung, ein gelöschter Punkt wird nicht mehr abgehakt.",
+  discardAsk: SHEET_DISCARD_COPY.ask,
+  discard: SHEET_DISCARD_COPY.discard,
+  keep: SHEET_DISCARD_COPY.keep,
 } as const;
 
 type Form = Setup;
@@ -121,6 +127,9 @@ export function SetupEditor(props: SetupEditorProps) {
   const usedBy = useMemo(() => (existing ? trades.filter((t) => (t.setups || []).includes(existing.id)).length : 0), [trades, existing]);
 
   const [form, setForm] = useState<Form>(() => emptyForm(settings.setups));
+  /** The form as it was opened – `dirty` = anything differs (unsaved input is never discarded silently). */
+  const [baseline, setBaseline] = useState<Form>(form);
+  const [askDiscard, setAskDiscard] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -137,9 +146,14 @@ export function SetupEditor(props: SetupEditorProps) {
       setError("");
       setConfirmDelete(false);
       setBusy(false);
-      setForm(existing ? structuredClone(existing) : emptyForm(settings.setups));
+      setAskDiscard(false);
+      const initial = existing ? structuredClone(existing) : emptyForm(settings.setups);
+      setForm(initial);
+      setBaseline(initial);
     }
   }
+  const dirty = open && !sameForm(form, baseline);
+  const cancel = () => (dirty ? setAskDiscard(true) : onClose());
 
   const patch = (p: Partial<Form>) => setForm((f) => ({ ...f, ...p }));
   const setItems = (checklist: ChecklistItem[]) => patch({ checklist });
@@ -188,42 +202,68 @@ export function SetupEditor(props: SetupEditorProps) {
       size="md"
       layoutId={layoutId}
       title={existing ? SETUP_EDITOR_STRINGS.titleEdit : SETUP_EDITOR_STRINGS.titleNew}
+      // Escape, backdrop, close button and swipe ask instead of closing while the form differs from how it opened
+      dismissGuard={() => dirty}
+      onDismissAttempt={() => setAskDiscard(true)}
       footer={
-        <>
-          {existing &&
-            (confirmDelete ? (
-              <motion.span
-                key="confirm"
-                className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
-                initial={reduced ? false : { opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ default: tween.fade, scale: spring.pop }}
-              >
-                {usedBy ? SETUP_EDITOR_STRINGS.delUsed(usedBy) : SETUP_EDITOR_STRINGS.delConfirm}
-                <Button size="sm" variant="danger" onClick={remove} disabled={busy}>
-                  {SETUP_EDITOR_STRINGS.yes}
-                </Button>
-                <Button ref={deleteNo} size="sm" onClick={() => setConfirmDelete(false)}>
-                  {SETUP_EDITOR_STRINGS.no}
-                </Button>
-              </motion.span>
-            ) : (
-              // a setup that trades still use never goes on a hold alone: the hold opens the inline warning with the count
-              <HoldConfirm ref={deleteTrigger} disabled={busy} onAsk={() => setConfirmDelete(true)} onConfirm={() => (usedBy > 0 ? setConfirmDelete(true) : void remove())}>
-                {SETUP_EDITOR_STRINGS.del}
-              </HoldConfirm>
-            ))}
-          <span className="flex-1" />
-          {error && (
-            <span role="alert" className="text-[12.5px] font-medium text-[#ff8a90]">
-              {error}
+        askDiscard ? (
+          <motion.span
+            key="discard"
+            role="group"
+            aria-label={SETUP_EDITOR_STRINGS.discardAsk}
+            data-testid="setup-discard-confirm"
+            className="flex w-full flex-wrap items-center justify-end gap-2.5"
+            initial={reduced ? false : { opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ default: tween.fade, scale: spring.pop }}
+          >
+            <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{SETUP_EDITOR_STRINGS.discardAsk}</span>
+            <span className="inline-flex gap-2">
+              <Button variant="danger" onClick={onClose}>
+                {SETUP_EDITOR_STRINGS.discard}
+              </Button>
+              <Button variant="primary" autoFocus onClick={() => setAskDiscard(false)}>
+                {SETUP_EDITOR_STRINGS.keep}
+              </Button>
             </span>
-          )}
-          <Button onClick={onClose}>{SETUP_EDITOR_STRINGS.cancel}</Button>
-          <Button variant="primary" onClick={save} disabled={busy}>
-            {SETUP_EDITOR_STRINGS.save}
-          </Button>
-        </>
+          </motion.span>
+        ) : (
+          <>
+            {existing &&
+              (confirmDelete ? (
+                <motion.span
+                  key="confirm"
+                  className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
+                  initial={reduced ? false : { opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ default: tween.fade, scale: spring.pop }}
+                >
+                  {usedBy ? SETUP_EDITOR_STRINGS.delUsed(usedBy) : SETUP_EDITOR_STRINGS.delConfirm}
+                  <Button size="sm" variant="danger" onClick={remove} disabled={busy}>
+                    {SETUP_EDITOR_STRINGS.yes}
+                  </Button>
+                  <Button ref={deleteNo} size="sm" onClick={() => setConfirmDelete(false)}>
+                    {SETUP_EDITOR_STRINGS.no}
+                  </Button>
+                </motion.span>
+              ) : (
+                // a setup that trades still use never goes on a hold alone: the hold opens the inline warning with the count
+                <HoldConfirm ref={deleteTrigger} disabled={busy} onAsk={() => setConfirmDelete(true)} onConfirm={() => (usedBy > 0 ? setConfirmDelete(true) : void remove())}>
+                  {SETUP_EDITOR_STRINGS.del}
+                </HoldConfirm>
+              ))}
+            <span className="flex-1" />
+            {error && (
+              <span role="alert" className="text-[12.5px] font-medium text-[#ff8a90]">
+                {error}
+              </span>
+            )}
+            <Button onClick={cancel}>{SETUP_EDITOR_STRINGS.cancel}</Button>
+            <Button variant="primary" onClick={save} disabled={busy}>
+              {SETUP_EDITOR_STRINGS.save}
+            </Button>
+          </>
+        )
       }
     >
       <form
@@ -263,7 +303,7 @@ export function SetupEditor(props: SetupEditorProps) {
         </StaggerItem>
 
         <StaggerItem>
-          <Field label={SETUP_EDITOR_STRINGS.checklist} help={SETUP_EDITOR_STRINGS.checklistHelp}>
+          <Field label={SETUP_EDITOR_STRINGS.checklist} help={form.id === MTF_SETUP_ID ? `${SETUP_EDITOR_STRINGS.checklistHelp} ${SETUP_EDITOR_STRINGS.mtfAuto}` : SETUP_EDITOR_STRINGS.checklistHelp}>
             <div className="grid gap-2">
               <Reorder.Group axis="y" values={form.checklist} onReorder={setItems} className="grid gap-2" aria-label={SETUP_EDITOR_STRINGS.checklist}>
                 <AnimatePresence mode="popLayout" initial={false}>
@@ -302,6 +342,19 @@ export function SetupEditor(props: SetupEditorProps) {
       </form>
     </Sheet>
   );
+}
+
+/** Same saved meaning: name/desc trimmed, empty checklist rows ignored (what `finalizeSetup` would store). */
+export function sameForm(a: Form, b: Form): boolean {
+  const norm = (f: Form) =>
+    JSON.stringify([
+      f.name.trim(),
+      f.desc.trim(),
+      f.color,
+      f.account,
+      f.checklist.filter((c) => c.text.trim()).map((c) => [c.id, c.text.trim()]),
+    ]);
+  return norm(a) === norm(b);
 }
 
 export function moveItem<T>(list: readonly T[], from: number, dir: -1 | 1): T[] {
@@ -345,7 +398,7 @@ function ColorRadios({ value, onChange }: { value: string; onChange: (hex: strin
               whileHover={reduced ? undefined : { scale: 1.1 }}
               whileTap={reduced ? undefined : { scale: 0.9 }}
               transition={spring.press}
-              className="size-8 rounded-full"
+              className="touch-hit size-8 rounded-full"
               style={{ background: hex, boxShadow: "inset 0 0 0 2px var(--color-ink-850)" }}
             />
           </span>
@@ -411,7 +464,7 @@ function ChecklistRow({ item, index, count, ids, onChange, onRemove, onMove }: C
         title="Ziehen oder Pfeiltasten"
         onPointerDown={(e) => controls.start(e)}
         onKeyDown={onHandleKey}
-        className="grid size-10 shrink-0 cursor-grab touch-none place-items-center rounded-xl border border-line-2 text-faint hover:text-fg active:cursor-grabbing"
+        className="grid size-10 shrink-0 cursor-grab touch-none place-items-center rounded-xl border border-line-2 text-faint hover:text-fg active:cursor-grabbing pointer-coarse:size-11"
       >
         <svg viewBox="0 0 12 12" className="size-3" fill="currentColor" aria-hidden="true">
           <circle cx="4" cy="2.5" r="1" />
@@ -427,7 +480,7 @@ function ChecklistRow({ item, index, count, ids, onChange, onRemove, onMove }: C
         type="button"
         aria-label={SETUP_EDITOR_STRINGS.removeItem}
         onClick={onRemove}
-        className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 text-mute hover:text-loss [&>svg]:size-4"
+        className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 text-mute hover:text-loss pointer-coarse:size-11 [&>svg]:size-4"
       >
         <Icon name="x" />
       </button>

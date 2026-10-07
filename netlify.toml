@@ -1,12 +1,24 @@
 # Netlify deploys the trading journal (Vite app) from the trading-journal/ subfolder.
+# Two editions on one site:
+#   /          personal edition ("persönlich", `npm run build` → dist/)
+#   /teilen/   share edition ("zum Teilen": empty journal, neutral setups, own tj2share-* storage;
+#              `npm run build:share` → dist/teilen/, the build fails if a personal string leaks)
+# The personal build empties dist/, so it must run first.
 # The legacy static dashboard stays reachable at /dashboard.html (copied into dist at build time).
 [build]
   base = "trading-journal"
-  command = "npm ci && npm run build"
+  command = "npm ci && npm run build && npm run build:share"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "22"
+
+# Share edition: its own SPA fallback, BEFORE the catch-all (existing files such as /teilen/assets/* win anyway;
+# `/teilen` without slash is served as /teilen/index.html by Netlify itself – no extra rule, rules ignore the slash).
+[[redirects]]
+  from = "/teilen/*"
+  to = "/teilen/index.html"
+  status = 200
 
 [[redirects]]
   from = "/*"

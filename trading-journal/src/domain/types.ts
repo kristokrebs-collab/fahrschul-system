@@ -9,7 +9,8 @@ export type TradeStatus = "closed" | "open";
 export type TradeResult = "win" | "loss" | "be" | "open";
 export type Conviction = 1 | 2 | 3 | 4 | 5;
 
-export const TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1D", "3D", "1W"] as const;
+/** Trade timeframes (30m/45m/2h added for the other journal version's data and the multi-TF ladder). */
+export const TIMEFRAMES = ["1m", "5m", "15m", "30m", "45m", "1h", "2h", "4h", "1D", "3D", "1W"] as const;
 export type Timeframe = (typeof TIMEFRAMES)[number];
 export const EMOTIONS = ["Ruhig", "Fokussiert", "Unsicher", "FOMO", "Gierig", "Revenge"] as const;
 export const SETUP_COLORS = [
@@ -54,6 +55,13 @@ export interface Trade {
   r: number | null;
   createdAt: string;
   updatedAt: string;
+  /** Mistake tags (`settings.mistakes` vocabulary); `normalizeTrade` always fills `[]`. Other version: same field. */
+  mistakes?: string[];
+  /**
+   * Entry-check snapshot stored when the trade was entered (other version's `SignalSnap`). Opaque here: kept
+   * verbatim through every read/write/backup path; the signal module parses it.
+   */
+  signal?: unknown;
 }
 
 export interface ChecklistEntry {
@@ -130,7 +138,31 @@ export interface Settings {
   backtest: BacktestReference;
   market: MarketLevels;
   hyblock: HyblockConfig;
+  /** Mistake tags offered in the trade form; `normalizeSettings` fills `DEFAULT_MISTAKES` when missing. */
+  mistakes: string[];
+  /**
+   * Entry-check configuration (other version's `SignalCfg`). Passthrough: kept verbatim (also unknown keys); the
+   * signal module parses it with its own defaults. Absent until the user saves the signal settings.
+   */
+  signals?: unknown;
 }
+
+/** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */
+export interface DayNote {
+  /** Free text (Tagesnotiz). */
+  note: string;
+  /** Optional pre-market plan / post-session review (Tradezella day journal). */
+  plan?: string;
+  review?: string;
+  /** 1 (schlecht) … 5 (sehr gut); `null`/absent = not rated. */
+  mood?: DayMood | null;
+  updatedAt: string;
+}
+export type DayMood = 1 | 2 | 3 | 4 | 5;
+/** `tj2-days`: `{ "2026-10-07": DayNote, … }`. */
+export type DayNotes = Record<string, DayNote>;
+/** Input of `saveDay`: every field optional, `updatedAt` is set by the store. */
+export type DayNoteInput = Partial<Omit<DayNote, "updatedAt">> & Record<string, unknown>;
 
 export interface HyblockReading {
   id: string;
@@ -151,6 +183,8 @@ export interface JsonBackup {
   hyblock?: HyblockReading[];
   /** NEW */
   schemaVersion?: number;
+  /** NEW: day journal (`tj2-days`). Absent in older backups and in the other version's backups. */
+  days?: DayNotes;
 }
 
 export interface TradeFilter {
@@ -168,6 +202,10 @@ export interface StoreApi {
   saveSettings(s: Settings): Promise<void>;
   saveHyblock(r: Omit<HyblockReading, "id"> & { id?: string }): Promise<void>;
   deleteHyblock(id: string): Promise<void>;
+  /** NEW: upserts the day journal entry of `date` (`YYYY-MM-DD`), merged over the stored one; empty → removed. */
+  saveDay(date: string, input: DayNoteInput): Promise<void>;
+  /** NEW: removes the day journal entry of `date`. */
+  deleteDay(date: string): Promise<void>;
 }
 
 export type StoreMode = "connecting" | "local" | "cloud" | "error";

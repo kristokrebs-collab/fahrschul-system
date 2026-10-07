@@ -6,7 +6,7 @@
 export type Source = "binance" | "bybit" | "okx" | "proxy" | "tradingview" | "cache";
 export type HealthState = "connecting" | "live" | "stale" | "fallback" | "offline";
 
-export type KlineFeed = "kline_1m" | "kline_1h" | "kline_4h" | "kline_1w";
+export type KlineFeed = "kline_1m" | "kline_15m" | "kline_1h" | "kline_4h" | "kline_1w";
 export type RatioFeed = "topPositionRatio" | "topAccountRatio" | "globalAccountRatio" | "takerRatio";
 export type FeedId =
   | KlineFeed
@@ -91,6 +91,8 @@ export interface FundingPoint {
 
 export interface FeedValue {
   kline_1m: Candle[];
+  /** additive: feeds the signal check (30m = 2 × 15m, 45m = 3 × 15m) */
+  kline_15m: Candle[];
   kline_1h: Candle[];
   kline_4h: Candle[];
   kline_1w: Candle[];

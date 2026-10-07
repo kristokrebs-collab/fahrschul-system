@@ -677,7 +677,8 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
           aria-valuemin={0}
           aria-valuemax={n}
           aria-valuenow={n}
-          className="group/scrub absolute inset-y-0 left-[62px] right-2 cursor-ew-resize touch-none select-none rounded-full outline-none"
+          // coarse pointers: the track's hit box grows to 44 px tall (10 px above and below the 24 px row)
+          className="group/scrub absolute inset-y-0 left-[62px] right-2 cursor-ew-resize touch-none select-none rounded-full outline-none pointer-coarse:-inset-y-2.5"
           onPointerDown={onScrubDown}
           onPointerMove={onScrubMove}
           onPointerUp={onScrubUp}

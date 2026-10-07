@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { create } from "zustand";
-import type { AccountId, EnrichedTrade, HyblockReading, Settings, StoreApi, StoreMode, Trade } from "@/domain/types";
+import type { AccountId, DayNote, DayNotes, EnrichedTrade, HyblockReading, Settings, StoreApi, StoreMode, Trade } from "@/domain/types";
 import { enrichTrades } from "@/domain/enrich";
 import { accountView, type AccountView } from "@/domain/account";
 import { normalizeSettings } from "@/domain/normalize";
@@ -11,6 +11,7 @@ import type { AdapterEvent, StorageAdapter, StorageSnapshot } from "./adapters/S
 import { migrate, quarantineToastTitle, readQuarantine, SNAPSHOT_FAILED_TITLE } from "./migrate";
 import { autoBackup } from "./backup";
 import { pushToast } from "./uiStore";
+import { storageStatus, type StorageStatus } from "./storage";
 
 /* ---------------------------------------------------------------- labels */
 
@@ -22,14 +23,30 @@ export const MODE_LABELS: Record<StoreMode, { text: string; tone: "win" | "warn"
   connecting: { text: "Verbinde …", tone: "faint" },
 };
 
+/** Header pill while nothing persists (`storage === "unavailable"`, local mode). */
+export const UNSAVED_LABEL = { text: "Nicht gespeichert", tone: "loss" } as const;
+
+/** Pill label for the current state: `UNSAVED_LABEL` in local mode without usable storage, else `MODE_LABELS[mode]`. */
+export function modeLabelFor(mode: StoreMode, storage: StorageStatus): { text: string; tone: "win" | "warn" | "loss" | "faint" } {
+  return mode === "local" && storage === "unavailable" ? UNSAVED_LABEL : MODE_LABELS[mode];
+}
+
 /* ----------------------------------------------------------------- state */
 
 export interface JournalState {
   trades: Trade[];
   settings: Settings;
   hyblock: HyblockReading[];
+  /** Day journal `{ "YYYY-MM-DD": DayNote }` (`tj2-days`; claude.ai: doc `config/days`). */
+  days: DayNotes;
   mode: StoreMode;
   loaded: boolean;
+  /**
+   * `"unavailable"`: this browser grants no usable localStorage (e.g. an HTML file opened from an Android
+   * `content://` URL). The journal then runs on a session-only store – nothing survives a reload; the banner offers
+   * backup import/export. Decided once at boot.
+   */
+  storage: StorageStatus;
   /** Write API of the active adapter (`null` until hydrated). */
   api: StoreApi | null;
   /** Number of records moved to `tj2-quarantine` (shows `Quarantäne ansehen` on the `Daten` card). */
@@ -40,6 +57,9 @@ export interface JournalState {
   saveSettings: StoreApi["saveSettings"];
   saveHyblock: StoreApi["saveHyblock"];
   deleteHyblock: StoreApi["deleteHyblock"];
+  /** Upserts the day entry (`saveDay("2026-10-07", { note, mood })`); an entry left empty is removed. */
+  saveDay: StoreApi["saveDay"];
+  deleteDay: StoreApi["deleteDay"];
   /** Bulk write (backup import / restore). */
   replaceAll(snapshot: StorageSnapshot): Promise<void>;
   /** Replaces state with a snapshot (the cloud snapshot REPLACES local state, never merges). */
@@ -58,8 +78,10 @@ export const useJournal = create<JournalState>()((set, get) => ({
   trades: [],
   settings: normalizeSettings(null),
   hyblock: [],
+  days: {},
   mode: "connecting",
   loaded: false,
+  storage: "ok",
   api: null,
   quarantined: 0,
 
@@ -68,6 +90,8 @@ export const useJournal = create<JournalState>()((set, get) => ({
   saveSettings: (s) => (get().api ?? NO_API()).saveSettings(s),
   saveHyblock: (r) => (get().api ?? NO_API()).saveHyblock(r),
   deleteHyblock: (id) => (get().api ?? NO_API()).deleteHyblock(id),
+  saveDay: (date, input) => (get().api ?? NO_API()).saveDay(date, input),
+  deleteDay: (date) => (get().api ?? NO_API()).deleteDay(date),
   replaceAll: (snapshot) => (adapter ?? NO_API()).replaceAll(snapshot),
   applySnapshot: (patch) => set(patch),
   setMode: (mode) => set({ mode }),
@@ -133,6 +157,11 @@ export function useReadings(): HyblockReading[] {
   return useJournal((s) => s.hyblock);
 }
 
+/** The day journal entry of `date` (`YYYY-MM-DD`, local), or `undefined`. */
+export function useDayNote(date: string): DayNote | undefined {
+  return useJournal((s) => s.days[date]);
+}
+
 /* ------------------------------------------------------------------- boot */
 
 export interface BootOptions {
@@ -192,7 +221,7 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
   bindAdapter(local, (e) => {
     if (e.type === "patch") set(e.patch);
   });
-  set({ ...snapshot, api: local.api, mode: "connecting", loaded: false, quarantined });
+  set({ days: {}, ...snapshot, api: local.api, mode: "connecting", loaded: false, quarantined, storage: storageStatus() });
   if (migration.aborted) pushToast({ kind: "error", title: SNAPSHOT_FAILED_TITLE, detail: "Migration wird beim nächsten Start erneut versucht" });
   if (migration.quarantined > 0) pushToast({ kind: "error", title: quarantineToastTitle(migration.quarantined) });
 
@@ -231,7 +260,7 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
         }
       });
       // Replace, never merge: locally hydrated data is not shown or uploaded in cloud mode.
-      set({ ...cloud.load(), api: cloud.api, mode: "cloud", loaded: false });
+      set({ ...cloud.load(), api: cloud.api, mode: "cloud", loaded: false, storage: "ok" });
     })
     .catch(() => {
       goLocal();
@@ -250,8 +279,10 @@ export function resetJournal(): void {
     trades: [],
     settings: normalizeSettings(null),
     hyblock: [],
+    days: {},
     mode: "connecting",
     loaded: false,
+    storage: "ok",
     api: null,
     quarantined: 0,
   });
@@ -260,4 +291,14 @@ export function resetJournal(): void {
 /** Current adapter (backup module uses it for bulk writes). */
 export function getAdapter(): StorageAdapter | null {
   return adapter;
+}
+
+/**
+ * The journal as stored right now (local: re-read from localStorage, so a write of another tab that has not arrived
+ * as a `storage` event yet is included; cloud: the last snapshots). Falls back to the store state before boot.
+ */
+export function freshSnapshot(): StorageSnapshot {
+  if (adapter) return adapter.fresh();
+  const s = useJournal.getState();
+  return { trades: s.trades, settings: s.settings, hyblock: s.hyblock, days: s.days };
 }

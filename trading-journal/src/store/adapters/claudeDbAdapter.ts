@@ -1,5 +1,5 @@
-import type { HyblockReading, Settings, StoreApi, Trade } from "@/domain/types";
-import { normalizeSettings } from "@/domain/normalize";
+import type { DayNotes, HyblockReading, Settings, StoreApi, Trade } from "@/domain/types";
+import { isDayKey, isEmptyDayNote, normalizeDayNote, normalizeDayNotes, normalizeSettings } from "@/domain/normalize";
 import { requestCapability } from "../capability";
 import { recordCloudQuarantine, validateReadings, validateTrades } from "../migrate";
 import type { AdapterEvent, StorageAdapter, StorageSnapshot } from "./StoreApi";
@@ -50,7 +50,8 @@ function stripId<T extends { id?: string }>(v: T): { id: string | undefined; res
 }
 
 /**
- * Cloud adapter (claude.ai). Collections `trades`, `hyblock`, doc `config/settings`, all via `onSnapshot`.
+ * Cloud adapter (claude.ai). Collections `trades`, `hyblock`, docs `config/settings` and `config/days` (day journal,
+ * NEW – `{ "YYYY-MM-DD": DayNote }`, written whole), all via `onSnapshot`.
  * Snapshots are validated (Plan 8.3 "migration on read only") but never written back.
  * Subscriptions start on the first `subscribe()` call; `dispose()` tears them down.
  */
@@ -58,6 +59,9 @@ export function createClaudeDbAdapter(db: ClaudeDb): StorageAdapter {
   let trades: Trade[] = [];
   let settings: Settings = normalizeSettings(null);
   let hyblock: HyblockReading[] = [];
+  let days: DayNotes = {};
+  /** Raw `config/days` document (non-date keys survive a day write). */
+  let daysRaw: Record<string, unknown> = {};
   const listeners = new Set<(event: AdapterEvent) => void>();
   let unsubs: Array<() => void> = [];
   let started = false;
@@ -101,6 +105,14 @@ export function createClaudeDbAdapter(db: ClaudeDb): StorageAdapter {
           emit({ type: "patch", patch: { settings } });
         }, onError),
       );
+      unsubs.push(
+        db.doc("config/days").onSnapshot((snap) => {
+          const raw = snap.exists ? clone<unknown>(snap.data()) : null;
+          daysRaw = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+          days = normalizeDayNotes(daysRaw);
+          emit({ type: "patch", patch: { days } });
+        }, onError),
+      );
     } catch (e) {
       onError(e);
     }
@@ -126,12 +138,30 @@ export function createClaudeDbAdapter(db: ClaudeDb): StorageAdapter {
     async deleteHyblock(id) {
       await db.collection("hyblock").doc(id).delete();
     },
+    async saveDay(date, input) {
+      if (!isDayKey(date)) throw new Error(`invalid day key ${date}`);
+      const prev = daysRaw[date];
+      const entry = normalizeDayNote({ ...(prev && typeof prev === "object" ? prev : {}), ...input, updatedAt: new Date().toISOString() });
+      const next = { ...daysRaw };
+      if (isEmptyDayNote(entry)) delete next[date];
+      else next[date] = entry;
+      await db.doc("config/days").set(next);
+    },
+    async deleteDay(date) {
+      if (!(date in daysRaw)) return;
+      const next = { ...daysRaw };
+      delete next[date];
+      await db.doc("config/days").set(next);
+    },
   };
 
   return {
     mode: "cloud",
     load(): StorageSnapshot {
-      return { trades, settings, hyblock };
+      return { trades, settings, hyblock, days };
+    },
+    fresh(): StorageSnapshot {
+      return { trades, settings, hyblock, days };
     },
     api,
     subscribe(listener) {
@@ -145,10 +175,12 @@ export function createClaudeDbAdapter(db: ClaudeDb): StorageAdapter {
       const keepReadings = new Set(snapshot.hyblock.map((r) => r.id));
       const staleTrades = trades.filter((t) => !keepTrades.has(t.id)).map((t) => t.id);
       const staleReadings = hyblock.filter((r) => !keepReadings.has(r.id)).map((r) => r.id);
+      const extraDays = Object.fromEntries(Object.entries(daysRaw).filter(([k]) => !isDayKey(k)));
       await Promise.all([
         ...snapshot.trades.map((t) => api.saveTrade(t)),
         ...snapshot.hyblock.map((r) => api.saveHyblock(r)),
         api.saveSettings(snapshot.settings),
+        ...(snapshot.days ? [db.doc("config/days").set({ ...extraDays, ...snapshot.days })] : []),
       ]);
       await Promise.all([...staleTrades.map((id) => api.deleteTrade(id)), ...staleReadings.map((id) => api.deleteHyblock(id))]);
     },

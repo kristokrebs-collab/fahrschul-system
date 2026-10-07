@@ -80,7 +80,7 @@ describe("command navigation", () => {
     expect(d).toHaveAttribute("aria-modal", "true");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.close })).toHaveFocus();
     const links = within(d).getAllByRole("link");
-    expect(links.map((l) => l.textContent?.replace(/^0\d/, ""))).toEqual([expect.stringMatching(/^Übersicht/), "Trades13", "Entscheidungsgrundlagen7", expect.stringMatching(/^Einstellungen\d+$/)]);
+    expect(links.map((l) => l.textContent?.replace(/^0\d/, ""))).toEqual([expect.stringMatching(/^Übersicht/), "Trades13", "Entscheidungsgrundlagen8", expect.stringMatching(/^Einstellungen\d+$/)]);
     expect(within(d).getByRole("link", { name: /Übersicht/ })).toHaveAttribute("aria-current", "page");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.newTrade })).toBeInTheDocument();
     // ⌘K again toggles it closed

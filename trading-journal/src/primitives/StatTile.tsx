@@ -138,7 +138,8 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
     // `@container`: the label tightens its tracking by the tile's own width (`LABEL_FIT`), not by the viewport
     <div onMouseEnter={onActivate} onFocus={onActivate} className={cn("@container min-w-0 grow basis-[calc(50%-4px)] sm:basis-[30%] xl:basis-[22%]", className)}>
       <motion.div className="relative h-full" initial={false} animate={lifted && !reduced ? LIFT : REST} transition={spring.hover}>
-        <MorphCard id={`fact-${fact}`} title={label} body={body} className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5">
+        {/* opaque surface (≈ the former white/3 % over the hero): the hero's dot matrix never shows through label or value */}
+        <MorphCard id={`fact-${fact}`} title={label} body={body} className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-ink-800 px-3 py-2.5">
           <motion.span
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 rounded-[inherit] border border-white/30 bg-white/[0.04]"

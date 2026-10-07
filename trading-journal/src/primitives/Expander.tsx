@@ -36,7 +36,8 @@ export function Expander({ open, onToggle, label, controls, className }: Expande
       whileTap={press.whileTap}
       transition={press.transition}
       className={cn(
-        "relative isolate grid size-6 shrink-0 place-items-center rounded-full border transition-colors duration-200",
+        // `touch-hit`: the 24 px disc keeps its look, coarse pointers get a 44 × 44 tap area (no layout change)
+        "touch-hit relative isolate grid size-6 shrink-0 place-items-center rounded-full border transition-colors duration-200",
         open ? "border-white text-ink-950" : "border-line-2 text-mute hover:border-white/50 hover:text-fg",
         className,
       )}

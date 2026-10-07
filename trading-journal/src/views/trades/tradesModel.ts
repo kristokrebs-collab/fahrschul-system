@@ -3,7 +3,8 @@
  * No React, no store access: `TradesView` feeds it `useEnriched()` + `uiStore.tradeFilter/tradeSort`.
  */
 import type { EnrichedTrade, Setup, TradeFilter } from "@/domain/types";
-import type { TradeSort } from "@/store/uiStore";
+import { parseSignalSnapshot, STRENGTH_LABEL, type SignalSnapshot } from "@/domain/signals";
+import type { TradeExtraFilter, TradeSort } from "@/store/uiStore";
 import { tradeTime } from "@/lib/dates";
 
 /** Sentinel of the `Entscheidungsgrundlage` select: trades without any known setup. */
@@ -56,9 +57,66 @@ export function sortTrades(list: readonly EnrichedTrade[], sort: TradeSort, setu
 }
 
 /** `layoutDependency` key of the rows: changes whenever the visible order or set can change. */
-export function listKey(f: TradeFilter, sort: TradeSort): string {
-  return [f.acc, f.setup, f.result, f.side, f.q.trim().toLowerCase(), sort.k, sort.dir].join("|");
+export function listKey(f: TradeFilter, sort: TradeSort, extra?: TradeExtraFilter): string {
+  const base = [f.acc, f.setup, f.result, f.side, f.q.trim().toLowerCase(), sort.k, sort.dir];
+  if (extra && (extra.mistake !== "all" || extra.strength !== "all")) base.push(`m:${extra.mistake}`, `s:${extra.strength}`);
+  return base.join("|");
 }
+
+/* ------------------------------------------------- mistakes / signal strength (additive filters) */
+
+/** Sentinels of the `Fehler` filter: trades without any tag / with at least one. */
+export const NO_MISTAKE = "__none";
+export const ANY_MISTAKE = "__any";
+
+const signalCache = new WeakMap<object, SignalSnapshot | null>();
+/** The stored `trade.signal` (either app's format), parsed once per trade object. */
+export function signalOf(t: { signal?: unknown }): SignalSnapshot | null {
+  if (typeof t !== "object" || t === null) return null;
+  if (signalCache.has(t)) return signalCache.get(t) ?? null;
+  const s = parseSignalSnapshot(t.signal);
+  signalCache.set(t, s);
+  return s;
+}
+
+/** Valid mistake tags of a trade (strings, trimmed, non-empty). */
+export function mistakesOf(t: { mistakes?: unknown }): string[] {
+  return Array.isArray(t.mistakes) ? t.mistakes.filter((m): m is string => typeof m === "string" && m.trim() !== "").map((m) => m.trim()) : [];
+}
+
+/** Strength key of a trade for the filter: `none` without a stored check, else `0` … `4`. */
+export function strengthKey(t: { signal?: unknown }): TradeExtraFilter["strength"] {
+  const s = signalOf(t);
+  return s ? (String(Math.max(0, Math.min(4, s.strength))) as TradeExtraFilter["strength"]) : "none";
+}
+
+/** Mistake tag / signal strength filter on top of `filterTrades`. */
+export function filterExtra<T extends { mistakes?: unknown; signal?: unknown }>(rows: readonly T[], extra: TradeExtraFilter): T[] {
+  if (extra.mistake === "all" && extra.strength === "all") return rows as T[];
+  return rows.filter((t) => {
+    if (extra.mistake !== "all") {
+      const tags = mistakesOf(t);
+      if (extra.mistake === NO_MISTAKE ? tags.length > 0 : extra.mistake === ANY_MISTAKE ? tags.length === 0 : !tags.includes(extra.mistake)) return false;
+    }
+    if (extra.strength !== "all" && strengthKey(t) !== extra.strength) return false;
+    return true;
+  });
+}
+
+/** Tags offered by the `Fehler` filter: those used in the journal (most used first), then the rest of the settings list. */
+export function mistakeFilterTags(trades: readonly { mistakes?: unknown }[], settingsTags: readonly string[] = []): string[] {
+  const count = new Map<string, number>();
+  for (const t of trades) for (const m of mistakesOf(t)) count.set(m, (count.get(m) ?? 0) + 1);
+  const used = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de")).map(([m]) => m);
+  return [...used, ...settingsTags.filter((m) => !count.has(m))];
+}
+
+/** `Signal-Stärke` filter options (labels from the engine's strength names). */
+export const STRENGTH_OPTIONS: readonly { value: TradeExtraFilter["strength"]; label: string }[] = [
+  { value: "all", label: "Alle Signal-Stärken" },
+  { value: "none", label: "Ohne Einstiegs-Check" },
+  ...[0, 1, 2, 3, 4].map((n) => ({ value: String(n) as TradeExtraFilter["strength"], label: `Stärke ${n} · ${STRENGTH_LABEL[n]}` })),
+];
 
 /**
  * `layoutDependency` of the rendered rows: `listKey` plus the count and an FNV-1a hash of the visible ids in order,

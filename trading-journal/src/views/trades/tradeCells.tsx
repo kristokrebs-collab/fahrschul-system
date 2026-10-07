@@ -7,6 +7,8 @@ import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { colorClass, date, n1, price, signed, time } from "@/lib/format";
 import { Badge, SetupChips } from "@/primitives";
+import { StrengthBars } from "@/overlays/SignalSummary";
+import { signalOf } from "./tradesModel";
 
 export function sideLabel(t: Pick<EnrichedTrade, "side">): string {
   return t.side === "short" ? "▼ Short" : "▲ Long";
@@ -46,13 +48,18 @@ export function TradeSetupChips({ t, setups, max }: { t: Pick<EnrichedTrade, "se
   return <SetupChips items={setupsOf(t, setups)} max={max} />;
 }
 
-/** `V.price(entry) → V.price(exit)` | `offen`. */
-export function EntryExit({ t }: { t: Pick<EnrichedTrade, "entry" | "exit" | "result"> }) {
+/**
+ * `V.price(entry) → V.price(exit)` | `offen`. With `stack` (table between `md` and `lg`) the exit goes onto its own
+ * line below the entry, so the column stays narrow without cutting a price.
+ */
+export function EntryExit({ t, stack }: { t: Pick<EnrichedTrade, "entry" | "exit" | "result">; stack?: boolean }) {
   return (
     <>
-      {price(t.entry)}
-      {" → "}
-      {t.result === "open" ? <span className="text-faint">offen</span> : price(t.exit)}
+      <span className="whitespace-nowrap">{price(t.entry)}</span>
+      <span className={cn("whitespace-nowrap", stack && "max-lg:block")}>
+        {" → "}
+        {t.result === "open" ? <span className="text-faint">offen</span> : price(t.exit)}
+      </span>
     </>
   );
 }
@@ -62,6 +69,11 @@ export function CheckCount({ t }: { t: Pick<EnrichedTrade, "checked" | "items" |
   return (
     <span className={t.complete ? "text-win" : "text-mute"}>{`${t.checked}/${t.items.length}`}</span>
   );
+}
+
+/** Strength bars of the stored Einstiegs-Check (`Signal-Stärke n von 4`, a dot without one) – table `Check` cell / cards. */
+export function SignalBadge({ t, className }: { t: { signal?: unknown }; className?: string }) {
+  return <StrengthBars snap={signalOf(t)} className={className} />;
 }
 
 /**

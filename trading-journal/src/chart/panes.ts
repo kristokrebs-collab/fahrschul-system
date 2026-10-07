@@ -20,10 +20,10 @@ import type { Candle, OpenInterestPoint, RatioPoint } from "@/market/types";
 import { NOTHING_CANDLES, NOTHING_OI_LINE, NOTHING_RATIO_LINE, NOTHING_VOLUME, VOLUME_SCALE_MARGINS, ink } from "./theme";
 
 export type PaneKind = "none" | "ratio" | "oi";
-export type ChartInterval = "1m" | "1h" | "4h" | "1w";
+export type ChartInterval = "1m" | "30m" | "1h" | "4h" | "1w";
 
-/** Seconds per bar for each interval. */
-export const INTERVAL_SECONDS: Record<ChartInterval, number> = { "1m": 60, "1h": 3600, "4h": 14400, "1w": 604800 };
+/** Seconds per bar for each interval (`30m` is built from 15m klines, UTC-aligned like every other bucket). */
+export const INTERVAL_SECONDS: Record<ChartInterval, number> = { "1m": 60, "30m": 1800, "1h": 3600, "4h": 14400, "1w": 604800 };
 /** Stretch factors: pane 0 : pane 1 = 3 : 1 → sub pane takes ~25 % of the height. */
 export const PANE_STRETCH = { main: 3, sub: 1 } as const;
 

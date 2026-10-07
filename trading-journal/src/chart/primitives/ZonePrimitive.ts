@@ -1,6 +1,8 @@
 /**
  * Series primitive drawing the macro zone band `zoneLow–zoneHigh` (Plan 5.4):
- * fill `#ffffff0e`, dashed edges `[2,3]·DPR`, `zOrder 'bottom'`, price-axis labels `Zone`,
+ * fill `#ffffff0e`, dashed edges `[2,3]·DPR`, `zOrder 'bottom'`, a small `ZONE` caption inside the band (top left)
+ * and the two edge PRICES as price-axis labels (as wide as the tick labels, which the chart blanks next to them –
+ * the former narrow `Zone` labels let "82.000" show beside and under them, tablet audit 3.2),
  * `autoscaleInfo` keeps the band in view, `hitTest` → `externalId:'zone'`, `fadeIn` via requestUpdate.
  */
 import type {
@@ -19,6 +21,7 @@ import type {
   SeriesType,
   Time,
 } from "lightweight-charts";
+import { fmt } from "../format";
 
 type RenderTarget = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
@@ -31,8 +34,12 @@ export interface ZoneOptions {
   strokeOpacity: number;
   /** overall alpha 0–1 (animated by `fadeIn`) */
   opacity: number;
-  /** price-axis label text */
+  /** caption drawn inside the band (top left), e.g. `Zone`; empty → none */
   label: string;
+  /** price-axis label text of an edge (default: the price, de-DE) */
+  formatPrice: (price: number) => string;
+  /** caption font (CSS px size + family) */
+  labelFont: string;
   labelBackground: string;
   labelText: string;
 }
@@ -43,9 +50,14 @@ export const ZONE_DEFAULTS: ZoneOptions = {
   strokeOpacity: 0.35,
   opacity: 1,
   label: "Zone",
+  formatPrice: (p) => fmt.price(p),
+  labelFont: '10px "IBM Plex Mono", ui-monospace, monospace',
   labelBackground: "#1c1c1c",
   labelText: "#9b9b9b",
 };
+
+/** The caption only fits a band at least this tall (CSS px). */
+const CAPTION_MIN_HEIGHT = 16;
 
 export interface ZoneRange {
   low: number;
@@ -100,6 +112,15 @@ class ZoneRenderer implements IPrimitivePaneRenderer {
       ctx.moveTo(h.position, v.position + v.length - 0.5);
       ctx.lineTo(h.position + h.length, v.position + v.length - 0.5);
       ctx.stroke();
+      if (this.o.label && v.length >= CAPTION_MIN_HEIGHT * scope.verticalPixelRatio) {
+        ctx.setLineDash([]);
+        ctx.globalAlpha = this.o.opacity * 0.8;
+        ctx.fillStyle = this.o.labelText;
+        const px = Number.parseFloat(this.o.labelFont) || 10;
+        ctx.font = this.o.labelFont.replace(/^[\d.]+px/, `${px * scope.verticalPixelRatio}px`);
+        ctx.textBaseline = "top";
+        ctx.fillText(this.o.label.toUpperCase(), h.position + 6 * scope.horizontalPixelRatio, v.position + 4 * scope.verticalPixelRatio);
+      }
       ctx.restore();
     });
   }
@@ -159,7 +180,7 @@ class ZoneAxisView implements ISeriesPrimitiveAxisView {
     return this.y ?? -10000;
   }
   text(): string {
-    return this.src.options.label;
+    return this.src.options.formatPrice(this.src.range[this.edge]);
   }
   textColor(): string {
     return this.src.options.labelText;

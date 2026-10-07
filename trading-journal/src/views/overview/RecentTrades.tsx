@@ -209,7 +209,7 @@ export function RecentTrades() {
       title={RECENT_TITLE}
       action={
         rows.length ? (
-          <button type="button" onClick={() => navigate("trades")} className="label !text-fg hover:!text-signal">
+          <button type="button" onClick={() => navigate("trades")} className="touch-hit label !text-fg hover:!text-signal">
             {RECENT_ALL}
           </button>
         ) : undefined

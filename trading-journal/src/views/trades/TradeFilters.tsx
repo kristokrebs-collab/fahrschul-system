@@ -11,7 +11,8 @@ import { Autocomplete, type AutocompleteItem } from "@/motion/pulse/Autocomplete
 import { MorphSelect, type MorphSelectOption } from "@/motion/pulse/MorphSelect";
 import { ValueFlash } from "@/motion/ValueFlash";
 import { Icon, Segmented } from "@/primitives";
-import { NO_SETUP, countLabel, type SearchSuggestion } from "./tradesModel";
+import type { TradeExtraFilter } from "@/store/uiStore";
+import { ANY_MISTAKE, NO_MISTAKE, NO_SETUP, STRENGTH_OPTIONS, countLabel, type SearchSuggestion } from "./tradesModel";
 
 export interface TradeFiltersProps {
   filter: TradeFilter;
@@ -23,6 +24,13 @@ export interface TradeFiltersProps {
   closed: Agg;
   /** Grouped search suggestions (`searchSuggestions`): setups / sides filter, emotions / words fill the search. */
   suggestions?: readonly SearchSuggestion[];
+  /** Additive mistake-tag / signal-strength filter (`uiStore.tradeExtra`). */
+  extra?: TradeExtraFilter;
+  onExtraChange?: (patch: Partial<TradeExtraFilter>) => void;
+  /** Tags of the `Fehler` select; empty → the select is not shown. */
+  mistakeTags?: readonly string[];
+  /** Show the `Signal-Stärke` select (the journal has stored checks, or the filter is set). */
+  showStrength?: boolean;
   className?: string;
 }
 
@@ -53,7 +61,8 @@ const PILL_LAYOUT: Transition = { layout: spring.island };
 /**
  * Filter bar of `Alle Trades` (bundle `H$`, Plan 6.2): search (`Trades durchsuchen`, 150 ms debounce; a pulse
  * `Autocomplete` with grouped suggestions), setup select (pulse `MorphSelect`, `Alle Grundlagen` / setups / `Ohne
- * Grundlage`), Segmented account / result / side and the count pill. State lives in `uiStore.tradeFilter` (the router
+ * Grundlage`), NEW (additive, shown once there is something to filter by) `Fehler-Tag` and `Signal-Stärke` selects
+ * (`uiStore.tradeExtra`, session only), Segmented account / result / side and the count pill. State lives in `uiStore.tradeFilter` (the router
  * mirrors it into the URL).
  *
  * Suggestions: choosing a setup or a side is a filter shortcut (the field clears, the select / segment switches –
@@ -66,7 +75,7 @@ const PILL_LAYOUT: Transition = { layout: spring.island };
  * new count never re-wraps the bar (TR-04); it flashes once per new count; the net figure flashes green/red by
  * direction. Reduced motion: tint only, no pop, fill or flash.
  */
-export function TradeFilters({ filter, onChange, setups, count, closed, suggestions, className }: TradeFiltersProps) {
+export function TradeFilters({ filter, onChange, setups, count, closed, suggestions, extra, onExtraChange, mistakeTags, showStrength, className }: TradeFiltersProps) {
   const reduced = useReducedFx();
   const [q, setQ] = useState(filter.q);
   const lastSent = useRef(filter.q);
@@ -93,6 +102,10 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
   const setupOptions = useMemo<MorphSelectOption[]>(
     () => [{ value: "all", label: "Alle Grundlagen" }, ...setups.map((s) => ({ value: s.id, label: s.name })), { value: NO_SETUP, label: "Ohne Grundlage" }],
     [setups],
+  );
+  const mistakeOptions = useMemo<MorphSelectOption[]>(
+    () => [{ value: "all", label: "Alle Fehler-Tags" }, { value: NO_MISTAKE, label: "Ohne Fehler" }, { value: ANY_MISTAKE, label: "Mit Fehlern" }, ...(mistakeTags ?? []).map((m) => ({ value: m, label: m }))],
+    [mistakeTags],
   );
   const items = useMemo<AutocompleteItem[]>(
     () =>
@@ -156,6 +169,16 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
       <div className="w-[min(100%,272px)] min-w-[190px]">
         <MorphSelect aria-label="Entscheidungsgrundlage" value={filter.setup} onChange={(setup) => onChange({ setup })} options={setupOptions} />
       </div>
+      {extra && onExtraChange && (mistakeTags?.length ?? 0) > 0 && (
+        <div className="w-[min(100%,210px)] min-w-[170px]">
+          <MorphSelect aria-label="Fehler-Tag" value={extra.mistake} onChange={(mistake) => onExtraChange({ mistake })} options={mistakeOptions} />
+        </div>
+      )}
+      {extra && onExtraChange && showStrength && (
+        <div className="w-[min(100%,230px)] min-w-[170px]">
+          <MorphSelect<TradeExtraFilter["strength"]> aria-label="Signal-Stärke" value={extra.strength} onChange={(strength) => onExtraChange({ strength })} options={STRENGTH_OPTIONS} />
+        </div>
+      )}
       <Segmented<"all" | AccountId> aria-label="Konto" size="sm" value={filter.acc} onChange={(acc) => onChange({ acc })} options={ACC_OPTIONS} />
       <Segmented aria-label="Ergebnis" size="sm" value={filter.result} onChange={(result) => onChange({ result })} options={RESULT_OPTIONS} />
       <Segmented aria-label="Richtung" size="sm" value={filter.side} onChange={(side) => onChange({ side })} options={SIDE_OPTIONS} />

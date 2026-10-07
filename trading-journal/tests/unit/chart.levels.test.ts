@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { LineStyle, type ISeriesApi } from "lightweight-charts";
-import { LEVEL_KEYS, LEVEL_STYLES, clearLevels, levelColor, levelWidth, setLevels } from "@/chart/levels";
+import { LEVEL_KEYS, LEVEL_STYLES, clearLevels, levelColor, levelWidth, setLevels, zoneIsSet } from "@/chart/levels";
 import { ZonePrimitive, positionsBox } from "@/chart/primitives/ZonePrimitive";
 import type { MarketLevels } from "@/domain/types";
 
@@ -83,6 +83,19 @@ describe("setLevels", () => {
     setLevels(series, { ...levels, lowerHigh: Number.NaN }, null, { reducedMotion: true });
     expect(created[4]?.opts).toMatchObject({ lineVisible: false, axisLabelVisible: false });
   });
+
+  it("treats 0 as not set: no line, no axis label, no zone band (share edition)", () => {
+    const { series, created } = fakeSeries();
+    const unset = { ...levels, longTrigger: 0, longStop: 0, shortTrigger: 0, invalidation: 0, lowerHigh: 0, zoneLow: 0, zoneHigh: 0 };
+    expect(zoneIsSet(unset)).toBe(false);
+    expect(zoneIsSet(levels)).toBe(true);
+    const handle = setLevels(series, unset, null, { reducedMotion: true });
+    for (const l of created) expect(l.opts).toMatchObject({ lineVisible: false, axisLabelVisible: false });
+    // a hidden band never pulls the autoscale down to 0
+    expect(handle.zone.autoscaleInfo(0 as never, 1 as never)).toBeNull();
+    setLevels(series, levels, handle, {});
+    expect(handle.zone.options.opacity).toBe(1);
+  });
 });
 
 describe("ZonePrimitive", () => {
@@ -92,7 +105,10 @@ describe("ZonePrimitive", () => {
     zone.applyOptions({ opacity: 0 });
     expect(zone.autoscaleInfo(0 as never, 1 as never)).toBeNull();
     expect(zone.priceAxisViews()).toHaveLength(2);
-    expect(zone.priceAxisViews()[0]?.text()).toBe("Zone");
+    // edge prices on the axis (high first), the `Zone` caption is drawn inside the band
+    expect(zone.priceAxisViews()[0]?.text()).toBe("120");
+    expect(zone.priceAxisViews()[1]?.text()).toBe("100");
+    expect(zone.options.label).toBe("Zone");
     expect(zone.hitTest(10, 10)).toBeNull(); // not attached → no coordinates
   });
 

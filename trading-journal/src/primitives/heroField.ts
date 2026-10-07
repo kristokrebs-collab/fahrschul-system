@@ -41,6 +41,16 @@ export interface FlickerField {
   signal: Uint8Array;
   /** brightness last drawn, quantised to 1/100 (`-1` = never drawn) */
   drawn: Int16Array;
+  /** 1 = the cell sits under text (`setBlocked`): it never lights, so no dot ever touches a glyph */
+  blocked: Uint8Array;
+}
+
+/** A box in field px (top-left origin) that keeps its dots dark, e.g. a text line plus padding. */
+export interface BlockRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface FieldPoint {
@@ -55,7 +65,37 @@ export function fieldSize(width: number, height: number): { cols: number; rows: 
 
 export function createField(cols: number, rows: number): FlickerField {
   const n = cols * rows;
-  return { cols, rows, level: new Float32Array(n), target: new Float32Array(n), signal: new Uint8Array(n), drawn: new Int16Array(n).fill(-1) };
+  return { cols, rows, level: new Float32Array(n), target: new Float32Array(n), signal: new Uint8Array(n), drawn: new Int16Array(n).fill(-1), blocked: new Uint8Array(n) };
+}
+
+/**
+ * Marks every cell whose dot (centre ± `dotPad` px) touches one of `rects` as blocked and darkens it at once (level 0,
+ * redrawn on the next step); cells that left the mask may light again. Returns the number of cells whose state flipped.
+ */
+export function setBlocked(f: FlickerField, rects: readonly BlockRect[], dotPad = 2): number {
+  let changed = 0;
+  const n = f.cols * f.rows;
+  for (let i = 0; i < n; i++) {
+    const x = FIELD_DOT_OFFSET + (i % f.cols) * FIELD_PITCH;
+    const y = FIELD_DOT_OFFSET + Math.floor(i / f.cols) * FIELD_PITCH;
+    let hit = 0;
+    for (const r of rects) {
+      if (x + dotPad >= r.x && x - dotPad <= r.x + r.w && y + dotPad >= r.y && y - dotPad <= r.y + r.h) {
+        hit = 1;
+        break;
+      }
+    }
+    if (hit === f.blocked[i]) continue;
+    f.blocked[i] = hit;
+    changed++;
+    if (hit) {
+      f.level[i] = 0;
+      f.target[i] = 0;
+      f.signal[i] = 0;
+      f.drawn[i] = -1;
+    }
+  }
+  return changed;
 }
 
 /** Centre of cell `i` in px. */
@@ -64,8 +104,12 @@ export function cellCenter(f: FlickerField, i: number): FieldPoint {
 }
 
 function light(f: FlickerField, i: number, rand: () => number, max: number): void {
-  f.target[i] = FIELD_MIN + rand() * (max - FIELD_MIN);
-  f.signal[i] = rand() < FIELD_SIGNAL_CHANCE ? 1 : 0;
+  const t = FIELD_MIN + rand() * (max - FIELD_MIN);
+  const red = rand() < FIELD_SIGNAL_CHANCE ? 1 : 0;
+  // the same random draws either way, so a mask never shifts the sequence of the cells around it
+  if (f.blocked[i]) return;
+  f.target[i] = t;
+  f.signal[i] = red;
 }
 
 /** Lights a random `FIELD_SEED_SHARE` of the cells at full level (no fade-in on the first frame). */
@@ -75,7 +119,7 @@ export function seedField(f: FlickerField, rand: () => number): void {
   for (let k = 0; k < count; k++) {
     const i = Math.floor(rand() * n);
     light(f, i, rand, FIELD_MAX);
-    f.level[i] = f.target[i] as number;
+    if (!f.blocked[i]) f.level[i] = f.target[i] as number;
   }
 }
 
@@ -106,6 +150,7 @@ export function stepField(f: FlickerField, rand: () => number, focus: FieldPoint
         const d = Math.sqrt(dx * dx + dy * dy);
         if (d >= r || rand() >= FIELD_FOCUS_REROLL) continue;
         const i = row * f.cols + col;
+        if (f.blocked[i]) continue;
         const near = 1 - d / r;
         f.target[i] = rand() < 0.5 + near * 0.5 ? FIELD_MIN + near * near * (FIELD_FOCUS_MAX - FIELD_MIN) * (0.6 + 0.4 * rand()) : 0;
         f.signal[i] = 0;

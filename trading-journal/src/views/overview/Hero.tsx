@@ -20,6 +20,7 @@ import { useAccountView, useJournal } from "@/store/journalStore";
 import { useUi, type AccFilter } from "@/store/uiStore";
 import { ExplanationView } from "./explainer";
 import { MarketPanel } from "./MarketPanel";
+import { SignalStrip } from "./SignalStrip";
 
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
 /** NEW (Plan 6.1): sixth/seventh tile – both explainers existed in `Jl` but were never wired. */
@@ -131,13 +132,15 @@ export function Hero() {
             never moves the P&L headline */}
         <div className="flex min-w-0 flex-col gap-7">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Segmented<AccFilter> aria-label="Konto" options={ACC_OPTIONS} value={acc} onChange={setAcc} />
-            <span className="text-xs text-mute">
+            <span data-hero-mask="box" className="inline-flex">
+              <Segmented<AccFilter> aria-label="Konto" options={ACC_OPTIONS} value={acc} onChange={setAcc} />
+            </span>
+            <span data-hero-mask="text" className="text-xs text-mute">
               Startkapital {n0(view.start)} {cur}
             </span>
           </div>
           <div>
-            <div className="mb-3 flex items-center gap-3">
+            <div className="mb-3 flex items-center gap-3" data-hero-mask="text">
               <span id="hero-net-label" className="label">
                 Netto-P&L · {ACCOUNT_LABELS[acc]}
               </span>
@@ -145,7 +148,7 @@ export function Hero() {
                 id="fact-net"
                 title="Netto-P&L"
                 borderRadius={radius.pill}
-                className="!w-auto rounded-full border border-line-2 px-2.5 py-0.5 hover:border-white/50"
+                className="touch-hit !w-auto rounded-full border border-line-2 px-2.5 py-0.5 hover:border-white/50"
                 body={() => (
                   <div className="grid gap-4">
                     <div className={cn("dot-num text-[34px] leading-none", colorClass(g.net))}>
@@ -158,7 +161,14 @@ export function Hero() {
                 <span className="label !text-[9.5px] group-hover:!text-fg">Details +</span>
               </MorphCard>
             </div>
-            <div className="dot-num relative isolate flex flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none" data-testid="hero-net" data-celebrate-anchor="hero-net">
+            {/* `w-fit`: the row hugs the figure, so the dot mask follows its width; one line from lg (the figure shrinks
+                with the column instead of pushing `USDT` under it at ~1024 px) */}
+            <div
+              className="dot-num relative isolate flex w-fit max-w-full flex-wrap items-baseline gap-x-3 text-[clamp(44px,8vw,78px)] leading-none lg:flex-nowrap lg:text-[clamp(44px,calc(5.6vw+14px),78px)]"
+              data-testid="hero-net"
+              data-celebrate-anchor="hero-net"
+              data-hero-mask="text"
+            >
               <NetGlow net={g.net} acc={acc} loaded={loaded} />
               <SkeletonSwap ready={loaded} skeleton={<Skeleton className="h-[0.78em] w-[5.2ch] rounded-2xl" />}>
                 {/* prism lens over the figure on hover devices (its copies count with the same MotionValue); touch: plain */}
@@ -166,14 +176,16 @@ export function Hero() {
                   <MotionNumber source={net} decimals={2} signed tone="auto" aria-label={heroTileValue("net", view)} />
                 </TextPrism>
               </SkeletonSwap>
-              <span className="font-sans text-lg font-medium text-mute">{cur}</span>
+              <span className="shrink-0 font-sans text-lg font-medium text-mute">{cur}</span>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-mute">
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-mute" data-hero-mask="text">
               {ret != null && g.n > 0 && <ReturnBadge ret={ret} />}
               <span>{heroSubline(view)}</span>
             </div>
           </div>
-          <dl className="mt-auto flex flex-wrap gap-2 border-t border-white/10 pt-5" onMouseLeave={() => setActive(null)}>
+          {/* lg+: the live entry check fills the band the market panel leaves above the tiles (landscape tablets) */}
+          <SignalStrip className="mt-auto hidden lg:grid" />
+          <dl className="mt-auto flex flex-wrap gap-2 border-t border-white/10 pt-5 lg:mt-0" onMouseLeave={() => setActive(null)}>
             {tiles.map((t, i) => (
               <StatTile
                 key={t.key}

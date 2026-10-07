@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import type { Candle, RatioPoint, Stamped, TakerPoint } from "../types";
-import { INTERVAL_MS, OKX_KLINE_BAR, toOkxPeriod, type KlineInterval, type Period } from "../period";
+import { FETCH_INTERVAL_MS, OKX_KLINE_BAR, toOkxPeriod, type FetchInterval, type Period } from "../period";
 import { fetchJson, qs, type FetchLike } from "./http";
 
 export const OKX_REST = "https://www.okx.com";
@@ -34,8 +34,8 @@ export function ratioToLongPct(ratio: number): number {
   return (ratio / (1 + ratio)) * 100;
 }
 
-export function mapOkxCandles(rows: [number, number, number, number, number, number, number, number, string, ...unknown[]][], interval: KlineInterval): Candle[] {
-  const iv = INTERVAL_MS[interval];
+export function mapOkxCandles(rows: [number, number, number, number, number, number, number, number, string, ...unknown[]][], interval: FetchInterval): Candle[] {
+  const iv = FETCH_INTERVAL_MS[interval];
   return rows
     .map(([ts, o, h, l, c, , volCcy, volQuote, confirm]) => ({ time: ts, open: o, high: h, low: l, close: c, volume: volCcy, quoteVolume: volQuote, closeTime: ts + iv - 1, closed: confirm === "1" }))
     .sort((a, b) => a.time - b.time);
@@ -63,7 +63,7 @@ export function okxRest(opts: OkxOptions = {}) {
       const r = await fetchJson(url("/api/v5/public/time", {}), okxTimeSchema, io);
       return r.data[0]?.ts ?? now();
     },
-    async candles(instId: string, interval: KlineInterval, p: { limit?: number; bar?: string } = {}): Promise<Stamped<Candle[]>> {
+    async candles(instId: string, interval: FetchInterval, p: { limit?: number; bar?: string } = {}): Promise<Stamped<Candle[]>> {
       const bar = p.bar ?? OKX_KLINE_BAR[interval];
       const r = await fetchJson(url("/api/v5/market/candles", { instId, bar, limit: p.limit ?? 100 }), okxCandlesSchema, io);
       const data = mapOkxCandles(r.data, interval);

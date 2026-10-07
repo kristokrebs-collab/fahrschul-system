@@ -15,7 +15,7 @@ import { KpiStrip } from "./KpiStrip";
 import { TradeFilters } from "./TradeFilters";
 import { TradesCards } from "./TradesCards";
 import { TradesTable } from "./TradesTable";
-import { filterTrades, listKey, rowsKey, searchSuggestions, sortTrades } from "./tradesModel";
+import { filterExtra, filterTrades, listKey, mistakeFilterTags, mistakesOf, rowsKey, searchSuggestions, signalOf, sortTrades } from "./tradesModel";
 
 export interface TradesViewProps {
   /** Override of the `Trade eintragen` CTA (default: `useUi().openEditor()`). */
@@ -60,6 +60,8 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   const deferredQ = useDeferredValue(liveFilter.q);
   const filter = useMemo(() => (deferredQ === liveFilter.q ? liveFilter : { ...liveFilter, q: deferredQ }), [liveFilter, deferredQ]);
   const setTradeFilter = useUi((s) => s.setTradeFilter);
+  const extra = useUi((s) => s.tradeExtra);
+  const setTradeExtra = useUi((s) => s.setTradeExtra);
   const resetTradeFilter = useUi((s) => s.resetTradeFilter);
   const sort = useUi((s) => s.tradeSort);
   const toggleSort = useUi((s) => s.toggleSort);
@@ -67,9 +69,13 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   const wide = useMediaQuery("(min-width: 768px)", true);
   const reduced = useReducedFx();
 
-  const rows = useMemo(() => sortTrades(filterTrades(all, filter, settings.setups), sort, settings.setups), [all, filter, sort, settings.setups]);
+  const rows = useMemo(() => sortTrades(filterExtra(filterTrades(all, filter, settings.setups), extra), sort, settings.setups), [all, filter, extra, sort, settings.setups]);
   const closed = useMemo(() => aggregate(rows.filter((t) => t.result !== "open")), [rows]);
-  const key = listKey(filter, sort);
+  const key = listKey(filter, sort, extra);
+  // the additive filters only show once the journal has something to filter by (or while they are set)
+  const usedMistakes = useMemo(() => all.some((t) => mistakesOf(t).length > 0), [all]);
+  const mistakeTags = useMemo(() => (usedMistakes || extra.mistake !== "all" ? mistakeFilterTags(all, settings.mistakes) : []), [all, settings.mistakes, usedMistakes, extra.mistake]);
+  const hasSignals = useMemo(() => all.some((t) => signalOf(t) != null), [all]);
   const layoutKey = useMemo(() => rowsKey(key, rows), [key, rows]);
 
   const suggestions = useMemo(() => searchSuggestions(all, settings.setups, EMOTIONS), [all, settings.setups]);
@@ -122,7 +128,18 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
     <div className={className ?? "grid grid-cols-1 gap-5"}>
       <PageHeader title="Alle Trades" lead={TRADES_LEAD} count={all.length} leadFill={TRADES_LEAD_FILL} />
       <Card>
-        <TradeFilters filter={liveFilter} onChange={setTradeFilter} setups={settings.setups} count={rows.length} closed={closed} suggestions={suggestions} />
+        <TradeFilters
+          filter={liveFilter}
+          onChange={setTradeFilter}
+          setups={settings.setups}
+          count={rows.length}
+          closed={closed}
+          suggestions={suggestions}
+          extra={extra}
+          onExtraChange={setTradeExtra}
+          mistakeTags={mistakeTags}
+          showStrength={hasSignals || extra.strength !== "all"}
+        />
         <AutoHeight className="relative">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

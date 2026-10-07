@@ -28,6 +28,7 @@ import {
 import { hhmmss } from "@/market/format";
 import { useNowMv } from "@/motion/clock";
 import { DotMatrix } from "@/motion/DotMatrix";
+import { MorphCard } from "@/motion/MorphCard";
 import { formatNumber, MotionNumber } from "@/motion/MotionNumber";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { StatusPill } from "@/motion/StatusPill";
@@ -36,6 +37,8 @@ import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { FLASH_MIN_INTERVAL_MS, useValueFlash } from "@/motion/ValueFlash";
 import { WidgetGrid } from "@/motion/pulse/WidgetGrid";
+import { Explainer } from "@/primitives/VerdictPanel";
+import { bookExplain, fundingExplain, openInterestExplain, takerExplain } from "./marketExplain";
 import { buyShare, change24h, distanceLabel, orFallback, priceDecimals, priceFlashStep, priceTick, triggerProximity } from "./marketMath";
 import { useMarketTileOrder } from "./marketTiles";
 import { jumpFromNaN, jumpFromUnknownPrice, useForceRefresh, useGlide, useMotionSelect, useOrderFlowMeter } from "./useMarket";
@@ -164,30 +167,54 @@ export const OrderFlow = memo(function OrderFlow() {
 
 /* ------------------------------------------------------------------ funding line + mini tiles */
 
+interface TileExplain {
+  /** morph id (`market-tile-{id}`) */
+  id: string;
+  title: string;
+  /** dialog body, evaluated when the tile is opened (live values read then) */
+  body: () => ReactNode;
+}
+
+const TILE_SURFACE = "@container relative isolate min-w-0 overflow-hidden rounded-xl border border-line bg-ink-900 bg-[linear-gradient(rgb(4_4_4/0.3),rgb(4_4_4/0.3))] px-2.5 py-1.5";
+
 /**
  * Mini tile; `flashOn` washes the whole tile green/red when that value moves by at least `minMove`, at most once per
- * `cooldownMs`.
+ * `cooldownMs`. With `explain` the tile is a morph source: a tap (or Enter) opens its explainer – a press-and-hold still
+ * lifts it for reordering (the grid swallows the click that ends a drag).
  */
-function MiniTile({ label, flashOn, minMove, cooldownMs, chars = 0, children }: { label: string; flashOn?: MotionValue<number>; minMove?: number; cooldownMs?: number; chars?: number; children: ReactNode }) {
+function MiniTile({ label, flashOn, minMove, cooldownMs, chars = 0, explain, children }: { label: string; flashOn?: MotionValue<number>; minMove?: number; cooldownMs?: number; chars?: number; explain?: TileExplain; children: ReactNode }) {
   const reduced = useReducedFx();
   const up = useRef<HTMLSpanElement>(null);
   const down = useRef<HTMLSpanElement>(null);
   useValueFlash({ source: flashOn }, up, down, { minMove, cooldownMs, enabled: !!flashOn && !reduced });
-  return (
-    // opaque surface (same tint as the former bg-ink-950/30 over the panel): a lifted tile glides over its neighbours
-    <div className="@container relative isolate min-w-0 overflow-hidden rounded-xl border border-line bg-ink-900 bg-[linear-gradient(rgb(4_4_4/0.3),rgb(4_4_4/0.3))] px-2.5 py-1.5">
+  const content = (
+    <>
       {flashOn && (
         <>
           <span ref={up} aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-win/[0.09] opacity-0" />
           <span ref={down} aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-loss/[0.09] opacity-0" />
         </>
       )}
-      <div className="label !text-[9.5px]">{label}</div>
+      <div className="label flex items-center justify-between gap-1 !text-[9.5px]">
+        <span className="truncate">{label}</span>
+        {explain && (
+          <span aria-hidden="true" className="shrink-0 text-faint transition-colors group-hover:text-fg">
+            +
+          </span>
+        )}
+      </div>
       {/* long values (Bid/Ask at ~1024 px) shrink to the tile instead of ellipsizing (MO-01): 0.6 em mono advance */}
       <div className="num truncate font-mono text-[12.5px] text-fg" style={chars > 0 ? { fontSize: `min(12.5px, calc(100cqw / ${(chars * 0.6).toFixed(2)}))` } : undefined}>
         {children}
       </div>
-    </div>
+    </>
+  );
+  // opaque surface (same tint as the former bg-ink-950/30 over the panel): a lifted tile glides over its neighbours
+  if (!explain) return <div className={TILE_SURFACE}>{content}</div>;
+  return (
+    <MorphCard id={explain.id} title={explain.title} as="div" borderRadius={12} body={explain.body} className={cn(TILE_SURFACE, "hover:border-white/25")}>
+      {content}
+    </MorphCard>
   );
 }
 
@@ -205,6 +232,8 @@ export interface FundingBlockProps {
   price: number | null;
   openInterest: number | null;
   takerDelta: number | null;
+  /** base asset of the pair (`BTC`) – unit of the open interest */
+  base?: string;
 }
 
 /**
@@ -212,7 +241,7 @@ export interface FundingBlockProps {
  * countdown follows the shared second clock) plus the Funding / OI / Taker / Bid-Ask tiles (`sm+`), which the user can
  * reorder by press-and-hold (or keyboard); the order persists in `tj2-ui-market-tiles`.
  */
-export const FundingBlock = memo(function FundingBlock({ mark, fundingRate, nextFundingTime, price, openInterest, takerDelta }: FundingBlockProps) {
+export const FundingBlock = memo(function FundingBlock({ mark, fundingRate, nextFundingTime, price, openInterest, takerDelta, base = "BTC" }: FundingBlockProps) {
   const reduced = useReducedFx();
   const now = useNowMv();
   const markLive = useTransform(markMv, (v) => orFallback(v, mark));
@@ -244,7 +273,12 @@ export const FundingBlock = memo(function FundingBlock({ mark, fundingRate, next
       {
         id: "funding",
         node: (
-          <MiniTile label="Funding" flashOn={rate} minMove={FUNDING_DISPLAY_STEP}>
+          <MiniTile
+            label="Funding"
+            flashOn={rate}
+            minMove={FUNDING_DISPLAY_STEP}
+            explain={{ id: "market-tile-funding", title: "Funding-Rate", body: () => <Explainer bare d={fundingExplain(rate.get(), orFallback(nextFundingMv.get(), nextFundingTime), Date.now(), orFallback(markMv.get(), mark))} /> }}
+          >
             <motion.span>{fundingText}</motion.span>
           </MiniTile>
         ),
@@ -252,7 +286,7 @@ export const FundingBlock = memo(function FundingBlock({ mark, fundingRate, next
       {
         id: "oi",
         node: (
-          <MiniTile label="OI">
+          <MiniTile label="OI" explain={{ id: "market-tile-oi", title: "Open Interest", body: () => <Explainer bare d={openInterestExplain(openInterest, base)} /> }}>
             <MotionNumber value={openInterest} format={n0} flash />
           </MiniTile>
         ),
@@ -260,7 +294,7 @@ export const FundingBlock = memo(function FundingBlock({ mark, fundingRate, next
       {
         id: "taker",
         node: (
-          <MiniTile label="Taker">
+          <MiniTile label="Taker" explain={{ id: "market-tile-taker", title: "Taker-Delta", body: () => <Explainer bare d={takerExplain(takerDelta)} /> }}>
             <MotionNumber value={takerDelta} decimals={1} signed suffix=" %" flash />
           </MiniTile>
         ),
@@ -268,13 +302,20 @@ export const FundingBlock = memo(function FundingBlock({ mark, fundingRate, next
       {
         id: "book",
         node: (
-          <MiniTile label="Bid/Ask" flashOn={bidMv} minMove={bookMinMove} cooldownMs={FLASH_MIN_INTERVAL_MS} chars={bookChars}>
+          <MiniTile
+            label="Bid/Ask"
+            flashOn={bidMv}
+            minMove={bookMinMove}
+            cooldownMs={FLASH_MIN_INTERVAL_MS}
+            chars={bookChars}
+            explain={{ id: "market-tile-book", title: "Bid / Ask", body: () => <Explainer bare d={bookExplain(bidMv.get(), askMv.get(), decimals)} /> }}
+          >
             <motion.span>{bidAsk}</motion.span>
           </MiniTile>
         ),
       },
     ],
-    [rate, fundingText, openInterest, takerDelta, bookMinMove, bidAsk, bookChars],
+    [rate, fundingText, openInterest, takerDelta, bookMinMove, bidAsk, bookChars, nextFundingTime, mark, base, decimals],
   );
 
   return (
@@ -328,7 +369,7 @@ export const LivePill = memo(function LivePill({ receivedAt, ringEndsAt }: LiveP
       disabled={disabled && !refreshing}
       title={STRINGS.refreshNow}
       aria-label={STRINGS.refreshNow}
-      className="rounded-full disabled:cursor-default"
+      className="touch-hit rounded-full disabled:cursor-default"
       whileTap={press.whileTap}
       transition={press.transition}
     >

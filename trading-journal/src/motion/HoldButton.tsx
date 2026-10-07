@@ -215,7 +215,8 @@ export function HoldButton({
         buttonBase,
         buttonSize[size],
         buttonVariant[variant],
-        "relative isolate touch-manipulation select-none overflow-hidden [-webkit-touch-callout:none]",
+        // overflow-hidden clips a `.touch-hit` area, so coarse pointers get the 44 px as real height instead
+        "relative isolate touch-manipulation select-none overflow-hidden [-webkit-touch-callout:none] pointer-coarse:min-h-11",
         className,
       )}
       style={reduced ? undefined : { scale }}

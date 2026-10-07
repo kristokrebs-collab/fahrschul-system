@@ -2,6 +2,7 @@ import { motion, type HTMLMotionProps } from "motion/react";
 import { useEffect, useRef, useState, type ElementType, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { useMorphDialog } from "@/motion/MorphDialog";
+import { contextSpringAt } from "@/motion/physics";
 import { radius, spring, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -58,7 +59,8 @@ export interface MorphCardProps {
  * starts closing so the reverse morph can crossfade into it; when that reverse morph finishes (or the card
  * unmounts) it reports back (`returned`) so the dialog can release `inert` and return focus.
  * Press feedback: `whileTap` scale .985 on `spring.press` (`usePressable`), switched off while its dialog is open
- * so the source is back at scale 1 whenever the shared layout measures it.
+ * so the source is back at scale 1 whenever the shared layout measures it. After a swipe-dismiss the reverse morph runs
+ * on `contextSpringAt(spring.morph, closeTempo)` (the token itself for every other close).
  *
  * Morph surface (OV-04/05): the source's content fades out the moment its dialog opens and back in after the reverse
  * morph, so the shared layout only ever scales an empty surface. Pill sources (`borderRadius >= 999`) keep their
@@ -66,7 +68,7 @@ export interface MorphCardProps {
  * h/2 of the pill (measured at the click) – the panel grows out of the pill's real shape instead of a 9999 px oval.
  */
 export function MorphCard({ id, title, body, children, className, as = "button", borderRadius = radius.card, dialogClassName, motionProps }: MorphCardProps) {
-  const { open, settled, closing, show, returned } = useMorphDialog();
+  const { open, settled, closing, closeTempo, show, returned } = useMorphDialog();
   const press = usePressable({ scale: PRESS_SCALE });
   const isOpen = open?.id === id;
   const hidden = isOpen && settled === id;
@@ -84,6 +86,8 @@ export function MorphCard({ id, title, body, children, className, as = "button",
     show({ id, title, body, className: dialogClassName, pill });
   };
   const { onLayoutAnimationComplete, transition, ...restMotion } = motionProps ?? {};
+  // reverse morph after a swipe: the release tempo picks a livelier context spring (the token itself at tempo 0)
+  const morphSpring = closing === id && closeTempo > 0 ? contextSpringAt(spring.morph, closeTempo) : spring.morph;
   // a source that leaves while its dialog closes (page switch from inside the dialog) has no reverse morph to wait for
   useEffect(() => () => returned(id), [returned, id]);
   if (pill) {
@@ -116,7 +120,7 @@ export function MorphCard({ id, title, body, children, className, as = "button",
           layoutDependency={isOpen}
           className="pointer-events-none invisible absolute inset-0 -z-10"
           style={{ borderRadius: pillRadius }}
-          transition={{ layout: spring.morph }}
+          transition={{ layout: morphSpring }}
           onLayoutAnimationComplete={() => {
             onLayoutAnimationComplete?.();
             if (!isOpen) returned(id);
@@ -159,7 +163,7 @@ export function MorphCard({ id, title, body, children, className, as = "button",
       // nothing shows through it, and it never draws translucently over the tiles it slides across
       style={{ borderRadius, visibility: hidden ? "hidden" : undefined, ...(away ? AWAY_SURFACE : null) }}
       {...restMotion}
-      transition={{ ...press.transition, layout: spring.morph, ...transition }}
+      transition={{ ...press.transition, layout: morphSpring, ...transition }}
       onLayoutAnimationComplete={() => {
         onLayoutAnimationComplete?.();
         if (!isOpen) returned(id);

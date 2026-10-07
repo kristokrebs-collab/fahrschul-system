@@ -1,25 +1,123 @@
 /**
  * localStorage keys and the `g`/`h` read/write helpers of the original bundle.
  * Every localStorage access in `src/store` goes through this file (try/catch everywhere).
+ *
+ * Namespaces: the personal edition (web root, "persönlich" file) uses `tj2-*` – the same keys as the other journal
+ * version, so existing data is picked up. The share edition ("zum Teilen": Netlify `/teilen/`, share file) uses
+ * `tj2share-*`, so testing it on the same origin / browser never reads or writes the personal journal.
+ * Other modules that persist their own flags should build their key with `storageKey("name")`.
+ *
+ * Storage availability: when the browser grants no usable localStorage (an HTML file opened from an Android
+ * `content://` URL, sandboxed frames, blocked site data) the journal keeps working on an in-memory store for this
+ * session and `storageStatus()` reports `"unavailable"` (the banner offers backup import/export).
  */
+import { IS_SHARE } from "@/edition";
+
+/** `tj2-` (personal) or `tj2share-` (share edition). */
+export const KEY_PREFIX: string = IS_SHARE ? "tj2share-" : "tj2-";
+
+/** Edition-namespaced storage key, e.g. `storageKey("fill-setups")` → `tj2-fill-setups` / `tj2share-fill-setups`. */
+export function storageKey(name: string): string {
+  return `${KEY_PREFIX}${name}`;
+}
+
 export const KEYS = {
-  trades: "tj2-trades",
-  settings: "tj2-settings",
-  hyblock: "tj2-hyblock",
-  meta: "tj2-meta",
-  ui: "tj2-ui",
-  quarantine: "tj2-quarantine",
-  triggerLast: "tj2-trigger-last",
-  backupPrefix: "tj2-backup-",
+  trades: storageKey("trades"),
+  settings: storageKey("settings"),
+  hyblock: storageKey("hyblock"),
+  /** Day journal `{ "YYYY-MM-DD": DayNote }` (NEW). */
+  days: storageKey("days"),
+  meta: storageKey("meta"),
+  ui: storageKey("ui"),
+  quarantine: storageKey("quarantine"),
+  triggerLast: storageKey("trigger-last"),
+  backupPrefix: storageKey("backup-"),
 } as const;
 
-function storage(): Storage | null {
-  try {
-    if (typeof localStorage === "undefined") return null;
-    return localStorage;
-  } catch {
-    return null;
+/** The journal data keys other tabs may change (`storage` event sync, see `localAdapter`). */
+export const DATA_KEYS: readonly string[] = [KEYS.trades, KEYS.settings, KEYS.hyblock, KEYS.days];
+
+/* ------------------------------------------------------------ availability */
+
+export type StorageStatus = "ok" | "unavailable";
+
+/** In-memory `Storage` used for the session when localStorage is not usable (nothing persists). */
+class MemoryStorage implements Storage {
+  private map = new Map<string, string>();
+  get length(): number {
+    return this.map.size;
   }
+  clear(): void {
+    this.map.clear();
+  }
+  getItem(key: string): string | null {
+    return this.map.has(key) ? (this.map.get(key) as string) : null;
+  }
+  key(index: number): string | null {
+    return [...this.map.keys()][index] ?? null;
+  }
+  removeItem(key: string): void {
+    this.map.delete(key);
+  }
+  setItem(key: string, value: string): void {
+    this.map.set(key, String(value));
+  }
+}
+
+let fallback: MemoryStorage | null = null;
+let probed: { status: StorageStatus; target: Storage | null } | null = null;
+const PROBE_KEY = storageKey("probe");
+
+/**
+ * Probes localStorage once: access + setItem/removeItem of a probe key. A quota error on a store that already holds
+ * data counts as usable (full, not missing – writes then fail with `StorageWriteError`); a quota error on an EMPTY
+ * store (Safari private mode) or any other error counts as unavailable.
+ */
+function probe(): { status: StorageStatus; target: Storage | null } {
+  if (probed) return probed;
+  let ls: Storage | null;
+  try {
+    ls = typeof localStorage === "undefined" ? null : localStorage;
+  } catch {
+    ls = null;
+  }
+  let ok = false;
+  if (ls) {
+    try {
+      ls.setItem(PROBE_KEY, "1");
+      ls.removeItem(PROBE_KEY);
+      ok = true;
+    } catch (e) {
+      let length: number;
+      try {
+        length = ls.length;
+      } catch {
+        length = 0;
+      }
+      ok = isQuotaError(e) && length > 0;
+    }
+  }
+  if (ok) probed = { status: "ok", target: ls };
+  else {
+    fallback ??= new MemoryStorage();
+    probed = { status: "unavailable", target: fallback };
+  }
+  return probed;
+}
+
+/** `"unavailable"` when nothing persists in this browser/file (the journal then runs on a session-only store). */
+export function storageStatus(): StorageStatus {
+  return probe().status;
+}
+
+/** Tests: forget the cached probe (and the session store). */
+export function resetStorageProbe(): void {
+  probed = null;
+  fallback = null;
+}
+
+function storage(): Storage | null {
+  return probe().target;
 }
 
 /** Result of `readJsonDetailed`: the key is absent, parsed fine, or holds a string that is not JSON. */

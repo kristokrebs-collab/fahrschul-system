@@ -7,8 +7,11 @@ export const BINANCE_PERIODS = ["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h
 export type Period = (typeof BINANCE_PERIODS)[number];
 export const DEFAULT_PERIOD: Period = "1h";
 
-export const KLINE_INTERVALS = ["1m", "1h", "4h", "1w"] as const;
+export const KLINE_INTERVALS = ["1m", "15m", "1h", "4h", "1w"] as const;
 export type KlineInterval = (typeof KLINE_INTERVALS)[number];
+/** Intervals the REST clients can fetch: the live feeds plus `1d` (signal ladder rung `1D`, REST only). */
+export const FETCH_INTERVALS = [...KLINE_INTERVALS, "1d"] as const;
+export type FetchInterval = (typeof FETCH_INTERVALS)[number];
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -28,6 +31,7 @@ export const PERIOD_MS: Record<Period, number> = {
 
 export const INTERVAL_MS: Record<KlineInterval, number> = {
   "1m": MIN,
+  "15m": 15 * MIN,
   "1h": HOUR,
   "4h": 4 * HOUR,
   "1w": 7 * DAY,
@@ -39,6 +43,7 @@ export function periodMs(p: Period): number {
 export function intervalMs(i: KlineInterval): number {
   return INTERVAL_MS[i];
 }
+export const FETCH_INTERVAL_MS: Record<FetchInterval, number> = { ...INTERVAL_MS, "1d": DAY };
 
 const ALIASES: Record<string, Period> = {
   "5m": "5m",
@@ -125,7 +130,7 @@ export function toBybitPeriod(p: Period): BybitPeriodMap {
   return { value: BYBIT_EXACT[target] as BybitPeriod, period: target, exact: false, detail: `Bybit: ${p} → ${target}` };
 }
 
-export const BYBIT_KLINE_INTERVAL: Record<KlineInterval, string> = { "1m": "1", "1h": "60", "4h": "240", "1w": "W" };
+export const BYBIT_KLINE_INTERVAL: Record<FetchInterval, string> = { "1m": "1", "15m": "15", "1h": "60", "4h": "240", "1w": "W", "1d": "D" };
 
 // ---------------------------------------------------------------- OKX
 
@@ -145,7 +150,7 @@ export function toOkxPeriod(p: Period): string {
 }
 
 /** `1Wutc` keeps weekly candles UTC-aligned like Binance (plain `1W` is Hong Kong time). */
-export const OKX_KLINE_BAR: Record<KlineInterval, string> = { "1m": "1m", "1h": "1H", "4h": "4H", "1w": "1Wutc" };
+export const OKX_KLINE_BAR: Record<FetchInterval, string> = { "1m": "1m", "15m": "15m", "1h": "1H", "4h": "4H", "1w": "1Wutc", "1d": "1Dutc" };
 
 // ---------------------------------------------------------------- cadence text
 

@@ -4,6 +4,7 @@ import { useIntroFlown } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
+import { InsightsSection } from "@/views/insights";
 import { BacktestCompare } from "./BacktestCompare";
 import { ChartCard } from "./ChartCard";
 import { ChecklistCard } from "./ChecklistCard";
@@ -14,6 +15,7 @@ import { PatternsCard } from "./PatternsCard";
 import { ProjectionCard } from "./ProjectionCard";
 import { RankingCard } from "./RankingCard";
 import { RecentTrades } from "./RecentTrades";
+import { SignalCard } from "./SignalCard";
 import { TopTraderCard } from "./TopTraderCard";
 import { WinRateCard } from "./WinRateCard";
 
@@ -61,9 +63,10 @@ function CellReveal({ col, defer, children }: Omit<CellProps, "span">) {
 
 /**
  * `Übersicht` (Bundle `z$`, Plan 6.1). Layout `grid gap-5 lg:grid-cols-12`:
- * 1 Hero (12) · 1b Chart (12) · 2 Backtest (5) | Win-Rate (3) | Hochrechnung (4) · 3 Kontostand (7) |
- * Top Trader (5) · 4 Entscheidungsgrundlagen (7) | Checkliste (5) · 5 P&L pro Monat (5) | Letzte Trades (7) ·
- * 6 Muster (12). Every card reads `uiStore.acc` through `useAccountView`.
+ * 1 Hero (12) · 1a Einstiegs-Check (12, NEW: live multi-timeframe signal check) · 1b Chart (12) · 2 Backtest (5) |
+ * Win-Rate (3) | Hochrechnung (4) · 3 Kontostand (7) | Top Trader (5) · 4 Entscheidungsgrundlagen (7) |
+ * Checkliste (5) · 5 P&L pro Monat (5) | Letzte Trades (7) · 6 Muster (12) · 7 Auswertung (12, `InsightsSection`,
+ * mounted bare: its cards bring their own reveal / deferral). Every card reads `uiStore.acc` through `useAccountView`.
  * Hero and chart render as they are (the chart has its own entrance, and its body hosts a `position: fixed` marker
  * ghost and the canvas – no reveal transform/filter around it); every card below cascades in per row.
  * Intro: every cell is an `IntroCell` – the on-screen ones start as a slanted deck and travel to their slots, and
@@ -79,6 +82,9 @@ export function OverviewView({ className }: { className?: string }) {
       <IntroCell className="lg:col-span-12">
         <Hero />
       </IntroCell>
+      <Cell col={0} span="lg:col-span-12">
+        <SignalCard />
+      </Cell>
       <IntroCell className="lg:col-span-12">
         <ChartCard />
       </IntroCell>
@@ -112,6 +118,9 @@ export function OverviewView({ className }: { className?: string }) {
       <Cell col={0} span="lg:col-span-12" defer={420}>
         <PatternsCard />
       </Cell>
+      <IntroCell className="lg:col-span-12" fly={false}>
+        <InsightsSection />
+      </IntroCell>
     </div>
   );
 }

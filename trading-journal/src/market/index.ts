@@ -7,6 +7,8 @@ export {
   KLINE_INTERVALS,
   PERIOD_MS,
   INTERVAL_MS,
+  FETCH_INTERVALS,
+  FETCH_INTERVAL_MS,
   periodMs,
   intervalMs,
   normalizePeriod,
@@ -21,10 +23,11 @@ export {
   type Period,
   type PeriodResult,
   type KlineInterval,
+  type FetchInterval,
   type BybitPeriod,
   type BybitPeriodMap,
 } from "./period";
-export { FEED_IDS, KLINE_FEEDS, RATIO_FEEDS, FUTURES_DATA_FEEDS, SERIES_FEEDS, WS_FEEDS, BYBIT_UNSUPPORTED, DEFAULT_SOURCE_CHAIN, buildFeedSpecs, effectiveSpec, klineFeedInterval, klineFeedFor, isKlineFeed, isSeriesFeed } from "./feeds";
+export { klineBootstrapLimit, FEED_IDS, KLINE_FEEDS, RATIO_FEEDS, FUTURES_DATA_FEEDS, SERIES_FEEDS, WS_FEEDS, BYBIT_UNSUPPORTED, DEFAULT_SOURCE_CHAIN, buildFeedSpecs, effectiveSpec, klineFeedInterval, klineFeedFor, isKlineFeed, isSeriesFeed } from "./feeds";
 export { Budget, TokenBucket, BUCKETS, klineWeight, RATE_LIMIT_BACKOFF_MS } from "./budget";
 export { nextAlignedAt, currentBoundary, wsBackoffMs, probeBackoffMs, Scheduler, realTimerHost, WS_SILENT_MS, WS_ROLLOVER_MS, WS_MAX_FAILED, type TimerHost, type AlignSpec } from "./schedule";
 export { MarketCache, upsertSeries, upsertBar, cacheKey, memoryKV, idbKV, RING_CAPACITY, type KVStore } from "./cache";
@@ -107,6 +110,7 @@ export {
   PRICE_SNAPSHOT_INTERVAL_MS,
   type PriceSnapshot,
 } from "./marketStore";
+export * from "./signals";
 export { parseWsMessage, wsStreamKind, buildStreamUrl, binanceRest, BINANCE_REST, BINANCE_WS, type WsEvent, type BinanceRest } from "./sources/binance";
 export { bybitRest, BYBIT_REST, type BybitRest } from "./sources/bybit";
 export { okxRest, OKX_REST, type OkxRest } from "./sources/okx";

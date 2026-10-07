@@ -16,16 +16,17 @@ import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Segmented } from "@/primitives/Segmented";
 import { Sparkline } from "@/primitives/Sparkline";
-import { Tooltip } from "@/primitives/Tooltip";
 import { useJournal, useReadings } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { HyblockForm } from "@/app/overlays";
 import { ExplanationView } from "./explainer";
+import { TapTooltip } from "./TapTooltip";
 import { useMotionSelect, usePriceClass, usePriceSource, useTopTraderView } from "./useMarket";
 
 export const TOP_TRADER_TITLE = "Top Trader · Binance";
 export const DELTA_HINT = "Top-vs-Alle-Delta: Top 20 % nach Margin vs. alle Konten (Binance), Ersatz für Whale-vs-Retail";
 export const READING_DIALOG_TITLE = "Hyblock-Ablesung";
+export const DELTA_CANDLES_LABEL = "Δ+ Kerzen";
 export const EMPTY_TITLE = "Noch keine Ablesung";
 export const EMPTY_TEXT = "Trag Top-Trader-Long-% und Whale-Delta aus Hyblock ein. Mit dem Live-Kurs prüft das Journal dann deinen Falling-Knife-Filter.";
 const SPARK_OPTIONS = [
@@ -82,7 +83,7 @@ function useStableValues(values: readonly number[]): readonly number[] {
 
 /**
  * `Top Trader · Binance` (Bundle `w2` with Binance as the data source, Plan 4.8 / 6.1): Long % (accounts or
- * positions per `tj2-ui.topTraderBase`), second value, `Top vs. Alle` delta, `Kerzen +`, `Stand`, sparkline
+ * positions per `tj2-ui.topTraderBase`), second value, `Top vs. Alle` delta, `Δ+ Kerzen`, `Stand`, sparkline
  * (`Ablesungen | Live`), Falling-Knife card → dialog, footer with `Letzte löschen` / `Hyblock ↗`.
  * Re-renders only when a ratio series publishes, its health changes or the price crosses the support zone –
  * never per trade or kline tick. Values flash on change; `Stand` ages on the shared clock.
@@ -183,18 +184,18 @@ export function TopTraderCard() {
                   <div className="mt-1 flex items-center gap-2 text-[11.5px] text-mute">
                     <span className="dot-num text-[18px] text-fg">{n1(tt.globalLongPct)} %</span>
                     <span>Alle Konten (Bybit)</span>
-                    <Tooltip content={COHORT_HINT.bybit} delayDuration={300}>
-                      <button type="button" className="rounded-full">
+                    <TapTooltip content={COHORT_HINT.bybit}>
+                      <button type="button" className="touch-hit rounded-full">
                         <Badge tone="mute">{STRINGS.otherCohort}</Badge>
                       </button>
-                    </Tooltip>
+                    </TapTooltip>
                   </div>
                 )
               ) : (
                 <button
                   type="button"
                   onClick={() => setPref("topTraderBase", base === "positions" ? "accounts" : "positions")}
-                  className="mt-1 flex items-center gap-2 text-[11.5px] text-mute hover:text-fg"
+                  className="touch-hit mt-1 flex items-center gap-2 text-[11.5px] text-mute hover:text-fg"
                   title="Basis wechseln"
                 >
                   <span className="dot-num text-[18px] text-fg">{otherBase == null ? "–" : `${n1(otherBase)} %`}</span>
@@ -207,18 +208,19 @@ export function TopTraderCard() {
 
           <div className="grid grid-cols-3 gap-2">
             <div className="rounded-xl border border-line bg-ink-950/30 px-3 py-2">
-              <Tooltip content={DELTA_HINT} delayDuration={300}>
-                <button type="button" className="label !text-[9.5px] underline decoration-dotted decoration-faint underline-offset-2">
+              <TapTooltip content={DELTA_HINT}>
+                <button type="button" className="touch-hit label !text-[9.5px] underline decoration-dotted decoration-faint underline-offset-2">
                   Delta
                 </button>
-              </Tooltip>
+              </TapTooltip>
               <div className={cn("num mt-0.5 font-mono text-[14px] transition-colors duration-300", current.delta > 0 ? "text-win" : current.delta < 0 ? "text-loss" : "")}>
                 <MotionNumber value={current.delta} decimals={1} signed flash />
               </div>
               <div className="text-[10px] text-faint">Top vs. Alle</div>
             </div>
             <div className="rounded-xl border border-line bg-ink-950/30 px-3 py-2">
-              <div className="label !text-[9.5px]">Kerzen +</div>
+              {/* "Δ+": consecutive candles with a positive delta (a bare "+" read like an expand affordance) */}
+              <div className="label !text-[9.5px]">{DELTA_CANDLES_LABEL}</div>
               <div className="num mt-0.5 font-mono text-[14px]">
                 <MotionNumber value={current.deltaCandles} flash />
               </div>
@@ -255,19 +257,19 @@ export function TopTraderCard() {
               {current.id &&
                 (confirm ? (
                   <>
-                    <button type="button" className="text-loss" onClick={remove}>
+                    <button type="button" className="touch-hit text-loss" onClick={remove}>
                       Wirklich löschen
                     </button>
-                    <button type="button" onClick={() => setConfirm(false)}>
+                    <button type="button" className="touch-hit" onClick={() => setConfirm(false)}>
                       Nein
                     </button>
                   </>
                 ) : (
-                  <button type="button" className="hover:text-loss" onClick={() => setConfirm(true)}>
+                  <button type="button" className="touch-hit hover:text-loss" onClick={() => setConfirm(true)}>
                     Letzte löschen
                   </button>
                 ))}
-              <a href={HYBLOCK_LINK} target="_blank" rel="noreferrer" className="text-fg hover:underline">
+              <a href={HYBLOCK_LINK} target="_blank" rel="noreferrer" className="touch-hit text-fg hover:underline">
                 Hyblock ↗
               </a>
             </span>
@@ -278,7 +280,7 @@ export function TopTraderCard() {
           title={EMPTY_TITLE}
           text={EMPTY_TEXT}
           action={
-            <a href={HYBLOCK_LINK} target="_blank" rel="noreferrer" className="label mt-2 !text-fg hover:underline">
+            <a href={HYBLOCK_LINK} target="_blank" rel="noreferrer" className="touch-hit label mt-2 !text-fg hover:underline">
               Hyblock öffnen ↗
             </a>
           }

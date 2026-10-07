@@ -59,7 +59,8 @@ describe("SetupEditor", () => {
     expect(created?.id.startsWith("s_")).toBe(true);
     expect(created?.checklist.map((c) => c.text)).toEqual(["Zweiter Punkt", "Erster Punkt"]);
     expect(created?.checklist.every((c) => c.id.startsWith("c"))).toBe(true);
-    await waitFor(() => expect(useJournal.getState().settings.setups).toHaveLength(2));
+    // fixture setup s_bo + s_mtf (appended to legacy settings, other version's multi-TF setup) + the new one
+    await waitFor(() => expect(useJournal.getState().settings.setups).toHaveLength(3));
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Grundlage angelegt");
     expect(onClose).toHaveBeenCalled();
   });
@@ -77,7 +78,7 @@ describe("SetupEditor", () => {
     expect(screen.queryByText("1 Trades verlieren die Zuordnung.")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Löschen" }));
     fireEvent.click(screen.getByRole("button", { name: "Ja" }));
-    await waitFor(() => expect(useJournal.getState().settings.setups).toHaveLength(0));
+    await waitFor(() => expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_mtf"]));
     expect(useUi.getState().toasts.map((t) => t.title)).toContain("Grundlage gelöscht");
     expect(onClose).toHaveBeenCalled();
   });
@@ -86,8 +87,8 @@ describe("SetupEditor", () => {
     render(<SetupEditor open setupId="s_bo" fromTrade onClose={vi.fn()} />);
     fireEvent.pointerDown(screen.getByRole("button", { name: "Löschen" }), { button: 0 });
     await screen.findByText("1 Trades verlieren die Zuordnung.", undefined, { timeout: 4000 });
-    expect(useJournal.getState().settings.setups).toHaveLength(1);
+    expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_bo", "s_mtf"]);
     fireEvent.click(screen.getByRole("button", { name: "Ja" }));
-    await waitFor(() => expect(useJournal.getState().settings.setups).toHaveLength(0));
+    await waitFor(() => expect(useJournal.getState().settings.setups.map((x) => x.id)).toEqual(["s_mtf"]));
   });
 });

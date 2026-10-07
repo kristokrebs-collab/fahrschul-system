@@ -1,11 +1,12 @@
 import { motion } from "motion/react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { SetupStats } from "@/domain/account";
-import { ACCOUNT_LABELS } from "@/domain/defaults";
+import { ACCOUNT_LABELS, MTF_SETUP_ID } from "@/domain/defaults";
 import type { SetupAccount } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { colorClass, pct0 } from "@/lib/format";
 import { canObserveInView, useFirstInView } from "@/motion/inView";
+import { MorphCard } from "@/motion/MorphCard";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { NotchedFrame, notchPath } from "@/motion/pulse/NotchedFrame";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
@@ -13,6 +14,9 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge, type BadgeTone } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Tilt } from "@/primitives/Tilt";
+import { ExplanationView } from "@/views/overview/explainer";
+import { MtfLiveStrip } from "./MtfLiveStrip";
+import { adherenceText, explainPlaybook, fromStats, pfText, PLAYBOOK_STRINGS, pnlText, type PlaybookStats } from "./playbook";
 
 export type RankedSetupStats = SetupStats & { id: string };
 
@@ -42,6 +46,13 @@ export interface SetupCardProps {
   hidden?: boolean;
   /** Re-measure trigger for `layout` (account filter + sort key). */
   layoutDependency?: unknown;
+  /**
+   * Playbook figures (Tradezella playbook report: Erwartung, Profit-Faktor, Regel-Treue, Bester / Schwächster); the
+   * block shows once the setup has closed trades and opens its explainer. Omitted → no block (additive).
+   */
+  playbook?: PlaybookStats;
+  /** Currency of the playbook explainer (`settings.currency`). */
+  currency?: string;
   className?: string;
 }
 
@@ -102,7 +113,7 @@ function useNotchClip(ref: RefObject<HTMLElement | null>, r: number, notch: numb
  * per session and setup), checklist bullets pop and their lines light up (`stagger.rows`), the win bar fills.
  * Tiles never ellipsize a number (MO-01): 2 × 2 below a 22rem card body, 4 in a row above.
  */
-export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layoutDependency, className }: SetupCardProps) {
+export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layoutDependency, playbook, currency = "USDT", className }: SetupCardProps) {
   const reduced = useReducedFx();
   const { setup, n, winRate, net, avgR } = stats;
   const badge = SETUP_BADGE[setup.account] ?? SETUP_BADGE.both;
@@ -234,7 +245,16 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
                 </ul>
               )}
 
-              <div className="@container mt-auto">
+              {/* the stat tiles are one morph source (tap / click / Enter → the setup's playbook explainer): nothing that
+                  looks like a tile is dead on touch (tablet audit §2a.7) */}
+              <MorphCard
+                id={`setup-stats-${setup.id}`}
+                title={`${PLAYBOOK_STRINGS.title} · ${setup.name}`}
+                as="div"
+                body={() => <ExplanationView bare d={explainPlaybook(stats, playbook ?? fromStats(stats), currency)} />}
+                motionProps={{ "aria-label": `${PLAYBOOK_STRINGS.stats}: ${setup.name}` } as Record<string, string>}
+                className="group/stats @container mt-auto rounded-xl"
+              >
                 <dl className="grid grid-cols-2 gap-2 @[22rem]:grid-cols-4">
                   <Tile label="Trades">
                     <MotionNumber value={n} decimals={0} countOnReveal revealKey={`setup-${setup.id}-n`} flash />
@@ -249,7 +269,7 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
                     <MotionNumber value={avgR} decimals={2} signed countOnReveal revealKey={`setup-${setup.id}-avgr`} flash />
                   </Tile>
                 </dl>
-              </div>
+              </MorphCard>
 
               {n > 0 && (
                 <div className="h-1.5 overflow-hidden rounded-full bg-loss/25" role="img" aria-label={`Win-Rate ${pct0(winRate)}`}>
@@ -263,8 +283,12 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
                 </div>
               )}
 
+              {playbook && playbook.agg.n > 0 && <PlaybookBlock stats={stats} playbook={playbook} currency={currency} />}
+
+              {setup.id === MTF_SETUP_ID && <MtfLiveStrip />}
+
               {/* right padding keeps both buttons clear of the notch + disc */}
-              <div className="flex flex-wrap gap-2" style={{ paddingRight: CONFIG.notch - 16 }}>
+              <div className="flex flex-wrap gap-2 pointer-coarse:gap-3.5" style={{ paddingRight: CONFIG.notch - 16 }}>
                 <Button size="sm" onClick={edit}>
                   Bearbeiten
                 </Button>
@@ -280,9 +304,76 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
   );
 }
 
+/**
+ * Playbook block (additive, Tradezella playbook report): Erwartung pro Trade, Profit-Faktor, Regel-Treue (all items of
+ * THIS setup ticked) and best / worst trade, plus the most frequent mistake tag. One morph source (tap / click /
+ * Enter) that opens the playbook explainer – the figures never look like dead tiles on touch. Plain text values (no
+ * extra live counters), `tabular-nums`, never ellipsized: 2 columns below a 22rem card body, 4 above.
+ */
+function PlaybookBlock({ stats, playbook, currency }: { stats: RankedSetupStats; playbook: PlaybookStats; currency: string }) {
+  const { agg, adherence, topMistake, signal } = playbook;
+  const name = stats.setup.name;
+  return (
+    <MorphCard
+      id={`setup-playbook-${stats.setup.id}`}
+      title={`${PLAYBOOK_STRINGS.title} · ${name}`}
+      as="div"
+      body={() => <ExplanationView bare d={explainPlaybook(stats, playbook, currency)} />}
+      motionProps={{ "aria-label": PLAYBOOK_STRINGS.open(name) } as Record<string, string>}
+      className="@container rounded-xl border border-line bg-ink-950/50 px-3 py-2.5 transition-colors duration-200 hover:border-white/25 focus-visible:border-white/40"
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-faint">{PLAYBOOK_STRINGS.title}</span>
+        <span aria-hidden="true" className="grid size-4 place-items-center rounded-full border border-line-2 text-[10px] leading-none text-mute">
+          +
+        </span>
+      </span>
+      <span className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1.5 @[22rem]:grid-cols-4" data-testid="setup-playbook">
+        <PbValue label={PLAYBOOK_STRINGS.exp} value={pnlText(agg.exp)} className={colorClass(agg.exp)} />
+        <PbValue label={PLAYBOOK_STRINGS.pf} value={pfText(agg.pf)} />
+        <PbValue label={PLAYBOOK_STRINGS.adherence} value={adherenceText(adherence)} className={adherence.items ? undefined : "text-faint !text-[11.5px] font-sans"} />
+        <PbValue
+          label={PLAYBOOK_STRINGS.bestWorst}
+          className="whitespace-normal"
+          value={
+            <>
+              <span className={cn("whitespace-nowrap", colorClass(agg.best?.pnl))}>{pnlText(agg.best?.pnl)}</span>
+              <span className="text-faint"> / </span>
+              <span className={cn("whitespace-nowrap", colorClass(agg.worst?.pnl))}>{pnlText(agg.worst?.pnl)}</span>
+            </>
+          }
+        />
+      </span>
+      {(topMistake || signal) && (
+        <span className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px] text-mute">
+          {topMistake && (
+            <span className="min-w-0 [overflow-wrap:anywhere]">
+              {PLAYBOOK_STRINGS.topMistake}: <span className="text-[#ff8a90]">{topMistake.tag}</span> · <span className="num font-mono">{topMistake.n}×</span>
+            </span>
+          )}
+          {signal?.avgScore != null && (
+            <span className="whitespace-nowrap">
+              {PLAYBOOK_STRINGS.signal}: <span className="num font-mono text-fg/90">{Math.round(signal.avgScore)}</span>
+            </span>
+          )}
+        </span>
+      )}
+    </MorphCard>
+  );
+}
+
+function PbValue({ label, value, className }: { label: string; value: ReactNode; className?: string }) {
+  return (
+    <span className="grid min-w-0 gap-0.5">
+      <span className="text-[9px] font-semibold uppercase leading-tight tracking-[0.08em] text-faint">{label}</span>
+      <span className={cn("num whitespace-nowrap font-mono text-[12.5px] font-medium", className)}>{value}</span>
+    </span>
+  );
+}
+
 function Tile({ label, className, children }: { label: string; className?: string; children: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-xl border border-line bg-ink-950/50 px-2 py-2 @[22rem]:px-2.5">
+    <div className="min-w-0 rounded-xl border border-line bg-ink-950/50 px-2 py-2 transition-colors duration-200 group-hover/stats:border-white/20 @[22rem]:px-2.5">
       <dt className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-faint">{label}</dt>
       <dd className={cn("num mt-0.5 whitespace-nowrap font-mono text-[13.5px] font-medium", className)}>{children}</dd>
     </div>

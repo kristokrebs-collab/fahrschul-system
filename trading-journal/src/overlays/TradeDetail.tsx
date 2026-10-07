@@ -6,7 +6,8 @@ import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { colorClass, date, n0, n1, n2, pct, price, r as fmtR, signed, time } from "@/lib/format";
 import type { Candle } from "@/market/types";
-import { useDialogBehaviour } from "@/motion/a11y";
+import { useDialogBehaviour, useTouchMoveGuard } from "@/motion/a11y";
+import { flingExit, useSwipeDismiss, type SwipeDismiss, type SwipeDismissInfo } from "@/motion/physics";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { BODY_REVEAL_AT, STAGGER_HIDDEN, STAGGER_SHOWN, StaggerItem, sectionDelay } from "@/motion/Stagger";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
@@ -16,6 +17,7 @@ import { useEnriched, useJournal } from "@/store/journalStore";
 import { pushToast, useUi } from "@/store/uiStore";
 import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { useOverlayLane } from "@/primitives/toastStore";
+import { MistakeChips, SignalSummary, tradeSignal } from "./SignalSummary";
 
 /** Lazy: keeps `lightweight-charts` in its own chunk (loaded the first time a detail with candles opens). */
 const MiniTradeChart = lazy(() => import("@/chart/MiniTradeChart").then((m) => ({ default: m.MiniTradeChart })));
@@ -51,10 +53,19 @@ export interface TradeDetailProps {
  * editor's dim (its wrapper is lifted over the sheet layer for the exit and its own dim leaves at once), the sheet's
  * dim starts at this dim's level and the editor panel enters after the exit – the page never shows through.
  * The mini chart (the heaviest part of the body) mounts once the morph has settled (PF-01).
+ *
+ * Swipe to dismiss (iOS 18 zoom, `useSwipeDismiss` mode "zoom") on touch and pen, from the header row or the sticky
+ * grabber strip (coarse pointers) once the open morph settled: the column follows the finger down 1:1, sideways at half
+ * speed, and shrinks to 0.88 while the dim lifts. A slow drag springs back; a projected flick closes – into its source
+ * (recent row, trade card) with the morph starting from the shrunk box (`dismissDetail(tempo)` → context spring), or,
+ * without a source to return to (table ghost, chart marker, calendar), flying out on the release velocity with its
+ * contents inside. The panel scrolls with `overscroll-contain`.
  */
 export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
   const detail = useUi((s) => s.detail);
   const closeDetail = useUi((s) => s.closeDetail);
+  const dismissDetail = useUi((s) => s.dismissDetail);
+  const reduced = useReducedFx();
   const enriched = useEnriched();
   const settings = useJournal((s) => s.settings);
   const deleteTrade = useJournal((s) => s.deleteTrade);
@@ -64,6 +75,8 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
   const trade = detail.id ? enriched.find((t) => t.id === detail.id) : undefined;
   const open = Boolean(trade);
   const panelRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
+  const [flung, setFlung] = useState<Flung | null>(null);
 
   const close = useCallback(() => closeDetail(), [closeDetail]);
   // `settled`: false from the moment a trade opens until its morph (or plain enter) completes, and again from the
@@ -71,7 +84,10 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
   const shownId = trade?.id ?? null;
   const [phase, setPhase] = useState<{ id: string | null; settled: boolean }>({ id: null, settled: true });
   // adjust during render (open, switch or close): the effects of this very commit already see `settled: false`
-  if (shownId !== phase.id) setPhase({ id: shownId, settled: false });
+  if (shownId !== phase.id) {
+    setPhase({ id: shownId, settled: false });
+    if (shownId && flung) setFlung(null);
+  }
   const markSettled = (id: string) => setPhase((p) => (p.id === id && !p.settled ? { id, settled: true } : p));
   // after a delete the row that opened the detail is gone: focus its neighbour (or the list heading) instead of <body>
   const focusAfterDelete = useRef<HTMLElement | null>(null);
@@ -82,6 +98,27 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
   }, []);
   useDialogBehaviour(panelRef, open, close, { settled: phase.settled, fallbackFocus });
   useOverlayLane(open);
+
+  const swipe = useSwipeDismiss({
+    mode: "zoom",
+    enabled: open && phase.settled && phase.id === shownId && !handoff,
+    open,
+    target: columnRef,
+    onDismiss: (info) => {
+      const id = shownId;
+      if (id && hasMorphBack(id, detail.source)) {
+        // the source morphs the shrunk panel back in (layout snapshot includes the column's transform)
+        dismissDetail(info.tempo);
+        return;
+      }
+      const col = columnRef.current;
+      const top = col ? col.getBoundingClientRect().top : 0;
+      setFlung({ ...info, distance: Math.max(info.size, swipe.y.get() + Math.max(0, window.innerHeight - top)) + 24 });
+      closeDetail();
+    },
+  });
+  const exitCustom: ExitCustom = { handoff, flung };
+  const touchGuard = useTouchMoveGuard(swipe.isDragging);
 
   const edit = (id: string) => {
     if (onEdit) onEdit(id);
@@ -96,19 +133,29 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
   };
 
   return (
-    <AnimatePresence custom={handoff} onExitComplete={() => setPhase((p) => (p.id === null ? { id: null, settled: true } : p))}>
+    <AnimatePresence
+      custom={exitCustom}
+      onExitComplete={() => {
+        setPhase((p) => (p.id === null ? { id: null, settled: true } : p));
+        // the swiped column was left transformed (zoom back / fling): rest again while nothing is mounted
+        swipe.reset({ instant: true });
+      }}
+    >
       {trade && (
         // decorative dim layer: clicks pass through to the wrapper below it in the DOM order (never made inert)
         <motion.div
           key="bg"
-          className="pointer-events-none fixed inset-0 z-[58] bg-black/70"
+          className="pointer-events-none fixed inset-0 z-[58]"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           variants={DIM_VARIANTS}
           exit="exit"
           transition={tween.fade}
           aria-hidden="true"
-        />
+        >
+          {/* the swipe lifts the dim through this inner layer (enter/exit and drag opacity multiply) */}
+          <motion.div className="absolute inset-0 bg-black/70" style={{ opacity: swipe.dim }} />
+        </motion.div>
       )}
       {trade && (
         // the backdrop click target is this wrapper – an ancestor of the panel, so `useInertOutside` never disables it;
@@ -123,7 +170,8 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
             if (e.target === e.currentTarget) close();
           }}
         >
-          <div className="pointer-events-none relative w-full max-w-[460px]">
+          {/* the swipe moves this column (shadow sibling + panel), never the `layoutId` panel itself */}
+          <motion.div ref={columnRef} className="pointer-events-none relative w-full max-w-[460px]" style={swipe.style} variants={COLUMN_VARIANTS} exit="exit">
             {/* the big shadow sits on an unscaled sibling and fades in after the morph: no per-frame shadow repaint */}
             <motion.div
               aria-hidden="true"
@@ -151,11 +199,21 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
               transition={{ ...spring.detail, layout: spring.detail }}
               onAnimationComplete={() => markSettled(trade.id)}
               onLayoutAnimationComplete={() => markSettled(trade.id)}
-              className="pointer-events-auto relative max-h-[92vh] w-full overflow-y-auto rounded-[28px] border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 outline-none"
+              className="pointer-events-auto relative max-h-[92vh] w-full overflow-y-auto overscroll-contain rounded-[28px] border border-line-2 bg-gradient-to-b from-ink-750 to-ink-850 outline-none"
             >
+              {/* swipe handle on touch screens: stays at the top while the panel scrolls (opaque, so text never shows under it) */}
+              <div
+                ref={touchGuard}
+                data-detail-grabber=""
+                aria-hidden="true"
+                className="sticky top-0 z-10 hidden h-5 rounded-t-[28px] bg-ink-750 pointer-coarse:block"
+                {...swipe.handle}
+              >
+                <span className="pointer-events-none absolute left-1/2 top-2 h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15" />
+              </div>
               {/* close: the contents fade first, then the (now empty, opaque) surface – page text never shows through
-                  the panel's text while it fades (390 cards have no morph target) */}
-              <motion.div exit={{ opacity: 0, transition: tween.exit }}>
+                  the panel's text while it fades (390 cards have no morph target); swiped away they ride out inside it */}
+              <motion.div variants={CONTENT_VARIANTS} exit="exit">
                 <DetailContent
                   trade={trade}
                   setups={settings.setups}
@@ -165,30 +223,64 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
                   onClose={close}
                   onEdit={() => edit(trade.id)}
                   onDelete={() => remove(trade.id)}
+                  handle={swipe.handle}
+                  handleRef={touchGuard}
+                  reduced={reduced}
                 />
               </motion.div>
             </motion.div>
-          </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
   );
 }
 
+/** A swiped-away detail without a morph-back source: release info + the travel that takes it off-screen. */
+interface Flung extends SwipeDismissInfo {
+  distance: number;
+}
+/** AnimatePresence `custom` of the detail: the editor hand-off and / or the fling. */
+interface ExitCustom {
+  handoff: boolean;
+  flung: Flung | null;
+}
+
+/**
+ * Whether closing `id` morphs back into a source that stays mounted: a recent-trades row, or a trade card
+ * (`data-trade-morph`). The table's ghost, chart markers and the calendar have none – those detail closes fade / fly.
+ */
+export function hasMorphBack(id: string, source: string | null): boolean {
+  if (source === "recent") return true;
+  if (source !== "table" || typeof document === "undefined") return false;
+  const sel = `[data-trade-morph="${typeof CSS !== "undefined" && CSS.escape ? CSS.escape(id) : id}"]`;
+  const el = document.querySelector(sel);
+  return el instanceof HTMLElement && el.getClientRects().length > 0;
+}
+
 /** Dim level the editor's sheet dim starts from on a hand-off (black/70 ≈ ink-950/80 × .875). */
 export const DETAIL_DIM_HANDOFF = 0.875;
 /** On a hand-off the dim leaves at once (the sheet's dim has taken over its level) … */
-/** Panel exit: after the contents (tween.exit) – except on the hand-off to the editor, which takes over at once. */
-const PANEL_VARIANTS = {
-  exit: (handoff: boolean) => ({ opacity: 0, scale: 0.98, transition: handoff ? tween.exit : { ...tween.exit, delay: tween.exit.duration } }),
+/** Panel exit: after the contents (tween.exit) – except on the hand-off to the editor, which takes over at once; swiped away it stays opaque. */
+const PANEL_VARIANTS: Variants = {
+  exit: (c?: ExitCustom) =>
+    c?.flung ? { opacity: 1, transition: { duration: 0 } } : { opacity: 0, scale: 0.98, transition: c?.handoff ? tween.exit : { ...tween.exit, delay: tween.exit.duration } },
+};
+/** The contents fade first – unless the panel was swiped away (they ride out inside it, no text over text). */
+const CONTENT_VARIANTS: Variants = {
+  exit: (c?: ExitCustom) => (c?.flung ? { opacity: 1, transition: { duration: 0 } } : { opacity: 0, transition: tween.exit }),
+};
+/** Swiped away without a source: the column flies on the release velocity. */
+const COLUMN_VARIANTS: Variants = {
+  exit: (c?: ExitCustom) => (c?.flung ? flingExit(c.flung, { distance: c.flung.distance }) : {}),
 };
 
 const DIM_VARIANTS: Variants = {
-  exit: (handoff: boolean) => ({ opacity: 0, transition: handoff ? { duration: 0 } : tween.exit }),
+  exit: (c?: ExitCustom) => ({ opacity: 0, transition: c?.handoff ? { duration: 0 } : tween.exit }),
 };
 /** … and the leaving panel is lifted above the sheet layer (z 60) so its fade is never dimmed mid-way. */
 const WRAP_VARIANTS: Variants = {
-  exit: (handoff: boolean) => (handoff ? { zIndex: 61, transition: { duration: 0 } } : { zIndex: 59, transition: { duration: 0 } }),
+  exit: (c?: ExitCustom) => (c?.handoff ? { zIndex: 61, transition: { duration: 0 } } : { zIndex: 59, transition: { duration: 0 } }),
 };
 
 /** Rendered (not `display:none`, e.g. the hidden keep-alive overview) and not on its way out. */
@@ -252,10 +344,14 @@ interface DetailContentProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => Promise<void>;
+  /** Swipe handle props for the header row (touch / pen). */
+  handle?: SwipeDismiss["handle"];
+  /** Native touchmove guard of the handle (`useTouchMoveGuard`). */
+  handleRef?: (el: HTMLElement | null) => (() => void) | undefined;
+  reduced: boolean;
 }
 
-function DetailContent({ trade: e, setups, currency, candles, settled, onClose, onEdit, onDelete }: DetailContentProps) {
-  const reduced = useReducedFx();
+function DetailContent({ trade: e, setups, currency, candles, settled, onClose, onEdit, onDelete, handle, handleRef, reduced }: DetailContentProps) {
   const [confirm, setConfirm] = useState(false);
   const [err, setErr] = useState("");
   const { trigger: deleteTrigger, no: deleteNo } = useConfirmFocus(confirm);
@@ -275,6 +371,8 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
   const d = tradeTime(e);
   const ratio = e.items.length ? e.checked / e.items.length : 0;
   const conviction = e.conviction ? CONVICTION_LEVELS.find((c) => c.v === e.conviction) : undefined;
+  const signal = tradeSignal(e);
+  const mistakes = (e.mistakes ?? []).filter((m): m is string => typeof m === "string" && m.trim() !== "");
 
   const facts: [string, string][] = [
     ["Einstieg", price(e.entry)],
@@ -311,7 +409,7 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
 
   return (
     <>
-      <div className="flex items-start justify-between gap-3 p-5 pb-3">
+      <div ref={handleRef} className="flex items-start justify-between gap-3 p-5 pb-3 pointer-coarse:pt-1" {...handle}>
         <div>
           <motion.div layoutId={`trade-side-${e.id}`} layout="position" className={cn("font-mono text-xs font-semibold uppercase tracking-[0.12em]", e.side === "short" ? "text-loss" : "text-win")}>
             {e.side === "short" ? "▼ Short" : "▲ Long"} · {e.account === "makro" ? "Makro" : "Scalp"}
@@ -382,6 +480,25 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
           )}
         </StaggerItem>
 
+        {signal && (
+          <StaggerItem>
+            <div className="mb-1.5 text-[11.5px]">
+              <span className="label">Einstiegs-Check</span>
+            </div>
+            <SignalSummary snap={signal} side={e.side} />
+          </StaggerItem>
+        )}
+
+        {mistakes.length > 0 && (
+          <StaggerItem>
+            <div className="mb-1.5 flex justify-between text-[11.5px]">
+              <span className="label">Fehler</span>
+              <span className="font-mono text-mute">{mistakes.length}</span>
+            </div>
+            <MistakeChips tags={mistakes} />
+          </StaggerItem>
+        )}
+
         <StaggerItem>
           <dl className="grid grid-cols-3 gap-2 text-[11.5px]">
             <Meta label="Überzeugung">{conviction ? `${conviction.v} · ${conviction.label}` : "–"}</Meta>
@@ -437,10 +554,10 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
               {confirm ? (
                 <motion.span key="confirm" className="flex flex-wrap items-center justify-end gap-2 text-[12.5px] text-[#ff8a90]" {...confirmSwapMotion(reduced)}>
                   Wirklich löschen?
-                  <Button size="sm" variant="danger" onClick={() => void del()}>
+                  <Button size="sm" variant="danger" className={COARSE} onClick={() => void del()}>
                     Ja, löschen
                   </Button>
-                  <Button ref={deleteNo} size="sm" onClick={() => setConfirm(false)}>
+                  <Button ref={deleteNo} size="sm" className={COARSE} onClick={() => setConfirm(false)}>
                     Nein
                   </Button>
                 </motion.span>
@@ -449,10 +566,10 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
                   <HoldConfirm ref={deleteTrigger} size="sm" onAsk={() => setConfirm(true)} onConfirm={deleteAfterHold}>
                     Löschen
                   </HoldConfirm>
-                  <Button size="sm" onClick={onClose}>
+                  <Button size="sm" className={COARSE} onClick={onClose}>
                     Schließen
                   </Button>
-                  <Button size="sm" variant="primary" onClick={onEdit}>
+                  <Button size="sm" variant="primary" className={COARSE} onClick={onEdit}>
                     Bearbeiten
                   </Button>
                 </motion.span>
@@ -482,6 +599,9 @@ export function CheckRow({ state, children }: { state: "yes" | "no" | "none"; ch
     </li>
   );
 }
+
+/** Footer buttons on coarse pointers: the HoldConfirm next to them is 44 px tall there (it cannot use `.touch-hit`). */
+const COARSE = "pointer-coarse:min-h-11";
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
   return (

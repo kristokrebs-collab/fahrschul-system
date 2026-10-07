@@ -57,6 +57,27 @@ interface TradeEditorProps {
   (overlays register via `useOverlayLane(open)` from `@/primitives/toastStore`), so `Speichern & neu` confirms visibly (TO-01).
 - Exports for reuse/tests: `defaultForm`, `formFromTrade`, `resetForNext`, `toRecord`, `validateRecord`, `livePriceInput`, `freshLivePrice`, `Section`, `LivePriceButton`,
   `EDITOR_MESSAGES`, `LIVE_PRICE_LABEL`, `LIVE_PRICE_CONFIRM_MS`, types `TradeFormStrings`, `TradeFormTyped`, `TradeRecord`.
+- **Einstiegs-Check zum Zeitpunkt** (NEW, after `Eckdaten`; `SignalSection.tsx`, other journal `forms.tsx`):
+  - new trade / re-check, date within 5 min of now → live check (`useSignalCheck`, only the section subscribes); the stored snapshot is
+    taken AT SAVE TIME (`resolveTradeSignal(date, side)` → `checkTradeAt`, ≤ 3 s, never rejects);
+  - back-dated → `retroCheck(minute)` debounced 300 ms with `Kerzen für diesen Zeitpunkt werden geladen …`; too little history →
+    `Zu wenig Kursdaten für diesen Zeitpunkt.` (no snapshot is stored – never a fake strength 0); load error → `Erneut versuchen`;
+  - existing trade: shows `trade.signal` (either app's format, `parseSignalSnapshot`) + `Neu prüfen`; without one `Prüfen`. It is re-checked
+    only on that click, or automatically when its date / side changed (the stored check no longer describes it). A failed / empty
+    re-check keeps the stored snapshot (`...stored trade` spread);
+  - `s_mtf` auto-ticks (`mtfAutoChecks`) while `s_mtf` is selected and the user has not toggled one of its items (existing trades start
+    manual; `Neu prüfen` re-enables); auto items read `{setup} · automatisch`. Applied as a derived layer (`withMtfAuto`), saved via `pruneChecks`.
+- **Fehler** (NEW, after `Überzeugung & Disziplin`): `aria-pressed` chips from `settings.mistakes`, then own tags used on other trades
+  (`usedOwnMistakes`, defaults excluded), then the trade's own (`mistakeOptions`); `+ Eigener Fehler` → field (Enter adds + selects, Escape cancels
+  only the field). Saved as `trade.mistakes` (the settings list is never written from here).
+- **Timeframe** options = `TIMEFRAMES` (incl. 30m / 45m / 2h) plus a stored value outside the list (`timeframeOptions`), never shown as `–`.
+- **Unsaved input** (`isFormDirty` vs. the state the form opened with / was reset to by `Speichern & neu`; `Neu prüfen` counts): Escape,
+  backdrop, header ✕, swipe and `Abbrechen` show the footer confirm `Änderungen verwerfen?` `[Verwerfen]` `[Weiter bearbeiten]` (focus on the
+  safe answer, back to `Abbrechen`) instead of closing (`Sheet dismissGuard / onDismissAttempt`).
+- More exports: `isFormDirty`, `mistakeOptions`, `usedOwnMistakes`, `withMtfAuto`, `timeframeOptions`, `DISCARD_COPY`, `MISTAKES_COPY`;
+  `SignalSection.tsx`: `SignalSection`, `resolveTradeSignal`, `signalSectionSub`, `localMs`, `SIGNAL_SECTION_TITLE`, `SIGNAL_SECTION_COPY`,
+  `RETRO_DEBOUNCE_MS`, `SAVE_CHECK_TIMEOUT_MS`; `SignalSummary.tsx`: `SignalSummary`, `StrengthBars`, `StrengthDots`, `MistakeChips`,
+  `signalTone`, `snapshotSource`, `tradeSignal`.
 
 ## `TradeDetail` (`TradeDetail.tsx`) – bundle `q$`, Plan 6.2 / 2.5
 
@@ -81,6 +102,14 @@ interface TradeDetailProps {
   `AnimatePresence mode="wait"`). `Bearbeiten` = `uiStore.editFromDetail(id)`: detail closes and editor opens in one update; the editor
   sheet gets `handoff` (dim starts at the detail's level, panel enters after the detail's exit) – no bare page in between (TR-05).
 - `MiniTradeChart` is imported from `@/chart/MiniTradeChart` (mock that path in tests).
+- NEW: `Einstiegs-Check` (`SignalSummary` of `trade.signal`: score, label, `{Stärke} · {tiers} von {n} Timeframes`, timeframe + zone pills,
+  where it came from) and `Fehler` chips (`trade.mistakes`), after the checklist.
+- NEW (physics): swipe to dismiss on touch / pen (`useSwipeDismiss` mode "zoom"): handle = the header row + a sticky opaque 20 px grabber
+  strip (coarse pointers). The column follows 1:1 down, ½ sideways, scales to .88, the dim lifts; a slow pull springs back, a projected
+  flick closes: with a source that stays mounted (`hasMorphBack`: recent row, trade card `[data-trade-morph]`) via `dismissDetail(tempo)` –
+  the source runs its layout morph from the shrunk box on `contextSpringAt(spring.detail, detailTempo)`; otherwise (table ghost, chart
+  marker, calendar) the column flies out on the release velocity with its contents inside. Disabled until the open morph settled and
+  during the editor hand-off. Panel `overscroll-contain`.
 
 ## Motion (premium pass)
 
@@ -97,6 +126,7 @@ interface TradeDetailProps {
 | `SetupEditor` | fields cascade (`StaggerItem`), checklist rows enter/leave and lift while dragged (scale 1.02 + pre-rendered shadow layer), colour ring glides (`layoutId="sf-color-{useId}"`), a missing name shakes into view. |
 | `ImportDialog` | blocks cascade, preview counts up (`countOnReveal`), progress bar (`role="progressbar"`) glides on `spring.bar` with a shimmer band inside the fill and turns win at 100 %. |
 | `HyblockForm` | blocks cascade with the MorphDialog body; a refused value shakes its field into view. |
+| swipe handles | every swipe handle (sheet header, dialog head, detail grabber / header, toast) carries `useTouchMoveGuard` (`@/motion/a11y`): a native non-passive `touchmove` that is `preventDefault`ed while dragging – otherwise Chrome treats the next tap within ~1 s as a fling cancel and swallows its click (e.g. the FAB right after swiping the editor away). |
 
 Helpers: `winCelebration` (`celebration.ts`), `BIG_WIN_R`, `STREAK_WINS`, `invalidFieldOf`. Shared with the views (moved out of this
 folder): `revealInvalid(idOrEl, { reduced })` → `@/primitives/fieldFx` (focus without jump → smooth scroll if needed → shake once
@@ -120,3 +150,7 @@ visible); `HoldConfirm`, `useConfirmFocus`, `HOLD_CONFIRM_TITLE` → `@/motion/H
 - **`HyblockForm`** / **`HyblockReadingsList`** (`HyblockForm.tsx`, bundle `tK`): `{ last?; live?: LiveHyblockValues; onClose?; onSave?; now?; className? }`
   (lives in the `hyblock-new` morph dialog; `live` renders `Live-Werte übernehmen`) / `{ readings?; limit? (5); onDelete?; className? }`. `HYBLOCK_FORM_STRINGS`.
 - **`ImportDialog`** (`ImportDialog.tsx`, Plan 8.5): `{ open; onClose; onDone?(result); readFile? }` – Sheet 540 px, `IMPORT_STRINGS`, `IMPORT_MODES`.
+  `dismissGuard={false}` (nothing typed to lose).
+- **Sheet guard for other editors**: pass `dismissGuard={() => dirty}` + `onDismissAttempt={() => showConfirm()}`. Without
+  `dismissGuard` the Sheet guards itself as soon as any field inside received input and asks with its own inline
+  `Änderungen verwerfen?` strip above the footer (`SHEET_DISCARD_COPY`).

@@ -14,15 +14,20 @@ import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { useJournal } from "@/store/journalStore";
+import { storageKey } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { DataCard } from "./DataCard";
-import { CURRENCIES, changedKeys, draftToSettings, settingsToDraft, type DraftKey, type DraftTextKey, type SettingsDraft } from "./draft";
+import { CURRENCIES, changedKeys, draftToSettings, settingsToDraft, type DraftKey, type DraftTextKey, type MistakeRow, type SettingsDraft } from "./draft";
 import { DraftField } from "./fields";
 import { ChangedDot, SaveButton, useActionPhase, type ActionPhase } from "./fx";
 import { HyblockConnectorCard, type HyblockTestConfig } from "./HyblockConnectorCard";
+import { LimitsCard } from "./LimitsCard";
 import { LiveDataCard } from "./LiveDataCard";
+import { MistakesCard } from "./MistakesCard";
 import { RulesCard } from "./RulesCard";
+import { SignalCheckCard } from "./SignalCheckCard";
+import { StorageCard } from "./StorageCard";
 import { SymbolField } from "./SymbolField";
 
 export const SETTINGS_STRINGS = {
@@ -76,7 +81,7 @@ export const SETTINGS_STRINGS = {
 } as const;
 
 /** Subtitle recipe: pixel fill once per session, then the marker on the key word. */
-export const SETTINGS_LEAD_FILL = { storageKey: "tj2-fill-settings", highlight: "Startkapital" } as const;
+export const SETTINGS_LEAD_FILL = { storageKey: storageKey("fill-settings"), highlight: "Startkapital" } as const;
 
 export interface SettingsViewProps {
   /** Live-Daten card: health snapshot + labels from the market provider (integrator wiring). */
@@ -147,6 +152,16 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
   const setRules = useCallback((rules: Rule[]) => {
     setDirty(true);
     setDraft((d) => ({ ...d, rules }));
+  }, []);
+  const setMistakes = useCallback((mistakes: MistakeRow[]) => {
+    setDirty(true);
+    setDraft((d) => ({ ...d, mistakes }));
+  }, []);
+  /** Several text keys at once (`Standardwerte setzen` of the Einstiegs-Check). */
+  const patch = useCallback((p: Partial<SettingsDraft>) => {
+    setDirty(true);
+    setInvalidField((f) => (f && f in p ? null : f));
+    setDraft((d) => ({ ...d, ...p }));
   }, []);
   const openImport = useCallback(() => setImportOpen(true), []);
 
@@ -222,11 +237,26 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
 
         <LiveDataCard health={health} statusLabels={statusLabels} onRefresh={onRefresh} onReconnect={onReconnect} onClearCache={onClearCache} />
 
-        <HyblockCard className="lg:col-span-2" draft={draft} onChange={set} onTest={onTestHyblock} />
+        {/* `Card` puts `className` on its inner surface, so a full-width card needs a spanning grid item around it */}
+        <div className="min-w-0 lg:col-span-2">
+          <SignalCheckCard draft={draft} onChange={set} onPatch={patch} changed={changed} invalid={invalidField} />
+        </div>
+
+        <div className="min-w-0 lg:col-span-2">
+          <HyblockCard draft={draft} onChange={set} onTest={onTestHyblock} />
+        </div>
 
         <DataCardMemo onImport={openImport} />
 
         <RulesCardMemo rules={draft.rules} onChange={setRules} trades={trades} changed={changed.has("rules")} />
+
+        <MistakesCard rows={draft.mistakes} onChange={setMistakes} trades={trades} changed={changed.has("mistakes")} />
+
+        <LimitsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+
+        <div className="min-w-0 lg:col-span-2">
+          <StorageCard />
+        </div>
 
         <div className="flex justify-end lg:col-span-2">
           <SaveButton phase={pagePhase} onClick={onSave} />

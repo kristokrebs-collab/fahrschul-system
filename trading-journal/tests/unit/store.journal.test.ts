@@ -99,11 +99,11 @@ describe("bootJournal", () => {
         doc: () => ({ set: async () => {}, delete: async () => {}, onSnapshot: () => () => {} }),
         add: async () => {},
       }),
-      doc: () => ({
+      doc: (path: string) => ({
         set: async () => {},
         delete: async () => {},
         onSnapshot: (next: (s: unknown) => void) => {
-          listeners.settings = next;
+          listeners[path === "config/settings" ? "settings" : path] = next; // also `config/days` (day journal)
           return () => {};
         },
       }),

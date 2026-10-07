@@ -12,6 +12,20 @@ describe("symbol", () => {
     expect(tvSymbolToBinance("  btcusdt ")).toBe("BTCUSDT");
     expect(tvPrefix("btcusdt")).toBeNull();
   });
+  it("maps USD chart symbols of other venues (the other journal's BITSTAMP:BTCUSD) to the USDT perp", () => {
+    expect(tvSymbolToBinance("BITSTAMP:BTCUSD")).toBe("BTCUSDT");
+    expect(tvSymbolToBinance("COINBASE:ETHUSD")).toBe("ETHUSDT");
+    expect(tvSymbolToBinance("BTCUSD")).toBe("BTCUSDT");
+    expect(tvSymbolToBinance("bitstamp:btcusd")).toBe("BTCUSDT");
+    expect(resolveSymbol("BITSTAMP:BTCUSD")).toMatchObject({ binance: "BTCUSDT", bybit: "BTCUSDT", okx: "BTC-USDT-SWAP", valid: true, prefix: "BITSTAMP", raw: "BITSTAMP:BTCUSD" });
+    // USDT / USDC / other quotes are untouched; BINANCE:…USD keeps the old behaviour
+    expect(tvSymbolToBinance("BITSTAMP:BTCUSDT")).toBe("BTCUSDT");
+    expect(tvSymbolToBinance("KRAKEN:BTCUSDC")).toBe("BTCUSDC");
+    expect(tvSymbolToBinance("BINANCE:BTCUSD")).toBe("BTCUSD");
+    // TradingView's perpetual suffix
+    expect(tvSymbolToBinance("BINANCE:BTCUSDT.P")).toBe("BTCUSDT");
+  });
+
   it("falls back to BTCUSDT for empty input", () => {
     expect(tvSymbolToBinance("")).toBe("BTCUSDT");
     expect(tvSymbolToBinance(undefined)).toBe("BTCUSDT");
@@ -74,7 +88,9 @@ describe("period", () => {
     expect(toOkxPeriod("5m")).toBe("5m");
     expect(toOkxPeriod("1d")).toBe("1D");
     expect(OKX_KLINE_BAR["1w"]).toBe("1Wutc");
-    expect(BYBIT_KLINE_INTERVAL).toEqual({ "1m": "1", "1h": "60", "4h": "240", "1w": "W" });
+    expect(BYBIT_KLINE_INTERVAL).toEqual({ "1m": "1", "15m": "15", "1h": "60", "4h": "240", "1w": "W", "1d": "D" });
+    expect(OKX_KLINE_BAR["15m"]).toBe("15m");
+    expect(OKX_KLINE_BAR["1d"]).toBe("1Dutc");
   });
   it("produces cadence labels", () => {
     expect(cadenceLabel(250)).toBe("Echtzeit");

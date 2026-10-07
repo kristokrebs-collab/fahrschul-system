@@ -131,6 +131,8 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
       onClose={onClose}
       size="md"
       title={IMPORT_STRINGS.title}
+      // nothing typed here to lose: a chosen file is picked again in a second (no "Änderungen verwerfen?")
+      dismissGuard={false}
       footer={
         <>
           <span className="flex-1" />

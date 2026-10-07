@@ -24,6 +24,7 @@ import { deriveMarket, deriveTopTrader, lastPrice, type DeriveOptions, type Mark
 import { initialHealth } from "./health";
 import { buildFeedSpecs, FEED_IDS, isKlineFeed } from "./feeds";
 import { STRINGS } from "./statusLabel";
+import { startSignals, stopSignals } from "./signals/boot";
 
 /** Feeds that publish several times per second; they never bump the slow version counter. */
 export const HIGH_FREQUENCY_FEEDS: ReadonlySet<FeedId> = new Set<FeedId>(["aggTrade", "bookTop", "markPrice"]);
@@ -184,11 +185,14 @@ export function startMarket(settings: Pick<Settings, "market" | "hyblock">, opts
   state.opts = opts;
   attach(p);
   p.start();
+  // live "Einstiegs-Check" follows the provider (≤ 1 evaluation per second, off the render path)
+  startSignals(p);
   emitNow();
   return p;
 }
 
 export function stopMarket(): void {
+  stopSignals();
   state.unbind?.();
   state.unbind = null;
   offProvider?.();

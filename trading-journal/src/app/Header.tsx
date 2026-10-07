@@ -2,6 +2,7 @@ import { motion, useScroll, useSpring, useTransform, type Variants } from "motio
 import { useState } from "react";
 import { EdgeBlur, type BlurBand } from "@/app/BottomFade";
 import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/CommandNav";
+import { FullscreenButton } from "@/app/DisplayActions";
 import { HeaderTicker } from "@/app/HeaderTicker";
 import type { StoreMode } from "@/domain/types";
 import { replayIntro, useIntroPhase, useIntroSettled, type IntroPhase } from "@/intro/introStore";
@@ -120,7 +121,7 @@ function MenuButton() {
       aria-expanded={open}
       aria-controls={open ? COMMAND_NAV_ID : undefined}
       title="Navigation (⌘K / Strg+K)"
-      className="group/menu relative grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
+      className="touch-hit group/menu relative grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 bg-ink-850 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg"
     >
       <span aria-hidden="true" className="flex w-4 flex-col gap-[3px]">
         <span className="h-px w-full bg-current transition-transform duration-200 ease-out group-hover/menu:translate-x-[2px]" />
@@ -134,8 +135,9 @@ function MenuButton() {
 /**
  * Sticky app header (Plan 2.5 "Header", 6.6): logo tile `₿` → overview + ASCII-cascade decode of the wordmark +
  * `replayIntro()` (3D flip on hover, press squash), dancing-letters wordmark, subtitle, command-nav menu button, live market ticker, sync pill (`hidden md:inline-flex`), Magnetic →
- * `.shiny-cta` `Trade eintragen` (label `max-sm:sr-only`) opening the editor without a morph source. Scroll-linked
- * hairline / shade (edge blur off, `TOP_BANDS`) and the red reading-progress bar sit on its bottom edge.
+ * `.shiny-cta` `Trade eintragen` (label `max-sm:sr-only`) opening the editor without a morph source, `Vollbild` (lg+, where
+ * the Fullscreen API exists). Opaque ink background. Scroll-linked hairline / shade (edge blur off, `TOP_BANDS`) and the
+ * red reading-progress bar sit on its bottom edge.
  */
 export function Header() {
   const mode = useJournal((s) => s.mode);
@@ -151,8 +153,9 @@ export function Header() {
     if (!reduced) setDecode((n) => n + 1);
   };
   return (
+    // opaque ink (no 97 % alpha): scrolled text must never ghost through under the header's pills (tablet audit §3.3)
     <motion.header
-      className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-ink-900/[0.97]"
+      className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-ink-900"
       initial={false}
       animate={reduced ? { y: "0%", opacity: 1 } : headerIntroTarget(phase)}
       // stage: parked at once (covered by the intro); build / skip / done: slides down on `spring.sheet`
@@ -162,7 +165,7 @@ export function Header() {
         <motion.button
           type="button"
           onClick={onLogo}
-          className="flex min-w-0 items-center gap-3 text-left"
+          className="touch-hit flex min-w-0 items-center gap-3 text-left"
           aria-label="Übersicht"
           initial={false}
           animate="rest"
@@ -191,9 +194,11 @@ export function Header() {
           <span className="hidden md:inline-flex" title={label.text}>
             <StatusPill tone={MODE_TONE[mode]} expanded label={label.text} feed="sync" />
           </span>
+          {/* grey-bar fix: hide the browser UI + system bars (Fullscreen API); lg+ only (at 768 the wordmark would run into the ticker) – narrower screens reach it in the command navigation */}
+          <FullscreenButton className="max-lg:hidden" />
           <MenuButton />
           <Magnetic intensity={0.25} range={120}>
-            <button type="button" onClick={() => openEditor()} className="shiny-cta inline-flex items-center gap-2 max-sm:!px-3">
+            <button type="button" onClick={() => openEditor()} className="shiny-cta inline-flex items-center gap-2 max-sm:!px-3 pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center">
               <span className="size-3.5 [&>svg]:size-full" aria-hidden="true">
                 <Icon name="plus" />
               </span>

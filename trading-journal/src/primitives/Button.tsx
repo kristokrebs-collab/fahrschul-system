@@ -35,7 +35,8 @@ export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "children">
 /**
  * Bundle `Re`: `motion.button` with `whileTap {scale:.96}` on `spring.press` (none while disabled).
  * NEW: a variant-coloured press ripple grows from the exact pointer point (keyboard presses from the centre),
- * `tween.ripple`, transform/opacity only, inside an overflow-hidden layer behind the label.
+ * `tween.ripple`, transform/opacity only, inside an overflow-hidden layer behind the label. Coarse pointers: ≥ 44 px
+ * tap area (`.touch-hit`, no layout change).
  */
 export function Button({ variant = "ghost", size = "md", className, type = "button", disabled, ripple = true, children, onPointerDown, onKeyDown, ...props }: ButtonProps) {
   const press = usePressable({ disabled: Boolean(disabled) });
@@ -57,7 +58,8 @@ export function Button({ variant = "ghost", size = "md", className, type = "butt
       type={type}
       disabled={disabled}
       {...press}
-      className={cn(buttonBase, "relative isolate", buttonSize[size], buttonVariant[variant], className)}
+      // `touch-hit`: coarse pointers get a ≥ 44 × 44 tap area (sm is 30 px tall) without a layout change
+      className={cn(buttonBase, "touch-hit relative isolate", buttonSize[size], buttonVariant[variant], className)}
       onPointerDown={(e: PointerEvent<HTMLButtonElement>) => {
         onPointerDown?.(e);
         if (e.button === 0) fire(e.currentTarget, e.clientX, e.clientY);

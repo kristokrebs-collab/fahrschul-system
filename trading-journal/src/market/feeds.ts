@@ -7,6 +7,7 @@ import { INTERVAL_MS, PERIOD_MS, type KlineInterval, type Period } from "./perio
 
 export const FEED_IDS: readonly FeedId[] = [
   "kline_1m",
+  "kline_15m",
   "kline_1h",
   "kline_4h",
   "kline_1w",
@@ -23,7 +24,7 @@ export const FEED_IDS: readonly FeedId[] = [
   "fundingHistory",
 ];
 
-export const KLINE_FEEDS: readonly KlineFeed[] = ["kline_1m", "kline_1h", "kline_4h", "kline_1w"];
+export const KLINE_FEEDS: readonly KlineFeed[] = ["kline_1m", "kline_15m", "kline_1h", "kline_4h", "kline_1w"];
 export const RATIO_FEEDS: readonly RatioFeed[] = ["topPositionRatio", "topAccountRatio", "globalAccountRatio", "takerRatio"];
 /** Feeds polled from `/futures/data/*` on the aligned 5-min schedule. */
 export const FUTURES_DATA_FEEDS: readonly FeedId[] = [...RATIO_FEEDS, "openInterestHist"];
@@ -44,8 +45,10 @@ export const MIN = 60_000;
 export const HOUR = 60 * MIN;
 export const DAY = 24 * HOUR;
 
-/** Bootstrap limits per Plan 4.2. */
-export const BOOTSTRAP_LIMIT = { kline: 499, kline1w: 200, futuresData: 500, funding: 200 } as const;
+/** Bootstrap limits per Plan 4.2; `kline15m`: 1500 × 15m = 500 × 45m for the signal check (weight 10, once). */
+export const BOOTSTRAP_LIMIT = { kline: 499, kline15m: 1500, kline1w: 200, futuresData: 500, funding: 200 } as const;
+/** Largest page the gap fill after a WS reconnect requests (Binance maximum). */
+export const GAP_FILL_MAX = 1500;
 export const POLL_LIMIT_FUTURES_DATA = 30;
 export const HISTORY_PAGE_LIMIT = 1500;
 export const HISTORY_MAX_CALLS = 8;
@@ -54,6 +57,10 @@ export const FUTURES_DATA_RETENTION_MS = 30 * DAY;
 
 export function klineFeedInterval(feed: KlineFeed): KlineInterval {
   return feed.slice(6) as KlineInterval;
+}
+/** REST bootstrap limit of a kline feed. */
+export function klineBootstrapLimit(interval: KlineInterval): number {
+  return interval === "1w" ? BOOTSTRAP_LIMIT.kline1w : interval === "15m" ? BOOTSTRAP_LIMIT.kline15m : BOOTSTRAP_LIMIT.kline;
 }
 export function klineFeedFor(interval: KlineInterval): KlineFeed {
   return `kline_${interval}` as KlineFeed;
@@ -97,6 +104,7 @@ export function buildFeedSpecs(period: Period, chain: readonly Source[] = DEFAUL
   const c = chain;
   return {
     kline_1m: klineSpec("1m", c),
+    kline_15m: klineSpec("15m", c),
     kline_1h: klineSpec("1h", c),
     kline_4h: klineSpec("4h", c),
     kline_1w: klineSpec("1w", c),
@@ -122,6 +130,7 @@ export const BYBIT_FALLBACK_CADENCE_MS: Partial<Record<FeedId, number>> = {
   openInterest: 5000,
   aggTrade: 5000,
   kline_1m: 10_000,
+  kline_15m: 10_000,
   kline_1h: 10_000,
   kline_4h: 10_000,
   kline_1w: 10_000,

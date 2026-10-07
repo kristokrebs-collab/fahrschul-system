@@ -10,7 +10,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { useUi, type SortKey, type TradeSort } from "@/store/uiStore";
 import { RowHighlight, type RowHighlightHandle } from "./RowHighlight";
 import { measureRow, type RowBox } from "./rowGeometry";
-import { CheckCount, EntryExit, PnlCell, RCell, ResultBadge, SideTag, TradeSetupChips, accountLine, dateLines } from "./tradeCells";
+import { CheckCount, EntryExit, PnlCell, RCell, ResultBadge, SideTag, SignalBadge, TradeSetupChips, accountLine, dateLines } from "./tradeCells";
 import { sortArrow } from "./tradesModel";
 
 export interface TradesTableProps {
@@ -33,17 +33,23 @@ interface Ghost extends RowBox {
 type ColumnId = "date" | "side" | "setup" | "prices" | "check" | "pnl" | "r" | "result";
 const SORTABLE: Partial<Record<ColumnId, SortKey>> = { date: "date", setup: "setup", pnl: "pnl", r: "r" };
 
-/** Bundle class strings per column (`H$`): header cells and body cells. */
-const TH = "px-3 pb-3 font-semibold uppercase tracking-[0.1em]";
+/**
+ * Bundle class strings per column (`H$`): header cells and body cells. Between `md` and `lg` (tablet portrait,
+ * 768–1023 px) the table drops its 900 px minimum and tightens instead of scrolling sideways: cell padding 6 px,
+ * setup chips in a 130 px column (they wrap, never truncate), entry / exit stacked – every column incl. P&L and R
+ * stays on screen.
+ */
+const PX = "px-1.5 lg:px-3";
+const TH = `${PX} pb-3 font-semibold uppercase tracking-[0.1em]`;
 const CELL: Record<ColumnId, { th: string; td: string }> = {
-  date: { th: "px-3 pb-3 font-semibold", td: "px-3 py-3" },
-  side: { th: TH, td: "px-3 py-3" },
-  setup: { th: "px-3 pb-3 font-semibold", td: "max-w-[260px] px-3 py-3" },
-  prices: { th: TH, td: "num px-3 py-3 font-mono text-[12.5px]" },
-  check: { th: `${TH} text-right`, td: "num px-3 py-3 text-right font-mono text-xs" },
-  pnl: { th: "px-3 pb-3 font-semibold text-right", td: "num px-3 py-3 text-right font-mono font-medium" },
-  r: { th: "px-3 pb-3 font-semibold text-right", td: "num px-3 py-3 text-right font-mono" },
-  result: { th: TH, td: "px-3 py-3" },
+  date: { th: `${PX} pb-3 font-semibold`, td: `${PX} py-3` },
+  side: { th: TH, td: `${PX} py-3` },
+  setup: { th: `${PX} pb-3 font-semibold`, td: `max-w-[130px] lg:max-w-[260px] ${PX} py-3` },
+  prices: { th: TH, td: `num ${PX} py-3 font-mono text-[12.5px]` },
+  check: { th: `${TH} text-right`, td: `num ${PX} py-3 text-right font-mono text-xs` },
+  pnl: { th: `${PX} pb-3 font-semibold text-right`, td: `num ${PX} py-3 text-right font-mono font-medium` },
+  r: { th: `${PX} pb-3 font-semibold text-right`, td: `num ${PX} py-3 text-right font-mono` },
+  result: { th: TH, td: `${PX} py-3` },
 };
 
 const col = createColumnHelper<EnrichedTrade>();
@@ -103,7 +109,8 @@ function rowTransition(i: number): Transition {
  *   `AnimatePresence` – the rows remount in their new order and re-run the staggered enter instead of FLIP-crossing –
  *   and rows inserted into the shown list (a widened filter) wait `INSERT_DELAY` so their siblings make room first.
  *   The height change itself is animated by the card body's `AutoHeight` (TR-03).
- * - One `RowHighlight` glides between hovered/focused rows; rows dip to `.995` on press.
+ * - One `RowHighlight` glides between hovered/focused rows (a context spring: livelier when the pointer sweeps fast);
+ *   rows dip to `.995` on press. The `Check` cell carries the stored Einstiegs-Check's strength bars.
  * - Sort headers carry a rotating chevron that slides between columns (`layoutId="sort-indicator-{useId}"`).
  * - Rule 13: the detail morph runs over an absolutely positioned ghost `motion.div layoutId="trade-{id}"` measured with
  *   `frame.read` (transform-free offsets) – never over the `<tr>`; the wrapper is `motion.div layoutScroll`.
@@ -200,8 +207,17 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
         header: "Grundlage",
         cell: ({ row }) => <TradeSetupChips t={row.original} setups={setups} />,
       }),
-      col.display({ id: "prices", header: "Einstieg → Ausstieg", cell: ({ row }) => <EntryExit t={row.original} /> }),
-      col.display({ id: "check", header: "Check", cell: ({ row }) => <CheckCount t={row.original} /> }),
+      col.display({ id: "prices", header: "Einstieg → Ausstieg", cell: ({ row }) => <EntryExit t={row.original} stack /> }),
+      col.display({
+        id: "check",
+        header: "Check",
+        cell: ({ row }) => (
+          <span className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
+            <CheckCount t={row.original} />
+            <SignalBadge t={row.original} />
+          </span>
+        ),
+      }),
       col.display({ id: "pnl", header: "P&L", cell: ({ row }) => <PnlCell value={row.original.pnl} /> }),
       col.display({ id: "r", header: "R", cell: ({ row }) => <RCell value={row.original.r} /> }),
       col.display({ id: "result", header: "Ergebnis", cell: ({ row }) => <ResultBadge t={row.original} /> }),
@@ -217,7 +233,7 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
   return (
     <motion.div ref={wrapRef} layoutScroll className={cn("relative -mx-2 overflow-x-auto px-2", className)}>
       <RowHighlight ref={highlight} root={wrapRef} id={uid} />
-      <table className="relative w-full min-w-[900px] border-collapse text-[13px]">
+      <table className="relative w-full border-collapse text-[13px] lg:min-w-[900px]">
         <thead className="text-left text-[10.5px] text-faint">
           {table.getHeaderGroups().map((hg) => (
             <tr key={hg.id}>
@@ -358,7 +374,8 @@ export function SortHeader({ k, label, sort, onSort, indicatorId }: SortHeaderPr
     <button
       type="button"
       onClick={() => onSort(k)}
-      className={cn("group/sort inline-flex items-center gap-1.5 uppercase tracking-[0.1em] transition-colors hover:text-fg", active && "text-signal")}
+      // coarse pointers: a 44 px hit area around the 16 px label without changing the header's layout
+      className={cn("touch-hit group/sort inline-flex items-center gap-1.5 uppercase tracking-[0.1em] transition-colors hover:text-fg", active && "text-signal")}
     >
       {label}
       {active && <span className="sr-only">{sortArrow(sort.dir)}</span>}

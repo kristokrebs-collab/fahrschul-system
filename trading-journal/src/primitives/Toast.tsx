@@ -1,6 +1,8 @@
-import { AnimatePresence, animate, motion, useMotionValue, useTransform, type PanInfo, type Variants } from "motion/react";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { AnimatePresence, animate, motion, useMotionValue, useTransform, type Variants } from "motion/react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { cn } from "@/lib/cn";
+import { flingExit, useSwipeDismiss, type SwipeDismissInfo } from "@/motion/physics";
+import { useTouchMoveGuard } from "@/motion/a11y";
 import { gesture, radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { GlyphCheck, GlyphCross, GlyphInfo } from "@/primitives/icons";
@@ -28,7 +30,22 @@ export interface ToastIslandProps {
 
 interface Fling {
   id: number;
-  dir: number;
+  /** release info of the throw (null for a tap / timeout). */
+  info: SwipeDismissInfo | null;
+}
+
+/** Minimum finger travel before a sideways throw can dismiss (px). */
+export const TOAST_MIN_OFFSET = 12;
+
+/**
+ * Exit of a thrown island: x flies on the release velocity (critically damped physics spring, ≥ 900 px/s) far enough
+ * to leave the screen, the opacity follows a beat later. Reduced motion: a plain fade.
+ */
+export function toastFlingExit(info: SwipeDismissInfo, reduced: boolean) {
+  if (reduced) return { opacity: 0, transition: { duration: 0 } };
+  const w = typeof window === "undefined" ? 800 : window.innerWidth;
+  const fly = flingExit(info, { axis: "x", distance: Math.max(gesture.toastFling, w / 2 + 240) });
+  return { ...fly, opacity: 0, transition: { ...(fly.transition as object), opacity: { ...tween.toastExit, delay: 0.08 } } };
 }
 
 /** Above every overlay: Sheet 60, MorphDialog 70, pulse select panels 75, Celebrate 80. */
@@ -43,7 +60,10 @@ export const TOAST_Z = 95;
  *   check mark `pathLength` on `tween.checkToast`;
  * - remaining-time bar: compositor `scaleX` loop (`.fx-countdown`), paused together with the dismiss timer while
  *   hovered, focused or dragged;
- * - drag-x to dismiss (±80 px or a flick) – the island flies out the way it was thrown;
+ * - swipe-x to dismiss (Apple physics, `useSwipeDismiss` axis x, either way): it tracks the finger 1:1, commits on
+ *   the projected throw (`|x + project(vx)| > 80`, ≥ 12 px travel, a flick back cancels) and flies out the way it was
+ *   thrown, keeping the finger's velocity; a released half-swipe springs back with that velocity (gentle when slow,
+ *   a small bounce when thrown); mouse, touch and pen; a press squishes the island (`scale .97`, Dynamic Island);
  * - win toasts (`ok` + `valueTone: "win"`) roll their value up (`spring.number`) under a green glow;
  * - `+n` queue badge pops (`spring.pop`) and rolls when the queue changes.
  * Reduced motion: no roll, glow or bar; instant transitions.
@@ -61,7 +81,7 @@ export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) 
     <div
       data-toast-island=""
       className={cn(
-        "pointer-events-none fixed inset-0 grid justify-items-center px-4 pb-[calc(92px+env(safe-area-inset-bottom,0px))] pt-[calc(10px+env(safe-area-inset-top,0px))]",
+        "pointer-events-none fixed inset-0 grid justify-items-center px-4 pb-[calc(92px+max(env(safe-area-inset-bottom,0px),var(--vv-bottom,0px)))] pt-[calc(10px+env(safe-area-inset-top,0px))]",
         className,
       )}
       style={{ zIndex: TOAST_Z }}
@@ -75,8 +95,8 @@ export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) 
             note={note}
             queued={list.length - 1}
             reduced={reduced}
-            onDismiss={(dir) => {
-              setFling(dir ? { id: note.id, dir } : null);
+            onDismiss={(info) => {
+              setFling(info ? { id: note.id, info } : null);
               dismiss(note.id);
             }}
           />
@@ -90,13 +110,12 @@ interface IslandCardProps {
   note: IslandToast;
   queued: number;
   reduced: boolean;
-  /** `dir` ±1 when swiped away, 0 for a tap or the timeout. */
-  onDismiss: (dir: number) => void;
+  /** Release info when swiped away, null for a tap or the timeout. */
+  onDismiss: (info: SwipeDismissInfo | null) => void;
 }
 
 function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
   const wrapper = useRef<HTMLDivElement>(null);
-  const dragged = useRef(false);
   const dismissRef = useRef(onDismiss);
   const hold = useRef<{ reasons: Set<string>; pause: () => void; resume: () => void } | null>(null);
   const ms = note.duration ?? toastDuration(note.kind);
@@ -125,7 +144,7 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const run = () => {
       startedAt = Date.now();
-      timer = setTimeout(() => dismissRef.current(0), remaining);
+      timer = setTimeout(() => dismissRef.current(null), remaining);
     };
     hold.current = {
       reasons,
@@ -162,17 +181,51 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
     if (h.reasons.size === 0) h.resume();
   };
 
-  const onDragEnd = (_: unknown, info: PanInfo) => {
-    holdOff("drag");
-    const { x } = info.offset;
-    const vx = info.velocity.x;
-    if (Math.abs(x) > TOAST_SWIPE_PX || Math.abs(vx) > TOAST_SWIPE_VELOCITY) onDismiss(Math.sign(x || vx) || 1);
+  const swipe = useSwipeDismiss({
+    axis: "x",
+    direction: 0,
+    threshold: TOAST_SWIPE_PX,
+    minOffset: TOAST_MIN_OFFSET,
+    pointerTypes: ["mouse", "touch", "pen"],
+    touchAction: "pan-y",
+    reduced,
+    target: wrapper,
+    measure: () => wrapper.current?.offsetWidth || 240,
+    onDismiss: (info) => {
+      holdOff("drag");
+      onDismiss(info);
+    },
+  });
+  const touchGuard = useTouchMoveGuard(swipe.isDragging);
+  const wrapperRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      wrapper.current = el;
+      return touchGuard(el);
+    },
+    [touchGuard],
+  );
+  // the countdown pauses while a finger / the mouse drags the island (the hook owns the gesture; zero state per move)
+  const h = swipe.handle;
+  const handle = {
+    ...h,
+    onPointerMove: (e: ReactPointerEvent<Element>) => {
+      h.onPointerMove(e);
+      if (swipe.isDragging()) holdOn("drag");
+    },
+    onPointerUp: (e: ReactPointerEvent<Element>) => {
+      h.onPointerUp(e);
+      holdOff("drag");
+    },
+    onPointerCancel: (e: ReactPointerEvent<Element>) => {
+      h.onPointerCancel(e);
+      holdOff("drag");
+    },
   };
 
   const exitTransition = reduced ? instant : tween.toastExit;
-  const flung = (c: Fling | null | undefined) => c?.id === note.id;
+  const flung = (c: Fling | null | undefined) => c?.id === note.id && c.info != null;
   const wrapperVariants: Variants = {
-    exit: (c: Fling | null | undefined) => (flung(c) && c ? { x: c.dir * gesture.toastFling, opacity: 0, transition: exitTransition } : { opacity: 1, transition: exitTransition }),
+    exit: (c: Fling | null | undefined) => (flung(c) && c?.info ? toastFlingExit(c.info, reduced) : { opacity: 1, transition: exitTransition }),
   };
   const islandVariants: Variants = {
     exit: (c: Fling | null | undefined) =>
@@ -181,20 +234,11 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
 
   return (
     <motion.div
-      ref={wrapper}
+      ref={wrapperRef}
       data-lane={initialLane}
       className="pointer-events-auto relative isolate self-end [grid-area:1/1] data-[lane=top]:self-start"
-      drag="x"
-      dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={0.6}
-      onPointerDown={() => {
-        dragged.current = false;
-      }}
-      onDragStart={() => {
-        dragged.current = true;
-        holdOn("drag");
-      }}
-      onDragEnd={onDragEnd}
+      {...handle}
+      style={{ ...h.style, x: swipe.x }}
       onPointerEnter={(e) => e.pointerType === "mouse" && holdOn("hover")}
       onPointerLeave={(e) => e.pointerType === "mouse" && holdOff("hover")}
       onFocus={() => holdOn("focus")}
@@ -213,13 +257,9 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
       )}
       <motion.button
         type="button"
-        onClick={() => {
-          if (dragged.current) {
-            dragged.current = false;
-            return;
-          }
-          onDismiss(0);
-        }}
+        // a click that ends a drag is swallowed by the swipe handle (capture phase) before it gets here
+        onClick={() => onDismiss(null)}
+        whileTap={reduced ? undefined : { scale: 0.97, transition: spring.press }}
         layoutRoot
         className="relative flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)]"
         style={{ maxWidth: "calc(100vw - 32px)" }}

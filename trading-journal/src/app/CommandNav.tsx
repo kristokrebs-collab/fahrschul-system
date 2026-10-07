@@ -2,7 +2,8 @@
  * Full-screen command navigation (pulse-motion `immersive-full-screen-navigation`, exact timings): ⌘K / Ctrl+K or
  * the header menu button opens a black panel that wipes in from the left (800 ms, cubic-bezier(.76,0,.24,1); the
  * shell translates in, its content counter-translates, so the wipe is transform-only), then the brand block, the
- * page links with live counts, the quick actions and the hint row fade up 24 px in the pack's stagger (650 ms,
+ * page links with live counts, the quick actions (plus `Vollbild` / `App installieren` where the browser offers them, and
+ * the install / Samsung dark-mode hints) and the hint row fade up 24 px in the pack's stagger (650 ms,
  * cubic-bezier(.22,1,.36,1)). Closing wipes the panel away to the right with its content still visible.
  *
  * Dialog behaviour: role=dialog, aria-modal, aria-label "Navigation", focus trap, Escape, scroll lock, inert page
@@ -12,10 +13,14 @@
  */
 import { AnimatePresence, motion, type Transition } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { GlyphFullscreen } from "@/app/DisplayActions";
 import { PAGE_LABELS } from "@/app/Dock";
+import { DISPLAY_STRINGS, isIosSafari, isSamsungInternet, promptInstall, toggleFullscreen, useCanInstall, useFullscreen, useFullscreenSupported, useStandalone } from "@/app/pwa";
 import { shellStatTexts, useLivePriceText, useShellStats } from "@/app/shellStats";
 import { cn } from "@/lib/cn";
+import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
 import { useDialogBehaviour } from "@/motion/a11y";
+import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Icon } from "@/primitives/icons";
 import { exportCsv, exportJson } from "@/store/backup";
@@ -30,8 +35,8 @@ export const CONFIG = {
   itemMs: 650,
   itemEase: [0.22, 1, 0.36, 1],
   lift: 24,
-  /** ms after the open: brand block, the four links, the quick actions (pack "images" slots), hint row, live price */
-  delays: { brand: 620, links: [620, 720, 820, 900], actions: [720, 800, 880], hints: 2250, price: 2300 },
+  /** ms after the open: brand block, the four links, the quick actions (pack "images" slots, then the display actions), hint row, live price */
+  delays: { brand: 620, links: [620, 720, 820, 900], actions: [720, 800, 880, 960, 1040], display: 1040, hints: 2250, price: 2300 },
 } as const;
 
 export const COMMAND_NAV_ID = "command-nav";
@@ -161,7 +166,25 @@ function Panel({ reduced }: { reduced: boolean }) {
   };
 
   const downloads = canDownload();
-  const actions: { key: string; label: string; icon: ReactNode; accent?: boolean; run: () => void }[] = [
+  // display (grey-bar fix): fullscreen toggle and install prompt – shown only where the browser offers them
+  const fsSupported = useFullscreenSupported();
+  const fullscreen = useFullscreen();
+  const installable = useCanInstall();
+  const standalone = useStandalone();
+  // the install hint only where installing makes sense: a touch device, served over http(s) (a file has no manifest)
+  const coarse = useMediaQuery("(pointer: coarse)", false);
+  const hintInstall = coarse && !installable && !standalone && !IS_FILE_BUILD && !isFileProtocol();
+  const display: { key: string; label: string; icon: ReactNode; pressed?: boolean; run: () => void }[] = [
+    ...(fsSupported
+      ? [{ key: "fullscreen", label: fullscreen ? DISPLAY_STRINGS.fullscreenExit : DISPLAY_STRINGS.fullscreen, pressed: fullscreen, icon: <GlyphFullscreen exit={fullscreen} />, run: () => void toggleFullscreen() }]
+      : []),
+    ...(installable && !standalone ? [{ key: "install", label: DISPLAY_STRINGS.install, icon: <GlyphInstall />, run: () => void promptInstall() }] : []),
+  ];
+  const displayHints = [
+    ...(hintInstall ? [isIosSafari() ? DISPLAY_STRINGS.installHintIos : DISPLAY_STRINGS.installHint] : []),
+    ...(isSamsungInternet() ? [DISPLAY_STRINGS.samsungDark] : []),
+  ];
+  const actions: { key: string; label: string; icon: ReactNode; accent?: boolean; pressed?: boolean; run: () => void }[] = [
     {
       key: "new",
       label: COMMAND_NAV_STRINGS.newTrade,
@@ -178,6 +201,7 @@ function Panel({ reduced }: { reduced: boolean }) {
           { key: "json", label: COMMAND_NAV_STRINGS.backup, icon: <GlyphArrowDown />, run: () => void exportJson() },
         ]
       : []),
+    ...display,
   ];
 
   return (
@@ -213,13 +237,14 @@ function Panel({ reduced }: { reduced: boolean }) {
               type="button"
               onClick={() => closeCommandNav()}
               aria-label={COMMAND_NAV_STRINGS.close}
-              className="grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg [&>svg]:size-4"
+              className="touch-hit grid size-9 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors duration-200 hover:border-white/40 hover:text-fg [&>svg]:size-4"
             >
               <Icon name="x" />
             </button>
           </div>
 
-          <div className="grid flex-1 content-center gap-10 py-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)] xl:gap-16">
+          {/* minmax(0,1fr): the longest page name may never widen the column past the screen (390: it overflowed 24 px) */}
+          <div className="grid flex-1 grid-cols-[minmax(0,1fr)] content-center gap-10 py-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)] xl:gap-16">
             <nav aria-label={COMMAND_NAV_STRINGS.pages}>
               <ul className="cmdnav-links grid">
                 {PAGES.map((p, i) => (
@@ -238,7 +263,7 @@ function Panel({ reduced }: { reduced: boolean }) {
                         <span aria-hidden="true" className="w-6 shrink-0 font-mono text-[11px] text-faint sm:w-8">
                           0{i + 1}
                         </span>
-                        <span className="min-w-0 break-words text-[clamp(26px,4.6vw,64px)] font-normal leading-[1.08] tracking-[-0.02em]">{PAGE_LABELS[p]}</span>
+                        <span className="min-w-0 break-words text-[clamp(22px,4.6vw,64px)] font-normal leading-[1.08] tracking-[-0.02em]">{PAGE_LABELS[p]}</span>
                         <span className={cn("dot-num shrink-0 self-start pt-[0.5em] text-[12px] sm:text-[14px]", counts[p].tone ?? "text-mute")}>{counts[p].text}</span>
                         {page === p && <span aria-hidden="true" className="size-1.5 shrink-0 self-center rounded-full bg-signal" />}
                       </a>
@@ -255,6 +280,7 @@ function Panel({ reduced }: { reduced: boolean }) {
                     type="button"
                     data-cmd-item=""
                     onClick={a.run}
+                    aria-pressed={a.pressed}
                     className="group/action flex w-full items-center gap-4 rounded-2xl border border-line-2 bg-ink-900 px-4 py-4 text-left outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60"
                   >
                     <span
@@ -270,6 +296,15 @@ function Panel({ reduced }: { reduced: boolean }) {
                   </button>
                 </Item>
               ))}
+              {displayHints.length > 0 && (
+                <Item delay={CONFIG.delays.display} reduced={reduced}>
+                  <div aria-label={DISPLAY_STRINGS.section} role="note" className="grid gap-2 px-1 pt-1 text-[12.5px] leading-relaxed text-mute">
+                    {displayHints.map((h) => (
+                      <p key={h}>{h}</p>
+                    ))}
+                  </div>
+                </Item>
+              )}
             </section>
           </div>
 
@@ -287,6 +322,15 @@ function Panel({ reduced }: { reduced: boolean }) {
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+function GlyphInstall() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="1.5" width="8" height="13" rx="2" />
+      <path d="M8 4.5v5M6 7.5 8 9.5 10 7.5M7 12.5h2" />
+    </svg>
   );
 }
 

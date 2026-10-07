@@ -11,7 +11,9 @@
     "lint": "eslint src tests dev --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "build:share": "vite build --mode share",
+    "build:single": "tsc -b && node scripts/build-single.mjs"
   },
   "dependencies": {
     "@tanstack/react-table": "^8.21.3",

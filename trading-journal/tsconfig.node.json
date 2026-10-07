@@ -10,5 +10,5 @@
     "types": ["node"],
     "allowImportingTsExtensions": true
   },
-  "include": ["vite.config.ts", "playwright.config.ts", "tests/e2e"]
+  "include": ["vite.config.ts", "vite.single.config.ts", "scripts/**/*.ts", "playwright.config.ts", "tests/e2e"]
 }

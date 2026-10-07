@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useMemo, useState, type CSSProperties } from "react";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
+import { ED } from "@/domain/edition";
 import { DEFAULT_RANK_KEY, RANK_KEYS, rankSetupStats, setupVisibleFor, type RankKey } from "@/domain/rank";
 import type { AccountId } from "@/domain/types";
 import { cn } from "@/lib/cn";
@@ -12,8 +13,10 @@ import { Icon } from "@/primitives/icons";
 import { Segmented } from "@/primitives/Segmented";
 import { useAccountView, useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
+import { storageKey } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
 import { PageHeader } from "./PageHeader";
+import { playbookBySetup } from "./playbook";
 import { SetupCard } from "./SetupCard";
 
 export type SetupAccFilter = "all" | AccountId;
@@ -29,12 +32,14 @@ export interface SetupsViewProps {
 }
 
 export const SETUPS_TITLE = "Entscheidungsgrundlagen";
-export const SETUPS_LEAD = "Deine Setups aus der MegaWhale-Methodik und deinen eigenen Regeln. Jede Karte zeigt, wie oft die Grundlage funktioniert hat.";
-/** Subtitle recipe: pixel fill once per session, then the marker on the key word. */
-export const SETUPS_LEAD_FILL = { storageKey: "tj2-fill-setups", highlight: "funktioniert" } as const;
+export const SETUPS_LEAD: string = ED.COPY.setupsLead;
+/** Subtitle recipe: pixel fill once per session, then the marker on the key word (key namespaced per edition). */
+export const SETUPS_LEAD_FILL = { storageKey: storageKey("fill-setups"), highlight: "funktioniert" } as const;
 export const NEW_SETUP_LABEL = "Neue Entscheidungsgrundlage";
 export const RULES_TITLE = "Grundregeln";
 export const RULES_NOTE = "Gelten für jeden Trade und stehen in jeder Checkliste. Bearbeiten unter Einstellungen.";
+/** Accessible name of a rule row (it opens the settings page, where the rules are edited). */
+export const RULE_EDIT_LABEL = (n: number, text: string): string => `Regel ${n} in den Einstellungen bearbeiten: ${text}`;
 
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
 
@@ -62,6 +67,8 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
   const [acc, setAcc] = useState<SetupAccFilter>("all");
 
   const ranked = useMemo(() => rankSetupStats(view.setups, sort).filter((c) => setupVisibleFor(c.setup, acc)), [view.setups, sort, acc]);
+  // playbook figures (Tradezella playbook report) – same closed trades as the card stats (account "all")
+  const playbooks = useMemo(() => playbookBySetup(settings.setups, view.closed), [settings.setups, view.closed]);
   const layoutDependency = `${acc}:${sort}:${ranked.map((c) => c.id).join(",")}`;
 
   const edit = onEdit ?? ((id: string) => openSetupEditor({ setupId: id }));
@@ -89,7 +96,17 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
       <motion.div layout layoutDependency={layoutDependency} transition={{ layout: spring.layout }} className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))]">
         <AnimatePresence mode="popLayout" initial={false}>
           {ranked.map((c, i) => (
-            <SetupCard key={c.id} stats={c} index={i} onEdit={edit} onTrades={trades} hidden={morphOpenId === c.id} layoutDependency={layoutDependency} />
+            <SetupCard
+              key={c.id}
+              stats={c}
+              index={i}
+              onEdit={edit}
+              onTrades={trades}
+              hidden={morphOpenId === c.id}
+              layoutDependency={layoutDependency}
+              playbook={playbooks.get(c.id)}
+              currency={settings.currency}
+            />
           ))}
           <motion.button
             key="__new"
@@ -123,9 +140,17 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
       <Card title={RULES_TITLE} note={RULES_NOTE}>
         <RevealGroup as="ol" className="grid gap-2" aria-label={RULES_TITLE}>
           {settings.rules.map((rule, i) => (
-            <RevealItem as="li" key={rule.id} className="flex items-start gap-3 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 text-[13px]">
-              <span className="mt-px font-mono text-[11px] text-faint">{String(i + 1).padStart(2, "0")}</span>
-              <span className="text-fg/90">{rule.text}</span>
+            <RevealItem as="li" key={rule.id}>
+              {/* a rule row reads like a tile: tapping it opens where it is edited (Einstellungen → Grundregeln) */}
+              <button
+                type="button"
+                onClick={() => navigate("settings")}
+                aria-label={RULE_EDIT_LABEL(i + 1, rule.text)}
+                className="flex w-full items-start gap-3 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 text-left text-[13px] transition-colors duration-200 hover:border-white/20 focus-visible:border-white/40 pointer-coarse:min-h-11"
+              >
+                <span className="mt-px font-mono text-[11px] text-faint">{String(i + 1).padStart(2, "0")}</span>
+                <span className="text-fg/90">{rule.text}</span>
+              </button>
             </RevealItem>
           ))}
         </RevealGroup>

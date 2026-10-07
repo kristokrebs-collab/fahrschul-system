@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 
@@ -18,13 +18,38 @@ export interface TooltipProps {
  * Wrapper over `@/ui/tooltip` with the bundle tooltip class string. The child must accept a ref (button, span).
  * Enters with `.fx-pop` (opacity + 4 px nudge away from the trigger + scale .96 → 1, 0.2 s `ease.out`, origin at the
  * trigger) and leaves in 0.12 s – CSS keyframes on transform/opacity, so Radix' presence waits for the exit.
+ * Touch (tablet audit 2a.2, rule "no hover-only information"): Radix closes on pointer-down and never opens from a
+ * tap, so a touch / pen tap toggles a controlled `open` instead; a tap outside closes it (dismissable layer). Mouse and
+ * keyboard keep Radix' hover / focus behaviour. The trigger's own `onClick` still runs (before the toggle).
  */
 export function Tooltip({ content, children, side = "top", sideOffset = 6, className, delayDuration = 150 }: TooltipProps) {
+  const [open, setOpen] = useState(false);
+  const touch = useRef(false);
+  // the dismissable layer closes an open tooltip on ANY pointer-down outside its content – the trigger included – so
+  // the toggle decides from the state at pointer-down
+  const wasOpen = useRef(false);
   return (
     <TooltipProvider delayDuration={delayDuration}>
-      <UiTooltip>
-        <TooltipTrigger asChild>{children}</TooltipTrigger>
-        <TooltipContent side={side} sideOffset={sideOffset} className={cn(tooltipClass, "fx-pop", className)}>
+      <UiTooltip open={open} onOpenChange={setOpen}>
+        <TooltipTrigger
+          asChild
+          onPointerDown={(e) => {
+            touch.current = e.pointerType !== "mouse";
+            wasOpen.current = open;
+            // skip Radix' "close on pointer-down" for touch: the click below toggles
+            if (touch.current) e.preventDefault();
+          }}
+          onClick={(e) => {
+            // the child's own onClick has already run (Slot calls it first); a submit button keeps its default
+            if (!touch.current || (e.currentTarget as HTMLButtonElement).type === "submit") return;
+            // keeps Radix' close-on-click from undoing the toggle
+            e.preventDefault();
+            setOpen(!wasOpen.current);
+          }}
+        >
+          {children}
+        </TooltipTrigger>
+        <TooltipContent side={side} sideOffset={sideOffset} collisionPadding={12} className={cn(tooltipClass, "fx-pop max-w-[min(280px,calc(100vw-24px))]", className)}>
           {content}
         </TooltipContent>
       </UiTooltip>

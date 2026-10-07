@@ -1,6 +1,8 @@
 /**
  * Trigger lines, zone and invalidation (Plan 5.4). Grey ramp only – the single red accent is the
- * hard invalidation line. Existing lines are updated via `applyOptions({ price })`, never rebuilt.
+ * hard invalidation line. Existing lines are updated via `applyOptions({ price })`, never rebuilt. A level of `0` (or
+ * any non-positive / non-finite value) counts as "not set": its line and axis label are hidden, and the zone band
+ * hides unless both edges are set.
  */
 import { LineStyle, type IPriceLine, type ISeriesApi, type LineWidth, type Time } from "lightweight-charts";
 import type { MarketLevels } from "@/domain/types";
@@ -86,12 +88,22 @@ export interface SetLevelsOptions {
   from?: Time | null;
   /** first creation fades the zone in (skipped under reduced motion) */
   reducedMotion?: boolean;
-  /** show/hide the zone band */
+  /** show/hide the zone band (default: shown when both edges are set, `zoneIsSet`) */
   zoneVisible?: boolean;
 }
 
 function isFinitePrice(v: unknown): v is number {
   return typeof v === "number" && Number.isFinite(v);
+}
+
+/** A level is set when it is a positive price (`0` = not set: share edition / fresh journal). */
+function isSetPrice(v: unknown): v is number {
+  return isFinitePrice(v) && v > 0;
+}
+
+/** The zone band shows only with both edges set (else its autoscale would pull the price axis down to 0). */
+export function zoneIsSet(levels: Pick<MarketLevels, "zoneLow" | "zoneHigh">): boolean {
+  return isSetPrice(levels.zoneLow) && isSetPrice(levels.zoneHigh);
 }
 
 /**
@@ -108,19 +120,21 @@ export function setLevels(
   const lo = Math.min(levels.zoneLow, levels.zoneHigh);
   const hi = Math.max(levels.zoneLow, levels.zoneHigh);
 
+  const zoneOn = opts.zoneVisible ?? zoneIsSet(levels);
+
   if (prev) {
     for (const key of LEVEL_KEYS) {
       const price = levels[key];
       const line = prev.lines[key];
       line.applyOptions({
-        price: isFinitePrice(price) ? price : 0,
-        lineVisible: isFinitePrice(price),
-        axisLabelVisible: isFinitePrice(price),
+        price: isSetPrice(price) ? price : 0,
+        lineVisible: isSetPrice(price),
+        axisLabelVisible: isSetPrice(price),
         lineWidth: levelWidth(key, active),
       });
     }
     prev.zone.setRange({ low: lo, high: hi, from: opts.from ?? null, to: null });
-    if (opts.zoneVisible === false) prev.zone.applyOptions({ opacity: 0 });
+    if (!zoneOn) prev.zone.applyOptions({ opacity: 0 });
     else if (prev.zone.options.opacity === 0) prev.zone.applyOptions({ opacity: 1 });
     return prev;
   }
@@ -131,12 +145,12 @@ export function setLevels(
     const price = levels[key];
     lines[key] = series.createPriceLine({
       id: key,
-      price: isFinitePrice(price) ? price : 0,
+      price: isSetPrice(price) ? price : 0,
       color: s.color,
       lineWidth: levelWidth(key, active),
       lineStyle: s.lineStyle,
-      lineVisible: isFinitePrice(price),
-      axisLabelVisible: isFinitePrice(price),
+      lineVisible: isSetPrice(price),
+      axisLabelVisible: isSetPrice(price),
       title: s.title,
       axisLabelColor: s.axisLabelColor,
       axisLabelTextColor: s.axisLabelTextColor,
@@ -144,7 +158,7 @@ export function setLevels(
   }
   const zone = new ZonePrimitive({ low: lo, high: hi, from: opts.from ?? null, to: null });
   series.attachPrimitive(zone);
-  if (opts.zoneVisible === false) zone.applyOptions({ opacity: 0 });
+  if (!zoneOn) zone.applyOptions({ opacity: 0 });
   else zone.fadeIn(320, opts.reducedMotion ?? false);
   return { lines, zone };
 }

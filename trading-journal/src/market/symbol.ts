@@ -31,13 +31,26 @@ export interface SymbolInfo {
   fallbackDetail?: string;
 }
 
-/** `"BINANCE:BTCUSDT"` → `"BTCUSDT"`; other prefixes are stripped too (the symbol is adopted and validated later). */
+/**
+ * `"BINANCE:BTCUSDT"` → `"BTCUSDT"`; other prefixes are stripped too (the symbol is adopted and validated later).
+ * A USD-quoted chart symbol of another venue (`BITSTAMP:BTCUSD`, the other journal's default, `COINBASE:ETHUSD`)
+ * or a bare `BTCUSD` has no USDⓈ-M perp: it maps to the USDT perp (`BTCUSDT`), otherwise every feed would die with
+ * `bad_symbol`. The raw TradingView symbol stays in the settings (display, chart links).
+ */
 export function tvSymbolToBinance(raw: string | null | undefined): string {
   const s = (raw ?? "").trim();
   if (!s) return DEFAULT_SYMBOL;
   const idx = s.lastIndexOf(":");
-  const bare = idx >= 0 ? s.slice(idx + 1) : s;
-  return bare.replace(/[^A-Za-z0-9]/g, "").toUpperCase() || DEFAULT_SYMBOL;
+  // `.P` is TradingView's perpetual suffix (`BINANCE:BTCUSDT.P`)
+  const bare = (idx >= 0 ? s.slice(idx + 1) : s)
+    .replace(/\.P$/i, "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase();
+  if (!bare) return DEFAULT_SYMBOL;
+  const prefix = idx > 0 ? s.slice(0, idx).trim().toUpperCase() : null;
+  // `BINANCE:BTCUSD` stays (COIN-M style, rejected later as bad_symbol like before); any other venue / no venue maps
+  if (prefix !== "BINANCE" && /^[A-Z0-9]{2,15}USD$/.test(bare)) return `${bare}T`;
+  return bare;
 }
 
 export function tvPrefix(raw: string | null | undefined): string | null {

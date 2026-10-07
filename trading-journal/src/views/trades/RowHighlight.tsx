@@ -1,5 +1,6 @@
 import { AnimatePresence, cancelFrame, frame, motion } from "motion/react";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from "react";
+import { contextSpring, pointerSpeed } from "@/motion/physics";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { insetBox, measureRow, sameBox, type RowBox } from "./rowGeometry";
@@ -28,12 +29,15 @@ interface Target {
   box: RowBox;
   /** Shown for keyboard focus (brighter ring) rather than for the pointer. */
   focus: boolean;
+  /** Pointer speed (px/s) when the move was asked for; 0 for focus / sync → the tuned `spring.hover` itself. */
+  speed: number;
 }
 
 /**
  * One gliding highlight for all table rows (replaces the per-row CSS hover background): an absolute pill in the
  * table's scroll wrapper whose box follows the hovered – else the focused – row. Moves are `layoutId` projections on
- * `spring.hover` (transform only, radius corrected), fades on `tween.hoverPill` and lingers .15 s after the pointer
+ * `spring.hover` (transform only, radius corrected; `contextSpring` makes it a little shorter and bouncier only when
+ * the pointer sweeps faster than 400 px/s – the token itself otherwise), fades on `tween.hoverPill` and lingers .15 s after the pointer
  * leaves so a quick exit and re-entry glides instead of blinking. Pointer events are coalesced to one measurement
  * per frame (`frame.read`, transform-free offsets), and only this component re-renders – never the table.
  * Reduced motion: the pill jumps (MotionConfig) and appears/disappears without fades.
@@ -41,7 +45,7 @@ interface Target {
 export function RowHighlight({ ref, root, id }: RowHighlightProps) {
   const reduced = useReducedFx();
   const [target, setTarget] = useState<Target | null>(null);
-  const track = useRef({ hover: null as HTMLElement | null, focus: null as HTMLElement | null, queued: false, flush: () => {} });
+  const track = useRef({ hover: null as HTMLElement | null, focus: null as HTMLElement | null, queued: false, speed: 0, flush: () => {} });
 
   useImperativeHandle(ref, () => {
     const t = track.current;
@@ -55,7 +59,9 @@ export function RowHighlight({ ref, root, id }: RowHighlightProps) {
       }
       const box = insetBox(measureRow(el, host), ROW_INSET_PX);
       const focus = el === t.focus;
-      setTarget((prev) => (prev && prev.focus === focus && sameBox(prev.box, box) ? prev : { box, focus }));
+      const speed = focus ? 0 : t.speed;
+      t.speed = 0;
+      setTarget((prev) => (prev && prev.focus === focus && sameBox(prev.box, box) ? prev : { box, focus, speed }));
     };
     const queue = () => {
       if (t.queued) return;
@@ -66,6 +72,8 @@ export function RowHighlight({ ref, root, id }: RowHighlightProps) {
       hover(row) {
         if (t.hover === row) return;
         t.hover = row;
+        // sampled in the event (never in render): a fast sweep gives the glide a livelier context spring
+        t.speed = row ? pointerSpeed() : 0;
         queue();
       },
       focus(row) {
@@ -99,7 +107,7 @@ export function RowHighlight({ ref, root, id }: RowHighlightProps) {
           initial={reduced ? false : { opacity: 0 }}
           animate={{ opacity: 1, transition: reduced ? { duration: 0 } : tween.hoverPill }}
           exit={reduced ? undefined : { opacity: 0, transition: { ...tween.hoverPill, delay: 0.15 } }}
-          transition={spring.hover}
+          transition={contextSpring(spring.hover, target.speed)}
         >
           <span className="absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-white/[0.07]" />
           <motion.span

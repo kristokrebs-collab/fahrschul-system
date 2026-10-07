@@ -7,7 +7,8 @@
  *   page, so the first switch to them only reconnects effects instead of mounting ~1 500 components.
  * - Other pages mount when shown and unmount once their exit has played.
  * - Transition (the PageSwitch spec): the entering page comes in from `x dir·16`, scale .985 and blur 4 px (transform on
- *   `spring.enter`, opacity/filter on `tween.page` delayed by the exit, SH-02), the leaving page leaves to `x −dir·12` and fades on `tween.exit`
+ *   `spring.enter` – after a fast dock flick its context spring, `consumeNavTempo()` – opacity/filter on `tween.page`
+ *   delayed by the exit, SH-02), the leaving page leaves to `x −dir·12` and fades on `tween.exit`
  *   while pinned absolutely in place, so the new page lays out immediately. Everything is a single `transform` / `opacity`
  *   / `filter` animation per layer, which Motion hands to WAAPI: the slide keeps running on the compositor while React
  *   reconnects the page's effects. Layers always end at `transform: none` / `filter: none` (no containing block for the
@@ -20,6 +21,7 @@
 import { animate, frame, type AnimationPlaybackControls } from "motion/react";
 import { Activity, memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { consumeNavTempo, contextSpringAt } from "@/motion/physics";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { detachShell, showPage } from "@/store/router";
@@ -165,6 +167,9 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
 
     const enterEl = layers.current.get(current);
     const exitEl = layers.current.get(leaving);
+    // a dock flick hands over its tempo (one-shot): a fast flick gets a slightly shorter, livelier slide; every other
+    // switch (tap, keyboard, back button) gets `spring.pageEnter` itself
+    const enterSpring = contextSpringAt(ENTER_SPRING, consumeNavTempo());
     const enter: AnimationPlaybackControls[] = [];
     const exit: AnimationPlaybackControls[] = [];
     if (exitEl) {
@@ -179,7 +184,7 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
       if (!reduced) {
         enterEl.style.transform = ENTER_FROM(dir);
         enterEl.style.filter = BLUR_FROM;
-        enter.push(animate(enterEl, { transform: [ENTER_FROM(dir), ENTER_TO] }, ENTER_SPRING));
+        enter.push(animate(enterEl, { transform: [ENTER_FROM(dir), ENTER_TO] }, enterSpring));
         enter.push(animate(enterEl, { opacity: [0, 1], filter: [BLUR_FROM, BLUR_TO] }, ENTER_FADE));
       } else {
         // a parked page may still carry its last exit offset

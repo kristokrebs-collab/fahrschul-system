@@ -79,7 +79,7 @@ export interface MockMarketOptions {
 }
 
 type KlineRow = [number, string, string, string, string, string, number, string, number, string, string, string];
-const INTERVAL_MS: Record<string, number> = { "1m": 60_000, "1h": 3_600_000, "4h": 14_400_000, "1w": 604_800_000 };
+const INTERVAL_MS: Record<string, number> = { "1m": 60_000, "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000, "1w": 604_800_000 };
 
 /** Prepends synthetic bars (walk backwards from the first fixture bar) until `min` rows exist. */
 export function extendKlines(rows: KlineRow[], interval: string, min: number): KlineRow[] {

@@ -52,7 +52,8 @@ export function Input({ numeric, invalid, className, wrapperClassName, ref, ...p
         ref={ref}
         inputMode={numeric ? "decimal" : props.inputMode}
         aria-invalid={invalid || undefined}
-        className={cn(inputClass, controlClass, numeric && "font-mono", invalid && invalidClass, className)}
+        // coarse pointers: ≥ 44 px tall (a 38 px field is hard to hit on a tablet)
+        className={cn(inputClass, controlClass, "pointer-coarse:min-h-11", numeric && "font-mono", invalid && invalidClass, className)}
         {...props}
       />
       <Rings invalid={invalid} />

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { normalizeSettings, normalizeTrade, normalizeReading, sortReadings } from "@/domain/normalize";
-import { DEFAULT_SETTINGS, DEFAULT_SETUPS, DEFAULT_RULES, defaultSettings, nextSetupColor, SETUP_PALETTE } from "@/domain/defaults";
+import { DEFAULT_MISTAKES, DEFAULT_SETTINGS, DEFAULT_SETUPS, DEFAULT_RULES, defaultSettings, nextSetupColor, SETUP_PALETTE } from "@/domain/defaults";
 import { JsonBackupSchema, TradeSchema, HyblockReadingSchema, SettingsSchema, RawSettingsSchema } from "@/domain/schemas";
 import { enrichTrades } from "@/domain/enrich";
 import { accountView } from "@/domain/account";
@@ -36,14 +36,17 @@ describe("normalizeSettings (bundle qM)", () => {
     for (const raw of [null, undefined, "x", 3, []]) {
       const s = normalizeSettings(raw);
       expect(s).toEqual(DEFAULT_SETTINGS);
-      expect(s.setups.length).toBe(11);
+      expect(s.setups.length).toBe(12); // the 11 bundle setups + s_mtf (multi-TF signal, other version)
       expect(s.rules.length).toBe(5);
+      expect(s.mistakes).toEqual(DEFAULT_MISTAKES);
     }
     // defaults are not shared by reference
     const s = normalizeSettings(null);
     s.setups.pop();
-    expect(DEFAULT_SETTINGS.setups.length).toBe(11);
-    expect(defaultSettings().setups.length).toBe(11);
+    s.mistakes.pop();
+    expect(DEFAULT_SETTINGS.setups.length).toBe(12);
+    expect(defaultSettings().setups.length).toBe(12);
+    expect(DEFAULT_SETTINGS.mistakes.length).toBe(8);
   });
   it("partial settings: scalars, capital strings, shallow merges, unknown keys survive", () => {
     const s = normalizeSettings({
@@ -74,7 +77,7 @@ describe("normalizeSettings (bundle qM)", () => {
     expect(normalizeSettings({ rules: "no" }).rules).toEqual(DEFAULT_RULES);
   });
   it("defaults verbatim", () => {
-    expect(DEFAULT_SETUPS.map((s) => s.id)).toEqual(["s_p1", "s_p2", "s_p3", "s_ml", "s_ladder", "s_bo", "s_short", "s_rej", "s_sweep", "s_rsi", "s_bt"]);
+    expect(DEFAULT_SETUPS.map((s) => s.id)).toEqual(["s_p1", "s_p2", "s_p3", "s_ml", "s_ladder", "s_bo", "s_short", "s_rej", "s_sweep", "s_rsi", "s_bt", "s_mtf"]);
     expect(DEFAULT_SETUPS.find((s) => s.id === "s_bt")!.checklist.map((c) => c.id)).toEqual(["c1", "c2", "c3"]);
     expect(DEFAULT_RULES.map((r) => r.id)).toEqual(["trigger", "topdown", "spx", "stop", "lev"]);
     expect(DEFAULT_SETTINGS.backtest).toEqual({ winRate: 0.6215, avgWin: 0.1664, avgLoss: -0.0931, expectancy: 0.0682, label: "214 Signale" });
@@ -89,7 +92,8 @@ describe("normalizeSettings (bundle qM)", () => {
       zoneLow: 81500,
       zoneHigh: 82200,
     });
-    expect(nextSetupColor(DEFAULT_SETUPS)).toBe("#9aa9bb");
+    expect(nextSetupColor(DEFAULT_SETUPS)).toBe("#c7768f"); // all 8 colours used (s_mtf took #9aa9bb) → cycles by count
+    expect(nextSetupColor(DEFAULT_SETUPS.slice(0, 11))).toBe("#9aa9bb");
     expect(nextSetupColor([])).toBe(SETUP_PALETTE[0]);
     expect(nextSetupColor(SETUP_PALETTE.map((c) => ({ color: c })))).toBe(SETUP_PALETTE[0]);
   });
@@ -103,8 +107,10 @@ describe("legacy fixture tj2-v0.json", () => {
   it("settings normalise with defaults for the missing fields", () => {
     expect(s.capital).toEqual({ makro: 20000, scalp: 5000 });
     expect(s.startDate).toBe("");
-    expect(s.setups.length).toBe(7);
+    expect(s.setups.length).toBe(8); // legacy settings (no mistakes/signals yet) get s_mtf appended once
     expect(s.setups[6]).toEqual({ id: "s_k3f9a2x1m0", name: "Eigenes Setup ohne Extras", checklist: [], account: "both", desc: "" });
+    expect(s.setups[7]?.id).toBe("s_mtf");
+    expect(s.mistakes).toEqual(DEFAULT_MISTAKES);
     expect(s.rules).toEqual(DEFAULT_RULES);
     expect(s.backtest.avgWin).toBe(0.1664);
     expect(s.market.longTrigger).toBe(86000);
@@ -166,6 +172,9 @@ describe("legacy fixture tj2-v0.json", () => {
     const parsed = JsonBackupSchema.safeParse(JSON.parse(JSON.stringify(backup)));
     expect(parsed.success).toBe(true);
     expect(JsonBackupSchema.safeParse({ exportedAt: "x", settings: {}, trades: [] }).success).toBe(true);
-    expect(JsonBackupSchema.safeParse({ trades: [] }).success).toBe(false);
+    // tolerant envelope (other version's `{ trades }`); present parts must still have the right type
+    expect(JsonBackupSchema.safeParse({ trades: [] }).success).toBe(true);
+    expect(JsonBackupSchema.safeParse({ settings: "nope", trades: [] }).success).toBe(false);
+    expect(JsonBackupSchema.safeParse({ exportedAt: 1, trades: [] }).success).toBe(false);
   });
 });
