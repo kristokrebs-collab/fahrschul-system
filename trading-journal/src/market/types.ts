@@ -8,6 +8,12 @@ export type HealthState = "connecting" | "live" | "stale" | "fallback" | "offlin
 
 export type KlineFeed = "kline_1m" | "kline_15m" | "kline_1h" | "kline_4h" | "kline_1w";
 export type RatioFeed = "topPositionRatio" | "topAccountRatio" | "globalAccountRatio" | "takerRatio";
+/**
+ * Additive: the same Binance ratios at the fixed 5-min period, independent of the chosen ratio period
+ * (`settings.hyblock.timeframe`). They give the Top-Trader card a reading that refreshes every 5 minutes while the
+ * chosen-period series keeps the history (`Δ+ Kerzen`, sparkline).
+ */
+export type LiveRatioFeed = "topPositionRatio5m" | "topAccountRatio5m" | "globalAccountRatio5m";
 export type FeedId =
   | KlineFeed
   | "markPrice"
@@ -17,6 +23,7 @@ export type FeedId =
   | "openInterest"
   | "openInterestHist"
   | RatioFeed
+  | LiveRatioFeed
   | "fundingHistory";
 
 export interface Candle {
@@ -106,9 +113,12 @@ export interface FeedValue {
   topAccountRatio: RatioPoint[];
   globalAccountRatio: RatioPoint[];
   takerRatio: TakerPoint[];
+  topPositionRatio5m: RatioPoint[];
+  topAccountRatio5m: RatioPoint[];
+  globalAccountRatio5m: RatioPoint[];
   fundingHistory: FundingPoint[];
 }
-export type SeriesFeed = KlineFeed | "openInterestHist" | RatioFeed | "fundingHistory";
+export type SeriesFeed = KlineFeed | "openInterestHist" | RatioFeed | LiveRatioFeed | "fundingHistory";
 
 export interface Stamped<T> {
   data: T;
@@ -139,6 +149,8 @@ export interface FeedSpec {
   jitterMs?: number;
   cost: { bucket: CostBucket; units: number };
   sources: Source[];
+  /** additive: the `/futures/data/*` period this feed is requested with (futures-data feeds only) */
+  period?: string;
 }
 
 export type FailureReason =
@@ -154,7 +166,9 @@ export type FailureReason =
   | "bad_period"
   | "beyond_retention"
   /** additive: the current source has no equivalent for this feed (e.g. Bybit top-trader ratios) */
-  | "unsupported";
+  | "unsupported"
+  /** additive: the request timed out (soft failure, never read as a geo-block) */
+  | "timeout";
 
 export interface FeedHealth {
   feed: FeedId;
@@ -171,7 +185,8 @@ export interface FeedHealth {
 export interface ProviderHealth {
   overall: HealthState;
   online: boolean;
-  primary: { source: "binance"; reachable: boolean | "unknown"; blocked: boolean; lastProbeAt?: number };
+  /** `nextProbeAt` (additive): when the provider re-probes Binance (blocked primary or feeds parked elsewhere) */
+  primary: { source: "binance"; reachable: boolean | "unknown"; blocked: boolean; lastProbeAt?: number; nextProbeAt?: number };
   proxy: { usable: boolean | "unknown"; blocked?: boolean };
   ws: { state: HealthState; connectedAt?: number; lastMessageAt?: number; attempt: number; nextRetryAt?: number };
   feeds: Record<FeedId, FeedHealth>;
@@ -193,6 +208,10 @@ export type HealthEvent =
   | { type: "schedule"; feed: FeedId; nextRefreshAt: number }
   | { type: "probe"; source: "binance" | "proxy" | "bybit" | "okx"; ok: boolean; now: number; blocked?: boolean }
   | { type: "unsupported"; feed: FeedId; source: Source; now: number; detail?: string }
+  /** additive: explicit source switch by the provider (proxy routing, a forced refresh back on the primary) */
+  | { type: "move"; feed: FeedId; source: Source; now: number; reason?: FailureReason; detail?: string }
+  /** additive: the next primary re-probe (`undefined` = none pending) */
+  | { type: "probe_scheduled"; at: number | undefined; now: number }
   | { type: "bad_period"; feeds: FeedId[]; detail: string; now: number }
   | { type: "bad_symbol"; now: number };
 

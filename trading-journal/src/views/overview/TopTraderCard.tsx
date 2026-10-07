@@ -5,7 +5,27 @@ import { explainFallingKnife, fallingKnife, KNIFE_TITLE, knifeCardLine, readingA
 import type { HyblockReading } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { date as fmtDate, n1 } from "@/lib/format";
-import { COHORT_HINT, priceMv, SOURCE_NAME, STRINGS, virtualReading } from "@/market";
+import {
+  buildFeedSpecs,
+  COHORT_HINT,
+  deriveTopTrader,
+  freshnessText,
+  initialHealth,
+  priceMv,
+  SOURCE_NAME,
+  STRINGS,
+  topTraderFreshness,
+  topTraderHealthSignature,
+  useFeed,
+  useHealthSelect,
+  useProvider,
+  virtualReading,
+  type ProviderHealth,
+  type StatusLabel,
+  type TopTraderBase,
+  type TopTraderFreshness,
+  type TopTraderView,
+} from "@/market";
 import { useNowMv } from "@/motion/clock";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
 import { useMorphDialog } from "@/motion/MorphDialog";
@@ -21,7 +41,7 @@ import { useUi } from "@/store/uiStore";
 import { HyblockForm } from "@/app/overlays";
 import { ExplanationView } from "./explainer";
 import { TapTooltip } from "./TapTooltip";
-import { useMotionSelect, usePriceClass, usePriceSource, useTopTraderView } from "./useMarket";
+import { useMotionSelect, usePriceClass, usePriceSource } from "./useMarket";
 
 export const TOP_TRADER_TITLE = "Top Trader · Binance";
 export const DELTA_HINT = "Top-vs-Alle-Delta: Top 20 % nach Margin vs. alle Konten (Binance), Ersatz für Whale-vs-Retail";
@@ -37,6 +57,50 @@ const SPARK_OPTIONS = [
 type KnifeState = "ok" | "no" | "none";
 const KNIFE_BAR: Record<KnifeState, string> = { ok: "bg-win", no: "bg-loss/60", none: "bg-white/10" };
 const KNIFE_STATES: KnifeState[] = ["none", "no", "ok"];
+
+const EMPTY_HEALTH: ProviderHealth = initialHealth(buildFeedSpecs("1h"));
+
+/**
+ * Top-trader view + freshness without the global version counter: re-derives when one of the ratio series (chosen
+ * period and the 5-min live twins) publishes or a health field the card reads changes – never on price ticks.
+ */
+function useTopTraderLive(base: TopTraderBase): { tt: TopTraderView; fresh: TopTraderFreshness } {
+  const provider = useProvider();
+  const health = useHealthSelect(topTraderHealthSignature);
+  const topAccountRatio = useFeed("topAccountRatio");
+  const topPositionRatio = useFeed("topPositionRatio");
+  const globalAccountRatio = useFeed("globalAccountRatio");
+  const takerRatio = useFeed("takerRatio");
+  const topAccountRatio5m = useFeed("topAccountRatio5m");
+  const topPositionRatio5m = useFeed("topPositionRatio5m");
+  const globalAccountRatio5m = useFeed("globalAccountRatio5m");
+  return useMemo(() => {
+    const h = provider?.getHealth() ?? EMPTY_HEALTH;
+    const tt = deriveTopTrader({ topAccountRatio, topPositionRatio, globalAccountRatio, takerRatio, topAccountRatio5m, topPositionRatio5m, globalAccountRatio5m }, h, base);
+    // cadence of the chosen-period series (a test double may come without `specs`)
+    const periodMs = provider?.specs?.topAccountRatio?.cadenceMs;
+    return { tt, fresh: topTraderFreshness(tt, h, periodMs) };
+    // `health` is the change signal for the health object read from the provider
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, health, topAccountRatio, topPositionRatio, globalAccountRatio, takerRatio, topAccountRatio5m, topPositionRatio5m, globalAccountRatio5m, base]);
+}
+
+const FRESH_TONE: Record<StatusLabel["tone"], string> = { live: "text-faint", muted: "text-faint", warn: "text-warn", error: "text-loss" };
+
+/**
+ * Card note: what the numbers are and how fresh – `Binance liefert alle 5 min neu · Stand 14:05 · nächste Daten in
+ * 3:12`, `Binance antwortet nicht (Netzwerk/CORS) · Stand 13:55 · neuer Versuch in 0:28`, `Binance blockiert (Region)`.
+ * The countdown runs on the shared second clock (no React render per second).
+ */
+export const FreshnessNote = memo(function FreshnessNote({ f }: { f: TopTraderFreshness }) {
+  const now = useNowMv();
+  const text = useTransform(now, (n) => freshnessText(f, n));
+  return (
+    <motion.span data-testid="top-trader-freshness" data-kind={f.kind} title={f.detail} className={cn("transition-colors duration-300", FRESH_TONE[f.tone])}>
+      {text}
+    </motion.span>
+  );
+});
 
 /** `Stand`: reading age (`vor 12 min`, `vor 3 h`, else the date) on the shared second clock; only the 12-h warn flip re-renders. */
 const StandAge = memo(function StandAge({ at }: { at: string }) {
@@ -96,7 +160,7 @@ export function TopTraderCard() {
   const spark = useUi((s) => s.sparkline);
   const setPref = useUi((s) => s.setPref);
   const pushToast = useUi((s) => s.pushToast);
-  const { tt, label } = useTopTraderView(base);
+  const { tt, fresh } = useTopTraderLive(base);
   const priceSource = usePriceSource();
   const { open, close } = useMorphDialog();
   const [confirm, setConfirm] = useState(false);
@@ -113,7 +177,7 @@ export function TopTraderCard() {
   const previous = virtual ? last : prev;
   const source = priceSource ? SOURCE_NAME[priceSource] : "Binance";
   const fk = fallingKnife(current, previous, { price: zone.price, source }, settings);
-  const note = tt.state === "live" || tt.state === "fallback" ? label.text : undefined;
+  const note = <FreshnessNote f={fresh} />;
   const otherBase = base === "positions" ? tt.longPctAccounts : tt.longPctPositions;
   const sparkValues = useStableValues(spark === "live" && !tt.onlyBinance ? tt.sparkline : readings.slice(-20).map((r) => r.longPct));
   const knifeStates = fk.pts.map((p) => (p.ok ? "o" : p.ok === false ? "x" : "-")).join("");
@@ -166,7 +230,7 @@ export function TopTraderCard() {
               <div className="label flex items-center gap-2">
                 Long %
                 {tt.onlyBinance && (
-                  <Badge tone="mute" title={label.detail ?? COHORT_HINT.bybit}>
+                  <Badge tone="mute" title={fresh.detail ?? COHORT_HINT.bybit}>
                     {STRINGS.onlyBinance}
                   </Badge>
                 )}

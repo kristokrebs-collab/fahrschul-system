@@ -25,6 +25,7 @@ import { initialHealth } from "./health";
 import { buildFeedSpecs, FEED_IDS, isKlineFeed } from "./feeds";
 import { STRINGS } from "./statusLabel";
 import { startSignals, stopSignals } from "./signals/boot";
+import { useUi } from "@/store/uiStore";
 
 /** Feeds that publish several times per second; they never bump the slow version counter. */
 export const HIGH_FREQUENCY_FEEDS: ReadonlySet<FeedId> = new Set<FeedId>(["aggTrade", "bookTop", "markPrice"]);
@@ -56,6 +57,16 @@ const feedListeners = new Map<FeedId, Set<FeedListener>>();
 const barKeys = new Map<FeedId, string>();
 let version = 0;
 let offProvider: (() => void) | null = null;
+/** `tj2-ui.useProxy` → `provider.setPreferProxy` while a provider runs */
+let offProxyPref: (() => void) | null = null;
+
+function readProxyPref(): boolean {
+  try {
+    return useUi.getState().useProxy === true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Change signal of a kline series: `${source}:${length}:${lastOpen}:${lastClosed}`. It changes when a bar is
@@ -178,12 +189,15 @@ export function startMarket(settings: Pick<Settings, "market" | "hyblock">, opts
     return state.provider;
   }
   stopMarket();
-  const p = createMarketProvider({ symbol, period, sources: opts.sources, bookTop: opts.bookTop, deps: opts.deps });
+  const p = createMarketProvider({ symbol, period, sources: opts.sources, bookTop: opts.bookTop, preferProxy: readProxyPref(), deps: opts.deps });
   state.provider = p;
   state.symbol = symbol;
   state.period = period;
   state.opts = opts;
   attach(p);
+  offProxyPref = useUi.subscribe((s, prev) => {
+    if (s.useProxy !== prev.useProxy) state.provider?.setPreferProxy(s.useProxy === true);
+  });
   p.start();
   // live "Einstiegs-Check" follows the provider (≤ 1 evaluation per second, off the render path)
   startSignals(p);
@@ -192,6 +206,8 @@ export function startMarket(settings: Pick<Settings, "market" | "hyblock">, opts
 }
 
 export function stopMarket(): void {
+  offProxyPref?.();
+  offProxyPref = null;
   stopSignals();
   state.unbind?.();
   state.unbind = null;

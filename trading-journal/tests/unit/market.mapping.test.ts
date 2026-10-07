@@ -6,12 +6,12 @@ import taker from "../fixtures/binance-takerlongshortRatio.json";
 import klines4h from "../fixtures/binance-klines-4h.json";
 import klines1w from "../fixtures/binance-klines-1w.json";
 import { mapRatio, mapTaker, mapKline, ratioSchema, takerSchema, klinesSchema } from "@/market/sources/binance";
-import { deltaSeries, deltaCandles, topTraderLongPct, takerDelta, fundingLine, fundingPct, lastPrice, deriveMarket, deriveTopTrader, virtualReading, openInterestChange24h, triggerDistances, legacyStatus } from "@/market/mapping";
+import { deltaSeries, deltaCandles, topTraderLongPct, takerDelta, fundingLine, fundingPct, lastPrice, deriveMarket, deriveTopTrader, virtualReading, openInterestChange24h, triggerDistances, legacyStatus, topTraderFreshness, freshnessText, mmss, topTraderHealthSignature } from "@/market/mapping";
 import { closedBar, rsiWilder, lastClosed4h, weeklyClose, currentBar } from "@/market/indicators";
 import { statusLabel, liveAgeLabel, refreshRingProgress, fallbackBadge, STRINGS } from "@/market/statusLabel";
 import { initialHealth, reduceHealth } from "@/market/health";
 import { buildFeedSpecs } from "@/market/feeds";
-import type { FeedHealth, ProviderHealth, Stamped } from "@/market/types";
+import type { FeedHealth, ProviderHealth, RatioPoint, Stamped } from "@/market/types";
 
 const T0 = 1790762400000;
 const specs = buildFeedSpecs("1h");
@@ -233,5 +233,78 @@ describe("derived views", () => {
     expect(ttb.liveReadingOk).toBe(false);
     expect(virtualReading(ttb, undefined)).toBeNull();
     expect(deriveTopTrader(snap, health, "positions").longPct).toBeCloseTo(Number(topPos.at(-1)!.longAccount) * 100, 6);
+  });
+
+  // 5-min twins: the last chosen-period point (T0) + one more 5-min snapshot at T0 + 5 min
+  const five = (series: RatioPoint[], longPct: number): RatioPoint[] => [...series.slice(-3), { time: T0 + 300_000, longPct, shortPct: 100 - longPct, ratio: longPct / (100 - longPct) }];
+  const liveHealth = live(health, [
+    { type: "rest_ok", feed: "topAccountRatio5m", source: "binance", asOf: T0 + 300_000, now: T0 + 360_000, nextRefreshAt: T0 + 660_000 },
+    { type: "rest_ok", feed: "topPositionRatio5m", source: "binance", asOf: T0 + 300_000, now: T0 + 360_000 },
+    { type: "rest_ok", feed: "globalAccountRatio5m", source: "binance", asOf: T0 + 300_000, now: T0 + 360_000 },
+    { type: "schedule", feed: "topAccountRatio5m", nextRefreshAt: T0 + 660_000 },
+  ]);
+  const liveSnap = { ...snap, topAccountRatio5m: st(five(acc, 61.5), T0 + 300_000), topPositionRatio5m: st(five(pos, 58), T0 + 300_000), globalAccountRatio5m: st(five(glob, 50), T0 + 300_000) };
+
+  it("Long % and Delta show the newest Binance snapshot (5-min twin); Δ+ Kerzen and sparkline stay on the chosen period", () => {
+    const tt = deriveTopTrader(liveSnap, liveHealth, "accounts");
+    expect(tt).toMatchObject({ longPct: 61.5, delta: 8, asOf: T0 + 300_000, fromLive: true, readingFeed: "topAccountRatio5m", liveReadingOk: true, deltaCandles: 3 });
+    expect(tt.longPctPositions).toBe(58);
+    expect(tt.globalLongPct).toBe(50);
+    expect(tt.sparkline).toEqual(acc.slice(-20).map((p) => p.longPct));
+    expect(virtualReading(tt, undefined)).toMatchObject({ longPct: 61.5, delta: 8, deltaCandles: 3, note: "Live von Binance · 5-min-Wert" });
+    // an older 5-min point never overrides a newer chosen-period point
+    const old = { ...snap, topAccountRatio5m: st(acc.slice(-5, -2), T0 - 600_000) };
+    expect(deriveTopTrader(old, liveHealth, "accounts")).toMatchObject({ fromLive: false, readingFeed: "topAccountRatio" });
+  });
+
+  it("the live reading needs Binance data per health AND per value (no Bybit cohort mixed into the delta)", () => {
+    // retail ratio served from Bybit (another population) → no virtual reading, even if its state ticks to `stale`
+    const hb = live(liveHealth, [{ type: "rest_ok", feed: "globalAccountRatio", source: "bybit", asOf: T0, now: T0 }, { type: "tick", now: T0 + 3 * 3_600_000 }]);
+    const sb = { ...liveSnap, globalAccountRatio: st(glob, T0, "bybit", false) };
+    expect(hb.feeds.globalAccountRatio.source).toBe("bybit");
+    expect(deriveTopTrader(sb, hb).liveReadingOk).toBe(false);
+    // the EU proxy is Binance's own data: fine
+    const hp = live(liveHealth, [{ type: "rest_ok", feed: "globalAccountRatio", source: "proxy", asOf: T0, now: T0 }]);
+    const sp = { ...liveSnap, globalAccountRatio: st(glob, T0, "proxy") };
+    expect(hp.feeds.globalAccountRatio.state).toBe("fallback");
+    expect(deriveTopTrader(sp, hp).liveReadingOk).toBe(true);
+  });
+
+  it("freshness distinguishes `Binance liefert alle 5 min neu` from `antwortet nicht`, `blockiert`, proxy and offline", () => {
+    const tt = deriveTopTrader(liveSnap, liveHealth, "accounts");
+    const f = topTraderFreshness(tt, liveHealth, 3_600_000);
+    expect(f).toMatchObject({ kind: "live", tone: "live", lead: "Binance liefert alle 5 min neu", standAt: T0 + 300_000, nextAt: T0 + 660_000, nextLabel: "nächste Daten" });
+    expect(freshnessText(f, T0 + 468_000, "UTC")).toBe("Binance liefert alle 5 min neu · Stand 10:05 · nächste Daten in 3:12");
+    expect(freshnessText(f, T0 + 700_000, "UTC")).toBe("Binance liefert alle 5 min neu · Stand 10:05 · lädt …");
+    // chosen period only (no twins yet): the cadence of the chosen period
+    expect(topTraderFreshness(deriveTopTrader(snap, health), health, 3_600_000).lead).toBe("Binance liefert stündlich neu");
+    // failing on Binance: retry countdown with the cause
+    const hr = live(liveHealth, [
+      { type: "rest_fail", feed: "topAccountRatio5m", source: "binance", kind: "network", now: T0 + 700_000, detail: "Netzwerk/CORS: Failed to fetch" },
+      { type: "schedule", feed: "topAccountRatio5m", nextRefreshAt: T0 + 715_000 },
+    ]);
+    const fr = topTraderFreshness(deriveTopTrader(liveSnap, hr), hr, 3_600_000);
+    expect(fr).toMatchObject({ kind: "retrying", tone: "warn", lead: "Binance antwortet nicht (Netzwerk/CORS)", detail: "Netzwerk/CORS: Failed to fetch" });
+    expect(freshnessText(fr, T0 + 702_000, "UTC")).toBe("Binance antwortet nicht (Netzwerk/CORS) · Stand 10:05 · neuer Versuch in 0:13");
+    expect(freshnessText(fr, T0 + 716_000, "UTC")).toBe("Binance antwortet nicht (Netzwerk/CORS) · Stand 10:05 · neuer Versuch läuft …");
+    // blocked: next re-probe
+    const hbk = live(liveHealth, [{ type: "probe", source: "binance", ok: false, blocked: true, now: T0 + 720_000 }, { type: "probe_scheduled", at: T0 + 1_020_000, now: T0 + 720_000 }]);
+    const fb = topTraderFreshness(deriveTopTrader(liveSnap, hbk), hbk, 3_600_000);
+    expect(fb).toMatchObject({ kind: "blocked", lead: "Binance blockiert (Region)", nextAt: T0 + 1_020_000, nextLabel: "neuer Versuch" });
+    // through the proxy
+    const hp = live(liveHealth, [{ type: "probe", source: "proxy", ok: true, now: T0 }, { type: "move", feed: "topAccountRatio5m", source: "proxy", now: T0 }, { type: "rest_ok", feed: "topAccountRatio5m", source: "proxy", asOf: T0 + 300_000, now: T0 + 360_000 }]);
+    const sp = { ...liveSnap, topAccountRatio5m: { ...liveSnap.topAccountRatio5m, source: "proxy" as const } };
+    expect(topTraderFreshness(deriveTopTrader(sp, hp), hp, 3_600_000)).toMatchObject({ kind: "proxy", lead: "Binance über EU-Proxy · alle 5 min neu" });
+    // offline
+    const ho = live(liveHealth, [{ type: "online", online: false, now: T0 }]);
+    expect(topTraderFreshness(deriveTopTrader(liveSnap, ho), ho).kind).toBe("offline");
+    expect(mmss(0)).toBe("0:00");
+    expect(mmss(61_001)).toBe("1:02");
+  });
+
+  it("the health signature moves only with what the card reads", () => {
+    const a = topTraderHealthSignature(liveHealth);
+    expect(topTraderHealthSignature(live(liveHealth, [{ type: "ws_message", feeds: ["aggTrade"], asOf: T0 + 9000, now: T0 + 9000 }]))).toBe(a);
+    expect(topTraderHealthSignature(live(liveHealth, [{ type: "schedule", feed: "topAccountRatio5m", nextRefreshAt: T0 + 999_000 }]))).not.toBe(a);
   });
 });

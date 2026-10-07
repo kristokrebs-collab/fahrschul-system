@@ -151,6 +151,66 @@ describe("health reducer", () => {
     expect(aggregate(h)).toBe("fallback");
   });
 
+  it("Binance-family ratio feeds: soft failures never hand them to Bybit; they stay on Binance and keep retrying", () => {
+    const fail = (feed: "topAccountRatio" | "globalAccountRatio" | "topAccountRatio5m", n: number, kind: "network" | "http_5xx" | "rate_limited" | "timeout" = "http_5xx"): HealthEvent[] =>
+      Array.from({ length: n }, () => ({ type: "rest_fail" as const, feed, source: "binance" as const, kind, now: T }));
+    let h = run([{ type: "rest_ok", feed: "topAccountRatio", source: "binance", asOf: T, now: T }, ...fail("topAccountRatio", 5)]);
+    expect(h.feeds.topAccountRatio).toMatchObject({ state: "live", source: "binance", consecutiveFailures: 5, reason: "http_5xx" });
+    h = run(fail("globalAccountRatio", 4, "rate_limited"), h);
+    expect(h.feeds.globalAccountRatio).toMatchObject({ source: "binance", reason: "rate_limited" }); // never Bybit's other cohort
+    h = run(fail("topAccountRatio5m", 3, "timeout"), h);
+    expect(h.feeds.topAccountRatio5m).toMatchObject({ source: "binance", reason: "timeout", consecutiveFailures: 3 });
+    // a usable proxy takes them over (Binance's own data)
+    h = reduceHealth(h, { type: "probe", source: "proxy", ok: true, now: T }, specs);
+    expect(h.feeds.topAccountRatio).toMatchObject({ state: "fallback", source: "proxy", consecutiveFailures: 0 });
+    expect(h.feeds.globalAccountRatio.source).toBe("proxy");
+    expect(h.feeds.topAccountRatio5m.source).toBe("proxy");
+    expect(h.feeds.topPositionRatio.source).toBe("binance"); // healthy feeds stay direct
+    // the proxy goes away → back to Binance
+    h = reduceHealth(h, { type: "probe", source: "proxy", ok: false, now: T }, specs);
+    expect(h.feeds.topAccountRatio).toMatchObject({ state: "connecting", source: "binance" });
+  });
+
+  it("cors on a futures-data feed goes straight to a usable proxy; without one a ratio feed stays put", () => {
+    let h = run([{ type: "rest_fail", feed: "topPositionRatio", source: "binance", kind: "cors", now: T }]);
+    expect(h.feeds.topPositionRatio).toMatchObject({ source: "binance", reason: "cors" });
+    h = run([{ type: "probe", source: "proxy", ok: true, now: T }, { type: "rest_fail", feed: "openInterestHist", source: "binance", kind: "cors", now: T }]);
+    expect(h.feeds.openInterestHist).toMatchObject({ state: "fallback", source: "proxy", reason: "cors" });
+    // the primary probe keeps futures-data feeds on the proxy (the browser still cannot read them directly)
+    h = reduceHealth(h, { type: "probe", source: "binance", ok: true, now: T }, specs);
+    expect(h.feeds.openInterestHist.source).toBe("proxy");
+  });
+
+  it("a real block: global ratio → Bybit, top traders unsupported there, the 5-min twins parked; a usable proxy takes all of them", () => {
+    let h = run([{ type: "probe", source: "binance", ok: false, blocked: true, now: T }]);
+    expect(h.feeds.globalAccountRatio).toMatchObject({ state: "fallback", source: "bybit" });
+    expect(h.feeds.topAccountRatio5m).toMatchObject({ state: "fallback", source: "cache", reason: "unsupported" });
+    expect(h.overall).toBe("fallback");
+    h = reduceHealth(h, { type: "unsupported", feed: "topAccountRatio", source: "bybit", now: T }, specs);
+    expect(h.feeds.topAccountRatio).toMatchObject({ source: "bybit", reason: "unsupported" });
+    h = reduceHealth(h, { type: "probe", source: "proxy", ok: true, now: T }, specs);
+    for (const f of ["globalAccountRatio", "topAccountRatio", "topAccountRatio5m"] as const) expect(h.feeds[f].source, f).toBe("proxy");
+    expect(h.feeds.ticker24h.source).toBe("bybit"); // prices stay on Bybit
+    // with the proxy known up front, the block sends the ratios to the proxy directly
+    const h2 = run([{ type: "probe", source: "proxy", ok: true, now: T }, { type: "probe", source: "binance", ok: false, blocked: true, now: T + 1 }]);
+    expect(h2.feeds.globalAccountRatio.source).toBe("proxy");
+    expect(h2.feeds.topPositionRatio.source).toBe("proxy");
+  });
+
+  it("ignores a late failure from a source the feed already left; move / probe_scheduled events", () => {
+    let h = run([{ type: "probe", source: "binance", ok: false, blocked: true, now: T }]);
+    expect(h.feeds.ticker24h.source).toBe("bybit");
+    const same = reduceHealth(h, { type: "rest_fail", feed: "ticker24h", source: "binance", kind: "blocked_451", now: T + 1 }, specs);
+    expect(same.feeds.ticker24h).toBe(h.feeds.ticker24h);
+    h = reduceHealth(h, { type: "move", feed: "ticker24h", source: "binance", now: T + 2 }, specs);
+    expect(h.feeds.ticker24h).toMatchObject({ source: "binance", state: "connecting", consecutiveFailures: 0 });
+    h = reduceHealth(h, { type: "probe_scheduled", at: T + 300_000, now: T + 2 }, specs);
+    expect(h.primary.nextProbeAt).toBe(T + 300_000);
+    expect(reduceHealth(h, { type: "probe_scheduled", at: T + 300_000, now: T + 3 }, specs)).toBe(h);
+    h = reduceHealth(h, { type: "stop", now: T + 4 }, specs);
+    expect(h.primary.nextProbeAt).toBeUndefined();
+  });
+
   it("stop resets to connecting", () => {
     const h = run([{ type: "rest_ok", feed: "ticker24h", source: "bybit", asOf: T, now: T }, { type: "stop", now: T }]);
     expect(h.feeds.ticker24h).toMatchObject({ state: "connecting", source: "binance" });

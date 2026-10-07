@@ -1,6 +1,8 @@
 import { animate, motion } from "motion/react";
 import { useEffect, useRef } from "react";
-import type { FeedId, HealthState, ProviderHealth, Source, StatusLabel } from "@/market/types";
+import type { FeedHealth, FeedId, HealthState, ProviderHealth, Source, StatusLabel } from "@/market/types";
+import { BINANCE_FAMILY_FEEDS, isLiveRatioFeed } from "@/market/feeds";
+import { SOFT_FAILURE_TEXT } from "@/market/statusLabel";
 import { IS_FILE_BUILD } from "@/edition";
 import { cn } from "@/lib/cn";
 import { time } from "@/lib/format";
@@ -28,7 +30,7 @@ export const LIVE_STRINGS = {
   readings: "Ablesungen",
   live: "Live",
   proxy: "EU-Proxy verwenden",
-  proxyHelp: "Nur wenn Binance die Region blockiert (451). Läuft über die Netlify-Function.",
+  proxyHelp: "Holt die Binance-Top-Trader-Daten über diese Seite (Netlify-Proxy) statt direkt – hilft, wenn der Browser Binance nicht lesen darf (CORS) oder die Region blockiert ist.",
   noHealth: "Noch keine Statusdaten. Der Provider startet mit der Übersicht.",
   reconnects: (n: number) => `WS-Reconnects: ${n}`,
   netlifyHint: "Auf Netlify laufen die Live-Daten ohne Key vom Browser zu Binance. Blockiert Binance die Region, springt der Provider auf Bybit/OKX oder den EU-Proxy und zeigt es an.",
@@ -37,6 +39,18 @@ export const LIVE_STRINGS = {
   overall: "Gesamtstatus",
   online: "Online",
   offline: "Offline",
+  binanceOk: "Binance erreichbar",
+  binanceUnknown: "Binance: wird geprüft",
+  binanceBlocked: (next?: string) => `Binance blockiert (Region)${next ? ` · neuer Versuch ${next}` : ""}`,
+  binanceDown: "Binance antwortet nicht",
+  proxyOk: "EU-Proxy bereit",
+  proxyOff: "EU-Proxy nicht erreichbar",
+  proxyBlocked: "EU-Proxy: Region blockiert (451)",
+  proxyFile: "Kein EU-Proxy in der Datei-Version",
+  point: "Punkt",
+  nextPoll: "nächste Abfrage",
+  nextRetry: "neuer Versuch",
+  failures: (n: number) => `${n}× in Folge`,
 } as const;
 
 export const FEED_LABELS: Record<FeedId, string> = {
@@ -55,6 +69,9 @@ export const FEED_LABELS: Record<FeedId, string> = {
   topAccountRatio: "Top-Trader Konten",
   globalAccountRatio: "Alle Konten",
   takerRatio: "Taker-Ratio",
+  topPositionRatio5m: "Top-Trader Positionen · 5 min",
+  topAccountRatio5m: "Top-Trader Konten · 5 min",
+  globalAccountRatio5m: "Alle Konten · 5 min",
   fundingHistory: "Funding",
 };
 
@@ -111,6 +128,42 @@ function StandCell({ at }: { at?: number }) {
   );
 }
 
+const at = (ms?: number): string => (ms ? time(new Date(ms)) : "");
+
+/**
+ * Second line under a feed name: for the Binance ratio feeds always (time of the newest point, next poll), for any
+ * feed while it fails (cause, count, next retry). Makes "Binance publishes every 5 min" vs. "Binance does not answer"
+ * visible per feed.
+ */
+export function feedDetailLine(f: FeedHealth): string | null {
+  const family = BINANCE_FAMILY_FEEDS.includes(f.feed);
+  const soft = f.reason ? SOFT_FAILURE_TEXT[f.reason] : undefined;
+  const failing = f.consecutiveFailures > 0 && !!soft;
+  if (!family && !failing) return null;
+  const parts: string[] = [];
+  if (failing) {
+    parts.push(`${soft}${f.detail ? ` (${f.detail})` : ""}`);
+    parts.push(LIVE_STRINGS.failures(f.consecutiveFailures));
+  } else if (family && f.lastDataAt) parts.push(`${LIVE_STRINGS.point} ${at(f.lastDataAt)}`);
+  if (f.nextRefreshAt && f.source !== "cache") parts.push(`${failing ? LIVE_STRINGS.nextRetry : LIVE_STRINGS.nextPoll} ${at(f.nextRefreshAt)}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+/** `Binance erreichbar` / `Binance blockiert (Region) · neuer Versuch 14:35` / proxy state — one line above the table. */
+export function routeLine(health: ProviderHealth): string[] {
+  const out: string[] = [];
+  const p = health.primary;
+  if (p?.blocked) out.push(LIVE_STRINGS.binanceBlocked(at(p.nextProbeAt) || undefined));
+  else if (p?.reachable === false) out.push(LIVE_STRINGS.binanceDown);
+  else if (p?.reachable === true || health.ws?.state === "live") out.push(LIVE_STRINGS.binanceOk);
+  else out.push(LIVE_STRINGS.binanceUnknown);
+  if (IS_FILE_BUILD) out.push(LIVE_STRINGS.proxyFile);
+  else if (health.proxy?.blocked) out.push(LIVE_STRINGS.proxyBlocked);
+  else if (health.proxy?.usable === true) out.push(LIVE_STRINGS.proxyOk);
+  else if (health.proxy?.usable === false) out.push(LIVE_STRINGS.proxyOff);
+  return out;
+}
+
 /**
  * NEW `Live-Daten` card (Plan 6.4): feed table `Feed | Quelle | Stand | Status` from the health
  * snapshot, `Jetzt aktualisieren` / `Jetzt neu verbinden` / `Cache leeren`, and the `tj2-ui`
@@ -145,7 +198,12 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
               <span className="label !text-[9.5px]">{LIVE_STRINGS.overall}</span>
             </span>
             <span>{health.online ? LIVE_STRINGS.online : LIVE_STRINGS.offline}</span>
-            <span className="font-mono text-[11.5px] text-faint">{LIVE_STRINGS.reconnects(health.ws.attempt)}</span>
+            <span className="font-mono text-[11.5px] text-faint">{LIVE_STRINGS.reconnects(health.ws?.attempt ?? 0)}</span>
+            {routeLine(health).map((t) => (
+              <span key={t} data-route className={cn("text-[11.5px]", health.primary?.blocked && t.startsWith("Binance") ? "text-warn" : "text-faint")}>
+                {t}
+              </span>
+            ))}
           </div>
           {/* below sm the rows stack (feed + status, then source · Stand) – no sideways scroll on phones */}
           <div ref={tableRef} className="rounded-xl border border-line sm:overflow-x-auto">
@@ -164,6 +222,7 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
               <tbody className="max-sm:block">
                 {feeds.map((f, i) => {
                   const label = statusLabels?.[f.feed];
+                  const line = f.consecutiveFailures === undefined ? null : feedDetailLine(f);
                   const delay = Math.min(i, stagger.max) * stagger.rows;
                   return (
                     <motion.tr
@@ -173,7 +232,14 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
                       animate={seen ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
                       transition={{ default: { ...tween.reveal, delay }, y: { ...spring.enter, delay } }}
                     >
-                      <td className="px-3 py-1.5 text-fg/90 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-w-0 max-sm:p-0">{FEED_LABELS[f.feed]}</td>
+                      <td className="px-3 py-1.5 text-fg/90 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-w-0 max-sm:p-0">
+                        {FEED_LABELS[f.feed] ?? f.feed}
+                        {line && (
+                          <span data-feed-detail className={cn("block text-[11px] leading-snug", f.consecutiveFailures > 0 ? "text-warn" : "text-faint", isLiveRatioFeed(f.feed) && "font-mono")}>
+                            {line}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-1.5 text-mute max-sm:col-start-1 max-sm:row-start-2 max-sm:min-w-0 max-sm:p-0 max-sm:text-[11.5px]">{SOURCE_LABELS[f.source]}</td>
                       <td className="num px-3 py-1.5 font-mono text-mute max-sm:col-start-2 max-sm:row-start-2 max-sm:p-0 max-sm:text-[11.5px]">
                         <StandCell at={f.lastDataAt} />

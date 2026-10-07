@@ -101,11 +101,16 @@ effect built on them with `useReducedFx()`. Countdowns and ages combine them wit
 | `bookTop` | WS `bookTicker` (opt-in) | realtime | 5 s | |
 | `ticker24h` | REST `ticker/24hr` | 30 s | 90 s | 24 h change; LivePill ring = `nextRefreshAt` |
 | `openInterest` | REST `openInterest` | 60 s | 180 s | |
-| `openInterestHist`, `topPositionRatio`, `topAccountRatio`, `globalAccountRatio`, `takerRatio` | REST `/futures/data/*` | point cadence = period (poll aligned: 5-min boundary + 60–105 s) | 2·period + 2 min | bootstrap `limit=500`, poll `limit=30`, ring buffer 500, 30-day retention |
+| `openInterestHist`, `topPositionRatio`, `topAccountRatio`, `globalAccountRatio`, `takerRatio` | REST `/futures/data/*` at the chosen period | point cadence = period (poll aligned to the PERIOD boundary + 60–105 s; a late point is retried +60 s, and for periods > 5 min +2 / +5 min) | 2·period + 2 min | bootstrap `limit=500`, poll `limit=30`, ring buffer 500, 30-day retention |
+| `topPositionRatio5m`, `topAccountRatio5m`, `globalAccountRatio5m` | the same `/futures/data/*` ratios at the fixed period `5m` | 5 min (aligned 5-min boundary + 60–105 s) | 12 min | bootstrap `limit=36`, poll `limit=3`, ring 288; Binance only (direct or proxy, never Bybit/OKX); with period `5m` they ride along with the chosen-period request (no extra call) |
 | `fundingHistory` | REST `fundingRate` | on funding tick (`T` from markPrice) | 9 h | |
 
 Period = `normalizePeriod(settings.hyblock.timeframe)`; unsupported (`1m`, `1w`, …) → `1h` and
-`reason: "bad_period"` with German `detail` on the five `/futures/data` feeds.
+`reason: "bad_period"` with German `detail` on the five chosen-period `/futures/data` feeds. The ratios are snapshots
+(the 5-min point at 14:00 equals the 1h point at 14:00), so the Top-Trader card shows Long % / Delta from the 5-min twins
+whenever they are newer and keeps `Δ+ Kerzen` / sparkline on the chosen period: the card refreshes every 5 minutes even
+with period `1h`. Cache keys of futures-data feeds carry the period (`${source}:${symbol}:${period}:${feed}`), so a
+period switch never hydrates the old period's ring.
 
 **Fallback chain** (fixed): Binance → Bybit → Proxy → Cache. Bybit serves price/candles/funding
 (`comparable:true`), global ratio + OI (`comparable:false`), and cannot serve `topPositionRatio`,
@@ -113,9 +118,34 @@ Period = `normalizePeriod(settings.hyblock.timeframe)`; unsupported (`1m`, `1w`,
 implemented and tested but not in the default chain (CORS unverified). When the WS dies 3× the WS feeds
 are REST-polled from Binance every 10 s (`state: fallback`, label `Binance-Daten · alle 10 s`).
 
-Blocked-primary detection: Binance `fetch` throws `TypeError` while `api.bybit.com/v5/market/time` answers →
-`primary.blocked`, every Binance feed moves to Bybit at once. Re-probe `fapi/v1/time` after 5 → 10 → 20 → 40 →
-60 min (cap), reset on success. Proxy probe (`/api/binance/fapi/v1/time`) once on start.
+Blocked-primary detection (strict — a false positive takes the top traders off Binance while prices keep ticking):
+never while Binance demonstrably answers (a WS frame < 30 s or a REST success < 60 s ago) or within 10 s of a tab
+resume; otherwise `TypeError`s on ≥ 2 different Binance paths within 2 min AND `api.bybit.com/v5/market/time` answering →
+`primary.blocked`, every Binance feed moves on (Bybit, ratio feeds to a usable proxy first). A timeout (`AbortError`) is
+its own soft kind `timeout`, never a block. Re-probe `fapi/v1/time` after 5 → 10 → 20 → 40 → 60 min (cap), reset on
+success — pulled forward to 5 s when the Binance socket delivers or a Binance REST call succeeds while marked blocked,
+and to ~3 s on a tab resume; `health.primary.nextProbeAt` holds the time. A successful probe only re-bootstraps the
+feeds that move back and reconnects the socket only when it is not live.
+
+Ratio feeds (`BINANCE_FAMILY_FEEDS`: the four chosen-period ratios + the 5-min twins) never leave Binance's cohort on a
+soft failure (network, timeout, 5xx, 429): they stay on Binance and retry after 15 s → 30 s → 60 s → 2 min → every 5 min
+(`failureRetryMs`); a second network failure in a row while the rest of Binance answers is read as `cors` (the browser
+cannot read `/futures/data`) and moves every futures-data feed to the proxy when it is usable. Only a real block hands
+`globalAccountRatio` to Bybit (other cohort); the 5-min twins are then parked (`Nur mit Binance`) unless the proxy serves
+them. A non-ratio REST feed moved to Bybit by soft failures gets a primary probe, so it comes back.
+
+Same-origin proxy `/api/binance/*`: Netlify proxy rewrites in the repo's `netlify.toml` (`/api/binance/futures/data/*` and
+the six `/fapi/v1/*` market paths → `https://fapi.binance.com`, served from the CDN edge next to the visitor). Probed on
+start (`/api/binance/fapi/v1/time` must return Binance JSON; the SPA's HTML or a 451 → not usable) and again — at most every
+5 min — when a ratio feed needs it. `preferProxy` / `provider.setPreferProxy(on)` (the `EU-Proxy verwenden` switch,
+`tj2-ui.useProxy`, wired in `marketStore`) routes the ratio feeds through it. Not available from disk (`file:`).
+
+Scheduler invariants: a failure while `navigator.onLine` is false keeps a 30-s retry armed, and data arriving while
+marked offline counts as "back online" (every REST feed is re-polled) — the `online` event is easily missed by a frozen
+tab. On a resume the overdue polls are spread over a few seconds. A watchdog on the 5-s health tick re-arms any REST feed
+that has neither a pending poll nor a poll in flight, and schedules a primary probe for feeds parked elsewhere.
+`provider.refresh(feed, { force: true })` (`Jetzt aktualisieren`) asks Binance again for a feed parked on another source
+while Binance is not blocked.
 
 ## Rendering status (Plan 4.4)
 
@@ -130,6 +160,7 @@ Use `useStatusLabel(feed)` / `provider.statusLabel(feed)`:
 | connecting | `Verbinde …` | muted |
 | reason `bad_symbol` | `Kein Live-Kurs` | error |
 | reason `unsupported` | `Nur mit Binance` (+ cohort tooltip in `detail`) | muted |
+| REST feed failing on its source (`consecutiveFailures > 0`, reason network/timeout/5xx/429/cors) | `Zuletzt HH:mm · Netzwerk/CORS-Fehler` / `· Zeitüberschreitung` / `· Serverfehler` / `· Rate-Limit` | warn |
 
 The **market card** status (`connecting|live|error|unavailable`) is driven only by the price feed:
 `useMarketView().status/message/sourceBadge` (`legacyStatus()`): a 6-s WS hiccup does not change the header;
@@ -208,8 +239,15 @@ in front. `requestSignalNotifyPermission()` must be called from the click that e
   `openInterestChange24h`, `taker`, `bid/ask`, `updatedAt`, `nextTickerRefreshAt`, `status/message/sourceBadge`.
 - `deriveTopTrader(snapshot, health, base)` → `longPct` (accounts|positions per `tj2-ui.topTraderBase`),
   `delta = topPositionLong% − globalLong%` (joined by timestamp), `deltaCandles` (trailing `> 0`, bundle `oK`),
-  `sparkline` (last 20), `onlyBinance`, `liveReadingOk`, `detail`, `taker`.
-- `virtualReading(topTrader, lastManual)` → `{ …, note: "Live von Binance" }` or `null` in the Bybit fallback.
+  `sparkline` (last 20), `onlyBinance`, `liveReadingOk`, `detail`, `taker`, `fromLive` / `readingFeed` (Long % and Delta
+  from the 5-min twin when it is newer). `liveReadingOk` needs the series from Binance or the proxy per health AND per
+  value (a Bybit retail series that ticked to `stale` no longer passes).
+- `topTraderFreshness(tt, health, periodMs)` + `freshnessText(f, now)` → the card note: `Binance liefert alle 5 min neu ·
+  Stand 14:05 · nächste Daten in 3:12`, `Binance antwortet nicht (Netzwerk/CORS) · Stand 13:55 · neuer Versuch in 0:28`,
+  `Binance blockiert (Region) · … · neuer Versuch in 4:10`, `Binance über EU-Proxy · alle 5 min neu …`, `Offline`.
+  `topTraderHealthSignature(h)` is the re-render key.
+- `virtualReading(topTrader, lastManual)` → `{ …, note: "Live von Binance" }` (`· 5-min-Wert` from the twin) or `null` in
+  the Bybit fallback.
 - `triggerDistances(price, levels)`, `takerDelta`, `fundingPct`, `lastPrice`.
 
 ## Other modules
@@ -219,7 +257,7 @@ venue — the other journal's `BITSTAMP:BTCUSD` — or a bare `BTCUSD` maps to t
 dropped),
 `period.ts` (Binance/Bybit/OKX period tables, `cadenceLabel`), `feeds.ts` (spec table), `budget.ts` (token
 buckets at 10 % reserve), `schedule.ts` (`nextAlignedAt`, `wsBackoffMs`, `probeBackoffMs`, pausable `Scheduler`),
-`cache.ts` (`MarketCache`, `upsertSeries`, key `${source}:${symbol}:${feed}`, DB `tj-market`), `health.ts`
+`cache.ts` (`MarketCache`, `upsertSeries`, key `${source}:${symbol}:${feed}` / `${source}:${symbol}:${period}:${feed}`, DB `tj-market`), `health.ts`
 (pure `reduceHealth`), `statusLabel.ts`, `indicators.ts`, `sources/*` (zod-validated REST clients, `WsClient`,
 proxy probe), `format.ts` (minimal de-DE formatters).
 
@@ -236,5 +274,8 @@ pure engine in `tests/unit/signals.*.test.ts`. Kline fixtures: `binance-klines-{
 E2E: `await mockMarket(page, "live")` (`tests/e2e/mocks/market.ts`) routes REST to fixtures and replays the
 WS scenario through a fake `window.WebSocket`. Unit tests: `tests/unit/market.*.test.ts`.
 
-Netlify EU proxy: `netlify/functions-disabled/binance.mts` (`/api/binance/*`, region `fra`, allowlist,
-`x-upstream-status`, CORS to `SITE_ORIGIN`). Move to `netlify/functions/` to enable; needs Pro for `fra`.
+Proxy: the active route is the `netlify.toml` proxy rewrite (see above). The optional Netlify function
+`netlify/functions-disabled/binance.mts` (`/api/binance/*`, region `fra`, allowlist, `x-upstream-status`, CORS to
+`SITE_ORIGIN`) answers on the same paths if moved to `netlify/functions/` (needs Pro for `fra`); the probe accepts both.
+Top-trader staleness scenarios (one TypeError, 503/429 ×3, CORS on `/futures/data`, period 1h, period switch, missed
+`online` event, resume, real block, proxy preference): `tests/unit/market.toptrader.test.ts`.

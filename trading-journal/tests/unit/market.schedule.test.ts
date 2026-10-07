@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nextAlignedAt, currentBoundary, wsBackoffMs, probeBackoffMs, Scheduler, type TimerHost } from "@/market/schedule";
+import { nextAlignedAt, currentBoundary, wsBackoffMs, probeBackoffMs, failureRetryMs, nonAdvanceRetries, Scheduler, type TimerHost } from "@/market/schedule";
+import { buildFeedSpecs } from "@/market/feeds";
 import { Budget, TokenBucket, BUCKETS, klineWeight } from "@/market/budget";
 import { upsertSeries, MarketCache, memoryKV, cacheKey } from "@/market/cache";
 import type { Candle, RatioPoint } from "@/market/types";
@@ -47,6 +48,22 @@ describe("backoff math", () => {
     expect(probeBackoffMs(3)).toBe(40 * 60_000);
     expect(probeBackoffMs(4)).toBe(60 * 60_000);
     expect(probeBackoffMs(9)).toBe(60 * 60_000);
+  });
+});
+
+describe("ratio polling cadence", () => {
+  it("soft failures back off 15 s → 30 s → 60 s → 2 min, then every 5 min", () => {
+    expect([1, 2, 3, 4, 5, 9].map(failureRetryMs)).toEqual([15_000, 30_000, 60_000, 120_000, 300_000, 300_000]);
+    expect(failureRetryMs(0)).toBe(15_000);
+  });
+  it("futures-data feeds align to their period (a 1h series is polled hourly, retried up to 3× when late)", () => {
+    const s1h = buildFeedSpecs("1h");
+    expect(s1h.topAccountRatio).toMatchObject({ alignMs: 3_600_000, period: "1h", cadenceMs: 3_600_000 });
+    expect(s1h.topAccountRatio5m).toMatchObject({ alignMs: 300_000, period: "5m", sources: ["binance", "proxy", "cache"] });
+    expect(nonAdvanceRetries(3_600_000)).toBe(3);
+    expect(nonAdvanceRetries(300_000)).toBe(1);
+    expect(buildFeedSpecs("5m").topAccountRatio.alignMs).toBe(300_000);
+    expect(buildFeedSpecs("15m").takerRatio.alignMs).toBe(900_000);
   });
 });
 
@@ -135,6 +152,23 @@ describe("Scheduler", () => {
     advance(4000);
     expect(fired).toEqual([1000, 5000]);
   });
+  it("reschedule moves a pending job (paused or not) and pending() lists due times", () => {
+    const s = new Scheduler(host);
+    const fired: number[] = [];
+    s.in("a", 100, () => fired.push(t));
+    expect(s.reschedule("a", 500)).toBe(true);
+    expect(s.reschedule("missing", 1)).toBe(false);
+    advance(200);
+    expect(fired).toEqual([]);
+    s.pause();
+    s.reschedule("a", 900);
+    expect(s.pending()).toEqual([["a", 900]]);
+    advance(600);
+    s.resume();
+    expect(fired).toEqual([]);
+    advance(100);
+    expect(fired).toEqual([900]);
+  });
   it("cancelAll clears everything", () => {
     const s = new Scheduler(host);
     s.in("a", 10, () => {
@@ -171,6 +205,19 @@ describe("cache", () => {
     expect(await otherSymbol.hydrate(["topAccountRatio"])).toEqual([]);
     await other.clear();
     expect(await kv.keys()).toEqual([]);
+  });
+  it("futures-data feeds persist per period (a 1h ring never hydrates the 4h series)", async () => {
+    const kv = memoryKV();
+    const pt = (time: number): RatioPoint => ({ time, longPct: 60, shortPct: 40, ratio: 1.5 });
+    const h1 = new MarketCache("BTCUSDT", kv, (f) => (f === "topAccountRatio" ? "1h" : undefined));
+    h1.set("topAccountRatio", { data: [pt(3_600_000)], asOf: 3_600_000, receivedAt: 1, source: "binance", comparable: true });
+    await h1.persist("topAccountRatio");
+    expect(await kv.keys()).toEqual(["binance:BTCUSDT:1h:topAccountRatio"]);
+    expect(cacheKey("binance", "BTCUSDT", "topAccountRatio", "4h")).toBe("binance:BTCUSDT:4h:topAccountRatio");
+    const h4 = new MarketCache("BTCUSDT", kv, (f) => (f === "topAccountRatio" ? "4h" : undefined));
+    expect(await h4.hydrate(["topAccountRatio"])).toEqual([]);
+    const again = new MarketCache("BTCUSDT", kv, () => "1h");
+    expect(await again.hydrate(["topAccountRatio"])).toEqual(["topAccountRatio"]);
   });
   it("replaces the buffer when the source changes", () => {
     const cache = new MarketCache("BTCUSDT", null);

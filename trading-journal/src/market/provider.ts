@@ -5,10 +5,41 @@
  */
 import type { Candle, FeedId, FeedSpec, FeedValue, HealthEvent, ProviderHealth, SeriesFeed, Source, Stamped, StatusLabel, MarketDataProvider, AggTrade } from "./types";
 import { resolveSymbol, type SymbolInfo } from "./symbol";
-import { normalizePeriod, INTERVAL_MS, type FetchInterval, type PeriodResult, type KlineInterval } from "./period";
-import { BOOTSTRAP_LIMIT, GAP_FILL_MAX, klineBootstrapLimit, BYBIT_UNSUPPORTED, DEFAULT_SOURCE_CHAIN, FEED_IDS, FUTURES_DATA_FEEDS, FUTURES_DATA_RETENTION_MS, HISTORY_MAX_CALLS, HISTORY_PAGE_LIMIT, KLINE_FEEDS, OKX_UNSUPPORTED, POLL_LIMIT_FUTURES_DATA, RATIO_FEEDS, WS_FEEDS, WS_REST_FALLBACK_MS, buildFeedSpecs, effectiveSpec, isKlineFeed, klineFeedInterval, isSeriesFeed } from "./feeds";
+import { normalizePeriod, INTERVAL_MS, type FetchInterval, type PeriodResult, type KlineInterval, type Period } from "./period";
+import {
+  ALL_FUTURES_DATA_FEEDS,
+  BINANCE_FAMILY_FEEDS,
+  BOOTSTRAP_LIMIT,
+  GAP_FILL_MAX,
+  klineBootstrapLimit,
+  BYBIT_UNSUPPORTED,
+  DEFAULT_SOURCE_CHAIN,
+  FEED_IDS,
+  FUTURES_DATA_FEEDS,
+  FUTURES_DATA_RETENTION_MS,
+  HISTORY_MAX_CALLS,
+  HISTORY_PAGE_LIMIT,
+  KLINE_FEEDS,
+  LIVE_RATIO_BOOTSTRAP_LIMIT,
+  LIVE_RATIO_MAIN,
+  LIVE_RATIO_OF,
+  LIVE_RATIO_PERIOD,
+  LIVE_RATIO_POLL_LIMIT,
+  OKX_UNSUPPORTED,
+  POLL_LIMIT_FUTURES_DATA,
+  RATIO_FEEDS,
+  WS_FEEDS,
+  WS_REST_FALLBACK_MS,
+  buildFeedSpecs,
+  effectiveSpec,
+  isFamilyFeed,
+  isKlineFeed,
+  isLiveRatioFeed,
+  klineFeedInterval,
+  isSeriesFeed,
+} from "./feeds";
 import { Budget, klineWeight } from "./budget";
-import { NON_ADVANCE_RETRY_MS, Scheduler, nextAlignedAt, probeBackoffMs, realTimerHost, type TimerHost } from "./schedule";
+import { NON_ADVANCE_RETRIES_MS, Scheduler, failureRetryMs, nextAlignedAt, nonAdvanceRetries, probeBackoffMs, realTimerHost, type TimerHost } from "./schedule";
 import { MarketCache, upsertBar, upsertSeries, RING_CAPACITY, type KVStore } from "./cache";
 import { initialHealth, reduceHealth } from "./health";
 import { statusLabelFor, STRINGS } from "./statusLabel";
@@ -31,7 +62,10 @@ export interface ProviderDeps {
   documentRef?: Pick<Document, "hidden" | "addEventListener" | "removeEventListener"> | null;
   windowRef?: Pick<Window, "addEventListener" | "removeEventListener"> | null;
   online?: () => boolean;
-  /** probe `/api/binance/fapi/v1/time` once on start (default: only in a browser) */
+  /**
+   * probe `/api/binance/fapi/v1/time` on start and again when a ratio feed needs it (default: only in a browser);
+   * `false` never touches the proxy
+   */
   probeProxy?: boolean;
   proxyBase?: string;
   timeZone?: string;
@@ -48,6 +82,8 @@ export interface ProviderOptions {
   sources?: Source[];
   /** subscribe to `bookTicker` (only when the Bid/Ask tile is visible) */
   bookTop?: boolean;
+  /** route the Binance ratio feeds through the same-origin proxy when it is usable (`tj2-ui.useProxy`) */
+  preferProxy?: boolean;
   deps?: ProviderDeps;
 }
 
@@ -57,6 +93,8 @@ export interface MarketProvider extends MarketDataProvider {
   readonly specs: Record<FeedId, FeedSpec>;
   readonly started: boolean;
   setBookTop(on: boolean): void;
+  /** `EU-Proxy verwenden`: route the Binance ratio feeds through `/api/binance` when the proxy is usable. */
+  setPreferProxy(on: boolean): void;
   /** any feed or health change (coarse; used by the store) */
   onChange(cb: () => void): () => void;
   snapshot(): FeedSnapshot;
@@ -80,7 +118,30 @@ class Unsupported extends Error {
 }
 
 const RETRY_MS = 15_000;
+/** Bybit liveness memo for the blocked check. */
 const BLOCK_PROBE_MEMO_MS = 30_000;
+/** A Binance WebSocket frame this recent proves Binance is reachable from here: no geo-block, whatever REST says. */
+const WS_PROOF_MS = 30_000;
+/** Same for a successful Binance REST answer. */
+const REST_PROOF_MS = 60_000;
+/** "Blocked" needs network failures on ≥ 2 different Binance paths within this window (plus Bybit answering). */
+const BLOCK_WINDOW_MS = 120_000;
+const BLOCK_MIN_PATHS = 2;
+/** Failures right after the tab becomes visible (radio / stale HTTP/2 connection waking up) never count as a block. */
+const RESUME_GRACE_MS = 10_000;
+/** Overdue polls on resume are spread out instead of all firing in the same tick. */
+const RESUME_STAGGER_MS = 1_500;
+const RESUME_STAGGER_STEP_MS = 300;
+/** Re-probe soon when evidence says Binance answers again (WS frame / REST success while marked blocked; resume). */
+const FAST_PROBE_MS = 5_000;
+/** …but at most this often (a socket that delivers while REST stays unreachable must not trigger a probe storm). */
+const FAST_PROBE_MIN_GAP_MS = 2 * 60_000;
+/** While `navigator.onLine` is false the failed feed is retried at this pace (the `online` event can be missed). */
+const OFFLINE_RETRY_MS = 30_000;
+/** Proxy re-probe throttle. */
+const PROXY_REPROBE_MS = 5 * 60_000;
+/** Watchdog re-arm delay for a REST feed without a pending poll. */
+const WATCHDOG_REARM_MS = 1_000;
 /** Default wait for budget tokens in `fetchKlines`. */
 const FETCH_KLINES_MAX_WAIT_MS = 15_000;
 
@@ -101,12 +162,14 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     return true;
   });
   const specs = buildFeedSpecs(period.period, chain);
+  /** With the chosen period = 5m the live 5-min ratios are the same request: they ride along with their main feed. */
+  const mirrorLive = period.period === LIVE_RATIO_PERIOD;
   const doc = deps.documentRef === undefined ? (typeof document !== "undefined" ? document : null) : deps.documentRef;
   const win = deps.windowRef === undefined ? (typeof window !== "undefined" ? window : null) : deps.windowRef;
   const isOnline = deps.online ?? (() => (typeof navigator !== "undefined" && typeof navigator.onLine === "boolean" ? navigator.onLine : true));
   const hidden = () => !!doc?.hidden;
 
-  const cache = new MarketCache(sym, deps.kv);
+  const cache = new MarketCache(sym, deps.kv, (f) => specs[f].period);
   const budget = new Budget(now());
   const scheduler = new Scheduler(host);
   const binance: BinanceRest = binanceRest({ fetch: deps.fetch, now });
@@ -119,9 +182,21 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   let bookTop = !!opts.bookTop;
   let wsOpens = 0;
   let probeFailures = 0;
-  let lastBlockProbeAt = 0;
   let lastNextFundingTime = 0;
-  const lastAdvanceCheck = new Map<FeedId, { newest: number; retried: boolean }>();
+  let preferProxy = !!opts.preferProxy;
+  /** evidence for / against a geo-block (see `detectBlocked`) */
+  let lastWsMessageAt = -Infinity;
+  let lastBinanceOkAt = -Infinity;
+  let resumedAt = -Infinity;
+  const netFailures: { at: number; path: string }[] = [];
+  let bybitCheck: { at: number; alive: Promise<boolean> } | null = null;
+  let lastProxyProbeAt = -Infinity;
+  let lastFastProbeAt = -Infinity;
+  let proxyProbing = false;
+  const proxyAllowed = chain.includes("proxy") && (deps.probeProxy ?? typeof window !== "undefined");
+  /** feeds whose poll is in flight (the watchdog must not re-arm them) */
+  const active = new Set<FeedId>();
+  const lastAdvanceCheck = new Map<FeedId, { newest: number; retries: number }>();
   const inflight = new Map<string, Promise<Batch>>();
   /** results younger than this are shared between feeds that map to the same request (e.g. Bybit `tickers`) */
   const recent = new Map<string, { at: number; batch: Batch }>();
@@ -213,8 +288,17 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
         return b;
       case "topPositionRatio":
       case "topAccountRatio":
-      case "globalAccountRatio":
-        set(b, feed, await client.ratio(feed, sym, period.period, { limit: bootstrap ? BOOTSTRAP_LIMIT.futuresData : POLL_LIMIT_FUTURES_DATA }));
+      case "globalAccountRatio": {
+        const v = await client.ratio(feed, sym, period.period, { limit: bootstrap ? BOOTSTRAP_LIMIT.futuresData : POLL_LIMIT_FUTURES_DATA });
+        set(b, feed, v);
+        const twin = LIVE_RATIO_OF[feed];
+        if (twin && isMirrored(twin, client.source)) set(b, twin, v);
+        return b;
+      }
+      case "topPositionRatio5m":
+      case "topAccountRatio5m":
+      case "globalAccountRatio5m":
+        set(b, feed, await client.ratio(LIVE_RATIO_MAIN[feed], sym, LIVE_RATIO_PERIOD, { limit: bootstrap ? LIVE_RATIO_BOOTSTRAP_LIMIT : LIVE_RATIO_POLL_LIMIT }));
         return b;
       case "takerRatio":
         set(b, "takerRatio", await client.takerRatio(sym, period.period, { limit: bootstrap ? BOOTSTRAP_LIMIT.futuresData : POLL_LIMIT_FUTURES_DATA }));
@@ -341,11 +425,12 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     const fh = health.feeds[feed];
     if (spec.alignMs) {
       const check = lastAdvanceCheck.get(feed);
-      if (!advanced && check && !check.retried) {
-        check.retried = true;
-        return t + NON_ADVANCE_RETRY_MS;
+      if (!advanced && check && check.retries < nonAdvanceRetries(spec.alignMs)) {
+        const wait = NON_ADVANCE_RETRIES_MS[check.retries]!;
+        check.retries += 1;
+        return t + wait;
       }
-      if (check) check.retried = false;
+      if (check) check.retries = 0;
       return nextAlignedAt(t, { alignMs: spec.alignMs, lagMs: spec.lagMs, jitterMs: spec.jitterMs }, random);
     }
     if (feed === "fundingHistory") {
@@ -361,6 +446,15 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (!started) return;
     scheduler.at(`poll:${feed}`, at, () => void poll(feed, { bootstrap }));
     dispatch({ type: "schedule", feed, nextRefreshAt: at });
+    const twin = LIVE_RATIO_OF[feed];
+    if (twin && isMirrored(twin)) dispatch({ type: "schedule", feed: twin, nextRefreshAt: at });
+  }
+
+  /** A live 5-min ratio served by its main feed's request (chosen period = 5m, both on the same source). */
+  function isMirrored(feed: FeedId, source?: Source): boolean {
+    if (!mirrorLive || !isLiveRatioFeed(feed)) return false;
+    const own = health.feeds[feed].source;
+    return own === (source ?? health.feeds[LIVE_RATIO_MAIN[feed]].source);
   }
 
   function wsCovers(feed: FeedId): boolean {
@@ -374,6 +468,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     const source = fh.source;
     if (source === "cache" || source === "tradingview") return;
     if (feed === "bookTop" && !bookTop) return;
+    if (isMirrored(feed)) return; // fetched with its chosen-period twin
     if (WS_FEEDS.includes(feed) && !o.bootstrap && !o.force && wsCovers(feed)) return; // WS delivers
     const spec = specs[feed];
     const units = isKlineFeed(feed) ? klineWeight(klineLimit(feed, !!o.bootstrap)) : spec.cost.units;
@@ -384,10 +479,14 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     }
     if (o.force) budget.take(cost.bucket, cost.units, now());
     const before = newestTime(feed);
+    active.add(feed);
     try {
       const batch = await fetchFeed(feed, source, !!o.bootstrap);
+      active.delete(feed);
       if (!started) return;
       const t = now();
+      if (!health.online) backOnline(feed); // data arrived: we are online (the event was missed)
+      if (source === "binance") onBinanceOk(t);
       for (const id of FEED_IDS) {
         const v = batch[id];
         if (!v) continue;
@@ -400,15 +499,30 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       }
       const after = newestTime(feed);
       const advanced = before === undefined || (after !== undefined && after > before);
-      if (spec.alignMs) lastAdvanceCheck.set(feed, { newest: after ?? 0, retried: lastAdvanceCheck.get(feed)?.retried ?? false });
-      if (isSeriesFeed(feed)) void cache.persist(feed);
+      if (spec.alignMs) lastAdvanceCheck.set(feed, { newest: after ?? 0, retries: lastAdvanceCheck.get(feed)?.retries ?? 0 });
+      for (const id of FEED_IDS) if (batch[id] && isSeriesFeed(id)) void cache.persist(id);
       // WS-fed feeds on Binance are only polled while the socket is down (10 s); otherwise the stream delivers
       if (WS_FEEDS.includes(feed) && source === "binance" && health.ws.state !== "fallback") return;
       schedulePoll(feed, nextPollAt(feed, source, advanced));
     } catch (err) {
+      active.delete(feed);
       if (!started) return;
       await onFetchError(feed, source, err);
     }
+  }
+
+  /** Binance answered over REST: evidence against a block; while marked blocked, re-probe right away. */
+  function onBinanceOk(t: number): void {
+    lastBinanceOkAt = t;
+    netFailures.length = 0;
+    if (health.primary.blocked) fastProbe(t);
+  }
+
+  /** Evidence that Binance answers while marked blocked: probe in 5 s instead of the 5–60 min backoff (throttled). */
+  function fastProbe(t: number): void {
+    if (t - lastFastProbeAt < FAST_PROBE_MIN_GAP_MS) return;
+    lastFastProbeAt = t;
+    scheduleProbe(FAST_PROBE_MS);
   }
 
   function newestTime(feed: FeedId): number | undefined {
@@ -421,42 +535,67 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     return v.asOf;
   }
 
+  /** German detail for the feed's tooltip / the Live-Daten table. */
+  function failureDetail(kind: string, status?: number, message?: string): string | undefined {
+    if (status) return `HTTP ${status}`;
+    if (kind === "timeout") return "Zeitüberschreitung (keine Antwort in 15 s)";
+    if (kind === "network") return `Netzwerk/CORS: ${message || "Abruf fehlgeschlagen"}`;
+    if (kind === "cors") return "Browser darf die Antwort nicht lesen (CORS)";
+    return message || undefined;
+  }
+
   async function onFetchError(feed: FeedId, source: Source, err: unknown): Promise<void> {
     const t = now();
     if (err instanceof Unsupported) {
+      const before = health;
       dispatch({ type: "unsupported", feed, source, now: t, detail: err.detail });
-      // nothing to poll on this source; re-probing the primary will bring it back
+      bootstrapMoved(before);
+      if (health.feeds[feed].source === source) {
+        // parked (e.g. a top-trader ratio on Bybit): the proxy or the primary re-probe brings it back — never idle
+        if (isFamilyFeed(feed)) void maybeProbeProxy();
+        scheduleProbe();
+      }
       return;
     }
     const rest = toRestError(err);
     let kind = rest.kind;
     if (kind === "offline" || !isOnline()) {
       dispatch({ type: "online", online: false, now: t });
+      // keep a retry armed: the `online` event is easily missed by a frozen tab
+      schedulePoll(feed, t + OFFLINE_RETRY_MS);
       return;
     }
     if (kind === "rate_limited") budget.backoff(bucketFor(feed, source, 0).bucket, t);
-    if (kind === "network" && (source === "binance" || source === "proxy") && source === "binance") {
-      const blocked = await detectBlocked();
-      if (blocked) kind = "blocked_451";
+    if (kind === "network" && source === "binance") {
+      noteNetworkFailure(feed, t);
+      if (await detectBlocked(t)) kind = "blocked_451";
+      // a ratio request fails again while the rest of Binance answers: the browser cannot read /futures/data
+      // (CORS / an edge error without CORS headers) → the proxy, if it serves Binance's data
+      else if (ALL_FUTURES_DATA_FEEDS.includes(feed) && health.feeds[feed].consecutiveFailures >= 1 && binanceProvenReachable(t) && health.proxy.usable === true) kind = "cors";
     }
+    if (!started) return;
     const before = health;
-    dispatch({ type: "rest_fail", feed, source, kind, now: t, detail: rest.status ? `HTTP ${rest.status}` : undefined });
-    if (kind === "blocked_451" || kind === "cors") {
+    dispatch({ type: "rest_fail", feed, source, kind, now: t, detail: failureDetail(kind, rest.status, rest.message) });
+    if (kind === "blocked_451") {
       dispatch({ type: "probe", source: "binance", ok: false, blocked: true, now: t });
       scheduleProbe();
     }
     bootstrapMoved(before, feed);
     const after = health.feeds[feed];
     if (after.source !== source && after.source !== "cache") {
-      // moved to the next source: bootstrap there right away
+      // moved to the next source: bootstrap there right away; a soft move off the primary gets a way back
       schedulePoll(feed, now(), true);
+      if (!health.primary.blocked && after.source !== "proxy") scheduleProbe();
       return;
     }
     if (after.state === "offline") {
       scheduleProbe();
       return;
     }
-    schedulePoll(feed, now() + (specs[feed].alignMs ? NON_ADVANCE_RETRY_MS : RETRY_MS));
+    // stayed on its source: retry with a capped backoff (the ratio feeds never park on a source without a retry)
+    if (isFamilyFeed(feed) && after.consecutiveFailures >= 2) void maybeProbeProxy();
+    const aligned = !!specs[feed].alignMs;
+    schedulePoll(feed, now() + (aligned || isFamilyFeed(feed) ? failureRetryMs(after.consecutiveFailures) : RETRY_MS));
   }
 
   /** Feeds whose source changed through a reducer step are bootstrapped on the new source right away. */
@@ -469,18 +608,40 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     }
   }
 
-  /** Binance `TypeError` while Bybit answers → primary blocked (Plan 4.4). Memoised for 30 s. */
-  async function detectBlocked(): Promise<boolean> {
-    const t = now();
-    if (t - lastBlockProbeAt < BLOCK_PROBE_MEMO_MS) return health.primary.blocked;
-    lastBlockProbeAt = t;
+  function noteNetworkFailure(path: string, t: number): void {
+    netFailures.push({ at: t, path });
+    while (netFailures.length && t - netFailures[0]!.at > BLOCK_WINDOW_MS) netFailures.shift();
+  }
+
+  /** Binance itself answered recently (a WS frame or a REST success). */
+  function binanceProvenReachable(t: number): boolean {
+    return t - lastWsMessageAt < WS_PROOF_MS || t - lastBinanceOkAt < REST_PROOF_MS;
+  }
+
+  /**
+   * Primary blocked (Plan 4.4) — strict, because a false positive takes the top traders off Binance: never while
+   * Binance demonstrably answers (WS frame < 30 s, REST success < 60 s) or right after a resume; otherwise network
+   * failures on ≥ 2 different Binance paths within 2 min AND Bybit answering. Bybit's answer is memoised for 30 s.
+   */
+  async function detectBlocked(t: number): Promise<boolean> {
+    if (health.primary.blocked) return true;
     if (!symbolInfo.bybit) return false;
-    try {
-      await bybit.serverTime();
-      return true;
-    } catch {
-      return false;
+    if (binanceProvenReachable(t)) return false;
+    if (t - resumedAt < RESUME_GRACE_MS) return false;
+    const paths = new Set(netFailures.filter((x) => t - x.at <= BLOCK_WINDOW_MS).map((x) => x.path));
+    if (paths.size < BLOCK_MIN_PATHS) return false;
+    if (!bybitCheck || t - bybitCheck.at >= BLOCK_PROBE_MEMO_MS) {
+      bybitCheck = {
+        at: t,
+        alive: bybit.serverTime().then(
+          () => true,
+          () => false,
+        ),
+      };
     }
+    const alive = await bybitCheck.alive;
+    // the socket may have delivered while Bybit was being asked
+    return alive && !binanceProvenReachable(now());
   }
 
   function onFundingTick(m: FeedValue["markPrice"]): void {
@@ -493,15 +654,38 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
 
   // ------------------------------------------------------------ primary re-probe
 
-  function scheduleProbe(): void {
-    if (!started || scheduler.has("probe")) return;
-    scheduler.in("probe", probeBackoffMs(probeFailures), () => void probePrimary());
+  /**
+   * Primary re-probe: after `probeBackoffMs(failures)` (5 → 60 min), or after `delayMs` (fast path: Binance answers
+   * again, tab resumed). An earlier pending probe is kept, a later one is pulled forward.
+   */
+  function scheduleProbe(delayMs?: number): void {
+    if (!started) return;
+    const at = now() + (delayMs ?? probeBackoffMs(probeFailures));
+    const due = scheduler.dueAt("probe");
+    if (due !== undefined && due <= at) return;
+    scheduler.at("probe", at, () => {
+      dispatch({ type: "probe_scheduled", at: undefined, now: now() });
+      void probePrimary();
+    });
+    dispatch({ type: "probe_scheduled", at, now: now() });
+  }
+
+  /** Something waits for the primary: blocked, or a REST feed parked on another exchange / the cache. */
+  function needsProbe(): boolean {
+    if (health.primary.blocked) return true;
+    for (const f of FEED_IDS) {
+      const fh = health.feeds[f];
+      if (specs[f].transport !== "rest" || (specs[f].sources[0] ?? "binance") !== "binance") continue;
+      if (fh.source !== "binance" && fh.source !== "proxy") return true;
+      if (fh.reason === "unsupported") return true;
+    }
+    return false;
   }
 
   async function probePrimary(): Promise<void> {
     if (!started) return;
     if (!isOnline() || hidden()) {
-      // retried on visibilitychange / online
+      // retried on visibilitychange / online / by the watchdog
       return;
     }
     const t = now();
@@ -511,18 +695,55 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     }
     try {
       await binance.serverTime();
+      if (!started) return;
       probeFailures = 0;
+      lastBinanceOkAt = now();
+      netFailures.length = 0;
+      const before = health;
       dispatch({ type: "probe", source: "binance", ok: true, now: now() });
-      bootstrapAll();
-      if (chain.includes("binance")) ws.reconnect();
+      if (preferProxy) routeFamilyToProxy();
+      bootstrapMoved(before);
+      if (chain.includes("binance") && health.ws.state !== "live") ws.reconnect();
     } catch (err) {
+      if (!started) return;
       probeFailures += 1;
       const rest = toRestError(err);
-      const blocked = rest.kind === "blocked_451" || (rest.kind === "network" && (await detectBlocked()));
+      if (rest.kind === "network") noteNetworkFailure("probe", now());
+      const blocked = rest.kind === "blocked_451" || (rest.kind === "network" && (await detectBlocked(now())));
+      if (!started) return;
       const before = health;
       dispatch({ type: "probe", source: "binance", ok: false, blocked, now: now() });
       bootstrapMoved(before);
-      scheduleProbe();
+      if (needsProbe()) scheduleProbe();
+    }
+  }
+
+  // ------------------------------------------------------------ proxy
+
+  /** (Re-)probes `/api/binance` — on start, and when a ratio feed needs it (throttled to every 5 min). */
+  async function maybeProbeProxy(force = false): Promise<void> {
+    if (!started || !proxyAllowed || proxyProbing) return;
+    const t = now();
+    if (!force && t - lastProxyProbeAt < PROXY_REPROBE_MS) return;
+    lastProxyProbeAt = t;
+    proxyProbing = true;
+    try {
+      const p = await probeProxy(deps.fetch, deps.proxyBase);
+      if (!started) return;
+      const before = health;
+      dispatch({ type: "probe", source: "proxy", ok: p.usable, blocked: p.blocked, now: now() });
+      if (preferProxy) routeFamilyToProxy();
+      bootstrapMoved(before);
+    } finally {
+      proxyProbing = false;
+    }
+  }
+
+  /** `EU-Proxy verwenden`: every Binance ratio feed on the direct route moves to the usable proxy. */
+  function routeFamilyToProxy(): void {
+    if (health.proxy.usable !== true) return;
+    for (const f of BINANCE_FAMILY_FEEDS) {
+      if (health.feeds[f].source === "binance" && specs[f].sources.includes("proxy")) dispatch({ type: "move", feed: f, source: "proxy", now: now() });
     }
   }
 
@@ -543,6 +764,9 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       }
     },
     onMessage: (raw, t) => {
+      lastWsMessageAt = t;
+      // the Binance socket delivers, so Binance is not blocked from here: re-probe soon instead of in 5–60 min
+      if (health.primary.blocked) fastProbe(t);
       const ev = parseWsMessage(raw);
       if (!ev) return;
       switch (ev.kind) {
@@ -595,6 +819,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   function bootstrapAll(): void {
     for (const f of FEED_IDS) {
       if (f === "bookTop" && !bookTop) continue;
+      if (isMirrored(f)) continue;
       if (f === "aggTrade" && chain[0] === "binance" && !health.primary.blocked) continue; // WS only, price from ticker until then
       void poll(f, { bootstrap: true });
     }
@@ -605,16 +830,48 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       scheduler.pause();
       void cache.persistAll();
     } else {
+      const t = now();
+      resumedAt = t;
+      staggerOverdue(t);
       scheduler.resume();
       ws.nudge();
-      if (health.primary.blocked && !scheduler.has("probe")) scheduleProbe();
+      if (needsProbe()) scheduleProbe(RESUME_GRACE_MS / 3);
       armTick();
     }
   }
+
+  /**
+   * Resume after the tab was hidden: every poll that fell due meanwhile would fire in the same tick, while the radio /
+   * the pooled HTTP/2 connection is still waking up. Spread them over a few seconds instead.
+   */
+  function staggerOverdue(t: number): void {
+    let i = 0;
+    for (const [key, at] of scheduler.pending()) {
+      if (!key.startsWith("poll:") || at > t + RESUME_STAGGER_MS) continue;
+      const next = t + RESUME_STAGGER_MS + i * RESUME_STAGGER_STEP_MS + Math.floor(random() * RESUME_STAGGER_STEP_MS);
+      if (scheduler.reschedule(key, next)) dispatch({ type: "schedule", feed: key.slice(5) as FeedId, nextRefreshAt: next });
+      i += 1;
+    }
+  }
   function onOnline(): void {
-    dispatch({ type: "online", online: true, now: now() });
+    backOnline();
+  }
+
+  /**
+   * Back online (the `online` event, or data arriving while marked offline because that event was missed): every
+   * feed restarts `connecting`, so every REST feed is polled again now — spread over a few seconds — instead of
+   * waiting for its next aligned slot (an hourly series would otherwise stay `connecting` for up to an hour).
+   */
+  function backOnline(except?: FeedId): void {
+    const t = now();
+    dispatch({ type: "online", online: true, now: t });
     ws.nudge();
-    for (const f of FEED_IDS) if (specs[f].transport === "rest") void poll(f);
+    let i = 0;
+    for (const f of FEED_IDS) {
+      if (f === except || specs[f].transport !== "rest" || isMirrored(f)) continue;
+      schedulePoll(f, t + i * RESUME_STAGGER_STEP_MS);
+      i += 1;
+    }
   }
   function onOffline(): void {
     dispatch({ type: "online", online: false, now: now() });
@@ -627,8 +884,27 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (!started || scheduler.has("tick")) return;
     scheduler.in("tick", deps.tickMs ?? 5000, () => {
       dispatch({ type: "tick", now: now() });
+      watchdog();
       armTick();
     });
+  }
+
+  /**
+   * Invariant: every REST feed has a pending poll, a poll in flight, or (parked on another exchange / the cache /
+   * unsupported) a pending primary probe. Re-arms whatever slipped through (a missed `online` event, an error path
+   * that returned early) — a feed that silently stops polling is exactly the "prices move, top traders don't" bug.
+   */
+  function watchdog(): void {
+    if (!started) return;
+    for (const f of FEED_IDS) {
+      if (specs[f].transport !== "rest" || isMirrored(f)) continue;
+      if (active.has(f) || scheduler.has(`poll:${f}`)) continue;
+      const fh = health.feeds[f];
+      if (fh.reason === "bad_symbol") continue;
+      if (fh.source === "cache" || fh.source === "tradingview" || fh.reason === "unsupported") continue; // probe below
+      schedulePoll(f, now() + WATCHDOG_REARM_MS + Math.floor(random() * WATCHDOG_REARM_MS), fh.lastDataAt === undefined);
+    }
+    if (needsProbe() && !scheduler.has("probe")) scheduleProbe();
   }
 
   function start(): void {
@@ -657,9 +933,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     });
     bootstrapAll();
     if (chain.includes("binance")) ws.start();
-    if (deps.probeProxy ?? (typeof window !== "undefined" && chain.includes("proxy"))) {
-      void probeProxy(deps.fetch, deps.proxyBase).then((p) => started && dispatch({ type: "probe", source: "proxy", ok: p.usable, blocked: p.blocked, now: now() }));
-    }
+    void maybeProbeProxy(true);
     if (hidden()) scheduler.pause();
     armTick();
   }
@@ -671,6 +945,11 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     scheduler.cancelAll();
     scheduler.resume();
     inflight.clear();
+    active.clear();
+    netFailures.length = 0;
+    bybitCheck = null;
+    lastFastProbeAt = -Infinity;
+    lastAdvanceCheck.clear();
     doc?.removeEventListener("visibilitychange", onVisibility);
     win?.removeEventListener("online", onOnline);
     win?.removeEventListener("offline", onOffline);
@@ -688,7 +967,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     const source = fh.source === "cache" ? "binance" : fh.source;
     const client = source === "proxy" ? proxy : source === "binance" ? binance : null;
     let from = range.from;
-    const isFutures = FUTURES_DATA_FEEDS.includes(feed);
+    const isFutures = ALL_FUTURES_DATA_FEEDS.includes(feed);
+    const feedPeriod = (specs[feed].period ?? period.period) as Period;
     if (isFutures) {
       const oldest = t - FUTURES_DATA_RETENTION_MS;
       if (range.to < oldest) {
@@ -723,9 +1003,12 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
         } else if (client && isFutures) {
           if (!budget.take("binance.futuresData", 1, now())) break;
           const p = { limit: 500, startTime: Math.max(from, endTime - 500 * specs[feed].cadenceMs), endTime };
-          if (feed === "openInterestHist") page = (await client.openInterestHist(sym, period.period, p)) as Stamped<FeedValue[F]>;
-          else if (feed === "takerRatio") page = (await client.takerRatio(sym, period.period, p)) as Stamped<FeedValue[F]>;
-          else page = (await client.ratio(feed as "topPositionRatio" | "topAccountRatio" | "globalAccountRatio", sym, period.period, p)) as Stamped<FeedValue[F]>;
+          if (feed === "openInterestHist") page = (await client.openInterestHist(sym, feedPeriod, p)) as Stamped<FeedValue[F]>;
+          else if (feed === "takerRatio") page = (await client.takerRatio(sym, feedPeriod, p)) as Stamped<FeedValue[F]>;
+          else {
+            const kind = isLiveRatioFeed(feed) ? LIVE_RATIO_MAIN[feed] : (feed as "topPositionRatio" | "topAccountRatio" | "globalAccountRatio");
+            page = (await client.ratio(kind, sym, feedPeriod, p)) as Stamped<FeedValue[F]>;
+          }
         } else if (client && feed === "fundingHistory") {
           if (!budget.take("binance.funding", 1, now())) break;
           page = (await client.fundingRate(sym, { limit: 1000, endTime })) as Stamped<FeedValue[F]>;
@@ -801,7 +1084,17 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       return () => void set!.delete(wrapped);
     },
     async refresh(f, o) {
-      await poll(f, { force: !!o?.force, bootstrap: false });
+      let bootstrap = false;
+      if (o?.force && started) {
+        // `Jetzt aktualisieren` on a feed parked elsewhere while Binance is not blocked: ask Binance again
+        const fh = health.feeds[f];
+        const primary = specs[f].sources[0] ?? "binance";
+        if (specs[f].transport === "rest" && fh.source !== primary && fh.source !== "proxy" && !health.primary.blocked && !isMirrored(f)) {
+          dispatch({ type: "move", feed: f, source: primary, now: now() });
+          bootstrap = true;
+        }
+      }
+      await poll(f, { force: !!o?.force, bootstrap });
     },
     history,
     getHealth: () => health,
@@ -811,6 +1104,19 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     },
     statusLabel(f, t): StatusLabel {
       return statusLabelFor(health, f, specs, cache.get(f), t ?? now(), deps.timeZone);
+    },
+    setPreferProxy(on) {
+      if (preferProxy === on) return;
+      preferProxy = on;
+      if (!started) return;
+      const before = health;
+      if (on) {
+        if (health.proxy.usable === true) routeFamilyToProxy();
+        else void maybeProbeProxy(true);
+      } else if (!health.primary.blocked) {
+        for (const f of BINANCE_FAMILY_FEEDS) if (health.feeds[f].source === "proxy") dispatch({ type: "move", feed: f, source: "binance", now: now() });
+      }
+      bootstrapMoved(before);
     },
     setBookTop(on) {
       if (bookTop === on) return;

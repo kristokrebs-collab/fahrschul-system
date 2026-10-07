@@ -13,6 +13,55 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Same-origin proxy for Binance USDⓈ-M PUBLIC market data (no keys, GET only), BEFORE the SPA fallbacks.
+# The app reads Binance directly from the browser; `src/market` switches the top-trader / retail ratio feeds to
+# /api/binance/* only when it must: the browser cannot read /futures/data/* (CORS / network) while the rest of Binance
+# answers, Binance is geo-blocked, or the user turned on "EU-Proxy verwenden". A probe of /api/binance/fapi/v1/time
+# must return Binance JSON first (without these rules it gets the SPA's index.html and the proxy stays off).
+# Netlify forwards the query string and proxies from its CDN edge next to the visitor. CSP: covered by 'self'.
+# Only the endpoints the app uses are mapped; anything else under /api/binance falls through to the SPA (HTML).
+[[redirects]]
+  from = "/api/binance/futures/data/*"
+  to = "https://fapi.binance.com/futures/data/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/time"
+  to = "https://fapi.binance.com/fapi/v1/time"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/klines"
+  to = "https://fapi.binance.com/fapi/v1/klines"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/premiumIndex"
+  to = "https://fapi.binance.com/fapi/v1/premiumIndex"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/ticker/24hr"
+  to = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/openInterest"
+  to = "https://fapi.binance.com/fapi/v1/openInterest"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/fundingRate"
+  to = "https://fapi.binance.com/fapi/v1/fundingRate"
+  status = 200
+  force = true
+
 # Share edition: its own SPA fallback, BEFORE the catch-all (existing files such as /teilen/assets/* win anyway;
 # `/teilen` without slash is served as /teilen/index.html by Netlify itself – no extra rule, rules ignore the slash).
 [[redirects]]

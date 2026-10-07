@@ -107,6 +107,20 @@ describe("marketStore", () => {
     expect(getProvider()).toBeNull();
   });
 
+  it("the `EU-Proxy verwenden` preference (tj2-ui.useProxy) reaches the running provider and stops with it", async () => {
+    const { useUi } = await import("@/store/uiStore");
+    useUi.setState({ useProxy: false });
+    const p = startMarket(settings, { deps });
+    const spy = vi.spyOn(p, "setPreferProxy");
+    useUi.setState({ useProxy: true });
+    expect(spy).toHaveBeenLastCalledWith(true);
+    useUi.setState({ theme: useUi.getState().theme }); // unrelated pref: no call
+    expect(spy).toHaveBeenCalledTimes(1);
+    stopMarket();
+    useUi.setState({ useProxy: false });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
   it("hooks follow feed, health and label changes; MotionValues update without renders", async () => {
     startMarket(settings, { deps });
     const hook = renderHook(() => ({ agg: useFeed("aggTrade"), health: useHealth(), label: useStatusLabel("markPrice"), view: useMarketView({ now: Date.now() }), tt: useTopTrader("accounts") }));

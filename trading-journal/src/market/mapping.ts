@@ -2,10 +2,11 @@
  * Mapping of feeds onto the app's legacy fields (Plan 4.8). Pure functions over `Stamped` values and the
  * health snapshot; every derived number carries its provenance (`source`, `comparable`, `asOf`).
  */
-import type { Candle, FeedHealth, FeedId, FeedValue, MarkPrice, ProviderHealth, RatioPoint, Source, Stamped, TakerPoint } from "./types";
+import type { Candle, FeedHealth, FeedId, FeedValue, MarkPrice, ProviderHealth, RatioPoint, Source, Stamped, StatusLabel, TakerPoint } from "./types";
 import { lastClosed4h, weeklyClose, weeklyRsi, currentBar } from "./indicators";
 import { hhmm, hhmmss, n0, n4 } from "./format";
-import { STRINGS, fallbackBadge } from "./statusLabel";
+import { SOFT_FAILURE_CAUSE, STRINGS, fallbackBadge } from "./statusLabel";
+import { cadenceLabel } from "./period";
 
 export type TopTraderBase = "accounts" | "positions";
 export type LegacyMarketStatus = "connecting" | "live" | "error" | "unavailable";
@@ -89,12 +90,17 @@ export interface TopTraderView {
   onlyBinance: boolean;
   /** period detail (bad_period / Bybit period mapping) */
   detail?: string;
-  /** whether a virtual live reading may be built (top feed AND delta series live/stale) */
+  /** whether a virtual live reading may be built (top feed AND delta series live/stale, all from Binance / proxy) */
   liveReadingOk: boolean;
   /** health state of the Long % feed */
   state: FeedHealth["state"];
+  /** time of the point Long % / Delta show (the 5-min point when the live series is newer) */
   asOf: number | null;
   taker: TakerView | null;
+  /** additive: Long % comes from the 5-min live series (newer than the chosen-period point) */
+  fromLive: boolean;
+  /** additive: the feed whose health describes the shown value (live 5-min twin or the chosen-period feed) */
+  readingFeed: FeedId;
 }
 
 export interface DeltaPoint {
@@ -265,27 +271,71 @@ export function deriveMarket(feeds: FeedSnapshot, health: ProviderHealth, opts: 
   };
 }
 
-/** Top-trader card (Plan 4.8). `base` comes from `tj2-ui.topTraderBase` (default `accounts`). */
+const BINANCE_DATA: readonly Source[] = ["binance", "proxy"];
+
+/**
+ * A ratio series usable for the live reading: data present, served by Binance (direct or through the proxy) both
+ * per health and per value, and `live`/`stale` (or `fallback` on the proxy, which is Binance's own data).
+ */
+function binanceSeries(health: ProviderHealth, feed: FeedId, v: Stamped<RatioPoint[]> | undefined): boolean {
+  const h = health.feeds[feed];
+  if (!h || !v || v.data.length === 0) return false;
+  if (!BINANCE_DATA.includes(v.source) || !BINANCE_DATA.includes(h.source)) return false;
+  return h.state === "live" || h.state === "stale" || (h.state === "fallback" && h.source === "proxy");
+}
+
+/** Newest of two optional points (the live one wins a tie). */
+function newer(live: RatioPoint | undefined, main: RatioPoint | undefined): RatioPoint | undefined {
+  if (!live) return main;
+  if (!main) return live;
+  return live.time >= main.time ? live : main;
+}
+
+/**
+ * Top-trader card (Plan 4.8). `base` comes from `tj2-ui.topTraderBase` (default `accounts`).
+ *
+ * Long % and Delta show the NEWEST Binance snapshot: the 5-min live series (`*5m`) when it is newer than the
+ * chosen-period point (ratios are snapshots, so the 5-min point at 14:00 equals the 1h point at 14:00 — the 5-min
+ * series just has one more every 5 minutes). `Δ+ Kerzen`, the sparkline and the "Live reading" gate stay on the
+ * chosen-period series (`settings.hyblock.timeframe`), as before.
+ */
 export function deriveTopTrader(feeds: FeedSnapshot, health: ProviderHealth, base: TopTraderBase = "accounts"): TopTraderView {
   const acc = feeds.topAccountRatio;
   const pos = feeds.topPositionRatio;
   const glob = feeds.globalAccountRatio;
   const primaryFeed: FeedId = base === "positions" ? "topPositionRatio" : "topAccountRatio";
+  const liveFeed: FeedId = base === "positions" ? "topPositionRatio5m" : "topAccountRatio5m";
   const primary = base === "positions" ? pos : acc;
   const h = health.feeds[primaryFeed];
   const onlyBinance = h.reason === "unsupported" || health.feeds.topPositionRatio.reason === "unsupported";
   const ds = deltaSeries(pos?.data, glob?.data);
   const deltas = ds.map((d) => d.delta);
   const last = ds[ds.length - 1];
-  const dsOk = ["live", "stale"].includes(health.feeds.topPositionRatio.state) && ["live", "stale"].includes(health.feeds.globalAccountRatio.state);
-  const liveOk = !onlyBinance && (h.state === "live" || h.state === "stale") && dsOk && primary !== undefined;
+  const dsOk = binanceSeries(health, "topPositionRatio", pos) && binanceSeries(health, "globalAccountRatio", glob);
+  const primaryOk = binanceSeries(health, primaryFeed, primary);
+
+  // 5-min live twins (absent until the provider delivered them; never from Bybit/OKX)
+  const liveOk = (f: FeedId, v: Stamped<RatioPoint[]> | undefined) => (binanceSeries(health, f, v) ? v!.data[v!.data.length - 1] : undefined);
+  const liveAcc = liveOk("topAccountRatio5m", feeds.topAccountRatio5m);
+  const livePos = liveOk("topPositionRatio5m", feeds.topPositionRatio5m);
+  const liveGlob = liveOk("globalAccountRatio5m", feeds.globalAccountRatio5m);
+  const liveTop = base === "positions" ? livePos : liveAcc;
+  const mainTop = primaryOk ? primary!.data[primary!.data.length - 1] : undefined;
+  const top = newer(liveTop, mainTop);
+  const fromLive = !!top && top === liveTop;
+  const liveDelta = livePos && liveGlob && livePos.time === liveGlob.time ? { time: livePos.time, delta: livePos.longPct - liveGlob.longPct } : undefined;
+  const delta = liveDelta && (!last || !dsOk || liveDelta.time >= last.time) ? liveDelta : last;
+
+  const longPct = top ? top.longPct : topTraderLongPct(acc?.data, pos?.data, base);
+  const liveReadingOk = !onlyBinance && dsOk && top !== undefined && delta !== undefined;
   const series = primary?.data ?? [];
+  const lastOf = (s: Stamped<RatioPoint[]> | undefined) => s?.data[s.data.length - 1];
   return {
-    longPct: topTraderLongPct(acc?.data, pos?.data, base),
-    longPctPositions: lastLongPct(pos?.data),
-    longPctAccounts: lastLongPct(acc?.data),
-    globalLongPct: lastLongPct(glob?.data),
-    delta: last ? last.delta : null,
+    longPct,
+    longPctPositions: newer(livePos, lastOf(pos))?.longPct ?? null,
+    longPctAccounts: newer(liveAcc, lastOf(acc))?.longPct ?? null,
+    globalLongPct: newer(liveGlob, lastOf(glob))?.longPct ?? null,
+    delta: delta ? delta.delta : null,
     deltaCandles: deltaCandles(deltas),
     deltaSeries: ds,
     sparkline: series.slice(-20).map((p) => p.longPct),
@@ -293,11 +343,114 @@ export function deriveTopTrader(feeds: FeedSnapshot, health: ProviderHealth, bas
     provenance: primary ? prov(primary) : null,
     onlyBinance,
     detail: h.detail ?? health.feeds.globalAccountRatio.detail,
-    liveReadingOk: liveOk,
-    state: h.state,
-    asOf: primary?.asOf ?? null,
+    liveReadingOk,
+    state: fromLive ? health.feeds[liveFeed].state : h.state,
+    asOf: top ? top.time : (primary?.asOf ?? null),
     taker: takerView(feeds.takerRatio?.data),
+    fromLive,
+    readingFeed: fromLive ? liveFeed : primaryFeed,
   };
+}
+
+// ------------------------------------------------------------------ freshness (Top-Trader card note)
+
+export type TopTraderFreshnessKind = "live" | "proxy" | "waiting" | "retrying" | "stale" | "blocked" | "offline" | "connecting";
+
+export interface TopTraderFreshness {
+  kind: TopTraderFreshnessKind;
+  tone: StatusLabel["tone"];
+  /** what is going on, e.g. `Binance liefert alle 5 min neu`, `Binance antwortet nicht (Netzwerk/CORS)` */
+  lead: string;
+  /** time of the shown point (`Stand HH:mm`) */
+  standAt: number | null;
+  /** next poll / retry / re-probe (countdown target), null when none is known */
+  nextAt: number | null;
+  /** countdown label: `nächste Daten` or `neuer Versuch` */
+  nextLabel: string;
+  /** tooltip: health detail of the feed (HTTP status, error text, period mapping) */
+  detail?: string;
+}
+
+export const FRESHNESS = {
+  everyFresh: (cadence: string) => `Binance liefert ${cadence} neu`,
+  viaProxy: (cadence: string) => `Binance über EU-Proxy · ${cadence} neu`,
+  retrying: "Binance antwortet nicht",
+  blocked: "Binance blockiert (Region)",
+  blockedProxy: "Binance blockiert · Daten über EU-Proxy",
+  offline: "Offline",
+  connecting: "Verbinde mit Binance …",
+  stale: "veraltet",
+  nextData: "nächste Daten",
+  retry: "neuer Versuch",
+  loading: "lädt …",
+  manual: "letzte Ablesung",
+} as const;
+
+/**
+ * What the Top-Trader card says about its numbers — distinguishes "Binance publishes every 5 min, next point in
+ * m:ss" from "Binance does not answer, retry in m:ss" and "Binance blocked here". `periodMs` is the cadence of the
+ * chosen-period series (`provider.specs.topAccountRatio.cadenceMs`); the live twins are 5 min.
+ */
+export function topTraderFreshness(tt: TopTraderView, health: ProviderHealth, periodMs?: number): TopTraderFreshness {
+  const fh = health.feeds[tt.readingFeed];
+  const cadenceMs = tt.fromLive ? 5 * 60_000 : periodMs;
+  const cadence = cadenceMs ? cadenceLabel(cadenceMs) : "";
+  const standAt = tt.asOf;
+  const detail = fh?.detail;
+  const base = { standAt, detail };
+  if (!health.online) return { ...base, kind: "offline", tone: "error", lead: FRESHNESS.offline, nextAt: null, nextLabel: FRESHNESS.retry };
+  if (health.primary.blocked) {
+    if (tt.liveReadingOk && fh?.source === "proxy") return { ...base, kind: "proxy", tone: "warn", lead: FRESHNESS.blockedProxy, nextAt: fh.nextRefreshAt ?? null, nextLabel: FRESHNESS.nextData };
+    return { ...base, kind: "blocked", tone: "warn", lead: FRESHNESS.blocked, nextAt: health.primary.nextProbeAt ?? null, nextLabel: FRESHNESS.retry };
+  }
+  if (!fh) return { ...base, kind: "connecting", tone: "muted", lead: FRESHNESS.connecting, nextAt: null, nextLabel: FRESHNESS.nextData };
+  // the reading's feed, or any series the reading needs, is failing on its source
+  const failing = [fh, health.feeds.topPositionRatio, health.feeds.globalAccountRatio].find((f) => f && f.consecutiveFailures > 0 && f.reason !== undefined && SOFT_FAILURE_CAUSE[f.reason] !== undefined);
+  if (failing) {
+    const why = SOFT_FAILURE_CAUSE[failing.reason!]!;
+    return { standAt, detail: failing.detail ?? detail, kind: "retrying", tone: "warn", lead: `${FRESHNESS.retrying} (${why})`, nextAt: failing.nextRefreshAt ?? null, nextLabel: FRESHNESS.retry };
+  }
+  if (!tt.liveReadingOk) {
+    if (tt.onlyBinance) return { ...base, kind: "blocked", tone: "warn", lead: STRINGS.onlyBinance, nextAt: health.primary.nextProbeAt ?? null, nextLabel: FRESHNESS.retry };
+    if (fh.state === "connecting" || fh.lastDataAt === undefined) return { ...base, kind: "connecting", tone: "muted", lead: FRESHNESS.connecting, nextAt: fh.nextRefreshAt ?? null, nextLabel: FRESHNESS.nextData };
+  }
+  if (fh.state === "stale" || fh.state === "offline") return { ...base, kind: "stale", tone: "warn", lead: FRESHNESS.stale, nextAt: fh.nextRefreshAt ?? null, nextLabel: FRESHNESS.nextData };
+  if (fh.source === "proxy") return { ...base, kind: "proxy", tone: "live", lead: FRESHNESS.viaProxy(cadence), nextAt: fh.nextRefreshAt ?? null, nextLabel: FRESHNESS.nextData };
+  return { ...base, kind: "live", tone: "live", lead: cadence ? FRESHNESS.everyFresh(cadence) : SOURCE_LEAD, nextAt: fh.nextRefreshAt ?? null, nextLabel: FRESHNESS.nextData };
+}
+const SOURCE_LEAD = "Binance";
+
+/** `m:ss` (minutes not padded), from milliseconds, never negative. */
+export function mmss(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+/**
+ * One line for the card note, recomputed every second on the shared clock:
+ * `Binance liefert alle 5 min neu · Stand 14:05 · nächste Daten in 3:12`. A countdown that ran out reads `lädt …`.
+ */
+export function freshnessText(f: TopTraderFreshness, now: number, timeZone?: string): string {
+  const parts: string[] = [f.lead];
+  if (f.standAt !== null) parts.push(`${STRINGS.standPrefix} ${hhmm(f.standAt, timeZone)}`);
+  if (f.nextAt !== null) parts.push(f.nextAt - now > 0 ? `${f.nextLabel} in ${mmss(f.nextAt - now)}` : f.nextLabel === FRESHNESS.retry ? `${FRESHNESS.retry} läuft …` : FRESHNESS.loading);
+  return parts.join(" · ");
+}
+
+/**
+ * Health signature of everything `deriveTopTrader` / `topTraderFreshness` read: re-derive the card only when one of
+ * these changes (the provider replaces the health object several times a second while the socket is live).
+ */
+export function topTraderHealthSignature(h: ProviderHealth): string {
+  const ids: FeedId[] = ["topAccountRatio", "topPositionRatio", "globalAccountRatio", "takerRatio", "topAccountRatio5m", "topPositionRatio5m", "globalAccountRatio5m"];
+  const parts = ids.map((id) => {
+    const f = h.feeds[id];
+    if (!f) return "-";
+    return `${f.state}:${f.source}:${f.reason ?? ""}:${f.consecutiveFailures}:${f.nextRefreshAt ?? 0}:${f.lastDataAt ?? 0}:${f.detail ?? ""}`;
+  });
+  return `${h.online ? 1 : 0}|${h.primary.blocked ? 1 : 0}|${h.primary.nextProbeAt ?? 0}|${String(h.proxy.usable)}|${parts.join("|")}`;
 }
 
 export interface VirtualReading {
@@ -322,7 +475,7 @@ export function virtualReading(tt: TopTraderView, last: { id?: string; structure
     deltaCandles: tt.deltaCandles,
     structure: !!last?.structure,
     rsi: !!last?.rsi,
-    note: "Live von Binance",
+    note: tt.fromLive ? "Live von Binance · 5-min-Wert" : "Live von Binance",
   };
 }
 

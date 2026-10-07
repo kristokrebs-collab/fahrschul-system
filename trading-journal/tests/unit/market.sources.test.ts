@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import klines1h from "../fixtures/binance-klines-1h.json";
 import klines1w from "../fixtures/binance-klines-1w.json";
 import premiumIndex from "../fixtures/binance-premiumIndex.json";
@@ -156,6 +156,27 @@ describe("binance error classification", () => {
     };
     await expect(fetchJson("https://fapi.binance.com/fapi/v1/time", z.unknown(), { fetch: f })).rejects.toMatchObject({ kind: "network" });
   });
+  it("classifies a timeout (AbortError / TimeoutError) as `timeout`, never as a network block", async () => {
+    const abort = async () => {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    };
+    await expect(fetchJson("https://fapi.binance.com/futures/data/topLongShortAccountRatio", z.unknown(), { fetch: abort })).rejects.toMatchObject({ kind: "timeout" });
+    const timeout = async () => {
+      throw new DOMException("signal timed out", "TimeoutError");
+    };
+    await expect(fetchJson("https://fapi.binance.com/fapi/v1/time", z.unknown(), { fetch: timeout })).rejects.toMatchObject({ kind: "timeout" });
+    // a hanging request is aborted after `timeoutMs`
+    vi.useFakeTimers();
+    try {
+      const hang = (_u: string, init?: RequestInit) =>
+        new Promise<Response>((_r, reject) => init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError"))));
+      const p = fetchJson("https://fapi.binance.com/fapi/v1/time", z.unknown(), { fetch: hang, timeoutMs: 15_000 }).catch((e: RestError) => e.kind);
+      await vi.advanceTimersByTimeAsync(15_001);
+      expect(await p).toBe("timeout");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it("treats an unexpected shape as http_5xx", async () => {
     const f = async () => jsonResponse({ nope: true });
     const err = await fetchJson("https://x/fapi/v1/time", z.object({ serverTime: z.number() }), { fetch: f }).catch((e) => e);
@@ -307,15 +328,20 @@ describe("okx adapter", () => {
 });
 
 describe("proxy probe", () => {
-  it("is usable only with JSON body, x-upstream-status and serverTime", async () => {
+  it("is usable only with a JSON body carrying serverTime (function header optional, SPA fallback and 451 are not)", async () => {
     const ok = await probeProxy(async () => jsonResponse(serverTime, { headers: { "x-upstream-status": "200" } }));
     expect(ok).toEqual({ usable: true, blocked: false, upstreamStatus: 200 });
     const spa = await probeProxy(async () => new Response("<!doctype html><html></html>", { status: 200, headers: { "content-type": "text/html" } }));
     expect(spa.usable).toBe(false);
-    const noHeader = await probeProxy(async () => jsonResponse(serverTime));
-    expect(noHeader.usable).toBe(false);
+    // the netlify.toml proxy rewrite passes Binance's own response: no x-upstream-status, still usable
+    const rewrite = await probeProxy(async () => jsonResponse(serverTime, { headers: { "content-type": "application/json;charset=UTF-8" } }));
+    expect(rewrite).toEqual({ usable: true, blocked: false, upstreamStatus: 200 });
     const blocked = await probeProxy(async () => jsonResponse(err451, { status: 451, headers: { "x-upstream-status": "451" } }));
-    expect(blocked).toEqual({ usable: true, blocked: true, upstreamStatus: 451 });
+    expect(blocked).toEqual({ usable: false, blocked: true, upstreamStatus: 451 });
+    const blockedRewrite = await probeProxy(async () => jsonResponse(err451, { status: 451 }));
+    expect(blockedRewrite).toEqual({ usable: false, blocked: true, upstreamStatus: 451 });
+    const wrongBody = await probeProxy(async () => jsonResponse({ hello: 1 }));
+    expect(wrongBody.usable).toBe(false);
     const thrown = await probeProxy(async () => {
       throw new TypeError("net");
     });

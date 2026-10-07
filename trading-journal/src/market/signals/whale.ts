@@ -43,15 +43,20 @@ let viaProxy: WhaleClient | null = null;
 
 const underTest = (): boolean => !!(globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.VITEST;
 
-/** REST client for the futures-data endpoints: Binance direct, the proxy while Binance is blocked, none on file://. */
+/**
+ * REST client for the futures-data endpoints: Binance direct; the same-origin proxy while Binance is blocked or
+ * while the provider routes its own ratio feeds through it (direct `/futures/data` unreadable, or the user prefers
+ * the proxy); none on file://.
+ */
 function clientFor(p: MarketProvider): WhaleClient | null {
   if (clientOverride !== undefined) return clientOverride(p);
   if (underTest()) return null; // tests inject a client; never the network
   const info = (p as Partial<MarketProvider>).symbolInfo;
   if (info && !info.valid) return null;
-  const blocked = p.getHealth().primary?.blocked === true;
-  if (!blocked) return (direct ??= binanceRest());
-  if (isFileProtocol()) return null;
+  const h = p.getHealth();
+  const viaProxyNow = h.primary?.blocked === true || h.feeds?.topPositionRatio?.source === "proxy";
+  if (!viaProxyNow) return (direct ??= binanceRest());
+  if (isFileProtocol() || h.proxy?.usable === false) return null;
   return (viaProxy ??= proxyRest());
 }
 
@@ -119,7 +124,12 @@ function poll(period: string): void {
   if (st.timer) clearTimeout(st.timer);
   st.timer = null;
   const client = clientFor(p);
-  if (!client) return; // no Binance futures data on this source: no reading
+  if (!client) {
+    // no Binance futures data on this route right now (blocked without a usable proxy): look again in a minute —
+    // never stop polling for good, the route comes back with the provider's next probe
+    st.timer = setTimeout(() => poll(period), RETRY_MIN_MS);
+    return;
+  }
   st.inflight = true;
   const per = period as Period;
   Promise.all([client.ratio("topPositionRatio", p.symbol, per, { limit: WHALE_POLL_LIMIT }), client.ratio("globalAccountRatio", p.symbol, per, { limit: WHALE_POLL_LIMIT })])

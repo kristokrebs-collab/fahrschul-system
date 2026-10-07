@@ -43,6 +43,21 @@ export function probeBackoffMs(failures: number): number {
 
 /** Retry after a non-advancing 5-min poll: once after 60 s, then wait for the next boundary. */
 export const NON_ADVANCE_RETRY_MS = 60_000;
+/**
+ * Retries after a non-advancing aligned poll (the exchange published late): 5-min feeds retry once (+60 s), longer
+ * periods up to three times (+60 s, +2 min, +5 min) before waiting for the next period boundary.
+ */
+export const NON_ADVANCE_RETRIES_MS: readonly number[] = [NON_ADVANCE_RETRY_MS, 120_000, 300_000];
+export function nonAdvanceRetries(alignMs: number): number {
+  return alignMs > 5 * 60_000 ? NON_ADVANCE_RETRIES_MS.length : 1;
+}
+
+/** Soft-failure retry of a feed that stays on its source: 15 s, 30 s, 60 s, 2 min, then every 5 min. */
+export const FAILURE_RETRY_MS: readonly number[] = [15_000, 30_000, 60_000, 120_000, 300_000];
+export function failureRetryMs(consecutiveFailures: number): number {
+  const i = Math.min(FAILURE_RETRY_MS.length - 1, Math.max(0, consecutiveFailures - 1));
+  return FAILURE_RETRY_MS[i]!;
+}
 
 /** WS liveness: no message for 10 s → `ws_silent`. */
 export const WS_SILENT_MS = 10_000;
@@ -118,6 +133,22 @@ export class Scheduler {
 
   dueAt(key: string): number | undefined {
     return this.jobs.get(key)?.at;
+  }
+
+  /** Moves a pending job to `at`, keeping its callback. Returns false when no such job exists. */
+  reschedule(key: string, at: number): boolean {
+    const job = this.jobs.get(key);
+    if (!job) return false;
+    if (job.handle != null) this.host.clearTimeout(job.handle);
+    job.handle = null;
+    job.at = at;
+    if (!this.paused) this.arm(key, job);
+    return true;
+  }
+
+  /** `[key, dueAt]` of every pending job (snapshot). */
+  pending(): Array<[string, number]> {
+    return [...this.jobs.entries()].map(([k, j]) => [k, j.at]);
   }
 
   pause(): void {

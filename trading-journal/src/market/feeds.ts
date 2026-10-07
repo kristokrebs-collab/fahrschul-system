@@ -2,7 +2,7 @@
  * Feed table (Plan 4.2 / 4.5): cadence, staleness, alignment, cost and source preference per feed.
  * The ratio feeds depend on the configured period, so the table is built per provider instance.
  */
-import type { FeedId, FeedSpec, HealthState, KlineFeed, RatioFeed, SeriesFeed, Source } from "./types";
+import type { FeedId, FeedSpec, HealthState, KlineFeed, LiveRatioFeed, RatioFeed, SeriesFeed, Source } from "./types";
 import { INTERVAL_MS, PERIOD_MS, type KlineInterval, type Period } from "./period";
 
 export const FEED_IDS: readonly FeedId[] = [
@@ -21,20 +21,54 @@ export const FEED_IDS: readonly FeedId[] = [
   "topAccountRatio",
   "globalAccountRatio",
   "takerRatio",
+  "topPositionRatio5m",
+  "topAccountRatio5m",
+  "globalAccountRatio5m",
   "fundingHistory",
 ];
 
 export const KLINE_FEEDS: readonly KlineFeed[] = ["kline_1m", "kline_15m", "kline_1h", "kline_4h", "kline_1w"];
 export const RATIO_FEEDS: readonly RatioFeed[] = ["topPositionRatio", "topAccountRatio", "globalAccountRatio", "takerRatio"];
-/** Feeds polled from `/futures/data/*` on the aligned 5-min schedule. */
+/** Feeds polled from `/futures/data/*` at the chosen ratio period (`settings.hyblock.timeframe`), aligned to that period. */
 export const FUTURES_DATA_FEEDS: readonly FeedId[] = [...RATIO_FEEDS, "openInterestHist"];
-export const SERIES_FEEDS: readonly SeriesFeed[] = [...KLINE_FEEDS, "openInterestHist", ...RATIO_FEEDS, "fundingHistory"];
+/** The Binance ratios at the fixed 5-min period (fresh Top-Trader reading, see `LiveRatioFeed`). */
+export const LIVE_RATIO_FEEDS: readonly LiveRatioFeed[] = ["topPositionRatio5m", "topAccountRatio5m", "globalAccountRatio5m"];
+export const LIVE_RATIO_PERIOD: Period = "5m";
+/** Live feed → the chosen-period feed with the same ratio. */
+export const LIVE_RATIO_MAIN: Record<LiveRatioFeed, "topPositionRatio" | "topAccountRatio" | "globalAccountRatio"> = {
+  topPositionRatio5m: "topPositionRatio",
+  topAccountRatio5m: "topAccountRatio",
+  globalAccountRatio5m: "globalAccountRatio",
+};
+/** Chosen-period feed → its 5-min live twin. */
+export const LIVE_RATIO_OF: Partial<Record<FeedId, LiveRatioFeed>> = {
+  topPositionRatio: "topPositionRatio5m",
+  topAccountRatio: "topAccountRatio5m",
+  globalAccountRatio: "globalAccountRatio5m",
+};
+/** Every `/futures/data/*` feed (chosen period + live): 30-day retention, period-tagged cache keys. */
+export const ALL_FUTURES_DATA_FEEDS: readonly FeedId[] = [...FUTURES_DATA_FEEDS, ...LIVE_RATIO_FEEDS];
+/**
+ * Top-trader / retail ratios: only Binance has these cohorts (direct or through the proxy, which serves the same
+ * data). A soft failure (network, timeout, 5xx, 429) never moves them to Bybit/OKX — they retry on Binance with a
+ * capped backoff and switch to the proxy when it is usable; only a real geo-block (451) hands `globalAccountRatio`
+ * to Bybit's all-accounts series.
+ */
+export const BINANCE_FAMILY_FEEDS: readonly FeedId[] = [...RATIO_FEEDS, ...LIVE_RATIO_FEEDS];
+export const SERIES_FEEDS: readonly SeriesFeed[] = [...KLINE_FEEDS, "openInterestHist", ...RATIO_FEEDS, ...LIVE_RATIO_FEEDS, "fundingHistory"];
 export const WS_FEEDS: readonly FeedId[] = [...KLINE_FEEDS, "markPrice", "bookTop", "aggTrade"];
 
 /** Feeds Bybit cannot serve at all (Plan 4.5: card shows `Nur mit Binance`). */
-export const BYBIT_UNSUPPORTED: readonly FeedId[] = ["topPositionRatio", "topAccountRatio", "takerRatio"];
+export const BYBIT_UNSUPPORTED: readonly FeedId[] = ["topPositionRatio", "topAccountRatio", "takerRatio", ...LIVE_RATIO_FEEDS];
 /** Feeds OKX cannot serve. */
-export const OKX_UNSUPPORTED: readonly FeedId[] = ["markPrice", "bookTop", "aggTrade", "ticker24h", "openInterest", "openInterestHist", "fundingHistory"];
+export const OKX_UNSUPPORTED: readonly FeedId[] = ["markPrice", "bookTop", "aggTrade", "ticker24h", "openInterest", "openInterestHist", "fundingHistory", ...LIVE_RATIO_FEEDS];
+
+export function isFamilyFeed(feed: FeedId): boolean {
+  return BINANCE_FAMILY_FEEDS.includes(feed);
+}
+export function isLiveRatioFeed(feed: FeedId): feed is LiveRatioFeed {
+  return (LIVE_RATIO_FEEDS as readonly FeedId[]).includes(feed);
+}
 
 /** REST polling cadence for WS-fed feeds when the socket is dead (Plan 4.2 "nach 3 Fehlversuchen"). */
 export const WS_REST_FALLBACK_MS = 10_000;
@@ -50,6 +84,9 @@ export const BOOTSTRAP_LIMIT = { kline: 499, kline15m: 1500, kline1w: 200, futur
 /** Largest page the gap fill after a WS reconnect requests (Binance maximum). */
 export const GAP_FILL_MAX = 1500;
 export const POLL_LIMIT_FUTURES_DATA = 30;
+/** Live 5-min ratios: 36 points (3 h) on bootstrap, the last 3 on every poll (upserted into the ring). */
+export const LIVE_RATIO_BOOTSTRAP_LIMIT = 36;
+export const LIVE_RATIO_POLL_LIMIT = 3;
 export const HISTORY_PAGE_LIMIT = 1500;
 export const HISTORY_MAX_CALLS = 8;
 /** `/futures/data/*` history depth. */
@@ -85,18 +122,29 @@ function klineSpec(interval: KlineInterval, chain: readonly Source[]): FeedSpec 
   };
 }
 
+/**
+ * `/futures/data/*` feed at `period`. Polls are aligned to the PERIOD boundary (+60–105 s: Binance publishes the
+ * point about a minute after the boundary) — a 1h series gets a new point once per hour, so polling it every 5 min
+ * only burned requests. A poll that brings no new point is retried after 60 s (+2 / +5 min for periods > 5 min).
+ */
 function futuresDataSpec(id: FeedId, period: Period, chain: readonly Source[]): FeedSpec {
   return {
     id,
     transport: "rest",
     cadenceMs: PERIOD_MS[period],
     staleAfterMs: 2 * PERIOD_MS[period] + 2 * MIN,
-    alignMs: 5 * MIN,
+    alignMs: Math.max(5 * MIN, PERIOD_MS[period]),
     lagMs: 60_000,
     jitterMs: 45_000,
     cost: { bucket: "binance.futuresData", units: 1 },
     sources: [...chain],
+    period,
   };
+}
+
+/** Live 5-min ratio: Binance only (direct or proxy), never Bybit/OKX (other cohort). */
+function liveRatioSpec(id: LiveRatioFeed, chain: readonly Source[]): FeedSpec {
+  return { ...futuresDataSpec(id, LIVE_RATIO_PERIOD, chain.filter((s) => s === "binance" || s === "proxy" || s === "cache")) };
 }
 
 /** Builds the full spec table for a period and a source chain (default: Binance → Bybit → Proxy → Cache). */
@@ -118,6 +166,9 @@ export function buildFeedSpecs(period: Period, chain: readonly Source[] = DEFAUL
     topAccountRatio: futuresDataSpec("topAccountRatio", period, c),
     globalAccountRatio: futuresDataSpec("globalAccountRatio", period, c),
     takerRatio: futuresDataSpec("takerRatio", period, c),
+    topPositionRatio5m: liveRatioSpec("topPositionRatio5m", c),
+    topAccountRatio5m: liveRatioSpec("topAccountRatio5m", c),
+    globalAccountRatio5m: liveRatioSpec("globalAccountRatio5m", c),
     fundingHistory: { id: "fundingHistory", transport: "rest", cadenceMs: 8 * HOUR, staleAfterMs: 9 * HOUR, cost: { bucket: "binance.funding", units: 1 }, sources: [...c] },
   };
 }

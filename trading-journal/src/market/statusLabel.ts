@@ -49,6 +49,24 @@ export function fallbackBadge(source: Source): string {
   return `Ersatzquelle ${SOURCE_NAME[source]}`;
 }
 
+/** Cause of a soft REST failure, short (`Binance antwortet nicht (Netzwerk/CORS)`). */
+export const SOFT_FAILURE_CAUSE: Partial<Record<NonNullable<FeedHealth["reason"]>, string>> = {
+  network: "Netzwerk/CORS",
+  timeout: "Zeitüberschreitung",
+  http_5xx: "Serverfehler",
+  rate_limited: "Rate-Limit",
+  cors: "CORS",
+};
+
+/** Short German text of a soft REST failure (the feed stays on its source and is retried). */
+export const SOFT_FAILURE_TEXT: Partial<Record<NonNullable<FeedHealth["reason"]>, string>> = {
+  network: "Netzwerk/CORS-Fehler",
+  timeout: "Zeitüberschreitung",
+  http_5xx: "Serverfehler",
+  rate_limited: "Rate-Limit",
+  cors: "CORS-Fehler",
+};
+
 export interface LabelInput {
   health: FeedHealth;
   spec: FeedSpec;
@@ -68,6 +86,11 @@ export function statusLabel({ health, spec, value, timeZone }: LabelInput): Stat
 
   if (health.reason === "bad_symbol") return { tone: "error", text: STRINGS.noPrice, detail: health.detail };
   if (health.reason === "unsupported") return { tone: "muted", text: STRINGS.onlyBinance, detail: health.detail ?? COHORT_HINT[health.source] };
+  // a REST feed failing on its source (retried with backoff): say so instead of a cheerful "Live"
+  const soft = health.reason ? SOFT_FAILURE_TEXT[health.reason] : undefined;
+  if (soft && spec.transport === "rest" && health.consecutiveFailures > 0 && (health.state === "live" || health.state === "stale" || health.state === "connecting")) {
+    return { tone: "warn", text: stand ? `${STRINGS.lastPrefix} ${stand} · ${soft}` : soft, detail: health.detail };
+  }
 
   switch (health.state) {
     case "live": {

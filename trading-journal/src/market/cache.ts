@@ -1,5 +1,6 @@
 /**
- * Memory + IndexedDB cache (Plan 4.7). Key `${source}:${symbol}:${feed}`, DB `tj-market`.
+ * Memory + IndexedDB cache (Plan 4.7). Key `${source}:${symbol}:${feed}` (futures-data feeds:
+ * `${source}:${symbol}:${period}:${feed}`), DB `tj-market`.
  * Series are ring buffers keyed by `time`; polls with `limit=30` upsert and never replace the buffer.
  */
 import { createStore, del, get, keys, set, type UseStore } from "idb-keyval";
@@ -20,11 +21,19 @@ export const RING_CAPACITY: Record<SeriesFeed, number> = {
   topAccountRatio: 500,
   globalAccountRatio: 500,
   takerRatio: 500,
+  topPositionRatio5m: 288, // 24 h
+  topAccountRatio5m: 288,
+  globalAccountRatio5m: 288,
   fundingHistory: 500,
 };
 
-export function cacheKey(source: Source, symbol: string, feed: FeedId): string {
-  return `${source}:${symbol}:${feed}`;
+/**
+ * `${source}:${symbol}:${feed}`, or `${source}:${symbol}:${period}:${feed}` for the `/futures/data/*` feeds: their
+ * points are period snapshots, and a ring hydrated from another period (1h → 4h switch) would mix both spacings and
+ * show an old-period point as the newest value.
+ */
+export function cacheKey(source: Source, symbol: string, feed: FeedId, period?: string): string {
+  return period ? `${source}:${symbol}:${period}:${feed}` : `${source}:${symbol}:${feed}`;
 }
 
 function trim<T>(arr: T[], cap: number): T[] {
@@ -143,11 +152,20 @@ export type StampedAny = Stamped<FeedValue[FeedId]>;
 export class MarketCache {
   private mem = new Map<FeedId, StampedAny>();
   private kv: KVStore | null;
+  /**
+   * @param periodOf the request period of a feed (futures-data feeds) — part of its persisted key, so the snapshot
+   *   of one period never hydrates the series of another
+   */
   constructor(
     public symbol: string,
     kv?: KVStore | null,
+    private periodOf: (feed: FeedId) => string | undefined = () => undefined,
   ) {
     this.kv = kv === undefined ? idbKV() : kv;
+  }
+
+  private key(source: Source, feed: FeedId): string {
+    return cacheKey(source, this.symbol, feed, this.periodOf(feed));
   }
 
   get<F extends FeedId>(feed: F): Stamped<FeedValue[F]> | undefined {
@@ -189,7 +207,7 @@ export class MarketCache {
       for (const source of sources) {
         let v: unknown;
         try {
-          v = await this.kv.get(cacheKey(source, this.symbol, feed));
+          v = await this.kv.get(this.key(source, feed));
         } catch {
           v = undefined;
         }
@@ -207,7 +225,7 @@ export class MarketCache {
     const v = this.mem.get(feed);
     if (!v || !this.kv) return;
     try {
-      await this.kv.set(cacheKey(v.source, this.symbol, feed), v);
+      await this.kv.set(this.key(v.source, feed), v);
     } catch {
       /* quota / private mode: cache is best-effort */
     }

@@ -30,11 +30,20 @@ export function classifyStatus(status: number, body?: unknown): FailureReason {
   return "http_5xx";
 }
 
-/** Fetch errors are opaque in the browser: a CORS-less 451/429 rejects with `TypeError`. */
+/** `AbortError` (our own timeout) / `TimeoutError` (`AbortSignal.timeout`). */
+export function isAbortLike(err: unknown): boolean {
+  const name = typeof err === "object" && err !== null ? (err as { name?: unknown }).name : undefined;
+  return name === "AbortError" || name === "TimeoutError";
+}
+
+/**
+ * Fetch errors are opaque in the browser: a CORS-less 451/429 rejects with `TypeError` (`network`). A timeout is
+ * its own soft kind (`timeout`): a slow answer is never evidence of a geo-block.
+ */
 export function classifyThrown(err: unknown): FailureReason {
   if (err instanceof RestError) return err.kind;
   if (typeof navigator !== "undefined" && navigator.onLine === false) return "offline";
-  if (err instanceof TypeError) return "network";
+  if (isAbortLike(err)) return "timeout";
   return "network";
 }
 
