@@ -5,6 +5,7 @@ import { levelsConfigured } from "@/domain/defaults";
 import { useJournal } from "@/store/journalStore";
 import { KEYS, readJson, writeJson } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
+import { overviewScenario, shownScenarioKey } from "@/app/overviewScenario";
 
 /** `tj2-trigger-last` (Plan 4.9): no duplicate toast after a reload (share edition: `tj2share-trigger-last`). */
 export const TRIGGER_LAST_KEY: string = KEYS.triggerLast;
@@ -34,7 +35,8 @@ export const sameClosed4h = (a: Closed4h | null, b: Closed4h | null): boolean =>
 /**
  * Bundle `$$`: toast `Neues Szenario: {title}` / `4H {n0(close4h)}` only when the scenario KEY changes
  * (5200 ms, kind `signal`). The last key + close time are persisted so a reload never re-toasts. Renders only when
- * the last CLOSED 4h bar changes, never per forming-bar tick.
+ * the last CLOSED 4h bar changes, never per forming-bar tick. Same long-only scenarios as the market panel (decision 13):
+ * no `Neues Szenario: Short-Trigger aktiv` – a close under the stored short level is the range.
  */
 export function ScenarioWatcher() {
   const closed = useFeedSelect("kline_4h", selectClosed4h, sameClosed4h);
@@ -45,7 +47,7 @@ export function ScenarioWatcher() {
 
   const closedT = closed?.t ?? null;
   const closedC = closed?.c ?? null;
-  const sc = closedC != null && configured ? scenario(closedC, levels) : null;
+  const sc = closedC != null && configured ? overviewScenario(scenario(closedC, levels), levels) : null;
   const key = sc?.key ?? null;
   // last persisted value, read once and kept here (no localStorage read per render)
   const last = useRef<TriggerLast | null | undefined>(undefined);
@@ -60,7 +62,7 @@ export function ScenarioWatcher() {
       writeJson(TRIGGER_LAST_KEY, next);
       return;
     }
-    if (prev.key === key || closedT <= prev.close4hAt) return;
+    if (shownScenarioKey(prev.key) === key || closedT <= prev.close4hAt) return;
     pushToast({ kind: "signal", title: SCENARIO_TOAST_TITLE(sc), value: SCENARIO_TOAST_VALUE(closedC), duration: SCENARIO_TOAST_MS });
     last.current = next;
     writeJson(TRIGGER_LAST_KEY, next);

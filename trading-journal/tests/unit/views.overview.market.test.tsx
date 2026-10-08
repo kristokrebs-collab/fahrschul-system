@@ -67,9 +67,24 @@ describe("MarketPanel", () => {
     expect(screen.getByText("83.000")).toBeInTheDocument();
     // trigger distance rows
     expect(screen.getByText(/^Long-Trigger in /)).toBeInTheDocument();
-    expect(screen.getByText(/^Short-Trigger in /)).toBeInTheDocument();
+    // decision 13: no general short trigger on the overview (the stored level stays in the settings)
+    expect(screen.queryByText(/^Short-Trigger in /)).toBeNull();
+    expect(screen.queryByText(/Short-Trigger/)).toBeNull();
     // funding line from markPrice
     expect(screen.getByText(/^Mark 86\.112 · Funding \+0,0100 % · nächstes Funding in /)).toBeInTheDocument();
+  });
+
+  it("a 4H close under the stored short trigger reads as the range: no short trigger on the overview (decision 13)", () => {
+    const s = useJournal.getState().settings;
+    useJournal.setState({ settings: { ...s, market: { ...s.market, longTrigger: 88_000, shortTrigger: 87_000 } } });
+    wrap(<MarketPanel />);
+    const box = screen.getByTestId("scenario-box");
+    expect(box.querySelector("[data-scenario-title]")?.getAttribute("data-scenario-title")).toBe("Range, kein Trigger");
+    expect(within(box).getByText(`4H-Schluss unter dem Long-Trigger 88.000, über der Invalidierung ${n0(s.market.invalidation)}. Abwarten – den Einstieg prüft der Einstiegs-Check.`)).toBeInTheDocument();
+    expect(screen.getByText(/^Long-Trigger in /)).toBeInTheDocument();
+    expect(screen.queryByText(/Short-Trigger/)).toBeNull();
+    // the stored level is untouched (no data loss)
+    expect(useJournal.getState().settings.market.shortTrigger).toBe(87_000);
   });
 
   it("`Jetzt aktualisieren` forces the five market-card feeds once per 5 s", async () => {

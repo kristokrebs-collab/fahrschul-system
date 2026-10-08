@@ -1,8 +1,9 @@
-import { AnimatePresence, motion, useTransform } from "motion/react";
+import { AnimatePresence, motion, useTransform, type MotionValue } from "motion/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { levelsConfigured, weeklyConfigured, zoneConfigured } from "@/domain/defaults";
 import { ED } from "@/domain/edition";
-import { checkGlyph, evaluateTrigger, LONG_IN_REACH_LABEL, LONG_INVALIDATION_LABEL, scenario, SHORT_IN_REACH_LABEL, TRIGGER_FOOTER, type CheckRow, type Scenario, type ScenarioTone } from "@/domain/trigger";
+import { checkGlyph, evaluateTrigger, LONG_IN_REACH_LABEL, LONG_INVALIDATION_LABEL, scenario, TRIGGER_FOOTER, type CheckRow, type Scenario, type ScenarioTone } from "@/domain/trigger";
+import { overviewScenario } from "@/app/overviewScenario";
 import { cn } from "@/lib/cn";
 import { dateTime, n0, n1 } from "@/lib/format";
 import { priceMv, setBookTop, SOURCE_NAME, STRINGS } from "@/market";
@@ -25,17 +26,31 @@ import { Explainer } from "@/primitives/VerdictPanel";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { Bar } from "./Bar";
-import { ChangeChip, FundingBlock, LivePill, LivePrice, OrderFlow, PreviewLine, TriggerDistances } from "./MarketLive";
+import { ChangeChip, FundingBlock, LivePill, LivePrice, OrderFlow, PreviewLine } from "./MarketLive";
 import { weeklyExplain } from "./marketExplain";
-import { orFallback, triggerFlagsKey } from "./marketMath";
+import { distanceLabel, orFallback, triggerFlagsKey, triggerProximity } from "./marketMath";
 import { jumpFromUnknownPrice, useForceRefresh, useGlide, useMarketPanelView, usePriceClass } from "./useMarket";
 
 export const CHART_CARD_ID = "chart-card";
 export const OPEN_CHART_LABEL = "Chart öffnen";
 export const WEEKLY_TITLE: string = ED.COPY.weeklyTitle;
 /** Share edition / fresh journal: trigger levels are 0 = not set → no scenario, distances or weekly rows, a CTA instead. */
-export const LEVELS_EMPTY_TEXT = "Noch keine Trigger-Level eingetragen. Mit Long- und Short-Trigger zeigt das Panel hier dein Szenario und die Abstände.";
+export const LEVELS_EMPTY_TEXT = "Noch keine Trigger-Level eingetragen. Mit deinen Trigger-Leveln zeigt das Panel hier dein Szenario und den Abstand zum Long-Trigger.";
 export const LEVELS_CTA = "Trigger-Level eintragen";
+
+/** `Long-Trigger in +0,42 %` following the gliding price every frame, with its proximity bar (full at the level, empty 2 % away). */
+const LongDistance = memo(function LongDistance({ price, longTrigger }: { price: MotionValue<number>; longTrigger: number }) {
+  const text = useTransform(price, (p) => distanceLabel("long", longTrigger, p));
+  const proximity = useTransform(price, (p) => triggerProximity("long", longTrigger, p));
+  return (
+    <span className="inline-flex items-center gap-2">
+      <motion.span className="num font-mono [contain:layout_paint]">{text}</motion.span>
+      <span aria-hidden="true" className="relative block h-1 w-10 overflow-hidden rounded-full bg-white/[0.07]">
+        <motion.span className="absolute inset-0 origin-left rounded-full bg-win/70" style={{ scaleX: proximity }} />
+      </span>
+    </span>
+  );
+});
 
 /** Goes to the settings page and brings the long-trigger field into view once it is mounted (≤ ~1 s of frames). */
 function openLevelSettings(setPage: (p: "settings") => void, reduced: boolean): void {
@@ -264,8 +279,11 @@ export function MarketPanel() {
     () => evaluateTrigger({ price: sample.price, close4h: view.close4h, close4hLive: view.live4hClose, closeW: view.closeW, rsiW: view.rsiW, levels }),
     [sample.price, view.close4h, view.live4hClose, view.closeW, view.rsiW, levels],
   );
-  // unset levels (0) never produce a scenario such as "Long-Trigger aktiv · 4H-Schluss über 0"
-  const sc = levelsOn ? t.scenario : null;
+  // unset levels (0) never produce a scenario such as "Long-Trigger aktiv · 4H-Schluss über 0"; no short case (decision 13)
+  const sc = levelsOn ? overviewScenario(t.scenario, levels) : null;
+  // "würde … auslösen" from the running 4H candle, on the same long-only scenarios (never "Short-Trigger aktiv")
+  const liveSc = useMemo(() => (view.live4hClose == null ? null : overviewScenario(scenario(view.live4hClose, levels), levels)), [view.live4hClose, levels]);
+  const livePreview = liveSc && liveSc.key !== sc?.key ? liveSc : null;
 
   // scenario changes since mount (the first scenario after loading is not a change)
   const [sweep, setSweep] = useState<{ key: string | null; n: number }>({ key: sc?.key ?? null, n: 0 });
@@ -390,29 +408,22 @@ export function MarketPanel() {
       )}
 
       <AnimatePresence initial={false}>
-        {levelsOn && t.livePreview && view.live4hCloseAt != null && (
+        {levelsOn && livePreview && view.live4hCloseAt != null && (
           <motion.p key="preview" {...fadeIn} className="text-[11.5px] text-mute">
-            <PreviewLine preview={t.livePreview} closesAt={view.live4hCloseAt} />
+            <PreviewLine preview={livePreview} closesAt={view.live4hCloseAt} />
           </motion.p>
         )}
       </AnimatePresence>
 
       <AnimatePresence initial={false}>
-        {levelsOn && (t.distance.longLabel || t.distance.shortLabel) && (
+        {levelsOn && t.distance.longLabel && (
           <motion.div key="dist" {...fadeIn} className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11.5px] text-mute">
-            <TriggerDistances price={glidePrice} longTrigger={levels.longTrigger} shortTrigger={levels.shortTrigger} />
+            <LongDistance price={glidePrice} longTrigger={levels.longTrigger} />
             <AnimatePresence initial={false}>
               {t.distance.longInReach && (
                 <motion.span key="long-reach" {...popIn}>
                   <Badge tone="warn" ping>
                     {LONG_IN_REACH_LABEL}
-                  </Badge>
-                </motion.span>
-              )}
-              {t.distance.shortInReach && (
-                <motion.span key="short-reach" {...popIn}>
-                  <Badge tone="warn" ping>
-                    {SHORT_IN_REACH_LABEL}
                   </Badge>
                 </motion.span>
               )}
