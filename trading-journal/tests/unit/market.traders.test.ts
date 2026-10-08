@@ -164,3 +164,19 @@ describe("live provider: the 5-min series keep coming and fetchRatios stays on B
     await expect(p.fetchRatios("topAccountRatio", "5m")).rejects.toMatchObject({ kind: "unsupported" });
   });
 });
+
+describe("file version (opened from disk): the Top-Trader note says why and what helps", () => {
+  it("a CORS/network failure on the ratio feeds reads `Datei-Version: … Web-Link nutzen`; on the web the usual cause", async () => {
+    const { topTraderFreshness, deriveTopTrader } = await import("@/market/mapping");
+    const edition = await import("@/edition");
+    const h = health({ topAccountRatio5m: { consecutiveFailures: 2, reason: "network", nextRefreshAt: NOW + 30 * SEC } });
+    const tt = deriveTopTrader(feeds(NOW - 2 * MIN), h, "accounts");
+    expect(topTraderFreshness(tt, h).lead).toBe("Binance antwortet nicht (Netzwerk/CORS)");
+    const spy = vi.spyOn(edition, "isFileProtocol").mockReturnValue(true);
+    try {
+      expect(topTraderFreshness(tt, h).lead).toBe("Datei-Version: Browser liest Binance-Top-Trader nicht (CORS) – Web-Link nutzen");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

@@ -7,6 +7,7 @@ import { lastClosed4h, weeklyClose, weeklyRsi, currentBar } from "./indicators";
 import { hhmm, hhmmss, n0, n4 } from "./format";
 import { SOFT_FAILURE_CAUSE, STRINGS, fallbackBadge } from "./statusLabel";
 import { cadenceLabel } from "./period";
+import { isFileProtocol } from "@/edition";
 
 export type TopTraderBase = "accounts" | "positions";
 export type LegacyMarketStatus = "connecting" | "live" | "error" | "unavailable";
@@ -384,6 +385,8 @@ export const FRESHNESS = {
   retry: "neuer Versuch",
   loading: "lädt …",
   manual: "letzte Ablesung",
+  /** single-file version opened from disk: no proxy for the CORS-less futures data */
+  fileCors: "Datei-Version: Browser liest Binance-Top-Trader nicht (CORS) – Web-Link nutzen",
 } as const;
 
 /**
@@ -408,7 +411,9 @@ export function topTraderFreshness(tt: TopTraderView, health: ProviderHealth, pe
   const failing = [fh, health.feeds.topPositionRatio, health.feeds.globalAccountRatio].find((f) => f && f.consecutiveFailures > 0 && f.reason !== undefined && SOFT_FAILURE_CAUSE[f.reason] !== undefined);
   if (failing) {
     const why = SOFT_FAILURE_CAUSE[failing.reason!]!;
-    return { standAt, detail: failing.detail ?? detail, kind: "retrying", tone: "warn", lead: `${FRESHNESS.retrying} (${why})`, nextAt: failing.nextRefreshAt ?? null, nextLabel: FRESHNESS.retry };
+    // opened from disk there is no EU proxy: a CORS-less /futures/data stays unreadable — say what helps
+    const lead = (failing.reason === "network" || failing.reason === "cors") && isFileProtocol() ? FRESHNESS.fileCors : `${FRESHNESS.retrying} (${why})`;
+    return { standAt, detail: failing.detail ?? detail, kind: "retrying", tone: "warn", lead, nextAt: failing.nextRefreshAt ?? null, nextLabel: FRESHNESS.retry };
   }
   if (!tt.liveReadingOk) {
     if (tt.onlyBinance) return { ...base, kind: "blocked", tone: "warn", lead: STRINGS.onlyBinance, nextAt: health.primary.nextProbeAt ?? null, nextLabel: FRESHNESS.retry };

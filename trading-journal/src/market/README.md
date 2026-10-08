@@ -147,6 +147,58 @@ that has neither a pending poll nor a poll in flight, and schedules a primary pr
 `provider.refresh(feed, { force: true })` (`Jetzt aktualisieren`) asks Binance again for a feed parked on another source
 while Binance is not blocked.
 
+## Reliability on the live site (decision 14) — tab switches, sleep/wake, network drops
+
+What keeps every feed refreshing on a Galaxy Tab in Samsung Internet (tests: `market.reliability`, `market.toptrader`,
+`market.ws`, `market.traders`, all with fake timers + a synthetic Binance in `tests/unit/market.netHarness.ts`):
+
+| Trigger | What the provider does |
+|---|---|
+| `visibilitychange` (visible), `pageshow` (bfcache), `focus` (split screen), Page Lifecycle `resume`, `online`, a device sleep (health ticks > 3 intervals apart) | `resume()`: overdue polls re-armed and spread over ~1.5 s, every REST feed older than one cadence re-polled, a silent socket reconnected, parked feeds re-probed (`focus` / `pageshow` / `resume` at most every 5 s) |
+| every 5-s health tick (watchdog) | lost timers (a poll > 3 s overdue) re-armed; REST data older than `staleAfterMs` on the Binance clock with the next poll far away kicked (now → 30 s → 60 s → 2 min → 5 min, reset when data advances); REST feeds without a pending poll re-armed; kline tails scanned for holes |
+| socket silent 10 s / handshake > 15 s / dead without retry | reconnect (exponential backoff; at most once a minute while hidden so background notifications keep their stream); 3 failures → WS feeds REST-polled every 10 s (`fallback`) |
+| one stream stalls while the socket delivers others (`STREAM_STALL_MS`: mark 15 s, trades/book 60 s, klines 90 s) | that feed fetched over REST (klines with gap fill); a second stall within 10 min re-subscribes |
+| reconnect / REST fallback / resume | kline gap fill from the oldest unfilled hole on the server clock (stays pending when the request fails; genuine exchange holes remembered) |
+| `429` | bucket paused 60 s, feed retried with backoff |
+| `418` | ban backoff 2 → 4 → … 30 min; every direct REST feed moves to the proxy at once (another IP), a probe brings them back |
+| `451` / network failures on ≥ 2 Binance paths while Bybit answers (strict, see below) | blocked: feeds move on (ratio feeds to a usable proxy, never to Bybit's cohort); re-probe 5 → 60 min, pulled forward on evidence |
+| `TypeError` on `/futures/data` while the rest of Binance answers | read as CORS → every futures-data feed to the same-origin proxy (`/api/binance/*`, `netlify.toml`); opened from disk (no proxy) the Live-Daten card and the Top-Trader note say so and point to the web link |
+| device clock off (`ClockSkew`, from WS mark price / premiumIndex / the time probe; applied ≥ 2 s and consistent) | staleness, aligned polls and gap fills use `serverNow()`; the Live-Daten card names the offset |
+| budget | token buckets per host; bulk pages (history, retro checks, `fetchKlines`, `fetchRatios`, 1D) only take tokens while 40 % of the bucket stays free (`BULK_RESERVE`), so no feed is ever starved by a history scroll |
+
+**Routes (CORS-safe).** Every Binance REST path the app uses is proxied by `netlify.toml` (`/api/binance/fapi/v1/{time,
+klines, premiumIndex, ticker/24hr, openInterest, fundingRate}`, `/api/binance/futures/data/*`); the CSP `connect-src`
+allows `fapi.binance.com`, `wss://fstream.binance.com`, Bybit, OKX and `'self'` (the proxy).
+
+**Honest freshness per feed** (Settings → Live-Daten): next to `Stand` (time of the newest data) every row says
+`nächste Daten in 3:12` (REST; `5 h 59 min` for long waits), `Stream · Daten vor 2 s` (WebSocket, on the Binance clock),
+`Stream getrennt · neuer Versuch in 0:04`, `per REST (Stream aus) · nächste Daten in 0:07`, or the cause while a poll fails
+(`Netzwerk/CORS-Fehler (…) · 2× in Folge · neuer Versuch in 0:28`). The countdown runs on the shared `nowMv` clock in a
+fixed-width tabular slot (no render per second, no column re-flow). The Top-Trader card note: see `topTraderFreshness`.
+
+### Live top-trader / retail series for the Einstiegs-Check (`traders.ts`)
+
+```ts
+import { getTraderSeries, subscribeTraderSeries, useTraderSeries, traderSeriesKey, deriveTraderSeries } from "@/market";
+
+const s = getTraderSeries();      // LiveTraderSeries | null (market stopped)
+// s.position / s.account / s.retail: RatioPoint[] (time ms at the 5-min boundary, longPct 0–100), oldest first —
+//   Binance topLongShortPositionRatio / topLongShortAccountRatio / globalLongShortAccountRatio at period 5m
+//   (the provider's 5-min twins: same points as the Top-Trader card, no extra request); fits the engine's TraderSeries
+// s.step = 300 000; s.source: "binance" | "proxy" | null; s.asOf: newest point; s.nextAt: next poll (device clock)
+// s.status: "live" | "loading" | "retrying" | "stale" | "blocked" | "unsupported" | "offline"; s.detail: German reason
+const off = subscribeTraderSeries(() => engine.markDirty());   // ≤ 1×/frame when one of the three series publishes
+const series = useTraderSeries();  // React; re-renders only when a newest point, route, status or next poll changes
+```
+
+Only Binance data counts (direct or proxy, per feed health AND per value); Bybit/OKX have no top-trader cohort → empty
+series, `unsupported`. Freshness is judged on `serverNow()` with the engine's rule (newest point ≤ 2 steps + 5 min old).
+
+`provider.fetchRatios(kind, period, { endTime?, startTime?, limit?, maxWaitMs? })` — one `/futures/data` page at any
+period (`topPositionRatio | topAccountRatio | globalAccountRatio`) on the route the ratio feeds use right now (Binance
+direct or the proxy, never Bybit/OKX), charged to the futures-data budget as a bulk call; no Binance route →
+`RestError("unsupported")`. For back-dated top-trader readings (Binance keeps ~30 days) and extra periods.
+
 ## Rendering status (Plan 4.4)
 
 Use `useStatusLabel(feed)` / `provider.statusLabel(feed)`:
@@ -256,7 +308,7 @@ in front. `requestSignalNotifyPermission()` must be called from the click that e
 venue — the other journal's `BITSTAMP:BTCUSD` — or a bare `BTCUSD` maps to the USDT perp `BTCUSDT`, TradingView's `.P` suffix is
 dropped),
 `period.ts` (Binance/Bybit/OKX period tables, `cadenceLabel`), `feeds.ts` (spec table), `budget.ts` (token
-buckets at 10 % reserve), `schedule.ts` (`nextAlignedAt`, `wsBackoffMs`, `probeBackoffMs`, pausable `Scheduler`),
+buckets at 10 % reserve; bulk calls keep 40 % free for the live feeds), `clock.ts` (`ClockSkew`, `skewText`), `schedule.ts` (`nextAlignedAt`, `wsBackoffMs`, `probeBackoffMs`, pausable `Scheduler`),
 `cache.ts` (`MarketCache`, `upsertSeries`, key `${source}:${symbol}:${feed}` / `${source}:${symbol}:${period}:${feed}`, DB `tj-market`), `health.ts`
 (pure `reduceHealth`), `statusLabel.ts`, `indicators.ts`, `sources/*` (zod-validated REST clients, `WsClient`,
 proxy probe), `format.ts` (minimal de-DE formatters).
