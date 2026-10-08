@@ -159,6 +159,36 @@ describe("scroll handoff to the shell", () => {
     expect(showPage("settings")).toBe(-320);
   });
 
+  it("skips the restore without a layout read when the window already stands where the page goes", () => {
+    showPage("overview");
+    const uninstall = installRouter();
+    try {
+      setScrollY(0);
+      navigate("trades"); // first visit → top 0, the window is at 0
+      let reads = 0;
+      Object.defineProperty(window, "scrollY", {
+        configurable: true,
+        get: () => {
+          reads++;
+          return 0;
+        },
+      });
+      expect(showPage("trades")).toBe(0);
+      expect(reads).toBe(0);
+      expect(scrollTo).not.toHaveBeenCalled();
+
+      // a scroll after the switch voids the shortcut: the restore runs (and measures) as before
+      setScrollY(0);
+      navigate("overview");
+      setScrollY(40);
+      window.dispatchEvent(new Event("scroll"));
+      expect(showPage("overview")).toBe(-40);
+      expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
+    } finally {
+      uninstall();
+    }
+  });
+
   it("without a shell the restore runs in the next animation frame", async () => {
     setScrollY(200);
     navigate("setups");

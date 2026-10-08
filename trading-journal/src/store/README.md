@@ -114,6 +114,9 @@ navigate("settings")                // leaving trades keeps the filter in the st
 installRouter()                     // initial parse (URL wins), hashchange listener, replaceState mirror of
                                     // filter changes on the trades page (`q` debounced 150 ms) → returns uninstall
 restoreScroll(page, forceTop?)      // scroll memory per tab (rAF), top 0 on first visit / deep link
+showPage(page) → px                 // shell (PageHost layout effect): applies a queued restore before paint; skipped –
+                                    // no layout read – when the window has not scrolled since the switch and already
+                                    // stands at the target (passive scroll listener of installRouter)
 getScroll(page); currentRoute(); PAGES; PAGE_KEYS ({ overview:"o", trades:"t", setups:"s", settings:"e" })
 ```
 

@@ -76,6 +76,12 @@ const visited = new Set<Page>();
  */
 let shownPage: Page | null = null;
 let pending: { page: Page; top: number } | null = null;
+/**
+ * Window position read when the last switch left a page (`rememberScroll`, a read at the click, layout still clean),
+ * `null` once the window scrolled since (passive `scroll` listener of the installed router) or when nothing was read:
+ * `showPage` then knows without a layout read whether a restore would move the window at all.
+ */
+let leftAt: number | null = null;
 
 export function getScroll(page: Page): number | undefined {
   return scroll[page];
@@ -86,6 +92,7 @@ function rememberScroll(page: Page): void {
   // a page that never reached the screen (switched past before its deferred render committed) has no position of its own
   if (shownPage !== null && shownPage !== page) return;
   scroll[page] = window.scrollY;
+  leftAt = scrollTracked ? scroll[page] : null;
 }
 
 function scrollToTop(top: number): void {
@@ -125,6 +132,9 @@ export function showPage(page: Page): number {
   const p = pending;
   if (!p || p.page !== page || typeof window === "undefined") return 0;
   pending = null;
+  // the window still stands where the switch left it, which is where this page goes: no scroll, and no layout forced
+  // inside the commit that shows the page (the read below lays out the whole new page before its first paint)
+  if (leftAt !== null && leftAt === p.top) return 0;
   const before = window.scrollY;
   scrollToTop(p.top);
   return window.scrollY - before;
@@ -134,6 +144,23 @@ export function showPage(page: Page): number {
 export function detachShell(): void {
   shownPage = null;
   pending = null;
+  leftAt = null;
+}
+
+let scrollTracked = false;
+
+/** Router install: any scroll after a page was left voids `leftAt` (passive, no layout read). */
+function trackScroll(): () => void {
+  const onScroll = () => {
+    leftAt = null;
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  scrollTracked = true;
+  return () => {
+    window.removeEventListener("scroll", onScroll);
+    scrollTracked = false;
+    leftAt = null;
+  };
 }
 
 /* -------------------------------------------------------------- navigation */
@@ -220,6 +247,7 @@ export function installRouter(): () => void {
 
   const onHashChange = () => applyRoute(currentRoute());
   window.addEventListener("hashchange", onHashChange);
+  const untrack = trackScroll();
 
   let qTimer: ReturnType<typeof setTimeout> | null = null;
   const unsubscribe = useUi.subscribe((state, prev) => {
@@ -235,6 +263,7 @@ export function installRouter(): () => void {
 
   return () => {
     window.removeEventListener("hashchange", onHashChange);
+    untrack();
     unsubscribe();
     if (qTimer) clearTimeout(qTimer);
   };
