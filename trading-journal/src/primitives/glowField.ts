@@ -8,6 +8,7 @@
  * pre-rendered conic layer by transform – the border itself never repaints.
  */
 import { frame } from "motion/react";
+import { UNREACHABLE_SELECTOR } from "@/motion/a11y";
 import { observeInView } from "@/motion/inView";
 // imported first: its capture scroll listener is attached before ours, so `isScrolling()` is current in `invalidate`
 import { isScrolling, onScrollEnd } from "@/motion/scrollGate";
@@ -91,8 +92,9 @@ let resizeObserver: ResizeObserver | null = null;
 
 function measure(): void {
   scheduled = false;
-  // cards behind an open dialog/sheet sit in an `inert` subtree: they stay dark
-  const live = [...entries].filter((e) => e.visible && !e.el.closest("[inert]"));
+  // cards behind an open dialog / sheet (marked `data-modal-behind` since bc292ec, no longer `inert`) or in an inert
+  // subtree stay dark
+  const live = [...entries].filter((e) => e.visible && !e.el.closest(UNREACHABLE_SELECTOR));
   for (const e of entries) {
     if (e.active && !live.includes(e)) {
       e.active = false;

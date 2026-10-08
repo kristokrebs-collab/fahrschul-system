@@ -94,6 +94,37 @@ describe("glowField registry", () => {
     off();
     page.remove();
   });
+
+  it("keeps cards behind an open dialog dark: the page is marked data-modal-behind (not inert, since bc292ec)", async () => {
+    const page = document.createElement("div");
+    const el = document.createElement("div");
+    page.appendChild(el);
+    document.body.appendChild(page);
+    vi.spyOn(el, "getBoundingClientRect").mockReturnValue({ ...rect, right: 300, bottom: 200, x: 100, y: 100, toJSON: () => ({}) } as DOMRect);
+    const listener = vi.fn();
+    const off = registerGlow(el, listener);
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 60, pointerType: "mouse" }));
+    await nextFrame();
+    expect(listener).toHaveBeenLastCalledWith(true, expect.any(Number));
+    // what isolateOutside does to the page behind a modal dialog
+    page.setAttribute("aria-hidden", "true");
+    page.setAttribute("data-modal-behind", "");
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 205, clientY: 60, pointerType: "mouse" }));
+    await nextFrame();
+    expect(listener).toHaveBeenLastCalledWith(false, 0);
+    listener.mockClear();
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 210, clientY: 60, pointerType: "mouse" }));
+    await nextFrame();
+    expect(listener).not.toHaveBeenCalledWith(true, expect.any(Number));
+    // the dialog closes: the card glows again
+    page.removeAttribute("data-modal-behind");
+    page.removeAttribute("aria-hidden");
+    document.dispatchEvent(new PointerEvent("pointermove", { clientX: 200, clientY: 60, pointerType: "mouse" }));
+    await nextFrame();
+    expect(listener).toHaveBeenLastCalledWith(true, expect.any(Number));
+    off();
+    page.remove();
+  });
 });
 
 describe("ripple", () => {

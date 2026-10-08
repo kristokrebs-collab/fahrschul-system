@@ -6,7 +6,7 @@ import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { colorClass, date, n0, n1, n2, pct, price, r as fmtR, signed, time } from "@/lib/format";
 import type { Candle } from "@/market/types";
-import { useDialogBehaviour, useTouchMoveGuard } from "@/motion/a11y";
+import { UNREACHABLE_SELECTOR, useDialogBehaviour, useTouchMoveGuard } from "@/motion/a11y";
 import { flingExit, useSwipeDismiss, type SwipeDismiss, type SwipeDismissInfo } from "@/motion/physics";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { BODY_REVEAL_AT, STAGGER_HIDDEN, STAGGER_SHOWN, StaggerItem, sectionDelay } from "@/motion/Stagger";
@@ -94,7 +94,8 @@ export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
   const fallbackFocus = useCallback(() => {
     const el = focusAfterDelete.current;
     focusAfterDelete.current = null;
-    return el?.isConnected && !el.closest("[inert]") ? el : null;
+    // behind a dialog (data-modal-behind) or inert: not a focus target
+    return el?.isConnected && !el.closest(UNREACHABLE_SELECTOR) ? el : null;
   }, []);
   useDialogBehaviour(panelRef, open, close, { settled: phase.settled, fallbackFocus });
   useOverlayLane(open);
