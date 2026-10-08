@@ -84,8 +84,14 @@ function useNotchClip(ref: RefObject<HTMLElement | null>, r: number, notch: numb
       last = key;
       el.style.clipPath = `path("${notchPath(w, h, r, notch)}")`;
     };
-    apply(el.offsetWidth, el.offsetHeight);
-    if (typeof ResizeObserver !== "function") return;
+    // the size comes from the ResizeObserver's first report (after the frame's layout, before its paint, all cards in
+    // one pass – the first painted frame is already clipped). Reading offsetWidth here forced a style + layout per card,
+    // each invalidated by the previous card's new clip-path (≈ 20–145 ms of layout thrash per Entscheidungsgrundlagen
+    // mount on the tablet probe, as in NotchedFrame e83c290). Without ResizeObserver: read once.
+    if (typeof ResizeObserver !== "function") {
+      apply(el.offsetWidth, el.offsetHeight);
+      return;
+    }
     const ro = new ResizeObserver((entries) => {
       const box = entries[0]?.borderBoxSize?.[0];
       if (box) apply(box.inlineSize, box.blockSize);

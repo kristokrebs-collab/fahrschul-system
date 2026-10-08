@@ -212,6 +212,31 @@ export function maskImageFor(rects: readonly BlockRect[], width: number, height:
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
 }
 
+let fontsReady: Promise<unknown> | null = null;
+let fontsSettled = false;
+
+/**
+ * `document.fonts.ready` the first time it is asked for in this page session (later: `null` once it has settled, the
+ * same pending promise before). Reading the property forces a style + layout of the whole document.
+ */
+export function fontsReadyOnce(): Promise<unknown> | null {
+  if (fontsSettled) return null;
+  if (fontsReady) return fontsReady;
+  const set = typeof document !== "undefined" ? document.fonts : undefined;
+  if (!set) return null;
+  fontsReady = set.ready.then(
+    () => void (fontsSettled = true),
+    () => void (fontsSettled = true),
+  );
+  return fontsReady;
+}
+
+/** Tests: forget the session's font state. */
+export function resetFontsReadyForTests(): void {
+  fontsReady = null;
+  fontsSettled = false;
+}
+
 /**
  * Watches the hero's masked text (`HERO_MASK_SELECTOR` under `host`) and the backdrop size, and reports the dark
  * boxes whenever either resizes (throttled, measured in a frame – never per pointer move or per tick).
@@ -243,7 +268,11 @@ function watchMask(root: HTMLElement, host: HTMLElement, onRects: (rects: BlockR
   const ro = new ResizeObserver(schedule);
   ro.observe(root);
   schedule();
-  document.fonts?.ready.then(schedule, () => undefined);
+  // the hero text re-measures once the web fonts are in – read once per session: `document.fonts.ready` forces a style
+  // + layout of the whole document, which on every re-show of the kept-alive Übersicht cost 25–37 ms in the reveal
+  // frame (trace); afterwards the fonts are loaded and the ResizeObserver covers any change
+  const fonts = fontsReadyOnce();
+  if (fonts) fonts.then(schedule, () => undefined);
   return () => {
     ro.disconnect();
     if (raf) cancelAnimationFrame(raf);
