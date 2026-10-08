@@ -65,17 +65,22 @@ CSS mirrors (`src/styles/tokens.css` cannot import TS; listed at the end of `tok
 ### `MotionRoot`
 ```tsx
 <MotionRoot>{app}</MotionRoot>
-// = <MotionConfig reducedMotion="user" transition={spring.smooth}><LayoutGroup>…</LayoutGroup></MotionConfig>
+// = <MotionConfig reducedMotion="user" transition={spring.smooth}><RootLayoutGroup>…</RootLayoutGroup></MotionConfig>
 ```
-One id-less `LayoutGroup`; `layoutId`s are global and de-duplicated by naming/conditions (see contracts).
+One id-less layout group; `layoutId`s are global and de-duplicated by naming/conditions (see contracts).
 
-`NoLayoutCascade` / `LayoutCascade` (`NoLayoutCascade.tsx`): when all exits of an `AnimatePresence` finish, Motion calls the
-root group's `forceRender`, which re-renders every motion component in the app (≈ 1,700). A presence whose exits never
-move an in-flow sibling — `popLayout` swaps (`TextRoll`, calendar month / day panel), fixed overlays (`Sheet`,
-`MorphDialogProvider`, `CommandNav`, `ToastIsland`), `absolute` layers (`Card` spot ring, the fresh-entry badge) — is
-wrapped in `<NoLayoutCascade>` (same `id` / `group`, no `forceRender`). Sheet and dialog bodies get the cascade back with
-`<LayoutCascade>`, so their own presences next to `layout` siblings still FLIP. The root itself keeps `forceRender`
-(non-`popLayout` presences next to un-gated `layout` nodes rely on it).
+`RootLayoutGroup` / `LayoutCascade` / `NoLayoutCascade` (`NoLayoutCascade.tsx`): when all exits of an `AnimatePresence`
+finish, Motion calls the group's `forceRender`, which re-renders every motion component under that group. Under an
+id-less root that is the whole app (≈ 1,700 components on the Übersicht) after EVERY exit – hover pills, spot rings,
+label rolls, toasts. The root (`RootLayoutGroup`) therefore keeps the shared projection `group` but has NO `forceRender`.
+The morph contracts do not need it (a `layoutId` node snapshots itself on unmount, a new stack lead takes the previous
+lead's snapshot, a `popLayout` exit dirties the group when it starts, nodes with a `layoutDependency` ignore re-renders).
+Subtrees whose sync-mode exits must FLIP `layout` siblings outside the presence opt in with `<LayoutCascade>` – a nested
+`LayoutGroup` that inherits the root's group and (absent) id, with a `forceRender` scoped to its subtree: sheet and
+dialog bodies (`Sheet`, `MorphDialogProvider`) and the settings page (`PageHost` `cascade={["settings"]}` – the `Reorder`
+rules glide up after a "Regel entfernen?" strip leaves). Inside such a cascade, `<NoLayoutCascade>` drops it again for a
+presence whose exits never move an in-flow sibling (`popLayout` swaps such as `TextRoll`, `absolute` rings and pills).
+Contract tests: `tests/unit/motion.cascade.test.tsx`.
 
 ### `PageSwitch`
 `{ index; pageKey?; children; onTransitioning?; rememberScroll? (true); className? }` – no longer used by the shell (see `PageHost`

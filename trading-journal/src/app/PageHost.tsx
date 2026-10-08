@@ -21,6 +21,7 @@
 import { animate, frame, type AnimationPlaybackControls } from "motion/react";
 import { Activity, memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { LayoutCascade } from "@/motion/NoLayoutCascade";
 import { consumeNavTempo, contextSpringAt } from "@/motion/physics";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -74,6 +75,8 @@ interface LayerProps {
   page: Page;
   role: PageRole;
   keepAlive: boolean;
+  /** The page gets its own layout cascade (`LayoutCascade`): finished exits re-render this page, never the app. */
+  cascade: boolean;
   renderPage: (page: Page) => ReactNode;
   layerRef: (el: HTMLDivElement | null) => void;
 }
@@ -82,8 +85,11 @@ interface LayerProps {
  * One page. The content element is memoised per page, so a role change (current → leaving → parked) re-renders this
  * wrapper only, never the page itself.
  */
-const PageLayer = memo(function PageLayer({ page, role, keepAlive, renderPage, layerRef }: LayerProps) {
-  const content = useMemo(() => renderPage(page), [renderPage, page]);
+const PageLayer = memo(function PageLayer({ page, role, keepAlive, cascade, renderPage, layerRef }: LayerProps) {
+  const content = useMemo(() => {
+    const node = renderPage(page);
+    return cascade ? <LayoutCascade>{node}</LayoutCascade> : node;
+  }, [renderPage, page, cascade]);
   return (
     <div
       ref={layerRef}
@@ -104,6 +110,12 @@ export interface PageHostProps {
   renderPage: (page: Page) => ReactNode;
   /** Pages kept mounted while hidden (React `Activity`); pass a module-level array. */
   keepAlive?: readonly Page[];
+  /**
+   * Pages wrapped in their own `LayoutCascade` (a scoped `LayoutGroup` with its own `forceRender`): a finished sync-mode
+   * exit there FLIPs the page's `layout` siblings (the settings page: `Reorder` rules glide up after a confirm strip
+   * leaves) and re-renders that page only. `MotionRoot` itself has no cascade. Pass a module-level array.
+   */
+  cascade?: readonly Page[];
   onTransitioning?: (transitioning: boolean) => void;
   className?: string;
 }
@@ -116,7 +128,7 @@ function settleStyles(el: HTMLElement): void {
   el.style.opacity = "";
 }
 
-export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = NONE, onTransitioning, className }: PageHostProps) {
+export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = NONE, cascade = NONE, onTransitioning, className }: PageHostProps) {
   const reduced = useReducedFx();
   const [nav, setNav] = useState<Nav>(() => ({ current: page, leaving: null, dir: 1, seq: 0 }));
   let view = nav;
@@ -223,7 +235,7 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     <div className={cn("relative", className)}>
       {PAGES.map((p) => {
         const role = layerRole(p, current, leaving, keepAlive);
-        return role ? <PageLayer key={p} page={p} role={role} keepAlive={keepAlive.includes(p)} renderPage={renderPage} layerRef={layerRefs[p]} /> : null;
+        return role ? <PageLayer key={p} page={p} role={role} keepAlive={keepAlive.includes(p)} cascade={cascade.includes(p)} renderPage={renderPage} layerRef={layerRefs[p]} /> : null;
       })}
     </div>
   );

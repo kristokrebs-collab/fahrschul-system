@@ -38,6 +38,13 @@ function LayerDiagHost() {
 
 /** Pages that stay mounted (hidden) while another tab is shown: the overview keeps its state, DOM and chart data. */
 const KEEP_ALIVE: readonly Page[] = ["overview"];
+/**
+ * Pages with their own layout cascade (`LayoutCascade`, see `src/motion/NoLayoutCascade.tsx`): only the settings page has
+ * sync-mode exits that must FLIP `layout` siblings (the `Reorder` rules close the gap of a left "Regel entfernen?" strip).
+ * The overview and the trades lists manage their own (popLayout exits dirty the shared group when they start; the trades
+ * rows feed their `layoutDependency` from `onExitComplete`), so a finished exit there never re-renders a page.
+ */
+const CASCADE_PAGES: readonly Page[] = ["settings"];
 
 function renderPage(page: Page): ReactNode {
   switch (page) {
@@ -62,7 +69,7 @@ function Pages() {
   const page = useUi((s) => s.page);
   const setTransitioning = useUi((s) => s.setTransitioning);
   const shown = useDeferredValue(page);
-  return <PageHost page={shown} renderPage={renderPage} keepAlive={KEEP_ALIVE} onTransitioning={setTransitioning} />;
+  return <PageHost page={shown} renderPage={renderPage} keepAlive={KEEP_ALIVE} cascade={CASCADE_PAGES} onTransitioning={setTransitioning} />;
 }
 
 /** Toast island fed from `uiStore.toasts` (its own subscription, so a toast never re-renders the shell). */
