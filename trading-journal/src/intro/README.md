@@ -1,7 +1,7 @@
 # `src/intro` – "das Journal baut sich auf"
 
 The opening intro (~5 s at 120 Hz, skippable). `IntroHost` is mounted once in `App`; the stage is a portal to `body`
-outside the (inert) app root, the build beat runs on the real overview DOM (no screenshots).
+outside the app root, the build beat runs on the real overview DOM (no screenshots).
 
 ## When it plays
 - Autoplay (`introBoot.canAutoplay`): once per session (sessionStorage `tj2-intro`, set when it starts; the e2e / perf
@@ -14,7 +14,9 @@ outside the (inert) app root, the build beat runs on the real overview DOM (no s
   settles in 260 ms. The pill fades out when the build starts (it would float over the landing cards).
 
 ## Phases (`introStore.ts`)
-`off` → `stage` (overlay covers, `#root` inert, wheel/keys held, focus on the overlay) → `build` (cells fly, header
+`off` → `stage` (overlay covers and takes every pointer, `#root` `aria-hidden` + `data-intro-covered` – NOT `inert`:
+releasing `inert` restyled the whole app in the first frames of the build –, wheel/touch/nav keys held, Tab stays on the
+pill, focus on the overlay) → `build` (cells fly, header
 slides down, dock rises) → `done` (focus returns to where it was). First-view effects wait for `useIntroLanded()`
 (`IntroCell` provides it per cell) / `useIntroGate()`; `useIntroFlown()` lets a flown cell skip its scroll reveal.
 

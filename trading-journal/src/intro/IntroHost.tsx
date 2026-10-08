@@ -14,12 +14,16 @@ export function resetIntroBootForTests(): void {
   autoplay = null;
 }
 
-const NAV_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", "Tab"]);
+const NAV_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"]);
+const APP_ROOT_ID = "root";
+/** Marks the app root while the intro stage covers it (with `aria-hidden="true"`). */
+export const COVERED_ATTR = "data-intro-covered";
 
 /**
  * Mounted once in App. Plays the "journal builds itself" intro: autoplay once per session on the overview (see
  * introBoot.canAutoplay), replay on `replayIntro()` (header logo, Settings), skip on `skipIntro()`, the pill, Esc /
- * Enter / Space or a click on the stage. Phases: "stage" (app inert, hidden from AT) → "build" (cells fly into place,
+ * Enter / Space or a click on the stage. Phases: "stage" (app hidden from AT, unreachable by pointer / Tab, scrolling
+ * held) → "build" (cells fly into place,
  * shell enters) → "done"; "off" when no intro plays. Renders nothing when the intro is off.
  */
 export function IntroHost() {
@@ -61,25 +65,43 @@ export function IntroHost() {
     [start],
   );
 
-  // app root inert + hidden from assistive tech while the stage covers it; wheel / keyboard scrolling is held
+  // While the stage covers the app, the app root is hidden from assistive tech (`aria-hidden`), pointers land on the
+  // covering overlay, wheel / touch scrolling and navigation keys are held and Tab stays on the stage (its pill).
+  // Deliberately NOT `inert`: toggling `inert` on the app root restyles every element of the app, and the release – at
+  // the hand-over to the build, the first frames of the cell flights – was forced right there by the focus return
+  // (≈ 40 ms on the overview, more on the tablet). `aria-hidden` changes no style.
   useLayoutEffect(() => {
     if (!covering) return;
-    const app = document.getElementById("root");
-    app?.setAttribute("inert", "");
+    const app = document.getElementById(APP_ROOT_ID);
+    const prevHidden = app?.getAttribute("aria-hidden") ?? null;
+    app?.setAttribute("aria-hidden", "true");
+    app?.setAttribute(COVERED_ATTR, "");
     const hold = (e: Event) => e.preventDefault();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         director.current?.skip();
+      } else if (e.key === "Tab") {
+        // the pill is the stage's only tab stop; the app behind is not reachable
+        e.preventDefault();
+        document.querySelector<HTMLElement>("[data-intro-stage] button")?.focus({ preventScroll: true });
       } else if (NAV_KEYS.has(e.key) && !(e.target instanceof HTMLElement && e.target.closest("[data-intro-stage]"))) {
         e.preventDefault();
       }
     };
+    // focus that lands in the hidden app anyway (a programmatic focus) goes back to the stage
+    const onFocusIn = (e: FocusEvent) => {
+      if (app && e.target instanceof Node && app.contains(e.target)) document.querySelector<HTMLElement>("[data-intro-overlay]")?.focus({ preventScroll: true });
+    };
     window.addEventListener("wheel", hold, { passive: false });
     window.addEventListener("touchmove", hold, { passive: false });
     window.addEventListener("keydown", onKey, true);
+    document.addEventListener("focusin", onFocusIn, true);
     return () => {
-      app?.removeAttribute("inert");
+      if (prevHidden === null) app?.removeAttribute("aria-hidden");
+      else app?.setAttribute("aria-hidden", prevHidden);
+      app?.removeAttribute(COVERED_ATTR);
+      document.removeEventListener("focusin", onFocusIn, true);
       window.removeEventListener("wheel", hold);
       window.removeEventListener("touchmove", hold);
       window.removeEventListener("keydown", onKey, true);

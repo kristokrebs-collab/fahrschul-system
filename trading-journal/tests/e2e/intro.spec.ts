@@ -50,7 +50,7 @@ async function pillShown(page: Page) {
   }
   expect(opacity).toBeGreaterThanOrEqual(0.99);
   // still the stage (≈ 3.5 s of intro time to go): the pill is on top and takes the tap
-  await expect(page.locator("#root")).toHaveAttribute("inert", "");
+  await expect(page.locator("#root")).toHaveAttribute("aria-hidden", "true");
   return pill;
 }
 
@@ -62,12 +62,14 @@ async function skipSettles(page: Page): Promise<void> {
 }
 
 /**
- * Settled app: no stage, app root not inert, every overview cell at transform none, cells on screen (and their reveal
+ * Settled app: no stage, app root neither hidden nor inert (while covering it is `aria-hidden`, deliberately not
+ * `inert` since perf-120), every overview cell at transform none, cells on screen (and their reveal
  * wrapper) fully opaque. "On screen" uses the Reveal's own viewport (`src/motion/Reveal.tsx` REVEAL_VIEWPORT margin
  * −50 px): a cell whose top edge peeks less than 50 px above the fold reveals on the first scroll, like every reveal.
  */
 async function expectSettled(page: Page): Promise<void> {
   await expect(stage(page)).toHaveCount(0);
+  await expect(page.locator("#root")).not.toHaveAttribute("aria-hidden", /.*/);
   await expect(page.locator("#root")).not.toHaveAttribute("inert", /.*/);
   const cells = await page.locator("[data-intro-cell]").evaluateAll((els) =>
     els.map((el) => {
@@ -98,7 +100,7 @@ test.describe("intro", () => {
     await seedWithIntro(page);
     await page.goto("/#overview");
     await expect(stage(page)).toBeVisible();
-    await expect(page.locator("#root")).toHaveAttribute("inert", "");
+    await expect(page.locator("#root")).toHaveAttribute("aria-hidden", "true");
     expect(await page.evaluate(() => sessionStorage.getItem("tj2-intro"))).toBe("1");
     const pill = await pillShown(page);
     await pill.click();

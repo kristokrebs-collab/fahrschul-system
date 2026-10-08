@@ -31,11 +31,14 @@ vi.mock("@/intro/IntroStage", () => ({
 const { IntroHost, resetIntroBootForTests } = await import("@/intro/IntroHost");
 const { getIntroPhase, replayIntro, setIntroPhase, skipIntro } = await import("@/intro/introStore");
 
+/** The app root and, next to it like the real stage portal (`createPortal(…, document.body)`), the host. */
 function mount() {
   const root = document.createElement("div");
   root.id = "root";
   document.body.appendChild(root);
-  const utils = render(<IntroHost />, { container: root });
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const utils = render(<IntroHost />, { container: host });
   return { root, ...utils };
 }
 
@@ -54,15 +57,20 @@ describe("IntroHost", () => {
     act(() => setIntroPhase("off"));
   });
 
-  it("autoplay: stage phase, session flag set, app root inert; skip settles to done and restores the app", () => {
+  // deliberately changed (perf-120): the covered app root is `aria-hidden` (+ `data-intro-covered`), no longer `inert` –
+  // releasing `inert` restyled the whole app in the first frames of the build
+  it("autoplay: stage phase, session flag set, app root hidden from AT (not inert); skip settles to done and restores the app", () => {
     const { root, unmount } = mount();
     expect(getIntroPhase()).toBe("stage");
     expect(sessionStorage.getItem("tj2-intro")).toBe("1");
-    expect(root).toHaveAttribute("inert");
+    expect(root).toHaveAttribute("aria-hidden", "true");
+    expect(root).toHaveAttribute("data-intro-covered");
+    expect(root).not.toHaveAttribute("inert");
     expect(screen.getByRole("dialog", { name: "Intro" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Überspringen" }));
     expect(getIntroPhase()).toBe("done");
-    expect(root).not.toHaveAttribute("inert");
+    expect(root).not.toHaveAttribute("aria-hidden");
+    expect(root).not.toHaveAttribute("data-intro-covered");
     expect(screen.queryByRole("dialog", { name: "Intro" })).toBeNull();
     unmount();
   });
@@ -75,13 +83,25 @@ describe("IntroHost", () => {
     expect(getIntroPhase()).toBe("stage");
     fireEvent.click(screen.getByRole("button", { name: "build" }));
     expect(getIntroPhase()).toBe("build");
-    expect(document.getElementById("root")).not.toHaveAttribute("inert");
+    expect(document.getElementById("root")).not.toHaveAttribute("aria-hidden");
     expect(screen.getByRole("dialog", { name: "Intro" })).toHaveAttribute("data-covering", "false");
     // during the build only Esc skips – Enter / Space belong to the app again
     fireEvent.keyDown(window, { key: " " });
     expect(getIntroPhase()).toBe("build");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(getIntroPhase()).toBe("done");
+  });
+
+  it("while the stage covers: Tab stays on the stage (its pill), never in the hidden app", () => {
+    const { root } = mount();
+    const outside = document.createElement("button");
+    outside.textContent = "App";
+    root.prepend(outside);
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toHaveTextContent("Überspringen");
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toHaveTextContent("Überspringen");
+    outside.remove();
   });
 
   it("skipIntro() command settles too", () => {

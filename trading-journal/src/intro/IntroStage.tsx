@@ -83,7 +83,7 @@ function useDataLine(go: boolean): string | null {
 }
 
 /**
- * Full-screen intro stage (portal to body, outside the inert app root): Nothing dot grid, signal dot + rotating marker
+ * Full-screen intro stage (portal to body, outside the app root – hidden from assistive tech while it covers): Nothing dot grid, signal dot + rotating marker
  * in the "O", AsciiCascade wordmark, PixelTextFill statement, typed data line, reel window with the user's KPIs and
  * the canvas for the glyph-portal dive. All motion is written by the director (director.ts); React renders only the
  * content and the discrete beats.
