@@ -55,6 +55,16 @@ describe("Hero", () => {
     expect(screen.getByText(`${view.g.wins} gewonnen · ${view.g.losses} verloren${view.g.be ? ` · ${view.g.be} Break-even` : ""}`)).toBeInTheDocument();
   });
 
+  it("KPI tiles sit in an aligned grid: 2 / 3 / 4 columns, Erwartungswert spans two at xl, Serie closes the row below xl", () => {
+    renderHero();
+    const grid = screen.getByRole("button", { name: /^Trades/ }).closest("dl")!;
+    expect(grid.className).toMatch(/\bgrid\b.*grid-cols-2.*sm:grid-cols-3.*xl:grid-cols-4/);
+    const cell = (label: RegExp) => screen.getByRole("button", { name: label }).closest("dl > div")!;
+    expect(cell(/^Erwartungswert/).className).toContain("xl:col-span-2");
+    expect(cell(/^Serie/).className).toContain("col-span-2 sm:col-span-3 xl:col-span-1");
+    expect(cell(/^Win-Rate/).className).not.toContain("col-span");
+  });
+
   it("account Segmented drives uiStore.acc and the label", async () => {
     renderHero();
     expect(screen.getByText("Netto-P&L · Gesamt")).toBeInTheDocument();

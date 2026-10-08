@@ -30,6 +30,8 @@ const XL_TILES: readonly { key: ExplainKey; label: string }[] = [
   { key: "streak", label: "Serie" },
 ];
 const TILES = [...HERO_TILES, ...XL_TILES];
+/** Grid spans of the KPI tiles (7 tiles in rows of 2 / 3 / 4, see the `dl`). */
+const TILE_SPAN: Partial<Record<ExplainKey, string>> = { exp: "xl:col-span-2", streak: "col-span-2 sm:col-span-3 xl:col-span-1" };
 /**
  * The prism lens box clips: 0.12 em of padding (cancelled by a negative margin, no layout change) keeps the glyphs
  * inside it at `leading-none`. (TextPrism itself gives every copy its layer colour over the number's win/loss tone.)
@@ -91,8 +93,8 @@ const ReturnBadge = memo(function ReturnBadge({ ret }: { ret: number }) {
  * Hero (Bundle `yhe`, Plan 6.1): account Segmented → `uiStore.acc`, `Startkapital`, Netto-P&L `MotionNumber`
  * (shared MotionValue with the `Details +` fact dialog, tone crossfades with the sign, green/red glow on change,
  * shimmering placeholder until the journal is loaded, pulse `text-prism-split` lens on hover devices), return badge roll, subline, KPI tiles (`StatTile`,
- * `morph-fact-{key}`, count-up on reveal, roll on change) wrapping into rows of 2 / 3 / 4 so every label and value
- * stays readable, living dot-matrix backdrop, right column `MarketPanel`.
+ * `morph-fact-{key}`, count-up on reveal, roll on change) in a grid of 2 / 3 / 4 columns (edges aligned) so every label and
+ * value stays readable, living dot-matrix backdrop, right column `MarketPanel`.
  */
 export function Hero() {
   const acc = useUi((s) => s.acc);
@@ -188,7 +190,9 @@ export function Hero() {
           </div>
           {/* lg+: the live entry check fills the band the market panel leaves above the tiles (landscape tablets) */}
           <SignalStrip className="mt-auto hidden lg:grid" />
-          <dl className="mt-auto flex flex-wrap gap-2 border-t border-white/10 pt-5 lg:mt-0" onMouseLeave={() => setActive(null)}>
+          {/* a grid, so every row's tile edges line up (design pass v3): 2 / 3 / 4 columns; the 7th tile closes the last
+              row on phones and tablets, and at xl the wide Erwartungswert spans two columns (4 + 1·2·1) */}
+          <dl className="mt-auto grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:grid-cols-3 lg:mt-0 xl:grid-cols-4" onMouseLeave={() => setActive(null)}>
             {tiles.map((t, i) => (
               <StatTile
                 key={t.key}
@@ -202,6 +206,7 @@ export function Hero() {
                 onActivate={t.activate}
                 body={t.body}
                 loading={!loaded}
+                className={TILE_SPAN[t.key]}
               />
             ))}
           </dl>

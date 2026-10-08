@@ -122,8 +122,8 @@ function TileValue({ text }: { text: string }) {
 }
 
 /**
- * Hero KPI tile (Plan 2.5 "StatTile", Plan 3.3 "KPI-Tile Hover"): a flex item in a wrapping row (2 per row on phones,
- * 3 from `sm`, 4 from `xl`), `MorphCard id="fact-{key}"` (→ fact dialog, press feedback built in). On hover devices
+ * Hero KPI tile (Plan 2.5 "StatTile", Plan 3.3 "KPI-Tile Hover"): a grid item of the hero's KPI grid (2 columns on phones,
+ * 3 from `sm`, 4 from `xl`; spans via `className`), `MorphCard id="fact-{key}"` (→ fact dialog, press feedback built in). On hover devices
  * the active tile lifts by transform on a wrapper outside the layout tree (`spring.hover`) and its highlight layer
  * crossfades (touch: a tap or the dialog's focus return never leaves a tile stuck lifted); the `+` glyph rotates 90°
  * and the verdict opens as a popover ABOVE the tile (out of flow, outside the card's `overflow-hidden`), revealed with
@@ -136,7 +136,7 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
   const lifted = active && canHover;
   return (
     // `@container`: the label tightens its tracking by the tile's own width (`LABEL_FIT`), not by the viewport
-    <div onMouseEnter={onActivate} onFocus={onActivate} className={cn("@container min-w-0 grow basis-[calc(50%-4px)] sm:basis-[30%] xl:basis-[22%]", className)}>
+    <div onMouseEnter={onActivate} onFocus={onActivate} className={cn("@container min-w-0", className)}>
       <motion.div className="relative h-full" initial={false} animate={lifted && !reduced ? LIFT : REST} transition={spring.hover}>
         {/* opaque surface (≈ the former white/3 % over the hero): the hero's dot matrix never shows through label or value */}
         <MorphCard id={`fact-${fact}`} title={label} body={body} className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-ink-800 px-3 py-2.5">
