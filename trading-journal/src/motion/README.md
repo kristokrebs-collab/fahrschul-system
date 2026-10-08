@@ -102,6 +102,10 @@ Card → 620 px dialog morph (Plan 2.5 "Morph-Dialog"), portal-less, with focus 
   `borderRadius 28` on `spring.morph`; sticky head `motion.h2 layoutId="morph-title-{id}"`; the body is a stagger parent (`StaggerItem`
   sections). The big drop shadow sits on an unscaled sibling and fades in (`tween.fade`) after the morph, so the per-frame radius
   correction repaints the panel alone.
+- State lives in an external store read with `useSyncExternalStore` (one synchronous batch per change, so a source's
+  `layoutDependency` flips in the commit that mounts / relegates the panel). `useMorphSource(id)` → `{ isOpen, settled,
+  closing, closeTempo, show, returned }` re-renders only when THIS id changes (`MorphCard`, `MorphTitle`); `useMorphDialog()` is
+  tracked – a reader re-renders only when a state field it read changed (`const { close } = useMorphDialog()` never does).
 - `useMorphDialog()` → `{ open, settled, closing, closeTempo, show({ id, title, body, className? }), close(), returned(id), registerGuard }`;
   `className` sizes the column. `close()` is the programmatic close (after saving, "Verwerfen") and is never guarded.
 - Swipe to dismiss (iOS 18 zoom, `useSwipeDismiss` mode "zoom", touch / pen once the open morph has settled): handle = the sticky head
@@ -184,7 +188,7 @@ Sparkline) only get opacity/translate reveals.
 | component | what it does | tokens |
 |---|---|---|
 | `TextShimmer` | band sweep clipped to the text (`background-clip:text`), textContent unchanged; native WAAPI loop paused off-screen (declared exception). | `tween.shimmerText` |
-| `TextRoll { text; mode?; direction? }` | label morph: shared letters glide (`layout="position"`, `layoutDependency=text`), others blur in/out; `mode="roll"`, labels > 24 chars always roll. The real label is an sr-only span, the visual layer uses `::before{content:attr(data-ch)}` – textContent and the accessible name are always exactly the label. | `spring.digit`, `tween.fade/exit/crossfade` |
+| `TextRoll { text; mode?; direction? }` | label morph: shared letters glide (`layout="position"`, `layoutDependency=text`), others blur in/out; `mode="roll"`, labels > 24 chars always roll. The real label is an sr-only span, the visual layer uses `::before{content:attr(data-ch)}` – textContent and the accessible name are always exactly the label. A swap within `RAPID_SWAP_MS` (200 ms) of the previous one is instant (the roll in flight is dropped – never stacked labels); `tabular-nums`. | `spring.digit`, `tween.fade/exit/crossfade` |
 | `TextScramble` | decode effect; the real text node stays (opacity 0 while decoding), an aria-hidden overlay shows the glyphs; zero React renders. | `stagger.letters`, `fxTiming.scramble*` |
 | `LiveText { source; format?; smooth?; flash?; … }` | MotionValue as text, zero renders; a single `motion.span`, so single-element `getByText` contracts hold. `smooth` glides on `spring.price`. | `spring.price`, `tween.flash` |
 
@@ -238,7 +242,10 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
 ### Hooks
 - `useReducedFx()` → boolean; gate every MotionValue/`useSpring` effect with it.
 - `usePressable({ disabled?, scale? (.96), hover?, transition? })` → `{ whileTap, whileHover (hover devices), transition: spring.press }`.
-- `useMediaQuery(q, fallback)`, `useCanHover()`, `useIsDesktop()` (≥ 640 px).
+- `useMediaQuery(q, fallback)`, `useCanHover()`, `useIsDesktop()` (≥ 640 px) – one shared `MediaQueryList` + listener per query
+  (stable `subscribe`: renders never re-subscribe or create lists).
+- `safeFx.ts`: `SAFE_FX_ATTR` / `isSafeFx()` – Samsung-Internet-safe effects (`html[data-safe-fx]`, set by `@/app/pwa`); `Reveal`,
+  `RevealItem`, `StaggerItem` and PageHost drop their blur under it.
 - `a11y.ts`: `useFocusTrap(ref, active, settled?)`, `useScrollLock(active)`, `useInertOutside(ref, active, settled?)`,
   `useEscape(active, onClose)`, `useDialogBehaviour(ref, active, onClose, { settled? })`:
   - focus moves into the panel and Tab is trapped at once; `inert` is applied when `settled` is true (open morph done);
