@@ -58,6 +58,7 @@ export { closedBar, lastClosed4h, weeklyClose, currentBar, rsiWilder, weeklyRsi,
 export {
   deriveMarket,
   deriveTopTrader,
+  isBinanceSeries,
   topTraderFreshness,
   topTraderHealthSignature,
   freshnessText,
@@ -138,6 +139,19 @@ export {
   PRICE_SNAPSHOT_INTERVAL_MS,
   type PriceSnapshot,
 } from "./marketStore";
+export {
+  deriveTraderSeries,
+  getTraderSeries,
+  subscribeTraderSeries,
+  useTraderSeries,
+  traderSeriesKey,
+  traderHealthSignature,
+  TRADER_SERIES_FEEDS,
+  TRADER_SERIES_STEP_MS,
+  TRADER_SERIES_FRESH_MS,
+  type LiveTraderSeries,
+  type TraderSeriesStatus,
+} from "./traders";
 export * from "./signals";
 export { parseWsMessage, wsStreamKind, buildStreamUrl, binanceRest, BINANCE_REST, BINANCE_WS, type WsEvent, type BinanceRest } from "./sources/binance";
 export { bybitRest, BYBIT_REST, type BybitRest } from "./sources/bybit";

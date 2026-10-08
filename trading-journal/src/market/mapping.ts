@@ -277,7 +277,7 @@ const BINANCE_DATA: readonly Source[] = ["binance", "proxy"];
  * A ratio series usable for the live reading: data present, served by Binance (direct or through the proxy) both
  * per health and per value, and `live`/`stale` (or `fallback` on the proxy, which is Binance's own data).
  */
-function binanceSeries(health: ProviderHealth, feed: FeedId, v: Stamped<RatioPoint[]> | undefined): boolean {
+export function isBinanceSeries(health: ProviderHealth, feed: FeedId, v: Stamped<RatioPoint[]> | undefined): boolean {
   const h = health.feeds[feed];
   if (!h || !v || v.data.length === 0) return false;
   if (!BINANCE_DATA.includes(v.source) || !BINANCE_DATA.includes(h.source)) return false;
@@ -311,11 +311,11 @@ export function deriveTopTrader(feeds: FeedSnapshot, health: ProviderHealth, bas
   const ds = deltaSeries(pos?.data, glob?.data);
   const deltas = ds.map((d) => d.delta);
   const last = ds[ds.length - 1];
-  const dsOk = binanceSeries(health, "topPositionRatio", pos) && binanceSeries(health, "globalAccountRatio", glob);
-  const primaryOk = binanceSeries(health, primaryFeed, primary);
+  const dsOk = isBinanceSeries(health, "topPositionRatio", pos) && isBinanceSeries(health, "globalAccountRatio", glob);
+  const primaryOk = isBinanceSeries(health, primaryFeed, primary);
 
   // 5-min live twins (absent until the provider delivered them; never from Bybit/OKX)
-  const liveOk = (f: FeedId, v: Stamped<RatioPoint[]> | undefined) => (binanceSeries(health, f, v) ? v!.data[v!.data.length - 1] : undefined);
+  const liveOk = (f: FeedId, v: Stamped<RatioPoint[]> | undefined) => (isBinanceSeries(health, f, v) ? v!.data[v!.data.length - 1] : undefined);
   const liveAcc = liveOk("topAccountRatio5m", feeds.topAccountRatio5m);
   const livePos = liveOk("topPositionRatio5m", feeds.topPositionRatio5m);
   const liveGlob = liveOk("globalAccountRatio5m", feeds.globalAccountRatio5m);

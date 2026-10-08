@@ -3,7 +3,7 @@
  * scheduler, the budgets, the cache and the health reducer. Views never talk to it directly; they use the
  * hooks in `marketStore.ts`.
  */
-import type { Candle, FeedId, FeedSpec, FeedValue, HealthEvent, ProviderHealth, SeriesFeed, Source, Stamped, StatusLabel, MarketDataProvider, AggTrade } from "./types";
+import type { Candle, FeedId, FeedSpec, FeedValue, HealthEvent, ProviderHealth, RatioPoint, SeriesFeed, Source, Stamped, StatusLabel, MarketDataProvider, AggTrade } from "./types";
 import { resolveSymbol, type SymbolInfo } from "./symbol";
 import { normalizePeriod, INTERVAL_MS, type FetchInterval, type PeriodResult, type KlineInterval, type Period } from "./period";
 import {
@@ -56,7 +56,7 @@ import { ClockSkew } from "./clock";
 import { MarketCache, upsertBar, upsertSeries, RING_CAPACITY, type KVStore } from "./cache";
 import { initialHealth, reduceHealth } from "./health";
 import { statusLabelFor, STRINGS } from "./statusLabel";
-import { binanceRest, buildStreamUrl, parseWsMessage, type BinanceRest } from "./sources/binance";
+import { binanceRest, buildStreamUrl, parseWsMessage, type BinanceRest, type RatioKind } from "./sources/binance";
 import { bybitRest, type BybitRest } from "./sources/bybit";
 import { okxRest, type OkxRest } from "./sources/okx";
 import { probeProxy, proxyRest } from "./sources/proxy";
@@ -122,6 +122,13 @@ export interface MarketProvider extends MarketDataProvider {
    * `maxWaitMs` (default 15 s) for budget tokens, then throws `RestError("rate_limited")`.
    */
   fetchKlines(interval: FetchInterval, p?: { endTime?: number; startTime?: number; limit?: number; maxWaitMs?: number }): Promise<Stamped<Candle[]>>;
+  /**
+   * One page of a Binance long/short ratio series (`/futures/data/*`) at any period, on the route the ratio feeds use
+   * right now (Binance direct or the EU proxy — never Bybit/OKX, they have no top-trader cohort), charged to the
+   * futures-data budget as a bulk call (never below the live reserve). Not published into the live cache (back-dated
+   * top-trader readings, extra periods). No Binance route (blocked without a usable proxy) → `RestError("unsupported")`.
+   */
+  fetchRatios(kind: RatioKind, period: Period, p?: { endTime?: number; startTime?: number; limit?: number; maxWaitMs?: number }): Promise<Stamped<RatioPoint[]>>;
   /** Device time corrected to the Binance server clock (`Date.now() + clockSkewMs`); compare it with `asOf` / point times. */
   serverNow(): number;
   /**
@@ -1403,6 +1410,25 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     }
   }
 
+  async function fetchRatios(kind: RatioKind, per: Period, p: { endTime?: number; startTime?: number; limit?: number; maxWaitMs?: number } = {}): Promise<Stamped<RatioPoint[]>> {
+    if (!symbolInfo.valid) throw new RestError("bad_symbol", "Ungültiges Symbol");
+    // the route of the 5-min twins (they never leave Binance's cohort): proxy when they use it or Binance is blocked
+    const twin = health.feeds.topPositionRatio5m?.source;
+    const viaProxy = twin === "proxy" || health.feeds[kind]?.source === "proxy" || health.primary.blocked;
+    if (viaProxy && (!chain.includes("proxy") || health.proxy.usable === false || health.proxy.blocked)) throw new RestError("unsupported", STRINGS.onlyBinance);
+    const client = viaProxy ? proxy : binance;
+    const limit = Math.max(1, Math.min(500, Math.round(p.limit ?? 30)));
+    const bucket = viaProxy ? "proxy" : "binance.futuresData";
+    await waitBudget(bucket, 1, p.maxWaitMs ?? FETCH_KLINES_MAX_WAIT_MS);
+    try {
+      return await client.ratio(kind, sym, per, { limit, endTime: p.endTime, startTime: p.startTime });
+    } catch (err) {
+      const e = toRestError(err);
+      if (e.kind === "rate_limited") budget.backoff(bucket, now());
+      throw e;
+    }
+  }
+
   // ------------------------------------------------------------ public
 
   const provider: MarketProvider = {
@@ -1478,6 +1504,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     clearCache: () => cache.clear(),
     dispatch,
     fetchKlines,
+    fetchRatios,
     serverNow,
     resume: (reason?: string) => resume(reason ?? "manual"),
   };
