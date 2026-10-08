@@ -126,8 +126,14 @@ export function NotchedFrame({ children, media, radius = 16, notchSize = 56, act
         svg.firstElementChild?.setAttribute("d", notchPath(w - 1, h - 1, Math.max(0, radius - 0.5), notchSize - 0.5));
       }
     };
-    apply(el.offsetWidth, el.offsetHeight);
-    if (typeof ResizeObserver !== "function") return;
+    // the size comes from the ResizeObserver's first report – delivered after the frame's layout and before its paint,
+    // for every card of a page in ONE pass, so the first painted frame already carries the mask. Reading offsetWidth
+    // here instead forced a style + layout per card, each invalidated by the previous card's new mask (≈ 95 ms of layout
+    // thrash when the Entscheidungsgrundlagen page mounted on the tablet probe). Without ResizeObserver: read once.
+    if (typeof ResizeObserver !== "function") {
+      apply(el.offsetWidth, el.offsetHeight);
+      return;
+    }
     const ro = new ResizeObserver((entries) => {
       const box = entries[0]?.borderBoxSize?.[0];
       if (box) apply(box.inlineSize, box.blockSize);

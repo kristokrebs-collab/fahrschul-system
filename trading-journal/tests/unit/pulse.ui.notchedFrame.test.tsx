@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CONFIG, NotchedFrame, notchPath } from "@/motion/pulse/NotchedFrame";
 
 describe("NotchedFrame", () => {
@@ -44,5 +44,31 @@ describe("NotchedFrame", () => {
       </NotchedFrame>,
     );
     expect(container.querySelector(".pn-frame")).toHaveAttribute("data-active");
+  });
+
+  describe("sizing (perf-120 C)", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("takes its size from the ResizeObserver's first report – no layout read while the page mounts", () => {
+      let report: ((entries: unknown[]) => void) | null = null;
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(cb: (entries: unknown[]) => void) {
+            report = cb;
+          }
+          observe() {}
+          disconnect() {}
+        },
+      );
+      const read = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
+      const { container } = render(<NotchedFrame className="p-4">x</NotchedFrame>);
+      expect(read).not.toHaveBeenCalled();
+      const surface = container.querySelector<HTMLElement>(".pn-frame > div:not([aria-hidden])")!;
+      expect(surface.style.maskImage).toBe("");
+      act(() => report?.([{ borderBoxSize: [{ inlineSize: 300, blockSize: 200 }] }]));
+      expect(surface.style.maskImage).toContain("data:image/svg+xml");
+      read.mockRestore();
+    });
   });
 });
