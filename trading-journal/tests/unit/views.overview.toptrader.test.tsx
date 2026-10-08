@@ -2,18 +2,26 @@
  * Top-Trader card freshness: the note says what the numbers are and how fresh they are — Binance's 5-min snapshot
  * with a countdown to the next one, "Binance antwortet nicht … neuer Versuch in m:ss", or "Binance blockiert" — and
  * Long % / Delta come from the newest Binance point (5-min twin) instead of freezing on the hourly one.
+ * Falling-Knife-Filter (decision 11): three automatic points from the Einstiegs-Check's evaluation (no support-zone
+ * point), the dialog with sources, verdict, the check's own state and the manual reading as a note.
  */
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootFixtureJournal, installDomPolyfills, type FakeMarket } from "./views.overview.harness";
 
 const fake = vi.hoisted(() => ({ current: null as FakeMarket | null }));
+const sig = vi.hoisted(() => ({ state: { state: "loading", snapshot: null, updatedAt: null, message: null } as unknown, listeners: new Set<() => void>() }));
 
 vi.mock("@/market", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/market")>();
   const { fakeMarket } = await import("./views.overview.harness");
+  const { useSyncExternalStore } = await import("react");
   fake.current = fakeMarket(actual);
-  return { ...actual, ...fake.current.overrides };
+  const subscribe = (cb: () => void) => {
+    sig.listeners.add(cb);
+    return () => void sig.listeners.delete(cb);
+  };
+  return { ...actual, ...fake.current.overrides, useSignalCheck: () => useSyncExternalStore(subscribe, () => sig.state, () => sig.state) };
 });
 vi.mock("@/app/overlays", () => ({
   TradeDetail: () => null,
@@ -25,7 +33,9 @@ vi.mock("@/app/overlays", () => ({
 import { reduceHealth, buildFeedSpecs, type FeedHealth, type FeedId, type ProviderHealth, type RatioPoint, type Stamped } from "@/market";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
-import { TopTraderCard } from "@/views/overview/TopTraderCard";
+import { KNIFE_INFO } from "@/domain/signals";
+import { knifeLine, TopTraderCard } from "@/views/overview/TopTraderCard";
+import { divHit, gradedSnapshot, structureAt, traderReadingOf, v2check } from "./views.overview.signalFixtures";
 
 const MIN = 60_000;
 const specs = buildFeedSpecs("1h");
@@ -128,5 +138,67 @@ describe("TopTraderCard freshness", () => {
     expect(note.textContent).toMatch(/^Binance blockiert \(Region\) · Stand \d\d:\d\d · neuer Versuch in [34]:\d\d$/);
     expect(screen.getByText("Nur mit Binance")).toBeInTheDocument();
     expect(screen.queryByText(/Live von Binance/)).toBeNull();
+  });
+});
+
+describe("Falling-Knife-Filter (live from the Einstiegs-Check)", () => {
+  beforeAll(() => installDomPolyfills());
+  beforeEach(async () => {
+    await bootFixtureJournal();
+    sig.state = { state: "loading", snapshot: null, updatedAt: null, message: null };
+  });
+  const publish = (snapshot: unknown) => {
+    sig.state = { state: "ok", snapshot, updatedAt: Date.now(), message: null };
+    for (const l of [...sig.listeners]) l();
+  };
+  /** 1h RSI divergence (closed) + top traders long / retail red; no structure break → 2 of 3. */
+  const evaluation = () =>
+    gradedSnapshot(
+      [
+        v2check("30m", { long: { kind: "bottom", barsAgo: 1 }, rsi: 28 }),
+        v2check("45m", { long: { kind: "bottom", barsAgo: 1 }, rsi: 33 }),
+        v2check("1h", { div: [divHit()], structure: structureAt(81_200, { price: 81_000, distAtr: 0.5 }, { price: 84_200 }) }),
+        v2check("4h", { structure: structureAt(81_200, null, null) }),
+      ],
+      traderReadingOf(),
+    );
+
+  it("waits for the check, then shows n / 3 with three segments and the line; no support-zone point anywhere", () => {
+    wrap(<TopTraderCard />);
+    expect(screen.getByTestId("knife-card")).toHaveAttribute("data-tone", "mute");
+    expect(screen.getByText("Wartet auf die Live-Daten des Einstiegs-Checks …")).toBeInTheDocument();
+    act(() => publish(evaluation()));
+    const card = screen.getByTestId("knife-card");
+    expect(card).toHaveAttribute("data-n", "2");
+    expect(card).toHaveAttribute("data-tone", "warn");
+    expect(screen.getByText("2 von 3 erfüllt · Tippen für Details")).toBeInTheDocument();
+    expect(screen.queryByText(/Support-\/Liquiditätszone/)).toBeNull();
+  });
+
+  it("dialog: the info (filter vs. trigger, same data), three points with source, verdict, the check's state, the reading as a note", () => {
+    publish(evaluation());
+    wrap(<TopTraderCard />);
+    fireEvent.click(screen.getByRole("button", { name: /Falling-Knife-Filter/ }));
+    const dialog = screen.getByRole("dialog", { name: "Falling-Knife-Filter" });
+    expect(within(dialog).getByText(KNIFE_INFO)).toBeInTheDocument();
+    const items = within(dialog).getAllByTestId("knife-item");
+    expect(items.map((i) => `${i.getAttribute("data-id")}:${i.getAttribute("data-met")}`)).toEqual(["structure:false", "divergence:true", "whale:true"]);
+    expect(items[0]).toHaveTextContent("Erstes Higher Low oder BOS auf 1H/4H");
+    expect(items[1]).toHaveTextContent("1h: RSI regulär");
+    expect(items[1]).toHaveTextContent("Divergenzen · dieselben wie im Einstiegs-Check");
+    expect(items[2]).toHaveTextContent("Top-Trader-Kombi · Binance-5-min-Daten");
+    expect(within(dialog).getByTestId("knife-count")).toHaveTextContent("2/3");
+    expect(within(dialog).getByText(/noch keine Absicherung für einen Makro-Long/)).toBeInTheDocument();
+    expect(within(dialog).getByTestId("knife-trigger")).toHaveTextContent(/Einstiegs-Check · Auslöser.*Long-Einstieg.*Score \d+/);
+    // the short mirror
+    fireEvent.click(within(dialog).getByRole("radio", { name: "Short" }));
+    expect(within(dialog).getAllByTestId("knife-item")[0]).toHaveTextContent("Erstes Lower High oder BOS auf 1H/4H");
+  });
+
+  it("card line wording", () => {
+    expect(knifeLine(null)).toBe("Wartet auf die Live-Daten des Einstiegs-Checks …");
+    const k = evaluation().knife!.long;
+    expect(knifeLine({ ...k, n: 3, all: true })).toBe("Kein fallendes Messer: Makro-Long abgesichert.");
+    expect(knifeLine({ ...k, n: 0, all: false })).toBe("Fallendes Messer möglich: beobachten statt kaufen.");
   });
 });
