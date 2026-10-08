@@ -1,6 +1,7 @@
 import { motion, type HTMLMotionProps, type Transition, type Variants } from "motion/react";
 import type { ReactNode } from "react";
 import { springSettleTime, type SpringConfig } from "@/motion/pulse/engine";
+import { isSafeFx } from "@/motion/safeFx";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -43,6 +44,11 @@ const ITEM: Variants = {
     transitionEnd: { filter: "none" },
   },
 };
+/** Samsung-Internet-safe effects (`data-safe-fx`): the same fade-up without the blur over every body section. */
+const ITEM_SAFE: Variants = {
+  [STAGGER_HIDDEN]: { opacity: 0, y: 8 },
+  [STAGGER_SHOWN]: { opacity: 1, y: 0, transition: { default: tween.reveal, y: spring.enter } },
+};
 const STATIC: Variants = { [STAGGER_HIDDEN]: {}, [STAGGER_SHOWN]: {} };
 
 type StaggerTag = "div" | "section" | "li";
@@ -62,7 +68,7 @@ export function StaggerItem({ as = "div", children, ...rest }: StaggerItemProps)
   const reduced = useReducedFx();
   const Tag = motion[as] as typeof motion.div;
   return (
-    <Tag variants={reduced ? STATIC : ITEM} {...rest}>
+    <Tag variants={reduced ? STATIC : isSafeFx() ? ITEM_SAFE : ITEM} {...rest}>
       {children}
     </Tag>
   );

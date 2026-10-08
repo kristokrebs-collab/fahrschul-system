@@ -9,6 +9,7 @@
  * for jsdom, file:// and browsers without the APIs.
  */
 import { useSyncExternalStore } from "react";
+import { SAFE_FX_ATTR } from "@/motion/safeFx";
 
 type Listener = () => void;
 
@@ -109,17 +110,13 @@ export function isSamsungInternet(ua: string = hasWindow ? navigator.userAgent :
  * `?safefx=1` / `?safefx=0` in the URL forces it on / off on any browser (comparison on the device and in tests);
  * the layer diagnostics can toggle it live.
  */
-export const SAFE_FX_ATTR = "data-safe-fx";
+export { SAFE_FX_ATTR, isSafeFx } from "@/motion/safeFx";
 
 /** Pure: whether the safe effects apply – the URL switch wins, else Samsung Internet. */
 export function wantsSafeFx(ua: string, search: string): boolean {
   const m = /[?&]safefx=([01])\b/.exec(search);
   if (m) return m[1] === "1";
   return isSamsungInternet(ua);
-}
-
-export function isSafeFx(): boolean {
-  return hasWindow && document.documentElement.hasAttribute(SAFE_FX_ATTR);
 }
 
 export function setSafeFx(on: boolean): void {

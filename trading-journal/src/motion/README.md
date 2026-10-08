@@ -135,14 +135,16 @@ sheet keeps its shadow on the panel (it only moves by transform). The source mus
 - `handoff { backdropFrom, enterDelay }`: detail → editor without the page brightening in between.
 
 ### `Stagger.tsx` – `StaggerItem` · `sectionDelay` · `withSectionStagger`
-`<StaggerItem as="div|section|li">` fades up from `{opacity 0, y 8, blur 4px}` (`tween.reveal`, y on `spring.enter`) and ends at
+`<StaggerItem as="div|section|li">` fades up from `{opacity 0, y 8, blur 4px}` (no blur under `html[data-safe-fx]`, `safeFx.ts`)
+(`tween.reveal`, y on `spring.enter`) and ends at
 `filter:none` / `transform:none`. The bodies of `MorphDialogProvider` and `Sheet` are stagger parents: sections cascade
 `stagger.sections` apart, capped at `stagger.max` (`sectionDelay(base)` / `withSectionStagger(t, base)`); labels `STAGGER_HIDDEN` /
 `STAGGER_SHOWN`. Outside a parent or under reduced motion it renders statically. Items start at opacity 0 in jsdom until the animation
 runs: tests `waitFor` before `toBeVisible`.
 
 ### `Reveal` · `RevealGroup` / `RevealItem`
-Blur-fade entrance `{opacity 0, y 14, blur 6px}` → rest, once, when 15 % is in view (margin −50px); stagger
+Blur-fade entrance `{opacity 0, y 14, blur 6px}` (`REVEAL_FROM`; under `html[data-safe-fx]` `REVEAL_FROM_SAFE` without the blur –
+a blur over a card revealed while the page scrolls is the tablet compositor's heaviest work) → rest, once, when 15 % is in view (margin −50px); stagger
 `min(i, stagger.max)·stagger.reveal`; ends at `transform:none` / `filter:none` (transitionEnd), no x offset. Reduced motion or no
 `IntersectionObserver`: `initial={false}`, static. The group is driven by `animate`, so items mounted later also enter.
 

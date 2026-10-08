@@ -79,8 +79,9 @@ known, so the app now lets the device answer it:
   forces it anywhere): base.css drops every `backdrop-filter`, the dock label plates fade (opacity) instead of the
   clip-path reveal, the dock's extra `will-change` layers, the header CTA's masked shine layers (a plain inset red under-glow instead), the fixed noise film
   (`body::before`, an SVG-filter image over the viewport) and the toast's blurred win glow; the dock's session entrance
-  rises without its blur filter (`dockEntrance(…, noBlur)`), and PageHost's entering page slides and fades without its
-  4 px blur.
+  rises without its blur filter (`dockEntrance(…, noBlur)`), PageHost's entering page slides and fades without its
+  4 px blur, and the motion primitives' content entrances fade without blur (`Reveal` / `RevealItem` on scroll,
+  `StaggerItem` sheet / dialog sections – `@/motion/safeFx`, the attribute's single source; `pwa.ts` re-exports it).
 - The toast island's live region is a 0×0 box at rest (no empty full-viewport fixed layer between toasts); it opens to
   `inset-0` while a toast shows or exits, staying in the DOM / accessibility tree throughout.
 - Layer names: `Header`, `Dock`, `Dock-Leiste`, `Unterer Verlauf`, `Toast-Insel`, `Navigation (Vollbild)` (`data-layer`).

@@ -228,6 +228,26 @@ describe("Reveal", () => {
       );
     });
 
+    it("Samsung-Internet-safe effects (html[data-safe-fx]): the same fade-up without a blur filter", async () => {
+      document.documentElement.setAttribute("data-safe-fx", "");
+      try {
+        render(
+          <Reveal data-testid="r">
+            <h2>Karte</h2>
+          </Reveal>,
+        );
+        const el = screen.getByTestId("r");
+        expect(el.style.opacity).toBe("0");
+        expect(el.style.filter).toBe("");
+        expect(el.style.transform).toContain("translateY(14px)");
+        act(() => intersect(el));
+        await waitFor(() => expect(el.style.opacity).toBe("1"), { timeout: 3000 });
+        expect(el.style.filter).toBe("");
+      } finally {
+        document.documentElement.removeAttribute("data-safe-fx");
+      }
+    });
+
     it("uses initial={false} under reduced motion: never hidden", () => {
       fx.reduced = true;
       render(

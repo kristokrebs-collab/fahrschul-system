@@ -2,11 +2,13 @@ import { motion, useInView, type HTMLMotionProps, type Transition, type Variants
 import { createContext, useContext, useRef, type ReactNode } from "react";
 import { useIntroGate } from "@/intro/introStore";
 import { canObserveInView } from "@/motion/inView";
+import { isSafeFx } from "@/motion/safeFx";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
 /**
- * Blur-fade entrance (21st.dev / magicui "Blur Fade"): `{opacity 0, y 14, blur 6px}` → rest once the element is
+ * Blur-fade entrance (21st.dev / magicui "Blur Fade"): `{opacity 0, y 14, blur 6px}` (Samsung-Internet-safe effects:
+ * no blur) → rest once the element is
  * 15 % in view (viewport shrunk by 50 px). `y` rides `spring.enter`, opacity/filter `tween.reveal`; delay =
  * `min(index, stagger.max) · stagger.reveal`.
  *
@@ -23,6 +25,9 @@ import { useReducedFx } from "@/motion/useReducedFx";
 
 export const REVEAL_FROM = { opacity: 0, y: 14, filter: "blur(6px)" } as const;
 const REVEAL_TO = { opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter: "none" } } as const;
+/** Samsung-Internet-safe effects (`data-safe-fx`, `@/motion/safeFx`): the same fade-up without the blur. */
+export const REVEAL_FROM_SAFE = { opacity: 0, y: 14 } as const;
+const REVEAL_TO_SAFE = { opacity: 1, y: 0 } as const;
 const REVEAL_VIEWPORT = { once: true, amount: 0.15, margin: "-50px" } as const;
 /** Rest pose for `settled`: identity, applied instantly (motion drops the identity transform → `transform: none`). */
 const REVEAL_REST = { opacity: 1, y: 0, filter: "none" } as const;
@@ -80,8 +85,10 @@ export function Reveal({ index = 0, delay = 0, as = "div", settled = false, chil
       </Tag>
     );
   }
+  // a blur over a card revealed while the page scrolls is the heaviest compositor work on the tablet: safe effects fade only
+  const [from, to] = isSafeFx() ? [REVEAL_FROM_SAFE, REVEAL_TO_SAFE] : [REVEAL_FROM, REVEAL_TO];
   return (
-    <Tag ref={ref} initial={REVEAL_FROM} animate={gate && inView ? REVEAL_TO : REVEAL_FROM} transition={revealTransition(revealDelay(index, delay))} {...rest}>
+    <Tag ref={ref} initial={from} animate={gate && inView ? to : from} transition={revealTransition(revealDelay(index, delay))} {...rest}>
       {children}
     </Tag>
   );
@@ -90,6 +97,10 @@ export function Reveal({ index = 0, delay = 0, as = "div", settled = false, chil
 const ITEM_VARIANTS: Variants = {
   hidden: REVEAL_FROM,
   shown: { ...REVEAL_TO, transition: { default: tween.reveal, y: spring.enter } },
+};
+const ITEM_VARIANTS_SAFE: Variants = {
+  hidden: REVEAL_FROM_SAFE,
+  shown: { ...REVEAL_TO_SAFE, transition: { default: tween.reveal, y: spring.enter } },
 };
 
 const RevealGroupContext = createContext(false);
@@ -138,7 +149,7 @@ export function RevealItem({ as = "div", children, ...rest }: RevealItemProps) {
   const enabled = useContext(RevealGroupContext);
   const Tag = motion[as] as typeof motion.div;
   return (
-    <Tag variants={enabled ? ITEM_VARIANTS : undefined} {...rest}>
+    <Tag variants={enabled ? (isSafeFx() ? ITEM_VARIANTS_SAFE : ITEM_VARIANTS) : undefined} {...rest}>
       {children}
     </Tag>
   );
