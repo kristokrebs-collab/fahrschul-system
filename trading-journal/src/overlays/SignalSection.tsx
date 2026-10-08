@@ -174,9 +174,12 @@ function LiveView({ side, onAuto }: { side: Side; onAuto: (a: MtfAuto | null) =>
   const snap = useMemo(() => (live ? toTradeSnapshot(live, side) : null), [live, side]);
   useReportAuto(snap, onAuto);
   if (!snap) return <LoadingLine text={check.state === "offline" ? (check.message ?? OFFLINE_TEXT) : (check.message ?? LOADING_TEXT)} busy={check.state === "loading"} />;
+  // a provisional live entry counts down to its base candle's close (stored snapshots record only the state)
+  const v = live ? (side === "long" ? live.long : live.short) : null;
+  const closesAt = v?.state === "provisional" ? (v.closesAt ?? null) : null;
   return (
     <div className="grid gap-2">
-      <SignalSummary snap={snap} side={side} />
+      <SignalSummary snap={snap} side={side} closesAt={closesAt} />
       {check.state === "stale" && <p className="text-[11.5px] text-warn">{check.message ?? STALE_TEXT}</p>}
     </div>
   );

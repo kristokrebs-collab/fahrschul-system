@@ -77,7 +77,16 @@ interface TradeEditorProps {
 - More exports: `isFormDirty`, `mistakeOptions`, `usedOwnMistakes`, `withMtfAuto`, `timeframeOptions`, `DISCARD_COPY`, `MISTAKES_COPY`;
   `SignalSection.tsx`: `SignalSection`, `resolveTradeSignal`, `signalSectionSub`, `localMs`, `SIGNAL_SECTION_TITLE`, `SIGNAL_SECTION_COPY`,
   `RETRO_DEBOUNCE_MS`, `SAVE_CHECK_TIMEOUT_MS`; `SignalSummary.tsx`: `SignalSummary`, `StrengthBars`, `StrengthDots`, `MistakeChips`,
-  `signalTone`, `snapshotSource`, `tradeSignal`.
+  `signalTone`, `snapshotSource`, `tradeSignal`, `StateChip`, `snapshotPartViews`, `knifeRows`.
+- v2 snapshots (decisions 6, 9, 5, 10, 11): `SignalSummary` shows the candle-close state as a chip (`bestätigt` · `stark bestätigt` ·
+  `⚠ vorläufig`, dashed in the ~50 % saturated side tone; the live editor view passes the base candle's `closesAt`, so the chip counts
+  down `vorläufig · schließt in mm:ss` on the shared clock `nowMv` – no render per second). A provisional entry shows its label without
+  the stored `Vorläufig: ` prefix and the strength it gets on the close (outlined dots, `… · bei Kerzenschluss`). Timeframe pills append
+  `· vorläufig` (dashed, soft) / `· stark`. Below the pills the stored graded parts (`snapshotPartViews`: Top-Trader-Kombi with the four
+  items lit / unlit and their values – `66,0 % Long`, `−0,5 pp`, `Discount · 20 %`; Divergenz per rung; Support / Widerstand with the
+  level leaned on, the target and R) and the falling-knife filter (`n von 3`). `keine Daten` is shown, never a fail. Nothing truncates:
+  a value that does not fit beside its label wraps right-aligned. Older snapshots (no `state` / `parts`) look as before.
+  `StrengthBars` of a provisional snapshot draws the strength on the close outlined in the soft tone.
 
 ## `TradeDetail` (`TradeDetail.tsx`) – bundle `q$`, Plan 6.2 / 2.5
 
