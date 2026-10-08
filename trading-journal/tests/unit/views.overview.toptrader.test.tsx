@@ -186,7 +186,9 @@ describe("Falling-Knife-Filter (live from the Einstiegs-Check)", () => {
     expect(items[0]).toHaveTextContent("Erstes Higher Low oder BOS auf 1H/4H");
     expect(items[1]).toHaveTextContent("1h: RSI regulär");
     expect(items[1]).toHaveTextContent("Divergenzen · dieselben wie im Einstiegs-Check");
-    expect(items[2]).toHaveTextContent("Top-Trader-Kombi · Binance-5-min-Daten");
+    expect(items[2]).toHaveTextContent("Top-Trader long · Whale–Retail-Delta rot");
+    expect(items[2]).toHaveTextContent("4 von 4 · Positionen 66,0 % Long · Konten 65,2 % Long · Delta −3,5 pp · 1h −2,1");
+    expect(items[2]).toHaveTextContent("Top-Trader-Kombi · Whale–Retail-Delta = Top-Trader-Konten minus alle Konten (Long-%) · Binance-5-min-Daten");
     expect(within(dialog).getByTestId("knife-count")).toHaveTextContent("2/3");
     expect(within(dialog).getByText(/noch keine Absicherung für einen Makro-Long/)).toBeInTheDocument();
     expect(within(dialog).getByTestId("knife-trigger")).toHaveTextContent(/Einstiegs-Check · Auslöser.*Long-Einstieg.*Score \d+/);

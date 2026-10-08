@@ -46,7 +46,8 @@ import { TapTooltip } from "./TapTooltip";
 import { useMotionSelect } from "./useMarket";
 
 export const TOP_TRADER_TITLE = "Top Trader · Binance";
-export const DELTA_HINT = "Top-vs-Alle-Delta: Top 20 % nach Margin vs. alle Konten (Binance), Ersatz für Whale-vs-Retail";
+export const DELTA_HINT =
+  "Top-vs-Alle-Delta: Long-Anteil der Top-Trader (Top 20 % nach Margin) minus alle Konten (Binance), Ersatz für Hyblocks Whale-vs-Retail. Der Einstiegs-Check rechnet sein Whale–Retail-Delta mit den Top-Trader-Konten.";
 export const READING_DIALOG_TITLE = "Hyblock-Ablesung";
 export const DELTA_CANDLES_LABEL = "Δ+ Kerzen";
 export const EMPTY_TITLE = "Noch keine Ablesung";
@@ -147,7 +148,7 @@ const KnifeBars = memo(function KnifeBars({ states }: { states: string }) {
 export const KNIFE_SOURCE: Readonly<Record<KnifeId, string>> = {
   structure: "Marktstruktur 1H/4H · dieselbe wie Support / Widerstand im Einstiegs-Check",
   divergence: "Divergenzen · dieselben wie im Einstiegs-Check",
-  whale: "Top-Trader-Kombi · Binance-5-min-Daten wie im Einstiegs-Check",
+  whale: "Top-Trader-Kombi · Whale–Retail-Delta = Top-Trader-Konten minus alle Konten (Long-%) · Binance-5-min-Daten wie im Einstiegs-Check",
 };
 export const KNIFE_WAITING = "Wartet auf die Live-Daten des Einstiegs-Checks …";
 

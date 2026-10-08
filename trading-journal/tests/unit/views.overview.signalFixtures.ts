@@ -82,7 +82,28 @@ export function structureAt(close: number, sup: { price: number; label?: string;
   return { swings: [], breaks: [], obs: [], eqs: [], trend: 0, itrend: 0, supports: s ? [s] : [], resistances: r ? [r] : [], support: s, resistance: r, atr, close, last: 100 } as Structure;
 }
 
-export const traderReadingOf = (o: Partial<TraderReading> = {}): TraderReading => ({ at: 1_760_000_000_000, position: 66, account: 65.2, retail: 46, retailPrev: 46.5, retailChg: -0.5, period: "5m", step: M5, ...o });
+/**
+ * Top traders 66 % / 65,2 % long; the Whale–Retail-Delta red: all accounts 68,7 % long → −3,5 pp, −2,1 pp over the hour
+ * (12 sparkline points from −1,6 down to −3,5).
+ */
+export const TRADER_AT = 1_760_000_000_000;
+export const DELTA_SERIES = Array.from({ length: 12 }, (_, k) => ({ time: TRADER_AT - (11 - k) * M5, delta: Math.round((-1.4 - (2.1 * (k + 1)) / 12) * 100) / 100 }));
+export const traderReadingOf = (o: Partial<TraderReading> = {}): TraderReading => ({
+  at: TRADER_AT,
+  position: 66,
+  account: 65.2,
+  retail: 68.7,
+  retailPrev: 68.4,
+  retailChg: 0.3,
+  period: "5m",
+  step: M5,
+  delta: -3.5,
+  deltaPrev: -1.4,
+  deltaChg: -2.1,
+  deltaWindow: "1h",
+  deltaSeries: DELTA_SERIES,
+  ...o,
+});
 
 /** Graded live snapshot from hand-built checks (the zone = the `zoneTf` rung). */
 export function gradedSnapshot(checks: (TfCheck | null)[], traders: TraderReading | null = null, cfg: SignalCfg = UI_CFG): LiveSignals {

@@ -14,7 +14,8 @@
  */
 import { animate, AnimatePresence, motion, useTransform } from "motion/react";
 import { memo, useEffect, useRef, useState, type ReactNode } from "react";
-import { ageText, mmss, TOO_FEW_BARS, ZONE_TEXT, zoneFooterText, zonePillText, type SignalCfg, type SignalState, type Side, type TfCheck, type Verdict } from "@/domain/signals";
+import { ageText, mmss, TOO_FEW_BARS, whaleCfgOf, ZONE_TEXT, zoneFooterText, zonePillText, type SignalCfg, type SignalState, type Side, type TfCheck, type TraderReading, type Verdict } from "@/domain/signals";
+import type { DeltaPoint } from "@/domain/signals/traders";
 import { cn } from "@/lib/cn";
 import { n0, n1 } from "@/lib/format";
 import { priceMv, signalClockOffset } from "@/market";
@@ -655,15 +656,110 @@ function TraderCell({ c, side }: { c: PartCell; side: Side }) {
   );
 }
 
+const sparkKey = (pts: readonly DeltaPoint[]): string => pts.map((p) => `${p.time}:${p.delta}`).join("|");
+
+/**
+ * Static sparkline of the Whale–Retail-Delta: the reading's last 12 five-minute points (oldest left), the side's
+ * threshold as a dashed hairline when it lies near the curve, the newest point as a dot. Plain SVG (no animation, no
+ * layout read); memoised on the points, so it re-renders only when the 5-min series changes.
+ */
+const DeltaSpark = memo(
+  function DeltaSpark({ points, level }: { points: readonly DeltaPoint[]; level: number }) {
+    if (points.length < 2) return null;
+    const vals = points.map((p) => p.delta);
+    let lo = Math.min(...vals);
+    let hi = Math.max(...vals);
+    const span = Math.max(1, hi - lo);
+    // the threshold joins the scale only when it is near the curve (else the curve would flatten to a line)
+    const showLevel = level >= lo - span && level <= hi + span;
+    if (showLevel) {
+      lo = Math.min(lo, level);
+      hi = Math.max(hi, level);
+    }
+    const pad = Math.max(0.2, (hi - lo) * 0.12);
+    lo -= pad;
+    hi += pad;
+    const x = (i: number): number => (i / (points.length - 1)) * 100;
+    const y = (v: number): number => 22 - ((v - lo) / (hi - lo)) * 20;
+    const d = vals.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(2)} ${y(v).toFixed(2)}`).join(" ");
+    const last = vals[vals.length - 1]!;
+    return (
+      <svg
+        viewBox="0 0 100 24"
+        preserveAspectRatio="none"
+        className="mt-1.5 block h-5 w-full overflow-visible"
+        role="img"
+        aria-label={`Delta letzte Stunde: ${n1(vals[0])} → ${n1(last)} pp`}
+        data-testid="signal-delta-spark"
+        data-points={points.length}
+      >
+        {showLevel && <line x1="0" x2="100" y1={y(level)} y2={y(level)} stroke="currentColor" strokeOpacity="0.28" strokeWidth="1" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />}
+        <path d={d} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        {/* a zero-length round-capped segment: a dot that stays round under the stretched viewBox */}
+        <path d={`M${x(vals.length - 1).toFixed(2)} ${y(last).toFixed(2)} l0 0`} stroke="currentColor" strokeWidth="4" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+      </svg>
+    );
+  },
+  (a, b) => a.level === b.level && sparkKey(a.points) === sparkKey(b.points),
+);
+
+/**
+ * The Whale–Retail-Delta cell ("Retail rot" / "Retail grün"), like Hyblock: the delta in pp with its change over the
+ * window (`−3,5 pp · 1h −2,1`), the last hour as a sparkline, the two long shares behind it (`Konten 65,6 % · Retail
+ * 69,1 %`) and the rule it must meet.
+ */
+function DeltaCell({ c, side, reading, level }: { c: PartCell; side: Side; reading: TraderReading | null | undefined; level: number }) {
+  const met = c.met === true;
+  const [main, ...rest] = c.value.split(" · ");
+  const pts = c.met === null ? [] : (reading?.deltaSeries ?? []);
+  const shares = reading && reading.account != null && reading.retail != null ? `Konten ${n1(reading.account)} % · Retail ${n1(reading.retail)} %` : null;
+  return (
+    <div
+      className={cn("relative h-full min-w-0 rounded-lg border px-2.5 py-2 transition-colors duration-300", met ? TONE_ON[side] : "border-line bg-ink-950/40")}
+      data-testid="signal-part-cell"
+      data-id={c.id}
+      data-met={c.met === null ? "none" : String(met)}
+    >
+      <span className="flex items-center gap-1.5">
+        <StateDot tone={c.met === null ? null : met ? side : null} strong={met} state="confirmed" lit={met} size={6} />
+        <span className="min-w-0 text-[9.5px] font-semibold uppercase leading-tight tracking-[0.12em] text-faint">{c.title}</span>
+      </span>
+      <span className={cn("num mt-1 block font-mono text-[14px] leading-tight transition-colors duration-300 [text-wrap:balance]", met ? SIDE_TEXT[side] : c.met === null ? "text-faint" : "text-fg")}>
+        <span className="sr-only">{c.met === null ? "keine Daten: " : met ? "erfüllt: " : "offen: "}</span>
+        <span className="whitespace-nowrap">{main}</span>
+        {/* the change wraps under the level in a narrow cell (never cut) */}
+        {rest.length > 0 && (
+          <>
+            {" "}
+            <span className="whitespace-nowrap text-[11px] text-mute">· {rest.join(" · ")}</span>
+          </>
+        )}
+      </span>
+      {pts.length > 1 && (
+        <span className={cn("block transition-colors duration-300", met ? SIDE_TEXT[side] : "text-mute")}>
+          <DeltaSpark points={pts} level={level} />
+        </span>
+      )}
+      {shares && (
+        <span className="num mt-1 block text-[10.5px] leading-snug text-mute" data-testid="signal-delta-shares">
+          {shares}
+        </span>
+      )}
+      <span className="mt-0.5 block text-[10.5px] leading-snug text-faint">{c.sub}</span>
+    </div>
+  );
+}
+
 /** Top-Trader-Kombi (decision 5): four cells lit / unlit with their values, segments = met parts. */
 function TradersCard({ pv, side, cfg, wide }: { pv: PartView; side: Side; cfg: SignalCfg; wide: boolean }) {
   const cells = traderCells(pv.part, cfg);
+  const red = whaleCfgOf(cfg).deltaRed;
   return (
     <PartShell pv={pv} side={side} testId="signal-whale" segments={cells.map((c) => c.met === true)}>
       <div className={cn("mt-2.5 grid grid-cols-2 gap-1.5", wide && "md:grid-cols-4 xl:grid-cols-2")} role="list" aria-label="Top-Trader-Teile">
         {cells.map((c) => (
           <div key={c.id} role="listitem" className="min-w-0">
-            <TraderCell c={c} side={side} />
+            {c.id === "retail" ? <DeltaCell c={c} side={side} reading={pv.part.reading} level={side === "long" ? red : -red} /> : <TraderCell c={c} side={side} />}
           </div>
         ))}
       </div>

@@ -1,6 +1,6 @@
 /**
  * The graded parts of the SignalCard (decisions 5 + 10): the Top-Trader-Kombi scorecard (four cells lit / unlit with
- * their values: Positionen, Konten, Retail Δ, Zone), the divergence rows (what, which timeframe, where) and the
+ * their values: Positionen, Konten, the Whale–Retail-Delta with its change and a 12-point sparkline, Zone), the divergence rows (what, which timeframe, where) and the
  * support / resistance meters (ATR distance, R to the next level), their points / strength, the strip's parts line and
  * the view models.
  */
@@ -64,19 +64,24 @@ describe("part view models", () => {
     expect(traderCells(p, UI_CFG)).toEqual([
       { id: "pos", title: "Positionen", value: "66,0 % Long", sub: "Ziel > 64 % Long", met: true },
       { id: "acc", title: "Konten", value: "65,2 % Long", sub: "Ziel > 64 % Long", met: true },
-      { id: "retail", title: "Retail", value: "−0,5 pp", sub: "Ziel rot: Long-Anteil fällt (5m)", met: true },
+      { id: "retail", title: "Whale–Retail", value: "−3,5 pp · 1h −2,1", sub: "Ziel rot: < 0 oder fällt ≥ 1 pp (1h)", met: true },
       { id: "zone", title: "Zone", value: "Discount · 20 %", sub: "Ziel Discount · 1h", met: true },
     ]);
     const short = s.short.parts!.find((x) => x.id === "traders")!;
     expect(traderCells(short, UI_CFG).map((c) => [c.value, c.met])).toEqual([
       ["34,0 % Short", false],
       ["34,8 % Short", false],
-      ["−0,5 pp", false],
+      ["−3,5 pp · 1h −2,1", false],
       ["Discount · 20 %", false],
     ]);
+    expect(traderCells(short, UI_CFG)[2]!.sub).toBe("Ziel grün: > 0 oder steigt ≥ 1 pp (1h)");
     // no reading: every value "–", met null
     const none = snap(null as never).long.parts!.find((x) => x.id === "traders")!;
     expect(traderCells(none, UI_CFG).slice(0, 3).every((c) => c.value === "–" && c.met === null)).toBe(true);
+    // the settings' thresholds and window reach the target text
+    const strict = sanitizeSignalCfg({ whale: { deltaRed: -2, deltaFall: 0.5, deltaWindow: "4h" } });
+    const ps = snap(traderReadingOf({ deltaWindow: "4h" }), strict).long.parts!.find((x) => x.id === "traders")!;
+    expect(traderCells(ps, strict)[2]).toMatchObject({ value: "−3,5 pp · 4h −2,1", sub: "Ziel rot: < −2 oder fällt ≥ 0,5 pp (4h)", met: true });
   });
 
   it("views, divergence line, S/R meters and the strip chips", () => {
@@ -115,7 +120,16 @@ describe("SignalCard parts", () => {
     expect(cells.map((c) => c.getAttribute("data-met"))).toEqual(["true", "true", "true", "true"]);
     expect(cells[0]).toHaveTextContent("Positionen");
     expect(cells[0]).toHaveTextContent("66,0 % Long");
-    expect(cells[2]).toHaveTextContent("−0,5 pp");
+    expect(cells[2]).toHaveTextContent("Whale–Retail");
+    expect(cells[2]).toHaveTextContent("−3,5 pp · 1h −2,1");
+    expect(cells[2]).toHaveTextContent("Ziel rot: < 0 oder fällt ≥ 1 pp (1h)");
+    expect(within(cells[2]!).getByTestId("signal-delta-shares")).toHaveTextContent("Konten 65,2 % · Retail 68,7 %");
+    // the last hour as a static sparkline: 12 points, the zero line (it lies near the curve), the newest point as a dot
+    const spark = within(cells[2]!).getByTestId("signal-delta-spark");
+    expect(spark).toHaveAttribute("data-points", "12");
+    expect(spark).toHaveAccessibleName("Delta letzte Stunde: −1,6 → −3,5 pp");
+    expect(spark.querySelectorAll("path")[0]!.getAttribute("d")!.match(/[ML]/g)).toHaveLength(12);
+    expect(spark.querySelectorAll("line")).toHaveLength(1);
     expect(cells[3]).toHaveTextContent("Discount · 20 %");
     expect(within(tt).getByTestId("signal-part-points")).toHaveTextContent("+10 von 10+1 Stärke");
     // divergences: per rung, the 4h hit is provisional (desaturated), the line names the best hit
@@ -147,7 +161,25 @@ describe("SignalCard parts", () => {
     const none = screen.getByTestId("signal-whale");
     expect(none).toHaveAttribute("data-state", "none");
     expect(within(none).getByTestId("signal-part-points")).toHaveTextContent("keine Daten");
+    expect(within(none).queryByTestId("signal-delta-spark")).toBeNull();
+    expect(within(none).queryByTestId("signal-delta-shares")).toBeNull();
     expect(within(none).getByText(/Binance-Top-Trader-Daten fehlen/)).toBeInTheDocument();
+  });
+
+  it("the sparkline follows the 5-min series (a new point redraws it); a reading without history shows the level only", () => {
+    live.state = { state: "ok", snapshot: snap(), updatedAt: 1, message: null };
+    wrap(<SignalCard />);
+    const cell = () => within(screen.getByTestId("signal-whale")).getAllByTestId("signal-part-cell")[2]!;
+    expect(within(cell()).getByTestId("signal-delta-spark")).toHaveAccessibleName("Delta letzte Stunde: −1,6 → −3,5 pp");
+    const next = [...traderReadingOf().deltaSeries!.slice(1), { time: traderReadingOf().at + 300_000, delta: -4.2 }];
+    act(() => publish({ snapshot: snap(traderReadingOf({ at: traderReadingOf().at + 300_000, delta: -4.2, deltaChg: -2.6, deltaSeries: next })), updatedAt: 2 }));
+    expect(within(cell()).getByTestId("signal-delta-spark")).toHaveAccessibleName("Delta letzte Stunde: −1,8 → −4,2 pp");
+    expect(cell()).toHaveTextContent("−4,2 pp · 1h −2,6");
+    act(() => publish({ snapshot: snap(traderReadingOf({ deltaPrev: null, deltaChg: null, deltaSeries: [] })), updatedAt: 3 }));
+    expect(within(cell()).queryByTestId("signal-delta-spark")).toBeNull();
+    expect(cell()).toHaveTextContent("−3,5 pp");
+    expect(cell()).not.toHaveTextContent("1h −");
+    expect(cell()).toHaveAttribute("data-met", "true"); // negative is enough
   });
 
   it("switched-off parts are not shown (and the section disappears when all are off)", () => {

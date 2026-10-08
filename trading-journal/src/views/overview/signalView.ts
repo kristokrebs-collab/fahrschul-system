@@ -9,6 +9,7 @@
  * remaining time on the shared second clock (`useNowMv`), so nothing re-renders per second.
  */
 import {
+  deltaRuleText,
   divCfgOf,
   isLongKind,
   isStrongKind,
@@ -283,21 +284,21 @@ export interface PartCell {
   id: string;
   /** small caps title (`Positionen`) */
   title: string;
-  /** main value (`66,0 % Long`, `−0,5 pp`, `Discount · 20 %`; `–` without data) */
+  /** main value (`66,0 % Long`, `−3,5 pp · 1h −2,1`, `Discount · 20 %`; `–` without data) */
   value: string;
-  /** what it must show (`Ziel > 64 % Long`, `Ziel rot: Long-Anteil fällt (5m)`, `Ziel Discount · 1h`) */
+  /** what it must show (`Ziel > 64 % Long`, `Ziel rot: < 0 oder fällt ≥ 1 pp (1h)`, `Ziel Discount · 1h`) */
   sub: string;
   met: boolean | null;
 }
 
 const tfIn = (label: string): string | null => /\(([^)]+)\)\s*$/.exec(label)?.[1] ?? null;
 
-/** The four cells of the Top-Trader-Kombi (positions, accounts, retail, zone) for its side. */
+/** The four cells of the Top-Trader-Kombi (positions, accounts, the Whale–Retail-Delta, zone) for its side. */
 export function traderCells(p: GradedPart, cfg: Pick<SignalCfg, "whale">): PartCell[] {
   const w = whaleCfgOf(cfg);
   const long = p.side === "long";
   const sideWord = long ? "Long" : "Short";
-  const period = p.reading?.period ?? w.retailPeriod;
+  const deltaWindow = p.reading?.deltaWindow ?? w.deltaWindow;
   const item = (id: string) => p.items.find((i) => i.id === id);
   const cell = (id: string, title: string, sub: string): PartCell => {
     const it = item(id);
@@ -308,7 +309,7 @@ export function traderCells(p: GradedPart, cfg: Pick<SignalCfg, "whale">): PartC
   return [
     cell("pos", "Positionen", `Ziel > ${dec1(w.topPct)} % ${sideWord}`),
     cell("acc", "Konten", `Ziel > ${dec1(w.topPct)} % ${sideWord}`),
-    cell("retail", "Retail", long ? `Ziel rot: Long-Anteil fällt (${period})` : `Ziel grün: Long-Anteil steigt (${period})`),
+    cell("retail", "Whale–Retail", `Ziel ${long ? "rot" : "grün"}: ${deltaRuleText(p.side, { ...w, deltaWindow })}`),
     cell("zone", "Zone", `Ziel ${long ? "Discount" : "Premium"}${zoneTf ? ` · ${zoneTf}` : ""}`),
   ];
 }
