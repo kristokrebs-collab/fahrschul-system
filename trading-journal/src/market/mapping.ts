@@ -16,7 +16,8 @@ export type LegacyMarketStatus = "connecting" | "live" | "error" | "unavailable"
 /**
  * How the shown last price arrives: `stream` (the trade stream delivers → LivePill), `poll` (a REST poll — the socket
  * is down and the ticker stands in every 5 s, or another exchange serves the price → `Kurs per Abfrage · 5 s`),
- * `waiting` (the socket is down and the REST stand-in is failing → `Verbinde …`, the price shown is still < 2 min old),
+ * `waiting` (the socket is down and the REST stand-in is failing → `Verbinde …`, the price shown is still < 2 min old;
+ * or back from the background with an older price while the stand-in's first request is on its way),
  * `none` (no usable price: connecting, offline, bad symbol, or nothing delivered for > 2 min → `Kein Live-Kurs`).
  */
 export type PriceMode = "stream" | "poll" | "waiting" | "none";
@@ -241,17 +242,23 @@ const PRICE_POLL_SEC = Math.round(PRICE_REST_FALLBACK_MS / 1000);
 const CONNECTING_PILL: StatusLabel = { tone: "muted", text: STRINGS.connecting };
 const LIVE_PILL: StatusLabel = { tone: "live", text: STRINGS.live };
 
+/** While the socket is down, a price received within this long (3 polls) counts as `Kurs per Abfrage`; older → `Verbinde …`. */
+const PRICE_POLL_FRESH_MS = 3 * PRICE_REST_FALLBACK_MS;
+
 /**
  * Legacy card status from the price feeds only (Plan 4.4 "Mapping auf das Bestands-Enum") plus the honest pill:
  * - `stream`: the socket delivers → `live`, the card shows the LivePill with the trade's age;
- * - `poll`: the socket is down (silent, exhausted, reconnecting) and the last price comes from the REST stand-in every
- *   5 s, or another exchange polls it → `live`, pill `Kurs per Abfrage · 5 s` (+ `Ersatzquelle Bybit` badge);
- * - `waiting`: the socket is down and the REST stand-in is failing too (price still < 2 min old) → `live`, pill `Verbinde …`;
- * - `none`: no price yet (`connecting`, `Verbinde …`), offline (`Offline · Stand HH:mm`), bad symbol, or the shown price is
- *   older than `PRICE_STALE_MS` — neither stream nor REST delivered for 2 minutes → `error`, pill `Kein Live-Kurs`, footer
- *   `Zuletzt HH:mm · veraltet` of the price actually shown (`lastPrice` picks the freshest, so a fresher REST price
- *   never hides behind a stale trade). A 6-s socket hiccup never reaches this: the silence is detected after 10 s and
- *   the REST stand-in answers within a second.
+ * - `poll`: the socket is down (silent, exhausted, reconnecting) and the REST stand-in delivered the shown price within
+ *   the last 15 s (every 5 s), or another exchange polls it → `live`, pill `Kurs per Abfrage · 5 s` (+ `Ersatzquelle Bybit`);
+ * - `waiting`: the socket is down and nothing fresher than 15 s arrived (the stand-in is failing or held back; the price
+ *   shown is still < 2 min old) → `live`, pill `Verbinde …`; and back from the background / a device sleep with an older
+ *   price while the stand-in's first request is on its way (armed now, nothing failed since) → `connecting`, `Verbinde …`
+ *   for the few hundred ms it takes — never a `Kein Live-Kurs` flash on the way back;
+ * - `none`: no price yet (`connecting`, `Verbinde …`), the device offline (`Offline`, `Offline · Stand HH:mm`), every
+ *   source failed, bad symbol, or the shown price is older than `PRICE_STALE_MS` — neither stream nor REST
+ *   delivered for 2 minutes → `error`, pill `Kein Live-Kurs`, footer `Zuletzt HH:mm · veraltet` of the price actually
+ *   shown (`lastPrice` picks the freshest, so a fresher REST price never hides behind a stale trade).
+ * A socket hiccup never reaches `Kein Live-Kurs`: the silence is detected after 10 s and the stand-in answers within a second.
  */
 export function legacyStatus(health: ProviderHealth, price: { provenance: Provenance } | null, now: number, retryInSec?: number): LegacyStatus {
   const agg = health.feeds.aggTrade;
@@ -261,6 +268,8 @@ export function legacyStatus(health: ProviderHealth, price: { provenance: Proven
   if (feed.reason === "bad_symbol") return noPrice(STRINGS.noPrice, feed.detail);
   if (!health.online || feed.state === "offline") {
     const at = price?.provenance.asOf ?? feed.lastDataAt;
+    // the device is online but every source failed for the price: no "Offline" (the user's network works)
+    if (health.online) return noPrice(at !== undefined ? `${STRINGS.lastPrefix} ${hhmm(at)} · ${STRINGS.staleSuffix}` : STRINGS.noPrice, feed.detail);
     const message = at !== undefined ? `${STRINGS.offline} · ${STRINGS.standPrefix} ${hhmm(at)}` : STRINGS.offline;
     return { status: "error", message, priceMode: "none", pill: { tone: "error", text: STRINGS.offline, detail: message } };
   }
@@ -269,9 +278,15 @@ export function legacyStatus(health: ProviderHealth, price: { provenance: Proven
     const message = feed.consecutiveFailures > 0 && retryInSec !== undefined ? STRINGS.retrying(retryInSec) : STRINGS.noPrice;
     return noPrice(message, message !== STRINGS.noPrice ? message : feed.detail);
   }
+  const down = wsDown(health);
   const age = now - price.provenance.asOf;
   if (age > PRICE_STALE_MS) {
     const message = `${STRINGS.lastPrefix} ${hhmm(price.provenance.asOf)} · ${STRINGS.staleSuffix}`;
+    // back from the background / a device sleep: nothing was tried while the timers slept (no REST failure, no source
+    // move since — a move leaves its failure reason), and the resume armed the stand-in for right now
+    const untried = agg.consecutiveFailures === 0 && (agg.reason === undefined || agg.reason === "ws_silent" || agg.reason === "ws_closed") && (agg.source === "binance" || agg.source === "proxy");
+    const fetching = down && untried && agg.nextRefreshAt !== undefined && Math.abs(now - agg.nextRefreshAt) < 2 * PRICE_REST_FALLBACK_MS;
+    if (fetching) return { status: "connecting", message, priceMode: "waiting", pill: { ...CONNECTING_PILL, detail: message } };
     return noPrice(message, message);
   }
   if (feed.state === "connecting" && price.provenance.receivedAt < (health.ws.connectedAt ?? 0)) return { status: "connecting", priceMode: "none", pill: CONNECTING_PILL };
@@ -279,11 +294,12 @@ export function legacyStatus(health: ProviderHealth, price: { provenance: Proven
   if (other) {
     return { status: "live", sourceBadge: fallbackBadge(price.provenance.source), message: STRINGS.fallbackDetail, priceMode: "poll", pill: { tone: "warn", text: STRINGS.pricePolled(PRICE_POLL_SEC), detail: STRINGS.fallbackDetail } };
   }
-  if (wsDown(health)) {
-    // the REST stand-in itself is failing: nothing fresh is on its way right now (the price shown is still < 2 min old)
-    const soft = agg.consecutiveFailures > 0 && agg.reason ? SOFT_FAILURE_TEXT[agg.reason] : undefined;
-    if (soft) return { status: "live", priceMode: "waiting", pill: { tone: "muted", text: STRINGS.connecting, detail: agg.detail ?? soft } };
-    return { status: "live", priceMode: "poll", pill: { tone: "warn", text: STRINGS.pricePolled(PRICE_POLL_SEC), detail: STRINGS.wsFallbackDetail } };
+  if (down) {
+    // device clock on both sides (`receivedAt`): a skewed device clock never turns a fresh poll into `Verbinde …`
+    if (now - price.provenance.receivedAt <= PRICE_POLL_FRESH_MS) return { status: "live", priceMode: "poll", pill: { tone: "warn", text: STRINGS.pricePolled(PRICE_POLL_SEC), detail: STRINGS.wsFallbackDetail } };
+    // nothing fresh on its way right now: the stand-in is failing (or held back by the budget)
+    const soft = agg.reason ? SOFT_FAILURE_TEXT[agg.reason] : undefined;
+    return { status: "live", priceMode: "waiting", pill: { tone: "muted", text: STRINGS.connecting, detail: agg.detail ?? soft ?? STRINGS.wsFallbackDetail } };
   }
   return { status: "live", priceMode: "stream", pill: LIVE_PILL };
 }

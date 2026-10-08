@@ -76,7 +76,7 @@ snapshot, returns the unsubscribe); `flushMotionValues()` flushes synchronously.
 
 | value | meaning | typical use |
 |---|---|---|
-| `priceMv` / `tradeTimeMv` | last trade price / its exchange time | odometer (`RollingDigits source`), forming-candle bucketing |
+| `priceMv` / `tradeTimeMv` | last trade price / its exchange time; a ticker carries the price in when the newest trade is > 5 s older than it (`tickerCarriesPrice`, same rule as `lastPrice`) — the REST stand-in while the socket is down | odometer (`RollingDigits source`), forming-candle bucketing |
 | `tickDirMv` | +1 / −1 direction of the last move (zero-ticks keep it; 0 = none yet) | pulse / flash colour (`#3ddc84` / `#ff4d4f`) |
 | `open24hMv` | 24 h reference open (`lastPrice / (1 + pct/100)` of the ticker) | live 24 h % = `(price / open − 1) · 100` |
 | `bidMv` `askMv` `markMv` `fundingMv` `nextFundingMv` | book / mark / funding | Bid/Ask tile, funding line with `nowMv` |
@@ -97,7 +97,7 @@ effect built on them with `useReducedFx()`. Countdowns and ages combine them wit
 | `kline_15m` | WS `kline_15m` (+ REST bootstrap 1500 = 500 × 45m, weight 10 once) | 250 ms | 31 min | feeds the signal check (30m = 2 × 15m, 45m = 3 × 15m); ring 3000. Also the chart's `30m` interval: `ChartCard` resamples history and live tail with `@/chart/resample` (`resampleCandles` / `resampleTail`), so the chart's 30m bars are the check's 30m rung. Settings → Live-Daten lists it as `Kerzen 15m` |
 | `kline_1w` | WS `kline_1w` (+ REST 200) | weekly | 7 d + 1 h | `closeW` via `weeklyClose()` |
 | `markPrice` | WS `markPrice@1s` (bootstrap `premiumIndex`) | 1 s | 5 s | heartbeat; funding rate + next funding |
-| `aggTrade` | WS `aggTrade` | 100 ms | 5 s | **the** last price (never mark) |
+| `aggTrade` | WS `aggTrade`; while the socket is not delivering REST `ticker/24hr` every 5 s (`PRICE_REST_FALLBACK_MS`, weight 1) | 100 ms | 5 s | **the** last price (never mark); see "Last price when the stream drops" |
 | `bookTop` | WS `bookTicker` (opt-in) | realtime | 5 s | |
 | `ticker24h` | REST `ticker/24hr` | 30 s | 90 s | 24 h change; LivePill ring = `nextRefreshAt` |
 | `openInterest` | REST `openInterest` | 60 s | 180 s | |
@@ -115,8 +115,36 @@ period switch never hydrates the old period's ring.
 **Fallback chain** (fixed): Binance → Bybit → Proxy → Cache. Bybit serves price/candles/funding
 (`comparable:true`), global ratio + OI (`comparable:false`), and cannot serve `topPositionRatio`,
 `topAccountRatio`, `takerRatio` → `reason: "unsupported"`, label `Nur mit Binance`. OKX (`sources/okx.ts`) is
-implemented and tested but not in the default chain (CORS unverified). When the WS dies 3× the WS feeds
-are REST-polled from Binance every 10 s (`state: fallback`, label `Binance-Daten · alle 10 s`).
+implemented and tested but not in the default chain (CORS unverified). When the WS dies 3× (handshakes that fail, time
+out, or open and stay silent) the WS feeds are REST-polled from Binance every 10 s (`state: fallback`, label
+`Binance-Daten · alle 10 s`); the last price is REST-polled every 5 s from the first silence on.
+
+### Last price when the stream drops (Galaxy Tab, 2026-10-08)
+
+The tablet showed 82.446,4 with `Kein Live-Kurs` / `Zuletzt 15:25 · veraltet` for 6 min while ticker, funding and OI
+kept updating: `lastPrice` preferred the trade whatever its age, an open-but-silent socket never counted as a failed
+attempt (so the WS feeds were never REST-polled), and the pill said `Kein Live-Kurs` for every non-live state. Now:
+
+- **Freshest wins** (`lastPrice`, `getPriceSnapshot`, `priceMv`): trade → book mid → ticker in that order of preference,
+  but only among the candidates within `PRICE_PREFER_MS` (5 s) of the newest `asOf`; never the mark price.
+- **Socket** (`WsClient`): 10 s without a frame → the socket is closed and the attempt ends like a close (`onSilent(now,
+  failedAttempts)`). An attempt that never delivered a frame is a failed attempt (3 in a row → `fallback`, `onFallback`
+  once per transition). Next attempt: at once after a blip on a socket that had streamed (at most once per minute), else
+  `wsBackoffMs` = 1 s, 2 s, 4 s, 8 s, 16 s, 30 s, 30 s … (+ ≤ 25 % / ≤ 1 s jitter, never above 30 s) **for good**; hidden
+  ≥ 1 min. `nudge()` (visible, `pageshow`, `focus`, `online`, Page Lifecycle `resume`) reconnects at once from any
+  non-live state and restarts the ladder.
+- **REST stand-in** (provider): whenever `wsDown(health)` (silent, exhausted, offline, or reconnecting after it had
+  delivered / after a failed attempt — never the first handshake) the ticker is polled every 5 s and its last price is
+  published as the trade (`aggFromTicker`); armed on every retry, on resume / `online` (at once, never staggered; a poll
+  that slept with the timers is re-armed for now) and by the 5-s watchdog; a failure retries after 5 s; the first trade
+  frame cancels it. Budget: class `price` may use the whole bucket, `live` leaves `PRICE_RESERVE` (5 %) of the
+  `PRICE_BUCKETS` (`binance.weight`, `proxy`) for it. A trade stream that stalls while the socket delivers other streams
+  is fetched over REST after 20 s (was 60 s).
+- **Pill** (`deriveMarket().priceMode` / `.pill`, MarketPanel): `stream` → LivePill (`Live`, `Live · vor 8s`); `poll` →
+  `Kurs per Abfrage · 5 s` (warn; the REST stand-in delivered within 15 s, or Bybit serves the price, + badge); `waiting` →
+  `Verbinde …` (socket down and nothing fresh for 15 s, or back from the background while the first poll is on its way);
+  `none` → `Kein Live-Kurs` only when nothing delivered for 2 min (footer `Zuletzt HH:mm · veraltet` = the time of the
+  price shown) or every source failed, `Offline` only when the device is offline.
 
 Blocked-primary detection (strict — a false positive takes the top traders off Binance while prices keep ticking):
 never while Binance demonstrably answers (a WS frame < 30 s or a REST success < 60 s ago) or within 10 s of a tab
@@ -156,15 +184,15 @@ What keeps every feed refreshing on a Galaxy Tab in Samsung Internet (tests: `ma
 |---|---|
 | `visibilitychange` (visible), `pageshow` (bfcache), `focus` (split screen), Page Lifecycle `resume`, `online`, a device sleep (health ticks > 3 intervals apart) | `resume()`: overdue polls re-armed and spread over ~1.5 s, every REST feed older than one cadence re-polled, a silent socket reconnected, parked feeds re-probed (`focus` / `pageshow` / `resume` at most every 5 s) |
 | every 5-s health tick (watchdog) | lost timers (a poll > 3 s overdue) re-armed; REST data older than `staleAfterMs` on the Binance clock with the next poll far away kicked (now → 30 s → 60 s → 2 min → 5 min, reset when data advances); REST feeds without a pending poll re-armed; kline tails scanned for holes |
-| socket silent 10 s / handshake > 15 s / dead without retry | reconnect (exponential backoff; at most once a minute while hidden so background notifications keep their stream); 3 failures → WS feeds REST-polled every 10 s (`fallback`) |
-| one stream stalls while the socket delivers others (`STREAM_STALL_MS`: mark 15 s, trades/book 60 s, klines 90 s) | that feed fetched over REST (klines with gap fill); a second stall within 10 min re-subscribes |
+| socket silent 10 s / handshake > 15 s / dead without retry | reconnect (at once after a blip, then 1, 2, 4 … 30 s for good; at most once a minute while hidden so background notifications keep their stream); the last price REST-polled every 5 s meanwhile; 3 attempts without a frame (silent ones included) → WS feeds REST-polled every 10 s (`fallback`) |
+| one stream stalls while the socket delivers others (`STREAM_STALL_MS`: mark 15 s, trades 20 s, book 60 s, klines 90 s) | that feed fetched over REST (klines with gap fill); a second stall within 10 min re-subscribes |
 | reconnect / REST fallback / resume | kline gap fill from the oldest unfilled hole on the server clock (stays pending when the request fails; genuine exchange holes remembered) |
 | `429` | bucket paused 60 s, feed retried with backoff |
 | `418` | ban backoff 2 → 4 → … 30 min; every direct REST feed moves to the proxy at once (another IP), a probe brings them back |
 | `451` / network failures on ≥ 2 Binance paths while Bybit answers (strict, see below) | blocked: feeds move on (ratio feeds to a usable proxy, never to Bybit's cohort); re-probe 5 → 60 min, pulled forward on evidence |
 | `TypeError` on `/futures/data` while the rest of Binance answers | read as CORS → every futures-data feed to the same-origin proxy (`/api/binance/*`, `netlify.toml`); opened from disk (no proxy) the Live-Daten card and the Top-Trader note say so and point to the web link |
 | device clock off (`ClockSkew`, from WS mark price / premiumIndex / the time probe; applied ≥ 2 s and consistent) | staleness, aligned polls and gap fills use `serverNow()`; the Live-Daten card names the offset |
-| budget | token buckets per host; bulk pages (history, retro checks, `fetchKlines`, `fetchRatios`, 1D) only take tokens while 40 % of the bucket stays free (`BULK_RESERVE`), so no feed is ever starved by a history scroll |
+| budget | token buckets per host; bulk pages (history, retro checks, `fetchKlines`, `fetchRatios`, 1D) only take tokens while 40 % of the bucket stays free (`BULK_RESERVE`), so no feed is ever starved by a history scroll; the other live feeds leave 5 % of the Binance weight / proxy buckets for the price stand-in (`PRICE_RESERVE`) |
 
 **Routes (CORS-safe).** Every Binance REST path the app uses is proxied by `netlify.toml` (`/api/binance/fapi/v1/{time,
 klines, premiumIndex, ticker/24hr, openInterest, fundingRate}`, `/api/binance/futures/data/*`); the CSP `connect-src`
@@ -215,9 +243,11 @@ Use `useStatusLabel(feed)` / `provider.statusLabel(feed)`:
 | REST feed failing on its source (`consecutiveFailures > 0`, reason network/timeout/5xx/429/cors) | `Zuletzt HH:mm · Netzwerk/CORS-Fehler` / `· Zeitüberschreitung` / `· Serverfehler` / `· Rate-Limit` | warn |
 
 The **market card** status (`connecting|live|error|unavailable`) is driven only by the price feed:
-`useMarketView().status/message/sourceBadge` (`legacyStatus()`): a 6-s WS hiccup does not change the header;
-`now − asOf > 120 s` → `error` with `Zuletzt HH:mm · veraltet`; Bybit price → `live` **with**
-`sourceBadge: "Ersatzquelle Bybit"`; offline → `Offline · Stand HH:mm`. LivePill text: `liveAgeLabel(receivedAt, now)`
+`useMarketView().status/message/sourceBadge/priceMode/pill` (`legacyStatus()`): a 6-s WS hiccup does not change the header;
+socket down with a fresh REST price → `live`, pill `Kurs per Abfrage · 5 s`; nothing fresh for 15 s → `live`, pill
+`Verbinde …`; `now − asOf > 120 s` → `error` with `Zuletzt HH:mm · veraltet` (time of the price shown), pill
+`Kein Live-Kurs` (`connecting` + `Verbinde …` instead while a resume's first poll is on its way); Bybit price → `live`
+**with** `sourceBadge: "Ersatzquelle Bybit"`; device offline → `Offline · Stand HH:mm`. LivePill text: `liveAgeLabel(receivedAt, now)`
 (`Live`, `Live · vor 12s`, `vor 3 min`, warn > 120 s), rendered on `nowMv`; ring: a `RingCycle { endsAt: nextTickerRefreshAt, ms }`
 that runs itself (`refreshRingProgress(nextTickerRefreshAt, now)` remains for a static progress).
 Non-comparable values (`comparable:false`) show the `andere Kohorte` badge with `COHORT_HINT[source]`.
@@ -298,7 +328,8 @@ in front. `requestSignalNotifyPermission()` must be called from the click that e
 - `deriveMarket(snapshot, health, { now, rsiWOverride })` → `price` (rounded last price), `change`, `close4h/At`
   (`lastClosed4h` = bundle `UM`), `closeW/At`, `rsiW` (local Wilder 14, TradingView override wins), `live4hClose`,
   `fundingLine` (`Mark 84.212 · Funding +0,0100 % · nächstes Funding in 05:59:59`), `openInterest`,
-  `openInterestChange24h`, `taker`, `bid/ask`, `updatedAt`, `nextTickerRefreshAt`, `status/message/sourceBadge`.
+  `openInterestChange24h`, `taker`, `bid/ask`, `updatedAt`, `nextTickerRefreshAt`, `status/message/sourceBadge`,
+  `priceMode` (`stream|poll|waiting|none`) and `pill` (the card's status pill, see "Last price when the stream drops").
 - `deriveTopTrader(snapshot, health, base)` → `longPct` (accounts|positions per `tj2-ui.topTraderBase`),
   `delta = topPositionLong% − globalLong%` (joined by timestamp), `deltaCandles` (trailing `> 0`, bundle `oK`),
   `sparkline` (last 20), `onlyBinance`, `liveReadingOk`, `detail`, `taker`, `fromLive` / `readingFeed` (Long % and Delta
@@ -318,7 +349,7 @@ in front. `requestSignalNotifyPermission()` must be called from the click that e
 venue — the other journal's `BITSTAMP:BTCUSD` — or a bare `BTCUSD` maps to the USDT perp `BTCUSDT`, TradingView's `.P` suffix is
 dropped),
 `period.ts` (Binance/Bybit/OKX period tables, `cadenceLabel`), `feeds.ts` (spec table), `budget.ts` (token
-buckets at 10 % reserve; bulk calls keep 40 % free for the live feeds), `clock.ts` (`ClockSkew`, `skewText`), `schedule.ts` (`nextAlignedAt`, `wsBackoffMs`, `probeBackoffMs`, pausable `Scheduler`),
+buckets at 10 % reserve; bulk calls keep 40 % free for the live feeds, live feeds keep 5 % of the price buckets for the price stand-in), `clock.ts` (`ClockSkew`, `skewText`), `schedule.ts` (`nextAlignedAt`, `wsBackoffMs`, `probeBackoffMs`, pausable `Scheduler`),
 `cache.ts` (`MarketCache`, `upsertSeries`, key `${source}:${symbol}:${feed}` / `${source}:${symbol}:${period}:${feed}`, DB `tj-market`), `health.ts`
 (pure `reduceHealth`), `statusLabel.ts`, `indicators.ts`, `sources/*` (zod-validated REST clients, `WsClient`,
 proxy probe), `format.ts` (minimal de-DE formatters).
@@ -341,3 +372,7 @@ Proxy: the active route is the `netlify.toml` proxy rewrite (see above). The opt
 `SITE_ORIGIN`) answers on the same paths if moved to `netlify/functions/` (needs Pro for `fra`); the probe accepts both.
 Top-trader staleness scenarios (one TypeError, 503/429 ×3, CORS on `/futures/data`, period 1h, period switch, missed
 `online` event, resume, real block, proxy preference): `tests/unit/market.toptrader.test.ts`.
+Stream-drop scenarios (silent socket → REST price within 20 s and ≤ 6 s old for 6 min, reconnect ladder for good, hidden
+6 min → visible, Page Lifecycle `resume`, `pageshow` / `online`, REST failing too → `Verbinde …` → `Kein Live-Kurs`):
+`tests/unit/market.priceFallback.test.ts`; the ladder itself in `market.ws.test.ts`, the pill in `market.mapping.test.ts`
+and `views.overview.marketPill.test.tsx`.

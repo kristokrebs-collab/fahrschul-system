@@ -82,6 +82,8 @@ export interface Net {
   wsUp: boolean;
   /** server time the `/futures/data/*` rows are generated for (default: the server clock) — freezes publishing */
   futuresAt?: () => number;
+  /** `ticker/24hr` last price (default 84205.90) — a REST price that differs from the stream's 84206.1 */
+  tickerLast?: () => number;
 }
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -122,7 +124,7 @@ export function makeFetch(net: Net) {
     if (path === "/fapi/v1/premiumIndex")
       return json({ symbol: "BTCUSDT", markPrice: "84212.3", indexPrice: "84198.7", estimatedSettlePrice: "84190.1", lastFundingRate: "0.0001", interestRate: "0.0001", nextFundingTime: Math.ceil(sn / (8 * HOUR)) * 8 * HOUR, time: sn });
     if (path === "/fapi/v1/ticker/24hr")
-      return json({ symbol: "BTCUSDT", priceChange: "-1123.40", priceChangePercent: "-1.316", weightedAvgPrice: "84650.12", lastPrice: "84205.90", lastQty: "0.012", openPrice: "85329.30", highPrice: "85710.00", lowPrice: "83650.10", volume: "182345.123", quoteVolume: "15435678901.23", openTime: sn - 24 * HOUR, closeTime: sn, firstId: 1, lastId: 2, count: 2 });
+      return json({ symbol: "BTCUSDT", priceChange: "-1123.40", priceChangePercent: "-1.316", weightedAvgPrice: "84650.12", lastPrice: String(net.tickerLast?.() ?? "84205.90"), lastQty: "0.012", openPrice: "85329.30", highPrice: "85710.00", lowPrice: "83650.10", volume: "182345.123", quoteVolume: "15435678901.23", openTime: sn - 24 * HOUR, closeTime: sn, firstId: 1, lastId: 2, count: 2 });
     if (path === "/fapi/v1/openInterest") return json({ openInterest: "78321.456", symbol: "BTCUSDT", time: sn });
     if (path === "/fapi/v1/fundingRate") {
       const last = Math.floor(sn / (8 * HOUR)) * 8 * HOUR;

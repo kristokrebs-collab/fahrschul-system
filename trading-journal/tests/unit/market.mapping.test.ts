@@ -350,7 +350,9 @@ describe("last price after the stream drops (Galaxy Tab, 2026-10-08: 82.446,4 fr
     expect(legacyStatus(retrying, binance(T0 + 15_400), T0 + 16_000).priceMode).toBe("poll");
 
     const failing = reduceHealth(polled, { type: "rest_fail", feed: "aggTrade", source: "binance", kind: "network", now: T0 + 15_500 }, specs);
-    expect(legacyStatus(failing, binance(T0 + 10_400), T0 + 16_000)).toMatchObject({ status: "live", priceMode: "waiting", pill: { tone: "muted", text: "Verbinde …" } });
+    // the stand-in fails: the last poll is 5.5 s old — still `Kurs per Abfrage`; nothing for > 15 s (3 polls) → `Verbinde …`
+    expect(legacyStatus(failing, binance(T0 + 10_400), T0 + 16_000).priceMode).toBe("poll");
+    expect(legacyStatus(failing, binance(T0 + 10_400), T0 + 26_000)).toMatchObject({ status: "live", priceMode: "waiting", pill: { tone: "muted", text: "Verbinde …", detail: "Netzwerk/CORS-Fehler" } });
 
     const stale = legacyStatus(failing, binance(T0 + 10_400), T0 + 10_400 + 121_000);
     expect(stale).toMatchObject({ status: "error", priceMode: "none", pill: { tone: "error", text: "Kein Live-Kurs" } });
@@ -359,6 +361,24 @@ describe("last price after the stream drops (Galaxy Tab, 2026-10-08: 82.446,4 fr
     // the stream is back: the first frame turns the pill Live again
     const back = reduceHealth(failing, { type: "ws_message", feeds: ["aggTrade", "markPrice"], asOf: T0 + 200_000, now: T0 + 200_000 }, specs);
     expect(legacyStatus(back, binance(T0 + 200_000), T0 + 200_300)).toMatchObject({ status: "live", priceMode: "stream", pill: { text: "Live" } });
+  });
+
+  it("back from the background with a 6-min-old price: `Verbinde …` while the armed stand-in is on its way, `Kein Live-Kurs` once it failed", () => {
+    const silent = reduceHealth(streaming, { type: "ws_silent", now: T0 + 10_000, failedAttempts: 0 }, specs);
+    const back = T0 + 6 * 60_000;
+    const armed = reduceHealth(silent, { type: "schedule", feed: "aggTrade", nextRefreshAt: back }, specs);
+    expect(legacyStatus(armed, binance(T0), back + 10)).toMatchObject({ status: "connecting", priceMode: "waiting", pill: { text: "Verbinde …" } });
+    const failed = reduceHealth(armed, { type: "rest_fail", feed: "aggTrade", source: "binance", kind: "network", now: back + 300 }, specs);
+    expect(legacyStatus(failed, binance(T0), back + 400)).toMatchObject({ status: "error", priceMode: "none", pill: { text: "Kein Live-Kurs" } });
+    // a stand-in armed long ago (nothing on its way now) → `Kein Live-Kurs`
+    expect(legacyStatus(armed, binance(T0), back + 60_000).pill.text).toBe("Kein Live-Kurs");
+  });
+
+  it("every source failed while the device is online: `Kein Live-Kurs` + `Zuletzt HH:mm · veraltet`, never `Offline`", () => {
+    const h = { ...streaming, feeds: { ...streaming.feeds, aggTrade: { ...streaming.feeds.aggTrade, state: "offline" as const, source: "cache" as const } } };
+    const s = legacyStatus(h, binance(T0), T0 + 30_000);
+    expect(s).toMatchObject({ status: "error", priceMode: "none", pill: { text: "Kein Live-Kurs" } });
+    expect(s.message).toMatch(/^Zuletzt \d\d:\d\d · veraltet$/);
   });
 
   it("the footer names the time of the price actually shown (not of the frozen trade)", () => {

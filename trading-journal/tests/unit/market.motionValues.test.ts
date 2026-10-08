@@ -17,6 +17,7 @@ import {
   priceReceivedAtMv,
   sellVolMv,
   tickDirMv,
+  tickerCarriesPrice,
   tradeCountMv,
   tradeTimeMv,
   volAccumMv,
@@ -149,6 +150,27 @@ describe("market motion values", () => {
     expect(priceMv.get()).toBe(50_600);
     expect(open24hMv.get()).toBeCloseTo(50_400 / 0.998, 8);
     off();
+  });
+
+  it("the trade stream falls silent: the next ticker (30-s poll / 5-s REST stand-in) carries the price into the odometer and header", () => {
+    expect(tickerCarriesPrice(stamp(ticker(1, 0), T0 + 5_000), stamp(trade(2, 1, false, T0), T0))).toBe(false); // within 5 s: the trade wins
+    expect(tickerCarriesPrice(stamp(ticker(1, 0), T0 + 5_001), stamp(trade(2, 1, false, T0), T0))).toBe(true);
+    expect(tickerCarriesPrice(stamp(ticker(1, 0), T0), undefined)).toBe(true);
+    const { provider, push } = fakeProvider("SILENTUSDT");
+    const off = bindMotionValues(provider);
+    push("aggTrade", trade(82_446.4, 0.1, false, T0), T0);
+    flushMotionValues();
+    expect(priceMv.get()).toBe(82_446.4);
+    push("ticker24h", ticker(82_080, -1), T0 + 360_000); // 6 min later, no trade since (Galaxy Tab)
+    flushMotionValues();
+    expect(priceMv.get()).toBe(82_080);
+    expect(tradeTimeMv.get()).toBe(T0 + 360_000);
+    off();
+    // a re-bind (remount) seeds from the fresher ticker, not the cached trade
+    const again = bindMotionValues(provider);
+    flushMotionValues();
+    expect(priceMv.get()).toBe(82_080);
+    again();
   });
 
   it("zeroes the symbol-scoped values on a symbol switch and keeps them when the same symbol re-binds", () => {

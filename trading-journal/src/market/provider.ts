@@ -1030,8 +1030,10 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     const fh = health.feeds.aggTrade;
     if (fh.reason === "bad_symbol" || (fh.source !== "binance" && fh.source !== "proxy")) return;
     if (active.has("aggTrade")) return;
+    // a poll due within one cadence is left alone; one overdue by more than a second slept with the timers (hidden tab,
+    // frozen page): re-armed for now, which also tells the card the price is on its way (`nextRefreshAt`)
     const due = scheduler.dueAt("poll:aggTrade");
-    if (due !== undefined && due <= t + PRICE_REST_FALLBACK_MS) return;
+    if (due !== undefined && due >= t - 1000 && due <= t + PRICE_REST_FALLBACK_MS) return;
     schedulePoll("aggTrade", t);
   }
 
