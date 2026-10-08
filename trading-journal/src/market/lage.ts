@@ -330,9 +330,9 @@ function syncProvider(): void {
   const p = getProvider();
   if (p === ctl.provider) return;
   ctl.provider = p;
-  const symbol = p?.symbol ?? "";
-  if (symbol !== ctl.symbol) {
-    ctl.symbol = symbol;
+  // a stopped market (no provider) keeps the bars: a period switch (stop → start, same symbol) needs no new page
+  if (p && p.symbol !== ctl.symbol) {
+    ctl.symbol = p.symbol;
     ctl.daily = [];
     ctl.fetchedAt = null;
     ctl.source = null;

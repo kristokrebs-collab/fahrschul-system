@@ -20,7 +20,7 @@ vi.mock("@/app/overlays", () => ({
 
 import { MotionRoot } from "@/motion/MotionRoot";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
-import { LEVELS_CTA, LEVELS_EMPTY_TEXT, MarketPanel, WEEKLY_TITLE } from "@/views/overview/MarketPanel";
+import { MarketPanel, WEEKLY_TITLE } from "@/views/overview/MarketPanel";
 import { DELTA_CANDLES_LABEL, DELTA_HINT, TopTraderCard } from "@/views/overview/TopTraderCard";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
@@ -39,7 +39,7 @@ describe("MarketPanel without trigger levels (share edition / fresh journal)", (
     await bootFixtureJournal();
   });
 
-  it("shows no scenario, distances, weekly rows or zone warning for levels 0, but a CTA to the settings", () => {
+  it("levels 0: no weekly rows or zone warning, and the automatic Lage panel instead of a levels CTA (decision 19)", () => {
     act(() => {
       useJournal.setState((s) => ({ settings: { ...s.settings, market: { ...s.settings.market, longTrigger: 0, shortTrigger: 0, longStop: 0, invalidation: 0, lowerHigh: 0, zoneLow: 0, zoneHigh: 0 } } }));
     });
@@ -47,15 +47,15 @@ describe("MarketPanel without trigger levels (share edition / fresh journal)", (
     expect(screen.queryByTestId("scenario-box")).toBeNull();
     expect(screen.queryByText(/Long-Trigger in/)).toBeNull();
     expect(screen.queryByText(WEEKLY_TITLE)).toBeNull();
-    expect(screen.getByTestId("levels-empty")).toHaveTextContent(LEVELS_EMPTY_TEXT);
-    fireEvent.click(screen.getByRole("button", { name: `${LEVELS_CTA} →` }));
-    expect(useUi.getState().page).toBe("settings");
+    expect(screen.queryByTestId("levels-empty")).toBeNull();
+    expect(screen.getByTestId("lage-panel")).toBeInTheDocument();
+    expect(useUi.getState().page).not.toBe("settings");
   });
 
-  it("with levels: scenario + weekly block, and the weekly block opens its explainer", () => {
+  it("with levels: Lage panel + weekly block, and the weekly block opens its explainer", () => {
     wrap(<MarketPanel />);
-    expect(screen.getByTestId("scenario-box")).toBeInTheDocument();
-    expect(screen.queryByTestId("levels-empty")).toBeNull();
+    expect(screen.getByTestId("lage-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("scenario-box")).toBeNull();
     const weekly = screen.getByRole("button", { name: new RegExp(WEEKLY_TITLE.replace("?", "\\?")) });
     fireEvent.click(weekly);
     const dialog = screen.getByRole("dialog");

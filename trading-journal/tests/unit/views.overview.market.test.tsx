@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Profiler } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { bootFixtureJournal, installDomPolyfills, type FakeMarket } from "./views.overview.harness";
@@ -41,7 +41,7 @@ describe("MarketPanel", () => {
     fake.current?.refresh.mockClear();
   });
 
-  it("renders header, live status, price, scenario and weekly checks for the fixture snapshot", () => {
+  it("renders header, live status, price, the Lage panel and weekly checks for the fixture snapshot", () => {
     const m = useJournal.getState().settings.market;
     expect(m.longTrigger).toBeLessThan(86_200);
     wrap(<MarketPanel />);
@@ -52,39 +52,31 @@ describe("MarketPanel", () => {
     // price 86.100 (RollingDigits) + 24h change
     expect(screen.getByText("86.100")).toBeInTheDocument();
     expect(screen.getByText("+1,20 % 24h")).toBeInTheDocument();
-    // scenario: close4h 86.200 > longTrigger 85.900 → long
-    const box = screen.getByTestId("scenario-box");
-    // the title is split into decode lead + marked key word (glyph layers aria-hidden); its full text is on the hook
-    expect(box.querySelector("[data-scenario-title]")?.getAttribute("data-scenario-title")).toBe("Long-Trigger aktiv");
-    expect(within(box).getByText("Long-Trigger", { selector: ".sr-only" })).toBeInTheDocument();
-    expect(within(box).getAllByText("aktiv", { selector: ".sr-only" }).length).toBeGreaterThan(0);
-    expect(within(box).getByText(`4H-Schluss über ${n0(m.longTrigger)}. Ziel 87.200, dann 89.000–90.000. Invalidierung unter ${n0(m.longStop)}.`)).toBeInTheDocument();
-    expect(within(box).getByText("4H 86.200")).toBeInTheDocument();
-    expect(within(box).getByText(/Letzter geschlossener 4H-Schluss · /)).toBeInTheDocument();
+    // decision 19: the automatic Lage panel replaced the manual trigger scenario (the stored levels stay)
+    expect(screen.getByTestId("lage-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("scenario-box")).toBeNull();
     // weekly block: closeW 83.000 > lowerHigh 82.829 → ✓
     expect(screen.getByText(WEEKLY_TITLE)).toBeInTheDocument();
     expect(screen.getByText(`Weekly Close über ${n0(m.lowerHigh)}`)).toBeInTheDocument();
     expect(screen.getByText("83.000")).toBeInTheDocument();
-    // trigger distance rows
-    expect(screen.getByText(/^Long-Trigger in /)).toBeInTheDocument();
-    // decision 13: no general short trigger on the overview (the stored level stays in the settings)
+    // no manual trigger distance any more (decision 19); decision 13: no general short trigger on the overview (the stored level stays in the settings)
     expect(screen.queryByText(/^Short-Trigger in /)).toBeNull();
     expect(screen.queryByText(/Short-Trigger/)).toBeNull();
     // funding line from markPrice
     expect(screen.getByText(/^Mark 86\.112 · Funding \+0,0100 % · nächstes Funding in /)).toBeInTheDocument();
   });
 
-  it("a 4H close under the stored short trigger reads as the range: no short trigger on the overview (decision 13)", () => {
+  it("the stored trigger levels no longer drive the overview: no scenario, no trigger rows, values untouched (decisions 13, 19)", () => {
     const s = useJournal.getState().settings;
     useJournal.setState({ settings: { ...s, market: { ...s.market, longTrigger: 88_000, shortTrigger: 87_000 } } });
     wrap(<MarketPanel />);
-    const box = screen.getByTestId("scenario-box");
-    expect(box.querySelector("[data-scenario-title]")?.getAttribute("data-scenario-title")).toBe("Range, kein Trigger");
-    expect(within(box).getByText(`4H-Schluss unter dem Long-Trigger 88.000, über der Invalidierung ${n0(s.market.invalidation)}. Abwarten – den Einstieg prüft der Einstiegs-Check.`)).toBeInTheDocument();
-    expect(screen.getByText(/^Long-Trigger in /)).toBeInTheDocument();
+    expect(screen.queryByTestId("scenario-box")).toBeNull();
+    expect(screen.queryByText(/Range, kein Trigger/)).toBeNull();
+    expect(screen.queryByText(/^Long-Trigger in /)).toBeNull();
     expect(screen.queryByText(/Short-Trigger/)).toBeNull();
-    // the stored level is untouched (no data loss)
+    // the stored levels are untouched (no data loss)
     expect(useJournal.getState().settings.market.shortTrigger).toBe(87_000);
+    expect(useJournal.getState().settings.market.longTrigger).toBe(88_000);
   });
 
   it("`Jetzt aktualisieren` forces the five market-card feeds once per 5 s", async () => {
@@ -147,33 +139,17 @@ describe("MarketPanel live leaves", () => {
     expect(commits).toBe(mounted);
   });
 
-  it("re-renders only when a trigger comes into reach, and pops the badge", async () => {
+  it("a price at the stored long trigger shows no reach badge any more (the Lage panel replaced it)", async () => {
     const m = useJournal.getState().settings.market;
-    let commits = 0;
-    wrap(
-      <Profiler id="panel" onRender={() => commits++}>
-        <MarketPanel />
-      </Profiler>,
-    );
-    await act(() => sleep(50));
-    expect(screen.queryByText(LONG_IN_REACH_LABEL)).not.toBeInTheDocument();
-    const before = commits;
+    wrap(<MarketPanel />);
     await act(async () => {
       priceMv.set(m.longTrigger * 0.999);
       await sleep(20);
     });
-    expect(screen.getByText(LONG_IN_REACH_LABEL)).toBeInTheDocument();
-    expect(commits).toBeGreaterThan(before);
-    const inReach = commits;
-    await act(async () => {
-      priceMv.set(m.longTrigger * 0.9995);
-      await sleep(20);
-    });
-    expect(commits).toBe(inReach);
+    expect(screen.queryByText(LONG_IN_REACH_LABEL)).not.toBeInTheDocument();
     await act(async () => {
       priceMv.set(86_100);
     });
-    await waitFor(() => expect(screen.queryByText(LONG_IN_REACH_LABEL)).not.toBeInTheDocument());
   });
 });
 

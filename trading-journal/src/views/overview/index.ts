@@ -1,6 +1,7 @@
 export { OverviewView } from "./OverviewView";
 export { Hero } from "./Hero";
-export { MarketPanel, CHART_CARD_ID, OPEN_CHART_LABEL, WEEKLY_TITLE, LEVELS_EMPTY_TEXT, LEVELS_CTA } from "./MarketPanel";
+export { MarketPanel, CHART_CARD_ID, OPEN_CHART_LABEL, WEEKLY_TITLE } from "./MarketPanel";
+export { LagePanel, LAGE_DETAILS_ID } from "./LagePanel";
 export { SignalCard, SIGNAL_CARD_ID, FRESH_ENTRY_TEXT } from "./SignalCard";
 export { SignalStrip } from "./SignalStrip";
 export { TopTraderCard, TOP_TRADER_TITLE, DELTA_HINT, READING_DIALOG_TITLE, DELTA_CANDLES_LABEL } from "./TopTraderCard";

@@ -202,6 +202,22 @@ describe("Lage feed", () => {
     again();
   });
 
+  it("a period switch (stop → start, same symbol) keeps the daily bars; only the missing days are asked for", async () => {
+    const release = retainLage();
+    await flush();
+    current = null;
+    for (const cb of feedSubs.get("kline_4h") ?? []) cb();
+    expect(getLage().status.state).toBe("idle");
+    current = { symbol: "BTCUSDT", serverNow: () => Date.now(), fetchKlines };
+    await vi.advanceTimersByTimeAsync(6 * 60_000);
+    for (const cb of feedSubs.get("kline_4h") ?? []) cb();
+    await flush();
+    expect(fetchKlines).toHaveBeenCalledTimes(2);
+    expect(fetchKlines.mock.calls[1]![1].limit).toBeLessThan(10);
+    expect(getLage().lage?.state).toBe("green");
+    release();
+  });
+
   it("without a provider (market stopped) it is idle and asks for nothing", () => {
     current = null;
     const release = retainLage();

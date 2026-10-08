@@ -4,22 +4,12 @@ import { digitsOnlyChange, StatusPill } from "@/motion/StatusPill";
 import { EmptyState, EMPTY_LINE } from "@/primitives/EmptyState";
 import { fitValue } from "@/primitives/StatTile";
 import { verdictKey } from "@/primitives/VerdictPanel";
-import { scenarioTitleParts } from "@/views/overview/MarketPanel";
 import { MARKET_TILE_IDS, MARKET_TILES_KEY, parseTileOrder, useMarketTileOrder } from "@/views/overview/marketTiles";
 import { milestoneProgress, milestoneVisual } from "@/views/overview/projectionTimeline";
 
 afterEach(() => {
   vi.useRealTimers();
   localStorage.clear();
-});
-
-describe("scenario title split (cascade lead + verdict key word)", () => {
-  it("splits after the first comma, else before the last word", () => {
-    expect(scenarioTitleParts("Range, kein Trigger")).toEqual({ lead: "Range,", key: "kein Trigger" });
-    expect(scenarioTitleParts("Long-Trigger aktiv")).toEqual({ lead: "Long-Trigger", key: "aktiv" });
-    expect(scenarioTitleParts("Volles Bär-Szenario")).toEqual({ lead: "Volles", key: "Bär-Szenario" });
-    expect(scenarioTitleParts("Abwarten")).toEqual({ lead: "", key: "Abwarten" });
-  });
 });
 
 describe("market tile order (tj2-ui-market-tiles)", () => {
