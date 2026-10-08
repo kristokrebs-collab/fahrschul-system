@@ -372,16 +372,31 @@ export function snapshotPartViews(snap: Pick<SignalSnapshot, "side" | "parts" | 
   return out;
 }
 
-/** Falling-knife items of a snapshot (short labels; long = HL/BOS, short mirrored). */
-export function knifeRows(snap: Pick<SignalSnapshot, "side" | "knife">): PartRow[] {
+/**
+ * Falling-knife items of a snapshot (short labels; long = HL/BOS, short mirrored). Lage layout (longs since decision
+ * 23): Tagestrend + 4H-Umkehrzeichen counted, the Top-Trader delta stored as info (`an` / `aus`, never `offen`).
+ */
+export function knifeRows(snap: Pick<SignalSnapshot, "side" | "knife"> & { lage?: SignalSnapshot["lage"] }): PartRow[] {
   const long = snap.side === "long";
+  const items = snap.knife?.items ?? [];
+  const lageLayout = items.some((i) => i.id === "lage");
+  const signs = snap.lage ? ` ${snap.lage.signs.length}/4` : "";
   const label: Record<string, string> = {
     structure: long ? "Higher Low / BOS 1H·4H" : "Lower High / BOS 1H·4H",
     divergence: long ? "RSI bullische Divergenz" : "RSI bärische Divergenz",
-    whale: "Whale vs. Retail",
+    whale: lageLayout ? "Top-Trader-Delta (Info)" : "Whale vs. Retail",
+    lage: "Tagestrend (1D-EMA 21)",
+    signs: `4H-Umkehrzeichen${signs}`,
   };
-  return (snap.knife?.items ?? []).map((i) => ({ id: i.id, label: label[i.id] ?? i.id, value: i.met == null ? NO_DATA : i.met ? "erfüllt" : "offen", met: i.met }));
+  return items.map((i) => {
+    const info = lageLayout && i.id === "whale";
+    const value = i.met == null ? NO_DATA : info ? (i.met ? "an · Info" : "aus · Info") : i.met ? "erfüllt" : "offen";
+    return { id: i.id, label: label[i.id] ?? i.id, value, met: i.met };
+  });
 }
+
+/** Points the stored filter counted: `total` (Lage layout: 2), else the items (the former 3). */
+const knifeTotal = (k: NonNullable<SignalSnapshot["knife"]>): number => k.total ?? (k.items.length || 3);
 
 /** Lit / unlit / no-data marker of a part row. */
 function RowDot({ met, side, provisional }: { met: boolean | null; side: Side; provisional?: boolean }) {
@@ -427,7 +442,7 @@ function SnapshotParts({ snap }: { snap: SignalSnapshot }) {
       ))}
       {knife && (
         <PartBlock
-          view={{ id: "knife", title: KNIFE_TITLE, detail: `${knife.n} von ${knife.items.length || 3}`, ok: knife.items.length > 0 && knife.n === knife.items.length, data: true, provisional: false, rows: knifeRows(snap) }}
+          view={{ id: "knife", title: KNIFE_TITLE, detail: `${knife.n} von ${knifeTotal(knife)}`, ok: knife.items.length > 0 && knife.n === knifeTotal(knife), data: true, provisional: false, rows: knifeRows(snap) }}
           side={snap.side}
         />
       )}

@@ -183,7 +183,8 @@ export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "sho
     whale = { id: "whale", label: LABEL.whale[side], met: top && retail, detail: `${part.met ?? 0} von 4 · ${vals.join(" · ")}`, tfs: [] };
   }
 
-  if (long && sig.lage !== undefined) return lageKnife(sig.lage?.lage ?? null, [structure, divergence], whale);
+  // Lage layout while the Ampel is on (also without daily data: "keine Daten"); switched off = the former three points
+  if (long && sig.lage && sig.lage.cfg.on) return lageKnife(sig.lage.lage, [structure, divergence], whale);
   const items = [structure, divergence, whale];
   const n = items.filter((i) => i.met === true).length;
   return { side, items, n, total: items.length, all: n === items.length, data: items.some((i) => i.met !== null), label: `${n} von ${items.length} erfüllt` };

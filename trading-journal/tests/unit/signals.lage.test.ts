@@ -120,6 +120,9 @@ describe("falling-knife filter, Lage layout", () => {
     const n = computeSignals(MARKET, cfg, Date.now(), { lage: { lage: null, cfg: BLOCK } })!;
     expect(n.knife!.long.items.slice(0, 2).map((i) => i.met)).toEqual([null, null]);
     expect(n.knife!.short.items.map((i) => i.id)).toEqual(["structure", "divergence", "whale"]);
+    // the Ampel switched off: the former three points
+    const off = computeSignals(MARKET, cfg, Date.now(), { lage: { lage: RED, cfg: { on: false, mode: "block" } } })!.knife!.long;
+    expect([off.items.map((i) => i.id), off.total, off.ltf]).toEqual([["structure", "divergence", "whale"], 3, undefined]);
   });
 });
 
