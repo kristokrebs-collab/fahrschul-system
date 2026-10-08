@@ -18,7 +18,7 @@
  * filter option). Pure, O(n · swing length).
  */
 import type { Bar } from "./indicators";
-import { rma } from "./indicators";
+import { rma, rolling } from "./indicators";
 
 export type SwingLabel = "HH" | "LH" | "HL" | "LL";
 
@@ -131,23 +131,6 @@ export interface StructureCfg {
 export function atr(bars: readonly Bar[], len: number): number[] {
   const tr = bars.map((b, i) => (i === 0 ? b.h - b.l : Math.max(b.h - b.l, Math.abs(b.h - bars[i - 1]!.c), Math.abs(b.l - bars[i - 1]!.c))));
   return rma(tr, len);
-}
-
-/** Rolling max of `x` over the last `len` values ending at each index (monotonic deque, O(n)); `min` mirrored. */
-function rolling(x: readonly number[], len: number, max: boolean): Float64Array {
-  const n = x.length;
-  const out = new Float64Array(n);
-  const q = new Int32Array(n);
-  let head = 0;
-  let tail = 0;
-  for (let i = 0; i < n; i++) {
-    const v = x[i]!;
-    while (tail > head && (max ? x[q[tail - 1]!]! <= v : x[q[tail - 1]!]! >= v)) tail--;
-    q[tail++] = i;
-    if (q[head]! <= i - len) head++;
-    out[i] = x[q[head]!]!;
-  }
-  return out;
 }
 
 interface LegPivot {

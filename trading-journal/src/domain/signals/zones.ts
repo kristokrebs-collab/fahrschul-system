@@ -4,7 +4,7 @@
  * "Discount" / "Premium" = below 47.5 % / above 52.5 % of the swing range; the LuxAlgo boxes are only the outer
  * 5 % (`deep`). The entry rule uses `zone`, not `deep`.
  */
-import type { Bar } from "./indicators";
+import { rolling, type Bar } from "./indicators";
 
 export type Zone = "premium" | "equilibrium" | "discount";
 export interface ZoneBreak {
@@ -69,6 +69,11 @@ export function luxZone(bars: readonly Bar[], size = 50): ZoneInfo | null {
   let bottom = NaN;
   let bias: -1 | 0 | 1 = 0;
   let brk: ZoneBreak | null = null;
+  // the window extremes of the last `size` bars: O(n) rolling max / min (monotonic deque, the same as `legPivots`);
+  // a series with a NaN high / low keeps the plain window loop (Math.max / min NaN semantics of the original)
+  const fast = Number.isInteger(size) && size >= 1 && bars.length > size && bars.every((b) => !Number.isNaN(b.h) && !Number.isNaN(b.l));
+  const rh = fast ? rolling(bars.map((b) => b.h), size, true) : null;
+  const rl = fast ? rolling(bars.map((b) => b.l), size, false) : null;
   for (let i = 0; i < bars.length; i++) {
     const b = bars[i]!;
     if (b.h >= top) top = b.h;
@@ -76,9 +81,14 @@ export function luxZone(bars: readonly Bar[], size = 50): ZoneInfo | null {
     if (i >= size) {
       let hh = -Infinity;
       let ll = Infinity;
-      for (let k = i - size + 1; k <= i; k++) {
-        hh = Math.max(hh, bars[k]!.h);
-        ll = Math.min(ll, bars[k]!.l);
+      if (rh && rl) {
+        hh = rh[i]!;
+        ll = rl[i]!;
+      } else {
+        for (let k = i - size + 1; k <= i; k++) {
+          hh = Math.max(hh, bars[k]!.h);
+          ll = Math.min(ll, bars[k]!.l);
+        }
       }
       const p = bars[i - size]!;
       if (p.h > hh) leg = 0;

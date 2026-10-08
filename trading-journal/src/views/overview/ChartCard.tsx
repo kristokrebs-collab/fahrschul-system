@@ -10,10 +10,8 @@ import { levelsConfigured } from "@/domain/defaults";
 import { scenario } from "@/domain/trigger";
 import { cn } from "@/lib/cn";
 import {
-  getDivergences,
-  getMcbSeries,
+  getChartOverlay,
   getProvider,
-  getStructure,
   KLINE_FEEDS,
   lastClosed4h,
   priceMv,
@@ -32,6 +30,7 @@ import {
   type ProviderHealth,
   type Stamped,
 } from "@/market";
+import { observeInView } from "@/motion/inView";
 import { TextShimmer } from "@/motion/TextShimmer";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -241,10 +240,24 @@ export function structureKey(s: StructureOverlay | null): string {
  * External store of the check overlay of one chart interval (MCB dots, divergences, structure + S/R): re-read when the
  * entry check publishes (≤ 1/s, only on a real change) and on a new bar (the store is re-created per history change),
  * each part memoised by content, so the chart re-sets a layer only when something on it appears, moves or changes
- * state. Hidden layers are not computed.
+ * state. Hidden layers are not computed; all layers come from one build of the bars (`getChartOverlay`).
+ *
+ * Off the publish path: the engine publishes inside its own timer task, so a publish only marks the overlay stale and
+ * schedules ONE re-read in a task of its own (the re-read costs ≈ 0.2 ms on 4h, ≈ 2.4 ms on 30m × 1500 bars). While
+ * the chart card is off screen nothing is re-read; it catches up when it scrolls back into view.
  */
-function createOverlayStore(interval: ChartIv, enabled: boolean, bars: number, layers: OverlayLayers): { read: () => CheckOverlay; subscribe: (cb: () => void) => () => void } {
+interface OverlayStore {
+  read: () => CheckOverlay;
+  subscribe: (cb: () => void) => () => void;
+  /** chart card on screen (default true): off screen, publishes are only noted */
+  setVisible: (on: boolean) => void;
+}
+
+function createOverlayStore(interval: ChartIv, enabled: boolean, bars: number, layers: OverlayLayers): OverlayStore {
   let dirty = true;
+  let visible = true;
+  let pending: ReturnType<typeof setTimeout> | null = null;
+  const subs = new Set<() => void>();
   const keys = { mcb: "", div: "", st: "" };
   let value: CheckOverlay = EMPTY_OVERLAY;
   const read = (): CheckOverlay => {
@@ -252,34 +265,55 @@ function createOverlayStore(interval: ChartIv, enabled: boolean, bars: number, l
     if (dirty) {
       dirty = false;
       let next = value;
-      const mcb = layers.mcb ? getMcbSeries(interval, { bars }) : NO_SIGNALS;
+      const o = getChartOverlay(interval, { bars, mcb: layers.mcb, div: layers.div, structure: layers.sr || layers.struct });
+      const mcb = o.mcb.length ? o.mcb : NO_SIGNALS;
       const mk = signalMarkersKey(mcb);
       if (mk !== keys.mcb) {
         keys.mcb = mk;
-        next = { ...next, signals: mcb.length ? mcb : NO_SIGNALS };
+        next = { ...next, signals: mcb };
       }
-      const div = layers.div ? getDivergences(interval, { bars }) : NO_LINES;
+      const div = o.div.length ? o.div : NO_LINES;
       const dk = divergencesKey(div);
       if (dk !== keys.div) {
         keys.div = dk;
-        next = { ...next, divergences: div.length ? div : NO_LINES };
+        next = { ...next, divergences: div };
       }
-      const st = layers.sr || layers.struct ? getStructure(interval, { bars }) : null;
-      const sk = structureKey(st);
+      const sk = structureKey(o.structure);
       if (sk !== keys.st) {
         keys.st = sk;
-        next = { ...next, structure: st };
+        next = { ...next, structure: o.structure };
       }
       value = next;
     }
     return value;
   };
-  const subscribe = (cb: () => void) =>
-    subscribeSignalCheck(() => {
+  const notify = () => {
+    if (pending || !visible || !subs.size) return;
+    pending = setTimeout(() => {
+      pending = null;
+      for (const cb of [...subs]) cb();
+    }, 0);
+  };
+  const subscribe = (cb: () => void) => {
+    subs.add(cb);
+    const off = subscribeSignalCheck(() => {
       dirty = true;
-      cb();
+      notify();
     });
-  return { read, subscribe };
+    return () => {
+      off();
+      subs.delete(cb);
+      if (!subs.size && pending) {
+        clearTimeout(pending);
+        pending = null;
+      }
+    };
+  };
+  const setVisible = (on: boolean) => {
+    visible = on;
+    if (on && dirty) notify();
+  };
+  return { read, subscribe, setVisible };
 }
 
 /** The check overlay for the chart (`createOverlayStore`); empty while collapsed or on 1m. */
@@ -287,6 +321,12 @@ function useCheckOverlay(interval: ChartIv, enabled: boolean, bars: number, laye
   // a new bar (history identity) re-creates the store: dots, pivots and levels follow the new candle
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `history` is the re-read trigger, not an input
   const store = useMemo(() => createOverlayStore(interval, enabled, bars, layers), [interval, enabled, bars, layers, history]);
+  // re-read only while the chart card is on screen (shared IntersectionObserver; without one it always is)
+  useEffect(() => {
+    const el = document.getElementById(CHART_CARD_ID);
+    if (!el) return;
+    return observeInView(el, (on) => store.setVisible(on));
+  }, [store]);
   return useSyncExternalStore(store.subscribe, store.read, () => EMPTY_OVERLAY);
 }
 
