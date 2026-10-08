@@ -64,7 +64,7 @@ describe("part view models", () => {
     expect(traderCells(p, UI_CFG)).toEqual([
       { id: "pos", title: "Positionen", value: "66,0 % Long", sub: "Ziel > 64 % Long", met: true },
       { id: "acc", title: "Konten", value: "65,2 % Long", sub: "Ziel > 64 % Long", met: true },
-      { id: "retail", title: "Retail", value: "−0,5 pp", sub: "rot: Long-Anteil fällt (5m)", met: true },
+      { id: "retail", title: "Retail", value: "−0,5 pp", sub: "Ziel rot: Long-Anteil fällt (5m)", met: true },
       { id: "zone", title: "Zone", value: "Discount · 20 %", sub: "Ziel Discount · 1h", met: true },
     ]);
     const short = s.short.parts!.find((x) => x.id === "traders")!;

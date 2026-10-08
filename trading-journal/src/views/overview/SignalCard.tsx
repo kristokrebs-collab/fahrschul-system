@@ -239,8 +239,9 @@ function FreshBadge({ side, current, onShow }: { side: Side; current: Side; onSh
     return () => cancelAnimationFrame(id);
   }, []);
   const label = (
-    <TactileHighlight active={on} tab={false} padX={0.4}>
-      <span className="label !text-[10.5px]">{FRESH_ENTRY_TEXT[side]}</span>
+    // the label look without `.label`'s own colour: the base copy inherits mute, the lit copy the highlight's ink
+    <TactileHighlight active={on} tab={false} padX={0.4} className="text-mute">
+      <span className="font-mono text-[10.5px] font-medium uppercase tracking-[0.14em]">{FRESH_ENTRY_TEXT[side]}</span>
     </TactileHighlight>
   );
   return (

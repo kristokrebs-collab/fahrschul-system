@@ -16,7 +16,7 @@ import {
   type LayerInfo,
   type ViewportInfo,
 } from "@/app/layerDiag";
-import LayerDiagnostics, { DIAG_TITLE, PROBE_H } from "@/app/LayerDiagnostics";
+import LayerDiagnostics, { DIAG_TITLE, placeLabels, PROBE_H } from "@/app/LayerDiagnostics";
 import { isSafeFx, setSafeFx, wantsSafeFx } from "@/app/pwa";
 
 const SAMSUNG = "Mozilla/5.0 (Linux; Android 14; SM-X916B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Safari/537.36";
@@ -137,6 +137,34 @@ describe("layer diagnostics – pure helpers", () => {
       "2. Toast-Insel (div) · fixed · 0×0 @ 0,888 · z 95 · transparent",
     ]);
     expect(layerLine({ ...ls[0]!, opacity: 0.05, visibility: "hidden" })).toContain("Deckkraft 5 % · will-change:transform · ausgeblendet");
+  });
+});
+
+describe("layer diagnostics – labels", () => {
+  const lay = (n: number, name: string, box: LayerInfo["box"]): LayerInfo => ({ n, name, position: "fixed", box, z: String(40 + n), opacity: 1, bg: "transparent", effects: [] }) as unknown as LayerInfo;
+
+  it("labels never overlap (crowded bottom edge at 390 px: a left column above the probe); a 0×0 layer gets none", () => {
+    const ls = [
+      lay(1, "Kopfzeile (header)", { x: 0, y: 0, w: 390, h: 56 }),
+      lay(2, "Unterer Verlauf (div)", { x: 0, y: 700, w: 390, h: 80 }),
+      lay(3, "Dock-Leiste (div)", { x: 0, y: 760, w: 390, h: 84 }),
+      lay(4, "Dock (nav)", { x: 12, y: 770, w: 366, h: 64 }),
+      lay(5, "Toast-Insel (div)", { x: 0, y: 844, w: 0, h: 0 }),
+      lay(6, "Aktionsknopf (button)", { x: 300, y: 690, w: 56, h: 56 }),
+      lay(7, "Statuszeile (div)", { x: 0, y: 760, w: 390, h: 20 }),
+    ];
+    const at = placeLabels(ls, 390, 844, PROBE_H);
+    expect(at.has(5)).toBe(false);
+    const boxes = [...at.entries()].map(([n, p]) => {
+      const l = ls.find((x) => x.n === n)!;
+      const text = `#${l.n} ${l.name} · ${l.box.w}×${l.box.h} · z ${l.z}`;
+      return { n, x: p.x, y: p.y, w: Math.min(382, text.length * 6.8 + 14), h: 18 };
+    });
+    expect(boxes.length).toBeGreaterThan(3);
+    for (const a of boxes) {
+      expect(a.y + a.h).toBeLessThanOrEqual(844 - PROBE_H);
+      for (const b of boxes) if (a !== b) expect(a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y, `#${a.n} / #${b.n}`).toBe(false);
+    }
   });
 });
 

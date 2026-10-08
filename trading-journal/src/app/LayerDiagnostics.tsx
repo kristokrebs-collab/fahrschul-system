@@ -37,24 +37,45 @@ interface Placed {
   h: number;
 }
 
-/** Label boxes in viewport px, nudged down until they no longer overlap an earlier label (estimated text width). */
-function placeLabels(layers: readonly LayerInfo[], vw: number, vh: number, bottom: number): Map<number, { x: number; y: number }> {
+/** A layer without area (an idle 0×0 region) gets no outline or label; the panel list still names it. */
+const hasArea = (l: LayerInfo): boolean => l.box.w * l.box.h > 0;
+
+/**
+ * Label boxes in viewport px, nudged down until they no longer overlap an earlier label (estimated text width, 6.8 px
+ * per character of the 10-px mono font). A label that still overlaps after 12 nudges goes to the first free slot of a
+ * column at the left edge, stacked upward from the bottom; with no free slot left it is not drawn — a label never
+ * keeps an overlapping spot.
+ */
+export function placeLabels(layers: readonly LayerInfo[], vw: number, vh: number, bottom: number): Map<number, { x: number; y: number }> {
   const placed: Placed[] = [];
   const out = new Map<number, { x: number; y: number }>();
+  const h = 18;
+  // never under the probe band: a label of a bottom layer (dock) sits just above it
+  const maxY = vh - bottom - h - 4;
+  const hits = (x: number, y: number, w: number) => placed.some((p) => x < p.x + p.w + 2 && x + w + 2 > p.x && y < p.y + p.h + 2 && y + h + 2 > p.y);
   for (const l of layers) {
+    if (!hasArea(l)) continue;
     const text = `#${l.n} ${l.name} · ${l.box.w}×${l.box.h} · ${l.position === "innen" ? "innen" : `z ${l.z}`}`;
-    const w = Math.min(vw - 8, text.length * 6.1 + 14);
-    const h = 18;
+    const w = Math.min(vw - 8, text.length * 6.8 + 14);
     let x = Math.max(4, Math.min(vw - w - 4, l.box.x + 4));
-    // never under the probe band: a label of a bottom layer (dock) sits just above it
-    const maxY = vh - bottom - h - 4;
     let y = Math.max(4, Math.min(maxY, l.box.y + 4));
-    for (let i = 0; i < 12 && placed.some((p) => x < p.x + p.w && x + w > p.x && y < p.y + p.h && y + h > p.y); i++) {
+    for (let i = 0; i < 12 && hits(x, y, w); i++) {
       if (y + h + 2 <= maxY) y += h + 2;
       else {
         y = Math.max(4, y - (h + 2));
         x = Math.min(vw - w - 4, x + 24);
       }
+    }
+    if (hits(x, y, w)) {
+      let free: { x: number; y: number } | null = null;
+      for (let fy = maxY; fy >= 4; fy -= h + 2) {
+        if (!hits(4, fy, w)) {
+          free = { x: 4, y: fy };
+          break;
+        }
+      }
+      if (!free) continue;
+      ({ x, y } = free);
     }
     placed.push({ x, y, w, h });
     out.set(l.n, { x, y });
@@ -66,9 +87,9 @@ function Outlines({ layers, vw, vh, bottom }: { layers: readonly LayerInfo[]; vw
   const labels = useMemo(() => placeLabels(layers, vw, vh, bottom), [layers, vw, vh, bottom]);
   return (
     <>
-      {layers.map((l) => {
+      {layers.filter(hasArea).map((l) => {
         const c = colorOf(l.n);
-        const at = labels.get(l.n) ?? { x: 4, y: 4 };
+        const at = labels.get(l.n);
         return (
           <div key={l.n} {...DIAG}>
             <div
@@ -77,14 +98,16 @@ function Outlines({ layers, vw, vh, bottom }: { layers: readonly LayerInfo[]; vw
               className="absolute"
               style={{ left: l.box.x, top: l.box.y, width: Math.max(1, l.box.w), height: Math.max(1, l.box.h), outline: `1.5px dashed ${c}`, outlineOffset: -1.5 }}
             />
-            <span
-              {...DIAG}
-              aria-hidden="true"
-              className="absolute whitespace-nowrap rounded-[5px] border bg-ink-950 px-1.5 font-mono text-[10px] leading-4 text-fg"
-              style={{ left: at.x, top: at.y, borderColor: c, maxWidth: vw - 8, overflow: "hidden", textOverflow: "ellipsis" }}
-            >
-              <span style={{ color: c }}>#{l.n}</span> {l.name} · {l.box.w}×{l.box.h} · {l.position === "innen" ? "innen" : `z ${l.z}`}
-            </span>
+            {at && (
+              <span
+                {...DIAG}
+                aria-hidden="true"
+                className="absolute whitespace-nowrap rounded-[5px] border bg-ink-950 px-1.5 font-mono text-[10px] leading-4 text-fg"
+                style={{ left: at.x, top: at.y, borderColor: c, maxWidth: vw - 8, overflow: "hidden", textOverflow: "ellipsis" }}
+              >
+                <span style={{ color: c }}>#{l.n}</span> {l.name} · {l.box.w}×{l.box.h} · {l.position === "innen" ? "innen" : `z ${l.z}`}
+              </span>
+            )}
           </div>
         );
       })}

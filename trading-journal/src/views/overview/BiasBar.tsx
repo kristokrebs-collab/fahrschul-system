@@ -147,20 +147,23 @@ const BiasTrack = memo(function BiasTrack({ score, firm, compact = false, empty 
   const x = useTransform(score, (s) => `${Math.max(NEEDLE_INSET, Math.min(100 - NEEDLE_INSET, biasX(s)))}%`);
   const winHalo = useTransform(score, (s) => Math.max(0, Math.min(1, (s - BIAS_LEAN / 2) * 2.5)));
   const lossHalo = useTransform(score, (s) => Math.max(0, Math.min(1, (-s - BIAS_LEAN / 2) * 2.5)));
-  const lean = BIAS_LEAN * 50;
   return (
     <span className={cn("relative block", compact ? "h-3" : "h-7")} data-testid={compact ? undefined : "bias-track"} aria-hidden="true">
       <span className={cn("absolute inset-x-0 top-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white/[0.05]", compact ? "h-1.5" : "h-2.5")}>
         <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-win/[0.16] to-transparent" />
         <span className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-loss/[0.16] to-transparent" />
-        <span className="absolute inset-y-0 bg-white/[0.07]" style={{ left: `${50 - lean}%`, right: `${50 - lean}%` }} />
+        {/* the neutral zone (±BIAS_LEAN) as two hairline ticks: a filled band showed its edge through the fills as a step */}
+        {[-BIAS_LEAN, BIAS_LEAN].map((t) => (
+          <span key={t} className="absolute inset-y-0 w-px bg-white/[0.14]" style={{ left: `${biasX(t)}%` }} />
+        ))}
         {!empty && (
           <>
-            {/* provisional part (desaturated, to the needle) under the confirmed fill (full colour, to `firm`) */}
-            <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-[#65b488]/10 via-[#65b488]/40 to-[#65b488]/80" style={{ scaleX: longScale }} />
-            <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-[#d27a7b]/10 via-[#d27a7b]/40 to-[#d27a7b]/80" style={{ scaleX: shortScale }} />
-            <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-win/10 via-win/45 to-win" style={{ scaleX: longFirm }} data-testid={compact ? undefined : "bias-fill-firm"} />
-            <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-loss/10 via-loss/45 to-loss" style={{ scaleX: shortFirm }} />
+            {/* provisional part (desaturated, to the needle) under the confirmed fill (full colour, to `firm`); both are
+                flat gradients that brighten toward their end, so the brightest point is the end, never mid-bar */}
+            <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-[#65b488]/45 to-[#65b488]/80" style={{ scaleX: longScale }} />
+            <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-[#d27a7b]/45 to-[#d27a7b]/80" style={{ scaleX: shortScale }} />
+            <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-win/55 via-win/75 to-win" style={{ scaleX: longFirm }} data-testid={compact ? undefined : "bias-fill-firm"} />
+            <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-loss/55 via-loss/75 to-loss" style={{ scaleX: shortFirm }} />
           </>
         )}
       </span>

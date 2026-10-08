@@ -233,6 +233,9 @@ export function rsiBands(cfg: Pick<SignalCfg, "rsiOs" | "rsiOb" | "rsiNear">): {
 /* ------------------------------------------------------------------ graded parts (decisions 5 + 10) */
 
 const dec1 = (x: number): string => (Number.isFinite(x) ? String(Math.round(x * 10) / 10).replace(".", ",").replace("-", "−") : "–");
+const fmtF1 = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+/** Distances in R / ATR always with one decimal (`9,0 R`, like the reasons list and the engine's texts). */
+const fix1 = (x: number): string => (Number.isFinite(x) ? fmtF1.format(x).replace("-", "−") : "–");
 const fmtInt = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
 const price0 = (x: number): string => (Number.isFinite(x) ? fmtInt.format(x) : "–");
 
@@ -282,7 +285,7 @@ export interface PartCell {
   title: string;
   /** main value (`66,0 % Long`, `−0,5 pp`, `Discount · 20 %`; `–` without data) */
   value: string;
-  /** what it must show (`> 64 % Long`, `rot: Long-Anteil fällt (5m)`, `Discount · 1h`) */
+  /** what it must show (`Ziel > 64 % Long`, `Ziel rot: Long-Anteil fällt (5m)`, `Ziel Discount · 1h`) */
   sub: string;
   met: boolean | null;
 }
@@ -305,7 +308,7 @@ export function traderCells(p: GradedPart, cfg: Pick<SignalCfg, "whale">): PartC
   return [
     cell("pos", "Positionen", `Ziel > ${dec1(w.topPct)} % ${sideWord}`),
     cell("acc", "Konten", `Ziel > ${dec1(w.topPct)} % ${sideWord}`),
-    cell("retail", "Retail", long ? `rot: Long-Anteil fällt (${period})` : `grün: Long-Anteil steigt (${period})`),
+    cell("retail", "Retail", long ? `Ziel rot: Long-Anteil fällt (${period})` : `Ziel grün: Long-Anteil steigt (${period})`),
     cell("zone", "Zone", `Ziel ${long ? "Discount" : "Premium"}${zoneTf ? ` · ${zoneTf}` : ""}`),
   ];
 }
@@ -351,16 +354,16 @@ export function srView(p: GradedPart, cfg: Pick<SignalCfg, "sr">): SrView {
     near: {
       label: near?.label ?? (long ? "Am Support / Demand" : "Am Widerstand / Supply"),
       level: lean ? `${lean.label} ${price0(lean.price)}` : !p.data ? "keine Daten" : long ? "kein Support darunter" : "kein Widerstand darüber",
-      value: !lean ? "–" : lean.dist === 0 ? "im Level" : `${dec1(lean.distAtr)} ATR`,
+      value: !lean ? "–" : lean.dist === 0 ? "im Level" : `${fix1(lean.distAtr)} ATR`,
       distAtr: lean ? lean.distAtr : null,
       band: sc.nearAtr,
       max: sc.nearAtr * 2,
       met: near?.met ?? null,
     },
     room: {
-      label: room?.label ?? `Platz (≥ ${dec1(sc.minR)} R)`,
+      label: room?.label ?? `Platz (≥ ${fix1(sc.minR)} R)`,
       level: target ? `${target.label} ${price0(target.price)}` : free ? `kein ${long ? "Widerstand" : "Support"}` : !p.data ? "keine Daten" : "–",
-      value: r == null ? "–" : free ? "frei" : `${dec1(r)} R`,
+      value: r == null ? "–" : free ? "frei" : `${fix1(r)} R`,
       r: r == null ? null : free ? Infinity : r,
       free,
       minR: sc.minR,
@@ -400,7 +403,7 @@ export function partChips(v: Pick<Verdict, "parts">): PartChip[] {
               ? "–"
               : p.levels.r === Infinity
                 ? "frei"
-                : `${dec1(p.levels.r)} R`;
+                : `${fix1(p.levels.r)} R`;
     return { id: p.id, label: p.id === "traders" ? "Top-Trader" : p.id === "div" ? "Divergenz" : "S/R", value, tone: pv.tone, provisional: pv.provisional };
   });
 }

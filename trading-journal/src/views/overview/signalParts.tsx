@@ -55,6 +55,8 @@ const TONE_ON: Record<Side, string> = { long: "border-win/35 bg-win/[0.06]", sho
 const TONE_PROV: Record<Side, string> = { long: "border-dashed border-[#65b488]/45 bg-[#65b488]/[0.035]", short: "border-dashed border-[#d27a7b]/45 bg-[#d27a7b]/[0.035]" };
 const SIDE_TEXT: Record<Side, string> = { long: "text-win", short: "text-loss" };
 const SIDE_BG: Record<Side, string> = { long: "bg-win", short: "bg-loss" };
+/** provisional fills: the side colours at about 50 % saturation (as `PROV_TEXT`) */
+const PROV_BG: Record<Side, string> = { long: "bg-[#65b488]", short: "bg-[#d27a7b]" };
 const GLOW: Record<Side, string> = { long: "rgb(61 220 132 / 0.55)", short: "rgb(255 77 79 / 0.55)" };
 const isFirm = (s: SignalState): boolean => s === "confirmed" || s === "strong";
 
@@ -170,12 +172,14 @@ export const VerdictRow = memo(function VerdictRow({ v, ladderLength, flash, lin
       </div>
       <div className="grid min-w-0 gap-2">
         <AnimatePresence mode="popLayout" initial={false}>
+          {/* sequenced swap (Long ↔ Short, a new verdict): the old label leaves first, the new one starts once it has
+              gone — two labels are never visible over each other (rule 5) */}
           <motion.div
             key={v.label}
             className={cn("text-[19px] font-semibold leading-tight tracking-tight", verdictText(v))}
             initial={reduced ? { opacity: 0 } : { opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0, transition: reduced ? tween.fade : spring.smooth }}
-            exit={{ opacity: 0, transition: tween.exit }}
+            animate={{ opacity: 1, y: 0, transition: { ...(reduced ? tween.fade : spring.smooth), delay: tween.exit.duration } }}
+            exit={{ opacity: 0, y: reduced ? 0 : -6, transition: tween.exit }}
             data-testid="signal-label"
           >
             {lbl.prefix && <span className="sr-only">{lbl.prefix}</span>}
@@ -216,6 +220,8 @@ export interface MeterProps {
   valueText?: string;
   /** label in normal case (part cards) instead of the small caps of the rung meters */
   plain?: boolean;
+  /** an active value on a forming candle: number and thumb in the desaturated side colour (decision 9) */
+  prov?: boolean;
 }
 
 /**
@@ -223,14 +229,14 @@ export interface MeterProps {
  * width = the track), so it moves on the compositor (`spring.smooth`); the clip box keeps the layer from widening the
  * card.
  */
-export const Meter = memo(function Meter({ label, value, min, max, bands, active, side, sub, ticks, valueText, plain = false }: MeterProps) {
+export const Meter = memo(function Meter({ label, value, min, max, bands, active, side, sub, ticks, valueText, plain = false, prov = false }: MeterProps) {
   const reduced = useReducedFx();
   const p = meterPct(value, min, max);
   return (
     <div className="mt-2.5">
       <div className="flex items-baseline justify-between gap-2 text-[10.5px]">
         <span className={cn("min-w-0", plain ? "truncate text-[11.5px] text-mute" : "uppercase tracking-[0.1em] text-faint")}>{label}</span>
-        <span className={cn("num shrink-0 whitespace-nowrap font-mono", plain && "text-[12px]", active ? SIDE_TEXT[side] : "text-mute")}>
+        <span className={cn("num shrink-0 whitespace-nowrap font-mono", plain && "text-[12px]", active ? (prov ? PROV_TEXT[side] : SIDE_TEXT[side]) : "text-mute")}>
           {valueText ?? n1(value)}
           {sub && <span className="ml-1.5 text-faint">{sub}</span>}
         </span>
@@ -245,7 +251,7 @@ export const Meter = memo(function Meter({ label, value, min, max, bands, active
           ))}
         </span>
         <motion.span className="absolute inset-y-0 left-[1.5px] right-[1.5px]" initial={false} animate={{ x: `${p}%` }} transition={reduced ? { duration: 0 } : spring.smooth}>
-          <span className={cn("absolute left-0 top-0 h-3 w-[3px] -translate-x-1/2 rounded-full", active ? SIDE_BG[side] : "bg-fg")} />
+          <span className={cn("absolute left-0 top-0 h-3 w-[3px] -translate-x-1/2 rounded-full", active ? (prov ? PROV_BG[side] : SIDE_BG[side]) : "bg-fg")} />
         </motion.span>
       </div>
     </div>
@@ -407,6 +413,7 @@ export const RungTile = memo(function RungTile({ rung, side, cfg, fresh }: RungT
               { from: cfg.wtOb, to: 100, className: "bg-loss/20" },
             ]}
             active={rung.match}
+            prov={rung.match && rung.state === "provisional"}
             side={side}
           />
           <Meter
@@ -422,6 +429,7 @@ export const RungTile = memo(function RungTile({ rung, side, cfg, fresh }: RungT
             ]}
             ticks={[bands.lo, bands.hi]}
             active={rung.rsiNear}
+            prov={rung.match && rung.state === "provisional"}
             side={side}
             sub={`Ø ${n1(c.rsiMa)}`}
           />
@@ -522,18 +530,23 @@ const TONE_SR: Record<PartView["tone"], string> = { ok: "erfüllt: ", part: "tei
 /** Thin grade bar: `segments` (Top-Trader: one per part, lit = met) or one continuous fill (scaleX = grade). */
 function GradeBar({ grade, segments, side, prov }: { grade: number; segments?: readonly (boolean | null)[]; side: Side; prov: boolean }) {
   const reduced = useReducedFx();
-  const fill = prov ? (side === "long" ? "bg-[#65b488]" : "bg-[#d27a7b]") : SIDE_BG[side];
+  const fill = prov ? PROV_BG[side] : SIDE_BG[side];
   if (segments) {
+    // one layer per side: on a side switch the old side's segments fade out in their own colour, and a side whose
+    // parts do not hold never lights up (no flash of the new colour on segments that are leaving)
     return (
       <span className="mt-2.5 grid grid-cols-4 gap-1" aria-hidden="true">
         {segments.map((m, i) => (
           <span key={i} className="relative h-1 overflow-hidden rounded-full bg-white/[0.06]">
-            <motion.span
-              className={cn("absolute inset-0 origin-left rounded-full", fill)}
-              initial={false}
-              animate={{ opacity: m ? 1 : 0, scaleX: m ? 1 : 0 }}
-              transition={reduced ? { duration: 0 } : { opacity: { ...tween.crossfade, delay: i * stagger.reveal }, scaleX: { ...tween.bar, delay: i * stagger.reveal } }}
-            />
+            {(["long", "short"] as const).map((s) => (
+              <motion.span
+                key={s}
+                className={cn("absolute inset-0 origin-left rounded-full", prov ? PROV_BG[s] : SIDE_BG[s])}
+                initial={false}
+                animate={{ opacity: m && side === s ? 1 : 0, scaleX: m && side === s ? 1 : 0 }}
+                transition={reduced ? { duration: 0 } : { opacity: { ...tween.crossfade, delay: i * stagger.reveal }, scaleX: { ...tween.bar, delay: i * stagger.reveal } }}
+              />
+            ))}
           </span>
         ))}
       </span>
@@ -622,7 +635,7 @@ function TraderCell({ c, side }: { c: PartCell; side: Side }) {
   const met = c.met === true;
   return (
     <div
-      className={cn("relative min-w-0 rounded-lg border px-2.5 py-2 transition-colors duration-300", met ? TONE_ON[side] : "border-line bg-ink-950/40")}
+      className={cn("relative h-full min-w-0 rounded-lg border px-2.5 py-2 transition-colors duration-300", met ? TONE_ON[side] : "border-line bg-ink-950/40")}
       data-testid="signal-part-cell"
       data-id={c.id}
       data-met={c.met === null ? "none" : String(met)}
@@ -631,7 +644,9 @@ function TraderCell({ c, side }: { c: PartCell; side: Side }) {
         <StateDot tone={c.met === null ? null : met ? side : null} strong={met} state="confirmed" lit={met} size={6} />
         <span className="truncate text-[9.5px] font-semibold uppercase tracking-[0.12em] text-faint">{c.title}</span>
       </span>
-      <span className={cn("num mt-1 block truncate font-mono text-[14px] leading-tight transition-colors duration-300", met ? SIDE_TEXT[side] : c.met === null ? "text-faint" : "text-fg")}>
+      {/* never cut (rule 5: numbers are never truncated): a long value ("Discount · 15 %" in a 390-px cell) wraps at
+          its space, balanced */}
+      <span className={cn("num mt-1 block font-mono text-[14px] leading-tight transition-colors duration-300 [text-wrap:balance]", met ? SIDE_TEXT[side] : c.met === null ? "text-faint" : "text-fg")}>
         <span className="sr-only">{c.met === null ? "keine Daten: " : met ? "erfüllt: " : "offen: "}</span>
         {c.value}
       </span>
