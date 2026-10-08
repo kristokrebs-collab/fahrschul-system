@@ -21,7 +21,7 @@ import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { MorphSelect, type MorphSelectOption } from "@/motion/pulse/MorphSelect";
 import { Button, CheckboxRow, ConvictionRadio, Field, Input, Segmented, Textarea, revealInvalid, shakeField } from "@/primitives";
-import { useJournal } from "@/store/journalStore";
+import { saveTradeNow, useJournal } from "@/store/journalStore";
 import { jsonEqual } from "@/store/merge3";
 import { pushToast, useUi, type AccFilter } from "@/store/uiStore";
 import { winCelebration } from "./celebration";
@@ -92,6 +92,12 @@ export const EDITOR_MESSAGES = {
   saveFailed: "Speichern fehlgeschlagen. Prüfe die Verbindung und versuch es erneut.",
   deleteFailed: "Löschen fehlgeschlagen.",
 } as const;
+
+/**
+ * A save that has not finished after this long shows its busy state ("Speichert …", disabled, aria-busy); a local save
+ * finishes within the same task and never flips the editor to busy and back.
+ */
+export const SAVE_BUSY_DELAY_MS = 160;
 
 /** Unsaved-input guard (Escape, backdrop, close button, swipe, `Abbrechen` on a changed form). */
 export const DISCARD_COPY = { ask: "Änderungen verwerfen?", discard: "Verwerfen", keep: "Weiter bearbeiten" } as const;
@@ -321,7 +327,6 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const openSetupEditor = useUi((s) => s.openSetupEditor);
   const trades = useJournal((s) => s.trades);
   const settings = useJournal((s) => s.settings);
-  const saveTrade = useJournal((s) => s.saveTrade);
   const deleteTrade = useJournal((s) => s.deleteTrade);
   const reduced = useReducedFx();
 
@@ -348,6 +353,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const alertRef = useRef<HTMLSpanElement>(null);
   const saveRef = useRef<HTMLButtonElement>(null);
   const againRef = useRef<HTMLButtonElement>(null);
+  /** A save is running (double-submit guard; the visible busy state follows only after `SAVE_BUSY_DELAY_MS`). */
+  const savingRef = useRef(false);
   const { trigger: deleteTrigger, no: deleteNo } = useConfirmFocus(confirmDelete);
   const { trigger: discardTrigger, no: discardNo } = useConfirmFocus(confirmDiscard);
 
@@ -423,6 +430,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
 
   const save = useCallback(
     async (mode: "close" | "again") => {
+      if (savingRef.current) return;
       const problem = validateRecord(rec, d.chart);
       if (problem) {
         const field = invalidFieldOf(problem);
@@ -434,33 +442,45 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       }
       setErr("");
       setInvalid(null);
-      setSaving(true);
-      // the check at save time: live within 5 min of now, else the (memoised) history check; none → keep the stored one
-      const signal = checking ? await resolveTradeSignal(d.date, t.side) : undefined;
-      const now = new Date().toISOString();
-      // Spread the stored trade first so passthrough/unknown fields (legacy extras, `signal`, `mistakes`) survive an edit.
-      const record: TradeRecord = {
-        ...(trade ?? {}),
-        ...rec,
-        checks: pruneChecks(checks, items),
-        ...(signal ? { signal } : null),
-        pnl: x.pnl,
-        r: x.r,
-        updatedAt: now,
-        createdAt: trade?.createdAt || now,
-      };
-      if (trade?.id) record.id = trade.id;
-      else delete record.id;
+      // One commit per save (perf-120 C): the button turns "Speichert …" (disabled, aria-busy) only for a save that
+      // takes a while (a history check, a remote store); a local save completes within the same task, and flipping the
+      // whole editor to busy and back cost two extra synchronous commits. `savingRef` blocks a second submit meanwhile.
+      savingRef.current = true;
+      let busyShown = false;
+      const busy = setTimeout(() => {
+        busyShown = true;
+        setSaving(true);
+      }, SAVE_BUSY_DELAY_MS);
       try {
-        await saveTrade(record);
+        // the check at save time: live within 5 min of now, else the (memoised) history check; none → keep the stored one
+        const signal = checking ? await resolveTradeSignal(d.date, t.side) : undefined;
+        const now = new Date().toISOString();
+        // Spread the stored trade first so passthrough/unknown fields (legacy extras, `signal`, `mistakes`) survive an edit.
+        const record: TradeRecord = {
+          ...(trade ?? {}),
+          ...rec,
+          checks: pruneChecks(checks, items),
+          ...(signal ? { signal } : null),
+          pnl: x.pnl,
+          r: x.r,
+          updatedAt: now,
+          createdAt: trade?.createdAt || now,
+        };
+        if (trade?.id) record.id = trade.id;
+        else delete record.id;
+        // `trades` is still the journal before this save – exactly what the equity-high check compares against
+        const burst = winCelebration(trades, record, trade);
+        // Local storage persists and publishes synchronously: the toast and the close (or the reset for the next trade)
+        // follow in the same tick, so React commits the new journal, the close and the toast together. A remote store
+        // is awaited first; nothing closes before the write is known to have happened (zero data loss).
+        const { persisted, done } = saveTradeNow(record);
+        if (!persisted) await done;
         pushToast({
           kind: "success",
           title: trade ? "Trade aktualisiert" : "Trade gespeichert",
           value: x.pnl == null ? "offen" : signed(x.pnl),
           valueTone: x.pnl == null ? undefined : x.pnl < 0 ? "loss" : "win",
         });
-        // `trades` is still the journal before this save – exactly what the equity-high check compares against
-        const burst = winCelebration(trades, record, trade);
         if (burst) {
           if (mode === "close") {
             // one moment, not two: the sheet exits first (`tween.exit`), then the burst rises from the hero Netto-P&L
@@ -490,10 +510,12 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         shakeField(alertRef.current, { reduced, self: true });
         pushToast({ kind: "error", title: "Speichern fehlgeschlagen" });
       } finally {
-        setSaving(false);
+        clearTimeout(busy);
+        savingRef.current = false;
+        if (busyShown) setSaving(false);
       }
     },
-    [rec, d, t, items, checks, checking, x, trade, trades, saveTrade, closeEditor, reduced],
+    [rec, d, t, items, checks, checking, x, trade, trades, closeEditor, reduced],
   );
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {

@@ -97,6 +97,28 @@ export const useJournal = create<JournalState>()((set, get) => ({
   setMode: (mode) => set({ mode }),
 }));
 
+/* ------------------------------------------------------------ immediate save */
+
+/** What `saveTradeNow` reports: `persisted` – the trade is stored and the store shows it when the call returns. */
+export interface ImmediateSave {
+  persisted: boolean;
+  /** The adapter's promise (resolved for a local save, the remote answer otherwise). */
+  done: Promise<void>;
+}
+
+/**
+ * Saves a trade and says whether it is ALREADY persisted when the call returns. The local store writes localStorage and
+ * publishes the new list synchronously (`persist` → `set`; a failing write throws before the list changes), so a
+ * changed list means saved – a caller that closes its form on success can do so in the same tick, and React commits the
+ * new list, the close and the toast together. A remote store (claude.ai) answers later: `persisted` is false and the
+ * caller awaits `done` as before. Zero data loss: nothing is closed before the write is known to have happened.
+ */
+export function saveTradeNow(t: Parameters<StoreApi["saveTrade"]>[0]): ImmediateSave {
+  const before = useJournal.getState().trades;
+  const done = useJournal.getState().saveTrade(t);
+  return { persisted: useJournal.getState().trades !== before, done };
+}
+
 /* --------------------------------------------------------------- selectors */
 
 const enrichedCache = new WeakMap<Trade[], WeakMap<Settings, EnrichedTrade[]>>();

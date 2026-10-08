@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bootJournal, getAccountView, getEnriched, MODE_LABELS, PROBE_TIMEOUT_MS, resetJournal, useJournal } from "@/store/journalStore";
+import { bootJournal, getAccountView, getEnriched, MODE_LABELS, PROBE_TIMEOUT_MS, resetJournal, saveTradeNow, useJournal } from "@/store/journalStore";
 import { readMeta } from "@/store/migrate";
 import { useUi } from "@/store/uiStore";
 import { BROKEN_TRADE, loadV0Fixture, seedV0 } from "./store.fixture";
@@ -39,6 +39,30 @@ describe("bootJournal", () => {
     expect(useJournal.getState().trades.at(-1)?.notes).toBe("z");
     expect(JSON.parse(localStorage.getItem("tj2-trades")!).at(-1).notes).toBe("z");
     expect(bootJournal()).toBe(p); // idempotent
+  });
+
+  it("saveTradeNow: a local save is persisted and shown when the call returns; a failing write reports nothing persisted", async () => {
+    await bootJournal({ autoBackup: false });
+    const first = useJournal.getState().trades[0]!;
+    const ok = saveTradeNow({ ...first, notes: "sofort" });
+    expect(ok.persisted).toBe(true);
+    // synchronously: the store and localStorage already hold it
+    expect(useJournal.getState().trades.find((t) => t.id === first.id)?.notes).toBe("sofort");
+    expect(JSON.parse(localStorage.getItem("tj2-trades")!).find((t: { id: string }) => t.id === first.id).notes).toBe("sofort");
+    await ok.done;
+
+    const before = useJournal.getState().trades;
+    const quota = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("full", "QuotaExceededError");
+    });
+    try {
+      const failed = saveTradeNow({ ...first, notes: "voll" });
+      expect(failed.persisted).toBe(false);
+      expect(useJournal.getState().trades).toBe(before);
+      await expect(failed.done).rejects.toThrow();
+    } finally {
+      quota.mockRestore();
+    }
   });
 
   it("Fall B with use('db') → null: stays connecting until resolved, then local", async () => {

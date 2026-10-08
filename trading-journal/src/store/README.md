@@ -65,6 +65,9 @@ getEnriched(trades, settings); getAccountView(enriched, settings, acc); // non-h
 
 // actions (bound to the active StoreApi; reject with StorageWriteError("Speichern fehlgeschlagen") on quota)
 await useJournal.getState().saveTrade(t);        // upsert, id assigned when missing (t_… local / doc id cloud)
+const { persisted, done } = saveTradeNow(t);     // same write; `persisted` = stored AND shown when the call returns (the
+// local store persists + publishes synchronously; a remote store → false, await `done`). The trade editor closes and
+// toasts in the same tick on `persisted`, so React commits the new journal, the close and the toast together (one commit)
 await useJournal.getState().deleteTrade(id);
 await useJournal.getState().saveSettings(s);     // whole object replaced, written verbatim
 await useJournal.getState().saveHyblock(r);      // upsert, h_… ids

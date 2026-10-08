@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { Profiler } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { TradeEditor, defaultForm, livePriceInput, resetForNext, toRecord, validateRecord, type TradeRecord } from "@/overlays/TradeEditor";
+import { SAVE_BUSY_DELAY_MS, TradeEditor, defaultForm, livePriceInput, resetForNext, toRecord, validateRecord, type TradeRecord } from "@/overlays/TradeEditor";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { SAMPLE, settings } from "./domain.fixtures";
@@ -226,6 +227,64 @@ describe("TradeEditor – edit mode", () => {
     const saved = saveTrade.mock.calls[0]?.[0] as unknown as Record<string, unknown>;
     expect(saved).toMatchObject({ id: "A", createdAt: "2026-01-01T00:00:00.000Z", legacyExtra: "keep-me", nested: { a: 1 }, notes: "edited" });
     expect(saved.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
+  });
+
+  it("perf-120 C: a local save commits the new journal, the toast and the close together (one commit, no busy flip)", async () => {
+    // a local-store-like save: persists and publishes the new list synchronously, like the local adapter
+    saveTrade.mockImplementation(async (t) => {
+      useJournal.setState({ trades: useJournal.getState().trades.map((x) => (x.id === t.id ? ({ ...x, ...t } as typeof x) : x)) });
+    });
+    const commits: { open: boolean; toasts: number; saved: boolean }[] = [];
+    let counting = false;
+    render(
+      <Profiler
+        id="editor"
+        onRender={() => {
+          if (counting) commits.push({ open: useUi.getState().editor.open, toasts: useUi.getState().toasts.length, saved: saveTrade.mock.calls.length > 0 });
+        }}
+      >
+        <MotionRoot>
+          <TradeEditor />
+        </MotionRoot>
+      </Profiler>,
+    );
+    type("Learnings & Notizen", "one commit");
+    const button = screen.getByRole("button", { name: "Speichern" });
+    counting = true;
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    await waitFor(() => expect(useUi.getState().editor.open).toBe(false));
+    const closing = commits.findIndex((c) => !c.open);
+    // the first commit after the click already shows the closed editor, the toast and the saved journal
+    expect(closing).toBe(0);
+    expect(commits[0]).toEqual({ open: false, toasts: 1, saved: true });
+    expect(button).not.toHaveAttribute("aria-busy");
+    expect(useJournal.getState().trades.find((x) => x.id === "A")?.notes).toBe("one commit");
+    saveTrade.mockImplementation(async () => {});
+  });
+
+  it("a save that is not persisted at once (remote store) is awaited before the editor closes; a slow one shows busy", async () => {
+    let finish: () => void = () => {};
+    saveTrade.mockImplementation(() => new Promise<void>((res) => (finish = res)));
+    try {
+      mount();
+      const button = screen.getByRole("button", { name: "Speichern" });
+      const t0 = performance.now();
+      fireEvent.click(button);
+      // real timers (faking them would freeze Motion's frame loop for the rest of the file)
+      await waitFor(() => expect(button).toHaveAttribute("aria-busy", "true"));
+      expect(performance.now() - t0).toBeGreaterThanOrEqual(SAVE_BUSY_DELAY_MS - 5);
+      expect(useUi.getState().editor.open).toBe(true);
+      // a second submit while the first runs is ignored
+      fireEvent.click(button);
+      expect(saveTrade).toHaveBeenCalledTimes(1);
+      await act(async () => finish());
+      await waitFor(() => expect(useUi.getState().editor.open).toBe(false));
+      expect(useUi.getState().toasts[0]?.title).toBe("Trade aktualisiert");
+    } finally {
+      saveTrade.mockImplementation(async () => {});
+    }
   });
 
   it("finding 18: the toast island stays live (not hidden) behind the open sheet", () => {
