@@ -5,15 +5,15 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ref from "./reference/otherSignals.js";
-import { DEFAULT_SIGNAL_CFG, mcbSeries, resampleBars, type Bar, type Signals, type SignalCfg } from "@/domain/signals";
+import { DEFAULT_SIGNAL_CFG, bestVerdict, mcbSeries, resampleBars, type Bar, type Signals, type SignalCfg, type TfCheck } from "@/domain/signals";
 import { buildFeedSpecs } from "@/market/feeds";
 import { initialHealth } from "@/market/health";
 import { priceMv, priceReceivedAtMv, tradeTimeMv } from "@/market/motionValues";
 import type { MarketProvider } from "@/market/provider";
 import type { Candle, FeedId, ProviderHealth, Stamped } from "@/market/types";
-import { __resetSignalEngine, __signalStats, attachSignalEngine, getMcbSeries, getSignalCandles, getSignalSnapshot, runSignalCheck, setSignalConfig, subscribeSignalCheck, type LiveSignals } from "@/market/signals/engine";
+import { __resetSignalEngine, __signalStats, attachSignalEngine, getDivergences, getMcbSeries, getSignalCandles, getSignalSnapshot, getStructure, runSignalCheck, setSignalConfig, subscribeSignalCheck, type LiveSignals } from "@/market/signals/engine";
 import { __clearRetroMemo, checkTradeAt, retroCheck } from "@/market/signals/retro";
-import { noteSignals, resetSignalNotifier, SIGNAL_HOLD_MS, SIGNAL_LAST_KEY, signalNotifyMinStrength } from "@/market/signals/notify";
+import { noteSignals, resetSignalNotifier, SIGNAL_HOLD_MS, SIGNAL_LAST_KEY, signalBarOpen, signalNotifyDetail, signalNotifyMinStrength } from "@/market/signals/notify";
 import { useUi } from "@/store/uiStore";
 import { benchAgg, synthBars } from "./signals.fixtures";
 
@@ -118,11 +118,20 @@ function reference(feeds: ReturnType<typeof liveFeeds>, price: number | null, cf
   }
 }
 
-function core(s: LiveSignals | Signals | null) {
+/** The reference's fields of a check (ours adds candle-close states, divergences, structure). */
+const CHECK_KEYS = ["tf", "ok", "closeAt", "rsi", "rsiMa", "wt", "zone", "longSignal", "shortSignal", "rsiLong", "rsiShort"] as const;
+const refCheck = (c: TfCheck | null) => (c ? Object.fromEntries(CHECK_KEYS.map((k) => [k, c[k]])) : c);
+/**
+ * The 1:1 core of an evaluation: the checks' reference fields and the raw ladder verdicts (`bestVerdict`). Ours
+ * grades on top (candle-close rule, parts) — tested in signals.v2.test.ts.
+ */
+function core(s: LiveSignals | null) {
   if (!s) return null;
-  const { at: _at, ...rest } = s as LiveSignals;
-  const { symbol: _s, source: _src, cfg: _c, price: _p, ...signals } = rest as Partial<LiveSignals>;
-  return signals;
+  return { checks: s.checks.map(refCheck), zone: refCheck(s.zone), ...bestVerdict(s.checks, DEFAULT_SIGNAL_CFG, s.zone) };
+}
+function refCore(s: Signals | null) {
+  if (!s) return null;
+  return { checks: s.checks, zone: s.zone, long: s.long, short: s.short, best: s.best };
 }
 
 beforeEach(() => {
@@ -154,14 +163,14 @@ describe("live check", () => {
     expect(st.snapshot).not.toBeNull();
     expect(st.snapshot!.symbol).toBe("BTCUSDT");
     expect(st.snapshot!.price).toBe(price);
-    expect(core(st.snapshot)).toEqual(core(reference(feeds, price)));
+    expect(core(st.snapshot)).toEqual(refCore(reference(feeds, price)));
     expect(st.snapshot!.checks.map((c) => c?.tf)).toEqual(["30m", "45m", "1h", "4h"]);
     // without a fresh price the forming candles stay as the exchange sent them
     setPrice(price, NOW - 10 * 60_000);
     __resetSignalEngine();
     attachSignalEngine(fake.provider);
     await vi.advanceTimersByTimeAsync(0);
-    expect(core(getSignalSnapshot().snapshot)).toEqual(core(reference(feeds, null)));
+    expect(core(getSignalSnapshot().snapshot)).toEqual(refCore(reference(feeds, null)));
   });
 
   it("evaluates at most once per second, off the publish path, and only re-renders on a real change", async () => {
@@ -327,6 +336,8 @@ describe("retro check (checkTradeAt)", () => {
 
   it("rebuilds every rung from history ending at T (one page per interval) and equals the reference", async () => {
     const fake = fakeProvider({}); // no live data → must fetch
+    // graded parts off: a back-dated check sees closed bars only, so the rest is the reference's evaluation
+    setSignalConfig({ whale: { on: false }, div: { on: false }, sr: { on: false } });
     attachSignalEngine(fake.provider);
     const snap = await checkTradeAt(new Date(T), "long");
     expect(snap).not.toBeNull();
@@ -478,5 +489,103 @@ describe("notification on a new valid entry", () => {
     expect(shown).toEqual(["Starker Long-Einstieg"]);
     hidden.mockRestore();
     vi.unstubAllGlobals();
+  });
+});
+
+describe("v2: chart data with candle-close states, divergences, structure; notification per signal bar", () => {
+  it("MCB markers carry their state: provisional on the running bar, confirmed / strong after closes", async () => {
+    const feeds = liveFeeds();
+    setPrice(feeds.kline_15m.at(-1)!.close);
+    attachSignalEngine(fakeProvider(feeds).provider);
+    await vi.advanceTimersByTimeAsync(0);
+    for (const tf of ["30m", "1h"]) {
+      const ms = getMcbSeries(tf, { minor: true });
+      expect(ms.length).toBeGreaterThan(5);
+      const lastBarTime = getSignalCandles(tf).at(-1)!.time;
+      for (const m of ms) {
+        expect(["provisional", "confirmed", "strong"]).toContain(m.state);
+        expect(m.state === "provisional").toBe(m.time === lastBarTime);
+        expect(m.live).toBe(m.state === "provisional");
+      }
+      expect(ms.some((m) => m.state === "strong")).toBe(true);
+    }
+  });
+
+  it("divergences and structure with chart times (ms), the same computation as the check", async () => {
+    const feeds = liveFeeds();
+    setPrice(feeds.kline_15m.at(-1)!.close);
+    attachSignalEngine(fakeProvider(feeds).provider);
+    await vi.advanceTimersByTimeAsync(0);
+    const ds = getDivergences("30m");
+    expect(ds.length).toBeGreaterThan(3);
+    for (const d of ds) {
+      expect(d.from.time % 1_800_000).toBe(0);
+      expect(d.from.time).toBeLessThan(d.to.time);
+      expect(d.confirmedAt).toBeGreaterThan(d.to.time);
+    }
+    const check = getSignalSnapshot().snapshot!.checks[0]!;
+    expect(ds.filter((d) => d.active).map((d) => `${d.osc}${d.kind}${d.dir}${d.to.time}`).sort()).toEqual(
+      [...check.div!.long, ...check.div!.short].map((d) => `${d.osc}${d.kind}${d.dir}${d.to.t * 1000}`).sort(),
+    );
+    expect(getDivergences("30m", { recent: 20 }).every((d) => d.barsAgo <= 20)).toBe(true);
+    const st = getStructure("1h")!;
+    expect(st.swings.length).toBeGreaterThan(3);
+    for (const l of st.supports) expect(l.btm).toBeLessThanOrEqual(st.close);
+    for (const l of st.resistances) expect(l.top).toBeGreaterThanOrEqual(st.close);
+    for (const l of [...st.supports, ...st.resistances]) expect(l.time === null).toBe(l.kind === "range");
+    for (const b of st.breaks) expect(b.pivotTime).toBeLessThan(b.time);
+    const zoneCheck = getSignalSnapshot().snapshot!.zone!;
+    expect(st.support?.price).toBe(zoneCheck.structure!.support?.price);
+    // switched off: no divergences; unknown timeframe / no provider: empty
+    setSignalConfig({ div: { on: false } });
+    expect(getDivergences("30m")).toEqual([]);
+    expect(getStructure("7m")).toBeNull();
+    __resetSignalEngine();
+    expect(getDivergences("30m")).toEqual([]);
+    expect(getStructure("1h")).toBeNull();
+  });
+
+  it("the dedupe key is the base signal's own bar; the text names the state and the parts that hold", () => {
+    const bar = 1_790_010_000;
+    const ev = { kind: "bottom" as const, barsAgo: 2 };
+    const conf = { state: "confirmed" as const, event: ev, closes: 2, held: true, closed: ev, forming: null };
+    const none = { state: "none" as const, event: null, closes: 0, held: false, closed: null, forming: null };
+    const base = { tf: "30m", closeAt: bar, conf: { long: conf, short: none } } as unknown as TfCheck;
+    const part = (id: "traders" | "div" | "sr", ok: boolean, extra: object = {}) => ({ id, side: "long", ok, label: id, grade: 1, points: 10, weight: 10, bonus: ok, state: "confirmed", data: true, items: [], detail: "", ...extra });
+    const v = {
+      side: "long",
+      tiers: 2,
+      strength: 3,
+      label: "Sehr starker Long-Einstieg",
+      valid: true,
+      rsiOk: true,
+      zoneOk: true,
+      strongSignal: true,
+      score: 90,
+      reasons: [],
+      state: "confirmed",
+      parts: [part("traders", true, { met: 3 }), part("div", true, { tf: "1h" }), part("sr", false)],
+    } as unknown as Signals["long"];
+    const s = { long: v, short: { ...v, side: "short", valid: false, parts: [] }, best: v, checks: [base], zone: null, at: NOW, cfg: DEFAULT_SIGNAL_CFG } as unknown as Signals & { cfg: SignalCfg };
+    expect(signalBarOpen(s, "long")).toBe((bar - 2 * 1800) * 1000);
+    expect(signalBarOpen(s, "short")).toBe(bar * 1000);
+    expect(signalNotifyDetail(s, "long")).toBe("Sehr stark · 2 von 4 Timeframes · bestätigt · Top-Trader 3/4 · Divergenz 1h");
+    // a provisional entry is not valid → never an edge
+    resetSignalNotifier();
+    const prov = { ...s, long: { ...v, valid: false, strength: 0, state: "provisional" } } as unknown as Signals & { cfg: SignalCfg };
+    noteSignals(prov, NOW);
+    noteSignals(prov, NOW + 1000);
+    noteSignals(prov, NOW + 1000 + SIGNAL_HOLD_MS);
+    expect(useUi.getState().toasts).toHaveLength(0);
+    // confirmed: one toast; the same signal bar one candle later (still lit, barsAgo 3 on a newer last bar) does not repeat
+    noteSignals(s, NOW + 2000);
+    noteSignals(s, NOW + 2000 + SIGNAL_HOLD_MS);
+    expect(useUi.getState().toasts).toHaveLength(1);
+    expect(useUi.getState().toasts[0]).toMatchObject({ title: "Sehr starker Long-Einstieg", detail: "Sehr stark · 2 von 4 Timeframes · bestätigt · Top-Trader 3/4 · Divergenz 1h" });
+    const later = { ...s, checks: [{ ...base, closeAt: bar + 1800, conf: { long: { ...conf, closed: { kind: "bottom", barsAgo: 3 } }, short: none } }] } as unknown as Signals & { cfg: SignalCfg };
+    noteSignals(prov, NOW + 200_000);
+    noteSignals(later, NOW + 201_000);
+    noteSignals(later, NOW + 201_000 + SIGNAL_HOLD_MS);
+    expect(useUi.getState().toasts).toHaveLength(1);
   });
 });

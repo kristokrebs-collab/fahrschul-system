@@ -62,6 +62,7 @@ export {
   bestVerdict,
   confirmVerdict,
   gradeSignals,
+  regradeSignals,
   rungState,
   PROVISIONAL_PREFIX,
   computeSignals,
@@ -77,6 +78,7 @@ export {
   type Strength,
   type BarsByTf,
   type SignalInputs,
+  type Graded,
 } from "./verdict";
 export {
   rungConf,

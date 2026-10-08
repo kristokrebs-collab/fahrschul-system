@@ -7,16 +7,17 @@
  *   `endTime` page per source interval through the provider's budget (`fetchKlines`, nothing enters the live
  *   cache). Binance futures history reaches back to 2019, so every journal date can be checked.
  * - Not enough history at T → `null` / status `no-history`. Never a fake "strength 0" (the other journal's bug).
- * - "Top-Trader kaufen · Retail rot" at T from Binance futures data (`whaleAt`); they reach ~30 days back, older
- *   trades get no reading (stored as `whale: null`, "keine Daten") and the grade without the condition.
+ * - Only closed bars at T count, so every signal of a back-dated check is `confirmed` / `strong` (never provisional).
+ * - Top-Trader-Kombi at T from Binance's 5-min futures data (`tradersAt`); they reach ~30 days back, older trades get
+ *   no reading (the part shows "keine Daten", never a fail) and the grade without it.
  */
-import { SIGNAL_BARS, applyWhale, sanitizeSignalCfg, signalCfgKey, signalsAt, toSignalSnapshot, LIVE_WINDOW_MS, type Bar, type Side, type SignalCfg, type SignalSnapshot, type Signals } from "@/domain/signals";
+import { SIGNAL_BARS, regradeSignals, sanitizeSignalCfg, signalCfgKey, signalsAt, toSignalSnapshot, LIVE_WINDOW_MS, type Bar, type Side, type SignalCfg, type SignalSnapshot, type Signals } from "@/domain/signals";
 import { FETCH_INTERVAL_MS, type FetchInterval } from "../period";
 import type { MarketProvider } from "../provider";
 import type { Candle, KlineFeed, Source, Stamped } from "../types";
 import { candleToBar, neededTfs, rungBars, tfSource } from "./bars";
 import { getSignalConfig, getSignalSnapshot, signalProvider, toTradeSnapshot, type LiveSignals } from "./engine";
-import { whaleAt } from "./whale";
+import { tradersAt } from "./traders";
 
 export type RetroStatus = "ok" | "live" | "no-history" | "error" | "unavailable";
 
@@ -126,13 +127,13 @@ async function computeRetro(p: MarketProvider, cfg: SignalCfg, t: number): Promi
 }
 
 /**
- * Top traders vs retail at T on top of the (memoised) candle result: Binance keeps ~30 days, older / unavailable →
- * no reading (snapshot `whale: null`). `whaleAt` memoises its pages and retries failed ones on the next call.
+ * The Top-Trader reading at T on top of the (memoised) candle result: Binance keeps ~30 days, older / unavailable →
+ * no reading (the part has no data). `tradersAt` memoises its pages and retries failed ones on the next call.
  */
-async function withWhaleAt(p: MarketProvider, cfg: SignalCfg, t: number, r: RetroResult): Promise<RetroResult> {
+async function withTradersAt(p: MarketProvider, cfg: SignalCfg, t: number, now: number, r: RetroResult): Promise<RetroResult> {
   if (r.status !== "ok" || !r.signals) return r;
-  const reading = await whaleAt(p, cfg, t);
-  return reading ? { ...r, signals: applyWhale(r.signals, reading, cfg) } : r;
+  const reading = await tradersAt(p, cfg, t, now);
+  return reading ? { ...r, signals: regradeSignals(r.signals, cfg, reading) } : r;
 }
 
 /**
@@ -155,14 +156,14 @@ export function retroCheck(date: Date | string | number, opts: { cfg?: unknown; 
   }
   const key = `${p.symbol}|${signalCfgKey(cfg)}|${Math.floor(t / 60_000)}`;
   const hit = memo.get(key);
-  if (hit) return hit.then((r) => withWhaleAt(p, cfg, t, r));
+  if (hit) return hit.then((r) => withTradersAt(p, cfg, t, now, r));
   const run = computeRetro(p, cfg, t).then((r) => {
     if (r.status === "error") memo.delete(key); // retry next time
     return r;
   });
   memo.set(key, run);
   if (memo.size > MEMO_MAX) memo.delete(memo.keys().next().value!);
-  return run.then((r) => withWhaleAt(p, cfg, t, r));
+  return run.then((r) => withTradersAt(p, cfg, t, now, r));
 }
 
 /**

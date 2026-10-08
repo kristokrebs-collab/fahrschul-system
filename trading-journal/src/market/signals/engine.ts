@@ -6,16 +6,54 @@
  *   other journal's `withLivePrice`).
  * - Cadence (120 Hz rule): never in render, never per WS frame. A data change only sets a dirty flag; one timer
  *   evaluates at most once per second (every 5 s in a hidden tab) and sleeps while nothing changes.
+ * - Top-Trader-Kombi: the provider's 5-min ratio twins (`traders.ts`), graded inside the same evaluation.
  * - Output: a `SignalCheckState` that changes identity only when the rounded result changes (score, strength,
- *   labels, events, wt1/RSI to 0.1, zone position to 0.01, status) — React subscribers re-render only then.
+ *   labels, events, candle-close states, parts, knife filter, wt1/RSI to 0.1, zone position to 0.01, status) —
+ *   React subscribers re-render only then. Countdowns are NOT part of it: render them from `closesAt` on a clock.
  */
-import { DEFAULT_SIGNAL_CFG, computeSignals, sanitizeSignalCfg, signalCfgKey, withLivePrice, tfSeconds, mcbSeries, toSignalSnapshot, type Bar, type Side, type SignalCfg, type SignalSnapshot, type Signals, type WtKind } from "@/domain/signals";
+import {
+  DEFAULT_SIGNAL_CFG,
+  computeSignals,
+  divCfgOf,
+  eventState,
+  isForming,
+  isLongKind,
+  luxZone,
+  marketStructure,
+  rsi,
+  sanitizeSignalCfg,
+  signalCfgKey,
+  srCfgOf,
+  strongClosesOf,
+  tfDivergences,
+  waveTrend,
+  withLivePrice,
+  tfSeconds,
+  mcbSeries,
+  toSignalSnapshot,
+  type Bar,
+  type DivKind,
+  type DivOsc,
+  type Level,
+  type RungConf,
+  type Side,
+  type SignalCfg,
+  type SignalSnapshot,
+  type SignalState,
+  type Signals,
+  type Structure,
+  type SwingLabel,
+  type TfCheck,
+  type Verdict,
+  type WtKind,
+} from "@/domain/signals";
+import { LIVE_RATIO_FEEDS } from "../feeds";
 import type { MarketProvider } from "../provider";
 import type { Candle, FeedId, KlineFeed, ProviderHealth, Source, Stamped } from "../types";
 import { priceMv, priceReceivedAtMv, tradeTimeMv } from "../motionValues";
 import { BarConverter, neededTfs, rungBars, tfSource } from "./bars";
 import { noteSignals, resetSignalNotifier, signalNotifyMinStrength } from "./notify";
-import { startWhale, stopWhale, whaleInputKey, withLiveWhale } from "./whale";
+import { liveTraders, tradersInputKey } from "./traders";
 
 export type SignalCheckStatus = "loading" | "ok" | "stale" | "offline";
 
@@ -155,7 +193,7 @@ function inputKeyOf(p: MarketProvider, cfg: SignalCfg, price: { price: number } 
     ids.push(`${f}:${v ? objectId(v.data) : 0}`);
   }
   if (needsDaily(cfg)) ids.push(`d:${objectId(eng.daily.candles)}`);
-  ids.push(whaleInputKey());
+  ids.push(tradersInputKey(p, cfg));
   return ids.join("|");
 }
 
@@ -196,6 +234,22 @@ function statusOf(p: MarketProvider | null, cfg: SignalCfg, hasResult: boolean):
 const r1 = (x: number): string => (Number.isFinite(x) ? (Math.round(x * 10) / 10).toFixed(1) : "-");
 const r2 = (x: number): string => (Number.isFinite(x) ? (Math.round(x * 100) / 100).toFixed(2) : "-");
 const ev = (e: { kind: WtKind; barsAgo: number } | null): string => (e ? `${e.kind}${e.barsAgo}` : "-");
+const confKey = (c: RungConf | undefined): string => (c ? `${c.state}${c.closes}${c.held ? "h" : ""}${ev(c.event)}` : "-");
+const lvlKey = (l: Level | null): string => (l ? `${l.kind}${r1(l.price)}/${r1(l.distAtr)}` : "-");
+
+function checkKey(c: TfCheck): string {
+  const d = c.div;
+  const divs = d ? [...d.long, ...d.short].map((x) => `${x.osc}${x.kind}${x.dir}@${x.at}${x.state}`).join("+") : "-";
+  const st = c.structure;
+  const brk = st?.breaks.at(-1);
+  const structure = st ? `${st.trend}${st.itrend}|${lvlKey(st.support)}|${lvlKey(st.resistance)}|${brk ? `${brk.kind}${brk.dir}${brk.index}` : "-"}` : "-";
+  return [c.forming ? 1 : 0, c.closesAt ?? "-", confKey(c.conf?.long), confKey(c.conf?.short), divs, structure].join(",");
+}
+
+function verdictKey(v: Verdict): string {
+  const parts = (v.parts ?? []).map((p) => `${p.id}:${r2(p.grade)}:${r1(p.points)}:${p.ok ? 1 : 0}${p.data ? 1 : 0}:${p.state}:${p.items.map((i) => `${i.met === null ? "n" : i.met ? 1 : 0}${i.value}`).join("~")}`);
+  return [v.state ?? "-", v.confTiers ?? "-", v.provStrength ?? "-", v.closesAt ?? "-", (v.rungStates ?? []).join("/"), parts.join("^")].join(",");
+}
 
 /** Rounded fingerprint of an evaluation: equal fingerprints never re-render a subscriber. */
 export function signalsKey(s: Signals | null): string {
@@ -207,13 +261,17 @@ export function signalsKey(s: Signals | null): string {
       continue;
     }
     parts.push(
-      [c.tf, c.closeAt, r1(c.rsi), r1(c.rsiMa), r1(c.wt.wt1), r1(c.wt.wt2), c.wt.kind ?? "-", c.wt.barsAgo ?? "-", ev(c.wt.long), ev(c.wt.short), c.zone.zone, c.zone.deep ? 1 : 0, r2(c.zone.pos), r1(c.zone.hi), r1(c.zone.lo), c.zone.brk ? `${c.zone.brk.kind}${c.zone.brk.dir}` : "-", c.zone.lux ? 1 : 0].join(","),
+      [c.tf, c.closeAt, r1(c.rsi), r1(c.rsiMa), r1(c.wt.wt1), r1(c.wt.wt2), c.wt.kind ?? "-", c.wt.barsAgo ?? "-", ev(c.wt.long), ev(c.wt.short), c.zone.zone, c.zone.deep ? 1 : 0, r2(c.zone.pos), r1(c.zone.hi), r1(c.zone.lo), c.zone.brk ? `${c.zone.brk.kind}${c.zone.brk.dir}` : "-", c.zone.lux ? 1 : 0, checkKey(c)].join(","),
     );
   }
   const z = s.zone;
-  parts.push(z ? `z:${z.tf},${z.zone.zone},${r2(z.zone.pos)},${r1(z.zone.hi)},${r1(z.zone.lo)},${z.zone.deep ? 1 : 0},${z.zone.brk ? `${z.zone.brk.kind}${z.zone.brk.dir}` : "-"},${z.zone.lux ? 1 : 0}` : "z:-");
-  for (const v of [s.long, s.short]) parts.push([v.score, v.strength, v.tiers, v.valid ? 1 : 0, v.rsiOk ? 1 : 0, v.zoneOk ? 1 : 0, v.label, v.reasons.map((r) => (r.ok ? 1 : 0)).join("")].join(","));
-  // top-trader / retail readings (rounded like the rest: a re-render only when a shown digit changes)
+  parts.push(z ? `z:${z.tf},${z.zone.zone},${r2(z.zone.pos)},${r1(z.zone.hi)},${r1(z.zone.lo)},${z.zone.deep ? 1 : 0},${z.zone.brk ? `${z.zone.brk.kind}${z.zone.brk.dir}` : "-"},${z.zone.lux ? 1 : 0},${checkKey(z)}` : "z:-");
+  for (const v of [s.long, s.short]) parts.push([v.score, v.strength, v.tiers, v.valid ? 1 : 0, v.rsiOk ? 1 : 0, v.zoneOk ? 1 : 0, v.label, v.reasons.map((r) => (r.ok ? 1 : 0)).join(""), verdictKey(v)].join(","));
+  // top-trader readings (rounded like the rest: a re-render only when a shown digit changes)
+  const t = s.traders;
+  parts.push(t ? `t:${t.at},${r1(t.position ?? NaN)},${r1(t.account ?? NaN)},${r1(t.retail ?? NaN)},${r1(t.retailChg ?? NaN)},${t.period}` : `t:${t === null ? "0" : "-"}`);
+  if (s.knife) for (const k of [s.knife.long, s.knife.short]) parts.push(`k:${k.n}:${k.items.map((i) => `${i.met === null ? "n" : i.met ? 1 : 0}${i.detail}`).join("~")}`);
+  // legacy run-rule readings (`applyWhale`; not set by the live engine)
   if (s.whale) {
     for (const w of s.whale.periods) parts.push(`w:${w.period},${w.at},${r1(w.top)},${r1(w.retail)},${r1(w.topChg)},${r1(w.retailChg)},${w.runLong},${w.runShort}`);
     parts.push(`wm:${s.whale.missing.join(",")}`);
@@ -250,9 +308,8 @@ export function runSignalCheck(now: number = Date.now()): SignalCheckState {
     eng.inputKey = key;
     stats.computes++;
     const bars = buildBars(p, cfg, price);
-    const raw = computeSignals(bars, cfg, now);
-    // "Top-Trader kaufen · Retail rot": graded on top of the 1:1 evaluation (unchanged without a reading)
-    const s = raw ? withLiveWhale(raw, cfg, now) : null;
+    // candle-close states from `now`; the Top-Trader-Kombi from the provider's 5-min series (Binance clock)
+    const s = computeSignals(bars, cfg, now, { traders: liveTraders(p, cfg) });
     if (s) {
       const live: LiveSignals = { ...s, symbol: p.symbol, source: p.getHealth().feeds[liveFeeds(cfg)[0] ?? "kline_1h"].source, cfg, price: price?.price ?? null };
       const k = signalsKey(live);
@@ -315,6 +372,8 @@ function subscribeInputs(p: MarketProvider): void {
   for (const off of eng.offs) off();
   eng.offs = [];
   for (const f of liveFeeds(eng.cfg)) eng.offs.push(p.subscribe(f, schedule));
+  // the Top-Trader-Kombi's 5-min series (a new point every 5 min; the evaluation stays ≤ 1/s)
+  for (const f of LIVE_RATIO_FEEDS) eng.offs.push(p.subscribe(f, schedule));
   eng.offs.push(p.onHealth(schedule));
   eng.offs.push(priceMv.on("change", schedule));
 }
@@ -326,7 +385,6 @@ export function attachSignalEngine(p: MarketProvider): void {
   eng.provider = p;
   subscribeInputs(p);
   if (needsDaily(eng.cfg)) pollDaily();
-  startWhale(p, eng.cfg, schedule);
   schedule();
 }
 
@@ -339,7 +397,6 @@ export function detachSignalEngine(): void {
   if (eng.daily.timer) clearTimeout(eng.daily.timer);
   eng.daily = { candles: [], fetchedAt: 0, timer: null, inflight: false };
   eng.converters.clear();
-  stopWhale();
   eng.provider = null;
   eng.inputKey = "";
   eng.snapKey = "∅";
@@ -365,7 +422,6 @@ export function setSignalConfig(raw: unknown): SignalCfg {
   if (eng.provider) {
     subscribeInputs(eng.provider);
     if (needsDaily(cfg)) pollDaily();
-    startWhale(eng.provider, cfg, schedule);
     schedule();
   }
   return cfg;
@@ -410,6 +466,18 @@ export interface McbMarker {
   kind: WtKind;
   /** the event sits on the running (repainting) bar */
   live: boolean;
+  /** candle-close state: `provisional` on the running bar, `confirmed` after its close, `strong` after `strongCloses` closes held */
+  state: SignalState;
+}
+
+/** Rung bars of one timeframe as the check builds them (running candle completed with the live price). */
+function chartBars(interval: string, n?: number): { bars: Bar[]; cfg: SignalCfg; now: number } | null {
+  const p = eng.provider;
+  if (!p || !tfSource(interval)) return null;
+  const cfg = eng.cfg;
+  const now = Date.now();
+  const bars = buildBars(p, { ...cfg, ladder: [interval], zoneTf: interval }, livePrice(now), n)[interval] ?? [];
+  return bars.length ? { bars, cfg, now } : null;
 }
 
 /**
@@ -418,15 +486,125 @@ export interface McbMarker {
  * `bull`/`bear` crosses; `bars` widens the window (as far as the loaded history reaches). Empty without data.
  */
 export function getMcbSeries(interval: string, opts: { minor?: boolean; bars?: number } = {}): McbMarker[] {
-  const p = eng.provider;
-  if (!p || !tfSource(interval)) return [];
-  const cfg = eng.cfg;
-  const now = Date.now();
-  const bars = buildBars(p, { ...cfg, ladder: [interval], zoneTf: interval }, livePrice(now), opts.bars)[interval] ?? [];
-  if (!bars.length) return [];
-  const sec = tfSeconds(interval);
+  const d = chartBars(interval, opts.bars);
+  if (!d) return [];
+  const { bars, cfg, now } = d;
+  const forming = isForming(bars, interval, now);
+  const strong = strongClosesOf(cfg);
   const lastT = bars[bars.length - 1]!.t;
-  return mcbSeries(bars, cfg, { minor: opts.minor }).map((m) => ({ time: m.t * 1000, kind: m.kind, live: m.t === lastT && (m.t + sec) * 1000 > now }));
+  const index = new Map<number, number>();
+  bars.forEach((b, i) => index.set(b.t, i));
+  return mcbSeries(bars, cfg, { minor: opts.minor }).map((m) => ({
+    time: m.t * 1000,
+    kind: m.kind,
+    live: forming && m.t === lastT,
+    state: eventState(bars, index.get(m.t)!, isLongKind(m.kind), forming, strong),
+  }));
+}
+
+/** A divergence pivot on the chart: bar open time (ms), price (bar low / high) and the oscillator value. */
+export interface ChartPivot {
+  time: number;
+  price: number;
+  osc: number;
+}
+
+export interface ChartDivergence {
+  /** `rsi` = RSI 14, `wt` = WaveTrend wt1 */
+  osc: DivOsc;
+  kind: DivKind;
+  /** 1 bullish, −1 bearish */
+  dir: 1 | -1;
+  /** line from → to (price pane: `price`, oscillator pane: `osc`) */
+  from: ChartPivot;
+  to: ChartPivot;
+  /** open time (ms) of the bar that confirmed it (`to` + right lookback) */
+  confirmedAt: number;
+  barsAgo: number;
+  state: SignalState;
+  /** counts in the check (held, at most `maxAge` bars old) */
+  active: boolean;
+}
+
+/**
+ * Divergences (RSI 14 and wt1 vs price pivots, regular + hidden) of one timeframe, oldest first — the same computation
+ * as the check's `TfCheck.div`. `recent` keeps those confirmed within the last `recent` bars; `bars` widens the window.
+ * Empty without data or while `settings.signals.div.on` is off.
+ */
+export function getDivergences(interval: string, opts: { bars?: number; recent?: number } = {}): ChartDivergence[] {
+  const d = chartBars(interval, opts.bars);
+  if (!d) return [];
+  const { bars, cfg, now } = d;
+  const dc = divCfgOf(cfg);
+  if (!dc.on) return [];
+  const r = rsi(
+    bars.map((b) => b.c),
+    cfg.rsiLen,
+  );
+  const { wt1 } = waveTrend(bars, cfg);
+  const all = tfDivergences(bars, r, wt1, dc, isForming(bars, interval, now), strongClosesOf(cfg)).all;
+  const pt = (x: { t: number; price: number; osc: number }): ChartPivot => ({ time: x.t * 1000, price: x.price, osc: x.osc });
+  return all
+    .filter((x) => opts.recent === undefined || x.barsAgo <= opts.recent)
+    .map((x) => ({ osc: x.osc, kind: x.kind, dir: x.dir, from: pt(x.from), to: pt(x.to), confirmedAt: bars[x.at]!.t * 1000, barsAgo: x.barsAgo, state: x.state, active: x.active }));
+}
+
+/** A support / resistance level on the chart (`time` = origin bar, ms; `null` for the premium/discount range). */
+export interface ChartLevel extends Omit<Level, "t" | "index"> {
+  time: number | null;
+}
+
+/** Market structure of one timeframe with chart times (ms). */
+export interface ChartStructure {
+  swings: Array<{ time: number; price: number; high: boolean; internal: boolean; label: SwingLabel; broken: boolean }>;
+  breaks: Array<{ time: number; level: number; pivotTime: number; kind: "BOS" | "CHoCH"; dir: 1 | -1; internal: boolean }>;
+  /** unmitigated order blocks: candle time, box, the break that made it */
+  obs: Array<{ time: number; top: number; btm: number; dir: 1 | -1; internal: boolean; breakTime: number }>;
+  eqs: Array<{ kind: "EQH" | "EQL"; price: number; from: { time: number; price: number }; to: { time: number; price: number }; broken: boolean }>;
+  /** nearest first (≤ 4 each) */
+  supports: ChartLevel[];
+  resistances: ChartLevel[];
+  support: ChartLevel | null;
+  resistance: ChartLevel | null;
+  trend: Structure["trend"];
+  itrend: Structure["itrend"];
+  atr: number;
+  close: number;
+}
+
+/**
+ * Market structure + support / resistance of one timeframe (LuxAlgo SMC: swing `swingLookback`, internal
+ * `settings.signals.sr.internal`, EQH/EQL, order blocks), the same computation as the check's `TfCheck.structure`,
+ * with chart times (ms). `null` without data. Computed whether or not the S/R part is weighted (the chart legend
+ * toggles it).
+ */
+export function getStructure(interval: string, opts: { bars?: number } = {}): ChartStructure | null {
+  const d = chartBars(interval, opts.bars);
+  if (!d) return null;
+  const { bars, cfg } = d;
+  const sc = srCfgOf(cfg);
+  const z = luxZone(bars, cfg.swingLookback);
+  const s = marketStructure(bars, { swing: cfg.swingLookback, internal: sc.internal, eqLen: sc.eqLen, eqThreshold: sc.eqThreshold, range: z ? { hi: z.hi, lo: z.lo } : null });
+  if (!s) return null;
+  const ms = (i: number): number => bars[i]!.t * 1000;
+  const lvl = (l: Level): ChartLevel => {
+    const { t, index, ...rest } = l;
+    return { ...rest, time: index >= 0 ? t * 1000 : null };
+  };
+  return {
+    swings: s.swings.map((p) => ({ time: p.t * 1000, price: p.price, high: p.high, internal: p.internal, label: p.label, broken: p.broken })),
+    breaks: s.breaks.map((b) => ({ time: b.t * 1000, level: b.level, pivotTime: ms(b.pivot), kind: b.kind, dir: b.dir, internal: b.internal })),
+    obs: s.obs.map((o) => ({ time: o.t * 1000, top: o.top, btm: o.btm, dir: o.dir, internal: o.internal, breakTime: ms(o.brk) })),
+    eqs: s.eqs.map((q) => ({ kind: q.kind, price: q.price, from: { time: q.from.t * 1000, price: q.from.price }, to: { time: q.to.t * 1000, price: q.to.price }, broken: q.broken })),
+    supports: s.supports.map(lvl),
+    resistances: s.resistances.map(lvl),
+    support: s.support ? lvl(s.support) : null,
+    resistance: s.resistance ? lvl(s.resistance) : null,
+    trend: s.trend,
+    itrend: s.itrend,
+    atr: s.atr,
+    close: s.close,
+  };
 }
 
 /**

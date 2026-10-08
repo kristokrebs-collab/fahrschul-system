@@ -250,7 +250,9 @@ function withParts(v: Verdict, parts: GradedPart[]): Verdict {
  * Candle-close rule + graded parts + falling-knife filter on top of the raw 1:1 evaluation (`bestVerdict`).
  * `traders` = the Top-Trader reading (`traderReading`), `null` = none (the part shows "keine Daten").
  */
-export function gradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders: TraderReading | null = null): S {
+export type Graded<S extends Signals> = S & { traders: TraderReading | null; knife: Readonly<Record<Side, KnifeFilter>> };
+
+export function gradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders: TraderReading | null = null): Graded<S> {
   const zoneRef = sig.zone ?? sig.checks[0] ?? null;
   const grade = (v: Verdict): Verdict => {
     const c = confirmVerdict(v, sig.checks, cfg);
@@ -261,6 +263,14 @@ export function gradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders:
   const short = grade(sig.short);
   const out = { ...sig, long, short, best: long.score >= short.score ? long : short, traders };
   return { ...out, knife: { long: knifeFilter(out, cfg, "long"), short: knifeFilter(out, cfg, "short") } };
+}
+
+/**
+ * An evaluation graded again with another Top-Trader reading (retro checks: the candles are memoised, the reading
+ * arrives later): the raw verdicts from its checks, then `gradeSignals`.
+ */
+export function regradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders: TraderReading | null): Graded<S> {
+  return gradeSignals({ ...sig, ...bestVerdict(sig.checks, cfg, sig.zone) }, cfg, traders);
 }
 
 export interface BestVerdict {
