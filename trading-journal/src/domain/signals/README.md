@@ -92,8 +92,10 @@ German strings of the card / form: `KIND_TEXT`, `kindText`, `isStrongKind`, `rol
 the reference fields + the raw verdicts over 7 config variants × 6 seeds, snapshots, the retro fix; with every candle closed and
 the parts off the graded evaluation keeps the reference's fields exactly), `tests/unit/signals.v2.test.ts` (candle-close states,
 divergences, structure vs a naive LuxAlgo leg reference and `luxZone`, Top-Trader-Kombi, parts, grading, knife filter, bias rows,
-snapshots, config keys, determinism, performance), `tests/unit/signals.tradersMarket.test.ts` (live 5-min reading / retro on a
-fake provider), `tests/unit/market.signals.test.ts` (live pipeline, cadence, chart data, notifications),
+snapshots, config keys, determinism, performance), `tests/unit/signals.traders.test.ts` (Whale–Retail-Delta: reading fields,
+windows, sparkline points, thresholds, short mirror, keine Daten, texts, snapshot round trip, config key),
+`tests/unit/signals.tradersMarket.test.ts` (live 5-min reading / retro on a fake provider, retro page deep enough for the
+delta window), `tests/unit/market.signals.test.ts` (live pipeline, cadence, chart data, notifications),
 `tests/unit/signals.whale.test.ts` (legacy run rule, config, info panel), `tests/unit/signals.resample.test.ts` (alignment,
 aggregation, config, snapshot parsing), `tests/unit/signals.tvCalibration.test.ts` (TradingView screenshots), fixtures in
 `tests/unit/signals.fixtures.ts`.
@@ -210,14 +212,31 @@ number | null, met: boolean | null (null = keine Daten) }`.
 
 | part | long (short mirrored) | grade | ok |
 |---|---|---|---|
-| `traders` Top-Trader-Kombi (`traders.ts`, decision 5) — title `Top-Trader long · Retail rot` / `Top-Trader short · Retail grün` | items `pos` top traders by POSITION long share > `topPct` (64 %; short: < 100 − topPct = > 64 % short, the exact mirror) · `acc` top traders by ACCOUNT likewise · `retail` all-accounts long share FALLING vs one `retailPeriod` earlier (5m, default; 15m · 30m · 1h) = Retail rot (short: rising = grün) · `zone` price in Discount on the check's zone reference (short: Premium). Values `66,0 % Long`, `−0,5 pp`, `Discount · 20 %` | met / 4 | ≥ `bonusParts` (3) met |
+| `traders` Top-Trader-Kombi (`traders.ts`, decision 5) — title `Top-Trader long · Retail rot` / `Top-Trader short · Retail grün` | items `pos` top traders by POSITION long share > `topPct` (64 %; short: < 100 − topPct = > 64 % short, the exact mirror) · `acc` top traders by ACCOUNT likewise · `retail` the Whale–Retail-Delta (see below) red: below `deltaRed` (0 pp) OR fell ≥ `deltaFall` (1 pp) over `deltaWindow` (1h) = Retail rot (short: above −`deltaRed` OR rose ≥ `deltaFall` = grün) · `zone` price in Discount on the check's zone reference (short: Premium). Values `66,0 % Long`, `−3,5 pp · 1h −2,1`, `Discount · 20 %`; the `retail` item's label `Whale–Retail-Delta rot · < 0 oder fällt ≥ 1 pp (1h)`, `raw` = the delta | met / 4 | ≥ `bonusParts` (3) met |
 | `div` Bullische / Bärische Divergenz (`divergence.ts`, decision 10) | one item per ladder rung: active divergences of that side (`RSI regulär · WT versteckt`) | best rung: regular 0.8, hidden 0.5, + 0.2 when RSI and wt1 both show one, provisional ½ | grade ≥ 0.8 (a closed regular one) |
 | `sr` Support + Platz nach oben / Widerstand + Platz nach unten (`structure.ts`, decision 10) | `near`: nearest support / demand below the close within `nearAtr` (1) ATR 14 · `room`: R = distance to the next resistance / (close − stop), stop = the level's bottom − 0.1 ATR; ≥ `minR` (2) R; no resistance = free | ½ near (fades to 0 at 2 × nearAtr) + ½ min(1, R / minR) | near AND room |
 
-`TraderReading = { at, position, account, retail, retailPrev, retailChg, period, step }` (`traderReading(series, cfg, atMs)`,
-`TraderSeries = { position, account, retail: RatioSample[]; step? }`; only points ≤ atMs; a series whose newest point is older
-than 2 steps + 5 min has no value; a coarser fallback series sets `step`). Settings `settings.signals.whale = { on, weight (0 …
-30, default 10), topPct (50 … 90, 64), retailPeriod, bonusParts (1 … 4, 3), periods / minRun (legacy) }`.
+`TraderReading = { at, position, account, retail, retailPrev, retailChg, period, step, delta?, deltaPrev?, deltaChg?,
+deltaWindow?, deltaSeries? }` (`traderReading(series, cfg, atMs)`, `TraderSeries = { position, account, retail: RatioSample[];
+step? }`; only points ≤ atMs; a series whose newest point is older than 2 steps + 5 min has no value; a coarser fallback
+series sets `step`). Settings `settings.signals.whale = { on, weight (0 … 30, default 10), topPct (50 … 90, 64), bonusParts
+(1 … 4, 3), deltaRed (−20 … 20 pp, 0), deltaFall (0 … 20 pp, 1), deltaWindow (30m · 1h · 2h · 4h, 1h), retailPeriod (legacy,
+kept), periods / minRun (legacy) }`; every key is in `signalCfgKey`.
+
+**Whale–Retail-Delta ("Retail rot", user decision 2026-10-08, "Delta wie bei Hyblock").** `delta` = Binance top-trader
+ACCOUNTS long % (`topLongShortAccountRatio`, the top 20 % by margin balance) − ALL-accounts long % (`globalLongShortAccountRatio`)
+on the newest 5-min boundary both series share (fresh like the rest; an all-accounts point within one step pairs);
+`deltaPrev` = the delta on the boundary one `deltaWindow` earlier, `deltaChg = delta − deltaPrev` (`null` when the series does
+not reach back that far — the level alone still decides); `deltaSeries` = the last `DELTA_SPARK_POINTS` (12) points up to the
+newest, oldest first (the scorecard sparkline: the last hour). pp values are rounded to 1e-6 (a threshold is never missed by
+float noise). Rule (`deltaMet(side, delta, deltaChg, w)`): long = `delta < deltaRed` OR `deltaChg ≤ −deltaFall` (and < 0); short
+= `delta > −deltaRed` OR `deltaChg ≥ deltaFall` (and > 0); neither value → `null` = keine Daten. A hand-built reading without
+`delta` uses `account − retail` (`readingDelta`), without `deltaChg` the level only. Honest note (`WHALE_DELTA_NOTE`, info
+panel, settings): these are Binance's cohorts, not Hyblock's own "whale" / "retail" cohorts — the value can differ slightly
+from Hyblock's "Whale vs Retail Delta". The former retail comparison (`retail` / `retailPrev` / `retailChg` over
+`retailPeriod`) is still computed for stored snapshots and the other journal but no longer grades. Texts: `deltaText` (`−3,5 pp
+· 1h −2,1`), `deltaRuleText` (`< 0 oder fällt ≥ 1 pp (1h)` / `> 0 oder steigt ≥ 1 pp (1h)`), `signedPp`. History a back-dated
+reading needs: `traderLookbackMs(cfg)` = max(retailPeriod, deltaWindow, 12 steps).
 
 ### Divergences (`divergence.ts`)
 
@@ -253,14 +272,17 @@ Einstiegs-Check (single source of truth). The former "Preis in Support-/Liquidit
 |---|---|
 | `structure` Erstes Higher Low oder BOS auf 1H/4H | on 1h or 4h (`KNIFE_TFS`): the newest internal low is the first HL after an LL and unbroken, OR the newest break is bullish (BOS / CHoCH, internal or swing) and ≤ `KNIFE_BREAK_MAX_AGE` (20) bars old — judged on CLOSED bars (`TfCheck.structureClosed`, the structure without the forming candle); a break or pivot only on the running candle is listed as `… (vorläufig)` and does not count |
 | `divergence` RSI bullische Divergenz | an active REGULAR bullish RSI divergence on a closed candle on any ladder rung (WT / hidden listed in `detail` only) |
-| `whale` Whale-vs-Retail-Delta | the Top-Trader-Kombi's own items: (positions OR accounts > topPct) AND retail red; `null` without a reading |
+| `whale` Top-Trader long · Whale–Retail-Delta rot (short: … grün) | the Top-Trader-Kombi's own items: (positions OR accounts > topPct) AND the delta red (negative or falling, the `retail` item); detail `3 von 4 · Positionen 66,0 % Long · Konten 65,2 % Long · Delta −3,5 pp · 1h −2,1`; `null` without a reading |
 
 Copy: `KNIFE_TITLE`, `KNIFE_INFO` (filter = safety check for macro longs, Einstiegs-Check = trigger, same live data).
 
 ### Snapshot (`trade.signal`) additions
 
 `state`, `confTiers`, `provStrength`, `partPoints`, `parts: SignalSnapshotPart[]` (`{ id, grade, points, weight, ok, data,
-state, items: [{ id, met, raw }], met?, period?, tf?, hits?, lean?, target?, r?, free? }`), `knife: { n, items: [{ id, met }] }`,
+state, items: [{ id, met, raw }], met?, period?, delta?, deltaChg?, deltaWindow?, tf?, hits?, lean?, target?, r?, free? }`;
+traders: `delta` / `deltaChg` rounded to 0.01 pp, `null` = keine Daten, the `retail` item's `raw` = the delta — before
+2026-10-08 it was the retail change over `period`; parsing keeps older parts as they are, a malformed number → `null`, a
+malformed window is dropped), `knife: { n, items: [{ id, met }] }`,
 per `tfs` entry `state`, `closes`. A provisional live snapshot stores `valid: false`, `strength: 0`, `state: "provisional"`,
 `provStrength`. `parseSignalSnapshot` keeps old snapshots unchanged (no `state` → `snapshotState(s)` = `null`), drops invalid new
 fields, keeps unknown keys. `snapshotPart(p)` = the stored form of a part.
@@ -273,8 +295,10 @@ fields, keeps unknown keys. `snapshotPart(p)` = the stored form of a part.
 - Top-Trader-Kombi live: the provider's 5-min twins (`topPositionRatio5m`, `topAccountRatio5m`, `globalAccountRatio5m`) through
   the data layer's `deriveTraderSeries` (`src/market/traders.ts`) — the same points as the Top-Trader card; Binance / proxy only.
   `liveTraders(p, cfg)`, `liveTraderSeriesOf(p)`, `tradersInputKey(p, cfg)`. Retro `tradersAt(p, cfg, t, now)`: the live ring
-  (24 h), else one `provider.fetchRatios(kind, "5m", { endTime: t, … })` page per series (memoised per minute, retried after a
-  failure); > ~30 days → `null`. The former 30m / 1h run-rule polling is gone.
+  (24 h) when it gives every value (positions, accounts, delta AND its change over the window), else one
+  `provider.fetchRatios(kind, "5m", { endTime: t, startTime: t − (traderLookbackMs + 3 steps), … })` page per series (memoised
+  per minute, retried after a failure); > ~30 days → `null`. Live, the ring is bootstrapped with 36 points (3 h): a 4h
+  window shows its change once the ring holds 4 h (the level counts from the start). The former 30m / 1h run-rule polling is gone.
 - `checkTradeAt` / `retroCheck`: closed bars only (never provisional) + `tradersAt`.
 - Notifications: only valid = confirmed entries; dedupe key = the base signal's own bar (`signalBarOpen(sig, side)`), so a
   signal never repeats while it stays lit; text `signalNotifyDetail` (`Sehr stark · 2 von 4 Timeframes · bestätigt ·
