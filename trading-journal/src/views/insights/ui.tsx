@@ -5,7 +5,7 @@ import type { EnrichedTrade } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { colorClass, date as fmtDate, signed, time as fmtTime } from "@/lib/format";
-import { HoverPill, useHoverGroup } from "@/motion/HoverPill";
+import { HoverPillFor, useHoverStore } from "@/motion/HoverPill";
 import { radius } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { Card } from "@/primitives/Card";
@@ -96,13 +96,13 @@ const PRESS = 0.985;
 
 /** One trade as a tappable row (date · time · side · account → P&L); opens the trade detail. */
 export function TradeRows({ trades, group, extra, className, timeOnly = false }: { trades: readonly EnrichedTrade[]; group: string; extra?: (t: EnrichedTrade) => ReactNode; className?: string; timeOnly?: boolean }) {
-  const hover = useHoverGroup<string>();
+  const hover = useHoverStore<string>();
   const press = usePressable({ scale: PRESS });
   return (
     <ul className={cn("grid", className)}>
       {trades.map((t, i) => (
         <li key={t.id} className={cn("relative", i > 0 && "border-t border-line")} {...hover.bind(t.id)}>
-          <HoverPill show={hover.hovered === t.id} group={group} className="inset-y-0.5" />
+          <HoverPillFor store={hover} id={t.id} group={group} className="inset-y-0.5" />
           <motion.button
             type="button"
             onClick={() => openTrade(t.id)}

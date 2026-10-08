@@ -450,7 +450,7 @@ projection root's updates for that commit (its layout cleanup runs before the ch
 
 | id | source → target | transition | rule |
 |---|---|---|---|
-| `hover-{group}` (`bt`, `rank`, `recent`) | `HoverPill` between rows of one list | `spring.hover`, opacity `tween.hoverPill` | one group per card |
+| `hover-{group}` (`bt`, `rank`, `recent`) | `HoverPill` between rows of one list | `spring.hover`, opacity `tween.hoverPill` | one group per card; lists use `useHoverStore()` + `HoverPillFor` (the hovered id lives outside React state: a hover re-renders the two pills, never the list) – `useHoverGroup` (state in the list) stays for small cases |
 | `hover-trades-{useId}` | `RowHighlight` (`src/views/trades/RowHighlight.tsx`) between hovered/focused table rows | `spring.hover`, opacity `tween.hoverPill` (exit delay .15 s) | one per table; `borderRadius radius.hover`; lives in the table's `layoutScroll` wrapper, measured with transform-free offsets |
 | `sort-indicator-{useId}` | active sort-column chip in `SortHeader` (`TradesTable.tsx`) | `spring.layout`; chevron rotate `spring.plus` | one per table; `borderRadius radius.pill`; `aria-hidden` (direction stays sr-only ` ↑`/` ↓`) |
 | `bg-{useId}` | `Segmented` thumb | `spring.segment` | unique per instance, `layoutDependency={value}`, `borderRadius 8` |

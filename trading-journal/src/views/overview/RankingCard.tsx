@@ -4,7 +4,7 @@ import { explainSetup } from "@/domain/explain";
 import { DEFAULT_RANK_KEY, RANK_KEYS, RANKING_EMPTY_TEXT, rankSetupStats, splitRanked, type RankKey } from "@/domain/rank";
 import { cn } from "@/lib/cn";
 import { colorClass, pct0, signed } from "@/lib/format";
-import { HoverPill, useHoverGroup, type HoverGroupBinding } from "@/motion/HoverPill";
+import { HoverPillFor, useHoverStore, type HoverStore } from "@/motion/HoverPill";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
 import { StaggerItem, useMorphDialog } from "@/motion/MorphDialog";
 import { TextRoll } from "@/motion/TextRoll";
@@ -46,8 +46,9 @@ function useRankMove(rank: number): { direction: "up" | "down"; moves: number } 
 interface RankRowProps {
   rank: number;
   dep: string;
-  hovered: boolean;
-  bind: HoverGroupBinding;
+  /** the list's hover store: the row binds its id, its pill follows it (a hover never re-renders the list) */
+  hover: HoverStore<string>;
+  id: string;
   /** sort switch: `out` = rows fade in place, `in` = new order placed instantly and fading in by rank */
   phase: SortPhase;
   children: ReactNode;
@@ -65,7 +66,7 @@ const SORT_IN_MS = (stagger.max * stagger.reveal + tween.fade.duration) * 1000;
  * One ranking row: `layout` reorder (`spring.layout`), enter/exit fade, and a soft white wash (`tween.flash`,
  * opacity only) whenever its rank changes – the eye can follow which rows moved. No flash on mount / reduced motion.
  */
-function RankRow({ rank, dep, hovered, bind, phase, children, ref }: RankRowProps) {
+function RankRow({ rank, dep, hover, id, phase, children, ref }: RankRowProps) {
   const reduced = useReducedFx();
   const wash = useRef<HTMLSpanElement>(null);
   const { moves } = useRankMove(rank);
@@ -90,10 +91,10 @@ function RankRow({ rank, dep, hovered, bind, phase, children, ref }: RankRowProp
       }
       exit={{ opacity: 0, transition: tween.exit }}
       className="relative border-t border-line"
-      {...bind}
+      {...hover.bind(id)}
     >
       <span ref={wash} aria-hidden="true" className="pointer-events-none absolute inset-x-0 inset-y-0.5 rounded-xl bg-white/[0.05] opacity-0" />
-      <HoverPill show={hovered} group="rank" className="inset-y-0.5" />
+      <HoverPillFor store={hover} id={id} group="rank" className="inset-y-0.5" />
       {children}
     </motion.div>
   );
@@ -122,7 +123,7 @@ export function RankingCard() {
   const [shown, setShown] = useState<RankKey>(key);
   const [entering, setEntering] = useState(false);
   const { close } = useMorphDialog();
-  const hover = useHoverGroup<string>();
+  const hover = useHoverStore<string>();
   const sortTo = (k: RankKey) => {
     setKey(k);
     if (reduced) setShown(k);
@@ -164,7 +165,7 @@ export function RankingCard() {
           </div>
           <AnimatePresence mode="popLayout" initial={false}>
             {used.map((c, i) => (
-              <RankRow key={c.id} rank={i + 1} dep={dep} hovered={hover.hovered === c.id} bind={hover.bind(c.id)} phase={phase}>
+              <RankRow key={c.id} rank={i + 1} dep={dep} hover={hover} id={c.id} phase={phase}>
                 <MorphCard
                   id={`setup-rank-${c.id}`}
                   title={c.setup.name}

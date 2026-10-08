@@ -6,7 +6,7 @@ import { snapshotState, WHALE_TITLE, type SignalSnapshot } from "@/domain/signal
 import type { EnrichedTrade } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { pct0, r as fmtR, signed } from "@/lib/format";
-import { HoverPill, useHoverGroup } from "@/motion/HoverPill";
+import { HoverPillFor, useHoverStore } from "@/motion/HoverPill";
 import { tween } from "@/motion/tokens";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Collapse } from "@/primitives/Expander";
@@ -217,7 +217,7 @@ interface GroupRow {
  * hover pill and open row per table.
  */
 function GroupTable({ head, rows, group, pill, barOffset = 0 }: { head: string; rows: readonly GroupRow[]; group: string; pill: string; barOffset?: number }) {
-  const hover = useHoverGroup<string>();
+  const hover = useHoverStore<string>();
   const [open, setOpen] = useState<string | null>(null);
   const max = Math.max(1, ...rows.map((r) => Math.abs(r.g.net)));
   return (
@@ -235,7 +235,7 @@ function GroupTable({ head, rows, group, pill, barOffset = 0 }: { head: string; 
           const domId = `${group}-${r.id}`;
           return (
             <li key={r.id} className="relative border-t border-line" {...hover.bind(r.id)} data-row={r.id}>
-              <HoverPill show={hover.hovered === r.id} group={pill} className="inset-y-0.5" />
+              <HoverPillFor store={hover} id={r.id} group={pill} className="inset-y-0.5" />
               <button type="button" aria-expanded={on} aria-controls={domId} onClick={() => setOpen(on ? null : r.id)} className={cn(TABLE_COLS, "relative z-10 min-h-11 w-full px-2 py-2 text-left text-[13px]")}>
                 <span className="flex min-w-0 items-center gap-2">
                   {r.glyph}

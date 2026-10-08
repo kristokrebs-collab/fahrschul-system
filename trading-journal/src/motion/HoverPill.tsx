@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useLayoutEffect, useRef, useState, type FocusEvent } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore, type FocusEvent } from "react";
 import { cn } from "@/lib/cn";
 import { contextSpring, lastPointerType, pointerSpeed } from "@/motion/physics";
 import { isScrolling } from "@/motion/scrollGate";
@@ -118,4 +118,107 @@ export function useHoverGroup<T extends string | number = string>() {
     [],
   );
   return { hovered, bind, clear: () => setHovered(null) };
+}
+
+/**
+ * The hovered id of one list OUTSIDE React state (perf-120 phase B): `useHoverGroup` keeps it in the list's state, so
+ * every hover re-rendered the whole list (6–12 rows of motion components) twice per row change. With a hover store the
+ * list never re-renders on hover: rows spread the store's cached `bind(id)` (stable per id) and render
+ * `<HoverPillFor store id group />`, which subscribes to its own row – a hover change re-renders the pill that leaves
+ * and the one that arrives, in one commit (the shared `hover-{group}` layoutId still glides between them).
+ * Same rules as `useHoverGroup`: no claim while the page scrolls or from touch / pen taps, `:focus-visible` only,
+ * pointer speed sampled per claim.
+ * ```tsx
+ * const hover = useHoverStore<string>();
+ * <li className="relative" {...hover.bind(id)}><HoverPillFor store={hover} id={id} group="recent" />…</li>
+ * ```
+ */
+export interface HoverStore<T extends string | number = string> {
+  get(): T | null;
+  subscribe(listener: () => void): () => void;
+  /** Cached per id: the same object for every render. */
+  bind(id: T): HoverGroupBinding;
+  clear(): void;
+}
+
+export function createHoverStore<T extends string | number = string>(): HoverStore<T> {
+  let hovered: T | null = null;
+  const listeners = new Set<() => void>();
+  const binds = new Map<T, HoverGroupBinding>();
+  const set = (id: T | null) => {
+    if (Object.is(id, hovered)) return;
+    hovered = id;
+    for (const l of [...listeners]) l();
+  };
+  const claim = (id: T) => {
+    // a claim (the pill moves here) re-samples the pointer speed; a move on the row that holds the pill does nothing
+    if (!Object.is(hovered, id)) lastHoverSpeed = pointerSpeed();
+    set(id);
+  };
+  return {
+    get: () => hovered,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    clear: () => set(null),
+    bind: (id) => {
+      let b = binds.get(id);
+      if (!b) {
+        b = {
+          onMouseEnter: () => {
+            if (isScrolling() || !isRealHover()) return;
+            lastHoverSpeed = pointerSpeed();
+            set(id);
+          },
+          onMouseMove: () => {
+            if (isScrolling() || !isRealHover()) return;
+            claim(id);
+          },
+          onMouseLeave: () => {
+            if (Object.is(hovered, id)) set(null);
+          },
+          onFocus: (e) => {
+            let visible = true;
+            try {
+              visible = e.currentTarget.matches(":focus-visible");
+            } catch {
+              /* selector unsupported → treat as visible */
+            }
+            if (!visible) return;
+            lastHoverSpeed = 0;
+            set(id);
+          },
+          onBlur: () => {
+            if (Object.is(hovered, id)) set(null);
+          },
+        };
+        binds.set(id, b);
+      }
+      return b;
+    },
+  };
+}
+
+/** One hover store per list for the component's lifetime. */
+export function useHoverStore<T extends string | number = string>(): HoverStore<T> {
+  const [store] = useState(() => createHoverStore<T>());
+  return store;
+}
+
+/** True while `id` holds the pill of `store`; re-renders only when that changes. */
+export function useHovered<T extends string | number>(store: HoverStore<T>, id: T): boolean {
+  return useSyncExternalStore(
+    store.subscribe,
+    () => Object.is(store.get(), id),
+    () => false,
+  );
+}
+
+/** `HoverPill` that follows its own row in a hover store (see `createHoverStore`). */
+export function HoverPillFor<T extends string | number>({ store, id, group, className }: { store: HoverStore<T>; id: T; group: string; className?: string }) {
+  const show = useHovered(store, id);
+  return <HoverPill show={show} group={group} className={className} />;
 }

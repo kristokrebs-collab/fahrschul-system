@@ -5,7 +5,7 @@ import type { EnrichedTrade, Setup } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { colorClass, date as fmtDate, signed, time as fmtTime } from "@/lib/format";
-import { HoverPill, useHoverGroup, type HoverGroupBinding } from "@/motion/HoverPill";
+import { HoverPillFor, useHoverStore, type HoverStore } from "@/motion/HoverPill";
 import { contextSpringAt } from "@/motion/physics";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
@@ -106,8 +106,8 @@ interface RowProps {
   /** layout transition of the `trade-{id}` morph: `spring.detail`, or its context spring after a swipe-dismissed detail */
   morphLayout: typeof spring.detail;
   pressing: boolean;
-  hovered: boolean;
-  bind: HoverGroupBinding;
+  /** the list's hover store: the row binds its id, its pill follows it (a hover never re-renders the list) */
+  hover: HoverStore<string>;
   setups: readonly Pick<Setup, "id" | "name" | "color">[];
   onOpen: (id: string) => void;
   ref?: Ref<HTMLDivElement>;
@@ -118,7 +118,7 @@ interface RowProps {
  * close the gap (`popLayout`), first-view cascade, new rows drop in with the fresh sweep. The button keeps the
  * conditional `trade-{id}` / `trade-side-{id}` / `trade-pnl-{id}` morph ids into the detail.
  */
-function Row({ t, index, count, seen, listKey, shareIds, morphLayout, pressing, hovered, bind, setups, onOpen, ref }: RowProps) {
+function Row({ t, index, count, seen, listKey, shareIds, morphLayout, pressing, hover, setups, onOpen, ref }: RowProps) {
   const reduced = useReducedFx();
   const present = useIsPresent();
   const presence = useContext(PresenceContext);
@@ -141,9 +141,9 @@ function Row({ t, index, count, seen, listKey, shareIds, morphLayout, pressing, 
       inert={!present}
       data-exiting={present ? undefined : ""}
       className={cn("relative", index > 0 && "border-t border-line")}
-      {...bind}
+      {...hover.bind(t.id)}
     >
-      <HoverPill show={hovered} group="recent" className="inset-y-0.5" />
+      <HoverPillFor store={hover} id={t.id} group="recent" className="inset-y-0.5" />
       {/* an insert made before the card was ever seen plays its highlight on first view instead of off-screen */}
       {sweep && seen && <FreshSweep tone={tone} onDone={() => setSweep(false)} />}
       <motion.button
@@ -199,7 +199,7 @@ export function RecentTrades() {
   const openEditor = useUi((s) => s.openEditor);
   const view = useAccountView(acc);
   const rows = useMemo(() => [...view.list].sort((a, b) => +tradeTime(b) - +tradeTime(a)).slice(0, RECENT_COUNT), [view.list]);
-  const hover = useHoverGroup<string>();
+  const hover = useHoverStore<string>();
   const body = useRef<HTMLDivElement>(null);
   const seen = useSeenOnce(body);
   const animateFirst = useAnimateFirstInsert(acc, rows.length);
@@ -240,8 +240,7 @@ export function RecentTrades() {
                   shareIds={shareIds}
                   morphLayout={morphLayout}
                   pressing={detail.id === t.id}
-                  hovered={hover.hovered === t.id}
-                  bind={hover.bind(t.id)}
+                  hover={hover}
                   setups={setupsOf(t)}
                   onOpen={open}
                 />
