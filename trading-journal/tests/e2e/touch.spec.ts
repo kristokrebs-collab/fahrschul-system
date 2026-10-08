@@ -9,7 +9,7 @@
  * - the Disziplin heat map takes a fat-finger tap beside a traded day.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { centre, collectErrors, hasTouch, isMobile, isTouchTablet, screenshot, scrollUntilVisible, seed, toast, touchKit } from "./helpers";
+import { centre, collectErrors, hasTouch, isMobile, isTouchTablet, screenshot, scrollUntilVisible, seed, settledBox, toast, touchKit } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR, type HitBoxMiss } from "./hitbox";
 
 const dock = (page: Page) => page.getByRole("toolbar", { name: "Navigation" });
@@ -109,9 +109,10 @@ test("toast: a half swipe springs back, a sideways flick dismisses it before its
   await saveWith("30000");
   const at = await centre(card);
   await kit.slowPull(at, 60, 0);
-  await page.waitForTimeout(350);
+  // the release spring is time-based: polled until it is home (one fixed 350-ms sample read 3,03 px on a loaded
+  // machine, where the last painted frame lags the clock); the toast is still there, not dismissed
+  await expect.poll(async () => Math.abs((await centre(card)).x - at.x), { timeout: 1500, intervals: [50], message: "springs back" }).toBeLessThan(3);
   await expect(island).toContainText("Einstellungen gespeichert");
-  expect(Math.abs((await centre(card)).x - at.x), "springs back").toBeLessThan(3);
 
   // a fresh toast, thrown sideways: it rides the finger and flies out that way (a timed-out toast shrinks in place)
   await expect(island).not.toContainText("Einstellungen gespeichert", { timeout: 6000 });
@@ -251,12 +252,14 @@ test.describe("touch review fixes", () => {
     await seed(page, { synth: { ratios: "whale-long", anchor: Date.now() } });
     await page.goto("/#overview");
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+    // the Einstiegs-Check above the chart grows with its first evaluation: scroll once it is there
+    await expect(page.getByTestId("signal-card")).toHaveAttribute("data-state", /ok|stale/, { timeout: 25_000 });
     const card = page.locator("#chart-card");
     await card.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
     const canvas = card.locator("canvas").first();
     await expect(canvas).toBeVisible({ timeout: 15_000 });
     await page.waitForTimeout(1200);
-    const b = (await canvas.boundingBox())!;
+    const b = await settledBox(canvas);
     const kit = await touchKit(page);
     const at = { x: b.x + b.width * 0.45, y: b.y + b.height * 0.6 };
     const y0 = await page.evaluate(() => window.scrollY);
@@ -336,13 +339,16 @@ test.describe("touch review fixes", () => {
     await seed(page, { synth: { ratios: "whale-long", anchor: Date.now() } });
     await page.goto("/#overview");
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+    // the Einstiegs-Check above the chart grows by ~1,500 px with its first evaluation: scroll once it is there
+    await expect(page.getByTestId("signal-card")).toHaveAttribute("data-state", /ok|stale/, { timeout: 25_000 });
     const card = page.locator("#chart-card");
     await card.evaluate((el) => el.scrollIntoView({ block: "start", behavior: "instant" }));
     await page.waitForTimeout(800);
     const expander = card.getByRole("button", { name: /Details (schließen|zeigen): Chart/ });
     await expect(expander).toHaveAccessibleName("Details schließen: Chart");
     const pill = card.getByRole("radio", { name: "1W", exact: true });
-    const b = (await pill.boundingBox())!;
+    const b = await settledBox(pill);
+    expect(b.y + b.height + 7, "the tap point is on screen").toBeLessThan(page.viewportSize()!.height);
     // inside the pill's own coarse tap band (10 px below its box)
     await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height + 7);
     await expect(pill).toHaveAttribute("aria-checked", "true");

@@ -135,9 +135,12 @@ test.describe("editor from the FAB", () => {
     await expect(dialog).toBeVisible();
     await screenshot(page, info, "editor-empty");
 
-    // live price from the mocked market (last trade 84.199)
+    // live price from the mocked market: the WS replay prints 84.206,1 → 84.215,4 → 84.199 within 2.2 s of the
+    // socket opening; the button takes the freshest trade, so wait until the last one arrived (the market card's price
+    // reads it) — a fast run reached the click while 84.215,4 was the last trade
     const live = dialog.getByRole("button", { name: /Live-Preis.*übernehmen/ }).first();
     await expect(live).toBeVisible();
+    await expect(page.getByTestId("market-panel").locator("[data-rolling-digits] > .sr-only").first()).toHaveText("84.199");
     await live.click();
     await expect(dialog.locator("#f-entry")).toHaveValue(/84\.?199/);
 
@@ -174,13 +177,15 @@ test.describe("market scenarios", () => {
     await gotoOverview(page);
     const panel = page.getByTestId("market-panel");
     await expect(panel.getByText(/Live · vor/)).toBeVisible();
-    // no WS message after 3 s: the age label keeps counting (≥ 10 s) instead of pretending a fresh tick …
-    await expect(panel.getByText(/Live · vor (1\d|[2-5]\d)s/)).toBeVisible({ timeout: 25_000 });
+    // no WS message after 3 s: the age label keeps counting (≥ 10 s) instead of pretending a fresh tick – or, once the
+    // silence is detected (10 s), the socket's recovery REST-polls the price and says so honestly …
+    await expect(panel.getByText(/Live · vor (1\d|[2-5]\d)s|Kurs per Abfrage · 5 s/).first()).toBeVisible({ timeout: 25_000 });
     await screenshot(page, info, "market-stale");
-    // … and the provider's silent recovery (REST poll / reconnect) never drops to `Kein Live-Kurs`
+    // … and the provider's silent recovery (REST poll / reconnect) never drops to `Kein Live-Kurs`: the pill reads
+    // `Live` (the reconnected socket delivers) or `Kurs per Abfrage · 5 s` (between a silence and the next delivery)
     await page.waitForTimeout(12_000);
     await expect(panel.getByText(/Kein Live-Kurs/)).toHaveCount(0);
-    await expect(panel.getByText(/^Live/).first()).toBeVisible();
+    await expect(panel.locator("[data-status-pill]").first()).toHaveText(/^(Live|Kurs per Abfrage · 5 s)/);
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
