@@ -19,7 +19,7 @@ import { Skeleton } from "@/primitives/Skeleton";
 import { Explainer } from "@/primitives/VerdictPanel";
 import { useJournal } from "@/store/journalStore";
 import { Bar } from "./Bar";
-import { LagePanel } from "./LagePanel";
+import { LagePanel, useLageBand } from "./LagePanel";
 import { ChangeChip, FundingBlock, LivePill, LivePrice, OrderFlow } from "./MarketLive";
 import { weeklyExplain } from "./marketExplain";
 import { triggerFlagsKey } from "./marketMath";
@@ -69,7 +69,7 @@ const WeeklyChecks = memo(function WeeklyChecks({ rows, rsiBar, showBar, body }:
 });
 
 /**
- * Market panel `Live-Status · Trigger-Level` (Bundle `vhe`, Plan 6.1 / 4.4 / 4.9). Zero React renders per tick:
+ * Market panel (Bundle `vhe` "Live-Status · Trigger-Level", Plan 6.1 / 4.4 / 4.9). Zero React renders per tick:
  * - live leaves (`MarketLive.tsx`): odometer price with tick flash, live 24 h change chip, order-flow meter,
  *   funding line + tiles, LivePill age / ring / trade pings;
  * - React re-renders only for structural changes (`useMarketPanelView` keys, `usePriceClass` trigger flags,
@@ -84,6 +84,8 @@ export function MarketPanel() {
   const zoneOn = zoneConfigured(settings);
   const view = useMarketPanelView(levels);
   const desktop = useIsDesktop();
+  // lg+: the Lage is the hero's band (Hero.tsx), so the two hero columns keep their balance; below: here
+  const lageBand = useLageBand();
   const reduced = useReducedFx();
   const [hover, setHover] = useState(false);
   const { refresh, refreshing, disabled } = useForceRefresh();
@@ -205,7 +207,7 @@ export function MarketPanel() {
       </AnimatePresence>
 
       {/* automatic Lage-Ampel (decisions 19 / 23): replaces the manual trigger scenario and the long-trigger distance */}
-      <LagePanel />
+      {!lageBand && <LagePanel />}
 
       {weeklyOn && t.weekly.show && (
         <WeeklyChecks

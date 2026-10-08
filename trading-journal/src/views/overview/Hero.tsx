@@ -19,6 +19,7 @@ import { rollDirection, StatTile } from "@/primitives/StatTile";
 import { useAccountView, useJournal } from "@/store/journalStore";
 import { useUi, type AccFilter } from "@/store/uiStore";
 import { ExplanationView } from "./explainer";
+import { LagePanel, useLageBand } from "./LagePanel";
 import { MarketPanel } from "./MarketPanel";
 import { SignalStrip } from "./SignalStrip";
 
@@ -124,6 +125,7 @@ export function Hero() {
     [view, settings, cur],
   );
 
+  const lageBand = useLageBand();
   return (
     <section className="relative overflow-hidden rounded-[28px] border border-line" aria-labelledby="hero-net-label">
       <HeroBackdrop />
@@ -205,6 +207,13 @@ export function Hero() {
           </dl>
         </div>
         <MarketPanel />
+        {/* lg+: the Lage-Ampel as a band under both columns (state left, ladder right) — inside the market panel it
+            made that column ~200 px taller than the P&L column (decision 12: no empty areas) */}
+        {lageBand && (
+          <div className="min-w-0 lg:col-span-2">
+            <LagePanel band />
+          </div>
+        )}
       </div>
     </section>
   );

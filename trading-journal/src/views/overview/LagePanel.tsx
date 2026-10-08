@@ -40,6 +40,7 @@ import { cn } from "@/lib/cn";
 import { n0, n1, pct } from "@/lib/format";
 import { priceMv, useLage, type LageFeedStatus } from "@/market";
 import { useNowMv } from "@/motion/clock";
+import { useMediaQuery } from "@/motion/useMediaQuery";
 import { MorphCard } from "@/motion/MorphCard";
 import { StaggerItem } from "@/motion/Stagger";
 import { radius } from "@/motion/tokens";
@@ -48,6 +49,10 @@ import { useJournal } from "@/store/journalStore";
 import { alignPad, CHIP_DOT, closeInText, emaColumn, feedText, keepTogether, levelColumn, meaningText, STATE_TONE, type LightTone } from "./lageView";
 
 export const LAGE_DETAILS_ID = "lage-details";
+/** lg+ (two hero columns): the Lage spans the hero as a band under P&L and market panel instead of sitting in the panel. */
+export const LAGE_BAND_QUERY = "(min-width: 1024px)";
+/** Whether the Lage renders as the hero band (lg+); else inside the market panel. `false` without `matchMedia`. */
+export const useLageBand = (): boolean => useMediaQuery(LAGE_BAND_QUERY, false);
 export const LAGE_DETAILS_LABEL = "Details +";
 /** Headline while the first daily bars load. */
 export const LAGE_PENDING = "Wird ermittelt …";
@@ -299,7 +304,7 @@ function LoadingBody() {
 /**
  * The panel. `data-state` = red | amber | green | none, `data-gate` = on | off, `data-mode` = block | warn.
  */
-export const LagePanel = memo(function LagePanel() {
+export const LagePanel = memo(function LagePanel({ band = false }: { band?: boolean }) {
   const { lage, status } = useLage();
   const settings = useLageSettings();
   const state: LageState = lage?.state ?? "none";
@@ -311,44 +316,46 @@ export const LagePanel = memo(function LagePanel() {
   const stand = standOf(status);
   return (
     <section
-      className="@container/lage relative grid gap-2.5 rounded-xl border border-line-2 bg-white/[0.02] p-3.5"
+      // band: a card of its own in the hero (the market panel's surface); else a box inside the market panel
+      className={cn("@container/lage relative grid gap-2.5", band ? "rounded-2xl border border-white/10 bg-ink-900 p-5" : "rounded-xl border border-line-2 bg-white/[0.02] p-3.5")}
       data-testid="lage-panel"
+      data-band={band ? "" : undefined}
       data-state={state}
       data-gate={settings.on ? "on" : "off"}
       data-mode={settings.mode}
       aria-label={`${LAGE_TITLE}: ${word} – ${title}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="grid min-w-0 gap-1.5">
-          <div className="flex items-center gap-2">
-            <span className="label">{LAGE_TITLE}</span>
-            <Lights state={state} off={!settings.on || !lage} />
-            <span className={cn("text-[11.5px] font-semibold transition-colors duration-300", TONE_TEXT[tone])} data-testid="lage-word">
-              {word}
-            </span>
-            <DetailsButton lage={lage} status={status} />
+      {/* the market panel's column: one stack; the hero band (≥ 860 px container, lg+): the state on the left, the
+          ladder on the right */}
+      <div className="grid gap-2.5 @min-[860px]/lage:grid-cols-[minmax(0,1fr)_minmax(0,1.55fr)] @min-[860px]/lage:gap-x-8">
+        <div className="grid min-w-0 content-start gap-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="grid min-w-0 gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="label">{LAGE_TITLE}</span>
+                <Lights state={state} off={!settings.on || !lage} />
+                <span className={cn("text-[11.5px] font-semibold transition-colors duration-300", TONE_TEXT[tone])} data-testid="lage-word">
+                  {word}
+                </span>
+                <DetailsButton lage={lage} status={status} />
+              </div>
+              <strong className={cn("text-[15px] font-semibold leading-snug transition-colors duration-300", lage && settings.on ? TONE_TEXT[tone] : "text-fg")} data-testid="lage-title">
+                {title}
+              </strong>
+              {lage && <DailyClose at={lage.dailyCloseAt} wide={false} stand={stand} />}
+            </div>
+            {lage && <DailyClose at={lage.dailyCloseAt} wide stand={stand} />}
           </div>
-          <strong className={cn("text-[15px] font-semibold leading-snug transition-colors duration-300", lage && settings.on ? TONE_TEXT[tone] : "text-fg")} data-testid="lage-title">
-            {title}
-          </strong>
-          {lage && <DailyClose at={lage.dailyCloseAt} wide={false} stand={stand} />}
-        </div>
-        {lage && <DailyClose at={lage.dailyCloseAt} wide stand={stand} />}
-      </div>
 
-      {loading ? (
-        <p className="text-[12px] leading-relaxed text-faint">{LAGE_LOADING}</p>
-      ) : (
-        <p className="text-[12px] leading-relaxed text-mute" data-testid="lage-meaning">
-          {lage ? meaningText(lage, settings) : LAGE_NO_DATA}
-        </p>
-      )}
+          {loading ? (
+            <p className="text-[12px] leading-relaxed text-faint">{LAGE_LOADING}</p>
+          ) : (
+            <p className="text-[12px] leading-relaxed text-mute" data-testid="lage-meaning">
+              {lage ? meaningText(lage, settings) : LAGE_NO_DATA}
+            </p>
+          )}
 
-      {loading ? (
-        <LoadingBody />
-      ) : !lage ? null : (
-        <>
-          {(lage.wobble || chips.length > 0) && (
+          {lage && (lage.wobble || chips.length > 0) && (
             <ul className="flex flex-wrap gap-1.5" aria-label="Gründe" data-testid="lage-chips">
               {lage.wobble && <Chip chip={lage.wobble} strong />}
               {chips.map((c) => (
@@ -356,10 +363,10 @@ export const LagePanel = memo(function LagePanel() {
               ))}
             </ul>
           )}
-          {lage.abwaerts && <Signs signs={lage.signs} met={lage.signsMet} />}
-          <Ladder lage={lage} />
-        </>
-      )}
+          {lage?.abwaerts && <Signs signs={lage.signs} met={lage.signsMet} />}
+        </div>
+        {loading ? <LoadingBody /> : lage ? <Ladder lage={lage} /> : null}
+      </div>
 
       {!stand && !loading && <Footer status={status} />}
     </section>

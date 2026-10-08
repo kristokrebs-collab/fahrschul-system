@@ -1,5 +1,6 @@
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ED } from "@/domain/edition";
 import type { Rule } from "@/domain/types";
 import type { FeedId, ProviderHealth, StatusLabel } from "@/market/types";
 import { cn } from "@/lib/cn";
@@ -33,7 +34,7 @@ import { SymbolField } from "./SymbolField";
 
 export const SETTINGS_STRINGS = {
   title: "Einstellungen",
-  lead: "Startkapital, Trigger-Level für den Live-Status und die Backtest-Werte, mit denen deine Trades verglichen werden.",
+  lead: "Startkapital, deine Chart-Level und die Backtest-Werte, mit denen deine Trades verglichen werden.",
   save: "Speichern",
   saving: "Speichert …",
   saved: "Gespeichert",
@@ -53,20 +54,22 @@ export const SETTINGS_STRINGS = {
   avgLoss: "Ø Verlierer %",
   avgLossHelp: "negativ eintragen, z. B. −9,31",
   label: "Bezeichnung",
-  trigger: "Live-Status · Trigger-Level",
+  // decision 19: the Übersicht shows the automatic Lage-Ampel; these levels only draw chart lines (+ weekly check, zone note)
+  trigger: "Chart-Level · manuell",
+  triggerNote: `Die Übersicht zeigt die automatische Lage-Ampel. Diese Werte zeichnen nur Linien im Chart; Lower High und Weekly-RSI speisen „${ED.COPY.weeklyTitle}“, die Zone den Zonen-Hinweis.`,
   symbol: "TradingView-Symbol",
   symbolHelp: "BINANCE:BTCUSDT → Binance Perp; anderes Präfix wird als Binance-Symbol geprüft",
   longTrigger: "Long-Trigger (4H über)",
-  longTriggerHelp: "Letzter 4H-Schluss darüber → Long-Trigger aktiv",
+  longTriggerHelp: "Nur LONG-Linie im Chart",
   longStop: "Long-Invalidierung",
-  longStopHelp: "Long ist ungültig, sobald der Kurs wieder darunter schließt",
+  longStopHelp: "Nur Linie im Chart",
   shortTrigger: "Short-Trigger (4H unter)",
   // decision 13: the Übersicht shows no short trigger any more; the stored level stays and draws the chart's SHORT line
   shortTriggerHelp: "Nur SHORT-Linie im Chart · Übersicht ohne Short-Trigger",
   invalidation: "Harte Invalidierung",
-  invalidationHelp: "4H-Schluss darunter → Bärenfall, alle Longs aus",
+  invalidationHelp: "Nur Linie im Chart (Bärenfall-Marke)",
   lowerHigh: "Lower High (Weekly)",
-  lowerHighHelp: "Weekly Close darüber bricht die Makro-Struktur",
+  lowerHighHelp: `Weekly Close darüber bricht die Makro-Struktur · Übersicht „${ED.COPY.weeklyTitle}“`,
   rsiWeekly: "Weekly-RSI-Schwelle",
   rsiWeeklyHelp: "Weekly-RSI darüber bestätigt den Bruch",
   zoneLow: "Makro-Zone von",
@@ -368,7 +371,7 @@ const BacktestCard = memo(function BacktestCard(props: DraftCardProps) {
 
 const TriggerCard = memo(function TriggerCard(props: DraftCardProps) {
   return (
-    <Card title={S.trigger}>
+    <Card title={S.trigger} note={S.triggerNote}>
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
         <SymbolField label={S.symbol} help={S.symbolHelp} value={props.draft.symbol ?? ""} onChange={props.onChange} changed={props.changed.has("symbol")} />
         <DraftFields fields={TRIGGER_FIELDS} {...props} />

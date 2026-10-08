@@ -231,21 +231,44 @@ export const NEUTRAL_COLOR = "#9b9b9b";
 /** Tailwind classes of the provisional colours (literal strings: the class scanner needs them whole). */
 export const PROV_TEXT: Readonly<Record<Side, string>> = { long: "text-[#65b488]", short: "text-[#d27a7b]" };
 
-type StatefulVerdict = Pick<Verdict, "valid" | "side"> & { state?: SignalState };
+type StatefulVerdict = Pick<Verdict, "valid" | "side"> & { state?: SignalState; lage?: Verdict["lage"] };
+
+/** A long entry held back by the Lage-Ampel (decision 23): shown faded, it does not count. */
+export const lageBlocked = (v: { lage?: Verdict["lage"] }): boolean => v.lage?.held === true;
 
 /** Candle-close state of a verdict (hand-built verdicts without `state`: valid = confirmed). */
 export const verdictState = (v: Pick<Verdict, "valid"> & { state?: SignalState }): SignalState => v.state ?? (v.valid ? "confirmed" : "none");
 
-/** Ring / label colour of a verdict: side colour once confirmed, desaturated while provisional, grey otherwise. */
+/** Ring / label colour of a verdict: side colour once confirmed, desaturated while provisional or held back by the Lage, grey otherwise. */
 export function verdictColor(v: StatefulVerdict): string {
   const st = verdictState(v);
-  return st === "provisional" ? PROV_COLOR[v.side] : v.valid ? SIDE_COLOR[v.side] : NEUTRAL_COLOR;
+  return st === "provisional" || lageBlocked(v) ? PROV_COLOR[v.side] : v.valid ? SIDE_COLOR[v.side] : NEUTRAL_COLOR;
 }
 /** Text class of the verdict label (same rule as `verdictColor`). */
 export function verdictText(v: StatefulVerdict): string {
   const st = verdictState(v);
-  if (st === "provisional") return PROV_TEXT[v.side];
+  if (st === "provisional" || lageBlocked(v)) return PROV_TEXT[v.side];
   return v.valid ? (v.side === "long" ? "text-win" : "text-loss") : "text-fg";
+}
+
+/** Tone of the Lage line under a verdict. */
+export type LageLineTone = "loss" | "warn";
+export interface LageLineView {
+  text: string;
+  tone: LageLineTone;
+  /** Kaufsignale do not count right now (mode `Sperre`); false = `nur Warnung` */
+  blocked: boolean;
+}
+/**
+ * The Lage line under a long verdict: `nur Warnung` → `Lage rot – nur Warnung (fällt noch)`; no entry while the Lage is
+ * red / amber → `Lage rot – Kaufsignale zählen nicht (fällt noch)` / `Lage gelb – Umkehr bildet sich (2/4) · Kaufsignale
+ * zählen erst bei Grün`; a held-back entry carries it in its label (`null`, not repeated).
+ */
+export function lageLine(v: Pick<Verdict, "lage">): LageLineView | null {
+  const g = v.lage;
+  if (!g || !g.label || g.held) return null;
+  const text = !g.blocked ? g.label : g.state === "red" ? g.label.replace("zählt nicht", "Kaufsignale zählen nicht") : `${g.label} · Kaufsignale zählen erst bei Grün`;
+  return { text, tone: g.state === "red" ? "loss" : "warn", blocked: g.blocked };
 }
 
 /** `Vorläufig: Starker Long-Einstieg` → `{ prefix: "Vorläufig: ", text: "Starker Long-Einstieg" }` (the state line says it visually). */
@@ -260,8 +283,13 @@ export interface StrengthView {
   line: string;
   aria: string;
 }
-export function strengthView(v: Pick<Verdict, "strength" | "tiers" | "valid"> & { state?: SignalState; provStrength?: number }, ladderLength: number): StrengthView {
+export function strengthView(v: Pick<Verdict, "strength" | "tiers" | "valid"> & { state?: SignalState; provStrength?: number; lage?: Verdict["lage"] }, ladderLength: number): StrengthView {
   const tf = `${v.tiers} von ${ladderLength} Timeframes`;
+  if (v.lage?.held) {
+    // held back by the Lage-Ampel: the strength it would have, outlined, and that it does not count
+    const p = Math.max(0, Math.min(4, v.lage.strength));
+    return { dots: p, outlined: true, line: `${strengthText(p)} · zählt nicht (Lage ${v.lage.state === "red" ? "rot" : "gelb"}) · ${tf}`, aria: `Stärke 0 von 4, gesperrt (sonst ${p})` };
+  }
   if (verdictState(v) === "provisional") {
     const p = Math.max(0, Math.min(4, v.provStrength ?? 0));
     return { dots: p, outlined: true, line: `${strengthText(p)} ab Kerzenschluss · ${tf}`, aria: `Stärke 0 von 4, vorläufig ${p}` };

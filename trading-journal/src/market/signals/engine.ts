@@ -364,7 +364,7 @@ export function signalsKey(s: Signals | null): string {
   }
   const z = s.zone;
   parts.push(z ? `z:${z.tf},${z.zone.zone},${r2(z.zone.pos)},${r1(z.zone.hi)},${r1(z.zone.lo)},${z.zone.deep ? 1 : 0},${z.zone.brk ? `${z.zone.brk.kind}${z.zone.brk.dir}` : "-"},${z.zone.lux ? 1 : 0},${checkKey(z)}` : "z:-");
-  for (const v of [s.long, s.short]) parts.push([v.score, v.strength, v.tiers, v.valid ? 1 : 0, v.rsiOk ? 1 : 0, v.zoneOk ? 1 : 0, v.label, v.reasons.map((r) => (r.ok ? 1 : 0)).join(""), verdictKey(v), v.lage ? `${v.lage.state}${v.lage.blocked ? "b" : ""}${v.lage.signsMet}` : "-"].join(","));
+  for (const v of [s.long, s.short]) parts.push([v.score, v.strength, v.tiers, v.valid ? 1 : 0, v.rsiOk ? 1 : 0, v.zoneOk ? 1 : 0, v.label, v.reasons.map((r) => (r.ok ? 1 : 0)).join(""), verdictKey(v), v.lage ? `${v.lage.state}${v.lage.blocked ? "b" : ""}${v.lage.held ? "h" : ""}${v.lage.signsMet}` : "-"].join(","));
   if (s.lage !== undefined) parts.push(`lg:${s.lage?.lage ? `${s.lage.lage.state}${s.lage.lage.signsMet}` : "∅"}${s.lage?.cfg.on ? 1 : 0}${s.lage?.cfg.mode ?? ""}`);
   // top-trader readings (rounded like the rest: a re-render only when a shown digit changes)
   const t = s.traders;

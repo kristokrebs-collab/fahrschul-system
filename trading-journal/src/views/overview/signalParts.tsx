@@ -32,6 +32,7 @@ import {
   divSetupText,
   divTrendLine,
   labelParts,
+  lageLine,
   meterPct,
   PROV_COLOR,
   PROV_TEXT,
@@ -47,6 +48,7 @@ import {
   verdictText,
   zonePosition,
   type IntrabarView,
+  type LageLineView,
   type PartCell,
   type PartView,
   type RungView,
@@ -153,6 +155,7 @@ export const VerdictRow = memo(function VerdictRow({ v, ladderLength, flash, lin
   const color = verdictColor(v);
   const st = strengthView(v, ladderLength);
   const lbl = labelParts(v.label);
+  const lage = lageLine(v);
   const halo = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!flash || reduced || !halo.current) return;
@@ -160,7 +163,7 @@ export const VerdictRow = memo(function VerdictRow({ v, ladderLength, flash, lin
     return () => a.stop();
   }, [flash, reduced]);
   return (
-    <div className="flex min-w-0 items-center gap-5" data-testid="signal-verdict" data-state={verdictState(v)}>
+    <div className="flex min-w-0 items-center gap-5" data-testid="signal-verdict" data-state={verdictState(v)} data-lage={v.lage?.state} data-blocked={v.lage?.held ? "" : undefined}>
       <div className="relative shrink-0">
         <span
           ref={halo}
@@ -195,10 +198,24 @@ export const VerdictRow = memo(function VerdictRow({ v, ladderLength, flash, lin
           <span className="text-[12px] text-mute">{st.line}</span>
         </div>
         <StateLine line={line} side={v.side} />
+        {lage && <LageVerdictLine line={lage} />}
       </div>
     </div>
   );
 });
+
+const LAGE_LINE_TONE = { loss: "text-loss", warn: "text-warn" } as const;
+const LAGE_LINE_DOT = { loss: "bg-loss", warn: "bg-warn" } as const;
+
+/** The Lage-Ampel under a long verdict (`nur Warnung`, or no entry while red / amber): dot + text, wraps. */
+function LageVerdictLine({ line }: { line: LageLineView }) {
+  return (
+    <span className={cn("flex min-w-0 items-baseline gap-1.5 text-[11.5px] leading-4", LAGE_LINE_TONE[line.tone])} data-testid="signal-lage">
+      <span aria-hidden="true" className={cn("relative top-[-1px] size-[5px] shrink-0 self-center rounded-full", LAGE_LINE_DOT[line.tone])} />
+      <span className="min-w-0">{line.text}</span>
+    </span>
+  );
+}
 
 /* ------------------------------------------------------------------ meters */
 

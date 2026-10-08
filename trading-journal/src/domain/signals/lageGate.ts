@@ -25,6 +25,8 @@ export interface VerdictLage extends LageGate {
   strength: Strength;
   /** the verdict's own label before the gate */
   from: string;
+  /** an entry (valid or provisional) was held back — `blocked` alone also marks a long without an entry under red / amber */
+  held: boolean;
 }
 
 /** Label prefix of a blocked long entry. */
@@ -46,7 +48,7 @@ export function applyLageGate(v: Verdict, input: LageInput | null | undefined): 
   const g = lageGate(input.lage, input.cfg, "long");
   if (!g.label) return v;
   const entry = v.valid || v.state === "provisional";
-  const lage: VerdictLage = { ...g, signsMet: input.lage?.signsMet ?? 0, strength: v.valid ? v.strength : ((v.provStrength ?? 0) as Strength), from: v.label };
+  const lage: VerdictLage = { ...g, signsMet: input.lage?.signsMet ?? 0, strength: v.valid ? v.strength : ((v.provStrength ?? 0) as Strength), from: v.label, held: entry && g.blocked };
   if (!entry) return { ...v, lage };
   const reasons = [...v.reasons, { text: g.label, ok: false }];
   if (!g.blocked) return { ...v, lage, reasons };

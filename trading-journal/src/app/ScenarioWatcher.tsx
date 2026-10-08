@@ -1,17 +1,26 @@
 import { useEffect, useRef } from "react";
-import { SCENARIO_TOAST_MS, SCENARIO_TOAST_TITLE, SCENARIO_TOAST_VALUE, scenario, type ScenarioKey } from "@/domain/trigger";
-import { lastClosed4h, useFeedSelect, type Candle, type Stamped } from "@/market";
-import { levelsConfigured } from "@/domain/defaults";
+import { LAGE_MEANING, LAGE_STATE_WORD, lageSettingsOf, type LageState } from "@/domain/lage";
+import { lastClosed4h, useLage, type Candle, type Stamped } from "@/market";
 import { useJournal } from "@/store/journalStore";
-import { KEYS, readJson, writeJson } from "@/store/storage";
+import { readJson, storageKey, writeJson } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
-import { overviewScenario, shownScenarioKey } from "@/app/overviewScenario";
 
-/** `tj2-trigger-last` (Plan 4.9): no duplicate toast after a reload (share edition: `tj2share-trigger-last`). */
-export const TRIGGER_LAST_KEY: string = KEYS.triggerLast;
-interface TriggerLast {
-  key: ScenarioKey;
-  close4hAt: number;
+/**
+ * `tj2-lage-last`: the last Lage the watcher announced (share edition: `tj2share-lage-last`), so a reload never toasts
+ * again. The former manual-level key (`tj2-trigger-last`) is no longer read or written (it stays stored untouched).
+ */
+export const LAGE_LAST_KEY: string = storageKey("lage-last");
+/** Toast time (the former scenario toast's 5.2 s). */
+export const LAGE_TOAST_MS = 5200;
+/**
+ * Red ↔ amber hangs on live values (U1 = the price around the 1D-EMA 21) and can flip back and forth within minutes:
+ * such a change is announced at most this often. A change of the daily trend (to or from green) always is.
+ */
+export const LAGE_AMBER_TOAST_GAP_MS = 4 * 60 * 60_000;
+
+interface LageLast {
+  state: Exclude<LageState, "none">;
+  at: number;
 }
 
 export interface Closed4h {
@@ -32,43 +41,44 @@ export function selectClosed4h(v: Stamped<Candle[]> | undefined): Closed4h | nul
 
 export const sameClosed4h = (a: Closed4h | null, b: Closed4h | null): boolean => a === b || (a !== null && b !== null && a.t === b.t && a.c === b.c);
 
+/** Whether a change `prev → next` at `now` is announced (pure; see `LAGE_AMBER_TOAST_GAP_MS`). */
+export function lageToastDue(prev: LageLast | null, next: Exclude<LageState, "none">, now: number): boolean {
+  if (!prev || prev.state === next) return false;
+  if (prev.state === "green" || next === "green") return true;
+  return now - prev.at >= LAGE_AMBER_TOAST_GAP_MS;
+}
+
 /**
- * Bundle `$$`: toast `Neues Szenario: {title}` / `4H {n0(close4h)}` only when the scenario KEY changes
- * (5200 ms, kind `signal`). The last key + close time are persisted so a reload never re-toasts. Renders only when
- * the last CLOSED 4h bar changes, never per forming-bar tick. Same long-only scenarios as the market panel (decision 13):
- * no `Neues Szenario: Short-Trigger aktiv` – a close under the stored short level is the range.
+ * Toast on a change of the Lage-Ampel (decision 23; replaces the manual-level scenario toast "Neues Szenario: …"):
+ * `Lage: Fällt noch · abwarten` / `Lage: Umkehr bildet sich · 2 von 4` / `Lage: Umkehr bestätigt`, once per change,
+ * never on the first load (the first state is only remembered) and never twice after a reload. Off while the Ampel is
+ * switched off; `keine Daten` is no state. Renders only when the published Lage changes (≤ 1/s, on shown values).
  */
 export function ScenarioWatcher() {
-  const closed = useFeedSelect("kline_4h", selectClosed4h, sameClosed4h);
-  const levels = useJournal((s) => s.settings.market);
-  // trigger levels 0 = not set (share edition): no scenario, no toast
-  const configured = useJournal((s) => levelsConfigured(s.settings));
+  const { lage } = useLage();
+  const on = useJournal((s) => lageSettingsOf(s.settings.signals).on);
+  const mode = useJournal((s) => lageSettingsOf(s.settings.signals).mode);
   const pushToast = useUi((s) => s.pushToast);
-
-  const closedT = closed?.t ?? null;
-  const closedC = closed?.c ?? null;
-  const sc = closedC != null && configured ? overviewScenario(scenario(closedC, levels), levels) : null;
-  const key = sc?.key ?? null;
+  const state = lage && lage.state !== "none" ? lage.state : null;
+  const title = lage?.title ?? "";
   // last persisted value, read once and kept here (no localStorage read per render)
-  const last = useRef<TriggerLast | null | undefined>(undefined);
+  const last = useRef<LageLast | null | undefined>(undefined);
 
   useEffect(() => {
-    if (closedT == null || closedC == null || !sc || key == null) return;
-    if (last.current === undefined) last.current = readJson<TriggerLast | null>(TRIGGER_LAST_KEY, null);
+    if (!on || !state) return;
+    if (last.current === undefined) last.current = readJson<LageLast | null>(LAGE_LAST_KEY, null);
     const prev = last.current;
-    const next: TriggerLast = { key, close4hAt: closedT };
-    if (!prev) {
-      last.current = next;
-      writeJson(TRIGGER_LAST_KEY, next);
-      return;
+    const now = Date.now();
+    const next: LageLast = { state, at: now };
+    if (prev && prev.state === state) return;
+    if (prev && !lageToastDue(prev, state, now)) return;
+    if (prev) {
+      const meaning = mode === "warn" && state !== "green" ? "Kaufsignale zählen trotzdem (nur Warnung)." : LAGE_MEANING[state];
+      pushToast({ kind: "signal", title: `Lage: ${title}`, value: LAGE_STATE_WORD[state], valueTone: state === "green" ? "win" : "loss", detail: meaning, duration: LAGE_TOAST_MS });
     }
-    if (shownScenarioKey(prev.key) === key || closedT <= prev.close4hAt) return;
-    pushToast({ kind: "signal", title: SCENARIO_TOAST_TITLE(sc), value: SCENARIO_TOAST_VALUE(closedC), duration: SCENARIO_TOAST_MS });
     last.current = next;
-    writeJson(TRIGGER_LAST_KEY, next);
-    // `sc` is derived from (closedC, levels) → keyed on the scenario key and the close time only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, closedT, closedC, pushToast]);
+    writeJson(LAGE_LAST_KEY, next);
+  }, [on, state, title, mode, pushToast]);
 
   return null;
 }
