@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
-import type { Ref } from "react";
+import { useLayoutEffect, useRef, useState, type Ref } from "react";
 import { cn } from "@/lib/cn";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { spring, tween } from "@/motion/tokens";
@@ -23,6 +23,13 @@ export interface TextRollProps {
 
 /** Longer labels roll instead of morphing (per-letter layout nodes stop paying off). */
 export const MORPH_MAX_CHARS = 24;
+
+/**
+ * A swap that follows the previous one within this window (ms) replaces it instantly instead of rolling: the old roll
+ * is dropped mid-flight, so labels never stack up (three values half-visible at once) when they change faster than
+ * a roll lasts (exit `tween.exit` 120 ms, enter ≈ 200 ms).
+ */
+export const RAPID_SWAP_MS = 200;
 
 export interface MorphGlyph {
   /** Stable identity: the character plus its occurrence index (`e-0`, `e-1` …). */
@@ -70,18 +77,30 @@ function Glyph({ ch, dep, ref }: { ch: string; dep: string; ref?: Ref<HTMLSpanEl
  * Animated label swap (21st.dev / motion-primitives "Text Morph" + "Text Roll"). The accessible text is always the
  * current `text`, synchronously (sr-only span); the animated layer is `aria-hidden` and contributes no text nodes, so
  * `getByText`, accessible names and `textContent` never see half-morphed or duplicated labels.
- * No animation on mount. Reduced motion: a plain opacity crossfade. The presences sit in `NoLayoutCascade`: a finished
- * swap does not re-render the app's motion tree (live scores and bias percentages roll about once per second).
+ * No animation on mount. Reduced motion: a plain opacity crossfade. A swap within `RAPID_SWAP_MS` of the previous one is
+ * instant (never two rolls stacked); digits are tabular. The presences sit in `NoLayoutCascade`: a finished swap never
+ * re-renders a surrounding `LayoutCascade` (live scores and bias percentages roll about once per second).
  */
 export function TextRoll({ text, mode = "morph", direction = "up", className }: TextRollProps) {
   const reduced = useReducedFx();
   const roll = mode === "roll" || Array.from(text).length > MORPH_MAX_CHARS;
   const dir = direction === "up" ? 1 : -1;
+  // rapid swaps: a new presence (`initial={false}`) shows the newest label at once and drops the rolls in flight –
+  // decided in a layout effect, so the stacked frame is never painted
+  const [gen, setGen] = useState(0);
+  const lastSwap = useRef({ text, at: Number.NEGATIVE_INFINITY });
+  useLayoutEffect(() => {
+    const prev = lastSwap.current;
+    if (prev.text === text) return;
+    const now = performance.now();
+    lastSwap.current = { text, at: now };
+    if (now - prev.at < RAPID_SWAP_MS) setGen((g) => g + 1);
+  }, [text]);
 
   let visual;
   if (reduced) {
     visual = (
-      <AnimatePresence mode="popLayout" initial={false}>
+      <AnimatePresence key={gen} mode="popLayout" initial={false}>
         <motion.span
           key={text}
           data-text={text}
@@ -95,7 +114,7 @@ export function TextRoll({ text, mode = "morph", direction = "up", className }: 
     );
   } else if (roll) {
     visual = (
-      <AnimatePresence mode="popLayout" initial={false}>
+      <AnimatePresence key={gen} mode="popLayout" initial={false}>
         <motion.span
           key={text}
           data-text={text}
@@ -109,7 +128,7 @@ export function TextRoll({ text, mode = "morph", direction = "up", className }: 
     );
   } else {
     visual = (
-      <AnimatePresence mode="popLayout" initial={false}>
+      <AnimatePresence key={gen} mode="popLayout" initial={false}>
         {morphGlyphs(text).map((g) => (
           <Glyph key={g.key} ch={g.ch} dep={text} />
         ))}
@@ -118,7 +137,8 @@ export function TextRoll({ text, mode = "morph", direction = "up", className }: 
   }
 
   return (
-    <span className={cn("relative inline-flex whitespace-pre", className)}>
+    // tabular figures: a changing digit never changes the label's width, so its neighbours never jump
+    <span className={cn("relative inline-flex whitespace-pre tabular-nums", className)}>
       <span className="sr-only">{text}</span>
       <span aria-hidden="true" className={cn("relative inline-flex", roll && !reduced && "overflow-hidden py-[0.12em] -my-[0.12em]")}>
         {/* every branch is `popLayout` (an exiting label never moves a sibling): no app-wide re-render per swap */}

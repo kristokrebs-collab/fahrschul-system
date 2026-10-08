@@ -2,7 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetInViewObserverForTests } from "@/motion/inView";
 import { REVEAL_FROM, Reveal, RevealGroup, RevealItem, revealDelay } from "@/motion/Reveal";
-import { TextRoll, MORPH_MAX_CHARS, morphGlyphs } from "@/motion/TextRoll";
+import { TextRoll, MORPH_MAX_CHARS, RAPID_SWAP_MS, morphGlyphs } from "@/motion/TextRoll";
 import { SCRAMBLE_CHARSET, TextScramble, scrambleDuration, scrambleText } from "@/motion/TextScramble";
 import { TextShimmer } from "@/motion/TextShimmer";
 import { stagger } from "@/motion/tokens";
@@ -52,6 +52,30 @@ describe("TextRoll", () => {
     rerender(<TextRoll text="OFFLINE" />);
     expect(container.querySelector("[data-text='OFFLINE']")).not.toBeNull();
     expect(container.textContent).toBe("OFFLINE");
+  });
+});
+
+describe("TextRoll rapid swaps", () => {
+  it("a swap within RAPID_SWAP_MS replaces the roll in flight: never stacked labels; a slow swap still rolls", () => {
+    let now = 1000;
+    const clock = vi.spyOn(performance, "now").mockImplementation(() => now);
+    try {
+      const { container, rerender } = render(<TextRoll text="84" mode="roll" />);
+      const labels = () => Array.from(container.querySelectorAll("[data-text]")).map((n) => n.getAttribute("data-text"));
+      now += 1000;
+      rerender(<TextRoll text="85" mode="roll" />);
+      // a normal swap rolls: the old label leaves while the new one comes in
+      expect(labels()).toEqual(expect.arrayContaining(["84", "85"]));
+      now += RAPID_SWAP_MS / 2;
+      rerender(<TextRoll text="86" mode="roll" />);
+      now += RAPID_SWAP_MS / 2;
+      rerender(<TextRoll text="87" mode="roll" />);
+      // rapid: only the newest label, nothing rolling out
+      expect(labels()).toEqual(["87"]);
+      expect(container.querySelector(".tabular-nums")).not.toBeNull();
+    } finally {
+      clock.mockRestore();
+    }
   });
 });
 
