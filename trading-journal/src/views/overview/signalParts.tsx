@@ -710,7 +710,9 @@ function PartShell({ pv, side, testId, segments, children }: { pv: PartView; sid
             {pv.title}
           </span>
         </span>
-        <span className="num shrink-0 whitespace-nowrap pt-px text-[10.5px] text-faint" data-testid="signal-part-points">
+        {/* room for "+10 von 10 +1 Stärke" at all times: the bonus comes and goes with the market (≤ 1/s), and a points
+            label that widened squeezed the title onto a second line – the whole part (and the card below it) jumped */}
+        <span className="num min-w-[18ch] shrink-0 whitespace-nowrap pt-px text-right text-[10.5px] text-faint" data-testid="signal-part-points">
           {pv.pointsText}
           {lit && pv.bonus && <span className={cn("ml-1.5", prov ? PROV_TEXT[side] : SIDE_TEXT[side])}>+1 Stärke</span>}
         </span>

@@ -154,6 +154,9 @@ describe("SignalCard parts", () => {
     expect(tt).toHaveAttribute("data-state", "ok"); // 3 of 4 = bonusParts
     expect(within(tt).getAllByTestId("signal-part-cell").map((c) => c.getAttribute("data-met"))).toEqual(["false", "true", "true", "true"]);
     expect(within(tt).getByTestId("signal-part-points")).toHaveTextContent("+7,5 von 10");
+    // the label keeps the room of "+10 von 10 +1 Stärke" without the bonus too: the bonus coming and going never
+    // re-wraps the title (the part and the card below it jumped)
+    expect(within(tt).getByTestId("signal-part-points")).toHaveClass("min-w-[18ch]", "text-right");
     fireEvent.click(screen.getByRole("radio", { name: "Short" }));
     expect(screen.getByTestId("signal-whale")).toHaveAttribute("data-state", "open");
     expect(within(screen.getByTestId("signal-whale")).getByText("Top-Trader short · Retail grün")).toBeInTheDocument();
