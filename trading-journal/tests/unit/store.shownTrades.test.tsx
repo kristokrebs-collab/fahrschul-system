@@ -35,6 +35,28 @@ describe("trades shown in the views", () => {
     expect(shown(container)).toBe(n + 1);
   });
 
+  it("many readers follow in one background render without React's 'large number of updates' warning", async () => {
+    const warn = vi.spyOn(console, "warn");
+    const error = vi.spyOn(console, "error");
+    const { container } = render(
+      <>
+        {Array.from({ length: 24 }, (_, i) => (
+          <Count key={i} />
+        ))}
+      </>,
+    );
+    const n = useJournal.getState().trades.length;
+    await act(async () => {
+      await useJournal.getState().saveTrade({ ...useJournal.getState().trades[0]!, id: undefined, notes: "viele" });
+    });
+    const shownAll = Array.from(container.querySelectorAll("[data-testid=n]")).map((e) => Number(e.textContent));
+    expect(new Set(shownAll)).toEqual(new Set([n + 1]));
+    const calls = [...warn.mock.calls, ...error.mock.calls].map((c) => String(c[0]));
+    expect(calls.filter((m) => /large number of updates/i.test(m))).toEqual([]);
+    warn.mockRestore();
+    error.mockRestore();
+  });
+
   it("a save from the open editor shows once the editor closed and its sheet left", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     const { container } = render(<Count />);

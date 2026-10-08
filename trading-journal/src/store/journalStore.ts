@@ -170,9 +170,9 @@ function publishTrades(): void {
   if (next === shownTrades) return;
   shownTrades = next;
   if (shownListeners.size === 0) return;
-  startTransition(() => {
-    for (const l of shownListeners) l(next);
-  });
+  // one transition per reader: they all land on the same transition lane of this task (one background render), and no
+  // transition scope carries more than one update (React's dev check flags > 10 updates inside one startTransition)
+  for (const l of shownListeners) startTransition(() => l(next));
 }
 
 function cancelPublish(): void {
