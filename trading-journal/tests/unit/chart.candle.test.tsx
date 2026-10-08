@@ -40,8 +40,12 @@ vi.mock("lightweight-charts", async (importOriginal) => {
   const pane = { getHeight: () => 300, setStretchFactor: vi.fn() };
   return {
     ...actual,
-    createChart: vi.fn(() => {
+    createChart: vi.fn((host: HTMLElement) => {
       calls.create += 1;
+      // what lightweight-charts appends to its host: a div holding a <table> of canvases
+      const element = document.createElement("div");
+      element.appendChild(document.createElement("table"));
+      host.appendChild(element);
       return {
         addSeries: vi.fn(makeSeries),
         removeSeries: vi.fn(),
@@ -55,8 +59,10 @@ vi.mock("lightweight-charts", async (importOriginal) => {
         unsubscribeClick: vi.fn(),
         applyOptions: vi.fn(),
         takeScreenshot: () => document.createElement("canvas"),
+        chartElement: () => element,
         remove: () => {
           calls.remove += 1;
+          element.remove();
         },
       };
     }),
@@ -235,7 +241,13 @@ describe("NothingCandleChart", () => {
     seriesSpies.setData.mockClear();
     seriesSpies.setMarkers.mockClear();
     rerender(view("hidden"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    // the hidden page holds no table of canvases
+    expect(container.querySelector("table")).toBeNull();
     rerender(view("visible"));
+    expect(container.querySelector("[role=img][aria-label=Kerzenchart] table")).not.toBeNull();
     await ready(container);
     await act(async () => {
       await new Promise((r) => setTimeout(r, 50));

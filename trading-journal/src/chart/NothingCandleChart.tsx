@@ -8,7 +8,7 @@
  * edge, spring tooltip and a skeleton → entrance. Tick labels next to a level / zone / last-price / S/R label are
  * blanked (`axisLabels.ts`), so no axis text overlaps.
  */
-import { memo, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { memo, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { AnimatePresence, animate, motion, useReducedMotion, type MotionValue } from "motion/react";
 import {
   createChart,
@@ -501,6 +501,25 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         parked.current = kept;
         parkChart(kept);
       } else kept.destroy();
+    };
+  }, []);
+
+  // a parked chart's DOM leaves the hidden page (lightweight-charts builds a <table> of canvases: the kept-alive overview
+  // holds no real table while another page is shown – that page's selectors, motion.spec / trades.spec) and comes back
+  // in the commit that shows the page again, before its first paint. Layout phase: the hide's cleanup runs before the
+  // passive one that parks the instance, the show's mount before the passive one that re-attaches it.
+  useLayoutEffect(() => {
+    const node = host.current;
+    const kept = parked.current;
+    if (node && kept && kept.instance.node === node) {
+      const el = kept.instance.chart.chartElement();
+      if (el.parentNode !== node) node.appendChild(el);
+    }
+    return () => {
+      const live = inst.current;
+      if (!node || !live || live.node !== node) return;
+      const el = live.chart.chartElement();
+      if (el.parentNode === node) node.removeChild(el);
     };
   }, []);
 
