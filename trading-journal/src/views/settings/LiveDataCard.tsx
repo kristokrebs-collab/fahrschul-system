@@ -13,6 +13,7 @@ import { canObserveInView, useFirstInView } from "@/motion/inView";
 import { StatusPill, type StatusTone } from "@/motion/StatusPill";
 import { Switch } from "@/motion/Switch";
 import { spring, stagger, tween } from "@/motion/tokens";
+import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
@@ -297,6 +298,57 @@ export function routeLine(health: ProviderHealth): string[] {
   return out;
 }
 
+/** xl and up: the feeds in two tables side by side (the card spans the settings page there). */
+export const SPLIT_QUERY = "(min-width: 1280px)";
+
+/** The feed table (`Feed | Quelle | Stand | Status`) for `feeds`; `offset` = index of the first row (reveal stagger). */
+function FeedTable({ feeds, offset, health, statusLabels, reveal, seen }: { feeds: FeedHealth[]; offset: number; health: ProviderHealth; statusLabels: LiveDataCardProps["statusLabels"]; reveal: boolean; seen: boolean }) {
+  return (
+    <table className="w-full text-left text-[12.5px] max-sm:block">
+      <thead className="max-sm:hidden">
+        <tr className="border-b border-line">
+          {(["feed", "source", "asOf", "status"] as const).map((c) => (
+            // ST-02: the status column reserves the longest pill (`Zuletzt 01:39 · veraltet`), so a label that
+            // grows never re-flows the table mid-morph (the other columns stay put)
+            <th key={c} scope="col" className={cn("label !text-faint px-3 py-2 tracking-[0.1em]", c === "status" && "min-w-[12rem]")}>
+              {LIVE_STRINGS.columns[c]}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="max-sm:block">
+        {feeds.map((f, j) => {
+          const i = offset + j;
+          const label = statusLabels?.[f.feed];
+          const line = f.consecutiveFailures === undefined ? null : feedLine(f, { transport: WS_FEEDS.includes(f.feed) ? "ws" : "rest", online: health.online, ws: health.ws, primary: health.primary, skewMs: health.clockSkewMs });
+          const delay = Math.min(i, stagger.max) * stagger.rows;
+          return (
+            <motion.tr
+              key={f.feed}
+              className="border-b border-line/60 last:border-b-0 max-sm:grid max-sm:grid-cols-[auto_minmax(0,1fr)_auto] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:px-3 max-sm:py-2"
+              initial={reveal ? { opacity: 0, y: 4 } : false}
+              animate={seen ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
+              transition={{ default: { ...tween.reveal, delay }, y: { ...spring.enter, delay } }}
+            >
+              <td className="px-3 py-1.5 text-fg/90 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-w-0 max-sm:p-0">
+                {FEED_LABELS[f.feed] ?? f.feed}
+                {line && <FeedLineView line={line} />}
+              </td>
+              <td className="px-3 py-1.5 text-mute max-sm:col-start-1 max-sm:row-start-2 max-sm:min-w-0 max-sm:p-0 max-sm:text-[11.5px]">{SOURCE_LABELS[f.source]}</td>
+              <td className="num px-3 py-1.5 font-mono text-mute max-sm:col-start-2 max-sm:row-start-2 max-sm:p-0 max-sm:text-[11.5px]">
+                <StandCell at={f.lastDataAt} />
+              </td>
+              <td className="px-3 py-1.5 max-sm:col-start-3 max-sm:row-span-2 max-sm:row-start-1 max-sm:justify-self-end max-sm:p-0" title={label?.detail ?? f.detail}>
+                <StatusPill tone={label?.tone ?? toneOfState(f.state)} label={label?.text ?? STATE_LABELS[f.state]} expanded />
+              </td>
+            </motion.tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 /**
  * NEW `Live-Daten` card (Plan 6.4): feed table `Feed | Quelle | Stand | Status` from the health
  * snapshot, `Jetzt aktualisieren` / `Jetzt neu verbinden` / `Cache leeren`, and the `tj2-ui`
@@ -317,6 +369,9 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
   const seen = useFirstInView(tableRef, reveal);
 
   const feeds = health ? (Object.values(health.feeds) as ProviderHealth["feeds"][FeedId][]) : [];
+  // xl: the card spans the page (SettingsView) – two tables side by side; the first takes the extra row of an odd count
+  const split = useMediaQuery(SPLIT_QUERY, false) && feeds.length > 6;
+  const half = Math.ceil(feeds.length / 2);
 
   return (
     <Card title={LIVE_STRINGS.title} note={LIVE_STRINGS.note} className={className}>
@@ -338,49 +393,14 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
               </span>
             ))}
           </div>
-          {/* below sm the rows stack (feed + status, then source · Stand) – no sideways scroll on phones */}
-          <div ref={tableRef} className="rounded-xl border border-line sm:overflow-x-auto">
-            <table className="w-full text-left text-[12.5px] max-sm:block">
-              <thead className="max-sm:hidden">
-                <tr className="border-b border-line">
-                  {(["feed", "source", "asOf", "status"] as const).map((c) => (
-                    // ST-02: the status column reserves the longest pill (`Zuletzt 01:39 · veraltet`), so a label that
-                    // grows never re-flows the table mid-morph (the other columns stay put)
-                    <th key={c} scope="col" className={cn("label !text-faint px-3 py-2 tracking-[0.1em]", c === "status" && "min-w-[12rem]")}>
-                      {LIVE_STRINGS.columns[c]}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="max-sm:block">
-                {feeds.map((f, i) => {
-                  const label = statusLabels?.[f.feed];
-                  const line = f.consecutiveFailures === undefined ? null : feedLine(f, { transport: WS_FEEDS.includes(f.feed) ? "ws" : "rest", online: health.online, ws: health.ws, primary: health.primary, skewMs: health.clockSkewMs });
-                  const delay = Math.min(i, stagger.max) * stagger.rows;
-                  return (
-                    <motion.tr
-                      key={f.feed}
-                      className="border-b border-line/60 last:border-b-0 max-sm:grid max-sm:grid-cols-[auto_minmax(0,1fr)_auto] max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-0.5 max-sm:px-3 max-sm:py-2"
-                      initial={reveal ? { opacity: 0, y: 4 } : false}
-                      animate={seen ? { opacity: 1, y: 0 } : { opacity: 0, y: 4 }}
-                      transition={{ default: { ...tween.reveal, delay }, y: { ...spring.enter, delay } }}
-                    >
-                      <td className="px-3 py-1.5 text-fg/90 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-w-0 max-sm:p-0">
-                        {FEED_LABELS[f.feed] ?? f.feed}
-                        {line && <FeedLineView line={line} />}
-                      </td>
-                      <td className="px-3 py-1.5 text-mute max-sm:col-start-1 max-sm:row-start-2 max-sm:min-w-0 max-sm:p-0 max-sm:text-[11.5px]">{SOURCE_LABELS[f.source]}</td>
-                      <td className="num px-3 py-1.5 font-mono text-mute max-sm:col-start-2 max-sm:row-start-2 max-sm:p-0 max-sm:text-[11.5px]">
-                        <StandCell at={f.lastDataAt} />
-                      </td>
-                      <td className="px-3 py-1.5 max-sm:col-start-3 max-sm:row-span-2 max-sm:row-start-1 max-sm:justify-self-end max-sm:p-0" title={label?.detail ?? f.detail}>
-                        <StatusPill tone={label?.tone ?? toneOfState(f.state)} label={label?.text ?? STATE_LABELS[f.state]} expanded />
-                      </td>
-                    </motion.tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* below sm the rows stack (feed + status, then source · Stand) – no sideways scroll on phones; from xl (the card
+              spans the settings page) the feeds run in two tables side by side, so the card is half as tall */}
+          <div ref={tableRef} className={cn("grid gap-3", split && "grid-cols-2 items-start")}>
+            {(split ? [feeds.slice(0, half), feeds.slice(half)] : [feeds]).map((part, k) => (
+              <div key={k} className="min-w-0 rounded-xl border border-line sm:overflow-x-auto">
+                <FeedTable feeds={part} offset={k === 0 ? 0 : half} health={health} statusLabels={statusLabels} reveal={reveal} seen={seen} />
+              </div>
+            ))}
           </div>
         </>
       ) : (

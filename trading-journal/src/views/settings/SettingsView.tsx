@@ -239,9 +239,15 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
       >
         <AccountsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
         <BacktestCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
-        <TriggerCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+        {/* Chart-Level and Live-Daten span the page (design pass v3): side by side the 9-field level card stood ~1000 px
+            empty next to the feed table; the table runs in two columns from xl */}
+        <div className="min-w-0 lg:col-span-2">
+          <TriggerCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+        </div>
 
-        <LiveDataCard health={health} statusLabels={statusLabels} onRefresh={onRefresh} onReconnect={onReconnect} onClearCache={onClearCache} />
+        <div className="min-w-0 lg:col-span-2">
+          <LiveDataCard health={health} statusLabels={statusLabels} onRefresh={onRefresh} onReconnect={onReconnect} onClearCache={onClearCache} />
+        </div>
 
         {/* `Card` puts `className` on its inner surface, so a full-width card needs a spanning grid item around it */}
         <div className="min-w-0 lg:col-span-2">
@@ -257,11 +263,12 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
           <HyblockCard draft={draft} onChange={set} onTest={onTestHyblock} />
         </div>
 
+        {/* pairs of similar height (design pass v3): Daten | Fehler-Tags, Grundregeln | Disziplin-Grenzen */}
         <DataCardMemo onImport={openImport} />
 
-        <RulesCardMemo rules={draft.rules} onChange={setRules} trades={trades} changed={changed.has("rules")} />
-
         <MistakesCard rows={draft.mistakes} onChange={setMistakes} trades={trades} changed={changed.has("mistakes")} />
+
+        <RulesCardMemo rules={draft.rules} onChange={setRules} trades={trades} changed={changed.has("rules")} />
 
         <LimitsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
 

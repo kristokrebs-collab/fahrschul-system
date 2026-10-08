@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildFeedSpecs } from "@/market/feeds";
 import { initialHealth, reduceHealth } from "@/market/health";
 import type { HealthEvent, ProviderHealth } from "@/market/types";
-import { FEED_LABELS, LiveDataCard, feedLine, feedLineText, routeLine, type FeedLineCtx } from "@/views/settings/LiveDataCard";
+import { FEED_LABELS, LiveDataCard, SPLIT_QUERY, feedLine, feedLineText, routeLine, type FeedLineCtx } from "@/views/settings/LiveDataCard";
 
 const disk = vi.hoisted(() => ({ on: false }));
 vi.mock("@/edition", async (orig) => ({ ...(await orig<typeof import("@/edition")>()), isFileProtocol: () => disk.on }));
@@ -163,5 +163,31 @@ describe("LiveDataCard · honest freshness for every feed (decision 14)", () => 
     const digits = ticker.querySelector(".tabular-nums")!;
     expect(digits.textContent).toMatch(/^0:(19|20|21)$/);
     expect(digits.className).toContain("min-w-[4.5ch]"); // the number never re-flows the column
+  });
+});
+
+describe("LiveDataCard · layout (design pass v3)", () => {
+  const health = run([{ type: "ws_message", feeds: ["aggTrade", "markPrice"], asOf: T, now: T }]);
+  const withMedia = (matches: (q: string) => boolean) => {
+    const prev = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: matches(q), media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false })) as unknown as typeof window.matchMedia;
+    return () => void (window.matchMedia = prev);
+  };
+
+  it("xl (the card spans the page): the feeds run in two tables, every feed once; below xl one table", () => {
+    const feeds = Object.keys(health.feeds).length;
+    let restore = withMedia((q) => q === SPLIT_QUERY);
+    const { unmount } = render(<LiveDataCard health={health} />);
+    const tables = screen.getAllByRole("table");
+    expect(tables).toHaveLength(2);
+    const rows = tables.map((t) => within(t).getAllByRole("row").length - 1);
+    expect(rows[0]! + rows[1]!).toBe(feeds);
+    expect(rows[0]! - rows[1]!).toBeLessThanOrEqual(1);
+    unmount();
+    restore();
+    restore = withMedia(() => false);
+    render(<LiveDataCard health={health} />);
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    restore();
   });
 });
