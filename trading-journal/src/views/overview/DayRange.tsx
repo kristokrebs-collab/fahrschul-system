@@ -9,12 +9,13 @@
  * has no empty band above `Chart öffnen` (lg+); elsewhere it keeps its minimum height.
  */
 import { motion, useMotionValue, useTransform } from "motion/react";
-import { memo, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
+import { memo, useEffect, useId, useMemo, useRef } from "react";
 import { cn } from "@/lib/cn";
 import { n0 } from "@/lib/format";
 import { getFeed, klineBarKey, priceMv, useFeedSelect, type Candle } from "@/market";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { useBoxSize } from "@/primitives/boxSize";
 
 export const DAY_RANGE_TITLE = "24 Stunden";
 const DAY_MS = 86_400_000;
@@ -63,25 +64,6 @@ export function dayGeometry(bars: readonly Candle[], w: number, h: number): DayG
   });
   const area = `${line}L${iw.toFixed(1)},${h}L0,${h}Z`;
   return { line, area, lo, hi };
-}
-
-/** Box size from a ResizeObserver report (rounded px; 0 × 0 reports of a hidden page are ignored). */
-function useBoxSize(ref: RefObject<HTMLElement | null>): { w: number; h: number } | null {
-  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver((entries) => {
-      const r = entries[entries.length - 1]?.contentRect;
-      if (!r || r.width < 1 || r.height < 1) return;
-      const w = Math.round(r.width);
-      const h = Math.round(r.height);
-      setSize((s) => (s && s.w === w && s.h === h ? s : { w, h }));
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref]);
-  return size;
 }
 
 export const DayRange = memo(function DayRange({ className }: { className?: string }) {

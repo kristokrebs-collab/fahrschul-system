@@ -48,3 +48,17 @@ describe("overview rows", () => {
     expect(chart.style.minHeight).toBe("240px");
   });
 });
+
+describe("Hochrechnung path", () => {
+  it("projectionGeometry: linear line from Start to 12 Monate, 'heute' at the elapsed share of the year; no room → null", async () => {
+    const { projectionGeometry } = await import("@/views/overview/ProjectionCard");
+    const g = projectionGeometry({ linear: 0.5, comp: 0.6, r: 0.1, days: 73 }, 212, 112)!;
+    // x from the left pad (6) to width − pad (206); the start capital (1.0) is the lowest value → bottom pad
+    expect(g.linear.startsWith("M6.0,106.0")).toBe(true);
+    expect(g.linear).toContain("L206.0,");
+    expect(g.now.x).toBeCloseTo(6 + (73 / 365) * 200, 5);
+    expect(g.now.y).toBeGreaterThan(6);
+    expect(g.now.y).toBeLessThan(106);
+    expect(projectionGeometry({ linear: 0.5, comp: 0.6, r: 0.1, days: 73 }, 212, 30)).toBeNull();
+  });
+});
