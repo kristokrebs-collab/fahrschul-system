@@ -428,16 +428,29 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   /** Implicit and explicit closes of a changed form ask first ("alle eingetragenen Werte bleiben"). */
   const cancel = () => (dirty ? setConfirmDiscard(true) : closeEditor());
 
+  /**
+   * The form as last committed. A save that waits for the Einstiegs-Check (a back-dated trade: the history check, up to
+   * `SAVE_CHECK_TIMEOUT_MS`) reads it again before it writes, so input typed meanwhile is saved – never dropped with
+   * the closing sheet.
+   */
+  const latestRef = useRef({ rec, d, t, checks, items, x, checking });
+  useLayoutEffect(() => {
+    latestRef.current = { rec, d, t, checks, items, x, checking };
+  });
+
   const save = useCallback(
     async (mode: "close" | "again") => {
       if (savingRef.current) return;
-      const problem = validateRecord(rec, d.chart);
-      if (problem) {
+      const reject = (problem: string): void => {
         const field = invalidFieldOf(problem);
         setErr(problem);
         setInvalid(field);
         shakeField(alertRef.current, { reduced, self: true });
         if (field) revealInvalid(`f-${field}`, { reduced });
+      };
+      const problem = validateRecord(rec, d.chart);
+      if (problem) {
+        reject(problem);
         return;
       }
       setErr("");
@@ -453,16 +466,32 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       }, SAVE_BUSY_DELAY_MS);
       try {
         // the check at save time: live within 5 min of now, else the (memoised) history check; none → keep the stored one
-        const signal = checking ? await resolveTradeSignal(d.date, t.side) : undefined;
+        let at = { date: d.date, side: t.side };
+        let signal = checking ? await resolveTradeSignal(at.date, at.side) : undefined;
+        // input typed while the check loaded is written with the trade: the form as it stands now (a date / side moved
+        // meanwhile is checked again), validated again – an invalid edit keeps the sheet open with its message
+        let cur = latestRef.current;
+        for (let i = 0; i < 3 && cur.checking && (cur.d.date !== at.date || cur.t.side !== at.side); i++) {
+          at = { date: cur.d.date, side: cur.t.side };
+          signal = await resolveTradeSignal(at.date, at.side);
+          cur = latestRef.current;
+        }
+        if (cur.rec !== rec) {
+          const late = validateRecord(cur.rec, cur.d.chart);
+          if (late) {
+            reject(late);
+            return;
+          }
+        }
         const now = new Date().toISOString();
         // Spread the stored trade first so passthrough/unknown fields (legacy extras, `signal`, `mistakes`) survive an edit.
         const record: TradeRecord = {
           ...(trade ?? {}),
-          ...rec,
-          checks: pruneChecks(checks, items),
+          ...cur.rec,
+          checks: pruneChecks(cur.checks, cur.items),
           ...(signal ? { signal } : null),
-          pnl: x.pnl,
-          r: x.r,
+          pnl: cur.x.pnl,
+          r: cur.x.r,
           updatedAt: now,
           createdAt: trade?.createdAt || now,
         };
@@ -478,8 +507,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         pushToast({
           kind: "success",
           title: trade ? "Trade aktualisiert" : "Trade gespeichert",
-          value: x.pnl == null ? "offen" : signed(x.pnl),
-          valueTone: x.pnl == null ? undefined : x.pnl < 0 ? "loss" : "win",
+          value: cur.x.pnl == null ? "offen" : signed(cur.x.pnl),
+          valueTone: cur.x.pnl == null ? undefined : cur.x.pnl < 0 ? "loss" : "win",
         });
         if (burst) {
           if (mode === "close") {
@@ -496,7 +525,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         if (mode === "close") {
           closeEditor();
         } else {
-          const next = resetForNext(d, t);
+          const next = resetForNext(cur.d, cur.t);
           setD(next.d);
           setT(next.t);
           setBaseline(next);
@@ -515,7 +544,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         if (busyShown) setSaving(false);
       }
     },
-    [rec, d, t, items, checks, checking, x, trade, trades, closeEditor, reduced],
+    [rec, d, t, checking, trade, trades, closeEditor, reduced],
   );
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
