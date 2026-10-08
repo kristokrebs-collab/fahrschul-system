@@ -4,8 +4,8 @@
  * the same data (`mocks/synthOracle.ts` → `computeBias`), top traders > 64 % long + retail red (`whale-long`). The SHORT
  * setup is the same price path mirrored around the live price (`p' = 2·84 200 − p`: a blow-off top that turns down)
  * with the mirrored ratios (`whale-short`) — WaveTrend, RSI and the premium/discount range mirror, so the bar must lean
- * right (Short) — never against the check's valid Short-Einstieg. The page clock is pinned at 10:03 UTC (the signal
- * candle closed: "bestätigt"; the 45m candle still forms → rows resting on it are flagged "vorläufig"). Also: the
+ * right (Short) — never against the check's valid Short-Einstieg. The page clock is pinned at 06:03 UTC (the 30m, 45m
+ * and 1h signal candles closed: "bestätigt"; rows resting on a forming candle would be flagged "vorläufig"). Also: the
  * explainer (tap / Enter; 9 rows incl. Top-Trader-Kombi, Divergenzen, Support / Widerstand; the weights add up to
  * 100 %, the contributions to the shown sum, no row text overlaps), the hero strip line, no overlap at the user's sizes.
  */
@@ -33,7 +33,8 @@ async function mirrorKlines(page: Page, anchor: number, now: () => number): Prom
 }
 
 async function openBias(page: Page, mode: "long" | "short"): Promise<{ card: Locator; bias: Locator; anchor: number; now: () => number }> {
-  const at = utcToday(10, 3);
+  // 06:03 UTC: the 30m, 45m and 1h candles with the turn have all closed (a confirmed entry, "Stark" possible)
+  const at = utcToday(6, 3);
   const clock = await pinClock(page, at);
   const anchor = at - 60_000;
   await seed(page, { synth: { ratios: mode === "long" ? "whale-long" : "whale-short", anchor }, clock: clock.now });

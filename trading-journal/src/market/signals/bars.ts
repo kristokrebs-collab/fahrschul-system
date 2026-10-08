@@ -50,10 +50,15 @@ export function neededTfs(cfg: { ladder: readonly string[]; zoneTf: string }): s
 
 export const candleToBar = (c: Candle): Bar => ({ t: c.time / 1000, o: c.open, h: c.high, l: c.low, c: c.close, v: c.volume });
 
+/** How far back a same-prefix update looks for replaced candles before converting the whole series again. */
+const TAIL_SCAN = 64;
+
 /**
  * Memoised candle → bar conversion of a live series. The feeds replace their array on every tick but keep the
  * prefix: when the new array has the same start and length (forming bar updated) or one more bar (a new bar), only
- * the tail is converted.
+ * the tail is converted. The tail is found by object identity, not by time: `upsertBar` keeps the prefix objects and
+ * `upsertSeries` puts its incoming objects into the overlap, so a REST gap fill that corrects an older bar after the
+ * socket already appended the next one (a reconnect across a candle boundary) is converted too.
  */
 export class BarConverter {
   private src: readonly Candle[] | null = null;
@@ -65,9 +70,16 @@ export class BarConverter {
     const n = candles.length;
     let out: Bar[];
     if (prev && prev.length > 1 && n >= prev.length && n <= prev.length + 1 && candles[0]?.time === prev[0]?.time && candles[prev.length - 2]?.time === prev[prev.length - 2]?.time) {
-      // same prefix: re-convert the old last bar (it may have closed) and anything appended
-      out = this.bars.slice(0, prev.length - 1);
-      for (let i = prev.length - 1; i < n; i++) out.push(candleToBar(candles[i]!));
+      // same prefix: re-convert the old last bar (it may have closed), every replaced candle before it and anything
+      // appended
+      let from = prev.length - 1;
+      const floor = Math.max(0, from - TAIL_SCAN);
+      while (from > floor && candles[from - 1] !== prev[from - 1]) from--;
+      if (from === floor && floor > 0 && candles[floor - 1] !== prev[floor - 1]) out = candles.map(candleToBar);
+      else {
+        out = this.bars.slice(0, from);
+        for (let i = from; i < n; i++) out.push(candleToBar(candles[i]!));
+      }
     } else {
       out = candles.map(candleToBar);
     }

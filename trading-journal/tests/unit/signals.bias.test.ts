@@ -542,10 +542,11 @@ describe("symmetry", () => {
     a.contributions.forEach((c, i) => expect(b.contributions[i]!.vote! + c.vote!).toBeCloseTo(0, 12));
   });
 
-  it("synthetic market: the e2e long setup is Stark Long once its 30m candle closed, its mirror image the same strength short", () => {
-    // the turn of the e2e market sits on the forming candle at its anchor; 31 min later the base candle has closed
+  it("synthetic market: the e2e long setup is Stark Long once its candles closed, its mirror image the same strength short", () => {
+    // the turn of the e2e market sits on the forming candle at its anchor; 46 min later the base (30m) and the required
+    // 45m candle have both closed with it, whatever the anchor's place in the 45m grid
     const anchor = Date.now();
-    const now = anchor + 31 * 60_000;
+    const now = anchor + 46 * 60_000;
     const SOURCE: Record<string, { interval: string; sec: number }> = { "30m": { interval: "15m", sec: 900 }, "45m": { interval: "15m", sec: 900 }, "1h": { interval: "1h", sec: 3600 }, "4h": { interval: "4h", sec: 14_400 } };
     const build = (flip: boolean, at: number, cfg: SignalCfg, traders?: TraderReading) => {
       const bars: Record<string, Bar[]> = {};

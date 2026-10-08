@@ -3,7 +3,8 @@
  * three-day fall into a capitulation low, then a sharp turn) as 15m / 1h / 4h klines, plus the top-trader / all-accounts
  * ratio series (the check reads the 5-minute ones). The expected evaluation comes from the app's own pure engine on the
  * same data (`mocks/synthOracle.ts`). The page clock is pinned (`pinClock`) so "now" always sits at the same place in the
- * 30m candle: 10:03 UTC with the turn ending at 10:02 → the base candle that carried the signal has CLOSED ("bestätigt").
+ * candle grid: 06:03 UTC with the turn ending at 06:02 → the 30m base and the required 45m candles that carried the signal
+ * have CLOSED ("bestätigt"; a required rung on a forming candle would keep the entry "vorläufig").
  * Covered: verdict + candle-close state, ladder tiles with their states, RSI, zone, the graded Top-Trader-Kombi (4 parts
  * lit / unlit with their values), divergence and support / resistance rows, the hero strip line, chart MCB dots on 30m
  * and the chart layer toggles.
@@ -16,8 +17,11 @@ import { expectedSignals } from "./mocks/synthOracle";
 
 /** Last trade price of the `live` WS scenario (the engine completes the running bars with it). */
 const LIVE_PRICE = 84_199;
-/** 10:03 UTC: three minutes into a 30m candle, the turn ended one minute ago on the candle before (closed). */
-const AT = () => utcToday(10, 3);
+/**
+ * 06:03 UTC: three minutes after the 30m, 45m and 1h candles closed together (every 3 h), the turn ended one minute ago
+ * on the candles before — the base and the required 45m confirmation are closed, so the entry is "bestätigt".
+ */
+const AT = () => utcToday(6, 3);
 
 const de0 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
 const RUNG_TEXT: Record<string, string> = { provisional: "vorläufig·schließt in", confirmed: "bestätigt", strong: "stark bestätigt" };

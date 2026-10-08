@@ -39,7 +39,7 @@ describe("SignalCheckCard · v2 thresholds", () => {
     expect(within(tt).getByRole("switch")).toBeChecked();
     expect(within(tt).getByText("Check „Top-Trader long · Retail rot“")).toBeInTheDocument();
     expect(within(tt).getByLabelText(/Top-Trader-Schwelle/)).toHaveValue("64");
-    expect(within(tt).getByText("Long: über 64 % Long · Short: über 64 % Short (Long ≤ 36 %)")).toBeInTheDocument();
+    expect(within(tt).getByText("Long: über 64 % Long · Short: über 64 % Short (Long unter 36 %)")).toBeInTheDocument();
     expect(within(within(tt).getByRole("radiogroup", { name: "Retail-Vergleich" })).getByRole("radio", { name: "5m", checked: true })).toBeInTheDocument();
     expect(within(within(tt).getByRole("radiogroup", { name: "+1 Stärke ab" })).getByRole("radio", { name: "3", checked: true })).toBeInTheDocument();
     expect(within(tt).getByText("bis +10 Score, anteilig (je erfüllter Teil ¼)")).toBeInTheDocument();
@@ -57,8 +57,10 @@ describe("SignalCheckCard · v2 thresholds", () => {
 
   it("every control writes its draft key", () => {
     const { onChange } = setup();
-    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "3" }));
-    expect(onChange).toHaveBeenLastCalledWith("sgStrong", "3");
+    // the default signal window (3 candles, the running one included) shows at most 2 closes
+    expect(within(screen.getByRole("radiogroup", { name: "Stark bestätigt nach" })).queryByRole("radio", { name: "3" })).toBeNull();
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "1" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgStrong", "1");
     const tt = screen.getByTestId("settings-whale");
     fireEvent.click(within(tt).getByRole("switch"));
     expect(onChange).toHaveBeenLastCalledWith("sgWhale", "");
@@ -85,7 +87,7 @@ describe("SignalCheckCard · v2 thresholds", () => {
   });
 
   it("the last oscillator cannot be switched off; stored values show; changed keys mark their group", () => {
-    const { onChange } = setup({ sgDivWt: "" }, { whale: { topPct: 70, weight: 7 }, strongCloses: 4 }, ["sgDivAge"]);
+    const { onChange } = setup({ sgDivWt: "" }, { whale: { topPct: 70, weight: 7 }, strongCloses: 4, signalLookback: 6 }, ["sgDivAge"]);
     const div = screen.getByTestId("settings-div");
     const rsi = within(div).getByRole("button", { name: "RSI" });
     expect(rsi).toHaveAttribute("aria-disabled", "true");
@@ -95,5 +97,14 @@ describe("SignalCheckCard · v2 thresholds", () => {
     expect(within(tt).getByLabelText(/Top-Trader-Schwelle/)).toHaveValue("70");
     expect(within(within(tt).getByRole("radiogroup", { name: "Gewicht (Score)" })).getByRole("radio", { name: "7", checked: true })).toBeInTheDocument();
     expect(within(within(screen.getByTestId("settings-confirm")).getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "4", checked: true })).toBeInTheDocument();
+  });
+
+  it("stark bestätigt: never more closes than the signal window holds; a larger stored value shows as the cap", () => {
+    setup({}, { strongCloses: 5, signalLookback: 3 });
+    const group = within(screen.getByTestId("settings-confirm"));
+    const radios = within(group.getByRole("radiogroup", { name: "Stark bestätigt nach" })).getAllByRole("radio");
+    expect(radios.map((r) => r.textContent)).toEqual(["1", "2"]);
+    expect(within(group.getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "2", checked: true })).toBeInTheDocument();
+    expect(group.getByText(/höchstens 2 bei diesem Signal-Fenster/)).toBeInTheDocument();
   });
 });

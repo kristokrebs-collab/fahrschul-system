@@ -17,7 +17,7 @@ import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { ageText, mmss, TOO_FEW_BARS, ZONE_TEXT, zoneFooterText, zonePillText, type SignalCfg, type SignalState, type Side, type TfCheck, type Verdict } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { n0, n1 } from "@/lib/format";
-import { priceMv } from "@/market";
+import { priceMv, signalClockOffset } from "@/market";
 import { useNowMv } from "@/motion/clock";
 import { formatNumber } from "@/motion/MotionNumber";
 import { spring, stagger, tween } from "@/motion/tokens";
@@ -64,10 +64,13 @@ const STATE_ICON: Record<SignalState, string> = { none: "", provisional: "⚠", 
 
 /* ------------------------------------------------------------------ state line + countdown */
 
-/** `mm:ss` until `closesAt` on the shared second clock (tabular figures: the width never jumps). */
+/**
+ * `mm:ss` until `closesAt` on the shared second clock (tabular figures: the width never jumps). `closesAt` is a
+ * Binance candle time, so the device clock is corrected by the exchange clock offset.
+ */
 export const Countdown = memo(function Countdown({ closesAt, className }: { closesAt: number; className?: string }) {
   const now = useNowMv();
-  const text = useTransform(now, (n) => mmss(closesAt - n));
+  const text = useTransform(now, (n) => mmss(closesAt - (n + signalClockOffset())));
   return <motion.span className={cn("num", className)}>{text}</motion.span>;
 });
 
@@ -78,7 +81,7 @@ export const Countdown = memo(function Countdown({ closesAt, className }: { clos
  */
 export const StateLine = memo(function StateLine({ line, side, className }: { line: StateLineView; side: Side; className?: string }) {
   const now = useNowMv();
-  const text = useTransform(now, (n) => stateLineText(line, n));
+  const text = useTransform(now, (n) => stateLineText(line, n + signalClockOffset()));
   return (
     <span className={cn("flex min-h-4 min-w-0 items-baseline gap-1.5 text-[11.5px] leading-4 transition-colors duration-300", stateTone(line.state, side), className)} data-testid="signal-state" data-state={line.state}>
       {STATE_ICON[line.state] && (

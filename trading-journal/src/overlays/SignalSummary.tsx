@@ -30,6 +30,7 @@ import {
 } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { dateTime, n1 } from "@/lib/format";
+import { signalClockOffset } from "@/market/signals";
 import { useNowMv } from "@/motion/clock";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -244,10 +245,13 @@ export function StateChip({ state, side, closesAt }: { state: SignalState; side:
   );
 }
 
-/** The countdown text of a forming candle: a MotionValue on the shared clock (no React render per second). */
+/**
+ * The countdown text of a forming candle: a MotionValue on the shared clock (no React render per second). `closesAt`
+ * is a Binance candle time: the device clock is corrected by the exchange clock offset.
+ */
 function Countdown({ closesAt }: { closesAt: number }) {
   const now = useNowMv();
-  const text = useTransform(now, (t) => provisionalText(closesAt - t));
+  const text = useTransform(now, (t) => provisionalText(closesAt - (t + signalClockOffset())));
   return <motion.span className="tabular-nums">{text}</motion.span>;
 }
 

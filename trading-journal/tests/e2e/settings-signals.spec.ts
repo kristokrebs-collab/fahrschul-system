@@ -51,18 +51,21 @@ test("Einstiegs-Check card: ladder, confirmation and the Top-Trader-Kombi are sa
   await expect(rung2h).toHaveAttribute("aria-pressed", "true");
   await expect(card.getByRole("list", { name: "Leiter" })).toContainText("2h");
 
-  // Bestätigung (Kerzenschluss): stark bestätigt after 3 closes
+  // Bestätigung (Kerzenschluss): stark bestätigt after 1 close; the 3-candle signal window offers at most 2
   const confirm = card.getByTestId("settings-confirm");
-  await expect(confirm.getByRole("radiogroup", { name: /Stark bestätigt nach/ }).getByRole("radio", { name: "2", exact: true })).toHaveAttribute("aria-checked", "true");
-  await confirm.getByRole("radiogroup", { name: /Stark bestätigt nach/ }).getByRole("radio", { name: "3", exact: true }).click();
-  await expect(confirm).toContainText("3 Schlüssen (inkl. der Signalkerze)");
+  const strong = confirm.getByRole("radiogroup", { name: /Stark bestätigt nach/ });
+  await expect(strong.getByRole("radio", { name: "2", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(strong.getByRole("radio", { name: "3", exact: true })).toHaveCount(0);
+  await expect(confirm).toContainText("höchstens 2 bei diesem Signal-Fenster");
+  await strong.getByRole("radio", { name: "1", exact: true }).click();
+  await expect(confirm).toContainText("1 Schluss (inkl. der Signalkerze)");
 
   // Top-Trader-Kombi: threshold 70 % long, retail compared over 15m, +1 strength from 2 parts, weight 20
   const whale = card.getByTestId("settings-whale");
   await expect(whale.getByRole("switch")).toHaveAttribute("aria-checked", "true");
   await expect(whale.locator("#s-sgWhaleTop")).toHaveValue("64");
   await whale.locator("#s-sgWhaleTop").fill("70");
-  await expect(whale).toContainText("Long: über 70 % Long · Short: über 70 % Short (Long ≤ 30 %)");
+  await expect(whale).toContainText("Long: über 70 % Long · Short: über 70 % Short (Long unter 30 %)");
   await whale.getByRole("radiogroup", { name: /Retail-Vergleich/ }).getByRole("radio", { name: "15m", exact: true }).click();
   await whale.getByRole("radiogroup", { name: /\+1 Stärke ab/ }).getByRole("radio", { name: "2", exact: true }).click();
   await expect(whale).toContainText("2 von 4 Teilen erfüllt");
@@ -85,7 +88,7 @@ test("Einstiegs-Check card: ladder, confirmation and the Top-Trader-Kombi are sa
   const s = (await stored<{ signals?: StoredSignals }>(page, "tj2-settings"))?.signals;
   expect(s?.ladder).toEqual(["30m", "45m", "1h", "2h", "4h"]);
   expect(s?.foo, "unknown key kept").toBe("keep");
-  expect(s?.strongCloses).toBe(3);
+  expect(s?.strongCloses).toBe(1);
   expect(s?.whale).toMatchObject({ keep: 1, on: true, periods: ["30m", "1h"], minRun: 2, weight: 20, topPct: 70, retailPeriod: "15m", bonusParts: 2 });
   expect(s?.div).toMatchObject({ keep: "x", on: true, weight: 5 });
   expect(s?.sr).toMatchObject({ on: true, minR: 3 });
@@ -97,7 +100,7 @@ test("Einstiegs-Check card: ladder, confirmation and the Top-Trader-Kombi are sa
   await expect(whale.locator("#s-sgWhaleTop")).toHaveValue("70");
   await expect(whale.getByRole("radiogroup", { name: /Retail-Vergleich/ }).getByRole("radio", { name: "15m", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(whale.getByRole("radiogroup", { name: /\+1 Stärke ab/ }).getByRole("radio", { name: "2", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(confirm.getByRole("radiogroup", { name: /Stark bestätigt nach/ }).getByRole("radio", { name: "3", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(confirm.getByRole("radiogroup", { name: /Stark bestätigt nach/ }).getByRole("radio", { name: "1", exact: true })).toHaveAttribute("aria-checked", "true");
   await expect(sr.locator("#s-sgSrMinR")).toHaveValue("3");
 
   // the live check follows: five rungs; top traders (66 / 65,4 %) are below 70 %, retail red over 15m and the discount

@@ -188,12 +188,31 @@ describe("candle-close state (decisions 6 + 9)", () => {
     expect(v.label).toBe(`${PROVISIONAL_PREFIX}${raw.label}`);
     expect(v.rungStates).toEqual(["provisional", "confirmed", "none", "none"]);
     expect(v.score).toBe(Math.round(((2 - 0.5) / 4) * 55 + 20 + 10)); // the forming base counts ½
-    // base closed, 45m still forming → confirmed entry, the 45m rung ½ in the score
-    const q = [rung("30m", "confirmed"), rung("45m", "provisional"), check("1h"), check("4h")];
+    // base closed, the required 45m still forming → still provisional (a higher rung counts at its own close), the
+    // countdown runs to the 45m close; the 45m rung ½ in the score
+    const q = [rung("30m", "confirmed"), rung("45m", "provisional", 1_760_002_700_000), check("1h"), check("4h")];
     const w = confirmVerdict(verdict("long", q, cfg, null), q, cfg);
-    expect(w).toMatchObject({ state: "confirmed", valid: true, confTiers: 1, closesAt: null });
-    expect(w.strength).toBeGreaterThan(0);
+    expect(w).toMatchObject({ state: "provisional", valid: false, strength: 0, confTiers: 1, closesAt: 1_760_002_700_000 });
+    expect(w.provStrength).toBeGreaterThan(0);
     expect(w.score).toBe(Math.round((1.5 / 4) * 55 + 20 + 10));
+    // base and 45m forming: the later of the two closes decides
+    const both = [rung("30m", "provisional"), rung("45m", "provisional", 1_760_002_700_000), check("1h"), check("4h")];
+    expect(confirmVerdict(verdict("long", both, cfg, null), both, cfg).closesAt).toBe(1_760_002_700_000);
+    // one required rung: confirmed on the closed base; the forming 45m adds strength only at its own close
+    const one = sanitizeSignalCfg({ ladder: ["30m", "45m", "1h", "4h"], required: 1 });
+    const raw1 = verdict("long", q, one, null);
+    expect(raw1.strength).toBe(2);
+    const w1 = confirmVerdict(raw1, q, one);
+    expect(w1).toMatchObject({ state: "confirmed", valid: true, strength: 1, provStrength: 1, label: "Long-Einstieg", closesAt: null });
+    // RSI only near the extreme on the forming candle: provisional until that candle closes (it can still repaint)
+    const live = [rung("30m", "confirmed"), check("45m", { ...rung("45m", "confirmed"), rsiLongClosed: false, forming: true, closesAt: 1_760_002_700_000 })];
+    live[0] = { ...live[0]!, rsiLongClosed: false, forming: true, closesAt: 1_760_001_800_000 };
+    const rv = verdict("long", [...live, check("1h"), check("4h")], cfg, null);
+    expect(rv.valid).toBe(true);
+    expect(confirmVerdict(rv, [...live, check("1h"), check("4h")], cfg)).toMatchObject({ state: "provisional", valid: false, closesAt: 1_760_001_800_000 });
+    // the RSI held at the last close of either head rung → confirmed
+    live[1] = { ...live[1]!, rsiLongClosed: true };
+    expect(confirmVerdict(rv, [...live, check("1h"), check("4h")], cfg)).toMatchObject({ state: "confirmed", valid: true });
     // strong base
     const r = [rung("30m", "strong"), rung("45m", "confirmed"), check("1h"), check("4h")];
     expect(confirmVerdict(verdict("long", r, cfg, null), r, cfg)).toMatchObject({ state: "strong", valid: true });
@@ -221,12 +240,16 @@ describe("candle-close state (decisions 6 + 9)", () => {
             expect(v.strength).toBe(0);
             expect(v.provStrength).toBeGreaterThan(0);
             expect(v.label.startsWith(PROVISIONAL_PREFIX)).toBe(true);
-            expect(v.closesAt).toBe(s.checks[0]!.closesAt);
+            // the countdown runs to a close of the head rungs (the base or a required rung still forming)
+            expect(s.checks.slice(0, Math.max(1, v.tiers)).map((c) => c!.closesAt)).toContain(v.closesAt);
+            expect(v.closesAt!).toBeGreaterThan(now);
           }
           if (v.valid) {
             conf++;
             expect(["confirmed", "strong"]).toContain(v.state);
-            expect(["confirmed", "strong"]).toContain(v.rungStates![0]);
+            // the base and every required rung on closed candles, the RSI condition on a closed candle
+            for (const st of v.rungStates!.slice(0, CFG.required)) expect(["confirmed", "strong"]).toContain(st);
+            expect(s.checks.slice(0, Math.max(1, v.tiers)).some((c) => (v.side === "long" ? c!.rsiLongClosed : c!.rsiShortClosed))).toBe(true);
           }
         }
       }
@@ -456,12 +479,16 @@ describe("Top-Trader-Kombi (decision 5)", () => {
     // two of four → half the points, no bonus
     const half = tradersPart("long", reading({ account: 60, retailChg: 0.2 }), zone, CFG)!;
     expect(half).toMatchObject({ met: 2, grade: 0.5, points: 5, ok: false, bonus: false });
-    // short: long share ≤ 36 % on both ratios, retail green, premium
-    const s = tradersPart("short", reading({ position: 35, account: 36, retailChg: 0.3 }), check("1h", { zone: zoneInfo(0.8) }), CFG)!;
+    // short: long share < 36 % (> 64 % short) on both ratios, retail green, premium
+    const s = tradersPart("short", reading({ position: 35, account: 35.9, retailChg: 0.3 }), check("1h", { zone: zoneInfo(0.8) }), CFG)!;
     expect(s.items.map((i) => i.met)).toEqual([true, true, true, true]);
     expect(s.items[0]!.value).toBe("65,0 % Short");
     expect(s.label).toBe("Top-Trader short · Retail grün");
     expect(tradersPart("short", reading(), zone, CFG)!.met).toBe(0);
+    // exact mirror at the threshold: 64,0 % long and 64,0 % short are both not "over 64 %"
+    const atLong = tradersPart("long", reading({ position: 64, account: 64 }), zone, CFG)!;
+    const atShort = tradersPart("short", reading({ position: 36, account: 36 }), zone, CFG)!;
+    expect([atLong.items[0]!.met, atLong.items[1]!.met, atShort.items[0]!.met, atShort.items[1]!.met]).toEqual([false, false, false, false]);
     // threshold 70 %: 66 / 65 no longer lit
     expect(tradersPart("long", reading(), zone, sanitizeSignalCfg({ whale: { topPct: 70 } }))!.met).toBe(2);
     // weight 0: shown, never counted
@@ -560,6 +587,25 @@ describe("falling-knife filter (decision 11)", () => {
     expect(knifeStructure(struct({ breaks: [{ ...bos, index: 70 }] }), "long").met).toBe(false); // 30 bars old
     expect(knifeStructure(struct({ breaks: [bos, { ...bos, index: 95, dir: -1 }] }), "long").met).toBe(false); // a later bearish break
     expect(knifeStructure(struct({ swings: [sp(80, true, "HH"), sp(95, true, "LH")] }), "short").met).toBe(true);
+  });
+
+  it("structure point on closed bars: a break on the running 1h candle is shown as vorläufig, never met", () => {
+    const now = { index: 100, t: 100, level: 104, pivot: 70, kind: "CHoCH" as const, dir: 1 as const, internal: true };
+    const closed = struct({ swings: [sp(90, true, "HH")], last: 99 });
+    const checks = [check("30m"), check("45m"), check("1h", { structure: struct({ swings: [sp(90, true, "HH")], breaks: [now] }), structureClosed: closed, forming: true }), check("4h")];
+    const k = knifeFilter({ checks, zone: checks[2]!, ...bestVerdict(checks, CFG, checks[2]!) }, CFG);
+    expect(k.items[0]).toMatchObject({ met: false, tfs: [] });
+    expect(k.items[0]!.detail).toBe("1h: CHoCH ↑ über 104 · jetzt (vorläufig)");
+    // the candle closed with it: the closed structure has the break → met
+    const done = [check("30m"), check("45m"), check("1h", { structure: struct({ breaks: [now] }) }), check("4h")];
+    expect(knifeFilter({ checks: done, zone: done[2]!, ...bestVerdict(done, CFG, done[2]!) }, CFG).items[0]).toMatchObject({ met: true, tfs: ["1h"] });
+    // real bars: the closed structure leaves the forming bar out
+    const b15 = synthBars(2600, 7);
+    const bars = ladderBars(b15);
+    const c1h = checkTf("1h", bars["1h"]!, CFG, (b15[b15.length - 1]!.t + 600) * 1000)!;
+    expect(c1h.forming).toBe(true);
+    expect(c1h.structureClosed!.last).toBe(c1h.structure!.last - 1);
+    expect(checkTf("30m", bars["30m"]!, CFG, (b15[b15.length - 1]!.t + 600) * 1000)!.structureClosed).toBeUndefined();
   });
 
   it("three automatic points from the same evaluation; no support-zone item; keine Daten = null", () => {
@@ -691,10 +737,14 @@ describe("config, determinism, performance", () => {
   it("every new setting is part of the evaluation key; sanitised and clamped", () => {
     const base = signalCfgKey(sanitizeSignalCfg({}));
     expect(base).toBe(signalCfgKey(DEFAULT_SIGNAL_CFG));
-    for (const raw of [{ strongCloses: 3 }, { whale: { topPct: 70 } }, { whale: { retailPeriod: "1h" } }, { whale: { bonusParts: 2 } }, { div: { left: 3 } }, { div: { hidden: false } }, { sr: { nearAtr: 2 } }, { sr: { minR: 3 } }]) {
+    for (const raw of [{ strongCloses: 1 }, { strongCloses: 3, signalLookback: 4 }, { whale: { topPct: 70 } }, { whale: { retailPeriod: "1h" } }, { whale: { bonusParts: 2 } }, { div: { left: 3 } }, { div: { hidden: false } }, { sr: { nearAtr: 2 } }, { sr: { minR: 3 } }]) {
       expect(signalCfgKey(sanitizeSignalCfg(raw)), JSON.stringify(raw)).not.toBe(base);
     }
-    expect(sanitizeSignalCfg({ strongCloses: 99, div: { left: 0, rangeMin: 50, rangeMax: 10 }, sr: { nearAtr: -1, minR: "x", extra: 1 } })).toMatchObject({
+    // the closes until "stark bestätigt" never exceed what the signal window can hold (window − the running candle)
+    expect(sanitizeSignalCfg({ strongCloses: 3 }).strongCloses).toBe(2);
+    expect(sanitizeSignalCfg({ strongCloses: 6, signalLookback: 5 }).strongCloses).toBe(4);
+    expect(sanitizeSignalCfg({ strongCloses: 2, signalLookback: 1 }).strongCloses).toBe(1);
+    expect(sanitizeSignalCfg({ strongCloses: 99, signalLookback: 20, div: { left: 0, rangeMin: 50, rangeMax: 10 }, sr: { nearAtr: -1, minR: "x", extra: 1 } })).toMatchObject({
       strongCloses: 6,
       div: { left: 1, rangeMin: 50, rangeMax: 50 },
       sr: { nearAtr: 0.1, minR: 2, extra: 1 },

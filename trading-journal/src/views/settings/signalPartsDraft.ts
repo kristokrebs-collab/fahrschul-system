@@ -44,6 +44,13 @@ export type PartsDraft = Record<PartsDraftKey, string>;
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const on = (b: boolean): string => (b ? "on" : "");
 
+/** Stored closes until "stark bestätigt", clamped to 1 … `STRONG_CLOSES_MAX` (not to the signal window). */
+function storedStrong(signals: unknown): number {
+  const v = isRec(signals) ? signals.strongCloses : undefined;
+  const n = typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+  return Number.isFinite(n) ? Math.min(STRONG_CLOSES_MAX, Math.max(1, Math.round(n))) : DEFAULT_STRONG_CLOSES;
+}
+
 /** Stored `settings.signals` (any app's shape) → the strings, as the engine would run them. */
 export function partsToDraft(signals: unknown): PartsDraft {
   const c = sanitizeSignalCfg(signals);
@@ -51,7 +58,9 @@ export function partsToDraft(signals: unknown): PartsDraft {
   const d = c.div ?? DEFAULT_DIV_CFG;
   const r = c.sr ?? DEFAULT_SR_CFG;
   return {
-    sgStrong: String(c.strongCloses ?? DEFAULT_STRONG_CLOSES),
+    // the stored value, not the window-capped runtime one (`sanitizeSignalCfg` caps it at signal window − 1): an
+    // untouched draft never rewrites it
+    sgStrong: String(storedStrong(signals)),
     sgWhaleTop: toInputString(w.topPct),
     sgWhaleRetail: w.retailPeriod,
     sgWhaleBonus: String(w.bonusParts),

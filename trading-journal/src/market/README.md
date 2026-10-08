@@ -250,6 +250,13 @@ Every rung evaluates its last 500 bars (the other journal's `count: 500`); the r
 (`priceMv` / `tradeTimeMv`, only while younger than 5 min). `startMarket` starts it (`signals/boot.ts` follows
 `settings.signals` from the journal store), `stopMarket` stops it — nothing to mount.
 
+**Clock:** forming vs closed (candle-close states, `msToClose`, the chart's `closed` flag) is decided on the exchange
+clock, `provider.serverNow()` (the device clock + the applied skew), since candle times are Binance times; countdowns
+render `closesAt − (nowMv + signalClockOffset())`. The notifier's own timers stay on the device clock.
+`BarConverter` re-converts the tail of a live series by object identity (a REST gap fill that corrects bar k after the
+socket appended k + 1 reaches the engine). `getChartOverlay(interval, { bars, mcb, div, structure })` = the three chart
+APIs from one build of the bars.
+
 **Cadence (120 Hz rule):** a kline publish, a price frame or a health change only marks the engine dirty; one timer evaluates at
 most once per second (5 s in a hidden tab) and sleeps while no data arrives. A full evaluation costs ≈ 1 ms (test budget 3 ms).
 The published state changes identity only when the rounded result changes.

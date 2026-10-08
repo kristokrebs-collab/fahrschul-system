@@ -9,7 +9,9 @@ export {
   getMcbSeries,
   getDivergences,
   getStructure,
+  getChartOverlay,
   getSignalCandles,
+  signalClockOffset,
   signalsKey,
   toTradeSnapshot,
   SIGNAL_MIN_INTERVAL_MS,
@@ -23,6 +25,7 @@ export {
   type ChartPivot,
   type ChartStructure,
   type ChartLevel,
+  type ChartOverlayData,
 } from "./engine";
 export { useSignalCheck } from "./hooks";
 export { checkTradeAt, retroCheck, RETRO_PAGE_MAX, type RetroResult, type RetroStatus } from "./retro";

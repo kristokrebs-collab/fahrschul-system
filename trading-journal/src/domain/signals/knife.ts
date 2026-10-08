@@ -108,12 +108,15 @@ export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "sho
   const sTexts: string[] = [];
   let sData = false;
   for (const tf of KNIFE_TFS) {
-    const s = checkOf(sig, tf)?.structure;
+    const c = checkOf(sig, tf);
+    // closed bars decide (a break on the running candle can still repaint); the live structure is only a preview
+    const s = c?.structureClosed ?? c?.structure;
     if (!s) continue;
     sData = true;
     const r = knifeStructure(s, side);
     if (r.met) sTfs.push(tf);
-    sTexts.push(`${tf}: ${r.text}`);
+    const live = !r.met && c?.structureClosed && c.structure ? knifeStructure(c.structure, side) : null;
+    sTexts.push(`${tf}: ${live?.met ? `${live.text} (vorläufig)` : r.text}`);
   }
   const structure: KnifeItem = { id: "structure", label: LABEL.structure[side], met: sData ? sTfs.length > 0 : null, detail: sData ? sTexts.join(" · ") : NO_DATA, tfs: sTfs };
 

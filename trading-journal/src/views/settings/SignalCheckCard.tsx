@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import { memo, useState, type ReactNode } from "react";
-import { roleText, SIGNAL_TFS, STRENGTH_LABEL, STRONG_CLOSES_MAX, TRADERS_SIDE_TITLE, WHALE_RETAIL_PERIODS, WHALE_WEIGHTS } from "@/domain/signals";
+import { roleText, SIGNAL_TFS, STRENGTH_LABEL, STRONG_CLOSES_MAX, strongClosesCap, TRADERS_SIDE_TITLE, WHALE_RETAIL_PERIODS, WHALE_WEIGHTS } from "@/domain/signals";
 import { IS_SHARE } from "@/edition";
 import { cn } from "@/lib/cn";
 import { parseNumber } from "@/lib/parse";
@@ -58,15 +58,16 @@ export const SIGNAL_STRINGS = {
   } satisfies Record<NotifyPermission, string>,
   confirm: "Bestätigung (Kerzenschluss)",
   confirmIntro:
-    "Ein Signal auf der laufenden Kerze ist vorläufig (⚠ vorläufig · schließt in mm:ss) und zählt im Score nur halb. Bestätigt ist es erst, wenn seine Kerze damit schließt; der Einstieg zählt, sobald die Basis-Kerze bestätigt hat. Hinweise kommen nur für bestätigte Einstiege.",
+    "Ein Signal auf der laufenden Kerze ist vorläufig (⚠ vorläufig · schließt in mm:ss) und zählt im Score nur halb. Bestätigt ist es erst, wenn seine Kerze damit schließt; der Einstieg zählt, sobald die Basis-Kerze und jede nötige Bestätigung damit geschlossen haben und der RSI auf einer geschlossenen Kerze passt. Hinweise kommen nur für bestätigte Einstiege.",
   strong: "Stark bestätigt nach",
   strongHelp: (n: number) => `${n} ${n === 1 ? "Schluss" : "Schlüssen"} (inkl. der Signalkerze), ohne dass der Kurs die Signalkerze bricht`,
+  strongCap: (max: number) => `höchstens ${max} bei diesem Signal-Fenster (danach verlässt das Signal das Fenster)`,
   whale: "Top-Trader-Kombi",
   whaleSwitch: `Check „${TRADERS_SIDE_TITLE.long}“`,
   whaleHelp:
     "Vier Teile, je mehr erfüllt, desto stärker: Binance-Top-Trader über der Schwelle Long nach Positionen und nach Konten, Retail rot (Long-Anteil aller Konten fällt) und Preis im Discount. Short spiegelbildlich (Top-Trader Short, Retail grün, Premium). Binance-5-min-Daten, ~30 Tage zurück; ohne Daten „keine Daten“, nie ein Fehler.",
   whaleTop: "Top-Trader-Schwelle (% Long)",
-  whaleTopHelp: (x: string, y: string) => `Long: über ${x} % Long · Short: über ${x} % Short (Long ≤ ${y} %)`,
+  whaleTopHelp: (x: string, y: string) => `Long: über ${x} % Long · Short: über ${x} % Short (Long unter ${y} %)`,
   whaleRetail: "Retail-Vergleich",
   whaleRetailHelp: "Long-Anteil aller Konten jetzt gegen so lange vorher",
   whaleBonus: "+1 Stärke ab",
@@ -383,12 +384,23 @@ function SwitchRow({ id, label, help, on, changed, onChange }: { id: DraftTextKe
 
 /** `Bestätigung (Kerzenschluss)`: what provisional / confirmed means and the closes until "stark bestätigt". */
 function ConfirmGroup({ draft, onChange, changed }: GroupProps) {
-  const n = Math.min(STRONG_CLOSES_MAX, Math.max(1, intOf(draft.sgStrong, 2)));
+  // a rung sees only the closes inside its signal window ("Signal gilt" N Kerzen, the running one included): more
+  // are not offered, and a larger stored value counts as the cap (the stored value itself stays untouched)
+  const cap = strongClosesCap(intOf(draft.sgLook, 3));
+  const n = Math.min(cap, Math.max(1, intOf(draft.sgStrong, 2)));
   return (
     <Group title={S.confirm}>
       <div className="grid gap-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start" data-testid="settings-confirm">
         <p className="max-w-[80ch] text-[12px] leading-relaxed text-mute">{S.confirmIntro}</p>
-        <Choice id="sgStrong" label={S.strong} help={S.strongHelp(n)} value={String(n)} options={STRONG_OPTIONS} onChange={(v) => onChange("sgStrong", v)} changed={changed.has("sgStrong")} />
+        <Choice
+          id="sgStrong"
+          label={S.strong}
+          help={`${S.strongHelp(n)} · ${S.strongCap(cap)}`}
+          value={String(n)}
+          options={STRONG_OPTIONS.slice(0, cap)}
+          onChange={(v) => onChange("sgStrong", v)}
+          changed={changed.has("sgStrong")}
+        />
       </div>
     </Group>
   );

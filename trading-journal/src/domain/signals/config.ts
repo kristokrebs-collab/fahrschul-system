@@ -72,7 +72,7 @@ export interface WhaleCfg {
   minRun: number;
   /** score points of the full combo (partial credit: weight × met / 4; 0 = shown only, never counted) */
   weight: number;
-  /** top-trader long share threshold in % (long: > topPct on positions and on accounts; short: ≤ 100 − topPct), 50 … 90 */
+  /** top-trader long share threshold in % (long: > topPct on positions and on accounts; short: < 100 − topPct = > topPct % short), 50 … 90 */
   topPct: number;
   /** retail comparison: long share of all accounts now vs one `retailPeriod` earlier (5-min data): 5m · 15m · 30m · 1h */
   retailPeriod: string;
@@ -129,6 +129,9 @@ export const WHALE_RETAIL_PERIODS: readonly string[] = ["5m", "15m", "30m", "1h"
 
 export const DEFAULT_STRONG_CLOSES = 2;
 export const STRONG_CLOSES_MAX = 6;
+/** Most closes until "stark bestätigt" that a `signalLookback` window can show (window − the running candle, ≥ 1). */
+export const strongClosesCap = (signalLookback: number): number =>
+  Math.max(1, Math.min(STRONG_CLOSES_MAX, (Number.isFinite(signalLookback) ? Math.round(signalLookback) : 3) - 1));
 export const PART_WEIGHT_MAX = 30;
 
 export const DEFAULT_DIV_CFG: Readonly<DivCfg> = Object.freeze({ on: true, rsi: true, wt: true, hidden: true, left: 2, right: 2, rangeMin: 3, rangeMax: 60, maxAge: 5, midline: true, weight: 10 });
@@ -242,6 +245,10 @@ export function sanitizeSignalCfg(raw: unknown): SignalCfg {
   out.notify = r.notify === true;
   out.whale = sanitizeWhaleCfg(r.whale);
   out.strongCloses = intIn(r.strongCloses, DEFAULT_STRONG_CLOSES, 1, STRONG_CLOSES_MAX);
+  // a rung only sees events inside its `signalLookback` window (the running candle included): more closes than the
+  // window can hold would never show "stark bestätigt" on the ladder while the chart dots get it. Runtime only — the
+  // stored settings value stays as it is.
+  out.strongCloses = Math.min(out.strongCloses, strongClosesCap(out.signalLookback));
   out.div = sanitizeDivCfg(r.div);
   out.sr = sanitizeSrCfg(r.sr);
   return out;

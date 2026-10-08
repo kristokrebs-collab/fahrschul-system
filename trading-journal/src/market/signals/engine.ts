@@ -172,6 +172,25 @@ function livePrice(now: number): { price: number; at: number } | null {
   return { price, at: tt > 0 ? tt : rec };
 }
 
+/**
+ * Offset (ms) of the exchange clock from the device clock (`serverNow() − Date.now()`; 0 without an estimate). Candle
+ * open / close times are Binance times, so whether a candle is still forming is decided on that clock: a tablet whose
+ * clock runs minutes ahead would otherwise treat the running candle as closed (and confirm its signals early).
+ */
+function skewOf(p: MarketProvider): number {
+  if (typeof p.serverNow !== "function") return 0;
+  const d = p.serverNow() - Date.now();
+  return Number.isFinite(d) ? d : 0;
+}
+
+/**
+ * Offset to add to the device clock for countdowns to the engine's `closesAt` times (`closesAt − (now + offset)`),
+ * the live provider's applied clock skew (`health.clockSkewMs`); 0 without a provider.
+ */
+export function signalClockOffset(): number {
+  return eng.provider ? skewOf(eng.provider) : 0;
+}
+
 /** Rung bars per timeframe for `cfg` from the provider, running candles completed with `price`. */
 export function buildBars(p: MarketProvider, cfg: SignalCfg, price: { price: number; at: number } | null, bars?: number): Record<string, Bar[]> {
   const out: Record<string, Bar[]> = {};
@@ -308,8 +327,9 @@ export function runSignalCheck(now: number = Date.now()): SignalCheckState {
     eng.inputKey = key;
     stats.computes++;
     const bars = buildBars(p, cfg, price);
-    // candle-close states from `now`; the Top-Trader-Kombi from the provider's 5-min series (Binance clock)
-    const s = computeSignals(bars, cfg, now, { traders: liveTraders(p, cfg) });
+    // candle-close states on the exchange clock (Binance candle times); the Top-Trader-Kombi from the provider's
+    // 5-min series (Binance clock)
+    const s = computeSignals(bars, cfg, now + skewOf(p), { traders: liveTraders(p, cfg) });
     if (s) {
       const live: LiveSignals = { ...s, symbol: p.symbol, source: p.getHealth().feeds[liveFeeds(cfg)[0] ?? "kline_1h"].source, cfg, price: price?.price ?? null };
       const k = signalsKey(live);
@@ -475,9 +495,10 @@ function chartBars(interval: string, n?: number): { bars: Bar[]; cfg: SignalCfg;
   const p = eng.provider;
   if (!p || !tfSource(interval)) return null;
   const cfg = eng.cfg;
-  const now = Date.now();
-  const bars = buildBars(p, { ...cfg, ladder: [interval], zoneTf: interval }, livePrice(now), n)[interval] ?? [];
-  return bars.length ? { bars, cfg, now } : null;
+  const device = Date.now();
+  const bars = buildBars(p, { ...cfg, ladder: [interval], zoneTf: interval }, livePrice(device), n)[interval] ?? [];
+  // `now` decides the forming candle: exchange clock, like the check
+  return bars.length ? { bars, cfg, now: device + skewOf(p) } : null;
 }
 
 /**
@@ -487,14 +508,19 @@ function chartBars(interval: string, n?: number): { bars: Bar[]; cfg: SignalCfg;
  */
 export function getMcbSeries(interval: string, opts: { minor?: boolean; bars?: number } = {}): McbMarker[] {
   const d = chartBars(interval, opts.bars);
-  if (!d) return [];
+  return d ? mcbOf(d, interval, opts.minor) : [];
+}
+
+type ChartBars = NonNullable<ReturnType<typeof chartBars>>;
+
+function mcbOf(d: ChartBars, interval: string, minor?: boolean): McbMarker[] {
   const { bars, cfg, now } = d;
   const forming = isForming(bars, interval, now);
   const strong = strongClosesOf(cfg);
   const lastT = bars[bars.length - 1]!.t;
   const index = new Map<number, number>();
   bars.forEach((b, i) => index.set(b.t, i));
-  return mcbSeries(bars, cfg, { minor: opts.minor }).map((m) => ({
+  return mcbSeries(bars, cfg, { minor }).map((m) => ({
     time: m.t * 1000,
     kind: m.kind,
     live: forming && m.t === lastT,
@@ -533,7 +559,10 @@ export interface ChartDivergence {
  */
 export function getDivergences(interval: string, opts: { bars?: number; recent?: number } = {}): ChartDivergence[] {
   const d = chartBars(interval, opts.bars);
-  if (!d) return [];
+  return d ? divergencesOf(d, interval, opts.recent) : [];
+}
+
+function divergencesOf(d: ChartBars, interval: string, recent?: number): ChartDivergence[] {
   const { bars, cfg, now } = d;
   const dc = divCfgOf(cfg);
   if (!dc.on) return [];
@@ -545,7 +574,7 @@ export function getDivergences(interval: string, opts: { bars?: number; recent?:
   const all = tfDivergences(bars, r, wt1, dc, isForming(bars, interval, now), strongClosesOf(cfg)).all;
   const pt = (x: { t: number; price: number; osc: number }): ChartPivot => ({ time: x.t * 1000, price: x.price, osc: x.osc });
   return all
-    .filter((x) => opts.recent === undefined || x.barsAgo <= opts.recent)
+    .filter((x) => recent === undefined || x.barsAgo <= recent)
     .map((x) => ({ osc: x.osc, kind: x.kind, dir: x.dir, from: pt(x.from), to: pt(x.to), confirmedAt: bars[x.at]!.t * 1000, barsAgo: x.barsAgo, state: x.state, active: x.active }));
 }
 
@@ -580,7 +609,10 @@ export interface ChartStructure {
  */
 export function getStructure(interval: string, opts: { bars?: number } = {}): ChartStructure | null {
   const d = chartBars(interval, opts.bars);
-  if (!d) return null;
+  return d ? structureOf(d) : null;
+}
+
+function structureOf(d: ChartBars): ChartStructure | null {
   const { bars, cfg } = d;
   const sc = srCfgOf(cfg);
   const z = luxZone(bars, cfg.swingLookback);
@@ -607,6 +639,25 @@ export function getStructure(interval: string, opts: { bars?: number } = {}): Ch
   };
 }
 
+/** The chart's check overlay of one timeframe: the layers asked for, all from ONE build of the bars. */
+export interface ChartOverlayData {
+  mcb: McbMarker[];
+  div: ChartDivergence[];
+  structure: ChartStructure | null;
+}
+
+/**
+ * `getMcbSeries` + `getDivergences` + `getStructure` of one timeframe from a single build of its bars (one resample
+ * instead of three); a layer that is not asked for stays empty / `null`.
+ */
+export function getChartOverlay(interval: string, opts: { bars?: number; mcb?: boolean; div?: boolean; structure?: boolean } = {}): ChartOverlayData {
+  const none: ChartOverlayData = { mcb: [], div: [], structure: null };
+  if (!opts.mcb && !opts.div && !opts.structure) return none;
+  const d = chartBars(interval, opts.bars);
+  if (!d) return none;
+  return { mcb: opts.mcb ? mcbOf(d, interval) : [], div: opts.div ? divergencesOf(d, interval) : [], structure: opts.structure ? structureOf(d) : null };
+}
+
 /**
  * Candles of a signal timeframe (e.g. `30m` / `45m` built from 15m) for a chart: `time` in ms, `closed` when the
  * bucket has ended. `bars` limits the count (default `SIGNAL_BARS`).
@@ -614,7 +665,7 @@ export function getStructure(interval: string, opts: { bars?: number } = {}): Ch
 export function getSignalCandles(interval: string, opts: { bars?: number } = {}): Candle[] {
   const p = eng.provider;
   if (!p || !tfSource(interval)) return [];
-  const now = Date.now();
+  const now = Date.now() + skewOf(p); // exchange clock: the `closed` flag of the running candle
   const sec = tfSeconds(interval);
   const bars = buildBars(p, { ...eng.cfg, ladder: [interval], zoneTf: interval }, null, opts.bars)[interval] ?? [];
   return bars.map((b) => ({ time: b.t * 1000, open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v ?? 0, closed: (b.t + sec) * 1000 <= now, closeTime: (b.t + sec) * 1000 - 1 }));

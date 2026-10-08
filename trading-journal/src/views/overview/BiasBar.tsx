@@ -40,7 +40,7 @@ import {
   type BiasLevel,
 } from "@/domain/signals/bias";
 import { cn } from "@/lib/cn";
-import { useSignalCheck } from "@/market";
+import { signalClockOffset, useSignalCheck } from "@/market";
 import { useNowMv } from "@/motion/clock";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
 import { contextSpringAt, smoothstep } from "@/motion/physics";
@@ -236,7 +236,7 @@ function provClose(sig: BiasInput, bias: Bias | null): number | null {
 /** `⚠ vorläufig · 12:04` (the leaning side's entry waits for its candle close) or `⚠ teils vorläufig` (some rows). */
 const ProvTag = memo(function ProvTag({ closesAt, partial, className }: { closesAt: number | null; partial: boolean; className?: string }) {
   const now = useNowMv();
-  const text = useTransform(now, (n) => (closesAt != null ? `vorläufig · ${mmss(closesAt - n)}` : partial ? "teils vorläufig" : "vorläufig"));
+  const text = useTransform(now, (n) => (closesAt != null ? `vorläufig · ${mmss(closesAt - (n + signalClockOffset()))}` : partial ? "teils vorläufig" : "vorläufig"));
   return (
     <span className={cn("flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] text-warn", className)} data-testid="bias-provisional">
       <span aria-hidden="true">⚠</span>

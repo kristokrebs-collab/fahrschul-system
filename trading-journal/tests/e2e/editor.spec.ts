@@ -2,7 +2,8 @@
  * Trade editor additions: the live Einstiegs-Check snapshot stored with a new trade (candle-close state "bestätigt",
  * the graded Top-Trader-Kombi and the falling-knife filter), mistake tags (list + own tag) stored as `trade.mistakes`,
  * both shown in the trade detail, and the unsaved-input guard ("Änderungen verwerfen?") on Escape / Abbrechen. The
- * page clock is pinned at 10:03 UTC (the synthetic signal candle closed a few minutes ago → "bestätigt").
+ * page clock is pinned at 06:03 UTC (the synthetic signal candles — 30m base, 45m, 1h — closed a few minutes ago →
+ * "bestätigt").
  */
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, isMobile, pinClock, screenshot, seed, stored, toast, utcToday } from "./helpers";
@@ -30,7 +31,8 @@ interface StoredTrade {
 
 test("new trade: the live check snapshot (bestätigt, Top-Trader-Kombi 4/4, falling-knife filter) and the mistake tags are stored and shown in the detail", async ({ page }, info) => {
   const errors = collectErrors(page);
-  const at = utcToday(10, 3);
+  // 06:03 UTC: the 30m, 45m and 1h candles with the turn have all closed (the entry is confirmed, not provisional)
+  const at = utcToday(6, 3);
   const clock = await pinClock(page, at);
   await seed(page, { synth: { ratios: "whale-long", anchor: at - 60_000 }, clock: clock.now });
   await page.goto("/#overview");

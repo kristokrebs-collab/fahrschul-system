@@ -6,9 +6,10 @@
  *   close time of the last bar, divergences (`div`, `divergence.ts`) and market structure / S-R (`structure`,
  *   `structure.ts`). The reference fields are computed exactly as before.
  * - `verdict()` / `bestVerdict()` stay the 1:1 port ("raw": every event counts as if its candle had closed).
- * - `confirmVerdict()` applies the candle-close rule: an entry counts (`valid`) only once the base candle has CLOSED
- *   with the signal; before that it is `provisional` (strength 0, `provStrength` = the strength it gets on the close,
- *   provisional rungs count ½ in the score).
+ * - `confirmVerdict()` applies the candle-close rule: an entry counts (`valid`) only once the base candle and every
+ *   required rung have CLOSED with the signal and the RSI condition holds on a closed candle; before that it is
+ *   `provisional` (strength 0, `provStrength` = the strength it gets on the close, provisional rungs count ½ in the
+ *   score).
  * - `gradeSignals()` adds the graded parts (`parts.ts`: Top-Trader-Kombi, divergences, support/resistance) and the
  *   falling-knife filter (`knife.ts`). `computeSignals()` = checks → raw verdicts → confirm → parts.
  *
@@ -18,7 +19,7 @@
 import { MIN_SIGNAL_BARS, divCfgOf, srCfgOf, strongClosesOf, tfSeconds, type Side, type SignalCfg } from "./config";
 import { tfDivergences, type TfDivergences } from "./divergence";
 import { rsi, sma, waveTrend, type Bar } from "./indicators";
-import { knifeFilter, type KnifeFilter } from "./knife";
+import { KNIFE_TFS, knifeFilter, type KnifeFilter } from "./knife";
 import { wtSignal, type WtSignal } from "./mcb";
 import { divPart, partReasonText, srPart, tradersPart, type GradedPart } from "./parts";
 import { PROVISIONAL_FACTOR, isConfirmedState, isForming, lastCloseAt, rungConf, type RungConf, type SignalState } from "./state";
@@ -51,10 +52,22 @@ export interface TfCheck {
   msToClose?: number;
   /** candle-close state per direction (`state.ts`) */
   conf?: Readonly<Record<Side, RungConf>>;
+  /**
+   * RSI near oversold / overbought on the last CLOSED bar (the one before a forming candle; = `rsiLong` / `rsiShort`
+   * when the last bar is closed). The candle-close rule reads these: a live RSI dip on a forming candle can still
+   * repaint. Absent (hand-built checks, old snapshots) = the live flags.
+   */
+  rsiLongClosed?: boolean;
+  rsiShortClosed?: boolean;
   /** divergences of RSI / wt1 vs price (when `settings.signals.div.on`) */
   div?: TfDivergences;
   /** market structure + support / resistance (when `settings.signals.sr.on`; `null` below 3 bars) */
   structure?: Structure | null;
+  /**
+   * The same structure on CLOSED bars only (the forming candle left out), for the falling-knife filter's structure
+   * point on 1h / 4h — a break on the running candle can still repaint. Set only while the last bar forms.
+   */
+  structureClosed?: Structure | null;
 }
 
 /** Candle-close state of a rung for a side (hand-built checks without `conf`: a signal counts as confirmed). */
@@ -82,6 +95,7 @@ export function checkTf(tf: string, bars: readonly Bar[], cfg: SignalCfg, now?: 
   const forming = isForming(bars, tf, now);
   const closesAt = lastCloseAt(bars, tf);
   const strong = strongClosesOf(cfg);
+  const rc = forming && r.length >= 2 ? r[r.length - 2]! : rv;
   const out: TfCheck = {
     tf,
     ok: true,
@@ -94,6 +108,8 @@ export function checkTf(tf: string, bars: readonly Bar[], cfg: SignalCfg, now?: 
     shortSignal: !!wt.short,
     rsiLong: rv <= cfg.rsiOs + cfg.rsiNear,
     rsiShort: rv >= cfg.rsiOb - cfg.rsiNear,
+    rsiLongClosed: rc <= cfg.rsiOs + cfg.rsiNear,
+    rsiShortClosed: rc >= cfg.rsiOb - cfg.rsiNear,
     forming,
     closesAt,
     msToClose: forming && now !== undefined ? Math.max(0, closesAt - now) : 0,
@@ -102,7 +118,11 @@ export function checkTf(tf: string, bars: readonly Bar[], cfg: SignalCfg, now?: 
   const d = divCfgOf(cfg);
   if (d.on) out.div = tfDivergences(bars, r, wt1, d, forming, strong);
   const sc = srCfgOf(cfg);
-  if (sc.on) out.structure = marketStructure(bars, { swing: cfg.swingLookback, internal: sc.internal, eqLen: sc.eqLen, eqThreshold: sc.eqThreshold, range: z.lux ? { hi: z.hi, lo: z.lo } : null });
+  if (sc.on) {
+    const opts = { swing: cfg.swingLookback, internal: sc.internal, eqLen: sc.eqLen, eqThreshold: sc.eqThreshold, range: z.lux ? { hi: z.hi, lo: z.lo } : null };
+    out.structure = marketStructure(bars, opts);
+    if (forming && KNIFE_TFS.includes(tf)) out.structureClosed = marketStructure(bars.slice(0, -1), opts);
+  }
   return out;
 }
 
@@ -201,13 +221,19 @@ function entryLabel(side: Side, strength: number): string {
 export const PROVISIONAL_PREFIX = "Vorläufig: ";
 
 /**
- * Candle-close rule on top of a raw `verdict()` (decision 6): the entry counts only when the base rung's signal is on
- * a CLOSED candle. Higher rungs keep their own state (`rungStates`; a provisional rung counts ½ in the score).
+ * Candle-close rule on top of a raw `verdict()` (decision 6): an entry counts only when it rests on CLOSED candles —
+ * the base rung's signal, the signals of every required rung (`cfg.required`; a higher rung counts as confirmed at its
+ * own close, provisional before) and the RSI condition (read on the last closed bar of the head rungs, never on a
+ * forming candle that can still repaint). Higher rungs keep their own state (`rungStates`; a provisional rung counts
+ * ½ in the score, and extra rungs beyond `required` add strength only once their candle closed).
  * Provisional entry: `valid` false, `strength` 0, `provStrength` = the raw strength, label `Vorläufig: …`, `closesAt` =
- * the base candle's close. Without any forming signal the reference fields stay exactly as `verdict()` gave them.
+ * the close that decides it (the last close among the provisional required rungs; with the RSI only live, not before
+ * the first forming head rung that shows it closes). Without any forming signal the reference fields stay exactly as
+ * `verdict()` gave them.
  */
-export function confirmVerdict(v: Verdict, checks: readonly (TfCheck | null)[], cfg: Pick<SignalCfg, "ladder">): Verdict {
+export function confirmVerdict(v: Verdict, checks: readonly (TfCheck | null)[], cfg: Pick<SignalCfg, "ladder" | "required">): Verdict {
   const n = Math.max(checks.length, cfg.ladder.length);
+  const required = Math.max(1, Math.min(n, cfg.required ?? 1));
   const rungStates: SignalState[] = [];
   for (let i = 0; i < n; i++) rungStates.push(rungState(checks[i], v.side));
   let confTiers = 0;
@@ -215,13 +241,32 @@ export function confirmVerdict(v: Verdict, checks: readonly (TfCheck | null)[], 
   let prov = 0;
   for (let i = 0; i < v.tiers; i++) if (rungStates[i] === "provisional") prov++;
   const baseState = rungStates[0] ?? "none";
-  const state: SignalState = !v.valid ? "none" : baseState === "provisional" ? "provisional" : baseState === "strong" ? "strong" : "confirmed";
+  // RSI condition on closed candles: the live flag of a forming head rung is only a preview
+  const long = v.side === "long";
+  const head = checks.slice(0, Math.max(1, v.tiers));
+  const rsiClosed = head.some((c) => !!c && (long ? (c.rsiLongClosed ?? c.rsiLong) : (c.rsiShortClosed ?? c.rsiShort)));
+  const waiting = baseState === "provisional" || confTiers < required || !rsiClosed;
+  const state: SignalState = !v.valid ? "none" : waiting ? "provisional" : baseState === "strong" ? "strong" : "confirmed";
   const score = prov
     ? Math.round(Math.min(100, ((v.tiers - PROVISIONAL_FACTOR * prov) / Math.max(1, checks.length)) * 55 + (v.rsiOk ? 20 : 0) + (v.zoneOk ? 15 : 0) + (v.strongSignal ? 10 : 0)))
     : v.score;
   const base = { ...v, score, state, confTiers, rungStates, provStrength: v.strength, closesAt: null };
-  if (state !== "provisional") return base;
-  return { ...base, valid: false, strength: 0, label: `${PROVISIONAL_PREFIX}${v.label}`, closesAt: checks[0]?.closesAt ?? null };
+  if (state === "provisional") {
+    // countdown to the close that can confirm it: every provisional required rung (the base included) must close, and
+    // one forming head rung whose live RSI meets the condition must close with it
+    const at = (c: TfCheck | null | undefined): number => (c?.closesAt != null && Number.isFinite(c.closesAt) ? c.closesAt : NaN);
+    let need = -Infinity;
+    for (let i = 0; i < required; i++) if (rungStates[i] === "provisional" && Number.isFinite(at(checks[i]))) need = Math.max(need, at(checks[i]));
+    let rsiAt = Infinity;
+    if (!rsiClosed) for (const c of head) if (c?.forming && (long ? c.rsiLong : c.rsiShort) && Number.isFinite(at(c))) rsiAt = Math.min(rsiAt, at(c));
+    let closesAt = Number.isFinite(rsiAt) ? Math.max(need, rsiAt) : need;
+    if (!Number.isFinite(closesAt)) closesAt = at(checks[0]);
+    return { ...base, valid: false, strength: 0, label: `${PROVISIONAL_PREFIX}${v.label}`, closesAt: Number.isFinite(closesAt) ? closesAt : null };
+  }
+  if (state === "none" || confTiers >= v.tiers) return base;
+  // confirmed, but extra rungs above `required` still on forming candles: they add strength at their own close
+  const strength = Math.min(4, 1 + Math.min(2, Math.min(confTiers, v.tiers) - required) + (v.zoneOk ? 1 : 0)) as Strength;
+  return strength === v.strength ? base : { ...base, strength, provStrength: strength, label: entryLabel(v.side, strength) };
 }
 
 /** The verdict graded with its parts: score + Σ points (max 100), +1 strength per part that holds (max 4). */

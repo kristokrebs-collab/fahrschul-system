@@ -85,7 +85,8 @@ export function tradersPart(side: Side, reading: TraderReading | null | undefine
   const lo = 100 - w.topPct;
   const sideWord = long ? "Long" : "Short";
   const share = (v: number | null): string => (v == null ? NO_DATA : `${n1(long ? v : 100 - v)} % ${sideWord}`);
-  const top = (v: number | null): boolean | null => (v == null ? null : long ? v > w.topPct : v <= lo);
+  // strict on both sides (exact mirror): long > topPct % long, short > topPct % short (= long share < 100 − topPct)
+  const top = (v: number | null): boolean | null => (v == null ? null : long ? v > w.topPct : v < lo);
   const z = zoneRef?.zone ?? null;
   const items: PartItem[] = [
     { id: "pos", label: `Top-Trader Positionen > ${n0(w.topPct)} % ${sideWord}`, value: share(r?.position ?? null), raw: r?.position ?? null, met: top(r?.position ?? null) },
