@@ -6,6 +6,7 @@
 import { motion, useTransform } from "motion/react";
 import { memo } from "react";
 import {
+  deltaText,
   isStrongKind,
   KNIFE_TITLE,
   kindText,
@@ -309,7 +310,11 @@ export function snapshotPartViews(snap: Pick<SignalSnapshot, "side" | "parts" | 
         rows: [
           { id: "pos", label: "Top-Trader Positionen", value: share(pos?.raw), met: pos?.met ?? null },
           { id: "acc", label: "Top-Trader Konten", value: share(acc?.raw), met: acc?.met ?? null },
-          { id: "retail", label: `Retail ${long ? "rot" : "grün"}${p.period ? ` (${p.period})` : ""}`, value: retail?.raw == null ? NO_DATA : ppText(retail.raw), met: retail?.met ?? null },
+          // snapshots with a delta window store the Whale–Retail-Delta as the retail raw (+ its change); older ones the
+          // retail long-share change over `period`
+          p.deltaWindow
+            ? { id: "retail", label: `Whale–Retail-Delta ${long ? "rot" : "grün"}`, value: deltaText(retail?.raw ?? null, p.deltaChg ?? null, p.deltaWindow), met: retail?.met ?? null }
+            : { id: "retail", label: `Retail ${long ? "rot" : "grün"}${p.period ? ` (${p.period})` : ""}`, value: retail?.raw == null ? NO_DATA : ppText(retail.raw), met: retail?.met ?? null },
           {
             id: "zone",
             label: `Preis im ${long ? "Discount" : "Premium"}`,

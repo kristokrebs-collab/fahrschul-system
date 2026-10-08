@@ -151,6 +151,19 @@ describe("SignalSummary – v2 snapshot (candle-close state, graded parts, falli
     expect(knifeRows(short).map((r) => r.label)[0]).toBe("Lower High / BOS 1H·4H");
   });
 
+  it("a snapshot with a delta window shows the Whale–Retail-Delta with its change (long rot, short grün)", () => {
+    const withDelta = (side: "long" | "short", chg: number | null) => {
+      const traders = { ...RAW.parts[0]!, items: RAW.parts[0]!.items.map((i) => (i.id === "retail" ? { ...i, raw: side === "long" ? -3.7 : 3.7 } : i)), delta: side === "long" ? -3.7 : 3.7, deltaChg: chg, deltaWindow: "2h" };
+      return parseSignalSnapshot({ ...RAW, side, zone: side === "long" ? "discount" : "premium", parts: [traders, ...RAW.parts.slice(1)] }) as SignalSnapshot;
+    };
+    expect(snapshotPartViews(withDelta("long", -2.7))[0]!.rows[2]).toMatchObject({ id: "retail", label: "Whale–Retail-Delta rot", value: "−3,7 pp · 2h −2,7", met: true });
+    expect(snapshotPartViews(withDelta("short", 4.7))[0]!.rows[2]).toMatchObject({ label: "Whale–Retail-Delta grün", value: "+3,7 pp · 2h +4,7" });
+    // no older point stored: the level alone
+    expect(snapshotPartViews(withDelta("long", null))[0]!.rows[2]!.value).toBe("−3,7 pp");
+    render(<SignalSummary snap={withDelta("long", -2.7)} side="long" />);
+    expect(screen.getByTestId("signal-summary-part-traders")).toHaveTextContent("Whale–Retail-Delta rot−3,7 pp · 2h −2,7");
+  });
+
   it("an older snapshot has no state chip and no parts section", () => {
     const old = parseSignalSnapshot({ ...RAW, state: undefined, parts: undefined, knife: undefined, v: undefined }) as SignalSnapshot;
     render(<SignalSummary snap={old} side="long" />);

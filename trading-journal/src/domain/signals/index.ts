@@ -22,6 +22,8 @@ export {
   sanitizeWhaleCfg,
   whaleCfgOf,
   WHALE_RETAIL_PERIODS,
+  WHALE_DELTA_WINDOWS,
+  WHALE_DELTA_PP_MAX,
   DEFAULT_STRONG_CLOSES,
   STRONG_CLOSES_MAX,
   strongClosesCap,
@@ -132,7 +134,22 @@ export {
   type Level,
   type LevelKind,
 } from "./structure";
-export { traderReading, TRADER_STEP_MS, TRADER_FRESH_STEPS, TRADERS_TITLE, TRADERS_SIDE_TITLE, type TraderSeries, type TraderReading } from "./traders";
+export {
+  traderReading,
+  traderLookbackMs,
+  deltaWindowMs,
+  deltaSeriesOf,
+  readingDelta,
+  deltaMet,
+  DELTA_SPARK_POINTS,
+  TRADER_STEP_MS,
+  TRADER_FRESH_STEPS,
+  TRADERS_TITLE,
+  TRADERS_SIDE_TITLE,
+  type TraderSeries,
+  type TraderReading,
+  type DeltaPoint,
+} from "./traders";
 export { tradersPart, divPart, srPart, divHitsText, divRungText, TREND_BREAK_TEXT, partReasonText, verdictPart, SR_STOP_ATR, type GradedPart, type PartItem, type PartId } from "./parts";
 export {
   knifeFilter,
