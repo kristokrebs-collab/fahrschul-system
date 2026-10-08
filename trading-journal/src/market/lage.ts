@@ -9,9 +9,12 @@
  * - 4H / 1H: the live `kline_4h` / `kline_1h` series (WS + REST bootstrap 499), closed candles only.
  * - Price: `priceMv` (freshest of trade / book / ticker), at most 1×/s; the forming 4H close stands in without it.
  *
- * Cadence (120 Hz rule): EMAs + structure (`lageBase`, ≈ 0.5 ms) run only when a closed input bar changes; a price
- * move recomputes the live part (≈ 0.04 ms) at most once a second and publishes a new snapshot only when a shown value
- * changes (`lageKey`: state, signs, chips, distances at 0.1 %). Nothing runs per frame, nothing while hidden.
+ * Cadence (120 Hz rule): EMAs + structure (`lageBase`, ≈ 0.5 ms) run only when a closed input bar changes — or once
+ * when a bar the series already report closed passes its close on the Binance clock (`provider.serverNow()`; a device
+ * clock a little behind Binance receives the socket's final frame "before" the close, and the next closed-bar change
+ * may be an hour away); a price move recomputes the live part (≈ 0.04 ms) at most once a second and publishes a new
+ * snapshot only when a shown value changes (`lageKey`: state, signs, chips, distances at 0.1 %). Nothing runs per
+ * frame, nothing while hidden.
  * Retained by subscribers (`useLage`, `retainLage`, the signal engine); with none, the listeners are off.
  */
 import { useEffect, useSyncExternalStore } from "react";
@@ -79,6 +82,12 @@ interface Ctl {
   h1: Bar[];
   formingClose: number | null;
   base: LageBase | null;
+  /**
+   * Close time (Binance clock) of the earliest input bar the series already report as closed but `base` left out — its
+   * close had not passed on `serverNow()` yet (a device clock a little behind Binance reads the socket's final frame
+   * just before the close). `Infinity` = none. Once the clock passes it, the base is computed again.
+   */
+  pendingAt: number;
   view: LageView;
   viewKey: string;
 }
@@ -100,6 +109,7 @@ const fresh = (): Ctl => ({
   h1: [],
   formingClose: null,
   base: null,
+  pendingAt: Infinity,
   view: { lage: null, status: IDLE },
   viewKey: "",
 });
@@ -161,17 +171,37 @@ function livePrice(): number | null {
   return Number.isFinite(p) && p > 0 ? p : ctl.formingClose;
 }
 
-/** Live part (price → U1, distances); cheap. */
+/** Earliest close of a series bar the base left out although the series reports it closed (`Infinity` = none). */
+function pendingCloseOf(b: LageBase | null): number {
+  if (!b) return Infinity;
+  let at = Infinity;
+  const left = (bars: readonly Bar[], used: number, sec: number): void => {
+    const x = bars[used];
+    if (x) at = Math.min(at, (x.t + sec) * 1000);
+  };
+  left(ctl.daily, b.dailyN, 86_400);
+  left(ctl.h4, b.h4N, 14_400);
+  left(ctl.h1, b.h1N, 3_600);
+  return at;
+}
+
+/** Live part (price → U1, distances); cheap. A closed bar the base is still waiting for recomputes the base first. */
 function runLive(): void {
+  if (ctl.base && serverNow() >= ctl.pendingAt) return runBase();
+  liveOnly();
+}
+
+function liveOnly(): void {
   ctl.lastLive = Date.now();
   if (!ctl.base) return publish(null);
   publish(lageAt(ctl.base, livePrice(), serverNow()));
 }
 
-/** Closed-bar part; only when an input bar changed. */
+/** Closed-bar part; only when an input bar changed (or a closed bar it left out has closed on the Binance clock). */
 function runBase(): void {
   ctl.base = ctl.provider && ctl.daily.length ? lageBase(ctl.daily, ctl.h4, serverNow(), { h1: ctl.h1 }) : null;
-  runLive();
+  ctl.pendingAt = pendingCloseOf(ctl.base);
+  liveOnly();
 }
 
 function onPrice(): void {
@@ -227,7 +257,7 @@ function readSeries(): boolean {
 
 function onSeries(): void {
   syncProvider();
-  if (readSeries()) runBase();
+  if (readSeries() || (ctl.base && serverNow() >= ctl.pendingAt)) runBase();
   else publish(ctl.view.lage); // a status-only change (fetched again, next poll)
 }
 
