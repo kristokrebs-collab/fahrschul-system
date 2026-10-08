@@ -47,15 +47,13 @@ function formatDe(value: number, decimals: number): string {
 
 /**
  * The visual column: a vertical 0–9–0 strip translated by its (unbounded) position – one transform per column.
- * Live strips get their own compositor layer (`will-change`), so a gliding price never repaints text; a strip with a
- * motion blur also declares `filter`, so the velocity blur is a compositor effect too (with `transform` alone every
- * blur step repainted the 11-glyph strip – ≈ 200 paints per 10 s of live price).
+ * Live strips get their own compositor layer (`will-change`), so a gliding price never repaints text.
  */
 function StripGlyphs({ y, filter, live = false }: { y: MotionValue<string>; filter?: MotionValue<string>; live?: boolean }) {
   return (
     <span className="relative inline-block w-[1ch] overflow-y-clip leading-none tabular-nums" aria-hidden="true">
       <span className="invisible">0</span>
-      <motion.span className={cn("absolute inset-0", live && (filter ? "will-change-[transform,filter]" : "will-change-transform"))} style={{ y, filter }}>
+      <motion.span className={cn("absolute inset-0", live && "will-change-transform")} style={{ y, filter }}>
         {GLYPHS.map((d, i) => (
           <span key={i} className="absolute inset-x-0 flex h-full items-center justify-center" style={{ top: `${i * 100}%` }}>
             {d}
