@@ -1,5 +1,5 @@
-import { AnimatePresence, animate, cancelFrame, frame, motion, motionValue, useMotionValue, useSpring, useTransform, type MotionValue, type Transition } from "motion/react";
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
+import { animate, cancelFrame, frame, motion, motionValue, useMotionValue, useSpring, useTransform, type AnimationPlaybackControls, type MotionValue, type Transition } from "motion/react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode, type Ref } from "react";
 import { expoCurve, springCurve } from "@/app/cssEasing";
 import { useIntroPhase, type IntroPhase } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
@@ -189,11 +189,65 @@ export interface DockSlotFx {
   bump?: MotionValue<number>;
 }
 
+type MarkerKind = "bg" | "dot";
+const MARKER_BG_STYLE: CSSProperties = { borderRadius: radius.pill };
+
+/**
+ * Where each tab marker last was on screen, captured when it leaves an item (mid-slide included); the item that takes
+ * over slides its own marker in from there. One dock, one marker of each kind.
+ */
+const markerFrom: Record<MarkerKind, DOMRect | null> = { bg: null, dot: null };
+
+/**
+ * Pure: the FLIP start of a marker that moved from `from` to `to` (screen boxes) inside a parent scaled by `s` (the
+ * magnified visual): translate in the marker's own coordinates + a uniform size ratio; `null` when nothing moved.
+ */
+export function markerFlip(from: { left: number; top: number; width: number; height: number }, to: { left: number; top: number; width: number; height: number }, s: number): string | null {
+  const k = s > 0 ? s : 1;
+  const dx = (from.left + from.width / 2 - (to.left + to.width / 2)) / k;
+  const dy = (from.top + from.height / 2 - (to.top + to.height / 2)) / k;
+  const ratio = to.width > 0 ? from.width / to.width : 1;
+  if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(ratio - 1) < 0.01) return null;
+  return `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(${ratio.toFixed(4)})`;
+}
+
+/**
+ * Active-tab marker (`bg`: the white disc behind the icon, `dot`: the red dot under it). A page switch slides it from
+ * the previous tab on `spring.layout` as ONE transform animation that Motion hands to WAAPI – the compositor runs it,
+ * so it glides on while the main thread commits the new page (the former shared-layout `dock-bg` / `dock-dot` morph
+ * was driven per frame from JS and stalled 67–83 ms in the middle of every switch back to the Übersicht, 8–10 frames
+ * for the whole slide on the tablet probe). FLIP: the box it left (captured in the leaving marker's cleanup, before the
+ * old one is removed) → its own box, measured once at mount in the dock's small fixed layer; the scaled visual
+ * (magnification) is divided out. Reduced motion: it simply moves. No projection node: a switch no longer starts a
+ * layout update over every `layout` node of the app.
+ */
+function DockMarker({ kind, className, style }: { kind: MarkerKind; className: string; style?: CSSProperties }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const reduced = useReducedFx();
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const from = markerFrom[kind];
+    markerFrom[kind] = null;
+    let slide: AnimationPlaybackControls | null = null;
+    if (from && !reduced) {
+      const to = el.getBoundingClientRect();
+      const start = markerFlip(from, to, el.offsetWidth > 0 ? to.width / el.offsetWidth : 1);
+      if (start) slide = animate(el, { transform: [start, "translate(0px, 0px) scale(1)"] }, spring.layout);
+    }
+    return () => {
+      markerFrom[kind] = el.isConnected ? el.getBoundingClientRect() : null;
+      slide?.stop();
+    };
+  }, [kind, reduced]);
+  return <span ref={ref} aria-hidden="true" data-dock-marker={kind} className={className} style={style} />;
+}
+
 export interface DockItemProps {
   label: string;
   onClick: (e: MouseEvent<HTMLButtonElement>) => void;
   active?: boolean;
-  /** Renders the `dock-bg` / `dock-dot` shared-layout markers when active (the four tabs). */
+  /** Renders the active-tab markers (`DockMarker` disc + dot) when active (the four tabs). */
   tab?: boolean;
   /** Magnification values of this slot (x shift + scale); the item never changes its layout box. */
   fx: DockSlotFx;
@@ -203,8 +257,6 @@ export interface DockItemProps {
   intro?: boolean;
   /** Intro stage: the icon waits hidden and pops in (same stagger) when the dock rises on "build". */
   waiting?: boolean;
-  /** Changes whenever the shared-layout markers must re-measure (page / editor); see SH-01 in the Dock doc. */
-  layoutKey?: string;
   index?: number;
   /** The hop to play when this item becomes active (press tempo / flick); `undefined` → the tuned tap hop. */
   takeHop?: () => HopTransition | undefined;
@@ -215,12 +267,12 @@ export interface DockItemProps {
 
 /**
  * Dock item (Bundle `Kw`). The 44 px button keeps its layout box; magnification is a transform only: the button shifts
- * by `fx.x` and its visual (disc, `dock-bg` pill, icon) scales by `fx.scale` from the bottom edge, so the item grows
+ * by `fx.x` and its visual (disc, tab marker, icon) scales by `fx.scale` from the bottom edge, so the item grows
  * up out of the tray like the macOS dock without a single layout per frame. The tooltip rides above the scaled visual
  * (CSS `:hover` / `:focus-visible`, no React state). On activation the icon hops (`spring.pop` with an upward launch);
  * `whileTap .94`.
  */
-export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, waiting = false, layoutKey, index = 0, takeHop, ref, className, children }: DockItemProps) {
+export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, waiting = false, index = 0, takeHop, ref, className, children }: DockItemProps) {
   const reduced = useReducedFx();
   const press = usePressable({ scale: 0.94 });
   const hop = useMotionValue(0);
@@ -265,22 +317,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
         {tab && <span className="absolute inset-0 rounded-full bg-white/[0.05]" />}
         {/* pack hover pill: fades in 25 ms after the label (τ 40 ms), out a little slower (τ 45 ms) */}
         <span className="absolute inset-0 rounded-full bg-line-2 opacity-0 [transition:var(--dock-pill-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-pill-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-pill-in)] group-data-[scrub]/dock:opacity-100 group-data-[scrub]/dock:[transition:var(--dock-pill-in)]" />
-        {tab && (
-          <AnimatePresence initial={false}>
-            {active && (
-              // `layoutKey` includes the editor state: the markers re-measure when the editor opens or closes (the
-              // unmounting `new-trade` disc snapshots itself; there is no layout group to do it for them)
-              <motion.span
-                key="bg"
-                layoutId="dock-bg"
-                layoutDependency={layoutKey}
-                className="absolute inset-0 rounded-full bg-white"
-                style={{ borderRadius: radius.pill }}
-                transition={spring.layout}
-              />
-            )}
-          </AnimatePresence>
-        )}
+        {tab && active && <DockMarker kind="bg" className="absolute inset-0 rounded-full bg-white" style={MARKER_BG_STYLE} />}
         {layer}
         <motion.span
           className="absolute inset-0 grid place-items-center"
@@ -296,21 +333,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
           </motion.span>
         </motion.span>
       </motion.span>
-      {tab && (
-        <AnimatePresence initial={false}>
-          {active && (
-            <motion.span
-              key="dot"
-              layoutId="dock-dot"
-              layoutDependency={layoutKey}
-              aria-hidden="true"
-              className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-signal"
-              style={{ borderRadius: radius.pill }}
-              transition={spring.layout}
-            />
-          )}
-        </AnimatePresence>
-      )}
+      {tab && active && <DockMarker kind="dot" className="absolute -bottom-1.5 left-1/2 size-1 -translate-x-1/2 rounded-full bg-signal" style={MARKER_BG_STYLE} />}
       <motion.span aria-hidden="true" className="pointer-events-none absolute bottom-full left-1/2 z-10 -translate-x-1/2" style={{ y: tipY, marginBottom: DOCK_CONFIG.tipGap }}>
         {/* pack label (fades in, rising from +6 px on the 1000/38 spring) on an opaque Nothing plate that is uncovered by
             clip-path instead of fading, so page text behind it is either fully covered or untouched (SH-03).
@@ -696,7 +719,7 @@ export function Dock() {
 
   return (
     // layoutRoot (SH-01): the nav is position:fixed, so Motion must never read a page-scroll clamp (the document got
-    // shorter while scrolled) as movement of the dock-bg / dock-dot / new-trade markers inside it
+    // shorter while scrolled) as movement of the new-trade disc inside it (the tab markers are no layout nodes)
     <motion.nav
       layoutRoot
       // grey-bar fix: above the taskbar safe area AND any host UI laid over the page bottom (`--safe-bottom`, base.css)
@@ -740,7 +763,6 @@ export function Dock() {
             fx={slots[k] as DockSlotFx}
             intro={intro}
             waiting={phase === "stage"}
-            layoutKey={layoutKey}
             index={k}
             takeHop={takeHop[k]}
             label={PAGE_LABELS[p]}

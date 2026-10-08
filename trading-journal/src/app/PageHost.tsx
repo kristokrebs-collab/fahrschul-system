@@ -27,9 +27,14 @@
  *   effect of the commit that shows the page, before paint, and the leaving layer is offset by the same distance so it
  *   fades out exactly where it was.
  * - `onTransitioning(true)` at the switch commit, `false` once enter and exit have both finished (locks the trade detail).
+ * - Switch timing (perf-120 phase C): the host takes a new `page` one painted frame after it arrived (`afterNextPaint`,
+ *   then a transition). The tap's own response – the dock's active tab and its marker slide, a compositor animation –
+ *   is painted first and keeps running on the compositor while the new page's (long, unsliceable) commit blocks the
+ *   main thread; before, the deferred page render often ran before any frame, so the dock showed nothing for the
+ *   whole commit and its marker only started after it (≈ 8 ms more latency at 120 Hz for a tap that answers at once).
  */
 import { animate, frame, type AnimationPlaybackControls } from "motion/react";
-import { Activity, memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { Activity, memo, startTransition, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { isSafeFx } from "@/app/pwa";
 import { cn } from "@/lib/cn";
 import { useHoldProjectionOnHide, useSettleProjectionOnShow } from "@/motion/activityProjection";
@@ -99,6 +104,18 @@ const swallow = (e: Event) => {
   // no focus / activation from a page that is leaving; touch defaults (scrolling) stay
   if (e.cancelable && !e.type.startsWith("touch")) e.preventDefault();
 };
+
+/** Runs `fn` after the next frame has been painted (a frame callback, then a task); returns the cancel. */
+export function afterNextPaint(fn: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const raf = requestAnimationFrame(() => {
+    timer = setTimeout(fn, 0);
+  });
+  return () => {
+    cancelAnimationFrame(raf);
+    if (timer !== undefined) clearTimeout(timer);
+  };
+}
 
 /** Pure: slide direction of a switch in tab order (`+1` → the new page comes from the right). */
 export function pageDirection(from: Page, to: Page): 1 | -1 {
@@ -221,11 +238,17 @@ function settleStyles(el: HTMLElement): void {
 
 export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = NONE, cascade = NONE, onTransitioning, className }: PageHostProps) {
   const reduced = useReducedFx();
+  // the page this host switches to: `page`, taken one painted frame later (see "Switch timing" above)
+  const [target, setTarget] = useState(page);
+  useLayoutEffect(() => {
+    if (target === page) return;
+    return afterNextPaint(() => startTransition(() => setTarget(page)));
+  }, [page, target]);
   const [nav, setNav] = useState<Nav>(() => ({ current: page, leaving: null, dir: 1, seq: 0 }));
   let view = nav;
-  if (nav.current !== page) {
+  if (nav.current !== target) {
     // state from props: the previous page becomes the leaving layer (a still-leaving older page is dropped at once)
-    view = { current: page, leaving: nav.current, dir: pageDirection(nav.current, page), seq: nav.seq + 1 };
+    view = { current: target, leaving: nav.current, dir: pageDirection(nav.current, target), seq: nav.seq + 1 };
     setNav(view);
   }
 

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bandBox, bandMask, BOTTOM_BANDS, BottomFade } from "@/app/BottomFade";
-import { Dock, DOCK, DOCK_INTRO_KEY, dockBell, dockLayout } from "@/app/Dock";
+import { Dock, DOCK, DOCK_INTRO_KEY, dockBell, dockLayout, markerFlip } from "@/app/Dock";
 import { HeaderEdge, scrollBar, scrollDrivenEdge } from "@/app/Header";
 import { priceStep, tickerChange, tickerChangePct, tickerDecimals, tickerJump, tickerPrice } from "@/app/HeaderTicker";
 import { toastLifetime, toIslandToast } from "@/app/toasts";
@@ -109,6 +109,34 @@ describe("Dock", () => {
     fireEvent.click(fab);
     expect(useUi.getState().editor).toEqual({ open: true, tradeId: undefined, fromFab: true });
     expect(fab.querySelector(".bg-gradient-to-br")).toBeNull();
+  });
+});
+
+describe("dock tab markers (compositor FLIP)", () => {
+  it("markerFlip: translate in the marker's own coordinates (magnification divided out) + size ratio; null when nothing moved", () => {
+    const box = (left: number, width = 44) => ({ left, top: 800, width, height: width });
+    expect(markerFlip(box(100), box(156), 1)).toBe("translate(-56.00px, 0.00px) scale(1.0000)");
+    // the new item is magnified ×2 (its box 88 px): the same screen distance is half as far in its coordinates
+    expect(markerFlip(box(100), box(134, 88), 2)).toBe("translate(-28.00px, -11.00px) scale(0.5000)");
+    expect(markerFlip(box(100), box(100.2), 1)).toBeNull();
+  });
+
+  it("one disc and one dot, always on the active tab (no shared-layout nodes)", () => {
+    useUi.setState({ page: "overview" });
+    const { container } = render(
+      <MotionRoot>
+        <Dock />
+      </MotionRoot>,
+    );
+    const active = () => container.querySelector('[aria-current="page"]');
+    expect(container.querySelectorAll('[data-dock-marker="bg"]')).toHaveLength(1);
+    expect(active()?.querySelector('[data-dock-marker="bg"]')).not.toBeNull();
+    expect(active()?.querySelector('[data-dock-marker="dot"]')).not.toBeNull();
+    act(() => useUi.setState({ page: "trades" }));
+    expect(container.querySelectorAll('[data-dock-marker="bg"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-dock-marker="dot"]')).toHaveLength(1);
+    expect(active()?.getAttribute("aria-label")).toBe("Trades");
+    expect(active()?.querySelector('[data-dock-marker="bg"]')).not.toBeNull();
   });
 });
 

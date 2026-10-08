@@ -32,6 +32,16 @@ function renderPage(page: Page): ReactNode {
 
 const KEEP: readonly Page[] = ["overview"];
 
+/** A painted frame + the task after it: the host takes a new page one painted frame after it arrived. */
+const afterPaint = () => new Promise<void>((r) => requestAnimationFrame(() => setTimeout(r, 0)));
+/** Hands the host a new page and waits for its switch commit. */
+async function switchTo(rerender: () => void): Promise<void> {
+  act(() => rerender());
+  await act(async () => {
+    await afterPaint();
+  });
+}
+
 function host(page: Page, onT?: (t: boolean) => void) {
   return (
     <MotionRoot>
@@ -75,7 +85,7 @@ describe("PageHost", () => {
     expect(screen.getByRole("button", { name: "Übersicht 1" })).toBeInTheDocument();
     expect(effects.mounted).toBe(1);
 
-    act(() => rerender(host("trades", onT)));
+    await switchTo(() => rerender(host("trades", onT)));
     expect(onT).toHaveBeenLastCalledWith(true);
     expect(screen.getByRole("heading", { name: "trades" })).toBeInTheDocument();
     await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
@@ -88,7 +98,7 @@ describe("PageHost", () => {
     expect(screen.getByText("Übersicht 1", { selector: "button" })).toBeInTheDocument();
     expect(effects.cleaned).toBe(1);
 
-    act(() => rerender(host("overview", onT)));
+    await switchTo(() => rerender(host("overview", onT)));
     expect(screen.getByRole("button", { name: "Übersicht 1" })).toBeInTheDocument();
     expect(effects.mounted).toBe(2);
     await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
@@ -104,7 +114,7 @@ describe("PageHost", () => {
     const button = screen.getByRole("button", { name: "Übersicht 0" });
     act(() => button.focus());
     expect(document.activeElement).toBe(button);
-    act(() => rerender(host("trades", onT)));
+    await switchTo(() => rerender(host("trades", onT)));
     const overview = document.querySelector<HTMLElement>("[data-page='overview']");
     expect(overview?.getAttribute("data-page-role")).toBe("leaving");
     // hidden from AT, but not inert / pointer-events none (both restyled the whole fading page); focus left it at the
@@ -121,7 +131,7 @@ describe("PageHost", () => {
     expect(overview?.getAttribute("data-page-role")).toBe("leaving");
     expect(effects).toEqual(base);
     // back before it was parked: shown again without a re-mount, the layer is restored at once
-    act(() => rerender(host("overview", onT)));
+    await switchTo(() => rerender(host("overview", onT)));
     expect(overview?.getAttribute("data-page-role")).toBe("current");
     expect(overview?.style.height).toBe("");
     expect(overview?.style.overflow).toBe("");
@@ -130,10 +140,27 @@ describe("PageHost", () => {
     expect(effects).toEqual(base);
   });
 
+  it("takes a new page one painted frame later (the tap's own response is painted first); the latest page wins", async () => {
+    const onT = vi.fn();
+    const { rerender } = render(host("overview", onT));
+    act(() => rerender(host("trades", onT)));
+    // not yet: the dock answers the tap in this frame, the page follows after it was painted
+    expect(document.querySelector("[data-page='trades']")).toBeNull();
+    expect(onT).not.toHaveBeenCalled();
+    // a second tap before the first one was taken: only the latest page is switched to
+    act(() => rerender(host("settings", onT)));
+    await act(async () => {
+      await afterPaint();
+    });
+    expect(document.querySelector("[data-page='settings']")?.getAttribute("data-page-role")).toBe("current");
+    expect(document.querySelector("[data-page='trades']")).toBeNull();
+    expect(onT).toHaveBeenCalledWith(true);
+  });
+
   it("SH-02: the entering page stays invisible while the leaving page fades (never two pages over each other)", async () => {
     const onT = vi.fn();
     const { rerender } = render(host("overview", onT));
-    act(() => rerender(host("settings", onT)));
+    await switchTo(() => rerender(host("settings", onT)));
     const entering = document.querySelector<HTMLElement>("[data-page='settings']");
     expect(entering?.style.opacity).toBe("0");
     await new Promise((r) => setTimeout(r, 60));
@@ -146,7 +173,7 @@ describe("PageHost", () => {
   it("ends every switch at transform/filter none (no containing block for fixed ghosts)", async () => {
     const onT = vi.fn();
     const { rerender } = render(host("overview", onT));
-    act(() => rerender(host("settings", onT)));
+    await switchTo(() => rerender(host("settings", onT)));
     await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
     const layer = document.querySelector<HTMLElement>("[data-page='settings']");
     expect(layer?.style.transform).toBe("none");
@@ -154,7 +181,7 @@ describe("PageHost", () => {
     expect(layer?.style.opacity).toBe("");
   });
 
-  it("applies a queued scroll restore at the commit that shows the page and holds the leaving page in place", () => {
+  it("applies a queued scroll restore at the commit that shows the page and holds the leaving page in place", async () => {
     const setScrollY = (y: number) => Object.defineProperty(window, "scrollY", { value: y, configurable: true });
     setScrollY(300);
     const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation((opts?: ScrollToOptions | number) => {
@@ -164,7 +191,7 @@ describe("PageHost", () => {
     // the store already moved on (navigate), the shell still shows the overview: nothing scrolls yet
     restoreScroll("trades", true);
     expect(scrollTo).not.toHaveBeenCalled();
-    act(() => rerender(host("trades")));
+    await switchTo(() => rerender(host("trades")));
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
     // the window jumped up 300 px; the fading overview is moved by the same distance, so it does not jump on screen
     const leaving = document.querySelector<HTMLElement>("[data-page='overview']");
