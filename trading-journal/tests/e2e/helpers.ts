@@ -175,8 +175,9 @@ export async function touchKit(page: Page): Promise<TouchKit> {
     cdp.send("Input.dispatchTouchEvent", { type, touchPoints: type === "touchEnd" ? [] : [{ x, y, id: 1, radiusX: 4, radiusY: 4, force: 1 }], timestamp: t });
   const drag: TouchKit["drag"] = async (from, to, ms, opts = {}) => {
     t = Math.max(t, Date.now() / 1000);
-    await send("touchStart", from.x, from.y);
+    const start = send("touchStart", from.x, from.y);
     if (opts.startHoldMs) {
+      await start;
       await page.waitForTimeout(opts.startHoldMs);
       t += opts.startHoldMs / 1000;
     }
@@ -184,7 +185,11 @@ export async function touchKit(page: Page): Promise<TouchKit> {
     for (let i = 1; i <= steps; i++) {
       const k = i / steps;
       t += ms / 1000 / steps;
-      await send("touchMove", from.x + (to.x - from.x) * k, from.y + (to.y - from.y) * k);
+      const move = send("touchMove", from.x + (to.x - from.x) * k, from.y + (to.y - from.y) * k);
+      // Without a hold the first move goes out together with the touchstart: on a loaded machine one CDP round trip
+      // can outlast a long-press delay (lightweight-charts: 240 ms → crosshair tracking, the page no longer scrolls),
+      // which a finger that moves at once never triggers.
+      await (i === 1 ? Promise.all([start, move]) : move);
     }
     if (opts.holdMs) {
       await page.waitForTimeout(opts.holdMs);
