@@ -84,14 +84,22 @@ export const Countdown = memo(function Countdown({ closesAt, className }: { clos
 
 /**
  * The candle-close state line: `⚠ vorläufig · schließt in 12:04` (warn), `✓ bestätigt · 30m-Kerze geschlossen`,
- * `✓✓ stark bestätigt · 3 Schlüsse gehalten` (side colour) or, without an entry, the base candle's countdown (faint).
+ * `✓✓ stark bestätigt · 3 Schlüsse gehalten` (side colour), `✓ Signal bestätigt · Einstieg gesperrt` (held back by the
+ * Lage-Ampel: faded side colour, `data-held`) or, without an entry, the base candle's countdown (faint).
  * The text runs on the shared clock; the line keeps its height when empty.
  */
 export const StateLine = memo(function StateLine({ line, side, className }: { line: StateLineView; side: Side; className?: string }) {
   const now = useNowMv();
   const text = useTransform(now, (n) => stateLineText(line, n + signalClockOffset()));
+  // held back by the Lage-Ampel: the faded side colour of the label and the dots, not the full "counts" colour
+  const held = line.held === true && isFirm(line.state);
   return (
-    <span className={cn("flex min-h-4 min-w-0 items-baseline gap-1.5 text-[11.5px] leading-4 transition-colors duration-300", stateTone(line.state, side), className)} data-testid="signal-state" data-state={line.state}>
+    <span
+      className={cn("flex min-h-4 min-w-0 items-baseline gap-1.5 text-[11.5px] leading-4 transition-colors duration-300", held ? PROV_TEXT[side] : stateTone(line.state, side), className)}
+      data-testid="signal-state"
+      data-state={line.state}
+      data-held={held ? "" : undefined}
+    >
       {STATE_ICON[line.state] && (
         <span aria-hidden="true" className="shrink-0 text-[10.5px]">
           {STATE_ICON[line.state]}

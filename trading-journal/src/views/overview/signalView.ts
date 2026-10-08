@@ -305,20 +305,34 @@ export interface StateLineView {
   closesAt: number | null;
   /** closed candles the base signal held (strong) */
   closes: number;
+  /** a long entry held back by the Lage-Ampel (decision 23): the signal is confirmed, the entry does not count */
+  held?: boolean;
 }
-export function verdictStateLine(sig: Pick<Signals, "checks">, v: Pick<Verdict, "side" | "valid"> & { state?: SignalState; closesAt?: number | null }, cfg: Pick<SignalCfg, "ladder">): StateLineView {
+export function verdictStateLine(
+  sig: Pick<Signals, "checks">,
+  v: Pick<Verdict, "side" | "valid"> & { state?: SignalState; closesAt?: number | null; lage?: Verdict["lage"] },
+  cfg: Pick<SignalCfg, "ladder">,
+): StateLineView {
   const base = sig.checks[0] ?? null;
   const state = verdictState(v);
   const closesAt = v.closesAt ?? (base?.forming && base.closesAt != null && Number.isFinite(base.closesAt) ? base.closesAt : null);
-  return { state, tf: base?.tf ?? cfg.ladder[0] ?? "", closesAt, closes: base?.conf?.[v.side]?.closes ?? 0 };
+  return { state, tf: base?.tf ?? cfg.ladder[0] ?? "", closesAt, closes: base?.conf?.[v.side]?.closes ?? 0, held: v.lage?.held === true };
 }
+
+/** State line of a held-back entry: the candle confirmed the SIGNAL, the entry itself is blocked (label / dots agree). */
+export const HELD_STATE_TEXT: Readonly<Record<"confirmed" | "strong", string>> = {
+  confirmed: "Signal bestätigt · Einstieg gesperrt",
+  strong: "Signal stark bestätigt · Einstieg gesperrt",
+};
 
 /**
  * Text of a state line at `now` (ms): `vorläufig · schließt in 12:04`, `bestätigt · 30m-Kerze geschlossen`, `stark
- * bestätigt · 3 Schlüsse gehalten`; without an entry the base candle's countdown (`30m-Kerze schließt in 12:04`).
+ * bestätigt · 3 Schlüsse gehalten`; held back by the Lage-Ampel `Signal bestätigt · Einstieg gesperrt` (never a plain
+ * `bestätigt` next to "zählt nicht"); without an entry the base candle's countdown (`30m-Kerze schließt in 12:04`).
  */
 export function stateLineText(l: StateLineView, now: number): string {
   if (l.state === "provisional") return l.closesAt != null ? provisionalText(l.closesAt - now) : "vorläufig";
+  if (l.held && (l.state === "confirmed" || l.state === "strong")) return HELD_STATE_TEXT[l.state];
   if (l.state === "confirmed") return `bestätigt · ${l.tf}-Kerze geschlossen`;
   if (l.state === "strong") return `stark bestätigt · ${l.closes} ${l.closes === 1 ? "Schluss" : "Schlüsse"} gehalten`;
   return l.closesAt != null ? `${l.tf}-Kerze schließt in ${mmss(l.closesAt - now)}` : "";

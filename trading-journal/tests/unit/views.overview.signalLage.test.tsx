@@ -28,7 +28,7 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { SignalCard } from "@/views/overview/SignalCard";
 import { SignalStrip } from "@/views/overview/SignalStrip";
-import { lageBlocked, lageLine, PROV_COLOR, PROV_TEXT, SIDE_COLOR, strengthView, verdictColor, verdictText } from "@/views/overview/signalView";
+import { HELD_STATE_TEXT, lageBlocked, lageLine, PROV_COLOR, PROV_TEXT, SIDE_COLOR, stateLineText, strengthView, verdictColor, verdictStateLine, verdictText } from "@/views/overview/signalView";
 
 interface Series {
   sec: number;
@@ -110,6 +110,24 @@ describe("SignalCard / SignalStrip", () => {
     expect(within(row).getByTestId("signal-label").className).toContain(PROV_TEXT.long);
     expect(within(row).getByRole("img", { name: /^Stärke 0 von 4, gesperrt \(sonst \d\)$/ })).toBeInTheDocument();
     expect(within(row).queryByTestId("signal-lage")).toBeNull();
+    // the state line no longer says a plain "bestätigt" in the side colour next to "zählt nicht"
+    const state = within(row).getByTestId("signal-state");
+    expect(state).toHaveAttribute("data-state", "confirmed");
+    expect(state).toHaveAttribute("data-held");
+    expect(state).toHaveTextContent("✓Signal bestätigt · Einstieg gesperrt");
+    expect(state.className).toContain(PROV_TEXT.long);
+  });
+
+  it("state line view: held back → `Signal (stark) bestätigt · Einstieg gesperrt`; counting / warn entries keep their text", () => {
+    const snap = snapshot(ENTRY, { lage: RED, cfg: BLOCK });
+    const line = verdictStateLine(snap, snap.long, UI_CFG);
+    expect(line).toMatchObject({ state: "confirmed", held: true });
+    expect(stateLineText(line, 0)).toBe(HELD_STATE_TEXT.confirmed);
+    expect(stateLineText({ ...line, state: "strong", closes: 3 }, 0)).toBe("Signal stark bestätigt · Einstieg gesperrt");
+    const w = snapshot(ENTRY, { lage: RED, cfg: WARN });
+    const lw = verdictStateLine(w, w.long, UI_CFG);
+    expect(lw.held).toBe(false);
+    expect(stateLineText(lw, 0)).toBe("bestätigt · 30m-Kerze geschlossen");
   });
 
   it("nur Warnung: the entry counts, the warning line sits under it", () => {
