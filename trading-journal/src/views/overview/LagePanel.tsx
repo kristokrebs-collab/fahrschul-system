@@ -80,21 +80,23 @@ function Lights({ state, off }: { state: LageState; off: boolean }) {
 
 /**
  * `Tagesschluss 02:00` + `in 8:29 h` — the countdown is a `nowMv` leaf (renders nothing per second). `wide`: the
- * right-hand block of the header (container content ≥ 400 px); else one line under the headline, so it never crowds the title.
+ * right-hand block of the header (the header COLUMN ≥ 400 px — in the hero band at 1024 px the state column is ~350 px,
+ * where the block ran into the Details pill); else one line under the headline, so it never crowds the title.
  */
 const DailyClose = memo(function DailyClose({ at, wide, stand }: { at: number; wide: boolean; stand: string | null }) {
   const now = useNowMv();
   const text = useTransform(now, (t) => `in ${closeInText(at - t)}`);
   if (!wide)
     return (
-      <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 @min-[400px]/lage:hidden" data-testid="lage-close-narrow">
+      <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 @min-[400px]/lagehead:hidden" data-testid="lage-close-narrow">
         <span className="label !text-[9.5px] !tracking-[0.12em]">Tagesschluss {clockText(at)}</span>
         <motion.span className="num font-mono text-[12px] text-fg">{text}</motion.span>
-        {stand && <span className="text-[10.5px] text-faint">· {stand}</span>}
+        {/* no leading "·": on a narrow phone the stand wraps to its own line and must not start with a separator */}
+        {stand && <span className="text-[10.5px] text-faint">{stand}</span>}
       </span>
     );
   return (
-    <span className="hidden shrink-0 justify-items-end gap-0.5 text-right @min-[400px]/lage:grid" data-testid="lage-close">
+    <span className="hidden shrink-0 justify-items-end gap-0.5 text-right @min-[400px]/lagehead:grid" data-testid="lage-close">
       <span className="label !text-[9.5px] !tracking-[0.12em]">Tagesschluss {clockText(at)}</span>
       <motion.span className="num inline-block min-w-[7ch] text-right font-mono text-[12.5px] leading-tight text-fg">{text}</motion.span>
       {stand && <span className="text-[10.5px] leading-tight text-faint">{stand}</span>}
@@ -161,7 +163,9 @@ function PriceRow({ fallback, line }: { fallback: number | null; line?: boolean 
   return (
     <li className={cn(ROW, "-mx-1.5 rounded-md bg-white/[0.07] px-1.5")} data-row="price">
       <span className="font-semibold text-fg">Kurs</span>
-      <motion.span className="num font-mono font-semibold text-fg">{text}</motion.span>
+      {/* every tick changes this text: its own layer with layout + paint containment, so a new price repaints these few
+          pixels only — not the Lage section (≈ 350 section repaints / 10 s of feed before) */}
+      <motion.span className="num inline-block min-w-[6ch] text-right font-mono font-semibold text-fg will-change-transform [contain:layout_paint]">{text}</motion.span>
       <span aria-hidden="true" />
     </li>
   );
@@ -207,7 +211,11 @@ function ColHead({ title, right }: { title: string; right: string }) {
   );
 }
 
-function Ladder({ lage }: { lage: Lage }) {
+/**
+ * The EMA ladder beside the levels. `footer` (hero band, falling market): the 4H reversal signs under both columns —
+ * beside the reason chips they made the state column ~150 px taller than the ladder, an empty band under it.
+ */
+function Ladder({ lage, footer }: { lage: Lage; footer?: ReactNode }) {
   const emas = useMemo(() => emaColumn(lage), [lage]);
   const lv = useMemo(() => levelColumn(lage, emas), [lage, emas]);
   const pad = alignPad(emas, lv);
@@ -244,6 +252,7 @@ function Ladder({ lage }: { lage: Lage }) {
           </ul>
         </div>
       )}
+      {footer && <div className="min-w-0 @min-[400px]/lage:col-span-2">{footer}</div>}
     </div>
   );
 }
@@ -328,7 +337,7 @@ export const LagePanel = memo(function LagePanel({ band = false }: { band?: bool
       {/* the market panel's column: one stack; the hero band (≥ 860 px container, lg+): the state on the left, the
           ladder on the right */}
       <div className="grid gap-2.5 @min-[860px]/lage:grid-cols-[minmax(0,1fr)_minmax(0,1.55fr)] @min-[860px]/lage:gap-x-8">
-        <div className="grid min-w-0 content-start gap-2.5">
+        <div className="@container/lagehead grid min-w-0 content-start gap-2.5">
           <div className="flex items-start justify-between gap-3">
             <div className="grid min-w-0 gap-1.5">
               <div className="flex items-center gap-2">
@@ -363,9 +372,9 @@ export const LagePanel = memo(function LagePanel({ band = false }: { band?: bool
               ))}
             </ul>
           )}
-          {lage?.abwaerts && <Signs signs={lage.signs} met={lage.signsMet} />}
+          {lage?.abwaerts && !band && <Signs signs={lage.signs} met={lage.signsMet} />}
         </div>
-        {loading ? <LoadingBody /> : lage ? <Ladder lage={lage} /> : null}
+        {loading ? <LoadingBody /> : lage ? <Ladder lage={lage} footer={band && lage.abwaerts ? <Signs signs={lage.signs} met={lage.signsMet} /> : null} /> : null}
       </div>
 
       {!stand && !loading && <Footer status={status} />}

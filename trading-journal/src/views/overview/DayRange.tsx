@@ -124,9 +124,14 @@ export const DayRange = memo(function DayRange({ className }: { className?: stri
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-mute">{DAY_RANGE_TITLE}</span>
         {ready && (
-          <span className="num font-mono text-[11px] text-faint">
-            T <motion.span className="text-mute">{loText}</motion.span> · H{" "}
-            <motion.span className="text-mute">{hiText}</motion.span>
+          // a new extreme changes a number: contained leaves (no repaint of the panel); centred, as a contained box has
+          // no text baseline
+          <span className="num inline-flex items-center gap-1 font-mono text-[11px] text-faint">
+            <span>T</span>
+            <motion.span className="inline-block text-mute [contain:layout_paint]">{loText}</motion.span>
+            <span aria-hidden="true">·</span>
+            <span>H</span>
+            <motion.span className="inline-block text-mute [contain:layout_paint]">{hiText}</motion.span>
           </span>
         )}
       </div>

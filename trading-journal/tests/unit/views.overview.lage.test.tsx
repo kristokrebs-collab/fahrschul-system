@@ -141,6 +141,21 @@ describe("LagePanel", () => {
     expect(screen.getByTestId("lage-feed")).toHaveTextContent(/^Netzwerk\/CORS-Fehler · 2× in Folge · nächster Versuch \d\d:\d\d$/);
   });
 
+  it("hero band, falling market: the reversal signs sit under the ladder (not beside the chips); the price leaf is its own contained layer", () => {
+    view.current = { lage: RED, status: OK };
+    wrap(<LagePanel band />);
+    const p = screen.getByTestId("lage-panel");
+    const ladder = within(p).getByTestId("lage-ladder");
+    expect(within(ladder).getByTestId("lage-signs")).toHaveAttribute("data-met", "0");
+    expect(within(p).getAllByTestId("lage-signs")).toHaveLength(1);
+    const price = ladder.querySelector('[data-row="price"] .num')!;
+    expect(price.className).toContain("[contain:layout_paint]");
+    expect(price.className).toContain("will-change-transform");
+    // the countdown's narrow / wide variants follow the state column, not the whole band
+    expect(within(p).getByTestId("lage-close").className).toContain("@min-[400px]/lagehead:grid");
+    expect(within(p).getByTestId("lage-close-narrow").textContent).not.toMatch(/·/);
+  });
+
   it("price ticks never re-render the panel (the price row is a MotionValue leaf)", async () => {
     let commits = 0;
     wrap(
