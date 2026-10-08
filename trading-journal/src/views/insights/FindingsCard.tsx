@@ -1,15 +1,49 @@
 import { useMemo, useState } from "react";
-import { EMPTY, explainFindings, findings, TITLES } from "@/domain/insights";
+import { MIN_TRADES_STABLE } from "@/domain/defaults";
+import { EDGE_MIN_TRADES, EMPTY, explainFindings, FINDING_MIN_N, findings, TITLES } from "@/domain/insights";
 import { cn } from "@/lib/cn";
 import { RevealGroup, RevealItem } from "@/motion/Reveal";
 import { Badge } from "@/primitives/Badge";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Collapse } from "@/primitives/Expander";
+import { Bar } from "@/views/overview/Bar";
 import { InsightCard, TradeList, useInsightsBase } from "./ui";
 
 /**
+ * What the Auswertung needs before its statistics carry weight – shown while there are trades but no clear pattern
+ * yet (sparse journal: the empty card says how far it is instead of only "noch nichts").
+ */
+export const PROGRESS_STEPS = [
+  { key: "findings", label: "Erste Erkenntnis", need: 2 * FINDING_MIN_N, sub: `${FINDING_MIN_N} Trades je Seite` },
+  { key: "edge", label: "Edge-Score aussagekräftig", need: EDGE_MIN_TRADES, sub: "sechs Kennzahlen" },
+  { key: "stable", label: "Backtest-Vergleich belastbar", need: MIN_TRADES_STABLE, sub: "Win-Rate und Erwartung" },
+] as const;
+
+function Progress({ have }: { have: number }) {
+  return (
+    <ul className="mt-3 grid w-full max-w-[21rem] gap-3 text-left" aria-label="Fortschritt der Auswertung">
+      {PROGRESS_STEPS.map((s, i) => {
+        const done = have >= s.need;
+        return (
+          <li key={s.key} className="grid gap-1.5">
+            <span className="flex items-baseline justify-between gap-3 text-[12px]">
+              <span className="min-w-0 text-fg">
+                {s.label} <span className="text-faint">· {s.sub}</span>
+              </span>
+              <span className={cn("num shrink-0 font-mono text-[11.5px]", done ? "text-win" : "text-mute")}>{done ? "✓" : `${have} / ${s.need}`}</span>
+            </span>
+            <Bar value={Math.min(1, have / s.need)} index={i} className="h-1" fill={done ? "bg-win" : "bg-fg"} />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
  * `Erkenntnisse` (rule-based Zella insights): the three findings with the largest money impact, each with the numbers
- * behind it and "klar" / "Tendenz"; a finding unfolds the trades it is about.
+ * behind it and "klar" / "Tendenz"; a finding unfolds the trades it is about. Without a clear pattern yet the card shows
+ * how many trades each part of the Auswertung still needs (`PROGRESS_STEPS`).
  */
 export function FindingsCard() {
   const { view, cur } = useInsightsBase();
@@ -18,7 +52,11 @@ export function FindingsCard() {
   return (
     <InsightCard title={TITLES.findings} explain={explainFindings} data-testid="insights-findings">
       {!list.length ? (
-        <EmptyState title={view.closed.length ? EMPTY.findings.title : EMPTY.trades.title} text={view.closed.length ? EMPTY.findings.text : EMPTY.trades.text} />
+        view.closed.length ? (
+          <EmptyState title={EMPTY.findings.title} text={EMPTY.findings.text} line={false} action={<Progress have={view.closed.length} />} />
+        ) : (
+          <EmptyState title={EMPTY.trades.title} text={EMPTY.trades.text} />
+        )
       ) : (
         <RevealGroup as="ol" className="grid gap-2.5">
           {list.map((f, i) => {

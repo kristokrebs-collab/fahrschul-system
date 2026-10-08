@@ -114,6 +114,40 @@ describe("InsightsSection", () => {
     await waitFor(() => expect(useJournal.getState().days[key]?.note).toBe("halb getippt"));
   });
 
+  it("Disziplin fills its space: every past day of the heat map, the 30-day trend, the last trading days and the weakest rule (decision 12)", async () => {
+    renderSection();
+    const card = screen.getByTestId("insights-discipline");
+    // jsdom: no width → the 26-week default; every past day is an option (future days are blank spacers)
+    const map = within(card).getByRole("listbox");
+    expect(map.dataset.weeks).toBe("26");
+    const options = within(map).getAllByRole("option");
+    expect(options.length).toBeGreaterThan(25 * 7);
+    expect(options.length).toBeLessThanOrEqual(26 * 7);
+    expect(options.some((o) => /keine Trades/.test(o.getAttribute("aria-label") ?? ""))).toBe(true);
+    expect(card.querySelector("[data-today]")).not.toBeNull();
+    expect(within(card).getByText(/Score-Verlauf · 30 Tage/)).toBeInTheDocument();
+    expect(within(card).getByText("Letzte Handelstage")).toBeInTheDocument();
+    expect(within(card).getByText(/Schwächste Regel · 30 Tage/)).toBeInTheDocument();
+    // a day row selects that day for the ring and the rule list
+    const rows = within(card).getAllByRole("button", { pressed: false }).filter((b) => /Regeln/.test(b.getAttribute("aria-label") ?? ""));
+    if (rows[0]) {
+      await act(async () => {
+        fireEvent.click(rows[0]!);
+      });
+      expect(rows[0]).toHaveAttribute("aria-pressed", "true");
+    }
+  });
+
+  it("Erkenntnisse without a clear pattern shows how many trades each evaluation still needs", async () => {
+    const { trades } = useJournal.getState();
+    useJournal.setState({ trades: trades.slice(0, 3) });
+    renderSection();
+    const card = screen.getByTestId("insights-findings");
+    const progress = within(card).getByRole("list", { name: "Fortschritt der Auswertung" });
+    expect(within(progress).getByText("Erste Erkenntnis")).toBeInTheDocument();
+    expect(within(progress).getAllByText(/\d+ \/ (10|20|30)/).length).toBe(3);
+  });
+
   it("an account without trades shows one preview card next to the calendar", async () => {
     useJournal.setState({ trades: [] });
     renderSection();

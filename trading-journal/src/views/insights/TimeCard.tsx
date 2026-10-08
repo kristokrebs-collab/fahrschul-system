@@ -20,7 +20,8 @@ const CHART_H = 132;
 
 /**
  * Net P&L columns around a zero line (positive up in green, negative down in red), one per bucket; they grow from
- * the zero line on first view (`scaleY`, staggered) and on every tab switch. The whole chart is a scrubber on touch:
+ * the zero line on first view (`scaleY`, staggered) and on every tab switch; an empty bucket keeps a faint dot on the zero
+ * line and every label carries the bucket's trade count. The whole chart is a scrubber on touch:
  * pressing or sliding anywhere selects the nearest column (one rect read per press).
  */
 function Columns({ buckets, selected, onSelect }: { buckets: readonly TimeBucket[]; selected: string | null; onSelect: (k: string) => void }) {
@@ -65,6 +66,10 @@ function Columns({ buckets, selected, onSelect }: { buckets: readonly TimeBucket
               onClick={() => onSelect(b.key)}
               className={cn("relative h-full rounded-md transition-colors", on ? "bg-white/[0.06]" : "[@media(hover:hover)]:hover:bg-white/[0.03]")}
             >
+              {b.g.n === 0 && (
+                // an empty bucket still shows where it is: a faint dot on the zero line (sparse journals)
+                <span aria-hidden="true" className="absolute left-1/2 size-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-faint" style={{ top: `${zero * 100}%` }} />
+              )}
               {b.g.n > 0 && (
                 <motion.span
                   aria-hidden="true"
@@ -81,9 +86,12 @@ function Columns({ buckets, selected, onSelect }: { buckets: readonly TimeBucket
       </div>
       <div className="grid gap-1 text-center" style={{ gridTemplateColumns: `repeat(${buckets.length}, minmax(0, 1fr))` }} aria-hidden="true">
         {buckets.map((b) => (
-          <span key={b.key} className={cn("truncate text-[10px]", selected === b.key ? "text-fg" : "text-faint")}>
-            <span className="@max-[440px]/time:hidden">{b.label}</span>
-            <span className="hidden @max-[440px]/time:inline">{b.short}</span>
+          <span key={b.key} className={cn("grid truncate text-[10px]", selected === b.key ? "text-fg" : "text-faint")}>
+            <span className="truncate">
+              <span className="@max-[440px]/time:hidden">{b.label}</span>
+              <span className="hidden @max-[440px]/time:inline">{b.short}</span>
+            </span>
+            <span className="num font-mono text-[9.5px] text-faint">{b.g.n ? `${b.g.n} T` : "–"}</span>
           </span>
         ))}
       </div>

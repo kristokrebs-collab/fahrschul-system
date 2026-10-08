@@ -15,7 +15,8 @@ const H = 120;
 /**
  * Under-water curve (fraction below the running peak after each trade) as an SVG area that wipes in from the left on
  * first view (clip-path). Pointer / finger over it shows the drawdown at that trade: the guide line moves by
- * transform and the readout is written straight to the DOM – no React render per move, one rect read per press.
+ * transform and the readout is written straight to the DOM – no React render per move, one rect read per press. It
+ * grows to the height its card leaves (min. 120 px); with ≤ 40 trades every trade is a dot on the curve.
  */
 function Underwater({ points, minDD }: { points: { dd: number; label: string }[]; minDD: number }) {
   const reduced = useReducedFx();
@@ -53,12 +54,14 @@ function Underwater({ points, minDD }: { points: { dd: number; label: string }[]
     if (readout.current) readout.current.textContent = "";
   };
 
+  // few trades: every trade gets a dot on the curve (HTML dots – the SVG is stretched, circles would turn into ellipses)
+  const dots = n <= 40 ? points.map((p, i) => ({ left: `${(i / W) * 100}%`, top: `${((y(p.dd) + 2) / H) * 100}%`, low: p.dd <= minDD })) : [];
   return (
-    <div className="grid gap-1.5">
+    <div className="flex min-h-0 flex-1 flex-col gap-1.5">
       <div
         ref={root}
-        className="relative"
-        style={{ height: H, touchAction: "pan-y" }}
+        className="relative flex-1"
+        style={{ minHeight: H, touchAction: "pan-y" }}
         onPointerEnter={enter}
         onPointerDown={enter}
         onPointerMove={(e) => rect.current && show(e.clientX)}
@@ -77,6 +80,9 @@ function Underwater({ points, minDD }: { points: { dd: number; label: string }[]
             <path d={area} fill="rgb(255 77 79 / 0.16)" />
             <path d={line} fill="none" stroke="#ff4d4f" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
           </svg>
+          {dots.map((d, i) => (
+            <span key={i} className={cn("absolute size-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full", d.low ? "bg-loss" : "bg-[#ff4d4f]/70")} style={{ left: d.left, top: d.top }} />
+          ))}
         </motion.div>
         <span ref={guide} className="pointer-events-none absolute inset-y-0 left-0 w-px bg-fg/50 opacity-0 transition-opacity duration-150" />
       </div>
@@ -108,14 +114,16 @@ export function DrawdownCard() {
       {!view.closed.length ? (
         <EmptyState title={EMPTY.trades.title} text={EMPTY.trades.text} />
       ) : (
-        <div className="grid gap-4">
-          {rep.maxDD < 0 ? <Underwater points={points} minDD={minDD} /> : <EmptyState title={EMPTY.drawdown.title} text={EMPTY.drawdown.text} line={false} className="min-h-[120px]" />}
+        // the curve takes the height the row leaves (the card stretches to its neighbour), the tiles stay compact
+        <div className="flex flex-1 flex-col gap-4">
+          {rep.maxDD < 0 ? <Underwater points={points} minDD={minDD} /> : <EmptyState title={EMPTY.drawdown.title} text={EMPTY.drawdown.text} line={false} className="min-h-[120px] flex-1" />}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <Stat label="Max. Drawdown" value={pct(rep.maxDD)} tone={rep.maxDD < 0 ? "text-loss" : "text-fg"} sub={rep.maxDD < 0 ? `${n0(-rep.maxDDAbs)} ${cur}${rep.troughAt ? ` · ${fmtDate(rep.troughAt)}` : ""}` : "–"} />
             <Stat label="Aktuell" value={pct(rep.current)} tone={rep.current < 0 ? "text-loss" : "text-win"} sub={rep.current < 0 ? `${pct(rep.needed)} bis zum Hoch` : "am Höchststand"} />
             <Stat label="Ø Drawdown" value={rep.avgDD == null ? "–" : pct(rep.avgDD)} sub="unter Wasser" />
             <Stat label="Erholungs-Faktor" value={rep.recovery == null ? "–" : n2(rep.recovery)} tone={cn(rep.recovery != null && (rep.recovery >= 1 ? "text-win" : "text-loss"))} sub="Netto ÷ max. DD" />
             <Stat
+              className="col-span-2"
               label="Längste Phase"
               value={longest ? `${longest.trades} ${longest.trades === 1 ? "Trade" : "Trades"}` : "–"}
               sub={longest ? `${Math.round(longest.days)} Tage${longest.to == null ? " · läuft" : ""}` : "nie unter Wasser"}

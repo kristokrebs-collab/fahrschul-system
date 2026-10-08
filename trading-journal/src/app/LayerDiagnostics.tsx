@@ -10,7 +10,7 @@
  * scroll at ≤ 10 Hz. Everything it changes (hidden layers, noise film, safe effects) is restored when it closes.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { isSafeFx, setSafeFx } from "@/app/pwa";
+import { DISPLAY_STRINGS, isSafeFx, setSafeFx } from "@/app/pwa";
 import { collectLayers, copyText, DIAG_ATTR, formatReport, layersAt, readViewport, refreshBoxes, setLayerDiagOpen, type LayerInfo, type ViewportInfo } from "@/app/layerDiag";
 import { cn } from "@/lib/cn";
 import { Button } from "@/primitives/Button";
@@ -283,6 +283,7 @@ export default function LayerDiagnostics() {
             </div>
           </div>
           <p className="leading-relaxed">{DIAG_HINT}</p>
+          {vp?.samsung && <p className="rounded-lg border border-warn/30 bg-warn/[0.07] px-3 py-2 leading-relaxed text-warn">{DISPLAY_STRINGS.samsungDark}</p>}
           {copy === "fail" && (
             <div className="grid gap-1.5">
               <span className="text-warn">Kopieren nicht erlaubt – Text ist markiert, über das Menü kopieren:</span>

@@ -220,7 +220,23 @@ test.describe("touch targets ≥ 44 px", () => {
     const card = page.getByTestId("insights-discipline");
     await scrollUntilVisible(page, card);
     await page.waitForTimeout(600);
-    const traded = card.locator('[role="option"][data-key]').first();
+    // a traded day whose right neighbour (the same weekday a week later) has no trades: the tap lands on an empty day
+    // (the number of weeks follows the card width, so which day that is depends on the layout)
+    const id = await card.evaluate((root) => {
+      const cells = Array.from(root.querySelectorAll<HTMLElement>('[role="option"][data-key]'));
+      const next = (key: string) => {
+        const d = new Date(key + "T12:00");
+        d.setDate(d.getDate() + 7);
+        return `heat-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      };
+      const free = cells.find((c) => {
+        const n = root.querySelector<HTMLElement>(`#${next(c.dataset.key!)}`);
+        return n && !n.dataset.key;
+      });
+      return free?.id ?? null;
+    });
+    expect(id).not.toBeNull();
+    const traded = card.locator(`#${id}`);
     await expect(traded).toBeVisible();
     const box = (await traded.boundingBox())!;
     // 9 px right of the cell's edge: a gap / neighbouring empty day, inside the 24 px radius
