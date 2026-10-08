@@ -216,3 +216,43 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     -webkit-touch-callout: none;
   }
 }
+
+/* Samsung-Internet-safe effects (decision 7; `data-safe-fx` on <html>, set by src/app/pwa.ts for Samsung Internet or
+   `?safefx=1`). Fixed / sticky layers keep opacity and transform only: no backdrop-filter anywhere, no clip-path
+   reveal on the dock label plates (they fade instead), no mask-image on the header CTA's shine layers, no fixed
+   noise film (an SVG-filter image over the whole viewport), no blurred toast glow, no extra composited will-change
+   layers in the dock. Un-layered rules: they beat the Tailwind utilities without !important where possible. */
+html[data-safe-fx] body::before,
+html[data-diag-nonoise] body::before {
+  display: none;
+}
+html[data-safe-fx] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html[data-safe-fx] .dock-tip {
+  clip-path: none;
+  opacity: 0;
+  transition: var(--dock-tipsafe-out);
+}
+html[data-safe-fx] .group\/dock:focus-visible .dock-tip,
+html[data-safe-fx] .group\/dock[data-scrub] .dock-tip {
+  opacity: 1;
+  transition: var(--dock-tipsafe-in);
+}
+@media (hover: hover) {
+  html[data-safe-fx] .group\/dock:hover .dock-tip {
+    opacity: 1;
+    transition: var(--dock-tipsafe-in);
+  }
+}
+html[data-safe-fx] [data-layer="Dock"] .will-change-transform {
+  will-change: auto;
+}
+html[data-safe-fx] .toast-glow {
+  display: none;
+}
+html[data-safe-fx] .shiny-cta::before,
+html[data-safe-fx] .shiny-cta::after {
+  display: none;
+}

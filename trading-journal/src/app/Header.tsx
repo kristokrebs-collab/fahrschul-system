@@ -1,9 +1,10 @@
 import { motion, useScroll, useSpring, useTransform, type Variants } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EdgeBlur, type BlurBand } from "@/app/BottomFade";
 import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/CommandNav";
 import { FullscreenButton } from "@/app/DisplayActions";
 import { HeaderTicker } from "@/app/HeaderTicker";
+import { createTapCounter, MULTI_TAP, toggleLayerDiag } from "@/app/layerDiag";
 import type { StoreMode } from "@/domain/types";
 import { replayIntro, useIntroPhase, useIntroSettled, type IntroPhase } from "@/intro/introStore";
 import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
@@ -134,7 +135,7 @@ function MenuButton() {
 
 /**
  * Sticky app header (Plan 2.5 "Header", 6.6): logo tile `₿` → overview + ASCII-cascade decode of the wordmark +
- * `replayIntro()` (3D flip on hover, press squash), dancing-letters wordmark, subtitle, command-nav menu button, live market ticker, sync pill (`hidden md:inline-flex`), Magnetic →
+ * `replayIntro()` after the multi-tap window (five quick taps open the layer diagnostics instead; 3D flip on hover, press squash), dancing-letters wordmark, subtitle, command-nav menu button, live market ticker, sync pill (`hidden md:inline-flex`), Magnetic →
  * `.shiny-cta` `Trade eintragen` (label `max-sm:sr-only`) opening the editor without a morph source, `Vollbild` (lg+, where
  * the Fullscreen API exists). Opaque ink background. Scroll-linked hairline / shade (edge blur off, `TOP_BANDS`) and the
  * red reading-progress bar sit on its bottom edge.
@@ -148,16 +149,36 @@ export function Header() {
   const [decode, setDecode] = useState(0);
   // "Nicht gespeichert" (loss) when nothing persists, else the mode label
   const label = modeLabelFor(mode, storage);
+  // five quick taps on the logo open / close the layer diagnostics (decision 7); the replay of a single tap waits for
+  // the multi-tap window (MULTI_TAP.gapMs), so a series never replays the intro (which parks the header) mid-way
+  const [taps] = useState(() => createTapCounter());
+  const replayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (replayTimer.current) clearTimeout(replayTimer.current);
+    },
+    [],
+  );
   const onLogo = () => {
     navigate("overview");
-    // the intro (when it may replay) switches to "stage" synchronously, so the decode below is held until "build"
-    replayIntro();
-    if (!reduced) setDecode((n) => n + 1);
+    if (replayTimer.current) clearTimeout(replayTimer.current);
+    replayTimer.current = null;
+    if (taps.tap(performance.now()) >= MULTI_TAP.count) {
+      toggleLayerDiag();
+      return;
+    }
+    replayTimer.current = setTimeout(() => {
+      replayTimer.current = null;
+      // the intro (when it may replay) switches to "stage" synchronously, so the decode below is held until "build"
+      replayIntro();
+      if (!reduced) setDecode((n) => n + 1);
+    }, MULTI_TAP.gapMs);
   };
   return (
     // opaque ink (no 97 % alpha): scrolled text must never ghost through under the header's pills (tablet audit §3.3)
     <motion.header
       className="sticky top-[env(safe-area-inset-top,0px)] z-40 bg-ink-900"
+      data-layer="Header"
       initial={false}
       animate={reduced ? { y: "0%", opacity: 1 } : headerIntroTarget(phase)}
       // stage: parked at once (covered by the intro); build / skip / done: slides down on `spring.sheet`

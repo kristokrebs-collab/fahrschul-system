@@ -1,11 +1,12 @@
 import { motion } from "motion/react";
-import { useDeferredValue, useEffect, useMemo, type ReactNode } from "react";
+import { lazy, Suspense, useDeferredValue, useEffect, useMemo, type ReactNode } from "react";
 import { BottomFade } from "@/app/BottomFade";
 import { CommandNav } from "@/app/CommandNav";
 import { Dock } from "@/app/Dock";
 import { EditorHost } from "@/app/EditorHost";
 import { Footer } from "@/app/Footer";
 import { Header } from "@/app/Header";
+import { useLayerDiagOpen } from "@/app/layerDiag";
 import { LocalModeBanner, useLocalBannerOpen } from "@/app/LocalModeBanner";
 import { SetupEditor, TradeDetail } from "@/app/overlays";
 import { PageHost } from "@/app/PageHost";
@@ -20,6 +21,20 @@ import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { spring } from "@/motion/tokens";
 import { ToastIsland } from "@/primitives/Toast";
 import { useUi, type Page } from "@/store/uiStore";
+
+/** Layer diagnostics (decision 7): its own chunk, loaded only when `?debug=layers` or five logo taps open it. */
+const LayerDiagnostics = lazy(() => import("@/app/LayerDiagnostics"));
+
+/** Leaf host of the layer diagnostics (renders nothing while closed – the app never pays for it). */
+function LayerDiagHost() {
+  const open = useLayerDiagOpen();
+  if (!open) return null;
+  return (
+    <Suspense fallback={null}>
+      <LayerDiagnostics />
+    </Suspense>
+  );
+}
 
 /** Pages that stay mounted (hidden) while another tab is shown: the overview keeps its state, DOM and chart data. */
 const KEEP_ALIVE: readonly Page[] = ["overview"];
@@ -101,6 +116,7 @@ export default function App() {
       <SetupEditor />
       <Celebrate />
       <IntroHost />
+      <LayerDiagHost />
     </MorphDialogProvider>
   );
 }

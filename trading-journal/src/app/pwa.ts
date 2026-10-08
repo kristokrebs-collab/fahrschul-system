@@ -100,6 +100,33 @@ export function isSamsungInternet(ua: string = hasWindow ? navigator.userAgent :
   return /SamsungBrowser\//.test(ua);
 }
 
+/* ------------------------------------------------------------------ Samsung-Internet-safe effects */
+
+/**
+ * `data-safe-fx` on `<html>` (decision 7): in Samsung Internet the fixed / sticky layers (dock, its label plates,
+ * bottom fade, toast island, header CTA, noise film) drop `clip-path`, `backdrop-filter`, `mask-image`, blur filters
+ * and composited `will-change` layers and fall back to opacity / transform only (base.css `html[data-safe-fx]`).
+ * `?safefx=1` / `?safefx=0` in the URL forces it on / off on any browser (comparison on the device and in tests);
+ * the layer diagnostics can toggle it live.
+ */
+export const SAFE_FX_ATTR = "data-safe-fx";
+
+/** Pure: whether the safe effects apply – the URL switch wins, else Samsung Internet. */
+export function wantsSafeFx(ua: string, search: string): boolean {
+  const m = /[?&]safefx=([01])\b/.exec(search);
+  if (m) return m[1] === "1";
+  return isSamsungInternet(ua);
+}
+
+export function isSafeFx(): boolean {
+  return hasWindow && document.documentElement.hasAttribute(SAFE_FX_ATTR);
+}
+
+export function setSafeFx(on: boolean): void {
+  if (!hasWindow) return;
+  document.documentElement.toggleAttribute(SAFE_FX_ATTR, on);
+}
+
 /** iOS / iPadOS Safari: no install prompt API, installation goes through the share sheet. */
 export function isIosSafari(ua: string = hasWindow ? navigator.userAgent : "", touchPoints: number = hasWindow ? navigator.maxTouchPoints : 0): boolean {
   const ios = /iP(hone|ad|od)/.test(ua) || (/Macintosh/.test(ua) && touchPoints > 1);
@@ -254,6 +281,8 @@ export const DISPLAY_STRINGS = {
 /* ------------------------------------------------------------------ install on import */
 
 if (hasWindow) {
+  // before React's first paint (this module is imported by the shell): the fallbacks never flash in
+  if (wantsSafeFx(navigator.userAgent, location.search)) setSafeFx(true);
   window.addEventListener("beforeinstallprompt", (e) => {
     // keep the browser's mini-infobar from covering the dock; the app offers "App installieren" itself
     e.preventDefault();

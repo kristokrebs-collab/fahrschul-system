@@ -69,7 +69,7 @@ export function EdgeBlur({ bands, toward, className }: EdgeBlurProps) {
 export function BottomFade() {
   return (
     // grows with the bottom inset (taskbar safe area / host UI over the page), so the fade still ends under the dock
-    <div aria-hidden="true" className="pointer-events-none fixed inset-x-0 bottom-0 z-[45] h-[calc(7rem+var(--safe-bottom,0px))]">
+    <div aria-hidden="true" data-layer="Unterer Verlauf" className="pointer-events-none fixed inset-x-0 bottom-0 z-[45] h-[calc(7rem+var(--safe-bottom,0px))]">
       <EdgeBlur bands={BOTTOM_BANDS} toward="bottom" className="absolute inset-0" />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-ink-900/70 to-ink-900" />
     </div>

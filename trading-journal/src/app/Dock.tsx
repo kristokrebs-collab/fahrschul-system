@@ -8,6 +8,7 @@ import { flickStep, haptic, lastPressMs, mixSpring, physics, pressTempo, rubberC
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useCanHover } from "@/motion/useMediaQuery";
+import { isSafeFx } from "@/app/pwa";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Icon, type IconName } from "@/primitives/icons";
 import { Magnetic } from "@/primitives/Magnetic";
@@ -59,6 +60,9 @@ const DOCK_FX_VARS = {
   // label text: the pack's exponential fade (τ 38 ms in / 35 ms out) on top of the opaque plate
   "--dock-tiptext-in": `opacity ${TIP_IN.ms}ms ${TIP_IN.easing}`,
   "--dock-tiptext-out": `opacity ${TIP_OUT.ms}ms ${TIP_OUT.easing}`,
+  // Samsung-Internet-safe effects (`html[data-safe-fx]`, base.css): the plate fades on the same curve instead of clipping
+  "--dock-tipsafe-in": `opacity ${TIP_IN.ms}ms ${TIP_IN.easing}, translate ${TIP_RISE.ms}ms ${TIP_RISE.easing}`,
+  "--dock-tipsafe-out": `opacity ${TIP_OUT.ms}ms ${TIP_OUT.easing}, translate 0s linear ${TIP_OUT.ms}ms`,
   "--dock-pill-in": `opacity ${PILL_IN.ms}ms ${PILL_IN.easing} ${DOCK_CONFIG.pillDelayMs}ms`,
   "--dock-pill-out": `opacity ${PILL_OUT.ms}ms ${PILL_OUT.easing}`,
   "--dock-tip-rise": `${DOCK_CONFIG.tipRiseFrom}px`,
@@ -311,7 +315,7 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
         {/* pack label (fades in, rising from +6 px on the 1000/38 spring) on an opaque Nothing plate that is uncovered by
             clip-path instead of fading, so page text behind it is either fully covered or untouched (SH-03).
             CSS transitions with the measured curves as linear() (compositor: clip-path, opacity, translate) */}
-        <span className="block translate-y-[var(--dock-tip-rise)] whitespace-pre rounded-md border border-white/15 bg-ink-700 px-2 py-0.5 text-xs font-medium text-fg [clip-path:inset(100%_0_0_0_round_6px)] [transition:var(--dock-tip-out)] group-hover/dock:translate-y-0 group-hover/dock:[clip-path:inset(0_0_0_0_round_6px)] group-hover/dock:[transition:var(--dock-tip-in)] group-focus-visible/dock:translate-y-0 group-focus-visible/dock:[clip-path:inset(0_0_0_0_round_6px)] group-focus-visible/dock:[transition:var(--dock-tip-in)] group-data-[scrub]/dock:translate-y-0 group-data-[scrub]/dock:[clip-path:inset(0_0_0_0_round_6px)] group-data-[scrub]/dock:[transition:var(--dock-tip-in)]">
+        <span className="dock-tip block translate-y-[var(--dock-tip-rise)] whitespace-pre rounded-md border border-white/15 bg-ink-700 px-2 py-0.5 text-xs font-medium text-fg [clip-path:inset(100%_0_0_0_round_6px)] [transition:var(--dock-tip-out)] group-hover/dock:translate-y-0 group-hover/dock:[clip-path:inset(0_0_0_0_round_6px)] group-hover/dock:[transition:var(--dock-tip-in)] group-focus-visible/dock:translate-y-0 group-focus-visible/dock:[clip-path:inset(0_0_0_0_round_6px)] group-focus-visible/dock:[transition:var(--dock-tip-in)] group-data-[scrub]/dock:translate-y-0 group-data-[scrub]/dock:[clip-path:inset(0_0_0_0_round_6px)] group-data-[scrub]/dock:[transition:var(--dock-tip-in)]">
           <span className="block opacity-0 [transition:var(--dock-tiptext-out)] group-hover/dock:opacity-100 group-hover/dock:[transition:var(--dock-tiptext-in)] group-focus-visible/dock:opacity-100 group-focus-visible/dock:[transition:var(--dock-tiptext-in)] group-data-[scrub]/dock:opacity-100 group-data-[scrub]/dock:[transition:var(--dock-tiptext-in)]">
             {label}
           </span>
@@ -360,14 +364,17 @@ interface TrayEntrance {
  * Pure: the tray's entrance for the intro phase. "stage": parked below the edge (the intro covers the app); "build":
  * rises with a soft bounce (`spring.reveal`, ζ ≈ 0.68); otherwise the once-per-session entrance (`spring.sheet` + blur)
  * or nothing. Always ends at y 0 / opacity 1, whatever phase sequence arrives (skip → "done" straight from "stage").
+ * `noBlur` (Samsung-Internet-safe effects): the session entrance without the blur filter – transform / opacity only.
  */
-export function dockEntrance(phase: IntroPhase, sessionIntro: boolean, reduced: boolean): TrayEntrance {
+export function dockEntrance(phase: IntroPhase, sessionIntro: boolean, reduced: boolean, noBlur = false): TrayEntrance {
   if (reduced) return { initial: false, animate: { y: 0, opacity: 1 }, transition: { duration: 0 } };
   // the tray mounts before the intro starts (phase "off" → the session entrance's blurred `initial`): "stage" drops
   // that blur at once, so the build rise is crisp
   if (phase === "stage") return { initial: false, animate: { y: DOCK_CONFIG.introRise, opacity: 0, filter: "none" }, transition: { duration: 0 } };
   if (phase === "build") return { initial: false, animate: { y: 0, opacity: 1, filter: "none" }, transition: { y: spring.reveal, opacity: tween.fade, filter: { duration: 0 } } };
   // the blurred session entrance only without an intro: after a played intro ("done") the tray is already in place
+  if (sessionIntro && phase === "off" && noBlur)
+    return { initial: { y: 72, opacity: 0 }, animate: { y: 0, opacity: 1 }, transition: { y: spring.sheet, opacity: tween.reveal } };
   if (sessionIntro && phase === "off")
     return {
       initial: { y: 72, opacity: 0, filter: "blur(8px)" },
@@ -396,6 +403,8 @@ export function Dock() {
   const canHover = useCanHover();
   const magnify = canHover && !reduced;
   const phase = useIntroPhase();
+  // Samsung-Internet-safe effects: the session entrance rises without the blur filter (read once per mount)
+  const [safeFx] = useState(isSafeFx);
 
   // read once per mount, written after commit (a StrictMode double render must not consume the flag)
   const [introFresh] = useState(() => !dockIntroSeen());
@@ -683,7 +692,7 @@ export function Dock() {
   const fabVisible = !(editor.open && editor.fromFab);
   const breathing = fabVisible && !editor.open && canHover && !reduced && phase !== "stage";
   const layoutKey = `${page}|${editor.open ? 1 : 0}`;
-  const entrance = dockEntrance(phase, intro, reduced);
+  const entrance = dockEntrance(phase, intro, reduced, safeFx);
 
   return (
     // layoutRoot (SH-01): the nav is position:fixed, so Motion must never read a page-scroll clamp (the document got
@@ -693,12 +702,14 @@ export function Dock() {
       // grey-bar fix: above the taskbar safe area AND any host UI laid over the page bottom (`--safe-bottom`, base.css)
       className="pointer-events-none fixed inset-x-0 bottom-[calc(12px+var(--safe-bottom,env(safe-area-inset-bottom,0px)))] z-50 flex justify-center"
       aria-label="Navigation"
+      data-layer="Dock"
       style={DOCK_FX_VARS}
     >
       <motion.div
         ref={panelCallbackRef}
         role="toolbar"
         aria-label="Navigation"
+        data-layer="Dock-Leiste"
         onPointerEnter={onPointerEnter}
         onPointerDown={drag.handlers.onPointerDown}
         onPointerMove={(e) => {

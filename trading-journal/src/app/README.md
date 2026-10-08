@@ -60,6 +60,37 @@ Samsung Internet's), drawn outside web content: no page z-index can cover it. Th
 | `pwa.ts` | `canInstall`, `promptInstall`, `useCanInstall`, `isStandalone`, `useStandalone`, `isSamsungInternet`, `isIosSafari`, `fullscreenSupported`, `isFullscreen`, `toggleFullscreen`, `useFullscreen`, `useFullscreenSupported`, `bottomInset`, `installViewportInset`, `VV_KEYBOARD_MIN`, `DISPLAY_STRINGS` | listeners installed on import (guarded for jsdom / file://) |
 | `DisplayActions.tsx` | `FullscreenButton`, `GlyphFullscreen` | header button (`aria-pressed`), renders nothing without the API; the Settings owner can mount `FullscreenButton` too |
 
+## Layer diagnostics + Samsung-Internet-safe effects (decision 7)
+
+The user still sees the grey bar in normal Samsung Internet (not in TradingView). Measured on their screenshots: the bottom
+47 CSS px × ~780 CSS px, centred, flush on the One UI taskbar, flat rgb(27,27,27) (Samsung's night mode darkens the page:
+ink-900 → 4, white → ~30), drawn OVER an open dialog's dim layer (z ≥ 70 if it were ours). No page layer of that size is
+known, so the app now lets the device answer it:
+- **`?debug=layers`** in the URL (search or hash query) or **five quick taps on the header logo** (each ≤ 450 ms apart,
+  `MULTI_TAP`; a single tap's intro replay now waits for that window) open `LayerDiagnostics` (lazy chunk, `LayerDiagHost`
+  in App, nothing runs while closed). It outlines and labels every `position: fixed | sticky` layer and named inner part
+  (`data-layer`) with `#n name · w×h · z`, draws an opaque red/black **Prüfstreifen** over the bottom 64 px at z
+  2147483647 with a 16/32/48 px ruler (a grey bar still covering it is browser UI; a bar under it is ours), and a panel
+  with inner / client / visual-viewport size, DPR, safe-area insets (probe elements), `--vv-bottom` / `--safe-bottom`,
+  the layers under the bottom centre, a hide toggle per layer (noise film included), the safe-effects switch and
+  **Kopieren** (plain-text report, Clipboard API with an `execCommand` / selectable textarea fallback). Minimieren keeps
+  only outlines + strip for a clean screenshot. Close: ×, Esc, five logo taps. Everything it changed is restored on close.
+- **`data-safe-fx`** on `<html>` (`pwa.ts`, set on import before the first paint for Samsung Internet; `?safefx=1/0`
+  forces it anywhere): base.css drops every `backdrop-filter`, the dock label plates fade (opacity) instead of the
+  clip-path reveal, the dock's extra `will-change` layers, the header CTA's masked shine layers, the fixed noise film
+  (`body::before`, an SVG-filter image over the viewport) and the toast's blurred win glow; the dock's session entrance
+  rises without its blur filter (`dockEntrance(…, noBlur)`).
+- The toast island's live region is a 0×0 box at rest (no empty full-viewport fixed layer between toasts); it opens to
+  `inset-0` while a toast shows or exits, staying in the DOM / accessibility tree throughout.
+- Layer names: `Header`, `Dock`, `Dock-Leiste`, `Unterer Verlauf`, `Toast-Insel`, `Navigation (Vollbild)` (`data-layer`).
+
+| file | export | notes |
+|---|---|---|
+| `layerDiag.ts` | `diagRequested`, `createTapCounter`, `MULTI_TAP`, `useLayerDiagOpen`, `setLayerDiagOpen`, `toggleLayerDiag`, `collectLayers`, `refreshBoxes`, `readViewport`, `layersAt`, `layerName`, `layerEffects`, `layerLine`, `formatReport`, `copyText`, `DIAG_ATTR` | pure helpers + DOM reads (overlay open only) |
+| `LayerDiagnostics.tsx` | default overlay, `DIAG_TITLE`, `DIAG_HINT`, `PROBE_H` | one DOM walk / s + on resize / visual-viewport change, box refresh on scroll ≤ 10 Hz |
+| `pwa.ts` | `SAFE_FX_ATTR`, `wantsSafeFx`, `isSafeFx`, `setSafeFx` | see above |
+| `overviewScenario.ts` | `overviewScenario`, `RANGE_TITLE`, `shownScenarioKey` | decision 13: long-only scenarios on the Übersicht (market panel + scenario toast); a close under the stored short level reads as the range, the stored level is untouched |
+
 ## Dock: touch physics (additive, `@/motion/physics`)
 - **Tap hop by press length**: `hopFor(lastPressMs())` – a tap ≤ 150 ms, keyboard (click `detail 0`) and programmatic switches get
   EXACTLY `{ ...spring.pop, velocity: −600 }`; a press ≥ 400 ms a calm `spring.smooth` lift at −300 px/s; blended between.

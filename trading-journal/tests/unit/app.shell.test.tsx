@@ -120,7 +120,8 @@ describe("App shell", () => {
     const header = screen.getByRole("banner");
     expect(header.querySelector('[data-pulse="dancing-letters"]')).not.toBeNull();
     fireEvent.click(within(header).getByRole("button", { name: "Übersicht" }));
-    expect(header.querySelector('[data-pulse="ascii-cascade"]')).not.toBeNull();
+    // the replay + decode wait for the multi-tap window (five quick taps open the layer diagnostics instead)
+    await waitFor(() => expect(header.querySelector('[data-pulse="ascii-cascade"]')).not.toBeNull());
     expect(screen.getAllByText("Trade Journal")).toHaveLength(1);
     // no new focusables in the dock; the menu button lives in the header
     const menu = within(header).getByRole("button", { name: "Navigation öffnen" });
@@ -130,6 +131,19 @@ describe("App shell", () => {
     expect(menu).toHaveAttribute("aria-expanded", "true");
     fireEvent.keyDown(document, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull(), { timeout: 2500 });
+  });
+
+  it("five quick taps on the logo open the layer diagnostics (no intro replay), five more close them", async () => {
+    const { isLayerDiagOpen } = await import("@/app/layerDiag");
+    renderApp();
+    const logo = within(screen.getByRole("banner")).getByRole("button", { name: "Übersicht" });
+    for (let i = 0; i < 5; i++) fireEvent.click(logo);
+    expect(isLayerDiagOpen()).toBe(true);
+    // lazy chunk: the first import is transformed on demand in the test run
+    expect(await screen.findByTestId("layer-diag", {}, { timeout: 8000 })).toBeInTheDocument();
+    for (let i = 0; i < 5; i++) fireEvent.click(logo);
+    expect(isLayerDiagOpen()).toBe(false);
+    await waitFor(() => expect(screen.queryByTestId("layer-diag")).toBeNull());
   });
 
   it("FAB and header CTA open the trade editor", () => {

@@ -214,6 +214,7 @@ function Panel({ reduced }: { reduced: boolean }) {
       tabIndex={-1}
       onKeyDown={onKeyDown}
       className="fixed inset-0 z-[75] overflow-hidden bg-black outline-none"
+      data-layer="Navigation (Vollbild)"
       initial={reduced ? false : { transform: "translateX(-100%)" }}
       animate={{ transform: "translateX(0%)" }}
       exit={reduced ? { opacity: 0, transition: { duration: 0 } } : { transform: "translateX(100%)", transition: WIPE }}

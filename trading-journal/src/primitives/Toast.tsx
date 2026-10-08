@@ -66,7 +66,8 @@ export const TOAST_Z = 95;
  *   a small bounce when thrown); mouse, touch and pen; a press squishes the island (`scale .97`, Dynamic Island);
  * - win toasts (`ok` + `valueTone: "win"`) roll their value up (`spring.number`) under a green glow;
  * - `+n` queue badge pops (`spring.pop`) and rolls when the queue changes.
- * Reduced motion: no roll, glow or bar; instant transitions.
+ * Reduced motion: no roll, glow or bar; instant transitions. At rest the region is a 0×0 box (no empty full-viewport
+ * fixed layer between toasts); Samsung-Internet-safe effects (`html[data-safe-fx]`) drop the blurred win glow.
  */
 export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) {
   const storeToasts = useToastStore((s) => s.toasts);
@@ -76,19 +77,34 @@ export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) 
   const reduced = useReducedFx();
   const [fling, setFling] = useState<Fling | null>(null);
   const note = list[0];
+  // At rest (no toast, no exit running) the live region shrinks to a 0×0 box: no empty full-viewport fixed layer sits
+  // over the page between toasts (decision 7, Samsung Internet), while the region itself stays in the DOM and the
+  // accessibility tree, so the next toast is announced. Derived during render (never one frame clipped).
+  const noteId = note?.id ?? null;
+  const [shownId, setShownId] = useState<number | null>(noteId);
+  const [leaving, setLeaving] = useState(false);
+  if (shownId !== noteId) {
+    setShownId(noteId);
+    if (shownId !== null && noteId === null) setLeaving(true);
+  }
+  const idle = noteId === null && !leaving;
 
   return (
     <div
       data-toast-island=""
+      data-layer="Toast-Insel"
+      data-idle={idle ? "" : undefined}
       className={cn(
-        "pointer-events-none fixed inset-0 grid justify-items-center px-4 pb-[calc(92px+max(env(safe-area-inset-bottom,0px),var(--vv-bottom,0px)))] pt-[calc(10px+env(safe-area-inset-top,0px))]",
+        idle
+          ? "pointer-events-none fixed bottom-0 left-0 size-0 overflow-hidden"
+          : "pointer-events-none fixed inset-0 grid justify-items-center px-4 pb-[calc(92px+max(env(safe-area-inset-bottom,0px),var(--vv-bottom,0px)))] pt-[calc(10px+env(safe-area-inset-top,0px))]",
         className,
       )}
       style={{ zIndex: TOAST_Z }}
       aria-live="polite"
       role="status"
     >
-      <AnimatePresence custom={fling}>
+      <AnimatePresence custom={fling} onExitComplete={() => setLeaving(false)}>
         {note && (
           <IslandCard
             key={note.id}
@@ -257,7 +273,7 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
       {win && !reduced && (
         <motion.span
           aria-hidden="true"
-          className="pointer-events-none absolute -inset-2 -z-10 rounded-[32px] bg-win/25 blur-xl"
+          className="toast-glow pointer-events-none absolute -inset-2 -z-10 rounded-[32px] bg-win/25 blur-xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: [0, 0.9, 0.4] }}
           transition={tween.burst}
