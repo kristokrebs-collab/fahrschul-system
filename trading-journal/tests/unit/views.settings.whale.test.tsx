@@ -48,7 +48,7 @@ describe("SignalCheckCard · v2 thresholds", () => {
     expect(within(within(delta).getByRole("radiogroup", { name: "Rot unter (pp)" })).getByRole("radio", { name: "0", checked: true })).toBeInTheDocument();
     expect(within(within(delta).getByRole("radiogroup", { name: "Rot unter (pp)" })).getAllByRole("radio").map((r) => r.textContent)).toEqual(["−2", "−1", "0", "+1", "+2"]);
     expect(within(delta).getByText("Long: Delta unter 0 pp · Short (grün): über 0 pp")).toBeInTheDocument();
-    expect(within(within(delta).getByRole("radiogroup", { name: "oder Fall um (pp)" })).getByRole("radio", { name: "+1", checked: true })).toBeInTheDocument();
+    expect(within(within(delta).getByRole("radiogroup", { name: "oder Fall um (pp)" })).getByRole("radio", { name: "1", checked: true })).toBeInTheDocument();
     expect(within(delta).getByText("Long: Delta fällt in 1h um mind. 1 pp · Short: steigt so stark")).toBeInTheDocument();
     expect(within(within(delta).getByRole("radiogroup", { name: "Delta-Fenster" })).getAllByRole("radio").map((r) => r.textContent)).toEqual(["30m", "1h", "2h", "4h"]);
     expect(within(within(delta).getByRole("radiogroup", { name: "Delta-Fenster" })).getByRole("radio", { name: "1h", checked: true })).toBeInTheDocument();
@@ -80,7 +80,7 @@ describe("SignalCheckCard · v2 thresholds", () => {
     expect(onChange).toHaveBeenLastCalledWith("sgWhaleTop", "70");
     fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "Rot unter (pp)" })).getByRole("radio", { name: "−1" }));
     expect(onChange).toHaveBeenLastCalledWith("sgWhaleDeltaRed", "-1");
-    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "oder Fall um (pp)" })).getByRole("radio", { name: "+0,5" }));
+    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "oder Fall um (pp)" })).getByRole("radio", { name: "0,5" }));
     expect(onChange).toHaveBeenLastCalledWith("sgWhaleDeltaFall", "0.5");
     fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "Delta-Fenster" })).getByRole("radio", { name: "4h" }));
     expect(onChange).toHaveBeenLastCalledWith("sgWhaleWindow", "4h");

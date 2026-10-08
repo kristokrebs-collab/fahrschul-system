@@ -353,10 +353,10 @@ const ppLabel = (x: number): string => `${x > 0 ? "+" : x < 0 ? "−" : ""}${fmt
 const DELTA_RED_STEPS = [-2, -1, 0, 1, 2];
 const DELTA_FALL_STEPS = [0, 0.5, 1, 2, 3];
 /** Options for `steps` (+ the current value when it is none of them); `value` = the option matching the draft by number. */
-function ppChoice(draftValue: string, steps: readonly number[], fallback: number, lo: number, hi: number): { value: string; options: { v: string; label: string }[]; n: number } {
+function ppChoice(draftValue: string, steps: readonly number[], fallback: number, lo: number, hi: number, signed: boolean): { value: string; options: { v: string; label: string }[]; n: number } {
   const n = Math.min(hi, Math.max(lo, parseNumber(draftValue) ?? fallback));
   const all = steps.includes(n) ? [...steps] : [...steps, n].sort((a, b) => a - b);
-  return { value: String(n), options: all.map((x) => ({ v: String(x), label: ppLabel(x) })), n };
+  return { value: String(n), options: all.map((x) => ({ v: String(x), label: signed ? ppLabel(x) : fmt(x) })), n };
 }
 const weightOptions = (w: number) => (WHALE_WEIGHTS.includes(w) ? WEIGHT_OPTIONS : [...WHALE_WEIGHTS, w].sort((a, b) => a - b).map((x) => ({ v: String(x), label: String(x) })));
 const intOf = (v: string, d: number): number => Math.round(parseNumber(v) ?? d);
@@ -436,8 +436,9 @@ function WhaleGroup({ draft, onChange, changed, field }: GroupProps & { field: F
   const bonus = Math.min(4, Math.max(1, intOf(draft.sgWhaleBonus, 3)));
   const weight = Math.max(0, intOf(draft.sgWhaleWeight, 10));
   const topHelp = top != null ? S.whaleTopHelp(fmt(top), fmt(100 - top)) : undefined;
-  const red = ppChoice(draft.sgWhaleDeltaRed, DELTA_RED_STEPS, 0, -WHALE_DELTA_PP_MAX, WHALE_DELTA_PP_MAX);
-  const fall = ppChoice(draft.sgWhaleDeltaFall, DELTA_FALL_STEPS, 1, 0, WHALE_DELTA_PP_MAX);
+  const red = ppChoice(draft.sgWhaleDeltaRed, DELTA_RED_STEPS, 0, -WHALE_DELTA_PP_MAX, WHALE_DELTA_PP_MAX, true);
+  // a fall is an amount (no sign)
+  const fall = ppChoice(draft.sgWhaleDeltaFall, DELTA_FALL_STEPS, 1, 0, WHALE_DELTA_PP_MAX, false);
   const win = WHALE_DELTA_WINDOWS.includes(draft.sgWhaleWindow) ? draft.sgWhaleWindow : "1h";
   return (
     <Group title={S.whale}>
