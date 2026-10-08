@@ -85,7 +85,7 @@ const netExplainer = explain("net", view, settings);        // { title, what, fo
 - `toJsonBackup(trades, settings, hyblock?, now?)` → `{ exportedAt, settings, trades (enrichment stripped, pnl/r kept), hyblock?, schemaVersion: 1 }`.
 
 ## Constants worth knowing
-`BACKTEST_SETUP_ID = "s_bt"`, `ACCOUNT_LABELS` (`Gesamt/Makro/Scalp`), `SETUP_ACCOUNT_LABELS` (`Beide`), `CONVICTION_LEVELS`, `RESULT_LABELS` (`Gewinn/Verlust/Break-even/Offen`), `LEVERAGE_RULE`, `HYBLOCK_LINK`, `nextSetupColor(setups)`, `BACKTEST_SETUP_DELETED`, `SCENARIO_TOAST_MS = 5200`, `TRIGGER_REACH_THRESHOLD = 0.003`.
+`BACKTEST_SETUP_ID = "s_bt"`, `ACCOUNT_LABELS` (`Gesamt/Makro/Scalp`), `SETUP_ACCOUNT_LABELS` (`Beide`), `CONVICTION_LEVELS`, `RESULT_LABELS` (`Gewinn/Verlust/Break-even/Offen`), `LEVERAGE_RULE`, `HYBLOCK_LINK`, `nextSetupColor(setups)`, `BACKTEST_SETUP_DELETED`, `TRIGGER_REACH_THRESHOLD = 0.003`.
 
 ## Tests / fixture
 `tests/unit/domain.*.test.ts`, `tests/unit/lib.*.test.ts`; `tests/fixtures/tj2-v0.json` is a legacy localStorage snapshot

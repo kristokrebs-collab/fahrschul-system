@@ -91,7 +91,6 @@ known, so the app now lets the device answer it:
 | `layerDiag.ts` | `diagRequested`, `createTapCounter`, `MULTI_TAP`, `useLayerDiagOpen`, `setLayerDiagOpen`, `toggleLayerDiag`, `collectLayers`, `refreshBoxes`, `readViewport`, `layersAt`, `layerName`, `layerEffects`, `layerLine`, `formatReport`, `copyText`, `DIAG_ATTR` | pure helpers + DOM reads (overlay open only) |
 | `LayerDiagnostics.tsx` | default overlay, `DIAG_TITLE`, `DIAG_HINT`, `PROBE_H` | one DOM walk / s + on resize / visual-viewport change, box refresh on scroll ≤ 10 Hz |
 | `pwa.ts` | `SAFE_FX_ATTR`, `wantsSafeFx`, `isSafeFx`, `setSafeFx` | see above |
-| `overviewScenario.ts` | `overviewScenario`, `RANGE_TITLE`, `shownScenarioKey` | decision 13: long-only scenarios on the Übersicht (market panel + scenario toast); a close under the stored short level reads as the range, the stored level is untouched |
 
 ## Dock: touch physics (additive, `@/motion/physics`)
 - **Tap hop by press length**: `hopFor(lastPressMs())` – a tap ≤ 150 ms, keyboard (click `detail 0`) and programmatic switches get
@@ -110,7 +109,7 @@ known, so the app now lets the device answer it:
 
 ```
 <MorphDialogProvider>                     (effect: installViewportInset() → --vv-bottom, see "Display")
-  <ScenarioWatcher/>                       toast `Neues Szenario: …` when a 4h bar closes into a new scenario key (tj2-trigger-last)
+  <ScenarioWatcher/>                       toast `Lage: …` when the Lage-Ampel changes (decision 23; once per change, never on load, tj2-lage-last)
   <Header/>                                HeaderEdge (hairline / shade / edge blur / red reading progress) + HeaderTicker
   <main class="mx-auto max-w-[1320px] px-4 pb-40 pt-6 sm:px-6">
     <LocalModeBanner/>                     mode === "local" && !hideLocalBanner
