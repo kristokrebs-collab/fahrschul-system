@@ -77,7 +77,7 @@ known, so the app now lets the device answer it:
   only outlines + strip for a clean screenshot. Close: ×, Esc, five logo taps. Everything it changed is restored on close.
 - **`data-safe-fx`** on `<html>` (`pwa.ts`, set on import before the first paint for Samsung Internet; `?safefx=1/0`
   forces it anywhere): base.css drops every `backdrop-filter`, the dock label plates fade (opacity) instead of the
-  clip-path reveal, the dock's extra `will-change` layers, the header CTA's masked shine layers, the fixed noise film
+  clip-path reveal, the dock's extra `will-change` layers, the header CTA's masked shine layers (a plain inset red under-glow instead), the fixed noise film
   (`body::before`, an SVG-filter image over the viewport) and the toast's blurred win glow; the dock's session entrance
   rises without its blur filter (`dockEntrance(…, noBlur)`).
 - The toast island's live region is a 0×0 box at rest (no empty full-viewport fixed layer between toasts); it opens to
