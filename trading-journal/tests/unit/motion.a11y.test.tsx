@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SETTLE_FALLBACK_MS, useDialogBehaviour } from "@/motion/a11y";
+import { SETTLE_FALLBACK_MS, useDialogBehaviour, useEscape } from "@/motion/a11y";
 
 function Harness({ open, settled, onClose = () => {} }: { open: boolean; settled?: boolean; onClose?: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -112,5 +112,32 @@ describe("useDialogBehaviour", () => {
     expect(document.activeElement).toBe(last);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+function EscapeHarness({ open, tick, onClose }: { open: boolean; tick: number; onClose: (tick: number) => void }) {
+  // an inline closure per render, like every caller passes
+  useEscape(open, () => onClose(tick));
+  return <span>{tick}</span>;
+}
+
+describe("useEscape", () => {
+  it("subscribes once per open session (re-renders never swap the listener mid-dispatch) and calls the latest onClose", () => {
+    const add = vi.spyOn(document, "addEventListener");
+    const remove = vi.spyOn(document, "removeEventListener");
+    const keydowns = (spy: typeof add) => spy.mock.calls.filter(([type]) => type === "keydown").length;
+    const onClose = vi.fn();
+    const { rerender } = render(<EscapeHarness open tick={1} onClose={onClose} />);
+    for (let tick = 2; tick <= 5; tick++) rerender(<EscapeHarness open tick={tick} onClose={onClose} />);
+    expect(keydowns(add)).toBe(1);
+    expect(keydowns(remove)).toBe(0);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledExactlyOnceWith(5);
+    rerender(<EscapeHarness open={false} tick={6} onClose={onClose} />);
+    expect(keydowns(remove)).toBe(1);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    add.mockRestore();
+    remove.mockRestore();
   });
 });

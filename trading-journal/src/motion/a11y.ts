@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef, type RefObject } from "react";
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
@@ -247,19 +247,25 @@ export function useInertOutside(ref: RefObject<HTMLElement | null>, active: bool
   useModalSession(ref, active, settled, { focus: false, inert: true });
 }
 
-/** Escape closes. */
+/**
+ * Escape closes. The listener is subscribed once per open session and calls the latest `onClose` (an effect event):
+ * callers pass inline closures, and re-subscribing on every render let a re-render that React committed inside the
+ * Escape keydown itself (pending work flushed at the start of a discrete event) swap the listener mid-dispatch –
+ * Chrome then ran neither the removed nor the added listener and that Escape was lost (command navigation stayed open).
+ */
 export function useEscape(active: boolean, onClose: () => void): void {
+  const close = useEffectEvent(onClose);
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        close();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [active, onClose]);
+  }, [active]);
 }
 
 export interface DialogBehaviourOptions {
