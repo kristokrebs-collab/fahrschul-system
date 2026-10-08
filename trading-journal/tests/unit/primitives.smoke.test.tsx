@@ -196,6 +196,8 @@ describe("smoke: motion kit renders and behaves in jsdom", () => {
         </div>
       );
     }
+    // a hover-capable device: the active tile shows its verdict popover (touch shows the verdict in the dialog only)
+    vi.stubGlobal("matchMedia", (q: string) => ({ matches: q === "(hover: hover)", media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => false }));
     render(
       <MotionRoot>
         <MorphDialogProvider>
@@ -206,6 +208,7 @@ describe("smoke: motion kit renders and behaves in jsdom", () => {
         </MorphDialogProvider>
       </MotionRoot>,
     );
+    vi.unstubAllGlobals();
     expect(screen.getByRole("button", { name: /Win-Rate/ })).toBeInTheDocument();
     expect(screen.getByText("Gut")).toBeInTheDocument();
     const a = screen.getByRole("button", { name: "Zeile a" });
@@ -216,6 +219,20 @@ describe("smoke: motion kit renders and behaves in jsdom", () => {
     fireEvent.mouseLeave(a);
     fireEvent.mouseEnter(b);
     expect(b.querySelector("span[aria-hidden]")?.className).toContain("bg-white/[0.055]");
+  });
+
+  it("StatTile on touch (no hover): an active tile never leaves its verdict popover open", () => {
+    render(
+      <MotionRoot>
+        <MorphDialogProvider>
+          <dl>
+            <StatTile fact="winRate" label="Win-Rate" value="62 %" active verdict={{ tone: "win", text: "Gut" }} body={() => <p>Body</p>} />
+          </dl>
+        </MorphDialogProvider>
+      </MotionRoot>,
+    );
+    expect(screen.getByRole("button", { name: /Win-Rate/ })).toBeInTheDocument();
+    expect(screen.queryByText("Gut")).toBeNull();
   });
 
   it("PageSwitch reports transitioning and renders the active page", () => {

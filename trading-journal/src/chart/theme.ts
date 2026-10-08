@@ -132,6 +132,9 @@ export function makeNothingTheme(background: string = CHART_BACKGROUND_TRANSPARE
       priceFormatter: (p: number) => fmt.price(p),
     },
     handleScale: { axisPressedMouseMove: { time: true, price: false } },
+    // a vertical swipe on the chart scrolls the page (the chart fills half a tablet screen); horizontal drags still pan
+    // and pinch still zooms
+    handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
   };
 }
 

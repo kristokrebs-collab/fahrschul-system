@@ -54,7 +54,7 @@ export function MistakesCard() {
                 <li key={x.tag} className={cn(i > 0 && "border-t border-line")}>
                   <button type="button" aria-expanded={on} aria-controls={`mistake-${i}`} onClick={() => setOpen(on ? null : x.tag)} className="grid min-h-11 w-full gap-1.5 rounded-lg px-1 py-2 text-left">
                     <span className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 text-[13px]">
-                      <span className="min-w-0 truncate">
+                      <span className="min-w-0 break-words">
                         {x.tag} <span className="text-faint">· {x.n}×{x.auto ? ` (${x.auto} automatisch)` : ""}</span>
                       </span>
                       <span className={cn("num font-mono", softTone(x.excess))}>{signed(x.excess, 0)}</span>

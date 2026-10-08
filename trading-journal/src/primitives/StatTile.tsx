@@ -154,7 +154,7 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
                 aria-hidden="true"
                 className={cn(
                   "grid size-5 shrink-0 place-items-center rounded-full border border-line-2 text-mute transition-all duration-300 group-hover:rotate-90 group-hover:border-white/50 group-hover:text-fg",
-                  active && "rotate-90 border-white/50 text-fg",
+                  lifted && "rotate-90 border-white/50 text-fg",
                 )}
               >
                 <GlyphPlus className="size-3" />
@@ -176,9 +176,11 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
           </motion.div>
         </MorphCard>
         {/* verdict popover: out of flow and outside the card's overflow-hidden, opening upward so it stays inside the
-            hero for both tile rows (the hero section clips its bottom edge) */}
+            hero for both tile rows (the hero section clips its bottom edge). Hover devices only: on touch the tap opens
+            the dialog, which shows the verdict, and nothing would ever close a popover left by the tap or the focus
+            return (no pointer leaves) */}
         <AnimatePresence initial={false}>
-          {active && verdict && (
+          {lifted && verdict && (
             <motion.p
               key="verdict"
               className={cn(

@@ -180,7 +180,8 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
         </div>
       )}
       <Segmented<"all" | AccountId> aria-label="Konto" size="sm" value={filter.acc} onChange={(acc) => onChange({ acc })} options={ACC_OPTIONS} />
-      <Segmented aria-label="Ergebnis" size="sm" value={filter.result} onChange={(result) => onChange({ result })} options={RESULT_OPTIONS} />
+      {/* wraps on a phone: a coarse-pointer row gap keeps the ±10 px tap bands of both rows apart */}
+      <Segmented aria-label="Ergebnis" size="sm" className="pointer-coarse:gap-y-5" value={filter.result} onChange={(result) => onChange({ result })} options={RESULT_OPTIONS} />
       <Segmented aria-label="Richtung" size="sm" value={filter.side} onChange={(side) => onChange({ side })} options={SIDE_OPTIONS} />
       <CountPill count={count} closed={closed} reduced={reduced} />
     </div>

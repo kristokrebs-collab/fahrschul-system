@@ -260,7 +260,7 @@ function Panel({ reduced }: { reduced: boolean }) {
                           e.preventDefault();
                           go(p);
                         }}
-                        className="cmdnav-link group/link inline-flex max-w-full items-baseline gap-3 rounded-lg py-1.5 text-fg outline-none transition-opacity duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:gap-5"
+                        className="cmdnav-link group/link inline-flex max-w-full items-baseline gap-3 rounded-lg py-1.5 text-fg outline-none max-sm:pointer-coarse:py-2.5 transition-opacity duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:gap-5"
                       >
                         <span aria-hidden="true" className="w-6 shrink-0 font-mono text-[11px] text-faint sm:w-8">
                           0{i + 1}

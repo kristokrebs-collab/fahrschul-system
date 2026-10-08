@@ -244,3 +244,108 @@ test.describe("touch targets ≥ 44 px", () => {
     await expect(traded).toHaveAttribute("aria-selected", "true");
   });
 });
+
+test.describe("touch review fixes", () => {
+  test("candle chart: a vertical swipe scrolls the page, the chart keeps horizontal panning", async ({ page }, info) => {
+    touchOnly(info);
+    await seed(page, { synth: { ratios: "whale-long", anchor: Date.now() } });
+    await page.goto("/#overview");
+    await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+    const card = page.locator("#chart-card");
+    await card.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+    const canvas = card.locator("canvas").first();
+    await expect(canvas).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(1200);
+    const b = (await canvas.boundingBox())!;
+    const kit = await touchKit(page);
+    const at = { x: b.x + b.width * 0.45, y: b.y + b.height * 0.6 };
+    const y0 = await page.evaluate(() => window.scrollY);
+    await kit.drag(at, { x: at.x, y: at.y - 220 }, 280);
+    await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 3000 }).toBeGreaterThan(y0 + 100);
+  });
+
+  test("morph dialog: once the card took the panel back, it never flashes up again empty nor catches taps", async ({ page }, info) => {
+    await seed(page);
+    await page.goto("/#overview");
+    await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+    const tile = page.locator('dl [aria-haspopup="dialog"]').nth(1);
+    await tile.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+    await page.waitForTimeout(700);
+    if (hasTouch(info)) await tile.tap();
+    else await tile.click();
+    const dialog = page.locator('[role="dialog"]').last();
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(1400);
+    const box = (await dialog.boundingBox())!;
+    // per frame after the close: the dialog box, its effective opacity and what a tap at its centre would hit
+    await page.evaluate((bx) => {
+      const w = window as unknown as { __ghost: { t: number; w: number; op: number; inOverlay: boolean }[] };
+      w.__ghost = [];
+      const t0 = performance.now();
+      const step = () => {
+        const t = performance.now() - t0;
+        const d = document.querySelector<HTMLElement>('[role="dialog"]');
+        if (d) {
+          const r = d.getBoundingClientRect();
+          let op = 1;
+          for (let n: HTMLElement | null = d; n && n !== document.documentElement; n = n.parentElement) {
+            const cs = getComputedStyle(n);
+            op *= Number(cs.opacity);
+            if (cs.visibility === "hidden") op = 0;
+          }
+          const hit = document.elementFromPoint(bx.x + bx.width / 2, bx.y + bx.height / 2);
+          w.__ghost.push({ t, w: r.width, op, inOverlay: !!hit?.closest(".z-\\[70\\]") });
+        }
+        if (t < 2400) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }, box);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(2600);
+    const log = await page.evaluate(() => (window as unknown as { __ghost: { t: number; w: number; op: number; inOverlay: boolean }[] }).__ghost);
+    let shrunk = false;
+    const ghosts: number[] = [];
+    for (const s of log) {
+      if (s.op < 0.05 || s.w < box.width * 0.8) shrunk = true;
+      if (shrunk && Math.abs(s.w - box.width) < box.width * 0.05 && (s.op > 0.05 || s.inOverlay)) ghosts.push(Math.round(s.t));
+    }
+    expect(ghosts, `frames with the empty panel back at full size: ${ghosts.join(", ")} ms`).toEqual([]);
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+  });
+
+  test("hero tile: after a tap and closing its dialog no verdict popover stays open", async ({ page }, info) => {
+    test.skip(!isTouchTablet(info), "touch tablets (the phone has no popover)");
+    await seed(page);
+    await page.goto("/#overview");
+    await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+    const tile = page.locator('dl [aria-haspopup="dialog"]').nth(1);
+    await tile.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+    await page.waitForTimeout(600);
+    await tile.tap();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await page.waitForTimeout(1200);
+    await dialog.getByRole("button", { name: "Schließen" }).tap();
+    await expect(dialog).toHaveCount(0, { timeout: 4000 });
+    await page.waitForTimeout(1200);
+    await expect(page.locator("dl p")).toHaveCount(0);
+  });
+
+  test("phone: a tap just below the range pills never collapses the chart", async ({ page }, info) => {
+    test.skip(!isMobile(info), "phone layout (the chart header wraps)");
+    await seed(page, { synth: { ratios: "whale-long", anchor: Date.now() } });
+    await page.goto("/#overview");
+    await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+    const card = page.locator("#chart-card");
+    await card.evaluate((el) => el.scrollIntoView({ block: "start", behavior: "instant" }));
+    await page.waitForTimeout(800);
+    const expander = card.getByRole("button", { name: /Details (schließen|zeigen): Chart/ });
+    await expect(expander).toHaveAccessibleName("Details schließen: Chart");
+    const pill = card.getByRole("radio", { name: "1W", exact: true });
+    const b = (await pill.boundingBox())!;
+    // inside the pill's own coarse tap band (10 px below its box)
+    await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height + 7);
+    await expect(pill).toHaveAttribute("aria-checked", "true");
+    await expect(expander).toHaveAccessibleName("Details schließen: Chart");
+  });
+});

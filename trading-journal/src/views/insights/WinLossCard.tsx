@@ -33,10 +33,10 @@ export function WinLossCard() {
                   <span className="hidden truncate @max-[400px]/wl:inline">{r.short}</span>
                   {r.highlight && <span className="sr-only">(großer Unterschied)</span>}
                 </span>
-                <span role="cell" className={cn("num line-clamp-2 break-words text-right font-mono", r.highlight ? "text-fg" : "text-mute")}>
+                <span role="cell" className={cn("num break-words text-right font-mono", r.highlight ? "text-fg" : "text-mute")}>
                   {r.win}
                 </span>
-                <span role="cell" className={cn("num line-clamp-2 break-words text-right font-mono", r.highlight ? "text-fg" : "text-mute")}>
+                <span role="cell" className={cn("num break-words text-right font-mono", r.highlight ? "text-fg" : "text-mute")}>
                   {r.loss}
                 </span>
               </RevealItem>

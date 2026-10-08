@@ -682,7 +682,8 @@ export function ChartCard() {
         title={`Chart · ${sym} Perp`}
         note={<ChartNote feedId={feedId} outside={outside} loading={loading} mcb={signals.length > 0} />}
         action={
-          <div className="flex flex-wrap items-center gap-2">
+          // wrapped rows spread apart on touch: the ±10 px tap bands of the range pills and the expander never overlap
+          <div className="flex flex-wrap items-center gap-2 pointer-coarse:gap-y-5">
             <Segmented<ChartIv>
               size="sm"
               aria-label="Intervall"

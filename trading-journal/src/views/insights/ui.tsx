@@ -85,7 +85,7 @@ export const SEG_TOUCH = "pointer-coarse:[&>button]:min-h-11 pointer-coarse:[&>b
 export function Stat({ label, value, sub, tone, className }: { label: ReactNode; value: ReactNode; sub?: ReactNode; tone?: string; className?: string }) {
   return (
     <div className={cn("grid min-w-0 content-start gap-1 rounded-xl border border-line bg-ink-950/50 px-3 py-2.5", className)}>
-      <span className="truncate text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{label}</span>
+      <span className="break-words text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{label}</span>
       <span className={cn("num truncate font-mono text-[15px] font-medium leading-tight", tone)}>{value}</span>
       {sub != null && <span className="num truncate text-[11px] text-faint">{sub}</span>}
     </div>

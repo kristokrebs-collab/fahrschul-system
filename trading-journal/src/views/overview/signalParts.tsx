@@ -381,8 +381,9 @@ export const RungTile = memo(function RungTile({ rung, side, cfg, fresh }: RungT
       ))}
       <span ref={glow} aria-hidden="true" className={cn("pointer-events-none absolute inset-0 -z-10 opacity-0", side === "long" ? "bg-win/15" : "bg-loss/15")} />
       <div className="flex items-baseline justify-between gap-2">
-        <span className="dot-num text-[20px] leading-none text-fg">{rung.tf}</span>
-        <span className="truncate text-[10px] uppercase tracking-[0.12em] text-faint">{rung.role}</span>
+        <span className="dot-num shrink-0 text-[20px] leading-none text-fg">{rung.tf}</span>
+        {/* narrow tiles (2-up on a phone): tighter letters, so "Bestätigung" fits next to the timeframe */}
+        <span className="truncate text-[10px] uppercase tracking-[0.12em] text-faint @max-[10rem]/rung:text-[9.5px] @max-[10rem]/rung:tracking-[0.03em]">{rung.role}</span>
       </div>
       {!c ? (
         <p className="mt-3 text-[11.5px] text-faint">{TOO_FEW_BARS}</p>
