@@ -91,7 +91,7 @@ test.describe("Übersicht v2", () => {
     await page.keyboard.press("Escape");
     await expect(diag).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.hasAttribute("data-safe-fx"))).toBe(samsung);
-    expect(await page.evaluate(() => [...document.querySelectorAll<HTMLElement>("[data-layer]")].filter((e) => e.style.visibility === "hidden").length)).toBe(0);
+    expect(await page.evaluate(() => Array.from(document.querySelectorAll<HTMLElement>("[data-layer]")).filter((e) => e.style.visibility === "hidden").length)).toBe(0);
     // without the parameter: nothing
     await page.goto("/#overview");
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
