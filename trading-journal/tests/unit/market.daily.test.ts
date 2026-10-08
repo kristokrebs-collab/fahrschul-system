@@ -36,7 +36,10 @@ describe("kline_1d feed", () => {
     expect(WS_FEEDS).not.toContain(DAILY_FEED);
   });
 
-  it("fresh start: one 1000-day page, then the missing days hourly at hh:00:20 — 00:00:20 brings the closed day", async () => {
+  // 14 h of fake time on the real provider (every feed polling, the socket pumped every 10–30 s): ≈ 2.5–3 s of CPU on
+  // its own, so a parallel full run (`--maxWorkers=2` beside other work) crossed vitest's 5-s default and failed by
+  // timeout — not by an assertion
+  it("fresh start: one 1000-day page, then the missing days hourly at hh:00:20 — 00:00:20 brings the closed day", { timeout: 30_000 }, async () => {
     const env = setup();
     p = env.provider;
     p.start();

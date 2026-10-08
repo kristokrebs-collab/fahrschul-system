@@ -201,7 +201,6 @@ const STRINGS = [
   "Invalidierung unter",
   "Ziel 82.000–81.500, Stop über",
   "Abwarten.",
-  "Neues Szenario: ",
   "Falling-Knife-Filter prüfen, bevor du kaufst.",
   "Long-Trigger in Reichweite",
   "Long-Invalidierung",
