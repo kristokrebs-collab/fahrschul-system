@@ -67,3 +67,16 @@ describe("RulesCard", () => {
     expect((onChange.mock.lastCall?.[0] as Rule[]).map((r) => r.id)).toEqual(["topdown", "spx"]);
   });
 });
+
+describe("RulesCard · drag feature armed lazily", () => {
+  it("mounting measures no row (Motion's drag feature waits); pressing a handle arms every row at once", () => {
+    const spy = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect");
+    const rowReads = () => spy.mock.contexts.filter((el) => (el as HTMLElement).closest?.("[data-testid^='rule-']")).length;
+    render(<Harness onChange={() => undefined} />);
+    expect(rowReads()).toBe(0);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Regel 2 verschieben" }), { pointerId: 1, button: 0, clientX: 10, clientY: 10 });
+    // armed synchronously on the press: each row's drag feature measured its element (Reorder needs every layout)
+    expect(rowReads()).toBeGreaterThanOrEqual(RULES.length);
+    spy.mockRestore();
+  });
+});

@@ -1,5 +1,6 @@
 import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
-import { useState, type KeyboardEvent } from "react";
+import { startTransition, useState, type KeyboardEvent } from "react";
+import { flushSync } from "react-dom";
 import type { Rule, Trade } from "@/domain/types";
 import { newRuleId } from "@/lib/ids";
 import { CONFIG as LIFT_CONFIG, useLift } from "@/motion/pulse/WidgetGrid";
@@ -55,6 +56,16 @@ export interface RulesCardProps {
  */
 export function RulesCard({ rules, onChange, trades, changed = false, className }: RulesCardProps) {
   const [confirm, setConfirm] = useState<string | null>(null);
+  // Motion's drag feature measures its element synchronously when it mounts (one forced style + layout of the
+  // settings page in the mount commit, ≈ 35 ms on the tablet probe): the rows get it only when a drag can start –
+  // pointer over / focus on a handle arms them in a background render, a press arms them at once (flushSync, so the
+  // drag starts on that very press). The arrow keys never need it.
+  const [dragReady, setDragReady] = useState(false);
+  const arm = (now: boolean) => {
+    if (dragReady) return;
+    if (now) flushSync(() => setDragReady(true));
+    else startTransition(() => setDragReady(true));
+  };
   const ids = rules.map((r) => r.id).join();
 
   const remove = (id: string) => {
@@ -84,6 +95,8 @@ export function RulesCard({ rules, onChange, trades, changed = false, className 
                 index={i}
                 count={rules.length}
                 ids={ids}
+                dragReady={dragReady}
+                onArm={arm}
                 confirming={confirm === rule.id}
                 used={used}
                 onText={(text) => onChange(rules.map((r) => (r.id === rule.id ? { ...r, text } : r)))}
@@ -111,6 +124,10 @@ interface RuleRowProps {
   index: number;
   count: number;
   ids: string;
+  /** the drag feature is mounted (see `RulesCard`) */
+  dragReady: boolean;
+  /** mount the drag feature on every row: `true` = synchronously (a press), `false` = in a background render */
+  onArm: (now: boolean) => void;
   used: number;
   confirming: boolean;
   onText: (text: string) => void;
@@ -120,7 +137,7 @@ interface RuleRowProps {
   onCancel: () => void;
 }
 
-function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, onRemove, onConfirm, onCancel }: RuleRowProps) {
+function RuleRow({ rule, index, count, ids, dragReady, onArm, used, confirming, onText, onMove, onRemove, onConfirm, onCancel }: RuleRowProps) {
   const controls = useDragControls();
   const lift = useLift({ scale: LIFT_SCALE });
   const onHandleKey = (e: KeyboardEvent<HTMLButtonElement>) => {
@@ -135,8 +152,10 @@ function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, on
   return (
     <Reorder.Item
       value={rule}
+      // overrides Reorder.Item's `drag={axis}`: no drag feature (and no mount-time measure) until armed
+      drag={dragReady ? "y" : false}
       dragListener={false}
-      dragControls={controls}
+      dragControls={dragReady ? controls : undefined}
       layout
       layoutDependency={ids}
       initial={{ opacity: 0, y: 6 }}
@@ -159,7 +178,12 @@ function RuleRow({ rule, index, count, ids, used, confirming, onText, onMove, on
           type="button"
           aria-label={RULES_STRINGS.move(index + 1)}
           title="Ziehen oder Pfeiltasten"
-          onPointerDown={(e) => controls.start(e)}
+          onPointerEnter={() => onArm(false)}
+          onFocus={() => onArm(false)}
+          onPointerDown={(e) => {
+            onArm(true);
+            controls.start(e);
+          }}
           onKeyDown={onHandleKey}
           className="grid size-10 shrink-0 cursor-grab touch-none place-items-center rounded-xl border border-line-2 text-faint hover:text-fg active:cursor-grabbing pointer-coarse:size-11"
         >
