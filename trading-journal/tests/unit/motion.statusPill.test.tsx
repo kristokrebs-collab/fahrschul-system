@@ -1,6 +1,6 @@
 import { act, render, waitFor } from "@testing-library/react";
 import { motionValue } from "motion/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { StatusPill } from "@/motion/StatusPill";
 
 const pings = () => Array.from(document.querySelectorAll<HTMLElement>("[data-fx='ping']"));
@@ -39,12 +39,21 @@ describe("StatusPill liveness", () => {
 
 describe("StatusPill countdown ring", () => {
   it("a RingCycle is placed at its elapsed progress on mount (two compositor half-rings)", () => {
-    const { container } = render(<StatusPill tone="live" expanded label="Live" ring={{ endsAt: Date.now() + 15_000, ms: 30_000 }} />);
-    const halves = container.querySelectorAll("[data-fx='ring'] .overflow-hidden > span");
-    expect(halves).toHaveLength(2);
-    // half-way: the right half-ring has arrived (45°), the left one has not started (45°)
-    expect(rotation(halves[0])).toBeCloseTo(45, 0);
-    expect(rotation(halves[1])).toBeCloseTo(45, 0);
+    // the ring reads Date.now() in its layout effect: on the wall clock, every ms between building the prop and the
+    // mount turns the half-rings by 0.012° — under a loaded parallel run > 40 ms passed and 45° ± 0.5 failed. Frozen
+    // Date: exactly half-way.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(1_790_000_000_000);
+    try {
+      const { container } = render(<StatusPill tone="live" expanded label="Live" ring={{ endsAt: Date.now() + 15_000, ms: 30_000 }} />);
+      const halves = container.querySelectorAll("[data-fx='ring'] .overflow-hidden > span");
+      expect(halves).toHaveLength(2);
+      // half-way: the right half-ring has arrived (45°), the left one has not started (45°)
+      expect(rotation(halves[0])).toBeCloseTo(45, 0);
+      expect(rotation(halves[1])).toBeCloseTo(45, 0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a numeric progress still renders (start of the cycle → both halves hidden)", () => {

@@ -239,7 +239,9 @@ describe("candle-close state (decisions 6 + 9)", () => {
     expect(confirmVerdict(verdict("short", r, cfg, null), r, cfg).state).toBe("none");
   });
 
-  it("live engine: valid only on a closed base candle; a provisional entry is never valid", () => {
+  // ~840 full evaluations (3 seeds × every 5th 15m bar, each with divergences + structure): ≈ 2 s of CPU alone, past
+  // vitest's 5-s default in a loaded parallel run — own timeout instead of fewer samples
+  it("live engine: valid only on a closed base candle; a provisional entry is never valid", { timeout: 30_000 }, () => {
     let prov = 0;
     let conf = 0;
     for (const seed of [1, 7, 42]) {

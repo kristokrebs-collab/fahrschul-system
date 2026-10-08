@@ -133,7 +133,9 @@ describe("App shell", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Navigation" })).toBeNull(), { timeout: 2500 });
   });
 
-  it("five quick taps on the logo open the layer diagnostics (no intro replay), five more close them", async () => {
+  // the lazy LayerDiagnostics chunk is transformed on its first import inside this test (the find below allows 8 s for
+  // it): under a loaded parallel run that alone outlasted vitest's 5-s default test timeout
+  it("five quick taps on the logo open the layer diagnostics (no intro replay), five more close them", { timeout: 20_000 }, async () => {
     const { isLayerDiagOpen } = await import("@/app/layerDiag");
     renderApp();
     const logo = within(screen.getByRole("banner")).getByRole("button", { name: "Übersicht" });
