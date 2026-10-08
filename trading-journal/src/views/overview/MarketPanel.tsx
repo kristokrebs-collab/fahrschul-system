@@ -19,6 +19,7 @@ import { Skeleton } from "@/primitives/Skeleton";
 import { Explainer } from "@/primitives/VerdictPanel";
 import { useJournal } from "@/store/journalStore";
 import { Bar } from "./Bar";
+import { DayRange } from "./DayRange";
 import { LagePanel, useLageBand } from "./LagePanel";
 import { ChangeChip, FundingBlock, LivePill, LivePrice, OrderFlow } from "./MarketLive";
 import { weeklyExplain } from "./marketExplain";
@@ -75,7 +76,9 @@ const WeeklyChecks = memo(function WeeklyChecks({ rows, rsiBar, showBar, body }:
  * - React re-renders only for structural changes (`useMarketPanelView` keys, `usePriceClass` trigger flags,
  *   hover), and everything below the root is memoised; `BorderBeam` loop on live + hover;
  * - the automatic Lage-Ampel (`LagePanel`, decisions 19 / 23) replaced the manual trigger scenario and the
- *   `Long-Trigger in +x %` row: the stored levels stay untouched (chart lines, weekly checks, zone note).
+ *   `Long-Trigger in +x %` row: the stored levels stay untouched (chart lines, weekly checks, zone note);
+ * - `24 Stunden` (`DayRange`, design pass v3): the last 24 h of 15m closes with a live dot, filling the panel's free
+ *   height in the stretched hero column.
  */
 export function MarketPanel() {
   const settings = useJournal((s) => s.settings);
@@ -179,6 +182,10 @@ export function MarketPanel() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* the last 24 h as a line with a live dot; in the stretched hero column it takes the panel's free height (lg+: no
+          empty band above "Chart öffnen", design pass v3) */}
+      {view.price != null && <DayRange className="flex-1" />}
 
       {reserve && !view.fundingLine && (
         <div aria-hidden="true" className="grid gap-2">
