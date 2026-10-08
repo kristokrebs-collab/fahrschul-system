@@ -16,6 +16,8 @@ export {
   toTradeSnapshot,
   SIGNAL_MIN_INTERVAL_MS,
   SIGNAL_HIDDEN_INTERVAL_MS,
+  SIGNAL_FRAME_MS,
+  SIGNAL_FRAME_GRACE_MS,
   LIVE_PRICE_MAX_AGE_MS,
   type SignalCheckState,
   type SignalCheckStatus,

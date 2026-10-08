@@ -11,7 +11,22 @@ import { initialHealth } from "@/market/health";
 import { priceMv, priceReceivedAtMv, tradeTimeMv } from "@/market/motionValues";
 import type { MarketProvider } from "@/market/provider";
 import type { Candle, FeedId, ProviderHealth, Stamped } from "@/market/types";
-import { __resetSignalEngine, __signalStats, attachSignalEngine, getDivergences, getMcbSeries, getSignalCandles, getSignalSnapshot, getStructure, runSignalCheck, setSignalConfig, subscribeSignalCheck, type LiveSignals } from "@/market/signals/engine";
+import {
+  __resetSignalEngine,
+  __signalStats,
+  attachSignalEngine,
+  getDivergences,
+  getMcbSeries,
+  getSignalCandles,
+  getSignalSnapshot,
+  getStructure,
+  runSignalCheck,
+  setSignalConfig,
+  subscribeSignalCheck,
+  SIGNAL_FRAME_GRACE_MS,
+  SIGNAL_FRAME_MS,
+  type LiveSignals,
+} from "@/market/signals/engine";
 import { __clearRetroMemo, checkTradeAt, retroCheck } from "@/market/signals/retro";
 import { noteSignals, resetSignalNotifier, SIGNAL_HOLD_MS, SIGNAL_LAST_KEY, signalBarOpen, signalNotifyDetail, signalNotifyMinStrength } from "@/market/signals/notify";
 import { useUi } from "@/store/uiStore";
@@ -199,7 +214,7 @@ describe("live check", () => {
     // a cent of price noise does not change the rounded result → same object, no notification
     expect(getSignalSnapshot()).toBe(first);
     expect(notified).toBe(0);
-    // no data → no timer, no evaluation (sleeps when idle)
+    // no data → no evaluation until the next frame (1m close + grace, 20 s after NOW here): sleeps when idle
     const idle = __signalStats().runs;
     await vi.advanceTimersByTimeAsync(10_000);
     expect(__signalStats().runs).toBe(idle);
@@ -306,12 +321,16 @@ describe("live check", () => {
     const fake = fakeProvider(feeds);
     attachSignalEngine(fake.provider);
     const times: number[] = [];
+    const computes = __signalStats().computes;
     for (let i = 0; i < 25; i++) {
-      setPrice(feeds.kline_15m.at(-1)!.close + i); // new input → full evaluation every time
+      // a new frame with a new price → full evaluation every time
+      const at = NOW + (i + 1) * SIGNAL_FRAME_MS;
+      setPrice(feeds.kline_15m.at(-1)!.close + i, at);
       const t = performance.now();
-      runSignalCheck(NOW);
+      runSignalCheck(at);
       times.push(performance.now() - t);
     }
+    expect(__signalStats().computes - computes).toBe(25);
     times.sort((a, b) => a - b);
     const median = times[Math.floor(times.length / 2)]!;
     expect(median).toBeLessThan(3);
@@ -521,7 +540,9 @@ describe("v2: chart data with candle-close states, divergences, structure; notif
     for (const d of ds) {
       expect(d.from.time % 1_800_000).toBe(0);
       expect(d.from.time).toBeLessThan(d.to.time);
-      expect(d.confirmedAt).toBeGreaterThan(d.to.time);
+      // a live candidate on the newest bars is "confirmed at" the newest bar (it may be that bar itself)
+      if (d.state === "provisional") expect(d.confirmedAt).toBeGreaterThanOrEqual(d.to.time);
+      else expect(d.confirmedAt).toBeGreaterThan(d.to.time);
     }
     const check = getSignalSnapshot().snapshot!.checks[0]!;
     expect(ds.filter((d) => d.active).map((d) => `${d.osc}${d.kind}${d.dir}${d.to.time}`).sort()).toEqual(
@@ -587,5 +608,99 @@ describe("v2: chart data with candle-close states, divergences, structure; notif
     noteSignals(later, NOW + 201_000);
     noteSignals(later, NOW + 201_000 + SIGNAL_HOLD_MS);
     expect(useUi.getState().toasts).toHaveLength(1);
+  });
+});
+
+describe("frames on 1m closes (tv-check proposals 1–3): no per-tick flicker, intrabar memory, turn prices", () => {
+  /** The next frame after `t` (ms): the minute boundary + grace. */
+  const nextFrame = (t: number): number => (Math.floor((t - SIGNAL_FRAME_GRACE_MS) / SIGNAL_FRAME_MS) + 1) * SIGNAL_FRAME_MS + SIGNAL_FRAME_GRACE_MS;
+
+  it("within a frame the price does not recompute the check (even a 3 % move); the next 1m close does", async () => {
+    const feeds = liveFeeds();
+    const fake = fakeProvider(feeds);
+    const p0 = feeds.kline_15m.at(-1)!.close;
+    setPrice(p0);
+    attachSignalEngine(fake.provider);
+    await vi.advanceTimersByTimeAsync(0);
+    const first = getSignalSnapshot();
+    expect(first.snapshot!.price).toBe(p0);
+    const computes = __signalStats().computes;
+    // ticks inside the frame: price and the forming 15m candle move, nothing is recomputed or published
+    for (let i = 0; i < 15; i++) {
+      const px = p0 * (i % 2 ? 0.97 : 1.03);
+      setPrice(px, Date.now());
+      const k = [...feeds.kline_15m];
+      k[k.length - 1] = { ...k.at(-1)!, close: px, high: Math.max(k.at(-1)!.high, px), low: Math.min(k.at(-1)!.low, px) };
+      fake.publish("kline_15m", k);
+      await vi.advanceTimersByTimeAsync(1000);
+    }
+    expect(__signalStats().computes).toBe(computes);
+    expect(getSignalSnapshot()).toBe(first);
+    // the next 1m close: one evaluation with the price of that moment
+    const p1 = p0 * 0.97;
+    setPrice(p1, Date.now());
+    await vi.advanceTimersByTimeAsync(nextFrame(Date.now()) - Date.now() + 5);
+    expect(__signalStats().computes).toBe(computes + 1);
+    const next = getSignalSnapshot().snapshot!;
+    expect(next.price).toBe(p1);
+    // the frame stands for the minute that just closed (its last ms)
+    expect(next.frameAt! % SIGNAL_FRAME_MS).toBe(SIGNAL_FRAME_MS - 1);
+    expect(next.frameAt!).toBeLessThan(Date.now());
+    // the countdown target is unaffected (the candle close times)
+    expect(next.checks[0]!.closesAt).toBe(first.snapshot!.checks[0]!.closesAt);
+    // a frame every minute while attached, ≤ 1 evaluation per second in between
+    const runs = __signalStats().runs;
+    await vi.advanceTimersByTimeAsync(3 * SIGNAL_FRAME_MS);
+    expect(__signalStats().runs - runs).toBeGreaterThanOrEqual(3);
+    expect(__signalStats().computes).toBe(computes + 4);
+  });
+
+  it("a closed-history change mid-frame recomputes with the frame's price (not the tick's)", async () => {
+    const feeds = liveFeeds();
+    const fake = fakeProvider(feeds);
+    const p0 = feeds.kline_15m.at(-1)!.close;
+    setPrice(p0);
+    attachSignalEngine(fake.provider);
+    await vi.advanceTimersByTimeAsync(0);
+    const computes = __signalStats().computes;
+    setPrice(p0 * 1.05, Date.now());
+    // a gap fill corrects the newest closed 15m candle
+    const k = [...feeds.kline_15m];
+    k[k.length - 2] = { ...k.at(-2)!, close: k.at(-2)!.close + 1 };
+    fake.publish("kline_15m", k);
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(__signalStats().computes).toBe(computes + 1);
+    expect(getSignalSnapshot().snapshot!.price).toBe(p0);
+  });
+
+  it("turn prices per forming rung; an event that came and went on the forming candle stays as intrabar memory (never counted)", async () => {
+    const feeds = liveFeeds();
+    const fake = fakeProvider(feeds);
+    setPrice(feeds.kline_15m.at(-1)!.close);
+    attachSignalEngine(fake.provider);
+    await vi.advanceTimersByTimeAsync(0);
+    const s0 = getSignalSnapshot().snapshot!;
+    expect(Object.keys(s0.turns!)).toEqual(["30m", "45m", "1h", "4h"]);
+    const t30 = s0.turns!["30m"]!;
+    expect(t30.price).toBeGreaterThan(0);
+    // the side whose cross counts at this level (long below the zero line, short above)
+    const side = t30.level < 0 ? "long" : "short";
+    const across = side === "long" ? t30.price * 1.002 : t30.price * 0.998;
+    const back = side === "long" ? t30.price * 0.998 : t30.price * 1.002;
+    // frame 1: the price is across the turn → the 30m forming candle crosses
+    setPrice(across, Date.now());
+    await vi.advanceTimersByTimeAsync(nextFrame(Date.now()) - Date.now() + 5);
+    const s1 = getSignalSnapshot().snapshot!;
+    expect(s1.price).toBe(across);
+    expect(s1.checks[0]!.conf![side].forming).not.toBeNull();
+    const frame1 = s1.frameAt!;
+    // frame 2: back → the event is gone, the memory keeps it (greyed in the card), the verdict does not count it
+    setPrice(back, Date.now());
+    await vi.advanceTimersByTimeAsync(nextFrame(Date.now()) - Date.now() + 5);
+    const s2 = getSignalSnapshot().snapshot!;
+    expect(s2.checks[0]!.conf![side].forming).toBeNull();
+    const ib = s2.intrabar!["30m"]![side]!;
+    expect(ib).toMatchObject({ first: frame1, last: frame1, price: across, bar: s2.checks[0]!.closeAt });
+    expect(s2.turns!["30m"]!.price).toBeCloseTo(t30.price, 6);
   });
 });

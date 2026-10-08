@@ -6,6 +6,12 @@
  *   other journal's `withLivePrice`).
  * - Cadence (120 Hz rule): never in render, never per WS frame. A data change only sets a dirty flag; one timer
  *   evaluates at most once per second (every 5 s in a hidden tab) and sleeps while nothing changes.
+ * - Frames on 1m closes (tv-check 2026-10-08, proposal 3): the running candles are completed with the price taken at
+ *   the last minute boundary (`SIGNAL_FRAME_MS` + `SIGNAL_FRAME_GRACE_MS`), and the check is recomputed only when a
+ *   new frame starts or the CLOSED history, the Top-Trader series or the config change — a rung's vorläufig state can
+ *   no longer flicker with every tick (30m "Kreuz" on at 13:30, off at 13:31 on a one-minute-old candle). The
+ *   countdowns run on the clock, unaffected. Per frame the engine also remembers forming-candle events that came and
+ *   went (`intrabar`, shown greyed, never counted) and the turn price of every forming rung (`turns`, `wtTurn`).
  * - Top-Trader-Kombi: the provider's 5-min ratio twins (`traders.ts`), graded inside the same evaluation.
  * - Output: a `SignalCheckState` that changes identity only when the rounded result changes (score, strength,
  *   labels, events, candle-close states, parts, knife filter, wt1/RSI to 0.1, zone position to 0.01, status) —
@@ -15,11 +21,13 @@ import {
   DEFAULT_SIGNAL_CFG,
   computeSignals,
   divCfgOf,
+  EMPTY_INTRABAR,
   eventState,
   isForming,
   isLongKind,
   luxZone,
   marketStructure,
+  noteIntrabar,
   rsi,
   sanitizeSignalCfg,
   signalCfgKey,
@@ -28,12 +36,14 @@ import {
   tfDivergences,
   waveTrend,
   withLivePrice,
+  wtTurn,
   tfSeconds,
   mcbSeries,
   toSignalSnapshot,
   type Bar,
   type DivKind,
   type DivOsc,
+  type IntrabarMemo,
   type Level,
   type RungConf,
   type Side,
@@ -46,6 +56,7 @@ import {
   type TfCheck,
   type Verdict,
   type WtKind,
+  type WtTurn,
 } from "@/domain/signals";
 import { LIVE_RATIO_FEEDS } from "../feeds";
 import type { MarketProvider } from "../provider";
@@ -65,8 +76,14 @@ export interface LiveSignals extends Signals {
   source: Source;
   /** the (sanitised) config the evaluation used */
   cfg: SignalCfg;
-  /** live price used to complete the running candles, `null` when none was fresh */
+  /** live price used to complete the running candles (the frame's price, taken at the last 1m close), `null` when none was fresh */
   price: number | null;
+  /** ms of the 1m close the frame stands for (`null` on hand-built input): the provisional states are read there */
+  frameAt?: number | null;
+  /** MCB turn price per ladder timeframe while its last bar forms (`wtTurn`: the close at which wt1 crosses wt2), else `null` */
+  turns?: Readonly<Record<string, WtTurn | null>>;
+  /** forming-candle events seen earlier on the current candles and gone now (`noteIntrabar`; shown greyed, never counted) */
+  intrabar?: IntrabarMemo;
 }
 
 export interface SignalCheckState {
@@ -81,6 +98,14 @@ export interface SignalCheckState {
 
 export const SIGNAL_MIN_INTERVAL_MS = 1000;
 export const SIGNAL_HIDDEN_INTERVAL_MS = 5000;
+/** The provisional states are read on 1m closes: one frame per minute (exchange clock). */
+export const SIGNAL_FRAME_MS = 60_000;
+/** A frame is taken this long after the minute boundary (the closing kline update arrives ~250 ms after it). */
+export const SIGNAL_FRAME_GRACE_MS = 1000;
+/** A frame that starts within this long after its boundary stands for the minute that just closed. */
+const FRAME_BOUNDARY_SLACK_MS = 5000;
+/** Bar length of the kline feeds (closed-history key). */
+const FEED_MS: Readonly<Record<string, number>> = { kline_1m: 60_000, kline_15m: 900_000, kline_1h: 3_600_000, kline_4h: 14_400_000, kline_1w: 604_800_000 };
 /** The live price completes the running candles only while it is younger than this (other journal: 5 min). */
 export const LIVE_PRICE_MAX_AGE_MS = 5 * 60_000;
 /** REST cadence of the lazily polled `1d` series. */
@@ -113,6 +138,17 @@ interface Engine {
   inputKey: string;
   converters: Map<string, BarConverter>;
   daily: { candles: Candle[]; fetchedAt: number; timer: ReturnType<typeof setTimeout> | null; inflight: boolean };
+  /** the current frame: index (minute on the exchange clock, after the grace), its price, the minute it stands for */
+  frame: Frame | null;
+  frameTimer: ReturnType<typeof setTimeout> | null;
+  intrabar: IntrabarMemo;
+}
+
+interface Frame {
+  index: number;
+  price: { price: number; at: number } | null;
+  /** ms of the 1m close the frame stands for (labels of the intrabar memory) */
+  at: number;
 }
 
 const eng: Engine = {
@@ -129,6 +165,9 @@ const eng: Engine = {
   inputKey: "",
   converters: new Map(),
   daily: { candles: [], fetchedAt: 0, timer: null, inflight: false },
+  frame: null,
+  frameTimer: null,
+  intrabar: EMPTY_INTRABAR,
 };
 const listeners = new Set<() => void>();
 /** Test / perf counters: evaluations run and full engine computations (inputs changed). */
@@ -205,15 +244,54 @@ export function buildBars(p: MarketProvider, cfg: SignalCfg, price: { price: num
   return out;
 }
 
-function inputKeyOf(p: MarketProvider, cfg: SignalCfg, price: { price: number } | null): string {
-  const ids: string[] = [eng.cfgKey, String(price?.price ?? "")];
+/**
+ * Key of the CLOSED history of a kline series at `ex` (exchange ms): length, first time and the identities of the two
+ * newest closed candles (the feeds keep the prefix objects and replace a corrected one). The forming candle — the one
+ * whose bucket holds `ex` — is left out: its ticks never trigger a recompute; the frame does.
+ */
+function closedKeyOf(cs: readonly Candle[], ex: number, ms: number): string {
+  const n = cs.length;
+  if (!n) return "0";
+  const end = cs[n - 1]!.time + ms > ex ? n - 1 : n;
+  const a = cs[end - 1];
+  const b = cs[end - 2];
+  return `${n}:${cs[0]!.time}:${a ? objectId(a) : 0}:${b ? objectId(b) : 0}`;
+}
+
+/** Inputs of an evaluation: config, frame (index + price), closed history per feed, daily series, Top-Trader series. */
+function inputKeyOf(p: MarketProvider, cfg: SignalCfg, frame: Frame, ex: number): string {
+  const ids: string[] = [eng.cfgKey, `f${frame.index}:${frame.price?.price ?? ""}`];
   for (const f of liveFeeds(cfg)) {
     const v = p.get(f) as Stamped<Candle[]> | undefined;
-    ids.push(`${f}:${v ? objectId(v.data) : 0}`);
+    ids.push(`${f}:${v ? closedKeyOf(v.data, ex, FEED_MS[f] ?? 60_000) : 0}`);
   }
   if (needsDaily(cfg)) ids.push(`d:${objectId(eng.daily.candles)}`);
   ids.push(tradersInputKey(p, cfg));
   return ids.join("|");
+}
+
+/**
+ * The frame at `now` (device ms): a new one per minute on the exchange clock (after the grace), with the live price
+ * of that moment; a frame without a price takes one as soon as it is fresh.
+ */
+function frameAt(now: number, skew: number): Frame {
+  const ex = now + skew;
+  const index = Math.floor((ex - SIGNAL_FRAME_GRACE_MS) / SIGNAL_FRAME_MS);
+  const cur = eng.frame;
+  if (cur && cur.index === index && cur.price) return cur;
+  const price = livePrice(now);
+  if (cur && cur.index === index && !price) return cur;
+  // taken right after its boundary → it stands for the minute that just closed (its close ≈ this price)
+  const sinceBoundary = ex - (index * SIGNAL_FRAME_MS + SIGNAL_FRAME_GRACE_MS);
+  const at = cur && cur.index === index ? cur.at : sinceBoundary < FRAME_BOUNDARY_SLACK_MS ? index * SIGNAL_FRAME_MS - 1 : ex;
+  return (eng.frame = { index, price, at });
+}
+
+/** Turn price of every ladder rung whose last bar forms (`null` for a closed or missing rung). */
+function turnsOf(bars: Readonly<Record<string, readonly Bar[]>>, s: Signals, cfg: SignalCfg): Record<string, WtTurn | null> {
+  const out: Record<string, WtTurn | null> = {};
+  for (const c of s.checks) if (c) out[c.tf] = c.forming && bars[c.tf] ? wtTurn(bars[c.tf]!, cfg) : null;
+  return out;
 }
 
 const ids = new WeakMap<object, number>();
@@ -296,6 +374,14 @@ export function signalsKey(s: Signals | null): string {
     parts.push(`wm:${s.whale.missing.join(",")}`);
   }
   for (const v of [s.long, s.short]) if (v.whale) parts.push(`wv:${v.whale.ok ? 1 : 0},${v.whale.run},${v.whale.period},${v.whale.points}`);
+  // live extras: turn prices (to the dollar) and the intrabar memory
+  const live = s as Partial<LiveSignals>;
+  if (live.turns) parts.push(`tp:${Object.entries(live.turns).map(([tf, t]) => (t ? `${tf}${Math.round(t.price)}${t.above ? "a" : "b"}${r1(t.level)}` : `${tf}-`)).join(",")}`);
+  if (live.intrabar) {
+    const ib: string[] = [];
+    for (const [tf, m] of Object.entries(live.intrabar)) for (const [side, x] of Object.entries(m)) if (x) ib.push(`${tf}${side}${x.kind}${x.bar}:${x.first}-${x.last}`);
+    parts.push(`ib:${ib.join(",")}`);
+  }
   return parts.join(";");
 }
 
@@ -319,8 +405,10 @@ export function runSignalCheck(now: number = Date.now()): SignalCheckState {
     publish(INITIAL, "init");
     return eng.current;
   }
-  const price = livePrice(now);
-  const key = inputKeyOf(p, cfg, price);
+  const skew = skewOf(p);
+  const frame = frameAt(now, skew);
+  const price = frame.price;
+  const key = inputKeyOf(p, cfg, frame, now + skew);
   let snap = eng.current.snapshot;
   let updatedAt = eng.current.updatedAt;
   if (key !== eng.inputKey || !snap) {
@@ -329,9 +417,19 @@ export function runSignalCheck(now: number = Date.now()): SignalCheckState {
     const bars = buildBars(p, cfg, price);
     // candle-close states on the exchange clock (Binance candle times); the Top-Trader-Kombi from the provider's
     // 5-min series (Binance clock)
-    const s = computeSignals(bars, cfg, now + skewOf(p), { traders: liveTraders(p, cfg) });
+    const s = computeSignals(bars, cfg, now + skew, { traders: liveTraders(p, cfg) });
     if (s) {
-      const live: LiveSignals = { ...s, symbol: p.symbol, source: p.getHealth().feeds[liveFeeds(cfg)[0] ?? "kline_1h"].source, cfg, price: price?.price ?? null };
+      eng.intrabar = noteIntrabar(eng.intrabar, s.checks, frame.at, price?.price ?? null);
+      const live: LiveSignals = {
+        ...s,
+        symbol: p.symbol,
+        source: p.getHealth().feeds[liveFeeds(cfg)[0] ?? "kline_1h"].source,
+        cfg,
+        price: price?.price ?? null,
+        frameAt: frame.at,
+        turns: turnsOf(bars, s, cfg),
+        intrabar: eng.intrabar,
+      };
       const k = signalsKey(live);
       if (k !== eng.snapKey) {
         eng.snapKey = k;
@@ -348,6 +446,29 @@ export function runSignalCheck(now: number = Date.now()): SignalCheckState {
   const st = statusOf(p, cfg, !!snap);
   publish({ state: st.state, snapshot: snap, updatedAt, message: st.message }, `${st.state}|${st.message}|${updatedAt}|${snap ? objectId(snap) : 0}`);
   return eng.current;
+}
+
+/** Wakes the engine at the next frame (1m close on the exchange clock + grace) while a provider is attached. */
+function armFrame(): void {
+  if (eng.frameTimer) clearTimeout(eng.frameTimer);
+  eng.frameTimer = null;
+  const p = eng.provider;
+  if (!p) return;
+  const ex = Date.now() + skewOf(p);
+  const next = (Math.floor((ex - SIGNAL_FRAME_GRACE_MS) / SIGNAL_FRAME_MS) + 1) * SIGNAL_FRAME_MS + SIGNAL_FRAME_GRACE_MS;
+  eng.frameTimer = setTimeout(
+    () => {
+      eng.frameTimer = null;
+      schedule();
+      armFrame();
+    },
+    Math.max(0, next - ex),
+  );
+}
+
+/** A price tick matters only while the current frame has no price (between frames the price is the frame's). */
+function onPrice(): void {
+  if (!eng.frame?.price) schedule();
 }
 
 function schedule(): void {
@@ -395,7 +516,7 @@ function subscribeInputs(p: MarketProvider): void {
   // the Top-Trader-Kombi's 5-min series (a new point every 5 min; the evaluation stays ≤ 1/s)
   for (const f of LIVE_RATIO_FEEDS) eng.offs.push(p.subscribe(f, schedule));
   eng.offs.push(p.onHealth(schedule));
-  eng.offs.push(priceMv.on("change", schedule));
+  eng.offs.push(priceMv.on("change", onPrice));
 }
 
 /** Binds the engine to a (started) provider; called by `startMarket`. */
@@ -406,6 +527,7 @@ export function attachSignalEngine(p: MarketProvider): void {
   subscribeInputs(p);
   if (needsDaily(eng.cfg)) pollDaily();
   schedule();
+  armFrame();
 }
 
 /** Releases the provider (symbol change, `stopMarket`); the last state is replaced by `loading`. */
@@ -414,6 +536,10 @@ export function detachSignalEngine(): void {
   eng.offs = [];
   if (eng.timer) clearTimeout(eng.timer);
   eng.timer = null;
+  if (eng.frameTimer) clearTimeout(eng.frameTimer);
+  eng.frameTimer = null;
+  eng.frame = null;
+  eng.intrabar = EMPTY_INTRABAR;
   if (eng.daily.timer) clearTimeout(eng.daily.timer);
   eng.daily = { candles: [], fetchedAt: 0, timer: null, inflight: false };
   eng.converters.clear();
@@ -496,7 +622,11 @@ function chartBars(interval: string, n?: number): { bars: Bar[]; cfg: SignalCfg;
   if (!p || !tfSource(interval)) return null;
   const cfg = eng.cfg;
   const device = Date.now();
-  const bars = buildBars(p, { ...cfg, ladder: [interval], zoneTf: interval }, livePrice(device), n)[interval] ?? [];
+  // the check's frame price (the last 1m close), so the chart's forming-candle markers equal the check's states
+  const f = eng.frame;
+  const index = Math.floor((device + skewOf(p) - SIGNAL_FRAME_GRACE_MS) / SIGNAL_FRAME_MS);
+  const price = f?.price && index - f.index <= LIVE_PRICE_MAX_AGE_MS / SIGNAL_FRAME_MS ? f.price : livePrice(device);
+  const bars = buildBars(p, { ...cfg, ladder: [interval], zoneTf: interval }, price, n)[interval] ?? [];
   // `now` decides the forming candle: exchange clock, like the check
   return bars.length ? { bars, cfg, now: device + skewOf(p) } : null;
 }
