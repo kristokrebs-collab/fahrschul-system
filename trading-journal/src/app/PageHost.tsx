@@ -4,8 +4,17 @@
  * - Keep-alive pages (the overview) stay mounted while another page is shown: React `<Activity mode="hidden">` hides
  *   them with `display: none`, keeps their state and DOM, and destroys their effects (subscriptions, the chart
  *   instance) until they are shown again. They are pre-rendered hidden at idle priority when the app starts on another
- *   page, so the first switch to them only reconnects effects instead of mounting ~1 500 components.
+ *   page, so the first switch to them only reconnects effects instead of mounting ~1 500 components. Motion's
+ *   projection around a hide / show: a hold in front of the page (`useHoldProjectionOnHide`, no `layoutId` snapshots of
+ *   a hidden page) and a settle behind it (`useSettleProjectionOnShow`, the re-mounted nodes are not all measured by the
+ *   next layout update) – `src/motion/activityProjection.ts`.
  * - Other pages mount when shown and unmount once their exit has played.
+ * - Parking (perf-120 phase C): the leaving layer is collapsed out of the document's scroll extent when its exit has
+ *   played (height 0, overflow and visibility hidden – its layout is kept, so no resize reaches its observers), and parked (hidden) or
+ *   unmounted only when the switch has settled AND the main thread is idle (`requestIdleCallback`, bounded by
+ *   `PARK_TIMEOUT_MS`): hiding the Übersicht is a ≈ 50 ms commit (every effect and motion component of ~600 detaches)
+ *   that used to land in the middle of the new page's entrance. A switch back before that shows the page without any
+ *   re-mount.
  * - Transition (the PageSwitch spec): the entering page comes in from `x dir·16`, scale .985 and blur 4 px (transform on
  *   `spring.enter` – after a fast dock flick its context spring, `consumeNavTempo()` – opacity/filter on `tween.page`
  *   delayed by the exit, SH-02), the leaving page leaves to `x −dir·12` and fades on `tween.exit`
@@ -20,9 +29,10 @@
  * - `onTransitioning(true)` at the switch commit, `false` once enter and exit have both finished (locks the trade detail).
  */
 import { animate, frame, type AnimationPlaybackControls } from "motion/react";
-import { Activity, memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Activity, memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { isSafeFx } from "@/app/pwa";
 import { cn } from "@/lib/cn";
+import { useHoldProjectionOnHide, useSettleProjectionOnShow } from "@/motion/activityProjection";
 import { LayoutCascade } from "@/motion/NoLayoutCascade";
 import { consumeNavTempo, contextSpringAt } from "@/motion/physics";
 import { spring, tween } from "@/motion/tokens";
@@ -52,6 +62,35 @@ const ENTER_SPRING = spring.pageEnter;
  * never drawn over each other; its slide and scale start at once (invisible at opacity 0) and still settle on time.
  */
 export const ENTER_FADE = { ...tween.page, delay: tween.exit.duration };
+/** Upper bound (ms) for the idle wait before a settled switch parks / unmounts the page it left. */
+export const PARK_TIMEOUT_MS = 600;
+
+type CancelIdle = () => void;
+/** `requestIdleCallback` with a timeout; a short timer where it is missing (Safari). Returns the cancel. */
+function whenIdle(fn: () => void): CancelIdle {
+  if (typeof window.requestIdleCallback === "function") {
+    const id = window.requestIdleCallback(fn, { timeout: PARK_TIMEOUT_MS });
+    return () => window.cancelIdleCallback(id);
+  }
+  const t = window.setTimeout(fn, 50);
+  return () => window.clearTimeout(t);
+}
+
+/**
+ * The leaving layer after its exit: out of the scroll extent and invisible (its layout is kept – no 0 × 0 resize reaches
+ * its observers, nothing is laid out again when it is shown before it was parked).
+ */
+function collapseLayer(el: HTMLElement): void {
+  el.style.height = "0px";
+  el.style.overflow = "hidden";
+  el.style.visibility = "hidden";
+}
+
+function restoreLayer(el: HTMLElement): void {
+  el.style.height = "";
+  el.style.overflow = "";
+  el.style.visibility = "";
+}
 
 /** Pure: slide direction of a switch in tab order (`+1` → the new page comes from the right). */
 export function pageDirection(from: Page, to: Page): 1 | -1 {
@@ -83,6 +122,18 @@ interface LayerProps {
   layerRef: (el: HTMLDivElement | null) => void;
 }
 
+/** First child of a keep-alive page: its layout cleanup (the hide) runs before any motion node of the page detaches. */
+function HideHold() {
+  useHoldProjectionOnHide();
+  return null;
+}
+
+/** Last child of a keep-alive page: its layout effect (the show) runs after every motion node of the page mounted. */
+function ShowSettle({ layer }: { layer: RefObject<HTMLElement | null> }) {
+  useSettleProjectionOnShow(layer);
+  return null;
+}
+
 /**
  * One page. The content element is memoised per page, so a role change (current → leaving → parked) re-renders this
  * wrapper only, never the page itself.
@@ -92,16 +143,32 @@ const PageLayer = memo(function PageLayer({ page, role, keepAlive, cascade, rend
     const node = renderPage(page);
     return cascade ? <LayoutCascade>{node}</LayoutCascade> : node;
   }, [renderPage, page, cascade]);
+  const own = useRef<HTMLDivElement | null>(null);
+  const setRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      own.current = el;
+      layerRef(el);
+    },
+    [layerRef],
+  );
   return (
     <div
-      ref={layerRef}
+      ref={setRef}
       data-page={page}
       data-page-role={role}
       inert={role !== "current"}
       aria-hidden={role === "leaving" ? true : undefined}
       className={cn(role === "leaving" && "pointer-events-none absolute inset-x-0 top-0")}
     >
-      {keepAlive ? <Activity mode={role === "parked" ? "hidden" : "visible"}>{content}</Activity> : content}
+      {keepAlive ? (
+        <Activity mode={role === "parked" ? "hidden" : "visible"}>
+          <HideHold />
+          {content}
+          <ShowSettle layer={own} />
+        </Activity>
+      ) : (
+        content
+      )}
     </div>
   );
 });
@@ -159,11 +226,14 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
 
   const running = useRef<AnimationPlaybackControls[]>([]);
   const handled = useRef(-1);
+  const parking = useRef<CancelIdle | null>(null);
   // unmount (and the StrictMode remount probe): stop the slide, hand scroll restores back to the router
   useLayoutEffect(
     () => () => {
       for (const c of running.current) c.stop();
       running.current = [];
+      parking.current?.();
+      parking.current = null;
       handled.current = -1;
       detachShell();
     },
@@ -177,6 +247,8 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     handled.current = seq;
     for (const c of running.current) c.stop();
     running.current = [];
+    parking.current?.();
+    parking.current = null;
     if (seq === 0 || !leaving) return;
 
     const enterEl = layers.current.get(current);
@@ -193,6 +265,8 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     }
     if (enterEl) {
       enterEl.style.top = "";
+      // shown again before it was parked: the layer was collapsed after its exit
+      restoreLayer(enterEl);
       // start values before paint: Motion resolves keyframes on the next frame, the first frame must not flash the page
       enterEl.style.opacity = "0";
       if (!reduced) {
@@ -216,8 +290,7 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     // stopped animations never resolve; the `handled` check also ignores a switch that was overtaken
     const live = () => handled.current === seq;
     void Promise.all(exit.map((c) => c.finished)).then(() => {
-      if (!live()) return;
-      setNav((n) => (n.seq === seq && n.leaving ? { ...n, leaving: null } : n));
+      if (live() && exitEl) collapseLayer(exitEl);
     });
     void Promise.all(enter.map((c) => c.finished)).then(() => {
       if (!live() || !enterEl) return;
@@ -233,6 +306,11 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
       if (!live()) return;
       running.current = [];
       notify.current?.(false);
+      // park (keep-alive) / unmount the page that left once nothing moves any more
+      parking.current = whenIdle(() => {
+        parking.current = null;
+        if (live()) setNav((n) => (n.seq === seq && n.leaving ? { ...n, leaving: null } : n));
+      });
     });
   }, [current, leaving, dir, seq, reduced]);
 

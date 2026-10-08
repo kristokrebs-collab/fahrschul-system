@@ -144,7 +144,15 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
   re-entrant and cheap (ChartCard's `history()` hits the cache; the chart is recreated from the `candles` prop). The hidden DOM stays in
   the document: no real `<table>`, no labels/texts that collide with selectors of other pages (`13 Trades`, `Entscheidungsgrundlage`,
   `Startkapital … USDT`). MotionValue text may show its last value for one tick after the page is shown again.
-- The leaving page is pinned absolutely, `inert` and `aria-hidden`, and offset by the scroll delta from `showPage()`.
+- Motion around a hide / show: the host puts `HideHold` in front of a keep-alive page (`useHoldProjectionOnHide`: no `layoutId`
+  snapshots of a page that is being hidden) and `ShowSettle` behind it (`useSettleProjectionOnShow`: the re-mounted nodes are not all
+  measured by the next layout update – that measured every node inside the Übersicht's `content-visibility: auto` cells, ≈ 20 ms).
+- The leaving page is pinned absolutely, `inert` and `aria-hidden`, and offset by the scroll delta from `showPage()`. When its exit
+  has played it is collapsed (height 0, overflow + visibility hidden, layout kept – no 0 × 0 resize for its observers); it is parked
+  (keep-alive) or unmounted only once the switch has settled and the main thread is idle (`requestIdleCallback`, ≤ `PARK_TIMEOUT_MS`
+  600 ms; a 50 ms timer without it): the hide of the Übersicht (≈ 50 ms – every effect and ~600 motion components detach) and the
+  unmount of a page no longer land in the middle of the new page's entrance. Switching back before that shows the page without a
+  re-mount (the layer is restored in the switch's layout effect).
 - `transitioning` has the same contract as PageSwitch (`true` at the switch commit, `false` once enter and exit finished).
 - Scroll memory: the router parks restores (`navigate` / `applyRoute` → `restoreScroll`, top on first visit / deep link); PageHost
   calls `showPage(page)` at the commit that shows the page (layout effect, before paint); `detachShell` on unmount. `PageSwitch` is no

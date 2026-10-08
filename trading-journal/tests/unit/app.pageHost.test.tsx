@@ -79,9 +79,10 @@ describe("PageHost", () => {
     expect(onT).toHaveBeenLastCalledWith(true);
     expect(screen.getByRole("heading", { name: "trades" })).toBeInTheDocument();
     await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
-    // hidden, not unmounted: the DOM stays (display:none), the effect was cleaned up
+    // parked once the switch has settled and the main thread is idle (never inside the entrance)
     const parked = document.querySelector<HTMLElement>("[data-page='overview']");
-    expect(parked?.getAttribute("data-page-role")).toBe("parked");
+    await waitFor(() => expect(parked?.getAttribute("data-page-role")).toBe("parked"), { timeout: 1500 });
+    // hidden, not unmounted: the DOM stays (display:none), the effect was cleaned up
     expect(parked).toHaveAttribute("inert");
     expect(screen.queryByRole("button", { name: /Übersicht/ })).toBeNull();
     expect(screen.getByText("Übersicht 1", { selector: "button" })).toBeInTheDocument();
@@ -93,6 +94,31 @@ describe("PageHost", () => {
     await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
     // the non-keep-alive page is gone once its exit played
     await waitFor(() => expect(screen.queryByRole("heading", { name: "trades" })).toBeNull());
+  });
+
+  it("collapses the leaving page after its exit, parks it only when idle; a switch back before that re-mounts nothing", async () => {
+    const onT = vi.fn();
+    const { rerender } = render(host("overview", onT));
+    // (the previous test's tree unmounts after the counters were reset)
+    const base = { ...effects };
+    act(() => rerender(host("trades", onT)));
+    const overview = document.querySelector<HTMLElement>("[data-page='overview']");
+    expect(overview?.getAttribute("data-page-role")).toBe("leaving");
+    // exit played (120 ms): out of the scroll extent, still alive (no effect cleanup yet)
+    await waitFor(() => expect(overview?.style.height).toBe("0px"), { timeout: 1000 });
+    expect(overview?.style.overflow).toBe("hidden");
+    expect(overview?.style.visibility).toBe("hidden");
+    expect(overview?.getAttribute("data-page-role")).toBe("leaving");
+    expect(effects).toEqual(base);
+    // back before it was parked: shown again without a re-mount, the layer is restored at once
+    act(() => rerender(host("overview", onT)));
+    expect(overview?.getAttribute("data-page-role")).toBe("current");
+    expect(overview?.style.height).toBe("");
+    expect(overview?.style.overflow).toBe("");
+    expect(overview?.style.visibility).toBe("");
+    await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "trades" })).toBeNull(), { timeout: 1500 });
+    expect(effects).toEqual(base);
   });
 
   it("SH-02: the entering page stays invisible while the leaving page fades (never two pages over each other)", async () => {
