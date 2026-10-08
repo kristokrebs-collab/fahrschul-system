@@ -280,7 +280,7 @@ export interface PartCell {
   id: string;
   /** small caps title (`Positionen`) */
   title: string;
-  /** main value (`66,0 %`, `−0,5 pp`, `Discount · 20 %`; `–` without data) */
+  /** main value (`66,0 % Long`, `−0,5 pp`, `Discount · 20 %`; `–` without data) */
   value: string;
   /** what it must show (`> 64 % Long`, `rot: Long-Anteil fällt (5m)`, `Discount · 1h`) */
   sub: string;
@@ -296,15 +296,15 @@ export function traderCells(p: GradedPart, cfg: Pick<SignalCfg, "whale">): PartC
   const sideWord = long ? "Long" : "Short";
   const period = p.reading?.period ?? w.retailPeriod;
   const item = (id: string) => p.items.find((i) => i.id === id);
-  const cell = (id: string, title: string, sub: string, strip?: RegExp): PartCell => {
+  const cell = (id: string, title: string, sub: string): PartCell => {
     const it = item(id);
     const none = !it || it.met === null;
-    return { id, title, value: none ? "–" : strip ? it.value.replace(strip, "") : it.value, sub, met: it?.met ?? null };
+    return { id, title, value: none ? "–" : it.value, sub, met: it?.met ?? null };
   };
   const zoneTf = tfIn(item("zone")?.label ?? "");
   return [
-    cell("pos", "Positionen", `Ziel > ${dec1(w.topPct)} % ${sideWord}`, / (Long|Short)$/),
-    cell("acc", "Konten", `Ziel > ${dec1(w.topPct)} % ${sideWord}`, / (Long|Short)$/),
+    cell("pos", "Positionen", `Ziel > ${dec1(w.topPct)} % ${sideWord}`),
+    cell("acc", "Konten", `Ziel > ${dec1(w.topPct)} % ${sideWord}`),
     cell("retail", "Retail", long ? `rot: Long-Anteil fällt (${period})` : `grün: Long-Anteil steigt (${period})`),
     cell("zone", "Zone", `Ziel ${long ? "Discount" : "Premium"}${zoneTf ? ` · ${zoneTf}` : ""}`),
   ];

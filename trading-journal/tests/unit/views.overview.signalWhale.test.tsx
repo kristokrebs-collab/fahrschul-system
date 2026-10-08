@@ -58,19 +58,19 @@ const wrap = (node: React.ReactNode) =>
   );
 
 describe("part view models", () => {
-  it("Top-Trader cells: values without the side word, the thresholds, lit flags (short mirrored)", () => {
+  it("Top-Trader cells: values with the side word, the thresholds, lit flags (short mirrored)", () => {
     const s = snap();
     const p = s.long.parts!.find((x) => x.id === "traders")!;
     expect(traderCells(p, UI_CFG)).toEqual([
-      { id: "pos", title: "Positionen", value: "66,0 %", sub: "Ziel > 64 % Long", met: true },
-      { id: "acc", title: "Konten", value: "65,2 %", sub: "Ziel > 64 % Long", met: true },
+      { id: "pos", title: "Positionen", value: "66,0 % Long", sub: "Ziel > 64 % Long", met: true },
+      { id: "acc", title: "Konten", value: "65,2 % Long", sub: "Ziel > 64 % Long", met: true },
       { id: "retail", title: "Retail", value: "−0,5 pp", sub: "rot: Long-Anteil fällt (5m)", met: true },
       { id: "zone", title: "Zone", value: "Discount · 20 %", sub: "Ziel Discount · 1h", met: true },
     ]);
     const short = s.short.parts!.find((x) => x.id === "traders")!;
     expect(traderCells(short, UI_CFG).map((c) => [c.value, c.met])).toEqual([
-      ["34,0 %", false],
-      ["34,8 %", false],
+      ["34,0 % Short", false],
+      ["34,8 % Short", false],
       ["−0,5 pp", false],
       ["Discount · 20 %", false],
     ]);
@@ -114,7 +114,7 @@ describe("SignalCard parts", () => {
     const cells = within(tt).getAllByTestId("signal-part-cell");
     expect(cells.map((c) => c.getAttribute("data-met"))).toEqual(["true", "true", "true", "true"]);
     expect(cells[0]).toHaveTextContent("Positionen");
-    expect(cells[0]).toHaveTextContent("66,0 %");
+    expect(cells[0]).toHaveTextContent("66,0 % Long");
     expect(cells[2]).toHaveTextContent("−0,5 pp");
     expect(cells[3]).toHaveTextContent("Discount · 20 %");
     expect(within(tt).getByTestId("signal-part-points")).toHaveTextContent("+10 von 10+1 Stärke");
