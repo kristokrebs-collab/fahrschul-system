@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page, Route } from "@playwright/test";
-import { synthKlines, synthRatios, type RatioKind, type RatioScript } from "./synth";
+import { synthKlines, synthRatios, type RatioKind, type RatioScript, type SynthShape } from "./synth";
 
 export type MarketScenario = "live" | "stale" | "blocked_451" | "offline" | "reconnect";
 
@@ -83,7 +83,13 @@ export interface MockMarketOptions {
    * `period`. `ratios: "whale-long"` = top traders buy while retail is red over the last 4 periods. The WS replay
    * then drops its (unaligned) `kline_1h` message. Time anchor = the moment `mockMarket` runs.
    */
-  synth?: { ratios?: RatioScript; /** time anchor of the price path (default: now) – pass it to `expectedSignals` too */ anchor?: number };
+  synth?: {
+    ratios?: RatioScript;
+    /** time anchor of the price path (default: now) – pass it to `expectedSignals` too */
+    anchor?: number;
+    /** price shape (`synth.ts`): `capitulation` (default, the long entry) or `divergence` */
+    shape?: SynthShape;
+  };
   /** called with every REST URL the page requests from Binance (request log for assertions) */
   onRequest?: (url: URL) => void;
   /**
@@ -202,7 +208,7 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
     opts.onRequest?.(u);
     const q = { limit: num(u.searchParams.get("limit")), startTime: num(u.searchParams.get("startTime")), endTime: num(u.searchParams.get("endTime")) };
     if (synth && u.pathname === "/fapi/v1/klines") {
-      const rows = synthKlines(u.searchParams.get("interval") ?? "1h", q, anchor, clock());
+      const rows = synthKlines(u.searchParams.get("interval") ?? "1h", q, anchor, clock(), synth.shape);
       return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(rows) });
     }
     const ratioKind = SYNTH_RATIO_KIND[u.pathname];
@@ -234,7 +240,7 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
     if (synth && u.pathname === "/v5/market/kline") {
       // Bybit: interval codes, `start` / `end`, newest row first, strings
       const iv = BYBIT_INTERVAL[u.searchParams.get("interval") ?? "60"] ?? "1h";
-      const rows = synthKlines(iv, { limit: num(u.searchParams.get("limit")) ?? 200, startTime: num(u.searchParams.get("start")), endTime: num(u.searchParams.get("end")) }, anchor, clock());
+      const rows = synthKlines(iv, { limit: num(u.searchParams.get("limit")) ?? 200, startTime: num(u.searchParams.get("start")), endTime: num(u.searchParams.get("end")) }, anchor, clock(), synth.shape);
       const list = rows.map((r) => [String(r[0]), r[1], r[2], r[3], r[4], r[5], r[7]]).reverse();
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ retCode: 0, retMsg: "OK", result: { category: "linear", symbol: "BTCUSDT", list }, time: clock() }) });
     }

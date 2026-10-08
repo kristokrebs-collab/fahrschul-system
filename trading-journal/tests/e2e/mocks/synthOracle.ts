@@ -21,7 +21,7 @@ import {
   type Signals,
   type TraderSeries,
 } from "../../../src/domain/signals";
-import { SYNTH_LAST, synthKlines, synthRatios, type RatioKind, type RatioScript } from "./synth";
+import { SYNTH_LAST, synthKlines, synthRatios, type RatioKind, type RatioScript, type SynthShape } from "./synth";
 
 const SOURCE: Record<string, { interval: string; sec: number }> = {
   "30m": { interval: "15m", sec: 900 },
@@ -53,6 +53,8 @@ export interface OracleOptions {
   cfg?: Partial<SignalCfg> | Record<string, unknown>;
   /** the price path mirrored around the live price (`bias.spec` short setup: p' = 2 · SYNTH_LAST − p) */
   mirror?: boolean;
+  /** price shape of the mock (`synth.ts`) */
+  shape?: SynthShape;
 }
 
 /** The evaluation the app shows for the synthetic market anchored at `anchor`, evaluated at `now` with `livePrice`. */
@@ -63,7 +65,7 @@ export function expectedSignals(anchor: number, now: number, livePrice: number, 
   for (const tf of [...new Set([...cfg.ladder, cfg.zoneTf])]) {
     const s = SOURCE[tf];
     if (!s) throw new Error(`synthetic market: no source for ${tf}`);
-    const src: Bar[] = synthKlines(s.interval, { limit: s.interval === "15m" ? 1500 : 499 }, anchor, now).map((r) => ({
+    const src: Bar[] = synthKlines(s.interval, { limit: s.interval === "15m" ? 1500 : 499 }, anchor, now, opts.shape).map((r) => ({
       t: r[0] / 1000,
       o: m(r[1]),
       h: opts.mirror ? m(r[3]) : m(r[2]),

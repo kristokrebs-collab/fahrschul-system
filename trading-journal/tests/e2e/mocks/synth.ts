@@ -45,8 +45,46 @@ function wiggle(t: number): number {
   return 0.0012 * Math.sin(h * 1.7) + 0.0008 * Math.sin(h * 0.53 + 1.3) + 0.0005 * Math.sin(h * 4.1 + 0.4);
 }
 
+/**
+ * Price shapes: `capitulation` (default: the fall into a fresh low 12 min before the anchor, then the turn — the long
+ * entry) or `divergence` (the same fall ends 10 h before the anchor at L1, a bounce, a SLOW decline to a slightly lower
+ * low L2 3 h before the anchor — lower low in price, higher low in RSI = a regular bullish divergence — then a rally
+ * through the bounce high (a bullish break on 1h) up to the live price, flat for the last hour).
+ */
+export type SynthShape = "capitulation" | "divergence";
+
+/** Levels of the `divergence` shape: the end price, the bounce high H (broken by the rally), the lows L1 > L2. */
+export const DIV_LEVELS = (() => {
+  const end = SYNTH_LAST;
+  const high = end / 1.006;
+  const low1 = high / 1.02;
+  return { end, high, low1, low2: low1 * 0.997 };
+})();
+
+function divergencePrice(t: number, anchor: number): number {
+  const before = anchor - t;
+  const { end, high, low1, low2 } = DIV_LEVELS;
+  if (before <= 60 * MIN) return end;
+  if (before <= 180 * MIN) {
+    // the rally: low2 → end, smooth (through the bounce high ~75 min before the anchor)
+    const k = (180 * MIN - before) / (120 * MIN);
+    return low2 + (end - low2) * (k * k * (3 - 2 * k));
+  }
+  if (before <= 420 * MIN) return high + (low2 - high) * ((420 * MIN - before) / (240 * MIN)); // the slow decline
+  if (before <= 600 * MIN) {
+    const k = (600 * MIN - before) / (180 * MIN); // the bounce from low1 to the high (eased out)
+    return low1 + (high - low1) * (1 - (1 - k) * (1 - k));
+  }
+  // before low1: the capitulation path, shifted so its low lands 10 h before the anchor at low1
+  return capitulationPrice(t, anchor - 600 * MIN + TURN_MS) * (low1 / SYNTH_LOW);
+}
+
 /** The price at absolute time `t` (ms) for a market anchored at `anchor` (ms, "now" of the mock). */
-export function synthPrice(t: number, anchor: number): number {
+export function synthPrice(t: number, anchor: number, shape: SynthShape = "capitulation"): number {
+  return shape === "divergence" ? divergencePrice(t, anchor) : capitulationPrice(t, anchor);
+}
+
+function capitulationPrice(t: number, anchor: number): number {
   const before = anchor - t;
   if (before <= 0) return SYNTH_LAST;
   if (before <= TURN_MS) {
@@ -78,15 +116,15 @@ export interface RangeQuery {
 type KlineRow = [number, string, string, string, string, string, number, string, number, string, string, string];
 
 /** One kline of `[open, open + step)` sampled at 1-min resolution (≤ 240 samples), cut at `now`. */
-function kline(open: number, step: number, anchor: number, now: number): KlineRow {
+function kline(open: number, step: number, anchor: number, now: number, shape: SynthShape): KlineRow {
   const end = Math.min(open + step, Math.max(open + 1, now));
   const n = Math.min(240, Math.max(2, Math.round((end - open) / MIN)));
-  const o = synthPrice(open, anchor);
+  const o = synthPrice(open, anchor, shape);
   let h = o;
   let l = o;
   let c = o;
   for (let i = 1; i <= n; i++) {
-    const p = synthPrice(open + ((end - open) * i) / n - 1, anchor);
+    const p = synthPrice(open + ((end - open) * i) / n - 1, anchor, shape);
     if (p > h) h = p;
     if (p < l) l = p;
     c = p;
@@ -96,7 +134,7 @@ function kline(open: number, step: number, anchor: number, now: number): KlineRo
 }
 
 /** Binance kline rows for `interval` (open times aligned to the interval, the newest one running at `now`). */
-export function synthKlines(interval: string, q: RangeQuery, anchor: number, now: number = Date.now()): KlineRow[] {
+export function synthKlines(interval: string, q: RangeQuery, anchor: number, now: number = Date.now(), shape: SynthShape = "capitulation"): KlineRow[] {
   const step = SYNTH_INTERVAL_MS[interval];
   if (!step) return [];
   const limit = Math.max(1, Math.min(1500, q.limit ?? 500));
@@ -105,7 +143,7 @@ export function synthKlines(interval: string, q: RangeQuery, anchor: number, now
   if (q.startTime !== undefined && q.endTime === undefined) first = Math.ceil(q.startTime / step) * step;
   else if (q.startTime !== undefined) first = Math.max(first, Math.ceil(q.startTime / step) * step);
   const rows: KlineRow[] = [];
-  for (let t = first; t <= last && rows.length < limit; t += step) rows.push(kline(t, step, anchor, now));
+  for (let t = first; t <= last && rows.length < limit; t += step) rows.push(kline(t, step, anchor, now, shape));
   return rows;
 }
 
