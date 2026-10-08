@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import { memo, useState, type ReactNode } from "react";
-import { parseWhalePeriods, roleText, SIGNAL_TFS, STRENGTH_LABEL, WHALE_MIN_RUN_MAX, WHALE_PERIODS, WHALE_TITLE, WHALE_WEIGHTS, whaleToDraft, type WhaleDraft, type WhaleDraftKey } from "@/domain/signals";
+import { roleText, SIGNAL_TFS, STRENGTH_LABEL, STRONG_CLOSES_MAX, TRADERS_SIDE_TITLE, WHALE_RETAIL_PERIODS, WHALE_WEIGHTS } from "@/domain/signals";
 import { IS_SHARE } from "@/edition";
 import { cn } from "@/lib/cn";
 import { parseNumber } from "@/lib/parse";
@@ -13,10 +13,10 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
 import { Segmented } from "@/primitives/Segmented";
-import { useJournal } from "@/store/journalStore";
 import { defaultSignalDraft, parseLadder, type DraftKey, type DraftTextKey, type SettingsDraft } from "./draft";
 import { DraftField } from "./fields";
 import { ChangedDot } from "./fx";
+import { PARTS_DRAFT_KEYS } from "./signalPartsDraft";
 
 export const SIGNAL_STRINGS = {
   title: "Einstiegs-Check",
@@ -56,23 +56,67 @@ export const SIGNAL_STRINGS = {
     unsupported: "Dieser Browser kann hier keine Systembenachrichtigungen zeigen (z. B. als Datei geöffnet). Der Hinweis in der App bleibt.",
     default: "Fragt beim Einschalten nach der Erlaubnis des Browsers.",
   } satisfies Record<NotifyPermission, string>,
-  whale: "Top-Trader · Retail",
-  whaleSwitch: `Check „${WHALE_TITLE.long}“`,
-  whaleHelp: "Binance-Top-Trader kaufen (Long-Anteil ihrer Positionen steigt), während Retail rot ist (Long-Anteil aller Konten fällt) – über abgeschlossene Perioden in Folge. Short spiegelbildlich: Top-Trader verkaufen, Retail grün. Nur mit Binance-Futures-Daten, die ~30 Tage zurückreichen; ältere Trades zeigen „keine Daten“.",
-  whalePeriods: "Perioden",
-  whalePeriodsHelp: "Gilt, wenn eine der Perioden passt. Mindestens eine bleibt aktiv.",
-  whalePeriodToggle: (p: string) => `Periode ${p}`,
-  whaleMin: "In Folge (mind.)",
-  whaleMinHelp: (n: number) => `${n} abgeschlossene ${n === 1 ? "Periode" : "Perioden"} hintereinander`,
+  confirm: "Bestätigung (Kerzenschluss)",
+  confirmIntro:
+    "Ein Signal auf der laufenden Kerze ist vorläufig (⚠ vorläufig · schließt in mm:ss) und zählt im Score nur halb. Bestätigt ist es erst, wenn seine Kerze damit schließt; der Einstieg zählt, sobald die Basis-Kerze bestätigt hat. Hinweise kommen nur für bestätigte Einstiege.",
+  strong: "Stark bestätigt nach",
+  strongHelp: (n: number) => `${n} ${n === 1 ? "Schluss" : "Schlüssen"} (inkl. der Signalkerze), ohne dass der Kurs die Signalkerze bricht`,
+  whale: "Top-Trader-Kombi",
+  whaleSwitch: `Check „${TRADERS_SIDE_TITLE.long}“`,
+  whaleHelp:
+    "Vier Teile, je mehr erfüllt, desto stärker: Binance-Top-Trader über der Schwelle Long nach Positionen und nach Konten, Retail rot (Long-Anteil aller Konten fällt) und Preis im Discount. Short spiegelbildlich (Top-Trader Short, Retail grün, Premium). Binance-5-min-Daten, ~30 Tage zurück; ohne Daten „keine Daten“, nie ein Fehler.",
+  whaleTop: "Top-Trader-Schwelle (% Long)",
+  whaleTopHelp: (x: string, y: string) => `Long: über ${x} % Long · Short: über ${x} % Short (Long ≤ ${y} %)`,
+  whaleRetail: "Retail-Vergleich",
+  whaleRetailHelp: "Long-Anteil aller Konten jetzt gegen so lange vorher",
+  whaleBonus: "+1 Stärke ab",
+  whaleBonusHelp: (n: number) => `${n} von 4 Teilen erfüllt (mit Gewicht über 0)`,
   whaleWeight: "Gewicht (Score)",
-  whaleWeightHelp: (w: number) => (w > 0 ? `+${w} Score, ein gültiger Einstieg wird eine Stärke höher (bis ${STRENGTH_LABEL[4]})` : "0 = nur anzeigen und speichern, zählt nicht"),
+  whaleWeightHelp: (w: number) => (w > 0 ? `bis +${w} Score, anteilig (je erfüllter Teil ¼)` : "0 = nur anzeigen und speichern, zählt nicht"),
+  div: "Divergenzen",
+  divSwitch: "Check „Bullische / Bärische Divergenz“",
+  divHelp: "RSI und WaveTrend wt1 gegen den Kurs an Pivots, je Timeframe der Leiter. Regulär = Umkehr (Kurs tieferes Tief, Oszillator höheres Tief), versteckt = Fortsetzung. Zählt bei einer regulären auf geschlossener Kerze voll.",
+  divOsc: "Oszillatoren und Filter",
+  divOscHelp: "Mindestens ein Oszillator bleibt aktiv. Mittellinie: bullische Pivots nur unter 50 (RSI) / 0 (WT).",
+  divRsi: "RSI",
+  divWt: "WaveTrend",
+  divHidden: "versteckte",
+  divMid: "Mittellinie",
+  divLeft: "Pivot links",
+  divLeftHelp: "Kerzen vor dem Pivot",
+  divRight: "Pivot rechts",
+  divRightHelp: "Kerzen danach = Bestätigung",
+  divMin: "Abstand min",
+  divMinHelp: "Kerzen zwischen den Pivots",
+  divMax: "Abstand max",
+  divMaxHelp: "Kerzen zwischen den Pivots",
+  divAge: "Gilt (Kerzen)",
+  divAgeHelp: "nach der Bestätigung",
+  sr: "Support / Widerstand",
+  srSwitch: "Check „Support + Platz“",
+  srHelp: "LuxAlgo-Struktur auf dem Zonen-Timeframe: Swing-Hochs/-Tiefs, BOS/CHoCH, Order-Blocks, EQH/EQL. Long: nah am Support/Demand und genug Platz bis zum nächsten Widerstand (in R, Stop knapp unter dem Level); Short spiegelbildlich.",
+  srNear: "Level-Nähe (ATR)",
+  srNearHelp: "Abstand zum Support in ATR 14",
+  srMinR: "Mindest-Platz (R)",
+  srMinRHelp: "Chance/Risiko bis zum nächsten Level",
+  srInt: "Intern (Kerzen)",
+  srIntHelp: "interne Struktur (LuxAlgo)",
+  srEqLen: "EQH/EQL Pivot",
+  srEqLenHelp: "Kerzen",
+  srEqThr: "EQH/EQL Toleranz",
+  srEqThrHelp: "× ATR 200",
+  partWeight: "Gewicht (Score)",
+  partWeightHelp: (w: number) => (w > 0 ? `bis +${w} Score anteilig, voll erfüllt +1 Stärke` : "0 = nur anzeigen, zählt nicht"),
   defaults: "Standardwerte setzen",
   defaultsHelp: "Setzt die Check-Werte auf die Standardwerte der Datei-Version zurück (erst mit „Speichern“ übernommen).",
 } as const;
 
 const S = SIGNAL_STRINGS;
 const TF_OPTIONS = SIGNAL_TFS.map((tf) => ({ value: tf, label: tf }));
-const STRENGTH_OPTIONS = [1, 2, 3, 4].map((n) => ({ v: String(n), label: String(n) }));
+const STRENGTH_OPTIONS = [1, 2, 3, 4].map((n) => ({
+  v: String(n),
+  label: String(n),
+}));
 
 export interface SignalCheckCardProps {
   draft: SettingsDraft;
@@ -88,10 +132,13 @@ export interface SignalCheckCardProps {
  * NEW `Einstiegs-Check` card (`settings.signals`, the other journal's `SignalCfg` 1:1 + `notify` / `notifyMinStrength`):
  * ladder toggles per timeframe (sorted small → large, ≥ 30m), `Pflicht-Stufen` (1 … ladder length), RSI thresholds +
  * nearness, MCB zones, signal window, WaveTrend lengths, zone timeframe + swing length, the system-notification switch
- * (asks the browser for permission in the same click) and the minimum strength for a notice, plus the "Top-Trader
- * kaufen · Retail rot" condition (`settings.signals.whale`: switch, periods, consecutive periods, weight). Values shown are the ones
- * the engine runs with (`sanitizeSignalCfg`); the part is written only when changed (see `draft.ts`), merged over the
- * stored object so unknown keys of either app survive. `Standardwerte setzen` = the other journal's defaults.
+ * (asks the browser for permission in the same click) and the minimum strength for a notice, plus the v2 thresholds
+ * (decisions 5, 6, 9, 10): closes until "stark bestätigt", the Top-Trader-Kombi (switch, % threshold, retail period,
+ * parts for +1 strength, weight), divergences (switch, oscillators / hidden / midline, pivot lookbacks, distance, age,
+ * weight) and support / resistance (switch, ATR nearness, R room, internal length, EQH/EQL, weight). Values shown are the
+ * ones the engine runs with (`sanitizeSignalCfg`); the part is written only when changed (see `draft.ts` /
+ * `signalPartsDraft.ts`), merged over the stored object so unknown keys of either app survive (the legacy run-rule
+ * values `whale.periods` / `minRun` stay as stored). `Standardwerte setzen` = the defaults.
  */
 export const SignalCheckCard = memo(function SignalCheckCard({ draft, onChange, onPatch, changed, invalid, className }: SignalCheckCardProps) {
   const ladder = parseLadder(draft.sgLadder);
@@ -101,8 +148,6 @@ export const SignalCheckCard = memo(function SignalCheckCard({ draft, onChange, 
   const near = parseNumber(draft.sgRsiNear);
   const nearHelp = os != null && ob != null && near != null ? S.rsiNearHelp(fmt(os + near), fmt(ob - near)) : undefined;
   const minStrength = Math.min(4, Math.max(1, Math.round(parseNumber(draft.sgNotifyMin) ?? 1)));
-  // "Top-Trader kaufen · Retail rot": draft strings when the draft carries them, else what is stored (see WhaleGroup)
-  const storedSignals = useJournal((st) => st.settings.signals);
 
   const toggleTf = (tf: string) => {
     const on = ladder.includes(tf);
@@ -138,7 +183,14 @@ export const SignalCheckCard = memo(function SignalCheckCard({ draft, onChange, 
               {S.ladder}
               <ChangedDot show={changed.has("sgLadder")} />
             </span>
-            <div id="s-sgLadder" tabIndex={-1} role="group" aria-labelledby="s-sgLadder-label" aria-describedby="s-sgLadder-help" className={cn("flex flex-wrap gap-2 rounded-xl outline-none", invalid === "sgLadder" && "ring-1 ring-loss/60")}>
+            <div
+              id="s-sgLadder"
+              tabIndex={-1}
+              role="group"
+              aria-labelledby="s-sgLadder-label"
+              aria-describedby="s-sgLadder-help"
+              className={cn("flex flex-wrap gap-2 rounded-xl outline-none", invalid === "sgLadder" && "ring-1 ring-loss/60")}
+            >
               {SIGNAL_TFS.map((tf) => (
                 <TfChip key={tf} tf={tf} on={ladder.includes(tf)} last={ladder.length <= 1 && ladder.includes(tf)} onToggle={() => toggleTf(tf)} />
               ))}
@@ -152,7 +204,17 @@ export const SignalCheckCard = memo(function SignalCheckCard({ draft, onChange, 
               {S.required}
               <ChangedDot show={changed.has("sgReq")} />
             </span>
-            <Segmented aria-labelledby="s-sgReq-label" size="sm" className="justify-self-start" value={String(req)} onChange={(v) => onChange("sgReq", v)} options={ladder.map((_, i) => ({ v: String(i + 1), label: String(i + 1) }))} />
+            <Segmented
+              aria-labelledby="s-sgReq-label"
+              size="sm"
+              className="justify-self-start"
+              value={String(req)}
+              onChange={(v) => onChange("sgReq", v)}
+              options={ladder.map((_, i) => ({
+                v: String(i + 1),
+                label: String(i + 1),
+              }))}
+            />
             <span className="text-[11px] text-faint">{S.requiredHelp}</span>
           </div>
         </div>
@@ -208,7 +270,13 @@ export const SignalCheckCard = memo(function SignalCheckCard({ draft, onChange, 
         </div>
       </Group>
 
-      <WhaleGroup draft={draft} stored={storedSignals} onChange={onChange} changed={changed} invalid={invalid} />
+      <ConfirmGroup draft={draft} onChange={onChange} changed={changed} />
+
+      <WhaleGroup draft={draft} onChange={onChange} changed={changed} field={field} />
+
+      <DivGroup draft={draft} onChange={onChange} changed={changed} field={field} />
+
+      <SrGroup draft={draft} onChange={onChange} changed={changed} field={field} />
 
       <Group title={S.alerts}>
         <div className="grid gap-3.5 md:grid-cols-2">
@@ -251,108 +319,186 @@ const SIGNAL_DIRTY_KEYS: readonly DraftKey[] = [
   "sgSig",
   "sgNotify",
   "sgNotifyMin",
-  ...(["sgWhale", "sgWhalePeriods", "sgWhaleMin", "sgWhaleWeight"] as unknown as DraftKey[]),
+  "sgWhale",
+  "sgWhalePeriods",
+  "sgWhaleMin",
+  "sgWhaleWeight",
+  ...PARTS_DRAFT_KEYS,
 ];
 
-/**
- * The whale draft keys (`sgWhale`, `sgWhalePeriods`, `sgWhaleMin`, `sgWhaleWeight`, see `@/domain/signals`
- * `whaleDraft.ts`) go through the same `onChange` / `changed` / `invalid` channel as the other `sg*` strings; the
- * casts keep this card compiling whether or not `SettingsDraft` lists them yet.
- */
-const asDraftKey = (k: WhaleDraftKey): DraftTextKey => k as unknown as DraftTextKey;
-const WEIGHT_OPTIONS = WHALE_WEIGHTS.map((w) => ({ v: String(w), label: String(w) }));
-const MIN_OPTIONS = Array.from({ length: WHALE_MIN_RUN_MAX }, (_, i) => ({ v: String(i + 1), label: String(i + 1) }));
+const WEIGHT_OPTIONS = WHALE_WEIGHTS.map((w) => ({
+  v: String(w),
+  label: String(w),
+}));
+const STRONG_OPTIONS = Array.from({ length: STRONG_CLOSES_MAX }, (_, i) => ({
+  v: String(i + 1),
+  label: String(i + 1),
+}));
+const BONUS_OPTIONS = [1, 2, 3, 4].map((n) => ({
+  v: String(n),
+  label: String(n),
+}));
+const RETAIL_OPTIONS = WHALE_RETAIL_PERIODS.map((p) => ({ v: p, label: p }));
+const weightOptions = (w: number) => (WHALE_WEIGHTS.includes(w) ? WEIGHT_OPTIONS : [...WHALE_WEIGHTS, w].sort((a, b) => a - b).map((x) => ({ v: String(x), label: String(x) })));
+const intOf = (v: string, d: number): number => Math.round(parseNumber(v) ?? d);
 
-/**
- * `Top-Trader · Retail` group: switch, period chips (≥ 1 stays on), consecutive periods (1 … 6) and the weight in score
- * points (0 = shown only). All choices are segmented / toggles, so a value can never be invalid.
- */
-function WhaleGroup({
-  draft,
-  stored,
-  onChange,
-  changed,
-  invalid,
-}: {
+interface GroupProps {
   draft: SettingsDraft;
-  stored: unknown;
   onChange: (key: DraftTextKey, value: string) => void;
   changed: ReadonlySet<DraftKey>;
-  invalid: DraftTextKey | null;
-}) {
-  const base = whaleToDraft(stored);
-  const d = draft as SettingsDraft & Partial<WhaleDraft>;
-  const val = (k: WhaleDraftKey): string => d[k] ?? base[k];
-  const isChanged = (k: WhaleDraftKey): boolean => changed.has(asDraftKey(k) as DraftKey);
-  const on = val("sgWhale") === "on";
-  const periods = parseWhalePeriods(val("sgWhalePeriods"));
-  const min = Math.min(WHALE_MIN_RUN_MAX, Math.max(1, Math.round(parseNumber(val("sgWhaleMin")) ?? 2)));
-  const weight = Math.max(0, Math.round(parseNumber(val("sgWhaleWeight")) ?? 10));
-  const togglePeriod = (p: string) => {
-    const has = periods.includes(p);
-    if (has && periods.length <= 1) return;
-    const next = parseWhalePeriods((has ? periods.filter((x) => x !== p) : [...periods, p]).join(","));
-    onChange(asDraftKey("sgWhalePeriods"), next.join(","));
-  };
+}
+type FieldFn = (id: DraftTextKey, label: string, help?: string) => ReactNode;
+
+/** A labelled segmented choice (`aria-labelledby`), with the changed dot and a help line. */
+function Choice({ id, label, help, value, options, onChange, changed }: { id: DraftTextKey; label: string; help: string; value: string; options: readonly { v: string; label: string }[]; onChange: (v: string) => void; changed: boolean }) {
+  return (
+    <div className="grid content-start gap-1.5">
+      <span id={`s-${id}-label`} className="label">
+        {label}
+        <ChangedDot show={changed} />
+      </span>
+      <Segmented aria-labelledby={`s-${id}-label`} size="sm" className="justify-self-start" value={value} onChange={onChange} options={options} />
+      <span className="text-[11px] text-faint">{help}</span>
+    </div>
+  );
+}
+
+/** Switch row of a condition (label, help, `Switch`), as the notification row. */
+function SwitchRow({ id, label, help, on, changed, onChange }: { id: DraftTextKey; label: string; help: string; on: boolean; changed: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5">
+      <span className="grid min-w-0 gap-0.5">
+        <label htmlFor={`s-${id}`} className="cursor-pointer text-[13px] text-fg">
+          {label}
+          <ChangedDot show={changed} />
+        </label>
+        <span id={`s-${id}-help`} className="max-w-[80ch] text-[11px] text-faint">
+          {help}
+        </span>
+      </span>
+      <Switch id={`s-${id}`} checked={on} onCheckedChange={onChange} aria-describedby={`s-${id}-help`} className="touch-hit mt-0.5 shrink-0" />
+    </div>
+  );
+}
+
+/** `Bestätigung (Kerzenschluss)`: what provisional / confirmed means and the closes until "stark bestätigt". */
+function ConfirmGroup({ draft, onChange, changed }: GroupProps) {
+  const n = Math.min(STRONG_CLOSES_MAX, Math.max(1, intOf(draft.sgStrong, 2)));
+  return (
+    <Group title={S.confirm}>
+      <div className="grid gap-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start" data-testid="settings-confirm">
+        <p className="max-w-[80ch] text-[12px] leading-relaxed text-mute">{S.confirmIntro}</p>
+        <Choice id="sgStrong" label={S.strong} help={S.strongHelp(n)} value={String(n)} options={STRONG_OPTIONS} onChange={(v) => onChange("sgStrong", v)} changed={changed.has("sgStrong")} />
+      </div>
+    </Group>
+  );
+}
+
+/**
+ * `Top-Trader-Kombi` group: switch, top-trader threshold (% long), retail comparison period, parts for +1 strength and
+ * the weight. The former run-rule values (periods / in a row) are no longer graded; they stay stored untouched.
+ */
+function WhaleGroup({ draft, onChange, changed, field }: GroupProps & { field: FieldFn }) {
+  const on = draft.sgWhale === "on";
+  const top = parseNumber(draft.sgWhaleTop);
+  const bonus = Math.min(4, Math.max(1, intOf(draft.sgWhaleBonus, 3)));
+  const weight = Math.max(0, intOf(draft.sgWhaleWeight, 10));
+  const topHelp = top != null ? S.whaleTopHelp(fmt(top), fmt(100 - top)) : undefined;
   return (
     <Group title={S.whale}>
       <div className="grid gap-3.5" data-testid="settings-whale">
-        <div className="flex items-start justify-between gap-4 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5">
-          <span className="grid min-w-0 gap-0.5">
-            <label htmlFor="s-sgWhale" className="cursor-pointer text-[13px] text-fg">
-              {S.whaleSwitch}
-              <ChangedDot show={isChanged("sgWhale")} />
-            </label>
-            <span id="s-sgWhale-help" className="max-w-[80ch] text-[11px] text-faint">
-              {S.whaleHelp}
-            </span>
-          </span>
-          <Switch id="s-sgWhale" checked={on} onCheckedChange={(v) => onChange(asDraftKey("sgWhale"), v ? "on" : "")} aria-describedby="s-sgWhale-help" className="touch-hit mt-0.5 shrink-0" />
+        <SwitchRow id="sgWhale" label={S.whaleSwitch} help={S.whaleHelp} on={on} changed={changed.has("sgWhale")} onChange={(v) => onChange("sgWhale", v ? "on" : "")} />
+        <div className={cn("grid gap-3.5 transition-opacity duration-300 sm:grid-cols-2 lg:grid-cols-4", !on && "opacity-60")}>
+          {field("sgWhaleTop", S.whaleTop, topHelp)}
+          <Choice id="sgWhaleRetail" label={S.whaleRetail} help={S.whaleRetailHelp} value={draft.sgWhaleRetail || "5m"} options={RETAIL_OPTIONS} onChange={(v) => onChange("sgWhaleRetail", v)} changed={changed.has("sgWhaleRetail")} />
+          <Choice id="sgWhaleBonus" label={S.whaleBonus} help={S.whaleBonusHelp(bonus)} value={String(bonus)} options={BONUS_OPTIONS} onChange={(v) => onChange("sgWhaleBonus", v)} changed={changed.has("sgWhaleBonus")} />
+          <Choice id="sgWhaleWeight" label={S.whaleWeight} help={S.whaleWeightHelp(weight)} value={String(weight)} options={weightOptions(weight)} onChange={(v) => onChange("sgWhaleWeight", v)} changed={changed.has("sgWhaleWeight")} />
         </div>
-        <div className={cn("grid gap-3.5 transition-opacity duration-300 md:grid-cols-3", !on && "opacity-60")}>
-          <div className="grid content-start gap-1.5">
-            <span id="s-sgWhalePeriods-label" className="label">
-              {S.whalePeriods}
-              <ChangedDot show={isChanged("sgWhalePeriods")} />
-            </span>
-            <div
-              id="s-sgWhalePeriods"
-              tabIndex={-1}
-              role="group"
-              aria-labelledby="s-sgWhalePeriods-label"
-              aria-describedby="s-sgWhalePeriods-help"
-              className={cn("flex flex-wrap gap-2 rounded-xl outline-none", invalid === asDraftKey("sgWhalePeriods") && "ring-1 ring-loss/60")}
-            >
-              {WHALE_PERIODS.map((p) => (
-                <TfChip key={p} tf={p} label={S.whalePeriodToggle(p)} on={periods.includes(p)} last={periods.length <= 1 && periods.includes(p)} onToggle={() => togglePeriod(p)} />
-              ))}
+      </div>
+    </Group>
+  );
+}
+
+/** `Divergenzen` group: switch, oscillator / filter toggles, pivot lookbacks, distance, age, weight. */
+function DivGroup({ draft, onChange, changed, field }: GroupProps & { field: FieldFn }) {
+  const on = draft.sgDiv === "on";
+  const weight = Math.max(0, intOf(draft.sgDivWeight, 10));
+  const rsi = draft.sgDivRsi === "on";
+  const wt = draft.sgDivWt === "on";
+  const toggles: {
+    key: DraftTextKey;
+    label: string;
+    on: boolean;
+    last?: boolean;
+  }[] = [
+    { key: "sgDivRsi", label: S.divRsi, on: rsi, last: rsi && !wt },
+    { key: "sgDivWt", label: S.divWt, on: wt, last: wt && !rsi },
+    { key: "sgDivHidden", label: S.divHidden, on: draft.sgDivHidden === "on" },
+    { key: "sgDivMid", label: S.divMid, on: draft.sgDivMid === "on" },
+  ];
+  const oscChanged = toggles.some((t) => changed.has(t.key));
+  return (
+    <Group title={S.div}>
+      <div className="grid gap-3.5" data-testid="settings-div">
+        <SwitchRow id="sgDiv" label={S.divSwitch} help={S.divHelp} on={on} changed={changed.has("sgDiv")} onChange={(v) => onChange("sgDiv", v ? "on" : "")} />
+        <div className={cn("grid gap-3.5 transition-opacity duration-300", !on && "opacity-60")}>
+          <div className="grid gap-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+            <div className="grid gap-1.5">
+              <span id="s-sgDivOsc-label" className="label">
+                {S.divOsc}
+                <ChangedDot show={oscChanged} />
+              </span>
+              <div role="group" aria-labelledby="s-sgDivOsc-label" className="flex flex-wrap gap-2">
+                {toggles.map((t) => (
+                  <TfChip
+                    key={t.key}
+                    tf={t.label}
+                    label={t.label}
+                    on={t.on}
+                    last={!!t.last}
+                    onToggle={() => {
+                      if (!t.last) onChange(t.key, t.on ? "" : "on");
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="text-[11px] text-faint">{S.divOscHelp}</span>
             </div>
-            <span id="s-sgWhalePeriods-help" className="text-[11px] text-faint">
-              {S.whalePeriodsHelp}
-            </span>
+            <Choice id="sgDivWeight" label={S.partWeight} help={S.partWeightHelp(weight)} value={String(weight)} options={weightOptions(weight)} onChange={(v) => onChange("sgDivWeight", v)} changed={changed.has("sgDivWeight")} />
           </div>
-          <div className="grid content-start gap-1.5">
-            <span id="s-sgWhaleMin-label" className="label">
-              {S.whaleMin}
-              <ChangedDot show={isChanged("sgWhaleMin")} />
-            </span>
-            <Segmented aria-labelledby="s-sgWhaleMin-label" size="sm" className="justify-self-start" value={String(min)} onChange={(v) => onChange(asDraftKey("sgWhaleMin"), v)} options={MIN_OPTIONS} />
-            <span className="text-[11px] text-faint">{S.whaleMinHelp(min)}</span>
+          <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3 xl:grid-cols-5">
+            {field("sgDivLeft", S.divLeft, S.divLeftHelp)}
+            {field("sgDivRight", S.divRight, S.divRightHelp)}
+            {field("sgDivMin", S.divMin, S.divMinHelp)}
+            {field("sgDivMax", S.divMax, S.divMaxHelp)}
+            {field("sgDivAge", S.divAge, S.divAgeHelp)}
           </div>
-          <div className="grid content-start gap-1.5">
-            <span id="s-sgWhaleWeight-label" className="label">
-              {S.whaleWeight}
-              <ChangedDot show={isChanged("sgWhaleWeight")} />
-            </span>
-            <Segmented
-              aria-labelledby="s-sgWhaleWeight-label"
-              size="sm"
-              className="justify-self-start"
-              value={String(weight)}
-              onChange={(v) => onChange(asDraftKey("sgWhaleWeight"), v)}
-              options={WHALE_WEIGHTS.includes(weight) ? WEIGHT_OPTIONS : [...WHALE_WEIGHTS, weight].sort((a, b) => a - b).map((w) => ({ v: String(w), label: String(w) }))}
-            />
-            <span className="text-[11px] text-faint">{S.whaleWeightHelp(weight)}</span>
+        </div>
+      </div>
+    </Group>
+  );
+}
+
+/** `Support / Widerstand` group: switch, ATR nearness, R room, internal structure, EQH/EQL, weight. */
+function SrGroup({ draft, onChange, changed, field }: GroupProps & { field: FieldFn }) {
+  const on = draft.sgSr === "on";
+  const weight = Math.max(0, intOf(draft.sgSrWeight, 10));
+  return (
+    <Group title={S.sr}>
+      <div className="grid gap-3.5" data-testid="settings-sr">
+        <SwitchRow id="sgSr" label={S.srSwitch} help={S.srHelp} on={on} changed={changed.has("sgSr")} onChange={(v) => onChange("sgSr", v ? "on" : "")} />
+        <div className={cn("grid gap-3.5 transition-opacity duration-300", !on && "opacity-60")}>
+          <div className="grid grid-cols-2 gap-3.5 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            {field("sgSrNear", S.srNear, S.srNearHelp)}
+            {field("sgSrMinR", S.srMinR, S.srMinRHelp)}
+            <div className="col-span-2 md:col-span-1">
+              <Choice id="sgSrWeight" label={S.partWeight} help={S.partWeightHelp(weight)} value={String(weight)} options={weightOptions(weight)} onChange={(v) => onChange("sgSrWeight", v)} changed={changed.has("sgSrWeight")} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3.5 md:grid-cols-3">
+            {field("sgSrInt", S.srInt, S.srIntHelp)}
+            {field("sgSrEqLen", S.srEqLen, S.srEqLenHelp)}
+            {field("sgSrEqThr", S.srEqThr, S.srEqThrHelp)}
           </div>
         </div>
       </div>

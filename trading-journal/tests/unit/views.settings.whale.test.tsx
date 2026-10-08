@@ -1,77 +1,99 @@
-/** Settings card group "Top-Trader · Retail": switch, periods, consecutive periods, weight (draft keys `sgWhale*`). */
+/**
+ * Settings card, Einstiegs-Check v2 groups: `Bestätigung (Kerzenschluss)` (closes until "stark bestätigt"),
+ * `Top-Trader-Kombi` (switch, % threshold, retail period, parts for +1 strength, weight), `Divergenzen` (switch,
+ * oscillator / filter chips, pivot lookbacks, weight) and `Support / Widerstand` (switch, ATR nearness, R room, weight).
+ * Every control writes its `sg*` draft key; the values shown are the engine's.
+ */
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useJournal } from "@/store/journalStore";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { SignalCheckCard } from "@/views/settings/SignalCheckCard";
-import { settingsToDraft, type SettingsDraft } from "@/views/settings/draft";
+import { settingsToDraft, type DraftKey, type SettingsDraft } from "@/views/settings/draft";
 
 vi.mock("@/market", async (orig) => ({ ...(await orig<typeof import("@/market")>()), signalNotifyPermission: () => "default" }));
 
-function setup(draftPatch: Record<string, string> = {}, signals?: unknown) {
+function setup(draftPatch: Partial<SettingsDraft> = {}, signals?: unknown, changed: DraftKey[] = []) {
   const base = useJournal.getState().settings;
-  useJournal.setState({ settings: { ...base, signals } });
   const draft = { ...settingsToDraft({ ...base, signals }), ...draftPatch } as SettingsDraft;
   const onChange = vi.fn();
   render(
     <MotionRoot>
-      <SignalCheckCard draft={draft} onChange={onChange} onPatch={vi.fn()} changed={new Set()} invalid={null} />
+      <SignalCheckCard draft={draft} onChange={onChange} onPatch={vi.fn()} changed={new Set(changed)} invalid={null} />
     </MotionRoot>,
   );
-  return { onChange, group: screen.getByTestId("settings-whale") };
+  return { onChange };
 }
 
-describe("SignalCheckCard · Top-Trader / Retail", () => {
+describe("SignalCheckCard · v2 thresholds", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
   });
 
-  it("shows the defaults: on, 30m + 1h, 2 in a row, weight 10 (with the grading line)", () => {
-    const { group } = setup();
-    expect(within(group).getByRole("switch")).toBeChecked();
-    expect(within(group).getByRole("button", { name: "Periode 30m" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(group).getByRole("button", { name: "Periode 1h" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(group).getByRole("button", { name: "Periode 4h" })).toHaveAttribute("aria-pressed", "false");
-    expect(within(group).getByRole("radiogroup", { name: "In Folge (mind.)" })).toBeInTheDocument();
-    expect(within(group).getByRole("radio", { name: "2" , checked: true })).toBeInTheDocument();
-    expect(within(group).getByText("+10 Score, ein gültiger Einstieg wird eine Stärke höher (bis Maximal)")).toBeInTheDocument();
+  it("shows the defaults: 2 closes, Top-Trader 64 % · 5m · 3 of 4 · 10, divergences and S/R on", () => {
+    setup();
+    const confirm = screen.getByTestId("settings-confirm");
+    expect(within(within(confirm).getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "2", checked: true })).toBeInTheDocument();
+    expect(within(confirm).getByText(/2 Schlüssen \(inkl\. der Signalkerze\)/)).toBeInTheDocument();
+    const tt = screen.getByTestId("settings-whale");
+    expect(within(tt).getByRole("switch")).toBeChecked();
+    expect(within(tt).getByText("Check „Top-Trader long · Retail rot“")).toBeInTheDocument();
+    expect(within(tt).getByLabelText(/Top-Trader-Schwelle/)).toHaveValue("64");
+    expect(within(tt).getByText("Long: über 64 % Long · Short: über 64 % Short (Long ≤ 36 %)")).toBeInTheDocument();
+    expect(within(within(tt).getByRole("radiogroup", { name: "Retail-Vergleich" })).getByRole("radio", { name: "5m", checked: true })).toBeInTheDocument();
+    expect(within(within(tt).getByRole("radiogroup", { name: "+1 Stärke ab" })).getByRole("radio", { name: "3", checked: true })).toBeInTheDocument();
+    expect(within(tt).getByText("bis +10 Score, anteilig (je erfüllter Teil ¼)")).toBeInTheDocument();
+    // the legacy run-rule controls are gone (their stored values stay untouched)
+    expect(within(tt).queryByRole("button", { name: /^Periode / })).toBeNull();
+    const div = screen.getByTestId("settings-div");
+    expect(within(div).getByRole("switch")).toBeChecked();
+    expect(within(div).getByRole("button", { name: "RSI" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(div).getByLabelText(/Pivot links/)).toHaveValue("2");
+    expect(within(div).getByLabelText(/Abstand max/)).toHaveValue("60");
+    const sr = screen.getByTestId("settings-sr");
+    expect(within(sr).getByLabelText(/Level-Nähe/)).toHaveValue("1");
+    expect(within(sr).getByLabelText(/Mindest-Platz/)).toHaveValue("2");
   });
 
   it("every control writes its draft key", () => {
-    const { onChange, group } = setup();
-    fireEvent.click(within(group).getByRole("switch"));
+    const { onChange } = setup();
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "3" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgStrong", "3");
+    const tt = screen.getByTestId("settings-whale");
+    fireEvent.click(within(tt).getByRole("switch"));
     expect(onChange).toHaveBeenLastCalledWith("sgWhale", "");
-    fireEvent.click(within(group).getByRole("button", { name: "Periode 4h" }));
-    expect(onChange).toHaveBeenLastCalledWith("sgWhalePeriods", "30m,1h,4h");
-    fireEvent.click(within(group).getByRole("button", { name: "Periode 30m" }));
-    expect(onChange).toHaveBeenLastCalledWith("sgWhalePeriods", "1h");
-    const min = within(group).getByRole("radiogroup", { name: "In Folge (mind.)" });
-    fireEvent.click(within(min).getByRole("radio", { name: "3" }));
-    expect(onChange).toHaveBeenLastCalledWith("sgWhaleMin", "3");
-    const weight = within(group).getByRole("radiogroup", { name: "Gewicht (Score)" });
-    fireEvent.click(within(weight).getByRole("radio", { name: "0" }));
+    fireEvent.change(within(tt).getByLabelText(/Top-Trader-Schwelle/), { target: { value: "70" } });
+    expect(onChange).toHaveBeenLastCalledWith("sgWhaleTop", "70");
+    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "Retail-Vergleich" })).getByRole("radio", { name: "1h" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgWhaleRetail", "1h");
+    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "+1 Stärke ab" })).getByRole("radio", { name: "4" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgWhaleBonus", "4");
+    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "Gewicht (Score)" })).getByRole("radio", { name: "0" }));
     expect(onChange).toHaveBeenLastCalledWith("sgWhaleWeight", "0");
+    const div = screen.getByTestId("settings-div");
+    fireEvent.click(within(div).getByRole("button", { name: "versteckte" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgDivHidden", "");
+    fireEvent.change(within(div).getByLabelText(/Gilt \(Kerzen\)/), { target: { value: "8" } });
+    expect(onChange).toHaveBeenLastCalledWith("sgDivAge", "8");
+    fireEvent.click(within(within(div).getByRole("radiogroup", { name: "Gewicht (Score)" })).getByRole("radio", { name: "20" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgDivWeight", "20");
+    const sr = screen.getByTestId("settings-sr");
+    fireEvent.change(within(sr).getByLabelText(/Level-Nähe/), { target: { value: "0,5" } });
+    expect(onChange).toHaveBeenLastCalledWith("sgSrNear", "0,5");
+    fireEvent.click(within(sr).getByRole("switch"));
+    expect(onChange).toHaveBeenLastCalledWith("sgSr", "");
   });
 
-  it("the last active period cannot be switched off", () => {
-    const { onChange, group } = setup({ sgWhalePeriods: "1h" });
-    const last = within(group).getByRole("button", { name: "Periode 1h" });
-    expect(last).toHaveAttribute("aria-disabled", "true");
-    fireEvent.click(last);
+  it("the last oscillator cannot be switched off; stored values show; changed keys mark their group", () => {
+    const { onChange } = setup({ sgDivWt: "" }, { whale: { topPct: 70, weight: 7 }, strongCloses: 4 }, ["sgDivAge"]);
+    const div = screen.getByTestId("settings-div");
+    const rsi = within(div).getByRole("button", { name: "RSI" });
+    expect(rsi).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(rsi);
     expect(onChange).not.toHaveBeenCalled();
-  });
-
-  it("reads the stored settings when the draft carries no whale strings, the draft strings when it does", () => {
-    const stored = { whale: { on: false, periods: ["4h"], minRun: 4, weight: 7 } };
-    const a = setup({}, stored);
-    expect(within(a.group).getByRole("switch")).not.toBeChecked();
-    expect(within(a.group).getByRole("button", { name: "Periode 4h" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(within(a.group).getByRole("radiogroup", { name: "Gewicht (Score)" })).getByRole("radio", { name: "7", checked: true })).toBeInTheDocument();
-    document.body.innerHTML = "";
-    const b = setup({ sgWhale: "on", sgWhalePeriods: "15m", sgWhaleMin: "1", sgWhaleWeight: "20" }, stored);
-    expect(within(b.group).getByRole("switch")).toBeChecked();
-    expect(within(b.group).getByRole("button", { name: "Periode 15m" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(b.group).getByRole("button", { name: "Periode 4h" })).toHaveAttribute("aria-pressed", "false");
-    expect(within(b.group).getByText("1 abgeschlossene Periode hintereinander")).toBeInTheDocument();
+    const tt = screen.getByTestId("settings-whale");
+    expect(within(tt).getByLabelText(/Top-Trader-Schwelle/)).toHaveValue("70");
+    expect(within(within(tt).getByRole("radiogroup", { name: "Gewicht (Score)" })).getByRole("radio", { name: "7", checked: true })).toBeInTheDocument();
+    expect(within(within(screen.getByTestId("settings-confirm")).getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "4", checked: true })).toBeInTheDocument();
   });
 });
