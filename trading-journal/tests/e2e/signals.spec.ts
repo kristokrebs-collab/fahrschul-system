@@ -320,7 +320,7 @@ test.describe("chart", () => {
     // layer toggles: MCB · Divergenzen · S/R on, Struktur off by default; the key names the candle-close looks
     const layers = card.getByTestId("chart-layers");
     await expect(layers).toBeVisible();
-    const toggle = (name: string) => layers.getByRole("group", { name: "Ebenen im Chart" }).locator(`button[data-layer=${name}]`);
+    const toggle = (name: string) => layers.getByRole("group", { name: "Ebenen im Chart" }).locator(`button[data-chart-layer=${name}]`);
     for (const [k, on] of [["mcb", "true"], ["div", "true"], ["sr", "true"], ["struct", "false"]] as const) await expect(toggle(k)).toHaveAttribute("aria-pressed", on);
     await expect(card.getByTestId("chart-state-key")).toContainText("vorläufig");
     await expect(card.getByTestId("chart-state-key")).toContainText("bestätigt");

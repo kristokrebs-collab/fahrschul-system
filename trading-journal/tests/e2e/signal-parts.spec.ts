@@ -139,7 +139,7 @@ test.describe("graded parts on a divergence market", () => {
     await card.getByRole("radio", { name: "1M", exact: true }).click();
     await expect(card.getByTestId("chart-layers")).toBeVisible({ timeout: 15_000 });
     await expect(card.getByTestId("chart-state-key")).toContainText("regulär");
-    const toggle = (k: string) => card.locator(`[data-testid=chart-layers] button[data-layer=${k}]`);
+    const toggle = (k: string) => card.locator(`[data-testid=chart-layers] button[data-chart-layer=${k}]`);
 
     const print = () =>
       card.locator("canvas").evaluateAll((els) => {

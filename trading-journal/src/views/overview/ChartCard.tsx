@@ -381,7 +381,7 @@ export const ChartLayers = memo(function ChartLayers({ layers, onToggle }: { lay
                 "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-[color,border-color,background-color,opacity] duration-200 pointer-coarse:min-h-11 pointer-coarse:px-3",
                 on ? "border-white/25 bg-white/[0.06] text-fg" : "border-line-2 text-faint hover:text-mute",
               )}
-              data-layer={k}
+              data-chart-layer={k}
             >
               <span className={cn("inline-flex transition-opacity duration-200", on ? "opacity-100" : "opacity-35")}>
                 <LayerGlyph layer={k} />
