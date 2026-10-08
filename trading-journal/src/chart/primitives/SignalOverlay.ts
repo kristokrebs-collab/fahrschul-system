@@ -117,7 +117,8 @@ const LABEL_H_SR = 14;
 const LABEL_H_TINY = 12;
 /** price-line titles (LONG / INVAL / HART …) sit at the right edge of the pane: labels keep this strip free */
 export const RIGHT_RESERVED = 64;
-const LABEL_BG = "rgba(10,10,10,0.78)";
+/** nearly opaque: price action behind a label never shows through its text */
+const LABEL_BG = "rgba(10,10,10,0.92)";
 const BAND_FILL = "rgba(255,255,255,0.035)";
 const NEAR_LINE = ink.mute;
 const FAR_LINE = ink.tick;
@@ -518,6 +519,8 @@ export class SignalOverlay implements ISeriesPrimitive<Time> {
   private geoIx: SignalOverlay["ix"] = null;
   /** nearest support / resistance on the price axis: price and y (null = hidden) */
   private axis: { sup: { price: number; y: number | null } | null; res: { price: number; y: number | null } | null } = { sup: null, res: null };
+  /** prices of the nearest support / resistance of the last full geometry pass (their axis labels are re-checked per print) */
+  private near: { sup: number | null; res: number | null } = { sup: null, res: null };
 
   constructor(private readonly host: OverlayHost) {
     this.views = [new OverlayPaneView(this, "bottom"), new OverlayPaneView(this, "top")];
@@ -619,6 +622,7 @@ export class SignalOverlay implements ISeriesPrimitive<Time> {
       this.geo = EMPTY_GEOMETRY;
       this.geoKey = "";
       this.axis = { sup: null, res: null };
+      this.near = { sup: null, res: null };
       return;
     }
     const ts = chart.timeScale();
@@ -629,22 +633,27 @@ export class SignalOverlay implements ISeriesPrimitive<Time> {
       this.geo = EMPTY_GEOMETRY;
       this.geoKey = "";
       this.axis = { sup: null, res: null };
+      this.near = { sup: null, res: null };
       return;
     }
     const ix = this.indexed();
     const L = this.layers;
-    // the chart redraws per live print: recompute only when something that moves the overlay changed
+    // the chart redraws per live print: recompute the geometry only when something that moves the overlay changed —
+    // not the live close (the other axis labels move with every print: only the axis check below follows them)
     const last = bars[bars.length - 1]!;
     const axisPrices = this.host.axisPrices();
     const reserved = this.host.reserved?.() ?? [];
-    const memo = `${this.ixKey}|${vis.from},${vis.to},${width},${height}|${series.priceToCoordinate(last.low)},${series.priceToCoordinate(last.low * 1.01 + 1)}|${last.high},${last.low}|${+L.mcb}${+L.div}${+L.sr}${+L.struct}|${axisPrices.join(",")}|${reserved.map((b) => `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.w)},${Math.round(b.h)}`).join(";")}`;
-    if (memo === this.geoKey && ix === this.geoIx) return;
+    const yOf = (p: number): number | null => series.priceToCoordinate(p);
+    const memo = `${this.ixKey}|${vis.from},${vis.to},${width},${height}|${series.priceToCoordinate(last.low)},${series.priceToCoordinate(last.low * 1.01 + 1)}|${last.high},${last.low}|${+L.mcb}${+L.div}${+L.sr}${+L.struct}|${reserved.map((b) => `${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.w)},${Math.round(b.h)}`).join(";")}`;
+    if (memo === this.geoKey && ix === this.geoIx) {
+      this.updateAxis(axisPrices, yOf);
+      return;
+    }
     this.geoKey = memo;
     this.geoIx = ix;
     const lo = Math.floor(vis.from) - 2;
     const hi = Math.ceil(vis.to) + 2;
     const xOf = (i: number): number | null => ts.logicalToCoordinate(i as Logical);
-    const yOf = (p: number): number | null => series.priceToCoordinate(p);
     const g: Geometry = { bands: [], hlines: [], segs: [], divs: [], dots: [], labels: [] };
     const cands: LabelCandidate<{ text: string; color: string; px: number; alpha: number }>[] = [];
     const obstacles: Box[] = [{ x: width - RIGHT_RESERVED, y: 0, w: RIGHT_RESERVED, h: height }, ...reserved];
@@ -684,11 +693,8 @@ export class SignalOverlay implements ISeriesPrimitive<Time> {
         }
       }
     }
-    // the nearest levels on the price axis only where no other axis label sits (no shoving, no half-covered digits)
-    const others = axisPrices.map(yOf);
-    const supY = sup && axisLabelClear(sup.y, others, AXIS_LABEL_GAP) ? sup.y : null;
-    const resY = res && axisLabelClear(res.y, [...others, supY], AXIS_LABEL_GAP) ? res.y : null;
-    this.axis = { sup: sup ? { price: sup.price, y: supY } : null, res: res ? { price: res.price, y: resY } : null };
+    this.near = { sup: sup?.price ?? null, res: res?.price ?? null };
+    this.updateAxis(axisPrices, yOf);
 
     // ---- structure (bottom layer)
     if (L.struct) {
@@ -755,9 +761,36 @@ export class SignalOverlay implements ISeriesPrimitive<Time> {
       }
     }
 
-    const placed = placeLabels(cands, obstacles, { x: 0, y: 0, w: width, h: height });
-    g.labels = placed.map((p) => ({ box: p.box, ...p.data }));
+    // the nearest S/R labels (they also carry the axis price) first; every other label also keeps off the candles in
+    // view (bodies and wicks), so price action never runs through text — it moves aside or is left out
+    const bounds = { x: 0, y: 0, w: width, h: height };
+    const first = placeLabels(cands.filter((c) => c.prio === 0), obstacles, bounds);
+    const candles: Box[] = [];
+    const x0 = xOf(Math.max(0, lo));
+    const x1 = xOf(Math.max(0, lo) + 1);
+    const bw = x0 != null && x1 != null ? Math.max(1, Math.abs(x1 - x0) * 0.8) : 6;
+    for (let i = Math.max(0, lo); i <= Math.min(bars.length - 1, hi); i++) {
+      const b = bars[i]!;
+      const x = xOf(i);
+      const yh = yOf(b.high);
+      const yl = yOf(b.low);
+      if (x == null || yh == null || yl == null) continue;
+      candles.push({ x: x - bw / 2, y: Math.min(yh, yl), w: bw, h: Math.max(1, Math.abs(yl - yh)) });
+    }
+    const rest = placeLabels(cands.filter((c) => c.prio !== 0), [...obstacles, ...candles, ...first.map((p) => p.box)], bounds);
+    g.labels = [...first, ...rest].map((p) => ({ box: p.box, ...p.data }));
     this.geo = g;
+  }
+
+  /** The nearest levels on the price axis only where no other axis label sits (no shoving, no half-covered digits). */
+  private updateAxis(axisPrices: readonly number[], yOf: (p: number) => number | null): void {
+    const { sup, res } = this.near;
+    const others = axisPrices.map(yOf);
+    const sy = sup != null ? yOf(sup) : null;
+    const ry = res != null ? yOf(res) : null;
+    const supY = sup != null && axisLabelClear(sy, others, AXIS_LABEL_GAP) ? sy : null;
+    const resY = res != null && axisLabelClear(ry, [...others, supY], AXIS_LABEL_GAP) ? ry : null;
+    this.axis = { sup: sup != null ? { price: sup, y: supY } : null, res: res != null ? { price: res, y: resY } : null };
   }
 
   paneViews(): readonly IPrimitivePaneView[] {

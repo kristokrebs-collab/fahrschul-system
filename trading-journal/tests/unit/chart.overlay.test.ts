@@ -48,7 +48,10 @@ const T0 = 1_790_000_000 - (1_790_000_000 % HOUR);
 const BARS = Array.from({ length: 60 }, (_, i) => ({ time: T0 + i * HOUR, low: 99 + i, high: 101 + i, close: 100 + i }));
 const ms = (i: number) => (T0 + i * HOUR) * 1000;
 
-function mount(opts: { axisPrices?: number[]; width?: number } = {}) {
+/** The same 60 bars far below the pane (price ~60): no candle in view, every label spot is free. */
+const LOW_BARS = BARS.map((b) => ({ ...b, low: 59, high: 61, close: 60 }));
+
+function mount(opts: { axisPrices?: number[]; width?: number; bars?: typeof BARS } = {}) {
   const width = opts.width ?? 800;
   const height = 400;
   // 10 px per bar, 2 px per price unit (price 100 at y 360)
@@ -57,7 +60,8 @@ function mount(opts: { axisPrices?: number[]; width?: number } = {}) {
     panes: () => [{ getHeight: () => height }],
   };
   const series = { priceToCoordinate: (p: number) => 360 - (p - 100) * 2 };
-  const o = new SignalOverlay({ bars: () => BARS, axisPrices: () => opts.axisPrices ?? [] });
+  const bars = opts.bars ?? BARS;
+  const o = new SignalOverlay({ bars: () => bars, axisPrices: () => opts.axisPrices ?? [] });
   let updates = 0;
   o.attached({ chart, series, requestUpdate: () => void updates++ } as never);
   return { o, width, height, updates: () => updates };
@@ -152,7 +156,7 @@ describe("SignalOverlay (check overlay primitive)", () => {
   });
 
   it("layers toggle without re-indexing; structure draws BOS / EQL / swing labels", () => {
-    const { o } = mount();
+    const { o } = mount({ bars: LOW_BARS });
     o.setMarkers([{ time: ms(30), kind: "top", state: "confirmed" }]);
     o.setDivergences([div({ from: { time: ms(10), price: 109 }, to: { time: ms(20), price: 105 }, active: true })]);
     o.setStructure(STRUCT);
@@ -183,6 +187,35 @@ describe("SignalOverlay (check overlay primitive)", () => {
       for (const b of g.labels) if (a !== b) expect(overlaps(a.box, b.box)).toBe(false);
       for (const d of g.dots) expect(overlaps(a.box, { x: d.x - d.r, y: d.y - d.r, w: 2 * d.r, h: 2 * d.r })).toBe(false);
     }
+  });
+
+  it("labels keep off the candles in view (only the nearest S/R labels, which carry the price, may sit over them)", () => {
+    const { o } = mount();
+    o.setMarkers([{ time: ms(30), kind: "top", state: "confirmed" }]);
+    o.setDivergences([div({ from: { time: ms(10), price: 109 }, to: { time: ms(20), price: 105 }, active: true })]);
+    o.setStructure(STRUCT);
+    o.setLayers({ mcb: true, div: true, sr: true, struct: true });
+    o.updateAllViews();
+    const y = (p: number) => 360 - (p - 100) * 2;
+    const candles = BARS.map((b, i) => ({ x: i * 10 + 5 - 4, y: y(b.high), w: 8, h: y(b.low) - y(b.high) }));
+    const labels = o.geometry().labels.filter((l) => !/^(Support|Widerstand)/.test(l.text));
+    for (const l of labels) for (const c of candles) expect(overlaps(l.box, c), `${l.text} over a candle`).toBe(false);
+    // on the rising path the structure words sit on price action → left out; on free space they are drawn
+    expect(o.geometry().labels.map((l) => l.text)).not.toContain("HH");
+  });
+
+  it("the nearest levels' axis labels follow the other axis labels without a geometry pass", () => {
+    let axis = [150];
+    const o = new SignalOverlay({ bars: () => BARS, axisPrices: () => axis });
+    o.attached({ chart: { timeScale: () => ({ getVisibleLogicalRange: () => ({ from: 0, to: 60 }), width: () => 800, logicalToCoordinate: (i: number) => i * 10 + 5 }), panes: () => [{ getHeight: () => 400 }] }, series: { priceToCoordinate: (p: number) => 360 - (p - 100) * 2 }, requestUpdate: () => undefined } as never);
+    o.setStructure(STRUCT);
+    o.updateAllViews();
+    const g = o.geometry();
+    expect(o.axisLabelPrices()).not.toContain(150); // the live price label sits on the support
+    axis = [130]; // the next print moved it away
+    o.updateAllViews();
+    expect(o.geometry()).toBe(g); // the geometry was reused
+    expect(o.axisLabelPrices()).toContain(150);
   });
 
   it("re-draws without new inputs reuse the geometry; new inputs request a redraw", () => {
