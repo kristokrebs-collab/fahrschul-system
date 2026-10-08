@@ -87,6 +87,8 @@ export interface SignalSnapshotPart {
   /** div: the rung of the best hit and the active hits */
   tf?: string;
   hits?: Array<{ tf: string; osc: DivOsc; kind: DivKind; state: SignalState; barsAgo: number }>;
+  /** div: active RSI trendline breaks (absent = none / recorded before 2026-10-08) */
+  trends?: Array<{ tf: string; dir: 1 | -1; state: SignalState; barsAgo: number }>;
   /** sr: the level leaned on, the target, reward / risk (`null` = no stop level; `free` = no target level) */
   lean?: { label: string; price: number; distAtr: number } | null;
   target?: { label: string; price: number } | null;
@@ -197,6 +199,7 @@ export function snapshotPart(p: GradedPart): SignalSnapshotPart {
   if (p.id === "div") {
     if (p.tf) out.tf = p.tf;
     out.hits = (p.hits ?? []).map((h) => ({ tf: h.tf, osc: h.osc, kind: h.kind, state: h.state, barsAgo: h.barsAgo }));
+    if (p.trends?.length) out.trends = p.trends.map((t) => ({ tf: t.tf, dir: t.dir, state: t.state, barsAgo: t.barsAgo }));
   }
   if (p.id === "sr" && p.levels) {
     const { lean, target, r } = p.levels;

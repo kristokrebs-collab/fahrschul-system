@@ -297,7 +297,7 @@ describe("divergences (decision 10)", () => {
     expect(findDivergences(mh.bars, mh.osc, "rsi", DIV, false, 2)).toMatchObject([{ kind: "hidden", dir: -1 }]);
   });
 
-  it("state: provisional while the confirmation bar forms, confirmed after one close, strong after N; inactive when old or broken", () => {
+  it("state: provisional while the confirmation bar forms, confirmed after one close, strong after N; active until broken (maxAge 0 = rangeMax cap)", () => {
     const s = bullishSetup("regular", 23); // confirmation bar 22 = the newest bar
     expect(findDivergences(s.bars, s.osc, "rsi", DIV, true, 2)[0]).toMatchObject({ state: "provisional", barsAgo: 0, active: true });
     expect(findDivergences(s.bars, s.osc, "rsi", DIV, false, 2)[0]).toMatchObject({ state: "confirmed", barsAgo: 0 });
@@ -305,7 +305,11 @@ describe("divergences (decision 10)", () => {
     expect(findDivergences(s24.bars, s24.osc, "rsi", DIV, false, 2)[0]!.state).toBe("strong");
     expect(findDivergences(s24.bars, s24.osc, "rsi", DIV, false, 3)[0]!.state).toBe("confirmed");
     const old = bullishSetup("regular", 30);
-    expect(findDivergences(old.bars, old.osc, "rsi", DIV, false, 2)[0]).toMatchObject({ barsAgo: 7, active: false });
+    // "bis zum Bruch": still active 7 bars after the confirmation; an explicit maxAge limits it, rangeMax caps it
+    expect(findDivergences(old.bars, old.osc, "rsi", DIV, false, 2)[0]).toMatchObject({ barsAgo: 7, active: true });
+    expect(findDivergences(old.bars, old.osc, "rsi", { ...DIV, maxAge: 5 }, false, 2)[0]).toMatchObject({ barsAgo: 7, active: false });
+    const older = bullishSetup("regular", 90);
+    expect(findDivergences(older.bars, older.osc, "rsi", DIV, false, 2)[0]).toMatchObject({ barsAgo: 67, held: true, active: false });
     const broken = bullishSetup("regular", 25);
     broken.bars[23] = { ...broken.bars[23]!, c: 94 };
     expect(findDivergences(broken.bars, broken.osc, "rsi", DIV, false, 2)[0]).toMatchObject({ held: false, active: false });
@@ -652,7 +656,7 @@ describe("falling-knife filter (decision 11)", () => {
     const noDiv = sanitizeSignalCfg({ div: { on: false } });
     expect(knifeFilter(gradeSignals({ ...raw, checks: checks.map((c) => ({ ...c, div: undefined })) }, noDiv, null), noDiv).items[1]!.met).toBeNull();
     // short side mirrored labels
-    expect(g.knife!.short.items.map((i) => i.label)).toEqual(["Erstes Lower High oder BOS auf 1H/4H", "RSI bärische Divergenz", "Top-Trader short · Whale–Retail-Delta grün"]);
+    expect(g.knife!.short.items.map((i) => i.label)).toEqual(["Erstes Lower High oder BOS auf 1H/4H", "RSI bärische Divergenz oder Trendlinienbruch", "Top-Trader short · Whale–Retail-Delta grün"]);
     expect(k.items[2]!.label).toBe("Top-Trader long · Whale–Retail-Delta rot");
   });
 });

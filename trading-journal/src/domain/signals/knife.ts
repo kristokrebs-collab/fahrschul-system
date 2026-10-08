@@ -7,7 +7,7 @@
  * | id | long | short | where |
  * |---|---|---|---|
  * | `structure` | first higher low (internal structure, unbroken) OR a bullish BOS / CHoCH within `KNIFE_BREAK_MAX_AGE` bars | first lower high OR a bearish break | 1h, 4h (`KNIFE_TFS`; a timeframe outside ladder + zone = no data) |
- * | `divergence` | an active REGULAR bullish RSI divergence on a closed candle (hidden = continuation, not a reversal; WaveTrend hits listed only) | bearish | every ladder rung |
+ * | `divergence` | an active REGULAR bullish RSI divergence on a closed candle (hidden = continuation, not a reversal; WaveTrend hits listed only) OR a falling RSI trendline broken on a close | bearish / rising line broken downward | every ladder rung |
  * | `whale` | top traders long-heavy (positions OR accounts > `topPct`) AND the Whale–Retail-Delta red (negative or falling) — the Top-Trader-Kombi's own items (5-min data) | short-heavy AND the delta green (positive or rising) | live reading |
  *
  * `met: null` = keine Daten (switched off, too few bars, no Binance top-trader data). Pure.
@@ -57,7 +57,7 @@ export const KNIFE_INFO =
 
 const LABEL: Readonly<Record<KnifeId, Readonly<Record<Side, string>>>> = {
   structure: { long: "Erstes Higher Low oder BOS auf 1H/4H", short: "Erstes Lower High oder BOS auf 1H/4H" },
-  divergence: { long: "RSI bullische Divergenz", short: "RSI bärische Divergenz" },
+  divergence: { long: "RSI bullische Divergenz oder Trendlinienbruch", short: "RSI bärische Divergenz oder Trendlinienbruch" },
   whale: { long: "Top-Trader long · Whale–Retail-Delta rot", short: "Top-Trader short · Whale–Retail-Delta grün" },
 };
 
@@ -120,7 +120,7 @@ export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "sho
   }
   const structure: KnifeItem = { id: "structure", label: LABEL.structure[side], met: sData ? sTfs.length > 0 : null, detail: sData ? sTexts.join(" · ") : NO_DATA, tfs: sTfs };
 
-  // ---- RSI divergence (regular, closed) on the ladder rungs
+  // ---- RSI divergence (regular, closed) or an RSI trendline break (closed) on the ladder rungs
   const dOn = divCfgOf(cfg).on;
   const dTfs: string[] = [];
   const dTexts: string[] = [];
@@ -130,14 +130,14 @@ export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "sho
     if (!c?.div) continue;
     dData = true;
     const hits: Divergence[] = long ? c.div.long : c.div.short;
+    const tl = (long ? c.div.trend?.long : c.div.trend?.short) ?? null;
     const rsiReg = hits.filter((d) => d.osc === "rsi" && d.kind === "regular");
-    const closed = rsiReg.some((d) => d.state !== "provisional");
+    const closed = rsiReg.some((d) => d.state !== "provisional") || (!!tl?.active && tl.state !== "provisional");
     if (closed) dTfs.push(c.tf);
-    else if (rsiReg.length) provisional = true;
-    if (hits.length) {
-      const seen = [...new Set(hits.map((d) => `${OSC[d.osc]} ${KIND[d.kind]}${d.state === "provisional" ? " (vorläufig)" : ""}`))];
-      dTexts.push(`${c.tf}: ${seen.join(", ")}`);
-    }
+    else if (rsiReg.length || tl?.active) provisional = true;
+    const seen = [...new Set(hits.map((d) => `${OSC[d.osc]} ${KIND[d.kind]}${d.state === "provisional" ? " (vorläufig)" : ""}`))];
+    if (tl?.active) seen.push(`Trendlinie gebrochen${tl.state === "provisional" ? " (vorläufig)" : ""}`);
+    if (seen.length) dTexts.push(`${c.tf}: ${seen.join(", ")}`);
   }
   const dMet = dOn && dData ? dTfs.length > 0 : null;
   const divergence: KnifeItem = {

@@ -5,16 +5,16 @@
  * | id | title (long / short) | items | grade |
  * |---|---|---|---|
  * | `traders` | Top-Trader long · Retail rot / short · Retail grün | `pos`, `acc`, `retail`, `zone` | met / 4 |
- * | `div` | Bullische / Bärische Divergenz | one per ladder rung (`30m` …) | best rung (regular 0.8, hidden 0.5, + 0.2 on both oscillators, provisional ½) |
+ * | `div` | Bullische / Bärische Divergenz | one per ladder rung (`30m` …) | best rung (regular 0.8, hidden 0.5, + 0.2 on both oscillators, + 0.2 RSI trendline break, provisional ½) |
  * | `sr` | Support + Platz / Widerstand + Platz | `near`, `room` | ½ near (≤ `nearAtr` ATR = 1, fading to 0 at 2×) + ½ room (R / `minR`, max 1) |
  *
  * points = weight × grade (0 without data); `bonus` (+1 strength for a valid entry, needs weight > 0): traders ≥
- * `bonusParts` met, div grade ≥ 0.8 (a regular divergence, closed), sr near AND room. Items carry their German value and
+ * `bonusParts` met, div a regular divergence on a closed candle (a trendline break alone never), sr near AND room. Items carry their German value and
  * a lit flag (`met: null` = keine Daten). Pure.
  */
 import { divCfgOf, srCfgOf, whaleCfgOf, type Side, type SignalCfg } from "./config";
 import { deltaRuleText, deltaText, zonePillText } from "./copy";
-import { divGrade, type Divergence } from "./divergence";
+import { divGrade, isFirmRegular, type Divergence, type TrendBreak } from "./divergence";
 import { STATE_RANK, type SignalState } from "./state";
 import type { Level } from "./structure";
 import { deltaMet, readingDelta, TRADERS_SIDE_TITLE, type TraderReading } from "./traders";
@@ -63,6 +63,8 @@ export interface GradedPart {
   reading?: TraderReading | null;
   /** div: the active hits of the side, with their timeframe (chart) */
   hits?: Array<Divergence & { tf: string }>;
+  /** div: the active RSI trendline breaks of the side, with their timeframe */
+  trends?: Array<TrendBreak & { tf: string }>;
   /** sr: the level leaned on, the target level, the stop below / above it and the R multiple (`null` = no level) */
   levels?: { lean: Level | null; target: Level | null; stop: number | null; r: number | null };
 }
@@ -136,29 +138,49 @@ export function tradersPart(side: Side, reading: TraderReading | null | undefine
 
 const OSC_TEXT = { rsi: "RSI", wt: "WT" } as const;
 const KIND_TEXT = { regular: "regulär", hidden: "versteckt" } as const;
+/** Short word of an RSI trendline break (the side says which line: falling for long, rising for short). */
+export const TREND_BREAK_TEXT = "RSI-Trendlinie gebrochen";
 
-/** `RSI regulär · WT versteckt` (+ ` · vorläufig` when every hit is provisional). */
+/** `RSI regulär · WT versteckt` (RSI first, regular first; + ` · vorläufig` when every hit is provisional). */
 export function divHitsText(hits: readonly Divergence[]): string {
   if (!hits.length) return "keine";
   const seen: string[] = [];
-  for (const d of hits) {
+  const order = (d: Divergence): number => (d.osc === "rsi" ? 0 : 2) + (d.kind === "regular" ? 0 : 1);
+  for (const d of [...hits].sort((x, y) => order(x) - order(y))) {
     const s = `${OSC_TEXT[d.osc]} ${KIND_TEXT[d.kind]}`;
     if (!seen.includes(s)) seen.push(s);
   }
   return `${seen.join(" · ")}${hits.every((d) => d.state === "provisional") ? " · vorläufig" : ""}`;
 }
 
-const bestState = (hits: readonly Divergence[]): SignalState => hits.reduce<SignalState>((a, d) => (STATE_RANK[d.state] > STATE_RANK[a] ? d.state : a), "none");
+/**
+ * Row text of a rung: the hits (`divHitsText`) and an active RSI trendline break — `RSI regulär · Trendlinie`,
+ * `RSI-Trendlinie gebrochen`, `RSI-Trendlinie gebrochen · vorläufig`, `keine`.
+ */
+export function divRungText(hits: readonly Divergence[], trend?: TrendBreak | null): string {
+  const tl = trend?.active ? trend : null;
+  if (!tl) return divHitsText(hits);
+  if (!hits.length) return `${TREND_BREAK_TEXT}${tl.state === "provisional" ? " · vorläufig" : ""}`;
+  const prov = hits.every((d) => d.state === "provisional") && tl.state === "provisional";
+  return `${divHitsText(hits).replace(/ · vorläufig$/, "")} · Trendlinie${prov ? " · vorläufig" : ""}`;
+}
 
-/** Divergences of the ladder for one side (`null` when off). */
+const bestState = (hits: readonly { state: SignalState }[]): SignalState => hits.reduce<SignalState>((a, d) => (STATE_RANK[d.state] > STATE_RANK[a] ? d.state : a), "none");
+
+/**
+ * Divergences of the ladder for one side (`null` when off): one item per rung (hits + RSI trendline break), the grade of
+ * the best rung (`divGrade`), `ok` = a regular divergence on a closed candle on any rung.
+ */
 export function divPart(side: Side, checks: readonly (TfCheck | null)[], cfg: Pick<SignalCfg, "div" | "ladder">): GradedPart | null {
   const d = divCfgOf(cfg);
   if (!d.on) return null;
   const n = Math.max(checks.length, cfg.ladder.length);
   const items: PartItem[] = [];
   const hits: Array<Divergence & { tf: string }> = [];
+  const trends: Array<TrendBreak & { tf: string }> = [];
   let grade = 0;
-  let best: { tf: string; hits: Divergence[] } | null = null;
+  let firm = false;
+  let best: { tf: string; hits: Divergence[]; trend: TrendBreak | null } | null = null;
   let data = false;
   for (let i = 0; i < n; i++) {
     const c = checks[i] ?? null;
@@ -169,15 +191,20 @@ export function divPart(side: Side, checks: readonly (TfCheck | null)[], cfg: Pi
     }
     data = true;
     const h = side === "long" ? c.div.long : c.div.short;
-    const g = divGrade(h);
+    const tr = (side === "long" ? c.div.trend?.long : c.div.trend?.short) ?? null;
+    const t = tr?.active ? tr : null;
+    const g = divGrade(h, t);
     for (const x of h) hits.push({ ...x, tf });
-    items.push({ id: tf, label: tf, value: divHitsText(h), raw: Math.round(g * 100) / 100, met: g > 0 });
+    if (t) trends.push({ ...t, tf });
+    if (h.some(isFirmRegular)) firm = true;
+    items.push({ id: tf, label: tf, value: divRungText(h, t), raw: Math.round(g * 100) / 100, met: g > 0 });
     if (g > grade) {
       grade = g;
-      best = { tf, hits: h };
+      best = { tf, hits: h, trend: t };
     }
   }
   const points = data ? d.weight * grade : 0;
+  const ok = data && firm;
   return {
     id: "div",
     side,
@@ -185,14 +212,15 @@ export function divPart(side: Side, checks: readonly (TfCheck | null)[], cfg: Pi
     grade,
     points,
     weight: d.weight,
-    ok: data && grade >= 0.8 - 1e-9,
-    bonus: data && d.weight > 0 && grade >= 0.8 - 1e-9,
-    state: best ? bestState(best.hits) : "none",
+    ok,
+    bonus: ok && d.weight > 0,
+    state: best ? bestState(best.trend ? [...best.hits, best.trend] : best.hits) : "none",
     data,
     items,
-    detail: !data ? NO_DATA : best ? `${best.tf}: ${divHitsText(best.hits)}${d.weight > 0 ? ` · ${pts(points)}` : " · zählt nicht"}` : "keine Divergenz",
+    detail: !data ? NO_DATA : best ? `${best.tf}: ${divRungText(best.hits, best.trend)}${d.weight > 0 ? ` · ${pts(points)}` : " · zählt nicht"}` : "keine Divergenz",
     tf: best?.tf,
     hits,
+    trends,
   };
 }
 

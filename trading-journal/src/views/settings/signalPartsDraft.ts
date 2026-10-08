@@ -9,13 +9,13 @@
  * | `sgWhaleTop`, `sgWhaleBonus` | `whale.topPct` (50 … 90), `whale.bonusParts` (1 … 4) | Top-Trader-Kombi |
  * | `sgWhaleDeltaRed`, `sgWhaleDeltaFall`, `sgWhaleWindow` | `whale.deltaRed` (−20 … 20 pp), `whale.deltaFall` (0 … 20 pp), `whale.deltaWindow` (30m · 1h · 2h · 4h) | "Retail rot" = Whale–Retail-Delta below deltaRed or fell ≥ deltaFall over the window |
  * | `sgWhaleRetail` | `whale.retailPeriod` (legacy comparison, no control any more: round-trips the stored value) | – |
- * | `sgDiv*` | `div.{on, rsi, wt, hidden, midline, left, right, rangeMin, rangeMax, maxAge, weight}` | divergences |
+ * | `sgDiv*` | `div.{on, rsi, wt, hidden, midline, trendline, left, right, rangeMin, rangeMax, maxAge, weight}` + `v: 2` | divergences (`sgDivTl` = RSI trendline break; maxAge 0 = bis zum Bruch) |
  * | `sgSr*` | `sr.{on, internal, nearAtr, minR, eqLen, eqThreshold, weight}` | structure + support / resistance |
  *
  * Values shown are the ones the engine runs with (`sanitizeSignalCfg`); saving merges over the stored objects (unknown
  * keys of either app survive) and clamps like the engine's sanitiser. Pure.
  */
-import { DEFAULT_DIV_CFG, DEFAULT_SR_CFG, DEFAULT_STRONG_CLOSES, DEFAULT_WHALE_CFG, PART_WEIGHT_MAX, sanitizeSignalCfg, STRONG_CLOSES_MAX, WHALE_RETAIL_PERIODS, type DivCfg, type SrCfg } from "@/domain/signals";
+import { DEFAULT_DIV_CFG, DIV_CFG_VERSION, DEFAULT_SR_CFG, DEFAULT_STRONG_CLOSES, DEFAULT_WHALE_CFG, PART_WEIGHT_MAX, sanitizeSignalCfg, STRONG_CLOSES_MAX, WHALE_RETAIL_PERIODS, type DivCfg, type SrCfg } from "@/domain/signals";
 import { WHALE_DELTA_PP_MAX, WHALE_DELTA_WINDOWS } from "@/domain/signals/config";
 import { parseNumber, toInputString } from "@/lib/parse";
 
@@ -40,7 +40,7 @@ export const PARTS_NUMERIC_KEYS = [
   "sgSrWeight",
 ] as const;
 /** Switches (`"on"` | `""`) and choices. */
-export const PARTS_TEXT_KEYS = ["sgWhaleRetail", "sgWhaleWindow", "sgDiv", "sgDivRsi", "sgDivWt", "sgDivHidden", "sgDivMid", "sgSr"] as const;
+export const PARTS_TEXT_KEYS = ["sgWhaleRetail", "sgWhaleWindow", "sgDiv", "sgDivRsi", "sgDivWt", "sgDivHidden", "sgDivMid", "sgDivTl", "sgSr"] as const;
 export const PARTS_DRAFT_KEYS = [...PARTS_NUMERIC_KEYS, ...PARTS_TEXT_KEYS] as const;
 
 export type PartsDraftKey = (typeof PARTS_DRAFT_KEYS)[number];
@@ -77,6 +77,7 @@ export function partsToDraft(signals: unknown): PartsDraft {
     sgDivWt: on(d.wt),
     sgDivHidden: on(d.hidden),
     sgDivMid: on(d.midline),
+    sgDivTl: on(d.trendline),
     sgDivLeft: String(d.left),
     sgDivRight: String(d.right),
     sgDivMin: String(d.rangeMin),
@@ -144,12 +145,15 @@ export function partsFromDraft(d: Partial<PartsDraft>, signals: unknown): PartsF
         wt: flag("sgDivWt"),
         hidden: flag("sgDivHidden"),
         midline: flag("sgDivMid"),
+        trendline: flag("sgDivTl"),
         left: clampInt(nums.sgDivLeft, 1, 20),
         right: clampInt(nums.sgDivRight, 1, 20),
         rangeMin,
         rangeMax: Math.max(rangeMin, clampInt(nums.sgDivMax, 1, 300)),
         maxAge: clampInt(nums.sgDivAge, 0, 50),
         weight: clampInt(nums.sgDivWeight, 0, PART_WEIGHT_MAX),
+        // the values above are today's rules (left 5 · "bis zum Bruch"): marks them so they are read as they are
+        v: DIV_CFG_VERSION,
       },
       sr: {
         ...storedSr,

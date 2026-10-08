@@ -97,18 +97,23 @@ export interface DivCfg {
   wt: boolean;
   /** also hidden divergences (trend continuation) */
   hidden: boolean;
-  /** pivot lookbacks: bars left / right of a pivot (MCB fractal = 2 / 2); right = confirmation delay */
+  /** pivot lookbacks: bars left / right of a pivot (default 5 / 2 since 2026-10-08; the MCB fractal 2 / 2 was too noisy); right = confirmation delay */
   left: number;
   right: number;
-  /** bars between the two pivots: min … max */
+  /** bars between the two pivots: min … max (every earlier pivot in this range is a partner, the most significant wins) */
   rangeMin: number;
   rangeMax: number;
-  /** a divergence counts in the check while its confirmation bar is at most this many bars old */
+  /**
+   * "Gilt bis zum Bruch": a held divergence counts until its pivot breaks on a close, at most `maxAge` bars after its
+   * confirmation; 0 (default since 2026-10-08) = no own limit, only `rangeMax`. Before, it expired after 5 bars.
+   */
   maxAge: number;
   /** bullish pivots only below the midline (wt1 < 0, RSI < 50), bearish above */
   midline: boolean;
   /** score points of the part (0 = shown only) */
   weight: number;
+  /** also the RSI trendline break (falling line through the RSI highs broken upward; short mirrored), graded inside the part */
+  trendline: boolean;
 }
 
 /** Market structure / support-resistance settings (`settings.signals.sr`). Swing length = `swingLookback`. */
@@ -147,7 +152,14 @@ export const strongClosesCap = (signalLookback: number): number =>
   Math.max(1, Math.min(STRONG_CLOSES_MAX, (Number.isFinite(signalLookback) ? Math.round(signalLookback) : 3) - 1));
 export const PART_WEIGHT_MAX = 30;
 
-export const DEFAULT_DIV_CFG: Readonly<DivCfg> = Object.freeze({ on: true, rsi: true, wt: true, hidden: true, left: 2, right: 2, rangeMin: 3, rangeMax: 60, maxAge: 5, midline: true, weight: 10 });
+export const DEFAULT_DIV_CFG: Readonly<DivCfg> = Object.freeze({ on: true, rsi: true, wt: true, hidden: true, left: 5, right: 2, rangeMin: 3, rangeMax: 60, maxAge: 0, midline: true, weight: 10, trendline: true });
+/**
+ * Version of the stored divergence settings (`settings.signals.div.v`). The settings card wrote every key on save, so
+ * an object without `v: 2` holding the former defaults (left 2, maxAge 5 = "5 Kerzen") is read with today's defaults
+ * (left 5, maxAge 0 = "bis zum Bruch"); the stored keys stay as they are until the next save writes `v: 2`.
+ */
+export const DIV_CFG_VERSION = 2;
+const DIV_V1_DEFAULTS = { left: 2, maxAge: 5 } as const;
 export const DEFAULT_SR_CFG: Readonly<SrCfg> = Object.freeze({ on: true, internal: 5, eqLen: 3, eqThreshold: 0.1, nearAtr: 1, minR: 2, weight: 10 });
 
 export const DEFAULT_SIGNAL_CFG: SignalCfg = {
@@ -281,19 +293,24 @@ export function sanitizeDivCfg(raw: unknown): DivCfg {
   const r = recOf(raw);
   const d = DEFAULT_DIV_CFG;
   const rangeMin = intIn(r.rangeMin, d.rangeMin, 1, 200);
+  // former defaults of an unversioned stored object → today's defaults (keys kept; the next save writes `v`)
+  const v1 = toNum(r.v) !== DIV_CFG_VERSION;
+  const left = intIn(r.left, d.left, 1, 20);
+  const maxAge = intIn(r.maxAge, d.maxAge, 0, 50);
   return {
     ...(r as Partial<DivCfg>),
     on: boolOr(r.on, d.on),
     rsi: boolOr(r.rsi, d.rsi),
     wt: boolOr(r.wt, d.wt),
     hidden: boolOr(r.hidden, d.hidden),
-    left: intIn(r.left, d.left, 1, 20),
+    left: v1 && left === DIV_V1_DEFAULTS.left ? d.left : left,
     right: intIn(r.right, d.right, 1, 20),
     rangeMin,
     rangeMax: Math.max(rangeMin, intIn(r.rangeMax, d.rangeMax, 1, 300)),
-    maxAge: intIn(r.maxAge, d.maxAge, 0, 50),
+    maxAge: v1 && maxAge === DIV_V1_DEFAULTS.maxAge ? d.maxAge : maxAge,
     midline: boolOr(r.midline, d.midline),
     weight: intIn(r.weight, d.weight, 0, PART_WEIGHT_MAX),
+    trendline: boolOr(r.trendline, d.trendline),
   };
 }
 
@@ -359,7 +376,7 @@ export function signalCfgKey(cfg: SignalCfg): string {
     ...NUM_KEYS.map((k) => cfg[k]),
     `w${w.on ? 1 : 0}:${w.periods.join(",")}:${w.minRun}:${w.weight}:${w.topPct}:${w.retailPeriod}:${w.bonusParts}:${w.deltaRed}:${w.deltaFall}:${w.deltaWindow}`,
     `s${strongClosesOf(cfg)}`,
-    `d${d.on ? 1 : 0}:${d.rsi ? 1 : 0}${d.wt ? 1 : 0}${d.hidden ? 1 : 0}:${d.left}:${d.right}:${d.rangeMin}:${d.rangeMax}:${d.maxAge}:${d.midline ? 1 : 0}:${d.weight}`,
+    `d${d.on ? 1 : 0}:${d.rsi ? 1 : 0}${d.wt ? 1 : 0}${d.hidden ? 1 : 0}:${d.left}:${d.right}:${d.rangeMin}:${d.rangeMax}:${d.maxAge}:${d.midline ? 1 : 0}:${d.weight}:${d.trendline === false ? 0 : 1}`,
     `r${r.on ? 1 : 0}:${r.internal}:${r.eqLen}:${r.eqThreshold}:${r.nearAtr}:${r.minR}:${r.weight}`,
   ].join("|");
 }

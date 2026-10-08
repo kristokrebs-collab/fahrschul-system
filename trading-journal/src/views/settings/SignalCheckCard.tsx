@@ -82,23 +82,25 @@ export const SIGNAL_STRINGS = {
   whaleWeightHelp: (w: number) => (w > 0 ? `bis +${w} Score, anteilig (je erfüllter Teil ¼)` : "0 = nur anzeigen und speichern, zählt nicht"),
   div: "Divergenzen",
   divSwitch: "Check „Bullische / Bärische Divergenz“",
-  divHelp: "RSI und WaveTrend wt1 gegen den Kurs an Pivots, je Timeframe der Leiter. Regulär = Umkehr (Kurs tieferes Tief, Oszillator höheres Tief), versteckt = Fortsetzung. Zählt bei einer regulären auf geschlossener Kerze voll.",
+  divHelp:
+    "RSI und WaveTrend wt1 gegen den Kurs an Pivots, je Timeframe der Leiter, verglichen mit jedem früheren Pivot im Abstand. Regulär = Umkehr (Kurs tieferes Tief, Oszillator höheres Tief), versteckt = Fortsetzung. Auf der laufenden Kerze schon vorläufig (zählt halb), voll bei einer regulären auf geschlossener Kerze; gilt, bis der Pivot auf Schlusskurs bricht.",
   divOsc: "Oszillatoren und Filter",
-  divOscHelp: "Mindestens ein Oszillator bleibt aktiv. Mittellinie: bullische Pivots nur unter 50 (RSI) / 0 (WT).",
+  divOscHelp: "Mindestens ein Oszillator bleibt aktiv. Mittellinie: bullische Pivots nur unter 50 (RSI) / 0 (WT). Trendlinie: RSI-Trendlinie gebrochen (fallende Linie über die letzten zwei RSI-Hochs nach oben; Short: steigende über die Tiefs nach unten) = +0,2 Note.",
   divRsi: "RSI",
   divWt: "WaveTrend",
   divHidden: "versteckte",
   divMid: "Mittellinie",
+  divTl: "Trendlinie",
   divLeft: "Pivot links",
-  divLeftHelp: "Kerzen vor dem Pivot",
+  divLeftHelp: "Kerzen vor dem Pivot (5)",
   divRight: "Pivot rechts",
-  divRightHelp: "Kerzen danach = Bestätigung",
+  divRightHelp: "Kerzen danach = Bestätigung (2)",
   divMin: "Abstand min",
   divMinHelp: "Kerzen zwischen den Pivots",
   divMax: "Abstand max",
   divMaxHelp: "Kerzen zwischen den Pivots",
   divAge: "Gilt (Kerzen)",
-  divAgeHelp: "nach der Bestätigung",
+  divAgeHelp: "0 = bis zum Bruch (max. Abstand max)",
   sr: "Support / Widerstand",
   srSwitch: "Check „Support + Platz“",
   srHelp: "LuxAlgo-Struktur auf dem Zonen-Timeframe: Swing-Hochs/-Tiefs, BOS/CHoCH, Order-Blocks, EQH/EQL. Long: nah am Support/Demand und genug Platz bis zum nächsten Widerstand (in R, Stop knapp unter dem Level); Short spiegelbildlich.",
@@ -462,7 +464,7 @@ function WhaleGroup({ draft, onChange, changed, field }: GroupProps & { field: F
   );
 }
 
-/** `Divergenzen` group: switch, oscillator / filter toggles, pivot lookbacks, distance, age, weight. */
+/** `Divergenzen` group: switch, oscillator / filter / trendline toggles, pivot lookbacks, distance, age (0 = bis zum Bruch), weight. */
 function DivGroup({ draft, onChange, changed, field }: GroupProps & { field: FieldFn }) {
   const on = draft.sgDiv === "on";
   const weight = Math.max(0, intOf(draft.sgDivWeight, 10));
@@ -478,6 +480,7 @@ function DivGroup({ draft, onChange, changed, field }: GroupProps & { field: Fie
     { key: "sgDivWt", label: S.divWt, on: wt, last: wt && !rsi },
     { key: "sgDivHidden", label: S.divHidden, on: draft.sgDivHidden === "on" },
     { key: "sgDivMid", label: S.divMid, on: draft.sgDivMid === "on" },
+    { key: "sgDivTl", label: S.divTl, on: draft.sgDivTl === "on" },
   ];
   const oscChanged = toggles.some((t) => changed.has(t.key));
   return (

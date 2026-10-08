@@ -27,6 +27,7 @@ export {
   strongClosesCap,
   PART_WEIGHT_MAX,
   DEFAULT_DIV_CFG,
+  DIV_CFG_VERSION,
   DEFAULT_SR_CFG,
   sanitizeDivCfg,
   sanitizeSrCfg,
@@ -55,7 +56,8 @@ export {
   type WhaleVerdict,
 } from "./whale";
 export { ema, sma, rma, rsi, waveTrend, type Bar } from "./indicators";
-export { wtSignal, mcbEvents, isLongKind, WT_RANK, type WtKind, type WtEvent, type WtSignal, type McbBarEvent } from "./mcb";
+export { wtSignal, mcbEvents, isLongKind, WT_RANK, wtTurn, type WtKind, type WtEvent, type WtSignal, type McbBarEvent, type WtTurn } from "./mcb";
+export { noteIntrabar, intrabarOf, EMPTY_INTRABAR, type IntrabarMemo, type IntrabarSighting } from "./intrabar";
 export { zoneOf, pdZone, luxZone, PD_FALLBACK_BARS, type Zone, type ZoneInfo, type ZoneBreak } from "./zones";
 export {
   checkTf,
@@ -99,7 +101,23 @@ export {
   type SignalState,
   type RungConf,
 } from "./state";
-export { findDivergences, tfDivergences, divGrade, DIV_MIDLINE, type Divergence, type DivPivot, type DivOsc, type DivKind, type TfDivergences } from "./divergence";
+export {
+  findDivergences,
+  tfDivergences,
+  divGrade,
+  rsiTrendBreak,
+  divActiveBars,
+  isFirmRegular,
+  DIV_MIDLINE,
+  TREND_BREAK_BARS,
+  TREND_BREAK_GRADE,
+  type Divergence,
+  type DivPivot,
+  type DivOsc,
+  type DivKind,
+  type TfDivergences,
+  type TrendBreak,
+} from "./divergence";
 export {
   marketStructure,
   lastInternalPivot,
@@ -115,7 +133,7 @@ export {
   type LevelKind,
 } from "./structure";
 export { traderReading, TRADER_STEP_MS, TRADER_FRESH_STEPS, TRADERS_TITLE, TRADERS_SIDE_TITLE, type TraderSeries, type TraderReading } from "./traders";
-export { tradersPart, divPart, srPart, divHitsText, partReasonText, verdictPart, SR_STOP_ATR, type GradedPart, type PartItem, type PartId } from "./parts";
+export { tradersPart, divPart, srPart, divHitsText, divRungText, TREND_BREAK_TEXT, partReasonText, verdictPart, SR_STOP_ATR, type GradedPart, type PartItem, type PartId } from "./parts";
 export { knifeFilter, knifeStructure, KNIFE_TFS, KNIFE_BREAK_MAX_AGE, KNIFE_TITLE, KNIFE_INFO, type KnifeFilter, type KnifeItem, type KnifeId } from "./knife";
 export { bucketOpen, resampleBars, withLivePrice } from "./resample";
 export { mcbSeries, MAJOR_KINDS, type McbPoint } from "./series";

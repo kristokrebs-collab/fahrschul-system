@@ -8,14 +8,17 @@ import type { Zone, ZoneInfo } from "./zones";
 
 export const SIGNAL_TITLE = "Einstiegs-Check";
 
-/** Event text per MCB kind (`null` = "kein Signal"). */
+/**
+ * Event text per MCB kind (`null` = "kein Signal"). The small zero-line crosses are "Kreuz" (until 2026-10-08
+ * "Einstieg", which the user mixed up with the Bottom he calls his entry: "Bottom/Einstieg").
+ */
 export const KIND_TEXT: Readonly<Record<WtKind, string>> = {
   bottom: "Bottom",
   buy: "Kaufsignal",
-  bull: "Einstieg",
+  bull: "Kreuz",
   top: "Top",
   sell: "Verkaufssignal",
-  bear: "Einstieg Short",
+  bear: "Kreuz Short",
 };
 export const NO_KIND_TEXT = "kein Signal";
 export const kindText = (k: WtKind | null | undefined): string => (k ? KIND_TEXT[k] : NO_KIND_TEXT);
@@ -106,6 +109,20 @@ export function strengthLine(strength: number, tiers: number, ladderLength: numb
 /** `1,5` (de-DE, at most one decimal). */
 const dec = (x: number): string => String(Math.round(x * 10) / 10).replace(".", ",");
 
+/** "Gilt" of a divergence: `bis zum Bruch des Pivots (höchstens 60 Kerzen)` / `bis zum Bruch, höchstens 20 Kerzen`. */
+export function divValidityText(d: { maxAge: number; rangeMax: number }): string {
+  return d.maxAge > 0 ? `bis zum Bruch des Pivots, höchstens ${Math.min(d.maxAge, d.rangeMax)} Kerzen` : `bis zum Bruch des Pivots (höchstens ${d.rangeMax} Kerzen)`;
+}
+
+/** The divergence rule in one sentence (info panel, settings help). */
+export function divInfoText(rsiLen: number, d: { left: number; right: number; hidden: boolean; maxAge: number; rangeMin: number; rangeMax: number; trendline?: boolean }): string {
+  return (
+    `RSI ${rsiLen} und WaveTrend wt1 gegen den Kurs an Pivots (${d.left} Kerzen links / ${d.right} rechts, verglichen mit jedem früheren Pivot ${d.rangeMin}–${d.rangeMax} Kerzen davor), ` +
+    `regulär = Umkehr, ${d.hidden ? "versteckt = Fortsetzung, " : ""}auf der laufenden Kerze schon vorläufig (zählt halb), gilt ${divValidityText(d)}` +
+    (d.trendline === false ? "" : `; RSI-Trendlinie gebrochen (fallende Linie über die letzten zwei RSI-Hochs nach oben, Short spiegelbildlich) = +0,2 Note`)
+  );
+}
+
 /** Info panel ("So prüft das Journal"), adapted to Binance. */
 export function signalInfo(cfg: SignalCfg, symbol = "BTCUSDT") {
   const ladder = cfg.ladder;
@@ -126,7 +143,7 @@ export function signalInfo(cfg: SignalCfg, symbol = "BTCUSDT") {
       ? [
           {
             k: "Divergenzen",
-            v: `RSI ${cfg.rsiLen} und WaveTrend wt1 gegen den Kurs an Pivots (${d.left} Kerzen links / ${d.right} rechts), regulär = Umkehr, ${d.hidden ? "versteckt = Fortsetzung, " : ""}gilt ${d.maxAge} Kerzen nach der Bestätigung; ${pts(d.weight)} bei einer regulären auf geschlossener Kerze.`,
+            v: `${divInfoText(cfg.rsiLen, d)}; ${pts(d.weight)} bei einer regulären auf geschlossener Kerze.`,
           },
         ]
       : []),
@@ -158,7 +175,8 @@ export function signalInfo(cfg: SignalCfg, symbol = "BTCUSDT") {
       { k: "Bestätigung", v: `vorläufig auf der laufenden Kerze · bestätigt nach ihrem Schluss · stark bestätigt nach ${strongClosesOf(cfg)} Schlüssen ohne Bruch` },
       { k: "Bottom/Top", v: `wt1 und Kurs drehen aus ${cfg.revRange}-Kerzen-Tief/Hoch` },
       { k: "Kauf-/Verkaufssignal", v: `Kreuzung bei ≤ ${cfg.wtOs} / ≥ ${cfg.wtOb}` },
-      { k: "Einstieg", v: "Kreuzung unter (Short: über) der Nulllinie" },
+      { k: "Kreuz", v: "kleine Kreuzung unter (Short: über) der Nulllinie" },
+      { k: "Vorläufig", v: "auf 1-Minuten-Schlüssen geprüft (kein Flackern pro Tick); ein Signal, das auf der laufenden Kerze schon da war und wieder weg ist, steht grau als „intrabar“ daneben (zählt nicht); „dreht ab …“ = Kurs, ab dem das MCB-Kreuz auf der laufenden Kerze erscheint" },
       { k: "Stärke", v: "Basis + Bestätigung = 1, jede weitere Stufe +1, Discount +1, jede voll erfüllte Teil-Bedingung +1 (bis Maximal)" },
       { k: "Score", v: "Leiter 55 · RSI 20 · Zone 15 · Bottom/Top 10" },
       { k: "Teil-Bedingungen", v: "zählen anteilig nach Gewicht (z. B. 3 von 4 = ¾ der Punkte); eine vorläufige Stufe zählt in der Leiter halb" },

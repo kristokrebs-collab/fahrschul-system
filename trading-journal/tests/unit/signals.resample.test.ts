@@ -85,9 +85,9 @@ describe("sanitizeSignalCfg", () => {
     expect(sanitizeSignalCfg(undefined)).toEqual({
       ...DEFAULT_SIGNAL_CFG,
       notify: false,
-      whale: { on: true, periods: ["30m", "1h"], minRun: 2, weight: 10, topPct: 64, retailPeriod: "5m", bonusParts: 3 },
+      whale: { on: true, periods: ["30m", "1h"], minRun: 2, weight: 10, topPct: 64, retailPeriod: "5m", bonusParts: 3, deltaRed: 0, deltaFall: 1, deltaWindow: "1h" },
       strongCloses: 2,
-      div: { on: true, rsi: true, wt: true, hidden: true, left: 2, right: 2, rangeMin: 3, rangeMax: 60, maxAge: 5, midline: true, weight: 10 },
+      div: { on: true, rsi: true, wt: true, hidden: true, left: 5, right: 2, rangeMin: 3, rangeMax: 60, maxAge: 0, midline: true, weight: 10, trendline: true },
       sr: { on: true, internal: 5, eqLen: 3, eqThreshold: 0.1, nearAtr: 1, minR: 2, weight: 10 },
     });
     const cfg = sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, extra: 1, notify: true });
