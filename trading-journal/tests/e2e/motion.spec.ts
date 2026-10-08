@@ -36,6 +36,8 @@ test("reduced motion: every page and overlay renders, nothing stays invisible", 
     const stuck = await page.evaluate(() => {
       const out: string[] = [];
       for (const el of Array.from(document.querySelectorAll<HTMLElement>("main h1, main h2, main h3, main table, main article, main button"))) {
+        // the kept-alive Übersicht that just left: aria-hidden, collapsed after its exit, parked once idle — not shown
+        if (el.closest('[data-page-role]:not([data-page-role="current"])')) continue;
         const cs = getComputedStyle(el);
         if (el.offsetParent === null && cs.position !== "fixed") continue; // display:none / detached: fine
         if (cs.opacity === "0" || cs.visibility === "hidden") out.push(`${el.tagName}: ${el.textContent?.slice(0, 30)}`);
