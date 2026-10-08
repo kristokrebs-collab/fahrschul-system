@@ -1,7 +1,8 @@
 /**
  * Übersicht after the rules-v2 decisions:
- * - decision 13: no general SHORT trigger on the hero — a 4H close under the stored short level shows the neutral range
- *   (never "Short-Trigger aktiv", no "Short-Trigger in −x %" row); the stored level itself stays untouched.
+ * - decision 13: no general SHORT trigger on the hero — a 4H close under the stored short level shows no
+ *   "Short-Trigger aktiv" and no "Short-Trigger in −x %" row (decision 23: the Lage-Ampel replaced the manual
+ *   scenario box); the stored level itself stays untouched.
  * - decision 7: `?debug=layers` opens the layer diagnostics (outlines + labels of every fixed / sticky layer, the
  *   Prüfstreifen, viewport numbers, Kopieren, Minimieren, Esc); Samsung Internet (the Galaxy Tab projects) gets the safe
  *   effects (`html[data-safe-fx]`). Everything it changed is restored on close.
@@ -14,7 +15,7 @@ import { collectErrors, expectNoHorizontalScroll, fixture, hasTouch, isTouchTabl
 const baseSettings = fixture["tj2-settings"] as Record<string, unknown>;
 
 test.describe("Übersicht v2", () => {
-  test("decision 13: a close under the stored short level shows the range — no Short-Trigger on the hero, the level stays stored", async ({ page }, info) => {
+  test("decision 13 / 23: a close under the stored short level — no Short-Trigger on the hero (the Lage-Ampel replaced the scenario), the level stays stored", async ({ page }, info) => {
     const errors = collectErrors(page);
     // levels far above the live price (~84 200): the last 4H close is under the SHORT level → the trigger engine says
     // "short"; the Übersicht must show the neutral range instead
@@ -23,13 +24,12 @@ test.describe("Übersicht v2", () => {
     await page.goto("/#overview");
     const panel = page.getByTestId("market-panel");
     await expect(panel).toBeVisible();
-    const box = panel.getByTestId("scenario-box");
-    // (the title runs through a letter effect: its text nodes are layered, so match the words)
-    await expect(box).toContainText("kein Trigger", { timeout: 20_000 });
-    await expect(box).toContainText("4H-Schluss unter dem Long-Trigger 99.000, über der Invalidierung 70.000");
-    await expect(box).toContainText("den Einstieg prüft der Einstiegs-Check");
+    // decision 23: the automatic Lage-Ampel replaced the manual scenario box and the "Long-Trigger in" row (the
+    // stored levels only draw chart lines); lg+ it is the hero's band, below inside the market panel
+    await expect(page.getByTestId("lage-panel")).toHaveAttribute("data-state", /red|amber|green/, { timeout: 20_000 });
+    await expect(page.getByTestId("scenario-box")).toHaveCount(0);
     await expect(panel).not.toContainText("Short-Trigger");
-    await expect(panel).toContainText(/Long-Trigger in \+\d/);
+    await expect(page.getByText(/Long-Trigger in [+−-]\d/)).toHaveCount(0);
     await expect(page.getByText(/Short-Trigger (aktiv|in )/)).toHaveCount(0);
     await page.screenshot({ path: info.outputPath("hero-no-short.png"), animations: "disabled" });
     // the stored level is untouched (no data deletion)
