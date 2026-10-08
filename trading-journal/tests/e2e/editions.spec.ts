@@ -73,7 +73,9 @@ test("share edition at /teilen/: empty journal, neutral setups, own storage; the
   await expect(page.getByRole("heading", { name: /Alle Trades/ })).toBeVisible();
   await expect(page.getByText("13 Trades", { exact: true })).toBeVisible();
   await page.goto("/#setups");
-  await expect(page.getByText(PERSONAL_SETUPS[0]!, { exact: true }).first()).toBeVisible();
+  // scoped to the setups page: the kept-alive overview is pre-rendered hidden at idle priority and carries the setup
+  // names too (its hidden copy came first in document order whenever the pre-render had already run)
+  await expect(page.locator('[data-page="setups"]').getByText(PERSONAL_SETUPS[0]!, { exact: true }).first()).toBeVisible();
   expect(errors, errors.join("\n")).toEqual([]);
 });
 
