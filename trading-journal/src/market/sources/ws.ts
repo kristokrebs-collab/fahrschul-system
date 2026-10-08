@@ -3,10 +3,11 @@
  * - liveness by message arrival (`markPrice@1s` is the heartbeat): 10 s silence → close + reconnect (`ws_silent`)
  * - full-jitter exponential backoff, `attempt` reset after 60 s stable
  * - proactive rollover at 23 h: open a second socket, wait for its first message, close the old one
- * - `visibilitychange`: no reconnects while hidden; on visible reconnect when silent > 10 s; `online` → reconnect
+ * - hidden tab: reconnects at most once a minute (`WS_HIDDEN_RETRY_MS`; the signal check's system notifications
+ *   still need the stream); on visible reconnect at once when silent > 10 s; `online` → reconnect
  * Browsers answer ping frames automatically; nothing is ever sent by this client.
  */
-import { WS_MAX_FAILED, WS_ROLLOVER_MS, WS_SILENT_MS, WS_STABLE_MS, wsBackoffMs, type TimerHost, realTimerHost } from "../schedule";
+import { WS_CONNECT_TIMEOUT_MS, WS_HIDDEN_RETRY_MS, WS_MAX_FAILED, WS_ROLLOVER_MS, WS_SILENT_MS, WS_STABLE_MS, wsBackoffMs, type TimerHost, realTimerHost } from "../schedule";
 
 export type WsClientState = "idle" | "connecting" | "open" | "silent" | "closed" | "fallback";
 
@@ -38,9 +39,16 @@ export interface WsClientOptions extends WsClientEvents {
   rolloverMs?: number;
   stableMs?: number;
   maxFailed?: number;
-  /** returns true while the tab is hidden (no reconnects then) */
+  /** returns true while the tab is hidden (reconnects slowed to `hiddenRetryMs` then) */
   hidden?: () => boolean;
+  /** reconnect pace while hidden (default `WS_HIDDEN_RETRY_MS`) */
+  hiddenRetryMs?: number;
+  /** a socket that neither opens nor closes within this time counts as failed (default `WS_CONNECT_TIMEOUT_MS`) */
+  connectTimeoutMs?: number;
 }
+
+/** `nudge()` restarts a handshake that has been pending for longer than this. */
+const NUDGE_STALE_CONNECT_MS = 5_000;
 
 export class WsClient {
   private ws: WsLike | null = null;
@@ -53,10 +61,13 @@ export class WsClient {
   private stableMs: number;
   private maxFailed: number;
   private hidden: () => boolean;
+  private hiddenRetryMs: number;
+  private connectTimeoutMs: number;
   private stopped = true;
   private attempt = 0;
   private failed = 0;
   private openedAt = 0;
+  private connectStartedAt = 0;
   private gotMessage = false;
   lastMessageAt = 0;
   state: WsClientState = "idle";
@@ -70,6 +81,13 @@ export class WsClient {
     this.stableMs = opts.stableMs ?? WS_STABLE_MS;
     this.maxFailed = opts.maxFailed ?? WS_MAX_FAILED;
     this.hidden = opts.hidden ?? (() => false);
+    this.hiddenRetryMs = opts.hiddenRetryMs ?? WS_HIDDEN_RETRY_MS;
+    this.connectTimeoutMs = opts.connectTimeoutMs ?? WS_CONNECT_TIMEOUT_MS;
+  }
+
+  /** A reconnect is armed (backoff after a close, or the slow hidden-tab retry). */
+  get retryPending(): boolean {
+    return this.timers.retry != null || this.timers.hiddenRetry != null;
   }
 
   get attempts(): number {
@@ -119,7 +137,13 @@ export class WsClient {
     if (this.state === "fallback" || this.state === "closed") {
       this.failed = 0;
       this.attempt = 0;
-      this.connect();
+      this.reconnect(); // clears the armed backoff retry first (it would open a second socket)
+      return;
+    }
+    // a handshake started long ago (before the tab was hidden / the device slept) is not worth waiting for
+    if (this.state === "connecting" && now - this.connectStartedAt > NUDGE_STALE_CONNECT_MS) {
+      this.attempt = 0;
+      this.reconnect();
       return;
     }
     if (this.state === "silent" || (this.state === "open" && now - this.lastMessageAt > this.silentMs)) {
@@ -130,7 +154,7 @@ export class WsClient {
     if (this.state === "open") this.armSilent(Math.max(1, this.lastMessageAt + this.silentMs - now));
   }
 
-  private timers: { silent?: unknown; rollover?: unknown; stable?: unknown; retry?: unknown } = {};
+  private timers: { silent?: unknown; rollover?: unknown; stable?: unknown; retry?: unknown; hiddenRetry?: unknown; connect?: unknown } = {};
 
   private clearTimers(): void {
     for (const k of Object.keys(this.timers) as (keyof typeof this.timers)[]) {
@@ -154,6 +178,7 @@ export class WsClient {
     if (this.stopped) return;
     this.state = "connecting";
     this.gotMessage = false;
+    this.connectStartedAt = this.host.now();
     let sock: WsLike;
     try {
       sock = this.factory(this.opts.url());
@@ -163,12 +188,21 @@ export class WsClient {
     }
     this.ws = sock;
     this.bind(sock, false);
+    // a handshake that hangs (radio waking up, captive network) never fires open or close: give up and retry
+    this.timers.connect = this.host.setTimeout(() => {
+      this.timers.connect = undefined;
+      if (this.stopped || this.ws !== sock || this.state !== "connecting") return;
+      this.closeSocket(sock);
+      this.onFail(1006);
+    }, this.connectTimeoutMs);
   }
 
   private bind(sock: WsLike, isRollover: boolean): void {
     const now = () => this.host.now();
     sock.onopen = () => {
       if (isRollover) return; // becomes primary on first message
+      if (this.timers.connect != null) this.host.clearTimeout(this.timers.connect);
+      this.timers.connect = undefined;
       this.state = "open";
       this.openedAt = now();
       this.lastMessageAt = this.openedAt;
@@ -224,11 +258,24 @@ export class WsClient {
       this.opts.onFallback?.(now);
       // keep trying in the background with capped backoff; the provider polls REST meanwhile
     }
-    if (this.hidden()) return; // resumed via nudge()
-    const delay = wsBackoffMs(this.attempt, this.random);
+    // hidden: slow retries (≥ 1 min) so a background tab keeps its stream; `nudge()` on visible reconnects at once
+    const delay = this.hidden() ? Math.max(this.hiddenRetryMs, wsBackoffMs(this.attempt, this.random)) : wsBackoffMs(this.attempt, this.random);
     this.attempt += 1;
     this.opts.onRetry?.(this.attempt, now + delay, now);
-    this.timers.retry = this.host.setTimeout(() => this.connect(), delay);
+    this.timers.retry = this.host.setTimeout(() => {
+      this.timers.retry = undefined;
+      this.connect();
+    }, delay);
+  }
+
+  /** Silent while hidden: one slow reconnect (≥ 1 min); `nudge()` on visible does it at once. */
+  private armHiddenRetry(): void {
+    if (this.timers.hiddenRetry != null) return;
+    this.timers.hiddenRetry = this.host.setTimeout(() => {
+      this.timers.hiddenRetry = undefined;
+      if (this.stopped || this.state !== "silent") return;
+      this.reconnect();
+    }, this.hiddenRetryMs);
   }
 
   /** Arms the silence check `delayMs` from now (default: the full window; `nudge()` passes the remaining part). */
@@ -240,7 +287,10 @@ export class WsClient {
       if (now - this.lastMessageAt >= this.silentMs) {
         this.state = "silent";
         this.opts.onSilent?.(now);
-        if (this.hidden()) return; // reconnect on visible via nudge()
+        if (this.hidden()) {
+          this.armHiddenRetry(); // slow; `nudge()` on visible reconnects at once
+          return;
+        }
         this.reconnect();
       } else {
         this.armSilent();

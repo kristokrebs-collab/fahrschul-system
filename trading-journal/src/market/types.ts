@@ -190,6 +190,11 @@ export interface ProviderHealth {
   proxy: { usable: boolean | "unknown"; blocked?: boolean };
   ws: { state: HealthState; connectedAt?: number; lastMessageAt?: number; attempt: number; nextRetryAt?: number };
   feeds: Record<FeedId, FeedHealth>;
+  /**
+   * Additive: estimated `Binance server time − device time` in ms (0 while the clocks agree within 2 s). Staleness,
+   * aligned polls and gap fills use the corrected time; the Live-Daten card says when the device clock is off.
+   */
+  clockSkewMs?: number;
 }
 
 /** Additive: events consumed by the pure health reducer in `market/health.ts`. */
@@ -213,6 +218,8 @@ export type HealthEvent =
   /** additive: the next primary re-probe (`undefined` = none pending) */
   | { type: "probe_scheduled"; at: number | undefined; now: number }
   | { type: "bad_period"; feeds: FeedId[]; detail: string; now: number }
+  /** additive: the applied device-clock offset changed (`server − local`, ms) */
+  | { type: "clock"; skewMs: number; now: number }
   | { type: "bad_symbol"; now: number };
 
 export interface StatusLabel {

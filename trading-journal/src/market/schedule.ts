@@ -59,6 +59,26 @@ export function failureRetryMs(consecutiveFailures: number): number {
   return FAILURE_RETRY_MS[i]!;
 }
 
+/**
+ * Stale-feed watchdog kicks (a feed whose data is older than its `staleAfterMs` while its next poll is far away):
+ * now, then 30 s, 60 s, 2 min, every 5 min until data arrives again.
+ */
+export const WATCHDOG_KICK_MS: readonly number[] = [0, 30_000, 60_000, 120_000, 300_000];
+export function watchdogKickMs(kicks: number): number {
+  return WATCHDOG_KICK_MS[Math.min(WATCHDOG_KICK_MS.length - 1, Math.max(0, kicks))]!;
+}
+
+/** HTTP 418 (IP banned after ignoring 429s): bucket pause 2 min, doubling per ban, capped at 30 min. */
+export function banBackoffMs(bans: number): number {
+  return Math.min(30 * 60_000, 2 * 60_000 * 2 ** Math.max(0, bans - 1));
+}
+
+/** WS reconnect pace while the tab is hidden (system notifications of the signal check still need the stream). */
+export const WS_HIDDEN_RETRY_MS = 60_000;
+
+/** A WS handshake that neither opens nor closes within this time counts as a failed attempt. */
+export const WS_CONNECT_TIMEOUT_MS = 15_000;
+
 /** WS liveness: no message for 10 s → `ws_silent`. */
 export const WS_SILENT_MS = 10_000;
 /** Proactive rollover before the 24 h server cut. */
@@ -144,6 +164,17 @@ export class Scheduler {
     job.at = at;
     if (!this.paused) this.arm(key, job);
     return true;
+  }
+
+  /**
+   * Keys of jobs whose due time passed more than `graceMs` ago without firing: their timer was lost or frozen
+   * (Android does not advance timers while the device sleeps; a frozen tab drops them). The watchdog re-arms them.
+   */
+  overdue(now: number, graceMs: number): string[] {
+    if (this.paused) return [];
+    const out: string[] = [];
+    for (const [key, job] of this.jobs) if (job.at < now - graceMs) out.push(key);
+    return out;
   }
 
   /** `[key, dueAt]` of every pending job (snapshot). */

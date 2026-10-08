@@ -22,6 +22,16 @@ export const BUCKETS: Record<CostBucket, BucketConfig> = {
   proxy: { capacity: 60, windowMs: 60_000 },
 };
 
+/**
+ * Request classes sharing a bucket. `live` = the feeds themselves (polls, WS gap fills, REST fallback, probes): may
+ * use the whole bucket. `bulk` = one-off pages (chart history, retro signal checks, the lazily polled 1D rung): may
+ * only take tokens while `BULK_RESERVE` of the bucket stays free for the live feeds, so a long history scroll or a
+ * batch of retro checks can never starve a live feed.
+ */
+export type BudgetClass = "live" | "bulk";
+/** Share of every bucket reserved for `live` requests. */
+export const BULK_RESERVE = 0.4;
+
 /** Backoff applied to a bucket after a 429 or a TypeError burst. */
 export const RATE_LIMIT_BACKOFF_MS = 60_000;
 
@@ -57,22 +67,28 @@ export class TokenBucket {
     return now < this.blockedUntil ? 0 : this.tokens;
   }
 
+  /** Tokens a request class must leave in the bucket (`bulk` keeps `BULK_RESERVE` free for the live feeds). */
+  private floor(cls: BudgetClass): number {
+    return cls === "bulk" ? this.cfg.capacity * BULK_RESERVE : 0;
+  }
+
   /** Consumes `units` when possible; returns false (and consumes nothing) otherwise. */
-  take(units: number, now: number): boolean {
+  take(units: number, now: number, cls: BudgetClass = "live"): boolean {
     this.refill(now);
     if (now < this.blockedUntil) return false;
-    if (this.tokens < units) return false;
+    if (this.tokens - units < this.floor(cls)) return false;
     this.tokens -= units;
     return true;
   }
 
   /** ms until `units` are available (0 when available now). */
-  waitFor(units: number, now: number): number {
+  waitFor(units: number, now: number, cls: BudgetClass = "live"): number {
     this.refill(now);
     const block = Math.max(0, this.blockedUntil - now);
-    if (this.tokens >= units) return block;
+    const need = units + this.floor(cls);
+    if (this.tokens >= need) return block;
     const perMs = this.cfg.capacity / this.cfg.windowMs;
-    return Math.max(block, Math.ceil((units - this.tokens) / perMs));
+    return Math.max(block, Math.ceil((need - this.tokens) / perMs));
   }
 
   backoff(ms: number, now: number): void {
@@ -94,11 +110,11 @@ export class Budget {
   bucket(id: CostBucket): TokenBucket {
     return this.buckets[id];
   }
-  take(id: CostBucket, units: number, now: number): boolean {
-    return this.buckets[id].take(units, now);
+  take(id: CostBucket, units: number, now: number, cls: BudgetClass = "live"): boolean {
+    return this.buckets[id].take(units, now, cls);
   }
-  waitFor(id: CostBucket, units: number, now: number): number {
-    return this.buckets[id].waitFor(units, now);
+  waitFor(id: CostBucket, units: number, now: number, cls: BudgetClass = "live"): number {
+    return this.buckets[id].waitFor(units, now, cls);
   }
   backoff(id: CostBucket, now: number, ms = RATE_LIMIT_BACKOFF_MS): void {
     this.buckets[id].backoff(ms, now);

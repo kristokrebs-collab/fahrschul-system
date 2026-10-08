@@ -38,8 +38,21 @@ import {
   klineFeedInterval,
   isSeriesFeed,
 } from "./feeds";
-import { Budget, klineWeight } from "./budget";
-import { NON_ADVANCE_RETRIES_MS, Scheduler, failureRetryMs, nextAlignedAt, nonAdvanceRetries, probeBackoffMs, realTimerHost, type TimerHost } from "./schedule";
+import { Budget, klineWeight, type BudgetClass } from "./budget";
+import {
+  NON_ADVANCE_RETRIES_MS,
+  Scheduler,
+  WS_SILENT_MS,
+  banBackoffMs,
+  failureRetryMs,
+  nextAlignedAt,
+  nonAdvanceRetries,
+  probeBackoffMs,
+  realTimerHost,
+  watchdogKickMs,
+  type TimerHost,
+} from "./schedule";
+import { ClockSkew } from "./clock";
 import { MarketCache, upsertBar, upsertSeries, RING_CAPACITY, type KVStore } from "./cache";
 import { initialHealth, reduceHealth } from "./health";
 import { statusLabelFor, STRINGS } from "./statusLabel";
@@ -59,7 +72,9 @@ export interface ProviderDeps {
   random?: () => number;
   /** `null` → memory only (tests); omitted → IndexedDB when available */
   kv?: KVStore | null;
+  /** `visibilitychange` and the Page Lifecycle `resume` / `freeze` events */
   documentRef?: Pick<Document, "hidden" | "addEventListener" | "removeEventListener"> | null;
+  /** `online` / `offline` / `pagehide` / `pageshow` / `focus` */
   windowRef?: Pick<Window, "addEventListener" | "removeEventListener"> | null;
   online?: () => boolean;
   /**
@@ -107,6 +122,14 @@ export interface MarketProvider extends MarketDataProvider {
    * `maxWaitMs` (default 15 s) for budget tokens, then throws `RestError("rate_limited")`.
    */
   fetchKlines(interval: FetchInterval, p?: { endTime?: number; startTime?: number; limit?: number; maxWaitMs?: number }): Promise<Stamped<Candle[]>>;
+  /** Device time corrected to the Binance server clock (`Date.now() + clockSkewMs`); compare it with `asOf` / point times. */
+  serverNow(): number;
+  /**
+   * Re-checks every feed now (what a tab resume does): overdue polls fire, stale REST feeds are re-polled, the socket
+   * reconnects when silent. Called by the provider itself on `visibilitychange` / `pageshow` / `focus` / `online` /
+   * Page Lifecycle `resume` and after a device sleep; exposed for adapters and tests.
+   */
+  resume(reason?: string): void;
 }
 
 type Batch = FeedSnapshot & { detail?: string };
@@ -118,6 +141,13 @@ class Unsupported extends Error {
 }
 
 const RETRY_MS = 15_000;
+/** German detail per HTTP status (tooltip, Live-Daten row). */
+const HTTP_DETAIL: Record<number, string> = {
+  429: "HTTP 429 · zu viele Anfragen",
+  418: "HTTP 418 · IP vorübergehend gesperrt",
+  451: "HTTP 451 · Region gesperrt",
+  403: "HTTP 403 · Zugriff verweigert",
+};
 /** Bybit liveness memo for the blocked check. */
 const BLOCK_PROBE_MEMO_MS = 30_000;
 /** A Binance WebSocket frame this recent proves Binance is reachable from here: no geo-block, whatever REST says. */
@@ -144,6 +174,34 @@ const PROXY_REPROBE_MS = 5 * 60_000;
 const WATCHDOG_REARM_MS = 1_000;
 /** Default wait for budget tokens in `fetchKlines`. */
 const FETCH_KLINES_MAX_WAIT_MS = 15_000;
+/** A scheduled poll this late (its timer was lost: device sleep, frozen tab) is re-armed by the watchdog. */
+const OVERDUE_GRACE_MS = 3_000;
+/** Health ticks further apart than this many tick intervals mean the device slept / the tab was frozen: resume. */
+const WAKE_TICK_FACTOR = 3;
+/** `focus` / `pageshow` / `resume` re-checks at most this often (a visibilitychange always runs). */
+const RESUME_THROTTLE_MS = 5_000;
+/**
+ * A WS stream that delivered nothing for this long while the socket itself delivers (other streams arrive) is stalled:
+ * its feed is fetched over REST (klines with gap fill) and a second stall within `STREAM_STALL_WINDOW_MS`
+ * re-subscribes (socket reconnect). BTC trades every second, so every subscribed stream updates several times a second.
+ */
+const STREAM_STALL_MS: Partial<Record<FeedId, number>> = {
+  markPrice: 15_000,
+  aggTrade: 60_000,
+  bookTop: 60_000,
+  kline_1m: 90_000,
+  kline_15m: 90_000,
+  kline_1h: 90_000,
+  kline_4h: 90_000,
+  kline_1w: 90_000,
+};
+const STREAM_STALL_WINDOW_MS = 10 * 60_000;
+/** The socket counts as delivering when its last frame is younger than this. */
+const SOCKET_ALIVE_MS = 5_000;
+/** The stale-feed watchdog leaves a feed alone whose next poll is at most this far away. */
+const KICK_LEAD_MS = 10_000;
+/** Kline tail scanned for holes on every health tick (the gap fill itself scans up to `GAP_FILL_MAX` bars). */
+const HOLE_SCAN_BARS = 300;
 
 export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   const deps = opts.deps ?? {};
@@ -168,6 +226,10 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   const win = deps.windowRef === undefined ? (typeof window !== "undefined" ? window : null) : deps.windowRef;
   const isOnline = deps.online ?? (() => (typeof navigator !== "undefined" && typeof navigator.onLine === "boolean" ? navigator.onLine : true));
   const hidden = () => !!doc?.hidden;
+  /** device clock vs. Binance server clock (see `clock.ts`) */
+  const skew = new ClockSkew();
+  /** device time on the Binance clock: compare with `asOf` / point times (exchange time) */
+  const serverNow = () => now() + skew.offsetMs;
 
   const cache = new MarketCache(sym, deps.kv, (f) => specs[f].period);
   const budget = new Budget(now());
@@ -196,6 +258,28 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   const proxyAllowed = chain.includes("proxy") && (deps.probeProxy ?? typeof window !== "undefined");
   /** feeds whose poll is in flight (the watchdog must not re-arm them) */
   const active = new Set<FeedId>();
+  /** local time of the last successful delivery per feed (REST answer or WS frame): transport liveness */
+  const lastOkAt = new Map<FeedId, number>();
+  /** local time of the last WS frame per stream (stall detection) */
+  const lastStreamAt = new Map<FeedId, number>();
+  /** recent stream stalls (local times) → a second one re-subscribes the socket */
+  const streamStalls: number[] = [];
+  /** watchdog kicks per feed since its last delivery (backoff) */
+  const kicks = new Map<FeedId, number>();
+  /**
+   * WS-fed feeds whose REST fetch must go out although the socket covers them: a kline gap after a reconnect / stall
+   * (survives a failed request: the feed's normal retry sends it again), a stalled stream
+   */
+  const restDue = new Set<FeedId>();
+  /** holes a completed gap fill could not close (no bars at the exchange): never requested again */
+  const knownHoles = new Map<FeedId, Set<number>>();
+  let lastTickAt = -Infinity;
+  let lastResumeAt = -Infinity;
+  let wsOpenedAt = -Infinity;
+  /** consecutive HTTP 418 bans (bucket pause grows) */
+  let bans = 0;
+  /** feeds moved to the proxy because Binance banned this IP (418): a primary probe brings them back */
+  const movedForBan = new Set<FeedId>();
   const lastAdvanceCheck = new Map<FeedId, { newest: number; retries: number }>();
   const inflight = new Map<string, Promise<Batch>>();
   /** results younger than this are shared between feeds that map to the same request (e.g. Bybit `tickers`) */
@@ -254,8 +338,49 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (!isKlineFeed(feed)) return 2;
     const newest = newestTime(feed);
     if (newest === undefined) return 2;
-    const missing = Math.ceil((now() - newest) / INTERVAL_MS[klineFeedInterval(feed)]) + 1;
+    const iv = INTERVAL_MS[klineFeedInterval(feed)];
+    // from the oldest open hole in the tail (a failed gap fill, frames lost while the socket stalled), else the newest
+    // bar; counted on the Binance clock so a device clock that runs behind never leaves the last bars out
+    const from = oldestHole(feed, GAP_FILL_MAX) ?? newest;
+    const missing = Math.ceil((serverNow() - from) / iv) + 1;
     return Math.max(2, Math.min(GAP_FILL_MAX, missing));
+  }
+
+  /**
+   * Open time of the bar BEFORE the oldest unfilled hole within the last `scan` bars of a kline series (undefined =
+   * contiguous). Holes a completed gap fill could not close (no trading at the exchange) are skipped.
+   */
+  function oldestHole(feed: FeedId, scan: number): number | undefined {
+    if (!isKlineFeed(feed)) return undefined;
+    const arr = cache.get(feed)?.data as Candle[] | undefined;
+    if (!arr || arr.length < 2) return undefined;
+    const iv = INTERVAL_MS[klineFeedInterval(feed)];
+    const known = knownHoles.get(feed);
+    // a tail request reaches at most GAP_FILL_MAX bars back: older holes stay (the chart's history() pages them)
+    const reach = serverNow() - GAP_FILL_MAX * iv;
+    let hole: number | undefined;
+    for (let i = arr.length - 1; i >= Math.max(1, arr.length - scan); i--) {
+      const prev = arr[i - 1]!.time;
+      if (prev < reach) break;
+      if (arr[i]!.time - prev > iv && !known?.has(prev)) hole = prev;
+    }
+    return hole;
+  }
+
+  /** After a gap fill that covered `limit` bars: holes still inside that range have no bars at the exchange. */
+  function rememberHoles(feed: FeedId, limit: number): void {
+    const arr = cache.get(feed)?.data as Candle[] | undefined;
+    if (!arr || arr.length < 2 || !isKlineFeed(feed)) return;
+    const iv = INTERVAL_MS[klineFeedInterval(feed)];
+    const covered = serverNow() - (limit - 1) * iv;
+    let known = knownHoles.get(feed);
+    for (let i = arr.length - 1; i >= 1 && arr[i]!.time >= covered; i--) {
+      const prev = arr[i - 1]!.time;
+      if (arr[i]!.time - prev > iv && prev >= covered - iv) {
+        if (!known) knownHoles.set(feed, (known = new Set()));
+        known.add(prev);
+      }
+    }
   }
 
   function klineLimit(feed: FeedId, bootstrap: boolean): number {
@@ -431,7 +556,9 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
         return t + wait;
       }
       if (check) check.retries = 0;
-      return nextAlignedAt(t, { alignMs: spec.alignMs, lagMs: spec.lagMs, jitterMs: spec.jitterMs }, random);
+      // Binance publishes on ITS clock: align on the corrected time, then back to the device clock for the timer
+      const off = skew.offsetMs;
+      return nextAlignedAt(t + off, { alignMs: spec.alignMs, lagMs: spec.lagMs, jitterMs: spec.jitterMs }, random) - off;
     }
     if (feed === "fundingHistory") {
       // refreshed on the funding tick (`T` from markPrice); safety net: 8 h
@@ -469,9 +596,11 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (source === "cache" || source === "tradingview") return;
     if (feed === "bookTop" && !bookTop) return;
     if (isMirrored(feed)) return; // fetched with its chosen-period twin
-    if (WS_FEEDS.includes(feed) && !o.bootstrap && !o.force && wsCovers(feed)) return; // WS delivers
+    // WS delivers (a pending gap fill after a reconnect / stall still goes out)
+    if (WS_FEEDS.includes(feed) && !o.bootstrap && !o.force && !restDue.has(feed) && wsCovers(feed)) return;
     const spec = specs[feed];
-    const units = isKlineFeed(feed) ? klineWeight(klineLimit(feed, !!o.bootstrap)) : spec.cost.units;
+    const limit = isKlineFeed(feed) ? klineLimit(feed, !!o.bootstrap) : 0;
+    const units = isKlineFeed(feed) ? klineWeight(limit) : spec.cost.units;
     const cost = bucketFor(feed, source, units);
     if (!o.force && !budget.take(cost.bucket, cost.units, now())) {
       schedulePoll(feed, now() + Math.max(1000, budget.waitFor(cost.bucket, cost.units, now())), o.bootstrap);
@@ -487,16 +616,26 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       const t = now();
       if (!health.online) backOnline(feed); // data arrived: we are online (the event was missed)
       if (source === "binance") onBinanceOk(t);
+      if (source === "binance" || source === "proxy") bans = 0;
+      restDue.delete(feed);
       for (const id of FEED_IDS) {
-        const v = batch[id];
+        let v = batch[id];
         if (!v) continue;
         // WS is authoritative for feeds it currently serves; REST only fills gaps
         if (id !== feed && wsCovers(id) && !o.bootstrap) continue;
+        if (isKlineFeed(id)) v = klineAsOf(v as Stamped<Candle[]>);
+        else if (id === "markPrice" && (v.source === "binance" || v.source === "proxy")) noteServerTime(v.asOf, v.receivedAt);
+        const prevNewest = isSeriesFeed(id) ? newestTime(id) : undefined;
         publish(id, v as Stamped<FeedValue[typeof id]>);
+        lastOkAt.set(id, t);
+        // the stale-feed backoff restarts only when the data moved on (a series that answers with the same old point
+        // stays on the 30 s → 5 min kick backoff instead of being kicked again at once)
+        if (!isSeriesFeed(id) || prevNewest === undefined || (newestTime(id) ?? 0) > prevNewest) kicks.delete(id);
         dispatch({ type: "rest_ok", feed: id, source: v.source, asOf: v.asOf, now: t });
         if (batch.detail) dispatch({ type: "bad_period", feeds: [id], detail: batch.detail, now: t });
         if (id === "markPrice") onFundingTick(v.data as FeedValue["markPrice"]);
       }
+      if (isKlineFeed(feed) && !o.bootstrap && limit > 2) rememberHoles(feed, limit);
       const after = newestTime(feed);
       const advanced = before === undefined || (after !== undefined && after > before);
       if (spec.alignMs) lastAdvanceCheck.set(feed, { newest: after ?? 0, retries: lastAdvanceCheck.get(feed)?.retries ?? 0 });
@@ -518,6 +657,22 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (health.primary.blocked) fastProbe(t);
   }
 
+  /**
+   * A REST kline page is stamped `min(device receive time, close time of the newest bar)`: on the Binance clock the
+   * receive time is `receivedAt + skew` (a device clock running behind would otherwise age the series at once).
+   */
+  function klineAsOf(v: Stamped<Candle[]>): Stamped<Candle[]> {
+    if (!skew.offsetMs) return v;
+    const last = v.data[v.data.length - 1];
+    const asOf = last ? Math.min(v.receivedAt + skew.offsetMs, last.closeTime ?? Infinity) : v.asOf;
+    return asOf === v.asOf ? v : { ...v, asOf };
+  }
+
+  /** One device-vs-Binance clock observation; a changed offset is published in the health snapshot. */
+  function noteServerTime(serverTime: number, localAt: number): void {
+    if (skew.sample(serverTime, localAt)) dispatch({ type: "clock", skewMs: skew.offsetMs, now: now() });
+  }
+
   /** Evidence that Binance answers while marked blocked: probe in 5 s instead of the 5–60 min backoff (throttled). */
   function fastProbe(t: number): void {
     if (t - lastFastProbeAt < FAST_PROBE_MIN_GAP_MS) return;
@@ -537,7 +692,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
 
   /** German detail for the feed's tooltip / the Live-Daten table. */
   function failureDetail(kind: string, status?: number, message?: string): string | undefined {
-    if (status) return `HTTP ${status}`;
+    if (status) return HTTP_DETAIL[status] ?? `HTTP ${status}`;
     if (kind === "timeout") return "Zeitüberschreitung (keine Antwort in 15 s)";
     if (kind === "network") return `Netzwerk/CORS: ${message || "Abruf fehlgeschlagen"}`;
     if (kind === "cors") return "Browser darf die Antwort nicht lesen (CORS)";
@@ -565,17 +720,23 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       schedulePoll(feed, t + OFFLINE_RETRY_MS);
       return;
     }
-    if (kind === "rate_limited") budget.backoff(bucketFor(feed, source, 0).bucket, t);
+    if (kind === "rate_limited") {
+      // 429: the bucket pauses 60 s; 418 (IP banned for ignoring 429s): 2 → 4 → … 30 min. Other buckets keep going.
+      const banned = rest.status === 418;
+      if (banned) bans += 1;
+      budget.backoff(bucketFor(feed, source, 0).bucket, t, banned ? banBackoffMs(bans) : undefined);
+    }
     if (kind === "network" && source === "binance") {
       noteNetworkFailure(feed, t);
       if (await detectBlocked(t)) kind = "blocked_451";
-      // a ratio request fails again while the rest of Binance answers: the browser cannot read /futures/data
-      // (CORS / an edge error without CORS headers) → the proxy, if it serves Binance's data
-      else if (ALL_FUTURES_DATA_FEEDS.includes(feed) && health.feeds[feed].consecutiveFailures >= 1 && binanceProvenReachable(t) && health.proxy.usable === true) kind = "cors";
+      // a request fails again while the rest of Binance answers: the browser cannot read this endpoint (CORS / an
+      // edge error without CORS headers) → the proxy, if it serves Binance's data
+      else if (specs[feed].sources.includes("proxy") && health.feeds[feed].consecutiveFailures >= 1 && binanceProvenReachable(t) && health.proxy.usable === true) kind = "cors";
     }
     if (!started) return;
     const before = health;
     dispatch({ type: "rest_fail", feed, source, kind, now: t, detail: failureDetail(kind, rest.status, rest.message) });
+    if (rest.status === 418 && source === "binance") routeAroundBan(t, rest.status);
     if (kind === "blocked_451") {
       dispatch({ type: "probe", source: "binance", ok: false, blocked: true, now: t });
       scheduleProbe();
@@ -596,6 +757,23 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (isFamilyFeed(feed) && after.consecutiveFailures >= 2) void maybeProbeProxy();
     const aligned = !!specs[feed].alignMs;
     schedulePoll(feed, now() + (aligned || isFamilyFeed(feed) ? failureRetryMs(after.consecutiveFailures) : RETRY_MS));
+  }
+
+  /**
+   * HTTP 418: Binance banned this IP for minutes to days. Every direct REST feed the proxy serves moves there at once
+   * (the proxy asks Binance from another IP) instead of collecting three failures behind a growing pause; a primary
+   * probe after the ban brings them back (the futures-data series stay on the proxy: same Binance data).
+   */
+  function routeAroundBan(t: number, status: number): void {
+    if (health.proxy.usable !== true) return;
+    const before = health;
+    for (const f of FEED_IDS) {
+      if (specs[f].transport !== "rest" || health.feeds[f].source !== "binance" || !specs[f].sources.includes("proxy")) continue;
+      dispatch({ type: "move", feed: f, source: "proxy", now: t, reason: "rate_limited", detail: HTTP_DETAIL[status] });
+      movedForBan.add(f);
+    }
+    bootstrapMoved(before);
+    scheduleProbe(banBackoffMs(bans) + 5_000);
   }
 
   /** Feeds whose source changed through a reducer step are bootstrapped on the new source right away. */
@@ -673,6 +851,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   /** Something waits for the primary: blocked, or a REST feed parked on another exchange / the cache. */
   function needsProbe(): boolean {
     if (health.primary.blocked) return true;
+    if (movedForBan.size > 0) return true;
     for (const f of FEED_IDS) {
       const fh = health.feeds[f];
       if (specs[f].transport !== "rest" || (specs[f].sources[0] ?? "binance") !== "binance") continue;
@@ -694,9 +873,11 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       return;
     }
     try {
-      await binance.serverTime();
+      const serverTime = await binance.serverTime();
       if (!started) return;
+      noteServerTime(serverTime, now());
       probeFailures = 0;
+      movedForBan.clear();
       lastBinanceOkAt = now();
       netFailures.length = 0;
       const before = health;
@@ -757,10 +938,16 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     hidden,
     onOpen: (t) => {
       wsOpens += 1;
+      wsOpenedAt = t;
+      lastStreamAt.clear();
       dispatch({ type: "ws_open", now: t });
       if (wsOpens > 1) {
-        // close the gap after a reconnect: last 2 candles per interval
-        for (const f of KLINE_FEEDS) void poll(f, { force: true });
+        // close the gap after a reconnect: every bar since the newest cached one, per interval; a failed request
+        // stays pending (`restDue`) and is retried with the feed's normal retry
+        for (const f of KLINE_FEEDS) {
+          restDue.add(f);
+          void poll(f, { force: true });
+        }
       }
     },
     onMessage: (raw, t) => {
@@ -772,6 +959,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       switch (ev.kind) {
         case "kline": {
           const feed = `kline_${ev.interval}` as const;
+          lastStreamAt.set(feed, t);
           const prev = cache.get(feed);
           // tail update (replace the forming bar / append the next one) instead of a full-ring merge per tick
           const merged = upsertBar(prev && prev.source === "binance" ? prev.data : [], ev.candle, RING_CAPACITY[feed]);
@@ -781,15 +969,19 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
           break;
         }
         case "markPrice":
+          lastStreamAt.set("markPrice", t);
+          noteServerTime(ev.value.time, t);
           publish("markPrice", { data: ev.value, asOf: ev.value.time, receivedAt: t, source: "binance", comparable: true });
           noteWs("markPrice", ev.value.time, t);
           onFundingTick(ev.value);
           break;
         case "aggTrade":
+          lastStreamAt.set("aggTrade", t);
           publish("aggTrade", { data: ev.value, asOf: ev.value.time, receivedAt: t, source: "binance", comparable: true });
           noteWs("aggTrade", ev.value.time, t);
           break;
         case "bookTop":
+          lastStreamAt.set("bookTop", t);
           publish("bookTop", { data: ev.value, asOf: ev.value.time || t, receivedAt: t, source: "binance", comparable: true });
           noteWs("bookTop", ev.value.time || t, t);
           break;
@@ -808,6 +1000,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
 
   /** Health updates from WS data are throttled to ≥ 1 s per feed to avoid 10 Hz reducer runs. */
   function noteWs(feed: FeedId, asOf: number, t: number): void {
+    lastOkAt.set(feed, t);
+    if (kicks.size) kicks.delete(feed);
     const fh = health.feeds[feed];
     if (fh.state === "live" && fh.source === "binance" && fh.lastDataAt !== undefined && asOf - fh.lastDataAt < 1000) return;
     if (fh.state !== "live" || fh.source !== "binance") scheduler.cancel(`poll:${feed}`); // WS took over again
@@ -829,16 +1023,32 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (hidden()) {
       scheduler.pause();
       void cache.persistAll();
-    } else {
-      const t = now();
-      resumedAt = t;
-      staggerOverdue(t);
-      scheduler.resume();
-      ws.nudge();
-      if (needsProbe()) scheduleProbe(RESUME_GRACE_MS / 3);
-      armTick();
-    }
+    } else resume("visible");
   }
+
+  /**
+   * Back in front (`visibilitychange`, `pageshow` from the back/forward cache, `focus` — a split-screen switch fires no
+   * visibilitychange —, the Page Lifecycle `resume` after a freeze, `online`, or a device sleep detected by the health
+   * tick): fire what fell due (spread over a few seconds), re-poll every REST feed whose data is older than its cadence,
+   * reconnect a silent socket (the reconnect fills the kline gap) and re-probe parked feeds.
+   */
+  function resume(reason = "visible"): void {
+    if (!started || hidden()) return;
+    const t = now();
+    if (reason !== "visible" && reason !== "wake" && t - lastResumeAt < RESUME_THROTTLE_MS) return;
+    lastResumeAt = t;
+    resumedAt = t;
+    lastTickAt = t;
+    staggerOverdue(t);
+    scheduler.resume();
+    kickStale(t, true);
+    ws.nudge();
+    if (needsProbe()) scheduleProbe(RESUME_GRACE_MS / 3);
+    armTick();
+  }
+  const onPageShow = () => resume("pageshow");
+  const onFocus = () => resume("focus");
+  const onDocResume = () => resume("lifecycle");
 
   /**
    * Resume after the tab was hidden: every poll that fell due meanwhile would fire in the same tick, while the radio /
@@ -880,10 +1090,17 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     void cache.persistAll();
   }
 
+  const tickMs = deps.tickMs ?? 5000;
+
   function armTick(): void {
     if (!started || scheduler.has("tick")) return;
-    scheduler.in("tick", deps.tickMs ?? 5000, () => {
-      dispatch({ type: "tick", now: now() });
+    scheduler.in("tick", tickMs, () => {
+      const t = now();
+      // ticks far apart while visible: the device slept or the tab was frozen (timers do not run then) → resume
+      const slept = t - lastTickAt > WAKE_TICK_FACTOR * tickMs && lastTickAt > -Infinity;
+      lastTickAt = t;
+      if (slept && !hidden()) resume("wake");
+      dispatch({ type: "tick", now: serverNow() });
       watchdog();
       armTick();
     });
@@ -896,15 +1113,120 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
    */
   function watchdog(): void {
     if (!started) return;
+    const t = now();
+    // 1. timers that were lost (device sleep, frozen tab): the job is still listed but long overdue → re-arm now
+    let i = 0;
+    for (const key of scheduler.overdue(t, OVERDUE_GRACE_MS)) {
+      scheduler.reschedule(key, t + i * RESUME_STAGGER_STEP_MS);
+      i += 1;
+    }
+    // 2. every REST feed has a poll pending, in flight, or (parked) a probe
     for (const f of FEED_IDS) {
       if (specs[f].transport !== "rest" || isMirrored(f)) continue;
       if (active.has(f) || scheduler.has(`poll:${f}`)) continue;
       const fh = health.feeds[f];
       if (fh.reason === "bad_symbol") continue;
       if (fh.source === "cache" || fh.source === "tradingview" || fh.reason === "unsupported") continue; // probe below
-      schedulePoll(f, now() + WATCHDOG_REARM_MS + Math.floor(random() * WATCHDOG_REARM_MS), fh.lastDataAt === undefined);
+      schedulePoll(f, t + WATCHDOG_REARM_MS + Math.floor(random() * WATCHDOG_REARM_MS), fh.lastDataAt === undefined);
     }
     if (needsProbe() && !scheduler.has("probe")) scheduleProbe();
+    // 3. data older than the feed's expected cadence while its next poll is far away: re-poll (backoff per feed)
+    kickStale(t, false);
+    // 4. the socket: a lost silent timer, a dead socket without a pending retry, single streams that stalled, holes
+    watchSocket(t);
+  }
+
+  /** Feed is parked on the cache / unsupported / bad symbol: the probe (not a poll) brings it back. */
+  function parked(f: FeedId): boolean {
+    const fh = health.feeds[f];
+    return fh.reason === "bad_symbol" || fh.source === "cache" || fh.source === "tradingview" || fh.reason === "unsupported";
+  }
+
+  /**
+   * Stale-feed watchdog for REST feeds: the data is older than the feed's `staleAfterMs` (on the Binance clock; for
+   * the aligned futures-data series that means "no new point"), or nothing arrived for that long (device clock), and
+   * the next poll is further away than the kick backoff (now → 30 s → 60 s → 2 min → 5 min) → poll then. A feed that
+   * is failing keeps its own retry (≤ 5 min). `resume`: every feed whose data is older than ONE cadence, staggered.
+   */
+  function kickStale(t: number, resuming: boolean): void {
+    if (!health.online && isOnline() === false) return;
+    const sn = serverNow();
+    let i = 0;
+    for (const f of FEED_IDS) {
+      const spec = specs[f];
+      if (spec.transport !== "rest" || isMirrored(f) || parked(f) || active.has(f)) continue;
+      if (f === "fundingHistory" && !resuming) continue; // refreshed on the funding tick; 8 h safety net
+      const fh = health.feeds[f];
+      if (fh.lastDataAt === undefined) continue; // bootstrap pending: the re-arm above covers it
+      if (fh.consecutiveFailures > 0 && scheduler.has(`poll:${f}`)) continue; // its own retry/backoff runs
+      const { cadenceMs, staleAfterMs } = effectiveSpec(spec, fh.source, fh.state);
+      const dataAge = sn - fh.lastDataAt;
+      const quietFor = t - (lastOkAt.get(f) ?? -Infinity);
+      const limit = resuming ? cadenceMs : staleAfterMs;
+      if (dataAge <= limit && quietFor <= limit) continue;
+      const due = scheduler.dueAt(`poll:${f}`);
+      const n = kicks.get(f) ?? 0;
+      const at = t + (resuming ? RESUME_STAGGER_MS + i * RESUME_STAGGER_STEP_MS : watchdogKickMs(n));
+      // a poll that comes soon anyway (e.g. staggered by a resume) is left alone
+      if (due !== undefined && due <= Math.max(at, t + KICK_LEAD_MS)) continue;
+      if (resuming && quietFor <= cadenceMs) continue; // fetched recently, the exchange has no newer point yet
+      kicks.set(f, n + 1);
+      schedulePoll(f, at);
+      i += 1;
+    }
+  }
+
+  /**
+   * WebSocket watchdog (visible tab only): re-arms a lost silent check, reconnects a dead socket that has no retry
+   * armed, fetches a stalled single stream over REST (kline gap fill included) and re-subscribes on a repeat, and
+   * fills holes in the kline tails that the stream left (frames lost during a stall).
+   */
+  function watchSocket(t: number): void {
+    if (hidden() || !chain.includes("binance") || health.primary.blocked || !symbolInfo.valid) return;
+    if (ws.state === "open" && t - ws.lastMessageAt > 2 * WS_SILENT_MS) {
+      ws.nudge(); // the silent timer did not fire (frozen timers)
+      return;
+    }
+    if ((ws.state === "closed" || ws.state === "fallback" || ws.state === "silent" || ws.state === "idle") && !ws.retryPending) {
+      ws.nudge();
+      return;
+    }
+    const alive = ws.state === "open" && t - lastWsMessageAt < SOCKET_ALIVE_MS;
+    if (!alive || wsOpens === 0) return;
+    let stalled = 0;
+    for (const f of WS_FEEDS) {
+      if (f === "bookTop" && !bookTop) continue;
+      if (!wsCovers(f)) continue;
+      const limit = STREAM_STALL_MS[f];
+      if (limit === undefined) continue;
+      const last = lastStreamAt.get(f) ?? wsOpenedAt;
+      if (t - last <= limit) continue;
+      const n = kicks.get(f) ?? 0;
+      const due = scheduler.dueAt(`poll:${f}`);
+      if (due !== undefined && due > t) continue; // a REST fetch for it is already pending
+      if (n > 0 && t - last < limit + watchdogKickMs(n)) continue;
+      kicks.set(f, n + 1);
+      stalled += 1;
+      restDue.add(f);
+      // the REST answer is published (`rest_ok`), the socket stays the source; the poll is not re-armed while WS covers it
+      schedulePoll(f, t + stalled * RESUME_STAGGER_STEP_MS);
+    }
+    if (stalled > 0) {
+      for (let k = 0; k < stalled; k++) streamStalls.push(t);
+      while (streamStalls.length && t - streamStalls[0]! > STREAM_STALL_WINDOW_MS) streamStalls.shift();
+      if (streamStalls.length >= 2) {
+        streamStalls.length = 0;
+        ws.reconnect(); // re-subscribe every stream; the reconnect fills the kline gaps
+      }
+      return;
+    }
+    // holes in the kline tails (frames lost while the socket stalled): fill them over REST
+    for (const f of KLINE_FEEDS) {
+      if (restDue.has(f) || !wsCovers(f) || scheduler.has(`poll:${f}`) || active.has(f)) continue;
+      if (oldestHole(f, HOLE_SCAN_BARS) === undefined) continue;
+      restDue.add(f);
+      schedulePoll(f, t + WATCHDOG_REARM_MS);
+    }
   }
 
   function start(): void {
@@ -919,9 +1241,12 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       return;
     }
     doc?.addEventListener("visibilitychange", onVisibility);
+    doc?.addEventListener("resume", onDocResume);
     win?.addEventListener("online", onOnline);
     win?.addEventListener("offline", onOffline);
     win?.addEventListener("pagehide", onPageHide);
+    win?.addEventListener("pageshow", onPageShow);
+    win?.addEventListener("focus", onFocus);
     void cache.hydrate(FEED_IDS).then((loaded) => {
       if (!started) return;
       for (const f of loaded) {
@@ -950,10 +1275,24 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     bybitCheck = null;
     lastFastProbeAt = -Infinity;
     lastAdvanceCheck.clear();
+    lastOkAt.clear();
+    lastStreamAt.clear();
+    streamStalls.length = 0;
+    kicks.clear();
+    restDue.clear();
+    knownHoles.clear();
+    lastTickAt = -Infinity;
+    lastResumeAt = -Infinity;
+    wsOpenedAt = -Infinity;
+    bans = 0;
+    movedForBan.clear();
     doc?.removeEventListener("visibilitychange", onVisibility);
+    doc?.removeEventListener("resume", onDocResume);
     win?.removeEventListener("online", onOnline);
     win?.removeEventListener("offline", onOffline);
     win?.removeEventListener("pagehide", onPageHide);
+    win?.removeEventListener("pageshow", onPageShow);
+    win?.removeEventListener("focus", onFocus);
     void cache.persistAll();
     wsOpens = 0;
     dispatch({ type: "stop", now: now() });
@@ -994,14 +1333,14 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
         if (isKlineFeed(feed)) {
           const iv: KlineInterval = klineFeedInterval(feed);
           if (client) {
-            if (!budget.take("binance.weight", klineWeight(HISTORY_PAGE_LIMIT), now())) break;
+            if (!budget.take("binance.weight", klineWeight(HISTORY_PAGE_LIMIT), now(), "bulk")) break;
             page = (await client.klines(sym, iv, { limit: HISTORY_PAGE_LIMIT, endTime })) as Stamped<FeedValue[F]>;
           } else if (source === "bybit" && symbolInfo.bybit) {
-            if (!budget.take("bybit.ip", 1, now())) break;
+            if (!budget.take("bybit.ip", 1, now(), "bulk")) break;
             page = (await bybit.klines(symbolInfo.bybit, iv, { limit: 1000, end: endTime })) as Stamped<FeedValue[F]>;
           } else break;
         } else if (client && isFutures) {
-          if (!budget.take("binance.futuresData", 1, now())) break;
+          if (!budget.take("binance.futuresData", 1, now(), "bulk")) break;
           const p = { limit: 500, startTime: Math.max(from, endTime - 500 * specs[feed].cadenceMs), endTime };
           if (feed === "openInterestHist") page = (await client.openInterestHist(sym, feedPeriod, p)) as Stamped<FeedValue[F]>;
           else if (feed === "takerRatio") page = (await client.takerRatio(sym, feedPeriod, p)) as Stamped<FeedValue[F]>;
@@ -1010,7 +1349,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
             page = (await client.ratio(kind, sym, feedPeriod, p)) as Stamped<FeedValue[F]>;
           }
         } else if (client && feed === "fundingHistory") {
-          if (!budget.take("binance.funding", 1, now())) break;
+          if (!budget.take("binance.funding", 1, now(), "bulk")) break;
           page = (await client.fundingRate(sym, { limit: 1000, endTime })) as Stamped<FeedValue[F]>;
         } else break;
       } catch (err) {
@@ -1031,10 +1370,11 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
 
   // ------------------------------------------------------------ one-off kline pages (signal check)
 
-  async function waitBudget(bucket: FeedSpec["cost"]["bucket"], units: number, maxWaitMs: number): Promise<void> {
+  /** Waits for `bulk` tokens (never below the live reserve, see `BULK_RESERVE`). */
+  async function waitBudget(bucket: FeedSpec["cost"]["bucket"], units: number, maxWaitMs: number, cls: BudgetClass = "bulk"): Promise<void> {
     const deadline = now() + maxWaitMs;
-    while (!budget.take(bucket, units, now())) {
-      const wait = Math.max(50, budget.waitFor(bucket, units, now()));
+    while (!budget.take(bucket, units, now(), cls)) {
+      const wait = Math.max(50, budget.waitFor(bucket, units, now(), cls));
       if (now() + wait > deadline) throw new RestError("rate_limited", "Abfrage-Budget erschöpft, gleich nochmal versuchen");
       await new Promise<void>((resolve) => host.setTimeout(resolve, wait));
     }
@@ -1138,6 +1478,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     clearCache: () => cache.clear(),
     dispatch,
     fetchKlines,
+    serverNow,
+    resume: (reason?: string) => resume(reason ?? "manual"),
   };
   return provider;
 }

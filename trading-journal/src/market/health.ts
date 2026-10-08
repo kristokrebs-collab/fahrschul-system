@@ -4,7 +4,8 @@
  *   connecting --rest_ok | ws_message------------------------------> live
  *   live       --tick: now − lastDataAt > staleAfterMs--------------> stale
  *   live|stale --rest_fail×3 | ws_close + 3 failed reconnects
- *              | rest_fail(kind ∈ {blocked_451, cors})--------------> fallback   (next USABLE source in spec.sources)
+ *              | rest_fail(kind ∈ {blocked_451, cors})--------------> fallback   (next USABLE source in spec.sources;
+ *              the usable proxy first for ratio feeds, CORS and rate limits — Binance's own data from another IP)
  *   Binance-family ratio feeds (BINANCE_FAMILY_FEEDS): soft failures never leave Binance's cohort — next source is
  *              the proxy when `proxy.usable === true`, otherwise the feed STAYS on its source (provider retries
  *              with a capped backoff); only blocked_451 hands `globalAccountRatio` to Bybit.
@@ -90,7 +91,9 @@ function nextSource(h: ProviderHealth, spec: FeedSpec, current: Source, exchange
 function advance(h: ProviderHealth, f: FeedHealth, spec: FeedSpec, reason: FailureReason | undefined, detail?: string): FeedHealth {
   const family = isFamilyFeed(f.feed);
   const exchange = !family || reason === "blocked_451";
-  const next = nextSource(h, spec, f.source, exchange, family || reason === "cors");
+  // Binance's own data through the proxy first: ratio feeds (cohort), unreadable responses (CORS), and a rate limit /
+  // IP ban on the direct route (the proxy asks Binance from another IP)
+  const next = nextSource(h, spec, f.source, exchange, family || reason === "cors" || reason === "rate_limited");
   if (next) return { ...f, state: "fallback", source: next, consecutiveFailures: 0, reason, detail };
   if (family && reason !== "blocked_451") return { ...f, reason, detail };
   // blocked and nobody else has this Binance-only series: parked like the top traders on Bybit (`Nur mit Binance`)
@@ -282,6 +285,9 @@ export function reduceHealth(h: ProviderHealth, ev: HealthEvent, specs: Specs): 
 
     case "probe_scheduled":
       return h.primary.nextProbeAt === ev.at ? h : { ...h, primary: { ...h.primary, nextProbeAt: ev.at } };
+
+    case "clock":
+      return (h.clockSkewMs ?? 0) === ev.skewMs ? h : { ...h, clockSkewMs: ev.skewMs };
 
     case "bad_period":
       return mapFeeds(h, (f) => ({ ...f, reason: "bad_period", detail: ev.detail }), specs, ev.feeds);
