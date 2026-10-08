@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { startTransition, useEffect, useMemo, useState } from "react";
 import { create } from "zustand";
 import type { AccountId, DayNote, DayNotes, EnrichedTrade, HyblockReading, Settings, StoreApi, StoreMode, Trade } from "@/domain/types";
 import { enrichTrades } from "@/domain/enrich";
@@ -10,7 +10,7 @@ import { createClaudeDbAdapter, probeClaudeDb } from "./adapters/claudeDbAdapter
 import type { AdapterEvent, StorageAdapter, StorageSnapshot } from "./adapters/StoreApi";
 import { migrate, quarantineToastTitle, readQuarantine, SNAPSHOT_FAILED_TITLE } from "./migrate";
 import { autoBackup } from "./backup";
-import { pushToast } from "./uiStore";
+import { pushToast, useUi } from "./uiStore";
 import { storageStatus, type StorageStatus } from "./storage";
 
 /* ---------------------------------------------------------------- labels */
@@ -140,8 +140,83 @@ export function getAccountView(enriched: EnrichedTrade[], settings: Settings, ac
   return view;
 }
 
+/* ----------------------------------------------------- trades shown in the views */
+
+/**
+ * The trades the views render from. `useJournal` changes synchronously with every write – persisted first, every
+ * `getState()` reader (editor, backup, router) sees the new list at once, nothing waits. The views follow:
+ * - in a React transition (an interruptible background render, never inside the commit of the action that wrote);
+ * - a write made while the trade editor is open (Speichern) is shown once the editor has closed and its sheet has left
+ *   (`PUBLISH_AFTER_CLOSE_MS`): the close and the toast commit alone, the sheet glides back undisturbed, then the
+ *   Übersicht (≈ 2,500 components reading the account view) re-renders – before, that re-render ran inside the save's
+ *   commit and held the sheet's exit back ≈ 300–400 ms on a loaded tablet, and as a transition it still landed mid-exit.
+ * All readers move together (one module-level publisher); a reader that mounts takes the published list.
+ */
+export const PUBLISH_AFTER_CLOSE_MS = 450;
+
+type ShownListener = (trades: Trade[]) => void;
+const shownListeners = new Set<ShownListener>();
+let shownTrades: Trade[] | null = null;
+let publishTimer: ReturnType<typeof setTimeout> | null = null;
+let offEditorWait: (() => void) | null = null;
+
+function shownNow(): Trade[] {
+  return shownTrades ?? useJournal.getState().trades;
+}
+
+function publishTrades(): void {
+  publishTimer = null;
+  const next = useJournal.getState().trades;
+  if (next === shownTrades) return;
+  shownTrades = next;
+  if (shownListeners.size === 0) return;
+  startTransition(() => {
+    for (const l of shownListeners) l(next);
+  });
+}
+
+function cancelPublish(): void {
+  if (publishTimer) clearTimeout(publishTimer);
+  publishTimer = null;
+  offEditorWait?.();
+  offEditorWait = null;
+}
+
+useJournal.subscribe((s, prev) => {
+  if (s.trades === prev.trades || publishTimer || offEditorWait) return;
+  if (!useUi.getState().editor.open) {
+    publishTrades();
+    return;
+  }
+  offEditorWait = useUi.subscribe((ui) => {
+    if (ui.editor.open) return;
+    offEditorWait?.();
+    offEditorWait = null;
+    publishTimer = setTimeout(publishTrades, PUBLISH_AFTER_CLOSE_MS);
+  });
+});
+
+/** The trades the views render (see above). */
+export function useShownTrades(): Trade[] {
+  const [shown, setShown] = useState(shownNow);
+  useEffect(() => {
+    const listener: ShownListener = (next) => setShown(next);
+    shownListeners.add(listener);
+    // published while this reader was not listening (between render and this effect, or while a keep-alive page was
+    // hidden): catch up now
+    queueMicrotask(() => {
+      const now = shownNow();
+      setShown((cur) => (cur === now ? cur : now));
+    });
+    return () => {
+      shownListeners.delete(listener);
+    };
+  }, []);
+  return shown;
+}
+
 export function useEnriched(): EnrichedTrade[] {
-  const trades = useJournal((s) => s.trades);
+  const trades = useShownTrades();
   const settings = useJournal((s) => s.settings);
   return useMemo(() => getEnriched(trades, settings), [trades, settings]);
 }
@@ -270,6 +345,8 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
 
 /** Tears the adapter down and resets the store (tests, hot reload). */
 export function resetJournal(): void {
+  cancelPublish();
+  shownTrades = null;
   unsubscribeAdapter?.();
   adapter?.dispose();
   adapter = null;

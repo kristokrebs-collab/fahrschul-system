@@ -56,6 +56,10 @@ const { trades, settings, hyblock, days, mode, loaded, storage, api, quarantined
 useJournal((s) => s.mode);                                   // selector form
 const enriched = useEnriched();                              // EnrichedTrade[], memoised (WeakMap on trades+settings)
 const view = useAccountView("all" | "makro" | "scalp");      // AccountView from @/domain/account, memoised
+const shown = useShownTrades();                               // the trades the views render (both hooks above use it):
+// `useJournal().trades` / getState() change synchronously with every write (persisted first); the views follow in a
+// React transition, and a write made while the trade editor is open is shown PUBLISH_AFTER_CLOSE_MS (450 ms) after the
+// editor closed – the close + toast commit alone, the sheet leaves undisturbed, then the Übersicht re-renders
 const readings = useReadings();                              // HyblockReading[] sorted by `at`
 getEnriched(trades, settings); getAccountView(enriched, settings, acc); // non-hook variants
 
