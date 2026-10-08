@@ -22,6 +22,7 @@ import { CURRENCIES, changedKeys, draftToSettings, settingsToDraft, type DraftKe
 import { DraftField } from "./fields";
 import { ChangedDot, SaveButton, useActionPhase, type ActionPhase } from "./fx";
 import { HyblockConnectorCard, type HyblockTestConfig } from "./HyblockConnectorCard";
+import { LageCard } from "./LageCard";
 import { LimitsCard } from "./LimitsCard";
 import { LiveDataCard } from "./LiveDataCard";
 import { MistakesCard } from "./MistakesCard";
@@ -242,6 +243,11 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
         {/* `Card` puts `className` on its inner surface, so a full-width card needs a spanning grid item around it */}
         <div className="min-w-0 lg:col-span-2">
           <SignalCheckCard draft={draft} onChange={set} onPatch={patch} changed={changed} invalid={invalidField} />
+        </div>
+
+        {/* Lage-Ampel (decision 23): applied at once, `settings.signals.lage` */}
+        <div className="min-w-0 lg:col-span-2">
+          <LageCard />
         </div>
 
         <div className="min-w-0 lg:col-span-2">
