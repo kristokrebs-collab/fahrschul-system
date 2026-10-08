@@ -173,7 +173,8 @@ const BiasTrack = memo(function BiasTrack({ score, firm, compact = false, empty 
         ))}
       <span className={cn("absolute left-1/2 top-1/2 w-px -translate-x-1/2 -translate-y-1/2 bg-white/40", compact ? "h-3" : "h-5")} />
       {!empty && (
-        <motion.span className="absolute inset-y-0 left-0 w-full" style={{ x }} data-testid={compact ? undefined : "bias-needle"}>
+        // its own compositor layer: the needle's spring moves it without repainting the track and its halos
+        <motion.span className="absolute inset-y-0 left-0 w-full will-change-transform" style={{ x }} data-testid={compact ? undefined : "bias-needle"}>
           {!compact && (
             <>
               <motion.span className="absolute left-0 top-1/2 size-7 -translate-x-1/2 -translate-y-1/2 rounded-full bg-win/35 blur-md" style={{ opacity: winHalo }} />

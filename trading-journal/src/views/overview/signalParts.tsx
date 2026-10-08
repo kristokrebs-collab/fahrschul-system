@@ -554,9 +554,11 @@ export const ZoneGauge = memo(function ZoneGauge({ c, side }: { c: TfCheck | nul
         <Badge tone={good ? (side === "long" ? "win" : "loss") : "mute"}>{zonePillText(z)}</Badge>
       </div>
       {/* price label row above the bar (its own band: it never covers the header or the range prices) */}
+      {/* marker and label follow every tick on their own compositor layers (a move never repaints the card; a new price
+          repaints the label's small layer only) */}
       <div className="relative mt-3 h-4 overflow-x-clip" aria-hidden="true">
-        <motion.span className="absolute inset-y-0 left-0 w-full" style={{ x }}>
-          <motion.span className="num absolute left-0 top-0 whitespace-nowrap font-mono text-[10.5px] leading-4 text-fg" style={{ x: labelX }}>
+        <motion.span className="absolute inset-y-0 left-0 w-full will-change-transform" style={{ x }}>
+          <motion.span className="num absolute left-0 top-0 whitespace-nowrap font-mono text-[10.5px] leading-4 text-fg will-change-transform [contain:layout_paint]" style={{ x: labelX }}>
             {priceText}
           </motion.span>
         </motion.span>
@@ -567,7 +569,7 @@ export const ZoneGauge = memo(function ZoneGauge({ c, side }: { c: TfCheck | nul
         <div className="absolute inset-y-0 left-0 w-[5%] bg-win/35" />
         <div className="absolute inset-y-0 right-0 w-[5%] bg-loss/35" />
         <div className="absolute inset-y-0 left-[47.5%] w-[5%] bg-white/[0.07]" />
-        <motion.span className="absolute inset-y-0 left-0 w-full" style={{ x }} aria-hidden="true">
+        <motion.span className="absolute inset-y-0 left-0 w-full will-change-transform" style={{ x }} aria-hidden="true">
           <span className="absolute inset-y-1 left-0 w-[3px] -translate-x-1/2 rounded-full bg-fg shadow-[0_0_0_3px_rgb(4_4_4/0.6)]" />
         </motion.span>
       </div>
