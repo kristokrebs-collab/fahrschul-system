@@ -69,11 +69,17 @@ export function dayGeometry(bars: readonly Candle[], w: number, h: number): DayG
 }
 
 export const DayRange = memo(function DayRange({ className }: { className?: string }) {
-  const reduced = useReducedFx();
-  const id = useId().replace(/:/g, "");
   const key = useFeedSelect("kline_15m", klineBarKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the feed's change signal (bar appended / closed)
   const bars = useMemo(() => lastDayBars(getFeed("kline_15m")?.data ?? []), [key]);
+  // no 15m history (a fallback source without it, still loading): no empty titled box — the panel keeps its old layout
+  if (bars.length < 2) return null;
+  return <DayChart bars={bars} className={className} />;
+});
+
+const DayChart = memo(function DayChart({ bars, className }: { bars: Candle[]; className?: string }) {
+  const reduced = useReducedFx();
+  const id = useId().replace(/:/g, "");
   const box = useRef<HTMLDivElement>(null);
   const size = useBoxSize(box);
   const geo = useMemo(() => (size ? dayGeometry(bars, size.w, size.h) : null), [bars, size]);

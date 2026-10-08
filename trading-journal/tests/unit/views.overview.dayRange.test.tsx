@@ -29,9 +29,9 @@ describe("DayRange", () => {
     expect(dayGeometry([bar(0, 1)], 100, 100)).toBeNull();
   });
 
-  it("renders its title without market data (no line, no dot)", () => {
-    render(<DayRange />);
-    expect(screen.getByText(DAY_RANGE_TITLE)).toBeTruthy();
-    expect(screen.getByTestId("day-range").querySelector("svg")).toBeNull();
+  it("renders nothing without 15m history (no empty titled box)", () => {
+    const { container } = render(<DayRange />);
+    expect(container.innerHTML).toBe("");
+    expect(screen.queryByText(DAY_RANGE_TITLE)).toBeNull();
   });
 });
