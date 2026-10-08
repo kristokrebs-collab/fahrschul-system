@@ -19,7 +19,7 @@ import { computeSignals, sanitizeSignalCfg, parseSignalSnapshot, toSignalSnapsho
 | Piece | Rule |
 |---|---|
 | WaveTrend (MCB "close 9/21/2") | `esa = ema(src, 9)`, `de = ema(|src − esa|, 9)`, `ci = (src − esa)/(0.015·de)`, `wt1 = ema(ci, 21)`, `wt2 = sma(wt1, 2)`; EMA seeded with the first value |
-| MCB events (`wtSignal`) | over the last `signalLookback` (3) bars incl. the running one: **Bottom/Top** = wt1 and close turn out of a new `revRange` (28)-bar low/high; **Kauf/Verkauf** (`buy`/`sell`) = wt1 crosses wt2 at ≤ −53 / ≥ 53; small crosses `bull`/`bear` only on the right side of zero. Strongest per direction: bottom/top 3 > buy/sell 2 > bull/bear 1 |
+| MCB events (`wtSignal`) | over the last `signalLookback` (3) bars incl. the running one: **Bottom/Top** = wt1 and close turn out of a new `revRange` (28)-bar low/high; **Kauf/Verkauf** (`buy`/`sell`) = wt1 crosses wt2 at ≤ −53 / ≥ 53; small crosses `bull`/`bear` ("Kreuz" in the UI, since 2026-10-08; before "Einstieg", which the user mixed up with the Bottom) only on the right side of zero. Strongest per direction: bottom/top 3 > buy/sell 2 > bull/bear 1 |
 | RSI | Wilder (`ta.rsi`), 14; `rsiLong = rsi ≤ rsiOs + rsiNear` (≤ 40), `rsiShort = rsi ≥ rsiOb − rsiNear` (≥ 60); `rsiMa = sma(rsi, 14)` (display) |
 | Premium/Discount (LuxAlgo) | `luxZone`: swing pivots of size `swingLookback` (50), trailing extremes since the last pivot, BOS/CHoCH; fallback `pdZone` (range of the last 120 bars). `discount` < 47.5 % ≤ `equilibrium` ≤ 52.5 % < `premium`; `deep` = outer 5 % (the LuxAlgo boxes) |
 | `checkTf` | `null` below 150 bars ("Zu wenig Kerzen") |
@@ -213,7 +213,7 @@ number | null, met: boolean | null (null = keine Daten) }`.
 | part | long (short mirrored) | grade | ok |
 |---|---|---|---|
 | `traders` Top-Trader-Kombi (`traders.ts`, decision 5) — title `Top-Trader long · Retail rot` / `Top-Trader short · Retail grün` | items `pos` top traders by POSITION long share > `topPct` (64 %; short: < 100 − topPct = > 64 % short, the exact mirror) · `acc` top traders by ACCOUNT likewise · `retail` the Whale–Retail-Delta (see below) red: below `deltaRed` (0 pp) OR fell ≥ `deltaFall` (1 pp) over `deltaWindow` (1h) = Retail rot (short: above −`deltaRed` OR rose ≥ `deltaFall` = grün) · `zone` price in Discount on the check's zone reference (short: Premium). Values `66,0 % Long`, `−3,5 pp · 1h −2,1`, `Discount · 20 %`; the `retail` item's label `Whale–Retail-Delta rot · < 0 oder fällt ≥ 1 pp (1h)`, `raw` = the delta | met / 4 | ≥ `bonusParts` (3) met |
-| `div` Bullische / Bärische Divergenz (`divergence.ts`, decision 10) | one item per ladder rung: active divergences of that side (`RSI regulär · WT versteckt`) | best rung: regular 0.8, hidden 0.5, + 0.2 when RSI and wt1 both show one, provisional ½ | grade ≥ 0.8 (a closed regular one) |
+| `div` Bullische / Bärische Divergenz (`divergence.ts`, decisions 10 + 17) | one item per ladder rung: active divergences of that side and the RSI trendline break (`RSI regulär · WT versteckt`, `RSI regulär · Trendlinie`, `RSI-Trendlinienbruch`) | best rung: regular 0.8, hidden 0.5, + 0.2 when RSI and wt1 both show one, + 0.2 for an RSI trendline break (`TREND_BREAK_GRADE`; alone 0.2), provisional ½ | a regular divergence on a closed candle on any rung (a trendline break alone never) |
 | `sr` Support + Platz nach oben / Widerstand + Platz nach unten (`structure.ts`, decision 10) | `near`: nearest support / demand below the close within `nearAtr` (1) ATR 14 · `room`: R = distance to the next resistance / (close − stop), stop = the level's bottom − 0.1 ATR; ≥ `minR` (2) R; no resistance = free | ½ near (fades to 0 at 2 × nearAtr) + ½ min(1, R / minR) | near AND room |
 
 `TraderReading = { at, position, account, retail, retailPrev, retailChg, period, step, delta?, deltaPrev?, deltaChg?,
@@ -240,15 +240,28 @@ reading needs: `traderLookbackMs(cfg)` = max(retailPeriod, deltaWindow, 12 steps
 
 ### Divergences (`divergence.ts`)
 
-MCB / WeloTrades style: oscillator fractals (`left` 2 bars lower/higher before, `right` 2 not lower/higher after; known `right`
-bars later = the confirmation bar), compared with the previous pivot of the same kind `rangeMin` … `rangeMax` (3 … 60) bars
-earlier; `midline` (on): bullish pivots below 50 (RSI) / 0 (wt1), bearish above. Regular bullish = price (bar low) lower low +
-oscillator higher low; hidden bullish = price higher low + oscillator lower low; bearish mirrored (bar highs). State:
-provisional while the confirmation bar forms, confirmed after its close, strong after `strongCloses` closes with the pivot held
-(bullish: no later close below the pivot low). `active` = held and confirmed at most `maxAge` (5) bars ago.
+Read the way a trader reads them (reworked after the TradingView check of 2026-10-08 13:30 UTC, decision 17 — see
+[§ v3](#v3-tv-check-2026-10-08-intrabar-memory-turn-price-1m-frames-divergences-like-a-trader)): oscillator fractals (`left` 5
+bars lower/higher before, `right` 2 not lower/higher after; known `right` bars later = the confirmation bar; the MCB fractal 2 / 2
+found a pivot every few bars and compared the wrong pair), compared with EVERY earlier pivot of the same kind `rangeMin` …
+`rangeMax` (3 … 60) bars earlier whose oscillator line to the new pivot is clean (no value between them across the line); the most
+significant partner wins (regular → the lowest / highest oscillator value, hidden → the lowest / highest price; regular before
+hidden, one per pivot); `midline` (on): bullish pivots below 50 (RSI) / 0 (wt1), bearish above. Regular bullish = price (bar low)
+lower low + oscillator higher low; hidden bullish = price higher low + oscillator lower low; bearish mirrored (bar highs). Live
+(the last bar forms) the newest pivots are candidates before their `right` bars are there — down to the forming candle itself
+(right 0: lowest of the last `left` bars, nothing after it lower): `provisional`, ½. State: provisional while the confirmation
+bar forms (or is not there yet), confirmed after its close, strong after `strongCloses` closes with the pivot held (bullish: no
+later close below the pivot low). `active` = "bis zum Bruch": held, and confirmed at most `maxAge` bars ago — `maxAge` 0 (the
+default) = only the cap `rangeMax` (`divActiveBars`). RSI trendline break (`trendline`, on): the falling line through the newest
+pair of consecutive RSI pivot highs that falls (clean, ≤ `rangeMax` apart) broken by a close above it (`rsiTrendBreak`; short:
+the rising line through two lows broken downward); on the forming candle `provisional`; active ≤ `TREND_BREAK_BARS` (10) bars
+unless the RSI closes back across the line.
 `Divergence = { osc: "rsi" | "wt", kind: "regular" | "hidden", dir: 1 | -1, from / to: { index, t (s), price, osc }, at, barsAgo,
-state, held, active }`; `TfCheck.div = { all (oldest first, chart lines), long, short (active, newest first) }`.
-Settings `settings.signals.div = { on, rsi, wt, hidden, left, right, rangeMin, rangeMax, maxAge, midline, weight }`.
+state, held, active }`; `TrendBreak = { osc: "rsi", dir, from / to (the pivots), index, t, value, line, at, barsAgo, state,
+active }`; `TfCheck.div = { all (oldest first, chart lines), long, short (active, newest first), trend?: { long, short } (active
+breaks) }`. Settings `settings.signals.div = { on, rsi, wt, hidden, trendline, left, right, rangeMin, rangeMax, maxAge,
+midline, weight, v }`: defaults 5 / 2, maxAge 0, trendline on; an object without `v: 2` (`DIV_CFG_VERSION`) holding the former
+defaults left 2 / maxAge 5 (the settings card wrote every key) is read with today's; the next save writes `v: 2`.
 
 ### Market structure + support / resistance (`structure.ts`)
 
@@ -271,7 +284,7 @@ Einstiegs-Check (single source of truth). The former "Preis in Support-/Liquidit
 | id | met (long; short mirrored) |
 |---|---|
 | `structure` Erstes Higher Low oder BOS auf 1H/4H | on 1h or 4h (`KNIFE_TFS`): the newest internal low is the first HL after an LL and unbroken, OR the newest break is bullish (BOS / CHoCH, internal or swing) and ≤ `KNIFE_BREAK_MAX_AGE` (20) bars old — judged on CLOSED bars (`TfCheck.structureClosed`, the structure without the forming candle); a break or pivot only on the running candle is listed as `… (vorläufig)` and does not count |
-| `divergence` RSI bullische Divergenz | an active REGULAR bullish RSI divergence on a closed candle on any ladder rung (WT / hidden listed in `detail` only) |
+| `divergence` RSI bullische Divergenz oder Trendlinienbruch | an active REGULAR bullish RSI divergence on a closed candle, OR a falling RSI trendline broken on a close, on any ladder rung (WT / hidden / provisional listed in `detail` only) |
 | `whale` Top-Trader long · Whale–Retail-Delta rot (short: … grün) | the Top-Trader-Kombi's own items: (positions OR accounts > topPct) AND the delta red (negative or falling, the `retail` item); detail `3 von 4 · Positionen 66,0 % Long · Konten 65,2 % Long · Delta −3,5 pp · 1h −2,1`; `null` without a reading |
 
 Copy: `KNIFE_TITLE`, `KNIFE_INFO` (filter = safety check for macro longs, Einstiegs-Check = trigger, same live data).
@@ -308,3 +321,24 @@ fields, keeps unknown keys. `snapshotPart(p)` = the stored form of a part.
   { time (ms), price, osc }, confirmedAt, barsAgo, state, active }[]` (oldest first; `[]` when `div.on` is off);
   `getStructure(interval, { bars? })` → `ChartStructure { swings, breaks (pivotTime), obs (breakTime), eqs, supports,
   resistances, support, resistance (ChartLevel: Level with `time` ms, `null` for the range), trend, itrend, atr, close }`.
+
+## v3: tv-check 2026-10-08 (intrabar memory, turn price, 1m frames, divergences like a trader)
+
+The user's screen of 13:30 UTC ("Bullische Divergenz: keine" on every rung; 1h / 4h MCB "kein Signal" while his chart showed
+green) rebuilt from real BINANCE:BTCUSDT.P / BITSTAMP:BTCUSD bars (`…/scratchpad/merge/tvcheck/REPORT.md`). Fixture
+`tests/fixtures/tv-btcusdt-p-2026-10-08.json` (closed 1h / 4h bars + 1m bars to rebuild the forming candles minute by minute),
+tests `tests/unit/signals.tvCheck.test.ts`.
+
+| proposal | what | where |
+|---|---|---|
+| 1 intrabar memory | per rung and side the strongest event seen on the CURRENT forming candle (kind, first / last sighting, price): the card shows it greyed while it is gone (`◌ Kaufsignal · intrabar`, `13:11–13:25 · bei 82.466 · nicht gehalten`), dropped at the close; never counted (verdict, score, bias) | `intrabar.ts` (`noteIntrabar`, `intrabarOf`), engine `LiveSignals.intrabar`, `signalView.intrabarView` |
+| 2 turn price | `wtTurn(bars, cfg)`: the close at which the forming candle's wt1 crosses wt2 (bisection over the O(1) last-bar WaveTrend, < 0.05 ms) + whether a cross can happen on this candle (`up` / `down`: wt1 on the other side of wt2 one bar earlier). Shown on the MCB meter (`−57,4 · dreht ab 82.447`, narrow `↗ 82.447`) while nothing of that side lights the rung and the cross would count (long below zero). 13:30: 1h 82 447, 4h 82 736 (price 82 415) | `mcb.ts`, engine `LiveSignals.turns`, `signalView.turnView` |
+| 3 1m frames | the live engine completes the forming candles with the price taken at the last minute boundary (+ 1 s) and recomputes only on a new frame or a change of the CLOSED history / Top-Trader series / config — no per-tick flicker of vorläufig states; ≤ 1 run/s kept, countdowns on the clock | `src/market/signals/engine.ts` (`SIGNAL_FRAME_MS`, `SIGNAL_FRAME_GRACE_MS`) |
+| 4 pivots | 5 / 2, every earlier pivot within `rangeMax` (clean line, most significant): the 1h regular bullish RSI divergence 10-07 14:00 → 10-08 04:00 (RSI 21,1 → 28,7, low 82 889 → 82 150) is found | `divergence.ts` |
+| 5 validity | active until the pivot breaks on a close (cap `rangeMax`): that divergence counts from its confirmation (07:00) until the 14:00 close (82 145) breaks 82 150 | `divergence.ts`, `config.ts` (`maxAge` 0) |
+| 6 provisional | candidates on the newest bars (down to the forming candle) are `provisional` (½, "RSI regulär · vorläufig"), confirmed after `right` closes | `divergence.ts` |
+| 7 trendline | RSI trendline break, +0,2 in the divergence part (provisional +0,1), its own line in the card (`1h · RSI-Trendlinienbruch nach oben (fallende Linie) · vor 2 Kerzen`), a Falling-Knife point. No RSI pane exists on the chart, so no line is drawn there | `divergence.ts` (`rsiTrendBreak`), `parts.ts`, `knife.ts`, `signalParts.tsx` |
+| 8 wording | the small cross is "Kreuz" (KIND_TEXT, strip, info panel); Bottom stays "Bottom" (the reasons keep "MCB Bottom/Einstieg") | `copy.ts` |
+
+MCB rule and TradingView calibration unchanged (`signals.tvCalibration.test.ts`); `midline` and `hidden` stay on.
+
