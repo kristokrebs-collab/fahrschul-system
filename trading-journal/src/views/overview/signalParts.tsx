@@ -30,6 +30,7 @@ import { rollDirection } from "@/primitives/StatTile";
 import {
   divHitLine,
   divSetupText,
+  divTrendLine,
   labelParts,
   meterPct,
   PROV_COLOR,
@@ -45,9 +46,11 @@ import {
   verdictState,
   verdictText,
   zonePosition,
+  type IntrabarView,
   type PartCell,
   type PartView,
   type RungView,
+  type TurnView,
   type StateLineView,
 } from "./signalView";
 
@@ -214,7 +217,7 @@ export interface MeterProps {
   /** value in the side's extreme band → marker and number take the side colour */
   active: boolean;
   side: Side;
-  sub?: string;
+  sub?: ReactNode;
   /** thin tick marks (e.g. RSI 30 / 70) */
   ticks?: readonly number[];
   /** the number shown (default `n1(value)`) */
@@ -338,6 +341,65 @@ function RungStateLine({ rung, side }: { rung: RungView; side: Side }) {
   );
 }
 
+/** Dashed neutral ring: an event that was on the forming candle and is gone (intrabar memory, never counted). */
+export function GhostDot({ size = 10 }: { size?: number }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 10 10" className="block shrink-0" style={{ width: size, height: size }}>
+      <circle cx="5" cy="5" r="4" fill="none" stroke="#6f6f6f" strokeWidth="1.5" strokeDasharray="2.1 1.55" />
+    </svg>
+  );
+}
+
+/**
+ * Intrabar memory in the event row: `◌ Kaufsignal · intrabar` greyed — the forming candle showed it earlier and the
+ * price took it back (tv-check 2026-10-08: the 1h Kaufsignal 13:11–13:25, gone at 13:26). Never counted.
+ */
+function IntrabarRow({ ib }: { ib: IntrabarView }) {
+  return (
+    <div className="mt-3 flex items-center justify-between gap-2" data-testid="signal-rung-intrabar" data-kind={ib.kind} title={ib.aria}>
+      <span className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-faint">
+        <span className="grid size-2.5 shrink-0 place-items-center">
+          <GhostDot />
+        </span>
+        <span className="truncate">
+          <span className="sr-only">{ib.aria}</span>
+          <span aria-hidden="true">{ib.text}</span>
+        </span>
+      </span>
+      <span aria-hidden="true" className="shrink-0 text-[10.5px] text-faint">
+        intrabar
+      </span>
+    </div>
+  );
+}
+
+/** Its line (the state line's slot, same height): `13:11–13:25 · bei 82.466 · nicht gehalten` (words where the tile is wide enough). */
+function IntrabarLine({ ib }: { ib: IntrabarView }) {
+  return (
+    <span aria-hidden="true" className="mt-1.5 flex min-h-4 items-center gap-1 whitespace-nowrap text-[10.5px] leading-4 text-faint" data-testid="signal-rung-intrabar-span">
+      <span className="num">{ib.span}</span>
+      <span className="text-faint/60">·</span>
+      <span className="hidden @[12.5rem]/rung:inline">bei</span>
+      <span className="num">{ib.price}</span>
+      <span className="hidden @[15.5rem]/rung:inline">· nicht gehalten</span>
+    </span>
+  );
+}
+
+/** MCB meter's side note: `↗ 82.447` (narrow) / `· dreht ab 82.447` — the close at which the forming candle's MCB crosses. */
+function TurnSub({ turn, side }: { turn: TurnView; side: Side }) {
+  return (
+    <span data-testid="signal-rung-turn" data-kind={turn.kind} title={turn.aria}>
+      <span className="sr-only">{turn.aria}</span>
+      <span aria-hidden="true">
+        <span className="@[12.5rem]/rung:hidden">{side === "long" ? "↗" : "↘"} </span>
+        <span className="hidden @[12.5rem]/rung:inline">· dreht ab </span>
+        {turn.value}
+      </span>
+    </span>
+  );
+}
+
 export interface RungTileProps {
   rung: RungView;
   side: Side;
@@ -396,14 +458,18 @@ export const RungTile = memo(function RungTile({ rung, side, cfg, fresh }: RungT
         <p className="mt-3 text-[11.5px] text-faint">{TOO_FEW_BARS}</p>
       ) : (
         <>
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <span className={cn("inline-flex min-w-0 items-center gap-1.5 text-[12px] font-semibold transition-colors duration-300", eventTone)}>
-              <EventDot rung={rung} side={side} fresh={fresh} />
-              <span className="truncate">{rung.text}</span>
-            </span>
-            {rung.event && <span className="shrink-0 text-[10.5px] text-faint">{ageText(rung.event.barsAgo)}</span>}
-          </div>
-          <RungStateLine rung={rung} side={side} />
+          {rung.intrabar ? (
+            <IntrabarRow ib={rung.intrabar} />
+          ) : (
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <span className={cn("inline-flex min-w-0 items-center gap-1.5 text-[12px] font-semibold transition-colors duration-300", eventTone)}>
+                <EventDot rung={rung} side={side} fresh={fresh} />
+                <span className="truncate">{rung.text}</span>
+              </span>
+              {rung.event && <span className="shrink-0 text-[10.5px] text-faint">{ageText(rung.event.barsAgo)}</span>}
+            </div>
+          )}
+          {rung.intrabar ? <IntrabarLine ib={rung.intrabar} /> : <RungStateLine rung={rung} side={side} />}
           <Meter
             label="MCB"
             value={c.wt.wt1}
@@ -416,6 +482,7 @@ export const RungTile = memo(function RungTile({ rung, side, cfg, fresh }: RungT
             active={rung.match}
             prov={rung.match && rung.state === "provisional"}
             side={side}
+            sub={rung.turn ? <TurnSub turn={rung.turn} side={side} /> : undefined}
           />
           <Meter
             label="RSI"
@@ -772,21 +839,26 @@ function TradersCard({ pv, side, cfg, wide }: { pv: PartView; side: Side; cfg: S
 /** Divergences (decision 10): one row per ladder rung (what, which timeframe) and the best hit (where). */
 function DivCard({ pv, side, cfg }: { pv: PartView; side: Side; cfg: SignalCfg }) {
   const hits = pv.part.hits ?? [];
+  const trends = pv.part.trends ?? [];
   const line = divHitLine(pv.part);
+  const tl = divTrendLine(pv.part);
   return (
     <PartShell pv={pv} side={side} testId="signal-div">
       <ul className="mt-2.5 grid gap-1" aria-label="Divergenzen je Timeframe">
         {pv.part.items.map((it) => {
           const own = hits.filter((h) => h.tf === it.id);
-          const st: SignalState = !it.met ? "none" : own.some((h) => h.state !== "provisional") ? "confirmed" : "provisional";
+          const ownTl = trends.filter((t) => t.tf === it.id);
+          const firm = own.some((h) => h.state !== "provisional") || ownTl.some((t) => t.state !== "provisional");
+          const st: SignalState = !it.met ? "none" : firm ? "confirmed" : "provisional";
           const regular = own.some((h) => h.kind === "regular");
           return (
-            <li key={it.id} className="grid grid-cols-[auto_2.5rem_minmax(0,1fr)] items-center gap-2 text-[11.5px] leading-5" data-testid="signal-div-row" data-tf={it.id} data-state={st}>
-              <span className="grid size-2.5 place-items-center">
+            <li key={it.id} className="grid grid-cols-[auto_2.5rem_minmax(0,1fr)] items-start gap-2 text-[11.5px] leading-5" data-testid="signal-div-row" data-tf={it.id} data-state={st} data-trend={ownTl.length ? "1" : undefined}>
+              <span className="grid h-5 w-2.5 place-items-center">
                 <StateDot tone={it.met ? side : null} strong={regular} state={st === "none" ? "confirmed" : st} lit={false} size={7} />
               </span>
               <span className={cn("num font-mono", it.met ? "text-fg" : "text-mute")}>{it.label}</span>
-              <span className={cn("min-w-0 truncate", it.met ? (st === "provisional" ? PROV_TEXT[side] : SIDE_TEXT[side]) : it.met === null ? "text-faint" : "text-mute")}>
+              {/* wraps instead of being cut (RSI + WT + Trendlinie on a 390-px phone) */}
+              <span className={cn("min-w-0 [text-wrap:pretty]", it.met ? (st === "provisional" ? PROV_TEXT[side] : SIDE_TEXT[side]) : it.met === null ? "text-faint" : "text-mute")}>
                 <span className="sr-only">{it.met ? "erfüllt: " : it.met === null ? "keine Daten: " : "offen: "}</span>
                 {it.value}
               </span>
@@ -794,9 +866,10 @@ function DivCard({ pv, side, cfg }: { pv: PartView; side: Side; cfg: SignalCfg }
           );
         })}
       </ul>
-      <p className="mt-auto pt-2 text-[11px] leading-snug text-faint" data-testid="signal-div-hit">
-        {line ?? divSetupText(cfg)}
-      </p>
+      <div className="mt-auto grid gap-0.5 pt-2 text-[11px] leading-snug text-faint">
+        {tl && <p data-testid="signal-div-trend">{tl}</p>}
+        <p data-testid="signal-div-hit">{line ?? divSetupText(cfg)}</p>
+      </div>
     </PartShell>
   );
 }

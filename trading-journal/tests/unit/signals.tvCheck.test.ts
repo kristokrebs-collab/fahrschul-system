@@ -253,13 +253,13 @@ describe("RSI trendline break (proposal 7)", () => {
     expect(divGrade([], tb())).toBeCloseTo(0.2, 9);
     expect(divGrade([], tb({ state: "provisional" }))).toBeCloseTo(0.1, 9);
     expect(divGrade([], tb({ active: false }))).toBe(0);
-    expect(divRungText([], tb())).toBe("RSI-Trendlinie gebrochen");
-    expect(divRungText([], tb({ state: "provisional" }))).toBe("RSI-Trendlinie gebrochen · vorläufig");
+    expect(divRungText([], tb())).toBe("RSI-Trendlinienbruch");
+    expect(divRungText([], tb({ state: "provisional" }))).toBe("RSI-Trendlinienbruch · vorläufig");
     const c = { tf: "1h", div: { all: [], long: [], short: [], trend: { long: tb(), short: null } } } as unknown as TfCheck;
     const p = divPart("long", [c], { div: DIV, ladder: ["1h"] })!;
     expect(p).toMatchObject({ grade: 0.2, ok: false, bonus: false, tf: "1h", state: "confirmed" });
     expect(p.trends).toHaveLength(1);
-    expect(p.items[0]).toMatchObject({ value: "RSI-Trendlinie gebrochen", met: true });
+    expect(p.items[0]).toMatchObject({ value: "RSI-Trendlinienbruch", met: true });
   });
 
   it("real data, 1h at 13:30: the rising RSI line through 10-07 14:00 and 10-08 04:00 broke with the 12:00 close (short side)", () => {

@@ -139,7 +139,7 @@ export function tradersPart(side: Side, reading: TraderReading | null | undefine
 const OSC_TEXT = { rsi: "RSI", wt: "WT" } as const;
 const KIND_TEXT = { regular: "regulär", hidden: "versteckt" } as const;
 /** Short word of an RSI trendline break (the side says which line: falling for long, rising for short). */
-export const TREND_BREAK_TEXT = "RSI-Trendlinie gebrochen";
+export const TREND_BREAK_TEXT = "RSI-Trendlinienbruch";
 
 /** `RSI regulär · WT versteckt` (RSI first, regular first; + ` · vorläufig` when every hit is provisional). */
 export function divHitsText(hits: readonly Divergence[]): string {
@@ -155,7 +155,7 @@ export function divHitsText(hits: readonly Divergence[]): string {
 
 /**
  * Row text of a rung: the hits (`divHitsText`) and an active RSI trendline break — `RSI regulär · Trendlinie`,
- * `RSI-Trendlinie gebrochen`, `RSI-Trendlinie gebrochen · vorläufig`, `keine`.
+ * `RSI-Trendlinienbruch`, `RSI-Trendlinienbruch · vorläufig`, `keine`.
  */
 export function divRungText(hits: readonly Divergence[], trend?: TrendBreak | null): string {
   const tl = trend?.active ? trend : null;

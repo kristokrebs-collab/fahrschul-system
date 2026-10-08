@@ -11,6 +11,8 @@
 import {
   deltaRuleText,
   divCfgOf,
+  divValidityText,
+  intrabarOf,
   isLongKind,
   isStrongKind,
   kindText,
@@ -24,6 +26,8 @@ import {
   whaleCfgOf,
   type Divergence,
   type GradedPart,
+  type IntrabarMemo,
+  type TrendBreak,
   type PartId,
   type Side,
   type SignalCfg,
@@ -32,6 +36,7 @@ import {
   type TfCheck,
   type Verdict,
   type WtKind,
+  type WtTurn,
   type ZoneInfo,
 } from "@/domain/signals";
 import type { SignalCheckState } from "@/market";
@@ -68,10 +73,71 @@ export interface RungView {
   closesAt: number | null;
   /** closed candles since the deciding event, counting its own close (0 = on the forming candle) */
   closes: number;
+  /** MCB turn price of the forming candle for this side while nothing lights the rung (`null` otherwise) */
+  turn: TurnView | null;
+  /** an event of this side that came and went on the forming candle (greyed, never counted), `null` otherwise */
+  intrabar: IntrabarView | null;
+}
+
+/** "dreht ab 82.447": the close at which the forming candle's MCB crosses for the side (long: up, short: down). */
+export interface TurnView {
+  price: number;
+  /** `82.447` */
+  value: string;
+  /** what the cross would be: Kaufsignal / Kreuz (long), Verkaufssignal / Kreuz Short (short) */
+  kind: WtKind;
+  /** `MCB dreht ab 82.447 nach oben (Kaufsignal)` */
+  aria: string;
+}
+
+/** A forming-candle event that is gone now: `Kaufsignal intrabar 13:11–13:25 bei 82.466 · aktuell nicht gehalten`. */
+export interface IntrabarView {
+  kind: WtKind;
+  /** `Kaufsignal` */
+  text: string;
+  /** `13:11–13:25` (local time; one minute: `13:30`) */
+  span: string;
+  /** `82.466` (`–` without a price) */
+  price: string;
+  /** the whole sentence (screen readers, title) */
+  aria: string;
+}
+
+const fmtHm = new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" });
+const hmText = (ms: number): string => fmtHm.format(new Date(ms));
+const fmtP0 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
+const priceText = (x: number): string => (Number.isFinite(x) ? fmtP0.format(x) : "–");
+
+/** The turn view of a rung for `side`: only on a forming candle without an event of that side, when the cross would count. */
+export function turnView(t: WtTurn | null | undefined, c: TfCheck | null | undefined, side: Side, cfg: Partial<Pick<SignalCfg, "wtOs" | "wtOb">>): TurnView | null {
+  if (!t || !c?.forming || rungState(c, side) !== "none") return null;
+  const long = side === "long";
+  // long: wt1 below wt2 now and the cross below the zero line (a "Kreuz" above it would not count); short mirrored
+  if (long ? !(t.level < 0) || t.above : !(t.level > 0) || !t.above) return null;
+  const kind: WtKind = long ? (t.level <= (cfg.wtOs ?? -53) ? "buy" : "bull") : t.level >= (cfg.wtOb ?? 53) ? "sell" : "bear";
+  const value = priceText(t.price);
+  return { price: t.price, value, kind, aria: `MCB dreht ab ${value} ${long ? "nach oben" : "nach unten"} (${kindText(kind)})` };
+}
+
+/** The intrabar view of a rung for `side` (`intrabarOf`: the rung's forming candle, nothing of that side lit now). */
+export function intrabarView(memo: IntrabarMemo | null | undefined, c: TfCheck | null | undefined, side: Side): IntrabarView | null {
+  const s = intrabarOf(memo, c, side);
+  if (!s) return null;
+  const a = hmText(s.first);
+  const b = hmText(s.last);
+  const span = a === b ? a : `${a}–${b}`;
+  const text = kindText(s.kind);
+  const price = priceText(s.price);
+  return { kind: s.kind, text, span, price, aria: `${text} intrabar ${span} bei ${price} · aktuell nicht gehalten (zählt nicht)` };
 }
 
 /** Rung tiles for `side`, one per ladder entry (a `null` check keeps its timeframe from the config). */
-export function rungViews(sig: Pick<Signals, "checks">, v: Pick<Verdict, "tiers">, side: Side, cfg: Pick<SignalCfg, "ladder" | "required">): RungView[] {
+export function rungViews(
+  sig: Pick<Signals, "checks"> & { turns?: Readonly<Record<string, WtTurn | null>>; intrabar?: IntrabarMemo },
+  v: Pick<Verdict, "tiers">,
+  side: Side,
+  cfg: Pick<SignalCfg, "ladder" | "required"> & Partial<Pick<SignalCfg, "wtOs" | "wtOb">>,
+): RungView[] {
   return sig.checks.map((c, i) => {
     const tf = c?.tf ?? cfg.ladder[i] ?? "";
     const conf = c?.conf?.[side];
@@ -93,6 +159,8 @@ export function rungViews(sig: Pick<Signals, "checks">, v: Pick<Verdict, "tiers"
       state,
       closesAt: state === "provisional" && c?.closesAt != null && Number.isFinite(c.closesAt) ? c.closesAt : null,
       closes: conf?.closes ?? 0,
+      turn: turnView(sig.turns?.[tf], c, side, cfg),
+      intrabar: intrabarView(sig.intrabar, c, side),
     };
   });
 }
@@ -375,11 +443,29 @@ export function srView(p: GradedPart, cfg: Pick<SignalCfg, "sr">): SrView {
   };
 }
 
-/** Divergence settings in one line for the card footer (`RSI + WT · regulär + versteckt · Pivots 2/2`). */
+/** Divergence settings in one line for the card footer (`RSI + WT · regulär + versteckt · Trendlinie · Pivots 5/2 · gilt bis zum Bruch`). */
 export function divSetupText(cfg: Pick<SignalCfg, "div">): string {
   const d = divCfgOf(cfg);
   const osc = [d.rsi ? "RSI" : "", d.wt ? "WT" : ""].filter(Boolean).join(" + ") || "–";
-  return `${osc} · regulär${d.hidden ? " + versteckt" : ""} · Pivots ${d.left}/${d.right} · gilt ${d.maxAge} Kerzen`;
+  const valid = d.maxAge > 0 ? `gilt bis zum Bruch, max. ${Math.min(d.maxAge, d.rangeMax)} Kerzen` : "gilt bis zum Bruch";
+  return `${osc} · regulär${d.hidden ? " + versteckt" : ""}${d.trendline === false ? "" : " · Trendlinie"} · Pivots ${d.left}/${d.right} · ${valid}`;
+}
+
+/** The divergence rule's validity in words (`bis zum Bruch des Pivots (höchstens 60 Kerzen)`), for titles. */
+export const divValidity = (cfg: Pick<SignalCfg, "div">): string => divValidityText(divCfgOf(cfg));
+
+/** Most relevant RSI trendline break of the part (confirmed before provisional, newest first). */
+export function bestTrendBreak(p: Pick<GradedPart, "trends">): (TrendBreak & { tf: string }) | null {
+  const ts = p.trends ?? [];
+  return ts.reduce<(TrendBreak & { tf: string }) | null>((a, t) => (!a || (a.state === "provisional" && t.state !== "provisional") || (a.state === t.state && t.barsAgo < a.barsAgo) ? t : a), null);
+}
+
+/** `1h · RSI-Trendlinienbruch nach oben (fallende Linie) · vor 2 Kerzen` (`· vorläufig (laufende Kerze)`); `null` without a break. */
+export function divTrendLine(p: Pick<GradedPart, "trends" | "side">): string | null {
+  const t = bestTrendBreak(p);
+  if (!t) return null;
+  const line = p.side === "long" ? "RSI-Trendlinienbruch nach oben (fallende Linie)" : "RSI-Trendlinienbruch nach unten (steigende Linie)";
+  return `${t.tf} · ${line} · ${t.state === "provisional" ? "vorläufig (laufende Kerze)" : barsText(t.barsAgo)}`;
 }
 
 /** Compact one-line summary of the parts (strip): `Top-Trader 3/4`, `Divergenz 1h`, `S/R 3,1 R`. */

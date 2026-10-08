@@ -78,7 +78,7 @@ describe("signal view model", () => {
     expect(rungs.map((r) => r.role)).toEqual(["Basis", "Bestätigung", "stärker", "stärker"]);
     expect(rungs.map((r) => r.lit)).toEqual([true, true, false, false]);
     expect(rungs[0]).toMatchObject({ text: "Bottom", match: true, strong: true, longKind: true, rsiNear: true });
-    expect(rungs[1]).toMatchObject({ text: "Einstieg", match: true, strong: false });
+    expect(rungs[1]).toMatchObject({ text: "Kreuz", match: true, strong: false });
     expect(rungs[2]).toMatchObject({ text: "kein Signal", event: null, match: false });
     // the short side shows the same long events muted (latest of any direction)
     const short = rungViews(s, s.short, "short", CFG);

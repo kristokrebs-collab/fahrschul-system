@@ -136,7 +136,7 @@ export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "sho
     if (closed) dTfs.push(c.tf);
     else if (rsiReg.length || tl?.active) provisional = true;
     const seen = [...new Set(hits.map((d) => `${OSC[d.osc]} ${KIND[d.kind]}${d.state === "provisional" ? " (vorläufig)" : ""}`))];
-    if (tl?.active) seen.push(`Trendlinie gebrochen${tl.state === "provisional" ? " (vorläufig)" : ""}`);
+    if (tl?.active) seen.push(`Trendlinienbruch${tl.state === "provisional" ? " (vorläufig)" : ""}`);
     if (seen.length) dTexts.push(`${c.tf}: ${seen.join(", ")}`);
   }
   const dMet = dOn && dData ? dTfs.length > 0 : null;

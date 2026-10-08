@@ -11,14 +11,14 @@ import { Skeleton } from "@/primitives/Skeleton";
 import { rollDirection } from "@/primitives/StatTile";
 import { BiasBar } from "./BiasBar";
 import { SIGNAL_CARD_ID } from "./SignalCard";
-import { StateDot, StateLine, StrengthDots } from "./signalParts";
+import { GhostDot, StateDot, StateLine, StrengthDots } from "./signalParts";
 import { labelParts, partChips, PROV_TEXT, rungViews, statusPill, strengthView, verdictColor, verdictStateLine, verdictText, type PartChip, type RungView } from "./signalView";
 
 export const SIGNAL_STRIP_DETAILS = "Details";
 
 const STATUS_DOT: Record<string, string> = { live: "bg-win", warn: "bg-warn", error: "bg-loss", muted: "bg-faint" };
-/** One-word event names for the chips (the dot colour carries the direction). */
-const SHORT_KIND: Record<WtKind, string> = { bottom: "Bottom", buy: "Kauf", bull: "Einstieg", top: "Top", sell: "Verkauf", bear: "Einstieg" };
+/** One-word event names for the chips (the dot colour carries the direction; the small crosses are "Kreuz", not "Einstieg"). */
+const SHORT_KIND: Record<WtKind, string> = { bottom: "Bottom", buy: "Kauf", bull: "Kreuz", top: "Top", sell: "Verkauf", bear: "Kreuz" };
 
 function Score({ score }: { score: number }) {
   const text = String(score);
@@ -52,11 +52,25 @@ const RungChip = memo(function RungChip({ r, side }: { r: RungView; side: "long"
         transition={tween.crossfade}
       />
       <span className="dot-num shrink-0 text-[14px] leading-none text-fg">{r.tf}</span>
-      <StateDot tone={tone} strong={r.strong} state={r.match && r.state !== "none" ? r.state : "confirmed"} lit={false} size={6} />
-      <span className={cn("truncate text-[11px]", r.match ? (prov ? PROV_TEXT[side] : side === "long" ? "text-win" : "text-loss") : "text-faint")}>
-        {!r.check ? "–" : r.event ? SHORT_KIND[r.event.kind] : NO_KIND_TEXT}
-        {prov && <span className="ml-1 text-warn">⚠</span>}
-      </span>
+      {r.intrabar ? (
+        // intrabar memory: the forming candle showed it earlier, the price took it back (greyed, never counted)
+        <>
+          <span className="grid size-[6px] shrink-0 place-items-center overflow-visible">
+            <GhostDot size={8} />
+          </span>
+          <span className="truncate text-[11px] text-faint" data-intrabar={r.intrabar.kind}>
+            {SHORT_KIND[r.intrabar.kind]}
+          </span>
+        </>
+      ) : (
+        <>
+          <StateDot tone={tone} strong={r.strong} state={r.match && r.state !== "none" ? r.state : "confirmed"} lit={false} size={6} />
+          <span className={cn("truncate text-[11px]", r.match ? (prov ? PROV_TEXT[side] : side === "long" ? "text-win" : "text-loss") : "text-faint")}>
+            {!r.check ? "–" : r.event ? SHORT_KIND[r.event.kind] : NO_KIND_TEXT}
+            {prov && <span className="ml-1 text-warn">⚠</span>}
+          </span>
+        </>
+      )}
     </span>
   );
 });

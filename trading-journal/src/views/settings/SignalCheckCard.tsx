@@ -85,7 +85,7 @@ export const SIGNAL_STRINGS = {
   divHelp:
     "RSI und WaveTrend wt1 gegen den Kurs an Pivots, je Timeframe der Leiter, verglichen mit jedem früheren Pivot im Abstand. Regulär = Umkehr (Kurs tieferes Tief, Oszillator höheres Tief), versteckt = Fortsetzung. Auf der laufenden Kerze schon vorläufig (zählt halb), voll bei einer regulären auf geschlossener Kerze; gilt, bis der Pivot auf Schlusskurs bricht.",
   divOsc: "Oszillatoren und Filter",
-  divOscHelp: "Mindestens ein Oszillator bleibt aktiv. Mittellinie: bullische Pivots nur unter 50 (RSI) / 0 (WT). Trendlinie: RSI-Trendlinie gebrochen (fallende Linie über die letzten zwei RSI-Hochs nach oben; Short: steigende über die Tiefs nach unten) = +0,2 Note.",
+  divOscHelp: "Mindestens ein Oszillator bleibt aktiv. Mittellinie: bullische Pivots nur unter 50 (RSI) / 0 (WT). Trendlinie: RSI-Trendlinienbruch (fallende Linie über die letzten zwei RSI-Hochs nach oben; Short: steigende über die Tiefs nach unten) = +0,2 Note.",
   divRsi: "RSI",
   divWt: "WaveTrend",
   divHidden: "versteckte",

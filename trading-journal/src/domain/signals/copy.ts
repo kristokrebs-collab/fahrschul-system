@@ -119,7 +119,7 @@ export function divInfoText(rsiLen: number, d: { left: number; right: number; hi
   return (
     `RSI ${rsiLen} und WaveTrend wt1 gegen den Kurs an Pivots (${d.left} Kerzen links / ${d.right} rechts, verglichen mit jedem früheren Pivot ${d.rangeMin}–${d.rangeMax} Kerzen davor), ` +
     `regulär = Umkehr, ${d.hidden ? "versteckt = Fortsetzung, " : ""}auf der laufenden Kerze schon vorläufig (zählt halb), gilt ${divValidityText(d)}` +
-    (d.trendline === false ? "" : `; RSI-Trendlinie gebrochen (fallende Linie über die letzten zwei RSI-Hochs nach oben, Short spiegelbildlich) = +0,2 Note`)
+    (d.trendline === false ? "" : `; RSI-Trendlinienbruch (fallende Linie über die letzten zwei RSI-Hochs nach oben, Short spiegelbildlich) = +0,2 Note`)
   );
 }
 
