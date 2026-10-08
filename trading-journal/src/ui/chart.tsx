@@ -57,10 +57,20 @@ function ChartContainer({
 }) {
   const uniqueId = React.useId()
   const chartId = `chart-${id ?? uniqueId.replace(/:/g, "")}`
+  const boxRef = React.useRef<HTMLDivElement>(null)
+  // A keep-alive page (React `Activity`, the overview) reconnects Recharts' ResponsiveContainer effect when it is shown
+  // again. Inside a `content-visibility: auto` cell that is still off screen, Chrome answers the FIRST layout read of
+  // the re-shown subtree with 0×0 (the next read is right): the container took 0×0, logged "The width(0) and height(0)
+  // of chart should be greater than 0" and rendered empty until its ResizeObserver fired. This layout effect runs
+  // before Recharts' passive one (also on every Activity reveal) and takes that first read.
+  React.useLayoutEffect(() => {
+    boxRef.current?.querySelector(".recharts-responsive-container")?.getBoundingClientRect()
+  }, [])
 
   return (
     <ChartContext.Provider value={{ config }}>
       <div
+        ref={boxRef}
         data-slot="chart"
         data-chart={chartId}
         className={cn(

@@ -35,3 +35,22 @@ test("pages", async ({ page }, info) => {
   await page.waitForTimeout(1200);
   await page.screenshot({ path: `/tmp/shots/${info.project.name}-settings.png`, fullPage: true });
 });
+
+test("back to the kept-alive overview from every page without console warnings (charts below the fold re-measure)", async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto("/#overview");
+  await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+  await page.waitForTimeout(1500);
+  for (const other of ["#trades", "#setups", "#settings"]) {
+    await page.evaluate((h) => (location.hash = h), other);
+    await page.waitForTimeout(900);
+    await page.evaluate(() => (location.hash = "#overview"));
+    await expect(page.locator('[data-page="overview"][data-page-role="current"]')).toBeVisible();
+    await page.waitForTimeout(900);
+  }
+  // the monthly bars (a content-visibility cell below the fold) still draw once scrolled to
+  const monthly = page.getByLabel("P&L pro Monat");
+  await monthly.scrollIntoViewIfNeeded();
+  await expect(monthly.locator(".recharts-bar-rectangle").first()).toBeVisible();
+  expect(errors, errors.join("\n")).toEqual([]);
+});
