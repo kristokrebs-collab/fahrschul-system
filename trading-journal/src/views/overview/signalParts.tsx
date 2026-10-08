@@ -712,7 +712,8 @@ function DeltaCell({ c, side, reading, level }: { c: PartCell; side: Side; readi
   const met = c.met === true;
   const [main, ...rest] = c.value.split(" · ");
   const pts = c.met === null ? [] : (reading?.deltaSeries ?? []);
-  const shares = reading && reading.account != null && reading.retail != null ? `Konten ${n1(reading.account)} % · Retail ${n1(reading.retail)} %` : null;
+  // each share stays whole; a narrow cell wraps at the separator
+  const shares = reading && reading.account != null && reading.retail != null ? [`Konten ${n1(reading.account)} %`, `Retail ${n1(reading.retail)} %`] : null;
   return (
     <div
       className={cn("relative h-full min-w-0 rounded-lg border px-2.5 py-2 transition-colors duration-300", met ? TONE_ON[side] : "border-line bg-ink-950/40")}
@@ -742,7 +743,7 @@ function DeltaCell({ c, side, reading, level }: { c: PartCell; side: Side; readi
       )}
       {shares && (
         <span className="num mt-1 block text-[10.5px] leading-snug text-mute" data-testid="signal-delta-shares">
-          {shares}
+          <span className="whitespace-nowrap">{shares[0]}</span> · <span className="whitespace-nowrap">{shares[1]}</span>
         </span>
       )}
       <span className="mt-0.5 block text-[10.5px] leading-snug text-faint">{c.sub}</span>

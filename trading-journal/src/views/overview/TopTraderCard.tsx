@@ -209,6 +209,9 @@ const ITEM_MARK: Record<"ok" | "no" | "none", { mark: string; cls: string; sr: s
   none: { mark: "–", cls: "bg-white/[0.06] text-faint", sr: "keine Daten: " },
 };
 
+/** Keeps a value with its unit and a window with its change together (`−3,7 pp`, `1h −6,7`): a narrow row never splits them. */
+const keepValues = (text: string): string => text.replace(/(\d) (pp|%)/g, "$1\u00a0$2").replace(/(\d+[mh]) (?=[−+±])/g, "$1\u00a0");
+
 function KnifeRow({ item }: { item: KnifeItem }) {
   const st = item.met ? "ok" : item.met === false ? "no" : "none";
   const m = ITEM_MARK[st];
@@ -222,7 +225,7 @@ function KnifeRow({ item }: { item: KnifeItem }) {
           <span className="sr-only">{m.sr}</span>
           {item.label}
         </span>
-        <span className="text-[12px] leading-snug text-mute">{item.detail}</span>
+        <span className="text-[12px] leading-snug text-mute">{item.id === "whale" ? keepValues(item.detail) : item.detail}</span>
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-faint">
           {item.tfs.map((tf) => (
             <span key={tf} className="num rounded-md border border-win/30 px-1.5 py-px font-mono text-[10.5px] text-win">
