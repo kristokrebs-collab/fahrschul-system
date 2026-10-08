@@ -28,7 +28,7 @@ import { createMarketProvider, type MarketProvider } from "@/market/provider";
 import type { WsLike } from "@/market/sources/ws";
 import { memoryKV, type KVStore } from "@/market/cache";
 import { deriveTopTrader, freshnessText, topTraderFreshness } from "@/market/mapping";
-import { FEED_IDS } from "@/market/feeds";
+import { FEED_IDS, LIVE_RATIO_BOOTSTRAP_LIMIT } from "@/market/feeds";
 import type { FeedId } from "@/market/types";
 
 const MIN = 60_000;
@@ -469,7 +469,7 @@ describe("top traders keep updating while the Binance WebSocket delivers", () =>
     provider.start();
     await flush();
     await runFor(20 * MIN, 30_000);
-    expect(calls(net, "limit=36")).toBe(0);
+    expect(calls(net, `limit=${LIVE_RATIO_BOOTSTRAP_LIMIT}`)).toBe(0);
     expect(provider.getHealth().feeds.topAccountRatio5m).toMatchObject({ state: "live", source: "binance" });
     expect(provider.get("topAccountRatio5m")!.data.at(-1)!.time).toBe(provider.get("topAccountRatio")!.data.at(-1)!.time);
     expect(tt(provider).liveReadingOk).toBe(true);
@@ -560,6 +560,35 @@ describe("top traders keep updating while the Binance WebSocket delivers", () =>
     h = provider.getHealth();
     expect(h.feeds.topAccountRatio).toMatchObject({ source: "binance", state: "live" });
     expect(tt(provider).liveReadingOk).toBe(true);
+  });
+
+  it("the page load's own `pageshow` / `focus` is no resume: a geo-block still falls back within the first second", async () => {
+    // every page load ends with a non-persisted `pageshow` (and may focus the window) a few hundred ms after the
+    // provider started; the 10-s resume grace (a radio waking up after a sleep) must not hold the fallback back
+    const { provider, listener } = setup({ binanceFail: () => "typeerror" });
+    p = provider;
+    provider.start();
+    // the load events arrive while the boot requests are still on their way (they fail a few hundred ms later)
+    listener("pageshow")!(); // persisted: false
+    listener("focus")!();
+    await vi.advanceTimersByTimeAsync(1_000);
+    const h = provider.getHealth();
+    expect(h.primary.blocked).toBe(true);
+    expect(h.feeds.ticker24h.source).toBe("bybit");
+    expect(h.feeds.kline_15m.source).toBe("bybit");
+  });
+
+  it("a resume after the tab was away keeps the grace: a failure in its first seconds is no block", async () => {
+    let failing = false;
+    const { provider, listener } = setup({ binanceFail: () => (failing ? "typeerror" : undefined) });
+    p = provider;
+    provider.start();
+    await flush();
+    await runFor(MIN);
+    failing = true;
+    listener("pageshow")!(); // back from the back/forward cache
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(provider.getHealth().primary.blocked).toBe(false);
   });
 
   it("a socket that delivers while Binance REST stays unreachable re-probes at most every 2 min (no probe storm)", async () => {

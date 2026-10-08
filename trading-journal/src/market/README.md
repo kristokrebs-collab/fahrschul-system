@@ -103,7 +103,7 @@ effect built on them with `useReducedFx()`. Countdowns and ages combine them wit
 | `ticker24h` | REST `ticker/24hr` | 30 s | 90 s | 24 h change; LivePill ring = `nextRefreshAt` |
 | `openInterest` | REST `openInterest` | 60 s | 180 s | |
 | `openInterestHist`, `topPositionRatio`, `topAccountRatio`, `globalAccountRatio`, `takerRatio` | REST `/futures/data/*` at the chosen period | point cadence = period (poll aligned to the PERIOD boundary + 60–105 s; a late point is retried +60 s, and for periods > 5 min +2 / +5 min) | 2·period + 2 min | bootstrap `limit=500`, poll `limit=30`, ring buffer 500, 30-day retention |
-| `topPositionRatio5m`, `topAccountRatio5m`, `globalAccountRatio5m` | the same `/futures/data/*` ratios at the fixed period `5m` | 5 min (aligned 5-min boundary + 60–105 s) | 12 min | bootstrap `limit=36`, poll `limit=3`, ring 288; Binance only (direct or proxy, never Bybit/OKX); with period `5m` they ride along with the chosen-period request (no extra call) |
+| `topPositionRatio5m`, `topAccountRatio5m`, `globalAccountRatio5m` | the same `/futures/data/*` ratios at the fixed period `5m` | 5 min (aligned 5-min boundary + 60–105 s) | 12 min | bootstrap `limit=52` (4 h 20 min: the 4h Whale–Retail-Delta window has its change from the first load), poll `limit=3`, ring 288; Binance only (direct or proxy, never Bybit/OKX); with period `5m` they ride along with the chosen-period request (no extra call) |
 | `fundingHistory` | REST `fundingRate` | on funding tick (`T` from markPrice) | 9 h | |
 
 Period = `normalizePeriod(settings.hyblock.timeframe)`; unsupported (`1m`, `1w`, …) → `1h` and
@@ -149,7 +149,8 @@ attempt (so the WS feeds were never REST-polled), and the pill said `Kein Live-K
 
 Blocked-primary detection (strict — a false positive takes the top traders off Binance while prices keep ticking):
 never while Binance demonstrably answers (a WS frame < 30 s or a REST success < 60 s ago) or within 10 s of a tab
-resume; otherwise `TypeError`s on ≥ 2 different Binance paths within 2 min AND `api.bybit.com/v5/market/time` answering →
+resume (a "resume" within 10 s of `start()` — the `pageshow` that ends every page load, a `focus` while it loads — follows no
+sleep and sets no grace: a blocked Binance falls back within a second of the load); otherwise `TypeError`s on ≥ 2 different Binance paths within 2 min AND `api.bybit.com/v5/market/time` answering →
 `primary.blocked`, every Binance feed moves on (Bybit, ratio feeds to a usable proxy first). A timeout (`AbortError`) is
 its own soft kind `timeout`, never a block. Re-probe `fapi/v1/time` after 5 → 10 → 20 → 40 → 60 min (cap), reset on
 success — pulled forward to 5 s when the Binance socket delivers or a Binance REST call succeeds while marked blocked,
@@ -288,9 +289,19 @@ render `closesAt − (nowMv + signalClockOffset())`. The notifier's own timers s
 socket appended k + 1 reaches the engine). `getChartOverlay(interval, { bars, mcb, div, structure })` = the three chart
 APIs from one build of the bars.
 
-**Cadence (120 Hz rule):** a kline publish, a price frame or a health change only marks the engine dirty; one timer evaluates at
+**Cadence (120 Hz rule):** a kline publish, a price frame or a health change only marks the engine dirty; one timer runs at
 most once per second (5 s in a hidden tab) and sleeps while no data arrives. A full evaluation costs ≈ 1 ms (test budget 3 ms).
 The published state changes identity only when the rounded result changes.
+
+**1m frames (`SIGNAL_FRAME_MS` = 60 s, `SIGNAL_FRAME_GRACE_MS` = 1 s):** the running candles are completed with the live price
+taken at the last minute boundary on the exchange clock (+ 1 s grace: the closing kline update arrives ~250 ms after it), and the
+check is RECOMPUTED only when a new minute frame starts (`armFrame` wakes the engine at hh:mm:01) or the CLOSED history, the
+Top-Trader series, the Lage or the config change (`inputKeyOf`) — not with every tick. A dirty run inside the same frame with the
+same closed bars returns the published state unchanged. So the forming-candle states (vorläufig signals, MCB / RSI meters, the
+Long/Short-Tendenz) move once a minute, like a trader reading the 1m closes; within a frame nothing flickers. Countdowns run on
+the clock (`closesAt`), unaffected. Per frame the engine also remembers forming-candle events that came and went (`intrabar`:
+greyed, never counted) and the turn price of every forming rung (`turns`). A frame taken within 5 s of its boundary stands for
+the minute that just closed (`frameAt` = boundary − 1 ms).
 
 ```ts
 import { useSignalCheck, getSignalSnapshot, subscribeSignalCheck, toTradeSnapshot, checkTradeAt, retroCheck, getMcbSeries, getSignalCandles } from "@/market";

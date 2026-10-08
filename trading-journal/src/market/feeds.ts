@@ -114,8 +114,12 @@ export const BOOTSTRAP_LIMIT = { kline: 499, kline15m: 1500, kline1w: 200, kline
 /** Largest page the gap fill after a WS reconnect requests (Binance maximum). */
 export const GAP_FILL_MAX = 1500;
 export const POLL_LIMIT_FUTURES_DATA = 30;
-/** Live 5-min ratios: 36 points (3 h) on bootstrap, the last 3 on every poll (upserted into the ring). */
-export const LIVE_RATIO_BOOTSTRAP_LIMIT = 36;
+/**
+ * Live 5-min ratios: 52 points (4 h 20 min) on bootstrap, the last 3 on every poll (upserted into the ring). The longest
+ * Whale–Retail-Delta window (4h) compares with the point 48 periods before the newest one, so it has its change from the
+ * first load (3 points of slack for a late or missing snapshot).
+ */
+export const LIVE_RATIO_BOOTSTRAP_LIMIT = 52;
 export const LIVE_RATIO_POLL_LIMIT = 3;
 export const HISTORY_PAGE_LIMIT = 1500;
 export const HISTORY_MAX_CALLS = 8;

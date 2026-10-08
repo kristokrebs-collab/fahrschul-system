@@ -267,6 +267,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   let lastWsMessageAt = -Infinity;
   let lastBinanceOkAt = -Infinity;
   let resumedAt = -Infinity;
+  /** when `start()` ran (a resume within `RESUME_GRACE_MS` of it follows no sleep) */
+  let startedAt = -Infinity;
   const netFailures: { at: number; path: string }[] = [];
   let bybitCheck: { at: number; alive: Promise<boolean> } | null = null;
   let lastProxyProbeAt = -Infinity;
@@ -1112,7 +1114,10 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     const t = now();
     if (reason !== "visible" && reason !== "wake" && t - lastResumeAt < RESUME_THROTTLE_MS) return;
     lastResumeAt = t;
-    resumedAt = t;
+    // a resume right after the start — the `pageshow` of every page load, a `focus` while the page loads — follows no
+    // sleep: the boot requests just used the network, so their failures count toward a block at once (a blocked
+    // Binance falls back to Bybit within a second or two of the load, not after the 10-s grace plus a retry)
+    if (t - startedAt >= RESUME_GRACE_MS) resumedAt = t;
     lastTickAt = t;
     staggerOverdue(t);
     scheduler.resume();
@@ -1315,6 +1320,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (started) return;
     started = true;
     const t = now();
+    startedAt = t;
     dispatch({ type: "start", now: t });
     if (!period.ok && period.detail) dispatch({ type: "bad_period", feeds: [...FUTURES_DATA_FEEDS], detail: period.detail, now: t });
     if (!isOnline()) dispatch({ type: "online", online: false, now: t });
