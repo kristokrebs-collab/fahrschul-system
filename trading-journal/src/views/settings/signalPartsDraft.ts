@@ -6,7 +6,9 @@
  * | draft keys | stored | engine |
  * |---|---|---|
  * | `sgStrong` | `strongCloses` (1 … 6) | closes until "stark bestätigt" |
- * | `sgWhaleTop`, `sgWhaleRetail`, `sgWhaleBonus` | `whale.topPct` (50 … 90), `whale.retailPeriod`, `whale.bonusParts` (1 … 4) | Top-Trader-Kombi |
+ * | `sgWhaleTop`, `sgWhaleBonus` | `whale.topPct` (50 … 90), `whale.bonusParts` (1 … 4) | Top-Trader-Kombi |
+ * | `sgWhaleDeltaRed`, `sgWhaleDeltaFall`, `sgWhaleWindow` | `whale.deltaRed` (−20 … 20 pp), `whale.deltaFall` (0 … 20 pp), `whale.deltaWindow` (30m · 1h · 2h · 4h) | "Retail rot" = Whale–Retail-Delta below deltaRed or fell ≥ deltaFall over the window |
+ * | `sgWhaleRetail` | `whale.retailPeriod` (legacy comparison, no control any more: round-trips the stored value) | – |
  * | `sgDiv*` | `div.{on, rsi, wt, hidden, midline, left, right, rangeMin, rangeMax, maxAge, weight}` | divergences |
  * | `sgSr*` | `sr.{on, internal, nearAtr, minR, eqLen, eqThreshold, weight}` | structure + support / resistance |
  *
@@ -14,6 +16,7 @@
  * keys of either app survive) and clamps like the engine's sanitiser. Pure.
  */
 import { DEFAULT_DIV_CFG, DEFAULT_SR_CFG, DEFAULT_STRONG_CLOSES, DEFAULT_WHALE_CFG, PART_WEIGHT_MAX, sanitizeSignalCfg, STRONG_CLOSES_MAX, WHALE_RETAIL_PERIODS, type DivCfg, type SrCfg } from "@/domain/signals";
+import { WHALE_DELTA_PP_MAX, WHALE_DELTA_WINDOWS } from "@/domain/signals/config";
 import { parseNumber, toInputString } from "@/lib/parse";
 
 /** Draft keys that must parse as numbers when the signal part is saved (compared by value). */
@@ -21,6 +24,8 @@ export const PARTS_NUMERIC_KEYS = [
   "sgStrong",
   "sgWhaleTop",
   "sgWhaleBonus",
+  "sgWhaleDeltaRed",
+  "sgWhaleDeltaFall",
   "sgDivLeft",
   "sgDivRight",
   "sgDivMin",
@@ -35,7 +40,7 @@ export const PARTS_NUMERIC_KEYS = [
   "sgSrWeight",
 ] as const;
 /** Switches (`"on"` | `""`) and choices. */
-export const PARTS_TEXT_KEYS = ["sgWhaleRetail", "sgDiv", "sgDivRsi", "sgDivWt", "sgDivHidden", "sgDivMid", "sgSr"] as const;
+export const PARTS_TEXT_KEYS = ["sgWhaleRetail", "sgWhaleWindow", "sgDiv", "sgDivRsi", "sgDivWt", "sgDivHidden", "sgDivMid", "sgSr"] as const;
 export const PARTS_DRAFT_KEYS = [...PARTS_NUMERIC_KEYS, ...PARTS_TEXT_KEYS] as const;
 
 export type PartsDraftKey = (typeof PARTS_DRAFT_KEYS)[number];
@@ -64,6 +69,9 @@ export function partsToDraft(signals: unknown): PartsDraft {
     sgWhaleTop: toInputString(w.topPct),
     sgWhaleRetail: w.retailPeriod,
     sgWhaleBonus: String(w.bonusParts),
+    sgWhaleDeltaRed: toInputString(w.deltaRed),
+    sgWhaleDeltaFall: toInputString(w.deltaFall),
+    sgWhaleWindow: w.deltaWindow,
     sgDiv: on(d.on),
     sgDivRsi: on(d.rsi),
     sgDivWt: on(d.wt),
@@ -88,7 +96,7 @@ export function partsToDraft(signals: unknown): PartsDraft {
 export interface PartsPatch {
   strongCloses: number;
   /** merged into the `whale` object the whale draft writes */
-  whale: { topPct: number; retailPeriod: string; bonusParts: number };
+  whale: { topPct: number; retailPeriod: string; bonusParts: number; deltaRed: number; deltaFall: number; deltaWindow: string };
   div: DivCfg & Record<string, unknown>;
   sr: SrCfg & Record<string, unknown>;
 }
@@ -115,6 +123,7 @@ export function partsFromDraft(d: Partial<PartsDraft>, signals: unknown): PartsF
   const storedDiv = isRec(stored.div) ? stored.div : {};
   const storedSr = isRec(stored.sr) ? stored.sr : {};
   const retail = d.sgWhaleRetail ?? def.sgWhaleRetail;
+  const deltaWindow = d.sgWhaleWindow ?? def.sgWhaleWindow;
   const rangeMin = clampInt(nums.sgDivMin, 1, 200);
   return {
     ok: true,
@@ -124,6 +133,9 @@ export function partsFromDraft(d: Partial<PartsDraft>, signals: unknown): PartsF
         topPct: clamp(nums.sgWhaleTop, 50, 90),
         retailPeriod: WHALE_RETAIL_PERIODS.includes(retail) ? retail : DEFAULT_WHALE_CFG.retailPeriod,
         bonusParts: clampInt(nums.sgWhaleBonus, 1, 4),
+        deltaRed: clamp(nums.sgWhaleDeltaRed, -WHALE_DELTA_PP_MAX, WHALE_DELTA_PP_MAX),
+        deltaFall: clamp(nums.sgWhaleDeltaFall, 0, WHALE_DELTA_PP_MAX),
+        deltaWindow: WHALE_DELTA_WINDOWS.includes(deltaWindow) ? deltaWindow : DEFAULT_WHALE_CFG.deltaWindow,
       },
       div: {
         ...storedDiv,

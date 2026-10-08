@@ -1,11 +1,12 @@
 /**
  * Settings card, Einstiegs-Check v2 groups: `Bestätigung (Kerzenschluss)` (closes until "stark bestätigt"),
- * `Top-Trader-Kombi` (switch, % threshold, retail period, parts for +1 strength, weight), `Divergenzen` (switch,
+ * `Top-Trader-Kombi` (switch, % threshold, parts for +1 strength, weight, the Whale–Retail-Delta thresholds + window), `Divergenzen` (switch,
  * oscillator / filter chips, pivot lookbacks, weight) and `Support / Widerstand` (switch, ATR nearness, R room, weight).
  * Every control writes its `sg*` draft key; the values shown are the engine's.
  */
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_DIV_CFG } from "@/domain/signals";
 import { useJournal } from "@/store/journalStore";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { SignalCheckCard } from "@/views/settings/SignalCheckCard";
@@ -30,7 +31,7 @@ describe("SignalCheckCard · v2 thresholds", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows the defaults: 2 closes, Top-Trader 64 % · 5m · 3 of 4 · 10, divergences and S/R on", () => {
+  it("shows the defaults: 2 closes, Top-Trader 64 % · 3 of 4 · 10, delta < 0 or −1 pp over 1h, divergences and S/R on", () => {
     setup();
     const confirm = screen.getByTestId("settings-confirm");
     expect(within(within(confirm).getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "2", checked: true })).toBeInTheDocument();
@@ -40,7 +41,18 @@ describe("SignalCheckCard · v2 thresholds", () => {
     expect(within(tt).getByText("Check „Top-Trader long · Retail rot“")).toBeInTheDocument();
     expect(within(tt).getByLabelText(/Top-Trader-Schwelle/)).toHaveValue("64");
     expect(within(tt).getByText("Long: über 64 % Long · Short: über 64 % Short (Long unter 36 %)")).toBeInTheDocument();
-    expect(within(within(tt).getByRole("radiogroup", { name: "Retail-Vergleich" })).getByRole("radio", { name: "5m", checked: true })).toBeInTheDocument();
+    // the former retail comparison period has no control any more (its stored value round-trips untouched)
+    expect(within(tt).queryByRole("radiogroup", { name: "Retail-Vergleich" })).toBeNull();
+    const delta = within(tt).getByTestId("settings-whale-delta");
+    expect(within(delta).getByText("Whale–Retail-Delta (Retail rot / grün)")).toBeInTheDocument();
+    expect(within(within(delta).getByRole("radiogroup", { name: "Rot unter (pp)" })).getByRole("radio", { name: "0", checked: true })).toBeInTheDocument();
+    expect(within(within(delta).getByRole("radiogroup", { name: "Rot unter (pp)" })).getAllByRole("radio").map((r) => r.textContent)).toEqual(["−2", "−1", "0", "+1", "+2"]);
+    expect(within(delta).getByText("Long: Delta unter 0 pp · Short (grün): über 0 pp")).toBeInTheDocument();
+    expect(within(within(delta).getByRole("radiogroup", { name: "oder Fall um (pp)" })).getByRole("radio", { name: "+1", checked: true })).toBeInTheDocument();
+    expect(within(delta).getByText("Long: Delta fällt in 1h um mind. 1 pp · Short: steigt so stark")).toBeInTheDocument();
+    expect(within(within(delta).getByRole("radiogroup", { name: "Delta-Fenster" })).getAllByRole("radio").map((r) => r.textContent)).toEqual(["30m", "1h", "2h", "4h"]);
+    expect(within(within(delta).getByRole("radiogroup", { name: "Delta-Fenster" })).getByRole("radio", { name: "1h", checked: true })).toBeInTheDocument();
+    expect(within(delta).getByTestId("settings-whale-note")).toHaveTextContent("Binance-Kohorten, nicht Hyblocks eigene");
     expect(within(within(tt).getByRole("radiogroup", { name: "+1 Stärke ab" })).getByRole("radio", { name: "3", checked: true })).toBeInTheDocument();
     expect(within(tt).getByText("bis +10 Score, anteilig (je erfüllter Teil ¼)")).toBeInTheDocument();
     // the legacy run-rule controls are gone (their stored values stay untouched)
@@ -48,7 +60,7 @@ describe("SignalCheckCard · v2 thresholds", () => {
     const div = screen.getByTestId("settings-div");
     expect(within(div).getByRole("switch")).toBeChecked();
     expect(within(div).getByRole("button", { name: "RSI" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(div).getByLabelText(/Pivot links/)).toHaveValue("2");
+    expect(within(div).getByLabelText(/Pivot links/)).toHaveValue(String(DEFAULT_DIV_CFG.left));
     expect(within(div).getByLabelText(/Abstand max/)).toHaveValue("60");
     const sr = screen.getByTestId("settings-sr");
     expect(within(sr).getByLabelText(/Level-Nähe/)).toHaveValue("1");
@@ -66,8 +78,12 @@ describe("SignalCheckCard · v2 thresholds", () => {
     expect(onChange).toHaveBeenLastCalledWith("sgWhale", "");
     fireEvent.change(within(tt).getByLabelText(/Top-Trader-Schwelle/), { target: { value: "70" } });
     expect(onChange).toHaveBeenLastCalledWith("sgWhaleTop", "70");
-    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "Retail-Vergleich" })).getByRole("radio", { name: "1h" }));
-    expect(onChange).toHaveBeenLastCalledWith("sgWhaleRetail", "1h");
+    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "Rot unter (pp)" })).getByRole("radio", { name: "−1" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgWhaleDeltaRed", "-1");
+    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "oder Fall um (pp)" })).getByRole("radio", { name: "+0,5" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgWhaleDeltaFall", "0.5");
+    fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "Delta-Fenster" })).getByRole("radio", { name: "4h" }));
+    expect(onChange).toHaveBeenLastCalledWith("sgWhaleWindow", "4h");
     fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "+1 Stärke ab" })).getByRole("radio", { name: "4" }));
     expect(onChange).toHaveBeenLastCalledWith("sgWhaleBonus", "4");
     fireEvent.click(within(within(tt).getByRole("radiogroup", { name: "Gewicht (Score)" })).getByRole("radio", { name: "0" }));
@@ -87,7 +103,7 @@ describe("SignalCheckCard · v2 thresholds", () => {
   });
 
   it("the last oscillator cannot be switched off; stored values show; changed keys mark their group", () => {
-    const { onChange } = setup({ sgDivWt: "" }, { whale: { topPct: 70, weight: 7 }, strongCloses: 4, signalLookback: 6 }, ["sgDivAge"]);
+    const { onChange } = setup({ sgDivWt: "" }, { whale: { topPct: 70, weight: 7, deltaRed: -3.5, deltaFall: 0, deltaWindow: "2h" }, strongCloses: 4, signalLookback: 6 }, ["sgDivAge", "sgWhaleWindow"]);
     const div = screen.getByTestId("settings-div");
     const rsi = within(div).getByRole("button", { name: "RSI" });
     expect(rsi).toHaveAttribute("aria-disabled", "true");
@@ -96,6 +112,12 @@ describe("SignalCheckCard · v2 thresholds", () => {
     const tt = screen.getByTestId("settings-whale");
     expect(within(tt).getByLabelText(/Top-Trader-Schwelle/)).toHaveValue("70");
     expect(within(within(tt).getByRole("radiogroup", { name: "Gewicht (Score)" })).getByRole("radio", { name: "7", checked: true })).toBeInTheDocument();
+    // a stored delta threshold outside the steps is offered too; 0 = any fall
+    expect(within(within(tt).getByRole("radiogroup", { name: "Rot unter (pp)" })).getAllByRole("radio").map((r) => r.textContent)).toEqual(["−3,5", "−2", "−1", "0", "+1", "+2"]);
+    expect(within(within(tt).getByRole("radiogroup", { name: "Rot unter (pp)" })).getByRole("radio", { name: "−3,5", checked: true })).toBeInTheDocument();
+    expect(within(tt).getByText("Long: Delta unter −3,5 pp · Short (grün): über +3,5 pp")).toBeInTheDocument();
+    expect(within(tt).getByText("jede Abnahme in 2h (Short: jede Zunahme)")).toBeInTheDocument();
+    expect(within(within(tt).getByRole("radiogroup", { name: "Delta-Fenster" })).getByRole("radio", { name: "2h", checked: true })).toBeInTheDocument();
     expect(within(within(screen.getByTestId("settings-confirm")).getByRole("radiogroup", { name: "Stark bestätigt nach" })).getByRole("radio", { name: "4", checked: true })).toBeInTheDocument();
   });
 

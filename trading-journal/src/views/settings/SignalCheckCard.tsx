@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { memo, useState, type ReactNode } from "react";
-import { roleText, SIGNAL_TFS, STRENGTH_LABEL, STRONG_CLOSES_MAX, strongClosesCap, TRADERS_SIDE_TITLE, WHALE_RETAIL_PERIODS, WHALE_WEIGHTS } from "@/domain/signals";
+import { roleText, SIGNAL_TFS, STRENGTH_LABEL, STRONG_CLOSES_MAX, strongClosesCap, TRADERS_SIDE_TITLE, WHALE_DELTA_NOTE, WHALE_WEIGHTS } from "@/domain/signals";
+import { WHALE_DELTA_PP_MAX, WHALE_DELTA_WINDOWS } from "@/domain/signals/config";
 import { IS_SHARE } from "@/edition";
 import { cn } from "@/lib/cn";
 import { parseNumber } from "@/lib/parse";
@@ -65,11 +66,16 @@ export const SIGNAL_STRINGS = {
   whale: "Top-Trader-Kombi",
   whaleSwitch: `Check „${TRADERS_SIDE_TITLE.long}“`,
   whaleHelp:
-    "Vier Teile, je mehr erfüllt, desto stärker: Binance-Top-Trader über der Schwelle Long nach Positionen und nach Konten, Retail rot (Long-Anteil aller Konten fällt) und Preis im Discount. Short spiegelbildlich (Top-Trader Short, Retail grün, Premium). Binance-5-min-Daten, ~30 Tage zurück; ohne Daten „keine Daten“, nie ein Fehler.",
+    "Vier Teile, je mehr erfüllt, desto stärker: Binance-Top-Trader über der Schwelle Long nach Positionen und nach Konten, Retail rot (Whale–Retail-Delta negativ oder fallend) und Preis im Discount. Short spiegelbildlich (Top-Trader Short, Retail grün = Delta positiv oder steigend, Premium). Binance-5-min-Daten, ~30 Tage zurück; ohne Daten „keine Daten“, nie ein Fehler.",
   whaleTop: "Top-Trader-Schwelle (% Long)",
   whaleTopHelp: (x: string, y: string) => `Long: über ${x} % Long · Short: über ${x} % Short (Long unter ${y} %)`,
-  whaleRetail: "Retail-Vergleich",
-  whaleRetailHelp: "Long-Anteil aller Konten jetzt gegen so lange vorher",
+  whaleDelta: "Whale–Retail-Delta (Retail rot / grün)",
+  whaleDeltaRed: "Rot unter (pp)",
+  whaleDeltaRedHelp: (x: string, y: string) => `Long: Delta unter ${x} pp · Short (grün): über ${y} pp`,
+  whaleDeltaFall: "oder Fall um (pp)",
+  whaleDeltaFallHelp: (x: string, win: string) => (x === "0" ? `jede Abnahme in ${win} (Short: jede Zunahme)` : `Long: Delta fällt in ${win} um mind. ${x} pp · Short: steigt so stark`),
+  whaleWindow: "Delta-Fenster",
+  whaleWindowHelp: "Änderung des Deltas über dieses Fenster",
   whaleBonus: "+1 Stärke ab",
   whaleBonusHelp: (n: number) => `${n} von 4 Teilen erfüllt (mit Gewicht über 0)`,
   whaleWeight: "Gewicht (Score)",
@@ -134,8 +140,8 @@ export interface SignalCheckCardProps {
  * ladder toggles per timeframe (sorted small → large, ≥ 30m), `Pflicht-Stufen` (1 … ladder length), RSI thresholds +
  * nearness, MCB zones, signal window, WaveTrend lengths, zone timeframe + swing length, the system-notification switch
  * (asks the browser for permission in the same click) and the minimum strength for a notice, plus the v2 thresholds
- * (decisions 5, 6, 9, 10): closes until "stark bestätigt", the Top-Trader-Kombi (switch, % threshold, retail period,
- * parts for +1 strength, weight), divergences (switch, oscillators / hidden / midline, pivot lookbacks, distance, age,
+ * (decisions 5, 6, 9, 10): closes until "stark bestätigt", the Top-Trader-Kombi (switch, % threshold, parts for +1
+ * strength, weight, the Whale–Retail-Delta thresholds and window), divergences (switch, oscillators / hidden / midline, pivot lookbacks, distance, age,
  * weight) and support / resistance (switch, ATR nearness, R room, internal length, EQH/EQL, weight). Values shown are the
  * ones the engine runs with (`sanitizeSignalCfg`); the part is written only when changed (see `draft.ts` /
  * `signalPartsDraft.ts`), merged over the stored object so unknown keys of either app survive (the legacy run-rule
@@ -339,7 +345,17 @@ const BONUS_OPTIONS = [1, 2, 3, 4].map((n) => ({
   v: String(n),
   label: String(n),
 }));
-const RETAIL_OPTIONS = WHALE_RETAIL_PERIODS.map((p) => ({ v: p, label: p }));
+const WINDOW_OPTIONS = WHALE_DELTA_WINDOWS.map((p) => ({ v: p, label: p }));
+/** pp choices of the delta thresholds (U+2212 / + in the label); a stored value outside them is offered as well */
+const ppLabel = (x: number): string => `${x > 0 ? "+" : x < 0 ? "−" : ""}${fmt(Math.abs(x))}`;
+const DELTA_RED_STEPS = [-2, -1, 0, 1, 2];
+const DELTA_FALL_STEPS = [0, 0.5, 1, 2, 3];
+/** Options for `steps` (+ the current value when it is none of them); `value` = the option matching the draft by number. */
+function ppChoice(draftValue: string, steps: readonly number[], fallback: number, lo: number, hi: number): { value: string; options: { v: string; label: string }[]; n: number } {
+  const n = Math.min(hi, Math.max(lo, parseNumber(draftValue) ?? fallback));
+  const all = steps.includes(n) ? [...steps] : [...steps, n].sort((a, b) => a - b);
+  return { value: String(n), options: all.map((x) => ({ v: String(x), label: ppLabel(x) })), n };
+}
 const weightOptions = (w: number) => (WHALE_WEIGHTS.includes(w) ? WEIGHT_OPTIONS : [...WHALE_WEIGHTS, w].sort((a, b) => a - b).map((x) => ({ v: String(x), label: String(x) })));
 const intOf = (v: string, d: number): number => Math.round(parseNumber(v) ?? d);
 
@@ -407,8 +423,10 @@ function ConfirmGroup({ draft, onChange, changed }: GroupProps) {
 }
 
 /**
- * `Top-Trader-Kombi` group: switch, top-trader threshold (% long), retail comparison period, parts for +1 strength and
- * the weight. The former run-rule values (periods / in a row) are no longer graded; they stay stored untouched.
+ * `Top-Trader-Kombi` group: switch, top-trader threshold (% long), parts for +1 strength, the weight and the
+ * Whale–Retail-Delta rule ("Retail rot": delta below `deltaRed` pp or fell ≥ `deltaFall` pp over `deltaWindow`; short
+ * mirrored), with the honest source note (Binance cohorts, not Hyblock's). The former run-rule values (periods / in a
+ * row) and the former retail comparison period are no longer graded; they stay stored untouched.
  */
 function WhaleGroup({ draft, onChange, changed, field }: GroupProps & { field: FieldFn }) {
   const on = draft.sgWhale === "on";
@@ -416,15 +434,28 @@ function WhaleGroup({ draft, onChange, changed, field }: GroupProps & { field: F
   const bonus = Math.min(4, Math.max(1, intOf(draft.sgWhaleBonus, 3)));
   const weight = Math.max(0, intOf(draft.sgWhaleWeight, 10));
   const topHelp = top != null ? S.whaleTopHelp(fmt(top), fmt(100 - top)) : undefined;
+  const red = ppChoice(draft.sgWhaleDeltaRed, DELTA_RED_STEPS, 0, -WHALE_DELTA_PP_MAX, WHALE_DELTA_PP_MAX);
+  const fall = ppChoice(draft.sgWhaleDeltaFall, DELTA_FALL_STEPS, 1, 0, WHALE_DELTA_PP_MAX);
+  const win = WHALE_DELTA_WINDOWS.includes(draft.sgWhaleWindow) ? draft.sgWhaleWindow : "1h";
   return (
     <Group title={S.whale}>
       <div className="grid gap-3.5" data-testid="settings-whale">
         <SwitchRow id="sgWhale" label={S.whaleSwitch} help={S.whaleHelp} on={on} changed={changed.has("sgWhale")} onChange={(v) => onChange("sgWhale", v ? "on" : "")} />
-        <div className={cn("grid gap-3.5 transition-opacity duration-300 sm:grid-cols-2 lg:grid-cols-4", !on && "opacity-60")}>
+        <div className={cn("grid gap-3.5 transition-opacity duration-300 sm:grid-cols-2 lg:grid-cols-3", !on && "opacity-60")}>
           {field("sgWhaleTop", S.whaleTop, topHelp)}
-          <Choice id="sgWhaleRetail" label={S.whaleRetail} help={S.whaleRetailHelp} value={draft.sgWhaleRetail || "5m"} options={RETAIL_OPTIONS} onChange={(v) => onChange("sgWhaleRetail", v)} changed={changed.has("sgWhaleRetail")} />
           <Choice id="sgWhaleBonus" label={S.whaleBonus} help={S.whaleBonusHelp(bonus)} value={String(bonus)} options={BONUS_OPTIONS} onChange={(v) => onChange("sgWhaleBonus", v)} changed={changed.has("sgWhaleBonus")} />
           <Choice id="sgWhaleWeight" label={S.whaleWeight} help={S.whaleWeightHelp(weight)} value={String(weight)} options={weightOptions(weight)} onChange={(v) => onChange("sgWhaleWeight", v)} changed={changed.has("sgWhaleWeight")} />
+        </div>
+        <div className={cn("grid gap-3 rounded-xl border border-line px-3 py-3 transition-opacity duration-300", !on && "opacity-60")} data-testid="settings-whale-delta">
+          <span className="text-[12px] font-semibold text-fg">{S.whaleDelta}</span>
+          <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            <Choice id="sgWhaleDeltaRed" label={S.whaleDeltaRed} help={S.whaleDeltaRedHelp(ppLabel(red.n), ppLabel(-red.n))} value={red.value} options={red.options} onChange={(v) => onChange("sgWhaleDeltaRed", v)} changed={changed.has("sgWhaleDeltaRed")} />
+            <Choice id="sgWhaleDeltaFall" label={S.whaleDeltaFall} help={S.whaleDeltaFallHelp(fmt(fall.n), win)} value={fall.value} options={fall.options} onChange={(v) => onChange("sgWhaleDeltaFall", v)} changed={changed.has("sgWhaleDeltaFall")} />
+            <Choice id="sgWhaleWindow" label={S.whaleWindow} help={S.whaleWindowHelp} value={win} options={WINDOW_OPTIONS} onChange={(v) => onChange("sgWhaleWindow", v)} changed={changed.has("sgWhaleWindow")} />
+          </div>
+          <p className="max-w-[80ch] text-[11px] leading-snug text-faint" data-testid="settings-whale-note">
+            {WHALE_DELTA_NOTE}
+          </p>
         </div>
       </div>
     </Group>
