@@ -11,7 +11,8 @@ import { Skeleton } from "@/primitives/Skeleton";
 import { rollDirection } from "@/primitives/StatTile";
 import { BiasBar } from "./BiasBar";
 import { SIGNAL_CARD_ID } from "./SignalCard";
-import { rungViews, statusPill, verdictColor, verdictText, whaleView, type RungView, type WhaleRowView } from "./signalView";
+import { StateDot, StateLine, StrengthDots } from "./signalParts";
+import { labelParts, partChips, PROV_TEXT, rungViews, statusPill, strengthView, verdictColor, verdictStateLine, verdictText, type PartChip, type RungView } from "./signalView";
 
 export const SIGNAL_STRIP_DETAILS = "Details";
 
@@ -26,54 +27,69 @@ function Score({ score }: { score: number }) {
   return <TextRoll text={text} mode="roll" direction={state.dir} />;
 }
 
-/** One rung chip: timeframe, event dot (filled = strong, ring = zero-line cross) and the event word; lit chips glow. */
+/**
+ * One rung chip: timeframe, event dot (filled = strong, ring = zero-line cross; dashed + desaturated while provisional,
+ * double ring when strongly confirmed) and the event word; lit chips glow (dashed tone while provisional).
+ */
 const RungChip = memo(function RungChip({ r, side }: { r: RungView; side: "long" | "short" }) {
-  const tone = !r.event ? null : r.longKind ? "win" : "loss";
+  const tone = !r.event ? null : r.longKind ? "long" : "short";
+  const prov = r.match && r.state === "provisional";
+  const lit = r.lit && !prov;
   return (
-    <span className="relative isolate flex min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-white/[0.07] bg-ink-950/60 px-2 py-1.5">
+    <span className="relative isolate flex min-w-0 items-center gap-2 overflow-clip rounded-lg border border-white/[0.07] bg-ink-950/60 px-2 py-1.5 [overflow-clip-margin:1px]" data-state={r.match ? r.state : "none"}>
       <motion.span
         aria-hidden="true"
         className={cn("pointer-events-none absolute -inset-px -z-10 rounded-lg border", side === "long" ? "border-win/35 bg-win/[0.07]" : "border-loss/35 bg-loss/[0.07]")}
         initial={false}
-        animate={{ opacity: r.lit ? 1 : 0 }}
+        animate={{ opacity: lit ? 1 : 0 }}
+        transition={tween.crossfade}
+      />
+      <motion.span
+        aria-hidden="true"
+        className={cn("pointer-events-none absolute -inset-px -z-10 rounded-lg border border-dashed", side === "long" ? "border-[#65b488]/45 bg-[#65b488]/[0.04]" : "border-[#d27a7b]/45 bg-[#d27a7b]/[0.04]")}
+        initial={false}
+        animate={{ opacity: r.lit && prov ? 1 : 0 }}
         transition={tween.crossfade}
       />
       <span className="dot-num shrink-0 text-[14px] leading-none text-fg">{r.tf}</span>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "size-1.5 shrink-0 rounded-full",
-          !tone ? "bg-line-2" : r.strong ? (tone === "win" ? "bg-win" : "bg-loss") : tone === "win" ? "border border-win" : "border border-loss",
-        )}
-      />
-      <span className={cn("truncate text-[11px]", r.match ? (side === "long" ? "text-win" : "text-loss") : "text-faint")}>{!r.check ? "–" : r.event ? SHORT_KIND[r.event.kind] : NO_KIND_TEXT}</span>
+      <StateDot tone={tone} strong={r.strong} state={r.match && r.state !== "none" ? r.state : "confirmed"} lit={false} size={6} />
+      <span className={cn("truncate text-[11px]", r.match ? (prov ? PROV_TEXT[side] : side === "long" ? "text-win" : "text-loss") : "text-faint")}>
+        {!r.check ? "–" : r.event ? SHORT_KIND[r.event.kind] : NO_KIND_TEXT}
+        {prov && <span className="ml-1 text-warn">⚠</span>}
+      </span>
     </span>
   );
 });
 
-/** One slim line "● Top-Trader kaufen · Retail rot … 2/2×" under the chips: same dot language, lit when it holds. */
-const WhaleLine = memo(function WhaleLine({ w, side }: { w: WhaleRowView; side: "long" | "short" }) {
-  const lit = w.state === "ok";
-  const tone = side === "long" ? "win" : "loss";
+/** The parts in one slim row: `● Top-Trader 3/4 · ● Divergenz 1h · ● S/R 3,1 R` (same dot language, lit while they hold). */
+const PartsLine = memo(function PartsLine({ chips, side }: { chips: readonly PartChip[]; side: "long" | "short" }) {
   return (
-    <span className="flex min-w-0 items-center gap-2 px-0.5 text-[11px]" data-testid="signal-strip-whale" data-lit={lit || undefined}>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "size-1.5 shrink-0 rounded-full transition-colors duration-300",
-          lit ? (tone === "win" ? "bg-win" : "bg-loss") : w.state === "open" && w.run > 0 ? (tone === "win" ? "border border-win" : "border border-loss") : "bg-line-2",
-        )}
-      />
-      <span className={cn("min-w-0 truncate transition-colors duration-300", lit ? (tone === "win" ? "text-win" : "text-loss") : "text-faint")}>{w.title}</span>
-      <span className="num ml-auto shrink-0 font-mono text-faint">{w.state === "none" ? "keine Daten" : `${Math.min(w.run, 99)}/${w.need}× ${w.period ?? ""}`}</span>
+    <span className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px]">
+      {chips.map((c) => {
+        const has = c.tone === "ok" || c.tone === "part";
+        return (
+          <span
+            key={c.id}
+            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap"
+            data-testid={c.id === "traders" ? "signal-strip-whale" : `signal-strip-${c.id}`}
+            data-lit={c.tone === "ok" || undefined}
+            data-state={c.tone}
+          >
+            <StateDot tone={has ? side : null} strong={c.tone === "ok"} state={c.provisional ? "provisional" : "confirmed"} lit={false} size={6} />
+            <span className={cn(c.tone === "ok" ? (c.provisional ? PROV_TEXT[side] : side === "long" ? "text-win" : "text-loss") : "text-faint")}>{c.label}</span>
+            <span className="num font-mono text-mute">{c.value}</span>
+          </span>
+        );
+      })}
     </span>
   );
 });
 
 /**
  * Compact "Einstiegs-Check" in the hero's left column (lg+, where the landscape-tablet layout left an empty band above
- * the KPI tiles): best verdict, score, strength dots, the timeframe ladder as chips and one slim "Top-Trader kaufen ·
- * Retail rot" line. The whole strip is one button
+ * the KPI tiles): best verdict, score, strength dots, the bias line, the timeframe ladder as chips (with their
+ * candle-close state) and one slim line with the entry's state (⚠ vorläufig · schließt in mm:ss / bestätigt, on the
+ * shared clock) and the graded parts. The whole strip is one button
  * that glides to the full card (`SIGNAL_CARD_ID`). Renders ≤ 1/s (published check state); opaque surface, so the hero
  * dot matrix never shows through its text.
  */
@@ -84,11 +100,13 @@ export function SignalStrip({ className }: { className?: string }) {
   const snap = check.snapshot;
   const v = snap?.best ?? null;
   const rungs = snap && v ? rungViews(snap, v, v.side, snap.cfg) : [];
-  const whale = snap && v ? whaleView(snap, v.side, snap.cfg) : null;
+  const chips = v ? partChips(v) : [];
+  const traders = v?.parts?.find((p) => p.id === "traders");
   const pill = statusPill(check.state);
   const color = v ? verdictColor(v) : "#9b9b9b";
+  const st = v ? strengthView(v, snap?.cfg.ladder.length ?? 4) : null;
   const open = () => document.getElementById(SIGNAL_CARD_ID)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
-  const whaleSaid = whale?.on && whale.state === "ok" ? `${whale.title}. ` : "";
+  const whaleSaid = traders?.ok ? `${traders.label}. ` : "";
   const name = v ? `${SIGNAL_TITLE}: ${v.label}, Score ${v.score} von 100. ${whaleSaid}${SIGNAL_STRIP_DETAILS} ansehen` : `${SIGNAL_TITLE}: ${check.message ?? LOADING_TEXT}`;
   return (
     <motion.button
@@ -121,22 +139,13 @@ export function SignalStrip({ className }: { className?: string }) {
                 animate={{ opacity: 1, y: 0, transition: reduced ? tween.fade : spring.smooth }}
                 exit={{ opacity: 0, transition: tween.exit }}
               >
-                {v.label}
+                {labelParts(v.label).prefix && <span className="sr-only">{labelParts(v.label).prefix}</span>}
+                {labelParts(v.label).text}
               </motion.span>
             </AnimatePresence>
             <span className="flex shrink-0 items-center gap-3">
-              <span className="flex gap-1" aria-hidden="true">
-                {[1, 2, 3, 4].map((i) => (
-                  <span key={i} className="relative size-1.5 rounded-full bg-[#2c2c2c]">
-                    <motion.span
-                      className="absolute inset-0 rounded-full"
-                      style={{ backgroundColor: color }}
-                      initial={false}
-                      animate={{ opacity: i <= v.strength ? 1 : 0, scale: i <= v.strength ? 1 : 0.4 }}
-                      transition={reduced ? tween.crossfade : { opacity: tween.fade, scale: spring.pop }}
-                    />
-                  </span>
-                ))}
+              <span aria-hidden="true" className="contents">
+                <StrengthDots strength={st?.dots ?? 0} color={color} outlined={st?.outlined} label={st?.aria ?? ""} size="sm" />
               </span>
               <span className="dot-num text-[20px] leading-none text-fg" aria-hidden="true">
                 <Score score={v.score} />
@@ -154,11 +163,10 @@ export function SignalStrip({ className }: { className?: string }) {
               <RungChip key={r.tf} r={r} side={v.side} />
             ))}
           </span>
-          {whale?.on && (
-            <span aria-hidden="true" className="contents">
-              <WhaleLine w={whale} side={v.side} />
-            </span>
-          )}
+          <span aria-hidden="true" className="flex min-w-0 items-center justify-between gap-3 px-0.5">
+            <StateLine line={verdictStateLine(snap, v, snap.cfg)} side={v.side} className="text-[11px]" />
+            {chips.length > 0 && <PartsLine chips={chips} side={v.side} />}
+          </span>
         </>
       ) : (
         <>

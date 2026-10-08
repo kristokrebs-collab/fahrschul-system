@@ -125,15 +125,17 @@ describe("BiasBar in the card", () => {
     const dialog = screen.getByRole("dialog", { name: "Long/Short-Tendenz" });
     const list = within(dialog).getByRole("list", { name: "Beiträge der Bedingungen" });
     const rows = within(list).getAllByTestId("bias-row");
-    expect(rows.map((r) => r.getAttribute("data-id"))).toEqual(["mcb-30m", "mcb-45m", "mcb-1h", "mcb-4h", "rsi", "zone", "whale"]);
+    expect(rows.map((r) => r.getAttribute("data-id"))).toEqual(["mcb-30m", "mcb-45m", "mcb-1h", "mcb-4h", "rsi", "zone", "traders", "div", "sr"]);
     expect(rows.find((r) => r.getAttribute("data-id") === "mcb-30m")).toHaveAttribute("data-vote", "1.00");
-    // no top-trader reading in this snapshot: shown as "keine Daten", not counted
-    const whale = rows.find((r) => r.getAttribute("data-id") === "whale")!;
-    expect(whale).toHaveAttribute("data-vote", "none");
-    expect(within(whale).getAllByText("keine Daten").length).toBeGreaterThan(0);
-    expect(within(whale).getByText("zählt nicht")).toBeInTheDocument();
-    expect(within(whale).getByText("Top-Trader vs. Retail")).toBeInTheDocument(); // no reading: neutral title
-    expect(within(dialog).getByText(/6 von 7 Bedingungen mit Daten/)).toBeInTheDocument();
+    // no top-trader reading, no divergences / structure in this hand-built snapshot: "keine Daten", not counted
+    for (const id of ["traders", "div", "sr"]) {
+      const row = rows.find((r) => r.getAttribute("data-id") === id)!;
+      expect(row, id).toHaveAttribute("data-vote", "none");
+      expect(within(row).getAllByText("keine Daten").length).toBeGreaterThan(0);
+      expect(within(row).getByText("zählt nicht")).toBeInTheDocument();
+    }
+    expect(within(rows.find((r) => r.getAttribute("data-id") === "traders")!).getByText("Top-Trader-Kombi")).toBeInTheDocument(); // no reading: neutral title
+    expect(within(dialog).getByText(/6 von 9 Bedingungen mit Daten/)).toBeInTheDocument();
     expect(within(dialog).getByText(/Gewichte wie die Score-Punkte des Checks/)).toBeInTheDocument();
     // "Gewicht 16 % → +0,16": the shares add up to exactly 100 %, the contributions to exactly the shown sum
     const parts = within(list)
@@ -146,7 +148,10 @@ describe("BiasBar in the card", () => {
     const sumLine = within(dialog).getByTestId("bias-sum").textContent ?? "";
     const sum = deNum(/^Summe ([+−±][\d,]+)/.exec(sumLine)![1]!);
     expect(parts.reduce((a, m) => a + Math.round(deNum(m[2]!) * 100), 0)).toBe(Math.round(sum * 100));
-    expect(sumLine).toMatch(/→ Stark Long · \d+ % Long · 6 von 7/);
+    expect(sumLine).toMatch(/→ Stark Long · \d+ % Long · 6 von 9/);
+    // nothing on a forming candle here: no provisional tag, no legend
+    expect(within(dialog).queryByTestId("bias-legend")).toBeNull();
+    expect(screen.getByTestId("signal-bias")).not.toHaveAttribute("data-provisional");
     expect(sumLine).not.toMatch(/begrenzt|gehalten/);
   });
 

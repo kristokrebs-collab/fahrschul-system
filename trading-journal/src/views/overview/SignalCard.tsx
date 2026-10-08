@@ -14,8 +14,8 @@ import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
 import { Explainer, type ExplainerData } from "@/primitives/VerdictPanel";
 import { BiasBar } from "./BiasBar";
-import { Reasons, RungTile, VerdictRow, WhaleRow, ZoneGauge } from "./signalParts";
-import { entryLevels, freshEntry, ladderText, rungViews, statusPill, whaleView, type EntryLevels, type RungView } from "./signalView";
+import { PartsSection, Reasons, RungTile, VerdictRow, ZoneGauge } from "./signalParts";
+import { entryLevels, freshEntry, ladderText, partViews, rungViews, statusPill, verdictStateLine, type EntryLevels, type RungView } from "./signalView";
 import { useForceRefresh } from "./useMarket";
 
 export const SIGNAL_CARD_ID = "signal-card";
@@ -121,9 +121,10 @@ function SignalSkeleton({ rungs }: { rungs: number }) {
 }
 
 /**
- * `Einstiegs-Check` (other journal's `signalpanel.tsx`, on Binance data): verdict ring + label + strength, the
- * timeframe ladder (MCB event, MCB and RSI meters per rung), the "Top-Trader kaufen · Retail rot" row (ours), the
- * Premium/Discount zone with the live price, and the reasons. Reads `useSignalCheck()` – the engine evaluates ≤ 1/s off the render path and publishes only real changes,
+ * `Einstiegs-Check` (other journal's `signalpanel.tsx`, on Binance data): verdict ring + label + strength + the
+ * candle-close state line (vorläufig · schließt in mm:ss / bestätigt / stark bestätigt), the timeframe ladder (MCB
+ * event with its state, MCB and RSI meters per rung), the graded parts (ours: Top-Trader-Kombi scorecard, divergences,
+ * support / resistance), the Premium/Discount zone with the live price, and the reasons. Reads `useSignalCheck()` – the engine evaluates ≤ 1/s off the render path and publishes only real changes,
  * so this card re-renders at most once per second; the zone marker follows the price as a MotionValue.
  * A NEW valid entry (never on load): one BorderBeam lap, a halo on the score ring, the rung dots that lit up pop, and a
  * `Neuer … Einstieg` marker (pulse `tactile-highlight`) that holds `SIGNAL_HOLD_MS`.
@@ -139,7 +140,7 @@ export function SignalCard() {
   const cfg = snap?.cfg ?? DEFAULT_SIGNAL_CFG;
   const fresh = useFreshEntry(snap);
   const rungs = snap && v ? rungViews(snap, v, cur, cfg) : [];
-  const whale = snap ? whaleView(snap, cur, cfg) : null;
+  const parts = v ? partViews(v) : [];
   const freshRungs = useFreshRungs(rungs, cur);
   const pill = statusPill(check.state);
   const n = cfg.ladder.length;
@@ -184,7 +185,7 @@ export function SignalCard() {
             <BiasBar sig={snap} cfg={cfg} />
             <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_2fr] xl:items-center">
               <div className="grid min-w-0 gap-3">
-                <VerdictRow v={v} ladderLength={n} flash={fresh.n[cur]} />
+                <VerdictRow v={v} ladderLength={n} flash={fresh.n[cur]} line={verdictStateLine(snap, v, cfg)} />
                 <AnimatePresence initial={false}>
                   {badge && (
                     <motion.div key={badge.seq} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: tween.fade }} exit={{ opacity: 0, transition: tween.exit }}>
@@ -206,7 +207,7 @@ export function SignalCard() {
                 ))}
               </div>
             </div>
-            {whale?.on && <WhaleRow w={whale} side={cur} />}
+            <PartsSection parts={parts} side={cur} cfg={cfg} points={v.partPoints ?? 0} />
             <div className="grid gap-5 md:grid-cols-[1.1fr_1fr]">
               <ZoneGauge c={snap.zone} side={cur} />
               <Reasons v={v} />

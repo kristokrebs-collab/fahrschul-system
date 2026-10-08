@@ -1,10 +1,38 @@
 /**
  * Pure view model of the "Einstiegs-Check" card (`SignalCard`) and the hero strip (`SignalStrip`): rung tiles,
- * meter positions, the "neuer Einstieg" detection and the status pill. No React, no market access – the card feeds
- * it the published `SignalCheckState` (≤ 1/s), so every helper here is cheap and deterministic (tested in
- * `tests/unit/views.overview.signal.test.tsx`).
+ * meter positions, the "neuer Einstieg" detection, the status pill, the candle-close states (vorläufig / bestätigt /
+ * stark bestätigt, decisions 6 + 9) and the graded parts (Top-Trader-Kombi, Divergenzen, Support / Widerstand,
+ * decisions 5 + 10). No React, no market access – the card feeds it the published `SignalCheckState` (≤ 1/s), so every
+ * helper here is cheap and deterministic (tested in `tests/unit/views.overview.signal*.test.tsx`).
+ *
+ * Countdowns are NOT computed here: the views carry the close time (`closesAt`, ms) and the components render the
+ * remaining time on the shared second clock (`useNowMv`), so nothing re-renders per second.
  */
-import { isLongKind, isStrongKind, kindText, periodsText, ppText, roleText, whaleCfgOf, WHALE_TITLE, type Side, type SignalCfg, type Signals, type TfCheck, type Verdict, type WtKind, type ZoneInfo } from "@/domain/signals";
+import {
+  divCfgOf,
+  isLongKind,
+  isStrongKind,
+  kindText,
+  mmss,
+  PROVISIONAL_PREFIX,
+  provisionalText,
+  roleText,
+  rungState,
+  srCfgOf,
+  strengthText,
+  whaleCfgOf,
+  type Divergence,
+  type GradedPart,
+  type PartId,
+  type Side,
+  type SignalCfg,
+  type SignalState,
+  type Signals,
+  type TfCheck,
+  type Verdict,
+  type WtKind,
+  type ZoneInfo,
+} from "@/domain/signals";
 import type { SignalCheckState } from "@/market";
 import type { StatusTone } from "@/motion/StatusPill";
 
@@ -18,11 +46,11 @@ export interface RungView {
   tf: string;
   /** "Basis" / "Bestätigung" / "stärker" */
   role: string;
-  /** part of the confirmed ladder for this side (`i < tiers`) – the tile lights up */
+  /** part of the ladder for this side (`i < tiers`) – the tile lights up (desaturated while `provisional`) */
   lit: boolean;
   /** `null` = too few bars on this rung */
   check: TfCheck | null;
-  /** event shown: the direction-matching strongest one, otherwise the latest of any direction (muted) */
+  /** event shown: the one deciding this side's candle-close state, otherwise the latest of any direction (muted) */
   event: RungEvent | null;
   /** the event points in the selected direction */
   match: boolean;
@@ -33,15 +61,23 @@ export interface RungView {
   text: string;
   /** RSI near the extreme for this side */
   rsiNear: boolean;
+  /** candle-close state of this side's signal on the rung (`none` without one) */
+  state: SignalState;
+  /** close (ms) of the rung's forming candle while `state` is provisional (countdown target), else `null` */
+  closesAt: number | null;
+  /** closed candles since the deciding event, counting its own close (0 = on the forming candle) */
+  closes: number;
 }
 
 /** Rung tiles for `side`, one per ladder entry (a `null` check keeps its timeframe from the config). */
 export function rungViews(sig: Pick<Signals, "checks">, v: Pick<Verdict, "tiers">, side: Side, cfg: Pick<SignalCfg, "ladder" | "required">): RungView[] {
   return sig.checks.map((c, i) => {
     const tf = c?.tf ?? cfg.ladder[i] ?? "";
-    const own = c ? (side === "long" ? c.wt.long : c.wt.short) : null;
+    const conf = c?.conf?.[side];
+    const own = conf?.event ?? (c ? (side === "long" ? c.wt.long : c.wt.short) : null);
     const event: RungEvent | null = own ?? (c && c.wt.kind ? { kind: c.wt.kind, barsAgo: c.wt.barsAgo ?? 0 } : null);
     const longKind = !!event && isLongKind(event.kind);
+    const state = rungState(c, side);
     return {
       tf,
       role: roleText(i, cfg.required),
@@ -53,6 +89,9 @@ export function rungViews(sig: Pick<Signals, "checks">, v: Pick<Verdict, "tiers"
       longKind,
       text: kindText(event?.kind ?? null),
       rsiNear: !!c && (side === "long" ? c.rsiLong : c.rsiShort),
+      state,
+      closesAt: state === "provisional" && c?.closesAt != null && Number.isFinite(c.closesAt) ? c.closesAt : null,
+      closes: conf?.closes ?? 0,
     };
   });
 }
@@ -110,76 +149,258 @@ export function statusPill(state: SignalCheckState["state"]): { tone: StatusTone
 /** `30m → 45m → 1h → 4h` */
 export const ladderText = (ladder: readonly string[]): string => ladder.join(" → ");
 
-/** Ring / label colour of a verdict (journal semantics: green long, red short, grey while not valid). */
-export const verdictColor = (v: Pick<Verdict, "valid" | "side">): string => (v.valid ? (v.side === "long" ? "#3ddc84" : "#ff4d4f") : "#9b9b9b");
-export const verdictText = (v: Pick<Verdict, "valid" | "side">): string => (v.valid ? (v.side === "long" ? "text-win" : "text-loss") : "text-fg");
+/** Journal colours: green long, red short (P&L semantics) and the same hues at ~50 % saturation (provisional). */
+export const SIDE_COLOR: Readonly<Record<Side, string>> = { long: "#3ddc84", short: "#ff4d4f" };
+export const PROV_COLOR: Readonly<Record<Side, string>> = { long: "#65b488", short: "#d27a7b" };
+export const NEUTRAL_COLOR = "#9b9b9b";
+/** Tailwind classes of the provisional colours (literal strings: the class scanner needs them whole). */
+export const PROV_TEXT: Readonly<Record<Side, string>> = { long: "text-[#65b488]", short: "text-[#d27a7b]" };
+
+type StatefulVerdict = Pick<Verdict, "valid" | "side"> & { state?: SignalState };
+
+/** Candle-close state of a verdict (hand-built verdicts without `state`: valid = confirmed). */
+export const verdictState = (v: Pick<Verdict, "valid"> & { state?: SignalState }): SignalState => v.state ?? (v.valid ? "confirmed" : "none");
+
+/** Ring / label colour of a verdict: side colour once confirmed, desaturated while provisional, grey otherwise. */
+export function verdictColor(v: StatefulVerdict): string {
+  const st = verdictState(v);
+  return st === "provisional" ? PROV_COLOR[v.side] : v.valid ? SIDE_COLOR[v.side] : NEUTRAL_COLOR;
+}
+/** Text class of the verdict label (same rule as `verdictColor`). */
+export function verdictText(v: StatefulVerdict): string {
+  const st = verdictState(v);
+  if (st === "provisional") return PROV_TEXT[v.side];
+  return v.valid ? (v.side === "long" ? "text-win" : "text-loss") : "text-fg";
+}
+
+/** `Vorläufig: Starker Long-Einstieg` → `{ prefix: "Vorläufig: ", text: "Starker Long-Einstieg" }` (the state line says it visually). */
+export function labelParts(label: string): { prefix: string; text: string } {
+  return label.startsWith(PROVISIONAL_PREFIX) ? { prefix: PROVISIONAL_PREFIX, text: label.slice(PROVISIONAL_PREFIX.length) } : { prefix: "", text: label };
+}
+
+/** Strength dots + line: a provisional entry shows the strength it gets on the close (outlined dots). */
+export interface StrengthView {
+  dots: number;
+  outlined: boolean;
+  line: string;
+  aria: string;
+}
+export function strengthView(v: Pick<Verdict, "strength" | "tiers" | "valid"> & { state?: SignalState; provStrength?: number }, ladderLength: number): StrengthView {
+  const tf = `${v.tiers} von ${ladderLength} Timeframes`;
+  if (verdictState(v) === "provisional") {
+    const p = Math.max(0, Math.min(4, v.provStrength ?? 0));
+    return { dots: p, outlined: true, line: `${strengthText(p)} ab Kerzenschluss · ${tf}`, aria: `Stärke 0 von 4, vorläufig ${p}` };
+  }
+  return { dots: v.strength, outlined: false, line: `${strengthText(v.strength)} · ${tf}`, aria: `Stärke ${v.strength} von 4` };
+}
+
+/** The state line under the verdict (and in the strip). `closesAt` = the base candle's close (countdown target). */
+export interface StateLineView {
+  state: SignalState;
+  /** base timeframe (`30m`) */
+  tf: string;
+  closesAt: number | null;
+  /** closed candles the base signal held (strong) */
+  closes: number;
+}
+export function verdictStateLine(sig: Pick<Signals, "checks">, v: Pick<Verdict, "side" | "valid"> & { state?: SignalState; closesAt?: number | null }, cfg: Pick<SignalCfg, "ladder">): StateLineView {
+  const base = sig.checks[0] ?? null;
+  const state = verdictState(v);
+  const closesAt = v.closesAt ?? (base?.forming && base.closesAt != null && Number.isFinite(base.closesAt) ? base.closesAt : null);
+  return { state, tf: base?.tf ?? cfg.ladder[0] ?? "", closesAt, closes: base?.conf?.[v.side]?.closes ?? 0 };
+}
+
+/**
+ * Text of a state line at `now` (ms): `vorläufig · schließt in 12:04`, `bestätigt · 30m-Kerze geschlossen`, `stark
+ * bestätigt · 3 Schlüsse gehalten`; without an entry the base candle's countdown (`30m-Kerze schließt in 12:04`).
+ */
+export function stateLineText(l: StateLineView, now: number): string {
+  if (l.state === "provisional") return l.closesAt != null ? provisionalText(l.closesAt - now) : "vorläufig";
+  if (l.state === "confirmed") return `bestätigt · ${l.tf}-Kerze geschlossen`;
+  if (l.state === "strong") return `stark bestätigt · ${l.closes} ${l.closes === 1 ? "Schluss" : "Schlüsse"} gehalten`;
+  return l.closesAt != null ? `${l.tf}-Kerze schließt in ${mmss(l.closesAt - now)}` : "";
+}
+
+/** Short state words of a rung tile (`vorläufig` / `bestätigt` / `stark bestätigt`). */
+export const RUNG_STATE_TEXT: Readonly<Record<SignalState, string>> = { none: "", provisional: "vorläufig", confirmed: "bestätigt", strong: "stark bestätigt" };
 
 /** RSI meter bands: near (≤ rsiOs + rsiNear / ≥ rsiOb − rsiNear) and the extreme itself (≤ rsiOs / ≥ rsiOb). */
 export function rsiBands(cfg: Pick<SignalCfg, "rsiOs" | "rsiOb" | "rsiNear">): { nearLo: number; lo: number; nearHi: number; hi: number } {
   return { nearLo: cfg.rsiOs + cfg.rsiNear, lo: cfg.rsiOs, nearHi: cfg.rsiOb - cfg.rsiNear, hi: cfg.rsiOb };
 }
 
-/** One period chip of the top-trader / retail row. */
-export interface WhalePeriodView {
-  period: string;
-  /** trailing periods that fit the side */
-  run: number;
-  ok: boolean;
-}
 
-/** View model of the "Top-Trader kaufen · Retail rot" row (card) and line (strip). */
-export interface WhaleRowView {
-  /** the condition is switched on (otherwise the row is not shown) */
-  on: boolean;
+/* ------------------------------------------------------------------ graded parts (decisions 5 + 10) */
+
+const dec1 = (x: number): string => (Number.isFinite(x) ? String(Math.round(x * 10) / 10).replace(".", ",").replace("-", "−") : "–");
+const fmtInt = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
+const price0 = (x: number): string => (Number.isFinite(x) ? fmtInt.format(x) : "–");
+
+/** `ok` = holds fully (lit), `part` = partial credit, `open` = data but nothing met, `none` = keine Daten. */
+export type PartTone = "ok" | "part" | "open" | "none";
+
+export interface PartView {
+  id: PartId;
+  /** German title for the side (`Top-Trader long · Retail rot`) */
   title: string;
-  /** `ok` = holds (lit), `open` = data but not (yet) held, `none` = no data ("keine Daten") */
-  state: "ok" | "open" | "none";
-  run: number;
-  need: number;
-  /** period of the shown readings */
-  period: string | null;
-  /** `+1,2 pp` / `−0,8 pp` over the last `need` periods */
-  top: string;
-  retail: string;
-  /** the reading points the way the side needs (long: top ↑ / retail ↓) */
-  topFits: boolean;
-  retailFits: boolean;
-  periods: WhalePeriodView[];
-  /** score points it adds now */
-  points: number;
-  weight: number;
-  /** configured periods without data */
-  missing: string[];
-  /** `3 Perioden · 30m` / `keine Daten` */
-  runText: string;
+  tone: PartTone;
+  /** 0 … 1 */
+  grade: number;
+  /** `+7,5 von 10` · `zählt nicht` · `keine Daten` */
+  pointsText: string;
+  /** the part gives a valid entry +1 strength (shown as `+1 Stärke` while it holds) */
+  bonus: boolean;
+  /** the grade rests on a forming candle */
+  provisional: boolean;
+  data: boolean;
+  detail: string;
+  part: GradedPart;
 }
 
-/** Row view for `side` from a published evaluation (works without a reading: `state: "none"`). */
-export function whaleView(sig: Pick<Signals, "whale" | "long" | "short">, side: Side, cfg: Pick<SignalCfg, "whale">): WhaleRowView {
-  const w = whaleCfgOf(cfg);
-  const v = sig[side].whale;
-  const reading = sig.whale;
-  const base = { on: w.on, title: WHALE_TITLE[side], need: w.minRun, weight: w.weight };
-  if (!v || !reading) {
-    return { ...base, state: "none", run: 0, period: null, top: "–", retail: "–", topFits: false, retailFits: false, periods: [], points: 0, missing: w.periods, runText: "keine Daten" };
-  }
-  const sign = side === "long" ? 1 : -1;
-  const periods = reading.periods.map((p) => {
-    const run = side === "long" ? p.runLong : p.runShort;
-    return { period: p.period, run, ok: run >= w.minRun };
+export function partTone(p: Pick<GradedPart, "data" | "ok" | "grade">): PartTone {
+  return !p.data ? "none" : p.ok ? "ok" : p.grade > 0 ? "part" : "open";
+}
+
+export function partView(p: GradedPart): PartView {
+  const pointsText = p.weight <= 0 ? "zählt nicht" : !p.data ? "keine Daten" : `+${dec1(p.points)} von ${p.weight}`;
+  return { id: p.id, title: p.label, tone: partTone(p), grade: p.grade, pointsText, bonus: p.bonus, provisional: p.state === "provisional", data: p.data, detail: p.detail, part: p };
+}
+
+/** The verdict's parts in the fixed order traders · div · sr (switched-off parts are absent). */
+export function partViews(v: Pick<Verdict, "parts">): PartView[] {
+  const order: PartId[] = ["traders", "div", "sr"];
+  return order.flatMap((id) => {
+    const p = v.parts?.find((x) => x.id === id);
+    return p ? [partView(p)] : [];
   });
-  return {
-    ...base,
-    state: v.ok ? "ok" : "open",
-    run: v.run,
-    period: v.period,
-    top: ppText(v.topChg),
-    retail: ppText(v.retailChg),
-    topFits: v.topChg * sign > 0,
-    retailFits: v.retailChg * sign < 0,
-    periods,
-    points: v.points,
-    missing: reading.missing,
-    runText: `${periodsText(v.run)} · ${v.period}`,
+}
+
+/** One cell of the Top-Trader scorecard. */
+export interface PartCell {
+  id: string;
+  /** small caps title (`Positionen`) */
+  title: string;
+  /** main value (`66,0 %`, `−0,5 pp`, `Discount · 20 %`; `–` without data) */
+  value: string;
+  /** what it must show (`> 64 % Long`, `rot: Long-Anteil fällt (5m)`, `Discount · 1h`) */
+  sub: string;
+  met: boolean | null;
+}
+
+const tfIn = (label: string): string | null => /\(([^)]+)\)\s*$/.exec(label)?.[1] ?? null;
+
+/** The four cells of the Top-Trader-Kombi (positions, accounts, retail, zone) for its side. */
+export function traderCells(p: GradedPart, cfg: Pick<SignalCfg, "whale">): PartCell[] {
+  const w = whaleCfgOf(cfg);
+  const long = p.side === "long";
+  const sideWord = long ? "Long" : "Short";
+  const period = p.reading?.period ?? w.retailPeriod;
+  const item = (id: string) => p.items.find((i) => i.id === id);
+  const cell = (id: string, title: string, sub: string, strip?: RegExp): PartCell => {
+    const it = item(id);
+    const none = !it || it.met === null;
+    return { id, title, value: none ? "–" : strip ? it.value.replace(strip, "") : it.value, sub, met: it?.met ?? null };
   };
+  const zoneTf = tfIn(item("zone")?.label ?? "");
+  return [
+    cell("pos", "Positionen", `Ziel > ${dec1(w.topPct)} % ${sideWord}`, / (Long|Short)$/),
+    cell("acc", "Konten", `Ziel > ${dec1(w.topPct)} % ${sideWord}`, / (Long|Short)$/),
+    cell("retail", "Retail", long ? `rot: Long-Anteil fällt (${period})` : `grün: Long-Anteil steigt (${period})`),
+    cell("zone", "Zone", `Ziel ${long ? "Discount" : "Premium"}${zoneTf ? ` · ${zoneTf}` : ""}`),
+  ];
+}
+
+const OSC_TEXT = { rsi: "RSI", wt: "WT" } as const;
+const DIV_KIND_TEXT = { regular: "regulär", hidden: "versteckt" } as const;
+const barsText = (n: number): string => (n <= 0 ? "diese Kerze" : n === 1 ? "vor 1 Kerze" : `vor ${n} Kerzen`);
+
+/** Strongest hit of the divergence part on its best timeframe (regular before hidden, RSI before WT, newest first). */
+export function bestDivHit(p: Pick<GradedPart, "hits" | "tf">): (Divergence & { tf: string }) | null {
+  const hits = (p.hits ?? []).filter((h) => !p.tf || h.tf === p.tf);
+  const rank = (d: Divergence): number => (d.kind === "regular" ? 4 : 0) + (d.state === "provisional" ? 0 : 2) + (d.osc === "rsi" ? 1 : 0);
+  return hits.reduce<(Divergence & { tf: string }) | null>((a, d) => (!a || rank(d) > rank(a) || (rank(d) === rank(a) && d.barsAgo < a.barsAgo) ? d : a), null);
+}
+
+/** `1h · RSI regulär: Tief 81.240 → 80.950 · RSI 28,1 → 31,4 · vor 2 Kerzen` (what, where, which timeframe). */
+export function divHitLine(p: Pick<GradedPart, "hits" | "tf">): string | null {
+  const d = bestDivHit(p);
+  if (!d) return null;
+  const pivot = d.dir === 1 ? "Tief" : "Hoch";
+  const state = d.state === "provisional" ? " · vorläufig" : d.state === "strong" ? " · stark bestätigt" : "";
+  return `${d.tf} · ${OSC_TEXT[d.osc]} ${DIV_KIND_TEXT[d.kind]}: ${pivot} ${price0(d.from.price)} → ${price0(d.to.price)} · ${OSC_TEXT[d.osc]} ${dec1(d.from.osc)} → ${dec1(d.to.osc)} · ${barsText(d.barsAgo)}${state}`;
+}
+
+/** Support / resistance meters: distance to the level leaned on (ATR) and room to the next opposite level (R). */
+export interface SrView {
+  near: { label: string; level: string; value: string; distAtr: number | null; band: number; max: number; met: boolean | null };
+  room: { label: string; level: string; value: string; r: number | null; free: boolean; minR: number; max: number; met: boolean | null };
+  tf: string | null;
+}
+
+export function srView(p: GradedPart, cfg: Pick<SignalCfg, "sr">): SrView {
+  const sc = srCfgOf(cfg);
+  const long = p.side === "long";
+  const lv = p.levels ?? { lean: null, target: null, stop: null, r: null };
+  const near = p.items.find((i) => i.id === "near");
+  const room = p.items.find((i) => i.id === "room");
+  const lean = lv.lean;
+  const target = lv.target;
+  const r = lv.r;
+  const free = r === Infinity;
+  return {
+    near: {
+      label: near?.label ?? (long ? "Am Support / Demand" : "Am Widerstand / Supply"),
+      level: lean ? `${lean.label} ${price0(lean.price)}` : !p.data ? "keine Daten" : long ? "kein Support darunter" : "kein Widerstand darüber",
+      value: !lean ? "–" : lean.dist === 0 ? "im Level" : `${dec1(lean.distAtr)} ATR`,
+      distAtr: lean ? lean.distAtr : null,
+      band: sc.nearAtr,
+      max: sc.nearAtr * 2,
+      met: near?.met ?? null,
+    },
+    room: {
+      label: room?.label ?? `Platz (≥ ${dec1(sc.minR)} R)`,
+      level: target ? `${target.label} ${price0(target.price)}` : free ? `kein ${long ? "Widerstand" : "Support"}` : !p.data ? "keine Daten" : "–",
+      value: r == null ? "–" : free ? "frei" : `${dec1(r)} R`,
+      r: r == null ? null : free ? Infinity : r,
+      free,
+      minR: sc.minR,
+      max: sc.minR * 2,
+      met: room?.met ?? null,
+    },
+    tf: p.tf ?? null,
+  };
+}
+
+/** Divergence settings in one line for the card footer (`RSI + WT · regulär + versteckt · Pivots 2/2`). */
+export function divSetupText(cfg: Pick<SignalCfg, "div">): string {
+  const d = divCfgOf(cfg);
+  const osc = [d.rsi ? "RSI" : "", d.wt ? "WT" : ""].filter(Boolean).join(" + ") || "–";
+  return `${osc} · regulär${d.hidden ? " + versteckt" : ""} · Pivots ${d.left}/${d.right} · gilt ${d.maxAge} Kerzen`;
+}
+
+/** Compact one-line summary of the parts (strip): `Top-Trader 3/4`, `Divergenz 1h`, `S/R 3,1 R`. */
+export interface PartChip {
+  id: PartId;
+  label: string;
+  value: string;
+  tone: PartTone;
+  provisional: boolean;
+}
+export function partChips(v: Pick<Verdict, "parts">): PartChip[] {
+  return partViews(v).map((pv) => {
+    const p = pv.part;
+    const value =
+      !p.data
+        ? "–"
+        : p.id === "traders"
+          ? `${p.met ?? 0}/4`
+          : p.id === "div"
+            ? (p.grade > 0 ? (p.tf ?? "✓") : "–")
+            : p.levels?.r == null
+              ? "–"
+              : p.levels.r === Infinity
+                ? "frei"
+                : `${dec1(p.levels.r)} R`;
+    return { id: p.id, label: p.id === "traders" ? "Top-Trader" : p.id === "div" ? "Divergenz" : "S/R", value, tone: pv.tone, provisional: pv.provisional };
+  });
 }
