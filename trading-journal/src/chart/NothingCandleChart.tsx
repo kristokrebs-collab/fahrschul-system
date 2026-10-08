@@ -176,6 +176,18 @@ interface Instance {
   cancelWipe: (() => void) | null;
   /** host size from a ResizeObserver (tooltip bounds without a layout read per move) */
   size: { width: number; height: number };
+  /**
+   * Inputs the effects last applied. A parked instance is re-attached when the kept-alive page is shown again and every
+   * effect re-runs then: an input it already holds is skipped (no setData / setMarkers / price-line churn on a return).
+   */
+  applied: {
+    candles?: readonly Candle[];
+    levels?: { levels: MarketLevels | undefined; active: ActiveScenario };
+    markers?: TradeMarker[] | undefined;
+    overlay?: readonly unknown[];
+    live?: Candle;
+    pane?: readonly unknown[];
+  };
   /** ready, on screen and not collapsed */
   isActive(): boolean;
   /** re-evaluates `isActive` for the pulse and the live engine */
@@ -185,6 +197,46 @@ interface Instance {
 }
 
 type Callbacks = Pick<NothingCandleChartProps, "onMarkerClick" | "onCrosshair" | "onOutsideCount">;
+
+/** A chart and its lifecycle: `attach` wires the per-shown-period observers (returns their detach), `destroy` tears down. */
+interface ChartRecord {
+  instance: Instance;
+  attach(): () => void;
+  destroy(): void;
+}
+
+/**
+ * Charts parked by a hidden keep-alive page. React runs no cleanup when a hidden subtree unmounts, so a parked chart whose
+ * host left the document is torn down by a slow sweep (one timer, only while something is parked).
+ */
+const PARKED = new Set<ChartRecord>();
+let sweepTimer: ReturnType<typeof setInterval> | null = null;
+const SWEEP_MS = 10_000;
+
+function sweepParked(): void {
+  for (const rec of PARKED) {
+    if (rec.instance.node.isConnected) continue;
+    PARKED.delete(rec);
+    rec.destroy();
+  }
+  if (PARKED.size === 0 && sweepTimer) {
+    clearInterval(sweepTimer);
+    sweepTimer = null;
+  }
+}
+
+function parkChart(rec: ChartRecord): void {
+  PARKED.add(rec);
+  if (!sweepTimer) sweepTimer = setInterval(sweepParked, SWEEP_MS);
+}
+
+function unparkChart(rec: ChartRecord): void {
+  PARKED.delete(rec);
+  if (PARKED.size === 0 && sweepTimer) {
+    clearInterval(sweepTimer);
+    sweepTimer = null;
+  }
+}
 
 const noop = () => undefined;
 /** Space between the follow pill and the price scale, px. */
@@ -211,6 +263,7 @@ function windowFor(i: Instance, days: RangeDays, interval: ChartInterval): Range
 }
 
 function syncLevels(i: Instance, levels: MarketLevels | undefined, active: ActiveScenario, reduced = false): void {
+  i.applied.levels = { levels, active };
   if (!levels) {
     clearLevels(i.main.candles, i.levels);
     i.levels = null;
@@ -250,6 +303,7 @@ function zoneCaptionBox(i: Instance, levels: MarketLevels | undefined): Box[] {
 
 /** Overlay inputs; the overlay re-indexes itself when the inputs or the loaded bars change. */
 function syncOverlay(i: Instance, p: { signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers }): void {
+  i.applied.overlay = [p.signals, p.divergences, p.structure, p.layers];
   i.check.setMarkers(p.signals ?? NO_MARKERS);
   i.check.setDivergences(p.divergences ?? NO_LINES);
   i.check.setStructure(p.structure ?? null);
@@ -260,6 +314,7 @@ function syncMarkers(i: Instance, markers: TradeMarker[] | undefined): BuiltMark
   const src = snapSourceOf(i.main.candles, i.chart.timeScale());
   const built = buildMarkers(markers ?? [], (t) => snapTime(src, t), i.bounds);
   i.built = built;
+  i.applied.markers = markers;
   i.markersApi.setMarkers(built.markers);
   return built;
 }
@@ -392,6 +447,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   const ripples = useRef<HTMLDivElement>(null);
   const pulse = useRef<PulseHandle>(null);
   const inst = useRef<Instance | null>(null);
+  /** the instance kept while a keep-alive <Activity> hides the page (see effect 1) */
+  const parked = useRef<ChartRecord | null>(null);
   const tip = useRef<TooltipHandle>(null);
   const cb = useRef<Callbacks>({});
   const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers; levels?: MarketLevels; activeScenario: ActiveScenario }>({
@@ -417,13 +474,41 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     latest.current = { markers, signals, divergences, structure, layers, levels, activeScenario };
   }, [markers, signals, divergences, structure, layers, levels, activeScenario]);
 
-  // 1. create once; full teardown (StrictMode-safe). A passive effect, not a layout effect: a keep-alive <Activity>
-  // re-show re-runs it, and createChart's forced layout must land after the reveal paint, not inside its commit
-  // (perf review perf-08). Every later effect and the imperative handle null-guard `inst`.
+  // 1. create once and keep it. A keep-alive <Activity> (the Übersicht on another tab) destroys this effect while the page
+  // is hidden but keeps the DOM: the cleanup then PARKS the instance (host still in the document) and the next run
+  // re-attaches it – no createChart / setData / first paint on every return to the Übersicht. A real unmount (host
+  // detached) tears it down; a parked chart whose host left the document while hidden is swept (`sweepParked`). StrictMode's
+  // probe re-run re-attaches the same instance. A passive effect: createChart's forced layout lands after the paint of the
+  // commit that shows the chart (perf review perf-08). Every later effect and the imperative handle null-guard `inst`.
   useEffect(() => {
     const node = host.current;
     if (!node) return;
-    const chart = createChart(node, NOTHING_DARK);
+    let rec = parked.current;
+    parked.current = null;
+    if (rec) unparkChart(rec);
+    if (rec && rec.instance.node !== node) {
+      rec.destroy();
+      rec = null;
+    }
+    if (!rec) rec = buildChart(node);
+    const kept = rec;
+    inst.current = kept.instance;
+    const detach = kept.attach();
+    return () => {
+      detach();
+      inst.current = null;
+      if (node.isConnected) {
+        parked.current = kept;
+        parkChart(kept);
+      } else kept.destroy();
+    };
+  }, []);
+
+  /** Creates the chart on `host`: the instance, its permanent wiring, `attach` (per shown period) and `destroy`. */
+  function buildChart(node: HTMLDivElement): ChartRecord {
+    // autoSize off: our observer below sizes the chart and ignores the 0 × 0 report of a hidden (display:none) page, so
+    // hiding and showing the kept-alive overview never resizes (or repaints) the chart at 0 × 0 and back
+    const chart = createChart(node, { ...NOTHING_DARK, autoSize: false });
     const main = createMainSeries(chart);
     const panes = new PaneController(chart);
     // the check overlay first (S/R under the candles, dots / lines / labels with the series), trade markers above it
@@ -483,6 +568,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       overlay: null,
       cancelWipe: null,
       size: { width: 0, height: 0 },
+      applied: {},
       isActive,
       syncActive: () => {
         pulse.current?.setActive(isActive());
@@ -495,10 +581,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         if (!placeRaf) placeRaf = requestAnimationFrame(place);
       },
     };
-    inst.current = instance;
 
     instance.fontReady.then(() => {
-      if (inst.current === instance) chart.applyOptions({ layout: { fontFamily: CHART_FONT } });
+      if (instance.node.isConnected || inst.current === instance) chart.applyOptions({ layout: { fontFamily: CHART_FONT } });
     });
 
     // axis collision guard: ticks next to a level / zone / last-price / S/R label stay blank (the label shows the price)
@@ -515,16 +600,22 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       if (instance.size.width === 0) instance.size = { width: node.clientWidth, height: node.clientHeight };
       return instance.size;
     };
+    // sizes the chart (autoSize is off): a 0 × 0 report means the page is hidden – keep size and picture; a real change
+    // repaints at once like lightweight-charts' own autoSize (no stretched frame); the first report only confirms the
+    // size createChart measured
+    let sized = false;
     const ro =
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver((entries) => {
             const r = entries[entries.length - 1]?.contentRect;
-            if (!r) return;
+            if (!r || r.width <= 0 || r.height <= 0) return;
+            const changed = r.width !== instance.size.width || r.height !== instance.size.height;
             instance.size = { width: r.width, height: r.height };
+            if (changed || !sized) chart.resize(r.width, r.height, sized);
+            sized = true;
             instance.requestPlace();
           })
         : null;
-    ro?.observe(node);
 
     const onMove = (p: MouseEventParams<Time>) => {
       if (inst.current !== instance) return;
@@ -561,7 +652,6 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       if (id) cb.current.onMarkerClick?.(id, markerRect(node, p.point.x, p.point.y));
     };
     const onRange = (r: LogicalRange | null) => {
-      if (inst.current !== instance) return;
       instance.requestPlace();
       const away = isAwayFromRealtime(r, instance.data.length - 1);
       if (away === awayRef.current) return;
@@ -574,48 +664,65 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
     node.addEventListener("wheel", stopMorph, { passive: true });
     node.addEventListener("pointerdown", stopMorph);
-    const offView = wrap.current
-      ? observeInView(wrap.current, (inView) => {
-          visibleRef.current = inView;
-          instance.syncActive();
-        })
-      : noop;
 
-    return () => {
-      offView();
-      ro?.disconnect();
-      node.removeEventListener("wheel", stopMorph);
-      node.removeEventListener("pointerdown", stopMorph);
-      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
-      chart.unsubscribeCrosshairMove(onMove);
-      chart.unsubscribeClick(onClick);
-      if (placeRaf) cancelAnimationFrame(placeRaf);
-      placeRaf = 0;
-      live.dispose();
-      instance.overlay?.remove();
-      instance.cancelWipe?.();
-      range.dispose();
-      markersApi.detach();
-      main.candles.detachPrimitive(check);
-      clearLevels(main.candles, instance.levels);
-      panes.dispose();
-      inst.current = null;
-      readyRef.current = false;
-      // `awayRef` is NOT reset: it mirrors the `follow` state, which a keep-alive <Activity> preserves across this
-      // cleanup – the re-created chart's first live-edge range event must still see "away" and hide the pill
-      chart.remove();
+    return {
+      instance,
+      // while shown: size observer and the on-screen observer (pulse + live pushes only while on screen)
+      attach: () => {
+        ro?.observe(node);
+        const offView = wrap.current
+          ? observeInView(wrap.current, (inView) => {
+              visibleRef.current = inView;
+              instance.syncActive();
+            })
+          : noop;
+        return () => {
+          offView();
+          ro?.disconnect();
+          if (placeRaf) cancelAnimationFrame(placeRaf);
+          placeRaf = 0;
+          // parked: nothing is pushed to the canvas or the pulse until the next attach reports "on screen"
+          visibleRef.current = false;
+          pulse.current?.setActive(false);
+        };
+      },
+      destroy: () => {
+        ro?.disconnect();
+        node.removeEventListener("wheel", stopMorph);
+        node.removeEventListener("pointerdown", stopMorph);
+        chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
+        chart.unsubscribeCrosshairMove(onMove);
+        chart.unsubscribeClick(onClick);
+        if (placeRaf) cancelAnimationFrame(placeRaf);
+        placeRaf = 0;
+        live.dispose();
+        instance.overlay?.remove();
+        instance.cancelWipe?.();
+        range.dispose();
+        markersApi.detach();
+        main.candles.detachPrimitive(check);
+        clearLevels(main.candles, instance.levels);
+        panes.dispose();
+        readyRef.current = false;
+        // `awayRef` is NOT reset: it mirrors the `follow` state, which a keep-alive <Activity> preserves – a re-created
+        // chart's first live-edge range event must still see "away" and hide the pill
+        chart.remove();
+      },
     };
-  }, []);
+  }
 
   // 2. history → setData (once per array identity); newer bars on the right → live engine; interval → strip wipe
   useEffect(() => {
     const i = inst.current;
     if (!i || candles.length === 0) return;
+    // a re-attached (parked) instance already shows these bars
+    if (i.applied.candles === candles && i.lastInterval === interval && readyRef.current) return;
     let cancelled = false;
     let raf1 = 0;
     let raf2 = 0;
     const apply = () => {
       if (cancelled || inst.current !== i) return;
+      i.applied.candles = candles;
       const data = normalizeSeries(candles.map(toCandleData));
       const intervalChanged = i.lastInterval !== null && i.lastInterval !== interval;
       const first = i.data.length === 0;
@@ -700,7 +807,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   // 4a. forming candle as a prop: an authoritative kline
   useEffect(() => {
     const i = inst.current;
-    if (i && live) i.live.bars([live], Number.POSITIVE_INFINITY);
+    if (!i || !live || i.applied.live === live) return;
+    i.applied.live = live;
+    i.live.bars([live], Number.POSITIVE_INFINITY);
   }, [live]);
 
   // 4b. trades: every print moves the forming candle and pings the pulse (MotionValue events, no React render)
@@ -732,13 +841,14 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   // 5. levels → price lines + zone (update in place)
   useEffect(() => {
     const i = inst.current;
-    if (i) syncLevels(i, levels, activeScenario, reduceRef.current);
+    if (!i || (i.applied.levels && i.applied.levels.levels === levels && i.applied.levels.active === activeScenario)) return;
+    syncLevels(i, levels, activeScenario, reduceRef.current);
   }, [levels, activeScenario]);
 
   // 6. markers (re-snapped after every history load, see step 2); a newly saved trade ripples at its marker
   useEffect(() => {
     const i = inst.current;
-    if (!i) return;
+    if (!i || ("markers" in i.applied && i.applied.markers === markers)) return;
     const built = syncMarkers(i, markers);
     cb.current.onOutsideCount?.(built.outside);
     const fresh = freshMarkerIds(i, built).slice(0, 3);
@@ -760,13 +870,17 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   // memoised by content upstream; re-indexed after every history load, see step 2)
   useEffect(() => {
     const i = inst.current;
-    if (i) syncOverlay(i, { signals, divergences, structure, layers });
+    const o = i?.applied.overlay;
+    if (!i || (o && o[0] === signals && o[1] === divergences && o[2] === structure && o[3] === layers)) return;
+    syncOverlay(i, { signals, divergences, structure, layers });
   }, [signals, divergences, structure, layers]);
 
   // 7. optional sub pane; switching the kind crossfades from a screenshot
   useEffect(() => {
     const i = inst.current;
-    if (!i) return;
+    const a = i?.applied.pane;
+    if (!i || (a && a[0] === pane && a[1] === ratio && a[2] === oi)) return;
+    i.applied.pane = [pane, ratio, oi];
     if (i.pane !== null && i.pane !== pane && readyRef.current && !reduceRef.current) crossfade(i, wrap.current);
     i.pane = pane;
     i.panes.setData({ ratio, oi });

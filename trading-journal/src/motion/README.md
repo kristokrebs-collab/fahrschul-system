@@ -434,9 +434,13 @@ markers: `data-fx="price-pulse"`, `"follow"`, `"equity-now"`.
 
 ### Keep-alive overview
 The shell keeps the overview mounted in React `<Activity mode="hidden">` on other tabs (`src/app/PageHost.tsx`): effects are destroyed
-on hide and re-run on show (keep them re-entrant and cheap – ChartCard's `history()` must hit the cache, the chart is recreated from
-the `candles` prop), the hidden DOM stays in the document (no real `<table>`, no labels/texts colliding with other pages' selectors),
-and MotionValue text may show its last value for one tick after the page is shown again.
+on hide and re-run on show (keep them re-entrant and cheap – ChartCard requests a `history()` range once per key; the candle chart
+PARKS its lightweight-charts instance when the hide destroys its effect (host still in the document) and re-attaches it on show:
+no createChart / setData on a return, every chart effect skips an input it already applied, autoSize is off and its own
+ResizeObserver ignores the 0 × 0 report of the hidden page), the hidden DOM stays in the document (no real `<table>`, no
+labels/texts colliding with other pages' selectors), and MotionValue text may show its last value for one tick after the page is
+shown again. A cleanup that must tell "hidden" from "unmounted" checks `node.isConnected`; React runs no cleanup for a subtree
+unmounted while hidden (the chart sweeps such parked instances every 10 s).
 
 ## layoutId contracts
 

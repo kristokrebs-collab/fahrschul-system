@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StrictMode, createRef } from "react";
+import { Activity, StrictMode, createRef } from "react";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { motionValue } from "motion/react";
 
@@ -221,5 +221,49 @@ describe("NothingCandleChart", () => {
     });
     await waitFor(() => expect(pulse?.style.opacity).toBe("0"));
     expect(screen.queryByRole("button", { name: "Folgen" })).toBeNull();
+  });
+  it("keeps the chart while a keep-alive <Activity> hides it: no re-create, no setData on the way back", async () => {
+    const markers = [{ id: "t1", time: candles[10]!.time + 60_000, side: "long" as const, entry: 84300, exit: 84900, pnl: 50, result: "win" as const }];
+    const view = (mode: "visible" | "hidden") => (
+      <Activity mode={mode}>
+        <NothingCandleChart candles={candles} interval="1h" markers={markers} />
+      </Activity>
+    );
+    const { container, rerender, unmount } = render(view("visible"));
+    await ready(container);
+    expect(calls.create).toBe(1);
+    seriesSpies.setData.mockClear();
+    seriesSpies.setMarkers.mockClear();
+    rerender(view("hidden"));
+    rerender(view("visible"));
+    await ready(container);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(calls.create).toBe(1);
+    expect(calls.remove).toBe(0);
+    expect(seriesSpies.setData).not.toHaveBeenCalled();
+    expect(seriesSpies.setMarkers).not.toHaveBeenCalled();
+    unmount();
+    expect(calls.remove).toBe(1);
+    expect(rangeHandlers.size).toBe(0);
+  });
+
+  it("tears a parked chart down once its hidden host left the document", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      const view = (mode: "visible" | "hidden", on = true) => <Activity mode={mode}>{on ? <NothingCandleChart candles={candles} interval="1h" /> : null}</Activity>;
+      const { rerender } = render(view("visible"));
+      expect(calls.create).toBe(1);
+      rerender(view("hidden"));
+      // unmounted while hidden: React runs no cleanup, the sweep finds the detached host
+      rerender(view("hidden", false));
+      expect(calls.remove).toBe(0);
+      vi.advanceTimersByTime(10_000);
+      expect(calls.remove).toBe(1);
+      expect(rangeHandlers.size).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -5,7 +5,8 @@ Owner: chart wave (Plan 5). Everything is exported from `@/chart` (barrel `index
 ## NothingCandleChart (`NothingCandleChart.tsx`)
 
 lightweight-charts 5.2.1 candlestick chart in the monochrome theme, `React.memo`. Created once (StrictMode-safe
-teardown), `setData` only for a new history (first load, interval change, older bars prepended, source switch); a
+teardown; a keep-alive `<Activity>` hide parks the instance and the re-show re-attaches it – no re-create, no `setData`,
+no 0 × 0 resize: autoSize is off and the chart's own ResizeObserver skips a hidden host), `setData` only for a new history (first load, interval change, older bars prepended, source switch); a
 history that only gained ≤ 2 bars on the right is appended in place. A live forming candle moves with every trade
 (`liveCandle.ts`), a DOM price pulse marks the current price, price lines + zone for `levels`, trade markers with a
 new-trade ripple, optional ratio/OI pane, animated 1W/1M/3M range, screenshot crossfade on interval **and** pane

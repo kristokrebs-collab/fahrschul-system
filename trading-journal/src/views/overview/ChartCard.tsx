@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactElement } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactElement } from "react";
 import { toTradeMarkers } from "@/chart/markers";
 import { ChartSkeleton } from "@/chart/ChartSkeleton";
 import type { BarsListener, MarkerRect, RangeDays } from "@/chart/NothingCandleChart";
@@ -579,14 +579,21 @@ export function ChartCard() {
 
   // range beyond the bootstrap window → `history()` (missing edge only, ≤ 30 days retention)
   const requestKey = `${symbol}:${feedId}:${rangeDays}`;
+  // the key whose history arrived; a keep-alive re-show of the Übersicht re-runs the effect below, and a second request
+  // for a range already loaded would hand the chart a new history identity (a full setData on every return)
+  const loadedFor = useRef<string | null>(null);
   useEffect(() => {
+    if (loadedFor.current === requestKey) return;
     const p = getProvider();
     if (!p) return;
     let cancelled = false;
     const now = Date.now();
     p.history(feedId, { from: now - rangeDays * 86_400_000, to: now })
       .then((res) => {
-        if (!cancelled && res.data.length) setExtra({ feed: feedId, symbol, candles: res.data });
+        if (cancelled) return;
+        // a failed request is retried on the next run (re-show, range change); a delivered one is kept
+        loadedFor.current = requestKey;
+        if (res.data.length) setExtra({ feed: feedId, symbol, candles: res.data });
       })
       .catch(() => undefined)
       .finally(() => {
