@@ -13,7 +13,8 @@
  * - Lage-Ampel at T (decision 23): `computeLage` from the daily bars ending at T (the cached `kline_1d` feed when it
  *   reaches T, else one `1d` page of 499 days, weight 2), the 4H / 1H bars and the last closed price at T; the long is
  *   gated with the CURRENT setting (`settings.signals.lage`). Daily data that cannot be loaded → no gate (never an
- *   error of the whole check); the switch off → no Lage, no extra request.
+ *   error of the whole check) and the result is not memoised (`partial`: the next check asks again); the switch off →
+ *   no Lage, no extra request.
  */
 import { computeLage, type Lage } from "@/domain/lage";
 import { SIGNAL_BARS, regradeSignals, sanitizeSignalCfg, signalCfgKey, signalsAt, toSignalSnapshot, LIVE_WINDOW_MS, type Bar, type Side, type SignalCfg, type SignalSnapshot, type Signals } from "@/domain/signals";
@@ -35,6 +36,11 @@ export interface RetroResult {
   source: Source | null;
   /** German text for the non-ok states */
   message: string | null;
+  /**
+   * The Lage-Ampel's bars at T could not be loaded (network): the result holds no gate and is not memoised — the next
+   * check of the same minute (`Neu prüfen`, the save) asks for them again. Absent = complete.
+   */
+  partial?: boolean;
 }
 
 const MSG = {
@@ -112,9 +118,13 @@ async function fetchEndingAt(p: MarketProvider, iv: FetchInterval, t: number, co
   return { candles: page.data.filter((c) => c.time <= t), source: page.source };
 }
 
-/** The Lage at T from the bars the check already has plus the missing ones; `null` when the daily bars fail. */
-async function lageAtT(p: MarketProvider, t: number, have: ReadonlyMap<FetchInterval, Bar[]>): Promise<Lage | null> {
+/**
+ * The Lage at T from the bars the check already has plus the missing ones; `lage: null` without daily bars. `failed`:
+ * a page could not be loaded (the caller does not memoise such a result).
+ */
+async function lageAtT(p: MarketProvider, t: number, have: ReadonlyMap<FetchInterval, Bar[]>): Promise<{ lage: Lage | null; failed: boolean }> {
   const got = new Map(have);
+  let failed = false;
   try {
     await Promise.all(
       LAGE_NEED.filter(([iv, n]) => (got.get(iv)?.length ?? 0) < Math.min(n, 120)).map(async ([iv, n]) => {
@@ -123,10 +133,11 @@ async function lageAtT(p: MarketProvider, t: number, have: ReadonlyMap<FetchInte
       }),
     );
   } catch {
-    if (!got.get("1d")?.length) return null;
+    failed = true;
+    if (!got.get("1d")?.length) return { lage: null, failed };
   }
   const daily = got.get("1d") ?? [];
-  if (!daily.length) return null;
+  if (!daily.length) return { lage: null, failed };
   // the price at T: the last bar CLOSED at T (the running bar's close lies after T)
   const closeAt = (bars: readonly Bar[] | undefined, sec: number): number | null => {
     if (!bars) return null;
@@ -134,7 +145,7 @@ async function lageAtT(p: MarketProvider, t: number, have: ReadonlyMap<FetchInte
     return null;
   };
   const price = closeAt(got.get("15m"), 900) ?? closeAt(got.get("1h"), 3600) ?? closeAt(got.get("4h"), 14_400);
-  return computeLage(daily, got.get("4h") ?? [], price, t, { h1: got.get("1h") ?? null });
+  return { lage: computeLage(daily, got.get("4h") ?? [], price, t, { h1: got.get("1h") ?? null }), failed };
 }
 
 async function computeRetro(p: MarketProvider, cfg: SignalCfg, t: number): Promise<RetroResult> {
@@ -152,7 +163,8 @@ async function computeRetro(p: MarketProvider, cfg: SignalCfg, t: number): Promi
   }
   // the Lage at T (one more daily page unless the cached feed reaches T); the switch off → no gate, no request
   const lc = getLageConfig();
-  const lage = lc.on ? await lageAtT(p, t, sources) : null;
+  const at = lc.on ? await lageAtT(p, t, sources) : null;
+  const lage = at?.lage ?? null;
   const bars: Record<string, Bar[]> = {};
   for (const tf of neededTfs(cfg)) {
     const s = tfSource(tf);
@@ -163,7 +175,7 @@ async function computeRetro(p: MarketProvider, cfg: SignalCfg, t: number): Promi
   // `now` far in the future relative to T: always the closed-bars path (the live window is handled by the caller)
   const sig = signalsAt(bars, cfg, t, t + LIVE_WINDOW_MS + 1, lc.on ? { lage: { lage, cfg: lc } } : {});
   if (!sig) return { status: "no-history", signals: null, symbol: p.symbol, source, message: MSG.noHistory };
-  return { status: "ok", signals: sig, symbol: p.symbol, source, message: null };
+  return { status: "ok", signals: sig, symbol: p.symbol, source, message: null, ...(at?.failed ? { partial: true } : {}) };
 }
 
 /**
@@ -199,7 +211,7 @@ export function retroCheck(date: Date | string | number, opts: { cfg?: unknown; 
   const hit = memo.get(key);
   if (hit) return hit.then((r) => withTradersAt(p, cfg, t, now, r));
   const run = computeRetro(p, cfg, t).then((r) => {
-    if (r.status === "error") memo.delete(key); // retry next time
+    if (r.status === "error" || r.partial) memo.delete(key); // retry next time (a Lage page that failed included)
     return r;
   });
   memo.set(key, run);

@@ -301,7 +301,9 @@ same closed bars returns the published state unchanged. So the forming-candle st
 Long/Short-Tendenz) move once a minute, like a trader reading the 1m closes; within a frame nothing flickers. Countdowns run on
 the clock (`closesAt`), unaffected. Per frame the engine also remembers forming-candle events that came and went (`intrabar`:
 greyed, never counted) and the turn price of every forming rung (`turns`). A frame taken within 5 s of its boundary stands for
-the minute that just closed (`frameAt` = boundary − 1 ms).
+the minute that just closed (`frameAt` = boundary − 1 ms). The frame's price completes only candles still forming at the
+evaluation: a rung whose candle closed after the frame was taken (its final frame arrives within the grace) keeps the feed's
+final close (`buildBars(…, ex)`).
 
 ```ts
 import { useSignalCheck, getSignalSnapshot, subscribeSignalCheck, toTradeSnapshot, checkTradeAt, retroCheck, getMcbSeries, getSignalCandles } from "@/market";
@@ -333,11 +335,12 @@ minute; network errors resolve `null` (status `error`, retried on the next call)
 **Lage-Ampel** (`src/market/lage.ts`, decision 23): `useLage()` / `getLage()` / `subscribeLage()` / `retainLage()` →
 `{ lage: Lage | null, status: { state: idle|loading|ok|stale|error, fetchedAt, closedAt, nextAt, source, detail } }`, computed
 by `@/domain/lage` from the closed candles of `kline_1d` (last 1000), `kline_4h` and `kline_1h` plus the live price
-(`priceMv`, ≤ 1/s); two stages (closed bars ≈ 0.5 ms on a new close, live values ≈ 0.04 ms), published only when a shown
-value changes (`lageKey`). Status from the daily feed's health (failures, CORS from a file, "Tagesschluss noch nicht geladen"
+(`priceMv`, ≤ 1/s); two stages (closed bars ≈ 0.5 ms on a new close — or once the Binance clock passes the close of a bar
+the series already report closed, e.g. the socket's final frame on a device clock slightly behind — live values ≈ 0.04 ms),
+published only when a shown value changes (`lageKey`). Status from the daily feed's health (failures, CORS from a file, "Tagesschluss noch nicht geladen"
 after 00:05 UTC). The engine holds it while running and gates the long verdict with it (`settings.signals.lage = { on, mode }`,
 part of the input key: a switch re-grades at once); retro checks compute the Lage at T from the cached daily feed or one
-`1d` page (`endTime = T`). The overview's toast (`src/app/ScenarioWatcher.tsx`) follows its state changes.
+`1d` page (`endTime = T`; a page that fails → no gate for that check and the result is not memoised, `partial`). The overview's toast (`src/app/ScenarioWatcher.tsx`) follows its state changes.
 
 **Notification:** a NEW valid entry (edge after the first evaluation, held ≥ 60 s against repaint) → toast (`pushToast`, kind
 `signal`, 5.2 s: label, `Score n`, strength line) once per base bar and side, persisted in `storageKey("signal-last")`
