@@ -440,7 +440,11 @@ no createChart / setData on a return, every chart effect skips an input it alrea
 ResizeObserver ignores the 0 × 0 report of the hidden page), the hidden DOM stays in the document (no real `<table>`, no
 labels/texts colliding with other pages' selectors), and MotionValue text may show its last value for one tick after the page is
 shown again. A cleanup that must tell "hidden" from "unmounted" checks `node.isConnected`; React runs no cleanup for a subtree
-unmounted while hidden (the chart sweeps such parked instances every 10 s).
+unmounted while hidden (the chart sweeps such parked instances every 10 s). The hide detaches every ref, so each motion
+component unmounts its VisualElement and every `layoutId` node would snapshot itself (a getBoundingClientRect of a
+`display: none` box, thrown away, each forcing the layout of the page switched to – ≈ 100 reads / 55 ms on the first switch
+away from the Übersicht): `useHoldProjectionOnHide()` (`activityProjection.ts`) in the page root blocks the document
+projection root's updates for that commit (its layout cleanup runs before the children detach).
 
 ## layoutId contracts
 

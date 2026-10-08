@@ -2,6 +2,7 @@ import { useRef, type ReactNode } from "react";
 import { IntroCell, useIntroRoot } from "@/intro/IntroCell";
 import { useIntroFlown } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
+import { useHoldProjectionOnHide } from "@/motion/activityProjection";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
 import { InsightsSection } from "@/views/insights";
@@ -79,6 +80,8 @@ export function OverviewView({ className }: { className?: string }) {
   useCloseMorphDialogOnUnmount();
   const root = useRef<HTMLDivElement>(null);
   useIntroRoot(root);
+  // switching away hides this kept-alive page: no layoutId snapshot of its (display: none) motion nodes
+  useHoldProjectionOnHide();
   return (
     <div ref={root} className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)}>
       <IntroCell className="lg:col-span-12">
