@@ -1,6 +1,6 @@
 import { useId, useMemo, useRef, useState } from "react";
 import type { Agg } from "@/domain/agg";
-import { CHECKLIST_CARD_TITLE, CHECKLIST_EMPTY_TEXT, CHECKLIST_EMPTY_TITLE, CHECKLIST_MISSED_EMPTY, CHECKLIST_MISSED_TITLE, CHECKLIST_TILE_FULL, CHECKLIST_TILE_GAPS, evaluateChecklist, explainChecklist, missedLabel } from "@/domain/checklist";
+import { type ChecklistItemStats, CHECKLIST_CARD_TITLE, CHECKLIST_EMPTY_TEXT, CHECKLIST_EMPTY_TITLE, CHECKLIST_MISSED_EMPTY, CHECKLIST_MISSED_TITLE, CHECKLIST_TILE_FULL, CHECKLIST_TILE_GAPS, evaluateChecklist, explainChecklist, missedLabel } from "@/domain/checklist";
 import { cn } from "@/lib/cn";
 import { colorClass, pct0, signed } from "@/lib/format";
 import { RevealGroup, RevealItem } from "@/motion/Reveal";
@@ -36,6 +36,54 @@ function Tile({ label, g, tone, index, open, controls, onOpen }: { label: string
   );
 }
 
+export const CHECKLIST_IMPACT_TITLE = "Wirkung je Punkt";
+export const CHECKLIST_IMPACT_NOTE = "Win-Rate mit ✓ · ohne";
+
+/** Items with trades on both sides (checked / left open), strongest win-rate difference first. */
+export function impactRows(items: readonly ChecklistItemStats[]): ChecklistItemStats[] {
+  return items.filter((i) => i.delta != null).sort((a, b) => Math.abs(b.delta ?? 0) - Math.abs(a.delta ?? 0) || b.n - a.n);
+}
+
+/** `+47 pp` / `−20 pp` (rounded percentage points). */
+const ppText = (d: number): string => {
+  const v = Math.round(d * 100);
+  return `${v > 0 ? "+" : v < 0 ? "−" : "±"}${Math.abs(v)} pp`;
+};
+
+/**
+ * `Wirkung je Punkt` (design pass v3): per checklist item the win rate with the item ticked vs left open, strongest
+ * difference first. It only takes the card's FREE height when its grid row is taller than the card's own content (a
+ * stretched card next to the ranking): the list has no height of its own (`basis-0`) and rows that do not fit wrap
+ * into a second, clipped flex column – whole rows, never a cut one; no free height (phones, a short row) → none shown.
+ * The heading travels with the first row.
+ */
+function ImpactList({ rows }: { rows: readonly ChecklistItemStats[] }) {
+  if (!rows.length) return null;
+  return (
+    <div className="flex min-h-0 flex-1 basis-0 flex-col flex-wrap content-start gap-x-8 overflow-hidden" data-testid="checklist-impact">
+      {/* a flex line always keeps its first item: a zero-height first item lets even the first row wrap away whole */}
+      <span aria-hidden="true" className="h-0 w-full shrink-0" />
+      {rows.map((r, i) => (
+        <div key={r.text} className="w-full shrink-0">
+          {i === 0 && (
+            <div className="mb-2 mt-1 flex items-baseline justify-between gap-3">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-mute">{CHECKLIST_IMPACT_TITLE}</span>
+              <span className="text-[11px] text-faint">{CHECKLIST_IMPACT_NOTE}</span>
+            </div>
+          )}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_3.75rem] items-center gap-x-3 border-t border-line py-2 text-[12.5px]">
+            <span className="line-clamp-2 min-w-0 text-fg">{r.text}</span>
+            <span className="num shrink-0 font-mono text-xs text-mute">
+              {pct0(r.withChecked.winRate)} · {pct0(r.withoutChecked.winRate)}
+            </span>
+            <span className={cn("num text-right font-mono text-xs", (r.delta ?? 0) > 0 ? "text-win" : (r.delta ?? 0) < 0 ? "text-loss" : "text-mute")}>{ppText(r.delta ?? 0)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /**
  * `Checkliste` (Bundle `khe`, Plan 6.1): `Alles erfüllt` / `Lücken` tiles (blur-fade cascade, percent + bar fill on
  * first view), `Am häufigsten ausgelassen` rows slide in after them, expander → `Checklisten-Auswertung`.
@@ -44,6 +92,7 @@ export function ChecklistCard() {
   const acc = useUi((s) => s.acc);
   const view = useAccountView(acc);
   const ev = useMemo(() => evaluateChecklist(view.closed), [view.closed]);
+  const impact = useMemo(() => impactRows(ev.items), [ev.items]);
   const [open, setOpen] = useState(false);
   const regionId = useId();
   const tiles = [
@@ -57,7 +106,7 @@ export function ChecklistCard() {
         <ExplanationView d={explainChecklist(ev)} className="!mt-0" />
       </Collapse>
       {ev.withList.length ? (
-        <RevealGroup className="grid grid-cols-1 gap-4">
+        <RevealGroup className="flex min-h-0 flex-1 flex-col gap-4">
           <div className="grid grid-cols-2 gap-3">
             {tiles.map(([label, g, tone], i) => (
               <Tile key={label} label={label} g={g} tone={tone} index={i} open={open} controls={regionId} onOpen={() => setOpen(true)} />
@@ -79,6 +128,7 @@ export function ChecklistCard() {
               </RevealItem>
             )}
           </div>
+          <ImpactList rows={impact} />
         </RevealGroup>
       ) : (
         <EmptyState title={CHECKLIST_EMPTY_TITLE} text={CHECKLIST_EMPTY_TEXT} />

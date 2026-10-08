@@ -48,6 +48,11 @@ export interface EquityChartProps {
   currency: string;
   /** px, default 268 */
   height?: number;
+  /**
+   * Fill the free height of a flex column (a stretched grid card): the chart grows from `height` (its minimum) to the
+   * card's row height, so neighbouring cards end on one line without an empty band under the chart.
+   */
+  fill?: boolean;
   className?: string;
 }
 
@@ -142,7 +147,7 @@ function EquityProbe({ points, onGeometry }: { points: EquityPoint[]; onGeometry
   return null;
 }
 
-export const EquityChart = memo(function EquityChart({ points, start, balance, currency, height = 268, className }: EquityChartProps) {
+export const EquityChart = memo(function EquityChart({ points, start, balance, currency, height = 268, fill: fillRow = false, className }: EquityChartProps) {
   const id = useId().replace(/:/g, "");
   const reduced = useReducedFx();
   const accent = equityAccent(balance, start);
@@ -571,8 +576,8 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
     <>
       <div
         ref={box}
-        className={cn("relative w-full [&[data-draw=pending]_.eq-area]:[clip-path:inset(0_100%_0_0)]", className)}
-        style={{ height }}
+        className={cn("relative w-full [&[data-draw=pending]_.eq-area]:[clip-path:inset(0_100%_0_0)]", fillRow && "flex-1", className)}
+        style={fillRow ? { minHeight: height } : { height }}
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
         onPointerCancel={onPointerLeave}

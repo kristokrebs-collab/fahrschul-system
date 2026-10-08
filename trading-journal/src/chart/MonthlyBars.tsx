@@ -37,6 +37,8 @@ export interface MonthlyBarsProps {
   currency: string;
   /** px, default 240 */
   height?: number;
+  /** Fill the free height of a flex column (a stretched grid card), `height` being the minimum. */
+  fill?: boolean;
   className?: string;
 }
 
@@ -153,7 +155,7 @@ function MonthTip({ active, payload, currency }: TipProps) {
   );
 }
 
-export const MonthlyBars = memo(function MonthlyBars({ months, currency, height = 240, className }: MonthlyBarsProps) {
+export const MonthlyBars = memo(function MonthlyBars({ months, currency, height = 240, fill: fillRow = false, className }: MonthlyBarsProps) {
   const reduced = useReducedFx();
   const wrap = useRef<HTMLDivElement>(null);
   const hot = useRef(-1);
@@ -196,10 +198,18 @@ export const MonthlyBars = memo(function MonthlyBars({ months, currency, height 
   };
 
   return (
-    <div ref={wrap} className={cn("w-full", className)}>
+    <div ref={wrap} className={cn("w-full", fillRow && "flex flex-1 flex-col", className)}>
       {/* frozen (static SVG) on the hidden keep-alive overview; Recharts' tooltip and keyboard layer need the live chart,
           so a pointer or focus draws it again */}
-      <ChartContainer config={config} className="aspect-auto w-full" style={{ height }} role="img" aria-label="P&L pro Monat" freezeKey={freezeKey} thawOnInteract>
+      <ChartContainer
+        config={config}
+        className={cn("aspect-auto w-full", fillRow && "flex-1")}
+        style={fillRow ? { minHeight: height } : { height }}
+        role="img"
+        aria-label="P&L pro Monat"
+        freezeKey={freezeKey}
+        thawOnInteract
+      >
         <BarChart
           data={months}
           margin={{ top: 8, right: 4, bottom: 0, left: 0 }}

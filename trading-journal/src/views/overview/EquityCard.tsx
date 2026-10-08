@@ -31,7 +31,7 @@ export function EquityCard() {
         ) : undefined
       }
     >
-      {n ? <EquityChart points={view.equity} start={view.start} balance={view.balance} currency={cur} /> : <EmptyState title={EQUITY_EMPTY_TITLE} text={EQUITY_EMPTY_TEXT} />}
+      {n ? <EquityChart points={view.equity} start={view.start} balance={view.balance} currency={cur} fill /> : <EmptyState title={EQUITY_EMPTY_TITLE} text={EQUITY_EMPTY_TEXT} />}
     </Card>
   );
 }

@@ -65,9 +65,10 @@ export function WinRateCard() {
 
   return (
     <Card title="Win-Rate" action={<Expander open={open} onToggle={() => setOpen((o) => !o)} label="Win-Rate" controls={regionId} />}>
-      {/* top-anchored (no h-full / justify-between): opening the explainer below must not slide the legend up and
-          back down while the stretched grid row re-balances (OV-01) */}
-      <div className="flex flex-col items-center gap-4">
+      {/* ring + legend as one group, centred in the card's free height (the overview stretches every card to its row,
+          design pass v3); the explainer below takes that free height first, so opening it glides the group up instead
+          of moving it down and back while the row re-balances (OV-01) */}
+      <div className="flex flex-1 flex-col items-center justify-center gap-4">
         <RingGauge value={g.winRate} marker={bt} color={FG} passColor={WIN} track="#222" aria-label={`Win-Rate ${label}`}>
           {(progress) => (
             <div>

@@ -28,6 +28,14 @@ import { WinRateCard } from "./WinRateCard";
  * is taken (390 px viewport must not scroll sideways).
  */
 const DEFER = "[content-visibility:auto] -my-3 py-3";
+/**
+ * Every cell fills its grid row (design pass v3): the cards of one row end on one line instead of ragged bottoms with
+ * black gaps between them. A deferred cell's padding (± 12 px, see `DEFER`) is added back, so its card is as tall as
+ * the row too. Inside, charts and empty states take the free height (`fill`, `EmptyState` is `h-full`), lists stay
+ * top-anchored.
+ */
+const FILL = "h-full";
+const FILL_DEFER = "h-[calc(100%+1.5rem)]";
 
 interface CellProps {
   /** Column within its row → reveal stagger (`stagger.reveal`). */
@@ -60,7 +68,7 @@ function CellReveal({ col, defer, children }: Omit<CellProps, "span">) {
     <Reveal
       index={col}
       settled={flown}
-      className={cn(defer != null && DEFER)}
+      className={cn(defer != null ? [DEFER, FILL_DEFER] : FILL)}
       style={defer != null ? { containIntrinsicBlockSize: `auto ${defer}px` } : undefined}
       data-defer={defer != null ? "" : undefined}
     >

@@ -15,7 +15,7 @@ export function MonthlyCard() {
   const view = useAccountView(acc);
   return (
     <Card title={MONTHLY_TITLE}>
-      {view.closed.length ? <MonthlyBars months={view.months} currency={settings.currency} /> : <EmptyState title={MONTHLY_EMPTY_TITLE} text={MONTHLY_EMPTY_TEXT} />}
+      {view.closed.length ? <MonthlyBars months={view.months} currency={settings.currency} fill /> : <EmptyState title={MONTHLY_EMPTY_TITLE} text={MONTHLY_EMPTY_TEXT} />}
     </Card>
   );
 }
