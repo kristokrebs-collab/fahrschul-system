@@ -137,19 +137,27 @@ function createEngine(root: HTMLElement): Engine {
     const ins = revs.map((r) => r.firstElementChild as HTMLElement) as [HTMLElement, HTMLElement];
     return { line, base, revs, ins, W: 0, fo: 0, fw: 0, eo: NaN, ew: NaN };
   });
+  const byLine = new Map<Element, LineEls>(lines.map((l) => [l.line, l]));
   let schedule: LineSchedule[] = [];
   let doneCb: (() => void) | undefined;
   let state: "rest" | "running" | "filled" = "rest";
   let lastT = -1e9;
+  /** Line widths and the font size are known (the first `ResizeObserver` report, or the synchronous fallback). */
+  let measured = false;
 
-  const measure = () => {
+  const readFont = () => {
     const fs = parseFloat(getComputedStyle(root).fontSize) || 16;
     for (const l of lines) {
-      l.W = l.line.offsetWidth;
       l.fo = CONFIG.featherOEm * fs;
       l.fw = CONFIG.featherWEm * fs;
       l.eo = l.ew = NaN;
     }
+  };
+  /** Fallback without `ResizeObserver` (jsdom): one synchronous read when a play starts. */
+  const measureNow = () => {
+    readFont();
+    for (const l of lines) l.W = l.line.offsetWidth;
+    measured = true;
   };
   const setEdge = (l: LineEls, layer: 0 | 1, e: number) => {
     const key = layer === 0 ? "eo" : "ew";
@@ -184,7 +192,15 @@ function createEngine(root: HTMLElement): Engine {
     }
   };
   let total = 0;
+  /** Frames a running play has waited for the first size report. */
+  let waited = 0;
   const timeline = createTimeline(root, (t) => {
+    // until the first size report the windows stay parked off-line (their initial transform) and the clock runs on;
+    // an observer that never reports (a stubbed one) falls back to one read in a frame
+    if (!measured) {
+      if (++waited <= 3) return true;
+      measureNow();
+    }
     apply(t);
     if (t >= total) {
       setMode("filled");
@@ -195,31 +211,36 @@ function createEngine(root: HTMLElement): Engine {
     }
     return true;
   });
+  // Sizes come from the observer, never from a read in a commit or an effect: a layout read there forced the whole
+  // freshly mounted page through style + layout inside the React task, once per instance with the writes of the
+  // previous one in between (≈ 200 ms of forced layout on a page switch to the Entscheidungsgrundlagen). The report
+  // arrives right after the browser's own layout; a font swap re-wraps the lines and reports again.
   const ro =
     typeof ResizeObserver === "function"
-      ? new ResizeObserver(() => {
-          measure();
+      ? new ResizeObserver((entries) => {
+          for (const e of entries) {
+            const l = byLine.get(e.target);
+            if (!l) continue;
+            const box = e.borderBoxSize?.[0];
+            l.W = box ? box.inlineSize : (e.target as HTMLElement).offsetWidth;
+          }
+          // style is clean right after layout: the font size (a `clamp(…vw)` statement follows the viewport) is free here
+          readFont();
+          measured = true;
           if (state === "running") apply(lastT);
         })
       : null;
-  ro?.observe(root);
-  measure();
-  const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
-  let alive = true;
-  void fonts?.ready.then(() => {
-    if (!alive) return;
-    measure();
-    if (state === "running") apply(lastT);
-  });
+  for (const l of lines) ro?.observe(l.line);
   return {
     play(delay, speed, onDone) {
       timeline.stop();
       schedule = scheduleFor(lines.length, speed);
       total = totalDuration(schedule);
       doneCb = onDone;
-      measure();
+      if (!ro) measureNow();
+      waited = 0;
       setMode("running");
-      apply(-1e6);
+      if (measured) apply(-1e6);
       timeline.start(delay);
     },
     setFilled() {
@@ -230,7 +251,6 @@ function createEngine(root: HTMLElement): Engine {
       cb?.();
     },
     destroy() {
-      alive = false;
       timeline.stop();
       doneCb = undefined;
       ro?.disconnect();

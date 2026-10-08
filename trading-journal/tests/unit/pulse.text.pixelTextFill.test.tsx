@@ -75,4 +75,39 @@ describe("<PixelTextFill>", () => {
     expect((container.firstElementChild as HTMLElement).dataset.state).toBe("filled");
     expect(onDone).toHaveBeenCalledTimes(1);
   });
+
+  it("never reads layout in a commit or effect: sizes come from the ResizeObserver report", () => {
+    const reports: ((entries: ResizeObserverEntry[]) => void)[] = [];
+    const observed: Element[] = [];
+    class FakeRO {
+      constructor(cb: (entries: ResizeObserverEntry[]) => void) {
+        reports.push(cb);
+      }
+      observe(el: Element) {
+        observed.push(el);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal("ResizeObserver", FakeRO);
+    const reads = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get");
+    try {
+      const { container } = render(<PixelTextFill lines={["Disziplin"]} />);
+      const root = container.firstElementChild as HTMLElement;
+      expect(root.dataset.state).toBe("running");
+      expect(reads).not.toHaveBeenCalled();
+      const ember = root.querySelector<HTMLElement>("[data-ptf-rev]")!;
+      // before the first report the window stays parked off the line
+      act(() => void vi.advanceTimersByTime(48));
+      expect(ember.style.transform).toBe("translate3d(-100000px,0,0)");
+      // the report (right after the browser's layout) carries the width: the window starts sweeping
+      act(() => reports[0]!(observed.map((target) => ({ target, borderBoxSize: [{ inlineSize: 200, blockSize: 20 }] }) as unknown as ResizeObserverEntry)));
+      act(() => void vi.advanceTimersByTime(500));
+      expect(ember.style.transform).not.toBe("translate3d(-100000px,0,0)");
+      expect(reads).not.toHaveBeenCalled();
+    } finally {
+      reads.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
 });
