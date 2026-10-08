@@ -1,11 +1,14 @@
-import { animate, motion } from "motion/react";
+import { animate, motion, useTransform } from "motion/react";
 import { useEffect, useRef } from "react";
 import type { FeedHealth, FeedId, HealthState, ProviderHealth, Source, StatusLabel } from "@/market/types";
-import { BINANCE_FAMILY_FEEDS, isLiveRatioFeed } from "@/market/feeds";
+import { BINANCE_FAMILY_FEEDS, WS_FEEDS } from "@/market/feeds";
+import { mmss } from "@/market/mapping";
+import { skewText } from "@/market/clock";
 import { SOFT_FAILURE_TEXT } from "@/market/statusLabel";
-import { IS_FILE_BUILD } from "@/edition";
+import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
 import { cn } from "@/lib/cn";
 import { time } from "@/lib/format";
+import { useNowMv } from "@/motion/clock";
 import { canObserveInView, useFirstInView } from "@/motion/inView";
 import { StatusPill, type StatusTone } from "@/motion/StatusPill";
 import { Switch } from "@/motion/Switch";
@@ -47,10 +50,23 @@ export const LIVE_STRINGS = {
   proxyOff: "EU-Proxy nicht erreichbar",
   proxyBlocked: "EU-Proxy: Region blockiert (451)",
   proxyFile: "Kein EU-Proxy in der Datei-Version",
-  point: "Punkt",
-  nextPoll: "nächste Abfrage",
+  nextData: "nächste Daten",
   nextRetry: "neuer Versuch",
+  running: "läuft …",
+  loading: "lädt …",
+  connecting: "Verbinde …",
+  stream: "Stream",
+  streamStale: "Stream stockt",
+  streamDown: "Stream getrennt",
+  lastData: "Daten",
+  fromCache: "aus dem Cache",
+  viaRest: "per REST (Stream aus)",
+  via: "über",
+  onlyBinance: "Nur mit Binance",
+  bookTopOptIn: "Nur solange die Bid/Ask-Kachel sichtbar ist",
   failures: (n: number) => `${n}× in Folge`,
+  /** single-file build opened from disk: the browser may not read Binance's futures data there */
+  fileCors: "Datei-Version: liest der Browser die Binance-Top-Trader-Daten nicht (CORS), den Web-Link öffnen – dort läuft der EU-Proxy.",
 } as const;
 
 export const FEED_LABELS: Record<FeedId, string> = {
@@ -131,22 +147,131 @@ function StandCell({ at }: { at?: number }) {
 const at = (ms?: number): string => (ms ? time(new Date(ms)) : "");
 
 /**
- * Second line under a feed name: for the Binance ratio feeds always (time of the newest point, next poll), for any
- * feed while it fails (cause, count, next retry). Makes "Binance publishes every 5 min" vs. "Binance does not answer"
- * visible per feed.
+ * Per-feed freshness under the feed name (decision 14), next to the row's `Stand` (time of the newest data): when the
+ * next data comes — `nächste Daten in 3:12` (REST), `Stream · Daten vor 2 s` (WebSocket), the cause while a poll fails
+ * (`Netzwerk/CORS-Fehler (…) · 2× in Folge · neuer Versuch in 0:28`), `Stream getrennt · neuer Versuch in 0:04`, `Offline`.
+ * The countdown / age is a separate segment rendered on the shared second clock (fixed width, no React render per
+ * second, no column re-flow); the static part changes only with the health.
  */
-export function feedDetailLine(f: FeedHealth): string | null {
-  const family = BINANCE_FAMILY_FEEDS.includes(f.feed);
+export type FeedLineDynamic =
+  /** `{label} in m:ss` until `to` (device clock); `expired` once it ran out */
+  | { kind: "countdown"; to: number; label: string; expired: string }
+  /** age of the data at `from` (exchange clock; `skewMs` = server − device) */
+  | { kind: "age"; from: number; skewMs: number };
+
+export interface FeedLine {
+  /** text before the dynamic segment */
+  lead: string;
+  dynamic?: FeedLineDynamic;
+  tone: "faint" | "warn" | "error";
+}
+
+export interface FeedLineCtx {
+  transport: "ws" | "rest";
+  online: boolean;
+  ws?: Partial<ProviderHealth["ws"]>;
+  primary?: Partial<ProviderHealth["primary"]>;
+  skewMs?: number;
+}
+
+const SEP = " · ";
+const join = (...parts: (string | null | undefined | false)[]): string => parts.filter(Boolean).join(SEP);
+
+/** The changing number: `3:12` (countdown), `2 s` / `3 min` / `2 h` (age); `""` once a countdown ran out. */
+export function dynamicValue(d: FeedLineDynamic, now: number): string {
+  if (d.kind === "countdown") {
+    const left = d.to - now;
+    if (left <= 0) return "";
+    // funding (8 h) and other long waits: `5 h 59 min` instead of `359:59`
+    if (left >= 3_600_000) {
+      const min = Math.ceil(left / 60_000);
+      return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")} min`;
+    }
+    return mmss(left);
+  }
+  const age = Math.max(0, Math.round((now + d.skewMs - d.from) / 1000));
+  if (age < 60) return `${age} s`;
+  if (age < 3600) return `${Math.floor(age / 60)} min`;
+  return `${Math.floor(age / 3600)} h`;
+}
+
+/** The words before the number: `nächste Daten in ` / `vor `; a countdown that ran out reads `lädt …` / `läuft …`. */
+export function dynamicLabel(d: FeedLineDynamic, now: number): string {
+  if (d.kind === "age") return "vor ";
+  return d.to - now > 0 ? `${d.label} in ` : d.expired;
+}
+
+/** `nächste Daten in 3:12` / `lädt …` / `vor 2 s`. */
+export function dynamicText(d: FeedLineDynamic, now: number): string {
+  return `${dynamicLabel(d, now)}${dynamicValue(d, now)}`;
+}
+
+/** Whole line as plain text (tests, title attribute). */
+export function feedLineText(l: FeedLine, now: number): string {
+  return l.dynamic ? `${l.lead}${dynamicText(l.dynamic, now)}` : l.lead;
+}
+
+const countdown = (to: number | undefined, lead: string, label: string, expired: string): Pick<FeedLine, "lead" | "dynamic"> =>
+  to === undefined ? { lead } : { lead: lead ? `${lead}${SEP}` : "", dynamic: { kind: "countdown", to, label, expired } };
+const nextData = (to: number | undefined, lead: string) => countdown(to, lead, LIVE_STRINGS.nextData, LIVE_STRINGS.loading);
+const retryAt = (to: number | undefined, lead: string) => countdown(to, lead, LIVE_STRINGS.nextRetry, `${LIVE_STRINGS.nextRetry} ${LIVE_STRINGS.running}`);
+
+/**
+ * The freshness line of one feed. REST feeds: newest point (`Stand`) and the next poll; WebSocket feeds: the stream's
+ * age, or the REST fallback / reconnect countdown; any failing feed: cause, count, retry.
+ */
+export function feedLine(f: FeedHealth, ctx: FeedLineCtx): FeedLine {
+  // the row's `Stand` column already shows the time of the newest data: the line says what comes next / what is wrong
+  if (!ctx.online) return { lead: LIVE_STRINGS.offline, tone: "error" };
   const soft = f.reason ? SOFT_FAILURE_TEXT[f.reason] : undefined;
-  const failing = f.consecutiveFailures > 0 && !!soft;
-  if (!family && !failing) return null;
-  const parts: string[] = [];
-  if (failing) {
-    parts.push(`${soft}${f.detail ? ` (${f.detail})` : ""}`);
-    parts.push(LIVE_STRINGS.failures(f.consecutiveFailures));
-  } else if (family && f.lastDataAt) parts.push(`${LIVE_STRINGS.point} ${at(f.lastDataAt)}`);
-  if (f.nextRefreshAt && f.source !== "cache") parts.push(`${failing ? LIVE_STRINGS.nextRetry : LIVE_STRINGS.nextPoll} ${at(f.nextRefreshAt)}`);
-  return parts.length ? parts.join(" · ") : null;
+  if (f.consecutiveFailures > 0 && soft) {
+    return { ...retryAt(f.nextRefreshAt, join(`${soft}${f.detail ? ` (${f.detail})` : ""}`, LIVE_STRINGS.failures(f.consecutiveFailures))), tone: "warn" };
+  }
+  if (f.reason === "unsupported") return { ...retryAt(ctx.primary?.nextProbeAt, f.detail ?? LIVE_STRINGS.onlyBinance), tone: "faint" };
+  if (f.reason === "bad_period" || f.reason === "bad_symbol" || f.reason === "beyond_retention") return { lead: f.detail ?? STATE_LABELS[f.state], tone: "warn" };
+  if (f.reason === "blocked_451") return { ...retryAt(ctx.primary?.nextProbeAt, LIVE_STRINGS.binanceBlocked()), tone: "warn" };
+  const stale = f.state === "stale";
+  const streamed = ctx.transport === "ws" && f.state !== "fallback" && f.source === "binance";
+  if (streamed) {
+    if (f.lastDataAt === undefined) {
+      if (f.feed === "bookTop") return { lead: LIVE_STRINGS.bookTopOptIn, tone: "faint" };
+      return ctx.ws?.nextRetryAt !== undefined && ctx.ws.state !== "live" ? { ...retryAt(ctx.ws.nextRetryAt, LIVE_STRINGS.streamDown), tone: "warn" } : { lead: LIVE_STRINGS.connecting, tone: "faint" };
+    }
+    if (ctx.ws?.state !== "live" && ctx.ws?.nextRetryAt !== undefined) return { ...retryAt(ctx.ws.nextRetryAt, LIVE_STRINGS.streamDown), tone: "warn" };
+    return { lead: `${join(stale ? LIVE_STRINGS.streamStale : LIVE_STRINGS.stream, LIVE_STRINGS.lastData)} `, dynamic: { kind: "age", from: f.lastDataAt, skewMs: ctx.skewMs ?? 0 }, tone: stale ? "warn" : "faint" };
+  }
+  // polled (REST feeds, a WebSocket feed in its REST fallback, a fallback source)
+  const via = ctx.transport === "ws" && f.source === "binance" ? LIVE_STRINGS.viaRest : f.source !== "binance" && f.source !== "cache" ? `${LIVE_STRINGS.via} ${SOURCE_LABELS[f.source]}` : null;
+  if (f.lastDataAt === undefined) return { ...nextData(f.nextRefreshAt, join(LIVE_STRINGS.loading, via)), tone: "faint" };
+  if (f.source === "cache") return { lead: join(LIVE_STRINGS.fromCache, stale && STATE_LABELS.stale.toLowerCase()), tone: stale ? "warn" : "faint" };
+  return { ...nextData(f.nextRefreshAt, join(stale && STATE_LABELS.stale.toLowerCase(), via)), tone: stale ? "warn" : "faint" };
+}
+
+const LINE_TONE: Record<FeedLine["tone"], string> = { faint: "text-faint", warn: "text-warn", error: "text-loss" };
+
+/**
+ * The dynamic segment, driven by `nowMv` (no React render per second): the words change only when a countdown runs
+ * out, the number sits in a fixed-width tabular slot so the line (and the table column) never re-flows per second.
+ */
+function DynamicSegment({ d }: { d: FeedLineDynamic }) {
+  const now = useNowMv();
+  const label = useTransform(now, (n) => dynamicLabel(d, n));
+  const value = useTransform(now, (n) => dynamicValue(d, n));
+  return (
+    <>
+      <motion.span>{label}</motion.span>
+      <motion.span className="inline-block min-w-[4.5ch] tabular-nums">{value}</motion.span>
+    </>
+  );
+}
+
+function FeedLineView({ line }: { line: FeedLine }) {
+  return (
+    <span data-feed-detail className={cn("block text-[11px] leading-snug transition-colors duration-300", LINE_TONE[line.tone])}>
+      {line.lead}
+      {line.dynamic && <DynamicSegment d={line.dynamic} />}
+    </span>
+  );
 }
 
 /** `Binance erreichbar` / `Binance blockiert (Region) · neuer Versuch 14:35` / proxy state — one line above the table. */
@@ -157,10 +282,17 @@ export function routeLine(health: ProviderHealth): string[] {
   else if (p?.reachable === false) out.push(LIVE_STRINGS.binanceDown);
   else if (p?.reachable === true || health.ws?.state === "live") out.push(LIVE_STRINGS.binanceOk);
   else out.push(LIVE_STRINGS.binanceUnknown);
-  if (IS_FILE_BUILD) out.push(LIVE_STRINGS.proxyFile);
+  const fromDisk = IS_FILE_BUILD || isFileProtocol();
+  if (fromDisk) out.push(LIVE_STRINGS.proxyFile);
   else if (health.proxy?.blocked) out.push(LIVE_STRINGS.proxyBlocked);
   else if (health.proxy?.usable === true) out.push(LIVE_STRINGS.proxyOk);
   else if (health.proxy?.usable === false) out.push(LIVE_STRINGS.proxyOff);
+  // opened from disk the browser may refuse Binance's /futures/data (CORS) and there is no proxy: say what helps
+  if (fromDisk && Object.values(health.feeds ?? {}).some((f) => f && BINANCE_FAMILY_FEEDS.includes(f.feed) && f.consecutiveFailures > 0 && (f.reason === "network" || f.reason === "cors"))) {
+    out.push(LIVE_STRINGS.fileCors);
+  }
+  const skew = skewText(health.clockSkewMs ?? 0);
+  if (skew) out.push(skew);
   return out;
 }
 
@@ -200,7 +332,7 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
             <span>{health.online ? LIVE_STRINGS.online : LIVE_STRINGS.offline}</span>
             <span className="font-mono text-[11.5px] text-faint">{LIVE_STRINGS.reconnects(health.ws?.attempt ?? 0)}</span>
             {routeLine(health).map((t) => (
-              <span key={t} data-route className={cn("text-[11.5px]", health.primary?.blocked && t.startsWith("Binance") ? "text-warn" : "text-faint")}>
+              <span key={t} data-route className={cn("text-[11.5px]", (health.primary?.blocked && t.startsWith("Binance")) || t === LIVE_STRINGS.fileCors ? "text-warn" : "text-faint")}>
                 {t}
               </span>
             ))}
@@ -222,7 +354,7 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
               <tbody className="max-sm:block">
                 {feeds.map((f, i) => {
                   const label = statusLabels?.[f.feed];
-                  const line = f.consecutiveFailures === undefined ? null : feedDetailLine(f);
+                  const line = f.consecutiveFailures === undefined ? null : feedLine(f, { transport: WS_FEEDS.includes(f.feed) ? "ws" : "rest", online: health.online, ws: health.ws, primary: health.primary, skewMs: health.clockSkewMs });
                   const delay = Math.min(i, stagger.max) * stagger.rows;
                   return (
                     <motion.tr
@@ -234,11 +366,7 @@ export function LiveDataCard({ health, statusLabels, onRefresh, onReconnect, onC
                     >
                       <td className="px-3 py-1.5 text-fg/90 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-w-0 max-sm:p-0">
                         {FEED_LABELS[f.feed] ?? f.feed}
-                        {line && (
-                          <span data-feed-detail className={cn("block text-[11px] leading-snug", f.consecutiveFailures > 0 ? "text-warn" : "text-faint", isLiveRatioFeed(f.feed) && "font-mono")}>
-                            {line}
-                          </span>
-                        )}
+                        {line && <FeedLineView line={line} />}
                       </td>
                       <td className="px-3 py-1.5 text-mute max-sm:col-start-1 max-sm:row-start-2 max-sm:min-w-0 max-sm:p-0 max-sm:text-[11.5px]">{SOURCE_LABELS[f.source]}</td>
                       <td className="num px-3 py-1.5 font-mono text-mute max-sm:col-start-2 max-sm:row-start-2 max-sm:p-0 max-sm:text-[11.5px]">
