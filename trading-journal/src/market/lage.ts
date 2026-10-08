@@ -6,6 +6,13 @@
  *   start only, then the missing days hourly at hh:00:20 on the Binance clock (00:00:20 brings the closed day), stale
  *   after 25 h, watched / resumed like every REST feed. Only candles that had CLOSED when Binance answered count (a
  *   forming day fetched at 23:00 never reads as the 00:00 close).
+ * - The just-closed day without its 1D candle (the 00:00:20 poll and its retries failed, or the first seconds after
+ *   00:00): built from the day's 24 closed 1H candles (`dailyFromHourly`: first open, max high, min low, last 1H close
+ *   — the same Binance trades as the 1D candle) and used for the Lage and the gate until the 1D candle arrives and
+ *   replaces it; the status says so after 5 min (`LAGE_DERIVED_TEXT`). Not all 24 there / closed → the honest status
+ *   as before ("Tagesschluss noch nicht geladen", the Lage of the day before), and once the close has been missing
+ *   for more than an hour after 00:00 UTC: no Lage, no gate ("keine Daten", `LAGE_NO_CLOSE_TEXT`) — never yesterday
+ *   silently.
  * - 4H / 1H: the live `kline_4h` / `kline_1h` series (WS + REST bootstrap 499), closed candles only.
  * - Price: `priceMv` (freshest of trade / book / ticker), at most 1×/s; the forming 4H close stands in without it.
  *
@@ -19,7 +26,7 @@
  */
 import { useEffect, useSyncExternalStore } from "react";
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
-import { DAY_MS, lageAt, lageBase, lageKey, type Lage, type LageBase } from "@/domain/lage";
+import { dailyFromHourly, DAY_MS, lageAt, lageBase, lageKey, type Lage, type LageBase } from "@/domain/lage";
 import type { Bar } from "@/domain/signals/indicators";
 import { DAILY_FEED } from "./feeds";
 import { getFeed, getProvider, subscribeFeed, useProvider } from "./marketStore";
@@ -36,6 +43,15 @@ export const LAGE_CLOSE_GRACE_MS = 20_000;
 export const LAGE_LIVE_MS = 1000;
 /** The newest closed day may lag this long behind the last 00:00 UTC before the status says "noch nicht geladen". */
 const MISSING_CLOSE_MS = 5 * 60_000;
+/**
+ * A daily close that is neither loaded (1D candle) nor derivable from the 24 closed 1H candles this long after
+ * 00:00 UTC (Binance clock) → no Lage, no gate ("keine Daten") instead of gating with the day before.
+ */
+export const LAGE_NO_CLOSE_MS = 60 * 60_000;
+/** Status note while the just-closed day is read from its 1H candles (the 1D candle has not arrived). */
+export const LAGE_DERIVED_TEXT = "Tagesschluss aus 1H-Kerzen (1D-Kerze fehlt noch)";
+/** Status note when the daily close is missing for more than `LAGE_NO_CLOSE_MS`: the Ampel holds nothing back. */
+export const LAGE_NO_CLOSE_TEXT = "Tagesschluss fehlt seit über 1 h – Lage-Ampel sperrt nichts (keine Daten)";
 
 export type LageFeedState = "idle" | "loading" | "ok" | "stale" | "error" | "offline";
 
@@ -67,6 +83,21 @@ const FAIL_TEXT: Readonly<Record<string, string>> = {
   bad_symbol: "Symbol unbekannt",
 };
 
+/**
+ * The just-closed day (00:00 UTC on the Binance clock) and the daily feed: the 1D candle is REST-only (hourly poll at
+ * hh:00:20, retried every 60 s after 00:00) and can be missing; the 1H series (socket) has the same day's candles.
+ */
+interface DailyGap {
+  /** the 1D candle of the day that closed at the last 00:00 UTC is not there */
+  missing: boolean;
+  /** that day from its 24 closed 1H candles (`dailyFromHourly`) — used until the 1D candle arrives and replaces it */
+  derived: Bar | null;
+  /** missing, not derivable and more than `LAGE_NO_CLOSE_MS` past 00:00 UTC → no Lage, no gate */
+  expired: boolean;
+  /** when the clock alone can change this (00:00 + 1 h while waiting, else the next 00:00), Binance clock */
+  decideAt: number;
+}
+
 interface Ctl {
   refs: number;
   provider: MarketProvider | null;
@@ -80,8 +111,12 @@ interface Ctl {
   daily: Bar[];
   h4: Bar[];
   h1: Bar[];
+  /** the last 1H candles the exchange reported closed (the derived day reads them) */
+  h1Closed: Bar[];
   formingClose: number | null;
   base: LageBase | null;
+  /** the daily gap the base was computed with (`null` without daily data) */
+  gap: DailyGap | null;
   /**
    * Close time (Binance clock) of the earliest input bar the series already report as closed but `base` left out — its
    * close had not passed on `serverNow()` yet (a device clock a little behind Binance reads the socket's final frame
@@ -107,8 +142,10 @@ const fresh = (): Ctl => ({
   daily: [],
   h4: [],
   h1: [],
+  h1Closed: [],
   formingClose: null,
   base: null,
+  gap: null,
   pendingAt: Infinity,
   view: { lage: null, status: IDLE },
   viewKey: "",
@@ -139,11 +176,16 @@ function statusOf(): LageFeedStatus {
   const failing = why ? `${why}${failures > 1 ? ` · ${failures}× in Folge` : ""}` : null;
   const detail = failing && fileNote && (fh?.reason === "network" || fh?.reason === "cors") ? LAGE_FILE_CORS : failing;
   const sn = serverNow();
+  const sinceClose = sn - Math.floor(sn / DAY_MS) * DAY_MS;
+  const gap = ctl.daily.length ? ctl.gap : null;
+  // the just-closed day read from its 1H candles (said after the usual grace) / missing for over an hour: no gate
+  const note = gap?.expired ? LAGE_NO_CLOSE_TEXT : gap?.derived && sinceClose > MISSING_CLOSE_MS ? LAGE_DERIVED_TEXT : null;
   let state: LageFeedState;
   if (!ctl.daily.length) state = offline() ? "offline" : failures > 0 || fh?.reason === "unsupported" || fh?.reason === "bad_symbol" ? "error" : "loading";
   else if (offline()) state = "offline";
+  else if (note) state = "stale";
   // the newest closed day ends before the last 00:00 UTC (+ grace): yesterday's close is missing
-  else if (closedAt != null && closedAt < Math.floor(sn / DAY_MS) * DAY_MS && sn - Math.floor(sn / DAY_MS) * DAY_MS > MISSING_CLOSE_MS) state = "stale";
+  else if (!gap?.derived && closedAt != null && closedAt < Math.floor(sn / DAY_MS) * DAY_MS && sinceClose > MISSING_CLOSE_MS) state = "stale";
   else state = failures > 0 || fh?.state === "stale" ? "stale" : "ok";
   return {
     state,
@@ -151,7 +193,7 @@ function statusOf(): LageFeedStatus {
     closedAt,
     nextAt: fh?.nextRefreshAt ?? null,
     source: v?.source ?? null,
-    detail: detail ?? (state === "stale" ? STALE_TEXT : null),
+    detail: note && state === "stale" ? [note, detail].filter(Boolean).join(" · ") : (detail ?? (state === "stale" ? STALE_TEXT : null)),
   };
 }
 
@@ -187,7 +229,7 @@ function pendingCloseOf(b: LageBase | null): number {
 
 /** Live part (price → U1, distances); cheap. A closed bar the base is still waiting for recomputes the base first. */
 function runLive(): void {
-  if (ctl.base && serverNow() >= ctl.pendingAt) return runBase();
+  if (serverNow() >= ctl.pendingAt) return runBase();
   liveOnly();
 }
 
@@ -197,10 +239,30 @@ function liveOnly(): void {
   publish(lageAt(ctl.base, livePrice(), serverNow()));
 }
 
-/** Closed-bar part; only when an input bar changed (or a closed bar it left out has closed on the Binance clock). */
+/** The daily gap at `sn` (Binance clock): is the just-closed day's 1D candle there, can its 1H candles stand in? */
+function dailyGapOf(sn: number): DailyGap {
+  const dayStart = Math.floor(sn / DAY_MS) * DAY_MS;
+  const expected = dayStart - DAY_MS; // open of the day that closed at the last 00:00 UTC
+  const last = ctl.daily.at(-1);
+  const missing = !last || last.t * 1000 < expected;
+  // only the just-closed day, right after the newest 1D candle (an older hole is not bridged)
+  const derived = missing && last && last.t * 1000 === expected - DAY_MS ? dailyFromHourly(ctl.h1Closed, expected, sn) : null;
+  const expired = missing && !derived && sn - dayStart > LAGE_NO_CLOSE_MS;
+  const decideAt = missing && !derived && !expired ? dayStart + LAGE_NO_CLOSE_MS + 1 : dayStart + DAY_MS;
+  return { missing, derived, expired, decideAt };
+}
+
+/**
+ * Closed-bar part; only when an input bar changed, a closed bar it left out has closed on the Binance clock, or the
+ * daily gap can change (00:00 UTC, 00:00 + 1 h). The just-closed day comes from its 1H candles while its 1D candle is
+ * missing; missing for over an hour (and not derivable) → no Lage at all (no gate).
+ */
 function runBase(): void {
-  ctl.base = ctl.provider && ctl.daily.length ? lageBase(ctl.daily, ctl.h4, serverNow(), { h1: ctl.h1 }) : null;
-  ctl.pendingAt = pendingCloseOf(ctl.base);
+  const sn = serverNow();
+  ctl.gap = ctl.provider && ctl.daily.length ? dailyGapOf(sn) : null;
+  const daily = ctl.gap?.derived ? [...ctl.daily, ctl.gap.derived] : ctl.daily;
+  ctl.base = ctl.provider && ctl.daily.length && !ctl.gap?.expired ? lageBase(daily, ctl.h4, sn, { h1: ctl.h1 }) : null;
+  ctl.pendingAt = Math.min(pendingCloseOf(ctl.base), ctl.gap ? ctl.gap.decideAt : Infinity);
   liveOnly();
 }
 
@@ -250,6 +312,8 @@ function readSeries(): boolean {
     ctl.h1Key = k1.key;
     // the new-low chip reads the last 23 closed 1H bars
     ctl.h1 = d1.slice(Math.max(0, k1.n - 120), k1.n).map(toBar);
+    // the derived day: the candles the exchange reported closed (a final socket frame or a REST page after the close)
+    ctl.h1Closed = d1.slice(Math.max(0, k1.n - 48), k1.n).filter((c) => c.closed).map(toBar);
     changed = true;
   }
   return changed;
@@ -257,7 +321,7 @@ function readSeries(): boolean {
 
 function onSeries(): void {
   syncProvider();
-  if (readSeries() || (ctl.base && serverNow() >= ctl.pendingAt)) runBase();
+  if (readSeries() || serverNow() >= ctl.pendingAt) runBase();
   else publish(ctl.view.lage); // a status-only change (fetched again, next poll)
 }
 

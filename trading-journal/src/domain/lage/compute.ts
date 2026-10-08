@@ -50,6 +50,32 @@ export function closedBars(bars: readonly Bar[] | null | undefined, sec: number,
   return n === bars.length ? bars : bars.slice(0, n);
 }
 
+/**
+ * The UTC day opening at `dayOpenMs` built from its 24 hourly candles (`h1`: ascending, open times in SECONDS, only
+ * candles the exchange reported closed): open = first open, high / low = max / min, close = the last 1H close (23:00
+ * candle), volume = sum. `null` unless all 24 are present, contiguous and closed at `nowMs` (exchange clock). The
+ * Binance 1D candle of a day is exactly this aggregate (same perp trades), so the Lage can read a daily close whose
+ * 1D candle has not arrived yet (the daily feed is REST-only: a failed 00:00:20 poll).
+ */
+export function dailyFromHourly(h1: readonly Bar[], dayOpenMs: number, nowMs: number): Bar | null {
+  const t0 = dayOpenMs / 1000;
+  if (!Number.isInteger(t0) || (t0 + 86_400) * 1000 > nowMs) return null;
+  let i = 0;
+  while (i < h1.length && h1[i]!.t < t0) i++;
+  if (h1.length - i < 24) return null;
+  let h = -Infinity;
+  let l = Infinity;
+  let v = 0;
+  for (let k = 0; k < 24; k++) {
+    const b = h1[i + k]!;
+    if (b.t !== t0 + k * 3600 || !fin(b.o) || !fin(b.h) || !fin(b.l) || !fin(b.c)) return null;
+    h = Math.max(h, b.h);
+    l = Math.min(l, b.l);
+    v += fin(b.v) ? b.v : 0;
+  }
+  return { t: t0, o: h1[i]!.o, h, l, c: h1[i + 23]!.c, v };
+}
+
 const tail = <T>(xs: readonly T[], n: number): readonly T[] => (xs.length > n ? xs.slice(xs.length - n) : xs);
 const fin = (x: number | null | undefined): x is number => typeof x === "number" && Number.isFinite(x);
 

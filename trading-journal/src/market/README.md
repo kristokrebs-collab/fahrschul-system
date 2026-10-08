@@ -337,7 +337,15 @@ minute; network errors resolve `null` (status `error`, retried on the next call)
 by `@/domain/lage` from the closed candles of `kline_1d` (last 1000), `kline_4h` and `kline_1h` plus the live price
 (`priceMv`, ≤ 1/s); two stages (closed bars ≈ 0.5 ms on a new close — or once the Binance clock passes the close of a bar
 the series already report closed, e.g. the socket's final frame on a device clock slightly behind — live values ≈ 0.04 ms),
-published only when a shown value changes (`lageKey`). Status from the daily feed's health (failures, CORS from a file, "Tagesschluss noch nicht geladen"
+published only when a shown value changes (`lageKey`). **Missing daily close:** while the 1D candle of the day that closed at
+the last 00:00 UTC is not there (the first seconds after 00:00, or the 00:00:20 poll and its retries failed), that day is
+built from its 24 closed 1H candles (`dailyFromHourly` in `@/domain/lage`: first open, max high, min low, last 1H close —
+the same Binance trades as the 1D candle) and used for the Lage and the gate until the 1D candle arrives and replaces it;
+after 5 min the status says so (`stale`, `LAGE_DERIVED_TEXT` "Tagesschluss aus 1H-Kerzen (1D-Kerze fehlt noch)").
+Not all 24 present / reported closed → the Lage of the day before with "Tagesschluss noch nicht geladen"; missing for more
+than `LAGE_NO_CLOSE_MS` (1 h) after 00:00 UTC → `lage: null` (no gate, "keine Daten"; status `stale`,
+`LAGE_NO_CLOSE_TEXT`), never yesterday's state silently. The base is recomputed at 00:00 and 00:00 + 1 h by the clock
+(`pendingAt`). Status from the daily feed's health (failures, CORS from a file, "Tagesschluss noch nicht geladen"
 after 00:05 UTC). The engine holds it while running and gates the long verdict with it (`settings.signals.lage = { on, mode }`,
 part of the input key: a switch re-grades at once); retro checks compute the Lage at T from the cached daily feed or one
 `1d` page (`endTime = T`; a page that fails → no gate for that check and the result is not memoised, `partial`). The overview's toast (`src/app/ScenarioWatcher.tsx`) follows its state changes.

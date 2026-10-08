@@ -17,6 +17,7 @@ export {
   lageKey,
   metSigns,
   closedBars,
+  dailyFromHourly,
   nextDailyClose,
   DAY_MS,
   H4_MS,
