@@ -58,10 +58,13 @@ export interface SignalCfg {
 
 /**
  * Settings of the Top-Trader condition (`settings.signals.whale`). Since decision 5 (2026-10-08) a GRADED combo of four
- * parts (top traders > `topPct` % long on positions, on accounts, retail long share falling, price in discount; short
- * mirrored), read from Binance's 5-min ratio data. `periods` / `minRun` belong to the former run rule ("Top-Trader kaufen
- * · Retail rot", n periods in a row) — kept so stored values and the legacy helpers (`whale.ts`) keep working; the
- * engine no longer grades with them.
+ * parts (top traders > `topPct` % long on positions, on accounts, "Retail rot", price in discount; short mirrored), read
+ * from Binance's 5-min ratio data. "Retail rot" (user decision 2026-10-08 15:45, "Delta wie bei Hyblock") = the
+ * Whale–Retail-Delta — top-trader ACCOUNTS long % minus ALL-accounts long % — is NEGATIVE (`< deltaRed`) or FALLING
+ * (change over `deltaWindow` ≤ −`deltaFall` pp); short mirrored (positive or rising). `retailPeriod` (the former "long
+ * share of all accounts falling vs one period earlier") stays stored and computed for compatibility but no longer
+ * grades. `periods` / `minRun` belong to the former run rule ("Top-Trader kaufen · Retail rot", n periods in a row) —
+ * kept so stored values and the legacy helpers (`whale.ts`) keep working; the engine no longer grades with them.
  */
 export interface WhaleCfg {
   /** evaluate and show the condition */
@@ -74,10 +77,16 @@ export interface WhaleCfg {
   weight: number;
   /** top-trader long share threshold in % (long: > topPct on positions and on accounts; short: < 100 − topPct = > topPct % short), 50 … 90 */
   topPct: number;
-  /** retail comparison: long share of all accounts now vs one `retailPeriod` earlier (5-min data): 5m · 15m · 30m · 1h */
+  /** legacy retail comparison (kept, no longer graded): long share of all accounts now vs one `retailPeriod` earlier (5-min data): 5m · 15m · 30m · 1h */
   retailPeriod: string;
   /** parts (of 4) that give a valid entry +1 strength, 1 … 4 (with `weight` > 0) */
   bonusParts: number;
+  /** "Retail rot" when the Whale–Retail-Delta is below this many pp (long; short mirrored: above −deltaRed), −20 … 20, default 0 */
+  deltaRed: number;
+  /** … or when the delta FELL by at least this many pp over `deltaWindow` (short: rose), 0 … 20, default 1 */
+  deltaFall: number;
+  /** window of the delta change (and the scorecard sparkline is the last 12 points): 30m · 1h · 2h · 4h, default 1h */
+  deltaWindow: string;
 }
 
 /** Divergence settings (`settings.signals.div`). */
@@ -123,9 +132,13 @@ export const WHALE_PERIODS: readonly string[] = ["15m", "30m", "1h", "2h", "4h"]
 export const WHALE_MIN_RUN_MAX = 6;
 export const WHALE_WEIGHT_MAX = 30;
 
-export const DEFAULT_WHALE_CFG: Readonly<WhaleCfg> = Object.freeze({ on: true, periods: ["30m", "1h"], minRun: 2, weight: 10, topPct: 64, retailPeriod: "5m", bonusParts: 3 });
-/** Retail comparison periods (all derivable from the 5-min series: the long share now vs one period earlier). */
+export const DEFAULT_WHALE_CFG: Readonly<WhaleCfg> = Object.freeze({ on: true, periods: ["30m", "1h"], minRun: 2, weight: 10, topPct: 64, retailPeriod: "5m", bonusParts: 3, deltaRed: 0, deltaFall: 1, deltaWindow: "1h" });
+/** Legacy retail comparison periods (all derivable from the 5-min series: the long share now vs one period earlier). */
 export const WHALE_RETAIL_PERIODS: readonly string[] = ["5m", "15m", "30m", "1h"];
+/** Windows of the Whale–Retail-Delta change (`deltaWindow`), all multiples of the 5-min step. */
+export const WHALE_DELTA_WINDOWS: readonly string[] = ["30m", "1h", "2h", "4h"];
+/** |`deltaRed`| and `deltaFall` are clamped to this many pp. */
+export const WHALE_DELTA_PP_MAX = 20;
 
 export const DEFAULT_STRONG_CLOSES = 2;
 export const STRONG_CLOSES_MAX = 6;
@@ -325,6 +338,9 @@ export function sanitizeWhaleCfg(raw: unknown): WhaleCfg {
     topPct: Math.min(90, Math.max(50, num(r.topPct, DEFAULT_WHALE_CFG.topPct))),
     retailPeriod: typeof r.retailPeriod === "string" && WHALE_RETAIL_PERIODS.includes(r.retailPeriod) ? r.retailPeriod : DEFAULT_WHALE_CFG.retailPeriod,
     bonusParts: Math.min(4, Math.max(1, Math.round(num(r.bonusParts, DEFAULT_WHALE_CFG.bonusParts)))),
+    deltaRed: Math.min(WHALE_DELTA_PP_MAX, Math.max(-WHALE_DELTA_PP_MAX, num(r.deltaRed, DEFAULT_WHALE_CFG.deltaRed))),
+    deltaFall: Math.min(WHALE_DELTA_PP_MAX, Math.max(0, num(r.deltaFall, DEFAULT_WHALE_CFG.deltaFall))),
+    deltaWindow: typeof r.deltaWindow === "string" && WHALE_DELTA_WINDOWS.includes(r.deltaWindow) ? r.deltaWindow : DEFAULT_WHALE_CFG.deltaWindow,
   };
 }
 
@@ -341,7 +357,7 @@ export function signalCfgKey(cfg: SignalCfg): string {
     cfg.zoneTf,
     cfg.wtSource,
     ...NUM_KEYS.map((k) => cfg[k]),
-    `w${w.on ? 1 : 0}:${w.periods.join(",")}:${w.minRun}:${w.weight}:${w.topPct}:${w.retailPeriod}:${w.bonusParts}`,
+    `w${w.on ? 1 : 0}:${w.periods.join(",")}:${w.minRun}:${w.weight}:${w.topPct}:${w.retailPeriod}:${w.bonusParts}:${w.deltaRed}:${w.deltaFall}:${w.deltaWindow}`,
     `s${strongClosesOf(cfg)}`,
     `d${d.on ? 1 : 0}:${d.rsi ? 1 : 0}${d.wt ? 1 : 0}${d.hidden ? 1 : 0}:${d.left}:${d.right}:${d.rangeMin}:${d.rangeMax}:${d.maxAge}:${d.midline ? 1 : 0}:${d.weight}`,
     `r${r.on ? 1 : 0}:${r.internal}:${r.eqLen}:${r.eqThreshold}:${r.nearAtr}:${r.minR}:${r.weight}`,

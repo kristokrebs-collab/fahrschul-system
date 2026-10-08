@@ -560,8 +560,9 @@ describe("symmetry", () => {
       }
       return computeSignals(bars, cfg, at, { traders })!;
     };
-    // top traders 66 % / 65 % long, retail red: the Top-Trader-Kombi 4 of 4 for the long side (discount)
-    const traders: TraderReading = { at: now, position: 66, account: 65, retail: 46, retailPrev: 46.4, retailChg: -0.4, period: "5m", step: 300_000 };
+    // top traders 66 % / 65 % long, the Whale–Retail-Delta red (−3,7 pp, −2,4 over the hour): the Top-Trader-Kombi 4 of 4
+    // for the long side (discount)
+    const traders: TraderReading = { at: now, position: 66, account: 65.4, retail: 69.1, retailPrev: 68.8, retailChg: 0.3, period: "5m", step: 300_000, delta: -3.7, deltaPrev: -1.3, deltaChg: -2.4, deltaWindow: "1h" };
     const sig = build(false, now, CFG, traders);
     expect(sig.long.valid).toBe(true);
     expect(["confirmed", "strong"]).toContain(sig.long.state);

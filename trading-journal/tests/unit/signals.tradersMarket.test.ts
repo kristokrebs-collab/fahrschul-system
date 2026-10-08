@@ -4,7 +4,7 @@
  * `fetchRatios` page per series ending at T (memoised, retried after a failure), older than ~30 days → no data.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_SIGNAL_CFG, type Bar } from "@/domain/signals";
+import { DEFAULT_SIGNAL_CFG, sanitizeSignalCfg, type Bar } from "@/domain/signals";
 import { buildFeedSpecs } from "@/market/feeds";
 import { initialHealth } from "@/market/health";
 import { priceMv, priceReceivedAtMv, tradeTimeMv } from "@/market/motionValues";
@@ -34,8 +34,13 @@ function series(end: number, values: number[]): RatioPoint[] {
   const last = Math.floor(end / M5) * M5;
   return values.map((v, i) => ({ time: last - (values.length - 1 - i) * M5, longPct: v, shortPct: 100 - v, ratio: v / (100 - v) }));
 }
-/** Top traders 66 % / 65 % long, retail falling (red): 4 of 4 for a long in discount. */
-const LONG_SET = { pos: [60, 63, 66], acc: [61, 63, 65], ret: [47.2, 46.8, 46.3] };
+/**
+ * Top traders 66 % / 65 % long, the Whale–Retail-Delta red: top-trader accounts 63,8 → 65,0 % and all accounts
+ * 64,2 → 67,8 % long over the last hour (13 points) → delta −0,4 → −2,8 pp (negative and −2,4 pp): 4 of 4 for a long in
+ * discount.
+ */
+const ramp = (from: number, by: number, n = 13): number[] => Array.from({ length: n }, (_, i) => Math.round((from + by * i) * 100) / 100);
+const LONG_SET = { pos: [60, 63, 66], acc: ramp(63.8, 0.1), ret: ramp(64.2, 0.3) };
 
 function fakeProvider(o: { ratioSource?: Source; ratios?: boolean; fetchFails?: boolean } = {}) {
   const store = new Map<FeedId, Stamped<unknown>>();
@@ -107,14 +112,15 @@ describe("live", () => {
     attachSignalEngine(provider);
     const snap = runSignalCheck(NOW).snapshot as LiveSignals;
     expect(fetches).toEqual([]);
-    expect(snap.traders).toMatchObject({ position: 66, account: 65, retail: 46.3, period: "5m" });
-    expect(snap.traders!.retailChg).toBeCloseTo(-0.5, 9);
+    expect(snap.traders).toMatchObject({ position: 66, account: 65, retail: 67.8, period: "5m", deltaWindow: "1h", delta: -2.8, deltaPrev: -0.4, deltaChg: -2.4 });
+    expect(snap.traders!.deltaSeries).toHaveLength(12);
+    expect(snap.traders!.deltaSeries!.at(-1)).toEqual({ time: Math.floor(NOW / M5) * M5, delta: -2.8 });
     const long = snap.long.parts!.find((p) => p.id === "traders")!;
     expect(long.items.slice(0, 3).map((i) => i.met)).toEqual([true, true, true]);
     expect(long.data).toBe(true);
     expect(snap.short.parts!.find((p) => p.id === "traders")!.items.slice(0, 3).map((i) => i.met)).toEqual([false, false, false]);
     const stored = toTradeSnapshot(snap, "long");
-    expect(stored.parts!.find((p) => p.id === "traders")).toMatchObject({ data: true, period: "5m" });
+    expect(stored.parts!.find((p) => p.id === "traders")).toMatchObject({ data: true, period: "5m", delta: -2.8, deltaChg: -2.4, deltaWindow: "1h" });
     expect(stored.whale).toBeUndefined();
     expect(snap.knife!.long.items.find((i) => i.id === "whale")!.met).toBe(true);
   });
@@ -125,7 +131,7 @@ describe("live", () => {
     attachSignalEngine(fake.provider);
     runSignalCheck(NOW);
     const before = __signalStats().computes;
-    fake.publish("globalAccountRatio5m", series(NOW, [46.3, 46.8, 47.4])); // retail turns green
+    fake.publish("globalAccountRatio5m", series(NOW, [46.3, 46.8, 47.4])); // all accounts far below the top traders: the delta turns green
     expect(__signalStats().computes).toBe(before);
     vi.advanceTimersByTime(1000);
     expect(__signalStats().computes).toBe(before + 1);
@@ -168,8 +174,21 @@ describe("retro (back-dated trades)", () => {
     const { provider, fetches } = fakeProvider();
     attachSignalEngine(provider);
     const r = await tradersAt(provider, { whale: undefined }, NOW - 60_000, NOW);
-    expect(r).toMatchObject({ position: 66, account: 65 });
+    expect(r).toMatchObject({ position: 66, account: 65, delta: -2.8, deltaChg: -2.4 });
     expect(fetches).toEqual([]);
+  });
+
+  it("the ring does not reach back over the delta window → one page per series, deep enough for the window", async () => {
+    const cfg = sanitizeSignalCfg({ whale: { deltaWindow: "2h" } });
+    setSignalConfig(cfg);
+    const { provider, fetches } = fakeProvider();
+    attachSignalEngine(provider);
+    const r = await tradersAt(provider, cfg, NOW - 60_000, NOW);
+    expect(fetches).toHaveLength(3);
+    // 2 h of 5-min points + 3 steps of slack
+    for (const f of fetches) expect([f.endTime! - f.startTime!, f.limit]).toEqual([27 * M5, 29]);
+    // the fake page has only the last hour → the change over 2 h stays unknown, the level still reads
+    expect(r).toMatchObject({ delta: -2.8, deltaChg: null, deltaWindow: "2h" });
   });
 
   it("inside Binance's ~30-day window: one 5-min page per series ending at T, graded and stored; memoised per minute", async () => {
@@ -180,7 +199,7 @@ describe("retro (back-dated trades)", () => {
     const snap = await checkTradeAt(T, "long");
     expect(snap?.mode).toBe("retro");
     expect(["confirmed", "strong", "none"]).toContain(snap!.state); // closed bars only: never provisional
-    expect(snap!.parts!.find((p) => p.id === "traders")).toMatchObject({ data: true, period: "5m" });
+    expect(snap!.parts!.find((p) => p.id === "traders")).toMatchObject({ data: true, period: "5m", delta: -2.8, deltaChg: -2.4 });
     expect(fetches.map((f) => [f.kind, f.period, f.endTime]).sort()).toEqual(
       [
         ["globalAccountRatio", "5m", T],

@@ -8,7 +8,7 @@
  * |---|---|---|---|
  * | `structure` | first higher low (internal structure, unbroken) OR a bullish BOS / CHoCH within `KNIFE_BREAK_MAX_AGE` bars | first lower high OR a bearish break | 1h, 4h (`KNIFE_TFS`; a timeframe outside ladder + zone = no data) |
  * | `divergence` | an active REGULAR bullish RSI divergence on a closed candle (hidden = continuation, not a reversal; WaveTrend hits listed only) | bearish | every ladder rung |
- * | `whale` | top traders long-heavy (positions OR accounts > `topPct`) AND retail red — the Top-Trader-Kombi's own items (5-min data) | short-heavy AND retail green | live reading |
+ * | `whale` | top traders long-heavy (positions OR accounts > `topPct`) AND the Whale–Retail-Delta red (negative or falling) — the Top-Trader-Kombi's own items (5-min data) | short-heavy AND the delta green (positive or rising) | live reading |
  *
  * `met: null` = keine Daten (switched off, too few bars, no Binance top-trader data). Pure.
  */
@@ -58,7 +58,7 @@ export const KNIFE_INFO =
 const LABEL: Readonly<Record<KnifeId, Readonly<Record<Side, string>>>> = {
   structure: { long: "Erstes Higher Low oder BOS auf 1H/4H", short: "Erstes Lower High oder BOS auf 1H/4H" },
   divergence: { long: "RSI bullische Divergenz", short: "RSI bärische Divergenz" },
-  whale: { long: "Whale-vs-Retail-Delta (Top-Trader long · Retail rot)", short: "Whale-vs-Retail-Delta (Top-Trader short · Retail grün)" },
+  whale: { long: "Top-Trader long · Whale–Retail-Delta rot", short: "Top-Trader short · Whale–Retail-Delta grün" },
 };
 
 const fmt0 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
@@ -157,7 +157,7 @@ export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "sho
     const item = (id: string) => part.items.find((i) => i.id === id);
     const top = item("pos")?.met === true || item("acc")?.met === true;
     const retail = item("retail")?.met === true;
-    const vals = part.items.filter((i) => i.id !== "zone").map((i) => `${i.id === "pos" ? "Positionen" : i.id === "acc" ? "Konten" : "Retail"} ${i.value}`);
+    const vals = part.items.filter((i) => i.id !== "zone").map((i) => `${i.id === "pos" ? "Positionen" : i.id === "acc" ? "Konten" : "Delta"} ${i.value}`);
     whale = { id: "whale", label: LABEL.whale[side], met: top && retail, detail: `${part.met ?? 0} von 4 · ${vals.join(" · ")}`, tfs: [] };
   }
 

@@ -13,11 +13,11 @@
  * a lit flag (`met: null` = keine Daten). Pure.
  */
 import { divCfgOf, srCfgOf, whaleCfgOf, type Side, type SignalCfg } from "./config";
-import { ppText, zonePillText } from "./copy";
+import { deltaRuleText, deltaText, zonePillText } from "./copy";
 import { divGrade, type Divergence } from "./divergence";
 import { STATE_RANK, type SignalState } from "./state";
 import type { Level } from "./structure";
-import { TRADERS_SIDE_TITLE, type TraderReading } from "./traders";
+import { deltaMet, readingDelta, TRADERS_SIDE_TITLE, type TraderReading } from "./traders";
 import type { TfCheck } from "./verdict";
 
 export type PartId = "traders" | "div" | "sr";
@@ -88,15 +88,19 @@ export function tradersPart(side: Side, reading: TraderReading | null | undefine
   // strict on both sides (exact mirror): long > topPct % long, short > topPct % short (= long share < 100 − topPct)
   const top = (v: number | null): boolean | null => (v == null ? null : long ? v > w.topPct : v < lo);
   const z = zoneRef?.zone ?? null;
+  // Whale–Retail-Delta (accounts − all accounts, pp): a hand-built reading without the field gets the definition
+  const delta = readingDelta(r);
+  const deltaChg = r?.deltaChg ?? null;
+  const window = r?.deltaWindow ?? w.deltaWindow;
   const items: PartItem[] = [
     { id: "pos", label: `Top-Trader Positionen > ${n0(w.topPct)} % ${sideWord}`, value: share(r?.position ?? null), raw: r?.position ?? null, met: top(r?.position ?? null) },
     { id: "acc", label: `Top-Trader Konten > ${n0(w.topPct)} % ${sideWord}`, value: share(r?.account ?? null), raw: r?.account ?? null, met: top(r?.account ?? null) },
     {
       id: "retail",
-      label: long ? `Retail rot · Long-Anteil fällt (${r?.period ?? w.retailPeriod})` : `Retail grün · Long-Anteil steigt (${r?.period ?? w.retailPeriod})`,
-      value: r?.retailChg == null ? NO_DATA : ppText(r.retailChg),
-      raw: r?.retailChg ?? null,
-      met: r?.retailChg == null ? null : long ? r.retailChg < 0 : r.retailChg > 0,
+      label: `Whale–Retail-Delta ${long ? "rot" : "grün"} · ${deltaRuleText(side, { ...w, deltaWindow: window })}`,
+      value: deltaText(delta, deltaChg, window),
+      raw: delta,
+      met: deltaMet(side, delta, deltaChg, w),
     },
     {
       id: "zone",
@@ -107,7 +111,7 @@ export function tradersPart(side: Side, reading: TraderReading | null | undefine
     },
   ];
   const met = items.filter((i) => i.met === true).length;
-  const data = !!r && (r.position != null || r.account != null || r.retailChg != null);
+  const data = !!r && (r.position != null || r.account != null || delta != null || deltaChg != null);
   const grade = met / 4;
   const points = data ? w.weight * grade : 0;
   return {

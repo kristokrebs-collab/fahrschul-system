@@ -104,7 +104,22 @@ function ratioSeries(end: number, values: number[], step = M5): RatioSample[] {
   return values.map((v, i) => ({ time: end - (values.length - 1 - i) * step, longPct: v }));
 }
 
-const reading = (o: Partial<TraderReading> = {}): TraderReading => ({ at: 1_760_000_000_000, position: 66, account: 65, retail: 46, retailPrev: 46.5, retailChg: -0.5, period: "5m", step: M5, ...o });
+// Whale–Retail-Delta red: top-trader accounts 65 % long, all accounts 67,1 % → −2,1 pp, fell 1,7 pp over the hour
+const reading = (o: Partial<TraderReading> = {}): TraderReading => ({
+  at: 1_760_000_000_000,
+  position: 66,
+  account: 65,
+  retail: 67.1,
+  retailPrev: 67.6,
+  retailChg: -0.5,
+  period: "5m",
+  step: M5,
+  delta: -2.1,
+  deltaPrev: -0.4,
+  deltaChg: -1.7,
+  deltaWindow: "1h",
+  ...o,
+});
 
 // ------------------------------------------------------------------ candle-close state
 
@@ -473,15 +488,17 @@ describe("Top-Trader-Kombi (decision 5)", () => {
       ["retail", true],
       ["zone", true],
     ]);
-    expect(p.items.map((i) => i.value)).toEqual(["66,0 % Long", "65,0 % Long", "−0,5 pp", "Discount · 20 %"]);
+    expect(p.items.map((i) => i.value)).toEqual(["66,0 % Long", "65,0 % Long", "−2,1 pp · 1h −1,7", "Discount · 20 %"]);
     expect(p.items[0]!.label).toBe("Top-Trader Positionen > 64 % Long");
+    expect(p.items[2]).toMatchObject({ label: "Whale–Retail-Delta rot · < 0 oder fällt ≥ 1 pp (1h)", raw: -2.1 });
     expect(p).toMatchObject({ grade: 1, points: 10, ok: true, bonus: true, met: 4, data: true, label: "Top-Trader long · Retail rot", detail: "4 von 4 · +10,0 Punkte" });
     // two of four → half the points, no bonus
-    const half = tradersPart("long", reading({ account: 60, retailChg: 0.2 }), zone, CFG)!;
+    const half = tradersPart("long", reading({ account: 60, delta: 1.5, deltaChg: 0.2 }), zone, CFG)!;
     expect(half).toMatchObject({ met: 2, grade: 0.5, points: 5, ok: false, bonus: false });
-    // short: long share < 36 % (> 64 % short) on both ratios, retail green, premium
-    const s = tradersPart("short", reading({ position: 35, account: 35.9, retailChg: 0.3 }), check("1h", { zone: zoneInfo(0.8) }), CFG)!;
+    // short: long share < 36 % (> 64 % short) on both ratios, the delta green (positive), premium
+    const s = tradersPart("short", reading({ position: 35, account: 35.9, delta: 2.4, deltaChg: 0.3 }), check("1h", { zone: zoneInfo(0.8) }), CFG)!;
     expect(s.items.map((i) => i.met)).toEqual([true, true, true, true]);
+    expect(s.items[2]).toMatchObject({ label: "Whale–Retail-Delta grün · > 0 oder steigt ≥ 1 pp (1h)", value: "+2,4 pp · 1h +0,3" });
     expect(s.items[0]!.value).toBe("65,0 % Short");
     expect(s.label).toBe("Top-Trader short · Retail grün");
     expect(tradersPart("short", reading(), zone, CFG)!.met).toBe(0);
@@ -625,17 +642,18 @@ describe("falling-knife filter (decision 11)", () => {
     expect(k).toMatchObject({ n: 3, all: true, data: true, label: "3 von 3 erfüllt" });
     expect(k.items[0]!.tfs).toEqual(["1h"]);
     expect(k.items[1]).toMatchObject({ tfs: ["1h"], detail: "1h: RSI regulär" });
-    expect(k.items[2]!.detail).toBe("4 von 4 · Positionen 66,0 % Long · Konten 65,0 % Long · Retail −0,5 pp");
+    expect(k.items[2]!.detail).toBe("4 von 4 · Positionen 66,0 % Long · Konten 65,0 % Long · Delta −2,1 pp · 1h −1,7");
     // the same data never contradicts the check: the whale point = the Kombi's own items
     expect(g.long.parts!.find((p) => p.id === "traders")!.items.find((i) => i.id === "retail")!.met).toBe(true);
-    // retail green → whale point fails; no reading → null
-    expect(knifeFilter(gradeSignals(raw, CFG, reading({ retailChg: 0.3 })), CFG).items[2]!.met).toBe(false);
+    // delta green (positive, rising) → whale point fails; no reading → null
+    expect(knifeFilter(gradeSignals(raw, CFG, reading({ delta: 0.4, deltaChg: 0.3 })), CFG).items[2]!.met).toBe(false);
     expect(knifeFilter(gradeSignals(raw, CFG, null), CFG).items[2]).toMatchObject({ met: null, detail: "keine Daten" });
     // divergence off → null
     const noDiv = sanitizeSignalCfg({ div: { on: false } });
     expect(knifeFilter(gradeSignals({ ...raw, checks: checks.map((c) => ({ ...c, div: undefined })) }, noDiv, null), noDiv).items[1]!.met).toBeNull();
     // short side mirrored labels
-    expect(g.knife!.short.items.map((i) => i.label)).toEqual(["Erstes Lower High oder BOS auf 1H/4H", "RSI bärische Divergenz", "Whale-vs-Retail-Delta (Top-Trader short · Retail grün)"]);
+    expect(g.knife!.short.items.map((i) => i.label)).toEqual(["Erstes Lower High oder BOS auf 1H/4H", "RSI bärische Divergenz", "Top-Trader short · Whale–Retail-Delta grün"]);
+    expect(k.items[2]!.label).toBe("Top-Trader long · Whale–Retail-Delta rot");
   });
 });
 
@@ -678,7 +696,7 @@ describe("bias: new rows vote, provisional counts ½, never against a confirmed 
       const b15 = synthBars(2600, seed);
       for (let end = 1300; end <= b15.length; end += 13) {
         const now = (b15[end - 1]!.t + 450) * 1000;
-        const s = computeSignals(ladderBars(b15.slice(0, end)), CFG, now, { traders: reading({ at: now, position: 40 + (end % 40), account: 50, retailChg: (end % 3) - 1 }) })!;
+        const s = computeSignals(ladderBars(b15.slice(0, end)), CFG, now, { traders: reading({ at: now, position: 40 + (end % 40), account: 50, delta: (end % 3) - 1, deltaChg: (end % 5) - 2 }) })!;
         const b = computeBias(s, CFG);
         if (!b) continue;
         evals++;
@@ -737,7 +755,7 @@ describe("config, determinism, performance", () => {
   it("every new setting is part of the evaluation key; sanitised and clamped", () => {
     const base = signalCfgKey(sanitizeSignalCfg({}));
     expect(base).toBe(signalCfgKey(DEFAULT_SIGNAL_CFG));
-    for (const raw of [{ strongCloses: 1 }, { strongCloses: 3, signalLookback: 4 }, { whale: { topPct: 70 } }, { whale: { retailPeriod: "1h" } }, { whale: { bonusParts: 2 } }, { div: { left: 3 } }, { div: { hidden: false } }, { sr: { nearAtr: 2 } }, { sr: { minR: 3 } }]) {
+    for (const raw of [{ strongCloses: 1 }, { strongCloses: 3, signalLookback: 4 }, { whale: { topPct: 70 } }, { whale: { retailPeriod: "1h" } }, { whale: { bonusParts: 2 } }, { whale: { deltaRed: -1 } }, { whale: { deltaFall: 2 } }, { whale: { deltaWindow: "4h" } }, { div: { left: 3 } }, { div: { hidden: false } }, { sr: { nearAtr: 2 } }, { sr: { minR: 3 } }]) {
       expect(signalCfgKey(sanitizeSignalCfg(raw)), JSON.stringify(raw)).not.toBe(base);
     }
     // the closes until "stark bestätigt" never exceed what the signal window can hold (window − the running candle)

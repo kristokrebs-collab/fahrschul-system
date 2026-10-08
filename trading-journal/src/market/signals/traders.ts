@@ -6,12 +6,15 @@
  *   data layer's `deriveTraderSeries` — the SAME points the Top-Trader card and the falling-knife filter read, no extra
  *   request. Freshness is judged on the Binance clock (`provider.serverNow()`). Only Binance data counts (direct or the
  *   EU proxy); a Bybit / OKX fallback yields no reading ("keine Daten", never a fail).
- * - Retro (`tradersAt`): the live ring when it reaches back to T (24 h), else one `fetchRatios` page per series ending
- *   at T (budget-aware, Binance route only; memoised, failures retried on the next call). Binance keeps these series
- *   for ~30 days: older times → `null`.
+ * - Retro (`tradersAt`): the live ring when it reaches back to T (24 h) with every value of the reading (positions,
+ *   accounts, the Whale–Retail-Delta and its change over `deltaWindow`), else one `fetchRatios` page per series ending
+ *   at T and reaching `traderLookbackMs(cfg)` back (the delta window, the 12-point sparkline, the legacy retail period;
+ *   budget-aware, Binance route only; memoised, failures retried on the next call). Binance keeps these series for
+ *   ~30 days: older times → `null`.
  * Pure helpers + one memo; the engine calls `liveTraders` inside its ≤ 1/s evaluation and keys it with `tradersInputKey`.
  */
-import { tfSeconds, traderReading, whaleCfgOf, type SignalCfg, type TraderReading, type TraderSeries } from "@/domain/signals";
+import { traderReading, whaleCfgOf, type SignalCfg, type TraderReading, type TraderSeries } from "@/domain/signals";
+import { traderLookbackMs } from "@/domain/signals/traders";
 import { FUTURES_DATA_RETENTION_MS, LIVE_RATIO_FEEDS, LIVE_RATIO_PERIOD } from "../feeds";
 import type { FeedSnapshot } from "../mapping";
 import type { MarketProvider } from "../provider";
@@ -61,7 +64,7 @@ const memo = new Map<string, Promise<TraderSeries | null>>();
 type Kind = "topPositionRatio" | "topAccountRatio" | "globalAccountRatio";
 const KINDS: readonly Kind[] = ["topPositionRatio", "topAccountRatio", "globalAccountRatio"];
 
-/** Points of the three series ending at `t` (enough for the retail comparison), `null` when every request failed. */
+/** Points of the three series ending at `t`, `back` ms deep (+ 3 steps), `null` when every request failed. */
 function fetchSeriesAt(p: MarketProvider, t: number, back: number): Promise<TraderSeries | null> {
   const n = Math.ceil(back / TRADER_SERIES_STEP_MS) + 3;
   const key = `${p.symbol}|${Math.floor(t / 60_000)}|${n}`;
@@ -84,8 +87,8 @@ function fetchSeriesAt(p: MarketProvider, t: number, back: number): Promise<Trad
   return run;
 }
 
-/** A reading with every value present (positions, accounts, the retail change). */
-const complete = (r: TraderReading | null): r is TraderReading => !!r && r.position != null && r.account != null && r.retailChg != null;
+/** A reading with every value present (positions, accounts, the Whale–Retail-Delta and its change over the window). */
+const complete = (r: TraderReading | null): r is TraderReading => !!r && r.position != null && r.account != null && r.delta != null && r.deltaChg != null;
 
 /**
  * The reading at time `t` (a back-dated trade). `null` when the condition is off, `t` lies outside Binance's ~30-day
@@ -94,7 +97,7 @@ const complete = (r: TraderReading | null): r is TraderReading => !!r && r.posit
 export async function tradersAt(p: MarketProvider, cfg: Pick<SignalCfg, "whale">, t: number, now: number = Date.now()): Promise<TraderReading | null> {
   const w = whaleCfgOf(cfg);
   if (!w.on || !Number.isFinite(t)) return null;
-  const back = Math.max(TRADER_SERIES_STEP_MS, tfSeconds(w.retailPeriod) * 1000);
+  const back = traderLookbackMs(cfg, TRADER_SERIES_STEP_MS);
   if (now - t > FUTURES_DATA_RETENTION_MS - back - 2 * TRADER_SERIES_STEP_MS) return null; // beyond Binance's window
   const live = traderReading(liveTraderSeriesOf(p), cfg, t);
   if (complete(live)) return live;

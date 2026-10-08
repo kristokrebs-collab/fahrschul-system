@@ -60,10 +60,40 @@ export const WHALE_NO_DATA_HINT = "Binance-Futures-Daten (Top-Trader / alle Kont
 /** `+1,2 pp` / `−0,8 pp` (U+2212). */
 export function ppText(x: number): string {
   if (!Number.isFinite(x)) return "–";
+  return `${signedPp(x)} pp`;
+}
+
+/** `+1,2` / `−0,8` / `±0,0` (one decimal, symmetric rounding, U+2212), without the unit. */
+export function signedPp(x: number): string {
+  if (!Number.isFinite(x)) return "–";
   const r = (Math.sign(x) * Math.round(Math.abs(x) * 10)) / 10; // symmetric: −0,85 → −0,9 like +0,85 → +0,9
   const abs = Math.abs(r).toFixed(1).replace(".", ",");
-  return `${r > 0 ? "+" : r < 0 ? "−" : "±"}${abs} pp`;
+  return `${r > 0 ? "+" : r < 0 ? "−" : "±"}${abs}`;
 }
+
+/**
+ * Whale–Retail-Delta as shown (like Hyblock): `−3,5 pp · 1h −2,1` (the level and its change over the window), `−3,5 pp`
+ * without an older point, `keine Daten` without a delta.
+ */
+export function deltaText(delta: number | null | undefined, chg: number | null | undefined, window: string): string {
+  if (delta == null) return chg == null ? WHALE_NO_DATA : `${window} ${signedPp(chg)} pp`;
+  return chg == null ? ppText(delta) : `${ppText(delta)} · ${window} ${signedPp(chg)}`;
+}
+
+/**
+ * The rule of the `retail` item in words: long `< 0 oder fällt ≥ 1 pp (1h)` ("Retail rot"), short `> 0 oder steigt ≥ 1 pp
+ * (1h)` ("Retail grün"); the level threshold mirrored (`deltaRed` −2 → long `< −2`, short `> 2`).
+ */
+export function deltaRuleText(side: "long" | "short", w: { deltaRed: number; deltaFall: number; deltaWindow: string }): string {
+  const long = side === "long";
+  const level = long ? w.deltaRed : -w.deltaRed;
+  const sign = level < 0 ? "−" : "";
+  return `${long ? "<" : ">"} ${sign}${dec(Math.abs(level))} oder ${long ? "fällt" : "steigt"} ≥ ${dec(w.deltaFall)} pp (${w.deltaWindow})`;
+}
+
+/** Honest source note: Binance's cohorts, not Hyblock's. */
+export const WHALE_DELTA_NOTE =
+  "Whale–Retail-Delta = Long-Anteil der Binance-Top-Trader nach Konten (Top 20 % nach Margin) minus Long-Anteil aller Konten, 5-min-Daten. Das sind Binance-Kohorten, nicht Hyblocks eigene – der Wert kann von Hyblocks „Whale vs Retail Delta“ leicht abweichen.";
 
 /** `2 Perioden` / `1 Periode`. */
 export const periodsText = (n: number): string => `${n} ${n === 1 ? "Periode" : "Perioden"}`;
@@ -88,7 +118,7 @@ export function signalInfo(cfg: SignalCfg, symbol = "BTCUSDT") {
       ? [
           {
             k: "Top-Trader-Kombi",
-            v: `4 Teile, je mehr erfüllt, desto stärker: Top-Trader > ${dec(w.topPct)} % Long nach Positionen, > ${dec(w.topPct)} % Long nach Konten, Retail rot (Long-Anteil aller Konten fällt gegenüber ${w.retailPeriod} vorher), Preis im Discount; Short spiegelbildlich (> ${dec(w.topPct)} % Short, Retail grün, Premium). Binance-5-min-Daten, ${pts(w.weight)} ab ${w.bonusParts} von 4.`,
+            v: `4 Teile, je mehr erfüllt, desto stärker: Top-Trader > ${dec(w.topPct)} % Long nach Positionen, > ${dec(w.topPct)} % Long nach Konten, Retail rot = Whale–Retail-Delta (Top-Trader-Konten minus alle Konten, Long-%) ${deltaRuleText("long", w)}, Preis im Discount; Short spiegelbildlich (> ${dec(w.topPct)} % Short, Retail grün = Delta ${deltaRuleText("short", w)}, Premium). Binance-5-min-Daten (Binance-Kohorten, nicht Hyblocks – Werte können leicht abweichen), ${pts(w.weight)} ab ${w.bonusParts} von 4.`,
           },
         ]
       : []),

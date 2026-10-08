@@ -77,9 +77,13 @@ export interface SignalSnapshotPart {
   data: boolean;
   state: SignalState;
   items: SignalSnapshotPartItem[];
-  /** traders: met parts of 4; the retail comparison period */
+  /** traders: met parts of 4; the legacy retail comparison period */
   met?: number;
   period?: string;
+  /** traders: Whale–Retail-Delta (top-trader accounts − all accounts, long %, pp) and its change over `deltaWindow`, rounded to 0.01; `null` = keine Daten */
+  delta?: number | null;
+  deltaChg?: number | null;
+  deltaWindow?: string;
   /** div: the rung of the best hit and the active hits */
   tf?: string;
   hits?: Array<{ tf: string; osc: DivOsc; kind: DivKind; state: SignalState; barsAgo: number }>;
@@ -182,7 +186,13 @@ export function snapshotPart(p: GradedPart): SignalSnapshotPart {
   };
   if (p.id === "traders") {
     out.met = p.met ?? 0;
-    if (p.reading) out.period = p.reading.period;
+    if (p.reading) {
+      out.period = p.reading.period;
+      const delta = p.items.find((i) => i.id === "retail")?.raw ?? null;
+      out.delta = delta == null || !Number.isFinite(delta) ? null : r2(delta);
+      out.deltaChg = p.reading.deltaChg == null || !Number.isFinite(p.reading.deltaChg) ? null : r2(p.reading.deltaChg);
+      if (p.reading.deltaWindow) out.deltaWindow = p.reading.deltaWindow;
+    }
   }
   if (p.id === "div") {
     if (p.tf) out.tf = p.tf;
@@ -405,7 +415,7 @@ function parsePart(raw: unknown): SignalSnapshotPart | null {
   const items = Array.isArray(raw.items)
     ? raw.items.filter((i): i is Record<string, unknown> => isRec(i) && typeof i.id === "string").map((i) => ({ ...i, id: i.id as string, met: metOf(i.met), raw: numOrNull(i.raw) }))
     : [];
-  return {
+  const out = {
     ...raw,
     id: raw.id as PartId,
     grade: Number.isFinite(g) ? clamp(g, 0, 1) : 0,
@@ -416,6 +426,14 @@ function parsePart(raw: unknown): SignalSnapshotPart | null {
     state: isSignalState(raw.state) ? raw.state : "none",
     items,
   } as SignalSnapshotPart;
+  if (raw.id === "traders") {
+    // additive Whale–Retail-Delta fields: a malformed number reads as "keine Daten", an absent one stays absent (older
+    // snapshots), a malformed window is dropped
+    if ("delta" in raw) out.delta = numOrNull(raw.delta);
+    if ("deltaChg" in raw) out.deltaChg = numOrNull(raw.deltaChg);
+    if ("deltaWindow" in raw && typeof raw.deltaWindow !== "string") delete out.deltaWindow;
+  }
+  return out;
 }
 
 function parseKnife(raw: unknown): SignalSnapshotKnife | null {
