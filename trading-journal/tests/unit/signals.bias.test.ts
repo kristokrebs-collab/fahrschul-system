@@ -50,6 +50,8 @@ import {
   type SignalCfg,
   type Signals,
   type TfCheck,
+  type TraderReading,
+  TRADERS_TITLE,
   type WhalePeriod,
   type WhaleReading,
   type WtEvent,
@@ -59,8 +61,10 @@ import { SYNTH_LAST, synthKlines } from "../e2e/mocks/synth";
 import { expectedSignals } from "../e2e/mocks/synthOracle";
 import { synthBars } from "./signals.fixtures";
 
-const CFG: SignalCfg = sanitizeSignalCfg(DEFAULT_SIGNAL_CFG);
-const NO_WHALE: SignalCfg = sanitizeSignalCfg({ whale: { on: false } });
+/** Hand-built checks carry no divergences / structure: those parts are off here (`signals.v2.test.ts` covers them). */
+const PARTS_OFF = { div: { on: false }, sr: { on: false } } as const;
+const CFG: SignalCfg = sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, ...PARTS_OFF });
+const NO_WHALE: SignalCfg = sanitizeSignalCfg({ whale: { on: false }, ...PARTS_OFF });
 
 function zone(pos: number): ZoneInfo {
   const z = pos > 0.525 ? "premium" : pos >= 0.475 ? "equilibrium" : "discount";
@@ -183,7 +187,7 @@ describe("votes", () => {
 
 describe("weights and the weighted mean", () => {
   it("reuses the check's score points: MCB 65 split equally over the rungs (55 / n like the score), RSI 20, zone 15, whale = its weight", () => {
-    expect(DEFAULT_BIAS_CFG).toEqual({ mcb: 65, rsi: 20, zone: 15, whale: null });
+    expect(DEFAULT_BIAS_CFG).toEqual({ mcb: 65, rsi: 20, zone: 15, whale: null, div: null, sr: null });
     expect(rungWeights(4, 65)).toEqual([16.25, 16.25, 16.25, 16.25]);
     expect(rungWeights(3, 60)).toEqual([20, 20, 20]);
     expect(rungWeights(0, 65)).toEqual([]);
@@ -255,12 +259,12 @@ describe("weights and the weighted mean", () => {
     expect(r4h).toMatchObject({ vote: null, share: 0, detail: "Zu wenig Kerzen", label: "MCB 4h · stärker" });
     expect(b.used).toBe(6);
     expect(b.total).toBe(7);
-    // the whale condition on, but no data → a "keine Daten" row, excluded
+    // the Top-Trader-Kombi on, but no reading → a "keine Daten" row, excluded
     const nd = computeBias(sig([allLong("30m"), allLong("45m"), allLong("1h"), allLong("4h")], undefined), CFG)!;
-    expect(nd.contributions.find((c) => c.id === "whale")).toMatchObject({ vote: null, share: 0, detail: "keine Daten" });
+    expect(nd.contributions.find((c) => c.id === "traders")).toMatchObject({ vote: null, share: 0, detail: "keine Daten", label: TRADERS_TITLE });
     expect(nd.score).toBe(1);
     // switched off → no row at all
-    expect(computeBias(sig([allLong("30m")]), NO_WHALE)!.contributions.some((c) => c.id === "whale")).toBe(false);
+    expect(computeBias(sig([allLong("30m")]), NO_WHALE)!.contributions.some((c) => c.id === "whale" || c.id === "traders")).toBe(false);
     // no zone check → the base's zone, like the check; no base either → zone excluded
     const baseZone = computeBias({ checks: [allLong("30m")], zone: null }, NO_WHALE)!;
     expect(baseZone.contributions.find((c) => c.id === "zone")).toMatchObject({ vote: 1, label: "Premium/Discount · 30m" });
@@ -270,12 +274,12 @@ describe("weights and the weighted mean", () => {
     // nothing with data / weight
     expect(computeBias(null, CFG)).toBeNull();
     expect(computeBias({ checks: [null, null, null, null], zone: null }, CFG)).toBeNull();
-    const zeroCfg = sanitizeSignalCfg({ whale: { on: false }, bias: { mcb: 0, rsi: 0, zone: 0 } });
+    const zeroCfg = sanitizeSignalCfg({ whale: { on: false }, bias: { mcb: 0, rsi: 0, zone: 0 }, ...PARTS_OFF });
     expect(computeBias(sig([allLong("30m"), allLong("45m"), allLong("1h"), allLong("4h")]), zeroCfg)).toBeNull();
   });
 
   it("whale weight 0 = shown, never counted; settings.signals.bias overrides the points", () => {
-    const zeroWhale = sanitizeSignalCfg({ whale: { weight: 0 } });
+    const zeroWhale = sanitizeSignalCfg({ whale: { weight: 0 }, ...PARTS_OFF });
     const r: WhaleReading = { periods: [period("30m", { runShort: 3, topChg: -2, retailChg: 2 })], missing: [] };
     const b = computeBias(sig([check("30m", { long: { kind: "bottom", barsAgo: 0 } }), check("45m"), check("1h"), check("4h")], r), zeroWhale)!;
     const row = b.contributions.find((c) => c.id === "whale")!;
@@ -283,14 +287,15 @@ describe("weights and the weighted mean", () => {
     expect(row.detail).toMatch(/zählt nicht$/);
     expect(b.score).toBeGreaterThan(0);
     // overrides (kept through sanitizeSignalCfg as an unknown key)
-    const custom = sanitizeSignalCfg({ bias: { mcb: "40", rsi: 30, zone: -5, whale: 25 } });
-    expect(sanitizeBiasCfg((custom as SignalCfg & { bias?: unknown }).bias)).toEqual({ mcb: 40, rsi: 30, zone: 0, whale: 25 });
-    expect(sanitizeBiasCfg({ mcb: Infinity, rsi: 500 })).toEqual({ mcb: 65, rsi: 100, zone: 15, whale: null });
+    const custom = sanitizeSignalCfg({ bias: { mcb: "40", rsi: 30, zone: -5, whale: 25 }, ...PARTS_OFF });
+    expect(sanitizeBiasCfg((custom as SignalCfg & { bias?: unknown }).bias)).toEqual({ mcb: 40, rsi: 30, zone: 0, whale: 25, div: null, sr: null });
+    expect(sanitizeBiasCfg({ mcb: Infinity, rsi: 500, div: 12, sr: "x" })).toEqual({ mcb: 65, rsi: 100, zone: 15, whale: null, div: 12, sr: null });
     const c2 = computeBias(sig([check("30m"), check("45m"), check("1h"), check("4h")], r), custom)!;
     expect(c2.contributions.find((c) => c.id === "whale")!.weight).toBe(25);
     expect(c2.contributions.find((c) => c.id === "zone")!.share).toBe(0);
     expect(biasMethodText(custom)).toContain("MCB 40");
-    expect(biasMethodText(CFG)).toContain("MCB 65 (zu gleichen Teilen auf 30m · 45m · 1h · 4h), RSI 20, Zone 15, Top-Trader · Retail 10");
+    expect(biasMethodText(CFG)).toContain("MCB 65 (zu gleichen Teilen auf 30m · 45m · 1h · 4h), RSI 20, Zone 15, Top-Trader-Kombi 10.");
+    expect(biasMethodText(sanitizeSignalCfg({}))).toContain("Zone 15, Top-Trader-Kombi 10, Divergenzen 10, Support/Widerstand 10.");
     expect(biasMethodText(CFG)).toContain("nur voll, wenn alle Stufen darunter dieselbe Richtung bestätigen (sonst ¼)");
     expect(biasMethodText(CFG)).toContain("„Stark“ ab 75 % und nur mit gültigem Einstieg");
     expect(biasMethodText(CFG)).toContain("Die Stufe wechselt erst 2,5 % hinter der Grenze.");
@@ -393,7 +398,7 @@ describe("consistency with the check's verdict", () => {
   }, 60_000);
 
   it("review case (seed 3, 2025-12-18 11:15Z): a valid Short-Einstieg is not read \"Eher Long\"", () => {
-    const cfg = sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, whale: { on: false } });
+    const cfg = sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, whale: { on: false }, ...PARTS_OFF });
     const src = synthBars(9000, 3, { sec: 900 });
     const at = Date.parse("2025-12-18T11:15:00Z");
     const SEC: Record<string, number> = { "30m": 1800, "45m": 2700, "1h": 3600, "4h": 14_400 };
@@ -419,7 +424,8 @@ describe("whale row", () => {
     expect(row.vote).toBe(0);
     expect(row.label).toBe(WHALE_NEUTRAL_TITLE);
     expect(row.detail).toBe("Top-Trader +1,0 pp · Retail +1,0 pp · Long 1× · Short 1× in Folge (30m, mind. 2) · 1h: keine Daten");
-    expect(computeBias(sig([check("30m")]), CFG)!.contributions.find((c) => c.id === "whale")!.label).toBe(WHALE_NEUTRAL_TITLE);
+    // without any reading the row is the Top-Trader-Kombi's "keine Daten" row
+    expect(computeBias(sig([check("30m")]), CFG)!.contributions.find((c) => c.id === "traders")!.label).toBe(TRADERS_TITLE);
     const short = computeBias(sig([check("30m")], { periods: [period("30m", { runShort: 2, topChg: -1, retailChg: 1 })], missing: [] }), CFG)!;
     expect(short.contributions.find((c) => c.id === "whale")).toMatchObject({ label: "Top-Trader verkaufen · Retail grün", vote: -1 });
     expect(short.contributions.find((c) => c.id === "whale")!.detail).toMatch(/· 2× in Folge \(30m, mind\. 2\)$/);
@@ -536,28 +542,36 @@ describe("symmetry", () => {
     a.contributions.forEach((c, i) => expect(b.contributions[i]!.vote! + c.vote!).toBeCloseTo(0, 12));
   });
 
-  it("synthetic market: the e2e long setup is Stark Long, its mirror image the same strength short", () => {
-    const now = Date.now();
-    const long = computeBias(expectedSignals(now, now, 84_199, "whale-long"), CFG)!;
-    expect(long.label).toBe("Stark Long");
-    expect(long.score).toBeGreaterThan(0.7);
-    for (const id of ["mcb-30m", "mcb-45m", "mcb-1h", "rsi", "zone", "whale"]) expect(long.contributions.find((c) => c.id === id)!.vote, id).toBeGreaterThan(0.5);
-    // the same price path mirrored around the live price, evaluated like the market layer does (whale off: exact mirror)
+  it("synthetic market: the e2e long setup is Stark Long once its 30m candle closed, its mirror image the same strength short", () => {
+    // the turn of the e2e market sits on the forming candle at its anchor; 31 min later the base candle has closed
+    const anchor = Date.now();
+    const now = anchor + 31 * 60_000;
     const SOURCE: Record<string, { interval: string; sec: number }> = { "30m": { interval: "15m", sec: 900 }, "45m": { interval: "15m", sec: 900 }, "1h": { interval: "1h", sec: 3600 }, "4h": { interval: "4h", sec: 14_400 } };
-    const build = (flip: boolean) => {
+    const build = (flip: boolean, at: number, cfg: SignalCfg, traders?: TraderReading) => {
       const bars: Record<string, Bar[]> = {};
       const m = (x: string) => (flip ? 2 * SYNTH_LAST - Number(x) : Number(x));
-      for (const tf of NO_WHALE.ladder) {
+      for (const tf of cfg.ladder) {
         const s = SOURCE[tf]!;
-        const src: Bar[] = synthKlines(s.interval, { limit: s.interval === "15m" ? 1500 : 499 }, now, now).map((r) => ({ t: r[0] / 1000, o: m(r[1]), h: flip ? m(r[3]) : m(r[2]), l: flip ? m(r[2]) : m(r[3]), c: m(r[4]) }));
+        const src: Bar[] = synthKlines(s.interval, { limit: s.interval === "15m" ? 1500 : 499 }, anchor, at).map((r) => ({ t: r[0] / 1000, o: m(r[1]), h: flip ? m(r[3]) : m(r[2]), l: flip ? m(r[2]) : m(r[3]), c: m(r[4]) }));
         const factor = tfSeconds(tf) / s.sec;
         const rung = factor === 1 ? src.slice(-SIGNAL_BARS) : resampleBars(src.slice(-(SIGNAL_BARS + 1) * factor), s.sec, s.sec * factor).slice(-SIGNAL_BARS);
-        bars[tf] = withLivePrice(rung, tfSeconds(tf), SYNTH_LAST, now) as Bar[];
+        bars[tf] = withLivePrice(rung, tfSeconds(tf), SYNTH_LAST, at) as Bar[];
       }
-      return computeSignals(bars, NO_WHALE, now)!;
+      return computeSignals(bars, cfg, at, { traders })!;
     };
-    const up = computeBias(build(false), NO_WHALE)!;
-    const down = computeBias(build(true), NO_WHALE)!;
+    // top traders 66 % / 65 % long, retail red: the Top-Trader-Kombi 4 of 4 for the long side (discount)
+    const traders: TraderReading = { at: now, position: 66, account: 65, retail: 46, retailPrev: 46.4, retailChg: -0.4, period: "5m", step: 300_000 };
+    const sig = build(false, now, CFG, traders);
+    expect(sig.long.valid).toBe(true);
+    expect(["confirmed", "strong"]).toContain(sig.long.state);
+    const long = computeBias(sig, CFG)!;
+    expect(long.label).toBe("Stark Long");
+    expect(long.state).toBe(sig.long.state);
+    expect(long.score).toBeGreaterThan(0.7);
+    for (const id of ["mcb-30m", "mcb-45m", "mcb-1h", "rsi", "zone", "traders"]) expect(long.contributions.find((c) => c.id === id)!.vote, id).toBeGreaterThan(0.5);
+    // the same price path mirrored around the live price (whale off: exact mirror)
+    const up = computeBias(build(false, now, NO_WHALE), NO_WHALE)!;
+    const down = computeBias(build(true, now, NO_WHALE), NO_WHALE)!;
     expect(up.level).toBe(2);
     expect(down.level).toBe(-2);
     expect(down.label).toBe("Stark Short");

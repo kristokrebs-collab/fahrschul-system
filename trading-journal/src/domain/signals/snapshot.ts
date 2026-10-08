@@ -4,7 +4,11 @@
  * optional and additive (the other app ignores them).
  */
 import { STRENGTH_LABEL, whaleCfgOf, type Side, type SignalCfg } from "./config";
+import type { DivKind, DivOsc } from "./divergence";
+import type { KnifeId } from "./knife";
 import type { WtKind } from "./mcb";
+import type { GradedPart, PartId } from "./parts";
+import { isSignalState, type SignalState } from "./state";
 import type { Signals } from "./verdict";
 import type { Zone } from "./zones";
 
@@ -44,6 +48,53 @@ export interface SignalSnapshotTf extends SignalSnapTf {
   ok?: boolean;
   /** RSI near oversold (long) / overbought (short) on this timeframe */
   rsiNear?: boolean;
+  /** candle-close state of this side's signal on the rung at check time (decision 6) */
+  state?: SignalState;
+  /** closed candles since that signal, counting its own close (0 = forming) */
+  closes?: number;
+}
+
+/** One item of a stored graded part (`PartItem` without the German strings). */
+export interface SignalSnapshotPartItem {
+  id: string;
+  /** lit / unlit; `null` = keine Daten */
+  met: boolean | null;
+  /** the number behind it (long %, pp, grade, ATR distance, R multiple), `null` without */
+  raw: number | null;
+}
+
+/** A graded part at check time (Top-Trader-Kombi, divergences, support / resistance), for the snapshot's side. */
+export interface SignalSnapshotPart {
+  id: PartId;
+  /** 0 … 1, rounded to 0.01 */
+  grade: number;
+  /** score points added, rounded to 0.1 */
+  points: number;
+  weight: number;
+  /** the part held fully (gave a valid entry +1 strength when weighted) */
+  ok: boolean;
+  /** inputs had data (false = "keine Daten", never a fail) */
+  data: boolean;
+  state: SignalState;
+  items: SignalSnapshotPartItem[];
+  /** traders: met parts of 4; the retail comparison period */
+  met?: number;
+  period?: string;
+  /** div: the rung of the best hit and the active hits */
+  tf?: string;
+  hits?: Array<{ tf: string; osc: DivOsc; kind: DivKind; state: SignalState; barsAgo: number }>;
+  /** sr: the level leaned on, the target, reward / risk (`null` = no stop level; `free` = no target level) */
+  lean?: { label: string; price: number; distAtr: number } | null;
+  target?: { label: string; price: number } | null;
+  r?: number | null;
+  free?: boolean;
+}
+
+/** The falling-knife filter at check time (the snapshot's side). */
+export interface SignalSnapshotKnife {
+  /** points met of 3 */
+  n: number;
+  items: Array<{ id: KnifeId; met: boolean | null }>;
 }
 
 /** One period of the stored "Top-Trader kaufen · Retail rot" reading. */
@@ -95,9 +146,60 @@ export interface SignalSnapshot extends SignalSnap {
    * condition, or switched off.
    */
   whale?: SignalSnapshotWhale | null;
+  /**
+   * Candle-close state of the entry at check time (decision 6): `provisional` = the base candle was still forming
+   * (stored `valid` false / `strength` 0, `provStrength` = the strength on the close), `confirmed`, `strong`, `none`.
+   * Absent = a snapshot from before the rule (state unknown).
+   */
+  state?: SignalState;
+  /** consecutive confirmed rungs from the base */
+  confTiers?: number;
+  /** strength the entry had once confirmed (= `strength` for confirmed entries) */
+  provStrength?: number;
+  /** graded parts at check time (absent = before the parts existed) */
+  parts?: SignalSnapshotPart[];
+  /** score points of the parts */
+  partPoints?: number;
+  /** falling-knife filter at check time */
+  knife?: SignalSnapshotKnife;
 }
 
 const r1 = (x: number): number => Math.round(x * 10) / 10;
+const r2 = (x: number): number => Math.round(x * 100) / 100;
+const fin = (x: number | null | undefined): number | null => (x == null || !Number.isFinite(x) ? null : r2(x));
+
+/** A graded part → its stored form. */
+export function snapshotPart(p: GradedPart): SignalSnapshotPart {
+  const out: SignalSnapshotPart = {
+    id: p.id,
+    grade: r2(p.grade),
+    points: r1(p.points),
+    weight: p.weight,
+    ok: p.ok,
+    data: p.data,
+    state: p.state,
+    items: p.items.map((i) => ({ id: i.id, met: i.met, raw: fin(i.raw) })),
+  };
+  if (p.id === "traders") {
+    out.met = p.met ?? 0;
+    if (p.reading) out.period = p.reading.period;
+  }
+  if (p.id === "div") {
+    if (p.tf) out.tf = p.tf;
+    out.hits = (p.hits ?? []).map((h) => ({ tf: h.tf, osc: h.osc, kind: h.kind, state: h.state, barsAgo: h.barsAgo }));
+  }
+  if (p.id === "sr" && p.levels) {
+    const { lean, target, r } = p.levels;
+    out.lean = lean ? { label: lean.label, price: r2(lean.price), distAtr: r2(lean.distAtr) } : null;
+    out.target = target ? { label: target.label, price: r2(target.price) } : null;
+    out.r = r == null || !Number.isFinite(r) ? null : r2(r);
+    if (r === Infinity) out.free = true;
+  }
+  return out;
+}
+
+/** Candle-close state of a stored snapshot (`null` = recorded before the rule existed). */
+export const snapshotState = (s: Pick<SignalSnapshot, "state">): SignalState | null => s.state ?? null;
 
 /** The other journal's `snapshot(sig, side)`, exact. */
 export function snapshot(sig: Signals, side: Side): SignalSnap {
@@ -132,16 +234,30 @@ export function toSignalSnapshot(sig: Signals, side: Side, cfg: Pick<SignalCfg, 
   const tfs: SignalSnapshotTf[] = base.tfs.map((t, j) => {
     const { c, i } = present[j]!;
     const e = side === "long" ? c.wt.long : c.wt.short;
-    return { ...t, barsAgo: e?.barsAgo ?? null, ok: i < v.tiers && (side === "long" ? c.longSignal : c.shortSignal), rsiNear: side === "long" ? c.rsiLong : c.rsiShort };
+    const row: SignalSnapshotTf = { ...t, barsAgo: e?.barsAgo ?? null, ok: i < v.tiers && (side === "long" ? c.longSignal : c.shortSignal), rsiNear: side === "long" ? c.rsiLong : c.rsiShort };
+    const conf = c.conf?.[side];
+    if (conf) {
+      row.state = conf.state;
+      row.closes = conf.closes;
+    }
+    return row;
   });
   const out: SignalSnapshot = { ...base, tfs, v: 2, ladder: [...cfg.ladder], required: cfg.required, zoneTf: cfg.zoneTf };
   if (sig.zone) out.zonePos = Math.round(sig.zone.zone.pos * 100) / 100;
   if (meta.mode) out.mode = meta.mode;
   if (meta.symbol) out.symbol = meta.symbol;
   if (meta.source) out.source = meta.source;
+  if (v.state) out.state = v.state;
+  if (v.confTiers !== undefined) out.confTiers = v.confTiers;
+  if (v.provStrength !== undefined) out.provStrength = v.provStrength;
+  if (v.parts) {
+    out.parts = v.parts.map(snapshotPart);
+    out.partPoints = v.partPoints ?? 0;
+  }
+  const k = sig.knife?.[side];
+  if (k) out.knife = { n: k.n, items: k.items.map((i) => ({ id: i.id, met: i.met })) };
   const w = v.whale;
   if (w && sig.whale) {
-    const r2 = (x: number): number => Math.round(x * 100) / 100;
     out.whale = {
       ok: w.ok,
       run: w.run,
@@ -152,7 +268,7 @@ export function toSignalSnapshot(sig: Signals, side: Side, cfg: Pick<SignalCfg, 
       points: w.points,
       periods: sig.whale.periods.map((p) => ({ period: p.period, top: r2(p.top), retail: r2(p.retail), topChg: r2(p.topChg), retailChg: r2(p.retailChg), run: side === "long" ? p.runLong : p.runShort })),
     };
-  } else if (whaleCfgOf(cfg).on) out.whale = null;
+  } else if (whaleCfgOf(cfg).on && !v.parts) out.whale = null; // legacy grading without a reading ("keine Daten")
   return out;
 }
 
@@ -176,6 +292,15 @@ function parseTf(raw: unknown): SignalSnapshotTf | null {
   }
   if (raw.ok !== undefined) out.ok = raw.ok === true;
   if (raw.rsiNear !== undefined) out.rsiNear = raw.rsiNear === true;
+  if (raw.state !== undefined) {
+    if (isSignalState(raw.state)) out.state = raw.state;
+    else delete out.state;
+  }
+  if (raw.closes !== undefined) {
+    const c = toNum(raw.closes);
+    if (Number.isFinite(c)) out.closes = Math.max(0, Math.round(c));
+    else delete out.closes;
+  }
   return out;
 }
 
@@ -241,7 +366,65 @@ export function parseSignalSnapshot(raw: unknown): SignalSnapshot | null {
     if (raw.whale === null || w) out.whale = w;
     else delete out.whale;
   }
+  if (raw.state !== undefined) {
+    if (isSignalState(raw.state)) out.state = raw.state;
+    else delete out.state;
+  }
+  for (const k of ["confTiers", "provStrength", "partPoints"] as const) {
+    if (raw[k] === undefined) continue;
+    const n = toNum(raw[k]);
+    if (Number.isFinite(n)) out[k] = k === "partPoints" ? Math.max(0, n) : clamp(Math.round(n), 0, k === "provStrength" ? 4 : 12);
+    else delete out[k];
+  }
+  if (raw.parts !== undefined) {
+    if (Array.isArray(raw.parts)) out.parts = raw.parts.map(parsePart).filter((p): p is SignalSnapshotPart => p !== null);
+    else delete out.parts;
+  }
+  if (raw.knife !== undefined) {
+    const k = parseKnife(raw.knife);
+    if (k) out.knife = k;
+    else delete out.knife;
+  }
   return out;
+}
+
+const PART_IDS: readonly PartId[] = ["traders", "div", "sr"];
+const KNIFE_IDS: readonly KnifeId[] = ["structure", "divergence", "whale"];
+const metOf = (v: unknown): boolean | null => (v === true ? true : v === false ? false : null);
+const numOrNull = (v: unknown): number | null => {
+  if (v === null || v === undefined) return null;
+  const n = toNum(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+function parsePart(raw: unknown): SignalSnapshotPart | null {
+  if (!isRec(raw) || typeof raw.id !== "string" || !(PART_IDS as readonly string[]).includes(raw.id)) return null;
+  const g = toNum(raw.grade);
+  const pts = toNum(raw.points);
+  const w = toNum(raw.weight);
+  const items = Array.isArray(raw.items)
+    ? raw.items.filter((i): i is Record<string, unknown> => isRec(i) && typeof i.id === "string").map((i) => ({ ...i, id: i.id as string, met: metOf(i.met), raw: numOrNull(i.raw) }))
+    : [];
+  return {
+    ...raw,
+    id: raw.id as PartId,
+    grade: Number.isFinite(g) ? clamp(g, 0, 1) : 0,
+    points: Number.isFinite(pts) ? Math.max(0, pts) : 0,
+    weight: Number.isFinite(w) ? Math.max(0, w) : 0,
+    ok: raw.ok === true,
+    data: raw.data !== false,
+    state: isSignalState(raw.state) ? raw.state : "none",
+    items,
+  } as SignalSnapshotPart;
+}
+
+function parseKnife(raw: unknown): SignalSnapshotKnife | null {
+  if (!isRec(raw) || !Array.isArray(raw.items)) return null;
+  const items = raw.items
+    .filter((i): i is Record<string, unknown> => isRec(i) && typeof i.id === "string" && (KNIFE_IDS as readonly string[]).includes(i.id))
+    .map((i) => ({ ...i, id: i.id as KnifeId, met: metOf(i.met) }));
+  const n = toNum(raw.n);
+  return { ...raw, n: Number.isFinite(n) ? clamp(Math.round(n), 0, 3) : items.filter((i) => i.met === true).length, items };
 }
 
 function parseWhale(raw: unknown): SignalSnapshotWhale | null {

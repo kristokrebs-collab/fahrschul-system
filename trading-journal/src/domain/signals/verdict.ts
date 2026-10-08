@@ -1,12 +1,29 @@
 /**
- * Per-timeframe check, ladder verdict and score, ported 1:1 from the other journal (`signals.ts:208-290`).
+ * Per-timeframe check, ladder verdict and score, ported 1:1 from the other journal (`signals.ts:208-290`), plus our
+ * additive layers (decisions 5, 6, 9, 10, 11 — 2026-10-08):
+ *
+ * - `checkTf(tf, bars, cfg, now)` adds the candle-close state per direction (`conf`, `state.ts`), the forming flag and
+ *   close time of the last bar, divergences (`div`, `divergence.ts`) and market structure / S-R (`structure`,
+ *   `structure.ts`). The reference fields are computed exactly as before.
+ * - `verdict()` / `bestVerdict()` stay the 1:1 port ("raw": every event counts as if its candle had closed).
+ * - `confirmVerdict()` applies the candle-close rule: an entry counts (`valid`) only once the base candle has CLOSED
+ *   with the signal; before that it is `provisional` (strength 0, `provStrength` = the strength it gets on the close,
+ *   provisional rungs count ½ in the score).
+ * - `gradeSignals()` adds the graded parts (`parts.ts`: Top-Trader-Kombi, divergences, support/resistance) and the
+ *   falling-knife filter (`knife.ts`). `computeSignals()` = checks → raw verdicts → confirm → parts.
  *
  * Deliberate difference (bug fix, §0.4 of the port spec): `signalsAt` for a past time returns `null` instead of a
  * "strength 0" result when any ladder rung or the zone timeframe lacks history or coverage at that time.
  */
-import { MIN_SIGNAL_BARS, tfSeconds, type Side, type SignalCfg } from "./config";
+import { MIN_SIGNAL_BARS, divCfgOf, srCfgOf, strongClosesOf, tfSeconds, type Side, type SignalCfg } from "./config";
+import { tfDivergences, type TfDivergences } from "./divergence";
 import { rsi, sma, waveTrend, type Bar } from "./indicators";
+import { knifeFilter, type KnifeFilter } from "./knife";
 import { wtSignal, type WtSignal } from "./mcb";
+import { divPart, partReasonText, srPart, tradersPart, type GradedPart } from "./parts";
+import { PROVISIONAL_FACTOR, isConfirmedState, isForming, lastCloseAt, rungConf, type RungConf, type SignalState } from "./state";
+import { marketStructure, type Structure } from "./structure";
+import type { TraderReading } from "./traders";
 import type { WhaleReading, WhaleVerdict } from "./whale";
 import { luxZone, pdZone, PD_FALLBACK_BARS, type ZoneInfo } from "./zones";
 
@@ -25,9 +42,34 @@ export interface TfCheck {
   /** RSI near oversold / overbought */
   rsiLong: boolean;
   rsiShort: boolean;
+  // ---- ours (additive; always set by `checkTf`, optional so hand-built checks stay valid — absent = closed / none)
+  /** the last bar is the running (forming) candle at the evaluation time */
+  forming?: boolean;
+  /** close time of the last bar, ms UTC (the countdown target of a provisional signal) */
+  closesAt?: number;
+  /** ms until that close at the evaluation (0 when closed). Render countdowns from `closesAt` on a shared clock */
+  msToClose?: number;
+  /** candle-close state per direction (`state.ts`) */
+  conf?: Readonly<Record<Side, RungConf>>;
+  /** divergences of RSI / wt1 vs price (when `settings.signals.div.on`) */
+  div?: TfDivergences;
+  /** market structure + support / resistance (when `settings.signals.sr.on`; `null` below 3 bars) */
+  structure?: Structure | null;
 }
 
-export function checkTf(tf: string, bars: readonly Bar[], cfg: SignalCfg): TfCheck | null {
+/** Candle-close state of a rung for a side (hand-built checks without `conf`: a signal counts as confirmed). */
+export function rungState(c: TfCheck | null | undefined, side: Side): SignalState {
+  if (!c) return "none";
+  const st = c.conf?.[side]?.state;
+  if (st) return st;
+  return (side === "long" ? c.longSignal : c.shortSignal) ? "confirmed" : "none";
+}
+
+/**
+ * One timeframe. `now` (ms) decides whether the last bar is still forming (its signals are then `provisional`);
+ * without `now` every bar counts as closed (the other journal's behaviour, back-dated checks).
+ */
+export function checkTf(tf: string, bars: readonly Bar[], cfg: SignalCfg, now?: number): TfCheck | null {
   if (!bars || bars.length < MIN_SIGNAL_BARS) return null; // RSI braucht ~150 Kerzen Vorlauf, um auf 0,1 genau zu sein
   const close = bars.map((b) => b.c);
   const r = rsi(close, cfg.rsiLen);
@@ -37,7 +79,10 @@ export function checkTf(tf: string, bars: readonly Bar[], cfg: SignalCfg): TfChe
   const z = luxZone(bars, cfg.swingLookback) ?? pdZone(bars, PD_FALLBACK_BARS);
   const rv = r[r.length - 1]!;
   const rm = rMa[rMa.length - 1]!;
-  return {
+  const forming = isForming(bars, tf, now);
+  const closesAt = lastCloseAt(bars, tf);
+  const strong = strongClosesOf(cfg);
+  const out: TfCheck = {
     tf,
     ok: true,
     closeAt: bars[bars.length - 1]!.t,
@@ -49,7 +94,16 @@ export function checkTf(tf: string, bars: readonly Bar[], cfg: SignalCfg): TfChe
     shortSignal: !!wt.short,
     rsiLong: rv <= cfg.rsiOs + cfg.rsiNear,
     rsiShort: rv >= cfg.rsiOb - cfg.rsiNear,
+    forming,
+    closesAt,
+    msToClose: forming && now !== undefined ? Math.max(0, closesAt - now) : 0,
+    conf: rungConf(bars, wt1, wt2, cfg, forming, strong),
   };
+  const d = divCfgOf(cfg);
+  if (d.on) out.div = tfDivergences(bars, r, wt1, d, forming, strong);
+  const sc = srCfgOf(cfg);
+  if (sc.on) out.structure = marketStructure(bars, { swing: cfg.swingLookback, internal: sc.internal, eqLen: sc.eqLen, eqThreshold: sc.eqThreshold, range: z.lux ? { hi: z.hi, lo: z.lo } : null });
+  return out;
 }
 
 export type Strength = 0 | 1 | 2 | 3 | 4;
@@ -69,8 +123,27 @@ export interface Verdict {
   /** 0..100 */
   score: number;
   reasons: VerdictReason[];
-  /** "Top-Trader kaufen · Retail rot" (ours, `applyWhale`); absent without data or when switched off */
+  /** legacy run rule "Top-Trader kaufen · Retail rot" (`applyWhale`); the live engine grades with `parts` instead */
   whale?: WhaleVerdict;
+  // ---- ours (additive; set by `confirmVerdict` / `gradeSignals`, i.e. by `computeSignals` and `signalsAt`)
+  /**
+   * Candle-close state of the entry: `none` (the entry rule does not hold), `provisional` (it holds, but the base
+   * signal sits on the forming candle — shown, not counted), `confirmed` (the base candle closed with the signal),
+   * `strong` (the base signal held for `strongCloses` closes).
+   */
+  state?: SignalState;
+  /** consecutive rungs from the base whose signal is confirmed (closed candle) */
+  confTiers?: number;
+  /** per ladder rung: the candle-close state of this side's signal (`none` without one / without data) */
+  rungStates?: SignalState[];
+  /** the strength the entry has (`provisional`) or gets once confirmed; = `strength` for a confirmed entry */
+  provStrength?: Strength;
+  /** close time (ms) of the base candle while the entry is `provisional` (countdown target), else `null` */
+  closesAt?: number | null;
+  /** graded parts (Top-Trader-Kombi, divergences, support / resistance) that are switched on */
+  parts?: GradedPart[];
+  /** score points the parts added (before the cap at 100) */
+  partPoints?: number;
 }
 
 /** Rates one direction: signal ladder + RSI + zone. */
@@ -117,6 +190,79 @@ export function verdict(side: Side, checks: readonly (TfCheck | null)[], cfg: Si
   return { side, tiers, strength, label, valid, rsiOk, zoneOk, strongSignal, score, reasons };
 }
 
+const SIDE_WORD: Readonly<Record<Side, string>> = { long: "Long", short: "Short" };
+
+function entryLabel(side: Side, strength: number): string {
+  const w = SIDE_WORD[side];
+  return strength >= 3 ? `Sehr starker ${w}-Einstieg` : strength === 2 ? `Starker ${w}-Einstieg` : `${w}-Einstieg`;
+}
+
+/** Label prefix of a provisional entry (`Vorläufig: Starker Long-Einstieg`). */
+export const PROVISIONAL_PREFIX = "Vorläufig: ";
+
+/**
+ * Candle-close rule on top of a raw `verdict()` (decision 6): the entry counts only when the base rung's signal is on
+ * a CLOSED candle. Higher rungs keep their own state (`rungStates`; a provisional rung counts ½ in the score).
+ * Provisional entry: `valid` false, `strength` 0, `provStrength` = the raw strength, label `Vorläufig: …`, `closesAt` =
+ * the base candle's close. Without any forming signal the reference fields stay exactly as `verdict()` gave them.
+ */
+export function confirmVerdict(v: Verdict, checks: readonly (TfCheck | null)[], cfg: Pick<SignalCfg, "ladder">): Verdict {
+  const n = Math.max(checks.length, cfg.ladder.length);
+  const rungStates: SignalState[] = [];
+  for (let i = 0; i < n; i++) rungStates.push(rungState(checks[i], v.side));
+  let confTiers = 0;
+  while (confTiers < n && isConfirmedState(rungStates[confTiers])) confTiers++;
+  let prov = 0;
+  for (let i = 0; i < v.tiers; i++) if (rungStates[i] === "provisional") prov++;
+  const baseState = rungStates[0] ?? "none";
+  const state: SignalState = !v.valid ? "none" : baseState === "provisional" ? "provisional" : baseState === "strong" ? "strong" : "confirmed";
+  const score = prov
+    ? Math.round(Math.min(100, ((v.tiers - PROVISIONAL_FACTOR * prov) / Math.max(1, checks.length)) * 55 + (v.rsiOk ? 20 : 0) + (v.zoneOk ? 15 : 0) + (v.strongSignal ? 10 : 0)))
+    : v.score;
+  const base = { ...v, score, state, confTiers, rungStates, provStrength: v.strength, closesAt: null };
+  if (state !== "provisional") return base;
+  return { ...base, valid: false, strength: 0, label: `${PROVISIONAL_PREFIX}${v.label}`, closesAt: checks[0]?.closesAt ?? null };
+}
+
+/** The verdict graded with its parts: score + Σ points (max 100), +1 strength per part that holds (max 4). */
+function withParts(v: Verdict, parts: GradedPart[]): Verdict {
+  if (!parts.length) return { ...v, parts, partPoints: 0 };
+  const points = parts.reduce((a, p) => a + (p.data ? p.points : 0), 0);
+  const bonus = parts.filter((p) => p.bonus).length;
+  const prov = (v.provStrength ?? v.strength) > 0 ? (Math.min(4, (v.provStrength ?? v.strength) + bonus) as Strength) : 0;
+  const strength = (v.valid ? Math.min(4, v.strength + bonus) : 0) as Strength;
+  let label = v.label;
+  if (v.valid && strength !== v.strength) label = entryLabel(v.side, strength);
+  else if (v.state === "provisional" && prov !== v.provStrength) label = `${PROVISIONAL_PREFIX}${entryLabel(v.side, prov)}`;
+  return {
+    ...v,
+    score: Math.round(Math.min(100, v.score + points)),
+    strength,
+    provStrength: prov,
+    label,
+    reasons: [...v.reasons, ...parts.map((p) => ({ text: partReasonText(p), ok: p.ok }))],
+    parts,
+    partPoints: Math.round(points * 10) / 10,
+  };
+}
+
+/**
+ * Candle-close rule + graded parts + falling-knife filter on top of the raw 1:1 evaluation (`bestVerdict`).
+ * `traders` = the Top-Trader reading (`traderReading`), `null` = none (the part shows "keine Daten").
+ */
+export function gradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders: TraderReading | null = null): S {
+  const zoneRef = sig.zone ?? sig.checks[0] ?? null;
+  const grade = (v: Verdict): Verdict => {
+    const c = confirmVerdict(v, sig.checks, cfg);
+    const parts = [tradersPart(v.side, traders, zoneRef, cfg), divPart(v.side, sig.checks, cfg), srPart(v.side, zoneRef, cfg)].filter((p): p is GradedPart => p !== null);
+    return withParts(c, parts);
+  };
+  const long = grade(sig.long);
+  const short = grade(sig.short);
+  const out = { ...sig, long, short, best: long.score >= short.score ? long : short, traders };
+  return { ...out, knife: { long: knifeFilter(out, cfg, "long"), short: knifeFilter(out, cfg, "short") } };
+}
+
 export interface BestVerdict {
   long: Verdict;
   short: Verdict;
@@ -135,19 +281,32 @@ export interface Signals extends BestVerdict {
   zone: TfCheck | null;
   /** evaluation time, ms */
   at: number;
-  /** top-trader / retail readings the verdicts were graded with (`applyWhale`); absent = none */
+  /** legacy run-rule readings (`applyWhale`); the live engine no longer sets it */
   whale?: WhaleReading;
+  /** ours: the Top-Trader reading the parts were graded with (`null` = condition on, no data; absent = off / raw) */
+  traders?: TraderReading | null;
+  /** ours: the falling-knife filter per side (`knife.ts`), from the same checks and parts */
+  knife?: Readonly<Record<Side, KnifeFilter>>;
+}
+
+/** Extra live inputs of an evaluation. */
+export interface SignalInputs {
+  /** Top-Trader reading at the evaluation time (`traderReading`); absent / `null` = no data */
+  traders?: TraderReading | null;
 }
 
 export type BarsByTf = Readonly<Record<string, readonly Bar[] | undefined>>;
 
-/** All checks from the bars per timeframe. `null` while no rung has enough bars. */
-export function computeSignals(bars: BarsByTf | undefined, cfg: SignalCfg, now: number = Date.now()): Signals | null {
+/**
+ * All checks from the bars per timeframe, graded (candle-close rule, parts, knife filter). `now` decides which last
+ * bars are still forming. `null` while no rung has enough bars.
+ */
+export function computeSignals(bars: BarsByTf | undefined, cfg: SignalCfg, now: number = Date.now(), inputs: SignalInputs = {}): Signals | null {
   if (!bars) return null;
-  const checks = cfg.ladder.map((tf) => checkTf(tf, bars[tf] || [], cfg));
+  const checks = cfg.ladder.map((tf) => checkTf(tf, bars[tf] || [], cfg, now));
   if (!checks.some(Boolean)) return null;
-  const zone = checks.find((c) => c?.tf === cfg.zoneTf) ?? checkTf(cfg.zoneTf, bars[cfg.zoneTf] || [], cfg);
-  return { checks, zone, at: now, ...bestVerdict(checks, cfg, zone) };
+  const zone = checks.find((c) => c?.tf === cfg.zoneTf) ?? checkTf(cfg.zoneTf, bars[cfg.zoneTf] || [], cfg, now);
+  return gradeSignals({ checks, zone, at: now, ...bestVerdict(checks, cfg, zone) }, cfg, inputs.traders ?? null);
 }
 
 /** Times within this window of `now` are evaluated live (running candle included). */
@@ -174,9 +333,9 @@ export function covers(bars: readonly Bar[], tf: string, atMs: number): boolean 
  * has fewer than `MIN_SIGNAL_BARS` bars or ends more than one bar before `atMs` (the other journal returned a fake
  * "strength 0" here). Within `LIVE_WINDOW_MS` of `now` it evaluates the bars as they are (live).
  */
-export function signalsAt(bars: BarsByTf | undefined, cfg: SignalCfg, atMs: number, now: number = Date.now()): Signals | null {
+export function signalsAt(bars: BarsByTf | undefined, cfg: SignalCfg, atMs: number, now: number = Date.now(), inputs: SignalInputs = {}): Signals | null {
   if (!bars || !isFinite(atMs)) return null;
-  if (atMs >= now - LIVE_WINDOW_MS) return computeSignals(bars, cfg, now);
+  if (atMs >= now - LIVE_WINDOW_MS) return computeSignals(bars, cfg, now, inputs);
   const cut: Record<string, Bar[]> = {};
   for (const [tf, b] of Object.entries(bars)) if (b) cut[tf] = closedAt(b, tf, atMs);
   const need = [...new Set([...cfg.ladder, cfg.zoneTf])];
@@ -184,7 +343,7 @@ export function signalsAt(bars: BarsByTf | undefined, cfg: SignalCfg, atMs: numb
     const b = cut[tf];
     if (!b || b.length < MIN_SIGNAL_BARS || !covers(b, tf, atMs)) return null; // Zeitpunkt nicht abgedeckt
   }
-  const s = computeSignals(cut, cfg, atMs);
+  const s = computeSignals(cut, cfg, atMs, inputs);
   if (!s || !s.checks[0] || !s.zone || s.checks.some((c) => !c)) return null;
   return s;
 }

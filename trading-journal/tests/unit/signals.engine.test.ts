@@ -2,7 +2,10 @@
  * Parity of the ported signal engine with a verbatim copy of the other journal's `signals.ts`
  * (`tests/unit/reference/otherSignals.js`): same synthetic inputs → bit-identical outputs. The only deliberate
  * differences are the back-dated check (`signalsAt` returns null instead of a fake "strength 0") and the exact 45m
- * from 15m (tested in signals.resample.test.ts).
+ * from 15m (tested in signals.resample.test.ts). Our additive layers (candle-close states, graded parts, knife
+ * filter — `signals.v2.test.ts`) add fields; the comparison here projects onto the reference's fields and checks that
+ * `verdict()` / `bestVerdict()` (the raw 1:1 core) stay identical, and that the confirmation layer changes nothing
+ * while every candle is closed.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as ours from "@/domain/signals";
@@ -146,11 +149,32 @@ describe("Premium / Discount", () => {
   });
 });
 
-/** All checks of one evaluation, for the reference comparison. */
-function stripAt(s: Signals | null): Omit<Signals, "at"> | null {
+/** The reference's fields of a check / verdict / evaluation (ours adds conf, div, structure, state, parts, …). */
+const CHECK_KEYS = ["tf", "ok", "closeAt", "rsi", "rsiMa", "wt", "zone", "longSignal", "shortSignal", "rsiLong", "rsiShort"] as const;
+const VERDICT_KEYS = ["side", "tiers", "strength", "label", "valid", "rsiOk", "zoneOk", "strongSignal", "score", "reasons"] as const;
+function pick<T extends object>(o: T, keys: readonly string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of keys) if (k in o) out[k] = (o as Record<string, unknown>)[k];
+  return out;
+}
+const refCheck = (c: TfCheck | null | undefined) => (c ? pick(c, CHECK_KEYS) : c);
+const refVerdict = (v: ours.Verdict) => pick(v, VERDICT_KEYS);
+function refSignals(s: Signals | null) {
   if (!s) return null;
-  const { at: _at, ...rest } = s;
-  return rest;
+  return { checks: s.checks.map(refCheck), zone: refCheck(s.zone), long: refVerdict(s.long), short: refVerdict(s.short), best: refVerdict(s.best) };
+}
+/** Parts off: the evaluation is the reference's plus the candle-close layer only. */
+const noParts = (cfg: SignalCfg): SignalCfg => ({ ...cfg, whale: { ...ours.DEFAULT_WHALE_CFG, on: false }, div: { ...ours.DEFAULT_DIV_CFG, on: false }, sr: { ...ours.DEFAULT_SR_CFG, on: false } });
+/** Far after every bar: nothing forms, every signal is on a closed candle. */
+const CLOSED = 4_102_444_800_000;
+
+/** Checks + raw verdicts of `a` equal the reference evaluation `b` (the 1:1 core). */
+function expectCore(a: Signals | null, b: Signals | null, cfg: SignalCfg): void {
+  expect(a === null).toBe(b === null);
+  if (!a || !b) return;
+  expect(a.checks.map(refCheck)).toEqual(b.checks);
+  expect(refCheck(a.zone)).toEqual(b.zone);
+  expect(ours.bestVerdict(a.checks, cfg, a.zone)).toEqual({ long: b.long, short: b.short, best: b.best });
 }
 
 describe("checkTf, verdict, computeSignals and snapshot", () => {
@@ -167,11 +191,14 @@ describe("checkTf, verdict, computeSignals and snapshot", () => {
           const now = (b15[end - 1]!.t + 900) * 1000;
           const a = ours.computeSignals(bars, cfg, now);
           const b = refAt(now, () => ref.computeSignals(bars, cfg));
-          expect(a).toEqual(b);
+          expectCore(a, b, cfg);
           if (!a || !b) continue;
-          strengths.add(a.long.strength).add(a.short.strength);
-          labels.add(a.long.label).add(a.short.label);
-          for (const side of ["long", "short"] as const) expect(ours.snapshot(a, side)).toEqual(ref.snapshot(b, side));
+          // every candle closed and the parts off: the graded evaluation keeps the reference's fields exactly
+          expect(refSignals(ours.computeSignals(bars, noParts(cfg), CLOSED))).toEqual(refSignals(b));
+          const raw = { ...a, ...ours.bestVerdict(a.checks, cfg, a.zone) };
+          strengths.add(raw.long.strength).add(raw.short.strength);
+          labels.add(raw.long.label).add(raw.short.label);
+          for (const side of ["long", "short"] as const) expect(ours.snapshot(raw, side)).toEqual(ref.snapshot(b, side));
           // verdict without an explicit zone check (zoneRef from the ladder)
           expect(ours.verdict("long", a.checks, cfg)).toEqual(ref.verdict("long", b.checks, cfg));
           expect(ours.bestVerdict(a.checks, cfg, null)).toEqual(ref.bestVerdict(b.checks, cfg, null));
@@ -183,14 +210,14 @@ describe("checkTf, verdict, computeSignals and snapshot", () => {
     expect([...labels].some((l) => l.includes("RSI noch nicht"))).toBe(true);
     expect([...labels].some((l) => l.includes(": nur 30m bestätigt"))).toBe(true);
     expect([...labels].some((l) => l.startsWith("Kein "))).toBe(true);
-  }, 120_000);
+  }, 180_000);
 
   it("checkTf: < 150 bars → null, like the reference", () => {
     const b = synthBars(149, 3);
     expect(ours.checkTf("1h", b, CFG)).toBeNull();
     expect(ref.checkTf("1h", b, CFG)).toBeNull();
     const c = synthBars(150, 3);
-    expect(ours.checkTf("1h", c, CFG)).toEqual(ref.checkTf("1h", c, CFG));
+    expect(refCheck(ours.checkTf("1h", c, CFG))).toEqual(ref.checkTf("1h", c, CFG));
     expect(ours.computeSignals({}, CFG)).toBeNull();
     expect(ours.computeSignals(undefined, CFG)).toBeNull();
   });
@@ -228,10 +255,12 @@ describe("back-dated check (deliberate fix)", () => {
     let fixed = 0;
     for (let i = 300; i < 3390; i += 37) {
       const at = (b15[i]!.t + 900) * 1000 + 60_000;
-      const a = ours.signalsAt(bars, CFG, at, now);
+      const a = ours.signalsAt(bars, noParts(CFG), at, now);
       const b = refAt(now, () => ref.signalsAt(bars, CFG, at));
       if (a) {
-        expect(stripAt(a)).toEqual(stripAt(b));
+        // a back-dated check sees closed bars only: with the parts off it is the reference's evaluation
+        expect(refSignals(a)).toEqual(refSignals(b));
+        expect(a.checks.every((c) => c?.forming === false)).toBe(true);
         expect(a.at).toBe(at);
         equal++;
       } else if (b) {
@@ -281,7 +310,8 @@ describe("random configs (fuzz)", () => {
         swingLookback: 20 + Math.floor(rnd() * 60),
         required: 1 + Math.floor(rnd() * 4),
       };
-      expect(stripAt(ours.computeSignals(bars, cfg, now))).toEqual(stripAt(refAt(now, () => ref.computeSignals(bars, cfg))));
+      expectCore(ours.computeSignals(bars, cfg, now), refAt(now, () => ref.computeSignals(bars, cfg)), cfg);
+      expect(refSignals(ours.computeSignals(bars, noParts(cfg), CLOSED))).toEqual(refSignals(refAt(now, () => ref.computeSignals(bars, cfg))));
     }
   });
 });

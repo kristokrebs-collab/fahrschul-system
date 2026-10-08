@@ -82,7 +82,14 @@ describe("resampleBars", () => {
 
 describe("sanitizeSignalCfg", () => {
   it("keeps a valid config (incl. unknown keys) and fills defaults", () => {
-    expect(sanitizeSignalCfg(undefined)).toEqual({ ...DEFAULT_SIGNAL_CFG, notify: false, whale: { on: true, periods: ["30m", "1h"], minRun: 2, weight: 10 } });
+    expect(sanitizeSignalCfg(undefined)).toEqual({
+      ...DEFAULT_SIGNAL_CFG,
+      notify: false,
+      whale: { on: true, periods: ["30m", "1h"], minRun: 2, weight: 10, topPct: 64, retailPeriod: "5m", bonusParts: 3 },
+      strongCloses: 2,
+      div: { on: true, rsi: true, wt: true, hidden: true, left: 2, right: 2, rangeMin: 3, rangeMax: 60, maxAge: 5, midline: true, weight: 10 },
+      sr: { on: true, internal: 5, eqLen: 3, eqThreshold: 0.1, nearAtr: 1, minR: 2, weight: 10 },
+    });
     const cfg = sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, extra: 1, notify: true });
     expect(cfg).toMatchObject({ ...DEFAULT_SIGNAL_CFG, notify: true });
     expect((cfg as unknown as { extra: number }).extra).toBe(1);

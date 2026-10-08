@@ -34,7 +34,9 @@ export function whaleToDraft(signals: unknown): WhaleDraft {
 /** The defaults as draft strings ("Standardwerte setzen"). */
 export const defaultWhaleDraft = (): WhaleDraft => whaleToDraft({ whale: { ...DEFAULT_WHALE_CFG } });
 
-export type WhaleFromDraft = { ok: true; whale: WhaleCfg } | { ok: false; field: WhaleDraftKey };
+/** The stored `whale` object the form writes: its four fields over the stored value (the combo's keys stay as stored). */
+export type StoredWhale = Pick<WhaleCfg, "on" | "periods" | "minRun" | "weight"> & Partial<WhaleCfg>;
+export type WhaleFromDraft = { ok: true; whale: StoredWhale } | { ok: false; field: WhaleDraftKey };
 
 /**
  * Draft strings → the `whale` object to store, spread over the stored one. Refuses an empty period list

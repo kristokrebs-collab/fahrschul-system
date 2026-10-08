@@ -2,7 +2,7 @@
  * German copy of the "Einstiegs-Check" (other journal `signalpanel.tsx` / `forms.tsx`), adapted to Binance data.
  * Pure strings and formatters; the UI agents render them.
  */
-import { STRENGTH_LABEL, whaleCfgOf, type SignalCfg } from "./config";
+import { STRENGTH_LABEL, divCfgOf, srCfgOf, strongClosesOf, whaleCfgOf, type SignalCfg } from "./config";
 import type { WtKind } from "./mcb";
 import type { Zone, ZoneInfo } from "./zones";
 
@@ -73,39 +73,67 @@ export function strengthLine(strength: number, tiers: number, ladderLength: numb
   return `${strengthText(strength)} · ${tiers} von ${ladderLength} Timeframes`;
 }
 
+/** `1,5` (de-DE, at most one decimal). */
+const dec = (x: number): string => String(Math.round(x * 10) / 10).replace(".", ",");
+
 /** Info panel ("So prüft das Journal"), adapted to Binance. */
 export function signalInfo(cfg: SignalCfg, symbol = "BTCUSDT") {
   const ladder = cfg.ladder;
   const w = whaleCfgOf(cfg);
-  const whaleRows = w.on
-    ? [
-        {
-          k: "Top-Trader · Retail",
-          v: `${w.minRun} abgeschlossene Perioden in Folge (${w.periods.join(" oder ")}): Top-Trader-Long % (Positionen) steigt, Long % aller Konten fällt; Short umgekehrt. ${
-            w.weight > 0 ? `+${w.weight} Score, gültiger Einstieg +1 Stärke` : "Nur Anzeige"
-          }. Binance-Futures-Daten reichen ~30 Tage zurück.`,
-        },
-      ]
-    : [];
+  const d = divCfgOf(cfg);
+  const r = srCfgOf(cfg);
+  const pts = (weight: number): string => (weight > 0 ? `bis +${weight} Score (anteilig), voll erfüllt +1 Stärke` : "nur Anzeige, zählt nicht");
+  const partRows = [
+    ...(w.on
+      ? [
+          {
+            k: "Top-Trader-Kombi",
+            v: `4 Teile, je mehr erfüllt, desto stärker: Top-Trader > ${dec(w.topPct)} % Long nach Positionen, > ${dec(w.topPct)} % Long nach Konten, Retail rot (Long-Anteil aller Konten fällt gegenüber ${w.retailPeriod} vorher), Preis im Discount; Short spiegelbildlich (> ${dec(w.topPct)} % Short, Retail grün, Premium). Binance-5-min-Daten, ${pts(w.weight)} ab ${w.bonusParts} von 4.`,
+          },
+        ]
+      : []),
+    ...(d.on
+      ? [
+          {
+            k: "Divergenzen",
+            v: `RSI ${cfg.rsiLen} und WaveTrend wt1 gegen den Kurs an Pivots (${d.left} Kerzen links / ${d.right} rechts), regulär = Umkehr, ${d.hidden ? "versteckt = Fortsetzung, " : ""}gilt ${d.maxAge} Kerzen nach der Bestätigung; ${pts(d.weight)} bei einer regulären auf geschlossener Kerze.`,
+          },
+        ]
+      : []),
+    ...(r.on
+      ? [
+          {
+            k: "Support/Widerstand",
+            v: `LuxAlgo-Struktur (Swing ${cfg.swingLookback}, intern ${r.internal}): Swing-Hochs/-Tiefs, BOS/CHoCH, Order-Blocks, EQH/EQL. Long: nahe Support/Demand (≤ ${dec(r.nearAtr)} ATR) und Platz bis zum nächsten Widerstand (≥ ${dec(r.minR)} R); Short spiegelbildlich. ${pts(r.weight)}.`,
+          },
+        ]
+      : []),
+  ];
+  const bonus = [w.on && w.weight > 0 ? "Top-Trader-Kombi" : "", d.on && d.weight > 0 ? "Divergenz" : "", r.on && r.weight > 0 ? "Support + Platz" : ""].filter(Boolean);
+  const bonusText = bonus.length ? ` · ${bonus.join(", ")} = Bonus` : "";
   return {
     title: "So prüft das Journal",
     what:
       `Aus den Binance-Kerzen (${symbol} Perp) rechnet das Journal deine Indikatoren nach: MCB/WaveTrend (Kanal ${cfg.wtChannel}, Schnitt ${cfg.wtAverage}, Signal ${cfg.wtSignal}), ` +
       `RSI ${cfg.rsiLen} mit gleitendem Durchschnitt ${cfg.rsiMaLen} und Premium/Discount nach LuxAlgo (Swing-Pivots mit Länge ${cfg.swingLookback}) auf ${cfg.zoneTf}. ` +
-      `45m entsteht exakt aus drei 15m-Kerzen. Die laufende Kerze wird mit dem Live-Kurs ergänzt, wie im Chart. Werte können vom Bitstamp-Chart leicht abweichen; private Indikator-Skripte selbst sind nicht lesbar.`,
+      `45m entsteht exakt aus drei 15m-Kerzen. Die laufende Kerze wird mit dem Live-Kurs ergänzt, wie im Chart: ein Signal darauf ist vorläufig und zählt erst, wenn die Kerze damit schließt. ` +
+      `Werte können vom Bitstamp-Chart leicht abweichen; private Indikator-Skripte selbst sind nicht lesbar.`,
     formula: [
-      `Long: MCB Bottom/Einstieg auf ${ladder.slice(0, cfg.required).join(" + ")} (Pflicht)${ladder.length > cfg.required ? ` · ${ladder.slice(cfg.required).join(", ")} = stärker` : ""} · RSI ≤ ${cfg.rsiOs + cfg.rsiNear} (Pflicht) · Discount = Bonus${w.on && w.weight > 0 ? " · Top-Trader kaufen + Retail rot = Bonus" : ""}`,
-      `Short: spiegelbildlich mit Top, RSI ≥ ${cfg.rsiOb - cfg.rsiNear} und Premium${w.on && w.weight > 0 ? ", Top-Trader verkaufen + Retail grün" : ""}`,
+      `Long: MCB Bottom/Einstieg auf ${ladder.slice(0, cfg.required).join(" + ")} (Pflicht)${ladder.length > cfg.required ? ` · ${ladder.slice(cfg.required).join(", ")} = stärker` : ""} · RSI ≤ ${cfg.rsiOs + cfg.rsiNear} (Pflicht) · Discount = Bonus${bonusText}`,
+      `Short: spiegelbildlich mit Top, RSI ≥ ${cfg.rsiOb - cfg.rsiNear} und Premium`,
+      `Bestätigt, sobald die ${ladder[0]}-Kerze mit dem Signal geschlossen hat; vorher vorläufig (zählt nicht als Einstieg)`,
     ],
     rows: [
       { k: "Signal gilt", v: `${cfg.signalLookback} Kerzen` },
+      { k: "Bestätigung", v: `vorläufig auf der laufenden Kerze · bestätigt nach ihrem Schluss · stark bestätigt nach ${strongClosesOf(cfg)} Schlüssen ohne Bruch` },
       { k: "Bottom/Top", v: `wt1 und Kurs drehen aus ${cfg.revRange}-Kerzen-Tief/Hoch` },
       { k: "Kauf-/Verkaufssignal", v: `Kreuzung bei ≤ ${cfg.wtOs} / ≥ ${cfg.wtOb}` },
       { k: "Einstieg", v: "Kreuzung unter (Short: über) der Nulllinie" },
-      { k: "Stärke", v: "Basis + Bestätigung = 1, jede weitere Stufe +1, Discount +1" },
+      { k: "Stärke", v: "Basis + Bestätigung = 1, jede weitere Stufe +1, Discount +1, jede voll erfüllte Teil-Bedingung +1 (bis Maximal)" },
       { k: "Score", v: "Leiter 55 · RSI 20 · Zone 15 · Bottom/Top 10" },
-      ...whaleRows,
+      { k: "Teil-Bedingungen", v: "zählen anteilig nach Gewicht (z. B. 3 von 4 = ¾ der Punkte); eine vorläufige Stufe zählt in der Leiter halb" },
+      ...partRows,
     ],
-    verdict: "Einstellbar unter Einstellungen → Einstiegs-Check. Beim Eintragen eines Trades wird der Check mitgespeichert, so siehst du später, welche Signal-Stärke wirklich Geld bringt.",
+    verdict: "Einstellbar unter Einstellungen → Einstiegs-Check. Beim Eintragen eines Trades wird der Check mitgespeichert (auch ob vorläufig oder bestätigt), so siehst du später, welche Signal-Stärke wirklich Geld bringt.",
   } as const;
 }

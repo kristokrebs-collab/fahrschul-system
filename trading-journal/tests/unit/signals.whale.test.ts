@@ -169,14 +169,17 @@ describe("applyWhale: grading", () => {
 });
 
 describe("config", () => {
-  it("defaults on, 30m + 1h, 2 periods, weight 10; DEFAULT_SIGNAL_CFG stays the other journal's (no whale key)", () => {
+  it("defaults on, 30m + 1h, 2 periods, weight 10 (+ the combo's 64 %, 5m, 3 of 4); DEFAULT_SIGNAL_CFG stays the other journal's (no whale key)", () => {
+    const def = { on: true, periods: ["30m", "1h"], minRun: 2, weight: 10, topPct: 64, retailPeriod: "5m", bonusParts: 3 };
     expect("whale" in DEFAULT_SIGNAL_CFG).toBe(false);
-    expect(whaleCfgOf(DEFAULT_SIGNAL_CFG)).toEqual({ on: true, periods: ["30m", "1h"], minRun: 2, weight: 10 });
-    expect(sanitizeSignalCfg({}).whale).toEqual({ on: true, periods: ["30m", "1h"], minRun: 2, weight: 10 });
+    expect(whaleCfgOf(DEFAULT_SIGNAL_CFG)).toEqual(def);
+    expect(sanitizeSignalCfg({}).whale).toEqual(def);
   });
 
   it("sanitises: periods filtered / sorted / unique, minRun 1…6, weight 0…30, unknown keys kept", () => {
-    expect(sanitizeWhaleCfg({ on: false, periods: ["1h", "30m", "1h", "45m", 7], minRun: "9", weight: -3, x: 1 })).toEqual({ on: false, periods: ["30m", "1h"], minRun: 6, weight: 0, x: 1 });
+    expect(sanitizeWhaleCfg({ on: false, periods: ["1h", "30m", "1h", "45m", 7], minRun: "9", weight: -3, x: 1 })).toEqual({ on: false, periods: ["30m", "1h"], minRun: 6, weight: 0, x: 1, topPct: 64, retailPeriod: "5m", bonusParts: 3 });
+    expect(sanitizeWhaleCfg({ topPct: "70", retailPeriod: "1h", bonusParts: 9 })).toMatchObject({ topPct: 70, retailPeriod: "1h", bonusParts: 4 });
+    expect(sanitizeWhaleCfg({ topPct: 20, retailPeriod: "45m", bonusParts: 0 })).toMatchObject({ topPct: 50, retailPeriod: "5m", bonusParts: 1 });
     expect(sanitizeWhaleCfg({ periods: [], minRun: 0, weight: 99 })).toMatchObject({ periods: ["30m", "1h"], minRun: 1, weight: 30 });
     expect(sanitizeWhaleCfg("nope")).toMatchObject({ on: true });
   });
@@ -189,8 +192,12 @@ describe("config", () => {
 
   it("the info panel documents the grading", () => {
     const rows = signalInfo(CFG).rows;
-    expect(rows.find((r) => r.k === "Top-Trader · Retail")?.v).toContain("+10 Score, gültiger Einstieg +1 Stärke");
-    expect(signalInfo(sanitizeSignalCfg({ whale: { on: false } })).rows.some((r) => r.k === "Top-Trader · Retail")).toBe(false);
+    expect(rows.find((r) => r.k === "Top-Trader-Kombi")?.v).toContain("bis +10 Score (anteilig), voll erfüllt +1 Stärke ab 3 von 4");
+    expect(rows.find((r) => r.k === "Top-Trader-Kombi")?.v).toContain("> 64 % Long nach Positionen");
+    expect(signalInfo(sanitizeSignalCfg({ whale: { on: false } })).rows.some((r) => r.k === "Top-Trader-Kombi")).toBe(false);
+    expect(rows.some((r) => r.k === "Divergenzen")).toBe(true);
+    expect(rows.some((r) => r.k === "Support/Widerstand")).toBe(true);
+    expect(rows.find((r) => r.k === "Bestätigung")?.v).toContain("stark bestätigt nach 2 Schlüssen");
     expect([ppText(1.24), ppText(-0.85), ppText(0), ppText(NaN)]).toEqual(["+1,2 pp", "−0,9 pp", "±0,0 pp", "–"]);
   });
 });

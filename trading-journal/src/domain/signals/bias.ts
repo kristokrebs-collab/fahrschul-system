@@ -15,14 +15,17 @@
  *   votes the strongest long reading minus the strongest short reading (the check: "some head rung near OS/OB").
  * - Premium/Discount (LuxAlgo): the check's reference — the `zoneTf` check, or the 30m base when that timeframe has too
  *   few bars — by the position in the range: bottom +1, equilibrium band 0, top −1.
- * - "Top-Trader kaufen · Retail rot": per period, top-trader long % up AND all-accounts long % down → +1 when the
- *   run holds (≥ `minRun`), ±0.75 when both point the same way over the window without a full run, ±0.5 when only one
- *   side does; short mirrored; the periods averaged.
+ * - Graded parts (decisions 5 + 10, `parts.ts`), each long grade − short grade (both 0 … 1):
+ *   Top-Trader-Kombi (met / 4 per side: positions, accounts, retail, zone), divergences (best rung per side; a
+ *   provisional divergence counts ½), support / resistance (near the level + room to the next one).
+ *   Without a reading (`sig.traders` absent) a legacy run-rule reading (`sig.whale`, `applyWhale`) still votes as before.
+ * - Provisional (decision 9): an MCB event on the forming candle counts `PROVISIONAL_FACTOR` (½); the row is flagged
+ *   `provisional`, and the bias carries the candle-close `state` of the side it leans to.
  *
  * Weights = the check's score points: MCB 65 (ladder 55 + Bottom/Top 10) split EQUALLY over the rungs (the score's
- * 55 / n per confirmed rung), RSI 20, zone 15, and the whale condition's own `settings.signals.whale.weight` (default
- * 10; 0 = shown, never counted). Override: `settings.signals.bias = { mcb, rsi, zone, whale }` (optional;
- * `sanitizeSignalCfg` keeps the unknown key, `sanitizeBiasCfg` reads it; no settings UI yet).
+ * 55 / n per confirmed rung), RSI 20, zone 15, and each part's own weight (`settings.signals.whale.weight`,
+ * `div.weight`, `sr.weight`, default 10; 0 = shown, never counted). Override: `settings.signals.bias = { mcb, rsi,
+ * zone, whale, div, sr }` (optional; `sanitizeSignalCfg` keeps the unknown key, `sanitizeBiasCfg` reads it).
  *
  * Missing data (a rung with too few bars, no zone, whale off / no Binance data) is EXCLUDED from the weighted mean —
  * never counted as a neutral vote. Nothing left → `null` ("Keine Daten").
@@ -36,10 +39,13 @@
  * adds a ±0.05 hysteresis around the boundaries so the label does not flicker while the score hovers there.
  * Pure: no React, no I/O.
  */
-import { whaleCfgOf, type Side, type SignalCfg, type WhaleCfg } from "./config";
+import { divCfgOf, srCfgOf, whaleCfgOf, type Side, type SignalCfg, type WhaleCfg } from "./config";
 import { ageText, kindText, roleText, ZONE_TEXT } from "./copy";
 import { WT_RANK, type WtEvent } from "./mcb";
-import { verdict, type Signals, type TfCheck } from "./verdict";
+import { divPart, srPart, tradersPart, type GradedPart, type PartId } from "./parts";
+import { PROVISIONAL_FACTOR, type SignalState } from "./state";
+import { TRADERS_TITLE } from "./traders";
+import { confirmVerdict, verdict, type Signals, type TfCheck, type Verdict } from "./verdict";
 import { WHALE_TITLE, type WhalePeriod, type WhaleReading } from "./whale";
 import type { ZoneInfo } from "./zones";
 
@@ -70,16 +76,18 @@ export const BIAS_UNCONFIRMED = 0.25;
 const EQ_LO = 0.475;
 const EQ_HI = 0.525;
 
-/** Weights (points) per condition group. `whale: null` = the whale condition's own `weight`. */
+/** Weights (points) per condition group. `null` = the part's own `weight` (`whale` = the Top-Trader-Kombi). */
 export interface BiasCfg {
   mcb: number;
   rsi: number;
   zone: number;
   whale: number | null;
+  div: number | null;
+  sr: number | null;
 }
 
-/** From the check's score: ladder 55 + Bottom/Top 10, RSI 20, zone 15; whale = `settings.signals.whale.weight`. */
-export const DEFAULT_BIAS_CFG: Readonly<BiasCfg> = Object.freeze({ mcb: 65, rsi: 20, zone: 15, whale: null });
+/** From the check's score: ladder 55 + Bottom/Top 10, RSI 20, zone 15; the parts = their own `weight`. */
+export const DEFAULT_BIAS_CFG: Readonly<BiasCfg> = Object.freeze({ mcb: 65, rsi: 20, zone: 15, whale: null, div: null, sr: null });
 const WEIGHT_MAX = 100;
 
 /** `settings.signals.bias` (raw, optional) → weights 0 … 100; missing / invalid → the defaults. */
@@ -94,6 +102,8 @@ export function sanitizeBiasCfg(raw: unknown): BiasCfg {
     rsi: num(r.rsi, DEFAULT_BIAS_CFG.rsi)!,
     zone: num(r.zone, DEFAULT_BIAS_CFG.zone)!,
     whale: num(r.whale, DEFAULT_BIAS_CFG.whale),
+    div: num(r.div, DEFAULT_BIAS_CFG.div),
+    sr: num(r.sr, DEFAULT_BIAS_CFG.sr),
   };
 }
 
@@ -133,12 +143,25 @@ export interface RungGate {
 const OPEN_GATE: Readonly<RungGate> = Object.freeze({ long: true, short: true });
 
 /**
- * MCB vote of one rung: long event − short event (both decayed; an event the ladder below does not confirm counts
- * `BIAS_UNCONFIRMED`) + `BIAS_WAVE_SHARE` × wave, clamped.
+ * Event magnitude of one direction with the candle-close rule: a closed event counts fully, an event on the forming
+ * candle `PROVISIONAL_FACTOR` (½); the larger of the two. Without `conf` (hand-built checks) = the window's event.
  */
-export function mcbVote(c: Pick<TfCheck, "wt">, cfg: Pick<SignalCfg, "signalLookback" | "wtObStrong" | "wtOsStrong">, gate: RungGate = OPEN_GATE): number {
-  const long = mcbEventVote(c.wt.long, cfg.signalLookback) * (gate.long ? 1 : BIAS_UNCONFIRMED);
-  const short = mcbEventVote(c.wt.short, cfg.signalLookback) * (gate.short ? 1 : BIAS_UNCONFIRMED);
+export function sideEventVote(c: Pick<TfCheck, "wt" | "conf">, side: Side, lookback: number): number {
+  const conf = c.conf?.[side];
+  if (!conf) return mcbEventVote(side === "long" ? c.wt.long : c.wt.short, lookback);
+  return Math.max(mcbEventVote(conf.closed, lookback), mcbEventVote(conf.forming, lookback) * PROVISIONAL_FACTOR);
+}
+
+/** The vote of this rung rests on a forming candle (its strongest counted event is provisional). */
+const isProvisionalRung = (c: Pick<TfCheck, "conf">): boolean => c.conf?.long.state === "provisional" || c.conf?.short.state === "provisional";
+
+/**
+ * MCB vote of one rung: long event − short event (both decayed; an event the ladder below does not confirm counts
+ * `BIAS_UNCONFIRMED`; an event on the forming candle `PROVISIONAL_FACTOR`) + `BIAS_WAVE_SHARE` × wave, clamped.
+ */
+export function mcbVote(c: Pick<TfCheck, "wt" | "conf">, cfg: Pick<SignalCfg, "signalLookback" | "wtObStrong" | "wtOsStrong">, gate: RungGate = OPEN_GATE): number {
+  const long = sideEventVote(c, "long", cfg.signalLookback) * (gate.long ? 1 : BIAS_UNCONFIRMED);
+  const short = sideEventVote(c, "short", cfg.signalLookback) * (gate.short ? 1 : BIAS_UNCONFIRMED);
   return clamp1(long - short + BIAS_WAVE_SHARE * waveVote(c.wt.wt1, c.wt.wt2, cfg));
 }
 
@@ -280,7 +303,7 @@ export function biasHoldText(score: number, level: BiasLevel): string {
 
 // ------------------------------------------------------------------ the bias
 
-export type BiasGroup = "mcb" | "rsi" | "zone" | "whale";
+export type BiasGroup = "mcb" | "rsi" | "zone" | "whale" | "traders" | "div" | "sr";
 
 export interface BiasContribution {
   /** `mcb-30m` … `rsi`, `zone`, `whale` */
@@ -296,6 +319,8 @@ export interface BiasContribution {
   share: number;
   /** German detail line (`Bottom · vor 1 · WT −61,2 ↑`, `keine Daten`, …) */
   detail: string;
+  /** the vote rests (partly) on a forming candle (shown desaturated, counted reduced) */
+  provisional?: boolean;
 }
 
 /** Why the shown score differs from the weighted sum. */
@@ -327,16 +352,21 @@ export interface Bias {
   valueText: string;
   /** hysteresis note (`gehalten: wechselt erst unter 55 %`), `""` when the label is the plain level */
   hold: string;
-  /** valid entry per side, from the check's verdict */
+  /** valid (= confirmed) entry per side, from the check's verdict */
   valid: Readonly<Record<Side, boolean>>;
+  /** candle-close state of the entry on the side the bar leans to (`none` at 50 % or without an entry rule there) */
+  state: SignalState;
   contributions: BiasContribution[];
   /** conditions that voted / all conditions */
   used: number;
   total: number;
 }
 
-/** What the bias reads: the checks, the zone and the whale reading; the verdicts when at hand (else recomputed). */
-export type BiasInput = Pick<Signals, "checks" | "zone" | "whale"> & Partial<Pick<Signals, "long" | "short">>;
+/**
+ * What the bias reads: the checks, the zone, the Top-Trader reading (or a legacy whale reading); the verdicts when at
+ * hand (else recomputed with `verdict()` + `confirmVerdict()`; parts then from the reading / checks).
+ */
+export type BiasInput = Pick<Signals, "checks" | "zone"> & Partial<Pick<Signals, "long" | "short" | "whale" | "traders">>;
 
 /** MCB rung weights: the group's points split equally over the ladder (the check's score: 55 / n per rung). */
 export function rungWeights(n: number, total: number): number[] {
@@ -350,7 +380,8 @@ function mcbDetail(c: TfCheck, gate: RungGate): string {
   const tag = (e: NonNullable<WtEvent>): string => `${kindText(e.kind)}${(e === long ? gate.long : gate.short) ? "" : " (unbestätigt)"}`;
   const head = ev ? `${tag(ev)} · ${ageText(ev.barsAgo)}` : kindText(null);
   const both = long && short ? ` (+ ${tag(ev === long ? short : long)})` : "";
-  return `${head}${both} · WT ${n1(c.wt.wt1)} ${c.wt.wt1 >= c.wt.wt2 ? "↑" : "↓"}`;
+  const prov = isProvisionalRung(c) ? " · vorläufig" : "";
+  return `${head}${both}${prov} · WT ${n1(c.wt.wt1)} ${c.wt.wt1 >= c.wt.wt2 ? "↑" : "↓"}`;
 }
 
 function zoneDetail(z: ZoneInfo): string {
@@ -394,6 +425,7 @@ export function computeBias(sig: BiasInput | null | undefined, cfg: SignalCfg, p
       vote: c ? mcbVote(c, cfg, gate) : null,
       weight: rw[i]!,
       detail: c ? mcbDetail(c, gate) : "Zu wenig Kerzen",
+      provisional: !!c && isProvisionalRung(c),
     });
   }
 
@@ -433,7 +465,21 @@ export function computeBias(sig: BiasInput | null | undefined, cfg: SignalCfg, p
     detail: z ? zoneDetail(z) : "Zu wenig Kerzen",
   });
 
-  if (w.on) {
+  // the check's verdict per side (the live snapshot carries it; hand-built inputs get it recomputed)
+  const vLong: Verdict = sig.long ?? confirmVerdict(verdict("long", checks, cfg, sig.zone), checks, cfg);
+  const vShort: Verdict = sig.short ?? confirmVerdict(verdict("short", checks, cfg, sig.zone), checks, cfg);
+
+  // graded parts: long grade − short grade (from the verdicts, else from the reading / checks)
+  const partOf = (v: Verdict, id: PartId): GradedPart | null => {
+    const p = v.parts?.find((x) => x.id === id);
+    if (p) return p;
+    if (v.parts) return null; // graded without this part (switched off)
+    if (id === "traders") return tradersPart(v.side, sig.traders ?? null, zc, cfg);
+    if (id === "div") return divPart(v.side, checks, cfg);
+    return srPart(v.side, zc, cfg);
+  };
+  const legacyWhale = w.on && sig.traders === undefined && !vLong.parts?.some((p) => p.id === "traders") && sig.whale !== undefined;
+  if (legacyWhale) {
     const v = whaleVote(sig.whale, w);
     out.push({
       id: "whale",
@@ -442,6 +488,30 @@ export function computeBias(sig: BiasInput | null | undefined, cfg: SignalCfg, p
       vote: v,
       weight: bc.whale ?? w.weight,
       detail: v == null || !sig.whale ? "keine Daten" : `${whaleDetail(sig.whale, w, v)}${(bc.whale ?? w.weight) > 0 ? "" : " · zählt nicht"}`,
+    });
+  }
+  const PART_ROWS: ReadonlyArray<{ id: PartId; weight: number | null; own: number; title: string }> = [
+    ...(legacyWhale ? [] : [{ id: "traders" as const, weight: bc.whale, own: w.weight, title: TRADERS_TITLE }]),
+    { id: "div", weight: bc.div, own: divCfgOf(cfg).weight, title: "Divergenzen" },
+    { id: "sr", weight: bc.sr, own: srCfgOf(cfg).weight, title: "Support / Widerstand" },
+  ];
+  for (const row of PART_ROWS) {
+    const pl = partOf(vLong, row.id);
+    const ps = partOf(vShort, row.id);
+    if (!pl && !ps) continue;
+    const data = !!(pl?.data || ps?.data);
+    const vote = data ? clamp1((pl?.data ? pl.grade : 0) - (ps?.data ? ps.grade : 0)) : null;
+    const weight = row.weight ?? row.own;
+    const lead = vote == null || vote === 0 ? null : vote > 0 ? pl : ps;
+    const detail = !data ? "keine Daten" : `Long ${n1(pl?.grade ?? 0)} · Short ${n1(ps?.grade ?? 0)}${lead ? ` · ${lead.detail}` : ""}${weight > 0 ? "" : " · zählt nicht"}`;
+    out.push({
+      id: row.id,
+      group: row.id,
+      label: lead ? lead.label : row.title,
+      vote,
+      weight,
+      detail,
+      provisional: !!lead && lead.state === "provisional",
     });
   }
 
@@ -455,11 +525,7 @@ export function computeBias(sig: BiasInput | null | undefined, cfg: SignalCfg, p
   if (!(sw > 0)) return null;
   const sum = clamp1(s / sw);
 
-  // the check's verdict per side (the live snapshot carries it; hand-built inputs get it recomputed)
-  const valid: Record<Side, boolean> = {
-    long: (sig.long ?? verdict("long", checks, cfg, sig.zone)).valid,
-    short: (sig.short ?? verdict("short", checks, cfg, sig.zone)).valid,
-  };
+  const valid: Record<Side, boolean> = { long: vLong.valid, short: vShort.valid };
   let score = sum;
   let limit: BiasLimit | null = null;
   const only: Side | null = valid.long !== valid.short ? (valid.long ? "long" : "short") : null;
@@ -476,6 +542,8 @@ export function computeBias(sig: BiasInput | null | undefined, cfg: SignalCfg, p
   if (Math.abs(level) === 2 && !valid[level > 0 ? "long" : "short"]) level = (level > 0 ? 1 : -1) as BiasLevel;
 
   const contributions: BiasContribution[] = out.map((c) => ({ ...c, share: c.vote != null && c.weight > 0 ? c.weight / sw : 0 }));
+  const leanSide = biasSide(score);
+  const state: SignalState = leanSide ? ((leanSide === "long" ? vLong : vShort).state ?? (valid[leanSide] ? "confirmed" : "none")) : "none";
   return {
     score,
     sum,
@@ -488,6 +556,7 @@ export function computeBias(sig: BiasInput | null | undefined, cfg: SignalCfg, p
     valueText: biasValueText(score, level),
     hold: biasHoldText(score, level),
     valid,
+    state,
     contributions,
     used: contributions.filter((c) => c.vote != null).length,
     total: contributions.length,
@@ -519,10 +588,19 @@ export function roundToSum(xs: readonly number[]): number[] {
 export function biasMethodText(cfg: SignalCfg): string {
   const bc = biasCfgOf(cfg);
   const w = whaleCfgOf(cfg);
-  const whale = w.on ? `, Top-Trader · Retail ${bc.whale ?? w.weight}` : "";
+  const d = divCfgOf(cfg);
+  const r = srCfgOf(cfg);
+  const parts = [
+    w.on ? `${TRADERS_TITLE} ${bc.whale ?? w.weight}` : "",
+    d.on ? `Divergenzen ${bc.div ?? d.weight}` : "",
+    r.on ? `Support/Widerstand ${bc.sr ?? r.weight}` : "",
+  ].filter(Boolean);
+  const extra = parts.length ? `, ${parts.join(", ")}` : "";
   return (
     `Jede Bedingung stimmt zwischen −1 (Short) und +1 (Long) ab; Stimme × Gewicht = Beitrag, die Beiträge ergeben die Summe. ` +
-    `Gewichte wie die Score-Punkte des Checks: MCB ${bc.mcb} (zu gleichen Teilen auf ${cfg.ladder.join(" · ")}), RSI ${bc.rsi}, Zone ${bc.zone}${whale}. ` +
+    `Gewichte wie die Score-Punkte des Checks: MCB ${bc.mcb} (zu gleichen Teilen auf ${cfg.ladder.join(" · ")}), RSI ${bc.rsi}, Zone ${bc.zone}${extra}. ` +
+    `Teil-Bedingungen stimmen mit Long-Anteil − Short-Anteil ab (z. B. 3 von 4 Top-Trader-Teilen = 0,75). ` +
+    `Ein Signal auf der laufenden Kerze (vorläufig) zählt halb. ` +
     `Ein MCB-Signal einer höheren Stufe zählt nur voll, wenn alle Stufen darunter dieselbe Richtung bestätigen (sonst ¼); RSI zählt ` +
     `auf der Basis und den bestätigten Stufen. Fehlende Daten zählen nicht. Neutral bis ${sidePct(BIAS_LEAN)} einer Seite, „Eher“ darüber, ` +
     `„Stark“ ab ${sidePct(BIAS_STRONG)} und nur mit gültigem Einstieg; nie gegen einen gültigen Einstieg. ` +
