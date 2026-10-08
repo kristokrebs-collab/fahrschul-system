@@ -79,7 +79,8 @@ known, so the app now lets the device answer it:
   forces it anywhere): base.css drops every `backdrop-filter`, the dock label plates fade (opacity) instead of the
   clip-path reveal, the dock's extra `will-change` layers, the header CTA's masked shine layers (a plain inset red under-glow instead), the fixed noise film
   (`body::before`, an SVG-filter image over the viewport) and the toast's blurred win glow; the dock's session entrance
-  rises without its blur filter (`dockEntrance(…, noBlur)`).
+  rises without its blur filter (`dockEntrance(…, noBlur)`), and PageHost's entering page slides and fades without its
+  4 px blur.
 - The toast island's live region is a 0×0 box at rest (no empty full-viewport fixed layer between toasts); it opens to
   `inset-0` while a toast shows or exits, staying in the DOM / accessibility tree throughout.
 - Layer names: `Header`, `Dock`, `Dock-Leiste`, `Unterer Verlauf`, `Toast-Insel`, `Navigation (Vollbild)` (`data-layer`).
@@ -134,7 +135,9 @@ new page renders afterwards in an interruptible background render.
 – after a fast dock flick the slide runs on `contextSpringAt(spring.pageEnter, consumeNavTempo())`, otherwise the token itself –
 exit `−dir·12` + fade). Each property is a single `transform` / `opacity` / `filter` animation via `animate(el, …)`, so Motion runs it
 on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyframes, see `src/motion/README.md`), opacity/filter on
-`tween.page`, exit `tween.exit`. Layers end at `transform: none` / `filter: none`.
+`tween.page`, exit `tween.exit`. Layers end at `transform: none` / `filter: none`. `data-safe-fx`: no blur (slide + fade only).
+- `cascade` (module-level array, the shell passes `["settings"]`): pages wrapped in their own `LayoutCascade` – a scoped layout
+  group, since `MotionRoot` has none (see `src/motion/README.md`).
 - Keep-alive pages (the overview) live in React `<Activity mode="hidden">`: state and DOM are kept, effects are destroyed while hidden
   and re-run on show, and the page is pre-rendered hidden at idle priority when the app starts elsewhere. Overview effects must stay
   re-entrant and cheap (ChartCard's `history()` hits the cache; the chart is recreated from the `candles` prop). The hidden DOM stays in
@@ -153,9 +156,10 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 - `dockLayout` windowed Gaussian bell (`dockBell`, σ 48, amplitude 0.8, amount on the pack's 400/20 spring), per-slot `x` on the button and `scale` (originY 1) on its visual; a stretchable tray:
   caps translate ∓W/2, the middle scales by 1 + W/mid. Item centres are measured once per pointerenter in `frame.read`.
 - The magnified transforms are MotionValues on motion components, so the `dock-bg` / `dock-dot` / `new-trade-{fabCycle}` shared transitions
-  account for them through latestValues – never drive them imperatively. `dock-bg` / `dock-dot` intentionally have NO
-  `layoutDependency`: their willUpdate on a Dock re-render snapshots the layout group when the editor opens, so the unmounting
-  `new-trade-{fabCycle}` disc has a box to morph from.
+  account for them through latestValues – never drive them imperatively. `dock-bg` / `dock-dot` carry
+  `layoutDependency = page|editor.open`; the unmounting `new-trade-{fabCycle}` disc snapshots itself when the editor opens
+  (a `layoutId` node's `projection.unmount` → `willUpdate`), and the sheet panel takes that snapshot as the new lead –
+  no layout group involved (`MotionRoot` has none, see `src/motion/README.md`).
 - FAB ↔ editor is a ONE-WAY morph: the disc and the FAB sheet share `layoutId="new-trade-{fabCycle}"`; `closeEditor` bumps
   `uiStore.fabCycle` for a FAB editor, so the disc remounts under a fresh id (it can never resume from the exiting sheet – that
   drew a sheet-sized red blob) and acknowledges the return with a scale .9 → 1 on `spring.pop`.

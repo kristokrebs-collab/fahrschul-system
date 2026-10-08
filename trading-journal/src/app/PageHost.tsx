@@ -12,7 +12,8 @@
  *   while pinned absolutely in place, so the new page lays out immediately. Everything is a single `transform` / `opacity`
  *   / `filter` animation per layer, which Motion hands to WAAPI: the slide keeps running on the compositor while React
  *   reconnects the page's effects. Layers always end at `transform: none` / `filter: none` (no containing block for the
- *   chart's fixed marker ghost or the table ghost). Reduced motion: opacity crossfade only.
+ *   chart's fixed marker ghost or the table ghost). Reduced motion: opacity crossfade only. Samsung-Internet-safe effects
+ *   (`html[data-safe-fx]`): no blur.
  * - Scroll: the router queues the restore for a page that is not on screen yet; `showPage()` applies it in the layout
  *   effect of the commit that shows the page, before paint, and the leaving layer is offset by the same distance so it
  *   fades out exactly where it was.
@@ -20,6 +21,7 @@
  */
 import { animate, frame, type AnimationPlaybackControls } from "motion/react";
 import { Activity, memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { isSafeFx } from "@/app/pwa";
 import { cn } from "@/lib/cn";
 import { LayoutCascade } from "@/motion/NoLayoutCascade";
 import { consumeNavTempo, contextSpringAt } from "@/motion/physics";
@@ -194,10 +196,13 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
       // start values before paint: Motion resolves keyframes on the next frame, the first frame must not flash the page
       enterEl.style.opacity = "0";
       if (!reduced) {
+        // Samsung-Internet-safe effects (`data-safe-fx`, decision 7): no blur – a filter over the whole page layer is the
+        // most expensive thing the tablet's compositor could run during a switch; slide + fade stay
+        const blur = !isSafeFx();
         enterEl.style.transform = ENTER_FROM(dir);
-        enterEl.style.filter = BLUR_FROM;
+        enterEl.style.filter = blur ? BLUR_FROM : "none";
         enter.push(animate(enterEl, { transform: [ENTER_FROM(dir), ENTER_TO] }, enterSpring));
-        enter.push(animate(enterEl, { opacity: [0, 1], filter: [BLUR_FROM, BLUR_TO] }, ENTER_FADE));
+        enter.push(animate(enterEl, blur ? { opacity: [0, 1], filter: [BLUR_FROM, BLUR_TO] } : { opacity: [0, 1] }, ENTER_FADE));
       } else {
         // a parked page may still carry its last exit offset
         enterEl.style.transform = "none";
