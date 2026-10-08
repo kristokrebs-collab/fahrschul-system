@@ -43,7 +43,7 @@ function Cell({ col, span, defer, children }: { col: number; span: string; defer
 function CellReveal({ col, defer, children }: { col: number; defer: number; children: ReactNode }) {
   const flown = useIntroFlown();
   return (
-    <Reveal index={col} settled={flown} className={cn(DEFER, FILL)} style={{ containIntrinsicBlockSize: `auto ${defer}px` }}>
+    <Reveal index={col} settled={flown} className={cn(DEFER, FILL)} style={{ containIntrinsicBlockSize: `auto ${defer}px` }} data-defer="">
       {children}
     </Reveal>
   );

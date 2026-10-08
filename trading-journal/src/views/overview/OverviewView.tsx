@@ -1,10 +1,11 @@
-import { useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { IntroCell, useIntroRoot } from "@/intro/IntroCell";
 import { useIntroFlown } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
 import { useHoldProjectionOnHide } from "@/motion/activityProjection";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
+import { startIdlePrerender } from "@/primitives/idlePrerender";
 import { InsightsSection } from "@/views/insights";
 import { BacktestCompare } from "./BacktestCompare";
 import { ChartCard } from "./ChartCard";
@@ -56,7 +57,13 @@ function Cell({ col, span, defer, children }: CellProps) {
 function CellReveal({ col, defer, children }: Omit<CellProps, "span">) {
   const flown = useIntroFlown();
   return (
-    <Reveal index={col} settled={flown} className={cn(defer != null && DEFER)} style={defer != null ? { containIntrinsicBlockSize: `auto ${defer}px` } : undefined}>
+    <Reveal
+      index={col}
+      settled={flown}
+      className={cn(defer != null && DEFER)}
+      style={defer != null ? { containIntrinsicBlockSize: `auto ${defer}px` } : undefined}
+      data-defer={defer != null ? "" : undefined}
+    >
       {children}
     </Reveal>
   );
@@ -82,6 +89,8 @@ export function OverviewView({ className }: { className?: string }) {
   useIntroRoot(root);
   // switching away hides this kept-alive page: no layoutId snapshot of its (display: none) motion nodes
   useHoldProjectionOnHide();
+  // the deferred cells (here and in the Auswertung) render once in idle time, not inside the first scroll past them
+  useEffect(() => (root.current ? startIdlePrerender(root.current) : undefined), []);
   return (
     <div ref={root} className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)}>
       <IntroCell className="lg:col-span-12">

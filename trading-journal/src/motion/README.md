@@ -384,7 +384,9 @@ Every live number is a MotionValue leaf, so the panel commits only on structural
 - Grid (`OverviewView`): cells below the hero are `<Reveal index={column}>`. Hero and ChartCard are deliberately NOT wrapped (the chart
   has its own `tween.chartIn` entrance and hosts the fixed marker ghost). Rows 3–6 add `content-visibility:auto` +
   `contain-intrinsic-block-size: auto <px>`; a deferred cell is paint-contained, so it uses `-my-3 py-3` for the hover lift – never put
-  `position:fixed` or overflow-escaping UI inside those cards.
+  `position:fixed` or overflow-escaping UI inside those cards. Deferred cells carry `data-defer` and render once in idle time
+  after load (`startIdlePrerender`, `@/primitives/idlePrerender`: one cell per idle period, top to bottom, `visible` for one
+  frame then `auto` again, paused while the page scrolls), so their first style / layout / paint never lands in a scroll frame.
 - `@/primitives/revealValue`: `useRevealValue(ref, target, { transition, from?, delay?, enabled?, onReveal? })` → a MotionValue resting
   at `from` until first in view, then animating; later changes animate from the current value (zero renders; reduced motion / no IO:
   starts at the target). `useSeenOnce(ref)` = a boolean that flips once.
