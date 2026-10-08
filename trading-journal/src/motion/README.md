@@ -173,7 +173,9 @@ Sparkline) only get opacity/translate reveals.
 - `source` mode: `<RollingDigits source={priceMv} decimals={1} decimalClassName="text-mute" formatLabel={n0} />` – rounded to the display
   grid and glided on ONE `spring.price`; columns derive a continuous carry position (`carryPosition(x, place)`): the lowest digit spins,
   higher digits roll in lock-step on a carry, every column rests exactly on a digit. Each column is a memoised 0–9–0 strip with one
-  transform and its own layer. Velocity blur 0–1.5 px (`blur={false}` disables it; off under reduced motion). Zero React renders per
+  transform and its own layer. Velocity blur, compositor-only: a pre-blurred copy of the strip (constant `blur(1.25px)`, `data-fx="digit-blur"`)
+  fades in over the sharp one with the column's speed (opacity only – animating the radius re-rasterised the strip ≈ 200× per 10 s);
+  `blur={false}` disables it; off under reduced motion and Samsung-Internet-safe effects. Zero React renders per
   tick (only digit-count / sign changes re-render); the aria-label is written imperatively at most once per second.
 
 ### `StatusPill`

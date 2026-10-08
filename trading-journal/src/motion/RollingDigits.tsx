@@ -1,6 +1,7 @@
 import { motion, useMotionValueEvent, useSpring, useTransform, useVelocity, type MotionValue } from "motion/react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
+import { isSafeFx } from "@/motion/safeFx";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -10,9 +11,14 @@ const GLYPHS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0] as const;
 const MAX_SPRING_HZ_INTERVAL_MS = 250;
 /** `source` mode: the accessible label follows the feed at most once per second. */
 const LABEL_INTERVAL_MS = 1000;
-/** Motion blur: 0 px at rest, +1 px per 40 positions/s, capped at 1.5 px, quantised to .25 px so the filter string rarely changes. */
-const BLUR_MAX_PX = 1.5;
-const BLUR_PX_PER_VELOCITY = 1 / 40;
+/**
+ * Motion blur: a pre-blurred copy of the strip (a constant `blur(1.25px)`, rasterised once) fades in over the sharp one
+ * with the column's speed – full at ≥ 60 positions/s, quantised to 1/20 – so a fast roll only changes an opacity.
+ * (Animating the blur radius itself re-rasterised the 11-glyph strip on every step: ≈ 200 paints, 250 Mpx per 10 s
+ * of live price.)
+ */
+const BLUR_PX = 1.25;
+const BLUR_FULL_VELOCITY = 60;
 
 const mod10 = (p: number) => ((p % 10) + 10) % 10;
 
@@ -49,16 +55,12 @@ function formatDe(value: number, decimals: number): string {
  * The visual column: a vertical 0–9–0 strip translated by its (unbounded) position – one transform per column.
  * Live strips get their own compositor layer (`will-change`), so a gliding price never repaints text.
  */
-function StripGlyphs({ y, filter, live = false }: { y: MotionValue<string>; filter?: MotionValue<string>; live?: boolean }) {
+function StripGlyphs({ y, live = false }: { y: MotionValue<string>; live?: boolean }) {
   return (
     <span className="relative inline-block w-[1ch] overflow-y-clip leading-none tabular-nums" aria-hidden="true">
       <span className="invisible">0</span>
-      <motion.span className={cn("absolute inset-0", live && "will-change-transform")} style={{ y, filter }}>
-        {GLYPHS.map((d, i) => (
-          <span key={i} className="absolute inset-x-0 flex h-full items-center justify-center" style={{ top: `${i * 100}%` }}>
-            {d}
-          </span>
-        ))}
+      <motion.span className={cn("absolute inset-0", live && "will-change-transform")} style={{ y }}>
+        <Glyphs />
       </motion.span>
     </span>
   );
@@ -71,15 +73,38 @@ const SharpStrip = memo(function SharpStrip({ pos, live }: { pos: MotionValue<nu
   return <StripGlyphs y={y} live={live} />;
 });
 
-/** Strip with a velocity-driven motion blur (compositor `filter`), `none` at rest so settled digits stay crisp. */
+const BLUR_STYLE = `blur(${BLUR_PX}px)`;
+
+/** Glyphs of one strip layer (sharp or pre-blurred), positioned on the column's 0–9–0 track. */
+function Glyphs() {
+  return GLYPHS.map((d, i) => (
+    <span key={i} className="absolute inset-x-0 flex h-full items-center justify-center" style={{ top: `${i * 100}%` }}>
+      {d}
+    </span>
+  ));
+}
+
+/**
+ * Strip with a velocity-driven motion blur, compositor-only: the sharp strip and a pre-blurred copy move on the same
+ * transform; the copy's opacity follows the speed (0 at rest – settled digits are the sharp strip alone).
+ */
 const BlurStrip = memo(function BlurStrip({ pos }: { pos: MotionValue<number> }) {
   const y = useTransform(pos, stripY);
   const velocity = useVelocity(pos);
-  const filter = useTransform(velocity, (v) => {
-    const px = Math.round(Math.min(BLUR_MAX_PX, Math.abs(v) * BLUR_PX_PER_VELOCITY) * 4) / 4;
-    return px === 0 ? "none" : `blur(${px}px)`;
-  });
-  return <StripGlyphs y={y} filter={filter} live />;
+  const mix = useTransform(velocity, (v) => Math.round(Math.min(1, Math.abs(v) / BLUR_FULL_VELOCITY) * 20) / 20);
+  // the sharp strip gives way by half, so at full speed the column reads as blurred, not doubled
+  const sharp = useTransform(mix, (m) => 1 - m / 2);
+  return (
+    <span className="relative inline-block w-[1ch] overflow-y-clip leading-none tabular-nums" aria-hidden="true">
+      <span className="invisible">0</span>
+      <motion.span className="absolute inset-0 will-change-[transform,opacity]" style={{ y, opacity: sharp }}>
+        <Glyphs />
+      </motion.span>
+      <motion.span className="absolute inset-0 will-change-[transform,opacity]" style={{ y, opacity: mix, filter: BLUR_STYLE }} data-fx="digit-blur">
+        <Glyphs />
+      </motion.span>
+    </span>
+  );
 });
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -233,7 +258,8 @@ function SourceDigits({
     };
   }, [source, fmt, ariaLabel]);
 
-  const fx = blur && !reduced;
+  // Samsung-Internet-safe effects: no blur layers at all (crisp digits, one layer per column)
+  const fx = blur && !reduced && !isSafeFx();
   const intCount = shape.count;
   return (
     <span className={cn("inline-flex items-center", className)} data-rolling-digits="">

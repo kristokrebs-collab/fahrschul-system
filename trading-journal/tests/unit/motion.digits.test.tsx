@@ -62,6 +62,26 @@ describe("RollingDigits source mode", () => {
     await waitFor(() => expect(el.querySelector(".sr-only")?.textContent).toBe("100.020"), { timeout: 2000 });
   });
 
+  it("motion blur is a pre-blurred copy that fades in (constant filter), never an animated radius; none on safe effects", () => {
+    const mv = motionValue(86100);
+    const { container, unmount } = render(<RollingDigits source={mv} />);
+    const copies = container.querySelectorAll<HTMLElement>("[data-fx='digit-blur']");
+    // every column but the lowest has its blurred copy
+    expect(copies).toHaveLength(4);
+    for (const c of copies) expect(c.style.filter).toBe("blur(1.25px)");
+    for (const strip of container.querySelectorAll<HTMLElement>(".will-change-transform, .will-change-\\[transform\\,opacity\\]")) {
+      if (strip.dataset.fx !== "digit-blur") expect(strip.style.filter).toBe("");
+    }
+    unmount();
+    document.documentElement.setAttribute("data-safe-fx", "");
+    try {
+      const safe = render(<RollingDigits source={mv} />);
+      expect(safe.container.querySelectorAll("[data-fx='digit-blur']")).toHaveLength(0);
+    } finally {
+      document.documentElement.removeAttribute("data-safe-fx");
+    }
+  });
+
   it("shows a leading minus for negative values", () => {
     render(<RollingDigits source={motionValue(-1250)} />);
     const el = digitsRoot("−1.250");
