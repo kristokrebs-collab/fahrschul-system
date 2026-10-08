@@ -91,7 +91,7 @@ async function expectRowsAddUp(dialog: Locator): Promise<void> {
 }
 
 test.describe("Long/Short-Tendenz", () => {
-  test("long setup: the bar leans right with the model's label; explainer lists every condition", async ({ page }, info) => {
+  test("long setup: the bar leans left (Long side) with the model's label; explainer lists every condition", async ({ page }, info) => {
     const errors = collectErrors(page);
     const { card, bias, anchor } = await openBias(page, "long");
     const exp = computeBias(expectedSignals(anchor, Date.now(), LIVE_PRICE, "whale-long"), sanitizeSignalCfg(DEFAULT_SIGNAL_CFG));
@@ -107,7 +107,7 @@ test.describe("Long/Short-Tendenz", () => {
     const now = Number(await meter.getAttribute("aria-valuenow"));
     expect(Math.abs(now - Math.round(exp!.score * 100)), `aria-valuenow ${now} vs model ${exp!.score}`).toBeLessThanOrEqual(3);
     const x = await needleAt(bias);
-    expect(x, "needle right of centre").toBeGreaterThan(0.5 + exp!.score / 2 - 0.04);
+    expect(x, "needle left of centre (Long left)").toBeLessThan(0.5 - exp!.score / 2 + 0.04);
 
     // label, percent and the bar never overlap; the box does not overlap the verdict row below
     const lb = await bias.getByTestId("bias-label").boundingBox();
@@ -170,7 +170,7 @@ test.describe("Long/Short-Tendenz", () => {
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
-  test("short setup (mirrored market): the bar leans left with a Short label", async ({ page }, info) => {
+  test("short setup (mirrored market): the bar leans right (Short side) with a Short label", async ({ page }, info) => {
     const errors = collectErrors(page);
     const { card, bias } = await openBias(page, "short");
     await expect(card.getByTestId("signal-label")).toHaveText(/Short-Einstieg/, { timeout: 15_000 });
@@ -181,7 +181,7 @@ test.describe("Long/Short-Tendenz", () => {
     await expect(meter).toHaveAttribute("aria-valuetext", /^(Stark|Eher) Short, \d+ %$/);
     expect(Number(await meter.getAttribute("aria-valuenow"))).toBeLessThan(-15);
     const x = await needleAt(bias);
-    expect(x, "needle left of centre").toBeLessThan(0.42);
+    expect(x, "needle right of centre (Short right)").toBeGreaterThan(0.58);
     await expectNoHorizontalScroll(page);
     await card.screenshot({ path: info.outputPath("bias-short-card-only.png"), animations: "disabled" });
     if ((page.viewportSize()?.width ?? 0) >= 1024) await expect(page.getByTestId("signal-strip-bias")).toHaveAttribute("data-level", /^-[12]$/);

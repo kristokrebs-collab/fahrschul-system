@@ -231,10 +231,13 @@ describe("view helpers", () => {
   });
 
   it("score → bar position and vote words", () => {
-    expect(biasX(-1)).toBe(0);
+    // Long left, Short right
+    expect(biasX(1)).toBe(0);
+    expect(biasX(-1)).toBe(100);
     expect(biasX(0)).toBe(50);
-    expect(biasX(0.5)).toBe(75);
-    expect(biasX(3)).toBe(100);
+    expect(biasX(0.5)).toBe(25);
+    expect(biasX(3)).toBe(0);
+    expect(biasX(-3)).toBe(100);
     expect(voteWord(null)).toBe("keine Daten");
     expect(voteWord(0.02)).toBe("neutral");
     expect(voteWord(0.4)).toBe("Long");

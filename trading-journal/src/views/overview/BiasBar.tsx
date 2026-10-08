@@ -1,6 +1,6 @@
 /**
  * "Long/Short-Tendenz": every condition of the Einstiegs-Check weighed against each other on ONE horizontal bar —
- * Short (left, loss red) ↔ Long (right, win green), a centre tick, the neutral zone and a needle (pure model:
+ * Long (left, win green) ↔ Short (right, loss red), a centre tick, the neutral zone and a needle (pure model:
  * `@/domain/signals/bias`).
  *
  * 120 Hz: the needle, the gradient fill (centre → needle) and the needle halo are ONE MotionValue (`useRevealValue`:
@@ -103,8 +103,8 @@ export function needleSpring(jump: number) {
   return contextSpringAt(spring.smooth, smoothstep(BIAS_JUMP_SLOW, BIAS_JUMP_FAST, Math.abs(jump)));
 }
 
-/** Score −1 … +1 → position 0 … 100 % on the bar (Short left). */
-export const biasX = (score: number): number => ((Math.max(-1, Math.min(1, score)) + 1) / 2) * 100;
+/** Score −1 … +1 → position 0 … 100 % on the bar (Long left: +1 → 0 %, Short right: −1 → 100 %). */
+export const biasX = (score: number): number => ((1 - Math.max(-1, Math.min(1, score))) / 2) * 100;
 
 const LEVEL_TEXT: Record<"long" | "short" | "none", string> = { long: "text-win", short: "text-loss", none: "text-fg" };
 const toneOf = (b: Bias | null): keyof typeof LEVEL_TEXT => (!b || b.level === 0 ? "none" : b.level > 0 ? "long" : "short");
@@ -112,7 +112,7 @@ const toneOf = (b: Bias | null): keyof typeof LEVEL_TEXT => (!b || b.level === 0
 /* ------------------------------------------------------------------ the track */
 
 /**
- * The bar: ambient short / long tints, the neutral zone (±`BIAS_LEAN`), ticks at the centre and at ±`BIAS_STRONG`,
+ * The bar: ambient long (left) / short (right) tints, the neutral zone (±`BIAS_LEAN`), ticks at the centre and at ±`BIAS_STRONG`,
  * the gradient fill from the centre to the needle (scaleX of a half-width layer) and the needle with its halo. All
  * driven by `score` (MotionValue) — no React render while it moves.
  */
@@ -126,13 +126,13 @@ const BiasTrack = memo(function BiasTrack({ score, compact = false, empty = fals
   return (
     <span className={cn("relative block", compact ? "h-3" : "h-7")} data-testid={compact ? undefined : "bias-track"} aria-hidden="true">
       <span className={cn("absolute inset-x-0 top-1/2 -translate-y-1/2 overflow-hidden rounded-full bg-white/[0.05]", compact ? "h-1.5" : "h-2.5")}>
-        <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-loss/[0.16] to-transparent" />
-        <span className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-win/[0.16] to-transparent" />
+        <span className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-win/[0.16] to-transparent" />
+        <span className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-loss/[0.16] to-transparent" />
         <span className="absolute inset-y-0 bg-white/[0.07]" style={{ left: `${50 - lean}%`, right: `${50 - lean}%` }} />
         {!empty && (
           <>
-            <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-win/10 via-win/45 to-win" style={{ scaleX: longScale }} />
-            <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-loss/10 via-loss/45 to-loss" style={{ scaleX: shortScale }} />
+            <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-win/10 via-win/45 to-win" style={{ scaleX: longScale }} />
+            <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-loss/10 via-loss/45 to-loss" style={{ scaleX: shortScale }} />
           </>
         )}
       </span>
@@ -165,9 +165,9 @@ const BiasTrack = memo(function BiasTrack({ score, compact = false, empty = fals
 function BiasScale() {
   return (
     <span className="mt-1 grid grid-cols-3 gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]" aria-hidden="true">
-      <span className="text-loss/80">Short</span>
+      <span className="text-win/80">Long</span>
       <span className="text-center text-faint">Neutral</span>
-      <span className="text-right text-win/80">Long</span>
+      <span className="text-right text-loss/80">Short</span>
     </span>
   );
 }
@@ -209,7 +209,7 @@ export interface BiasBarProps {
 }
 
 /**
- * The bar. Full: header (title, conditions counted, `Details`), label + percent, the bar, the Short · Neutral · Long
+ * The bar. Full: header (title, conditions counted, `Details`), label + percent, the bar, the Long · Neutral · Short
  * scale; the whole box is the `MorphCard` that opens the explainer. Compact: `Tendenz` · bar · label + percent.
  */
 export function BiasBar({ compact = false, ...props }: BiasBarProps) {
@@ -328,7 +328,7 @@ export function voteWord(v: number | null): string {
 }
 
 /**
- * One condition: name, vote word + number, a diverging bar (left Short, right Long, from the centre), detail, and
+ * One condition: name, vote word + number, a diverging bar (left Long, right Short, from the centre), detail, and
  * `Gewicht 16 % → +0,16` (weight share and the row's contribution to the sum, both rounded so the rows add up exactly).
  */
 const ContributionRow = memo(function ContributionRow({ c, pct, cents }: { c: BiasContribution; pct: number; cents: number }) {
@@ -348,7 +348,7 @@ const ContributionRow = memo(function ContributionRow({ c, pct, cents }: { c: Bi
       <span className="relative block h-2 overflow-hidden rounded-full bg-white/[0.05]" aria-hidden="true">
         {side && (
           <motion.span
-            className={cn("absolute inset-y-0 w-1/2", side === "long" ? "left-1/2 origin-left bg-gradient-to-r from-win/25 to-win" : "right-1/2 origin-right bg-gradient-to-l from-loss/25 to-loss")}
+            className={cn("absolute inset-y-0 w-1/2", side === "long" ? "right-1/2 origin-right bg-gradient-to-l from-win/25 to-win" : "left-1/2 origin-left bg-gradient-to-r from-loss/25 to-loss")}
             initial={reduced ? false : { scaleX: 0 }}
             animate={{ scaleX: mag }}
             transition={reduced ? { duration: 0 } : needleSpring(mag)}
