@@ -58,9 +58,12 @@ export interface OracleOptions {
   shape?: SynthShape;
 }
 
-/** The evaluation the app shows for the synthetic market anchored at `anchor`, evaluated at `now` with `livePrice`. */
-export function expectedSignals(anchor: number, now: number, livePrice: number, ratios: RatioScript, opts: OracleOptions = {}): Signals {
-  const cfg = sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, ...(opts.cfg ?? {}) } as SignalCfg);
+/** The sanitised config the oracle grades with (`opts.cfg` over the engine defaults). */
+export const oracleCfg = (opts: OracleOptions = {}): SignalCfg => sanitizeSignalCfg({ ...DEFAULT_SIGNAL_CFG, ...(opts.cfg ?? {}) } as SignalCfg);
+
+/** The rung bars the engine evaluates (running bar completed with `livePrice`), per ladder / zone timeframe. */
+export function expectedBars(anchor: number, now: number, livePrice: number, opts: OracleOptions = {}): Record<string, Bar[]> {
+  const cfg = oracleCfg(opts);
   const m = (x: string) => (opts.mirror ? 2 * SYNTH_LAST - Number(x) : Number(x));
   const bars: Record<string, Bar[]> = {};
   for (const tf of [...new Set([...cfg.ladder, cfg.zoneTf])]) {
@@ -76,6 +79,13 @@ export function expectedSignals(anchor: number, now: number, livePrice: number, 
     }));
     bars[tf] = withLivePrice(rungBars(tf, src), tfSeconds(tf), livePrice, now) as Bar[];
   }
+  return bars;
+}
+
+/** The evaluation the app shows for the synthetic market anchored at `anchor`, evaluated at `now` with `livePrice`. */
+export function expectedSignals(anchor: number, now: number, livePrice: number, ratios: RatioScript, opts: OracleOptions = {}): Signals {
+  const cfg = oracleCfg(opts);
+  const bars = expectedBars(anchor, now, livePrice, opts);
   const traders = traderReading(synthTraderSeries(ratios, now), cfg, now);
   const sig = computeSignals(bars, cfg, now, { traders });
   if (!sig) throw new Error("synthetic market: no evaluation");

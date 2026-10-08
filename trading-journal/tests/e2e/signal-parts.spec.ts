@@ -66,6 +66,20 @@ test.describe("graded parts on a divergence market", () => {
     await expect(hit).toContainText(`${de0.format(best.from.price)} → ${de0.format(best.to.price)}`);
     await expect(card.getByRole("list", { name: "Bedingungen" }).locator("li", { hasText: `Bullische Divergenz (${tf})` })).toContainText("erfüllt");
 
+    // RSI trendline break (decision 17): the card's line names the engine's most relevant break, its rows carry the mark
+    const trends = div.trends ?? [];
+    const trendBox = box.getByTestId("signal-div-trend");
+    if (trends.length) {
+      const tb = trends.reduce((a, t) => ((a.state === "provisional" && t.state !== "provisional") || (a.state === t.state && t.barsAgo < a.barsAgo) ? t : a));
+      const when = tb.state === "provisional" ? "vorläufig (laufende Kerze)" : tb.barsAgo <= 0 ? "diese Kerze" : tb.barsAgo === 1 ? "vor 1 Kerze" : `vor ${tb.barsAgo} Kerzen`;
+      await expect(trendBox).toHaveText(`${tb.tf} · RSI-Trendlinienbruch nach oben (fallende Linie) · ${when}`);
+    } else await expect(trendBox).toHaveCount(0);
+    for (const it of div.items) {
+      const row = box.locator(`[data-testid=signal-div-row][data-tf="${it.id}"]`);
+      if (trends.some((t) => t.tf === it.id)) await expect(row, `${it.id} trend mark`).toHaveAttribute("data-trend", "1");
+      else await expect(row, `${it.id} no trend mark`).not.toHaveAttribute("data-trend", /.*/);
+    }
+
     // support / resistance: the engine's levels (the range low under the price, the supply block above)
     const sr = part(exp, "sr");
     const srBox = card.getByTestId("signal-sr");

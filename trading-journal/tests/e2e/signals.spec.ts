@@ -10,10 +10,10 @@
  * and the chart layer toggles.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { STRENGTH_LABEL, type GradedPart, type Signals } from "../../src/domain/signals";
+import { kindText, STRENGTH_LABEL, wtTurn, type GradedPart, type Signals } from "../../src/domain/signals";
 import { collectErrors, fixture, isMobile, pinClock, screenshot, seed, stored, utcToday, verdictLabel, type FakeClock } from "./helpers";
 import type { RatioScript } from "./mocks/synth";
-import { expectedSignals } from "./mocks/synthOracle";
+import { expectedBars, expectedSignals, oracleCfg } from "./mocks/synthOracle";
 
 /** Last trade price of the `live` WS scenario (the engine completes the running bars with it). */
 const LIVE_PRICE = 84_199;
@@ -206,6 +206,26 @@ test.describe("Einstiegs-Check on a known market", () => {
     await expect(card.getByTestId("signal-whale")).toHaveCount(0);
     await expect(card.getByTestId("signal-div")).toBeVisible();
     await expect(card.getByRole("list", { name: "Bedingungen" }).getByText(/Top-Trader/)).toHaveCount(0);
+  });
+
+  test("forming 4h rung without a long event: `MCB dreht ab` names the close at which its MCB would cross (engine's wtTurn)", async ({ page }) => {
+    const { card, anchor, clock } = await openCheck(page, "whale-long");
+    const cfg = oracleCfg();
+    const exp = expectedSignals(anchor, clock.now(), LIVE_PRICE, "whale-long");
+    const i = cfg.ladder.indexOf("4h");
+    const c = exp.checks[i]!;
+    expect(c.forming, "oracle: the 4h candle forms at 06:03").toBe(true);
+    expect(c.wt.long, "oracle: no long event on the forming 4h candle").toBeFalsy();
+    const t = wtTurn(expectedBars(anchor, clock.now(), LIVE_PRICE)["4h"]!, cfg);
+    expect(t, "oracle: a turn price exists").not.toBeNull();
+    // shown only when a long cross is possible on this candle and lies below the zero line (a cross above it would not count)
+    expect(t!.up && t!.level < 0 && !t!.above, `oracle: long cross possible (${JSON.stringify(t)})`).toBe(true);
+    const kind = t!.level <= cfg.wtOs ? "buy" : "bull";
+    const turn = card.getByTestId("signal-rung").nth(i).getByTestId("signal-rung-turn");
+    await expect(turn).toHaveAttribute("data-kind", kind);
+    await expect(turn.locator(".sr-only")).toHaveText(`MCB dreht ab ${de0.format(t!.price)} nach oben (${kindText(kind)})`);
+    // the confirmed lower rungs carry an event: no turn note there
+    for (let k = 0; k < exp.long.tiers; k++) await expect(card.getByTestId("signal-rung").nth(k).getByTestId("signal-rung-turn")).toHaveCount(0);
   });
 
   test("Bybit fallback (no Binance top traders): `keine Daten`, never a fail", async ({ page }) => {
