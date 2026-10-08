@@ -734,6 +734,26 @@ function PartShell({ pv, side, testId, segments, children }: { pv: PartView; sid
 }
 
 /** One cell of the Top-Trader scorecard: small caps title with its dot, the value, what it must show. */
+/**
+ * `a · b · c` that wraps only between its parts, each part whole (no break inside "Premium-Zone") and the separator
+ * kept at the END of a line — a wrapped line never starts with "·" (390-px cells). Same text as the plain string.
+ */
+function SepText({ parts, className }: { parts: readonly string[]; className?: string }) {
+  return (
+    <>
+      {parts.map((p, i) => (
+        <span key={i}>
+          {i > 0 && " "}
+          <span className={cn("whitespace-nowrap", className)}>
+            {p}
+            {i < parts.length - 1 && " ·"}
+          </span>
+        </span>
+      ))}
+    </>
+  );
+}
+
 function TraderCell({ c, side }: { c: PartCell; side: Side }) {
   const met = c.met === true;
   return (
@@ -751,7 +771,7 @@ function TraderCell({ c, side }: { c: PartCell; side: Side }) {
           its space, balanced */}
       <span className={cn("num mt-1 block font-mono text-[14px] leading-tight transition-colors duration-300 [text-wrap:balance]", met ? SIDE_TEXT[side] : c.met === null ? "text-faint" : "text-fg")}>
         <span className="sr-only">{c.met === null ? "keine Daten: " : met ? "erfüllt: " : "offen: "}</span>
-        {c.value}
+        <SepText parts={c.value.split(" · ")} />
       </span>
       <span className="mt-0.5 block text-[10.5px] leading-snug text-faint">{c.sub}</span>
     </div>
@@ -829,12 +849,15 @@ function DeltaCell({ c, side, reading, level }: { c: PartCell; side: Side; readi
       </span>
       <span className={cn("num mt-1 block font-mono text-[14px] leading-tight transition-colors duration-300 [text-wrap:balance]", met ? SIDE_TEXT[side] : c.met === null ? "text-faint" : "text-fg")}>
         <span className="sr-only">{c.met === null ? "keine Daten: " : met ? "erfüllt: " : "offen: "}</span>
-        <span className="whitespace-nowrap">{main}</span>
-        {/* the change wraps under the level in a narrow cell (never cut) */}
+        {/* the change wraps under the level in a narrow cell (never cut, never a line starting with "·") */}
+        <span className="whitespace-nowrap">
+          {main}
+          {rest.length > 0 && <span className="text-[11px] text-mute"> ·</span>}
+        </span>
         {rest.length > 0 && (
           <>
             {" "}
-            <span className="whitespace-nowrap text-[11px] text-mute">· {rest.join(" · ")}</span>
+            <span className="whitespace-nowrap text-[11px] text-mute">{rest.join(" · ")}</span>
           </>
         )}
       </span>
@@ -845,7 +868,7 @@ function DeltaCell({ c, side, reading, level }: { c: PartCell; side: Side; readi
       )}
       {shares && (
         <span className="num mt-1 block text-[10.5px] leading-snug text-mute" data-testid="signal-delta-shares">
-          <span className="whitespace-nowrap">{shares[0]}</span> · <span className="whitespace-nowrap">{shares[1]}</span>
+          <SepText parts={shares} />
         </span>
       )}
       <span className="mt-0.5 block text-[10.5px] leading-snug text-faint">{c.sub}</span>
