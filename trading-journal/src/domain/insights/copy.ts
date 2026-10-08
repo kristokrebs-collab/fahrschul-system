@@ -98,14 +98,35 @@ export function explainMistakes(rep: MistakeReport, currency: string, withAuto: 
   };
 }
 
-export function explainSignal(res: StrengthResult, effects: readonly ConditionEffect[]): Explanation {
+/** A further row of "Wirkung der Bedingungen" (Top-Trader legacy reading, graded parts of v2 snapshots). */
+export interface SignalEffectRow {
+  label: string;
+  /** win-rate difference met − missed (fraction), `null` when one side is empty */
+  dWin: number | null;
+  /** an item of the row above (Top-Trader parts) */
+  sub?: boolean;
+  /** trades whose check had no data for it (listed, never counted) */
+  noData?: number;
+}
+
+/**
+ * Info panel of `Ergebnis nach Signal-Stärke`: the ladder conditions' effects plus `extra` — the stored top-trader
+ * reading and the graded parts of v2 snapshots (Top-Trader-Kombi and its items, Divergenz, Support / Widerstand).
+ */
+export function explainSignal(res: StrengthResult, effects: readonly ConditionEffect[], extra: readonly SignalEffectRow[] = []): Explanation {
+  const effectRow = (label: string, dWin: number | null, noData = 0): ExplainRow => [
+    label,
+    `${dWin == null ? DASH : `${signed(dWin * 100, 0)} Prozentpunkte`}${noData > 0 ? ` · ${noData} ohne Daten` : ""}`,
+    colorClass(dWin),
+  ];
   return {
     key: "signal",
     title: "Zahlt sich Bestätigung aus?",
-    what: "Jeder Trade speichert beim Eintragen den Einstiegs-Check (MCB-Leiter, RSI, Zone). Hier wird nach der Stärke gruppiert. Steigen Win-Rate und P&L mit der Stärke, lohnt sich Warten auf mehr Bestätigung. Liegen schwache Signale vorne, steigst du vielleicht zu spät ein. Darunter: wie jede einzelne Bedingung die Win-Rate verändert (mit gegen ohne).",
+    what: `Jeder Trade speichert beim Eintragen den Einstiegs-Check (MCB-Leiter, RSI, Zone). Hier wird nach der Stärke gruppiert. Steigen Win-Rate und P&L mit der Stärke, lohnt sich Warten auf mehr Bestätigung. Liegen schwache Signale vorne, steigst du vielleicht zu spät ein. Darunter: wie jede einzelne Bedingung die Win-Rate verändert (mit gegen ohne).${extra.length ? " Neuere Checks speichern auch den Kerzenschluss (vorläufig · bestätigt · stark bestätigt) und die Teil-Bedingungen (Top-Trader-Kombi mit ihren Teilen, Divergenz, Support / Widerstand); Trades ohne Daten dafür zählen weder als erfüllt noch als offen." : ""}`,
     rows: [
       ["Trades mit Check", String(res.withCheck)],
-      ...effects.map((e) => [e.label, e.dWin == null ? DASH : `${signed(e.dWin * 100, 0)} Prozentpunkte`, colorClass(e.dWin)] as ExplainRow),
+      ...effects.map((e) => effectRow(e.label, e.dWin)),
+      ...extra.map((e) => effectRow(e.sub ? `· ${e.label}` : e.label, e.dWin, e.noData ?? 0)),
     ],
     verdict: { tone: "mute", text: "Aussagekräftig ab etwa 10 Trades pro Stufe." },
   };

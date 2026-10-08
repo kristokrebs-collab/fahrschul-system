@@ -60,7 +60,8 @@ export const SETTINGS_STRINGS = {
   longStop: "Long-Invalidierung",
   longStopHelp: "Long ist ungültig, sobald der Kurs wieder darunter schließt",
   shortTrigger: "Short-Trigger (4H unter)",
-  shortTriggerHelp: "Letzter 4H-Schluss darunter → Short-Trigger aktiv",
+  // decision 13: the Übersicht shows no short trigger any more; the stored level stays and draws the chart's SHORT line
+  shortTriggerHelp: "Nur SHORT-Linie im Chart · Übersicht ohne Short-Trigger",
   invalidation: "Harte Invalidierung",
   invalidationHelp: "4H-Schluss darunter → Bärenfall, alle Longs aus",
   lowerHigh: "Lower High (Weekly)",
@@ -69,7 +70,8 @@ export const SETTINGS_STRINGS = {
   rsiWeeklyHelp: "Weekly-RSI darüber bestätigt den Bruch",
   zoneLow: "Makro-Zone von",
   zoneHigh: "Makro-Zone bis",
-  zoneHelp: "Support-/Liquiditätszone für den Falling-Knife-Filter",
+  // decision 11: the zone is no point of the Falling-Knife-Filter any more (it runs from the Einstiegs-Check's data)
+  zoneHelp: "Makro-Long-Zone: Hinweis auf der Übersicht und Band im Chart",
   toastSaved: "Einstellungen gespeichert",
   toastNumbers: "Bitte alle Zahlenfelder ausfüllen",
   toastFailed: "Speichern fehlgeschlagen",

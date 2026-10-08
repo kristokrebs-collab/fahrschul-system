@@ -60,6 +60,18 @@ Left column: score ring + day / streak / Ø (`Im Kalender öffnen`) beside the h
 - `Schwächste Regel` (`weakestRule`): lowest 30-day rate (ties → judged on more days), `An x von y Handelstagen verletzt.`
   + the rule's hint; `Alle prüfbaren Regeln eingehalten.` when nothing broke. Pure helpers: `disciplineView.ts`.
 
+## Ergebnis nach Signal-Stärke (`SignalStrengthCard`, Einstiegs-Check v2)
+- `Stärke` table (4 … 0 + `Ohne Check`) as before; a row unfolds its trades.
+- `Kerzenschluss` table (`stateRows`, `insights-signal-state`): the same columns grouped by the stored candle-close state —
+  stark bestätigt · bestätigt · vorläufig · kein Einstieg · ohne Status (snapshots from before decision 6 / the other
+  version). Shown only when at least one snapshot carries a state.
+- `Wirkung der Bedingungen`: win rate with vs without each ladder condition (`conditionEffects`), the legacy top-trader
+  reading (`whaleEffect`, `insights-signal-whale`), then the graded parts of v2 snapshots (`partEffects`,
+  `insights-signal-part-{key}`): Top-Trader-Kombi erfüllt with its items Positionen / Konten / Retail (indented, `sub`),
+  Divergenz (regulär, bestätigt), Support / Widerstand + Platz. A trade whose check had no data for a part is counted in
+  `noData` (`n ohne Daten`), never as "not met"; snapshots without the part are left out; a part no trade has data for is
+  omitted. The info panel (`explainSignal(res, effects, extra)`) lists the same rows.
+
 ## Other cards with sparse data (audited at 1692×978, 1280×800 and 390 with 3 trades)
 - Erkenntnisse without a clear pattern: the empty state lists what each evaluation still needs (`PROGRESS_STEPS`: first
   finding 2 × `FINDING_MIN_N`, Edge-Score `EDGE_MIN_TRADES`, Backtest-Vergleich `MIN_TRADES_STABLE`) with `have / need` bars.

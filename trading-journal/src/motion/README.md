@@ -379,6 +379,11 @@ Every live number is a MotionValue leaf, so the panel commits only on structural
 - A NEW valid entry (never on load): one `<BorderBeam fire>` lap, a halo on the score ring, the rung dots that lit up pop
   (`spring.pop`), `.fx-ping` on the running bar, and a `TactileHighlight` "Neuer … Einstieg" marker held for `SIGNAL_HOLD_MS`.
   Reduced motion: the final state at once.
+- Candle-close states (decisions 6 + 9): countdowns (`⚠ vorläufig · schließt in mm:ss`) are text on the shared second clock
+  (`useNowMv` → `useTransform` → `motion.span`), never React state per second. Provisional looks use the side colours at about
+  50 % saturation (`#65b488` / `#d27a7b`, `ink.winSoft` / `ink.lossSoft` in the chart), dashed borders and dashed / outlined dots;
+  "stark bestätigt" adds a double ring. Lit tiles draw their tone border on a `-inset-px` layer, so the tile needs
+  `overflow-clip` with `overflow-clip-margin: 1px` (plain `overflow-hidden` clipped it away).
 
 ### `HeroBackdrop` text mask
 Elements marked `data-hero-mask="text"` (their text lines) or `"box"` (their border box) keep the dot field away: the canvas skips the

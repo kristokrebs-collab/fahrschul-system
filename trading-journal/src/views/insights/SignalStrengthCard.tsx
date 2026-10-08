@@ -294,7 +294,7 @@ export function SignalStrengthCard() {
   return (
     <InsightCard
       title={TITLES.signal}
-      explain={() => explainSignal(res, effects)}
+      explain={() => explainSignal(res, effects, [...(whale ? [whale] : []), ...parts])}
       note={res.withCheck ? `${res.withCheck} Trades mit Check` : undefined}
       data-testid="insights-signal"
     >
