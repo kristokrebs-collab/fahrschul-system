@@ -29,6 +29,7 @@ import { useHoverRect } from "@/primitives/hoverRect";
 import { fmt, tradeTime } from "./format";
 import { buildReplaySeries, replayAt, replayKey, timeAtX, xAtTime } from "./replay";
 import { TOOLTIP_CLASS, placeTooltip } from "./tooltip";
+import { axisTick } from "./AxisTick";
 
 export interface EquityPoint {
   /** 0 = start, n = n-th closed trade */
@@ -63,6 +64,9 @@ export const TICK_STYLE = {
   fontSize: 11,
   fontFamily: "IBM Plex Mono, monospace",
 } as const;
+
+/** Axis labels as plain `<text>` (no Recharts `Text` measuring, no per-mount style read – `AxisTick.tsx`). */
+export const TICK = axisTick(TICK_STYLE);
 
 export const equityAccent = (balance: number, start: number): string => (balance >= start ? EQUITY_COLORS.up : EQUITY_COLORS.down);
 export const equityTickLabel = (i: number): string => (i === 0 ? "Start" : "#" + i);
@@ -142,6 +146,7 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
   const id = useId().replace(/:/g, "");
   const reduced = useReducedFx();
   const accent = equityAccent(balance, start);
+  const freezeKey = useMemo(() => [points, start, accent] as const, [points, start, accent]);
   const fillId = `eqFill-${id}`;
   const strokeId = `eqStroke-${id}`;
   const box = useRef<HTMLDivElement>(null);
@@ -572,7 +577,9 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
         onPointerLeave={onPointerLeave}
         onPointerCancel={onPointerLeave}
       >
-        <ChartContainer config={config} className="aspect-auto size-full" role="img" aria-label="Kontostand-Verlauf">
+        {/* frozen (static SVG) on the hidden keep-alive overview until points / start / colour or size change; hover and
+            replay run on the HTML overlays and the kept geometry, so they never need the live chart */}
+        <ChartContainer config={config} className="aspect-auto size-full" role="img" aria-label="Kontostand-Verlauf" freezeKey={freezeKey}>
           <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }} accessibilityLayer={false}>
             <defs>
               <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
@@ -585,8 +592,9 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
               </linearGradient>
             </defs>
             <CartesianGrid stroke={EQUITY_COLORS.grid} strokeDasharray="0" vertical={false} />
-            <XAxis dataKey="i" tickLine={false} axisLine={false} minTickGap={28} tick={TICK_STYLE} tickFormatter={equityTickLabel} />
-            <YAxis width={62} tickLine={false} axisLine={false} domain={["auto", "auto"]} tick={TICK_STYLE} tickFormatter={fmt.mio} />
+            <XAxis dataKey="i" tickLine={false} axisLine={false} minTickGap={28} tick={TICK} tickFormatter={equityTickLabel} />
+            {/* five ticks on a ≥ 200 px plot never collide: interval 0 shows them all without measuring the labels */}
+            <YAxis width={62} tickLine={false} axisLine={false} domain={["auto", "auto"]} interval={0} tick={TICK} tickFormatter={fmt.mio} />
             <ReferenceLine y={start} stroke={EQUITY_COLORS.ref} strokeDasharray="3 4" />
             <Area
               className="eq-area"

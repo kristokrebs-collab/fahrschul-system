@@ -38,34 +38,152 @@ function useChart() {
   return context
 }
 
+/** Static stand-in of a chart on a hidden keep-alive page: its markup, the inputs and the size it was drawn with. */
+interface FrozenChart {
+  html: string
+  key: readonly unknown[]
+  width: number
+  height: number
+}
+
+const sameKey = (a: readonly unknown[], b: readonly unknown[]): boolean =>
+  a.length === b.length && a.every((v, i) => Object.is(v, b[i]))
+
+/**
+ * The box size from a ResizeObserver report – never a layout read. A 0 × 0 report (the box sits on a hidden keep-alive
+ * page, `display: none`, or in content-visibility-skipped content) keeps the last size, so hiding and showing a page
+ * never resizes a chart. Without ResizeObserver (jsdom) the fallback size is used.
+ */
+function useBoxSize(
+  ref: React.RefObject<HTMLDivElement | null>,
+  fallback: { width: number; height: number }
+): { width: number; height: number } | null {
+  const [size, setSize] = React.useState<{ width: number; height: number } | null>(() =>
+    typeof ResizeObserver === "undefined" ? fallback : null
+  )
+  const known = React.useRef(size !== null)
+  React.useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === "undefined") return
+    if (!known.current) {
+      // first mount only (after paint, like ResponsiveContainer did): a box that is laid out draws without waiting for
+      // the first observer report; 0 × 0 (skipped or hidden) waits for it
+      const r = el.getBoundingClientRect()
+      if (r.width > 0 && r.height > 0) {
+        known.current = true
+        setSize({ width: Math.round(r.width), height: Math.round(r.height) })
+      }
+    }
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[entries.length - 1]?.contentRect
+      if (!r || r.width <= 0 || r.height <= 0) return
+      const width = Math.round(r.width)
+      const height = Math.round(r.height)
+      known.current = true
+      setSize((s) => (s && s.width === width && s.height === height ? s : { width, height }))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return size
+}
+
+/**
+ * Recharts measures tick labels (to drop colliding ones) in a hidden span with the font size its axis callback ref read
+ * through `getComputedStyle` from a rendered label. The plain tick labels (`chart/AxisTick.tsx`) skip that read (a forced
+ * style recalc of the page on every mount and keep-alive re-show), so the span gets the size of our axis labels here.
+ */
+const MEASURE_STYLE = "#recharts_measurement_span{font-size:11px;letter-spacing:normal}"
+
+/** Inner box of the drawing (the layout role of Recharts' ResponsiveContainer: its content never sizes the card). */
+const SIZE_BOX_STYLE: React.CSSProperties = { width: "100%", height: "100%", minWidth: 0 }
+const ANCHOR_STYLE: React.CSSProperties = { width: 0, height: 0, overflow: "visible" }
+
+/**
+ * Recharts chart sized from the container's ResizeObserver (the chart element gets `width` / `height`): no
+ * ResponsiveContainer, so a mount or a keep-alive re-show never reads layout, never draws a 320 × 200 first frame
+ * and never sees the 0 × 0 of a hidden page.
+ *
+ * `freezeKey` (the inputs that change the drawing): when a keep-alive `<Activity>` hides the page, the chart's last
+ * markup replaces the live chart (static SVG, same pixels); on the re-show it stays static while the key and the size
+ * are unchanged – Recharts' re-show work (axis re-registration in its store, a synchronous re-render, its layout
+ * reads) never runs on a return to the page. A new key or size draws live again; `thawOnInteract` also on pointer /
+ * focus (charts with Recharts' own tooltip or keyboard layer).
+ */
 function ChartContainer({
   id,
   className,
   children,
   config,
   initialDimension = INITIAL_DIMENSION,
+  freezeKey,
+  thawOnInteract = false,
+  onPointerEnter,
+  onPointerDown,
+  onFocus,
   ...props
 }: React.ComponentProps<"div"> & {
   config: ChartConfig
-  children: React.ComponentProps<
-    typeof RechartsPrimitive.ResponsiveContainer
-  >["children"]
+  children: React.ReactElement<{ width?: number; height?: number }>
   initialDimension?: {
     width: number
     height: number
   }
+  freezeKey?: readonly unknown[]
+  thawOnInteract?: boolean
 }) {
   const uniqueId = React.useId()
   const chartId = `chart-${id ?? uniqueId.replace(/:/g, "")}`
   const boxRef = React.useRef<HTMLDivElement>(null)
-  // A keep-alive page (React `Activity`, the overview) reconnects Recharts' ResponsiveContainer effect when it is shown
-  // again. Inside a `content-visibility: auto` cell that is still off screen, Chrome answers the FIRST layout read of
-  // the re-shown subtree with 0×0 (the next read is right): the container took 0×0, logged "The width(0) and height(0)
-  // of chart should be greater than 0" and rendered empty until its ResizeObserver fired. This layout effect runs
-  // before Recharts' passive one (also on every Activity reveal) and takes that first read.
+  const size = useBoxSize(boxRef, initialDimension)
+  const [frozen, setFrozen] = React.useState<FrozenChart | null>(null)
+  const isFrozen =
+    frozen !== null &&
+    freezeKey !== undefined &&
+    sameKey(frozen.key, freezeKey) &&
+    (size === null || (size.width === frozen.width && size.height === frozen.height))
+
+  const keyRef = React.useRef(freezeKey)
+  const sizeRef = React.useRef(size)
   React.useLayoutEffect(() => {
-    boxRef.current?.querySelector(".recharts-responsive-container")?.getBoundingClientRect()
+    keyRef.current = freezeKey
+    sizeRef.current = size
+  })
+
+  // a keep-alive hide destroys this effect with the box still in the document: freeze. The markup is taken in the
+  // layout cleanup – a parent's runs before its children's, so before Recharts unregisters its axes (its store would
+  // re-render the hidden chart without them); the switch to it waits a task (StrictMode's probe re-runs the effect
+  // synchronously, a real unmount detaches the box)
+  const shown = React.useRef(false)
+  React.useLayoutEffect(() => {
+    const box = boxRef.current
+    shown.current = true
+    return () => {
+      shown.current = false
+      const key = keyRef.current
+      const at = sizeRef.current
+      const drawing = box?.querySelector("[data-slot=chart-size]")
+      if (!box || !key || !at || !drawing?.querySelector(".recharts-surface")) return
+      const html = drawing.innerHTML
+      setTimeout(() => {
+        if (shown.current || !box.isConnected) return
+        setFrozen((f) =>
+          f && f.html === html && sameKey(f.key, key) && f.width === at.width && f.height === at.height
+            ? f
+            : { html, key, width: at.width, height: at.height }
+        )
+      }, 0)
+    }
   }, [])
+
+  const refocus = React.useRef(false)
+  const thaw = isFrozen && thawOnInteract
+  const thawNow = () => setFrozen(null)
+  React.useLayoutEffect(() => {
+    if (isFrozen || !refocus.current) return
+    refocus.current = false
+    boxRef.current?.querySelector<SVGElement>(".recharts-surface[tabindex]")?.focus({ preventScroll: true })
+  }, [isFrozen])
 
   return (
     <ChartContext.Provider value={{ config }}>
@@ -73,18 +191,37 @@ function ChartContainer({
         ref={boxRef}
         data-slot="chart"
         data-chart={chartId}
+        data-frozen={isFrozen ? "" : undefined}
         className={cn(
           "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
           className
         )}
+        onPointerEnter={(e) => {
+          if (thaw) thawNow()
+          onPointerEnter?.(e)
+        }}
+        onPointerDown={(e) => {
+          if (thaw) thawNow()
+          onPointerDown?.(e)
+        }}
+        onFocus={(e) => {
+          if (thaw) {
+            refocus.current = true
+            thawNow()
+          }
+          onFocus?.(e)
+        }}
         {...props}
       >
         <ChartStyle id={chartId} config={config} />
-        <RechartsPrimitive.ResponsiveContainer
-          initialDimension={initialDimension}
-        >
-          {children}
-        </RechartsPrimitive.ResponsiveContainer>
+        <style>{MEASURE_STYLE}</style>
+        {isFrozen ? (
+          <div key="frozen" data-slot="chart-size" style={SIZE_BOX_STYLE} dangerouslySetInnerHTML={{ __html: frozen.html }} />
+        ) : (
+          <div key="live" data-slot="chart-size" style={SIZE_BOX_STYLE}>
+            <div style={ANCHOR_STYLE}>{size ? React.cloneElement(children, { width: size.width, height: size.height }) : null}</div>
+          </div>
+        )}
       </div>
     </ChartContext.Provider>
   )

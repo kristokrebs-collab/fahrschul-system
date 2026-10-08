@@ -155,6 +155,16 @@ Both wrap shadcn `ChartContainer` (`@/ui/chart`), `isAnimationActive={false}` (R
 motion below is ours), `React.memo`. Tick style `{ fill:"#5f5f5f", fontSize:11, fontFamily:"IBM Plex Mono, monospace" }`,
 Y formatter `fmt.mio`, tooltip box `TOOLTIP_CLASS`.
 
+Keep-alive cost (the Übersicht is hidden / shown by React `Activity`): `ChartContainer` sizes the chart from its own
+ResizeObserver (no `ResponsiveContainer`: no layout read on mount / re-show, no 320 × 200 first frame, a 0 × 0 report of
+a hidden page keeps the size) and, with `freezeKey`, stands the chart's last markup in as static SVG while the page is
+hidden and after it is shown again until the key or the size change (Recharts' re-show work – axis re-registration in
+its store, a synchronous re-render, layout reads – never runs on a return). EquityChart's hover / replay run on HTML
+overlays and need no live chart; MonthlyBars (`thawOnInteract`) draws live again on the first pointer / focus for
+Recharts' tooltip and keyboard layer and is never frozen while its bars grow. Axis labels are plain `<text>`
+(`AxisTick.tsx`, `TICK`): Recharts' default label class makes its axis ref read `getComputedStyle` on every mount;
+the measuring span gets the 11 px from `ChartContainer`. Y axes use `interval={0}` (five ticks never collide).
+
 ```tsx
 <EquityChart points={stats.equity} start={stats.start} balance={stats.balance} currency={settings.currency} />
 // EquityPoint = { i: number; v: number; t: Trade | null }  (i = 0 → "Start", n → "#n")

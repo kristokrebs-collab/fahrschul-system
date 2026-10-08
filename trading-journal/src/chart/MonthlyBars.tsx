@@ -9,7 +9,7 @@
  * no React render). Reduced motion: static bars, instant dim.
  */
 import { motion } from "motion/react";
-import { memo, useEffect, useRef, useState, type ReactElement } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartContainer, type ChartConfig } from "@/ui/chart";
 import { cn } from "@/lib/cn";
@@ -18,7 +18,7 @@ import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { fmt } from "./format";
 import { TOOLTIP_CLASS } from "./tooltip";
-import { EQUITY_COLORS, TICK_STYLE } from "./EquityChart";
+import { EQUITY_COLORS, TICK } from "./EquityChart";
 
 export interface MonthBucket {
   /** `YYYY-MM` */
@@ -70,6 +70,9 @@ export function roundedBarPath(g: RoundedBarGeometry): string | null {
   return `M${x},${top} L${x + w},${top} L${x + w},${bottom - r} Q${x + w},${bottom} ${x + w - r},${bottom} L${x + r},${bottom} Q${x},${bottom} ${x},${bottom - r} Z`;
 }
 
+/** Time a grown bar's `spring.cards` needs to settle after its delay (s, generous). */
+const GROW_SETTLE_S = 1.2;
+
 /** Grow delay of bar `index` (capped like every stagger in the app). */
 export const barDelay = (index: number): number => Math.min(Math.max(0, index), stagger.max) * stagger.cards;
 
@@ -94,11 +97,13 @@ interface GrowProps {
   grow: boolean;
   /** the chart has been in view */
   revealed: boolean;
+  /** the bars grew already: a bar mounted now (the live chart drawn again after its static stand-in) starts grown */
+  grown: boolean;
 }
 
 const BAR_CLASS = "transition-opacity duration-200 [[data-hovering]_&:not([data-hot])]:opacity-40";
 
-function RoundedBar({ x = 0, y = 0, width = 0, height = 0, fill, payload, index = 0, grow, revealed }: ShapeProps & GrowProps): ReactElement | null {
+function RoundedBar({ x = 0, y = 0, width = 0, height = 0, fill, payload, index = 0, grow, revealed, grown }: ShapeProps & GrowProps): ReactElement | null {
   const positive = ((payload as MonthBucket | undefined)?.net ?? 0) >= 0;
   const d = roundedBarPath({ x, y, width, height, positive });
   if (!d) return null;
@@ -111,7 +116,7 @@ function RoundedBar({ x = 0, y = 0, width = 0, height = 0, fill, payload, index 
       className={BAR_CLASS}
       // grow out of the zero line: the bottom edge of a gain, the top edge of a loss
       style={{ originY: positive ? 1 : 0 }}
-      initial={{ scaleY: 0 }}
+      initial={grown ? false : { scaleY: 0 }}
       animate={{ scaleY: revealed ? 1 : 0 }}
       transition={{ ...spring.cards, delay: barDelay(index) }}
     />
@@ -155,6 +160,17 @@ export const MonthlyBars = memo(function MonthlyBars({ months, currency, height 
   const [grow] = useState(() => canObserveInView());
   const [revealed, setRevealed] = useState(false);
   const animateIn = grow && !reduced;
+  // the entrance is over (or never ran): a bar mounted later (the live chart drawn again after its static stand-in)
+  // starts grown
+  const [grown, setGrown] = useState(!animateIn);
+  useEffect(() => {
+    if (grown || !revealed) return;
+    const t = setTimeout(() => setGrown(true), (barDelay(months.length) + GROW_SETTLE_S) * 1000);
+    return () => clearTimeout(t);
+  }, [grown, revealed, months.length]);
+  // static SVG on a hidden keep-alive page: before the first view (bars at 0 – the reveal changes the key, so the live
+  // chart grows them) and once grown, never while the bars grow (a freeze would keep them half grown)
+  const freezeKey = useMemo(() => (grown ? [months] : revealed ? undefined : [months, "ungrown"]), [grown, revealed, months]);
 
   useEffect(() => {
     const el = wrap.current;
@@ -181,7 +197,9 @@ export const MonthlyBars = memo(function MonthlyBars({ months, currency, height 
 
   return (
     <div ref={wrap} className={cn("w-full", className)}>
-      <ChartContainer config={config} className="aspect-auto w-full" style={{ height }} role="img" aria-label="P&L pro Monat">
+      {/* frozen (static SVG) on the hidden keep-alive overview; Recharts' tooltip and keyboard layer need the live chart,
+          so a pointer or focus draws it again */}
+      <ChartContainer config={config} className="aspect-auto w-full" style={{ height }} role="img" aria-label="P&L pro Monat" freezeKey={freezeKey} thawOnInteract>
         <BarChart
           data={months}
           margin={{ top: 8, right: 4, bottom: 0, left: 0 }}
@@ -189,14 +207,14 @@ export const MonthlyBars = memo(function MonthlyBars({ months, currency, height 
           onMouseLeave={() => setHot(-1)}
         >
           <CartesianGrid stroke={EQUITY_COLORS.grid} vertical={false} />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK_STYLE} />
-          <YAxis width={56} tickLine={false} axisLine={false} tick={TICK_STYLE} tickFormatter={fmt.mio} />
+          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK} />
+          <YAxis width={56} tickLine={false} axisLine={false} interval={0} tick={TICK} tickFormatter={fmt.mio} />
           <ReferenceLine y={0} stroke={EQUITY_COLORS.ref} />
           <Tooltip
             cursor={{ fill: "rgb(255 255 255 / 0.04)" }}
             content={(p) => <MonthTip active={p.active} payload={p.payload} currency={currency} />}
           />
-          <Bar dataKey="net" maxBarSize={36} isAnimationActive={false} shape={(p: ShapeProps) => <RoundedBar {...p} grow={animateIn} revealed={revealed} />}>
+          <Bar dataKey="net" maxBarSize={36} isAnimationActive={false} shape={(p: ShapeProps) => <RoundedBar {...p} grow={animateIn} revealed={revealed} grown={grown} />}>
             {months.map((m) => (
               <Cell key={m.key} fill={monthFill(m.net)} />
             ))}
