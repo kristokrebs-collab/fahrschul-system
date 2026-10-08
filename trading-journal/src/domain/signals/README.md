@@ -277,8 +277,8 @@ eqThreshold, nearAtr, minR, weight }`.
 
 ### Falling-Knife-Filter (`knife.ts`, decision 11)
 
-`knifeFilter(sig, cfg, side = "long") → { side, items: KnifeItem[3], n, total: 3, all, data, label: "2 von 3 erfüllt" }`,
-`KnifeItem = { id, label, met: boolean | null, detail, tfs }`; also on `Signals.knife.long / .short`. Same evaluation as the
+`knifeFilter(sig, cfg, side = "long") → { side, items: KnifeItem[3], n, total: 3, all, data, label: "2 von 3 erfüllt", ltf? }`,
+`KnifeItem = { id, label, met: boolean | null, detail, tfs, info? }`; also on `Signals.knife.long / .short`. Same evaluation as the
 Einstiegs-Check (single source of truth). The former "Preis in Support-/Liquiditätszone" item is removed.
 
 | id | met (long; short mirrored) |
@@ -289,13 +289,24 @@ Einstiegs-Check (single source of truth). The former "Preis in Support-/Liquidit
 
 Copy: `KNIFE_TITLE`, `KNIFE_INFO` (filter = safety check for macro longs, Einstiegs-Check = trigger, same live data).
 
+**Lage layout (longs, decision 23)** — while the Lage-Ampel is on (`Signals.lage.cfg.on`, also without daily data): the
+counted items are `lage` "Lage: Tagestrend (1D-EMA 21)" (met = not `abwaerts`; detail "17 Tagesschlüsse unter 1D-EMA 21
+(76.213, −8,2 %)", the wobble line on green; `null` = keine Daten) and `signs` "4H-Umkehrzeichen n/4" (met = ≥ 1 sign while
+the daily trend is down; detail the lit signs or "keines an · zählen nur im Abwärtstrend"), `whale` becomes info
+("Top-Trader-Delta (Info)", `info: true`, not counted), `total: 2`; the former `structure` / `divergence` move to
+`KnifeFilter.ltf` under `KNIFE_LTF_TITLE` "Umkehr-Zeichen 30m/1H – im Abwärtstrend nicht verlässlich" (info, the
+knife-lab showed they fire in every falling market). Copy `KNIFE_INFO_LAGE`, `KNIFE_WHALE_INFO_LABEL`. Shorts and the Ampel
+switched off keep the three points. Stored snapshots with the old ids parse unchanged.
+
 ### Snapshot (`trade.signal`) additions
 
 `state`, `confTiers`, `provStrength`, `partPoints`, `parts: SignalSnapshotPart[]` (`{ id, grade, points, weight, ok, data,
 state, items: [{ id, met, raw }], met?, period?, delta?, deltaChg?, deltaWindow?, tf?, hits?, lean?, target?, r?, free? }`;
 traders: `delta` / `deltaChg` rounded to 0.01 pp, `null` = keine Daten, the `retail` item's `raw` = the delta — before
 2026-10-08 it was the retail change over `period`; parsing keeps older parts as they are, a malformed number → `null`, a
-malformed window is dropped), `knife: { n, items: [{ id, met }] }`,
+malformed window is dropped), `knife: { n, items: [{ id, met }], total? }` (`total` only for the Lage layout: 2),
+`lage: { state, signs (met ids U1…U4), ema21_1d, dist, counts, on, mode }` (the Lage at check time, whether the entry counted
+under it and the setting; see "Lage-Ampel gate"),
 per `tfs` entry `state`, `closes`. A provisional live snapshot stores `valid: false`, `strength: 0`, `state: "provisional"`,
 `provStrength`. `parseSignalSnapshot` keeps old snapshots unchanged (no `state` → `snapshotState(s)` = `null`), drops invalid new
 fields, keeps unknown keys. `snapshotPart(p)` = the stored form of a part.
@@ -321,6 +332,25 @@ fields, keeps unknown keys. `snapshotPart(p)` = the stored form of a part.
   { time (ms), price, osc }, confirmedAt, barsAgo, state, active }[]` (oldest first; `[]` when `div.on` is off);
   `getStructure(interval, { bars? })` → `ChartStructure { swings, breaks (pivotTime), obs (breakTime), eqs, supports,
   resistances, support, resistance (ChartLevel: Level with `time` ms, `null` for the range), trend, itrend, atr, close }`.
+
+### Lage-Ampel gate (`lageGate.ts`, decision 23)
+
+The daily-trend protection of the knife-lab (`src/domain/lage`, its README / REPORT) decides whether a LONG entry counts.
+`SignalInputs.lage = { lage: Lage | null, cfg: { on, mode } }` (`computeSignals` / `signalsAt` / `gradeSignals` /
+`regradeSignals` pass it on; `Signals.lage` carries it). `applyLageGate(v, input)` runs LAST in `gradeSignals`, after the
+candle-close rule and the graded parts:
+
+| Lage | `block` (Sperre, default) | `warn` (nur Warnung) |
+|---|---|---|
+| green / `none` (no data) / off / short | untouched | untouched |
+| red | entry shown, `valid: false`, `strength: 0`, label `Kaufsignal · Lage rot – zählt nicht (fällt noch)`, reason row | counts; label kept; reason row `Lage rot – nur Warnung (fällt noch)` |
+| amber | label `Kaufsignal · Lage gelb – Umkehr bildet sich (2/4)` | counts; `Lage gelb – nur Warnung (2/4)` |
+
+A provisional entry keeps its prefix (`Vorläufig: Kaufsignal · …`, `provStrength` kept). `Verdict.lage = { state, counts,
+blocked, label, signsMet, strength (what it would have), from (the label before the gate), held (an entry was held back) }`
+— also on a long without an entry under red / amber, so the card can name the Lage. Score, tiers, parts, checks stay
+(the ladder keeps computing). `verdictLageText(v)`, `lageBlockedLabel`, `LAGE_BLOCK_PREFIX`. Notifications follow `valid`
+(a held-back entry never notifies); `nur Warnung` appends the Lage label to the notification text.
 
 ## v3: tv-check 2026-10-08 (intrabar memory, turn price, 1m frames, divergences like a trader)
 

@@ -96,6 +96,7 @@ effect built on them with `useReducedFx()`. Countdowns and ages combine them wit
 | `kline_1m/1h/4h` | WS `kline_*` (+ REST bootstrap 499) | 250 ms | 2·interval + 60 s | upsert by open time; `closed` = final |
 | `kline_15m` | WS `kline_15m` (+ REST bootstrap 1500 = 500 × 45m, weight 10 once) | 250 ms | 31 min | feeds the signal check (30m = 2 × 15m, 45m = 3 × 15m); ring 3000. Also the chart's `30m` interval: `ChartCard` resamples history and live tail with `@/chart/resample` (`resampleCandles` / `resampleTail`), so the chart's 30m bars are the check's 30m rung. Settings → Live-Daten lists it as `Kerzen 15m` |
 | `kline_1w` | WS `kline_1w` (+ REST 200) | weekly | 7 d + 1 h | `closeW` via `weeklyClose()` |
+| `kline_1d` | REST `klines?interval=1d` only (not in the stream, not in `KLINE_FEEDS`) | hourly at hh:00:20 on the Binance clock (`DAILY_POLL_MS`, `DAILY_LAG_MS`); after 00:00 retried every 60 s for 30 min while the newest bar is still yesterday's | 25 h | the Lage-Ampel's daily closes + the signal check's `1D` rung (`DAILY_FEED`). 1000 days once on a fresh start; a cached ring (≥ 900 days, recent) asks only for the missing days (gap fill, weight 1); no "no new point" retries in between; ring 1100. Settings → Live-Daten `Kerzen 1D` |
 | `markPrice` | WS `markPrice@1s` (bootstrap `premiumIndex`) | 1 s | 5 s | heartbeat; funding rate + next funding |
 | `aggTrade` | WS `aggTrade`; while the socket is not delivering REST `ticker/24hr` every 5 s (`PRICE_REST_FALLBACK_MS`, weight 1) | 100 ms | 5 s | **the** last price (never mark); see "Last price when the stream drops" |
 | `bookTop` | WS `bookTicker` (opt-in) | realtime | 5 s | |
@@ -257,7 +258,7 @@ Kline gap fill: a non-bootstrap kline poll (WS reconnect, REST fallback) request
 
 `provider.fetchKlines(interval, { endTime?, startTime?, limit?, maxWaitMs? })` — one kline page (`FetchInterval` = the live
 intervals + `1d`) from the source the kline feeds currently use, charged to the same budget (waits ≤ 15 s for tokens, then
-`RestError("rate_limited")`), never published into the live cache. Used by the retro signal check and the lazily polled `1d` rung.
+`RestError("rate_limited")`), never published into the live cache. Used by the retro signal check (incl. the Lage at T).
 
 Opened from disk (`file:`/`content:`, `isFileProtocol()` from `@/edition`) the proxy source is dropped from the chain (no Netlify
 function; no `file:///api/…` CORS noise).
@@ -274,7 +275,7 @@ falling-knife filter and the chart APIs `getMcbSeries` / `getDivergences` / `get
 | 30m, 45m | `kline_15m` × 2 / × 3 | exact, UTC-session aligned like TradingView |
 | 1h, 2h, 3h | `kline_1h` × 1 / 2 / 3 | |
 | 4h | `kline_4h` | |
-| 1D | REST `1d` (polled every 5 min, only when a ladder uses it) | |
+| 1D | the provider's `kline_1d` feed (shared with the Lage-Ampel; the engine's own 5-min polling is gone) | |
 
 Every rung evaluates its last 500 bars (the other journal's `count: 500`); the running candle is completed with the live price
 (`priceMv` / `tradeTimeMv`, only while younger than 5 min). `startMarket` starts it (`signals/boot.ts` follows
@@ -317,6 +318,15 @@ getSignalCandles("45m");                                         // Candle[] of 
 as ONE `endTime = T` page (1500 × 15m, 499 × 1h, 499 × 4h ≈ weight 20) unless the live ring already holds enough contiguous bars
 before T; only bars closed at T count. Too little history → `null` (never a fake "strength 0"). Memoised per symbol, config and
 minute; network errors resolve `null` (status `error`, retried on the next call). Debounce date inputs in the form (≈ 300 ms).
+
+**Lage-Ampel** (`src/market/lage.ts`, decision 23): `useLage()` / `getLage()` / `subscribeLage()` / `retainLage()` →
+`{ lage: Lage | null, status: { state: idle|loading|ok|stale|error, fetchedAt, closedAt, nextAt, source, detail } }`, computed
+by `@/domain/lage` from the closed candles of `kline_1d` (last 1000), `kline_4h` and `kline_1h` plus the live price
+(`priceMv`, ≤ 1/s); two stages (closed bars ≈ 0.5 ms on a new close, live values ≈ 0.04 ms), published only when a shown
+value changes (`lageKey`). Status from the daily feed's health (failures, CORS from a file, "Tagesschluss noch nicht geladen"
+after 00:05 UTC). The engine holds it while running and gates the long verdict with it (`settings.signals.lage = { on, mode }`,
+part of the input key: a switch re-grades at once); retro checks compute the Lage at T from the cached daily feed or one
+`1d` page (`endTime = T`). The overview's toast (`src/app/ScenarioWatcher.tsx`) follows its state changes.
 
 **Notification:** a NEW valid entry (edge after the first evaluation, held ≥ 60 s against repaint) → toast (`pushToast`, kind
 `signal`, 5.2 s: label, `Score n`, strength line) once per base bar and side, persisted in `storageKey("signal-last")`
