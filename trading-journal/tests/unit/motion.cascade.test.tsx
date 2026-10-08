@@ -61,7 +61,7 @@ async function leaveAndSettle(): Promise<void> {
   await act(() => new Promise((r) => setTimeout(r, 120)));
 }
 
-describe("MotionRoot layout group", () => {
+describe("MotionRoot layout groups", () => {
   it("a finished exit does NOT re-render group consumers outside the presence (no app-wide cascade)", async () => {
     const count = counter("root-consumer");
     render(
@@ -77,10 +77,11 @@ describe("MotionRoot layout group", () => {
     const before = count.n;
     await leaveAndSettle();
     expect(count.n).toBe(before);
-    // the root group exposes the shared projection group, no id (layoutIds stay unprefixed) and no forceRender
+    // no layout group at the root: no id (layoutIds stay unprefixed), no shared projection group (a layout change never
+    // measures unrelated nodes) and no forceRender
     const ctx = count.ctx[0] as { id?: string; group?: unknown; forceRender?: unknown };
     expect(ctx.id).toBeUndefined();
-    expect(ctx.group).toBeDefined();
+    expect(ctx.group).toBeUndefined();
     expect(ctx.forceRender).toBeUndefined();
   });
 
@@ -105,10 +106,11 @@ describe("MotionRoot layout group", () => {
     await leaveAndSettle();
     expect(inside.n).toBeGreaterThan(insideBefore);
     expect(outside.n).toBe(outsideBefore);
-    // the scoped group shares the root's projection group and keeps layoutIds unprefixed
+    // the scoped group owns its projection group (the root has none) and keeps layoutIds unprefixed
     const root = outside.ctx[0] as { id?: string; group?: unknown };
     const scoped = inside.ctx[0] as { id?: string; group?: unknown; forceRender?: unknown };
-    expect(scoped.group).toBe(root.group);
+    expect(root.group).toBeUndefined();
+    expect(scoped.group).toBeDefined();
     expect(scoped.id).toBeUndefined();
     expect(typeof scoped.forceRender).toBe("function");
   });
@@ -130,5 +132,48 @@ describe("MotionRoot layout group", () => {
     const before = inside.n;
     await leaveAndSettle();
     expect(inside.n).toBe(before);
+  });
+
+  it("a layout change measures only the nodes that changed – siblings join in only inside a LayoutCascade", async () => {
+    const measured: string[] = [];
+    /** A memoised `layout` node that never re-renders on its own: only a group can make it measure. */
+    const Still = memo(function Still({ id }: { id: string }) {
+      return <motion.div layout data-testid={id} onLayoutMeasure={() => measured.push(id)} />;
+    });
+    function Mover({ dep }: { dep: number }) {
+      return <motion.div layout layoutDependency={dep} onLayoutMeasure={() => measured.push(`mover-${dep}`)} />;
+    }
+    function Scene({ scoped }: { scoped: boolean }) {
+      const [dep, setDep] = useState(0);
+      const body = (
+        <>
+          <button type="button" onClick={() => setDep((d) => d + 1)}>
+            weiter
+          </button>
+          <Mover dep={dep} />
+          <Still id="still" />
+        </>
+      );
+      return <MotionRoot>{scoped ? <LayoutCascade>{body}</LayoutCascade> : body}</MotionRoot>;
+    }
+    const step = async () => {
+      measured.length = 0;
+      act(() => screen.getByRole("button", { name: "weiter" }).click());
+      await act(() => new Promise((r) => setTimeout(r, 50)));
+      return [...measured];
+    };
+
+    const { unmount } = render(<Scene scoped={false} />);
+    await step(); // the first projection update after mount
+    const root = await step();
+    expect(root).toContain("mover-2");
+    expect(root).not.toContain("still");
+    unmount();
+
+    render(<Scene scoped />);
+    await step();
+    const scoped = await step();
+    expect(scoped).toContain("mover-2");
+    expect(scoped).toContain("still");
   });
 });

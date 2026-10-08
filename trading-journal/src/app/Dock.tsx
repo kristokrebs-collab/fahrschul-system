@@ -268,8 +268,8 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
         {tab && (
           <AnimatePresence initial={false}>
             {active && (
-              // `layoutKey` includes the editor state: the markers' willUpdate when the editor opens is what snapshots the
-              // layout group, so the unmounting `new-trade` disc has a box to morph from
+              // `layoutKey` includes the editor state: the markers re-measure when the editor opens or closes (the
+              // unmounting `new-trade` disc snapshots itself; there is no layout group to do it for them)
               <motion.span
                 key="bg"
                 layoutId="dock-bg"

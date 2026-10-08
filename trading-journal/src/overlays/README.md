@@ -1,7 +1,7 @@
 # `src/overlays` – app-level dialogs
 
-Overlays are mounted **once at app level, without a portal** (Plan 6.6, Entscheidung 6), inside `MotionRoot`'s
-group-less `LayoutGroup`, so the `layoutId` morphs from list rows / FAB / cards work. They read their open state from
+Overlays are mounted **once at app level, without a portal** (Plan 6.6, Entscheidung 6), inside `MotionRoot` (no
+layout group – the `layoutId` morphs from list rows / FAB / cards run on the document's single projection root). They read their open state from
 `uiStore` and their data from `useJournal()`; the integrator only wires the two market-dependent props below.
 
 ```tsx

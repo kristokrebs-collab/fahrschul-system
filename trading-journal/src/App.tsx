@@ -89,8 +89,8 @@ function Detail() {
 /**
  * App shell (Plan 6.6): header, `main` container (page host with the keep-alive overview, local banner), the
  * visual-viewport bottom inset (`--vv-bottom`, `@/app/pwa`), the
- * in-flow footer with its staggered reveal, dock, command navigation (⌘K), toast island, the app-level overlays and the celebration layer (no portal, inside the group-less `LayoutGroup` of
- * `MotionRoot`). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
+ * in-flow footer with its staggered reveal, dock, command navigation (⌘K), toast island, the app-level overlays and the celebration layer (no portal, inside
+ * `MotionRoot`, which has no layout group). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
  * banner opens or closes; the page, toasts, detail and editor each re-render on their own.
  */
 export default function App() {

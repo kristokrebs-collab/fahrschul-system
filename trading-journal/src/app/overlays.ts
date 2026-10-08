@@ -1,6 +1,6 @@
 /**
  * App-level overlays owned by other waves (Plan 6.6: mounted once at app level, no portal, inside
- * the group-less `LayoutGroup`). One seam for the shell and for tests (`vi.mock("@/app/overlays")`).
+ * `MotionRoot`, no layout group). One seam for the shell and for tests (`vi.mock("@/app/overlays")`).
  * Contracts: `src/overlays/README.md`.
  *
  * - `TradeDetail { candles?, onEdit?, className? }` – reads `uiStore.detail`; the shell passes the 1h slice (`useDetailCandles`).
