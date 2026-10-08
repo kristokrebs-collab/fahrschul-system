@@ -98,6 +98,15 @@ fake provider), `tests/unit/market.signals.test.ts` (live pipeline, cadence, cha
 aggregation, config, snapshot parsing), `tests/unit/signals.tvCalibration.test.ts` (TradingView screenshots), fixtures in
 `tests/unit/signals.fixtures.ts`.
 
+e2e on a KNOWN market (`tests/e2e/mocks/synth.ts` price shapes `capitulation` / `divergence`, ratio scripts `whale-long`
+= top traders > 64 % long on positions + accounts with retail red, `whale-short` mirrored, `flat`; the expected result
+from this engine via `mocks/synthOracle.ts` → `computeSignals(…, { traders: traderReading(5-min series) })`). The page
+clock is pinned (`pinClock` / `utcToday` in `tests/e2e/helpers.ts`, the mock follows it) so the candle-close state is
+the same on every run: `signals.spec` (confirmed entry, ladder, Top-Trader-Kombi cells, div / S/R rows, chart layers),
+`signal-states.spec` (vorläufig → bestätigt → stark bestätigt across 30m closes, notification only when confirmed,
+provisional snapshot), `signal-parts.spec` (divergence market: divergence rows, Falling-Knife-Filter 3 of 3, chart
+lines), `bias.spec`, `editor.spec`, `settings-signals.spec`.
+
 ## Long/Short-Tendenz (ours, `bias.ts`)
 
 Additive (user request 2026-10-07: "alle Bedingungen abgleichen … waagerechter Balken, ob eher Short oder eher Long").

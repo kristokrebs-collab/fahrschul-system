@@ -234,7 +234,10 @@ function; no `file:///api/…` CORS noise).
 
 ## Signal check (`signals/`) — live "Einstiegs-Check", retro check, chart markers
 
-The pure engine is `@/domain/signals` (1:1 port of the other journal, see its README). This layer feeds it:
+The pure engine is `@/domain/signals` (1:1 port of the other journal, see its README; the v2 additions — candle-close
+states, Top-Trader-Kombi on the 5-min series (`tradersAt` for back-dated trades), divergences, structure + S/R, the
+falling-knife filter and the chart APIs `getMcbSeries` / `getDivergences` / `getStructure` — are in its section
+"v2: candle-close states, graded parts, falling-knife filter"). This layer feeds it:
 
 | Rung | Built from | |
 |---|---|---|
