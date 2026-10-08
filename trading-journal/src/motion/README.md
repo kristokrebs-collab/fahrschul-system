@@ -69,6 +69,14 @@ CSS mirrors (`src/styles/tokens.css` cannot import TS; listed at the end of `tok
 ```
 One id-less `LayoutGroup`; `layoutId`s are global and de-duplicated by naming/conditions (see contracts).
 
+`NoLayoutCascade` / `LayoutCascade` (`NoLayoutCascade.tsx`): when all exits of an `AnimatePresence` finish, Motion calls the
+root group's `forceRender`, which re-renders every motion component in the app (≈ 1,700). A presence whose exits never
+move an in-flow sibling — `popLayout` swaps (`TextRoll`, calendar month / day panel), fixed overlays (`Sheet`,
+`MorphDialogProvider`, `CommandNav`, `ToastIsland`), `absolute` layers (`Card` spot ring, the fresh-entry badge) — is
+wrapped in `<NoLayoutCascade>` (same `id` / `group`, no `forceRender`). Sheet and dialog bodies get the cascade back with
+`<LayoutCascade>`, so their own presences next to `layout` siblings still FLIP. The root itself keeps `forceRender`
+(non-`popLayout` presences next to un-gated `layout` nodes rely on it).
+
 ### `PageSwitch`
 `{ index; pageKey?; children; onTransitioning?; rememberScroll? (true); className? }` – no longer used by the shell (see `PageHost`
 in `src/app`), kept in the barrel for other uses.
@@ -91,6 +99,9 @@ Card → 620 px dialog morph (Plan 2.5 "Morph-Dialog"), portal-less, with focus 
   `contextSpringAt(spring.morph, closeTempo)` (the token itself for every other close).
 - `useMorphDialogGuard(guard, onAttempt)` (a dialog body with input, e.g. `HyblockForm`): while `guard()` is true, Escape, backdrop, × and
   swipe call `onAttempt` (show "Änderungen verwerfen?") instead of closing; the swipe is resisted with a rubber band and never commits.
+- Hand-back: once the source reports `returned(id)` after a close, the leaving panel is kept at opacity 0 with
+  `pointer-events: none` (two MotionValues on the wrapper / panel) — Motion stops projecting it when the card's reverse
+  morph ends and it would otherwise snap back to its full box while the other exits run.
 - `MorphCard { id; title; body; children; className?; as?; borderRadius? (16); dialogClassName?; motionProps? }` – the source,
   `layoutDependency={isOpen}`; hidden (`visibility`) once the morph settled, visible again on close; `whileTap` scale .985 on
   `spring.press` (off while its dialog is open); reports `returned(id)` when its reverse morph ends or it unmounts.
