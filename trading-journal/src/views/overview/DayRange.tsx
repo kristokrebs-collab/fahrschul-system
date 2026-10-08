@@ -13,11 +13,13 @@ import { memo, useEffect, useId, useMemo, useRef } from "react";
 import { cn } from "@/lib/cn";
 import { n0 } from "@/lib/format";
 import { getFeed, klineBarKey, priceMv, useFeedSelect, type Candle } from "@/market";
-import { tween } from "@/motion/tokens";
+import { ease, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useBoxSize } from "@/primitives/boxSize";
 
 export const DAY_RANGE_TITLE = "24 Stunden";
+/** The line has drawn in once in this page session (later mounts show it at once). */
+let drawnOnce = false;
 const DAY_MS = 86_400_000;
 const BAR_MS = 15 * 60_000;
 /** Vertical inset of the line inside the box (px): the stroke and the live dot never touch the edges. */
@@ -75,6 +77,17 @@ export const DayRange = memo(function DayRange({ className }: { className?: stri
   const box = useRef<HTMLDivElement>(null);
   const size = useBoxSize(box);
   const geo = useMemo(() => (size ? dayGeometry(bars, size.w, size.h) : null), [bars, size]);
+  // the draw-in plays once per page session (WAAPI on the element, not a motion `initial`: the keep-alive Übersicht
+  // re-mounts its motion nodes on every return and motion replays their initial state — the chart flickered in again)
+  const svgRef = useRef<SVGSVGElement>(null);
+  const ready0 = geo != null;
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!ready0 || !el || drawnOnce) return;
+    drawnOnce = true;
+    if (reduced || typeof el.animate !== "function") return;
+    el.animate([{ clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)" }], { duration: tween.draw.duration * 1000, easing: `cubic-bezier(${ease.out.join(",")})`, fill: "backwards" });
+  }, [ready0, reduced]);
 
   // the live dot: domain and box height as MotionValues, the price maps to a translateY (clamped to the box)
   const lo = useMotionValue(0);
@@ -119,15 +132,12 @@ export const DayRange = memo(function DayRange({ className }: { className?: stri
       </div>
       <div ref={box} className="relative min-h-0" aria-hidden="true">
         {ready && size && (
-          <motion.svg
-            key={reduced ? "static" : "drawn"}
+          <svg
+            ref={svgRef}
             width={size.w}
             height={size.h}
             viewBox={`0 0 ${size.w} ${size.h}`}
             className="absolute inset-0 overflow-visible"
-            initial={reduced ? false : { clipPath: "inset(0 100% 0 0)" }}
-            animate={{ clipPath: "inset(0 0% 0 0)" }}
-            transition={tween.draw}
           >
             <defs>
               <pattern id={`${id}-dots`} width="4" height="4" patternUnits="userSpaceOnUse">
@@ -143,7 +153,7 @@ export const DayRange = memo(function DayRange({ className }: { className?: stri
             </defs>
             <rect width={size.w} height={size.h} fill={`url(#${id}-dots)`} mask={`url(#${id}-mask)`} />
             <path d={geo.line} fill="none" stroke="#f2f2f2" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-          </motion.svg>
+          </svg>
         )}
         {ready && (
           // the live price: its own layer, moved by transform only
