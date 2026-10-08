@@ -1,5 +1,5 @@
 import { motion, useScroll, useSpring, useTransform, type Variants } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { EdgeBlur, type BlurBand } from "@/app/BottomFade";
 import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/CommandNav";
 import { FullscreenButton } from "@/app/DisplayActions";
@@ -49,12 +49,66 @@ const TILE: Variants = {
 };
 const TILE_TRANSITION = { rotateY: spring.tilt, scale: spring.press };
 
+/** `ScrollTimeline` (scroll-driven animations; Chromium / Samsung Internet ≥ 115) – not in this TypeScript DOM lib. */
+interface ScrollTimelineCtor {
+  new (options: { source: Element; axis: "block" }): AnimationTimeline;
+}
+type ScrollDrivenOptions = KeyframeAnimationOptions & { timeline: AnimationTimeline; rangeStart?: string; rangeEnd?: string };
+
+/** The scroll-driven edge needs `ScrollTimeline` and WAAPI; without them (and with blur bands) the Motion edge runs. */
+export function scrollDrivenEdge(): boolean {
+  return typeof window !== "undefined" && typeof (window as unknown as { ScrollTimeline?: unknown }).ScrollTimeline === "function" && typeof Element.prototype.animate === "function" && TOP_BANDS.length === 0;
+}
+
 /**
- * Scroll-linked chrome under the header: a hairline and a soft shade that fade in over the first `EDGE_RANGE` px, a
- * progressive blur strip for content passing under the bar, and the 1 px signal-red reading-progress bar (`scaleX`,
- * smoothed on `spring.smooth`; raw under reduced motion). All transform / opacity; decorative.
+ * Scroll-linked chrome under the header (hairline, shade, reading-progress bar) on scroll-driven animations: three WAAPI
+ * animations on one `ScrollTimeline` of the document, created once – the browser runs them on the compositor with the
+ * scroll itself, no scroll listener, no layout read, no style write per frame (the Motion edge read scrollTop /
+ * clientHeight / scrollHeight in every scroll frame, forcing the frame's style recalc there: 52 forced recalcs per
+ * 3 200 px scroll on the desktop probe). Same values as the Motion edge: shade 0 → 1 and hairline .35 → 1 over the first
+ * `EDGE_RANGE` px; the bar tracks the scroll progress exactly (no `spring.smooth` lag – it stays on the scroll, like
+ * iOS indicators) and rests at 0 at the top and on a page without a scroll range (inactive timeline → base style).
  */
-function HeaderEdge() {
+function ScrollDrivenEdge() {
+  const shade = useRef<HTMLDivElement>(null);
+  const hairline = useRef<HTMLDivElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const Timeline = (window as unknown as { ScrollTimeline: ScrollTimelineCtor }).ScrollTimeline;
+    const timeline = new Timeline({ source: document.scrollingElement ?? document.documentElement, axis: "block" });
+    const edge: ScrollDrivenOptions = { timeline, rangeStart: "0px", rangeEnd: `${EDGE_RANGE}px`, fill: "both" };
+    const all: ScrollDrivenOptions = { timeline, fill: "both" };
+    const anims = [
+      shade.current?.animate([{ opacity: 0 }, { opacity: 1 }], edge),
+      hairline.current?.animate([{ opacity: 0.35 }, { opacity: 1 }], edge),
+      bar.current?.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], all),
+    ];
+    return () => {
+      for (const a of anims) a?.cancel();
+    };
+  }, []);
+  return (
+    <div aria-hidden="true" data-scroll-driven="" className="pointer-events-none absolute inset-x-0 bottom-0">
+      <div ref={shade} className="absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-ink-950/55 to-transparent" style={{ opacity: 0 }} />
+      <div ref={hairline} className="absolute inset-x-0 -top-px h-px bg-line-2" style={{ opacity: 0.35 }} />
+      <div ref={bar} className="absolute inset-x-0 -top-px h-px origin-left bg-signal" style={{ transform: "scaleX(0)" }} />
+    </div>
+  );
+}
+
+/** Scroll-linked header chrome: scroll-driven where the browser has `ScrollTimeline`, else the Motion edge. */
+export function HeaderEdge() {
+  const [driven] = useState(scrollDrivenEdge);
+  return driven ? <ScrollDrivenEdge /> : <MotionEdge />;
+}
+
+/**
+ * Scroll-linked chrome under the header (fallback without `ScrollTimeline`): a hairline and a soft shade that fade in
+ * over the first `EDGE_RANGE` px, a progressive blur strip for content passing under the bar, and the 1 px signal-red
+ * reading-progress bar (`scaleX`, smoothed on `spring.smooth`; raw under reduced motion). All transform / opacity;
+ * decorative.
+ */
+function MotionEdge() {
   const reduced = useReducedFx();
   const { scrollY, scrollYProgress } = useScroll();
   const edge = useTransform(scrollY, [0, EDGE_RANGE], [0, 1]);

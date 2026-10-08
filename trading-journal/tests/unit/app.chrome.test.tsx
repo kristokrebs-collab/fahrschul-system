@@ -1,8 +1,8 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { bandBox, bandMask, BOTTOM_BANDS, BottomFade } from "@/app/BottomFade";
 import { Dock, DOCK, DOCK_INTRO_KEY, dockBell, dockLayout } from "@/app/Dock";
-import { scrollBar } from "@/app/Header";
+import { HeaderEdge, scrollBar, scrollDrivenEdge } from "@/app/Header";
 import { priceStep, tickerChange, tickerChangePct, tickerDecimals, tickerJump, tickerPrice } from "@/app/HeaderTicker";
 import { toastLifetime, toIslandToast } from "@/app/toasts";
 import { MotionRoot } from "@/motion/MotionRoot";
@@ -118,6 +118,56 @@ describe("header chrome", () => {
     expect(scrollBar(120, 0.25)).toBe(0.25);
     expect(scrollBar(120, Number.NaN)).toBe(0);
     expect(scrollBar(120, 1.2)).toBe(1);
+  });
+
+  describe("scroll-driven edge (ScrollTimeline)", () => {
+    const hadAnimate = Object.prototype.hasOwnProperty.call(Element.prototype, "animate");
+    const nativeAnimate = Element.prototype.animate;
+    afterEach(() => {
+      delete (window as unknown as { ScrollTimeline?: unknown }).ScrollTimeline;
+      // jsdom has no WAAPI: never leave a stub behind (Motion memoises WAAPI support on first use)
+      if (hadAnimate) Element.prototype.animate = nativeAnimate;
+      else delete (Element.prototype as { animate?: unknown }).animate;
+      vi.restoreAllMocks();
+    });
+
+    it("runs the hairline, shade and bar as scroll-driven animations: no scroll listener, nothing per frame", () => {
+      const timelines: unknown[] = [];
+      (window as unknown as { ScrollTimeline: unknown }).ScrollTimeline = class {
+        constructor(public options: unknown) {
+          timelines.push(options);
+        }
+      };
+      const cancel = vi.fn();
+      const animate = vi.fn(() => ({ cancel }) as unknown as Animation);
+      Element.prototype.animate = animate as unknown as typeof Element.prototype.animate;
+      const listen = vi.spyOn(window, "addEventListener");
+      expect(scrollDrivenEdge()).toBe(true);
+      const { container, unmount } = render(<HeaderEdge />);
+      expect(container.querySelector("[data-scroll-driven]")).not.toBeNull();
+      expect(timelines).toEqual([{ source: document.scrollingElement ?? document.documentElement, axis: "block" }]);
+      expect(animate).toHaveBeenCalledTimes(3);
+      const calls = animate.mock.calls as unknown as [Keyframe[], Record<string, unknown>][];
+      const [shade, hairline, bar] = [calls[0]!, calls[1]!, calls[2]!];
+      expect(shade[0]).toEqual([{ opacity: 0 }, { opacity: 1 }]);
+      expect(shade[1]).toMatchObject({ rangeStart: "0px", rangeEnd: "24px", fill: "both" });
+      expect(hairline[0]).toEqual([{ opacity: 0.35 }, { opacity: 1 }]);
+      expect(bar[0]).toEqual([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }]);
+      expect(bar[1]).not.toHaveProperty("rangeEnd");
+      // base styles = the values at the top / without a scroll range
+      const bars = container.querySelectorAll<HTMLElement>("[data-scroll-driven] > div");
+      expect(bars[2]?.style.transform).toBe("scaleX(0)");
+      expect(listen.mock.calls.filter(([type]) => type === "scroll")).toHaveLength(0);
+      unmount();
+      expect(cancel).toHaveBeenCalledTimes(3);
+    });
+
+    it("falls back to the Motion edge without ScrollTimeline", () => {
+      expect(scrollDrivenEdge()).toBe(false);
+      const { container } = render(<HeaderEdge />);
+      expect(container.querySelector("[data-scroll-driven]")).toBeNull();
+      expect(container.querySelector(".bg-signal")).not.toBeNull();
+    });
   });
 
   it("ticker formats price and live 24 h change de-DE, `–` while unknown", () => {

@@ -184,7 +184,11 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 
 ### Edges, banner, ticker
 - `Header`: `HeaderEdge` – hairline, shade, edge blur (`TOP_BANDS = []`, off for perf: shade + hairline only) and the red
-  reading progress (`spring.smooth`); logo flip/press (`spring.tilt` / `spring.press`). `HeaderTicker`: the live price glides on
+  reading progress. Where the browser has `ScrollTimeline` (Chromium / Samsung Internet ≥ 115, `scrollDrivenEdge()`) they are
+  three scroll-driven WAAPI animations on one document timeline (shade / hairline over the first 24 px via `rangeEnd`, the bar
+  over the whole range, exact – no spring lag), created once and run by the compositor: no scroll listener, no per-frame read
+  (Motion's `useScroll` read scrollTop / clientHeight / scrollHeight every scroll frame and forced the frame's style recalc
+  there – 52× per 3 200 px on the desktop probe). Without it: the Motion edge (`useScroll`, bar on `spring.smooth`); logo flip/press (`spring.tilt` / `spring.press`). `HeaderTicker`: the live price glides on
   `spring.price` (pure helpers `tickerPrice`, `tickerChange`, `priceStep`).
 - `BottomFade`: the plain gradient only – `BOTTOM_BANDS` is `[]` (perf fallback applied: the fixed full-width strip under the dock
   was re-blurred on every composited frame and pegged the display compositor). `EdgeBlur` returns null for `[]`; re-enable bands only
