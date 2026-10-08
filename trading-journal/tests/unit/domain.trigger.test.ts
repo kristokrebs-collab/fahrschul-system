@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scenario, evaluateTrigger, zoneWarning, livePreviewLabel, countdownLabel, checkGlyph, SCENARIO_TOAST_TITLE, SCENARIO_TOAST_VALUE } from "@/domain/trigger";
+import { scenario, evaluateTrigger, zoneWarning, livePreviewLabel, countdownLabel, checkGlyph } from "@/domain/trigger";
 import { fallingKnife, knifeCardLine, knifeVerdict, explainFallingKnife, knifePointValue, readingAge, liveReading } from "@/domain/fallingKnife";
 import { DEFAULT_MARKET } from "@/domain/defaults";
 import type { HyblockReading } from "@/domain/types";
@@ -33,8 +33,6 @@ describe("scenario (bundle Ng) – state table", () => {
     });
     expect(scenario(84000, m)).toEqual({ key: "short", tone: "loss", title: "Short-Trigger aktiv", detail: "4H-Schluss unter 84.500. Ziel 82.000–81.500, Stop über 85.300." });
     expect(scenario(85000, m)).toEqual({ key: "range", tone: "mute", title: "Range, kein Trigger", detail: "4H-Schluss zwischen 84.500 und 85.900. Abwarten." });
-    expect(SCENARIO_TOAST_TITLE(scenario(86000, m)!)).toBe("Neues Szenario: Long-Trigger aktiv");
-    expect(SCENARIO_TOAST_VALUE(86000)).toBe("4H 86.000");
   });
 });
 

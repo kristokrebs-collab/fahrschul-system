@@ -100,9 +100,6 @@ export const LONG_IN_REACH_LABEL = "Long-Trigger in Reichweite";
 export const SHORT_IN_REACH_LABEL = "Short-Trigger in Reichweite";
 export const LONG_INVALIDATION_LABEL = "Long-Invalidierung";
 export const TRIGGER_FOOTER = "Letzter geschlossener 4H-Schluss · ";
-export const SCENARIO_TOAST_TITLE = (s: Scenario): string => `Neues Szenario: ${s.title}`;
-export const SCENARIO_TOAST_VALUE = (close4h: number): string => `4H ${n0(close4h)}`;
-export const SCENARIO_TOAST_MS = 5200;
 
 export function zoneWarning(price: number | null | undefined, m: MarketLevels): string | null {
   if (price == null || !(price >= m.zoneLow && price <= m.zoneHigh)) return null;
