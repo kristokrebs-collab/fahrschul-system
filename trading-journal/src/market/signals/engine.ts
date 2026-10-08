@@ -229,15 +229,23 @@ export function signalClockOffset(): number {
   return eng.provider ? skewOf(eng.provider) : 0;
 }
 
-/** Rung bars per timeframe for `cfg` from the provider, running candles completed with `price`. */
-export function buildBars(p: MarketProvider, cfg: SignalCfg, price: { price: number; at: number } | null, bars?: number): Record<string, Bar[]> {
+/**
+ * Rung bars per timeframe for `cfg` from the provider, running candles completed with `price`. `ex` (exchange ms, the
+ * evaluation time): a rung whose last candle has CLOSED by then keeps the feed's final close when `price` predates that
+ * close — the frame's price (taken at the last 1m close) belongs to the candle's past, never in place of its close (a
+ * close between two frames would otherwise be read with a minute-old price until the next frame).
+ */
+export function buildBars(p: MarketProvider, cfg: SignalCfg, price: { price: number; at: number } | null, bars?: number, ex?: number): Record<string, Bar[]> {
   const out: Record<string, Bar[]> = {};
   for (const tf of neededTfs(cfg)) {
     const s = tfSource(tf);
     if (!s) continue;
     const src = converter(s.interval).convert(sourceCandles(p, tf));
     let rung = rungBars(tf, src, bars);
-    if (price && rung.length) rung = withLivePrice(rung, tfSeconds(tf), price.price, price.at) as Bar[];
+    const sec = tfSeconds(tf);
+    const closeAt = rung.length ? (rung[rung.length - 1]!.t + sec) * 1000 : NaN;
+    const closedBefore = ex !== undefined && closeAt <= ex && !!price && price.at < closeAt;
+    if (price && rung.length && !closedBefore) rung = withLivePrice(rung, sec, price.price, price.at) as Bar[];
     out[tf] = rung;
   }
   return out;
@@ -416,7 +424,7 @@ export function runSignalCheck(now: number = Date.now()): SignalCheckState {
   if (key !== eng.inputKey || !snap) {
     eng.inputKey = key;
     stats.computes++;
-    const bars = buildBars(p, cfg, price);
+    const bars = buildBars(p, cfg, price, undefined, now + skew);
     // candle-close states on the exchange clock (Binance candle times); the Top-Trader-Kombi from the provider's
     // 5-min series (Binance clock)
     const s = computeSignals(bars, cfg, now + skew, { traders: liveTraders(p, cfg), lage: { lage: getLage().lage, cfg: eng.lageCfg } });
@@ -617,7 +625,7 @@ function chartBars(interval: string, n?: number): { bars: Bar[]; cfg: SignalCfg;
   const f = eng.frame;
   const index = Math.floor((device + skewOf(p) - SIGNAL_FRAME_GRACE_MS) / SIGNAL_FRAME_MS);
   const price = f?.price && index - f.index <= LIVE_PRICE_MAX_AGE_MS / SIGNAL_FRAME_MS ? f.price : livePrice(device);
-  const bars = buildBars(p, { ...cfg, ladder: [interval], zoneTf: interval }, price, n)[interval] ?? [];
+  const bars = buildBars(p, { ...cfg, ladder: [interval], zoneTf: interval }, price, n, device + skewOf(p))[interval] ?? [];
   // `now` decides the forming candle: exchange clock, like the check
   return bars.length ? { bars, cfg, now: device + skewOf(p) } : null;
 }
