@@ -126,6 +126,25 @@ function invalidate(): void {
 
 let offScrollEnd: (() => void) | null = null;
 
+/** Quiet period after the last size change of a registered card before a resting pointer's arcs are re-measured. */
+export const GLOW_RESIZE_SETTLE_MS = 160;
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * A card changed size (page switch, expander, async content, a sheet's height spring): the cached rects are dropped at
+ * once – the next real pointer move measures fresh – but a resting pointer is only re-measured once the sizes have
+ * settled. Re-reading every card rect in the frame after each report forced a layout per frame while a page mounted or
+ * a box animated its height.
+ */
+function invalidateResized(): void {
+  for (const e of entries) e.rect = null;
+  if (resizeTimer !== null) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    resizeTimer = null;
+    if (pointer && !isScrolling()) schedule();
+  }, GLOW_RESIZE_SETTLE_MS);
+}
+
 function onPointerMove(e: PointerEvent): void {
   if (e.pointerType !== "mouse") return;
   pointer = { x: e.clientX, y: e.clientY };
@@ -150,7 +169,7 @@ function attach(): void {
     if (pointer && entries.size) schedule();
   });
   // any registered card changing size usually shifts its neighbours too (expanders, async content)
-  if (typeof ResizeObserver !== "undefined") resizeObserver = new ResizeObserver(invalidate);
+  if (typeof ResizeObserver !== "undefined") resizeObserver = new ResizeObserver(invalidateResized);
 }
 
 function detach(): void {
@@ -163,6 +182,8 @@ function detach(): void {
   offScrollEnd = null;
   resizeObserver?.disconnect();
   resizeObserver = null;
+  if (resizeTimer !== null) clearTimeout(resizeTimer);
+  resizeTimer = null;
   pointer = null;
 }
 
