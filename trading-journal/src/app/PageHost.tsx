@@ -77,20 +77,28 @@ function whenIdle(fn: () => void): CancelIdle {
 }
 
 /**
- * The leaving layer after its exit: out of the scroll extent and invisible (its layout is kept – no 0 × 0 resize reaches
- * its observers, nothing is laid out again when it is shown before it was parked).
+ * The leaving layer after its exit (opacity 0): out of the scroll extent and out of hit testing, its layout kept – no
+ * 0 × 0 resize reaches its observers, nothing is laid out again when it is shown before it was parked. Height and
+ * overflow only: `visibility` / `pointer-events` are inherited and restyle every element of the page (≈ 11 ms for the
+ * Übersicht on the tablet probe, `flick/restyle.mjs`), height 0 + overflow hidden cost nothing.
  */
 function collapseLayer(el: HTMLElement): void {
   el.style.height = "0px";
   el.style.overflow = "hidden";
-  el.style.visibility = "hidden";
 }
 
 function restoreLayer(el: HTMLElement): void {
   el.style.height = "";
   el.style.overflow = "";
-  el.style.visibility = "";
 }
+
+/** Pointer input that a leaving layer swallows while it fades out (capture phase, before Motion / React see it). */
+const LEAVING_SWALLOW = ["pointerdown", "pointerup", "mousedown", "mouseup", "click", "dblclick", "auxclick", "contextmenu", "touchstart", "touchend"] as const;
+const swallow = (e: Event) => {
+  e.stopPropagation();
+  // no focus / activation from a page that is leaving; touch defaults (scrolling) stay
+  if (e.cancelable && !e.type.startsWith("touch")) e.preventDefault();
+};
 
 /** Pure: slide direction of a switch in tab order (`+1` → the new page comes from the right). */
 export function pageDirection(from: Page, to: Page): 1 | -1 {
@@ -144,6 +152,17 @@ const PageLayer = memo(function PageLayer({ page, role, keepAlive, cascade, rend
     return cascade ? <LayoutCascade>{node}</LayoutCascade> : node;
   }, [renderPage, page, cascade]);
   const own = useRef<HTMLDivElement | null>(null);
+  // the leaving page ignores pointer input (Apple: no interaction during a transition) – by listeners, not by
+  // `pointer-events: none`, which restyled every element of the page in the switch frame
+  const leaving = role === "leaving";
+  useLayoutEffect(() => {
+    const el = own.current;
+    if (!leaving || !el) return;
+    for (const t of LEAVING_SWALLOW) el.addEventListener(t, swallow, { capture: true });
+    return () => {
+      for (const t of LEAVING_SWALLOW) el.removeEventListener(t, swallow, { capture: true });
+    };
+  }, [leaving]);
   const setRef = useCallback(
     (el: HTMLDivElement | null) => {
       own.current = el;
@@ -156,9 +175,12 @@ const PageLayer = memo(function PageLayer({ page, role, keepAlive, cascade, rend
       ref={setRef}
       data-page={page}
       data-page-role={role}
-      inert={role !== "current"}
-      aria-hidden={role === "leaving" ? true : undefined}
-      className={cn(role === "leaving" && "pointer-events-none absolute inset-x-0 top-0")}
+      // `inert` only while parked (display:none inside – free); on the leaving layer it restyled every element of the page
+      // that is fading out in the switch frame (≈ 2 200 on the Übersicht, 20–30 ms) – that layer is aria-hidden, swallows
+      // pointer input, releases focus at the switch and is collapsed once its exit has played
+      inert={role === "parked"}
+      aria-hidden={leaving ? true : undefined}
+      className={cn(leaving && "absolute inset-x-0 top-0")}
     >
       {keepAlive ? (
         <Activity mode={role === "parked" ? "hidden" : "visible"}>
@@ -261,6 +283,9 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     if (exitEl) {
       // the window may have scrolled to the new page's position: hold the old page where it was on screen
       exitEl.style.top = delta ? `${delta}px` : "";
+      // what `inert` did for the leaving page: focus does not stay on an element that fades out
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && exitEl.contains(focused)) focused.blur();
       exit.push(animate(exitEl, reduced ? { opacity: [1, 0] } : { transform: [EXIT_FROM, EXIT_TO(dir)], opacity: [1, 0] }, tween.exit));
     }
     if (enterEl) {

@@ -147,8 +147,12 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 - Motion around a hide / show: the host puts `HideHold` in front of a keep-alive page (`useHoldProjectionOnHide`: no `layoutId`
   snapshots of a page that is being hidden) and `ShowSettle` behind it (`useSettleProjectionOnShow`: the re-mounted nodes are not all
   measured by the next layout update – that measured every node inside the Übersicht's `content-visibility: auto` cells, ≈ 20 ms).
-- The leaving page is pinned absolutely, `inert` and `aria-hidden`, and offset by the scroll delta from `showPage()`. When its exit
-  has played it is collapsed (height 0, overflow + visibility hidden, layout kept – no 0 × 0 resize for its observers); it is parked
+- The leaving page is pinned absolutely, `aria-hidden`, and offset by the scroll delta from `showPage()`. It swallows pointer input
+  (capture listeners – no interaction during a transition, like iOS) and focus inside it is released at the switch; it is NOT
+  `inert` and has no `pointer-events: none` – both are inherited and restyled every element of the page fading out in the switch
+  frame (≈ 2 200 on the Übersicht, 20–30 ms; `visibility` likewise, `flick/restyle.mjs`). A parked page is `inert` (free: display
+  none inside). When its exit has played it is collapsed (height 0 + overflow hidden, layout kept – no 0 × 0 resize for its
+  observers); it is parked
   (keep-alive) or unmounted only once the switch has settled and the main thread is idle (`requestIdleCallback`, ≤ `PARK_TIMEOUT_MS`
   600 ms; a 50 ms timer without it): the hide of the Übersicht (≈ 50 ms – every effect and ~600 motion components detach) and the
   unmount of a page no longer land in the middle of the new page's entrance. Switching back before that shows the page without a

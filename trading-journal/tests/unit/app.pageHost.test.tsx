@@ -101,13 +101,23 @@ describe("PageHost", () => {
     const { rerender } = render(host("overview", onT));
     // (the previous test's tree unmounts after the counters were reset)
     const base = { ...effects };
+    const button = screen.getByRole("button", { name: "Übersicht 0" });
+    act(() => button.focus());
+    expect(document.activeElement).toBe(button);
     act(() => rerender(host("trades", onT)));
     const overview = document.querySelector<HTMLElement>("[data-page='overview']");
     expect(overview?.getAttribute("data-page-role")).toBe("leaving");
+    // hidden from AT, but not inert / pointer-events none (both restyled the whole fading page); focus left it at the
+    // switch and its buttons ignore pointer input while it leaves
+    expect(overview).toHaveAttribute("aria-hidden", "true");
+    expect(overview).not.toHaveAttribute("inert");
+    expect(overview?.className).not.toContain("pointer-events-none");
+    expect(document.activeElement).not.toBe(button);
+    act(() => button.click());
+    expect(screen.getByText("Übersicht 0", { selector: "button" })).toBeInTheDocument();
     // exit played (120 ms): out of the scroll extent, still alive (no effect cleanup yet)
     await waitFor(() => expect(overview?.style.height).toBe("0px"), { timeout: 1000 });
     expect(overview?.style.overflow).toBe("hidden");
-    expect(overview?.style.visibility).toBe("hidden");
     expect(overview?.getAttribute("data-page-role")).toBe("leaving");
     expect(effects).toEqual(base);
     // back before it was parked: shown again without a re-mount, the layer is restored at once
@@ -115,7 +125,6 @@ describe("PageHost", () => {
     expect(overview?.getAttribute("data-page-role")).toBe("current");
     expect(overview?.style.height).toBe("");
     expect(overview?.style.overflow).toBe("");
-    expect(overview?.style.visibility).toBe("");
     await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
     await waitFor(() => expect(screen.queryByRole("heading", { name: "trades" })).toBeNull(), { timeout: 1500 });
     expect(effects).toEqual(base);
