@@ -46,21 +46,29 @@ class FakeSocket implements WsLike {
   }
 }
 
-function setup(hidden: () => boolean) {
+function setup(hidden: () => boolean, random: () => number = () => 0.5) {
   FakeSocket.all = [];
   const h = fakeHost();
   const silent: number[] = [];
+  const silentFailed: number[] = [];
+  const retries: { attempt: number; delay: number }[] = [];
+  const fallbacks: number[] = [];
   const client = new WsClient({
     url: () => "wss://x",
     factory: (u) => new FakeSocket(u),
     host: h.host,
-    random: () => 0.5,
+    random,
     silentMs: 10_000,
     hidden,
     onMessage: () => {},
-    onSilent: (t) => silent.push(t),
+    onSilent: (t, failed) => {
+      silent.push(t);
+      silentFailed.push(failed);
+    },
+    onRetry: (attempt, at, t) => retries.push({ attempt, delay: at - t }),
+    onFallback: (t) => fallbacks.push(t),
   });
-  return { ...h, client, silent };
+  return { ...h, client, silent, silentFailed, retries, fallbacks };
 }
 
 describe("WsClient silence while hidden (finding 6)", () => {
@@ -82,11 +90,12 @@ describe("WsClient silence while hidden (finding 6)", () => {
     expect(s.client.state).toBe("silent");
     expect(FakeSocket.all).toHaveLength(1);
 
+    expect(first.closed).toBe(true); // a silent socket is closed at once (it counts like a close)
+
     hidden = false;
-    s.client.nudge(); // visibilitychange → visible
-    expect(s.silent).toHaveLength(2);
+    s.client.nudge(); // visibilitychange → visible: the slow hidden retry is replaced by an immediate reconnect
+    expect(s.silent).toHaveLength(1); // the silence was reported once, when it happened
     expect(FakeSocket.all).toHaveLength(2);
-    expect(first.closed).toBe(true);
     expect(s.client.state).toBe("connecting");
     s.client.stop();
   });
@@ -163,6 +172,100 @@ describe("WsClient silence while hidden (finding 6)", () => {
     s.client.nudge();
     expect(s.silent).toHaveLength(1);
     expect(FakeSocket.all).toHaveLength(2);
+    s.client.stop();
+  });
+});
+
+describe("WsClient reconnect ladder (Galaxy Tab: the stream dropped and never came back)", () => {
+  it("a socket that went silent after streaming reconnects at once (a blip), then 1, 2, 4 … 30 s for good", () => {
+    const s = setup(() => false, () => 0); // no jitter: the exact ladder
+    s.client.start();
+    const first = FakeSocket.all[0]!;
+    first.onopen?.({});
+    first.onmessage?.({ data: "{}" });
+    s.advance(10_000); // silence: closed here, the next handshake starts synchronously
+    expect(first.closed).toBe(true);
+    expect(s.silent).toHaveLength(1);
+    expect(s.silentFailed).toEqual([0]); // it HAD delivered: not a failed attempt
+    expect(FakeSocket.all).toHaveLength(2);
+    expect(s.retries[0]).toEqual({ attempt: 0, delay: 0 });
+
+    // every following handshake fails (dead network): the ladder grows to 30 s and never stops
+    const delays: number[] = [];
+    for (let i = 0; i < 9; i++) {
+      FakeSocket.all.at(-1)!.onclose?.({ code: 1006 });
+      const r = s.retries.at(-1)!;
+      delays.push(r.delay);
+      const before = FakeSocket.all.length;
+      s.advance(r.delay - 1);
+      expect(FakeSocket.all).toHaveLength(before); // not one ms early
+      s.advance(1);
+      expect(FakeSocket.all).toHaveLength(before + 1);
+    }
+    expect(delays).toEqual([1000, 2000, 4000, 8000, 16_000, 30_000, 30_000, 30_000, 30_000]);
+    expect(s.fallbacks).toHaveLength(1); // the third failed attempt in a row → fallback, reported once
+    expect(s.client.state).toBe("connecting"); // … and it still keeps trying
+    s.client.stop();
+  });
+
+  it("open-but-silent sockets count as failed attempts: the third in a row → fallback (the provider polls REST)", () => {
+    const s = setup(() => false, () => 0);
+    s.client.start();
+    for (let i = 0; i < 3; i++) {
+      const sock = FakeSocket.all.at(-1)!;
+      sock.onopen?.({}); // the handshake succeeds …
+      s.advance(10_000); // … but no frame ever arrives
+      expect(sock.closed).toBe(true);
+      if (i < 2) s.advance(s.retries.at(-1)!.delay);
+    }
+    expect(s.silentFailed).toEqual([1, 2, 3]);
+    expect(s.fallbacks).toHaveLength(1);
+    expect(s.client.state).toBe("fallback");
+    expect(s.client.retryPending).toBe(true); // still retrying in the background
+    // a later socket that streams again resets the count
+    s.advance(s.retries.at(-1)!.delay);
+    const sock = FakeSocket.all.at(-1)!;
+    sock.onopen?.({});
+    sock.onmessage?.({ data: "{}" });
+    expect(s.client.state).toBe("open");
+    expect(s.client.failedAttempts).toBe(0);
+    for (let i = 0; i < 12; i++) {
+      s.advance(5_000); // stable for a minute (frames keep arriving): the ladder starts at 1 s again
+      sock.onmessage?.({ data: "{}" });
+    }
+    expect(s.client.attempts).toBe(0);
+    s.client.stop();
+  });
+
+  it("jitter stays small and never lifts a step above the 30 s cap", () => {
+    const s = setup(() => false, () => 0.999);
+    s.client.start();
+    const delays: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      FakeSocket.all.at(-1)!.onclose?.({ code: 1006 });
+      delays.push(s.retries.at(-1)!.delay);
+      s.advance(s.retries.at(-1)!.delay);
+    }
+    expect(delays.slice(0, 5)).toEqual([1249, 2499, 4999, 8999, 16_999]);
+    expect(delays.slice(5)).toEqual([30_000, 30_000]);
+    s.client.stop();
+  });
+
+  it("nudge() from fallback (visible / online / pageshow / focus) resets the ladder and connects at once", () => {
+    const s = setup(() => false, () => 0);
+    s.client.start();
+    for (let i = 0; i < 4; i++) {
+      FakeSocket.all.at(-1)!.onclose?.({ code: 1006 });
+      if (i < 3) s.advance(s.retries.at(-1)!.delay);
+    }
+    expect(s.client.state).toBe("fallback");
+    const n = FakeSocket.all.length;
+    s.client.nudge();
+    expect(FakeSocket.all).toHaveLength(n + 1);
+    expect(s.client.state).toBe("connecting");
+    // that one fails too: the ladder starts again at 1 s (not at the 8 s it had reached)
+    FakeSocket.all.at(-1)!.onclose?.({ code: 1006 });
+    expect(s.retries.at(-1)!.delay).toBe(1000);
     s.client.stop();
   });
 });

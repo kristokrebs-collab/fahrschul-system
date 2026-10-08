@@ -1,10 +1,14 @@
 /**
  * Binance combined-stream WebSocket client (Plan 4.2 "WS-Regeln").
- * - liveness by message arrival (`markPrice@1s` is the heartbeat): 10 s silence → close + reconnect (`ws_silent`)
- * - full-jitter exponential backoff, `attempt` reset after 60 s stable
+ * - liveness by message arrival (`markPrice@1s` is the heartbeat): 10 s silence → the socket is closed here and counts
+ *   like a close (`ws_silent`) — a browser never learns of a dead TCP connection by itself (NAT timeout, network switch,
+ *   Samsung Internet waking up), so an "open" socket without frames IS a failed connection
+ * - an attempt that never delivered a message is a failed attempt; `WS_MAX_FAILED` (3) in a row → `fallback` (the provider
+ *   polls REST meanwhile); the client keeps retrying for good: at once after a blip on a socket that had been delivering,
+ *   otherwise 1 s, 2 s, 4 s … 30 s (`wsBackoffMs`), `attempt` reset after 60 s stable
  * - proactive rollover at 23 h: open a second socket, wait for its first message, close the old one
  * - hidden tab: reconnects at most once a minute (`WS_HIDDEN_RETRY_MS`; the signal check's system notifications
- *   still need the stream); on visible reconnect at once when silent > 10 s; `online` → reconnect
+ *   still need the stream); `nudge()` on visible / `online` / resume reconnects at once whatever the state
  * Browsers answer ping frames automatically; nothing is ever sent by this client.
  */
 import { WS_CONNECT_TIMEOUT_MS, WS_HIDDEN_RETRY_MS, WS_MAX_FAILED, WS_ROLLOVER_MS, WS_SILENT_MS, WS_STABLE_MS, wsBackoffMs, type TimerHost, realTimerHost } from "../schedule";
@@ -25,8 +29,10 @@ export interface WsClientEvents {
   onMessage(raw: string, now: number): void;
   onOpen?(now: number): void;
   onClose?(code: number, failedAttempts: number, now: number): void;
-  onSilent?(now: number): void;
+  /** the stream went silent (the socket is closed and replaced); `failedAttempts` counts attempts without a message */
+  onSilent?(now: number, failedAttempts: number): void;
   onRetry?(attempt: number, nextRetryAt: number, now: number): void;
+  /** `WS_MAX_FAILED` attempts in a row without a message (fired once per transition into `fallback`) */
   onFallback?(now: number): void;
 }
 
@@ -50,6 +56,8 @@ export interface WsClientOptions extends WsClientEvents {
 /** `nudge()` restarts a handshake that has been pending for longer than this. */
 const NUDGE_STALE_CONNECT_MS = 5_000;
 
+type FailCause = "closed" | "silent";
+
 export class WsClient {
   private ws: WsLike | null = null;
   private pending: WsLike | null = null; // rollover socket
@@ -69,6 +77,8 @@ export class WsClient {
   private openedAt = 0;
   private connectStartedAt = 0;
   private gotMessage = false;
+  /** when the last blip reconnect went out without a backoff (at most one per `stableMs`: never a reconnect loop) */
+  private lastBlipAt = -Infinity;
   lastMessageAt = 0;
   state: WsClientState = "idle";
 
@@ -85,9 +95,9 @@ export class WsClient {
     this.connectTimeoutMs = opts.connectTimeoutMs ?? WS_CONNECT_TIMEOUT_MS;
   }
 
-  /** A reconnect is armed (backoff after a close, or the slow hidden-tab retry). */
+  /** A reconnect is armed (the backoff after a failure, or the slow hidden-tab retry). */
   get retryPending(): boolean {
-    return this.timers.retry != null || this.timers.hiddenRetry != null;
+    return this.timers.retry != null;
   }
 
   get attempts(): number {
@@ -127,17 +137,19 @@ export class WsClient {
   }
 
   /**
-   * `visibilitychange → visible` / `online`: reconnect when the stream went silent meanwhile — including when the
-   * silent timer already fired while the tab was hidden (`state === "silent"`, no timer armed any more). An open,
-   * healthy socket gets its silent timer re-armed (timers may have been throttled while hidden).
+   * `visibilitychange → visible` / `online` / Page Lifecycle `resume`: whatever the state, a live connection is on its
+   * way NOW — a stream that went silent (also when the silent timer already fired while the tab was hidden and the slow
+   * hidden retry is still pending), a closed or exhausted socket waiting for its backoff, a handshake started before the
+   * tab was hidden / the device slept, an "open" socket without frames (throttled timers). An open, healthy socket gets
+   * its silent timer re-armed.
    */
   nudge(): void {
     if (this.stopped) return;
     const now = this.host.now();
-    if (this.state === "fallback" || this.state === "closed") {
+    if (this.state === "fallback" || this.state === "closed" || this.state === "silent") {
       this.failed = 0;
       this.attempt = 0;
-      this.reconnect(); // clears the armed backoff retry first (it would open a second socket)
+      this.reconnect(); // clears the armed retry first (it would open a second socket)
       return;
     }
     // a handshake started long ago (before the tab was hidden / the device slept) is not worth waiting for
@@ -146,15 +158,14 @@ export class WsClient {
       this.reconnect();
       return;
     }
-    if (this.state === "silent" || (this.state === "open" && now - this.lastMessageAt > this.silentMs)) {
-      this.opts.onSilent?.(now);
-      this.reconnect();
+    if (this.state === "open" && now - this.lastMessageAt > this.silentMs) {
+      this.fail(1006, "silent", true);
       return;
     }
     if (this.state === "open") this.armSilent(Math.max(1, this.lastMessageAt + this.silentMs - now));
   }
 
-  private timers: { silent?: unknown; rollover?: unknown; stable?: unknown; retry?: unknown; hiddenRetry?: unknown; connect?: unknown } = {};
+  private timers: { silent?: unknown; rollover?: unknown; stable?: unknown; retry?: unknown; connect?: unknown } = {};
 
   private clearTimers(): void {
     for (const k of Object.keys(this.timers) as (keyof typeof this.timers)[]) {
@@ -183,7 +194,7 @@ export class WsClient {
     try {
       sock = this.factory(this.opts.url());
     } catch {
-      this.onFail(1006);
+      this.fail(1006, "closed");
       return;
     }
     this.ws = sock;
@@ -193,7 +204,7 @@ export class WsClient {
       this.timers.connect = undefined;
       if (this.stopped || this.ws !== sock || this.state !== "connecting") return;
       this.closeSocket(sock);
-      this.onFail(1006);
+      this.fail(1006, "closed");
     }, this.connectTimeoutMs);
   }
 
@@ -226,6 +237,7 @@ export class WsClient {
         this.bind(sock, false);
       }
       this.gotMessage = true;
+      this.failed = 0; // a frame arrived: no failed attempts in a row any more
       this.lastMessageAt = t;
       this.state = "open";
       this.armSilent();
@@ -237,64 +249,71 @@ export class WsClient {
         return;
       }
       if (this.ws !== sock) return;
-      this.onFail(ev.code ?? 1006);
+      this.fail(ev.code ?? 1006, "closed");
     };
     sock.onerror = () => {
       /* the close event follows; nothing to do */
     };
   }
 
-  private onFail(code: number): void {
+  /**
+   * The current attempt ended: the handshake failed or timed out, the server closed the socket (`closed`), or the
+   * stream went silent (`silent` — the socket is closed here). An attempt that never delivered a message is a failed
+   * attempt; `maxFailed` of them in a row → `fallback` (the provider polls REST meanwhile). The next attempt starts at
+   * once when this socket had been delivering (a blip — at most once per `stableMs`, so a server that accepts, sends a
+   * frame and drops the socket never spins a reconnect loop) or when `immediate` (a nudge), else after the backoff ladder.
+   */
+  private fail(code: number, cause: FailCause, immediate = false): void {
     if (this.stopped) return;
     this.clearTimers();
+    const sock = this.ws;
     this.ws = null;
+    if (cause === "silent") this.closeSocket(sock);
     const now = this.host.now();
-    // a connection that never delivered a message counts as a failed attempt
-    this.failed = this.gotMessage ? 0 : this.failed + 1;
-    this.state = "closed";
-    this.opts.onClose?.(code, this.failed, now);
+    const delivered = this.gotMessage;
+    this.failed = delivered ? 0 : this.failed + 1;
+    this.state = cause === "silent" ? "silent" : "closed";
+    if (cause === "silent") this.opts.onSilent?.(now, this.failed);
+    else this.opts.onClose?.(code, this.failed, now);
     if (this.failed >= this.maxFailed) {
       this.state = "fallback";
-      this.opts.onFallback?.(now);
-      // keep trying in the background with capped backoff; the provider polls REST meanwhile
+      if (this.failed === this.maxFailed) this.opts.onFallback?.(now); // once per transition, not on every later attempt
+      // keep trying for good with the capped backoff; the provider polls REST meanwhile
     }
-    // hidden: slow retries (≥ 1 min) so a background tab keeps its stream; `nudge()` on visible reconnects at once
-    const delay = this.hidden() ? Math.max(this.hiddenRetryMs, wsBackoffMs(this.attempt, this.random)) : wsBackoffMs(this.attempt, this.random);
-    this.attempt += 1;
+    const blip = delivered && now - this.lastBlipAt >= this.stableMs;
+    if (blip) this.lastBlipAt = now;
+    this.armRetry(now, blip || immediate);
+  }
+
+  /**
+   * Arms the next attempt: synchronously after a blip / nudge (`atOnce`), else after `wsBackoffMs(attempt)` — 1 s, 2 s,
+   * 4 s … 30 s. Hidden: at least `hiddenRetryMs` (≥ 1 min), so a background tab keeps its stream without a tight loop;
+   * `nudge()` on visible reconnects at once.
+   */
+  private armRetry(now: number, atOnce: boolean): void {
+    let delay = atOnce ? 0 : wsBackoffMs(this.attempt, this.random);
+    if (!atOnce) this.attempt += 1;
+    if (this.hidden()) delay = Math.max(this.hiddenRetryMs, delay);
     this.opts.onRetry?.(this.attempt, now + delay, now);
+    if (delay === 0) {
+      this.connect();
+      return;
+    }
     this.timers.retry = this.host.setTimeout(() => {
       this.timers.retry = undefined;
       this.connect();
     }, delay);
   }
 
-  /** Silent while hidden: one slow reconnect (≥ 1 min); `nudge()` on visible does it at once. */
-  private armHiddenRetry(): void {
-    if (this.timers.hiddenRetry != null) return;
-    this.timers.hiddenRetry = this.host.setTimeout(() => {
-      this.timers.hiddenRetry = undefined;
-      if (this.stopped || this.state !== "silent") return;
-      this.reconnect();
-    }, this.hiddenRetryMs);
-  }
-
   /** Arms the silence check `delayMs` from now (default: the full window; `nudge()` passes the remaining part). */
   private armSilent(delayMs: number = this.silentMs): void {
     if (this.timers.silent != null) this.host.clearTimeout(this.timers.silent);
     this.timers.silent = this.host.setTimeout(() => {
+      this.timers.silent = undefined;
       if (this.stopped || !this.ws) return;
       const now = this.host.now();
-      if (now - this.lastMessageAt >= this.silentMs) {
-        this.state = "silent";
-        this.opts.onSilent?.(now);
-        if (this.hidden()) {
-          this.armHiddenRetry(); // slow; `nudge()` on visible reconnects at once
-          return;
-        }
-        this.reconnect();
-      } else {
-        this.armSilent();
-      }
+      if (now - this.lastMessageAt >= this.silentMs) this.fail(1006, "silent");
+      else this.armSilent();
     }, delayMs);
   }
 

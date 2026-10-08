@@ -36,11 +36,13 @@ describe("aligned schedule", () => {
 });
 
 describe("backoff math", () => {
-  it("ws backoff is full-jitter and capped at 30 s", () => {
-    expect(wsBackoffMs(0, () => 0.5)).toBe(500);
-    expect(wsBackoffMs(3, () => 1)).toBe(8000);
-    expect(wsBackoffMs(10, () => 1)).toBe(30_000);
-    expect(wsBackoffMs(10, () => 0)).toBe(0);
+  it("ws backoff grows 1, 2, 4 … s, is capped at 30 s, and its small jitter never retries at once", () => {
+    expect([0, 1, 2, 3, 4, 5, 6, 12].map((n) => wsBackoffMs(n, () => 0))).toEqual([1000, 2000, 4000, 8000, 16_000, 30_000, 30_000, 30_000]);
+    expect(wsBackoffMs(0, () => 0.5)).toBe(1125); // + ≤ 25 % of the step
+    expect(wsBackoffMs(3, () => 0.999)).toBe(8999); // + ≤ 1 s
+    expect(wsBackoffMs(4, () => 0.999)).toBe(16_999);
+    expect(wsBackoffMs(10, () => 0.999)).toBe(30_000); // never above the cap
+    expect(wsBackoffMs(-1, () => 0)).toBe(1000);
   });
   it("probe backoff doubles from 5 min and caps at 60 min", () => {
     expect(probeBackoffMs(0)).toBe(5 * 60_000);

@@ -57,8 +57,10 @@ describe("decision 14: every feed keeps refreshing", () => {
     for (const path of ["/fapi/v1/ticker/24hr", "/fapi/v1/openInterest", "topLongShortAccountRatio?symbol=BTCUSDT&period=5m"]) {
       expect(requests(net, path, back).length, path).toBeGreaterThan(0);
     }
-    const first = Math.min(...net.log.filter((r) => r.at >= back).map((r) => r.at));
-    expect(first - back).toBeGreaterThanOrEqual(1_000); // spread out (radio waking up), not in the visibilitychange tick
+    // the last price goes out with the visibilitychange (one ticker/24hr: the socket is dead, the number the user looks
+    // at must not wait for the stagger); everything else is spread out (radio waking up), not in the visibilitychange tick
+    const early = net.log.filter((r) => r.at >= back && r.at - back < 1_000).map((r) => new URL(r.url, "https://site.invalid").pathname);
+    expect(early).toEqual(["/fapi/v1/ticker/24hr"]); // … and nothing else within the first second
     // WS: a new socket right away; every kline feed is fetched since the newest cached bar (REST stand-in for the
     // dead socket and/or the gap fill when it opens — a request answered < 1 s ago is shared, not repeated)
     expect(FakeSocket.all.length).toBeGreaterThan(sockets);

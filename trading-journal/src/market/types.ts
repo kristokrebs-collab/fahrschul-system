@@ -206,7 +206,8 @@ export type HealthEvent =
   | { type: "ws_open"; now: number }
   | { type: "ws_message"; now: number; feeds: FeedId[]; asOf?: number }
   | { type: "ws_close"; code: number; now: number; failedAttempts: number }
-  | { type: "ws_silent"; now: number }
+  /** `failedAttempts` (additive): attempts without a message in a row — `WS_MAX_FAILED` of them → `fallback` like `ws_close` */
+  | { type: "ws_silent"; now: number; failedAttempts?: number }
   | { type: "ws_retry"; now: number; attempt: number; nextRetryAt: number }
   | { type: "rest_ok"; feed: FeedId; source: Source; asOf: number; now: number; nextRefreshAt?: number }
   | { type: "rest_fail"; feed: FeedId; source: Source; kind: FailureReason; now: number; detail?: string }

@@ -27,6 +27,8 @@ export const STRINGS = {
   proxyBlocked: "EU-Proxy: Region blockiert (451)",
   fallbackOnlyUsdt: "Fallback nur für USDT-Perps",
   retrying: (sec: number) => `Binance antwortet gerade nicht. Nächster Versuch in ${sec} Sekunden.`,
+  /** market card pill while the socket is down and the last price arrives by REST poll (`Kurs per Abfrage · 5 s`) */
+  pricePolled: (sec: number) => `Kurs per Abfrage · ${sec} s`,
 } as const;
 
 export const SOURCE_NAME: Record<Source, string> = {

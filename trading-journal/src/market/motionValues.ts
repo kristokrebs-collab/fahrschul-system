@@ -11,6 +11,7 @@
  * reset anything; they derive windows by differencing the monotonic accumulators.
  */
 import { cancelFrame, frame, motionValue, type MotionValue } from "motion/react";
+import { PRICE_PREFER_MS } from "./feeds";
 import type { AggTrade, MarketDataProvider, Stamped, Ticker24h } from "./types";
 
 /** last traded price (`aggTrade.p`, fallback ticker) */
@@ -173,6 +174,16 @@ function queueTicker(v: Stamped<Ticker24h>, withPrice: boolean): void {
   schedule();
 }
 
+/**
+ * Whether a ticker carries the price into `priceMv`: when no trade print exists, or the newest trade is more than
+ * `PRICE_PREFER_MS` older than the ticker (the same rule as `lastPrice`). The trade stream is authoritative while it
+ * delivers; the ticker — the 30-s poll and the 5-s REST stand-in while the socket is down — takes over the moment the
+ * trade stream falls silent, so the odometer and the header never keep a frozen trade price while REST delivers.
+ */
+export function tickerCarriesPrice(ticker: Stamped<Ticker24h>, trade: Stamped<AggTrade> | undefined): boolean {
+  return !trade || ticker.asOf - trade.asOf > PRICE_PREFER_MS;
+}
+
 /** Immediate flush (tests / unmount). */
 export function flushMotionValues(): void {
   if (!scheduled) return;
@@ -225,10 +236,10 @@ export function bindMotionValues(provider: MarketDataProvider): () => void {
     pending.price = seedAgg.data.price;
     pending.receivedAt = seedAgg.receivedAt;
     pending.tradeTime = seedAgg.data.time;
-    pending.seed = true;
   }
-  if (seedTicker) queueTicker(seedTicker, !seedAgg);
-  if (!seedAgg && seedTicker) pending.seed = true;
+  // a cached trade from before the page was away loses to a fresher ticker (same rule as `lastPrice`)
+  if (seedTicker) queueTicker(seedTicker, tickerCarriesPrice(seedTicker, seedAgg));
+  if (pending.price !== undefined) pending.seed = true;
   if (seedBook) {
     pending.bid = seedBook.data.bid;
     pending.ask = seedBook.data.ask;
@@ -242,8 +253,9 @@ export function bindMotionValues(provider: MarketDataProvider): () => void {
 
   const offs = [
     provider.subscribe("aggTrade", (v) => queueTrade(v.data, v.receivedAt)),
-    // the ticker always refreshes the 24 h open; it carries the price only when no trade stream serves it
-    provider.subscribe("ticker24h", (v) => queueTicker(v, !provider.get("aggTrade"))),
+    // the ticker always refreshes the 24 h open; it carries the price when the trade stream is silent (no trade within
+    // PRICE_PREFER_MS of it) — the REST stand-in while the socket is down, and the 30-s poll when a stream stalls
+    provider.subscribe("ticker24h", (v) => queueTicker(v, tickerCarriesPrice(v, provider.get("aggTrade")))),
     provider.subscribe("bookTop", (v) => {
       pending.bid = v.data.bid;
       pending.ask = v.data.ask;

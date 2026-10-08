@@ -203,7 +203,7 @@ describe("createMarketProvider", () => {
   });
 
   it("schedules the 5-min feeds aligned to the boundary and polls ticker every 30 s", async () => {
-    const { provider, state } = setup();
+    const { provider, state, sockets } = setup();
     p = provider;
     provider.start();
     await flush();
@@ -212,8 +212,15 @@ describe("createMarketProvider", () => {
     expect(next - boundary).toBeGreaterThanOrEqual(60_000);
     expect(next - boundary).toBeLessThan(105_000);
     const tickerCalls = () => state.log.filter((u) => u.includes("/fapi/v1/ticker/24hr")).length;
+    // the stream delivers (a socket that never answers would make the price REST-polled every 5 s instead)
+    const ws = sockets()[0]!;
+    ws.open();
     const before = tickerCalls();
-    await vi.advanceTimersByTimeAsync(30_000);
+    for (let i = 0; i < 6; i++) {
+      ws.send({ ...wsMark, data: { ...wsMark.data, E: Date.now() } });
+      ws.send({ ...wsAgg, data: { ...wsAgg.data, E: Date.now(), T: Date.now() } });
+      await vi.advanceTimersByTimeAsync(5_000);
+    }
     expect(tickerCalls()).toBe(before + 1);
     // the aligned poll requests only limit=30 and upserts into the ring buffer
     await vi.advanceTimersByTimeAsync(next - Date.now() + 10);
@@ -263,12 +270,23 @@ describe("createMarketProvider", () => {
     const premiumBefore = state.log.filter((u) => u.includes("premiumIndex")).length;
     await vi.advanceTimersByTimeAsync(10_000);
     expect(state.log.filter((u) => u.includes("premiumIndex")).length).toBeGreaterThan(premiumBefore);
-    // price is still available through the ticker fallback
-    expect(deriveMarket(provider.snapshot(), provider.getHealth(), { now: Date.now() }).price).toBe(84206);
+    // price is still available through the ticker fallback, polled every 5 s, and the card says so
+    const tickers = state.log.filter((u) => u.includes("/fapi/v1/ticker/24hr")).length;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(state.log.filter((u) => u.includes("/fapi/v1/ticker/24hr")).length).toBeGreaterThanOrEqual(tickers + 2);
+    const m = deriveMarket(provider.snapshot(), provider.getHealth(), { now: Date.now() });
+    expect(m.price).toBe(84206);
+    expect(m).toMatchObject({ status: "live", priceMode: "poll", pill: { text: "Kurs per Abfrage · 5 s" } });
+    expect(Date.now() - m.priceSource!.asOf).toBeLessThanOrEqual(5_000);
+    // the client keeps retrying (1, 2, 4 … 30 s): wait for its next handshake, which this time succeeds
+    const n = sockets().length;
+    while (sockets().length === n) await vi.advanceTimersByTimeAsync(1_000);
     const ws = sockets().at(-1)!;
     ws.open();
     ws.send({ ...wsMark, data: { ...wsMark.data, E: Date.now() } });
     expect(provider.getHealth().feeds.markPrice).toMatchObject({ state: "live", source: "binance" });
+    ws.send({ ...wsAgg, data: { ...wsAgg.data, E: Date.now(), T: Date.now() } });
+    expect(deriveMarket(provider.snapshot(), provider.getHealth(), { now: Date.now() })).toMatchObject({ priceMode: "stream", pill: { text: "Live" } });
   });
 
   it("blocked Binance (TypeError while Bybit answers) → whole chain on Bybit, top-trader feeds `Nur mit Binance`", async () => {

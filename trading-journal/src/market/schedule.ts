@@ -29,10 +29,16 @@ export function currentBoundary(now: number, alignMs: number): number {
   return Math.floor(now / alignMs) * alignMs;
 }
 
-/** Full-jitter exponential backoff: `rand(0, min(cap, base·2^attempt))`. */
+/**
+ * WebSocket reconnect backoff: `base · 2^attempt` (1 s, 2 s, 4 s, 8 s, 16 s) capped at `cap` (30 s), plus a little
+ * jitter from `random` (≤ 25 % of the step and ≤ 1 s) that never lifts the result above the cap. Deterministic growth,
+ * so a dead stream is retried after 1 s rather than "somewhere between 0 and 1 s" (the old full jitter could retry at 0 ms
+ * and never gave the reconnect ladder the user expects to see in the Live-Daten countdown).
+ */
 export function wsBackoffMs(attempt: number, random: () => number = Math.random, base = 1000, cap = 30_000): number {
   const ceiling = Math.min(cap, base * 2 ** Math.max(0, attempt));
-  return Math.floor(random() * ceiling);
+  const jitter = Math.floor(random() * Math.min(1000, ceiling * 0.25));
+  return Math.min(cap, ceiling + jitter);
 }
 
 /** Blocked-primary re-probe interval: 5 min, doubling per failure, capped at 60 min. */

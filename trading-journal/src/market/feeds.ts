@@ -72,6 +72,19 @@ export function isLiveRatioFeed(feed: FeedId): feed is LiveRatioFeed {
 
 /** REST polling cadence for WS-fed feeds when the socket is dead (Plan 4.2 "nach 3 Fehlversuchen"). */
 export const WS_REST_FALLBACK_MS = 10_000;
+/**
+ * REST polling cadence of the LAST PRICE (`aggTrade`, served by `ticker/24hr`) whenever the socket is not delivering —
+ * from the first silence on, not only after three failed attempts: the price is what the user looks at.
+ */
+export const PRICE_REST_FALLBACK_MS = 5_000;
+/**
+ * The last price prefers the trade stream over the book mid over the ticker — but only while the preferred value is
+ * within this much of the newest candidate (`asOf`, exchange clock). A trade price older than that loses to a fresher
+ * ticker price (a silent trade stream must never keep a frozen number on screen while REST delivers).
+ */
+export const PRICE_PREFER_MS = 5_000;
+/** The market card calls a last price older than this `veraltet` (`Kein Live-Kurs`): nothing — stream or REST — delivered for 2 min. */
+export const PRICE_STALE_MS = 120_000;
 
 export const DEFAULT_SOURCE_CHAIN: readonly Source[] = ["binance", "bybit", "proxy", "cache"];
 
@@ -158,7 +171,8 @@ export function buildFeedSpecs(period: Period, chain: readonly Source[] = DEFAUL
     kline_1w: klineSpec("1w", c),
     markPrice: { id: "markPrice", transport: "ws", cadenceMs: 1000, staleAfterMs: 5000, cost: { bucket: "binance.weight", units: 1 }, sources: [...c] },
     bookTop: { id: "bookTop", transport: "ws", cadenceMs: 250, staleAfterMs: 5000, cost: { bucket: "binance.weight", units: 0 }, sources: [...c] },
-    aggTrade: { id: "aggTrade", transport: "ws", cadenceMs: 100, staleAfterMs: 5000, cost: { bucket: "binance.weight", units: 0 }, sources: [...c] },
+    // the REST stand-in for the trade stream is `ticker/24hr` (weight 1): a WS feed's cost is charged only for REST polls
+    aggTrade: { id: "aggTrade", transport: "ws", cadenceMs: 100, staleAfterMs: 5000, cost: { bucket: "binance.weight", units: 1 }, sources: [...c] },
     ticker24h: { id: "ticker24h", transport: "rest", cadenceMs: 30_000, staleAfterMs: 90_000, cost: { bucket: "binance.weight", units: 1 }, sources: [...c] },
     openInterest: { id: "openInterest", transport: "rest", cadenceMs: 60_000, staleAfterMs: 180_000, cost: { bucket: "binance.weight", units: 1 }, sources: [...c] },
     openInterestHist: futuresDataSpec("openInterestHist", period, c),
@@ -196,10 +210,13 @@ export const BYBIT_FALLBACK_STALE_MS: Partial<Record<FeedId, number>> = {
 
 /**
  * Effective cadence / staleness for a feed served by a given source. WS feeds in `fallback` on Binance
- * itself (socket dead, REST polling every 10 s) report the polling cadence.
+ * itself (socket not delivering, REST polling every 10 s — the last price every 5 s) report the polling cadence.
  */
 export function effectiveSpec(spec: FeedSpec, source: Source, state?: HealthState): { cadenceMs: number; staleAfterMs: number } {
-  if (source === "binance" && spec.transport === "ws" && state === "fallback") return { cadenceMs: WS_REST_FALLBACK_MS, staleAfterMs: 3 * WS_REST_FALLBACK_MS };
+  if (source === "binance" && spec.transport === "ws" && state === "fallback") {
+    const cadenceMs = spec.id === "aggTrade" ? PRICE_REST_FALLBACK_MS : WS_REST_FALLBACK_MS;
+    return { cadenceMs, staleAfterMs: 3 * cadenceMs };
+  }
   if (source === "bybit" || source === "okx") {
     return {
       cadenceMs: BYBIT_FALLBACK_CADENCE_MS[spec.id] ?? spec.cadenceMs,

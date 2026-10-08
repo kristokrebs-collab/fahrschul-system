@@ -295,6 +295,8 @@ export function MarketPanel() {
 
   const source = view.priceSource?.source === "tradingview" ? "TradingView" : "Binance";
   const live = view.status === "live";
+  /** the trade stream delivers: the LivePill with the trade's age; every other mode shows the honest pill from `legacyStatus` */
+  const streaming = live && view.priceMode === "stream";
   const connecting = view.status === "connecting";
   /** placeholders for the live rows (order flow, funding) while a cached price shows and the feed connects */
   const reserve = connecting && view.price != null;
@@ -327,17 +329,13 @@ export function MarketPanel() {
               </motion.span>
             )}
           </AnimatePresence>
-          {live ? (
+          {streaming ? (
             <LivePill receivedAt={view.updatedAt} ringEndsAt={view.nextTickerRefreshAt} />
           ) : (
-            // one pill for every non-live state, so `Verbinde …` → `Kein Live-Kurs` morphs (grows first, never clips)
-            <StatusPill
-              tone={connecting || view.status === "unavailable" ? "muted" : "error"}
-              expanded
-              label={connecting ? STRINGS.connecting : STRINGS.noPrice}
-              feed="markPrice"
-              title={connecting ? undefined : view.statusDetail}
-            />
+            // one pill for every other state, so `Verbinde …` → `Kurs per Abfrage · 5 s` → `Kein Live-Kurs` morphs (grows first,
+            // never clips); the text comes from `legacyStatus`: `Kein Live-Kurs` only when neither the stream nor a REST poll
+            // delivered for 2 minutes, `Kurs per Abfrage · 5 s` while the socket is down and the ticker stands in
+            <StatusPill tone={view.pill.tone} expanded label={view.pill.text} feed="markPrice" title={view.pill.detail ?? (connecting ? undefined : view.statusDetail)} />
           )}
         </span>
       </div>

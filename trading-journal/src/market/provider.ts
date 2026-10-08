@@ -27,6 +27,7 @@ import {
   LIVE_RATIO_POLL_LIMIT,
   OKX_UNSUPPORTED,
   POLL_LIMIT_FUTURES_DATA,
+  PRICE_REST_FALLBACK_MS,
   RATIO_FEEDS,
   WS_FEEDS,
   WS_REST_FALLBACK_MS,
@@ -54,7 +55,7 @@ import {
 } from "./schedule";
 import { ClockSkew } from "./clock";
 import { MarketCache, upsertBar, upsertSeries, RING_CAPACITY, type KVStore } from "./cache";
-import { initialHealth, reduceHealth } from "./health";
+import { initialHealth, reduceHealth, wsDown } from "./health";
 import { statusLabelFor, STRINGS } from "./statusLabel";
 import { binanceRest, buildStreamUrl, parseWsMessage, type BinanceRest, type RatioKind } from "./sources/binance";
 import { bybitRest, type BybitRest } from "./sources/bybit";
@@ -190,11 +191,12 @@ const RESUME_THROTTLE_MS = 5_000;
 /**
  * A WS stream that delivered nothing for this long while the socket itself delivers (other streams arrive) is stalled:
  * its feed is fetched over REST (klines with gap fill) and a second stall within `STREAM_STALL_WINDOW_MS`
- * re-subscribes (socket reconnect). BTC trades every second, so every subscribed stream updates several times a second.
+ * re-subscribes (socket reconnect). BTC trades every second, so every subscribed stream updates several times a second;
+ * the trade stream (the displayed price) gets the shortest leash after the 1-s mark price.
  */
 const STREAM_STALL_MS: Partial<Record<FeedId, number>> = {
   markPrice: 15_000,
-  aggTrade: 60_000,
+  aggTrade: 20_000,
   bookTop: 60_000,
   kline_1m: 90_000,
   kline_15m: 90_000,
@@ -409,7 +411,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       case "aggTrade": {
         const t = await client.ticker24h(sym);
         set(b, "ticker24h", t);
-        if (feed === "aggTrade" || health.feeds.aggTrade.state === "fallback") set(b, "aggTrade", aggFromTicker(t, client.source));
+        // the ticker's last price stands in for the trade stream whenever the socket is not delivering
+        if (feed === "aggTrade" || health.feeds.aggTrade.state === "fallback" || wsDown(health)) set(b, "aggTrade", aggFromTicker(t, client.source));
         return b;
       }
       case "openInterest":
@@ -591,9 +594,10 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     return own === (source ?? health.feeds[LIVE_RATIO_MAIN[feed]].source);
   }
 
+  /** The socket serves this feed right now (so a REST poll for it is a gap fill or stall stand-in, not a cadence). */
   function wsCovers(feed: FeedId): boolean {
     const fh = health.feeds[feed];
-    return WS_FEEDS.includes(feed) && fh.source === "binance" && fh.state !== "fallback" && (health.ws.state === "live" || health.ws.state === "connecting") && wsOpens > 0;
+    return WS_FEEDS.includes(feed) && fh.source === "binance" && fh.state !== "fallback" && !wsDown(health) && wsOpens > 0;
   }
 
   async function poll(feed: FeedId, o: { bootstrap?: boolean; force?: boolean } = {}): Promise<void> {
@@ -609,11 +613,13 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     const limit = isKlineFeed(feed) ? klineLimit(feed, !!o.bootstrap) : 0;
     const units = isKlineFeed(feed) ? klineWeight(limit) : spec.cost.units;
     const cost = bucketFor(feed, source, units);
-    if (!o.force && !budget.take(cost.bucket, cost.units, now())) {
-      schedulePoll(feed, now() + Math.max(1000, budget.waitFor(cost.bucket, cost.units, now())), o.bootstrap);
+    // the price stand-in may use the reserve the other live feeds leave for it (`PRICE_RESERVE`)
+    const cls: BudgetClass = feed === "aggTrade" ? "price" : "live";
+    if (!o.force && !budget.take(cost.bucket, cost.units, now(), cls)) {
+      schedulePoll(feed, now() + Math.max(1000, budget.waitFor(cost.bucket, cost.units, now(), cls)), o.bootstrap);
       return;
     }
-    if (o.force) budget.take(cost.bucket, cost.units, now());
+    if (o.force) budget.take(cost.bucket, cost.units, now(), cls);
     const before = newestTime(feed);
     active.add(feed);
     try {
@@ -647,8 +653,9 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       const advanced = before === undefined || (after !== undefined && after > before);
       if (spec.alignMs) lastAdvanceCheck.set(feed, { newest: after ?? 0, retries: lastAdvanceCheck.get(feed)?.retries ?? 0 });
       for (const id of FEED_IDS) if (batch[id] && isSeriesFeed(id)) void cache.persist(id);
-      // WS-fed feeds on Binance are only polled while the socket is down (10 s); otherwise the stream delivers
-      if (WS_FEEDS.includes(feed) && source === "binance" && health.ws.state !== "fallback") return;
+      // WS-fed feeds on Binance are only polled while the socket is not delivering (price 5 s, others 10 s); otherwise
+      // the stream delivers and `noteWs` cancels any poll that is still pending when its frames arrive again
+      if (WS_FEEDS.includes(feed) && source === "binance" && !wsDown(health)) return;
       schedulePoll(feed, nextPollAt(feed, source, advanced));
     } catch (err) {
       active.delete(feed);
@@ -760,10 +767,12 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       scheduleProbe();
       return;
     }
-    // stayed on its source: retry with a capped backoff (the ratio feeds never park on a source without a retry)
+    // stayed on its source: retry with a capped backoff (the ratio feeds never park on a source without a retry); the
+    // price stand-in keeps its 5-s pace (the bucket pause after a 429 still holds it back)
     if (isFamilyFeed(feed) && after.consecutiveFailures >= 2) void maybeProbeProxy();
     const aligned = !!specs[feed].alignMs;
-    schedulePoll(feed, now() + (aligned || isFamilyFeed(feed) ? failureRetryMs(after.consecutiveFailures) : RETRY_MS));
+    const retryMs = aligned || isFamilyFeed(feed) ? failureRetryMs(after.consecutiveFailures) : feed === "aggTrade" ? PRICE_REST_FALLBACK_MS : RETRY_MS;
+    schedulePoll(feed, now() + retryMs);
   }
 
   /**
@@ -997,13 +1006,34 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       }
     },
     onClose: (code, failed, t) => dispatch({ type: "ws_close", code, now: t, failedAttempts: failed }),
-    onSilent: (t) => dispatch({ type: "ws_silent", now: t }),
-    onRetry: (attempt, nextRetryAt, t) => dispatch({ type: "ws_retry", attempt, nextRetryAt, now: t }),
+    onSilent: (t, failed) => dispatch({ type: "ws_silent", now: t, failedAttempts: failed }),
+    onRetry: (attempt, nextRetryAt, t) => {
+      dispatch({ type: "ws_retry", attempt, nextRetryAt, now: t });
+      // every failed / silent attempt: the last price is REST-polled from now on (every 5 s) until the stream delivers
+      armPricePoll(t);
+    },
     onFallback: () => {
-      // REST polling every 10 s for the WS-fed feeds while the socket is down
+      // REST polling every 10 s for the WS-fed feeds while the socket is down (the price keeps its own 5 s)
       for (const f of WS_FEEDS) if (health.feeds[f].source === "binance") schedulePoll(f, now() + (f === "bookTop" ? WS_REST_FALLBACK_MS : 0));
     },
   });
+
+  /**
+   * The socket is not delivering (silent, closed, exhausted, reconnecting): make sure the last price is REST-polled —
+   * `poll("aggTrade")` asks `ticker/24hr` and publishes its last price as the trade (`aggFromTicker`), re-arming
+   * itself every `PRICE_REST_FALLBACK_MS` while `wsDown(health)`; the first trade frame cancels it (`noteWs`). Idempotent:
+   * a poll already pending within one cadence or in flight is left alone. Not for a price served by another exchange
+   * (its own 5-s poll runs) or a bad symbol.
+   */
+  function armPricePoll(t: number): void {
+    if (!started || !symbolInfo.valid) return;
+    const fh = health.feeds.aggTrade;
+    if (fh.reason === "bad_symbol" || (fh.source !== "binance" && fh.source !== "proxy")) return;
+    if (active.has("aggTrade")) return;
+    const due = scheduler.dueAt("poll:aggTrade");
+    if (due !== undefined && due <= t + PRICE_REST_FALLBACK_MS) return;
+    schedulePoll("aggTrade", t);
+  }
 
   /** Health updates from WS data are throttled to ≥ 1 s per feed to avoid 10 Hz reducer runs. */
   function noteWs(feed: FeedId, asOf: number, t: number): void {
@@ -1050,6 +1080,9 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     scheduler.resume();
     kickStale(t, true);
     ws.nudge();
+    // the one number the user looks at goes out with the handshake, not in the stagger: a silent / dead socket is
+    // reconnecting now, and the ticker answers in a few hundred ms (a failure within the resume grace never counts as a block)
+    if (wsDown(health)) armPricePoll(t);
     if (needsProbe()) scheduleProbe(RESUME_GRACE_MS / 3);
     armTick();
   }
@@ -1064,7 +1097,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   function staggerOverdue(t: number): void {
     let i = 0;
     for (const [key, at] of scheduler.pending()) {
-      if (!key.startsWith("poll:") || at > t + RESUME_STAGGER_MS) continue;
+      // the price stand-in is never held back (one request; `resume` wants the price at once)
+      if (!key.startsWith("poll:") || key === "poll:aggTrade" || at > t + RESUME_STAGGER_MS) continue;
       const next = t + RESUME_STAGGER_MS + i * RESUME_STAGGER_STEP_MS + Math.floor(random() * RESUME_STAGGER_STEP_MS);
       if (scheduler.reschedule(key, next)) dispatch({ type: "schedule", feed: key.slice(5) as FeedId, nextRefreshAt: next });
       i += 1;
@@ -1083,6 +1117,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     const t = now();
     dispatch({ type: "online", online: true, now: t });
     ws.nudge();
+    if (wsDown(health)) armPricePoll(t);
     let i = 0;
     for (const f of FEED_IDS) {
       if (f === except || specs[f].transport !== "rest" || isMirrored(f)) continue;
@@ -1190,6 +1225,8 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
    */
   function watchSocket(t: number): void {
     if (hidden() || !chain.includes("binance") || health.primary.blocked || !symbolInfo.valid) return;
+    // invariant: while the socket is not delivering, the price stand-in is armed (whatever path dropped it)
+    if (wsDown(health)) armPricePoll(t);
     if (ws.state === "open" && t - ws.lastMessageAt > 2 * WS_SILENT_MS) {
       ws.nudge(); // the silent timer did not fire (frozen timers)
       return;

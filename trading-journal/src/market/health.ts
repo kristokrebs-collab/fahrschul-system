@@ -51,6 +51,18 @@ function isPristine(f: FeedHealth): boolean {
   return f.state === "connecting" && f.lastDataAt === undefined && f.consecutiveFailures === 0 && f.reason === undefined;
 }
 
+/**
+ * The socket is not delivering: it went silent (`stale`), is exhausted (`fallback`), offline, or is (re)connecting after
+ * it had ever delivered / after a failed attempt. The initial handshake (never delivered, no retry yet) is NOT "down" —
+ * the REST bootstrap that races it must keep reading as live, not as a stand-in. While down, the provider REST-polls
+ * the last price every `PRICE_REST_FALLBACK_MS` and the market card says `Kurs per Abfrage` instead of `Live`.
+ */
+export function wsDown(h: ProviderHealth): boolean {
+  const ws = h.ws;
+  if (ws.state === "stale" || ws.state === "fallback" || ws.state === "offline") return true;
+  return ws.state === "connecting" && (ws.lastMessageAt !== undefined || ws.attempt > 0);
+}
+
 export function aggregate(h: ProviderHealth): HealthState {
   if (!h.online) return "offline";
   const active = Object.values(h.feeds).filter((f) => !isPristine(f));
@@ -185,11 +197,23 @@ export function reduceHealth(h: ProviderHealth, ev: HealthEvent, specs: Specs): 
       });
     }
 
-    case "ws_silent":
+    case "ws_silent": {
+      // the third attempt in a row without a message (open-but-silent sockets included) exhausts the socket like a close
+      const exhausted = (ev.failedAttempts ?? 0) >= WS_MAX_FAILED;
       return finish({
-        ...mapFeeds(h, (f) => (f.source === "binance" && f.state === "live" ? { ...f, state: "stale", reason: "ws_silent" } : f), specs, WS_FEEDS),
-        ws: { ...h.ws, state: "stale" },
+        ...mapFeeds(
+          h,
+          (f) => {
+            if (f.source !== "binance") return f;
+            if (exhausted) return f.state === "offline" ? f : { ...f, state: "fallback", reason: "ws_silent" };
+            return f.state === "live" ? { ...f, state: "stale", reason: "ws_silent" } : f;
+          },
+          specs,
+          WS_FEEDS,
+        ),
+        ws: { ...h.ws, state: exhausted ? "fallback" : "stale" },
       });
+    }
 
     case "ws_retry":
       return { ...h, ws: { ...h.ws, attempt: ev.attempt, nextRetryAt: ev.nextRetryAt } };
@@ -210,16 +234,17 @@ export function reduceHealth(h: ProviderHealth, ev: HealthEvent, specs: Specs): 
         mapFeeds(
           h,
           (f, spec) => {
-            // WS feed polled over REST while the socket is down: stays `fallback` (reason ws_closed) until a WS message arrives
-            const wsDown = spec.transport === "ws" && ev.source === "binance" && h.ws.state === "fallback";
+            // WS feed polled over REST while the socket is not delivering (silent, exhausted, reconnecting): the REST
+            // stand-in reads `fallback` (reason ws_silent / ws_closed) until a WS message arrives — never "Live · 1 s"
+            const standIn = spec.transport === "ws" && ev.source === "binance" && wsDown(h);
             return {
               ...f,
-              state: wsDown ? "fallback" : ev.source === (spec.sources[0] ?? "binance") ? "live" : "fallback",
+              state: standIn ? "fallback" : ev.source === (spec.sources[0] ?? "binance") ? "live" : "fallback",
               source: ev.source,
               lastDataAt: ev.asOf,
               consecutiveFailures: 0,
               nextRefreshAt: ev.nextRefreshAt ?? f.nextRefreshAt,
-              reason: f.reason === "bad_period" ? f.reason : wsDown ? "ws_closed" : undefined,
+              reason: f.reason === "bad_period" ? f.reason : standIn ? (f.reason === "ws_silent" ? "ws_silent" : "ws_closed") : undefined,
               detail: f.reason === "bad_period" ? f.detail : undefined,
             };
           },

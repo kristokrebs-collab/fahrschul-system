@@ -206,14 +206,15 @@ describe("derived views", () => {
     expect(stale.status).toBe("error");
     expect(stale.message).toMatch(/^Zuletzt \d\d:\d\d · veraltet$/);
     const bybit = legacyStatus(health, { provenance: { source: "bybit", comparable: true, asOf: T0, receivedAt: T0 } }, T0 + 1000);
-    expect(bybit).toEqual({ status: "live", sourceBadge: "Ersatzquelle Bybit", message: "Binance nicht erreichbar (451/CORS)" });
-    expect(legacyStatus(initialHealth(specs), null, T0)).toEqual({ status: "connecting", message: undefined });
+    expect(bybit).toMatchObject({ status: "live", sourceBadge: "Ersatzquelle Bybit", message: "Binance nicht erreichbar (451/CORS)", priceMode: "poll" });
+    expect(bybit.pill).toMatchObject({ tone: "warn", text: "Kurs per Abfrage · 5 s" });
+    expect(legacyStatus(initialHealth(specs), null, T0)).toMatchObject({ status: "connecting", message: undefined, priceMode: "none", pill: { text: "Verbinde …" } });
     const off = reduceHealth(health, { type: "online", online: false, now: T0 }, specs);
     expect(legacyStatus(off, null, T0).status).toBe("error");
     expect(legacyStatus(off, null, T0).message).toMatch(/^Offline · Stand \d\d:\d\d$/);
     expect(legacyStatus(reduceHealth(initialHealth(specs), { type: "online", online: false, now: T0 }, specs), null, T0).message).toBe("Offline");
     const bad = reduceHealth(health, { type: "bad_symbol", now: T0 }, specs);
-    expect(legacyStatus(bad, null, T0)).toEqual({ status: "error", message: "Kein Live-Kurs" });
+    expect(legacyStatus(bad, null, T0)).toMatchObject({ status: "error", message: "Kein Live-Kurs", priceMode: "none", pill: { tone: "error", text: "Kein Live-Kurs" } });
   });
   it("deriveTopTrader + virtual reading", () => {
     const tt = deriveTopTrader(snap, health, "accounts");
@@ -306,5 +307,73 @@ describe("derived views", () => {
     const a = topTraderHealthSignature(liveHealth);
     expect(topTraderHealthSignature(live(liveHealth, [{ type: "ws_message", feeds: ["aggTrade"], asOf: T0 + 9000, now: T0 + 9000 }]))).toBe(a);
     expect(topTraderHealthSignature(live(liveHealth, [{ type: "schedule", feed: "topAccountRatio5m", nextRefreshAt: T0 + 999_000 }]))).not.toBe(a);
+  });
+});
+
+describe("last price after the stream drops (Galaxy Tab, 2026-10-08: 82.446,4 frozen for 6 min while REST delivered)", () => {
+  const ticker = (lastPrice: number, asOf: number) => st({ lastPrice, priceChangePercent: 0, high: 0, low: 0, volume: 0, quoteVolume: 0, time: asOf }, asOf);
+  const trade = (price: number, asOf: number) => st({ price, qty: 0.1, isBuyerMaker: false, time: asOf }, asOf);
+
+  it("the freshest source wins: a trade older than PRICE_PREFER_MS loses to the ticker / book; within it, trade > mid > ticker", () => {
+    // stream alive: the trade is a few hundred ms behind the ticker's closeTime and keeps winning
+    expect(lastPrice({ aggTrade: trade(82_446.4, T0 + 4_800), ticker24h: ticker(82_440, T0 + 5_000) })!.price).toBe(82_446.4);
+    // the tablet: the last trade at 15:25, the 30-s ticker poll 6 min later
+    const lp = lastPrice({ aggTrade: trade(82_446.4, T0), ticker24h: ticker(82_080, T0 + 360_000) })!;
+    expect(lp.price).toBe(82_080);
+    expect(lp.provenance.asOf).toBe(T0 + 360_000);
+    // a fresh book mid beats a stale trade too; the ticker stands back while the mid is as fresh
+    expect(lastPrice({ aggTrade: trade(1, T0), bookTop: st({ bid: 4, ask: 6, time: T0 + 60_000 }, T0 + 60_000), ticker24h: ticker(3, T0 + 61_000) })!.price).toBe(5);
+    // never the mark price
+    expect(lastPrice({ markPrice: st({ markPrice: 9, indexPrice: 9, fundingRate: 0, nextFundingTime: 0, time: T0 + 999_999 }, T0 + 999_999), aggTrade: trade(2, T0) })!.price).toBe(2);
+  });
+
+  const at = (evs: Parameters<typeof reduceHealth>[1][]) => evs.reduce((a, ev) => reduceHealth(a, ev, specs), initialHealth(specs));
+  const streaming = at([
+    { type: "ws_open", now: T0 },
+    { type: "ws_message", feeds: ["aggTrade", "markPrice", "bookTop"], asOf: T0, now: T0 },
+    { type: "rest_ok", feed: "ticker24h", source: "binance", asOf: T0, now: T0, nextRefreshAt: T0 + 30_000 },
+  ]);
+  const binance = (asOf: number) => ({ provenance: { source: "binance" as const, comparable: true, asOf, receivedAt: asOf + 100 } });
+
+  it("pill: Live → Kurs per Abfrage · 5 s (socket silent, REST stands in) → Verbinde … (REST failing) → Kein Live-Kurs (nothing for 2 min) → Live", () => {
+    expect(legacyStatus(streaming, binance(T0), T0 + 500)).toMatchObject({ status: "live", priceMode: "stream", pill: { tone: "live", text: "Live" } });
+
+    const silent = reduceHealth(streaming, { type: "ws_silent", now: T0 + 10_000, failedAttempts: 0 }, specs);
+    const polled = reduceHealth(silent, { type: "rest_ok", feed: "aggTrade", source: "binance", asOf: T0 + 10_400, now: T0 + 10_500 }, specs);
+    expect(polled.feeds.aggTrade.state).toBe("fallback"); // a REST stand-in never reads "Live · 1 s"
+    const poll = legacyStatus(polled, binance(T0 + 10_400), T0 + 11_000);
+    expect(poll).toMatchObject({ status: "live", priceMode: "poll", pill: { tone: "warn", text: "Kurs per Abfrage · 5 s" } });
+    expect(poll.message).toBeUndefined(); // no "veraltet" footer for a fresh polled price
+
+    // reconnecting (attempt > 0) still reads as down: the poll keeps the pill honest
+    const retrying = reduceHealth(reduceHealth(polled, { type: "ws_retry", attempt: 1, nextRetryAt: T0 + 12_000, now: T0 + 11_000 }, specs), { type: "ws_open", now: T0 + 12_000 }, specs);
+    expect(legacyStatus(retrying, binance(T0 + 15_400), T0 + 16_000).priceMode).toBe("poll");
+
+    const failing = reduceHealth(polled, { type: "rest_fail", feed: "aggTrade", source: "binance", kind: "network", now: T0 + 15_500 }, specs);
+    expect(legacyStatus(failing, binance(T0 + 10_400), T0 + 16_000)).toMatchObject({ status: "live", priceMode: "waiting", pill: { tone: "muted", text: "Verbinde …" } });
+
+    const stale = legacyStatus(failing, binance(T0 + 10_400), T0 + 10_400 + 121_000);
+    expect(stale).toMatchObject({ status: "error", priceMode: "none", pill: { tone: "error", text: "Kein Live-Kurs" } });
+    expect(stale.message).toMatch(/^Zuletzt \d\d:\d\d · veraltet$/);
+
+    // the stream is back: the first frame turns the pill Live again
+    const back = reduceHealth(failing, { type: "ws_message", feeds: ["aggTrade", "markPrice"], asOf: T0 + 200_000, now: T0 + 200_000 }, specs);
+    expect(legacyStatus(back, binance(T0 + 200_000), T0 + 200_300)).toMatchObject({ status: "live", priceMode: "stream", pill: { text: "Live" } });
+  });
+
+  it("the footer names the time of the price actually shown (not of the frozen trade)", () => {
+    const h = reduceHealth(streaming, { type: "ws_silent", now: T0 + 10_000, failedAttempts: 0 }, specs);
+    const feeds = { aggTrade: trade(82_446.4, T0), ticker24h: ticker(82_080, T0 + 360_000) };
+    const m = deriveMarket(feeds, h, { now: T0 + 361_000 });
+    expect(m.price).toBe(82_080);
+    expect(m.priceSource!.asOf).toBe(T0 + 360_000);
+    expect(m.status).toBe("live");
+    expect(m.priceMode).toBe("poll");
+    expect(m.pill.text).toBe("Kurs per Abfrage · 5 s");
+  });
+
+  it("the initial handshake racing the REST bootstrap is not 'down' (no Kurs-per-Abfrage flash on load)", () => {
+    const boot = reduceHealth(initialHealth(specs), { type: "rest_ok", feed: "aggTrade", source: "binance", asOf: T0, now: T0 }, specs);
+    expect(boot.feeds.aggTrade.state).toBe("live");
   });
 });

@@ -23,14 +23,22 @@ export const BUCKETS: Record<CostBucket, BucketConfig> = {
 };
 
 /**
- * Request classes sharing a bucket. `live` = the feeds themselves (polls, WS gap fills, REST fallback, probes): may
- * use the whole bucket. `bulk` = one-off pages (chart history, retro signal checks, the lazily polled 1D rung): may
- * only take tokens while `BULK_RESERVE` of the bucket stays free for the live feeds, so a long history scroll or a
- * batch of retro checks can never starve a live feed.
+ * Request classes sharing a bucket. `price` = the REST stand-in for the last price while the socket is down (one
+ * `ticker/24hr` every 5 s): may use the whole bucket. `live` = the other feeds (polls, WS gap fills, REST fallback,
+ * probes): keep `PRICE_RESERVE` of the `PRICE_BUCKETS` free, so the price poll always finds its tokens. `bulk` = one-off pages
+ * (chart history, retro signal checks, the lazily polled 1D rung): may only take tokens while `BULK_RESERVE` of the
+ * bucket stays free for the live feeds, so a long history scroll or a batch of retro checks can never starve a live feed.
  */
-export type BudgetClass = "live" | "bulk";
+export type BudgetClass = "price" | "live" | "bulk";
 /** Share of every bucket reserved for `live` requests. */
 export const BULK_RESERVE = 0.4;
+/** Share of a price bucket the `live` feeds leave for the price poll (`binance.weight`: 12 of 240 = one ticker per 5 s for a minute). */
+export const PRICE_RESERVE = 0.05;
+/**
+ * The buckets the price stand-in draws from (`ticker/24hr` on Binance, or through the EU proxy). Only these keep
+ * `PRICE_RESERVE` free of `live` requests; every other bucket (OKX with 2 tokens, funding, futures data) stays whole.
+ */
+export const PRICE_BUCKETS: readonly CostBucket[] = ["binance.weight", "proxy"];
 
 /** Backoff applied to a bucket after a 429 or a TypeError burst. */
 export const RATE_LIMIT_BACKOFF_MS = 60_000;
@@ -47,9 +55,14 @@ export class TokenBucket {
   private tokens: number;
   private last: number;
   private blockedUntil = 0;
+  /**
+   * @param priceReserve share of the bucket `live` requests leave for the `price` class (0 = none; `Budget` passes
+   *   `PRICE_RESERVE` for the `PRICE_BUCKETS`)
+   */
   constructor(
     readonly cfg: BucketConfig,
     now: number,
+    private readonly priceReserve = 0,
   ) {
     this.tokens = cfg.capacity;
     this.last = now;
@@ -67,9 +80,11 @@ export class TokenBucket {
     return now < this.blockedUntil ? 0 : this.tokens;
   }
 
-  /** Tokens a request class must leave in the bucket (`bulk` keeps `BULK_RESERVE` free for the live feeds). */
+  /** Tokens a request class must leave in the bucket (`bulk` keeps `BULK_RESERVE` free for the live feeds, `live` keeps `PRICE_RESERVE` for the price poll). */
   private floor(cls: BudgetClass): number {
-    return cls === "bulk" ? this.cfg.capacity * BULK_RESERVE : 0;
+    if (cls === "bulk") return this.cfg.capacity * BULK_RESERVE;
+    if (cls === "live") return this.cfg.capacity * this.priceReserve;
+    return 0;
   }
 
   /** Consumes `units` when possible; returns false (and consumes nothing) otherwise. */
@@ -104,7 +119,7 @@ export class Budget {
   private buckets: Record<CostBucket, TokenBucket>;
   constructor(now: number, cfg: Record<CostBucket, BucketConfig> = BUCKETS) {
     this.buckets = Object.fromEntries(
-      (Object.keys(cfg) as CostBucket[]).map((k) => [k, new TokenBucket(cfg[k], now)]),
+      (Object.keys(cfg) as CostBucket[]).map((k) => [k, new TokenBucket(cfg[k], now, PRICE_BUCKETS.includes(k) ? PRICE_RESERVE : 0)]),
     ) as Record<CostBucket, TokenBucket>;
   }
   bucket(id: CostBucket): TokenBucket {

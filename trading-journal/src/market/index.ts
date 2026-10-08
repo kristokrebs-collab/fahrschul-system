@@ -38,6 +38,10 @@ export {
   FUTURES_DATA_FEEDS,
   SERIES_FEEDS,
   WS_FEEDS,
+  WS_REST_FALLBACK_MS,
+  PRICE_REST_FALLBACK_MS,
+  PRICE_PREFER_MS,
+  PRICE_STALE_MS,
   BYBIT_UNSUPPORTED,
   DEFAULT_SOURCE_CHAIN,
   buildFeedSpecs,
@@ -49,10 +53,10 @@ export {
   isFamilyFeed,
   isLiveRatioFeed,
 } from "./feeds";
-export { Budget, TokenBucket, BUCKETS, klineWeight, RATE_LIMIT_BACKOFF_MS } from "./budget";
+export { Budget, TokenBucket, BUCKETS, BULK_RESERVE, PRICE_RESERVE, PRICE_BUCKETS, klineWeight, RATE_LIMIT_BACKOFF_MS, type BudgetClass } from "./budget";
 export { nextAlignedAt, currentBoundary, wsBackoffMs, probeBackoffMs, Scheduler, realTimerHost, WS_SILENT_MS, WS_ROLLOVER_MS, WS_MAX_FAILED, type TimerHost, type AlignSpec } from "./schedule";
 export { MarketCache, upsertSeries, upsertBar, cacheKey, memoryKV, idbKV, RING_CAPACITY, type KVStore } from "./cache";
-export { initialHealth, reduceHealth, aggregate, worst, feedsBySource, RANK, FAILURES_BEFORE_FALLBACK } from "./health";
+export { initialHealth, reduceHealth, aggregate, worst, wsDown, feedsBySource, RANK, FAILURES_BEFORE_FALLBACK } from "./health";
 export { statusLabel, statusLabelFor, liveAgeLabel, refreshRingProgress, fallbackBadge, STRINGS, SOURCE_NAME, COHORT_HINT, SOFT_FAILURE_TEXT } from "./statusLabel";
 export { closedBar, lastClosed4h, weeklyClose, currentBar, rsiWilder, weeklyRsi, type ClosedBar } from "./indicators";
 export {
@@ -88,6 +92,8 @@ export {
   type DeltaPoint,
   type VirtualReading,
   type LegacyMarketStatus,
+  type LegacyStatus,
+  type PriceMode,
 } from "./mapping";
 export { createMarketProvider, type MarketProvider, type ProviderOptions, type ProviderDeps } from "./provider";
 export {
@@ -109,6 +115,7 @@ export {
   ORDER_FLOW_HALF_LIFE_MS,
   flowImbalance,
   open24hFrom,
+  tickerCarriesPrice,
   bindMotionValues,
   flushMotionValues,
 } from "./motionValues";
