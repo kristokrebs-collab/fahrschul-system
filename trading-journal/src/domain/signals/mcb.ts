@@ -115,6 +115,9 @@ export interface WtTurn {
   level: number;
   /** wt1 is above wt2 on the forming candle right now (the up-cross is lit or was earlier in the window) */
   above: boolean;
+  /** a cross is possible on this candle: up = wt1 ≤ wt2 on the previous bar (the MCB cross rule), down = wt1 ≥ wt2 there */
+  up: boolean;
+  down: boolean;
 }
 
 /**
@@ -155,6 +158,11 @@ export function wtTurn(bars: readonly Bar[], cfg: Pick<SignalCfg, "wtSource" | "
     sum += v;
   }
   const level = sum / (L - 1);
+  // wt2 of the previous bar (SMA L ending there): the cross needs wt1 on the other side of it one bar earlier
+  let prevSum = 0;
+  for (let k = n - 1 - L; k < n - 1; k++) prevSum += wt1[k] ?? NaN;
+  const prevW2 = prevSum / L;
+  const prevW1 = wt1[n - 2]!;
   if (!isFinite(esa) || !isFinite(de) || !isFinite(w)) return null;
   const last = bars[n - 1]!;
   const wtAt = (c: number): number => {
@@ -174,5 +182,5 @@ export function wtTurn(bars: readonly Bar[], cfg: Pick<SignalCfg, "wtSource" | "
     if (wtAt(m) > level) hi = m;
     else lo = m;
   }
-  return { price: hi, level, above: wtAt(last.c) > level };
+  return { price: hi, level, above: wtAt(last.c) > level, up: prevW1 <= prevW2, down: prevW1 >= prevW2 };
 }

@@ -376,7 +376,7 @@ export function signalsKey(s: Signals | null): string {
   for (const v of [s.long, s.short]) if (v.whale) parts.push(`wv:${v.whale.ok ? 1 : 0},${v.whale.run},${v.whale.period},${v.whale.points}`);
   // live extras: turn prices (to the dollar) and the intrabar memory
   const live = s as Partial<LiveSignals>;
-  if (live.turns) parts.push(`tp:${Object.entries(live.turns).map(([tf, t]) => (t ? `${tf}${Math.round(t.price)}${t.above ? "a" : "b"}${r1(t.level)}` : `${tf}-`)).join(",")}`);
+  if (live.turns) parts.push(`tp:${Object.entries(live.turns).map(([tf, t]) => (t ? `${tf}${Math.round(t.price)}${t.above ? "a" : "b"}${t.up ? "u" : ""}${t.down ? "d" : ""}${r1(t.level)}` : `${tf}-`)).join(",")}`);
   if (live.intrabar) {
     const ib: string[] = [];
     for (const [tf, m] of Object.entries(live.intrabar)) for (const [side, x] of Object.entries(m)) if (x) ib.push(`${tf}${side}${x.kind}${x.bar}:${x.first}-${x.last}`);

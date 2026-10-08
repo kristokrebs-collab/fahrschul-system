@@ -31,9 +31,9 @@ const hm = (ms: number) => new Intl.DateTimeFormat("de-DE", { hour: "2-digit", m
 
 const TURNS: Record<string, WtTurn | null> = {
   "30m": null,
-  "45m": { price: 82_334.3, level: -57.9, above: true },
-  "1h": { price: 82_447.3, level: -56.9, above: false },
-  "4h": { price: 82_736.5, level: -46.0, above: false },
+  "45m": { price: 82_334.3, level: -57.9, above: true, up: true, down: false },
+  "1h": { price: 82_447.3, level: -56.9, above: false, up: true, down: false },
+  "4h": { price: 82_736.5, level: -46.0, above: false, up: true, down: false },
 };
 const MEMO: IntrabarMemo = { "1h": { long: { kind: "buy", bar: BAR, first: T1311, last: T1325, price: 82_466.2, lastPrice: 82_462 } } };
 
@@ -78,7 +78,7 @@ describe("view model: turn price, intrabar memory", () => {
     expect(r.map((x) => x.turn?.value ?? null)).toEqual([null, null, "82.447", "82.737"]);
     expect(r[2]!.turn).toMatchObject({ kind: "buy", aria: "MCB dreht ab 82.447 nach oben (Kaufsignal)" });
     expect(r[3]!.turn!.kind).toBe("bull"); // −46 > −53: the cross would be a Kreuz
-    expect(r[2]!.intrabar).toEqual({ kind: "buy", text: "Kaufsignal", span: `${hm(T1311)}–${hm(T1325)}`, price: "82.466", aria: `Kaufsignal intrabar ${hm(T1311)}–${hm(T1325)} bei 82.466 · aktuell nicht gehalten (zählt nicht)` });
+    expect(r[2]!.intrabar).toEqual({ kind: "buy", text: "Kaufsignal", short: "Kauf", span: `${hm(T1311)}–${hm(T1325)}`, price: "82.466", aria: `Kaufsignal intrabar ${hm(T1311)}–${hm(T1325)} bei 82.466 · aktuell nicht gehalten (zählt nicht)` });
     expect(r.filter((x) => x.intrabar)).toHaveLength(1);
     // the 45m wt1 is already above wt2 (crossed earlier): no turn price; the short side: the crosses would not count
     expect(rungViews(s, s.short, "short", UI_CFG).every((x) => x.turn === null && x.intrabar === null)).toBe(true);
@@ -91,7 +91,9 @@ describe("view model: turn price, intrabar memory", () => {
     expect(turnView(t, v2check("1h"), "long", UI_CFG)).toBeNull(); // closed last bar
     expect(turnView(t, v2check("1h", { closesAt: Date.now() + MIN, long: { kind: "buy", barsAgo: 0 }, state: "provisional" }), "long", UI_CFG)).toBeNull();
     expect(turnView({ ...t, level: 4 }, forming, "long", UI_CFG)).toBeNull(); // a Kreuz above zero would not count
-    expect(turnView({ ...t, level: 58, above: true }, forming, "short", UI_CFG)).toMatchObject({ kind: "sell" });
+    expect(turnView({ ...t, level: 58, above: true, down: true }, forming, "short", UI_CFG)).toMatchObject({ kind: "sell" });
+    // wt1 was already above wt2 one bar earlier: closing above the turn would not be a cross → no turn price
+    expect(turnView({ ...t, up: false }, forming, "long", UI_CFG)).toBeNull();
     expect(intrabarView(MEMO, forming, "long")!.text).toBe("Kaufsignal");
     expect(intrabarView({ "1h": { long: { ...MEMO["1h"]!.long!, bar: BAR - 3600 } } }, forming, "long")).toBeNull();
     const one = intrabarView({ "1h": { long: { ...MEMO["1h"]!.long!, last: T1311 } } }, forming, "long")!;

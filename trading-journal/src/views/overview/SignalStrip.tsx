@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useState, type CSSProperties } from "react";
-import { LOADING_TEXT, NO_KIND_TEXT, OFFLINE_TEXT, SIGNAL_TITLE, type WtKind } from "@/domain/signals";
+import { LOADING_TEXT, NO_KIND_TEXT, OFFLINE_TEXT, SIGNAL_TITLE } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { useSignalCheck } from "@/market";
 import { spring, tween } from "@/motion/tokens";
@@ -12,13 +12,13 @@ import { rollDirection } from "@/primitives/StatTile";
 import { BiasBar } from "./BiasBar";
 import { SIGNAL_CARD_ID } from "./SignalCard";
 import { GhostDot, StateDot, StateLine, StrengthDots } from "./signalParts";
-import { labelParts, partChips, PROV_TEXT, rungViews, statusPill, strengthView, verdictColor, verdictStateLine, verdictText, type PartChip, type RungView } from "./signalView";
+import { KIND_SHORT_TEXT, labelParts, partChips, PROV_TEXT, rungViews, statusPill, strengthView, verdictColor, verdictStateLine, verdictText, type PartChip, type RungView } from "./signalView";
 
 export const SIGNAL_STRIP_DETAILS = "Details";
 
 const STATUS_DOT: Record<string, string> = { live: "bg-win", warn: "bg-warn", error: "bg-loss", muted: "bg-faint" };
 /** One-word event names for the chips (the dot colour carries the direction; the small crosses are "Kreuz", not "Einstieg"). */
-const SHORT_KIND: Record<WtKind, string> = { bottom: "Bottom", buy: "Kauf", bull: "Kreuz", top: "Top", sell: "Verkauf", bear: "Kreuz" };
+const SHORT_KIND = KIND_SHORT_TEXT;
 
 function Score({ score }: { score: number }) {
   const text = String(score);

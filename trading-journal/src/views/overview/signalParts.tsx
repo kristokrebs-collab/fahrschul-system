@@ -363,7 +363,13 @@ function IntrabarRow({ ib }: { ib: IntrabarView }) {
         </span>
         <span className="truncate">
           <span className="sr-only">{ib.aria}</span>
-          <span aria-hidden="true">{ib.text}</span>
+          {/* a phone's 2-up tile: the one-word name, so "intrabar" stays beside it */}
+          <span aria-hidden="true" className="@max-[10rem]/rung:hidden">
+            {ib.text}
+          </span>
+          <span aria-hidden="true" className="hidden @max-[10rem]/rung:inline">
+            {ib.short}
+          </span>
         </span>
       </span>
       <span aria-hidden="true" className="shrink-0 text-[10.5px] text-faint">

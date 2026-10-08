@@ -90,11 +90,16 @@ export interface TurnView {
   aria: string;
 }
 
+/** One-word event names for narrow places (strip chips, a phone's rung tile); the dot colour carries the direction. */
+export const KIND_SHORT_TEXT: Readonly<Record<WtKind, string>> = { bottom: "Bottom", buy: "Kauf", bull: "Kreuz", top: "Top", sell: "Verkauf", bear: "Kreuz" };
+
 /** A forming-candle event that is gone now: `Kaufsignal intrabar 13:11–13:25 bei 82.466 · aktuell nicht gehalten`. */
 export interface IntrabarView {
   kind: WtKind;
   /** `Kaufsignal` */
   text: string;
+  /** `Kauf` (narrow tiles) */
+  short: string;
   /** `13:11–13:25` (local time; one minute: `13:30`) */
   span: string;
   /** `82.466` (`–` without a price) */
@@ -112,8 +117,9 @@ const priceText = (x: number): string => (Number.isFinite(x) ? fmtP0.format(x) :
 export function turnView(t: WtTurn | null | undefined, c: TfCheck | null | undefined, side: Side, cfg: Partial<Pick<SignalCfg, "wtOs" | "wtOb">>): TurnView | null {
   if (!t || !c?.forming || rungState(c, side) !== "none") return null;
   const long = side === "long";
-  // long: wt1 below wt2 now and the cross below the zero line (a "Kreuz" above it would not count); short mirrored
-  if (long ? !(t.level < 0) || t.above : !(t.level > 0) || !t.above) return null;
+  // long: a cross is possible on this candle (wt1 ≤ wt2 one bar earlier), wt1 below wt2 now and the cross below the zero
+  // line (a "Kreuz" above it would not count); short mirrored. Hand-built turns without the flags count as possible.
+  if (long ? t.up === false || !(t.level < 0) || t.above : t.down === false || !(t.level > 0) || !t.above) return null;
   const kind: WtKind = long ? (t.level <= (cfg.wtOs ?? -53) ? "buy" : "bull") : t.level >= (cfg.wtOb ?? 53) ? "sell" : "bear";
   const value = priceText(t.price);
   return { price: t.price, value, kind, aria: `MCB dreht ab ${value} ${long ? "nach oben" : "nach unten"} (${kindText(kind)})` };
@@ -128,7 +134,7 @@ export function intrabarView(memo: IntrabarMemo | null | undefined, c: TfCheck |
   const span = a === b ? a : `${a}–${b}`;
   const text = kindText(s.kind);
   const price = priceText(s.price);
-  return { kind: s.kind, text, span, price, aria: `${text} intrabar ${span} bei ${price} · aktuell nicht gehalten (zählt nicht)` };
+  return { kind: s.kind, text, short: KIND_SHORT_TEXT[s.kind], span, price, aria: `${text} intrabar ${span} bei ${price} · aktuell nicht gehalten (zählt nicht)` };
 }
 
 /** Rung tiles for `side`, one per ladder entry (a `null` check keeps its timeframe from the config). */

@@ -98,7 +98,7 @@ describe("tv-check 13:30 UTC: MCB on the forming candle (proposals 1 + 2)", () =
     expect(Math.round(h.price)).toBe(82_415);
     expect(t1.price).toBeCloseTo(82_447, -0.5);
     expect(t4.price).toBeCloseTo(82_736, -0.5);
-    expect(t1).toMatchObject({ above: false });
+    expect(t1).toMatchObject({ above: false, up: true, down: false }); // wt1 fell into the 12:00 close: an up-cross is possible
     expect(t1.level).toBeCloseTo(-56.9, 1); // wt1 of the 12:00 close: the cross level (wt2 = SMA 2)
     // exact: a cent above the turn the forming candle crosses up, a cent below it does not
     const crossAt = (c: number): boolean => {
