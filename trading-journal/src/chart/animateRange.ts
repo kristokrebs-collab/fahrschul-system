@@ -59,6 +59,20 @@ export function rangeForDays(src: RangeSource, days: number, interval: ChartInte
   return { from: Math.max(-0.5, fromIdx - 0.5), to: lastIndex + offsetOf(rightOffset, lastIndex - fromIdx + 1) };
 }
 
+/**
+ * A window that fits the time scale: lightweight-charts never zooms out beyond `minSpacing` px per bar, and a wider
+ * request (e.g. 1W of 30m bars on a 390 px phone, 1M of 30m on a tablet) kept its right offset but lost its left part –
+ * the newest candle ended up at the LEFT edge of an empty chart. Such a window keeps the newest bars that fit and the
+ * free space right of the last bar (`minPx`).
+ */
+export function fitToWidth(r: Range, lastIndex: number, width: number, minSpacing: number, minPx = RIGHT_FREE_PX): Range {
+  if (!(width > 0) || !(minSpacing > 0)) return r;
+  const maxBars = width / minSpacing;
+  if (r.to - r.from <= maxBars) return r;
+  const to = lastIndex + Math.max(1, Math.ceil(minPx / minSpacing));
+  return { from: to - maxBars, to };
+}
+
 export const sameRange = (a: LogicalRange | Range | null, b: Range, eps = 0.01): boolean =>
   !!a && Math.abs(a.from - b.from) < eps && Math.abs(a.to - b.to) < eps;
 

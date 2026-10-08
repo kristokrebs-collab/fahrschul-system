@@ -16,4 +16,7 @@ export const ink = {
   /** journal semantics for trade overlays (declared exception, Plan 5.5) */
   win: "#3ddc84",
   loss: "#ff4d4f",
+  /** `win` / `loss` at ~50 % saturation: provisional (forming-candle) signals, decision 9 */
+  winSoft: "#65b488",
+  lossSoft: "#d2797a",
 } as const;

@@ -2,10 +2,11 @@
  * NothingCandleChart – lightweight-charts 5.2.1 candlestick chart in the monochrome "Nothing" theme
  * (Plan 5.1–5.6). Creates the chart once (StrictMode-safe), `setData` per history load (newer bars on the right are
  * appended in place instead), a live forming candle that moves with every trade (`liveCandle.ts`), a DOM price pulse,
- * price lines + zone for `levels`, trade markers with a new-trade ripple, MCB signal dots (`signals`, own marker
- * layer), optional ratio/OI pane, range morph, interval strip wipe / pane crossfade, a "Folgen" pill away from the live
- * edge, spring tooltip and a skeleton → entrance. Tick labels next to a level / zone / last-price label are blanked
- * (`axisLabels.ts`), so no axis text overlaps.
+ * price lines + zone for `levels`, trade markers with a new-trade ripple, the Einstiegs-Check overlay (MCB dots by
+ * candle-close state, divergence lines, support / resistance, optional structure – `primitives/SignalOverlay.ts`),
+ * optional ratio/OI pane, range morph, interval strip wipe / pane crossfade, a "Folgen" pill away from the live
+ * edge, spring tooltip and a skeleton → entrance. Tick labels next to a level / zone / last-price / S/R label are
+ * blanked (`axisLabels.ts`), so no axis text overlaps.
  */
 import { memo, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { AnimatePresence, animate, motion, useReducedMotion, type MotionValue } from "motion/react";
@@ -26,7 +27,7 @@ import { observeInView } from "@/motion/inView";
 import { playStripWipe } from "@/motion/pulse/StripWipe";
 import { tween } from "@/motion/tokens";
 import { cn } from "@/lib/cn";
-import { CHART_FONT, CHART_FONT_LOAD, CHART_PRICE_MIN_MOVE, CHART_RIGHT_OFFSET, NOTHING_DARK, ink } from "./theme";
+import { CHART_FONT, CHART_FONT_LOAD, CHART_MIN_BAR_SPACING, CHART_PRICE_MIN_MOVE, CHART_RIGHT_OFFSET, NOTHING_DARK, ink } from "./theme";
 import {
   INTERVAL_SECONDS,
   PaneController,
@@ -42,7 +43,9 @@ import {
 import { clearLevels, LEVEL_KEYS, setLevels, zoneIsSet, type ActiveScenario, type LevelLines } from "./levels";
 import { filterTickLabels } from "./axisLabels";
 import { fmt } from "./format";
-import { buildSignalMarkers, signalMarkersKey, type SignalMarker } from "./signalMarkers";
+import type { SignalMarker } from "./signalMarkers";
+import { DEFAULT_LAYERS, SignalOverlay, type DivergenceLine, type OverlayLayers, type StructureOverlay } from "./primitives/SignalOverlay";
+import type { Box } from "./overlayLayout";
 import {
   MARKER_ENTRY_PREFIX,
   MARKER_EXIT_PREFIX,
@@ -56,7 +59,7 @@ import {
   type HistoryBounds,
   type TradeMarker,
 } from "./markers";
-import { RangeAnimator, rangeForDays, rightOffsetBars, type RightOffset } from "./animateRange";
+import { fitToWidth, RangeAnimator, rangeForDays, rightOffsetBars, type Range, type RightOffset } from "./animateRange";
 import { ChartTooltip, type TooltipData, type TooltipHandle } from "./tooltip";
 import { ChartSkeleton } from "./ChartSkeleton";
 import { LiveCandle, extendsTail, type Bar } from "./liveCandle";
@@ -109,8 +112,14 @@ export interface NothingCandleChartProps {
   /** highlights the trigger line of the active scenario */
   activeScenario?: ActiveScenario;
   markers?: TradeMarker[];
-  /** MCB events of the entry check for this interval (dots below / above the bars) */
+  /** MCB events of the entry check for this interval (dots below / above the bars, styled by candle-close state) */
   signals?: SignalMarker[];
+  /** RSI / WaveTrend divergences of this interval (lines between the pivots) */
+  divergences?: DivergenceLine[];
+  /** market structure + support / resistance of this interval */
+  structure?: StructureOverlay | null;
+  /** overlay layers shown (legend toggles); default MCB, divergences and S/R on, structure off */
+  layers?: OverlayLayers;
   ratio?: RatioPoint[];
   oi?: OpenInterestPoint[];
   pane?: PaneKind;
@@ -149,10 +158,8 @@ interface Instance {
   main: MainSeries;
   panes: PaneController;
   markersApi: ISeriesMarkersPluginApi<Time>;
-  /** MCB signal dots (separate layer under the trade markers) */
-  signalsApi: ISeriesMarkersPluginApi<Time>;
-  /** `signalMarkersKey` + data length of the last signal sync */
-  signalsKey: string;
+  /** Einstiegs-Check overlay: MCB dots, divergences, S/R, structure (under the trade markers) */
+  check: SignalOverlay;
   range: RangeAnimator;
   live: LiveCandle;
   levels: LevelLines | null;
@@ -195,6 +202,14 @@ function loadChartFont(): Promise<void> {
 /** Right offset that keeps the price-line titles and the live pulse clear of the last bar (pixel based). */
 const rightOffsetOf = (i: Instance): RightOffset => (bars: number) => rightOffsetBars(bars, i.chart.timeScale().width());
 
+/** The last `days` days on the loaded bars, cut to what fits the time scale at the narrowest bar spacing. */
+function windowFor(i: Instance, days: RangeDays, interval: ChartInterval): Range | null {
+  const last = i.data[i.data.length - 1];
+  const ts = i.chart.timeScale();
+  const target = rangeForDays({ timeToIndex: (t, n) => ts.timeToIndex(t, n), length: i.data.length, lastTime: last?.time ?? null }, days, interval, rightOffsetOf(i));
+  return target ? fitToWidth(target, i.data.length - 1, ts.width(), CHART_MIN_BAR_SPACING) : null;
+}
+
 function syncLevels(i: Instance, levels: MarketLevels | undefined, active: ActiveScenario, reduced = false): void {
   if (!levels) {
     clearLevels(i.main.candles, i.levels);
@@ -204,20 +219,41 @@ function syncLevels(i: Instance, levels: MarketLevels | undefined, active: Activ
   i.levels = setLevels(i.main.candles, levels, i.levels, { active, from: i.data[0]?.time ?? null, reducedMotion: reduced });
 }
 
-/** MCB dots on the bars the chart holds; re-set only when the list or the loaded bars changed. */
-function syncSignals(i: Instance, signals: SignalMarker[] | undefined): void {
-  const list = signals ?? [];
-  const key = `${signalMarkersKey(list)}|${i.data.length}:${i.data[0]?.time ?? 0}`;
-  if (key === i.signalsKey) return;
-  i.signalsKey = key;
-  if (list.length === 0) {
-    i.signalsApi.setMarkers([]);
-    return;
+const NO_MARKERS: SignalMarker[] = [];
+const NO_LINES: DivergenceLine[] = [];
+
+/**
+ * Prices that already carry a price-axis label: set trigger levels, both zone edges, the last close. The tick formatter
+ * blanks ticks next to them (plus the S/R labels the overlay shows); the overlay hides its S/R axis labels next to them.
+ */
+function axisLabelPrices(i: Instance, levels: MarketLevels | undefined): number[] {
+  const out: number[] = [];
+  if (levels) {
+    for (const k of LEVEL_KEYS) if (levels[k] > 0) out.push(levels[k]);
+    if (zoneIsSet(levels)) out.push(levels.zoneLow, levels.zoneHigh);
   }
-  const times = new Set<number>();
-  for (const d of i.data) times.add(d.time);
-  // dots only: words on the canvas collided on clustered events (legend in the card note)
-  i.signalsApi.setMarkers(buildSignalMarkers(list, times));
+  const last = i.data[i.data.length - 1];
+  if (last) out.push(last.close);
+  return out;
+}
+
+/** The zone band's `ZONE` caption (top left inside the band, CSS px) – overlay labels keep clear of it. */
+function zoneCaptionBox(i: Instance, levels: MarketLevels | undefined): Box[] {
+  if (!levels || !zoneIsSet(levels) || !i.levels) return [];
+  const top = i.main.candles.priceToCoordinate(Math.max(levels.zoneLow, levels.zoneHigh));
+  const btm = i.main.candles.priceToCoordinate(Math.min(levels.zoneLow, levels.zoneHigh));
+  if (top == null || btm == null || Math.abs(btm - top) < 16) return [];
+  const first = i.data[0];
+  const x = first ? (i.chart.timeScale().timeToCoordinate(first.time) ?? 0) : 0;
+  return [{ x: x + 2, y: Math.min(top, btm) + 1, w: 44, h: 18 }];
+}
+
+/** Overlay inputs; the overlay re-indexes itself when the inputs or the loaded bars change. */
+function syncOverlay(i: Instance, p: { signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers }): void {
+  i.check.setMarkers(p.signals ?? NO_MARKERS);
+  i.check.setDivergences(p.divergences ?? NO_LINES);
+  i.check.setStructure(p.structure ?? null);
+  i.check.setLayers(p.layers ?? DEFAULT_LAYERS);
 }
 
 function syncMarkers(i: Instance, markers: TradeMarker[] | undefined): BuiltMarkers {
@@ -329,6 +365,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   activeScenario = null,
   markers,
   signals,
+  divergences,
+  structure,
+  layers,
   ratio,
   oi,
   pane = "none",
@@ -355,7 +394,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   const inst = useRef<Instance | null>(null);
   const tip = useRef<TooltipHandle>(null);
   const cb = useRef<Callbacks>({});
-  const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; levels?: MarketLevels; activeScenario: ActiveScenario }>({ activeScenario: null });
+  const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers; levels?: MarketLevels; activeScenario: ActiveScenario }>({
+    activeScenario: null,
+  });
   const reduceRef = useRef(false);
   const readyRef = useRef(false);
   const visibleRef = useRef(true);
@@ -373,8 +414,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     reduceRef.current = reduce;
   }, [reduce]);
   useEffect(() => {
-    latest.current = { markers, signals, levels, activeScenario };
-  }, [markers, signals, levels, activeScenario]);
+    latest.current = { markers, signals, divergences, structure, layers, levels, activeScenario };
+  }, [markers, signals, divergences, structure, layers, levels, activeScenario]);
 
   // 1. create once; full teardown (StrictMode-safe). A passive effect, not a layout effect: a keep-alive <Activity>
   // re-show re-runs it, and createChart's forced layout must land after the reveal paint, not inside its commit
@@ -385,8 +426,13 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     const chart = createChart(node, NOTHING_DARK);
     const main = createMainSeries(chart);
     const panes = new PaneController(chart);
-    // MCB dots first (normal z-order, with the series), trade markers above them
-    const signalsApi = createSeriesMarkers(main.candles, [], { zOrder: "normal" });
+    // the check overlay first (S/R under the candles, dots / lines / labels with the series), trade markers above it
+    const check = new SignalOverlay({
+      bars: () => instance.data,
+      axisPrices: () => axisLabelPrices(instance, latest.current.levels),
+      reserved: () => zoneCaptionBox(instance, latest.current.levels),
+    });
+    main.candles.attachPrimitive(check);
     const markersApi = createSeriesMarkers(main.candles, [], { zOrder: "aboveSeries" });
     const range = new RangeAnimator(chart, { reducedMotion: () => reduceRef.current });
     let placeRaf = 0;
@@ -423,8 +469,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       main,
       panes,
       markersApi,
-      signalsApi,
-      signalsKey: "",
+      check,
       range,
       live,
       levels: null,
@@ -456,18 +501,11 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       if (inst.current === instance) chart.applyOptions({ layout: { fontFamily: CHART_FONT } });
     });
 
-    // axis collision guard: ticks next to a level / zone / last-price label stay blank (the label shows the price)
+    // axis collision guard: ticks next to a level / zone / last-price / S/R label stay blank (the label shows the price)
     chart.applyOptions({
       localization: {
         tickmarksPriceFormatter: (prices: readonly number[]) => {
-          const lv = latest.current.levels;
-          const labels: number[] = [];
-          if (lv) {
-            for (const k of LEVEL_KEYS) if (lv[k] > 0) labels.push(lv[k]);
-            if (zoneIsSet(lv)) labels.push(lv.zoneLow, lv.zoneHigh);
-          }
-          const last = instance.data[instance.data.length - 1];
-          if (last) labels.push(last.close);
+          const labels = [...axisLabelPrices(instance, latest.current.levels), ...check.axisLabelPrices()];
           return filterTickLabels(prices, labels, (p) => main.candles.priceToCoordinate(p), (p) => fmt.price(p));
         },
       },
@@ -558,7 +596,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       instance.cancelWipe?.();
       range.dispose();
       markersApi.detach();
-      signalsApi.detach();
+      main.candles.detachPrimitive(check);
       clearLevels(main.candles, instance.levels);
       panes.dispose();
       inst.current = null;
@@ -596,7 +634,6 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       if (intervalChanged && readyRef.current && !reduceRef.current) stripWipe(i, wrap.current);
 
       const volume = normalizeSeries(candles.map(toVolumeData));
-      const last = data[data.length - 1];
       // before setData: range-change callbacks fired from inside it must see the new bars
       i.data = data;
       i.lastInterval = interval;
@@ -608,12 +645,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       i.panes.setGrid(data.map((d) => d.time));
 
       if (first || intervalChanged) {
-        const target = rangeForDays(
-          { timeToIndex: (t, n) => i.chart.timeScale().timeToIndex(t, n), length: data.length, lastTime: last?.time ?? null },
-          rangeDays,
-          interval,
-          rightOffsetOf(i),
-        );
+        const target = windowFor(i, rangeDays, interval);
         if (target) i.range.goTo(target, false);
       } else if (prevRange) {
         // same interval, different history (older bars prepended, source switch): keep the user's window on the same
@@ -624,7 +656,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       // levels & markers depend on the loaded bars (zone left edge, snapping, bounds)
       syncLevels(i, latest.current.levels, latest.current.activeScenario, reduceRef.current);
       i.markerIds = null;
-      syncSignals(i, latest.current.signals);
+      i.check.invalidate();
+      syncOverlay(i, latest.current);
       const built = syncMarkers(i, latest.current.markers);
       freshMarkerIds(i, built);
       cb.current.onOutsideCount?.(built.outside);
@@ -660,13 +693,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     }
     if (lastRange.current === rangeDays) return;
     lastRange.current = rangeDays;
-    const last = i.data[i.data.length - 1];
-    const target = rangeForDays(
-      { timeToIndex: (t, n) => i.chart.timeScale().timeToIndex(t, n), length: i.data.length, lastTime: last?.time ?? null },
-      rangeDays,
-      interval,
-      rightOffsetOf(i),
-    );
+    const target = windowFor(i, rangeDays, interval);
     if (target) i.range.goTo(target, true);
   }, [rangeDays, interval]);
 
@@ -729,11 +756,12 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     return () => cancelAnimationFrame(raf);
   }, [markers]);
 
-  // 6b. MCB signal dots (≤ 1 update per published signal check; re-synced after every history load, see step 2)
+  // 6b. check overlay: MCB dots, divergences, S/R, structure (≤ 1 update per published signal check; identities are
+  // memoised by content upstream; re-indexed after every history load, see step 2)
   useEffect(() => {
     const i = inst.current;
-    if (i && i.data.length) syncSignals(i, signals);
-  }, [signals]);
+    if (i) syncOverlay(i, { signals, divergences, structure, layers });
+  }, [signals, divergences, structure, layers]);
 
   // 7. optional sub pane; switching the kind crossfades from a screenshot
   useEffect(() => {
@@ -771,13 +799,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       fitRange(days, animated = true) {
         const i = inst.current;
         if (!i) return;
-        const last = i.data[i.data.length - 1];
-        const target = rangeForDays(
-          { timeToIndex: (t, n) => i.chart.timeScale().timeToIndex(t, n), length: i.data.length, lastTime: last?.time ?? null },
-          days,
-          i.lastInterval ?? interval,
-          rightOffsetOf(i),
-        );
+        const target = windowFor(i, days, i.lastInterval ?? interval);
         if (target) i.range.goTo(target, animated);
       },
       follow: followLive,

@@ -1,12 +1,17 @@
 /**
- * MCB (Market Cipher B / WaveTrend) events of the "Einstiegs-Check" as chart markers: long kinds (Bottom, Kaufsignal)
- * as a win-green dot BELOW the bar, short kinds (Top, Verkaufssignal) as a loss-red dot ABOVE it – the same journal
- * semantics as the trade markers (declared exception to the one-accent rule, Plan 5.5). Bottom/Top are the larger
- * dots; an event on the running (repainting) bar is drawn translucent. Marker ids are `m:{time}:{kind}`, so a click
- * on one is never mistaken for a trade marker.
+ * MCB (Market Cipher B / WaveTrend) events of the "Einstiegs-Check" as chart dots: long kinds (Bottom, Kaufsignal)
+ * in win green BELOW the bar, short kinds (Top, Verkaufssignal) in loss red ABOVE it – the same journal semantics as
+ * the trade markers (declared exception to the one-accent rule, Plan 5.5). Bottom/Top are the larger dots.
+ *
+ * Candle-close state (decisions 6 + 9): an event on the forming candle is `provisional` – an outlined ring in the
+ * ~50 % saturated tone; after its candle closed with the event it is `confirmed` – a filled dot at full saturation;
+ * still lit after `strongCloses` closes with the move held it is `strong` – the filled dot plus a thin halo ring.
+ * Drawn by `primitives/SignalOverlay.ts` (lightweight-charts series markers cannot outline). Dot ids are
+ * `m:{time}:{kind}`, so a dot is never mistaken for a trade marker.
  */
-import type { SeriesMarker, Time, UTCTimestamp } from "lightweight-charts";
+import type { SignalState } from "@/domain/signals/state";
 import { ink } from "./ink";
+import { barIndex, DOT_RADIUS, stackDots } from "./overlayLayout";
 
 export type SignalKind = "bottom" | "buy" | "bull" | "top" | "sell" | "bear";
 
@@ -16,41 +21,77 @@ export interface SignalMarker {
   kind: SignalKind;
   /** on the running bar (may still repaint) */
   live?: boolean;
+  /** candle-close state (`@/market` `getMcbSeries`); absent → `live` decides (provisional) or confirmed */
+  state?: SignalState;
 }
 
 export const SIGNAL_MARKER_PREFIX = "m:";
 const LONG_KINDS: ReadonlySet<SignalKind> = new Set(["bottom", "buy", "bull"]);
-/** size multiplier per kind (lightweight-charts marker `size`) */
-const SIZE: Record<SignalKind, number> = { bottom: 1, top: 1, buy: 0.7, sell: 0.7, bull: 0.45, bear: 0.45 };
-const TITLE: Record<SignalKind, string> = { bottom: "Bottom", top: "Top", buy: "Kauf", sell: "Verkauf", bull: "", bear: "" };
-/** translucent tone for the repainting bar (≈ 55 % alpha) */
-const LIVE_ALPHA = "8c";
+export const isLongSignal = (k: SignalKind): boolean => LONG_KINDS.has(k);
+
+export type DotStyle = "provisional" | "confirmed" | "strong";
+
+/** Look of a marker: provisional (forming candle) → ring, confirmed → dot, strong → dot + halo. */
+export function dotStyle(s: Pick<SignalMarker, "live" | "state">): DotStyle {
+  if (s.state === "provisional" || (s.state === undefined && s.live)) return "provisional";
+  return s.state === "strong" ? "strong" : "confirmed";
+}
+
+/** Colour of a dot: full win / loss once confirmed, the desaturated tone while provisional. */
+export function dotColor(long: boolean, style: DotStyle): string {
+  if (style === "provisional") return long ? ink.winSoft : ink.lossSoft;
+  return long ? ink.win : ink.loss;
+}
+
+/** One dot as the overlay draws it. */
+export interface SignalDot {
+  id: string;
+  /** index of the bar in the chart's data */
+  index: number;
+  long: boolean;
+  kind: SignalKind;
+  /** radius, CSS px */
+  r: number;
+  /** centre distance from the wick tip (CSS px, away from the bar; stacked dots of one bar grow outwards) */
+  offset: number;
+  style: DotStyle;
+  color: string;
+}
 
 /**
- * Series markers for `signals`, keeping only bars the chart holds (`times`, UTC seconds) – lightweight-charts expects
- * marker times on existing bars, sorted ascending. `labels` adds the short word (`Bottom` / `Top`) to the strong dots.
+ * Dots for `signals` on the chart's bars (`bars[i].time` in UTC seconds, ascending). Events on bars the chart does not
+ * hold are dropped; several events on one bar side stack outwards (strongest kind next to the bar).
  */
-export function buildSignalMarkers(signals: readonly SignalMarker[], times: ReadonlySet<number>, opts: { labels?: boolean } = {}): SeriesMarker<Time>[] {
-  const out: SeriesMarker<Time>[] = [];
+export function signalDots(signals: readonly SignalMarker[], bars: { readonly length: number; readonly [i: number]: { time: number } }): SignalDot[] {
+  const bySide = new Map<string, SignalMarker[]>();
+  const order: string[] = [];
   for (const s of signals) {
     const t = Math.floor(s.time / 1000);
-    if (!times.has(t)) continue;
-    const long = LONG_KINDS.has(s.kind);
-    const base = long ? ink.win : ink.loss;
-    const text = opts.labels ? TITLE[s.kind] : "";
-    out.push({
-      id: `${SIGNAL_MARKER_PREFIX}${t}:${s.kind}`,
-      time: t as UTCTimestamp,
-      position: long ? "belowBar" : "aboveBar",
-      shape: "circle",
-      color: s.live ? `${base}${LIVE_ALPHA}` : base,
-      size: SIZE[s.kind],
-      ...(text ? { text } : {}),
+    const index = barIndex(bars, t);
+    if (index < 0) continue;
+    const key = `${index}:${isLongSignal(s.kind) ? "L" : "S"}`;
+    const list = bySide.get(key);
+    if (list) list.push(s);
+    else {
+      bySide.set(key, [s]);
+      order.push(key);
+    }
+  }
+  const out: SignalDot[] = [];
+  for (const key of order) {
+    const list = bySide.get(key)!.slice().sort((a, b) => (DOT_RADIUS[b.kind] ?? 0) - (DOT_RADIUS[a.kind] ?? 0));
+    const index = Number(key.slice(0, key.indexOf(":")));
+    const radii = list.map((s) => DOT_RADIUS[s.kind] ?? 2.5);
+    const offsets = stackDots(radii);
+    list.forEach((s, k) => {
+      const long = isLongSignal(s.kind);
+      const style = dotStyle(s);
+      out.push({ id: `${SIGNAL_MARKER_PREFIX}${Math.floor(s.time / 1000)}:${s.kind}`, index, long, kind: s.kind, r: radii[k]!, offset: offsets[k]!, style, color: dotColor(long, style) });
     });
   }
-  out.sort((a, b) => (a.time as number) - (b.time as number));
+  out.sort((a, b) => a.index - b.index);
   return out;
 }
 
-/** Stable key of a marker list (the chart re-sets markers only when it changes). */
-export const signalMarkersKey = (signals: readonly SignalMarker[]): string => signals.map((s) => `${s.time}${s.kind}${s.live ? "~" : ""}`).join(",");
+/** Stable key of a marker list (the chart re-sets its dots only when it changes). */
+export const signalMarkersKey = (signals: readonly SignalMarker[]): string => signals.map((s) => `${s.time}${s.kind}${s.live ? "~" : ""}${s.state ? s.state[0] : ""}`).join(",");

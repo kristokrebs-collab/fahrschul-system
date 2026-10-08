@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { rightOffsetBars, rangeForDays } from "@/chart/animateRange";
+import { fitToWidth, rightOffsetBars, rangeForDays } from "@/chart/animateRange";
 import { AXIS_LABEL_GAP, filterTickLabels } from "@/chart/axisLabels";
 import { resampleCandles, resampleTail } from "@/chart/resample";
-import { buildSignalMarkers, SIGNAL_MARKER_PREFIX, signalMarkersKey } from "@/chart/signalMarkers";
+import { dotColor, dotStyle, SIGNAL_MARKER_PREFIX, signalDots, signalMarkersKey } from "@/chart/signalMarkers";
+import { DOT_GAP, DOT_RADIUS, DOT_STACK_GAP } from "@/chart/overlayLayout";
 import { ink } from "@/chart/ink";
 import type { Candle } from "@/market/types";
 
@@ -43,28 +44,52 @@ describe("resampleCandles (30m from 15m)", () => {
   });
 });
 
-describe("MCB signal markers", () => {
-  const times = new Set([1000, 2800, 4600]);
-  it("long kinds below the bar in win green, short kinds above in loss red; live bars translucent", () => {
-    const m = buildSignalMarkers(
+describe("MCB signal dots (candle-close states)", () => {
+  const bars = [{ time: 1000 }, { time: 2800 }, { time: 4600 }];
+  it("long kinds below the bar in win green, short kinds above in loss red; provisional = soft ring, strong = halo", () => {
+    const d = signalDots(
       [
-        { time: 4_600_000, kind: "top", live: true },
-        { time: 1_000_000, kind: "bottom" },
-        { time: 2_800_000, kind: "sell" },
+        { time: 4_600_000, kind: "top", live: true, state: "provisional" },
+        { time: 1_000_000, kind: "bottom", state: "strong" },
+        { time: 2_800_000, kind: "sell", state: "confirmed" },
         { time: 9_999_000, kind: "buy" }, // not a loaded bar → dropped
       ],
-      times,
+      bars,
     );
-    expect(m.map((x) => x.time)).toEqual([1000, 2800, 4600]);
-    expect(m[0]).toMatchObject({ position: "belowBar", shape: "circle", color: ink.win, size: 1, id: `${SIGNAL_MARKER_PREFIX}1000:bottom` });
-    expect(m[1]).toMatchObject({ position: "aboveBar", color: ink.loss, size: 0.7 });
-    expect(m[2]!.color).toBe(`${ink.loss}8c`);
-    expect(m.every((x) => x.text === undefined)).toBe(true);
+    expect(d.map((x) => x.index)).toEqual([0, 1, 2]);
+    expect(d[0]).toMatchObject({ long: true, color: ink.win, style: "strong", r: DOT_RADIUS.bottom, id: `${SIGNAL_MARKER_PREFIX}1000:bottom` });
+    expect(d[1]).toMatchObject({ long: false, color: ink.loss, style: "confirmed", r: DOT_RADIUS.sell });
+    expect(d[2]).toMatchObject({ long: false, color: ink.lossSoft, style: "provisional" });
   });
 
-  it("key changes only with content", () => {
+  it("an old marker without state: live → provisional, else confirmed", () => {
+    expect(dotStyle({ live: true })).toBe("provisional");
+    expect(dotStyle({})).toBe("confirmed");
+    expect(dotStyle({ state: "none" })).toBe("confirmed");
+    expect(dotColor(true, "provisional")).toBe(ink.winSoft);
+    expect(dotColor(false, "strong")).toBe(ink.loss);
+  });
+
+  it("several events on one bar side stack outwards, strongest next to the bar", () => {
+    const d = signalDots(
+      [
+        { time: 1_000_000, kind: "buy" },
+        { time: 1_000_000, kind: "bottom" },
+        { time: 1_000_000, kind: "top" },
+      ],
+      bars,
+    );
+    const long = d.filter((x) => x.long);
+    expect(long.map((x) => x.kind)).toEqual(["bottom", "buy"]);
+    expect(long[0]!.offset).toBe(DOT_GAP + DOT_RADIUS.bottom);
+    expect(long[1]!.offset).toBe(DOT_GAP + 2 * DOT_RADIUS.bottom + DOT_STACK_GAP + DOT_RADIUS.buy);
+    expect(d.find((x) => !x.long)!.offset).toBe(DOT_GAP + DOT_RADIUS.top);
+  });
+
+  it("key changes only with content (state included)", () => {
     expect(signalMarkersKey([{ time: 1, kind: "top" }])).toBe(signalMarkersKey([{ time: 1, kind: "top" }]));
     expect(signalMarkersKey([{ time: 1, kind: "top" }])).not.toBe(signalMarkersKey([{ time: 1, kind: "top", live: true }]));
+    expect(signalMarkersKey([{ time: 1, kind: "top", state: "confirmed" }])).not.toBe(signalMarkersKey([{ time: 1, kind: "top", state: "strong" }]));
   });
 });
 
@@ -94,5 +119,20 @@ describe("pixel-aware right offset", () => {
     const src = { length: 1000, lastTime: 1_000_000, timeToIndex: () => 500 };
     const r = rangeForDays(src, 7, "30m", (bars) => bars / 10);
     expect(r).toEqual({ from: 499.5, to: 999 + 50 });
+  });
+});
+
+describe("fitToWidth (window wider than the narrowest bar spacing allows)", () => {
+  it("keeps the newest bars that fit and the free space right of the last bar", () => {
+    // 1W of 30m (336 bars + offset) on a 220 px time scale at ≥ 3 px per bar → 73 bars
+    const r = fitToWidth({ from: 413.5, to: 913 }, 749, 220, 3);
+    expect(r.to).toBe(749 + 24);
+    expect(r.to - r.from).toBeCloseTo(220 / 3, 6);
+    expect(r.from).toBeLessThan(749);
+  });
+  it("leaves a window that fits untouched", () => {
+    const r = { from: 600, to: 760 };
+    expect(fitToWidth(r, 749, 1200, 3)).toBe(r);
+    expect(fitToWidth(r, 749, 0, 3)).toBe(r);
   });
 });

@@ -27,6 +27,8 @@ export { ink };
 
 /** Empty bar slots right of the last candle (the live edge); `follow()` restores it. */
 export const CHART_RIGHT_OFFSET = 8;
+/** Narrowest bar spacing (px) the candle chart zooms out to; a window with more bars than fit is cut from the left. */
+export const CHART_MIN_BAR_SPACING = 3;
 /** Price grid of the candle series (axis label precision 1). */
 export const CHART_PRICE_MIN_MOVE = 0.1;
 
@@ -120,7 +122,7 @@ export function makeNothingTheme(background: string = CHART_BACKGROUND_TRANSPARE
       secondsVisible: false,
       rightOffset: CHART_RIGHT_OFFSET,
       barSpacing: 9,
-      minBarSpacing: 3,
+      minBarSpacing: CHART_MIN_BAR_SPACING,
       lockVisibleTimeRangeOnResize: true,
       tickMarkFormatter: (time: Time, type: TickMarkType) => formatTickMark(time, type),
     },
