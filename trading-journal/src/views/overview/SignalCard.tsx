@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { DATA_SOURCE_NOTE, DEFAULT_SIGNAL_CFG, LOADING_TEXT, OFFLINE_TEXT, SIGNAL_TITLE, signalInfo, type Side } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { SIGNAL_HOLD_MS, useSignalCheck, type LiveSignals } from "@/market";
@@ -14,6 +14,7 @@ import { Collapse, Expander } from "@/primitives/Expander";
 import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
 import { Explainer, type ExplainerData } from "@/primitives/VerdictPanel";
+import { storageKey } from "@/store/storage";
 import { BiasBar } from "./BiasBar";
 import { PartsSection, Reasons, RungTile, VerdictRow, ZoneGauge } from "./signalParts";
 import { entryLevels, freshEntry, ladderText, partViews, rungViews, statusPill, verdictStateLine, type EntryLevels, type RungView } from "./signalView";
@@ -102,21 +103,103 @@ function infoData(snap: LiveSignals | null): ExplainerData {
 }
 
 /** Height-reserving placeholder while the first evaluation loads (the card sits above the chart: no jump later). */
-function SignalSkeleton({ rungs }: { rungs: number }) {
+/** Per-browser UI cache (not journal data): the evaluated card body's height per window width, `tj2-ui-signal-h`. */
+export const SIGNAL_HEIGHT_KEY = storageKey("ui-signal-h");
+/** Widths remembered (rotation, split screen, a desktop window): the most recent ones win. */
+const HEIGHT_WIDTHS = 6;
+
+const widthKey = (): string => (typeof window === "undefined" ? "0" : String(Math.round(window.innerWidth)));
+
+function readHeights(): Record<string, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SIGNAL_HEIGHT_KEY) ?? "{}") as unknown;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+    return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter((e): e is [string, number] => typeof e[1] === "number" && e[1] > 80 && e[1] < 8000));
+  } catch {
+    return {};
+  }
+}
+
+/** The body height the evaluated card had at this window width last time (`null`: never seen at this width). */
+export function reservedSignalHeight(): number | null {
+  return readHeights()[widthKey()] ?? null;
+}
+
+/** Remembers the evaluated body height for this window width (storage failures are ignored). */
+export function rememberSignalHeight(h: number): void {
+  const key = widthKey();
+  const all = readHeights();
+  if (all[key] === h) return;
+  delete all[key];
+  const next = Object.fromEntries([...Object.entries(all).slice(-(HEIGHT_WIDTHS - 1)), [key, h]]);
+  try {
+    localStorage.setItem(SIGNAL_HEIGHT_KEY, JSON.stringify(next));
+  } catch {
+    /* private mode / quota: the skeleton's own height stands in */
+  }
+}
+
+/** Reports the evaluated body's height (ResizeObserver, never a layout read) for the next load's skeleton. */
+function useRememberHeight(ref: RefObject<HTMLElement | null>, on: boolean) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!on || !el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const h = entries[entries.length - 1]?.borderBoxSize?.[0]?.blockSize;
+      if (h && h > 80) rememberSignalHeight(Math.round(h));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref, on]);
+}
+
+const SK = "rounded-xl";
+
+/**
+ * Loading state with the evaluated card's structure and heights (design pass v3, coordinator A): bias bar, verdict +
+ * timeframe ladder, the three parts, zone + reasons, the source note — the same grids as the evaluated body, with the
+ * section heights measured per breakpoint (390 / 430 / 640 / 768 / 1024 / 1280 / 1692). The card no longer grows by
+ * ≈ 1,500 px (390) / 600 px (1692) when the first evaluation arrives, which pushed the chart below off the screen of
+ * anyone already scrolled past it. When this browser has seen the evaluated card at the same window width, its exact
+ * height is reserved (`reservedSignalHeight`). The loading text sits inside the bias block (no extra line).
+ */
+function SignalSkeleton({ rungs, message }: { rungs: number; message: string }) {
+  const [reserved] = useState(reservedSignalHeight);
   return (
-    <div className="grid gap-5" aria-hidden="true">
-      <div className="flex items-center gap-5">
-        <Skeleton className="size-[86px] rounded-full" />
-        <div className="grid flex-1 gap-2">
-          <Skeleton className="h-5 w-48 max-w-full rounded-md" />
-          <Skeleton className="h-3 w-40 max-w-full rounded-md" />
+    <div className="grid content-start gap-5 overflow-hidden" style={reserved ? { height: reserved } : undefined} data-testid="signal-skeleton" data-reserved={reserved ?? undefined}>
+      <div className="relative">
+        <Skeleton className={cn(SK, "h-[157px] xl:h-[110px]")} />
+        <TextShimmer as="p" className="absolute inset-x-4 top-4 text-[13px] leading-relaxed">
+          {message}
+        </TextShimmer>
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_2fr] xl:items-center" aria-hidden="true">
+        <div className="flex h-[110px] items-center gap-4 min-[420px]:h-[86px]">
+          <Skeleton className="size-[86px] shrink-0 rounded-full" />
+          <div className="grid flex-1 gap-2">
+            <Skeleton className="h-5 w-48 max-w-full rounded-md" />
+            <Skeleton className="h-3 w-40 max-w-full rounded-md" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(var(--rungs),minmax(0,1fr))]" style={{ "--rungs": Math.max(1, rungs) } as CSSProperties}>
+          {Array.from({ length: rungs }, (_, i) => (
+            <Skeleton key={i} className={cn(SK, "h-[183px]")} />
+          ))}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {Array.from({ length: rungs }, (_, i) => (
-          <Skeleton key={i} className="h-[132px]" />
-        ))}
+      <div className="grid gap-2.5" aria-hidden="true">
+        <Skeleton className="h-[17px] w-40 rounded-md" />
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[1.25fr_1fr_1fr]">
+          <Skeleton className={cn(SK, "h-[319px] min-[420px]:h-[285px] sm:h-[256px] md:col-span-2 md:h-[208px] lg:h-[179px] xl:col-span-1 xl:h-[256px]")} />
+          <Skeleton className={cn(SK, "h-[197px] sm:h-[182px] md:h-[202px] lg:h-[185px] xl:h-[256px]")} />
+          <Skeleton className={cn(SK, "h-[202px] min-[420px]:h-[185px] md:h-[202px] lg:h-[185px] xl:h-[256px]")} />
+        </div>
       </div>
+      <div className="grid gap-5 md:grid-cols-[1.1fr_1fr]" aria-hidden="true">
+        <Skeleton className={cn(SK, "h-[161px] sm:h-[146px] md:h-[203px]")} />
+        <Skeleton className={cn(SK, "h-[203px]")} />
+      </div>
+      <Skeleton className="h-[30px] w-3/4 rounded-md sm:h-[15px]" aria-hidden="true" />
     </div>
   );
 }
@@ -146,12 +229,15 @@ export function SignalCard() {
   const pill = statusPill(check.state);
   const n = cfg.ladder.length;
   const badge = fresh.last;
+  const body = useRef<HTMLDivElement>(null);
+  useRememberHeight(body, !!(snap && v));
 
   return (
     <div id={SIGNAL_CARD_ID} className="scroll-mt-20" data-testid="signal-card" data-state={check.state}>
       <Card
         title={SIGNAL_TITLE}
-        note={snap ? `live · ${ladderText(cfg.ladder)}` : undefined}
+        // while loading the note line is reserved (invisible), so the header keeps the evaluated card's height
+        note={snap ? `live · ${ladderText(cfg.ladder)}` : check.state === "loading" ? <span className="invisible">live · {ladderText(cfg.ladder)}</span> : undefined}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <StatusPill tone={pill.tone} expanded label={pill.label} title={check.message ?? undefined} />
@@ -166,23 +252,18 @@ export function SignalCard() {
           </span>
         )}
         {!snap || !v ? (
-          <div className="grid gap-4">
-            {check.state === "loading" ? (
-              <TextShimmer as="p" className="text-[13px] leading-relaxed">
-                {check.message ?? LOADING_TEXT}
-              </TextShimmer>
-            ) : (
-              <div className="flex flex-wrap items-center gap-3 text-[13px] leading-relaxed text-mute">
-                <p>{check.message ?? OFFLINE_TEXT}</p>
-                <button type="button" onClick={refresh} disabled={disabled} className="touch-hit text-fg underline-offset-2 hover:underline disabled:opacity-50">
-                  {refreshing ? "Aktualisiere …" : "Jetzt aktualisieren"}
-                </button>
-              </div>
-            )}
-            {check.state === "loading" && <SignalSkeleton rungs={n} />}
-          </div>
+          check.state === "loading" ? (
+            <SignalSkeleton rungs={n} message={check.message ?? LOADING_TEXT} />
+          ) : (
+            <div className="flex flex-wrap items-center gap-3 text-[13px] leading-relaxed text-mute">
+              <p>{check.message ?? OFFLINE_TEXT}</p>
+              <button type="button" onClick={refresh} disabled={disabled} className="touch-hit text-fg underline-offset-2 hover:underline disabled:opacity-50">
+                {refreshing ? "Aktualisiere …" : "Jetzt aktualisieren"}
+              </button>
+            </div>
+          )
         ) : (
-          <div className={cn("grid gap-5 transition-opacity duration-300", check.state === "stale" && "opacity-80")}>
+          <div ref={body} className={cn("grid gap-5 transition-opacity duration-300", check.state === "stale" && "opacity-80")}>
             <BiasBar sig={snap} cfg={cfg} />
             <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_2fr] xl:items-center">
               <div className="grid min-w-0 gap-3">
