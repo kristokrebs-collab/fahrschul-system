@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { evaluateTrigger } from "@/domain/trigger";
 import type { MarketLevels } from "@/domain/types";
-import { buildFeedSpecs, initialHealth, type Candle, type FeedSnapshot, type ProviderHealth, type Stamped } from "@/market";
+import { buildFeedSpecs, initialHealth, PRICE_POLL_FRESH_MS, type Candle, type FeedSnapshot, type ProviderHealth, type Stamped } from "@/market";
 import {
   buyShare,
   change24h,
@@ -117,6 +117,7 @@ describe("change keys", () => {
     const h = initialHealth(buildFeedSpecs("1h"));
     h.feeds.aggTrade = { ...h.feeds.aggTrade, state: "live", lastDataAt: 1_000 };
     h.feeds.markPrice = { ...h.feeds.markPrice, state: "live", lastDataAt: 1_000 };
+    h.ws = { ...h.ws, state: "live", connectedAt: 500, lastMessageAt: 1_000 };
     return h;
   };
 
@@ -136,6 +137,10 @@ describe("change keys", () => {
     const offline = base();
     offline.online = false;
     expect(panelHealthKey(offline)).not.toBe(panelHealthKey(a));
+    // the socket stops delivering (silent → stale) while the price feeds still read live: the pill must switch
+    const silent = base();
+    silent.ws = { ...silent.ws, state: "stale", lastMessageAt: 1_000 };
+    expect(panelHealthKey(silent)).not.toBe(panelHealthKey(a));
   });
 
   it("top-trader health key follows the selected base", () => {
@@ -146,17 +151,20 @@ describe("change keys", () => {
     expect(topTraderHealthKey(b, "positions")).toBe(topTraderHealthKey(a, "positions"));
   });
 
-  it("deadlines cover price staleness and the 4 h / weekly closes (one minute early)", () => {
+  it("deadlines cover the polled price's freshness, price staleness and the 4 h / weekly closes (one minute early)", () => {
     const H4 = 14_400_000;
     const W1 = 7 * 86_400_000;
     const feeds: FeedSnapshot = {
-      aggTrade: stamp({ price: 86_100, qty: 1, isBuyerMaker: false, time: 5_000 }, 5_000),
+      aggTrade: { ...stamp({ price: 86_100, qty: 1, isBuyerMaker: false, time: 5_000 }, 5_000), receivedAt: 5_200 },
       kline_4h: stamp([bar(0, 1, true), bar(H4, 1, false)], 5_000),
       kline_1w: stamp([bar(0, 1, false)], 5_000),
     };
     const d = viewDeadlines(feeds);
-    expect(d).toEqual([5_000 + STALE_PRICE_MS + 1, 2 * H4 - 60_000, 2 * H4, W1 - 60_000]);
-    expect(nextDeadline(d, 0)).toBe(5_000 + STALE_PRICE_MS + 1);
+    // `Kurs per Abfrage` → `Verbinde …` exactly 15 s after the (device-clock) arrival of the shown price
+    expect(PRICE_POLL_FRESH_MS).toBe(15_000);
+    expect(d).toEqual([5_200 + PRICE_POLL_FRESH_MS + 1, 5_000 + STALE_PRICE_MS + 1, 2 * H4 - 60_000, 2 * H4, W1 - 60_000]);
+    expect(nextDeadline(d, 0)).toBe(5_200 + PRICE_POLL_FRESH_MS + 1);
+    expect(nextDeadline(d, 5_200 + PRICE_POLL_FRESH_MS + 1)).toBe(5_000 + STALE_PRICE_MS + 1);
     expect(nextDeadline(d, 2 * H4 - 60_000)).toBe(2 * H4);
     expect(nextDeadline(d, W1)).toBeNull();
     expect(viewDeadlines({})).toEqual([]);

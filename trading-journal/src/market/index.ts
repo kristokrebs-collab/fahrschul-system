@@ -97,6 +97,7 @@ export {
   type LegacyMarketStatus,
   type LegacyStatus,
   type PriceMode,
+  PRICE_POLL_FRESH_MS,
 } from "./mapping";
 export { createMarketProvider, type MarketProvider, type ProviderOptions, type ProviderDeps } from "./provider";
 export {

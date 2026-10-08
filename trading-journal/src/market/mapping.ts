@@ -243,7 +243,7 @@ const CONNECTING_PILL: StatusLabel = { tone: "muted", text: STRINGS.connecting }
 const LIVE_PILL: StatusLabel = { tone: "live", text: STRINGS.live };
 
 /** While the socket is down, a price received within this long (3 polls) counts as `Kurs per Abfrage`; older → `Verbinde …`. */
-const PRICE_POLL_FRESH_MS = 3 * PRICE_REST_FALLBACK_MS;
+export const PRICE_POLL_FRESH_MS = 3 * PRICE_REST_FALLBACK_MS;
 
 /**
  * Legacy card status from the price feeds only (Plan 4.4 "Mapping auf das Bestands-Enum") plus the honest pill:

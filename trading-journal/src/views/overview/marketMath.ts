@@ -4,7 +4,7 @@
  * which `deriveMarket` changes by time alone. No React, no MotionValues – unit-tested in isolation.
  */
 import { pct } from "@/lib/format";
-import { lastPrice, type FeedHealth, type FeedSnapshot, type ProviderHealth, type TopTraderBase } from "@/market";
+import { lastPrice, PRICE_POLL_FRESH_MS, wsDown, type FeedHealth, type FeedSnapshot, type ProviderHealth, type TopTraderBase } from "@/market";
 import { scenario, TRIGGER_REACH_THRESHOLD, type ScenarioKey } from "@/domain/trigger";
 import type { MarketLevels } from "@/domain/types";
 
@@ -155,10 +155,11 @@ function feedKey(f: FeedHealth): string {
 /**
  * The health fields the market panel derives from (`legacyStatus`, source badge, status-label detail, refresh
  * ring). `lastDataAt` moves with every WS second, so only its presence counts – this keeps the panel still while
- * the stream is healthy.
+ * the stream is healthy. `wsDown` flips the pill between `Live` and `Kurs per Abfrage` / `Verbinde …` the moment the
+ * socket stops (or starts again) delivering, whatever the feed states do.
  */
 export function panelHealthKey(h: ProviderHealth): string {
-  return [h.online ? 1 : 0, h.ws.connectedAt ?? 0, feedKey(h.feeds.aggTrade), feedKey(h.feeds.markPrice), h.feeds.ticker24h.nextRefreshAt ?? 0].join("|");
+  return [h.online ? 1 : 0, h.ws.connectedAt ?? 0, wsDown(h) ? 1 : 0, feedKey(h.feeds.aggTrade), feedKey(h.feeds.markPrice), h.feeds.ticker24h.nextRefreshAt ?? 0].join("|");
 }
 
 /** The health fields `deriveTopTrader` and the card's status note read for `base`. */
@@ -170,14 +171,15 @@ export function topTraderHealthKey(h: ProviderHealth, base: TopTraderBase): stri
 /* ------------------------------------------------------------------ time */
 
 /**
- * Instants at which `deriveMarket(feeds, health, { now })` changes by the passage of time alone: the price turning
- * stale, the forming 4 h bar counting as closed (one minute early) and leaving the "running" slot, the forming
- * weekly bar counting as closed.
+ * Instants at which `deriveMarket(feeds, health, { now })` changes by the passage of time alone: the polled price
+ * (socket down) no longer counting as fresh (`Kurs per Abfrage` → `Verbinde …` 15 s after it arrived), the price
+ * turning stale, the forming 4 h bar counting as closed (one minute early) and leaving the "running" slot, the
+ * forming weekly bar counting as closed.
  */
 export function viewDeadlines(feeds: FeedSnapshot): number[] {
   const out: number[] = [];
   const lp = lastPrice(feeds);
-  if (lp) out.push(lp.provenance.asOf + STALE_PRICE_MS + 1);
+  if (lp) out.push(lp.provenance.receivedAt + PRICE_POLL_FRESH_MS + 1, lp.provenance.asOf + STALE_PRICE_MS + 1);
   const k4 = feeds.kline_4h?.data;
   const f4 = k4?.[k4.length - 1];
   if (f4) out.push(f4.time + H4_MS - CLOSE_GRACE_MS, f4.time + H4_MS);
