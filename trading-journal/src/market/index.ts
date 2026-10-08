@@ -166,3 +166,18 @@ export { okxRest, OKX_REST, type OkxRest } from "./sources/okx";
 export { probeProxy, proxyRest, PROXY_BASE, type ProxyProbe } from "./sources/proxy";
 export { WsClient, type WsClientOptions, type WsFactory, type WsLike } from "./sources/ws";
 export { RestError, fetchJson, classifyStatus, type FetchLike } from "./sources/http";
+export {
+  useLage,
+  getLage,
+  subscribeLage,
+  retainLage,
+  LAGE_DAILY_LIMIT,
+  LAGE_REFRESH_MS,
+  LAGE_CLOSE_GRACE_MS,
+  LAGE_RESUME_MS,
+  LAGE_LIVE_MS,
+  LAGE_FILE_CORS,
+  type LageView,
+  type LageFeedStatus,
+  type LageFeedState,
+} from "./lage";
