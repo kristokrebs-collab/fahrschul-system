@@ -3,6 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 
 import { cn } from "@/lib/cn";
 import { useDialogBehaviour, useTouchMoveGuard } from "@/motion/a11y";
 import { confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
+import { LayoutCascade, NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { flingExit, useSwipeDismiss, type SwipeDismissInfo } from "@/motion/physics";
 import { STAGGER_HIDDEN, STAGGER_SHOWN, bodyRevealDelay, sectionDelay, withSectionStagger } from "@/motion/Stagger";
 import { radius, spring, tween } from "@/motion/tokens";
@@ -233,162 +234,168 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
       : { initial: { y: "100%" }, animate: { y: 0 }, transition: { ...tween.sheetIos, delay: enterDelay } };
 
   return (
-    <AnimatePresence
-      custom={flung}
-      onExitComplete={() => {
-        setReadiness((r) => (r.exiting ? { ...r, exiting: false } : r));
-        // the flung column was left off-screen: back to rest while nothing is mounted
-        swipe.reset({ instant: true });
-      }}
-    >
-      {open && (
-        // the wrapper itself never fades (a fading parent would make the morphing panel translucent, OV-04): the dim
-        // layer is a decorative sibling under the panel that fades with it; the wrapper stays the close target
-        <motion.div
-          key="overlay"
-          layoutRoot
-          className="fixed inset-0 z-[60] grid items-end justify-items-center sm:place-items-center sm:p-4"
-          onPointerDown={(e) => {
-            if (e.target === e.currentTarget) requestClose("backdrop");
-          }}
-        >
+    // a fixed overlay: its exit never moves a sibling, so no app-wide re-render once it has left
+    <NoLayoutCascade>
+      <AnimatePresence
+        custom={flung}
+        onExitComplete={() => {
+          setReadiness((r) => (r.exiting ? { ...r, exiting: false } : r));
+          // the flung column was left off-screen: back to rest while nothing is mounted
+          swipe.reset({ instant: true });
+        }}
+      >
+        {open && (
+          // the wrapper itself never fades (a fading parent would make the morphing panel translucent, OV-04): the dim
+          // layer is a decorative sibling under the panel that fades with it; the wrapper stays the close target
           <motion.div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0"
-            initial={{ opacity: handoff && !reduced ? handoff.backdropFrom : 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: tween.exit }}
-            transition={tween.fade}
+            key="overlay"
+            layoutRoot
+            className="fixed inset-0 z-[60] grid items-end justify-items-center sm:place-items-center sm:p-4"
+            onPointerDown={(e) => {
+              if (e.target === e.currentTarget) requestClose("backdrop");
+            }}
           >
-            {/* the swipe dims through this inner layer, so enter/exit and drag opacity multiply */}
-            <motion.div className="absolute inset-0 bg-ink-950/80" style={{ opacity: swipe.dim }} />
-          </motion.div>
-          {/* `min-h-0` is load-bearing: as a grid item with `overflow: visible` the column's automatic minimum height
-              would be its full content height, which stretches the overlay's single row past the viewport – the
-              percentage max-height then resolves against that oversized row and the footer ends up off-screen.
-              The column is what the swipe moves (panel + shadow sibling together, the `layoutId` panel untouched);
-              below `sm` it carries a bleed under the bottom sheet, so a pull upwards never opens a gap. */}
-          <motion.div
-            ref={columnRef}
-            className={cn(
-              "relative flex min-h-0 max-h-[94%] w-full flex-col sm:max-h-[calc(100%-16px)]",
-              "max-sm:after:pointer-events-none max-sm:after:absolute max-sm:after:inset-x-0 max-sm:after:top-[calc(100%-1px)] max-sm:after:h-24 max-sm:after:bg-ink-850 max-sm:after:content-['']",
-              WIDTH[size],
-            )}
-            style={swipe.style}
-            variants={columnVariants}
-            exit="gone"
-          >
-            {morph && (
+            {/* the body's own presences (discard strip, form sections) keep the root group's cascade */}
+            <LayoutCascade>
               <motion.div
                 aria-hidden="true"
-                className={cn("pointer-events-none absolute inset-0 max-sm:hidden", SHADOW)}
-                style={{ borderRadius: radius.sheet }}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: bodyReady ? 1 : 0 }}
+                className="pointer-events-none absolute inset-0"
+                initial={{ opacity: handoff && !reduced ? handoff.backdropFrom : 0 }}
+                animate={{ opacity: 1 }}
                 exit={{ opacity: 0, transition: tween.exit }}
                 transition={tween.fade}
-              />
-            )}
-            <motion.div
-              ref={panelRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={titleId}
-              layoutId={layoutId}
-              style={{ borderRadius: radius.sheet }}
-              className={cn(
-                "relative flex min-h-0 w-full flex-col overflow-hidden rounded-t-3xl border border-line-2 bg-ink-850 outline-none sm:rounded-3xl",
-                // a sliding panel only moves by transform, so its own shadow is never repainted mid-flight
-                !morph && SHADOW,
-                WIDTH[size],
-                className,
-              )}
-              {...enterExit}
-              variants={panelVariants}
-              exit="gone"
-              // opaque from the first frame: the source hides when the panel takes over instead of both crossfading
-              layoutCrossfade={morph ? false : undefined}
-              onLayoutAnimationComplete={morph ? setBodyReady : undefined}
-              onInputCapture={() => {
-                touched.current = true;
-              }}
-            >
-              <motion.div
-                ref={touchGuard}
-                data-sheet-handle=""
-                className="relative flex items-center justify-between gap-3 border-b border-line px-6 py-4 pointer-coarse:cursor-grab pointer-coarse:active:cursor-grabbing"
-                // a morphing panel starts at the source's size: head and footer (not scale-corrected) appear with the body
-                initial={morph ? { opacity: 0 } : false}
-                animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
-                variants={CONTENT_VARIANTS}
-                exit="gone"
-                transition={tween.fade}
-                {...swipe.handle}
               >
-                {/* grabber: the visible handle of the swipe on touch screens (decorative, the header row is the handle) */}
-                <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1.5 hidden h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15 pointer-coarse:block" />
-                <h2 id={titleId} className="text-[17px] font-semibold">
-                  {title}
-                </h2>
-                <div className="flex items-center gap-2">
-                  {headerExtra}
-                  <button
-                    ref={askTrigger}
-                    type="button"
-                    onClick={() => requestClose("close")}
-                    aria-label="Schließen"
-                    className="grid size-9 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:text-fg pointer-coarse:size-11 [&>svg]:size-4"
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                      <path d="M6 6l12 12M18 6 6 18" />
-                    </svg>
-                  </button>
-                </div>
+                {/* the swipe dims through this inner layer, so enter/exit and drag opacity multiply */}
+                <motion.div className="absolute inset-0 bg-ink-950/80" style={{ opacity: swipe.dim }} />
               </motion.div>
-              <SheetBody morph={morph} ready={bodyReady}>
-                {children}
-              </SheetBody>
-              {/* the sheet's own unsaved-input confirm (callers without `onDismissAttempt`) */}
-              <AnimatePresence initial={false}>
-                {asking && (
-                  <motion.div
-                    key="ask"
-                    role="group"
-                    aria-label={SHEET_DISCARD_COPY.ask}
-                    data-testid="sheet-discard-confirm"
-                    className="flex flex-wrap items-center justify-end gap-2.5 border-t border-line bg-ink-900 px-6 py-3"
-                    {...confirmSwapMotion(reduced)}
-                  >
-                    <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{SHEET_DISCARD_COPY.ask}</span>
-                    <span className="inline-flex gap-2">
-                      <Button variant="danger" className="pointer-coarse:min-h-11" onClick={() => closeRef.current()}>
-                        {SHEET_DISCARD_COPY.discard}
-                      </Button>
-                      <Button ref={askNo} variant="primary" className="pointer-coarse:min-h-11" onClick={() => setAsking(false)}>
-                        {SHEET_DISCARD_COPY.keep}
-                      </Button>
-                    </span>
-                  </motion.div>
+              {/* `min-h-0` is load-bearing: as a grid item with `overflow: visible` the column's automatic minimum height
+                  would be its full content height, which stretches the overlay's single row past the viewport – the
+                  percentage max-height then resolves against that oversized row and the footer ends up off-screen.
+                  The column is what the swipe moves (panel + shadow sibling together, the `layoutId` panel untouched);
+                  below `sm` it carries a bleed under the bottom sheet, so a pull upwards never opens a gap. */}
+              <motion.div
+                ref={columnRef}
+                className={cn(
+                  "relative flex min-h-0 max-h-[94%] w-full flex-col sm:max-h-[calc(100%-16px)]",
+                  "max-sm:after:pointer-events-none max-sm:after:absolute max-sm:after:inset-x-0 max-sm:after:top-[calc(100%-1px)] max-sm:after:h-24 max-sm:after:bg-ink-850 max-sm:after:content-['']",
+                  WIDTH[size],
                 )}
-              </AnimatePresence>
-              {footer && (
+                style={swipe.style}
+                variants={columnVariants}
+                exit="gone"
+              >
+                {morph && (
+                  <motion.div
+                    aria-hidden="true"
+                    className={cn("pointer-events-none absolute inset-0 max-sm:hidden", SHADOW)}
+                    style={{ borderRadius: radius.sheet }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: bodyReady ? 1 : 0 }}
+                    exit={{ opacity: 0, transition: tween.exit }}
+                    transition={tween.fade}
+                  />
+                )}
                 <motion.div
-                  className="flex flex-wrap items-center gap-2.5 border-t border-line bg-ink-900/60 px-6 py-3.5 pb-[calc(14px+var(--safe-bottom,env(safe-area-inset-bottom,0px)))]"
-                  initial={morph ? { opacity: 0 } : false}
-                  animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
-                  variants={CONTENT_VARIANTS}
+                  ref={panelRef}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby={titleId}
+                  layoutId={layoutId}
+                  style={{ borderRadius: radius.sheet }}
+                  className={cn(
+                    "relative flex min-h-0 w-full flex-col overflow-hidden rounded-t-3xl border border-line-2 bg-ink-850 outline-none sm:rounded-3xl",
+                    // a sliding panel only moves by transform, so its own shadow is never repainted mid-flight
+                    !morph && SHADOW,
+                    WIDTH[size],
+                    className,
+                  )}
+                  {...enterExit}
+                  variants={panelVariants}
                   exit="gone"
-                  transition={tween.fade}
+                  // opaque from the first frame: the source hides when the panel takes over instead of both crossfading
+                  layoutCrossfade={morph ? false : undefined}
+                  onLayoutAnimationComplete={morph ? setBodyReady : undefined}
+                  onInputCapture={() => {
+                    touched.current = true;
+                  }}
                 >
-                  {footer}
+                  <motion.div
+                    ref={touchGuard}
+                    data-sheet-handle=""
+                    className="relative flex items-center justify-between gap-3 border-b border-line px-6 py-4 pointer-coarse:cursor-grab pointer-coarse:active:cursor-grabbing"
+                    // a morphing panel starts at the source's size: head and footer (not scale-corrected) appear with the body
+                    initial={morph ? { opacity: 0 } : false}
+                    animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
+                    variants={CONTENT_VARIANTS}
+                    exit="gone"
+                    transition={tween.fade}
+                    {...swipe.handle}
+                  >
+                    {/* grabber: the visible handle of the swipe on touch screens (decorative, the header row is the handle) */}
+                    <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1.5 hidden h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15 pointer-coarse:block" />
+                    <h2 id={titleId} className="text-[17px] font-semibold">
+                      {title}
+                    </h2>
+                    <div className="flex items-center gap-2">
+                      {headerExtra}
+                      <button
+                        ref={askTrigger}
+                        type="button"
+                        onClick={() => requestClose("close")}
+                        aria-label="Schließen"
+                        className="grid size-9 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:text-fg pointer-coarse:size-11 [&>svg]:size-4"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                          <path d="M6 6l12 12M18 6 6 18" />
+                        </svg>
+                      </button>
+                    </div>
+                  </motion.div>
+                  <SheetBody morph={morph} ready={bodyReady}>
+                    {children}
+                  </SheetBody>
+                  {/* the sheet's own unsaved-input confirm (callers without `onDismissAttempt`) */}
+                  <AnimatePresence initial={false}>
+                    {asking && (
+                      <motion.div
+                        key="ask"
+                        role="group"
+                        aria-label={SHEET_DISCARD_COPY.ask}
+                        data-testid="sheet-discard-confirm"
+                        className="flex flex-wrap items-center justify-end gap-2.5 border-t border-line bg-ink-900 px-6 py-3"
+                        {...confirmSwapMotion(reduced)}
+                      >
+                        <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{SHEET_DISCARD_COPY.ask}</span>
+                        <span className="inline-flex gap-2">
+                          <Button variant="danger" className="pointer-coarse:min-h-11" onClick={() => closeRef.current()}>
+                            {SHEET_DISCARD_COPY.discard}
+                          </Button>
+                          <Button ref={askNo} variant="primary" className="pointer-coarse:min-h-11" onClick={() => setAsking(false)}>
+                            {SHEET_DISCARD_COPY.keep}
+                          </Button>
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  {footer && (
+                    <motion.div
+                      className="flex flex-wrap items-center gap-2.5 border-t border-line bg-ink-900/60 px-6 py-3.5 pb-[calc(14px+var(--safe-bottom,env(safe-area-inset-bottom,0px)))]"
+                      initial={morph ? { opacity: 0 } : false}
+                      animate={{ opacity: !morph || bodyReady ? 1 : 0 }}
+                      variants={CONTENT_VARIANTS}
+                      exit="gone"
+                      transition={tween.fade}
+                    >
+                      {footer}
+                    </motion.div>
+                  )}
                 </motion.div>
-              )}
-            </motion.div>
+              </motion.div>
+            </LayoutCascade>
           </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+      </AnimatePresence>
+    </NoLayoutCascade>
   );
 }
 

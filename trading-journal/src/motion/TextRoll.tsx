@@ -1,6 +1,7 @@
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import type { Ref } from "react";
 import { cn } from "@/lib/cn";
+import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -69,7 +70,8 @@ function Glyph({ ch, dep, ref }: { ch: string; dep: string; ref?: Ref<HTMLSpanEl
  * Animated label swap (21st.dev / motion-primitives "Text Morph" + "Text Roll"). The accessible text is always the
  * current `text`, synchronously (sr-only span); the animated layer is `aria-hidden` and contributes no text nodes, so
  * `getByText`, accessible names and `textContent` never see half-morphed or duplicated labels.
- * No animation on mount. Reduced motion: a plain opacity crossfade.
+ * No animation on mount. Reduced motion: a plain opacity crossfade. The presences sit in `NoLayoutCascade`: a finished
+ * swap does not re-render the app's motion tree (live scores and bias percentages roll about once per second).
  */
 export function TextRoll({ text, mode = "morph", direction = "up", className }: TextRollProps) {
   const reduced = useReducedFx();
@@ -119,7 +121,8 @@ export function TextRoll({ text, mode = "morph", direction = "up", className }: 
     <span className={cn("relative inline-flex whitespace-pre", className)}>
       <span className="sr-only">{text}</span>
       <span aria-hidden="true" className={cn("relative inline-flex", roll && !reduced && "overflow-hidden py-[0.12em] -my-[0.12em]")}>
-        {visual}
+        {/* every branch is `popLayout` (an exiting label never moves a sibling): no app-wide re-render per swap */}
+        <NoLayoutCascade>{visual}</NoLayoutCascade>
       </span>
     </span>
   );

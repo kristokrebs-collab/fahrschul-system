@@ -20,6 +20,7 @@ import { shellStatTexts, useLivePriceText, useShellStats } from "@/app/shellStat
 import { cn } from "@/lib/cn";
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
 import { useDialogBehaviour } from "@/motion/a11y";
+import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Icon } from "@/primitives/icons";
@@ -366,5 +367,10 @@ export function CommandNav() {
   // a page that unmounts the host (tests) must not leave the store open
   useEffect(() => () => useNav.setState({ open: false, immediate: false }), []);
 
-  return <AnimatePresence>{open && <Panel key="nav" reduced={reduced} />}</AnimatePresence>;
+  // a fixed overlay: its exit never moves a sibling, so no app-wide re-render once it has left
+  return (
+    <NoLayoutCascade>
+      <AnimatePresence>{open && <Panel key="nav" reduced={reduced} />}</AnimatePresence>
+    </NoLayoutCascade>
+  );
 }

@@ -1,5 +1,6 @@
 export * from "@/motion/tokens";
 export { MotionRoot } from "@/motion/MotionRoot";
+export { NoLayoutCascade, LayoutCascade } from "@/motion/NoLayoutCascade";
 export { PageSwitch, type PageSwitchProps } from "@/motion/PageSwitch";
 export { MorphDialogProvider, useMorphDialog, useMorphDialogGuard, useCloseMorphDialogOnUnmount, type MorphDialogGuard, type MorphDialogRequest } from "@/motion/MorphDialog";
 export { MorphCard, MorphTitle, type MorphCardProps, type MorphTitleProps } from "@/motion/MorphCard";

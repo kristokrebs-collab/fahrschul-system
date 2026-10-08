@@ -3,6 +3,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { DATA_SOURCE_NOTE, DEFAULT_SIGNAL_CFG, LOADING_TEXT, OFFLINE_TEXT, SIGNAL_TITLE, signalInfo, type Side } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { SIGNAL_HOLD_MS, useSignalCheck, type LiveSignals } from "@/market";
+import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
 import { StatusPill } from "@/motion/StatusPill";
 import { TextShimmer } from "@/motion/TextShimmer";
@@ -186,13 +187,15 @@ export function SignalCard() {
             <div className="grid gap-5 xl:grid-cols-[minmax(280px,0.8fr)_2fr] xl:items-center">
               <div className="grid min-w-0 gap-3">
                 <VerdictRow v={v} ladderLength={n} flash={fresh.n[cur]} line={verdictStateLine(snap, v, cfg)} />
-                <AnimatePresence initial={false}>
-                  {badge && (
-                    <motion.div key={badge.seq} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: tween.fade }} exit={{ opacity: 0, transition: tween.exit }}>
-                      <FreshBadge side={badge.side} current={cur} onShow={() => setSide(badge.side)} />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <NoLayoutCascade>
+                  <AnimatePresence initial={false}>
+                    {badge && (
+                      <motion.div key={badge.seq} initial={{ opacity: 0 }} animate={{ opacity: 1, transition: tween.fade }} exit={{ opacity: 0, transition: tween.exit }}>
+                        <FreshBadge side={badge.side} current={cur} onShow={() => setSide(badge.side)} />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </NoLayoutCascade>
               </div>
               <div
                 className="grid grid-cols-2 gap-2 sm:grid-cols-[repeat(var(--rungs),minmax(0,1fr))]"

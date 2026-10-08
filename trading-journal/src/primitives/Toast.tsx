@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { cn } from "@/lib/cn";
 import { flingExit, useSwipeDismiss, type SwipeDismissInfo } from "@/motion/physics";
 import { useTouchMoveGuard } from "@/motion/a11y";
+import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { gesture, radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { GlyphCheck, GlyphCross, GlyphInfo } from "@/primitives/icons";
@@ -104,20 +105,23 @@ export function ToastIsland({ toasts, onDismiss, className }: ToastIslandProps) 
       aria-live="polite"
       role="status"
     >
-      <AnimatePresence custom={fling} onExitComplete={() => setLeaving(false)}>
-        {note && (
-          <IslandCard
-            key={note.id}
-            note={note}
-            queued={list.length - 1}
-            reduced={reduced}
-            onDismiss={(info) => {
-              setFling(info ? { id: note.id, info } : null);
-              dismiss(note.id);
-            }}
-          />
-        )}
-      </AnimatePresence>
+      {/* the island cards share one grid cell (and the badge is absolute): no exit moves a sibling */}
+      <NoLayoutCascade>
+        <AnimatePresence custom={fling} onExitComplete={() => setLeaving(false)}>
+          {note && (
+            <IslandCard
+              key={note.id}
+              note={note}
+              queued={list.length - 1}
+              reduced={reduced}
+              onDismiss={(info) => {
+                setFling(info ? { id: note.id, info } : null);
+                dismiss(note.id);
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </NoLayoutCascade>
     </div>
   );
 }

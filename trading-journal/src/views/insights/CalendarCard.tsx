@@ -25,6 +25,7 @@ import { isoWeek } from "@/lib/dates";
 import { pct, pct0, signed } from "@/lib/format";
 import { useTouchMoveGuard } from "@/motion/a11y";
 import { flickDecision, rubberBand, useAxisDrag } from "@/motion/physics";
+import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { spring, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -214,37 +215,40 @@ function MonthGrid({ month, unit, capital, currency, dir, armed, focusKey, canPr
       </div>
       <div ref={rootRef} className="relative overflow-hidden" {...drag.handlers} style={drag.style as CSSProperties}>
         <motion.div style={{ x }}>
-          <AnimatePresence mode="popLayout" initial={false} custom={dir}>
-            <motion.div
-              key={ymKey(month)}
-              custom={dir}
-              variants={reduced ? MONTH_VARIANTS_REDUCED : MONTH_VARIANTS}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ x: spring.segment, opacity: tween.fade }}
-              role="group"
-              aria-label={monthTitle(month)}
-              onKeyDown={onKeyDown}
-              className={cn("grid gap-0.5 @min-[420px]/cal:gap-1", cols)}
-            >
-              {month.weeks.map((w, wi) => [
-                ...w.cells.map((c) => (
-                  <DayButton key={c.key} c={c} unit={unit} capital={capital} currency={currency} armed={armed === c.key} tabbable={c.key === tabKey} onOpen={onOpen} onArm={onArm} />
-                )),
-                <div key={`w${wi}`} className="hidden min-w-0 flex-col justify-center rounded-lg border border-line bg-ink-950/40 px-1.5 text-right @min-[420px]/cal:flex">
-                  {w.g.n ? (
-                    <>
-                      <span className={cn("num truncate font-mono text-[10.5px]", w.g.net > 0 ? "text-win" : w.g.net < 0 ? "text-loss" : "text-mute")}>{cellText(unit, unitValue(w.g, w.rSum, unit, capital))}</span>
-                      <span className="text-[9.5px] text-faint">{w.days} T</span>
-                    </>
-                  ) : (
-                    <span className="text-[10px] text-faint">–</span>
-                  )}
-                </div>,
-              ])}
-            </motion.div>
-          </AnimatePresence>
+          {/* popLayout month swap: the leaving month never moves a sibling */}
+          <NoLayoutCascade>
+            <AnimatePresence mode="popLayout" initial={false} custom={dir}>
+              <motion.div
+                key={ymKey(month)}
+                custom={dir}
+                variants={reduced ? MONTH_VARIANTS_REDUCED : MONTH_VARIANTS}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ x: spring.segment, opacity: tween.fade }}
+                role="group"
+                aria-label={monthTitle(month)}
+                onKeyDown={onKeyDown}
+                className={cn("grid gap-0.5 @min-[420px]/cal:gap-1", cols)}
+              >
+                {month.weeks.map((w, wi) => [
+                  ...w.cells.map((c) => (
+                    <DayButton key={c.key} c={c} unit={unit} capital={capital} currency={currency} armed={armed === c.key} tabbable={c.key === tabKey} onOpen={onOpen} onArm={onArm} />
+                  )),
+                  <div key={`w${wi}`} className="hidden min-w-0 flex-col justify-center rounded-lg border border-line bg-ink-950/40 px-1.5 text-right @min-[420px]/cal:flex">
+                    {w.g.n ? (
+                      <>
+                        <span className={cn("num truncate font-mono text-[10.5px]", w.g.net > 0 ? "text-win" : w.g.net < 0 ? "text-loss" : "text-mute")}>{cellText(unit, unitValue(w.g, w.rSum, unit, capital))}</span>
+                        <span className="text-[9.5px] text-faint">{w.days} T</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-faint">–</span>
+                    )}
+                  </div>,
+                ])}
+              </motion.div>
+            </AnimatePresence>
+          </NoLayoutCascade>
         </motion.div>
       </div>
       {/* narrow cards: the week column moves below the grid */}
@@ -407,22 +411,25 @@ export function CalendarCard() {
                 onFocusKey={setFocusKey}
               />
             </motion.div>
-            <AnimatePresence mode="popLayout" initial={false}>
-              {selected && (
-                <DayPanel
-                  key="day"
-                  dayKey={selected}
-                  view={view}
-                  currency={cur}
-                  onClose={close}
-                  onNavigate={(k) => {
-                    setArmed(k);
-                    setSelected(k);
-                    setYm(ymOf(new Date(k + "T12:00")));
-                  }}
-                />
-              )}
-            </AnimatePresence>
+            {/* popLayout day panel: no app-wide re-render after it leaves */}
+            <NoLayoutCascade>
+              <AnimatePresence mode="popLayout" initial={false}>
+                {selected && (
+                  <DayPanel
+                    key="day"
+                    dayKey={selected}
+                    view={view}
+                    currency={cur}
+                    onClose={close}
+                    onNavigate={(k) => {
+                      setArmed(k);
+                      setSelected(k);
+                      setYm(ymOf(new Date(k + "T12:00")));
+                    }}
+                  />
+                )}
+              </AnimatePresence>
+            </NoLayoutCascade>
           </div>
         </AutoHeight>
       </InsightCard>

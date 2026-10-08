@@ -1,6 +1,7 @@
 import { AnimatePresence, animate, frame, motion, useMotionValue, useSpring, type HTMLMotionProps } from "motion/react";
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { isScrolling } from "@/motion/scrollGate";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useMediaQuery } from "@/motion/useMediaQuery";
@@ -206,24 +207,27 @@ export function Card({
           />
         )}
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 rounded-[inherit] border border-line" />
-        <AnimatePresence initial={false}>
-          {fx && ringOn && (
-            <motion.span
-              key="spot-ring"
-              aria-hidden="true"
-              className="fx-ring pointer-events-none absolute inset-0 z-20 rounded-[inherit] p-px"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={tween.fade}
-            >
+        {/* the ring is `absolute inset-0`: its exit never moves a sibling, so no app-wide re-render after it */}
+        <NoLayoutCascade>
+          <AnimatePresence initial={false}>
+            {fx && ringOn && (
               <motion.span
-                className="absolute left-0 top-0 rounded-full will-change-transform"
-                style={{ x, y, width: size, height: size, background: `radial-gradient(closest-side, ${gradientFrom}, ${gradientTo}, transparent)` }}
-              />
-            </motion.span>
-          )}
-        </AnimatePresence>
+                key="spot-ring"
+                aria-hidden="true"
+                className="fx-ring pointer-events-none absolute inset-0 z-20 rounded-[inherit] p-px"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={tween.fade}
+              >
+                <motion.span
+                  className="absolute left-0 top-0 rounded-full will-change-transform"
+                  style={{ x, y, width: size, height: size, background: `radial-gradient(closest-side, ${gradientFrom}, ${gradientTo}, transparent)` }}
+                />
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </NoLayoutCascade>
         {fx && edgeGlow && arcOn && (
           <motion.span aria-hidden="true" className="fx-ring pointer-events-none absolute inset-0 z-20 rounded-[inherit] p-px [container-type:size]" style={{ opacity: arcOpacity }}>
             {/* sized to the card's diagonal (≤ √2 × the longer side), not the sum of its sides: the rotating disc stays

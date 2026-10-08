@@ -1,7 +1,8 @@
-import { AnimatePresence, motion, type Variants } from "motion/react";
+import { AnimatePresence, motion, useMotionValue, type Variants } from "motion/react";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDialogBehaviour, useTouchMoveGuard } from "@/motion/a11y";
+import { LayoutCascade, NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { useSwipeDismiss } from "@/motion/physics";
 import { STAGGER_HIDDEN, STAGGER_SHOWN, bodyRevealDelay, withSectionStagger } from "@/motion/Stagger";
 import { radius, spring, tween } from "@/motion/tokens";
@@ -141,6 +142,11 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
   const guardRef = useRef<MorphDialogGuard | null>(null);
   const titleId = useId();
   const reduced = useReducedFx();
+  // Hand-back: once the source card has finished its reverse morph, the exiting panel is no longer projected and
+  // would snap back to its own full-size box at opacity 1 while the presence still runs the other exits (an empty
+  // panel flashing for ~300 ms, catching taps). Motion values reach the frozen exiting subtree without a render.
+  const handoff = useMotionValue(1);
+  const hits = useMotionValue<"auto" | "none">("auto");
 
   useEffect(() => {
     openRef.current = open;
@@ -154,14 +160,29 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
     setSettled(null);
   }, []);
   const close = useCallback(() => closeWith(0), [closeWith]);
-  const show = useCallback((req: MorphDialogRequest) => {
-    setBody(typeof req.body === "function" ? req.body() : req.body);
-    setSettled(null);
-    setClosing(null);
-    setCloseTempo(0);
-    setOpen(req);
-  }, []);
-  const returned = useCallback((id: string) => setClosing((c) => (c === id ? null : c)), []);
+  const show = useCallback(
+    (req: MorphDialogRequest) => {
+      handoff.set(1);
+      hits.set("auto");
+      setBody(typeof req.body === "function" ? req.body() : req.body);
+      setSettled(null);
+      setClosing(null);
+      setCloseTempo(0);
+      setOpen(req);
+    },
+    [handoff, hits],
+  );
+  const returned = useCallback(
+    (id: string) => {
+      // the card owns the picture again: keep the leaving panel invisible and let taps through to the page
+      if (openRef.current === null) {
+        handoff.set(0);
+        hits.set("none");
+      }
+      setClosing((c) => (c === id ? null : c));
+    },
+    [handoff, hits],
+  );
   const registerGuard = useCallback((g: MorphDialogGuard) => {
     guardRef.current = g;
     return () => {
@@ -200,84 +221,88 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
-      {/* the swiped column was left transformed for the zoom back: rest again once the dialog is gone */}
-      <AnimatePresence onExitComplete={() => swipe.reset({ instant: true })}>
-        {open && (
-          // The click target for "close on backdrop" is this wrapper – an ancestor of the panel, so it is never made
-          // inert; the dimming layer itself is decorative and lets clicks through. The fixed wrapper (not the panel)
-          // is the `layoutRoot`: on the panel itself Motion would force its layout animation to `type: false`.
-          <motion.div
-            key="wrap"
-            layoutRoot
-            className="fixed inset-0 z-[70] grid place-items-center p-4"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) dismiss();
-            }}
-          >
+      {/* the swiped column was left transformed for the zoom back: rest again once the dialog is gone. A fixed
+          overlay: its exit never moves a sibling, so no app-wide re-render once it has left (the body keeps it). */}
+      <NoLayoutCascade>
+        <AnimatePresence onExitComplete={() => swipe.reset({ instant: true })}>
+          {open && (
+            // The click target for "close on backdrop" is this wrapper – an ancestor of the panel, so it is never made
+            // inert; the dimming layer itself is decorative and lets clicks through. The fixed wrapper (not the panel)
+            // is the `layoutRoot`: on the panel itself Motion would force its layout animation to `type: false`.
             <motion.div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: tween.exit }}
-              transition={tween.fade}
+              key="wrap"
+              layoutRoot
+              className="fixed inset-0 z-[70] grid place-items-center p-4"
+              style={{ pointerEvents: hits }}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) dismiss();
+              }}
             >
-              <motion.div className="absolute inset-0 bg-ink-950/75" style={{ opacity: swipe.dim }} />
-            </motion.div>
-            {/* the swipe moves this column (shadow sibling + panel together), never the `layoutId` panel itself */}
-            <motion.div ref={columnRef} className={cn("pointer-events-none relative w-full max-w-[620px]", open.className)} style={swipe.style}>
               <motion.div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 shadow-[0_40px_90px_rgb(0_0_0/0.45)]"
-                style={{ borderRadius: radius.dialog }}
-                initial={reduced ? false : { opacity: 0 }}
-                animate={{ opacity: morphDone || reduced ? 1 : 0 }}
+                className="pointer-events-none absolute inset-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 exit={{ opacity: 0, transition: tween.exit }}
                 transition={tween.fade}
-              />
-              <motion.div
-                ref={panelRef}
-                layoutId={`morph-${open.id}`}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={titleId}
-                className="pointer-events-auto relative max-h-[86vh] w-full overflow-y-auto overscroll-contain border border-line-2 bg-gradient-to-b from-ink-750 to-ink-800 outline-none"
-                style={{ borderRadius: radius.dialog }}
-                layoutCrossfade={false}
-                transition={{ layout: spring.morph }}
-                onLayoutAnimationComplete={() => setSettled(open.id)}
               >
+                <motion.div className="absolute inset-0 bg-ink-950/75" style={{ opacity: swipe.dim }} />
+              </motion.div>
+              {/* the swipe moves this column (shadow sibling + panel together), never the `layoutId` panel itself */}
+              <motion.div ref={columnRef} className={cn("pointer-events-none relative w-full max-w-[620px]", open.className)} style={swipe.style}>
                 <motion.div
-                  ref={touchGuard}
-                  data-dialog-handle=""
-                  className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-ink-750 via-ink-750/95 to-transparent px-6 pb-3 pt-5 pointer-coarse:cursor-grab pointer-coarse:active:cursor-grabbing"
-                  variants={open.pill && !reduced ? HEAD : undefined}
-                  initial={STAGGER_HIDDEN}
-                  animate={STAGGER_SHOWN}
-                  {...swipe.handle}
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 shadow-[0_40px_90px_rgb(0_0_0/0.45)]"
+                  style={{ borderRadius: radius.dialog }}
+                  initial={reduced ? false : { opacity: 0 }}
+                  animate={{ opacity: morphDone || reduced ? 1 : 0 }}
+                  exit={{ opacity: 0, transition: tween.exit }}
+                  transition={tween.fade}
+                />
+                <motion.div
+                  ref={panelRef}
+                  layoutId={`morph-${open.id}`}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby={titleId}
+                  className="pointer-events-auto relative max-h-[86vh] w-full overflow-y-auto overscroll-contain border border-line-2 bg-gradient-to-b from-ink-750 to-ink-800 outline-none"
+                  style={{ borderRadius: radius.dialog, opacity: handoff, pointerEvents: hits }}
+                  layoutCrossfade={false}
+                  transition={{ layout: spring.morph }}
+                  onLayoutAnimationComplete={() => setSettled(open.id)}
                 >
-                  <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1.5 hidden h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15 pointer-coarse:block" />
-                  <motion.h2 id={titleId} layoutId={`morph-title-${open.id}`} layout="position" className="label !text-fg flex items-center gap-2">
-                    <span className="size-1.5 rounded-full bg-signal" />
-                    {open.title}
-                  </motion.h2>
-                  <button
-                    type="button"
-                    onClick={dismiss}
-                    aria-label="Schließen"
-                    className="touch-hit grid size-8 place-items-center rounded-full border border-line-2 text-mute transition-colors hover:text-fg"
+                  <motion.div
+                    ref={touchGuard}
+                    data-dialog-handle=""
+                    className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-gradient-to-b from-ink-750 via-ink-750/95 to-transparent px-6 pb-3 pt-5 pointer-coarse:cursor-grab pointer-coarse:active:cursor-grabbing"
+                    variants={open.pill && !reduced ? HEAD : undefined}
+                    initial={STAGGER_HIDDEN}
+                    animate={STAGGER_SHOWN}
+                    {...swipe.handle}
                   >
-                    {CLOSE_GLYPH}
-                  </button>
-                </motion.div>
-                <motion.div className="px-6 pb-6" variants={BODY} initial={STAGGER_HIDDEN} animate={STAGGER_SHOWN} exit={{ opacity: 0, transition: tween.exit }}>
-                  {body}
+                    <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1.5 hidden h-[5px] w-9 -translate-x-1/2 rounded-full bg-white/15 pointer-coarse:block" />
+                    <motion.h2 id={titleId} layoutId={`morph-title-${open.id}`} layout="position" className="label !text-fg flex items-center gap-2">
+                      <span className="size-1.5 rounded-full bg-signal" />
+                      {open.title}
+                    </motion.h2>
+                    <button
+                      type="button"
+                      onClick={dismiss}
+                      aria-label="Schließen"
+                      className="touch-hit grid size-8 place-items-center rounded-full border border-line-2 text-mute transition-colors hover:text-fg"
+                    >
+                      {CLOSE_GLYPH}
+                    </button>
+                  </motion.div>
+                  <motion.div className="px-6 pb-6" variants={BODY} initial={STAGGER_HIDDEN} animate={STAGGER_SHOWN} exit={{ opacity: 0, transition: tween.exit }}>
+                    <LayoutCascade>{body}</LayoutCascade>
+                  </motion.div>
                 </motion.div>
               </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </NoLayoutCascade>
     </Ctx.Provider>
   );
 }
