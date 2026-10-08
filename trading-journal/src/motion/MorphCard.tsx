@@ -1,7 +1,7 @@
 import { motion, type HTMLMotionProps } from "motion/react";
 import { useEffect, useRef, useState, type ElementType, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
-import { useMorphDialog } from "@/motion/MorphDialog";
+import { useMorphSource } from "@/motion/MorphDialog";
 import { contextSpringAt } from "@/motion/physics";
 import { radius, spring, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
@@ -68,11 +68,11 @@ export interface MorphCardProps {
  * h/2 of the pill (measured at the click) – the panel grows out of the pill's real shape instead of a 9999 px oval.
  */
 export function MorphCard({ id, title, body, children, className, as = "button", borderRadius = radius.card, dialogClassName, motionProps }: MorphCardProps) {
-  const { open, settled, closing, closeTempo, show, returned } = useMorphDialog();
+  // only this id's dialog state: opening another card's dialog never re-renders this one
+  const { isOpen, settled, closing, closeTempo, show, returned } = useMorphSource(id);
   const press = usePressable({ scale: PRESS_SCALE });
-  const isOpen = open?.id === id;
-  const hidden = isOpen && settled === id;
-  const away = isOpen || closing === id;
+  const hidden = settled;
+  const away = isOpen || closing;
   const reduced = useReducedFx();
   const srcRef = useRef<HTMLElement>(null);
   useContentAway(srcRef, away, reduced);
@@ -87,7 +87,7 @@ export function MorphCard({ id, title, body, children, className, as = "button",
   };
   const { onLayoutAnimationComplete, transition, ...restMotion } = motionProps ?? {};
   // reverse morph after a swipe: the release tempo picks a livelier context spring (the token itself at tempo 0)
-  const morphSpring = closing === id && closeTempo > 0 ? contextSpringAt(spring.morph, closeTempo) : spring.morph;
+  const morphSpring = closing && closeTempo > 0 ? contextSpringAt(spring.morph, closeTempo) : spring.morph;
   // a source that leaves while its dialog closes (page switch from inside the dialog) has no reverse morph to wait for
   useEffect(() => () => returned(id), [returned, id]);
   if (pill) {
@@ -189,10 +189,10 @@ export interface MorphTitleProps {
  * when its dialog opens or closes (`layoutDependency`), so value / hover re-renders of the tile never force a layout read.
  */
 export function MorphTitle({ id, as = "span", className, layoutDependency, children }: MorphTitleProps) {
-  const { open } = useMorphDialog();
+  const { isOpen } = useMorphSource(id);
   const Tag = motion[as];
   return (
-    <Tag layoutId={`morph-title-${id}`} layout="position" layoutDependency={layoutDependency ?? open?.id === id} className={className}>
+    <Tag layoutId={`morph-title-${id}`} layout="position" layoutDependency={layoutDependency ?? isOpen} className={className}>
       {children}
     </Tag>
   );

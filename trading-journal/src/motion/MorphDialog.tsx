@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useMotionValue, type Variants } from "motion/react";
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useDialogBehaviour, useTouchMoveGuard } from "@/motion/a11y";
 import { LayoutCascade, NoLayoutCascade } from "@/motion/NoLayoutCascade";
@@ -38,7 +38,8 @@ export interface MorphDialogGuard {
   onAttempt: () => void;
 }
 
-interface MorphDialogState {
+/** The dialog's state: one immutable snapshot per change (`MorphDialogStore`). */
+interface MorphDialogSnapshot {
   open: MorphDialogRequest | null;
   /** id whose open morph has completed → its source is `visibility:hidden` (Plan 3.2 rule 9). */
   settled: string | null;
@@ -50,6 +51,11 @@ interface MorphDialogState {
    * livelier, everything else keeps the tuned token (layout animations cannot take the finger's velocity).
    */
   closeTempo: number;
+  /** The open request's body, evaluated once at `show`. */
+  body: ReactNode;
+}
+
+interface MorphDialogActions {
   show: (req: MorphDialogRequest) => void;
   close: () => void;
   /** Called by the source `MorphCard` when its reverse morph has finished (releases inert + focus). */
@@ -58,20 +64,133 @@ interface MorphDialogState {
   registerGuard: (g: MorphDialogGuard) => () => void;
 }
 
-const Ctx = createContext<MorphDialogState>({
-  open: null,
-  settled: null,
-  closing: null,
-  closeTempo: 0,
-  show: () => {},
-  close: () => {},
-  returned: () => {},
-  registerGuard: () => () => {},
-});
+export type MorphDialogState = Omit<MorphDialogSnapshot, "body"> & MorphDialogActions;
 
-/** `{ open, show, close }` – `show({ id, title, body })` opens the dialog morphing out of `MorphCard id`. */
+/**
+ * External store of the dialog state. Every reader subscribes with `useSyncExternalStore`, so the provider, the source
+ * cards and the other readers all re-render in ONE synchronous batch with every change – the source card's
+ * `layoutDependency` flips in the very commit that mounts (or relegates) the panel, which the shared-layout morph needs –
+ * while each reader re-renders only when the part it reads changed. (With a context value every `MorphCard` and every
+ * reader – ≈ 2,100 components on the Übersicht – re-rendered four times per open/close.)
+ */
+interface MorphDialogStore {
+  get: () => MorphDialogSnapshot;
+  set: (patch: Partial<MorphDialogSnapshot>) => void;
+  subscribe: (listener: (prev: MorphDialogSnapshot, next: MorphDialogSnapshot) => void) => () => void;
+  /** `useSyncExternalStore` form of `subscribe`. */
+  subscribeAll: (onChange: () => void) => () => void;
+}
+
+const EMPTY: MorphDialogSnapshot = { open: null, settled: null, closing: null, closeTempo: 0, body: null };
+
+function createMorphDialogStore(): MorphDialogStore {
+  let snap = EMPTY;
+  const listeners = new Set<(prev: MorphDialogSnapshot, next: MorphDialogSnapshot) => void>();
+  const subscribe: MorphDialogStore["subscribe"] = (listener) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  };
+  return {
+    get: () => snap,
+    set(patch) {
+      const prev = snap;
+      let changed = false;
+      for (const k of Object.keys(patch) as (keyof MorphDialogSnapshot)[]) if (!Object.is(prev[k], patch[k])) changed = true;
+      if (!changed) return;
+      snap = { ...prev, ...patch };
+      for (const l of [...listeners]) l(prev, snap);
+    },
+    subscribe,
+    subscribeAll: (onChange) => subscribe(() => onChange()),
+  };
+}
+
+interface MorphDialogCtx {
+  store: MorphDialogStore;
+  actions: MorphDialogActions;
+}
+
+/** Outside a provider: an empty store that never changes and no-op actions. */
+const OUTSIDE: MorphDialogCtx = {
+  store: createMorphDialogStore(),
+  actions: { show: () => {}, close: () => {}, returned: () => {}, registerGuard: () => () => {} },
+};
+
+const Ctx = createContext<MorphDialogCtx>(OUTSIDE);
+
+const STATE_KEYS = ["open", "settled", "closing", "closeTempo"] as const;
+type StateKey = (typeof STATE_KEYS)[number];
+
+/**
+ * `{ open, settled, closing, closeTempo, show, close, … }` – `show({ id, title, body })` opens the dialog morphing out of
+ * `MorphCard id`. Tracked: the component re-renders only when a state field it has READ changes (`const { close } =
+ * useMorphDialog()` never re-renders; `const { open } = …` re-renders on open / close). The actions are stable.
+ */
 export function useMorphDialog(): MorphDialogState {
-  return useContext(Ctx);
+  const { store, actions } = useContext(Ctx);
+  const [used] = useState(() => new Set<StateKey>());
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      store.subscribe((prev, next) => {
+        for (const k of used) {
+          if (!Object.is(prev[k], next[k])) {
+            onChange();
+            return;
+          }
+        }
+      }),
+    [store, used],
+  );
+  const snap = useSyncExternalStore(subscribe, store.get, store.get);
+  return useMemo(() => {
+    const view = { ...actions } as MorphDialogState;
+    for (const k of STATE_KEYS) {
+      Object.defineProperty(view, k, {
+        enumerable: true,
+        get: () => {
+          used.add(k);
+          return snap[k];
+        },
+      });
+    }
+    return view;
+  }, [snap, actions, used]);
+}
+
+/** What a morph source needs to know about its own id. */
+export interface MorphSourceState {
+  /** Its dialog is open. */
+  isOpen: boolean;
+  /** Its dialog's open morph has completed (the source is hidden behind it). */
+  settled: boolean;
+  /** Its dialog is closing and its reverse morph has not reported back yet. */
+  closing: boolean;
+  /** Release tempo of the swipe that closed its dialog (0 otherwise). */
+  closeTempo: number;
+}
+
+/**
+ * Per-source view of the dialog (`MorphCard`, `MorphTitle`): re-renders only when THIS id's state changes – opening one
+ * fact tile no longer re-renders the other morph sources on the page.
+ */
+export function useMorphSource(id: string): MorphSourceState & Pick<MorphDialogActions, "show" | "returned"> {
+  const { store, actions } = useContext(Ctx);
+  const cache = useRef<{ key: string; view: MorphSourceState } | null>(null);
+  const get = useCallback(() => {
+    const s = store.get();
+    const isOpen = s.open?.id === id;
+    const settled = isOpen && s.settled === id;
+    const closing = s.closing === id;
+    const closeTempo = closing ? s.closeTempo : 0;
+    const key = `${isOpen}|${settled}|${closing}|${closeTempo}`;
+    const c = cache.current;
+    if (c && c.key === key) return c.view;
+    const view = { isOpen, settled, closing, closeTempo };
+    cache.current = { key, view };
+    return view;
+  }, [store, id]);
+  const view = useSyncExternalStore(store.subscribeAll, get, get);
+  return { ...view, show: actions.show, returned: actions.returned };
 }
 
 /**
@@ -80,7 +199,7 @@ export function useMorphDialog(): MorphDialogState {
  * Outside a `MorphDialogProvider` it does nothing.
  */
 export function useMorphDialogGuard(guard: () => boolean, onAttempt: () => void): void {
-  const { registerGuard } = useContext(Ctx);
+  const { registerGuard } = useContext(Ctx).actions;
   const latest = useRef({ guard, onAttempt });
   useEffect(() => {
     latest.current = { guard, onAttempt };
@@ -131,14 +250,10 @@ const HEAD: Variants = {
  * (the swipe is resisted with a rubber band and never commits).
  */
 export function MorphDialogProvider({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState<MorphDialogRequest | null>(null);
-  const [settled, setSettled] = useState<string | null>(null);
-  const [closing, setClosing] = useState<string | null>(null);
-  const [closeTempo, setCloseTempo] = useState(0);
-  const [body, setBody] = useState<ReactNode>(null);
+  const [store] = useState(createMorphDialogStore);
+  const { open, settled, closing, body } = useSyncExternalStore(store.subscribeAll, store.get, store.get);
   const panelRef = useRef<HTMLDivElement>(null);
   const columnRef = useRef<HTMLDivElement>(null);
-  const openRef = useRef<MorphDialogRequest | null>(null);
   const guardRef = useRef<MorphDialogGuard | null>(null);
   const titleId = useId();
   const reduced = useReducedFx();
@@ -148,40 +263,32 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
   const handoff = useMotionValue(1);
   const hits = useMotionValue<"auto" | "none">("auto");
 
-  useEffect(() => {
-    openRef.current = open;
-  }, [open]);
-
-  const closeWith = useCallback((tempo: number) => {
-    const current = openRef.current;
-    if (current) setClosing(current.id);
-    setCloseTempo(tempo);
-    setOpen(null);
-    setSettled(null);
-  }, []);
+  const closeWith = useCallback(
+    (tempo: number) => {
+      const current = store.get();
+      store.set({ closing: current.open ? current.open.id : current.closing, closeTempo: tempo, open: null, settled: null });
+    },
+    [store],
+  );
   const close = useCallback(() => closeWith(0), [closeWith]);
   const show = useCallback(
     (req: MorphDialogRequest) => {
       handoff.set(1);
       hits.set("auto");
-      setBody(typeof req.body === "function" ? req.body() : req.body);
-      setSettled(null);
-      setClosing(null);
-      setCloseTempo(0);
-      setOpen(req);
+      store.set({ body: typeof req.body === "function" ? req.body() : req.body, settled: null, closing: null, closeTempo: 0, open: req });
     },
-    [handoff, hits],
+    [store, handoff, hits],
   );
   const returned = useCallback(
     (id: string) => {
       // the card owns the picture again: keep the leaving panel invisible and let taps through to the page
-      if (openRef.current === null) {
+      if (store.get().open === null) {
         handoff.set(0);
         hits.set("none");
       }
-      setClosing((c) => (c === id ? null : c));
+      if (store.get().closing === id) store.set({ closing: null });
     },
-    [handoff, hits],
+    [store, handoff, hits],
   );
   const registerGuard = useCallback((g: MorphDialogGuard) => {
     guardRef.current = g;
@@ -213,10 +320,8 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
   });
   const touchGuard = useTouchMoveGuard(swipe.isDragging);
 
-  const value = useMemo<MorphDialogState>(
-    () => ({ open, settled, closing, closeTempo, show, close, returned, registerGuard }),
-    [open, settled, closing, closeTempo, show, close, returned, registerGuard],
-  );
+  // stable: the context never changes, readers subscribe to the store (`useMorphDialog`, `useMorphSource`)
+  const value = useMemo<MorphDialogCtx>(() => ({ store, actions: { show, close, returned, registerGuard } }), [store, show, close, returned, registerGuard]);
 
   return (
     <Ctx.Provider value={value}>
@@ -269,7 +374,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
                   style={{ borderRadius: radius.dialog, opacity: handoff, pointerEvents: hits }}
                   layoutCrossfade={false}
                   transition={{ layout: spring.morph }}
-                  onLayoutAnimationComplete={() => setSettled(open.id)}
+                  onLayoutAnimationComplete={() => store.set({ settled: open.id })}
                 >
                   <motion.div
                     ref={touchGuard}

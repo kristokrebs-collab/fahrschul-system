@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { Profiler, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
 import { MorphDialogProvider, StaggerItem, useMorphDialog, useMorphDialogGuard } from "@/motion/MorphDialog";
@@ -212,5 +212,61 @@ describe("PageSwitch", () => {
     const page = screen.getByText("Trades").parentElement as HTMLElement;
     await waitFor(() => expect(page.style.filter).toBe("none"));
     expect(page.style.transform === "" || page.style.transform === "none").toBe(true);
+  });
+});
+
+describe("MorphDialog subscriptions", () => {
+  it("opening one card's dialog re-renders that card, not the other sources; readers re-render only for what they read", async () => {
+    const commits = new Map<string, number>();
+    const onRender = (id: string) => commits.set(id, (commits.get(id) ?? 0) + 1);
+    function CloseOnly() {
+      const { close } = useMorphDialog();
+      return (
+        <button type="button" onClick={close}>
+          Zu
+        </button>
+      );
+    }
+    function OpenReader() {
+      const { open } = useMorphDialog();
+      return <span data-testid="open-id">{open?.id ?? "–"}</span>;
+    }
+    const card = (id: string, title: string) => (
+      <Profiler id={id} onRender={onRender}>
+        <MorphCard id={id} title={title} body={() => <p>Text {title}</p>}>
+          <MorphTitle id={id}>{title}</MorphTitle>
+        </MorphCard>
+      </Profiler>
+    );
+    render(
+      <MotionRoot>
+        <MorphDialogProvider>
+          {card("fact-a", "Alpha")}
+          {card("fact-b", "Beta")}
+          {card("fact-c", "Gamma")}
+          <Profiler id="close-only" onRender={onRender}>
+            <CloseOnly />
+          </Profiler>
+          <Profiler id="open-reader" onRender={onRender}>
+            <OpenReader />
+          </Profiler>
+        </MorphDialogProvider>
+      </MotionRoot>,
+    );
+    commits.clear();
+    fireEvent.click(screen.getByRole("button", { name: /Alpha/ }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByTestId("open-id")).toHaveTextContent("fact-a");
+    expect(commits.get("fact-a")).toBeGreaterThan(0);
+    expect(commits.get("open-reader")).toBeGreaterThan(0);
+    expect(commits.get("fact-b")).toBeUndefined();
+    expect(commits.get("fact-c")).toBeUndefined();
+    expect(commits.get("close-only")).toBeUndefined();
+    // the close-only reader closes it with its stable action
+    fireEvent.click(screen.getByRole("button", { name: "Zu", hidden: true }));
+    expect(screen.getByRole("button", { name: /Alpha/, hidden: true })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByTestId("open-id")).toHaveTextContent("–");
+    expect(commits.get("fact-b")).toBeUndefined();
+    expect(commits.get("close-only")).toBeUndefined();
   });
 });
