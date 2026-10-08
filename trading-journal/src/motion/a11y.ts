@@ -3,9 +3,16 @@ import { useCallback, useEffect, useEffectEvent, useRef, type RefObject } from "
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
 
+/**
+ * Elements a user cannot reach right now: `inert` subtrees (a sheet body still hidden during its open morph, an exiting
+ * row, a parked page) and everything behind an open modal dialog (`data-modal-behind`, see `isolateOutside`). Use it for
+ * "is this a usable focus / glow target" checks instead of `[inert]` alone.
+ */
+export const UNREACHABLE_SELECTOR = "[inert],[data-modal-behind]";
+
 function focusables(root: HTMLElement): HTMLElement[] {
-  // `closest` covers the element itself and inert wrappers (e.g. a sheet body still hidden during its open morph)
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.closest("[inert]"));
+  // `closest` covers the element itself and unreachable wrappers
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => !el.closest(UNREACHABLE_SELECTOR));
 }
 
 /**
@@ -21,60 +28,97 @@ export const INERT_EXEMPT_SELECTOR = "[aria-live],[data-toast-island],[data-puls
 export const SETTLE_FALLBACK_MS = 700;
 
 /**
- * Reference counts of the `inert` attributes set by dialog sessions. Two sessions can overlap (detail → editor
- * hand-off: the editor opens while the detail is still exiting); the element stays inert until the LAST session that
- * marked it releases it. Elements inert for other reasons (an exiting list row) are never touched.
+ * Content behind a modal dialog (perf-120 phase C). It is `aria-hidden` (screen readers stay in the dialog, which also
+ * carries `aria-modal`) and marked `data-modal-behind` (visual consumers: cards behind a dialog stay dark), and it is
+ * kept out of reach without `inert`:
+ * - pointer input never gets there: every modal overlay is a fixed full-viewport layer above the page, dock and header;
+ * - Tab / Shift+Tab are trapped in the panel (`trapTab`), and focus that still lands behind the dialog (Tab in from the
+ *   browser UI, a programmatic focus) is sent back into the panel (`guardFocus`);
+ * - `UNREACHABLE_SELECTOR` includes the marker, so focus-target checks treat it like inert content.
+ * `inert` itself is inherited style: setting and lifting it restyled every element of the page behind (≈ 1 900 on the
+ * Übersicht – 15–24 ms, forced by the focus return in the frame after a sheet closed; `flick/restyle.mjs`: inert
+ * 10.9 ms vs aria-hidden / data attribute 0). Reference counts: two sessions can overlap (detail → editor hand-off: the
+ * editor opens while the detail is still exiting); an element stays marked until the LAST session that marked it
+ * releases it. Elements already `aria-hidden="true"` for other reasons (decoration, the intro cover) are never touched.
  */
-const inertRefs = new Map<HTMLElement, number>();
+const behindRefs = new Map<HTMLElement, { n: number; ariaHidden: string | null }>();
 
-function acquireInert(el: HTMLElement): boolean {
-  const n = inertRefs.get(el);
-  if (n) {
-    inertRefs.set(el, n + 1);
+function acquireBehind(el: HTMLElement): boolean {
+  const held = behindRefs.get(el);
+  if (held) {
+    held.n += 1;
     return true;
   }
-  if (el.hasAttribute("inert")) return false;
-  el.setAttribute("inert", "");
-  inertRefs.set(el, 1);
+  const ariaHidden = el.getAttribute("aria-hidden");
+  if (ariaHidden === "true") return false;
+  el.setAttribute("aria-hidden", "true");
+  el.setAttribute("data-modal-behind", "");
+  behindRefs.set(el, { n: 1, ariaHidden });
   return true;
 }
 
-function releaseInert(el: HTMLElement): void {
-  const n = inertRefs.get(el);
-  if (!n) return;
-  if (n > 1) inertRefs.set(el, n - 1);
-  else {
-    inertRefs.delete(el);
-    el.removeAttribute("inert");
+function releaseBehind(el: HTMLElement): void {
+  const held = behindRefs.get(el);
+  if (!held) return;
+  if (held.n > 1) {
+    held.n -= 1;
+    return;
   }
+  behindRefs.delete(el);
+  el.removeAttribute("data-modal-behind");
+  if (held.ariaHidden == null) el.removeAttribute("aria-hidden");
+  else el.setAttribute("aria-hidden", held.ariaHidden);
+}
+
+/** Panels of the sessions whose outside is isolated, latest last: focus that lands behind goes to the latest one. */
+const guardedPanels: HTMLElement[] = [];
+
+function onGuardedFocus(e: FocusEvent): void {
+  const target = e.target;
+  if (!(target instanceof Element) || !target.closest("[data-modal-behind]")) return;
+  const panel = guardedPanels[guardedPanels.length - 1];
+  if (!panel || panel.contains(target)) return;
+  (focusables(panel)[0] ?? panel).focus({ preventScroll: true });
+}
+
+function guardFocus(panel: HTMLElement): () => void {
+  if (guardedPanels.length === 0) document.addEventListener("focusin", onGuardedFocus, true);
+  guardedPanels.push(panel);
+  return () => {
+    const i = guardedPanels.lastIndexOf(panel);
+    if (i >= 0) guardedPanels.splice(i, 1);
+    if (guardedPanels.length === 0) document.removeEventListener("focusin", onGuardedFocus, true);
+  };
 }
 
 /**
- * Marks everything outside `el` as `inert` (siblings of every ancestor up to `<body>`); live regions are descended
- * into instead of inerted as a whole. Returns the undo.
+ * Isolates everything outside `el` (siblings of every ancestor up to `<body>`, see `acquireBehind`); live regions are
+ * descended into instead of hidden as a whole. Returns the undo.
  */
-function inertOutside(el: HTMLElement): () => void {
+function isolateOutside(el: HTMLElement): () => void {
   const touched: HTMLElement[] = [];
-  const inertChildren = (parent: HTMLElement, skip: HTMLElement | null) => {
+  const hideChildren = (parent: HTMLElement, skip: HTMLElement | null) => {
     for (const child of Array.from(parent.children)) {
       if (child === skip || !(child instanceof HTMLElement)) continue;
       if (child.tagName === "SCRIPT" || child.tagName === "STYLE") continue;
       if (child.matches(INERT_EXEMPT_SELECTOR)) continue;
       if (child.querySelector(INERT_EXEMPT_SELECTOR)) {
-        inertChildren(child, null);
+        hideChildren(child, null);
         continue;
       }
-      if (acquireInert(child)) touched.push(child);
+      if (acquireBehind(child)) touched.push(child);
     }
   };
   let node: HTMLElement | null = el;
   while (node && node !== document.body && node.parentElement) {
     const parent: HTMLElement = node.parentElement;
-    inertChildren(parent, node);
+    hideChildren(parent, node);
     node = parent;
   }
+  const unguard = guardFocus(el);
   return () => {
-    for (const t of touched) releaseInert(t);
+    unguard();
+    for (const t of touched) releaseBehind(t);
   };
 }
 
@@ -118,7 +162,7 @@ interface ModalParts {
   inert: boolean;
 }
 
-/** Lifts `inert` first, then returns focus – unless the user has meanwhile focused something outside the dialog. */
+/** Releases the outside first, then returns focus – unless the user has meanwhile focused something outside the dialog. */
 function endSession(s: ModalSession, parts: ModalParts, restoreFocus: boolean): void {
   if (s.done) return;
   s.done = true;
@@ -126,7 +170,7 @@ function endSession(s: ModalSession, parts: ModalParts, restoreFocus: boolean): 
   s.undoInert = null;
   if (!parts.focus || !restoreFocus) return;
   const prev = s.previous;
-  const target = prev?.isConnected && !prev.closest("[inert]") ? prev : (s.fallback?.() ?? null);
+  const target = prev?.isConnected && !prev.closest(UNREACHABLE_SELECTOR) ? prev : (s.fallback?.() ?? null);
   if (!target) return;
   const now = document.activeElement;
   const focusLost = !now || now === document.body || !now.isConnected || s.panel.contains(now);
@@ -137,11 +181,11 @@ function endSession(s: ModalSession, parts: ModalParts, restoreFocus: boolean): 
  * The shared dialog session behind `useFocusTrap` / `useInertOutside` / `useDialogBehaviour`.
  *
  * Opening: focus moves into the panel at once (before any document-wide write, so it only lays out the new panel)
- * and Tab is trapped; marking the page `inert` – a style invalidation of the whole document – waits until
- * `settled` (the open morph has finished, bounded by `SETTLE_FALLBACK_MS`) so it never lands in the morph's first
- * frames. Closing: the trap is removed at once; lifting `inert` and restoring focus wait until `settled` again
- * (the exit / reverse morph has finished) and then run together, inert first. `settled` defaults to `true`,
- * which keeps everything immediate.
+ * and Tab is trapped; isolating the page (`isolateOutside`: aria-hidden + `data-modal-behind` + focus guard – no style
+ * change) waits until `settled` (the open morph has finished, bounded by `SETTLE_FALLBACK_MS`), so the morph's frames
+ * carry no document-wide work. Closing: the trap is removed at once; releasing the page and restoring focus wait until
+ * `settled` again (the exit / reverse morph has finished) and then run together, release first. `settled` defaults to
+ * `true`, which keeps everything immediate.
  */
 function useModalSession(ref: RefObject<HTMLElement | null>, active: boolean, settled: boolean, parts: ModalParts, fallbackFocus?: () => HTMLElement | null): void {
   const session = useRef<ModalSession | null>(null);
@@ -189,7 +233,7 @@ function useModalSession(ref: RefObject<HTMLElement | null>, active: boolean, se
     const step = () => {
       if (s.done) return;
       if (s.closing) endSession(s, { focus, inert }, true);
-      else if (inert && !s.undoInert) s.undoInert = inertOutside(s.panel);
+      else if (inert && !s.undoInert) s.undoInert = isolateOutside(s.panel);
     };
     if (settled) {
       step();
@@ -237,10 +281,11 @@ export function useScrollLock(active: boolean): void {
 }
 
 /**
- * Marks everything outside `ref` as `inert` (siblings of every ancestor up to `<body>`), so the
- * page behind a portal-less dialog is neither focusable nor read by screen readers.
+ * Isolates everything outside `ref` (siblings of every ancestor up to `<body>`: `aria-hidden`, `data-modal-behind`,
+ * focus that lands there returns to the panel – see `isolateOutside`), so the page behind a portal-less dialog is
+ * neither reachable nor read by screen readers, without restyling it the way `inert` did.
  * Live regions (`[aria-live]`, `data-toast-island`) are exempt: a subtree that contains one is descended
- * into instead of being inerted as a whole, so toasts keep announcing while a sheet is open.
+ * into instead of being hidden as a whole, so toasts keep announcing while a sheet is open.
  * With `settled = false` the toggle waits for the morph (see `useDialogBehaviour`).
  */
 export function useInertOutside(ref: RefObject<HTMLElement | null>, active: boolean, settled = true): void {
@@ -271,7 +316,7 @@ export function useEscape(active: boolean, onClose: () => void): void {
 export interface DialogBehaviourOptions {
   /**
    * Morph-aware timing. Pass `false` while the dialog's open morph or its exit / reverse morph is running and
-   * `true` once it has finished: `inert` is applied after the open morph and lifted – together with the focus
+   * `true` once it has finished: the page is isolated after the open morph and released – together with the focus
    * return – after the close animation (each bounded by `SETTLE_FALLBACK_MS`). Omit for immediate behaviour.
    */
   settled?: boolean;
@@ -282,7 +327,7 @@ export interface DialogBehaviourOptions {
   fallbackFocus?: () => HTMLElement | null;
 }
 
-/** All dialog behaviours in one call (focus trap, scroll lock, inert siblings, Escape). */
+/** All dialog behaviours in one call (focus trap, scroll lock, isolated outside, Escape). */
 export function useDialogBehaviour(ref: RefObject<HTMLElement | null>, active: boolean, onClose: () => void, { settled = true, fallbackFocus }: DialogBehaviourOptions = {}): void {
   useModalSession(ref, active, settled, { focus: true, inert: true }, fallbackFocus);
   useScrollLock(active);

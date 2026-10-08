@@ -20,6 +20,7 @@ export {
   useDialogBehaviour,
   SETTLE_FALLBACK_MS,
   INERT_EXEMPT_SELECTOR,
+  UNREACHABLE_SELECTOR,
   type DialogBehaviourOptions,
 } from "@/motion/a11y";
 export { StaggerItem, sectionDelay, withSectionStagger, STAGGER_HIDDEN, STAGGER_SHOWN, type StaggerItemProps } from "@/motion/Stagger";

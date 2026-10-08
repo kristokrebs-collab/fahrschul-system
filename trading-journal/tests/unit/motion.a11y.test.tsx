@@ -23,47 +23,52 @@ function Harness({ open, settled, onClose = () => {} }: { open: boolean; settled
   );
 }
 
-const trigger = () => screen.getByRole("button", { name: "Auslöser", hidden: true });
+// by text: an aria-hidden button has no accessible name (the page behind an open dialog is aria-hidden)
+const trigger = () => screen.getByText("Auslöser", { selector: "button" });
 const outside = () => screen.getByTestId("outside");
+/** The page behind an open dialog (deliberately changed, perf-120 C: aria-hidden + data-modal-behind + focus guard, not `inert`). */
+const behind = (el: HTMLElement) => el.getAttribute("aria-hidden") === "true" && el.hasAttribute("data-modal-behind");
 
 describe("useDialogBehaviour", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("without a settle signal: focus, inert, scroll lock at once; everything released on close", () => {
+  it("without a settle signal: focus, isolation, scroll lock at once; everything released on close", () => {
     const { rerender } = render(<Harness open={false} />);
     trigger().focus();
     rerender(<Harness open />);
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Erster" }));
-    expect(outside()).toHaveAttribute("inert");
-    expect(screen.getByTestId("live")).not.toHaveAttribute("inert"); // live regions stay announced
+    expect(behind(outside())).toBe(true);
+    expect(outside().hasAttribute("inert")).toBe(false); // no restyle of the page behind
+    expect(screen.getByTestId("live")).not.toHaveAttribute("aria-hidden"); // live regions stay announced
     expect(document.body.style.overflow).toBe("hidden");
     rerender(<Harness open={false} />);
-    expect(outside()).not.toHaveAttribute("inert");
+    expect(outside()).not.toHaveAttribute("aria-hidden");
+    expect(outside()).not.toHaveAttribute("data-modal-behind");
     expect(document.activeElement).toBe(trigger());
     expect(document.body.style.overflow).toBe("");
   });
 
-  it("morph-aware: focus moves at once, inert waits for `settled`; release + focus return wait for the exit", () => {
+  it("morph-aware: focus moves at once, isolation waits for `settled`; release + focus return wait for the exit", () => {
     const { rerender } = render(<Harness open={false} settled />);
     trigger().focus();
     rerender(<Harness open settled={false} />);
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Erster" }));
     expect(document.body.style.overflow).toBe("hidden");
-    expect(outside()).not.toHaveAttribute("inert");
+    expect(behind(outside())).toBe(false);
 
     rerender(<Harness open settled />);
-    expect(outside()).toHaveAttribute("inert");
+    expect(behind(outside())).toBe(true);
 
     // closing: the exit animation is still running
     rerender(<Harness open={false} settled={false} />);
     expect(document.body.style.overflow).toBe("");
-    expect(outside()).toHaveAttribute("inert");
+    expect(behind(outside())).toBe(true);
     expect(document.activeElement).not.toBe(trigger());
 
     rerender(<Harness open={false} settled />);
-    expect(outside()).not.toHaveAttribute("inert");
+    expect(behind(outside())).toBe(false);
     expect(document.activeElement).toBe(trigger());
   });
 
@@ -72,14 +77,14 @@ describe("useDialogBehaviour", () => {
     const { rerender } = render(<Harness open={false} settled />);
     trigger().focus();
     rerender(<Harness open settled={false} />);
-    expect(outside()).not.toHaveAttribute("inert");
+    expect(behind(outside())).toBe(false);
     act(() => vi.advanceTimersByTime(SETTLE_FALLBACK_MS));
-    expect(outside()).toHaveAttribute("inert");
+    expect(behind(outside())).toBe(true);
 
     rerender(<Harness open={false} settled={false} />);
-    expect(outside()).toHaveAttribute("inert");
+    expect(behind(outside())).toBe(true);
     act(() => vi.advanceTimersByTime(SETTLE_FALLBACK_MS));
-    expect(outside()).not.toHaveAttribute("inert");
+    expect(behind(outside())).toBe(false);
     expect(document.activeElement).toBe(trigger());
   });
 
@@ -88,7 +93,7 @@ describe("useDialogBehaviour", () => {
     trigger().focus();
     rerender(<Harness open settled />);
     rerender(<Harness open={false} settled={false} />);
-    // the page is still inert during the exit – focus an element outside the inerted tree
+    // the page is still isolated during the exit – focus an element outside the isolated tree
     const elsewhere = document.createElement("button");
     document.body.appendChild(elsewhere);
     try {
@@ -97,6 +102,40 @@ describe("useDialogBehaviour", () => {
       expect(document.activeElement).toBe(elsewhere);
     } finally {
       elsewhere.remove();
+    }
+  });
+
+  it("focus that lands behind the dialog (Tab in from the browser UI, a programmatic focus) returns into the panel", () => {
+    const { rerender } = render(<Harness open={false} />);
+    trigger().focus();
+    rerender(<Harness open />);
+    const first = screen.getByRole("button", { name: "Erster" });
+    act(() => screen.getByText("Draußen", { selector: "button" }).focus());
+    expect(document.activeElement).toBe(first);
+    // released with the session: the page is reachable again
+    rerender(<Harness open={false} />);
+    const out = screen.getByRole("button", { name: "Draußen" });
+    act(() => out.focus());
+    expect(document.activeElement).toBe(out);
+  });
+
+  it("keeps an aria-hidden it did not set and restores an explicit aria-hidden value", () => {
+    const { rerender } = render(<Harness open={false} />);
+    outside().setAttribute("aria-hidden", "false");
+    const deco = document.createElement("span");
+    deco.setAttribute("aria-hidden", "true");
+    document.body.appendChild(deco);
+    try {
+      rerender(<Harness open />);
+      expect(behind(outside())).toBe(true);
+      expect(deco).not.toHaveAttribute("data-modal-behind");
+      rerender(<Harness open={false} />);
+      expect(outside()).toHaveAttribute("aria-hidden", "false");
+      expect(outside()).not.toHaveAttribute("data-modal-behind");
+      expect(deco).toHaveAttribute("aria-hidden", "true");
+    } finally {
+      deco.remove();
+      outside().removeAttribute("aria-hidden");
     }
   });
 

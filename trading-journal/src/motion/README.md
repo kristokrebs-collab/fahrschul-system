@@ -96,9 +96,9 @@ in `src/app`), kept in the barrel for other uses.
   reduced motion, ends at `filter: none`. Exit `{x: −dir·12, opacity 0}` on `tween.exit`. `transitioning` clears after ≈ 0.45 s.
 
 ### `MorphDialogProvider` · `useMorphDialog` · `MorphCard` · `MorphTitle`
-Card → 620 px dialog morph (Plan 2.5 "Morph-Dialog"), portal-less, with focus trap, scroll lock, `inert` on siblings, Escape/backdrop close.
+Card → 620 px dialog morph (Plan 2.5 "Morph-Dialog"), portal-less, with focus trap, scroll lock, isolated siblings (`a11y.ts`), Escape/backdrop close.
 - `MorphDialogProvider` – mount once at app level. Overlay = ONE fixed `z-[70]` wrapper: it is the backdrop-click target and is never
-  made inert; the `bg-ink-950/75` dim layer is decorative (`pointer-events-none`). Panel `layoutId="morph-{id}"` `layoutRoot`
+  isolated; the `bg-ink-950/75` dim layer is decorative (`pointer-events-none`). Panel `layoutId="morph-{id}"` `layoutRoot`
   `borderRadius 28` on `spring.morph`; sticky head `motion.h2 layoutId="morph-title-{id}"`; the body is a stagger parent (`StaggerItem`
   sections). The big drop shadow sits on an unscaled sibling and fades in (`tween.fade`) after the morph, so the per-frame radius
   correction repaints the panel alone.
@@ -126,7 +126,7 @@ Card → 620 px dialog morph (Plan 2.5 "Morph-Dialog"), portal-less, with focus 
 ### `Sheet`
 `{ open; onClose; title; size?: "md"|"lg"; layoutId?; headerExtra?; footer?; children; className?; onOpened?; handoff?; dismissGuard?;
 onDismissAttempt? }` – overlay `z-[60]`, panel `role="dialog"` `layoutRoot` `borderRadius 28`, body `layoutScroll`, focus trap, scroll
-lock, `inert`, Escape. With `layoutId` (`new-trade`, `setup-card-{id}`) the panel morphs on `spring.sheet`; without, desktop
+lock, isolated outside (`a11y.ts`), Escape. With `layoutId` (`new-trade`, `setup-card-{id}`) the panel morphs on `spring.sheet`; without, desktop
 `{y 40, scale .98}` on `spring.sheet`, mobile `y 100%` on `tween.sheetIos`. The body is a stagger parent (`StaggerItem`). A sliding
 sheet keeps its shadow on the panel (it only moves by transform). The source must be `visibility:hidden` while open. The footer pads by
 `var(--safe-bottom, env(safe-area-inset-bottom))`, so it clears a browser bar laid over the page bottom.
@@ -250,10 +250,16 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
   `RevealItem`, `StaggerItem` and PageHost drop their blur under it.
 - `a11y.ts`: `useFocusTrap(ref, active, settled?)`, `useScrollLock(active)`, `useInertOutside(ref, active, settled?)`,
   `useEscape(active, onClose)`, `useDialogBehaviour(ref, active, onClose, { settled? })`:
-  - focus moves into the panel and Tab is trapped at once; `inert` is applied when `settled` is true (open morph done);
-  - after close, lifting `inert` and then returning focus wait for `settled` (exit / reverse morph done);
+  - focus moves into the panel and Tab is trapped at once; the outside is isolated when `settled` is true (open morph done);
+  - after close, releasing the outside and then returning focus wait for `settled` (exit / reverse morph done);
   - each deferral is bounded by `SETTLE_FALLBACK_MS` (700); omitting `settled` gives immediate behaviour; focus is not returned if the
-    user focused something else meanwhile; `INERT_EXEMPT_SELECTOR` (`[aria-live]`, the toast island) is never made inert.
+    user focused something else meanwhile; `INERT_EXEMPT_SELECTOR` (`[aria-live]`, the toast island) is never isolated.
+  - Isolation (perf-120 C) is NOT `inert`: the siblings of every ancestor get `aria-hidden="true"` + `data-modal-behind` (reference
+    counted, an `aria-hidden` they already had is kept / restored) and a document `focusin` guard sends focus that lands there (Tab in
+    from the browser UI, a programmatic focus) back into the latest isolated panel; pointer input never reaches the page (every modal
+    overlay is a fixed full-viewport layer above page, header and dock) and Tab stays trapped. `inert` is inherited style: setting and
+    lifting it restyled every element of the page behind (≈ 1 900 on the Übersicht, 15–25 ms forced by the focus return after a sheet
+    closed, the same again after the open morph). Reachability checks use `UNREACHABLE_SELECTOR` (`[inert],[data-modal-behind]`).
   - `MorphDialog`, `Sheet` and `TradeDetail` pass `settled`.
   - `useTouchMoveGuard(isDragging)` → ref callback: a native NON-passive `touchmove` listener that `preventDefault`s while a drag is
     engaged. React's touch listeners are passive; an unconsumed fast touch sequence lets Chrome treat the next tap (≈ 1 s) as a fling

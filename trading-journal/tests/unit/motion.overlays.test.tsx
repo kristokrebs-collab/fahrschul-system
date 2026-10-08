@@ -7,8 +7,16 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import { PageSwitch } from "@/motion/PageSwitch";
 import { Sheet } from "@/motion/Sheet";
 
+/**
+ * The page behind an open dialog is isolated by `aria-hidden` + `data-modal-behind` + a focus guard (deliberately
+ * changed, perf-120 C – `inert` restyled the whole page behind on open and close); `inert` remains for the sheet body
+ * while it waits for the morph.
+ */
+const isBehind = (el: Element) => el.closest("[data-modal-behind]") !== null;
+const byText = (text: string) => screen.getByText(text, { selector: "button" });
+
 describe("Sheet", () => {
-  it("morph sheet: no shadow on the morphing panel, an unscaled shadow sibling; inert + body wait for the morph", async () => {
+  it("morph sheet: no shadow on the morphing panel, an unscaled shadow sibling; isolation + body wait for the morph", async () => {
     function H() {
       const [open, setOpen] = useState(true);
       return (
@@ -28,20 +36,23 @@ describe("Sheet", () => {
     expect(dialog.className).toContain("sm:max-w-[860px]");
     const shadow = dialog.parentElement?.querySelector(":scope > [aria-hidden='true']");
     expect(shadow?.className).toContain("shadow-[");
-    const outside = screen.getByRole("button", { name: "Draußen", hidden: true });
-    // focus moved at once, the page is not inert yet and the body waits for the morph: it is laid out at once (so the
+    const outside = byText("Draußen");
+    // focus moved at once, the page is not isolated yet and the body waits for the morph: it is laid out at once (so the
     // morph targets the final box) but hidden and inert until the morph has finished
     expect(dialog.contains(document.activeElement)).toBe(true);
-    expect(outside).not.toHaveAttribute("inert");
+    expect(isBehind(outside)).toBe(false);
     expect(screen.getByText("Abschnitt").closest("[inert]")).not.toBeNull();
-    // no source in the DOM → the morph fallback reveals the body, then the page becomes inert
+    // no source in the DOM → the morph fallback reveals the body, then the page is isolated (never inert)
     await waitFor(() => expect(screen.getByText("Abschnitt").closest("[inert]")).toBeNull(), { timeout: 1500 });
-    await waitFor(() => expect(outside).toHaveAttribute("inert"), { timeout: 1500 });
+    await waitFor(() => expect(isBehind(outside)).toBe(true), { timeout: 1500 });
+    expect(outside).toHaveAttribute("aria-hidden", "true");
+    expect(outside).not.toHaveAttribute("inert");
     fireEvent.keyDown(document, { key: "Escape" });
-    await waitFor(() => expect(outside).not.toHaveAttribute("inert"), { timeout: 1500 });
+    await waitFor(() => expect(isBehind(outside)).toBe(false), { timeout: 1500 });
+    expect(outside).not.toHaveAttribute("aria-hidden");
   });
 
-  it("sliding sheet keeps its own shadow and inerts the page immediately", () => {
+  it("sliding sheet keeps its own shadow and isolates the page immediately", () => {
     render(
       <MotionRoot>
         <button type="button">Draußen</button>
@@ -51,7 +62,7 @@ describe("Sheet", () => {
       </MotionRoot>,
     );
     expect(screen.getByRole("dialog", { name: "Grundlage bearbeiten" }).className).toContain("shadow-[");
-    expect(screen.getByRole("button", { name: "Draußen", hidden: true })).toHaveAttribute("inert");
+    expect(isBehind(byText("Draußen"))).toBe(true);
     expect(screen.getByText("Formular")).toBeInTheDocument();
   });
 });
@@ -70,7 +81,7 @@ describe("StaggerItem", () => {
 });
 
 describe("MorphDialog", () => {
-  it("body sections stagger in; after Escape inert is lifted and focus returns to the card", async () => {
+  it("body sections stagger in; after Escape the page is released and focus returns to the card", async () => {
     render(
       <MotionRoot>
         <MorphDialogProvider>
@@ -100,15 +111,15 @@ describe("MorphDialog", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.contains(document.activeElement)).toBe(true);
     expect(screen.getByText("Formel")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Anderer", hidden: true })).toHaveAttribute("inert"), { timeout: 1500 });
+    await waitFor(() => expect(isBehind(byText("Anderer"))).toBe(true), { timeout: 1500 });
     fireEvent.keyDown(document, { key: "Escape" });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Anderer" })).not.toHaveAttribute("inert"), { timeout: 1500 });
+    await waitFor(() => expect(isBehind(screen.getByRole("button", { name: "Anderer" }))).toBe(false), { timeout: 1500 });
     await waitFor(() => expect(document.activeElement).toBe(card), { timeout: 1500 });
   });
 });
 
 describe("MorphDialog backdrop", () => {
-  it("closes on a click on the (never inert) overlay wrapper, not on the panel", async () => {
+  it("closes on a click on the (never isolated) overlay wrapper, not on the panel", async () => {
     render(
       <MotionRoot>
         <MorphDialogProvider>
@@ -122,9 +133,10 @@ describe("MorphDialog backdrop", () => {
     fireEvent.click(card);
     const dialog = screen.getByRole("dialog");
     const overlay = dialog.closest(".fixed") as HTMLElement;
-    // once the page behind is inert, the overlay wrapper (an ancestor of the panel) is still live
-    await waitFor(() => expect(card).toHaveAttribute("inert"), { timeout: 1500 });
-    expect(overlay).not.toHaveAttribute("inert");
+    // once the page behind is isolated, the overlay wrapper (an ancestor of the panel) is still live
+    await waitFor(() => expect(isBehind(card)).toBe(true), { timeout: 1500 });
+    expect(isBehind(overlay)).toBe(false);
+    expect(overlay).not.toHaveAttribute("aria-hidden");
     fireEvent.click(dialog);
     expect(card).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(overlay);
@@ -164,14 +176,14 @@ describe("MorphDialog unsaved-input guard", () => {
     );
     const card = screen.getByRole("button", { name: /Ablesung/ });
     fireEvent.click(card);
-    await waitFor(() => expect(card).toHaveAttribute("inert"), { timeout: 1500 });
+    await waitFor(() => expect(isBehind(card)).toBe(true), { timeout: 1500 });
     // clean body: Escape closes at once (and the card reopens it)
     fireEvent.keyDown(document, { key: "Escape" });
     expect(card).toHaveAttribute("aria-expanded", "false");
     expect(onAttempt).not.toHaveBeenCalled();
-    await waitFor(() => expect(card).not.toHaveAttribute("inert"), { timeout: 1500 });
+    await waitFor(() => expect(isBehind(card)).toBe(false), { timeout: 1500 });
     fireEvent.click(card);
-    await waitFor(() => expect(card).toHaveAttribute("inert"), { timeout: 1500 });
+    await waitFor(() => expect(isBehind(card)).toBe(true), { timeout: 1500 });
     fireEvent.click(screen.getByRole("button", { name: "Tippen" }));
     fireEvent.keyDown(document, { key: "Escape" });
     fireEvent.click(screen.getByRole("dialog").closest(".fixed") as HTMLElement);

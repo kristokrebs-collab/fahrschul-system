@@ -228,7 +228,7 @@ describe("TradeEditor – edit mode", () => {
     expect(saved.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
   });
 
-  it("finding 18: the toast island stays live (not inert) behind the open sheet", () => {
+  it("finding 18: the toast island stays live (not hidden) behind the open sheet", () => {
     const island = document.createElement("div");
     island.setAttribute("aria-live", "polite");
     island.setAttribute("data-toast-island", "");
@@ -240,9 +240,11 @@ describe("TradeEditor – edit mode", () => {
     try {
       mount();
       expect(screen.getByRole("dialog", { name: "Trade bearbeiten" })).toBeInTheDocument();
-      expect(other.hasAttribute("inert")).toBe(true);
-      expect(wrapper.hasAttribute("inert")).toBe(false); // contains a live region → descended into
-      expect(island.hasAttribute("inert")).toBe(false);
+      // the page behind is isolated by aria-hidden + data-modal-behind (perf-120 C, no `inert`)
+      expect(other.getAttribute("aria-hidden")).toBe("true");
+      expect(other.hasAttribute("data-modal-behind")).toBe(true);
+      expect(wrapper.hasAttribute("aria-hidden")).toBe(false); // contains a live region → descended into
+      expect(island.hasAttribute("aria-hidden")).toBe(false);
     } finally {
       wrapper.remove();
       other.remove();

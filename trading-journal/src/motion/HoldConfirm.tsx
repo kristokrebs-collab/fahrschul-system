@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { UNREACHABLE_SELECTOR } from "@/motion/a11y";
 import { HoldButton, type HoldButtonProps } from "@/motion/HoldButton";
 import { spring, tween } from "@/motion/tokens";
 
@@ -94,7 +95,7 @@ function createHandOff() {
   };
   const request = (target: "no" | "trigger") => {
     const el = refs[target].current;
-    const usable = el?.isConnected && !el.closest("[inert]");
+    const usable = el?.isConnected && !el.closest(UNREACHABLE_SELECTOR);
     if (!usable) {
       want = target;
       return;
