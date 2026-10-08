@@ -1,12 +1,15 @@
 /**
- * Einstellungen → Einstiegs-Check (ladder, RSI, "Top-Trader · Retail" group) and Fehler-Tags: edits are saved into
- * `settings.signals` / `settings.mistakes` merged over the stored objects (unknown keys survive), come back after a
- * reload, and drive the live check (the whale row follows periods / in Folge / weight) and the editor's tag chips.
+ * Einstellungen → Einstiegs-Check (ladder, RSI, candle-close confirmation, Top-Trader-Kombi, divergences, support /
+ * resistance) and Fehler-Tags: edits are saved into `settings.signals` / `settings.mistakes` merged over the stored
+ * objects (unknown keys and the former run-rule values survive), come back after a reload, and drive the live check
+ * (the combo follows threshold / retail period / "+1 Stärke ab" / weight) and the editor's tag chips.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { collectErrors, fixture, openTradeEditor, screenshot, seed, stored, toast } from "./helpers";
+import { collectErrors, fixture, openTradeEditor, pinClock, screenshot, seed, stored, toast, utcToday } from "./helpers";
+import { expectedSignals } from "./mocks/synthOracle";
 
 const baseSettings = fixture["tj2-settings"] as Record<string, unknown>;
+const LIVE_PRICE = 84_199;
 
 async function gotoSettings(page: Page) {
   await page.goto("/#settings");
@@ -22,13 +25,20 @@ interface StoredSignals {
   ladder?: string[];
   rsiOs?: number;
   foo?: string;
-  whale?: { on?: boolean; periods?: string[]; minRun?: number; weight?: number; keep?: number };
+  strongCloses?: number;
+  whale?: { on?: boolean; periods?: string[]; minRun?: number; weight?: number; keep?: number; topPct?: number; retailPeriod?: string; bonusParts?: number };
+  div?: { on?: boolean; weight?: number; keep?: string };
+  sr?: { on?: boolean; minR?: number; weight?: number };
 }
 
-test("Einstiegs-Check card: ladder, RSI and the Top-Trader group are saved, reloaded and drive the live check", async ({ page }, info) => {
+test("Einstiegs-Check card: ladder, confirmation and the Top-Trader-Kombi are saved, reloaded and drive the live check", async ({ page }, info) => {
   const errors = collectErrors(page);
-  // the other version's / an older save's extra keys must survive a save from this page
-  await seed(page, { synth: { ratios: "whale-long" }, extra: { "tj2-settings": { ...baseSettings, signals: { foo: "keep", whale: { keep: 1 } } } } });
+  const at = utcToday(10, 3);
+  const clock = await pinClock(page, at);
+  const anchor = at - 60_000;
+  // the other version's / an older save's extra keys (and the former run-rule values) must survive a save from this page
+  const signals0 = { foo: "keep", whale: { keep: 1, periods: ["30m", "1h"], minRun: 2 }, div: { keep: "x" } };
+  await seed(page, { synth: { ratios: "whale-long", anchor }, clock: clock.now, extra: { "tj2-settings": { ...baseSettings, signals: signals0 } } });
   await gotoSettings(page);
   const card = page.getByTestId("settings-signal-card");
   await card.scrollIntoViewIfNeeded();
@@ -41,30 +51,61 @@ test("Einstiegs-Check card: ladder, RSI and the Top-Trader group are saved, relo
   await expect(rung2h).toHaveAttribute("aria-pressed", "true");
   await expect(card.getByRole("list", { name: "Leiter" })).toContainText("2h");
 
-  // Top-Trader kaufen · Retail rot: + period 4h, 3 in a row, weight 20
+  // Bestätigung (Kerzenschluss): stark bestätigt after 3 closes
+  const confirm = card.getByTestId("settings-confirm");
+  await expect(confirm.getByRole("radiogroup", { name: /Stark bestätigt nach/ }).getByRole("radio", { name: "2", exact: true })).toHaveAttribute("aria-checked", "true");
+  await confirm.getByRole("radiogroup", { name: /Stark bestätigt nach/ }).getByRole("radio", { name: "3", exact: true }).click();
+  await expect(confirm).toContainText("3 Schlüssen (inkl. der Signalkerze)");
+
+  // Top-Trader-Kombi: threshold 70 % long, retail compared over 15m, +1 strength from 2 parts, weight 20
   const whale = card.getByTestId("settings-whale");
   await expect(whale.getByRole("switch")).toHaveAttribute("aria-checked", "true");
-  await whale.getByRole("button", { name: "Periode 4h", exact: true }).click();
-  await expect(whale.getByRole("button", { name: "Periode 4h", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await whale.getByRole("radiogroup", { name: /In Folge/ }).getByRole("radio", { name: "3", exact: true }).click();
+  await expect(whale.locator("#s-sgWhaleTop")).toHaveValue("64");
+  await whale.locator("#s-sgWhaleTop").fill("70");
+  await expect(whale).toContainText("Long: über 70 % Long · Short: über 70 % Short (Long ≤ 30 %)");
+  await whale.getByRole("radiogroup", { name: /Retail-Vergleich/ }).getByRole("radio", { name: "15m", exact: true }).click();
+  await whale.getByRole("radiogroup", { name: /\+1 Stärke ab/ }).getByRole("radio", { name: "2", exact: true }).click();
+  await expect(whale).toContainText("2 von 4 Teilen erfüllt");
   await whale.getByRole("radiogroup", { name: /Gewicht/ }).getByRole("radio", { name: "20", exact: true }).click();
-  await expect(whale).toContainText("+20 Score, ein gültiger Einstieg wird eine Stärke höher");
+  await expect(whale).toContainText("bis +20 Score, anteilig (je erfüllter Teil ¼)");
+  // the former run-rule controls are gone (their stored values stay)
+  await expect(whale.getByRole("button", { name: "Periode 4h", exact: true })).toHaveCount(0);
+  await expect(whale.getByRole("radiogroup", { name: /In Folge/ })).toHaveCount(0);
+
+  // divergences and support / resistance: their own switch, weight and thresholds
+  const div = card.getByTestId("settings-div");
+  await expect(div.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+  await div.getByRole("radiogroup", { name: /Gewicht/ }).getByRole("radio", { name: "5", exact: true }).click();
+  const sr = card.getByTestId("settings-sr");
+  await expect(sr.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+  await sr.locator("#s-sgSrMinR").fill("3");
   await screenshot(page, info, "settings-signal-card");
   await save(page);
 
   const s = (await stored<{ signals?: StoredSignals }>(page, "tj2-settings"))?.signals;
   expect(s?.ladder).toEqual(["30m", "45m", "1h", "2h", "4h"]);
   expect(s?.foo, "unknown key kept").toBe("keep");
-  expect(s?.whale).toMatchObject({ keep: 1, on: true, periods: ["30m", "1h", "4h"], minRun: 3, weight: 20 });
+  expect(s?.strongCloses).toBe(3);
+  expect(s?.whale).toMatchObject({ keep: 1, on: true, periods: ["30m", "1h"], minRun: 2, weight: 20, topPct: 70, retailPeriod: "15m", bonusParts: 2 });
+  expect(s?.div).toMatchObject({ keep: "x", on: true, weight: 5 });
+  expect(s?.sr).toMatchObject({ on: true, minR: 3 });
 
   // reload: the card shows the stored values
   await page.reload();
   await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Stufe 2h", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(whale.getByRole("button", { name: "Periode 4h", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(whale.getByRole("radiogroup", { name: /In Folge/ }).getByRole("radio", { name: "3", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(whale.locator("#s-sgWhaleTop")).toHaveValue("70");
+  await expect(whale.getByRole("radiogroup", { name: /Retail-Vergleich/ }).getByRole("radio", { name: "15m", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(whale.getByRole("radiogroup", { name: /\+1 Stärke ab/ }).getByRole("radio", { name: "2", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(confirm.getByRole("radiogroup", { name: /Stark bestätigt nach/ }).getByRole("radio", { name: "3", exact: true })).toHaveAttribute("aria-checked", "true");
+  await expect(sr.locator("#s-sgSrMinR")).toHaveValue("3");
 
-  // the live check follows: five rungs, the whale row reads all three periods with 3 in a row and weight 20
+  // the live check follows: five rungs; top traders (66 / 65,4 %) are below 70 %, retail red over 15m and the discount
+  // hold → 2 of 4 parts = the combo holds with "+1 Stärke ab 2", +10 of 20 points
+  const exp = expectedSignals(anchor, clock.now(), LIVE_PRICE, "whale-long", { cfg: s as Record<string, unknown> });
+  const traders = exp.long.parts!.find((x) => x.id === "traders")!;
+  expect(traders.met, "oracle: retail + zone").toBe(2);
+  expect(traders.ok, "oracle: 2 parts are enough now").toBe(true);
   await page.goto("/#overview");
   const check = page.getByTestId("signal-card");
   await check.scrollIntoViewIfNeeded();
@@ -72,9 +113,15 @@ test("Einstiegs-Check card: ladder, RSI and the Top-Trader group are saved, relo
   await expect(check.getByTestId("signal-rung")).toHaveCount(5);
   const row = check.getByTestId("signal-whale");
   await expect(row).toHaveAttribute("data-state", "ok");
-  await expect(row).toContainText("+20 Score · +1 Stärke");
-  await expect(row.getByLabel("Perioden in Folge")).toContainText("4h · 4×");
-  await expect(check.getByRole("list", { name: "Bedingungen" })).toContainText("Top-Trader kaufen · Retail rot (3× 30m/1h/4h)");
+  await expect(row.getByTestId("signal-part-points")).toHaveText("+10 von 20+1 Stärke");
+  await expect(row.locator("[data-testid=signal-part-cell][data-id=pos]")).toHaveAttribute("data-met", "false");
+  await expect(row.locator("[data-testid=signal-part-cell][data-id=pos]")).toContainText("Ziel > 70 % Long");
+  await expect(row.locator("[data-testid=signal-part-cell][data-id=retail]")).toHaveAttribute("data-met", "true");
+  await expect(row.locator("[data-testid=signal-part-cell][data-id=retail]")).toContainText("rot: Long-Anteil fällt (15m)");
+  await expect(row.locator("[data-testid=signal-part-cell][data-id=retail]")).toContainText(traders.items.find((x) => x.id === "retail")!.value);
+  await expect(check.getByRole("img", { name: `Score ${exp.long.score} von 100` })).toBeVisible();
+  await expect(check.getByRole("list", { name: "Bedingungen" })).toContainText("Top-Trader long · Retail rot (2 von 4)");
+  await expect(check.getByTestId("signal-div").getByTestId("signal-part-points")).toContainText("von 5");
   expect(errors, errors.join("\n")).toEqual([]);
 });
 

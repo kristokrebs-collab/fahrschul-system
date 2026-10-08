@@ -39,6 +39,43 @@ export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
   );
 }
 
+/** The page's pinned clock (`pinClock`): `now()` = the browser's `Date.now()`, `forward(ms)` = lid closed for `ms`. */
+export interface FakeClock {
+  /** the page's current time (ms) — pass it to `seed(…, { clock: c.now })` so the market mock agrees */
+  now(): number;
+  /** jumps the page's clock forward (`page.clock.fastForward`: due timers fire once, like a device waking up) */
+  forward(ms: number): Promise<void>;
+}
+
+/**
+ * Pins the page's clock at `at` (`page.clock.install`; time keeps flowing from there). Call BEFORE `seed` / `goto`.
+ * The Einstiegs-Check states depend on where "now" sits inside the 30m candle; a pinned clock makes them the same on
+ * every run (`utcToday`).
+ */
+export async function pinClock(page: Page, at: number): Promise<FakeClock> {
+  let skew = at - Date.now();
+  await page.clock.install({ time: at });
+  return {
+    now: () => Date.now() + skew,
+    forward: async (ms) => {
+      await page.clock.fastForward(ms);
+      skew += ms;
+    },
+  };
+}
+
+/** Today's UTC date at `h:m` UTC (ms) — a fixed candle position (30m / 45m / 1h / 4h) on every run. */
+export function utcToday(h: number, m: number): number {
+  const d = new Date();
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), h, m);
+}
+
+/**
+ * The Einstiegs-Check verdict label inside `scope` (card, editor summary). During a label change the leaving label is
+ * popped out of the layout (AnimatePresence `popLayout`) and carries `data-motion-pop-id` until its exit ends.
+ */
+export const verdictLabel = (scope: Locator): Locator => scope.locator("[data-testid=signal-label]:not([data-motion-pop-id])");
+
 /** Collects page errors and console errors/warnings (React/Motion warnings count as defects). */
 export function collectErrors(page: Page): string[] {
   const errors: string[] = [];

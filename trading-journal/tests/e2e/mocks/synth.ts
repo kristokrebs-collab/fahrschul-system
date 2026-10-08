@@ -7,9 +7,11 @@
  *   so 15m / 1h / 4h klines agree with each other the way real exchange candles do and the 30m / 45m resampling sees
  *   aligned buckets (open times are multiples of the interval, like Binance).
  * - `synthKlines(interval, q, anchor)`: Binance `/fapi/v1/klines` rows for a request (`limit`, `startTime`, `endTime`).
- * - `synthRatios(kind, period, q)`: Binance `/futures/data/*LongShort*Ratio` rows aligned to period boundaries. The
- *   `whale-long` script makes the top traders BUY (position long % up) while retail is RED (all-accounts long % down)
- *   over the last four closed periods of every period — "Top-Trader kaufen · Retail rot" holds with a run of 4.
+ * - `synthRatios(kind, period, q)`: Binance `/futures/data/*LongShort*Ratio` rows aligned to period boundaries (the
+ *   Einstiegs-Check reads the 5-minute ones). `whale-long`: top traders > 64 % long by POSITIONS (66,0 %) and by ACCOUNTS
+ *   (65,4 %) while the all-accounts long share FALLS (retail red, −0,5 pp per point) — with the setup's Discount the
+ *   Top-Trader-Kombi holds 4 of 4 on the long side. `whale-short` mirrors it (34,0 % / 34,6 % long = > 64 % short,
+ *   retail rising = green) for the mirrored market. `flat`: gentle swings around 55 / 53 / 50 % (no part met).
  */
 export const SYNTH_INTERVAL_MS: Record<string, number> = {
   "1m": 60_000,
@@ -108,19 +110,21 @@ export function synthKlines(interval: string, q: RangeQuery, anchor: number, now
 }
 
 export type RatioKind = "top-position" | "top-account" | "global";
-export type RatioScript = "whale-long" | "flat";
+export type RatioScript = "whale-long" | "whale-short" | "flat";
+
+/** Newest snapshots the scripts shape (1 h of 5-min points); older ones swing gently like `flat`. */
+const SCRIPT_POINTS = 12;
 
 /**
- * Long % (0–100) of `kind` at the snapshot `i` periods before the newest one. `whale-long`: over the last four
- * periods the top traders' position long % rises (55 → 58.9) while the all-accounts long % falls (51 → 46.6); the
- * period before breaks both runs, so the run is exactly 4. Older snapshots swing gently.
+ * Long % (0–100) of `kind` at the snapshot `i` periods before the newest one. `whale-long`: top traders 66,0 % long by
+ * position and 65,4 % by account (−0,1 pp per older point, so every point of the last hour is > 64 %), all accounts
+ * 46,6 % long and +0,5 pp per older point (= the retail long share falls toward now: Retail rot for every comparison
+ * period up to 1 h). `whale-short` = the mirror image (100 − x): top traders > 64 % short, retail rising (Retail grün).
  */
 export function ratioLongPct(kind: RatioKind, i: number, script: RatioScript): number {
-  if (script === "whale-long") {
-    const top = [58.9, 57.5, 56.2, 55.0, 54.0, 55.0];
-    const ret = [46.6, 47.9, 49.1, 50.2, 51.0, 50.0];
-    if (kind === "top-position" && i < top.length) return top[i]!;
-    if (kind === "global" && i < ret.length) return ret[i]!;
+  if (script !== "flat" && i < SCRIPT_POINTS) {
+    const long = kind === "top-position" ? 66 - 0.1 * i : kind === "top-account" ? 65.4 - 0.1 * i : 46.6 + 0.5 * i;
+    return script === "whale-long" ? long : 100 - long;
   }
   const base = kind === "global" ? 50 : kind === "top-account" ? 53 : 55;
   return base + 1.5 * Math.sin(i * 0.9) + 0.5 * Math.sin(i * 2.3);

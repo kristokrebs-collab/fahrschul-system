@@ -86,6 +86,12 @@ export interface MockMarketOptions {
   synth?: { ratios?: RatioScript; /** time anchor of the price path (default: now) – pass it to `expectedSignals` too */ anchor?: number };
   /** called with every REST URL the page requests from Binance (request log for assertions) */
   onRequest?: (url: URL) => void;
+  /**
+   * "Now" of the mocked exchange (ms). Pass the page's fake clock (`pinClock` in `helpers.ts`) so klines, ratio points,
+   * `/fapi/v1/time` and the fixture timestamps follow the browser's `Date.now()` (also across `forward()` jumps).
+   * Default: the wall clock, fixture shift fixed when `mockMarket` runs.
+   */
+  clock?: () => number;
 }
 
 const SYNTH_RATIO_KIND: Record<string, RatioKind> = {
@@ -174,16 +180,19 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
   const file = readJson<ScenarioFile>(`ws-scenarios/${scenario}.json`);
   // Exact shift (no 5-min flooring): the REST `asOf` stamps must read as fresh, otherwise the legacy panel flips
   // to `Zuletzt HH:mm · veraltet` whenever the wall clock is > 2 min past a 5-min boundary.
-  const delta = opts.shiftToNow === false ? 0 : Date.now() - file.baseTime;
+  const clock = opts.clock ?? Date.now;
+  const delta0 = opts.shiftToNow === false ? 0 : clock() - file.baseTime;
+  /** fixture shift per response: follows a pinned clock (jumps included), else fixed at setup */
+  const delta = (): number => (opts.clock && opts.shiftToNow !== false ? clock() - file.baseTime : delta0);
   const synth = opts.synth;
-  const anchor = synth?.anchor ?? Date.now();
+  const anchor = synth?.anchor ?? clock();
   if (synth) {
     const drop = (steps: WsStep[] | undefined) => steps?.filter((st) => st.fixture !== "binance-ws-kline.json");
     file.ws = { ...file.ws, steps: drop(file.ws.steps) ?? [], reconnectSteps: drop(file.ws.reconnectSteps) };
   }
   const json = async (route: Route, name: string, status = 200) => {
     if (opts.latencyMs) await new Promise((r) => setTimeout(r, opts.latencyMs));
-    await route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(shiftTimes(readJson(name), delta)) });
+    await route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(shiftTimes(readJson(name), delta())) });
   };
 
   await page.route("https://fapi.binance.com/**", async (route) => {
@@ -193,25 +202,25 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
     opts.onRequest?.(u);
     const q = { limit: num(u.searchParams.get("limit")), startTime: num(u.searchParams.get("startTime")), endTime: num(u.searchParams.get("endTime")) };
     if (synth && u.pathname === "/fapi/v1/klines") {
-      const rows = synthKlines(u.searchParams.get("interval") ?? "1h", q, anchor);
+      const rows = synthKlines(u.searchParams.get("interval") ?? "1h", q, anchor, clock());
       return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(rows) });
     }
     const ratioKind = SYNTH_RATIO_KIND[u.pathname];
     if (synth && ratioKind) {
-      const rows = synthRatios(ratioKind, u.searchParams.get("period") ?? "1h", q, synth.ratios ?? "flat");
+      const rows = synthRatios(ratioKind, u.searchParams.get("period") ?? "1h", q, synth.ratios ?? "flat", clock());
       return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(rows) });
     }
     if (u.pathname === "/fapi/v1/klines") {
       const iv = u.searchParams.get("interval") ?? "1h";
       const limit = Number(u.searchParams.get("limit") ?? 500);
-      const rows = extendKlines(shiftTimes(readJson<KlineRow[]>(`binance-klines-${iv}.json`), delta) as KlineRow[], iv, opts.klineBars ?? 500);
+      const rows = extendKlines(shiftTimes(readJson<KlineRow[]>(`binance-klines-${iv}.json`), delta()) as KlineRow[], iv, opts.klineBars ?? 500);
       return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(rows.slice(-limit)) });
     }
     if (u.pathname.startsWith("/futures/data/")) {
       const name = BINANCE_ROUTES[u.pathname];
       if (!name) return route.fulfill({ status: 404, body: "{}" });
       const limit = Number(u.searchParams.get("limit") ?? 30);
-      const rows = extendFuturesData(shiftTimes(readJson<Record<string, string>[]>(name), delta) as Record<string, string>[], opts.klineBars ?? 500);
+      const rows = extendFuturesData(shiftTimes(readJson<Record<string, string>[]>(name), delta()) as Record<string, string>[], opts.klineBars ?? 500);
       return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(rows.slice(-limit)) });
     }
     const hit = BINANCE_ROUTES[u.pathname];
@@ -225,9 +234,9 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
     if (synth && u.pathname === "/v5/market/kline") {
       // Bybit: interval codes, `start` / `end`, newest row first, strings
       const iv = BYBIT_INTERVAL[u.searchParams.get("interval") ?? "60"] ?? "1h";
-      const rows = synthKlines(iv, { limit: num(u.searchParams.get("limit")) ?? 200, startTime: num(u.searchParams.get("start")), endTime: num(u.searchParams.get("end")) }, anchor);
+      const rows = synthKlines(iv, { limit: num(u.searchParams.get("limit")) ?? 200, startTime: num(u.searchParams.get("start")), endTime: num(u.searchParams.get("end")) }, anchor, clock());
       const list = rows.map((r) => [String(r[0]), r[1], r[2], r[3], r[4], r[5], r[7]]).reverse();
-      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ retCode: 0, retMsg: "OK", result: { category: "linear", symbol: "BTCUSDT", list }, time: Date.now() }) });
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ retCode: 0, retMsg: "OK", result: { category: "linear", symbol: "BTCUSDT", list }, time: clock() }) });
     }
     const hit = BYBIT_ROUTES[u.pathname];
     if (!hit) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ retCode: 10001, retMsg: "not mocked", result: {} }) });
@@ -238,7 +247,7 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
   await page.route("https://www.okx.com/**", (route) => route.abort("failed"));
 
   const fixtures: Record<string, unknown> = {};
-  for (const step of [...file.ws.steps, ...(file.ws.reconnectSteps ?? [])]) if (step.fixture && !fixtures[step.fixture]) fixtures[step.fixture] = shiftTimes(readJson(step.fixture), delta);
+  for (const step of [...file.ws.steps, ...(file.ws.reconnectSteps ?? [])]) if (step.fixture && !fixtures[step.fixture]) fixtures[step.fixture] = shiftTimes(readJson(step.fixture), delta0);
 
   await page.addInitScript(
     ({ file, fixtures }: { file: ScenarioFile; fixtures: Record<string, unknown> }) => {

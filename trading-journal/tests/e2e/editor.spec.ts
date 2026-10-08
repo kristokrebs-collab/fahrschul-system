@@ -1,10 +1,11 @@
 /**
- * Trade editor additions: the live Einstiegs-Check snapshot stored with a new trade (incl. "Top-Trader kaufen ·
- * Retail rot"), mistake tags (list + own tag) stored as `trade.mistakes`, both shown in the trade detail, and the
- * unsaved-input guard ("Änderungen verwerfen?") on Escape / Abbrechen.
+ * Trade editor additions: the live Einstiegs-Check snapshot stored with a new trade (candle-close state "bestätigt",
+ * the graded Top-Trader-Kombi and the falling-knife filter), mistake tags (list + own tag) stored as `trade.mistakes`,
+ * both shown in the trade detail, and the unsaved-input guard ("Änderungen verwerfen?") on Escape / Abbrechen. The
+ * page clock is pinned at 10:03 UTC (the synthetic signal candle closed a few minutes ago → "bestätigt").
  */
 import { expect, test, type Page } from "@playwright/test";
-import { collectErrors, isMobile, screenshot, seed, stored, toast } from "./helpers";
+import { collectErrors, isMobile, pinClock, screenshot, seed, stored, toast, utcToday } from "./helpers";
 
 const fab = (page: Page) => page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Trade eintragen" });
 
@@ -13,12 +14,25 @@ interface StoredTrade {
   entry: number;
   reason?: string;
   mistakes?: string[];
-  signal?: { side: string; strength: number; valid: boolean; label: string; mode?: string; tfs: { tf: string; kind: string | null }[]; whale?: { ok: boolean; run: number; points: number } | null } | null;
+  signal?: {
+    side: string;
+    strength: number;
+    valid: boolean;
+    label: string;
+    mode?: string;
+    state?: string;
+    tfs: { tf: string; kind: string | null; state?: string }[];
+    whale?: unknown;
+    parts?: { id: string; ok: boolean; grade: number; data: boolean; items: { id: string; met: boolean | null }[] }[];
+    knife?: { n: number; items: { id: string; met: boolean | null }[] };
+  } | null;
 }
 
-test("new trade: the live check snapshot and the mistake tags are stored and shown in the detail", async ({ page }, info) => {
+test("new trade: the live check snapshot (bestätigt, Top-Trader-Kombi 4/4, falling-knife filter) and the mistake tags are stored and shown in the detail", async ({ page }, info) => {
   const errors = collectErrors(page);
-  await seed(page, { synth: { ratios: "whale-long" } });
+  const at = utcToday(10, 3);
+  const clock = await pinClock(page, at);
+  await seed(page, { synth: { ratios: "whale-long", anchor: at - 60_000 }, clock: clock.now });
   await page.goto("/#overview");
   // the live check has evaluated (the editor's section reads the same engine)
   await expect(page.getByTestId("signal-card")).toHaveAttribute("data-state", "ok", { timeout: 25_000 });
@@ -28,7 +42,11 @@ test("new trade: the live check snapshot and the mistake tags are stored and sho
 
   const summary = editor.getByTestId("signal-summary");
   await expect(summary).toHaveAttribute("data-strength", "4", { timeout: 15_000 });
+  await expect(summary).toHaveAttribute("data-state", "confirmed");
   await expect(summary).toContainText("Sehr starker Long-Einstieg");
+  await expect(summary.getByTestId("signal-summary-state")).toHaveAttribute("data-state", "confirmed");
+  await expect(summary.getByTestId("signal-summary-state")).toHaveText("bestätigt");
+  await expect(summary.getByTestId("signal-summary-part-traders")).toHaveAttribute("data-ok", "true");
   await expect(editor.getByText("Live-Check · wird beim Speichern mitgespeichert")).toBeVisible();
 
   await editor.locator("#f-entry").fill("80000");
@@ -56,13 +74,24 @@ test("new trade: the live check snapshot and the mistake tags are stored and sho
   expect(t, "saved trade").toBeTruthy();
   expect(t!.mistakes).toEqual(["Zu früh raus", "Nachgekauft"]);
   expect(t!.signal, "signal snapshot").toBeTruthy();
-  expect(t!.signal).toMatchObject({ side: "long", strength: 4, valid: true, label: "Sehr starker Long-Einstieg", mode: "live" });
+  expect(t!.signal).toMatchObject({ side: "long", strength: 4, valid: true, label: "Sehr starker Long-Einstieg", mode: "live", state: "confirmed" });
   expect(t!.signal!.tfs.slice(0, 3).every((x) => x.kind === "bottom" || x.kind === "buy"), JSON.stringify(t!.signal!.tfs)).toBe(true);
-  expect(t!.signal!.whale).toMatchObject({ ok: true, run: 4, points: 10 });
+  // the graded combo is stored as a part (the legacy `whale` reading is no longer written)
+  const traders = t!.signal!.parts?.find((p) => p.id === "traders");
+  expect(traders, JSON.stringify(t!.signal!.parts)).toMatchObject({ ok: true, grade: 1, data: true });
+  expect(traders!.items.map((i) => [i.id, i.met])).toEqual([
+    ["pos", true],
+    ["acc", true],
+    ["retail", true],
+    ["zone", true],
+  ]);
+  expect(t!.signal!.parts?.map((p) => p.id)).toEqual(["traders", "div", "sr"]);
+  expect(t!.signal!.knife?.items.map((i) => i.id)).toEqual(["structure", "divergence", "whale"]);
+  expect(t!.signal!.whale).toBeUndefined();
   // the 13 legacy trades are untouched
   expect(trades).toHaveLength(14);
 
-  // trade detail: the stored check and the tags
+  // trade detail: the stored check with its state, parts, the filter and the tags
   await page.goto("/#trades");
   await expect(page.getByRole("heading", { name: /Alle Trades/ })).toBeVisible();
   await page.waitForTimeout(700);
@@ -70,10 +99,17 @@ test("new trade: the live check snapshot and the mistake tags are stored and sho
   await row.click();
   const detail = page.getByRole("dialog", { name: "Trade-Details" });
   await expect(detail).toBeVisible();
-  await expect(detail.getByTestId("signal-summary")).toHaveAttribute("data-strength", "4");
-  // the stored "Top-Trader kaufen · Retail rot" reading
-  await expect(detail.getByTestId("signal-summary-whale")).toHaveAttribute("data-state", "ok");
-  await expect(detail.getByTestId("signal-summary-whale")).toContainText("Top-Trader kaufen · Retail rot · 4× 30m");
+  const ds = detail.getByTestId("signal-summary");
+  await expect(ds).toHaveAttribute("data-strength", "4");
+  await expect(ds).toHaveAttribute("data-state", "confirmed");
+  await expect(ds.getByTestId("signal-summary-state")).toHaveText("bestätigt");
+  const part = ds.getByTestId("signal-summary-part-traders");
+  await expect(part).toHaveAttribute("data-ok", "true");
+  await expect(part.locator("li[data-met=true]")).toHaveCount(4);
+  await expect(ds.getByTestId("signal-summary-part-div")).toBeVisible();
+  await expect(ds.getByTestId("signal-summary-part-sr")).toBeVisible();
+  await expect(ds.getByTestId("signal-summary-part-knife")).toContainText(`${t!.signal!.knife!.n} von 3`);
+  await expect(ds.getByTestId("signal-summary-whale")).toHaveCount(0);
   await expect(detail).toContainText("Zu früh raus");
   await expect(detail).toContainText("Nachgekauft");
   await screenshot(page, info, "detail-signal-mistakes");

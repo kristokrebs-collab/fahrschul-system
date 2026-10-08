@@ -1,16 +1,18 @@
 /**
  * Long/Short-Tendenz on a KNOWN market (`mocks/synth.ts`): the generated capitulation low + turn is a long setup on
- * every rung, so the bar must lean right of the centre with the label the pure model computes from the same data
- * (`mocks/synthOracle.ts` → `computeBias`). The SHORT setup is the same price path mirrored around the live price
- * (`p' = 2·84 200 − p`: a blow-off top that turns down) — WaveTrend, RSI and the premium/discount range mirror exactly,
- * so the bar must lean left — never against the check's valid Short-Einstieg. Also: the explainer (tap / Enter; the
- * weights add up to 100 %, the contributions to the shown sum, no row text overlaps), the hero strip line, no overlap
- * at the user's sizes.
+ * every rung, so the bar must lean to the LONG side (left, decision 15) with the label the pure model computes from
+ * the same data (`mocks/synthOracle.ts` → `computeBias`), top traders > 64 % long + retail red (`whale-long`). The SHORT
+ * setup is the same price path mirrored around the live price (`p' = 2·84 200 − p`: a blow-off top that turns down)
+ * with the mirrored ratios (`whale-short`) — WaveTrend, RSI and the premium/discount range mirror, so the bar must lean
+ * right (Short) — never against the check's valid Short-Einstieg. The page clock is pinned at 10:03 UTC (the signal
+ * candle closed: "bestätigt"; the 45m candle still forms → rows resting on it are flagged "vorläufig"). Also: the
+ * explainer (tap / Enter; 9 rows incl. Top-Trader-Kombi, Divergenzen, Support / Widerstand; the weights add up to
+ * 100 %, the contributions to the shown sum, no row text overlaps), the hero strip line, no overlap at the user's sizes.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { computeBias } from "../../src/domain/signals/bias";
 import { DEFAULT_SIGNAL_CFG, sanitizeSignalCfg } from "../../src/domain/signals";
-import { collectErrors, expectNoHorizontalScroll, seed } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, pinClock, seed, utcToday } from "./helpers";
 import { SYNTH_LAST, synthKlines } from "./mocks/synth";
 import { expectedSignals } from "./mocks/synthOracle";
 
@@ -18,11 +20,11 @@ const LIVE_PRICE = 84_199;
 const MIRROR = 2 * SYNTH_LAST;
 
 /** Serves the synthetic klines mirrored around the live price (registered after `seed`, so it wins). */
-async function mirrorKlines(page: Page, anchor: number): Promise<void> {
+async function mirrorKlines(page: Page, anchor: number, now: () => number): Promise<void> {
   await page.route("https://fapi.binance.com/fapi/v1/klines**", async (route) => {
     const u = new URL(route.request().url());
     const num = (k: string) => (u.searchParams.get(k) == null ? undefined : Number(u.searchParams.get(k)));
-    const rows = synthKlines(u.searchParams.get("interval") ?? "1h", { limit: num("limit"), startTime: num("startTime"), endTime: num("endTime") }, anchor).map((r) => {
+    const rows = synthKlines(u.searchParams.get("interval") ?? "1h", { limit: num("limit"), startTime: num("startTime"), endTime: num("endTime") }, anchor, now()).map((r) => {
       const m = (x: string) => (MIRROR - Number(x)).toFixed(1);
       return [r[0], m(r[1]), m(r[3]), m(r[2]), m(r[4]), ...r.slice(5)];
     });
@@ -30,18 +32,22 @@ async function mirrorKlines(page: Page, anchor: number): Promise<void> {
   });
 }
 
-async function openBias(page: Page, mode: "long" | "short"): Promise<{ card: Locator; bias: Locator; anchor: number }> {
-  const anchor = Date.now();
-  await seed(page, { synth: { ratios: mode === "long" ? "whale-long" : "flat", anchor } });
-  if (mode === "short") await mirrorKlines(page, anchor);
+async function openBias(page: Page, mode: "long" | "short"): Promise<{ card: Locator; bias: Locator; anchor: number; now: () => number }> {
+  const at = utcToday(10, 3);
+  const clock = await pinClock(page, at);
+  const anchor = at - 60_000;
+  await seed(page, { synth: { ratios: mode === "long" ? "whale-long" : "whale-short", anchor }, clock: clock.now });
+  if (mode === "short") await mirrorKlines(page, anchor, clock.now);
   await page.goto("/#overview");
   await expect(page.getByText("Netto-P&L").first()).toBeVisible();
   const card = page.getByTestId("signal-card");
   await card.scrollIntoViewIfNeeded();
   await expect(card).toHaveAttribute("data-state", "ok", { timeout: 25_000 });
   const bias = card.getByTestId("signal-bias");
+  // the card is taller than a phone screen: bring the bar itself into view (its needle springs out on first view)
+  await bias.scrollIntoViewIfNeeded();
   await expect(bias).toBeVisible();
-  return { card, bias, anchor };
+  return { card, bias, anchor, now: clock.now };
 }
 
 /** x of the needle's centre relative to the track (0 … 1), once the spring has settled. */
@@ -93,13 +99,21 @@ async function expectRowsAddUp(dialog: Locator): Promise<void> {
 test.describe("Long/Short-Tendenz", () => {
   test("long setup: the bar leans left (Long side) with the model's label; explainer lists every condition", async ({ page }, info) => {
     const errors = collectErrors(page);
-    const { card, bias, anchor } = await openBias(page, "long");
-    const exp = computeBias(expectedSignals(anchor, Date.now(), LIVE_PRICE, "whale-long"), sanitizeSignalCfg(DEFAULT_SIGNAL_CFG));
+    const { card, bias, anchor, now: clockNow } = await openBias(page, "long");
+    const exp = computeBias(expectedSignals(anchor, clockNow(), LIVE_PRICE, "whale-long"), sanitizeSignalCfg(DEFAULT_SIGNAL_CFG));
     expect(exp, "oracle").not.toBeNull();
     expect(exp!.score, "oracle leans long").toBeGreaterThan(0.5);
     expect(exp!.label).toBe("Stark Long");
+    expect(exp!.state, "oracle: the long entry is confirmed").toBe("confirmed");
+    const provRows = exp!.contributions.filter((c) => c.provisional).map((c) => c.id);
 
     await expect(bias).toHaveAttribute("data-level", "2", { timeout: 15_000 });
+    // candle-close state of the leaning side's entry; rows on a forming candle flag the bar "teils vorläufig"
+    await expect(bias).toHaveAttribute("data-state", "confirmed");
+    if (provRows.length) {
+      await expect(bias).toHaveAttribute("data-provisional", "true");
+      await expect(bias.getByTestId("bias-provisional")).toHaveText("⚠teils vorläufig");
+    } else await expect(bias).not.toHaveAttribute("data-provisional", /.*/);
     await expect(bias.getByTestId("bias-label")).toHaveText("Stark Long");
     await expect(bias.getByTestId("bias-percent")).toContainText("Long");
     const meter = card.getByRole("meter", { name: "Long/Short-Tendenz" });
@@ -144,16 +158,24 @@ test.describe("Long/Short-Tendenz", () => {
     }
 
     // tap → explainer with a diverging bar per condition
-    await bias.getByRole("button", { name: /^Long\/Short-Tendenz: Stark Long, \d+ %\. Bedingungen ansehen$/ }).click();
+    await bias.getByRole("button", { name: /^Long\/Short-Tendenz: Stark Long, \d+ %\.( \d+ Bedingungen vorläufig\.)? Bedingungen ansehen$/ }).click();
     const dialog = page.getByRole("dialog", { name: "Long/Short-Tendenz" });
     await expect(dialog).toBeVisible();
     const rows = dialog.getByTestId("bias-row");
-    await expect(rows).toHaveCount(7);
-    for (const id of ["mcb-30m", "mcb-45m", "mcb-1h", "rsi", "zone", "whale"]) {
+    await expect(rows).toHaveCount(9);
+    expect(await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-id")))).toEqual(["mcb-30m", "mcb-45m", "mcb-1h", "mcb-4h", "rsi", "zone", "traders", "div", "sr"]);
+    for (const id of ["mcb-30m", "mcb-45m", "mcb-1h", "rsi", "zone", "traders"]) {
       const v = Number(await dialog.locator(`[data-testid=bias-row][data-id="${id}"]`).getAttribute("data-vote"));
       expect(v, `${id} votes long`).toBeGreaterThan(0);
     }
-    await expect(dialog.getByText("Top-Trader kaufen · Retail rot", { exact: true })).toBeVisible();
+    for (const c of exp!.contributions) {
+      const row = dialog.locator(`[data-testid=bias-row][data-id="${c.id}"]`);
+      if (c.provisional) await expect(row, `${c.id} vorläufig`).toHaveAttribute("data-provisional", "true");
+      else await expect(row, `${c.id} closed`).not.toHaveAttribute("data-provisional", /.*/);
+    }
+    // the combo row is titled by its leading side (all four parts met → full vote)
+    await expect(dialog.locator("[data-testid=bias-row][data-id=traders]")).toContainText("Top-Trader long · Retail rot");
+    expect(Number(await dialog.locator("[data-testid=bias-row][data-id=traders]").getAttribute("data-vote"))).toBe(1);
     await page.waitForTimeout(700);
     await expectRowsAddUp(dialog);
     await expect(dialog.getByTestId("bias-sum")).toContainText("→ Stark Long");
@@ -172,8 +194,10 @@ test.describe("Long/Short-Tendenz", () => {
 
   test("short setup (mirrored market): the bar leans right (Short side) with a Short label", async ({ page }, info) => {
     const errors = collectErrors(page);
-    const { card, bias } = await openBias(page, "short");
-    await expect(card.getByTestId("signal-label")).toHaveText(/Short-Einstieg/, { timeout: 15_000 });
+    const { card, bias, anchor, now: clockNow } = await openBias(page, "short");
+    const exp = computeBias(expectedSignals(anchor, clockNow(), LIVE_PRICE, "whale-short", { mirror: true }), sanitizeSignalCfg(DEFAULT_SIGNAL_CFG));
+    expect(exp!.score, "oracle leans short").toBeLessThan(-0.15);
+    await expect(card.locator("[data-testid=signal-label]:not([data-motion-pop-id])")).toHaveText(/Short-Einstieg/, { timeout: 15_000 });
     await expect(bias).toHaveAttribute("data-level", /^-[12]$/);
     await expect(bias.getByTestId("bias-label")).toHaveText(/Short$/);
     await expect(bias.getByTestId("bias-percent")).toContainText("Short");
@@ -186,16 +210,17 @@ test.describe("Long/Short-Tendenz", () => {
     await card.screenshot({ path: info.outputPath("bias-short-card-only.png"), animations: "disabled" });
     if ((page.viewportSize()?.width ?? 0) >= 1024) await expect(page.getByTestId("signal-strip-bias")).toHaveAttribute("data-level", /^-[12]$/);
 
-    // explainer: rows add up; the flat top-trader reading is not titled "kaufen · Retail rot" on the short side
+    // explainer: rows add up; the mirrored combo (top traders > 64 % short, retail green, premium) votes fully short
     await bias.getByRole("button", { name: /Bedingungen ansehen$/ }).click();
     const dialog = page.getByRole("dialog", { name: "Long/Short-Tendenz" });
     await expect(dialog).toBeVisible();
     await page.waitForTimeout(700);
     await expectRowsAddUp(dialog);
     await expect(dialog.getByTestId("bias-sum")).toContainText(/→ (Stark|Eher) Short/);
-    const whale = dialog.locator("[data-testid=bias-row][data-id=whale]");
-    const vote = await whale.getAttribute("data-vote");
-    if (vote === "none" || Number(vote) <= 0) await expect(whale).not.toContainText("Top-Trader kaufen · Retail rot");
+    const traders = dialog.locator("[data-testid=bias-row][data-id=traders]");
+    await expect(traders).toHaveAttribute("data-vote", "-1.00");
+    await expect(traders).toContainText("Top-Trader short · Retail grün");
+    await expect(traders).not.toContainText("Retail rot");
     await page.screenshot({ path: info.outputPath("bias-short-explainer.png"), animations: "disabled" });
     expect(errors, errors.join("\n")).toEqual([]);
   });
