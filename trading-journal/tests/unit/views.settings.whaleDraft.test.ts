@@ -46,7 +46,9 @@ describe("settings draft: Einstiegs-Check v2 thresholds (candle close, Top-Trade
     expect([...changedKeys({ ...d, sgDivAge: "7" }, d)]).toEqual(["sgDivAge"]);
     expect(changedKeys({ ...d, sgSrNear: "1,0" }, d).size).toBe(0);
     // defaults reset the v2 values too
-    expect(defaultSignalDraft({ ...d, sgStrong: "5" }).sgStrong).toBe("2");
+    const d5 = settingsToDraft({ ...s, signals: { strongCloses: 5 } });
+    expect(d5.sgStrong).toBe("5");
+    expect(defaultSignalDraft(d5).sgStrong).toBe("2");
   });
 
   it("pure helpers: an unknown retail period falls back, partial drafts use the stored values", () => {
