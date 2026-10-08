@@ -1,8 +1,11 @@
-import { animate, type AnimationPlaybackControls, type MotionValue } from "motion/react";
+import type { MotionValue } from "motion/react";
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
+import { replay, type ReplayControls } from "@/motion/replay";
 import { fxTiming, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+
+const FLASH_FRAMES = { opacity: [1, 0] } as const;
 
 /** Ticks closer than this keep the current flash lit instead of restarting it (≈ 8 Hz; React-driven values). */
 export const FLASH_COOLDOWN_MS = 120;
@@ -49,7 +52,7 @@ export function useValueFlash(
   { minMove = 0, cooldownMs = FLASH_COOLDOWN_MS, enabled = true }: ValueFlashOptions = {},
 ): void {
   const { value, source } = input;
-  const state = useRef({ value: value ?? NaN, at: -Infinity, dir: 0, controls: null as AnimationPlaybackControls | null });
+  const state = useRef({ value: value ?? NaN, at: -Infinity, dir: 0, controls: null as ReplayControls | null });
 
   useEffect(() => {
     const s = state.current;
@@ -70,7 +73,8 @@ export function useValueFlash(
       if (!on) return;
       s.controls?.stop();
       if (off) off.style.opacity = "0";
-      s.controls = animate(on, { opacity: [1, 0] }, tween.flash);
+      // one native animation per layer, restarted (`replay`) – nothing built per tick
+      s.controls = replay(on, FLASH_FRAMES, tween.flash);
       s.at = now;
       s.dir = dir;
     };

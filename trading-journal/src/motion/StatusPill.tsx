@@ -1,7 +1,8 @@
-import { animate, AnimatePresence, motion, type AnimationPlaybackControls } from "motion/react";
+import { animate, AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { canObserveInView, observeInView } from "@/motion/inView";
+import { replay, type ReplayControls } from "@/motion/replay";
 import { springSettleTime } from "@/motion/pulse/engine";
 import { TextMorph } from "@/motion/pulse/TextMorph";
 import { radius, spring, tween } from "@/motion/tokens";
@@ -268,7 +269,7 @@ function Heartbeat({ ring }: { ring: boolean }) {
 
 /** Pooled bright pings for `pingKey` / `pingOn`, throttled to `PING_MIN_INTERVAL_MS`. */
 function usePings(pool: RefObject<(HTMLSpanElement | null)[]>, pingKey: string | number | undefined, pingOn: ChangeSource | undefined, scale: number, reduced: boolean): void {
-  const state = useRef({ at: -Infinity, next: 0, controls: [] as (AnimationPlaybackControls | undefined)[], scale, reduced });
+  const state = useRef({ at: -Infinity, next: 0, controls: [] as (ReplayControls | undefined)[], scale, reduced });
   useEffect(() => {
     state.current.scale = scale;
     state.current.reduced = reduced;
@@ -284,8 +285,8 @@ function usePings(pool: RefObject<(HTMLSpanElement | null)[]>, pingKey: string |
     if (!el) return;
     s.at = now;
     s.next = (i + 1) % PING_POOL;
-    s.controls[i]?.stop();
-    s.controls[i] = animate(el, { transform: ["scale(1)", `scale(${s.scale})`], opacity: [0.9, 0] }, tween.ripple);
+    // one native animation per pooled ring, restarted (`replay`) – nothing built per ping
+    s.controls[i] = replay(el, { transform: ["scale(1)", `scale(${s.scale})`], opacity: [0.9, 0] }, tween.ripple);
   }, [pool]);
 
   // React-driven pings: every change of `pingKey` after mount (StrictMode-safe: compares with the last seen key)

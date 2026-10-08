@@ -195,6 +195,10 @@ Sparkline) only get opacity/translate reveals.
 | `LiveText { source; format?; smooth?; flash?; … }` | MotionValue as text, zero renders; a single `motion.span`, so single-element `getByText` contracts hold. `smooth` glides on `spring.price`. | `spring.price`, `tween.flash` |
 
 ### Live indicators: `ValueFlash` · `PulseDot` · `DotMatrix`
+- Tick feedback (per-trade pings, up/down washes, `StatusPill` / `MotionNumber` pings and flashes) goes through `replay(el,
+  frames, timing)` (`replay.ts`): ONE native WAAPI animation per layer, restarted on each tick (`cancelReplay` cuts it) – no
+  Motion animation built per tick (that was ≈ 0.5–1 ms plus garbage each, several per second on a 40 Hz feed); jsdom falls
+  back to Motion's `animate`. `PulseDot` pings only while on screen.
 - `ValueFlash` / `useValueFlash` – up/down flash on pre-rendered `bg-win/15` / `bg-loss/15` layers (opacity only); reduced motion: 2 px underline. `tween.flash`.
 - `PulseDot { tone?; size?; rings? 1|2; active?; ping?; label? }` – live dot with ping rings; `ping` MotionValue fires a per-trade
   ping ≤ 4 Hz; rings ping 3× (`tween.pingFew`) on start / re-entry, then rest; pause off-screen; aria-hidden unless `label`. `tween.pingFew/ripple/flash`.

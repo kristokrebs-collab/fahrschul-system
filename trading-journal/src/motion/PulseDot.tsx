@@ -2,6 +2,7 @@ import { animate, type AnimationPlaybackControls, type MotionValue } from "motio
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
 import { observeInView } from "@/motion/inView";
+import { replay } from "@/motion/replay";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -17,6 +18,9 @@ const TONE_BG: Record<PulseTone, string> = {
   fg: "bg-fg",
   signal: "bg-signal",
 };
+
+const PING_FRAMES = { transform: ["scale(1)", "scale(2.2)"], opacity: [0.9, 0] } as const;
+const FLASH_FRAMES = { opacity: [0.85, 0] } as const;
 
 /** Per-trade pings are capped at 4 Hz – faster prints keep the current ping running. */
 export const PING_MIN_INTERVAL_MS = 250;
@@ -78,15 +82,26 @@ export function PulseDot({ tone = "live", size = 6, rings = 1, active = true, pi
   }, [reduced, active, rings]);
 
   useEffect(() => {
-    if (!ping || reduced) return;
+    const root = rootRef.current;
+    if (!ping || reduced || !root) return;
     let last = -Infinity;
-    return ping.on("change", () => {
-      const now = performance.now();
-      if (!pingAllowed(last, now)) return;
-      last = now;
-      if (pingRef.current) animate(pingRef.current, { transform: ["scale(1)", "scale(2.2)"], opacity: [0.9, 0] }, tween.ripple);
-      if (flashRef.current) animate(flashRef.current, { opacity: [0.85, 0] }, tween.flash);
+    // off screen nothing pings (a hidden dot fired up to 4 animations a second on the feed)
+    let visible = true;
+    const unobserve = observeInView(root, (inView) => {
+      visible = inView;
     });
+    const off = ping.on("change", () => {
+      const now = performance.now();
+      if (!visible || !pingAllowed(last, now)) return;
+      last = now;
+      // one native animation per layer, restarted (`replay`): no Motion animation built per ping
+      if (pingRef.current) replay(pingRef.current, PING_FRAMES, tween.ripple);
+      if (flashRef.current) replay(flashRef.current, FLASH_FRAMES, tween.flash);
+    });
+    return () => {
+      off();
+      unobserve();
+    };
   }, [ping, reduced]);
 
   const bg = TONE_BG[tone];

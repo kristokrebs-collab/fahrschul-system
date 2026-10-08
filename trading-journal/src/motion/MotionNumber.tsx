@@ -2,6 +2,7 @@ import { animate, motion, useMotionValue, useTransform, type AnimationPlaybackCo
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { cn } from "@/lib/cn";
 import { canObserveInView, observeInView } from "@/motion/inView";
+import { cancelReplay, replay, type ReplayControls } from "@/motion/replay";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -158,6 +159,8 @@ function useOwnedNumber(
   return mv;
 }
 
+const FLASH_FRAMES = { opacity: [1, 0] } as const;
+
 /**
  * Up/down flash on two pre-rendered layers (refs returned for them). React `value` changes flash once per change;
  * a `source` flashes on its own change events (≥ `FLASH_COOLDOWN_MS` apart, or immediately when the direction flips).
@@ -166,7 +169,7 @@ function useValueFlash(enabled: boolean, value: number, source: MotionValue<numb
   const reduced = useReducedFx();
   const up = useRef<HTMLSpanElement>(null);
   const down = useRef<HTMLSpanElement>(null);
-  const state = useRef({ value, at: 0, dir: 0, controls: null as AnimationPlaybackControls | null });
+  const state = useRef({ value, at: 0, dir: 0, controls: null as ReplayControls | null });
 
   const fire = useCallback((dir: 1 | -1) => {
     const s = state.current;
@@ -174,9 +177,10 @@ function useValueFlash(enabled: boolean, value: number, source: MotionValue<numb
     const off = dir > 0 ? down.current : up.current;
     if (!on) return;
     s.controls?.stop();
-    // the opposite tint is cut, not faded: a direction flip must read instantly (Motion owns the value, so set it there)
-    if (off) animate(off, { opacity: 0 }, { duration: 0 });
-    s.controls = animate(on, { opacity: [1, 0] }, tween.flash);
+    // the opposite tint is cut, not faded: a direction flip must read instantly; one native animation per layer,
+    // restarted (`replay`) – nothing built per tick
+    cancelReplay(off);
+    s.controls = replay(on, FLASH_FRAMES, tween.flash);
     s.at = performance.now();
     s.dir = dir;
   }, []);
