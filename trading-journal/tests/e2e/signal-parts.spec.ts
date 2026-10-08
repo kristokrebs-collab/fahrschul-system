@@ -38,7 +38,9 @@ test.describe("graded parts on a divergence market", () => {
     const { card, exp } = await openDivMarket(page);
     const div = part(exp, "div");
     expect(div.ok, "oracle: a closed regular bullish divergence").toBe(true);
-    expect(div.tf).toBe("30m");
+    // the engine's best rung (the shape makes a regular bullish divergence on 30m, 45m and 1h; RSI + WT on 45m rank first)
+    const tf = div.tf!;
+    expect(["30m", "45m", "1h"]).toContain(tf);
     await expect(verdictLabel(card)).toHaveText(exp.long.label, { timeout: 15_000 });
 
     const box = card.getByTestId("signal-div");
@@ -51,15 +53,18 @@ test.describe("graded parts on a divergence market", () => {
       await expect(row).toContainText(it.value);
       await expect(row, `${it.id} state`).toHaveAttribute("data-state", it.met ? "confirmed" : "none");
     }
-    // the best hit: what (RSI regulär), where (the two lows: price lower, oscillator higher) and when
+    // the best hit on that rung (regular before hidden, closed before provisional, RSI before WT, newest first – the
+    // card's `bestDivHit`): what, where (the two lows: price lower, oscillator higher) and when
     const hit = box.getByTestId("signal-div-hit");
-    await expect(hit).toContainText("30m · RSI regulär: Tief");
-    const best = div.hits!.filter((h) => h.tf === "30m" && h.osc === "rsi" && h.kind === "regular").sort((a, b) => a.barsAgo - b.barsAgo)[0]!;
+    const rank = (h: NonNullable<typeof div.hits>[number]) => (h.kind === "regular" ? 4 : 0) + (h.state === "provisional" ? 0 : 2) + (h.osc === "rsi" ? 1 : 0);
+    const best = div.hits!.filter((h) => h.tf === tf).sort((a, b) => rank(b) - rank(a) || a.barsAgo - b.barsAgo)[0]!;
+    expect(best, "oracle: a regular hit on the best rung").toMatchObject({ kind: "regular", dir: 1 });
+    await expect(hit).toContainText(`${tf} · ${best.osc === "rsi" ? "RSI" : "WT"} regulär: Tief`);
     expect(best.to.price, "lower low in price").toBeLessThan(best.from.price);
-    expect(best.to.osc, "higher low in RSI").toBeGreaterThan(best.from.osc);
+    expect(best.to.osc, `higher low in ${best.osc}`).toBeGreaterThan(best.from.osc);
     expect(best.to.price).toBeCloseTo(DIV_LEVELS.low2, -2);
     await expect(hit).toContainText(`${de0.format(best.from.price)} → ${de0.format(best.to.price)}`);
-    await expect(card.getByRole("list", { name: "Bedingungen" }).locator("li", { hasText: "Bullische Divergenz (30m)" })).toContainText("erfüllt");
+    await expect(card.getByRole("list", { name: "Bedingungen" }).locator("li", { hasText: `Bullische Divergenz (${tf})` })).toContainText("erfüllt");
 
     // support / resistance: the engine's levels (the range low under the price, the supply block above)
     const sr = part(exp, "sr");
@@ -71,7 +76,7 @@ test.describe("graded parts on a divergence market", () => {
     if ((page.viewportSize()?.width ?? 0) >= 1024) {
       const strip = page.getByTestId("signal-strip");
       await expect(strip.getByTestId("signal-strip-div")).toHaveAttribute("data-lit", "true");
-      await expect(strip.getByTestId("signal-strip-div")).toContainText("Divergenz30m");
+      await expect(strip.getByTestId("signal-strip-div")).toContainText(`Divergenz${tf}`);
     }
     await card.screenshot({ path: info.outputPath("div-card.png"), animations: "disabled" });
     expect(errors, errors.join("\n")).toEqual([]);

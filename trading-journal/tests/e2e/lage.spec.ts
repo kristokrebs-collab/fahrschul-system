@@ -91,7 +91,7 @@ test.describe("Lage-Ampel", () => {
     // 10:20 UTC: the turn sits on the forming 30m candle; it closes 10:30
     const at = utcToday(10, 20);
     const clock = await pinClock(page, at);
-    await seed(page, { synth: { ratios: "whale-long", anchor: at }, clock: clock.now, extra: { "tj2-settings": { ...baseSettings, signals: { notify: true } } } });
+    await seed(page, { synth: { ratios: "whale-long", anchor: at }, clock: clock.now, lage: true, extra: { "tj2-settings": { ...baseSettings, signals: { notify: true } } } });
     await page.goto("/#overview");
     const lage = page.getByTestId("lage-panel");
     await expect(lage).toHaveAttribute("data-state", "red", { timeout: 30_000 });
@@ -146,7 +146,7 @@ test.describe("Lage-Ampel", () => {
     const at = utcToday(6, 3);
     const clock = await pinClock(page, at);
     const signals = { lage: { on: false, mode: "block" } };
-    await seed(page, { synth: { ratios: "whale-long", anchor: at - MIN }, clock: clock.now, extra: { "tj2-settings": { ...baseSettings, signals } } });
+    await seed(page, { synth: { ratios: "whale-long", anchor: at - MIN }, clock: clock.now, lage: true, extra: { "tj2-settings": { ...baseSettings, signals } } });
     await page.goto("/#overview");
     const lage = page.getByTestId("lage-panel");
     await expect(lage).toHaveAttribute("data-gate", "off", { timeout: 30_000 });

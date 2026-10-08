@@ -9,9 +9,11 @@
  * - `synthKlines(interval, q, anchor)`: Binance `/fapi/v1/klines` rows for a request (`limit`, `startTime`, `endTime`).
  * - `synthRatios(kind, period, q)`: Binance `/futures/data/*LongShort*Ratio` rows aligned to period boundaries (the
  *   Einstiegs-Check reads the 5-minute ones). `whale-long`: top traders > 64 % long by POSITIONS (66,0 %) and by ACCOUNTS
- *   (65,4 %) while the all-accounts long share FALLS (retail red, −0,5 pp per point) — with the setup's Discount the
+ *   (65,4 %) while all accounts are MORE long (69,1 %, rising toward now): the Whale–Retail-Delta (top accounts − all
+ *   accounts) is −3,7 pp and fell 2,7 pp over the last hour (retail red by both rules) — with the setup's Discount the
  *   Top-Trader-Kombi holds 4 of 4 on the long side. `whale-short` mirrors it (34,0 % / 34,6 % long = > 64 % short,
- *   retail rising = green) for the mirrored market. `flat`: gentle swings around 55 / 53 / 50 % (no part met).
+ *   delta +3,7 pp, rising = retail green) for the mirrored market. `flat`: gentle swings around 55 / 53 / 54 % (delta
+ *   ≈ −1 pp: retail red for a long, nothing else met).
  */
 export const SYNTH_INTERVAL_MS: Record<string, number> = {
   "1m": 60_000,
@@ -32,6 +34,12 @@ const DAY = 24 * HOUR;
 /** Price at the end of the decline (the fresh low) and at the anchor (after the turn). */
 export const SYNTH_LOW = 82_900;
 export const SYNTH_LAST = 84_200;
+/**
+ * The ONE live price of the synthetic market (`mockMarket` with `synth`): every trade, the book mid, the ticker's last
+ * price (Binance and Bybit) — so the engine completes the running candles with the same price whichever source it
+ * reads first (it keeps the price of its minute frame), and the oracles pass the same number.
+ */
+export const SYNTH_LIVE_PRICE = 84_199;
 const HIGH = 96_500;
 const FALL_MS = 3 * DAY;
 const TURN_MS = 12 * MIN;
@@ -156,15 +164,18 @@ const SCRIPT_POINTS = 12;
 /**
  * Long % (0–100) of `kind` at the snapshot `i` periods before the newest one. `whale-long`: top traders 66,0 % long by
  * position and 65,4 % by account (−0,1 pp per older point, so every point of the last hour is > 64 %), all accounts
- * 46,6 % long and +0,5 pp per older point (= the retail long share falls toward now: Retail rot for every comparison
- * period up to 1 h). `whale-short` = the mirror image (100 − x): top traders > 64 % short, retail rising (Retail grün).
+ * 69,1 % long and −0,3 pp per older point (all accounts grow MORE long toward now than the top accounts): the
+ * Whale–Retail-Delta (top accounts − all accounts) is −3,7 pp now and fell 2,7 pp over 1 h (−1,3 pp at the oldest
+ * scripted point) — "Retail rot" by the level (< 0) and by the fall (≥ 1 pp) rule. `whale-short` = the mirror image
+ * (100 − x): top traders > 64 % short, delta +3,7 pp and rising 4,7 pp over 1 h (Retail grün).
  */
 export function ratioLongPct(kind: RatioKind, i: number, script: RatioScript): number {
   if (script !== "flat" && i < SCRIPT_POINTS) {
-    const long = kind === "top-position" ? 66 - 0.1 * i : kind === "top-account" ? 65.4 - 0.1 * i : 46.6 + 0.5 * i;
+    const long = kind === "top-position" ? 66 - 0.1 * i : kind === "top-account" ? 65.4 - 0.1 * i : 69.1 - 0.3 * i;
     return script === "whale-long" ? long : 100 - long;
   }
-  const base = kind === "global" ? 50 : kind === "top-account" ? 53 : 55;
+  // older points / `flat`: top accounts 53 %, all accounts 54 % → delta ≈ −1 pp (below 0 = retail red for a long only)
+  const base = kind === "global" ? 54 : kind === "top-account" ? 53 : 55;
   return base + 1.5 * Math.sin(i * 0.9) + 0.5 * Math.sin(i * 2.3);
 }
 

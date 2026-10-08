@@ -3,7 +3,7 @@
  * (`src/domain/signals`) the way the market layer feeds it: exchange bars per source interval, resampled to the rung
  * (`rungBars` of `src/market/signals/bars.ts`, replicated here without the `@/` alias), the running bar completed
  * with the live price (bootstrap depths of `src/market/feeds.ts` BOOTSTRAP_LIMIT: 1500 × 15m, 499 × 1h / 4h), then graded
- * with the live Top-Trader reading: the three 5-minute ratio series (positions, accounts, all accounts — 36 points like
+ * with the live Top-Trader reading: the three 5-minute ratio series (positions, accounts, all accounts — as many points as
  * `LIVE_RATIO_BOOTSTRAP_LIMIT`) through `traderReading` → `computeSignals(bars, cfg, now, { traders })`. The spec compares
  * the card with this.
  */
@@ -21,6 +21,7 @@ import {
   type Signals,
   type TraderSeries,
 } from "../../../src/domain/signals";
+import { LIVE_RATIO_BOOTSTRAP_LIMIT } from "../../../src/market/feeds";
 import { SYNTH_LAST, synthKlines, synthRatios, type RatioKind, type RatioScript, type SynthShape } from "./synth";
 
 const SOURCE: Record<string, { interval: string; sec: number }> = {
@@ -31,8 +32,8 @@ const SOURCE: Record<string, { interval: string; sec: number }> = {
   "4h": { interval: "4h", sec: 14_400 },
 };
 
-/** Points of each live 5-min ratio series on bootstrap (`LIVE_RATIO_BOOTSTRAP_LIMIT`). */
-const TRADER_POINTS = 36;
+/** Points of each live 5-min ratio series on bootstrap. */
+const TRADER_POINTS = LIVE_RATIO_BOOTSTRAP_LIMIT;
 
 function rungBars(tf: string, source: readonly Bar[]): Bar[] {
   const s = SOURCE[tf]!;

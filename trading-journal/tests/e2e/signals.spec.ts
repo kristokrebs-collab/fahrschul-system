@@ -119,7 +119,7 @@ test.describe("Einstiegs-Check on a known market", () => {
     for (const [id, value] of [
       ["pos", "66,0 % Long"],
       ["acc", "65,4 % Long"],
-      ["retail", "−0,5 pp"],
+      ["retail", traders.items.find((x) => x.id === "retail")!.value],
       ["zone", traders.items.find((x) => x.id === "zone")!.value],
     ] as const) {
       const cell = whale.locator(`[data-testid=signal-part-cell][data-id=${id}]`);
@@ -127,7 +127,7 @@ test.describe("Einstiegs-Check on a known market", () => {
       await expect(cell).toContainText(value);
     }
     await expect(whale.locator("[data-testid=signal-part-cell][data-id=pos]")).toContainText("Ziel > 64 % Long");
-    await expect(whale.locator("[data-testid=signal-part-cell][data-id=retail]")).toContainText("rot: Long-Anteil fällt (5m)");
+    await expect(whale.locator("[data-testid=signal-part-cell][data-id=retail]")).toContainText("Ziel rot: < 0 oder fällt ≥ 1 pp (1h)");
 
     // divergences: one row per ladder timeframe; the synthetic fall has none
     const div = card.getByTestId("signal-div");

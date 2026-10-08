@@ -4,6 +4,7 @@
  */
 import { expect, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { readFileSync } from "node:fs";
+import { MTF_SETUP } from "../../src/domain/edition/mtf";
 import { mockMarket, type MarketScenario, type MockMarketOptions } from "./mocks/market";
 
 export const fixture: Record<string, unknown> = JSON.parse(readFileSync(new URL("../fixtures/tj2-v0.json", import.meta.url), "utf8"));
@@ -19,6 +20,33 @@ export interface SeedOptions extends MockMarketOptions {
   extra?: Record<string, unknown>;
   /** skip the legacy journal fixture → empty journal */
   empty?: boolean;
+  /**
+   * Lage-Ampel (decision 23, `settings.signals.lage.on`) of the seeded journal. Default: OFF with a synthetic market
+   * (`synth`) — its three-day fall puts the daily trend at red, which would hold back every long entry the signal specs
+   * check (oracle `mocks/synthOracle.ts` grades without the Lage); otherwise (and with `lage: true`) the settings are
+   * seeded as given — the app's default is ON (`lage.spec.ts` tests the Ampel itself with `lage: true`). Off =
+   * `{ on: false }` merged into the seeded settings' `signals.lage` (every other key kept).
+   */
+  lage?: boolean;
+}
+
+/**
+ * `extra` with `signals.lage.on = false` merged into the seeded `tj2-settings` (the given ones, else the fixture's).
+ * Settings that carried neither `signals` nor `mistakes` get the multi-timeframe setup `s_mtf` appended the way the
+ * app's one-time migration (`normalizeSettings`) would have — it only runs while both keys are absent, so the seeded
+ * journal shows the same setups as without the flag.
+ */
+function lageOff(extra: Record<string, unknown>, empty: boolean): Record<string, unknown> {
+  const raw = extra["tj2-settings"] ?? (empty ? undefined : fixture["tj2-settings"]);
+  const settings = (typeof raw === "string" ? JSON.parse(raw) : (raw ?? {})) as Record<string, unknown>;
+  const signals = (settings.signals ?? {}) as Record<string, unknown>;
+  const lage = (signals.lage ?? {}) as Record<string, unknown>;
+  const next: Record<string, unknown> = { ...settings, signals: { ...signals, lage: { ...lage, on: false } } };
+  const setups = settings.setups;
+  if (Array.isArray(setups) && setups.length > 0 && !("mistakes" in settings) && !("signals" in settings) && !setups.some((x: { id?: unknown } | null) => x?.id === MTF_SETUP.id)) {
+    next.setups = [...setups, { ...MTF_SETUP, checklist: MTF_SETUP.checklist.map((c) => ({ ...c })) }];
+  }
+  return { ...extra, "tj2-settings": next };
 }
 
 /**
@@ -27,6 +55,7 @@ export interface SeedOptions extends MockMarketOptions {
  */
 export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
   await mockMarket(page, opts.scenario ?? "live", opts);
+  const extra = (opts.lage ?? !opts.synth) ? (opts.extra ?? {}) : lageOff(opts.extra ?? {}, !!opts.empty);
   await page.addInitScript(
     ({ fx, extra }) => {
       sessionStorage.setItem("tj2-intro", "1");
@@ -35,7 +64,7 @@ export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
       for (const [k, v] of Object.entries(extra)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
       localStorage.setItem("__e2e-seeded", "1");
     },
-    { fx: opts.empty ? {} : fixture, extra: opts.extra ?? {} },
+    { fx: opts.empty ? {} : fixture, extra },
   );
 }
 
@@ -210,6 +239,31 @@ export async function touchKit(page: Page): Promise<TouchKit> {
       await send("touchEnd", at.x, at.y);
     },
   };
+}
+
+/**
+ * The box of `locator` once it stopped moving (two reads 100 ms apart agree within 0.5 px). Content above it that is
+ * still filling — the Einstiegs-Check's first evaluation adds ~1,500 px on a phone, the Lage panel its rows — pushes it
+ * down, and a tap at a box read a moment earlier lands somewhere else (or below the viewport).
+ */
+type Box = { x: number; y: number; width: number; height: number };
+export async function settledBox(locator: Locator, timeout = 10_000): Promise<Box> {
+  let prev: Box | null = null;
+  let box: Box | null = null;
+  await expect
+    .poll(
+      async () => {
+        const cur: Box | null = await locator.boundingBox();
+        const last: Box | null = prev;
+        const same = !!cur && !!last && Math.abs(cur.x - last.x) < 0.5 && Math.abs(cur.y - last.y) < 0.5 && Math.abs(cur.height - last.height) < 0.5;
+        prev = box = cur;
+        return same;
+      },
+      { timeout, intervals: [100], message: "box settles" },
+    )
+    .toBe(true);
+  if (!box) throw new Error("no bounding box");
+  return box;
 }
 
 /** Centre of a locator's box (throws when it has none). */

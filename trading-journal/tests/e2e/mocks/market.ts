@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page, Route } from "@playwright/test";
-import { synthKlines, synthRatios, type RatioKind, type RatioScript, type SynthShape } from "./synth";
+import { SYNTH_LIVE_PRICE, synthKlines, synthRatios, type RatioKind, type RatioScript, type SynthShape } from "./synth";
 
 export type MarketScenario = "live" | "stale" | "blocked_451" | "offline" | "reconnect";
 
@@ -81,7 +81,10 @@ export interface MockMarketOptions {
    * Generated market instead of the kline / long-short-ratio fixtures (`synth.ts`): one price path for every interval
    * (open times aligned like Binance) that yields a KNOWN Einstiegs-Check result, and ratio series per requested
    * `period`. `ratios: "whale-long"` = top traders buy while retail is red over the last 4 periods. The WS replay
-   * then drops its (unaligned) `kline_1h` message. Time anchor = the moment `mockMarket` runs.
+   * then drops its (unaligned) `kline_1h` message, and every price the app may read as the last price — the replayed
+   * trades (84.206,1 / 84.215,4 / 84.199 in the fixtures), the book mid, the tickers' last price — is the one
+   * `SYNTH_LIVE_PRICE`: the signal engine keeps the price of its minute frame (whatever arrived first), the oracles
+   * grade with this one. Time anchor = the moment `mockMarket` runs.
    */
   synth?: {
     ratios?: RatioScript;
@@ -192,13 +195,30 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
   const delta = (): number => (opts.clock && opts.shiftToNow !== false ? clock() - file.baseTime : delta0);
   const synth = opts.synth;
   const anchor = synth?.anchor ?? clock();
+  const live = SYNTH_LIVE_PRICE.toFixed(2);
   if (synth) {
-    const drop = (steps: WsStep[] | undefined) => steps?.filter((st) => st.fixture !== "binance-ws-kline.json");
-    file.ws = { ...file.ws, steps: drop(file.ws.steps) ?? [], reconnectSteps: drop(file.ws.reconnectSteps) };
+    // one live price: the trades and the book mid of the replay at SYNTH_LIVE_PRICE
+    const PRICE_PATCH: Record<string, Record<string, string>> = {
+      "binance-ws-aggTrade.json": { "data.p": live },
+      "binance-ws-bookTicker.json": { "data.b": (SYNTH_LIVE_PRICE - 0.1).toFixed(2), "data.a": (SYNTH_LIVE_PRICE + 0.1).toFixed(2) },
+    };
+    const adapt = (steps: WsStep[] | undefined) =>
+      steps?.filter((st) => st.fixture !== "binance-ws-kline.json").map((st) => (st.fixture && PRICE_PATCH[st.fixture] ? { ...st, patch: { ...st.patch, ...PRICE_PATCH[st.fixture] } } : st));
+    file.ws = { ...file.ws, steps: adapt(file.ws.steps) ?? [], reconnectSteps: adapt(file.ws.reconnectSteps) };
   }
+  /** synthetic market: the tickers' last price is the live price too (Binance `lastPrice`, Bybit `list[].lastPrice`) */
+  const livePatch = (name: string, body: unknown): unknown => {
+    if (!synth) return body;
+    if (name === "binance-ticker24hr.json") return { ...(body as Record<string, unknown>), lastPrice: live };
+    if (name === "bybit-tickers.json") {
+      const b = body as { result: { list: Record<string, unknown>[] } };
+      return { ...b, result: { ...b.result, list: b.result.list.map((x) => ({ ...x, lastPrice: live })) } };
+    }
+    return body;
+  };
   const json = async (route: Route, name: string, status = 200) => {
     if (opts.latencyMs) await new Promise((r) => setTimeout(r, opts.latencyMs));
-    await route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(shiftTimes(readJson(name), delta())) });
+    await route.fulfill({ status, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(livePatch(name, shiftTimes(readJson(name), delta()))) });
   };
 
   await page.route("https://fapi.binance.com/**", async (route) => {
