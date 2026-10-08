@@ -2,7 +2,7 @@
  * German copy of the Lage-Ampel: headline, sign labels, chip texts, the method / backtest text of the "Details"
  * panel. Numbers through `@/lib/format` (de-DE, U+2212 minus).
  */
-import { n0, pct } from "@/lib/format";
+import { n0, pct } from "../../lib/format";
 import type { LageSignId, LageState } from "./types";
 
 export const LAGE_TITLE = "Lage";

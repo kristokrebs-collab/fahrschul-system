@@ -75,6 +75,7 @@ export const FEED_LABELS: Record<FeedId, string> = {
   kline_1h: "Kerzen 1h",
   kline_4h: "Kerzen 4h",
   kline_1w: "Kerzen 1W",
+  kline_1d: "Kerzen 1D",
   markPrice: "Mark-Preis",
   bookTop: "Orderbuch",
   aggTrade: "Trades",

@@ -2,8 +2,8 @@
  * Types of the "Lage-Ampel" (decision 23, knife-lab REPORT § RECOMMENDATION): the higher-timeframe context that
  * decides whether a long entry of the Einstiegs-Check counts. Pure data, no React.
  */
-import type { Bar } from "@/domain/signals/indicators";
-import type { LevelKind, StructureCfg } from "@/domain/signals/structure";
+import type { Bar } from "../signals/indicators";
+import type { LevelKind, StructureCfg } from "../signals/structure";
 
 /** `none` = too few daily bars (no gate, "keine Daten"). */
 export type LageState = "red" | "amber" | "green" | "none";

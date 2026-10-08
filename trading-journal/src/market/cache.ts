@@ -16,6 +16,7 @@ export const RING_CAPACITY: Record<SeriesFeed, number> = {
   kline_1h: 2_200, // ≈ 90 days
   kline_4h: 600,
   kline_1w: 260,
+  kline_1d: 1_100, // ≈ 3 years: the 1000 days the Lage-Ampel evaluates (EMA 200, 500-day structure)
   openInterestHist: 500,
   topPositionRatio: 500,
   topAccountRatio: 500,

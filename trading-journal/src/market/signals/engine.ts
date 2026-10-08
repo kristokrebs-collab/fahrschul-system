@@ -58,7 +58,9 @@ import {
   type WtKind,
   type WtTurn,
 } from "@/domain/signals";
+import { lageKey, lageSettingsOf, type LageSettings } from "@/domain/lage";
 import { LIVE_RATIO_FEEDS } from "../feeds";
+import { getLage, retainLage, subscribeLage } from "../lage";
 import type { MarketProvider } from "../provider";
 import type { Candle, FeedId, KlineFeed, ProviderHealth, Source, Stamped } from "../types";
 import { priceMv, priceReceivedAtMv, tradeTimeMv } from "../motionValues";
@@ -105,12 +107,9 @@ export const SIGNAL_FRAME_GRACE_MS = 1000;
 /** A frame that starts within this long after its boundary stands for the minute that just closed. */
 const FRAME_BOUNDARY_SLACK_MS = 5000;
 /** Bar length of the kline feeds (closed-history key). */
-const FEED_MS: Readonly<Record<string, number>> = { kline_1m: 60_000, kline_15m: 900_000, kline_1h: 3_600_000, kline_4h: 14_400_000, kline_1w: 604_800_000 };
+const FEED_MS: Readonly<Record<string, number>> = { kline_1m: 60_000, kline_15m: 900_000, kline_1h: 3_600_000, kline_4h: 14_400_000, kline_1w: 604_800_000, kline_1d: 86_400_000 };
 /** The live price completes the running candles only while it is younger than this (other journal: 5 min). */
 export const LIVE_PRICE_MAX_AGE_MS = 5 * 60_000;
-/** REST cadence of the lazily polled `1d` series. */
-export const DAILY_POLL_MS = 5 * 60_000;
-const DAILY_BARS = 499;
 
 const MSG = {
   loading: "Kerzen werden geladen …",
@@ -137,7 +136,9 @@ interface Engine {
   /** identity of the inputs of the last evaluation: source arrays + price */
   inputKey: string;
   converters: Map<string, BarConverter>;
-  daily: { candles: Candle[]; fetchedAt: number; timer: ReturnType<typeof setTimeout> | null; inflight: boolean };
+  /** Lage-Ampel setting (`settings.signals.lage`, decision 23) and the release of the Lage feed the engine holds */
+  lageCfg: LageSettings;
+  lageRelease: (() => void) | null;
   /** the current frame: index (minute on the exchange clock, after the grace), its price, the minute it stands for */
   frame: Frame | null;
   frameTimer: ReturnType<typeof setTimeout> | null;
@@ -164,7 +165,8 @@ const eng: Engine = {
   lastRunAt: 0,
   inputKey: "",
   converters: new Map(),
-  daily: { candles: [], fetchedAt: 0, timer: null, inflight: false },
+  lageCfg: lageSettingsOf(undefined),
+  lageRelease: null,
   frame: null,
   frameTimer: null,
   intrabar: EMPTY_INTRABAR,
@@ -187,8 +189,6 @@ function liveFeeds(cfg: SignalCfg): KlineFeed[] {
   return [...out];
 }
 
-const needsDaily = (cfg: SignalCfg): boolean => neededTfs(cfg).some((tf) => tfSource(tf)?.interval === "1d");
-
 function converter(key: string): BarConverter {
   let c = eng.converters.get(key);
   if (!c) eng.converters.set(key, (c = new BarConverter()));
@@ -198,7 +198,6 @@ function converter(key: string): BarConverter {
 function sourceCandles(p: MarketProvider, tf: string): readonly Candle[] {
   const s = tfSource(tf);
   if (!s) return [];
-  if (!s.feed) return eng.daily.candles;
   return (p.get(s.feed) as Stamped<Candle[]> | undefined)?.data ?? [];
 }
 
@@ -265,8 +264,10 @@ function inputKeyOf(p: MarketProvider, cfg: SignalCfg, frame: Frame, ex: number)
     const v = p.get(f) as Stamped<Candle[]> | undefined;
     ids.push(`${f}:${v ? closedKeyOf(v.data, ex, FEED_MS[f] ?? 60_000) : 0}`);
   }
-  if (needsDaily(cfg)) ids.push(`d:${objectId(eng.daily.candles)}`);
   ids.push(tradersInputKey(p, cfg));
+  // the Lage-Ampel gate: its state, signs and the texts the knife filter shows (published ≤ 1/s, on shown changes)
+  const lage = getLage().lage;
+  ids.push(`lage:${eng.lageCfg.on ? 1 : 0}${eng.lageCfg.mode}:${lage ? lageKey(lage) : "∅"}`);
   return ids.join("|");
 }
 
@@ -363,11 +364,12 @@ export function signalsKey(s: Signals | null): string {
   }
   const z = s.zone;
   parts.push(z ? `z:${z.tf},${z.zone.zone},${r2(z.zone.pos)},${r1(z.zone.hi)},${r1(z.zone.lo)},${z.zone.deep ? 1 : 0},${z.zone.brk ? `${z.zone.brk.kind}${z.zone.brk.dir}` : "-"},${z.zone.lux ? 1 : 0},${checkKey(z)}` : "z:-");
-  for (const v of [s.long, s.short]) parts.push([v.score, v.strength, v.tiers, v.valid ? 1 : 0, v.rsiOk ? 1 : 0, v.zoneOk ? 1 : 0, v.label, v.reasons.map((r) => (r.ok ? 1 : 0)).join(""), verdictKey(v)].join(","));
+  for (const v of [s.long, s.short]) parts.push([v.score, v.strength, v.tiers, v.valid ? 1 : 0, v.rsiOk ? 1 : 0, v.zoneOk ? 1 : 0, v.label, v.reasons.map((r) => (r.ok ? 1 : 0)).join(""), verdictKey(v), v.lage ? `${v.lage.state}${v.lage.blocked ? "b" : ""}${v.lage.signsMet}` : "-"].join(","));
+  if (s.lage !== undefined) parts.push(`lg:${s.lage?.lage ? `${s.lage.lage.state}${s.lage.lage.signsMet}` : "∅"}${s.lage?.cfg.on ? 1 : 0}${s.lage?.cfg.mode ?? ""}`);
   // top-trader readings (rounded like the rest: a re-render only when a shown digit changes)
   const t = s.traders;
   parts.push(t ? `t:${t.at},${r1(t.position ?? NaN)},${r1(t.account ?? NaN)},${r1(t.retail ?? NaN)},${r1(t.retailChg ?? NaN)},${t.period}` : `t:${t === null ? "0" : "-"}`);
-  if (s.knife) for (const k of [s.knife.long, s.knife.short]) parts.push(`k:${k.n}:${k.items.map((i) => `${i.met === null ? "n" : i.met ? 1 : 0}${i.detail}`).join("~")}`);
+  if (s.knife) for (const k of [s.knife.long, s.knife.short]) parts.push(`k:${k.n}/${k.total}:${[...k.items, ...(k.ltf ?? [])].map((i) => `${i.id}${i.met === null ? "n" : i.met ? 1 : 0}${i.label}${i.detail}`).join("~")}`);
   // legacy run-rule readings (`applyWhale`; not set by the live engine)
   if (s.whale) {
     for (const w of s.whale.periods) parts.push(`w:${w.period},${w.at},${r1(w.top)},${r1(w.retail)},${r1(w.topChg)},${r1(w.retailChg)},${w.runLong},${w.runShort}`);
@@ -417,7 +419,7 @@ export function runSignalCheck(now: number = Date.now()): SignalCheckState {
     const bars = buildBars(p, cfg, price);
     // candle-close states on the exchange clock (Binance candle times); the Top-Trader-Kombi from the provider's
     // 5-min series (Binance clock)
-    const s = computeSignals(bars, cfg, now + skew, { traders: liveTraders(p, cfg) });
+    const s = computeSignals(bars, cfg, now + skew, { traders: liveTraders(p, cfg), lage: { lage: getLage().lage, cfg: eng.lageCfg } });
     if (s) {
       eng.intrabar = noteIntrabar(eng.intrabar, s.checks, frame.at, price?.price ?? null);
       const live: LiveSignals = {
@@ -482,31 +484,6 @@ function schedule(): void {
   }, wait);
 }
 
-// ------------------------------------------------------------------ 1d REST series (only for a `1D` rung)
-
-function pollDaily(): void {
-  const p = eng.provider;
-  const d = eng.daily;
-  if (d.timer) clearTimeout(d.timer);
-  d.timer = null;
-  if (!p || !needsDaily(eng.cfg)) return;
-  if (d.inflight) return;
-  d.inflight = true;
-  // 499 daily bars: Binance weight 2 (500+ would cost 5), same window as the native 1h / 4h rungs
-  p.fetchKlines("1d", { limit: DAILY_BARS })
-    .then((v) => {
-      if (eng.provider !== p) return;
-      d.candles = v.data;
-      d.fetchedAt = Date.now();
-      schedule();
-    })
-    .catch(() => undefined)
-    .finally(() => {
-      d.inflight = false;
-      if (eng.provider === p && needsDaily(eng.cfg)) d.timer = setTimeout(pollDaily, d.candles.length ? DAILY_POLL_MS : 60_000);
-    });
-}
-
 // ------------------------------------------------------------------ lifecycle
 
 function subscribeInputs(p: MarketProvider): void {
@@ -517,6 +494,8 @@ function subscribeInputs(p: MarketProvider): void {
   for (const f of LIVE_RATIO_FEEDS) eng.offs.push(p.subscribe(f, schedule));
   eng.offs.push(p.onHealth(schedule));
   eng.offs.push(priceMv.on("change", onPrice));
+  // the Lage-Ampel (decision 23): a new state / sign / chip re-grades the long (≤ 1/s like every input)
+  eng.offs.push(subscribeLage(schedule));
 }
 
 /** Binds the engine to a (started) provider; called by `startMarket`. */
@@ -524,8 +503,9 @@ export function attachSignalEngine(p: MarketProvider): void {
   if (eng.provider === p) return;
   detachSignalEngine();
   eng.provider = p;
+  // the engine keeps the Lage feed running (its gate must work without the Übersicht on screen)
+  eng.lageRelease = retainLage();
   subscribeInputs(p);
-  if (needsDaily(eng.cfg)) pollDaily();
   schedule();
   armFrame();
 }
@@ -540,8 +520,8 @@ export function detachSignalEngine(): void {
   eng.frameTimer = null;
   eng.frame = null;
   eng.intrabar = EMPTY_INTRABAR;
-  if (eng.daily.timer) clearTimeout(eng.daily.timer);
-  eng.daily = { candles: [], fetchedAt: 0, timer: null, inflight: false };
+  eng.lageRelease?.();
+  eng.lageRelease = null;
   eng.converters.clear();
   eng.provider = null;
   eng.inputKey = "";
@@ -555,6 +535,13 @@ export function detachSignalEngine(): void {
 export function setSignalConfig(raw: unknown): SignalCfg {
   const cfg = sanitizeSignalCfg(raw);
   const key = signalCfgKey(cfg);
+  // Lage-Ampel switch / mode (`settings.signals.lage`): part of the input key, so a change re-grades at once
+  const lc = lageSettingsOf(raw);
+  if (lc.on !== eng.lageCfg.on || lc.mode !== eng.lageCfg.mode) {
+    eng.lageCfg = lc;
+    eng.inputKey = "";
+    if (eng.provider) schedule();
+  }
   // notification-only settings (switch, minimum strength) do not change the evaluation, but the notifier reads them
   const notifyChanged = cfg.notify !== eng.cfg.notify || signalNotifyMinStrength(cfg) !== signalNotifyMinStrength(eng.cfg);
   if (key === eng.cfgKey) {
@@ -567,7 +554,6 @@ export function setSignalConfig(raw: unknown): SignalCfg {
   resetSignalNotifier();
   if (eng.provider) {
     subscribeInputs(eng.provider);
-    if (needsDaily(cfg)) pollDaily();
     schedule();
   }
   return cfg;
@@ -575,6 +561,11 @@ export function setSignalConfig(raw: unknown): SignalCfg {
 
 export function getSignalConfig(): SignalCfg {
   return eng.cfg;
+}
+
+/** The Lage-Ampel setting the engine gates with (`settings.signals.lage`, sanitised). */
+export function getLageConfig(): LageSettings {
+  return eng.lageCfg;
 }
 
 /** Forces an evaluation on the next tick (ignores the input memo, still ≤ 1/s). */

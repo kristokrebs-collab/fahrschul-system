@@ -5,16 +5,21 @@
  */
 import type { Candle, FeedId, FeedSpec, FeedValue, HealthEvent, ProviderHealth, RatioPoint, SeriesFeed, Source, Stamped, StatusLabel, MarketDataProvider, AggTrade } from "./types";
 import { resolveSymbol, type SymbolInfo } from "./symbol";
-import { normalizePeriod, INTERVAL_MS, type FetchInterval, type PeriodResult, type KlineInterval, type Period } from "./period";
+import { normalizePeriod, INTERVAL_MS, FETCH_INTERVAL_MS, type FetchInterval, type PeriodResult, type Period } from "./period";
 import {
   ALL_FUTURES_DATA_FEEDS,
   BINANCE_FAMILY_FEEDS,
   BOOTSTRAP_LIMIT,
-  GAP_FILL_MAX,
   klineBootstrapLimit,
   BYBIT_UNSUPPORTED,
+  DAILY_CACHE_MIN,
+  DAILY_FEED,
+  DAILY_LAG_MS,
+  DAILY_POLL_MS,
+  DAY,
   DEFAULT_SOURCE_CHAIN,
   FEED_IDS,
+  GAP_FILL_MAX,
   FUTURES_DATA_FEEDS,
   FUTURES_DATA_RETENTION_MS,
   HISTORY_MAX_CALLS,
@@ -42,6 +47,7 @@ import {
 import { Budget, klineWeight, type BudgetClass } from "./budget";
 import {
   NON_ADVANCE_RETRIES_MS,
+  NON_ADVANCE_RETRY_MS,
   Scheduler,
   WS_SILENT_MS,
   banBackoffMs,
@@ -209,6 +215,8 @@ const STREAM_STALL_WINDOW_MS = 10 * 60_000;
 const SOCKET_ALIVE_MS = 5_000;
 /** The stale-feed watchdog leaves a feed alone whose next poll is at most this far away. */
 const KICK_LEAD_MS = 10_000;
+/** Daily feed: after 00:00 UTC a page without the new day's bar is asked again after 60 s for this long. */
+const DAILY_CLOSE_RETRY_WINDOW_MS = 30 * 60_000;
 /** Kline tail scanned for holes on every health tick (the gap fill itself scans up to `GAP_FILL_MAX` bars). */
 const HOLE_SCAN_BARS = 300;
 
@@ -347,7 +355,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (!isKlineFeed(feed)) return 2;
     const newest = newestTime(feed);
     if (newest === undefined) return 2;
-    const iv = INTERVAL_MS[klineFeedInterval(feed)];
+    const iv = FETCH_INTERVAL_MS[klineFeedInterval(feed)];
     // from the oldest open hole in the tail (a failed gap fill, frames lost while the socket stalled), else the newest
     // bar; counted on the Binance clock so a device clock that runs behind never leaves the last bars out
     const from = oldestHole(feed, GAP_FILL_MAX) ?? newest;
@@ -363,7 +371,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     if (!isKlineFeed(feed)) return undefined;
     const arr = cache.get(feed)?.data as Candle[] | undefined;
     if (!arr || arr.length < 2) return undefined;
-    const iv = INTERVAL_MS[klineFeedInterval(feed)];
+    const iv = FETCH_INTERVAL_MS[klineFeedInterval(feed)];
     const known = knownHoles.get(feed);
     // a tail request reaches at most GAP_FILL_MAX bars back: older holes stay (the chart's history() pages them)
     const reach = serverNow() - GAP_FILL_MAX * iv;
@@ -380,7 +388,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
   function rememberHoles(feed: FeedId, limit: number): void {
     const arr = cache.get(feed)?.data as Candle[] | undefined;
     if (!arr || arr.length < 2 || !isKlineFeed(feed)) return;
-    const iv = INTERVAL_MS[klineFeedInterval(feed)];
+    const iv = FETCH_INTERVAL_MS[klineFeedInterval(feed)];
     const covered = serverNow() - (limit - 1) * iv;
     let known = knownHoles.get(feed);
     for (let i = arr.length - 1; i >= 1 && arr[i]!.time >= covered; i--) {
@@ -558,6 +566,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     const spec = specs[feed];
     const t = now();
     const fh = health.feeds[feed];
+    if (feed === DAILY_FEED) return nextDailyPollAt(t);
     if (spec.alignMs) {
       const check = lastAdvanceCheck.get(feed);
       if (!advanced && check && check.retries < nonAdvanceRetries(spec.alignMs)) {
@@ -577,6 +586,32 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     }
     const { cadenceMs } = effectiveSpec(spec, source, WS_FEEDS.includes(feed) && health.ws.state === "fallback" ? "fallback" : fh.state);
     return t + cadenceMs;
+  }
+
+  /**
+   * Daily feed: hourly at hh:00:20 on the Binance clock (00:00:20 brings the closed day). Right after a daily close a
+   * page whose newest bar is still yesterday's is asked again after 60 s (for 30 min) — the hourly rhythm needs no
+   * "no new point" retries in between (the forming day's bar does not advance within a day).
+   */
+  function nextDailyPollAt(t: number): number {
+    const sn = serverNow();
+    const dayStart = Math.floor(sn / DAY) * DAY;
+    const newest = newestTime(DAILY_FEED);
+    if (newest !== undefined && newest < dayStart && sn - dayStart < DAILY_CLOSE_RETRY_WINDOW_MS) return t + NON_ADVANCE_RETRY_MS;
+    const off = skew.offsetMs;
+    return nextAlignedAt(t + off, { alignMs: DAILY_POLL_MS, lagMs: DAILY_LAG_MS }, random) - off;
+  }
+
+  /**
+   * First daily page after the cache hydration: the full `BOOTSTRAP_LIMIT.kline1d` days (weight 5) only when the cache
+   * does not hold them already (fresh install, other symbol, cache cleared); otherwise just the missing days.
+   */
+  function bootstrapDaily(): void {
+    if (!started) return;
+    const arr = cache.get(DAILY_FEED)?.data as Candle[] | undefined;
+    const newest = arr?.[arr.length - 1]?.time;
+    const full = !arr || arr.length < DAILY_CACHE_MIN || newest === undefined || serverNow() - newest > (GAP_FILL_MAX - 2) * DAY;
+    void poll(DAILY_FEED, { bootstrap: full });
   }
 
   function schedulePoll(feed: FeedId, at: number, bootstrap = false): void {
@@ -1051,6 +1086,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
 
   function bootstrapAll(): void {
     for (const f of FEED_IDS) {
+      if (f === DAILY_FEED) continue; // after the cache hydration (`bootstrapDaily`): a cached series needs no 1000-day page
       if (f === "bookTop" && !bookTop) continue;
       if (isMirrored(f)) continue;
       if (f === "aggTrade" && chain[0] === "binance" && !health.primary.blocked) continue; // WS only, price from ticker until then
@@ -1293,15 +1329,19 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
     win?.addEventListener("pagehide", onPageHide);
     win?.addEventListener("pageshow", onPageShow);
     win?.addEventListener("focus", onFocus);
-    void cache.hydrate(FEED_IDS).then((loaded) => {
-      if (!started) return;
-      for (const f of loaded) {
-        const v = cache.get(f);
-        const subs = feedSubs.get(f);
-        if (v && subs) for (const cb of subs) cb(v as Stamped<unknown>);
-      }
-      if (loaded.length) notifyChange();
-    });
+    void cache
+      .hydrate(FEED_IDS)
+      .then((loaded) => {
+        if (!started) return;
+        for (const f of loaded) {
+          const v = cache.get(f);
+          const subs = feedSubs.get(f);
+          if (v && subs) for (const cb of subs) cb(v as Stamped<unknown>);
+        }
+        if (loaded.length) notifyChange();
+      })
+      .catch(() => undefined)
+      .finally(bootstrapDaily);
     bootstrapAll();
     if (chain.includes("binance")) ws.start();
     void maybeProbeProxy(true);
@@ -1377,7 +1417,7 @@ export function createMarketProvider(opts: ProviderOptions): MarketProvider {
       let page: Stamped<FeedValue[F]>;
       try {
         if (isKlineFeed(feed)) {
-          const iv: KlineInterval = klineFeedInterval(feed);
+          const iv: FetchInterval = klineFeedInterval(feed);
           if (client) {
             if (!budget.take("binance.weight", klineWeight(HISTORY_PAGE_LIMIT), now(), "bulk")) break;
             page = (await client.klines(sym, iv, { limit: HISTORY_PAGE_LIMIT, endTime })) as Stamped<FeedValue[F]>;

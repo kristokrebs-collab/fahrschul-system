@@ -2,7 +2,7 @@ import { motion, useTransform } from "motion/react";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { HYBLOCK_LINK } from "@/domain/defaults";
 import { readingAge } from "@/domain/fallingKnife";
-import { KNIFE_INFO, KNIFE_TITLE, type KnifeFilter, type KnifeId, type KnifeItem, type Side } from "@/domain/signals";
+import { KNIFE_INFO, KNIFE_INFO_LAGE, KNIFE_LTF_TITLE, KNIFE_TITLE, type KnifeFilter, type KnifeId, type KnifeItem, type Side } from "@/domain/signals";
 import type { HyblockReading } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { date as fmtDate, n1, signed } from "@/lib/format";
@@ -146,6 +146,8 @@ const KnifeBars = memo(function KnifeBars({ states }: { states: string }) {
 
 /** Where each point comes from — the same module as in the Einstiegs-Check (single source of truth). */
 export const KNIFE_SOURCE: Readonly<Record<KnifeId, string>> = {
+  lage: "Lage-Ampel · 2 Tagesschlüsse unter der 1D-EMA 21 = Abwärtstrend · dieselbe Sperre wie im Einstiegs-Check",
+  signs: "Lage-Ampel · Kurs > 1D-EMA 21 · 4H > EMA 21 · 4H-EMA 21 > 50 · 4H-Struktur hoch",
   structure: "Marktstruktur 1H/4H · dieselbe wie Support / Widerstand im Einstiegs-Check",
   divergence: "Divergenzen · dieselben wie im Einstiegs-Check",
   whale: "Top-Trader-Kombi · Whale–Retail-Delta = Top-Trader-Konten minus alle Konten (Long-%) · Binance-5-min-Daten wie im Einstiegs-Check",
@@ -155,6 +157,12 @@ export const KNIFE_WAITING = "Wartet auf die Live-Daten des Einstiegs-Checks …
 /** Card line under the bars. */
 export function knifeLine(k: KnifeFilter | null): string {
   if (!k || !k.data) return KNIFE_WAITING;
+  if (k.ltf) {
+    // Lage layout (decision 23): point 1 is the gate
+    const trend = k.items.find((i) => i.id === "lage");
+    if (trend?.met) return k.all ? "Tagestrend steht, 4H dreht hoch: kein fallendes Messer." : "Tagestrend steht: Kaufsignale zählen.";
+    return k.n > 0 ? "Abwärtstrend, Umkehr bildet sich: noch abwarten." : "Fällt noch: abwarten statt kaufen.";
+  }
   if (k.all) return k.side === "long" ? "Kein fallendes Messer: Makro-Long abgesichert." : "Kein steigendes Messer: Makro-Short abgesichert.";
   if (k.n === 0) return k.side === "long" ? "Fallendes Messer möglich: beobachten statt kaufen." : "Steigendes Messer möglich: beobachten statt shorten.";
   return `${k.label} · Tippen für Details`;
@@ -169,6 +177,13 @@ export function knifeTone(k: KnifeFilter | null): VerdictTone {
 const TONE_TEXT: Record<VerdictTone, string> = { win: "text-win", loss: "text-loss", warn: "text-warn", mute: "text-faint" };
 
 function knifeVerdict(k: KnifeFilter): string {
+  if (k.ltf) {
+    const trend = k.items.find((i) => i.id === "lage");
+    if (trend?.met) return "Lage grün: kein Abwärtstrend im Tageschart – Kaufsignale des Einstiegs-Checks zählen. Die 4H-Zeichen zeigen, wie fest die Erholung ist.";
+    return k.n > 0
+      ? "Lage gelb: der Tagestrend ist noch abwärts, auf 4H bilden sich Umkehr-Zeichen – Kaufsignale zählen noch nicht (an der Historie: halb so oft ein fallendes Messer wie ohne Zeichen, aber noch zu oft)."
+      : "Lage rot: Abwärtstrend ohne Umkehr-Zeichen – fallendes Messer. Kaufsignale zählen nicht; auf den ersten Tagesschluss über der 1D-EMA 21 warten.";
+  }
   const what = k.side === "long" ? "Makro-Long" : "Makro-Short";
   if (k.all) return `Alle ${k.total} Punkte erfüllt: Filter frei – der ${what} ist abgesichert. Auslöser bleibt der Einstiegs-Check.`;
   if (k.n === 0) return `Kein Punkt erfüllt: ${k.side === "long" ? "fallendes" : "steigendes"} Messer möglich – beobachten statt handeln.`;
@@ -179,7 +194,8 @@ function knifeVerdict(k: KnifeFilter): string {
 const KnifeCard = memo(function KnifeCard({ open, body }: { open: boolean; body: () => ReactNode }) {
   const snap = useSignalCheck().snapshot;
   const k = snap?.knife?.long ?? null;
-  const states = k ? k.items.map((i) => (i.met ? "o" : i.met === false ? "x" : "-")).join("") : "---";
+  // the counted points (Lage layout: Tagestrend + 4H signs; the Top-Trader delta is info only and has no bar)
+  const states = k ? k.items.filter((i) => !i.info).map((i) => (i.met ? "o" : i.met === false ? "x" : "-")).join("") : "---";
   const tone = knifeTone(k);
   return (
     <MorphCard id="falling-knife" title={KNIFE_TITLE} className="rounded-2xl border border-line-2 bg-ink-950/25 p-3.5 hover:border-white/30" body={body}>
@@ -212,11 +228,24 @@ const ITEM_MARK: Record<"ok" | "no" | "none", { mark: string; cls: string; sr: s
 /** Keeps a value with its unit and a window with its change together (`−3,7 pp`, `1h −6,7`): a narrow row never splits them. */
 const keepValues = (text: string): string => text.replace(/(\d) (pp|%)/g, "$1\u00a0$2").replace(/(\d+[mh]) (?=[−+±])/g, "$1\u00a0");
 
-function KnifeRow({ item }: { item: KnifeItem }) {
+/** Marks of a point that does not count (Top-Trader delta as info, the 30m/1H signs in the Lage layout): no ✕ in red. */
+const INFO_MARK: Record<"ok" | "no" | "none", { mark: string; cls: string; sr: string }> = {
+  ok: { mark: "✓", cls: "bg-white/[0.1] text-fg", sr: "an (zählt nicht): " },
+  no: { mark: "·", cls: "bg-white/[0.06] text-faint", sr: "aus (zählt nicht): " },
+  none: { mark: "–", cls: "bg-white/[0.06] text-faint", sr: "keine Daten: " },
+};
+
+function KnifeRow({ item, info }: { item: KnifeItem; info?: boolean }) {
   const st = item.met ? "ok" : item.met === false ? "no" : "none";
-  const m = ITEM_MARK[st];
+  const m = (info ?? item.info) ? INFO_MARK[st] : ITEM_MARK[st];
   return (
-    <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5" data-testid="knife-item" data-id={item.id} data-met={item.met === null ? "none" : String(item.met)}>
+    <li
+      className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5"
+      data-testid="knife-item"
+      data-id={item.id}
+      data-met={item.met === null ? "none" : String(item.met)}
+      data-info={(info ?? item.info) ? "" : undefined}
+    >
       <span aria-hidden="true" className={cn("mt-px grid size-5 place-items-center rounded-full text-[11px] font-bold", m.cls)}>
         {m.mark}
       </span>
@@ -258,7 +287,7 @@ export function KnifeExplain({ reading }: { reading: HyblockReading | null }) {
   const tone = knifeTone(k);
   return (
     <div className="grid gap-4" data-testid="knife-explain">
-      <p className="max-w-[70ch] text-[13px] leading-relaxed text-mute">{KNIFE_INFO}</p>
+      <p className="max-w-[70ch] text-[13px] leading-relaxed text-mute">{k?.ltf ? KNIFE_INFO_LAGE : KNIFE_INFO}</p>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Segmented<Side> size="sm" aria-label="Richtung des Filters" options={KNIFE_SIDES} value={side} onChange={setSide} tones={KNIFE_SIDE_TONES} />
         <span className={cn("dot-num text-[18px]", TONE_TEXT[tone])} data-testid="knife-count">
@@ -277,6 +306,16 @@ export function KnifeExplain({ reading }: { reading: HyblockReading | null }) {
           <VerdictPanel tone={tone} className="text-[12.5px]">
             {knifeVerdict(k)}
           </VerdictPanel>
+          {k.ltf && k.ltf.length > 0 && (
+            <div className="grid gap-2" data-testid="knife-ltf">
+              <span className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">{KNIFE_LTF_TITLE}</span>
+              <ul className="grid gap-2" aria-label={KNIFE_LTF_TITLE}>
+                {k.ltf.map((it) => (
+                  <KnifeRow key={it.id} item={it} info />
+                ))}
+              </ul>
+            </div>
+          )}
         </>
       )}
       {snap && v && (

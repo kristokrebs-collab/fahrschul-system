@@ -134,7 +134,21 @@ export {
 } from "./structure";
 export { traderReading, TRADER_STEP_MS, TRADER_FRESH_STEPS, TRADERS_TITLE, TRADERS_SIDE_TITLE, type TraderSeries, type TraderReading } from "./traders";
 export { tradersPart, divPart, srPart, divHitsText, divRungText, TREND_BREAK_TEXT, partReasonText, verdictPart, SR_STOP_ATR, type GradedPart, type PartItem, type PartId } from "./parts";
-export { knifeFilter, knifeStructure, KNIFE_TFS, KNIFE_BREAK_MAX_AGE, KNIFE_TITLE, KNIFE_INFO, type KnifeFilter, type KnifeItem, type KnifeId } from "./knife";
+export {
+  knifeFilter,
+  knifeStructure,
+  KNIFE_TFS,
+  KNIFE_BREAK_MAX_AGE,
+  KNIFE_TITLE,
+  KNIFE_INFO,
+  KNIFE_INFO_LAGE,
+  KNIFE_LTF_TITLE,
+  KNIFE_WHALE_INFO_LABEL,
+  type KnifeFilter,
+  type KnifeItem,
+  type KnifeId,
+} from "./knife";
+export { applyLageGate, lageBlockedLabel, verdictLageText, LAGE_BLOCK_PREFIX, type LageInput, type VerdictLage } from "./lageGate";
 export { bucketOpen, resampleBars, withLivePrice } from "./resample";
 export { mcbSeries, MAJOR_KINDS, type McbPoint } from "./series";
 export {
@@ -155,6 +169,7 @@ export {
   type SignalSnapshotPart,
   type SignalSnapshotPartItem,
   type SignalSnapshotKnife,
+  type SignalSnapshotLage,
   type SnapshotMeta,
 } from "./snapshot";
 export * from "./copy";

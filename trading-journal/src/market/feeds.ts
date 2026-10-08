@@ -3,7 +3,7 @@
  * The ratio feeds depend on the configured period, so the table is built per provider instance.
  */
 import type { FeedId, FeedSpec, HealthState, KlineFeed, LiveRatioFeed, RatioFeed, SeriesFeed, Source } from "./types";
-import { INTERVAL_MS, PERIOD_MS, type KlineInterval, type Period } from "./period";
+import { INTERVAL_MS, PERIOD_MS, type FetchInterval, type KlineInterval, type Period } from "./period";
 
 export const FEED_IDS: readonly FeedId[] = [
   "kline_1m",
@@ -11,6 +11,7 @@ export const FEED_IDS: readonly FeedId[] = [
   "kline_1h",
   "kline_4h",
   "kline_1w",
+  "kline_1d",
   "markPrice",
   "bookTop",
   "aggTrade",
@@ -27,7 +28,20 @@ export const FEED_IDS: readonly FeedId[] = [
   "fundingHistory",
 ];
 
+/** Kline feeds the WebSocket streams (`kline_1d` is REST only and not part of them). */
 export const KLINE_FEEDS: readonly KlineFeed[] = ["kline_1m", "kline_15m", "kline_1h", "kline_4h", "kline_1w"];
+/**
+ * Daily candles (Lage-Ampel, a `1D` ladder rung): REST only, cached like every series. The first start fetches
+ * `BOOTSTRAP_LIMIT.kline1d` days (weight 5) unless the cache already holds them; afterwards only the missing days
+ * (`limit` 2–3, weight 1) on hourly polls at hh:00:20 on the Binance clock — the closed day arrives 20 s after 00:00
+ * UTC (a page that does not have it yet is asked again after 60 s, up to 30 min). Stale after 25 h.
+ */
+export const DAILY_FEED = "kline_1d" as const satisfies KlineFeed;
+/** Hourly poll of the daily feed, `DAILY_LAG_MS` after the hour on the Binance clock. */
+export const DAILY_POLL_MS = 3_600_000;
+export const DAILY_LAG_MS = 20_000;
+/** Daily feed: days held at least before a start skips the full bootstrap page (the cache serves them). */
+export const DAILY_CACHE_MIN = 900;
 export const RATIO_FEEDS: readonly RatioFeed[] = ["topPositionRatio", "topAccountRatio", "globalAccountRatio", "takerRatio"];
 /** Feeds polled from `/futures/data/*` at the chosen ratio period (`settings.hyblock.timeframe`), aligned to that period. */
 export const FUTURES_DATA_FEEDS: readonly FeedId[] = [...RATIO_FEEDS, "openInterestHist"];
@@ -55,7 +69,7 @@ export const ALL_FUTURES_DATA_FEEDS: readonly FeedId[] = [...FUTURES_DATA_FEEDS,
  * to Bybit's all-accounts series.
  */
 export const BINANCE_FAMILY_FEEDS: readonly FeedId[] = [...RATIO_FEEDS, ...LIVE_RATIO_FEEDS];
-export const SERIES_FEEDS: readonly SeriesFeed[] = [...KLINE_FEEDS, "openInterestHist", ...RATIO_FEEDS, ...LIVE_RATIO_FEEDS, "fundingHistory"];
+export const SERIES_FEEDS: readonly SeriesFeed[] = [...KLINE_FEEDS, DAILY_FEED, "openInterestHist", ...RATIO_FEEDS, ...LIVE_RATIO_FEEDS, "fundingHistory"];
 export const WS_FEEDS: readonly FeedId[] = [...KLINE_FEEDS, "markPrice", "bookTop", "aggTrade"];
 
 /** Feeds Bybit cannot serve at all (Plan 4.5: card shows `Nur mit Binance`). */
@@ -92,8 +106,11 @@ export const MIN = 60_000;
 export const HOUR = 60 * MIN;
 export const DAY = 24 * HOUR;
 
-/** Bootstrap limits per Plan 4.2; `kline15m`: 1500 × 15m = 500 × 45m for the signal check (weight 10, once). */
-export const BOOTSTRAP_LIMIT = { kline: 499, kline15m: 1500, kline1w: 200, futuresData: 500, funding: 200 } as const;
+/**
+ * Bootstrap limits per Plan 4.2; `kline15m`: 1500 × 15m = 500 × 45m for the signal check (weight 10, once); `kline1d`:
+ * 1000 days for the Lage-Ampel (weight 5, only when the cache does not hold them).
+ */
+export const BOOTSTRAP_LIMIT = { kline: 499, kline15m: 1500, kline1w: 200, kline1d: 1000, futuresData: 500, funding: 200 } as const;
 /** Largest page the gap fill after a WS reconnect requests (Binance maximum). */
 export const GAP_FILL_MAX = 1500;
 export const POLL_LIMIT_FUTURES_DATA = 30;
@@ -105,12 +122,12 @@ export const HISTORY_MAX_CALLS = 8;
 /** `/futures/data/*` history depth. */
 export const FUTURES_DATA_RETENTION_MS = 30 * DAY;
 
-export function klineFeedInterval(feed: KlineFeed): KlineInterval {
-  return feed.slice(6) as KlineInterval;
+export function klineFeedInterval(feed: KlineFeed): FetchInterval {
+  return feed.slice(6) as FetchInterval;
 }
 /** REST bootstrap limit of a kline feed. */
-export function klineBootstrapLimit(interval: KlineInterval): number {
-  return interval === "1w" ? BOOTSTRAP_LIMIT.kline1w : interval === "15m" ? BOOTSTRAP_LIMIT.kline15m : BOOTSTRAP_LIMIT.kline;
+export function klineBootstrapLimit(interval: FetchInterval): number {
+  return interval === "1w" ? BOOTSTRAP_LIMIT.kline1w : interval === "15m" ? BOOTSTRAP_LIMIT.kline15m : interval === "1d" ? BOOTSTRAP_LIMIT.kline1d : BOOTSTRAP_LIMIT.kline;
 }
 export function klineFeedFor(interval: KlineInterval): KlineFeed {
   return `kline_${interval}` as KlineFeed;
@@ -169,6 +186,8 @@ export function buildFeedSpecs(period: Period, chain: readonly Source[] = DEFAUL
     kline_1h: klineSpec("1h", c),
     kline_4h: klineSpec("4h", c),
     kline_1w: klineSpec("1w", c),
+    // REST only, hourly at hh:00:20 (Binance clock; the scheduling is the provider's `nextPollAt`), stale after 25 h
+    kline_1d: { id: "kline_1d", transport: "rest", cadenceMs: DAILY_POLL_MS, staleAfterMs: 25 * HOUR, cost: { bucket: "binance.weight", units: 1 }, sources: [...c] },
     markPrice: { id: "markPrice", transport: "ws", cadenceMs: 1000, staleAfterMs: 5000, cost: { bucket: "binance.weight", units: 1 }, sources: [...c] },
     bookTop: { id: "bookTop", transport: "ws", cadenceMs: 250, staleAfterMs: 5000, cost: { bucket: "binance.weight", units: 0 }, sources: [...c] },
     // the REST stand-in for the trade stream is `ticker/24hr` (weight 1): a WS feed's cost is charged only for REST polls

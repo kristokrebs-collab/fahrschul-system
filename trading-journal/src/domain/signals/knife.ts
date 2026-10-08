@@ -11,14 +11,23 @@
  * | `whale` | top traders long-heavy (positions OR accounts > `topPct`) AND the Whale–Retail-Delta red (negative or falling) — the Top-Trader-Kombi's own items (5-min data) | short-heavy AND the delta green (positive or rising) | live reading |
  *
  * `met: null` = keine Daten (switched off, too few bars, no Binance top-trader data). Pure.
+ *
+ * Lage-Ampel layout (decision 23, knife-lab REPORT: on BTC history the 30m/1H signs did NOT separate falling knives —
+ * HL/BOS J 0,02, RSI divergence J −0,05 — the daily trend did): when the evaluation carries a Lage input
+ * (`Signals.lage`, the live engine and the retro check always pass one), the LONG filter counts
+ * | `lage` | Lage: Tagestrend (1D-EMA 21) — no downtrend (fewer than 2 daily closes under the 1D-EMA 21) |
+ * | `signs` | 4H-Umkehrzeichen n/4 — at least one of U1 … U4 lit |
+ * and shows `whale` "Top-Trader-Delta (Info)" (untested historically, not counted); the former points move to `ltf`
+ * ("Umkehr-Zeichen 30m/1H – im Abwärtstrend nicht verlässlich", shown, never counted). Shorts keep the three points.
  */
+import type { Lage } from "../lage";
 import { divCfgOf, whaleCfgOf, type Side, type SignalCfg } from "./config";
 import type { Divergence } from "./divergence";
 import { tradersPart, type GradedPart } from "./parts";
 import { lastInternalPivot, type Structure } from "./structure";
 import type { Signals, TfCheck } from "./verdict";
 
-export type KnifeId = "structure" | "divergence" | "whale";
+export type KnifeId = "structure" | "divergence" | "whale" | "lage" | "signs";
 
 export interface KnifeItem {
   id: KnifeId;
@@ -30,6 +39,8 @@ export interface KnifeItem {
   detail: string;
   /** timeframes that hold the point (structure / divergence) */
   tfs: string[];
+  /** shown, never counted (`Top-Trader-Delta (Info)`) */
+  info?: boolean;
 }
 
 export interface KnifeFilter {
@@ -44,6 +55,8 @@ export interface KnifeFilter {
   data: boolean;
   /** German summary (`2 von 3 erfüllt`) */
   label: string;
+  /** Lage layout (long with a Lage input): the 30m/1H reversal signs, shown under `LTF_TITLE`, never counted */
+  ltf?: KnifeItem[];
 }
 
 /** Timeframes of the structure point. */
@@ -54,12 +67,21 @@ export const KNIFE_TITLE = "Falling-Knife-Filter";
 /** One-line explanation (dialog intro): filter vs entry check, shared data. */
 export const KNIFE_INFO =
   "Sicherheits-Check für Makro-Longs („kein fallendes Messer“). Der Einstiegs-Check ist der Auslöser, dieser Filter die Absicherung – beide lesen dieselben Live-Daten (Struktur, Divergenzen, Top-Trader), deshalb widersprechen sie sich nie.";
+/** Dialog intro of the Lage layout. */
+export const KNIFE_INFO_LAGE =
+  "Sicherheits-Check für Longs („kein fallendes Messer“): zählt der Tagestrend (1D-EMA 21) und bilden sich auf 4H Umkehr-Zeichen? Dieselbe Lage-Ampel sperrt im Einstiegs-Check die Kaufsignale – an der BTC-Historie geprüft. Die 30m/1H-Zeichen leuchten in jedem fallenden Markt immer wieder auf; sie stehen darunter nur zur Info.";
+/** Heading of the former points in the Lage layout. */
+export const KNIFE_LTF_TITLE = "Umkehr-Zeichen 30m/1H – im Abwärtstrend nicht verlässlich";
 
 const LABEL: Readonly<Record<KnifeId, Readonly<Record<Side, string>>>> = {
   structure: { long: "Erstes Higher Low oder BOS auf 1H/4H", short: "Erstes Lower High oder BOS auf 1H/4H" },
   divergence: { long: "RSI bullische Divergenz oder Trendlinienbruch", short: "RSI bärische Divergenz oder Trendlinienbruch" },
   whale: { long: "Top-Trader long · Whale–Retail-Delta rot", short: "Top-Trader short · Whale–Retail-Delta grün" },
+  lage: { long: "Lage: Tagestrend (1D-EMA 21)", short: "Lage: Tagestrend (1D-EMA 21)" },
+  signs: { long: "4H-Umkehrzeichen", short: "4H-Umkehrzeichen" },
 };
+/** The whale point in the Lage layout. */
+export const KNIFE_WHALE_INFO_LABEL = "Top-Trader-Delta (Info)";
 
 const fmt0 = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 0 });
 const price = (x: number): string => (Number.isFinite(x) ? fmt0.format(x) : "–");
@@ -100,7 +122,7 @@ const OSC = { rsi: "RSI", wt: "WT" } as const;
 const KIND = { regular: "regulär", hidden: "versteckt" } as const;
 
 /** The falling-knife filter of an evaluation for `side` (default long). */
-export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "short" | "traders">, cfg: SignalCfg, side: Side = "long"): KnifeFilter {
+export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "short" | "traders" | "lage">, cfg: SignalCfg, side: Side = "long"): KnifeFilter {
   const long = side === "long";
 
   // ---- structure on 1h / 4h
@@ -161,7 +183,34 @@ export function knifeFilter(sig: Pick<Signals, "checks" | "zone" | "long" | "sho
     whale = { id: "whale", label: LABEL.whale[side], met: top && retail, detail: `${part.met ?? 0} von 4 · ${vals.join(" · ")}`, tfs: [] };
   }
 
+  if (long && sig.lage !== undefined) return lageKnife(sig.lage?.lage ?? null, [structure, divergence], whale);
   const items = [structure, divergence, whale];
   const n = items.filter((i) => i.met === true).length;
   return { side, items, n, total: items.length, all: n === items.length, data: items.some((i) => i.met !== null), label: `${n} von ${items.length} erfüllt` };
+}
+
+/** Lage layout (long): Tagestrend + 4H-Umkehrzeichen counted, the Top-Trader delta as info, 30m/1H signs below. */
+function lageKnife(lage: Lage | null, ltf: KnifeItem[], whale: KnifeItem): KnifeFilter {
+  const ok = !!lage && lage.state !== "none";
+  const daily = lage?.reasons.find((r) => r.id === "daily")?.text;
+  const trend: KnifeItem = {
+    id: "lage",
+    label: LABEL.lage.long,
+    met: ok ? !lage!.abwaerts : null,
+    detail: !ok ? NO_DATA : (lage!.wobble?.text ?? daily ?? lage!.title),
+    tfs: ok && !lage!.abwaerts ? ["1D"] : [],
+  };
+  const lit = ok ? lage!.signs.filter((x) => x.met) : [];
+  const signs: KnifeItem = {
+    id: "signs",
+    label: `${LABEL.signs.long} ${ok ? lit.length : 0}/4`,
+    met: ok ? lit.length > 0 : null,
+    detail: !ok ? NO_DATA : `${lit.length ? lit.map((x) => x.label).join(" · ") : "keines an"}${lage!.abwaerts ? "" : " · zählen nur im Abwärtstrend"}`,
+    tfs: lit.length ? ["4h"] : [],
+  };
+  const info: KnifeItem = { ...whale, label: KNIFE_WHALE_INFO_LABEL, info: true };
+  const items = [trend, signs, info];
+  const counted = [trend, signs];
+  const n = counted.filter((i) => i.met === true).length;
+  return { side: "long", items, n, total: counted.length, all: n === counted.length, data: counted.some((i) => i.met !== null), label: `${n} von ${counted.length} erfüllt`, ltf };
 }

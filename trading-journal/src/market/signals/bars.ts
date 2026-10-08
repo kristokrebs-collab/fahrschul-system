@@ -7,7 +7,7 @@
  * | 30m, 45m | `kline_15m` (WS + REST) | 2, 3 (exact, UTC-session aligned — see `resampleBars`) |
  * | 1h, 2h, 3h | `kline_1h` | 1, 2, 3 |
  * | 4h | `kline_4h` | 1 |
- * | 1D | REST `1d`, polled lazily (only when a ladder uses it) | 1 |
+ * | 1D | `kline_1d` (the provider's REST daily feed: hourly, cached; the Lage-Ampel reads it too) | 1 |
  */
 import { SIGNAL_BARS, resampleBars, tfSeconds, type Bar } from "@/domain/signals";
 import type { FetchInterval } from "../period";
@@ -16,8 +16,8 @@ import type { Candle, KlineFeed } from "../types";
 export interface TfSource {
   /** exchange interval the rung is built from */
   interval: FetchInterval;
-  /** live feed for that interval, or null = REST only (`1d`) */
-  feed: KlineFeed | null;
+  /** live feed for that interval (`kline_1d`: the provider's REST daily feed) */
+  feed: KlineFeed;
   /** source bar length, seconds */
   srcSec: number;
   /** source bars per rung bar */
@@ -32,7 +32,7 @@ const SRC: Record<string, Omit<TfSource, "factor">> = {
   "2h": { interval: "1h", feed: "kline_1h", srcSec: 3600 },
   "3h": { interval: "1h", feed: "kline_1h", srcSec: 3600 },
   "4h": { interval: "4h", feed: "kline_4h", srcSec: 14_400 },
-  "1D": { interval: "1d", feed: null, srcSec: 86_400 },
+  "1D": { interval: "1d", feed: "kline_1d", srcSec: 86_400 },
 };
 
 /** Source of a ladder / zone timeframe, `null` for a timeframe the engine cannot build. */

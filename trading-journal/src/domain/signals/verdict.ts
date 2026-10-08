@@ -20,6 +20,7 @@ import { MIN_SIGNAL_BARS, divCfgOf, srCfgOf, strongClosesOf, tfSeconds, type Sid
 import { tfDivergences, type TfDivergences } from "./divergence";
 import { rsi, sma, waveTrend, type Bar } from "./indicators";
 import { KNIFE_TFS, knifeFilter, type KnifeFilter } from "./knife";
+import { applyLageGate, type LageInput, type VerdictLage } from "./lageGate";
 import { wtSignal, type WtSignal } from "./mcb";
 import { divPart, partReasonText, srPart, tradersPart, type GradedPart } from "./parts";
 import { PROVISIONAL_FACTOR, isConfirmedState, isForming, lastCloseAt, rungConf, type RungConf, type SignalState } from "./state";
@@ -164,6 +165,12 @@ export interface Verdict {
   parts?: GradedPart[];
   /** score points the parts added (before the cap at 100) */
   partPoints?: number;
+  /**
+   * Lage-Ampel gate (decision 23, `lageGate.ts`, long only): set while the Lage has something to say (red / amber with
+   * the switch on). `blocked` = the entry is held back (`valid` false, strength 0, label `Kaufsignal · Lage rot – zählt
+   * nicht (fällt noch)`); `nur Warnung`: counts, `label` is the warning.
+   */
+  lage?: VerdictLage;
 }
 
 /** Rates one direction: signal ladder + RSI + zone. */
@@ -297,16 +304,17 @@ function withParts(v: Verdict, parts: GradedPart[]): Verdict {
  */
 export type Graded<S extends Signals> = S & { traders: TraderReading | null; knife: Readonly<Record<Side, KnifeFilter>> };
 
-export function gradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders: TraderReading | null = null): Graded<S> {
+export function gradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders: TraderReading | null = null, lage?: LageInput | null): Graded<S> {
   const zoneRef = sig.zone ?? sig.checks[0] ?? null;
   const grade = (v: Verdict): Verdict => {
     const c = confirmVerdict(v, sig.checks, cfg);
     const parts = [tradersPart(v.side, traders, zoneRef, cfg), divPart(v.side, sig.checks, cfg), srPart(v.side, zoneRef, cfg)].filter((p): p is GradedPart => p !== null);
-    return withParts(c, parts);
+    // the Lage-Ampel gate comes last: it holds a long entry back on red / amber (decision 23)
+    return applyLageGate(withParts(c, parts), lage);
   };
   const long = grade(sig.long);
   const short = grade(sig.short);
-  const out = { ...sig, long, short, best: long.score >= short.score ? long : short, traders };
+  const out = { ...sig, long, short, best: long.score >= short.score ? long : short, traders, ...(lage !== undefined ? { lage: lage ?? null } : {}) };
   return { ...out, knife: { long: knifeFilter(out, cfg, "long"), short: knifeFilter(out, cfg, "short") } };
 }
 
@@ -314,8 +322,8 @@ export function gradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders:
  * An evaluation graded again with another Top-Trader reading (retro checks: the candles are memoised, the reading
  * arrives later): the raw verdicts from its checks, then `gradeSignals`.
  */
-export function regradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders: TraderReading | null): Graded<S> {
-  return gradeSignals({ ...sig, ...bestVerdict(sig.checks, cfg, sig.zone) }, cfg, traders);
+export function regradeSignals<S extends Signals>(sig: S, cfg: SignalCfg, traders: TraderReading | null, lage: LageInput | null | undefined = sig.lage): Graded<S> {
+  return gradeSignals({ ...sig, ...bestVerdict(sig.checks, cfg, sig.zone) }, cfg, traders, lage);
 }
 
 export interface BestVerdict {
@@ -342,12 +350,16 @@ export interface Signals extends BestVerdict {
   traders?: TraderReading | null;
   /** ours: the falling-knife filter per side (`knife.ts`), from the same checks and parts */
   knife?: Readonly<Record<Side, KnifeFilter>>;
+  /** ours: the Lage-Ampel input the long was gated with (`null` = gate given, no Lage data; absent = no gate input) */
+  lage?: LageInput | null;
 }
 
 /** Extra live inputs of an evaluation. */
 export interface SignalInputs {
   /** Top-Trader reading at the evaluation time (`traderReading`); absent / `null` = no data */
   traders?: TraderReading | null;
+  /** Lage-Ampel at the evaluation time + setting (decision 23); absent = no gate (hand-built / older callers) */
+  lage?: LageInput | null;
 }
 
 export type BarsByTf = Readonly<Record<string, readonly Bar[] | undefined>>;
@@ -361,7 +373,7 @@ export function computeSignals(bars: BarsByTf | undefined, cfg: SignalCfg, now: 
   const checks = cfg.ladder.map((tf) => checkTf(tf, bars[tf] || [], cfg, now));
   if (!checks.some(Boolean)) return null;
   const zone = checks.find((c) => c?.tf === cfg.zoneTf) ?? checkTf(cfg.zoneTf, bars[cfg.zoneTf] || [], cfg, now);
-  return gradeSignals({ checks, zone, at: now, ...bestVerdict(checks, cfg, zone) }, cfg, inputs.traders ?? null);
+  return gradeSignals({ checks, zone, at: now, ...bestVerdict(checks, cfg, zone) }, cfg, inputs.traders ?? null, inputs.lage);
 }
 
 /** Times within this window of `now` are evaluated live (running candle included). */

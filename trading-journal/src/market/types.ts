@@ -6,7 +6,11 @@
 export type Source = "binance" | "bybit" | "okx" | "proxy" | "tradingview" | "cache";
 export type HealthState = "connecting" | "live" | "stale" | "fallback" | "offline";
 
-export type KlineFeed = "kline_1m" | "kline_15m" | "kline_1h" | "kline_4h" | "kline_1w";
+/**
+ * `kline_1d` (additive, Lage-Ampel): daily candles over REST only (no stream) — polled hourly at hh:00:20 on the
+ * Binance clock, so the closed day arrives 20 s after 00:00 UTC; see `DAILY_FEED` in `feeds.ts`.
+ */
+export type KlineFeed = "kline_1m" | "kline_15m" | "kline_1h" | "kline_4h" | "kline_1w" | "kline_1d";
 export type RatioFeed = "topPositionRatio" | "topAccountRatio" | "globalAccountRatio" | "takerRatio";
 /**
  * Additive: the same Binance ratios at the fixed 5-min period, independent of the chosen ratio period
@@ -103,6 +107,8 @@ export interface FeedValue {
   kline_1h: Candle[];
   kline_4h: Candle[];
   kline_1w: Candle[];
+  /** additive: daily candles (REST, hourly) — the Lage-Ampel and a `1D` ladder rung read them */
+  kline_1d: Candle[];
   markPrice: MarkPrice;
   bookTop: BookTop;
   aggTrade: AggTrade;

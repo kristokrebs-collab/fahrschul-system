@@ -3,6 +3,7 @@ export {
   getSignalSnapshot,
   subscribeSignalCheck,
   getSignalConfig,
+  getLageConfig,
   setSignalConfig,
   refreshSignalCheck,
   runSignalCheck,

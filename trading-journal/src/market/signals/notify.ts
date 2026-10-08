@@ -129,7 +129,9 @@ export function signalNotifyDetail(s: Signals & { cfg: SignalCfg }, side: Side):
   const whale = v.whale?.ok ? ` · ${WHALE_TITLE[side]}` : "";
   const state = v.state ? ` · ${STATE_TEXT[v.state]}` : "";
   const parts = (v.parts ?? []).filter((p) => p.ok).map((p) => ` · ${partNote(p)}`).join("");
-  return `${strengthText(v.strength)} · ${v.tiers} von ${s.cfg.ladder.length} Timeframes${state}${parts}${whale}`;
+  // `nur Warnung` (decision 23): the entry counts, the Lage warning rides along (a blocked entry never notifies)
+  const lage = v.lage && !v.lage.blocked ? ` · ${v.lage.label}` : "";
+  return `${strengthText(v.strength)} · ${v.tiers} von ${s.cfg.ladder.length} Timeframes${state}${parts}${whale}${lage}`;
 }
 
 function fire(side: Side, s: Signals & { cfg: SignalCfg }, now: number): void {

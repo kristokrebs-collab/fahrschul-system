@@ -107,6 +107,8 @@ function fakeProvider(feeds: Partial<Record<FeedId, Candle[]>>): Fake {
 }
 
 const liveFeeds = () => ({ kline_15m: candles(S15).slice(-1500), kline_1h: candles(3600).slice(-499), kline_4h: candles(14_400).slice(-499) });
+/** The provider's daily feed (`kline_1d`): 700 synthetic days up to NOW (the forming day included). */
+const dailyCandles = (): Candle[] => synthBars(700, 9, { sec: 86_400, t0: Math.floor(NOW / 86_400_000) * 86_400 - 699 * 86_400 }).map((b) => toCandle(b, 86_400, NOW));
 
 function setPrice(price: number, at: number = NOW): void {
   tradeTimeMv.set(at);
@@ -275,22 +277,22 @@ describe("live check", () => {
     expect(s.checks.map((c) => c?.tf)).toEqual(["30m", "2h", "3h"]);
   });
 
-  it("a 1D rung is polled lazily over REST (499 daily bars) and completed with the live price", async () => {
-    const fake = fakeProvider(liveFeeds());
+  it("a 1D rung reads the provider's daily feed (kline_1d) — no own REST polling — and follows its updates", async () => {
+    const fake = fakeProvider({ ...liveFeeds(), kline_1d: dailyCandles() });
     attachSignalEngine(fake.provider);
     await vi.advanceTimersByTimeAsync(0);
-    expect(fake.calls).toEqual([]); // default ladder: no REST
     setSignalConfig({ ...DEFAULT_SIGNAL_CFG, ladder: ["30m", "1h", "1D"], zoneTf: "1D" });
     await vi.advanceTimersByTimeAsync(1100);
-    expect(fake.calls).toEqual([{ iv: "1d", endTime: undefined, limit: 499 }]);
+    expect(fake.calls).toEqual([]);
     const s = getSignalSnapshot().snapshot!;
     expect(s.checks.map((c) => c?.tf)).toEqual(["30m", "1h", "1D"]);
     expect(s.zone?.tf).toBe("1D");
-    // re-polled every 5 minutes, not per evaluation
-    await vi.advanceTimersByTimeAsync(4 * 60_000);
-    expect(fake.calls).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(61_000);
-    expect(fake.calls).toHaveLength(2);
+    // a new daily page (the provider's hourly poll) re-evaluates; still no request of the engine's own
+    const before = s.checks[2]!.closeAt;
+    fake.publish("kline_1d", dailyCandles().slice(0, -1));
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(getSignalSnapshot().snapshot!.checks[2]!.closeAt).not.toBe(before);
+    expect(fake.calls).toEqual([]);
   });
 
   it("chart markers and signal candles come from the same bars as the check", async () => {
@@ -355,8 +357,9 @@ describe("retro check (checkTradeAt)", () => {
 
   it("rebuilds every rung from history ending at T (one page per interval) and equals the reference", async () => {
     const fake = fakeProvider({}); // no live data → must fetch
-    // graded parts off: a back-dated check sees closed bars only, so the rest is the reference's evaluation
-    setSignalConfig({ whale: { on: false }, div: { on: false }, sr: { on: false } });
+    // graded parts and the Lage-Ampel off: a back-dated check sees closed bars only, so the rest is the reference's
+    // evaluation (the gate has its own retro test below)
+    setSignalConfig({ whale: { on: false }, div: { on: false }, sr: { on: false }, lage: { on: false } });
     attachSignalEngine(fake.provider);
     const snap = await checkTradeAt(new Date(T), "long");
     expect(snap).not.toBeNull();
@@ -372,7 +375,7 @@ describe("retro check (checkTradeAt)", () => {
 
   it("uses the live series without network when it covers T", async () => {
     // rings that grew beyond the bootstrap (chart history): 3000 × 15m, 1000 × 1h, 600 × 4h
-    const fake = fakeProvider({ kline_15m: candles(S15).slice(-3000), kline_1h: candles(3600).slice(-1000), kline_4h: candles(14_400).slice(-600) });
+    const fake = fakeProvider({ kline_15m: candles(S15).slice(-3000), kline_1h: candles(3600).slice(-1000), kline_4h: candles(14_400).slice(-600), kline_1d: dailyCandles() });
     attachSignalEngine(fake.provider);
     const t = (HIST15[N15 - 9]!.t + 10) * 1000; // 2 h ago
     const r = await retroCheck(t);
@@ -380,7 +383,7 @@ describe("retro check (checkTradeAt)", () => {
     expect(fake.calls).toEqual([]);
     // the bootstrap-sized 15m ring (1500) holds only 1492 bars before T → that interval is fetched
     __clearRetroMemo();
-    const small = fakeProvider({ kline_15m: candles(S15).slice(-1500), kline_1h: candles(3600).slice(-1000), kline_4h: candles(14_400).slice(-600) });
+    const small = fakeProvider({ kline_15m: candles(S15).slice(-1500), kline_1h: candles(3600).slice(-1000), kline_4h: candles(14_400).slice(-600), kline_1d: dailyCandles() });
     attachSignalEngine(small.provider);
     expect((await retroCheck(t)).status).toBe("ok");
     expect(small.calls.map((c) => c.iv)).toEqual(["15m"]);

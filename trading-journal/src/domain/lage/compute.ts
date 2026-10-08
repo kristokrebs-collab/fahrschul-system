@@ -13,9 +13,9 @@
  * Two stages so the market layer can cache the closed-bar part: `lageBase` (bars → EMAs, structure, phase) and
  * `lageAt` (+ live price → Lage); `computeLage` = both.
  */
-import { n0, pct } from "@/lib/format";
-import { ema, type Bar } from "@/domain/signals/indicators";
-import { marketStructure, type Level, type Structure, type StructureCfg } from "@/domain/signals/structure";
+import { n0, pct } from "../../lib/format";
+import { ema, type Bar } from "../signals/indicators";
+import { marketStructure, type Level, type Structure, type StructureCfg } from "../signals/structure";
 import { aboveText, belowText, ema200Text, LAGE_HEADLINE, SIGN_LABEL, TREND_TEXT, wobbleText } from "./copy";
 import type { Lage, LageChip, LageDaily, LageEma, LageH4, LageLevel, LageOptions, LageSign, LageSignId, LageState } from "./types";
 

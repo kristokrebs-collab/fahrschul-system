@@ -3,6 +3,7 @@
  * (`signals.ts:292-306`) field for field, so trades move between both apps without loss; our extra fields are
  * optional and additive (the other app ignores them).
  */
+import { parseLageSnapshot, toLageSnapshot, type LageSnapshot } from "../lage";
 import { STRENGTH_LABEL, whaleCfgOf, type Side, type SignalCfg } from "./config";
 import type { DivKind, DivOsc } from "./divergence";
 import type { KnifeId } from "./knife";
@@ -98,9 +99,21 @@ export interface SignalSnapshotPart {
 
 /** The falling-knife filter at check time (the snapshot's side). */
 export interface SignalSnapshotKnife {
-  /** points met of 3 */
+  /** points met of 3 (Lage layout: of 2 — `total`) */
   n: number;
   items: Array<{ id: KnifeId; met: boolean | null }>;
+  /** points counted (absent = 3, before the Lage layout) */
+  total?: number;
+}
+
+/**
+ * Lage-Ampel at check time (decision 23): `{ state, signs (met ids), ema21_1d, dist }` + whether the entry counted
+ * under it (`counts`; false = held back by the gate) and the setting (`on`, `mode`).
+ */
+export interface SignalSnapshotLage extends LageSnapshot {
+  counts?: boolean;
+  on?: boolean;
+  mode?: "block" | "warn";
 }
 
 /** One period of the stored "Top-Trader kaufen · Retail rot" reading. */
@@ -168,6 +181,8 @@ export interface SignalSnapshot extends SignalSnap {
   partPoints?: number;
   /** falling-knife filter at check time */
   knife?: SignalSnapshotKnife;
+  /** Lage-Ampel at check time (absent = before the Lage existed / no daily data) */
+  lage?: SignalSnapshotLage;
 }
 
 const r1 = (x: number): number => Math.round(x * 10) / 10;
@@ -268,7 +283,9 @@ export function toSignalSnapshot(sig: Signals, side: Side, cfg: Pick<SignalCfg, 
     out.partPoints = v.partPoints ?? 0;
   }
   const k = sig.knife?.[side];
-  if (k) out.knife = { n: k.n, items: k.items.map((i) => ({ id: i.id, met: i.met })) };
+  if (k) out.knife = { n: k.n, items: k.items.map((i) => ({ id: i.id, met: i.met })), ...(k.total !== 3 ? { total: k.total } : {}) };
+  const ls = sig.lage?.lage ? toLageSnapshot(sig.lage.lage) : null;
+  if (ls && sig.lage) out.lage = { ...ls, counts: v.lage ? v.lage.counts : true, on: sig.lage.cfg.on, mode: sig.lage.cfg.mode };
   const w = v.whale;
   if (w && sig.whale) {
     out.whale = {
@@ -398,11 +415,22 @@ export function parseSignalSnapshot(raw: unknown): SignalSnapshot | null {
     if (k) out.knife = k;
     else delete out.knife;
   }
+  if (raw.lage !== undefined) {
+    const l = parseLageSnapshot(raw.lage);
+    if (l) {
+      const o = raw.lage as Record<string, unknown>;
+      const lage: SignalSnapshotLage = { ...l };
+      if ("counts" in o && typeof o.counts !== "boolean") delete lage.counts;
+      if ("on" in o && typeof o.on !== "boolean") delete lage.on;
+      if ("mode" in o && o.mode !== "block" && o.mode !== "warn") delete lage.mode;
+      out.lage = lage;
+    } else delete out.lage;
+  }
   return out;
 }
 
 const PART_IDS: readonly PartId[] = ["traders", "div", "sr"];
-const KNIFE_IDS: readonly KnifeId[] = ["structure", "divergence", "whale"];
+const KNIFE_IDS: readonly KnifeId[] = ["structure", "divergence", "whale", "lage", "signs"];
 const metOf = (v: unknown): boolean | null => (v === true ? true : v === false ? false : null);
 const numOrNull = (v: unknown): number | null => {
   if (v === null || v === undefined) return null;
@@ -445,7 +473,13 @@ function parseKnife(raw: unknown): SignalSnapshotKnife | null {
     .filter((i): i is Record<string, unknown> => isRec(i) && typeof i.id === "string" && (KNIFE_IDS as readonly string[]).includes(i.id))
     .map((i) => ({ ...i, id: i.id as KnifeId, met: metOf(i.met) }));
   const n = toNum(raw.n);
-  return { ...raw, n: Number.isFinite(n) ? clamp(Math.round(n), 0, 3) : items.filter((i) => i.met === true).length, items };
+  const out: SignalSnapshotKnife = { ...raw, n: Number.isFinite(n) ? clamp(Math.round(n), 0, 3) : items.filter((i) => i.met === true).length, items };
+  if (raw.total !== undefined) {
+    const t = toNum(raw.total);
+    if (Number.isFinite(t)) out.total = clamp(Math.round(t), 1, 3);
+    else delete out.total;
+  }
+  return out;
 }
 
 function parseWhale(raw: unknown): SignalSnapshotWhale | null {

@@ -10,13 +10,18 @@
  * - Only closed bars at T count, so every signal of a back-dated check is `confirmed` / `strong` (never provisional).
  * - Top-Trader-Kombi at T from Binance's 5-min futures data (`tradersAt`); they reach ~30 days back, older trades get
  *   no reading (the part shows "keine Daten", never a fail) and the grade without it.
+ * - Lage-Ampel at T (decision 23): `computeLage` from the daily bars ending at T (the cached `kline_1d` feed when it
+ *   reaches T, else one `1d` page of 499 days, weight 2), the 4H / 1H bars and the last closed price at T; the long is
+ *   gated with the CURRENT setting (`settings.signals.lage`). Daily data that cannot be loaded → no gate (never an
+ *   error of the whole check); the switch off → no Lage, no extra request.
  */
+import { computeLage, type Lage } from "@/domain/lage";
 import { SIGNAL_BARS, regradeSignals, sanitizeSignalCfg, signalCfgKey, signalsAt, toSignalSnapshot, LIVE_WINDOW_MS, type Bar, type Side, type SignalCfg, type SignalSnapshot, type Signals } from "@/domain/signals";
 import { FETCH_INTERVAL_MS, type FetchInterval } from "../period";
 import type { MarketProvider } from "../provider";
 import type { Candle, KlineFeed, Source, Stamped } from "../types";
 import { candleToBar, neededTfs, rungBars, tfSource } from "./bars";
-import { getSignalConfig, getSignalSnapshot, signalProvider, toTradeSnapshot, type LiveSignals } from "./engine";
+import { getLageConfig, getSignalConfig, getSignalSnapshot, signalProvider, toTradeSnapshot, type LiveSignals } from "./engine";
 import { tradersAt } from "./traders";
 
 export type RetroStatus = "ok" | "live" | "no-history" | "error" | "unavailable";
@@ -64,7 +69,14 @@ function needPerInterval(cfg: SignalCfg): Map<FetchInterval, number> {
   return out;
 }
 
-const FEED_OF: Partial<Record<FetchInterval, KlineFeed>> = { "15m": "kline_15m", "1h": "kline_1h", "4h": "kline_4h" };
+const FEED_OF: Partial<Record<FetchInterval, KlineFeed>> = { "15m": "kline_15m", "1h": "kline_1h", "4h": "kline_4h", "1d": "kline_1d" };
+
+/** Bars the Lage at T reads per interval (daily: 499 = weight 2; the EMA 21 / 50 settle, the EMA 200 nearly). */
+const LAGE_NEED: ReadonlyArray<readonly [FetchInterval, number]> = [
+  ["1d", RETRO_NATIVE_BARS],
+  ["4h", RETRO_NATIVE_BARS],
+  ["1h", 120],
+];
 
 /** Index of the first candle with `time > t` (ascending series). */
 function upperBound(arr: readonly Candle[], t: number): number {
@@ -100,6 +112,31 @@ async function fetchEndingAt(p: MarketProvider, iv: FetchInterval, t: number, co
   return { candles: page.data.filter((c) => c.time <= t), source: page.source };
 }
 
+/** The Lage at T from the bars the check already has plus the missing ones; `null` when the daily bars fail. */
+async function lageAtT(p: MarketProvider, t: number, have: ReadonlyMap<FetchInterval, Bar[]>): Promise<Lage | null> {
+  const got = new Map(have);
+  try {
+    await Promise.all(
+      LAGE_NEED.filter(([iv, n]) => (got.get(iv)?.length ?? 0) < Math.min(n, 120)).map(async ([iv, n]) => {
+        const r = fromLive(p, iv, t, n) ?? (await fetchEndingAt(p, iv, t, n));
+        got.set(iv, r.candles.map(candleToBar));
+      }),
+    );
+  } catch {
+    if (!got.get("1d")?.length) return null;
+  }
+  const daily = got.get("1d") ?? [];
+  if (!daily.length) return null;
+  // the price at T: the last bar CLOSED at T (the running bar's close lies after T)
+  const closeAt = (bars: readonly Bar[] | undefined, sec: number): number | null => {
+    if (!bars) return null;
+    for (let i = bars.length - 1; i >= 0; i--) if ((bars[i]!.t + sec) * 1000 <= t) return bars[i]!.c;
+    return null;
+  };
+  const price = closeAt(got.get("15m"), 900) ?? closeAt(got.get("1h"), 3600) ?? closeAt(got.get("4h"), 14_400);
+  return computeLage(daily, got.get("4h") ?? [], price, t, { h1: got.get("1h") ?? null });
+}
+
 async function computeRetro(p: MarketProvider, cfg: SignalCfg, t: number): Promise<RetroResult> {
   const sources = new Map<FetchInterval, Bar[]>();
   let source: Source | null = null;
@@ -113,6 +150,9 @@ async function computeRetro(p: MarketProvider, cfg: SignalCfg, t: number): Promi
   } catch {
     return { status: "error", signals: null, symbol: p.symbol, source, message: MSG.error };
   }
+  // the Lage at T (one more daily page unless the cached feed reaches T); the switch off → no gate, no request
+  const lc = getLageConfig();
+  const lage = lc.on ? await lageAtT(p, t, sources) : null;
   const bars: Record<string, Bar[]> = {};
   for (const tf of neededTfs(cfg)) {
     const s = tfSource(tf);
@@ -121,7 +161,7 @@ async function computeRetro(p: MarketProvider, cfg: SignalCfg, t: number): Promi
     bars[tf] = rungBars(tf, sources.get(s.interval) ?? [], SIGNAL_BARS + 1);
   }
   // `now` far in the future relative to T: always the closed-bars path (the live window is handled by the caller)
-  const sig = signalsAt(bars, cfg, t, t + LIVE_WINDOW_MS + 1);
+  const sig = signalsAt(bars, cfg, t, t + LIVE_WINDOW_MS + 1, lc.on ? { lage: { lage, cfg: lc } } : {});
   if (!sig) return { status: "no-history", signals: null, symbol: p.symbol, source, message: MSG.noHistory };
   return { status: "ok", signals: sig, symbol: p.symbol, source, message: null };
 }
@@ -154,7 +194,8 @@ export function retroCheck(date: Date | string | number, opts: { cfg?: unknown; 
       ok ? { status: "live", signals: live, symbol: live.symbol, source: live.source, message: null } : { status: "unavailable", signals: null, symbol: p.symbol, source: null, message: MSG.liveLoading },
     );
   }
-  const key = `${p.symbol}|${signalCfgKey(cfg)}|${Math.floor(t / 60_000)}`;
+  const lc = getLageConfig();
+  const key = `${p.symbol}|${signalCfgKey(cfg)}|lage:${lc.on ? 1 : 0}${lc.mode}|${Math.floor(t / 60_000)}`;
   const hit = memo.get(key);
   if (hit) return hit.then((r) => withTradersAt(p, cfg, t, now, r));
   const run = computeRetro(p, cfg, t).then((r) => {
