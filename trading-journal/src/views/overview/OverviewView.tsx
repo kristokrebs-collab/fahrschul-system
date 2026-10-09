@@ -2,7 +2,6 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { IntroCell, useIntroRoot } from "@/intro/IntroCell";
 import { useIntroFlown } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
-import { useHoldProjectionOnHide } from "@/motion/activityProjection";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
 import { startIdlePrerender } from "@/primitives/idlePrerender";
@@ -95,8 +94,8 @@ export function OverviewView({ className }: { className?: string }) {
   useCloseMorphDialogOnUnmount();
   const root = useRef<HTMLDivElement>(null);
   useIntroRoot(root);
-  // switching away hides this kept-alive page: no layoutId snapshot of its (display: none) motion nodes
-  useHoldProjectionOnHide();
+  // the hide of this kept-alive page (no layoutId snapshots of its display: none motion nodes) is held by PageHost's
+  // HideHold in front of it
   // the deferred cells (here and in the Auswertung) render once in idle time, not inside the first scroll past them
   useEffect(() => (root.current ? startIdlePrerender(root.current) : undefined), []);
   return (
