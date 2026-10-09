@@ -41,13 +41,62 @@ function docTop(el: HTMLElement): number {
   return y;
 }
 
+/** `ScrollTimeline` (scroll-driven animations; Chromium / Samsung Internet ≥ 115) – not in this TypeScript DOM lib. */
+interface ScrollTimelineCtor {
+  new (options: { source: Element; axis: "block" }): AnimationTimeline;
+}
+type ScrollDrivenOptions = KeyframeAnimationOptions & { timeline: AnimationTimeline; rangeStart?: string; rangeEnd?: string };
+
+/** The rail runs on scroll-driven animations where the browser has `ScrollTimeline` and WAAPI (as the header edge). */
+export function railScrollDriven(): boolean {
+  return typeof window !== "undefined" && typeof (window as unknown as { ScrollTimeline?: unknown }).ScrollTimeline === "function" && typeof Element.prototype.animate === "function";
+}
+
+/** Keyframe samples per milestone: the stem's p^2.2 and the dot's cubic ease, piecewise linear in between (< 0.4 % off). */
+export const RAIL_SAMPLES = 20;
+
+export interface MilestoneTrack {
+  /** document scroll offsets (px) where the milestone's progress starts / reaches 1 */
+  start: number;
+  end: number;
+  /** dot fill `scale()` and stem `scaleY()` keyframes, evenly spaced over [start, end] */
+  dot: Keyframe[];
+  stem: Keyframe[];
+}
+
+/**
+ * The scroll range of a milestone whose dot centre sits at document y `y`, in a viewport `vh` px high: progress 0 at
+ * scroll `y − 74 % vh`, 1 at `y − 49 % vh` (`milestoneProgress` of its viewport y), sampled into keyframes. A range
+ * that starts above the top of the page begins at scroll 0 with the progress it has there; `null` = already complete
+ * at scroll 0 (no animation, the final state).
+ */
+export function milestoneTrack(y: number, vh: number, samples = RAIL_SAMPLES): MilestoneTrack | null {
+  const end = y - TIMELINE.revealTo * vh;
+  if (vh <= 0 || end <= 0) return null;
+  const start = Math.max(0, y - TIMELINE.revealFrom * vh);
+  const dot: Keyframe[] = [];
+  const stem: Keyframe[] = [];
+  for (let k = 0; k <= samples; k++) {
+    const v = milestoneVisual(milestoneProgress(y - (start + ((end - start) * k) / samples), vh));
+    dot.push({ transform: `scale(${v.dot.toFixed(4)})` });
+    stem.push({ transform: `scaleY(${v.stem.toFixed(4)})` });
+  }
+  return { start, end, dot, stem };
+}
+
 /**
  * Drives the rail inside `root` (positioned): `[data-tl-row]` are the milestone rows (in order), `[data-tl-dot]` one
  * dot per row (its first child is the fill), `[data-tl-stem]` the segments (stem i leads INTO dot i + 1) and
  * `[data-tl-rail]` the grey track between the first and last dot. Dots, stems and rail are absolutely positioned
  * siblings of the rows (never inside a revealing row: its transform would change their containing block).
- * Geometry is measured once and on resize (ResizeObserver on the list and the page); the passive scroll listener
- * only reads `scrollY`; one sleeping frame loop smooths and writes transforms. `enabled` = the intro cell landed.
+ * Geometry is measured once and on resize (ResizeObserver on the list and the page). Where the browser has
+ * `ScrollTimeline` every dot fill and stem is a scroll-driven WAAPI animation on the document's timeline over its own
+ * scroll range (`milestoneTrack`), recreated only when the geometry changed: the compositor moves them with the
+ * scroll, no scroll listener, no `scrollY` read (the listener read it per scroll event, a forced style recalc whenever
+ * the page was dirty: 20–31 per down-and-up scroll of the desktop probe) and no style write per frame; the rail then
+ * sits exactly on the scroll, without the 1 − e^(−12·dt) lag (as the header edge). Elsewhere the passive scroll
+ * listener reads `scrollY` while the rail is near the viewport and one sleeping frame loop smooths and writes
+ * transforms. `enabled` = the intro cell landed.
  */
 export function useMilestoneRail(root: RefObject<HTMLElement | null>, enabled: boolean, deps: unknown): void {
   useEffect(() => {
@@ -92,7 +141,7 @@ export function useMilestoneRail(root: RefObject<HTMLElement | null>, enabled: b
       }
       return moving;
     });
-    const measure = () => {
+    const place = (): number[] => {
       const top = docTop(el);
       vh = window.innerHeight;
       // row centres relative to the list (rows are in flow: offsetTop ignores their reveal transforms)
@@ -110,6 +159,49 @@ export function useMilestoneRail(root: RefObject<HTMLElement | null>, enabled: b
         stems[i]!.style.top = `${y0}px`;
         stems[i]!.style.height = `${Math.max(0, y1 - y0)}px`;
       }
+      return ys;
+    };
+
+    if (!reduced && railScrollDriven()) {
+      const Timeline = (window as unknown as { ScrollTimeline: ScrollTimelineCtor }).ScrollTimeline;
+      const timeline = new Timeline({ source: document.scrollingElement ?? document.documentElement, axis: "block" });
+      let anims: Animation[] = [];
+      let key = "";
+      const build = () => {
+        const at = place();
+        const next = `${vh}|${at.map((y) => Math.round(y)).join(",")}`;
+        if (next === key) return;
+        key = next;
+        for (const a of anims) a.cancel();
+        anims = [];
+        for (let i = 0; i < dots.length; i++) {
+          const track = milestoneTrack(at[i]!, vh);
+          const fillEl = dots[i]!.firstElementChild as HTMLElement | null;
+          const stem = stems[i - 1];
+          if (!track) {
+            // complete at the top of the page: the final state, no animation
+            write(i, 1);
+            continue;
+          }
+          const range: ScrollDrivenOptions = { timeline, rangeStart: `${track.start.toFixed(1)}px`, rangeEnd: `${track.end.toFixed(1)}px`, fill: "both", easing: "linear" };
+          if (fillEl) anims.push(fillEl.animate(track.dot, range));
+          if (stem) anims.push(stem.animate(track.stem, range));
+        }
+      };
+      build();
+      const ro = typeof ResizeObserver === "function" ? new ResizeObserver(build) : null;
+      ro?.observe(el);
+      ro?.observe(document.body);
+      window.addEventListener("resize", build, { passive: true });
+      return () => {
+        for (const a of anims) a.cancel();
+        ro?.disconnect();
+        window.removeEventListener("resize", build);
+      };
+    }
+
+    const measure = () => {
+      place();
       computeTargets();
       loop.wake();
     };

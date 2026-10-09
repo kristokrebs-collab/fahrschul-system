@@ -1,6 +1,7 @@
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { PointerEvent, ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { isScrolling } from "@/motion/scrollGate";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useHoverRect } from "@/primitives/hoverRect";
@@ -28,7 +29,8 @@ export function Tilt({ children, factor = 6, className }: TiltProps) {
   const rotateY = useTransform(sx, [0, 1], [-factor, factor]);
 
   const onPointerEnter = (e: PointerEvent<HTMLDivElement>) => {
-    if (reduced || e.pointerType !== "mouse") return;
+    // scrolling under a resting pointer: no rect read now, the first real move measures (`onPointerMove`)
+    if (reduced || e.pointerType !== "mouse" || isScrolling()) return;
     hoverRect.enter(e.currentTarget);
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {

@@ -1,4 +1,4 @@
-import { AnimatePresence, animate, frame, motion, useMotionValue, useSpring, type HTMLMotionProps } from "motion/react";
+import { AnimatePresence, animate, frame, motion, useMotionValue, useSpring, type AnimationPlaybackControls, type HTMLMotionProps } from "motion/react";
 import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
@@ -96,17 +96,27 @@ export function Card({
     setRingOn(on);
   };
 
-  const place = (clientX: number, clientY: number, rect: DOMRect) => {
-    x.set(clientX - rect.left - gradientSize);
-    y.set(clientY - rect.top - gradientSize);
+  const glide = useRef<AnimationPlaybackControls[]>([]);
+  const place = (clientX: number, clientY: number, rect: DOMRect, smooth = false) => {
+    for (const g of glide.current) g.stop();
+    glide.current = [];
+    const nx = clientX - rect.left - gradientSize;
+    const ny = clientY - rect.top - gradientSize;
+    if (smooth) {
+      glide.current = [animate(x, nx, tween.fade), animate(y, ny, tween.fade)];
+      return;
+    }
+    x.set(nx);
+    y.set(ny);
   };
 
   const track = (el: HTMLDivElement): DOMRect => {
-    // a scroll under a resting pointer moves the card, not the pointer: re-place the blob from the last position
+    // a scroll under a resting pointer moves the card, not the pointer: the blob rides with the card while it scrolls
+    // (no rect read per scroll event) and glides back under the pointer once the scroll has settled
     const rect = hoverRect.enter(el, () =>
       frame.read(() => {
         const r = hoverRect.read();
-        if (r) place(lastPointer.current.x, lastPointer.current.y, r);
+        if (r) place(lastPointer.current.x, lastPointer.current.y, r, true);
       }),
     );
     primeGlowRect(el, rect);

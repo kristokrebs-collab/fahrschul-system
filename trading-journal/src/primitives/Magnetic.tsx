@@ -1,6 +1,7 @@
 import { frame, motion, useMotionValue, useSpring } from "motion/react";
 import { useRef, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { isScrolling } from "@/motion/scrollGate";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useHoverRect } from "@/primitives/hoverRect";
@@ -42,7 +43,8 @@ export function Magnetic({ children, intensity = 0.35, range = 90, remeasure = f
   };
 
   const onPointerEnter = (e: PointerEvent<HTMLSpanElement>) => {
-    if (reduced || e.pointerType !== "mouse") return;
+    // scrolling under a resting pointer: no rect read now, the first real move measures (`onPointerMove`)
+    if (reduced || e.pointerType !== "mouse" || isScrolling()) return;
     measure(hoverRect.enter(e.currentTarget, invalidate));
   };
   const apply = (clientX: number, clientY: number) => {

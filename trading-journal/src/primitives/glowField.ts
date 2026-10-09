@@ -206,7 +206,8 @@ export function registerGlow(el: HTMLElement, listener: GlowListener): () => voi
       entry.active = false;
       entry.listener(false, 0);
     }
-    if (inView && pointer) schedule();
+    // a card scrolling into view under a resting pointer: measured once the scroll settled (`onScrollEnd`)
+    if (inView && pointer && !isScrolling()) schedule();
   });
   return () => {
     entry.stopObserving();

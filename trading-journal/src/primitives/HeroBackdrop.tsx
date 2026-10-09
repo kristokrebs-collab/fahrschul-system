@@ -2,6 +2,7 @@ import { animate, cancelFrame, frame, motion, useMotionValue, useSpring, useTran
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
 import { observeInView } from "@/motion/inView";
+import { isScrolling } from "@/motion/scrollGate";
 import { dwell, spring, tween } from "@/motion/tokens";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -358,7 +359,9 @@ export function HeroBackdrop({ className }: { className?: string }) {
       fade = animate(opacity, to, tween.fade);
     };
     const enter = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse") return;
+      // the hero scrolling under a resting pointer: no rect read now (a forced style + layout of the page, 30–70 ms on
+      // the scroll probe), the first real move enters
+      if (e.pointerType !== "mouse" || isScrolling()) return;
       rect.enter(host);
       const p = local(e);
       if (!p) return;
@@ -371,7 +374,11 @@ export function HeroBackdrop({ className }: { className?: string }) {
       show(1);
     };
     const move = (e: PointerEvent) => {
-      if (e.pointerType !== "mouse" || !rect.tracks(host)) return;
+      if (e.pointerType !== "mouse") return;
+      if (!rect.tracks(host)) {
+        enter(e);
+        return;
+      }
       const p = local(e);
       if (!p) return;
       focus.current = p;
