@@ -84,7 +84,7 @@ test.describe("Lage-Ampel", () => {
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
-  test("red Lage: the long entry is shown faded and never announced; Nur Warnung lets it count with the warning", async ({ page }, info) => {
+  test("red Lage: the long entry is shown faded and never announced", async ({ page }, info) => {
     test.setTimeout(150_000);
     const errors = collectErrors(page);
     await stubNotifications(page);
@@ -124,20 +124,45 @@ test.describe("Lage-Ampel", () => {
     expect(await page.evaluate(() => window.__notes?.length ?? -1)).toBe(0);
     await expect(toast(page).getByText(/^Lage:/)).toHaveCount(0);
 
-    // Nur Warnung (applied at once, stored additively in settings.signals.lage)
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  // `clock.forward` (page.clock.fastForward) leaves the fake animation frames behind, so a page switch after it never
+  // finishes its animation: the settings radio is therefore exercised without a clock jump, the warn mode is seeded
+  test("Nur Warnung: the settings radio applies at once and is stored additively in settings.signals.lage", async ({ page }) => {
+    const errors = collectErrors(page);
+    await seed(page, { lage: true, extra: { "tj2-settings": { ...baseSettings, signals: { notify: true } } } });
     await page.goto("/#settings");
     const settingsCard = page.getByTestId("settings-lage");
     await settingsCard.scrollIntoViewIfNeeded();
+    await expect(settingsCard).toHaveAttribute("data-mode", "block");
     await settingsCard.getByRole("radio", { name: "Nur Warnung" }).click();
     await expect(settingsCard).toHaveAttribute("data-mode", "warn");
     const s = await stored<{ signals?: { notify?: boolean; lage?: { on?: boolean; mode?: string } } }>(page, "tj2-settings");
     expect(s?.signals).toMatchObject({ notify: true, lage: { on: true, mode: "warn" } });
     await page.goto("/#overview");
+    await expect(page.getByTestId("lage-panel")).toHaveAttribute("data-mode", "warn", { timeout: 30_000 });
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  test("red Lage with Nur Warnung: the confirmed long counts, with the warning line", async ({ page }) => {
+    test.setTimeout(120_000);
+    const errors = collectErrors(page);
+    await stubNotifications(page);
+    const at = utcToday(10, 20);
+    const clock = await pinClock(page, at);
+    await seed(page, { synth: { ratios: "whale-long", anchor: at }, clock: clock.now, lage: true, extra: { "tj2-settings": { ...baseSettings, signals: { notify: true, lage: { on: true, mode: "warn" } } } } });
+    await page.goto("/#overview");
+    await expect(page.getByTestId("lage-panel")).toHaveAttribute("data-state", "red", { timeout: 30_000 });
+    await expect(page.getByTestId("lage-panel")).toHaveAttribute("data-mode", "warn");
+    const card = page.getByTestId("signal-card");
     await card.scrollIntoViewIfNeeded();
-    await expect(verdictLabel(card)).toHaveText("Sehr starker Long-Einstieg", { timeout: 20_000 });
+    await expect(card).toHaveAttribute("data-state", "ok", { timeout: 25_000 });
+    await clock.forward(10 * MIN + 30_000);
+    const verdict = card.getByTestId("signal-verdict").first();
+    await expect(verdictLabel(card)).toHaveText("Sehr starker Long-Einstieg", { timeout: 30_000 });
     await expect(verdict).not.toHaveAttribute("data-blocked", "");
     await expect(verdict.getByTestId("signal-lage")).toHaveText("Lage rot – nur Warnung (fällt noch)");
-    await expect(page.getByTestId("lage-panel")).toHaveAttribute("data-mode", "warn");
     expect(errors, errors.join("\n")).toEqual([]);
   });
 

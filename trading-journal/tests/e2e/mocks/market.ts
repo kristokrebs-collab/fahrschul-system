@@ -239,7 +239,11 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
     if (u.pathname === "/fapi/v1/klines") {
       const iv = u.searchParams.get("interval") ?? "1h";
       const limit = Number(u.searchParams.get("limit") ?? 500);
-      const rows = extendKlines(shiftTimes(readJson<KlineRow[]>(`binance-klines-${iv}.json`), delta()) as KlineRow[], iv, opts.klineBars ?? 500);
+      // daily bars keep the exchange's 00:00 UTC grid: the fixture's day of `baseTime` (its forming bar) becomes the
+      // mocked "today" – a bar off the grid reads to the Lage as a missing daily close (1ba7f81)
+      const D = INTERVAL_MS["1d"];
+      const shift = iv === "1d" ? (Math.floor((file.baseTime + delta()) / D) - Math.floor(file.baseTime / D)) * D : delta();
+      const rows = extendKlines(shiftTimes(readJson<KlineRow[]>(`binance-klines-${iv}.json`), shift) as KlineRow[], iv, opts.klineBars ?? 500);
       return route.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(rows.slice(-limit)) });
     }
     if (u.pathname.startsWith("/futures/data/")) {
