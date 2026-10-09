@@ -7,11 +7,10 @@
  *
  * How everything ends up in one file without extra dependencies:
  * - `codeSplitting: false` (rolldown) inlines the lazy imports (MiniTradeChart, NothingCandleChart, lightweight-charts)
- *   into the entry chunk; `cssCodeSplit: false` gives one stylesheet; no image/font assets are imported by the app.
+ *   into the entry chunk; `cssCodeSplit: false` gives one stylesheet; `assetsInlineLimit` inlines every asset (the
+ *   embedded fonts of src/styles/fonts.css) as a data: URI, so nothing is left next to the file.
  * - `singleFile()` replaces the entry <script src> / <link rel=stylesheet> with inline <script type="module"> / <style>
  *   in `generateBundle` with hook order "post" (after vite:build-import-analysis has resolved `__VITE_PRELOAD__`).
- * - The Google-Fonts <link> is replaced by the vendored latin woff2 subsets in single/fonts as data: URIs (offline,
- *   no third-party request from a shared file).
  * - The share edition runs the privacy guard (scripts/privacyGuard.ts): a personal string in the bundle fails the build.
  * `__TJ_TARGET__` is "file" here ("web" in vite.config.ts), see src/edition.ts.
  */
@@ -45,15 +44,6 @@ const NO_JS_BODY =
   '<div class="tj-nojs"><b>BTC Trade Journal</b><br>Diese Datei ist eine App. Die Vorschau zeigt sie nicht an: ' +
   "öffne sie in Chrome, Safari oder Samsung Internet (Datei antippen → Öffnen mit …).</div>";
 
-/** Vendored fonts (single/fonts/fonts.css + woff2) as one inline <style> with data: URIs. */
-function fontStyle(): string {
-  const css = readFileSync(here("./single/fonts/fonts.css"), "utf8").replace(/url\(\.\/([^)]+)\)/g, (_m, file: string) => {
-    const b64 = readFileSync(here(`./single/fonts/${file}`)).toString("base64");
-    return `url(data:font/woff2;base64,${b64})`;
-  });
-  return `<style>/* IBM Plex Mono/Sans, Doto: SIL Open Font License 1.1 */${css.replace(/\s*\n\s*/g, "")}</style>`;
-}
-
 function singleFile(edition: FileEdition): Plugin {
   return {
     name: "tj-single-file",
@@ -86,8 +76,6 @@ function singleFile(edition: FileEdition): Plugin {
           .replace(/\s*<link rel="modulepreload"[^>]*>/g, "")
           // a file opened from disk has no manifest / touch icon next to it (the favicon is a data: URI and stays)
           .replace(/\s*<link rel="(?:manifest|apple-touch-icon)"[^>]*>/g, "")
-          .replace(/\s*<link rel="preconnect" href="https:\/\/fonts\.g[^>]*>/g, "")
-          .replace(/<link\s+href="https:\/\/fonts\.googleapis\.com[^>]*>/, () => fontStyle())
           .replace(/<title>[^<]*<\/title>/, `<title>${TITLES[edition]}</title>`)
           .replace("</title>", () => `</title>\n    ${NO_JS_HINT}`)
           .replace('<div id="root"></div>', () => `<div id="root">${NO_JS_BODY}</div>`)

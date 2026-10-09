@@ -77,6 +77,6 @@
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://fapi.binance.com wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com https://fonts.googleapis.com https://fonts.gstatic.com; font-src https://fonts.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self' blob:"
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://fapi.binance.com wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self' blob:"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
