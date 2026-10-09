@@ -51,6 +51,7 @@ test("new trade: the live check snapshot (bestätigt, Top-Trader-Kombi 4/4, fall
   await expect(summary.getByTestId("signal-summary-part-traders")).toHaveAttribute("data-ok", "true");
   await expect(editor.getByText("Live-Check · wird beim Speichern mitgespeichert")).toBeVisible();
 
+  await expect(editor.locator("[inert] #f-entry")).toHaveCount(0); // the open morph has lifted `inert` (a fill before it is lost)
   await editor.locator("#f-entry").fill("80000");
   await editor.locator("#f-stop").fill("79200");
   await editor.locator("#f-exit").fill("81500");
@@ -133,7 +134,8 @@ test("unsaved input: Escape and Abbrechen ask `Änderungen verwerfen?`; keep edi
 
   await fab(page).click();
   await expect(editor.locator("#f-entry")).toBeVisible();
-  await editor.locator("#f-entry").click(); // takes input once the open morph lifted `inert`
+  await expect(editor.locator("[inert] #f-entry")).toHaveCount(0); // the open morph has lifted `inert` (a fill before it is lost)
+  await editor.locator("#f-entry").click();
   await editor.locator("#f-entry").fill("80123");
   await page.keyboard.press("Escape");
   const confirm = editor.getByTestId("discard-confirm");
