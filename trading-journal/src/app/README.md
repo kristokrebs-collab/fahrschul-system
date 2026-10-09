@@ -147,7 +147,11 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
   snapshots of a page that is being hidden) and `ShowSettle` behind it (`useSettleProjectionOnShow`: the re-mounted nodes are not all
   measured by the next layout update – that measured every node inside the Übersicht's `content-visibility: auto` cells, ≈ 20 ms).
 - The leaving page is pinned absolutely, `aria-hidden`, and offset by the scroll delta from `showPage()`. It swallows pointer input
-  (capture listeners – no interaction during a transition, like iOS) and focus inside it is released at the switch; it is NOT
+  (capture listeners – no interaction during a transition, like iOS); focus inside it moves at the switch into the shown page (its
+  `h1`, else its layer – `focusLayer`, a temporary `tabindex="-1"` without outline), and focus that lands in it later (Tab from the
+  shown page's end, the back button) is sent there too – a plain `blur()` left the sequential-focus point in the invisible page, so
+  the next Tab walked its hidden controls. The entering page swallows pointer input while it is still invisible (opacity 0 until the
+  leaving page has faded, SH-02): it lies above the fading page, so a tap meant for that one acted on the new page. The leaving page is NOT
   `inert` and has no `pointer-events: none` – both are inherited and restyled every element of the page fading out in the switch
   frame (≈ 2 200 on the Übersicht, 20–30 ms; `visibility` likewise, `flick/restyle.mjs`). A parked page is `inert` (free: display
   none inside). When its exit has played it is collapsed (height 0 + overflow hidden, layout kept – no 0 × 0 resize for its
@@ -155,7 +159,8 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
   (keep-alive) or unmounted only once the switch has settled and the main thread is idle (`requestIdleCallback`, ≤ `PARK_TIMEOUT_MS`
   600 ms; a 50 ms timer without it): the hide of the Übersicht (≈ 50 ms – every effect and ~600 motion components detach) and the
   unmount of a page no longer land in the middle of the new page's entrance. Switching back before that shows the page without a
-  re-mount (the layer is restored in the switch's layout effect).
+  re-mount (the layer is restored in the switch's layout effect, BEFORE `showPage()` applies the queued scroll restore – a collapsed
+  layer clamped it: Übersicht at 1 400 px → Trades → back within ≈ 1 s landed at ≈ 420 px).
 - `transitioning` has the same contract as PageSwitch (`true` at the switch commit, `false` once enter and exit finished).
 - Scroll memory: the router parks restores (`navigate` / `applyRoute` → `restoreScroll`, top on first visit / deep link); PageHost
   calls `showPage(page)` at the commit that shows the page (layout effect, before paint); `detachShell` on unmount. `PageSwitch` is no

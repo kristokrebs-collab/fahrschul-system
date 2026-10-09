@@ -140,6 +140,72 @@ describe("PageHost", () => {
     expect(effects).toEqual(base);
   });
 
+  it("a page shown again before it was parked gets its height back before the queued scroll restore runs (no clamp)", async () => {
+    const { rerender } = render(host("overview"));
+    await switchTo(() => rerender(host("trades")));
+    const overview = document.querySelector<HTMLElement>("[data-page='overview']");
+    await waitFor(() => expect(overview?.style.height).toBe("0px"), { timeout: 1000 });
+    // the layer's height at the moment the restore scrolls the window (a collapsed layer clamped the restore)
+    const heights: string[] = [];
+    const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {
+      heights.push(overview?.style.height ?? "gone");
+    });
+    try {
+      restoreScroll("overview", true);
+      await switchTo(() => rerender(host("overview")));
+      expect(heights).toEqual([""]);
+    } finally {
+      scrollTo.mockRestore();
+    }
+  });
+
+  it("keyboard: focus in the page that leaves moves to the shown page's title, and focus landing in the leaving page later goes there too", async () => {
+    const { rerender } = render(host("overview"));
+    const button = screen.getByRole("button", { name: "Übersicht 0" });
+    act(() => button.focus());
+    await switchTo(() => rerender(host("trades")));
+    const title = screen.getByRole("heading", { name: "trades" });
+    // the next Tab continues in the page on screen, never in the invisible one that leaves (a reader hears its title)
+    expect(document.activeElement).toBe(title);
+    expect(title).toHaveAttribute("tabindex", "-1");
+    expect(title.style.outline).toBe("none");
+    // e.g. Tab from the shown page's end / the back button: focus lands in the leaving page → sent on
+    act(() => title.blur());
+    expect(title).not.toHaveAttribute("tabindex");
+    expect(title.style.outline).toBe("");
+    act(() => button.focus());
+    expect(document.activeElement).toBe(title);
+  });
+
+  it("a page without a title takes focus on its layer (the Übersicht)", async () => {
+    const { rerender } = render(host("trades"));
+    const title = screen.getByRole("heading", { name: "trades" });
+    // a control inside the Trades page switched to the Übersicht
+    title.setAttribute("tabindex", "0");
+    act(() => title.focus());
+    await switchTo(() => rerender(host("overview")));
+    const overview = document.querySelector<HTMLElement>("[data-page='overview']");
+    expect(document.activeElement).toBe(overview);
+    expect(overview).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("the entering page takes no input while it is still invisible (the leaving page fades above nothing it could act on)", async () => {
+    const onT = vi.fn();
+    const { rerender } = render(host("trades", onT));
+    await switchTo(() => rerender(host("overview", onT)));
+    const overview = document.querySelector<HTMLElement>("[data-page='overview']");
+    expect(overview?.getAttribute("data-page-role")).toBe("current");
+    expect(overview?.style.opacity).toBe("0");
+    // a tap meant for the fading Trades page lands on the invisible Übersicht: swallowed
+    act(() => screen.getByText("Übersicht 0", { selector: "button" }).click());
+    expect(screen.getByText("Übersicht 0", { selector: "button" })).toBeInTheDocument();
+    // once the leaving page has faded (120 ms) the new page fades in and takes input
+    await waitFor(() => expect(document.querySelector("[data-page='trades']")?.getAttribute("style") ?? "").toContain("height: 0px"), { timeout: 1000 });
+    act(() => screen.getByRole("button", { name: "Übersicht 0" }).click());
+    expect(screen.getByRole("button", { name: "Übersicht 1" })).toBeInTheDocument();
+    await waitFor(() => expect(onT).toHaveBeenLastCalledWith(false), { timeout: 1500 });
+  });
+
   it("takes a new page one painted frame later (the tap's own response is painted first); the latest page wins", async () => {
     const onT = vi.fn();
     const { rerender } = render(host("overview", onT));

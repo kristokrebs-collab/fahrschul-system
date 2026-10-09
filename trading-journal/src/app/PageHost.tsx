@@ -10,11 +10,15 @@
  *   next layout update) – `src/motion/activityProjection.ts`.
  * - Other pages mount when shown and unmount once their exit has played.
  * - Parking (perf-120 phase C): the leaving layer is collapsed out of the document's scroll extent when its exit has
- *   played (height 0, overflow and visibility hidden – its layout is kept, so no resize reaches its observers), and parked (hidden) or
+ *   played (height 0 + overflow hidden – its layout is kept, so no resize reaches its observers), and parked (hidden) or
  *   unmounted only when the switch has settled AND the main thread is idle (`requestIdleCallback`, bounded by
  *   `PARK_TIMEOUT_MS`): hiding the Übersicht is a ≈ 50 ms commit (every effect and motion component of ~600 detaches)
  *   that used to land in the middle of the new page's entrance. A switch back before that shows the page without any
- *   re-mount.
+ *   re-mount (its height comes back before the scroll restore, which would otherwise be clamped).
+ * - The leaving layer is not `inert` (that restyled the whole fading page): it is aria-hidden, swallows pointer input,
+ *   and focus inside it – or landing in it later – moves into the shown page (`focusLayer`), so Tab never walks
+ *   through the invisible page that leaves. The entering layer takes no pointer input while it is still invisible (until
+ *   the leaving page has faded): a tap meant for the page still on screen never acts on the new one.
  * - Transition (the PageSwitch spec): the entering page comes in from `x dir·16`, scale .985 and blur 4 px (transform on
  *   `spring.enter` – after a fast dock flick its context spring, `consumeNavTempo()` – opacity/filter on `tween.page`
  *   delayed by the exit, SH-02), the leaving page leaves to `x −dir·12` and fades on `tween.exit`
@@ -105,6 +109,54 @@ const swallow = (e: Event) => {
   if (e.cancelable && !e.type.startsWith("touch")) e.preventDefault();
 };
 
+/**
+ * The entering layer swallows pointer input while it is still invisible (opacity 0 until the leaving page has faded,
+ * SH-02): it lies above the fading page, so a tap meant for what is still on screen changed the invisible new page (a
+ * tap ~50 ms after a switch to Trades set its "Verlierer" filter). Its own function: the same layer may become the
+ * leaving one in the next switch, whose listeners must survive this one's removal.
+ */
+const swallowUnseen = (e: Event) => swallow(e);
+
+/** Adds `swallowUnseen` to `el`; returns the removal. */
+function swallowWhileUnseen(el: HTMLElement): () => void {
+  for (const t of LEAVING_SWALLOW) el.addEventListener(t, swallowUnseen, { capture: true });
+  return () => {
+    for (const t of LEAVING_SWALLOW) el.removeEventListener(t, swallowUnseen, { capture: true });
+  };
+}
+
+/**
+ * Focus moves into the page on screen: its `h1` (Trades, Entscheidungsgrundlagen, Einstellungen – a screen reader reads
+ * the page title, like a route change should), else the layer itself; programmatic only (`tabindex="-1"` and no outline
+ * while it holds focus, both gone on blur), so the next Tab continues in the shown page. The leaving layer is not `inert`
+ * (that restyled the whole fading page), so a plain `blur()` left the sequential-focus starting point inside it: the
+ * next Tab focused the next control of the invisible, aria-hidden page that was leaving.
+ */
+export function focusLayer(layer: HTMLElement): void {
+  const el = layer.querySelector<HTMLElement>("h1") ?? layer;
+  if (!el.hasAttribute("tabindex")) {
+    el.setAttribute("tabindex", "-1");
+    el.style.outline = "none";
+    el.addEventListener(
+      "blur",
+      () => {
+        el.removeAttribute("tabindex");
+        el.style.outline = "";
+      },
+      { once: true },
+    );
+  }
+  el.focus({ preventScroll: true });
+}
+
+/** Focus that still lands in a leaving layer (Tab from the shown page's end, the browser's back button) goes to the shown page. */
+const sendFocusOn = (e: FocusEvent) => {
+  const layer = e.currentTarget as HTMLElement;
+  const shown = layer.parentElement?.querySelector<HTMLElement>(':scope > [data-page-role="current"]');
+  if (shown) focusLayer(shown);
+  else if (e.target instanceof HTMLElement) e.target.blur();
+};
+
 /** Runs `fn` after the next frame has been painted (a frame callback, then a task); returns the cancel. */
 export function afterNextPaint(fn: () => void): () => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -176,8 +228,11 @@ const PageLayer = memo(function PageLayer({ page, role, keepAlive, cascade, rend
     const el = own.current;
     if (!leaving || !el) return;
     for (const t of LEAVING_SWALLOW) el.addEventListener(t, swallow, { capture: true });
+    // keyboard: focus never stays in the page that leaves (see `focusLayer`)
+    el.addEventListener("focusin", sendFocusOn);
     return () => {
       for (const t of LEAVING_SWALLOW) el.removeEventListener(t, swallow, { capture: true });
+      el.removeEventListener("focusin", sendFocusOn);
     };
   }, [leaving]);
   const setRef = useCallback(
@@ -272,6 +327,7 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
   const running = useRef<AnimationPlaybackControls[]>([]);
   const handled = useRef(-1);
   const parking = useRef<CancelIdle | null>(null);
+  const unseen = useRef<(() => void) | null>(null);
   // unmount (and the StrictMode remount probe): stop the slide, hand scroll restores back to the router
   useLayoutEffect(
     () => () => {
@@ -279,6 +335,8 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
       running.current = [];
       parking.current?.();
       parking.current = null;
+      unseen.current?.();
+      unseen.current = null;
       handled.current = -1;
       detachShell();
     },
@@ -287,6 +345,11 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
 
   const { current, leaving, dir, seq } = view;
   useLayoutEffect(() => {
+    // shown again before it was parked: the layer was collapsed after its exit – give it its height back BEFORE the
+    // queued scroll restore runs, or the restore is clamped to the document without it (Übersicht at 1 400 px → Trades →
+    // back within ≈ 1 s landed at ≈ 420 px)
+    const shown = layers.current.get(current);
+    if (shown) restoreLayer(shown);
     const delta = showPage(current);
     if (handled.current === seq) return;
     handled.current = seq;
@@ -294,6 +357,8 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     running.current = [];
     parking.current?.();
     parking.current = null;
+    unseen.current?.();
+    unseen.current = null;
     if (seq === 0 || !leaving) return;
 
     const enterEl = layers.current.get(current);
@@ -306,15 +371,19 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     if (exitEl) {
       // the window may have scrolled to the new page's position: hold the old page where it was on screen
       exitEl.style.top = delta ? `${delta}px` : "";
-      // what `inert` did for the leaving page: focus does not stay on an element that fades out
+      // what `inert` did for the leaving page: focus does not stay on an element that fades out – it moves to the page
+      // that is shown (a link inside the page switched it), so Tab continues there
       const focused = document.activeElement;
-      if (focused instanceof HTMLElement && exitEl.contains(focused)) focused.blur();
+      if (focused instanceof HTMLElement && exitEl.contains(focused)) {
+        if (enterEl) focusLayer(enterEl);
+        else focused.blur();
+      }
       exit.push(animate(exitEl, reduced ? { opacity: [1, 0] } : { transform: [EXIT_FROM, EXIT_TO(dir)], opacity: [1, 0] }, tween.exit));
     }
     if (enterEl) {
       enterEl.style.top = "";
-      // shown again before it was parked: the layer was collapsed after its exit
-      restoreLayer(enterEl);
+      // invisible until the leaving page has faded: no input reaches it before it shows (released with the exit below)
+      if (exitEl) unseen.current = swallowWhileUnseen(enterEl);
       // start values before paint: Motion resolves keyframes on the next frame, the first frame must not flash the page
       enterEl.style.opacity = "0";
       if (!reduced) {
@@ -338,7 +407,11 @@ export const PageHost = memo(function PageHost({ page, renderPage, keepAlive = N
     // stopped animations never resolve; the `handled` check also ignores a switch that was overtaken
     const live = () => handled.current === seq;
     void Promise.all(exit.map((c) => c.finished)).then(() => {
-      if (live() && exitEl) collapseLayer(exitEl);
+      if (!live()) return;
+      if (exitEl) collapseLayer(exitEl);
+      // the new page starts to fade in now (`ENTER_FADE` waits exactly `tween.exit`): it takes input from here on
+      unseen.current?.();
+      unseen.current = null;
     });
     void Promise.all(enter.map((c) => c.finished)).then(() => {
       if (!live() || !enterEl) return;
