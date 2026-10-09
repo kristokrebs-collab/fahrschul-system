@@ -255,7 +255,9 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
 - `a11y.ts`: `useFocusTrap(ref, active, settled?)`, `useScrollLock(active)`, `useInertOutside(ref, active, settled?)`,
   `useEscape(active, onClose)`, `useDialogBehaviour(ref, active, onClose, { settled? })`:
   - focus moves into the panel and Tab is trapped at once; the outside is isolated when `settled` is true (open morph done);
-  - after close, releasing the outside and then returning focus wait for `settled` (exit / reverse morph done);
+  - after close, releasing the outside and then returning focus wait for `settled` (exit / reverse morph done); a dialog opened from
+    inside a CLOSING one (the detail's `Bearbeiten` → the editor) returns focus to that one's opener (the trade row) – its button is
+    gone by then, and focus used to fall to `<body>`;
   - each deferral is bounded by `SETTLE_FALLBACK_MS` (700); omitting `settled` gives immediate behaviour; focus is not returned if the
     user focused something else meanwhile; `INERT_EXEMPT_SELECTOR` (live regions – `[aria-live]` except `aria-live="off"`, which
     is muted content like the chart's OHLC legend – and the toast island) is never isolated.

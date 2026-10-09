@@ -177,10 +177,25 @@ interface ModalParts {
   inert: boolean;
 }
 
+/**
+ * Sessions that have not ended yet (open, or closing until their exit settled). A dialog opened from inside a CLOSING
+ * one – the detail's `Bearbeiten` hands off to the editor while the detail fades out – returns focus to where that one
+ * was opened from (the trade row), not to its button, which is gone by the time the editor closes (focus fell to <body>).
+ */
+const liveSessions = new Set<ModalSession>();
+
+/** The element focus returns to for a dialog opened while `opener` had focus (see `liveSessions`). */
+function returnTargetFor(opener: HTMLElement | null): HTMLElement | null {
+  if (!opener) return null;
+  for (const o of liveSessions) if (o.closing && !o.done && o.panel.contains(opener)) return o.previous;
+  return opener;
+}
+
 /** Releases the outside first, then returns focus – unless the user has meanwhile focused something outside the dialog. */
 function endSession(s: ModalSession, parts: ModalParts, restoreFocus: boolean): void {
   if (s.done) return;
   s.done = true;
+  liveSessions.delete(s);
   s.isolation?.release();
   s.isolation = null;
   if (!parts.focus || !restoreFocus) return;
@@ -222,13 +237,14 @@ function useModalSession(ref: RefObject<HTMLElement | null>, active: boolean, se
     if (prior) endSession(prior, { focus, inert }, false);
     const s: ModalSession = {
       panel,
-      previous: carried ?? (document.activeElement as HTMLElement | null),
+      previous: carried ?? returnTargetFor(document.activeElement as HTMLElement | null),
       fallback: () => fallbackRef.current?.() ?? null,
       isolation: null,
       closing: false,
       done: false,
     };
     session.current = s;
+    liveSessions.add(s);
     let untrap: (() => void) | undefined;
     if (focus) {
       if (!panel.hasAttribute("tabindex")) panel.setAttribute("tabindex", "-1");

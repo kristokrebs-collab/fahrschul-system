@@ -36,6 +36,28 @@ const outside = () => screen.getByTestId("outside");
 /** The page behind an open dialog (deliberately changed, perf-120 C: aria-hidden + data-modal-behind + focus guard, not `inert`). */
 const behind = (el: HTMLElement) => el.getAttribute("aria-hidden") === "true" && el.hasAttribute("data-modal-behind");
 
+/** Two dialogs: B opens from a button inside A while A closes (the detail's `Bearbeiten` → the trade editor). */
+function Pane({ open, exiting = false, settled, name }: { open: boolean; exiting?: boolean; settled: boolean; name: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useDialogBehaviour(ref, open, () => {}, { settled });
+  if (!open && !exiting) return null;
+  return (
+    <div ref={ref} role="dialog" aria-label={name}>
+      <button type="button">{`${name} bearbeiten`}</button>
+    </div>
+  );
+}
+
+function HandOff({ a, b }: { a: { open: boolean; exiting?: boolean; settled: boolean }; b: { open: boolean; exiting?: boolean; settled: boolean } }) {
+  return (
+    <div>
+      <button type="button">Zeile</button>
+      <Pane name="A" {...a} />
+      <Pane name="B" {...b} />
+    </div>
+  );
+}
+
 describe("useDialogBehaviour", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -129,6 +151,35 @@ describe("useDialogBehaviour", () => {
     rerender(<Harness open={false} settled exiting />);
     expect(behind(outside())).toBe(false);
     expect(document.activeElement).toBe(out);
+  });
+
+  it("hand-off: a dialog opened from inside a closing one returns focus to that one's opener, not to its removed button", () => {
+    const closed = { open: false, settled: true };
+    const { rerender } = render(<HandOff a={closed} b={closed} />);
+    const row = screen.getByText("Zeile", { selector: "button" });
+    row.focus();
+    rerender(<HandOff a={{ open: true, settled: true }} b={closed} />);
+    expect(document.activeElement).toBe(screen.getByText("A bearbeiten"));
+    // one update: A closes (still fading out, focus on its button), B opens
+    rerender(<HandOff a={{ open: false, exiting: true, settled: false }} b={{ open: true, settled: true }} />);
+    expect(document.activeElement).toBe(screen.getByText("B bearbeiten"));
+    // A is gone; B closes and settles: focus is back on the row that opened A
+    rerender(<HandOff a={closed} b={{ open: true, settled: true }} />);
+    rerender(<HandOff a={closed} b={{ open: false, exiting: true, settled: true }} />);
+    rerender(<HandOff a={closed} b={closed} />);
+    expect(document.activeElement).toBe(row);
+  });
+
+  it("a dialog opened from inside a dialog that stays open returns focus into that one", () => {
+    const closed = { open: false, settled: true };
+    const { rerender } = render(<HandOff a={closed} b={closed} />);
+    screen.getByText("Zeile", { selector: "button" }).focus();
+    rerender(<HandOff a={{ open: true, settled: true }} b={closed} />);
+    const inA = screen.getByText("A bearbeiten");
+    expect(document.activeElement).toBe(inA);
+    rerender(<HandOff a={{ open: true, settled: true }} b={{ open: true, settled: true }} />);
+    rerender(<HandOff a={{ open: true, settled: true }} b={closed} />);
+    expect(document.activeElement).toBe(inA);
   });
 
   it("a muted status (aria-live=off) is hidden with the page; real live regions stay announced", () => {
