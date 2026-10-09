@@ -18,8 +18,10 @@ function focusables(root: HTMLElement): HTMLElement[] {
 /**
  * Elements that must stay live behind a dialog: the toast island and any other live region, plus the floating
  * layers of pulse selects / autocompletes (portalled to `<body>`, they belong to the field inside the dialog).
+ * `aria-live="off"` is no live region (e.g. the candle chart's OHLC legend, `role=status` muted): it is hidden with
+ * the page like everything else, never left readable beside the dialog.
  */
-export const INERT_EXEMPT_SELECTOR = "[aria-live],[data-toast-island],[data-pulse-select],[data-pulse-autocomplete]";
+export const INERT_EXEMPT_SELECTOR = '[aria-live]:not([aria-live="off"]),[data-toast-island],[data-pulse-select],[data-pulse-autocomplete]';
 
 /**
  * Upper bound for the morph-aware deferrals: a dialog whose `settled` signal never arrives (no layout animation
@@ -91,11 +93,17 @@ function guardFocus(panel: HTMLElement): () => void {
   };
 }
 
+/** An isolated outside: `unguard` ends the focus guard alone (the dialog started to close), `release` undoes everything. */
+interface Isolation {
+  unguard: () => void;
+  release: () => void;
+}
+
 /**
  * Isolates everything outside `el` (siblings of every ancestor up to `<body>`, see `acquireBehind`); live regions are
- * descended into instead of hidden as a whole. Returns the undo.
+ * descended into instead of hidden as a whole.
  */
-function isolateOutside(el: HTMLElement): () => void {
+function isolateOutside(el: HTMLElement): Isolation {
   const touched: HTMLElement[] = [];
   const hideChildren = (parent: HTMLElement, skip: HTMLElement | null) => {
     for (const child of Array.from(parent.children)) {
@@ -115,10 +123,17 @@ function isolateOutside(el: HTMLElement): () => void {
     hideChildren(parent, node);
     node = parent;
   }
-  const unguard = guardFocus(el);
-  return () => {
-    unguard();
-    for (const t of touched) releaseBehind(t);
+  let guard: (() => void) | null = guardFocus(el);
+  const unguard = () => {
+    guard?.();
+    guard = null;
+  };
+  return {
+    unguard,
+    release: () => {
+      unguard();
+      for (const t of touched) releaseBehind(t);
+    },
   };
 }
 
@@ -152,7 +167,7 @@ interface ModalSession {
   previous: HTMLElement | null;
   /** Focus target when `previous` is gone (removed, or inert while it exits) – e.g. the neighbour of a deleted row. */
   fallback?: () => HTMLElement | null;
-  undoInert: (() => void) | null;
+  isolation: Isolation | null;
   closing: boolean;
   done: boolean;
 }
@@ -166,8 +181,8 @@ interface ModalParts {
 function endSession(s: ModalSession, parts: ModalParts, restoreFocus: boolean): void {
   if (s.done) return;
   s.done = true;
-  s.undoInert?.();
-  s.undoInert = null;
+  s.isolation?.release();
+  s.isolation = null;
   if (!parts.focus || !restoreFocus) return;
   const prev = s.previous;
   const target = prev?.isConnected && !prev.closest(UNREACHABLE_SELECTOR) ? prev : (s.fallback?.() ?? null);
@@ -183,7 +198,7 @@ function endSession(s: ModalSession, parts: ModalParts, restoreFocus: boolean): 
  * Opening: focus moves into the panel at once (before any document-wide write, so it only lays out the new panel)
  * and Tab is trapped; isolating the page (`isolateOutside`: aria-hidden + `data-modal-behind` + focus guard – no style
  * change) waits until `settled` (the open morph has finished, bounded by `SETTLE_FALLBACK_MS`), so the morph's frames
- * carry no document-wide work. Closing: the trap is removed at once; releasing the page and restoring focus wait until
+ * carry no document-wide work. Closing: the trap and the focus guard are removed at once; releasing the page and restoring focus wait until
  * `settled` again (the exit / reverse morph has finished) and then run together, release first. `settled` defaults to
  * `true`, which keeps everything immediate.
  */
@@ -209,7 +224,7 @@ function useModalSession(ref: RefObject<HTMLElement | null>, active: boolean, se
       panel,
       previous: carried ?? (document.activeElement as HTMLElement | null),
       fallback: () => fallbackRef.current?.() ?? null,
-      undoInert: null,
+      isolation: null,
       closing: false,
       done: false,
     };
@@ -223,6 +238,10 @@ function useModalSession(ref: RefObject<HTMLElement | null>, active: boolean, se
     return () => {
       untrap?.();
       s.closing = true;
+      // closing: the page is the next thing the user touches – a tap into it during the exit (the navigation's 800 ms
+      // wipe uncovers the page long before it is released) keeps its focus instead of being sent back into the leaving
+      // panel and then to the opener (the first tap into a field was lost). The release itself still waits for `settled`.
+      s.isolation?.unguard();
     };
   }, [ref, active, focus, inert]);
 
@@ -233,7 +252,7 @@ function useModalSession(ref: RefObject<HTMLElement | null>, active: boolean, se
     const step = () => {
       if (s.done) return;
       if (s.closing) endSession(s, { focus, inert }, true);
-      else if (inert && !s.undoInert) s.undoInert = isolateOutside(s.panel);
+      else if (inert && !s.isolation) s.isolation = isolateOutside(s.panel);
     };
     if (settled) {
       step();

@@ -3,7 +3,7 @@ import { useRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SETTLE_FALLBACK_MS, useDialogBehaviour, useEscape } from "@/motion/a11y";
 
-function Harness({ open, settled, onClose = () => {} }: { open: boolean; settled?: boolean; onClose?: () => void }) {
+function Harness({ open, settled, onClose = () => {}, muted = false, exiting = false }: { open: boolean; settled?: boolean; onClose?: () => void; muted?: boolean; exiting?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useDialogBehaviour(ref, open, onClose, settled === undefined ? undefined : { settled });
   return (
@@ -13,7 +13,14 @@ function Harness({ open, settled, onClose = () => {} }: { open: boolean; settled
         <button type="button">Draußen</button>
       </div>
       <div aria-live="polite" data-testid="live" />
-      {open && (
+      {/* a muted status (the candle chart's OHLC legend): no live region */}
+      {muted && (
+        <div role="status" aria-live="off" data-testid="muted">
+          OHLC
+        </div>
+      )}
+      {/* `exiting`: the panel stays mounted while it animates out (AnimatePresence), like every real dialog */}
+      {(open || exiting) && (
         <div ref={ref} role="dialog" aria-label="Dialog">
           <button type="button">Erster</button>
           <button type="button">Letzter</button>
@@ -103,6 +110,35 @@ describe("useDialogBehaviour", () => {
     } finally {
       elsewhere.remove();
     }
+  });
+
+  it("closing: focus the user puts into the page during the exit stays there (the guard ends with the close, the release waits)", () => {
+    const { rerender } = render(<Harness open={false} settled />);
+    trigger().focus();
+    rerender(<Harness open settled />);
+    // open: guarded
+    act(() => screen.getByText("Draußen", { selector: "button" }).focus());
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Erster" }));
+    // closing (the exit runs, e.g. the navigation's wipe has uncovered the page): a tap into the page keeps its focus
+    rerender(<Harness open={false} settled={false} exiting />);
+    expect(behind(outside())).toBe(true);
+    const out = screen.getByText("Draußen", { selector: "button" });
+    act(() => out.focus());
+    expect(document.activeElement).toBe(out);
+    // released after the exit; the user's focus is not taken back to the opener
+    rerender(<Harness open={false} settled exiting />);
+    expect(behind(outside())).toBe(false);
+    expect(document.activeElement).toBe(out);
+  });
+
+  it("a muted status (aria-live=off) is hidden with the page; real live regions stay announced", () => {
+    const { rerender } = render(<Harness open={false} muted />);
+    rerender(<Harness open muted />);
+    expect(behind(screen.getByTestId("muted"))).toBe(true);
+    expect(screen.getByTestId("live")).not.toHaveAttribute("aria-hidden");
+    rerender(<Harness open={false} muted />);
+    expect(screen.getByTestId("muted")).not.toHaveAttribute("aria-hidden");
+    expect(screen.getByTestId("muted")).not.toHaveAttribute("data-modal-behind");
   });
 
   it("focus that lands behind the dialog (Tab in from the browser UI, a programmatic focus) returns into the panel", () => {

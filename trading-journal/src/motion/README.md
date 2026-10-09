@@ -257,10 +257,13 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
   - focus moves into the panel and Tab is trapped at once; the outside is isolated when `settled` is true (open morph done);
   - after close, releasing the outside and then returning focus wait for `settled` (exit / reverse morph done);
   - each deferral is bounded by `SETTLE_FALLBACK_MS` (700); omitting `settled` gives immediate behaviour; focus is not returned if the
-    user focused something else meanwhile; `INERT_EXEMPT_SELECTOR` (`[aria-live]`, the toast island) is never isolated.
+    user focused something else meanwhile; `INERT_EXEMPT_SELECTOR` (live regions – `[aria-live]` except `aria-live="off"`, which
+    is muted content like the chart's OHLC legend – and the toast island) is never isolated.
   - Isolation (perf-120 C) is NOT `inert`: the siblings of every ancestor get `aria-hidden="true"` + `data-modal-behind` (reference
     counted, an `aria-hidden` they already had is kept / restored) and a document `focusin` guard sends focus that lands there (Tab in
-    from the browser UI, a programmatic focus) back into the latest isolated panel; pointer input never reaches the page (every modal
+    from the browser UI, a programmatic focus) back into the latest isolated panel while it is open – the guard ends when the dialog
+    starts to close (a tap into the page the exit uncovers, e.g. during the navigation's 800 ms wipe, keeps its focus; the release
+    still waits for `settled`); pointer input never reaches the page while the dialog is open (every modal
     overlay is a fixed full-viewport layer above page, header and dock) and Tab stays trapped. `inert` is inherited style: setting and
     lifting it restyled every element of the page behind (≈ 1 900 on the Übersicht, 15–25 ms forced by the focus return after a sheet
     closed, the same again after the open morph). Reachability checks use `UNREACHABLE_SELECTOR` (`[inert],[data-modal-behind]`).
