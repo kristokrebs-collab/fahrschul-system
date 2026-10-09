@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useRef, type RefObject } from "react";
+import { openBackEntry } from "@/store/backStack";
 
 const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"]),[contenteditable="true"]';
@@ -348,6 +349,21 @@ export function useEscape(active: boolean, onClose: () => void): void {
   }, [active]);
 }
 
+/**
+ * Android back (decision 26): while `active`, the session owns one history entry (`store/backStack.ts`); the system
+ * back button / back gesture runs `onBack` – the dialog's normal close path, the same as Escape (an unsaved form asks
+ * "Änderungen verwerfen?" and keeps its entry) – instead of switching the page underneath. Closing by any other path
+ * consumes the entry without the router seeing it. Called with the latest `onBack` (an effect event), subscribed once
+ * per open session; nested sessions stack (back closes the topmost first), a hand-off in one commit keeps the entry.
+ */
+export function useBackClose(active: boolean, onBack: () => void): void {
+  const back = useEffectEvent(onBack);
+  useEffect(() => {
+    if (!active) return;
+    return openBackEntry(() => back());
+  }, [active]);
+}
+
 export interface DialogBehaviourOptions {
   /**
    * Morph-aware timing. Pass `false` while the dialog's open morph or its exit / reverse morph is running and
@@ -362,11 +378,12 @@ export interface DialogBehaviourOptions {
   fallbackFocus?: () => HTMLElement | null;
 }
 
-/** All dialog behaviours in one call (focus trap, scroll lock, isolated outside, Escape). */
+/** All dialog behaviours in one call (focus trap, scroll lock, isolated outside, Escape, Android back = Escape). */
 export function useDialogBehaviour(ref: RefObject<HTMLElement | null>, active: boolean, onClose: () => void, { settled = true, fallbackFocus }: DialogBehaviourOptions = {}): void {
   useModalSession(ref, active, settled, { focus: true, inert: true }, fallbackFocus);
   useScrollLock(active);
   useEscape(active, onClose);
+  useBackClose(active, onClose);
 }
 
 /**

@@ -7,7 +7,7 @@ Plan 1.4/1.5 (boot, router, banner), 6.6 (shell), 3.3 (dock/page morphs). The `�
 
 ```ts
 void bootJournal();      // migrate + sync hydrate, then claude.ai probe (Fall A/B) – @/store/journalStore
-installRouter();         // hash grammar #{page}[?query], hashchange, filter mirror – @/store/router
+installRouter();         // hash grammar #{page}[?query], hashchange, filter mirror, dialog back stack (back closes the topmost dialog first) – @/store/router, @/store/backStack
 bootMarket();            // startMarket(settings); follows settings.market.symbol → setSymbol, hyblock.timeframe → setPeriod
 createRoot(#root).render(<StrictMode><MotionRoot><App/></MotionRoot></StrictMode>)
 ```

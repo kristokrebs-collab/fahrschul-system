@@ -17,6 +17,7 @@ export {
   useScrollLock,
   useInertOutside,
   useEscape,
+  useBackClose,
   useDialogBehaviour,
   SETTLE_FALLBACK_MS,
   INERT_EXEMPT_SELECTOR,

@@ -72,7 +72,7 @@ interface TradeEditorProps {
   only the field). Saved as `trade.mistakes` (the settings list is never written from here).
 - **Timeframe** options = `TIMEFRAMES` (incl. 30m / 45m / 2h) plus a stored value outside the list (`timeframeOptions`), never shown as `–`.
 - **Unsaved input** (`isFormDirty` vs. the state the form opened with / was reset to by `Speichern & neu`; `Neu prüfen` counts): Escape,
-  backdrop, header ✕, swipe and `Abbrechen` show the footer confirm `Änderungen verwerfen?` `[Verwerfen]` `[Weiter bearbeiten]` (focus on the
+  the Android back button / gesture (`@/motion/a11y` `useBackClose`), backdrop, header ✕, swipe and `Abbrechen` show the footer confirm `Änderungen verwerfen?` `[Verwerfen]` `[Weiter bearbeiten]` (focus on the
   safe answer, back to `Abbrechen`) instead of closing (`Sheet dismissGuard / onDismissAttempt`).
 - More exports: `isFormDirty`, `mistakeOptions`, `usedOwnMistakes`, `withMtfAuto`, `timeframeOptions`, `DISCARD_COPY`, `MISTAKES_COPY`;
   `SignalSection.tsx`: `SignalSection`, `resolveTradeSignal`, `signalSectionSub`, `localMs`, `SIGNAL_SECTION_TITLE`, `SIGNAL_SECTION_COPY`,

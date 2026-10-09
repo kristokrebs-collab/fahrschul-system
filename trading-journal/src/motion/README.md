@@ -253,7 +253,7 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
 - `safeFx.ts`: `SAFE_FX_ATTR` / `isSafeFx()` – Samsung-Internet-safe effects (`html[data-safe-fx]`, set by `@/app/pwa`); `Reveal`,
   `RevealItem`, `StaggerItem` and PageHost drop their blur under it.
 - `a11y.ts`: `useFocusTrap(ref, active, settled?)`, `useScrollLock(active)`, `useInertOutside(ref, active, settled?)`,
-  `useEscape(active, onClose)`, `useDialogBehaviour(ref, active, onClose, { settled? })`:
+  `useEscape(active, onClose)`, `useBackClose(active, onBack)`, `useDialogBehaviour(ref, active, onClose, { settled? })`:
   - focus moves into the panel and Tab is trapped at once; the outside is isolated when `settled` is true (open morph done);
   - after close, releasing the outside and then returning focus wait for `settled` (exit / reverse morph done); a dialog opened from
     inside a CLOSING one (the detail's `Bearbeiten` → the editor) returns focus to that one's opener (the trade row) – its button is
@@ -270,6 +270,13 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
     lifting it restyled every element of the page behind (≈ 1 900 on the Übersicht, 15–25 ms forced by the focus return after a sheet
     closed, the same again after the open morph). Reachability checks use `UNREACHABLE_SELECTOR` (`[inert],[data-modal-behind]`).
   - `MorphDialog`, `Sheet` and `TradeDetail` pass `settled`.
+  - Android back (decision 26, `useBackClose(active, onBack)`, part of `useDialogBehaviour` – so every modal session has it: sheets
+    incl. the trade / setup editor and the import, morph dialogs, the trade detail, the command navigation): while open the session owns
+    one same-URL history entry (`store/backStack.ts`); the system back button / back gesture runs `onClose` – the Escape path, so an
+    unsaved form asks "Änderungen verwerfen?" and, kept open, gets its entry back (the next back asks again) – instead of switching the
+    page underneath; any other close (×, Escape, Speichern, swipe, backdrop) consumes the entry with an own `history.go` the router
+    never sees. Nested sessions stack (back closes the topmost: setup editor before the trade editor); a hand-off in one commit (detail →
+    Bearbeiten → editor, navigation → Trade eintragen) keeps the one entry. Only with no dialog open does back reach the hash router.
   - `useTouchMoveGuard(isDragging)` → ref callback: a native NON-passive `touchmove` listener that `preventDefault`s while a drag is
     engaged. React's touch listeners are passive; an unconsumed fast touch sequence lets Chrome treat the next tap (≈ 1 s) as a fling
     cancel and swallow its click. Every swipe / drag surface carries it: sheet header, dialog head, detail grabber + header, toast,

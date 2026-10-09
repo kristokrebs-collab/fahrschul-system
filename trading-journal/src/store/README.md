@@ -116,16 +116,42 @@ is the tiny persist helper (writes when any picked key changes).
 parseHash("#trades?setup=s_bo&result=win", knownSetupIds) // → { page: "trades", filter: {...y0, setup: "s_bo", result: "win"} }
 parseHash("#nope?x=1")                                     // → { page: "overview" } (query dropped)
 buildHash("trades", { setup: "s_bo" })                     // → "#trades?setup=s_bo" (non-defaults only, no sort)
-navigate("trades", { setup: id })   // tab switch = pushState (back button switches tabs); filter set AND in the URL
+navigate("trades", { setup: id })   // tab switch = pushState (back button switches tabs once no dialog is open);
+                                    // filter set AND in the URL; from inside a dialog the page entry takes the
+                                    // dialog entries' place (backStack.pushPageEntry)
 navigate("settings")                // leaving trades keeps the filter in the store; target URL has no query
 installRouter()                     // initial parse (URL wins), hashchange listener, replaceState mirror of
-                                    // filter changes on the trades page (`q` debounced 150 ms) → returns uninstall
+                                    // filter changes on the trades page (`q` debounced 150 ms; a dialog entry keeps
+                                    // its marker) + installBackStack() → returns uninstall
 restoreScroll(page, forceTop?)      // scroll memory per tab (rAF), top 0 on first visit / deep link
 showPage(page) → px                 // shell (PageHost layout effect): applies a queued restore before paint; skipped –
                                     // no layout read – when the window has not scrolled since the switch and already
                                     // stands at the target (passive scroll listener of installRouter)
 getScroll(page); currentRoute(); PAGES; PAGE_KEYS ({ overview:"o", trades:"t", setups:"s", settings:"e" })
 ```
+
+## `backStack.ts` – Android back closes the topmost dialog (decision 26)
+
+Every open modal session (`useDialogBehaviour` → `useBackClose`, `motion/a11y.ts`) owns one history entry above the page entry:
+same URL, `history.state = { tjBack: depth }`. The layer keeps the depth of the current entry (`have`) equal to the open sessions
+(`want`), reconciled once per microtask (a hand-off – one closes, one opens in the same commit – and StrictMode's replay cost nothing):
+
+```ts
+openBackEntry(onBack) → release      // session opened (push, same URL: no hashchange) / closed by any path (own history.go(-n),
+                                     // its popstate counted and ignored – nobody reacts)
+// back pressed (popstate to a smaller depth): the topmost session's onBack = its Escape path; still open BACK_CHECK_MS (50)
+// later (the guard asked "Änderungen verwerfen?") → its entry is pushed again – one push per back press, never a loop
+pushPageEntry(url)                   // router navigate: plain pushState, or – with dialog entries on top – replaces the single
+                                     // dialog entry / traverses down to the page entry and pushes after landing (nested)
+replaceEntryURL(url)                 // router filter mirror: keeps a dialog entry's marker
+consumeHandledHashChange(newURL)     // router: a hashchange of a traversal the layer handled (back that closed a dialog whose
+                                     // entry carried a newer filter URL) is no page switch – the router writes the UI's URL back
+installBackStack(env?) → uninstall   // installRouter calls it; a reload on a dialog entry steps back to the page entry
+```
+Safety: an own traversal whose `popstate` never comes is dropped after `BACK_LAND_TIMEOUT_MS` (1 s) and not retried; a traversal that
+did not move stops further automatic backs until the sessions change; a refused `pushState` switches the layer off (dialogs work
+without entries). Same-URL `pushState` is allowed on `file://` (single-file editions) and `content://`. The history never grows: at
+most one forward entry remains after a close. Not installed (component tests), sessions are only counted.
 
 ## Persistence
 

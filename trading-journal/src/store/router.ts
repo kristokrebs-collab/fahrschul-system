@@ -1,4 +1,5 @@
 import type { TradeFilter } from "@/domain/types";
+import { consumeHandledHashChange, installBackStack, pushPageEntry, replaceEntryURL } from "./backStack";
 import { useJournal } from "./journalStore";
 import { DEFAULT_TRADE_FILTER, PAGES, useUi, type Page } from "./uiStore";
 
@@ -169,21 +170,23 @@ function knownSetupIds(): string[] {
   return useJournal.getState().settings.setups.map((s) => s.id);
 }
 
+/** Rewrites the current entry's URL; a dialog entry keeps its back-stack marker (`backStack.ts`). */
 function replaceHash(hash: string): void {
   if (typeof history === "undefined" || typeof location === "undefined") return;
   if (location.hash === hash) return;
   try {
-    history.replaceState(null, "", hash);
+    replaceEntryURL(hash);
   } catch {
     /* ignore */
   }
 }
 
+/** New page entry; with dialog entries on top it takes their place (`pushPageEntry`). */
 function pushHash(hash: string): void {
   if (typeof history === "undefined" || typeof location === "undefined") return;
   if (location.hash === hash) return;
   try {
-    history.pushState(null, "", hash);
+    pushPageEntry(hash);
   } catch {
     /* ignore */
   }
@@ -209,9 +212,9 @@ function applyRoute(route: Route): void {
 }
 
 /**
- * Tab switch (`history.pushState`, back button changes the tab). With `query` the filter is set
- * AND the URL carries it (`Alle Trades mit dieser Grundlage →`). Leaving `trades` keeps the filter in
- * the store; the target hash has no query.
+ * Tab switch (`history.pushState`, back button changes the tab – once no dialog is open, see `backStack.ts`). With
+ * `query` the filter is set AND the URL carries it (`Alle Trades mit dieser Grundlage →`). Leaving `trades` keeps the
+ * filter in the store; the target hash has no query.
  */
 export function navigate(page: Page, query?: Partial<TradeFilter>): void {
   const ui = useUi.getState();
@@ -234,19 +237,34 @@ export function currentRoute(): Route {
   return parseHash(typeof location === "undefined" ? "" : location.hash, knownSetupIds());
 }
 
+/** The URL of what the UI shows now (page + the trades filter). */
+function uiHash(): string {
+  const ui = useUi.getState();
+  return buildHash(ui.page, ui.page === "trades" ? ui.tradeFilter : undefined);
+}
+
 /**
  * Installs the hash router: initial parse (query wins over the store), `hashchange` listener
  * (back/forward), and a store subscription that mirrors filter changes on the trades page into the
- * URL via `replaceState` (`q` debounced 150 ms, no history entry). Returns an uninstall function.
+ * URL via `replaceState` (`q` debounced 150 ms, no history entry). Also installs the dialog back stack
+ * (`backStack.ts`: back closes the topmost dialog first): a `hashchange` that belongs to closing a dialog is no page
+ * switch – the URL is set back to what the UI shows. Returns an uninstall function.
  */
 export function installRouter(): () => void {
   if (typeof window === "undefined") return () => {};
 
   applyRoute(currentRoute());
-  replaceHash(buildHash(useUi.getState().page, useUi.getState().page === "trades" ? useUi.getState().tradeFilter : undefined));
+  replaceHash(uiHash());
 
-  const onHashChange = () => applyRoute(currentRoute());
+  const onHashChange = (e: HashChangeEvent) => {
+    if (consumeHandledHashChange(e.newURL || location.href)) {
+      replaceHash(uiHash());
+      return;
+    }
+    applyRoute(currentRoute());
+  };
   window.addEventListener("hashchange", onHashChange);
+  const uninstallBack = installBackStack();
   const untrack = trackScroll();
 
   let qTimer: ReturnType<typeof setTimeout> | null = null;
@@ -263,6 +281,7 @@ export function installRouter(): () => void {
 
   return () => {
     window.removeEventListener("hashchange", onHashChange);
+    uninstallBack();
     untrack();
     unsubscribe();
     if (qTimer) clearTimeout(qTimer);
