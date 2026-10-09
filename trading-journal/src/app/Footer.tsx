@@ -14,6 +14,7 @@ import { ChartAttribution } from "@/chart/Attribution";
 import { cn } from "@/lib/cn";
 import { DancingSvgWord } from "@/motion/pulse/DancingLetters";
 import { Marquee } from "@/motion/pulse/Marquee";
+import { isScrolling } from "@/motion/scrollGate";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useHoverRect } from "@/primitives/hoverRect";
@@ -88,6 +89,9 @@ export function FooterOutline({ text = FOOTER_TEXT, draw = true }: { text?: stri
 
   const at = (e: PointerEvent<HTMLDivElement>, r: DOMRect) => ({ x: e.clientX - r.left, y: e.clientY - r.top });
   const onPointerEnter = (e: PointerEvent<HTMLDivElement>) => {
+    // the page scrolled the outline under a resting pointer: no rect read inside a scroll frame (like the cards);
+    // the first real move starts the tracking
+    if (isScrolling()) return;
     if (e.pointerType !== "mouse") return;
     const p = at(e, hoverRect.enter(e.currentTarget));
     // start the mask under the pointer instead of sweeping in from the last spot
