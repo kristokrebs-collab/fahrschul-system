@@ -1,0 +1,265 @@
+@import "./fonts.css";
+@import "./tokens.css";
+@import "./shiny-cta.css";
+
+/* Dark only, declared three ways (meta in index.html, this property, the media block below): Chromium's Auto Dark Mode
+   and WebView force-dark leave a page alone that declares dark support; Samsung Internet keeps a site's own dark
+   theme when its "Use website dark theme" lab is on and the site answers `prefers-color-scheme: dark`. `only` forbids
+   the user agent from re-theming (CSS Color Adjust 1). Nothing a page can do stops Samsung's default night filter. */
+:root {
+  color-scheme: only dark;
+  /* Bottom inset (grey-bar fix): the larger of the notch/taskbar safe area and the host UI that covers the bottom of
+     the layout viewport (browser toolbar or sheet), measured from visualViewport by src/app/pwa.ts → --vv-bottom.
+     Everything pinned to the bottom (dock, toast island, footer padding, bottom fade, focus scroll padding) uses it. */
+  --vv-bottom: 0px;
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--vv-bottom));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: only dark;
+  }
+}
+
+html,
+body {
+  background: var(--color-ink-900);
+}
+
+/* Android draws a translucent rectangle on every tapped element (and keeps it while the finger rests): the press
+   feedback is our own (whileTap / ripple / :active), so the system flash is off. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* The dialog scroll lock (body overflow:hidden) must not make the scrollbar vanish and reflow the page
+   under a running morph: keep its gutter reserved. */
+html {
+  scrollbar-gutter: stable;
+  /* keyboard focus scrolls controls clear of the sticky header (top) and the bottom fade + dock (bottom); this also
+     lets the focused control's Reveal cell cross its in-view threshold, so a focus ring never sits at opacity 0 */
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 72px);
+  scroll-padding-bottom: calc(var(--safe-bottom) + 120px);
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  background-color: var(--color-ink-900);
+  background-image:
+    radial-gradient(1200px 600px at 50% -10%, #ffffff0b, transparent 70%),
+    radial-gradient(circle at 1px 1px, #ffffff0e 1px, transparent 0);
+  background-size:
+    auto,
+    22px 22px;
+  background-position:
+    0 0,
+    0 0;
+}
+
+/* fractal noise film */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: #e5202e66;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-steel);
+  outline-offset: 2px;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.recharts-wrapper svg,
+.recharts-surface {
+  outline: none;
+}
+
+@utility num {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility dot-num {
+  font-family: var(--font-dot);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+}
+
+/* Reduced motion: every CSS transition/animation completes at once. Infinite loops (spinners, pings, shimmers,
+   beams) run a single ~0 ms iteration and stop, so nothing keeps the page animating; delays are dropped so nothing
+   pops in late. They are deliberately not `paused`: a paused animation would freeze on its first keyframe, which is
+   often invisible (opacity 0). */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* Command navigation (pack immersive-full-screen-navigation): hovering one link dims the others to 45 % */
+@media (hover: hover) {
+  .cmdnav-links:hover .cmdnav-link:not(:hover) {
+    opacity: 0.45;
+  }
+}
+
+/* Touch hit area: on coarse pointers the element's tap target grows to at least 44 × 44 CSS px without changing
+   layout (an invisible centred ::after). Opt-in; the element becomes a positioning context. In the components layer:
+   an un-layered `position: relative` would beat Tailwind's `absolute` / `fixed` / `sticky` utilities on the element. */
+@layer components {
+  @media (pointer: coarse) {
+    .touch-hit {
+      position: relative;
+    }
+    .touch-hit::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+/* For markup we do not render ourselves (e.g. the chart attribution's text link): every link inside gets the same
+   ≥ 44 × 44 coarse-pointer tap area. */
+@layer components {
+  @media (pointer: coarse) {
+    .touch-hit-links a {
+      position: relative;
+    }
+    .touch-hit-links a::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 44px);
+      height: max(100%, 44px);
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
+/* Same, vertical only (dense rows of side-by-side controls: the area grows to 44 px tall and never sideways into a
+   neighbour). */
+@layer components {
+  @media (pointer: coarse) {
+    .touch-hit-y {
+      position: relative;
+    }
+    .touch-hit-y::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      height: max(100%, 44px);
+      transform: translateY(-50%);
+    }
+  }
+}
+
+/* Installed app (standalone / fullscreen display mode, see public/manifest.webmanifest): no text selection by long
+   press on chrome surfaces, no callout menu – it behaves like an app, not a page. Form fields keep selection. */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  header,
+  nav {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
+/* Samsung-Internet-safe effects (decision 7; `data-safe-fx` on <html>, set by src/app/pwa.ts for Samsung Internet or
+   `?safefx=1`). Fixed / sticky layers keep opacity and transform only: no backdrop-filter anywhere, no clip-path
+   reveal on the dock label plates (they fade instead), no mask-image on the header CTA's shine layers, no fixed
+   noise film (an SVG-filter image over the whole viewport), no blurred toast glow, no extra composited will-change
+   layers in the dock. Un-layered rules: they beat the Tailwind utilities without !important where possible. */
+html[data-safe-fx] body::before,
+html[data-diag-nonoise] body::before {
+  display: none;
+}
+html[data-safe-fx] * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html[data-safe-fx] .dock-tip {
+  clip-path: none;
+  opacity: 0;
+  transition: var(--dock-tipsafe-out);
+}
+html[data-safe-fx] .group\/dock:focus-visible .dock-tip,
+html[data-safe-fx] .group\/dock[data-scrub] .dock-tip {
+  opacity: 1;
+  transition: var(--dock-tipsafe-in);
+}
+@media (hover: hover) {
+  html[data-safe-fx] .group\/dock:hover .dock-tip {
+    opacity: 1;
+    transition: var(--dock-tipsafe-in);
+  }
+}
+html[data-safe-fx] [data-layer="Dock"] .will-change-transform {
+  will-change: auto;
+}
+html[data-safe-fx] .toast-glow {
+  display: none;
+}
+html[data-safe-fx] .shiny-cta::before,
+html[data-safe-fx] .shiny-cta::after {
+  display: none;
+}
+/* the masked shimmer's red under-glow at rest, as a plain inset shadow */
+html[data-safe-fx] .shiny-cta {
+  box-shadow:
+    inset 0 0 0 1px var(--shiny-cta-bg-subtle),
+    inset 0 -14px 16px -14px rgb(229 32 46 / 0.75);
+}

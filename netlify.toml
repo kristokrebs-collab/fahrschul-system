@@ -1,0 +1,82 @@
+# Netlify deploys the trading journal (Vite app) from the trading-journal/ subfolder.
+# Two editions on one site:
+#   /          personal edition ("persönlich", `npm run build` → dist/)
+#   /teilen/   share edition ("zum Teilen": empty journal, neutral setups, own tj2share-* storage;
+#              `npm run build:share` → dist/teilen/, the build fails if a personal string leaks)
+# The personal build empties dist/, so it must run first.
+# The legacy static dashboard stays reachable at /dashboard.html (copied into dist at build time).
+[build]
+  base = "trading-journal"
+  command = "npm ci && npm run build && npm run build:share"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Same-origin proxy for Binance USDⓈ-M PUBLIC market data (no keys, GET only), BEFORE the SPA fallbacks.
+# The app reads Binance directly from the browser; `src/market` switches the top-trader / retail ratio feeds to
+# /api/binance/* only when it must: the browser cannot read /futures/data/* (CORS / network) while the rest of Binance
+# answers, Binance is geo-blocked, or the user turned on "EU-Proxy verwenden". A probe of /api/binance/fapi/v1/time
+# must return Binance JSON first (without these rules it gets the SPA's index.html and the proxy stays off).
+# Netlify forwards the query string and proxies from its CDN edge next to the visitor. CSP: covered by 'self'.
+# Only the endpoints the app uses are mapped; anything else under /api/binance falls through to the SPA (HTML).
+[[redirects]]
+  from = "/api/binance/futures/data/*"
+  to = "https://fapi.binance.com/futures/data/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/time"
+  to = "https://fapi.binance.com/fapi/v1/time"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/klines"
+  to = "https://fapi.binance.com/fapi/v1/klines"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/premiumIndex"
+  to = "https://fapi.binance.com/fapi/v1/premiumIndex"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/ticker/24hr"
+  to = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/openInterest"
+  to = "https://fapi.binance.com/fapi/v1/openInterest"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/binance/fapi/v1/fundingRate"
+  to = "https://fapi.binance.com/fapi/v1/fundingRate"
+  status = 200
+  force = true
+
+# Share edition: its own SPA fallback, BEFORE the catch-all (existing files such as /teilen/assets/* win anyway;
+# `/teilen` without slash is served as /teilen/index.html by Netlify itself – no extra rule, rules ignore the slash).
+[[redirects]]
+  from = "/teilen/*"
+  to = "/teilen/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; connect-src 'self' https://fapi.binance.com wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self'; worker-src 'self' blob:"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

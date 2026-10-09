@@ -1,0 +1,11 @@
+node_modules
+dist
+dist-single
+release
+.env
+.env.*
+!.env.example
+playwright-report
+test-results
+*.local
+*.tsbuildinfo

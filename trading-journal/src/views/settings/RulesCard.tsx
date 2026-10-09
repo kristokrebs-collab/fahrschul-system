@@ -1,0 +1,233 @@
+import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
+import { startTransition, useState, type KeyboardEvent } from "react";
+import { flushSync } from "react-dom";
+import type { Rule, Trade } from "@/domain/types";
+import { newRuleId } from "@/lib/ids";
+import { CONFIG as LIFT_CONFIG, useLift } from "@/motion/pulse/WidgetGrid";
+import { radius, spring, tween } from "@/motion/tokens";
+import { Button } from "@/primitives/Button";
+import { Card } from "@/primitives/Card";
+import { Icon } from "@/primitives/icons";
+import { Input } from "@/primitives/Input";
+import { ChangedDot } from "./fx";
+
+export const RULES_STRINGS = {
+  title: "Grundregeln",
+  note: "Stehen in jeder Checkliste. Reihenfolge per Griff oder Pfeiltasten.",
+  add: "+ Regel hinzufügen",
+  remove: "Regel entfernen",
+  removeHint: (n: number) => `${n} Trades verlieren den Haken`,
+  rule: (n: number) => `Regel ${n}`,
+  move: (n: number) => `Regel ${n} verschieben`,
+  yes: "Ja",
+  no: "Nein",
+} as const;
+
+/** Trades that have `checks["g:{ruleId}"] === true`. */
+export function ruleUsage(trades: readonly Trade[], ruleId: string): number {
+  const key = `g:${ruleId}`;
+  return trades.filter((t) => t.checks?.[key] === true).length;
+}
+
+export function moveRule(list: readonly Rule[], from: number, dir: -1 | 1): Rule[] {
+  const to = from + dir;
+  if (to < 0 || to >= list.length) return [...list];
+  const out = [...list];
+  const [it] = out.splice(from, 1);
+  out.splice(to, 0, it as Rule);
+  return out;
+}
+
+export interface RulesCardProps {
+  rules: Rule[];
+  onChange: (rules: Rule[]) => void;
+  trades: readonly Trade[];
+  /** The rules differ from the saved settings → signal dot after the title. */
+  changed?: boolean;
+  className?: string;
+}
+
+/**
+ * NEW `Grundregeln` card (Plan 6.4): editable `settings.rules` – text inputs, `Reorder` (drag handle +
+ * arrow keys), `+ Regel hinzufügen` (ids `newRuleId()`), `Regel entfernen` with the hint
+ * `{n} Trades verlieren den Haken` as inline confirm. Built-in ids stay stable. Rows enter/exit via
+ * `AnimatePresence mode="popLayout"` (Plan 3.3). Saved with the page's `Speichern`.
+ * A dragged rule lifts (scale 1.02 + a pre-rendered shadow layer fading in, never an animated box-shadow).
+ */
+export function RulesCard({ rules, onChange, trades, changed = false, className }: RulesCardProps) {
+  const [confirm, setConfirm] = useState<string | null>(null);
+  // Motion's drag feature measures its element synchronously when it mounts (one forced style + layout of the
+  // settings page in the mount commit, ≈ 35 ms on the tablet probe): the rows get it only when a drag can start –
+  // pointer over / focus on a handle arms them in a background render, a press arms them at once (flushSync, so the
+  // drag starts on that very press). The arrow keys never need it.
+  const [dragReady, setDragReady] = useState(false);
+  const arm = (now: boolean) => {
+    if (dragReady) return;
+    if (now) flushSync(() => setDragReady(true));
+    else startTransition(() => setDragReady(true));
+  };
+  const ids = rules.map((r) => r.id).join();
+
+  const remove = (id: string) => {
+    onChange(rules.filter((r) => r.id !== id));
+    setConfirm(null);
+  };
+
+  return (
+    <Card
+      title={
+        <>
+          {RULES_STRINGS.title}
+          <ChangedDot show={changed} />
+        </>
+      }
+      note={RULES_STRINGS.note}
+      className={className}
+    >
+      <Reorder.Group axis="y" values={rules} onReorder={onChange} className="grid gap-2" aria-label={RULES_STRINGS.title}>
+        <AnimatePresence mode="popLayout" initial={false}>
+          {rules.map((rule, i) => {
+            const used = ruleUsage(trades, rule.id);
+            return (
+              <RuleRow
+                key={rule.id}
+                rule={rule}
+                index={i}
+                count={rules.length}
+                ids={ids}
+                dragReady={dragReady}
+                onArm={arm}
+                confirming={confirm === rule.id}
+                used={used}
+                onText={(text) => onChange(rules.map((r) => (r.id === rule.id ? { ...r, text } : r)))}
+                onMove={(dir) => onChange(moveRule(rules, i, dir))}
+                onRemove={() => (used > 0 ? setConfirm(rule.id) : remove(rule.id))}
+                onConfirm={() => remove(rule.id)}
+                onCancel={() => setConfirm(null)}
+              />
+            );
+          })}
+        </AnimatePresence>
+      </Reorder.Group>
+      <Button size="sm" className="mt-3 justify-self-start" onClick={() => onChange([...rules, { id: newRuleId(), text: "" }])}>
+        {RULES_STRINGS.add}
+      </Button>
+    </Card>
+  );
+}
+
+/** Row lift for the pulse `useLift` physics (scale spring 900/40 + glow τ 70 ms); 1.02 instead of the tile's 1.06 – a full-width row must stay inside the card padding. */
+const LIFT_SCALE = 1.02;
+
+interface RuleRowProps {
+  rule: Rule;
+  index: number;
+  count: number;
+  ids: string;
+  /** the drag feature is mounted (see `RulesCard`) */
+  dragReady: boolean;
+  /** mount the drag feature on every row: `true` = synchronously (a press), `false` = in a background render */
+  onArm: (now: boolean) => void;
+  used: number;
+  confirming: boolean;
+  onText: (text: string) => void;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function RuleRow({ rule, index, count, ids, dragReady, onArm, used, confirming, onText, onMove, onRemove, onConfirm, onCancel }: RuleRowProps) {
+  const controls = useDragControls();
+  const lift = useLift({ scale: LIFT_SCALE });
+  const onHandleKey = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "ArrowUp" && index > 0) {
+      e.preventDefault();
+      onMove(-1);
+    } else if (e.key === "ArrowDown" && index < count - 1) {
+      e.preventDefault();
+      onMove(1);
+    }
+  };
+  return (
+    <Reorder.Item
+      value={rule}
+      // overrides Reorder.Item's `drag={axis}`: no drag feature (and no mount-time measure) until armed
+      drag={dragReady ? "y" : false}
+      dragListener={false}
+      dragControls={dragReady ? controls : undefined}
+      layout
+      layoutDependency={ids}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.98, transition: tween.exit }}
+      onDragStart={lift.lift}
+      onDragEnd={lift.settle}
+      transition={{ ...spring.layout, layout: spring.layout }}
+      style={{ borderRadius: radius.input, scale: lift.scale }}
+      className="relative isolate grid gap-2"
+      data-testid={`rule-${rule.id}`}
+    >
+      <motion.span
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-1 -z-10 rounded-[14px] bg-ink-850"
+        style={{ opacity: lift.glow, boxShadow: LIFT_CONFIG.glowShadow }}
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          aria-label={RULES_STRINGS.move(index + 1)}
+          title="Ziehen oder Pfeiltasten"
+          onPointerEnter={() => onArm(false)}
+          onFocus={() => onArm(false)}
+          onPointerDown={(e) => {
+            onArm(true);
+            controls.start(e);
+          }}
+          onKeyDown={onHandleKey}
+          className="grid size-10 shrink-0 cursor-grab touch-none place-items-center rounded-xl border border-line-2 text-faint hover:text-fg active:cursor-grabbing pointer-coarse:size-11"
+        >
+          <svg viewBox="0 0 12 12" className="size-3" fill="currentColor" aria-hidden="true">
+            <circle cx="4" cy="2.5" r="1" />
+            <circle cx="8" cy="2.5" r="1" />
+            <circle cx="4" cy="6" r="1" />
+            <circle cx="8" cy="6" r="1" />
+            <circle cx="4" cy="9.5" r="1" />
+            <circle cx="8" cy="9.5" r="1" />
+          </svg>
+        </button>
+        <Input value={rule.text} aria-label={RULES_STRINGS.rule(index + 1)} onChange={(e) => onText(e.target.value)} autoComplete="off" />
+        <motion.button
+          type="button"
+          aria-label={RULES_STRINGS.remove}
+          onClick={onRemove}
+          whileTap={{ scale: 0.92 }}
+          transition={spring.press}
+          className="grid size-10 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors hover:border-loss/40 hover:text-loss pointer-coarse:size-11 [&>svg]:size-4"
+        >
+          <Icon name="x" />
+        </motion.button>
+      </div>
+      <AnimatePresence initial={false}>
+        {confirming && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, transition: tween.exit }}
+            transition={tween.fade}
+            className="flex flex-wrap items-center gap-2 pl-12 text-[12.5px] text-[#ff8a90] pointer-coarse:pl-[3.25rem]"
+            role="alert"
+          >
+            {RULES_STRINGS.removeHint(used)}
+            <Button size="sm" variant="danger" onClick={onConfirm}>
+              {RULES_STRINGS.yes}
+            </Button>
+            <Button size="sm" onClick={onCancel}>
+              {RULES_STRINGS.no}
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Reorder.Item>
+  );
+}
