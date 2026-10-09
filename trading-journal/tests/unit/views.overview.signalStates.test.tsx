@@ -130,10 +130,19 @@ describe("SignalCard", () => {
     }
     wrap(<Probe />);
     const before = renders;
-    act(() => nowMv.set(closesAt - 65_000));
-    await waitFor(() => expect(screen.getByTestId("signal-state")).toHaveTextContent("vorläufig · schließt in 1:05"));
-    act(() => nowMv.set(closesAt - 64_000));
-    await waitFor(() => expect(screen.getByTestId("signal-state")).toHaveTextContent("vorläufig · schließt in 1:04"));
+    // the card holds the real clock, whose next second tick sets nowMv to Date.now(): Date follows each step, so a
+    // tick that lands between the step and the assertion (a loaded parallel run) cannot move the countdown back
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(closesAt - 65_000);
+      act(() => nowMv.set(closesAt - 65_000));
+      await waitFor(() => expect(screen.getByTestId("signal-state")).toHaveTextContent("vorläufig · schließt in 1:05"));
+      vi.setSystemTime(closesAt - 64_000);
+      act(() => nowMv.set(closesAt - 64_000));
+      await waitFor(() => expect(screen.getByTestId("signal-state")).toHaveTextContent("vorläufig · schließt in 1:04"));
+    } finally {
+      vi.useRealTimers();
+    }
     expect(renders).toBe(before);
     act(() => publish({ snapshot: confirmedEntry(), updatedAt: 2 }));
     expect(screen.getByTestId("signal-state")).toHaveAttribute("data-state", "confirmed");
