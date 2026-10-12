@@ -125,7 +125,12 @@ export const PLAN_CATALOG: Readonly<Record<PlanId, PlanCatalogEntry>> = {
     id: "pro",
     name: "Pro",
     tagline: "Für Trader, die ihren Edge messen wollen.",
-    highlights: ["Börsen-Sync – Trades kommen automatisch", "Coach findet deine teuersten Fehler", "Profi-Statistik & Monte Carlo", "Trade-Replay & Box-Scanner"],
+    highlights: [
+      "Börsen-Sync – Trades kommen automatisch",
+      "Coach findet deine teuersten Fehler",
+      "Profi-Statistik & Monte Carlo",
+      "Trade-Replay & Box-Scanner",
+    ],
     glyph: "PRO",
     recommended: true,
   },
@@ -185,6 +190,12 @@ export function minPlanFor(feature: Feature): PlanId {
 export function upgradePlanFor(feature: Feature): PaidPlanId {
   const p = minPlanFor(feature);
   return p === "free" ? "pro" : p;
+}
+
+/** The cheapest paid plan above `current` whose limit for `key` exceeds `used` (Premium when none does). */
+export function upgradePlanForLimit(key: LimitKey, current: PlanId, used: number): PaidPlanId {
+  for (const p of PAID_PLANS) if (PLAN_RANK[p] > PLAN_RANK[current] && PLAN_LIMITS[p][key] > used) return p;
+  return "premium";
 }
 
 /** Highest-ranked plan of a list (`free` for none). */

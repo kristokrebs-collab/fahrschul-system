@@ -117,7 +117,16 @@ export const PORTAL_ACTIONS = ["cancel", "resume", "pause"] as const;
 export type PortalAction = (typeof PORTAL_ACTIONS)[number];
 
 /** Stripe's `cancellation_details.feedback` values. */
-export const CANCEL_REASONS = ["too_expensive", "missing_features", "unused", "switched_service", "too_complex", "low_quality", "customer_service", "other"] as const;
+export const CANCEL_REASONS = [
+  "too_expensive",
+  "missing_features",
+  "unused",
+  "switched_service",
+  "too_complex",
+  "low_quality",
+  "customer_service",
+  "other",
+] as const;
 export type CancelReason = (typeof CANCEL_REASONS)[number];
 
 export interface PortalRequest {

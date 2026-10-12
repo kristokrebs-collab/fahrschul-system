@@ -18,9 +18,44 @@
  */
 import { randomBytes } from "node:crypto";
 import Stripe from "stripe";
-import { normalizePromoCode, normalizeRefCode, safeReturnTo, type BillingConfig, type BillingStatus, type CancelReason, type CheckoutRequest, type CheckoutResponse, type CodeLookup, type InvoiceSummary, type LedgerEntry, type PortalAction, type PortalFlow, type PriceInfo, type ReferralInfo, type SubscriptionSummary } from "../../../src/billing/contract";
-import { DEFAULT_REFERRAL_REWARD_CENTS, DEFAULT_REFERRAL_TRIAL_DAYS, DEFAULT_TRIAL_DAYS, PAID_PLANS, PLAN_CATALOG, PLAN_RANK, isPaidPlan, type PaidPlanId } from "../../../src/billing/plans";
-import { BILLING_INTERVALS, grantsPlan, isPlanId, isPlanStatus, type BillingInterval, type PlanId, type PlanInfo, type PlanStatus } from "../../../src/billing/types";
+import {
+  normalizePromoCode,
+  normalizeRefCode,
+  safeReturnTo,
+  type BillingConfig,
+  type BillingStatus,
+  type CancelReason,
+  type CheckoutRequest,
+  type CheckoutResponse,
+  type CodeLookup,
+  type InvoiceSummary,
+  type LedgerEntry,
+  type PortalAction,
+  type PortalFlow,
+  type PriceInfo,
+  type ReferralInfo,
+  type SubscriptionSummary,
+} from "../../../src/billing/contract";
+import {
+  DEFAULT_REFERRAL_REWARD_CENTS,
+  DEFAULT_REFERRAL_TRIAL_DAYS,
+  DEFAULT_TRIAL_DAYS,
+  PAID_PLANS,
+  PLAN_CATALOG,
+  PLAN_RANK,
+  isPaidPlan,
+  type PaidPlanId,
+} from "../../../src/billing/plans";
+import {
+  BILLING_INTERVALS,
+  grantsPlan,
+  isPlanId,
+  isPlanStatus,
+  type BillingInterval,
+  type PlanId,
+  type PlanInfo,
+  type PlanStatus,
+} from "../../../src/billing/types";
 import { isMissingTable } from "./account";
 import { audit } from "./audit";
 import type { AuthUser } from "./auth";
@@ -144,7 +179,8 @@ export async function stripeCall<T>(what: string, fn: () => Promise<T>): Promise
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const validUuid = (v: unknown): string | null => (typeof v === "string" && UUID.test(v) ? v : null);
-const idOf = (v: unknown): string | null => (typeof v === "string" ? v : v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string" ? (v as { id: string }).id : null);
+const idOf = (v: unknown): string | null =>
+  typeof v === "string" ? v : v && typeof v === "object" && typeof (v as { id?: unknown }).id === "string" ? (v as { id: string }).id : null;
 const iso = (sec: number | null | undefined): string | null => (typeof sec === "number" && sec > 0 ? new Date(sec * 1000).toISOString() : null);
 
 /** One `subscriptions` row (snake_case = the table). */
@@ -178,7 +214,9 @@ export function mapStatus(status: string, pausedCollection: boolean): Exclude<Pl
 }
 
 /** Plan of a Stripe price: the env map, else `metadata.plan` / `lookup_key` (`pro_monthly`, …). */
-export function planOfPrice(price: Pick<Stripe.Price, "id" | "metadata" | "lookup_key" | "recurring"> | null | undefined): { plan: PlanId; interval: BillingInterval | null } | null {
+export function planOfPrice(
+  price: Pick<Stripe.Price, "id" | "metadata" | "lookup_key" | "recurring"> | null | undefined,
+): { plan: PlanId; interval: BillingInterval | null } | null {
   if (!price) return null;
   const mapped = planForPrice(price.id);
   if (mapped) return mapped;
@@ -267,7 +305,12 @@ const SUB_COLUMNS =
 
 /** The user's subscription rows, newest first (empty while the table does not exist). */
 export async function subscriptionRows(userId: string): Promise<SubscriptionRow[]> {
-  const { data, error } = await supabaseAdmin().from("subscriptions").select(SUB_COLUMNS).eq("user_id", userId).order("updated_at", { ascending: false }).limit(20);
+  const { data, error } = await supabaseAdmin()
+    .from("subscriptions")
+    .select(SUB_COLUMNS)
+    .eq("user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(20);
   if (error) {
     if (isMissingTable(error)) return [];
     dbFail("subscriptions read", error);
@@ -296,7 +339,9 @@ async function userForCustomer(customerId: string): Promise<string | null> {
 
 /** Links the user to a Stripe customer (the first link wins). */
 export async function linkCustomer(userId: string, customerId: string): Promise<void> {
-  const { error } = await supabaseAdmin().from("billing_customers").upsert({ user_id: userId, stripe_customer_id: customerId }, { onConflict: "user_id", ignoreDuplicates: true });
+  const { error } = await supabaseAdmin()
+    .from("billing_customers")
+    .upsert({ user_id: userId, stripe_customer_id: customerId }, { onConflict: "user_id", ignoreDuplicates: true });
   if (error && !isMissingTable(error) && error.code !== "23505") dbFail("billing_customers write", error);
 }
 
@@ -333,14 +378,18 @@ export interface SyncResult {
  * `fresh`: the object was just read from Stripe (always written); otherwise a snapshot older than the stored
  * `last_event_at` is skipped. Returns null when the subscription cannot be attributed to a user.
  */
-export async function syncSubscription(sub: Stripe.Subscription, opts: { eventAt?: number | null; userId?: string | null; fresh?: boolean } = {}): Promise<SyncResult | null> {
+export async function syncSubscription(
+  sub: Stripe.Subscription,
+  opts: { eventAt?: number | null; userId?: string | null; fresh?: boolean } = {},
+): Promise<SyncResult | null> {
   const sb = supabaseAdmin();
   const customer = idOf(sub.customer);
   const prev = await sb.from("subscriptions").select("user_id,last_event_at").eq("id", sub.id).maybeSingle();
   if (prev.error && !isMissingTable(prev.error)) dbFail("subscriptions read", prev.error);
   const prevRow = prev.data as { user_id?: string; last_event_at?: string | null } | null;
   // a subscription never moves between users: the first attribution wins
-  const userId = validUuid(prevRow?.user_id) ?? validUuid(opts.userId) ?? validUuid(sub.metadata?.supabase_user_id) ?? (customer ? await userForCustomer(customer) : null);
+  const userId =
+    validUuid(prevRow?.user_id) ?? validUuid(opts.userId) ?? validUuid(sub.metadata?.supabase_user_id) ?? (customer ? await userForCustomer(customer) : null);
   if (!userId || !customer) {
     console.error("[fn] subscription without a user", sub.id);
     return null;
@@ -405,7 +454,9 @@ const PRICE_TTL_MS = 10 * 60_000;
 
 /** Real prices of the configured price ids (cached 10 min per instance; Stripe down → `{}`, the client shows list prices). */
 export async function configuredPrices(now = Date.now()): Promise<BillingConfig["prices"]> {
-  const ids = PAID_PLANS.flatMap((p) => BILLING_INTERVALS.map((i) => [p, i, priceIdFor(p, i)] as const)).filter((x): x is readonly [PaidPlanId, BillingInterval, string] => !!x[2]);
+  const ids = PAID_PLANS.flatMap((p) => BILLING_INTERVALS.map((i) => [p, i, priceIdFor(p, i)] as const)).filter(
+    (x): x is readonly [PaidPlanId, BillingInterval, string] => !!x[2],
+  );
   const key = ids.map((x) => x[2]).join(",");
   if (priceCache && priceCache.key === key && now - priceCache.at < PRICE_TTL_MS) return priceCache.prices;
   const prices: BillingConfig["prices"] = {};
@@ -461,7 +512,10 @@ export async function ensureCustomer(user: Pick<AuthUser, "id" | "email">): Prom
   const existing = await customerIdOf(user.id);
   if (existing) return existing;
   const created = await stripeCall("customer create", () =>
-    stripeApi().customers.create({ ...(user.email ? { email: user.email } : {}), preferred_locales: ["de"], metadata: { supabase_user_id: user.id } }, { idempotencyKey: `tj-customer-${user.id}` }),
+    stripeApi().customers.create(
+      { ...(user.email ? { email: user.email } : {}), preferred_locales: ["de"], metadata: { supabase_user_id: user.id } },
+      { idempotencyKey: `tj-customer-${user.id}` },
+    ),
   );
   await linkCustomer(user.id, created.id);
   const winner = (await customerIdOf(user.id)) ?? created.id;
@@ -488,7 +542,8 @@ export async function findPromotionCode(code: string): Promise<Stripe.PromotionC
   return pc;
 }
 
-const euro = (cents: number, currency = "eur") => new Intl.NumberFormat("de-DE", { style: "currency", currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
+const euro = (cents: number, currency = "eur") =>
+  new Intl.NumberFormat("de-DE", { style: "currency", currency: currency.toUpperCase(), minimumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100);
 
 /** Preview of a promotion code for the pricing page. */
 export async function lookupCode(raw: string): Promise<CodeLookup> {
@@ -498,8 +553,19 @@ export async function lookupCode(raw: string): Promise<CodeLookup> {
   const pc = await findPromotionCode(code);
   const coupon = pc?.promotion?.coupon;
   if (!pc || !coupon || typeof coupon !== "object") return invalid;
-  const value = coupon.percent_off ? `−${coupon.percent_off.toLocaleString("de-DE")} %` : coupon.amount_off ? `−${euro(coupon.amount_off, coupon.currency ?? "eur")}` : "";
-  const span = coupon.duration === "forever" ? "dauerhaft" : coupon.duration === "once" ? "auf die erste Zahlung" : coupon.duration_in_months ? `für ${coupon.duration_in_months} ${coupon.duration_in_months === 1 ? "Monat" : "Monate"}` : "";
+  const value = coupon.percent_off
+    ? `−${coupon.percent_off.toLocaleString("de-DE")} %`
+    : coupon.amount_off
+      ? `−${euro(coupon.amount_off, coupon.currency ?? "eur")}`
+      : "";
+  const span =
+    coupon.duration === "forever"
+      ? "dauerhaft"
+      : coupon.duration === "once"
+        ? "auf die erste Zahlung"
+        : coupon.duration_in_months
+          ? `für ${coupon.duration_in_months} ${coupon.duration_in_months === 1 ? "Monat" : "Monate"}`
+          : "";
   return {
     valid: true,
     code: pc.code.toUpperCase(),
@@ -547,7 +613,9 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     customer,
     client_reference_id: user.id,
     locale: "de",
-    line_items: [{ price: priceId, quantity: seats, ...(team ? { adjustable_quantity: { enabled: true, minimum: cat.minSeats ?? 2, maximum: cat.maxSeats ?? 50 } } : {}) }],
+    line_items: [
+      { price: priceId, quantity: seats, ...(team ? { adjustable_quantity: { enabled: true, minimum: cat.minSeats ?? 2, maximum: cat.maxSeats ?? 50 } } : {}) },
+    ],
     success_url: `${origin}${path}?billing=success&session_id={CHECKOUT_SESSION_ID}${hash}`,
     cancel_url: `${origin}${path}?billing=cancel${hash}`,
     metadata: meta,
@@ -559,7 +627,9 @@ export async function createCheckout(user: AuthUser, body: CheckoutRequest, orig
     ...(cardless ? { payment_method_collection: "if_required" as const } : {}),
     // allow_promotion_codes and discounts are mutually exclusive: a pre-checked code is applied, otherwise the field shows
     ...(discounts ? { discounts } : { allow_promotion_codes: true }),
-    ...(tax ? { automatic_tax: { enabled: true }, customer_update: { address: "auto" as const, name: "auto" as const }, tax_id_collection: { enabled: true } } : {}),
+    ...(tax
+      ? { automatic_tax: { enabled: true }, customer_update: { address: "auto" as const, name: "auto" as const }, tax_id_collection: { enabled: true } }
+      : {}),
     billing_address_collection: tax ? "required" : "auto",
   };
   const session = await stripeCall("checkout", () => stripeApi().checkout.sessions.create(params));
@@ -580,10 +650,16 @@ export async function createPortal(userId: string, flow: PortalFlow, origin: str
     if (!current || !OPEN.has(current.status)) throw new HttpError(404, "no_subscription", "Es läuft gerade kein Abo.");
     flowData =
       flow === "cancel"
-        ? { type: "subscription_cancel", subscription_cancel: { subscription: current.id }, after_completion: { type: "redirect", redirect: { return_url: returnUrl } } }
+        ? {
+            type: "subscription_cancel",
+            subscription_cancel: { subscription: current.id },
+            after_completion: { type: "redirect", redirect: { return_url: returnUrl } },
+          }
         : { type: "subscription_update", subscription_update: { subscription: current.id } };
   } else if (flow === "payment") flowData = { type: "payment_method_update" };
-  const session = await stripeCall("portal", () => stripeApi().billingPortal.sessions.create({ customer, return_url: returnUrl, locale: "de", ...(flowData ? { flow_data: flowData } : {}) }));
+  const session = await stripeCall("portal", () =>
+    stripeApi().billingPortal.sessions.create({ customer, return_url: returnUrl, locale: "de", ...(flowData ? { flow_data: flowData } : {}) }),
+  );
   return session.url;
 }
 
@@ -592,7 +668,11 @@ export async function createPortal(userId: string, flow: PortalFlow, origin: str
  * with the reason as Stripe `cancellation_details`), `resume` (undo the cancellation / end a pause), `pause` (1–3
  * months without invoices; paused = no paid features). Writes the result right away (the webhook confirms it later).
  */
-export async function changeSubscription(userId: string, action: PortalAction, opts: { reason?: CancelReason; comment?: string; months?: number } = {}): Promise<{ subscription: SubscriptionSummary | null; plan: PlanInfo }> {
+export async function changeSubscription(
+  userId: string,
+  action: PortalAction,
+  opts: { reason?: CancelReason; comment?: string; months?: number } = {},
+): Promise<{ subscription: SubscriptionSummary | null; plan: PlanInfo }> {
   const current = pickCurrent(await subscriptionRows(userId));
   if (!current || !OPEN.has(current.status)) throw new HttpError(404, "no_subscription", "Es läuft gerade kein Abo.");
   let params: Stripe.SubscriptionUpdateParams;
@@ -602,7 +682,8 @@ export async function changeSubscription(userId: string, action: PortalAction, o
   } else if (action === "resume") {
     params = { cancel_at_period_end: false, ...(current.status === "paused" || current.pause_resumes_at ? { pause_collection: "" as const } : {}) };
   } else {
-    if (current.status !== "active" || current.cancel_at_period_end) throw new HttpError(409, "cannot_pause", "Pausieren geht nur bei einem laufenden, bezahlten Abo.");
+    if (current.status !== "active" || current.cancel_at_period_end)
+      throw new HttpError(409, "cannot_pause", "Pausieren geht nur bei einem laufenden, bezahlten Abo.");
     const months = Math.max(1, Math.min(3, Math.round(opts.months ?? 1)));
     params = { pause_collection: { behavior: "void", resumes_at: Math.floor(Date.now() / 1000) + months * 30 * 86_400 } };
   }
@@ -671,14 +752,23 @@ export async function recordReferral(code: string, referredId: string, subscript
   if (!referrer || referrer === referredId) return;
   const { error } = await supabaseAdmin()
     .from("referrals")
-    .upsert({ referrer_id: referrer, referred_id: referredId, code: normalizeRefCode(code), status: "trialing", stripe_subscription_id: subscriptionId }, { onConflict: "referred_id", ignoreDuplicates: true });
+    .upsert(
+      { referrer_id: referrer, referred_id: referredId, code: normalizeRefCode(code), status: "trialing", stripe_subscription_id: subscriptionId },
+      { onConflict: "referred_id", ignoreDuplicates: true },
+    );
   if (error && !isMissingTable(error) && error.code !== "23505") dbFail("referrals write", error);
 }
 
 /** Applies the referrer's pending credits to their Stripe balance (negative balance = credit on the next invoices). */
 export async function applyPendingCredits(referrerId: string, customerId: string): Promise<number> {
   const sb = supabaseAdmin();
-  const { data, error } = await sb.from("affiliate_ledger").select("id,amount,currency").eq("referrer_id", referrerId).eq("kind", "credit").eq("status", "pending").limit(50);
+  const { data, error } = await sb
+    .from("affiliate_ledger")
+    .select("id,amount,currency")
+    .eq("referrer_id", referrerId)
+    .eq("kind", "credit")
+    .eq("status", "pending")
+    .limit(50);
   if (error) {
     if (!isMissingTable(error)) console.error("[fn] ledger read failed", error.code);
     return 0;
@@ -686,7 +776,11 @@ export async function applyPendingCredits(referrerId: string, customerId: string
   let applied = 0;
   for (const row of (data ?? []) as { id: number; amount: number; currency: string }[]) {
     try {
-      const txn = await stripeApi().customers.createBalanceTransaction(customerId, { amount: -Math.abs(row.amount), currency: row.currency, description: "Empfehlungs-Gutschrift" }, { idempotencyKey: `tj-ref-credit-${row.id}` });
+      const txn = await stripeApi().customers.createBalanceTransaction(
+        customerId,
+        { amount: -Math.abs(row.amount), currency: row.currency, description: "Empfehlungs-Gutschrift" },
+        { idempotencyKey: `tj-ref-credit-${row.id}` },
+      );
       await sb.from("affiliate_ledger").update({ status: "applied", stripe_balance_txn_id: txn.id }).eq("id", row.id);
       applied++;
     } catch (e) {
@@ -720,18 +814,48 @@ export async function rewardReferral(inv: Stripe.Invoice, subscriptionId: string
     const since = referral.converted_at ? Date.parse(referral.converted_at) : Date.now();
     if (Date.now() - since > COMMISSION_MONTHS * 31 * 86_400_000) return;
     const amount = Math.round((inv.amount_paid * Number(pct)) / 100);
-    const ins = await sb.from("affiliate_ledger").upsert({ referrer_id: referral.referrer_id, referral_id: referral.id, kind: "commission", amount, currency: inv.currency, status: "pending", stripe_invoice_id: inv.id }, { onConflict: "stripe_invoice_id,kind", ignoreDuplicates: true });
+    const ins = await sb
+      .from("affiliate_ledger")
+      .upsert(
+        {
+          referrer_id: referral.referrer_id,
+          referral_id: referral.id,
+          kind: "commission",
+          amount,
+          currency: inv.currency,
+          status: "pending",
+          stripe_invoice_id: inv.id,
+        },
+        { onConflict: "stripe_invoice_id,kind", ignoreDuplicates: true },
+      );
     if (ins.error) dbFail("ledger write", ins.error);
   } else if (referral.status !== "paying") {
     const reward = referralRewardCents();
     if (reward > 0) {
-      const ins = await sb.from("affiliate_ledger").upsert({ referrer_id: referral.referrer_id, referral_id: referral.id, kind: "credit", amount: reward, currency: inv.currency, status: "pending", stripe_invoice_id: inv.id }, { onConflict: "stripe_invoice_id,kind", ignoreDuplicates: true });
+      const ins = await sb
+        .from("affiliate_ledger")
+        .upsert(
+          {
+            referrer_id: referral.referrer_id,
+            referral_id: referral.id,
+            kind: "credit",
+            amount: reward,
+            currency: inv.currency,
+            status: "pending",
+            stripe_invoice_id: inv.id,
+          },
+          { onConflict: "stripe_invoice_id,kind", ignoreDuplicates: true },
+        );
       if (ins.error) dbFail("ledger write", ins.error);
       const customer = await customerIdOf(referral.referrer_id);
       if (customer) await applyPendingCredits(referral.referrer_id, customer);
     }
   }
-  if (referral.status !== "paying") await sb.from("referrals").update({ status: "paying", converted_at: referral.converted_at ?? now }).eq("id", referral.id);
+  if (referral.status !== "paying")
+    await sb
+      .from("referrals")
+      .update({ status: "paying", converted_at: referral.converted_at ?? now })
+      .eq("id", referral.id);
 }
 
 /** The user's referral page data (creates the code on first call). */
@@ -739,9 +863,16 @@ export async function referralInfo(userId: string): Promise<ReferralInfo> {
   const sb = supabaseAdmin();
   const { code, commissionPct } = await referralCodeOf(userId);
   const refs = await sb.from("referrals").select("status").eq("referrer_id", userId).limit(1000);
-  const ledger = await sb.from("affiliate_ledger").select("id,kind,amount,currency,status,created_at").eq("referrer_id", userId).order("created_at", { ascending: false }).limit(20);
+  const ledger = await sb
+    .from("affiliate_ledger")
+    .select("id,kind,amount,currency,status,created_at")
+    .eq("referrer_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(20);
   const statuses = ((refs.data ?? []) as { status: string }[]).map((r) => r.status);
-  const entries = ((ledger.data ?? []) as { id: number; kind: LedgerEntry["kind"]; amount: number; currency: string; status: LedgerEntry["status"]; created_at: string }[]).map<LedgerEntry>((r) => ({
+  const entries = (
+    (ledger.data ?? []) as { id: number; kind: LedgerEntry["kind"]; amount: number; currency: string; status: LedgerEntry["status"]; created_at: string }[]
+  ).map<LedgerEntry>((r) => ({
     id: r.id,
     kind: r.kind,
     amount: r.amount,
@@ -842,12 +973,18 @@ export async function processEvent(event: Stripe.Event): Promise<{ result: "proc
   if (row?.processed_at) return { result: "duplicate" };
   if (tracked) {
     if (!row) {
-      const ins = await sb.from("stripe_events").insert({ id: event.id, type: event.type.slice(0, 100), created_at: new Date(event.created * 1000).toISOString() });
+      const ins = await sb
+        .from("stripe_events")
+        .insert({ id: event.id, type: event.type.slice(0, 100), created_at: new Date(event.created * 1000).toISOString() });
       if (ins.error) {
         if (ins.error.code === "23505") throw new HttpError(409, "event_in_progress", "Dieses Ereignis wird gerade verarbeitet.");
         dbFail("stripe_events write", ins.error);
       }
-    } else await sb.from("stripe_events").update({ attempts: (row.attempts ?? 1) + 1, error: null }).eq("id", event.id);
+    } else
+      await sb
+        .from("stripe_events")
+        .update({ attempts: (row.attempts ?? 1) + 1, error: null })
+        .eq("id", event.id);
   }
   try {
     const result = await handleStripeEvent(event);
@@ -855,7 +992,11 @@ export async function processEvent(event: Stripe.Event): Promise<{ result: "proc
     return { result };
   } catch (e) {
     const msg = e instanceof HttpError ? `${e.status} ${e.code}` : e instanceof Error ? e.name : "error";
-    if (tracked) await sb.from("stripe_events").update({ error: msg.slice(0, 300) }).eq("id", event.id);
+    if (tracked)
+      await sb
+        .from("stripe_events")
+        .update({ error: msg.slice(0, 300) })
+        .eq("id", event.id);
     if (e instanceof HttpError) throw e.status < 500 && e.status !== 409 ? new HttpError(500, "webhook_failed") : e;
     console.error("[fn] webhook handler failed", event.type, msg);
     throw new HttpError(500, "webhook_failed");

@@ -181,7 +181,20 @@ const PRICES: Record<string, { amount: number; interval: "month" | "year" }> = {
   price_team_m: { amount: 1900, interval: "month" },
 };
 
-function stripeSub(id: string, o: Partial<{ customer: string; status: string; price: string; quantity: number; user: string; trialEnd: number | null; cancelAtPeriodEnd: boolean; ref: string; paused: boolean }> = {}): Stripe.Subscription {
+function stripeSub(
+  id: string,
+  o: Partial<{
+    customer: string;
+    status: string;
+    price: string;
+    quantity: number;
+    user: string;
+    trialEnd: number | null;
+    cancelAtPeriodEnd: boolean;
+    ref: string;
+    paused: boolean;
+  }> = {},
+): Stripe.Subscription {
   const price = o.price ?? "price_pro_m";
   return {
     id,
@@ -197,7 +210,24 @@ function stripeSub(id: string, o: Partial<{ customer: string; status: string; pr
     pause_collection: o.paused ? { behavior: "void", resumes_at: NOW + 30 * 86400 } : null,
     default_payment_method: "pm_1",
     default_source: null,
-    items: { object: "list", data: [{ id: "si_1", quantity: o.quantity ?? 1, current_period_end: NOW + 30 * 86400, price: { id: price, unit_amount: PRICES[price]?.amount ?? 999, currency: "eur", recurring: { interval: PRICES[price]?.interval ?? "month" }, metadata: {}, lookup_key: null } }] },
+    items: {
+      object: "list",
+      data: [
+        {
+          id: "si_1",
+          quantity: o.quantity ?? 1,
+          current_period_end: NOW + 30 * 86400,
+          price: {
+            id: price,
+            unit_amount: PRICES[price]?.amount ?? 999,
+            currency: "eur",
+            recurring: { interval: PRICES[price]?.interval ?? "month" },
+            metadata: {},
+            lookup_key: null,
+          },
+        },
+      ],
+    },
   } as unknown as Stripe.Subscription;
 }
 
@@ -214,7 +244,17 @@ interface FakeStripe {
 }
 
 function fakeStripe(): FakeStripe {
-  const f: FakeStripe = { api: null as unknown as StripeApi, subs: new Map(), checkout: [], portal: [], customers: [], balance: [], updates: [], canceled: [], retrieveFails: false };
+  const f: FakeStripe = {
+    api: null as unknown as StripeApi,
+    subs: new Map(),
+    checkout: [],
+    portal: [],
+    customers: [],
+    balance: [],
+    updates: [],
+    canceled: [],
+    retrieveFails: false,
+  };
   let n = 0;
   f.api = {
     customers: {
@@ -274,7 +314,16 @@ function fakeStripe(): FakeStripe {
     invoices: {
       list: async () => ({
         data: [
-          { id: "in_2", number: "TJ-0002", status: "paid", total: 1200, currency: "eur", created: NOW, hosted_invoice_url: "https://invoice.stripe.com/i/2", invoice_pdf: "https://pay.stripe.com/invoice/2/pdf" },
+          {
+            id: "in_2",
+            number: "TJ-0002",
+            status: "paid",
+            total: 1200,
+            currency: "eur",
+            created: NOW,
+            hosted_invoice_url: "https://invoice.stripe.com/i/2",
+            invoice_pdf: "https://pay.stripe.com/invoice/2/pdf",
+          },
           { id: "in_d", number: null, status: "draft", total: 0, currency: "eur", created: NOW, hosted_invoice_url: null, invoice_pdf: null },
         ] as unknown as Stripe.Invoice[],
       }),
@@ -292,14 +341,33 @@ function fakeStripe(): FakeStripe {
               max_redemptions: null,
               times_redeemed: 3,
               restrictions: { first_time_transaction: true, minimum_amount: null, minimum_amount_currency: null },
-              promotion: { type: "coupon", coupon: { id: "co_1", valid: true, percent_off: 20, amount_off: null, currency: null, duration: "repeating", duration_in_months: 3, applies_to: undefined } },
+              promotion: {
+                type: "coupon",
+                coupon: {
+                  id: "co_1",
+                  valid: true,
+                  percent_off: 20,
+                  amount_off: null,
+                  currency: null,
+                  duration: "repeating",
+                  duration_in_months: 3,
+                  applies_to: undefined,
+                },
+              },
             } as unknown as Stripe.PromotionCode,
           ],
         };
       },
     },
     prices: {
-      retrieve: async (id) => ({ id, active: true, unit_amount: PRICES[id]?.amount ?? 0, currency: "eur", recurring: { interval: PRICES[id]?.interval ?? "month" } }) as unknown as Stripe.Price,
+      retrieve: async (id) =>
+        ({
+          id,
+          active: true,
+          unit_amount: PRICES[id]?.amount ?? 0,
+          currency: "eur",
+          recurring: { interval: PRICES[id]?.interval ?? "month" },
+        }) as unknown as Stripe.Price,
     },
     webhooks: sdk.webhooks,
   };
@@ -318,7 +386,15 @@ const ENV: Record<string, string> = {
   STRIPE_PRICE_TEAM_MONTHLY: "price_team_m",
   SITE_ORIGIN: "https://journal.example",
 };
-const OPTIONAL_ENV = ["STRIPE_TRIAL_CARDLESS", "STRIPE_AUTOMATIC_TAX", "TRIAL_DAYS", "REFERRAL_TRIAL_DAYS", "REFERRAL_REWARD_CENTS", "STRIPE_PRICE_PREMIUM_YEARLY", "STRIPE_PRICE_TEAM_YEARLY"];
+const OPTIONAL_ENV = [
+  "STRIPE_TRIAL_CARDLESS",
+  "STRIPE_AUTOMATIC_TAX",
+  "TRIAL_DAYS",
+  "REFERRAL_TRIAL_DAYS",
+  "REFERRAL_REWARD_CENTS",
+  "STRIPE_PRICE_PREMIUM_YEARLY",
+  "STRIPE_PRICE_TEAM_YEARLY",
+];
 
 function setEnv(on: boolean): void {
   for (const [k, v] of Object.entries(ENV)) {
@@ -345,7 +421,17 @@ async function call(fn: (r: Request, c: typeof ctx) => Promise<Response>, r: Req
 
 let evtSeq = 0;
 function event(type: string, object: unknown, created = NOW): Stripe.Event {
-  return { id: `evt_${++evtSeq}`, object: "event", type, created, data: { object }, livemode: false, api_version: "2026-09-30.endive", pending_webhooks: 1, request: null } as unknown as Stripe.Event;
+  return {
+    id: `evt_${++evtSeq}`,
+    object: "event",
+    type,
+    created,
+    data: { object },
+    livemode: false,
+    api_version: "2026-09-30.endive",
+    pending_webhooks: 1,
+    request: null,
+  } as unknown as Stripe.Event;
 }
 
 async function deliver(ev: Stripe.Event, secret = WHSEC): Promise<{ status: number; body: Record<string, unknown> }> {
@@ -379,8 +465,14 @@ afterEach(() => {
 describe("mapping", () => {
   it("maps prices via env, metadata and lookup keys", () => {
     expect(planOfPrice({ id: "price_pro_y", metadata: {}, lookup_key: null, recurring: null } as never)).toEqual({ plan: "pro", interval: "year" });
-    expect(planOfPrice({ id: "price_x", metadata: { plan: "premium" }, lookup_key: null, recurring: { interval: "month" } } as never)).toEqual({ plan: "premium", interval: "month" });
-    expect(planOfPrice({ id: "price_y", metadata: {}, lookup_key: "team_yearly", recurring: { interval: "year" } } as never)).toEqual({ plan: "team", interval: "year" });
+    expect(planOfPrice({ id: "price_x", metadata: { plan: "premium" }, lookup_key: null, recurring: { interval: "month" } } as never)).toEqual({
+      plan: "premium",
+      interval: "month",
+    });
+    expect(planOfPrice({ id: "price_y", metadata: {}, lookup_key: "team_yearly", recurring: { interval: "year" } } as never)).toEqual({
+      plan: "team",
+      interval: "year",
+    });
     expect(planOfPrice({ id: "price_z", metadata: {}, lookup_key: null, recurring: null } as never)).toBeNull();
   });
 
@@ -392,7 +484,15 @@ describe("mapping", () => {
 
   it("builds the row from the SubscriptionItem (period end, seats, amount)", () => {
     const row = rowFromSubscription(stripeSub("sub_1", { price: "price_team_m", quantity: 4, ref: "abcd2345" }), U1, NOW);
-    expect(row).toMatchObject({ plan: "team", interval: "month", seats: 4, amount: 7600, stripe_customer_id: "cus_A", ref_code: "ABCD2345", has_payment_method: true });
+    expect(row).toMatchObject({
+      plan: "team",
+      interval: "month",
+      seats: 4,
+      amount: 7600,
+      stripe_customer_id: "cus_A",
+      ref_code: "ABCD2345",
+      has_payment_method: true,
+    });
     expect(row.current_period_end).toBe(new Date((NOW + 30 * 86400) * 1000).toISOString());
   });
 
@@ -414,7 +514,9 @@ describe("mapping", () => {
   it("exports the billing tables without other people's ids", () => {
     const refs = EXPORT_TABLES.find((t) => t.table === "referrals")!;
     expect(refs.columns).not.toMatch(/referred_id|\*/);
-    expect(EXPORT_TABLES.map((t) => t.table)).toEqual(expect.arrayContaining(["subscriptions", "billing_customers", "referral_codes", "affiliate_ledger", "team_seats"]));
+    expect(EXPORT_TABLES.map((t) => t.table)).toEqual(
+      expect.arrayContaining(["subscriptions", "billing_customers", "referral_codes", "affiliate_ledger", "team_seats"]),
+    );
   });
 });
 
@@ -528,7 +630,7 @@ describe("POST /api/v1/billing/checkout", () => {
   });
 
   it("409 when a subscription already runs, 503 for an interval without a price", async () => {
-    db.tables.subscriptions!.push(rowFromSubscription(stripeSub("sub_live", { status: "active" }), U1));
+    db.tables.subscriptions!.push({ ...rowFromSubscription(stripeSub("sub_live", { status: "active" }), U1) });
     expect((await checkout({ plan: "premium", interval: "month" })).status).toBe(409);
     expect((await checkout({ plan: "premium", interval: "year" }, U2)).status).toBe(503);
   });
@@ -555,7 +657,17 @@ describe("POST /api/v1/stripe/webhook", () => {
   it("checkout.session.completed links the customer, stores the subscription, sets profiles.plan and books the referral", async () => {
     db.tables.referral_codes!.push({ user_id: U2, code: "ABCD2345" });
     stripe.subs.set("sub_1", stripeSub("sub_1", { customer: "cus_9", user: U1, ref: "ABCD2345" }));
-    const res = await deliver(event("checkout.session.completed", { id: "cs_1", object: "checkout.session", mode: "subscription", client_reference_id: U1, customer: "cus_9", subscription: "sub_1", metadata: { supabase_user_id: U1, ref: "ABCD2345" } }));
+    const res = await deliver(
+      event("checkout.session.completed", {
+        id: "cs_1",
+        object: "checkout.session",
+        mode: "subscription",
+        client_reference_id: U1,
+        customer: "cus_9",
+        subscription: "sub_1",
+        metadata: { supabase_user_id: U1, ref: "ABCD2345" },
+      }),
+    );
     expect(res).toMatchObject({ status: 200, body: { received: true, result: "processed" } });
     expect(profile(db, U1)).toMatchObject({ plan: "pro", plan_status: "trialing" });
     expect(profile(db, U1).trial_end).toBeTruthy();
@@ -591,7 +703,16 @@ describe("POST /api/v1/stripe/webhook", () => {
 
   it("deleted → free (status canceled); payment_failed keeps access during dunning", async () => {
     stripe.subs.set("sub_1", stripeSub("sub_1", { user: U1, status: "past_due", trialEnd: null }));
-    await deliver(event("invoice.payment_failed", { id: "in_1", object: "invoice", amount_paid: 0, attempt_count: 1, currency: "eur", parent: { subscription_details: { subscription: "sub_1" } } }));
+    await deliver(
+      event("invoice.payment_failed", {
+        id: "in_1",
+        object: "invoice",
+        amount_paid: 0,
+        attempt_count: 1,
+        currency: "eur",
+        parent: { subscription_details: { subscription: "sub_1" } },
+      }),
+    );
     expect(profile(db, U1)).toMatchObject({ plan: "pro", plan_status: "past_due" });
     stripe.subs.set("sub_1", stripeSub("sub_1", { user: U1, status: "canceled", trialEnd: null }));
     await deliver(event("customer.subscription.deleted", stripe.subs.get("sub_1"), NOW + 5));
@@ -608,8 +729,25 @@ describe("POST /api/v1/stripe/webhook", () => {
     db.tables.referral_codes!.push({ user_id: U2, code: "ABCD2345" });
     db.tables.billing_customers!.push({ user_id: U2, stripe_customer_id: "cus_ref" });
     stripe.subs.set("sub_1", stripeSub("sub_1", { customer: "cus_9", user: U1, status: "active", ref: "ABCD2345", trialEnd: null }));
-    await deliver(event("checkout.session.completed", { id: "cs_1", mode: "subscription", client_reference_id: U1, customer: "cus_9", subscription: "sub_1", metadata: { ref: "ABCD2345" } }));
-    const paid = (id: string) => event("invoice.paid", { id, object: "invoice", amount_paid: 1200, currency: "eur", attempt_count: 1, parent: { subscription_details: { subscription: "sub_1" } } });
+    await deliver(
+      event("checkout.session.completed", {
+        id: "cs_1",
+        mode: "subscription",
+        client_reference_id: U1,
+        customer: "cus_9",
+        subscription: "sub_1",
+        metadata: { ref: "ABCD2345" },
+      }),
+    );
+    const paid = (id: string) =>
+      event("invoice.paid", {
+        id,
+        object: "invoice",
+        amount_paid: 1200,
+        currency: "eur",
+        attempt_count: 1,
+        parent: { subscription_details: { subscription: "sub_1" } },
+      });
     await deliver(paid("in_1"));
     expect(stripe.balance).toEqual([{ customer: "cus_ref", amount: -1000, key: expect.stringMatching(/^tj-ref-credit-/) }]);
     expect(db.tables.affiliate_ledger).toEqual([expect.objectContaining({ referrer_id: U2, kind: "credit", amount: 1000, status: "applied" })]);
@@ -623,8 +761,20 @@ describe("POST /api/v1/stripe/webhook", () => {
   it("affiliates earn their commission on every paid invoice (pending, paid out by hand)", async () => {
     db.tables.referral_codes!.push({ user_id: U2, code: "AFFIL123", commission_pct: 25 });
     stripe.subs.set("sub_1", stripeSub("sub_1", { customer: "cus_9", user: U1, status: "active", trialEnd: null }));
-    await deliver(event("checkout.session.completed", { id: "cs_1", mode: "subscription", client_reference_id: U1, customer: "cus_9", subscription: "sub_1", metadata: { ref: "AFFIL123" } }));
-    for (const id of ["in_1", "in_2"]) await deliver(event("invoice.paid", { id, object: "invoice", amount_paid: 2400, currency: "eur", parent: { subscription_details: { subscription: "sub_1" } } }));
+    await deliver(
+      event("checkout.session.completed", {
+        id: "cs_1",
+        mode: "subscription",
+        client_reference_id: U1,
+        customer: "cus_9",
+        subscription: "sub_1",
+        metadata: { ref: "AFFIL123" },
+      }),
+    );
+    for (const id of ["in_1", "in_2"])
+      await deliver(
+        event("invoice.paid", { id, object: "invoice", amount_paid: 2400, currency: "eur", parent: { subscription_details: { subscription: "sub_1" } } }),
+      );
     expect(db.tables.affiliate_ledger!.map((l) => [l.kind, l.amount, l.status])).toEqual([
       ["commission", 600, "pending"],
       ["commission", 600, "pending"],
@@ -674,7 +824,11 @@ describe("POST /api/v1/billing/portal", () => {
     expect(stripe.portal[0]).toMatchObject({ customer: "cus_A", locale: "de", return_url: "https://journal.example/?billing=portal#konto" });
     expect(stripe.portal[0]!.flow_data).toBeUndefined();
     await portal({ flow: "cancel" });
-    expect(stripe.portal[1]!.flow_data).toMatchObject({ type: "subscription_cancel", subscription_cancel: { subscription: "sub_1" }, after_completion: { type: "redirect" } });
+    expect(stripe.portal[1]!.flow_data).toMatchObject({
+      type: "subscription_cancel",
+      subscription_cancel: { subscription: "sub_1" },
+      after_completion: { type: "redirect" },
+    });
     await portal({ flow: "update" });
     expect(stripe.portal[2]!.flow_data).toEqual({ type: "subscription_update", subscription_update: { subscription: "sub_1" } });
     await portal({ flow: "payment" });
@@ -685,7 +839,10 @@ describe("POST /api/v1/billing/portal", () => {
     await subscribe();
     const res = await portal({ action: "cancel", reason: "too_expensive", comment: "  zu teuer gerade  " });
     expect(res.status).toBe(200);
-    expect(stripe.updates[0]).toEqual({ id: "sub_1", params: { cancel_at_period_end: true, cancellation_details: { feedback: "too_expensive", comment: "zu teuer gerade" } } });
+    expect(stripe.updates[0]).toEqual({
+      id: "sub_1",
+      params: { cancel_at_period_end: true, cancellation_details: { feedback: "too_expensive", comment: "zu teuer gerade" } },
+    });
     expect(res.body.subscription).toMatchObject({ cancelAtPeriodEnd: true, cancelAt: expect.any(String) });
     // still entitled until the period ends
     expect(res.body.plan).toMatchObject({ plan: "pro", status: "active" });
@@ -714,7 +871,15 @@ describe("POST /api/v1/billing/code", () => {
 
   it("previews a valid code with German terms; unknown codes are invalid", async () => {
     const ok = await code(" trader20 ");
-    expect(ok.body).toMatchObject({ valid: true, code: "TRADER20", percentOff: 20, duration: "repeating", durationInMonths: 3, firstTimeOnly: true, message: "−20 % für 3 Monate" });
+    expect(ok.body).toMatchObject({
+      valid: true,
+      code: "TRADER20",
+      percentOff: 20,
+      duration: "repeating",
+      durationInMonths: 3,
+      firstTimeOnly: true,
+      message: "−20 % für 3 Monate",
+    });
     const bad = await code("NOPE");
     expect(bad.body).toMatchObject({ valid: false, message: "Dieser Code ist ungültig oder abgelaufen." });
   });
@@ -755,7 +920,11 @@ describe("GET /api/v1/billing/referral", () => {
 describe("server-side feature gates", () => {
   it("free users get 402 for paid features once payments are set up", async () => {
     expect(paymentsConfigured()).toBe(true);
-    await expect(requireFeature(U1, "exchangeSync")).rejects.toMatchObject({ status: 402, code: "plan_required", details: { feature: "exchangeSync", required: "pro" } });
+    await expect(requireFeature(U1, "exchangeSync")).rejects.toMatchObject({
+      status: 402,
+      code: "plan_required",
+      details: { feature: "exchangeSync", required: "pro" },
+    });
     await expect(requireFeature(U1, "cloudSync")).resolves.toMatchObject({ plan: "free" });
     await expect(requireLimit(U1, "savedViews", 3)).rejects.toMatchObject({ status: 402, code: "limit_reached" });
     await expect(requireLimit(U1, "savedViews", 2)).resolves.toBe(3);

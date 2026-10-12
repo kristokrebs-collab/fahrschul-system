@@ -30,7 +30,12 @@ export default handler(async (req, ctx) => {
   await enforceRateLimit(rateKey("billing-checkout", user.id), 10, 600);
   const body = await readJson(req, Body, { maxBytes: 2048 });
   const out = await createCheckout(user, body, siteOrigin(req));
-  await audit(user.id, "billing.checkout", { step: "session", plan: body.plan, interval: body.interval, code: !!body.code, ref: !!body.ref }, clientIp(req, ctx));
+  await audit(
+    user.id,
+    "billing.checkout",
+    { step: "session", plan: body.plan, interval: body.interval, code: !!body.code, ref: !!body.ref },
+    clientIp(req, ctx),
+  );
   return json(out);
 });
 
