@@ -34,6 +34,10 @@ export const spring = {
   // thresholds are 0.5 px / 2 px·s⁻¹ on the 16 px slide (PAGE_ENTER_X), so it settles in ≈ 0.42 s, not ≈ 0.55 s
   pageEnter: { type: "spring", stiffness: 240, damping: 30, mass: 0.9, restDelta: 3.125, restSpeed: 12.5 },
   island: { type: "spring", stiffness: 400, damping: 30 }, // NEW: dynamic-island size morph
+  // NEW (P01 fx): LiquidGauge level – a soft slosh with one small overshoot (ζ ≈ 0.63), settles ≈ 0.9 s
+  liquid: { type: "spring", stiffness: 90, damping: 12, mass: 1 },
+  // NEW (P01 fx): CardSpread "deal" (deck → layout) and HeatGridReveal cell pop – lively (ζ ≈ 0.73, ≈ 3.6 % overshoot), ≈ 0.45 s
+  deal: { type: "spring", stiffness: 170, damping: 18, mass: 0.9 },
 } as const satisfies Record<string, Transition>;
 
 export const ease = {
@@ -76,6 +80,15 @@ export const tween = {
   burst: { duration: 1.2, ease: ease.out }, // NEW: confetti particle life
   toastText: { duration: 0.2, ease: "easeOut", delay: 0.12 }, // NEW: toast island text fade (= tween.fade one beat in); the win value starts rolling on the same delay
   debounce: { duration: 0.15, ease: "linear" }, // NEW: search debounce made visible (hairline fill); its duration IS the debounce (SEARCH_DEBOUNCE_MS)
+  // NEW (P01 fx, `@/motion/fx`):
+  sweep: { duration: 0.9, ease: ease.out }, // SpotlightSweep: the one red signal line crossing a card
+  scan: { duration: 2.4, ease: "linear", repeat: Infinity }, // RadarSweep revolution / band pass – ONLY while a scan runs (declared exception `radar-sweep`)
+  glow: { duration: 1.6, ease: "easeInOut", repeat: 2 }, // GlowBreak: the glow breathes 3× (= tween.pingFew cadence), then rests
+  streak: { duration: 0.9, ease: ease.out }, // BreakoutStreak: life of one chevron particle
+  heat: { duration: 0.36, ease: ease.out }, // HeatGridReveal: opacity / brightness of one cell entering
+  cascade: { duration: 1.2, ease: ease.out }, // NumberCascade: count-up + digit rain until the last column locks
+  dissolve: { duration: 0.48, ease: "linear" }, // DissolveOut: pixel dissolve (clip-path steps) of a deleted element
+  wave: { duration: 1.4, ease: ease.out }, // LiquidGauge: the surface wave decays to flat after a level change
 } as const satisfies Record<string, Transition>;
 
 export const stagger = {
@@ -89,6 +102,10 @@ export const stagger = {
   reveal: 0.04,
   lead: 0.12, // NEW: beat between a surface's reveal and its content starting (bar fills, Hochrechnung rows, bar/counter pairs)
   insert: 0.2, // NEW: rows inserted into a shown list wait this long (≈ spring.layout 90 % settled), so siblings make room first
+  heat: 0.028, // NEW (P01): HeatGridReveal – delay per ring of (Chebyshev) distance from the origin cell …
+  heatMax: 0.42, // … capped here, so a 30 × 30 grid still lands in < 0.8 s
+  streak: 0.018, // NEW (P01): BreakoutStreak – launch spacing of the chevron particles
+  deal: 0.05, // NEW (P01): CardSpread "deal" – one card after the other leaves the deck (capped by `max`)
 } as const;
 
 /**
@@ -114,6 +131,8 @@ export const fxTiming = {
   scrambleMin: 0.35, // s – … clamped to [min, max]
   scrambleMax: 0.8,
   liveFlashGap: 0.5, // s – live price / book washes (odometer, header ticker, Bid/Ask, chart pulse tint): minimum gap between two flashes, direction flips included
+  cascadeReroll: 0.045, // s – NEW (P01): NumberCascade digit rain, one re-roll of an unlocked column
+  dissolveFps: 20, // NEW (P01): DissolveOut – clip-path steps per second (tween.dissolve · 20 ≈ 10 steps)
 } as const;
 
 /** NEW: gesture distances / speeds (px, px·s⁻¹). */
@@ -142,4 +161,5 @@ export const radius = {
  * - `.fx-strike` 0.32 s ease.out = tween.collapse · `.fx-pop` 0.2 s ease-out / 0.12 s linear = tween.tooltipIn / tween.exit
  * - `fx-ping` 1.6 s ease-out × 3 = tween.pingFew · `fx-shimmer` 1.6 s linear = tween.skeleton · `fx-spin` 9 s = tween.beam
  * - `.fx-ants` 0.9 s per dash period (CSS only, `--fx-ants-speed`) · dock tooltip `duration-200 ease-out` = tween.tooltipIn
+ * - P01 fx: `.fx-radar__sweep` / `.fx-scan__band` 2.4 s linear ∞ = tween.scan (only while `[data-scanning]`)
  */
