@@ -60,11 +60,15 @@ export function AccountDataCard({ className }: { className?: string }) {
     <PixelDissolve active={dissolving} onDone={() => setDissolving(false)} className="h-full rounded-2xl">
       <Card title={DATA_CARD.title} className={className}>
         <p className="mb-4 text-[13px] leading-relaxed text-mute">{DATA_CARD.intro}</p>
-        <div className="grid gap-6">
-          <ExportSection onDone={() => setAuditKey((k) => k + 1)} />
-          <BackupsSection />
-          <AuditSection reloadKey={auditKey} />
-          <DeleteSection onDeleted={() => setDissolving(true)} />
+        <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+          <div className="grid content-start gap-6">
+            <ExportSection onDone={() => setAuditKey((k) => k + 1)} />
+            <BackupsSection />
+          </div>
+          <div className="grid content-start gap-6">
+            <AuditSection reloadKey={auditKey} />
+            <DeleteSection onDeleted={() => setDissolving(true)} />
+          </div>
         </div>
       </Card>
     </PixelDissolve>

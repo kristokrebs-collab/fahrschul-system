@@ -90,6 +90,7 @@ export const KONTO = {
   unavailableFile: "In der Datei-Version gibt es keine Cloud. Alles bleibt auf diesem Gerät.",
   unavailableOwner: "Für Betreiber: VITE_SUPABASE_URL und VITE_SUPABASE_PUBLISHABLE_KEY setzen, dann neu bauen.",
   unavailableClaude: "Auf claude.ai synchronisiert das Journal über claude.ai selbst.",
+  localFacts: ["Alles bleibt auf diesem Gerät", "Backup als Datei jederzeit", "Kein Tracking"],
 } as const;
 
 export const AUTH_CARD = {

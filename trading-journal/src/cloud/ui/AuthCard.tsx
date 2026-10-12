@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { date as fmtDate } from "@/lib/format";
 import { HoldConfirm } from "@/motion/HoldConfirm";
 import { TextScramble } from "@/motion/TextScramble";
@@ -55,16 +55,17 @@ function SignedOut() {
       <div className="grid gap-2">
         <h3 className="text-[clamp(20px,5.5vw,26px)] font-semibold leading-tight tracking-tight">
           {words.map((w, i) => (
-            <motion.span
-              key={`${w}-${i}`}
-              className="inline-block"
-              initial={reduced ? false : { opacity: 0, y: 10, filter: "blur(4px)" }}
-              animate={{ opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter: "none", transform: "none" } }}
-              transition={{ y: { ...spring.enter, delay: i * stagger.words * 2 }, opacity: { ...tween.reveal, delay: i * stagger.words * 2 }, filter: { ...tween.reveal, delay: i * stagger.words * 2 } }}
-            >
-              {w}
-              {i < words.length - 1 ? " " : ""}
-            </motion.span>
+            <Fragment key={`${w}-${i}`}>
+              <motion.span
+                className="inline-block"
+                initial={reduced ? false : { opacity: 0, y: 10, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)", transitionEnd: { filter: "none", transform: "none" } }}
+                transition={{ y: { ...spring.enter, delay: i * stagger.words * 2 }, opacity: { ...tween.reveal, delay: i * stagger.words * 2 }, filter: { ...tween.reveal, delay: i * stagger.words * 2 } }}
+              >
+                {w}
+              </motion.span>
+              {i < words.length - 1 ? " " : null}
+            </Fragment>
           ))}
         </h3>
         <p className="text-[13px] leading-relaxed text-mute">{AUTH_CARD.signedOutText}</p>

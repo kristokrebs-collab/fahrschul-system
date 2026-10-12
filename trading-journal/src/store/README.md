@@ -25,6 +25,17 @@ probe `window.claude?.use("db")`.
   after the trades **and** settings snapshot. Snapshot errors → `mode:"error"`.
 - Local mode runs the daily auto-backup (`tj2-backup-YYYY-MM-DD`, keeps 14).
 - Quarantined records from the migration toast `{n} Einträge konnten nicht gelesen werden`.
+- **Supabase login (P09, `src/cloud`)**: with a configured cloud and a stored login of this edition (`KEYS.cloudAuth`, or an
+  auth callback in the URL – `cloudSessionHint()`), Fall A keeps `mode:"connecting"` (`loaded:true`, the local data is
+  already hydrated) instead of flashing the local banner; the cloud host then switches to the sync adapter. When nothing
+  takes over within `CLOUD_HANDOFF_MS` (12 s) the store settles in `local`. Without cloud config nothing changes.
+
+### `switchAdapter(next, { mode? })` (P09)
+
+Replaces the active adapter at runtime – the Supabase sync adapter after login, the local adapter after sign-out:
+`next.load()` becomes the state at once, `next.api` the write API, its events drive the store (`patch` → state,
+`status` → `mode`, `error` → `Offline`, `quarantine` → count). Waits for a running boot; refuses (returns `false`,
+disposes `next`) while the claude.ai adapter is active – that path stays exactly as it is.
 
 ## Editions and storage namespaces
 
@@ -155,11 +166,15 @@ most one forward entry remains after a close. Not installed (component tests), s
 
 ## Persistence
 
-- `adapters/StoreApi.ts`: `StoreApi`, `StorageSnapshot { trades, settings, hyblock }`, `StorageAdapter { mode, load(), api, subscribe(ev), replaceAll(), dispose() }`, `AdapterEvent` (`patch` | `error` | `quarantine`).
+- `adapters/StoreApi.ts`: `StoreApi`, `StorageSnapshot { trades, settings, hyblock }`, `StorageAdapter { mode, load(), api, subscribe(ev), replaceAll(), dispose() }`, `AdapterEvent` (`patch` | `error` | `quarantine` | NEW `status { mode }`), NEW `LocalStorageAdapter` (+ `replaceParts`).
+- `localAdapter.replaceParts(parts)` (NEW, P09): writes only the given parts as one atomic unit (rollback like `replaceAll`) and
+  emits one patch with exactly them – the sync applies remote changes this way without rewriting untouched keys.
+- Supabase sync adapter: `src/cloud/sync/supabaseAdapter.ts` (local-first wrapper around a local adapter; see `src/cloud/README.md`).
 - `adapters/localAdapter.ts`: `createLocalAdapter()`, `readLocalSnapshot()`. Keys `tj2-trades`, `tj2-settings`, `tj2-hyblock`, `tj2-days`; upsert `filter(id≠).concat` on a FRESH read; settings via `merge3`; `storage`-event sync (attached on subscribe, removed on dispose); normalisation on read only; readings sorted by `at.localeCompare`; a list key holding a non-array is quarantined before it is replaced.
 - `adapters/claudeDbAdapter.ts`: `probeClaudeDb()` (`null` outside claude.ai), `createClaudeDbAdapter(db)` – collections `trades`/`hyblock`, docs `config/settings` and `config/days` (day journal), `onSnapshot`; `saveTrade` strips `id` → `set`/`add`. `ClaudeDb` interface is deliberately loose.
 - `StorageAdapter.fresh()`: data as stored right now without touching adapter state (backup import merges onto it).
-- `storage.ts`: `KEYS` (incl. `days`), `KEY_PREFIX`, `storageKey(name)`, `DATA_KEYS`, `storageStatus()`, `readJson`/`writeJson` (bundle `g`/`h`), `readJsonDetailed(key)` → `{ status: "missing" | "ok" | "corrupt" }`,
+- `storage.ts`: `KEYS` (incl. `days`; NEW `cloudAuth` = `tj2-sb-auth` – Supabase session of this edition – and `cloudBase` =
+  `tj2-cloud-base` – the sync base), `KEY_PREFIX`, `storageKey(name)`, `DATA_KEYS`, `storageStatus()`, `readJson`/`writeJson` (bundle `g`/`h`), `readJsonDetailed(key)` → `{ status: "missing" | "ok" | "corrupt" }`,
   `writeJsonStrict`, `writeRaw`, `listKeys(prefix)`, `removeKey`, `isQuotaError`, `StorageWriteError`.
   **Corrupt keys**: `readJson` copies an unparseable value to `tj2-quarantine` as `{ kind:"blob", key, raw, error:"invalid JSON", at }`
   (`quarantineRaw`, once per key+raw) before returning the fallback; `assertWritable(key)` (used by every local write) throws

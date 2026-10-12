@@ -157,7 +157,13 @@ function MfaSection() {
             </div>
             <div className="grid gap-2">
               <span className="text-center text-[12px] text-faint">{SECURITY.codeLabel}</span>
-              <CodeSlots value={code} onChange={setCode} label={SECURITY.codeLabel} disabled={busy || accepted} invalidKey={err?.key ?? null} accepted={accepted} />
+              <CodeSlots
+                value={code}
+                onChange={(c) => {
+                  setCode(c);
+                  if (c) setErr(null);
+                }}
+                label={SECURITY.codeLabel} disabled={busy || accepted} invalidKey={err?.key ?? null} accepted={accepted} />
               {err && (
                 <motion.p key={err.key} role="alert" className="text-center text-[12.5px] text-loss" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade}>
                   {err.message}

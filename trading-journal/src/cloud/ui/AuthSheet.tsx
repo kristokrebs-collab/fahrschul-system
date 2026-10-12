@@ -475,7 +475,14 @@ function MfaView() {
         <p className="text-[13px] leading-relaxed text-mute">{AUTH.lead.mfa}</p>
       </StaggerItem>
       <StaggerItem>
-        <CodeSlots value={code} onChange={setCode} onComplete={(c) => void verify(c)} label="2FA-Code" disabled={busy || accepted} invalidKey={err?.key ?? null} accepted={accepted} autoFocus />
+        <CodeSlots
+          value={code}
+          onChange={(c) => {
+            setCode(c);
+            if (c) setErr(null);
+          }}
+          onComplete={(c) => void verify(c)}
+          label="2FA-Code" disabled={busy || accepted} invalidKey={err?.key ?? null} accepted={accepted} autoFocus />
       </StaggerItem>
       {err && (
         <motion.p key={err.key} role="alert" className="text-center text-[12.5px] text-loss" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade}>

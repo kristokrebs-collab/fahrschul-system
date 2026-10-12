@@ -7,7 +7,7 @@ single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `sr
 
 | File | Owner | Content |
 |---|---|---|
-| `migrations/0001_core.sql` | P09 | `profiles`, `journal_docs` (+ Realtime), `rate_hits` + `rate_hit()`, `audit_log`, `app_errors`, `exchange_connections`, `mfa_satisfied()` |
+| `migrations/0001_core.sql` | P09 | `profiles`, `journal_docs` (+ Realtime), `rate_hits` + `rate_hit()`, `audit_log`, `app_errors`, `exchange_connections`, `mfa_satisfied()`, `my_sessions()`, `backup_candidates()`, buckets `backups` / `screenshots` (+ own-folder policies) |
 | `migrations/0002_billing.sql` | P10 | `subscriptions`, `referrals`, `affiliate_ledger`, `stripe_events` |
 | `migrations/0003_exchange.sql` | P11 | `sync_runs`, `sync_cursor`, `api_tokens`, `upsert_synced_trade()` – secrets live in `exchange_connections` (0001) |
 | `migrations/0004_social.sql` | P12 | groups, members, shares, comments, feedback, leaderboards |
@@ -34,10 +34,20 @@ never edit an applied migration – add a new one.
 - **`rate_hits` / `rate_hit(key, window_sec)`**, **`app_errors`**: service role only. **`audit_log`**: users read their
   own trail, only functions write; rows survive account deletion without the user id.
 - Account deletion: `auth.admin.deleteUser()` (function, service role) cascades `profiles`, `journal_docs`,
-  `exchange_connections`.
+  `exchange_connections`; the function cancels Stripe first and removes the user's bucket files.
+- **`my_sessions()`** (authenticated): the caller's own `auth.sessions` – id, created / updated / refreshed, user agent, IP
+  coarsened to /24 (/48 for IPv6), aal, `is_current` (from the JWT `session_id`), this device first. Signing the other
+  devices out runs through Supabase Auth (`signOut({ scope: "others" })`).
+- **`backup_candidates(since, after?, limit?)`** (service role): users whose journal changed since `since`, keyset-paged –
+  the nightly backup (`netlify/functions/backup-nightly.mts`).
+- **Storage**: `backups` (private, no client policy – service role only) and `screenshots` (private; select / insert /
+  update / delete only below `<auth.uid()>/…`). Created by the migration where the `storage` schema exists.
 
 The migration was checked against Postgres 16 (PGlite) with a minimal `auth` shim: own-row visibility, column grants,
-tombstone-only deletes, the aal2 rule, `rate_hit` counting and privileges, and the delete cascades.
+tombstone-only deletes, the aal2 rule, `rate_hit` counting and privileges, and the delete cascades. P09 re-checked it on
+PGlite 0.3 (Postgres 17) with an `auth` + `storage` shim: `my_sessions()` (own rows only, current first, coarsened IPs,
+anon refused), `backup_candidates()` (distinct, keyset paging, service role only), bucket creation and the screenshot
+folder policies, the `rev` bump on a tombstone update and a stale optimistic `rev` update matching nothing.
 
 ## External setup (dashboard)
 

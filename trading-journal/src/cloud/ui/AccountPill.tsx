@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
-import { StatusPill } from "@/motion/StatusPill";
+import { StatusPill, type StatusTone } from "@/motion/StatusPill";
 import { radius, spring } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { cloudEnabled } from "../env";
@@ -8,6 +8,8 @@ import { openAuthSheet, useCloudSession } from "../session";
 import { useSyncStatus } from "../sync/status";
 import { AUTH_LAYOUT_ID, syncPill } from "./pill";
 import { PILL } from "./strings";
+
+const DOT_TONE: Record<StatusTone, string> = { live: "bg-win", warn: "bg-warn", error: "bg-loss", muted: "bg-faint" };
 
 export interface AccountPillProps {
   className?: string;
@@ -51,8 +53,10 @@ export function AccountPill({ className }: AccountPillProps) {
     >
       {signedIn ? (
         <>
-          <span aria-hidden="true" className="grid size-6 place-items-center rounded-full border border-line-2 bg-ink-700 font-dot text-[12px] text-fg">
+          <span aria-hidden="true" className="relative grid size-6 place-items-center rounded-full border border-line-2 bg-ink-700 font-dot text-[12px] text-fg">
             {(email ?? "?").slice(0, 1).toUpperCase()}
+            {/* phones hide the status pill: a status dot on the avatar keeps the sync state visible */}
+            <span className={cn("absolute -right-0.5 -top-0.5 size-2 rounded-full border border-ink-900 sm:hidden", DOT_TONE[pill.tone])} />
           </span>
           <StatusPill tone={pill.tone} expanded label={pill.label} pingKey={pings} className="max-sm:hidden" />
         </>
