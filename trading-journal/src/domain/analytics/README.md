@@ -51,7 +51,10 @@ copy.ts         German titles, empty states, verdicts, RATIO_LABELS and the expl
 ## Conventions
 - Minimum samples: ratios `RATIO_MIN` (5 trades / 10 days / 20 trades for the tail ratio), breakdown buckets 5
   (`BREAKDOWN_MIN_N`), heat cells 3, excursion 5, streak verdict 10, compare 5 per side, adaptive benchmark 30 earlier
-  windows. Below it the value is `null` (UI: "zu wenig"), never an extrapolation.
+  windows; the Analyse page adds Monte Carlo ≥ 10 sample values and risk of ruin ≥ 20 trades. Below it the value is
+  `null` (UI: "zu wenig"), never an extrapolation.
+- Verdicts: a "good" ratio whose 80 % interval reaches below break-even is reported as "noch nicht sicher" (mute);
+  the edge test says "klar" only at a one-sided p < 0,05 (`EDGE_CLEAR_P`).
 - Breakdown unit: R when ≥ 60 % of the trades (and ≥ 5) carry one, else money per trade.
 - Days: ratios use local calendar days (like the calendar); the benchmark uses UTC days (the candles' grid).
 - Performance: everything is O(n) or O(n · runs) with adaptive bootstrap runs (`bootRuns`, ≈ 200k draws); the view

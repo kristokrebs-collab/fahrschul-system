@@ -30,13 +30,13 @@ stays in the header row on phones).
   "Details +" pill are `MorphCard`s → explainer dialog (formula, sample, interval, minimum sample, verdict); the sample
   rolls (`RollingDigits`).
 - **Monte Carlo** (`MonteCarloCard.tsx`): 2000 seeded paths of the next 50 / 100 / 250 trades (bootstrap or
-  reshuffle) from the R multiples (else P&L), computed by `runMonteCarlo` (worker on web builds, idle chunks in the
+  reshuffle) from the R multiples (else P&L; from 10 values, below 30 with a "grober Ausblick" hint), computed by `runMonteCarlo` (worker on web builds, idle chunks in the
   single-file builds / without `Worker`). The fan: 120 pale paths drawn staggered into a canvas (incremental rAF loop,
   asleep when done), then a clip-path wipe uncovers p5–p95 / p25–p75 / median and one `SpotlightSweep` crosses the
   card; `ScrubTimeline` scrubs through the runs (worst / median / best marked) – the scrubbed run is the red path and its
   end and max drawdown are written into the DOM (MotionValue subscription, no React render per scrub). `DotMatrixText`
   "SIM" waves while it simulates. Below: median / 5 % / 95 % / max DD (95 %) and P(DD ≥ x) bars.
-- **Risk of Ruin** (`RiskOfRuinCard.tsx`): ruin (−30 % / −50 %) at 0,5 / 1 / 2 / 3 % or the trader's own median risk,
+- **Risk of Ruin** (`RiskOfRuinCard.tsx`, from 20 trades): ruin (−30 % / −50 %) at 0,5 / 1 / 2 / 3 % or the trader's own median risk,
   simulated over 500 trades from the own R multiples (`NumberCascade` headline) and analytic (infinite horizon), Half-
   Kelly, and the ruin curve per stake (analytic, Half-Kelly marked). The win / loss model is built in R when the trades
   carry R – the same base as the simulation.
