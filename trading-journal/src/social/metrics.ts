@@ -122,6 +122,23 @@ export function socialStats(trades: readonly MetricTrade[], now: number, windowD
   };
 }
 
+/** All-time R figures of the closed trades of one setup (the optional numbers of a setup share). */
+export function setupFigures(trades: readonly (MetricTrade & { setups?: unknown })[], setupId: string): { trades: number; winRate: number | null; expectancyR: number | null } {
+  const rs: number[] = [];
+  let n = 0;
+  for (const t of trades) {
+    if (t.status !== "closed" || !Array.isArray(t.setups) || !t.setups.includes(setupId)) continue;
+    n++;
+    if (fin(t.r)) rs.push(Math.max(-R_CAP, Math.min(R_CAP, t.r)));
+  }
+  const k = rs.length;
+  return {
+    trades: n,
+    winRate: k >= MIN_R_TRADES ? round((rs.filter((r) => r > 0).length / k) * 100, 1) : null,
+    expectancyR: k >= MIN_R_TRADES ? round(rs.reduce((a, b) => a + b, 0) / k, 2) : null,
+  };
+}
+
 /** The value a metric ranks by (`null` = not enough data for it). */
 export function metricValue(s: Pick<SocialStats, "expectancyR" | "discipline" | "consistency" | "winRate">, metric: SocialMetric | StatMetric): number | null {
   switch (metric) {
