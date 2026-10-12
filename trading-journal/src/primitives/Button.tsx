@@ -12,15 +12,15 @@ export const buttonBase =
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50";
 export const buttonVariant: Record<ButtonVariant, string> = {
   ghost: "border-line-2 bg-white/[0.03] text-fg hover:bg-white/[0.07] hover:border-steel/40",
-  primary: "border-transparent bg-gradient-to-b from-white to-[#d6d6d6] text-ink-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.6)] hover:to-white",
-  danger: "border-signal/40 bg-signal/10 text-[#ff8a90] hover:bg-signal/20",
+  primary: "border-transparent bg-gradient-to-b from-white to-(--color-primary-btn-to) text-ink-950 shadow-(--shadow-btn-sheen) hover:to-white",
+  danger: "border-(--color-danger)/40 bg-(--color-danger)/10 text-(--color-danger-text) hover:bg-(--color-danger)/20",
 };
 export const buttonSize: Record<ButtonSize, string> = { md: "px-4 py-2 text-[13px]", sm: "px-3 py-1.5 text-xs" };
 
 /** Ripple ink per variant: white on dark, ink on the white primary, signal red on destructive. */
 export const rippleColor: Record<ButtonVariant, string> = {
-  ghost: "rgb(255 255 255 / 0.18)",
-  primary: "rgb(4 4 4 / 0.14)",
+  ghost: "rgb(var(--veil-rgb, 255 255 255) / 0.18)",
+  primary: "rgb(var(--veil-ink-rgb, 4 4 4) / 0.14)",
   danger: "rgb(229 32 46 / 0.32)",
 };
 

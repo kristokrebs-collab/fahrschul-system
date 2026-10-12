@@ -259,3 +259,11 @@ pixel-aware right offset, `fitToWidth`), `chart.overlay` (label placement, the c
 states, merged / dashed / faint divergences, S/R lines + axis-label guard, layers, no label overlap, geometry memo),
 `chart.levels` (0 = unset, zone edge-price labels).
 Fixture: `tests/fixtures/candles-1h.json` (240 hourly BTC-like candles from 2026-09-01).
+
+## Light mode (P13)
+
+- Canvas (lightweight-charts): `themeStore.syncChartInk()` calls `applyInk()` with the `--chart-ink-*` mirrors of
+  `themes.css` on every theme / accent change, `resetInk()` for dark – the P02 hook above, nothing else to wire.
+- SVG (Recharts cards): JS colours go through `themePaint(hex)` (`@/lib/themePaint`) – the dark hex becomes
+  `var(--token, hex)` (grid, reference line, ticks, bars, the equity stroke), so the SVG follows the theme and the dark
+  render is unchanged. Never use `themePaint` for canvas (`fillStyle` cannot resolve `var()`).

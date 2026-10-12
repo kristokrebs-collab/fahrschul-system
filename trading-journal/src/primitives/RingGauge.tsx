@@ -45,7 +45,7 @@ export function crossing(prev: number, next: number, marker: number | null | und
  *   moment its tip passes the needle and an upward crossing flashes a halo (`tween.flash`, opacity only).
  * Reduced motion / no `IntersectionObserver`: the final state, static.
  */
-export function RingGauge({ value, marker, size = 148, stroke = 9, color = "#f2f2f2", passColor, track = "#222", children, "aria-label": ariaLabel }: RingGaugeProps) {
+export function RingGauge({ value, marker, size = 148, stroke = 9, color = "var(--color-fg, #f2f2f2)", passColor, track = "var(--color-gauge-track, #222)", children, "aria-label": ariaLabel }: RingGaugeProps) {
   const reduced = useReducedFx();
   const root = useRef<HTMLDivElement>(null);
   const halo = useRef<HTMLSpanElement>(null);

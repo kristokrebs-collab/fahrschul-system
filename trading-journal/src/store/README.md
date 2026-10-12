@@ -233,3 +233,21 @@ autoBackup(now?)                       // daily tj2-backup-YYYY-MM-DD, keeps 14,
 `download(filename, data, mime)` → claude.ai `downloads.save` when present, else Blob + `<a download>`;
 `declined` is silent, other errors toast `Export fehlgeschlagen`. `canDownload()`, `DOWNLOAD_UNAVAILABLE`
 (`Export gibt es nur, wenn das Journal auf claude.ai geöffnet ist.`).
+
+## `themeStore.ts` (P13)
+
+`storageKey("theme")` = `{ pref: "dark" | "light" | "system", accent: "signal" | "kobalt" | "violett" }` (a bare
+`"light"` is read too). `useTheme` → `{ pref, accent, resolved, setPref(pref, origin?), setAccent(accent, origin?) }`;
+`toggleTheme(origin?)`; `applyInitialTheme()` (main.tsx, before the first render; follows the OS live while the
+preference is System); `applyThemeToDom(t)` writes `data-theme`, `data-theme-pref`, `data-accent`, `color-scheme` and
+the metas (`theme-color` = ink-900 of the scheme, `THEME_META_COLOR`); `syncChartInk()` = the chart bridge: dark →
+`resetInk()` (P02 defaults), light / accents → `applyInk()` from the `--chart-ink-*` mirrors in `themes.css`.
+`setThemeTransition(fn)` is the injection point for the visual switch (`src/app/themeTransition.ts`), so the store stays
+animation-free and testable. Strings in `THEME_STRINGS`.
+
+`src/styles/themes.css`: light mode, System and the accents ONLY as custom properties under `:root[data-theme="light"]`
+/ `[data-accent]` (no rule matches in dark + Signalrot). Light swaps `--color-white` (= the veil ink, dark) and
+`--color-black` (= paper), so every `bg-white/[x]` veil Tailwind compiles to `color-mix(… var(--color-white) …)` follows
+without a class rewrite; the ink ramp is inverted (cards brightest, wells one step below). Dark islands keep the ink
+ramp in light mode: the intro stage, the immersive navigation, the overview hero (`:has(> [data-hero-backdrop])`) and
+anything marked `data-theme-scope="dark"`. Light text tokens meet WCAG AA on every plane (`tests/e2e/theme.spec.ts`).

@@ -33,7 +33,7 @@ export function beamSpan(size: number): number {
  * Loop: CSS `fx-spin` (runs on the compositor, no per-frame JS). Mount it only while it should run (`status === "live"`
  * AND hover, Plan 3.2 rule 8) or use `fire` for a single lap. Renders nothing under reduced motion.
  */
-export function BorderBeam({ size = 80, duration = 9, delay = 0, colorFrom = "#e5202e", colorTo = "#ffffff", borderWidth = 1, fire, className }: BorderBeamProps) {
+export function BorderBeam({ size = 80, duration = 9, delay = 0, colorFrom = "var(--color-signal, #e5202e)", colorTo = "var(--color-white, #ffffff)", borderWidth = 1, fire, className }: BorderBeamProps) {
   const reduced = useReducedFx();
   if (reduced || fire === false || fire === 0 || fire === "") return null;
   const span = beamSpan(size);

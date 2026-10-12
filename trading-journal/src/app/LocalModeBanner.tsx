@@ -104,7 +104,7 @@ export function LocalModeBanner() {
             transition={{ y: spring.layout, clipPath: spring.layout, opacity: tween.fade }}
           >
             {noStorage ? (
-              <WarnBanner className="border-signal/40 bg-signal/[0.07] text-[#ff8a90] [&>span]:bg-signal [&>span>span]:bg-signal">
+              <WarnBanner className="border-signal/40 bg-signal/[0.07] text-(--color-danger-text) [&>span]:bg-signal [&>span>span]:bg-signal">
                 <strong className="font-semibold">{NO_STORAGE_STRONG}</strong>
                 {NO_STORAGE_TEXT}
                 <span className="mt-2.5 flex flex-wrap gap-2">

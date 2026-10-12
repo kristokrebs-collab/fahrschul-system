@@ -54,7 +54,7 @@ export function SplitText({ text, className, force = false }: SplitTextProps) {
       {mode === "play" && (
         <motion.span
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_40%,rgb(255_255_255/0.3)_50%,transparent_60%)]"
+          className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_40%,rgb(var(--veil-rgb,255_255_255)/0.3)_50%,transparent_60%)]"
           initial={{ x: "-120%" }}
           animate={{ x: "120%" }}
           transition={tween.shimmer}

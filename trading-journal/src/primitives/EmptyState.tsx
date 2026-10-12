@@ -21,7 +21,7 @@ export interface EmptyStateProps {
 export const EMPTY_LINE = "Bereit für den ersten Eintrag.";
 
 /** Marching-ants border (`.fx-ants`): calm white dashes, paused while the box is off-screen. */
-const ANTS_STYLE = { "--fx-ants-color": "rgb(255 255 255 / 0.16)", "--fx-ants-dash": "4px", "--fx-ants-speed": "1.8s" } as CSSProperties;
+const ANTS_STYLE = { "--fx-ants-color": "rgb(var(--veil-rgb, 255 255 255) / 0.16)", "--fx-ants-dash": "4px", "--fx-ants-speed": "1.8s" } as CSSProperties;
 
 /**
  * One sheen across the CTA button (a `::after` band behind its label, parked off the left edge) that runs once when

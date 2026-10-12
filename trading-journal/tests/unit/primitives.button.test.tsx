@@ -22,10 +22,11 @@ describe("Button", () => {
       </>,
     );
     const primary = screen.getByRole("button", { name: "Trade eintragen" });
-    expect(primary.className).toContain("border-transparent bg-gradient-to-b from-white to-[#d6d6d6] text-ink-950 shadow-[inset_0_1px_0_rgb(255_255_255/0.6)] hover:to-white");
+    // P13 theme tokens: dark values = the former literals (#d6d6d6, inset 0 1px 0 rgb(255 255 255 / 0.6), #ff8a90 – tokens.css)
+    expect(primary.className).toContain("border-transparent bg-gradient-to-b from-white to-(--color-primary-btn-to) text-ink-950 shadow-(--shadow-btn-sheen) hover:to-white");
     expect(primary.className).toContain("px-3 py-1.5 text-xs");
     const danger = screen.getByRole("button", { name: "Löschen" });
-    expect(danger.className).toContain("border-signal/40 bg-signal/10 text-[#ff8a90] hover:bg-signal/20");
+    expect(danger.className).toContain("border-(--color-danger)/40 bg-(--color-danger)/10 text-(--color-danger-text) hover:bg-(--color-danger)/20");
   });
 
   it("fires onClick and respects disabled", () => {

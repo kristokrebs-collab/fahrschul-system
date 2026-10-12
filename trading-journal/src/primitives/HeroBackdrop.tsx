@@ -404,7 +404,7 @@ export function HeroBackdrop({ className }: { className?: string }) {
   }, [spot, x, y, tx, ty, opacity]);
 
   return (
-    <div ref={rootRef} className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)} aria-hidden="true">
+    <div ref={rootRef} data-hero-backdrop="" className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)} aria-hidden="true">
       <div
         className="absolute inset-0"
         style={{

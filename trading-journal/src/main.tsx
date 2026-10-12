@@ -1,11 +1,19 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles/base.css";
+import "./styles/themes.css";
 import App from "./App";
 import { bootMarket } from "@/app/marketBoot";
+import { installThemeTransition } from "@/app/themeTransition";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { bootJournal } from "@/store/journalStore";
 import { installRouter } from "@/store/router";
+import { applyInitialTheme } from "@/store/themeStore";
+
+// Theme (P13) before anything paints: data-theme / accent / color-scheme / metas from localStorage, synchronously – the
+// CSP allows no inline script, so this is the earliest point. Dark (the default) only sets the attributes.
+applyInitialTheme();
+installThemeTransition();
 
 // Font hints: the numerals (Doto) and the mono axis font are needed for the first paint of the hero /
 // charts; requesting them early avoids a late swap (Plan 9.4). Fire-and-forget, never blocks; a blocked font host

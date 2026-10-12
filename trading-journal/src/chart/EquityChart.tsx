@@ -14,6 +14,7 @@
  * Recharts' own animation stays off (`isAnimationActive={false}`, bundle parity). Reduced motion: static, the
  * replay jumps (scrubbing itself stays, it is user-driven).
  */
+import { themePaint } from "@/lib/themePaint";
 import { animate, motion, useMotionValue, useSpring, useTransform, type AnimationPlaybackControls } from "motion/react";
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis, usePlotArea, useXAxisScale, useYAxisScale } from "recharts";
@@ -71,7 +72,8 @@ export const TICK_STYLE = {
 } as const;
 
 /** Axis labels as plain `<text>` (no Recharts `Text` measuring, no per-mount style read – `AxisTick.tsx`). */
-export const TICK = axisTick(TICK_STYLE);
+// light mode: the tick ink follows the theme (`themePaint`, dark value unchanged)
+export const TICK = axisTick({ ...TICK_STYLE, fill: themePaint(TICK_STYLE.fill) });
 
 export const equityAccent = (balance: number, start: number): string => (balance >= start ? EQUITY_COLORS.up : EQUITY_COLORS.down);
 export const equityTickLabel = (i: number): string => (i === 0 ? "Start" : "#" + i);
@@ -150,7 +152,7 @@ function EquityProbe({ points, onGeometry }: { points: EquityPoint[]; onGeometry
 export const EquityChart = memo(function EquityChart({ points, start, balance, currency, height = 268, fill: fillRow = false, className }: EquityChartProps) {
   const id = useId().replace(/:/g, "");
   const reduced = useReducedFx();
-  const accent = equityAccent(balance, start);
+  const accent = themePaint(equityAccent(balance, start));
   const freezeKey = useMemo(() => [points, start, accent] as const, [points, start, accent]);
   const fillId = `eqFill-${id}`;
   const strokeId = `eqStroke-${id}`;
@@ -592,15 +594,15 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
                 <stop offset="100%" stopColor={accent} stopOpacity={0} />
               </linearGradient>
               <linearGradient id={strokeId} x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor={EQUITY_COLORS.strokeStart} />
+                <stop offset="0%" stopColor={themePaint(EQUITY_COLORS.strokeStart)} />
                 <stop offset="100%" stopColor={accent} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke={EQUITY_COLORS.grid} strokeDasharray="0" vertical={false} />
+            <CartesianGrid stroke={themePaint(EQUITY_COLORS.grid)} strokeDasharray="0" vertical={false} />
             <XAxis dataKey="i" tickLine={false} axisLine={false} minTickGap={28} tick={TICK} tickFormatter={equityTickLabel} />
             {/* five ticks on a ≥ 200 px plot never collide: interval 0 shows them all without measuring the labels */}
             <YAxis width={62} tickLine={false} axisLine={false} domain={["auto", "auto"]} interval={0} tick={TICK} tickFormatter={fmt.mio} />
-            <ReferenceLine y={start} stroke={EQUITY_COLORS.ref} strokeDasharray="3 4" />
+            <ReferenceLine y={start} stroke={themePaint(EQUITY_COLORS.ref)} strokeDasharray="3 4" />
             <Area
               className="eq-area"
               type="linear"

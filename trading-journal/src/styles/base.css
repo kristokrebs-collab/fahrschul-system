@@ -2,10 +2,13 @@
 @import "./tokens.css";
 @import "./shiny-cta.css";
 
-/* Dark only, declared three ways (meta in index.html, this property, the media block below): Chromium's Auto Dark Mode
-   and WebView force-dark leave a page alone that declares dark support; Samsung Internet keeps a site's own dark
+/* Dark by default, declared three ways (meta in index.html, this property, the media block below): Chromium's Auto Dark
+   Mode and WebView force-dark leave a page alone that declares dark support; Samsung Internet keeps a site's own dark
    theme when its "Use website dark theme" lab is on and the site answers `prefers-color-scheme: dark`. `only` forbids
-   the user agent from re-theming (CSS Color Adjust 1). Nothing a page can do stops Samsung's default night filter. */
+   the user agent from re-theming (CSS Color Adjust 1). Nothing a page can do stops Samsung's default night filter.
+   Light mode (P13, `themes.css`) switches all three to `only light` under `html[data-theme="light"]` (the metas are
+   written by `src/store/themeStore.ts`). The page film below reads its colours from custom properties whose fallbacks
+   are the dark values, so the dark page is unchanged. */
 :root {
   color-scheme: only dark;
   /* Bottom inset (grey-bar fix): the larger of the notch/taskbar safe area and the host UI that covers the bottom of
@@ -54,8 +57,8 @@ body {
   text-rendering: optimizeLegibility;
   background-color: var(--color-ink-900);
   background-image:
-    radial-gradient(1200px 600px at 50% -10%, #ffffff0b, transparent 70%),
-    radial-gradient(circle at 1px 1px, #ffffff0e 1px, transparent 0);
+    radial-gradient(1200px 600px at 50% -10%, var(--page-glow, #ffffff0b), transparent 70%),
+    radial-gradient(circle at 1px 1px, var(--page-dots, #ffffff0e) 1px, transparent 0);
   background-size:
     auto,
     22px 22px;
@@ -71,7 +74,7 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.05;
+  opacity: var(--page-noise-opacity, 0.05);
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
@@ -81,7 +84,7 @@ body::before {
 }
 
 ::selection {
-  background: #e5202e66;
+  background: var(--selection-bg, #e5202e66);
 }
 
 :focus-visible {
@@ -91,7 +94,7 @@ body::before {
 
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.7);
+  filter: var(--page-date-indicator, invert(0.7));
 }
 
 [hidden] {

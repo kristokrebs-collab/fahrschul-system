@@ -113,9 +113,9 @@ export function FooterOutline({ text = FOOTER_TEXT, draw = true }: { text?: stri
     <defs>
       <linearGradient id={`tg${id}`} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={box.w} y2={0}>
         <stop offset="0%" stopColor="#8a8a8a" />
-        <stop offset="40%" stopColor="#ffffff" />
-        <stop offset="65%" stopColor="#ffffff" />
-        <stop offset="100%" stopColor="#e5202e" />
+        <stop offset="40%" stopColor="var(--color-white, #ffffff)" />
+        <stop offset="65%" stopColor="var(--color-white, #ffffff)" />
+        <stop offset="100%" stopColor="var(--color-signal, #e5202e)" />
       </linearGradient>
       <motion.radialGradient id={`rm${id}`} gradientUnits="userSpaceOnUse" r={box.w * 0.22} cx={cx as MotionValue<number>} cy={cy as MotionValue<number>}>
         <stop offset="0%" stopColor="white" />

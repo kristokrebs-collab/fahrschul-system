@@ -103,5 +103,23 @@ style is its reduced-motion fallback. Timings mirror the TS tokens (list at the 
   utilities on the element still win over the `position: relative` they set.
 - `--safe-bottom` = `max(env(safe-area-inset-bottom), var(--vv-bottom))`: the bottom inset every pinned-to-bottom element uses
   (dock, toast island, footer padding, bottom fade, `scroll-padding-bottom`); `--vv-bottom` is written by `src/app/pwa.ts`.
-- `color-scheme: only dark` (+ an explicit `prefers-color-scheme: dark` block), `-webkit-tap-highlight-color: transparent`,
+- `color-scheme: only dark` by default (`only light` under `html[data-theme="light"]`, P13) (+ an explicit `prefers-color-scheme: dark` block), `-webkit-tap-highlight-color: transparent`,
   no callout / selection on header and nav in an installed app.
+
+## Themes (P13)
+
+Primitives take colours from tokens, never from dark-only literals, so the light mode and the accents reach them –
+always with the old dark value as the fallback, so dark stays byte-identical:
+
+- classes: `text-(--color-danger-text)`, `to-(--color-primary-btn-to)`, `shadow-(--shadow-btn-sheen)`,
+  `focus:shadow-(--ring-focus-input)`; white / black veils (`bg-white/[0.06]`) need nothing (themes.css swaps the ink);
+- JS / SVG strings: `var(--color-fg, #f2f2f2)`, `var(--card-ring-from, #9b9b9b)` …; for SVG charts `themePaint(hex)`
+  (`@/lib/themePaint`);
+- literal white alphas in JS or arbitrary values: `rgb(var(--veil-rgb, 255 255 255) / 0.16)` – in dark the fallback IS
+  the old literal (a `color-mix(in srgb, …)` would round differently), in light `--veil-rgb` is the ink.
+  `--veil-ink-rgb` (dark `4 4 4`) is the counterpart for ink on the white primary button.
+
+`scripts/codemod-veil.mjs` moves the remaining literals of the feature pages onto the tokens (P14 runs it after the
+merges; P13 converted the shell and the primitives). `base.css`: `color-scheme: only dark` by default, `only light`
+under `html[data-theme="light"]` (themes.css); the page film (glow, dot grid, noise, date-picker icon, selection) reads
+`--page-*` / `--selection-bg` with the dark values as fallbacks.
