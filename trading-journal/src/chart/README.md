@@ -144,14 +144,16 @@ toggles under the chart (`ChartLayers`, `aria-pressed`, ≥ 44 px on coarse poin
 Prop `boxes?: ChartBox[]` of `NothingCandleChart` (+ `boxAutoscale?`): one series primitive on the candle series,
 attached BEFORE the check overlay (fills under everything, S/R and dots over them) and before the trade markers. Sync
 effect 6c (identity = content upstream), `invalidate()` + re-sync after every `setData`, detached in `destroy`.
-`toChartBoxes(analysis, { intervalMs, tfLabel? })` (`@/views/markt/chartBoxes`) maps an analysis.
+`toChartBoxes(analysis, { intervalMs, tfLabel?, liveFrom? })` (`@/views/markt/chartBoxes`) maps an analysis.
 
 | | |
 |---|---|
 | `ChartBox` | `{ id, from (ms), to (ms \| null = live edge), top, btm, tone: win\|loss\|neutral, state?: provisional\|confirmed, active?, label?, targets?: { price, label?, kind: tp\|sl\|entry }[] }` |
-| x mapping | `logicalAt(bars, sec, intervalSec)`: the bar at or after a time; times past the last bar → logical indices into the empty space on the right (targets reach into the future); a box start before the loaded bars clamps to the left edge |
+| x mapping | `logicalAt(bars, sec, intervalSec)`: the bar at or after a time; times past the last bar → logical indices into the empty space on the right (targets reach into the future). A box spans its bars edge to edge (`i − 0.5`); a box older than the loaded bars starts off screen on the same grid, one that ENDED before them is not drawn (never the live edge) |
+| ⚠ fractional logicals | lwc 5.2 `timeScale().logicalToCoordinate(l)` maps WHOLE logicals only – a fractional one answers **0** (the left pane edge). Use `logicalToX(ts, l)` (`logicalX.ts`, interpolates between the whole neighbours) for bar edges, sub-bar times and the future space. (Box fix: the active box was drawn from the pane's left edge, finished boxes had zero width; `AnnotationPrimitive.xOf` and the replay's MAE / MFE band had the same bug.) |
+| debug hook | `NothingCandleChart` puts a read-only `BoxDebugHook` on its chart host (`[role=img][aria-label=Kerzenchart]`) under `BOX_DEBUG_KEY` (`__tjBoxes`): `geometry()`, `boxes()`, `bars()`, `x(logical)` – a plain property (nothing runs until it is read); the e2e `markt.spec.ts` checks every box against the bars with it |
 | look | fill `fillAlpha` .08 in the tone (active ×1.4, older boxes at half alpha), edges `edgeAlpha` .55; provisional = dashed edges in the soft tone; targets from the box's right end to the price-line strip (`tp` dotted in the tone, `sl` dashed loss, `entry` solid fg) |
-| labels | `T1 84.028` / `Stop …` / caption `BOX STARK` on a nearly opaque plate, placed by `placeLabels` against the 64 px price-line strip, the zone caption and the check overlay's labels (`BoxHost.reserved`) – a label that finds no free spot is left out (its line stays) |
+| labels | `T1 84.028` / `Stop …` / caption `BOX STARK` (two parts of one box with the same caption show it once: the first part in view with room) on a nearly opaque plate, placed by `placeLabels` against the 64 px price-line strip, the zone caption and the check overlay's labels (`BoxHost.reserved`) – a label that finds no free spot is left out (its line stays) |
 | axis | the active box's edges as price-axis labels unless another axis label sits within `AXIS_LABEL_GAP`; `targetPrices()` feeds the tick formatter's blanking |
 | autoscale | opt-in (`boxAutoscale`, the Markt chart): boxes overlapping the view + the active box's targets |
 | hit test | `externalId: "b:{id}"` |

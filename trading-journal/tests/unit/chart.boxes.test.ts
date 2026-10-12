@@ -6,7 +6,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import btc4h from "./fixtures/binance-btcusdt-4h.json";
-import { analyzeBoxes } from "@/domain/boxes";
+import { analyzeBoxes, reentryIndex } from "@/domain/boxes";
 import type { Bar } from "@/domain/signals/indicators";
 import { BoxPrimitive, easeOutCubic, logicalAt, type ChartBox } from "@/chart/primitives/BoxPrimitive";
 import { toChartBoxes } from "@/views/markt/chartBoxes";
@@ -20,7 +20,8 @@ const ms = (i: number) => (T0 + i * H) * 1000;
 function attach(box: BoxPrimitive, opts: { from?: number; to?: number; width?: number } = {}) {
   const width = opts.width ?? 1000;
   const chart = {
-    timeScale: () => ({ getVisibleLogicalRange: () => ({ from: opts.from ?? 0, to: opts.to ?? 110 }), width: () => width, logicalToCoordinate: (i: number) => i * 8 + 4 }),
+    // like lightweight-charts 5.2: only WHOLE logicals map (a fractional one answers 0, the left pane edge)
+    timeScale: () => ({ getVisibleLogicalRange: () => ({ from: opts.from ?? 0, to: opts.to ?? 110 }), width: () => width, logicalToCoordinate: (i: number) => (Number.isInteger(i) ? i * 8 + 4 : 0) }),
     panes: () => [{ getHeight: () => 400 }],
   };
   const series = { priceToCoordinate: (p: number) => 400 - (p - 80) * 10 };
@@ -195,18 +196,34 @@ describe("BoxPrimitive motion (finite)", () => {
 describe("analysis → chart boxes (Markt page / overview layer)", () => {
   const load = (j: unknown): Bar[] => (j as { bars: number[][] }).bars.map(([t, o, h, l, c]) => ({ t: t!, o: o!, h: h!, l: l!, c: c! }));
   it("maps the boxes of an analysis: older ones faint, broken ones in their tone, the newest active with targets", () => {
-    const a = analyzeBoxes({ tf: "4h", bars: load(btc4h).slice(0, 1493), bias: 1 })!;
-    const cb = toChartBoxes(a, { intervalMs: 4 * H * 1000 });
+    const bars = load(btc4h).slice(0, 1493);
+    const a = analyzeBoxes({ tf: "4h", bars, bias: 1 })!;
+    const iv = 4 * H * 1000;
+    // the newest box broke out upward on 2026-10-02 and the market came back: it ends with its last bar …
+    const cb = toChartBoxes(a, { intervalMs: iv });
     expect(cb.length).toBe(a.box.boxes.length);
     const active = cb.filter((b) => b.active);
     expect(active).toHaveLength(1);
     expect(a.box.phase).toBe("inside");
-    expect(active[0]!.to).toBeNull(); // the market trades inside the newest box: open to the live edge
+    const newest = a.box.box!;
+    expect(newest.brk).toBe(1);
+    expect(active[0]!.to).toBe(newest.t1 * 1000 + iv); // never across the bars that closed above it
     expect(active[0]!.tone).toBe("neutral");
     expect(active[0]!.targets?.length).toBeGreaterThan(0);
     for (const b of cb.filter((x) => !x.active)) expect(b.to).not.toBeNull();
     const broken = a.box.boxes.slice(0, -1).filter((b) => b.brk !== 0);
     for (const b of broken) expect(cb.find((x) => x.from === b.t0 * 1000)!.tone).toBe(b.brk > 0 ? "win" : "loss");
     expect(new Set(cb.map((b) => b.id)).size).toBe(cb.length);
+    // … and runs on from the current run of closes back inside to the live edge (the live part carries the targets)
+    const re = reentryIndex(bars, newest)!;
+    expect(re).toBeGreaterThan(newest.i1 + 1);
+    const live = toChartBoxes(a, { intervalMs: iv, liveFrom: bars[re]!.t * 1000 });
+    expect(live).toHaveLength(cb.length + 1);
+    const tail = live.at(-1)!;
+    expect(tail).toMatchObject({ id: `${active[0]!.id}:live`, from: bars[re]!.t * 1000, to: null, top: newest.top, btm: newest.bottom, active: true });
+    expect(tail.targets?.length).toBeGreaterThan(0);
+    expect(live.at(-2)!.targets).toBeUndefined();
+    expect(live.at(-2)!.label).toBe("Box stark");
+    expect(new Set(live.map((b) => b.id)).size).toBe(live.length);
   });
 });

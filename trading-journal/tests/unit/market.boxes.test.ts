@@ -81,7 +81,7 @@ vi.mock("@/market/marketStore", () => ({
   },
 }));
 
-const { retainBoxes, getBoxes, subscribeBoxes, getBoxBars, __boxStats, __resetBoxes } = await import("@/market/boxes/store");
+const { retainBoxes, getBoxes, subscribeBoxes, getBoxBars, closedBars, __boxStats, __resetBoxes } = await import("@/market/boxes/store");
 const { scanSymbol, getScan, retainScanner, scanNow, nextScanAt, lastClosedOpen, __resetScanner, SCAN_BUDGET } = await import("@/market/boxes/scanner");
 const { evaluateBoxes, __resetBoxAlerts, startBoxAlerts, scanAlertKey, BOX_ALERTS_KEY } = await import("@/market/boxes/alerts");
 const { resolveTradeBoxes, tradeDateMs, barOpenOf, __resetBoxSnapshotMemo } = await import("@/market/boxes/snapshot");
@@ -304,6 +304,72 @@ describe("live box store", () => {
     setBoxesSettings({ minGrade: "A+" });
     await vi.advanceTimersByTimeAsync(300);
     expect(getBoxes().best.every((b) => b.setup.grade === "A+")).toBe(true);
+    release();
+  });
+
+  // ---------------------------------------------------------------- box fix: the bars the engine sees = the chart's
+
+  const ascendingGapFree = (bars: readonly Bar[], stepSec: number): boolean => bars.every((b, i) => i === 0 || b.t - bars[i - 1]!.t === stepSec);
+
+  it("history page + the provider's trimmed ring: strictly ascending, gap-free 4h bars up to the last close", async () => {
+    // a live upsert trimmed the ring back to 600 bars after the history load; the page reaches 760 bars back and overlaps it
+    publishFeed("kline_4h", B4.slice(B4.length - 600).map((b) => toCandle(b, H4, NOW)));
+    const page = B4.slice(B4.length - 760).map((b) => toCandle(b, H4, NOW));
+    market.current = fakeProvider({ history: vi.fn(() => Promise.resolve(stamp(page))) });
+    const release = retainBoxes();
+    await vi.advanceTimersByTimeAsync(300);
+    const bars = getBoxBars("4h");
+    expect(bars).toHaveLength(759); // 760 − the forming bar
+    expect(ascendingGapFree(bars, H4 / 1000)).toBe(true);
+    expect(bars[0]!.t).toBe(B4[B4.length - 760]!.t);
+    expect(bars.at(-1)!.t).toBe(B4[B4.length - 2]!.t);
+    expect(getBoxes().tfs["4h"].analysis).not.toBeNull();
+    release();
+  });
+
+  it("a history page that does not reach the ring is not glued on (a hole would read as adjacent bars)", async () => {
+    publishFeed("kline_4h", B4.slice(B4.length - 600).map((b) => toCandle(b, H4, NOW)));
+    const page = B4.slice(B4.length - 760, B4.length - 605).map((b) => toCandle(b, H4, NOW)); // ends 5 bars short
+    market.current = fakeProvider({ history: vi.fn(() => Promise.resolve(stamp(page))) });
+    const release = retainBoxes();
+    await vi.advanceTimersByTimeAsync(300);
+    const bars = getBoxBars("4h");
+    expect(bars).toHaveLength(599);
+    expect(ascendingGapFree(bars, H4 / 1000)).toBe(true);
+    release();
+  });
+
+  it("closedBars: drops the forming bar, repeated / out-of-order rows and everything before the newest hole", () => {
+    const c = (i: number, closed = true): Candle => ({ time: i * H4, open: 1, high: 2, low: 0, close: 1, volume: 1, closed });
+    expect(closedBars([], [c(1), c(2), c(3, false)], H4).map((x) => x.time / H4)).toEqual([1, 2]);
+    expect(closedBars([c(0), c(1)], [c(2), c(3), c(4, false)], H4).map((x) => x.time / H4)).toEqual([0, 1, 2, 3]);
+    expect(closedBars([c(0)], [c(2), c(3)], H4).map((x) => x.time / H4)).toEqual([2, 3]); // the page misses bar 1
+    const dup = closedBars([], [c(1), c(2), { ...c(2), close: 9 }, c(3), c(0)], H4); // a repeated bar, one out of order
+    expect(dup.map((x) => x.time / H4)).toEqual([1, 2, 3]);
+    expect(dup[1]!.close).toBe(9); // the newer row wins
+    expect(closedBars([], [c(1), c(2), c(5), c(6)], H4).map((x) => x.time / H4)).toEqual([5, 6]); // a hole in the ring
+    expect(closedBars([], [], H4)).toEqual([]);
+  });
+
+  it("a re-entered box: liveFrom is the first bar of the current run of closes back inside (the chart's live part)", async () => {
+    for (const k of Object.keys(fakeFeeds)) delete fakeFeeds[k];
+    const now = (B4[1493]!.t + 3600) * 1000;
+    vi.setSystemTime(now);
+    feedsAt(now, 1494);
+    const release = retainBoxes();
+    await vi.advanceTimersByTimeAsync(300);
+    const v = getBoxes().tfs["4h"];
+    const box = v.analysis!.box.box!;
+    expect(box.brk).toBe(1); // broke out upward on 2026-10-02, back inside since
+    const bars = getBoxBars("4h");
+    const i = bars.findIndex((b) => b.t * 1000 === v.liveFrom);
+    expect(i).toBeGreaterThan(box.i1 + 1);
+    const buf = DEFAULT_BOXES_CFG.box.breakAtr * box.atr;
+    const inside = (b: Bar) => b.c <= box.top + buf && b.c >= box.bottom - buf;
+    expect(bars.slice(i).every(inside)).toBe(true);
+    expect(inside(bars[i - 1]!)).toBe(false);
+    // an unbroken newest box needs no live part
+    for (const tf of ["1d", "1w"] as const) if (getBoxes().tfs[tf].analysis?.box.box?.brk === 0) expect(getBoxes().tfs[tf].liveFrom).toBeNull();
     release();
   });
 });

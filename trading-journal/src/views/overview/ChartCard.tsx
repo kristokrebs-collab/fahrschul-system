@@ -666,7 +666,11 @@ export function ChartCard() {
   // Box-zu-Box layer (P02): the live 4h boxes, computed only while the layer is on (and the card open)
   const boxView = useBoxes({ enabled: boxesOn && chart.open });
   const analysis4h = boxView.tfs["4h"].analysis;
-  const chartBoxes = useMemo(() => (boxesOn && MCB_INTERVALS.has(interval) ? toChartBoxes(analysis4h, { intervalMs: 4 * 3_600_000, tfLabel: interval === "4h" ? undefined : "4h" }) : undefined), [boxesOn, analysis4h, interval]);
+  const liveFrom4h = boxView.tfs["4h"].liveFrom ?? null;
+  const chartBoxes = useMemo(
+    () => (boxesOn && MCB_INTERVALS.has(interval) ? toChartBoxes(analysis4h, { intervalMs: 4 * 3_600_000, tfLabel: interval === "4h" ? undefined : "4h", liveFrom: liveFrom4h }) : undefined),
+    [boxesOn, analysis4h, interval, liveFrom4h],
+  );
   const onBoxLayer = useMemo(() => ({ on: boxesOn, onToggle: () => setFlag(BOX_LAYER_FLAG, !boxesOn) }), [boxesOn, setFlag]);
   const active = levelsOn && close4h != null ? scenario(close4h, settings.market) : null;
   const activeScenario = active?.key === "long" || active?.key === "short" ? active.key : null;

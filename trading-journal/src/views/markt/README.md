@@ -30,8 +30,10 @@ trade markers, so there is no `position: fixed` ghost a reveal could trap).
   pending, live after a breakout, with the candle-close countdown ring) and the countdown to the close.
 - **Box-Chart** (`BoxChartCard.tsx`): its own lazy `NothingCandleChart` (the overview chart is a separate keep-alive
   instance) with `boxes` (`toChartBoxes`: the active box, earlier boxes faded, the open reference box while price is
-  inside / failed, targets) and `boxAutoscale`, the RSI pane (`panes: ["rsi"]`) with the diagonal trendlines and break
-  glow. Timeframe `Segmented` 4h / 1D / 1W (the chart's `StripWipe` wipes the new picture in); window 30 / 180 / 730
+  inside / failed, targets) and `boxAutoscale`. A box covers only its own bars – never a candle that closed outside it: a
+  newest box that broke out and was re-entered ends at its breakout, and its live part (`{id}:live`, targets, shared
+  caption) runs from `BoxTfView.liveFrom` (first bar of the current run of closes back inside) to the live edge; the
+  RSI pane (`panes: ["rsi"]`) with the diagonal trendlines and break glow. Timeframe `Segmented` 4h / 1D / 1W (the chart's `StripWipe` wipes the new picture in); window 30 / 180 / 730
   days; 4h history extended once (`provider.history`, 120 days).
 - **RSI-Linien** (`RsiLinesCard.tsx`): per timeframe a mini RSI with its two lines (`miniGeo`), drawn in on first view
   (`useFirstInView` + clip-path), a fresh break breathes (`GlowBreak`, 3 cycles).

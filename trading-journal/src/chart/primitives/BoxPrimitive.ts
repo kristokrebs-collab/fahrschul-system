@@ -15,8 +15,10 @@
  *   (ZonePrimitive `fadeIn` pattern), its target lines extend left → right one after another (`stagger.cards`);
  * - provisional → confirmed: the solid edge wipes in over `tween.reveal`.
  * The rAF loop runs only while a tween runs and calls `requestUpdate`; geometry is computed in `updateAllViews` for the
- * boxes in view, memoised on what moves it. x: `logicalToCoordinate(barIndex)`; times beyond the last bar map to logical
- * indices past it (`last + Δt / interval`), so targets reach into the future space. No React, no timers.
+ * boxes in view, memoised on what moves it. x: `logicalToX(barIndex ± 0.5)` (`../logicalX.ts` – lwc maps only WHOLE
+ * logicals, a fractional one would land on x = 0); a box spans its bars edge to edge, times beyond the last bar map to
+ * logical indices past it (`last + Δt / interval`), so targets reach into the future space; a box older than the loaded
+ * bars starts off screen on the same grid, one that ended before them is not drawn. No React, no timers.
  */
 import type {
   AutoscaleInfo,
@@ -37,6 +39,7 @@ import { stagger, tween } from "@/motion/tokens";
 import { AXIS_LABEL_GAP } from "../axisLabels";
 import { fmt } from "../format";
 import { ink } from "../ink";
+import { logicalToX } from "../logicalX";
 import { axisLabelClear, barIndexAtOrAfter, estimateTextWidth, LINE_NUDGE, placeLabels, type Box as OverlayBox, type LabelCandidate } from "../overlayLayout";
 import { RIGHT_RESERVED } from "./SignalOverlay";
 
@@ -92,6 +95,22 @@ export interface BoxOptions {
   autoscale: boolean;
   /** price-axis labels of the active box's edges */
   axisLabels: boolean;
+}
+
+/**
+ * Read-only diagnostics hook a chart puts on its host element under `BOX_DEBUG_KEY` (e2e / dev tools: where a box is
+ * drawn against the bar grid). A plain property – nothing runs until it is read.
+ */
+export const BOX_DEBUG_KEY = "__tjBoxes";
+export interface BoxDebugHook {
+  /** the boxes as drawn right now (CSS px, chart-relative) */
+  geometry(): readonly BoxGeo[];
+  /** the boxes handed to the chart (times in ms) */
+  boxes(): readonly ChartBox[];
+  /** the chart's bars (ascending, UTC seconds) */
+  bars(): ReadonlyArray<{ time: number; open: number; high: number; low: number; close: number }>;
+  /** CSS-px x of a logical index (fractional allowed: `i − 0.5` is the left edge of bar `i`) */
+  x(logical: number): number | null;
 }
 
 export const BOX_DEFAULTS: BoxOptions = { fillAlpha: 0.08, edgeAlpha: 0.55, inMs: tween.draw.duration * 1000, autoscale: false, axisLabels: true };
@@ -385,6 +404,11 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
     return this.geo.length;
   }
 
+  /** The boxes as handed in (`setBoxes`; tests / diagnostics). */
+  chartBoxes(): readonly ChartBox[] {
+    return this.boxes;
+  }
+
   axisY(edge: "top" | "btm"): number | null {
     return this.axis[edge]?.y ?? null;
   }
@@ -454,13 +478,22 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
     const right = width - RIGHT_RESERVED;
     const out: BoxGeo[] = [];
     const cands: LabelCandidate<{ set: (l: PlacedLabel) => void; text: string; color: string }>[] = [];
+    /** captions already wanted: the two parts of a re-entered box share theirs – the first part in view with room shows it */
+    const captions = new Set<string>();
     for (const b of this.boxes) {
-      const i0 = logicalAt(bars, Math.floor(b.from / 1000), iv) ?? 0;
-      const i1 = b.to == null ? null : logicalAt(bars, Math.floor(b.to / 1000), iv);
+      const s0 = Math.floor(b.from / 1000);
+      // a box older than the loaded bars starts on the bar grid left of them (off screen), never on the first bar
+      const i0 = logicalAt(bars, s0, iv) ?? (s0 - bars[0]!.time) / Math.max(1, iv);
+      let i1: number | null = null;
+      if (b.to != null) {
+        i1 = logicalAt(bars, Math.floor(b.to / 1000), iv);
+        if (i1 == null) continue; // ended before the first loaded bar (never the live edge)
+      }
       if (i1 != null && i1 < vis.from - 1) continue; // ends left of the view
       if (i0 > vis.to + 1) continue; // starts right of the view
-      const xa = ts.logicalToCoordinate((i0 - 0.5) as Logical);
-      const xb = i1 == null ? width : ts.logicalToCoordinate((i1 - 0.5) as Logical);
+      // bar edges are half-integer logicals: lwc maps only whole ones (`logicalToX` interpolates)
+      const xa = logicalToX(ts, i0 - 0.5);
+      const xb = i1 == null ? width : logicalToX(ts, i1 - 0.5);
       const y1 = yOf(b.top);
       const y2 = yOf(b.btm);
       if (xa == null || xb == null || y1 == null || y2 == null) continue;
@@ -504,7 +537,8 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
         cands.push({ box: { x: right - w - 4, y: t.y - LABEL_H / 2, w, h: LABEL_H }, prio: k, nudge: LINE_NUDGE.slice(0, 2), data: { set: (l) => (t.label = l), text: t.text, color: t.color } });
       });
       const text = (b.label ?? "").toUpperCase();
-      if (text && Math.abs(y2 - y1) >= CAPTION_H + 4 && x2 - x1 > 60) {
+      if (text && !captions.has(`${text}@${b.top}:${b.btm}`) && Math.abs(y2 - y1) >= CAPTION_H + 4 && x2 - x1 > 60) {
+        captions.add(`${text}@${b.top}:${b.btm}`);
         const w = estimateTextWidth(text, CAPTION_PX) + 2 * LABEL_PAD;
         const color = b.state === "provisional" ? toneOf(tone).soft : tone === "neutral" ? ink.mute : toneOf(tone).solid;
         cands.push({ box: { x: x1 + 4, y: Math.min(y1, y2) + 3, w, h: CAPTION_H }, prio: b.active ? 10 : 20, nudge: [CAPTION_H + 2], data: { set: (l) => (g.caption = l), text, color } });
@@ -520,8 +554,9 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
 
   /** The active box's edges on the price axis, only where no other axis label sits. */
   private updateAxis(axisPrices: readonly number[], yOf: (p: number) => number | null): void {
-    const act = this.options.axisLabels ? this.boxes.find((b) => b.active) : undefined;
-    if (!act || !this.geo.some((g) => g.id === act.id)) {
+    // an active box in view (a re-entered box has two active parts with the same edges: whichever is drawn)
+    const act = this.options.axisLabels ? this.boxes.find((b) => b.active && this.geo.some((g) => g.id === b.id)) : undefined;
+    if (!act) {
       this.axis = { top: null, btm: null };
       return;
     }

@@ -151,6 +151,14 @@ describe("setups – trade the best", () => {
     expect(s[0]!.best).toBe(false);
   });
 
+  it("a breakout without any target (no CRV) is never 'best' (box fix: no measured move below zero)", () => {
+    const s = boxSetups(base({ phase: "breakout", dir: -1, price: 98, pos: -0.2, zone: "bottom", targets: [], barsSince: 1 }), { ...rsiUp, breakUp: null, breakDown: rsiUp.breakUp, ageDown: 1 } as RsiLineState, -1, null);
+    expect(s[0]!.kind).toBe("breakout");
+    expect(s[0]!.rr).toBeNull();
+    expect(s[0]!.best).toBe(false);
+    expect(s[0]!.grade).not.toMatch(/^A/);
+  });
+
   it("a mid-box price yields no range setup", () => {
     expect(boxSetups(base({ price: 105, pos: 0.5, zone: "mid" }), null, null, null).filter((x) => x.kind === "range")).toHaveLength(0);
   });

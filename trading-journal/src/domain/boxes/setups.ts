@@ -57,7 +57,8 @@ function make(side: "long" | "short", kind: SetupKind, entry: number, stop: numb
   const t1 = targets[0];
   const rr = t1 && risk > 0 ? Math.abs(t1.price - entry) / risk : null;
   let grade = gradeOf(score);
-  if ((rr != null && rr < 1.5) || weakBox || kind === "pre") grade = capB(grade);
+  // no target (no CRV) is never "the best" either – e.g. a breakout below a tall weekly box without a level beneath
+  if (rr == null || rr < 1.5 || weakBox || kind === "pre") grade = capB(grade);
   return {
     side, kind, grade, score, best: grade === "A+" || grade === "A",
     title: `${KIND_TEXT[kind]} ${side === "long" ? "Long" : "Short"}`, detail, entry, stop, targets, rr, reasons,

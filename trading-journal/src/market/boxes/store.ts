@@ -33,6 +33,7 @@ import {
   findBoxes,
   gradePasses,
   HTF_OF,
+  reentryIndex,
   rsiLines,
   traderBiasOf,
   type Box,
@@ -79,6 +80,12 @@ export interface BoxTfView {
   closesAt: number | null;
   /** stable id of the newest box (`boxIdOf`) */
   boxId: string | null;
+  /**
+   * Open time (ms) of the first bar of the current run of closes back inside the newest box after it broke out
+   * (`reentryIndex`): the chart extends the box from here to the live edge, never across the bars that closed outside.
+   * `null` while the box is unbroken (it runs to the live edge itself) or the market is outside it.
+   */
+  liveFrom?: number | null;
   key: string;
 }
 
@@ -147,7 +154,7 @@ interface Ctl {
   baseRuns: number;
 }
 
-const emptyTfView = (tf: BoxTf): BoxTfView => ({ tf, analysis: null, bars: 0, closedAt: null, closesAt: null, boxId: null, key: "∅" });
+const emptyTfView = (tf: BoxTf): BoxTfView => ({ tf, analysis: null, bars: 0, closedAt: null, closesAt: null, boxId: null, liveFrom: null, key: "∅" });
 const emptyTf = (tf: BoxTf): TfCtl => ({ key: "", bars: [], closesAt: null, forming: null, baseKey: "", boxes: [], rsi: null, view: emptyTfView(tf) });
 const EMPTY_TFS = (): Record<BoxTf, BoxTfView> => ({ "4h": emptyTfView("4h"), "1d": emptyTfView("1d"), "1w": emptyTfView("1w") });
 const IDLE_VIEW: BoxesView = { state: "idle", detail: null, symbol: null, cfg: DEFAULT_BOXES_CFG, bias: null, tfs: EMPTY_TFS(), best: [] };
@@ -270,9 +277,11 @@ function runLive(): void {
       htf: h && hs ? { tf: h, phase: hs.phase, dir: hs.dir, pos: hs.pos } : null,
     };
     const key = boxKey(analysis);
+    const re = reentryIndex(t.bars, box.box, ctl.cfg.box);
+    const liveFrom = re == null ? null : t.bars[re]!.t * 1000;
     // keep the old object while nothing shown changed: consumers compare identities
-    if (key !== t.view.key || t.view.closesAt !== t.closesAt) {
-      t.view = { tf, analysis, bars: t.bars.length, closedAt: analysis.at * 1000, closesAt: t.closesAt, boxId: boxIdOf(tf, box.box), key };
+    if (key !== t.view.key || t.view.closesAt !== t.closesAt || t.view.liveFrom !== liveFrom) {
+      t.view = { tf, analysis, bars: t.bars.length, closedAt: analysis.at * 1000, closesAt: t.closesAt, boxId: boxIdOf(tf, box.box), liveFrom, key };
     }
   }
   publish();
@@ -322,12 +331,35 @@ export function closedKeyOf(data: readonly Candle[]): { n: number; key: string }
   return { n, key: lc ? `${n}:${lc.time}:${lc.close}:${lc.high}:${lc.low}:${data[0]!.time}` : "0" };
 }
 
-/** The bars of `older` that lie before `first` (the history page's part the provider's ring no longer holds). */
-function olderThan(older: readonly Candle[], first: number | undefined): readonly Candle[] {
-  if (!older.length || first === undefined) return [];
-  let n = 0;
-  while (n < older.length && older[n]!.time < first) n++;
-  return older.slice(0, n);
+/**
+ * The CLOSED bars a timeframe analyses, strictly ascending and gap-free on the `intervalMs` grid – the engine works on
+ * bar indices, so a hole would read as two adjacent bars (and a box drawn by time would span bars it never saw):
+ * - the history page's bars older than the provider's ring are put in front only where they CONNECT to it (the page's
+ *   newest older bar is the ring's first bar minus one interval, or they overlap);
+ * - a repeated open time keeps the newer row, rows out of order are dropped, and only the newest gap-free run is kept;
+ * - the forming bar (`closed: false`, always the last) is left out.
+ */
+export function closedBars(older: readonly Candle[], data: readonly Candle[], intervalMs: number): Candle[] {
+  const n = data.length > 0 && data[data.length - 1]!.closed === false ? data.length - 1 : data.length;
+  const first = data[0]?.time;
+  const head: Candle[] = [];
+  if (first !== undefined) for (const c of older) if (c.time < first && c.closed !== false) head.push(c);
+  // the page must reach the ring: its newest bar sits one interval before the ring's first one
+  const joined = head.length > 0 && first !== undefined && first - head[head.length - 1]!.time === intervalMs ? [...head, ...data.slice(0, n)] : data.slice(0, n);
+  // strictly ascending: a repeated open time keeps the newer row, an older one out of order is dropped
+  const rows: Candle[] = [];
+  for (const c of joined) {
+    const last = rows[rows.length - 1];
+    if (last && c.time <= last.time) {
+      if (c.time === last.time) rows[rows.length - 1] = c;
+      continue;
+    }
+    rows.push(c);
+  }
+  // newest gap-free run (walk back from the newest bar)
+  let k = rows.length - 1;
+  while (k > 0 && rows[k]!.time - rows[k - 1]!.time === intervalMs) k--;
+  return k > 0 ? rows.slice(k) : rows;
 }
 
 /** Re-reads the three series; true when a closed bar changed somewhere. */
@@ -345,8 +377,7 @@ function readSeries(): boolean {
     const key = older.length ? `${k.key}+${older.length}:${older[0]!.time}` : k.key;
     if (key === t.key) continue;
     t.key = key;
-    const head = olderThan(older, data[0]?.time);
-    const closed = head.length ? [...head, ...data.slice(0, k.n)] : data.slice(0, k.n);
+    const closed = closedBars(older, data, BOX_TF_MS[tf]);
     t.bars = closed.slice(Math.max(0, closed.length - BOX_MAX_BARS)).map(toBar);
     changed = true;
   }
