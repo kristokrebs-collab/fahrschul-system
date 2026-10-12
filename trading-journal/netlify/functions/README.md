@@ -75,3 +75,16 @@ pagination, rate spacing, read-only allowlist), `tests/unit/exchange.mapping.tes
 payloads), `tests/unit/exchange.functions.test.ts` (P11: connect / sync / dry run / pull / positions / backfill / cron /
 webhook / REST against an admin fake with a JS twin of `upsert_synced_trades` and a fake Bitunix that verifies every
 signature). `functions-disabled/binance.mts` stays out of the build.
+
+## Functions (P04 coach – optional)
+
+The coach is fully deterministic in the app (`src/domain/coach`). This function is OPTIONAL: it only rewrites an answer
+the app already computed into natural German. Without `ANTHROPIC_API_KEY` it reports `enabled: false` and the app never
+shows the button – nothing breaks.
+
+| file | route | notes |
+|---|---|---|
+| `coach-ask.mts` | GET `/api/v1/coach/ask` → `{ enabled }` · POST `{ question?, title, text, facts[≤ 12], confidence, notes?[≤ 3, opt-in] }` → `{ text \| null, model, reason? }` | official SDK `@anthropic-ai/sdk` (server only, never in the client bundle); model `COACH_MODEL` (default `claude-opus-5-5`), effort `low`, server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`); signed in, plan feature `coachAi` (Premium, not gated while payments are not set up), 10 / 10 min + `coachAiPerDay` per day (50 without payments); body ≤ 8 KiB, only computed facts; every number of the answer must occur in the input, else `text: null, reason: "unverified"` (refusal → `"refusal"`); German errors 503 `coach_ai_unavailable`, 429 `coach_ai_busy`, 502 `coach_ai_failed`; nothing stored, only error codes logged |
+
+Tests: `tests/unit/coach.ask.test.ts` (fake admin + fake Anthropic client: availability, auth, plan gate, rate limits,
+request shape, number guard, refusal, error mapping).

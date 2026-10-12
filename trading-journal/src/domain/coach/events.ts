@@ -1,8 +1,9 @@
 /**
  * Behaviour events contract (Wave 0 – owner P04, consumers P08 psych tracker, P05 guard, P12 mentor queue).
- * Pure. Signatures are final; `detectBehaviors` is a STUB (no events) until P04 lands its detectors.
+ * Pure. Signatures are final; `detectBehaviors` runs the P04 detectors (`detectors.ts`, rules and tuning there).
  */
 import type { DayNotes, EnrichedTrade, Settings } from "../types";
+import { runDetectors } from "./detectors";
 
 export const BEHAVIOR_KEYS = [
   "revenge",
@@ -57,8 +58,11 @@ export interface DetectInput {
   now?: number;
 }
 
-/** All behaviour events of the journal, oldest first. STUB: always `[]` until P04. */
+/**
+ * All behaviour events of the journal, oldest first: revenge, tilt, overtrading, FOMO, stop moved, early profit, loss
+ * aversion, overconfidence, impulsive, boredom and rule violations (from the discipline limits). Deterministic – the
+ * same journal always gives the same events; `now` is accepted for the contract, no detector depends on the clock.
+ */
 export function detectBehaviors(input: DetectInput): BehaviorEvent[] {
-  void input;
-  return [];
+  return runDetectors(input);
 }
