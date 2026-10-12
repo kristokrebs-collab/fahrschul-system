@@ -255,3 +255,82 @@ revoke all on public.exchange_connections from anon, authenticated;
 grant select (id, user_id, exchange, label, key_version, key_last4, permissions, status, last_sync_at, last_error,
               created_at, updated_at)
   on public.exchange_connections to authenticated;
+
+-- ── Sessions (Konto → Sicherheit) ───────────────────────────────────────────────────────────────────────────────
+-- Lists the caller's own login sessions (devices). The IP is coarsened (/24, /48) – enough to tell "home" from
+-- "somewhere else", never the full address. Signing the other devices out runs through Supabase Auth
+-- (`auth.signOut({ scope: "others" })`), not through SQL.
+
+create function public.my_sessions()
+returns table (
+  id           uuid,
+  created_at   timestamptz,
+  updated_at   timestamptz,
+  refreshed_at timestamptz,
+  user_agent   text,
+  ip           text,
+  aal          text,
+  is_current   boolean
+)
+language sql stable security definer set search_path = '' as $$
+  select s.id,
+         s.created_at,
+         s.updated_at,
+         s.refreshed_at::timestamptz,
+         left(s.user_agent, 300),
+         case
+           when s.ip is null then null
+           when family(s.ip) = 4 then regexp_replace(host(network(set_masklen(s.ip, 24))), '\.0$', '.x')
+           else host(network(set_masklen(s.ip, 48))) || '…'
+         end,
+         s.aal::text,
+         coalesce(s.id = nullif(auth.jwt() ->> 'session_id', '')::uuid, false)
+  from auth.sessions s
+  where s.user_id = auth.uid()
+    and (s.not_after is null or s.not_after > now())
+  order by coalesce(s.id = nullif(auth.jwt() ->> 'session_id', '')::uuid, false) desc,
+           coalesce(s.refreshed_at::timestamptz, s.updated_at, s.created_at) desc nulls last
+  limit 50;
+$$;
+revoke execute on function public.my_sessions() from public, anon;
+grant execute on function public.my_sessions() to authenticated;
+
+-- ── Nightly backups (netlify/functions/backup-nightly.mts) ──────────────────────────────────────────────────────
+-- Users whose journal changed since `p_since`, keyset-paged by user id. Service role only.
+
+create function public.backup_candidates(p_since timestamptz, p_after uuid default null, p_limit integer default 500)
+returns table (user_id uuid)
+language sql stable security definer set search_path = '' as $$
+  select distinct d.user_id
+  from public.journal_docs d
+  where d.updated_at >= p_since
+    and (p_after is null or d.user_id > p_after)
+  order by d.user_id
+  limit least(greatest(coalesce(p_limit, 500), 1), 1000);
+$$;
+revoke execute on function public.backup_candidates(timestamptz, uuid, integer) from public, anon, authenticated;
+grant execute on function public.backup_candidates(timestamptz, uuid, integer) to service_role;
+
+-- ── Storage buckets ─────────────────────────────────────────────────────────────────────────────────────────────
+-- `backups`: private, service role only (no client policy) – `backups/<user id>/<YYYY-MM-DD>.json`, kept 14 days.
+-- `screenshots` (P06): private, every user reads / writes only below `screenshots/<own user id>/…`.
+-- Skipped where the storage schema does not exist (plain Postgres); create both buckets in the dashboard then.
+
+do $$
+begin
+  if exists (select 1 from information_schema.tables where table_schema = 'storage' and table_name = 'buckets') then
+    insert into storage.buckets (id, name, public) values ('backups', 'backups', false) on conflict (id) do nothing;
+    insert into storage.buckets (id, name, public) values ('screenshots', 'screenshots', false) on conflict (id) do nothing;
+  end if;
+  if exists (select 1 from information_schema.tables where table_schema = 'storage' and table_name = 'objects') then
+    execute $p$create policy "screenshots: read own" on storage.objects for select to authenticated
+      using (bucket_id = 'screenshots' and (storage.foldername(name))[1] = (select auth.uid())::text)$p$;
+    execute $p$create policy "screenshots: insert own" on storage.objects for insert to authenticated
+      with check (bucket_id = 'screenshots' and (storage.foldername(name))[1] = (select auth.uid())::text)$p$;
+    execute $p$create policy "screenshots: update own" on storage.objects for update to authenticated
+      using (bucket_id = 'screenshots' and (storage.foldername(name))[1] = (select auth.uid())::text)
+      with check (bucket_id = 'screenshots' and (storage.foldername(name))[1] = (select auth.uid())::text)$p$;
+    execute $p$create policy "screenshots: delete own" on storage.objects for delete to authenticated
+      using (bucket_id = 'screenshots' and (storage.foldername(name))[1] = (select auth.uid())::text)$p$;
+  end if;
+end $$;
