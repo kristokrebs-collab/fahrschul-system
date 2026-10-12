@@ -18,6 +18,11 @@ import { pushToast, useUi } from "@/store/uiStore";
 import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { useOverlayLane } from "@/primitives/toastStore";
 import { MistakeChips, SignalSummary, tradeSignal } from "./SignalSummary";
+import type { Annotation } from "@/domain/types";
+import { stripEnrichment } from "@/domain/csv";
+import { ExcursionBackfillHost } from "@/journal/ExcursionBackfillHost";
+import { JournalDetail } from "@/journal/ui/JournalDetail";
+import { ReplayHost } from "@/views/trades/replay/TradeReplay";
 
 /** Lazy: keeps `lightweight-charts` in its own chunk (loaded the first time a detail with candles opens). */
 const MiniTradeChart = lazy(() => import("@/chart/MiniTradeChart").then((m) => ({ default: m.MiniTradeChart })));
@@ -61,7 +66,19 @@ export interface TradeDetailProps {
  * without a source to return to (table ghost, chart marker, calendar), flying out on the release velocity with its
  * contents inside. The panel scrolls with `overscroll-contain`.
  */
-export function TradeDetail({ candles, onEdit, className }: TradeDetailProps) {
+export function TradeDetail(props: TradeDetailProps) {
+  return (
+    <>
+      <TradeDetailDialog {...props} />
+      {/* Journal v3: the trade replay sheet (opened from the detail's `Replay`) lives next to the detail, and the
+          idle MAE / MFE backfill runs from here (both render nothing until needed) */}
+      <ReplayHost />
+      <ExcursionBackfillHost />
+    </>
+  );
+}
+
+function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
   const detail = useUi((s) => s.detail);
   const closeDetail = useUi((s) => s.closeDetail);
   const dismissDetail = useUi((s) => s.dismissDetail);
@@ -354,6 +371,15 @@ interface DetailContentProps {
 
 function DetailContent({ trade: e, setups, currency, candles, settled, onClose, onEdit, onDelete, handle, handleRef, reduced }: DetailContentProps) {
   const [confirm, setConfirm] = useState(false);
+  const saveTrade = useJournal((st) => st.saveTrade);
+  // Journal v3: chart drawings are saved with the trade as they change (they never touch P&L / R)
+  const saveAnnotations = useCallback(
+    (next: Annotation[]) => {
+      const { annotations: _old, ...rest } = stripEnrichment(e);
+      void saveTrade({ ...rest, ...(next.length ? { annotations: next } : null), updatedAt: new Date().toISOString() }).catch(() => pushToast({ kind: "error", title: "Zeichnung nicht gespeichert" }));
+    },
+    [e, saveTrade],
+  );
   const [err, setErr] = useState("");
   const { trigger: deleteTrigger, no: deleteNo } = useConfirmFocus(confirm);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -525,11 +551,13 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
           </StaggerItem>
         )}
 
+        <JournalDetail trade={e} currency={currency} setups={setups} />
+
         {candles && candles.length > 0 && (
           <StaggerItem>
             {settled ? (
               <Suspense fallback={<Skeleton height={MINI_CHART_HEIGHT} />}>
-                <MiniTradeChart candles={candles} trade={e} height={MINI_CHART_HEIGHT} />
+                <MiniTradeChart candles={candles} trade={e} height={MINI_CHART_HEIGHT} annotations={e.annotations} onAnnotationsChange={saveAnnotations} />
               </Suspense>
             ) : (
               <Skeleton height={MINI_CHART_HEIGHT} />
