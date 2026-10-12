@@ -13,4 +13,5 @@ export * from "./recommendations";
 export * from "./tradeReview";
 export * from "./watch";
 export * from "./copy";
+export * from "./prefs";
 export { accountOf, byEntry, closeMs, entryMs, hashSeed, sizeRatio, minutesLabel } from "./shared";
