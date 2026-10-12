@@ -8,7 +8,7 @@ import { cloudEnabled } from "../env";
 import { openAuthSheet, useCloudSession } from "../session";
 import { useSyncStatus } from "../sync/status";
 import { AUTH_LAYOUT_ID, syncPill } from "./pill";
-import { PILL } from "./strings";
+import { PILL } from "./pillStrings";
 
 const DOT_TONE: Record<StatusTone, string> = { live: "bg-win", warn: "bg-warn", error: "bg-loss", muted: "bg-faint" };
 

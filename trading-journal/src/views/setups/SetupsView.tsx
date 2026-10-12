@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, type Variants } from "motion/react";
-import { useMemo, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useMemo, useState, type CSSProperties } from "react";
 import { EMPTY_LIBRARY_FILTER, libraryFacets, matchesLibrary, type LibraryFilter } from "@/domain/strategy";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { ED } from "@/domain/edition";
@@ -20,8 +20,13 @@ import { PageHeader } from "./PageHeader";
 import { playbookBySetup } from "./playbook";
 import { SetupCard } from "./SetupCard";
 import { ClassifyCard } from "./ClassifyCard";
-import { CompareSheet } from "./CompareSheet";
 import { LibraryBar, LIBRARY_STRINGS } from "./LibraryBar";
+
+/**
+ * "Grundlagen vergleichen" (P07): its own chunk (it brings the significance stats of the Analyse page), loaded on the
+ * first tap on "Vergleichen" and kept mounted afterwards so the sheet's exit can play (P14 bundle).
+ */
+const CompareSheet = lazy(() => import("./CompareSheet").then((m) => ({ default: m.CompareSheet })));
 
 export type SetupAccFilter = "all" | AccountId;
 
@@ -72,6 +77,7 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
   // P07: library filter (only hides cards, like the account switch) and the comparison sheet
   const [filter, setFilter] = useState<LibraryFilter>(EMPTY_LIBRARY_FILTER);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [compareMounted, setCompareMounted] = useState(false);
   const facets = useMemo(() => libraryFacets(settings.setups), [settings.setups]);
 
   const ranked = useMemo(() => rankSetupStats(view.setups, sort).filter((c) => setupVisibleFor(c.setup, acc) && matchesLibrary(c.setup, filter, c.n)), [view.setups, sort, acc, filter]);
@@ -102,7 +108,10 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
         }
       />
 
-      <LibraryBar filter={filter} onChange={setFilter} facets={facets} onCompare={() => setCompareOpen(true)} comparable={comparable} />
+      <LibraryBar filter={filter} onChange={setFilter} facets={facets} onCompare={() => {
+          setCompareMounted(true);
+          setCompareOpen(true);
+        }} comparable={comparable} />
       {ranked.length === 0 && view.setups.length > 0 && (
         <p className="text-[13px] text-mute" data-testid="setup-library-empty">
           {LIBRARY_STRINGS.none}
@@ -174,7 +183,11 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
         </RevealGroup>
       </Card>
 
-      <CompareSheet open={compareOpen} onClose={() => setCompareOpen(false)} setups={settings.setups} closed={view.closed} settings={settings} />
+      {compareMounted && (
+        <Suspense fallback={null}>
+          <CompareSheet open={compareOpen} onClose={() => setCompareOpen(false)} setups={settings.setups} closed={view.closed} settings={settings} />
+        </Suspense>
+      )}
     </div>
   );
 }

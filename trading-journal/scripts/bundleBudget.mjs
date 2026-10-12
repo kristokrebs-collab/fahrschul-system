@@ -11,7 +11,8 @@
  *
  * Budgets are in KiB gzip (`BUDGETS` below). They sit ~10 % above the measured build so a real regression trips them,
  * not a dependency patch. The P13 overlays (search, shortcut sheet, tour, cockpit) must never be part of the
- * first load – they are lazy chunks by design; the check reports them as "nicht im Build" until P14 wires them.
+ * first load – they are lazy chunks by design; one that is not a chunk of its own (P14: `WidgetCatalog` lives inside the
+ * lazy `CockpitView` chunk) is reported as "nicht im Build" – never as part of the first load.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -20,15 +21,18 @@ import { gzipSync } from "node:zlib";
 
 /**
  * KiB gzip. `initial*` = first load, `chunk` = any other single JS file, `named` = the entry (`index`) and the vendor
- * chunks of `vite.config.ts`. Measured 2026-10-12 (P13 branch, personal edition): first load JS 762.6 / CSS 41.2,
- * index 465.5, recharts 103.3, react 63.3, lwc 55.1, motion 52.8, largest lazy chunk 64.1. P14 re-measures after the
- * merge of all packages and moves these numbers once, deliberately.
+ * chunks of `vite.config.ts`. P13 measured (2026-10-12, P13 branch): first load JS 762.6 / CSS 41.2, index 465.5.
+ * P14 re-measured once after the merge of all packages (2026-10-12, personal edition, every feature page a lazy chunk,
+ * the first load in ONE `app` chunk via `codeSplitting` `$initial`): first load JS 728.2 / CSS 41.2, index 508.5 (it now
+ * holds the whole first-load app code that P13 still split into ~80 shared chunks), recharts 103.3, react 65.8,
+ * motion 50.1, lwc 55.1 (lazy), largest lazy chunk 62.4 (Supabase client). The first-load budget is TIGHTER than P13's
+ * (840 → 800); `index` moves to ~10 % above the new measure.
  */
 export const BUDGETS = {
-  initialJs: 840,
+  initialJs: 800,
   initialCss: 46,
   chunk: 120,
-  named: { index: 512, react: 70, motion: 58, recharts: 114, lwc: 62 },
+  named: { index: 560, react: 72, motion: 58, recharts: 114, lwc: 62 },
 };
 
 /** Lazy P13 chunks (file name prefix) that must stay out of the first load. */

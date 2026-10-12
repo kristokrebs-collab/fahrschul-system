@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { Button, type ButtonSize } from "@/primitives/Button";
 import { hasClaudeRuntime } from "@/store/capability";
 import type { ShareTarget } from "../store";
-import { SHARE } from "../strings";
+import { SHARE_BUTTON } from "../buttonStrings";
 import { Glyph } from "./glyphs";
 
 /**
@@ -33,9 +33,9 @@ export function ShareButton(props: ShareButtonProps) {
   if (props.setupId && !(cloudEnabled() && !hasClaudeRuntime())) return null;
   const onClick = () => (props.tradeId ? share({ kind: "trade", tradeId: props.tradeId }) : share({ kind: "setup", setupId: props.setupId! }));
   return (
-    <Button size={size} onClick={onClick} aria-label={iconOnly ? SHARE.button : undefined} className={cn(iconOnly && "px-2.5", className)} data-testid="share-button">
+    <Button size={size} onClick={onClick} aria-label={iconOnly ? SHARE_BUTTON : undefined} className={cn(iconOnly && "px-2.5", className)} data-testid="share-button">
       <Glyph name="share" className="size-4" />
-      {!iconOnly && SHARE.button}
+      {!iconOnly && SHARE_BUTTON}
     </Button>
   );
 }

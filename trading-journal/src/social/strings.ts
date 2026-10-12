@@ -1,4 +1,5 @@
 /** German copy of the community (P12): short, natural sentences. */
+import { SHARE_BUTTON } from "./buttonStrings";
 import type { GroupKind, GroupRole, ShareKind } from "./contract";
 
 export const S = {
@@ -220,7 +221,7 @@ export const MENTOR = {
 } as const;
 
 export const SHARE = {
-  button: "Teilen",
+  button: SHARE_BUTTON,
   sheetTitle: "Teilen",
   what: "Was geteilt wird",
   never: "Nie geteilt: Euro-Beträge, Kontogröße, Notizen, Börse.",

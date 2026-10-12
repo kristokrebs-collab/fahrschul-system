@@ -1,17 +1,6 @@
 /** German copy of the cloud UI (P09). Short, natural sentences; no tech jargon on the surface. */
 
-export const PILL = {
-  signIn: "Anmelden",
-  live: "Sync · live",
-  connecting: "Verbinde …",
-  syncing: "Synchronisiert …",
-  offline: "Offline",
-  error: "Sync-Fehler",
-  paused: "Sync pausiert",
-  locked: "2FA-Code fehlt",
-  signedIn: "Angemeldet",
-  accountLabel: (email: string | null) => (email ? `Konto: ${email}` : "Konto"),
-} as const;
+export { PILL } from "./pillStrings";
 
 export const AUTH = {
   titles: {

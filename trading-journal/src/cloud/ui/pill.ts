@@ -1,7 +1,7 @@
 import type { StatusTone } from "@/motion/StatusPill";
 import type { CloudPhase } from "../session";
 import type { SyncPhase } from "../sync/status";
-import { PILL } from "./strings";
+import { PILL } from "./pillStrings";
 
 /** `layoutId` the header pill and the login sheet share (the sheet morphs out of the pill). */
 export const AUTH_LAYOUT_ID = "auth-sheet";
