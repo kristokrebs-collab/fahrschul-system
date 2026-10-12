@@ -39,7 +39,8 @@ describe("Button ripple", () => {
     expect(layer.childElementCount).toBe(1);
     fireEvent.keyDown(b, { key: "Enter" });
     expect(layer.childElementCount).toBe(2);
-    expect((layer.firstElementChild as HTMLElement).style.background.replace(/\s/g, "")).toMatch(/rgba?\(4,4,4/);
+    // ink ripple on the white primary: rgb(4 4 4 / …), via the P13 veil channel token in dark (`--veil-ink-rgb` fallback)
+    expect((layer.firstElementChild as HTMLElement).style.background.replace(/\s/g, "")).toMatch(/rgba?\(4,4,4|var\(--veil-ink-rgb,444\)/);
   });
 
   it("never ripples while disabled or with ripple={false}", () => {
@@ -155,7 +156,8 @@ describe("Card", () => {
     fireEvent.pointerEnter(container.querySelector(".group > .group") as HTMLElement, { pointerType: "mouse", clientX: 10, clientY: 10 });
     const spot = container.querySelector(".fx-ring") as HTMLElement;
     expect(spot).not.toBeNull();
-    expect((spot.firstElementChild as HTMLElement).style.background).toContain("rgb(70, 166, 160)");
+    // jsdom keeps the hex when the gradient also holds a theme var() (P13 `--card-ring-to`)
+    expect((spot.firstElementChild as HTMLElement).style.background).toMatch(/rgb\(70, 166, 160\)|#46a6a0/);
     // a pointer near the card's edge lights the arc
     fireEvent.pointerMove(document, { pointerType: "mouse", clientX: 30, clientY: 30 });
     await waitFor(() => expect(container.querySelectorAll(".fx-ring")).toHaveLength(2));

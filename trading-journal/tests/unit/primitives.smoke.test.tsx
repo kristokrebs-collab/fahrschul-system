@@ -107,7 +107,8 @@ describe("smoke: motion kit renders and behaves in jsdom", () => {
     expect(container.querySelectorAll("path")).toHaveLength(2);
     const d = container.querySelectorAll("path")[1]?.getAttribute("d") ?? "";
     expect(d.split("L")).toHaveLength(20);
-    expect(container.querySelector("circle")).toHaveAttribute("fill", "#e5202e");
+    // the signal accent as a P13 theme token (dark = #e5202e)
+    expect(container.querySelector("circle")).toHaveAttribute("fill", "var(--color-signal, #e5202e)");
   });
 
   it("ConvictionRadio exposes five radios, selects and clears", () => {

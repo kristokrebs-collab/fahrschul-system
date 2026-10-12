@@ -111,7 +111,8 @@ function EditTile({ item, widget }: { item: BoardItem; widget: CockpitWidget }) 
       </div>
       {/* live preview of the card, not interactive while arranging */}
       <div inert aria-hidden="true" className="pointer-events-none relative overflow-hidden p-2 opacity-60 [mask-image:linear-gradient(#000_70%,transparent)]">
-        <div className="origin-top scale-[0.92]">
+        {/* a fixed height: cards that fill their grid row (`h-full`, e.g. the equity chart) need one to draw */}
+        <div className="h-[320px] origin-top scale-[0.92]">
           <WidgetSlot widget={widget} />
         </div>
       </div>
