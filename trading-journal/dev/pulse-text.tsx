@@ -21,6 +21,12 @@ import { SplitFlap } from "@/motion/fx/SplitFlap";
 /** `?only=<id>` (or `?c=<id>`) renders a single section, so a 120 Hz measurement sees only the effect under test. */
 const SEARCH = new URLSearchParams(location.search);
 const ONLY = SEARCH.get("only") ?? SEARCH.get("c");
+// `&bare`: drop the app backdrop (noise film + gradients) so a 120 Hz check measures the effect alone
+if (SEARCH.has("bare")) {
+  const st = document.createElement("style");
+  st.textContent = "body{background-image:none!important}body::before{display:none!important}";
+  document.head.appendChild(st);
+}
 
 function Section({ id, title, children, onReplay }: { id: string; title: string; children: ReactNode; onReplay?: () => void }) {
   if (ONLY && ONLY !== id) return null;
