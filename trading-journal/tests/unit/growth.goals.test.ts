@@ -5,7 +5,7 @@
  * self-check goals).
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { activeGoalsOf, addGoalFromDraft, goalOf, goalProgress, growthOf, HOLD_DEFAULT, prepare, rankGoals, sanitizeGoalDraft, sameGoal, setGoalStore, weekSummary, withGoalAppended, withGrowthItem, withGrowthPatch, type Goal, type GoalDraft } from "@/domain/growth";
+import { activeGoalsOf, addGoalFromDraft, GOALS_MAX, goalOf, goalProgress, growthOf, HOLD_DEFAULT, prepare, rankGoals, sanitizeGoalDraft, sameGoal, setGoalStore, weekSummary, withGoalAppended, withGrowthItem, withGrowthPatch, type Goal, type GoalDraft } from "@/domain/growth";
 import type { DayNote, DayNotes, Settings } from "@/domain/types";
 import { at, COACH_SETTINGS, ct, enrichC } from "./coach.fixtures";
 
@@ -99,6 +99,17 @@ describe("settings.growth schreiben", () => {
     expect(growthOf(withHabit).habits.map((h) => h.title)).toEqual(["Bewegung"]);
     expect(growthOf({ growth: "kaputt" })).toEqual({ goals: [], challenges: [], habits: [] });
     expect(activeGoalsOf(withGoalAppended(COACH_SETTINGS, { ...draft(), id: "x", createdAt: "y", status: "active" }))).toHaveLength(1);
+  });
+
+  it("über GOALS_MAX weichen nur entfernte Ziele – aktive und erreichte bleiben", () => {
+    const status = (i: number) => (i === 0 ? "active" : i === 1 ? "done" : "dropped");
+    const full = { ...COACH_SETTINGS, growth: { goals: Array.from({ length: GOALS_MAX }, (_, i) => ({ ...draft(), title: `G${i}`, id: `g${i}`, createdAt: "x", status: status(i) })) } } as Settings;
+    const next = growthOf(withGoalAppended(full, { ...draft(), title: "Neu", id: "new", createdAt: "y", status: "active" })).goals.map((g) => g.id);
+    expect(next).toHaveLength(GOALS_MAX);
+    expect(next.slice(0, 3)).toEqual(["g0", "g1", "g3"]);
+    expect(next.at(-1)).toBe("new");
+    const allActive = { ...COACH_SETTINGS, growth: { goals: Array.from({ length: GOALS_MAX }, (_, i) => ({ ...draft(), title: `A${i}`, id: `a${i}`, createdAt: "x", status: "active" })) } } as Settings;
+    expect(activeGoalsOf(withGoalAppended(allActive, { ...draft(), title: "Neu", id: "new", createdAt: "y", status: "active" }))).toHaveLength(GOALS_MAX + 1);
   });
 });
 

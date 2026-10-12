@@ -172,12 +172,21 @@ async function goalStore(): Promise<GoalStore> {
   return { getSettings: () => useJournal.getState().settings, saveSettings: (s) => useJournal.getState().saveSettings(s) };
 }
 
-/** Pure: `settings` with `goal` appended to `settings.growth.goals` (every other key of `growth` and `settings` kept). */
+/**
+ * Pure: `settings` with `goal` appended to `settings.growth.goals` (every other key of `growth` and `settings` kept).
+ * Over `GOALS_MAX` only the oldest removed (`dropped`) goals give way – an active goal is never lost and a reached one
+ * stays (it counts as a record).
+ */
 export function withGoalAppended(settings: Settings, goal: Goal): Settings {
   const s = settings as Settings & { growth?: unknown };
   const growth = isObj(s.growth) ? s.growth : {};
-  const goals = Array.isArray(growth.goals) ? growth.goals : [];
-  return { ...s, growth: { ...growth, goals: [...goals, goal].slice(-GOALS_MAX) } } as Settings;
+  const goals: unknown[] = [...(Array.isArray(growth.goals) ? growth.goals : []), goal];
+  for (let i = 0; goals.length > GOALS_MAX && i < goals.length; ) {
+    const g = goals[i];
+    if (isObj(g) && g.status === "dropped") goals.splice(i, 1);
+    else i++;
+  }
+  return { ...s, growth: { ...growth, goals } } as Settings;
 }
 
 /** Active goals of `settings` (sanitised). */
@@ -198,15 +207,16 @@ export function addGoalFromDraft(draft: GoalDraft): Promise<Goal | null> {
   const run = async (): Promise<Goal | null> => {
     const clean = sanitizeGoalDraft(draft);
     if (!clean) return null;
-    const store = await goalStore();
-    const settings = store.getSettings();
-    const existing = activeGoalsOf(settings).find((g) => sameGoal(g, clean));
-    if (existing) return existing;
-    const goal: Goal = { ...clean, id: newId("gl_"), createdAt: new Date().toISOString(), status: "active" };
-    // the P08 sheet may pass how often in a row (`Goal.hold`) with the draft
-    const hold = (draft as { hold?: unknown }).hold;
-    if (typeof hold === "number" && Number.isInteger(hold) && hold >= 1) goal.hold = Math.min(HOLD_MAX, hold);
     try {
+      // inside the try: a failed chunk load of the store resolves `null` like a failed save
+      const store = await goalStore();
+      const settings = store.getSettings();
+      const existing = activeGoalsOf(settings).find((g) => sameGoal(g, clean));
+      if (existing) return existing;
+      const goal: Goal = { ...clean, id: newId("gl_"), createdAt: new Date().toISOString(), status: "active" };
+      // the P08 sheet may pass how often in a row (`Goal.hold`) with the draft
+      const hold = (draft as { hold?: unknown }).hold;
+      if (typeof hold === "number" && Number.isInteger(hold) && hold >= 1) goal.hold = Math.min(HOLD_MAX, hold);
       await store.saveSettings(withGoalAppended(settings, goal));
       return goal;
     } catch {
