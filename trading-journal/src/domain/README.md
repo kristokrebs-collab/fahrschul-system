@@ -55,6 +55,33 @@ signals/      multi-timeframe entry check (MCB + RSI + Premium/Discount, strengt
 - `DayNote` (`tj2-days`, `{ "YYYY-MM-DD": { note, plan?, review?, mood? 1–5, updatedAt } }`): `normalizeDayNote(s)` keeps unknown fields,
   `isEmptyDayNote` → the entry is removed instead of stored.
 
+## Journal v3 trade fields (Wave-0 contract, owner P06)
+All optional and additive – no migration, no `SCHEMA_VERSION` bump. `normalizeTrade` coerces a key only when the record
+carries it (an absent key is never added), so legacy trades normalise, derive (`pnl`/`r`) and export byte-identically.
+`TradeSchema` lists them leniently (`numOrNull` / `textOrNull` / `array(unknown)` / `unknown`), never required.
+
+| Field(s) | Type | Normalised |
+|---|---|---|
+| `exitDate`, `syncedAt` | local wall clock like `date` / ISO | non-empty string, else removed |
+| `market` | `"perp" \| "spot"` (absent = perp) | other values removed |
+| `exchange`, `exchangeAccount`, `externalId`, `syncSource` | string | numbers → string, empty/other removed |
+| `positionId`, `groupId`, `hedgeOf` | string | as above |
+| `qty`, `fundingFees`, `slippage`, `plannedEntry`, `margin`, `liqPrice` | `number \| null` | `parseNumber` |
+| `mae`, `mfe` (price distance ≥ 0), `maeR`, `mfeR`, `atrPct` | `number \| null` | `parseNumber` |
+| `marginMode` | `"isolated" \| "cross"` | `ISOLATION` / `CROSS` (venue spelling) mapped, other removed |
+| `tags` | `string[]` | trimmed, unique, non-strings dropped |
+| `rating` | `1–5 \| null` | integer 1–5 else `null` |
+| `fills` | `Fill[]` `{id, at, side open\|close, price, qty, fee?, kind entry\|add\|partial\|exit}` | entries without price/qty > 0 dropped; missing id → `f<i>`; bad kind → from side |
+| `screenshots` | `ScreenshotRef[]` `{id, store idb\|cloud\|url, key?, url?, …}` | needs id + store; `url` via `sanitizeUrl`; `store:"url"` without a valid url dropped |
+| `annotations` | `Annotation[]` `{id, kind hline\|trend\|box\|text\|arrow, points {time (s), price}[]}` | needs id, kind and ≥ 1 valid point |
+| `stopHistory`, `targets` | `StopChange[]`, `TradeTarget[]` | entries need a numeric `price` |
+| `psych` | `{stress?, confidence? 1–5, flags?, exitReason?, preNote?, postNote?}` | non-object removed |
+| `origin` | `{kind manual\|api\|csv\|bot\|webhook, botId?}` | unknown kind → removed |
+| `boxSnap` | opaque (`BoxSnapshot`, `@/market/boxes/snapshot`) | verbatim |
+
+Conventions: `size` stays the notional (qty × entry); `fees`, `fundingFees`, `slippage` are costs in `settings.currency`
+(positive = paid). Whether `fills` / `fundingFees` feed the auto P&L is decided in `derive.ts` (P06) – only when present.
+
 ## Pipeline
 ```ts
 import { normalizeSettings } from "@/domain/normalize";

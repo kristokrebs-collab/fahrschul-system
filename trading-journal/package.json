@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "lint": "eslint src tests dev --max-warnings 0",
+    "lint": "eslint src tests dev netlify --max-warnings 0",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
@@ -16,29 +16,33 @@
     "build:single": "tsc -b && node scripts/build-single.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "@tanstack/react-table": "^8.21.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "idb-keyval": "^6.2.2",
     "lightweight-charts": "5.2.1",
     "lucide-react": "latest",
     "motion": "^13.4.6",
     "radix-ui": "latest",
     "react": "^19.3.0",
+    "react-day-picker": "^10.0.2",
     "react-dom": "^19.3.0",
     "recharts": "^3.10.1",
+    "stripe": "^23.0.0",
     "tailwind-merge": "^3.3.1",
-    "zod": "^3.25.76",
-    "zustand": "^5.0.8",
-    "cmdk": "^1.1.1",
     "vaul": "^1.1.2",
-    "react-day-picker": "^10.0.2"
+    "zod": "^3.25.76",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@axe-core/playwright": "latest",
     "@eslint/js": "latest",
+    "@netlify/functions": "^6.0.2",
     "@playwright/test": "latest",
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@types/node": "^22",
@@ -54,7 +58,6 @@
     "typescript": "^5.6",
     "typescript-eslint": "latest",
     "vite": "^8",
-    "vitest": "latest",
-    "@testing-library/dom": "^10"
+    "vitest": "latest"
   }
 }

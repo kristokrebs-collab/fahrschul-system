@@ -133,6 +133,42 @@ export const TradeSchema = z
     /** Other version / NEW: mistake tags (strings kept by `normalizeTrade`) and the opaque entry-check snapshot. */
     mistakes: z.array(z.unknown()).nullable().optional(),
     signal: z.unknown().optional(),
+    /**
+     * Journal v3 (Wave-0 contract, all optional and lenient – never required, so no old record is quarantined).
+     * Validated after `normalizeTrade`, which coerces / drops malformed values of these keys.
+     */
+    exitDate: textOrNull,
+    market: textOrNull,
+    exchange: textOrNull,
+    exchangeAccount: textOrNull,
+    externalId: textOrNull,
+    syncSource: textOrNull,
+    syncedAt: textOrNull,
+    qty: numOrNull,
+    fills: z.array(z.unknown()).nullable().optional(),
+    fundingFees: numOrNull,
+    slippage: numOrNull,
+    plannedEntry: numOrNull,
+    margin: numOrNull,
+    marginMode: textOrNull,
+    liqPrice: numOrNull,
+    positionId: textOrNull,
+    groupId: textOrNull,
+    hedgeOf: textOrNull,
+    tags: z.array(z.unknown()).nullable().optional(),
+    rating: numOrNull,
+    screenshots: z.array(z.unknown()).nullable().optional(),
+    annotations: z.array(z.unknown()).nullable().optional(),
+    mae: numOrNull,
+    mfe: numOrNull,
+    maeR: numOrNull,
+    mfeR: numOrNull,
+    atrPct: numOrNull,
+    stopHistory: z.array(z.unknown()).nullable().optional(),
+    targets: z.array(z.unknown()).nullable().optional(),
+    psych: z.unknown().optional(),
+    origin: z.unknown().optional(),
+    boxSnap: z.unknown().optional(),
   })
   .passthrough();
 

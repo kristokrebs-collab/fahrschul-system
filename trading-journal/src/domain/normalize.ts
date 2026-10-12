@@ -9,7 +9,28 @@
  * - `market.symbol` of another venue (`BITSTAMP:BTCUSD`, the other version's default) is mapped to the Binance
  *   USDⓈ-M symbol the live market can serve (`BINANCE:BTCUSDT`); the original is kept in `market.sourceSymbol`.
  */
-import type { DayNote, DayNotes, HyblockReading, Rule, Settings, Setup, Trade } from "./types";
+import type {
+  Annotation,
+  AnnotationKind,
+  DayNote,
+  DayNotes,
+  Fill,
+  FillKind,
+  FillSide,
+  HyblockReading,
+  MarginMode,
+  Rule,
+  ScreenshotRef,
+  Settings,
+  Setup,
+  StopChange,
+  Trade,
+  TradeOrigin,
+  TradeOriginKind,
+  TradePsych,
+  TradeRating,
+  TradeTarget,
+} from "./types";
 import { DEFAULT_BACKTEST, DEFAULT_HYBLOCK, DEFAULT_MARKET, DEFAULT_MISTAKES, defaultSettings, MTF_SETUP, MTF_SETUP_ID } from "./defaults";
 import { parseNumber, sanitizeUrl } from "@/lib/parse";
 
@@ -139,7 +160,172 @@ export function normalizeTrade(raw: unknown): Trade {
   };
   if (r.account === "makro" || r.account === "scalp") out.account = r.account;
   else delete (out as Partial<Trade>).account;
+  normalizeJournalV3(r, out as unknown as Raw);
   return out;
+}
+
+// ── Journal v3 fields (Wave-0 contract, owner P06) ──────────────────────────────────────────────────────────────
+// Every key is coerced only when it is PRESENT in the stored record; an absent key is never added, so a legacy record
+// normalises exactly as before. A malformed value is dropped (key removed) – or set to `null` for numbers / rating,
+// mirroring the legacy number fields. Unknown keys inside fills / screenshots / … survive (passthrough).
+
+const V3_TIME = ["exitDate", "syncedAt"] as const;
+const V3_TEXT = ["exchange", "exchangeAccount", "externalId", "syncSource", "positionId", "groupId", "hedgeOf"] as const;
+const V3_NUM = ["qty", "fundingFees", "slippage", "plannedEntry", "margin", "liqPrice", "mae", "mfe", "maeR", "mfeR", "atrPct"] as const;
+const FILL_KINDS: readonly FillKind[] = ["entry", "add", "partial", "exit"];
+const ANNOTATION_KINDS: readonly AnnotationKind[] = ["hline", "trend", "box", "text", "arrow"];
+const ORIGIN_KINDS: readonly TradeOriginKind[] = ["manual", "api", "csv", "bot", "webhook"];
+const SHOT_STORES: readonly ScreenshotRef["store"][] = ["idb", "cloud", "url"];
+
+const has = (r: Raw, k: string): boolean => Object.prototype.hasOwnProperty.call(r, k);
+const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined => (list as readonly unknown[]).includes(v) ? (v as T) : undefined;
+
+/** Id / label text: non-empty strings verbatim, finite numbers as string (venue ids often arrive as numbers), else dropped. */
+function idText(v: unknown): string | undefined {
+  if (typeof v === "string") return v === "" ? undefined : v;
+  if (typeof v === "number" && Number.isFinite(v)) return String(v);
+  return undefined;
+}
+
+/** Integer 1–5 (rating, stress, confidence) or `null`. */
+function scale5(v: unknown): TradeRating | null {
+  const n = numOrNull(v);
+  return n != null && Number.isInteger(n) && n >= 1 && n <= 5 ? (n as TradeRating) : null;
+}
+
+function fillsOf(v: unknown): Fill[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: Fill[] = [];
+  v.forEach((x: unknown, i) => {
+    if (!isObj(x)) return;
+    const price = numOrNull(x.price);
+    const qty = numOrNull(x.qty);
+    if (price == null || price <= 0 || qty == null || qty <= 0) return;
+    const side: FillSide = x.side === "close" ? "close" : "open";
+    const f: Fill = { ...x, id: idText(x.id) ?? `f${i}`, at: str(x.at), side, price, qty, kind: oneOf(FILL_KINDS, x.kind) ?? (side === "close" ? "exit" : "entry") };
+    if (has(x, "fee")) f.fee = numOrNull(x.fee);
+    out.push(f);
+  });
+  return out;
+}
+
+function screenshotsOf(v: unknown): ScreenshotRef[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: ScreenshotRef[] = [];
+  for (const x of v) {
+    if (!isObj(x)) continue;
+    const id = idText(x.id);
+    const store = oneOf(SHOT_STORES, x.store);
+    if (!id || !store) continue;
+    const s: ScreenshotRef = { ...x, id, store };
+    if (has(x, "url")) {
+      const url = sanitizeUrl(x.url);
+      if (url) s.url = url;
+      else delete s.url;
+    }
+    if (has(x, "key") && typeof x.key !== "string") delete s.key;
+    if (store === "url" && !s.url) continue;
+    out.push(s);
+  }
+  return out;
+}
+
+function annotationsOf(v: unknown): Annotation[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: Annotation[] = [];
+  for (const x of v) {
+    if (!isObj(x)) continue;
+    const id = idText(x.id);
+    const kind = oneOf(ANNOTATION_KINDS, x.kind);
+    if (!id || !kind) continue;
+    const points: Annotation["points"] = [];
+    for (const p of Array.isArray(x.points) ? (x.points as unknown[]) : []) {
+      if (!isObj(p)) continue;
+      const time = numOrNull(p.time);
+      const price = numOrNull(p.price);
+      if (time != null && price != null) points.push({ time, price });
+    }
+    if (points.length) out.push({ ...x, id, kind, points });
+  }
+  return out;
+}
+
+function stopHistoryOf(v: unknown): StopChange[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: StopChange[] = [];
+  for (const x of v) {
+    if (!isObj(x)) continue;
+    const price = numOrNull(x.price);
+    if (price != null) out.push({ ...x, at: str(x.at), price });
+  }
+  return out;
+}
+
+function targetsOf(v: unknown): TradeTarget[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: TradeTarget[] = [];
+  for (const x of v) {
+    if (!isObj(x)) continue;
+    const price = numOrNull(x.price);
+    if (price == null) continue;
+    const t: TradeTarget = { ...x, price };
+    if (has(x, "pct")) t.pct = numOrNull(x.pct);
+    if (has(x, "qty")) t.qty = numOrNull(x.qty);
+    if (has(x, "hit")) t.hit = x.hit === true;
+    out.push(t);
+  }
+  return out;
+}
+
+function psychOf(v: unknown): TradePsych | undefined {
+  if (!isObj(v)) return undefined;
+  const p: TradePsych = { ...v };
+  if (has(v, "stress")) p.stress = scale5(v.stress);
+  if (has(v, "confidence")) p.confidence = scale5(v.confidence);
+  if (has(v, "flags")) p.flags = stringList(v.flags) ?? [];
+  for (const k of ["exitReason", "preNote", "postNote"] as const) if (has(v, k)) p[k] = str(v[k]);
+  return p;
+}
+
+function originOf(v: unknown): TradeOrigin | undefined {
+  if (!isObj(v)) return undefined;
+  const kind = oneOf(ORIGIN_KINDS, v.kind);
+  if (!kind) return undefined;
+  const o: TradeOrigin = { ...v, kind };
+  if (has(v, "botId")) {
+    const botId = idText(v.botId);
+    if (botId) o.botId = botId;
+    else delete o.botId;
+  }
+  return o;
+}
+
+function marginModeOf(v: unknown): MarginMode | undefined {
+  const s = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return s === "isolated" || s === "isolation" ? "isolated" : s === "cross" || s === "crossed" ? "cross" : undefined;
+}
+
+/** Coerces the journal-v3 keys present in `r` onto `out` (which already carries them verbatim via the spread). */
+function normalizeJournalV3(r: Raw, out: Raw): void {
+  const put = (k: string, v: unknown): void => {
+    if (v === undefined) delete out[k];
+    else out[k] = v;
+  };
+  for (const k of V3_TIME) if (has(r, k)) put(k, typeof r[k] === "string" && r[k] !== "" ? r[k] : undefined);
+  for (const k of V3_TEXT) if (has(r, k)) put(k, idText(r[k]));
+  for (const k of V3_NUM) if (has(r, k)) put(k, numOrNull(r[k]));
+  if (has(r, "market")) put("market", r.market === "spot" || r.market === "perp" ? r.market : undefined);
+  if (has(r, "marginMode")) put("marginMode", marginModeOf(r.marginMode));
+  if (has(r, "tags")) put("tags", stringList(r.tags) ?? undefined);
+  if (has(r, "rating")) put("rating", scale5(r.rating));
+  if (has(r, "fills")) put("fills", fillsOf(r.fills));
+  if (has(r, "screenshots")) put("screenshots", screenshotsOf(r.screenshots));
+  if (has(r, "annotations")) put("annotations", annotationsOf(r.annotations));
+  if (has(r, "stopHistory")) put("stopHistory", stopHistoryOf(r.stopHistory));
+  if (has(r, "targets")) put("targets", targetsOf(r.targets));
+  if (has(r, "psych")) put("psych", psychOf(r.psych));
+  if (has(r, "origin")) put("origin", originOf(r.origin));
+  // boxSnap: opaque (P02 parses it) – kept verbatim by the spread.
 }
 
 /** Normalises a persisted Hyblock reading ("Ablesung"). */
