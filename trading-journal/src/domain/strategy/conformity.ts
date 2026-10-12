@@ -111,13 +111,18 @@ export interface StrategyConformity {
   parts: Partial<Record<ConformityPart, { rate: number; n: number }>>;
   /** exit fidelity over the closed trades whose exit was measurable */
   exit: { rate: number | null; plan: number; breaks: number; n: number };
-  /** win rate of conform (≥ 80) vs. other trades, when both sides have trades */
+  /** win rate of conform (≥ 80) vs. other trades, when both sides have at least `SPLIT_MIN` trades */
   conformWinRate: number | null;
   otherWinRate: number | null;
+  conformN: number;
+  otherN: number;
   /** weakest measurable part */
   weakest: ConformityPart | null;
   perTrade: TradeConformity[];
 }
+
+/** Fewest trades on each side before "conform vs. other" win rates are shown (1 against 1 says nothing). */
+export const SPLIT_MIN = 3;
 
 /** Conformity of a strategy over its closed trades. */
 export function strategyConformity(x: SetupX, closed: readonly EnrichedTrade[], settings: Pick<Settings, "capital">, leverageRule?: Partial<Record<"makro" | "scalp", number>>): StrategyConformity {
@@ -134,6 +139,7 @@ export function strategyConformity(x: SetupX, closed: readonly EnrichedTrade[], 
   const byId = new Map(list.map((t) => [t.id, t]));
   const conform = scored.filter((c) => c.score! >= CONFORM_MIN).map((c) => byId.get(c.id)!);
   const other = scored.filter((c) => c.score! < CONFORM_MIN).map((c) => byId.get(c.id)!);
+  const split = conform.length >= SPLIT_MIN && other.length >= SPLIT_MIN;
   let weakest: ConformityPart | null = null;
   for (const [k, v] of Object.entries(parts) as [ConformityPart, { rate: number }][]) if (!weakest || v.rate < parts[weakest]!.rate) weakest = k;
   return {
@@ -141,8 +147,10 @@ export function strategyConformity(x: SetupX, closed: readonly EnrichedTrade[], 
     score: scored.length ? Math.round(scored.reduce((s, c) => s + c.score!, 0) / scored.length) : null,
     parts,
     exit: { rate: plan + breaks ? plan / (plan + breaks) : null, plan, breaks, n: plan + breaks },
-    conformWinRate: conform.length && other.length ? aggregate(conform).winRate : null,
-    otherWinRate: conform.length && other.length ? aggregate(other).winRate : null,
+    conformWinRate: split ? aggregate(conform).winRate : null,
+    otherWinRate: split ? aggregate(other).winRate : null,
+    conformN: conform.length,
+    otherN: other.length,
     weakest,
     perTrade,
   };

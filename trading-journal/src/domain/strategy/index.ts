@@ -34,6 +34,7 @@ export {
   EXIT_TOL_R,
   STOP_BREACH_R,
   CONFORM_MIN,
+  SPLIT_MIN,
   type TradeConformity,
   type StrategyConformity,
   type ConformityPart,

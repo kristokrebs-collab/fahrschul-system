@@ -22,6 +22,7 @@ import {
   EMPTY_LIBRARY_FILTER,
   type StrategyExtras,
 } from "@/domain/strategy";
+import { explainPlaybook, playbookStats } from "@/views/setups/playbook";
 import { mkTrade } from "./domain.fixtures";
 import { enrich, settingsWith, utc } from "./insights.fixtures";
 
@@ -141,6 +142,23 @@ describe("Konformität und Exit-Treue", () => {
     expect(s.n).toBe(2);
     expect(s.exit).toMatchObject({ rate: 1, plan: 2, breaks: 0 });
     expect(s.weakest).toBe("checklist");
+  });
+
+  it("ein gesetzter Stop allein ergibt keinen Score (braucht einen planbezogenen Teil)", () => {
+    const bare = strategyOf({ id: "s_x", name: "Leer", account: "both", color: "#999", desc: "", checklist: [] });
+    const c = tradeConformity(mk({ id: "a", exit: 100.6 }), bare, 5000);
+    expect(Object.keys(c.parts)).toEqual(["stop"]);
+    expect(c.score).toBeNull();
+  });
+
+  it("Playbook zeigt Exit-Treue, Konformität und Beispiele (additiv)", () => {
+    const setup = withStrategy(base, extras);
+    const list = [mk({ id: "t1", exit: 102, checks: { "s_x:c1": true, "s_x:c2": true }, followedPlan: true }), mk({ id: "t2", exit: 100.6, psych: { exitReason: "Manuell" } })];
+    const pb = playbookStats(setup, list, { capital: settings.capital });
+    expect(pb.strategy).toMatchObject({ n: 2, exitN: 2, exitRate: 0.5, examples: 1 });
+    expect(pb.strategy!.score).toBeGreaterThan(0);
+    const rows = explainPlaybook({ setup } as never, pb, "USDT").rows.map((r) => r[0]);
+    expect(rows.slice(-3)).toEqual(["Exit-Treue", "Konformität", "Beispiele"]);
   });
 });
 

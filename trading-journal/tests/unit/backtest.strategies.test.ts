@@ -128,6 +128,14 @@ describe("Labor-Job", () => {
     expect(a.specs.map((s) => s.label)).toEqual(["Ziel", "Stop", "Zeit-Stop"]);
   });
 
+  it("Ergebnis übersteht postMessage (structuredClone: keine Funktionen, Heatmap-Achsen mit Texten)", () => {
+    const a = createLabJob(input({ strategy: "rules" })).result();
+    const b = structuredClone(a);
+    expect(b.stats).toEqual(a.stats);
+    expect(b.heat?.rows.labels.length).toBe(b.heat?.rows.options.length);
+    expect(b.heat?.cols.labels.every((l) => typeof l === "string")).toBe(true);
+  });
+
   it("Box-zu-Box 1D auf der Tages-Historie und Idle-Lauf = synchroner Lauf", async () => {
     const inp = input({ strategy: "box", box: { tf: "1d" }, data: { "1d": D1 }, fromMs: D1[300]!.t * 1000, toMs: (D1[D1.length - 1]!.t + 86_400) * 1000 });
     const sync = createLabJob(inp).result();

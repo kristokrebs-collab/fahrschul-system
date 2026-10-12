@@ -118,7 +118,7 @@ export function StrategyProfile({ setupId }: { setupId: string }) {
         <Parts parts={conf.parts} />
         <p className="text-[12px] text-mute">
           {conf.exit.n ? `Exit-Treue ${pct0(conf.exit.rate)}: ${conf.exit.plan} planmäßig, ${conf.exit.breaks} Brüche.` : "Exit-Treue noch nicht messbar (Ausstiegsgrund oder Stop / Ziel fehlen)."}
-          {conf.conformWinRate != null && conf.otherWinRate != null ? ` Regelkonform gewinnst du ${pct0(conf.conformWinRate)}, sonst ${pct0(conf.otherWinRate)}.` : ""}
+          {conf.conformWinRate != null && conf.otherWinRate != null ? ` Regelkonform gewinnst du ${pct0(conf.conformWinRate)} (${conf.conformN} Trades), sonst ${pct0(conf.otherWinRate)} (${conf.otherN}).` : ""}
         </p>
       </StaggerItem>
       <StaggerItem>

@@ -35,3 +35,21 @@ Tests: `tests/unit/views.setups.card.test.tsx`, `tests/unit/views.settings.motio
 - `MtfLiveStrip` (only on `s_mtf`, `data-testid="mtf-live"`, `data-state`): its own `useSignalCheck()` subscription (≤ 1 re-render/s, only on rounded changes) → status pill (Lädt / Live / Veraltet / Offline), stronger side's label + `StrengthDots` + `Score · x von n TF`; the whole strip is a button to the overview (`Einstiegs-Check öffnen: …`). No live region (the toast island announces entries).
 - `SetupsView`: passes `playbookBySetup(settings.setups, view.closed)`; `SETUPS_LEAD = ED.COPY.setupsLead` (edition copy, F1 privacy patch hunk applied here); lead-fill key `storageKey("fill-setups")` (personal: `tj2-fill-setups` unchanged); Grundregeln rows are buttons → Einstellungen (`RULE_EDIT_LABEL(n, text)`).
 - Tests: `tests/unit/views.setups.playbook.test.tsx`.
+
+## P07 – Strategie-Management (additive)
+Nothing above changed; the page gains a library, a comparison, the strategy description and the auto assignment.
+The strategy description lives as passthrough keys on `settings.setups[i]` (`entryCriteria`, `exitCriteria`,
+`riskModel`, `tags`, `examples`, `markets`, `tf`, `auto`) – read with `strategyOf`, written with `withStrategy` (only
+filled parts) from `@/domain/strategy`; `normalizeSettings` keeps them.
+
+| file | what |
+|---|---|
+| `LibraryBar.tsx` | search (name, rules, criteria, tags), facet chips (tags / markets / timeframes the library uses), `Mit Trades`, `Vergleichen` (needs 2 setups with trades), `Filter zurücksetzen`. Only hides cards like the account switch (`matchesLibrary`). `data-testid="setup-library"`, `setup-compare-open`; empty result `setup-library-empty` (`LIBRARY_STRINGS.none`). |
+| `CompareSheet.tsx` | Sheet `Grundlagen vergleichen`: pick 2–3 (preset = the two with the most trades, a fourth pick drops the oldest); columns dealt by `CardSpread` (`setup-compare-column`), Win-Rate / Ø R / Erwartung with their 80 % interval + `CiWhisker` on a shared axis, PF, Netto, Konformität, Exit-Treue; verdict (`setup-compare-verdict`) with the leader (highest lower bound of Ø R) as `TactileHighlight`; differences against the leader with `SigBadge`. `compareStrategies` (P03 statistics). |
+| `StrategyBlock.tsx` | on a card only when the setup has strategy data (`showsStrategy`): strip with Konformität, Exit-Treue, Beispiele, tags – morph source `setup-strategy-{id}` (`MorphCard`, name `Strategie · {name}`) → `StrategyProfile` (`strategy-profile`): criteria, risk model, markets & TF, auto rules, conformity per part (bars + `ConfidenceMeter`), best-practice gallery (`ReelWindow`, `strategy-gallery`; a tap opens the trade). |
+| `StrategyFields.tsx` | the editor section (`setup-strategy-fields`): entry / exit criteria lists (`Entry n` / `Exit n`, quick chips from `PLAN_EXITS`), strategy tags (`ChipInput`), expander `Risiko, Märkte und Auto-Erkennung` (risk %, max leverage, min CRV, stop rule, markets, TF, box kinds, min grade, min check strength, sessions, side), example picker (≤ `EXAMPLE_PICK_MAX`). |
+| `ClassifyCard.tsx` | `Automatisch zuordnen` (`setup-classify`, only with untagged trades): count + sure suggestions (`classifyUntagged`, ≥ mittel, never `s_bt`); sheet with rows (`setup-classify-row`: trade, suggested setup, reasons, `ConfidenceMeter`), `Übernehmen` (row dissolves) and `HoldButton` `Alle sicheren übernehmen (n)` (`setup-classify-all`, every "hoch"). Writes `saveTrade({ ...trade, setups: [id] })`, never overwrites a tagged trade. |
+| `playbook.ts` | `playbookStats(setup, closed, ctx?)` / `playbookBySetup(setups, closed, ctx?)` add `strategy { score, n, exitRate, exitN, examples, weakest }` (`strategyConformity`, `examplesOf`); the card's Playbook line shows `Exit-Treue` (`setup-exit-fidelity`) once measurable; `explainPlaybook` appends rows `Exit-Treue`, `Konformität`, `Beispiele`. `fromStats` is unchanged (no `strategy`). |
+
+`SetupsView` order: header, account/sort switches, `LibraryBar`, grid, `ClassifyCard`, `Grundregeln`, `CompareSheet`.
+Tests: `tests/unit/views.labor.test.tsx` (setups block), `tests/unit/strategy.domain.test.ts`, e2e `tests/e2e/labor.spec.ts` (`Entscheidungsgrundlagen · Strategie`).

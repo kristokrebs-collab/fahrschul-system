@@ -99,7 +99,7 @@ function ClassifySheet({ open, onClose, suggestions, byId }: { open: boolean; on
   };
   const all = async () => {
     const n = await assign(high.map((s) => ({ tradeId: s.tradeId, setupId: s.best.setupId })));
-    pushToast({ kind: "success", title: CLASSIFY_STRINGS.done(n) });
+    if (n) pushToast({ kind: "success", title: CLASSIFY_STRINGS.done(n) });
   };
   const colorOf = (id: string) => setups.find((s) => s.id === id)?.color ?? "#9b9b9b";
   return (

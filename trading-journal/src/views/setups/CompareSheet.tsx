@@ -39,17 +39,22 @@ export function CompareSheet({ open, onClose, setups, closed, settings }: { open
     [setups, counts],
   );
   const [picked, setPicked] = useState<string[] | null>(null);
+  // every new selection deals the columns again
+  const [deal, setDeal] = useState(0);
   const ids = picked ?? preset;
-  const chosen = setups.filter((s) => ids.includes(s.id));
+  const idsKey = ids.join("|");
+  const chosen = useMemo(() => setups.filter((s) => idsKey.split("|").includes(s.id)), [setups, idsKey]);
   const cmp = useMemo(() => (chosen.length >= 2 ? compareStrategies(chosen, closed, settings) : null), [chosen, closed, settings]);
-  const toggle = (id: string) => setPicked((p) => {
-    const cur = p ?? preset;
-    if (cur.includes(id)) return cur.filter((x) => x !== id);
-    return cur.length >= COMPARE_MAX ? [...cur.slice(1), id] : [...cur, id];
-  });
+  const toggle = (id: string) => {
+    setDeal((d) => d + 1);
+    setPicked((p) => {
+      const cur = p ?? preset;
+      if (cur.includes(id)) return cur.filter((x) => x !== id);
+      return cur.length >= COMPARE_MAX ? [...cur.slice(1), id] : [...cur, id];
+    });
+  };
   const rDomain = useMemo(() => (cmp ? whiskerDomain(cmp.rows.map((r) => r.rCI), cmp.rows.map((r) => r.avgR)) : ([-1, 1] as [number, number])), [cmp]);
   const wrDomain: [number, number] = [0, 1];
-  const playKey = ids.join("|").length + ids.length * 31;
   const leader = cmp?.rows.find((r) => r.best) ?? null;
 
   return (
@@ -95,7 +100,7 @@ export function CompareSheet({ open, onClose, setups, closed, settings }: { open
                 )}
               </p>
             </StaggerItem>
-            <CardSpread variant="deal" play={playKey} label={COMPARE_STRINGS.title} className={cn("grid gap-3", cmp.rows.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+            <CardSpread variant="deal" play={deal} label={COMPARE_STRINGS.title} className={cn("grid gap-3", cmp.rows.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
               {cmp.rows.map((r, i) => (
                 <Column key={r.id} row={r} index={i} rDomain={rDomain} wrDomain={wrDomain} cur={settings.currency} />
               ))}

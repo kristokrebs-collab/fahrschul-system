@@ -134,7 +134,7 @@ export function StrategyFields({ value, onChange, trades, knownTags = [] }: Stra
               </Pills>
             </Group>
             <Group label={STRATEGY_FIELD_STRINGS.markets}>
-              <ChipInput values={value.markets} onChange={(markets) => onChange({ markets: markets.map(marketKey).filter(Boolean) })} placeholder={STRATEGY_FIELD_STRINGS.marketsPlaceholder} ariaLabel={STRATEGY_FIELD_STRINGS.markets} suggestions={DEFAULT_WATCHLIST} upper />
+              <ChipInput values={value.markets} onChange={(markets) => onChange({ markets: markets.map(marketKey).filter((m, i, a) => m && a.indexOf(m) === i) })} placeholder={STRATEGY_FIELD_STRINGS.marketsPlaceholder} ariaLabel={STRATEGY_FIELD_STRINGS.markets} suggestions={DEFAULT_WATCHLIST} upper />
             </Group>
             <Pills label={STRATEGY_FIELD_STRINGS.tf}>
               {TFS.map((tf) => (
