@@ -15,6 +15,7 @@
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 
 /**
@@ -118,4 +119,4 @@ function main(argv) {
   return breaches.length && !report ? 1 : 0;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname)) process.exit(main(process.argv.slice(2)));
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) process.exit(main(process.argv.slice(2)));
