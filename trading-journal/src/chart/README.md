@@ -85,8 +85,9 @@ authoritative kline without glide – tests / simple callers), `paused?`, `follo
 
 ### Skeleton → entrance
 
-`setData` → 2× `requestAnimationFrame` → `ready`; then the container animates `{opacity:0, scale:.985} → {1,1}` with
-`tween.chartIn` and the skeleton exits with `tween.fade` (absolute overlay, fixed height → no CLS). The skeleton shows
+`setData` → 2× `requestAnimationFrame` → `ready` (also when a copy of the same bars, or one more bar, replaced the
+first array before those frames ran: the tail-append path reveals too); then the container animates
+`{opacity:0, scale:.985} → {1,1}` with `tween.chartIn` and the skeleton exits with `tween.fade` (absolute overlay, fixed height → no CLS). The skeleton shows
 the Nothing dot-matrix loader (`DotMatrix preset="loader"`, decorative) and a transform-only shimmer
 (`animate-fx-shimmer`). Reduced motion → instant, static.
 

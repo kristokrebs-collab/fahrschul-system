@@ -28,8 +28,20 @@ const local = (ms: number): string => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
+/**
+ * The fixture's clock: Monday 00:00 (local) of the current week. Hours and weekdays of the generated trades – and with
+ * them the session / weekday / heatmap buckets – then no longer drift with the time of day or the weekday the suite
+ * runs on (a run at 09:25 met a `Spät` session of six straight losses, whose win-rate bar rightly ends at scaleX(0)).
+ */
+function fixtureNow(at = Date.now()): number {
+  const d = new Date(at);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getTime();
+}
+
 /** 140 closed trades over ~10 months, seeded (mulberry32). */
-export function analyseTrades(now = Date.now(), n = 140): Record<string, unknown>[] {
+export function analyseTrades(now = fixtureNow(), n = 140): Record<string, unknown>[] {
   let a = 20261012;
   const rand = () => {
     a = (a + 0x6d2b79f5) >>> 0;

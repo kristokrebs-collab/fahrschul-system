@@ -114,6 +114,21 @@ describe("NothingCandleChart", () => {
     expect(rangeHandlers.size).toBe(0);
   });
 
+  it("a copy of the same bars landing before the reveal frames still reveals the chart (no skeleton forever)", async () => {
+    const { container, rerender } = render(<NothingCandleChart candles={candles} interval="1h" />);
+    // the first apply ran (font promise settled) and drew the bars; its two reveal frames are still pending
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(seriesSpies.setData).toHaveBeenCalledTimes(2);
+    expect(container.firstElementChild?.getAttribute("data-ready")).toBe("false");
+    // a new array identity with the same bars (a feed re-emit / a loaded box cancels those frames): the tail path
+    rerender(<NothingCandleChart candles={[...candles]} interval="1h" />);
+    await ready(container);
+    expect(seriesSpies.setData).toHaveBeenCalledTimes(2);
+  });
+
   it("sets data once, applies live ticks via update and exposes the handle", async () => {
     const ref = createRef<ChartHandle>();
     const outside = vi.fn();

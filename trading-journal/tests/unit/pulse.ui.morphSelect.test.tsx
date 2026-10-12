@@ -133,6 +133,24 @@ describe("MorphSelect", () => {
     await closed();
   });
 
+  it("an outside scroll closes once the trigger moved; a scroll event that left it in place (queued before the open) does not", async () => {
+    render(<Harness />);
+    let top = 200;
+    const t = trigger();
+    t.getBoundingClientRect = () => ({ left: 40, top, right: 240, bottom: top + 36, width: 200, height: 36, x: 40, y: top, toJSON: () => ({}) });
+    fireEvent.click(t);
+    act(() => {
+      fireEvent.scroll(window);
+    });
+    expect(trigger()).toHaveAttribute("aria-expanded", "true");
+    top = 120;
+    act(() => {
+      fireEvent.scroll(window);
+    });
+    expect(trigger()).toHaveAttribute("aria-expanded", "false");
+    await closed();
+  });
+
   it("labels via <label for> on the id and links the listbox to the trigger", () => {
     render(
       <>

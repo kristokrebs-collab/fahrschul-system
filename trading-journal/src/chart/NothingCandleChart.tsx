@@ -923,6 +923,17 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     let cancelled = false;
     let raf1 = 0;
     let raf2 = 0;
+    // fade the chart in two frames after its bars are drawn
+    const reveal = () => {
+      raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => {
+          if (cancelled || inst.current !== i) return;
+          readyRef.current = true;
+          setReady(true);
+          i.syncActive();
+        });
+      });
+    };
     const apply = () => {
       if (cancelled || inst.current !== i) return;
       i.applied.candles = candles;
@@ -936,6 +947,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         const lastSec = i.data[i.data.length - 1]?.time ?? 0;
         const added = candles.slice(-(data.length - i.data.length + 1)).filter((c) => sec(c.time) > lastSec);
         if (added.length > 0) i.live.bars(added, 0);
+        // these bars replaced the first apply's array before its reveal frames ran (this effect's cleanup cancelled
+        // them): reveal here, or the chart stays on the skeleton until the next full history
+        if (!readyRef.current) reveal();
         return;
       }
 
@@ -978,15 +992,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       freshMarkerIds(i, built);
       cb.current.onOutsideCount?.(built.outside);
       i.requestPlace();
-
-      raf1 = requestAnimationFrame(() => {
-        raf2 = requestAnimationFrame(() => {
-          if (cancelled || inst.current !== i) return;
-          readyRef.current = true;
-          setReady(true);
-          i.syncActive();
-        });
-      });
+      reveal();
     };
     i.fontReady.then(apply);
     return () => {

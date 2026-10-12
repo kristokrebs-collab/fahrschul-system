@@ -1278,16 +1278,14 @@ function LiveTicker({ wide }: { wide: boolean }) {
  * `Live-Preis übernehmen` (Plan 6.5): writes the last price into the field, then shows `✓ {price}` for 800 ms
  * (`AnimatePresence mode="wait"`). Rendered only while a price exists; disabled together with `Ausstieg`. While idle
  * a mini live odometer (`priceMv`, aria-hidden) rides next to the label when there is room. `onApply` may return the
- * price it actually applied (the freshest trade); the check mark then shows that one instead of `price`.
+ * price it actually applied (the freshest trade); the check mark then shows that one instead of `price`. The 800 ms
+ * dwell starts when the check mark is on screen (after the label's exit), not on click — a stalled frame loop
+ * would otherwise eat the whole confirmation before `mode="wait"` ever mounted it.
  */
 export function LivePriceButton({ price, label, disabled, onApply, className }: { price: number; label: string; disabled?: boolean; onApply: () => number | void; className?: string }) {
   const [applied, setApplied] = useState<number | null>(null);
   const done = applied !== null;
-  useEffect(() => {
-    if (!done) return;
-    const id = setTimeout(() => setApplied(null), LIVE_PRICE_CONFIRM_MS);
-    return () => clearTimeout(id);
-  }, [done]);
+  const clearApplied = useCallback(() => setApplied(null), []);
   return (
     <motion.button
       type="button"
@@ -1313,7 +1311,7 @@ export function LivePriceButton({ price, label, disabled, onApply, className }: 
           className={cn("num inline-flex items-center gap-1.5", done && "font-mono text-win")}
         >
           {done ? (
-            `✓ ${fmtPrice(applied ?? price)}`
+            <AppliedCheck value={applied ?? price} onDone={clearApplied} />
           ) : (
             <>
               {label}
@@ -1324,4 +1322,13 @@ export function LivePriceButton({ price, label, disabled, onApply, className }: 
       </AnimatePresence>
     </motion.button>
   );
+}
+
+/** The `✓ {price}` confirmation; its `LIVE_PRICE_CONFIRM_MS` dwell runs from its own mount. */
+function AppliedCheck({ value, onDone }: { value: number; onDone: () => void }) {
+  useEffect(() => {
+    const id = setTimeout(onDone, LIVE_PRICE_CONFIRM_MS);
+    return () => clearTimeout(id);
+  }, [onDone]);
+  return <>{`✓ ${fmtPrice(value)}`}</>;
 }

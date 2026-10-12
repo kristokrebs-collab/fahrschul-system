@@ -210,6 +210,8 @@ export function MorphSelect<T extends string = string>({
   const loopRef = useRef<ReturnType<typeof createFrameLoop> | null>(null);
   const typeRef = useRef({ buffer: "", timer: 0 as ReturnType<typeof setTimeout> | 0 });
   const geoRef = useRef<Geo | null>(null);
+  // where the trigger sat when the panel was placed (the outside-scroll close only fires once it actually moved)
+  const placedAt = useRef<{ left: number; top: number } | null>(null);
   // press-drag-release on the trigger (UIMenu): armed on pointerdown, "drag" once the panel opened under the pointer
   const pressRef = useRef({ mode: "idle" as "idle" | "armed" | "drag", pid: -1, touch: false, sx: 0, sy: 0, timer: 0 as ReturnType<typeof setTimeout> | 0, row: -1, suppressClick: false });
   const tracker = useRef(createVelocityTracker());
@@ -312,6 +314,7 @@ export function MorphSelect<T extends string = string>({
     const t = triggerRef.current;
     if (!t || disabled || options.length === 0) return;
     const r = t.getBoundingClientRect();
+    placedAt.current = { left: r.left, top: r.top };
     const g = placePanel(r, options.length, !!heading, window.innerWidth, window.innerHeight, coarsePointer() ? CONFIG.rowHCoarse : CONFIG.rowH);
     geoRef.current = g;
     setGeo(g);
@@ -413,6 +416,12 @@ export function MorphSelect<T extends string = string>({
     };
     const onScroll = (e: Event) => {
       if (e.target instanceof Node && boxRef.current?.contains(e.target)) return;
+      // a scroll that left the trigger where the panel was placed from changes nothing: the event of a scroll right
+      // BEFORE the open (scroll events arrive with the next frame, after the click opened the panel) or of a scroller
+      // the field does not sit in. One read per such event; the first real move closes and unhooks.
+      const at = placedAt.current;
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (at && r && Math.abs(r.left - at.left) < 0.5 && Math.abs(r.top - at.top) < 0.5) return;
       close(undefined, false);
     };
     const onResize = () => close(undefined, false);

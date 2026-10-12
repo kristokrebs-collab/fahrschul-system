@@ -41,7 +41,7 @@ interface TradeEditorProps {
   `Überzeugung & Disziplin` (`Wie sicher warst du beim Einstieg?` `ConvictionRadio`, `Plan befolgt?` Ja|Nein (re-click → null), `Gefühl beim Einstieg` `EMOTIONS` chips) ·
   `Review` (`Learnings & Notizen`, `Chart-Link (TradingView)` → `sanitizeUrl`).
 - **Live-Preis übernehmen**: rendered under `Einstieg` and `Ausstieg` only when `livePrice` is finite; disabled with `Ausstieg` while `Noch offen`;
-  writes `toInputString(Number(p.toFixed(p < 10 ? 4 : 1)))`, shows `✓ {price(p)}` for 800 ms (`AnimatePresence mode="wait"`).
+  writes `toInputString(Number(p.toFixed(p < 10 ? 4 : 1)))`, shows `✓ {price(p)}` for 800 ms (`AnimatePresence mode="wait"`), counted from the moment the check mark is on screen.
 - **Validation** (`validateRecord`, bundle order): `Bitte Datum angeben.` · `Bitte einen Einstiegspreis angeben.` ·
   `Bitte Ausstieg angeben oder P&L manuell eintragen.` · `Bitte Positionsgröße angeben oder P&L manuell eintragen.` · `Der Chart-Link muss mit https:// beginnen.`
   Footer error `role="alert"`.
