@@ -1,6 +1,6 @@
 /**
  * Series & panes (Plan 5.3): pane 0 = volume (overlay) + candles, pane 1 (optional, ~25 % height) =
- * Long/Short ratio (`longPct` + 50 % baseline) or Open Interest. The live price pulse is a DOM overlay
+ * Long/Short ratio (`longPct` + 50 % baseline), Open Interest or the RSI 14 with its diagonal trendlines (P02, `rsiPane.ts`). The live price pulse is a DOM overlay
  * (`overlays.tsx`), not a series, so the canvas only redraws when data changes.
  */
 import {
@@ -18,12 +18,13 @@ import {
 } from "lightweight-charts";
 import type { Candle, OpenInterestPoint, RatioPoint } from "@/market/types";
 import { NOTHING_CANDLES, NOTHING_OI_LINE, NOTHING_RATIO_LINE, NOTHING_VOLUME, VOLUME_SCALE_MARGINS, ink } from "./theme";
+import { RsiPane, type RsiBar } from "./rsiPane";
 
-export type PaneKind = "none" | "ratio" | "oi";
-export type ChartInterval = "1m" | "30m" | "1h" | "4h" | "1w";
+export type PaneKind = "none" | "ratio" | "oi" | "rsi";
+export type ChartInterval = "1m" | "30m" | "1h" | "4h" | "1d" | "1w";
 
 /** Seconds per bar for each interval (`30m` is built from 15m klines, UTC-aligned like every other bucket). */
-export const INTERVAL_SECONDS: Record<ChartInterval, number> = { "1m": 60, "30m": 1800, "1h": 3600, "4h": 14400, "1w": 604800 };
+export const INTERVAL_SECONDS: Record<ChartInterval, number> = { "1m": 60, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800 };
 /** Stretch factors: pane 0 : pane 1 = 3 : 1 → sub pane takes ~25 % of the height. */
 export const PANE_STRETCH = { main: 3, sub: 1 } as const;
 
@@ -100,13 +101,19 @@ export interface PaneData {
   oi?: OpenInterestPoint[];
 }
 
-/** Owns the optional sub pane; switch kinds with `set`, refresh data with `setData`, `dispose` on unmount. */
+/**
+ * Owns the optional sub pane; switch kinds with `set`, refresh data with `setData` (ratio / OI) or `setBars` (RSI: the
+ * chart's own bars), push the forming bar with `pushLive`, `dispose` on unmount. One sub pane at a time (`rsi` is
+ * exclusive with ratio / OI); the pane index is resolved from the series, never assumed.
+ */
 export class PaneController {
   private kind: PaneKind = "none";
   private line: ISeriesApi<"Line"> | null = null;
   private baseline: IPriceLine | null = null;
+  private rsiPane: RsiPane | null = null;
   private data: PaneData = {};
   private grid: UTCTimestamp[] = [];
+  private bars: readonly RsiBar[] = [];
 
   constructor(private readonly chart: IChartApi) {}
 
@@ -116,12 +123,39 @@ export class PaneController {
     this.apply();
   }
 
+  /** The chart's bars (the last one forming): the RSI pane computes from them; call after `setData` and on append. */
+  setBars(bars: readonly RsiBar[]): void {
+    this.bars = bars;
+    this.rsiPane?.setBars(bars);
+  }
+
+  /** The forming bar moved (at most once per frame): the RSI follows in O(1). */
+  pushLive(bar: RsiBar): void {
+    this.rsiPane?.push(bar);
+  }
+
   current(): PaneKind {
     return this.kind;
   }
 
   series(): ISeriesApi<"Line"> | null {
     return this.line;
+  }
+
+  /** The RSI pane while `kind === "rsi"`. */
+  rsi(): RsiPane | null {
+    return this.rsiPane;
+  }
+
+  /** Index of the sub pane (resolved from its series), `null` without one. */
+  paneIndex(): number | null {
+    const l = this.line as (ISeriesApi<"Line"> & { getPane?: () => { paneIndex(): number } }) | null;
+    if (!l) return null;
+    try {
+      return l.getPane?.().paneIndex() ?? 1;
+    } catch {
+      return 1;
+    }
   }
 
   setData(data: PaneData): void {
@@ -134,21 +168,27 @@ export class PaneController {
     this.remove();
     this.kind = kind;
     if (kind === "none") return;
-    const line = this.chart.addSeries(LineSeries, kind === "ratio" ? NOTHING_RATIO_LINE : NOTHING_OI_LINE, 1);
-    this.line = line;
-    if (kind === "ratio") {
-      this.baseline = line.createPriceLine({
-        price: 50,
-        color: ink.ref,
-        lineWidth: 1,
-        lineStyle: LineStyle.Dotted,
-        axisLabelVisible: false,
-        title: "",
-      });
+    if (kind === "rsi") {
+      this.rsiPane = new RsiPane(this.chart, 1);
+      this.line = this.rsiPane.series;
+      this.rsiPane.setBars(this.bars);
+    } else {
+      const line = this.chart.addSeries(LineSeries, kind === "ratio" ? NOTHING_RATIO_LINE : NOTHING_OI_LINE, 1);
+      this.line = line;
+      if (kind === "ratio") {
+        this.baseline = line.createPriceLine({
+          price: 50,
+          color: ink.ref,
+          lineWidth: 1,
+          lineStyle: LineStyle.Dotted,
+          axisLabelVisible: false,
+          title: "",
+        });
+      }
     }
     const panes = this.chart.panes();
     panes[0]?.setStretchFactor(PANE_STRETCH.main);
-    panes[1]?.setStretchFactor(PANE_STRETCH.sub);
+    panes[this.paneIndex() ?? 1]?.setStretchFactor(PANE_STRETCH.sub);
     this.apply();
   }
 
@@ -163,16 +203,26 @@ export class PaneController {
     else if (this.kind === "oi") this.line.setData(alignToGrid(normalizeSeries((this.data.oi ?? []).map(toOiData)), this.grid));
   }
 
+  /**
+   * Removes the sub pane's series and - only if lightweight-charts kept it - its now empty pane. The pane is resolved
+   * BEFORE the removal: removing the last series of a pane drops the pane and shifts every pane below it up, so a blind
+   * `removePane(1)` deleted the next sub pane when there were two.
+   */
   private remove(): void {
     if (!this.line) return;
+    const before = this.chart.panes().length;
+    const idx = this.paneIndex();
     if (this.baseline) this.line.removePriceLine(this.baseline);
     this.baseline = null;
+    this.rsiPane?.dispose();
+    this.rsiPane = null;
     this.chart.removeSeries(this.line);
     this.line = null;
-    // removing the last series of a pane drops the pane unless preserveEmptyPane is set; be defensive
-    if (this.chart.panes().length > 1) {
+    const panes = this.chart.panes();
+    const left = idx != null && idx > 0 && panes.length === before ? (panes[idx] as { getSeries?: () => unknown[] } | undefined) : undefined;
+    if (left && (typeof left.getSeries !== "function" || left.getSeries().length === 0)) {
       try {
-        this.chart.removePane(1);
+        this.chart.removePane(idx as number);
       } catch {
         /* pane already gone */
       }

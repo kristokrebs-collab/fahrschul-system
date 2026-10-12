@@ -23,7 +23,7 @@ export const CHART_TIME_ZONE = "Europe/Berlin";
 export const CHART_FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 export const CHART_FONT_LOAD = '11px "IBM Plex Mono"';
 
-export { ink };
+export { ink, applyInk, resetInk, subscribeInk, INK_DEFAULTS, type Ink, type InkKey } from "./ink";
 
 /** Empty bar slots right of the last candle (the live edge); `follow()` restores it. */
 export const CHART_RIGHT_OFFSET = 8;
@@ -140,6 +140,23 @@ export function makeNothingTheme(background: string = CHART_BACKGROUND_TRANSPARE
 
 export const NOTHING_DARK: DeepPartial<ChartOptions> = makeNothingTheme();
 
+/**
+ * The colour part of the chart options from the LIVE palette (`applyInk`, P02 theme hook): layout text, pane separator,
+ * grid, crosshair. `NothingCandleChart` re-applies it when the palette changes; the defaults equal `NOTHING_DARK`.
+ */
+export function inkChartOptions(): DeepPartial<ChartOptions> {
+  return {
+    layout: { textColor: ink.tick, panes: { separatorColor: ink.separator } },
+    grid: { vertLines: { color: ink.grid }, horzLines: { color: ink.grid } },
+    crosshair: { vertLine: { color: ink.ref, labelBackgroundColor: ink.labelBg }, horzLine: { color: ink.ref, labelBackgroundColor: ink.labelBg } },
+  };
+}
+
+/** Candle colours from the live palette (same values as `NOTHING_CANDLES` with the default ink). */
+export function inkCandleOptions(): CandlestickSeriesPartialOptions {
+  return { upColor: ink.fg, downColor: ink.bg, borderUpColor: ink.mute, borderDownColor: ink.mute, wickUpColor: ink.mute, wickDownColor: ink.mute, priceLineColor: ink.signal };
+}
+
 /** Up = filled white, down = hollow (`#0a0a0a` body) with grey borders and wicks. */
 export const NOTHING_CANDLES: CandlestickSeriesPartialOptions = {
   upColor: ink.fg,
@@ -183,6 +200,19 @@ export const NOTHING_OI_LINE: LineSeriesPartialOptions = {
   priceLineVisible: false,
   crosshairMarkerVisible: false,
   priceFormat: { type: "volume" },
+};
+
+/** RSI pane line (P02): 1 px fg, a small crosshair dot, no axis label (the pane legend carries the value). */
+export const NOTHING_RSI_LINE: LineSeriesPartialOptions = {
+  color: ink.fg,
+  lineWidth: 1,
+  lastValueVisible: false,
+  priceLineVisible: false,
+  crosshairMarkerVisible: true,
+  crosshairMarkerRadius: 2.5,
+  crosshairMarkerBorderColor: ink.bg,
+  crosshairMarkerBackgroundColor: ink.fg,
+  priceFormat: { type: "price", precision: 1, minMove: 0.1 },
 };
 
 /** Non-interactive variant for `MiniTradeChart`. */
