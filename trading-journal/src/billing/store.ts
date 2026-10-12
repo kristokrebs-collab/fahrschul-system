@@ -11,6 +11,7 @@
 import { create } from "zustand";
 import { ApiError, FUNCTIONS_MISSING } from "@/cloud/api";
 import { cloudEnabled } from "@/cloud/env";
+import { hasStoredSession } from "@/cloud/hint";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import { hasClaudeRuntime } from "@/store/capability";
 import { readJson, storageKey, writeJson } from "@/store/storage";
@@ -134,8 +135,10 @@ export function modeOf(active: boolean, config: BillingConfig | null, cached: Bi
 }
 
 /** Pure effective plan: Free unless the shop is open and the signed-in user's plan is known (server, else cache). */
-export function effectivePlanOf(mode: BillingMode, userId: string | null, account: BillingAccount | null, cached: BillingCache | null): PlanInfo {
-  if (mode !== "open" || !userId) return FREE_PLAN;
+export function effectivePlanOf(mode: BillingMode, userId: string | null, account: BillingAccount | null, cached: BillingCache | null, restoring = false): PlanInfo {
+  if (mode !== "open") return FREE_PLAN;
+  // a stored login is being restored (reload): the last known plan of this browser keeps the gates steady
+  if (!userId) return restoring && cached?.userId && cached.plan ? cached.plan : FREE_PLAN;
   if (account?.userId === userId) return account.plan;
   if (cached?.userId === userId && cached.plan) return cached.plan;
   return FREE_PLAN;
@@ -161,9 +164,10 @@ function sessionUserId(): string | null {
 export function useEffectivePlan(): PlanInfo {
   const mode = useBillingMode();
   const userId = useCloudSession((s) => (s.phase === "signedIn" ? (s.user?.id ?? null) : null));
+  const restoring = useCloudSession((s) => s.phase === "idle" || s.phase === "loading") && hasStoredSession();
   const account = useBilling((s) => s.account);
   const cached = useBilling((s) => s.cached);
-  return effectivePlanOf(mode, userId, account, cached);
+  return effectivePlanOf(mode, userId, account, cached, restoring);
 }
 
 /** Trial days the next checkout gets (none after a used trial; longer via a valid referral). */

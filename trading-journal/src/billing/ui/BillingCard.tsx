@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
 import { useCloudSession } from "@/cloud/session";
 import { RevealGroup, RevealItem } from "@/motion/Reveal";
@@ -24,9 +24,17 @@ export function BillingCard({ className }: { className?: string }) {
   const hasCustomer = !!account?.hasCustomer;
   const invoices = account?.invoices ?? null;
 
+  // once per user: an answer without invoices (Stripe down) must not trigger the next request
+  const asked = useRef<string | null>(null);
+  const userId = account?.userId ?? null;
+  const wants = !account || (account.hasCustomer && account.invoices === null);
   useEffect(() => {
-    if (mode === "open" && signedIn && (!account || (account.hasCustomer && account.invoices === null))) void loadBilling({ invoices: true });
-  }, [mode, signedIn, account]);
+    if (mode !== "open" || !signedIn || !wants) return;
+    const key = userId ?? "pending";
+    if (asked.current === key) return;
+    asked.current = key;
+    void loadBilling({ invoices: true });
+  }, [mode, signedIn, wants, userId]);
 
   if (mode !== "open" || !signedIn) return null;
   return (

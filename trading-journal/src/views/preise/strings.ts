@@ -31,7 +31,7 @@ export const PREISE = {
   ctaTrial: (days: number) => (days > 0 ? `${days} Tage gratis testen` : "Abonnieren"),
   ctaManage: "Abo verwalten",
   ctaSwitch: "Wechseln",
-  ctaSoon: "Bald verfügbar",
+  ctaSoon: "Noch nicht buchbar",
   seats: "Sitze",
   seatsLess: "Einen Sitz weniger",
   seatsMore: "Einen Sitz mehr",

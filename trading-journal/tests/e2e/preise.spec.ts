@@ -253,7 +253,7 @@ test.describe("Preise & Abo", () => {
     test.skip(!(await openPage(page, PREISE_URL, "Preise")), "dev harness only (Vite dev server)");
     await expect(page.getByTestId("preise-view")).toHaveAttribute("data-mode", "closed");
     await expect(page.getByTestId("billing-closed")).toContainText("Zahlungen noch nicht eingerichtet");
-    await expect(page.getByTestId("note-pro")).toHaveText("Bald verfügbar");
+    await expect(page.getByTestId("note-pro")).toHaveText("Noch nicht buchbar");
     await expect(page.getByTestId("cta-pro")).toHaveCount(0);
     await expect(page.getByLabel("Rabattcode")).toBeDisabled();
     await expectNoHorizontalScroll(page);

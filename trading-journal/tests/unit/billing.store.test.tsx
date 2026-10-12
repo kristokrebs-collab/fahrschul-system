@@ -103,6 +103,10 @@ describe("modes + entitlements", () => {
     expect(effectivePlanOf("open", "u2", account, null).plan).toBe("free");
     expect(effectivePlanOf("open", "u2", null, { userId: "u2", plan: { plan: "premium", status: "trialing", trialEnd: null }, closed: false, at: 0 }).plan).toBe("premium");
     expect(effectivePlanOf("closed", "u1", account, null).plan).toBe("free");
+    // reload with a stored login: the cached plan holds until the session is back, never for a signed-out visitor
+    const cache = { userId: "u1", plan: { plan: "pro" as const, status: "active" as const, trialEnd: null }, closed: false, at: 0 };
+    expect(effectivePlanOf("open", null, null, cache, true).plan).toBe("pro");
+    expect(effectivePlanOf("open", null, null, cache, false).plan).toBe("free");
   });
 
   it("without cloud everything is unlocked", () => {

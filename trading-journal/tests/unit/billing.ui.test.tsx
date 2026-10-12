@@ -204,6 +204,6 @@ describe("PreiseView", () => {
     expect(screen.getByTestId("preise-view")).toHaveAttribute("data-mode", "off");
     expect(screen.getByTestId("billing-closed")).toHaveTextContent("Keine Abos in dieser Version");
     expect(screen.queryByTestId("cta-pro")).toBeNull();
-    expect(screen.getByTestId("note-pro")).toHaveTextContent("Bald verfügbar");
+    expect(screen.getByTestId("note-pro")).toHaveTextContent("Noch nicht buchbar");
   });
 });
