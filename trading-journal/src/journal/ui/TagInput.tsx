@@ -10,7 +10,7 @@ export const MAX_TAG_LENGTH = 32;
 
 /** Normalises a typed tag: trimmed, inner whitespace collapsed, leading `#` dropped, capped. */
 export function cleanTag(raw: string): string {
-  return raw.replace(/^#+/, "").replace(/\s+/g, " ").trim().slice(0, MAX_TAG_LENGTH);
+  return raw.trim().replace(/^#+/, "").replace(/\s+/g, " ").trim().slice(0, MAX_TAG_LENGTH);
 }
 
 /** Adds `tag` (case-insensitive unique, at most `MAX_TAGS`). */

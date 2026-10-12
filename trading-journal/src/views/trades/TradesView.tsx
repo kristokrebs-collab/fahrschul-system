@@ -63,6 +63,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   const setTradeFilter = useUi((s) => s.setTradeFilter);
   const extra = useUi((s) => s.tradeExtra);
   const setTradeExtra = useUi((s) => s.setTradeExtra);
+  const replaceTradeExtra = useUi((s) => s.replaceTradeExtra);
   const resetTradeFilter = useUi((s) => s.resetTradeFilter);
   const sort = useUi((s) => s.tradeSort);
   const toggleSort = useUi((s) => s.toggleSort);
@@ -141,6 +142,7 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
           suggestions={suggestions}
           extra={extra}
           onExtraChange={setTradeExtra}
+          onExtraReplace={replaceTradeExtra}
           mistakeTags={mistakeTags}
           showStrength={hasSignals || extra.strength !== "all"}
           journalOptions={journalOptions}

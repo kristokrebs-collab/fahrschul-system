@@ -28,6 +28,8 @@ export interface TradeFiltersProps {
   /** Additive mistake-tag / signal-strength filter (`uiStore.tradeExtra`). */
   extra?: TradeExtraFilter;
   onExtraChange?: (patch: Partial<TradeExtraFilter>) => void;
+  /** Journal v3 (P06): replaces the whole extra filter (`Diese Filter leeren`). */
+  onExtraReplace?: (next: TradeExtraFilter) => void;
   /** Tags of the `Fehler` select; empty → the select is not shown. */
   mistakeTags?: readonly string[];
   /** Show the `Signal-Stärke` select (the journal has stored checks, or the filter is set). */
@@ -83,7 +85,7 @@ const PILL_LAYOUT: Transition = { layout: spring.island };
  * new count never re-wraps the bar (TR-04); it flashes once per new count; the net figure flashes green/red by
  * direction. Reduced motion: tint only, no pop, fill or flash.
  */
-export function TradeFilters({ filter, onChange, setups, count, closed, suggestions, extra, onExtraChange, mistakeTags, showStrength, journalOptions, sort, className }: TradeFiltersProps) {
+export function TradeFilters({ filter, onChange, setups, count, closed, suggestions, extra, onExtraChange, onExtraReplace, mistakeTags, showStrength, journalOptions, sort, className }: TradeFiltersProps) {
   const reduced = useReducedFx();
   const [q, setQ] = useState(filter.q);
   const lastSent = useRef(filter.q);
@@ -192,7 +194,7 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
       <Segmented aria-label="Ergebnis" size="sm" className="pointer-coarse:gap-y-5" value={filter.result} onChange={(result) => onChange({ result })} options={RESULT_OPTIONS} />
       <Segmented aria-label="Richtung" size="sm" value={filter.side} onChange={(side) => onChange({ side })} options={SIDE_OPTIONS} />
       <CountPill count={count} closed={closed} reduced={reduced} />
-      {extra && onExtraChange && journalOptions && sort && <JournalFilterBar filter={filter} extra={extra} sort={sort} onExtraChange={onExtraChange} options={journalOptions} />}
+      {extra && onExtraChange && journalOptions && sort && <JournalFilterBar filter={filter} extra={extra} sort={sort} onExtraChange={onExtraChange} onExtraReplace={onExtraReplace} options={journalOptions} />}
     </div>
   );
 }

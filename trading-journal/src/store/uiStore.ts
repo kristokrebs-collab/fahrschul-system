@@ -195,6 +195,8 @@ export interface UiState extends UiPrefs {
   /** Resets `tradeFilter` and `tradeExtra`. */
   resetTradeFilter(): void;
   setTradeExtra(patch: Partial<TradeExtraFilter>): void;
+  /** Journal v3 (P06): replaces the whole extra filter (clearing the v3 filters leaves no empty keys behind). */
+  replaceTradeExtra(next: TradeExtraFilter): void;
   /** Journal v3 (P06): replaces filter, extra filter and sort at once (a saved view). */
   applyTradeView(view: { filter: TradeFilter; extra: TradeExtraFilter; sort: TradeSort }): void;
   setTradeSort(sort: TradeSort): void;
@@ -308,6 +310,7 @@ export const useUi = create<UiState>()((set, get) => ({
   setTradeFilter: (patch) => set((s) => ({ tradeFilter: { ...s.tradeFilter, ...patch } })),
   resetTradeFilter: () => set({ tradeFilter: DEFAULT_TRADE_FILTER, tradeExtra: DEFAULT_TRADE_EXTRA }),
   setTradeExtra: (patch) => set((s) => ({ tradeExtra: { ...s.tradeExtra, ...patch } })),
+  replaceTradeExtra: (next) => set({ tradeExtra: { ...DEFAULT_TRADE_EXTRA, ...next } }),
   applyTradeView: ({ filter, extra, sort }) => set({ tradeFilter: { ...DEFAULT_TRADE_FILTER, ...filter }, tradeExtra: { ...DEFAULT_TRADE_EXTRA, ...extra }, tradeSort: sort }),
   setTradeSort: (tradeSort) => set({ tradeSort }),
   toggleSort: (k) =>

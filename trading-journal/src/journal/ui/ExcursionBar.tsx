@@ -1,8 +1,10 @@
 import { motion } from "motion/react";
+import { useRef } from "react";
 import { captureRatio } from "@/domain/excursion";
 import { fillPosition } from "@/domain/fills";
 import type { EnrichedTrade } from "@/domain/types";
 import { cn } from "@/lib/cn";
+import { useFirstInView } from "@/motion/inView";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -47,6 +49,9 @@ export function keptShare(t: ExcursionTrade): number | null {
  */
 export function ExcursionBar({ trade, className }: { trade: ExcursionTrade; className?: string }) {
   const reduced = useReducedFx();
+  const barRef = useRef<HTMLDivElement>(null);
+  const seen = useFirstInView(barRef, !reduced);
+  const run = reduced || seen;
   const ax = excursionAxis(trade);
   if (!ax) return null;
   const span = Math.max(ax.mae, ax.mfe, Math.abs(ax.exit ?? 0), ax.stop ?? 0, 0.0001) * 1.12;
@@ -65,10 +70,10 @@ export function ExcursionBar({ trade, className }: { trade: ExcursionTrade; clas
           MFE <MotionNumber value={ax.mfe} decimals={2} signed suffix={suffix} countOnReveal revealKey="mfe" />
         </span>
       </div>
-      <div className="relative h-3" aria-hidden="true">
+      <div ref={barRef} className="relative h-3" aria-hidden="true">
         <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-line-2" />
-        <motion.span className="absolute right-1/2 top-0 h-full rounded-l-full bg-loss/70" style={{ width: `${half(ax.mae)}%`, transformOrigin: "right center" }} initial={reduced ? false : { scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }} transition={grow(0)} />
-        <motion.span className="absolute left-1/2 top-0 h-full rounded-r-full bg-win/70" style={{ width: `${half(ax.mfe)}%`, transformOrigin: "left center" }} initial={reduced ? false : { scaleX: 0 }} whileInView={{ scaleX: 1 }} viewport={{ once: true }} transition={grow(1)} />
+        <motion.span className="absolute right-1/2 top-0 h-full rounded-l-full bg-loss/70" style={{ width: `${half(ax.mae)}%`, transformOrigin: "right center" }} initial={reduced ? false : { scaleX: 0 }} animate={run ? { scaleX: 1 } : undefined} transition={grow(0)} />
+        <motion.span className="absolute left-1/2 top-0 h-full rounded-r-full bg-win/70" style={{ width: `${half(ax.mfe)}%`, transformOrigin: "left center" }} initial={reduced ? false : { scaleX: 0 }} animate={run ? { scaleX: 1 } : undefined} transition={grow(1)} />
         <span className="absolute left-1/2 top-[-3px] h-[18px] w-px bg-fg/60" />
         {ax.stop != null && <span className="absolute top-[-2px] h-4 border-l border-dashed border-mute/70" style={{ left: `${50 - half(ax.stop)}%` }} />}
         {exitAt != null && (
@@ -76,8 +81,7 @@ export function ExcursionBar({ trade, className }: { trade: ExcursionTrade; clas
             className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink-850 bg-fg"
             style={{ left: `${exitAt}%` }}
             initial={reduced ? false : { scale: 0 }}
-            whileInView={{ scale: 1 }}
-            viewport={{ once: true }}
+            animate={run ? { scale: 1 } : undefined}
             transition={reduced ? { duration: 0 } : { ...spring.pop, delay: 2 * stagger.lead + tween.fade.duration }}
           />
         )}
