@@ -52,8 +52,9 @@ Phones: one column in the same order, no horizontal scroll at 390 px. Every cell
 ## Watcher, trade panel, state
 - `CoachWatcher.tsx`: **`useCoachWatch()` / `CoachWatcher`** – after a save, `coachAlert` (pure, domain) compares the
   journal before and after; a new pattern of severity ≥ 2 on the saved trade becomes ONE toast (advice + suggested
-  pause) and the live alert of the Heute card. Bulk changes (> 3 records: import, restore, sync) and stale records
-  (`updatedAt` older than 5 min) are ignored; each event is toasted once per session; the work runs off the save's task.
+  pause) and the live alert of the Heute card. Bulk changes (> 3 records: import, restore, sync), stale records
+  (`updatedAt` older than 5 min) and changes the app makes on its own (`MACHINE_FIELDS`: the MAE / MFE backfill,
+  drawings) are ignored; each event is toasted once per session; the work runs off the save's task.
 - `TradeCoachPanel.tsx`: **`<TradeCoachPanel tradeId />`** for the trade detail – grade A–D (`spring.pop`), verdict,
   plan vs. execution, MAE / MFE, rules, context, triggered behaviours, similar trades (buttons open them). Sections are
   `StaggerItem`s, so they cascade with the detail body. Renders nothing for an unknown id.

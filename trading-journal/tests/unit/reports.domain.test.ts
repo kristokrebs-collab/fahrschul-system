@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { aggregate } from "@/domain/agg";
 import { detectBehaviors } from "@/domain/coach/events";
 import { coachPrefsOf, withCoachPlan, withReportSeen } from "@/domain/coach/prefs";
-import { buildReport, pendingReport, periodFromKey, periodOf, reportArchive, reportFilename, reportToCsv, reportToJson, reportToMarkdown, shiftPeriod, type ReportPeriod } from "@/domain/reports";
+import { buildReport, pendingReport, pendingReports, periodFromKey, periodOf, reportArchive, reportFilename, reportToCsv, reportToJson, reportToMarkdown, shiftPeriod, type ReportPeriod } from "@/domain/reports";
 import type { Settings, Trade } from "@/domain/types";
 import { at, COACH_SETTINGS, ct, enrichC } from "./coach.fixtures";
 
@@ -121,6 +121,17 @@ describe("Archiv und Gesehen-Marker", () => {
     expect(withReportSeen(seen, [p.period.key])).toBe(seen);
     // too late: a week report is not announced two weeks later
     expect(pendingReport(list, COACH_SETTINGS, new Date(2026, 2, 30).getTime())).toBeNull();
+  });
+
+  it("lists every report that just became ready, the most important first", () => {
+    // 2 April: Q1 and March ended on 1 April, the week of 23–29 March on 30 March (trades on 22 and 29 March)
+    const late = enrichC([ct(at(20, 600), { id: "m1", p: 100 }), ct(at(27, 600), { id: "m2", p: -50 })]);
+    const now2 = new Date(2026, 3, 2, 9).getTime();
+    const all = pendingReports(late, COACH_SETTINGS, now2);
+    expect(all.map((e) => e.period.kind)).toEqual(["quarter", "month", "week"]);
+    expect(all.map((e) => e.period.key)).toEqual(["2026-Q1", "2026-03", "2026-W13"]);
+    expect(pendingReport(late, COACH_SETTINGS, now2)!.period.key).toBe("2026-Q1");
+    expect(pendingReports(late, withReportSeen(COACH_SETTINGS, ["2026-Q1"]), now2).map((e) => e.period.key)).toEqual(["2026-03", "2026-W13"]);
   });
 
   it("keeps unknown keys of settings.coach", () => {
