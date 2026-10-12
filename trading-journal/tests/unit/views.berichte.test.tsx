@@ -92,6 +92,8 @@ describe("BerichteView", () => {
     expect(screen.getByTestId("report-export-md")).toBeDisabled();
     expect(screen.getByTestId("report-export-pdf")).toBeDisabled();
     expect(screen.queryByTestId("report-performance")).toBeNull();
+    // no older trades: no walk back through empty periods
+    expect(screen.getByTestId("report-prev")).toBeDisabled();
   });
 
   it("journal: the newest finished week, kind / period / focus switches, the archive", async () => {

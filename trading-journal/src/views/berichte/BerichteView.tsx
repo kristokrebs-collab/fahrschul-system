@@ -12,11 +12,12 @@
  * Opening a finished report marks it seen (`settings.coach.reports.seen`, after a short look – flipping through does
  * not count). Registered by the integrator (P14) as page `berichte`.
  */
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { BERICHTE_HIGHLIGHT, BERICHTE_LEAD, BERICHTE_TITLE, withReportSeen } from "@/domain/coach";
 import { FOCUS_LABEL, KIND_LABEL, REPORT_FOCI, REPORT_KINDS, periodOf, shiftPeriod, type ReportFocus, type ReportKind } from "@/domain/reports";
 import { cn } from "@/lib/cn";
+import { tradeTime } from "@/lib/dates";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
 import { Segmented } from "@/primitives/Segmented";
@@ -78,6 +79,8 @@ export function BerichteView({ className }: { className?: string }) {
 
   const next = shiftPeriod(period, 1);
   const canNext = next.from <= now;
+  // back only while older trades exist (no endless walk through empty periods)
+  const canPrev = useMemo(() => page.view.closed.some((t) => +tradeTime(t) < period.from), [page.view.closed, period.from]);
   const newest = archive[0]?.period.key ?? null;
   const running = periodOf(kind, now);
 
@@ -107,7 +110,7 @@ export function BerichteView({ className }: { className?: string }) {
       <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3 lg:col-span-12" data-testid="report-toolbar">
         <Segmented<ReportKind> aria-label="Art des Berichts" options={KIND_OPTIONS} value={kind} onChange={setKind} size="sm" className={SEG_TOUCH} />
         <div className="flex min-w-0 items-center gap-2" role="group" aria-label="Zeitraum">
-          <Arrow dir="prev" label="Vorheriger Zeitraum" onClick={() => setPeriod(shiftPeriod(period, -1).key, "down")} />
+          <Arrow dir="prev" label="Vorheriger Zeitraum" onClick={() => setPeriod(shiftPeriod(period, -1).key, "down")} disabled={!canPrev} />
           <span className="num min-w-[4.75rem] text-center font-mono text-[13px] text-fg" data-testid="report-period-label">
             {period.short}
           </span>
