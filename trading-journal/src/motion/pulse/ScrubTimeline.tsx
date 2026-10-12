@@ -327,7 +327,7 @@ export function ScrubTimeline({
     transition: reduced ? undefined : `opacity ${CONFIG.dimMs}ms cubic-bezier(.22,.8,.3,1)`,
   });
   return (
-    <div ref={rootRef} data-pulse="scrub-timeline" className={cn("grid gap-3 rounded-2xl border border-line-2 bg-ink-850 p-3 sm:p-4", className)}>
+    <div ref={rootRef} data-pulse="scrub-timeline" className={cn("grid gap-3 overflow-x-clip rounded-2xl border border-line-2 bg-ink-850 p-3 sm:p-4", className)}>
       {(transport || title) && (
         <div className="flex items-center gap-3">
           {transport && (
@@ -363,7 +363,7 @@ export function ScrubTimeline({
         </div>
       )}
 
-      <div className="grid" style={{ gridTemplateColumns: hasRows ? `minmax(0, ${labelWidth}px) minmax(0, 1fr)` : "minmax(0, 1fr)" }}>
+      <div className="grid" style={{ gridTemplateColumns: hasRows ? `minmax(0, min(${labelWidth}px, 30%)) minmax(0, 1fr)` : "minmax(0, 1fr)" }}>
         {hasRows && (
           <div className="grid content-start">
             <span aria-hidden="true" className="h-4" />

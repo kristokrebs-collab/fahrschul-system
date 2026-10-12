@@ -179,7 +179,7 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
   useEffect(() => () => tl.current?.stop(), []);
 
   return (
-    <figure ref={stageRef} aria-label={label} data-pulse="reel-window" className={cn("relative isolate m-0 aspect-video w-full overflow-hidden rounded-2xl border border-line bg-ink-950 [container-type:size]", className)}>
+    <figure ref={stageRef} aria-label={label} data-pulse="reel-window" className={cn("relative isolate m-0 aspect-[4/3] w-full sm:aspect-video overflow-hidden rounded-2xl border border-line bg-ink-950 [container-type:size]", className)}>
       {/* tableau cards (the real, reachable content) */}
       {tableau.map((card, i) => {
         const [cx, cy, w] = CONFIG.slots[i]!;
@@ -213,10 +213,10 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
         <span className="pointer-events-none absolute inset-0 shadow-[inset_0_0_0_1px_rgb(229_32_46/0.35),inset_0_0_4cqw_rgb(229_32_46/0.12)]" />
       </div>
       {/* headline lines */}
-      <span ref={topRef} className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg" style={{ transform: "translate(-50%,-100%)" }}>
+      <span ref={topRef} className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/0.85)]" style={{ transform: "translate(-50%,-100%)" }}>
         <span ref={topText}>{lines[0]}</span>
       </span>
-      <span ref={botRef} className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg" style={{ transform: "translate(-50%,0)" }}>
+      <span ref={botRef} className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/0.85)]" style={{ transform: "translate(-50%,0)" }}>
         <span ref={botText}>{lines[1]}</span>
       </span>
       <figcaption className="sr-only">

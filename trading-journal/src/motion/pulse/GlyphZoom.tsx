@@ -98,6 +98,11 @@ export interface GlyphZoomProps {
   duration?: number;
   /** Wall colour (a concrete colour – the canvas cannot resolve CSS variables per frame). */
   wallColor?: string;
+  /**
+   * What the letters show while the wall stands (CSS background; default a signal-red glow) – it fades into the content
+   * during the plunge. `null` lets the content itself shine through the letters.
+   */
+  portal?: string | null;
   /** Content behind the wall (visible through the letters, revealed by the dive). */
   children: ReactNode;
   /** Accessible name of the stage. */
@@ -118,11 +123,14 @@ interface Layout {
   span: number;
 }
 
-export function GlyphZoom({ word, letter, open = false, progress, duration = CONFIG.duration, wallColor = "#0a0a0a", children, label, className, onDone }: GlyphZoomProps) {
+const PORTAL = "radial-gradient(120% 120% at 50% 40%, #ff3b47 0%, #e5202e 35%, #7a0d16 100%)";
+
+export function GlyphZoom({ word, letter, open = false, progress, duration = CONFIG.duration, wallColor = "#0a0a0a", portal = PORTAL, children, label, className, onDone }: GlyphZoomProps) {
   const reduced = useReducedFx();
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const portalRef = useRef<HTMLDivElement>(null);
   const [covered, setCovered] = useState(() => (progress ? progress.get() >= CONFIG.cover : open));
   const st = useRef({ u: progress ? progress.get() : open ? 1 : 0, from: 0, to: 0, t0: 0, layout: null as Layout | null, active: true, covered, onDone, wallColor, reduced });
   useLayoutEffect(() => {
@@ -166,6 +174,9 @@ export function GlyphZoom({ word, letter, open = false, progress, duration = CON
     }
     const content = contentRef.current;
     if (content) content.style.transform = s.reduced ? "none" : `scale(${(1.12 - 0.12 * Math.min(1, u / CONFIG.cover)).toFixed(4)})`;
+    // the portal colour fades into the content during the plunge (u .55 → cover)
+    const portalEl = portalRef.current;
+    if (portalEl) portalEl.style.opacity = s.reduced ? (cov ? "0" : "1") : (1 - Math.min(1, Math.max(0, (u - 0.55) / (CONFIG.cover - 0.55)))).toFixed(3);
     if (cov !== s.covered) {
       s.covered = cov;
       setCovered(cov);
@@ -318,6 +329,7 @@ export function GlyphZoom({ word, letter, open = false, progress, duration = CON
       <div ref={contentRef} className="absolute inset-0" aria-hidden={covered ? undefined : true} inert={!covered}>
         {children}
       </div>
+      {portal ? <div ref={portalRef} aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: portal }} /> : null}
       <span className="sr-only">{word}</span>
       <canvas ref={canvasRef} aria-hidden="true" className="pointer-events-none absolute inset-0 size-full" style={reduced ? { transition: `opacity ${tween.fade.duration}s ease-out` } : undefined} />
     </div>

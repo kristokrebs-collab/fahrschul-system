@@ -13,9 +13,14 @@ import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
 import { TextMorph } from "@/motion/pulse/TextMorph";
 import { TextPrism } from "@/motion/pulse/TextPrism";
 import { Typewriter } from "@/motion/pulse/Typewriter";
+import { CoachStream } from "@/motion/fx/CoachStream";
+import { DotMatrixText } from "@/motion/fx/DotMatrixText";
+import { NumberCascade } from "@/motion/fx/NumberCascade";
+import { SplitFlap } from "@/motion/fx/SplitFlap";
 
-/** `?only=<id>` renders a single section, so a 120 Hz measurement sees only the effect under test. */
-const ONLY = new URLSearchParams(location.search).get("only");
+/** `?only=<id>` (or `?c=<id>`) renders a single section, so a 120 Hz measurement sees only the effect under test. */
+const SEARCH = new URLSearchParams(location.search);
+const ONLY = SEARCH.get("only") ?? SEARCH.get("c");
 
 function Section({ id, title, children, onReplay }: { id: string; title: string; children: ReactNode; onReplay?: () => void }) {
   if (ONLY && ONLY !== id) return null;
@@ -47,6 +52,8 @@ function FooterWordmark() {
 }
 
 const STATUS = ["LIVE", "VERZÖGERT", "OFFLINE"];
+const PERIODS = ["Tag", "Woche", "Monat", "Jahr"] as const;
+const COACH = "Deine besten Trades kommen aus dem Sweep in London. Lass Short-Trades nach 20 Uhr liegen.";
 
 function Gallery() {
   const [cascade, setCascade] = useState(0);
@@ -55,6 +62,9 @@ function Gallery() {
   const [status, setStatus] = useState(0);
   const [marker, setMarker] = useState(true);
   const [title, setTitle] = useState(0);
+  const [period, setPeriod] = useState(1);
+  const [coach, setCoach] = useState(COACH);
+  const [cascadeRun, setCascadeRun] = useState(0);
   return (
     <main className="bg-ink-900 text-fg mx-auto max-w-5xl">
       <Section id="cascade" title="01 · AsciiCascade" onReplay={() => setCascade((n) => n + 1)}>
@@ -112,6 +122,31 @@ function Gallery() {
         <p className="text-mute text-center text-[18px]">
           Szenario-Urteil: <TactileHighlight tone="signal" playOnView>kein Trade</TactileHighlight> bis 86.400.
         </p>
+      </Section>
+
+      {/* P01 text fx (`@/motion/fx`) – the full set lives in dev/pulse-fx.html */}
+      <Section id="flap" title="08 · SplitFlap" onReplay={() => setPeriod((n) => (n + 1) % PERIODS.length)}>
+        <p className="flex flex-wrap items-center justify-center gap-3 text-[28px] font-medium">
+          Bericht für die <SplitFlap text={PERIODS[period]!} order={PERIODS} />
+        </p>
+      </Section>
+
+      <Section id="coach" title="09 · CoachStream" onReplay={() => setCoach((t) => (t === COACH ? `${COACH} ` : COACH))}>
+        <CoachStream text={coach} className="mx-auto max-w-[620px] text-[17px] leading-relaxed" />
+      </Section>
+
+      <Section id="cascade" title="10 · NumberCascade" onReplay={() => setCascadeRun((n) => n + 1)}>
+        <div className="flex justify-center">
+          <NumberCascade value={12480.5} decimals={2} signed suffix=" USDT" play={cascadeRun} className="dot-num text-[34px] text-win sm:text-[52px]" />
+        </div>
+      </Section>
+
+      <Section id="matrix" title="11 · DotMatrixText">
+        <div className="flex flex-wrap items-center justify-center gap-8">
+          <DotMatrixText text="A+" tone="signal" preset="chevrons" presetTone="win" size={7} label="Note A plus" />
+          <DotMatrixText text="1:5" size={6} label="Schritt 1 von 5" />
+          <DotMatrixText text="3/4" size={6} label="3 von 4" />
+        </div>
       </Section>
     </main>
   );

@@ -219,7 +219,7 @@ export function LaunchGrid({ children, slots = [], cards = [], aside, hud, play,
 
   return (
     <LaunchSlotContext.Provider value={ctx}>
-      <section ref={rootRef} aria-label={label} data-pulse="launch-grid" className={cn("grid gap-4", className)}>
+      <section ref={rootRef} aria-label={label} data-pulse="launch-grid" className={cn("grid gap-4 overflow-x-clip", className)}>
         <div className={cn("grid gap-4", aside != null && "md:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]")}>
           <div ref={panelRef} className="relative isolate overflow-hidden rounded-[28px] border border-line bg-ink-950" style={{ transformOrigin: "100% 50%" }}>
             <span
@@ -229,7 +229,7 @@ export function LaunchGrid({ children, slots = [], cards = [], aside, hud, play,
               style={{ backgroundImage: "radial-gradient(rgb(255 255 255 / 0.085) 1px, transparent 1.4px)", backgroundSize: "24px 24px", backgroundPosition: "12px 12px" }}
             />
             <span aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(70% 60% at 30% 40%, rgb(229 32 46 / 0.07), transparent 70%)" }} />
-            <span ref={squareRef} aria-hidden="true" className="pointer-events-none absolute right-[9%] top-[14%] size-[clamp(38px,6vw,64px)] rounded-[6px] border border-white/25" />
+            <span ref={squareRef} aria-hidden="true" className="pointer-events-none absolute right-[9%] top-[14%] size-[clamp(38px,6vw,64px)] rounded-[6px] border border-white/25 max-sm:top-auto max-sm:bottom-[5%] max-sm:right-[7%]" />
             <div className={cn("relative grid min-h-[300px] gap-6 p-6 sm:p-9", cards.length > 0 && "md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]")}>
               <div className="relative z-[1] grid content-center gap-4">{children}</div>
               {cards.length > 0 && (

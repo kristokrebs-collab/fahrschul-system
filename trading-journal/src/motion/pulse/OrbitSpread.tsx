@@ -230,7 +230,7 @@ export function OrbitSpread({ items, children, trigger = "view", open: openProp,
         s.ptrT = { x: 0, y: 0 };
         loopRef.current?.wake();
       }}
-      className={cn("relative isolate aspect-video w-full overflow-hidden rounded-2xl bg-ink-950 outline-none [container-type:size] focus-visible:ring-2 focus-visible:ring-steel/60", trigger === "click" && "cursor-pointer", className)}
+      className={cn("relative isolate aspect-[4/3] w-full overflow-hidden sm:aspect-video rounded-2xl bg-ink-950 outline-none [container-type:size] focus-visible:ring-2 focus-visible:ring-steel/60", trigger === "click" && "cursor-pointer", className)}
     >
       <span aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(42cqw 42cqw at 50% 50%, rgb(229 32 46 / 0.1), transparent 72%)" }} />
       <div ref={copyRef} className="absolute inset-x-[10%] top-[30%] z-[60] grid justify-items-center gap-[1cqw] text-center" style={{ opacity: reduced ? 1 : 0 }}>
