@@ -97,7 +97,9 @@ export function tradeConformity(t: EnrichedTrade, x: SetupX, capital: number | n
     w += CONFORMITY_WEIGHTS[k];
     s += CONFORMITY_WEIGHTS[k] * v;
   }
-  return { id: t.id, score: w ? Math.round((s / w) * 100) : null, parts, exit };
+  // "a stop was set" alone says nothing about THIS plan: a score needs at least one plan-specific part
+  const planParts = Object.keys(parts).filter((k) => k !== "stop").length;
+  return { id: t.id, score: w && planParts ? Math.round((s / w) * 100) : null, parts, exit };
 }
 
 export interface StrategyConformity {

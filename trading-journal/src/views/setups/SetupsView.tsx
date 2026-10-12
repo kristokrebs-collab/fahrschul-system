@@ -1,5 +1,6 @@
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useMemo, useState, type CSSProperties } from "react";
+import { EMPTY_LIBRARY_FILTER, libraryFacets, matchesLibrary, type LibraryFilter } from "@/domain/strategy";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { ED } from "@/domain/edition";
 import { DEFAULT_RANK_KEY, RANK_KEYS, rankSetupStats, setupVisibleFor, type RankKey } from "@/domain/rank";
@@ -18,6 +19,9 @@ import { useUi } from "@/store/uiStore";
 import { PageHeader } from "./PageHeader";
 import { playbookBySetup } from "./playbook";
 import { SetupCard } from "./SetupCard";
+import { ClassifyCard } from "./ClassifyCard";
+import { CompareSheet } from "./CompareSheet";
+import { LibraryBar, LIBRARY_STRINGS } from "./LibraryBar";
 
 export type SetupAccFilter = "all" | AccountId;
 
@@ -65,10 +69,15 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
   const openSetupEditor = useUi((s) => s.openSetupEditor);
   const [sort, setSort] = useState<RankKey>(DEFAULT_RANK_KEY);
   const [acc, setAcc] = useState<SetupAccFilter>("all");
+  // P07: library filter (only hides cards, like the account switch) and the comparison sheet
+  const [filter, setFilter] = useState<LibraryFilter>(EMPTY_LIBRARY_FILTER);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const facets = useMemo(() => libraryFacets(settings.setups), [settings.setups]);
 
-  const ranked = useMemo(() => rankSetupStats(view.setups, sort).filter((c) => setupVisibleFor(c.setup, acc)), [view.setups, sort, acc]);
+  const ranked = useMemo(() => rankSetupStats(view.setups, sort).filter((c) => setupVisibleFor(c.setup, acc) && matchesLibrary(c.setup, filter, c.n)), [view.setups, sort, acc, filter]);
+  const comparable = useMemo(() => view.setups.filter((c) => c.n > 0).length, [view.setups]);
   // playbook figures (Tradezella playbook report) – same closed trades as the card stats (account "all")
-  const playbooks = useMemo(() => playbookBySetup(settings.setups, view.closed), [settings.setups, view.closed]);
+  const playbooks = useMemo(() => playbookBySetup(settings.setups, view.closed, { capital: settings.capital }), [settings.setups, view.closed, settings.capital]);
   const layoutDependency = `${acc}:${sort}:${ranked.map((c) => c.id).join(",")}`;
 
   const edit = onEdit ?? ((id: string) => openSetupEditor({ setupId: id }));
@@ -92,6 +101,13 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
           </div>
         }
       />
+
+      <LibraryBar filter={filter} onChange={setFilter} facets={facets} onCompare={() => setCompareOpen(true)} comparable={comparable} />
+      {ranked.length === 0 && view.setups.length > 0 && (
+        <p className="text-[13px] text-mute" data-testid="setup-library-empty">
+          {LIBRARY_STRINGS.none}
+        </p>
+      )}
 
       <motion.div layout layoutDependency={layoutDependency} transition={{ layout: spring.layout }} className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))]">
         <AnimatePresence mode="popLayout" initial={false}>
@@ -137,6 +153,8 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
         </AnimatePresence>
       </motion.div>
 
+      <ClassifyCard />
+
       <Card title={RULES_TITLE} note={RULES_NOTE}>
         <RevealGroup as="ol" className="grid gap-2" aria-label={RULES_TITLE}>
           {settings.rules.map((rule, i) => (
@@ -155,6 +173,8 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
           ))}
         </RevealGroup>
       </Card>
+
+      <CompareSheet open={compareOpen} onClose={() => setCompareOpen(false)} setups={settings.setups} closed={view.closed} settings={settings} />
     </div>
   );
 }

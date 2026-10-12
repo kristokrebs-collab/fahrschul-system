@@ -22,7 +22,7 @@ export {
   type AutoRule,
   type StopRule,
 } from "./types";
-export { classifyTrade, classifyUntagged, historyModel, levelOf, LEVEL_MIN, type Suggestion, type BulkSuggestion, type ConfidenceLevel, type ClassifyOptions, type HistoryModel, type Reason as ClassifyReason } from "./classify";
+export { classifyTrade, KIND_TEXT as BOX_KIND_TEXT, SESSION_TEXT, classifyUntagged, historyModel, levelOf, LEVEL_MIN, type Suggestion, type BulkSuggestion, type ConfidenceLevel, type ClassifyOptions, type HistoryModel, type Reason as ClassifyReason } from "./classify";
 export {
   tradeConformity,
   strategyConformity,

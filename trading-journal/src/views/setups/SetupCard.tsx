@@ -17,6 +17,7 @@ import { Tilt } from "@/primitives/Tilt";
 import { ExplanationView } from "@/views/overview/explainer";
 import { MtfLiveStrip } from "./MtfLiveStrip";
 import { adherenceText, explainPlaybook, fromStats, pfText, PLAYBOOK_STRINGS, pnlText, type PlaybookStats } from "./playbook";
+import { showsStrategy, StrategyBlock } from "./StrategyBlock";
 
 export type RankedSetupStats = SetupStats & { id: string };
 
@@ -291,6 +292,9 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
 
               {playbook && playbook.agg.n > 0 && <PlaybookBlock stats={stats} playbook={playbook} currency={currency} />}
 
+              {/* P07 (additive): conformity, exit fidelity, examples → the strategy profile */}
+              {showsStrategy(setup) && <StrategyBlock setup={setup} playbook={playbook} />}
+
               {setup.id === MTF_SETUP_ID && <MtfLiveStrip />}
 
               {/* right padding keeps both buttons clear of the notch + disc */}
@@ -350,7 +354,7 @@ function PlaybookBlock({ stats, playbook, currency }: { stats: RankedSetupStats;
           }
         />
       </span>
-      {(topMistake || signal) && (
+      {(topMistake || signal || playbook.strategy?.exitRate != null) && (
         <span className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px] text-mute">
           {topMistake && (
             <span className="min-w-0 [overflow-wrap:anywhere]">
@@ -360,6 +364,11 @@ function PlaybookBlock({ stats, playbook, currency }: { stats: RankedSetupStats;
           {signal?.avgScore != null && (
             <span className="whitespace-nowrap">
               {PLAYBOOK_STRINGS.signal}: <span className="num font-mono text-fg/90">{Math.round(signal.avgScore)}</span>
+            </span>
+          )}
+          {playbook.strategy?.exitRate != null && (
+            <span className="whitespace-nowrap" data-testid="setup-exit-fidelity">
+              {PLAYBOOK_STRINGS.exitFidelity}: <span className="num font-mono text-fg/90">{pct0(playbook.strategy.exitRate)}</span>
             </span>
           )}
         </span>

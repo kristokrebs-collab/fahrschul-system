@@ -57,8 +57,8 @@ const SIGNAL_WORDS = ["mcb", "multi-tf", "multi tf", "einstiegs-check", "signal"
 const LONG_WORDS = ["long", "kauf", "bull"];
 const SHORT_WORDS = ["short", "verkauf", "bear"];
 
-const KIND_TEXT: Readonly<Record<SetupKind, string>> = { range: "Range-Trade", breakout: "Ausbruch", retest: "Retest", fakeout: "Fehlausbruch", pre: "vorbereiteter Ausbruch" };
-const SESSION_TEXT: Readonly<Record<SessionKey, string>> = { asia: "Asien", london: "London", ny: "New York", late: "Spät", weekend: "Wochenende" };
+export const KIND_TEXT: Readonly<Record<SetupKind, string>> = { range: "Range-Trade", breakout: "Ausbruch", retest: "Retest", fakeout: "Fehlausbruch", pre: "vorbereiteter Ausbruch" };
+export const SESSION_TEXT: Readonly<Record<SessionKey, string>> = { asia: "Asien", london: "London", ny: "New York", late: "Spät", weekend: "Wochenende" };
 
 function textOf(x: SetupX): string {
   return [x.name, x.desc, ...x.checklist.map((c) => c.text), ...x.entryCriteria.map((c) => c.text), ...x.tags].join(" ").toLowerCase();
