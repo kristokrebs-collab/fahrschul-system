@@ -70,6 +70,21 @@ export interface SplitResult {
   cutTime: number | null;
 }
 
+export interface HeatAxis {
+  key: string;
+  label: string;
+  options: (string | number)[];
+  /** formatted options ("T1", "2 × ATR") */
+  labels: string[];
+}
+
+export interface HeatLite extends Omit<Heat, "rows" | "cols"> {
+  rows: HeatAxis;
+  cols: HeatAxis;
+}
+
+const axisOf = (s: ParamSpec): HeatAxis => ({ key: s.key, label: s.label, options: [...s.options], labels: s.options.map((o) => s.format(o)) });
+
 export interface WfWindowLite extends Omit<WfWindow, "testTrades"> {
   testN: number;
 }
@@ -95,7 +110,8 @@ export interface LabResult {
   wf: { windows: WfWindowLite[]; oosMeanR: number | null; efficiency: number | null; positiveShare: number | null; oosN: number; oosSumR: number } | null;
   dsr: Dsr | null;
   pbo: Pbo | null;
-  heat: Heat | null;
+  /** the heat map, structured-clone safe (worker → page): axis labels instead of format functions */
+  heat: HeatLite | null;
   trials: TrialLite[];
   robust: Robustness;
   /** ms spent per phase (diagnostics) */
@@ -218,7 +234,8 @@ export function createLabJob(input: LabJobInput): LabJob {
     const dsr = selected ? deflatedSharpe(selected.trades.map((t) => t.r), isTrials.map((t) => t.sharpe ?? NaN)) : null;
     const span = Math.max(1, window.to - window.from + 1);
     const pbo = pboOf(fullTrials, (t) => Math.min(7, Math.floor(((t.exitIndex - window.from) / span) * 8)));
-    const heat = paramHeat(specs, fullTrials, params);
+    const heatRaw = paramHeat(specs, fullTrials, params);
+    const heat: HeatLite | null = heatRaw ? { ...heatRaw, rows: axisOf(heatRaw.rows), cols: axisOf(heatRaw.cols) } : null;
     const robust = robustness({
       trades: stats.n,
       dsr: dsr?.dsr ?? null,
