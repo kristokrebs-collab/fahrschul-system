@@ -9,7 +9,6 @@ import { CORR_CLUSTER, type CorrCluster, type CorrMatrix } from "@/domain/risk";
 import { cn } from "@/lib/cn";
 import { retryDaily, type MultiDailyView } from "@/market/multiDaily";
 import { DotMatrixText, HeatGridReveal, heatColor } from "@/motion/fx";
-import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { EmptyState } from "@/primitives/EmptyState";
 import { RISIKO } from "./strings";
@@ -65,7 +64,7 @@ export function CorrelationCard({ symbols, view, cm, clusters }: { symbols: read
 
   return (
     <RiskCard title={S.title} note={S.note} action={action} data-testid="risk-corr" data-state={view.state} data-n={k}>
-      <div className="grid gap-3">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] xl:items-start">
         {k >= 2 ? (
           <HeatGridReveal
             cols={k + 1}
@@ -73,7 +72,7 @@ export function CorrelationCard({ symbols, view, cm, clusters }: { symbols: read
             play={k}
             role="img"
             aria-label={summary}
-            className="grid w-full max-w-[28rem] gap-1"
+            className="grid w-full max-w-[28rem] gap-1 xl:max-w-[24rem]"
             cellClassName="min-w-0"
           >
             {[
@@ -109,17 +108,23 @@ export function CorrelationCard({ symbols, view, cm, clusters }: { symbols: read
         ) : (
           <p className="text-[12.5px] text-mute">{loading ? S.loading : view.detail ?? S.empty}</p>
         )}
-        <div className="flex flex-wrap items-center gap-1.5" data-testid="corr-clusters">
-          {clusters.length ? (
-            clusters.slice(0, 2).map((c) => (
-              <Badge key={c.symbols.join("+")} tone="warn" dot>
-                {S.cluster(c.symbols.length, c.avg.toFixed(2).replace(".", ","))} {c.symbols.map(short).join(" · ")}
-              </Badge>
-            ))
-          ) : k >= 2 ? (
-            <span className="text-[11.5px] text-faint">{S.noCluster}</span>
-          ) : null}
-          {view.detail && !loading && <span className="text-[11px] text-faint">{view.detail}</span>}
+        <div className="grid min-w-0 content-start gap-2">
+          <div className="grid gap-1.5" data-testid="corr-clusters">
+            {clusters.length ? (
+              clusters.slice(0, 2).map((c) => (
+                <div key={c.symbols.join("+")} className="flex min-w-0 items-start gap-2 rounded-xl border border-warn/25 bg-warn/[0.06] px-3 py-2 text-[12px] leading-snug text-warn">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-warn" aria-hidden="true" />
+                  <span className="min-w-0">
+                    {S.cluster(c.symbols.length, c.avg.toFixed(2).replace(".", ","))} <span className="font-mono text-fg">{c.symbols.map(short).join(" · ")}</span>
+                  </span>
+                </div>
+              ))
+            ) : k >= 2 ? (
+              <span className="text-[11.5px] text-faint">{S.noCluster}</span>
+            ) : null}
+            {view.detail && !loading && <span className="text-[11px] text-faint">{view.detail}</span>}
+          </div>
+          <p className="max-w-[46ch] text-[12px] leading-relaxed text-mute">{S.explain}</p>
         </div>
       </div>
     </RiskCard>

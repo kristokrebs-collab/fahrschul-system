@@ -268,9 +268,9 @@ test.describe("Risiko", () => {
     const spread = page.getByTestId("risk-spread");
     await spread.scrollIntoViewIfNeeded();
     await expect(spread.getByTestId("spread-row").first()).toBeVisible();
+    await shot(page, info, "patterns");
     await spread.getByRole("radio", { name: "Asset" }).click();
     await expect(spread.locator("[data-testid=spread-row][data-key=BTC]")).toBeVisible();
-    await shot(page, info, "patterns");
 
     await expectNoHorizontalScroll(page);
     if (SHOTS) await shot(page, info, "full", true);

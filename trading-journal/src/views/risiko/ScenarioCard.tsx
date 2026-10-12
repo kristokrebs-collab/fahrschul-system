@@ -163,16 +163,16 @@ export function ScenarioCard({ legs, equity, cur }: { legs: readonly ScenarioLeg
             )}
             data-testid="scenario-slider"
           />
-          <div className="flex flex-wrap justify-between gap-1.5">
+          <div className="flex justify-between gap-1">
             {PRESETS.map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => go(p)}
-                className="touch-hit min-h-8 rounded-full border border-line-2 px-2.5 py-1 font-mono text-[11px] text-mute transition-colors duration-200 hover:border-white/30 hover:text-fg"
+                className="touch-hit min-h-8 rounded-full border border-line-2 px-2 py-1 font-mono text-[11px] text-mute sm:px-2.5 transition-colors duration-200 hover:border-white/30 hover:text-fg"
                 data-testid={`scenario-preset-${Math.round(p * 100)}`}
               >
-                {p === 0 ? "0 %" : shockText(p)}
+                {p === 0 ? "0 %" : `${p > 0 ? "+" : "−"}${Math.round(Math.abs(p) * 100)} %`}
               </button>
             ))}
           </div>

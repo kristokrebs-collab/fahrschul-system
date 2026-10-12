@@ -19,7 +19,12 @@ export function RiskCard({ beam, children, className, ...rest }: CardProps & { b
   return (
     <div className={cn("relative h-full rounded-2xl", className)}>
       <Card {...rest}>{children}</Card>
-      {beam ? <BorderBeam fire={beam} size={120} colorFrom={SIGNAL_HEX} colorTo="#ffb3b8" borderWidth={1.5} /> : null}
+      {beam ? (
+        // the beam's rotating disc is far larger than the card: clip it here (the mask alone does not stop the overflow)
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+          <BorderBeam fire={beam} size={120} colorFrom={SIGNAL_HEX} colorTo="#ffb3b8" borderWidth={1.5} />
+        </div>
+      ) : null}
     </div>
   );
 }

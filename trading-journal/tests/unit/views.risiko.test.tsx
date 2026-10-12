@@ -179,7 +179,31 @@ describe("RisikoView", () => {
     const toasts = useUi.getState().toasts;
     expect(toasts.length).toBe(before + 1);
     expect(toasts.at(-1)!.kind).toBe("error");
-    expect(useRiskGuardStore.getState().marks.l3).toBeGreaterThan(0);
+    // the guard needs a FRESH save to mark (mkTrade's updatedAt is old): no mark, the pause runs on exitDate
+    expect(useRiskGuardStore.getState().marks.l3).toBeUndefined();
+  });
+
+  it("a bulk change (import / restore) is not a save: no toast, no marks", async () => {
+    await load([]);
+    renderView();
+    const before = useUi.getState().toasts.length;
+    const now = Date.now();
+    const fresh = new Date(now).toISOString();
+    await act(async () => {
+      useJournal.setState({ trades: journal(now).map((t) => ({ ...t, updatedAt: fresh })) });
+    });
+    expect(useUi.getState().toasts.length).toBe(before);
+    expect(useRiskGuardStore.getState().marks).toEqual({});
+  });
+
+  it("a fresh close without exitDate is marked now (its pause starts at the save)", async () => {
+    await load(journal().filter((t) => t.id !== "l2"));
+    renderView();
+    const now = Date.now();
+    await act(async () => {
+      useJournal.setState({ trades: [...useJournal.getState().trades, mkTrade({ id: "l4", date: local(now - 3 * 3_600_000), pnlManual: -10, entry: 100, stop: 99, size: 1000, updatedAt: new Date(now).toISOString() })] });
+    });
+    expect(useRiskGuardStore.getState().marks.l4).toBeGreaterThanOrEqual(now);
   });
 
   it("widgets for the cockpit render", async () => {
@@ -227,6 +251,8 @@ describe("guard helpers", () => {
     expect(newlyClosed([a, b], [a2, b]).map((t) => t.id)).toEqual(["a"]);
     expect(newlyClosed([a], [a, b]).map((t) => t.id)).toEqual(["b"]);
     expect(changedTrades([a, b], [a2, b]).map((t) => t.id)).toEqual(["a"]);
+    // a re-read record (new object, same content) is not a change
+    expect(changedTrades([a, b], [{ ...a }, { ...b }])).toEqual([]);
     const w = (key: string, tone: "warn" | "breach") => ({ key, tone, title: key, detail: "", source: "limit" as const });
     expect(guardToasts([w("limit:day", "warn")], [w("limit:day", "breach"), w("limit:week", "warn")], new Set()).map((x) => `${x.key}|${x.tone}`)).toEqual(["limit:day|breach", "limit:week|warn"]);
     expect(guardToasts([], [w("limit:day", "warn")], new Set(["limit:day|warn"]))).toEqual([]);

@@ -84,11 +84,11 @@ const GROUPS: { title: string; fields: NumSpec[] }[] = [
   {
     title: "Pause",
     fields: [
-      { id: "rs-closs", label: "Pause nach Verlusten", suffix: "×", digits: 0, help: "0 = aus", get: (l) => l.cooldownLosses, put: (v) => (Number.isInteger(v) && v >= 0 && v <= 10 ? { risk: { cooldownLosses: v } } : null) },
-      { id: "rs-cmin", label: "Pause", suffix: "min", digits: 0, get: (l) => l.cooldownMin, put: (v) => (Number.isInteger(v) && v >= 0 && v <= 1440 ? { risk: { cooldownMin: v } } : null) },
+      { id: "rs-closs", label: "Verluste in Folge", suffix: "×", digits: 0, help: "starten die Pause · 0 = aus", get: (l) => l.cooldownLosses, put: (v) => (Number.isInteger(v) && v >= 0 && v <= 10 ? { risk: { cooldownLosses: v } } : null) },
+      { id: "rs-cmin", label: "Pausenlänge", suffix: "min", digits: 0, get: (l) => l.cooldownMin, put: (v) => (Number.isInteger(v) && v >= 0 && v <= 1440 ? { risk: { cooldownMin: v } } : null) },
       {
         id: "rs-trades",
-        label: "Trades pro Tag (Scalp)",
+        label: "Trades/Tag Scalp",
         suffix: "",
         digits: 0,
         help: "= Disziplin-Grenze",
@@ -97,7 +97,7 @@ const GROUPS: { title: string; fields: NumSpec[] }[] = [
       },
       {
         id: "rs-trades-m",
-        label: "Trades pro Tag (Makro)",
+        label: "Trades/Tag Makro",
         suffix: "",
         digits: 0,
         help: "= Disziplin-Grenze",
@@ -175,6 +175,10 @@ function TierEditor({ tiers, onCommit }: { tiers: readonly MaintTier[]; onCommit
   const set = (i: number, k: "upTo" | "mmr", v: string) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
   return (
     <Field label={S.tiers} help={S.tiersHelp} invalidKey={bad}>
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,6rem)_2.25rem] gap-1.5 px-1 text-[10.5px] text-faint sm:hidden" aria-hidden="true">
+        <span>{S.tierUpTo} (Positionsgröße)</span>
+        <span>Maint. %</span>
+      </div>
       <ul className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-3" data-testid="risk-tiers">
         <AnimatePresence initial={false}>
           {rows.map((r, i) => {
@@ -193,7 +197,12 @@ function TierEditor({ tiers, onCommit }: { tiers: readonly MaintTier[]; onCommit
                 ) : (
                   <Input numeric aria-label={`${S.tierUpTo} (Stufe ${i + 1})`} value={r.upTo} onChange={(e) => set(i, "upTo", e.target.value)} onBlur={() => void commit()} />
                 )}
-                <Input numeric aria-label={`Maintenance % (Stufe ${i + 1})`} value={r.mmr} onChange={(e) => set(i, "mmr", e.target.value)} onBlur={() => void commit()} />
+                <div className="relative">
+                  <Input numeric aria-label={`Maintenance % (Stufe ${i + 1})`} value={r.mmr} onChange={(e) => set(i, "mmr", e.target.value)} onBlur={() => void commit()} className="pr-7" />
+                  <span className="pointer-events-none absolute inset-y-0 right-2.5 grid place-items-center font-mono text-[11px] text-faint" aria-hidden="true">
+                    %
+                  </span>
+                </div>
                 {rows.length > 1 ? (
                   <button
                     type="button"

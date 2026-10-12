@@ -129,6 +129,7 @@ export const RISIKO = {
     cluster: (n: number, r: string) => `${n} Paare laufen zusammen (ρ ≈ ${r}).`,
     noCluster: "Keine starke Kopplung zwischen deinen Paaren.",
     matrix: "Korrelationsmatrix",
+    explain: "Rot heißt: läuft zusammen. Zwei Longs in Paaren mit ρ über 0,7 sind praktisch ein großer Trade – dann zählt ihr Risiko doppelt.",
   },
   streak: {
     title: "Serien",

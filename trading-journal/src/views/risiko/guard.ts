@@ -5,7 +5,8 @@
  *
  * State per device (`localStorage` `storageKey("risk-guard")`, try/catch – a private window simply starts empty):
  * - `marks`: trade id → the moment the guard saw the trade close (stands in for a missing `exitDate`, so a loss saved
- *   now starts its pause now – an old trade edited later never restarts one);
+ *   now starts its pause now – an old trade edited later never restarts one; only records whose `updatedAt` is fresh
+ *   count, and a bulk change of more than `BULK_CHANGE` records – import, restore, a sync snapshot – is ignored);
  * - `override`: `{ at, until }` of the last "Limit überschreiben".
  * Mounted once by `RiskGuardHost` (P14: App.tsx leaf with `data-layer`, after SetupEditor, before Celebrate).
  */
@@ -81,6 +82,17 @@ export const useRiskGuardStore = create<GuardState>()((set, get) => ({
   },
 }));
 
+/** More trades changed at once than this = a bulk change (import, restore, sync snapshot), not a save. */
+export const BULK_CHANGE = 3;
+/** A record saved within this window counts as "just saved" (its `updatedAt`). */
+export const FRESH_SAVE_MS = 5 * 60_000;
+
+/** Was the record saved just now (not an imported / synced old one)? */
+export function freshSave(t: Pick<Trade, "updatedAt">, now: number): boolean {
+  const u = Date.parse(t.updatedAt);
+  return Number.isFinite(u) && Math.abs(now - u) <= FRESH_SAVE_MS;
+}
+
 /** Is an override active at `now`? */
 export const overrideActive = (o: GuardOverride | null, now: number): boolean => !!o && o.until > now;
 
@@ -90,10 +102,16 @@ export function newlyClosed(prev: readonly Trade[], next: readonly Trade[]): Tra
   return next.filter((t) => t.status === "closed" && (!before.has(t.id) || before.get(t.id)!.status !== "closed"));
 }
 
-/** Trades added or changed between two snapshots (by reference – the store replaces a saved record). */
+/** The fields of a record the limits read (an adapter re-reads every record on a save: new objects, same content). */
+const riskKey = (t: Trade): string => [t.updatedAt, t.status, t.account, t.pnl, t.pnlManual, t.exit, t.exitDate, t.entry, t.stop, t.size, t.qty, t.leverage, t.date].join("|");
+
+/** Trades added or changed between two snapshots (by the fields the limits read, not by reference). */
 export function changedTrades(prev: readonly Trade[], next: readonly Trade[]): Trade[] {
   const before = new Map(prev.map((t) => [t.id, t]));
-  return next.filter((t) => before.get(t.id) !== t);
+  return next.filter((t) => {
+    const b = before.get(t.id);
+    return b !== t && (!b || riskKey(b) !== riskKey(t));
+  });
 }
 
 const toneRank = (w: RiskWarning): number => (w.tone === "breach" ? 0 : 1);
@@ -135,10 +153,12 @@ export function useRiskGuard(): void {
       if (!state.loaded || !before.loaded || state.trades === before.trades) return;
       const now = Date.now();
       const guard = useRiskGuardStore.getState();
-      const closedNow = newlyClosed(before.trades, state.trades);
-      if (closedNow.length) guard.mark(closedNow.map((t) => t.id), now);
       const changed = changedTrades(before.trades, state.trades);
-      if (!changed.length) return;
+      // a bulk change (backup import / restore, first cloud snapshot) is not a save: no marks, no toasts
+      if (!changed.length || changed.length > BULK_CHANGE) return;
+      // only a FRESH close starts its pause now (an imported or synced old record keeps its own time)
+      const closedNow = newlyClosed(before.trades, state.trades).filter((t) => freshSave(t, now));
+      if (closedNow.length) guard.mark(closedNow.map((t) => t.id), now);
       if (!riskLimits(state.settings).guard) return;
       const marks = useRiskGuardStore.getState().marks;
       const accounts = [...new Set(changed.map((t) => (t.account ?? "scalp") as AccountId))];

@@ -6,7 +6,7 @@
  * - `RISIKO_WIDGETS` → cockpit (P13).
  */
 export { RisikoView, RISIKO_LEAD_FILL } from "./RisikoView";
-export { RiskGuardHost, useRiskGuard, useRiskGuardStore, GUARD_KEY, guardToasts, newlyClosed, changedTrades, overrideActive, OVERRIDDEN_BY_HOLD, pruneMarks, MARKS_MAX, MARKS_TTL_MS } from "./guard";
+export { RiskGuardHost, useRiskGuard, useRiskGuardStore, GUARD_KEY, guardToasts, newlyClosed, changedTrades, overrideActive, OVERRIDDEN_BY_HOLD, pruneMarks, MARKS_MAX, MARKS_TTL_MS, BULK_CHANGE, FRESH_SAVE_MS, freshSave } from "./guard";
 export { useRiskPreview, useRiskBase, useLimitReport, useExposure, useLiveUpnl, useMinute } from "./hooks";
 export { useRiskUi, parseInput, toInput } from "./riskStore";
 export { RISIKO } from "./strings";

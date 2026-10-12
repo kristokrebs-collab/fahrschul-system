@@ -115,7 +115,7 @@ export function LimitsCard({ report, now, warnings: all }: { report: LimitReport
       <div className="grid gap-4 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
         {day && (
           <div className="grid content-start gap-2" data-testid="limit-day" data-state={day.state}>
-            <LiquidGauge value={Math.min(1, day.ratio)} danger={report.limits.warnAt} label={S.dayGauge} valueText={`${pct(day.ratio, 0)} vom Tageslimit`} className="h-40 w-full sm:h-48">
+            <LiquidGauge value={Math.min(1, day.ratio)} danger={report.limits.warnAt} label={S.dayGauge} valueText={`${pct(day.ratio, 0)} vom Tageslimit`} className="h-32 w-full sm:h-48">
               <span className="grid justify-items-center gap-0.5 text-center">
                 <span className={cn("dot-num text-[34px] leading-none", day.state === "breach" ? "text-loss" : "text-fg")}>{Math.round(Math.min(day.ratio, 9.99) * 100)}%</span>
                 <span className="num font-mono text-[11px] text-mute">{day.used > 0 ? money(-day.used, report.currency) : money(0, report.currency)}</span>
