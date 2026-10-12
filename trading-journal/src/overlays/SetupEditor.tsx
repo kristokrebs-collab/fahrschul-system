@@ -15,10 +15,12 @@ import { Field } from "@/primitives/Field";
 import { Icon } from "@/primitives/icons";
 import { Input, Textarea } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
-import { useJournal } from "@/store/journalStore";
+import { useEnriched, useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
 import { revealInvalid } from "@/primitives/fieldFx";
+import { extrasKey, extrasOf, strategyOf, withStrategy, type StrategyExtras } from "@/domain/strategy";
+import { StrategyFields } from "@/views/setups/StrategyFields";
 
 export interface SetupEditorProps {
   /** Overrides `uiStore.setupEditor.open`. */
@@ -125,10 +127,16 @@ export function SetupEditor(props: SetupEditorProps) {
 
   const existing = useMemo(() => (setupId ? settings.setups.find((s) => s.id === setupId) : undefined), [settings.setups, setupId]);
   const usedBy = useMemo(() => (existing ? trades.filter((t) => (t.setups || []).includes(existing.id)).length : 0), [trades, existing]);
+  // P07: the strategy extras (passthrough keys on the setup) with their own baseline; examples come from this setup's closed trades
+  const enriched = useEnriched();
+  const ownClosed = useMemo(() => (existing ? enriched.filter((t) => t.status === "closed" && (t.setups || []).includes(existing.id)) : []), [enriched, existing]);
+  const knownTags = useMemo(() => [...new Set(settings.setups.filter((s) => s.id !== existing?.id).flatMap((s) => strategyOf(s).tags))], [settings.setups, existing]);
 
   const [form, setForm] = useState<Form>(() => emptyForm(settings.setups));
   /** The form as it was opened – `dirty` = anything differs (unsaved input is never discarded silently). */
   const [baseline, setBaseline] = useState<Form>(form);
+  const [extras, setExtras] = useState<StrategyExtras>(() => extrasOf(strategyOf(form)));
+  const [extrasBase, setExtrasBase] = useState<StrategyExtras>(extras);
   const [askDiscard, setAskDiscard] = useState(false);
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -150,9 +158,12 @@ export function SetupEditor(props: SetupEditorProps) {
       const initial = existing ? structuredClone(existing) : emptyForm(settings.setups);
       setForm(initial);
       setBaseline(initial);
+      const x = extrasOf(strategyOf(initial));
+      setExtras(x);
+      setExtrasBase(x);
     }
   }
-  const dirty = open && !sameForm(form, baseline);
+  const dirty = open && (!sameForm(form, baseline) || extrasKey(extras) !== extrasKey(extrasBase));
   const cancel = () => (dirty ? setAskDiscard(true) : onClose());
 
   const patch = (p: Partial<Form>) => setForm((f) => ({ ...f, ...p }));
@@ -164,7 +175,7 @@ export function SetupEditor(props: SetupEditorProps) {
       revealInvalid("sf-name", { reduced });
       return;
     }
-    const setup = finalizeSetup(form);
+    const setup = withStrategy(finalizeSetup(form), extras);
     setBusy(true);
     try {
       await saveSettings(upsertSetup(useJournal.getState().settings, setup));
@@ -332,6 +343,10 @@ export function SetupEditor(props: SetupEditorProps) {
           <Field label={<span id="sf-color-label">{SETUP_EDITOR_STRINGS.color}</span>}>
             <ColorRadios value={form.color} onChange={(color) => patch({ color })} />
           </Field>
+        </StaggerItem>
+
+        <StaggerItem>
+          <StrategyFields value={extras} onChange={(p) => setExtras((x) => ({ ...x, ...p }))} trades={ownClosed} knownTags={knownTags} />
         </StaggerItem>
 
         {existing && (

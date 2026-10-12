@@ -201,6 +201,10 @@ visible); `HoldConfirm`, `useConfirmFocus`, `HOLD_CONFIRM_TITLE` → `@/motion/H
     words from `SHEET_DISCARD_COPY`) instead of closing.
   - `s_mtf` (Multi-TF Signal): the checklist help adds `SETUP_EDITOR_STRINGS.mtfAuto` (the entry check ticks these items when a trade is
     entered; renaming keeps the link, a deleted item is no longer ticked).
+  - P07 (additive): below `Farbe` the strategy section `StrategyFields` (`@/views/setups/StrategyFields`, `setup-strategy-fields`):
+    entry / exit criteria, tags, risk model, markets / TF, auto-recognition rules, best-practice examples from the setup's own closed
+    trades. Saved as passthrough keys via `withStrategy(finalizeSetup(form), extras)` (`@/domain/strategy`; empty parts are not
+    written); the dirty guard also compares `extrasKey(extras)` with how the sheet opened.
 - **`HyblockForm`** / **`HyblockReadingsList`** (`HyblockForm.tsx`, bundle `tK`): `{ last?; live?: LiveHyblockValues; onClose?; onSave?; now?; className? }`
   (lives in the `hyblock-new` morph dialog; `live` renders `Live-Werte übernehmen`) / `{ readings?; limit? (5); onDelete?; className? }`. `HYBLOCK_FORM_STRINGS`.
   - Unsaved input: `Abbrechen` with typed values shows the confirm `HYBLOCK_FORM_STRINGS.discardAsk` `[Verwerfen]` `[Weiter bearbeiten]`

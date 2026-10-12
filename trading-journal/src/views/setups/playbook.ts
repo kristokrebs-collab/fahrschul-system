@@ -9,7 +9,8 @@ import { aggregate, type Agg } from "@/domain/agg";
 import type { Explanation, ExplainRow, Verdict } from "@/domain/explain";
 import { manualMistakes } from "@/domain/insights/mistakes";
 import { snapOf } from "@/domain/insights/signal";
-import type { EnrichedTrade, Setup } from "@/domain/types";
+import type { EnrichedTrade, Settings, Setup } from "@/domain/types";
+import { examplesOf, strategyConformity, strategyOf, CONFORMITY_LABEL, type ConformityPart } from "@/domain/strategy";
 import { colorClass, DASH, INFINITY_SIGN, n0, n2, pct0, r as fmtR, signed } from "@/lib/format";
 
 export interface PlaybookAdherence {
@@ -37,6 +38,19 @@ export interface PlaybookSignal {
   validShare: number | null;
 }
 
+/** P07 strategy figures of the playbook: conformity with the setup's own plan, exit fidelity, picked examples. */
+export interface PlaybookStrategy {
+  /** mean conformity 0–100 over the measurable trades (`strategyConformity`), null without */
+  score: number | null;
+  n: number;
+  /** exit fidelity over the closed trades with a measurable exit */
+  exitRate: number | null;
+  exitN: number;
+  /** picked best-practice examples that still exist */
+  examples: number;
+  weakest: ConformityPart | null;
+}
+
 export interface PlaybookStats {
   /** The setup's aggregate over its closed trades (same object shape as `SetupStats`). */
   agg: Agg;
@@ -44,12 +58,19 @@ export interface PlaybookStats {
   /** Most frequent manual mistake tag on this setup's trades (ties: first seen). */
   topMistake: { tag: string; n: number } | null;
   signal: PlaybookSignal | null;
+  /** P07 (additive): conformity, exit fidelity, examples – absent from `fromStats` */
+  strategy?: PlaybookStrategy;
+}
+
+/** Context of the strategy figures: the account capital (risk % of the risk model). */
+export interface PlaybookCtx {
+  capital?: Settings["capital"];
 }
 
 const hasSetup = (t: Pick<EnrichedTrade, "setups">, id: string): boolean => (t.setups || []).includes(id);
 
 /** Playbook figures of one setup over closed trades (`accountView().closed` – callers pass closed trades only). */
-export function playbookStats(setup: Pick<Setup, "id" | "checklist">, closed: readonly EnrichedTrade[]): PlaybookStats {
+export function playbookStats(setup: Pick<Setup, "id" | "checklist">, closed: readonly EnrichedTrade[], ctx: PlaybookCtx = {}): PlaybookStats {
   const list = closed.filter((t) => hasSetup(t, setup.id));
   const agg = aggregate(list);
 
@@ -96,7 +117,19 @@ export function playbookStats(setup: Pick<Setup, "id" | "checklist">, closed: re
   }
   const signal: PlaybookSignal | null = sn ? { n: sn, avgScore: scoreSum / sn, avgStrength: strengthSum / sn, validShare: valid / sn } : null;
 
-  return { agg, adherence, topMistake, signal };
+  // P07: conformity with the setup's own plan (checklist, risk model, exit criteria, markets) and exit fidelity
+  const x = strategyOf(setup as Setup);
+  const conf = strategyConformity(x, list, { capital: ctx.capital ?? { makro: 0, scalp: 0 } });
+  const strategy: PlaybookStrategy = {
+    score: conf.score,
+    n: conf.n,
+    exitRate: conf.exit.rate,
+    exitN: conf.exit.n,
+    examples: examplesOf(x, closed, conf.perTrade).picked.length,
+    weakest: conf.weakest,
+  };
+
+  return { agg, adherence, topMistake, signal, strategy };
 }
 
 /** Playbook figures from the card's own aggregate only (no trade list at hand): adherence / mistakes / signal unknown. */
@@ -110,9 +143,9 @@ export function fromStats(agg: Agg): PlaybookStats {
 }
 
 /** `playbookStats` for every setup, keyed by setup id (one pass per setup over the closed trades). */
-export function playbookBySetup(setups: readonly Pick<Setup, "id" | "checklist">[], closed: readonly EnrichedTrade[]): Map<string, PlaybookStats> {
+export function playbookBySetup(setups: readonly Pick<Setup, "id" | "checklist">[], closed: readonly EnrichedTrade[], ctx: PlaybookCtx = {}): Map<string, PlaybookStats> {
   const out = new Map<string, PlaybookStats>();
-  for (const s of setups) out.set(s.id, playbookStats(s, closed));
+  for (const s of setups) out.set(s.id, playbookStats(s, closed, ctx));
   return out;
 }
 
@@ -129,6 +162,9 @@ export const PLAYBOOK_STRINGS = {
   noList: "ohne Checkliste",
   topMistake: "Häufigster Fehler",
   signal: "Ø Signal-Score",
+  exitFidelity: "Exit-Treue",
+  conformity: "Konformität",
+  examples: "Beispiele",
 } as const;
 
 /** Profit factor as text: `∞` for gains without losses, `–` without trades. */
@@ -186,6 +222,15 @@ export function explainPlaybook(stats: Pick<SetupStats, "setup">, pb: PlaybookSt
     row("Häufigster Fehler-Tag", topMistake ? `${topMistake.tag} · ${topMistake.n}×` : DASH),
     row("Ø Signal-Score", signal?.avgScore != null ? `${Math.round(signal.avgScore)} · ${signal.n}×` : DASH, "", "Trades mit gespeichertem Einstiegs-Check"),
   ];
+  // P07 (additive rows): the strategy figures
+  const st = pb.strategy;
+  if (st) {
+    rows.push(
+      row(PLAYBOOK_STRINGS.exitFidelity, st.exitRate == null ? DASH : `${pct0(st.exitRate)} · ${st.exitN}×`, "", "Ausstieg am Ziel, am Stop oder nach einem Exit-Kriterium"),
+      row(PLAYBOOK_STRINGS.conformity, st.score == null ? DASH : `${st.score} / 100`, "", st.weakest ? `Schwächster Teil: ${CONFORMITY_LABEL[st.weakest]}` : "Checkliste, Plan, Risiko-Modell, Stop, Exit, Markt"),
+      row(PLAYBOOK_STRINGS.examples, String(st.examples)),
+    );
+  }
   return {
     key: `playbook:${stats.setup.id}`,
     title: PLAYBOOK_STRINGS.title,
