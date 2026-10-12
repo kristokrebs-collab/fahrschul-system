@@ -51,7 +51,8 @@ import { filterTickLabels } from "./axisLabels";
 import { fmt } from "./format";
 import type { SignalMarker } from "./signalMarkers";
 import { DEFAULT_LAYERS, SignalOverlay, type DivergenceLine, type OverlayLayers, type StructureOverlay } from "./primitives/SignalOverlay";
-import { BoxPrimitive, type ChartBox } from "./primitives/BoxPrimitive";
+import { BOX_DEBUG_KEY, BoxPrimitive, type BoxDebugHook, type ChartBox } from "./primitives/BoxPrimitive";
+import { logicalToX } from "./logicalX";
 import type { RsiOverlayBreak } from "./primitives/RsiOverlay";
 import type { Box } from "./overlayLayout";
 import {
@@ -676,6 +677,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       reserved: () => [...zoneCaptionBox(instance, latest.current.levels), ...check.geometry().labels.map((l) => l.box)],
     });
     main.candles.attachPrimitive(boxes);
+    // read-only diagnostics hook (e2e / dev tools): the boxes as drawn against the bar grid – a property, no cost
+    const boxDebug: BoxDebugHook = { geometry: () => boxes.geometry(), boxes: () => boxes.chartBoxes(), bars: () => instance.data, x: (l) => logicalToX(chart.timeScale(), l) };
+    Object.defineProperty(node, BOX_DEBUG_KEY, { value: boxDebug, configurable: true });
     main.candles.attachPrimitive(check);
     const markersApi = createSeriesMarkers(main.candles, [], { zOrder: "aboveSeries" });
     const range = new RangeAnimator(chart, { reducedMotion: () => reduceRef.current });
@@ -899,6 +903,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         main.candles.detachPrimitive(check);
         boxes.dispose();
         main.candles.detachPrimitive(boxes);
+        Reflect.deleteProperty(node, BOX_DEBUG_KEY);
         clearLevels(main.candles, instance.levels);
         panes.dispose();
         readyRef.current = false;

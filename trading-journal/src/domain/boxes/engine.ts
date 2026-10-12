@@ -389,7 +389,8 @@ export function boxTargets(bars: readonly Bar[], boxes: readonly Box[], k: numbe
   }
   if (extI >= 0 && beyond(ext)) c.push({ price: ext, kind: "origin", label: `Startpunkt der Bewegung (${dt(bars[extI]!.t)})`, zone: null, i: extI });
   for (const L of levels) if (beyond(L.price)) c.push({ price: L.price, kind: "level", label: `${dir > 0 ? "Widerstand" : "Unterstützung"} · ${L.touches} Berührungen`, zone: null, i: L.lastI });
-  if (!c.length) c.push({ price: edge + dir * B.height, kind: "measured", label: "Measured Move (Boxhöhe)", zone: null, i: null });
+  // a measured move below zero is no target (a tall weekly box: bottom − height < 0)
+  if (!c.length && edge + dir * B.height > 0) c.push({ price: edge + dir * B.height, kind: "measured", label: "Measured Move (Boxhöhe)", zone: null, i: null });
   c.sort((a, b) => dir * (a.price - b.price));
   const rank: Record<TargetKind, number> = { box: 3, origin: 2, level: 1, measured: 0 };
   const out: Target[] = [];

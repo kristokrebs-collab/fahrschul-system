@@ -99,10 +99,11 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
   }, [feed, tf, older, symbol]);
 
   const analysis = view.tfs[tf].analysis;
+  const liveFrom = view.tfs[tf].liveFrom ?? null;
   const boxesKeyed = useMemo(() => {
-    const b = toChartBoxes(analysis, { intervalMs: BOX_TF_MS[tf] });
+    const b = toChartBoxes(analysis, { intervalMs: BOX_TF_MS[tf], liveFrom });
     return { key: chartBoxesKey(b), boxes: b };
-  }, [analysis, tf]);
+  }, [analysis, tf, liveFrom]);
   // identity per content: the chart re-sets the boxes only when something drawn changed
   const [stable, setStable] = useState(boxesKeyed);
   if (stable.key !== boxesKeyed.key) setStable(boxesKeyed);

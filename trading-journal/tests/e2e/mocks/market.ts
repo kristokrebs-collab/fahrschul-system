@@ -15,6 +15,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Page, Route } from "@playwright/test";
 import { SYNTH_LIVE_PRICE, synthKlines, synthRatios, type RatioKind, type RatioScript, type SynthShape } from "./synth";
+import { boxFixture } from "./boxFixture";
 
 export type MarketScenario = "live" | "stale" | "blocked_451" | "offline" | "reconnect";
 
@@ -102,84 +103,18 @@ export interface MockMarketOptions {
    */
   clock?: () => number;
   /**
-   * P02 (additive): serve REAL BTCUSDT 4h / 1D bars (`tests/unit/fixtures/binance-btcusdt-{4h,1d}.json`, 1W aggregated
-   * from the days) so the Box-zu-Box engine finds real boxes: the 4h bar `cut4h` (default 1493, an A+ range long at the
-   * support with a broken RSI line) becomes the forming bar of "now", the days and weeks are shifted to the same moment
-   * on their own grid, and every live price of the replay (trades, book, tickers) is that bar's close.
+   * P02 (additive): serve REAL BTCUSDT 4h / 1D bars (`tests/unit/fixtures/binance-btcusdt-{4h,1d}.json`, see
+   * `./boxFixture.ts`) so the Box-zu-Box engine finds real boxes: the 4h bar `cut4h` (default 1493, 2026-10-11 00:00 UTC,
+   * an A+ range long at the support with a broken RSI line) becomes the forming bar of "now"; 1D are the UTC days of the
+   * same shifted 4h bars (older days from the daily fixture), 1W their weeks; Binance `startTime` / `endTime` / `limit`
+   * semantics; every live price of the replay (trades, book, tickers) is that bar's close.
    */
   boxes?: boolean | { cut4h?: number };
 }
 
-/** Real bars for the Box-zu-Box e2e (`boxes` option): rows per interval, shifted so `cut4h` is forming at `now`. */
-export interface BoxFixture {
-  /** `symbol`: BTCUSDT gets the cut as given; any other symbol (the watchlist scanner) a cut and price scale of its own */
-  rows: (interval: string, q: { limit?: number; startTime?: number; endTime?: number }, symbol?: string) => KlineRow[] | null;
-  live: number;
-}
-
-const BOX_FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "unit", "fixtures");
-const HOUR_MS = 3_600_000;
-
-export function boxFixture(now: number, cut4h = 1493): BoxFixture {
-  const btc = boxSeries(now, cut4h, 1);
-  const bySymbol = new Map<string, ReturnType<typeof boxSeries>>([["BTCUSDT", btc]]);
-  return {
-    live: btc.live,
-    rows(interval, q, symbol = "BTCUSDT") {
-      let ser = bySymbol.get(symbol);
-      if (!ser) {
-        // another market: the same real bars at another moment and price level (deterministic per symbol)
-        let h = 0x811c9dc5;
-        for (let i = 0; i < symbol.length; i++) h = Math.imul(h ^ symbol.charCodeAt(i), 0x01000193) >>> 0;
-        ser = boxSeries(now, cut4h - 30 - (h % 700), [0.031, 0.0021, 0.0074, 0.000029, 0.0000026, 0.00011, 0.00043, 0.0019][h % 8]!);
-        bySymbol.set(symbol, ser);
-      }
-      return ser.rows(interval, q);
-    },
-  };
-}
-
-function boxSeries(now: number, cut4h: number, scale: number): { rows: (interval: string, q: { limit?: number; startTime?: number; endTime?: number }) => KlineRow[] | null; live: number } {
-  const read = (n: string) => (JSON.parse(readFileSync(join(BOX_FIXTURES, n), "utf8")) as { bars: number[][] }).bars;
-  const h4 = read("binance-btcusdt-4h.json");
-  const d1 = read("binance-btcusdt-1d.json");
-  const cut = Math.max(100, Math.min(h4.length - 1, cut4h));
-  const H4 = 4 * HOUR_MS;
-  const D = 24 * HOUR_MS;
-  const W = 7 * D;
-  const fixAt = h4[cut]![0]! * 1000; // open of the bar that is forming "now"
-  const d4 = Math.floor(now / H4) * H4 - fixAt;
-  const dD = Math.floor(now / D) * D - Math.floor(fixAt / D) * D;
-  // prices scaled per market (6 significant digits); the volume follows the bar's range (a plausible histogram)
-  const px = (v: number): string => (v * scale).toPrecision(6);
-  const toRow = (t: number, o: number, h: number, l: number, c: number, iv: number): KlineRow => {
-    const v = (((h - l) / c) * 40_000).toFixed(3);
-    return [t, px(o), px(h), px(l), px(c), v, t + iv - 1, (Number(v) * c * scale).toFixed(2), 1000, (Number(v) / 2).toFixed(3), ((Number(v) / 2) * c * scale).toFixed(2), "0"];
-  };
-  const rows4h = h4.slice(0, cut + 1).map(([t, o, h, l, c]) => toRow(t! * 1000 + d4, o!, h!, l!, c!, H4));
-  const fixDay = Math.floor(fixAt / D) * D;
-  const days = d1.filter(([t]) => t! * 1000 <= fixDay).map(([t, o, h, l, c]) => ({ t: t! * 1000 + dD, o: o!, h: h!, l: l!, c: c! }));
-  const rows1d = days.map((b) => toRow(b.t, b.o, b.h, b.l, b.c, D));
-  const weeks: Array<{ t: number; o: number; h: number; l: number; c: number }> = [];
-  for (const b of days) {
-    const open = Math.floor((b.t - 4 * D) / W) * W + 4 * D;
-    const w = weeks[weeks.length - 1];
-    if (w && w.t === open) Object.assign(w, { h: Math.max(w.h, b.h), l: Math.min(w.l, b.l), c: b.c });
-    else weeks.push({ t: open, o: b.o, h: b.h, l: b.l, c: b.c });
-  }
-  const rows1w = weeks.map((b) => toRow(b.t, b.o, b.h, b.l, b.c, W));
-  const by: Record<string, KlineRow[]> = { "4h": rows4h, "1d": rows1d, "1w": rows1w };
-  return {
-    live: Number(px(h4[cut]![4]!)),
-    rows(interval, q) {
-      const all = by[interval];
-      if (!all) return null;
-      let out = all.filter((r) => (q.endTime == null || r[0] <= q.endTime) && (q.startTime == null || r[0] >= q.startTime));
-      out = out.slice(-(q.limit ?? 500));
-      return out;
-    },
-  };
-}
+// P02 box fix: the real-bar market of the `boxes` option lives in `./boxFixture` (consistent 4h / 1D / 1W, Binance
+// startTime / endTime / limit semantics); re-exported here for existing imports
+export { boxFixture, type BoxFixture } from "./boxFixture";
 
 const SYNTH_RATIO_KIND: Record<string, RatioKind> = {
   "/futures/data/topLongShortPositionRatio": "top-position",

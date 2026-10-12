@@ -387,11 +387,19 @@ graded setups). `src/market/boxes` runs it live; import from `@/market/boxes` (n
 | `scanner.ts` — `retainScanner()` / `getScan()` / `subscribeScan()` / `useScan()` / `scanNow()` / `scanSymbol()` | Watchlist (`settings.boxes.watchlist`, default 10 USDT perps, ≤ 20): per symbol one 4h page (499, weight 2) + one 1D page (300, weight 2) from `binanceRest().klines`; the 1D boxes grade the 4h ones; rows = only setups passing the minimum grade, best score first. **Own token bucket** `SCAN_BUDGET` ≤ 20 weight / min (separate from the provider's buckets — a full default scan takes ~2 min). After every 4h close + 20–80 s jitter (`nextScanAt`), on demand, an overdue scan on return to the tab. 451 / CORS / network on the direct route → the rest of the session via the same-origin proxy (`proxyRest`), not in the file build (honest error). Bars cached in IndexedDB (`tj-market`, key `${storageKey("box-scan")}:${symbol}:${tf}`): a reload shows the last results without a request while the newest closed 4h bar is cached. |
 | `snapshot.ts` — `resolveTradeBoxes(date, side, { symbol?, tf?, signal? })`, `boxGradeOf(trade)`, `parseBoxSnapshot`, `toBoxSnapshot` | `Trade.boxSnap` contract (pure part in `@/domain/boxes/snapshot.ts`). **Live** when the entry lies in the forming (or just closed) bar of the running store's symbol; **retro** otherwise: `provider.fetchKlines(tf, { endTime: entry })` + the higher timeframe, closed bars before the entry only (no look-ahead), memoised per bar, 6 s timeout → `null`. No top-trader read retro (never invented). |
 
+Box fix: the bars a timeframe analyses come from `closedBars(older, ring, intervalMs)` – strictly ascending and gap-free on
+the interval grid (the history page is put in front only where it connects to the ring, a repeated open time keeps the
+newer row, only the newest gap-free run is kept), so the engine's bar indices and the chart's bar times always agree.
+`BoxTfView.liveFrom` (ms) = `reentryIndex` (`@/domain/boxes/live.ts`): where a broken-and-re-entered newest box is live
+again – the chart's live part starts there.
+
 Tests: `tests/unit/market.boxes.test.ts` (domain additions, store on a fake provider and on the net harness, scanner budget /
 proxy / cache, alerts seed / close-only / dedup, resolver live / retro), `tests/unit/market.boxSnapshot.test.ts`. E2E:
 `mockMarket(page, "live", { boxes: true })` serves REAL BTCUSDT 4h / 1D bars (`tests/unit/fixtures/binance-btcusdt-*.json`,
 1W aggregated) with the 4h bar `cut4h` (default 1493, an A+ range long) forming "now"; other symbols get their own cut and
-price level (scanner).
+price level (scanner). Since the box fix (`tests/e2e/mocks/boxFixture.ts`, unit-tested in `mocks.boxFixture.test.ts`): one
+shift for every timeframe, 1D = the UTC days of the same shifted 4h bars (older days from the daily fixture), 1W = their
+weeks, Binance `startTime` / `endTime` / `limit` window semantics.
 
 ## Other modules
 

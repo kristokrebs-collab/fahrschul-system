@@ -9,8 +9,9 @@
  * drawing draws itself in (stroke progress 0 → 1, ease-out, `drawInMs`, rAF + `requestUpdate`, finite; instant under
  * reduced motion). The selected drawing is thicker with round handles. `hitAt(x, y)` finds a drawing under a point.
  */
-import type { IChartApiBase, IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, Logical, PrimitivePaneViewZOrder, SeriesAttachedParameter, SeriesType, Time } from "lightweight-charts";
+import type { IChartApiBase, IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, PrimitivePaneViewZOrder, SeriesAttachedParameter, SeriesType, Time } from "lightweight-charts";
 import type { Annotation, AnnotationKind } from "@/domain/types";
+import { logicalToX } from "../logicalX";
 
 type RenderTarget = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
@@ -294,7 +295,8 @@ export class AnnotationPrimitive implements ISeriesPrimitive<Time> {
     const ts = this.chart?.timeScale();
     if (!ts) return null;
     const l = logicalOf(this.host.times(), time, this.host.intervalSec());
-    return l == null ? null : ts.logicalToCoordinate(l as Logical);
+    // sub-bar times are fractional logicals: lwc maps only whole ones (a fractional one lands on x = 0) → interpolate
+    return l == null ? null : logicalToX(ts, l);
   }
   yOf(price: number): number | null {
     return this.series?.priceToCoordinate(price) ?? null;

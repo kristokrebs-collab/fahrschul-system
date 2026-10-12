@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { playStripWipe } from "@/motion/pulse/StripWipe";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { CHART_FONT, CHART_FONT_LOAD, NOTHING_MINI, ink } from "./theme";
+import { logicalToX } from "./logicalX";
 import { createMainSeries, type MainSeries } from "./panes";
 import { spawnMarkerRipple } from "./overlays";
 import { MARKER_COLORS } from "./markers";
@@ -99,8 +100,9 @@ class ReplayBand implements ISeriesPrimitive<Time> {
       e: s.priceToCoordinate(this.v.entry),
       a: s.priceToCoordinate(this.v.entry - dir * this.v.mae),
       f: s.priceToCoordinate(this.v.entry + dir * this.v.mfe),
-      x1: ts.logicalToCoordinate(this.v.from as Logical),
-      x2: ts.logicalToCoordinate(this.v.to as Logical),
+      // bar edges (`i − 0.5`): lwc maps only whole logicals (a fractional one lands on x = 0) → interpolate
+      x1: logicalToX(ts, this.v.from),
+      x2: logicalToX(ts, this.v.to),
     };
   }
   paneViews(): readonly IPrimitivePaneView[] {
