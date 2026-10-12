@@ -1,0 +1,253 @@
+/* ---------------------------------------------------------------------------------------------------------------
+ * Themes (P13): light mode, the system scheme and the accents – ONLY custom properties under `[data-theme]` /
+ * `[data-accent]` on <html> (written by `src/store/themeStore.ts` before the first render). The dark design is the
+ * default and is not touched here: `tokens.css` holds its values, and no rule below matches without
+ * `data-theme="light"` or `data-accent` (dark + Signalrot = byte-for-byte the existing look).
+ *
+ * How the light ramp reaches ~400 hard-coded veils without a class rewrite: Tailwind v4 compiles `bg-white/[0.06]`,
+ * `border-white/40` … to `color-mix(in oklab, var(--color-white) N%, transparent)`. In this design "white" means
+ * "maximum foreground ink" and "black" means "deepest ground", so the light theme swaps the two: `--color-white` is
+ * the dark veil ink, `--color-black` the paper. Surfaces follow the same inversion (`ink-950` wells stay one step
+ * deeper than the card, cards are the brightest plane).
+ *
+ * Dark islands: the intro stage, the immersive command navigation and anything marked `[data-theme-scope="dark"]`
+ * keep the ink ramp in light mode (cinematic layers are black by design). Their block repeats the dark values –
+ * keep it in sync with `tokens.css`.
+ * ------------------------------------------------------------------------------------------------------------- */
+
+/* Provisional (forming-candle) tones as tokens (decision 9: win / loss at ~50 % saturation) – dark values = the literals
+   the views used (`scripts/codemod-veil.mjs` maps `[#65b488]` / `[#d27a7b]` onto them). */
+:root {
+  --color-win-soft: #65b488;
+  --color-loss-soft: #d27a7b;
+  /* destructive actions stay red whatever the accent (= the signal red in the default look) */
+  --color-danger: #e5202e;
+}
+
+/* Mirrors for the canvas charts (`syncChartInk` → `applyInk`, P02 `src/chart/ink.ts`). Dark values = `INK_DEFAULTS`. */
+:root {
+  --chart-ink-bg: #0a0a0a;
+  --chart-ink-grid: #1c1c1c;
+  --chart-ink-ref: #3a3a3a;
+  --chart-ink-tick: #5f5f5f;
+  --chart-ink-mute: #9b9b9b;
+  --chart-ink-fg: #f2f2f2;
+  --chart-ink-separator: #1f1f1f;
+  --chart-ink-label-bg: #161616;
+  --chart-ink-signal: var(--color-signal);
+  --chart-ink-win: #3ddc84;
+  --chart-ink-loss: #ff4d4f;
+  --chart-ink-win-soft: #65b488;
+  --chart-ink-loss-soft: #d2797a;
+}
+
+:root[data-theme="light"] {
+  color-scheme: only light;
+
+  /* ground → raised (inverted ramp: the card is the brightest plane, wells sit one step below it) */
+  --color-ink-950: #f2f2f0;
+  --color-ink-900: #ebebe9;
+  --color-ink-850: #fdfdfc;
+  --color-ink-800: #f6f6f5;
+  --color-ink-750: #efefed;
+  --color-ink-700: #e6e6e4;
+  --color-line: #dfdfdc;
+  --color-line-2: #cfcfcb;
+  --color-fg: #121212;
+  --color-mute: #565656;
+  --color-faint: #6b6b6b;
+  --color-steel: #1a1a1a;
+  --color-teal: #2d2d2d;
+  --color-aqua: #000;
+  /* win / loss / warn deepened for ≥ 4.5 : 1 on the white card (the dark tones are 1.9 – 3.3 : 1 on white) */
+  --color-win: #0c8441;
+  --color-loss: #d11f2a;
+  --color-warn: #9a5b00;
+  /* the swap: "white" = the veil ink, "black" = the paper (see the header) */
+  --color-white: #0b0b0b;
+  --color-black: #ebebe9;
+
+  --color-danger-text: #c0141f;
+  --color-win-soft: #4f9a70;
+  --color-loss-soft: #c25e61;
+  --color-primary-btn-to: #2c2c2c;
+  --color-fab-from: #ff3b47;
+  --color-chart-grid: #e3e3e0;
+  --color-chart-ref: #c4c4c0;
+  --color-chart-tick: #6b6b6b;
+  --color-gauge-track: #e4e4e1;
+  --color-hero-a: #e3e3e0;
+  --color-hero-b: #ebebe9;
+  --color-hero-c: #f3f3f1;
+  --color-hero-d: #fafaf9;
+  --shadow-btn-sheen: inset 0 1px 0 rgb(255 255 255 / 0.16);
+  --ring-focus-input: 0 0 0 3px rgb(0 0 0 / 0.06);
+  --ring-glow-input: 0 0 0 3px rgb(0 0 0 / 0.06), 0 0 24px rgb(0 0 0 / 0.04);
+  --ring-glow-invalid: 0 0 0 3px rgb(209 31 42 / 0.14), 0 0 22px rgb(209 31 42 / 0.1);
+  --ring-pulse-invalid: 0 0 0 3px rgb(209 31 42 / 0.22), 0 0 26px rgb(209 31 42 / 0.16);
+
+  --conv-1: #c9c9c6;
+  --conv-2: #a0a0a0;
+  --conv-3: #6e6e6e;
+  --conv-4: #3a3a3a;
+  --conv-5: #000;
+
+  /* shadcn mapping onto the light ramp */
+  --chart-1: #121212;
+  --chart-2: #565656;
+  --chart-3: #8a8a8a;
+  --chart-4: #cfcfcb;
+  --chart-5: #dfdfdc;
+  --background: #fdfdfc;
+  --foreground: #121212;
+  --card: #fdfdfc;
+  --card-foreground: #121212;
+  --popover: #ffffff;
+  --popover-foreground: #121212;
+  --primary: #121212;
+  --primary-foreground: #fdfdfc;
+  --secondary: #f2f2f0;
+  --secondary-foreground: #121212;
+  --muted: #f2f2f0;
+  --muted-foreground: #565656;
+  --accent: #efefed;
+  --accent-foreground: #121212;
+  --destructive: #d11f2a;
+  --destructive-foreground: #fdfdfc;
+  --border: #dfdfdc;
+  --input: #dfdfdc;
+  --ring: #1a1a1a;
+
+  /* page film (base.css): soft top light, ink dot grid, a fainter noise */
+  --page-glow: #ffffff;
+  --page-dots: #0000000f;
+  --page-noise-opacity: 0.035;
+  --page-date-indicator: invert(0.25);
+
+  /* card light (Card spotlight / proximity arc) */
+  --card-ring-from: #8a8a8a;
+  --card-ring-to: #d6d6d3;
+  --card-ring-peak: #121212;
+  --card-spot: rgb(0 0 0 / 0.035);
+
+  --chart-ink-bg: #fdfdfc;
+  --chart-ink-grid: #ebebe8;
+  --chart-ink-ref: #c4c4c0;
+  --chart-ink-tick: #6b6b6b;
+  --chart-ink-mute: #565656;
+  --chart-ink-fg: #121212;
+  --chart-ink-separator: #dfdfdc;
+  --chart-ink-label-bg: #f2f2f0;
+  --chart-ink-win: #0c8441;
+  --chart-ink-loss: #d11f2a;
+  --chart-ink-win-soft: #5a9e78;
+  --chart-ink-loss-soft: #c46a6c;
+}
+
+/* the page itself (wins over the bootstrap `<style>` in index.html regardless of source order) */
+:root[data-theme="light"],
+:root[data-theme="light"] body {
+  background-color: var(--color-ink-900);
+}
+
+/* the shiny FAB stays an ink pill on paper (its own palette, see shiny-cta.css); only its ring follows the accent */
+:root[data-theme="light"] .shiny-cta {
+  --shiny-cta-bg: #111;
+  --shiny-cta-bg-subtle: #2a2a2a;
+  --shiny-cta-fg: #f5f5f5;
+}
+
+/* ---------------------------------------------------------------------------------------- accents (one accent) */
+/* Signalrot is the default (no attribute). Each accent replaces the ONE signal colour – win / loss stay green / red. */
+:root[data-accent="kobalt"] {
+  --color-signal: #3d6bff;
+  --color-fab-from: #6a8dff;
+  --chart-ink-signal: #3d6bff;
+}
+:root[data-accent="violett"] {
+  --color-signal: #9466ff;
+  --color-fab-from: #b08cff;
+  --chart-ink-signal: #9466ff;
+}
+:root[data-theme="light"][data-accent="kobalt"] {
+  --color-signal: #2a55e6;
+  --color-fab-from: #4f74ff;
+  --chart-ink-signal: #2a55e6;
+}
+:root[data-theme="light"][data-accent="violett"] {
+  --color-signal: #7444e0;
+  --color-fab-from: #9466ff;
+  --chart-ink-signal: #7444e0;
+}
+:root[data-accent] .shiny-cta {
+  --shiny-cta-highlight: var(--color-signal);
+}
+:root[data-accent] {
+  --selection-bg: color-mix(in srgb, var(--color-signal) 40%, transparent);
+}
+
+/* ----------------------------------------------------------------------------------------------- dark islands */
+/* Cinematic layers stay ink in light mode: the intro stage, the immersive command navigation and the overview hero
+   (the section that hosts the `HeroBackdrop` dot-matrix canvas – an ink widget on paper, the Nothing light look).
+   Values = tokens.css (dark defaults); keep in sync. */
+:root[data-theme="light"] [data-intro-stage],
+:root[data-theme="light"] [data-layer="Navigation (Vollbild)"],
+:root[data-theme="light"] :has(> [data-hero-backdrop]),
+:root[data-theme="light"] [data-theme-scope="dark"] {
+  color-scheme: only dark;
+  --color-ink-950: #040404;
+  --color-ink-900: #0a0a0a;
+  --color-ink-850: #111;
+  --color-ink-800: #161616;
+  --color-ink-750: #1c1c1c;
+  --color-ink-700: #242424;
+  --color-line: #1f1f1f;
+  --color-line-2: #2c2c2c;
+  --color-fg: #f2f2f2;
+  --color-mute: #9b9b9b;
+  --color-faint: #5f5f5f;
+  --color-steel: #e6e6e6;
+  --color-teal: #d9d9d9;
+  --color-aqua: #fff;
+  --color-win: #3ddc84;
+  --color-loss: #ff4d4f;
+  --color-warn: #ffb020;
+  --color-white: #fff;
+  --color-black: #000;
+  --color-danger-text: #ff8a90;
+  --color-win-soft: #65b488;
+  --color-loss-soft: #d27a7b;
+  --color-primary-btn-to: #d6d6d6;
+  --background: #111;
+  --foreground: #f2f2f2;
+  --card: #111;
+  --popover: #161616;
+  --border: #1f1f1f;
+  --card-ring-from: #9b9b9b;
+  --card-ring-to: #2c2c2c;
+  --card-ring-peak: #fff;
+  --card-spot: rgba(255, 255, 255, 0.045);
+  color: var(--color-fg);
+}
+:root[data-theme="light"][data-accent="kobalt"] :is([data-intro-stage], [data-layer="Navigation (Vollbild)"], :has(> [data-hero-backdrop]), [data-theme-scope="dark"]) {
+  --color-signal: #3d6bff;
+}
+:root[data-theme="light"][data-accent="violett"] :is([data-intro-stage], [data-layer="Navigation (Vollbild)"], :has(> [data-hero-backdrop]), [data-theme-scope="dark"]) {
+  --color-signal: #9466ff;
+}
+
+/* ------------------------------------------------------------------------------------- theme switch (reveal) */
+/* `src/app/themeTransition.ts` (declared exception `theme-reveal`): a View Transition whose NEW snapshot is revealed by
+   a growing clip-path circle from the switch – only while `[data-theme-switching]` is on <html>, so no other view
+   transition is affected. The old snapshot stays still underneath. */
+:root[data-theme-switching]::view-transition-old(root),
+:root[data-theme-switching]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+:root[data-theme-switching]::view-transition-old(root) {
+  z-index: 0;
+}
+:root[data-theme-switching]::view-transition-new(root) {
+  z-index: 1;
+}

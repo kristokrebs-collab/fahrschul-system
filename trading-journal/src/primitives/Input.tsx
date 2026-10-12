@@ -2,7 +2,7 @@ import type { InputHTMLAttributes, Ref, TextareaHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
 
 export const inputClass =
-  "w-full rounded-xl border border-line bg-ink-950/70 px-3 py-2 text-[13.5px] text-fg outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-faint focus:border-white/40 focus:shadow-[0_0_0_3px_rgb(255_255_255/0.07)] disabled:opacity-40";
+  "w-full rounded-xl border border-line bg-ink-950/70 px-3 py-2 text-[13.5px] text-fg outline-none transition-[border-color,box-shadow] duration-200 placeholder:text-faint focus:border-white/40 focus:shadow-(--ring-focus-input) disabled:opacity-40";
 
 /** The control drops its CSS focus shadow: the glow is the pre-rendered ring layer next to it. */
 const controlClass = "peer relative focus:shadow-none";

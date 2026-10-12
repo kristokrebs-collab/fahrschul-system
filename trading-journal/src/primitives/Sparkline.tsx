@@ -54,7 +54,7 @@ export interface SparklineProps {
  * The first time it scrolls into view the line draws itself left to right (clip-path, `tween.draw`); afterwards the
  * end dot breathes with a compositor ping ring (paused off-screen). Reduced motion → static, instant.
  */
-export function Sparkline({ values, className, stroke = "#f2f2f2", dot = "#e5202e" }: SparklineProps) {
+export function Sparkline({ values, className, stroke = "var(--color-fg, #f2f2f2)", dot = "var(--color-signal, #e5202e)" }: SparklineProps) {
   const id = useId().replace(/:/g, "");
   const reduced = useReducedFx();
   const key = values.join(",");

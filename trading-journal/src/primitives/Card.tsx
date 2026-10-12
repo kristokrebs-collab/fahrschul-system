@@ -60,9 +60,9 @@ export function Card({
   note,
   bare,
   gradientSize = 240,
-  gradientFrom = "#9b9b9b",
-  gradientTo = "#2c2c2c",
-  gradientColor = "rgba(255,255,255,0.045)",
+  gradientFrom = "var(--card-ring-from, #9b9b9b)",
+  gradientTo = "var(--card-ring-to, #2c2c2c)",
+  gradientColor = "var(--card-spot, rgba(255,255,255,0.045))",
   edgeGlow = true,
   className,
   innerClassName,
@@ -187,7 +187,7 @@ export function Card({
   }, [fx, edgeGlow, arcTarget, arcRotate, arcOpacity, arcWillChange]);
 
   const size = gradientSize * 2;
-  const arc = `conic-gradient(from ${-ARC_SPREAD}deg, transparent 0deg, ${gradientFrom} ${ARC_SPREAD * 0.55}deg, #fff ${ARC_SPREAD}deg, ${gradientFrom} ${ARC_SPREAD * 1.45}deg, transparent ${ARC_SPREAD * 2}deg)`;
+  const arc = `conic-gradient(from ${-ARC_SPREAD}deg, transparent 0deg, ${gradientFrom} ${ARC_SPREAD * 0.55}deg, var(--card-ring-peak, #fff) ${ARC_SPREAD}deg, ${gradientFrom} ${ARC_SPREAD * 1.45}deg, transparent ${ARC_SPREAD * 2}deg)`;
 
   return (
     <div className="group relative h-full">

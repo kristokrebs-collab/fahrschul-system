@@ -21,7 +21,7 @@ export interface EmptyStateProps {
 export const EMPTY_LINE = "Bereit für den ersten Eintrag.";
 
 /** Marching-ants border (`.fx-ants`): calm white dashes, paused while the box is off-screen. */
-const ANTS_STYLE = { "--fx-ants-color": "rgb(255 255 255 / 0.16)", "--fx-ants-dash": "4px", "--fx-ants-speed": "1.8s" } as CSSProperties;
+const ANTS_STYLE = { "--fx-ants-color": "color-mix(in srgb, var(--color-white, #fff) 16%, transparent)", "--fx-ants-dash": "4px", "--fx-ants-speed": "1.8s" } as CSSProperties;
 
 /**
  * One sheen across the CTA button (a `::after` band behind its label, parked off the left edge) that runs once when
@@ -31,7 +31,7 @@ const CTA_SHINE = [
   "contents",
   "[&>button]:overflow-hidden",
   "[&>button]:after:pointer-events-none [&>button]:after:absolute [&>button]:after:inset-0 [&>button]:after:-z-[1] [&>button]:after:rounded-[inherit] [&>button]:after:content-['']",
-  "[&>button]:after:bg-[linear-gradient(100deg,transparent_30%,rgb(255_255_255/0.5)_50%,transparent_70%)] [&>button]:after:[transform:translateX(-100%)]",
+  "[&>button]:after:bg-[linear-gradient(100deg,transparent_30%,color-mix(in_srgb,var(--color-white,#fff)_50%,transparent)_50%,transparent_70%)] [&>button]:after:[transform:translateX(-100%)]",
   "data-[shine]:[&>button]:after:[animation:fx-shimmer-x_var(--cta-shine-duration)_ease-in-out_var(--cta-shine-delay)_1_both]",
 ].join(" ");
 const CTA_TIMING = { "--cta-shine-duration": `${tween.shimmer.duration}s`, "--cta-shine-delay": `${tween.shimmer.delay}s` } as CSSProperties;
