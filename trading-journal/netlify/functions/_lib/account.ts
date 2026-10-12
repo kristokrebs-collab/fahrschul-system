@@ -75,7 +75,13 @@ export const EXPORT_TABLES: ExportTable[] = [
     columns: "id,exchange,label,key_version,key_last4,permissions,status,last_sync_at,last_error,created_at,updated_at",
   },
   { table: "subscriptions", userColumn: "user_id", columns: "*" },
-  { table: "referrals", userColumn: "referrer_id", columns: "*" },
+  // never `referred_id` – that is another person's account
+  { table: "referrals", userColumn: "referrer_id", columns: "id,code,status,created_at,converted_at" },
+  // P10 (0002_billing): the user's Stripe customer link, referral code, credits / commissions, team seats they own
+  { table: "billing_customers", userColumn: "user_id", columns: "user_id,stripe_customer_id,created_at" },
+  { table: "referral_codes", userColumn: "user_id", columns: "user_id,code,commission_pct,created_at" },
+  { table: "affiliate_ledger", userColumn: "referrer_id", columns: "id,kind,amount,currency,status,created_at" },
+  { table: "team_seats", userColumn: "owner_id", columns: "owner_id,member_id,created_at" },
   { table: "sync_runs", userColumn: "user_id", columns: "*" },
 ];
 

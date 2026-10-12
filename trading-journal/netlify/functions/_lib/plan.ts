@@ -1,9 +1,11 @@
 /**
  * Server-side plan lookup (Wave-0 contract, owner P09/P10). The plan is NEVER taken from the client: it comes from
  * `profiles.plan` / `plan_status` / `trial_end`, which only the Stripe webhook (service role) writes.
- * P10 adds the feature matrix (`src/billing/plans.ts`) and a `requireFeature` on top.
+ * P10 adds the feature matrix (`src/billing/plans.ts`) and `requireFeature` / `requireLimit` on top (end of this file).
  */
-import { FREE_PLAN, grantsPlan, isPlanId, isPlanStatus, type PlanId, type PlanInfo } from "../../../src/billing/types";
+import { FEATURE_INFO, limitOf, PAID_PLANS, planIncludes, upgradePlanFor } from "../../../src/billing/plans";
+import { FREE_PLAN, grantsPlan, isPlanId, isPlanStatus, type Feature, type LimitKey, type PlanId, type PlanInfo } from "../../../src/billing/types";
+import { envOptional, type ServerEnvName } from "./env";
 import { HttpError } from "./http";
 import { supabaseAdmin } from "./supabase";
 
@@ -38,4 +40,36 @@ export async function requirePlan(userId: string, plans: readonly PlanId[]): Pro
   const info = await planOf(userId);
   if (!plans.includes(info.plan)) throw new HttpError(402, "plan_required", undefined, { required: plans, plan: info.plan });
   return info;
+}
+
+/* ------------------------------------------------------------------ feature gates (P10) */
+
+/**
+ * Payments are set up: `STRIPE_SECRET_KEY` plus at least one `STRIPE_PRICE_<PLAN>_<MONTHLY|YEARLY>`. Until then nothing
+ * is gated – the client shows "Zahlungen noch nicht eingerichtet" and unlocks every feature, the server does the same.
+ */
+export function paymentsConfigured(): boolean {
+  if (!envOptional("STRIPE_SECRET_KEY")) return false;
+  return PAID_PLANS.some((p) => (["MONTHLY", "YEARLY"] as const).some((i) => !!envOptional(`STRIPE_PRICE_${p.toUpperCase()}_${i}` as ServerEnvName)));
+}
+
+/**
+ * Throws 402 `plan_required` (German message naming the feature, `details.required` = the cheapest paid plan with it)
+ * unless the user's effective plan includes `feature` (`src/billing/plans.ts`). Not gated while payments are not set up.
+ */
+export async function requireFeature(userId: string, feature: Feature): Promise<PlanInfo> {
+  const info = await planOf(userId);
+  if (planIncludes(info.plan, feature) || !paymentsConfigured()) return info;
+  throw new HttpError(402, "plan_required", `${FEATURE_INFO[feature].label} ist in deinem Tarif nicht enthalten.`, { feature, required: upgradePlanFor(feature), plan: info.plan });
+}
+
+/**
+ * Throws 402 `limit_reached` when `used` already reaches the plan's limit for `key` (e.g. a 2nd exchange connection on
+ * Pro). Returns the limit (`Infinity` = unlimited). Not enforced while payments are not set up.
+ */
+export async function requireLimit(userId: string, key: LimitKey, used: number): Promise<number> {
+  const info = await planOf(userId);
+  const limit = limitOf(info.plan, key);
+  if (used < limit || !paymentsConfigured()) return limit;
+  throw new HttpError(402, "limit_reached", "Das Limit deines Tarifs ist erreicht.", { key, limit, plan: info.plan });
 }
