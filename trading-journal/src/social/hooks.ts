@@ -37,7 +37,7 @@ export function useCommunityBoot(): void {
 
   useEffect(() => {
     if (!ready) {
-      if (phase === "signedOut") resetSocial();
+      if (phase === "signedOut") resetSocial({ keepInvite: true });
       return;
     }
     void loadCommunity();

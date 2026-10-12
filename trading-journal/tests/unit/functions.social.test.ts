@@ -544,6 +544,15 @@ describe("groups", () => {
     expect((await join(C, "OLDCODE123")).status).toBe(404);
   });
 
+  it("an invite's last use goes to exactly one of two concurrent joins", async () => {
+    const id = (await createGroup(A, "group")).body.group.id;
+    const r = await call<{ invite: { code: string } }>(groupsFn, "POST", `/api/v1/social/groups/${id}/invites`, { user: A, body: { role: "member", maxUses: 1 } });
+    const both = await Promise.all([join(B, r.body.invite.code), join(C, r.body.invite.code)]);
+    expect(both.map((x) => x.status).sort()).toEqual([201, 409]);
+    expect(db.tables.group_members!.filter((m) => m.group_id === id).length).toBe(2); // owner + one
+    expect(db.tables.group_invites!.find((i) => i.code === r.body.invite.code)).toMatchObject({ uses: 1 });
+  });
+
   it("team: needs the Team plan; members take a seat each, no free seat → no join; removing frees the seat", async () => {
     expect((await createGroup(A, "team", "Desk")).status).toBe(402);
     db.tables.subscriptions!.push({ id: "sub_t", user_id: A, stripe_customer_id: "cus_t", status: "active", plan: "team", seats: 3, updated_at: iso() });
@@ -558,6 +567,7 @@ describe("groups", () => {
     const full = await join(D, code);
     expect(full.status).toBe(409);
     expect(db.tables.group_members!.some((m) => m.user_id === D)).toBe(false);
+    expect(db.tables.group_invites!.find((i) => i.code === code)).toMatchObject({ uses: 2 }); // the failed join gave its use back
 
     const detail = await feedOf(A, g.body.group.id);
     expect(detail.body.group.seats).toEqual({ seats: 3, used: 3 });

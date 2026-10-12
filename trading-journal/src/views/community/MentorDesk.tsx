@@ -14,7 +14,7 @@ import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import type { GoalInfo, GroupDetail, MemberInfo, MentorGoalDraft, ReviewInfo } from "@/social/contract";
 import { fmtR } from "@/social/format";
-import { adoptGoal, declineGoal, proposeGoal, setReviewStatus, useSocial } from "@/social/store";
+import { adoptGoal, closeSheet, declineGoal, openSheet, proposeGoal, setReviewStatus, useSocial } from "@/social/store";
 import { MENTOR } from "@/social/strings";
 import { Glyph } from "@/social/ui/glyphs";
 import { Monogram } from "@/social/ui/Monogram";
@@ -37,7 +37,11 @@ const PERIODS = [
 /** Share metrics (0–1 in P08's goals) are entered in % here. */
 const isShare = (m: MentorGoalDraft["metric"]) => m === "planAdherence" || m === "journalRate" || m === "checklistRate";
 
-export function GoalSheet({ group, student, onClose }: { group: GroupDetail; student: MemberInfo | null; onClose: () => void }) {
+export function GoalSheet() {
+  const ask = useSocial((s) => (s.sheet?.kind === "goal" ? s.sheet : null));
+  const group = useSocial((s) => (ask ? (s.feeds[ask.groupId]?.data?.group ?? null) : null));
+  const student: MemberInfo | null = (ask && group?.memberList.find((m) => m.id === ask.studentId)) || null;
+  const onClose = closeSheet;
   const [preset, setPreset] = useState(PRESETS[0]!.id);
   const p = PRESETS.find((x) => x.id === preset)!;
   const [title, setTitle] = useState(p.label);
@@ -58,7 +62,7 @@ export function GoalSheet({ group, student, onClose }: { group: GroupDetail; stu
   const value = Number(target.replace(",", "."));
   const valid = Number.isFinite(value) && title.trim().length >= 3;
   const send = async () => {
-    if (!student || !valid) return;
+    if (!student || !group || !valid) return;
     const draft: MentorGoalDraft = {
       title: title.trim(),
       kind: p.draft.kind,
@@ -154,7 +158,6 @@ function QueueCard({ r, group, onAnswer }: { r: ReviewInfo; group: GroupDetail; 
 export function MentorDesk({ group, reviews, onAnswer }: { group: GroupDetail; reviews: readonly ReviewInfo[]; onAnswer: (id: string) => void }) {
   const open = reviews.filter((r) => r.status === "open" && !r.me).sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
   const students = group.memberList.filter((m) => m.role === "student");
-  const [goalFor, setGoalFor] = useState<MemberInfo | null>(null);
   return (
     <section className="grid gap-3 rounded-2xl border border-line bg-ink-950/40 p-4" data-testid="mentor-desk">
       <div className="flex items-center justify-between gap-2">
@@ -180,7 +183,7 @@ export function MentorDesk({ group, reviews, onAnswer }: { group: GroupDetail; r
               <li key={s.id} className="flex items-center gap-2 rounded-full border border-line-2 bg-ink-900 py-1 pl-1 pr-1.5">
                 <Monogram pseudonym={s.pseudonym} size="xs" />
                 <span className="text-[12.5px]">{s.pseudonym}</span>
-                <Button size="sm" className="h-7 px-2.5 text-[11.5px]" onClick={() => setGoalFor(s)} data-testid="goal-open">
+                <Button size="sm" className="h-7 px-2.5 text-[11.5px]" onClick={() => openSheet({ kind: "goal", groupId: group.id, studentId: s.id })} data-testid="goal-open">
                   {MENTOR.goal}
                 </Button>
               </li>
@@ -188,7 +191,6 @@ export function MentorDesk({ group, reviews, onAnswer }: { group: GroupDetail; r
           </ul>
         </div>
       )}
-      <GoalSheet group={group} student={goalFor} onClose={() => setGoalFor(null)} />
     </section>
   );
 }

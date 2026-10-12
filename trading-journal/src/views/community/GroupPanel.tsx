@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { cn } from "@/lib/cn";
 import { openPortal } from "@/billing/store";
 import { RevealGroup, RevealItem } from "@/motion/Reveal";
@@ -8,6 +8,7 @@ import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
+import { Collapse } from "@/primitives/Expander";
 import type { GroupDetail, InviteInfo, MemberInfo } from "@/social/contract";
 import { fmtPct, fmtR } from "@/social/format";
 import { inviteUrl } from "@/social/links";
@@ -25,12 +26,15 @@ const dateLabel = (iso: string) => new Date(iso).toLocaleDateString("de-DE", { d
 
 function MemberRow({ m, group, index }: { m: MemberInfo; group: GroupDetail; index: number }) {
   const reduced = useReducedFx();
+  const [manage, setManage] = useState(false);
+  const panelId = useId();
   const owner = group.role === "owner";
   const canRemove = !m.me && m.role !== "owner" && (owner || (group.role === "mentor" && m.role === "student"));
+  const canRole = owner && group.kind === "mentor" && !m.me && m.role !== "owner";
   const f = m.figures;
   return (
     <motion.li
-      className="grid gap-2 border-t border-line py-2.5 first:border-t-0"
+      className="grid border-t border-line py-2.5 first:border-t-0"
       initial={reduced ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
       transition={{ ...tween.reveal, delay: Math.min(index, 12) * 0.03 }}
@@ -43,9 +47,7 @@ function MemberRow({ m, group, index }: { m: MemberInfo; group: GroupDetail; ind
             {m.pseudonym}
             {m.me && <span className="text-faint"> · du</span>}
           </span>
-          <span className="font-mono text-[10.5px] text-faint">
-            {f ? `${fmtR(f.expectancyR)} · ${fmtPct(f.discipline)} Disziplin · ${f.trades} Trades` : GROUPS.noFigures}
-          </span>
+          <span className="truncate font-mono text-[10.5px] text-faint">{f ? `${fmtR(f.expectancyR)} · ${fmtPct(f.discipline)} Disz. · ${f.trades} Tr.` : GROUPS.noFigures}</span>
         </span>
         {m.seat && (
           <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] text-mute" title={GROUPS.seat}>
@@ -54,17 +56,32 @@ function MemberRow({ m, group, index }: { m: MemberInfo; group: GroupDetail; ind
           </span>
         )}
         <Badge tone={ROLE_TONE[m.role]}>{ROLE_LABEL[m.role]}</Badge>
+        {(canRemove || canRole) && (
+          <button
+            type="button"
+            aria-expanded={manage}
+            aria-controls={panelId}
+            aria-label={`${GROUPS.manage}: ${m.pseudonym}`}
+            onClick={() => setManage((v) => !v)}
+            className="touch-hit grid size-7 place-items-center rounded-lg text-mute transition-colors hover:bg-white/[0.05] hover:text-fg"
+            data-testid="member-manage"
+          >
+            <motion.span aria-hidden="true" className="text-[15px] leading-none" animate={{ rotate: manage ? 90 : 0 }} transition={spring.pop}>
+              ⋯
+            </motion.span>
+          </button>
+        )}
       </div>
-      {(canRemove || (owner && group.kind === "mentor" && !m.me)) && (
-        <div className="flex flex-wrap items-center justify-end gap-2 pl-11">
-          {owner && group.kind === "mentor" && !m.me && m.role !== "owner" && (
+      <Collapse open={manage} id={panelId}>
+        <div className="flex flex-wrap items-center justify-end gap-2 pl-11 pt-2">
+          {canRole && (
             <Button size="sm" onClick={() => void setRole(group.id, m.id, m.role === "mentor" ? "student" : "mentor")}>
               {m.role === "mentor" ? GROUPS.makeStudent : GROUPS.makeMentor}
             </Button>
           )}
-          {canRemove && <ConfirmAction label={GROUPS.remove} question="Entfernen?" onConfirm={() => void removeMember(group.id, m.id)} />}
+          {canRemove && <ConfirmAction label={GROUPS.remove} question="Entfernen?" onConfirm={() => void removeMember(group.id, m.id)} testId="member-remove" />}
         </div>
-      )}
+      </Collapse>
     </motion.li>
   );
 }
@@ -72,7 +89,7 @@ function MemberRow({ m, group, index }: { m: MemberInfo; group: GroupDetail; ind
 function InviteRow({ inv, groupId }: { inv: InviteInfo; groupId: string }) {
   const copy = async () => pushToast((await copyText(inviteUrl(inv.code))) ? { kind: "success", title: S.linkCopied } : { kind: "error", title: S.copyFailed });
   return (
-    <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-ink-950/40 px-3 py-2" data-testid="invite-row">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-ink-950/40 px-3 py-2" data-testid="invite-row">
       <span className="grid">
         <span className="font-mono text-[13px] tracking-[0.16em]">{inv.code}</span>
         <span className="font-mono text-[10.5px] text-faint">
@@ -87,7 +104,7 @@ function InviteRow({ inv, groupId }: { inv: InviteInfo; groupId: string }) {
           {GROUPS.revoke}
         </Button>
       </span>
-    </li>
+    </div>
   );
 }
 

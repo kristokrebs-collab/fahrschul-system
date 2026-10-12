@@ -34,13 +34,13 @@ export function GroupSwitcher({ groups, active, onCreate, onJoin }: { groups: re
           </span>
         ),
       })),
-      { id: "__create", label: GROUPS.create, onSelect: onCreate, icon: <Glyph name="plus" className="size-5" /> },
-      { id: "__join", label: GROUPS.join, onSelect: onJoin, icon: <Glyph name="users" className="size-5" /> },
+      { id: "__create", label: GROUPS.create, onSelect: onCreate, icon: <span className="grid size-5 place-items-center"><Glyph name="plus" className="size-5" /></span> },
+      { id: "__join", label: GROUPS.join, onSelect: onJoin, icon: <span className="grid size-5 place-items-center"><Glyph name="users" className="size-5" /></span> },
     ],
     [groups, active, onCreate, onJoin],
   );
   return (
-    <div className="-mx-1 max-w-full overflow-x-auto px-1 pb-1 pt-8 [scrollbar-width:none]" data-testid="group-switcher">
+    <div className="-mx-1 -mt-3 max-w-full overflow-x-auto px-1 pb-1 pt-7 [scrollbar-width:none]" data-testid="group-switcher">
       <MagnifyRow items={items} label={GROUPS.switcher} size={44} gap={6} />
     </div>
   );

@@ -124,7 +124,7 @@ export function SharedView({ token, onOpenApp, className }: SharedViewProps) {
         <>
           <Reveal index={0} className="relative min-w-0 overflow-hidden rounded-2xl">
             <SpotlightSweep tone="signal" />
-            <PayloadCard p={state.data.payload} className="p-5 sm:p-7" />
+            <PayloadCard p={state.data.payload} big className="bg-[radial-gradient(120%_70%_at_0%_0%,#1c1c1c_0%,#111_55%)] p-5 sm:p-7" />
           </Reveal>
           <Reveal index={1} className="flex flex-wrap items-center justify-between gap-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-faint">

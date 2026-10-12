@@ -73,6 +73,10 @@ export interface Slot<T> {
 
 const EMPTY_SLOT = { data: null, load: "idle", error: null } as const;
 
+/** The Community page's own sheets (mounted once at the page root – a sheet inside a card would take the card's
+ * transform as its containing block). */
+export type CommunitySheet = { kind: "create" } | { kind: "join" } | { kind: "pick" } | { kind: "goal"; groupId: string; studentId: string };
+
 /** What the share sheet shows (`openShare`). */
 export type ShareTarget = { kind: "trade"; tradeId: string } | { kind: "setup"; setupId: string } | { kind: "stats" };
 
@@ -96,6 +100,8 @@ export interface SocialState {
   /** What the share sheet shows (kept while it closes, so the exit animation keeps its content). */
   share: ShareTarget | null;
   shareOpen: boolean;
+  /** The open page sheet (null = none). */
+  sheet: CommunitySheet | null;
   /** Bumped per open – the sheet body remounts (fresh options) for every share. */
   shareSeq: number;
   /** Bumped on every new review / comment / share – replay keys for the effects. */
@@ -118,15 +124,17 @@ const INITIAL: SocialState = {
   invite: null,
   share: null,
   shareOpen: false,
+  sheet: null,
   shareSeq: 0,
   pulse: 0,
 };
 
 export const useSocial = create<SocialState>()(() => ({ ...INITIAL }));
 
-/** Tests. */
-export function resetSocial(): void {
-  useSocial.setState({ ...INITIAL, feeds: {}, boards: {}, shares: { ...EMPTY_SLOT } });
+/** Sign-out / tests: back to the initial state. `keepInvite` keeps a pending invitation (it waits for the login). */
+export function resetSocial(opts: { keepInvite?: boolean } = {}): void {
+  const invite = opts.keepInvite ? useSocial.getState().invite : null;
+  useSocial.setState({ ...INITIAL, feeds: {}, boards: {}, shares: { ...EMPTY_SLOT }, invite });
 }
 
 /** The build can talk to the community functions (cloud configured, not inside claude.ai). */
@@ -441,6 +449,14 @@ export async function revokeShareLink(id: string): Promise<void> {
   if (await act("revokeShare", () => deleteShare(id), S.shareRevoked)) {
     useSocial.setState((s) => ({ shares: { ...s.shares, data: (s.shares.data ?? []).map((x) => (x.id === id ? { ...x, revoked: true } : x)) } }));
   }
+}
+
+export function openSheet(sheet: CommunitySheet): void {
+  useSocial.setState({ sheet });
+}
+
+export function closeSheet(): void {
+  useSocial.setState({ sheet: null });
 }
 
 export function openShare(target: ShareTarget): void {

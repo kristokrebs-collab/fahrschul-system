@@ -12,12 +12,15 @@ import { Field } from "@/primitives/Field";
 import { Input, Textarea } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import type { GroupKind } from "@/social/contract";
-import { checkInvite, clearInvite, createGroup, joinGroup, useSocial } from "@/social/store";
+import { useCloudSession } from "@/cloud/session";
+import { checkInvite, clearInvite, closeSheet, createGroup, joinGroup, useSocial } from "@/social/store";
 import { GROUP_KIND_HINT, GROUP_KIND_LABEL, GROUPS, ROLE_LABEL } from "@/social/strings";
 import { Glyph } from "@/social/ui/glyphs";
 
 /** New group: name, kind (peer group / mentoring / team), description. */
-export function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function CreateGroupSheet() {
+  const open = useSocial((s) => s.sheet?.kind === "create");
+  const onClose = closeSheet;
   const [kind, setKind] = useState<GroupKind>("group");
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
@@ -87,9 +90,14 @@ export function CreateGroupSheet({ open, onClose }: { open: boolean; onClose: ()
  * Join by code (typed in, or from an invitation link): the code is checked first and the sheet shows WHERE the user is
  * about to go (group, role, size) and asks the one privacy question – share my figures? – before anything happens.
  */
-export function JoinSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function JoinSheet() {
   const reduced = useReducedFx();
   const invite = useSocial((s) => s.invite);
+  const asked = useSocial((s) => s.sheet?.kind === "join");
+  // an invitation from the URL opens the sheet by itself – once the login sheet is gone (never two dialogs at once)
+  const authOpen = useCloudSession((s) => s.sheet.open);
+  const open = asked || (!!invite?.code && !authOpen);
+  const onClose = closeSheet;
   const busy = useSocial((s) => s.busy);
   const [code, setCode] = useState(invite?.code ?? "");
   const [share, setShare] = useState(false);

@@ -8,6 +8,7 @@ import { COMMUNITY } from "@/social/strings";
 import { storageKey } from "@/store/storage";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { CommunityMarquee } from "./CommunityMarquee";
+import { CommunitySheets } from "./CommunitySheets";
 import { FeedbackCard } from "./FeedbackCard";
 import { GroupsSection } from "./GroupsSection";
 import { LeaderboardCard } from "./LeaderboardCard";
@@ -83,6 +84,7 @@ export function CommunityView({ className }: CommunityViewProps) {
           <Reveal index={5} className="min-w-0 lg:col-span-12">
             <CommunityMarquee />
           </Reveal>
+          <CommunitySheets />
         </>
       )}
     </div>

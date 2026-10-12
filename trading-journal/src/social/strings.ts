@@ -100,6 +100,8 @@ export const YOU = {
   percentileNone: "Noch zu wenige Teilnehmer für einen Vergleich (mind. 10).",
   percentileNoValue: "Für deinen Wert fehlen noch Trades mit R.",
   median: "Median",
+  whereTitle: (m: string) => `Wo du stehst · ${m}`,
+  whereN: (n: number) => `${n} Teilnehmende`,
   refresh: "Jetzt neu berechnen",
   syncHint: "Die Rangliste nutzt deine synchronisierten Trades.",
 } as const;
@@ -160,6 +162,7 @@ export const GROUPS = {
   delete: "Gruppe löschen",
   deleteHint: "Alles in dieser Gruppe wird gelöscht – für alle.",
   remove: "Entfernen",
+  manage: "Verwalten",
   makeMentor: "Zum Mentor machen",
   makeStudent: "Zum Schüler machen",
   seat: "Sitz",

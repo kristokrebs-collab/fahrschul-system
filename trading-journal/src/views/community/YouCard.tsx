@@ -13,6 +13,7 @@ import { refreshMe, rerollPseudonym, setOptIn, useBoard, useSocial } from "@/soc
 import { YOU } from "@/social/strings";
 import { Glyph } from "@/social/ui/glyphs";
 import { Monogram } from "@/social/ui/Monogram";
+import { DistributionStrip } from "./DistributionStrip";
 import { Caption, Progress } from "./parts";
 
 function Figure({ metric, value, active }: { metric: SocialMetric; value: number | null; active: boolean }) {
@@ -21,7 +22,7 @@ function Figure({ metric, value, active }: { metric: SocialMetric; value: number
   return (
     <div className={cn("grid gap-1 rounded-xl border px-3 py-2.5 transition-colors duration-200", active ? "border-line-2 bg-white/[0.04]" : "border-line bg-ink-950/40")} data-testid={`you-${metric}`}>
       <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{METRIC_LABEL[metric]}</span>
-      <span className={cn("dot-num text-[22px] leading-none", tone)}>
+      <span className={cn("dot-num truncate text-[17px] leading-none sm:text-[19px] lg:text-[17px] xl:text-[19px]", tone)}>
         {value == null ? (
           "–"
         ) : (
@@ -55,7 +56,8 @@ export function YouCard({ className }: { className?: string }) {
   const eligible = server ? server.eligible : local.eligible;
   const value = metricValue(fig, metric);
   const pct = percentileIn(board.data?.community, metric, value);
-  const hasDist = !!board.data?.community.some((d) => d.metric === metric);
+  const dist = board.data?.community.find((d) => d.metric === metric) ?? null;
+  const hasDist = !!dist;
   const optIn = me?.optIn ?? false;
   return (
     <Card title={YOU.title} className={cn("h-full", className)} data-testid="you-card">
@@ -110,6 +112,16 @@ export function YouCard({ className }: { className?: string }) {
             </span>
           </div>
         </div>
+
+        {dist && (
+          <div className="grid gap-2 rounded-xl border border-line bg-ink-950/40 px-3.5 pb-2.5 pt-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <Caption>{YOU.whereTitle(METRIC_LABEL[metric])}</Caption>
+              <span className="font-mono text-[10px] text-faint">{YOU.whereN(dist.n)}</span>
+            </div>
+            <DistributionStrip key={metric} dist={dist} metric={metric} value={value} />
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
           <span className="text-[11.5px] text-faint">{YOU.syncHint}</span>

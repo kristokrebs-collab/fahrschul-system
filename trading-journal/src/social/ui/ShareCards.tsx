@@ -61,7 +61,7 @@ function Footer({ children }: { children?: ReactNode }) {
 const heroTone = (v: number | null) => (v == null || v === 0 ? "fg" : v > 0 ? "win" : "loss");
 
 /** A shared trade as the recipient sees it: the R in dot-matrix digits, facts below. */
-export function TradeShareCard({ p, className, compact = false }: { p: SharedTrade; className?: string; compact?: boolean }) {
+export function TradeShareCard({ p, className, compact = false, big = false }: { p: SharedTrade; className?: string; compact?: boolean; big?: boolean }) {
   const hero = p.r != null ? fmtR(p.r).replace("−", "-") : p.movePct != null ? fmtMove(p.movePct).replace("−", "-").replace(" %", "%") : p.result === "open" ? "OFFEN" : "-";
   const tone = heroTone(p.r ?? p.movePct);
   const facts: { label: string; value: string; tone?: "win" | "loss" | "mute" }[] = [
@@ -93,7 +93,8 @@ export function TradeShareCard({ p, className, compact = false }: { p: SharedTra
         </span>
       </header>
       <div className="grid gap-1">
-        <DotMatrixText text={hero} tone={tone} size={compact ? 4 : 6} gap={compact ? 1.5 : 2} label={p.r != null ? fmtR(p.r) : hero} className="max-w-full" />
+        <DotMatrixText text={hero} tone={tone} size={compact ? 4 : 6} gap={compact ? 1.5 : 2} label={p.r != null ? fmtR(p.r) : hero} className={cn("max-w-full", big && "sm:hidden")} />
+        {big && <DotMatrixText text={hero} tone={tone} size={9} gap={3} decorative className="hidden max-w-full sm:inline-flex" />}
         <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-faint">{p.r != null ? "R-Multiple" : p.movePct != null ? "Kursbewegung" : "Ergebnis"}</span>
       </div>
       <div className={cn("grid gap-2", compact ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-3")}>
@@ -191,6 +192,6 @@ export function StatsShareCard({ p, className }: { p: SharedStats; className?: s
   );
 }
 
-export function PayloadCard({ p, className }: { p: SharePayload; className?: string }) {
-  return p.kind === "trade" ? <TradeShareCard p={p} className={className} /> : p.kind === "setup" ? <SetupShareCard p={p} className={className} /> : <StatsShareCard p={p} className={className} />;
+export function PayloadCard({ p, className, big = false }: { p: SharePayload; className?: string; big?: boolean }) {
+  return p.kind === "trade" ? <TradeShareCard p={p} className={className} big={big} /> : p.kind === "setup" ? <SetupShareCard p={p} className={className} /> : <StatsShareCard p={p} className={className} />;
 }

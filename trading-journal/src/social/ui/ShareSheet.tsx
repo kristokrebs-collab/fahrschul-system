@@ -7,7 +7,7 @@ import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { GlyphZoom } from "@/motion/pulse/GlyphZoom";
 import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { Sheet } from "@/motion/Sheet";
-import { StaggerItem } from "@/motion/Stagger";
+import { bodyRevealDelay, StaggerItem } from "@/motion/Stagger";
 import { Switch } from "@/motion/Switch";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -84,7 +84,7 @@ function Toggle({ label, checked, onChange, testId }: { label: string; checked: 
 function Fields({ p }: { p: SharePayload }) {
   const rows: [string, string][] = [];
   if (p.kind === "trade") {
-    rows.push(["R", fmtR(p.r)], ["Bewegung", fmtMove(p.movePct)], ["Tag", p.day ?? "–"]);
+    rows.push(["R", fmtR(p.r)], ["Bewegung", fmtMove(p.movePct)], ["Tag", p.day ? p.day.split("-").reverse().join(".") : "–"]);
     if (p.time) rows.push(["Uhrzeit", p.time]);
     if (p.entry !== undefined) rows.push(["Preise", "Einstieg, Ausstieg, Stop, Ziel"]);
     if (p.setups?.length) rows.push(["Grundlagen", p.setups.join(", ")]);
@@ -222,7 +222,16 @@ function GroupPart({ payload }: { payload: SharedTrade }) {
   );
 }
 
-function Body({ target, trade, setup, opened }: { target: ShareTarget; trade: EnrichedTrade | null; setup: Setup | null; opened: boolean }) {
+/** The dive starts once the sheet has landed and the stage faded in (sheet spring reveal point + one reveal). */
+const DIVE_AFTER_MS = Math.round((bodyRevealDelay(spring.sheet) + tween.reveal.duration) * 1000);
+
+function Body({ target, trade, setup, open }: { target: ShareTarget; trade: EnrichedTrade | null; setup: Setup | null; open: boolean }) {
+  const [dive, setDive] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const id = setTimeout(() => setDive(true), DIVE_AFTER_MS);
+    return () => clearTimeout(id);
+  }, [open]);
   const settings = useJournal((s) => s.settings);
   const trades = useJournal((s) => s.trades);
   const stats = useLocalStats();
@@ -247,7 +256,7 @@ function Body({ target, trade, setup, opened }: { target: ShareTarget; trade: En
   return (
     <div className="grid gap-3">
       <StaggerItem>
-        <GlyphZoom word={wordOf(payload)} open={opened} label={shareTitle(payload)} className="h-[220px] rounded-2xl border border-line-2 sm:h-[250px]">
+        <GlyphZoom word={wordOf(payload)} open={open && dive} label={shareTitle(payload)} className="h-[220px] rounded-2xl border border-line-2 sm:h-[250px]">
           <Hero p={payload} />
         </GlyphZoom>
       </StaggerItem>
@@ -303,13 +312,12 @@ export function ShareSheet() {
   const seq = useSocial((s) => s.shareSeq);
   const enriched = useEnriched();
   const setups = useJournal((s) => s.settings.setups);
-  const [openedSeq, setOpenedSeq] = useState(-1);
   const trade = target?.kind === "trade" ? (enriched.find((t) => t.id === target.tradeId) ?? null) : null;
   const setup = target?.kind === "setup" ? (setups.find((s) => s.id === target.setupId) ?? null) : null;
   const title = target?.kind === "setup" ? `${SHARE.sheetTitle} · Setup` : target?.kind === "stats" ? `${SHARE.sheetTitle} · Kennzahlen` : SHARE.sheetTitle;
   return (
-    <Sheet open={open} onClose={closeShare} title={title} size="md" dismissGuard={false} onOpened={() => setOpenedSeq(seq)}>
-      {target && <Body key={seq} target={target} trade={trade} setup={setup} opened={open && openedSeq === seq} />}
+    <Sheet open={open} onClose={closeShare} title={title} size="md" dismissGuard={false}>
+      {target && <Body key={seq} target={target} trade={trade} setup={setup} open={open} />}
     </Sheet>
   );
 }

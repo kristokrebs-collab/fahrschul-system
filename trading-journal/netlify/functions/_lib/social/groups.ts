@@ -346,15 +346,30 @@ export async function joinGroup(userId: string, code: string, shareLevel: ShareL
   const already = existing.data as MemberRow | null;
   if (already) return summaryOf(group, already, 0, 0);
   await ensurePseudonym(userId);
-  if (group.kind === "team") await assignSeat(group.owner_id, userId); // 409 no_seats / 402 without Team plan → no join
+  // claim one use first (compare-and-set on `uses`): concurrent joins can never push an invite past `max_uses`
+  const claim = await sb().from("group_invites").update({ uses: inv.uses + 1 }).eq("code", inv.code).eq("uses", inv.uses).select("code");
+  if (claim.error) dbFail("group_invites claim", claim.error);
+  if (!((claim.data ?? []) as unknown[]).length) throw new HttpError(409, "invite_busy", "Die Einladung wurde gerade benutzt – bitte noch einmal versuchen.");
+  const unclaim = () =>
+    sb()
+      .from("group_invites")
+      .update({ uses: inv.uses })
+      .eq("code", inv.code)
+      .eq("uses", inv.uses + 1)
+      .then(({ error: e }) => e && console.error("[fn] invite unclaim failed", e.code));
+  try {
+    if (group.kind === "team") await assignSeat(group.owner_id, userId); // 409 no_seats / 402 without Team plan → no join
+  } catch (e) {
+    await unclaim();
+    throw e;
+  }
   const { error } = await sb().from("group_members").insert({ group_id: group.id, user_id: userId, role: inv.role, share_level: shareLevel });
   if (error) {
     if (group.kind === "team") await releaseSeat(group.owner_id, userId).catch(() => undefined);
+    await unclaim();
     if (error.code === "23505") throw new HttpError(409, "already_member", "Du bist schon Mitglied.");
     dbFail("group_members insert", error);
   }
-  const { error: uErr } = await sb().from("group_invites").update({ uses: inv.uses + 1 }).eq("code", inv.code);
-  if (uErr) console.error("[fn] invite use count failed", uErr.code);
   const me: MemberRow = { group_id: group.id, user_id: userId, role: inv.role, share_level: shareLevel, joined_at: new Date(now).toISOString() };
   const { count } = await sb().from("group_members").select("user_id", { count: "exact", head: true }).eq("group_id", group.id);
   return summaryOf(group, me, count ?? 1, 0);

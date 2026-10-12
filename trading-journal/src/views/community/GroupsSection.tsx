@@ -7,10 +7,9 @@ import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { Skeleton } from "@/primitives/Skeleton";
-import { useActiveFeed, useSocial } from "@/social/store";
+import { openSheet, useActiveFeed, useSocial } from "@/social/store";
 import { GROUP_KIND_LABEL, GROUPS, ROLE_LABEL } from "@/social/strings";
 import { Glyph } from "@/social/ui/glyphs";
-import { CreateGroupSheet, JoinSheet } from "./GroupSheets";
 import { GroupPanel } from "./GroupPanel";
 import { GroupSwitcher } from "./GroupSwitcher";
 import { GoalList, MentorDesk } from "./MentorDesk";
@@ -26,16 +25,11 @@ export function GroupsSection({ className }: { className?: string }) {
   const groups = useSocial((s) => s.groups);
   const goals = useSocial((s) => s.goals);
   const active = useSocial((s) => s.activeGroup);
-  const invite = useSocial((s) => s.invite);
   const load = useSocial((s) => s.load);
   const feed = useActiveFeed();
-  const [creating, setCreating] = useState(false);
-  const [joining, setJoining] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
-  const onCreate = useCallback(() => setCreating(true), []);
-  const onJoin = useCallback(() => setJoining(true), []);
-  // an invitation from the URL opens the join sheet by itself (closing it drops the invitation)
-  const pending = !!invite?.code;
+  const onCreate = useCallback(() => openSheet({ kind: "create" }), []);
+  const onJoin = useCallback(() => openSheet({ kind: "join" }), []);
   const detail = feed.data?.group.id === active ? feed.data : null;
   const group = detail?.group ?? null;
   const reviews = detail?.reviews ?? [];
@@ -113,8 +107,6 @@ export function GroupsSection({ className }: { className?: string }) {
           </AnimatePresence>
         )}
       </div>
-      <CreateGroupSheet open={creating} onClose={() => setCreating(false)} />
-      <JoinSheet open={joining || pending} onClose={() => setJoining(false)} />
     </Card>
   );
 }
