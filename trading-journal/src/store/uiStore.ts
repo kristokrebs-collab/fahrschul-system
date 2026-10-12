@@ -36,7 +36,8 @@ export interface SetupEditorState {
   fromTrade: boolean;
 }
 export type ChartInterval = "1m" | "30m" | "1h" | "4h";
-export type ChartPane = "ratio" | "oi" | "cvd";
+/** Sub pane of the overview chart; `rsi` (P02) = RSI 14 with its diagonal trendlines. */
+export type ChartPane = "ratio" | "oi" | "cvd" | "rsi";
 export interface ChartPrefs {
   interval: ChartInterval;
   rangeDays: number;
@@ -216,7 +217,7 @@ export function loadPrefs(): UiPrefs {
     chart: {
       interval: chart.interval === "1m" || chart.interval === "30m" || chart.interval === "1h" ? chart.interval : DEFAULT_CHART.interval,
       rangeDays: typeof chart.rangeDays === "number" && chart.rangeDays > 0 ? chart.rangeDays : DEFAULT_CHART.rangeDays,
-      pane: chart.pane === "oi" || chart.pane === "cvd" ? chart.pane : DEFAULT_CHART.pane,
+      pane: chart.pane === "oi" || chart.pane === "cvd" || chart.pane === "rsi" ? chart.pane : DEFAULT_CHART.pane,
       open: chart.open !== false,
     },
     flags: raw.flags && typeof raw.flags === "object" ? { ...raw.flags } : {},

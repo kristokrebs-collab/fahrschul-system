@@ -19,6 +19,8 @@ export interface ToChartBoxesOptions {
   targets?: boolean;
   /** the setup whose targets / stop are drawn (default: the analysis' best) */
   setup?: BoxSetup | null;
+  /** timeframe in the caption (`4h-Box stark`) – for a chart of another interval */
+  tfLabel?: string;
 }
 
 const GRADE_WORD: Readonly<Record<string, string>> = { stark: "stark", solide: "solide", schwach: "schwach" };
@@ -59,7 +61,7 @@ export function toChartBoxes(a: BoxAnalysis | null | undefined, o: ToChartBoxesO
       tone,
       state: pending ? "provisional" : "confirmed",
       active,
-      label: active ? `Box ${GRADE_WORD[b.grade] ?? b.grade}` : undefined,
+      label: active ? `${o.tfLabel ? `${o.tfLabel}-` : ""}Box ${GRADE_WORD[b.grade] ?? b.grade}` : undefined,
       targets: active && o.targets !== false ? targetsOf(a, setup) : undefined,
     };
   });

@@ -488,12 +488,15 @@ export function subscribeBoxes(cb: () => void): () => void {
 
 /**
  * React: the live boxes. A publish arrives as a transition (the card trees re-render in slices between frames, never
- * inside the store's own task); re-renders only when something shown changes.
+ * inside the store's own task); re-renders only when something shown changes. `enabled: false` (an off layer) neither
+ * retains nor subscribes – nothing is computed for it.
  */
-export function useBoxes(): BoxesView {
+export function useBoxes(opts: { enabled?: boolean } = {}): BoxesView {
+  const enabled = opts.enabled !== false;
   const provider = useProvider();
   const [view, setView] = useState(getBoxes);
   useEffect(() => {
+    if (!enabled) return;
     const release = retainBoxes();
     const sync = () => startTransition(() => setView(getBoxes()));
     sync();
@@ -502,7 +505,7 @@ export function useBoxes(): BoxesView {
       off();
       release();
     };
-  }, []);
+  }, [enabled]);
   // a symbol switch replaces the provider: follow it at once
   useEffect(() => {
     if (ctl.refs > 0) syncProvider();
