@@ -9,7 +9,7 @@ single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `sr
 |---|---|---|
 | `migrations/0001_core.sql` | P09 | `profiles`, `journal_docs` (+ Realtime), `rate_hits` + `rate_hit()`, `audit_log`, `app_errors`, `exchange_connections`, `mfa_satisfied()`, `my_sessions()`, `backup_candidates()`, buckets `backups` / `screenshots` (+ own-folder policies) |
 | `migrations/0002_billing.sql` | P10 | `billing_customers`, `subscriptions`, `team_seats`, `referral_codes`, `referrals`, `affiliate_ledger`, `stripe_events` |
-| `migrations/0003_exchange.sql` | P11 | `sync_runs`, `sync_cursor`, `api_tokens`, `upsert_synced_trade()` – secrets live in `exchange_connections` (0001) |
+| `migrations/0003_exchange.sql` | P11 | `exchange_connections` + `journal_account`, `sync_enabled`, `meta`; `sync_runs`, `sync_cursor`, `api_tokens`, `upsert_synced_trade()` / `upsert_synced_trades()` – secrets stay in `exchange_connections` (0001) |
 | `migrations/0004_social.sql` | P12 | groups, members, shares, comments, feedback, leaderboards |
 
 Apply with the Supabase CLI (`supabase db push`) or paste each file into the SQL editor. Every migration runs once;
@@ -70,6 +70,32 @@ folder policies, the `rev` bump on a tombstone update and a stale optimistic `re
 for every table, refused client writes, hidden columns (`referred_id`, `stripe_invoice_id`), the code / id checks, the
 ledger uniqueness and the `on delete set null` of `referrals`.
 
+## Rules the schema enforces (0003, exchange sync)
+
+- **`exchange_connections`** (0001) gains `journal_account` (`makro` | `scalp`, the account synced trades land in),
+  `sync_enabled` (Auto-Sync) – both client-readable via column grants – and `meta` (service only: fee convention,
+  venue details). The encrypted key columns stay unreadable for clients.
+- **`sync_runs`**: one row per sync / dry run / backfill / cron run with counts (`fetched`, `inserted`, `updated`,
+  `unchanged`, `skipped`), status and a German error (≤ 300 chars, never a secret). Users read their own rows (aal2 when
+  2FA is on, restrictive policy); only functions write. `connection_id` → `null` when a connection is removed, so the
+  history stays.
+- **`sync_cursor`** `(connection_id, stream)`: the incremental position (`cursor_ms`) and the resume point of an
+  unfinished window (`meta`); service role only, deleted with the connection.
+- **`api_tokens`**: personal tokens for the REST API / TradingView webhook – only the SHA-256 (`^[0-9a-f]{64}$`,
+  unique) is stored plus a display prefix; scopes limited to `trades:read`, `trades:write`, `webhook:tradingview`.
+  Clients read their own rows without `token_hash` (column grants); create / revoke run in `trades-api.mts`.
+- **`upsert_synced_trade(user, id, set, fill, new)`** / **`upsert_synced_trades(user, items ≤ 200)`** (service role
+  only, `security definer`, empty `search_path`): the one write path of server-side imports into `journal_docs`.
+  New → inserted; tombstone → `deleted` (a trade the trader deleted is never resurrected); existing → `set` keys
+  overwrite, `fill` keys only fill empty values (`null`, `""`, `[]`), everything else of the trader stays; equal apart
+  from `syncedAt` / `updatedAt` → `unchanged` without a write (no Realtime event). The key lists mirror
+  `src/exchanges/syncFields.ts`.
+
+0003 was checked on PGlite (Postgres 17) on top of 0001 / 0002 and their shims (`scratchpad` script, not committed):
+own-row visibility and refused client writes for the three tables, hidden `token_hash` / `meta` / secrets, the hash /
+scope / `journal_account` checks, insert → unchanged → updated → tombstone results of `upsert_synced_trade` (FILL never replaces a value),
+the 200-item limit, `execute` refused for `authenticated`, and the cascades on connection and user deletion.
+
 ## External setup (dashboard)
 
 1. Project in the **EU (Frankfurt)** region; sign the DPA (AVV).
@@ -88,3 +114,6 @@ ledger uniqueness and the `on delete set null` of `referrals`.
    button deep-links there); promotion codes for coupons (the pricing page checks them live); tax / invoice settings
    (German invoices, optional `STRIPE_AUTOMATIC_TAX=true`). A comp plan for the owner: `update profiles set plan = 'premium'
    where id = '<uuid>'` (stays until a webhook for that user rewrites it).
+7. **Exchange sync** (P11): Netlify secret `EXCHANGE_ENC_KEY_V1` (`openssl rand -base64 32`, scope Functions) – without
+   it the app says honestly that the sync is not set up and offers the CSV import. Optional `SYNC_CRON_ENABLED=false`
+   stops the 30-minute sync. Rotation: add `EXCHANGE_ENC_KEY_V2`; old keys keep decrypting and are re-encrypted on use.
