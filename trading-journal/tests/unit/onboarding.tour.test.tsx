@@ -10,6 +10,7 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import { OnboardingHost } from "@/onboarding/OnboardingHost";
 import { ONBOARDING_KEY, readOnboarding, useOnboarding } from "@/onboarding/onboardingStore";
 import { useJournal } from "@/store/journalStore";
+import { useShareRoute } from "@/store/router";
 import { useUi } from "@/store/uiStore";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
@@ -38,6 +39,21 @@ describe("Onboarding tour", () => {
     await bootFixtureJournal();
     localStorage.removeItem(ONBOARDING_KEY);
     useOnboarding.setState({ open: false, step: 0, source: "manual", paused: false, loaded: false });
+  });
+
+  it("a share-link visitor (#share/<token>) is not toured over the shared trade; opening the app starts it", async () => {
+    await act(async () => {
+      useJournal.setState({ trades: [] });
+      useShareRoute.setState({ token: "AbCdEfGhIjKlMnOpQrStUv" });
+    });
+    mount();
+    await new Promise((r) => setTimeout(r, 30));
+    expect(useOnboarding.getState().open).toBe(false);
+    expect(readOnboarding()).toBeNull();
+    await act(async () => {
+      useShareRoute.setState({ token: null });
+    });
+    expect(await screen.findByRole("dialog", { name: "Einführung" })).toBeInTheDocument();
   });
 
   it("an existing trader (journal with trades) is marked seen and never interrupted", async () => {

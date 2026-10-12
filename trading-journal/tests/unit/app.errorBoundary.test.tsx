@@ -4,9 +4,10 @@
  * retry re-mounts the children and `resetKeys` re-arms the boundary (page switch).
  */
 import { fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { Suspense, useState, type ComponentType } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ErrorBoundary, ERROR_STRINGS, glitchFrames } from "@/app/ErrorBoundary";
+import { retryableLazy } from "@/app/retryableLazy";
 import { textFrame } from "@/motion";
 
 // the boundary imports `reportError` from its module (P14: not the `@/cloud` barrel, which stays out of the first load)
@@ -125,5 +126,36 @@ describe("ErrorBoundary", () => {
     fireEvent.click(screen.getByRole("button", { name: "Testfehler 42" }));
     expect(screen.getByText("Inhalt")).toBeInTheDocument();
     expect(reportError).toHaveBeenCalledTimes(1);
+  });
+
+  it("a lazy page whose chunk failed downloads again on 'Erneut versuchen' (retryableLazy)", async () => {
+    let online = false;
+    const loader = vi.fn(async (): Promise<{ default: ComponentType }> => {
+      if (!online) throw new TypeError("Failed to fetch dynamically imported module");
+      return { default: () => <p>Analyse geladen</p> };
+    });
+    const view = retryableLazy(loader);
+    // the page leaf looks its component up while rendering (like `LazyPageView` in App.tsx)
+    function Leaf() {
+      const View = view();
+      // eslint-disable-next-line react-hooks/static-components
+      return <View />;
+    }
+    render(
+      <ErrorBoundary variant="page">
+        <Suspense fallback={<p>lädt</p>}>
+          <Leaf />
+        </Suspense>
+      </ErrorBoundary>,
+    );
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    const failed = loader.mock.calls.length;
+    // back online: a plain React.lazy would rethrow its cached rejection here
+    online = true;
+    fireEvent.click(screen.getByRole("button", { name: ERROR_STRINGS.retry }));
+    expect(await screen.findByText("Analyse geladen")).toBeInTheDocument();
+    expect(loader).toHaveBeenCalledTimes(failed + 1);
+    // a working component keeps its identity
+    expect(view()).toBe(view());
   });
 });

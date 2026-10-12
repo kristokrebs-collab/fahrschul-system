@@ -15,6 +15,7 @@ import { cn } from "@/lib/cn";
 import { pct0, signed } from "@/lib/format";
 import { FullscreenWipe, WipeItem } from "@/motion/pulse/FullscreenWipe";
 import { useEnriched, useJournal } from "@/store/journalStore";
+import { useShareRoute } from "@/store/router";
 import { readRaw, storageKey, writeRaw } from "@/store/storage";
 import { useMinuteClock } from "@/views/coach/hooks";
 import { openReport } from "./berichteStore";
@@ -45,7 +46,9 @@ export function ReportReadyHost({ onOpen }: { onOpen?: (key: string) => void }) 
   /** the announced report (kept after closing, so the wipe can play out) */
   const [entry, setEntry] = useState<ArchiveEntry | null>(null);
   const [open, setOpen] = useState(false);
-  const batch = useMemo(() => (loaded && allowed ? pendingReports(enriched, settings, now) : []), [loaded, allowed, enriched, settings, now]);
+  // never over a shared link (`#share/<token>`, P14): the visitor came for the shared trade, the wipe waits for the app
+  const sharing = useShareRoute((s) => s.token !== null);
+  const batch = useMemo(() => (loaded && allowed && !sharing ? pendingReports(enriched, settings, now) : []), [loaded, allowed, sharing, enriched, settings, now]);
   // the most important report that was not announced yet; announcing it covers the smaller ones that ended with it
   // (a quarter that ended also ended a month and a week: ONE wipe, never three on three app starts)
   const next = batch.find((e) => !announced.includes(e.period.key)) ?? null;

@@ -23,7 +23,7 @@ vi.mock("@/app/pages", async () => {
     TradesView: () => <div data-testid="page-trades">Alle Trades</div>,
     SetupsView: () => <div data-testid="page-setups">Entscheidungsgrundlagen</div>,
     SettingsView: () => <div data-testid="page-settings">Einstellungen</div>,
-    LAZY_VIEWS,
+    lazyView: (p: string) => LAZY_VIEWS[p],
     LAZY_PAGES: Object.keys(LAZY_VIEWS),
     isLazyPage: (p: string) => p in LAZY_VIEWS,
     PAGE_FEATURE: { coach: "coach" },

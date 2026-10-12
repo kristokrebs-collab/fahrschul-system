@@ -101,10 +101,34 @@ interface Isolation {
 }
 
 /**
+ * A dialog stacked over another one (the trade detail → the share sheet or the replay of an app-level host, P14):
+ * hosts mount their dialogs in place, so the new panel may sit inside a wrapper the OLDER session already marked as
+ * behind. Its own chain (the panel and its ancestors) is lifted while it is open – otherwise the topmost dialog itself
+ * would be aria-hidden – and marked again on release if the older session still holds it.
+ */
+function liftOwnChain(el: HTMLElement): () => void {
+  const lifted: HTMLElement[] = [];
+  for (let node: HTMLElement | null = el; node && node !== document.body; node = node.parentElement) {
+    if (!behindRefs.has(node)) continue;
+    node.removeAttribute("aria-hidden");
+    node.removeAttribute("data-modal-behind");
+    lifted.push(node);
+  }
+  return () => {
+    for (const node of lifted) {
+      if (!behindRefs.has(node)) continue;
+      node.setAttribute("aria-hidden", "true");
+      node.setAttribute("data-modal-behind", "");
+    }
+  };
+}
+
+/**
  * Isolates everything outside `el` (siblings of every ancestor up to `<body>`, see `acquireBehind`); live regions are
- * descended into instead of hidden as a whole.
+ * descended into instead of hidden as a whole. An older dialog's marks on `el`'s own chain are lifted meanwhile.
  */
 function isolateOutside(el: HTMLElement): Isolation {
+  const unlift = liftOwnChain(el);
   const touched: HTMLElement[] = [];
   const hideChildren = (parent: HTMLElement, skip: HTMLElement | null) => {
     for (const child of Array.from(parent.children)) {
@@ -134,6 +158,7 @@ function isolateOutside(el: HTMLElement): Isolation {
     release: () => {
       unguard();
       for (const t of touched) releaseBehind(t);
+      unlift();
     },
   };
 }

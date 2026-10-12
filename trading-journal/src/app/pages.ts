@@ -8,7 +8,8 @@
  *   anywhere in the shell would pull the whole page into the main chunk.
  * `renderPage` in `App.tsx` wraps each lazy page in `Suspense` (skeleton) and its plan gate (`PAGE_FEATURE`).
  */
-import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import type { ComponentType, LazyExoticComponent } from "react";
+import { retryableLazy } from "@/app/retryableLazy";
 import type { Feature } from "@/billing/types";
 import type { Page } from "@/store/uiStore";
 
@@ -56,8 +57,12 @@ function load(page: LazyPage): Promise<{ default: ComponentType }> {
   return p;
 }
 
-/** The lazy component of every feature page (stable identities, created once). */
-export const LAZY_VIEWS = Object.fromEntries(LAZY_PAGES.map((p) => [p, lazy(() => load(p))])) as Record<LazyPage, LazyExoticComponent<ComponentType>>;
+const VIEWS = Object.fromEntries(LAZY_PAGES.map((p) => [p, retryableLazy(() => load(p))])) as Record<LazyPage, () => LazyExoticComponent<ComponentType>>;
+
+/** The lazy component of a feature page – read it while rendering (`LazyPageView` in `App.tsx`), never cache it. */
+export function lazyView(page: LazyPage): LazyExoticComponent<ComponentType> {
+  return VIEWS[page]();
+}
 
 /** Starts the download of a page's chunk (intent: hover / focus / press of its link). No-op for static pages. */
 export function preloadPage(page: Page): void {

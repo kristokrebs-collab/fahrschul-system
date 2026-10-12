@@ -182,6 +182,37 @@ describe("useDialogBehaviour", () => {
     expect(document.activeElement).toBe(inA);
   });
 
+  it("stacked: a dialog that mounts inside a wrapper the open one hid (an app-level host) is reachable, and the wrapper is hidden again after it", () => {
+    function Stack({ a, b }: { a: boolean; b: boolean }) {
+      return (
+        <div>
+          <button type="button">Zeile</button>
+          <Pane name="Detail" open={a} settled />
+          {/* a host's wrapper (HostSlot, `display: contents`): already there when the detail isolates the page */}
+          <div data-testid="host">
+            <Pane name="Teilen" open={b} settled />
+          </div>
+        </div>
+      );
+    }
+    const { rerender } = render(<Stack a={false} b={false} />);
+    rerender(<Stack a b={false} />);
+    const host = screen.getByTestId("host");
+    expect(behind(host)).toBe(true);
+    rerender(<Stack a b />);
+    // the share sheet is the topmost dialog: its chain is reachable, the detail is behind it
+    expect(host).not.toHaveAttribute("aria-hidden");
+    expect(screen.getByRole("dialog", { name: "Teilen" })).toBeInTheDocument();
+    expect(behind(document.querySelector<HTMLElement>('[role="dialog"][aria-label="Detail"]')!)).toBe(true);
+    // the sheet closes: the detail is back on top and its isolation holds the wrapper again
+    rerender(<Stack a b={false} />);
+    expect(behind(host)).toBe(true);
+    expect(screen.getByRole("dialog", { name: "Detail" })).toBeInTheDocument();
+    rerender(<Stack a={false} b={false} />);
+    expect(host).not.toHaveAttribute("aria-hidden");
+    expect(host).not.toHaveAttribute("data-modal-behind");
+  });
+
   it("a muted status (aria-live=off) is hidden with the page; real live regions stay announced", () => {
     const { rerender } = render(<Harness open={false} muted />);
     rerender(<Harness open muted />);

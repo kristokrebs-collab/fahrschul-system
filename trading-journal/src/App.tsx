@@ -13,7 +13,7 @@ import { LocalModeBanner, useLocalBannerOpen } from "@/app/LocalModeBanner";
 import { SetupEditor, TradeDetail } from "@/app/overlays";
 import { PageHost } from "@/app/PageHost";
 import { PageSkeleton } from "@/app/PageSkeleton";
-import { isLazyPage, LAZY_VIEWS, OverviewView, PAGE_FEATURE, preloadPage, SettingsView, SetupsView, TradesView } from "@/app/pages";
+import { isLazyPage, lazyView, OverviewView, PAGE_FEATURE, preloadPage, SettingsView, SetupsView, TradesView, type LazyPage } from "@/app/pages";
 import { installViewportInset } from "@/app/pwa";
 import { ScenarioWatcher } from "@/app/ScenarioWatcher";
 import { ShortcutHost } from "@/app/ShortcutHost";
@@ -80,6 +80,18 @@ function PageGate({ page, feature, children }: { page: Page; feature: Feature; c
   );
 }
 
+/**
+ * A feature page's lazy chunk. The component is looked up while rendering: after a failed download the page's error
+ * boundary re-mounts this leaf on "Erneut versuchen", which then gets a fresh lazy component – a new download.
+ */
+function LazyPageView({ page }: { page: LazyPage }) {
+  const View = lazyView(page);
+  // stable per page (created once in `pages.ts`); a new identity only after a failed download, where the fresh mount
+  // – a new download attempt – is exactly the point
+  // eslint-disable-next-line react-hooks/static-components
+  return <View />;
+}
+
 function pageContent(page: Page): ReactNode {
   switch (page) {
     case "overview":
@@ -92,10 +104,9 @@ function pageContent(page: Page): ReactNode {
       return <SettingsView />;
   }
   if (!isLazyPage(page)) return <OverviewView />;
-  const View = LAZY_VIEWS[page];
   const body = (
     <Suspense fallback={<PageSkeleton page={page} />}>
-      <View />
+      <LazyPageView page={page} />
     </Suspense>
   );
   const feature = PAGE_FEATURE[page];

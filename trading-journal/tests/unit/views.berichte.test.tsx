@@ -14,6 +14,7 @@ import { nowLocalInput } from "@/lib/dates";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { useJournal } from "@/store/journalStore";
+import { useShareRoute } from "@/store/router";
 import { readRaw } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
 import { BerichteView, berichteQuery, berichtePeriodFromQuery, openReport, periodBars, PRINT_CLASS, READY_KEY, readAnnounced, ReportReadyHost, resolvePeriod, useBerichteUi } from "@/views/berichte";
@@ -193,6 +194,23 @@ describe("ReportReadyHost", () => {
     );
     await new Promise((r) => setTimeout(r, 30));
     expect(screen.queryByTestId("report-ready")).toBeNull();
+  });
+
+  it("waits while a shared link is on screen (#share/<token>)", async () => {
+    await load(recent());
+    useShareRoute.setState({ token: "AbCdEfGhIjKlMnOpQrStUv" });
+    render(
+      <MotionRoot>
+        <ReportReadyHost />
+      </MotionRoot>,
+    );
+    await new Promise((r) => setTimeout(r, 30));
+    expect(screen.queryByTestId("report-ready")).toBeNull();
+    expect(readAnnounced()).toEqual([]);
+    await act(async () => {
+      useShareRoute.setState({ token: null });
+    });
+    expect(await screen.findByTestId("report-ready")).toBeInTheDocument();
   });
 
   it("stays silent for an empty journal", async () => {
