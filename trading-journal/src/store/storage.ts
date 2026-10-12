@@ -32,6 +32,10 @@ export const KEYS = {
   quarantine: storageKey("quarantine"),
   triggerLast: storageKey("trigger-last"),
   backupPrefix: storageKey("backup-"),
+  /** NEW (P09): Supabase auth session of this edition (`auth.storageKey`; editions never share a login). */
+  cloudAuth: storageKey("sb-auth"),
+  /** NEW (P09): sync base – owner, content hashes and settings of the last successful sync (`src/cloud/sync`). */
+  cloudBase: storageKey("cloud-base"),
 } as const;
 
 /** The journal data keys other tabs may change (`storage` event sync, see `localAdapter`). */

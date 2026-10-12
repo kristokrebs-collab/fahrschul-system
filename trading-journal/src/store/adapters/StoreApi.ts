@@ -16,7 +16,9 @@ export type SnapshotPatch = Partial<StorageSnapshot>;
 export type AdapterEvent =
   | { type: "patch"; patch: SnapshotPatch }
   | { type: "error"; error: unknown }
-  | { type: "quarantine"; count: number };
+  | { type: "quarantine"; count: number }
+  /** NEW (P09): the adapter's connection state changed (Supabase sync: `connecting` → `cloud`, `error` while offline). */
+  | { type: "status"; mode: StoreMode };
 
 export interface StorageAdapter {
   /** `local` or `cloud`. */
@@ -32,4 +34,11 @@ export interface StorageAdapter {
   /** Bulk write used by backup import/restore. */
   replaceAll(snapshot: StorageSnapshot): Promise<void>;
   dispose(): void;
+}
+
+/** NEW (P09): the local adapter can also write SOME parts atomically (the sync applies remote changes this way). */
+export interface LocalStorageAdapter extends StorageAdapter {
+  readonly mode: "local";
+  /** Writes only the given parts (one atomic unit, rolled back on failure) and emits one patch with exactly them. */
+  replaceParts(parts: SnapshotPatch): Promise<void>;
 }

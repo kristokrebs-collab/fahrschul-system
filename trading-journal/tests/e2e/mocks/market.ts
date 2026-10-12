@@ -355,7 +355,15 @@ export async function mockMarket(page: Page, scenario: MarketScenario, opts: Moc
           this.dispatchEvent(ev);
         }
       }
-      Object.defineProperty(window, "WebSocket", { value: FakeWebSocket, configurable: true, writable: true });
+      // P09 (additive): Supabase Realtime keeps the browser's WebSocket – `mocks/supabase.ts` answers it via
+      // `page.routeWebSocket`; every market socket stays scripted as before
+      const NativeWebSocket = window.WebSocket;
+      const SelectWebSocket = function (this: unknown, url: string | URL, protocols?: string | string[]) {
+        return /\.supabase\.co\//.test(String(url)) ? new NativeWebSocket(url, protocols) : new FakeWebSocket(String(url));
+      } as unknown as typeof FakeWebSocket;
+      Object.assign(SelectWebSocket, { CONNECTING: 0, OPEN: 1, CLOSING: 2, CLOSED: 3 });
+      SelectWebSocket.prototype = FakeWebSocket.prototype;
+      Object.defineProperty(window, "WebSocket", { value: SelectWebSocket, configurable: true, writable: true });
       Object.defineProperty(window, "__marketScenario", { value: file.name, configurable: true });
     },
     { file, fixtures },
