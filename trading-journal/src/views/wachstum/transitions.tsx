@@ -8,7 +8,7 @@
  * celebrate twice. The burst fires before the save – the card still exists then.
  */
 import { useEffect, useRef } from "react";
-import type { ChallengeProgress, GoalProgress } from "@/domain/growth";
+import { periodUnit, type ChallengeProgress, type GoalProgress } from "@/domain/growth";
 import { celebrateRecord, celebrateStreak } from "@/motion/fx";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { FullscreenWipe, WipeItem } from "@/motion/pulse/FullscreenWipe";
@@ -35,7 +35,7 @@ export function useGrowthTransitions(goals: readonly GoalProgress[], challenges:
     const party = reached.filter((g) => g.celebrate);
     if (party.length) {
       celebrateRecord(document.querySelector(`[data-goal="${party[0]!.goal.id}"]`));
-      useGrowthUi.getState().showWipe({ titles: party.map((g) => g.goal.title), detail: party.length === 1 ? `${party[0]!.hold}× in Folge gehalten.` : `${party.length} Ziele auf einmal.` });
+      useGrowthUi.getState().showWipe({ titles: party.map((g) => g.goal.title), detail: party.length === 1 ? `${party[0]!.hold} ${periodUnit(party[0]!.goal.period, party[0]!.hold)} in Folge gehalten.` : `${party.length} Ziele auf einmal.` });
     }
     for (const c of ended) {
       if (c.state === "done") {

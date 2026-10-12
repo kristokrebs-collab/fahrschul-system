@@ -91,7 +91,10 @@ export function BestsCard({ bests, next, className }: { bests: readonly Personal
                     <span className="truncate text-[11.5px] text-mute">{b.label}</span>
                     {fresh ? <span className="text-[9.5px] font-semibold uppercase tracking-wider text-signal">{P.newBest}</span> : b.live ? <span className="text-[9.5px] font-semibold uppercase tracking-wider text-win">{P.live}</span> : null}
                   </span>
-                  {fresh ? <TextScramble text={b.valueText} className="dot-num text-[22px] leading-none" /> : <span className="dot-num text-[22px] leading-none">{b.valueText}</span>}
+                  <span className="flex items-baseline gap-1.5">
+                    {fresh ? <TextScramble text={String(b.value)} className="dot-num text-[26px] leading-none" /> : <span className="dot-num text-[26px] leading-none">{b.value}</span>}
+                    <span className="text-[11.5px] text-mute">{b.valueText.replace(/^[\d.,]+\s*/, "")}</span>
+                  </span>
                 </motion.li>
               );
             })}

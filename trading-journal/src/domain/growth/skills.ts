@@ -88,7 +88,7 @@ export function skillProfile(p: Prepared): SkillProfile {
   const spread = riskSpread(recentClosed, p.settings, "setup", p.limits.maxLossTradePct).overall;
   add("risk", spread && spread.n >= 5 ? 100 * spread.consistency * (1 - spread.over / spread.n) : null, `${spread?.n ?? 0} Trades mit Stop`);
 
-  add("journal", recentAll.length >= 3 ? journalRate(recentAll) * 100 : null, `${recentAll.length} Trades`);
+  add("journal", recentClosed.length >= 3 ? journalRate(recentClosed) * 100 : null, `${recentClosed.length} Trades`);
 
   const calm = days.filter((k) => {
     if ((p.eventsByDay.get(k) ?? []).some((e) => RESTLESS.has(e.key))) return false;

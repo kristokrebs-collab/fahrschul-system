@@ -83,7 +83,7 @@ export function TrackersCard({ trackers, className }: { trackers: readonly Track
                 </span>
               </span>
               <span className="flex shrink-0 items-end gap-2">
-                <span className={cn("dot-num text-[18px] leading-none", t.count ? "text-fg" : "text-faint")}>{t.count}</span>
+                <span className={cn("num font-mono text-[15px] font-semibold leading-none", t.count ? "text-fg" : "text-faint")}>{t.count}×</span>
                 <Bars weekly={t.weekly} tone={t.count ? "fg" : "mute"} />
               </span>
             </li>

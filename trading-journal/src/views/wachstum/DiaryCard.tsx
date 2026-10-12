@@ -84,20 +84,22 @@ function Timeline({ shown }: { shown: readonly DiaryDay[] }) {
   const reduced = useReducedFx();
   const wide = useMediaQuery("(min-width: 640px)", true);
   const total = shown.length;
-  const time = useMotionValue(total);
+  // the axis runs a little past the last day, so the row labels after the newest bars stay inside the card
+  const axis = total + 1.5;
+  const time = useMotionValue(axis);
   const [idx, setIdx] = useState(total - 1);
   useMotionValueEvent(time, "change", (t) => {
     const i = Math.max(0, Math.min(total - 1, Math.ceil(t) - 1));
     if (i !== idx) setIdx(i);
   });
-  const spans: ScrubSpan[] = shown.map((d, i) => ({ id: d.key, label: d.label, start: i, duration: 1, tone: toneOf(d), meta: d.mood ? MOOD_LABELS[d.mood - 1] : d.trades.length ? `${d.trades.length} Trade${d.trades.length === 1 ? "" : "s"}` : undefined }));
+  const spans: ScrubSpan[] = shown.map((d, i) => ({ id: d.key, label: wide ? d.label : `${d.key.slice(8, 10)}.${d.key.slice(5, 7)}.`, start: i, duration: 1, tone: toneOf(d), meta: d.mood ? MOOD_LABELS[d.mood - 1] : d.trades.length ? `${d.trades.length} Trade${d.trades.length === 1 ? "" : "s"}` : undefined }));
   const cur = shown[Math.max(0, Math.min(total - 1, idx))];
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
       <ScrubTimeline
         label="Tagebuch durchblättern"
         title="Tag für Tag"
-        total={total}
+        total={axis}
         spans={spans}
         time={time}
         playSeconds={Math.max(3, total * 0.6)}

@@ -161,6 +161,13 @@ describe("Zielfortschritt", () => {
     expect(custom.history[custom.history.length - 1]!.met).toBe(true);
   });
 
+  it("offene Trades zählen nicht gegen die Review-Quote; höchstens vier Meilensteine", () => {
+    const open = prepare({ list: enrichC([...trades, ct(at(37, 700), { id: "open", status: "open", exit: null, pnlManual: null })]), events: [], days: {}, settings: COACH_SETTINGS, now: NOW });
+    expect(goalProgress(goal(), open).actual).toBe(0.5);
+    const long = goalProgress(goal({ hold: 12 }), p);
+    expect(long.milestones.map((m) => m.n)).toEqual([3, 6, 9, 12]);
+  });
+
   it("Rangfolge und Wochenübersicht", () => {
     const list = [goalProgress(goal({ title: "Outcome", metric: "winRate", kind: "outcome", target: 0.6 }), p), goalProgress(goal(), p), goalProgress(goal({ title: "L", metric: "tradesPerDay", target: 1, comparator: "atMost" }), p)];
     expect(rankGoals(list)[0]!.goal.title).toBe("Jeden Trade reviewen");

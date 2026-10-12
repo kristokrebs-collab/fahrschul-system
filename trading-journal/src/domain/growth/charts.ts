@@ -51,7 +51,8 @@ export function progressSeries(p: Prepared, habits: readonly Habit[] = [], weeks
       fromKey,
       toKey,
       discipline: disciplineAvg(p.discDays, fromKey, toKey),
-      journal: list.length ? journalRate(list) : null,
+      // reviews follow the close: open trades are left out of the journaling rate
+      journal: list.some((t) => t.result !== "open") ? journalRate(list.filter((t) => t.result !== "open")) : null,
       checkins,
       ruleBreaks: breaks.filter((e) => {
         const k = localDateKey(new Date(e.at));

@@ -146,6 +146,15 @@ describe("Challenges", () => {
     expect(challengeProgress(ch("calm14", 15, "dropped"), ctx([]))!.state).toBe("active");
   });
 
+  it("ein Trade vor dem Annehmen am Starttag bricht die Challenge nicht", () => {
+    const p = ctx([ct(at(18, 540), { id: "early", stop: null }), ct(at(18, 900), { id: "late", stop: null })]);
+    const accepted = (min: number): Challenge => ({ ...ch("stop14", 18), createdAt: new Date(at(18, min)).toISOString() });
+    // accepted at 12:00: the 09:00 trade is before, the 15:00 one breaks it
+    expect(challengeProgress(accepted(720), p)!.violations.map((v) => v.tradeId)).toEqual(["late"]);
+    // accepted at 16:00: nothing after it
+    expect(challengeProgress(accepted(960), p)!.state).toBe("active");
+  });
+
   it("Vorschlag: passend zum häufigsten Muster, keine laufende", () => {
     const s = suggestChallenges([{ key: "revenge", count: 4 }], [], 5);
     expect(s[0]!.key).toBe("calm14");

@@ -16,6 +16,8 @@ import { Segmented } from "@/primitives/Segmented";
 import { WACHSTUM } from "./strings";
 import { SEG_TOUCH } from "./ui";
 
+const SHORT: Readonly<Record<PsychFactor["key"], string>> = { mood: "Stimmung", stress: "Stress", energy: "Energie", sleep: "Schlaf", tradeStress: "Trade-Stress", confidence: "Zuversicht" };
+
 const fmt = (v: number | null, unit: "R" | "money", cur: string) => {
   if (v == null) return "–";
   const s = unit === "R" ? `${Math.abs(v).toFixed(2).replace(".", ",")} R` : `${Math.round(Math.abs(v)).toLocaleString("de-DE")} ${cur}`;
@@ -34,7 +36,7 @@ function FactorBars({ f, cur }: { f: PsychFactor; cur: string }) {
         const w = Math.abs(v) / max;
         const best = f.best === b;
         return (
-          <li key={b.key} className="grid grid-cols-[92px_minmax(0,1fr)_76px] items-center gap-2 text-[11.5px]">
+          <li key={b.key} className="grid grid-cols-[84px_minmax(0,1fr)_108px] items-center gap-2 text-[11.5px]">
             <span className={cn("truncate", best ? "font-medium text-fg" : "text-mute")}>{b.label}</span>
             <span className="relative h-3.5 rounded-sm bg-white/[0.04]" role="img" aria-label={`${b.label}: Ø ${fmt(b.avg, f.unit, cur)}, ${b.n} ${f.scope === "day" ? "Tage" : "Trades"}`}>
               <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-px bg-line-2" />
@@ -47,7 +49,7 @@ function FactorBars({ f, cur }: { f: PsychFactor; cur: string }) {
                 transition={{ ...spring.enter, delay: reduced ? 0 : i * stagger.reveal }}
               />
             </span>
-            <span className={cn("num text-right font-mono", v > 0 ? "text-win" : v < 0 ? "text-loss" : "text-mute")}>
+            <span className={cn("num whitespace-nowrap text-right font-mono", v > 0 ? "text-win" : v < 0 ? "text-loss" : "text-mute")}>
               {fmt(b.avg, f.unit, cur)} <span className="text-faint">· {b.n}</span>
             </span>
           </li>
@@ -68,7 +70,7 @@ export function MoodCard({ factors, cur, className }: { factors: readonly PsychF
     <Card
       title={WACHSTUM.psyche.mood}
       note={f ? `${f.scope === "day" ? "Je Tag" : "Je Trade"} · Ø ${f.unit === "R" ? "R" : cur} pro Trade` : undefined}
-      action={strong.length > 1 ? <Segmented aria-label="Faktor" size="sm" className={SEG_TOUCH} options={strong.map((x) => ({ v: x.key, label: x.label.replace(" im Trade", "") }))} value={f?.key ?? null} onChange={setSel} /> : undefined}
+      action={strong.length > 1 ? <Segmented aria-label="Faktor" size="sm" className={SEG_TOUCH} options={strong.map((x) => ({ v: x.key, label: SHORT[x.key] }))} value={f?.key ?? null} onChange={setSel} /> : undefined}
       className={className}
       data-testid="growth-mood"
       data-factor={f?.key ?? ""}

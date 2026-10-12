@@ -20,7 +20,6 @@ import { addHabit, archiveHabit, setHabitDone } from "./actions";
 import { WACHSTUM } from "./strings";
 
 const H = WACHSTUM.habits;
-const WD = ["M", "D", "M", "D", "F", "S", "S"] as const;
 
 function Row({ row, columns, todayKey }: { row: HabitRow; columns: readonly string[]; todayKey: string }) {
   const reduced = useReducedFx();
@@ -42,9 +41,9 @@ function Row({ row, columns, todayKey }: { row: HabitRow; columns: readonly stri
         </div>
         <div className="flex items-center gap-3 text-[11px] text-mute">
           <span className="num">{Math.round(row.rate * 100)} % · {H.rate}</span>
-          <span className="flex items-baseline gap-1">
-            <RollingDigits value={row.streak} className="dot-num text-[15px] text-fg" aria-label={`Serie ${row.streak} Tage`} />
-            <span>Tage</span>
+          <span className="flex items-baseline gap-1" title={`Bestwert ${row.best} Tage`}>
+            <RollingDigits value={row.streak} className="num font-mono text-[13px] font-semibold text-fg" aria-label={`Serie ${row.streak} Tage`} />
+            <span>{row.streak === 1 ? "Tag" : "Tage"} in Folge</span>
           </span>
           {!h.auto && (
             <motion.button
@@ -82,7 +81,8 @@ function Row({ row, columns, todayKey }: { row: HabitRow; columns: readonly stri
 export function HabitGrid({ rows, columns, todayKey, existing, className }: { rows: readonly HabitRow[]; columns: readonly string[]; todayKey: string; existing: readonly string[]; className?: string }) {
   const [adding, setAdding] = useState(false);
   const [text, setText] = useState("");
-  const weekdays = columns.slice(0, 7).map((_, i) => WD[i]!);
+  // one label per week: the Monday's date ("ab 05.10.")
+  const weeks = columns.filter((_, i) => i % 7 === 0).map((k) => `${k.slice(8, 10)}.${k.slice(5, 7)}.`);
   const add = async (title: string, auto?: (typeof AUTO_HABITS)[number]) => {
     const ok = await addHabit(auto?.title ?? title, auto?.auto, auto?.id);
     if (ok) {
@@ -136,9 +136,11 @@ export function HabitGrid({ rows, columns, todayKey, existing, className }: { ro
         <p className="text-[12.5px] leading-relaxed text-mute">{H.empty}</p>
       ) : (
         <div className="grid gap-2">
-          <div className="grid gap-[3px] text-center text-[9px] text-faint" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }} aria-hidden="true">
-            {columns.map((k, i) => (
-              <span key={k}>{i < 7 ? weekdays[i] : ""}</span>
+          <div className="grid gap-[3px] text-[9.5px] text-faint" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }} aria-hidden="true">
+            {weeks.map((w) => (
+              <span key={w} className="truncate border-l border-line-2 pl-1" style={{ gridColumn: "span 7" }}>
+                {w}
+              </span>
             ))}
           </div>
           <ul className="grid gap-3">

@@ -83,7 +83,7 @@ export function GoalCard({ g, index = 0 }: { g: GoalProgress; index?: number }) 
         </div>
       </div>
       {goal.why && <p className="line-clamp-2 text-[11.5px] leading-relaxed text-faint">{goal.why}</p>}
-      <MilestoneRail items={rail} orientation="horizontal" active={reachedCount === 0 ? -1 : active} label={`Meilensteine: ${goal.title}`} className="-mx-1 [&>li]:!w-[92px] [&>li]:!pr-2" />
+      <MilestoneRail items={rail} orientation="horizontal" active={reachedCount === 0 ? -1 : active} label={`Meilensteine: ${goal.title}`} className="-mx-1 [&>li]:!w-0 [&>li]:min-w-0 [&>li]:grow [&>li]:!pr-2" />
       {g.history.length > 0 && (
         <div className="flex items-center gap-1" aria-label="Letzte Perioden" role="img">
           {g.history.slice(-8).map((h) => (

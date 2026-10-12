@@ -19,8 +19,8 @@ import { useGrowthUi } from "./growthStore";
 import { WACHSTUM } from "./strings";
 import { signedInt } from "./ui";
 
-const W = 300;
-const H = 250;
+const W = 340;
+const H = 290;
 const CX = W / 2;
 const CY = H / 2 + 4;
 const R = 92;
@@ -31,6 +31,16 @@ function vertex(i: number, v: number): [number, number] {
   return [CX + r * Math.cos(a), CY + r * Math.sin(a)];
 }
 const ring = (v: number) => Array.from({ length: 6 }, (_, i) => vertex(i, v).join(",")).join(" ");
+/** Label anchor of axis `i` outside the 100 ring (top / bottom labels centred, the sides pushed out). */
+function labelPos(i: number): { x: number; y: number; anchor: "start" | "middle" | "end" } {
+  const a = -Math.PI / 2 + (i * 2 * Math.PI) / 6;
+  const r = R + 16;
+  const x = CX + r * Math.cos(a);
+  const y = CY + r * Math.sin(a);
+  if (i === 0) return { x, y: y - 14, anchor: "middle" };
+  if (i === 3) return { x, y: y + 4, anchor: "middle" };
+  return { x: x + (x > CX ? 4 : -4), y: y - 4, anchor: x > CX ? "start" : "end" };
+}
 const poly = (vals: readonly (number | null)[]) => vals.map((v, i) => vertex(i, v ?? 0).map((x) => x.toFixed(1)).join(",")).join(" ");
 
 export function SkillRadar({ now, before, className }: { now: SkillProfile; before: SkillProfile; className?: string }) {
@@ -74,7 +84,7 @@ export function SkillRadar({ now, before, className }: { now: SkillProfile; befo
             {now.weakest && now.weakest !== now.strongest ? <span className="block text-faint">Größter Hebel: {now.weakest.label}</span> : null}
           </span>
         </div>
-        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="mx-auto block w-full max-w-[340px] overflow-visible" role="img" aria-label={now.axes.map((a) => `${a.label} ${a.value ?? "keine Daten"}`).join(", ")}>
+        <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="mx-auto block w-full max-w-[360px] overflow-visible" role="img" aria-label={now.axes.map((a) => `${a.label} ${a.value ?? "keine Daten"}`).join(", ")}>
           {[25, 50, 75, 100].map((v) => (
             <polygon key={v} points={ring(v)} fill="none" stroke={v === 100 ? "#2c2c2c" : "#1f1f1f"} strokeWidth="1" />
           ))}
@@ -103,8 +113,7 @@ export function SkillRadar({ now, before, className }: { now: SkillProfile; befo
             })}
           </motion.g>
           {now.axes.map((a, i) => {
-            const [x, y] = vertex(i, 124);
-            const anchor = Math.abs(x - CX) < 4 ? "middle" : x > CX ? "start" : "end";
+            const { x, y, anchor } = labelPos(i);
             return (
               <g key={a.key}>
                 <text x={x} y={y - 2} textAnchor={anchor} className="fill-mute text-[10.5px] font-medium">

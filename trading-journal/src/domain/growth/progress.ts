@@ -113,7 +113,9 @@ export function goalValue(goal: Goal, period: ReportPeriod, p: Prepared, habits:
     const ms = +tradeTime(t);
     return ms >= period.from && ms < period.to;
   });
-  return goalActual(goal.metric, goal.scope, { closed: inP.filter((t) => t.result !== "open"), list: inP, events: p.events, settings: p.settings });
+  const closed = inP.filter((t) => t.result !== "open");
+  // a review follows the close: an open trade cannot be reviewed yet and must not pull the journaling rate down
+  return goalActual(goal.metric, goal.scope, { closed, list: goal.metric === "journalRate" ? closed : inP, events: p.events, settings: p.settings });
 }
 
 const metOf = (goal: Goal, v: number | null): boolean | null => {
@@ -123,7 +125,8 @@ const metOf = (goal: Goal, v: number | null): boolean | null => {
 };
 
 function milestonesOf(hold: number, period: GoalPeriod, streak: number): GoalMilestone[] {
-  const ns = hold <= 6 ? Array.from({ length: hold }, (_, i) => i + 1) : [...new Set([1, Math.round(hold / 4), Math.round(hold / 2), Math.round((3 * hold) / 4), hold])].filter((n) => n >= 1);
+  // at most four steps (a compact rail): 1 … hold up to 4, else the quarters of the hold
+  const ns = hold <= 4 ? Array.from({ length: hold }, (_, i) => i + 1) : [...new Set([Math.ceil(hold / 4), Math.round(hold / 2), Math.round((3 * hold) / 4), hold])].filter((n) => n >= 1);
   return ns.map((n) => ({ n, label: `${n} ${periodUnit(period, n)}`, reached: streak >= n }));
 }
 

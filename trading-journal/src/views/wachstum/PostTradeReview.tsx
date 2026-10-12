@@ -153,14 +153,18 @@ export function PostTradeReviewSheet() {
       onClose={() => close(true)}
       title={R.title}
       dismissGuard={false}
-      headerExtra={
-        <label className="hidden items-center gap-2 text-[11px] text-faint sm:flex">
-          {R.auto}
-          <Switch size="sm" checked={auto} onCheckedChange={setAuto} aria-label={R.auto} />
-        </label>
-      }
     >
-      {shown ? <PostTradeReview key={shown.id} trade={shown} onDone={(saved) => close(!saved)} /> : <div />}
+      {shown ? (
+        <div className="grid gap-5">
+          <PostTradeReview key={shown.id} trade={shown} onDone={(saved) => close(!saved)} />
+          <label className="flex items-center justify-between gap-3 border-t border-line pt-3 text-[11.5px] text-faint">
+            {R.auto}
+            <Switch size="sm" checked={auto} onCheckedChange={setAuto} aria-label={R.auto} data-testid="post-trade-auto" />
+          </label>
+        </div>
+      ) : (
+        <div />
+      )}
     </Sheet>
   );
 }

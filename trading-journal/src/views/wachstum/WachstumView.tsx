@@ -60,6 +60,7 @@ export function WachstumView({ className }: { className?: string }) {
   const bests = useBests(b, streaks);
   const series = useSeries(b);
   const openCheckin = useGrowthUi((s) => s.openCheckin);
+  const doneChallenges = useMemo(() => b.prefs.challenges.filter((c) => c.status === "done").sort((a, z) => (z.endedAt ?? "").localeCompare(a.endedAt ?? "")).map((c) => c.title), [b.prefs.challenges]);
   const existingHabits = useMemo(() => b.prefs.habits.filter((h) => !h.archived).map((h) => h.id), [b.prefs.habits]);
   useGrowthTransitions(goals.active, challenges);
   useCloseMorphDialogOnUnmount();
@@ -75,7 +76,7 @@ export function WachstumView({ className }: { className?: string }) {
         lead={WACHSTUM.lead}
         leadFill={WACHSTUM_LEAD_FILL}
         action={
-          <Button variant="primary" onClick={() => openCheckin(today.key)} data-testid="wachstum-checkin">
+          <Button onClick={() => openCheckin(today.key)} data-testid="wachstum-checkin">
             {has ? WACHSTUM.checkin.ctaEdit : WACHSTUM.checkin.cta}
           </Button>
         }
@@ -100,7 +101,7 @@ export function WachstumView({ className }: { className?: string }) {
       </Section>
       <Section id={ids.routines} title={S.routines.title} sub={S.routines.sub}>
         <Cell index={0} span="lg:col-span-5">
-          <ChallengeCard running={challenges} suggestions={deck} todayKey={today.key} />
+          <ChallengeCard running={challenges} suggestions={deck} todayKey={today.key} done={doneChallenges} />
         </Cell>
         <Cell index={1} span="lg:col-span-7">
           <HabitGrid rows={habits.rows} columns={habits.columns} todayKey={today.key} existing={existingHabits} />

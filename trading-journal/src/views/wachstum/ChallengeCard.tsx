@@ -154,12 +154,28 @@ function Deck({ suggestions, todayKey }: { suggestions: readonly ChallengeTempla
   );
 }
 
-export function ChallengeCard({ running, suggestions, todayKey, className }: { running: readonly ChallengeProgress[]; suggestions: readonly ChallengeTemplate[]; todayKey: string; className?: string }) {
+export function ChallengeCard({ running, suggestions, todayKey, done = [], className }: { running: readonly ChallengeProgress[]; suggestions: readonly ChallengeTemplate[]; todayKey: string; done?: readonly string[]; className?: string }) {
   return (
     <Card title={CH.title} note={running.length ? `${running.length} läuft` : CH.none} className={className} data-testid="growth-challenges" data-running={running.length}>
-      <CardSpread variant="deal" className="grid gap-3 sm:grid-cols-2" itemClassName="min-w-0" label="Challenge-Karten">
-        {[...running.map((p) => <Running key={p.challenge.id} p={p} />), <Deck key="deck" suggestions={suggestions} todayKey={todayKey} />]}
-      </CardSpread>
+      <div className="grid gap-4">
+        <CardSpread variant="deal" className="grid gap-3 sm:grid-cols-2" itemClassName="min-w-0" label="Challenge-Karten">
+          {[...running.map((p) => <Running key={p.challenge.id} p={p} />), <Deck key="deck" suggestions={suggestions} todayKey={todayKey} />]}
+        </CardSpread>
+        <div className="grid gap-1.5 border-t border-line pt-3" data-testid="challenge-done" data-n={done.length}>
+          <span className="label !text-[10px]">Gemeistert</span>
+          {done.length ? (
+            <ul className="flex flex-wrap gap-1.5">
+              {done.slice(0, 8).map((t, i) => (
+                <li key={`${t}-${i}`} className="rounded-full border border-win/40 px-2.5 py-1 text-[11.5px] text-fg">
+                  {t}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-[12px] text-faint">Noch keine – jede Karte dauert 7 bis 14 Tage und braucht keinen einzigen Trade.</p>
+          )}
+        </div>
+      </div>
     </Card>
   );
 }
