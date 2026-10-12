@@ -11,10 +11,15 @@ import { openUx, themeSettled, UX_PROJECTS, UX_SKIP } from "./uxHarness";
 
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Suche" });
 const box = (page: Page) => dialog(page).getByRole("combobox", { name: "Suche" });
+/**
+ * The overlays are lazy chunks by design (search, shortcut sheet): the first open per page load fetches them – under
+ * the dev harness a module waterfall that takes seconds while the other workers load the app too.
+ */
+const FIRST_OPEN = { timeout: 15_000 };
 
 async function openWithSlash(page: Page) {
   await page.locator("body").press("/");
-  await expect(dialog(page)).toBeVisible();
+  await expect(dialog(page)).toBeVisible(FIRST_OPEN);
   await expect(box(page)).toBeFocused();
 }
 
@@ -77,7 +82,7 @@ test.describe("Globale Suche", () => {
     const before = page.getByRole("heading", { level: 1 }).first();
     await before.waitFor();
     await page.locator("body").press("Control+Shift+F");
-    await expect(dialog(page)).toBeVisible();
+    await expect(dialog(page)).toBeVisible(FIRST_OPEN);
     await box(page).press("Escape");
     await expect(dialog(page)).toBeHidden();
     await page.locator("body").press("Meta+Shift+F");
@@ -108,7 +113,7 @@ test.describe("Globale Suche", () => {
     test.skip(!(await openUx(page, "app", "overview")), UX_SKIP);
     await page.locator("body").press("Shift+?");
     const sheet = page.getByTestId("shortcut-sheet");
-    await expect(sheet).toBeVisible();
+    await expect(sheet).toBeVisible(FIRST_OPEN);
     await expect(sheet.getByRole("toolbar", { name: "Wichtigste Tasten" })).toBeVisible();
     await expectNoHorizontalScroll(page);
     await page.keyboard.press("Escape");
