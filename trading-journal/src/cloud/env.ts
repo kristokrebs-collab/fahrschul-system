@@ -4,6 +4,16 @@
  */
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
 
+// P09's extra build variables, merged into the shared `ImportMetaEnv` (`src/env.d.ts`) from here so that file stays as is.
+declare global {
+  interface ImportMetaEnv {
+    /** Optional OAuth buttons in the login sheet, comma-separated (`google,github,apple,discord`). */
+    readonly VITE_SUPABASE_OAUTH_PROVIDERS?: string;
+    /** Vite: public base path of the build (`/` personal, `/teilen/` share). */
+    readonly BASE_URL: string;
+  }
+}
+
 export interface CloudConfig {
   /** Supabase project URL without trailing slash, e.g. `https://<ref>.supabase.co`. */
   url: string;
