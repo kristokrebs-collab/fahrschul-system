@@ -3,11 +3,19 @@
  * candles around the trade, lines `Einstieg` / `Stop` / `Ziel` / `Ausstieg`, entry/exit markers.
  * Mount: skeleton (fixed 160 px) → setData → 2 rAF → opacity fade (`tween.fade`, no scale: it lives
  * inside a `layout` dialog).
+ *
+ * Journal v3 (P06): `annotations` are drawn by the `AnnotationPrimitive`; with `onAnnotationsChange` a toolbar above
+ * the chart offers line / trend / box / arrow / text in four colours: a tap places a point (two-point tools show a
+ * dashed preview that follows the pointer), a tap on a drawing selects it, `Zeichnung löschen` removes it. Drawings are
+ * stored in time / price, so they stay on their candles.
  */
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { createChart, createSeriesMarkers, LineStyle, type IChartApi, type IPriceLine } from "lightweight-charts";
-import type { EnrichedTrade } from "@/domain/types";
+import type { Annotation, AnnotationKind, EnrichedTrade } from "@/domain/types";
+import { newId } from "@/lib/ids";
+import { AnnotationToolbar, DRAW_COLORS, TOOLS } from "@/journal/annotations/AnnotationToolbar";
+import { AnnotationPrimitive } from "./primitives/AnnotationPrimitive";
 import type { Candle } from "@/market/types";
 import { tween } from "@/motion/tokens";
 import { cn } from "@/lib/cn";
@@ -26,6 +34,10 @@ export interface MiniTradeChartProps {
   /** px, default 160 */
   height?: number;
   className?: string;
+  /** Journal v3: chart drawings of the trade (time / price). */
+  annotations?: readonly Annotation[];
+  /** Journal v3: given → the drawing toolbar shows and every change is reported (the caller saves the trade). */
+  onAnnotationsChange?: (next: Annotation[]) => void;
 }
 
 export const MINI_LINES = {
@@ -41,13 +53,26 @@ interface Instance {
   main: MainSeries;
   lines: Partial<Record<MiniLineKey, IPriceLine>>;
   detach: () => void;
+  notes: AnnotationPrimitive;
+  times: number[];
 }
 
-export function MiniTradeChart({ candles, trade, interval = "1h", height = 160, className }: MiniTradeChartProps) {
+export function MiniTradeChart({ candles, trade, interval = "1h", height = 160, className, annotations, onAnnotationsChange }: MiniTradeChartProps) {
   const host = useRef<HTMLDivElement>(null);
   const inst = useRef<Instance | null>(null);
   const [ready, setReady] = useState(false);
   const reduce = useReducedMotion() ?? false;
+  const reduceRef = useRef(reduce);
+  useEffect(() => {
+    reduceRef.current = reduce;
+  }, [reduce]);
+  const editable = typeof onAnnotationsChange === "function";
+  const [tool, setTool] = useState<AnnotationKind | null>(null);
+  const [color, setColor] = useState<string>(DRAW_COLORS[0].hex);
+  const [placed, setPlaced] = useState<{ time: number; price: number } | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [noteText, setNoteText] = useState("");
+  const list = annotations ?? EMPTY_NOTES;
 
   useLayoutEffect(() => {
     const node = host.current;
@@ -56,7 +81,10 @@ export function MiniTradeChart({ candles, trade, interval = "1h", height = 160, 
     const main = createMainSeries(chart, { volume: false });
     main.candles.applyOptions({ priceLineVisible: false, lastValueVisible: false });
     const markers = createSeriesMarkers(main.candles, [], { zOrder: "aboveSeries" });
-    const instance: Instance = { chart, main, lines: {}, detach: () => markers.detach() };
+    const own = { times: [] as number[] };
+    const notes = new AnnotationPrimitive({ times: () => inst.current?.times ?? own.times, intervalSec: () => INTERVAL_SECONDS[interval], reducedMotion: () => reduceRef.current });
+    main.candles.attachPrimitive(notes);
+    const instance: Instance = { chart, main, lines: {}, detach: () => markers.detach(), notes, times: own.times };
     inst.current = instance;
     const fonts = typeof document !== "undefined" ? document.fonts : undefined;
     fonts?.load?.(CHART_FONT_LOAD).then(
@@ -67,9 +95,12 @@ export function MiniTradeChart({ candles, trade, interval = "1h", height = 160, 
     );
     return () => {
       instance.detach();
+      main.candles.detachPrimitive(notes);
       inst.current = null;
       chart.remove();
     };
+    // the interval only feeds the primitive's host getter (read lazily)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -79,6 +110,7 @@ export function MiniTradeChart({ candles, trade, interval = "1h", height = 160, 
     let raf2 = 0;
     const data = normalizeSeries(candles.map(toCandleData));
     i.main.candles.setData(data);
+    i.times = data.map((b) => Number(b.time));
 
     for (const key of Object.keys(MINI_LINES) as MiniLineKey[]) {
       const price = trade[key];
@@ -122,18 +154,124 @@ export function MiniTradeChart({ candles, trade, interval = "1h", height = 160, 
     };
   }, [candles, trade, interval]);
 
+  // drawings → primitive (new ids draw themselves in)
+  useEffect(() => {
+    inst.current?.notes.setAnnotations(list);
+  }, [list]);
+  useEffect(() => {
+    inst.current?.notes.select(selected);
+  }, [selected]);
+  useEffect(() => {
+    if (!tool) inst.current?.notes.setDraft(null);
+  }, [tool]);
+
+  /* ------------------------------------------------------------ drawing input (DOM pointer, one rect read per gesture) */
+  const rect = useRef<DOMRect | null>(null);
+  const pending = useRef<{ x: number; y: number } | null>(null);
+  const raf = useRef(0);
+  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  const local = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const r = rect.current ?? e.currentTarget.getBoundingClientRect();
+    rect.current = r;
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  const onMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!editable || !tool || !placed) return;
+    pending.current = local(e);
+    if (raf.current) return;
+    raf.current = requestAnimationFrame(() => {
+      raf.current = 0;
+      const i = inst.current;
+      const p = pending.current;
+      if (!i || !p || !placed) return;
+      const at = i.notes.pointAt(p.x, p.y);
+      if (at) i.notes.setDraft({ kind: tool, points: [placed, at], color });
+    });
+  };
+  const commit = useCallback(
+    (a: Annotation) => {
+      onAnnotationsChange?.([...list, a]);
+    },
+    [list, onAnnotationsChange],
+  );
+  const onTap = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const i = inst.current;
+    if (!editable || !i) return;
+    rect.current = e.currentTarget.getBoundingClientRect();
+    const { x, y } = local(e);
+    if (!tool) {
+      setSelected(i.notes.hitAt(x, y));
+      return;
+    }
+    const at = i.notes.pointAt(x, y);
+    if (!at) return;
+    const spec = TOOLS.find((t) => t.kind === tool);
+    if (spec?.points === 2 && !placed) {
+      setPlaced(at);
+      i.notes.setDraft({ kind: tool, points: [at, at], color });
+      return;
+    }
+    const points = spec?.points === 2 && placed ? [placed, at] : [at];
+    commit({ id: newId("a_"), kind: tool, points, color, ...(tool === "text" ? { text: noteText.trim() || "Notiz" } : null), tf: interval });
+    setPlaced(null);
+    i.notes.setDraft(null);
+    if (tool === "text") setNoteText("");
+    setTool(null);
+  };
+
   const show = ready && candles.length > 0;
-  return (
-    <div className={cn("relative w-full overflow-hidden rounded-xl", className)} style={{ height }} data-ready={show ? "true" : "false"}>
+  const chartBox = (
+    <div className={cn("relative w-full overflow-hidden rounded-xl", !editable && className)} style={{ height }} data-ready={show ? "true" : "false"}>
       <motion.div
         className="absolute inset-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: show ? 1 : 0 }}
         transition={reduce ? { duration: 0 } : tween.fade}
       >
-        <div ref={host} className="absolute inset-0" role="img" aria-label="Trade-Chart" />
+        <div ref={host} className="absolute inset-0" role="img" aria-label={list.length ? `Trade-Chart mit ${list.length} Zeichnung${list.length === 1 ? "" : "en"}` : "Trade-Chart"} />
       </motion.div>
+      {editable && (
+        <div
+          className={cn("absolute inset-0 z-[2]", tool ? "cursor-crosshair touch-none" : "cursor-default")}
+          data-testid="annotation-surface"
+          aria-hidden="true"
+          onPointerEnter={() => (rect.current = null)}
+          onPointerMove={onMove}
+          onPointerUp={onTap}
+        />
+      )}
       <AnimatePresence initial={false}>{show ? null : <ChartSkeleton key="skeleton" rows={3} cols={4} className="rounded-xl" />}</AnimatePresence>
     </div>
   );
+  if (!editable) return chartBox;
+  return (
+    <div className={cn("grid gap-2", className)}>
+      <AnnotationToolbar
+        tool={tool}
+        onTool={(t) => {
+          setTool(t);
+          setPlaced(null);
+          setSelected(null);
+        }}
+        color={color}
+        onColor={setColor}
+        placed={placed ? 1 : 0}
+        selected={selected != null}
+        onDelete={() => {
+          onAnnotationsChange?.(list.filter((a) => a.id !== selected));
+          setSelected(null);
+        }}
+        count={list.length}
+        onClear={() => {
+          onAnnotationsChange?.([]);
+          setSelected(null);
+        }}
+        text={noteText}
+        onText={setNoteText}
+      />
+      {chartBox}
+    </div>
+  );
 }
+
+const EMPTY_NOTES: readonly Annotation[] = [];

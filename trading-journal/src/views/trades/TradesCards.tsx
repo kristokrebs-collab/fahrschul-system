@@ -8,6 +8,8 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { DETACHED_DETAIL_SOURCES, useUi } from "@/store/uiStore";
 import { useInsertHold } from "./TradesTable";
 import { CheckCount, EntryExit, PnlCell, RCell, ResultBadge, SideTag, SignalBadge, TradeSetupChips, accountLine, dateLines } from "./tradeCells";
+import { groupRows } from "@/domain/grouping";
+import { GroupCard } from "@/journal/grouping/GroupRows";
 
 export interface TradesCardsProps {
   rows: readonly EnrichedTrade[];
@@ -17,6 +19,8 @@ export interface TradesCardsProps {
   /** Sort identity (`{k}:{dir}`): a new order re-keys the list (remount + staggered enter instead of crossing FLIPs). */
   sortKey?: string;
   onOpen?: (id: string) => void;
+  /** Journal v3: fold positions / groups / hedges into one card each (`GroupCard`). Off = unchanged. Default: `uiStore.tradeExtra.group`. */
+  grouped?: boolean;
   className?: string;
 }
 
@@ -43,7 +47,9 @@ function cardTransition(i: number): Transition {
  * `layoutDependency`); inserted cards are held (`useInsertHold`) until their siblings made room; a new sort order re-keys
  * the list (staggered re-enter instead of crossing FLIPs). The card's height follows on the body's `AutoHeight`.
  */
-export function TradesCards({ rows, setups, listKey, sortKey = "", onOpen, className }: TradesCardsProps) {
+export function TradesCards({ rows, setups, listKey, sortKey = "", onOpen, grouped: groupedProp, className }: TradesCardsProps) {
+  const groupedPref = useUi((s) => s.tradeExtra.group === true);
+  const grouped = groupedProp ?? groupedPref;
   const detailSource = useUi((s) => s.detail.source);
   const detailTempo = useUi((s) => s.detailTempo);
   const openDetail = useUi((s) => s.openDetail);
@@ -61,6 +67,49 @@ export function TradesCards({ rows, setups, listKey, sortKey = "", onOpen, class
     return () => cancelAnimationFrame(id);
   }, [sortKey]);
   const inserting = readyGroup === sortKey;
+  // Journal v3: grouped list and the unfolded groups
+  const items = useMemo(() => (grouped ? groupRows(rows) : null), [grouped, rows]);
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleGroup = (id: string) => setOpenGroups((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set([...s, id])));
+  const openMember = (id: string) => (onOpen ? onOpen(id) : openDetail(id, "insights"));
+
+  if (items) {
+    return (
+      <ul className={cn("relative grid gap-2", className)} aria-label="Trades" data-trade-list="">
+        <AnimatePresence key={`${sortKey}:g`} onExitComplete={onExitComplete}>
+          {items.map((it, i) =>
+            it.kind === "trade" ? (
+              <TradeCard
+                key={it.trade.id}
+                t={it.trade}
+                index={i}
+                insert={inserting}
+                setups={setups}
+                listKey={layoutKey}
+                shareLayout={shareLayout}
+                morphTransition={morphTransition}
+                reduced={reduced}
+                onOpen={onOpen ?? openDetail}
+              />
+            ) : (
+              <motion.li
+                key={it.group.id}
+                layout="position"
+                layoutDependency={layoutKey}
+                initial={reduced ? false : CARD_FROM}
+                animate={CARD_SHOWN}
+                exit={reduced ? ITEM_EXIT_REDUCED : ITEM_EXIT}
+                transition={reduced ? CARD_TRANSITION_REDUCED : cardTransition(i)}
+                style={{ borderRadius: radius.card }}
+              >
+                <GroupCard group={it.group} open={openGroups.has(it.group.id)} onToggle={() => toggleGroup(it.group.id)} onOpenTrade={openMember} />
+              </motion.li>
+            ),
+          )}
+        </AnimatePresence>
+      </ul>
+    );
+  }
 
   return (
     <ul className={cn("relative grid gap-2", className)} aria-label="Trades" data-trade-list="">

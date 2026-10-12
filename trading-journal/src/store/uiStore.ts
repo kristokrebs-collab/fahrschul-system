@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { TradeFilter } from "@/domain/types";
+import type { Trade, TradeFilter } from "@/domain/types";
 import { KEYS, readJson, writeJson } from "./storage";
 
 /* ---------------------------------------------------------------- types */
@@ -29,7 +29,18 @@ export interface EditorState {
   fromFab: boolean;
   /** Opened by `Bearbeiten` in the trade detail, which leaves in the same commit (one shared dim, no bare page). */
   fromDetail?: boolean;
+  /**
+   * Journal v3 (P06): pre-filled values of a NEW trade (risk calculator, box setup, exchange position …). Form fields
+   * fill the inputs; every other key (`signal`, `boxSnap`, `origin`, `exchange`, …) is saved with the trade as given.
+   * Ignored when `tradeId` is set.
+   */
+  draft?: TradeDraft;
+  /** Bumped by every `openEditor({ draft })`, so a new draft re-initialises an editor that is already open. */
+  draftSeq?: number;
 }
+
+/** A pre-filled new trade for `openEditor({ draft })` (P06 contract for P02 / P05 / P11). */
+export type TradeDraft = Partial<Omit<Trade, "id" | "createdAt" | "updatedAt" | "pnl" | "r">>;
 export interface SetupEditorState {
   open: boolean;
   setupId?: string;
@@ -106,6 +117,29 @@ export interface UiPrefs {
 export interface TradeExtraFilter {
   mistake: string;
   strength: "all" | "none" | "0" | "1" | "2" | "3" | "4";
+  /**
+   * Journal v3 (P06), all optional (absent = not set, so stored views and tests written before stay valid):
+   * period `from` / `to` (local `YYYY-MM-DD`, inclusive), pair (`pairKey`), venue, instrument kind, tags (all must
+   * match), P&L / R / holding time (minutes) / leverage ranges and a minimum rating (inclusive, `null` = open end), and `group` (fold
+   * positions / groups / hedges into one row).
+   */
+  from?: string;
+  to?: string;
+  pair?: string;
+  exchange?: string;
+  market?: "perp" | "spot";
+  tags?: string[];
+  pnlMin?: number | null;
+  pnlMax?: number | null;
+  rMin?: number | null;
+  rMax?: number | null;
+  holdMin?: number | null;
+  holdMax?: number | null;
+  levMin?: number | null;
+  levMax?: number | null;
+  /** Minimum execution rating (1–5); `Top-Trades` = 4. */
+  ratingMin?: number | null;
+  group?: boolean;
 }
 export const DEFAULT_TRADE_EXTRA: TradeExtraFilter = { mistake: "all", strength: "all" };
 
@@ -162,6 +196,10 @@ export interface UiState extends UiPrefs {
   /** Resets `tradeFilter` and `tradeExtra`. */
   resetTradeFilter(): void;
   setTradeExtra(patch: Partial<TradeExtraFilter>): void;
+  /** Journal v3 (P06): replaces the whole extra filter (clearing the v3 filters leaves no empty keys behind). */
+  replaceTradeExtra(next: TradeExtraFilter): void;
+  /** Journal v3 (P06): replaces filter, extra filter and sort at once (a saved view). */
+  applyTradeView(view: { filter: TradeFilter; extra: TradeExtraFilter; sort: TradeSort }): void;
   setTradeSort(sort: TradeSort): void;
   /** Same column flips direction; a new column starts with `setup → 1`, everything else `−1` (bundle). */
   toggleSort(k: SortKey): void;
@@ -169,7 +207,7 @@ export interface UiState extends UiPrefs {
   closeDetail(): void;
   /** Close by swipe: like `closeDetail`, remembering the release tempo for the morph back. */
   dismissDetail(tempo: number): void;
-  openEditor(opts?: { tradeId?: string; fromFab?: boolean }): void;
+  openEditor(opts?: { tradeId?: string; fromFab?: boolean; draft?: TradeDraft }): void;
   /** Detail → editor hand-off in ONE update: the detail closes while the editor opens over its fading dim. */
   editFromDetail(tradeId: string): void;
   closeEditor(): void;
@@ -273,6 +311,8 @@ export const useUi = create<UiState>()((set, get) => ({
   setTradeFilter: (patch) => set((s) => ({ tradeFilter: { ...s.tradeFilter, ...patch } })),
   resetTradeFilter: () => set({ tradeFilter: DEFAULT_TRADE_FILTER, tradeExtra: DEFAULT_TRADE_EXTRA }),
   setTradeExtra: (patch) => set((s) => ({ tradeExtra: { ...s.tradeExtra, ...patch } })),
+  replaceTradeExtra: (next) => set({ tradeExtra: { ...DEFAULT_TRADE_EXTRA, ...next } }),
+  applyTradeView: ({ filter, extra, sort }) => set({ tradeFilter: { ...DEFAULT_TRADE_FILTER, ...filter }, tradeExtra: { ...DEFAULT_TRADE_EXTRA, ...extra }, tradeSort: sort }),
   setTradeSort: (tradeSort) => set({ tradeSort }),
   toggleSort: (k) =>
     set((s) => ({
@@ -284,7 +324,12 @@ export const useUi = create<UiState>()((set, get) => ({
   },
   closeDetail: () => set({ detail: { id: null, source: null }, detailTempo: 0 }),
   dismissDetail: (tempo) => set({ detail: { id: null, source: null }, detailTempo: Number.isFinite(tempo) ? Math.min(1, Math.max(0, tempo)) : 0 }),
-  openEditor: (opts = {}) => set({ editor: { open: true, tradeId: opts.tradeId, fromFab: opts.fromFab === true } }),
+  openEditor: (opts = {}) =>
+    set((s) =>
+      opts.draft && !opts.tradeId
+        ? { editor: { open: true, fromFab: opts.fromFab === true, draft: opts.draft, draftSeq: (s.editor.draftSeq ?? 0) + 1 } }
+        : { editor: { open: true, tradeId: opts.tradeId, fromFab: opts.fromFab === true } },
+    ),
   editFromDetail: (tradeId) => set({ detail: { id: null, source: null }, editor: { open: true, tradeId, fromFab: false, fromDetail: true } }),
   closeEditor: () =>
     set((s) => ({

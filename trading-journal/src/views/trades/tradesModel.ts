@@ -5,7 +5,9 @@
 import type { EnrichedTrade, Setup, TradeFilter } from "@/domain/types";
 import { parseSignalSnapshot, STRENGTH_LABEL, type SignalSnapshot } from "@/domain/signals";
 import type { TradeExtraFilter, TradeSort } from "@/store/uiStore";
-import { tradeTime } from "@/lib/dates";
+import { localDateKey, tradeTime } from "@/lib/dates";
+import { holdMs } from "@/domain/excursion";
+import { pairKey } from "@/domain/grouping";
 
 /** Sentinel of the `Entscheidungsgrundlage` select: trades without any known setup. */
 export const NO_SETUP = "__none";
@@ -60,6 +62,9 @@ export function sortTrades(list: readonly EnrichedTrade[], sort: TradeSort, setu
 export function listKey(f: TradeFilter, sort: TradeSort, extra?: TradeExtraFilter): string {
   const base = [f.acc, f.setup, f.result, f.side, f.q.trim().toLowerCase(), sort.k, sort.dir];
   if (extra && (extra.mistake !== "all" || extra.strength !== "all")) base.push(`m:${extra.mistake}`, `s:${extra.strength}`);
+  // Journal v3: only active keys join the key (the bundle key is unchanged without them)
+  if (extra && journalFilterCount(extra) > 0) base.push(`j:${journalFilterKey(extra)}`);
+  if (extra?.group) base.push("g");
   return base.join("|");
 }
 
@@ -90,17 +95,138 @@ export function strengthKey(t: { signal?: unknown }): TradeExtraFilter["strength
   return s ? (String(Math.max(0, Math.min(4, s.strength))) as TradeExtraFilter["strength"]) : "none";
 }
 
-/** Mistake tag / signal strength filter on top of `filterTrades`. */
-export function filterExtra<T extends { mistakes?: unknown; signal?: unknown }>(rows: readonly T[], extra: TradeExtraFilter): T[] {
-  if (extra.mistake === "all" && extra.strength === "all") return rows as T[];
+/** Mistake tag / signal strength filter (plus the Journal-v3 ranges, `matchJournal`) on top of `filterTrades`. */
+export function filterExtra<T extends { mistakes?: unknown; signal?: unknown } & Partial<JournalFilterable>>(rows: readonly T[], extra: TradeExtraFilter): T[] {
+  const journal = journalFilterCount(extra) > 0;
+  if (extra.mistake === "all" && extra.strength === "all" && !journal) return rows as T[];
   return rows.filter((t) => {
     if (extra.mistake !== "all") {
       const tags = mistakesOf(t);
       if (extra.mistake === NO_MISTAKE ? tags.length > 0 : extra.mistake === ANY_MISTAKE ? tags.length === 0 : !tags.includes(extra.mistake)) return false;
     }
     if (extra.strength !== "all" && strengthKey(t) !== extra.strength) return false;
+    if (journal && !matchJournal(t, extra)) return false;
     return true;
   });
+}
+
+/* ------------------------------------------------------------ Journal v3 filters (P06) */
+
+/** What the v3 filters read of a trade. */
+export interface JournalFilterable {
+  date: string;
+  createdAt: string;
+  exitDate?: string;
+  pair: string;
+  exchange?: string;
+  market?: "perp" | "spot";
+  tags?: string[];
+  rating?: number | null;
+  pnl: number | null;
+  r: number | null;
+  leverage: number | null;
+}
+
+const RANGE_KEYS = ["pnlMin", "pnlMax", "rMin", "rMax", "holdMin", "holdMax", "levMin", "levMax", "ratingMin"] as const;
+
+/** Number of active v3 filters (the `Mehr Filter` badge). */
+export function journalFilterCount(e: TradeExtraFilter): number {
+  let n = 0;
+  if (e.from || e.to) n += 1;
+  if (e.pair) n += 1;
+  if (e.exchange) n += 1;
+  if (e.market) n += 1;
+  if (e.tags?.length) n += 1;
+  if (e.pnlMin != null || e.pnlMax != null) n += 1;
+  if (e.rMin != null || e.rMax != null) n += 1;
+  if (e.holdMin != null || e.holdMax != null) n += 1;
+  if (e.levMin != null || e.levMax != null) n += 1;
+  if (e.ratingMin != null) n += 1;
+  return n;
+}
+
+function journalFilterKey(e: TradeExtraFilter): string {
+  const parts = [e.from ?? "", e.to ?? "", e.pair ?? "", e.exchange ?? "", e.market ?? "", (e.tags ?? []).join(",")];
+  for (const k of RANGE_KEYS) parts.push(e[k] == null ? "" : String(e[k]));
+  return parts.join("/");
+}
+
+const inRange = (v: number | null | undefined, lo: number | null | undefined, hi: number | null | undefined): boolean => {
+  if (lo == null && hi == null) return true;
+  if (v == null || !Number.isFinite(v)) return false;
+  return (lo == null || v >= lo) && (hi == null || v <= hi);
+};
+
+/** True when `t` passes every active v3 filter (period = local entry day, inclusive). */
+export function matchJournal(t: Partial<JournalFilterable>, e: TradeExtraFilter): boolean {
+  if (e.from || e.to) {
+    const day = localDateKey(tradeTime({ date: t.date, createdAt: t.createdAt }));
+    if (e.from && day < e.from) return false;
+    if (e.to && day > e.to) return false;
+  }
+  if (e.pair && pairKey(t.pair ?? "") !== pairKey(e.pair)) return false;
+  if (e.exchange && (t.exchange ?? "").toLowerCase() !== e.exchange.toLowerCase()) return false;
+  if (e.market && (t.market ?? "perp") !== e.market) return false;
+  if (e.tags?.length) {
+    const own = new Set((t.tags ?? []).map((x) => x.toLowerCase()));
+    if (!e.tags.every((x) => own.has(x.toLowerCase()))) return false;
+  }
+  if (!inRange(t.pnl, e.pnlMin, e.pnlMax)) return false;
+  if (!inRange(t.r, e.rMin, e.rMax)) return false;
+  if (e.holdMin != null || e.holdMax != null) {
+    const ms = t.date ? holdMs({ date: t.date, exitDate: t.exitDate, createdAt: t.createdAt }) : null;
+    if (!inRange(ms == null ? null : ms / 60_000, e.holdMin, e.holdMax)) return false;
+  }
+  if (!inRange(t.leverage, e.levMin, e.levMax)) return false;
+  if (e.ratingMin != null && !((t.rating ?? 0) >= e.ratingMin)) return false;
+  return true;
+}
+
+/** Values the v3 filters offer (only those the journal has). */
+export interface JournalFilterOptions {
+  pairs: string[];
+  exchanges: string[];
+  tags: string[];
+  /** The journal has spot trades (the Perp / Spot switch shows only then). */
+  spot: boolean;
+  /** Any exit time (holding-time filter) / leverage / rating in the journal. */
+  hold: boolean;
+  leverage: boolean;
+  rating: boolean;
+}
+
+export function journalFilterOptions(trades: readonly Partial<JournalFilterable>[]): JournalFilterOptions {
+  const pairs = new Map<string, string>();
+  const exchanges = new Map<string, string>();
+  const tags = new Map<string, number>();
+  let spot = false;
+  let hold = false;
+  let leverage = false;
+  let rating = false;
+  for (const t of trades) {
+    const pk = pairKey(t.pair ?? "");
+    if (pk && !pairs.has(pk)) pairs.set(pk, pk);
+    if (t.exchange) exchanges.set(t.exchange.toLowerCase(), t.exchange);
+    for (const g of t.tags ?? []) tags.set(g, (tags.get(g) ?? 0) + 1);
+    if (t.market === "spot") spot = true;
+    if (t.exitDate) hold = true;
+    if (t.leverage != null) leverage = true;
+    if (t.rating != null) rating = true;
+  }
+  return {
+    pairs: [...pairs.values()].sort(),
+    exchanges: [...exchanges.values()].sort((a, b) => a.localeCompare(b, "de")),
+    tags: [...tags.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de")).map(([g]) => g),
+    spot,
+    hold,
+    leverage,
+    rating,
+  };
+}
+
+/** The v3 part of the extra filter cleared (mistake / strength / grouping stay). */
+export function clearJournalFilters(e: TradeExtraFilter): TradeExtraFilter {
+  return { mistake: e.mistake, strength: e.strength, ...(e.group ? { group: true } : null) };
 }
 
 /** Tags offered by the `Fehler` filter: those used in the journal (most used first), then the rest of the settings list. */

@@ -12,6 +12,7 @@ import { MorphSelect, type MorphSelectOption } from "@/motion/pulse/MorphSelect"
 import { ValueFlash } from "@/motion/ValueFlash";
 import { Icon, Segmented } from "@/primitives";
 import type { TradeExtraFilter } from "@/store/uiStore";
+import { JournalFilterSlot } from "@/journal/filters/JournalFilterBar";
 import { ANY_MISTAKE, NO_MISTAKE, NO_SETUP, STRENGTH_OPTIONS, countLabel, type SearchSuggestion } from "./tradesModel";
 
 export interface TradeFiltersProps {
@@ -184,6 +185,8 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
       <Segmented aria-label="Ergebnis" size="sm" className="pointer-coarse:gap-y-5" value={filter.result} onChange={(result) => onChange({ result })} options={RESULT_OPTIONS} />
       <Segmented aria-label="Richtung" size="sm" value={filter.side} onChange={(side) => onChange({ side })} options={SIDE_OPTIONS} />
       <CountPill count={count} closed={closed} reduced={reduced} />
+      {/* Journal v3 (P06): saved views, Top-Trades / ≥ 2 R, grouping switch and `Mehr Filter` (period, pair, venue, tags, ranges) */}
+      {extra && onExtraChange && <JournalFilterSlot filter={filter} extra={extra} onExtraChange={onExtraChange} />}
     </div>
   );
 }

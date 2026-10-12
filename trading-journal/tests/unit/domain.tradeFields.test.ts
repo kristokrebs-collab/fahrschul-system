@@ -108,7 +108,9 @@ describe("journal v3 trade fields – backward compatibility", () => {
     const a = enrichTrades(legacy, settings);
     const b = enrichTrades(withV3, settings);
     expect(b.map((t) => [t.pnl, t.r, t.risk, t.rr, t.result])).toEqual(a.map((t) => [t.pnl, t.r, t.risk, t.rr, t.result]));
-    expect(tradesToCsv(b, settings)).toBe(tradesToCsv(a, settings));
+    // the bundle's 25 columns are byte-identical; the present v3 fields only fill the appended Journal-v3 columns
+    const bundleCols = (csv: string) => csv.split("\n").map((line) => line.split(";").slice(0, 25).join(";"));
+    expect(bundleCols(tradesToCsv(b, settings))).toEqual(bundleCols(tradesToCsv(a, settings)));
   });
 });
 
