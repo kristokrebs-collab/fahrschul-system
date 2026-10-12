@@ -241,7 +241,7 @@ function MarqueeDemo() {
 
 function Gallery() {
   return (
-    <main className="mx-auto grid max-w-[1100px] gap-6 px-4 py-8 text-fg">
+    <main data-gallery="pulse-ui" className="mx-auto grid max-w-[1100px] gap-6 px-4 py-8 text-fg">
       <h1 className="font-dot text-[28px]">pulse · UI</h1>
       <Section id="select" title="MorphSelect">
         <SelectDemo />
