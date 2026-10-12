@@ -188,6 +188,14 @@ describe("DotMatrix glyphs and DotMatrixText", () => {
     expect(screen.queryByRole("img")).toBeNull();
     expect(document.querySelector('[data-fx="dot-matrix-text"]')).toHaveAttribute("aria-hidden", "true");
   });
+
+  it("reduced motion: activity glyphs (wave, snake) are dropped, a direction (chevrons) stays", () => {
+    fx.reduced = true;
+    const { container, rerender } = render(<DotMatrixText text="SCAN" preset="wave" />);
+    expect(container.querySelectorAll("[data-matrix]")).toHaveLength(1);
+    rerender(<DotMatrixText text="A+" preset="chevrons" />);
+    expect(container.querySelector('[data-matrix="chevrons"]')).not.toBeNull();
+  });
 });
 
 /* ------------------------------------------------------------------ GlowBreak */

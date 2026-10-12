@@ -442,7 +442,7 @@ function MatrixDemo() {
         <DotMatrixText text="A+" tone="signal" preset="chevrons" presetTone="win" size={6} label="Note A plus" />
         <DotMatrixText text={`${n}:5`} size={5} label={`Schritt ${n} von 5`} />
         <DotMatrixText text="3/4" size={5} tone="fg" label="3 von 4" />
-        <DotMatrixText text="SCAN" size={4} preset="wave" tone="mute" presetTone="signal" />
+        <DotMatrixText text="SCAN" size={4} preset="wave" presetPosition="before" tone="mute" presetTone="signal" />
         <DotMatrixText text="PRO" size={5} tone="fg" preset="snake" presetTone="signal" />
         <DotMatrixText text="+2,4%" tone="win" size={4} preset="chevrons-left" presetTone="mute" presetPosition="before" />
       </div>

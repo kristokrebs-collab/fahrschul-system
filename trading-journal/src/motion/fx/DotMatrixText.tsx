@@ -65,7 +65,10 @@ export function DotMatrixText({ text, width, align = "right", preset, presetPosi
   }, [preset, cycles, reduced, fps]);
 
   const a11y = decorative ? { "aria-hidden": true as const } : { role: "img", "aria-label": label ?? text };
-  const glyph = preset ? <DotMatrix preset={preset} tone={presetTone ?? tone} size={size} gap={gap} glow={glow} playing={!resting} fps={fps} /> : null;
+  // reduced motion: the pure activity glyphs (wave, snake) carry no information as a still frame – only the chevrons
+  // (a direction) stay
+  const shown = preset && !(reduced && (preset === "wave" || preset === "snake")) ? preset : undefined;
+  const glyph = shown ? <DotMatrix preset={shown} tone={presetTone ?? tone} size={size} gap={gap} glow={glow} playing={!resting} fps={fps} /> : null;
   return (
     <span {...a11y} data-fx="dot-matrix-text" className={cn("inline-flex items-center gap-[0.5em] align-middle leading-none", className)}>
       {presetPosition === "before" ? glyph : null}

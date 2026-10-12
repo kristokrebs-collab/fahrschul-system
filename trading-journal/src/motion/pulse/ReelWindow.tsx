@@ -97,8 +97,11 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
   const reelRefs = useRef<(HTMLDivElement | null)[]>([]);
   const topRef = useRef<HTMLSpanElement>(null);
   const botRef = useRef<HTMLSpanElement>(null);
-  const topText = useRef<HTMLSpanElement>(null);
-  const botText = useRef<HTMLSpanElement>(null);
+  // both texts of each line are rendered (same grid cell); the swap is an opacity flip – no text mutation
+  const topA = useRef<HTMLSpanElement>(null);
+  const topB = useRef<HTMLSpanElement>(null);
+  const botA = useRef<HTMLSpanElement>(null);
+  const botB = useRef<HTMLSpanElement>(null);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const tl = useRef<Timeline | null>(null);
   const tableau = (cards ?? reels).slice(0, CONFIG.slots.length);
@@ -110,14 +113,13 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
 
   /** Writes the frame at `t` ms (cache keys: DOM writes only on change). */
   const cache = useRef<Record<string, string | number>>({});
-  const set = (key: string, el: HTMLElement | null | undefined, prop: "transform" | "opacity" | "text", value: string) => {
+  const set = (key: string, el: HTMLElement | null | undefined, prop: "transform" | "opacity", value: string) => {
     if (!el || cache.current[key] === value) return;
     cache.current[key] = value;
-    if (prop === "text") el.textContent = value;
-    else el.style[prop] = value;
+    el.style[prop] = value;
   };
   const render = (t: number) => {
-    const { n, m, lines: l0, swap: l1 } = live.current;
+    const { n, m } = live.current;
     const reel = reelAt(t, n);
     for (let i = 0; i < n; i++) set(`r${i}`, reelRefs.current[i], "opacity", i === reel ? "1" : "0");
     const c = collapseAt(t);
@@ -132,16 +134,18 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
     set("t", topRef.current, "transform", `translate(calc(-50% + ${(tx0 * sp).toFixed(2)}cqw), calc(-100% - ${(ty * (1 - sp) - ty0 * sp).toFixed(2)}cqh))`);
     set("b", botRef.current, "transform", `translate(calc(-50% + ${(bx0 * sp).toFixed(2)}cqw), calc(${(ty * (1 - sp) + by0 * sp).toFixed(2)}cqh))`);
     const swapped = t >= CONFIG.swapAt;
-    set("tt", topText.current, "text", swapped ? l1[0] : l0[0]);
-    set("bt", botText.current, "text", swapped ? l1[1] : l0[1]);
+    set("ta", topA.current, "opacity", swapped ? "0" : "1");
+    set("tb", topB.current, "opacity", swapped ? "1" : "0");
+    set("ba", botA.current, "opacity", swapped ? "0" : "1");
+    set("bb", botB.current, "opacity", swapped ? "1" : "0");
     for (let i = 0; i < m; i++) {
       const slot = CONFIG.slots[i]!;
       const local = Math.max(0, Math.min(1, (t - CONFIG.spreadAt - i * CONFIG.cardStagger) / CONFIG.spreadDur));
       const k = easeOutCubic(local);
       const o = Math.max(0, Math.min(1, (t - CONFIG.spreadAt - i * CONFIG.cardStagger) / CONFIG.cardFade));
-      // start at 72 % of the way from the centre, in units of the card's own size (no measuring)
-      const dx = ((0.5 - slot[0]) / slot[2]) * 100 * CONFIG.cardStartK * (1 - k);
-      const dy = ((0.5 - slot[1]) / (slot[2] * 0.62)) * 100 * CONFIG.cardStartK * (1 - k);
+      // start at 72 % of the final distance from the centre (pack `cardStartK`), in units of the card's own size (no measuring)
+      const dx = ((0.5 - slot[0]) / slot[2]) * 100 * (1 - CONFIG.cardStartK) * (1 - k);
+      const dy = ((0.5 - slot[1]) / (slot[2] * 0.62)) * 100 * (1 - CONFIG.cardStartK) * (1 - k);
       const sc = CONFIG.cardStartScale + (1 - CONFIG.cardStartScale) * k;
       const el = cardRefs.current[i];
       set(`c${i}`, el, "transform", k >= 1 ? "translate(-50%,-50%)" : `translate(calc(-50% + ${dx.toFixed(2)}%), calc(-50% + ${dy.toFixed(2)}%)) scale(${sc.toFixed(4)})`);
@@ -189,7 +193,7 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
             ref={(el) => {
               cardRefs.current[i] = el;
             }}
-            className="absolute overflow-hidden rounded-[1.2cqw] border border-white/10 bg-ink-850 shadow-[0_1.5cqw_3cqw_-1cqw_rgb(0_0_0/0.6)]"
+            className={cn("absolute overflow-hidden rounded-[1.2cqw] border border-white/10 bg-ink-850 shadow-[0_1.5cqw_3cqw_-1cqw_rgb(0_0_0/0.6)]", !cards && "aspect-[3/2] [&>*]:size-full")}
             style={{ left: `${cx * 100}%`, top: `${cy * 100}%`, width: `${w * 100}%`, transform: "translate(-50%,-50%)" }}
           >
             {card}
@@ -213,14 +217,30 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
         <span className="pointer-events-none absolute inset-0 shadow-[inset_0_0_0_1px_rgb(229_32_46/0.35),inset_0_0_4cqw_rgb(229_32_46/0.12)]" />
       </div>
       {/* headline lines */}
-      <span ref={topRef} className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/0.85)]" style={{ transform: "translate(-50%,-100%)" }}>
-        <span ref={topText}>{lines[0]}</span>
+      <span ref={topRef} aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/0.85)]" style={{ transform: "translate(-50%,-100%)" }}>
+        <span className="grid [grid-template-areas:'l'] justify-items-center">
+          <span ref={topA} className="[grid-area:l]">
+            {lines[0]}
+          </span>
+          <span ref={topB} className="[grid-area:l]" style={{ opacity: 0 }}>
+            {swap[0]}
+          </span>
+        </span>
       </span>
-      <span ref={botRef} className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/0.85)]" style={{ transform: "translate(-50%,0)" }}>
-        <span ref={botText}>{lines[1]}</span>
+      <span ref={botRef} aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/0.85)]" style={{ transform: "translate(-50%,0)" }}>
+        <span className="grid [grid-template-areas:'l'] justify-items-center">
+          <span ref={botA} className="[grid-area:l]">
+            {lines[1]}
+          </span>
+          <span ref={botB} className="[grid-area:l]" style={{ opacity: 0 }}>
+            {swap[1]}
+          </span>
+        </span>
       </span>
+      {/* the headline lines are visual copies; the caption carries both texts once */}
       <figcaption className="sr-only">
-        {swap[0]} {swap[1]}
+        {lines[0]} {lines[1]}
+        {swap !== lines && (swap[0] !== lines[0] || swap[1] !== lines[1]) ? ` – ${swap[0]} ${swap[1]}` : null}
       </figcaption>
     </figure>
   );

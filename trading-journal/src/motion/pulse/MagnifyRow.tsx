@@ -197,7 +197,13 @@ export function MagnifyRow({ items, label, size = CONFIG.size, gap = CONFIG.gap,
             onFocus={(e) => {
               setFocusIdx(i);
               setHot(i);
-              if (magnifyOn && e.currentTarget.matches(":focus-visible")) aim(slotCenter(i), st.current.amount.x < 0.01);
+              let keyboard: boolean;
+              try {
+                keyboard = e.currentTarget.matches(":focus-visible");
+              } catch {
+                keyboard = false; // engines without :focus-visible: no focus magnification
+              }
+              if (magnifyOn && keyboard) aim(slotCenter(i), st.current.amount.x < 0.01);
             }}
             onBlur={() => {
               setHot((h) => (h === i ? null : h));
