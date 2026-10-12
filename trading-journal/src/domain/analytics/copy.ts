@@ -17,7 +17,6 @@ import type { MonteCarloResult } from "./montecarlo";
 import type { Metric, RatioKey, RatioReport } from "./ratios";
 import { RATIO_MIN, SQN_CAP } from "./ratios";
 import type { RollingReport } from "./rolling";
-import type { Significance } from "./stats";
 import { CI_LEVEL, FDR_Q } from "./stats";
 import type { StreakReport } from "./streaks";
 import { STREAK_MIN_N } from "./streaks";
@@ -68,8 +67,8 @@ export const ANA_EMPTY = {
 } as const;
 
 /** Badge text of a significance verdict. */
-export const SIG_LABEL: Readonly<Record<Significance, string>> = { klar: "klar", tendenz: "Tendenz", offen: "offen", wenig: "zu wenig" };
-export const SIG_TONE: Readonly<Record<Significance, Tone>> = { klar: "win", tendenz: "warn", offen: "mute", wenig: "mute" };
+// the significance words live next to `Significance` (`stats.ts`, P14: light enough for the first load)
+export { SIG_LABEL, SIG_TONE } from "./stats";
 
 const ciText = `${Math.round(CI_LEVEL * 100)}-%-Intervall`;
 

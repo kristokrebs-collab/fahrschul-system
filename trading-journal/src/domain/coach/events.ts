@@ -3,39 +3,10 @@
  * Pure. Signatures are final; `detectBehaviors` runs the P04 detectors (`detectors.ts`, rules and tuning there).
  */
 import type { DayNotes, EnrichedTrade, Settings } from "../types";
+import type { BehaviorKey, BehaviorSeverity } from "./behaviorKeys";
 import { runDetectors } from "./detectors";
 
-export const BEHAVIOR_KEYS = [
-  "revenge",
-  "tilt",
-  "overtrading",
-  "fomo",
-  "stopMoved",
-  "earlyProfit",
-  "lossAversion",
-  "overconfidence",
-  "impulsive",
-  "boredom",
-  "ruleViolation",
-] as const;
-export type BehaviorKey = (typeof BEHAVIOR_KEYS)[number];
-
-/** 1 = Hinweis, 2 = Warnung, 3 = kritisch. */
-export type BehaviorSeverity = 1 | 2 | 3;
-
-export const BEHAVIOR_LABEL: Readonly<Record<BehaviorKey, string>> = {
-  revenge: "Revenge-Trade",
-  tilt: "Tilt",
-  overtrading: "Overtrading",
-  fomo: "FOMO",
-  stopMoved: "Stop verschoben",
-  earlyProfit: "Frühe Gewinnmitnahme",
-  lossAversion: "Verlustangst",
-  overconfidence: "Selbstüberschätzung",
-  impulsive: "Impulsiver Einstieg",
-  boredom: "Langeweile-Trade",
-  ruleViolation: "Regelverstoß",
-};
+export { BEHAVIOR_KEYS, BEHAVIOR_LABEL, type BehaviorKey, type BehaviorSeverity } from "./behaviorKeys";
 
 export interface BehaviorEvent {
   key: BehaviorKey;

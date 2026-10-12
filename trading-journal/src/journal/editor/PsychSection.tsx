@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import type { KeyboardEvent } from "react";
-import { BEHAVIOR_KEYS, BEHAVIOR_LABEL, type BehaviorKey } from "@/domain/coach/events";
+import { BEHAVIOR_KEYS, BEHAVIOR_LABEL, type BehaviorKey } from "@/domain/coach/behaviorKeys";
 import { cn } from "@/lib/cn";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";

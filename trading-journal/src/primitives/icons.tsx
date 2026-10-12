@@ -2,7 +2,26 @@ import { motion } from "motion/react";
 import type { SVGProps } from "react";
 import { cn } from "@/lib/cn";
 
-export type IconName = "grid" | "list" | "target" | "sliders" | "plus" | "x" | "search";
+export type IconName =
+  | "grid"
+  | "list"
+  | "target"
+  | "sliders"
+  | "plus"
+  | "x"
+  | "search"
+  // feature pages (P14): 24er viewBox, stroke 1.8
+  | "candles"
+  | "chart"
+  | "shield"
+  | "coach"
+  | "report"
+  | "flask"
+  | "sprout"
+  | "users"
+  | "gauge"
+  | "user"
+  | "tag";
 
 type SvgProps = Omit<SVGProps<SVGSVGElement>, "children">;
 
@@ -59,6 +78,88 @@ export function Icon({ name, className, ...props }: { name: IconName } & SvgProp
         <svg {...p} strokeWidth="2">
           <circle cx="11" cy="11" r="7" />
           <path d="m20 20-3.5-3.5" />
+        </svg>
+      );
+    case "candles":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M6 3v4M6 15v6M12 3v2M12 12v9M18 6v3M18 17v3" />
+          <rect x="4" y="7" width="4" height="8" rx="1" />
+          <rect x="10" y="5" width="4" height="7" rx="1" />
+          <rect x="16" y="9" width="4" height="8" rx="1" />
+        </svg>
+      );
+    case "chart":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M3 3v18h18" />
+          <path d="M7 15l4-4 3 3 5-6" />
+          <circle cx="19" cy="8" r="1.2" fill="currentColor" />
+        </svg>
+      );
+    case "shield":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z" />
+          <path d="M12 8v5M12 16v.5" />
+        </svg>
+      );
+    case "coach":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M4 5h16v11H9l-5 4z" />
+          <path d="M8.5 10.5h.01M12 10.5h.01M15.5 10.5h.01" strokeWidth="2.4" />
+        </svg>
+      );
+    case "report":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M6 3h8l4 4v14H6z" />
+          <path d="M14 3v4h4M9 17v-3M12 17v-5M15 17v-2" />
+        </svg>
+      );
+    case "flask":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3" />
+          <path d="M7 15h10" />
+        </svg>
+      );
+    case "sprout":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M12 21V11" />
+          <path d="M12 11C12 7 9 5 4 5c0 4 3 6 8 6zM12 13c0-4 3-6 8-6 0 4-3 6-8 6z" />
+        </svg>
+      );
+    case "users":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <circle cx="9" cy="8" r="3.5" />
+          <path d="M2.5 20c.7-3.6 3.3-5.5 6.5-5.5s5.8 1.9 6.5 5.5" />
+          <path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c2 .7 3.2 2.4 3.5 5.2" />
+        </svg>
+      );
+    case "gauge":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M4.5 18a9 9 0 1 1 15 0" />
+          <path d="M12 14l4-5" />
+          <circle cx="12" cy="14" r="1.4" fill="currentColor" />
+        </svg>
+      );
+    case "user":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21c.9-4.2 4-6.5 8-6.5s7.1 2.3 8 6.5" />
+        </svg>
+      );
+    case "tag":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" />
+          <circle cx="8" cy="8" r="1.5" />
         </svg>
       );
   }

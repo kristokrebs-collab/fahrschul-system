@@ -7,7 +7,7 @@ import { motion, useMotionValue, useSpring } from "motion/react";
 import { spring } from "@/motion/tokens";
 import { cn } from "@/lib/cn";
 import { fmt } from "./format";
-import { formatChartTime } from "./theme";
+import { formatChartTime } from "./timeFormat";
 
 export const TOOLTIP_CLASS =
   "rounded-xl border border-line-2 bg-ink-850/95 px-3 py-2 text-xs shadow-[0_12px_32px_rgb(0_0_0/0.45)] backdrop-blur-sm";

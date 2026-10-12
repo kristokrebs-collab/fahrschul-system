@@ -4,6 +4,7 @@ import { EdgeBlur, type BlurBand } from "@/app/BottomFade";
 import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/CommandNav";
 import { FullscreenButton } from "@/app/DisplayActions";
 import { HeaderTicker } from "@/app/HeaderTicker";
+import { AccountPill } from "@/cloud/ui/AccountPill";
 import { createTapCounter, MULTI_TAP, toggleLayerDiag } from "@/app/layerDiag";
 import type { StoreMode } from "@/domain/types";
 import { replayIntro, useIntroPhase, useIntroSettled, type IntroPhase } from "@/intro/introStore";
@@ -271,6 +272,8 @@ export function Header() {
           <span className="hidden md:inline-flex" title={label.text}>
             <StatusPill tone={MODE_TONE[mode]} expanded label={label.text} feed="sync" />
           </span>
+          {/* P09: login / sync state of the cloud (renders nothing without cloud) – the ONE `auth-sheet` morph source */}
+          <AccountPill />
           {/* grey-bar fix: hide the browser UI + system bars (Fullscreen API); lg+ only (at 768 the wordmark would run into the ticker) – narrower screens reach it in the command navigation */}
           <FullscreenButton className="max-lg:hidden" />
           <MenuButton />

@@ -18,8 +18,10 @@ import {
 import { fmt } from "./format";
 import { ink } from "./ink";
 
-/** Display time zone for axis and crosshair labels. Data stays in UTC seconds. */
-export const CHART_TIME_ZONE = "Europe/Berlin";
+// time zone + label formatters: their own module (no `lightweight-charts` value import), so the overview's tooltip in
+// the first load stays free of the chart library (P14) – re-exported here, the import paths stay
+export { CHART_TIME_ZONE, formatChartTime } from "./timeFormat";
+import { formatChartTime, tickFmt, toMs } from "./timeFormat";
 export const CHART_FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 export const CHART_FONT_LOAD = '11px "IBM Plex Mono"';
 
@@ -36,41 +38,6 @@ export const CHART_PRICE_MIN_MOVE = 0.1;
 export const CHART_BACKGROUND_TRANSPARENT = "transparent";
 /** Solid fallback if the canvas does not stay see-through (Plan decision 7, M2). */
 export const CHART_BACKGROUND_SOLID = ink.bg;
-
-const tickFmt = {
-  year: new Intl.DateTimeFormat("de-DE", { timeZone: CHART_TIME_ZONE, year: "numeric" }),
-  month: new Intl.DateTimeFormat("de-DE", { timeZone: CHART_TIME_ZONE, month: "short" }),
-  day: new Intl.DateTimeFormat("de-DE", { timeZone: CHART_TIME_ZONE, day: "2-digit", month: "2-digit" }),
-  time: new Intl.DateTimeFormat("de-DE", { timeZone: CHART_TIME_ZONE, hour: "2-digit", minute: "2-digit" }),
-  timeSec: new Intl.DateTimeFormat("de-DE", {
-    timeZone: CHART_TIME_ZONE,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }),
-  full: new Intl.DateTimeFormat("de-DE", {
-    timeZone: CHART_TIME_ZONE,
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }),
-};
-
-function toMs(time: Time): number | null {
-  if (typeof time === "number") return time * 1000;
-  if (typeof time === "string") {
-    const ms = Date.parse(time);
-    return Number.isNaN(ms) ? null : ms;
-  }
-  return Date.UTC(time.year, time.month - 1, time.day);
-}
-
-/** Crosshair time label: `dd.MM. HH:mm` in Europe/Berlin. */
-export function formatChartTime(time: Time): string {
-  const ms = toMs(time);
-  return ms == null ? "" : tickFmt.full.format(ms);
-}
 
 /** Axis tick labels per tick weight, Europe/Berlin. */
 export function formatTickMark(time: Time, type: TickMarkType): string {
@@ -225,15 +192,6 @@ export const NOTHING_MINI: DeepPartial<ChartOptions> = {
   timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false, rightOffset: 2, barSpacing: 4 },
 };
 
-/**
- * Apache-2.0 attribution (Plan 5.8). `attributionLogo:false` requires the NOTICE text and a link to
- * tradingview.com on the page (footer). `public/NOTICE-lightweight-charts.txt` holds the notice file.
- */
-export const CHART_ATTRIBUTION = {
-  notice: "TradingView Lightweight Charts™ · Copyright (с) 2025 TradingView, Inc. · ",
-  linkText: "tradingview.com",
-  href: "https://www.tradingview.com/",
-  /** alternative link text if the footer prefers a sentence */
-  linkTextLong: "Charting by TradingView",
-  dataLine: "Marktdaten: Binance Futures (öffentlich)",
-} as const;
+// Apache-2.0 attribution (Plan 5.8): its own module, so the footer (first load) shows it without pulling
+// `lightweight-charts` into the main chunk (P14) – re-exported here, the import path stays.
+export { CHART_ATTRIBUTION } from "./attribution";

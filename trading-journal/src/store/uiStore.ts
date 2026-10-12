@@ -4,10 +4,36 @@ import { KEYS, readJson, writeJson } from "./storage";
 
 /* ---------------------------------------------------------------- types */
 
-export const PAGES = ["overview", "trades", "setups", "settings"] as const;
+/**
+ * Every page of the app (P14). The first four keep their digits 1–4 (CommandNav) and their bundle keys; the feature
+ * pages follow (markt 5, analyse 6, risiko 7, coach 8, berichte 9, …). The order is the digit order – the dock and the
+ * slide direction use `NAV_ORDER`.
+ */
+export const PAGES = ["overview", "trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise"] as const;
 export type Page = (typeof PAGES)[number];
-/** Page keys of the original bundle (`o|t|s|e`). */
-export const PAGE_KEYS: Record<Page, "o" | "t" | "s" | "e"> = { overview: "o", trades: "t", setups: "s", settings: "e" };
+export type PageKey = "o" | "t" | "s" | "e" | "m" | "a" | "r" | "c" | "b" | "l" | "w" | "g" | "d" | "k" | "p";
+/** `g` + letter (shortcuts): the bundle's `o|t|s|e` plus one letter per feature page. */
+export const PAGE_KEYS: Record<Page, PageKey> = {
+  overview: "o",
+  trades: "t",
+  setups: "s",
+  settings: "e",
+  markt: "m",
+  analyse: "a",
+  risiko: "r",
+  coach: "c",
+  berichte: "b",
+  labor: "l",
+  wachstum: "w",
+  community: "g",
+  cockpit: "d",
+  konto: "k",
+  preise: "p",
+};
+/** The five tabs of the dock (fits 390 px with the FAB); every other page is reached via CommandNav, search, `g`+letter and links. */
+export const DOCK_PAGES = ["overview", "trades", "setups", "markt", "settings"] as const satisfies readonly Page[];
+/** Spatial order of the pages: the dock tabs left to right, then the rest – the page slide direction and `[` / `]` follow it. */
+export const NAV_ORDER: readonly Page[] = [...DOCK_PAGES, ...PAGES.filter((p) => !(DOCK_PAGES as readonly Page[]).includes(p))];
 
 export type AccFilter = "all" | "makro" | "scalp";
 export type SortKey = "date" | "pnl" | "r" | "setup";

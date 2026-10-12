@@ -8,6 +8,7 @@
  * - Anything random takes a seed (`rng`, mulberry32): the same input always gives the same numbers.
  * - Too little data → `null`, never a made-up number.
  */
+import type { Tone } from "../explain";
 import { mean as meanOf, wilson, Z80 } from "../insights/shared";
 
 export { wilson, Z80 };
@@ -26,6 +27,9 @@ export interface Interval {
 
 /** Honest verdict of a test: significant after FDR, a tendency, open, or too few trades to say anything. */
 export type Significance = "klar" | "tendenz" | "offen" | "wenig";
+/** German word / tone of a significance (re-exported by `copy.ts`). */
+export const SIG_LABEL: Readonly<Record<Significance, string>> = { klar: "klar", tendenz: "Tendenz", offen: "offen", wenig: "zu wenig" };
+export const SIG_TONE: Readonly<Record<Significance, Tone>> = { klar: "win", tendenz: "warn", offen: "mute", wenig: "mute" };
 
 // ── PRNG ────────────────────────────────────────────────────────────────────────────────────────────────────────
 

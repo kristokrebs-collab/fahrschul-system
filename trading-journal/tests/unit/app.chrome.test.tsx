@@ -87,7 +87,8 @@ describe("Dock", () => {
     const names = within(dock)
       .getAllByRole("button")
       .map((b) => b.getAttribute("aria-label"));
-    expect(names).toEqual(["Übersicht", "Trades", "Entscheidungsgrundlagen", "Einstellungen", "Trade eintragen"]);
+    // P14: five tabs (DOCK_PAGES – Markt joins between Grundlagen and Einstellungen), then the FAB
+    expect(names).toEqual(["Übersicht", "Trades", "Entscheidungsgrundlagen", "Markt", "Einstellungen", "Trade eintragen"]);
     expect(within(dock).getByRole("button", { name: "Übersicht" })).toHaveAttribute("aria-current", "page");
     // tooltips are CSS-only and hidden from assistive tech (the button carries the name)
     expect(within(dock).queryByRole("tooltip")).toBeNull();
@@ -96,6 +97,11 @@ describe("Dock", () => {
     act(() => useUi.setState({ page: "trades" }));
     expect(within(dock).getByRole("button", { name: "Trades" })).toHaveAttribute("aria-current", "page");
     expect(within(dock).getByRole("button", { name: "Übersicht" })).not.toHaveAttribute("aria-current");
+    // a page outside the dock (CommandNav, search, g + letter) marks no tab
+    act(() => useUi.setState({ page: "coach" }));
+    expect(within(dock).queryByRole("button", { current: "page" })).toBeNull();
+    act(() => useUi.setState({ page: "markt" }));
+    expect(within(dock).getByRole("button", { name: "Markt" })).toHaveAttribute("aria-current", "page");
   });
 
   it("the FAB opens the editor from the dock and its disc leaves while the editor is open", () => {

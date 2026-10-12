@@ -20,9 +20,23 @@ import { useOverlayLane } from "@/primitives/toastStore";
 import { MistakeChips, SignalSummary, tradeSignal } from "./SignalSummary";
 import type { Annotation } from "@/domain/types";
 import { stripEnrichment } from "@/domain/csv";
-import { ExcursionBackfillHost } from "@/journal/ExcursionBackfillHost";
+import { useEntitlement } from "@/billing/entitlements";
+import { ShareButton } from "@/social/ui/ShareButton";
 import { JournalDetail } from "@/journal/ui/JournalDetail";
-import { ReplayHost } from "@/views/trades/replay/TradeReplay";
+
+/** P04 coach panel of this trade (grade, plan vs. execution, behaviours) – a lazy chunk, mounted once the morph settled. */
+const TradeCoachPanel = lazy(() => import("@/views/coach/TradeCoachPanel").then((m) => ({ default: m.TradeCoachPanel })));
+
+/** The coach panel while the plan includes the coach (P14 slot; without payments always). */
+function CoachSlot({ tradeId, settled }: { tradeId: string; settled: boolean }) {
+  const allowed = useEntitlement("coach");
+  if (!allowed || !settled) return null;
+  return (
+    <Suspense fallback={null}>
+      <TradeCoachPanel tradeId={tradeId} />
+    </Suspense>
+  );
+}
 
 /** Lazy: keeps `lightweight-charts` in its own chunk (loaded the first time a detail with candles opens). */
 const MiniTradeChart = lazy(() => import("@/chart/MiniTradeChart").then((m) => ({ default: m.MiniTradeChart })));
@@ -67,15 +81,9 @@ export interface TradeDetailProps {
  * contents inside. The panel scrolls with `overscroll-contain`.
  */
 export function TradeDetail(props: TradeDetailProps) {
-  return (
-    <>
-      <TradeDetailDialog {...props} />
-      {/* Journal v3: the trade replay sheet (opened from the detail's `Replay`) lives next to the detail, and the
-          idle MAE / MFE backfill runs from here (both render nothing until needed) */}
-      <ReplayHost />
-      <ExcursionBackfillHost />
-    </>
-  );
+  // Journal v3: the trade replay sheet (opened from the detail's `Replay`) and the idle MAE / MFE backfill are app hosts
+  // (P14: `src/app/DeferredHosts.tsx`, a lazy chunk), so the replay chart never weighs on the first load
+  return <TradeDetailDialog {...props} />;
 }
 
 function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
@@ -553,6 +561,8 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
 
         <JournalDetail trade={e} currency={currency} setups={setups} />
 
+        <CoachSlot tradeId={e.id} settled={settled} />
+
         {candles && candles.length > 0 && (
           <StaggerItem>
             {settled ? (
@@ -565,14 +575,16 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
           </StaggerItem>
         )}
 
-        <StaggerItem className="flex items-center justify-between gap-2">
-          {e.chart ? (
-            <a href={e.chart} target="_blank" rel="noreferrer" className="label !text-fg underline-offset-4 hover:underline">
-              Chart öffnen ↗
-            </a>
-          ) : (
-            <span />
-          )}
+        <StaggerItem className="flex flex-wrap items-center justify-between gap-2">
+          <span className="flex flex-wrap items-center gap-3">
+            {/* P12: share as a picture (always) or a redacted link (cloud) */}
+            <ShareButton tradeId={e.id} className={COARSE} />
+            {e.chart && (
+              <a href={e.chart} target="_blank" rel="noreferrer" className="label !text-fg underline-offset-4 hover:underline">
+                Chart öffnen ↗
+              </a>
+            )}
+          </span>
           <div className="flex min-h-8 flex-wrap items-center justify-end gap-2">
             {err && (
               <span role="alert" className="text-[12px] font-medium text-[#ff8a90]">

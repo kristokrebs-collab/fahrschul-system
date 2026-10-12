@@ -2,8 +2,8 @@
  * Keyboard shortcuts (P13): one registry, a pure matcher and the guard rules – the host (`ShortcutHost.tsx`) only wires
  * them to `keydown`.
  *
- *   g + Buchstabe   page (`PAGE_KEYS`: o Übersicht, t Trades, s Setups, e Einstellungen – pages the integrator adds
- *                   later bring their letter along)
+ *   g + Buchstabe   page (`PAGE_KEYS`: o Übersicht, t Trades, s Setups, e Einstellungen, m Markt, a Analyse, r Risiko,
+ *                   c Coach, b Berichte, l Labor, w Wachstum, g Community, d Cockpit, k Konto, p Preise)
  *   n               new trade                     /  or ⌘⇧F / Ctrl+⇧F   global search
  *   ?               this sheet                    [  ]                  previous / next page
  *   t               light / dark                  ⌘K / Ctrl+K           navigation (CommandNav, unchanged)
@@ -16,7 +16,7 @@ import { create } from "zustand";
 import { PAGE_LABELS } from "@/app/Dock";
 import { navigate } from "@/store/router";
 import { toggleTheme } from "@/store/themeStore";
-import { PAGE_KEYS, PAGES, useUi, type Page } from "@/store/uiStore";
+import { NAV_ORDER, PAGE_KEYS, PAGES, useUi, type Page } from "@/store/uiStore";
 import { openSearch } from "@/search/searchStore";
 
 export const CHORD_MS = 1200;
@@ -57,9 +57,10 @@ export function toggleShortcutSheet(): void {
 
 const label = (p: Page): string => (PAGE_LABELS as Partial<Record<string, string>>)[p] ?? p;
 
+/** `[` / `]`: the previous / next page in navigation order (dock tabs first, then the rest – like the slide direction). */
 function stepPage(dir: 1 | -1): void {
-  const i = PAGES.indexOf(useUi.getState().page);
-  const next = PAGES[(i + dir + PAGES.length) % PAGES.length]!;
+  const i = NAV_ORDER.indexOf(useUi.getState().page);
+  const next = NAV_ORDER[(i + dir + NAV_ORDER.length) % NAV_ORDER.length]!;
   navigate(next);
 }
 

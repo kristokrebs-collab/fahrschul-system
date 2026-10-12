@@ -12,11 +12,16 @@
  * texts exist in the page otherwise.
  */
 import { AnimatePresence, motion, type Transition } from "motion/react";
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { GlyphFullscreen } from "@/app/DisplayActions";
-import { PAGE_LABELS } from "@/app/Dock";
+import { PAGE_ICON, PAGE_LABELS } from "@/app/Dock";
+import { preloadPage } from "@/app/pages";
 import { DISPLAY_STRINGS, isIosSafari, isSamsungInternet, promptInstall, toggleFullscreen, useCanInstall, useFullscreen, useFullscreenSupported, useStandalone } from "@/app/pwa";
-import { shellStatTexts, useLivePriceText, useShellStats } from "@/app/shellStats";
+import { useLivePriceText, usePageCounts, useShellStats } from "@/app/shellStats";
+import { cloudEnabled } from "@/cloud/env";
+import { ensureCloud } from "@/cloud/runtime";
+import { useCloudSession } from "@/cloud/session";
+import { useSyncStatus } from "@/cloud/sync/status";
 import { cn } from "@/lib/cn";
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
 import { useDialogBehaviour } from "@/motion/a11y";
@@ -24,10 +29,13 @@ import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Icon } from "@/primitives/icons";
+import { openSearch } from "@/search/searchStore";
 import { exportCsv, exportJson } from "@/store/backup";
 import { canDownload } from "@/store/download";
 import { navigate } from "@/store/router";
-import { PAGES, useUi, type Page } from "@/store/uiStore";
+import { toggleTheme, useTheme } from "@/store/themeStore";
+import { PAGES, pushToast, useUi, type Page } from "@/store/uiStore";
+import { useViews } from "@/store/viewsStore";
 import { create } from "zustand";
 
 export const CONFIG = {
@@ -36,8 +44,19 @@ export const CONFIG = {
   itemMs: 650,
   itemEase: [0.22, 1, 0.36, 1],
   lift: 24,
-  /** ms after the open: brand block, the four links, the quick actions (pack "images" slots, then the display actions), hint row, live price */
-  delays: { brand: 620, links: [620, 720, 820, 900], actions: [720, 800, 880, 960, 1040], display: 1040, hints: 2250, price: 2300 },
+  /**
+   * ms after the open: brand block, the page links (the pack's four, then one beat of 60 ms per further page), the quick
+   * actions (pack "images" slots, then the display actions), hint row, live price
+   */
+  delays: {
+    brand: 620,
+    links: [620, 720, 820, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560],
+    actions: [720, 800, 880, 960, 1040, 1120, 1200, 1280],
+    display: 1280,
+    views: 1360,
+    hints: 2250,
+    price: 2300,
+  },
 } as const;
 
 export const COMMAND_NAV_ID = "command-nav";
@@ -49,9 +68,17 @@ export const COMMAND_NAV_STRINGS = {
   pages: "Seiten",
   actions: "Schnellaktionen",
   newTrade: "Trade eintragen",
+  search: "Suchen",
+  themeLight: "Hell",
+  themeDark: "Dunkel",
+  sync: "Jetzt synchronisieren",
+  synced: "Synchronisiert",
+  syncFailed: "Synchronisieren fehlgeschlagen",
   csv: "CSV-Export",
   backup: "Backup herunterladen",
-  hints: "↑↓ wählen · ↵ öffnen · Esc schließt",
+  more: "Werkzeuge & Konto",
+  views: "Gespeicherte Ansichten",
+  hints: "↑↓ wählen · ↵ öffnen · 1–9 Seite · Esc schließt",
 } as const;
 
 /* ------------------------------------------------------------------ open state */
@@ -120,7 +147,12 @@ function Item({ delay, reduced, className, children }: { delay: number; reduced:
   );
 }
 
-const PAGE_HASH: Record<Page, string> = { overview: "#overview", trades: "#trades", setups: "#setups", settings: "#settings" };
+const PAGE_HASH = Object.fromEntries(PAGES.map((p) => [p, `#${p}`])) as Record<Page, string>;
+/** The pack's big links: the four original pages (digits 1–4); the feature pages follow in a compact grid. */
+const PRIMARY = PAGES.slice(0, 4);
+const SECONDARY = PAGES.slice(4);
+/** Two-digit index of a page (`01` … `15`) – the digit shortcut of the first nine. */
+const pageNo = (i: number): string => String(i + 1).padStart(2, "0");
 
 function Panel({ reduced }: { reduced: boolean }) {
   const open = useNav((s) => s.open);
@@ -128,21 +160,18 @@ function Panel({ reduced }: { reduced: boolean }) {
   const page = useUi((s) => s.page);
   const openEditor = useUi((s) => s.openEditor);
   const stats = useShellStats();
-  const texts = shellStatTexts(stats);
+  const counts = usePageCounts(stats);
   const price = useLivePriceText();
+  const theme = useTheme((s) => s.resolved);
+  const views = useViews((s) => s.views);
+  const signedIn = useCloudSession((s) => s.phase === "signedIn");
+  const syncOn = useSyncStatus((s) => s.phase !== "off");
   const ref = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState(reduced);
 
   // focus lands on the close button (visible from the first frame; the entries fade in later), arrows move into the list
   const settled = open ? opened : immediate;
   useDialogBehaviour(ref, open, () => closeCommandNav(), { settled });
-
-  const counts: Record<Page, { text: string; tone?: string }> = {
-    overview: { text: texts.net, tone: stats.net > 0 ? "text-win" : stats.net < 0 ? "text-loss" : "text-mute" },
-    trades: { text: texts.trades },
-    setups: { text: texts.setups },
-    settings: { text: texts.rules },
-  };
 
   const go = (p: Page) => {
     navigate(p);
@@ -185,7 +214,7 @@ function Panel({ reduced }: { reduced: boolean }) {
     ...(hintInstall ? [isIosSafari() ? DISPLAY_STRINGS.installHintIos : DISPLAY_STRINGS.installHint] : []),
     ...(isSamsungInternet() ? [DISPLAY_STRINGS.samsungDark] : []),
   ];
-  const actions: { key: string; label: string; icon: ReactNode; accent?: boolean; pressed?: boolean; run: () => void }[] = [
+  const actions: { key: string; label: string; icon: ReactNode; accent?: boolean; pressed?: boolean; run: (e: MouseEvent<HTMLButtonElement>) => void }[] = [
     {
       key: "new",
       label: COMMAND_NAV_STRINGS.newTrade,
@@ -196,6 +225,40 @@ function Panel({ reduced }: { reduced: boolean }) {
         openEditor();
       },
     },
+    {
+      key: "search",
+      label: COMMAND_NAV_STRINGS.search,
+      icon: <Icon name="search" />,
+      run: () => {
+        closeCommandNav(true);
+        openSearch();
+      },
+    },
+    {
+      key: "theme",
+      label: theme === "light" ? COMMAND_NAV_STRINGS.themeDark : COMMAND_NAV_STRINGS.themeLight,
+      icon: <GlyphTheme light={theme === "light"} />,
+      // the reveal grows from the pressed button (P13 theme transition)
+      run: (e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        toggleTheme({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+      },
+    },
+    ...(cloudEnabled() && signedIn && syncOn
+      ? [
+          {
+            key: "sync",
+            label: COMMAND_NAV_STRINGS.sync,
+            icon: <GlyphSync />,
+            run: () => {
+              void ensureCloud()
+                .then((m) => m.syncNow())
+                .then((ok) => pushToast(ok ? { kind: "success", title: COMMAND_NAV_STRINGS.synced } : { kind: "error", title: COMMAND_NAV_STRINGS.syncFailed }))
+                .catch(() => pushToast({ kind: "error", title: COMMAND_NAV_STRINGS.syncFailed }));
+            },
+          },
+        ]
+      : []),
     ...(downloads
       ? [
           { key: "csv", label: COMMAND_NAV_STRINGS.csv, icon: <GlyphArrowDown />, run: () => void exportCsv() },
@@ -247,9 +310,9 @@ function Panel({ reduced }: { reduced: boolean }) {
 
           {/* minmax(0,1fr): the longest page name may never widen the column past the screen (390: it overflowed 24 px) */}
           <div className="grid flex-1 grid-cols-[minmax(0,1fr)] content-center gap-10 py-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)] xl:gap-16">
-            <nav aria-label={COMMAND_NAV_STRINGS.pages}>
+            <nav aria-label={COMMAND_NAV_STRINGS.pages} className="grid gap-7">
               <ul className="cmdnav-links grid">
-                {PAGES.map((p, i) => (
+                {PRIMARY.map((p, i) => (
                   <li key={p}>
                     <Item delay={CONFIG.delays.links[i] ?? 900} reduced={reduced}>
                       <a
@@ -263,9 +326,9 @@ function Panel({ reduced }: { reduced: boolean }) {
                         className="cmdnav-link group/link inline-flex max-w-full items-baseline gap-3 rounded-lg py-1.5 text-fg outline-none max-sm:pointer-coarse:py-2.5 transition-opacity duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:gap-5"
                       >
                         <span aria-hidden="true" className="w-6 shrink-0 font-mono text-[11px] text-faint sm:w-8">
-                          0{i + 1}
+                          {pageNo(i)}
                         </span>
-                        <span className="min-w-0 break-words text-[clamp(22px,4.6vw,64px)] font-normal leading-[1.08] tracking-[-0.02em]">{PAGE_LABELS[p]}</span>
+                        <span className="min-w-0 break-words text-[clamp(22px,4.6vw,56px)] font-normal leading-[1.08] tracking-[-0.02em]">{PAGE_LABELS[p]}</span>
                         <span className={cn("dot-num shrink-0 self-start pt-[0.5em] text-[12px] sm:text-[14px]", counts[p].tone ?? "text-mute")}>{counts[p].text}</span>
                         {page === p && <span aria-hidden="true" className="size-1.5 shrink-0 self-center rounded-full bg-signal" />}
                       </a>
@@ -273,6 +336,48 @@ function Panel({ reduced }: { reduced: boolean }) {
                   </li>
                 ))}
               </ul>
+              {/* the feature pages: a compact grid (icon, name, live count, digit) – preloading their chunk on intent */}
+              <div className="grid gap-2.5">
+                <Item delay={CONFIG.delays.links[PRIMARY.length] ?? 960} reduced={reduced}>
+                  <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">{COMMAND_NAV_STRINGS.more}</p>
+                </Item>
+                <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,168px),1fr))] gap-2">
+                  {SECONDARY.map((p, k) => {
+                    const i = PRIMARY.length + k;
+                    return (
+                      <li key={p} className="min-w-0">
+                        <Item delay={CONFIG.delays.links[i] ?? 1560} reduced={reduced} className="h-full">
+                          <a
+                            href={PAGE_HASH[p]}
+                            data-cmd-item=""
+                            aria-current={page === p ? "page" : undefined}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              go(p);
+                            }}
+                            onPointerEnter={() => preloadPage(p)}
+                            onFocus={() => preloadPage(p)}
+                            onPointerDown={() => preloadPage(p)}
+                            className="cmdnav-link group/link relative flex h-full min-h-12 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
+                          >
+                            <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg border border-line-2 text-mute group-hover/link:text-fg [&>svg]:size-4">
+                              <Icon name={PAGE_ICON[p]} />
+                            </span>
+                            <span className="grid min-w-0 flex-1">
+                              <span className="truncate text-[15px] font-medium leading-tight">{PAGE_LABELS[p]}</span>
+                              <span className={cn("dot-num truncate text-[11.5px]", counts[p].tone ?? "text-mute")}>{counts[p].text}</span>
+                            </span>
+                            <span aria-hidden="true" className="shrink-0 self-start font-mono text-[10px] text-faint">
+                              {pageNo(i)}
+                            </span>
+                            {page === p && <span aria-hidden="true" className="absolute right-2 bottom-2 size-1.5 rounded-full bg-signal" />}
+                          </a>
+                        </Item>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             </nav>
 
             <section aria-label={COMMAND_NAV_STRINGS.actions} className="grid content-start gap-3">
@@ -281,7 +386,7 @@ function Panel({ reduced }: { reduced: boolean }) {
                   <button
                     type="button"
                     data-cmd-item=""
-                    onClick={a.run}
+                    onClick={(e) => a.run(e)}
                     aria-pressed={a.pressed}
                     className="group/action flex w-full items-center gap-4 rounded-2xl border border-line-2 bg-ink-900 px-4 py-4 text-left outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60"
                   >
@@ -298,6 +403,29 @@ function Panel({ reduced }: { reduced: boolean }) {
                   </button>
                 </Item>
               ))}
+              {views.length > 0 && (
+                <Item delay={CONFIG.delays.views} reduced={reduced}>
+                  <div role="group" aria-label={COMMAND_NAV_STRINGS.views} className="grid gap-2 px-1 pt-1">
+                    <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">{COMMAND_NAV_STRINGS.views}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {views.slice(0, 8).map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          data-cmd-item=""
+                          onClick={() => {
+                            useViews.getState().applyView(v.id);
+                            go("trades");
+                          }}
+                          className="max-w-full truncate rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] text-fg outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60 pointer-coarse:min-h-11"
+                        >
+                          {v.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Item>
+              )}
               {displayHints.length > 0 && (
                 <Item delay={CONFIG.delays.display} reduced={reduced}>
                   <div aria-label={DISPLAY_STRINGS.section} role="note" className="grid gap-2 px-1 pt-1 text-[12.5px] leading-relaxed text-mute">
@@ -324,6 +452,29 @@ function Panel({ reduced }: { reduced: boolean }) {
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+function GlyphTheme({ light }: { light: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {light ? (
+        <path d="M13.5 9.5A5.5 5.5 0 0 1 6.5 2.5a5.5 5.5 0 1 0 7 7z" />
+      ) : (
+        <>
+          <circle cx="8" cy="8" r="3" />
+          <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1 1M11.6 11.6l1 1M3.4 12.6l1-1M11.6 4.4l1-1" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function GlyphSync() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M13 6.5A5 5 0 0 0 4 4.5L2.5 6M3 9.5a5 5 0 0 0 9 2l1.5-1.5M2.5 2.5V6H6M13.5 13.5V10H10" />
+    </svg>
   );
 }
 

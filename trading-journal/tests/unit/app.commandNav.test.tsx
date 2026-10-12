@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { closeCommandNav, CommandNav, COMMAND_NAV_STRINGS, CONFIG, isCommandNavShortcut, openCommandNav, rovingIndex } from "@/app/CommandNav";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { useUi } from "@/store/uiStore";
+import { PAGES, useUi } from "@/store/uiStore";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
 function Opener() {
@@ -59,7 +59,9 @@ describe("command navigation: pure helpers", () => {
     expect(CONFIG.wipeEase).toEqual([0.76, 0, 0.24, 1]);
     expect(CONFIG.itemMs).toBe(650);
     expect(CONFIG.itemEase).toEqual([0.22, 1, 0.36, 1]);
-    expect(CONFIG.delays.links).toEqual([620, 720, 820, 900]);
+    // the pack's four, then one 60 ms beat per further page (P14: 15 pages)
+    expect(CONFIG.delays.links).toEqual([620, 720, 820, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560]);
+    expect(CONFIG.delays.links).toHaveLength(PAGES.length);
   });
 });
 
@@ -80,7 +82,24 @@ describe("command navigation", () => {
     expect(d).toHaveAttribute("aria-modal", "true");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.close })).toHaveFocus();
     const links = within(d).getAllByRole("link");
-    expect(links.map((l) => l.textContent?.replace(/^0\d/, ""))).toEqual([expect.stringMatching(/^Übersicht/), "Trades13", "Entscheidungsgrundlagen8", expect.stringMatching(/^Einstellungen\d+$/)]);
+    // the four big links (digit first), then the feature pages (name, live count, digit last)
+    expect(links.map((l) => l.textContent?.replace(/^0\d/, ""))).toEqual([
+      expect.stringMatching(/^Übersicht/),
+      "Trades13",
+      "Entscheidungsgrundlagen8",
+      expect.stringMatching(/^Einstellungen\d+$/),
+      expect.stringMatching(/^Markt.+05$/),
+      expect.stringMatching(/^Analyse\d+ %06$/),
+      expect.stringMatching(/^Risiko.+07$/),
+      expect.stringMatching(/^Coach\d+08$/),
+      expect.stringMatching(/^BerichteKW \d+09$/),
+      expect.stringMatching(/^Labor\d+10$/),
+      expect.stringMatching(/^Wachstum\d+11$/),
+      expect.stringMatching(/^Community.+12$/),
+      expect.stringMatching(/^Cockpit\d+13$/),
+      expect.stringMatching(/^Konto.+14$/),
+      expect.stringMatching(/^Preise.+15$/),
+    ]);
     expect(within(d).getByRole("link", { name: /Übersicht/ })).toHaveAttribute("aria-current", "page");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.newTrade })).toBeInTheDocument();
     // ⌘K again toggles it closed

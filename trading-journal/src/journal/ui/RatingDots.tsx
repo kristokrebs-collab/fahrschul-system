@@ -2,7 +2,7 @@ import { motion } from "motion/react";
 import { useState, type KeyboardEvent } from "react";
 import type { TradeRating } from "@/domain/types";
 import { cn } from "@/lib/cn";
-import { DotMatrix, type DotFrame } from "@/motion";
+import { DotMatrix, type Frame as DotFrame } from "@/motion/DotMatrix";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 

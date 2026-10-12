@@ -1,7 +1,8 @@
 import { Component, useEffect, useMemo, useState, type ErrorInfo, type ReactNode } from "react";
-import { reportError } from "@/cloud";
+import { reportError } from "@/cloud/report";
 import { cn } from "@/lib/cn";
-import { DotMatrix, mulberry32, textFrame, type DotFrame } from "@/motion";
+import { mulberry32 } from "@/motion/Celebrate";
+import { DotMatrix, textFrame, type Frame as DotFrame } from "@/motion/DotMatrix";
 import { fxTiming } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";

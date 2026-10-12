@@ -6,7 +6,8 @@
  */
 import { motion } from "motion/react";
 import { useRef, type ReactNode } from "react";
-import { SIG_LABEL, SIG_TONE, type Interval, type Significance } from "@/domain/analytics";
+// the module, not the barrel: the setups compare sheet (first load) uses these helpers
+import { SIG_LABEL, SIG_TONE, type Interval, type Significance } from "@/domain/analytics/stats";
 import { cn } from "@/lib/cn";
 import { DASH, INFINITY_SIGN, r as fmtR, signed } from "@/lib/format";
 import { useFirstInView } from "@/motion/inView";

@@ -100,6 +100,8 @@ export function OverviewView({ className }: { className?: string }) {
   useEffect(() => (root.current ? startIdlePrerender(root.current) : undefined), []);
   return (
     <div ref={root} className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)}>
+      {/* every page names itself with an h1 (P14; the page switch moves focus there) – the hero is the visible title */}
+      <h1 className="sr-only">Übersicht</h1>
       <IntroCell className="lg:col-span-12">
         <Hero />
       </IntroCell>

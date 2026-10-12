@@ -11,13 +11,26 @@ vi.mock("@/chart/NothingCandleChart", () => ({ NothingCandleChart: () => <div da
 vi.mock("@/chart/MiniTradeChart", () => ({ MiniTradeChart: () => null }));
 vi.mock("@/app/pages", async () => {
   const overview = await import("@/views/overview");
+  // the feature pages (P14: lazy chunks in the app) as plain stubs with their h1
+  const stub = (name: string) => () => (
+    <div data-testid={`page-${name}`}>
+      <h1>{name}</h1>
+    </div>
+  );
+  const LAZY_VIEWS = Object.fromEntries(["markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise"].map((p) => [p, stub(p)]));
   return {
     OverviewView: overview.OverviewView,
     TradesView: () => <div data-testid="page-trades">Alle Trades</div>,
     SetupsView: () => <div data-testid="page-setups">Entscheidungsgrundlagen</div>,
     SettingsView: () => <div data-testid="page-settings">Einstellungen</div>,
+    LAZY_VIEWS,
+    LAZY_PAGES: Object.keys(LAZY_VIEWS),
+    isLazyPage: (p: string) => p in LAZY_VIEWS,
+    PAGE_FEATURE: { coach: "coach" },
+    preloadPage: () => undefined,
   };
 });
+vi.mock("@/app/DeferredHosts", () => ({ default: () => <div data-testid="feature-hosts" /> }));
 vi.mock("@/app/overlays", () => ({
   TradeDetail: () => null,
   TradeEditor: () => null,
@@ -27,6 +40,7 @@ vi.mock("@/app/overlays", () => ({
 
 import App from "@/App";
 import { MotionRoot } from "@/motion/MotionRoot";
+import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
 
 function renderApp() {
@@ -73,6 +87,26 @@ describe("App shell", () => {
     });
     expect(useUi.getState().page).toBe("settings");
     expect(location.hash).toBe("#settings");
+  });
+
+  it("feature pages: the dock's Markt tab and the router reach the lazy pages; the feature hosts mount (P14)", async () => {
+    renderApp();
+    const dock = screen.getByRole("toolbar", { name: "Navigation" });
+    await act(async () => {
+      fireEvent.click(within(dock).getByRole("button", { name: "Markt" }));
+    });
+    expect(useUi.getState().page).toBe("markt");
+    expect(location.hash).toBe("#markt");
+    expect(await screen.findByTestId("page-markt")).toBeInTheDocument();
+    expect(within(dock).getByRole("button", { name: "Markt" })).toHaveAttribute("aria-current", "page");
+    // a page outside the dock (no payments in tests → the coach gate is open)
+    await act(async () => {
+      navigate("coach");
+    });
+    expect(await screen.findByTestId("page-coach")).toBeInTheDocument();
+    expect(within(dock).queryByRole("button", { current: "page" })).toBeNull();
+    expect(await screen.findByTestId("feature-hosts")).toBeInTheDocument();
+    for (const layer of ["Suche", "Tastenkürzel", "Einführung", "Cloud"]) expect(document.querySelector(`[data-layer="${layer}"]`)).not.toBeNull();
   });
 
   it("shows the local-mode banner and hides it via the close button (pref persisted)", async () => {

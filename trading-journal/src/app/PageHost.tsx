@@ -47,7 +47,7 @@ import { consumeNavTempo, contextSpringAt } from "@/motion/physics";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { detachShell, showPage } from "@/store/router";
-import { PAGES, type Page } from "@/store/uiStore";
+import { NAV_ORDER, PAGES, type Page } from "@/store/uiStore";
 
 export type PageRole = "current" | "leaving" | "parked";
 
@@ -169,9 +169,9 @@ export function afterNextPaint(fn: () => void): () => void {
   };
 }
 
-/** Pure: slide direction of a switch in tab order (`+1` → the new page comes from the right). */
+/** Pure: slide direction of a switch in navigation order (`NAV_ORDER`: dock tabs, then the rest; `+1` → the new page comes from the right). */
 export function pageDirection(from: Page, to: Page): 1 | -1 {
-  return PAGES.indexOf(to) >= PAGES.indexOf(from) ? 1 : -1;
+  return NAV_ORDER.indexOf(to) >= NAV_ORDER.indexOf(from) ? 1 : -1;
 }
 
 /** Pure: the role of `page`'s layer, or `null` when it is not mounted. */

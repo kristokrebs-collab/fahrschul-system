@@ -11,7 +11,7 @@ import { BOX_KIND_TEXT, CONFORMITY_LABEL, examplesOf, hasStrategyData, SESSION_T
 import type { EnrichedTrade, Setup } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { date as fmtDate, pct0, r as fmtR } from "@/lib/format";
-import { ConfidenceMeter } from "@/motion/fx";
+import { ConfidenceMeter } from "@/motion/fx/ConfidenceMeter";
 import { MorphCard } from "@/motion/MorphCard";
 import { useMorphDialog } from "@/motion/MorphDialog";
 import { ReelWindow } from "@/motion/pulse/ReelWindow";

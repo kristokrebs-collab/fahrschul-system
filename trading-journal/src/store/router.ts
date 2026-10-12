@@ -1,4 +1,6 @@
+import { create } from "zustand";
 import type { TradeFilter } from "@/domain/types";
+import { parseShareHash, SHARE_ROUTE } from "@/social/links";
 import { consumeHandledHashChange, installBackStack, pushPageEntry, replaceEntryURL } from "./backStack";
 import { useJournal } from "./journalStore";
 import { DEFAULT_TRADE_FILTER, PAGES, useUi, type Page } from "./uiStore";
@@ -10,7 +12,17 @@ export interface Route {
   page: Page;
   /** Only present for `#trades?…` deep links (parsed query, defaults filled in). */
   filter?: TradeFilter;
+  /**
+   * Raw query of a page with its own deep-link seam (`QUERY_PAGES`): `#analyse?dim=session`, `#berichte?p=2026-W41`,
+   * `#community?invite=CODE`. The page's seam validates it (unknown values are ignored there).
+   */
+  query?: string;
+  /** `#share/<token>`: the public view of a share link (P12) – shown instead of the pages, no login needed. */
+  share?: string;
 }
+
+/** Pages whose query the router keeps (each validates its own keys; every other page drops the query). */
+export const QUERY_PAGES: ReadonlySet<Page> = new Set<Page>(["analyse", "berichte", "community"]);
 
 const RESULTS = new Set<TradeFilter["result"]>(["all", "win", "loss", "open", "be"]);
 const SIDES = new Set<TradeFilter["side"]>(["all", "long", "short"]);
@@ -29,9 +41,11 @@ function isPage(v: string): v is Page {
  */
 export function parseHash(hash: string, knownSetupIds?: readonly string[]): Route {
   const h = hash.startsWith("#") ? hash.slice(1) : hash;
+  const share = parseShareHash(h);
+  if (share) return { page: "overview", share };
   const [pageRaw = "", queryRaw = ""] = h.split("?");
   if (!isPage(pageRaw)) return { page: "overview" };
-  if (pageRaw !== "trades") return { page: pageRaw };
+  if (pageRaw !== "trades") return queryRaw && QUERY_PAGES.has(pageRaw) ? { page: pageRaw, query: queryRaw } : { page: pageRaw };
   if (!queryRaw) return { page: "trades" };
 
   const p = new URLSearchParams(queryRaw);
@@ -50,9 +64,13 @@ export function parseHash(hash: string, knownSetupIds?: readonly string[]): Rout
   return { page: "trades", filter };
 }
 
-/** Builds `#page` or `#trades?…` with non-default filter values only (sort never goes into the URL). */
-export function buildHash(page: Page, filter?: Partial<TradeFilter>): string {
-  if (page !== "trades" || !filter) return `#${page}`;
+/**
+ * Builds `#page`, `#trades?…` with non-default filter values only (sort never goes into the URL), or `#page?query` for
+ * a page with a deep-link seam (`QUERY_PAGES`, the query as its seam writes it).
+ */
+export function buildHash(page: Page, filter?: Partial<TradeFilter>, query?: string): string {
+  if (page !== "trades") return query && QUERY_PAGES.has(page) ? `#${page}?${query}` : `#${page}`;
+  if (!filter) return `#${page}`;
   const p = new URLSearchParams();
   const f = { ...DEFAULT_TRADE_FILTER, ...filter };
   if (f.setup !== DEFAULT_TRADE_FILTER.setup) p.set("setup", f.setup);
@@ -60,8 +78,8 @@ export function buildHash(page: Page, filter?: Partial<TradeFilter>): string {
   if (f.side !== DEFAULT_TRADE_FILTER.side) p.set("side", f.side);
   if (f.acc !== DEFAULT_TRADE_FILTER.acc) p.set("acc", f.acc);
   if (f.q) p.set("q", f.q.slice(0, Q_MAX));
-  const query = p.toString();
-  return query ? `#trades?${query}` : "#trades";
+  const qs = p.toString();
+  return qs ? `#trades?${qs}` : "#trades";
 }
 
 /* ------------------------------------------------------------ scroll memory */
@@ -194,13 +212,119 @@ function pushHash(hash: string): void {
 
 let applying = false;
 
+/* -------------------------------------------------------- share route */
+
+/** The token of a `#share/<token>` route on screen (the shell shows the public SharedView instead of the pages). */
+export const useShareRoute = create<{ token: string | null }>(() => ({ token: null }));
+
+function setShare(token: string | null): void {
+  if (useShareRoute.getState().token !== token) useShareRoute.setState({ token });
+}
+
+/* --------------------------------------------------- deep-link seams */
+
+/**
+ * A page's own deep-link state (P03 `#analyse?dim=…`, P04 `#berichte?p=…`): `apply` takes a query (invalid keys are
+ * ignored there), `query` is the query of the current state (`""` = none), `subscribe` reports changes so the URL
+ * follows (replace, no history entry). The seams live in the pages' store modules and are loaded on first use, so the
+ * router never pulls a page's domain into the main chunk.
+ */
+export interface QuerySeam {
+  apply(query: string): void;
+  query(): string;
+  subscribe(onChange: () => void): () => void;
+}
+
+const SEAM_LOADERS: Partial<Record<Page, () => Promise<QuerySeam>>> = {
+  analyse: () =>
+    import("@/views/analyse/analyseStore").then((m) => ({
+      apply: (q) => m.setAnalyseDim(m.analyseDimFromQuery(q)),
+      query: () => m.analyseQuery(),
+      subscribe: (cb) => m.useAnalyseUi.subscribe((st, prev) => st.dim !== prev.dim && cb()),
+    })),
+  berichte: () =>
+    import("@/views/berichte/berichteStore").then((m) => ({
+      apply: (q) => {
+        const key = m.berichtePeriodFromQuery(q);
+        if (key) m.openReport(key);
+      },
+      query: () => {
+        const key = m.useBerichteUi.getState().key;
+        return key ? m.berichteQuery(key) : "";
+      },
+      subscribe: (cb) => m.useBerichteUi.subscribe((st, prev) => st.key !== prev.key && cb()),
+    })),
+};
+
+const seams: Partial<Record<Page, QuerySeam>> = {};
+const seamLoads: Partial<Record<Page, Promise<QuerySeam | null>>> = {};
+/** A deep-link query that arrived before its seam was loaded (kept in the URL meanwhile). */
+const pendingQuery: Partial<Record<Page, string>> = {};
+let seamOffs: (() => void)[] = [];
+let routerInstalled = false;
+
+/** Loads `page`'s seam once; applies a pending query and starts mirroring its state into the URL. */
+export function ensureSeam(page: Page): Promise<QuerySeam | null> {
+  const load = SEAM_LOADERS[page];
+  if (!load) return Promise.resolve(null);
+  let p = seamLoads[page];
+  if (!p) {
+    p = load()
+      .then((seam) => {
+        seams[page] = seam;
+        const q = pendingQuery[page];
+        delete pendingQuery[page];
+        if (q) seam.apply(q);
+        seamOffs.push(
+          seam.subscribe(() => {
+            if (!applying && routerInstalled && useUi.getState().page === page && !useShareRoute.getState().token) replaceHash(uiHash());
+          }),
+        );
+        if (routerInstalled && useUi.getState().page === page && !useShareRoute.getState().token) replaceHash(uiHash());
+        return seam;
+      })
+      .catch(() => {
+        delete seamLoads[page];
+        return null;
+      });
+    seamLoads[page] = p;
+  }
+  return p;
+}
+
+/** The query `page` shows in the URL now: its seam's state, or a deep link still waiting for the seam. */
+function pageQuery(page: Page): string {
+  const seam = seams[page];
+  if (seam) return seam.query();
+  return pendingQuery[page] ?? "";
+}
+
+/** Tests: forget the loaded seams (their store modules stay loaded). */
+export function resetSeamsForTests(): void {
+  for (const off of seamOffs) off();
+  seamOffs = [];
+  for (const k of Object.keys(seams) as Page[]) delete seams[k];
+  for (const k of Object.keys(seamLoads) as Page[]) delete seamLoads[k];
+  for (const k of Object.keys(pendingQuery) as Page[]) delete pendingQuery[k];
+}
+
 /** Applies a parsed route to the UI store: the URL query wins over `uiStore.tradeFilter`. */
 function applyRoute(route: Route): void {
+  if (route.share) {
+    setShare(route.share);
+    return;
+  }
+  setShare(null);
   const ui = useUi.getState();
   const prev = ui.page;
   applying = true;
   try {
     if (route.filter) ui.setTradeFilter(route.filter);
+    if (route.query && SEAM_LOADERS[route.page]) {
+      const seam = seams[route.page];
+      if (seam) seam.apply(route.query);
+      else pendingQuery[route.page] = route.query;
+    }
     if (prev !== route.page) {
       rememberScroll(prev);
       ui.setPage(route.page);
@@ -208,6 +332,7 @@ function applyRoute(route: Route): void {
   } finally {
     applying = false;
   }
+  void ensureSeam(route.page);
   restoreScroll(route.page, Boolean(route.filter));
 }
 
@@ -219,8 +344,17 @@ function applyRoute(route: Route): void {
 export function navigate(page: Page, query?: Partial<TradeFilter>): void {
   const ui = useUi.getState();
   const prev = ui.page;
+  // leaving a public share view (its "Zum eigenen Journal") is a page entry of its own
+  const fromShare = useShareRoute.getState().token !== null;
+  setShare(null);
   if (page === "trades" && query) ui.setTradeFilter(query);
-  const hash = buildHash(page, page === "trades" ? useUi.getState().tradeFilter : undefined);
+  void ensureSeam(page);
+  const hash = buildHash(page, page === "trades" ? useUi.getState().tradeFilter : undefined, pageQuery(page));
+  if (fromShare && prev === page) {
+    pushHash(hash);
+    restoreScroll(page, true);
+    return;
+  }
   if (prev !== page) {
     rememberScroll(prev);
     ui.setPage(page);
@@ -237,10 +371,12 @@ export function currentRoute(): Route {
   return parseHash(typeof location === "undefined" ? "" : location.hash, knownSetupIds());
 }
 
-/** The URL of what the UI shows now (page + the trades filter). */
+/** The URL of what the UI shows now (a share view, or the page + the trades filter / the page's seam query). */
 function uiHash(): string {
+  const token = useShareRoute.getState().token;
+  if (token) return `#${SHARE_ROUTE}${token}`;
   const ui = useUi.getState();
-  return buildHash(ui.page, ui.page === "trades" ? ui.tradeFilter : undefined);
+  return buildHash(ui.page, ui.page === "trades" ? ui.tradeFilter : undefined, pageQuery(ui.page));
 }
 
 /**
@@ -253,8 +389,11 @@ function uiHash(): string {
 export function installRouter(): () => void {
   if (typeof window === "undefined") return () => {};
 
-  applyRoute(currentRoute());
-  replaceHash(uiHash());
+  routerInstalled = true;
+  const start = currentRoute();
+  applyRoute(start);
+  // an invitation (`#community?invite=CODE`) stays in the address until the Community page has read it (P12 clears it)
+  if (!(start.page === "community" && start.query)) replaceHash(uiHash());
 
   const onHashChange = (e: HashChangeEvent) => {
     if (consumeHandledHashChange(e.newURL || location.href)) {
@@ -280,6 +419,7 @@ export function installRouter(): () => void {
   });
 
   return () => {
+    routerInstalled = false;
     window.removeEventListener("hashchange", onHashChange);
     uninstallBack();
     untrack();

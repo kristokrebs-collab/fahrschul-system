@@ -67,15 +67,24 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       rollupOptions: {
         output: {
-          // Chart libraries in their own chunks: lightweight-charts is only reached through lazy imports,
-          // recharts is a parallel-loaded vendor chunk so the main chunk stays small (Plan 9.4).
-          manualChunks(id) {
-            if (!id.includes("node_modules")) return undefined;
-            if (/node_modules\/(lightweight-charts|fancy-canvas)\//.test(id)) return "lwc";
-            if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "react";
-            if (/node_modules\/(motion|motion-dom|motion-utils|framer-motion)\//.test(id)) return "motion";
-            if (/node_modules\/(recharts|victory-vendor|d3-[a-z-]+|internmap|decimal\.js-light|@reduxjs|immer|reselect|react-redux|redux|eventemitter3|es-toolkit|tiny-invariant)\//.test(id)) return "recharts";
-            return undefined;
+          // Chunks (P14): the vendor libraries keep their own chunks (lightweight-charts is reached through lazy
+          // imports only, recharts is a parallel-loaded vendor chunk, Plan 9.4); everything else the first paint needs
+          // – the `$initial` dependency chain of the entry – goes into ONE `app` chunk. Without that group Rolldown
+          // splits every module the entry shares with a lazy page (P02–P13 views, hosts) into its own common chunk:
+          // ~80 first-load requests and ~30 KiB more gzip (each file compresses alone). The feature pages and the
+          // hosts stay lazy chunks of their own (`src/app/pages.ts`, `src/app/DeferredHosts.tsx`).
+          codeSplitting: {
+            groups: [
+              { name: "lwc", test: /node_modules[\\/](lightweight-charts|fancy-canvas)[\\/]/, priority: 30 },
+              { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 30 },
+              { name: "motion", test: /node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/, priority: 30 },
+              {
+                name: "recharts",
+                test: /node_modules[\\/](recharts|victory-vendor|d3-[a-z-]+|internmap|decimal\.js-light|@reduxjs|immer|reselect|react-redux|redux|eventemitter3|es-toolkit|tiny-invariant)[\\/]/,
+                priority: 30,
+              },
+              { name: "app", tags: ["$initial"], priority: 10 },
+            ],
           },
         },
       },

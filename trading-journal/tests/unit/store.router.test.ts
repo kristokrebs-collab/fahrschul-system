@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildHash, detachShell, getScroll, installRouter, navigate, parseHash, Q_DEBOUNCE_MS, showPage } from "@/store/router";
+import { buildHash, detachShell, ensureSeam, getScroll, installRouter, navigate, parseHash, Q_DEBOUNCE_MS, resetSeamsForTests, showPage, useShareRoute } from "@/store/router";
+import { DEFAULT_DIM, useAnalyseUi } from "@/views/analyse/analyseStore";
+import { useBerichteUi } from "@/views/berichte/berichteStore";
 import { DEFAULT_TRADE_FILTER, useUi } from "@/store/uiStore";
 import { useJournal } from "@/store/journalStore";
 
@@ -195,5 +197,84 @@ describe("scroll handoff to the shell", () => {
     expect(scrollTo).not.toHaveBeenCalled();
     await new Promise((r) => requestAnimationFrame(() => r(undefined)));
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "instant" });
+  });
+});
+
+describe("feature pages, deep-link seams and the share route (P14)", () => {
+  const TOKEN = "AbCdEfGhIjKlMnOpQrStUv";
+  beforeEach(() => {
+    vi.useRealTimers();
+    resetSeamsForTests();
+    useShareRoute.setState({ token: null });
+    useAnalyseUi.setState({ dim: DEFAULT_DIM });
+    useBerichteUi.getState().reset();
+    history.replaceState(null, "", "#overview");
+    useUi.setState({ page: "overview", tradeFilter: y0 });
+  });
+
+  it("parses every page; only the seam pages keep their query", () => {
+    expect(parseHash("#markt")).toEqual({ page: "markt" });
+    expect(parseHash("#preise?x=1")).toEqual({ page: "preise" });
+    expect(parseHash("#analyse?dim=weekday")).toEqual({ page: "analyse", query: "dim=weekday" });
+    expect(parseHash("#berichte?p=2026-W41")).toEqual({ page: "berichte", query: "p=2026-W41" });
+    expect(parseHash("#community?invite=ABCDEFGH23")).toEqual({ page: "community", query: "invite=ABCDEFGH23" });
+    expect(parseHash(`#share/${TOKEN}`)).toEqual({ page: "overview", share: TOKEN });
+    expect(parseHash("#share/kurz")).toEqual({ page: "overview" });
+    expect(buildHash("analyse", undefined, "dim=session")).toBe("#analyse?dim=session");
+    expect(buildHash("markt", undefined, "dim=session")).toBe("#markt");
+  });
+
+  it("#analyse?dim= sets the dimension once the seam is loaded, and the URL follows the page's state", async () => {
+    history.replaceState(null, "", "#analyse?dim=weekday");
+    const uninstall = installRouter();
+    expect(useUi.getState().page).toBe("analyse");
+    await ensureSeam("analyse");
+    expect(useAnalyseUi.getState().dim).toBe("weekday");
+    expect(location.hash).toBe("#analyse?dim=weekday");
+    useAnalyseUi.setState({ dim: "session" });
+    expect(location.hash).toBe("#analyse?dim=session");
+    useAnalyseUi.setState({ dim: DEFAULT_DIM });
+    expect(location.hash).toBe("#analyse");
+    uninstall();
+  });
+
+  it("#berichte?p= opens that report; an invalid key is ignored", async () => {
+    history.replaceState(null, "", "#berichte?p=2026-W41");
+    const uninstall = installRouter();
+    await ensureSeam("berichte");
+    expect(useBerichteUi.getState().key).toBe("2026-W41");
+    expect(location.hash).toBe("#berichte?p=2026-W41");
+    history.replaceState(null, "", "#berichte?p=quatsch");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(useBerichteUi.getState().key).toBe("2026-W41");
+    uninstall();
+  });
+
+  it("an invitation stays in the address until the Community page read it", () => {
+    history.replaceState(null, "", "#community?invite=ABCDEFGH23");
+    const uninstall = installRouter();
+    expect(useUi.getState().page).toBe("community");
+    expect(location.hash).toBe("#community?invite=ABCDEFGH23");
+    uninstall();
+  });
+
+  it("#share/<token> shows the shared view without touching the page; navigating leaves it", () => {
+    useUi.setState({ page: "trades" });
+    history.replaceState(null, "", `#share/${TOKEN}`);
+    const uninstall = installRouter();
+    expect(useShareRoute.getState().token).toBe(TOKEN);
+    expect(useUi.getState().page).toBe("trades");
+    expect(location.hash).toBe(`#share/${TOKEN}`);
+    navigate("trades");
+    expect(useShareRoute.getState().token).toBeNull();
+    expect(location.hash).toBe("#trades");
+    history.replaceState(null, "", `#share/${TOKEN}`);
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(useShareRoute.getState().token).toBe(TOKEN);
+    history.replaceState(null, "", "#markt");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    expect(useShareRoute.getState().token).toBeNull();
+    expect(useUi.getState().page).toBe("markt");
+    uninstall();
   });
 });

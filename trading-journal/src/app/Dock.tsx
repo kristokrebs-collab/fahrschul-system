@@ -14,12 +14,44 @@ import { Icon, type IconName } from "@/primitives/icons";
 import { Magnetic } from "@/primitives/Magnetic";
 import { navigate } from "@/store/router";
 import { storageKey } from "@/store/storage";
-import { PAGES, useUi, type Page } from "@/store/uiStore";
+import { DOCK_PAGES, useUi, type Page } from "@/store/uiStore";
 
-/** Bundle `Dhe`. */
-export const PAGE_LABELS: Record<Page, string> = { overview: "Übersicht", trades: "Trades", setups: "Entscheidungsgrundlagen", settings: "Einstellungen" };
+/** Bundle `Dhe` + the feature pages (P14). */
+export const PAGE_LABELS: Record<Page, string> = {
+  overview: "Übersicht",
+  trades: "Trades",
+  setups: "Entscheidungsgrundlagen",
+  settings: "Einstellungen",
+  markt: "Markt",
+  analyse: "Analyse",
+  risiko: "Risiko",
+  coach: "Coach",
+  berichte: "Berichte",
+  labor: "Labor",
+  wachstum: "Wachstum",
+  community: "Community",
+  cockpit: "Cockpit",
+  konto: "Konto",
+  preise: "Preise",
+};
 export const FAB_LABEL = "Trade eintragen";
-const PAGE_ICON: Record<Page, IconName> = { overview: "grid", trades: "list", setups: "target", settings: "sliders" };
+export const PAGE_ICON: Record<Page, IconName> = {
+  overview: "grid",
+  trades: "list",
+  setups: "target",
+  settings: "sliders",
+  markt: "candles",
+  analyse: "chart",
+  risiko: "shield",
+  coach: "coach",
+  berichte: "report",
+  labor: "flask",
+  wachstum: "sprout",
+  community: "users",
+  cockpit: "gauge",
+  konto: "user",
+  preise: "tag",
+};
 
 /**
  * pulse-motion `dock` (measured) + its magnification remix. Label: opacity `1 − e^(−t/τ)` in 38 ms / out 35 ms, rises
@@ -350,10 +382,10 @@ export function DockItem({ label, onClick, active = false, tab = false, fx, laye
 
 /* ------------------------------------------------------------------ dock */
 
-/** Slots in DOM order: four tabs, the divider (moves, never scales), the FAB. */
-const SLOT_COUNT = PAGES.length + 2;
-const DIVIDER = PAGES.length;
-const FAB_SLOT = PAGES.length + 1;
+/** Slots in DOM order: the dock tabs (`DOCK_PAGES`), the divider (moves, never scales), the FAB. */
+const SLOT_COUNT = DOCK_PAGES.length + 2;
+const DIVIDER = DOCK_PAGES.length;
+const FAB_SLOT = DOCK_PAGES.length + 1;
 const SCALABLE: readonly boolean[] = Array.from({ length: SLOT_COUNT }, (_, k) => k !== DIVIDER);
 
 interface Geometry {
@@ -555,7 +587,7 @@ export function Dock() {
 
   /** Tab activation (tap, keyboard, scrub release). The active tab again → back to the top of the page (iOS). */
   const activateTab = (k: number, pressMs: number) => {
-    const p = PAGES[k];
+    const p = DOCK_PAGES[k];
     if (!p) return;
     if (p === useUi.getState().page) {
       // native smooth scroll (compositor), instant under reduced motion
@@ -656,12 +688,13 @@ export function Dock() {
       // fast and short → one tab per flick (finger right = next tab), slow → the item under the finger
       const step = flickStep({ offset: r.dx, velocity: r.vx, durationMs: r.durationMs });
       if (step !== 0) {
-        const at = PAGES.indexOf(useUi.getState().page);
+        // a page outside the dock (CommandNav, search) has no tab to flick from: nothing happens
+        const at = (DOCK_PAGES as readonly Page[]).indexOf(useUi.getState().page);
         const to = at + step;
-        if (at >= 0 && to >= 0 && to < PAGES.length) {
+        if (at >= 0 && to >= 0 && to < DOCK_PAGES.length) {
           setNavTempo(r.tempo);
           intendHop(to, flickHop(r.speed));
-          navigate(PAGES[to] as Page);
+          navigate(DOCK_PAGES[to] as Page);
         } else if (at >= 0) bumpSlot(at); // at the end of the row: a dip instead of a switch
         return "none";
       }
@@ -755,7 +788,7 @@ export function Dock() {
         className="pointer-events-auto relative mx-2 flex max-w-full items-end gap-3 px-3 pb-2 [-webkit-touch-callout:none]"
       >
         <DockTray left={tray.left} right={tray.right} mid={tray.mid} />
-        {PAGES.map((p, k) => (
+        {DOCK_PAGES.map((p, k) => (
           <DockItem
             key={p}
             ref={slotRefs[k]}

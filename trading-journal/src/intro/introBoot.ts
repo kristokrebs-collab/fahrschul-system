@@ -13,10 +13,17 @@ export interface IntroEnv {
   page: string;
 }
 
-const OTHER_PAGES = new Set(["trades", "setups", "settings"]);
+/** Every page but the overview (`PAGES` of `@/store/uiStore`, spelled out: this module loads before the stores). */
+const OTHER_PAGES = new Set(["trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise"]);
 
+/**
+ * Page of a start hash: a known page, `share` for a public share link (`#share/<token>` – a visitor's first look is
+ * the shared card, never the intro), else the overview.
+ */
 export function pageOfHash(hash: string): string {
-  const name = (hash.startsWith("#") ? hash.slice(1) : hash).split("?")[0] ?? "";
+  const raw = hash.startsWith("#") ? hash.slice(1) : hash;
+  if (raw.startsWith("share/")) return "share";
+  const name = raw.split("?")[0] ?? "";
   return OTHER_PAGES.has(name) ? name : "overview";
 }
 

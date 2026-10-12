@@ -3,7 +3,7 @@
  * (`attributionLogo:false` makes this mandatory).
  */
 import { cn } from "@/lib/cn";
-import { CHART_ATTRIBUTION } from "./theme";
+import { CHART_ATTRIBUTION } from "./attribution";
 
 export function ChartAttribution({ className }: { className?: string }) {
   return (

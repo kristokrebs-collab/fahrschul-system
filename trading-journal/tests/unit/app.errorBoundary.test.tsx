@@ -9,8 +9,9 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ErrorBoundary, ERROR_STRINGS, glitchFrames } from "@/app/ErrorBoundary";
 import { textFrame } from "@/motion";
 
-vi.mock("@/cloud", async (orig) => ({ ...(await orig<typeof import("@/cloud")>()), reportError: vi.fn() }));
-const { reportError } = await import("@/cloud");
+// the boundary imports `reportError` from its module (P14: not the `@/cloud` barrel, which stays out of the first load)
+vi.mock("@/cloud/report", async (orig) => ({ ...(await orig<typeof import("@/cloud/report")>()), reportError: vi.fn() }));
+const { reportError } = await import("@/cloud/report");
 
 let broken = true;
 function Flaky({ label = "Inhalt" }: { label?: string }) {

@@ -32,6 +32,12 @@ describe("intro play conditions", () => {
     expect(pageOfHash("#nope")).toBe("overview");
     expect(pageOfHash("#trades?setup=x")).toBe("trades");
     expect(pageOfHash("#settings")).toBe("settings");
+    // P14: every feature page counts as "another page" (a deep link there never plays the intro) …
+    for (const p of ["markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise"]) expect(pageOfHash(`#${p}`)).toBe(p);
+    expect(pageOfHash("#analyse?dim=weekday")).toBe("analyse");
+    // … and a public share link shows the shared card, never the intro
+    expect(pageOfHash("#share/AbCdEfGhIjKlMnOpQrStUv")).toBe("share");
+    expect(canAutoplay({ browser: true, seen: false, reduced: false, pref: null, page: pageOfHash("#share/AbCdEfGhIjKlMnOpQrStUv") })).toBe(false);
   });
 
   it("jsdom is never a real browser", () => {
