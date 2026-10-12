@@ -46,7 +46,9 @@ export interface BuildOptions {
 /** Parsed CSV trades → journal records (pair filled in where the export has none). */
 export function buildTrades(parsed: ParseResult, opts: BuildOptions): Trade[] {
   const nowIso = (opts.now ?? new Date()).toISOString();
-  return parsed.trades.map((t: CsvTrade) => toJournalTrade({ ...t, pair: t.pair || opts.fallbackPair }, { formatId: opts.formatId, venue: opts.venue, account: opts.account, nowIso }));
+  return parsed.trades.map((t: CsvTrade) =>
+    toJournalTrade({ ...t, pair: t.pair || opts.fallbackPair }, { formatId: opts.formatId, venue: opts.venue, account: opts.account, nowIso }),
+  );
 }
 
 export interface CsvMergePlan {
@@ -90,5 +92,7 @@ export async function importCsvTrades(trades: readonly Trade[], now = new Date()
   const write = [...plan.added, ...plan.updated];
   if (!write.length) return { ok: true, added: 0, updated: 0, unchanged: plan.unchanged };
   const res = await importBackup(JSON.stringify({ trades: write }), { mode: "merge", silent: true, now });
-  return res.ok ? { ok: true, added: plan.added.length, updated: plan.updated.length, unchanged: plan.unchanged } : { ok: false, added: 0, updated: 0, unchanged: 0, error: res.error };
+  return res.ok
+    ? { ok: true, added: plan.added.length, updated: plan.updated.length, unchanged: plan.unchanged }
+    : { ok: false, added: 0, updated: 0, unchanged: 0, error: res.error };
 }

@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { cn } from "@/lib/cn";
 import { celebrateFrom } from "@/motion/Celebrate";
 import { DotMatrix } from "@/motion/DotMatrix";
@@ -62,7 +63,13 @@ function HowTo() {
       <ol className="grid gap-2">
         {CONNECT.how.map((s, i) => (
           <StaggerItem as="li" key={s.t} className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 rounded-xl border border-line bg-ink-950/40 p-3">
-            <span aria-hidden="true" className={cn("grid size-7 place-items-center rounded-lg border font-mono text-[12px]", i === 2 ? "border-signal/50 text-signal" : "border-line-2 text-fg")}>
+            <span
+              aria-hidden="true"
+              className={cn(
+                "grid size-7 place-items-center rounded-lg border font-mono text-[12px]",
+                i === 2 ? "border-signal/50 text-signal" : "border-line-2 text-fg",
+              )}
+            >
               {i + 1}
             </span>
             <span className="grid gap-0.5">
@@ -156,17 +163,33 @@ export function ConnectSheet() {
       setShake(Date.now());
       return;
     }
-    setError(null);
+    // the secret leaves the state – and the form's DOM, committed once more WITHOUT it (flushSync) before the step
+    // changes, so the exiting form's frozen copy holds no secret either; it only comes back from this closure when
+    // the check fails, so the trader can correct it
+    const creds = { apiKey: apiKey.trim(), secret: secret.trim() };
+    flushSync(() => {
+      setError(null);
+      setSecret("");
+      setShowSecret(false);
+      setKeyFocused(false);
+    });
     setStep(2);
     setChecking(true);
-    const out = await connectAccount({ exchange: "bitunix", apiKey: apiKey.trim(), secret: secret.trim(), label: label.trim() || undefined, journalAccount: account, readOnlyConfirmed: true });
+    const out = await connectAccount({
+      exchange: "bitunix",
+      apiKey: creds.apiKey,
+      secret: creds.secret,
+      label: label.trim() || undefined,
+      journalAccount: account,
+      readOnlyConfirmed: true,
+    });
     setChecking(false);
     if (out.ok) {
-      setSecret("");
       setApiKey("");
       setResult(out.result);
       requestAnimationFrame(() => okRef.current && celebrateFrom(okRef.current, { kind: "streak", tone: "win" }));
     } else {
+      setSecret(creds.secret);
       setError(out.error);
       setStep(1);
       setShake(Date.now());
@@ -222,7 +245,14 @@ export function ConnectSheet() {
     );
 
   return (
-    <Sheet open={open} onClose={close} size="md" title={CONNECT.title} dismissGuard={() => step === 1 && (apiKey.length > 0 || secret.length > 0)} footer={footer}>
+    <Sheet
+      open={open}
+      onClose={close}
+      size="md"
+      title={CONNECT.title}
+      dismissGuard={() => step === 1 && (apiKey.length > 0 || secret.length > 0)}
+      footer={footer}
+    >
       <div className="grid gap-5" data-testid="connect-sheet">
         <StaggerItem>
           <Stepper step={step} />
@@ -230,7 +260,13 @@ export function ConnectSheet() {
 
         <AnimatePresence mode="popLayout" initial={false}>
           {step === 0 && (
-            <motion.div key="how" initial={reduced ? false : { opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0, transitionEnd: { transform: "none" } }} exit={{ opacity: 0, x: -16, transition: tween.exit }} transition={{ x: spring.enter, opacity: tween.fade }}>
+            <motion.div
+              key="how"
+              initial={reduced ? false : { opacity: 0, x: -16 }}
+              animate={{ opacity: 1, x: 0, transitionEnd: { transform: "none" } }}
+              exit={{ opacity: 0, x: -16, transition: tween.exit }}
+              transition={{ x: spring.enter, opacity: tween.fade }}
+            >
               <HowTo />
             </motion.div>
           )}
@@ -310,16 +346,35 @@ export function ConnectSheet() {
                   <span id="bx-account" className="label">
                     {CONNECT.account}
                   </span>
-                  <Segmented aria-labelledby="bx-account" value={account} onChange={setAccount} options={ACCOUNTS} />
+                  <Segmented className="justify-self-start" aria-labelledby="bx-account" value={account} onChange={setAccount} options={ACCOUNTS} />
                 </div>
               </div>
-              <label className={cn("flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-[13px] transition-colors", readOnly ? "border-win/35 bg-win/[0.05]" : "border-line bg-ink-950/40")} data-field="">
-                <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[#3fb27f]" checked={readOnly} onChange={(e) => setReadOnly(e.target.checked)} data-testid="connect-readonly" />
+              <label
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-[13px] transition-colors",
+                  readOnly ? "border-win/35 bg-win/[0.05]" : "border-line bg-ink-950/40",
+                )}
+                data-field=""
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 shrink-0 accent-[#3fb27f]"
+                  checked={readOnly}
+                  onChange={(e) => setReadOnly(e.target.checked)}
+                  data-testid="connect-readonly"
+                />
                 <span className="text-fg">{CONNECT.confirm}</span>
               </label>
               <p className="text-[11.5px] leading-relaxed text-faint">{CONNECT.privacy}</p>
               {error && (
-                <motion.p role="alert" className="rounded-xl border border-loss/35 bg-loss/[0.07] px-3 py-2 text-[12.5px] text-loss" initial={reduced ? false : { opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade} data-testid="connect-error">
+                <motion.p
+                  role="alert"
+                  className="rounded-xl border border-loss/35 bg-loss/[0.07] px-3 py-2 text-[12.5px] text-loss"
+                  initial={reduced ? false : { opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={tween.fade}
+                  data-testid="connect-error"
+                >
                   {error.message}
                 </motion.p>
               )}
@@ -328,7 +383,14 @@ export function ConnectSheet() {
           )}
 
           {step === 2 && (
-            <motion.div key="check" className="relative grid gap-4" initial={reduced ? false : { opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1, transitionEnd: { transform: "none" } }} exit={{ opacity: 0, transition: tween.exit }} transition={{ scale: spring.enter, opacity: tween.fade }}>
+            <motion.div
+              key="check"
+              className="relative grid gap-4"
+              initial={reduced ? false : { opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1, transitionEnd: { transform: "none" } }}
+              exit={{ opacity: 0, transition: tween.exit }}
+              transition={{ scale: spring.enter, opacity: tween.fade }}
+            >
               <div className="relative grid place-items-center gap-3 overflow-hidden rounded-2xl border border-line bg-ink-950/50 px-4 py-7 text-center">
                 {result && (
                   <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
@@ -345,25 +407,48 @@ export function ConnectSheet() {
                 ) : (
                   <>
                     <span ref={okRef} className="grid size-12 place-items-center rounded-full border border-win/40 bg-win/10 text-win">
-                      <svg viewBox="0 0 24 24" className="size-6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <motion.path d="M5 12.5 10 17 19 7" initial={reduced ? false : { pathLength: 0 }} animate={{ pathLength: 1 }} transition={tween.check} />
+                      <svg
+                        viewBox="0 0 24 24"
+                        className="size-6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <motion.path
+                          d="M5 12.5 10 17 19 7"
+                          initial={reduced ? false : { pathLength: 0 }}
+                          animate={{ pathLength: 1 }}
+                          transition={tween.check}
+                        />
                       </svg>
                     </span>
                     <span className="text-[17px] font-semibold" data-testid="connect-ok">
                       {CONNECT.ok}
                     </span>
                     <span className="flex items-baseline gap-2 text-mute">
-                      <RollingDigits value={Math.round(result.account.available)} className="dot-num text-[30px] leading-none text-fg" aria-label={`${fmtPlain(result.account.available)} USDT`} />
+                      <RollingDigits
+                        value={Math.round(result.account.available)}
+                        className="dot-num text-[30px] leading-none text-fg"
+                        aria-label={`${fmtPlain(result.account.available)} USDT`}
+                      />
                       <span className="text-[12.5px]">{CONNECT.available}</span>
                     </span>
                   </>
                 )}
               </div>
               {result && (
-                <motion.div className="grid gap-2" initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }} transition={{ y: { ...spring.enter, delay: 0.15 }, opacity: { ...tween.fade, delay: 0.15 } }}>
+                <motion.div
+                  className="grid gap-2"
+                  initial={reduced ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
+                  transition={{ y: { ...spring.enter, delay: 0.15 }, opacity: { ...tween.fade, delay: 0.15 } }}
+                >
                   <span className="label">{CONNECT.importTitle}</span>
                   <p className="text-[12.5px] text-mute">{CONNECT.importLead}</p>
-                  <Segmented aria-label={CONNECT.importTitle} value={range} onChange={setRange} options={CONNECT.importRanges} />
+                  <Segmented className="justify-self-start" aria-label={CONNECT.importTitle} value={range} onChange={setRange} options={CONNECT.importRanges} />
                 </motion.div>
               )}
             </motion.div>

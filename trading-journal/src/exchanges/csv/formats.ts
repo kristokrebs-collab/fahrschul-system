@@ -110,7 +110,8 @@ export const binanceFormat: CsvFormat = {
   label: "Binance Futures – Trade-Historie",
   venue: "binance",
   hint: "Binance → Orders → Futures-Orderverlauf → Trade-Historie → Exportieren (CSV).",
-  detect: (h) => score(h, [[/^date\(utc\)$/i, /^(date|time)\b.*utc/i], [/^symbol$/i], [/^side$/i], [/^price$/i], [/^(quantity|qty)$/i]], [[/realized profit/i], [/^fee$/i]]),
+  detect: (h) =>
+    score(h, [[/^date\(utc\)$/i, /^(date|time)\b.*utc/i], [/^symbol$/i], [/^side$/i], [/^price$/i], [/^(quantity|qty)$/i]], [[/realized profit/i], [/^fee$/i]]),
   parse: (t) => {
     const ci = {
       at: col(t, /^date\(utc\)$/i, /^(date|time)/i),
@@ -132,11 +133,23 @@ export const binanceFormat: CsvFormat = {
         skipped++;
         return;
       }
-      fills.push({ id: cell(r, ci.id) || `r${i}`, symbol: cell(r, ci.symbol), side, qty: Math.abs(qty), price, fee: Math.abs(parseNum(cell(r, ci.fee)) ?? 0), at });
+      fills.push({
+        id: cell(r, ci.id) || `r${i}`,
+        symbol: cell(r, ci.symbol),
+        side,
+        qty: Math.abs(qty),
+        price,
+        fee: Math.abs(parseNum(cell(r, ci.fee)) ?? 0),
+        at,
+      });
     });
     const agg = aggregateFills(fills, { allowShort: true, market: "perp", pairOf: normalizePair });
     const open = agg.trades.filter((x) => x.status === "open").length;
-    return { trades: agg.trades, skipped: skipped + agg.skipped, warnings: open ? [`${open} Position(en) am Dateiende noch offen – als offen importiert.`] : [] };
+    return {
+      trades: agg.trades,
+      skipped: skipped + agg.skipped,
+      warnings: open ? [`${open} Position(en) am Dateiende noch offen – als offen importiert.`] : [],
+    };
   },
 };
 
@@ -147,7 +160,12 @@ export const bybitFormat: CsvFormat = {
   label: "Bybit – Closed P&L",
   venue: "bybit",
   hint: "Bybit → Aufträge → Derivate → Closed P&L → Exportieren.",
-  detect: (h) => score(h, [[/^(contracts|instrument|symbol|market)$/i], [/entry price/i], [/exit price/i], [/closed p&?l/i]], [[/closing direction|trade type|side/i], [/exit type/i]]),
+  detect: (h) =>
+    score(
+      h,
+      [[/^(contracts|instrument|symbol|market)$/i], [/entry price/i], [/exit price/i], [/closed p&?l/i]],
+      [[/closing direction|trade type|side/i], [/exit type/i]],
+    ),
   parse: (t) => {
     const ci = {
       symbol: col(t, /^contracts$/i, /^instrument$/i, /^symbol$/i, /^market$/i),
@@ -165,7 +183,15 @@ export const bybitFormat: CsvFormat = {
     for (const r of t.rows) {
       const dir = cell(r, ci.dir);
       // the closing order: "Close Long" / "Sell" closes a long; "Close Short" / "Buy" closes a short
-      const side: "long" | "short" | null = /long/i.test(dir) ? "long" : /short/i.test(dir) ? "short" : /sell/i.test(dir) ? "long" : /buy/i.test(dir) ? "short" : null;
+      const side: "long" | "short" | null = /long/i.test(dir)
+        ? "long"
+        : /short/i.test(dir)
+          ? "short"
+          : /sell/i.test(dir)
+            ? "long"
+            : /buy/i.test(dir)
+              ? "short"
+              : null;
       const entry = parseNum(cell(r, ci.entry));
       const closedAt = parseTime(cell(r, ci.closed), { assume: "utc" });
       if (!side || !entry || closedAt === null) {
@@ -201,7 +227,17 @@ export const okxFormat: CsvFormat = {
   label: "OKX – Positionshistorie",
   venue: "okx",
   hint: "OKX → Handel → Positionshistorie → Herunterladen.",
-  detect: (h) => score(h, [[/^instrument$/i, /^instrument id$/i], [/(avg\.? )?(entry|open) (avg\.? )?price/i, /open avg/i], [/(avg\.? )?close (avg\.? )?price/i, /close avg/i], [/^(opened|open time|created)/i]], [[/realized p(n|&)l/i], [/funding/i], [/margin mode/i]]),
+  detect: (h) =>
+    score(
+      h,
+      [
+        [/^instrument$/i, /^instrument id$/i],
+        [/(avg\.? )?(entry|open) (avg\.? )?price/i, /open avg/i],
+        [/(avg\.? )?close (avg\.? )?price/i, /close avg/i],
+        [/^(opened|open time|created)/i],
+      ],
+      [[/realized p(n|&)l/i], [/funding/i], [/margin mode/i]],
+    ),
   parse: (t) => {
     const ci = {
       inst: col(t, /^instrument$/i, /^instrument id$/i),
@@ -269,7 +305,16 @@ export const krakenFormat: CsvFormat = {
   hint: "Kraken → Dokumente → Exporte → Trades (CSV).",
   detect: (h) => score(h, [[/^txid$/i], [/^pair$/i], [/^time$/i], [/^type$/i], [/^price$/i], [/^vol$/i]], [[/^fee$/i], [/^margin$/i]]),
   parse: (t) => {
-    const ci = { id: col(t, /^txid$/i), pair: col(t, /^pair$/i), time: col(t, /^time$/i), type: col(t, /^type$/i), price: col(t, /^price$/i), vol: col(t, /^vol$/i), fee: col(t, /^fee$/i), margin: col(t, /^margin$/i) };
+    const ci = {
+      id: col(t, /^txid$/i),
+      pair: col(t, /^pair$/i),
+      time: col(t, /^time$/i),
+      type: col(t, /^type$/i),
+      price: col(t, /^price$/i),
+      vol: col(t, /^vol$/i),
+      fee: col(t, /^fee$/i),
+      margin: col(t, /^margin$/i),
+    };
     const fills: CsvFill[] = [];
     let skipped = 0;
     let margin = false;
@@ -283,7 +328,15 @@ export const krakenFormat: CsvFormat = {
         return;
       }
       if ((parseNum(cell(r, ci.margin)) ?? 0) > 0) margin = true;
-      fills.push({ id: cell(r, ci.id) || `r${i}`, symbol: cell(r, ci.pair), side, qty: Math.abs(qty), price, fee: Math.abs(parseNum(cell(r, ci.fee)) ?? 0), at });
+      fills.push({
+        id: cell(r, ci.id) || `r${i}`,
+        symbol: cell(r, ci.pair),
+        side,
+        qty: Math.abs(qty),
+        price,
+        fee: Math.abs(parseNum(cell(r, ci.fee)) ?? 0),
+        at,
+      });
     });
     const agg = aggregateFills(fills, { allowShort: margin, market: margin ? "perp" : "spot", pairOf: normalizePair });
     return { trades: agg.trades, skipped: skipped + agg.skipped, warnings: [] };
@@ -305,8 +358,26 @@ export const coinbaseFormat: CsvFormat = {
   parse: (t) => {
     const tx = col(t, /^transaction type$/i) >= 0;
     const ci = tx
-      ? { id: col(t, /^id$/i), sym: col(t, /^asset$/i), quote: col(t, /price currency/i), side: col(t, /^transaction type$/i), at: col(t, /^timestamp$/i), qty: col(t, /quantity transacted/i), price: col(t, /price at transaction/i), fee: col(t, /fees/i) }
-      : { id: col(t, /^trade id$/i), sym: col(t, /^product$/i), quote: -1, side: col(t, /^side$/i), at: col(t, /^created at$/i), qty: col(t, /^size$/i), price: col(t, /^price$/i), fee: col(t, /^fee$/i) };
+      ? {
+          id: col(t, /^id$/i),
+          sym: col(t, /^asset$/i),
+          quote: col(t, /price currency/i),
+          side: col(t, /^transaction type$/i),
+          at: col(t, /^timestamp$/i),
+          qty: col(t, /quantity transacted/i),
+          price: col(t, /price at transaction/i),
+          fee: col(t, /fees/i),
+        }
+      : {
+          id: col(t, /^trade id$/i),
+          sym: col(t, /^product$/i),
+          quote: -1,
+          side: col(t, /^side$/i),
+          at: col(t, /^created at$/i),
+          qty: col(t, /^size$/i),
+          price: col(t, /^price$/i),
+          fee: col(t, /^fee$/i),
+        };
     const fills: CsvFill[] = [];
     let skipped = 0;
     t.rows.forEach((r, i) => {
@@ -329,7 +400,28 @@ export const coinbaseFormat: CsvFormat = {
 
 /* ------------------------------------------------------------------ MetaTrader 4 / 5 */
 
-const FX = new Set(["EUR", "USD", "GBP", "JPY", "CHF", "AUD", "NZD", "CAD", "SEK", "NOK", "DKK", "PLN", "HUF", "CZK", "TRY", "ZAR", "MXN", "SGD", "HKD", "CNH"]);
+const FX = new Set([
+  "EUR",
+  "USD",
+  "GBP",
+  "JPY",
+  "CHF",
+  "AUD",
+  "NZD",
+  "CAD",
+  "SEK",
+  "NOK",
+  "DKK",
+  "PLN",
+  "HUF",
+  "CZK",
+  "TRY",
+  "ZAR",
+  "MXN",
+  "SGD",
+  "HKD",
+  "CNH",
+]);
 
 /** Units per lot: FX 100 000, gold 100 oz, silver 5 000 oz; unknown (indices, CFDs) → null (no notional, no R). */
 export function contractSize(symbol: string): number | null {
@@ -346,7 +438,11 @@ export const mtFormat: CsvFormat = {
   hint: "MT4/5 → Kontoauszug / Bericht → Positionen als CSV speichern (Zeiten in Serverzeit).",
   detect: (h) =>
     Math.max(
-      score(h, [[/^time$/i], [/^position$/i], [/^symbol$/i], [/^type$/i], [/^volume$/i], [/^price$/i], [/^time_2$/i], [/^profit$/i]], [[/^swap$/i], [/^commission$/i]]),
+      score(
+        h,
+        [[/^time$/i], [/^position$/i], [/^symbol$/i], [/^type$/i], [/^volume$/i], [/^price$/i], [/^time_2$/i], [/^profit$/i]],
+        [[/^swap$/i], [/^commission$/i]],
+      ),
       score(h, [[/^ticket$/i], [/^open time$/i], [/^type$/i], [/^size$/i], [/^item$/i], [/^close time$/i], [/^profit$/i]], [[/^swap$/i]]),
     ),
   parse: (t) => {
@@ -404,7 +500,11 @@ export const mtFormat: CsvFormat = {
         target: parseNum(cell(r, ci.tp), dec(t)) || null,
       });
     }
-    return { trades: out, skipped, warnings: ["MetaTrader-Zeiten sind Serverzeit und werden als Ortszeit übernommen. Lots → Einheiten: FX 100.000, Gold 100, Silber 5.000."] };
+    return {
+      trades: out,
+      skipped,
+      warnings: ["MetaTrader-Zeiten sind Serverzeit und werden als Ortszeit übernommen. Lots → Einheiten: FX 100.000, Gold 100, Silber 5.000."],
+    };
   },
 };
 
@@ -414,7 +514,12 @@ export const ibkrFormat: CsvFormat = {
   id: "ibkr",
   label: "Interactive Brokers – Flex Query Trades",
   hint: "IBKR Client Portal → Berichte → Flex Queries → Trades (CSV, Felder Symbol, DateTime, Quantity, TradePrice, IBCommission).",
-  detect: (h) => score(h, [[/^symbol$/i], [/^(datetime|date\/time|tradedate)$/i], [/^quantity$/i], [/^tradeprice$/i, /^t\. price$/i]], [[/^ibcommission$/i, /^comm\/fee$/i], [/^buy\/sell$/i], [/^multiplier$/i]]),
+  detect: (h) =>
+    score(
+      h,
+      [[/^symbol$/i], [/^(datetime|date\/time|tradedate)$/i], [/^quantity$/i], [/^tradeprice$/i, /^t\. price$/i]],
+      [[/^ibcommission$/i, /^comm\/fee$/i], [/^buy\/sell$/i], [/^multiplier$/i]],
+    ),
   parse: (t) => {
     const ci = {
       sym: col(t, /^symbol$/i),
@@ -464,7 +569,12 @@ export const tradingViewFormat: CsvFormat = {
   id: "tradingview",
   label: "TradingView – Strategietester",
   hint: "TradingView → Strategietester → Liste der Trades → Exportieren (CSV). Wird als Backtest markiert.",
-  detect: (h) => score(h, [[/^trade ?#$/i], [/^type$/i], [/^date\/time$/i, /^date and time$/i], [/^price\b/i]], [[/^(contracts|position size \(qty\)|quantity)/i], [/^(profit|net p&l)\b/i]]),
+  detect: (h) =>
+    score(
+      h,
+      [[/^trade ?#$/i], [/^type$/i], [/^date\/time$/i, /^date and time$/i], [/^price\b/i]],
+      [[/^(contracts|position size \(qty\)|quantity)/i], [/^(profit|net p&l)\b/i]],
+    ),
   parse: (t) => {
     const ci = {
       n: col(t, /^trade ?#$/i),
@@ -516,7 +626,17 @@ export const tradingViewFormat: CsvFormat = {
   },
 };
 
-export const FORMATS: readonly CsvFormat[] = [bitunixFormat, binanceFormat, bybitFormat, okxFormat, krakenFormat, coinbaseFormat, mtFormat, ibkrFormat, tradingViewFormat];
+export const FORMATS: readonly CsvFormat[] = [
+  bitunixFormat,
+  binanceFormat,
+  bybitFormat,
+  okxFormat,
+  krakenFormat,
+  coinbaseFormat,
+  mtFormat,
+  ibkrFormat,
+  tradingViewFormat,
+];
 
 /** Best format for a header (≥ 0.6), or null → mapping assistant. */
 export function detectFormat(header: readonly string[]): { format: CsvFormat; score: number } | null {

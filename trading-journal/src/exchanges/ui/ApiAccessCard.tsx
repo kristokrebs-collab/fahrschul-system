@@ -191,55 +191,62 @@ export function ApiAccessCard({ className }: { className?: string }) {
                 )}
               </AnimatePresence>
 
-              <form
-                className="grid gap-2.5 rounded-xl border border-line bg-ink-950/40 p-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (scopes.size) void create();
-                }}
-              >
-                <label className="grid gap-1">
-                  <span className="label">{API_CARD.name}</span>
-                  <Input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder={API_CARD.namePh} />
-                </label>
-                <div className="flex flex-wrap gap-1.5" role="group" aria-label="Rechte">
-                  {SCOPES.map((s) => {
-                    const on = scopes.has(s);
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() =>
-                          setScopes((cur) => {
-                            const n = new Set(cur);
-                            if (n.has(s)) n.delete(s);
-                            else n.add(s);
-                            return n;
-                          })
-                        }
-                        className={cn("touch-hit rounded-full border px-2.5 py-1 text-[11.5px] transition-colors", on ? "border-white/40 bg-white/[0.1] text-fg" : "border-line text-mute hover:text-fg")}
-                      >
-                        {API_CARD.scopes[s]}
-                      </button>
-                    );
-                  })}
-                </div>
-                <Button type="submit" size="sm" variant="primary" className="justify-self-start" disabled={busy || scopes.size === 0}>
-                  {API_CARD.create}
-                </Button>
-              </form>
+              <div className="grid items-start gap-4 lg:grid-cols-2">
+                <form
+                  className="grid gap-2.5 rounded-xl border border-line bg-ink-950/40 p-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (scopes.size) void create();
+                  }}
+                >
+                  <label className="grid gap-1">
+                    <span className="label">{API_CARD.name}</span>
+                    <Input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder={API_CARD.namePh} />
+                  </label>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label="Rechte">
+                    {SCOPES.map((s) => {
+                      const on = scopes.has(s);
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() =>
+                            setScopes((cur) => {
+                              const n = new Set(cur);
+                              if (n.has(s)) n.delete(s);
+                              else n.add(s);
+                              return n;
+                            })
+                          }
+                          className={cn(
+                            "touch-hit rounded-full border px-2.5 py-1 text-[11.5px] transition-colors",
+                            on ? "border-white/40 bg-white/[0.1] text-fg" : "border-line text-mute hover:text-fg",
+                          )}
+                        >
+                          {API_CARD.scopes[s]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <Button type="submit" size="sm" variant="primary" className="justify-self-start" disabled={busy || scopes.size === 0}>
+                    {API_CARD.create}
+                  </Button>
+                </form>
 
-              {error && <Notice tone="warn">{error}</Notice>}
-              {tokens && tokens.length > 0 ? (
-                <ul className="grid gap-2">
-                  {tokens.map((t) => (
-                    <TokenRow key={t.id} t={t} onRevoke={() => void revoke(t.id)} />
-                  ))}
-                </ul>
-              ) : tokens ? (
-                <p className="text-[12px] text-faint">{API_CARD.none}</p>
-              ) : null}
+                <div className="grid gap-2">
+                  {error && <Notice tone="warn">{error}</Notice>}
+                  {tokens && tokens.length > 0 ? (
+                    <ul className="grid gap-2">
+                      {tokens.map((t) => (
+                        <TokenRow key={t.id} t={t} onRevoke={() => void revoke(t.id)} />
+                      ))}
+                    </ul>
+                  ) : tokens ? (
+                    <p className="rounded-xl border border-dashed border-line-2 p-3 text-[12px] text-faint">{API_CARD.none}</p>
+                  ) : null}
+                </div>
+              </div>
             </>
           )}
         </div>

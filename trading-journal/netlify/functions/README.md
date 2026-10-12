@@ -4,7 +4,8 @@ Netlify bundles every `*.mts` here with esbuild (`[functions] directory = "netli
 `netlify.toml`, P14). Each file: `export default handler(async (req, ctx) => …)` + `export const config: Config = { path,
 method }` (or `{ schedule }`). Typecheck: `tsc -p tsconfig.functions.json` (part of `npm run typecheck`); lint: `npm run
 lint` covers `netlify/`. Functions import `src/` modules only by RELATIVE path and only alias-free ones
-(`src/billing/types.ts`, `plans.ts`, `contract.ts`, `src/cloud/scrub.ts`, `src/cloud/sync/docs.ts`). Server env: `.env.example` (Netlify secrets, scope
+(`src/billing/types.ts`, `plans.ts`, `contract.ts`, `src/cloud/scrub.ts`, `src/cloud/sync/docs.ts`,
+`src/exchanges/syncFields.ts`). Server env: `.env.example` (Netlify secrets, scope
 Functions, never `VITE_`).
 
 ## `_lib` (shared, P09)
@@ -22,6 +23,7 @@ Functions, never `VITE_`).
 | `account.ts` | `collectExport`, `EXPORT_TABLES` (later packages append their per-user tables; missing tables are skipped), `fetchAllDocs`, `journalBackup`, `listUserFiles` / `removeUserFiles` (buckets `screenshots`, `backups`), `listBackups`, `expiredBackups`, `ensureBackupBucket`, `runNightlyBackup`, `DELETE_CONFIRM_WORD`, `redactSecrets` |
 | `billingCleanup.ts` | `cancelBillingForUser(userId)` – P09 ↔ P10 contract: cancels open Stripe subscriptions BEFORE an account is deleted; throws (409 `subscription_active` without Stripe config, 502 on Stripe errors) → nothing is deleted. P10 may delegate the body to its `_lib/stripe.ts`; keep the signature and the throw-means-abort rule |
 | `stripe.ts` (P10) | everything Stripe: `stripeApi()` (503 `billing_unavailable` "Zahlungen sind noch nicht eingerichtet." without `STRIPE_SECRET_KEY`), price ids per plan × interval from env, `billingStatus`, `billingConfig` (real Stripe prices, 10-min cache), `ensureCustomer` (metadata `supabase_user_id`), `createCheckout` (trial 14 / 30 via invitation / 0 after a used trial, promotion code or Stripe's own code field, optional cardless trial + automatic tax, seats for Team), `createPortal(flow)`, `changeSubscription` (cancel with reason / resume / pause 1–3 months), `cancelSubscription(userId)` (P09 may delegate `billingCleanup` to it), `lookupCode`, referrals (`referralCodeOf`, `recordReferral`, `rewardReferral` – one credit per referred customer or affiliate commission for 12 months, idempotency keys), team seats (`assignSeat` / `releaseSeat`, P12), `verifyWebhook` + `processEvent` (`stripe_events` idempotency, out-of-order guard via `last_event_at`), `recomputePlan` (the only writer of `profiles.plan`); `setStripeApiForTests` |
+| `exchanges/*` (P11) | exchange sync: Bitunix signer + read-only client (`bitunix.ts`), venue → trade mapping with the fee / funding convention (`mapping.ts`), resumable incremental `runSync` (`sync.ts`), connections / cursor / runs / `upsertSyncedTrades` (`store.ts`), personal tokens (`tokens.ts`), TradingView + REST formats (`inbound.ts`) – see `_lib/exchanges/README.md` |
 
 ## Functions (P09)
 
@@ -45,6 +47,31 @@ Functions, never `VITE_`).
 | `billing-referral.mts` | GET `/api/v1/billing/referral[?code=]` | public `?code=` check (valid / trial days) or the user's own code, stats and credit ledger |
 | `stripe-webhook.mts` | POST `/api/v1/stripe/webhook` | raw body (≤ 1 MB) + `Stripe-Signature` → `constructEventAsync`; events: `checkout.session.completed`, `customer.subscription.created/updated/deleted/paused/resumed/trial_will_end`, `invoice.paid`, `invoice.payment_failed`; duplicates → 200, concurrent delivery → 409, failures → 500 (Stripe retries) |
 
+## Functions (P11 exchange sync, API & webhooks)
+
+All exchange routes: signed-in user (aal2 when 2FA is on), plan feature `exchangeSync` (Pro+, not gated while payments
+are not set up), 503 `exchange_unavailable` "Der Börsen-Sync ist auf diesem Server noch nicht eingerichtet." without
+`EXCHANGE_ENC_KEY_V1`. Keys are encrypted with `_lib/crypto.ts` (AAD `<user>:<connection>:<field>`) and never
+returned, logged or audited – only `key_last4`.
+
+| file | route | notes |
+|---|---|---|
+| `exchange-connect.mts` | POST `/api/v1/exchange/connect` `{ exchange, apiKey, secret, label?, journalAccount, readOnlyConfirmed: true }` · PATCH `{ connectionId, journalAccount?, syncEnabled?, label? }` | verifies the key with a signed read call before storing; German venue errors (wrong key / signature / IP binding / missing permission → 422); `exchangeConnections` limit (free 0, pro 1, premium 5); 10 attempts / 10 min fail-closed; audited |
+| `exchange-disconnect.mts` | POST `/api/v1/exchange/disconnect` `{ connectionId }` | deletes the encrypted key and the cursor; the trades stay in the journal; audited |
+| `exchange-sync.mts` | GET `/api/v1/exchange/sync` (status: `configured`, plan, cron, connections, runs) · GET `?since=` / `?pull=1` (server-written trades for devices without cloud sync) · POST `[?dryRun=1]` `{ connectionId?, tz, from? }` | one budgeted sync (8 s, `more: true` → the client continues); dry run writes nothing; 30 POST / 10 min |
+| `exchange-backfill-background.mts` | POST `/api/v1/exchange/backfill` `{ connectionId, from, runId, tz }` → 202 | background function (15 min): first import up to 366 days, 13-min budget, progress as the run `runId`; 3 / h fail-closed |
+| `exchange-positions.mts` | GET `/api/v1/exchange/positions` | live positions of all active connections + mark prices (P05 `useExchangePositions`); per-venue errors listed, not thrown; 120 / 10 min |
+| `exchange-sync-cron.mts` | schedule `*/30 * * * *` (in code) | longest-waiting active connections first, ≥ 20 min gap, 8 s each, ≤ 24 s total; `SYNC_CRON_ENABLED=false` stops it |
+| `hooks-tradingview.mts` | POST `/api/v1/hooks/tradingview/:token` | TradingView alert JSON (`open` / `close`); token in the path (TradingView sends no headers), scope `webhook:tradingview`, plan `apiAccess`; idempotent per alert id; 60 / min per token; never echoes the token |
+| `trades-api.mts` | GET/POST `/api/v1/trades[/<id>]` (Bearer `tj_…`, scopes `trades:read` / `trades:write`) · GET/POST/DELETE `/api/v1/trades/tokens[/<id>]` (app session) | personal REST API, insert-only writes (`externalId` → idempotent `t_api_<id>`); tokens stored as SHA-256, plain token shown once, max 10; 120 / 10 min |
+
+P14 (`netlify.toml`): the functions declare their own `path`; nothing to redirect. The background function needs the
+`-background` file suffix (kept). No CSP change – the browser never talks to an exchange.
+
 Tests: `tests/unit/functions.lib.test.ts`, `tests/unit/functions.account.test.ts` (in-memory admin fake: tables, RPCs,
 storage, auth admin; fake Stripe), `tests/unit/functions.stripe.test.ts` (P10: fake Stripe API + admin fake – checkout,
-portal, codes, referrals, seats, webhook signature / idempotency / ordering). `functions-disabled/binance.mts` stays out of the build.
+portal, codes, referrals, seats, webhook signature / idempotency / ordering), `tests/unit/functions.bitunix.test.ts` (P11: signer vs. the doc vector and the official demo, request building,
+pagination, rate spacing, read-only allowlist), `tests/unit/exchange.mapping.test.ts` (positions → trades on the documented
+payloads), `tests/unit/exchange.functions.test.ts` (P11: connect / sync / dry run / pull / positions / backfill / cron /
+webhook / REST against an admin fake with a JS twin of `upsert_synced_trades` and a fake Bitunix that verifies every
+signature). `functions-disabled/binance.mts` stays out of the build.

@@ -67,7 +67,8 @@ const hasConnection = (): boolean => !!useExchange.getState().status?.connection
 const signedIn = (): boolean => useCloudSession.getState().phase === "signedIn";
 const visible = (): boolean => typeof document === "undefined" || document.visibilityState !== "hidden";
 
-const samePositions = (a: readonly ExchangePosition[], b: readonly ExchangePosition[]): boolean => a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
+const samePositions = (a: readonly ExchangePosition[], b: readonly ExchangePosition[]): boolean =>
+  a.length === b.length && JSON.stringify(a) === JSON.stringify(b);
 
 /** One poll (exported for tests / a manual refresh). */
 export async function refreshPositions(): Promise<void> {

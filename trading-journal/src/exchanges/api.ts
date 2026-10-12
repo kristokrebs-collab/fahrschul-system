@@ -50,5 +50,6 @@ export const pullServerTrades = (since: string | null) => apiFetch<PullResult>("
 export const fetchExchangePositions = () => apiFetch<PositionsResult>("/exchange/positions");
 
 export const listApiTokens = () => apiFetch<{ tokens: ApiToken[] }>("/trades/tokens");
-export const createApiToken = (name: string, scopes: TokenScope[]) => apiFetch<{ token: string; info: ApiToken }>("/trades/tokens", { method: "POST", body: { name, scopes } });
+export const createApiToken = (name: string, scopes: TokenScope[]) =>
+  apiFetch<{ token: string; info: ApiToken }>("/trades/tokens", { method: "POST", body: { name, scopes } });
 export const revokeApiToken = (id: string) => apiFetch<{ ok: true }>(`/trades/tokens/${encodeURIComponent(id)}`, { method: "DELETE" });

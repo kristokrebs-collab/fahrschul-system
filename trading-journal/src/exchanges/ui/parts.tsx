@@ -54,14 +54,14 @@ const ICONS: Record<string, ReactNode> = {
 };
 
 /** Three facts with drawn icons, rising one after another (first view). */
-export function FactList({ facts }: { facts: readonly { k: string; title: string; text: string }[] }) {
+export function FactList({ facts, vertical = false }: { facts: readonly { k: string; title: string; text: string }[]; vertical?: boolean }) {
   const reduced = useReducedFx();
   return (
-    <ul className="grid gap-2.5 sm:grid-cols-3">
+    <ul className={cn("grid gap-2.5", !vertical && "sm:grid-cols-3")}>
       {facts.map((f, i) => (
         <motion.li
           key={f.k}
-          className="flex min-w-0 gap-3 rounded-xl border border-line bg-ink-950/40 p-3 sm:flex-col sm:gap-2"
+          className={cn("flex min-w-0 gap-3 rounded-xl border border-line bg-ink-950/40 p-3", !vertical && "sm:flex-col sm:gap-2")}
           initial={reduced ? false : { opacity: 0, y: 10 }}
           whileInView={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
           viewport={{ once: true, margin: "-40px" }}
@@ -86,7 +86,11 @@ export function Notice({ children, tone = "mute", className }: { children: React
     <p
       className={cn(
         "rounded-xl border px-3 py-2 text-[12.5px] leading-relaxed",
-        tone === "loss" ? "border-loss/35 bg-loss/[0.07] text-loss" : tone === "warn" ? "border-warn/30 bg-warn/[0.06] text-warn" : "border-line bg-ink-950/40 text-mute",
+        tone === "loss"
+          ? "border-loss/35 bg-loss/[0.07] text-loss"
+          : tone === "warn"
+            ? "border-warn/30 bg-warn/[0.06] text-warn"
+            : "border-line bg-ink-950/40 text-mute",
         className,
       )}
     >
@@ -99,7 +103,20 @@ export function Notice({ children, tone = "mute", className }: { children: React
 export function Money({ value, className, digits = 2 }: { value: number | null | undefined; className?: string; digits?: 0 | 1 | 2 }) {
   if (value == null || !Number.isFinite(value)) return <span className={cn("text-faint", className)}>–</span>;
   const s = new Intl.NumberFormat("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Math.abs(value));
-  return <span className={cn("num font-mono tabular-nums", value > 0 ? "text-win" : value < 0 ? "text-loss" : "text-mute", className)}>{`${value > 0 ? "+" : value < 0 ? "−" : ""}${s}`}</span>;
+  return (
+    <span
+      className={cn("num font-mono tabular-nums", value > 0 ? "text-win" : value < 0 ? "text-loss" : "text-mute", className)}
+    >{`${value > 0 ? "+" : value < 0 ? "−" : ""}${s}`}</span>
+  );
 }
 
-export const fmtPlain = (v: number, digits = 2): string => new Intl.NumberFormat("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+export const fmtPlain = (v: number, digits = 2): string =>
+  new Intl.NumberFormat("de-DE", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(v);
+
+/** Journal wall clock `2026-10-05T09:30` → `05.10. · 09:30` (with `26` after the dot when not this year). */
+export function shortWhen(wall: string | null | undefined, now = new Date()): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(wall ?? "");
+  if (!m) return wall ?? "";
+  const year = Number(m[1]) === now.getFullYear() ? "" : m[1]!.slice(2);
+  return `${m[3]}.${m[2]}.${year} · ${m[4]}:${m[5]}`;
+}

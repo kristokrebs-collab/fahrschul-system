@@ -6,7 +6,8 @@ import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import { useTick } from "@/cloud/ui/SyncStatusCard";
 import { agoLabel } from "@/cloud/device";
 import { celebrateFrom } from "@/motion/Celebrate";
-import { DotMatrix } from "@/motion/DotMatrix";
+import { chevronFrames, DotMatrix } from "@/motion/DotMatrix";
+import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { RadarSweep } from "@/motion/fx/RadarSweep";
 import { HoldConfirm, useConfirmFocus } from "@/motion/HoldConfirm";
 import { RollingDigits } from "@/motion/RollingDigits";
@@ -158,6 +159,8 @@ function Loading() {
 }
 
 /** Venue tile → chevrons → journal tile; the chevrons run three cycles on first view, then rest. */
+const CHEVRONS = chevronFrames(1, 25);
+
 function Bridge({ flowing = false }: { flowing?: boolean }) {
   const reduced = useReducedFx();
   const [play, setPlay] = useState(!reduced);
@@ -169,11 +172,11 @@ function Bridge({ flowing = false }: { flowing?: boolean }) {
   return (
     <div aria-hidden="true" className="flex items-center gap-3">
       <VenueTile exchange="bitunix" />
-      <span className="grid min-w-0 flex-1 place-items-center overflow-hidden rounded-xl border border-dashed border-line-2 px-2 py-2.5">
-        <DotMatrix preset="chevrons" size={3} gap={2} tone={flowing ? "win" : "fg"} playing={play || flowing} />
+      <span className="relative grid min-w-0 flex-1 place-items-center overflow-hidden rounded-xl border border-dashed border-line-2 px-2 py-3">
+        <DotMatrix frames={CHEVRONS} size={3} gap={2} tone={flowing ? "win" : "fg"} playing={play || flowing} />
       </span>
-      <span className="grid h-12 min-w-12 shrink-0 place-items-center rounded-2xl border border-line-2 bg-ink-950 px-2.5 font-mono text-[13px] font-semibold tracking-tight text-fg">
-        TJ
+      <span className="grid h-12 min-w-12 shrink-0 place-items-center rounded-2xl border border-line-2 bg-ink-950 px-2.5">
+        <DotMatrixText text="TJ" size={3} gap={1} tone="fg" decorative />
       </span>
     </div>
   );
@@ -182,37 +185,39 @@ function Bridge({ flowing = false }: { flowing?: boolean }) {
 function Hero({ status }: { status: ExchangeStatus }) {
   const entitled = status.plan.entitled;
   return (
-    <div className="grid gap-5" data-testid="exchange-hero">
-      <Bridge />
-      <div className="grid gap-1.5">
-        <h3 className="text-[clamp(20px,5vw,24px)] font-semibold leading-tight tracking-tight">{EX.heroTitle}</h3>
-        <p className="text-[13.5px] leading-relaxed text-mute">{EX.heroLead}</p>
-      </div>
-      <FactList facts={EX.facts} />
-      {entitled ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" onClick={() => openConnect()} data-testid="exchange-connect">
-            {EX.connect}
-          </Button>
-          <Button onClick={openCsvImport}>{EX.csv}</Button>
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-8" data-testid="exchange-hero">
+      <div className="grid content-start gap-5">
+        <Bridge />
+        <div className="grid gap-1.5">
+          <h3 className="text-[clamp(20px,5vw,26px)] font-semibold leading-tight tracking-tight">{EX.heroTitle}</h3>
+          <p className="text-[13.5px] leading-relaxed text-mute">{EX.heroLead}</p>
         </div>
-      ) : (
-        <div className="grid gap-2.5 rounded-xl border border-line bg-ink-950/40 p-3">
-          <span className="flex items-center gap-2 text-[13px] text-mute">
-            <Badge tone="steel">Pro</Badge>
-            {EX.upgradeLine}
-          </span>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="primary" size="sm" onClick={() => openUpgrade("exchangeSync", "pro")}>
-              {EX.upgrade}
+        {entitled ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="primary" onClick={() => openConnect()} data-testid="exchange-connect">
+              {EX.connect}
             </Button>
-            <Button size="sm" onClick={openCsvImport}>
-              {EX.csv}
-            </Button>
+            <Button onClick={openCsvImport}>{EX.csv}</Button>
           </div>
-        </div>
-      )}
-      <p className="text-[11.5px] text-faint">{EX.otherVenues}</p>
+        ) : (
+          <div className="grid gap-2.5 rounded-xl border border-line bg-ink-950/40 p-3">
+            <span className="flex items-center gap-2 text-[13px] text-mute">
+              <Badge tone="steel">Pro</Badge>
+              {EX.upgradeLine}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary" size="sm" onClick={() => openUpgrade("exchangeSync", "pro")}>
+                {EX.upgrade}
+              </Button>
+              <Button size="sm" onClick={openCsvImport}>
+                {EX.csv}
+              </Button>
+            </div>
+          </div>
+        )}
+        <p className="text-[11.5px] text-faint">{EX.otherVenues}</p>
+      </div>
+      <FactList facts={EX.facts} vertical />
     </div>
   );
 }
@@ -261,165 +266,195 @@ function Connected({ conn, status }: { conn: ExchangeConnection; status: Exchang
   }, [fire]);
 
   return (
-    <div className="relative grid gap-4" data-testid="exchange-connected">
+    <div className="relative grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-x-7" data-testid="exchange-connected">
       {fire > 0 && (
         <span aria-hidden="true" className="pointer-events-none absolute -inset-1 overflow-hidden rounded-2xl">
           <BorderBeam fire={fire} />
         </span>
       )}
-
-      <div className="relative overflow-hidden rounded-2xl border border-line bg-ink-950/45 p-3.5">
-        <RadarSweep active={scanning} variant="band" tone={invalid ? "signal" : "win"} />
-        <div className="relative flex flex-wrap items-center gap-3">
-          <VenueTile exchange={conn.exchange} />
-          <div className="grid min-w-0 flex-1 gap-0.5">
-            <span className="flex min-w-0 items-baseline gap-2">
-              <span className="truncate text-[15px] font-semibold">{VENUE_NAME[conn.exchange] ?? conn.exchange}</span>
-              {conn.label && <span className="truncate text-[12px] text-faint">{conn.label}</span>}
-            </span>
-            <span className="text-[12.5px] text-mute">
-              <MaskedKey last4={conn.keyLast4} /> · <span className="text-faint">nur Lesen</span>
+      <div className="grid min-w-0 content-start gap-4">
+        <div className="relative overflow-hidden rounded-2xl border border-line bg-ink-950/45 p-3.5">
+          <RadarSweep active={scanning} variant="band" tone={invalid ? "signal" : "win"} />
+          <div className="relative flex flex-wrap items-center gap-3">
+            <VenueTile exchange={conn.exchange} />
+            <div className="grid min-w-0 flex-1 gap-0.5">
+              <span className="flex min-w-0 items-baseline gap-2">
+                <span className="truncate text-[15px] font-semibold">{VENUE_NAME[conn.exchange] ?? conn.exchange}</span>
+                {conn.label && <span className="truncate text-[12px] text-faint">{conn.label}</span>}
+              </span>
+              <span className="text-[12.5px] text-mute">
+                <MaskedKey last4={conn.keyLast4} /> · <span className="text-faint">nur Lesen</span>
+              </span>
+            </div>
+            <span className="flex basis-full items-center gap-1.5 text-[11.5px] text-faint sm:shrink-0 sm:basis-auto">
+              {scanning && <DotMatrix preset="snake" size={2} gap={1} tone="win" playing />}
+              <TextRoll text={scanning ? EX.syncing : `${EX.lastSync} ${conn.lastSyncAt ? agoLabel(conn.lastSyncAt, now) : EX.never}`} />
             </span>
           </div>
-          <span className="flex shrink-0 items-center gap-1.5 text-[11.5px] text-faint">
-            {scanning && <DotMatrix preset="snake" size={2} gap={1} tone="win" playing />}
-            <TextRoll text={scanning ? EX.syncing : `${EX.lastSync} ${conn.lastSyncAt ? agoLabel(conn.lastSyncAt, now) : EX.never}`} />
-          </span>
+
+          <dl className="relative mt-3.5 grid grid-cols-3 gap-2" data-testid="exchange-counters">
+            {(["inserted", "updated", "unchanged"] as const).map((k) => (
+              <div key={k} className="min-w-0 rounded-xl border border-line bg-ink-900/60 px-3 py-2">
+                <dd>
+                  <RollingDigits
+                    value={counts[k]}
+                    className={cn("dot-num text-[26px] leading-none", k === "inserted" && counts[k] > 0 ? "text-win" : "text-fg")}
+                  />
+                </dd>
+                <dt className="mt-1 truncate text-[11px] text-faint">{EX.counters[k]}</dt>
+              </div>
+            ))}
+          </dl>
         </div>
 
-        <dl className="relative mt-3.5 grid grid-cols-3 gap-2" data-testid="exchange-counters">
-          {(["inserted", "updated", "unchanged"] as const).map((k) => (
-            <div key={k} className="min-w-0 rounded-xl border border-line bg-ink-900/60 px-3 py-2">
-              <dd>
-                <RollingDigits value={counts[k]} className={cn("dot-num text-[26px] leading-none", k === "inserted" && counts[k] > 0 ? "text-win" : "text-fg")} />
-              </dd>
-              <dt className="mt-1 truncate text-[11px] text-faint">{EX.counters[k]}</dt>
-            </div>
-          ))}
-        </dl>
+        {invalid && (
+          <div className="grid gap-2">
+            <Notice tone="loss">{conn.lastError ?? "Der Key wird von Bitunix nicht mehr akzeptiert."}</Notice>
+            <Button variant="primary" size="sm" className="justify-self-start" onClick={() => openConnect(conn.id)}>
+              {EX.reconnect}
+            </Button>
+          </div>
+        )}
+        {!invalid && conn.lastError && <Notice tone="warn">{conn.lastError}</Notice>}
+        {actionError && !invalid && actionError.message !== conn.lastError && <Notice tone="warn">{actionError.message}</Notice>}
+
+        <AnimatePresence initial={false}>
+          {importing && (
+            <motion.div
+              key="import"
+              className="flex items-center gap-3 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 text-[12.5px] text-mute"
+              initial={reduced ? false : { opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
+              exit={{ opacity: 0, transition: tween.exit }}
+              transition={{ y: spring.enter, opacity: tween.fade }}
+              data-testid="exchange-backfill"
+            >
+              <DotMatrix preset="wave" size={3} gap={1.5} tone="fg" playing />
+              <span className="min-w-0 flex-1">{CONNECT.importRunning}</span>
+              {backfill?.run && <span className="num font-mono text-fg">{backfill.run.inserted}</span>}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {!invalid && (
+          <div className="flex flex-wrap items-center gap-2">
+            <ActionButton
+              ref={syncRef}
+              variant="primary"
+              size="sm"
+              icon={GLYPH_SYNC}
+              spinIcon
+              disabled={!!busy || importing}
+              onRun={() => syncNow(conn.id).then((o) => o !== null)}
+              data-testid="exchange-sync"
+            >
+              {EX.syncNow}
+            </ActionButton>
+            <Button size="sm" disabled={!!busy || importing} onClick={() => void runDryRun(conn.id)} title={EX.dryRunHint} data-testid="exchange-dry">
+              {busy === "dry" ? "Liest …" : EX.dryRun}
+            </Button>
+            <Button size="sm" disabled={!!busy || importing} aria-expanded={rangeOpen} onClick={() => setRangeOpen((o) => !o)}>
+              {EX.firstImport}
+            </Button>
+          </div>
+        )}
+
+        <AnimatePresence initial={false}>
+          {rangeOpen && !invalid && (
+            <motion.div
+              key="range"
+              className="grid gap-2 rounded-xl border border-line bg-ink-950/40 p-3"
+              style={{ transformOrigin: "top" }}
+              initial={reduced ? false : { opacity: 0, clipPath: "inset(0 0 100% 0 round 12px)" }}
+              animate={{ opacity: 1, clipPath: "inset(0 0 0% 0 round 12px)" }}
+              exit={{ opacity: 0, clipPath: "inset(0 0 100% 0 round 12px)", transition: tween.exit }}
+              transition={{ clipPath: tween.reveal, opacity: tween.fade }}
+            >
+              <span className="text-[12.5px] text-mute">{CONNECT.importLead}</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <Segmented size="sm" aria-label={CONNECT.importTitle} value={range} onChange={setRange} options={CONNECT.importRanges} />
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={!!busy}
+                  onClick={() => {
+                    setRangeOpen(false);
+                    void startFirstImport(conn.id, Number(range));
+                  }}
+                >
+                  {CONNECT.importStart}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {invalid && (
-        <div className="grid gap-2">
-          <Notice tone="loss">{conn.lastError ?? "Der Key wird von Bitunix nicht mehr akzeptiert."}</Notice>
-          <Button variant="primary" size="sm" className="justify-self-start" onClick={() => openConnect(conn.id)}>
-            {EX.reconnect}
-          </Button>
+      <div className="grid min-w-0 content-start gap-4 lg:border-l lg:border-line lg:pl-7">
+        <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2 lg:border-t-0 lg:pt-0">
+          <div className="grid gap-1.5">
+            <span id={`acc-${conn.id}`} className="label">
+              {EX.journalAccount}
+            </span>
+            <Segmented
+              size="sm"
+              className="justify-self-start"
+              aria-labelledby={`acc-${conn.id}`}
+              value={conn.journalAccount}
+              onChange={(v) => void updateConnection(conn.id, { journalAccount: v })}
+              options={ACCOUNTS}
+            />
+          </div>
+          <label className="flex items-center justify-between gap-3 sm:justify-end">
+            <span className="grid gap-0.5 sm:text-right">
+              <span className="text-[13px] text-fg">{EX.autoSync}</span>
+              <span className="text-[11px] text-faint">{status.cron.enabled ? `alle ${status.cron.everyMin} Min` : "auf diesem Server aus"}</span>
+            </span>
+            <Switch checked={conn.syncEnabled} onCheckedChange={(v) => void updateConnection(conn.id, { syncEnabled: v })} aria-label={EX.autoSync} />
+          </label>
         </div>
-      )}
-      {!invalid && conn.lastError && <Notice tone="warn">{conn.lastError}</Notice>}
-      {actionError && !invalid && actionError.message !== conn.lastError && <Notice tone="warn">{actionError.message}</Notice>}
 
-      <AnimatePresence initial={false}>
-        {importing && (
-          <motion.div
-            key="import"
-            className="flex items-center gap-3 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 text-[12.5px] text-mute"
-            initial={reduced ? false : { opacity: 0, y: -6 }}
-            animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
-            exit={{ opacity: 0, transition: tween.exit }}
-            transition={{ y: spring.enter, opacity: tween.fade }}
-            data-testid="exchange-backfill"
-          >
-            <DotMatrix preset="wave" size={3} gap={1.5} tone="fg" playing />
-            <span className="min-w-0 flex-1">{CONNECT.importRunning}</span>
-            {backfill?.run && <span className="num font-mono text-fg">{backfill.run.inserted}</span>}
-          </motion.div>
-        )}
-      </AnimatePresence>
+        <SyncStatus connectionId={conn.id} />
 
-      {!invalid && (
-        <div className="flex flex-wrap items-center gap-2">
-          <ActionButton ref={syncRef} variant="primary" size="sm" icon={GLYPH_SYNC} spinIcon disabled={!!busy || importing} onRun={() => syncNow(conn.id).then((o) => o !== null)} data-testid="exchange-sync">
-            {EX.syncNow}
-          </ActionButton>
-          <Button size="sm" disabled={!!busy || importing} onClick={() => void runDryRun(conn.id)} title={EX.dryRunHint} data-testid="exchange-dry">
-            {busy === "dry" ? "Liest …" : EX.dryRun}
-          </Button>
-          <Button size="sm" disabled={!!busy || importing} aria-expanded={rangeOpen} onClick={() => setRangeOpen((o) => !o)}>
-            {EX.firstImport}
-          </Button>
-        </div>
-      )}
-
-      <AnimatePresence initial={false}>
-        {rangeOpen && !invalid && (
-          <motion.div
-            key="range"
-            className="grid gap-2 rounded-xl border border-line bg-ink-950/40 p-3"
-            style={{ transformOrigin: "top" }}
-            initial={reduced ? false : { opacity: 0, clipPath: "inset(0 0 100% 0 round 12px)" }}
-            animate={{ opacity: 1, clipPath: "inset(0 0 0% 0 round 12px)" }}
-            exit={{ opacity: 0, clipPath: "inset(0 0 100% 0 round 12px)", transition: tween.exit }}
-            transition={{ clipPath: tween.reveal, opacity: tween.fade }}
-          >
-            <span className="text-[12.5px] text-mute">{CONNECT.importLead}</span>
-            <div className="flex flex-wrap items-center gap-2">
-              <Segmented size="sm" aria-label={CONNECT.importTitle} value={range} onChange={setRange} options={CONNECT.importRanges} />
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          <span className="min-w-0 flex-1 text-[11.5px] leading-snug text-faint">{EX.ipNote}</span>
+          {asking ? (
+            <motion.span
+              className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
+              role="alert"
+              initial={reduced ? false : { opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ default: tween.fade, scale: spring.pop }}
+            >
+              {EX.disconnectAsk}
               <Button
-                variant="primary"
                 size="sm"
-                disabled={!!busy}
+                variant="danger"
                 onClick={() => {
-                  setRangeOpen(false);
-                  void startFirstImport(conn.id, Number(range));
+                  setAsking(false);
+                  void disconnectAccount(conn.id);
                 }}
               >
-                {CONNECT.importStart}
+                {EX.disconnect}
               </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <div className="grid gap-3 border-t border-line pt-3 sm:grid-cols-2">
-        <div className="grid gap-1.5">
-          <span id={`acc-${conn.id}`} className="label">
-            {EX.journalAccount}
-          </span>
-          <Segmented size="sm" aria-labelledby={`acc-${conn.id}`} value={conn.journalAccount} onChange={(v) => void updateConnection(conn.id, { journalAccount: v })} options={ACCOUNTS} />
-        </div>
-        <label className="flex items-center justify-between gap-3 sm:justify-end">
-          <span className="grid gap-0.5 sm:text-right">
-            <span className="text-[13px] text-fg">{EX.autoSync}</span>
-            <span className="text-[11px] text-faint">{status.cron.enabled ? `alle ${status.cron.everyMin} Min` : "auf diesem Server aus"}</span>
-          </span>
-          <Switch checked={conn.syncEnabled} onCheckedChange={(v) => void updateConnection(conn.id, { syncEnabled: v })} aria-label={EX.autoSync} />
-        </label>
-      </div>
-
-      <SyncStatus connectionId={conn.id} />
-
-      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <span className="min-w-0 flex-1 text-[11.5px] leading-snug text-faint">{EX.ipNote}</span>
-        {asking ? (
-          <motion.span
-            className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
-            role="alert"
-            initial={reduced ? false : { opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ default: tween.fade, scale: spring.pop }}
-          >
-            {EX.disconnectAsk}
-            <Button
+              <Button ref={no} size="sm" onClick={() => setAsking(false)}>
+                Abbrechen
+              </Button>
+            </motion.span>
+          ) : (
+            <HoldConfirm
+              ref={trigger}
               size="sm"
               variant="danger"
-              onClick={() => {
-                setAsking(false);
-                void disconnectAccount(conn.id);
-              }}
+              disabled={busy === "disconnect"}
+              onAsk={() => setAsking(true)}
+              onConfirm={() => void disconnectAccount(conn.id)}
+              data-testid="exchange-disconnect"
             >
               {EX.disconnect}
-            </Button>
-            <Button ref={no} size="sm" onClick={() => setAsking(false)}>
-              Abbrechen
-            </Button>
-          </motion.span>
-        ) : (
-          <HoldConfirm ref={trigger} size="sm" variant="danger" disabled={busy === "disconnect"} onAsk={() => setAsking(true)} onConfirm={() => void disconnectAccount(conn.id)} data-testid="exchange-disconnect">
-            {EX.disconnect}
-          </HoldConfirm>
-        )}
+            </HoldConfirm>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -12,14 +12,7 @@ import { cloudEnabled } from "@/cloud/env";
 import { useCloudSession } from "@/cloud/session";
 import { hasClaudeRuntime } from "@/store/capability";
 import { pushToast } from "@/store/uiStore";
-import {
-  connectExchange,
-  disconnectExchange,
-  fetchExchangeStatus,
-  patchConnection,
-  runExchangeSync,
-  startBackfill,
-} from "./api";
+import { connectExchange, disconnectExchange, fetchExchangeStatus, patchConnection, runExchangeSync, startBackfill } from "./api";
 import { pullAndMerge, type PullOutcome } from "./localMerge";
 import { CONNECT, EX } from "./strings";
 import type { ConnectInput, ConnectResult, ExchangeConnection, ExchangeStatus, JournalAccount, SyncCounts, SyncResult, SyncRun } from "./types";
@@ -283,7 +276,16 @@ function followBackfill(status: ExchangeStatus): void {
   }
   void pullNow({ toast: false }).then((pulled) => {
     const counts = run ? { fetched: run.fetched, inserted: run.inserted, updated: run.updated, unchanged: run.unchanged, skipped: run.skipped } : ZERO;
-    useExchange.setState({ outcome: { key: ++seq, connectionId: job.connectionId, counts, merged: (pulled?.added ?? 0) + (pulled?.updated ?? 0), more: run?.more ?? false, at: Date.now() } });
+    useExchange.setState({
+      outcome: {
+        key: ++seq,
+        connectionId: job.connectionId,
+        counts,
+        merged: (pulled?.added ?? 0) + (pulled?.updated ?? 0),
+        more: run?.more ?? false,
+        at: Date.now(),
+      },
+    });
     pushToast({ kind: "success", title: CONNECT.importDone(counts.inserted), detail: EX.syncDetail(counts.updated) });
   });
 }
@@ -291,7 +293,10 @@ function followBackfill(status: ExchangeStatus): void {
 /** Starts the first import of the last `days` days in the background and follows it. */
 export async function startFirstImport(connectionId: string, days: number): Promise<boolean> {
   if (useExchange.getState().busy) return false;
-  const runId = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `00000000-0000-4000-8000-${String(Date.now()).padStart(12, "0").slice(-12)}`;
+  const runId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `00000000-0000-4000-8000-${String(Date.now()).padStart(12, "0").slice(-12)}`;
   const from = new Date(Date.now() - days * 86_400_000).toISOString();
   useExchange.setState({ busy: "backfill", actionError: null });
   try {

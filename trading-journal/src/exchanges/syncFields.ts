@@ -114,7 +114,12 @@ export const SYNC_ID_PREFIX: Readonly<Record<string, string>> = {
 
 /** Deterministic id of a synced position (`t_bx_123`); ids from other characters are reduced to `[A-Za-z0-9_-]`. */
 export function syncedTradeId(exchange: string, externalId: string): string {
-  const prefix = SYNC_ID_PREFIX[exchange] ?? `t_${exchange.replace(/[^a-z0-9]/gi, "").slice(0, 6).toLowerCase()}_`;
+  const prefix =
+    SYNC_ID_PREFIX[exchange] ??
+    `t_${exchange
+      .replace(/[^a-z0-9]/gi, "")
+      .slice(0, 6)
+      .toLowerCase()}_`;
   return `${prefix}${externalId.replace(/[^A-Za-z0-9_-]/g, "").slice(0, 96)}`;
 }
 

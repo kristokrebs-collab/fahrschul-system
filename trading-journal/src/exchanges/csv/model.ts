@@ -80,14 +80,30 @@ const round = (n: number, d = 8): number => {
 const QTY_EPS = 1e-9;
 
 /** Fills → positions per symbol (average cost). `allowShort` false: spot – a sell without holdings is skipped. */
-export function aggregateFills(fills: readonly CsvFill[], opts: { allowShort: boolean; market: "perp" | "spot"; pairOf: (symbol: string) => string }): { trades: CsvTrade[]; skipped: number } {
+export function aggregateFills(
+  fills: readonly CsvFill[],
+  opts: { allowShort: boolean; market: "perp" | "spot"; pairOf: (symbol: string) => string },
+): { trades: CsvTrade[]; skipped: number } {
   const bySymbol = new Map<string, CsvFill[]>();
   for (const f of fills) bySymbol.set(f.symbol, [...(bySymbol.get(f.symbol) ?? []), f]);
   const trades: CsvTrade[] = [];
   let skipped = 0;
   for (const [symbol, list] of bySymbol) {
     const sorted = [...list].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
-    let cur: { side: "long" | "short"; pos: number; avg: number; openCost: number; openQty: number; closeQty: number; closeValue: number; gross: number; fees: number; peak: number; fills: NonNullable<CsvTrade["fills"]>; first: CsvFill } | null = null;
+    let cur: {
+      side: "long" | "short";
+      pos: number;
+      avg: number;
+      openCost: number;
+      openQty: number;
+      closeQty: number;
+      closeValue: number;
+      gross: number;
+      fees: number;
+      peak: number;
+      fills: NonNullable<CsvTrade["fills"]>;
+      first: CsvFill;
+    } | null = null;
     const finish = (status: "closed" | "open") => {
       if (!cur) return;
       const entry = cur.openQty > 0 ? cur.openCost / cur.openQty : null;
@@ -133,7 +149,15 @@ export function aggregateFills(fills: readonly CsvFill[], opts: { allowShort: bo
           cur.openQty += qty;
           cur.peak = Math.max(cur.peak, cur.pos);
           cur.fees += Math.abs(f.fee) * (qty / f.qty);
-          cur.fills.push({ id: f.id, at: f.at, side: "open", price: f.price, qty: round(qty), fee: round(Math.abs(f.fee) * (qty / f.qty)), kind: cur.fills.some((x) => x.side === "open") ? "add" : "entry" });
+          cur.fills.push({
+            id: f.id,
+            at: f.at,
+            side: "open",
+            price: f.price,
+            qty: round(qty),
+            fee: round(Math.abs(f.fee) * (qty / f.qty)),
+            kind: cur.fills.some((x) => x.side === "open") ? "add" : "entry",
+          });
           qty = 0;
         } else {
           const take = Math.min(qty, cur.pos);
@@ -144,7 +168,15 @@ export function aggregateFills(fills: readonly CsvFill[], opts: { allowShort: bo
           cur.pos -= take;
           cur.fees += Math.abs(f.fee) * (take / f.qty);
           const flat = cur.pos <= QTY_EPS * Math.max(1, cur.peak);
-          cur.fills.push({ id: f.id, at: f.at, side: "close", price: f.price, qty: round(take), fee: round(Math.abs(f.fee) * (take / f.qty)), kind: flat ? "exit" : "partial" });
+          cur.fills.push({
+            id: f.id,
+            at: f.at,
+            side: "close",
+            price: f.price,
+            qty: round(take),
+            fee: round(Math.abs(f.fee) * (take / f.qty)),
+            kind: flat ? "exit" : "partial",
+          });
           qty -= take;
           if (flat) {
             finish("closed");
@@ -219,7 +251,15 @@ export function toJournalTrade(t: CsvTrade, ctx: ToTradeContext): Trade {
   if (t.funding != null) rec.fundingFees = round(t.funding);
   if (t.tags?.length) rec.tags = t.tags;
   if (t.fills?.length && t.fills.length <= 200) {
-    rec.fills = t.fills.map((f) => ({ id: `csv_${fnv1a(f.id)}_${f.at}`, at: toWallClock(f.at, true), side: f.side, price: f.price, qty: f.qty, fee: f.fee, kind: f.kind }));
+    rec.fills = t.fills.map((f) => ({
+      id: `csv_${fnv1a(f.id)}_${f.at}`,
+      at: toWallClock(f.at, true),
+      side: f.side,
+      price: f.price,
+      qty: f.qty,
+      fee: f.fee,
+      kind: f.kind,
+    }));
   }
   return rec;
 }

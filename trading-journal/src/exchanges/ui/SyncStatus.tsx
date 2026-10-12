@@ -59,7 +59,12 @@ export function SyncStatus({ connectionId, className }: { connectionId?: string;
       <div className="flex items-center justify-between gap-2">
         <span className="label">{EX.history}</span>
         {rest.length > 0 && (
-          <button type="button" className="touch-hit text-[11.5px] text-mute underline-offset-4 hover:text-fg hover:underline" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <button
+            type="button"
+            className="touch-hit text-[11.5px] text-mute underline-offset-4 hover:text-fg hover:underline"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+          >
             {open ? "Weniger" : `+${rest.length} ältere`}
           </button>
         )}

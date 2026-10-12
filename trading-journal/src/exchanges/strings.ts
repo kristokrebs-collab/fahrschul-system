@@ -119,6 +119,7 @@ export const INBOX = {
   done: "Passt so",
   stopPh: "Stop",
   stopSave: "Stop speichern",
+  saveFailed: "Nicht gespeichert – öffne den Trade und versuche es dort erneut.",
   more: (n: number) => `+${n} weitere im Journal`,
   missing: "Fehlt",
 } as const;
@@ -136,7 +137,10 @@ export const RECON = {
   missLine: "Aus dem letzten Probelauf – noch nicht importiert.",
   merge: "Zusammenführen",
   mergeHold: "Halten zum Zusammenführen",
+  holdHint: "Zum Zusammenführen gedrückt halten",
   mergeDone: "Zusammengeführt – Börsenwerte plus deine Notizen.",
+  mergeFailed: "Zusammenführen fehlgeschlagen – beide Einträge bleiben.",
+  removeFailed: "Zusammengeführt, aber dein Eintrag konnte nicht entfernt werden – lösche ihn im Journal.",
   ignore: "Ignorieren",
   importMissing: "Jetzt importieren",
   manual: "Dein Eintrag",

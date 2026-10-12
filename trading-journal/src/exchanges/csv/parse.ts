@@ -243,7 +243,11 @@ export function fnv1a(s: string): string {
 export function normalizePair(raw: string): string {
   let s = raw.trim().toUpperCase();
   if (s.includes(":")) s = s.slice(s.indexOf(":") + 1);
-  s = s.replace(/\.P$/, "").replace(/-?(SWAP|PERP|PERPETUAL)$/, "").replace(/^PF_/, "").replace(/^PI_/, "");
+  s = s
+    .replace(/\.P$/, "")
+    .replace(/-?(SWAP|PERP|PERPETUAL)$/, "")
+    .replace(/^PF_/, "")
+    .replace(/^PI_/, "");
   if (s.includes("/")) return s;
   if (/^[A-Z0-9]+-[A-Z0-9]+$/.test(s)) return s.replace("-", "/");
   s = s.replace(/[^A-Z0-9]/g, "");

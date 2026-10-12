@@ -8,7 +8,7 @@ import { Button } from "@/primitives/Button";
 import { closeDryRun, primaryConnection, syncNow, useExchange } from "../store";
 import { DRY } from "../strings";
 import type { PositionCheck, SyncResult } from "../types";
-import { Money } from "./parts";
+import { Money, shortWhen } from "./parts";
 
 const TOP = 8;
 
@@ -20,11 +20,15 @@ function conventionLine(r: SyncResult): { text: string; tone: "win" | "warn" } {
 
 function Row({ c }: { c: PositionCheck }) {
   return (
-    <StaggerItem as="li" className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 sm:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))_auto] sm:items-center" data-testid="dry-row">
+    <StaggerItem
+      as="li"
+      className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5 sm:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))_auto] sm:items-center"
+      data-testid="dry-row"
+    >
       <span className="flex min-w-0 items-center gap-2">
         <span className={cn("size-1.5 shrink-0 rounded-full", c.side === "long" ? "bg-win" : "bg-loss")} aria-hidden="true" />
         <span className="truncate text-[13px] font-medium">{c.pair}</span>
-        <span className="truncate text-[11px] text-faint">{c.exitDate.slice(5).replace("T", " ")}</span>
+        <span className="truncate text-[11px] text-faint">{shortWhen(c.exitDate)}</span>
       </span>
       <Money value={c.net} className="text-right text-[13.5px] sm:order-none" />
       <span className="col-span-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px] text-faint sm:contents">
@@ -111,7 +115,13 @@ export function DryRunSheet() {
           ))}
         </StaggerItem>
         <StaggerItem>
-          <p className={cn("rounded-xl border px-3 py-2 text-[12.5px] leading-relaxed", conv.tone === "win" ? "border-win/30 bg-win/[0.05] text-mute" : "border-warn/30 bg-warn/[0.05] text-mute")} data-testid="dry-convention">
+          <p
+            className={cn(
+              "rounded-xl border px-3 py-2 text-[12.5px] leading-relaxed",
+              conv.tone === "win" ? "border-win/30 bg-win/[0.05] text-mute" : "border-warn/30 bg-warn/[0.05] text-mute",
+            )}
+            data-testid="dry-convention"
+          >
             {conv.text}
           </p>
         </StaggerItem>

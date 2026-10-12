@@ -96,10 +96,34 @@ export function reconcile(trades: readonly Trade[], dryRun: readonly PositionChe
 }
 
 /** Trader-owned fields carried from the hand-typed record into the synced one on a merge. */
-const CARRY = ["setups", "checks", "conviction", "followedPlan", "emotion", "reason", "notes", "chart", "mistakes", "tags", "rating", "psych", "screenshots", "annotations", "timeframe", "account", "signal", "boxSnap"] as const;
+const CARRY = [
+  "setups",
+  "checks",
+  "conviction",
+  "followedPlan",
+  "emotion",
+  "reason",
+  "notes",
+  "chart",
+  "mistakes",
+  "tags",
+  "rating",
+  "psych",
+  "screenshots",
+  "annotations",
+  "timeframe",
+  "account",
+  "signal",
+  "boxSnap",
+] as const;
 const FILL_IF_EMPTY = ["stop", "target", "stopHistory", "targets"] as const;
 
-const empty = (v: unknown): boolean => v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0) || (typeof v === "object" && v !== null && !Array.isArray(v) && Object.keys(v).length === 0);
+const empty = (v: unknown): boolean =>
+  v === undefined ||
+  v === null ||
+  v === "" ||
+  (Array.isArray(v) && v.length === 0) ||
+  (typeof v === "object" && v !== null && !Array.isArray(v) && Object.keys(v).length === 0);
 
 const TEXT_JOIN = new Set(["notes", "reason"]);
 
@@ -120,7 +144,8 @@ export function mergeDuplicate(synced: Trade, manual: Trade, nowIso: string): Tr
       const seen = new Set(sv.map((x) => JSON.stringify(x)));
       out[k] = [...sv, ...mv.filter((x) => !seen.has(JSON.stringify(x)))];
     } else if (TEXT_JOIN.has(k) && typeof sv === "string" && typeof mv === "string" && sv.trim() !== mv.trim()) out[k] = `${sv}\n\n${mv}`;
-    else if (typeof sv === "object" && sv !== null && typeof mv === "object" && mv !== null && !Array.isArray(sv)) out[k] = { ...(mv as object), ...(sv as object) };
+    else if (typeof sv === "object" && sv !== null && typeof mv === "object" && mv !== null && !Array.isArray(sv))
+      out[k] = { ...(mv as object), ...(sv as object) };
   }
   // the synced record only carries the connection's default account / an empty timeframe – the trader's choice wins
   if (!empty(m.account)) out.account = m.account;

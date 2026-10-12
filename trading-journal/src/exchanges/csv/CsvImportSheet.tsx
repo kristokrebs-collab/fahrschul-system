@@ -19,7 +19,7 @@ import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { closeCsvImport, useExchange } from "../store";
-import { Money } from "../ui/parts";
+import { Money, shortWhen } from "../ui/parts";
 import {
   buildTrades,
   FORMATS,
@@ -60,11 +60,16 @@ export const CSV_STRINGS = {
   run: "Importieren",
   running: "Importiert …",
   done: (n: number) => (n === 1 ? "1 Trade importiert" : `${n} Trades importiert`),
-  doneDetail: (u: number, s: number) => [u ? `${u} aktualisiert` : "", s ? `${s} unverändert` : ""].filter(Boolean).join(" · ") || "Notizen und Setups bleiben unberührt.",
+  doneDetail: (u: number, s: number) =>
+    [u ? `${u} aktualisiert` : "", s ? `${s} unverändert` : ""].filter(Boolean).join(" · ") || "Notizen und Setups bleiben unberührt.",
   failed: "Import fehlgeschlagen",
   readError: "Datei konnte nicht gelesen werden.",
+  tooBig: "Die Datei ist größer als 20 MB – exportiere einen kürzeren Zeitraum.",
   empty: "Keine Trades in der Datei gefunden.",
 } as const;
+
+/** A CSV is parsed in the main thread – larger exports are refused instead of freezing the tab. */
+export const CSV_MAX_BYTES = 20 * 1024 * 1024;
 
 const ACCOUNTS = [
   { v: "scalp" as const, label: "Scalp" },
@@ -123,6 +128,11 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
     if (!file) return;
     setFileName(file.name);
     setReadError(null);
+    if (file.size > CSV_MAX_BYTES) {
+      setLoaded(null);
+      setReadError(CSV_STRINGS.tooBig);
+      return;
+    }
     try {
       const text = await (readFile ? readFile(file) : file.text());
       const l = loadCsv(text);
@@ -212,10 +222,30 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
             }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
-            className={cn("relative grid place-items-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-center transition-colors", dragging ? "border-white/50 bg-white/[0.05]" : "border-line-2 bg-ink-950/40")}
+            className={cn(
+              "relative grid place-items-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-center transition-colors",
+              dragging ? "border-white/50 bg-white/[0.05]" : "border-line-2 bg-ink-950/40",
+            )}
           >
-            <input ref={inputRef} type="file" accept=".csv,text/csv,text/plain,.txt" className="sr-only" aria-label={CSV_STRINGS.choose} onChange={(e) => void onFile(e.target.files?.[0])} data-testid="csv-file" />
-            <svg viewBox="0 0 24 24" className="size-6 text-mute" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".csv,text/csv,text/plain,.txt"
+              className="sr-only"
+              aria-label={CSV_STRINGS.choose}
+              onChange={(e) => void onFile(e.target.files?.[0])}
+              data-testid="csv-file"
+            />
+            <svg
+              viewBox="0 0 24 24"
+              className="size-6 text-mute"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <path d="M12 16V4M7 9l5-5 5 5" />
               <path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" />
             </svg>
@@ -248,7 +278,14 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
 
         <AnimatePresence mode="popLayout" initial={false}>
           {loaded && (
-            <motion.div key={fileName} className="grid gap-4" initial={reduced ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }} exit={{ opacity: 0, transition: tween.exit }} transition={{ y: spring.enter, opacity: tween.fade }}>
+            <motion.div
+              key={fileName}
+              className="grid gap-4"
+              initial={reduced ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
+              exit={{ opacity: 0, transition: tween.exit }}
+              transition={{ y: spring.enter, opacity: tween.fade }}
+            >
               {loaded.format ? (
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-win/30 bg-win/[0.05] px-3 py-2.5" data-testid="csv-detected">
                   <Badge tone="win" dot>
@@ -279,7 +316,7 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
                   </div>
                   <div className="grid gap-1.5">
                     <span className="label">{CSV_STRINGS.zone}</span>
-                    <Segmented size="sm" aria-label={CSV_STRINGS.zone} value={zone} onChange={setZone} options={ZONES} />
+                    <Segmented size="sm" className="justify-self-start" aria-label={CSV_STRINGS.zone} value={zone} onChange={setZone} options={ZONES} />
                   </div>
                 </div>
               )}
@@ -289,7 +326,7 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
                   <span id="csv-account" className="label">
                     {CSV_STRINGS.account}
                   </span>
-                  <Segmented aria-labelledby="csv-account" value={account} onChange={setAccount} options={ACCOUNTS} />
+                  <Segmented className="justify-self-start" aria-labelledby="csv-account" value={account} onChange={setAccount} options={ACCOUNTS} />
                 </div>
                 {needsPair && (
                   <label className="grid content-start gap-1.5">
@@ -334,7 +371,7 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
                             <span className="flex min-w-0 items-center gap-2 text-[13px]">
                               <span className={cn("size-1.5 shrink-0 rounded-full", t.side === "long" ? "bg-win" : "bg-loss")} aria-hidden="true" />
                               <span className="truncate font-medium">{t.pair}</span>
-                              <span className="truncate text-[11px] text-faint">{t.date.replace("T", " · ")}</span>
+                              <span className="truncate text-[11px] text-faint">{shortWhen(t.date)}</span>
                               {t.status === "open" && <Badge tone="mute">offen</Badge>}
                             </span>
                             <Money value={pnlOf(t)} className="text-[13px]" />
