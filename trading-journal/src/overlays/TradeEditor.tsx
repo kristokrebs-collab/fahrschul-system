@@ -2,10 +2,11 @@ import { AnimatePresence, motion, useMotionValueEvent, type Variants } from "mot
 import { ED } from "@/domain/edition";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { deriveTrade, leverageOverRule } from "@/domain/derive";
+import { EXCURSION_KEYS, excursionStale } from "@/domain/excursion";
 import { checklistItemsFor, pruneChecks } from "@/domain/enrich";
 import { DEFAULT_MISTAKES, EMOTIONS, LEVERAGE_HELP, LEVERAGE_WARNING, MTF_SETUP_ID, TIMEFRAMES } from "@/domain/defaults";
 import { parseSignalSnapshot } from "@/domain/signals";
-import type { AccountId, Conviction, Settings, Setup, Side, Trade, TradeStatus } from "@/domain/types";
+import type { AccountId, Conviction, ScreenshotRef, Settings, Setup, Side, Trade, TradeStatus } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { nowLocalInput } from "@/lib/dates";
 import { n1, n2, price as fmtPrice, signed } from "@/lib/format";
@@ -23,7 +24,13 @@ import { MorphSelect, type MorphSelectOption } from "@/motion/pulse/MorphSelect"
 import { Button, CheckboxRow, ConvictionRadio, Field, Input, Segmented, Textarea, revealInvalid, shakeField } from "@/primitives";
 import { saveTradeNow, useJournal } from "@/store/journalStore";
 import { jsonEqual } from "@/store/merge3";
-import { pushToast, useUi, type AccFilter } from "@/store/uiStore";
+import { pushToast, useUi, type AccFilter, type TradeDraft } from "@/store/uiStore";
+import { ExecutionSection } from "@/journal/editor/ExecutionSection";
+import { PsychSection } from "@/journal/editor/PsychSection";
+import { dropEmptyJournalKeys, fillFix, journalDefaults, journalFromTrade, journalKey, journalRecord, journalReset, validateJournal, type JournalForm } from "@/journal/editor/form";
+import { ShotsField } from "@/journal/screenshots/ShotsField";
+import { RatingDots } from "@/journal/ui/RatingDots";
+import { TagInput, tagSuggestions } from "@/journal/ui/TagInput";
 import { winCelebration } from "./celebration";
 import { FAB_LABEL } from "@/app/Dock";
 import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
@@ -63,6 +70,8 @@ export interface TradeFormTyped {
   emotion: string;
   /** Mistake tags (`trade.mistakes`, other journal version): chips from `settings.mistakes` plus own tags. */
   mistakes: string[];
+  /** Journal v3 (P06): execution, tags & rating, psyche, screenshots – see `@/journal/editor/form`. */
+  j: JournalForm;
 }
 
 export type TradeRecord = Omit<Trade, "id"> & { id?: string };
@@ -125,7 +134,7 @@ export function defaultForm(settings: Pick<Settings, "pair">, account: AccountId
       notes: "",
       chart: "",
     },
-    t: { account, side: "long", status: "closed", setups: [], checks: {}, conviction: null, followedPlan: null, emotion: "", mistakes: [] },
+    t: { account, side: "long", status: "closed", setups: [], checks: {}, conviction: null, followedPlan: null, emotion: "", mistakes: [], j: journalDefaults() },
   };
 }
 
@@ -158,15 +167,104 @@ export function formFromTrade(t: Trade): { d: TradeFormStrings; t: TradeFormType
       followedPlan: t.followedPlan ?? null,
       emotion: t.emotion || "",
       mistakes: [...(t.mistakes ?? [])],
+      j: journalFromTrade(t),
     },
   };
+}
+
+/** Keys the form edits (everything else of a draft is saved with the new trade as given). */
+const FORM_KEYS = new Set<string>([
+  "id",
+  "account",
+  "side",
+  "status",
+  "date",
+  "pair",
+  "timeframe",
+  "entry",
+  "stop",
+  "target",
+  "exit",
+  "size",
+  "leverage",
+  "fees",
+  "pnlManual",
+  "setups",
+  "checks",
+  "conviction",
+  "followedPlan",
+  "emotion",
+  "reason",
+  "notes",
+  "chart",
+  "pnl",
+  "r",
+  "createdAt",
+  "updatedAt",
+  "mistakes",
+  "exitDate",
+  "qty",
+  "fills",
+  "fundingFees",
+  "slippage",
+  "plannedEntry",
+  "margin",
+  "marginMode",
+  "liqPrice",
+  "market",
+  "exchange",
+  "exchangeAccount",
+  "targets",
+  "stopHistory",
+  "tags",
+  "rating",
+  "psych",
+  "screenshots",
+]);
+
+/**
+ * Journal v3 (P06): form state of a pre-filled NEW trade (`openEditor({ draft })` from the risk calculator, a box setup or
+ * an exchange position): the defaults with every given field applied.
+ */
+export function formFromDraft(settings: Pick<Settings, "pair">, account: AccountId, draft: TradeDraft): { d: TradeFormStrings; t: TradeFormTyped } {
+  const base = defaultForm(settings, draft.account ?? account);
+  const d = { ...base.d };
+  if (draft.date) d.date = draft.date.slice(0, 16);
+  if (draft.pair) d.pair = draft.pair;
+  if (draft.timeframe) d.timeframe = draft.timeframe;
+  for (const k of ["entry", "stop", "target", "exit", "size", "leverage", "fees", "pnlManual"] as const) if (draft[k] != null) d[k] = toInputString(draft[k]);
+  for (const k of ["reason", "notes", "chart"] as const) {
+    const v = draft[k];
+    if (typeof v === "string") d[k] = v;
+  }
+  const t: TradeFormTyped = {
+    ...base.t,
+    side: draft.side ?? base.t.side,
+    status: draft.status ?? base.t.status,
+    setups: [...(draft.setups ?? [])],
+    checks: { ...(draft.checks ?? {}) },
+    conviction: draft.conviction ?? null,
+    followedPlan: draft.followedPlan ?? null,
+    emotion: draft.emotion ?? "",
+    mistakes: [...(draft.mistakes ?? [])],
+    j: journalFromTrade(draft),
+  };
+  return { d, t };
+}
+
+/** The keys of a draft the form does not edit (`signal`, `boxSnap`, `origin`, `externalId`, …): saved verbatim. */
+export function draftExtras(draft: TradeDraft | undefined): Partial<Trade> {
+  if (!draft) return {};
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(draft)) if (!FORM_KEYS.has(k) && v !== undefined) out[k] = v;
+  return out as Partial<Trade>;
 }
 
 /** `Speichern & neu` reset (Plan 6.5): keeps date (renewed), pair, account, side, leverage, timeframe. */
 export function resetForNext(d: TradeFormStrings, t: TradeFormTyped): { d: TradeFormStrings; t: TradeFormTyped } {
   return {
     d: { ...d, date: nowLocalInput(), entry: "", stop: "", target: "", exit: "", size: "", fees: "", pnlManual: "", reason: "", notes: "", chart: "" },
-    t: { ...t, status: "closed", setups: [], checks: {}, conviction: null, followedPlan: null, emotion: "", mistakes: [] },
+    t: { ...t, status: "closed", setups: [], checks: {}, conviction: null, followedPlan: null, emotion: "", mistakes: [], j: journalReset(t.j ?? journalDefaults()) },
   };
 }
 
@@ -175,7 +273,7 @@ function formKey(d: TradeFormStrings, t: TradeFormTyped) {
   const checks = Object.keys(t.checks)
     .filter((k) => t.checks[k])
     .sort();
-  return { d, t: { ...t, checks, setups: [...t.setups].sort(), mistakes: [...t.mistakes].sort() } };
+  return { d, t: { ...t, checks, setups: [...t.setups].sort(), mistakes: [...t.mistakes].sort(), j: t.j ? journalKey(t.j) : undefined } };
 }
 
 /** True when the form differs from the state it was opened (or last reset) with. */
@@ -221,8 +319,25 @@ export function withMtfAuto(checks: Record<string, boolean>, auto: MtfAuto | nul
   return out;
 }
 
-/** Bundle `S`: the typed record the form would save (before pnl/r/timestamps). */
+/**
+ * Bundle `S`: the typed record the form would save (before pnl/r/timestamps). Journal v3: the v3 keys follow
+ * (`journalRecord`, empty → `undefined`), and with fills the bundle fields `Einstieg` / `Größe` (and `Ausstieg` once the
+ * position is flat) come from the fills (Ø entry, notional, Ø exit) – what every older reader of the trade shows.
+ */
 export function toRecord(d: TradeFormStrings, t: TradeFormTyped): Omit<Trade, "id" | "pnl" | "r" | "createdAt" | "updatedAt"> {
+  const { j, ...typed } = t;
+  const base = toBundleRecord(d, typed);
+  if (!j) return base;
+  const fix = fillFix(j.fills, t.side);
+  const v3 = journalRecord(j, { status: t.status, side: t.side });
+  return {
+    ...base,
+    ...v3,
+    ...(fix ? { entry: fix.entry, size: fix.size, exit: t.status === "open" ? null : (fix.exit ?? base.exit) } : null),
+  };
+}
+
+function toBundleRecord(d: TradeFormStrings, t: Omit<TradeFormTyped, "j">): Omit<Trade, "id" | "pnl" | "r" | "createdAt" | "updatedAt"> {
   return {
     ...t,
     date: d.date,
@@ -242,16 +357,20 @@ export function toRecord(d: TradeFormStrings, t: TradeFormTyped): Omit<Trade, "i
   };
 }
 
-/** Bundle validation order; `null` when valid. */
-export function validateRecord(rec: ReturnType<typeof toRecord>, rawChart: string): string | null {
+/**
+ * Bundle validation order; `null` when valid. Journal v3: a closed trade may give its size as `Menge` (qty) instead of
+ * `Größe`; with the form's `j` the v3 checks follow (exit time before the entry, incomplete fills / ladder rungs / stop
+ * moves, more closed than opened, ladder over 100 %).
+ */
+export function validateRecord(rec: ReturnType<typeof toRecord>, rawChart: string, j?: JournalForm): string | null {
   if (!rec.date) return EDITOR_MESSAGES.date;
   if (!(rec.entry != null && rec.entry > 0)) return EDITOR_MESSAGES.entry;
   if (rec.status !== "open" && rec.pnlManual == null) {
     if (!(rec.exit != null && rec.exit > 0)) return EDITOR_MESSAGES.exit;
-    if (!(rec.size != null && rec.size > 0)) return EDITOR_MESSAGES.size;
+    if (!(rec.size != null && rec.size > 0) && !(rec.qty != null && rec.qty > 0)) return EDITOR_MESSAGES.size;
   }
   if (rawChart.trim() && !rec.chart) return EDITOR_MESSAGES.chart;
-  return null;
+  return j ? validateJournal(j, { date: rec.date, status: rec.status, side: rec.side }) : null;
 }
 
 /**
@@ -331,7 +450,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const reduced = useReducedFx();
 
   const trade = editor.tradeId ? trades.find((t) => t.id === editor.tradeId) : undefined;
-  const session = editor.open ? `${editor.tradeId ?? ""}` : null;
+  // a pre-filled new trade (`openEditor({ draft })`, Journal v3); its sequence re-initialises an already open editor
+  const draft = !editor.tradeId ? editor.draft : undefined;
+  const session = editor.open ? `${editor.tradeId ?? ""}|${draft ? (editor.draftSeq ?? 0) : ""}` : null;
   const initialised = useRef<string | null>(null);
 
   const [d, setD] = useState<TradeFormStrings>(() => defaultForm(settings, defaultAccount(acc)).d);
@@ -374,11 +495,11 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     setCheckReq(false);
     setManualMtf(Boolean(trade));
     setAutoMtf(null);
-    const init = trade ? formFromTrade(trade) : defaultForm(settings, defaultAccount(acc));
+    const init = trade ? formFromTrade(trade) : draft ? formFromDraft(settings, defaultAccount(acc), draft) : defaultForm(settings, defaultAccount(acc));
     setD(init.d);
     setT(init.t);
     setBaseline(init);
-  }, [session, trade, settings, acc]);
+  }, [session, trade, draft, settings, acc]);
 
   const rec = useMemo(() => toRecord(d, t), [d, t]);
   const x = useMemo(() => deriveTrade(rec), [rec]);
@@ -397,6 +518,11 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const usedTags = useMemo(() => usedOwnMistakes(trades), [trades]);
   const tags = useMemo(() => mistakeOptions(settings.mistakes, t.mistakes, usedTags), [settings.mistakes, t.mistakes, usedTags]);
   const tfOptions = useMemo(() => timeframeOptions(d.timeframe), [d.timeframe]);
+  // Journal v3: fills fix Einstieg / Größe (and Ausstieg once flat); journal tags offered as quick picks
+  const fix = useMemo(() => fillFix(t.j.fills, t.side), [t.j.fills, t.side]);
+  const journalTags = useMemo(() => tagSuggestions(trades), [trades]);
+  const patchJ = useCallback((patch: Partial<JournalForm>) => setT((o) => ({ ...o, j: { ...o.j, ...patch } })), []);
+  const updateShots = useCallback((update: (prev: ScreenshotRef[]) => ScreenshotRef[]) => setT((o) => ({ ...o, j: { ...o.j, screenshots: update(o.j.screenshots) } })), []);
   const leverageOver = leverageOverRule(rec.leverage, account);
   const sortedSetups = useMemo(
     () => [...settings.setups].sort((a, b) => +(b.account === account || b.account === "both") - +(a.account === account || a.account === "both")),
@@ -448,7 +574,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         shakeField(alertRef.current, { reduced, self: true });
         if (field) revealInvalid(`f-${field}`, { reduced });
       };
-      const problem = validateRecord(rec, d.chart);
+      const problem = validateRecord(rec, d.chart, t.j);
       if (problem) {
         reject(problem);
         return;
@@ -477,7 +603,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           cur = latestRef.current;
         }
         if (cur.rec !== rec) {
-          const late = validateRecord(cur.rec, cur.d.chart);
+          const late = validateRecord(cur.rec, cur.d.chart, cur.t.j);
           if (late) {
             reject(late);
             return;
@@ -486,7 +612,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         const now = new Date().toISOString();
         // Spread the stored trade first so passthrough/unknown fields (legacy extras, `signal`, `mistakes`) survive an edit.
         const record: TradeRecord = {
-          ...(trade ?? {}),
+          ...(trade ?? draftExtras(draft)),
           ...cur.rec,
           checks: pruneChecks(cur.checks, cur.items),
           ...(signal ? { signal } : null),
@@ -497,6 +623,10 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         };
         if (trade?.id) record.id = trade.id;
         else delete record.id;
+        // Journal v3: an empty v3 field writes no key (an untouched legacy trade gains nothing, a cleared one loses it)
+        dropEmptyJournalKeys(record);
+        // stored MAE / MFE were measured from the old entry / exit / stop: drop them, the backfill measures again
+        if (trade && excursionStale(trade, record)) for (const k of EXCURSION_KEYS) delete (record as Record<string, unknown>)[k];
         // `trades` is still the journal before this save – exactly what the equity-high check compares against
         const burst = winCelebration(trades, record, trade);
         // Local storage persists and publishes synchronously: the toast and the close (or the reset for the next trade)
@@ -544,7 +674,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         if (busyShown) setSaving(false);
       }
     },
-    [rec, d, t, checking, trade, trades, closeEditor, reduced],
+    [rec, d, t, checking, trade, draft, trades, closeEditor, reduced],
   );
 
   const onSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -649,18 +779,25 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
 
   const fieldInvalid = (k: InvalidField) => (invalid === k ? { invalid: true, "aria-describedby": ERROR_ID } : {});
 
+  // Journal v3: with fills Einstieg (Ø), Größe (notional) and – once flat – Ausstieg (Ø) come from the fills
+  const fromFills = (k: "entry" | "exit" | "size"): string | null => {
+    if (!fix) return null;
+    const v = k === "entry" ? fix.entry : k === "size" ? fix.size : isOpen ? null : fix.exit;
+    return v == null ? null : toInputString(Number(v.toFixed(v < 10 ? 6 : 2)));
+  };
   const priceField = (k: "entry" | "stop" | "target" | "exit", label: string) => {
     const live = (k === "entry" || k === "exit") && hasLive;
-    const disabled = k === "exit" && isOpen;
+    const fixed = k === "entry" || k === "exit" ? fromFills(k) : null;
+    const disabled = (k === "exit" && isOpen) || fixed != null;
     return (
-      <Field key={k} label={label} htmlFor={"f-" + k}>
+      <Field key={k} label={label} htmlFor={"f-" + k} help={fixed != null ? "Ø aus den Fills" : undefined}>
         <div className={cn(live && "grid gap-1.5")}>
           <Input
             id={"f-" + k}
             ref={k === "entry" ? entryRef : undefined}
             numeric
             autoComplete="off"
-            value={d[k]}
+            value={fixed ?? d[k]}
             onChange={setStr(k)}
             disabled={disabled}
             {...(k === "entry" || k === "exit" ? fieldInvalid(k) : {})}
@@ -759,8 +896,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
             {priceField("stop", "Stop-Loss")}
             {priceField("target", "Take-Profit")}
             {priceField("exit", "Ausstieg")}
-            <Field label={`Größe (${cur})`} htmlFor="f-size" help="Positionswert inkl. Hebel">
-              <Input id="f-size" numeric autoComplete="off" value={d.size} onChange={setStr("size")} {...fieldInvalid("size")} />
+            <Field label={`Größe (${cur})`} htmlFor="f-size" help={fix ? "Aus den Fills" : "Positionswert inkl. Hebel"}>
+              <Input id="f-size" numeric autoComplete="off" value={fromFills("size") ?? d.size} onChange={setStr("size")} disabled={fix != null} {...fieldInvalid("size")} />
             </Field>
             <Field label="Hebel" htmlFor="f-lev" suffix="x" help={leverageOver ? <span className="font-medium text-warn">{LEVERAGE_WARNING[account]}</span> : LEVERAGE_HELP[account]}>
               <Input id="f-lev" numeric autoComplete="off" value={d.leverage} onChange={setStr("leverage")} placeholder="z. B. 4" className={cn(leverageOver && "border-warn/60")} />
@@ -780,6 +917,10 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               </div>
             ))}
           </div>
+        </Section>
+
+        <Section title="Ausführung" sub="Fills, Teil-Exits, Funding, Margin – alles optional">
+          <ExecutionSection j={t.j} onChange={patchJ} side={t.side} status={t.status} date={d.date} entry={rec.entry} stop={rec.stop} currency={cur} />
         </Section>
 
         <Section title="Entscheidungsgrundlage" sub="Warum bist du eingestiegen?">
@@ -853,6 +994,21 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           </div>
         </Section>
 
+        <Section title="Tags & Bewertung" sub="Wie sauber war die Ausführung?">
+          <div className="grid gap-3.5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+            <Field label="Tags">
+              <TagInput value={t.j.tags} onChange={(tags) => patchJ({ tags })} suggestions={journalTags} />
+            </Field>
+            <Field label="Bewertung">
+              <RatingDots value={t.j.rating} onChange={(rating) => patchJ({ rating })} />
+            </Field>
+          </div>
+        </Section>
+
+        <Section title="Psyche" sub="Stress, Zuversicht, Verhalten">
+          <PsychSection j={t.j} onChange={patchJ} />
+        </Section>
+
         <Section title={MISTAKES_COPY.title} sub={MISTAKES_COPY.sub}>
           <MistakeChips options={tags} value={t.mistakes} onChange={(mistakes) => patchT({ mistakes })} />
         </Section>
@@ -864,6 +1020,10 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           <Field label="Chart-Link (TradingView)" htmlFor="f-chart">
             <Input id="f-chart" type="url" value={d.chart} onChange={setStr("chart")} placeholder="https://www.tradingview.com/x/…" autoComplete="off" {...fieldInvalid("chart")} />
           </Field>
+        </Section>
+
+        <Section title="Screenshots" sub="Ziehen, einfügen oder wählen">
+          <ShotsField value={t.j.screenshots} onChange={updateShots} />
         </Section>
       </form>
     </Sheet>

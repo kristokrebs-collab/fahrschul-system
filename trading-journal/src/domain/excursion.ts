@@ -137,6 +137,25 @@ export function excursionInterval(windowMs: number): "15m" | "1h" {
   return windowMs <= 3 * 86_400_000 ? "15m" : "1h";
 }
 
+/** The stored excursion keys of a trade (`src/market/excursion.ts` writes them, an edit of the inputs clears them). */
+export const EXCURSION_KEYS = ["mae", "mfe", "maeR", "mfeR", "atrPct"] as const;
+
+type ExcursionSource = { side?: string; date?: string; exitDate?: string; entry?: number | null; stop?: number | null; status?: string; pair?: string; fills?: unknown };
+
+/** True when an edit changed what the stored MAE / MFE were measured from (they must be measured again). */
+export function excursionStale(before: ExcursionSource, after: ExcursionSource): boolean {
+  return (
+    before.side !== after.side ||
+    before.date !== after.date ||
+    (before.exitDate ?? "") !== (after.exitDate ?? "") ||
+    (before.entry ?? null) !== (after.entry ?? null) ||
+    (before.stop ?? null) !== (after.stop ?? null) ||
+    before.status !== after.status ||
+    (before.pair ?? "") !== (after.pair ?? "") ||
+    JSON.stringify(before.fills ?? null) !== JSON.stringify(after.fills ?? null)
+  );
+}
+
 /** One step of a replay: the running excursion up to bar `i` and the unrealised R at its close. */
 export interface ReplayStep {
   /** Running MAE / MFE (price distance ≥ 0) from the entry bar through this bar; 0 before the entry. */

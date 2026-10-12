@@ -4,6 +4,7 @@
 import type { EnrichedTrade, HyblockReading, JsonBackup, Settings, Trade } from "./types";
 import { tradeTime } from "@/lib/dates";
 import { RESULT_LABELS } from "./defaults";
+import { holdMs } from "./excursion";
 
 export const CSV_HEADER = [
   "Datum",
@@ -31,6 +32,33 @@ export const CSV_HEADER = [
   "Begründung",
   "Notizen",
   "Chart",
+  // Journal v3 (P06): appended only – the 25 columns above keep their order, so existing spreadsheets stay valid
+  "Ausstiegszeit",
+  "Haltedauer (Min)",
+  "Markt",
+  "Börse",
+  "Börsenkonto",
+  "Menge",
+  "Fills",
+  "Funding",
+  "Slippage",
+  "Margin",
+  "Margin-Modus",
+  "Liq.-Preis",
+  "Tags",
+  "Bewertung",
+  "Stress",
+  "Zuversicht",
+  "Exit-Grund",
+  "MAE",
+  "MFE",
+  "MAE R",
+  "MFE R",
+  "ATR % Einstieg",
+  "Screenshots",
+  "Positions-ID",
+  "Gruppe",
+  "Quelle",
 ] as const;
 
 export const CSV_BOM = "﻿";
@@ -87,7 +115,71 @@ export const CSV_COLUMN_KINDS: Readonly<Record<(typeof CSV_HEADER)[number], CsvC
   Begründung: "text",
   Notizen: "text",
   Chart: "text",
+  Ausstiegszeit: "value",
+  "Haltedauer (Min)": "value",
+  Markt: "value",
+  Börse: "text",
+  Börsenkonto: "text",
+  Menge: "value",
+  Fills: "value",
+  Funding: "value",
+  Slippage: "value",
+  Margin: "value",
+  "Margin-Modus": "value",
+  "Liq.-Preis": "value",
+  Tags: "text",
+  Bewertung: "value",
+  Stress: "value",
+  Zuversicht: "value",
+  "Exit-Grund": "text",
+  MAE: "value",
+  MFE: "value",
+  "MAE R": "value",
+  "MFE R": "value",
+  "ATR % Einstieg": "value",
+  Screenshots: "value",
+  "Positions-ID": "text",
+  Gruppe: "text",
+  Quelle: "value",
 };
+
+const MARKET_LABEL = { perp: "Perp", spot: "Spot" } as const;
+const MARGIN_LABEL = { isolated: "Isoliert", cross: "Cross" } as const;
+const ORIGIN_LABEL = { manual: "Manuell", api: "API", csv: "CSV", bot: "Bot", webhook: "Webhook" } as const;
+const round = (v: number | null | undefined, d: number) => (v == null || !Number.isFinite(v) ? "" : +v.toFixed(d));
+
+/** The appended Journal-v3 cells of one trade (empty strings for a legacy trade). */
+function v3Cells(t: EnrichedTrade): unknown[] {
+  const hold = holdMs(t);
+  return [
+    t.exitDate ?? "",
+    hold == null ? "" : Math.round(hold / 60_000),
+    t.market ? MARKET_LABEL[t.market] : "",
+    t.exchange ?? "",
+    t.exchangeAccount ?? "",
+    t.qty ?? "",
+    t.fills?.length ? t.fills.length : "",
+    t.fundingFees ?? "",
+    t.slippage ?? "",
+    t.margin ?? "",
+    t.marginMode ? MARGIN_LABEL[t.marginMode] : "",
+    t.liqPrice ?? "",
+    (t.tags ?? []).join(" | "),
+    t.rating ?? "",
+    t.psych?.stress ?? "",
+    t.psych?.confidence ?? "",
+    t.psych?.exitReason ?? "",
+    t.mae ?? "",
+    t.mfe ?? "",
+    round(t.maeR, 2),
+    round(t.mfeR, 2),
+    round(t.atrPct, 2),
+    t.screenshots?.length ? t.screenshots.length : "",
+    t.positionId ?? "",
+    t.groupId ?? "",
+    t.origin ? ORIGIN_LABEL[t.origin.kind] : "",
+  ];
+}
 
 const CELL_FORMATTERS: ReadonlyArray<(h: unknown) => string> = CSV_HEADER.map((name) => (CSV_COLUMN_KINDS[name] === "text" ? csvTextCell : csvCell));
 
@@ -121,6 +213,7 @@ export function tradeToCsvRow(t: EnrichedTrade, setupNames: ReadonlyMap<string, 
     t.reason,
     t.notes,
     t.chart,
+    ...v3Cells(t),
   ]
     .map((cell, i) => (CELL_FORMATTERS[i] ?? csvCell)(cell))
     .join(";");
