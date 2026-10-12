@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "build:share": "vite build --mode share",
-    "build:single": "tsc -b && node scripts/build-single.mjs"
+    "build:single": "tsc -b && node scripts/build-single.mjs",
+    "budget": "node scripts/bundleBudget.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

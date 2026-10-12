@@ -1,7 +1,9 @@
 /**
  * Deploy configuration (P14): `netlify.toml` at the repo root (functions directory, the Binance proxy rewrites before the
  * SPA fallbacks, the CSP with exactly the hosts the browser talks to, security headers, Node 22), every function routed
- * under `/api/v1` or scheduled in code, and `.env.example` naming every variable the client and the functions read.
+ * under `/api/v1` or scheduled in code, `.env.example` naming every variable the client and the functions read, the CI
+ * workflow running the gate (e2e on pull requests with Playwright's own Chromium) and `SETUP.md` covering every
+ * migration, variable and scheduled function.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,6 +12,8 @@ import { describe, expect, it } from "vitest";
 // vitest runs from trading-journal/
 const root = process.cwd();
 const toml = readFileSync(join(root, "../netlify.toml"), "utf8");
+const ci = readFileSync(join(root, "../.github/workflows/ci.yml"), "utf8");
+const setup = readFileSync(join(root, "SETUP.md"), "utf8");
 const envExample = readFileSync(join(root, ".env.example"), "utf8");
 const fnDir = join(root, "netlify/functions");
 const functions = readdirSync(fnDir).filter((f) => f.endsWith(".mts"));
@@ -89,5 +93,38 @@ describe(".env.example", () => {
     expect(missing, `missing in .env.example: ${missing.join(", ")}`).toEqual([]);
     // client values are public, server values never carry the VITE_ prefix
     for (const n of listed) if (/SECRET|ENC_KEY|API_KEY/.test(n)) expect(n.startsWith("VITE_"), n).toBe(false);
+  });
+});
+
+describe("CI workflow", () => {
+  it("runs the gate in trading-journal on Node 22; e2e on pull requests with Playwright's own Chromium", () => {
+    expect(ci).toMatch(/working-directory: trading-journal/);
+    expect(ci).toMatch(/node-version: 22/);
+    for (const step of ["npm ci", "npm run typecheck", "npm run lint", "npm test", "npm run build", "npm run budget", "npm run build:share"]) {
+      expect(ci, step).toContain(`- run: ${step}\n`);
+    }
+    const e2e = ci.slice(ci.indexOf("\n  e2e:"));
+    expect(e2e).toMatch(/if: github\.event_name == 'pull_request'/);
+    expect(e2e).toContain("npx playwright install --with-deps chromium");
+    expect(e2e).toContain("npx playwright test --project=mobile --project=desktop");
+    // the pinned container browser is never assumed in CI
+    expect(ci).not.toMatch(/^\s*PW_CHROMIUM:/m);
+  });
+});
+
+describe("SETUP.md", () => {
+  it("walks through every migration in order, every variable of .env.example and the scheduled functions", () => {
+    const migrations = readdirSync(join(root, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort();
+    expect(migrations.length).toBeGreaterThanOrEqual(4);
+    const at = migrations.map((m) => setup.indexOf(m));
+    for (const [i, m] of migrations.entries()) expect(at[i], m).toBeGreaterThan(0);
+    expect([...at].sort((a, b) => a - b)).toEqual(at);
+    for (const m of envExample.matchAll(/^([A-Z][A-Z0-9_]+)=/gm)) {
+      const name = m[1]!;
+      // the Stripe price ids are listed as `_MONTHLY` / `_YEARLY` pairs, the Hyblock ones as `HYBLOCK_*`
+      const stem = name.replace(/_(MONTHLY|YEARLY)$/, "").replace(/^HYBLOCK_.*/, "HYBLOCK_");
+      expect(setup, name).toContain(stem);
+    }
+    for (const f of ["exchange-sync-cron", "backup-nightly", "social-aggregate", "/api/v1/stripe/webhook", "dryRun=1"]) expect(setup).toContain(f);
   });
 });

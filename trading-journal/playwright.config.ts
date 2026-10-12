@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
 /** Samsung Internet on a Galaxy Tab S9/S10 Ultra (the user's device: 1692×978 CSS px at DPR 1.75, One UI taskbar). */
@@ -19,6 +20,8 @@ const galaxyTab = (width: number, height: number) => ({
  * agent's own preview on another port) – no build, no `webServer`; `PW_OUTPUT_DIR` moves the test artifacts.
  */
 const BASE_URL = process.env.PW_BASE_URL;
+const CONTAINER_CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const PINNED_CHROMIUM = process.env.PW_CHROMIUM ?? (existsSync(CONTAINER_CHROMIUM) ? CONTAINER_CHROMIUM : undefined);
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -28,8 +31,9 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    // The container ships a pinned Chromium; keep Playwright from downloading its own.
-    launchOptions: { executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" },
+    // The container ships a pinned Chromium (`PW_CHROMIUM` or the default path when it exists); elsewhere – CI after
+    // `npx playwright install chromium` – Playwright's own browser is used.
+    launchOptions: { executablePath: PINNED_CHROMIUM },
     baseURL: BASE_URL ?? "http://127.0.0.1:4173",
     trace: "retain-on-failure",
     colorScheme: "dark",
