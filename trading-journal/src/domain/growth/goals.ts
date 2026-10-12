@@ -72,6 +72,14 @@ export const RATE_METRICS: ReadonlySet<GoalMetric> = new Set(["journalRate", "pl
 /** Result metrics – shown, never celebrated or counted as growth. */
 export const OUTCOME_METRICS: ReadonlySet<GoalMetric> = new Set(["expectancyR", "winRate", "profitFactor", "netR"]);
 /** Metrics that only make sense as an upper limit. */
+/**
+ * Metrics whose target may be NEGATIVE (P14, one rule for P08 and the P12 mentor contract): the R-based outcomes and
+ * own metrics – "Netto-R der Woche nicht unter −2 R" is a real goal. Every other target is a count, a rate or a factor
+ * and is clamped at 0. Targets stay within ±`TARGET_ABS_MAX`. `src/social/contract.ts` (`SIGNED_GOAL_METRICS`)
+ * validates mentor proposals by the same rule (a negative target for any other metric is refused, never zeroed).
+ */
+export const SIGNED_METRICS: ReadonlySet<GoalMetric> = new Set(["expectancyR", "netR", "custom"]);
+export const TARGET_ABS_MAX = 1000;
 export const LIMIT_METRICS: ReadonlySet<GoalMetric> = new Set(["ruleBreaks", "behavior", "tradesPerDay", "lossDayPct", "riskPerTradePct"]);
 
 const METRICS = new Set<GoalMetric>(["journalRate", "planAdherence", "checklistRate", "ruleBreaks", "behavior", "tradesPerDay", "lossDayPct", "riskPerTradePct", "expectancyR", "winRate", "profitFactor", "netR", "habit", "custom"]);
@@ -94,7 +102,7 @@ export function sanitizeGoalDraft(raw: unknown): GoalDraft | null {
   if (typeof raw.target !== "number" || !Number.isFinite(raw.target)) return null;
   let comparator: GoalComparator = raw.comparator === "atMost" ? "atMost" : "atLeast";
   if (LIMIT_METRICS.has(metric)) comparator = "atMost";
-  let target = Math.max(0, raw.target);
+  let target = SIGNED_METRICS.has(metric) ? Math.max(-TARGET_ABS_MAX, Math.min(TARGET_ABS_MAX, raw.target)) : Math.max(0, Math.min(TARGET_ABS_MAX, raw.target));
   if (RATE_METRICS.has(metric)) target = Math.min(1, target);
   const kind: GoalKind = OUTCOME_METRICS.has(metric) ? "outcome" : raw.kind === "limit" ? "limit" : "process";
   const src = isObj(raw.source) ? raw.source : {};

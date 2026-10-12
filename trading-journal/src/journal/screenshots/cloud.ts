@@ -6,15 +6,19 @@
  * Everything degrades: without a configured cloud or while signed out the helpers report `null` / `false` and the
  * screenshot simply stays local (`store: "idb"`). The Supabase chunk is loaded lazily (`ensureCloud()`).
  */
+import { entitledNow } from "@/billing/entitlements";
 import { cloudEnabled, ensureCloud, useCloudSession } from "@/cloud";
 
 export const SHOTS_BUCKET = "screenshots";
 /** Signed URLs live this long (s); they are renewed a minute before. */
 const SIGNED_TTL_S = 3600;
 
-/** A signed-in user id when the cloud is usable right now, else `null`. */
+/**
+ * A signed-in user id when the cloud is usable right now and the plan stores screenshots there (`screenshotsCloud`,
+ * `src/billing/plans.ts` – without payments always), else `null`: the screenshot stays on this device.
+ */
 export function cloudShotOwner(): string | null {
-  if (!cloudEnabled()) return null;
+  if (!cloudEnabled() || !entitledNow("screenshotsCloud")) return null;
   const s = useCloudSession.getState();
   return s.phase === "signedIn" && s.user ? s.user.id : null;
 }

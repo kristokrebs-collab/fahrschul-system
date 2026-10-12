@@ -1,3 +1,6 @@
+import { useLimit, usePlan } from "@/billing/entitlements";
+import { PLAN_CATALOG, upgradePlanForLimit } from "@/billing/plans";
+import { openUpgrade } from "@/billing/store";
 import { AnimatePresence, motion } from "motion/react";
 import { useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { TradeFilter } from "@/domain/types";
@@ -66,6 +69,10 @@ export function JournalFilterBar({ filter, extra, sort, onExtraChange, onExtraRe
   const saveView = useViews((s) => s.saveView);
   const deleteView = useViews((s) => s.deleteView);
   const applyView = useViews((s) => s.applyView);
+  // plan limit `savedViews` (P10 / P14; unlimited without payments): at the limit the button offers the next plan
+  const viewLimit = useLimit("savedViews");
+  const plan = usePlan();
+  const atLimit = views.length >= viewLimit;
   const [open, setOpen] = useState(() => journalFilterCount(extra) > 0);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
@@ -148,8 +155,13 @@ export function JournalFilterBar({ filter, extra, sort, onExtraChange, onExtraRe
             />
           ) : (
             !current && (
-              <button type="button" onClick={() => setNaming(true)} className="rounded-full border border-dashed border-line-2 px-3 py-1 text-[12px] text-mute transition-colors hover:border-white/40 hover:text-fg pointer-coarse:min-h-11">
-                + Ansicht speichern
+              <button
+                type="button"
+                onClick={() => (atLimit ? openUpgrade(null, upgradePlanForLimit("savedViews", plan.plan, views.length)) : setNaming(true))}
+                className="rounded-full border border-dashed border-line-2 px-3 py-1 text-[12px] text-mute transition-colors hover:border-white/40 hover:text-fg pointer-coarse:min-h-11"
+                data-limit={atLimit ? "full" : undefined}
+              >
+                {atLimit ? `+ Ansicht speichern · mehr mit ${PLAN_CATALOG[upgradePlanForLimit("savedViews", plan.plan, views.length)].name}` : "+ Ansicht speichern"}
               </button>
             )
           )}

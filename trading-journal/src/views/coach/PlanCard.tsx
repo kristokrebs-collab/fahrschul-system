@@ -1,8 +1,8 @@
 /**
  * Improvement plan (P04): the three strongest actions with evidence as a milestone rail (`MilestoneRail`: the rail
  * draws itself, the dots pop, the active step pings 3×). "Plan übernehmen" pins it (`settings.coach.plan`, synced like
- * every setting) and hands the goals to the growth module (`addGoalFromDraft`, P08 – while that module is not there the
- * plan is still pinned here and measured in the reports' "Zielerreichung"). A pinned plan shows how this week is going
+ * every setting) and hands the goals to the growth module (`addGoalFromDraft`, P08: stored on the Wachstum page,
+ * de-duplicated; the plan is measured in the reports' "Zielerreichung" either way). A pinned plan shows how this week is going
  * per step (measured from the journal, never ticked by hand).
  */
 import { useMemo, useState } from "react";
@@ -61,7 +61,7 @@ export function PlanCard({ plan, list, events, settings, now, className }: { pla
       await saveSettings(withCoachPlan(settings, plan.map((r) => r.goal), Date.now()));
       const stored = await Promise.all(plan.map((r) => addGoalFromDraft(r.goal).catch(() => null)));
       const inGrowth = stored.filter(Boolean).length;
-      pushToast({ kind: "success", title: "Plan gepinnt", detail: inGrowth ? `${inGrowth} Ziele auch unter Ziele & Gewohnheiten.` : "Im Wochenbericht siehst du, wie du ihn hältst." });
+      pushToast({ kind: "success", title: "Plan gepinnt", detail: inGrowth ? `${inGrowth} ${inGrowth === 1 ? "Ziel" : "Ziele"} auch auf der Seite Wachstum.` : "Im Wochenbericht siehst du, wie du ihn hältst." });
     } catch {
       pushToast({ kind: "error", title: "Plan nicht gespeichert", detail: "Bitte noch einmal versuchen." });
     } finally {

@@ -174,7 +174,9 @@ export function goalProgress(goal: Goal, p: Prepared, habits: readonly Habit[] =
       ratio = 0;
     }
   } else {
-    ratio = actual == null ? 0 : goal.metric === "custom" ? actual : goal.target <= 0 ? 1 : Math.max(0, Math.min(1, actual / goal.target));
+    // a floor at or below zero ("Woche nicht schlechter als −2 R", P14 rule for signed metrics) has no share to fill:
+    // the ring is full while it holds, empty when it broke
+    ratio = actual == null ? 0 : goal.metric === "custom" ? actual : goal.target <= 0 ? (met ? 1 : 0) : Math.max(0, Math.min(1, actual / goal.target));
     state = actual == null ? "noData" : met ? "met" : ratio >= 0.75 ? "onTrack" : "atRisk";
   }
   // only COMPLETE periods count: a rate can still drop and a limit can still break while the period runs

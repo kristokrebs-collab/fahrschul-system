@@ -7,6 +7,8 @@
  * the cells blur-fade in one after another (`Reveal`, ends at `transform: none` – the chart's morph-free, so no
  * containing-block trap). Registered by the integrator (P14) as page `markt` (see `README.md`).
  */
+import { Gate } from "@/billing/entitlements";
+import { UpgradeTeaser } from "@/billing/ui/UpgradeTeaser";
 import { type ReactNode } from "react";
 import { biasText, BOX_TF_LABEL, PHASE_LABEL, type BoxTf } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
@@ -104,7 +106,10 @@ export function MarktView({ className }: { className?: string }) {
         <RsiLinesCard view={view} />
       </Cell>
       <Cell index={4} span="lg:col-span-7">
-        <ScannerCard />
+        {/* plan gate `boxScanner` (P10 / P14): the watchlist scan + alarms; the box chart itself stays free */}
+        <Gate feature="boxScanner" fallback={<UpgradeTeaser feature="boxScanner" className="h-full" />}>
+          <ScannerCard />
+        </Gate>
       </Cell>
       <Cell index={5} span="lg:col-span-12">
         <BoxSettingsCard />

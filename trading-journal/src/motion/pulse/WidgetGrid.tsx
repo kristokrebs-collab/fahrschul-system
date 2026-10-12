@@ -380,7 +380,9 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
     if (d.phase !== "hold") return;
     d.phase = "drag";
     d.startOrder = work.current.slice();
-    d.moved = true;
+    // only a POINTER drag ends with a click that must be swallowed (`onClickCapture`); a keyboard drag (Space / Enter)
+    // ends without one – setting the flag there swallowed the next real click in the grid (P14 fix of the P13 report)
+    d.moved = !d.kbd;
     lift(d.id);
     const t = tile(d.id);
     if (!d.kbd && t.el && d.pid >= 0) {

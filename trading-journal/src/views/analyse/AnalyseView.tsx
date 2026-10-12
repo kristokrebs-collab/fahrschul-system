@@ -11,6 +11,8 @@
  * one calm preview card. Registered by the integrator (P14) as page `analyse` (`#analyse?dim=<dimension>`).
  */
 import { useId, type ReactNode } from "react";
+import { Gate } from "@/billing/entitlements";
+import { UpgradeTeaser } from "@/billing/ui/UpgradeTeaser";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { ANALYSE_HIGHLIGHT, ANALYSE_LEAD, ANALYSE_TITLE, CARD_TITLES, SECTIONS } from "@/domain/analytics";
 import { cn } from "@/lib/cn";
@@ -101,12 +103,22 @@ export function AnalyseView({ className }: { className?: string }) {
           </section>
           <section aria-labelledby={ids.future} className="contents">
             <SectionTitle id={ids.future} title={SECTIONS.future} sub="Tausende mögliche Zukünfte aus deinen echten Trades." className="lg:col-span-12" />
-            <Cell index={0} span="lg:col-span-8">
-              <MonteCarloCard view={view} cur={cur} />
-            </Cell>
-            <Cell index={1} span="lg:col-span-4">
-              <RiskOfRuinCard view={view} settings={settings} rep={rep} />
-            </Cell>
+            {/* plan gate `monteCarlo` (P10 / P14; without payments always open) */}
+            <Gate
+              feature="monteCarlo"
+              fallback={
+                <Cell index={0} span="lg:col-span-12">
+                  <UpgradeTeaser feature="monteCarlo" />
+                </Cell>
+              }
+            >
+              <Cell index={0} span="lg:col-span-8">
+                <MonteCarloCard view={view} cur={cur} />
+              </Cell>
+              <Cell index={1} span="lg:col-span-4">
+                <RiskOfRuinCard view={view} settings={settings} rep={rep} />
+              </Cell>
+            </Gate>
           </section>
           <section aria-labelledby={ids.edge} className="contents">
             <SectionTitle id={ids.edge} title={SECTIONS.edge} sub="Trade the best, fuck the rest – aber nur, was den Zufall übersteht." className="lg:col-span-12" />

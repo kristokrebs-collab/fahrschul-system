@@ -14,8 +14,9 @@
  * The plan is never decided here – it comes from `/api/v1/billing/status`, which reads `profiles.plan` (webhook-written).
  */
 import type { ReactNode } from "react";
+import { useCloudSession } from "@/cloud/session";
 import { limitOf, planIncludes } from "./plans";
-import { useBillingMode, useEffectivePlan } from "./store";
+import { currentMode, effectivePlanOf, useBilling, useBillingMode, useEffectivePlan } from "./store";
 import type { Feature, LimitKey, PlanInfo } from "./types";
 
 export * from "./types";
@@ -25,6 +26,19 @@ export function useEntitlement(feature: Feature): boolean {
   const mode = useBillingMode();
   const plan = useEffectivePlan();
   return mode !== "open" || planIncludes(plan.plan, feature);
+}
+
+/**
+ * `useEntitlement` outside React (P14: e.g. the screenshot upload deciding cloud vs. device) – the same rules, read
+ * once from the stores at call time.
+ */
+export function entitledNow(feature: Feature): boolean {
+  const mode = currentMode();
+  if (mode !== "open") return true;
+  const session = useCloudSession.getState();
+  const userId = session.phase === "signedIn" ? (session.user?.id ?? null) : null;
+  const { account, cached } = useBilling.getState();
+  return planIncludes(effectivePlanOf(mode, userId, account, cached).plan, feature);
 }
 
 /** Numeric limit of the user's plan (`Infinity` = unlimited, also while nothing is gated). */

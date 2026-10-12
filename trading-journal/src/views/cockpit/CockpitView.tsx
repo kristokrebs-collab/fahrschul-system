@@ -1,4 +1,5 @@
-import { Suspense, useEffect, useMemo, useState, type ComponentType, type KeyboardEvent } from "react";
+import { useLimit } from "@/billing/entitlements";
+import { Suspense, useEffect, useMemo, useState, type ComponentType } from "react";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { cn } from "@/lib/cn";
 import { HoldButton } from "@/motion/HoldButton";
@@ -120,20 +121,6 @@ function EditTile({ item, widget }: { item: BoardItem; widget: CockpitWidget }) 
   );
 }
 
-/**
- * Workaround for the pulse `WidgetGrid` (P01): a KEYBOARD drop leaves its "a drag just ended" flag set (only a pointer
- * press on a tile clears it), so the next click inside the grid – mouse or Enter on "Entfernen" / "Breiter" – would be
- * swallowed as the end of a drag. After Space / Enter on a tile we hand the grid that one click on its own list
- * element (nothing there reacts to it), so the next real click works. Remove once WidgetGrid resets the flag itself.
- */
-function settleKeyboardDrop(e: KeyboardEvent<HTMLDivElement>): void {
-  if (e.key !== " " && e.key !== "Enter") return;
-  const target = e.target as HTMLElement;
-  if (target.getAttribute("role") !== "listitem") return;
-  const list = target.closest('[role="list"]');
-  list?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-}
-
 function EditGrid({ boardId, items }: { boardId: string; items: { item: BoardItem; widget: CockpitWidget }[] }) {
   const tiles = useMemo(() => items.map(({ item, widget }) => ({ id: item.id, label: widget.title, node: <EditTile item={item} widget={widget} /> })), [items]);
   const order = useMemo(() => items.map((i) => i.item.id), [items]);
@@ -141,7 +128,7 @@ function EditGrid({ boardId, items }: { boardId: string; items: { item: BoardIte
     <div className="grid gap-3">
       <p className="text-[12px] text-mute">{S.editHint}</p>
       <style>{spanRules(boardId, items.map((i) => i.item))}</style>
-      <div data-cockpit-grid={boardId} className="contents" onKeyUp={settleKeyboardDrop}>
+      <div data-cockpit-grid={boardId} className="contents">
         <WidgetGrid items={tiles} order={order} onOrderChange={(ids) => cockpit.reorder(ids)} aria-label={S.grid} className="grid grid-cols-1 gap-5 lg:grid-cols-12" />
       </div>
     </div>
@@ -152,6 +139,8 @@ function BoardBar({ editing }: { editing: boolean }) {
   const boards = useCockpit((s) => s.boards);
   const active = useCockpit((s) => s.active);
   const board = boards.find((b) => b.id === active)!;
+  // plan limit `dashboards` (P10 / P14; without payments only the store's own cap)
+  const maxBoards = Math.min(MAX_BOARDS, useLimit("dashboards"));
   const [name, setName] = useState(board.name);
   const [nameFor, setNameFor] = useState(board.id);
   if (nameFor !== board.id) {
@@ -162,7 +151,7 @@ function BoardBar({ editing }: { editing: boolean }) {
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <Segmented aria-label={S.boards} options={boards.map((b) => ({ v: b.id, label: b.name }))} value={active} onChange={(id) => cockpit.setActive(id)} size="sm" />
-        {boards.length < MAX_BOARDS && (
+        {boards.length < maxBoards && (
           <Button size="sm" onClick={() => cockpit.newBoard()} data-testid="cockpit-new-board">
             + {S.newBoard}
           </Button>

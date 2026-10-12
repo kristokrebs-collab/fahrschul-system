@@ -9,7 +9,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 
-vi.mock("@/cloud", async (orig) => ({ ...(await orig<typeof import("@/cloud")>()), reportError: vi.fn() }));
+// the error boundary reports through `@/cloud/report` (P14: not the barrel)
+vi.mock("@/cloud/report", async (orig) => ({ ...(await orig<typeof import("@/cloud/report")>()), reportError: vi.fn() }));
 
 vi.mock("@/views/cockpit/builtins", async () => {
   const { registerWidget } = await import("@/views/cockpit/registry");
@@ -37,7 +38,7 @@ vi.mock("@/views/cockpit/builtins", async () => {
 
 const { CockpitView, spanRules } = await import("@/views/cockpit/CockpitView");
 const { COCKPIT_KEY, defaultData, useCockpit } = await import("@/views/cockpit/cockpitStore");
-const { reportError } = await import("@/cloud");
+const { reportError } = await import("@/cloud/report");
 
 function renderView() {
   return render(

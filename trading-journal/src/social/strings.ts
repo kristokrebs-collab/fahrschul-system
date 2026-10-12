@@ -26,7 +26,7 @@ export const S = {
   goalProposed: "Ziel vorgeschlagen",
   goalAdopted: "Ziel übernommen",
   goalDeclined: "Ziel abgelehnt",
-  goalStoreFailed: "Ziele lassen sich in dieser Version noch nicht speichern.",
+  goalStoreFailed: "Das Ziel ließ sich nicht speichern – bitte noch einmal versuchen.",
   shareRevoked: "Link zurückgezogen",
   linkCopied: "Link kopiert",
   copyFailed: "Kopieren ging nicht – bitte den Link markieren.",

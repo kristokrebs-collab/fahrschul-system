@@ -99,6 +99,21 @@ describe("WidgetGrid a11y + keyboard", () => {
     expect(taker).not.toHaveAttribute("data-grabbed");
   });
 
+  it("a keyboard drop never swallows the next click inside the grid (P14 fix)", () => {
+    const clicks: string[] = [];
+    const items = ITEMS.map((i) => ({ ...i, node: <button type="button" onClick={() => clicks.push(i.id)}>{i.id}</button> }));
+    render(<WidgetGrid aria-label="Markt-Kacheln" items={items} />);
+    const oi = tiles()[1]!;
+    oi.focus();
+    fireEvent.keyDown(oi, { key: " " });
+    fireEvent.keyDown(oi, { key: "ArrowLeft" });
+    fireEvent.keyDown(oi, { key: " " });
+    expect(tiles()[0]).toHaveAccessibleName("Open Interest, 1 von 4");
+    // the very next click – mouse or Enter on a button inside a tile – reaches its target
+    fireEvent.click(screen.getByRole("button", { name: "taker" }));
+    expect(clicks).toEqual(["taker"]);
+  });
+
   it("works uncontrolled", () => {
     render(<WidgetGrid items={ITEMS} />);
     const oi = tiles()[1]!;

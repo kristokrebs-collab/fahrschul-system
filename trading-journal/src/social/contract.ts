@@ -166,6 +166,12 @@ export const ReviewPatchSchema = z.object({ status: z.enum(["open", "done"]) }).
 export const CommentSchema = z.object({ body: z.string().trim().min(1).max(1000) }).strict();
 
 export const GOAL_METRICS = ["journalRate", "planAdherence", "checklistRate", "ruleBreaks", "tradesPerDay", "expectancyR", "winRate", "netR", "custom"] as const;
+/**
+ * Metrics whose target may be negative – the same rule as P08's `SIGNED_METRICS` (`src/domain/growth/goals.ts`, P14):
+ * R-based outcomes and own metrics. A negative target for any other metric is refused (400), so a student never adopts
+ * a goal that was silently changed to 0.
+ */
+export const SIGNED_GOAL_METRICS = ["expectancyR", "netR", "custom"] as const satisfies readonly (typeof GOAL_METRICS)[number][];
 /** A mentor's goal proposal – the subset of P08's `GoalDraft` a mentor may set (no account scope, no personal data). */
 export const GoalDraftSchema = z
   .object({
@@ -178,7 +184,8 @@ export const GoalDraftSchema = z
     due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     why: z.string().trim().max(240).optional(),
   })
-  .strict();
+  .strict()
+  .refine((d) => d.target >= 0 || (SIGNED_GOAL_METRICS as readonly string[]).includes(d.metric), { message: "negative target only for R metrics", path: ["target"] });
 export type MentorGoalDraft = z.infer<typeof GoalDraftSchema>;
 export const GoalSchema = z.object({ studentId: z.string().uuid(), draft: GoalDraftSchema }).strict();
 export const GoalPatchSchema = z.object({ status: z.enum(["accepted", "declined"]) }).strict();
