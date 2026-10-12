@@ -188,26 +188,30 @@ function cumulative(run: RunResult): { equity: number }[] {
 }
 
 /**
- * At most `max` points of a curve for drawing (min / max kept per bucket so a drawdown never disappears).
+ * Indices of at most `max` points of a curve for drawing (min / max kept per bucket so a drawdown never disappears;
+ * first and last always). Apply the same indices to a companion curve (buy & hold) to keep both aligned.
  */
-export function downsample<T extends { equity: number }>(points: readonly T[], max = 320): T[] {
-  if (points.length <= max) return [...points];
-  const out: T[] = [];
-  const bucket = points.length / (max / 2);
-  for (let b = 0; b * bucket < points.length; b++) {
+export function downsampleIdx(points: readonly { equity: number }[], max = 320): number[] {
+  const n = points.length;
+  if (n <= max) return points.map((_, i) => i);
+  const out: number[] = [0];
+  const bucket = n / Math.max(1, Math.floor(max / 2));
+  for (let b = 0; b * bucket < n; b++) {
     const s = Math.floor(b * bucket);
-    const e = Math.min(points.length, Math.floor((b + 1) * bucket));
+    const e = Math.min(n, Math.floor((b + 1) * bucket));
     let lo = s;
     let hi = s;
     for (let i = s; i < e; i++) {
       if (points[i]!.equity < points[lo]!.equity) lo = i;
       if (points[i]!.equity > points[hi]!.equity) hi = i;
     }
-    if (lo === hi) out.push(points[lo]!);
-    else if (lo < hi) out.push(points[lo]!, points[hi]!);
-    else out.push(points[hi]!, points[lo]!);
+    for (const i of lo <= hi ? [lo, hi] : [hi, lo]) if (i > out[out.length - 1]!) out.push(i);
   }
-  const last = points[points.length - 1]!;
-  if (out[out.length - 1] !== last) out.push(last);
+  if (out[out.length - 1] !== n - 1) out.push(n - 1);
   return out;
+}
+
+/** At most `max` points of a curve (see `downsampleIdx`). */
+export function downsample<T extends { equity: number }>(points: readonly T[], max = 320): T[] {
+  return downsampleIdx(points, max).map((i) => points[i]!);
 }

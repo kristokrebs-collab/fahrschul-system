@@ -58,9 +58,11 @@ export function sanitizeCond(c: RuleCond): RuleCond {
       return { kind: c.kind, a: Math.max(1, Math.min(99, Number.isFinite(c.a) ? c.a : 50)) };
     case "emaCrossUp":
     case "emaCrossDown": {
-      const a = int(c.a, 2, 400);
-      const b = int(c.b ?? a * 2, 3, 400);
-      return { kind: c.kind, a: Math.min(a, b - 1), b: Math.max(b, a + 1) };
+      const x = int(c.a, 2, 400);
+      const y = int(c.b ?? x * 2, 2, 400);
+      const lo = Math.min(x, y);
+      const hi = Math.max(x, y);
+      return { kind: c.kind, a: lo, b: hi > lo ? hi : lo + 1 };
     }
     case "closeAboveEma":
     case "closeBelowEma":

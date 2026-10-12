@@ -14,7 +14,7 @@ import { mcbLadder, type McbCfgIn } from "./strategies/mcbLadder";
 import { ruleBuilder, type RulesCfgIn } from "./strategies/rules";
 import { now, paramGrid, paramKey, type LabStrategy, type ParamSpec, type Params, type Prepared, type Stepper } from "./strategies/types";
 import { bestTrial, evaluate, oosSplit, trialOf, type Trial, type Window } from "./optimize";
-import { downsample, runStats, type RunStats } from "./metrics";
+import { downsampleIdx, runStats, type RunStats } from "./metrics";
 import { summarizeWf, wfLayout, wfWindow, type WalkForward, type WfWindow } from "./walkForward";
 import { deflatedSharpe, paramHeat, pboOf, robustness, type Dsr, type Heat, type Pbo, type Robustness } from "./overfit";
 import { gapsOf } from "./bars";
@@ -229,6 +229,7 @@ export function createLabJob(input: LabJobInput): LabJob {
       wfMeanR: wf?.oosMeanR ?? null,
     });
     const inPeriod = bars.slice(window.from, window.to + 1);
+    const idx = downsampleIdx(run.equity, 360);
     return {
       strategy: input.strategy,
       symbol: input.symbol,
@@ -241,8 +242,8 @@ export function createLabJob(input: LabJobInput): LabJob {
       to: run.to,
       stats,
       trades: run.trades,
-      equity: downsample(run.equity, 360),
-      buyHold: downsample(buyHold, 360),
+      equity: idx.map((i) => run.equity[i]!),
+      buyHold: buyHold.length === run.equity.length ? idx.map((i) => buyHold[i]!) : [],
       skipped: run.skipped,
       split,
       wf: wf

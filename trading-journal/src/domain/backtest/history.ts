@@ -137,7 +137,8 @@ export async function loadKlines(o: LoadKlinesOptions): Promise<Loaded<Bar>> {
       if (!rows.length) break;
       fresh.push(...rows);
       const nextStart = rows[rows.length - 1]!.t * 1000 + iv;
-      if (nextStart <= start || page.length < 1) break;
+      // a short page is the end of what the exchange has
+      if (nextStart <= start || page.length < KLINE_PAGE) break;
       start = nextStart;
     }
   }
@@ -206,7 +207,7 @@ export async function loadFunding(o: LoadFundingOptions): Promise<Loaded<Funding
       if (!rows.length) break;
       fresh.push(...rows);
       const next = rows[rows.length - 1]!.t + 1;
-      if (next <= start) break;
+      if (next <= start || page.length < FUNDING_PAGE) break;
       start = next;
     }
   }
