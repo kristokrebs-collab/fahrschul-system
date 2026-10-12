@@ -333,9 +333,12 @@ export function toRecord(d: TradeFormStrings, t: TradeFormTyped): Omit<Trade, "i
   return {
     ...base,
     ...v3,
-    ...(fix ? { entry: fix.entry, size: fix.size, exit: t.status === "open" ? null : (fix.exit ?? base.exit) } : null),
+    // 12 significant digits: an average of fills never stores binary noise (83 799,99999999999)
+    ...(fix ? { entry: sig12(fix.entry), size: sig12(fix.size), exit: t.status === "open" ? null : fix.exit != null ? sig12(fix.exit) : base.exit } : null),
   };
 }
+
+const sig12 = (v: number): number => Number(v.toPrecision(12));
 
 function toBundleRecord(d: TradeFormStrings, t: Omit<TradeFormTyped, "j">): Omit<Trade, "id" | "pnl" | "r" | "createdAt" | "updatedAt"> {
   return {

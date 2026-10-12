@@ -61,7 +61,7 @@ describe("tradesToCsv (bundle K$)", () => {
       origin: { kind: "api" as const },
     };
     const line = tradesToCsv(enriched([v3]), s).slice(1).split("\n")[1]!;
-    expect(line.split(";").slice(25).join(";")).toBe("2026-01-05T13:20;200;Perp;bitunix;Haupt;0,1;1;1,5;0,25;1600;Isoliert;64000;\'=evil | Breakout;4;2;5;Ziel erreicht;300;4200;0,3;4,2;1,23;1;p1;g1;API");
+    expect(line.split(";").slice(25).join(";")).toBe("2026-01-05T13:20;200;Perp;bitunix;Haupt;0,1;1;1,5;0,25;1600;Isoliert;64000;'=evil | Breakout;4;2;5;Ziel erreicht;300;4200;0,3;4,2;1,23;1;p1;g1;API");
     // fills + funding feed the bundle columns: (84000 − 80000) × 0.1 − fees 4 − funding 1.5
     expect(line.split(";")[CSV_HEADER.indexOf("P&L")]).toBe("394,5");
   });

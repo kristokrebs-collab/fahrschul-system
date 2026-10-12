@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import type { KeyboardEvent } from "react";
-import { BEHAVIOR_KEYS, BEHAVIOR_LABEL } from "@/domain/coach/events";
+import { BEHAVIOR_KEYS, BEHAVIOR_LABEL, type BehaviorKey } from "@/domain/coach/events";
 import { cn } from "@/lib/cn";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -12,8 +12,13 @@ export const SCALE_LABELS = {
   confidence: ["Zweifelnd", "Unsicher", "Okay", "Sicher", "Felsenfest"],
 } as const;
 
-/** Behaviour flags offered on a trade (P04 keys, German labels). */
-export const PSYCH_FLAGS: readonly { key: string; label: string }[] = BEHAVIOR_KEYS.map((k) => ({ key: k, label: BEHAVIOR_LABEL[k] }));
+/**
+ * Inner-state flags offered on a trade (P04 behaviour keys, German labels). The keys that describe an ACTION already
+ * have a mistake tag (`Revenge-Trade`, `FOMO-Einstieg`, `Stop verschoben`, `Zu früh raus`, `Gegen den Plan`), so the
+ * `Fehler` section keeps those; here only the states.
+ */
+const STATE_KEYS = new Set<BehaviorKey>(["tilt", "overtrading", "lossAversion", "overconfidence", "impulsive", "boredom"]);
+export const PSYCH_FLAGS: readonly { key: string; label: string }[] = BEHAVIOR_KEYS.filter((k) => STATE_KEYS.has(k)).map((k) => ({ key: k, label: BEHAVIOR_LABEL[k] }));
 
 export interface PsychSectionProps {
   j: JournalForm;
@@ -28,6 +33,8 @@ export function PsychSection({ j, onChange }: PsychSectionProps) {
   const toggleFlag = (k: string) => onChange({ flags: j.flags.includes(k) ? j.flags.filter((f) => f !== k) : [...j.flags, k] });
   const reduced = useReducedFx();
   const customFlags = j.flags.filter((f) => !PSYCH_FLAGS.some((p) => p.key === f));
+  // a chosen quick reason shows as its chip only; the text field holds own words (typing replaces the chip)
+  const preset = (EXIT_REASONS as readonly string[]).includes(j.exitReason);
   return (
     <div className="grid gap-4">
       <div className="grid gap-3.5 sm:grid-cols-2">
@@ -40,7 +47,7 @@ export function PsychSection({ j, onChange }: PsychSectionProps) {
       </div>
       <Field label="Verhalten">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Verhalten">
-          {[...PSYCH_FLAGS, ...customFlags.map((f) => ({ key: f, label: f }))].map((f) => {
+          {[...PSYCH_FLAGS, ...customFlags.map((f) => ({ key: f, label: BEHAVIOR_LABEL[f as BehaviorKey] ?? f }))].map((f) => {
             const on = j.flags.includes(f.key);
             return (
               <motion.button
@@ -82,7 +89,14 @@ export function PsychSection({ j, onChange }: PsychSectionProps) {
               );
             })}
           </div>
-          <Input id="f-exit-reason" value={j.exitReason} onChange={(e) => onChange({ exitReason: e.target.value })} placeholder="Oder in eigenen Worten" maxLength={120} autoComplete="off" />
+          <Input
+            id="f-exit-reason"
+            value={preset ? "" : j.exitReason}
+            onChange={(e) => onChange({ exitReason: e.target.value })}
+            placeholder={preset ? "Oder in eigenen Worten (ersetzt die Auswahl)" : "Oder in eigenen Worten"}
+            maxLength={120}
+            autoComplete="off"
+          />
         </div>
       </Field>
       <div className="grid gap-3.5 md:grid-cols-2">

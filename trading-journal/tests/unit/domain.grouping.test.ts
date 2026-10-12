@@ -51,9 +51,11 @@ describe("detectHedges", () => {
     expect(detectHedges([a, t("b", { side: "short", date: "2026-10-01T15:00" })], NOW)).toEqual([]);
     expect(detectHedges([a, t("b", { side: "short", date: "2026-10-01T14:00", exitDate: "2026-10-01T15:00" })], NOW)).toEqual([]);
   });
-  it("an open trade is held until now", () => {
+  it("an open trade is held until now – unless it is older than two weeks (a forgotten position)", () => {
     const a = t("a", { status: "open", date: "2026-10-09T10:00" });
     expect(detectHedges([a, t("b", { side: "short", date: "2026-10-10T09:00" })], NOW)).toEqual([["a", "b"]]);
+    const stale = t("s", { status: "open", date: "2026-09-01T10:00" });
+    expect(detectHedges([stale, t("b", { side: "short", date: "2026-10-10T09:00" })], NOW)).toEqual([]);
   });
 });
 

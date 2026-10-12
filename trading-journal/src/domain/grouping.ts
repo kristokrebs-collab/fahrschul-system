@@ -111,13 +111,19 @@ class Union {
 }
 
 /**
+ * An open trade older than this takes no part in the automatic detection: a position forgotten as "open" in the journal
+ * would otherwise pair with every later trade of the other side (explicit `hedgeOf` still links it).
+ */
+export const STALE_OPEN_MS = 14 * 86_400_000;
+
+/**
  * Automatic hedge pairs: opposite sides, same `pairKey`, same account (missing = scalp) and – when both name one – same
  * venue / venue account, overlapping time in the market. Sweep over the entry times, O(n log n + k).
  */
 export function detectHedges<T extends GroupableTrade>(trades: readonly T[], now: number = Date.now()): [string, string][] {
   const items = trades
     .map((t) => ({ t, from: entryMs(t), to: exitMs(t, now), key: hedgeScope(t) }))
-    .filter((x) => x.key !== "")
+    .filter((x) => x.key !== "" && !(x.t.status === "open" && now - x.from > STALE_OPEN_MS))
     .sort((a, b) => a.from - b.from);
   const out: [string, string][] = [];
   const active: typeof items = [];

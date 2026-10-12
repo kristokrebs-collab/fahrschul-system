@@ -2,14 +2,13 @@ import { motion } from "motion/react";
 import { useMemo, useState, type ReactNode } from "react";
 import { BEHAVIOR_LABEL, type BehaviorKey } from "@/domain/coach/events";
 import { holdLabel, holdMs } from "@/domain/excursion";
-import { fillStats, FILL_KIND_LABELS } from "@/domain/fills";
-import type { EnrichedTrade, Setup, Trade } from "@/domain/types";
+import { fillStats } from "@/domain/fills";
+import type { EnrichedTrade, Setup } from "@/domain/types";
 import { stripEnrichment } from "@/domain/csv";
 import { cn } from "@/lib/cn";
 import { date as fmtDate, n2, price as fmtPrice, signed, time as fmtTime } from "@/lib/format";
 import { useProvider } from "@/market";
 import { measureAndStore, measurablePair, MEASURE_HINTS, type MeasureStatus } from "@/market/excursion";
-import { MilestoneRail, type Milestone } from "@/motion/pulse/MilestoneRail";
 import { StaggerItem } from "@/motion/Stagger";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -21,6 +20,7 @@ import { ShotReel } from "../screenshots/ShotReel";
 import { downloadShareCard } from "../sharePng";
 import { ExcursionBar } from "./ExcursionBar";
 import { FillsBar } from "./FillsBar";
+import { FillsTimeline } from "./FillsTimeline";
 import { RatingDots } from "./RatingDots";
 
 export interface JournalDetailProps {
@@ -51,22 +51,6 @@ export function executionFacts(t: EnrichedTrade, currency: string): [string, str
   return out;
 }
 
-/** Fill milestones for the rail (time order). */
-export function fillMilestones(t: Pick<Trade, "fills" | "side">): Milestone[] {
-  const s = fillStats(t.fills, t.side);
-  const partTone = new Map(s.parts.map((p) => [p.id, p.pnl > 0 ? "win" : p.pnl < 0 ? "loss" : "mute"] as const));
-  return s.ordered.map((f) => {
-    const d = f.at ? new Date(f.at) : null;
-    return {
-      id: f.id,
-      title: FILL_KIND_LABELS[f.kind],
-      date: d && !Number.isNaN(+d) ? `${fmtDate(d)} ${fmtTime(d)}` : undefined,
-      text: `${fmtPrice(f.price)} × ${f.qty.toLocaleString("de-DE", { maximumFractionDigits: 6 })}`,
-      tone: f.side === "open" ? "fg" : (partTone.get(f.id) ?? "mute"),
-    };
-  });
-}
-
 /**
  * Journal-v3 block of the trade detail: execution facts, the fills (position bar cut by every exit + a horizontal
  * milestone rail), MAE / MFE (measure on demand with an honest hint when it cannot be measured here), tags and rating,
@@ -82,7 +66,6 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
   const [sharing, setSharing] = useState(false);
   const facts = useMemo(() => executionFacts(t, currency), [t, currency]);
   const stats = useMemo(() => (t.fills?.length ? fillStats(t.fills, t.side) : null), [t.fills, t.side]);
-  const milestones = useMemo(() => (t.fills?.length ? fillMilestones(t) : []), [t]);
   const psych = t.psych;
   const hasPsych = !!psych && (psych.stress != null || psych.confidence != null || (psych.flags?.length ?? 0) > 0 || !!psych.exitReason || !!psych.preNote || !!psych.postNote);
   const canMeasure = t.status === "closed" && t.mae == null && measurablePair(t.pair, provider);
@@ -116,11 +99,11 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
       {facts.length > 0 && (
         <StaggerItem>
           <Head label="Ausführung" />
-          <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11.5px] min-[420px]:grid-cols-3">
+          <dl className="grid grid-cols-1 gap-x-3 gap-y-1 text-[11.5px] min-[420px]:grid-cols-2">
             {facts.map(([label, value]) => (
               <div key={label} className="flex min-w-0 items-baseline justify-between gap-2 border-b border-line/60 pb-1">
                 <dt className="shrink-0 text-faint">{label}</dt>
-                <dd className="num truncate whitespace-nowrap font-mono text-fg/85">{value}</dd>
+                <dd className="num min-w-0 break-words text-right font-mono text-fg/85">{value}</dd>
               </div>
             ))}
           </dl>
@@ -131,7 +114,7 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
         <StaggerItem className="grid gap-2">
           <Head label="Fills" right={`${stats.ordered.length} · Ø ${fmtPrice(stats.avgEntry)}${stats.avgExit != null ? ` → ${fmtPrice(stats.avgExit)}` : ""}`} />
           <FillsBar stats={stats} />
-          {milestones.length > 1 && <MilestoneRail items={milestones} orientation="horizontal" label="Fills der Position" className="-mx-1" />}
+          <FillsTimeline stats={stats} />
           {stats.dca && (
             <p className="text-[11.5px] text-mute">
               DCA mit {stats.dca.entries} Einstiegen: Ø {stats.dca.improvement >= 0 ? "besser" : "schlechter"} als der erste um <span className="font-mono text-fg">{Math.abs(stats.dca.improvement * 100).toFixed(2).replace(".", ",")} %</span>.

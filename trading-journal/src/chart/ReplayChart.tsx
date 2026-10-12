@@ -153,7 +153,8 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, height 
   useLayoutEffect(() => {
     const node = host.current;
     if (!node) return;
-    const chart = createChart(node, { ...NOTHING_MINI, timeScale: { ...NOTHING_MINI.timeScale, rightOffset: 0, fixLeftEdge: false } });
+    // the window stays put while bars are appended (lwc would otherwise scroll one bar per `update`)
+    const chart = createChart(node, { ...NOTHING_MINI, timeScale: { ...NOTHING_MINI.timeScale, rightOffset: 0, fixLeftEdge: false, fixRightEdge: false, shiftVisibleRangeOnNewBar: false } });
     const main = createMainSeries(chart, { volume: false });
     main.candles.applyOptions({ priceLineVisible: false, lastValueVisible: false });
     const band = new ReplayBand();
@@ -211,10 +212,8 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, height 
       const n = Math.max(0, Math.min(data.length, Math.floor(raw)));
       if (n === i.shown) return;
       if (n > i.shown && n - i.shown <= 8) for (let k = i.shown; k < n; k++) i.main.candles.update(data[k]!);
-      else {
-        i.main.candles.setData(data.slice(0, n));
-        fit();
-      }
+      else i.main.candles.setData(data.slice(0, n));
+      fit();
       const forward = n > i.shown;
       i.shown = n;
       const st = steps[Math.max(0, n - 1)];

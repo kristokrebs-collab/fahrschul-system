@@ -1,21 +1,43 @@
 import { motion } from "motion/react";
 import { captureRatio } from "@/domain/excursion";
+import { fillPosition } from "@/domain/fills";
 import type { EnrichedTrade } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
-export type ExcursionTrade = Pick<EnrichedTrade, "side" | "entry" | "exit" | "stop" | "r" | "mae" | "mfe" | "maeR" | "mfeR" | "result">;
+export type ExcursionTrade = Pick<EnrichedTrade, "side" | "entry" | "exit" | "stop" | "r" | "mae" | "mfe" | "maeR" | "mfeR" | "result" | "status" | "fills">;
+
+/**
+ * The prices MAE / MFE are measured against: the Ø entry / Ø exit of the fills when the trade has them (that is what
+ * `src/market/excursion.ts` measures from), else the trade's own entry / exit.
+ */
+export function excursionPrices(t: ExcursionTrade): { entry: number | null; exit: number | null } {
+  const pos = t.fills?.length ? fillPosition(t) : null;
+  const exit = t.result === "open" ? null : (pos?.exit ?? t.exit ?? null);
+  return { entry: pos?.entry ?? t.entry ?? null, exit };
+}
 
 /** Values on one axis (R when the stop is known, else % of the entry). */
 export function excursionAxis(t: ExcursionTrade): { unit: "R" | "%"; mae: number; mfe: number; exit: number | null; stop: number | null } | null {
   if (t.mae == null || t.mfe == null) return null;
   if (t.maeR != null && t.mfeR != null) return { unit: "R", mae: t.maeR, mfe: t.mfeR, exit: t.r ?? null, stop: 1 };
-  if (!(t.entry != null && t.entry > 0)) return null;
-  const pct = (v: number) => (v / (t.entry as number)) * 100;
-  const moved = t.exit != null && t.result !== "open" ? (t.side === "short" ? t.entry - t.exit : t.exit - t.entry) : null;
+  const { entry, exit } = excursionPrices(t);
+  if (!(entry != null && entry > 0)) return null;
+  const pct = (v: number) => (v / entry) * 100;
+  const moved = exit != null ? (t.side === "short" ? entry - exit : exit - entry) : null;
   return { unit: "%", mae: pct(t.mae), mfe: pct(t.mfe), exit: moved == null ? null : pct(moved), stop: null };
+}
+
+/**
+ * Share of the best move the exit kept, capped at 100 % (whole bars can understate the MFE by a wick at the edges, so
+ * a ratio above 1 is a measuring artefact, not a better-than-best exit); `null` without an MFE / exit.
+ */
+export function keptShare(t: ExcursionTrade): number | null {
+  const { entry, exit } = excursionPrices(t);
+  const cap = captureRatio(t.side, entry ?? 0, exit, t.mfe);
+  return cap == null ? null : Math.min(1, cap);
 }
 
 /**
@@ -30,7 +52,7 @@ export function ExcursionBar({ trade, className }: { trade: ExcursionTrade; clas
   const span = Math.max(ax.mae, ax.mfe, Math.abs(ax.exit ?? 0), ax.stop ?? 0, 0.0001) * 1.12;
   const half = (v: number) => Math.min(50, (v / span) * 50);
   const exitAt = ax.exit == null ? null : 50 + Math.max(-50, Math.min(50, (ax.exit / span) * 50));
-  const cap = captureRatio(trade.side, trade.entry ?? 0, trade.result === "open" ? null : trade.exit, trade.mfe);
+  const cap = keptShare(trade);
   const grow = (i: number) => (reduced ? { duration: 0 } : { ...spring.bar, delay: i * stagger.lead });
   const suffix = ax.unit === "R" ? " R" : " %";
   return (

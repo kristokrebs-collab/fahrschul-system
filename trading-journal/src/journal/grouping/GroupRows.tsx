@@ -233,7 +233,7 @@ function MemberButton({ t, onOpen }: { t: EnrichedTrade; onOpen: () => void }) {
         e.stopPropagation();
         onOpen();
       }}
-      data-trade-id={t.id}
+      data-group-member={t.id}
       className="grid h-11 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-2 text-left text-[12px] transition-colors hover:bg-white/[0.04] focus-visible:bg-white/[0.06] focus-visible:outline-none"
       style={{ borderRadius: radius.hover }}
     >
