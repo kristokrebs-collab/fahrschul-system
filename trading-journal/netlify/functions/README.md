@@ -88,3 +88,29 @@ shows the button – nothing breaks.
 
 Tests: `tests/unit/coach.ask.test.ts` (fake admin + fake Anthropic client: availability, auth, plan gate, rate limits,
 request shape, number guard, refusal, error mapping).
+
+## Functions (P12 community)
+
+Shared logic in `_lib/social/` (`store.ts` pseudonyms, opt-in, figures, membership checks · `groups.ts` groups, invites,
+members, reviews, comments, goals, team seats · `leaderboard.ts` · `shares.ts` · `feedback.ts` · `aggregate.ts`). Wire
+contract and pure helpers come from `src/social/{contract,metrics,pseudonym,format}.ts` (alias-free, relative imports).
+Privacy rules: people appear only as pseudonyms (`social_profiles`); the ranking reads opted-in users only
+(`profiles.privacy.leaderboard`) and drops a withdrawn opt-in at once (snapshot rows deleted, read-time filter);
+group averages and community distributions need ≥ 10 people (k-anonymity); every payload a user shares is re-validated
+against the strict redacted schemas (unknown keys → 422 – no PnL, size, fees, notes, account); strangers get 404 for a
+group (never "forbidden"). Plan gates via `requireFeature` / `requireLimit` (`community`, `mentor`, `groups`; open while
+payments are not set up). All writes are audited where they matter (`social.*`).
+
+| file | route | notes |
+|---|---|---|
+| `social-share.mts` | GET/POST `/api/v1/social/share` `{ payload, expiresInDays: 1 \| 7 \| 30 \| 0 }` · DELETE `/api/v1/social/share/<id>` | the owner's links (≤ 200), 22-char base64url token, revoke = immediately unreadable; signed in (aal2 if 2FA); 20 new / h |
+| `social-shared.mts` | GET `/api/v1/social/shared/:token` | PUBLIC (no login): redacted payload of a valid link via `shared_payload()` (counts a view), re-validated before it is served, `x-robots-tag: noindex`; 60 / 10 min per IP hash. The app route is `/#share/<token>` – never `/teilen/` |
+| `social-groups.mts` | `/api/v1/social/groups[/<id>[/invites\|members\|reviews\|goals…]]`, `/api/v1/social/invite/<code>` | groups (`group` / `mentor` / `team`; team needs Team seats and assigns / releases them via P10 `assignSeat` / `releaseSeat`), invites (10 chars without look-alikes, expiry, max uses), roles + `share_level`, joint reviews with comments and `@mentions`, mentor goals (adopted on the student's device via P08 `addGoalFromDraft`); leaving / removal deletes the member's reviews, comments and goals; per-route limits (5 groups / day, 30 comments / 10 min, invite checks fail-closed) |
+| `social-leaderboard.mts` | GET `/api/v1/social/leaderboard[?metric=&group=]` · POST `{ action: "optIn" \| "refresh" \| "reroll" }` | the caller's status (pseudonym, opt-in, own figures), global top 25 + own row from the latest snapshot, group ranking (live, members sharing stats), community distributions (k ≥ 10); refresh 6 / h, new pseudonym 3 / day |
+| `social-aggregate.mts` | `@daily` (published deploys) | `social_candidates()` = opt-ins + members sharing stats only; figures over 90 days (Expectancy R, discipline, consistency, min. 20 R trades), today's snapshots, `community_stats` (quantiles only with n ≥ 10), purge after 35 days, time budget |
+| `feedback.mts` | POST `/api/v1/feedback` `{ kind: "bug" \| "idea" \| "praise" \| "report" \| "other", message, page?, target? }` | feedback (anonymous allowed: 5 / 10 min per IP hash fail-closed) and reports (login, one per target, only for targets the reporter can see; 3 reports by different people hide a comment for everyone but its author and the group's owner / mentors) |
+
+Tests: `tests/unit/functions.social.test.ts` (in-memory PostgREST fake: shares + public read + revoke / expiry, strict
+redaction, groups / invites / roles / mentor visibility, comments + mentions, goals, team seats, opt-in + immediate
+withdrawal, k-anonymity, aggregate, feedback + reports, public-read rate limit). `account.ts` `EXPORT_TABLES` lists the P12 tables
+(DSGVO export); account deletion cascades through `auth.users`.
