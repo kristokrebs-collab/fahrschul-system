@@ -239,6 +239,30 @@
   }
 }
 
+/* RadarSweep band pass (P01 `@/motion/fx`): the band (as wide as its scanner) moves from just left of the scanner to
+   its right edge, its bright leading edge crossing the whole area once per period. */
+@keyframes fx-scan {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0%);
+  }
+}
+
+/* RadarSweep blip: lights up when the wedge passes (the delay puts it at its angle), then fades for the rest of the turn */
+@keyframes fx-blip {
+  0% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  45%,
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
 /* Ring mask: only the padding band of the element stays visible (ring width = padding). Children moved by
    transform underneath it (spotlight blob, rotating conic arc/beam) light up the border without repainting it. */
 @utility fx-ring {
@@ -381,5 +405,27 @@
   }
   .fx-pop[data-side="right"] {
     --fx-pop-x: -4px;
+  }
+
+  /* RadarSweep (P01 `@/motion/fx`, declared exception `radar-sweep`): the radar wedge turns (`fx-spin`) / the scan band
+     passes (`fx-scan`) ONLY while the scanner carries [data-scanning] and is on screen ([data-offscreen] pauses it);
+     2.4 s linear = tween.scan. At rest the wedge stands still and the band is parked off the left edge. */
+  .fx-radar__sweep {
+    transform-origin: 50% 50%;
+  }
+  [data-scanning]:not([data-offscreen]) .fx-radar__sweep {
+    animation: fx-spin 2.4s linear infinite;
+  }
+  .fx-scan__band {
+    transform: translateX(-100%);
+  }
+  [data-scanning]:not([data-offscreen]) .fx-scan__band {
+    animation: fx-scan 2.4s linear infinite;
+  }
+  .fx-radar__blip {
+    opacity: 0;
+  }
+  [data-scanning]:not([data-offscreen]) .fx-radar__blip {
+    animation: fx-blip 2.4s linear infinite;
   }
 }

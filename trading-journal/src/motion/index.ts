@@ -60,3 +60,6 @@ export {
 export { HoldButton, type HoldButtonProps, type HoldPhase } from "@/motion/HoldButton";
 export { HoldConfirm, useConfirmFocus, HOLD_CONFIRM_TITLE, type HoldConfirmProps } from "@/motion/HoldConfirm";
 export { Switch, type SwitchProps, type SwitchSize, type SwitchTone } from "@/motion/Switch";
+// P01: the dot-matrix text convenience lives in the fx kit; the whole kit has its own barrel `@/motion/fx` (like
+// `@/motion/pulse` and `@/motion/physics` it is not re-exported here – its names would crowd the main barrel)
+export { DotMatrixText, matrixText, type DotMatrixTextProps, type DotMatrixTextPreset } from "@/motion/fx/DotMatrixText";

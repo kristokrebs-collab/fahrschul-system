@@ -7,10 +7,13 @@ import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { NotchedFrame } from "@/motion/pulse/NotchedFrame";
 import { StripWipe } from "@/motion/pulse/StripWipe";
 import { WidgetGrid } from "@/motion/pulse/WidgetGrid";
+import { GlyphDemo, LaunchDemo, MagnifyDemo, MilestoneDemo, OrbitDemo, PinnedDemo, ReelDemo, ScrubDemo, SpreadDemo, WipeFsDemo } from "./pulse-ports";
 
 /*
  * Dev gallery of the A2 pulse UI primitives (120 Hz checks + visual review). `?c=select|autocomplete|notch|grid|wipe|marquee`
- * shows one section only (isolated check120 runs), `&bare` removes the app backdrop.
+ * shows one section only (isolated check120 runs), `&bare` removes the app backdrop. P01 ports (demos in
+ * `dev/pulse-ports.tsx`): `?c=scrub|milestone|magnify|fswipe|glyph|reel|spread|orbit|launch`, and `?c=pinned` for the
+ * pinned (scroll-driven) milestone rail, which is left out of the full page.
  */
 const params = new URLSearchParams(location.search);
 const only = params.get("c");
@@ -238,7 +241,7 @@ function MarqueeDemo() {
 
 function Gallery() {
   return (
-    <main className="mx-auto grid max-w-[1100px] gap-6 px-4 py-8 text-fg">
+    <main data-gallery="pulse-ui" className="mx-auto grid max-w-[1100px] gap-6 px-4 py-8 text-fg">
       <h1 className="font-dot text-[28px]">pulse · UI</h1>
       <Section id="select" title="MorphSelect">
         <SelectDemo />
@@ -258,6 +261,35 @@ function Gallery() {
       <Section id="marquee" title="Marquee">
         <MarqueeDemo />
       </Section>
+      {/* P01 ports */}
+      <Section id="scrub" title="ScrubTimeline">
+        <ScrubDemo />
+      </Section>
+      <Section id="milestone" title="MilestoneRail">
+        <MilestoneDemo />
+      </Section>
+      <Section id="magnify" title="MagnifyRow">
+        <MagnifyDemo />
+      </Section>
+      <Section id="fswipe" title="FullscreenWipe">
+        <WipeFsDemo />
+      </Section>
+      <Section id="glyph" title="GlyphZoom">
+        <GlyphDemo />
+      </Section>
+      <Section id="reel" title="ReelWindow">
+        <ReelDemo />
+      </Section>
+      <Section id="spread" title="CardSpread">
+        <SpreadDemo />
+      </Section>
+      <Section id="orbit" title="OrbitSpread">
+        <OrbitDemo />
+      </Section>
+      <Section id="launch" title="LaunchGrid">
+        <LaunchDemo />
+      </Section>
+      {only === "pinned" && <PinnedDemo />}
       <div className="h-[40vh]" />
     </main>
   );
