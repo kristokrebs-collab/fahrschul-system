@@ -73,7 +73,8 @@ import { ChartSkeleton } from "./ChartSkeleton";
 import { LiveCandle, extendsTail, type Bar } from "./liveCandle";
 import { FollowPill, LivePulse, isAwayFromRealtime, spawnMarkerRipple, type PulseHandle, type PulsePoint } from "./overlays";
 
-export type RangeDays = 7 | 30 | 90;
+/** Visible window in days (overview pills 1W / 1M / 3M; the Markt chart also uses 6M / 1J / 2J for 1D and 1W bars). */
+export type RangeDays = 7 | 30 | 90 | 180 | 365 | 730;
 
 /** Viewport-relative box of a clicked marker (morph source for the trade detail ghost). */
 export interface MarkerRect {
@@ -671,6 +672,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       intervalSec: () => INTERVAL_SECONDS[instance.lastInterval ?? "1h"],
       reducedMotion: () => reduceRef.current,
       axisPrices: () => [...axisLabelPrices(instance, latest.current.levels), ...check.axisLabelPrices()],
+      // target labels / captions keep clear of the check overlay's labels and the zone caption
+      reserved: () => [...zoneCaptionBox(instance, latest.current.levels), ...check.geometry().labels.map((l) => l.box)],
     });
     main.candles.attachPrimitive(boxes);
     main.candles.attachPrimitive(check);

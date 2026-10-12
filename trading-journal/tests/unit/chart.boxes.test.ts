@@ -66,6 +66,27 @@ describe("BoxPrimitive geometry", () => {
     expect(t[1]!.color).toBe("#ff4d4f");
   });
 
+  it("labels never overlap the check overlay's labels: nudged off a reserved spot, else left out (the line stays)", () => {
+    const reserved: Array<{ x: number; y: number; w: number; h: number }> = [];
+    const p = new BoxPrimitive({ ...host(), reserved: () => reserved });
+    attach(p);
+    const targets = [{ price: 112, label: "T1", kind: "tp" as const }];
+    p.setBoxes([B({ active: true, label: "Box stark", targets })]);
+    p.updateAllViews();
+    const free = p.geometry()[0]!;
+    expect(free.targets[0]!.label).not.toBeNull();
+    expect(free.caption?.text).toBe("BOX STARK");
+    // a check-overlay label right where T1's label wants to sit, and over the caption
+    reserved.push({ ...free.targets[0]!.label!.box }, { x: 0, y: 0, w: 1000, h: free.caption!.box.y + free.caption!.box.h + 40 });
+    p.applyOptions({}); // drop the geometry memo
+    p.updateAllViews();
+    const g = p.geometry()[0]!;
+    const lab = g.targets[0]!.label;
+    if (lab) for (const r of reserved) expect(lab.box.y >= r.y + r.h || lab.box.y + lab.box.h <= r.y || lab.box.x >= r.x + r.w || lab.box.x + lab.box.w <= r.x).toBe(true);
+    expect(g.targets[0]!.text).toBe("T1 112");
+    expect(g.caption).toBeNull();
+  });
+
   it("culls boxes outside the visible range", () => {
     const p = new BoxPrimitive(host());
     attach(p, { from: 50, to: 100 });

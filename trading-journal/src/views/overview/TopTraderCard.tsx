@@ -160,11 +160,11 @@ export const FLOW_TEXT = {
   title: "Order-Flow",
   name: "Order-Flow: Taker, Open Interest, Funding",
   taker: "Taker",
-  takerSub: (buy: number) => `Käufer ${n1(buy)} % · Verkäufer ${n1(100 - buy)} %`,
+  takerSub: "Käuferanteil",
   oi: "OI Δ24h",
-  oiSub: "Open Interest, 24 h",
+  oiSub: "Open Interest",
   funding: "Funding",
-  next: "nächstes in",
+  next: "in",
   boxBias: "Box-Bias",
   none: "–",
 } as const;
@@ -228,50 +228,52 @@ const FlowRow = memo(function FlowRow({ taker }: { taker: TakerView | null }) {
   const tone = (v: number | null) => (v == null || v === 0 ? "" : v > 0 ? "text-win" : "text-loss");
   return (
     <div className="rounded-2xl border border-line bg-ink-950/25" data-testid="top-trader-flow" data-open={open ? "true" : "false"}>
-      <div className="flex flex-wrap items-center gap-2 px-3.5 py-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3.5 py-2">
         <button
           type="button"
           aria-expanded={open}
           aria-controls="top-trader-flow-body"
           aria-label={FLOW_TEXT.name}
           onClick={() => setFlag(FLOW_OPEN_FLAG, !open)}
-          className="touch-hit flex min-w-0 flex-1 items-center gap-2 text-left"
+          className="touch-hit flex min-w-[min(100%,15rem)] flex-1 items-center gap-2 text-left"
         >
-          <span className="label !text-fg">{FLOW_TEXT.title}</span>
-          <span className="num truncate font-mono text-[11.5px] text-mute">
-            {buy == null ? FLOW_TEXT.none : `${n1(buy)} % Käufer`} · <span className={tone(oi)}>{oi == null ? FLOW_TEXT.none : `OI ${signed(oi, 1)} %`}</span>
+          <span className="label whitespace-nowrap !text-fg">{FLOW_TEXT.title}</span>
+          <span className="num min-w-0 truncate font-mono text-[11.5px] text-mute">
+            {buy == null ? FLOW_TEXT.none : `Käufer ${n1(buy)} %`} · <span className={tone(oi)}>{oi == null ? FLOW_TEXT.none : `OI ${signed(oi, 1)} %`}</span>
           </span>
-          <motion.span aria-hidden="true" className="ml-auto text-faint" animate={{ rotate: open ? 180 : 0 }} transition={reduced ? { duration: 0 } : spring.plus}>
+          <motion.span aria-hidden="true" className="ml-auto shrink-0 text-faint" animate={{ rotate: open ? 180 : 0 }} transition={reduced ? { duration: 0 } : spring.plus}>
             ▾
           </motion.span>
         </button>
         <BoxBiasChip />
       </div>
       <Collapse open={open} id="top-trader-flow-body">
-        <div className="grid grid-cols-3 gap-2 px-3.5 pb-3.5">
-          <div className="min-w-0 rounded-xl border border-line bg-ink-950/30 px-3 py-2">
+        {/* phone: one row per value (label left, value right); from sm three tiles */}
+        <div className="grid grid-cols-1 gap-2 px-3.5 pb-3.5 sm:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-xl border border-line bg-ink-950/30 px-3 py-2 sm:block">
             <div className="label !text-[9.5px]">{FLOW_TEXT.taker}</div>
-            <div className="num mt-0.5 font-mono text-[14px]">{buy == null ? FLOW_TEXT.none : <MotionNumber value={buy} decimals={1} suffix=" %" flash />}</div>
-            <div className="relative mt-1.5 h-1 overflow-hidden rounded-full bg-loss/40" aria-hidden="true">
-              <motion.span
-                className="absolute inset-0 origin-left rounded-full bg-win"
-                initial={false}
-                animate={{ scaleX: (buy ?? 50) / 100 }}
-                transition={reduced ? { duration: 0 } : tween.bar}
-              />
+            <div className="grid justify-items-end gap-1 sm:block">
+              <div className="num font-mono text-[14px] sm:mt-0.5">{buy == null ? FLOW_TEXT.none : <MotionNumber value={buy} decimals={1} suffix=" %" flash />}</div>
+              <div className="relative h-1 w-24 overflow-hidden rounded-full bg-loss/40 sm:mt-1.5 sm:w-auto" aria-hidden="true">
+                <motion.span className="absolute inset-0 origin-left rounded-full bg-win" initial={false} animate={{ scaleX: (buy ?? 50) / 100 }} transition={reduced ? { duration: 0 } : tween.bar} />
+              </div>
+              <div className="truncate text-[10px] text-faint sm:mt-1">{FLOW_TEXT.takerSub}</div>
             </div>
-            <div className="mt-1 truncate text-[10px] text-faint">{buy == null ? FLOW_TEXT.none : FLOW_TEXT.takerSub(buy)}</div>
           </div>
-          <div className="min-w-0 rounded-xl border border-line bg-ink-950/30 px-3 py-2">
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-xl border border-line bg-ink-950/30 px-3 py-2 sm:block">
             <div className="label !text-[9.5px]">{FLOW_TEXT.oi}</div>
-            <div className={cn("num mt-0.5 font-mono text-[14px] transition-colors duration-300", tone(oi))}>{oi == null ? FLOW_TEXT.none : <MotionNumber value={oi} decimals={1} signed suffix=" %" flash />}</div>
-            <div className="mt-1 truncate text-[10px] text-faint">{FLOW_TEXT.oiSub}</div>
+            <div className="grid justify-items-end sm:block">
+              <div className={cn("num font-mono text-[14px] transition-colors duration-300 sm:mt-0.5", tone(oi))}>{oi == null ? FLOW_TEXT.none : <MotionNumber value={oi} decimals={1} signed suffix=" %" flash />}</div>
+              <div className="truncate text-[10px] text-faint sm:mt-1">{FLOW_TEXT.oiSub}</div>
+            </div>
           </div>
-          <div className="min-w-0 rounded-xl border border-line bg-ink-950/30 px-3 py-2">
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-xl border border-line bg-ink-950/30 px-3 py-2 sm:block">
             <div className="label !text-[9.5px]">{FLOW_TEXT.funding}</div>
-            <motion.div className="num mt-0.5 font-mono text-[14px]">{fundingText}</motion.div>
-            <div className="mt-1 truncate text-[10px] text-faint">
-              {FLOW_TEXT.next} <motion.span className="num">{countdown}</motion.span>
+            <div className="grid justify-items-end sm:block">
+              <motion.div className="num whitespace-nowrap font-mono text-[14px] sm:mt-0.5 sm:text-[13px] lg:text-[14px]">{fundingText}</motion.div>
+              <div className="truncate text-[10px] text-faint sm:mt-1">
+                {FLOW_TEXT.next} <motion.span className="num">{countdown}</motion.span>
+              </div>
             </div>
           </div>
         </div>

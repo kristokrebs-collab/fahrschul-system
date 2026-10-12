@@ -37,7 +37,7 @@ import { stagger, tween } from "@/motion/tokens";
 import { AXIS_LABEL_GAP } from "../axisLabels";
 import { fmt } from "../format";
 import { ink } from "../ink";
-import { axisLabelClear, barIndexAtOrAfter, estimateTextWidth } from "../overlayLayout";
+import { axisLabelClear, barIndexAtOrAfter, estimateTextWidth, LINE_NUDGE, placeLabels, type Box as OverlayBox, type LabelCandidate } from "../overlayLayout";
 import { RIGHT_RESERVED } from "./SignalOverlay";
 
 type RenderTarget = Parameters<IPrimitivePaneRenderer["draw"]>[0];
@@ -79,6 +79,8 @@ export interface BoxHost {
   reducedMotion(): boolean;
   /** prices of the OTHER price-axis labels (levels, last price, S/R): the edge labels keep clear of them */
   axisPrices?(): readonly number[];
+  /** boxes (CSS px) the labels keep clear of: the check overlay's labels, the zone caption */
+  reserved?(): readonly OverlayBox[];
 }
 
 export interface BoxOptions {
@@ -97,6 +99,10 @@ export const BOX_DEFAULTS: BoxOptions = { fillAlpha: 0.08, edgeAlpha: 0.55, inMs
 const FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 const LABEL_PX = 9;
 const CAPTION_PX = 10;
+const LABEL_PAD = 3;
+const LABEL_H = 12;
+const CAPTION_H = 14;
+const LABEL_BG = "rgba(10,10,10,0.92)";
 /** faint alpha multiplier of older (inactive) boxes */
 const OLD = 0.5;
 /** reveal of the confirmation wipe (ms) */
@@ -143,8 +149,36 @@ export interface BoxGeo {
   edge: number;
   /** solid-edge wipe 0..1 (confirmation) */
   wipe: number;
-  label: string;
-  targets: Array<{ y: number; x1: number; x2: number; color: string; dash: readonly number[]; text: string; grow: number }>;
+  /** caption box (CSS px, placed collision-free), `null` = no room */
+  caption: PlacedLabel | null;
+  targets: Array<{ y: number; x1: number; x2: number; color: string; dash: readonly number[]; text: string; grow: number; label: PlacedLabel | null }>;
+}
+
+/** A label placed by `placeLabels` (never over another label, the zone caption or the check overlay's labels). */
+export interface PlacedLabel {
+  box: OverlayBox;
+  text: string;
+  color: string;
+}
+
+/** A label on a nearly opaque plate (price action behind it never shows through the text). */
+function drawLabel(ctx: CanvasRenderingContext2D, l: PlacedLabel, px: number, alpha: number, hr: number, vr: number): void {
+  const x = Math.round(l.box.x * hr);
+  const y = Math.round(l.box.y * vr);
+  const w = Math.round(l.box.w * hr);
+  const h = Math.round(l.box.h * vr);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = Math.min(1, alpha + 0.1);
+  ctx.fillStyle = LABEL_BG;
+  ctx.beginPath();
+  if (typeof ctx.roundRect === "function") ctx.roundRect(x, y, w, h, 3 * hr);
+  else ctx.rect(x, y, w, h);
+  ctx.fill();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = l.color;
+  ctx.font = `${px * vr}px ${FONT}`;
+  ctx.textBaseline = "middle";
+  ctx.fillText(l.text, x + LABEL_PAD * hr, y + h / 2 + 0.5 * vr);
 }
 
 class BoxRenderer implements IPrimitivePaneRenderer {
@@ -214,29 +248,9 @@ class BoxRenderer implements IPrimitivePaneRenderer {
           ctx.moveTo(tx1, ty);
           ctx.lineTo(tx2, ty);
           ctx.stroke();
-          if (t.grow >= 1 && t.text) {
-            ctx.setLineDash([]);
-            ctx.font = `${LABEL_PX * vr}px ${FONT}`;
-            const w = (estimateTextWidth(t.text, LABEL_PX) + 6) * hr;
-            const lx = tx2 - w - 4 * hr;
-            const lh = 12 * vr;
-            ctx.globalAlpha = 0.92;
-            ctx.fillStyle = "rgba(10,10,10,0.92)";
-            ctx.fillRect(lx, ty - lh / 2, w, lh);
-            ctx.globalAlpha = b.edge;
-            ctx.fillStyle = t.color;
-            ctx.textBaseline = "middle";
-            ctx.fillText(t.text, lx + 3 * hr, ty + 0.5 * vr);
-          }
+          if (t.grow >= 1 && t.label) drawLabel(ctx, t.label, LABEL_PX, b.edge, hr, vr);
         }
-        if (b.label && b.edge > 0 && Math.abs(b.y2 - b.y1) >= 18 && b.x2 - b.x1 > 60) {
-          ctx.setLineDash([]);
-          ctx.globalAlpha = 0.8 * b.edge * k;
-          ctx.fillStyle = b.provisional ? toneOf(b.tone).soft : b.tone === "neutral" ? ink.mute : toneOf(b.tone).solid;
-          ctx.font = `${CAPTION_PX * vr}px ${FONT}`;
-          ctx.textBaseline = "top";
-          ctx.fillText(b.label.toUpperCase(), Math.round(b.x1 * hr) + 6 * hr, Math.round(Math.min(b.y1, b.y2) * vr) + 4 * vr);
-        }
+        if (b.caption && b.edge > 0) drawLabel(ctx, b.caption, CAPTION_PX, 0.85 * b.edge * k, hr, vr);
       }
       ctx.restore();
     });
@@ -439,6 +453,7 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
     const now = typeof performance !== "undefined" ? performance.now() : 0;
     const right = width - RIGHT_RESERVED;
     const out: BoxGeo[] = [];
+    const cands: LabelCandidate<{ set: (l: PlacedLabel) => void; text: string; color: string }>[] = [];
     for (const b of this.boxes) {
       const i0 = logicalAt(bars, Math.floor(b.from / 1000), iv) ?? 0;
       const i1 = b.to == null ? null : logicalAt(bars, Math.floor(b.to / 1000), iv);
@@ -478,10 +493,27 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
           dash: TARGET_DASH[t.kind],
           text: t.label ? `${t.label} ${fmt.price(t.price)}` : fmt.price(t.price),
           grow: Number.isFinite(t0) ? easeOutCubic(tAge / (this.options.inMs * 0.6)) : 1,
+          label: null,
         });
       });
-      out.push({ id: b.id, x1, x2, y1, y2, tone, provisional: b.state === "provisional", active: !!b.active, grow: Number.isFinite(t0) ? grow : 1, edge: Number.isFinite(t0) ? edge : 1, wipe: c0 == null || !Number.isFinite(c0) ? 1 : wipe, label: b.label ?? "", targets });
+      const g: BoxGeo = { id: b.id, x1, x2, y1, y2, tone, provisional: b.state === "provisional", active: !!b.active, grow: Number.isFinite(t0) ? grow : 1, edge: Number.isFinite(t0) ? edge : 1, wipe: c0 == null || !Number.isFinite(c0) ? 1 : wipe, caption: null, targets };
+      out.push(g);
+      // candidates: the target labels at the right (left of the price-line strip), the caption top left inside the box
+      targets.forEach((t, k) => {
+        const w = estimateTextWidth(t.text, LABEL_PX) + 2 * LABEL_PAD;
+        cands.push({ box: { x: right - w - 4, y: t.y - LABEL_H / 2, w, h: LABEL_H }, prio: k, nudge: LINE_NUDGE.slice(0, 2), data: { set: (l) => (t.label = l), text: t.text, color: t.color } });
+      });
+      const text = (b.label ?? "").toUpperCase();
+      if (text && Math.abs(y2 - y1) >= CAPTION_H + 4 && x2 - x1 > 60) {
+        const w = estimateTextWidth(text, CAPTION_PX) + 2 * LABEL_PAD;
+        const color = b.state === "provisional" ? toneOf(tone).soft : tone === "neutral" ? ink.mute : toneOf(tone).solid;
+        cands.push({ box: { x: x1 + 4, y: Math.min(y1, y2) + 3, w, h: CAPTION_H }, prio: b.active ? 10 : 20, nudge: [CAPTION_H + 2], data: { set: (l) => (g.caption = l), text, color } });
+      }
     }
+    // collision-free: never over another label, the check overlay's labels or the zone caption (else left out)
+    const height = (this.chart?.panes()[0]?.getHeight() ?? 0) || 10_000;
+    const placed = placeLabels(cands, [{ x: width - RIGHT_RESERVED, y: 0, w: RIGHT_RESERVED, h: height }, ...(this.host.reserved?.() ?? [])], { x: 0, y: 0, w: width, h: height });
+    for (const p of placed) p.data.set({ box: p.box, text: p.data.text, color: p.data.color });
     this.geo = out;
     this.updateAxis(axisPrices, yOf);
   }
