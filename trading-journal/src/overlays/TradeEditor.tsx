@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useMotionValueEvent, type Variants } from "motion/react";
 import { ED } from "@/domain/edition";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { deriveTrade } from "@/domain/derive";
+import { deriveTrade, leverageOverRule } from "@/domain/derive";
 import { checklistItemsFor, pruneChecks } from "@/domain/enrich";
 import { DEFAULT_MISTAKES, EMOTIONS, LEVERAGE_HELP, LEVERAGE_WARNING, MTF_SETUP_ID, TIMEFRAMES } from "@/domain/defaults";
 import { parseSignalSnapshot } from "@/domain/signals";
@@ -397,7 +397,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const usedTags = useMemo(() => usedOwnMistakes(trades), [trades]);
   const tags = useMemo(() => mistakeOptions(settings.mistakes, t.mistakes, usedTags), [settings.mistakes, t.mistakes, usedTags]);
   const tfOptions = useMemo(() => timeframeOptions(d.timeframe), [d.timeframe]);
-  const leverageOver = rec.leverage != null && (account === "scalp" ? rec.leverage > 4 : rec.leverage > 5);
+  const leverageOver = leverageOverRule(rec.leverage, account);
   const sortedSetups = useMemo(
     () => [...settings.setups].sort((a, b) => +(b.account === account || b.account === "both") - +(a.account === account || a.account === "both")),
     [settings.setups, account],
