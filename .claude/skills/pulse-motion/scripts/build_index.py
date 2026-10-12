@@ -7,7 +7,7 @@ import re, pathlib
 root = pathlib.Path(__file__).resolve().parent.parent
 rows = []
 for md in sorted((root / "references").glob("*.md")):
-    if md.stem.startswith("principles"):
+    if md.stem.startswith(("principles", "design-")):
         continue
     t = md.read_text(encoding="utf-8")
     m = re.match(r"#\s*(.+?)\s*\((.+?)\)", t)
@@ -31,5 +31,20 @@ table = "| Name | Was es ist | Stichworte (EN) | Dateien |\n|---|---|---|---|\n"
 sk = root / "SKILL.md"
 s = sk.read_text(encoding="utf-8")
 new = re.sub(r"(<!-- INDEX:START -->).*?(<!-- INDEX:END -->)", lambda m: f"{m.group(1)}\n{table}\n{m.group(2)}", s, flags=re.S)
+
+# --- Style-Referenzen (references/styles/*.md) -> Tabelle zwischen STYLES:START/END ---
+srows = []
+for md in sorted((root / "references" / "styles").glob("*.md")):
+    t = md.read_text(encoding="utf-8")
+    m = re.match(r"#\s*(.+?)\s*\((.+?)\)", t)
+    name, slug = (m.group(1), m.group(2)) if m else (md.stem, md.stem)
+    q = re.search(r"^>\s*(.+)$", t, re.M)
+    one = q.group(1).strip() if q else ""
+    th = re.search(r"\*\*Theme:\*\*\s*([a-zA-Z]+)", t)
+    th = th.group(1) if th else ""
+    css = f"assets/styles/{slug}.css"
+    srows.append(f"| **{name}** | {th} | {one} | [{slug}.md](references/styles/{md.name}) · " + (f"[css]({css})" if (root / css).exists() else "css fehlt") + " |")
+stable = "| Style | Theme | Essenz | Dateien |\n|---|---|---|---|\n" + "\n".join(srows)
+new = re.sub(r"(<!-- STYLES:START -->).*?(<!-- STYLES:END -->)", lambda m: f"{m.group(1)}\n{stable}\n{m.group(2)}", new, flags=re.S)
 sk.write_text(new, encoding="utf-8")
-print(f"{len(rows)} Animationen im Index")
+print(f"{len(rows)} Animationen, {len(srows)} Styles im Index")

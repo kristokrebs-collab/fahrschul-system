@@ -1,11 +1,13 @@
 ---
 name: pulse-motion
-description: Bibliothek 120-Hz-tauglicher UI-Animationen, aus echten 21st.dev-Bildschirmaufnahmen als eigenständige HTML-Komponenten nachgebaut (mit exakten Timing-, Easing-, Feder- und Look-Werten) plus Werkzeuge, um neue Aufnahmen aufzunehmen. Nutze diesen Skill IMMER, wenn eine Website, Landing-Page, ein Dashboard, eine App-Komponente oder ein Artefakt animiert, premium, "wow", butterweich, flüssig, mit hoher Bildwiederholrate (120 fps / 120 Hz / 144 Hz), Micro-Interactions, Hover-, Scroll-, Cursor- oder Text-Effekten oder im 21st.dev-Look gebaut werden soll, auch wenn der Nutzer keinen Skill nennt, und wenn Animations-Videos geschickt werden, die in den Skill aufgenommen werden sollen. Kreativ kombinierbar und remixbar. English: micro-interactions, motion design, spring physics, smooth 120Hz UI, hover/scroll/cursor effects, text animation, morphing dropdown, dock, typewriter, autocomplete, 21st.dev components.
+description: Bibliothek 120-Hz-tauglicher UI-Animationen (22 aus 21st.dev-Aufnahmen nachgebaute, eigenständige HTML-Komponenten mit Timing-, Feder- und Look-Werten) plus 10 Design-Style-Referenzen (Dala, Apple, ORYZO, Origin, Air, Superhuman, Slush, Factory, Structured) als Inspirations-Schnipsel mit drop-in-CSS. Nutze IMMER, wenn eine Website, Landing-Page, App-Komponente oder ein Artefakt animiert, premium, 'wow', butterweich (120 fps / 120 Hz), mit Micro-Interactions, Hover-, Scroll-, Cursor- oder Text-Effekten oder im 21st.dev-Look gebaut werden soll, oder wenn nur Look & Feel, Farbschema, Typografie oder dark/light Theme gefragt ist - auch ohne dass der Nutzer einen Skill nennt. Auch wenn Animations-Videos oder Style-Referenzen zum Aufnehmen geschickt werden. EN: micro-interactions, motion design, spring physics, smooth 120Hz UI, text animation, dock, typewriter, design inspiration, style reference, color palette, design tokens.
 ---
 
 # pulse-motion — Animationen mit hoher Bildwiederholrate
 
 Zwei Dinge sind hier festgelegt: **(1)** jede Animation sieht aus und fühlt sich an wie das Original-Video (gemessene Dauer, Easing, Feder, Farben, Abstände), **(2)** jede läuft auf **≥ 120 Hz** ruckelfrei (zeitbasiert, nur Compositor-Eigenschaften, geprüft mit `scripts/check120.cjs`). Die Nachbauten sind **Vanilla HTML/CSS/JS ohne Abhängigkeiten** — sie laufen in jedem Chat/Artefakt, jeder Seite, jedem Framework. Quelle sind Aufnahmen von 21st.dev-Komponenten; der Original-Code lag nicht vor, alles ist aus dem Video rekonstruiert (Abweichungen stehen ehrlich in jeder Spec).
+
+Zusätzlich liefert der Skill **Design-Inspiration**: 10 Style-Referenzen mit drop-in-CSS (siehe „Style-Schnipsel“ unten) — Look von dort, Bewegung von hier.
 
 ## So setzt Du sie ein
 1. **Passende Animation suchen** im Index unten (Stichworte DE/EN). Passt keine exakt: die nächste nehmen und remixen (Schritt 4).
@@ -20,6 +22,28 @@ Zwei Dinge sind hier festgelegt: **(1)** jede Animation sieht aus und fühlt sic
 - Federn per exakter Formel (`springAt`), Glätten per `1 - exp(-k·dt)`.
 - `pointermove` merken, 1× pro rAF anwenden; nichts pro Frame messen oder neu bauen; Leerlauf = keine Arbeit.
 - `prefers-reduced-motion` respektieren; Tastatur/ARIA wo sinnvoll.
+
+## Style-Schnipsel (Design-Inspiration)
+Zehn Style-Referenzen in `references/styles/<slug>.md` + `assets/styles/<slug>.css` — **Inspiration zum Schnipsel-Klauen, nicht zum 1:1-Nachbauen** (keine Marken/Logos/Fotos übernehmen, proprietäre Schriften durch die genannten Ersatzschriften ersetzen).
+- **Vorgehen:** passenden Host-Style wählen → dessen `.md` lesen (Signature-Moves, Farben, Typo-Skala, Komponenten, Do/Don't) → CSS einbinden (`_base.css` + `<slug>.css`, Scope `data-style="<slug>"`) oder nur einzelne Werte/Moves übernehmen → mit einer Animation kombinieren.
+- **Mischen:** Regeln, Move-Tabelle, Style→Animation-Brücke und Kombinations-Vorschläge in `references/design-mixing.md`. Vorschau aller Styles: `assets/styles/_preview.html`.
+- Die gemeinsame Semantik-Schicht (`--s-bg`, `--s-fg`, `--s-accent`, `--s-action-bg`, `--s-radius-*`, `--s-font-*` …) ist in allen Styles gleich benannt → Style per Attribut austauschbar; Markenwerte tragen Slug-Prefix (kollisionsfrei, auch verschachtelt).
+- Auch für Design-Anfragen **ohne Animation** nutzen: Farbschema/Typo/Radien/Button-Logik aus dem passenden Style ableiten.
+
+<!-- STYLES:START -->
+| Style | Theme | Essenz | Dateien |
+|---|---|---|---|
+| **Air** | dark | Mitternachtshimmel durch Glasskulptur: Vollbild-Wolkenfotografie und 3D-Glasformen tragen die Emotion, die UI bleibt leicht. | [air.md](references/styles/air.md) · [css](assets/styles/air.css) |
+| **Apple España** | light | Kathedrale aus Weißraum: riesige Headlines schweben auf fast weißem Grund, Farbe kommt nur aus dem Produkt, ein einziger blauer Faden. | [apple-espana.md](references/styles/apple-espana.md) · [css](assets/styles/apple-espana.css) |
+| **Apple Foldable-Launch** | light | Foldable-Gerät in weißer Galerie: das Produkt-Render ist das Ereignis, Typo und blaue Controls bleiben bewusst leise. | [apple-foldable.md](references/styles/apple-foldable.md) · [css](assets/styles/apple-foldable.css) |
+| **Dala** | dark | Konstellation auf schwarzem Samt: reines Schwarz, EIN violetter Akzent, Bernstein-Funken, riesige federleichte Headlines. | [dala.md](references/styles/dala.md) · [css](assets/styles/dala.css) |
+| **Factory** | dark | Terminal-War-Room um Mitternacht: schwarze Kontrollfläche, auf der eine einzige weiße Karte wie ein Lichtkegel landet; Farbe nur für Live-Daten. | [factory.md](references/styles/factory.md) · [css](assets/styles/factory.css) |
+| **Origin Financial** | dark | Mitternachts-Galerie: Near-Black, Whisper-Serif in 80–96px und leuchtende Farbkacheln; Finanzen als kuratierte Kunst. | [origin-financial.md](references/styles/origin-financial.md) · [css](assets/styles/origin-financial.css) |
+| **ORYZO AI** | dark | Dunkelkammer-Editorial: ein einzelnes Objekt schwebt im warmen Dunkel, Creme-Typografie ist die einzige Dekoration. | [oryzo-ai.md](references/styles/oryzo-ai.md) · [css](assets/styles/oryzo-ai.css) |
+| **Slush** | light | Aufblasbares Sticker-Universum auf Pastellpapier: riesige gequetschte Display-Typo, 3D-Ribbons in Electric Blue, Sticker-Konfetti mit schwarzer Kontur. | [slush.md](references/styles/slush.md) · [css](assets/styles/slush.css) |
+| **Structured** | mixed | Renaissance-Galerie auf Spachtelpapier: monumentale Serife, klassische Ölgemälde, harte Hell/Dunkel-Schnitte; Finanzen als Hochkunst. | [structured.md](references/styles/structured.md) · [css](assets/styles/structured.css) |
+| **Superhuman** | light | Goldene-Stunde-Editorial: warmes Pergament statt Weiß, ein Weinrot-Moment, Violett-Links, Produkt-UI als Glaskarten über Fotografie. | [superhuman.md](references/styles/superhuman.md) · [css](assets/styles/superhuman.css) |
+<!-- STYLES:END -->
 
 ## Animations-Index (automatisch erzeugt: `python3 scripts/build_index.py`)
 <!-- INDEX:START -->
@@ -61,7 +85,11 @@ Der Nutzer schickt 21st.dev-Bildschirmaufnahmen (Samsung-Aufnahmen, 1730×1080, 
 8. **Spec schreiben** nach dem Muster der vorhandenen (`references/notched-project-card.md` ist ein gutes Vorbild): Wann einsetzen (DE + `- EN:`-Stichwortzeile!), Anatomie & Zeitleiste, Motion-/Look-Tokens, Interaktion & Barrierefreiheit, 120 Hz, Einbindung, React/Framer-Mapping, Kreativ remixen (5 Ideen), Bekannte Abweichungen.
 9. **Index + Paket:** `python3 scripts/build_index.py`, dann `scripts/package.sh` → `pulse-motion.zip` für den Upload in claude.ai (Einstellungen → Fähigkeiten/Skills → Hochladen).
 
+## Neue Style-Referenz aufnehmen
+Schickt der Nutzer weitere „Style Reference“-Blöcke: verdichten statt kopieren (Signature-Moves, Farben, Typo, Form, Komponenten, Do/Don't), Quell-Tippfehler korrigieren, `references/styles/<slug>.md` + `assets/styles/<slug>.css` anlegen, `_preview.html` erweitern, `python3 scripts/build_index.py`, `scripts/package.sh`. Details: `references/design-mixing.md` §6.
+
 ## Ehrliche Grenzen
 - Nachbauten sind aus Videos rekonstruiert, nicht der Original-Quellcode: Timing/Look sind gegen das Video gefittet (Fidelity je Spec benannt), Nicht-Sichtbares (z. B. `:active`, Touch-Verhalten des Originals) ist als „nicht erkennbar“ markiert.
 - 120-Hz-Messung läuft in Headless-Chromium (Software-Raster, kein echtes 120-Hz-Display). Sie beweist Zeitbasiertheit und niedrige Frame-Kosten, ersetzt aber keinen Test auf dem Gerät.
 - Demo-Bilder in Specs sind aus dem Video extrahierte Platzhalter, keine Originale.
+- Style-Referenzen sind aus Beschreibungen öffentlicher Seiten abgeleitet (Inspiration); Schriften sind proprietär und nur als Ersatzstack hinterlegt.
