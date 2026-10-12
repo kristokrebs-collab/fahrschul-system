@@ -247,3 +247,42 @@ flow windows), `useMarket.ts` (`useMarketPanelView(levels)`, `useMotionSelect`, 
 "Page host"); cells below the hero are `Reveal`s (never the ChartCard body).
 Tests: `tests/unit/app.shell.test.tsx`, `tests/unit/views.overview.{hero,market,recent}.test.tsx`; the market is mocked through
 `tests/unit/views.overview.harness.tsx` (`fakeMarket(actual)` → deterministic snapshot + fake provider, `bootFixtureJournal()`).
+
+## UX shell (P13): themes, shortcuts, error states
+
+**Themes.** `main.tsx` calls `applyInitialTheme()` + `installThemeTransition()` BEFORE `createRoot` (the CSP forbids an
+inline script, so this is the earliest point): `data-theme` (`dark` | `light`), `data-theme-pref` (`dark` | `light` |
+`system`), `data-accent` (absent for Signalrot), `color-scheme` and the `color-scheme` / `theme-color` metas – the first
+React commit already paints the stored theme. Everything visual lives in `src/styles/themes.css` (see
+`src/store/README.md` → `themeStore.ts`). Dark + Signalrot is byte-identical to the design before P13.
+
+- `themeTransition.ts` – the switch (declared `// motion-exception: theme-reveal`): View Transitions API → the NEW page is
+  revealed by a growing `clip-path` circle from the tapped control (`tween.reveal`); fallback: a paper/ink disc
+  (`data-layer="Theme-Wechsel"`) grows, the theme flips underneath, the disc fades; `data-safe-fx` → plain fade;
+  reduced motion → instant. Finite, nothing left behind.
+- `ThemeCard.tsx` – "Darstellung" for the settings page: Dunkel / Hell / System as live miniatures + the accent
+  (Signalrot, Kobalt, Violett). Both are radio groups (roving tab stop, arrows select). Mount: `import { ThemeCard } from "@/app/ThemeCard"`.
+- `toggleTheme(origin?)` (`@/store/themeStore`) – Hell ↔ Dunkel; bound to `t` and the search command; CommandNav may add it.
+
+**Shortcuts.** `shortcuts.ts` is the registry (`shortcutList()`): `g` + page key (derived from `PAGES` / `PAGE_KEYS` at
+call time, so new pages get a chord for free; window `CHORD_MS` 1200), `[` / `]` previous / next page, `n` new trade,
+`t` theme, `/` and ⌘⇧F / Ctrl+⇧F search, `?` the sheet; ⌘K (CommandNav) and Esc are listed only. `matchKey` is pure
+(Shift / AltGr for `? / [ ]` on German layouts; Ctrl / ⌘ / Alt / key repeat never match). Never fires from a text
+field (`isEditableTarget`: inputs, textareas, contenteditable, comboboxes) or while a modal dialog is open (`modalOpen`).
+- `ShortcutHost.tsx` – the window listener + the chord hint (`data-layer="Tastenkürzel-Hinweis"`, "g … dann" with the
+  page keys) + the lazy sheet. Mount once in `App` after `<SetupEditor/>`, before `<Celebrate/>`.
+- `ShortcutSheet.tsx` – the cheat sheet (`Sheet`): the most important keys as a `MagnifyRow` toolbar, then every group,
+  and "Einführung noch einmal ansehen". `Kbd.tsx` – `Kbd` / `KeyCombo` key caps.
+
+**Error states.** `ErrorBoundary.tsx` – `variant="app"` (full ink stage, "Neu laden"), `"page"` ("Erneut versuchen" +
+"Neu laden", the shell stays usable), `"widget"` (compact tile, the rest keeps running). The mark is a dot-matrix "ERR"
+that glitches ONCE (seeded `glitchFrames`, `fxTiming.matrixFps`, rests on the clean word; reduced motion: clean word).
+Every catch goes to `reportError(error, { source: "boundary", … })` (P09: sent only with the trader's opt-in).
+`resetKeys` re-arms it (wrap `renderPage` with `resetKeys={[page]}`).
+
+**Dev harness.** `/dev/ux.html` (`npm run dev`): `?view=app` (default) = the real app + the three P13 hosts + the app
+boundary; `?view=cockpit`, `?view=cards` (ThemeCard + OnboardingCard), `?view=crash`, `?view=crash-widget`. The P13 e2e
+specs run against it until P14 wires everything (`tests/e2e/uxHarness.ts`, `PW_UX_URL=/` afterwards).
+
+Tests: `tests/unit/theme.{store,transition,codemod,card,budget}.test.*`, `shortcuts.{registry,host}.test.*`,
+`app.errorBoundary.test.tsx`; e2e `theme.spec.ts`, `search.spec.ts` (shortcuts too), `a11y.spec.ts`.

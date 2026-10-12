@@ -41,3 +41,8 @@ import { fmt, n0, n1, n2, signed, pct, pct0, r, price, date, time, dateTime, pf,
 
 ## `cn.ts`
 `cn(...classes)` – clsx + tailwind-merge (owned by the lead).
+
+## `themePaint.ts` (P13)
+`themePaint(color)` – a dark-palette hex from JS (`#f2f2f2`, `#1c1c1c`, `#3ddc84`, `#e5202e` …) → `var(--token, hex)`
+for SVG presentation attributes and inline styles, so they follow the light mode and the accent; unknown colours pass
+through. Not for canvas. Used by `EquityChart` / `MonthlyBars`.
