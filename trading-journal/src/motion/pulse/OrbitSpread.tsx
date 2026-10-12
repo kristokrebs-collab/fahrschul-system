@@ -107,6 +107,7 @@ export function OrbitSpread({ items, children, trigger = "view", open: openProp,
   const open = reduced ? true : trigger === "manual" ? !!openProp : own;
   const st = useRef({ ms: reduced ? CONFIG.openMs : 0, dir: 0, last: 0, n, ptr: { x: { x: 0, v: 0 }, y: { x: 0, v: 0 } }, ptrT: { x: 0, y: 0 }, spin: { x: 0, v: 0 }, spinT: 0, z: [] as number[], active: true, reduced, rect: null as DOMRect | null });
   const loopRef = useRef<ReturnType<typeof createFrameLoop> | null>(null);
+  const writeRef = useRef<() => void>(() => {});
 
   useLayoutEffect(() => {
     const s = st.current;
@@ -154,6 +155,7 @@ export function OrbitSpread({ items, children, trigger = "view", open: openProp,
       return busy;
     });
     loopRef.current = loop;
+    writeRef.current = write;
     write();
     const stage = stageRef.current;
     const unwatch = stage
@@ -174,7 +176,7 @@ export function OrbitSpread({ items, children, trigger = "view", open: openProp,
     if (reduced) {
       s.ms = CONFIG.openMs;
       s.dir = 0;
-      loopRef.current?.wake();
+      writeRef.current();
       return;
     }
     s.dir = open ? 1 : -1;
@@ -191,7 +193,13 @@ export function OrbitSpread({ items, children, trigger = "view", open: openProp,
   const turn = (by: number) => {
     const s = st.current;
     s.spinT += by;
-    if (s.reduced) s.spin.x = s.spinT;
+    if (s.reduced) {
+      // reduced motion: the ring jumps one slot
+      s.spin.x = s.spinT;
+      s.spin.v = 0;
+      writeRef.current();
+      return;
+    }
     loopRef.current?.wake();
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {

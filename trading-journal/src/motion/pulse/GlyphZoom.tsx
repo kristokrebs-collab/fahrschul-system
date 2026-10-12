@@ -43,7 +43,7 @@ const gr = monotoneCurve(CONFIG.rollKeys);
 /** Scale and roll (deg) at dive progress `u` for a log end-scale `span`. */
 export function glyphCamera(u: number, span: number): { scale: number; roll: number } {
   const c = Math.min(1, Math.max(0, u));
-  return { scale: Math.exp(span * gz(c)), roll: CONFIG.roll * gr(c) };
+  return { scale: Math.exp(span * gz(c)), roll: CONFIG.roll * gr(c) || 0 };
 }
 
 /**
