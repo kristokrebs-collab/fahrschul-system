@@ -6,6 +6,7 @@
  *     substring (55) > subsequence with gaps (≤ 40, consecutive runs and word starts reward, gaps cost). Returns the
  *     matched character ranges of the ORIGINAL text.
  *   - `scoreFields`: every token of the query must match the title or one keyword (AND); title hits weigh double.
+ *     A token typed with the umlaut digraph ("uebersicht", "gebuehren") falls back to its folded form ("ubersicht").
  */
 
 export interface MatchRange {
@@ -142,23 +143,36 @@ export function haystack(title: string, keywords: readonly string[] = []): Hayst
   return { title: fold(title), keywords: keywords.filter(Boolean).map(fold) };
 }
 
+/** "uebersicht" → "ubersicht" (the umlaut typed as a digraph, folded like `fold` folds "ü"); null when nothing changes. */
+export function digraphFold(token: string): string | null {
+  const alt = token.replace(/([aou])e/g, "$1");
+  return alt !== token && alt.length >= 2 ? alt : null;
+}
+
 /** All tokens must hit (title or a keyword); title hits weigh double. Null when any token misses. */
 export function scoreFields(tokens: readonly string[], h: Haystack): FieldMatch | null {
   if (!tokens.length) return { score: 0, title: [] };
   let total = 0;
   const title: MatchRange[] = [];
   for (const tok of tokens) {
-    const inTitle = matchFolded(tok, h.title);
-    let best = inTitle ? inTitle.score * 2 : 0;
-    for (const k of h.keywords) {
-      const m = matchFolded(tok, k);
-      if (m && m.score > best) best = m.score;
-    }
+    let { inTitle, best } = scoreToken(tok, h);
+    const alt = best ? null : digraphFold(tok);
+    if (alt) ({ inTitle, best } = scoreToken(alt, h));
     if (!best) return null;
     if (inTitle) title.push(...inTitle.ranges);
     total += best;
   }
   return { score: total / tokens.length, title: mergeRanges(title) };
+}
+
+function scoreToken(tok: string, h: Haystack): { inTitle: TextMatch | null; best: number } {
+  const inTitle = matchFolded(tok, h.title);
+  let best = inTitle ? inTitle.score * 2 : 0;
+  for (const k of h.keywords) {
+    const m = matchFolded(tok, k);
+    if (m && m.score > best) best = m.score;
+  }
+  return { inTitle, best };
 }
 
 export function mergeRanges(r: MatchRange[]): MatchRange[] {

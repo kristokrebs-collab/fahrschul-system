@@ -42,6 +42,7 @@ export const TOUR = {
     title: "Deine Setups",
     lead: "Setups sind deine Entscheidungsgrundlagen: feste Regeln mit Checkliste. Das Journal misst, welche wirklich Geld bringt – die stärksten stehen immer oben.",
     count: (n: number) => (n === 1 ? "1 Grundlage ist schon angelegt" : `${n} Grundlagen sind schon angelegt`),
+    rules: (n: number) => (n === 1 ? "1 Regel" : `${n} Regeln`),
     add: "Eigene Grundlage anlegen",
     addHint: "Die Einführung wartet so lange.",
   },
@@ -194,7 +195,7 @@ export function StepSetups({ setups, onAdd }: { setups: readonly { id: string; n
             <li key={s.id} className="inline-flex max-w-full items-center gap-2 rounded-full border border-line-2 bg-white/[0.03] px-3 py-1.5 text-[12.5px] text-fg">
               <span className="size-2 shrink-0 rounded-full" style={{ background: s.color || "var(--color-mute)" }} aria-hidden="true" />
               <span className="truncate">{s.name}</span>
-              {s.checklist && s.checklist.length > 0 && <span className="font-mono text-[11px] text-faint">{s.checklist.length}</span>}
+              {s.checklist && s.checklist.length > 0 && <span className="font-mono text-[11px] text-faint">{TOUR.setups.rules(s.checklist.length)}</span>}
             </li>
           ))}
         </ul>

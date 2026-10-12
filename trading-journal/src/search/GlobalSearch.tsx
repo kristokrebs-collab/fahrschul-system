@@ -191,7 +191,7 @@ export function GlobalSearch() {
             />
           )}
           <motion.div
-            className="relative border border-line-2 bg-ink-900 [border-radius:inherit]"
+            className="relative border border-line-2 bg-ink-850 [border-radius:inherit]"
             initial={reduced ? { opacity: 0 } : { transform: "translateX(-101%)" }}
             animate={reduced ? { opacity: 1 } : { transform: "translateX(0%)" }}
             transition={reduced ? { duration: 0 } : { ...WIPE, delay }}

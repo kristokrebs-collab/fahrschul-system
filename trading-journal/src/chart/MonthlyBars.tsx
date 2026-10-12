@@ -8,6 +8,7 @@
  * staggered by `stagger.cards`); hovering a month dims its siblings (CSS opacity, toggled through data attributes –
  * no React render). Reduced motion: static bars, instant dim.
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { memo, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, ReferenceLine, Tooltip, XAxis, YAxis } from "recharts";
@@ -216,17 +217,17 @@ export const MonthlyBars = memo(function MonthlyBars({ months, currency, height 
           onMouseMove={(s) => setHot(toBarIndex(s.activeTooltipIndex))}
           onMouseLeave={() => setHot(-1)}
         >
-          <CartesianGrid stroke={EQUITY_COLORS.grid} vertical={false} />
+          <CartesianGrid stroke={themePaint(EQUITY_COLORS.grid)} vertical={false} />
           <XAxis dataKey="label" tickLine={false} axisLine={false} tick={TICK} />
           <YAxis width={56} tickLine={false} axisLine={false} interval={0} tick={TICK} tickFormatter={fmt.mio} />
-          <ReferenceLine y={0} stroke={EQUITY_COLORS.ref} />
+          <ReferenceLine y={0} stroke={themePaint(EQUITY_COLORS.ref)} />
           <Tooltip
-            cursor={{ fill: "rgb(255 255 255 / 0.04)" }}
+            cursor={{ fill: "color-mix(in srgb, var(--color-white, #fff) 4%, transparent)" }}
             content={(p) => <MonthTip active={p.active} payload={p.payload} currency={currency} />}
           />
           <Bar dataKey="net" maxBarSize={36} isAnimationActive={false} shape={(p: ShapeProps) => <RoundedBar {...p} grow={animateIn} revealed={revealed} grown={grown} />}>
             {months.map((m) => (
-              <Cell key={m.key} fill={monthFill(m.net)} />
+              <Cell key={m.key} fill={themePaint(monthFill(m.net))} />
             ))}
           </Bar>
         </BarChart>
