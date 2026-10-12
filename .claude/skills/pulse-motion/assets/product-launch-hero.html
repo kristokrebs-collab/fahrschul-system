@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product Launch Hero</title>
+<style>
+/* ==========================================================================
+   CONFIG (CSS) - alle Look-Werte zum "Hochdrehen". Referenz-Viewport 1234x673,
+   die Buehne ist 1194x672 (16:9) und wird per Skalierung eingepasst.
+   Motion-/Kamera-/Karten-Werte stehen im CONFIG (JS) weiter unten.
+   ========================================================================== */
+:root {
+  /* --- Farben (aus dem Video gemessen, +-2 Stufen) --- */
+  --plh-page:       #010101;  /* Seitenhintergrund ausserhalb der Buehne */
+  --plh-stage:      #020202;  /* Video-Hintergrund (fast schwarz) */
+  --plh-panel:      #070909;  /* Panel A: dunkle Seite mit Punktraster (leichter Gruenstich) */
+  --plh-dot:        rgba(255,255,255,.085); /* Punktraster-Punkte */
+  --plh-dot-gap:    24px;     /* Raster-Abstand */
+  --plh-ink:        #f5f5f5;  /* Satz "that lets you ..." */
+  --plh-ink-soft:   rgba(245,245,245,.86); /* "out AI." etwas leiser */
+  --plh-square:     rgba(255,255,255,.36);  /* drehendes Quadrat-Outline */
+  --plh-lit:        #e4e6e7;  /* Panel A "eingeschaltet" (weiss, kuehl) */
+  --plh-hud:        #ffffff;  /* Befehlszeile "npx shadcn add @snapcn" */
+  --plh-b-title-a:  #ececec;  /* Titel links (hell) ... */
+  --plh-b-title-b:  #6a6a6a;  /* ... verblasst nach rechts */
+  --plh-b-sub:      #5e5e5e;  /* "Article - The Design Process" */
+  --plh-b-btn-bg:   #262626;  /* "Explore"-Pille */
+  --plh-b-btn-ink:  #8a8a8a;
+
+  /* --- Geometrie --- */
+  --plh-radius-panel: 28px;   /* Ecken Panel A */
+  --plh-radius-tile:  20px;   /* Ecken der Ring-Kacheln in B */
+  --plh-card-radius:  3px;    /* Foto-Karten Panel A */
+
+  /* --- Typo --- */
+  --plh-font: Inter, Geist, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Liberation Sans", sans-serif;
+  --plh-row-size:   30px;     /* "that lets you [Foto] filter out AI." */
+  --plh-hud-size:   34px;     /* Befehlszeile */
+  --plh-title-size: 66px;     /* "A whole new universe" (vor der Seiten-Stauchung scaleX .74) */
+}
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--plh-page);
+  display: grid; place-items: center; overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===== COMPONENT CSS ===== */
+.plh {
+  position: relative;
+  width: min(100vw, calc(100vh * 1194 / 672));      /* 16:9-Buehne, passt in jeden Viewport */
+  aspect-ratio: 1194 / 672;
+  overflow: hidden; contain: layout paint style;
+  background: var(--plh-stage);
+  font-family: var(--plh-font);
+  color: var(--plh-ink);
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  touch-action: manipulation;
+  -webkit-font-smoothing: antialiased; text-rendering: geometricPrecision;
+  --plh-s: 1;
+}
+.plh:focus-visible { outline: 2px solid rgba(255,255,255,.55); outline-offset: -2px; }
+.plh__stage {                      /* feste 1194x672-Zeichenflaeche, per --plh-s skaliert (nur bei Resize gesetzt) */
+  position: absolute; left: 0; top: 0; width: 1194px; height: 672px;
+  transform-origin: 0 0; transform: scale(var(--plh-s));
+}
+.plh__rig {                        /* Kamera-Absenkung (2D-Verschiebung) + 3D-Kontext fuer Panel A */
+  position: absolute; inset: 0;
+  perspective: 1200px; perspective-origin: 597px 336px;
+}
+.plh__a {                          /* Panel A: Ebene (1430 breit, breiter als die Buehne) mit translate3d + rotateY + scale um den Zeilenmittelpunkt */
+  position: absolute; left: -118px; top: 54px; width: 1430px; height: 870px;
+  transform-origin: 715px 433px;
+}
+.plh__panel {
+  position: absolute; inset: 0; border-radius: var(--plh-radius-panel);
+  background:
+    radial-gradient(circle at center, var(--plh-dot) 0 1.1px, transparent 1.9px) 4px 12px / var(--plh-dot-gap) var(--plh-dot-gap),
+    var(--plh-panel);
+  overflow: hidden;
+}
+.plh__lit {                        /* weisse "Leinwand": links weich aus dem Dunkel, linear 0 -> 1 in ~0.5 s */
+  position: absolute; inset: 0; border-radius: var(--plh-radius-panel); opacity: 0;
+  background: linear-gradient(90deg, rgba(228,230,231,0) 0, var(--plh-lit) var(--lit-x, 430px), var(--plh-lit) 100%);
+}
+.plh__row {                        /* Satzzeile in der Panel-Mitte */
+  position: absolute; left: 0; right: 0; top: 436px; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center; white-space: nowrap;
+  font-size: var(--plh-row-size); line-height: 1.2; letter-spacing: -0.005em; font-weight: 400;
+}
+.plh__row b { font-weight: 700; }
+.plh__row .t2 { color: var(--plh-ink-soft); }
+.plh__slot { position: relative; width: 131px; height: 174px; margin: 0 23px; flex: none; }
+.plh__slot svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; display: block; }
+.plh__sq {                         /* drehendes Quadrat-Outline (Auswahl-Marker) */
+  position: absolute; left: 896px; top: 279px; width: 52px; height: 52px; box-sizing: border-box;
+  border: 1.5px solid var(--plh-square); opacity: 0;
+}
+.plh__sq--dark { border-color: rgba(0,0,0,.2); }
+.plh__ptr { position: absolute; left: 894px; top: 253px; width: 22px; height: 27px; opacity: 0; overflow: visible; }
+.plh__cards { position: absolute; inset: 0; }
+.plh__card {                       /* Foto-Karte (schwebt vor Panel A) */
+  position: absolute; left: 0; top: 0; opacity: 0; visibility: hidden;
+  border-radius: var(--plh-card-radius); overflow: hidden; background: #111;
+}
+.plh__card svg { display: block; width: 100%; height: 100%; }
+.plh__card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.14), rgba(0,0,0,.22)); box-shadow: inset 0 0 14px rgba(0,0,0,.35); }
+
+/* Panel B: Hero-Mock mit Kachel-Ring, schraege Oberkante (skewY) */
+.plh__b {
+  position: absolute; left: 628px; top: 205px; width: 1272px; height: 1000px;
+  border-radius: 24px 0 0 0; overflow: hidden; background: #000;
+  transform-origin: 0 0; transform: skewY(3.43deg);
+  visibility: hidden;
+}
+.plh__bin { position: absolute; left: 0; top: 0; width: 100%; height: 100%; transform-origin: 0 0; transform: skewY(-3.43deg); }
+.plh__tile {
+  position: absolute; left: 0; top: 0; border-radius: var(--plh-radius-tile); overflow: hidden; background: #222;
+}
+.plh__tile svg { display: block; width: 100%; height: 100%; }
+.plh__tile::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.26); }
+.plh__title {
+  position: absolute; left: 144px; top: 225px; white-space: nowrap; transform-origin: 0 50%; transform: translateY(-50%) scaleX(.74);
+  font-size: var(--plh-title-size); font-weight: 500; letter-spacing: -0.025em; line-height: 1;
+  background: linear-gradient(90deg, var(--plh-b-title-a) 0, var(--plh-b-title-a) 7%, var(--plh-b-title-b) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+}
+.plh__sub { position: absolute; left: 300px; top: 293px; width: 200px; text-align: center; white-space: nowrap; font-size: 13.5px; color: var(--plh-b-sub); transform: translate(0,-50%); letter-spacing: -0.005em; }
+.plh__btn {
+  position: absolute; left: 368px; top: 349px; width: 68px; height: 34px; border-radius: 17px;
+  background: var(--plh-b-btn-bg); color: var(--plh-b-btn-ink); font-size: 12.5px; display: grid; place-items: center; transform: translate(0,-50%);
+}
+.plh__fade {                       /* Bildschirm-fester Verlauf nach unten (blendet mit der weissen Flaeche ein): alles faedelt zum Rand */
+  position: absolute; left: 0; right: 0; top: 440px; bottom: 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(180deg, rgba(2,2,2,0) 0, rgba(2,2,2,.05) 37px, rgba(2,2,2,.145) 57px, rgba(2,2,2,.24) 77px, rgba(2,2,2,.34) 97px, rgba(2,2,2,.44) 117px, rgba(2,2,2,.54) 137px, rgba(2,2,2,.66) 157px, rgba(2,2,2,.78) 177px, rgba(2,2,2,.88) 197px, rgba(2,2,2,.96) 217px, #020202 232px);
+}
+.plh__hud {
+  position: absolute; left: 0; right: 0; top: 177px; text-align: center; opacity: 0; white-space: nowrap;
+  font-size: var(--plh-hud-size); font-weight: 600; letter-spacing: -0.012em; line-height: 1; color: var(--plh-hud);
+  transform: translateY(-50%);
+}
+.plh__veil { position: absolute; inset: 0; background: var(--plh-stage); opacity: 0; pointer-events: none; }
+.plh__sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+/* will-change nur waehrend die Animation laeuft (JS setzt .is-live) */
+.plh.is-live .plh__rig, .plh.is-live .plh__a, .plh.is-live .plh__b, .plh.is-live .plh__card, .plh.is-live .plh__tile, .plh.is-live .plh__hud, .plh.is-live .plh__lit { will-change: transform, opacity; }
+/* ===== /COMPONENT CSS ===== */
+</style>
+</head>
+<body>
+
+<!-- COMPONENT:START -->
+<div class="plh" data-plh tabindex="0" role="img" aria-label="Produkt-Launch-Animation: Der Satz &quot;that lets you filter out AI.&quot; mit wechselnden Fotos, eine Foto-Wand, ein hell werdendes Panel, das Hero &quot;A whole new universe&quot; mit kreisenden Kacheln und der Befehl &quot;npx shadcn add @snapcn&quot;. Klick oder Leertaste pausiert.">
+  <div class="plh__stage">
+    <svg class="plh__sprite" aria-hidden="true" focusable="false" width="0" height="0">
+      <defs>
+        <path id="plh-prof" d="M40 160 L44 120 C36 110 33 98 36 86 C30 70 33 48 47 36 C59 25 82 24 92 40 C98 50 98 60 95 66 L103 73 C105 75 103 78 99 78 L99 82 L102 87 L99 91 C97 99 91 105 85 105 L83 113 C90 119 100 126 106 160Z"/>
+        <filter id="plh-blur2" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.2"/></filter>
+        <filter id="plh-blur1" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.1"/></filter>
+        <linearGradient id="plh-g-walker" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b9fc6"/><stop offset=".42" stop-color="#8dc0d8"/><stop offset=".57" stop-color="#eaa9c3"/><stop offset=".6" stop-color="#7fb7c6"/><stop offset="1" stop-color="#2f7b92"/></linearGradient>
+        <linearGradient id="plh-g-rays" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0a2431"/><stop offset=".55" stop-color="#1c5a6e"/><stop offset="1" stop-color="#0b2430"/></linearGradient>
+        <radialGradient id="plh-g-glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe9a8"/><stop offset=".35" stop-color="#ff9a38"/><stop offset=".75" stop-color="#ff5a1f" stop-opacity=".55"/><stop offset="1" stop-color="#ff4a1a" stop-opacity="0"/></radialGradient>
+        <linearGradient id="plh-g-head" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4863a"/><stop offset=".45" stop-color="#f8c24f"/><stop offset=".75" stop-color="#ee7f6a"/><stop offset="1" stop-color="#7a3a46"/></linearGradient>
+        <linearGradient id="plh-g-warm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f06a2f"/><stop offset=".6" stop-color="#f5a73e"/><stop offset="1" stop-color="#f6d56b"/></linearGradient>
+        <linearGradient id="plh-g-red" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e44a26"/><stop offset="1" stop-color="#f6903a"/></linearGradient>
+        <linearGradient id="plh-g-hill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eec688"/><stop offset=".5" stop-color="#d9d39a"/><stop offset="1" stop-color="#8aa84a"/></linearGradient>
+        <linearGradient id="plh-g-grass" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#5f8d30"/><stop offset=".6" stop-color="#b9c744"/><stop offset="1" stop-color="#e3d34c"/></linearGradient>
+        <linearGradient id="plh-g-blue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0f2a52"/><stop offset=".55" stop-color="#1a4a7c"/><stop offset="1" stop-color="#0c2038"/></linearGradient>
+        <linearGradient id="plh-g-neon" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffb327"/><stop offset=".55" stop-color="#7fd89a"/><stop offset="1" stop-color="#2fd6bd"/></linearGradient>
+        <linearGradient id="plh-g-sunset" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a5fd8"/><stop offset=".5" stop-color="#9a8ce0"/><stop offset="1" stop-color="#f3a9bf"/></linearGradient>
+        <linearGradient id="plh-g-dusk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b1f4a"/><stop offset="1" stop-color="#43347a"/></linearGradient>
+        <linearGradient id="plh-g-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ab6d6"/><stop offset=".55" stop-color="#eac6d6"/><stop offset=".58" stop-color="#8cc4d0"/><stop offset="1" stop-color="#3f8ea6"/></linearGradient>
+        <!-- Foto-Karten (3:4, viewBox 120x160) -->
+        <symbol id="plh-a-walker" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-walker)"/><g fill="#d9628f" opacity=".9"><circle cx="10" cy="132" r="4"/><circle cx="24" cy="141" r="5"/><circle cx="38" cy="128" r="3.5"/><circle cx="52" cy="147" r="5"/><circle cx="70" cy="139" r="4"/><circle cx="88" cy="151" r="5"/><circle cx="102" cy="134" r="4"/><circle cx="113" cy="146" r="5"/><circle cx="16" cy="153" r="4"/><circle cx="62" cy="155" r="4"/></g><g fill="#1a2130"><circle cx="70" cy="70" r="4.2"/><path d="M64 76 L77 76 L79 108 L66 110Z"/><path d="M66 108 L70 138 L65 139 L62 110Z M74 108 L81 134 L76 136 L70 110Z"/></g></symbol>
+        <symbol id="plh-a-rays" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-rays)"/><g fill="#bfe6f2" opacity=".34"><polygon points="10,0 30,0 92,160 62,160"/><polygon points="42,0 52,0 120,118 120,152"/><polygon points="0,34 8,34 70,160 52,160"/><polygon points="80,0 90,0 120,60 120,76"/></g><ellipse cx="66" cy="112" rx="28" ry="24" fill="url(#plh-g-glow)"/><path d="M0 160 L0 126 C18 116 40 122 54 134 L64 160Z" fill="#0b1217"/><path d="M52 110 L56 92 M60 106 L64 88 M68 106 L74 90 M76 112 L84 100" stroke="#ffd08a" stroke-width="2.4" stroke-linecap="round" opacity=".9"/></symbol>
+        <symbol id="plh-a-portrait" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="#f3eee4"/><g fill="#211b1e"><circle cx="34" cy="48" r="11"/><circle cx="28" cy="64" r="10"/><circle cx="34" cy="82" r="9"/><circle cx="46" cy="38" r="9"/></g><use href="#plh-prof" fill="url(#plh-g-head)" transform="translate(2 -4)"/><path d="M60 56 L82 52 M62 62 L88 60" stroke="#2a1f24" stroke-width="3" stroke-linecap="round"/><path d="M26 160 L34 116 C52 110 76 110 92 118 L106 160Z" fill="#1c191c"/><path d="M42 122 C56 128 76 128 92 122" stroke="#f08a4a" stroke-width="2" fill="none" opacity=".8"/></symbol>
+        <symbol id="plh-a-warm" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-warm)"/><g filter="url(#plh-blur2)"><use href="#plh-prof" fill="#2e1520" opacity=".88"/></g><rect x="0" y="50" width="120" height="7" fill="#ffe08a" opacity=".6" filter="url(#plh-blur1)"/></symbol>
+        <symbol id="plh-a-red" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-red)"/><g filter="url(#plh-blur2)"><use href="#plh-prof" fill="#26101a" opacity=".9" transform="translate(6 14) scale(.92)"/></g></symbol>
+        <symbol id="plh-a-hill" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-hill)"/><path d="M0 160 L0 84 C36 66 84 92 120 56 L120 160Z" fill="url(#plh-g-grass)"/><g fill="#1d1a18"><circle cx="74" cy="90" r="2.6"/><rect x="72.4" y="92" width="3.2" height="10" rx="1"/></g></symbol>
+        <symbol id="plh-a-blue" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-blue)"/><g transform="translate(120 0) scale(-1 1)"><use href="#plh-prof" fill="#0a1128" opacity=".93"/></g><rect x="-6" y="80" width="132" height="10" fill="url(#plh-g-neon)" transform="rotate(-8 60 85)" filter="url(#plh-blur1)"/><g fill="#ff9d3a"><circle cx="34" cy="30" r="1.6"/><circle cx="29" cy="40" r="1.2"/><circle cx="38" cy="22" r="1.1"/><circle cx="31" cy="54" r="1.3"/></g></symbol>
+        <symbol id="plh-a-sunset" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-sunset)"/><path d="M34 62 C48 28 92 36 98 62 C102 82 70 86 60 70 C52 58 70 50 82 58" stroke="#f6bdd0" stroke-width="5" fill="none" stroke-linecap="round" opacity=".92"/><path d="M52 66 L40 112" stroke="#f3e6f0" stroke-width="1.4"/><g fill="#1b1c2e"><circle cx="46" cy="104" r="5"/><path d="M40 110 L54 110 L56 150 L40 150Z"/><path d="M42 112 L38 96 L42 94 L47 108Z"/></g></symbol>
+        <symbol id="plh-a-dusk" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-dusk)"/><g filter="url(#plh-blur2)"><use href="#plh-prof" fill="#0b0d22" opacity=".85"/></g></symbol>
+        <symbol id="plh-a-sea" viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice"><rect width="120" height="160" fill="url(#plh-g-sea)"/><g fill="#1c2735"><circle cx="64" cy="76" r="4"/><path d="M58 82 L71 82 L72 112 L60 113Z"/><path d="M60 112 L63 138 L58 138 L56 114Z M68 112 L73 136 L68 137 L64 114Z"/></g></symbol>
+        <!-- Ring-Kacheln (1:1, viewBox 100x100) -->
+        <linearGradient id="plh-g-forest" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1c6a2a"/><stop offset=".6" stop-color="#4e9a35"/><stop offset="1" stop-color="#a6d96a"/></linearGradient>
+        <linearGradient id="plh-g-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7f90a6"/><stop offset="1" stop-color="#d6dfea"/></linearGradient>
+        <linearGradient id="plh-g-lav" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a9a6c4"/><stop offset="1" stop-color="#ecebf6"/></linearGradient>
+        <linearGradient id="plh-g-beach" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9d0b4"/><stop offset=".55" stop-color="#c8bfa6"/><stop offset=".58" stop-color="#9fb3bb"/><stop offset="1" stop-color="#6f8794"/></linearGradient>
+        <linearGradient id="plh-g-mist" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7b94a4"/><stop offset="1" stop-color="#c5d0d2"/></linearGradient>
+        <linearGradient id="plh-g-tan" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a9bcc2"/><stop offset=".5" stop-color="#cfc6b0"/><stop offset="1" stop-color="#8a643c"/></linearGradient>
+        <linearGradient id="plh-g-fall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6f7f8e"/><stop offset="1" stop-color="#b8c2cb"/></linearGradient>
+        <radialGradient id="plh-g-orange" cx=".5" cy=".4" r=".7"><stop offset="0" stop-color="#ffc062"/><stop offset=".5" stop-color="#d77a1f"/><stop offset="1" stop-color="#5a2b10"/></radialGradient>
+        <symbol id="plh-t-forest" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="url(#plh-g-forest)"/><g fill="#d9f2a0" opacity=".35"><circle cx="24" cy="30" r="9"/><circle cx="60" cy="22" r="7"/><circle cx="70" cy="62" r="10"/><circle cx="30" cy="74" r="8"/></g><g fill="#0f4a1c" opacity=".4"><circle cx="46" cy="48" r="9"/><circle cx="82" cy="36" r="6"/><circle cx="14" cy="56" r="7"/></g></symbol>
+        <symbol id="plh-t-sky" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="url(#plh-g-sky)"/><ellipse cx="40" cy="70" rx="40" ry="16" fill="#fff" opacity=".55"/></symbol>
+        <symbol id="plh-t-lav" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="url(#plh-g-lav)"/></symbol>
+        <symbol id="plh-t-beach" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="url(#plh-g-beach)"/><path d="M0 62 L100 58" stroke="#fff" stroke-width="1.2" opacity=".5"/></symbol>
+        <symbol id="plh-t-mist" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="url(#plh-g-mist)"/><path d="M0 100 L0 70 C30 50 60 64 100 40 L100 100Z" fill="#6b7f78" opacity=".55"/></symbol>
+        <symbol id="plh-t-tan" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="url(#plh-g-tan)"/><path d="M0 100 L0 60 C30 46 60 66 100 40 L100 100Z" fill="#9a6f40" opacity=".75"/></symbol>
+        <symbol id="plh-t-wood" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#8c4e2c"/><g stroke="#b06a40" stroke-width="3" opacity=".7"><path d="M0 14 H100 M0 34 H100 M0 54 H100 M0 74 H100 M0 94 H100"/></g><g stroke="#5e3016" stroke-width="1.6" opacity=".6"><path d="M0 24 H100 M0 44 H100 M0 64 H100 M0 84 H100"/></g></symbol>
+        <symbol id="plh-t-fall" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="url(#plh-g-fall)"/><g stroke="#fff" opacity=".6" stroke-width="3"><path d="M20 0 V100 M38 0 V100 M56 0 V100 M74 0 V100"/></g></symbol>
+        <symbol id="plh-t-orange" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="url(#plh-g-orange)"/><g fill="#ffd488" opacity=".5"><circle cx="30" cy="30" r="6"/><circle cx="64" cy="22" r="4"/><circle cx="52" cy="58" r="7"/><circle cx="80" cy="70" r="5"/></g></symbol>
+        <symbol id="plh-t-city" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#dfe6ef"/><g fill="#8e9ab0"><rect x="10" y="40" width="12" height="60"/><rect x="26" y="26" width="10" height="74"/><rect x="40" y="46" width="14" height="54"/><rect x="58" y="32" width="10" height="68"/><rect x="72" y="50" width="16" height="50"/></g><rect x="0" y="86" width="100" height="14" fill="#b9c3d2"/></symbol>
+        <symbol id="plh-t-daisy" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#19231a"/><g fill="#f4f4ee"><ellipse cx="50" cy="28" rx="7" ry="16"/><ellipse cx="50" cy="72" rx="7" ry="16"/><ellipse cx="28" cy="50" rx="16" ry="7"/><ellipse cx="72" cy="50" rx="16" ry="7"/><ellipse cx="34" cy="34" rx="7" ry="15" transform="rotate(-45 34 34)"/><ellipse cx="66" cy="66" rx="7" ry="15" transform="rotate(-45 66 66)"/><ellipse cx="66" cy="34" rx="7" ry="15" transform="rotate(45 66 34)"/><ellipse cx="34" cy="66" rx="7" ry="15" transform="rotate(45 34 66)"/></g><circle cx="50" cy="50" r="8" fill="#e9c443"/></symbol>
+        <symbol id="plh-t-gray" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice"><rect width="100" height="100" fill="#4a5058"/><rect x="20" y="20" width="60" height="60" fill="#6a717a" opacity=".6"/></symbol>
+      </defs>
+    </svg>
+
+    <div class="plh__rig" data-rig>
+      <div class="plh__a" data-a>
+        <div class="plh__panel" data-panel></div>
+        <div class="plh__lit" data-lit></div>
+        <div class="plh__row" data-row><span class="t1">that lets you</span><span class="plh__slot" data-slot aria-hidden="true"></span><span class="t2"><b>filter</b> out AI.</span></div>
+        <div class="plh__sq" data-sq aria-hidden="true"></div>
+        <div class="plh__sq plh__sq--dark" data-sqd aria-hidden="true"></div>
+        <svg class="plh__ptr" data-ptr viewBox="0 0 22 27" aria-hidden="true"><path d="M3.5 2.8 L3.5 24 L19 14.2 Z" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.3" stroke-linejoin="round"/></svg>
+        <div class="plh__cards" data-cards aria-hidden="true"></div>
+      </div>
+      <div class="plh__b" data-b aria-hidden="true">
+        <div class="plh__bin" data-bin>
+          <div class="plh__title" data-title>A whole new universe</div>
+          <div class="plh__sub" data-sub>Article &mdash; The Design Process</div>
+          <div class="plh__btn" data-btn>Explore</div>
+        </div>
+      </div>
+    </div>
+    <div class="plh__fade" aria-hidden="true"></div>
+    <div class="plh__hud" data-hud aria-hidden="true">npx shadcn add @snapcn</div>
+    <div class="plh__veil" data-veil aria-hidden="true"></div>
+  </div>
+</div>
+<!-- COMPONENT:END -->
+
+<script>
+/* ==========================================================================
+   CONFIG (JS) - Zeitleiste in Sekunden (Videozeit v), Kamera, Karten, Ring.
+   Alle Glaettungen sind exponentiell: wert = ziel * (1 - exp(-k * (v - t0))).
+   ========================================================================== */
+const PRODUCT_LAUNCH_HERO_CONFIG = {
+  duration: 6.65,              // s: Laenge des Loops (Video: 6.65 s; danach harter Schnitt auf Schwarz)
+  loop: true, autoplay: true, speed: 1,
+  stage: { w: 1194, h: 672 },
+
+  intro:  { t0: 0.10, dur: 0.31 },                  // Panel + Text blenden aus dem Schwarz ein (fast linear)
+  row:    { fadeOutAt: 1.52, fadeOutDur: 0.16 },    // Satzzeile (+ Quadrat, Zeiger) blendet beim Kamerastart aus
+  pointer:{ at: 1.42, fade: 0.03 },                 // kleiner Zeiger-Pfeil erscheint kurz vor dem Kamerastart
+  slot:   { firstAt: 0.34, every: 0.40, firstFade: 0.07, crossFade: 0.14, art: ['walker', 'rays', 'portrait'] }, // Foto-Slot: alle 0.4 s ein neues Bild
+  square: { fadeFrom: 0.17, fadeTo: 0.55, rot0: 2, rotPerSec: 18.5, rotT0: 0.31, cx: 804, cy: 359, driftY: 12, driftEnd: 1.5, endAt: [295, 553], k: 1.3 }, // drehendes Outline-Quadrat (klebt am Panel A)
+
+  // Kamera um Panel A: Zoom-Out (scale) um den Zeilenmittelpunkt, dann Schwenk (translate) + Prisma-Drehung (rotateY); alles exponentiell geglaettet
+  cam: {
+    d: 1200, pivot: [715, 433],                      // Perspektive px; Drehpunkt in Panel-Koordinaten (= Zeilenmitte, Buehne 597/487)
+    s:   { t0: 1.3747, k: 5.4816, to: 0.6213 },      // 1.0 -> 0.62: Panel zoomt heraus
+    tx:  { t0: 1.5485, k: 6.582,  to: -379 },        // Panel rutscht nach links (rechte Kante -> x=566)
+    ty:  { t0: 1.570,  k: 18.9,   to: 15.04 },       // kleine Korrektur nach unten
+    rot: { t0: 1.565,  k: 8.483,  to: -36.72 },      // linke Seite weicht zurueck (Prisma-Winkel)
+    drop: { t0: 4.02, t1: 5.15, to: 111, rate: 3.4 }  // spaete Absenkung der ganzen Szene (Bildschirmraum, exponentiell beschleunigt, harter Stopp)
+  },
+  lit: { t0: 3.0, dur: 0.52 },                      // Panel A wird linear weiss (#e4e6e7)
+  cards: { flyK: 8.5, flyDx: 260, fadeIn: 0.22, collapseAt: 2.94, collapseDur: 0.38 }, // Foto-Wand: Einflug von links, Kollaps zur Hero-Karte
+  b:     { x0: 1228, x1: 628, t0: 2.02, omega: 7.3 }, // Panel B fliegt von rechts ein (kritisch gedaempfte Feder), links bei x=628
+  ring:  { cx: 1029, cy: 467, aspect: 0.74, ref: 3.03 },
+  hud:   { t0: 4.24, dur: 0.7, kY: 6.6, dy: 38, blur: 14 } // Befehlszeile: Deckkraft easeOutQuad ueber 0.7 s, Versatz exp. (k 6.6), Blur 14 -> 0
+};
+
+/* Foto-Karten (Panel A) - Rohdaten in BILDSCHIRM-Koordinaten der Buehne (1194x672) im Endzustand der Kamera;
+   init rechnet sie in Panel-Koordinaten um (unproject). [art, cx, cy, w, h, rot(deg), spawn(s), gone(s)] */
+const PLH_CARDS = [
+  ['blue',    32, 309,  96, 156,   4, 1.58, 2.34],
+  ['walker', 162, 305,  90, 148,   0, 1.64, 2.36],
+  ['warm',    -8, 433, 112, 160,   0, 1.70, 2.30],
+  ['rays',    62, 558, 118, 188,  -3, 1.76, 2.44],
+  ['sunset', 263, 415, 135, 200,  -4, 1.82, 2.48],
+  ['dusk',   165, 647, 106, 150,   0, 1.88, 2.52],
+  ['portrait',344, 575, 128, 175,   8, 1.92, 2.58],
+  ['rays',    18, 480, 112, 176,  -6, 2.10, 3.0],
+  ['red',    116, 345, 128, 201,  -8, 2.18, 3.0],
+  ['hill',   212, 297, 120, 160,   6, 2.26, 3.0],
+  ['warm',   347, 297, 135, 165,   6, 2.33, 3.0],
+  ['walker', 226, 566, 133, 166,   1, 2.50, 3.0],
+  ['dusk',   105, 662, 100, 150,   0, 2.58, 3.0]
+];
+const PLH_HERO = {                                                      // die Karte, die auf der weissen Flaeche stehen bleibt (3:4)
+  art: 'blue', from: [332, 468, 112, 169, -4], to: [167, 505, 178, 330, 0],   // [cx, cy, w, h, rot] in Bildschirm-Koordinaten
+  spawn: 2.42, moveAt: 2.94, k: 6, blur: 5.5, blurRise: 0.12, blurFrom: 3.18, blurK: 5   // gleitet ab 2.94 s nach links/gross, ist dabei unscharf und schaerft ab 3.18 s
+};
+
+/* Ring-Kacheln in Panel B: [art, ring, phi0(deg bei v=ring.ref), size(px), rotOffset(deg)]; phi waechst gegen den Uhrzeigersinn */
+const PLH_RINGS = [
+  { r: 490, w: 13.5, tiles: [['daisy', 68.6, 88, 6], ['grayblue', 82.4, 86, -4], ['tan', 96.2, 92, 5], ['orange', 109.4, 100, 0], ['city', 126.6, 100, 4], ['sky', 140.1, 102, -3], ['lav', 153.6, 104, 0], ['forest', 166.8, 88, -2], ['beach', 181.2, 94, 0], ['mist', 194.9, 92, 3], ['mist', 208.5, 90, -4], ['fall', 222.2, 92, 2], ['sky', 236, 90, 0]] },
+  { r: 300, w: 24, tiles: [['city', 66, 62, 0], ['daisy', 91.5, 58, 8], ['forest', 117, 64, -6], ['fall', 141.9, 78, 0], ['tan', 166.9, 68, -12], ['wood', 191.3, 66, -15], ['sky', 216, 64, 4], ['beach', 241, 62, 0]] },
+  { r: 215, w: -16, dim: .5, tiles: [['gray', 20, 28, 10], ['fall', 70, 24, 0], ['gray', 130, 30, 20], ['city', 200, 24, 0], ['fall', 262, 30, 12], ['gray', 320, 22, 0]] },
+  { r: 130, w: 18, dim: .5, tiles: [['gray', 40, 18, 0], ['fall', 170, 20, 30], ['gray', 290, 16, 0]] }
+];
+const PLH_TILE_SYM = { forest: 'forest', sky: 'sky', lav: 'lav', beach: 'beach', mist: 'mist', grayblue: 'mist', tan: 'tan', wood: 'wood', fall: 'fall', orange: 'orange', city: 'city', daisy: 'daisy', gray: 'gray' };
+
+/* ===== COMPONENT JS ===== */
+/* initProductLaunchHero(root, opts) -> { play(), pause(), toggle(), seek(sec), time(), destroy() }
+   root: Element mit dem Markup (siehe COMPONENT:START). opts ueberschreibt PRODUCT_LAUNCH_HERO_CONFIG (flach: duration, loop, autoplay, speed).
+   120 Hz: komplette Szene ist eine reine Funktion render(v) der Videozeit v; v wird aus dem rAF-Zeitstempel akkumuliert (dt <= 50 ms),
+   kein Frame-Zaehler, keine Intervalle. Pro Frame nur transform/opacity/filter-Schreibzugriffe (nur bei Aenderung), Layout nur bei Init/Resize. */
+function initProductLaunchHero(root, opts) {
+  const C = Object.assign({}, PRODUCT_LAUNCH_HERO_CONFIG, opts || {});
+  const stage = root.querySelector('.plh__stage'), rig = root.querySelector('[data-rig]'), A = root.querySelector('[data-a]');
+  const lit = root.querySelector('[data-lit]'), panel = root.querySelector('[data-panel]'), row = root.querySelector('[data-row]');
+  const slot = root.querySelector('[data-slot]'), sq = root.querySelector('[data-sq]'), sqd = root.querySelector('[data-sqd]'), ptr = root.querySelector('[data-ptr]'), fadeEl = root.querySelector('.plh__fade'), cardsEl = root.querySelector('[data-cards]');
+  const B = root.querySelector('[data-b]'), bin = root.querySelector('[data-bin]'), hud = root.querySelector('[data-hud]'), veil = root.querySelector('[data-veil]');
+  const clamp01 = x => x < 0 ? 0 : x > 1 ? 1 : x;
+  const E = (v, t0, k) => v <= t0 ? 0 : 1 - Math.exp(-k * (v - t0));          // exponentielle Glaettung (bildratenunabhaengig)
+  const NS = 'http://www.w3.org/2000/svg';
+  const mkArt = (sym, vb) => { const s = document.createElementNS(NS, 'svg'); s.setAttribute('viewBox', vb); s.setAttribute('preserveAspectRatio', 'xMidYMid slice'); const u = document.createElementNS(NS, 'use'); u.setAttribute('href', '#plh-' + sym); s.appendChild(u); return s; };
+  // Schreibzugriffe nur bei Aenderung
+  const memo = new WeakMap();
+  const put = (el, prop, val) => { let m = memo.get(el); if (!m) { m = {}; memo.set(el, m); } if (m[prop] !== val) { m[prop] = val; if (prop === 't') el.style.transform = val; else if (prop === 'o') el.style.opacity = val; else if (prop === 'f') el.style.filter = val; else if (prop === 'v') el.style.visibility = val; } };
+  const r3 = x => Math.round(x * 1000) / 1000, r2 = x => Math.round(x * 100) / 100;
+
+  // --- Slot-Bilder ---
+  const slotImgs = C.slot.art.map(a => { const s = mkArt('a-' + a, '0 0 120 160'); slot.appendChild(s); return s; });
+
+  // --- Kamera-Mathematik (identisch zur CSS-3D-Projektion), fuer unproject der Karten ---
+  const cam = C.cam, th = cam.rot.to * Math.PI / 180, cth = Math.cos(th), sth = Math.sin(th), CX = 597, CY = 336, PX = cam.pivot[0], PY = cam.pivot[1], PYS = 487;
+  function project(px, py) {            // Panel-Koordinaten -> Bildschirm (Endzustand der Kamera), identisch zur CSS-Projektion
+    const s = cam.s.to, qx = (px - PX) * s, qy = (py - PY) * s, z = -qx * sth, k = cam.d / (cam.d - z);
+    return [CX + (cam.tx.to + qx * cth) * k, CY + (PYS + cam.ty.to + qy - CY) * k, k];
+  }
+  function unproject(X, Y) {            // Bildschirm (Endzustand der Kamera) -> Panel-Koordinaten + lokale Skalierung (numerisch)
+    const s = cam.s.to, a = s * cth, b = -s * sth, d = cam.d;
+    const qx = d * ((X - CX) - cam.tx.to) / (d * a + (X - CX) * b), k = d / (d - b * qx);
+    const qy = ((Y - CY) / k - (PYS + cam.ty.to - CY)) / s, px = PX + qx, py = PY + qy;
+    const x1 = project(px + 1, py)[0], x0 = project(px - 1, py)[0], y1 = project(px, py + 1)[1], y0 = project(px, py - 1)[1];
+    return { px, py, k, sx: Math.abs(x1 - x0) / 2, sy: Math.abs(y1 - y0) / 2 };
+  }
+
+  // --- Foto-Karten aufbauen ---
+  const mkCard = (art, cx, cy, w, h) => {
+    const u = unproject(cx, cy), pw = w / u.sx, ph = h / u.sy;           // Bildschirmgroesse -> Panel-Pixel
+    const el = document.createElement('div'); el.className = 'plh__card'; el.appendChild(mkArt('a-' + art, '0 0 120 160'));
+    el.style.width = pw + 'px'; el.style.height = ph + 'px'; el.style.marginLeft = (-pw / 2) + 'px'; el.style.marginTop = (-ph / 2) + 'px';
+    cardsEl.appendChild(el); return { el, px: u.px, py: u.py, pw, ph };
+  };
+  const cards = PLH_CARDS.map(c => Object.assign(mkCard(c[0], c[1], c[2], c[3], c[4]), { rot: c[5], t0: c[6], t1: c[7] }));
+  const HERO = PLH_HERO, hero = Object.assign(mkCard(HERO.art, HERO.from[0], HERO.from[1], HERO.from[2], HERO.from[3]), { rot: HERO.from[4] });
+  const heroTo = mkCard(HERO.art, HERO.to[0], HERO.to[1], HERO.to[2], HERO.to[3]); cardsEl.removeChild(heroTo.el);   // nur Zielgeometrie
+  // weisse Flaeche: weicher Verlauf links; Start/Ende in Panel-Koordinaten aus den Bildschirm-x 0 und 272 (gemessen)
+  lit.style.background = 'linear-gradient(90deg, rgba(228,230,231,0) ' + Math.round(unproject(0, 400).px) + 'px, var(--plh-lit) ' + Math.round(unproject(272, 400).px) + 'px, var(--plh-lit) 100%)';
+
+  const sqEnd = unproject(C.square.endAt[0], C.square.endAt[1]);   // Endposition des Quadrats (Panel-Koordinaten)
+
+  // --- Ring-Kacheln in Panel B ---
+  const tiles = [];
+  PLH_RINGS.forEach(ring => ring.tiles.forEach(t => {
+    const el = document.createElement('div'); el.className = 'plh__tile'; el.style.width = t[2] + 'px'; el.style.height = t[2] + 'px'; el.style.marginLeft = (-t[2] / 2) + 'px'; el.style.marginTop = (-t[2] / 2) + 'px';
+    el.appendChild(mkArt('t-' + PLH_TILE_SYM[t[0]], '0 0 100 100')); bin.insertBefore(el, bin.firstChild);
+    if (ring.dim) el.style.opacity = ring.dim;
+    tiles.push({ el, r: ring.r, w: ring.w, phi: t[1], rot: t[3] });
+  }));
+  const BX = 628;   // linke Kante von Panel B im Endzustand (Buehnen-x)
+
+  const reduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+
+  function render(v) {
+    const D = C.duration;
+    // 0) Schwarz am Loop-Anfang / Einblenden
+    const a = clamp01((v - C.intro.t0) / C.intro.dur), aE = 1 - Math.pow(1 - a, 1.4);
+    put(panel, 'o', r3(aE));
+    // 1) Kamera Panel A
+    const sc = 1 + (cam.s.to - 1) * E(v, cam.s.t0, cam.s.k), tx = cam.tx.to * E(v, cam.tx.t0, cam.tx.k), ty = cam.ty.to * E(v, cam.ty.t0, cam.ty.k), rt = cam.rot.to * E(v, cam.rot.t0, cam.rot.k);
+    put(A, 't', 'translate3d(' + r2(tx) + 'px,' + r2(ty) + 'px,0) rotateY(' + r3(rt) + 'deg) scale(' + r3(sc) + ')');
+    // spaete Absenkung der ganzen Szene
+    const dr = cam.drop; let dd = 0;
+    if (v > dr.t0) { const e0 = Math.exp(dr.rate * (dr.t0 - dr.t1)); dd = dr.to * (Math.exp(dr.rate * (Math.min(v, dr.t1) - dr.t1)) - e0) / (1 - e0); }
+    put(rig, 't', 'translate3d(0,' + r2(dd) + 'px,0)');
+    // 2) Satzzeile + Slot + Quadrat
+    const rowO = aE * (1 - clamp01((v - C.row.fadeOutAt) / C.row.fadeOutDur));
+    put(row, 'o', r3(rowO)); put(row, 'v', rowO > 0.002 ? 'visible' : 'hidden');
+    for (let i = 0; i < slotImgs.length; i++) {
+      const at = C.slot.firstAt + C.slot.every * i, fd = i === 0 ? C.slot.firstFade : C.slot.crossFade;
+      put(slotImgs[i], 'o', r3(clamp01((v - at) / fd)));
+    }
+    const S = C.square, so = clamp01((v - S.fadeFrom) / (S.fadeTo - S.fadeFrom));
+    const litR = clamp01((v - C.lit.t0) / C.lit.dur);
+    const sa = S.rot0 + S.rotPerSec * (v - S.rotT0);
+    // Quadrat klebt am Panel: anfangs +12 px/s nach unten, ab 1.5 s gleitet es zur Endposition (auf der weissen Flaeche als dunkler Outline)
+    const e = E(v, S.driftEnd, S.k), sy = S.driftY * (Math.min(v, S.driftEnd) - S.rotT0) + (sqEnd.py - 305 - S.driftY * (S.driftEnd - S.rotT0)) * e, sxp = (sqEnd.px - 922) * e;
+    const sT = 'translate3d(' + r2(sxp) + 'px,' + r2(sy) + 'px,0) rotate(' + r2(sa) + 'deg)';
+    put(sq, 'o', r3(so * (1 - clamp01((v - C.row.fadeOutAt) / C.row.fadeOutDur)))); put(sq, 't', sT); put(sqd, 'o', r3(so * litR)); put(sqd, 't', sT);
+    put(ptr, 'o', r3(clamp01((v - C.pointer.at) / C.pointer.fade) * (1 - clamp01((v - C.row.fadeOutAt) / C.row.fadeOutDur))));
+    // 3) weisse Flaeche
+    put(lit, 'o', r3(litR)); put(fadeEl, 'o', r3(litR));
+    // 4) Foto-Wand
+    const K = C.cards, cg = clamp01((v - K.collapseAt) / K.collapseDur);
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i], ageIn = v - c.t0;
+      if (ageIn < 0 || v > c.t1 + 0.4) { put(c.el, 'v', 'hidden'); continue; }
+      const off = K.flyDx * Math.exp(-K.flyK * ageIn);               // fliegt von links ein, Tempo klingt exponentiell ab
+      const pop = 0.94 + 0.06 * clamp01(ageIn / 0.15);
+      let o = clamp01(ageIn / K.fadeIn), x = c.px - off, sxs = 1, blur = 0;
+      if (c.t1 < 3.0 && v > c.t1) { o *= 1 - clamp01((v - c.t1) / 0.12); }          // frueh abgeloeste Karten blenden aus
+      if (c.t1 >= 3.0 && cg > 0) {                                                 // Kollaps: zur Hero-Karte hin stauchen (Stapel rechts neben ihr), weichzeichnen, ausblenden
+        const g = cg * cg * (3 - 2 * cg), tgt = heroTo.px + heroTo.pw * 0.42 + (i % 5) * 16;
+        x = x + (tgt - x) * g; sxs = 1 - 0.62 * g; blur = 5 * g; o *= 1 - clamp01((cg - 0.4) / 0.5);
+      }
+      put(c.el, 'v', o > 0.003 ? 'visible' : 'hidden'); put(c.el, 'o', r3(o));
+      put(c.el, 't', 'translate3d(' + r2(x) + 'px,' + r2(c.py) + 'px,0) rotate(' + c.rot + 'deg) scale(' + r3(sxs * pop) + ',' + r3(pop) + ')');
+      put(c.el, 'f', blur > 0.05 ? 'blur(' + r2(blur) + 'px)' : 'none');
+    }
+    // Hero-Karte: Teil der Wand, gleitet ab collapseAt zur Zielposition (gross, links) und schaerft sich nach
+    { const ag = v - HERO.spawn, e = E(v, HERO.moveAt, HERO.k), off = K.flyDx * Math.exp(-K.flyK * Math.max(0, ag));
+      const o = clamp01(ag / K.fadeIn), pop = 0.94 + 0.06 * clamp01(ag / 0.15);
+      const x = hero.px + (heroTo.px - hero.px) * e - off, y = hero.py + (heroTo.py - hero.py) * e;
+      const sx = (1 + (heroTo.pw / hero.pw - 1) * e) * pop, sy = (1 + (heroTo.ph / hero.ph - 1) * e) * pop, rt = hero.rot * (1 - e);
+      const bl = HERO.blur * clamp01((v - HERO.moveAt) / HERO.blurRise) * Math.exp(-HERO.blurK * Math.max(0, v - HERO.blurFrom));
+      put(hero.el, 'v', o > 0.003 ? 'visible' : 'hidden'); put(hero.el, 'o', r3(o));
+      put(hero.el, 't', 'translate3d(' + r2(x) + 'px,' + r2(y) + 'px,0) rotate(' + r2(rt) + 'deg) scale(' + r3(sx) + ',' + r3(sy) + ')'); put(hero.el, 'f', bl > 0.1 ? 'blur(' + r2(bl) + 'px)' : 'none'); }
+    // 5) Panel B: kritisch gedaempfte Feder von rechts
+    const Bc = C.b, tau = v - Bc.t0; let bx = Bc.x0 - Bc.x1 > 0 ? Bc.x0 - BX : 0;
+    const f = tau <= 0 ? 1 : (1 + Bc.omega * tau) * Math.exp(-Bc.omega * tau);   // 1 -> 0
+    bx = (Bc.x0 - Bc.x1) * f;
+    put(B, 'v', bx < 600 ? 'visible' : 'hidden');
+    put(B, 't', 'translate3d(' + r2(bx) + 'px,0,0) skewY(3.43deg)');
+    // Ring-Kacheln: Position auf Ellipse um (cx,cy), Winkel waechst linear mit der Zeit
+    if (bx < 600) {
+      const R = C.ring, bxc = bx;
+      for (let i = 0; i < tiles.length; i++) {
+        const t = tiles[i], phi = (t.phi + t.w * (v - R.ref)) * Math.PI / 180;
+        const x = R.cx + t.r * R.aspect * Math.cos(phi), y = R.cy - t.r * Math.sin(phi);
+        const rot = 180 - phi * 180 / Math.PI + t.rot;
+        put(t.el, 't', 'translate3d(' + r2(x - BX) + 'px,' + r2(y - 205 + 0.06 * (x - BX) * 0) + 'px,0) rotate(' + r2(rot) + 'deg)');
+      }
+    }
+    // 6) HUD: Befehlszeile blur-in (Deckkraft easeOutQuad, Versatz exponentiell, Blur kubisch)
+    const H = C.hud, hx = clamp01((v - H.t0) / H.dur), ho = 1 - (1 - hx) * (1 - hx), hy = v <= H.t0 ? H.dy : H.dy * Math.exp(-H.kY * (v - H.t0)), hb = H.blur * (1 - hx) * (1 - hx) * (1 - hx);
+    put(hud, 'o', r3(ho)); put(hud, 't', 'translate3d(0,' + r2(hy) + 'px,0) translateY(-50%)'); put(hud, 'f', hb > 0.15 ? 'blur(' + r2(hb) + 'px)' : 'none');
+    // 7) harter Schnitt am Ende (Loop): Schwarz
+    put(veil, 'o', v < 0.1 ? 1 : 0);
+  }
+
+  // --- Skalierung der Buehne (nur bei Resize messen) ---
+  let ro = null;
+  const fit = () => { const w = root.clientWidth || C.stage.w; stage.style.setProperty('--plh-s', String(w / C.stage.w)); root.style.setProperty('--plh-s', String(w / C.stage.w)); };
+  fit();
+  if (window.ResizeObserver) { ro = new ResizeObserver(fit); ro.observe(root); }
+
+  // --- Zeitgeber ---
+  let v = C.autoplay && !reduce.matches ? 0 : Math.min(C.duration - 0.2, 6.0), playing = false, raf = 0, last = 0, visible = true, userPaused = !C.autoplay;
+  function tick(now) {
+    raf = 0; if (!playing) return;
+    const dt = Math.min(50, Math.max(0, now - last)); last = now;          // dt aus dem rAF-Zeitstempel, begrenzt
+    v += dt / 1000 * C.speed;
+    if (v >= C.duration) { if (C.loop) v = v % C.duration; else { v = C.duration - 0.001; playing = false; root.classList.remove('is-live'); render(v); return; } }
+    render(v); raf = requestAnimationFrame(tick);
+  }
+  function play() { if (reduce.matches) return; userPaused = false; if (!playing && visible) { playing = true; root.classList.add('is-live'); last = performance.now(); raf = requestAnimationFrame(tick); } }
+  function pause() { userPaused = true; playing = false; if (raf) cancelAnimationFrame(raf); raf = 0; root.classList.remove('is-live'); }
+  function toggle() { (playing || (!userPaused && visible && raf)) ? pause() : play(); }
+  function seek(sec) { v = ((sec % C.duration) + C.duration) % C.duration; render(v); }
+
+  // --- Eingabe: Klick/Tipp = Pause/Play, Tasten ---
+  const ac = new AbortController(), P = { signal: ac.signal, passive: true };
+  root.addEventListener('pointerup', e => { if (e.pointerType === 'mouse' && e.button !== 0) return; toggle(); }, P);
+  root.addEventListener('keydown', e => {
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'k') { e.preventDefault(); toggle(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); seek(v + 0.5); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(v - 0.5); }
+    else if (e.key === 'Home') { e.preventDefault(); seek(0); }
+  }, { signal: ac.signal });
+  // Tab unsichtbar / ausserhalb des Viewports: Loop anhalten (Energie)
+  const onVis = () => { visible = !document.hidden; if (!visible) { playing = false; if (raf) cancelAnimationFrame(raf); raf = 0; root.classList.remove('is-live'); } else if (!userPaused) play(); };
+  document.addEventListener('visibilitychange', onVis, { signal: ac.signal });
+  let io = null;
+  if (window.IntersectionObserver) { io = new IntersectionObserver(es => { visible = es[es.length - 1].isIntersecting && !document.hidden; if (!visible) { playing = false; if (raf) cancelAnimationFrame(raf); raf = 0; root.classList.remove('is-live'); } else if (!userPaused) play(); }); io.observe(root); }
+  if (reduce.addEventListener) reduce.addEventListener('change', () => { if (reduce.matches) { pause(); seek(6.0); } else if (C.autoplay) play(); }, { signal: ac.signal });
+
+  render(v);
+  if (C.autoplay && !reduce.matches) play(); else { userPaused = true; }
+  return {
+    play, pause, toggle, seek, time: () => v,
+    destroy() { ac.abort(); pause(); ro && ro.disconnect(); io && io.disconnect(); }
+  };
+}
+/* ===== /COMPONENT JS ===== */
+
+/* ===== DEMO ===== */
+window.plh = initProductLaunchHero(document.querySelector('[data-plh]'));
+</script>
+</body>
+</html>

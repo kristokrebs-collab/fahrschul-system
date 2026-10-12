@@ -1,0 +1,21 @@
+/* Slush — „Aufblasbares Sticker-Universum auf Pastellpapier“ (light). Einsatz: <section data-style="slush"> (+ _base.css) */
+[data-style="slush"] {
+  /* Marke */
+  --sl-carbon: #000000; --sl-paper: #ffffff; --sl-sky: #dceeff; --sl-concrete: #cccccc; --sl-mist: #e9e9e9;
+  --sl-blue: #4da2ff; --sl-mint: #55db9c; --sl-lavender: #e9ccff; --sl-ember: #fb4903; --sl-sun: #ffd731; --sl-violet: #5c4ade;
+  /* Semantik-Schicht */
+  --s-bg: var(--sl-sky); --s-surface: var(--sl-paper); --s-fg: var(--sl-carbon); --s-fg-muted: rgba(0,0,0,.6);
+  --s-border: var(--sl-carbon); --s-border-strong: var(--sl-carbon); --s-accent: var(--sl-blue); --s-link: var(--sl-carbon);
+  --s-action-bg: var(--sl-carbon); --s-action-fg: var(--sl-paper);                 /* CTA = schwarz gefüllt, nie blau */
+  --s-radius-card: 20px; --s-radius-btn: 1600px; --s-card-pad: 24px; --s-card-border: 1px solid var(--sl-carbon);
+  --s-btn-pad: 10px 12px; --s-btn-weight: 700; --s-btn-case: uppercase; --s-btn-tracking: .032em; --s-btn-border: 1px solid var(--sl-carbon);
+  --s-font-ui: 'Aeonik Pro', 'Inter', 'Satoshi', 'General Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: 'Lateral', 'Druk', 'Bowlby One', 'Antonio', Impact, 'Arial Narrow Bold', sans-serif;
+  --s-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 800; --s-display-leading: 0.78; --s-display-tracking: normal; --s-display-case: uppercase; --s-body-weight: 500;
+  --s-ease: ease; --s-dur: .2s;
+  /* Extras: Sticker-Palette wird gemeinsam genutzt (mehrere Farben pro Screen), Sektionen wechseln Sky / Weiß / Grau */
+  --sl-band-1: var(--sl-sky); --sl-band-2: var(--sl-paper); --sl-band-3: var(--sl-concrete);
+  --sl-sticker-border: 1px solid var(--sl-carbon); --sl-sticker-radius: 20px;
+}
+[data-style="slush"] .s-sticker { border: var(--sl-sticker-border); border-radius: var(--sl-sticker-radius); background: var(--sl-sun); padding: 8px 14px; font-weight: 700; display: inline-block; transform: rotate(-4deg); }

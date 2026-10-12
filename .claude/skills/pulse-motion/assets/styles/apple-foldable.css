@@ -1,0 +1,22 @@
+/* Apple Foldable-Launchseite — „Weiße Galerie, Produkt als Ereignis“ (light). Einsatz: <section data-style="apple-foldable"> (+ _base.css) */
+[data-style="apple-foldable"] {
+  /* Marke */
+  --afo-white: #ffffff; --afo-mist: #f5f5f7; --afo-frost: #fafafc; --afo-hairline: #d6d6d6; --afo-control: #e6e6e8;
+  --afo-ink: #1d1d1f; --afo-slate: #707070; --afo-steel: #86868b; --afo-blue: #0066cc; --afo-pricing: #0071e3; --afo-orange: #b64400;
+  /* Semantik-Schicht */
+  --s-bg: var(--afo-white); --s-surface: var(--afo-white); --s-fg: var(--afo-ink); --s-fg-muted: var(--afo-slate);
+  --s-border: var(--afo-hairline); --s-border-strong: var(--afo-steel); --s-accent: var(--afo-pricing); --s-link: var(--afo-blue);
+  --s-action-bg: var(--afo-pricing); --s-action-fg: #ffffff;
+  --s-radius-card: 28px; --s-radius-btn: 9999px; --s-card-pad: 28px; --s-card-border: 0;
+  --s-btn-pad: 4px 12px; --s-btn-weight: 400;
+  --s-font-ui: 'SF Pro Text', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-display: 'SF Pro Display', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --s-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --s-display-weight: 600; --s-display-leading: 1.05; --s-display-tracking: -0.015em; --s-body-weight: 400;
+  --s-ease: ease; --s-dur: .2s;
+  /* Extras */
+  --afo-band: var(--afo-mist);                 /* abwechselndes Section-Band */
+  --afo-outline: 0 0 0 1px var(--afo-steel);   /* einziger „Schatten“: 1px-Kontur */
+  --afo-section-gap: 90px; --afo-element-gap: 20px; --afo-body-tracking: -0.374px;
+  font-feature-settings: "numr";
+}

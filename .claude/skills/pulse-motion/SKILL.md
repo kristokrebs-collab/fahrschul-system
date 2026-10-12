@@ -1,0 +1,95 @@
+---
+name: pulse-motion
+description: Bibliothek 120-Hz-tauglicher UI-Animationen (22 aus 21st.dev-Aufnahmen nachgebaute, eigenständige HTML-Komponenten mit Timing-, Feder- und Look-Werten) plus 10 Design-Style-Referenzen (Dala, Apple, ORYZO, Origin, Air, Superhuman, Slush, Factory, Structured) als Inspirations-Schnipsel mit drop-in-CSS. Nutze IMMER, wenn eine Website, Landing-Page, App-Komponente oder ein Artefakt animiert, premium, 'wow', butterweich (120 fps / 120 Hz), mit Micro-Interactions, Hover-, Scroll-, Cursor- oder Text-Effekten oder im 21st.dev-Look gebaut werden soll, oder wenn nur Look & Feel, Farbschema, Typografie oder dark/light Theme gefragt ist - auch ohne dass der Nutzer einen Skill nennt. Auch wenn Animations-Videos oder Style-Referenzen zum Aufnehmen geschickt werden. EN: micro-interactions, motion design, spring physics, smooth 120Hz UI, text animation, dock, typewriter, design inspiration, style reference, color palette, design tokens.
+---
+
+# pulse-motion — Animationen mit hoher Bildwiederholrate
+
+Zwei Dinge sind hier festgelegt: **(1)** jede Animation sieht aus und fühlt sich an wie das Original-Video (gemessene Dauer, Easing, Feder, Farben, Abstände), **(2)** jede läuft auf **≥ 120 Hz** ruckelfrei (zeitbasiert, nur Compositor-Eigenschaften, geprüft mit `scripts/check120.cjs`). Die Nachbauten sind **Vanilla HTML/CSS/JS ohne Abhängigkeiten** — sie laufen in jedem Chat/Artefakt, jeder Seite, jedem Framework. Quelle sind Aufnahmen von 21st.dev-Komponenten; der Original-Code lag nicht vor, alles ist aus dem Video rekonstruiert (Abweichungen stehen ehrlich in jeder Spec).
+
+Zusätzlich liefert der Skill **Design-Inspiration**: 10 Style-Referenzen mit drop-in-CSS (siehe „Style-Schnipsel“ unten) — Look von dort, Bewegung von hier.
+
+## So setzt Du sie ein
+1. **Passende Animation suchen** im Index unten (Stichworte DE/EN). Passt keine exakt: die nächste nehmen und remixen (Schritt 4).
+2. **Spec lesen** (`references/<slug>.md`): Zeitleiste in ms, Motion-/Look-Tokens, Interaktion, Barrierefreiheit, 120-Hz-Technik, Einbindung, React/Framer-Motion-Mapping.
+3. **Komponente übernehmen** (`assets/<slug>.html`): Block zwischen `<!-- COMPONENT:START/END -->` + `/* COMPONENT CSS */` + `init<Name>(root, opts)` ins Zielprojekt kopieren. Look und Tempo nur über die Variablen/CONFIG oben ändern, nicht im Code. Fürs Projekt anpassen: Texte, Farben (Variablen), Größen.
+4. **Kreativ remixen** — jede Spec hat einen Abschnitt „Kreativ remixen“. Allgemein: Stellschrauben hochdrehen (weniger Dämpfung → mehr Overshoot, kürzere Dauer, Stagger, Tiefe/Glow), Effekte kombinieren (z. B. Dock-Magnification + Tooltip-Morph, Text-Linse + Typewriter), den Auslöser wechseln (Hover → Scroll → Cursor-Nähe → Tastatur). Die **Anti-Muster-Regeln bleiben bindend** (siehe unten).
+5. **Prüfen:** Bei eigenen/geänderten Animationen `node scripts/check120.cjs <html> <actions.cjs>` laufen lassen (Anleitung in `references/principles-120hz.md`); Ziel `VERDIKT 120Hz: statisch=ok laufzeit(4x CPU)=ok fehler=keine`.
+
+## Die harten 120-Hz-Regeln (Kurzfassung — Details & getestete Code-Bausteine: `references/principles-120hz.md`)
+- Zeit statt Frames: rAF-Zeitstempel/`performance.now()`, **nie** `setInterval`, `1000/60`, „+= pro Frame“.
+- Nur `transform`/`opacity`/`filter` animieren; kein `transition: all`; keine Layout-Eigenschaften.
+- Federn per exakter Formel (`springAt`), Glätten per `1 - exp(-k·dt)`.
+- `pointermove` merken, 1× pro rAF anwenden; nichts pro Frame messen oder neu bauen; Leerlauf = keine Arbeit.
+- `prefers-reduced-motion` respektieren; Tastatur/ARIA wo sinnvoll.
+
+## Style-Schnipsel (Design-Inspiration)
+Zehn Style-Referenzen in `references/styles/<slug>.md` + `assets/styles/<slug>.css` — **Inspiration zum Schnipsel-Klauen, nicht zum 1:1-Nachbauen** (keine Marken/Logos/Fotos übernehmen, proprietäre Schriften durch die genannten Ersatzschriften ersetzen).
+- **Vorgehen:** passenden Host-Style wählen → dessen `.md` lesen (Signature-Moves, Farben, Typo-Skala, Komponenten, Do/Don't) → CSS einbinden (`_base.css` + `<slug>.css`, Scope `data-style="<slug>"`) oder nur einzelne Werte/Moves übernehmen → mit einer Animation kombinieren.
+- **Mischen:** Regeln, Move-Tabelle, Style→Animation-Brücke und Kombinations-Vorschläge in `references/design-mixing.md`. Vorschau aller Styles: `assets/styles/_preview.html`.
+- Die gemeinsame Semantik-Schicht (`--s-bg`, `--s-fg`, `--s-accent`, `--s-action-bg`, `--s-radius-*`, `--s-font-*` …) ist in allen Styles gleich benannt → Style per Attribut austauschbar; Markenwerte tragen Slug-Prefix (kollisionsfrei, auch verschachtelt).
+- Auch für Design-Anfragen **ohne Animation** nutzen: Farbschema/Typo/Radien/Button-Logik aus dem passenden Style ableiten.
+
+<!-- STYLES:START -->
+| Style | Theme | Essenz | Dateien |
+|---|---|---|---|
+| **Air** | dark | Mitternachtshimmel durch Glasskulptur: Vollbild-Wolkenfotografie und 3D-Glasformen tragen die Emotion, die UI bleibt leicht. | [air.md](references/styles/air.md) · [css](assets/styles/air.css) |
+| **Apple España** | light | Kathedrale aus Weißraum: riesige Headlines schweben auf fast weißem Grund, Farbe kommt nur aus dem Produkt, ein einziger blauer Faden. | [apple-espana.md](references/styles/apple-espana.md) · [css](assets/styles/apple-espana.css) |
+| **Apple Foldable-Launch** | light | Foldable-Gerät in weißer Galerie: das Produkt-Render ist das Ereignis, Typo und blaue Controls bleiben bewusst leise. | [apple-foldable.md](references/styles/apple-foldable.md) · [css](assets/styles/apple-foldable.css) |
+| **Dala** | dark | Konstellation auf schwarzem Samt: reines Schwarz, EIN violetter Akzent, Bernstein-Funken, riesige federleichte Headlines. | [dala.md](references/styles/dala.md) · [css](assets/styles/dala.css) |
+| **Factory** | dark | Terminal-War-Room um Mitternacht: schwarze Kontrollfläche, auf der eine einzige weiße Karte wie ein Lichtkegel landet; Farbe nur für Live-Daten. | [factory.md](references/styles/factory.md) · [css](assets/styles/factory.css) |
+| **Origin Financial** | dark | Mitternachts-Galerie: Near-Black, Whisper-Serif in 80–96px und leuchtende Farbkacheln; Finanzen als kuratierte Kunst. | [origin-financial.md](references/styles/origin-financial.md) · [css](assets/styles/origin-financial.css) |
+| **ORYZO AI** | dark | Dunkelkammer-Editorial: ein einzelnes Objekt schwebt im warmen Dunkel, Creme-Typografie ist die einzige Dekoration. | [oryzo-ai.md](references/styles/oryzo-ai.md) · [css](assets/styles/oryzo-ai.css) |
+| **Slush** | light | Aufblasbares Sticker-Universum auf Pastellpapier: riesige gequetschte Display-Typo, 3D-Ribbons in Electric Blue, Sticker-Konfetti mit schwarzer Kontur. | [slush.md](references/styles/slush.md) · [css](assets/styles/slush.css) |
+| **Structured** | mixed | Renaissance-Galerie auf Spachtelpapier: monumentale Serife, klassische Ölgemälde, harte Hell/Dunkel-Schnitte; Finanzen als Hochkunst. | [structured.md](references/styles/structured.md) · [css](assets/styles/structured.css) |
+| **Superhuman** | light | Goldene-Stunde-Editorial: warmes Pergament statt Weiß, ein Weinrot-Moment, Violett-Links, Produkt-UI als Glaskarten über Fotografie. | [superhuman.md](references/styles/superhuman.md) · [css](assets/styles/superhuman.css) |
+<!-- STYLES:END -->
+
+## Animations-Index (automatisch erzeugt: `python3 scripts/build_index.py`)
+<!-- INDEX:START -->
+| Name | Was es ist | Stichworte (EN) | Dateien |
+|---|---|---|---|
+| **Agent Trace** | Dunkle Gantt-/Trace-Karte eines Agent-Laufs mit scrubbarer Timeline: Beim Ziehen des Reglers fuellen sich Balken, Token- und Zeitwerte laufen live mit, Zeilen "wachen ... | Agent-/LLM-Observability, Run-Replay, Tracing-Dashboards (Langfuse/Datadog-Stil) | [agent-trace.md](references/agent-trace.md) · [html](assets/agent-trace.html) |
+| **Autocomplete** | Such-Eingabefeld "Search a framework" mit Dropdown, das per kurzem Fade+Scale aufpoppt (Treffer-Liste oder Leerzustand "No frameworks found.") und gegenlaeufig zu einem ... | Such-/Command-Felder, Framework-/Tag-/Stadt-Picker, Combobox, Typeahead (autocomplete, com ... | [autocomplete.md](references/autocomplete.md) · [html](assets/autocomplete.html) |
+| **Cinematic Orbit Hero** | Acht Foto-Karten liegen zuerst als schraeger Faecher (gerade Diagonale, -12 Grad) in der Mitte; nach ~2.5 s oeffnen sie sich in ~2.8 s (langsamer Anlauf, Spitze bei 1.4 ... | Hero einer Produkt-/Portfolio-/Sport-/Wearable-Seite mit 6-10 starken Fotos (Kampagnen-Loo ... | [cinematic-orbit-hero.md](references/cinematic-orbit-hero.md) · [html](assets/cinematic-orbit-hero.html) |
+| **Dancing Letters** | Grosses Wort "ANIMATE": Buchstaben in der Naehe des Zeigers springen federnd weg (kleiner, hoeher/tiefer, teils gekippt), bleiben ca. 1.4 s verrutscht und gleiten dann ... | dancing letters, playful hover text, per-letter spring, scatter letters, kinetic typograph ... | [dancing-letters.md](references/dancing-letters.md) · [html](assets/dancing-letters.html) |
+| **Dock** | macOS-artige Icon-Leiste (Home, Search, Music, Favorites, Add New, Profile, Settings): beim Ueberfahren eines Icons blendet ein Textlabel darueber ein (steigt ~6px auf) ... | Floating Navigation / Bottom-Dock fuer Apps, Portfolios, Landing-Pages (Icon-only Toolbar) | [dock.md](references/dock.md) · [html](assets/dock.html) |
+| **Draggable Widget Grid** | Dunkles Dashboard-Raster (4 Spalten, 8 "live" tickende Mono-Widgets): Karte gedrueckt halten, sie hebt ab (Scale 1.06 + heller Schein) und folgt dem Zeiger; ueberfaehrt ... | Anpassbare Dashboards / Admin-Panels / Analytics- und Observability-Boards (Widgets umsort ... | [draggable-widget-grid.md](references/draggable-widget-grid.md) · [html](assets/draggable-widget-grid.html) |
+| **Glyph Portal** | Ein riesiges Wort ("SUBLIME") in dunklem Gruen auf Grau; beim Scrollen blendet das Interface aus, die Kamera taucht in einen Buchstaben (M) ein - er kippt leicht, wird ... | Hero -> naechste Sektion mit "Wow": Agentur-/Portfolio-/Studio-Startseite, Markenname als  ... | [glyph-portal.md](references/glyph-portal.md) · [html](assets/glyph-portal.html) |
+| **Immersive Full Screen Navigation** | Menue-Button: ein schwarzes Vollbild-Panel faehrt per Wipe von links auf, danach erscheinen Brand-Block, Links, Bilder und Socials gestaffelt (Fade + Anhub); Schliessen ... | Fullscreen-/Overlay-Navigation fuer Studio-, Agentur-, Portfolio-Sites (Editorial-Look) | [immersive-full-screen-navigation.md](references/immersive-full-screen-navigation.md) · [html](assets/immersive-full-screen-navigation.html) |
+| **Morphing Language Selector** | Eine Pille ("English v") morpht per Feder zu einer scrollbaren Sprachliste (dunkles Panel), nach Auswahl zieht sie sich zurueck zur Pille mit neuer Sprache ("Deutsch v"). | Sprach-/Region-/Waehrungs-Umschalter in Header, Footer, Settings (language switcher, local ... | [morphing-language-selector.md](references/morphing-language-selector.md) · [html](assets/morphing-language-selector.html) |
+| **Motion Footer** | Scroll-Reveal-Footer: ein dunkler "Vorhang" (Hero "SCROLL DOWN TO REVEAL" mit gerundeten unteren Ecken) scrollt nach oben weg und gibt einen darunter festgepinnten ... | scroll reveal, sticky footer, staggered fade-in, infinite marquee, dark UI | [motion-footer.md](references/motion-footer.md) · [html](assets/motion-footer.html) |
+| **Notched Project Card** | Drei Projekt-Karten mit Foto in Graustufen und runder Kerbe unten rechts; beim Hover blendet das Foto in Farbe und der Pfeil-Kreis in der Kerbe wird dunkelrot. | portfolio grid, case studies, team/blog cards, grayscale-to-color hover, notched / cut-out ... | [notched-project-card.md](references/notched-project-card.md) · [html](assets/notched-project-card.html) |
+| **Parallax Strip Slider** | Vollflaechiger Bild-Slider: das naechste Bild "waechst" in 10 vertikalen Streifen von links nach rechts (oben nach unten) ueber das alte; Titel steigt danach Buchstabe ... | Editorial / Mode / Fotografie-Hero, Kollektions- oder Case-Study-Slider (Fashion, Portfolio) | [parallax-strip-slider.md](references/parallax-strip-slider.md) · [html](assets/parallax-strip-slider.html) |
+| **Pixel Text Fill** | Vierzeiliger Satz in dunklem Grau; eine pixelig gerasterte orange "Glut"-Front läuft Zeile für Zeile von links nach rechts, direkt dahinter füllt weiches Weiß den Text. | text reveal, pixel dither text fill, scanline highlight, ember sweep, hero statement, line ... | [pixel-text-fill.md](references/pixel-text-fill.md) · [html](assets/pixel-text-fill.html) |
+| **Product Launch Hero** | Ein 6.65-s-Produkt-Trailer als Loop: dunkle Punktraster-Karte mit Satz "that lets you [Foto] filter out AI." und drehendem Quadrat -> Kamera zoomt heraus und schwenkt ... | Produkt-/Library-Launch-Hero, "Trailer"-Sektion auf Landingpages - product launch, hero tr ... | [product-launch-hero.md](references/product-launch-hero.md) · [html](assets/product-launch-hero.html) |
+| **Product Timeline** | Scroll-gekoppelte, gepinnte Horizontal-Timeline: Hero "Six years, one horizontal scroll." -> Abschnitt pinnt, Track gleitet seitwaerts, jeder Meilenstein zeichnet seinen ... | Roadmap / Firmengeschichte / Changelog als Scroll-Story (scrollytelling) | [product-timeline.md](references/product-timeline.md) · [html](assets/product-timeline.html) |
+| **Reel Collage** | Zwei Headline-Zeilen rahmen ein Fenster, in dem Video-Reels im Schnelldurchlauf wechseln; das Fenster klappt per scaleY zu, der Text wechselt und sechs Karten fliegen ... | Launch-/Produkt-Hero ("The videos / That you ship"), Showreel, Agentur-Intro | [reel-collage.md](references/reel-collage.md) · [html](assets/reel-collage.html) |
+| **Slanted Spread Hero** | Ein kompakter, schraeg geneigter Kartenstapel faechert sich weich diagonal auf und blendet dahinter eine grosse Headline mit Untertext ein. | Hero-Bereich einer Landing-Page / Portfolio / Galerie-Teaser (hero, showcase) | [slanted-spread-hero.md](references/slanted-spread-hero.md) · [html](assets/slanted-spread-hero.html) |
+| **Tactile Highlight** | Zweizeiliger Claim-Text, dessen Schlusswort ("Better Interfaces.") auf einem fast schwarzen Marker-Balken liegt, der per kurzem "Tab" und exponentiellem Wisch von links ... | Hero-/Mission-Statement, in dem ein Schluesselbegriff hervorgehoben werden soll (Marker st ... | [tactile-highlight.md](references/tactile-highlight.md) · [html](assets/tactile-highlight.html) |
+| **Text Animate** | Typewriter: Der Satz "Ship beautiful interfaces, fast." tippt sich Zeichen fuer Zeichen mit Cursor neu, ausgeloest per "Replay"-Button. | Hero-Headline / Claim, der sich "live tippt" (typewriter, headline reveal) | [text-animate.md](references/text-animate.md) · [html](assets/text-animate.html) |
+| **Text ASCII Cascade** | Ein Wort zerfaellt in zufaellige ASCII-/Block-Zeichen, sackt dabei ~1 Schriftgroesse nach unten und verblasst ins Blaugrau, steigt wieder auf, leuchtet auf und loest ... | Hero-Headline / Logo-Wort, das beim Laden oder Hover "decodiert" (Hacker-/Terminal-/Matrix ... | [text-ascii-cascade.md](references/text-ascii-cascade.md) · [html](assets/text-ascii-cascade.html) |
+| **Text Morphing** | Zentriertes Wort morpht alle 2 s per Blur-Crossfade + Alpha-Schwelle (Gooey-Effekt) von "Develop" ueber "Deploy" zu "Delight" und wieder von vorn. | Hero-Claim / Tagline mit wechselnden Schluesselwoertern (Develop, Deploy, Delight) | [text-morphing.md](references/text-morphing.md) · [html](assets/text-morphing.html) |
+| **Text Prism Split** | Ein Wort in Fliesstext-Groesse, ueber dem ein schwarzes, weich gerandetes Linsenfenster federnd dem Zeiger folgt; darin ist der Text 6% groesser, 5px hoeher und besteht ... | Hero-Headline / Markenname / Portfolio-Name auf dunklem Grund (Wow beim ersten Hover) - he ... | [text-prism-split.md](references/text-prism-split.md) · [html](assets/text-prism-split.html) |
+<!-- INDEX:END -->
+
+## Neue Animation aufnehmen (wenn der Nutzer weitere Videos schickt)
+Der Nutzer schickt 21st.dev-Bildschirmaufnahmen (Samsung-Aufnahmen, 1730×1080, ca. 90–115 Bilder/s variabel). Jede wird zu `assets/<slug>.html` + `references/<slug>.md`.
+1. **Duplikate zuerst:** `md5sum` aller Videos vergleichen — der Nutzer schickt Dateien öfter doppelt. Nur Neues bearbeiten.
+2. **Identifizieren:** Vollbild ansehen (`ffmpeg -ss 0.3 -i v.mp4 -frames:v 1 full.png`); oben links steht der Komponentenname → `slug`.
+3. **Zerlegen:** `scripts/frames.sh <video> <outdir> [fps] [crop]` (Bühne ausschneiden, Kontaktblatt). Schnelle Übergänge mit `fps=120` in kurzen Fenstern; echte Frame-Zeiten via `ffprobe -select_streams v -show_entries frame=pts_time`.
+4. **Analysieren:** Zeitleiste der Zustände (ms), Easing-Charakter (ease/Feder/Overshoot), Stagger, Scale/Blur/Opacity, Farben (ImageMagick `convert f.png -crop 1x1+X+Y -format '%[hex:u]' info:`), Radien, Abstände, Schrift.
+5. **Nachbauen:** eine selbständige HTML-Datei nach den Regeln oben (Variablen/CONFIG ganz oben, `COMPONENT:START/END`, `init<Name>()`, Demo mit dem Video-Inhalt).
+6. **Gegen das Video prüfen:** `scripts/record.cjs` (Playwright nimmt den Nachbau mit derselben Choreografie auf) → `frames.sh` → `scripts/sidebyside.sh` (Original | Nachbau). Bis ~3 Runden verbessern.
+7. **120-Hz-Gate:** `scripts/check120.cjs` (alle FAIL beheben).
+8. **Spec schreiben** nach dem Muster der vorhandenen (`references/notched-project-card.md` ist ein gutes Vorbild): Wann einsetzen (DE + `- EN:`-Stichwortzeile!), Anatomie & Zeitleiste, Motion-/Look-Tokens, Interaktion & Barrierefreiheit, 120 Hz, Einbindung, React/Framer-Mapping, Kreativ remixen (5 Ideen), Bekannte Abweichungen.
+9. **Index + Paket:** `python3 scripts/build_index.py`, dann `scripts/package.sh` → `pulse-motion.zip` für den Upload in claude.ai (Einstellungen → Fähigkeiten/Skills → Hochladen).
+
+## Neue Style-Referenz aufnehmen
+Schickt der Nutzer weitere „Style Reference“-Blöcke: verdichten statt kopieren (Signature-Moves, Farben, Typo, Form, Komponenten, Do/Don't), Quell-Tippfehler korrigieren, `references/styles/<slug>.md` + `assets/styles/<slug>.css` anlegen, `_preview.html` erweitern, `python3 scripts/build_index.py`, `scripts/package.sh`. Details: `references/design-mixing.md` §6.
+
+## Ehrliche Grenzen
+- Nachbauten sind aus Videos rekonstruiert, nicht der Original-Quellcode: Timing/Look sind gegen das Video gefittet (Fidelity je Spec benannt), Nicht-Sichtbares (z. B. `:active`, Touch-Verhalten des Originals) ist als „nicht erkennbar“ markiert.
+- 120-Hz-Messung läuft in Headless-Chromium (Software-Raster, kein echtes 120-Hz-Display). Sie beweist Zeitbasiertheit und niedrige Frame-Kosten, ersetzt aber keinen Test auf dem Gerät.
+- Demo-Bilder in Specs sind aus dem Video extrahierte Platzhalter, keine Originale.
+- Style-Referenzen sind aus Beschreibungen öffentlicher Seiten abgeleitet (Inspiration); Schriften sind proprietär und nur als Ersatzstack hinterlegt.

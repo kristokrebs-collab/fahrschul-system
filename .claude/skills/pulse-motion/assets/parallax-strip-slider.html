@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Parallax Strip Slider</title>
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+:root{
+  /* Look */
+  --stage-bg:#050505;              /* Buehne hinter den Bildern */
+  --ui-text:#ffffff;               /* Label + Titel (Weiss) */
+  --ui-text-dim:rgba(255,255,255,.55); /* Zaehler "01/ 03" */
+  --line-base:rgba(255,255,255,.18);   /* Fortschrittslinie: Grundlinie */
+  --line-fill:rgba(255,255,255,.65);   /* Fortschrittslinie: gefuellter Teil */
+  --font-serif:"Instrument Serif","Cormorant Garamond","Playfair Display",ui-serif,"Liberation Serif",Georgia,serif;
+  --font-sans:Inter,Geist,ui-sans-serif,system-ui,"Liberation Sans",Arial,sans-serif;
+  --title-size:8.6cqw;             /* Titel ~106px @1230 Buehne */
+  --title-xscale:.74;              /* Titel schmaler (Original: condensed Serif; Fallback-Serif ist breiter) */
+  --title-letter-spacing:-.01em;
+  --label-size:12px;               /* "Collection 01" */
+  --counter-size:11px;             /* "01/ 03" */
+  --pad:41px;                      /* Innenabstand der UI (links/rechts/oben) */
+  --line-top:32px;                 /* Abstand der Linie von oben */
+  --title-bottom:5.6%;             /* Abstand Titel-Unterkante zum unteren Rand */
+  --veil:linear-gradient(to top,rgba(0,0,0,.28),rgba(0,0,0,0) 38%); /* leichter Verlauf unten */
+}
+</style>
+<script>
+/* ===== MOTION CONFIG (alle Zeiten in ms) ===== */
+const PS_CONFIG = {
+  columns: 10,            // Anzahl Streifen
+  colStagger: 26,         // Versatz zwischen Streifen (links -> rechts)
+  colWidthMs: 420,        // Dauer Breitenwachstum je Streifen (easeOutQuart)
+  colHeightTau: 45,       // Zeitkonstante Hoehenwachstum von oben nach unten (1-exp(-t/tau)); klein = schneller
+  colHeightEnd: 420,      // ab hier ist die Hoehe = 100 %
+  titleOutDelay: 260,     // alter Titel/Label blendet ab
+  titleOutMs: 280,
+  titleInDelay: 560,      // neuer Titel steigt buchstabenweise auf
+  letterStagger: 30,
+  letterMs: 320,
+  metaInDelay: 600,       // neues Label + Zaehler blenden ein
+  metaInMs: 260,
+  lineDelay: 300,         // Fortschrittslinie wandert zum neuen Stand
+  lineMs: 650,
+  totalMs: 1050,          // Gesamtdauer eines Wechsels
+  autoplayMs: 1900,       // Start-zu-Start-Abstand; 0 = aus (nur Klick/Swipe/Tasten)
+  firstDelayMs: 1040,     // Wartezeit bis zum ersten Wechsel (Video: ~1.04 s)
+  swipePx: 40,
+  reducedFadeMs: 220      // prefers-reduced-motion: nur Ueberblendung
+};
+</script>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0;height:100%}
+body{background:var(--stage-bg);overflow:hidden;font-family:var(--font-sans)}
+.ps{position:relative;width:100%;height:100%;container-type:size;contain:layout paint;overflow:hidden;
+  background:var(--stage-bg);color:var(--ui-text);touch-action:pan-y;-webkit-tap-highlight-color:transparent;outline:none;user-select:none;-webkit-user-select:none}
+.ps__slide{position:absolute;inset:0;visibility:hidden}
+.ps__slide svg{display:block;width:100%;height:100%}
+.ps__slide.is-base{visibility:visible;z-index:1}
+.ps__slide.is-next{visibility:visible;z-index:2}
+.ps.is-running .ps__slide.is-next{will-change:clip-path}
+.ps__veil{position:absolute;inset:0;z-index:3;background:var(--veil);pointer-events:none}
+.ps__line{position:absolute;z-index:4;left:var(--pad);right:var(--pad);top:var(--line-top);height:1px;background:var(--line-base);pointer-events:none}
+.ps__fill{position:absolute;inset:0;background:var(--line-fill);transform-origin:0 50%;transform:scale3d(.3333,1,1)}
+.ps__label{position:absolute;z-index:4;left:var(--pad);top:calc(var(--line-top) + 33px);font:600 var(--label-size)/1 var(--font-sans);letter-spacing:.01em;margin:0;pointer-events:none}
+.ps__count{position:absolute;z-index:4;right:var(--pad);bottom:calc(var(--title-bottom) + 3.2cqw);font:400 var(--counter-size)/1 var(--font-sans);color:var(--ui-text-dim);letter-spacing:.04em;margin:0;pointer-events:none;font-variant-numeric:tabular-nums}
+.ps__title{position:absolute;z-index:4;left:var(--pad);bottom:var(--title-bottom);margin:0;font:400 var(--title-size)/1.12 var(--font-serif);letter-spacing:var(--title-letter-spacing);
+  transform:scale3d(var(--title-xscale),1,1);transform-origin:0 100%;overflow:hidden;padding:0 .08em .06em 0;white-space:nowrap;pointer-events:none}
+.ps__ch{display:inline-block;transform:translate3d(0,0,0)}
+.ps__nav{position:absolute;z-index:5;top:50%;margin-top:-18px;width:36px;height:36px;border-radius:50%;border:0;padding:0;display:grid;place-items:center;
+  background:rgba(0,0,0,.28);color:#fff;cursor:pointer;opacity:0;transition:opacity .2s}
+.ps:hover .ps__nav,.ps:focus-within .ps__nav{opacity:.85}
+.ps__nav--prev{left:14px}.ps__nav--next{right:14px}
+.ps__nav svg{width:16px;height:16px}
+.ps__sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (hover:none){.ps__nav{display:none}}
+@media (prefers-reduced-motion:reduce){.ps__nav{transition:none}}
+</style>
+</head>
+<body>
+<!-- COMPONENT:START -->
+<section class="ps" id="ps" tabindex="0" role="region" aria-roledescription="carousel" aria-label="Parallax Strip Slider">
+  <div class="ps__slides"></div>
+  <div class="ps__veil"></div>
+  <div class="ps__line"><div class="ps__fill"></div></div>
+  <p class="ps__label"></p>
+  <p class="ps__count"></p>
+  <h2 class="ps__title" aria-hidden="true"></h2>
+  <button class="ps__nav ps__nav--prev" type="button" aria-label="Vorheriges Bild"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <button class="ps__nav ps__nav--next" type="button" aria-label="Naechstes Bild"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+  <div class="ps__sr" aria-live="polite"></div>
+</section>
+<!-- COMPONENT:END -->
+
+<script>
+/* COMPONENT JS: initParallaxStripSlider(root, opts)
+   opts: { slides:[{title,label,image(SVG/HTML-String ODER URL)}], ...PS_CONFIG-Ueberschreibungen, onChange(i) }
+   API:  returns { next(), prev(), go(i), destroy() } */
+function initParallaxStripSlider(root, opts){
+  opts = opts || {};
+  const C = Object.assign({}, PS_CONFIG, opts);
+  const slides = opts.slides || [];
+  const N = slides.length;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s) => root.querySelector(s);
+  const wrap = $('.ps__slides'), fill = $('.ps__fill'), label = $('.ps__label'), count = $('.ps__count'),
+        title = $('.ps__title'), live = $('.ps__sr');
+  const ease4 = (p) => 1 - Math.pow(1 - p, 4);
+  const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
+  const pad2 = (n) => (n < 10 ? '0' : '') + n;
+
+  // --- Slides einmal aufbauen ---
+  const els = slides.map((s) => {
+    const d = document.createElement('div'); d.className = 'ps__slide';
+    if (/^\s*</.test(s.image)) d.innerHTML = s.image;
+    else d.style.cssText = 'background:center/cover url("' + s.image + '")';
+    wrap.appendChild(d); return d;
+  });
+
+  // --- Buehnengroesse einmal messen (kein Layout-Lesen pro Frame) ---
+  let W = 1230, H = 672;
+  const measure = () => { W = root.clientWidth; H = root.clientHeight; };
+  measure();
+  const ro = new ResizeObserver(() => { measure(); if (!running) idleClip(); });
+  ro.observe(root);
+
+  // --- Titel (Buchstaben-Spans nur beim Wechsel neu bauen) ---
+  let chars = [];
+  function setTitle(text){
+    title.textContent = ''; chars = [];
+    for (const ch of text) {
+      const sp = document.createElement('span'); sp.className = 'ps__ch';
+      sp.textContent = ch === ' ' ? ' ' : ch; title.appendChild(sp); chars.push(sp);
+    }
+  }
+  function setMeta(i){ label.textContent = slides[i].label; count.textContent = pad2(i + 1) + '/ ' + pad2(N); }
+  function idleClip(){ if (cur != null) els[cur].style.clipPath = 'none'; }
+
+  let cur = 0, from = 0, to = 0, running = false, t0 = 0, raf = 0, nextAt = 0, dead = false;
+  let lineFrom = 1 / N, lineTo = 1 / N;
+  let metaSwapped = false, titleSwapped = false;
+
+  els[0].classList.add('is-base'); setTitle(slides[0].title); setMeta(0);
+  live.textContent = slides[0].label + ': ' + slides[0].title;
+
+  function clipPath(e){
+    // N Streifen: Breite waechst (links verankert), Hoehe waechst von oben nach unten
+    const cw = W / C.columns; let d = '';
+    for (let i = 0; i < C.columns; i++) {
+      const le = e - i * C.colStagger;
+      if (le <= 0) continue;
+      const sx = ease4(clamp01(le / C.colWidthMs));
+      const sy = le >= C.colHeightEnd ? 1 : 1 - Math.exp(-le / C.colHeightTau);
+      const x = i * cw, w = cw * sx, h = H * sy;
+      d += 'M' + x.toFixed(1) + ' 0h' + w.toFixed(1) + 'v' + h.toFixed(1) + 'h-' + w.toFixed(1) + 'z';
+    }
+    return d ? 'path("' + d + '")' : 'path("M0 0h0v0z")';
+  }
+
+  function render(e){
+    const nextEl = els[to];
+    if (reduce) {
+      nextEl.style.opacity = clamp01(e / C.reducedFadeMs);
+    } else {
+      nextEl.style.clipPath = clipPath(e);
+    }
+    // Titel/Label alt: ausblenden, neu: aufsteigen
+    const outP = clamp01((e - C.titleOutDelay) / C.titleOutMs);
+    if (!titleSwapped) {
+      title.style.opacity = 1 - outP; label.style.opacity = 1 - outP; count.style.opacity = 1 - outP;
+      if (e >= C.titleInDelay) { titleSwapped = true; setTitle(slides[to].title); title.style.opacity = 1; }
+    }
+    if (titleSwapped) {
+      for (let i = 0; i < chars.length; i++) {
+        const p = ease4(clamp01((e - C.titleInDelay - i * C.letterStagger) / C.letterMs));
+        chars[i].style.transform = 'translate3d(0,' + ((1 - p) * 110).toFixed(2) + '%,0)';
+      }
+    }
+    if (!metaSwapped && e >= C.metaInDelay) { metaSwapped = true; setMeta(to); }
+    if (metaSwapped) {
+      const p = clamp01((e - C.metaInDelay) / C.metaInMs);
+      label.style.opacity = p; count.style.opacity = p;
+    }
+    // Fortschrittslinie
+    const lp = clamp01((e - C.lineDelay) / C.lineMs);
+    const le = lp < .5 ? 4 * lp * lp * lp : 1 - Math.pow(-2 * lp + 2, 3) / 2;
+    fill.style.transform = 'scale3d(' + (lineFrom + (lineTo - lineFrom) * le).toFixed(4) + ',1,1)';
+  }
+
+  function finish(){
+    running = false; root.classList.remove('is-running');
+    els[from].classList.remove('is-base');
+    const n = els[to]; n.classList.remove('is-next'); n.classList.add('is-base'); n.style.clipPath = 'none'; n.style.opacity = '';
+    title.style.opacity = ''; label.style.opacity = ''; count.style.opacity = '';
+    for (const c of chars) c.style.transform = '';
+    cur = to; lineFrom = lineTo; fill.style.transform = 'scale3d(' + lineTo.toFixed(4) + ',1,1)';
+    live.textContent = slides[cur].label + ': ' + slides[cur].title;
+    if (opts.onChange) opts.onChange(cur);
+  }
+
+  function frame(t){
+    raf = 0; if (dead) return;
+    if (running) {
+      const e = t - t0;
+      render(e);
+      if (e >= C.totalMs) { finish(); if (C.autoplayMs > 0) nextAt = t0 + C.autoplayMs; }
+    } else if (C.autoplayMs > 0 && nextAt && t >= nextAt) { start(cur + 1, t); return; }
+    if (running || (C.autoplayMs > 0 && !document.hidden)) raf = requestAnimationFrame(frame);
+  }
+  function kick(){ if (!raf && !dead) raf = requestAnimationFrame(frame); }
+
+  function start(i, t){
+    if (N < 2) return;
+    if (running) finish();            // laufenden Wechsel sofort abschliessen
+    i = ((i % N) + N) % N;
+    from = cur; to = i; lineTo = (to + 1) / N; metaSwapped = false; titleSwapped = false;
+    const n = els[to]; n.classList.add('is-next');
+    if (reduce) n.style.opacity = 0; else n.style.clipPath = 'path("M0 0h0v0z")';
+    running = true; root.classList.add('is-running'); t0 = t != null ? t : performance.now();
+    kick();
+  }
+  const go = (i) => start(i, null);
+  const next = () => go(cur + 1), prev = () => go(cur - 1);
+  // Autoplay-Start
+  if (C.autoplayMs > 0) { nextAt = performance.now() + C.firstDelayMs; kick(); }
+
+  // --- Eingabe: Pfeile, Tasten, Swipe (nur Position merken, passive Listener) ---
+  $('.ps__nav--next').addEventListener('click', () => { nextAt = 0; next(); });
+  $('.ps__nav--prev').addEventListener('click', () => { nextAt = 0; prev(); });
+  const onKey = (e) => { if (e.key === 'ArrowRight') { nextAt = 0; next(); } else if (e.key === 'ArrowLeft') { nextAt = 0; prev(); } };
+  root.addEventListener('keydown', onKey);
+  let sx = null;
+  const down = (e) => { sx = e.clientX; };
+  const up = (e) => {
+    if (sx == null) return; const dx = e.clientX - sx; sx = null;
+    if (Math.abs(dx) > C.swipePx) { nextAt = 0; dx < 0 ? next() : prev(); }
+  };
+  root.addEventListener('pointerdown', down, { passive: true });
+  root.addEventListener('pointerup', up, { passive: true });
+  root.addEventListener('pointercancel', () => { sx = null; }, { passive: true });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (C.autoplayMs > 0) nextAt = performance.now() + C.autoplayMs; kick(); } });
+
+  return { next, prev, go, destroy(){ dead = true; ro.disconnect(); cancelAnimationFrame(raf); root.removeEventListener('keydown', onKey); } };
+}
+</script>
+
+<script>
+/* ===== DEMO: exakt der Video-Inhalt (Fire / Allure / Ember) ===== */
+/* Die drei "Fotos" sind hier als Inline-SVG gezeichnet (Annaeherung an die Originalbilder).
+   Eigene Bilder: image:'https://.../bild.jpg' (URL) statt SVG-String. */
+const SVG_FIRE =
+'<svg viewBox="0 0 1230 672" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+'<defs><radialGradient id="pf-bg" cx="68%" cy="42%" r="75%"><stop offset="0" stop-color="#2c1a0c"/><stop offset=".6" stop-color="#1c110a"/><stop offset="1" stop-color="#0c0806"/></radialGradient>' +
+'<linearGradient id="pf-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d9a24a"/><stop offset=".35" stop-color="#7a4a1a"/><stop offset="1" stop-color="#1a0d06"/></linearGradient>' +
+'<linearGradient id="pf-c" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a5a22"/><stop offset=".5" stop-color="#4a2a10"/><stop offset="1" stop-color="#150a05"/></linearGradient></defs>' +
+'<rect width="1230" height="672" fill="url(#pf-bg)"/>' +
+'<path d="M0 470C120 380 300 300 470 290L640 330 760 672H0Z" fill="url(#pf-c)"/>' +
+'<path d="M0 520C140 420 330 360 520 330 460 420 380 520 330 672H0Z" fill="#0e0704" opacity=".55"/>' +
+'<path d="M560 250C600 220 660 215 700 240L860 330C900 420 880 560 840 672H420C470 560 540 420 560 250Z" fill="url(#pf-g)"/>' +
+'<path d="M600 330C650 400 690 500 700 672" stroke="#e8b866" stroke-opacity=".35" stroke-width="3" fill="none"/>' +
+'<path d="M640 300C700 380 760 480 770 672" stroke="#e8b866" stroke-opacity=".3" stroke-width="2" fill="none"/>' +
+'<path d="M580 280C560 330 600 400 660 470" stroke="#f0c878" stroke-opacity=".4" stroke-width="3" fill="none"/>' +
+'<ellipse cx="660" cy="150" rx="46" ry="62" fill="#a06a3e"/><ellipse cx="610" cy="120" rx="40" ry="44" fill="#1a0e08"/>' +
+'<path d="M640 190 690 200 700 250 640 240Z" fill="#6a4228"/>' +
+'</svg>';
+const SVG_ALLURE =
+'<svg viewBox="0 0 1230 672" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+'<defs><linearGradient id="pa-s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#860a13"/><stop offset=".45" stop-color="#a21c14"/><stop offset=".78" stop-color="#cf4a1a"/><stop offset="1" stop-color="#e8782a"/></linearGradient></defs>' +
+'<rect width="1230" height="672" fill="url(#pa-s)"/>' +
+'<path d="M0 560 50 545 110 570 190 540 260 565 340 548 420 575 520 560 600 580 700 555 790 575 880 545 970 570 1060 548 1150 566 1230 552V672H0Z" fill="#07070a"/>' +
+'<g fill="#0a0a0d"><path d="M580 190C580 150 600 128 640 128 680 128 700 150 700 190L720 215 760 250 775 420 760 470 745 672H520L505 470 490 420 505 250 560 215Z"/><path d="M505 250 480 420 500 520 520 440Z"/><path d="M775 250 790 420 765 520 750 440Z"/></g>' +
+'<path d="M565 255 600 235 640 300 640 420 560 430Z" fill="#1c2a86" opacity=".9"/><path d="M640 300 700 235 735 255 740 420 640 420Z" fill="#161820" opacity=".7"/>' +
+'<ellipse cx="640" cy="175" rx="30" ry="34" fill="#4a2a24"/>' +
+'<g stroke="#8a2a10" stroke-width="3" fill="none" opacity=".8"><path d="M390 600C386 560 384 540 372 520M395 600C398 560 408 545 420 530M400 600C405 575 420 565 435 560"/></g>' +
+'</svg>';
+const SVG_EMBER =
+'<svg viewBox="0 0 1230 672" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">' +
+'<defs><radialGradient id="pe-g" cx="60%" cy="52%" r="55%"><stop offset="0" stop-color="#e2e2e2"/><stop offset=".5" stop-color="#9a9a9a"/><stop offset="1" stop-color="#2a2a2a"/></radialGradient></defs>' +
+'<rect width="1230" height="672" fill="#020202"/>' +
+'<path d="M780 0C700 80 730 200 800 300 860 400 880 500 1000 672H1230V0Z" fill="url(#pe-g)"/>' +
+'<path d="M780 0C720 60 740 120 760 160 800 240 880 330 960 420 1040 500 1100 672 1100 672H940C880 560 800 500 720 460 640 420 660 220 700 100Z" fill="#020202" opacity=".0"/>' +
+'<path d="M960 0H1230V260C1180 240 1150 180 1100 140 1040 90 1000 60 960 0Z" fill="#050505"/>' +
+'<path d="M1060 300 1160 220 1190 250 1110 330 1090 350Z" fill="#0a0a0a"/>' +
+'<path d="M820 215C820 175 850 150 880 150 910 150 930 175 925 215L950 245 1040 300 1070 400 1080 672H760C770 560 790 460 800 380L820 300Z" fill="#050505"/>' +
+'<ellipse cx="868" cy="190" rx="26" ry="32" fill="#2a2a2a"/>' +
+'</svg>';
+
+initParallaxStripSlider(document.getElementById('ps'), {
+  slides: [
+    { title: 'Fire',   label: 'Collection 01', image: SVG_FIRE },
+    { title: 'Allure', label: 'Collection 02', image: SVG_ALLURE },
+    { title: 'Ember',  label: 'Collection 03', image: SVG_EMBER }
+  ]
+});
+</script>
+</body>
+</html>

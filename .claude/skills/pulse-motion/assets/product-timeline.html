@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Product Timeline</title>
+<style>
+/* ===== CONFIG (hier hochdrehen) ===== */
+:root{
+  /* Look */
+  --stage-bg:#1f1f1f;            /* Buehnenfarbe (gemessen 1F1F1F) */
+  --text-color:#f8f8f8;          /* Titel (gemessen F8F8F8) */
+  --muted-color:#adadad;         /* Fliesstext (gemessen ADADAD) */
+  --eyebrow-color:#8a8a8a;       /* "PRODUCT ROADMAP" (dunkles Grau, ~5A-6A) */
+  --active-color:#fd7a1b;        /* Akzent-Punkte (gemessen FD7A1B; Control zeigt FF5F00) */
+  --axis-color:#c82701;          /* Zeitachse (gemessen C82701 / A00000) */
+  --stem-color:#8d2612;          /* Staebe (gemessen 8D2612) */
+  --marker-blue:#3a77f4;         /* blauer Endstrich (gemessen 3A77F4) */
+  --font:Roboto,Inter,Geist,"Liberation Sans",ui-sans-serif,system-ui,sans-serif;
+  --mono:ui-monospace,"Roboto Mono","DejaVu Sans Mono",Menlo,monospace;
+  --hero-size:58px;              /* Hero-Titel */
+  --hero-ls:-0.035em;             /* enge Laufweite */
+  --hero-lh:76px;
+  --title-size:26px;             /* Meilenstein-/Intro-Titel */
+  --desc-size:14.5px;
+  --desc-lh:17px;
+  --card-w:248px; --card-h:287px; --card-radius:10px;
+  --dot-size:7px;
+  --stem-h:140px;                /* Stablaenge ab Achse */
+  --axis-y:36%;                  /* Hoehe der Achse im Viewport */
+}
+</style>
+<script>
+/* CONFIG Motion (JS) – alle Zeiten in ms, Werte zeitbasiert (120-Hz-sicher) */
+const CONFIG = {
+  items:[                                  /* abwechselnd oben/unten */
+    {date:'2020 March',   text:'Signal research turns scattered\nnotes into a clear product thesis'},
+    {date:'2020 November',text:'Prototype sprint validates\nthe experience with real\noperators'},
+    {date:'2021 July',    text:'Founding release ships with the\nfirst live customer journeys'},
+    {date:'2022 October', text:'Community feedback\nreshapes the roadmap\ninto sharper releases'},
+    {date:'2023 April',   text:'Automation layer connects\ninsight, publishing, and sales\nmotion'},
+    {date:'2025 September',text:'Companion mobile\nworkflows make the\ntimeline travel-ready'},
+    {date:'2026 May',     text:'New markets open with\nlocalized launches and faster\nonboarding'}
+  ],
+  eyebrow:'Product Roadmap',
+  heading:'Six years, one horizontal scroll.',
+  lede:'Keep scrolling — the section pins, the track slides sideways, and each milestone draws its stem and reveals its copy as it reaches centre.',
+  introTitle:'Product Storyline', introRange:'2020 — 2026',
+  outro:'From the first research note to a multi-market launch.',
+  step:218,            /* px Abstand zwischen Meilensteinen */
+  introX:24,           /* px: linker Rand des Intro-Bilds im Track */
+  axisStartX:320,      /* px: Beginn der Achse im Track */
+  introLineLen:286,    /* px: Achsenlaenge im Ruhezustand */
+  firstStemX:642,      /* px: Stab des ersten Meilensteins im Track */
+  axisEndFrac:0.763,   /* Achsenende (Anteil Viewportbreite) am Scroll-Ende */
+  axisGrow:0.35,       /* Scroll-Anteil, bis die Achse ihr Ende erreicht */
+  revealFrom:0.74,     /* Meilenstein startet (Anteil Viewportbreite), Stab waechst */
+  revealTo:0.49,       /* Meilenstein "am Zentrum": alles sichtbar */
+  stemPow:2.2,         /* Stab-Wachstum ~ p^x */
+  copyStart:0.5,       /* ab diesem p Titel/Text-Reveal */
+  smoothK:12,          /* Glaettung der Reveals: a = 1 - exp(-k*dt) (1/s) */
+  introDrawMs:700,     /* Intro-Linie zieht sich auf (ease-out) */
+  introDrawAt:0.62     /* startet, wenn Abschnitt so weit im Bild ist (Anteil Hoehe) */
+};
+</script>
+<style>
+/* COMPONENT CSS */
+html,body{margin:0;height:100%;background:var(--stage-bg)}
+body{overflow:hidden;font-family:var(--font);color:var(--text-color);-webkit-font-smoothing:antialiased}
+.ptl{position:relative;height:100%;overflow-y:auto;overflow-x:hidden;contain:layout paint;
+  background:var(--stage-bg);color:var(--text-color);font-family:var(--font);outline:none;
+  overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#4a4a4a transparent;touch-action:pan-y}
+.ptl__hero{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 16px;box-sizing:border-box}
+.ptl__eyebrow{font:400 12.5px/16px var(--mono);letter-spacing:.28em;text-transform:uppercase;color:var(--eyebrow-color);margin:0 0 20px}
+.ptl__h1{margin:0;font:600 var(--hero-size)/var(--hero-lh) var(--font);letter-spacing:var(--hero-ls);max-width:480px}
+.ptl__lede{margin:18px 0 0;max-width:450px;font:400 14.2px/24px var(--font);color:var(--muted-color)}
+.ptl__cue{margin:21px 0 0;font:400 13px/20px var(--font);color:var(--muted-color)}
+.ptl__pin{position:relative}
+.ptl__stage{position:sticky;top:0;height:100%;overflow:hidden}
+.ptl__track{position:absolute;left:0;top:0;height:100%;width:100%;transform:translate3d(0,0,0)}
+.ptl__axis-y{position:absolute;left:0;right:0;top:var(--axis-y);height:0}
+.ptl__card{position:absolute;top:calc(var(--card-h) / -2);left:0;width:var(--card-w);height:var(--card-h);border-radius:var(--card-radius);overflow:hidden;background:#1d2a8a}
+.ptl__card svg{display:block;width:100%;height:100%}
+.ptl__title{position:absolute;margin:0;font:400 var(--title-size)/27px var(--font);color:var(--text-color);white-space:nowrap;bottom:72px}
+.ptl__range{position:absolute;margin:0;top:18px;font:400 16px/18px var(--font);color:var(--muted-color);white-space:nowrap}
+.ptl__line{position:absolute;left:0;top:-1px;height:2px;width:100%;background:var(--axis-color);transform-origin:0 50%;transform:scale3d(0,1,1)}
+.ptl__dot{position:absolute;left:calc(var(--dot-size) / -2);top:calc(var(--dot-size) / -2);width:var(--dot-size);height:var(--dot-size);border-radius:50%;background:var(--active-color)}
+.ptl__item{position:absolute;left:0;top:0;width:0;height:0}
+.ptl__stem{position:absolute;left:0;width:1px;height:var(--stem-h);background:var(--stem-color);transform:scale3d(1,0,1)}
+.ptl__item--up .ptl__stem{bottom:0;transform-origin:50% 100%}
+.ptl__item--down .ptl__stem{top:0;transform-origin:50% 0}
+.ptl__item .ptl__dot{transform:scale3d(0,0,1)}
+.ptl__item--up .ptl__dot{top:calc(var(--stem-h) * -1 - var(--dot-size) / 2)}
+.ptl__item--down .ptl__dot{top:calc(var(--stem-h) - var(--dot-size) / 2)}
+.ptl__copy{position:absolute;left:28px;width:260px}
+.ptl__item--up .ptl__copy{top:calc(var(--stem-h) * -1 - 14px)}
+.ptl__item--down .ptl__copy{bottom:calc(var(--stem-h) * -1 - 6px)}
+.ptl__mask{overflow:hidden}
+.ptl__mask>*{display:block;transform:translate3d(0,100%,0)}
+.ptl__date{margin:0;font:400 var(--title-size)/29px var(--font);color:var(--text-color);white-space:nowrap}
+.ptl__desc{margin:8px 0 0;font:400 var(--desc-size)/var(--desc-lh) var(--font);color:var(--muted-color);white-space:pre-line}
+.ptl__axis{position:absolute;left:0;top:var(--axis-y);height:0}
+.ptl__axis-line{position:absolute;left:0;top:-1px;height:2px;width:100%;background:var(--axis-color);transform-origin:0 50%;transform:scale3d(0,1,1)}
+.ptl__axis-end{position:absolute;left:0;top:0}
+.ptl__outro{height:100%;display:grid;place-items:center;padding:0 16px;box-sizing:border-box}
+.ptl__outro p{margin:0;font:400 12.5px/20px var(--font);color:var(--muted-color);text-align:center}
+.ptl__fixed{position:sticky;top:0;height:0;z-index:2;pointer-events:none}
+.ptl__marker{position:absolute;left:74.7%;top:43%;width:2px;height:20px;background:var(--marker-blue);opacity:0;border-radius:1px}
+.ptl.is-anim .ptl__item .ptl__stem,.ptl.is-anim .ptl__item .ptl__dot,.ptl.is-anim .ptl__mask>*{will-change:transform}
+.ptl__sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){.ptl{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<!-- COMPONENT:START -->
+<section class="ptl" id="ptl" tabindex="0" role="region" aria-label="Product Timeline – nach unten scrollen"></section>
+<!-- COMPONENT:END -->
+<script>
+/* COMPONENT JS */
+function initProductTimeline(root, opts){
+  const C = Object.assign({}, CONFIG, opts || {});
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+  const ss=x=>{x=clamp(x,0,1);return x*x*(3-2*x)};
+  const el=(tag,cls,html)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.textContent=html;return e};
+
+  /* ---------- DOM einmal aufbauen ---------- */
+  root.textContent='';
+  const hero=el('div','ptl__hero');
+  hero.append(el('p','ptl__eyebrow',C.eyebrow),el('h1','ptl__h1',C.heading),el('p','ptl__lede',C.lede));
+  const cue=el('p','ptl__cue','↓'); cue.setAttribute('aria-hidden','true'); hero.append(cue);
+  const pin=el('div','ptl__pin'), stage=el('div','ptl__stage'), track=el('div','ptl__track');
+  const trackY=el('div','ptl__axis-y');           /* Koordinatenursprung = Achse */
+  const card=el('div','ptl__card');
+  card.innerHTML='<svg viewBox="0 0 248 287" aria-hidden="true" preserveAspectRatio="xMidYMid slice"><defs>'
+   +'<linearGradient id="pg1" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6f86d8"/><stop offset=".45" stop-color="#2c3fb0"/><stop offset="1" stop-color="#0e1a6e"/></linearGradient>'
+   +'<linearGradient id="pg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9c4ea" stop-opacity=".75"/><stop offset="1" stop-color="#5a6bb8" stop-opacity=".35"/></linearGradient>'
+   +'<linearGradient id="pg3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2a9a"/><stop offset="1" stop-color="#0a1250"/></linearGradient></defs>'
+   +'<rect width="248" height="287" fill="url(#pg1)"/>'
+   +'<polygon points="52,0 150,0 150,40 52,70" fill="url(#pg2)" opacity=".7"/><polygon points="150,0 200,0 200,120 150,92" fill="url(#pg3)"/>'
+   +'<polygon points="0,150 90,100 210,150 120,215" fill="url(#pg2)" opacity=".8"/><polygon points="120,215 210,150 210,190 120,262" fill="#0c1766" opacity=".9"/>'
+   +'<polygon points="20,60 70,40 110,70 60,95" fill="#cfd7f2" opacity=".55"/><polygon points="40,215 130,190 200,240 100,287 20,287" fill="url(#pg2)" opacity=".6"/>'
+   +'<polygon points="0,0 52,0 52,70 0,110" fill="#14217f" opacity=".8"/></svg>';
+  card.style.left=C.introX+'px';
+  const title=el('h2','ptl__title'); title.innerHTML='Product<br>Storyline'; title.style.left=C.axisStartX+'px';
+  const range=el('p','ptl__range',C.introRange); range.style.left=C.axisStartX+'px';
+  const dotL=el('span','ptl__dot'); dotL.style.left=C.axisStartX-3.5+'px'; dotL.style.transform='scale3d(0,0,1)';
+  trackY.append(card,title,range,dotL);
+  const items=C.items.map((it,i)=>{
+    const up=i%2===0, x=C.firstStemX+i*C.step;
+    const e=el('div','ptl__item '+(up?'ptl__item--up':'ptl__item--down'));
+    e.style.left=x+'px';
+    const stem=el('span','ptl__stem'), dot=el('span','ptl__dot');
+    const copy=el('div','ptl__copy'), m1=el('div','ptl__mask'), m2=el('div','ptl__mask');
+    m2.style.marginTop='8px';
+    const d=el('p','ptl__date',it.date), t=el('p','ptl__desc',it.text); t.style.marginTop='0';
+    m1.append(d); m2.append(t); copy.append(m1,m2); e.append(stem,dot,copy); trackY.append(e);
+    return {x,up,e,stem,dot,d,t,cur:0,tgt:0,sv:-1,dv:-1,r1v:-1,r2v:-1};
+  });
+  track.append(trackY);
+  /* Achse + Endpunkt liegen in der Buehne (Viewport-Koordinaten) */
+  const axis=el('div','ptl__axis'); const axisLine=el('div','ptl__axis-line'); const axisEnd=el('div','ptl__axis-end');
+  const dotR=el('span','ptl__dot'); axisEnd.append(dotR); axis.append(axisLine,axisEnd);
+  stage.append(axis,track); pin.append(stage);
+  const outro=el('div','ptl__outro'); outro.append(el('p',null,C.outro));
+  const fixed=el('div','ptl__fixed'); const marker=el('span','ptl__marker'); marker.setAttribute('aria-hidden','true'); fixed.append(marker);
+  const sr=el('p','ptl__sr',C.items.map(i=>i.date+': '+i.text).join('. '));
+  root.append(fixed,hero,pin,outro,sr);
+
+  /* ---------- Geometrie einmal messen (nicht pro Frame) ---------- */
+  let W=0,H=0,travel=0,axisY=0,st=0,introT=0,introTgt=0,lastT=0,running=false,scrollDirty=true,lastIntroT=-1;
+  function measure(){
+    W=root.clientWidth; H=root.clientHeight;
+    const lastX=items[items.length-1].x;
+    travel=Math.max(0,lastX-C.revealTo*W);
+    pin.style.height=(H+travel)+"px"; stage.style.height=H+"px";
+    axisY=Math.round(H*0.36);
+    axis.style.top=axisY+'px';
+    axisLine.style.width=Math.ceil(W+4)+'px';
+    st=root.scrollTop; scrollDirty=true; wake();
+  }
+
+  /* ---------- Frame-Anwendung ---------- */
+  function apply(dt,t){
+    const p=travel>0?clamp((st-H)/travel,0,1):0;
+    const trackX=-travel*p;
+    track.style.transform='translate3d('+trackX.toFixed(2)+'px,0,0)';
+    /* Achse: Anfang im Track, Ende waechst scroll-linked nach rechts */
+    const e0=C.axisStartX+C.introLineLen, e1=C.axisEndFrac*W;
+    const endVp=e0+(Math.max(e1,e0)-e0)*ss(p/C.axisGrow);
+    const startVp=C.axisStartX+trackX;
+    /* Intro-Zug (zeitbasiert): startet, wenn der Abschnitt ins Bild steigt */
+    introTgt=(st>=H*(1-C.introDrawAt))?1:0;
+    if(reduce)introT=introTgt; else{
+      const step=dt/C.introDrawMs, d=introTgt-introT;
+      introT+=Math.abs(d)<=step?d:Math.sign(d)*step;
+    }
+    const ie=1-Math.pow(1-introT,3);
+    const sx0=Math.max(0,startVp);
+    const len=Math.max(0,(startVp+(endVp-startVp)*ie)-sx0);
+    axisLine.style.transform='translate3d('+sx0.toFixed(2)+'px,0,0) scale3d('+(len/Math.ceil(W+4)).toFixed(4)+',1,1)';
+    axisEnd.style.transform='translate3d('+(startVp+(endVp-startVp)*ie).toFixed(2)+'px,0,0)';
+    dotR.style.transform='scale3d('+ie.toFixed(3)+','+ie.toFixed(3)+',1)';
+    dotL.style.transform='scale3d('+ie.toFixed(3)+','+ie.toFixed(3)+',1)';
+    /* Meilensteine */
+    const a=reduce?1:1-Math.exp(-C.smoothK*dt/1000);
+    const R=C.revealFrom*W, Cc=C.revealTo*W;
+    let moving=Math.abs(introTgt-introT)>1e-3;
+    for(let i=0;i<items.length;i++){
+      const it=items[i], sx=trackX+it.x;
+      let tgt=0;
+      if(sx<W+10) tgt=clamp((R-sx)/(R-Cc),0,1);
+      if(sx>R && it.cur<0.001){it.tgt=0;continue}
+      it.tgt=tgt;
+      const d=tgt-it.cur;
+      it.cur=Math.abs(d)<0.0005?tgt:it.cur+d*a;
+      if(Math.abs(tgt-it.cur)>0.0005)moving=true;
+      const c=it.cur;
+      const sv=Math.pow(c,C.stemPow), dv=ss((c-0.25)/0.35), r1=ss((c-C.copyStart)/0.4), r2=ss((c-C.copyStart-0.18)/0.32);
+      if(Math.abs(sv-it.sv)>5e-4){it.sv=sv;it.stem.style.transform='scale3d(1,'+sv.toFixed(4)+',1)'}
+      if(Math.abs(dv-it.dv)>5e-4){it.dv=dv;it.dot.style.transform='scale3d('+dv.toFixed(3)+','+dv.toFixed(3)+',1)'}
+      if(Math.abs(r1-it.r1v)>5e-4){it.r1v=r1;it.d.style.transform='translate3d(0,'+((1-r1)*100).toFixed(2)+'%,0)'}
+      if(Math.abs(r2-it.r2v)>5e-4){it.r2v=r2;it.t.style.transform='translate3d(0,'+((1-r2)*100).toFixed(2)+'%,0)'}
+    }
+    /* blauer Endstrich: sichtbar waehrend der Abschnitt wegscrollt */
+    const u=(st-(H+travel))/H;
+    const mo=clamp(u/0.08,0,1)*clamp((0.97-u)/0.06,0,1);
+    marker.style.opacity=mo.toFixed(3);
+    return moving;
+  }
+
+  /* ---------- Loop: nur aktiv, solange sich etwas bewegt ---------- */
+  function frame(t){
+    const dt=Math.min(t-lastT,50); lastT=t;
+    const moving=apply(dt,t);
+    if(moving||scrollDirty){scrollDirty=false;if(!moving){root.classList.remove('is-anim')}requestAnimationFrame(frame)}
+    else{running=false;root.classList.remove('is-anim')}
+  }
+  function wake(){
+    if(running)return;running=true;root.classList.add('is-anim');
+    requestAnimationFrame(t=>{lastT=t-8;frame(t)});
+  }
+  root.addEventListener('scroll',()=>{st=root.scrollTop;scrollDirty=true;wake()},{passive:true});
+  if('ResizeObserver' in window)new ResizeObserver(measure).observe(root); else addEventListener('resize',measure);
+  measure();
+  return {measure};
+}
+</script>
+<script>
+/* DEMO – zeigt exakt den Video-Inhalt */
+initProductTimeline(document.getElementById('ptl'));
+</script>
+</body>
+</html>
