@@ -83,6 +83,16 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: "affiliate_ledger", userColumn: "referrer_id", columns: "id,kind,amount,currency,status,created_at" },
   { table: "team_seats", userColumn: "owner_id", columns: "owner_id,member_id,created_at" },
   { table: "sync_runs", userColumn: "user_id", columns: "*" },
+  // P12 (0004_social): pseudonym, own groups / memberships, what the user posted or shared, their figures, feedback
+  { table: "social_profiles", userColumn: "user_id", columns: "pseudonym,created_at,updated_at" },
+  { table: "groups", userColumn: "owner_id", columns: "id,kind,name,description,created_at" },
+  { table: "group_members", userColumn: "user_id", columns: "group_id,role,share_level,joined_at" },
+  { table: "group_reviews", userColumn: "author_id", columns: "id,group_id,payload,question,status,created_at" },
+  { table: "comments", userColumn: "author_id", columns: "id,review_id,body,hidden,created_at" },
+  { table: "group_goals", userColumn: "student_id", columns: "id,group_id,draft,status,created_at" },
+  { table: "shares", userColumn: "user_id", columns: "id,kind,payload,created_at,expires_at,revoked_at,views" },
+  { table: "member_stats", userColumn: "user_id", columns: "*" },
+  { table: "feedback", userColumn: "user_id", columns: "id,kind,message,page,target_type,target_id,status,created_at" },
 ];
 
 const SECRET_KEY = /secret|password|passphrase|token|api[-_]?key|authorization|cookie|jwt|_enc$/i;
