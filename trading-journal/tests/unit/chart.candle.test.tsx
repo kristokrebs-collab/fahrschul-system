@@ -25,6 +25,8 @@ vi.mock("lightweight-charts", async (importOriginal) => {
     priceToCoordinate: () => 10,
     coordinateToPrice: () => 85000,
     data: () => [],
+    // P02: the RSI pane resolves its pane from its series (never a hard-coded index)
+    getPane: () => ({ paneIndex: () => 1, getHeight: () => 100, getHTMLElement: () => null }),
   });
   const timeScale = {
     getVisibleLogicalRange: () => ({ from: 0, to: 100 }),
@@ -37,7 +39,7 @@ vi.mock("lightweight-charts", async (importOriginal) => {
     subscribeVisibleLogicalRangeChange: (h: (r: { from: number; to: number } | null) => void) => void rangeHandlers.add(h),
     unsubscribeVisibleLogicalRangeChange: (h: (r: { from: number; to: number } | null) => void) => void rangeHandlers.delete(h),
   };
-  const pane = { getHeight: () => 300, setStretchFactor: vi.fn() };
+  const pane = { getHeight: () => 300, setStretchFactor: vi.fn(), paneIndex: () => 0, getSeries: () => [], getHTMLElement: () => null };
   return {
     ...actual,
     createChart: vi.fn((host: HTMLElement) => {
@@ -277,5 +279,23 @@ describe("NothingCandleChart", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("P02: the RSI pane gets the RSI of the chart's bars and a legend; Box-zu-Box boxes are a primitive, set once per identity", async () => {
+    const boxes = [{ id: "b1", from: candles[20]!.time, to: null, top: 85_000, btm: 84_000, tone: "neutral" as const, active: true }];
+    const { container, rerender } = render(<NothingCandleChart candles={candles} interval="1h" pane="rsi" boxes={boxes} />);
+    await ready(container);
+    // candles + volume + the RSI line (values 0..100 on the candle grid, whitespace lead-in)
+    const rsiCall = seriesSpies.setData.mock.calls.find((c) => (c[0] as Array<{ value?: number }>).some((p) => typeof p.value === "number" && p.value >= 0 && p.value <= 100) && (c[0] as unknown[]).length === candles.length);
+    expect(rsiCall).toBeDefined();
+    expect("value" in (rsiCall![0] as object[])[0]!).toBe(false);
+    // reference lines 70 / 50 / 30
+    for (const price of [70, 50, 30]) expect(seriesSpies.createPriceLine).toHaveBeenCalledWith(expect.objectContaining({ price, axisLabelVisible: false }));
+    const legend = screen.getByTestId("rsi-legend");
+    expect(legend.getAttribute("aria-hidden")).toBeNull();
+    await waitFor(() => expect(legend.textContent).toMatch(/^RSI 14\d+,\d$/));
+    // the same boxes again: nothing re-set; switching the pane off removes the legend
+    rerender(<NothingCandleChart candles={candles} interval="1h" pane="none" boxes={boxes} />);
+    expect(screen.queryByTestId("rsi-legend")).toBeNull();
   });
 });

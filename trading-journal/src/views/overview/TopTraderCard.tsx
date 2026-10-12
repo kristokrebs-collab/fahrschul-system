@@ -1,4 +1,7 @@
 import { motion, useTransform } from "motion/react";
+import { PHASE_LABEL, type BoxPhase } from "@/domain/boxes";
+import { useBoxes, type BoxesView } from "@/market/boxes/store";
+import { Collapse } from "@/primitives/Expander";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { HYBLOCK_LINK } from "@/domain/defaults";
 import { readingAge } from "@/domain/fallingKnife";
@@ -6,12 +9,17 @@ import { KNIFE_INFO, KNIFE_INFO_LAGE, KNIFE_LTF_TITLE, KNIFE_TITLE, type KnifeFi
 import type { HyblockReading } from "@/domain/types";
 import { cn } from "@/lib/cn";
 import { date as fmtDate, n1, signed } from "@/lib/format";
+import { hhmmss } from "@/market/format";
 import {
   buildFeedSpecs,
   COHORT_HINT,
   deriveTopTrader,
   freshnessText,
+  fundingMv,
+  fundingPct,
   initialHealth,
+  nextFundingMv,
+  openInterestChange24h,
   STRINGS,
   topTraderFreshness,
   topTraderHealthSignature,
@@ -22,6 +30,7 @@ import {
   virtualReading,
   type ProviderHealth,
   type StatusLabel,
+  type TakerView,
   type TopTraderBase,
   type TopTraderFreshness,
   type TopTraderView,
@@ -31,6 +40,7 @@ import { MorphCard, MorphTitle } from "@/motion/MorphCard";
 import { useMorphDialog } from "@/motion/MorphDialog";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { radius, spring, stagger, tween } from "@/motion/tokens";
+import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
@@ -138,6 +148,136 @@ const KnifeBars = memo(function KnifeBars({ states }: { states: string }) {
           </span>
         );
       })}
+    </div>
+  );
+});
+
+/* ------------------------------------------------------------------ order flow + box bias (P02) */
+
+/** `tj2-ui.flags` key: the order-flow row is open (closed by default – the card looks as before). */
+export const FLOW_OPEN_FLAG = "topTraderFlowOpen";
+export const FLOW_TEXT = {
+  title: "Order-Flow",
+  name: "Order-Flow: Taker, Open Interest, Funding",
+  taker: "Taker",
+  takerSub: "Käuferanteil",
+  oi: "OI Δ24h",
+  oiSub: "Open Interest",
+  funding: "Funding",
+  next: "in",
+  boxBias: "Box-Bias",
+  none: "–",
+} as const;
+
+type BiasTone = "win" | "loss" | "mute";
+/**
+ * The Box-zu-Box read of the 4h box for the chip: a breakout / retest / target → its direction; else the best A+ / A
+ * setup's side; else where the price sits in the box. `null` without an analysis.
+ */
+export function boxBiasOf(v: Pick<BoxesView, "tfs" | "best">): { text: string; tone: BiasTone; phase: BoxPhase } | null {
+  const a = v.tfs["4h"].analysis;
+  if (!a) return null;
+  const st = a.box;
+  if (st.dir !== 0 && st.phase !== "failed") return { text: st.dir > 0 ? "Long" : "Short", tone: st.dir > 0 ? "win" : "loss", phase: st.phase };
+  const best = v.best.find((b) => b.tf === "4h");
+  if (best) return { text: `${best.setup.side === "long" ? "Long" : "Short"} · ${best.setup.grade}`, tone: best.setup.side === "long" ? "win" : "loss", phase: st.phase };
+  const where = st.zone === "top" ? "Box oben" : st.zone === "bottom" ? "Box unten" : st.box ? "Box-Mitte" : "Keine Box";
+  return { text: where, tone: "mute", phase: st.phase };
+}
+
+const BIAS_TONE: Record<BiasTone, string> = { win: "border-win/35 text-win", loss: "border-loss/35 text-loss", mute: "border-line-2 text-mute" };
+
+/** `Box-Bias · Long` chip (4h box of the Markt page; the store runs while the card is shown). */
+const BoxBiasChip = memo(function BoxBiasChip() {
+  const view = useBoxes();
+  const b = boxBiasOf(view);
+  const reduced = useReducedFx();
+  return (
+    <span
+      className={cn("inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold transition-colors duration-300", BIAS_TONE[b?.tone ?? "mute"])}
+      title={b ? `4h: ${PHASE_LABEL[b.phase]}` : "Box-zu-Box lädt"}
+      data-testid="box-bias"
+      data-tone={b?.tone ?? "mute"}
+    >
+      <span className="text-faint">{FLOW_TEXT.boxBias}</span>
+      <motion.span key={b?.text ?? "-"} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={spring.smooth}>
+        {b?.text ?? FLOW_TEXT.none}
+      </motion.span>
+    </span>
+  );
+});
+
+/**
+ * Collapsible order-flow row inside the Top-Trader card: Taker buy share (`tt.taker`), Open Interest change over 24 h
+ * (`openInterestHist`), Funding (`fundingMv` / `nextFundingMv`, MotionValue text and countdown – no render per second),
+ * plus the Box-Bias chip. Closed by default (`tj2-ui.flags.topTraderFlowOpen`); the body grows through `Collapse`.
+ */
+const FlowRow = memo(function FlowRow({ taker }: { taker: TakerView | null }) {
+  const open = useUi((s) => s.flags[FLOW_OPEN_FLAG] === true);
+  const setFlag = useUi((s) => s.setFlag);
+  const reduced = useReducedFx();
+  const oiHist = useFeed("openInterestHist");
+  const oi = useMemo(() => openInterestChange24h(oiHist?.data), [oiHist]);
+  const now = useNowMv();
+  const fundingText = useTransform(fundingMv, (r) => (r !== 0 ? fundingPct(r) : FLOW_TEXT.none));
+  const countdown = useTransform(() => {
+    const next = nextFundingMv.get();
+    return next > 0 ? hhmmss(Math.max(0, next - now.get())) : FLOW_TEXT.none;
+  });
+  const buy = taker ? Math.max(0, Math.min(100, 50 + taker.takerDelta / 2)) : null;
+  const tone = (v: number | null) => (v == null || v === 0 ? "" : v > 0 ? "text-win" : "text-loss");
+  return (
+    <div className="rounded-2xl border border-line bg-ink-950/25" data-testid="top-trader-flow" data-open={open ? "true" : "false"}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3.5 py-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls="top-trader-flow-body"
+          aria-label={FLOW_TEXT.name}
+          onClick={() => setFlag(FLOW_OPEN_FLAG, !open)}
+          className="touch-hit flex min-w-[min(100%,15rem)] flex-1 items-center gap-2 text-left"
+        >
+          <span className="label whitespace-nowrap !text-fg">{FLOW_TEXT.title}</span>
+          <span className="num min-w-0 truncate font-mono text-[11.5px] text-mute">
+            {buy == null ? FLOW_TEXT.none : `Käufer ${n1(buy)} %`} · <span className={tone(oi)}>{oi == null ? FLOW_TEXT.none : `OI ${signed(oi, 1)} %`}</span>
+          </span>
+          <motion.span aria-hidden="true" className="ml-auto shrink-0 text-faint" animate={{ rotate: open ? 180 : 0 }} transition={reduced ? { duration: 0 } : spring.plus}>
+            ▾
+          </motion.span>
+        </button>
+        <BoxBiasChip />
+      </div>
+      <Collapse open={open} id="top-trader-flow-body">
+        {/* phone: one row per value (label left, value right); from sm three tiles */}
+        <div className="grid grid-cols-1 gap-2 px-3.5 pb-3.5 sm:grid-cols-3">
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-xl border border-line bg-ink-950/30 px-3 py-2 sm:block">
+            <div className="label !text-[9.5px]">{FLOW_TEXT.taker}</div>
+            <div className="grid justify-items-end gap-1 sm:block">
+              <div className="num font-mono text-[14px] sm:mt-0.5">{buy == null ? FLOW_TEXT.none : <MotionNumber value={buy} decimals={1} suffix=" %" flash />}</div>
+              <div className="relative h-1 w-24 overflow-hidden rounded-full bg-loss/40 sm:mt-1.5 sm:w-auto" aria-hidden="true">
+                <motion.span className="absolute inset-0 origin-left rounded-full bg-win" initial={false} animate={{ scaleX: (buy ?? 50) / 100 }} transition={reduced ? { duration: 0 } : tween.bar} />
+              </div>
+              <div className="truncate text-[10px] text-faint sm:mt-1">{FLOW_TEXT.takerSub}</div>
+            </div>
+          </div>
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-xl border border-line bg-ink-950/30 px-3 py-2 sm:block">
+            <div className="label !text-[9.5px]">{FLOW_TEXT.oi}</div>
+            <div className="grid justify-items-end sm:block">
+              <div className={cn("num font-mono text-[14px] transition-colors duration-300 sm:mt-0.5", tone(oi))}>{oi == null ? FLOW_TEXT.none : <MotionNumber value={oi} decimals={1} signed suffix=" %" flash />}</div>
+              <div className="truncate text-[10px] text-faint sm:mt-1">{FLOW_TEXT.oiSub}</div>
+            </div>
+          </div>
+          <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 rounded-xl border border-line bg-ink-950/30 px-3 py-2 sm:block">
+            <div className="label !text-[9.5px]">{FLOW_TEXT.funding}</div>
+            <div className="grid justify-items-end sm:block">
+              <motion.div className="num whitespace-nowrap font-mono text-[14px] sm:mt-0.5 sm:text-[13px] lg:text-[14px]">{fundingText}</motion.div>
+              <div className="truncate text-[10px] text-faint sm:mt-1">
+                {FLOW_TEXT.next} <motion.span className="num">{countdown}</motion.span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Collapse>
     </div>
   );
 });
@@ -491,6 +631,8 @@ export function TopTraderCard() {
             </div>
           </div>
 
+          <FlowRow taker={tt.taker} />
+
           <KnifeCard open={knifeOpen} body={knifeBody} />
 
           <div className="flex items-center justify-between gap-2 text-[11.5px] text-faint">
@@ -528,6 +670,7 @@ export function TopTraderCard() {
               </a>
             }
           />
+          <FlowRow taker={tt.taker} />
           <KnifeCard open={knifeOpen} body={knifeBody} />
         </div>
       )}

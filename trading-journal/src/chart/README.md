@@ -139,6 +139,45 @@ memoised by content (`signalMarkersKey`, `divergencesKey`, `structureKey`); hidd
 toggles under the chart (`ChartLayers`, `aria-pressed`, ≥ 44 px on coarse pointers) persist in `tj2-ui.flags`
 (`chartMcbOff`, `chartDivOff`, `chartSrOff`, `chartStructOn`).
 
+## Box-zu-Box boxes (`primitives/BoxPrimitive.ts`, P02)
+
+Prop `boxes?: ChartBox[]` of `NothingCandleChart` (+ `boxAutoscale?`): one series primitive on the candle series,
+attached BEFORE the check overlay (fills under everything, S/R and dots over them) and before the trade markers. Sync
+effect 6c (identity = content upstream), `invalidate()` + re-sync after every `setData`, detached in `destroy`.
+`toChartBoxes(analysis, { intervalMs, tfLabel? })` (`@/views/markt/chartBoxes`) maps an analysis.
+
+| | |
+|---|---|
+| `ChartBox` | `{ id, from (ms), to (ms \| null = live edge), top, btm, tone: win\|loss\|neutral, state?: provisional\|confirmed, active?, label?, targets?: { price, label?, kind: tp\|sl\|entry }[] }` |
+| x mapping | `logicalAt(bars, sec, intervalSec)`: the bar at or after a time; times past the last bar → logical indices into the empty space on the right (targets reach into the future); a box start before the loaded bars clamps to the left edge |
+| look | fill `fillAlpha` .08 in the tone (active ×1.4, older boxes at half alpha), edges `edgeAlpha` .55; provisional = dashed edges in the soft tone; targets from the box's right end to the price-line strip (`tp` dotted in the tone, `sl` dashed loss, `entry` solid fg) |
+| labels | `T1 84.028` / `Stop …` / caption `BOX STARK` on a nearly opaque plate, placed by `placeLabels` against the 64 px price-line strip, the zone caption and the check overlay's labels (`BoxHost.reserved`) – a label that finds no free spot is left out (its line stays) |
+| axis | the active box's edges as price-axis labels unless another axis label sits within `AXIS_LABEL_GAP`; `targetPrices()` feeds the tick formatter's blanking |
+| autoscale | opt-in (`boxAutoscale`, the Markt chart): boxes overlapping the view + the active box's targets |
+| hit test | `externalId: "b:{id}"` |
+| motion | a NEW id draws in from its first drawn frame: fill grows from → to (`easeOutCubic`, `tween.draw`), edges fade in, targets extend left → right one after another (`stagger.cards`); provisional → confirmed wipes the solid edge in (`tween.reveal`). Finite rAF loop calling `requestUpdate` only while a tween runs; reduced motion: static |
+
+## RSI pane (`rsiPane.ts`, `primitives/RsiOverlay.ts`, P02)
+
+`pane="rsi"` (exclusive with `ratio` / `oi`; `PaneKind` and `uiStore.ChartPane` accept it): `PaneController.set("rsi")`
+creates an `RsiPane` in pane 1 — a 1 px fg line (`NOTHING_RSI_LINE`, autoscale 0–100), dotted 70 / 30 and a faint 50.
+- RSI 14 of the chart's own bars with `rsi()` (`@/domain/signals`) on every `setBars` (after `setData` and on a new bar,
+  `LiveCandle.onAppend`); NaN lead-in values are whitespace (the pane keeps the candle grid). The forming bar's value in O(1)
+  from the Wilder state after the last closed bar (`wilderState` / `wilderStep`, parity with `rsi()` tested) on
+  `LiveCandle.onPush` – one `series.update` per pushed frame.
+- Trendlines: `rsiLines()` (`@/domain/boxes`) on the CLOSED bars, once per closed-bar change; `rsiOverlayData` → the
+  overlay draws active lines (mute, dotted 6 bars into the future), broken lines in their tone and the break marker (dot +
+  `shadowBlur` glow – none under `data-safe-fx` – + halo ring); a forming bar beyond the active line is a provisional break
+  in the soft tone. Height from the RSI pane (`series.getPane().getHeight()`), never pane 0.
+- The newest fresh break breathes as a DOM `GlowBreak` (`@/motion/fx`) in the ripple layer, its x / y MotionValues moved in
+  the pulse's placement frame (no React render); a break that appears live pings once (`spawnMarkerRipple`). The pane's top
+  is measured on resize / pane switch only (`getHTMLElement()`, else pane heights + 1 px separators).
+- Legend `RSI 14 · 54,3` top left of the pane (`data-testid="rsi-legend"`): the hovered bar's RSI on every pane (the RSI
+  pane included), else the newest – written through a ref.
+- `PaneController.remove()` fix: the pane is resolved BEFORE the series removal and removed only when lightweight-charts kept
+  it and it is empty (a blind `removePane(1)` deleted the next sub pane when there were two).
+- `ChartInterval` gained `1d` (Markt chart), `RangeDays` gained 180 / 365 / 730 (the 1D / 1W windows).
+
 ## Theme (`theme.ts`)
 
 `NOTHING_DARK` (`makeNothingTheme(background)`), `NOTHING_CANDLES`, `NOTHING_VOLUME`,
@@ -146,7 +185,11 @@ toggles under the chart (`ChartLayers`, `aria-pressed`, ≥ 44 px on coarse poin
 `CHART_PRICE_MIN_MOVE` (0.1), `CHART_BACKGROUND_TRANSPARENT`
 (decision 7, default) / `CHART_BACKGROUND_SOLID` (`#0a0a0a` fallback), `CHART_FONT`, `CHART_TIME_ZONE`,
 `formatTickMark`, `formatChartTime`. One-accent rule: red only on the hard invalidation line and the
-series' own last-price line. Fonts: `document.fonts.load('11px "IBM Plex Mono"')` is awaited (≤ 600 ms)
+series' own last-price line. `NOTHING_RSI_LINE` (P02).
+
+Runtime palette (P02 hook for the light mode, P13): `applyInk(partial)` changes the live `ink` in place (defaults
+unchanged, `INK_DEFAULTS`; `resetInk()`), `subscribeInk(cb)` notifies; `NothingCandleChart` re-applies
+`inkChartOptions()` / `inkCandleOptions()` and invalidates its overlays (which read `ink` at draw time). Fonts: `document.fonts.load('11px "IBM Plex Mono"')` is awaited (≤ 600 ms)
 before the first `setData`.
 
 ## Recharts cards (`EquityChart.tsx`, `MonthlyBars.tsx`)

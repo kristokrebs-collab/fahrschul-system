@@ -24,3 +24,14 @@ import { analyzeBoxes, findBoxes, boxState, rsiLines, rsiLineText, PHASE_LABEL }
 
 Calibrated on real Binance BTCUSDT.P 4h / 1D (TradingView connector, Feb–Oct 2026, fixtures in `tests/unit/fixtures/`):
 the 62–66k range of April–May is one strong box that broke out upward into the 78k rally.
+
+## P02 additions (live wiring)
+
+| File | Contents |
+|---|---|
+| `config.ts` | `settings.boxes` (passthrough, like `settings.signals`): `boxesCfgOf(raw)` – sanitiser, every field defaulted / clamped (`on`, `alerts`, `notify`, `minGrade` `A+` / `A`, `scanner`, `watchlist` ≤ 20 normalised USDT perps – default `DEFAULT_WATCHLIST` of 10 –, `box` engine knobs); `withBoxesSettings(raw, patch)` keeps unknown keys and returns the same object when nothing changes; `boxesCfgKey`; `gradePasses(g, min)`; `traderBiasOf(reading)` (top traders ≥ 55 % long with a non-negative Whale–Retail-Delta → `1`, mirrored → `−1`, else `0`, no data → `null`); `BOX_TFS`, `HTF_OF` (1D grades 4h, 1W grades 1D), `BOX_TF_MS`, `BOX_TF_LABEL`. |
+| `snapshot.ts` | `BoxSnapshot` (what `Trade.boxSnap` holds, `v: 1`), `toBoxSnapshot(analysis, { symbol, tf, side, source })` (the best setup on the TRADE's side, prices at 6 significant digits), `parseBoxSnapshot`, `boxGradeOf(trade)` (reader for analytics), `boxIdOf(tf, box)` (stable id: start bar + edges), `boxKey(analysis)` (fingerprint of everything shown – the live store publishes only when it changes). The live / retro resolver is `@/market/boxes/snapshot`. |
+
+The engine files are unchanged. The live store, alerts and scanner: `src/market/README.md` → "Box-zu-Box live"; the page:
+`src/views/markt/README.md`. Tests of the additions: `tests/unit/market.boxes.test.ts` (domain block); the engine itself:
+`tests/unit/domain.boxes.test.ts`.

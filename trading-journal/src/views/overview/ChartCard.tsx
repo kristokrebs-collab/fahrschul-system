@@ -38,8 +38,10 @@ import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Expander } from "@/primitives/Expander";
 import { Segmented } from "@/primitives/Segmented";
+import { useBoxes } from "@/market/boxes/store";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { useUi, type ChartInterval, type ChartPane } from "@/store/uiStore";
+import { toChartBoxes } from "@/views/markt/chartBoxes";
 import { CHART_CARD_ID } from "./MarketPanel";
 
 const NothingCandleChart = lazy(() => import("@/chart/NothingCandleChart").then((m) => ({ default: m.NothingCandleChart })));
@@ -61,6 +63,12 @@ export const PANE_OFF_FLAG = "chartPaneOff";
  * default (their flag hides them), structure is off by default (its flag shows it).
  */
 export const LAYER_FLAGS = { mcb: "chartMcbOff", div: "chartDivOff", sr: "chartSrOff", struct: "chartStructOn" } as const;
+/**
+ * `tj2-ui.flags` key of the Box-zu-Box layer (P02): the 4h boxes, their targets and edges on the chart. OFF by default
+ * (its flag shows it), so the overview stays as it was until the trader turns it on.
+ */
+export const BOX_LAYER_FLAG = "chartBoxesOn";
+export const BOX_LAYER_TEXT = { label: "Boxen", name: "Box-zu-Box-Boxen im Chart (4h)" } as const;
 
 /**
  * Chart intervals (`uiStore.ChartInterval`, persisted in `tj2-ui`). `30m` has no stream of its own: it is resampled
@@ -92,6 +100,7 @@ const PANES: readonly { v: PaneChoice; label: string }[] = [
   { v: "none", label: "–" },
   { v: "ratio", label: "Ratio" },
   { v: "oi", label: "OI" },
+  { v: "rsi", label: "RSI" },
 ];
 
 /** Union by open time, sorted ascending (keeps the history identity stable across live ticks). */
@@ -375,6 +384,16 @@ function LayerGlyph({ layer }: { layer: keyof OverlayLayers }) {
   );
 }
 
+/** Legend glyph of the Box-zu-Box layer: a box with a target line (decorative). */
+function BoxGlyph() {
+  return (
+    <svg width="18" height="10" viewBox="0 0 18 10" aria-hidden="true" className="shrink-0">
+      <rect x="1" y="2.5" width="9" height="5" fill="rgba(255,255,255,0.1)" stroke="#9b9b9b" strokeWidth="1" />
+      <path d="M10 1.5 H17" stroke="var(--color-win)" strokeWidth="1" strokeDasharray="1.5 2" />
+    </svg>
+  );
+}
+
 /** Key glyph of a candle-close state (neutral ink: the style, not the side). */
 function StateGlyph({ state }: { state: "provisional" | "confirmed" | "strong" }) {
   return (
@@ -401,7 +420,16 @@ function LineGlyph({ dashed }: { dashed?: boolean }) {
  * Layer toggles + style key under the chart (`aria-pressed` chips, ≥ 44 px tall on coarse pointers): MCB · Divergenzen
  * · S/R · Struktur, then what a ring / dot / halo and a solid / dashed line mean. Persisted in `tj2-ui.flags`.
  */
-export const ChartLayers = memo(function ChartLayers({ layers, onToggle }: { layers: OverlayLayers; onToggle: (layer: keyof OverlayLayers) => void }) {
+export const ChartLayers = memo(function ChartLayers({
+  layers,
+  onToggle,
+  boxes,
+}: {
+  layers: OverlayLayers;
+  onToggle: (layer: keyof OverlayLayers) => void;
+  /** P02: the Box-zu-Box layer toggle (rendered after the check layers when given) */
+  boxes?: { on: boolean; onToggle: () => void };
+}) {
   const reduced = useReducedFx();
   return (
     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line pt-3" data-testid="chart-layers">
@@ -430,6 +458,26 @@ export const ChartLayers = memo(function ChartLayers({ layers, onToggle }: { lay
             </motion.button>
           );
         })}
+        {boxes && (
+          <motion.button
+            type="button"
+            aria-pressed={boxes.on}
+            aria-label={BOX_LAYER_TEXT.name}
+            onClick={boxes.onToggle}
+            whileTap={reduced ? undefined : { scale: 0.95 }}
+            transition={spring.press}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-[color,border-color,background-color,opacity] duration-200 pointer-coarse:min-h-11 pointer-coarse:px-3",
+              boxes.on ? "border-white/25 bg-white/[0.06] text-fg" : "border-line-2 text-faint hover:text-mute",
+            )}
+            data-chart-layer="boxes"
+          >
+            <span className={cn("inline-flex transition-opacity duration-200", boxes.on ? "opacity-100" : "opacity-35")}>
+              <BoxGlyph />
+            </span>
+            {BOX_LAYER_TEXT.label}
+          </motion.button>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint" data-testid="chart-state-key">
         {layers.mcb && (
@@ -539,6 +587,7 @@ export function ChartCard() {
   const divOff = useUi((s) => s.flags[LAYER_FLAGS.div] === true);
   const srOff = useUi((s) => s.flags[LAYER_FLAGS.sr] === true);
   const structOn = useUi((s) => s.flags[LAYER_FLAGS.struct] === true);
+  const boxesOn = useUi((s) => s.flags[BOX_LAYER_FLAG] === true);
   const layers = useMemo<OverlayLayers>(() => ({ mcb: !mcbOff, div: !divOff, sr: !srOff, struct: structOn }), [mcbOff, divOff, srOff, structOn]);
   const setFlag = useUi((s) => s.setFlag);
   const detailId = useUi((s) => s.detail.id);
@@ -614,6 +663,11 @@ export function ChartCard() {
     },
     [layers, setFlag],
   );
+  // Box-zu-Box layer (P02): the live 4h boxes, computed only while the layer is on (and the card open)
+  const boxView = useBoxes({ enabled: boxesOn && chart.open });
+  const analysis4h = boxView.tfs["4h"].analysis;
+  const chartBoxes = useMemo(() => (boxesOn && MCB_INTERVALS.has(interval) ? toChartBoxes(analysis4h, { intervalMs: 4 * 3_600_000, tfLabel: interval === "4h" ? undefined : "4h" }) : undefined), [boxesOn, analysis4h, interval]);
+  const onBoxLayer = useMemo(() => ({ on: boxesOn, onToggle: () => setFlag(BOX_LAYER_FLAG, !boxesOn) }), [boxesOn, setFlag]);
   const active = levelsOn && close4h != null ? scenario(close4h, settings.market) : null;
   const activeScenario = active?.key === "long" || active?.key === "short" ? active.key : null;
 
@@ -666,6 +720,7 @@ export function ChartCard() {
         divergences={overlay.divergences}
         structure={overlay.structure}
         layers={layers}
+        boxes={chartBoxes}
         pane={pane}
         ratio={ratio?.data}
         oi={oi?.data}
@@ -719,7 +774,7 @@ export function ChartCard() {
         {/* Collapse without unmount (Plan 3.3 "Chart-Karte einklappen"): height animates like the Collapsible-Explainer, the chart instance stays. */}
         <motion.div id={`${CHART_CARD_ID}-body`} className="relative overflow-hidden" initial={false} animate={{ height: chart.open ? "auto" : 0, opacity: chart.open ? 1 : 0 }} transition={tween.collapse} aria-hidden={!chart.open}>
           <ChartBodyGate feedId={feedId} hasCandles={candles.length > 0} loading={loading} chart={body} />
-          {MCB_INTERVALS.has(interval) && candles.length > 0 && <ChartLayers layers={layers} onToggle={onLayer} />}
+          {MCB_INTERVALS.has(interval) && candles.length > 0 && <ChartLayers layers={layers} onToggle={onLayer} boxes={onBoxLayer} />}
           <AnimatePresence>
             {ghost && detailSource === "marker" && (
               <motion.div

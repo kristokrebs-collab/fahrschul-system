@@ -7,9 +7,14 @@
  * optional ratio/OI pane, range morph, interval strip wipe / pane crossfade, a "Folgen" pill away from the live
  * edge, spring tooltip and a skeleton → entrance. Tick labels next to a level / zone / last-price / S/R label are
  * blanked (`axisLabels.ts`), so no axis text overlaps.
+ *
+ * P02: Box-zu-Box boxes + targets (`boxes`, `primitives/BoxPrimitive.ts`, draw-in on first view) and the RSI pane
+ * (`pane="rsi"`, `rsiPane.ts`: RSI 14 of the chart's own bars, O(1) live, diagonal trendlines with glowing breaks; the
+ * newest fresh break breathes as a DOM `GlowBreak` in the ripple layer; a legend top-left of the pane shows the RSI of
+ * the hovered / newest bar, written through a ref).
  */
-import { memo, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from "react";
-import { AnimatePresence, animate, motion, useReducedMotion, type MotionValue } from "motion/react";
+import { memo, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref, type RefObject } from "react";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, type MotionValue } from "motion/react";
 import {
   createChart,
   createSeriesMarkers,
@@ -23,11 +28,12 @@ import {
 } from "lightweight-charts";
 import type { Candle, OpenInterestPoint, RatioPoint } from "@/market/types";
 import type { MarketLevels } from "@/domain/types";
+import { GlowBreak } from "@/motion/fx/GlowBreak";
 import { observeInView } from "@/motion/inView";
 import { playStripWipe } from "@/motion/pulse/StripWipe";
 import { tween } from "@/motion/tokens";
 import { cn } from "@/lib/cn";
-import { CHART_FONT, CHART_FONT_LOAD, CHART_MIN_BAR_SPACING, CHART_PRICE_MIN_MOVE, CHART_RIGHT_OFFSET, NOTHING_DARK, ink } from "./theme";
+import { CHART_FONT, CHART_FONT_LOAD, CHART_MIN_BAR_SPACING, CHART_PRICE_MIN_MOVE, CHART_RIGHT_OFFSET, NOTHING_DARK, ink, inkCandleOptions, inkChartOptions, subscribeInk } from "./theme";
 import {
   INTERVAL_SECONDS,
   PaneController,
@@ -45,6 +51,8 @@ import { filterTickLabels } from "./axisLabels";
 import { fmt } from "./format";
 import type { SignalMarker } from "./signalMarkers";
 import { DEFAULT_LAYERS, SignalOverlay, type DivergenceLine, type OverlayLayers, type StructureOverlay } from "./primitives/SignalOverlay";
+import { BoxPrimitive, type ChartBox } from "./primitives/BoxPrimitive";
+import type { RsiOverlayBreak } from "./primitives/RsiOverlay";
 import type { Box } from "./overlayLayout";
 import {
   MARKER_ENTRY_PREFIX,
@@ -65,7 +73,8 @@ import { ChartSkeleton } from "./ChartSkeleton";
 import { LiveCandle, extendsTail, type Bar } from "./liveCandle";
 import { FollowPill, LivePulse, isAwayFromRealtime, spawnMarkerRipple, type PulseHandle, type PulsePoint } from "./overlays";
 
-export type RangeDays = 7 | 30 | 90;
+/** Visible window in days (overview pills 1W / 1M / 3M; the Markt chart also uses 6M / 1J / 2J for 1D and 1W bars). */
+export type RangeDays = 7 | 30 | 90 | 180 | 365 | 730;
 
 /** Viewport-relative box of a clicked marker (morph source for the trade detail ghost). */
 export interface MarkerRect {
@@ -122,7 +131,12 @@ export interface NothingCandleChartProps {
   layers?: OverlayLayers;
   ratio?: RatioPoint[];
   oi?: OpenInterestPoint[];
+  /** sub pane: Long/Short ratio, Open Interest or the RSI 14 with its diagonal trendlines (P02) */
   pane?: PaneKind;
+  /** Box-zu-Box boxes and their targets (P02, identity = content; a new box id draws in) */
+  boxes?: ChartBox[];
+  /** keep the boxes overlapping the view and the active box's targets in the price range (default false) */
+  boxAutoscale?: boolean;
   rangeDays?: RangeDays;
   /** last traded price: every print moves the forming candle (the close jumps; the canvas never glides) */
   price?: MotionValue<number>;
@@ -160,6 +174,10 @@ interface Instance {
   markersApi: ISeriesMarkersPluginApi<Time>;
   /** Einstiegs-Check overlay: MCB dots, divergences, S/R, structure (under the trade markers) */
   check: SignalOverlay;
+  /** Box-zu-Box boxes + targets (P02), under the check overlay */
+  boxes: BoxPrimitive;
+  /** chart-relative top (CSS px) of the sub pane, measured on resize / pane switch only (RSI legend + glow) */
+  subTop: number;
   range: RangeAnimator;
   live: LiveCandle;
   levels: LevelLines | null;
@@ -187,6 +205,7 @@ interface Instance {
     overlay?: readonly unknown[];
     live?: Candle;
     pane?: readonly unknown[];
+    boxes?: ChartBox[] | undefined;
   };
   /** ready, on screen and not collapsed */
   isActive(): boolean;
@@ -194,6 +213,8 @@ interface Instance {
   syncActive(): void;
   /** places the pulse right after lightweight-charts drew its next frame */
   requestPlace(): void;
+  /** re-reads the sub pane's top after a resize / pane switch (one layout read, in a frame) */
+  measurePanes(): void;
 }
 
 type Callbacks = Pick<NothingCandleChartProps, "onMarkerClick" | "onCrosshair" | "onOutsideCount">;
@@ -308,6 +329,94 @@ function syncOverlay(i: Instance, p: { signals?: SignalMarker[]; divergences?: D
   i.check.setDivergences(p.divergences ?? NO_LINES);
   i.check.setStructure(p.structure ?? null);
   i.check.setLayers(p.layers ?? DEFAULT_LAYERS);
+}
+
+const NO_BOXES: ChartBox[] = [];
+
+/** Box-zu-Box boxes (P02): a new id draws in, the rest is re-indexed by the primitive. */
+function syncBoxes(i: Instance, boxes: ChartBox[] | undefined): void {
+  i.applied.boxes = boxes;
+  i.boxes.setBoxes(boxes ?? NO_BOXES);
+}
+
+/** Chart-relative top (CSS px) of the sub pane – one layout read, only on a resize / pane switch. */
+function subPaneTop(i: Instance): number {
+  const idx = i.panes.paneIndex();
+  if (idx == null) return 0;
+  const panes = i.chart.panes();
+  const pane = panes[idx] as { getHTMLElement?: () => HTMLElement | null } | undefined;
+  const el = pane?.getHTMLElement?.();
+  if (el) {
+    const top = el.getBoundingClientRect().top - i.node.getBoundingClientRect().top;
+    if (Number.isFinite(top) && top > 0) return top;
+  }
+  // without the element: the panes above plus lightweight-charts' 1 px separator each
+  let y = 0;
+  for (let k = 0; k < idx; k++) y += (panes[k]?.getHeight() ?? 0) + 1;
+  return y;
+}
+
+/** What the chart's RSI legend and glow write to (refs and MotionValues of the component, reached imperatively). */
+interface RsiFx {
+  legend: RefObject<HTMLDivElement | null>;
+  value: RefObject<HTMLSpanElement | null>;
+  ripples: RefObject<HTMLDivElement | null>;
+  /** key of the newest fresh break (`time:dir`) */
+  glowKey: { current: string | null };
+  setGlow: (g: { key: string; dir: 1 | -1 } | null) => void;
+  mv: { x: MotionValue<number>; y: MotionValue<number>; shown: MotionValue<number> };
+  reduced: () => boolean;
+}
+
+/** RSI legend text: the hovered bar's RSI (`time`, UTC s) or the newest; written only when it changes. */
+function writeRsiLegend(i: Instance, fx: RsiFx, time: number | null): void {
+  const el = fx.value.current;
+  const rp = i.panes.rsi();
+  if (!el || !rp) return;
+  const v = time != null ? rp.valueAt(time) : rp.lastValue();
+  const text = v == null ? "–" : fmt.n1(v);
+  if (el.textContent !== text) el.textContent = text;
+}
+
+/** Chart-relative px of an RSI break (sub pane offset + the RSI series' y), `null` out of view. */
+function glowPoint(i: Instance, b: RsiOverlayBreak): PulsePoint | null {
+  const rp = i.panes.rsi();
+  if (!rp) return null;
+  const ts = i.chart.timeScale();
+  const x = ts.logicalToCoordinate(b.i as never);
+  const y = rp.series.priceToCoordinate(b.v);
+  if (x == null || y == null || x < 0 || x > ts.width()) return null;
+  return { x, y: i.subTop + y };
+}
+
+/** The newest fresh RSI break: a new one mounts the breathing glow (and pings once when it appeared live). */
+function syncGlow(i: Instance, fx: RsiFx, appended: boolean): void {
+  const b = i.panes.rsi()?.freshBreak() ?? null;
+  const key = b ? `${i.data[b.i]?.time ?? b.i}:${b.dir}` : null;
+  if (key === fx.glowKey.current) return;
+  const prev = fx.glowKey.current;
+  fx.glowKey.current = key;
+  fx.setGlow(b && key ? { key, dir: b.dir } : null);
+  const layer = fx.ripples.current;
+  if (appended && prev !== null && b && !fx.reduced() && layer) {
+    const at = glowPoint(i, b);
+    if (at) spawnMarkerRipple(layer, at, b.dir === 1 ? ink.win : ink.loss);
+  }
+  i.requestPlace();
+}
+
+/** Moves the glow with the canvas (in the frame lightweight-charts drew): MotionValues, no React render. */
+function placeGlow(i: Instance, fx: RsiFx): void {
+  if (!fx.glowKey.current) return;
+  const b = i.panes.rsi()?.freshBreak() ?? null;
+  const at = b && i.isActive() ? glowPoint(i, b) : null;
+  if (!at) {
+    fx.mv.shown.set(0);
+    return;
+  }
+  fx.mv.x.set(at.x);
+  fx.mv.y.set(at.y);
+  fx.mv.shown.set(1);
 }
 
 function syncMarkers(i: Instance, markers: TradeMarker[] | undefined): BuiltMarkers {
@@ -426,6 +535,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   ratio,
   oi,
   pane = "none",
+  boxes,
+  boxAutoscale = false,
   rangeDays = 30,
   price,
   tradeTime,
@@ -451,8 +562,27 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   const parked = useRef<ChartRecord | null>(null);
   const tip = useRef<TooltipHandle>(null);
   const cb = useRef<Callbacks>({});
-  const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers; levels?: MarketLevels; activeScenario: ActiveScenario }>({
+  const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers; levels?: MarketLevels; activeScenario: ActiveScenario; boxes?: ChartBox[] }>({
     activeScenario: null,
+  });
+  /** RSI legend (top left of the RSI pane): text and position written through refs, never React state */
+  const rsiLegend = useRef<HTMLDivElement>(null);
+  const rsiValue = useRef<HTMLSpanElement>(null);
+  /** the newest fresh RSI break: its key mounts a breathing `GlowBreak`; x / y follow the canvas without renders */
+  const [glow, setGlow] = useState<{ key: string; dir: 1 | -1 } | null>(null);
+  const glowKey = useRef<string | null>(null);
+  const glowX = useMotionValue(-100);
+  const glowY = useMotionValue(-100);
+  const glowShown = useMotionValue(0);
+  // the chart's imperative helpers reach the legend / glow through one ref (stable for the effects)
+  const fx = useRef<RsiFx>({
+    legend: rsiLegend,
+    value: rsiValue,
+    ripples,
+    glowKey,
+    setGlow,
+    mv: { x: glowX, y: glowY, shown: glowShown },
+    reduced: () => reduceRef.current,
   });
   const reduceRef = useRef(false);
   const readyRef = useRef(false);
@@ -471,8 +601,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     reduceRef.current = reduce;
   }, [reduce]);
   useEffect(() => {
-    latest.current = { markers, signals, divergences, structure, layers, levels, activeScenario };
-  }, [markers, signals, divergences, structure, layers, levels, activeScenario]);
+    latest.current = { markers, signals, divergences, structure, layers, levels, activeScenario, boxes };
+  }, [markers, signals, divergences, structure, layers, levels, activeScenario, boxes]);
 
   // 1. create once and keep it. A keep-alive <Activity> (the Übersicht on another tab) destroys this effect while the page
   // is hidden but keeps the DOM: the cleanup then PARKS the instance (host still in the document) and the next run
@@ -536,16 +666,36 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       axisPrices: () => axisLabelPrices(instance, latest.current.levels),
       reserved: () => zoneCaptionBox(instance, latest.current.levels),
     });
+    // the Box-zu-Box boxes first (their fills sit under everything), then the check overlay, trade markers on top
+    const boxes = new BoxPrimitive({
+      bars: () => instance.data,
+      intervalSec: () => INTERVAL_SECONDS[instance.lastInterval ?? "1h"],
+      reducedMotion: () => reduceRef.current,
+      axisPrices: () => [...axisLabelPrices(instance, latest.current.levels), ...check.axisLabelPrices()],
+      // target labels / captions keep clear of the check overlay's labels and the zone caption
+      reserved: () => [...zoneCaptionBox(instance, latest.current.levels), ...check.geometry().labels.map((l) => l.box)],
+    });
+    main.candles.attachPrimitive(boxes);
     main.candles.attachPrimitive(check);
     const markersApi = createSeriesMarkers(main.candles, [], { zOrder: "aboveSeries" });
     const range = new RangeAnimator(chart, { reducedMotion: () => reduceRef.current });
     let placeRaf = 0;
+    let measureRaf = 0;
+    const measure = () => {
+      measureRaf = 0;
+      if (inst.current !== instance) return;
+      instance.subTop = subPaneTop(instance);
+      const el = fx.current.legend.current;
+      if (el) el.style.transform = `translate3d(0, ${instance.subTop + 4}px, 0)`;
+      instance.requestPlace();
+    };
     const isActive = () => readyRef.current && visibleRef.current && !pausedRef.current;
     const place = () => {
       placeRaf = 0;
       if (inst.current !== instance) return;
       const last = instance.data[instance.data.length - 1];
       pulse.current?.place(isActive() && last ? pointInPane(instance, last.time, last.close) : null);
+      placeGlow(instance, fx.current);
     };
     const live = new LiveCandle({
       host: {
@@ -564,8 +714,17 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         const last = instance.data[instance.data.length - 1];
         if (instance.bounds && last) instance.bounds = { ...instance.bounds, last: last.time };
         panes.setGrid(instance.data.map((d) => d.time));
+        // a bar closed: RSI + trendlines of the closed bars (once per bar), the box geometry re-indexes
+        panes.setBars(instance.data);
+        boxes.invalidate();
+        syncGlow(instance, fx.current, true);
+        writeRsiLegend(instance, fx.current, null);
       },
-      onPush: () => instance.requestPlace(),
+      onPush: (tail) => {
+        panes.pushLive(tail);
+        writeRsiLegend(instance, fx.current, null);
+        instance.requestPlace();
+      },
     });
     const instance: Instance = {
       chart,
@@ -574,6 +733,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       panes,
       markersApi,
       check,
+      boxes,
+      subTop: 0,
       range,
       live,
       levels: null,
@@ -599,6 +760,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       requestPlace: () => {
         if (!placeRaf) placeRaf = requestAnimationFrame(place);
       },
+      measurePanes: () => {
+        if (!measureRaf) measureRaf = requestAnimationFrame(measure);
+      },
     };
 
     instance.fontReady.then(() => {
@@ -609,7 +773,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     chart.applyOptions({
       localization: {
         tickmarksPriceFormatter: (prices: readonly number[]) => {
-          const labels = [...axisLabelPrices(instance, latest.current.levels), ...check.axisLabelPrices()];
+          const labels = [...axisLabelPrices(instance, latest.current.levels), ...check.axisLabelPrices(), ...boxes.targetPrices()];
           return filterTickLabels(prices, labels, (p) => main.candles.priceToCoordinate(p), (p) => fmt.price(p));
         },
       },
@@ -633,6 +797,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
             if (changed || !sized) chart.resize(r.width, r.height, sized);
             sized = true;
             instance.requestPlace();
+            if (changed) instance.measurePanes();
           })
         : null;
 
@@ -641,6 +806,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       const point = p.point;
       const bar = point && p.time !== undefined ? p.seriesData.get(main.candles) : undefined;
       const ohlc = bar && "open" in bar ? (bar as CandlestickData<Time>) : null;
+      // the RSI legend follows the crosshair on every pane (the RSI pane included), else shows the newest value
+      writeRsiLegend(instance, fx.current, point && typeof p.time === "number" ? p.time : null);
       if (!point || p.paneIndex !== 0 || !ohlc || typeof ohlc.time !== "number") {
         tip.current?.hide();
         cb.current.onCrosshair?.(null);
@@ -680,6 +847,13 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     const stopMorph = () => range.cancel();
     chart.subscribeCrosshairMove(onMove);
     chart.subscribeClick(onClick);
+    // runtime palette (light mode, P13): re-apply the colour options; overlays read `ink` at draw time
+    const offInk = subscribeInk(() => {
+      chart.applyOptions(inkChartOptions());
+      main.candles.applyOptions(inkCandleOptions());
+      check.invalidate();
+      boxes.invalidate();
+    });
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
     node.addEventListener("wheel", stopMorph, { passive: true });
     node.addEventListener("pointerdown", stopMorph);
@@ -714,12 +888,17 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         chart.unsubscribeClick(onClick);
         if (placeRaf) cancelAnimationFrame(placeRaf);
         placeRaf = 0;
+        if (measureRaf) cancelAnimationFrame(measureRaf);
+        measureRaf = 0;
+        offInk();
         live.dispose();
         instance.overlay?.remove();
         instance.cancelWipe?.();
         range.dispose();
         markersApi.detach();
         main.candles.detachPrimitive(check);
+        boxes.dispose();
+        main.candles.detachPrimitive(boxes);
         clearLevels(main.candles, instance.levels);
         panes.dispose();
         readyRef.current = false;
@@ -769,6 +948,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       i.live.reset(interval, volume[volume.length - 1]?.value ?? 0);
       // sub pane shares the time scale → snap its points onto the candle grid (no whitespace slots)
       i.panes.setGrid(data.map((d) => d.time));
+      // the RSI pane computes from the chart's own bars
+      i.panes.setBars(i.data);
 
       if (first || intervalChanged) {
         const target = windowFor(i, rangeDays, interval);
@@ -784,6 +965,10 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       i.markerIds = null;
       i.check.invalidate();
       syncOverlay(i, latest.current);
+      i.boxes.invalidate();
+      syncBoxes(i, latest.current.boxes);
+      syncGlow(i, fx.current, false);
+      writeRsiLegend(i, fx.current, null);
       const built = syncMarkers(i, latest.current.markers);
       freshMarkerIds(i, built);
       cb.current.onOutsideCount?.(built.outside);
@@ -894,6 +1079,16 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     syncOverlay(i, { signals, divergences, structure, layers });
   }, [signals, divergences, structure, layers]);
 
+  // 6c. Box-zu-Box boxes (identity = content upstream; re-indexed after every history load, see step 2)
+  useEffect(() => {
+    const i = inst.current;
+    if (!i || ("boxes" in i.applied && i.applied.boxes === boxes)) return;
+    syncBoxes(i, boxes);
+  }, [boxes]);
+  useEffect(() => {
+    inst.current?.boxes.applyOptions({ autoscale: boxAutoscale });
+  }, [boxAutoscale]);
+
   // 7. optional sub pane; switching the kind crossfades from a screenshot
   useEffect(() => {
     const i = inst.current;
@@ -904,6 +1099,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     i.pane = pane;
     i.panes.setData({ ratio, oi });
     i.panes.set(pane);
+    syncGlow(i, fx.current, false);
+    writeRsiLegend(i, fx.current, null);
+    i.measurePanes();
     i.requestPlace();
   }, [pane, ratio, oi]);
 
@@ -969,8 +1167,21 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         <div ref={host} className="absolute inset-0" aria-label="Kerzenchart" role="img" />
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[4] overflow-hidden">
           <div ref={ripples} className="absolute inset-0" />
+          {pane === "rsi" && glow ? (
+            <motion.span className="absolute inset-0" style={{ opacity: glowShown }} data-fx="rsi-glow">
+              <GlowBreak key={glow.key} x={glowX} y={glowY} tone={glow.dir === 1 ? "win" : "loss"} size={30} />
+            </motion.span>
+          ) : null}
           <LivePulse ref={pulse} reduced={reduce} />
         </div>
+        {pane === "rsi" ? (
+          <div ref={rsiLegend} className="pointer-events-none absolute left-2 top-0 z-[3] flex items-baseline gap-1.5 font-mono text-[10px] text-faint" data-testid="rsi-legend">
+            <span className="uppercase tracking-[0.12em]">RSI 14</span>
+            <span ref={rsiValue} className="num text-[11px] text-mute">
+              –
+            </span>
+          </div>
+        ) : null}
         {tooltip ? <ChartTooltip ref={tip} /> : null}
       </motion.div>
       {followLabel ? <FollowPill show={showChart && !paused && follow !== null} label={followLabel} right={follow?.right ?? 0} reduced={reduce} onFollow={followLive} /> : null}
