@@ -451,9 +451,18 @@ describe("HeatGridReveal", () => {
     );
     const grid = container.querySelector('[data-fx="heat-grid"]')!;
     expect(grid.getAttribute("data-run")).toBe("1");
-    await vi.waitFor(() => {
-      for (const cell of grid.children) expect((cell as HTMLElement).style.transform).toBe("none");
-    });
+    // the cascade starts from the hidden pop state …
+    expect((grid.children[3] as HTMLElement).style.opacity).not.toBe("1");
+    // … and every cell rests without an inline transform / opacity (transform: none)
+    await vi.waitFor(
+      () => {
+        for (const cell of grid.children) {
+          expect((cell as HTMLElement).style.transform).toBe("");
+          expect((cell as HTMLElement).style.opacity).toBe("");
+        }
+      },
+      { timeout: 3000 },
+    );
   });
 });
 

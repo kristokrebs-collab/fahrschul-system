@@ -1,5 +1,5 @@
-import { motion } from "motion/react";
-import { Children, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { animate, type AnimationPlaybackControls } from "motion/react";
+import { Children, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { FX_TONE, useFxPlay } from "@/motion/fx/shared";
 import { isSafeFx } from "@/motion/safeFx";
@@ -10,14 +10,17 @@ import { useReducedFx } from "@/motion/useReducedFx";
  * HeatGridReveal – the cells of a heatmap / correlation matrix / habit grid land as a radial cascade from ONE origin
  * cell (pass the best cell – "trade the best"): delay = Chebyshev ring distance · `stagger.heat`, capped at
  * `stagger.heatMax`, so even a 30 × 30 grid lands in < 0.8 s. Each cell pops from `{opacity 0, scale .55}` on
- * `spring.deal` (opacity `tween.heat`) and ends at `transform: none`; the origin cell gets one signal ring.
+ * `spring.deal` (opacity `tween.heat`) and ends with no inline transform (`transform: none`); the origin cell gets one
+ * signal ring.
  *
  * You render the cells (row-major children); the component lays them out with `cols` columns (CSS grid, `className`
- * for gap / sizing) and wraps each in a motion cell. Plays on first view and on every new `play` key (the cells are
- * re-mounted for a replay). Reduced motion: static grid. Helpers: `heatDelay`, `heatColor`.
+ * for gap / sizing) and wraps each in a plain cell. The cascade is imperative (one Motion animation per cell, started
+ * in a layout effect – no motion component per cell, no React render per frame, a replay does not re-mount your
+ * cells). Plays on first view and on every new `play` key. Reduced motion: static grid. Helpers: `heatDelay`,
+ * `heatColor`.
  */
 export const HEAT_GRID = {
-  from: { opacity: 0, scale: 0.55 },
+  fromScale: 0.55,
   /** the origin cell's ring: start / end scale */
   ring: [0.9, 2.2] as const,
 } as const;
@@ -71,45 +74,64 @@ export interface HeatGridRevealProps {
 export function HeatGridReveal({ cols, origin = 0, play, playOnView = true, children, className, cellClassName, ring = true, "aria-label": ariaLabel, role }: HeatGridRevealProps) {
   const reduced = useReducedFx();
   const ref = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<HTMLSpanElement>(null);
   const [run, setRun] = useState(0);
   const [safe] = useState(isSafeFx);
   useFxPlay(ref, play, playOnView, !reduced, () => setRun((n) => n + 1));
   const cells = Children.toArray(children);
   const c = Math.max(1, Math.round(cols));
   const originIndex = typeof origin === "number" ? origin : origin[0] * c + origin[1];
+  const originKey = typeof origin === "number" ? origin : `${origin[0]}:${origin[1]}`;
   const grid: CSSProperties = { gridTemplateColumns: `repeat(${c}, minmax(0, 1fr))` };
-  const animating = !reduced && run > 0;
+  // before the first cascade (waiting for the first view) the cells are hidden – never a flash of the final grid
   const hidden = !reduced && run === 0 && playOnView;
+
+  useLayoutEffect(() => {
+    const root = ref.current;
+    if (!root || run === 0 || reduced) return;
+    const controls: AnimationPlaybackControls[] = [];
+    const els = Array.from(root.children) as HTMLElement[];
+    els.forEach((el, i) => {
+      const delay = heatDelay(i, c, origin);
+      el.style.opacity = "0";
+      el.style.transform = `scale(${HEAT_GRID.fromScale})`;
+      const pop = animate(el, { transform: [`scale(${HEAT_GRID.fromScale})`, "scale(1)"] }, { ...spring.deal, delay });
+      const fade = animate(el, { opacity: [0, 1] }, { ...tween.heat, delay });
+      controls.push(pop, fade);
+      // rest without an inline transform (`transform: none` – no containing block for fixed descendants)
+      void Promise.all([pop.finished, fade.finished]).then(() => {
+        el.style.transform = "";
+        el.style.opacity = "";
+      });
+    });
+    const r = ringRef.current;
+    if (r) controls.push(animate(r, { opacity: [0.95, 0], transform: [`scale(${HEAT_GRID.ring[0]})`, `scale(${HEAT_GRID.ring[1]})`] }, { ...tween.ripple, delay: 0.05 }));
+    return () => {
+      for (const ctl of controls) ctl.stop();
+      for (const el of els) {
+        el.style.transform = "";
+        el.style.opacity = "";
+      }
+    };
+    // `origin` is captured through `originKey`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, reduced, c, originKey]);
 
   return (
     <div ref={ref} role={role} aria-label={ariaLabel} data-fx="heat-grid" data-run={run} className={cn("grid", className)} style={grid}>
-      {cells.map((cell, i) =>
-        animating ? (
-          <motion.div
-            key={`${run}-${i}`}
-            className={cn("relative", cellClassName)}
-            initial={HEAT_GRID.from}
-            animate={{ opacity: 1, scale: 1, transitionEnd: { transform: "none" } }}
-            transition={{ scale: { ...spring.deal, delay: heatDelay(i, c, origin) }, opacity: { ...tween.heat, delay: heatDelay(i, c, origin) } }}
-          >
-            {cell}
-            {ring && i === originIndex && (
-              <motion.span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-[inherit]"
-                style={{ boxShadow: `0 0 0 1.5px ${FX_TONE.signal}${safe ? "" : `, 0 0 14px ${FX_TONE.signal}`}`, borderRadius: "inherit" }}
-                initial={{ opacity: 0.95, scale: HEAT_GRID.ring[0] }}
-                animate={{ opacity: 0, scale: HEAT_GRID.ring[1] }}
-                transition={{ ...tween.ripple, delay: 0.05 }}
-              />
-            )}
-          </motion.div>
-        ) : (
-          <div key={i} className={cn("relative", cellClassName)} style={hidden ? { opacity: 0 } : undefined}>
-            {cell}
-          </div>
-        ),
-      )}
+      {cells.map((cell, i) => (
+        <div key={i} className={cn("relative", cellClassName)} style={hidden ? { opacity: 0 } : undefined}>
+          {cell}
+          {ring && !reduced && i === originIndex && (
+            <span
+              ref={ringRef}
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0"
+              style={{ boxShadow: `0 0 0 1.5px ${FX_TONE.signal}${safe ? "" : `, 0 0 14px ${FX_TONE.signal}`}` }}
+            />
+          )}
+        </div>
+      ))}
     </div>
   );
 }
