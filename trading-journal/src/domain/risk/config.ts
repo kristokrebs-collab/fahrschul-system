@@ -123,8 +123,9 @@ export function riskSettingsOf(raw: unknown): RiskSettings {
 }
 
 /** The merged limits (`settings.risk` + `settings.discipline` + `ED.LEVERAGE_RULE`). */
-export function riskLimits(settings: { risk?: unknown; discipline?: unknown }): RiskLimits {
-  return { ...riskSettingsOf(settings.risk), ...disciplineLimits(settings), leverageRule: ED.LEVERAGE_RULE };
+export function riskLimits(settings: object): RiskLimits {
+  const s = settings as { risk?: unknown; discipline?: unknown };
+  return { ...riskSettingsOf(s.risk), ...disciplineLimits(s), leverageRule: ED.LEVERAGE_RULE };
 }
 
 /** JSON form of a tier table (`Infinity` → `null`). */

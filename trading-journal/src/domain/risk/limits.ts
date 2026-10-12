@@ -16,16 +16,17 @@ import { localDateKey, tradeTime, weekStart } from "@/lib/dates";
 import { n0 } from "@/lib/format";
 import { riskLimits, type RiskLimits } from "./config";
 
-export type LimitKey = "day" | "week" | "drawdown" | "trades" | "leverage" | "openRisk";
+export type LimitKey = "day" | "week" | "drawdown" | "trade" | "trades" | "leverage" | "openRisk";
 export type LimitState = "ok" | "warn" | "breach";
 export type RiskScope = "all" | AccountId;
 
-export const LIMIT_ORDER: readonly LimitKey[] = ["day", "week", "drawdown", "openRisk", "trades", "leverage"];
+export const LIMIT_ORDER: readonly LimitKey[] = ["day", "week", "drawdown", "openRisk", "trade", "trades", "leverage"];
 
 export const LIMIT_LABELS: Readonly<Record<LimitKey, string>> = {
   day: "Tagesverlust",
   week: "Wochenverlust",
   drawdown: "Drawdown",
+  trade: "Größter Verlust",
   trades: "Trades heute",
   leverage: "Hebel",
   openRisk: "Offenes Risiko",
@@ -164,6 +165,8 @@ interface AccNumbers {
   capital: number;
   dayPnl: number;
   weekPnl: number;
+  /** largest single loss closed today (positive) */
+  worstToday: number;
   tradesToday: number;
   openRisk: number;
   openNoStop: number;
@@ -175,6 +178,7 @@ function numbersOf(acc: AccountId, trades: readonly EnrichedTrade[], capital: nu
   const wk = weekStart(new Date(now)).getTime();
   let dayPnl = 0;
   let weekPnl = 0;
+  let worstToday = 0;
   let tradesToday = 0;
   let openRisk = 0;
   let openNoStop = 0;
@@ -191,10 +195,13 @@ function numbersOf(acc: AccountId, trades: readonly EnrichedTrade[], capital: nu
     if (!fin(t.pnl)) continue;
     const at = closeAt(t, marks);
     if (at > now) continue;
-    if (localDateKey(new Date(at)) === today) dayPnl += t.pnl;
+    if (localDateKey(new Date(at)) === today) {
+      dayPnl += t.pnl;
+      worstToday = Math.max(worstToday, -t.pnl);
+    }
     if (at >= wk) weekPnl += t.pnl;
   }
-  return { acc, capital, dayPnl, weekPnl, tradesToday, openRisk, openNoStop, maxLev };
+  return { acc, capital, dayPnl, weekPnl, worstToday, tradesToday, openRisk, openNoStop, maxLev };
 }
 
 /** The live limit status of a scope (see the module comment). */
@@ -246,6 +253,15 @@ export function limitStatus(input: LimitInput): LimitReport {
       const state = n.openNoStop > 0 && stateOf(ratio, limits.warnAt) === "ok" ? "warn" : stateOf(ratio, limits.warnAt);
       const noStop = n.openNoStop ? ` · ${n.openNoStop} ohne Stop` : "";
       return { key: "openRisk", label: LIMIT_LABELS.openRisk, used: n.openRisk, limit, ratio: n.openNoStop && ratio < limits.warnAt ? limits.warnAt : ratio, state, unit: "money", account: n.acc, detail: `${money(n.openRisk, cur)} von ${money(limit, cur)} bis zu den Stops${noStop}${tag(n.acc)}` } satisfies LimitRow;
+    }),
+  );
+
+  // the largest single loss of today against the per-trade limit (settings.discipline.maxLossTradePct)
+  pick(
+    nums.map((n) => {
+      const limit = limits.maxLossTradePct * n.capital;
+      const ratio = n.worstToday / limit;
+      return { key: "trade", label: LIMIT_LABELS.trade, used: n.worstToday, limit, ratio, state: stateOf(ratio, limits.warnAt, true), unit: "money", account: n.acc, detail: `${n.worstToday > 0 ? "−" : ""}${money(n.worstToday, cur)} von ${money(limit, cur)} pro Trade${tag(n.acc)}` } satisfies LimitRow;
     }),
   );
 

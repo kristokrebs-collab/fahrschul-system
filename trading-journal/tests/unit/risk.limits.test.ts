@@ -48,6 +48,13 @@ describe("Live-Limits", () => {
     expect(row(run([closed(at(14, 9), -25)], strict), "day").state).toBe("breach");
   });
 
+  it("largest single loss of today against the per-trade limit (discipline.maxLossTradePct, strict)", () => {
+    const r = run([closed(at(14, 9), -15), closed(at(14, 10), -20)]);
+    expect(row(r, "trade")).toMatchObject({ used: 20, limit: 20, state: "warn" });
+    expect(row(run([closed(at(14, 9), -21)]), "trade").state).toBe("breach");
+    expect(row(run([closed(at(13, 9), -50)]), "trade").used).toBe(0);
+  });
+
   it("weekly loss from Monday, drawdown from the equity peak", () => {
     const r = run([closed(at(12, 9), 200), closed(at(12, 10), -150), closed(at(11, 10), -500)]);
     // week (Mon 12th): +200 − 150 = +50 → nothing used
