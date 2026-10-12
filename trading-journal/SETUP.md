@@ -309,14 +309,17 @@ Netlify → **Functions** listet sie mit „Scheduled“ und dem nächsten Lauf.
 - **check**: `npm ci`, `npm run typecheck`, `npm run lint`, `npm test`, `npm run build`, `npm run budget`
   (Größe der Erstladung, `scripts/bundleBudget.mjs`), `npm run build:share`.
 - **e2e** (nur Pull Requests): installiert Chromium (`npx playwright install --with-deps chromium`) und führt die
-  Playwright-Specs gegen den Produktions-Build (`vite preview`) aus – mobil und Desktop.
+  Playwright-Specs gegen den Produktions-Build (`vite preview`) aus – mobil und Desktop. Zwei Server: der normale Build
+  (ohne Cloud, Port 4173) und eine Cloud-Ausgabe gegen den Supabase-Mock der Tests (`npm run build:e2e-cloud`, Port 4174)
+  für Konto, Preise, Börse und Community.
 
 Lokal:
 
 ```bash
-npm run e2e -- --project=mobile --project=desktop   # baut beide Ausgaben und startet vite preview auf :4173
-# gegen einen schon laufenden Preview-Server:
-PW_BASE_URL=http://127.0.0.1:4173 npx playwright test tests/e2e/pages.spec.ts --project=mobile --project=desktop
+npm run e2e -- --project=mobile --project=desktop   # baut alles und startet vite preview auf :4173 und :4174
+# gegen schon laufende Preview-Server:
+PW_BASE_URL=http://127.0.0.1:4173 PW_CLOUD_BASE_URL=http://127.0.0.1:4174 \
+  npx playwright test tests/e2e/pages.spec.ts --project=mobile --project=desktop
 ```
 
 Die Specs laufen ohne echtes Supabase / Stripe / Bitunix (Netzwerk wird in den Tests nachgebildet). Den echten
