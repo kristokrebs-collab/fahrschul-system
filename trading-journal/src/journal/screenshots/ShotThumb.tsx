@@ -9,7 +9,7 @@ export function ShotImage({ shot, className, fit = "cover" }: { shot: Screenshot
   if (s.status === "ok") return <img src={s.url} alt={shot.caption || "Screenshot"} draggable={false} className={cn("size-full select-none", fit === "cover" ? "object-cover" : "object-contain", className)} />;
   return (
     <span className={cn("grid size-full place-items-center bg-ink-850 text-center text-[10.5px] text-faint", className)}>
-      {s.status === "loading" ? <span className="size-3 animate-pulse rounded-full bg-white/10" aria-hidden="true" /> : <span className="px-2">Nicht verfügbar{shot.store === "cloud" ? " · Cloud anmelden" : ""}</span>}
+      {s.status === "loading" ? <span className="size-3 rounded-full bg-white/10" aria-hidden="true" /> : <span className="px-2">Nicht verfügbar{shot.store === "cloud" ? " · Cloud anmelden" : ""}</span>}
     </span>
   );
 }

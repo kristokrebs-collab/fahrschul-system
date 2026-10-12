@@ -27,7 +27,7 @@ export interface TradesTableProps {
   onOpen?: (id: string) => void;
   /**
    * Journal v3: fold positions / groups / hedges (`groupRows`) into one summary row each that unfolds its members
-   * (`GroupTableRows`). Off = the bundle table, unchanged.
+   * (`GroupTableRows`). Off = the bundle table, unchanged. Default: the `Gruppieren` switch (`uiStore.tradeExtra.group`).
    */
   grouped?: boolean;
   className?: string;
@@ -125,7 +125,9 @@ function rowTransition(i: number): Transition {
  * `content-visibility: auto` is deliberately not used on the rows: containment does not apply to internal table
  * boxes (a no-op on `<tr>`), and on cell content it would let off-screen rows drop out of the auto column sizing.
  */
-export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, grouped = false, className }: TradesTableProps) {
+export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, grouped: groupedProp, className }: TradesTableProps) {
+  const groupedPref = useUi((s) => s.tradeExtra.group === true);
+  const grouped = groupedProp ?? groupedPref;
   const detail = useUi((s) => s.detail);
   const openDetail = useUi((s) => s.openDetail);
   const reduced = useReducedFx();

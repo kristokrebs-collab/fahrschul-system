@@ -78,6 +78,31 @@ interface TradeEditorProps {
   `SignalSection.tsx`: `SignalSection`, `resolveTradeSignal`, `signalSectionSub`, `localMs`, `SIGNAL_SECTION_TITLE`, `SIGNAL_SECTION_COPY`,
   `RETRO_DEBOUNCE_MS`, `SAVE_CHECK_TIMEOUT_MS`; `SignalSummary.tsx`: `SignalSummary`, `StrengthBars`, `StrengthDots`, `MistakeChips`,
   `signalTone`, `snapshotSource`, `tradeSignal`, `StateChip`, `snapshotPartViews`, `knifeRows`.
+- **Journal v3 (P06)** – four more sections, all optional (an untouched legacy trade gains no key; a cleared field removes
+  its key: `journalRecord` writes `undefined` for empty values and `dropEmptyJournalKeys` deletes them before saving). Form
+  state lives in `t.j` (`JournalForm`, `src/journal/editor/form.ts`); `defaultForm` / `formFromTrade` / `resetForNext` /
+  `toRecord` / `validateRecord(rec, chart, j?)` carry it.
+  - `Ausführung` (after `Preise & Größe`, `ExecutionSection.tsx`): `Ausstiegszeit` (`#f-exit-date`, closed trades), `Menge`,
+    `Funding`, `Markt` Perp|Spot, `Margin-Modus` Isoliert|Cross, `Margin`, `Liq.-Preis`, `Slippage`, `Geplanter Einstieg`,
+    `Börse`, `Börsenkonto`; below a `Segmented` `Ausführungsdetails` (`Fills` · `TP-Leiter` · `Stop-Verlauf`, `AutoHeight`).
+    Fills: rows `Fill n Zeit/Preis/Menge/Gebühr`, `+ Einstieg` / `+ Nachkauf` / `+ Teil-Exit`, side toggle Kauf|Verkauf, a
+    stats line with the `FillsBar`. As soon as a fill opens the position, `Einstieg` / `Größe` (and `Ausstieg` once flat) are
+    disabled and show `Ø aus den Fills` (`fillFix`, 12 significant digits). TP-Leiter: price / % / `Erreicht?` with a ladder
+    viz; Stop-Verlauf: `+ Stop verschoben`.
+  - `Tags & Bewertung` (`TagInput` – Enter / Komma, journal suggestions, chips morph in with `TextRoll`; `RatingDots` 1–5).
+  - `Psyche` (before `Fehler`, `PsychSection.tsx`): `Stress` / `Zuversicht` meters (radiogroups 1–5), `Verhalten` (inner states
+    only: Tilt, Overtrading, Verlustangst, Selbstüberschätzung, Impulsiver Einstieg, Langeweile-Trade – actions such as
+    Revenge / FOMO stay `Fehler` chips), `Exit-Grund` (quick chips; the text field holds own words and replaces a chip),
+    `Vor dem Trade` / `Nach dem Trade`.
+  - `Screenshots` (after `Review`, `ShotsField`): drop zone (`data-testid="shots-drop"`, marching ants while dragging), paste
+    anywhere in the open editor, `Bild wählen`; thumbnails open the lightbox. See `src/journal/README.md` for storage.
+  - Validation adds `JOURNAL_MESSAGES` (exit before entry, incomplete fill, fills closing more than opened, TP ladder
+    without price / over 100 %, stop move without price). The leverage warning uses `leverageOverRule` (`ED.LEVERAGE_RULE`).
+  - Saving drops stored MAE / MFE / ATR when entry, stop, times or fills changed (`excursionStale`), so the backfill measures again.
+  - **Draft** (`openEditor({ draft })`, `TradeDraft` in `uiStore`): a new trade pre-filled by another feature (bot, import,
+    signal). `formFromDraft` fills the bundle fields and `t.j`; keys the form does not edit (`origin`, `positionId`,
+    `externalId`, `boxSnap` …) are kept by `draftExtras` and saved with the record. Every `openEditor({ draft })` bumps
+    `editor.draftSeq`, so a new draft re-initialises an open editor. Exports: `formFromDraft`, `draftExtras`.
 - v2 snapshots (decisions 6, 9, 5, 10, 11): `SignalSummary` shows the candle-close state as a chip (`bestätigt` · `stark bestätigt` ·
   `⚠ vorläufig`, dashed in the ~50 % saturated side tone; the live editor view passes the base candle's `closesAt`, so the chip counts
   down `vorläufig · schließt in mm:ss` on the shared clock `nowMv` – no render per second). A provisional entry shows its label without
@@ -137,6 +162,18 @@ interface TradeDetailProps {
 | `SetupEditor` | fields cascade (`StaggerItem`), checklist rows enter/leave and lift while dragged (scale 1.02 + pre-rendered shadow layer), colour ring glides (`layoutId="sf-color-{useId}"`), a missing name shakes into view. |
 | `ImportDialog` | blocks cascade, preview counts up (`countOnReveal`), progress bar (`role="progressbar"`) glides on `spring.bar` with a shimmer band inside the fill and turns win at 100 %. |
 | `HyblockForm` | blocks cascade with the MorphDialog body; a refused value shakes its field into view. |
+- **Journal v3 (P06)** – `JournalDetail` (`src/journal/ui/JournalDetail.tsx`) renders between the review and the mini chart,
+  each part only when the trade has data: `Ausführung` facts (exit time, `Haltedauer`, `Börse` = market · exchange · account,
+  quantity, funding, slippage, planned entry, margin, liq. price, ATR at entry), `Fills` (`FillsBar` – the position bar cut
+  by every exit – plus `FillsTimeline`, list `Fills der Position`, DCA line), `MAE / MFE` (`ExcursionBar`: adverse left,
+  favourable right, exit tick, −1 R stop, `Mitgenommen: x %` capped at 100 %; without values `MAE/MFE messen` or the honest
+  reason from `MEASURE_HINTS`), tags + `RatingDots`, `Psyche`, `Screenshots` (`ShotReel` + lightbox) and the actions `Replay`
+  (detail steps aside, comes back after the replay) and `Als Bild` (share PNG without amounts).
+- The mini chart gets drawings: `MiniTradeChart annotations / onAnnotationsChange` (toolbar Linie / Trend / Box / Pfeil /
+  Text, colours, `Alle löschen`; stored in time / price coordinates on `trade.annotations`).
+- `TradeDetail(props)` additionally mounts `<ReplayHost />` (the replay sheet) and `<ExcursionBackfillHost />` (idle MAE / MFE
+  backfill) – both render nothing until needed, so the app shell needs no new host.
+
 | swipe handles | every swipe handle (sheet header, dialog head, detail grabber / header, toast) carries `useTouchMoveGuard` (`@/motion/a11y`): a native non-passive `touchmove` that is `preventDefault`ed while dragging – otherwise Chrome treats the next tap within ~1 s as a fling cancel and swallows its click (e.g. the FAB right after swiping the editor away). |
 
 Helpers: `winCelebration` (`celebration.ts`), `BIG_WIN_R`, `STREAK_WINS`, `invalidFieldOf`. Shared with the views (moved out of this
@@ -152,6 +189,7 @@ visible); `HoldConfirm`, `useConfirmFocus`, `HOLD_CONFIRM_TITLE` → `@/motion/H
 | `TradeDetail.candles` | `provider.history("kline_1h", …)` / cache slice ±3 days around `tradeTime(trade)` | stable array identity per load |
 | `uiStore.toasts` | `ToastIsland` | see toast note above |
 | FAB / setup card sources | `visibility:hidden` while the sheet with the matching `layoutId` is open | Plan 3.2 rule 9 |
+| `openEditor({ draft })` | any feature that wants a pre-filled new trade (P02 / P05 / P11) | `TradeDraft` = `Partial<Trade>` without id / timestamps / pnl / r |
 
 ## Other overlays (owned by the setups / settings / overview agents – summary of their exported props)
 

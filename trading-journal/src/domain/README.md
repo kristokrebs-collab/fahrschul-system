@@ -13,7 +13,10 @@ edition/      personal.ts, share.ts, mtf.ts (pure literals) + index.ts (`ED`, pi
 normalize.ts  normalizeSettings (qM), normalizeTrade, normalizeReading, sortReadings, normalizeDayNote(s), isEmptyDayNote,
               mapToBinanceSymbol
 schemas.ts    zod: TradeSchema, HyblockReadingSchema, RawSettingsSchema, SettingsSchema, JsonBackupSchema (all passthrough)
-derive.ts     deriveTrade (qw), computePnlR, leverageOverRule
+derive.ts     deriveTrade (qw), computePnlR, leverageOverRule (rule from `ED.LEVERAGE_RULE`)
+fills.ts      fillStats, fillPosition, effectiveFees, runningCost, positionSlices, relabelFills (Journal v3, P06)
+grouping.ts   groupTrades, detectHedges, pairKey, groupRows (Journal v3, P06)
+excursion.ts  excursion (MAE/MFE), atrPctAt, holdMs/holdLabel, captureRatio, replaySteps, excursionStale (Journal v3, P06)
 enrich.ts     checklistItemsFor (Uw), enrichTrade / enrichTrades (FG), pruneChecks
 agg.ts        aggregate (wn) → Agg, EMPTY_AGG
 account.ts    accountView (Hw) → AccountView (equity, drawdown, streak, months, projection, per-setup)
@@ -82,6 +85,37 @@ carries it (an absent key is never added), so legacy trades normalise, derive (`
 Conventions: `size` stays the notional (qty × entry); `fees`, `fundingFees`, `slippage` are costs in `settings.currency`
 (positive = paid). Whether `fills` / `fundingFees` feed the auto P&L is decided in `derive.ts` (P06) – only when present.
 
+## Journal v3 logic (P06)
+Old trades are untouched: a trade without `fills` / `fundingFees` derives exactly as before (pinned by
+`domain.derive.test.ts` and the CSV tests).
+
+- **`fills.ts`** – average-cost accounting of a scaled position. `fillStats(fills, side)` → `{ ordered (time order, stable),
+  openQty, closeQty, remaining, avgEntry, avgExit, realized (per partial vs the running Ø), parts[] (per close: basis, pnl,
+  share), fees (Σ fill fees, `feesKnown`), peakQty, dca {entries, adds, first, last, low, high, spread, improvement} | null,
+  flat }`. `fillPosition(t)` = the `{entry, qty, gross, exit}` the derivation uses (a closed trade with a remainder prices
+  it at `t.exit`). `effectiveFees(t)` = `t.fees` when set, else Σ fill fees. `positionSlices(stats)` = the position bar cut by
+  every exit (`FillsBar`). `relabelFills` names the closing fill that flattens `exit`, earlier ones `partial`;
+  `FILL_KIND_LABELS` = Einstieg / Nachkauf / Teil-Exit / Ausstieg. Quantities compare with `QTY_EPS`.
+- **`derive.ts`** – `deriveTrade` takes `fills` (Ø entry, qty, gross P&L over all partials) only when the trade has an opening
+  fill, and subtracts `fundingFees` only when it is a finite number. `leverageOverRule(lev, account)` is
+  `lev > ED.LEVERAGE_RULE[account]` (personal scalp 4x / makro 5x, share 5x) – the editor's warning and the detail use it.
+- **`grouping.ts`** – `groupTrades(trades, { hedges?, now? })` → `{ groups, groupOf }`: union-find over `positionId`
+  (kind `position`), `groupId` (`group`) and `hedgeOf` / automatic hedges (`hedge`). `detectHedges` (sweep line) links a long
+  and a short on the same `pairKey` (`BINANCE:BTCUSDT.P` = `btc/usdt` = `BTCUSDT`) whose time in the market overlaps;
+  open trades older than `STALE_OPEN_MS` (14 days, a forgotten open entry) take no part. A group has `side`
+  (`long | short | hedge`), summed `pnl` / `risk`, `r = pnl / risk`, `open`, `from` / `to`, a German `label` and `auto`.
+  `groupRows(rows, groups)` keeps the list order and folds each group into one row at its first member.
+- **`excursion.ts`** – pure maths on OHLC bars (ms): `excursion(bars, { side, entry, stop, from, to, intervalMs })` →
+  MAE / MFE as non-negative price distances from the (Ø) entry plus R and where they happened (whole bars: at most one
+  bar's range overstated at each end – documented). `atrPctAt` = ATR(14) % of the bars closed before the entry.
+  `excursionInterval` (≤ 3 days 15m, else 1h), `captureRatio`, `holdMs` / `holdLabel` ("3 Std 20 Min"),
+  `replaySteps` (running excursion per bar for the replay), `EXCURSION_KEYS` + `excursionStale(before, after)` (an edit of
+  entry / stop / times / fills makes stored values stale – the editor drops them, the backfill measures again).
+- **`csv.ts`** – 26 columns APPENDED after the bundle header (the first 25 columns stay byte-identical): `Ausstiegszeit;
+  Haltedauer (Min);Markt;Börse;Börsenkonto;Menge;Fills;Funding;Slippage;Margin;Margin-Modus;Liq.-Preis;Tags;Bewertung;
+  Stress;Zuversicht;Exit-Grund;MAE;MFE;MAE R;MFE R;ATR % Einstieg;Screenshots;Positions-ID;Gruppe;Quelle` (counts for fills
+  and screenshots, tags joined with ` | `, formula-injection guard as for every text cell).
+
 ## Pipeline
 ```ts
 import { normalizeSettings } from "@/domain/normalize";
@@ -96,7 +130,7 @@ const netExplainer = explain("net", view, settings);        // { title, what, fo
 ```
 
 ## Key signatures
-- `deriveTrade(t): { pnl, risk, r, rr, move, result }` — qty = size/entry; fees only in auto-P&L; leverage never used.
+- `deriveTrade(t): { pnl, risk, r, rr, move, result }` — qty = size/entry (or the fills, see above); fees only in auto-P&L; leverage never used.
 - `aggregate(closed: EnrichedTrade[]): Agg` — `n, wins, losses, be, net, gw, gl, fees, winRate, pf (∞ possible), avgWin, avgLoss (neg.), beWinRate, payoff, avgR, rN, r2, bestR, worstR, exp, best, worst, moveWin, moveLoss, moveExp, moveN`.
 - `accountView(all, settings, acc = "all", { now? })`: `{ start, list, closed (tt asc), open, g, equity: {i,v,t}[], balance, maxDD, dd:{peak,trough,peakI,troughI}, curDD, peak, streak, streakType, months: MonthBucket[] (last 12, "Sep 26"), proj: {days,r,linear,comp,monthly,perWeek,endLin,weak}|null, setups: SetupStats[], none }`.
 - `rankSetups(list, key)` — desc by key (null → −∞), ties → more trades first.
@@ -115,5 +149,5 @@ const netExplainer = explain("net", view, settings);        // { title, what, fo
 `BACKTEST_SETUP_ID = "s_bt"`, `ACCOUNT_LABELS` (`Gesamt/Makro/Scalp`), `SETUP_ACCOUNT_LABELS` (`Beide`), `CONVICTION_LEVELS`, `RESULT_LABELS` (`Gewinn/Verlust/Break-even/Offen`), `LEVERAGE_RULE`, `HYBLOCK_LINK`, `nextSetupColor(setups)`, `BACKTEST_SETUP_DELETED`, `TRIGGER_REACH_THRESHOLD = 0.003`.
 
 ## Tests / fixture
-`tests/unit/domain.*.test.ts`, `tests/unit/lib.*.test.ts`; `tests/fixtures/tj2-v0.json` is a legacy localStorage snapshot
+`tests/unit/domain.*.test.ts` (Journal v3: `domain.fills`, `domain.grouping`, `domain.excursion`, `domain.tradeFields`), `tests/unit/lib.*.test.ts`; `tests/fixtures/tj2-v0.json` is a legacy localStorage snapshot
 (`tj2-settings` partial/raw, 13 trades incl. 2 open + one without `account`, 3 `tj2-hyblock` readings) for migration tests.

@@ -10,9 +10,10 @@ import { Switch } from "@/motion/Switch";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Collapse, Segmented } from "@/primitives";
-import type { TradeExtraFilter, TradeSort } from "@/store/uiStore";
+import { useJournal } from "@/store/journalStore";
+import { useUi, type TradeExtraFilter, type TradeSort } from "@/store/uiStore";
 import { matchView, useViews } from "@/store/viewsStore";
-import { clearJournalFilters, journalFilterCount, type JournalFilterOptions } from "@/views/trades/tradesModel";
+import { clearJournalFilters, journalFilterCount, journalFilterOptions, type JournalFilterOptions } from "@/views/trades/tradesModel";
 
 export interface JournalFilterBarProps {
   filter: TradeFilter;
@@ -46,6 +47,18 @@ const PERIODS: readonly { id: string; label: string; from: () => string; to?: ()
  * ("trade the best"), `Positionen gruppieren` and `Mehr Filter` (count badge pops) that unfolds period, pair, venue,
  * Perp / Spot, tags and the P&L / R / holding-time / leverage ranges (`Collapse`).
  */
+/**
+ * `JournalFilterBar` wired to the stores, as `TradeFilters` renders it on the trades page: the options come from the
+ * journal's trades, the sort and the clear (`replaceTradeExtra`) from `uiStore` – so the page itself needs no change.
+ */
+export function JournalFilterSlot({ filter, extra, onExtraChange, className }: Pick<JournalFilterBarProps, "filter" | "extra" | "onExtraChange" | "className">) {
+  const trades = useJournal((s) => s.trades);
+  const options = useMemo(() => journalFilterOptions(trades), [trades]);
+  const sort = useUi((s) => s.tradeSort);
+  const replace = useUi((s) => s.replaceTradeExtra);
+  return <JournalFilterBar filter={filter} extra={extra} sort={sort} onExtraChange={onExtraChange} onExtraReplace={replace} options={options} className={className} />;
+}
+
 export function JournalFilterBar({ filter, extra, sort, onExtraChange, onExtraReplace, options, className }: JournalFilterBarProps) {
   const reduced = useReducedFx();
   const id = useId();

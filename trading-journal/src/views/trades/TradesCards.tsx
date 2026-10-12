@@ -19,7 +19,7 @@ export interface TradesCardsProps {
   /** Sort identity (`{k}:{dir}`): a new order re-keys the list (remount + staggered enter instead of crossing FLIPs). */
   sortKey?: string;
   onOpen?: (id: string) => void;
-  /** Journal v3: fold positions / groups / hedges into one card each (`GroupCard`). Off = unchanged. */
+  /** Journal v3: fold positions / groups / hedges into one card each (`GroupCard`). Off = unchanged. Default: `uiStore.tradeExtra.group`. */
   grouped?: boolean;
   className?: string;
 }
@@ -47,7 +47,9 @@ function cardTransition(i: number): Transition {
  * `layoutDependency`); inserted cards are held (`useInsertHold`) until their siblings made room; a new sort order re-keys
  * the list (staggered re-enter instead of crossing FLIPs). The card's height follows on the body's `AutoHeight`.
  */
-export function TradesCards({ rows, setups, listKey, sortKey = "", onOpen, grouped = false, className }: TradesCardsProps) {
+export function TradesCards({ rows, setups, listKey, sortKey = "", onOpen, grouped: groupedProp, className }: TradesCardsProps) {
+  const groupedPref = useUi((s) => s.tradeExtra.group === true);
+  const grouped = groupedProp ?? groupedPref;
   const detailSource = useUi((s) => s.detail.source);
   const detailTempo = useUi((s) => s.detailTempo);
   const openDetail = useUi((s) => s.openDetail);

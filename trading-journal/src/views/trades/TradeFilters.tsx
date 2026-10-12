@@ -11,9 +11,9 @@ import { Autocomplete, type AutocompleteItem } from "@/motion/pulse/Autocomplete
 import { MorphSelect, type MorphSelectOption } from "@/motion/pulse/MorphSelect";
 import { ValueFlash } from "@/motion/ValueFlash";
 import { Icon, Segmented } from "@/primitives";
-import type { TradeExtraFilter, TradeSort } from "@/store/uiStore";
-import { JournalFilterBar } from "@/journal/filters/JournalFilterBar";
-import { ANY_MISTAKE, NO_MISTAKE, NO_SETUP, STRENGTH_OPTIONS, countLabel, type JournalFilterOptions, type SearchSuggestion } from "./tradesModel";
+import type { TradeExtraFilter } from "@/store/uiStore";
+import { JournalFilterSlot } from "@/journal/filters/JournalFilterBar";
+import { ANY_MISTAKE, NO_MISTAKE, NO_SETUP, STRENGTH_OPTIONS, countLabel, type SearchSuggestion } from "./tradesModel";
 
 export interface TradeFiltersProps {
   filter: TradeFilter;
@@ -28,19 +28,10 @@ export interface TradeFiltersProps {
   /** Additive mistake-tag / signal-strength filter (`uiStore.tradeExtra`). */
   extra?: TradeExtraFilter;
   onExtraChange?: (patch: Partial<TradeExtraFilter>) => void;
-  /** Journal v3 (P06): replaces the whole extra filter (`Diese Filter leeren`). */
-  onExtraReplace?: (next: TradeExtraFilter) => void;
   /** Tags of the `Fehler` select; empty → the select is not shown. */
   mistakeTags?: readonly string[];
   /** Show the `Signal-Stärke` select (the journal has stored checks, or the filter is set). */
   showStrength?: boolean;
-  /**
-   * Journal v3 (P06): values of the period / pair / venue / tag / range filters; given (with `extra`, `onExtraChange`
-   * and `sort`) the saved views, quick picks, grouping switch and `Mehr Filter` row shows under the bar.
-   */
-  journalOptions?: JournalFilterOptions;
-  /** Current sort (saved views store it). */
-  sort?: TradeSort;
   className?: string;
 }
 
@@ -85,7 +76,7 @@ const PILL_LAYOUT: Transition = { layout: spring.island };
  * new count never re-wraps the bar (TR-04); it flashes once per new count; the net figure flashes green/red by
  * direction. Reduced motion: tint only, no pop, fill or flash.
  */
-export function TradeFilters({ filter, onChange, setups, count, closed, suggestions, extra, onExtraChange, onExtraReplace, mistakeTags, showStrength, journalOptions, sort, className }: TradeFiltersProps) {
+export function TradeFilters({ filter, onChange, setups, count, closed, suggestions, extra, onExtraChange, mistakeTags, showStrength, className }: TradeFiltersProps) {
   const reduced = useReducedFx();
   const [q, setQ] = useState(filter.q);
   const lastSent = useRef(filter.q);
@@ -194,7 +185,8 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
       <Segmented aria-label="Ergebnis" size="sm" className="pointer-coarse:gap-y-5" value={filter.result} onChange={(result) => onChange({ result })} options={RESULT_OPTIONS} />
       <Segmented aria-label="Richtung" size="sm" value={filter.side} onChange={(side) => onChange({ side })} options={SIDE_OPTIONS} />
       <CountPill count={count} closed={closed} reduced={reduced} />
-      {extra && onExtraChange && journalOptions && sort && <JournalFilterBar filter={filter} extra={extra} sort={sort} onExtraChange={onExtraChange} onExtraReplace={onExtraReplace} options={journalOptions} />}
+      {/* Journal v3 (P06): saved views, Top-Trades / ≥ 2 R, grouping switch and `Mehr Filter` (period, pair, venue, tags, ranges) */}
+      {extra && onExtraChange && <JournalFilterSlot filter={filter} extra={extra} onExtraChange={onExtraChange} />}
     </div>
   );
 }
