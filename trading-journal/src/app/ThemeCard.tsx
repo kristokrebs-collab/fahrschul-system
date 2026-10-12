@@ -184,7 +184,7 @@ export function ThemeCard({ className }: ThemeCardProps) {
               />
             ))}
           </div>
-          <p className="text-[12px] text-faint">
+          <p className="text-[12px] text-mute">
             {pref === "system" ? `${THEME_STRINGS.systemHelp} Gerade: ${THEME_STRINGS.prefs[resolved]}.` : THEME_STRINGS.toggleHint}
           </p>
         </div>
@@ -231,7 +231,7 @@ export function ThemeCard({ className }: ThemeCardProps) {
               );
             })}
           </div>
-          <p className="text-[12px] text-faint">{THEME_STRINGS.accentHelp}</p>
+          <p className="text-[12px] text-mute">{THEME_STRINGS.accentHelp}</p>
         </div>
       </div>
     </Card>

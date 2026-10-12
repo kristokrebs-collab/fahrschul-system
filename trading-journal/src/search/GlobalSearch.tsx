@@ -58,7 +58,7 @@ const WIPE: Transition = { duration: CONFIG.wipeMs / 1000, ease: CONFIG.wipeEase
 /** Session flag: the suggestion titles decode only on the first open. */
 let decodedOnce = false;
 
-const TONE: Record<SearchTone, string> = { win: "text-win", loss: "text-loss", signal: "text-signal", mute: "text-faint" };
+const TONE: Record<SearchTone, string> = { win: "text-win", loss: "text-loss", signal: "text-signal", mute: "text-mute" };
 
 function Highlighted({ text, ranges }: { text: string; ranges: readonly MatchRange[] }) {
   if (!ranges.length) return <>{text}</>;
@@ -244,7 +244,7 @@ export function GlobalSearch() {
                   <div className="grid justify-items-center gap-3 px-6 py-10 text-center">
                     <DotMatrixText text="0" tone="mute" size={5} decorative />
                     <p className="text-[14px] font-medium text-fg">{SEARCH_STRINGS.empty}</p>
-                    <p className="max-w-[34ch] text-[12.5px] text-faint">{SEARCH_STRINGS.emptyHint}</p>
+                    <p className="max-w-[34ch] text-[12.5px] text-mute">{SEARCH_STRINGS.emptyHint}</p>
                   </div>
                 ) : (
                   <motion.div
@@ -300,7 +300,7 @@ export function GlobalSearch() {
                                   <span className={cn("truncate text-[14px] font-medium", on ? "text-fg" : "text-fg/90")}>
                                     {scramble ? <TextScramble text={it.title} /> : <Highlighted text={it.title} ranges={hit.ranges} />}
                                   </span>
-                                  {it.subtitle && <span className="truncate text-[12px] text-faint">{it.subtitle}</span>}
+                                  {it.subtitle && <span className="truncate text-[12px] text-mute">{it.subtitle}</span>}
                                 </span>
                                 {it.meta && <span className={cn("relative shrink-0 font-mono text-[12.5px] tabular-nums", TONE[it.metaTone ?? "mute"])}>{it.meta}</span>}
                                 {!it.meta && it.keys && (
@@ -319,7 +319,7 @@ export function GlobalSearch() {
               </div>
 
               {/* hints */}
-              <div className="hidden items-center gap-4 border-t border-line px-5 py-2.5 text-[11.5px] text-faint sm:flex">
+              <div className="hidden items-center gap-4 border-t border-line px-5 py-2.5 text-[11.5px] text-mute sm:flex">
                 <span className="inline-flex items-center gap-1.5">
                   <KeyCombo keys={["↑", "↓"]} size="sm" /> {SEARCH_STRINGS.hints.move}
                 </span>

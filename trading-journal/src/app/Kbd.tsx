@@ -21,7 +21,7 @@ export function KeyCombo({ keys, then = false, size }: { keys: readonly string[]
     <span className="inline-flex items-center gap-1">
       {keys.map((k, i) => (
         <span key={`${k}-${i}`} className="inline-flex items-center gap-1">
-          {i > 0 && then && <span className="text-[10.5px] text-faint">dann</span>}
+          {i > 0 && then && <span className="text-[10.5px] text-mute">dann</span>}
           <Kbd size={size}>{k.length === 1 ? k.toUpperCase() : k}</Kbd>
         </span>
       ))}

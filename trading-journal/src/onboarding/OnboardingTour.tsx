@@ -27,7 +27,8 @@ import { GOAL_TEMPLATES, parseAmount, StepBoerse, StepKonten, StepSetups, StepSt
 
 const RAIL: Milestone[] = STEP_IDS.map((id, i) => ({ id, title: TOUR.steps[id], date: `0${i + 1}` }));
 /** the pulse rail lays its steps out 220 px wide for scrolling; here all five share the sheet's width */
-const RAIL_FIT = "overflow-visible pb-0 snap-none [&>li]:w-auto [&>li]:min-w-0 [&>li]:flex-1 [&>li]:pr-2 [&>li:last-child]:flex-none";
+// the rail's step numbers are real text here (small mono): mute instead of faint keeps them at AA contrast
+const RAIL_FIT = "overflow-visible pb-0 snap-none [&>li]:w-auto [&>li]:min-w-0 [&>li]:flex-1 [&>li]:pr-2 [&>li:last-child]:flex-none [&_.uppercase]:text-mute";
 
 function initialKonten(): KontenDraft {
   const s = useJournal.getState().settings;

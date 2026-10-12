@@ -50,7 +50,7 @@ export function OnboardingCard({ className }: { className?: string }) {
     <Card title={ONBOARDING_CARD.title} className={className}>
       <div className="grid gap-4">
         <p className="text-[13px] leading-relaxed text-mute">{ONBOARDING_CARD.lead}</p>
-        <p className="text-[12px] text-faint" data-testid="onboarding-status">
+        <p className="text-[12px] text-mute" data-testid="onboarding-status">
           {onboardingStatusText(stored)}
         </p>
         <ul className="grid gap-1.5 border-t border-line pt-3" aria-label="Wichtige Tastenkürzel">

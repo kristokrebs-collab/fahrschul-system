@@ -52,7 +52,7 @@ export function WidgetCatalog({ open, onClose, present, onAdd, version }: Widget
         </StaggerItem>
         {groups.length === 0 && (
           <StaggerItem>
-            <p className="py-6 text-center text-[13px] text-faint">{COCKPIT_STRINGS.catalog.none}</p>
+            <p className="py-6 text-center text-[13px] text-mute">{COCKPIT_STRINGS.catalog.none}</p>
           </StaggerItem>
         )}
         {groups.map(([g, list]) => (
@@ -68,7 +68,7 @@ export function WidgetCatalog({ open, onClose, present, onAdd, version }: Widget
                   <li key={w.id} className={cn("flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5", on ? "border-line bg-white/[0.02]" : "border-line-2")}>
                     <span className="grid min-w-0 gap-0.5">
                       <span className="truncate text-[13.5px] font-medium text-fg">{w.title}</span>
-                      {w.description && <span className="truncate text-[12px] text-faint">{w.description}</span>}
+                      {w.description && <span className="truncate text-[12px] text-mute">{w.description}</span>}
                     </span>
                     <button
                       type="button"

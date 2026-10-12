@@ -101,7 +101,7 @@ export function ErrorFallback({ error, variant, label, onRetry }: ErrorFallbackP
           {ERROR_STRINGS.reload}
         </Button>
       </div>
-      <details className="max-w-[60ch] text-left text-[11.5px] text-faint">
+      <details className="max-w-[60ch] text-left text-[11.5px] text-mute">
         <summary className="cursor-pointer select-none text-center">{ERROR_STRINGS.details}</summary>
         <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl border border-line bg-ink-950 p-3 font-mono">{error.message || String(error)}</pre>
       </details>

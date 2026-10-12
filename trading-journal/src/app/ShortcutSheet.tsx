@@ -94,7 +94,7 @@ export function ShortcutSheet() {
           );
         })}
         <StaggerItem className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-          <span className="text-[12px] text-faint">{SHEET_STRINGS.touch}</span>
+          <span className="text-[12px] text-mute">{SHEET_STRINGS.touch}</span>
           <button
             type="button"
             onClick={() => {

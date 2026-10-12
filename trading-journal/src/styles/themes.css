@@ -59,9 +59,9 @@
   --color-steel: #1a1a1a;
   --color-teal: #2d2d2d;
   --color-aqua: #000;
-  /* win / loss / warn deepened for ≥ 4.5 : 1 on the white card (the dark tones are 1.9 – 3.3 : 1 on white) */
-  --color-win: #0c8441;
-  --color-loss: #d11f2a;
+  /* win / loss / warn deepened for ≥ 4.5 : 1 on the page and the card (the dark tones are 1.9 – 3.3 : 1 on white) */
+  --color-win: #0a783b;
+  --color-loss: #cc1e29;
   --color-warn: #9a5b00;
   /* the swap: "white" = the veil ink, "black" = the paper (see the header) */
   --color-white: #0b0b0b;
@@ -83,8 +83,8 @@
   --shadow-btn-sheen: inset 0 1px 0 rgb(255 255 255 / 0.16);
   --ring-focus-input: 0 0 0 3px rgb(0 0 0 / 0.06);
   --ring-glow-input: 0 0 0 3px rgb(0 0 0 / 0.06), 0 0 24px rgb(0 0 0 / 0.04);
-  --ring-glow-invalid: 0 0 0 3px rgb(209 31 42 / 0.14), 0 0 22px rgb(209 31 42 / 0.1);
-  --ring-pulse-invalid: 0 0 0 3px rgb(209 31 42 / 0.22), 0 0 26px rgb(209 31 42 / 0.16);
+  --ring-glow-invalid: 0 0 0 3px rgb(204 30 41 / 0.14), 0 0 22px rgb(204 30 41 / 0.1);
+  --ring-pulse-invalid: 0 0 0 3px rgb(204 30 41 / 0.22), 0 0 26px rgb(204 30 41 / 0.16);
 
   --conv-1: #c9c9c6;
   --conv-2: #a0a0a0;
@@ -112,7 +112,7 @@
   --muted-foreground: #565656;
   --accent: #efefed;
   --accent-foreground: #121212;
-  --destructive: #d11f2a;
+  --destructive: #cc1e29;
   --destructive-foreground: #fdfdfc;
   --border: #dfdfdc;
   --input: #dfdfdc;
@@ -138,8 +138,8 @@
   --chart-ink-fg: #121212;
   --chart-ink-separator: #dfdfdc;
   --chart-ink-label-bg: #f2f2f0;
-  --chart-ink-win: #0c8441;
-  --chart-ink-loss: #d11f2a;
+  --chart-ink-win: #0a783b;
+  --chart-ink-loss: #cc1e29;
   --chart-ink-win-soft: #5a9e78;
   --chart-ink-loss-soft: #c46a6c;
 }

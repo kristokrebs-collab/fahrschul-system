@@ -40,7 +40,7 @@ export const THEME_STRINGS = {
 } as const;
 
 /** `<meta name="theme-color">` per scheme (browser chrome, installed app title bar) = the page colour `ink-900`. */
-export const THEME_META_COLOR: Record<ResolvedTheme, string> = { dark: "#0a0a0a", light: "#ebebe8" };
+export const THEME_META_COLOR: Record<ResolvedTheme, string> = { dark: "#0a0a0a", light: "#ebebe9" };
 
 export interface StoredTheme {
   pref: ThemePref;

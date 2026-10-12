@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { isCloudAvailable } from "@/cloud";
 import type { GoalDraft } from "@/domain/growth/goals";
 import { cn } from "@/lib/cn";
@@ -107,29 +107,34 @@ function StartCard({ label, index }: { label: string; index: number }) {
   );
 }
 
+/** The HUD line sits BELOW the ink panel, on the sheet: it keeps the page's mute ink (resolved outside the dark scope). */
+const HUD_INK = { "--tour-hud-ink": "var(--color-mute)" } as CSSProperties;
+
 export function StepStart({ play }: { play: number }) {
   return (
-    <div data-theme-scope="dark" className="rounded-[28px]">
-      <LaunchGrid
-        play={play}
-        playOnView={false}
-        label={TOUR.title}
-        slots={TOUR.start.slots.map((w, i) => (
-          <span key={w} className={cn("rounded-md px-2 py-0.5", i === TOUR.start.slots.length - 1 ? "bg-fg text-ink-950" : "bg-ink-700 text-fg")}>
-            {w}
-          </span>
-        ))}
-        cards={TOUR.start.cards.map((c, i) => (
-          <StartCard key={c} label={c} index={i} />
-        ))}
-        hud={<Typewriter text={TOUR.start.hud} className="font-mono text-[12.5px] text-mute" delay={2600} />}
-      >
-        <AsciiCascade text={TOUR.start.word} as="h3" className="font-dot text-[clamp(26px,7vw,46px)] font-extrabold leading-none tracking-[0.04em]" drop={0.6} reserve />
-        <p className="text-[clamp(18px,3.4vw,24px)] font-semibold leading-snug text-fg">
-          {TOUR.start.lead} <LaunchSlot />
-        </p>
-        <PixelTextFill lines={[...TOUR.start.lines]} className="text-[14px] leading-relaxed text-mute" delay={900} />
-      </LaunchGrid>
+    <div style={HUD_INK}>
+      <div data-theme-scope="dark" className="rounded-[28px]">
+        <LaunchGrid
+          play={play}
+          playOnView={false}
+          label={TOUR.title}
+          slots={TOUR.start.slots.map((w, i) => (
+            <span key={w} className={cn("rounded-md px-2 py-0.5", i === TOUR.start.slots.length - 1 ? "bg-fg text-ink-950" : "bg-ink-700 text-fg")}>
+              {w}
+            </span>
+          ))}
+          cards={TOUR.start.cards.map((c, i) => (
+            <StartCard key={c} label={c} index={i} />
+          ))}
+          hud={<Typewriter text={TOUR.start.hud} className="font-mono text-[12.5px] text-(--tour-hud-ink)" delay={2600} />}
+        >
+          <AsciiCascade text={TOUR.start.word} as="h3" className="font-dot text-[clamp(26px,7vw,46px)] font-extrabold leading-none tracking-[0.04em]" drop={0.6} reserve />
+          <p className="text-[clamp(18px,3.4vw,24px)] font-semibold leading-snug text-fg">
+            {TOUR.start.lead} <LaunchSlot />
+          </p>
+          <PixelTextFill lines={[...TOUR.start.lines]} className="text-[14px] leading-relaxed text-mute" delay={900} />
+        </LaunchGrid>
+      </div>
     </div>
   );
 }
@@ -156,7 +161,8 @@ export function StepKonten({ draft, onChange, invalid }: { draft: KontenDraft; o
   return (
     <div className="grid gap-5">
       <StepHead title={TOUR.konten.title} lead={TOUR.konten.lead} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* the fields' help line and unit read as mute here (faint is below AA on the dark sheet) – the primitive stays as is */}
+      <div className="grid gap-4 sm:grid-cols-2 [&_.text-faint]:text-mute">
         <Field label={TOUR.konten.makro} htmlFor="ob-makro" help={TOUR.konten.makroHelp} suffix={draft.currency} error={invalid === "makro" ? TOUR.konten.invalid : undefined}>
           <Input id="ob-makro" numeric value={draft.makro} invalid={invalid === "makro"} onChange={(e) => onChange({ ...draft, makro: e.target.value })} />
         </Field>
@@ -195,7 +201,7 @@ export function StepSetups({ setups, onAdd }: { setups: readonly { id: string; n
             <li key={s.id} className="inline-flex max-w-full items-center gap-2 rounded-full border border-line-2 bg-white/[0.03] px-3 py-1.5 text-[12.5px] text-fg">
               <span className="size-2 shrink-0 rounded-full" style={{ background: s.color || "var(--color-mute)" }} aria-hidden="true" />
               <span className="truncate">{s.name}</span>
-              {s.checklist && s.checklist.length > 0 && <span className="font-mono text-[11px] text-faint">{TOUR.setups.rules(s.checklist.length)}</span>}
+              {s.checklist && s.checklist.length > 0 && <span className="font-mono text-[11px] text-mute">{TOUR.setups.rules(s.checklist.length)}</span>}
             </li>
           ))}
         </ul>
@@ -204,7 +210,7 @@ export function StepSetups({ setups, onAdd }: { setups: readonly { id: string; n
         <button type="button" onClick={onAdd} className="touch-hit rounded-xl border border-line-2 bg-white/[0.03] px-4 py-2 text-[13px] font-semibold text-fg transition-colors hover:border-white/30">
           + {TOUR.setups.add}
         </button>
-        <span className="text-[12px] text-faint">{TOUR.setups.addHint}</span>
+        <span className="text-[12px] text-mute">{TOUR.setups.addHint}</span>
       </div>
     </div>
   );
@@ -273,7 +279,7 @@ export function StepZiel({ value, onChange }: { value: GoalTemplateId | null; on
                 </span>
                 {tpl ? tpl.title : TOUR.ziel.none}
               </span>
-              {tpl && <span className="pl-6 text-[12px] text-faint">{tpl.text}</span>}
+              {tpl && <span className="pl-6 text-[12px] text-mute">{tpl.text}</span>}
             </button>
           );
         })}
