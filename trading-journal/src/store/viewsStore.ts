@@ -79,7 +79,7 @@ export function parseExtra(raw: unknown): TradeExtraFilter {
     const tags = e.tags.filter((x): x is string => typeof x === "string" && x.trim() !== "");
     if (tags.length) out.tags = tags;
   }
-  for (const k of ["pnlMin", "pnlMax", "rMin", "rMax", "holdMin", "holdMax", "levMin", "levMax"] as const) {
+  for (const k of ["pnlMin", "pnlMax", "rMin", "rMax", "holdMin", "holdMax", "levMin", "levMax", "ratingMin"] as const) {
     const v = num(e[k]);
     if (v != null) out[k] = v;
   }

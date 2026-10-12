@@ -119,7 +119,7 @@ export interface TradeExtraFilter {
   /**
    * Journal v3 (P06), all optional (absent = not set, so stored views and tests written before stay valid):
    * period `from` / `to` (local `YYYY-MM-DD`, inclusive), pair (`pairKey`), venue, instrument kind, tags (all must
-   * match), P&L / R / holding time (minutes) / leverage ranges (inclusive, `null` = open end), and `group` (fold
+   * match), P&L / R / holding time (minutes) / leverage ranges and a minimum rating (inclusive, `null` = open end), and `group` (fold
    * positions / groups / hedges into one row).
    */
   from?: string;
@@ -136,6 +136,8 @@ export interface TradeExtraFilter {
   holdMax?: number | null;
   levMin?: number | null;
   levMax?: number | null;
+  /** Minimum execution rating (1–5); `Top-Trades` = 4. */
+  ratingMin?: number | null;
   group?: boolean;
 }
 export const DEFAULT_TRADE_EXTRA: TradeExtraFilter = { mistake: "all", strength: "all" };

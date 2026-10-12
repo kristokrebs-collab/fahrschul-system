@@ -16,7 +16,7 @@ import { KpiStrip } from "./KpiStrip";
 import { TradeFilters } from "./TradeFilters";
 import { TradesCards } from "./TradesCards";
 import { TradesTable } from "./TradesTable";
-import { filterExtra, filterTrades, listKey, mistakeFilterTags, mistakesOf, rowsKey, searchSuggestions, signalOf, sortTrades } from "./tradesModel";
+import { filterExtra, filterTrades, journalFilterOptions, listKey, mistakeFilterTags, mistakesOf, rowsKey, searchSuggestions, signalOf, sortTrades } from "./tradesModel";
 
 export interface TradesViewProps {
   /** Override of the `Trade eintragen` CTA (default: `useUi().openEditor()`). */
@@ -80,6 +80,9 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
   const layoutKey = useMemo(() => rowsKey(key, rows), [key, rows]);
 
   const suggestions = useMemo(() => searchSuggestions(all, settings.setups, EMOTIONS), [all, settings.setups]);
+  // Journal v3: values of the period / pair / venue / tag / range filters and the grouped list mode
+  const journalOptions = useMemo(() => journalFilterOptions(all), [all]);
+  const grouped = extra.group === true;
   const onSort = useCallback((k: SortKey) => toggleSort(k), [toggleSort]);
   const newTrade = () => (onNew ? onNew() : openEditor());
 
@@ -117,9 +120,9 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
       <>
         <KpiStrip closed={closed} count={rows.length} currency={settings.currency} />
         {wide ? (
-          <TradesTable rows={rows} setups={settings.setups} sort={sort} onSort={onSort} listKey={layoutKey} onOpen={onOpen} />
+          <TradesTable rows={rows} setups={settings.setups} sort={sort} onSort={onSort} listKey={layoutKey} onOpen={onOpen} grouped={grouped} />
         ) : (
-          <TradesCards rows={rows} setups={settings.setups} listKey={layoutKey} sortKey={`${sort.k}:${sort.dir}`} onOpen={onOpen} />
+          <TradesCards rows={rows} setups={settings.setups} listKey={layoutKey} sortKey={`${sort.k}:${sort.dir}`} onOpen={onOpen} grouped={grouped} />
         )}
       </>
     );
@@ -140,6 +143,8 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
           onExtraChange={setTradeExtra}
           mistakeTags={mistakeTags}
           showStrength={hasSignals || extra.strength !== "all"}
+          journalOptions={journalOptions}
+          sort={sort}
         />
         <AutoHeight className="relative">
           <AnimatePresence mode="wait" initial={false}>

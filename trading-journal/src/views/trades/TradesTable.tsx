@@ -12,6 +12,8 @@ import { RowHighlight, type RowHighlightHandle } from "./RowHighlight";
 import { measureRow, type RowBox } from "./rowGeometry";
 import { CheckCount, EntryExit, PnlCell, RCell, ResultBadge, SideTag, SignalBadge, TradeSetupChips, accountLine, dateLines } from "./tradeCells";
 import { sortArrow } from "./tradesModel";
+import { groupRows } from "@/domain/grouping";
+import { GroupTableRows } from "@/journal/grouping/GroupRows";
 
 export interface TradesTableProps {
   /** Already filtered + sorted (see `tradesModel.ts`). */
@@ -23,6 +25,11 @@ export interface TradesTableProps {
   listKey: string;
   /** Row activation (click / Enter). The table opens the detail itself (`openDetail(id, "table")`) when omitted. */
   onOpen?: (id: string) => void;
+  /**
+   * Journal v3: fold positions / groups / hedges (`groupRows`) into one summary row each that unfolds its members
+   * (`GroupTableRows`). Off = the bundle table, unchanged.
+   */
+  grouped?: boolean;
   className?: string;
 }
 
@@ -118,7 +125,7 @@ function rowTransition(i: number): Transition {
  * `content-visibility: auto` is deliberately not used on the rows: containment does not apply to internal table
  * boxes (a no-op on `<tr>`), and on cell content it would let off-screen rows drop out of the auto column sizing.
  */
-export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, className }: TradesTableProps) {
+export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, grouped = false, className }: TradesTableProps) {
   const detail = useUi((s) => s.detail);
   const openDetail = useUi((s) => s.openDetail);
   const reduced = useReducedFx();
@@ -166,8 +173,13 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
 
   const onExitComplete = useCallback(() => setSettled((n) => n + 1), []);
 
-  // one presence group per sort order; rows mounted after the group's first frame are inserts (`stagger.insert`)
-  const groupKey = `${sort.k}:${sort.dir}`;
+  // one presence group per sort order (and grouping mode); rows mounted after the group's first frame are inserts (`stagger.insert`)
+  const groupKey = `${sort.k}:${sort.dir}${grouped ? ":g" : ""}`;
+  // Journal v3: grouped list (positions / groups / hedges folded) and which groups are unfolded
+  const items = useMemo(() => (grouped ? groupRows(rows) : null), [grouped, rows]);
+  const [openGroups, setOpenGroups] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleGroup = useCallback((id: string) => setOpenGroups((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : new Set([...s, id]))), []);
+  const openMember = useCallback((id: string) => (onOpen ? onOpen(id) : openDetail(id, "insights")), [onOpen, openDetail]);
   const [readyGroup, setReadyGroup] = useState<string | null>(null);
   useEffect(() => {
     const id = requestAnimationFrame(() => setReadyGroup(groupKey));
@@ -230,6 +242,20 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
   const table = useReactTable({ data: rows as EnrichedTrade[], columns, getCoreRowModel: getCoreRowModel(), getRowId: (t) => t.id });
   const rowLayoutKey = useMemo(() => `${listKey}~${settled}`, [listKey, settled]);
 
+  function renderGrouped(list: NonNullable<typeof items>, tanRows: Row<EnrichedTrade>[]) {
+    const byId = new Map(tanRows.map((r) => [r.id, r] as const));
+    return list.map((it, i) => {
+      if (it.kind === "trade") {
+        const row = byId.get(it.trade.id);
+        return row ? <TradeRow key={row.id} row={row} index={i} insert={inserting} layoutKey={rowLayoutKey} reduced={reduced} onActivate={activate} highlight={highlight} /> : null;
+      }
+      const g = it.group;
+      return (
+        <GroupTableRows key={g.id} group={g} setups={setups} open={openGroups.has(g.id)} onToggle={() => toggleGroup(g.id)} onOpenTrade={openMember} index={i} layoutKey={rowLayoutKey} columns={columns.length} />
+      );
+    });
+  }
+
   return (
     // touch: the scroll box (its overflow clips the children's tap areas) reaches 14 px up into the KPI strip's 16 px
     // margin, so the 16 px sort headers keep their full 44 px tap area (same position on screen)
@@ -257,9 +283,11 @@ export function TradesTable({ rows, setups, sort, onSort, listKey, onOpen, class
         </thead>
         <tbody data-trade-list="" onPointerLeave={() => highlight.current?.hover(null)}>
           <AnimatePresence key={groupKey} onExitComplete={onExitComplete}>
-            {table.getRowModel().rows.map((row, i) => (
-              <TradeRow key={row.id} row={row} index={i} insert={inserting} layoutKey={rowLayoutKey} reduced={reduced} onActivate={activate} highlight={highlight} />
-            ))}
+            {items
+              ? renderGrouped(items, table.getRowModel().rows)
+              : table.getRowModel().rows.map((row, i) => (
+                  <TradeRow key={row.id} row={row} index={i} insert={inserting} layoutKey={rowLayoutKey} reduced={reduced} onActivate={activate} highlight={highlight} />
+                ))}
           </AnimatePresence>
         </tbody>
       </table>
