@@ -100,6 +100,8 @@ export function riskWarnings(state: RiskState): RiskWarning[] {
 
 /** The trade fields the preview reads (a `TradeDraft` / editor form). */
 export interface RiskDraft {
+  /** id of the trade being edited: the preview's report must be built without it (`useRiskPreview` does that) */
+  id?: string;
   account?: AccountId;
   side?: Side;
   status?: "open" | "closed";

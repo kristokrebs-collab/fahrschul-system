@@ -145,13 +145,20 @@ export function useRiskGuard(): void {
   }, [positions]);
 
   useEffect(() => {
+    // toasted warnings, per local day (a limit breached again tomorrow is news again)
     const seen = new Set<string>();
+    let seenDay = "";
     let prev = useJournal.getState();
     return useJournal.subscribe((state) => {
       const before = prev;
       prev = state;
       if (!state.loaded || !before.loaded || state.trades === before.trades) return;
       const now = Date.now();
+      const day = new Date(now).toDateString();
+      if (day !== seenDay) {
+        seen.clear();
+        seenDay = day;
+      }
       const guard = useRiskGuardStore.getState();
       const changed = changedTrades(before.trades, state.trades);
       // a bulk change (backup import / restore, first cloud snapshot) is not a save: no marks, no toasts

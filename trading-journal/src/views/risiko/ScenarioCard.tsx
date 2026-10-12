@@ -212,7 +212,8 @@ export function ScenarioCard({ legs, equity, cur }: { legs: readonly ScenarioLeg
           {kinks.length
             ? `Liquidation bei ${kinks.map((k) => `${shockText(k.s)} (${legs.find((l) => l.id === k.id)?.label ?? ""})`).join(", ")} – rote Punkte auf der Kurve.`
             : "Keine Liquidation bis ±30 %."}{" "}
-          Bei −30 %: {pct(equity > 0 ? curve.pnl[0]! / equity : null)} aufs Konto.
+          Bei −30 %: {equity > 0 && curve.pnl[0]! > 0 ? "+" : ""}
+          {pct(equity > 0 ? curve.pnl[0]! / equity : null)} aufs Konto.
         </p>
       </div>
     </RiskCard>

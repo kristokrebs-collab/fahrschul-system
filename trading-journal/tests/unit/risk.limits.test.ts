@@ -76,6 +76,8 @@ describe("Live-Limits", () => {
     expect(row(r, "openRisk")).toMatchObject({ used: 20, limit: 30, state: "ok" });
     const nostop = run([open(at(14, 9), { stop: null })]);
     expect(row(nostop, "openRisk").state).toBe("warn");
+    // the gauge shows the true ratio (0 % to the stops), the warning comes from the missing stop
+    expect(row(nostop, "openRisk").ratio).toBe(0);
     expect(row(nostop, "openRisk").detail).toContain("1 ohne Stop");
     expect(row(run([open(at(14, 9)), open(at(14, 10))]), "openRisk").state).toBe("breach");
   });

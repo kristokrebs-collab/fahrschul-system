@@ -238,6 +238,9 @@ describe("useRiskPreview (editor contract)", () => {
     const keys = result.current!.warnings.map((w) => w.key);
     expect(keys).toEqual(expect.arrayContaining(["preview:trade", "preview:leverage", "preview:day"]));
     expect(result.current!.state).toBe("breach");
+    // editing the open BTC trade itself: its own open risk is not counted twice
+    rerender({ id: "o1", account: "scalp", side: "long", entry: 60_000, stop: 57_000, size: 3000 });
+    expect(result.current!.warnings.map((w) => w.key)).not.toContain("preview:open");
     rerender(null);
     expect(result.current).toBeNull();
   });

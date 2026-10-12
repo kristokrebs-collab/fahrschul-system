@@ -117,7 +117,12 @@ export function useRiskPreview(draft: RiskDraft | null | undefined): RiskPreview
   const positions = useExchangePositions();
   const now = useMinute();
   const acc: AccountId = draft?.account ?? "scalp";
-  const report = useMemo(() => limitStatus({ trades: getEnriched(trades, settings), settings, scope: acc, now, marks, positions }), [trades, settings, acc, now, marks, positions]);
+  const editId = draft?.id ?? null;
+  // an edited trade is judged against the journal WITHOUT itself (its open risk / today's count would count twice)
+  const report = useMemo(() => {
+    const all = getEnriched(trades, settings);
+    return limitStatus({ trades: editId ? all.filter((t) => t.id !== editId) : all, settings, scope: acc, now, marks, positions });
+  }, [trades, settings, acc, now, marks, positions, editId]);
   const d = draft ?? null;
   const key = d ? JSON.stringify([d.account, d.side, d.status, d.entry, d.stop, d.target, d.size, d.qty, d.leverage, d.marginMode, d.margin]) : "";
   return useMemo(() => {

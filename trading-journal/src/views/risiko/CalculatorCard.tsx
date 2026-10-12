@@ -89,7 +89,9 @@ export function useCalcModel(base: RiskBase): CalcModel {
   const provider = useProvider();
   const account: AccountId = base.acc === "all" ? "scalp" : base.acc;
   const acc = calc.account ?? account;
-  const pair = provider?.symbolInfo.binance ?? base.settings.pair;
+  const live = provider?.symbolInfo.binance ?? null;
+  // the journal's own spelling ("BTC/USDT") when it is the live symbol, else the live symbol / the journal pair
+  const pair = live && symbolOf(base.settings.pair) !== live ? live : base.settings.pair;
   return useMemo(() => calcModel(calc, { account, capital: base.settings.capital[acc] ?? 0, riskPct: base.limits.riskPerTradePct, pair }, base.limits), [calc, account, acc, base.settings.capital, base.limits, pair]);
 }
 

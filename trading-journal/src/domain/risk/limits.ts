@@ -214,7 +214,7 @@ export function limitStatus(input: LimitInput): LimitReport {
   const tag = (a: AccountId) => (scope === "all" ? ` · ${ACC_LABEL[a]}` : "");
   const rows: LimitRow[] = [];
   const pick = (cands: LimitRow[]) => {
-    if (cands.length) rows.push(cands.sort((a, b) => b.ratio - a.ratio)[0]!);
+    if (cands.length) rows.push(cands.sort((a, b) => RANK[b.state] - RANK[a.state] || b.ratio - a.ratio)[0]!);
   };
 
   // daily / weekly loss
@@ -252,7 +252,7 @@ export function limitStatus(input: LimitInput): LimitReport {
       // a trade without a stop has no bounded risk: at least "warn"
       const state = n.openNoStop > 0 && stateOf(ratio, limits.warnAt) === "ok" ? "warn" : stateOf(ratio, limits.warnAt);
       const noStop = n.openNoStop ? ` · ${n.openNoStop} ohne Stop` : "";
-      return { key: "openRisk", label: LIMIT_LABELS.openRisk, used: n.openRisk, limit, ratio: n.openNoStop && ratio < limits.warnAt ? limits.warnAt : ratio, state, unit: "money", account: n.acc, detail: `${money(n.openRisk, cur)} von ${money(limit, cur)} bis zu den Stops${noStop}${tag(n.acc)}` } satisfies LimitRow;
+      return { key: "openRisk", label: LIMIT_LABELS.openRisk, used: n.openRisk, limit, ratio, state, unit: "money", account: n.acc, detail: `${money(n.openRisk, cur)} von ${money(limit, cur)} bis zu den Stops${noStop}${tag(n.acc)}` } satisfies LimitRow;
     }),
   );
 
