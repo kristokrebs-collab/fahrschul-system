@@ -28,7 +28,25 @@ export interface SeedOptions extends MockMarketOptions {
    * `{ on: false }` merged into the seeded settings' `signals.lage` (every other key kept).
    */
   lage?: boolean;
+  /**
+   * First visit: leave the onboarding marker out, so the tour may start by itself on an empty journal (P13). By
+   * default the tour counts as finished in both editions (`tj2-onboarding`, `tj2share-onboarding`) – specs that are
+   * not about the onboarding never see it.
+   */
+  firstRun?: boolean;
+  /**
+   * Let the P04 "Bericht bereit" wipe announce the period that just ended (a full-screen dialog on the first visit
+   * after a week / month / quarter / year with trades). By default the periods around "now" count as announced on this
+   * device (`tj2-report-ready`) – specs that are not about the reports never have the wipe over their page.
+   */
+  reportReady?: boolean;
 }
+
+/** The finished tour (`storageKey("onboarding")` of both editions). */
+export const ONBOARDING_DONE: Record<string, string> = {
+  "tj2-onboarding": JSON.stringify({ status: "done", at: "", v: 1 }),
+  "tj2share-onboarding": JSON.stringify({ status: "done", at: "", v: 1 }),
+};
 
 /**
  * `extra` with `signals.lage.on = false` merged into the seeded `tj2-settings` (the given ones, else the fixture's).
@@ -50,21 +68,43 @@ function lageOff(extra: Record<string, unknown>, empty: boolean): Record<string,
 }
 
 /**
- * Seeds localStorage with the legacy fixture, marks the intro as seen and mocks the market. The data is written ONCE
- * per browser context (marker `__e2e-seeded`), so a reload or a second tab sees what the app saved, never the seed again.
+ * Seeds localStorage with the legacy fixture, marks the intro as seen (and the onboarding as finished, unless
+ * `firstRun`) and mocks the market. The data is written ONCE per browser context (marker `__e2e-seeded`), so a reload
+ * or a second tab sees what the app saved, never the seed again. It also sets the e2e hook flag (`__e2e-hooks`,
+ * `src/app/e2eHooks.ts`): the production build then exposes the stores the specs read and write (`__tjJournal`, …).
  */
 export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
   await mockMarket(page, opts.scenario ?? "live", opts);
-  const extra = (opts.lage ?? !opts.synth) ? (opts.extra ?? {}) : lageOff(opts.extra ?? {}, !!opts.empty);
+  const given = { ...(opts.firstRun ? {} : ONBOARDING_DONE), ...(opts.extra ?? {}) };
+  const extra = (opts.lage ?? !opts.synth) ? given : lageOff(given, !!opts.empty);
   await page.addInitScript(
-    ({ fx, extra }) => {
+    ({ fx, extra, announce }) => {
       sessionStorage.setItem("tj2-intro", "1");
+      localStorage.setItem("__e2e-hooks", "1");
       if (localStorage.getItem("__e2e-seeded")) return;
       for (const [k, v] of Object.entries(fx)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
       for (const [k, v] of Object.entries(extra)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
+      if (announce) {
+        // the report periods that may have just ended (the browser's clock – a pinned one too): years, quarters,
+        // months and ISO weeks (Monday start, `src/lib/dates.ts`) of the last five weeks, as `periodOf` keys them
+        const keys = new Set<string>();
+        const p2 = (n: number) => String(n).padStart(2, "0");
+        for (let back = 0; back <= 35; back++) {
+          const d = new Date(Date.now() - back * 86_400_000);
+          const y = d.getFullYear();
+          keys.add(String(y));
+          keys.add(`${y}-Q${Math.floor(d.getMonth() / 3) + 1}`);
+          keys.add(`${y}-${p2(d.getMonth() + 1)}`);
+          const t = new Date(Date.UTC(y, d.getMonth(), d.getDate()));
+          t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+          const wy = t.getUTCFullYear();
+          keys.add(`${wy}-W${p2(Math.ceil(((+t - Date.UTC(wy, 0, 1)) / 864e5 + 1) / 7))}`);
+        }
+        for (const k of ["tj2-report-ready", "tj2share-report-ready"]) if (!(k in extra)) localStorage.setItem(k, JSON.stringify([...keys]));
+      }
       localStorage.setItem("__e2e-seeded", "1");
     },
-    { fx: opts.empty ? {} : fixture, extra },
+    { fx: opts.empty ? {} : fixture, extra, announce: !opts.reportReady },
   );
 }
 
@@ -157,6 +197,30 @@ export const isTouchTablet = (info: TestInfo): boolean => hasTouch(info) && info
 /** Seeds an empty journal (no fixture) for specs that build their own data. */
 export async function seedRaw(page: Page, entries: Record<string, unknown>, opts: SeedOptions = {}): Promise<void> {
   await seed(page, { ...opts, empty: true, extra: { ...entries, ...(opts.extra ?? {}) } });
+}
+
+/**
+ * The cloud edition of the production build (P14): the same app built against the Supabase mock of
+ * `mocks/supabase.ts` (`npm run build:e2e-cloud`, second `webServer` of playwright.config.ts). The Konto, Preise, Börse
+ * and Community specs run there; their "without cloud" cases run on the default build (`baseURL`).
+ */
+export const CLOUD_BASE = (process.env.PW_CLOUD_BASE_URL ?? "http://127.0.0.1:4174").replace(/\/$/, "");
+
+/** `#<hash>` of the cloud edition, optionally with a query string before it (`?ref=…`). */
+export const cloudUrl = (hash: string, search = ""): string => `${CLOUD_BASE}/${search}#${hash}`;
+
+/**
+ * Opens a route of the app (`/#markt`, `/#berichte?p=…`, an absolute URL of the cloud preview …) and waits until the
+ * page's own `h1` is there – the test fails when the page does not come up (P14: every feature page is routed, no
+ * spec skips itself any more). `attached`: the heading only has to be in the DOM (a full-screen dialog may hide it
+ * from the accessibility tree).
+ */
+export async function openRoute(page: Page, url: string, h1: string, opts: { attached?: boolean; timeout?: number } = {}): Promise<void> {
+  const res = await page.goto(url);
+  expect(res?.ok(), `${url} answers`).toBe(true);
+  const heading = page.locator("h1", { hasText: h1 }).first();
+  if (opts.attached) await heading.waitFor({ state: "attached", timeout: opts.timeout ?? 25_000 });
+  else await expect(page.getByRole("heading", { level: 1, name: h1 }).first()).toBeVisible({ timeout: opts.timeout ?? 25_000 });
 }
 
 /** Parsed `localStorage[key]` of the page (null when absent). */

@@ -10,14 +10,13 @@
  * benchmark race, the comparison, a custom stat saved into `settings.analytics.custom` and removed again, the empty
  * journal's preview, `?dim=` deep link, no horizontal scroll at 390 px, no console errors.
  *
- * Until P14 registers the `analyse` page the spec opens the dev harness `/dev/analyse.html` (Vite dev server, e.g.
- * `npx vite --port 4181` + `PW_BASE_URL`); set `PW_ANALYSE_URL=/#analyse` once routed. On a production preview without
- * the harness the tests skip themselves. `P03_SHOTS` writes review screenshots into that directory.
+ * Runs on the routed page `/#analyse` of the production build (P14; `PW_ANALYSE_URL` overrides it, e.g. the dev harness
+ * `/dev/analyse.html` under `npm run dev`). `P03_SHOTS` writes review screenshots into that directory.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, seed } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
 
-const ANALYSE_URL = process.env.PW_ANALYSE_URL ?? "/dev/analyse.html";
+const ANALYSE_URL = process.env.PW_ANALYSE_URL ?? "/#analyse";
 const SHOTS = process.env.P03_SHOTS;
 const PROJECTS = ["mobile", "desktop"];
 
@@ -129,15 +128,9 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P03-analytics-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-/** Opens the Analyse page; false (→ skip) where the dev harness is not served. */
-async function openAnalyse(page: Page, query = ""): Promise<boolean> {
-  const res = await page.goto(`${ANALYSE_URL}${query}`);
-  if (!res || !res.ok()) return false;
-  return page
-    .getByRole("heading", { level: 1, name: "Analyse" })
-    .waitFor({ timeout: 20_000 })
-    .then(() => true)
-    .catch(() => false);
+/** Opens the Analyse page (`query` = the hash query, e.g. `?dim=weekday`); fails when it does not come up. */
+async function openAnalyse(page: Page, query = ""): Promise<void> {
+  await openRoute(page, `${ANALYSE_URL}${query}`, "Analyse");
 }
 
 test.describe("Analyse", () => {
@@ -150,7 +143,7 @@ test.describe("Analyse", () => {
   test("Kennzahlen, Monte Carlo, Risk of Ruin, Breakdown, Heatmap … – no errors, no horizontal scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page, { extra: { "tj2-trades": analyseTrades() } });
-    test.skip(!(await openAnalyse(page)), "the Analyse page is served by the dev harness (Vite dev server) until P14 routes it");
+    await openAnalyse(page);
     const view = page.getByTestId("analyse-view");
     await expect(view).toHaveAttribute("data-n", "140");
 
@@ -238,7 +231,7 @@ test.describe("Analyse", () => {
 
   test("a custom stat is saved into the settings and removed again", async ({ page }) => {
     await seed(page, { extra: { "tj2-trades": analyseTrades() } });
-    test.skip(!(await openAnalyse(page)), "dev harness only");
+    await openAnalyse(page);
     const card = page.getByTestId("ana-custom");
     await card.scrollIntoViewIfNeeded();
     await card.getByTestId("custom-metric").click();
@@ -262,7 +255,7 @@ test.describe("Analyse", () => {
 
   test("deep link ?dim= opens the breakdown on that dimension", async ({ page }) => {
     await seed(page, { extra: { "tj2-trades": analyseTrades() } });
-    test.skip(!(await openAnalyse(page, "?dim=weekday")), "dev harness only");
+    await openAnalyse(page, "?dim=weekday");
     await expect(page.getByTestId("ana-breakdown").getByTestId("bd-row").first()).toHaveAttribute("data-key", "0");
     await expect(page.getByTestId("bd-dim")).toContainText("Wochentag");
   });
@@ -270,7 +263,7 @@ test.describe("Analyse", () => {
   test("the empty journal shows one calm preview card", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page, { empty: true });
-    test.skip(!(await openAnalyse(page)), "dev harness only");
+    await openAnalyse(page);
     await expect(page.getByTestId("ana-preview")).toBeVisible();
     await expect(page.getByTestId("ana-preview")).toContainText("Noch nichts zu analysieren");
     await shot(page, info, "empty");
@@ -282,7 +275,7 @@ test.describe("Analyse", () => {
     const errors = collectErrors(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await seed(page, { extra: { "tj2-trades": analyseTrades() } });
-    test.skip(!(await openAnalyse(page)), "dev harness only");
+    await openAnalyse(page);
     await expect(page.getByRole("heading", { level: 2, name: "Kennzahlen" })).toBeVisible();
     const mc = page.getByTestId("ana-mc");
     await mc.scrollIntoViewIfNeeded();
@@ -297,7 +290,7 @@ test.describe("Analyse", () => {
   test("the legacy fixture (11 closed trades): honest small-sample states, no errors", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page);
-    test.skip(!(await openAnalyse(page)), "dev harness only");
+    await openAnalyse(page);
     await expect(page.getByTestId("analyse-view")).toHaveAttribute("data-n", "11");
     await expect(page.getByTestId("ana-hero")).toBeVisible();
     await expect(page.getByTestId("ana-excursion")).toContainText("Noch keine MAE / MFE");

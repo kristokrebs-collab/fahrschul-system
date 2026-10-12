@@ -1,13 +1,12 @@
 /**
- * P13 Cockpit end to end on the fixture journal (dev harness `/dev/ux.html?view=cockpit`, see `uxHarness.ts`; once P14
- * routes the page: `PW_COCKPIT_URL=/#cockpit`). Covered: `h1 Cockpit` with the real cards of the starter board, a
+ * P13 Cockpit end to end on the fixture journal (`/#cockpit` of the production build, see `uxHarness.ts`). Covered: `h1 Cockpit` with the real cards of the starter board, a
  * widget from the catalog (filter, add, the "NEU" entrance settles), "Anordnen" (wider by button, moved by keyboard:
  * Space, arrow, Space – the WidgetGrid drag), the layout written to `tj2-cockpit` and still there after a reload, a
  * second dashboard (empty state → a widget), no horizontal scroll at 390 px, no console errors.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, stored } from "./helpers";
-import { openUx, UX_PROJECTS, UX_SKIP } from "./uxHarness";
+import { openUx, UX_PROJECTS } from "./uxHarness";
 
 interface Layout {
   active: string;
@@ -26,7 +25,7 @@ test.describe("Cockpit", () => {
 
   test("starter board with the real cards; a widget from the catalog enters and stays after a reload", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "cockpit")), UX_SKIP);
+    await openUx(page, "cockpit");
     await expect(page.getByRole("heading", { level: 1, name: "Cockpit" })).toBeVisible();
     // the existing cards, unchanged, inside the tiles
     await expect(tile(page, "ov-equity")).toBeVisible();
@@ -57,7 +56,7 @@ test.describe("Cockpit", () => {
 
   test("Anordnen: wider by button, moved by keyboard, written through", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "cockpit")), UX_SKIP);
+    await openUx(page, "cockpit");
     await page.getByTestId("cockpit-arrange").click();
     const grid = page.getByRole("list", { name: "Widgets" });
     await expect(grid).toBeVisible();
@@ -86,7 +85,7 @@ test.describe("Cockpit", () => {
 
   test("a second dashboard starts empty, gets a widget from the empty state, and the switch is remembered", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "cockpit")), UX_SKIP);
+    await openUx(page, "cockpit");
     await page.getByTestId("cockpit-new-board").click();
     await expect(page.getByText("Noch keine Widgets")).toBeVisible();
     const name = page.getByRole("textbox", { name: "Name des Dashboards" });

@@ -5,19 +5,21 @@
  * referral), the in-app cancellation (§ 312k BGB) + undo, the customer portal round trip, a locked feature with its
  * UpgradeSheet, the dunning banner and the honest states without payments / without cloud.
  *
- * Needs the dev harness `/dev/preise.html` on a Vite DEV server built with the mock cloud:
- *   VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e npx vite --port 4182
- *   PW_BASE_URL=http://127.0.0.1:4182 npx playwright test preise.spec.ts --project=mobile --project=desktop
- * Without the harness (production preview) the tests skip themselves. Set `PW_PREISE_URL=/#preise` /
- * `PW_KONTO_URL=/#konto` once P14 routed the pages. `P10_SHOTS_DIR` writes review screenshots.
+ * Runs on `/#preise`, `/#konto` and `/#analyse` of the cloud edition (the production build against the mock project,
+ * `cloudUrl` in helpers.ts) – a locked feature is the Analyse page itself (Profi-Statistik, Pro) and its Monte Carlo
+ * card; "without cloud" runs on `/#preise` of the default build. `PW_PREISE_URL` / `PW_KONTO_URL` override the cloud
+ * URLs. `P10_SHOTS_DIR` writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed, toast } from "./helpers";
 import { mockBilling, mockSubscription, type MockBillingOptions } from "./mocks/billing";
 import { mockSupabase, type MockSupabase } from "./mocks/supabase";
 
-const PREISE_URL = process.env.PW_PREISE_URL ?? "/dev/preise.html";
-const KONTO_URL = process.env.PW_KONTO_URL ?? "/dev/preise.html#konto";
+const PREISE_URL = process.env.PW_PREISE_URL ?? cloudUrl("preise");
+const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
+const ANALYSE_URL = cloudUrl("analyse");
+/** The pricing page with an invitation (`?ref=` is read from the query string, before the hash). */
+const preiseWithRef = (code: string) => (process.env.PW_PREISE_URL ? `${PREISE_URL}?ref=${code}` : cloudUrl("preise", `?ref=${code}`));
 const SHOTS = process.env.P10_SHOTS_DIR;
 const EMAIL = "trader@example.com";
 const PASSWORD = "richtig-geheim-42";
@@ -29,15 +31,17 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P10-billing-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-/** Opens a page of the harness; false (→ skip) where it is not served. */
-async function openPage(page: Page, url: string, h1: "Preise" | "Konto"): Promise<boolean> {
-  const res = await page.goto(url);
-  if (!res || !res.ok()) return false;
-  return page
-    .getByRole("heading", { level: 1, name: h1 })
-    .waitFor({ timeout: 30_000 })
-    .then(() => true)
-    .catch(() => false);
+/** Opens a page of the app (fails when it does not come up). */
+async function openPage(page: Page, url: string, h1: "Preise" | "Konto" | "Analyse"): Promise<void> {
+  await openRoute(page, url, h1, { timeout: 30_000 });
+}
+
+/** Switches the page inside the running app (the hash router – no reload, the session stays as it is). */
+async function goTo(page: Page, hash: string, h1: string): Promise<void> {
+  await page.evaluate((h) => {
+    location.hash = h;
+  }, hash);
+  await expect(page.locator('[data-page-role="current"] h1', { hasText: h1 }).first()).toBeVisible({ timeout: 20_000 });
 }
 
 async function setup(
@@ -84,7 +88,7 @@ test.describe("Preise & Abo", () => {
 
   test("pricing page: hero, four plans, Monat/Jahr rolls the price, a code decodes the new price, ?ref landing", async ({ page }, info) => {
     const { errors } = await setup(page);
-    test.skip(!(await openPage(page, `${PREISE_URL}?ref=friend30`, "Preise")), "dev harness only (Vite dev server)");
+    await openPage(page, preiseWithRef("friend30"), "Preise");
     await expect(page.getByTestId("preise-view")).toHaveAttribute("data-mode", "open");
     await expect(page.getByRole("region", { name: "Trade Journal Pro" })).toBeVisible();
     for (const p of ["free", "pro", "premium", "team"]) await expect(page.getByTestId(`plan-${p}`)).toBeVisible();
@@ -132,14 +136,14 @@ test.describe("Preise & Abo", () => {
 
   test("sign in → Stripe Checkout (redirect) → return wipe → Pro is active; the referral travels along", async ({ page }, info) => {
     const { bill, errors } = await setup(page);
-    test.skip(!(await openPage(page, `${PREISE_URL}?ref=FRIEND30`, "Preise")), "dev harness only (Vite dev server)");
+    await openPage(page, preiseWithRef("FRIEND30"), "Preise");
     await signIn(page);
     await expect(page.getByTestId("current-plan")).toContainText("Free");
     await page.getByTestId("plan-pro").scrollIntoViewIfNeeded();
     await page.getByTestId("cta-pro").click();
     // left the app for (the fake) Stripe Checkout
     await page.waitForURL(/checkout\.stripe\.com/);
-    expect(bill.checkouts[0]).toMatchObject({ plan: "pro", interval: "year", ref: "FRIEND30", returnTo: expect.stringMatching(/^\/(dev\/preise\.html)?(#preise)?$/) });
+    expect(bill.checkouts[0]).toMatchObject({ plan: "pro", interval: "year", ref: "FRIEND30", returnTo: expect.stringMatching(/^\/(#preise)?$/) });
     await page.getByRole("link", { name: "Jetzt abonnieren" }).click();
     // back in the journal: the wipe confirms the plan, the URL is clean
     const wipe = page.getByRole("dialog", { name: "Abo gestartet" });
@@ -174,7 +178,7 @@ test.describe("Preise & Abo", () => {
         },
       ],
     });
-    test.skip(!(await openPage(page, KONTO_URL, "Konto")), "dev harness only (Vite dev server)");
+    await openPage(page, KONTO_URL, "Konto");
     await signIn(page);
     const card = page.getByTestId("plan-card");
     await expect(card.getByRole("heading", { name: "Pro" })).toBeVisible();
@@ -183,11 +187,14 @@ test.describe("Preise & Abo", () => {
     await expect(page.getByTestId("billing-card").getByText("TJ-0042")).toBeVisible();
     await expect(page.getByTestId("billing-card").getByRole("link", { name: "PDF" })).toHaveAttribute("href", "https://pay.stripe.com/invoice/1/pdf");
     await expect(page.getByTestId("referral-card").locator("#ref-link")).toHaveValue(/\/\?ref=TRADE24X$/);
-    // the paid plan unlocks the gated feature
-    await expect(page.getByTestId("montecarlo-demo")).toBeVisible();
     await expectNoHorizontalScroll(page);
     await card.scrollIntoViewIfNeeded();
     await shot(page, info, "konto-plan");
+    // the paid plan unlocks the gated features: the Analyse page with Monte Carlo
+    await goTo(page, "#analyse", "Analyse");
+    await expect(page.getByTestId("ana-mc")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("upgrade-teaser")).toHaveCount(0);
+    await goTo(page, "#konto", "Konto");
 
     // § 312k: the button is there, the flow is reason → offer → confirm → done
     await card.getByTestId("cancel-contract").click();
@@ -224,11 +231,12 @@ test.describe("Preise & Abo", () => {
       subscription: mockSubscription({ status: "past_due", trialEnd: null }),
       plan: { plan: "pro", status: "past_due", trialEnd: null },
     });
-    test.skip(!(await openPage(page, KONTO_URL, "Konto")), "dev harness only (Vite dev server)");
-    // signed out on a shop with payments: Free → the Pro feature is locked
+    await openPage(page, ANALYSE_URL, "Analyse");
+    // signed out on a shop with payments: Free → the Pro page is locked (its header + the teaser, no chunk loaded)
     const teaser = page.getByTestId("upgrade-teaser");
     await teaser.scrollIntoViewIfNeeded();
-    await expect(teaser).toContainText("Monte Carlo & Ruin-Risiko");
+    await expect(teaser).toContainText("Profi-Statistik");
+    await expect(page.getByTestId("analyse-view")).toHaveCount(0);
     await shot(page, info, "teaser");
     await teaser.getByRole("button", { name: "Freischalten" }).click();
     const sheet = page.getByRole("dialog", { name: "Freischalten" });
@@ -243,14 +251,15 @@ test.describe("Preise & Abo", () => {
     await signIn(page);
     await expect(page.getByTestId("billing-banner")).toContainText("Die letzte Zahlung ist fehlgeschlagen.");
     await expect(page.getByRole("button", { name: "Zahlung aktualisieren" }).first()).toBeVisible();
-    // past_due keeps access during dunning
-    await expect(page.getByTestId("montecarlo-demo")).toBeVisible();
+    // past_due keeps access during dunning: the page opens, Monte Carlo included
+    await expect(page.getByTestId("analyse-view")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("ana-mc")).toBeVisible();
     expect(errors).toEqual([]);
   });
 
   test("payments not set up: honest notice, plans still shown, nothing locked", async ({ page }, info) => {
     const { errors } = await setup(page, { enabled: false });
-    test.skip(!(await openPage(page, PREISE_URL, "Preise")), "dev harness only (Vite dev server)");
+    await openPage(page, PREISE_URL, "Preise");
     await expect(page.getByTestId("preise-view")).toHaveAttribute("data-mode", "closed");
     await expect(page.getByTestId("billing-closed")).toContainText("Zahlungen noch nicht eingerichtet");
     await expect(page.getByTestId("note-pro")).toHaveText("Noch nicht buchbar");
@@ -258,15 +267,15 @@ test.describe("Preise & Abo", () => {
     await expect(page.getByLabel("Rabattcode")).toBeDisabled();
     await expectNoHorizontalScroll(page);
     await shot(page, info, "closed");
-    await page.goto(KONTO_URL);
-    await expect(page.getByTestId("montecarlo-demo")).toBeVisible();
+    await goTo(page, "#analyse", "Analyse");
+    await expect(page.getByTestId("ana-mc")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("upgrade-teaser")).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
   test("without cloud: no abos in this version, everything unlocked", async ({ page }, info) => {
     const { errors } = await setup(page);
-    test.skip(!(await openPage(page, `${PREISE_URL}?cloud=off`, "Preise")), "dev harness only (Vite dev server)");
+    await openPage(page, "/#preise", "Preise");
     await expect(page.getByTestId("preise-view")).toHaveAttribute("data-mode", "off");
     await expect(page.getByTestId("billing-closed")).toContainText("Keine Abos in dieser Version");
     await expect(page.getByTestId("plan-pro")).toBeVisible();

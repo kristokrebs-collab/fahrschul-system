@@ -10,14 +10,13 @@
  * automatic prompt after closing a trade); trackers / mood / diary / skills / bests / progress; no horizontal scroll at
  * 390 px; no console errors.
  *
- * Until P14 registers the page the spec opens the dev harness `/dev/wachstum.html` (Vite dev server, e.g.
- * `npx vite --port 4181` + `PW_BASE_URL`); set `PW_WACHSTUM_URL=/#wachstum` once routed. On a production preview without
- * the harness the tests skip themselves. `P08_SHOTS=<dir>` writes review screenshots.
+ * Runs on the routed page `/#wachstum` of the production build (P14; `PW_WACHSTUM_URL` overrides it, e.g. the dev
+ * harness `/dev/wachstum.html` under `npm run dev`). `P08_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, fixture, seed, stored, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, stored, toast } from "./helpers";
 
-const URL_ = process.env.PW_WACHSTUM_URL ?? "/dev/wachstum.html";
+const URL_ = process.env.PW_WACHSTUM_URL ?? "/#wachstum";
 const SHOTS = process.env.P08_SHOTS;
 const PROJECTS = ["mobile", "desktop"];
 const DAY = 86_400_000;
@@ -129,18 +128,10 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P08-psych-growth-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-async function open(page: Page, s: GrowthSeed | null): Promise<boolean> {
+async function open(page: Page, s: GrowthSeed | null): Promise<void> {
   await seed(page, s ? { extra: { "tj2-trades": s.trades, "tj2-days": s.days, "tj2-settings": s.settings } } : { empty: true });
-  const res = await page.goto(URL_);
-  if (!res || !res.ok()) return false;
-  return page
-    .getByRole("heading", { level: 1, name: "Wachstum" })
-    .waitFor({ timeout: 20_000 })
-    .then(() => true)
-    .catch(() => false);
+  await openRoute(page, URL_, "Wachstum");
 }
-
-const SKIP = "the Wachstum page is served by the dev harness (Vite dev server) until P14 routes it";
 
 test.describe("Wachstum", () => {
   test.setTimeout(120_000);
@@ -151,7 +142,7 @@ test.describe("Wachstum", () => {
 
   test("Seite: Heute, Serien, Ziele, Challenges, Gewohnheiten, Psyche, Fortschritt – keine Fehler, kein horizontaler Scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
-    test.skip(!(await open(page, growthSeed(Date.now()))), SKIP);
+    await open(page, growthSeed(Date.now()));
     const view = page.getByTestId("wachstum-view");
     await expect(view).toBeVisible();
     for (const t of ["Heute", "Serien", "Ziele", "Challenges & Gewohnheiten", "Psyche", "Fortschritt"]) await expect(page.getByRole("heading", { level: 2, name: t, exact: true })).toBeAttached();
@@ -208,7 +199,7 @@ test.describe("Wachstum", () => {
 
   test("Check-in: Stimmung, Regler per Tastatur, Wörter → Tagesjournal; Checkliste → Bereit", async ({ page }, info) => {
     const errors = collectErrors(page);
-    test.skip(!(await open(page, growthSeed(Date.now()))), SKIP);
+    await open(page, growthSeed(Date.now()));
     await page.getByTestId("wachstum-checkin").click();
     const sheet = page.getByTestId("checkin-sheet");
     await expect(sheet).toBeVisible();
@@ -248,7 +239,7 @@ test.describe("Wachstum", () => {
 
   test("Pause: zwei Verluste gerade geschlossen → P05-Pause im Bereitschafts-Check", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await open(page, growthSeed(Date.now(), { pause: true }))), SKIP);
+    await open(page, growthSeed(Date.now(), { pause: true }));
     const ready = page.getByTestId("growth-ready");
     await expect(ready).toHaveAttribute("data-state", "pause");
     await expect(ready).toContainText(/Pause · \d+:\d\d/);
@@ -265,7 +256,7 @@ test.describe("Wachstum", () => {
         if (el) (window as unknown as { __wipe?: string }).__wipe = el.textContent ?? "";
       }).observe(document, { childList: true, subtree: true });
     });
-    test.skip(!(await open(page, growthSeed(Date.now(), { reached: true }))), SKIP);
+    await open(page, growthSeed(Date.now(), { reached: true }));
     await expect.poll(() => page.evaluate(() => (window as unknown as { __wipe?: string }).__wipe ?? ""), { timeout: 15_000 }).toContain("Jeden Trade reviewen");
     const wipe = page.getByTestId("goal-wipe");
     if (await wipe.isVisible()) {
@@ -299,7 +290,7 @@ test.describe("Wachstum", () => {
 
   test("Challenge ziehen und annehmen, Gewohnheit anlegen und abhaken", async ({ page }, info) => {
     const errors = collectErrors(page);
-    test.skip(!(await open(page, growthSeed(Date.now()))), SKIP);
+    await open(page, growthSeed(Date.now()));
     const ch = page.getByTestId("growth-challenges");
     await ch.scrollIntoViewIfNeeded();
     await ch.getByTestId("challenge-draw").click();
@@ -329,7 +320,7 @@ test.describe("Wachstum", () => {
 
   test("Post-Trade-Review: offene Reviews und automatische Frage nach dem Schließen", async ({ page }, info) => {
     const errors = collectErrors(page);
-    test.skip(!(await open(page, growthSeed(Date.now()))), SKIP);
+    await open(page, growthSeed(Date.now()));
     await page.getByTestId("growth-review-open").click();
     const review = page.getByTestId("post-trade-review");
     await expect(review).toBeVisible();
@@ -354,7 +345,7 @@ test.describe("Wachstum", () => {
 
   test("leeres Journal: ehrliche Leerzustände, keine Fehler, kein horizontaler Scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
-    test.skip(!(await open(page, null)), SKIP);
+    await open(page, null);
     await expect(page.getByTestId("growth-goals")).toHaveAttribute("data-n", "0");
     await expect(page.getByTestId("tracker-quiet")).toBeVisible();
     await expect(page.getByTestId("mood-empty")).toBeVisible();

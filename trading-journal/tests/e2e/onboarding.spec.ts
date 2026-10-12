@@ -1,5 +1,5 @@
 /**
- * P13 first-run tour end to end (dev harness `/dev/ux.html`, see `uxHarness.ts`): an empty journal starts the tour by
+ * P13 first-run tour end to end (the app's real routes, see `uxHarness.ts`): an empty journal starts the tour by
  * itself after the intro; Konten & Kapital writes the settings; Setups steps aside for the editor and comes back; the
  * Börse step tells the truth without the cloud; Ziel + "Halten zum Starten" (a real pointer hold) adds the goal,
  * celebrates and remembers "done" – a reload stays quiet. Skipping is remembered too, and the settings card starts the
@@ -7,7 +7,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, stored, toast } from "./helpers";
-import { openUx, UX_PROJECTS, UX_SKIP } from "./uxHarness";
+import { openUx, UX_PROJECTS } from "./uxHarness";
 
 const tour = (page: Page) => page.getByRole("dialog", { name: "Einführung" });
 const step = (page: Page) => page.getByTestId("onboarding");
@@ -26,7 +26,7 @@ test.describe("Einführung", () => {
 
   test("first run: five steps with real writes, the hold starts the journal, a reload stays quiet", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "overview", { empty: true, firstRun: true })), UX_SKIP);
+    await openUx(page, "app", "overview", { empty: true, firstRun: true });
     await expect(tour(page)).toBeVisible({ timeout: 20_000 });
     await expect(step(page)).toHaveAttribute("data-step", "start");
     await expect(tour(page).getByRole("list", { name: "Fortschritt der Einführung" })).toBeVisible();
@@ -78,13 +78,13 @@ test.describe("Einführung", () => {
 
   test("skip is remembered; the settings card starts the tour again; Zurück goes back", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "settings", { empty: true, firstRun: true })), UX_SKIP);
+    await openUx(page, "app", "settings", { empty: true, firstRun: true });
     await expect(tour(page)).toBeVisible({ timeout: 20_000 });
     await page.getByTestId("tour-skip").click();
     await expect(tour(page)).toBeHidden();
     expect(await stored<{ status: string }>(page, "tj2-onboarding")).toMatchObject({ status: "skipped" });
 
-    await page.goto("/dev/ux.html?view=cards");
+    await page.goto("/#settings");
     await expect(page.getByTestId("onboarding-status")).toContainText("Übersprungen");
     await page.getByRole("button", { name: "Einführung starten" }).click();
     await expect(tour(page)).toBeVisible();
@@ -98,7 +98,7 @@ test.describe("Einführung", () => {
 
   test("a journal with trades is never interrupted", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "overview", { firstRun: true })), UX_SKIP);
+    await openUx(page, "app", "overview", { firstRun: true });
     await page.waitForTimeout(3000);
     await expect(tour(page)).toBeHidden();
     expect(await stored<{ status: string }>(page, "tj2-onboarding")).toMatchObject({ status: "seen" });

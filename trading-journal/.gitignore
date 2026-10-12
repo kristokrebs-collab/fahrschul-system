@@ -1,6 +1,7 @@
 node_modules
 dist
 dist-single
+dist-e2e-cloud
 release
 .env
 .env.*

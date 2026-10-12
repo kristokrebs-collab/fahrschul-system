@@ -16,10 +16,14 @@ const galaxyTab = (width: number, height: number) => ({
 });
 
 /**
- * Optional overrides (defaults unchanged): `PW_BASE_URL` runs the suite against a server that is already up (e.g. an
- * agent's own preview on another port) – no build, no `webServer`; `PW_OUTPUT_DIR` moves the test artifacts.
+ * Two production previews (P14): the default build at `baseURL` (local-only: no `VITE_SUPABASE_*`), and the same app
+ * built against the Supabase mock of `tests/e2e/mocks/supabase.ts` (`npm run build:e2e-cloud`) at `CLOUD_URL` – the
+ * Konto, Preise, Börse and Community specs run there. Optional overrides: `PW_BASE_URL` / `PW_CLOUD_BASE_URL` run the
+ * suite against servers that are already up (e.g. an agent's own previews on other ports) – no build, no `webServer`;
+ * `PW_OUTPUT_DIR` moves the test artifacts.
  */
 const BASE_URL = process.env.PW_BASE_URL;
+export const CLOUD_URL = process.env.PW_CLOUD_BASE_URL ?? "http://127.0.0.1:4174";
 const CONTAINER_CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const PINNED_CHROMIUM = process.env.PW_CHROMIUM ?? (existsSync(CONTAINER_CHROMIUM) ? CONTAINER_CHROMIUM : undefined);
 
@@ -42,13 +46,26 @@ export default defineConfig({
   },
   webServer: BASE_URL
     ? undefined
-    : {
-        // personal edition at `/`, share edition at `/teilen/` (build:share writes dist/teilen after the personal build)
-        command: "npm run build && npm run build:share && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
-        url: "http://127.0.0.1:4173",
-        reuseExistingServer: !process.env.CI,
-        timeout: 240_000,
-      },
+    : [
+        {
+          // personal edition at `/`, share edition at `/teilen/` (build:share writes dist/teilen after the personal build)
+          command: "npm run build && npm run build:share && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
+          url: "http://127.0.0.1:4173",
+          reuseExistingServer: !process.env.CI,
+          timeout: 240_000,
+        },
+        ...(process.env.PW_CLOUD_BASE_URL
+          ? []
+          : [
+              {
+                // the cloud edition against the Supabase mock (vite only – the typecheck runs in the first build)
+                command: "npm run build:e2e-cloud && npx vite preview --outDir dist-e2e-cloud --host 127.0.0.1 --port 4174 --strictPort",
+                url: "http://127.0.0.1:4174",
+                reuseExistingServer: !process.env.CI,
+                timeout: 240_000,
+              },
+            ]),
+      ],
   projects: [
     { name: "mobile", use: { ...devices["iPhone 13"], browserName: "chromium", viewport: { width: 390, height: 844 } } },
     // portrait tablet with a mouse (iPad-Air-sized window)

@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "e2e": "playwright test",
     "build:share": "vite build --mode share",
+    "build:e2e-cloud": "VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e vite build --outDir dist-e2e-cloud --emptyOutDir",
     "build:single": "tsc -b && node scripts/build-single.mjs",
     "budget": "node scripts/bundleBudget.mjs"
   },

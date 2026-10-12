@@ -5,17 +5,16 @@
  * Markt page: `h1 Markt`, the best setups (A+ / A only, a MorphCard dialog with every reason and weight), the box phase
  * rail with the candle-close countdown, the own chart with boxes + targets + RSI pane (timeframe switch 4h / 1D / 1W),
  * the RSI trendlines, the watchlist scanner (on demand), the settings written at once, no horizontal scroll at 390 px,
- * no console errors. Until P14 registers the `markt` page the spec opens the dev harness `/dev/markt.html` (Vite dev
- * server, e.g. `npx vite --port 4191` + `PW_BASE_URL`); set `PW_MARKT_URL=/#markt` once the page is routed. On a
- * production preview without the harness these tests skip themselves.
+ * no console errors. Runs on the routed page `/#markt` of the production build (P14; `PW_MARKT_URL` overrides it, e.g.
+ * the dev harness `/dev/markt.html` under `npm run dev`).
  *
  * Overview (real app, any server): the chart's new `RSI` pane and the `Boxen` layer toggle (off by default), the
  * Top-Trader card's order-flow row with the Box-Bias chip. `P02_SHOTS_DIR` also writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, fixture, isMobile, seed } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, fixture, isMobile, openRoute, seed } from "./helpers";
 
-const MARKT_URL = process.env.PW_MARKT_URL ?? "/dev/markt.html";
+const MARKT_URL = process.env.PW_MARKT_URL ?? "/#markt";
 const SHOTS = process.env.P02_SHOTS_DIR;
 const P02_PROJECTS = ["mobile", "desktop"];
 /** The seeded journal's settings (the fixture stores them as a JSON string or an object). */
@@ -127,15 +126,9 @@ async function newestBoxInView(page: Page, scope: string, el: Locator, closes: b
   return p;
 }
 
-/** Opens the Markt page; false (→ skip) where the dev harness is not served. */
-async function openMarkt(page: Page): Promise<boolean> {
-  const res = await page.goto(MARKT_URL);
-  if (!res || !res.ok()) return false;
-  return page
-    .getByRole("heading", { level: 1, name: "Markt" })
-    .waitFor({ timeout: 20_000 })
-    .then(() => true)
-    .catch(() => false);
+/** Opens the Markt page (fails when it does not come up). */
+async function openMarkt(page: Page): Promise<void> {
+  await openRoute(page, MARKT_URL, "Markt");
 }
 
 test.describe("Markt · Box zu Box", () => {
@@ -148,7 +141,7 @@ test.describe("Markt · Box zu Box", () => {
   test("best setups, phase rail, chart with boxes and RSI pane, RSI lines – no errors, no horizontal scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page, { boxes: true });
-    test.skip(!(await openMarkt(page)), "the Markt page is served by the dev harness (Vite dev server) until P14 routes it");
+    await openMarkt(page);
     const view = page.getByTestId("markt-view");
     await expect(view).toHaveAttribute("data-state", "ok", { timeout: 30_000 });
 
@@ -189,7 +182,7 @@ test.describe("Markt · Box zu Box", () => {
 
   test("a setup opens its reasons with weights and the plan (MorphCard dialog)", async ({ page }, info) => {
     await seed(page, { boxes: true });
-    test.skip(!(await openMarkt(page)), "dev harness only");
+    await openMarkt(page);
     const card = page.getByTestId("best-setup").first();
     await expect(card).toBeVisible({ timeout: 30_000 });
     await card.click();
@@ -207,7 +200,7 @@ test.describe("Markt · Box zu Box", () => {
   test("box fix: every box sits on its own bars – the active box starts at the bar of its t0, no candle under a box closes outside (4h / 1D / 1W)", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page, { boxes: true });
-    test.skip(!(await openMarkt(page)), "dev harness only");
+    await openMarkt(page);
     await expect(page.getByTestId("markt-view")).toHaveAttribute("data-state", "ok", { timeout: 30_000 });
     const chart = page.getByTestId("markt-chart");
     await chart.scrollIntoViewIfNeeded();
@@ -243,7 +236,7 @@ test.describe("Markt · Box zu Box", () => {
     const errors = collectErrors(page);
     // four symbols = 16 weight: one scan fits the scanner's own minute budget (ten take ~2 minutes by design)
     await seed(page, { boxes: true, extra: { "tj2-settings": { ...fixtureSettings(), boxes: { watchlist: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT"] } } } });
-    test.skip(!(await openMarkt(page)), "dev harness only");
+    await openMarkt(page);
     const scanner = page.getByTestId("markt-scanner");
     await scanner.scrollIntoViewIfNeeded();
     // the first scan starts by itself; afterwards "Jetzt scannen" works again

@@ -1,5 +1,5 @@
 /**
- * P13 global search end to end (dev harness `/dev/ux.html`, see `uxHarness.ts`): `/` and ⌘⇧F / Ctrl+⇧F open it, the
+ * P13 global search end to end (the integrated app, see `uxHarness.ts`): `/` and ⌘⇧F / Ctrl+⇧F open it, the
  * strongest first before typing, typing filters the seeded journal (trades, setups, pages, settings, commands),
  * arrows + Enter run the hit after the overlay is gone (page switch, trade detail, a command), Escape closes and
  * gives the focus back, `/` typed into a field stays a character, the shortcut sheet `?` and the g-chords. Mobile
@@ -7,7 +7,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll } from "./helpers";
-import { openUx, themeSettled, UX_PROJECTS, UX_SKIP } from "./uxHarness";
+import { openUx, themeSettled, UX_PROJECTS } from "./uxHarness";
 
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Suche" });
 const box = (page: Page) => dialog(page).getByRole("combobox", { name: "Suche" });
@@ -31,7 +31,7 @@ test.describe("Globale Suche", () => {
 
   test("/ opens it with the strongest first; typing filters; Enter switches the page after the exit", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "overview")), UX_SKIP);
+    await openUx(page, "app", "overview");
     await openWithSlash(page);
     const list = dialog(page).getByRole("listbox");
     await expect(list).toHaveAttribute("aria-label", "Stärkste zuerst");
@@ -49,7 +49,7 @@ test.describe("Globale Suche", () => {
 
   test("a trade from its notes opens the trade detail; a setup hit; nothing found is honest", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "overview")), UX_SKIP);
+    await openUx(page, "app", "overview");
     await openWithSlash(page);
     await box(page).fill("zzzqqq");
     await expect(dialog(page).getByText("Nichts gefunden")).toBeVisible();
@@ -78,7 +78,7 @@ test.describe("Globale Suche", () => {
 
   test("⌘⇧F / Ctrl+⇧F opens it; Escape closes and returns the focus; / inside a field is just a character", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "trades")), UX_SKIP);
+    await openUx(page, "app", "trades");
     const before = page.getByRole("heading", { level: 1 }).first();
     await before.waitFor();
     await page.locator("body").press("Control+Shift+F");
@@ -110,7 +110,7 @@ test.describe("Globale Suche", () => {
 
   test("? opens the shortcut sheet; g then s switches to the setups", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "overview")), UX_SKIP);
+    await openUx(page, "app", "overview");
     await page.locator("body").press("Shift+?");
     const sheet = page.getByTestId("shortcut-sheet");
     await expect(sheet).toBeVisible(FIRST_OPEN);

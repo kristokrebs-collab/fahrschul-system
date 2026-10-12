@@ -42,7 +42,7 @@ test.describe("pages (P14)", () => {
   for (const [key, h1] of PAGES) {
     test(`#${key}: h1, no sideways scroll, no warnings`, async ({ page }, info) => {
       const errors = collectErrors(page);
-      await seed(page, { extra: { "tj2-onboarding": { status: "done", at: "", v: 1 } } });
+      await seed(page);
       await page.goto(`/#${key}`);
       await expect(pageH1(page, key)).toHaveText(h1, { timeout: 20_000 });
       // the lazy page replaced its skeleton
@@ -57,7 +57,7 @@ test.describe("pages (P14)", () => {
   }
 
   test("the dock has five tabs and the FAB, and fits the screen", async ({ page }) => {
-    await seed(page, { extra: { "tj2-onboarding": { status: "done", at: "", v: 1 } } });
+    await seed(page);
     await page.goto("/");
     const dock = page.getByRole("toolbar", { name: "Navigation" });
     await expect(dock).toBeVisible();
@@ -76,7 +76,7 @@ test.describe("pages (P14)", () => {
   });
 
   test("command navigation lists every page with its count; a link opens a lazy page", async ({ page }) => {
-    await seed(page, { extra: { "tj2-onboarding": { status: "done", at: "", v: 1 } } });
+    await seed(page);
     await page.goto("/");
     await page.getByRole("button", { name: /Navigation öffnen|Menü/ }).first().click();
     const nav = page.getByRole("dialog", { name: "Navigation" });
@@ -90,7 +90,7 @@ test.describe("pages (P14)", () => {
   });
 
   test("g + letter opens a page; deep links keep their query", async ({ page }) => {
-    await seed(page, { extra: { "tj2-onboarding": { status: "done", at: "", v: 1 } } });
+    await seed(page);
     await page.goto("/");
     await expect(page.getByRole("toolbar", { name: "Navigation" })).toBeVisible();
     // the chord waits CHORD_MS (1.2 s) for its letter: on a busy first load the second key may arrive later – press again

@@ -23,10 +23,10 @@ import { useUi } from "@/store/uiStore";
 import { CockpitView } from "@/views/cockpit";
 
 /*
- * Dev harness of the P13 UX shell until the integrator wires it (P14): `/dev/ux.html` under `npm run dev`.
- *   - default (`?view=app`): the real app (main.tsx boot: theme before the first render, journal, router, market)
- *     plus the three P13 hosts the integrator mounts in `App` – GlobalSearchHost, ShortcutHost, OnboardingHost – and
- *     the app-level ErrorBoundary around it.
+ * Dev harness of the P13 UX shell: `/dev/ux.html` under `npm run dev` (the e2e suite runs on the real routes since P14,
+ * see tests/e2e/uxHarness.ts).
+ *   - default (`?view=app`): the real app (main.tsx boot: theme before the first render, journal, router, market) –
+ *     since P14 `App` itself mounts GlobalSearchHost, ShortcutHost, OnboardingHost and the app-level ErrorBoundary.
  *   - `?view=cockpit`: the Cockpit page (its own route `cockpit` once registered) with the trade detail, toasts, confetti.
  *   - `?view=cards`: the two settings cards P13 adds (Darstellung, Einführung & Hilfe) in the settings grid.
  *   - `?view=crash` / `?view=crash-widget`: the error boundary (page / widget variant) around a component that throws.
@@ -123,14 +123,8 @@ function Harness() {
         </Shell>
       );
     default:
-      return (
-        <>
-          <ErrorBoundary variant="app">
-            <App />
-          </ErrorBoundary>
-          <Hosts />
-        </>
-      );
+      // the integrated app (P14): App mounts the hosts and its own app-level error boundary
+      return <App />;
   }
 }
 

@@ -5,22 +5,21 @@
  * student's goals, joining by invitation link, a team's seats, share links (create → public SharedView → revoke) and
  * feedback. Every shared payload is checked against the strict schema in the mock (a money field would be a 422).
  *
- * Needs the dev harness `/dev/community.html` on a Vite DEV server built with the mock cloud:
- *   VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e npx vite --port 4182
- *   PW_BASE_URL=http://127.0.0.1:4182 npx playwright test community.spec.ts --project=mobile --project=desktop
- * Without the harness (production preview) the tests skip themselves. Set `PW_COMMUNITY_URL=/#community` once P14 routed
- * the page (and `PW_SHARE_BASE=/` for the public view). `P12_SHOTS_DIR` writes review screenshots.
+ * Runs on `/#community` of the cloud edition (the production build against the mock project, `cloudUrl` in
+ * helpers.ts); a share link is born in the trade detail (P14: its footer carries the share button) and opened publicly
+ * at the app root (`/#share/<token>`); "without cloud" runs on `/#community` of the default build. `PW_COMMUNITY_URL` /
+ * `PW_SHARE_BASE` override the cloud URLs. `P12_SHOTS_DIR` writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
+import { CLOUD_BASE, cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { fig, mockSocial, mockTradePayload, type MockGroup, type MockSocialOptions } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
 
-const COMMUNITY_URL = process.env.PW_COMMUNITY_URL ?? "/dev/community.html";
-const TRADES_URL = process.env.PW_COMMUNITY_TRADES_URL ?? "/dev/community.html#trades";
-/** Page that serves `#share/<token>` (P14: "/"). */
-const SHARE_BASE = process.env.PW_SHARE_BASE ?? "/dev/community.html";
+const COMMUNITY_URL = process.env.PW_COMMUNITY_URL ?? cloudUrl("community");
+const TRADES_URL = process.env.PW_COMMUNITY_TRADES_URL ?? cloudUrl("trades");
+/** Page that serves `#share/<token>` (P14: the app root). */
+const SHARE_BASE = process.env.PW_SHARE_BASE ?? `${CLOUD_BASE}/`;
 const SHOTS = process.env.P12_SHOTS_DIR;
 const EMAIL = "trader@example.com";
 const PASSWORD = "richtig-geheim-42";
@@ -33,16 +32,11 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P12-social-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-/** Opens the harness; false (→ skip) where it is not served. */
-async function open(page: Page, url = COMMUNITY_URL): Promise<boolean> {
+/** Opens a page of the app and waits for its own `h1` (fails when it does not come up). */
+async function open(page: Page, url = COMMUNITY_URL): Promise<void> {
   const res = await page.goto(url);
-  if (!res || !res.ok()) return false;
-  return page
-    .getByRole("heading", { level: 1 })
-    .first()
-    .waitFor({ timeout: 30_000 })
-    .then(() => true)
-    .catch(() => false);
+  expect(res?.ok(), `${url} answers`).toBe(true);
+  await expect(page.locator('[data-page-role="current"] h1').first()).toBeVisible({ timeout: 30_000 });
 }
 
 async function setup(page: Page, social: MockSocialOptions = {}) {
@@ -66,8 +60,11 @@ async function shareReady(sheet: Locator): Promise<void> {
   await expect(sheet.locator('[data-pulse="glyph-zoom"]')).toHaveAttribute("data-covered", "", { timeout: 10_000 });
 }
 
-/** Signs in through the header pill and closes the welcome sheet once the first sync is live. */
-async function signIn(page: Page): Promise<void> {
+/**
+ * Signs in through the header pill and closes the welcome sheet once the first sync is live. Afterwards no dialog is
+ * open – unless `expectNext` (an invitation link opens the join sheet right after the login).
+ */
+async function signIn(page: Page, { expectNext = false }: { expectNext?: boolean } = {}): Promise<void> {
   await page.locator('[data-cloud-pill="signin"]').click();
   const sheet = page.getByRole("dialog", { name: "Anmelden" });
   await ready(sheet);
@@ -76,7 +73,8 @@ async function signIn(page: Page): Promise<void> {
   await sheet.getByRole("button", { name: "Anmelden", exact: true }).click();
   await expect(page.getByText("Alles synchron.", { exact: false })).toBeVisible({ timeout: 20_000 });
   await page.getByRole("button", { name: "Los geht’s" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
+  if (expectNext) await expect(page.getByRole("dialog", { name: "Willkommen" })).toHaveCount(0);
+  else await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
 const member = (id: string, pseudonym: string, role: MockGroup["members"][number]["role"], stats = false) => ({ id, pseudonym, role, shareLevel: stats ? ("stats" as const) : ("none" as const), figures: stats ? fig(0.31, 74, 58) : null });
@@ -91,7 +89,7 @@ test.describe("Community", () => {
   test("without cloud: an honest, animated state – no ranking, no invented members", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page);
-    test.skip(!(await open(page, `${COMMUNITY_URL}?cloud=off`)), "dev harness only (Vite dev server)");
+    await open(page, "/#community"); // the default build has no cloud
     await expect(page.getByRole("heading", { level: 1, name: "Community" })).toBeVisible();
     const card = page.getByTestId("community-no-cloud");
     await expect(card).toBeVisible();
@@ -107,7 +105,7 @@ test.describe("Community", () => {
 
   test("signed out: the pitch and the way in", async ({ page }, info) => {
     const { errors } = await setup(page);
-    test.skip(!(await open(page)), "dev harness only (Vite dev server)");
+    await open(page);
     await expect(page.getByTestId("community-signed-out")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Werde Teil der Community" })).toBeVisible();
     await expectNoHorizontalScroll(page);
@@ -119,7 +117,7 @@ test.describe("Community", () => {
 
   test("signed in: own card with percentile, ranking with podium; opting in puts the own row on the board", async ({ page }, info) => {
     const { soc, errors } = await setup(page, { optIn: false });
-    test.skip(!(await open(page)), "dev harness only (Vite dev server)");
+    await open(page);
     await signIn(page);
     const you = page.getByTestId("you-card");
     await expect(you.getByText("Stiller Falke 27")).toBeVisible();
@@ -147,7 +145,7 @@ test.describe("Community", () => {
 
   test("groups: create, invite link, a redacted trade for review, a comment with @mention", async ({ page }, info) => {
     const { soc, errors } = await setup(page);
-    test.skip(!(await open(page)), "dev harness only (Vite dev server)");
+    await open(page);
     await signIn(page);
     const groups = page.getByTestId("groups-card");
     await expect(groups.getByTestId("groups-empty")).toBeVisible();
@@ -215,7 +213,7 @@ test.describe("Community", () => {
       },
     ];
     const { soc, errors } = await setup(page, { groups });
-    test.skip(!(await open(page)), "dev harness only (Vite dev server)");
+    await open(page);
     await signIn(page);
     const desk = page.getByTestId("mentor-desk");
     await expect(desk.getByTestId("queue-card")).toHaveCount(2);
@@ -249,7 +247,7 @@ test.describe("Community", () => {
     ];
     const { soc, errors } = await setup(page, { groups });
     soc.goals.push({ id: "abcdabcd-0000-4000-8000-00000000g001", groupId: groups[0]!.id, mentorId: "55555555-5555-4555-8555-555555555555", studentId: ME, draft: { title: "Keine Regelbrüche", kind: "limit", metric: "ruleBreaks", target: 0, comparator: "atMost", period: "week" }, status: "open", createdAt: "2026-10-12T08:00:00Z" });
-    test.skip(!(await open(page)), "dev harness only (Vite dev server)");
+    await open(page);
     await signIn(page);
     const card = page.getByTestId("groups-card");
     await expect(card.getByTestId("feed-empty")).toBeVisible(); // the other student's review is not visible
@@ -267,10 +265,10 @@ test.describe("Community", () => {
       { id: "abcdabcd-0000-4000-8000-00000000a003", kind: "group", name: "Asia Open", description: "", ownerId: "55555555-5555-4555-8555-555555555555", members: [member("55555555-5555-4555-8555-555555555555", "Treue Elster 58", "owner")], invites: [{ code: "ABCDEFGH23", role: "member", uses: 0, maxUses: 10, expiresAt: "2026-12-31T00:00:00Z" }], reviews: [] },
     ];
     const { soc, errors } = await setup(page, { groups });
-    test.skip(!(await open(page, `${COMMUNITY_URL}#community?invite=ABCDEFGH23`)), "dev harness only (Vite dev server)");
+    await open(page, process.env.PW_COMMUNITY_URL ? `${COMMUNITY_URL}?invite=ABCDEFGH23` : cloudUrl("community?invite=ABCDEFGH23"));
     await expect(page.getByTestId("community-invite-waiting")).toBeVisible();
     expect(page.url()).not.toContain("invite=");
-    await signIn(page);
+    await signIn(page, { expectNext: true });
     const sheet = page.getByRole("dialog", { name: "Gruppe beitreten" });
     await ready(sheet);
     await expect(sheet.getByTestId("join-preview")).toContainText("Einladung zu „Asia Open“");
@@ -288,7 +286,7 @@ test.describe("Community", () => {
       { id: "abcdabcd-0000-4000-8000-00000000a004", kind: "team", name: "Desk Berlin", description: "", ownerId: ME, seats: 5, members: [member(ME, "Stiller Falke 27", "owner"), member("66666666-6666-4666-8666-666666666666", "Fester Specht 83", "member")], invites: [], reviews: [] },
     ];
     const { errors } = await setup(page, { groups });
-    test.skip(!(await open(page)), "dev harness only (Vite dev server)");
+    await open(page);
     await signIn(page);
     await expect(page.getByTestId("team-seats")).toContainText("2 von 5 Sitzen belegt");
     await expect(page.getByTestId("member-row").filter({ hasText: "Sitz" })).toHaveCount(2);
@@ -297,9 +295,14 @@ test.describe("Community", () => {
 
   test("share link: born from the trade, opened publicly, revoked at once", async ({ page, context }, info) => {
     const { soc, errors } = await setup(page);
-    test.skip(!(await open(page, TRADES_URL)), "dev harness only (Vite dev server)");
+    await open(page, TRADES_URL);
     await signIn(page);
-    await page.getByTestId("demo-trade").first().getByTestId("share-button").click();
+    // the trade detail's footer carries the share button (P14)
+    const row = info.project.name === "mobile" ? page.getByRole("list", { name: "Trades" }).locator("li").first().getByRole("button").first() : page.locator("tbody tr[tabindex='0']").first();
+    await row.click();
+    const detail = page.getByRole("dialog", { name: "Trade-Details" });
+    await expect(detail).toBeVisible();
+    await detail.getByTestId("share-button").click();
     const sheet = page.getByRole("dialog", { name: "Teilen" });
     await shareReady(sheet);
     await sheet.getByTestId("share-opt-prices").click();
@@ -343,7 +346,7 @@ test.describe("Community", () => {
   test("feedback goes out; reduced motion shows the same page at rest", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     const { soc, errors } = await setup(page);
-    test.skip(!(await open(page)), "dev harness only (Vite dev server)");
+    await open(page);
     await signIn(page);
     const card = page.getByTestId("feedback-card");
     await card.getByRole("radio", { name: "Idee" }).click();

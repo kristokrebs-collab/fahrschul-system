@@ -3,6 +3,7 @@
  * Multi-file (web) builds of the journal – Netlify serves both:
  *   npm run build         → dist/          personal edition at `/`        (`__TJ_EDITION__` "personal")
  *   npm run build:share   → dist/teilen/   share edition at `/teilen/`    (`vite build --mode share`, privacy guard)
+ *   npm run build:e2e-cloud → dist-e2e-cloud/  personal edition against the Supabase mock of the e2e suite (P14)
  * Run `build` BEFORE `build:share` (the personal build empties dist/). Dev / vitest use the personal edition;
  * `vite --mode share` serves the share edition at http://localhost:5173/teilen/.
  * The single-file builds live in `vite.single.config.ts`.
@@ -12,15 +13,24 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { privacyGuard } from "./scripts/privacyGuard.ts";
 
-/** Copies the repo's legacy static dashboard into dist so the Netlify site keeps serving /dashboard.html. */
-function keepLegacyDashboard() {
+/**
+ * Copies the repo's legacy static dashboard into the out dir (`dist/` on Netlify) so the site keeps serving
+ * /dashboard.html. Follows `--outDir` (the e2e cloud build writes `dist-e2e-cloud/`).
+ */
+function keepLegacyDashboard(): Plugin {
+  let outDir = fileURLToPath(new URL("./dist", import.meta.url));
   return {
     name: "keep-legacy-dashboard",
+    apply: "build",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+    },
     closeBundle() {
       const src = fileURLToPath(new URL("../dashboard.html", import.meta.url));
-      if (existsSync(src)) copyFileSync(src, fileURLToPath(new URL("./dist/dashboard.html", import.meta.url)));
+      if (existsSync(src) && existsSync(outDir)) copyFileSync(src, join(outDir, "dashboard.html"));
     },
   };
 }
@@ -65,6 +75,9 @@ export default defineConfig(({ mode }) => {
       outDir: share ? "dist/teilen" : "dist",
       target: "es2022",
       sourcemap: false,
+      // the first load is ONE app chunk by design (see `codeSplitting` below); its size is governed by the gzip budgets
+      // of `npm run budget` (scripts/bundleBudget.mjs), not by Vite's raw-size hint
+      chunkSizeWarningLimit: 1800,
       rollupOptions: {
         output: {
           // Chunks (P14): the vendor libraries keep their own chunks (lightweight-charts is reached through lazy

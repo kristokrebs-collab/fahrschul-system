@@ -4,16 +4,16 @@
  * and the step-up at the next login, export, account deletion (journal stays local), the honest "Cloud nicht
  * eingerichtet" state, 390-px layout.
  *
- * The app must be built / served with the mock project as its cloud:
- *   VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e
- * Until P14 registers the `konto` page the spec opens the dev harness `/dev/konto.html` (vite dev server); set
- * `PW_KONTO_URL=/#konto` once the page is routed. `P09_SHOTS_DIR` also writes review screenshots.
+ * Runs on `/#konto` of the cloud edition (the production build against the mock project, `cloudUrl` in helpers.ts:
+ * `VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e`); the "without
+ * cloud" case on `/#konto` of the default build. `PW_KONTO_URL` overrides the cloud URL (e.g. the dev harness
+ * `/dev/konto.html`). `P09_SHOTS_DIR` also writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, fixture, seed, stored, toast } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, stored, toast } from "./helpers";
 import { mockSupabase, TOTP_CODE, type MockSupabase } from "./mocks/supabase";
 
-const KONTO_URL = process.env.PW_KONTO_URL ?? "/dev/konto.html";
+const KONTO_URL = process.env.PW_KONTO_URL ?? cloudUrl("konto");
 const SHOTS = process.env.P09_SHOTS_DIR;
 const EMAIL = "trader@example.com";
 const PASSWORD = "richtig-geheim-42";
@@ -28,9 +28,8 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
   await page.screenshot({ path: `${SHOTS}/P09-cloud-${name}-${info.project.name}.png`, animations: "disabled" });
 }
 
-async function open(page: Page, query = ""): Promise<void> {
-  await page.goto(`${KONTO_URL}${query}`);
-  await expect(page.getByRole("heading", { level: 1, name: "Konto" })).toBeVisible({ timeout: 30_000 });
+async function open(page: Page, url = KONTO_URL): Promise<void> {
+  await openRoute(page, url, "Konto", { timeout: 30_000 });
 }
 
 /** The sheet body is inert while the panel still morphs out of the pill – wait until it takes input. */
@@ -133,17 +132,14 @@ test.describe("Konto & Cloud", () => {
     await sb.emit("trade", second, { deletedAt: "2026-10-12T09:31:00.000Z" }, true);
     await expect.poll(async () => ((await stored<Array<{ id: string }>>(page, "tj2-trades")) ?? []).some((t) => t.id === second), { timeout: 10_000 }).toBe(false);
 
-    // a local write through the store API (as the trade editor does; the dev harness exposes the store) goes up at once
-    const hooked = await page.evaluate(() => "__tjJournal" in window);
-    if (hooked) {
-      await page.evaluate(async (id) => {
-        type Store = { getState(): { trades: Array<Record<string, unknown>>; saveTrade(t: unknown): Promise<void> } };
-        const store = (window as unknown as { __tjJournal: Store }).__tjJournal;
-        const t = store.getState().trades.find((x) => x.id === id)!;
-        await store.getState().saveTrade({ ...t, notes: "am Rechner", updatedAt: new Date().toISOString() });
-      }, first);
-      await expect.poll(() => (sb.live(`trade:${first}`) as { notes?: string } | undefined)?.notes, { timeout: 10_000 }).toBe("am Rechner");
-    }
+    // a local write through the store API (as the trade editor does; the e2e hook exposes the store) goes up at once
+    await page.evaluate(async (id) => {
+      type Store = { getState(): { trades: Array<Record<string, unknown>>; saveTrade(t: unknown): Promise<void> } };
+      const store = (window as unknown as { __tjJournal: Store }).__tjJournal;
+      const t = store.getState().trades.find((x) => x.id === id)!;
+      await store.getState().saveTrade({ ...t, notes: "am Rechner", updatedAt: new Date().toISOString() });
+    }, first);
+    await expect.poll(() => (sb.live(`trade:${first}`) as { notes?: string } | undefined)?.notes, { timeout: 10_000 }).toBe("am Rechner");
     expect(errors).toEqual([]);
   });
 
@@ -212,7 +208,8 @@ test.describe("Konto & Cloud", () => {
   test("without cloud config: an honest card, no login anywhere", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page);
-    await open(page, "?cloud=off");
+    // the default build has no cloud configured
+    await open(page, "/#konto");
     await expect(page.getByText("Login und Sync sind in dieser Version nicht aktiv.", { exact: false })).toBeVisible();
     await expect(page.locator("[data-cloud-pill]")).toHaveCount(0);
     await expect(page.getByText("Öffne das Journal über claude.ai", { exact: false })).toBeVisible();

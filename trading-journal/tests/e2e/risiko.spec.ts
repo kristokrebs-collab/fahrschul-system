@@ -12,15 +12,14 @@
  * (settings.risk + settings.discipline), the guard toast after a save, the empty journal, no horizontal scroll at
  * 390 px, no console errors.
  *
- * Until P14 registers the page the spec opens the dev harness `/dev/risiko.html` (Vite dev server, e.g.
- * `npx vite --port 4181` + `PW_BASE_URL`); set `PW_RISIKO_URL=/#risiko` once routed. On a production preview without
- * the harness the tests skip themselves. `P05_SHOTS=<dir>` writes review screenshots.
+ * Runs on the routed page `/#risiko` of the production build (P14; `PW_RISIKO_URL` overrides it, e.g. the dev harness
+ * `/dev/risiko.html` under `npm run dev`). `P05_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
 import { boxFixture } from "./mocks/boxFixture";
 
-const RISIKO_URL = process.env.PW_RISIKO_URL ?? "/dev/risiko.html";
+const RISIKO_URL = process.env.PW_RISIKO_URL ?? "/#risiko";
 const SHOTS = process.env.P05_SHOTS;
 const PROJECTS = ["mobile", "desktop"];
 const DAY = 86_400_000;
@@ -125,7 +124,9 @@ async function routeDaily(page: Page, requests: string[]): Promise<void> {
     const u = new URL(route.request().url());
     const sym = u.searchParams.get("symbol") ?? "";
     if (u.searchParams.get("interval") !== "1d" || !["ETHUSDT", "SOLUSDT", "XRPUSDT"].includes(sym)) return route.fallback();
-    requests.push(sym);
+    // the correlation's own fetches (`multiDaily`: one page of DAILY_LIMIT = 99 candles); the box scanner of the app
+    // (P02, watchlist, 300 daily candles with its own budget) is served the same series but not counted here
+    if (u.searchParams.get("limit") === "99") requests.push(sym);
     const limit = Number(u.searchParams.get("limit") ?? 99);
     const driver = rng(7);
     const own = rng(sym.charCodeAt(0) * 31 + sym.length);
@@ -161,14 +162,8 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P05-risk-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-async function openRisiko(page: Page): Promise<boolean> {
-  const res = await page.goto(RISIKO_URL);
-  if (!res || !res.ok()) return false;
-  return page
-    .getByRole("heading", { level: 1, name: "Risiko" })
-    .waitFor({ timeout: 20_000 })
-    .then(() => true)
-    .catch(() => false);
+async function openRisiko(page: Page): Promise<void> {
+  await openRoute(page, RISIKO_URL, "Risiko");
 }
 
 test.describe("Risiko", () => {
@@ -185,7 +180,7 @@ test.describe("Risiko", () => {
     await seed(page, { boxes: true, extra: { "tj2-trades": riskTrades(now, live) } });
     const daily: string[] = [];
     await routeDaily(page, daily);
-    test.skip(!(await openRisiko(page)), "the Risiko page is served by the dev harness (Vite dev server) until P14 routes it");
+    await openRisiko(page);
     await expect(page.getByTestId("risiko-view")).toBeVisible();
 
     // live limits: day loss 160 of 200 (warn), the pause after two losses, rings for the other limits
@@ -283,7 +278,7 @@ test.describe("Risiko", () => {
     const live = boxFixture(now).live;
     await seed(page, { boxes: true, extra: { "tj2-trades": riskTrades(now, live) } });
     await routeDaily(page, []);
-    test.skip(!(await openRisiko(page)), "the Risiko page is served by the dev harness (Vite dev server) until P14 routes it");
+    await openRisiko(page);
 
     // override the pause by holding
     const limits = page.getByTestId("risk-limits");
@@ -323,14 +318,17 @@ test.describe("Risiko", () => {
       const j = (window as unknown as { __tjJournal: { getState(): { saveTrade(t: unknown): Promise<void> } } }).__tjJournal;
       void j.getState().saveTrade({ ...args.t });
     }, { t: base({ side: "long", status: "closed", date: local(now - 5 * 60_000), exitDate: local(now - 60_000), pair: "BTC/USDT", entry: live, stop: live * 0.99, exit: live * 0.995, size: 2000, pnlManual: -30, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }) });
-    await expect(toast(page)).toContainText(/Verluste in Folge|Grenze|Tageslimit/);
+    // the guard's toast joins the island's queue (box alerts of the app may be in front of it)
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { __tjUi: { getState(): { toasts: { title: string; detail?: string }[] } } }).__tjUi.getState().toasts.map((t) => `${t.title} ${t.detail ?? ""}`).join(" | ")), { timeout: 10_000 })
+      .toMatch(/Verluste in Folge|Grenze|Tageslimit/);
     expect(errors).toEqual([]);
   });
 
   test("leeres Journal: ehrliche Leerzustände, keine Fehler", async ({ page }) => {
     const errors = collectErrors(page);
     await seed(page, { empty: true, boxes: true });
-    test.skip(!(await openRisiko(page)), "the Risiko page is served by the dev harness (Vite dev server) until P14 routes it");
+    await openRisiko(page);
     await expect(page.getByTestId("risk-exposure")).toContainText("Keine offenen Positionen");
     await expect(page.getByTestId("risk-margin")).toContainText("Keine Börse verbunden");
     await expect(page.getByTestId("risk-scenario")).toContainText("Keine offenen Positionen");

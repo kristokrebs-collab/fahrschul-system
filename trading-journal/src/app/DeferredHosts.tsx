@@ -18,6 +18,7 @@
  * | `ReplayHost`, `ExcursionBackfillHost` | P06 | trade replay sheet, idle MAE / MFE backfill |
  */
 import type { ReactNode } from "react";
+import { installE2eHooks } from "@/app/e2eHooks";
 import { HostSlot } from "@/app/HostSlot";
 import { useEntitlement } from "@/billing/entitlements";
 import type { Feature } from "@/billing/types";
@@ -29,9 +30,12 @@ import { SocialHost } from "@/social/ui/SocialHost";
 import { navigate } from "@/store/router";
 import { ReportReadyHost } from "@/views/berichte/ReportReady";
 import { CoachWatcher } from "@/views/coach/CoachWatcher";
-import { RiskGuardHost } from "@/views/risiko/guard";
+import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
 import { ReplayHost } from "@/views/trades/replay/TradeReplay";
 import { PostTradeReviewHost } from "@/views/wachstum/PostTradeReview";
+
+// e2e only (`src/app/e2eHooks.ts`): the risk guard's store (override / marks)
+installE2eHooks({ __tjGuard: useRiskGuardStore });
 
 /** Renders a watcher only while the plan includes its feature. */
 function Entitled({ feature, children }: { feature: Feature; children: ReactNode }) {

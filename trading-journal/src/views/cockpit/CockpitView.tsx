@@ -1,5 +1,6 @@
 import { useLimit } from "@/billing/entitlements";
 import { Suspense, useEffect, useMemo, useState, type ComponentType } from "react";
+import { installE2eHooks } from "@/app/e2eHooks";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { cn } from "@/lib/cn";
 import { HoldButton } from "@/motion/HoldButton";
@@ -16,10 +17,12 @@ import { PageHeader } from "@/views/setups/PageHeader";
 import { registerBuiltinWidgets } from "./builtins";
 import { cockpit, MAX_BOARDS, useCockpit, type BoardItem } from "./cockpitStore";
 import { COCKPIT_LEAD_FILL, COCKPIT_STRINGS as S } from "./copy";
-import { getWidget, SPANS, useRegistryVersion, type CockpitWidget } from "./registry";
+import { getWidget, registerWidget, SPANS, useRegistryVersion, type CockpitWidget } from "./registry";
 import { WidgetCatalog } from "./WidgetCatalog";
 
 registerBuiltinWidgets();
+// e2e only (`src/app/e2eHooks.ts`): a spec registers a throwing widget to check the widget error state
+installE2eHooks({ __tjCockpitRegistry: registerWidget });
 
 /** Static class per span (Tailwind needs literal class names). */
 export const SPAN_CLASS: Record<number, string> = {

@@ -2,11 +2,12 @@
  * P13 accessibility (axe-core, WCAG 2.1 A + AA) on everything the package adds, in the dark AND the light theme:
  * the Cockpit page (view + "Anordnen" + the catalog), the search dialog (open + with hits), the shortcut sheet, the
  * onboarding tour, the two settings cards and the error states. Each scan is scoped to the P13 surface (the pages
- * underneath belong to their packages); colour contrast included. Dev harness `/dev/ux.html` (see `uxHarness.ts`).
+ * underneath belong to their packages); colour contrast included. Real routes of the production build (`uxHarness.ts`):
+ * the page error state is a lazy chunk that cannot be loaded, the widget error state a throwing cockpit widget.
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { openUx, themeSettled, UX_PROJECTS, UX_SKIP } from "./uxHarness";
+import { openUx, themeSettled, UX_PROJECTS } from "./uxHarness";
 
 const THEMES = ["dark", "light"] as const;
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -35,7 +36,7 @@ test.describe("Barrierefreiheit (axe)", () => {
 
   for (const theme of THEMES) {
     test(`Cockpit, Anordnen und Katalog (${theme})`, async ({ page }) => {
-      test.skip(!(await openUx(page, "cockpit", "", { theme })), UX_SKIP);
+      await openUx(page, "cockpit", "", { theme });
       await expectAccessible(page, '[data-testid="cockpit"]', "Cockpit");
       await page.getByTestId("cockpit-arrange").click();
       await expectAccessible(page, '[data-testid="cockpit"]', "Cockpit – Anordnen");
@@ -46,7 +47,7 @@ test.describe("Barrierefreiheit (axe)", () => {
     });
 
     test(`Suche und Tastenkürzel (${theme})`, async ({ page }) => {
-      test.skip(!(await openUx(page, "app", "overview", { theme })), UX_SKIP);
+      await openUx(page, "app", "overview", { theme });
       await page.locator("body").press("/");
       const dialog = page.getByRole("dialog", { name: "Suche" });
       await dialog.waitFor();
@@ -65,14 +66,11 @@ test.describe("Barrierefreiheit (axe)", () => {
     });
 
     test(`Einführung (${theme})`, async ({ page }) => {
-      test.skip(
-        !(await openUx(page, "app", "settings", {
+      await openUx(page, "app", "settings", {
           theme,
           empty: true,
           firstRun: true,
-        })),
-        UX_SKIP,
-      );
+        });
       const tour = page.getByRole("dialog", { name: "Einführung" });
       await tour.waitFor({ timeout: 20_000 });
       await expectAccessible(page, '[role="dialog"]:has([data-testid="onboarding"])', "Einführung – Start");
@@ -84,15 +82,13 @@ test.describe("Barrierefreiheit (axe)", () => {
     });
 
     test(`Einstellungskarten und Fehlerzustände (${theme})`, async ({ page }) => {
-      test.skip(!(await openUx(page, "cards", "", { theme })), UX_SKIP);
+      await openUx(page, "cards", "", { theme });
       await themeSettled(page);
       await expectAccessible(page, "main", "Darstellung + Einführung & Hilfe");
-      await page.goto(`/dev/ux.html?view=crash`);
-      await page.getByRole("alert").waitFor();
-      await expectAccessible(page, "main", "Fehler (Seite)");
-      await page.goto(`/dev/ux.html?view=crash-widget`);
-      await page.getByRole("alert").waitFor();
-      await expectAccessible(page, "main", "Fehler (Widget)");
+      await openUx(page, "crash", "", { theme });
+      await expectAccessible(page, '[data-page="analyse"][data-page-role="current"]', "Fehler (Seite)");
+      await openUx(page, "crash-widget", "", { theme });
+      await expectAccessible(page, '[data-widget="e2e-crash"]', "Fehler (Widget)");
     });
   }
 });

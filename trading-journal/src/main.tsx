@@ -3,12 +3,14 @@ import { createRoot } from "react-dom/client";
 import "./styles/base.css";
 import "./styles/themes.css";
 import App from "./App";
+import { installE2eHooks } from "@/app/e2eHooks";
 import { bootMarket } from "@/app/marketBoot";
 import { installThemeTransition } from "@/app/themeTransition";
 import { MotionRoot } from "@/motion/MotionRoot";
-import { bootJournal } from "@/store/journalStore";
+import { bootJournal, useJournal } from "@/store/journalStore";
 import { installRouter } from "@/store/router";
-import { applyInitialTheme } from "@/store/themeStore";
+import { applyInitialTheme, useTheme } from "@/store/themeStore";
+import { useUi } from "@/store/uiStore";
 
 // Theme (P13) before anything paints: data-theme / accent / color-scheme / metas from localStorage, synchronously – the
 // CSP allows no inline script, so this is the earliest point. Dark (the default) only sets the attributes.
@@ -32,6 +34,8 @@ try {
 void bootJournal();
 installRouter();
 bootMarket();
+// e2e only (flag set by the Playwright seed, `src/app/e2eHooks.ts`): the stores the specs read and write
+installE2eHooks({ __tjJournal: useJournal, __tjUi: useUi, __tjTheme: useTheme });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

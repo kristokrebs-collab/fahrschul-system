@@ -7,21 +7,20 @@
  * Coach: `h1 Coach`, hero (wordmark, lesson, score), German questions with typed answers, evidence and confidence (a
  * suggestion chip, the best setup, the honest fallback), Heute, Leaks & Edges, "Plan übernehmen" (settings.coach.plan),
  * the timeline (filter, opens the trade detail), the profile, the live watcher (a revenge save → toast + live alert)
- * and the trade panel (as P14 mounts it in the trade detail).
+ * and the trade panel in the trade detail (P14 mounts it there; a timeline row opens it).
  * Berichte: "Bericht bereit" (full-screen wipe once, "Bericht öffnen"), `h1 Berichte`, the newest finished week, the
  * period stepper (split flap), month / focus switches, the archive, the seen marker, Markdown export (download) and the
  * PDF print view (print stubbed: the light print document is mounted while printing).
  * Both: the empty journal, no horizontal scroll at 390 px, no console errors.
  *
- * Until P14 registers the pages the spec opens the dev harnesses `/dev/coach.html` and `/dev/berichte.html` (Vite dev
- * server + `PW_BASE_URL`); set `PW_COACH_URL=/#coach` / `PW_BERICHTE_URL=/#berichte` once routed. Without the harness
- * (production preview) the tests skip themselves. `P04_SHOTS=<dir>` writes review screenshots.
+ * Runs on the routed pages `/#coach` and `/#berichte` of the production build (P14; `PW_COACH_URL` / `PW_BERICHTE_URL`
+ * override them, e.g. the dev harnesses under `npm run dev`). `P04_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, openRoute, seed, toast } from "./helpers";
 
-const COACH_URL = process.env.PW_COACH_URL ?? "/dev/coach.html";
-const BERICHTE_URL = process.env.PW_BERICHTE_URL ?? "/dev/berichte.html";
+const COACH_URL = process.env.PW_COACH_URL ?? "/#coach";
+const BERICHTE_URL = process.env.PW_BERICHTE_URL ?? "/#berichte";
 const SHOTS = process.env.P04_SHOTS;
 const PROJECTS = ["mobile", "desktop"];
 const DAY = 86_400_000;
@@ -140,16 +139,9 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P04-coach-reports-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-/** Opens the page; true once its `h1` is in the DOM (a full-screen dialog may hide it from the a11y tree). */
-async function open(page: Page, url: string, h1: string): Promise<boolean> {
-  const res = await page.goto(url);
-  if (!res || !res.ok()) return false;
-  return page
-    .locator("h1", { hasText: h1 })
-    .first()
-    .waitFor({ state: "attached", timeout: 20_000 })
-    .then(() => true)
-    .catch(() => false);
+/** Opens the page once its `h1` is in the DOM (a full-screen dialog may hide it from the a11y tree). */
+async function open(page: Page, url: string, h1: string): Promise<void> {
+  await openRoute(page, url, h1, { attached: true });
 }
 
 test.describe("Coach", () => {
@@ -163,7 +155,7 @@ test.describe("Coach", () => {
     const errors = collectErrors(page);
     const now = Date.now();
     await seed(page, { extra: { "tj2-trades": coachTrades(now) } });
-    test.skip(!(await open(page, COACH_URL, "Coach")), "the Coach page is served by the dev harness (Vite dev server) until P14 routes it");
+    await open(page, COACH_URL, "Coach");
     const view = page.getByTestId("coach-view");
     await expect(view).toBeVisible();
     await expect(page.getByTestId("coach-hero")).toBeVisible();
@@ -225,7 +217,13 @@ test.describe("Coach", () => {
     await expect(tl.getByTestId("coach-timeline-row").first()).toContainText("Revenge");
     await shot(page, info, "coach-plan-timeline");
     await tl.getByTestId("coach-timeline-row").first().click();
-    await expect(page.getByRole("dialog").first()).toBeVisible();
+    const detail = page.getByRole("dialog", { name: "Trade-Details" });
+    await expect(detail).toBeVisible();
+    // the trade panel (P14 mounts it in the trade detail once the detail settled)
+    const panel = detail.getByTestId("trade-coach-panel");
+    await panel.scrollIntoViewIfNeeded();
+    await expect(panel).toContainText("Coach");
+    await expect(panel).toContainText(/Plan & Ausführung|Verhalten|Regeln/);
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
 
@@ -234,12 +232,6 @@ test.describe("Coach", () => {
     await profile.scrollIntoViewIfNeeded();
     await expect(profile).toContainText(/Stil|Stärkstes Setup|Schwächster Tag/);
     await shot(page, info, "coach-profile");
-
-    // the trade panel (P14 mounts it in the trade detail)
-    const panel = page.getByTestId("trade-coach-panel");
-    await panel.scrollIntoViewIfNeeded();
-    await expect(panel).toContainText("Coach");
-    await expect(panel).toContainText(/Plan & Ausführung|Verhalten|Regeln/);
 
     await expectNoHorizontalScroll(page);
     await shot(page, info, "coach-full", true);
@@ -263,7 +255,7 @@ test.describe("Coach", () => {
   test("leeres Journal: ehrliche Leerzustände, Fragen ohne Raten, keine Fehler", async ({ page }) => {
     const errors = collectErrors(page);
     await seed(page, { empty: true });
-    test.skip(!(await open(page, COACH_URL, "Coach")), "the Coach page is served by the dev harness (Vite dev server) until P14 routes it");
+    await open(page, COACH_URL, "Coach");
     await expect(page.getByTestId("coach-score")).toContainText("Zu wenig Daten");
     await expect(page.getByTestId("coach-chat")).toContainText("nichts wird geraten");
     await page.getByTestId("coach-input").fill("Wie ist meine Win-Rate?");
@@ -286,7 +278,7 @@ test.describe("Berichte", () => {
   test("Bericht bereit, Woche, Zeitraum-Wechsel, Monat, Fokus, Archiv, gesehen, Export Markdown + PDF – no errors, no horizontal scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
     const now = Date.now();
-    await seed(page, { extra: { "tj2-trades": coachTrades(now) } });
+    await seed(page, { reportReady: true, extra: { "tj2-trades": coachTrades(now) } });
     // the print dialog: record that the light print document is mounted at the moment print() is called
     await page.addInitScript(() => {
       const w = window as unknown as { __printed?: { n: number; cls: boolean; doc: boolean; html: string } };
@@ -295,7 +287,7 @@ test.describe("Berichte", () => {
         w.__printed = { n: (w.__printed?.n ?? 0) + 1, cls: document.documentElement.classList.contains("tj-report-printing"), doc: !!root?.querySelector("[data-testid=report-print]"), html: root?.outerHTML ?? "" };
       };
     });
-    test.skip(!(await open(page, BERICHTE_URL, "Berichte")), "the Berichte page is served by the dev harness (Vite dev server) until P14 routes it");
+    await open(page, BERICHTE_URL, "Berichte");
 
     // the period that just ended is announced once (the week – or a month / quarter / year that ended too)
     const ready = page.getByTestId("report-ready");
@@ -388,7 +380,7 @@ test.describe("Berichte", () => {
   test("leeres Journal: kein Bericht bereit, ehrliche Leerzustände, Export gesperrt, keine Fehler", async ({ page }) => {
     const errors = collectErrors(page);
     await seed(page, { empty: true });
-    test.skip(!(await open(page, BERICHTE_URL, "Berichte")), "the Berichte page is served by the dev harness (Vite dev server) until P14 routes it");
+    await open(page, BERICHTE_URL, "Berichte");
     await expect(page.getByTestId("report-ready")).toHaveCount(0);
     await expect(page.getByTestId("report-summary")).toContainText("Keine abgeschlossenen Trades");
     await expect(page.getByTestId("report-archive")).toContainText("Noch kein abgeschlossener Zeitraum");

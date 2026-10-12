@@ -10,14 +10,13 @@
  * run is served from the IndexedDB cache (no new kline requests); cancel; the rule builder; an unreachable Binance gives
  * the honest German hint; no horizontal scroll at 390 px; no console errors.
  *
- * Until P14 registers the page the spec opens the dev harness `/dev/labor.html` (Vite dev server, e.g.
- * `npx vite --port 4182` + `PW_BASE_URL`); set `PW_LABOR_URL=/#labor` once routed. On a production preview without the
- * harness the tests skip themselves. `P07_SHOTS=<dir>` writes review screenshots.
+ * Runs on the routed page `/#labor` of the production build (P14; `PW_LABOR_URL` overrides it, e.g. the dev harness
+ * `/dev/labor.html` under `npm run dev`). `P07_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, fixture, seed } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed } from "./helpers";
 
-const LABOR_URL = process.env.PW_LABOR_URL ?? "/dev/labor.html";
+const LABOR_URL = process.env.PW_LABOR_URL ?? "/#labor";
 const SHOTS = process.env.P07_SHOTS;
 const PROJECTS = ["mobile", "desktop"];
 
@@ -43,16 +42,7 @@ async function open(page: Page, info: TestInfo, opts: { extra?: Record<string, u
   const klines: URL[] = [];
   await seed(page, { boxes: true, extra: { "tj2-labor": { strategy: "box", symbol: "BTCUSDT", period: "6m", boxTf: "4h" }, ...(opts.extra ?? {}) }, onRequest: (u) => u.pathname === "/fapi/v1/klines" && u.searchParams.has("startTime") && klines.push(u) });
   if (opts.block) await page.route("https://fapi.binance.com/fapi/v1/klines**", (r) => r.abort("failed"));
-  const res = await page.goto(LABOR_URL);
-  const served =
-    !!res &&
-    res.ok() &&
-    (await page
-      .getByRole("heading", { level: 1, name: "Labor" })
-      .waitFor({ timeout: 20_000 })
-      .then(() => true)
-      .catch(() => false));
-  test.skip(!served, "the Labor page is served by the dev harness (Vite dev server) until P14 routes it");
+  await openRoute(page, LABOR_URL, "Labor");
   return { errors, klines };
 }
 

@@ -1,5 +1,5 @@
 /**
- * P13 themes end to end (dev harness `/dev/ux.html`, see `uxHarness.ts`):
+ * P13 themes end to end (the integrated app, see `uxHarness.ts`):
  *   - dark stays the default (attributes, `color-scheme`, `theme-color`, the ink page),
  *   - `t` switches to light with the circular reveal, persists, and a reload paints light from the first React commit
  *     (applied in `main.tsx` before the render – no flash, no inline script),
@@ -9,7 +9,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, stored } from "./helpers";
-import { openUx, themeSettled, UX_PROJECTS, UX_SKIP } from "./uxHarness";
+import { openUx, themeSettled, UX_PROJECTS } from "./uxHarness";
 
 const css = (page: Page, name: string, sel = ":root") => page.evaluate(([n, s]) => getComputedStyle(document.querySelector(s!)!).getPropertyValue(n!).trim(), [name, sel] as const);
 
@@ -21,7 +21,7 @@ test.describe("Themes", () => {
 
   test("dark is the default: attributes, color-scheme, theme-color and the ink page", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "overview")), UX_SKIP);
+    await openUx(page, "app", "overview");
     const html = page.locator("html");
     await expect(html).toHaveAttribute("data-theme", "dark");
     await expect(html).toHaveAttribute("data-theme-pref", "dark");
@@ -66,7 +66,7 @@ test.describe("Themes", () => {
       };
       watchRoot();
     });
-    test.skip(!(await openUx(page, "app", "overview")), UX_SKIP);
+    await openUx(page, "app", "overview");
     await page.locator("body").press("t");
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     await themeSettled(page);
@@ -92,7 +92,7 @@ test.describe("Themes", () => {
 
   test("Darstellung: Hell, System following the OS live, an accent", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "cards")), UX_SKIP);
+    await openUx(page, "cards");
     const modes = page.getByRole("radiogroup", { name: "Modus" });
     await modes.getByRole("radio", { name: "Hell" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
@@ -119,7 +119,7 @@ test.describe("Themes", () => {
   });
 
   test("light: text tokens keep their contrast on every plane", async ({ page }) => {
-    test.skip(!(await openUx(page, "cards", "", { theme: "light" })), UX_SKIP);
+    await openUx(page, "cards", "", { theme: "light" });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     const ratios = await page.evaluate(() => {
       const probe = document.createElement("span");
@@ -154,7 +154,7 @@ test.describe("Themes", () => {
 
   test("light overview: the hero stays an ink island, charts on the light ink, no horizontal scroll", async ({ page }) => {
     const errors = collectErrors(page);
-    test.skip(!(await openUx(page, "app", "overview", { theme: "light" })), UX_SKIP);
+    await openUx(page, "app", "overview", { theme: "light" });
     await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
     const hero = page.locator(":has(> [data-hero-backdrop])").first();
     await hero.waitFor();

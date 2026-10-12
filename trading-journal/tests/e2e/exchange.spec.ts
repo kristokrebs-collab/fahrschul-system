@@ -6,19 +6,18 @@
  * (detected format and the mapping assistant); API token; the live positions contract; honest states (server not set
  * up, plan without sync, no cloud).
  *
- * Needs the dev harness `/dev/boerse.html` on a Vite DEV server built with the mock cloud:
- *   VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e npx vite --port 4182
- *   PW_BASE_URL=http://127.0.0.1:4182 npx playwright test exchange.spec.ts --project=mobile --project=desktop
- * Without the harness (production preview) the tests skip themselves. `PW_BOERSE_URL=/#konto` once P14 mounted the
- * cards in Konto; `P11_SHOTS_DIR` writes review screenshots.
+ * Runs on `/#konto` of the cloud edition (the production build against the mock project, `cloudUrl` in helpers.ts),
+ * where P14 mounted the exchange cards; the live positions are checked where P05 consumes them (Risiko → Exposure),
+ * the CSV import is opened from the Börse card (signed out) or from Einstellungen → Daten → Backup importieren (the
+ * default build without cloud). `PW_BOERSE_URL` overrides the cloud URL; `P11_SHOTS_DIR` writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, seed } from "./helpers";
+import { cloudUrl, collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { mockExchange, WRONG_SECRET, type MockExchangeOptions } from "./mocks/exchange";
 import { mockSupabase } from "./mocks/supabase";
 
-const URL_ = process.env.PW_BOERSE_URL ?? "/dev/boerse.html";
+const URL_ = process.env.PW_BOERSE_URL ?? cloudUrl("konto");
 const SHOTS = process.env.P11_SHOTS_DIR;
 const EMAIL = "trader@example.com";
 const PASSWORD = "richtig-geheim-42";
@@ -34,14 +33,16 @@ async function shot(page: Page, info: TestInfo, name: string, target?: Locator):
   else await page.screenshot({ path, animations: "disabled" });
 }
 
-async function open(page: Page, url = URL_): Promise<boolean> {
-  const res = await page.goto(url);
-  if (!res || !res.ok()) return false;
-  return page
-    .getByRole("heading", { level: 1, name: "Konto" })
-    .waitFor({ timeout: 30_000 })
-    .then(() => true)
-    .catch(() => false);
+async function open(page: Page, url = URL_): Promise<void> {
+  await openRoute(page, url, "Konto", { timeout: 30_000 });
+}
+
+/** Switches the page inside the running app (the hash router – no reload). */
+async function goTo(page: Page, hash: string, h1: string): Promise<void> {
+  await page.evaluate((h) => {
+    location.hash = h;
+  }, hash);
+  await expect(page.locator('[data-page-role="current"] h1', { hasText: h1 }).first()).toBeVisible({ timeout: 20_000 });
 }
 
 async function setup(page: Page, ex: MockExchangeOptions = {}, docs?: NonNullable<Parameters<typeof mockSupabase>[1]>["docs"]) {
@@ -88,7 +89,7 @@ test.describe("Börse (P11)", () => {
 
   test("Bitunix verbinden: Anleitung, maskierter Key, falsches Secret, Prüfung, Erstimport im Hintergrund", async ({ page }, info) => {
     const { mx, errors } = await setup(page);
-    test.skip(!(await open(page)), "dev harness not served");
+    await open(page);
     await signIn(page);
     await expect(page.getByTestId("exchange-hero")).toBeVisible();
     await card(page).scrollIntoViewIfNeeded();
@@ -178,7 +179,7 @@ test.describe("Börse (P11)", () => {
       updatedAt: "2026-10-05T11:10:00.000Z",
     };
     const { errors } = await setup(page, { connected: true }, [{ kind: "trade", id: manual.id, data: manual }]);
-    test.skip(!(await open(page)), "dev harness not served");
+    await open(page);
     await signIn(page);
     await expect(page.getByTestId("exchange-connected")).toBeVisible();
 
@@ -224,8 +225,11 @@ test.describe("Börse (P11)", () => {
     );
     expect(all).not.toContain("t_hand_btc");
 
-    // live positions (P05 contract)
-    await expect(page.getByTestId("positions-probe")).toContainText("BTCUSDT");
+    // live positions (P05 contract): the Risiko page's exposure lists the venue's open position
+    await goTo(page, "#risiko", "Risiko");
+    await expect(page.getByTestId("exposure-legs")).toContainText("BTCUSDT", { timeout: 20_000 });
+    await goTo(page, "#konto", "Konto");
+    await expect(page.getByTestId("exchange-connected")).toBeVisible();
 
     // manual sync: nothing new
     await page.getByTestId("exchange-sync").click();
@@ -242,8 +246,10 @@ test.describe("Börse (P11)", () => {
 
   test("CSV-Import: erkanntes Format und Mapping-Assistent", async ({ page }, info) => {
     const { errors } = await setup(page);
-    test.skip(!(await open(page)), "dev harness not served");
-    await page.getByTestId("harness-csv").click();
+    await open(page);
+    // signed out, the Börse card offers the CSV import
+    const csvButton = card(page).getByRole("button", { name: "CSV importieren" });
+    await csvButton.click();
     const sheet = page.getByRole("dialog", { name: "CSV importieren" });
     await expect(sheet).toBeVisible();
     await shot(page, info, "csv-empty");
@@ -263,7 +269,7 @@ test.describe("Börse (P11)", () => {
     await expect.poll(async () => (await journalIds(page)).length).toBe(2);
 
     // unknown German export → mapping assistant pre-filled from the header
-    await page.getByTestId("harness-csv").click();
+    await csvButton.click();
     const de = `Datum;Paar;Richtung;Einstieg;Ausstieg;Menge;Gebühren;Gewinn
 05.10.2026 09:30;SOL/USDT;Long;148,2;151,65;40;4,80;131,95
 `;
@@ -280,7 +286,7 @@ test.describe("Börse (P11)", () => {
   test("API-Token: einmal sichtbar, mit Webhook-URL und Vorlage", async ({ page }, info) => {
     const { errors } = await setup(page);
     await mockBilling(page, { plan: { plan: "premium", status: "active", trialEnd: null } });
-    test.skip(!(await open(page)), "dev harness not served");
+    await open(page);
     await signIn(page);
     const api = page.getByTestId("api-card");
     await api.scrollIntoViewIfNeeded();
@@ -296,7 +302,7 @@ test.describe("Börse (P11)", () => {
 
   test("ehrlich: Server ohne Schlüssel", async ({ page }, info) => {
     const { errors } = await setup(page, { unconfigured: true });
-    test.skip(!(await open(page)), "dev harness not served");
+    await open(page);
     await signIn(page);
     await expect(card(page)).toContainText("noch nicht eingerichtet");
     await expect(card(page).getByRole("button", { name: "CSV importieren" })).toBeVisible();
@@ -306,7 +312,7 @@ test.describe("Börse (P11)", () => {
 
   test("ehrlich: Tarif ohne Börsen-Sync", async ({ page }, info) => {
     const { errors } = await setup(page, { notEntitled: true });
-    test.skip(!(await open(page)), "dev harness not served");
+    await open(page);
     await signIn(page);
     await expect(card(page)).toContainText("ab Pro dabei");
     await expect(card(page).getByRole("button", { name: "Pro freischalten" })).toBeVisible();
@@ -316,9 +322,13 @@ test.describe("Börse (P11)", () => {
 
   test("ohne Cloud: keine Börsen-Karten, CSV-Import geht trotzdem", async ({ page }) => {
     const { errors } = await setup(page);
-    test.skip(!(await open(page, `${URL_}?cloud=off`)), "dev harness not served");
+    // the default build has no cloud: Konto shows no exchange cards …
+    await open(page, "/#konto");
     await expect(page.getByTestId("exchange-card")).toHaveCount(0);
-    await page.getByTestId("harness-csv").click();
+    // … and the CSV import is one tap from Einstellungen → Daten → Backup importieren
+    await goTo(page, "#settings", "Einstellungen");
+    await page.getByRole("button", { name: "Backup importieren" }).click();
+    await page.getByTestId("import-csv").click();
     await expect(page.getByRole("dialog", { name: "CSV importieren" })).toBeVisible();
     expect(errors).toEqual([]);
   });
