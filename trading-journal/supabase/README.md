@@ -8,7 +8,7 @@ single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `sr
 | File | Owner | Content |
 |---|---|---|
 | `migrations/0001_core.sql` | P09 | `profiles`, `journal_docs` (+ Realtime), `rate_hits` + `rate_hit()`, `audit_log`, `app_errors`, `exchange_connections`, `mfa_satisfied()`, `my_sessions()`, `backup_candidates()`, buckets `backups` / `screenshots` (+ own-folder policies) |
-| `migrations/0002_billing.sql` | P10 | `subscriptions`, `referrals`, `affiliate_ledger`, `stripe_events` |
+| `migrations/0002_billing.sql` | P10 | `billing_customers`, `subscriptions`, `team_seats`, `referral_codes`, `referrals`, `affiliate_ledger`, `stripe_events` |
 | `migrations/0003_exchange.sql` | P11 | `sync_runs`, `sync_cursor`, `api_tokens`, `upsert_synced_trade()` – secrets live in `exchange_connections` (0001) |
 | `migrations/0004_social.sql` | P12 | groups, members, shares, comments, feedback, leaderboards |
 
@@ -49,6 +49,27 @@ PGlite 0.3 (Postgres 17) with an `auth` + `storage` shim: `my_sessions()` (own r
 anon refused), `backup_candidates()` (distinct, keyset paging, service role only), bucket creation and the screenshot
 folder policies, the `rev` bump on a tombstone update and a stale optimistic `rev` update matching nothing.
 
+## Rules the schema enforces (0002, billing)
+
+- **Only the service role writes** (Stripe webhook / billing functions). Clients get `select` on their own rows and
+  nothing else; `profiles.plan` / `plan_status` / `trial_end` stay webhook-only (0001 column grants).
+- **`billing_customers`** (user ↔ Stripe customer): no client grant at all.
+- **`subscriptions`** (`id` = Stripe `sub_…`): one row per Stripe subscription with plan, price, interval, seats, amount,
+  period end, cancel / pause state, trial end, `has_payment_method`, `ref_code`; `last_event_at` lets the webhook drop
+  events that arrive out of order. Users read their own rows.
+- **`team_seats`** (`owner_id`, `member_id` unique): a member holds at most one seat; owner and member read the row. The
+  plan of a member is recomputed by `_lib/stripe.ts` `recomputePlan` (own subscription or seat, the better one wins).
+- **`referral_codes`** (`code` = `^[A-Z0-9]{6,12}$`, optional `commission_pct` for affiliates – set by the owner in SQL),
+  **`referrals`** (one per referred user, `referred_id` is not readable by the referrer – column grants), **`affiliate_ledger`**
+  (credits / commissions, unique per `(stripe_invoice_id, kind)` so a retried webhook never pays twice; the invoice id is
+  not client-readable).
+- **`stripe_events`** (`id` = `evt_…`): webhook idempotency – processed, attempts, last error; service role only.
+- Account deletion: the referrer keeps the history (`referred_id` → `null`), everything else of the user cascades.
+
+0002 was checked on PGlite (Postgres 17) with the 0001 shims (`scratchpad` script, not committed): own-row visibility
+for every table, refused client writes, hidden columns (`referred_id`, `stripe_invoice_id`), the code / id checks, the
+ledger uniqueness and the `on delete set null` of `referrals`.
+
 ## External setup (dashboard)
 
 1. Project in the **EU (Frankfurt)** region; sign the DPA (AVV).
@@ -59,3 +80,11 @@ folder policies, the `rev` bump on a tombstone update and a stale optimistic `re
 4. **Storage** (P06 / P09): bucket `screenshots` (private, object path `<auth.uid()>/<file>`, policies select/insert/
    delete own folder) and bucket `backups` (private, service role only, 14-day retention by `backup-nightly`).
 5. Env vars: see `.env.example` (server values as Netlify secrets, scope Functions, never `VITE_`-prefixed).
+6. **Stripe** (P10, test mode first): products **Pro**, **Premium**, **Team** (per seat) with a monthly and a yearly
+   recurring price each → `STRIPE_PRICE_<PLAN>_<MONTHLY|YEARLY>`; webhook endpoint `/api/v1/stripe/webhook` with the events
+   `checkout.session.completed`, `customer.subscription.created/updated/deleted/paused/resumed/trial_will_end`,
+   `invoice.paid`, `invoice.payment_failed` → `STRIPE_WEBHOOK_SECRET`; **Customer Portal**: allow cancellation (at period
+   end, with reasons), payment-method update, invoice history and **switching between the six prices** (the "Wechseln"
+   button deep-links there); promotion codes for coupons (the pricing page checks them live); tax / invoice settings
+   (German invoices, optional `STRIPE_AUTOMATIC_TAX=true`). A comp plan for the owner: `update profiles set plan = 'premium'
+   where id = '<uuid>'` (stays until a webhook for that user rewrites it).
