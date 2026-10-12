@@ -17,7 +17,7 @@ import { authErrorText, type AuthErrorText } from "./authErrors";
 import { cloudConfig, type OAuthProvider } from "./env";
 import { ACCOUNT_PRIVACY_KEYS, onPrivacyChange, parsePrivacy, setPrivacy, usePrivacy, type PrivacyPrefs } from "./privacy";
 import { openAuthSheet, SIGNED_OUT, useCloudSession } from "./session";
-import { startSyncController } from "./sync/controller";
+import { activeSync, startSyncController } from "./sync/controller";
 import type { MfaFactor } from "./types";
 
 let client: SupabaseClient | null = null;
@@ -314,7 +314,11 @@ export async function enrollTotp(friendlyName = "Authenticator"): Promise<Action
     const name = `${friendlyName} ${new Date().toISOString().slice(0, 10)}`;
     const { data, error } = await sb.auth.mfa.enroll({ factorType: "totp", friendlyName: name });
     if (error || !data) return fail(error);
-    const qr = data.totp.qr_code.startsWith("data:") ? data.totp.qr_code : `data:image/svg+xml;utf-8,${encodeURIComponent(data.totp.qr_code)}`;
+    // supabase-js prefixes the raw SVG with `data:image/svg+xml;utf-8,` unencoded – re-encode so `#` / `%` in the
+    // markup cannot break the URL
+    const raw = data.totp.qr_code;
+    const body = raw.startsWith("data:") ? raw.slice(raw.indexOf(",") + 1) : raw;
+    const qr = body.trimStart().startsWith("<") ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(body)}` : raw;
     return { ok: true, value: { factorId: data.id, qr, secret: data.totp.secret, uri: data.totp.uri } };
   } catch (e) {
     return fail(e);
@@ -353,6 +357,14 @@ export async function unenrollTotp(factorId: string): Promise<ActionResult> {
   } catch (e) {
     return fail(e);
   }
+}
+
+/** "Jetzt synchronisieren": full reconcile of the running sync (false when none runs). */
+export async function syncNow(): Promise<boolean> {
+  const a = activeSync();
+  if (!a) return false;
+  await a.engine.syncNow();
+  return true;
 }
 
 /* ------------------------------------------------------------------ sessions */

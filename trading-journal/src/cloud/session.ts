@@ -20,6 +20,12 @@ export interface AuthSheetState {
   email: string;
   /** Short line under the title (e.g. after the reset link was used). */
   notice: string | null;
+  /** True from the first open on: the lazy sheet stays mounted so its exit animation can run. */
+  mounted: boolean;
+  /** The view before the current one (slide direction of the switch). */
+  prev: AuthView;
+  /** What the `sent` view talks about. */
+  sent: "magic" | "reset" | "confirm";
 }
 
 export interface CloudSessionState {
@@ -37,7 +43,7 @@ export interface CloudSessionState {
   sheet: AuthSheetState;
 }
 
-const SHEET_CLOSED: AuthSheetState = { open: false, view: "signin", source: "card", email: "", notice: null };
+const SHEET_CLOSED: AuthSheetState = { open: false, view: "signin", source: "card", email: "", notice: null, mounted: false, prev: "signin", sent: "magic" };
 
 export const SIGNED_OUT: Omit<CloudSessionState, "phase" | "sheet"> = {
   user: null,
@@ -65,7 +71,7 @@ export function useCloudUserState(): CloudUser | null {
 export function openAuthSheet(view?: AuthView, source: AuthSheetSource = "card"): void {
   const s = useCloudSession.getState();
   const next: AuthView = view ?? (s.phase === "signedIn" ? (s.needsMfa ? "mfa" : "account") : "signin");
-  useCloudSession.setState({ sheet: { ...s.sheet, open: true, view: next, source, notice: null } });
+  useCloudSession.setState({ sheet: { ...s.sheet, open: true, view: next, prev: next, source, notice: null, mounted: true } });
 }
 
 export function closeAuthSheet(): void {
@@ -74,9 +80,9 @@ export function closeAuthSheet(): void {
 }
 
 /** Switches the open sheet to another view (keeps the typed e-mail). */
-export function setAuthView(view: AuthView, patch: Partial<Pick<AuthSheetState, "email" | "notice">> = {}): void {
+export function setAuthView(view: AuthView, patch: Partial<Pick<AuthSheetState, "email" | "notice" | "sent">> = {}): void {
   const s = useCloudSession.getState();
-  useCloudSession.setState({ sheet: { ...s.sheet, ...patch, view } });
+  useCloudSession.setState({ sheet: { ...s.sheet, ...patch, view, prev: s.sheet.view } });
 }
 
 /** Remembers the e-mail typed in any view. */

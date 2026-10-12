@@ -11,6 +11,8 @@ import { hasClaudeRuntime } from "@/store/capability";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { IS_FILE_BUILD } from "@/edition";
+import { cloudEnabled } from "@/cloud/env";
+import { openAuthSheet, useCloudSession } from "@/cloud/session";
 
 export const LOCAL_BANNER_STRONG = "Lokaler Modus.";
 export const LOCAL_BANNER_TEXT =
@@ -32,6 +34,16 @@ export const NO_STORAGE_TEXT =
   " Dieser Browser erlaubt hier keinen dauerhaften Speicher, Änderungen gehen beim Schließen verloren. Importiere dein Backup (JSON), arbeite weiter und exportiere es vor dem Schließen wieder. Dauerhaft speichern: Datei in Chrome öffnen oder den Web-Link nutzen.";
 export const NO_STORAGE_IMPORT = "Backup importieren";
 export const NO_STORAGE_EXPORT = "Backup exportieren";
+
+/**
+ * NEW (P09): with a configured cloud the claude.ai sentence would be wrong – the banner points to the login instead
+ * (signed out), to the paused sync, or to the missing 2FA code (signed in, store still local).
+ */
+export const CLOUD_BANNER_TEXT = " Trades bleiben nur in diesem Browser. Melde dich an, dann ist dein Journal auf allen Geräten synchron.";
+export const CLOUD_BANNER_PAUSED = " Du bist angemeldet, aber Sync ist auf diesem Gerät pausiert. Einschalten unter Konto → Datenschutz.";
+export const CLOUD_BANNER_LOCKED = " Gib deinen 2FA-Code ein, dann startet der Sync.";
+export const CLOUD_BANNER_SIGN_IN = "Anmelden";
+export const CLOUD_BANNER_CODE = "Code eingeben";
 
 /** True when nothing persists in this browser (local mode on the session-only store). */
 export function useNoStorage(): boolean {
@@ -72,6 +84,13 @@ export function LocalModeBanner() {
   const reduced = useReducedFx();
   const netlify = !hasClaudeRuntime();
   const [importOpen, setImportOpen] = useState(false);
+  // P09: cloud configured on this web build → the banner talks about the login instead of claude.ai
+  const cloud = netlify && !IS_FILE_BUILD && cloudEnabled();
+  const authPhase = useCloudSession((s) => s.phase);
+  const needsMfa = useCloudSession((s) => s.needsMfa);
+  const cloudText = authPhase === "signedIn" ? (needsMfa ? CLOUD_BANNER_LOCKED : CLOUD_BANNER_PAUSED) : CLOUD_BANNER_TEXT;
+  const cloudAction =
+    authPhase === "signedIn" ? (needsMfa ? { label: CLOUD_BANNER_CODE, view: "mfa" as const } : null) : authPhase === "signedOut" || authPhase === "idle" ? { label: CLOUD_BANNER_SIGN_IN, view: "signin" as const } : null;
   return (
     <>
       <AnimatePresence initial={false} mode="popLayout">
@@ -111,8 +130,15 @@ export function LocalModeBanner() {
                 }
               >
                 <strong className="font-semibold">{IS_FILE_BUILD ? FILE_BANNER_STRONG : LOCAL_BANNER_STRONG}</strong>
-                {IS_FILE_BUILD ? FILE_BANNER_TEXT : LOCAL_BANNER_TEXT}
-                {!IS_FILE_BUILD && netlify && LOCAL_BANNER_NETLIFY}
+                {IS_FILE_BUILD ? FILE_BANNER_TEXT : cloud ? cloudText : LOCAL_BANNER_TEXT}
+                {!IS_FILE_BUILD && netlify && !cloud && LOCAL_BANNER_NETLIFY}
+                {cloud && cloudAction && (
+                  <span className="mt-2.5 flex flex-wrap gap-2">
+                    <Button size="sm" className="touch-hit" onClick={() => openAuthSheet(cloudAction.view, "banner")}>
+                      {cloudAction.label}
+                    </Button>
+                  </span>
+                )}
               </WarnBanner>
             )}
           </motion.div>
