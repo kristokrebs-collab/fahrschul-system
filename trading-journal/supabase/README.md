@@ -1,4 +1,4 @@
-# `supabase/` – database schema for login, sync, billing and exchange sync
+# `supabase/` – database schema for login, sync, billing, exchange sync and community
 
 Local-first stays the default: without `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` (and always in the
 single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `src/cloud`).
@@ -10,7 +10,7 @@ single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `sr
 | `migrations/0001_core.sql` | P09 | `profiles`, `journal_docs` (+ Realtime), `rate_hits` + `rate_hit()`, `audit_log`, `app_errors`, `exchange_connections`, `mfa_satisfied()`, `my_sessions()`, `backup_candidates()`, buckets `backups` / `screenshots` (+ own-folder policies) |
 | `migrations/0002_billing.sql` | P10 | `billing_customers`, `subscriptions`, `team_seats`, `referral_codes`, `referrals`, `affiliate_ledger`, `stripe_events` |
 | `migrations/0003_exchange.sql` | P11 | `exchange_connections` + `journal_account`, `sync_enabled`, `meta`; `sync_runs`, `sync_cursor`, `api_tokens`, `upsert_synced_trade()` / `upsert_synced_trades()` – secrets stay in `exchange_connections` (0001) |
-| `migrations/0004_social.sql` | P12 | groups, members, shares, comments, feedback, leaderboards |
+| `migrations/0004_social.sql` | P12 | `groups`, `group_members` (role, `share_level`), `social_profiles` (pseudonyms), `group_invites`, `group_reviews`, `comments`, `group_goals`, `shares`, `feedback`, `member_stats`, `leaderboard_snapshots`, `community_stats`; helpers `is_group_member()`, `group_role()`, `shares_group_with()`, `can_see_review()`, `shared_payload()`, `social_candidates()` |
 
 Apply with the Supabase CLI (`supabase db push`) or paste each file into the SQL editor. Every migration runs once;
 never edit an applied migration – add a new one.
@@ -95,6 +95,37 @@ ledger uniqueness and the `on delete set null` of `referrals`.
 own-row visibility and refused client writes for the three tables, hidden `token_hash` / `meta` / secrets, the hash /
 scope / `journal_account` checks, insert → unchanged → updated → tombstone results of `upsert_synced_trade` (FILL never replaces a value),
 the 200-item limit, `execute` refused for `authenticated`, and the cascades on connection and user deletion.
+
+## Rules the schema enforces (0004, community)
+
+- **Opt-in only.** Nobody is ranked unless `profiles.privacy.leaderboard = true`; nobody's figures reach a group unless
+  their membership says `share_level = 'stats'`; a trade leaves the journal only when its owner posts or shares it.
+  People appear under a generated pseudonym (`social_profiles`, "Stiller Falke 27", checked by a pattern), never under
+  an e-mail or display name.
+- **RLS via membership** on every table, through `security definer` helpers with an empty `search_path`
+  (`is_group_member`, `group_role`, `shares_group_with`, `can_see_review` – no policy recursion) plus the restrictive
+  `mfa_satisfied()` policy. Members read their groups, co-members and co-members' pseudonyms; in a **mentor** group a
+  student sees only their own reviews and the mentors; invites are readable by owners / mentors only; shares,
+  feedback, goals and `member_stats` only by their owner(s). **All writes run through the functions** (service role) so
+  rate limits, redaction, mentions and seat rules hold – clients have no insert / update / delete grant.
+- **Redacted content only.** `group_reviews.payload` / `shares.payload` are JSON objects ≤ 16 KiB that the functions
+  validated against the strict schemas of `src/social/contract.ts` (no money, size, fees, notes, account); share tokens
+  are 22-char base64url (`^[A-Za-z0-9_-]{22}$`), readable publicly only through `shared_payload(token)` (service role:
+  not revoked, not expired, counts a view).
+- **k-anonymity.** `community_stats` refuses rows with `n < 10` (check constraint) and requires ordered quantiles;
+  `leaderboard_snapshots` has no client grant at all (served by the function after the live opt-in filter).
+  `social_candidates()` (service role) lists only opt-ins and members sharing stats – the nightly aggregate never
+  reads anybody else.
+- **Abuse.** Comments ≤ 1000 chars with ≤ 10 mentions, `hidden` after reports; one report per reporter and target
+  (unique), a report needs a user and a target.
+- **Cascades (DSGVO).** Deleting a user removes their groups (with all content), memberships, pseudonym, reviews,
+  comments, goals, shares, stats, snapshots and feedback; a deleted group takes its members, invites, reviews,
+  comments and goals with it.
+
+0004 was checked on PGlite (Postgres 17) on top of 0001 – 0003 and their shims (`scratchpad` script, not committed):
+co-member visibility vs. strangers, mentor-group visibility, refused client writes on every table, hidden snapshots,
+the token / pseudonym / invite / report checks, `n >= 10`, `shared_payload()` (expired / revoked / views),
+`social_candidates()` (opt-ins only), `execute` refused for `authenticated`, and the cascades on group and user deletion.
 
 ## External setup (dashboard)
 
