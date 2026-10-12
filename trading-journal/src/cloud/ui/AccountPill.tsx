@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { useRef } from "react";
 import { cn } from "@/lib/cn";
 import { StatusPill, type StatusTone } from "@/motion/StatusPill";
 import { radius, spring } from "@/motion/tokens";
@@ -22,6 +23,8 @@ export interface AccountPillProps {
  * - Signed in: a `StatusPill` (`Sync · live`, `Offline`, `2FA-Code fehlt` …) that pings on every realtime patch /
  *   upload (`pingKey`, ≤ 4 pings/s); a tap opens the account panel (same morph).
  * Press: `usePressable` squash. Reduced motion: no morph (the sheet slides), no pings.
+ * While the pill morphs (scaled up to the sheet's box) its `touch-hit` ::after is off – scaled ×10 the 44-px tap ring
+ * would reach past the screen edge and widen a phone's layout viewport for the length of the morph.
  */
 export function AccountPill({ className }: AccountPillProps) {
   const phase = useCloudSession((s) => s.phase);
@@ -30,14 +33,18 @@ export function AccountPill({ className }: AccountPillProps) {
   const sync = useSyncStatus((s) => s.phase);
   const pings = useSyncStatus((s) => s.pings);
   const press = usePressable({ scale: 0.95 });
+  const ref = useRef<HTMLButtonElement>(null);
   if (!cloudEnabled() || phase === "off") return null;
   const signedIn = phase === "signedIn";
   const pill = syncPill(sync, phase);
   return (
     <motion.button
+      ref={ref}
       type="button"
       layoutId={AUTH_LAYOUT_ID}
       layoutDependency={sheetFromPill}
+      onLayoutAnimationStart={() => ref.current?.setAttribute("data-morph", "")}
+      onLayoutAnimationComplete={() => ref.current?.removeAttribute("data-morph")}
       onClick={() => openAuthSheet(undefined, "pill")}
       aria-label={signedIn ? PILL.accountLabel(email) : PILL.signIn}
       aria-haspopup="dialog"
@@ -46,7 +53,7 @@ export function AccountPill({ className }: AccountPillProps) {
       transition={{ layout: spring.sheet, ...press.transition }}
       style={{ borderRadius: radius.pill, visibility: sheetFromPill ? "hidden" : "visible" }}
       className={cn(
-        "touch-hit inline-flex h-9 shrink-0 items-center gap-2 border px-1.5 text-[12.5px] font-medium transition-colors",
+        "touch-hit inline-flex h-9 shrink-0 items-center gap-2 border px-1.5 text-[12.5px] font-medium transition-colors data-[morph]:after:hidden",
         signedIn ? "border-line bg-ink-900 text-mute hover:border-line-2 hover:text-fg" : "border-line-2 bg-white/[0.04] pl-3 pr-3.5 text-fg hover:bg-white/[0.08]",
         className,
       )}
