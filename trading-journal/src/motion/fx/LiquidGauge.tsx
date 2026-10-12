@@ -93,6 +93,7 @@ export function LiquidGauge({ value, danger = LIQUID_GAUGE.danger, tone = "fg", 
 
   useLayoutEffect(() => {
     const e = eng.current;
+    // motion-exception: liquid-gauge — hand-rolled loop (transforms only) while the level / wave moves (README)
     const loop = createFrameLoop((dt) => {
       if (!e.active) return false;
       stepSpring(e.s, e.target, spring.liquid, dt);

@@ -46,6 +46,19 @@ Helpers (all from `@/primitives`):
 | `rollValue.ts` | `parseRollValue`, `formatRoll` | toast win-value roll |
 | `heroField.ts` | `createField`, `stepField`, `FIELD_*` | pure flicker state for `HeroBackdrop` |
 
+## Effect kit for feature pages (`@/motion/fx`, P01)
+
+The primitives stay the building blocks; the creative one-shot effects of the feature pages live in `@/motion/fx` (contracts in
+`src/motion/README.md` → "fx kit") and the reusable pulse ports in `@/motion/pulse` (`ScrubTimeline`, `MilestoneRail`,
+`MagnifyRow`, `FullscreenWipe`, `GlyphZoom`, `ReelWindow`, `CardSpread`, `OrbitSpread`, `LaunchGrid`). They pair with the
+primitives like this:
+- `BorderBeam fire` (a lap around a card) + `SpotlightSweep` (one red line across it) for a found leak / a breach.
+- `RingGauge marker passColor` (a target) next to `LiquidGauge` (a limit filling towards its red edge).
+- `Sparkline` (small, first-view draw) vs `EquityDraw` (a headline curve with a glowing head, scrub / race via `progress`).
+- `EmptyState`'s ∅ glyph and `DotMatrixText` share the DotMatrix (letters, `/`, arrows since P01).
+- `shakeField` / `HoldConfirm` before a delete, `DissolveOut` for the delete itself.
+- `SplitText` (unused so far) for section titles; `SplitFlap` for period / label switches.
+
 ## Usage snippets
 
 ```tsx

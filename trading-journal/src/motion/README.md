@@ -17,6 +17,14 @@ Declared exceptions (Plan 3.2 rule 1):
   on the floating panel only.
 - Intro stage (`src/intro/portal.ts`) – the glyph-portal camera is a 2D canvas redraw per frame (the pack's technique:
   the wordmark stays a crisp vector at 30×+); one clear + three fills, no layout reads.
+- `// motion-exception: glyph-zoom` (`pulse/GlyphZoom.tsx`, P01) – the same canvas technique for the reusable dive: one
+  clear, one rect, one text fill per frame while the dive moves; asleep at rest, off screen and in hidden tabs.
+- `// motion-exception: radar-sweep` (`fx/RadarSweep.tsx`, P01) – a loop BY DESIGN: the radar wedge turns / the scan band
+  passes (`tween.scan`, 2.4 s linear ∞, CSS `fx-spin` / `fx-scan`, transform only) for exactly as long as a scan runs
+  (`active`), paused off screen (`[data-offscreen]`) – never at idle. Reduced motion: a still wedge.
+- `// motion-exception: liquid-gauge` (`fx/LiquidGauge.tsx`, P01) – a JS frame loop (not a CSS / Motion tween) moves the
+  liquid (`translateY`) and its wave crest (`translateX` + `scaleY`) only while the level / wave moves; it sleeps at rest
+  and jumps to the rest state off screen. Listed because it is a hand-rolled loop – it writes transforms only.
 
 The dock no longer animates layout (transform-only magnification, see `src/app/README.md`), so the former
 `dock-magnify` exception is gone.
@@ -55,10 +63,21 @@ seconds unless noted. Additions over the bundle set:
 | `fxTiming.*` | phosphor rise/fall `.04/.12`, `matrixFps 12`, `fieldEase .45`, scramble `reroll .033 · base .25 · min .35 · max .8` | `DotMatrix`, `HeroBackdrop` (`heroField.ts`), `TextScramble` |
 | `gesture.toastSwipe / toastFlick / toastFling` | `80 px / 500 px·s⁻¹ / 360 px` | toast island drag dismiss + fling-out |
 | `radius.hover 12`, `radius.thumb 8`, `radius.toastStart 22`, `radius.toastEnd 25`, `radius.fab 22` (h/2 of the 44 px disc) | | `HoverPill`, `Segmented`, `Toast`, FAB |
+| `spring.liquid` (P01) | `{90, 12}` (ζ ≈ .63, one small overshoot) | `LiquidGauge` level |
+| `spring.deal` (P01) | `{170, 18, mass .9}` (ζ ≈ .73, ≈ 3.6 % overshoot, ≈ .45 s) | `CardSpread` deal, `HeatGridReveal` cell pop |
+| `tween.sweep` (P01) | `.9 s ease.out` | `SpotlightSweep` (one pass) |
+| `tween.scan` (P01) | `2.4 s linear ∞` – **only while a scan runs** (exception `radar-sweep`) | `RadarSweep` (CSS mirror `.fx-radar__sweep` / `.fx-scan__band`) |
+| `tween.glow` (P01) | `1.6 s easeInOut × 3` | `GlowBreak` halo breathing, `EquityDraw` head after the draw |
+| `tween.streak` / `tween.heat` / `tween.cascade` / `tween.dissolve` / `tween.wave` (P01) | `.9 s` / `.36 s` / `1.2 s` (ease.out) / `.48 s linear` / `1.4 s` | `BreakoutStreak` particle life / `HeatGridReveal` cell fade / `NumberCascade` / `DissolveOut` / `LiquidGauge` wave decay (τ = wave / 4) |
+| `stagger.heat` / `stagger.heatMax` / `stagger.streak` / `stagger.deal` (P01) | `.028` per ring, capped `.42` / `.018` / `.05` | `HeatGridReveal` / `BreakoutStreak` launches / `CardSpread` deal |
+| `fxTiming.cascadeReroll` / `fxTiming.dissolveFps` (P01) | `.045 s` / `20` steps·s⁻¹ | `NumberCascade` rain / `DissolveOut` clip steps |
 
 CSS mirrors (`src/styles/tokens.css` cannot import TS; listed at the end of `tokens.ts`): `.fx-strike` = `tween.collapse`,
 `.fx-pop` = `tween.tooltipIn` / `tween.exit`, `fx-ping` = `tween.pingFew` (3 iterations), `fx-shimmer` = `tween.skeleton`, `fx-spin` = `tween.beam`;
-`.fx-ants` (0.9 s per period) is CSS-only.
+`.fx-ants` (0.9 s per period) is CSS-only; `.fx-radar__sweep` / `.fx-scan__band` / `.fx-radar__blip` = `tween.scan` (2.4 s linear ∞, only
+under `[data-scanning]:not([data-offscreen])`).
+
+Token ownership: only P01 (the motion package) edits `tokens.ts` / `tokens.css`; feature packages ask for new values.
 
 ## Components
 
@@ -203,7 +222,8 @@ Sparkline) only get opacity/translate reveals.
 - `PulseDot { tone?; size?; rings? 1|2; active?; ping?; label? }` – live dot with ping rings; `ping` MotionValue fires a per-trade
   ping ≤ 4 Hz; rings ping 3× (`tween.pingFew`) on start / re-entry, then rest; pause off-screen; aria-hidden unless `label`. `tween.pingFew/ripple/flash`.
 - `DotMatrix` – LED matrix, zero React renders (imperative opacity writes in `frame.render`), useId ids, one glow layer, no aria-live.
-  Presets `text` (5×7 digits), loader, pulse, wave, snake, chevrons; `meter` = scrolling VU from a MotionValue (`signed`: buys up,
+  Presets `text` (5×7 digits, `- − + . , : % /`, upper-case `A–Z` (`I` 3 wide), `↑ ↓ ! ?` – lower case stays blank; the
+  comfortable wrapper is `DotMatrixText` in `@/motion/fx`), loader, pulse, wave, snake, chevrons; `meter` = scrolling VU from a MotionValue (`signed`: buys up,
   sells down; stepped at `sampleMs`, written once per sample, no frame loop in between). Phosphor / step rate from `fxTiming`.
 
 ### Celebration: `Celebrate` · `celebrateFrom(el, { kind, tone })`
@@ -297,26 +317,89 @@ written, never React state; reduced motion shows the final state at once. Every 
 
 | Component | Pack effect | Where it is used |
 | --- | --- | --- |
-| `AsciiCascade` (`color`, `scrambleColor`, `scrambled`, `reserve`, `drop`) | text-ascii-cascade | intro wordmark (starts `scrambled` – never flashes the answer first); header logo click (decode after the replay); MarketPanel scenario lead on a scenario change (`color="inherit"` keeps the tone) |
+| `AsciiCascade` (`color`, `scrambleColor`, `scrambled`, `reserve`, `drop`) | text-ascii-cascade | intro wordmark (starts `scrambled` – never flashes the answer first); header logo click (decode after the replay); `color="inherit"` keeps a tone |
 | `PixelTextFill` | pixel-text-fill | intro statement; page subtitles once per session (`LeadFill`: Trades, Entscheidungsgrundlagen, Einstellungen) |
 | `Typewriter` | text-animate | intro data line (real counts + live price); `EmptyState` line (`line` prop, "Keine Treffer": "Filter lockern oder zurücksetzen.") |
-| `TextMorph` | text-morphing | every string `StatusPill` label; MarketPanel scenario key word |
+| `TextMorph` | text-morphing | every string `StatusPill` label (the MarketPanel shows its pair · source through `TextScramble` and its loading line through `TextShimmer`) |
 | `TextPrism` (`colors`) | text-prism-split | Hero Netto-P&L; lens and copies only on hover devices (touch renders the plain figure, no copies); copies always take their layer colour |
 | `DancingLetters` · `DancingSvgWord` | dancing-letters | header wordmark (hover); footer outline wordmark |
-| `TactileHighlight` (`padX`, `tab`) | tactile-highlight | verdict key words (`VerdictPanel`), scenario key word, `LeadFill` key word – inline places pass `tab={false}` (the 90 ms tab would cross the preceding text) |
+| `TactileHighlight` (`padX`, `tab`) | tactile-highlight | verdict key words (`VerdictPanel`), the "Neuer … Einstieg" marker (`SignalCard`), `LeadFill` key word – inline places pass `tab={false}` (the 90 ms tab would cross the preceding text) |
 | `MorphSelect` | morphing-language-selector | `#f-tf` timeframe, Trades setup filter, `#s-currency` |
 | `Autocomplete` | autocomplete | Trades search (grouped suggestions); `#s-symbol` (Binance futures symbols → `BINANCE:…`) |
 | `NotchedFrame` | notched-project-card | setup cards (CSS in `@layer components`, utilities win) |
 | `WidgetGrid` · `useLift` | draggable-widget-grid | MarketPanel mini tiles (order in `tj2-ui-market-tiles`); RulesCard / SetupEditor checklist lift |
 | `StripWipe` · `playStripWipe` | parallax-strip-slider | chart interval switch (10 strips from an opaque snapshot) |
 | `Marquee` (`paused`) | motion-footer | footer stats band; `paused` follows the footer's reveal hysteresis (hidden at ≤ 50 % in view), so it resumes where it stopped |
+| `ScrubTimeline` (P01) | agent-trace (generalised from `chart/replay.ts`) | session / trade replays, Monte-Carlo runs, a diary – see "P01 ports" below |
+| `MilestoneRail` (P01) | product-timeline | plans, goals, fills, onboarding progress (vertical, horizontal, pinned) |
+| `MagnifyRow` (P01) | dock (magnification remix) | group switchers, shortcut keys |
+| `FullscreenWipe` · `WipeItem` (P01) | immersive-full-screen-navigation | "Bericht bereit", "Ziel erreicht", checkout return, search overlay |
+| `GlyphZoom` (P01) | glyph-portal | share card born from a trade, a new cockpit widget |
+| `ReelWindow` (P01) | reel-collage | screenshot galleries, example setups |
+| `CardSpread` (`deal` / `fan`, P01) | slanted-spread-hero | tariff / setup / strategy cards dealt into their grid; the slanted fan hero |
+| `OrbitSpread` (P01) | cinematic-orbit-hero | coach profile, team / mentor ring |
+| `LaunchGrid` · `LaunchSlot` (P01) | product-launch-hero | pricing hero, onboarding start |
 
 Built on the same engine outside this folder: the intro (`src/intro`, glyph-portal / reel-collage / slanted-spread /
 cinematic-orbit / product-launch), the dock labels + magnification and the command navigation (`src/app`), the
-equity replay scrubber (`src/chart/EquityChart.tsx`) and the Hochrechnung milestone rail (`views/overview`).
+equity replay scrubber (`src/chart/EquityChart.tsx`) and the Hochrechnung milestone rail (`views/overview`). These
+one-off builds stay as they are; the P01 ports below are the reusable versions for new features.
+
+### P01 ports – contracts
+
+Dev gallery: `dev/pulse-ui.html?c=scrub|milestone|magnify|fswipe|glyph|reel|spread|orbit|launch` (`?c=pinned` for the pinned
+rail, `&bare` without the backdrop; demos in `dev/pulse-ports.tsx`). Tests: `tests/unit/pulse.ports.test.tsx`.
+
+| component | props (abridged) | contract |
+| --- | --- | --- |
+| `ScrubTimeline` | `{ label; total; spans?: {id,label,start,duration,tone?,meta?}[]; markers?; time?: MotionValue; defaultTime?; autoPlay?; loop?; playSeconds? (10.4); speeds? ([1,2,4]); step?; bigStep?; formatTime?; onCommit?; transport?; title? }` | Everything is a pure function of `time` (`spanProgress`, `scrubKey`, `timeAtX`, `playStep`): playhead, `scaleX` bars, rows waking up (opacity .45 → 1), readout and `aria-valuenow` are written on change, zero React renders. Scrub = 1:1 pointer (coalesced, one rect read per gesture); Play from the rAF clock, stops at the end (or `loop`), sleeps off screen. `role="slider"` (arrows / Shift / Page / Home / End, Space = play). Subscribe your chart to the same `time`. Clips its horizontal overflow (`overflow-x: clip`). Reduced motion: no auto-play. |
+| `MilestoneRail` | `{ items: {id,title,date?,text?,tone?}[]; orientation? ("vertical"\|"horizontal"); pinned?; active?; label }` | First view: the rail draws segment by segment (`tween.draw` split, capped), dots pop (`spring.pop`), copy rises from a mask; the active dot pings 3× (`.fx-ping`). `pinned` (horizontal): sticky section, track = page scroll (smoothed `1 − e^(−12·dt)`), stems `p^2.2`, reveal 74 % → 49 % of the viewport; geometry on resize only. `<ol>` + `aria-current="step"`. Reduced motion: static (pinned → horizontal row). |
+| `MagnifyRow` | `{ items: {id,label,icon,onSelect?,active?,disabled?}[]; label; size? (44); gap? (6); magnify? (.8); showLabels? }` | Windowed Gaussian bell (`magnifyBell`, σ 48, window 140 px), symmetric widening (`magnifyLayout`), transform only, pointer on `spring.dock`, amount 400 / 20; labels rise 6 px. `role="toolbar"`, roving focus (arrows / Home / End; keyboard focus magnifies like a hover). Hover devices only; reduced motion: none. Leave ≈ 40 px of room left / right of the row (the magnified items widen it by transform). |
+| `FullscreenWipe` / `WipeItem` | `{ open; onClose; label; children; curtain? (true); autoCloseMs?; closeLabel? ("Schließen") }` / `{ index; children }` | Portalled `role="dialog"` (`useDialogBehaviour`; the session ends with the close). Red signal curtain 80 ms ahead, black panel wipes in (800 ms, `cubic-bezier(.76,0,.24,1)`, shell + counter-translate), items fade up 24 px from 620 ms (`wipeItemDelay`), out to the right. `autoCloseMs` + `.fx-countdown` hairline. z-index 77 / 78 (under the confetti layer). Reduced motion: instant fade. |
+| `GlyphZoom` | `{ word; letter?; open? \| progress?: MotionValue; duration? (1.6); wallColor?; portal?; children; label }` | Canvas wall with the word punched out (exception `glyph-zoom`); dive point = deepest stroke point (`deepestPoint`, distance transform, once per layout), end scale just covers the stage, curves `glyphCamera` (pack keys). Content `inert` + aria-hidden until covered (`data-covered`), then interactive; the portal colour fades into it. Reduced motion: the wall fades. |
+| `ReelWindow` | `{ reels; lines: [string,string]; swapLines?; cards?; play?; playOnView? (true); loop?; label }` | Hard cuts (`reelStart`, faster first), collapse `scaleY` 340 ms, line swap, spread 440 ms (`collapseAt`, `spreadAt`) – pure functions of time, one timeline (pauses off screen), container units (`cqw`/`cqh`, no measuring). Rests on the tableau (finite; `loop` opt-in). `figure` + `label`, the swapped lines in `figcaption`. 4:3 below `sm`. Reduced motion: the tableau. |
+| `CardSpread` | `{ variant? ("deal"\|"fan"); children; cards? (fan); play?; playOnView?; open?; onOpenChange?; autoplay?; label?; itemClassName? }` | `deal`: YOUR grid; one layout read per deal, cards start as a slanted deck (±4°, .86) and are dealt on `spring.deal` (`stagger.deal`), ending at `transform: none`. `fan`: the pack hero (−13°, spring 14 / 7.5, headline fades 10 → 80 %), `role="button"` + `aria-expanded`. Reduced motion: final layout / open fan. |
+| `OrbitSpread` | `{ items; children; trigger? ("view"\|"click"\|"manual"); open?; label; listLabel? }` | Fan → elliptical ring on the measured curve (`orbitProgress`, 2.8 s), depth scale / z-order (`orbitPose`), copy opacity + scale .9 → 1, pointer drift by depth (20 / 9), ←/→ turn one slot (70 / 15). Container units, transforms only, z-index written on change. `role="group"`, the cards a `<ul>`. 4:3 below `sm`. Reduced motion: open ring, no drift. |
+| `LaunchGrid` / `LaunchSlot` | `{ children; slots?; cards?; aside?; hud?; play?; playOnView?; label }` | `launchAt(v)`: dot grid lights radially (clip-path circle), square marker turns in (finite spin), `LaunchSlot` cuts through `slots` (0.4 s) to the last, cards fly in (k 8.5) and collapse onto the hero card, prismatic camera turn and back (rotateY, ends `none`), `aside` flies in (ω 7.3), `hud` blurs in (no blur under safe-fx). ≈ 4.1 s, then rest. `section` + `label`; layout by CSS grid. Reduced motion: the rest frame. |
 
 Intro gating: first-view effects inside an overview cell wait for `useIntroLanded()` / `useIntroGate()`
 (`src/intro/introStore.ts`); `TactileHighlight playOnView` does this itself.
+
+## fx kit (`src/motion/fx`, barrel `@/motion/fx`, P01)
+
+Creative one-shot effects for the feature pages, built to the same contract as everything above: transform / opacity /
+filter / clip-path only, timings from `tokens.ts` (measured or tuning values in an exported config object per file),
+`useReducedFx` → the static end state, no blur under `html[data-safe-fx]`, finite (the one loop, `RadarSweep`, only
+while a scan runs), canvas through `createFrameLoop` / `createTimeline` (asleep off screen and in hidden tabs), live values
+as MotionValues, decorative layers `aria-hidden` with the real value kept accessible, never `aria-live`. Shared runtime:
+`shared.ts` (`FX_TONE` / `FX_HEX` – red stays the one accent –, `playWaapi`, `useFxPlay(ref, play, playOnView, enabled,
+run)`: replay key + once on first view, intro-gated), `curve.ts` (`monotoneCurve`, `expApproach`, `smoothstep`,
+`progressIn`, `easeInOutCubic`). Dev gallery: `dev/pulse-fx.html?c=<id>&bare` (text effects also in
+`dev/pulse-text.html?c=flap|coach|cascade|matrix`); tests: `tests/unit/motion.fx.test.tsx`.
+
+| effect | props (abridged) | what / tokens | reduced · safe-fx |
+| --- | --- | --- | --- |
+| `GlowBreak` | `{ x?, y?: number \| MotionValue; tone? ("win"\|"loss"\|"soft"); size?; rings? (0–3); play?; playOnMount? }` | DOM glow pinned to a chart point (place it in a `relative` overlay): halo breathes 3× (`tween.glow`), sonar rings 3× each (`tween.pingFew`, staggered), WAAPI, pre-rendered gradients | resting glow, no rings · no filter used |
+| `BreakoutStreak` | `{ direction? ("up"\|"down"\|"left"\|"right"); tone?; count? (≤ 40); play?; playOnMount?; origin?; spread?; seed?; onDone? }` | Canvas chevrons (`›` + echo) in the breakout direction, seeded (`streakParticles`, `streakAt`), launched `stagger.streak`, life `tween.streak`, then the canvas clears and sleeps | nothing drawn |
+| `RadarSweep` | `{ active; variant? ("radar"\|"band"); tone?; size?; label? }` | Radar scope (wedge + blips) or a scan band over its parent; CSS loop only under `[data-scanning]`, paused off screen (exception `radar-sweep`) | still wedge / static tint |
+| `LiquidGauge` | `{ value: number \| MotionValue; danger? (.8 \| null); tone?; shape? ("tank"\|"round"); label; valueText?; children? }` | `role="meter"`; level on `spring.liquid`, wave kick + decay (`waveKick`, `waveDecay`, `tween.wave`), red crossfade + dashed edge above `danger`; rises from empty on first view; loop asleep at rest (exception `liquid-gauge`) | level jumps, no wave |
+| `EquityDraw` | `{ values; height?; tone? ("auto"…); area?; baseline?; play?; playOnView?; progress?: MotionValue; duration?; label }` | `role="img"`; left → right draw by `clip-path: inset()` + glowing head (`transform`), both from one MotionValue (zero renders), head breathes 3× after; `progress` scrubs / races; width on resize only | drawn at once · no drop-shadow |
+| `HeatGridReveal` | `{ cols; origin?; play?; playOnView?; children; className?; cellClassName?; ring? }` | Your cells, cascading from the origin cell (`heatDelay`: Chebyshev ring · `stagger.heat`, cap `stagger.heatMax`), pop on `spring.deal`, end `transform: none`, origin ring once; `heatColor(t, mode)` for cell colours. A replay re-mounts the cells | static grid · ring without glow |
+| `SplitFlap` | `{ text; order?; direction?; tiles?; minChars?; align? }` | Dark tiles with a hinge, label rolls via `TextRoll mode="roll"`; direction from `order` (`flapDirection`) | TextRoll swaps instantly |
+| `CoachStream` | `{ text; thinking?; thinkingLabel? ("Coach denkt …"); msPerChar? (65); maxCatchUp? (2400); cursor?; instant?; onCaughtUp? }` | Typewriter on the rAF clock that CONTINUES when `text` grows (streaming), a chunk never takes longer than `maxCatchUp`; `TextShimmer` while thinking; full text sr-only; caret blinks 3× after catching up | full text at once |
+| `ConfidenceMeter` | `{ value (0–100); label? ("Konfidenz"); hideLabel?; tone? ("auto"…); rows?; cols?; size?; gap?; showValue? }` | `role="meter"`; DotMatrix ramp (`confidenceFrame`) uncovered by a clip wipe on first view, phosphor crossfade on change, `RollingDigits` %; auto tone ≥ 70 win / ≥ 40 fg / below mute | static |
+| `NumberCascade` | `{ value; decimals?; prefix?; suffix?; signed?; format?; play?; playOnView?; duration?; onDone? }` | Count-up under a numeral rain (`fxTiming.cascadeReroll`), columns lock most significant first (`lockAt`) with a pop, `tween.cascade`; slots from the final string (no width jump), zero renders; a new value cascades again | final value |
+| `DissolveOut` / `dissolveElement(el)` | `{ active; onDone?; cell?; seed?; as? }` | Pixel dissolve: seeded order (`dissolveOrder`), `clip-path: path()` of the remaining row runs (`dissolvePath`) in `fxTiming.dissolveFps` steps over `tween.dissolve`, dims + sinks 4 px, then `onDone` (the owner removes the element). One size read per dissolve | plain fade (`tween.exit`) |
+| `SpotlightSweep` | `{ play?; playOnView? (true); tone? ("signal"…); onDone? }` | ONE red line with a soft trail crosses its `relative` card (`tween.sweep`), WAAPI, then gone | nothing |
+| `celebrateStreak(el, {streak})` / `celebrateRecord(el)` | – | Presets for the `streak` / `record` kinds of `Celebrate` (the overlay in `App`): streak + white echo from `STREAK_ECHO_FROM` (5); record (red signal dot) + win echo `stagger.insert` later – at most 2 bursts | no echo (the overlay shows its ring) |
+| `DotMatrixText` (also in `@/motion`) | `{ text; width?; align?; preset? ("wave"\|"snake"\|"chevrons"\|"chevrons-left"); presetPosition?; cycles? (3); tone?; presetTone?; size?; gap?; glow?; label?; decorative? }` | DotMatrix text mode, upper-cased + padded (`matrixText`), optional animated preset glyph that plays `cycles` loops then rests (`Infinity` only for busy indicators that unmount); `role="img"` with the text | static frame, no glow |
+
+Planned uses (feature packages): boxes / breakouts – `BreakoutStreak`, `GlowBreak`, `RadarSweep`, `CardSpread`, `DotMatrixText`
+"A+"; analytics – `HeatGridReveal`, `NumberCascade`, `EquityDraw`, `ScrubTimeline`; coach / reports – `CoachStream`,
+`SpotlightSweep`, `ConfidenceMeter`, `SplitFlap`, `FullscreenWipe`, `MilestoneRail`, `OrbitSpread`; risk – `LiquidGauge`,
+`DissolveOut`, `NumberCascade`; growth – `celebrateStreak` / `celebrateRecord`, `MilestoneRail`; pricing / onboarding –
+`LaunchGrid`, `CardSpread`, `FullscreenWipe`; social – `MagnifyRow`, `GlyphZoom`. P01 adds no `layoutId`s (the contract
+table below is unchanged).
 
 ## Physics (`src/motion/physics`)
 

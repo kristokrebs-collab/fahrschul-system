@@ -50,6 +50,7 @@ export function RadarSweep({ active, variant = "radar", tone = "signal", size = 
   const color = FX_TONE[tone];
   const period = tween.scan.duration;
 
+  // motion-exception: radar-sweep — the CSS loop runs while `active` (a scan) only (README)
   // pause the loop while off screen (attribute write only, no React state)
   useEffect(() => {
     const el = ref.current;

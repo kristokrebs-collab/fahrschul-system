@@ -139,6 +139,7 @@ export function GlyphZoom({ word, letter, open = false, progress, duration = CON
     st.current.reduced = reduced;
   });
 
+  // motion-exception: glyph-zoom — canvas redraw per frame while the dive moves (README)
   const draw = () => {
     const s = st.current;
     const c = canvasRef.current;
