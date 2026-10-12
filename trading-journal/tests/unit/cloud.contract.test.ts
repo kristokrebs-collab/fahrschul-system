@@ -1,8 +1,9 @@
 /**
  * Cloud contract (`src/cloud`, Wave 0): availability gate, `apiFetch` against the functions' error envelope.
  */
+import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { API_BASE, ApiError, apiFetch, cloudConfig, getAccessToken, installErrorReporting, isCloudAvailable, reportError, setAccessTokenProvider, useCloudUser } from "@/cloud";
+import { API_BASE, ApiError, apiFetch, cloudConfig, FUNCTIONS_MISSING, getAccessToken, installErrorReporting, isCloudAvailable, reportError, setAccessTokenProvider, useCloudUser } from "@/cloud";
 
 const ENV = { VITE_SUPABASE_URL: "https://abc.supabase.co/", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x" };
 
@@ -20,12 +21,14 @@ describe("cloud availability", () => {
     expect(isCloudAvailable({ VITE_SUPABASE_URL: "abc.supabase.co", VITE_SUPABASE_PUBLISHABLE_KEY: "k" })).toBe(false);
   });
 
-  it("is off in the test build (no env) and stubs stay inert", async () => {
+  it("is off in the test build (no env): signed out, no token, reporting inert", async () => {
     expect(isCloudAvailable()).toBe(false);
-    expect(useCloudUser()).toBeNull();
+    expect(renderHook(() => useCloudUser()).result.current).toBeNull();
     await expect(getAccessToken()).resolves.toBeNull();
     expect(() => reportError(new Error("x"), { source: "manual" })).not.toThrow();
-    expect(typeof installErrorReporting()).toBe("function");
+    const uninstall = installErrorReporting();
+    expect(typeof uninstall).toBe("function");
+    uninstall();
   });
 });
 
@@ -59,5 +62,11 @@ describe("apiFetch", () => {
     expect(e2).toMatchObject({ status: 502, code: "http_502" });
     const e3 = await apiFetch("/x", { fetchImpl: async () => Promise.reject(new TypeError("Failed to fetch")) }).catch((e: unknown) => e);
     expect(e3).toMatchObject({ status: 0, code: "unavailable" });
+  });
+
+  it("an HTML page instead of a function (SPA fallback, no functions deployed) is `unavailable`, plain text still resolves", async () => {
+    const e = await apiFetch("/account/export", { fetchImpl: async () => reply(200, "<!doctype html><html></html>", "text/html") }).catch((x: unknown) => x);
+    expect(e).toMatchObject({ status: 0, code: "unavailable", message: FUNCTIONS_MISSING });
+    await expect(apiFetch("/x", { fetchImpl: async () => reply(200, "ok", "text/plain") })).resolves.toBe("ok");
   });
 });

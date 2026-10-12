@@ -3,7 +3,7 @@ import { isDayKey, isEmptyDayNote, normalizeDayNote, normalizeDayNotes, normaliz
 import { newId } from "@/lib/ids";
 import { merge3 } from "../merge3";
 import { assertWritable, DATA_KEYS, KEYS, quarantineRaw, readJson, readJsonDetailed, readRaw, removeKey, StorageWriteError, writeJsonStrict, writeRaw } from "../storage";
-import type { AdapterEvent, StorageAdapter, StorageSnapshot } from "./StoreApi";
+import type { AdapterEvent, LocalStorageAdapter, SnapshotPatch, StorageSnapshot } from "./StoreApi";
 
 function sortReadings(list: HyblockReading[]): HyblockReading[] {
   return [...list].sort((a, b) => a.at.localeCompare(b.at));
@@ -95,7 +95,7 @@ function readDaysRaw(): Record<string, unknown> {
  * - **`storage` events** (writes of other tabs) reload the changed key and emit a patch, so open tabs stay current.
  * A failed write (quota, blocked storage) throws `StorageWriteError` and leaves memory untouched.
  */
-export function createLocalAdapter(): StorageAdapter {
+export function createLocalAdapter(): LocalStorageAdapter {
   let trades: Trade[] = [];
   let settings: Settings = normalizeSettings(null);
   let hyblock: HyblockReading[] = [];
@@ -221,6 +221,24 @@ export function createLocalAdapter(): StorageAdapter {
       hyblock = sortReadings(snapshot.hyblock);
       if (snapshot.days) days = { ...snapshot.days };
       emit({ type: "patch", patch: snapshot.days ? { trades, settings, hyblock, days } : { trades, settings, hyblock } });
+    },
+    async replaceParts(parts: SnapshotPatch) {
+      const entries: Array<readonly [string, unknown]> = [];
+      if (parts.trades) entries.push([KEYS.trades, parts.trades]);
+      if (parts.settings) entries.push([KEYS.settings, parts.settings]);
+      if (parts.hyblock) entries.push([KEYS.hyblock, parts.hyblock]);
+      if (parts.days) {
+        const extra = Object.fromEntries(Object.entries(readDaysRaw()).filter(([k]) => !isDayKey(k)));
+        entries.push([KEYS.days, { ...extra, ...parts.days }]);
+      }
+      if (!entries.length) return;
+      persistAll(entries);
+      const patch: SnapshotPatch = {};
+      if (parts.trades) patch.trades = trades = parts.trades;
+      if (parts.settings) patch.settings = settings = parts.settings;
+      if (parts.hyblock) patch.hyblock = hyblock = sortReadings(parts.hyblock);
+      if (parts.days) patch.days = days = { ...parts.days };
+      emit({ type: "patch", patch });
     },
     dispose() {
       detachStorage?.();

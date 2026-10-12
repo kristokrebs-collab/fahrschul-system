@@ -12,6 +12,7 @@ import { migrate, quarantineToastTitle, readQuarantine, SNAPSHOT_FAILED_TITLE } 
 import { autoBackup } from "./backup";
 import { pushToast, useUi } from "./uiStore";
 import { storageStatus, type StorageStatus } from "./storage";
+import { cloudSessionHint } from "@/cloud/hint";
 
 /* ---------------------------------------------------------------- labels */
 
@@ -287,6 +288,12 @@ function withTimeout<T>(probe: Promise<T | null>, ms: number): Promise<T | null>
 
 let booting: Promise<void> | null = null;
 
+/** P09: how long a stored cloud login keeps the store in `connecting` before it settles in local mode. */
+export const CLOUD_HANDOFF_MS = 12_000;
+let handoffTimer: ReturnType<typeof setTimeout> | null = null;
+/** Whether the active adapter is the claude.ai one (cloud switching never touches it). */
+let isClaudeAdapter = false;
+
 function bindAdapter(next: StorageAdapter, onEvent: (e: AdapterEvent) => void): void {
   unsubscribeAdapter?.();
   adapter?.dispose();
@@ -323,7 +330,16 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
   if (migration.quarantined > 0) pushToast({ kind: "error", title: quarantineToastTitle(migration.quarantined) });
 
   const goLocal = () => {
-    set({ mode: "local", loaded: true });
+    // P09: a stored login of this edition (or an auth callback in the URL) means the cloud host is about to switch to
+    // the sync adapter – stay "Verbinde …" instead of flashing the local-mode banner; the data is already hydrated.
+    // Without a host taking over within CLOUD_HANDOFF_MS the store settles in local mode as before.
+    if (cloudSessionHint()) {
+      set({ mode: "connecting", loaded: true });
+      handoffTimer = setTimeout(() => {
+        handoffTimer = null;
+        if (adapter?.mode === "local" && useJournal.getState().mode === "connecting") set({ mode: "local" });
+      }, CLOUD_HANDOFF_MS);
+    } else set({ mode: "local", loaded: true });
     if (opts.autoBackup !== false) {
       try {
         autoBackup(now());
@@ -343,6 +359,7 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
         return;
       }
       const cloud = createClaudeDbAdapter(db);
+      isClaudeAdapter = true;
       const seen = { trades: false, settings: false };
       bindAdapter(cloud, (e) => {
         if (e.type === "patch") {
@@ -365,8 +382,42 @@ export function bootJournal(opts: BootOptions = {}): Promise<void> {
   return booting;
 }
 
+export interface SwitchOptions {
+  /** Store mode right after the switch (default: `local` for a local adapter, else `connecting`). */
+  mode?: StoreMode;
+}
+
+/**
+ * NEW (P09): replaces the active adapter at runtime – the Supabase sync adapter after login, the local adapter after
+ * sign-out. The new adapter's `load()` becomes the state at once (the sync adapter reads the same localStorage, so
+ * nothing jumps), its events drive the store: `patch` → state, `status` → `mode`, `error` → `Offline`, `quarantine`
+ * → count. Waits for a running boot first; never replaces the claude.ai adapter (that path stays as it is).
+ * Returns false when it refused.
+ */
+export async function switchAdapter(next: StorageAdapter, opts: SwitchOptions = {}): Promise<boolean> {
+  if (booting) await booting;
+  if (adapter && adapter !== next && isClaudeAdapter) {
+    next.dispose();
+    return false;
+  }
+  if (handoffTimer) clearTimeout(handoffTimer);
+  handoffTimer = null;
+  const set = useJournal.setState;
+  bindAdapter(next, (e) => {
+    if (e.type === "patch") set(e.patch);
+    else if (e.type === "status") set({ mode: e.mode });
+    else if (e.type === "error") set({ mode: "error" });
+    else if (e.type === "quarantine") set({ quarantined: Math.max(e.count, readQuarantine().length) });
+  });
+  set({ days: {}, ...next.load(), api: next.api, mode: opts.mode ?? (next.mode === "local" ? "local" : "connecting"), loaded: true, storage: storageStatus() });
+  return true;
+}
+
 /** Tears the adapter down and resets the store (tests, hot reload). */
 export function resetJournal(): void {
+  if (handoffTimer) clearTimeout(handoffTimer);
+  handoffTimer = null;
+  isClaudeAdapter = false;
   cancelPublish();
   shownTrades = null;
   unsubscribeAdapter?.();

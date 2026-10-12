@@ -5,6 +5,10 @@
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
+  /** P09: optional OAuth buttons in the login sheet, comma-separated (`google,github,apple,discord`). */
+  readonly VITE_SUPABASE_OAUTH_PROVIDERS?: string;
+  /** Vite: public base path of the build (`/` personal, `/teilen/` share). */
+  readonly BASE_URL: string;
 }
 
 interface ImportMeta {
