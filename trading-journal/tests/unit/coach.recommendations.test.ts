@@ -153,7 +153,9 @@ describe("Live-Wächter", () => {
     expect(a.key).toBe("revenge");
     expect(a.cooldownMin).toBe(30);
     expect(a.until).toBe(now + 30 * 60_000);
-    expect(a.detail).toContain("Pause 30 Min");
+    // the pause is named once (the advice already says it)
+    expect(a.detail).toContain("30 Minuten Pause");
+    expect(a.detail.match(/Pause/g)).toHaveLength(1);
     expect(a.tradeId).toBe("R");
   });
 

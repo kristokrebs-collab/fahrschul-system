@@ -142,7 +142,7 @@ export function HeroCard({ lesson, tips, score, headline, className }: { lesson:
         <div className="grid min-w-0 content-start gap-5">
           <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-2">
             <DancingLetters text="COACH" className="font-dot text-[clamp(44px,13vw,84px)] font-extrabold leading-[0.85] tracking-[0.04em] text-fg" />
-            {headline && <span className="max-w-[28ch] pb-1 text-right text-[12px] leading-snug text-mute">{headline}</span>}
+            {headline && <span className="max-w-[28ch] pb-1 text-[12px] leading-snug text-mute sm:text-right">{headline}</span>}
           </div>
           <Lesson lesson={lesson} />
           {tips.length > 0 && (

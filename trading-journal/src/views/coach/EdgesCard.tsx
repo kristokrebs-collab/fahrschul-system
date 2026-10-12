@@ -40,7 +40,7 @@ function EdgeItem({ c, closed, cur, minN, kind }: { c: EdgeCandidate; closed: Ed
             Ø <span className={cn("num font-mono", tone)}>{unitText(c.mean, c.unit, cur)}</span> statt {unitText(c.restMean, c.unit, cur)} · {pct0(c.winRate)} Win-Rate
           </p>
         </div>
-        <VerdictBadge verdict={c.verdict} className="shrink-0" />
+        <VerdictBadge verdict={c.verdict} leak={kind === "leak"} className="shrink-0" />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
         {kind === "edge" ? <ConfidenceMeter value={c.confidence} label="Konfidenz" cols={12} size={3} gap={2} /> : <span className="num font-mono text-[12px] text-mute">Konfidenz {c.confidence} %</span>}

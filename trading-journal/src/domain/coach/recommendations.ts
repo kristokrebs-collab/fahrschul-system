@@ -155,7 +155,7 @@ export function recommendations(input: RecommendationInput): Recommendation[] {
     const wi = whatIf(closed, (t) => ids.has(t.id), "skip", unit, `Ohne „${c.label}“`);
     const why = `${c.label}: ${c.n} Trades, Ø ${unitText(c.mean, unit, cur)} statt ${unitText(c.restMean, unit, cur)} im Rest.`;
     const title = `Meiden: ${c.label}`;
-    out.push({ id: `leak:${c.id}`, kind: "stop", title, why, impact: c.impact, unit, confidence: c.confidence, verdict: c.verdict, evidence: newest(c.trades), whatIf: wi, goal: goalFor(null, `Keine Trades: ${c.label}`, why, `leak:${c.id}`) });
+    out.push({ id: `leak:${c.id}`, kind: "stop", title, why, impact: c.impact, unit, confidence: c.confidence, verdict: c.verdict, evidence: newest(c.trades), whatIf: wi, goal: goalFor(null, `${c.label} – auslassen`, why, `leak:${c.id}`) });
   }
 
   // edges: focus
@@ -163,7 +163,7 @@ export function recommendations(input: RecommendationInput): Recommendation[] {
     const ids = new Set(c.trades.map((t) => t.id));
     const wi = whatIf(closed, (t) => ids.has(t.id), "only", unit, `Nur „${c.label}“`);
     const why = `${c.label}: ${c.n} Trades, Ø ${unitText(c.mean, unit, cur)} statt ${unitText(c.restMean, unit, cur)} im Rest, ${pct0(c.winRate)} Win-Rate.`;
-    out.push({ id: `edge:${c.id}`, kind: "focus", title: `Fokus: ${c.label}`, why, impact: c.impact, unit, confidence: c.confidence, verdict: c.verdict, evidence: newest(c.trades), whatIf: wi, goal: { title: `Mehr ${c.label}`, kind: "process", metric: "expectancyR", target: Math.max(0, Math.round(c.mean * 10) / 10), comparator: "atLeast", period: "month", source: { kind: "coach", ref: `edge:${c.id}` }, why } });
+    out.push({ id: `edge:${c.id}`, kind: "focus", title: `Fokus: ${c.label}`, why, impact: c.impact, unit, confidence: c.confidence, verdict: c.verdict, evidence: newest(c.trades), whatIf: wi, goal: { title: `${c.label} – mehr davon`, kind: "process", metric: "expectancyR", target: Math.max(0, Math.round(c.mean * 10) / 10), comparator: "atLeast", period: "month", source: { kind: "coach", ref: `edge:${c.id}` }, why } });
   }
 
   // journaling: a coach is only as good as the journal

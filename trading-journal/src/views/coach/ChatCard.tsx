@@ -7,7 +7,7 @@
  * signed in with the plan – see `ask.ts`); the computed answer always stays visible.
  */
 import { motion } from "motion/react";
-import { useEffect, useId, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { withAiNotes } from "@/domain/coach";
 import { askJournal, suggestQuestions, type Answer, type AnswerData } from "@/domain/coach/nlq";
 import type { EnrichedTrade } from "@/domain/types";
@@ -95,6 +95,14 @@ function AnswerView({ entry, trades, cur, aiNotes }: { entry: ChatEntry; trades:
   const live = entry.fresh && !reduced;
   const [thinking, setThinking] = useState(live);
   const [landed, setLanded] = useState(!live);
+  const articleRef = useRef<HTMLElement>(null);
+  const scrolled = useRef(false);
+  // a new answer comes into view (it types only while visible)
+  useEffect(() => {
+    if (scrolled.current || !entry.fresh) return;
+    scrolled.current = true;
+    articleRef.current?.scrollIntoView?.({ block: "nearest", behavior: reduced ? "auto" : "smooth" });
+  }, [entry.fresh, reduced]);
   useEffect(() => {
     if (!thinking) return;
     const t = setTimeout(() => setThinking(false), THINK_MS);
@@ -103,7 +111,7 @@ function AnswerView({ entry, trades, cur, aiNotes }: { entry: ChatEntry; trades:
   const evidence = a.trades.map((id) => trades.get(id)).filter((t): t is EnrichedTrade => !!t);
   const verdictTone = a.confidence.label === "klar" ? "win" : a.confidence.label === "Tendenz" ? "fg" : "mute";
   return (
-    <article className="grid gap-3" aria-label={`Antwort auf: ${entry.question}`} data-testid="coach-answer" data-kind={a.kind}>
+    <article ref={articleRef} className="grid scroll-mt-24 gap-3" aria-label={`Antwort auf: ${entry.question}`} data-testid="coach-answer" data-kind={a.kind}>
       <div className="flex justify-end">
         <p className="max-w-[85%] rounded-2xl rounded-br-md border border-line-2 bg-white/[0.06] px-3.5 py-2 text-[13px] text-fg">{entry.question}</p>
       </div>

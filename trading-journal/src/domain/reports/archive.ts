@@ -44,8 +44,12 @@ export function reportArchive(list: readonly EnrichedTrade[], settings: object, 
     });
 }
 
-/** The report the "Bericht bereit" wipe announces, or null. */
-export function pendingReport(list: readonly EnrichedTrade[], settings: Settings, now: number): ArchiveEntry | null {
+/**
+ * Every unopened report that just became ready, most important first (year, quarter, month, week): per kind only the
+ * period that ended last and only within `READY_DAYS` of its end.
+ */
+export function pendingReports(list: readonly EnrichedTrade[], settings: Settings, now: number): ArchiveEntry[] {
+  const out: ArchiveEntry[] = [];
   for (const kind of READY_ORDER) {
     const newest = reportArchive(list, settings, kind, now, 1)[0];
     if (!newest || newest.seen) continue;
@@ -53,7 +57,12 @@ export function pendingReport(list: readonly EnrichedTrade[], settings: Settings
     // only the period that ended last (not an older one with trades) and only shortly after its end
     if (newest.period.to !== prevOfNow.from) continue;
     if (now - newest.period.to > READY_DAYS[kind] * 86_400_000) continue;
-    return newest;
+    out.push(newest);
   }
-  return null;
+  return out;
+}
+
+/** The report the "Bericht bereit" wipe announces (the most important of `pendingReports`), or null. */
+export function pendingReport(list: readonly EnrichedTrade[], settings: Settings, now: number): ArchiveEntry | null {
+  return pendingReports(list, settings, now)[0] ?? null;
 }

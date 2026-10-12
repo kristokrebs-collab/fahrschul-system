@@ -22,10 +22,10 @@ import { TradeRows } from "@/views/insights/ui";
 
 export const TONE_TEXT: Readonly<Record<Tone | "warn", string>> = { win: "text-win", loss: "text-loss", fg: "text-fg", mute: "text-mute", warn: "text-warn" };
 
-/** "klar" / "Tendenz" / "zu wenig Daten" as a badge. */
-export function VerdictBadge({ verdict, className }: { verdict: EdgeLabel; className?: string }) {
+/** "klar" / "Tendenz" / "zu wenig Daten" as a badge (`leak`: a clear leak is red, not green). */
+export function VerdictBadge({ verdict, leak = false, className }: { verdict: EdgeLabel; leak?: boolean; className?: string }) {
   return (
-    <Badge tone={verdict === "klar" ? "win" : verdict === "Tendenz" ? "warn" : "mute"} dot={verdict === "klar"} className={className}>
+    <Badge tone={verdict === "klar" ? (leak ? "loss" : "win") : verdict === "Tendenz" ? "warn" : "mute"} dot={verdict === "klar"} className={className}>
       {verdict}
     </Badge>
   );
@@ -75,7 +75,7 @@ export function AnswerBars({ spec, cur, label, className }: { spec: Extract<Char
         const left = hasNeg ? (neg ? 50 - frac * 50 : 50) : 0;
         const width = hasNeg ? frac * 50 : frac * 100;
         return (
-          <div key={`${row.label}-${i}`} aria-hidden="true" className="grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto] items-center gap-2.5 text-[11.5px]">
+          <div key={`${row.label}-${i}`} aria-hidden="true" className="grid grid-cols-[minmax(0,5.5rem)_minmax(3rem,1fr)_auto] items-center gap-2 text-[11.5px] sm:grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_auto] sm:gap-2.5">
             <span className={cn("truncate", row.highlight ? "font-semibold text-fg" : "text-mute")}>{row.label}</span>
             <span className="relative h-2.5 overflow-hidden rounded-full bg-white/[0.05]">
               {hasNeg && <span className="absolute inset-y-0 left-1/2 w-px bg-white/20" />}

@@ -49,7 +49,8 @@ export function coachAlert(input: { before: readonly EnrichedTrade[]; after: rea
   if (!top) return null;
   const adv = BEHAVIOR_ADVICE[top.key];
   const until = adv.cooldownMin > 0 ? now + adv.cooldownMin * 60_000 : adv.cooldownMin < 0 ? midnight(now) : null;
-  const pause = adv.cooldownMin > 0 ? ` Pause ${adv.cooldownMin} Min.` : adv.cooldownMin < 0 ? " Pause bis morgen." : "";
+  // the pause is named once: advice that already says it gets no suffix
+  const pause = /Pause/.test(adv.advice) ? "" : adv.cooldownMin > 0 ? ` Pause ${adv.cooldownMin} Min.` : adv.cooldownMin < 0 ? " Pause bis morgen." : "";
   return {
     key: top.key,
     severity: top.severity,

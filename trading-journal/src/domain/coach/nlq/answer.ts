@@ -221,6 +221,9 @@ const scopeText = (intent: Intent, filters: readonly Filter[] = intent.filters):
   return parts.length ? parts.join(" · ") : "Alle Trades";
 };
 
+/** "in allen Trades" / "in Long · Montag" (the scope inside a sentence). */
+const inScope = (intent: Intent): string => (intent.filters.length || intent.period ? `in ${scopeText(intent)}` : "in allen Trades");
+
 const newestIds = (ts: readonly EnrichedTrade[], k = 6): string[] => [...ts].sort((a, b) => +tradeTime(b) - +tradeTime(a)).slice(0, k).map((t) => t.id);
 const biggestIds = (ts: readonly EnrichedTrade[], k = 6): string[] => [...ts].sort((a, b) => Math.abs(b.pnl ?? 0) - Math.abs(a.pnl ?? 0)).slice(0, k).map((t) => t.id);
 
@@ -245,7 +248,7 @@ function empty(intent: Intent): Answer {
     intent,
     kind: "empty",
     title: scopeText(intent),
-    text: `Für ${scopeText(intent)} gibt es keine abgeschlossenen Trades.`,
+    text: intent.filters.length || intent.period ? `Für ${scopeText(intent)} gibt es keine abgeschlossenen Trades.` : "Es gibt noch keine abgeschlossenen Trades.",
     facts: [],
     trades: [],
     chart: null,
@@ -314,7 +317,7 @@ function groupAnswer(intent: Intent, data: AnswerData): Answer {
   const bd = breakdown(ts, dim, { settings: data.settings }, { minN: 5 });
   const metric: MetricKey = ["best", "worst", "hold", "streak", "maxDD", "avgWin", "avgLoss", "payoff"].includes(intent.metric) ? "net" : intent.metric;
   const rows = bd.rows.filter((r) => !r.none).map((r) => ({ r, v: rowMetric(metric, r) })).filter((x): x is { r: BreakdownRow; v: number } => x.v != null && Number.isFinite(x.v));
-  if (!rows.length) return { ...empty(intent), text: `Keine Trades mit ${DIM_LABEL[dim]}-Angabe in ${scopeText(intent)}.` };
+  if (!rows.length) return { ...empty(intent), text: `Keine Trades mit ${DIM_LABEL[dim]}-Angabe ${inScope(intent)}.` };
   const ranked = rows.filter((x) => x.r.g.n >= ROW_MIN);
   const pool = ranked.length ? ranked : rows;
   const worst = intent.sort === "worst";
@@ -415,7 +418,7 @@ function behaviorAnswer(intent: Intent, data: AnswerData): Answer {
       intent,
       kind: "behavior",
       title: name,
-      text: `Keine ${name}-Muster in ${scopeText(intent)} gefunden. ${ts.length ? "Weiter so." : ""}`.trim(),
+      text: `Keine ${name}-Muster ${inScope(intent)} gefunden. ${ts.length ? "Weiter so." : ""}`.trim(),
       facts: [{ label: "Vorkommen", value: "0", raw: 0, tone: "win" }],
       trades: [],
       chart: null,
@@ -425,7 +428,7 @@ function behaviorAnswer(intent: Intent, data: AnswerData): Answer {
   }
   const trend = behaviorTrend(data.events, key, data.now, 30 * 86_400_000);
   const r = st.sumR;
-  const text = `${name}: ${st.count}× in ${scopeText(intent)}, ${st.trades.length} Trades mit ${money(st.g.net, data.currency)}${r != null ? ` (${fmtR(r)})` : ""}. Gegenüber deinen sauberen Trades: ${money(st.excess, data.currency)}. ${adv.advice}`;
+  const text = `${name}: ${st.count}× ${inScope(intent)}, ${st.trades.length} Trades mit ${money(st.g.net, data.currency)}${r != null ? ` (${fmtR(r)})` : ""}.${rep.clean.n ? ` Gegenüber deinen sauberen Trades: ${money(st.excess, data.currency)}.` : " Saubere Vergleichstrades gibt es hier keine."} ${adv.advice}`;
   const weeks: ChartRow[] = [];
   const byMonth = new Map<string, number>();
   for (const e of st.events) {
@@ -442,7 +445,7 @@ function behaviorAnswer(intent: Intent, data: AnswerData): Answer {
     facts: [
       { label: "Vorkommen", value: `${st.count}`, raw: st.count, tone: "loss" },
       { label: "P&L dieser Trades", value: money(st.g.net, data.currency), raw: st.g.net, tone: toneOf(st.g.net) },
-      { label: "vs. saubere Trades", value: money(st.excess, data.currency), raw: st.excess, tone: toneOf(st.excess) },
+      rep.clean.n ? { label: "vs. saubere Trades", value: money(st.excess, data.currency), raw: st.excess, tone: toneOf(st.excess) } : { label: "vs. saubere Trades", value: "–", raw: null, tone: "mute" },
       { label: "Letzte 30 Tage", value: `${trend.current} (davor ${trend.previous})`, raw: trend.current, tone: trend.current > trend.previous ? "loss" : trend.current < trend.previous ? "win" : "fg" },
     ],
     trades: newestIds(st.trades),

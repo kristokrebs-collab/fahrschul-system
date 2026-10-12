@@ -5,7 +5,8 @@
  * the same alert with a countdown; a critical one fires a red `BorderBeam` lap there.
  *
  * Only real saves count: at most `BULK_SAVE` records changed at once (an import, a restore or a sync snapshot is not
- * a save) and only records whose `updatedAt` is fresh. Hints (severity 1) are not toasted – they wait in the timeline.
+ * a save), only records whose `updatedAt` is fresh and only changes the trader made (the MAE / MFE backfill or a
+ * drawing on the chart is not a decision – `MACHINE_FIELDS`). Hints (severity 1) are not toasted – they wait in the timeline.
  * Each event (behaviour + triggering trade) is toasted at most once per session. Never blocks anything.
  *
  * P14: mount `<CoachWatcher />` once in App.tsx as a leaf with `data-layer`, after SetupEditor, before Celebrate.
@@ -22,13 +23,35 @@ export const BULK_SAVE = 3;
 /** A record counts as "just saved" within this window of its `updatedAt`. */
 export const FRESH_MS = 5 * 60_000;
 
-/** Ids of records added or changed between two snapshots (new object with a different `updatedAt`, or new). */
+/**
+ * Fields the app writes on its own (the MAE / MFE backfill, drawings on the chart, the save stamp): a change of only
+ * these is no trading decision and never wakes the coach.
+ */
+export const MACHINE_FIELDS: readonly string[] = ["updatedAt", "mae", "mfe", "maeR", "mfeR", "atrPct", "annotations"];
+
+/** True when `a` and `b` differ in a field the trader decides (anything but `MACHINE_FIELDS`). */
+export function userChanged(a: Trade, b: Trade): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const k of keys) {
+    if (MACHINE_FIELDS.includes(k)) continue;
+    const x = (a as unknown as Record<string, unknown>)[k];
+    const y = (b as unknown as Record<string, unknown>)[k];
+    if (x === y) continue;
+    if (typeof x === "object" && typeof y === "object" && x && y && JSON.stringify(x) === JSON.stringify(y)) continue;
+    return true;
+  }
+  return false;
+}
+
+/** Ids of records added, or changed by the trader, between two snapshots. */
 export function changedIds(prev: readonly Trade[], next: readonly Trade[]): string[] {
   const before = new Map(prev.map((t) => [t.id, t]));
-  return next.filter((t) => {
-    const b = before.get(t.id);
-    return !b || (b !== t && b.updatedAt !== t.updatedAt);
-  }).map((t) => t.id);
+  return next
+    .filter((t) => {
+      const b = before.get(t.id);
+      return !b || (b !== t && b.updatedAt !== t.updatedAt && userChanged(b, t));
+    })
+    .map((t) => t.id);
 }
 
 /** Saved just now (not an imported / synced old record). */
