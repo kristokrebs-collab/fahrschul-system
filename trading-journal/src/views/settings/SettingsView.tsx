@@ -25,6 +25,9 @@ import { ChangedDot, SaveButton, useActionPhase, type ActionPhase } from "./fx";
 import { HyblockConnectorCard, type HyblockTestConfig } from "./HyblockConnectorCard";
 import { LageCard } from "./LageCard";
 import { LimitsCard } from "./LimitsCard";
+import { MoreSettingsCard } from "./MoreSettingsCard";
+import { ThemeCard } from "@/app/ThemeCard";
+import { OnboardingCard } from "@/onboarding/OnboardingCard";
 import { LiveDataCard } from "./LiveDataCard";
 import { MistakesCard } from "./MistakesCard";
 import { RulesCard } from "./RulesCard";
@@ -271,6 +274,15 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
         <RulesCardMemo rules={draft.rules} onChange={setRules} trades={trades} changed={changed.has("rules")} />
 
         <LimitsCard draft={draft} onChange={set} changed={changed} invalid={invalidField} />
+
+        {/* P13: theme (Hell / Dunkel / System, accents) and the guided tour – a pair of similar height */}
+        <ThemeCard />
+        <OnboardingCard />
+
+        {/* P14: the settings that live on their pages (Konto, Preise, Box-, Risiko-Einstellungen) */}
+        <div className="min-w-0 lg:col-span-2">
+          <MoreSettingsCard />
+        </div>
 
         <div className="min-w-0 lg:col-span-2">
           <StorageCard />

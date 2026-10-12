@@ -1,4 +1,5 @@
 import { motion } from "motion/react";
+import { ShareButton } from "@/social/ui/ShareButton";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { SetupStats } from "@/domain/account";
 import { ACCOUNT_LABELS, MTF_SETUP_ID } from "@/domain/defaults";
@@ -305,6 +306,8 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
                 <Button size="sm" disabled={!n} onClick={() => onTrades(setup.id)}>
                   {TRADES_BUTTON_LABEL}
                 </Button>
+                {/* P12: share the setup as a redacted link (renders nothing without cloud) */}
+                <ShareButton setupId={setup.id} iconOnly />
               </div>
             </article>
           </NotchedFrame>

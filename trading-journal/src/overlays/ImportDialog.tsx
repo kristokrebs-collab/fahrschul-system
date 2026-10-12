@@ -35,7 +35,14 @@ export const IMPORT_STRINGS = {
   readings: "Ablesungen",
   exportedAt: "exportiert am",
   readError: "Datei konnte nicht gelesen werden",
+  csvLead: "Trades aus einer Tabelle oder einem Börsen-Export (Bitunix, Binance, Bybit, OKX …)?",
+  csv: "CSV importieren",
 } as const;
+
+/** P11 CSV import (mapping assistant, duplicates check) – the sheet lives in the app's ExchangeHost; works without cloud. */
+export function openCsvImportSheet(): void {
+  void import("@/exchanges/store").then((m) => m.openCsvImport());
+}
 
 export const IMPORT_MODES: readonly { v: ImportMode; label: string }[] = [
   { v: "merge", label: IMPORT_STRINGS.merge },
@@ -170,6 +177,21 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
       <div className="grid gap-4">
         <StaggerItem>
           <p className="text-[13px] text-mute">{IMPORT_STRINGS.intro}</p>
+        </StaggerItem>
+
+        <StaggerItem className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-ink-950/40 px-3.5 py-2.5">
+          <span className="text-[12.5px] text-mute">{IMPORT_STRINGS.csvLead}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              onClose();
+              openCsvImportSheet();
+            }}
+            disabled={busy}
+            data-testid="import-csv"
+          >
+            {IMPORT_STRINGS.csv}
+          </Button>
         </StaggerItem>
 
         <StaggerItem className="flex flex-wrap items-center gap-3">

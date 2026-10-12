@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useMotionValueEvent, type Variants } from "motion/react";
 import { ED } from "@/domain/edition";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { deriveTrade, leverageOverRule } from "@/domain/derive";
 import { EXCURSION_KEYS, excursionStale } from "@/domain/excursion";
 import { checklistItemsFor, pruneChecks } from "@/domain/enrich";
@@ -36,7 +36,27 @@ import { FAB_LABEL } from "@/app/Dock";
 import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldConfirm";
 import { AutoHeight } from "@/views/trades/AutoHeight";
 import { DETAIL_DIM_HANDOFF } from "./TradeDetail";
-import { SIGNAL_SECTION_TITLE, SignalSection, resolveTradeSignal, signalSectionSub, type MtfAuto } from "./SignalSection";
+import { SAVE_CHECK_TIMEOUT_MS, SIGNAL_SECTION_TITLE, SignalSection, resolveTradeSignal, signalSectionSub, type MtfAuto } from "./SignalSection";
+import { resolveTradeBoxes, type BoxSnapshot } from "@/market/boxes/snapshot";
+import { useEntitlement } from "@/billing/entitlements";
+
+/** P05 risk preview (limits, liquidation, risk %) – a lazy chunk of the editor (P14 slot). */
+const RiskPreviewSlot = lazy(() => import("./slots/RiskPreviewSlot"));
+/** P07 strategy suggestion for a trade without a setup – a lazy chunk of the editor (P14 slot). */
+const ClassifyChipSlot = lazy(() => import("./slots/ClassifyChipSlot"));
+
+/**
+ * P02 box context of the entry for `trade.boxSnap` (P14 save path): resolved next to the entry check and never waited
+ * for longer than it (`SAVE_CHECK_TIMEOUT_MS`); `null` = no data (offline, another symbol, too little history).
+ */
+export function boxSnapAt(date: string, side: Side, timeoutMs = SAVE_CHECK_TIMEOUT_MS): Promise<BoxSnapshot | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), timeoutMs);
+    resolveTradeBoxes(date, side)
+      .then((snap) => resolve(snap), () => resolve(null))
+      .finally(() => clearTimeout(timer));
+  });
+}
 
 /* ------------------------------------------------------------------ types */
 
@@ -535,6 +555,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const cur = settings.currency;
   const isOpen = t.status === "open";
   const hasLive = livePrice != null && Number.isFinite(livePrice);
+  const riskLive = useEntitlement("riskLive");
+  const v3 = rec as Partial<Trade>;
 
   const setStr = (k: keyof TradeFormStrings) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const v = e.target.value;
@@ -596,12 +618,17 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
       try {
         // the check at save time: live within 5 min of now, else the (memoised) history check; none → keep the stored one
         let at = { date: d.date, side: t.side };
+        // P02 box context, in parallel with the entry check (a draft that brought its own – the box card's setup – keeps it)
+        const ownBoxes = !trade && draft?.boxSnap != null;
+        const boxesFor = (a: { date: string; side: Side }): Promise<BoxSnapshot | null> | null => (checking && !ownBoxes ? boxSnapAt(a.date, a.side) : null);
+        let boxes = boxesFor(at);
         let signal = checking ? await resolveTradeSignal(at.date, at.side) : undefined;
         // input typed while the check loaded is written with the trade: the form as it stands now (a date / side moved
         // meanwhile is checked again), validated again – an invalid edit keeps the sheet open with its message
         let cur = latestRef.current;
         for (let i = 0; i < 3 && cur.checking && (cur.d.date !== at.date || cur.t.side !== at.side); i++) {
           at = { date: cur.d.date, side: cur.t.side };
+          boxes = boxesFor(at);
           signal = await resolveTradeSignal(at.date, at.side);
           cur = latestRef.current;
         }
@@ -612,6 +639,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
             return;
           }
         }
+        const boxSnap = boxes ? await boxes : undefined;
         const now = new Date().toISOString();
         // Spread the stored trade first so passthrough/unknown fields (legacy extras, `signal`, `mistakes`) survive an edit.
         const record: TradeRecord = {
@@ -619,6 +647,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           ...cur.rec,
           checks: pruneChecks(cur.checks, cur.items),
           ...(signal ? { signal } : null),
+          ...(boxSnap ? { boxSnap } : null),
           pnl: cur.x.pnl,
           r: cur.x.r,
           updatedAt: now,
@@ -626,6 +655,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         };
         if (trade?.id) record.id = trade.id;
         else delete record.id;
+        // a re-checked entry without box data drops the old context (it belonged to another time / side)
+        if (boxSnap === null) delete (record as Partial<Trade>).boxSnap;
         // Journal v3: an empty v3 field writes no key (an untouched legacy trade gains nothing, a cleared one loses it)
         dropEmptyJournalKeys(record);
         // stored MAE / MFE were measured from the old entry / exit / stop: drop them, the backfill measures again
@@ -920,6 +951,24 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               </div>
             ))}
           </div>
+          {riskLive && editor.open && (
+            <Suspense fallback={null}>
+              <RiskPreviewSlot
+                id={trade?.id}
+                account={account}
+                side={t.side}
+                status={t.status}
+                entry={rec.entry}
+                stop={rec.stop}
+                target={rec.target}
+                size={rec.size}
+                qty={v3.qty ?? null}
+                leverage={rec.leverage}
+                marginMode={v3.marginMode}
+                margin={v3.margin ?? null}
+              />
+            </Suspense>
+          )}
         </Section>
 
         <Section title="Ausführung" sub="Fills, Teil-Exits, Funding, Margin – alles optional">
@@ -955,6 +1004,15 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               </motion.div>
             </AnimatePresence>
           </AutoHeight>
+          {editor.open && (
+            <Suspense fallback={null}>
+              <ClassifyChipSlot
+                draft={{ side: t.side, pair: d.pair, timeframe: d.timeframe, account, date: d.date, boxSnap: v3.boxSnap ?? draft?.boxSnap, signal: trade?.signal ?? draft?.signal }}
+                picked={t.setups}
+                onApply={(id) => patchT({ setups: [id] })}
+              />
+            </Suspense>
+          )}
           <Field label="Begründung" htmlFor="f-reason">
             <Textarea id="f-reason" rows={3} className="leading-relaxed" value={d.reason} onChange={setStr("reason")} placeholder={ED.COPY.reasonPlaceholder} />
           </Field>

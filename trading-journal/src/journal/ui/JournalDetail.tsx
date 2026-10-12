@@ -1,6 +1,8 @@
 import { motion } from "motion/react";
 import { useMemo, useState, type ReactNode } from "react";
-import { BEHAVIOR_LABEL, type BehaviorKey } from "@/domain/coach/events";
+import { useEntitlement } from "@/billing/entitlements";
+import { openUpgrade } from "@/billing/store";
+import { BEHAVIOR_LABEL, type BehaviorKey } from "@/domain/coach/behaviorKeys";
 import { holdLabel, holdMs } from "@/domain/excursion";
 import { fillStats } from "@/domain/fills";
 import type { EnrichedTrade, Setup } from "@/domain/types";
@@ -64,6 +66,7 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
   const [measuring, setMeasuring] = useState(false);
   const [measureNote, setMeasureNote] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const replayOk = useEntitlement("replay");
   const facts = useMemo(() => executionFacts(t, currency), [t, currency]);
   const stats = useMemo(() => (t.fills?.length ? fillStats(t.fills, t.side) : null), [t.fills, t.side]);
   const psych = t.psych;
@@ -205,7 +208,8 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
       )}
 
       <StaggerItem className="flex flex-wrap items-center gap-2">
-        <ActionButton onClick={() => openReplay(t.id, { fromDetail: true })} icon="M7 5v14l11-7z">
+        {/* plan gate `replay` (P10 / P14): a locked replay opens the upgrade sheet instead */}
+        <ActionButton onClick={() => (replayOk ? openReplay(t.id, { fromDetail: true }) : openUpgrade("replay"))} icon="M7 5v14l11-7z">
           Replay
         </ActionButton>
         <ActionButton onClick={() => void share()} disabled={sharing} icon="M12 4v11M7 9l5-5 5 5M5 20h14">
