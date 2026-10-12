@@ -198,7 +198,15 @@ What keeps every feed refreshing on a Galaxy Tab in Samsung Internet (tests: `ma
 
 **Routes (CORS-safe).** Every Binance REST path the app uses is proxied by `netlify.toml` (`/api/binance/fapi/v1/{time,
 klines, premiumIndex, ticker/24hr, openInterest, fundingRate}`, `/api/binance/futures/data/*`); the CSP `connect-src`
-allows `fapi.binance.com`, `wss://fstream.binance.com`, Bybit, OKX and `'self'` (the proxy).
+allows `fapi.binance.com`, `wss://fstream.binance.com`, Bybit, OKX and `'self'` (the proxy) – plus `*.supabase.co` (https +
+wss) for the cloud since P14; nothing else of the market layer needs a new host.
+
+**Daily candles of several consumers (P14).** Two subsystems fetch 1D klines for symbols other than the live one, each
+through its own budget and cache: `multiDaily.ts` (P05 correlation: one page of 99, at most one fetch per symbol and UTC
+day, reuses the provider's own `kline_1d`) and the box scanner (`boxes/scanner.ts`, P02: 300 daily bars per watchlist
+symbol, its IndexedDB cache); the Analyse benchmark (P03) reads the provider's `kline_1d` feed. In the integrated app a
+watchlist symbol that is also traded may be fetched once by each – a known, bounded overlap (weight 1–2 per symbol and
+day), never a loop.
 
 **Honest freshness per feed** (Settings → Live-Daten): next to `Stand` (time of the newest data) every row says
 `nächste Daten in 3:12` (REST; `5 h 59 min` for long waits), `Stream · Daten vor 2 s` (WebSocket, on the Binance clock),

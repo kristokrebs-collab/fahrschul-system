@@ -289,6 +289,10 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
     overlay is a fixed full-viewport layer above page, header and dock) and Tab stays trapped. `inert` is inherited style: setting and
     lifting it restyled every element of the page behind (≈ 1 900 on the Übersicht, 15–25 ms forced by the focus return after a sheet
     closed, the same again after the open morph). Reachability checks use `UNREACHABLE_SELECTOR` (`[inert],[data-modal-behind]`).
+  - Stacked dialogs (P14): the app-level hosts mount their dialogs in place (a `HostSlot` wrapper, `display: contents`), so a
+    sheet opened from the trade detail (share, replay) sits in a wrapper the detail's isolation already marked as behind. The
+    newer dialog lifts the marks on its own chain while it is open (`liftOwnChain`) and they come back on its release while
+    the older dialog still holds them – the topmost dialog is never aria-hidden.
   - `MorphDialog`, `Sheet` and `TradeDetail` pass `settled`.
   - Android back (decision 26, `useBackClose(active, onBack)`, part of `useDialogBehaviour` – so every modal session has it: sheets
     incl. the trade / setup editor and the import, morph dialogs, the trade detail, the command navigation): while open the session owns
@@ -577,6 +581,20 @@ page's nodes that take part in no animation (`settleRevealedProjection`); a late
 | `new-trade` | FAB disc (`borderRadius 999`, inside the FAB's scaled visual) → `Sheet size="lg"` | `spring.sheet` | disc unmounted while `editor.open && fromFab` |
 | `status-{feed}` | `StatusPill` header ↔ card | `spring.pill` | optional |
 | `chart-range` | RangePills thumb | `spring.layout` | one per chart card, `layoutDependency={value}`, `borderRadius radius.thumb` |
+
+Feature packages (P02–P13, registered by the integrator P14 – each id lives in exactly one mounted component at a time):
+
+| id | source → target | transition | rule |
+|---|---|---|---|
+| `hover-{group}` (`community-board`, `search`) | `HoverPill` in the leaderboard rows (P12) / the search hits (P13) | `spring.hover` | same contract as above; the search pill follows the active option (keyboard too) |
+| `morph-{id}` / `morph-title-{id}` (`box-setup-{id}` P02, `fact-ana-{key}` P03, `setup-strategy-{id}` P07) | best-setup card / ratio tile / strategy strip → `MorphDialogProvider` panel | `spring.morph` | the `MorphCard` contract above; ids are unique per page (the Markt and Analyse pages are never shown together) |
+| `auth-sheet` | header `AccountPill` "Anmelden" (P09) → login `Sheet` | `spring.sheet` | ONE source on screen (the header pill); opened from anywhere else the sheet slides in without a morph |
+| `labor-chip-{id}`, `labor-strat-{uid}` | Labor option chips / strategy tiles thumb (P07) | `spring.segment` / `spring.layout` | per chip group / per config card, `layoutDependency={value}`, `borderRadius radius.pill` / card radius; reduced motion: no transition |
+| `annotation-tool-{uid}` | active tool of the screenshot annotation toolbar (P06) | `spring.segment` | per toolbar, `borderRadius radius.thumb` |
+| `cal-day-{key}` | calendar day cell → `DayPanel` (Auswertung) | `spring.detail` | set only while the cell is armed (pressed); the panel carries the same id while open |
+
+`// motion-exception: theme-reveal` (P13, `src/app/themeTransition.ts`): the theme switch reveals the new page through a
+growing `clip-path` circle (View Transitions) – a declared exception to "only transform / opacity / filter".
 
 Every element above sets `style={{ borderRadius }}` (`radius.card 16`, `radius.dialog/sheet 28`, `radius.pill 9999`, `radius.hover 12`, `radius.thumb 8`).
 `position:fixed` panels carry `layoutRoot`; scrolling ancestors of `layout` elements carry `layoutScroll` (sheet/dialog body, table wrapper).

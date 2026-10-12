@@ -9,6 +9,7 @@ Plan 1.4/1.5 (boot, router, banner), 6.6 (shell), 3.3 (dock/page morphs). The `�
 void bootJournal();      // migrate + sync hydrate, then claude.ai probe (Fall A/B) – @/store/journalStore
 installRouter();         // hash grammar #{page}[?query], hashchange, filter mirror, dialog back stack (back closes the topmost dialog first) – @/store/router, @/store/backStack
 bootMarket();            // startMarket(settings); follows settings.market.symbol → setSymbol, hyblock.timeframe → setPeriod
+installE2eHooks({…});    // no-op unless the e2e seed set the flag (see "E2E hooks")
 createRoot(#root).render(<StrictMode><MotionRoot><App/></MotionRoot></StrictMode>)
 ```
 Font hints (`document.fonts.load` for Doto / IBM Plex Mono / Sans) run before the first render; they never block, and a
@@ -108,27 +109,78 @@ known, so the app now lets the device answer it:
 ## `App.tsx`
 
 ```
-<MorphDialogProvider>                     (effect: installViewportInset() → --vv-bottom, see "Display")
+<ErrorBoundary variant="app">              (P13: full stage, "Neu laden")
+<MorphDialogProvider>                     (effect: installViewportInset() → --vv-bottom, see "Display"; idle: preloadPage("markt"))
   <ScenarioWatcher/>                       toast `Lage: …` when the Lage-Ampel changes (decision 23; once per change, never on load, tj2-lage-last)
-  <Header/>                                HeaderEdge (hairline / shade / edge blur / red reading progress) + HeaderTicker
-  <main class="mx-auto max-w-[1320px] px-4 pb-40 pt-6 sm:px-6">
+  <Header/>                                HeaderEdge + HeaderTicker; mode pill + AccountPill (P09, renders nothing without cloud)
+  <main class="mx-auto max-w-[1320px] px-4 pb-10 pt-6 sm:px-6">
     <LocalModeBanner/>                     mode === "local" && !hideLocalBanner
-    <motion.div layout="position" layoutDependency={bannerOpen}>   moves only when the banner enters / leaves (spring.layout)
-      <Pages/>                             useDeferredValue(page) → <PageHost keepAlive={["overview"]} onTransitioning={ui.setTransitioning}/>
-      <Footer/>                            SVG outline `TRADE JOURNAL` + <ChartAttribution/>
+    <Banners/>                             P10 BillingBanner (lazy) only when billingActive()
+    <motion.div layout="position" layoutDependency={bannerOpen}>
+      <Routed/>                            #share/<token> → SharedView (P12, lazy, page boundary) | <Pages/>
     </motion.div>
   </main>
-  <BottomFade/> <Dock/>
-  <Toasts/>                                leaf host: uiStore.toasts → toIslandToast → <ToastIsland onDismiss={dismissToast}/>
-  <Detail/>                                leaf host: <TradeDetail candles={useDetailCandles()}/> (always mounted, owns its AnimatePresence)
-  <EditorHost/>                            → <TradeEditor livePrice livePriceLabel/>; the rounded price is read once a second on `nowMv` only while the editor is open (`useLivePriceWhile`); label `Live-Preis (Bybit) übernehmen` on fallback
-  <SetupEditor/>
-  <Celebrate/>                             confetti layer, mounted once (renders null until `celebrateFrom` queues a burst)
+  <Footer/> <BottomFade/> <Dock/> <CommandNav/> <Toasts/>
+  <Detail/> <EditorHost/> <SetupEditor/>   each behind its own widget boundary (fallback null)
+  hosts (P14, leaves after SetupEditor, before Celebrate – each a HostSlot: widget boundary + data-layer):
+  <HostSlot Suche/Tastenkürzel/Einführung/Cloud>   GlobalSearchHost, ShortcutHost, OnboardingHost, CloudSyncHost
+  <FeatureHosts/>                          lazy chunk DeferredHosts (table below)
+  <Celebrate/> <IntroHost/> <LayerDiagHost/>
 </MorphDialogProvider>
 ```
-Every store subscription lives in a leaf host, so the shell itself only re-renders when the local banner opens or closes.
-`Pages` reads the page through `useDeferredValue`: the dock (which reads the store directly) reacts in the click's own frame, and the
-new page renders afterwards in an interruptible background render.
+`Pages` reads the page through `useDeferredValue` → `<PageHost keepAlive={["overview"]} cascade={["settings"]}>`;
+`renderPage(page)` wraps every page in `<ErrorBoundary variant="page" resetKeys={[page]}>`. The four original pages are
+static; every other page is a lazy chunk (`pages.ts`) behind `Suspense` with `<PageSkeleton page>` and, for a paid page,
+`PageGate` (`PAGE_FEATURE` → `useEntitlement`; locked → `LockedPage`: the page's `h1` + `UpgradeTeaser`, the page chunk
+is never downloaded). Every store subscription lives in a leaf host, so the shell itself only re-renders when the local
+banner opens or closes.
+
+## Pages and navigation (P14)
+
+| page | key | chunk | gate (`plans.ts`) | dock |
+|---|---|---|---|---|
+| overview, trades, setups, settings | o t s e | static | – | ✓ (digits 1–4) |
+| markt | m | `MarktView` | scanner card: `boxScanner` | ✓ |
+| analyse | a | `AnalyseView` | page `analyticsPro`, Monte Carlo + Ruin `monteCarlo` | |
+| risiko | r | `RisikoView` | `riskLive` | |
+| coach · berichte | c · b | `CoachView` · `BerichteView` | `coach` · `reports` | |
+| labor · wachstum | l · w | `LaborView` · `WachstumView` | `backtestLab` · `growth` | |
+| community | g | `CommunityView` | – (cloud only inside) | |
+| cockpit | d | `CockpitView` | `customDashboards`; boards limit `dashboards` | |
+| konto · preise | k · p | `KontoPage` · `PreiseView` | – | |
+
+- `uiStore`: `PAGES`, `PAGE_KEYS`, `DOCK_PAGES` (5 tabs, fit 390 px), `NAV_ORDER` (dock first – direction of the page
+  switch and `[` / `]`). `Dock.tsx` exports `PAGE_LABELS` / `PAGE_ICON` for every page.
+- Every other page: CommandNav (⌘K / menu: four big links + a grid with icon, live count `shellStats.pageCounts`, digit;
+  hover / focus / press preloads the chunk), the global search, `g` + key, in-page links (settings → "Weitere
+  Einstellungen", CloudSyncHost → Konto, "Bericht bereit" → Berichte).
+- `pages.ts`: `LOADERS` import the view MODULES (never a barrel – a barrel pulls lazy code into the first load),
+  `lazyView(page)` (`retryableLazy`: a failed download – offline, a deploy replaced the chunk – is tried again by the
+  boundary's "Erneut versuchen", a plain `React.lazy` would keep its rejection), `preloadPage`, `PAGE_FEATURE`.
+- Router (`@/store/router`): `#analyse?dim=`, `#berichte?p=`, `#community?invite=` (`QUERY_PAGES`, the page's query
+  state lives in a lazily loaded seam that mirrors into the URL), `#share/<token>` (`useShareRoute`; leaving it with
+  any navigation). The tour (OnboardingHost) and the "Bericht bereit" wipe wait while a share link is on screen.
+- `introBoot.ts`: `OTHER_PAGES` = every page but the overview (the intro plays only on the overview).
+
+## Feature hosts (`DeferredHosts.tsx`, one lazy chunk)
+
+| host | package | gate | does |
+|---|---|---|---|
+| `BillingHost` | P10 | – | upgrade / cancel sheets, Stripe return, `?ref=` (inert without billing) |
+| `ExchangeHost` | P11 | – | connect / dry-run / CSV sheets, server pulls (CSV without cloud too) |
+| `BoxAlertHost` | P02 | `boxScanner` | box alerts + watchlist scanner while `settings.boxes.alerts` |
+| `CoachWatcher` | P04 | `coach` | live coach alerts after a save |
+| `ReportReadyHost` | P04 | (`reports` inside) | "Bericht bereit" wipe → Berichte |
+| `RiskGuardHost` | P05 | `riskLive` | limit / cooldown toasts after a save |
+| `PostTradeReviewHost` | P08 | `growth` | review prompt for closed trades |
+| `SocialHost` | P12 | – | share sheet |
+| `ReplayHost`, `ExcursionBackfillHost` | P06 | (replay gate at the button) | replay sheet, idle MAE / MFE backfill |
+
+## E2E hooks (`e2eHooks.ts`)
+
+The Playwright seed sets `localStorage["__e2e-hooks"] = "1"`; only then `installE2eHooks` puts `__tjJournal`, `__tjUi`,
+`__tjTheme` (main.tsx), `__tjGuard` (DeferredHosts) and `__tjCockpitRegistry` (CockpitView) on `window`. A normal visit
+never gets them; they expose nothing a visitor could not reach through the dev tools of their own browser.
 
 ### Page host (`PageHost.tsx`) – replaces `PageSwitch` in the shell
 `<PageHost page renderPage keepAlive onTransitioning>`: the PageSwitch visual spec (enter `x dir·16` + scale .985 + blur 4 px → none
@@ -220,7 +272,7 @@ on WAAPI (compositor); the transform springs on `spring.pageEnter` (string keyfr
 | `marketBoot.ts` | `bootMarket(): () => void` | see boot |
 | `toasts.ts` | `toIslandToast(uiToast)`, `toastLifetime` | `success→ok`, `error→error`, `signal/info→warn` (info glyph); passes the lifetime (`TOAST_MS` or the toast's `duration`, `0` = sticky) as the island `duration` – the island owns the countdown, `uiStore` never auto-dismisses |
 | `useDetailCandles.ts` | `useDetailCandles()`, `sliceAround`, `DETAIL_WINDOW_MS` | 1h cache slice ±3 d around `tradeTime(trade)` (identity per detail id), `history()` for the missing edge |
-| `pages.ts` / `overlays.ts` | re-exports of the four views / the app overlays | single seam for the shell and for tests (`vi.mock("@/app/pages")`, `vi.mock("@/app/overlays")`) |
+| `pages.ts` / `overlays.ts` | the four static views + the lazy page registry (`lazyView`, `preloadPage`, `PAGE_FEATURE`) / the app overlays | single seam for the shell and for tests (`vi.mock("@/app/pages")`, `vi.mock("@/app/overlays")`) |
 
 ## What the integrator should check
 
@@ -280,9 +332,10 @@ that glitches ONCE (seeded `glitchFrames`, `fxTiming.matrixFps`, rests on the cl
 Every catch goes to `reportError(error, { source: "boundary", … })` (P09: sent only with the trader's opt-in).
 `resetKeys` re-arms it (wrap `renderPage` with `resetKeys={[page]}`).
 
-**Dev harness.** `/dev/ux.html` (`npm run dev`): `?view=app` (default) = the real app + the three P13 hosts + the app
-boundary; `?view=cockpit`, `?view=cards` (ThemeCard + OnboardingCard), `?view=crash`, `?view=crash-widget`. The P13 e2e
-specs run against it until P14 wires everything (`tests/e2e/uxHarness.ts`, `PW_UX_URL=/` afterwards).
+**Dev harness.** `/dev/ux.html` (`npm run dev`): `?view=app` (default) = the integrated app; `?view=cockpit`,
+`?view=cards` (ThemeCard + OnboardingCard), `?view=crash`, `?view=crash-widget`. Since P14 the e2e specs run on the real
+routes of the production build (`tests/e2e/uxHarness.ts`: the page error state is a lazy chunk that cannot be loaded,
+the widget error state a throwing cockpit widget).
 
 Tests: `tests/unit/theme.{store,transition,codemod,card,budget}.test.*`, `shortcuts.{registry,host}.test.*`,
 `app.errorBoundary.test.tsx`; e2e `theme.spec.ts`, `search.spec.ts` (shortcuts too), `a11y.spec.ts`.

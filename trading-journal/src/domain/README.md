@@ -31,6 +31,21 @@ csv.ts        tradesToCsv, csvCell, toJsonBackup, jsonBackupText, exportFilename
 insights/     Auswertung metrics (Tradezella-style: calendar, discipline, mistakes, risk, edge, R distribution, recap …),
               see src/domain/insights/README.md
 signals/      multi-timeframe entry check (MCB + RSI + Premium/Discount, strength score), see src/domain/signals/README.md
+lage/         Lage-Ampel (daily / weekly trend state, decision 23)
+boxes/        Box zu Box (P02): box detection, phases, setups with grade, snapshot – see src/domain/boxes/README.md
+analytics/    Analyse (P03): ratios with intervals, Monte Carlo (+ worker), risk of ruin, breakdowns, dimensions, rolling,
+              benchmark, compare, custom stats, significance labels – see src/domain/analytics/README.md
+coach/        Coach (P04): behaviour detectors, edges / leaks, recommendations, trade review, German Q&A (nlq) –
+              see src/domain/coach/README.md
+reports/      Berichte (P04): periods, report builder, archive, pending "Bericht bereit", exports – src/domain/reports/README.md
+risk/         Risiko (P05): sizing, liquidation, limits, exposure, correlation, streak risk, scenarios, per strategy, warnings –
+              see src/domain/risk/README.md
+strategy/     Strategien (P07): strategy extras on setups, classifier, conformity – see src/domain/strategy/README.md
+backtest/     Labor (P07): backtest engine, strategies, fees, slippage, walk-forward, OOS, overfit check (+ worker) –
+              see src/domain/backtest/README.md
+growth/       Wachstum (P08): goals (one rule for negative targets: only R metrics and custom), streaks, challenges, habits,
+              bests, skills – see src/domain/growth/README.md
+psych/        Psyche (P08): states and patterns from the coach's events and P05's limits (no diagnoses) – src/domain/psych/README.md
 ```
 
 ## Editions (`edition/`)
