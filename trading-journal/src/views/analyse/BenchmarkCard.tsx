@@ -6,6 +6,7 @@
  * each scale to their own range and lie about who is ahead). Below: the adaptive benchmark – the last 90 days as a
  * percentile of the trader's own history. Without candles: an honest hint, never a made-up line.
  */
+import { themePaint } from "@/lib/themePaint";
 import { animate, motion, useMotionValue, useTransform } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { adaptiveBenchmark, ANA_EMPTY, benchmark, CARD_TITLES, explainBenchmark, type BenchmarkReport } from "@/domain/analytics";
@@ -83,15 +84,15 @@ function Race({ rep, symbol }: { rep: BenchmarkReport; symbol: string }) {
     const pt = pointAt(geo.bh, headX(v));
     return `translate(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px)`;
   });
-  const ownTone = rep.own >= rep.bh ? "#3ddc84" : "#f2f2f2";
+  const ownTone = rep.own >= rep.bh ? themePaint("#3ddc84") : themePaint("#f2f2f2");
   return (
     <div className="grid gap-2">
       <div ref={root} className="relative overflow-hidden rounded-xl border border-line bg-ink-950/60" style={{ height: H }} role="img" aria-label={`Du ${pct(rep.own)} gegen Buy & Hold ${symbol} ${pct(rep.bh)} seit ${fmtDate(new Date(rep.from))}`} data-testid="bench-race">
         {w > 0 && (
           <>
             <motion.svg aria-hidden="true" viewBox={`0 0 ${w} ${H}`} className="absolute inset-0 h-full w-full" style={{ clipPath: clip }}>
-              <line x1={0} x2={w} y1={geo.zeroY} y2={geo.zeroY} stroke="#2c2c2c" strokeDasharray="3 4" />
-              <path d={geo.bhD} fill="none" stroke="#9b9b9b" strokeWidth={1.4} strokeLinejoin="round" strokeDasharray="1 0" />
+              <line x1={0} x2={w} y1={geo.zeroY} y2={geo.zeroY} stroke={themePaint("#2c2c2c")} strokeDasharray="3 4" />
+              <path d={geo.bhD} fill="none" stroke={themePaint("#9b9b9b")} strokeWidth={1.4} strokeLinejoin="round" strokeDasharray="1 0" />
               <path d={geo.ownD} fill="none" stroke={ownTone} strokeWidth={2} strokeLinejoin="round" />
             </motion.svg>
             <motion.span aria-hidden="true" className="absolute left-0 top-0 -ml-[4px] -mt-[4px] size-2 rounded-full bg-mute" style={{ transform: bhHead }} />

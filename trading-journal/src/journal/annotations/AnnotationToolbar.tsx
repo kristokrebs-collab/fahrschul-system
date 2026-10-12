@@ -97,7 +97,7 @@ export function AnnotationToolbar({ tool, onTool, color, onColor, placed, select
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, transition: tween.exit }}
               transition={{ scale: spring.pop, opacity: tween.fade }}
-              className="rounded-full border border-loss/40 px-2.5 py-1 text-[11.5px] text-[#ff8a90] pointer-coarse:min-h-11"
+              className="rounded-full border border-loss/40 px-2.5 py-1 text-[11.5px] text-(--color-danger-text) pointer-coarse:min-h-11"
             >
               Zeichnung löschen
             </motion.button>
@@ -108,7 +108,7 @@ export function AnnotationToolbar({ tool, onTool, color, onColor, placed, select
             type="button"
             onClick={() => (confirmClear ? (onClear(), setConfirmClear(false)) : setConfirmClear(true))}
             onBlur={() => setConfirmClear(false)}
-            className={cn("rounded-full border px-2.5 py-1 text-[11.5px] transition-colors pointer-coarse:min-h-11", confirmClear ? "border-loss/50 text-[#ff8a90]" : "border-line-2 text-mute hover:text-fg")}
+            className={cn("rounded-full border px-2.5 py-1 text-[11.5px] transition-colors pointer-coarse:min-h-11", confirmClear ? "border-loss/50 text-(--color-danger-text)" : "border-line-2 text-mute hover:text-fg")}
           >
             {confirmClear ? "Wirklich alle?" : "Alle löschen"}
           </button>

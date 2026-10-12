@@ -6,6 +6,7 @@
  * the rest folds away. Reaching a goal is celebrated by the page (`useGrowthTransitions`: record burst + "Ziel
  * erreicht" wipe) – never an outcome goal.
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { BEHAVIOR_LABEL, type BehaviorKey } from "@/domain/coach/events";
@@ -25,8 +26,8 @@ import { WACHSTUM } from "./strings";
 import { pushToast } from "@/store/uiStore";
 
 const G = WACHSTUM.goals;
-const WIN = "#3ddc84";
-const LOSS = "#ff4d4f";
+const WIN = themePaint("#3ddc84");
+const LOSS = themePaint("#ff4d4f");
 const STATE_TEXT: Record<GoalProgress["state"], string> = { met: "erfüllt", onTrack: "auf Kurs", atRisk: "gefährdet", missed: "verfehlt", noData: "keine Daten" };
 const STATE_TONE: Record<GoalProgress["state"], string> = { met: "border-win/50 text-win", onTrack: "border-white/25 text-fg", atRisk: "border-warn/50 text-warn", missed: "border-loss/50 text-loss", noData: "border-line-2 text-faint" };
 const SOURCE: Record<string, string> = { coach: "Coach", mentor: "Mentor", onboarding: "Start", user: "Eigenes" };
@@ -63,7 +64,7 @@ export function GoalCard({ g, index = 0 }: { g: GoalProgress; index?: number }) 
       transition={{ ...spring.enter, delay: reduced ? 0 : index * stagger.cards * 2 }}
     >
       <div className="flex items-start gap-3.5">
-        <RingGauge value={limit && g.state === "missed" ? 1 : g.ratio} marker={limit ? null : 1} passColor={limit ? undefined : WIN} color={g.state === "missed" ? LOSS : "#f2f2f2"} size={86} stroke={9} aria-label={`${goal.title}: ${g.valueText} von ${g.targetText}`}>
+        <RingGauge value={limit && g.state === "missed" ? 1 : g.ratio} marker={limit ? null : 1} passColor={limit ? undefined : WIN} color={g.state === "missed" ? LOSS : themePaint("#f2f2f2")} size={86} stroke={9} aria-label={`${goal.title}: ${g.valueText} von ${g.targetText}`}>
           <span className="grid justify-items-center leading-none">
             <span className="num font-mono text-[13px] font-semibold">{g.valueText}</span>
             <span className="num mt-1 font-mono text-[9.5px] text-faint">{g.targetText}</span>

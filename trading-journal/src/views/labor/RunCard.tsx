@@ -54,7 +54,7 @@ export function RunCard({ className }: { className?: string }) {
       </div>
       {result && !busy && <Kpis result={result} runSeq={runSeq} />}
       {result && !busy && <Race result={result} runSeq={runSeq} />}
-      {status === "error" && result && <p role="alert" className="mt-3 text-[12.5px] text-[#ff8a90]">{error}</p>}
+      {status === "error" && result && <p role="alert" className="mt-3 text-[12.5px] text-(--color-danger-text)">{error}</p>}
     </Card>
   );
 }
@@ -64,7 +64,7 @@ function Idle({ text, tone }: { text: string; tone: "idle" | "error" }) {
     <motion.div className="absolute inset-0 grid place-items-center p-6 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: tween.exit }} transition={tween.fade}>
       <div className="grid justify-items-center gap-3">
         <DotMatrix text={tone === "error" ? "!" : "--"} tone={tone === "error" ? "signal" : "mute"} size={4} gap={2} glow={false} />
-        <p role={tone === "error" ? "alert" : undefined} className={cn("max-w-[42ch] text-[13px]", tone === "error" ? "text-[#ff8a90]" : "text-mute")}>
+        <p role={tone === "error" ? "alert" : undefined} className={cn("max-w-[42ch] text-[13px]", tone === "error" ? "text-(--color-danger-text)" : "text-mute")}>
           {text}
         </p>
       </div>

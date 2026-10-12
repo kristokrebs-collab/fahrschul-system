@@ -196,7 +196,7 @@ export function HyblockForm({ last, live, onClose, onSave, now, className }: Hyb
       <StaggerItem className="flex flex-wrap items-center justify-end gap-2">
         {asking ? (
           <span role="group" aria-label={HYBLOCK_FORM_STRINGS.discardAsk} className="flex w-full flex-wrap items-center justify-end gap-2" data-testid="hyblock-discard-confirm">
-            <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{HYBLOCK_FORM_STRINGS.discardAsk}</span>
+            <span className="basis-full text-[12.5px] font-medium text-(--color-danger-text) sm:mr-auto sm:basis-auto">{HYBLOCK_FORM_STRINGS.discardAsk}</span>
             <Button variant="danger" onClick={close}>
               {HYBLOCK_FORM_STRINGS.discard}
             </Button>
@@ -282,7 +282,7 @@ export function HyblockReadingsList({ readings, limit = 5, onDelete, className }
               {r.note && <span className="truncate text-faint">{r.note}</span>}
             </span>
             {confirm === r.id ? (
-              <span className="flex items-center gap-2 text-[#ff8a90]" role="alert">
+              <span className="flex items-center gap-2 text-(--color-danger-text)" role="alert">
                 {HYBLOCK_FORM_STRINGS.confirmDelete}
                 <Button size="sm" variant="danger" onClick={() => void remove(r.id)}>
                   {HYBLOCK_FORM_STRINGS.del}

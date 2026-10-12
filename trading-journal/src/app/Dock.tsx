@@ -824,7 +824,7 @@ export function Dock() {
                 <motion.span
                   layoutId={`new-trade-${fabCycle}`}
                   layoutDependency={layoutKey}
-                  className="absolute inset-0 rounded-full bg-gradient-to-br from-[#ff3b47] to-signal"
+                  className="absolute inset-0 rounded-full bg-gradient-to-br from-(--color-fab-from) to-signal"
                   style={{ borderRadius: radius.fab }}
                   initial={fabCycle > 0 && !reduced ? { scale: 0.9 } : false}
                   animate={{ scale: 1 }}

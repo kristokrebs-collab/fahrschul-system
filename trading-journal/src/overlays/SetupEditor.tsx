@@ -228,7 +228,7 @@ export function SetupEditor(props: SetupEditorProps) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ default: tween.fade, scale: spring.pop }}
           >
-            <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{SETUP_EDITOR_STRINGS.discardAsk}</span>
+            <span className="basis-full text-[12.5px] font-medium text-(--color-danger-text) sm:mr-auto sm:basis-auto">{SETUP_EDITOR_STRINGS.discardAsk}</span>
             <span className="inline-flex gap-2">
               <Button variant="danger" onClick={onClose}>
                 {SETUP_EDITOR_STRINGS.discard}
@@ -244,7 +244,7 @@ export function SetupEditor(props: SetupEditorProps) {
               (confirmDelete ? (
                 <motion.span
                   key="confirm"
-                  className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
+                  className="flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)"
                   initial={reduced ? false : { opacity: 0, scale: 0.96 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ default: tween.fade, scale: spring.pop }}
@@ -265,7 +265,7 @@ export function SetupEditor(props: SetupEditorProps) {
               ))}
             <span className="flex-1" />
             {error && (
-              <span role="alert" className="text-[12.5px] font-medium text-[#ff8a90]">
+              <span role="alert" className="text-[12.5px] font-medium text-(--color-danger-text)">
                 {error}
               </span>
             )}

@@ -234,7 +234,7 @@ function FillsEditor({ rows, onChange, side, date, currency }: { rows: FillRow[]
                 aria-label={`Fill ${i + 1}: ${r.side === "open" ? openLabel : closeLabel} – wechseln`}
                 className={cn(
                   "min-w-[5.6rem] rounded-full border px-2.5 py-1 text-left text-[11.5px] font-semibold transition-colors pointer-coarse:min-h-11",
-                  r.side === "open" ? "border-white/25 text-fg" : side === "short" ? "border-win/40 text-win" : "border-loss/40 text-[#ff8a90]",
+                  r.side === "open" ? "border-white/25 text-fg" : side === "short" ? "border-win/40 text-win" : "border-loss/40 text-(--color-danger-text)",
                 )}
               >
                 {r.side === "open" ? openLabel : closeLabel}
@@ -317,7 +317,7 @@ function TargetsEditor({ rows, onChange, side, entry, stop }: { rows: TargetRow[
         <AddButton onClick={() => onChange([...rows, newTargetRow()])} disabled={rows.length >= 8}>
           + Ziel
         </AddButton>
-        <span className={cn("text-[11px]", total > 100 ? "text-[#ff8a90]" : "text-faint")}>{rows.length ? `${trimNum(total)} % der Position verteilt` : "Teilziele mit Anteil – z. B. 50 % bei TP 1."}</span>
+        <span className={cn("text-[11px]", total > 100 ? "text-(--color-danger-text)" : "text-faint")}>{rows.length ? `${trimNum(total)} % der Position verteilt` : "Teilziele mit Anteil – z. B. 50 % bei TP 1."}</span>
       </div>
     </div>
   );

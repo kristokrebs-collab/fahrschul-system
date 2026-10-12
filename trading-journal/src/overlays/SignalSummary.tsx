@@ -121,7 +121,7 @@ export interface SignalSummaryProps {
 
 /** Soft (~50 % saturation) tones of a provisional signal (decision 9), as in the chart. */
 const SOFT = {
-  long: { text: "text-[#65b488]", dot: "bg-[#65b488]", ring: "border-[#65b488]", on: "border-dashed border-[#65b488]/45 bg-[#65b488]/[0.05]" },
+  long: { text: "text-(--color-win-soft)", dot: "bg-(--color-win-soft)", ring: "border-(--color-win-soft)", on: "border-dashed border-(--color-win-soft)/45 bg-(--color-win-soft)/[0.05]" },
   short: { text: "text-[#d2797a]", dot: "bg-[#d2797a]", ring: "border-[#d2797a]", on: "border-dashed border-[#d2797a]/45 bg-[#d2797a]/[0.05]" },
 } as const;
 
@@ -487,7 +487,7 @@ export function MistakeChips({ tags, className }: { tags: readonly string[]; cla
   return (
     <ul className={cn("flex flex-wrap gap-1.5", className)} aria-label="Fehler">
       {tags.map((m) => (
-        <li key={m} className="rounded-full border border-loss/40 bg-loss/[0.1] px-2.5 py-1 text-[11.5px] text-[#ff8a90]">
+        <li key={m} className="rounded-full border border-loss/40 bg-loss/[0.1] px-2.5 py-1 text-[11.5px] text-(--color-danger-text)">
           {m}
         </li>
       ))}

@@ -5,6 +5,7 @@
  * error `StatusPill` whose ring runs to `endsAt` ("Pause · mm:ss" on `nowMv`, zero renders per second) with a
  * `HoldConfirm` "Limit überschreiben" (hold = do it, a tap asks inline). Only the strongest warnings are listed.
  */
+import { themePaint } from "@/lib/themePaint";
 import { AnimatePresence, motion, useTransform } from "motion/react";
 import { useEffect, useState } from "react";
 import { clockText, type LimitReport, type LimitRow, type RiskWarning } from "@/domain/risk";
@@ -22,7 +23,7 @@ import { RISIKO } from "./strings";
 import { RiskCard, money, pct } from "./ui";
 
 const S = RISIKO.limits;
-const SIGNAL = "#e5202e";
+const SIGNAL = themePaint("#e5202e");
 
 /** True while `until` (epoch ms) lies ahead; flips to false on time (one timer), not at the next minute tick. */
 function useActiveUntil(until: number | null): boolean {

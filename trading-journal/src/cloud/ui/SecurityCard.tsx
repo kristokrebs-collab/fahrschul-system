@@ -184,7 +184,7 @@ function MfaSection() {
             {aal !== "aal2" ? (
               <p className="text-[12.5px] text-warn">{SECURITY.needCode}</p>
             ) : askOff ? (
-              <span className="inline-flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]" role="alert">
+              <span className="inline-flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)" role="alert">
                 {SECURITY.disableAsk}
                 <Button size="sm" variant="danger" onClick={() => void disable()} disabled={busy}>
                   {SECURITY.yes}
@@ -316,7 +316,7 @@ function SessionsSection() {
       )}
       {(otherCount > 0 || failed) &&
         (ask ? (
-          <span className="inline-flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]" role="alert">
+          <span className="inline-flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)" role="alert">
             {SECURITY.signOutOthersAsk}
             <Button size="sm" variant="danger" onClick={() => void others()} disabled={busy}>
               {SECURITY.yes}

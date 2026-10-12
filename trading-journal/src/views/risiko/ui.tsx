@@ -2,6 +2,7 @@
  * Building blocks of the Risiko page (P05): the card frame with the breach beam (one red `BorderBeam` lap per new
  * breach, `fire` key), the reveal cell, number formatting and a small labelled value.
  */
+import { themePaint } from "@/lib/themePaint";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { n0, n2 } from "@/lib/format";
@@ -12,7 +13,7 @@ import { Card, type CardProps } from "@/primitives/Card";
 export { SEG_TOUCH } from "@/views/insights/ui";
 
 /** Signal red of the single accent (BorderBeam head). */
-export const SIGNAL_HEX = "#e5202e";
+export const SIGNAL_HEX = themePaint("#e5202e");
 
 /** A Card with an optional red beam lap (`beam` = a key that changes on every new breach; falsy = none). */
 export function RiskCard({ beam, children, className, ...rest }: CardProps & { beam?: string | number | false | null }) {

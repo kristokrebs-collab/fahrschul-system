@@ -262,7 +262,7 @@ function DeleteSection({ onDeleted }: { onDeleted: () => void }) {
 
   return (
     <section className="grid gap-3 rounded-2xl border border-signal/25 bg-signal/[0.04] p-4" aria-labelledby="data-delete">
-      <h3 id="data-delete" className="text-[14px] font-semibold text-[#ff8a90]">
+      <h3 id="data-delete" className="text-[14px] font-semibold text-(--color-danger-text)">
         {DATA_CARD.deleteTitle}
       </h3>
       <p className="text-[12.5px] leading-relaxed text-mute">{DATA_CARD.deleteText}</p>

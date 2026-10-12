@@ -5,6 +5,7 @@
  * break breathes (`GlowBreak`). History: the provider's series (4h extended once by `provider.history`), the forming bar
  * from the trade stream and the kline frames – never a React render per tick.
  */
+import { themePaint } from "@/lib/themePaint";
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ChartSkeleton } from "@/chart/ChartSkeleton";
 import type { BarsListener, RangeDays } from "@/chart/NothingCandleChart";
@@ -46,14 +47,14 @@ function merge(older: readonly Candle[], data: readonly Candle[]): Candle[] {
 function Glyph({ kind }: { kind: "box" | "broken" | "pending" | "target" | "stop" | "rsi" }) {
   const common = { width: 18, height: 10, viewBox: "0 0 18 10", "aria-hidden": true, className: "shrink-0" } as const;
   if (kind === "box" || kind === "broken" || kind === "pending") {
-    const c = kind === "broken" ? "var(--color-win)" : kind === "pending" ? "#65b488" : "#9b9b9b";
+    const c = kind === "broken" ? "var(--color-win)" : kind === "pending" ? themePaint("#65b488") : themePaint("#9b9b9b");
     return (
       <svg {...common}>
         <rect x="1" y="1.5" width="16" height="7" fill={kind === "broken" ? "rgba(61,220,132,0.12)" : "rgba(255,255,255,0.08)"} stroke={c} strokeWidth="1" strokeDasharray={kind === "pending" ? "2 2" : undefined} />
       </svg>
     );
   }
-  const stroke = kind === "stop" ? "var(--color-loss)" : kind === "target" ? "var(--color-win)" : "#9b9b9b";
+  const stroke = kind === "stop" ? "var(--color-loss)" : kind === "target" ? "var(--color-win)" : themePaint("#9b9b9b");
   return (
     <svg {...common}>
       <path d={kind === "rsi" ? "M1 2 L17 8" : "M1 5 H17"} stroke={stroke} strokeWidth="1.25" strokeDasharray={kind === "target" ? "1.5 2.5" : kind === "stop" ? "4 3" : undefined} strokeLinecap="round" />

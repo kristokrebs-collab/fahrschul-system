@@ -20,7 +20,7 @@ import { InsightCard, useInsightsBase } from "./ui";
  * Opaque cell colours (no white-alpha: Samsung Internet's dark filter turns translucent white into translucent black,
  * which made the empty days vanish on the user's tablet). Index = heat level (1 < 50 % · 2 < 75 % · 3 < 100 % · 4 = 100 %).
  */
-const LEVEL_BG = ["bg-[#2c2c2c]", "bg-[#4a4a4a]", "bg-[#7d7d7d]", "bg-[#b5b5b5]", "bg-fg"] as const;
+const LEVEL_BG = ["bg-(--color-line-2)", "bg-(--conv-1)", "bg-[#7d7d7d]", "bg-[#b5b5b5]", "bg-fg"] as const;
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 /**
  * Fat-finger radius (px) of a heat-map tap: a tap that misses every traded cell picks the nearest traded cell whose
@@ -180,7 +180,7 @@ function HeatMap({ days, today, selected, onSelect, onOpen }: { days: readonly D
                     )}
                     style={reduced ? undefined : { transitionDelay: `${ci * 8}ms` }}
                   >
-                    {!has && !isToday && <span aria-hidden="true" className="size-[3px] rounded-full bg-[#3a3a3a]" />}
+                    {!has && !isToday && <span aria-hidden="true" className="size-[3px] rounded-full bg-(--color-chart-ref)" />}
                   </div>
                 );
               }),
@@ -192,7 +192,7 @@ function HeatMap({ days, today, selected, onSelect, onOpen }: { days: readonly D
         <span className="flex items-center gap-3">
           <span className="flex items-center gap-1.5">
             <span className="grid size-2.5 place-items-center">
-              <span className="size-[3px] rounded-full bg-[#3a3a3a]" />
+              <span className="size-[3px] rounded-full bg-(--color-chart-ref)" />
             </span>
             kein Trade
           </span>
@@ -235,7 +235,7 @@ function ScoreTrend({ points, avg, selected }: { points: readonly TrendPoint[]; 
       </div>
       <div ref={root} aria-hidden="true" className="relative h-[76px]">
         {/* 80 % streak line + 0 baseline */}
-        <span className="absolute inset-x-0 border-t border-dashed border-[#3a3a3a]" style={{ bottom: `${STREAK_MIN}%` }} />
+        <span className="absolute inset-x-0 border-t border-dashed border-(--color-chart-ref)" style={{ bottom: `${STREAK_MIN}%` }} />
         <span className="absolute left-0 -translate-y-full pb-0.5 font-mono text-[9px] leading-none text-faint" style={{ bottom: `${STREAK_MIN}%` }}>
           {STREAK_MIN} %
         </span>
@@ -248,13 +248,13 @@ function ScoreTrend({ points, avg, selected }: { points: readonly TrendPoint[]; 
             return (
               <div key={p.key} className="relative">
                 {p.score == null ? (
-                  <span className={cn("absolute bottom-[-1px] left-1/2 size-[3px] -translate-x-1/2 rounded-full", p.today ? "bg-mute" : "bg-[#3a3a3a]")} />
+                  <span className={cn("absolute bottom-[-1px] left-1/2 size-[3px] -translate-x-1/2 rounded-full", p.today ? "bg-mute" : "bg-(--color-chart-ref)")} />
                 ) : (
                   <span
                     className="absolute inset-x-0 bottom-0 origin-bottom transition-transform duration-500 ease-out"
                     style={{ height: `${Math.max(4, p.score)}%`, transform: seen || reduced ? "none" : "scaleY(0.02)", transitionDelay: reduced ? undefined : `${i * 12}ms` }}
                   >
-                    <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[#5f5f5f]" />
+                    <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-(--color-faint)" />
                     <span className={cn("absolute left-1/2 top-0 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full", TONE_DOT[tone], on && "ring-2 ring-signal ring-offset-2 ring-offset-ink-900")} />
                   </span>
                 )}
@@ -300,7 +300,7 @@ function LastDays({ days, selected, onSelect }: { days: readonly DisciplineDay[]
                   </span>
                   <span aria-hidden="true" className="flex items-center gap-[3px]">
                     {marks.map((m) => (
-                      <span key={m.key} className={cn("h-2.5 w-1.5 rounded-[1.5px]", m.ok === true ? "bg-win/80" : m.ok === false ? "bg-loss" : "bg-[#2c2c2c]")} />
+                      <span key={m.key} className={cn("h-2.5 w-1.5 rounded-[1.5px]", m.ok === true ? "bg-win/80" : m.ok === false ? "bg-loss" : "bg-(--color-line-2)")} />
                     ))}
                   </span>
                   <span className={cn("num w-11 text-right font-mono text-[12px]", TONE_TEXT[tone])}>{d.score == null ? "–" : `${Math.round(d.score)} %`}</span>

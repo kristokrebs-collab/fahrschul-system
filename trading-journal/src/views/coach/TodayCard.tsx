@@ -4,6 +4,7 @@
  * ring runs down – "Pause · mm:ss" on the shared clock, zero renders per second) and the focus for the rest of the day
  * (the first step of the plan). A critical alert sends one signal-red `BorderBeam` lap round the card.
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion, useTransform } from "motion/react";
 import { useMemo } from "react";
 import { BEHAVIOR_LABEL, triggerOf, type BehaviorEvent, type Recommendation } from "@/domain/coach";
@@ -21,7 +22,7 @@ import { openTrade } from "@/views/insights/ui";
 import { useCoachUi } from "./coachStore";
 import { SeverityDot } from "./ui";
 
-const SIGNAL_HEX = "#e5202e";
+const SIGNAL_HEX = themePaint("#e5202e");
 
 function PauseLabel({ until }: { until: number }) {
   const now = useNowMv();

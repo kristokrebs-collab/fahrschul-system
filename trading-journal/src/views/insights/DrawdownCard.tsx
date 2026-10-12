@@ -81,7 +81,7 @@ function Underwater({ points, minDD }: { points: { dd: number; label: string }[]
             <path d={line} fill="none" stroke="#ff4d4f" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
           </svg>
           {dots.map((d, i) => (
-            <span key={i} className={cn("absolute size-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full", d.low ? "bg-loss" : "bg-[#ff4d4f]/70")} style={{ left: d.left, top: d.top }} />
+            <span key={i} className={cn("absolute size-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full", d.low ? "bg-loss" : "bg-(--color-loss)/70")} style={{ left: d.left, top: d.top }} />
           ))}
         </motion.div>
         <span ref={guide} className="pointer-events-none absolute inset-y-0 left-0 w-px bg-fg/50 opacity-0 transition-opacity duration-150" />

@@ -394,7 +394,7 @@ function Panel({ reduced }: { reduced: boolean }) {
                       aria-hidden="true"
                       className={cn(
                         "grid size-10 shrink-0 place-items-center rounded-full [&>svg]:size-4",
-                        a.accent ? "bg-gradient-to-br from-[#ff3b47] to-signal text-ink-950" : "border border-line-2 text-mute group-hover/action:text-fg",
+                        a.accent ? "bg-gradient-to-br from-(--color-fab-from) to-signal text-ink-950" : "border border-line-2 text-mute group-hover/action:text-fg",
                       )}
                     >
                       {a.icon}

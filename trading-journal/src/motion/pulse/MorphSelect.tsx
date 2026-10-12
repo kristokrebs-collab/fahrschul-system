@@ -770,7 +770,7 @@ export function MorphSelect<T extends string = string>({
                 <div
                   ref={thumbRef}
                   aria-hidden="true"
-                  className="pointer-events-none absolute right-[5px] top-0 w-1 rounded-full bg-[#4a4a4a] opacity-0 transition-opacity duration-300 ease-out data-[on]:opacity-100 data-[on]:duration-[60ms]"
+                  className="pointer-events-none absolute right-[5px] top-0 w-1 rounded-full bg-(--conv-1) opacity-0 transition-opacity duration-300 ease-out data-[on]:opacity-100 data-[on]:duration-[60ms]"
                 />
               )}
             </div>

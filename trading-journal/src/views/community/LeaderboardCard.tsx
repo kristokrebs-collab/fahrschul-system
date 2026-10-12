@@ -1,3 +1,4 @@
+import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
@@ -61,7 +62,7 @@ function Podium({ row, metric, place, pulse }: { row: LeaderboardRow; metric: So
       data-testid={`podium-${place}`}
       data-me={row.me ? "" : undefined}
     >
-      {place === 1 && <BorderBeam fire={pulse + 1} colorFrom="#f2f2f2" colorTo="#e5202e" />}
+      {place === 1 && <BorderBeam fire={pulse + 1} colorFrom={themePaint("#f2f2f2")} colorTo={themePaint("#e5202e")} />}
       {row.me && <SpotlightSweep play={pulse} />}
       <DotMatrixText text={String(row.rank)} tone={place === 1 ? "signal" : "fg"} size={place === 1 ? 4 : 3} gap={1} label={`Platz ${row.rank}`} />
       <Monogram pseudonym={row.pseudonym} size="sm" tone={row.me ? "signal" : "fg"} />

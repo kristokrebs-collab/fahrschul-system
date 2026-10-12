@@ -160,8 +160,8 @@ const BiasTrack = memo(function BiasTrack({ score, firm, compact = false, empty 
           <>
             {/* provisional part (desaturated, to the needle) under the confirmed fill (full colour, to `firm`); both are
                 flat gradients that brighten toward their end, so the brightest point is the end, never mid-bar */}
-            <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-[#65b488]/45 to-[#65b488]/80" style={{ scaleX: longScale }} />
-            <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-[#d27a7b]/45 to-[#d27a7b]/80" style={{ scaleX: shortScale }} />
+            <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-(--color-win-soft)/45 to-(--color-win-soft)/80" style={{ scaleX: longScale }} />
+            <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-(--color-loss-soft)/45 to-(--color-loss-soft)/80" style={{ scaleX: shortScale }} />
             <motion.span className="absolute inset-y-0 right-1/2 w-1/2 origin-right bg-gradient-to-l from-win/55 via-win/75 to-win" style={{ scaleX: longFirm }} data-testid={compact ? undefined : "bias-fill-firm"} />
             <motion.span className="absolute inset-y-0 left-1/2 w-1/2 origin-left bg-gradient-to-r from-loss/55 via-loss/75 to-loss" style={{ scaleX: shortFirm }} />
           </>
@@ -408,7 +408,7 @@ const ContributionRow = memo(function ContributionRow({ c, pct, cents }: { c: Bi
   const side = v == null || Math.abs(v) < 0.05 ? null : v > 0 ? "long" : "short";
   const mag = v == null ? 0 : Math.min(1, Math.abs(v));
   const prov = !!c.provisional && v != null;
-  const fill = !side ? "" : prov ? (side === "long" ? "from-[#65b488]/20 to-[#65b488]" : "from-[#d27a7b]/20 to-[#d27a7b]") : side === "long" ? "from-win/25 to-win" : "from-loss/25 to-loss";
+  const fill = !side ? "" : prov ? (side === "long" ? "from-(--color-win-soft)/20 to-(--color-win-soft)" : "from-(--color-loss-soft)/20 to-(--color-loss-soft)") : side === "long" ? "from-win/25 to-win" : "from-loss/25 to-loss";
   return (
     <li className={cn("grid gap-1.5", v == null && "opacity-60")} data-testid="bias-row" data-id={c.id} data-vote={v == null ? "none" : v.toFixed(2)} data-provisional={prov || undefined}>
       <span className="flex items-baseline justify-between gap-3">
@@ -420,7 +420,7 @@ const ContributionRow = memo(function ContributionRow({ c, pct, cents }: { c: Bi
             </span>
           )}
         </span>
-        <span className={cn("shrink-0 whitespace-nowrap text-[11.5px]", side ? (prov ? (side === "long" ? "text-[#65b488]" : "text-[#d27a7b]") : LEVEL_TEXT[side]) : "text-faint")}>
+        <span className={cn("shrink-0 whitespace-nowrap text-[11.5px]", side ? (prov ? (side === "long" ? "text-(--color-win-soft)" : "text-(--color-loss-soft)") : LEVEL_TEXT[side]) : "text-faint")}>
           {voteWord(v)}
           {v != null && <span className="num ml-1.5 font-mono">{fmtVote(v)}</span>}
         </span>
@@ -483,7 +483,7 @@ export function BiasExplain({ seed }: { seed?: BiasLevel | null }) {
                 bestätigt
               </span>
               <span className="flex items-center gap-1.5">
-                <span aria-hidden="true" className={cn("h-1.5 w-4 rounded-full", bias.side === "short" ? "bg-[#d27a7b]/70" : "bg-[#65b488]/70")} />
+                <span aria-hidden="true" className={cn("h-1.5 w-4 rounded-full", bias.side === "short" ? "bg-(--color-loss-soft)/70" : "bg-(--color-win-soft)/70")} />
                 vorläufig (laufende Kerze, zählt halb) · {provN} {provN === 1 ? "Bedingung" : "Bedingungen"}
               </span>
             </span>

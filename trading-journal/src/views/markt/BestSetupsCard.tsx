@@ -9,6 +9,7 @@
  * distance of the live price to the setup's edge rolls (`RollingDigits` on `priceMv`, zero renders per tick).
  * Reduced motion: every end state at once.
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { memo, useMemo } from "react";
 import { KIND_TEXT, PHASE_LABEL, type BoxSetup } from "@/domain/boxes";
@@ -193,7 +194,7 @@ const SetupTile = memo(function SetupTile({ b }: { b: BestSetup }) {
           <ConfidenceMeter value={s.score} label={S.score} size={3} gap={1.5} cols={16} rows={4} />
         </div>
       </div>
-      {brk && <BorderBeam fire={b.id} colorFrom={up ? "#3ddc84" : "#ff4d4f"} colorTo="#ffffff" size={90} />}
+      {brk && <BorderBeam fire={b.id} colorFrom={up ? themePaint("#3ddc84") : themePaint("#ff4d4f")} colorTo="var(--color-white, #ffffff)" size={90} />}
     </MorphCard>
   );
 });

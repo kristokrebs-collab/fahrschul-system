@@ -4,6 +4,7 @@
  * exit efficiency as a ring (how much of the best move the winners kept), entry precision (Ø MAE in R), money left on
  * the table and losers that had been ≥ 1 R up, plus the stop hint ("80 % deiner Gewinner …").
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { useMemo, useRef } from "react";
 import { ANA_EMPTY, CARD_TITLES, excursionReport, explainExcursion, EXCURSION_MIN_N, type ExcursionReport } from "@/domain/analytics";
@@ -72,7 +73,7 @@ export function ExcursionCard({ view, cur }: { view: AccountView; cur: string })
         <div className="grid gap-4">
           <Scatter rep={rep} />
           <div className="flex flex-wrap items-center gap-4">
-            <RingGauge value={eff} size={92} stroke={8} color="#3ddc84" aria-label={`Exit-Effizienz ${pct0(eff)}`}>
+            <RingGauge value={eff} size={92} stroke={8} color={themePaint("#3ddc84")} aria-label={`Exit-Effizienz ${pct0(eff)}`}>
               <span className="grid justify-items-center">
                 <span className="dot-num text-[19px] leading-none">{pct0(eff)}</span>
                 <span className="text-[9px] uppercase tracking-[0.1em] text-faint">Exit</span>

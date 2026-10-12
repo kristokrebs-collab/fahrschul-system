@@ -155,7 +155,7 @@ function SignedIn() {
         ) : null}
         <Button onClick={() => void out("local")}>{AUTH_CARD.signOut}</Button>
         {askAll ? (
-          <span className="inline-flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]" role="alert">
+          <span className="inline-flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)" role="alert">
             {AUTH_CARD.signOutAll}?
             <Button size="sm" variant="danger" onClick={() => void out("global")}>
               Ja

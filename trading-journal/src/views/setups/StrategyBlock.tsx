@@ -70,7 +70,7 @@ export function StrategyBlock({ setup, playbook }: { setup: Setup; playbook?: Pl
       </span>
       <span className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11.5px] text-mute" data-testid="setup-strategy">
         <span className="whitespace-nowrap">
-          {STRATEGY_BLOCK_STRINGS.conformity}: <span className={cn("num font-mono", st?.score == null ? "text-faint" : st.score >= 80 ? "text-win" : st.score < 50 ? "text-[#ff8a90]" : "text-fg/90")}>{st?.score ?? "–"}</span>
+          {STRATEGY_BLOCK_STRINGS.conformity}: <span className={cn("num font-mono", st?.score == null ? "text-faint" : st.score >= 80 ? "text-win" : st.score < 50 ? "text-(--color-danger-text)" : "text-fg/90")}>{st?.score ?? "–"}</span>
         </span>
         <span className="whitespace-nowrap">
           {STRATEGY_BLOCK_STRINGS.examples}: <span className="num font-mono text-fg/90">{st?.examples ?? x.examples.length}</span>

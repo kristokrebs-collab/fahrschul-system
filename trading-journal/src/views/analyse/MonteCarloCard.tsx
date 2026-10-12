@@ -12,6 +12,7 @@
  * While the worker simulates, `DotMatrixText` waves "SIM" (only shown when it takes longer than a beat).
  * Reduced motion: the finished picture at once.
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion, useMotionValue } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -237,11 +238,11 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
             animate={{ clipPath: bandOn ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)" }}
             transition={tween.draw}
           >
-            <line x1={0} x2={geo.w} y1={geo.startY} y2={geo.startY} stroke="#5f5f5f" strokeDasharray="3 4" strokeWidth={1} />
+            <line x1={0} x2={geo.w} y1={geo.startY} y2={geo.startY} stroke={themePaint("#5f5f5f")} strokeDasharray="3 4" strokeWidth={1} />
             <path d={geo.band} fill="rgb(242 242 242 / 0.05)" stroke="rgb(242 242 242 / 0.22)" strokeDasharray="2 3" strokeWidth={1} />
             <path d={geo.core} fill="rgb(242 242 242 / 0.08)" />
-            <path d={geo.median} fill="none" stroke="#f2f2f2" strokeWidth={1.6} strokeLinejoin="round" />
-            <path ref={hl} fill="none" stroke="#e5202e" strokeWidth={1.6} strokeLinejoin="round" opacity={0.95} />
+            <path d={geo.median} fill="none" stroke={themePaint("#f2f2f2")} strokeWidth={1.6} strokeLinejoin="round" />
+            <path ref={hl} fill="none" stroke={themePaint("#e5202e")} strokeWidth={1.6} strokeLinejoin="round" opacity={0.95} />
           </motion.svg>
         )}
         {bandOn && !reduced && <SpotlightSweep play={1} playOnView={false} />}

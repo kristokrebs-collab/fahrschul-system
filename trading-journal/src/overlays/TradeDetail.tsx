@@ -587,13 +587,13 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
           </span>
           <div className="flex min-h-8 flex-wrap items-center justify-end gap-2">
             {err && (
-              <span role="alert" className="text-[12px] font-medium text-[#ff8a90]">
+              <span role="alert" className="text-[12px] font-medium text-(--color-danger-text)">
                 {err}
               </span>
             )}
             <AnimatePresence mode="wait" initial={false}>
               {confirm ? (
-                <motion.span key="confirm" className="flex flex-wrap items-center justify-end gap-2 text-[12.5px] text-[#ff8a90]" {...confirmSwapMotion(reduced)}>
+                <motion.span key="confirm" className="flex flex-wrap items-center justify-end gap-2 text-[12.5px] text-(--color-danger-text)" {...confirmSwapMotion(reduced)}>
                   Wirklich löschen?
                   <Button size="sm" variant="danger" className={COARSE} onClick={() => void del()}>
                     Ja, löschen

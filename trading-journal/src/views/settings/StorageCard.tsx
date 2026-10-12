@@ -60,12 +60,12 @@ export const StorageCard = memo(function StorageCard({ className }: { className?
       <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
         <Row term={S.edition} value={IS_SHARE ? S.share : S.personal} />
         <Row term={S.target} value={file ? S.file : S.web} />
-        <Row term={S.where} value={where} tone={noStorage ? "text-[#ff8a90]" : undefined} />
+        <Row term={S.where} value={where} tone={noStorage ? "text-(--color-danger-text)" : undefined} />
         <Row term={S.keys} value={<span className="num font-mono">{`${KEY_PREFIX}*`}</span>} sub={IS_SHARE ? S.keysShare : S.keysPersonal} />
       </dl>
 
       {noStorage && (
-        <p className="mt-4 rounded-xl border border-signal/40 bg-signal/[0.07] p-3 text-[12.5px] leading-relaxed text-[#ff8a90]" data-testid="settings-no-storage">
+        <p className="mt-4 rounded-xl border border-signal/40 bg-signal/[0.07] p-3 text-[12.5px] leading-relaxed text-(--color-danger-text)" data-testid="settings-no-storage">
           <strong className="font-semibold">{NO_STORAGE_STRONG}</strong>
           {NO_STORAGE_TEXT} {S.noStorageHint}
         </p>

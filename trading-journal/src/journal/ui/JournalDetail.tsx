@@ -175,7 +175,7 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
           {(psych.flags?.length ?? 0) > 0 && (
             <div className="flex flex-wrap gap-1.5" aria-label="Verhalten">
               {psych.flags!.map((f) => (
-                <span key={f} className="rounded-full border border-loss/35 bg-loss/[0.08] px-2.5 py-0.5 text-[11.5px] text-[#ff8a90]">
+                <span key={f} className="rounded-full border border-loss/35 bg-loss/[0.08] px-2.5 py-0.5 text-[11.5px] text-(--color-danger-text)">
                   {BEHAVIOR_LABEL[f as BehaviorKey] ?? f}
                 </span>
               ))}

@@ -46,7 +46,7 @@ const RungChip = memo(function RungChip({ r, side }: { r: RungView; side: "long"
       />
       <motion.span
         aria-hidden="true"
-        className={cn("pointer-events-none absolute -inset-px -z-10 rounded-lg border border-dashed", side === "long" ? "border-[#65b488]/45 bg-[#65b488]/[0.04]" : "border-[#d27a7b]/45 bg-[#d27a7b]/[0.04]")}
+        className={cn("pointer-events-none absolute -inset-px -z-10 rounded-lg border border-dashed", side === "long" ? "border-(--color-win-soft)/45 bg-(--color-win-soft)/[0.04]" : "border-(--color-loss-soft)/45 bg-(--color-loss-soft)/[0.04]")}
         initial={false}
         animate={{ opacity: r.lit && prov ? 1 : 0 }}
         transition={tween.crossfade}

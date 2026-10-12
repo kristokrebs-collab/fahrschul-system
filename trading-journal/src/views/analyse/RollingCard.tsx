@@ -6,6 +6,7 @@
  * into the DOM, the signed `DotMatrix` meter shows the window's Ø R as an R-VU meter (green up, red down) and the
  * `EquityDraw` of the equity in R draws up to the scrubbed trade – all without a React render per scrub.
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion, useMotionValue, useTransform, type MotionValue } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { aggregate } from "@/domain/agg";
@@ -98,9 +99,9 @@ function Chart({ points, metric, overall, time }: { points: RollingPoint[]; metr
         transition={tween.draw}
       >
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full overflow-visible">
-          {zero != null && <line x1={0} x2={W} y1={zero} y2={zero} stroke="#2c2c2c" vectorEffect="non-scaling-stroke" />}
-          {overall != null && <line x1={0} x2={W} y1={y(metric === "pf" ? Math.min(PF_CAP, overall) : overall)} y2={y(metric === "pf" ? Math.min(PF_CAP, overall) : overall)} stroke="#5f5f5f" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />}
-          <path d={d} fill="none" stroke="#f2f2f2" strokeWidth={1.6} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          {zero != null && <line x1={0} x2={W} y1={zero} y2={zero} stroke={themePaint("#2c2c2c")} vectorEffect="non-scaling-stroke" />}
+          {overall != null && <line x1={0} x2={W} y1={y(metric === "pf" ? Math.min(PF_CAP, overall) : overall)} y2={y(metric === "pf" ? Math.min(PF_CAP, overall) : overall)} stroke={themePaint("#5f5f5f")} strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />}
+          <path d={d} fill="none" stroke={themePaint("#f2f2f2")} strokeWidth={1.6} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         </svg>
       </motion.div>
       <span ref={guide} className="pointer-events-none absolute inset-y-0 left-0 w-px bg-signal/80" />

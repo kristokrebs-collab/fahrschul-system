@@ -58,11 +58,11 @@ import {
 
 const TONE_ON: Record<Side, string> = { long: "border-win/35 bg-win/[0.06]", short: "border-loss/35 bg-loss/[0.06]" };
 /** Provisional tone: the side colour at ~50 % saturation, dashed. */
-const TONE_PROV: Record<Side, string> = { long: "border-dashed border-[#65b488]/45 bg-[#65b488]/[0.035]", short: "border-dashed border-[#d27a7b]/45 bg-[#d27a7b]/[0.035]" };
+const TONE_PROV: Record<Side, string> = { long: "border-dashed border-(--color-win-soft)/45 bg-(--color-win-soft)/[0.035]", short: "border-dashed border-(--color-loss-soft)/45 bg-(--color-loss-soft)/[0.035]" };
 const SIDE_TEXT: Record<Side, string> = { long: "text-win", short: "text-loss" };
 const SIDE_BG: Record<Side, string> = { long: "bg-win", short: "bg-loss" };
 /** provisional fills: the side colours at about 50 % saturation (as `PROV_TEXT`) */
-const PROV_BG: Record<Side, string> = { long: "bg-[#65b488]", short: "bg-[#d27a7b]" };
+const PROV_BG: Record<Side, string> = { long: "bg-(--color-win-soft)", short: "bg-(--color-loss-soft)" };
 const GLOW: Record<Side, string> = { long: "rgb(61 220 132 / 0.55)", short: "rgb(255 77 79 / 0.55)" };
 const isFirm = (s: SignalState): boolean => s === "confirmed" || s === "strong";
 
@@ -129,7 +129,7 @@ export const StrengthDots = memo(function StrengthDots({ strength, color, outlin
   return (
     <span className="flex gap-1" role="img" aria-label={label}>
       {[1, 2, 3, 4].map((i) => (
-        <span key={i} className={cn("relative rounded-full bg-[#2c2c2c]", size === "md" ? "size-2" : "size-1.5")} aria-hidden="true">
+        <span key={i} className={cn("relative rounded-full bg-(--color-line-2)", size === "md" ? "size-2" : "size-1.5")} aria-hidden="true">
           <motion.span
             className="absolute inset-0 rounded-full"
             style={outlined ? { border: `1.5px dashed ${color}`, backgroundColor: "#0a0a0a" } : { backgroundColor: color }}
@@ -334,7 +334,7 @@ function EventDot({ rung, side, fresh }: { rung: RungView; side: Side; fresh: bo
       >
         <StateDot tone={tone} strong={rung.strong} state={state} lit={rung.match && rung.lit && isFirm(state)} />
       </motion.span>
-      {e && e.barsAgo === 0 && rung.match && !reduced && <span key={`${e.kind}-ping`} className={cn("fx-ping", rung.state === "provisional" ? (side === "long" ? "bg-[#65b488]" : "bg-[#d27a7b]") : side === "long" ? "bg-win" : "bg-loss")} />}
+      {e && e.barsAgo === 0 && rung.match && !reduced && <span key={`${e.kind}-ping`} className={cn("fx-ping", rung.state === "provisional" ? (side === "long" ? "bg-(--color-win-soft)" : "bg-(--color-loss-soft)") : side === "long" ? "bg-win" : "bg-loss")} />}
     </span>
   );
 }

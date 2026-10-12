@@ -5,6 +5,7 @@
  * Meister) with its change against 30 days ago. A level-up this device has not seen yet runs one `SpotlightSweep`
  * across the card (first visit: initialised silently). No P&L axis – skills are how you trade.
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { LEVEL_NAMES, type SkillProfile } from "@/domain/growth";
@@ -86,15 +87,15 @@ export function SkillRadar({ now, before, className }: { now: SkillProfile; befo
         </div>
         <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="mx-auto block w-full max-w-[360px] overflow-visible" role="img" aria-label={now.axes.map((a) => `${a.label} ${a.value ?? "keine Daten"}`).join(", ")}>
           {[25, 50, 75, 100].map((v) => (
-            <polygon key={v} points={ring(v)} fill="none" stroke={v === 100 ? "#2c2c2c" : "#1f1f1f"} strokeWidth="1" />
+            <polygon key={v} points={ring(v)} fill="none" stroke={v === 100 ? themePaint("#2c2c2c") : themePaint("#1f1f1f")} strokeWidth="1" />
           ))}
           {now.axes.map((a, i) => {
             const [x, y] = vertex(i, 100);
-            return <line key={a.key} x1={CX} y1={CY} x2={x} y2={y} stroke="#1f1f1f" strokeWidth="1" />;
+            return <line key={a.key} x1={CX} y1={CY} x2={x} y2={y} stroke={themePaint("#1f1f1f")} strokeWidth="1" />;
           })}
-          {hasGhost && <polygon points={poly(ghost)} fill="none" stroke="#5f5f5f" strokeWidth="1" strokeDasharray="3 3" />}
+          {hasGhost && <polygon points={poly(ghost)} fill="none" stroke={themePaint("#5f5f5f")} strokeWidth="1" strokeDasharray="3 3" />}
           <motion.g style={{ transformOrigin: `${CX}px ${CY}px`, transformBox: "view-box" }} initial={reduced ? false : { opacity: 0, scale: 0 }} animate={grow ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0 }} transition={{ scale: spring.smooth, opacity: tween.fade }}>
-            <polygon points={poly(vals)} fill="rgb(61 220 132 / 0.12)" stroke="#3ddc84" strokeWidth="1.5" strokeLinejoin="round" />
+            <polygon points={poly(vals)} fill="rgb(61 220 132 / 0.12)" stroke={themePaint("#3ddc84")} strokeWidth="1.5" strokeLinejoin="round" />
             {vals.map((v, i) => {
               const [x, y] = vertex(i, v ?? 0);
               return (
@@ -103,7 +104,7 @@ export function SkillRadar({ now, before, className }: { now: SkillProfile; befo
                   cx={x}
                   cy={y}
                   r={3}
-                  fill={v == null ? "#5f5f5f" : "#f2f2f2"}
+                  fill={v == null ? themePaint("#5f5f5f") : themePaint("#f2f2f2")}
                   style={{ transformOrigin: `${x}px ${y}px`, transformBox: "view-box" }}
                   initial={reduced ? false : { scale: 0 }}
                   animate={grow ? { scale: 1 } : { scale: 0 }}

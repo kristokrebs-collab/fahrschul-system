@@ -604,7 +604,7 @@ function AccountView({ onOpenAccount }: { onOpenAccount?: () => void }) {
         )}
         <Button onClick={() => void out("local")}>{AUTH.account.signOut}</Button>
         {confirmAll ? (
-          <span className="inline-flex items-center gap-2 text-[12.5px] text-[#ff8a90]" role="alert">
+          <span className="inline-flex items-center gap-2 text-[12.5px] text-(--color-danger-text)" role="alert">
             {AUTH.account.signOutAll}?
             <Button size="sm" variant="danger" onClick={() => void out("global")}>
               Ja

@@ -215,7 +215,7 @@ function RuleRow({ rule, index, count, ids, dragReady, onArm, used, confirming, 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, transition: tween.exit }}
             transition={tween.fade}
-            className="flex flex-wrap items-center gap-2 pl-12 text-[12.5px] text-[#ff8a90] pointer-coarse:pl-[3.25rem]"
+            className="flex flex-wrap items-center gap-2 pl-12 text-[12.5px] text-(--color-danger-text) pointer-coarse:pl-[3.25rem]"
             role="alert"
           >
             {RULES_STRINGS.removeHint(used)}

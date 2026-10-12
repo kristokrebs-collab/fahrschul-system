@@ -229,7 +229,7 @@ export const SIDE_COLOR: Readonly<Record<Side, string>> = { long: "#3ddc84", sho
 export const PROV_COLOR: Readonly<Record<Side, string>> = { long: "#65b488", short: "#d27a7b" };
 export const NEUTRAL_COLOR = "#9b9b9b";
 /** Tailwind classes of the provisional colours (literal strings: the class scanner needs them whole). */
-export const PROV_TEXT: Readonly<Record<Side, string>> = { long: "text-[#65b488]", short: "text-[#d27a7b]" };
+export const PROV_TEXT: Readonly<Record<Side, string>> = { long: "text-(--color-win-soft)", short: "text-(--color-loss-soft)" };
 
 type StatefulVerdict = Pick<Verdict, "valid" | "side"> & { state?: SignalState; lage?: Verdict["lage"] };
 

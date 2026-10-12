@@ -148,7 +148,7 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
           </Button>
           {mode === "replace" && confirm ? (
             <motion.span
-              className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
+              className="flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)"
               role="alert"
               initial={reduced ? false : { opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}

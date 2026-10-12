@@ -361,7 +361,7 @@ function PlaybookBlock({ stats, playbook, currency }: { stats: RankedSetupStats;
         <span className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px] text-mute">
           {topMistake && (
             <span className="min-w-0 [overflow-wrap:anywhere]">
-              {PLAYBOOK_STRINGS.topMistake}: <span className="text-[#ff8a90]">{topMistake.tag}</span> · <span className="num font-mono">{topMistake.n}×</span>
+              {PLAYBOOK_STRINGS.topMistake}: <span className="text-(--color-danger-text)">{topMistake.tag}</span> · <span className="num font-mono">{topMistake.n}×</span>
             </span>
           )}
           {signal?.avgScore != null && (

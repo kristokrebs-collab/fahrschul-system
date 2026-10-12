@@ -1,3 +1,4 @@
+import { themePaint } from "@/lib/themePaint";
 import { useMemo } from "react";
 import { cn } from "@/lib/cn";
 import { displayPrice } from "@/billing/format";
@@ -20,7 +21,7 @@ function CurveThumb({ seed, win, label }: { seed: number; win?: boolean; label?:
       }).join(" "),
     [seed, win],
   );
-  const tone = win ? "#3ddc84" : "#5f5f5f";
+  const tone = win ? themePaint("#3ddc84") : themePaint("#5f5f5f");
   return (
     <div className="relative aspect-[3/4] w-full bg-ink-900">
       <svg viewBox="0 0 160 90" preserveAspectRatio="none" className="absolute inset-0 size-full">

@@ -741,7 +741,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
     <AnimatePresence mode="wait" initial={false}>
       {confirmDiscard ? (
         <motion.div key="discard" role="group" aria-label={DISCARD_COPY.ask} className="flex w-full flex-wrap items-center justify-end gap-2.5" data-testid="discard-confirm" {...confirmSwapMotion(reduced)}>
-          <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{DISCARD_COPY.ask}</span>
+          <span className="basis-full text-[12.5px] font-medium text-(--color-danger-text) sm:mr-auto sm:basis-auto">{DISCARD_COPY.ask}</span>
           <span className="inline-flex gap-2">
             <Button variant="danger" className="pointer-coarse:min-h-11" onClick={closeEditor}>
               {DISCARD_COPY.discard}
@@ -757,7 +757,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         <span className="flex min-h-10 items-center">
           <AnimatePresence mode="wait" initial={false}>
             {confirmDelete ? (
-              <motion.span key="confirm" className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]" {...confirmSwapMotion(reduced)}>
+              <motion.span key="confirm" className="flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)" {...confirmSwapMotion(reduced)}>
                 Wirklich löschen?
                 <Button size="sm" variant="danger" className="pointer-coarse:min-h-11" onClick={() => void onDelete()}>
                   Ja, löschen
@@ -777,7 +777,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         </span>
       )}
       <span className="flex-1" />
-      <span ref={alertRef} id={ERROR_ID} role="alert" className="text-[12.5px] font-medium text-[#ff8a90]">
+      <span ref={alertRef} id={ERROR_ID} role="alert" className="text-[12.5px] font-medium text-(--color-danger-text)">
         <AnimatePresence mode="wait" initial={false}>
           {err && (
             <motion.span
@@ -1122,7 +1122,7 @@ function ChecklistBar({ ratio, complete }: { ratio: number; complete: boolean })
   return (
     <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]" aria-hidden="true">
       <motion.div className="relative h-full w-full rounded-full" style={{ transformOrigin: "left" }} initial={false} animate={{ scaleX: ratio }} transition={spring.bar}>
-        <span className="absolute inset-0 rounded-full bg-gradient-to-r from-[#5f5f5f] to-white" />
+        <span className="absolute inset-0 rounded-full bg-gradient-to-r from-(--color-faint) to-white" />
         <motion.span className="absolute inset-0 rounded-full bg-win" initial={false} animate={{ opacity: complete ? 1 : 0 }} transition={reduced ? { duration: 0 } : tween.crossfade} />
       </motion.div>
     </div>
@@ -1227,7 +1227,7 @@ function MistakeChips({ options, value, onChange }: { options: readonly string[]
             transition={spring.press}
             className={cn(
               "rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-200 pointer-coarse:min-h-11",
-              on ? "border-loss/50 bg-loss/[0.12] text-[#ff8a90]" : "border-line-2 text-mute hover:border-white/40 hover:text-fg",
+              on ? "border-loss/50 bg-loss/[0.12] text-(--color-danger-text)" : "border-line-2 text-mute hover:border-white/40 hover:text-fg",
             )}
           >
             {m}

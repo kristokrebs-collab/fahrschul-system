@@ -5,6 +5,7 @@
  * Motion: each mini chart draws in left → right once in view (`clip-path` wipe on `tween.draw`); a fresh break breathes
  * three times (`GlowBreak`, `tween.glow` + finite sonar rings) and rests as a soft glow. Reduced motion: drawn, static.
  */
+import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { memo, useRef } from "react";
 import { DEFAULT_RSI_LINE_CFG, lineAt, rsiLineText, type BoxTf, type RsiLine, type RsiLineState } from "@/domain/boxes";
@@ -68,7 +69,7 @@ export function miniGeo(s: RsiLineState, w = W, h = H, span = SPAN): MiniGeo {
 /** Left → right draw-in of the mini chart (clip-path wipe), ends unclipped. */
 const DRAW = { hidden: { clipPath: "inset(0 100% 0 0)" }, shown: { clipPath: "inset(0 0% 0 0)", transitionEnd: { clipPath: "none" } } };
 
-const LINE_TONE: Record<MiniGeo["lines"][number]["tone"], string> = { res: "#9b9b9b", sup: "#9b9b9b", up: "#3ddc84", down: "#ff4d4f" };
+const LINE_TONE: Record<MiniGeo["lines"][number]["tone"], string> = { res: themePaint("#9b9b9b"), sup: themePaint("#9b9b9b"), up: themePaint("#3ddc84"), down: themePaint("#ff4d4f") };
 
 const Mini = memo(function Mini({ s, label }: { s: RsiLineState; label: string }) {
   const reduced = useReducedFx();
@@ -79,13 +80,13 @@ const Mini = memo(function Mini({ s, label }: { s: RsiLineState; label: string }
     // the (unclipped) wrapper is observed (shared observer, intro-gated); the chart draws in once it is seen
     <motion.div ref={ref} className="relative shrink-0" style={{ width: W, height: H }} role="img" aria-label={label} initial={reduced ? false : "hidden"} animate={reduced || seen ? "shown" : "hidden"}>
       <motion.svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="overflow-visible" variants={DRAW} transition={tween.draw} aria-hidden="true">
-        <line x1="0" x2={W} y1={g.levels.y70} y2={g.levels.y70} stroke="#3a3a3a" strokeDasharray="1 3" />
-        <line x1="0" x2={W} y1={g.levels.y30} y2={g.levels.y30} stroke="#3a3a3a" strokeDasharray="1 3" />
-        <path d={g.path} fill="none" stroke="#f2f2f2" strokeWidth="1.25" strokeLinejoin="round" />
+        <line x1="0" x2={W} y1={g.levels.y70} y2={g.levels.y70} stroke={themePaint("#3a3a3a")} strokeDasharray="1 3" />
+        <line x1="0" x2={W} y1={g.levels.y30} y2={g.levels.y30} stroke={themePaint("#3a3a3a")} strokeDasharray="1 3" />
+        <path d={g.path} fill="none" stroke={themePaint("#f2f2f2")} strokeWidth="1.25" strokeLinejoin="round" />
         {g.lines.map((l, i) => (
           <path key={i} d={l.d} fill="none" stroke={LINE_TONE[l.tone]} strokeWidth="1" strokeDasharray={l.tone === "res" || l.tone === "sup" ? "3 2" : undefined} />
         ))}
-        {g.brk && <circle cx={g.brk.x} cy={g.brk.y} r="3" fill={g.brk.dir === 1 ? "#3ddc84" : "#ff4d4f"} />}
+        {g.brk && <circle cx={g.brk.x} cy={g.brk.y} r="3" fill={g.brk.dir === 1 ? themePaint("#3ddc84") : themePaint("#ff4d4f")} />}
       </motion.svg>
       {g.brk && <GlowBreak x={g.brk.x} y={g.brk.y} tone={g.brk.dir === 1 ? "win" : "loss"} size={22} rings={1} play={g.brk.x} />}
     </motion.div>

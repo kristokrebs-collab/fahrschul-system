@@ -23,7 +23,7 @@ export function ConfirmAction({ label, question, onConfirm, disabled, testId }: 
         <motion.span
           key="ask"
           role="alert"
-          className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
+          className="flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)"
           initial={reduced ? false : { opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1, transitionEnd: { transform: "none" } }}
           exit={{ opacity: 0, transition: tween.exit }}

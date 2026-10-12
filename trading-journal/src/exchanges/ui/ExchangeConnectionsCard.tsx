@@ -420,7 +420,7 @@ function Connected({ conn, status }: { conn: ExchangeConnection; status: Exchang
           <span className="min-w-0 flex-1 text-[11.5px] leading-snug text-faint">{EX.ipNote}</span>
           {asking ? (
             <motion.span
-              className="flex flex-wrap items-center gap-2 text-[12.5px] text-[#ff8a90]"
+              className="flex flex-wrap items-center gap-2 text-[12.5px] text-(--color-danger-text)"
               role="alert"
               initial={reduced ? false : { opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}

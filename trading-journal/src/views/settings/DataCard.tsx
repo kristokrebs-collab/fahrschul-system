@@ -213,7 +213,7 @@ function BackupRow({ entry: b, ids, confirming, busy, onAsk, onCancel, onRestore
       </span>
       {confirming ? (
         <motion.span
-          className="flex flex-wrap items-center gap-2 text-[#ff8a90]"
+          className="flex flex-wrap items-center gap-2 text-(--color-danger-text)"
           role="alert"
           initial={reduced ? false : { opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}

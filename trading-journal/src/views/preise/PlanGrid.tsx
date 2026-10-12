@@ -191,7 +191,7 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
                 {cat.name}
               </h3>
               {cat.recommended && (
-                <Badge tone="loss" className="border-signal/30 bg-signal/15 text-[#ff8a90]">
+                <Badge tone="loss" className="border-signal/30 bg-signal/15 text-(--color-danger-text)">
                   {PREISE.recommended}
                 </Badge>
               )}

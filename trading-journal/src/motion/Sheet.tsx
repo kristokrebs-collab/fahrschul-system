@@ -365,7 +365,7 @@ export function Sheet({ open, onClose, title, size = "md", layoutId, headerExtra
                         className="flex flex-wrap items-center justify-end gap-2.5 border-t border-line bg-ink-900 px-6 py-3"
                         {...confirmSwapMotion(reduced)}
                       >
-                        <span className="basis-full text-[12.5px] font-medium text-[#ff8a90] sm:mr-auto sm:basis-auto">{SHEET_DISCARD_COPY.ask}</span>
+                        <span className="basis-full text-[12.5px] font-medium text-(--color-danger-text) sm:mr-auto sm:basis-auto">{SHEET_DISCARD_COPY.ask}</span>
                         <span className="inline-flex gap-2">
                           <Button variant="danger" className="pointer-coarse:min-h-11" onClick={() => closeRef.current()}>
                             {SHEET_DISCARD_COPY.discard}

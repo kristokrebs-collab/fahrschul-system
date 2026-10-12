@@ -63,7 +63,7 @@ const WeeklyChecks = memo(function WeeklyChecks({ rows, rsiBar, showBar, body }:
         </MorphTitle>
         <CheckRowView {...rows[0]} />
         <CheckRowView {...rows[1]} />
-        {showBar && <Bar value={rsiBar / 100} fill="bg-gradient-to-r from-[#3a3a3a] via-[#bdbdbd] to-white" />}
+        {showBar && <Bar value={rsiBar / 100} fill="bg-gradient-to-r from-(--color-chart-ref) via-[#bdbdbd] to-white" />}
       </div>
     </MorphCard>
   );

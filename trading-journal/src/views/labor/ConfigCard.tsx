@@ -94,7 +94,7 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <FieldRow label={LABOR.symbol} htmlFor={`labor-sym-${uid}`} hint={!symValid ? <span className="text-[#ff8a90]">{LABOR.symbolInvalid}</span> : LABOR.symbolHint}>
+          <FieldRow label={LABOR.symbol} htmlFor={`labor-sym-${uid}`} hint={!symValid ? <span className="text-(--color-danger-text)">{LABOR.symbolInvalid}</span> : LABOR.symbolHint}>
             <Autocomplete
               id={`labor-sym-${uid}`}
               value={symDraft ?? cfg.symbol}
@@ -269,7 +269,7 @@ function RulesEditor({ cfg, uid }: { cfg: LabConfig; uid: string }) {
             ))}
           </AnimatePresence>
         </ul>
-        {!rules.conds.length && <p className="text-[12px] text-[#ff8a90]">{LABOR.noConds}</p>}
+        {!rules.conds.length && <p className="text-[12px] text-(--color-danger-text)">{LABOR.noConds}</p>}
         {rules.conds.length < 6 && (
           <Button size="sm" className="justify-self-start" onClick={() => set([...rules.conds, { ...RULE_DEFAULTS.closeAboveEma }])}>
             {LABOR.addCond}

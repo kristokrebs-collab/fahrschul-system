@@ -78,7 +78,7 @@ function TokenRow({ t, onRevoke }: { t: ApiToken; onRevoke: () => void }) {
         ))}
         <span className="flex-1" />
         {asking ? (
-          <span className="flex flex-wrap items-center gap-2 text-[12px] text-[#ff8a90]" role="alert">
+          <span className="flex flex-wrap items-center gap-2 text-[12px] text-(--color-danger-text)" role="alert">
             {API_CARD.revokeAsk}
             <Button size="sm" variant="danger" onClick={onRevoke}>
               {API_CARD.revoke}
