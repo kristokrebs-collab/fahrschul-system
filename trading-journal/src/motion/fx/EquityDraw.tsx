@@ -149,7 +149,7 @@ export function EquityDraw({ values, height = EQUITY_DRAW.height, tone = "auto",
       const x1 = pts[pts.length - 1]!.x;
       const x = x0 + (x1 - x0) * t;
       const right = Math.max(0, g.width - x - 0.5);
-      if (clipRef.current) clipRef.current.style.clipPath = t >= 1 ? "none" : `inset(-20px ${right.toFixed(2)}px -20px -20px)`;
+      if (clipRef.current) clipRef.current.style.clipPath = t >= 1 ? "none" : t <= 0 ? "inset(0 100% 0 0)" : `inset(-20px ${right.toFixed(2)}px -20px -20px)`;
       const at = pointAt(pts, x);
       if (headRef.current) {
         headRef.current.style.transform = `translate(${at.x.toFixed(2)}px, ${at.y.toFixed(2)}px)`;

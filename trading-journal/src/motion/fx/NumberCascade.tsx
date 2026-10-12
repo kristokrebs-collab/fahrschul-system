@@ -153,13 +153,12 @@ export function NumberCascade({ value, decimals = 0, prefix = "", suffix = "", s
 
   useFxPlay(rootRef, play, playOnView, !reduced, run);
 
-  // a new value cascades again once the first run happened (or settles at once under reduced motion)
-  const first = useRef(true);
+  // a NEW value cascades again (or settles at once under reduced motion); StrictMode's effect replay sees the same
+  // value and does nothing
+  const shownFinal = useRef(final);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (shownFinal.current === final) return;
+    shownFinal.current = final;
     if (reduced) settle();
     else run();
     // run / settle only touch refs
@@ -173,7 +172,7 @@ export function NumberCascade({ value, decimals = 0, prefix = "", suffix = "", s
       <span className="sr-only">{final}</span>
       <span ref={slotsRef} aria-hidden="true" className="inline-flex">
         {chars.map((ch, i) => (
-          <span key={`${final}-${i}`} className="inline-block whitespace-pre" style={isDigit(ch) ? { minWidth: "0.62em", textAlign: "center" } : undefined}>
+          <span key={`${final}-${i}`} className="inline-block whitespace-pre">
             {ch}
           </span>
         ))}
