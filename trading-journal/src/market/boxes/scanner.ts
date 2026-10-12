@@ -178,11 +178,25 @@ export function scanSymbol(symbol: string, bars: Record<ScanTf, readonly Bar[]>,
 
 // ------------------------------------------------------------------ publish
 
+/** Rows per fetched series (a new fetch = a new object): every symbol is analysed once per fetch and engine setting. */
+const rowMemo = new WeakMap<SymData, { key: string; rows: ScanRow[] }>();
+
+/** The symbol's rows (analysed at most once per fetch / setting – a few ms, in the task that brought the bars). */
+function rowsFor(symbol: string, d: SymData): ScanRow[] {
+  const key = JSON.stringify([ctl.cfg.minGrade, ctl.cfg.box]);
+  let m = rowMemo.get(d);
+  if (!m || m.key !== key) {
+    m = { key, rows: scanSymbol(symbol, d.bars, ctl.cfg) };
+    rowMemo.set(d, m);
+  }
+  return m.rows;
+}
+
 function rowsOf(): ScanRow[] {
   const out: ScanRow[] = [];
   for (const symbol of ctl.cfg.watchlist) {
     const d = ctl.data.get(symbol);
-    if (d) out.push(...scanSymbol(symbol, d.bars, ctl.cfg));
+    if (d) out.push(...rowsFor(symbol, d));
   }
   return out.sort((a, b) => b.setup.score - a.setup.score || (b.setup.rr ?? 0) - (a.setup.rr ?? 0));
 }
@@ -250,7 +264,9 @@ async function hydrate(): Promise<void> {
       const raw = await Promise.all((["4h", "1d"] as const).map((tf) => kv.get(cacheKeyOf(symbol, tf)) as Promise<{ fetchedAt?: number; bars?: number[][] } | undefined>));
       if (!raw[0]?.bars || !raw[1]?.bars) continue;
       const bars = (x: number[][]): Bar[] => x.map(([t, o, h, l, c]) => ({ t: t!, o: o!, h: h!, l: l!, c: c! }));
-      ctl.data.set(symbol, { bars: { "4h": bars(raw[0].bars), "1d": bars(raw[1].bars) }, fetchedAt: raw[0].fetchedAt ?? 0 });
+      const d: SymData = { bars: { "4h": bars(raw[0].bars), "1d": bars(raw[1].bars) }, fetchedAt: raw[0].fetchedAt ?? 0 };
+      ctl.data.set(symbol, d);
+      rowsFor(symbol, d); // analysed here, one symbol per task (between the cache reads), not all at once below
     } catch {
       /* cache unreadable: scanned fresh */
     }

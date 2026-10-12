@@ -13,12 +13,13 @@
  * (Markt page marquee).
  */
 import { useEffect, useSyncExternalStore } from "react";
-import { BOX_TF_LABEL, PHASE_LABEL, type BoxPhase, type BoxTf } from "@/domain/boxes";
+import { BOX_TF_LABEL, boxesCfgOf, PHASE_LABEL, type BoxesCfg, type BoxPhase, type BoxTf } from "@/domain/boxes";
+import { useJournal } from "@/store/journalStore";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
 import { fmt } from "@/chart/format";
 import { getBoxes, retainBoxes, subscribeBoxes, type BoxesView } from "./store";
-import { getScan, retainScanner, subscribeScan } from "./scanner";
+import { getScan, retainScanner, subscribeScan, type ScanRow } from "./scanner";
 
 export const BOX_ALERTS_KEY = storageKey("box-alerts");
 const MAX_SEEN = 200;
@@ -45,11 +46,20 @@ interface AlertCtl {
   seeded: boolean;
   scanSeeded: boolean;
   recent: BoxAlert[];
+  /** the settings subscription of the running host */
   offs: Array<() => void>;
+  /** retain + subscription of the box store while `on` and `alerts` are set (else the host keeps nothing running) */
+  boxOffs: Array<() => void> | null;
+  /** retain + subscription of the scanner while `alerts` and `scanner` are set */
+  scanOffs: Array<() => void> | null;
+  settingsRaw: unknown;
 }
 
 const recentListeners = new Set<() => void>();
-const ctl: AlertCtl = { refs: 0, seen: [], closed: new Map(), seeded: false, scanSeeded: false, recent: [], offs: [] };
+const fresh = (): AlertCtl => ({ refs: 0, seen: [], closed: new Map(), seeded: false, scanSeeded: false, recent: [], offs: [], boxOffs: null, scanOffs: null, settingsRaw: undefined });
+const ctl: AlertCtl = fresh();
+const settingsBoxes = (s: unknown): unknown => (s && typeof s === "object" ? (s as { boxes?: unknown }).boxes : undefined);
+const cfgNow = (): BoxesCfg => boxesCfgOf(settingsBoxes(useJournal.getState().settings));
 
 function loadSeen(): string[] {
   const raw = readJson<unknown>(BOX_ALERTS_KEY, []);
@@ -162,14 +172,20 @@ function onBoxes(): void {
   for (const a of evaluateBoxes(view)) fire(a, view.cfg.notify);
 }
 
+/**
+ * Dedup key of a scanner alert: the row id (symbol, timeframe, side, kind, box start) – NOT the bar time, so a setup
+ * that stays A+ over the next scans (every 4h close) alerts once; a new box or another kind is a new alert.
+ */
+export const scanAlertKey = (r: Pick<ScanRow, "id">): string => `x:${r.id}`;
+
 function onScan(): void {
   const scan = getScan();
-  const cfg = getBoxes().cfg;
+  const cfg = cfgNow();
   if (scan.state !== "ok" && scan.state !== "scanning") return;
   const seeding = !ctl.scanSeeded;
   for (const r of scan.rows) {
     if (r.setup.grade !== "A+") continue;
-    const key = `x:${r.id}:${r.at}`;
+    const key = scanAlertKey(r);
     if (seeding || !cfg.alerts || !cfg.scanner) {
       markSeen(key);
       continue;
@@ -190,16 +206,51 @@ function onScan(): void {
   if (scan.state === "ok") ctl.scanSeeded = true;
 }
 
-/** Starts the alert watcher (ref-counted; keeps the box store and the scanner running). Returns the stop. */
+const release = (offs: Array<() => void> | null): null => {
+  for (const off of offs ?? []) off();
+  return null;
+};
+
+/**
+ * Keeps the box store / the scanner running only while their alerts are wanted: `alerts` off (or the analysis off) →
+ * the host releases them, so nothing is fetched for alerts nobody gets (the Markt page retains its own). Turning them
+ * on again seeds silently first.
+ */
+function syncHost(): void {
+  const cfg = cfgNow();
+  const wantBoxes = cfg.on && cfg.alerts;
+  const wantScan = cfg.alerts && cfg.scanner;
+  if (wantBoxes && !ctl.boxOffs) {
+    ctl.seeded = false;
+    ctl.closed.clear();
+    ctl.boxOffs = [retainBoxes(), subscribeBoxes(onBoxes)];
+    onBoxes();
+  } else if (!wantBoxes && ctl.boxOffs) ctl.boxOffs = release(ctl.boxOffs);
+  if (wantScan && !ctl.scanOffs) {
+    ctl.scanSeeded = false;
+    ctl.scanOffs = [retainScanner(), subscribeScan(onScan)];
+    onScan();
+  } else if (!wantScan && ctl.scanOffs) ctl.scanOffs = release(ctl.scanOffs);
+}
+
+/**
+ * Starts the alert watcher (ref-counted). While `settings.boxes.alerts` is on it keeps the box store (analysis on) and
+ * the scanner (scanner on) running. Returns the stop.
+ */
 export function startBoxAlerts(): () => void {
   ctl.refs += 1;
   if (ctl.refs === 1) {
     ctl.seen = loadSeen();
-    ctl.seeded = false;
-    ctl.scanSeeded = false;
-    ctl.closed.clear();
-    ctl.offs = [retainBoxes(), subscribeBoxes(onBoxes), retainScanner(), subscribeScan(onScan)];
-    onBoxes();
+    ctl.settingsRaw = settingsBoxes(useJournal.getState().settings);
+    ctl.offs = [
+      useJournal.subscribe((st) => {
+        const raw = settingsBoxes(st.settings);
+        if (raw === ctl.settingsRaw) return;
+        ctl.settingsRaw = raw;
+        syncHost();
+      }),
+    ];
+    syncHost();
   }
   let stopped = false;
   return () => {
@@ -207,8 +258,9 @@ export function startBoxAlerts(): () => void {
     stopped = true;
     ctl.refs -= 1;
     if (ctl.refs === 0) {
-      for (const off of ctl.offs) off();
-      ctl.offs = [];
+      ctl.offs = release(ctl.offs) ?? [];
+      ctl.boxOffs = release(ctl.boxOffs);
+      ctl.scanOffs = release(ctl.scanOffs);
     }
   };
 }
@@ -232,7 +284,9 @@ export function useRecentBoxAlerts(): readonly BoxAlert[] {
 
 /** Tests: forget everything. */
 export function __resetBoxAlerts(): void {
-  for (const off of ctl.offs) off();
-  Object.assign(ctl, { refs: 0, seen: [], closed: new Map(), seeded: false, scanSeeded: false, recent: [], offs: [] });
+  release(ctl.offs);
+  release(ctl.boxOffs);
+  release(ctl.scanOffs);
+  Object.assign(ctl, fresh());
   recentListeners.clear();
 }

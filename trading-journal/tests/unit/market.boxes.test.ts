@@ -83,7 +83,7 @@ vi.mock("@/market/marketStore", () => ({
 
 const { retainBoxes, getBoxes, subscribeBoxes, getBoxBars, __boxStats, __resetBoxes } = await import("@/market/boxes/store");
 const { scanSymbol, getScan, retainScanner, scanNow, nextScanAt, lastClosedOpen, __resetScanner, SCAN_BUDGET } = await import("@/market/boxes/scanner");
-const { evaluateBoxes, __resetBoxAlerts, startBoxAlerts, BOX_ALERTS_KEY } = await import("@/market/boxes/alerts");
+const { evaluateBoxes, __resetBoxAlerts, startBoxAlerts, scanAlertKey, BOX_ALERTS_KEY } = await import("@/market/boxes/alerts");
 const { resolveTradeBoxes, tradeDateMs, barOpenOf, __resetBoxSnapshotMemo } = await import("@/market/boxes/snapshot");
 const { priceMv } = await import("@/market/motionValues");
 
@@ -242,6 +242,21 @@ describe("live box store", () => {
     expect(published).toBeGreaterThanOrEqual(1);
     off();
     release();
+  });
+
+  it("a keep-alive page released and retained again keeps its boxes: no recompute, no second history request", async () => {
+    feedsAt(NOW, B4.length, 499);
+    const release = retainBoxes();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(__boxStats().baseRuns).toBe(3);
+    release();
+    expect(__boxStats().refs).toBe(0);
+    const again = retainBoxes();
+    await vi.advanceTimersByTimeAsync(200);
+    expect(__boxStats().baseRuns).toBe(3);
+    expect((market.current as ReturnType<typeof fakeProvider>).history).toHaveBeenCalledTimes(1);
+    expect(getBoxes().state).toBe("ok");
+    again();
   });
 
   it("the live price (≤ 1/s) drives the pending state without recomputing the boxes", async () => {
@@ -469,6 +484,20 @@ describe("box alerts", () => {
     expect(JSON.parse(localStorage.getItem(BOX_ALERTS_KEY) ?? "[]")).toContain(fired[0]!.id);
   });
 
+  it("scanner alerts dedupe per setup and box, not per scan: the same A+ row on the next 4h close is the same key", () => {
+    const now = (B4[1493]!.t + 3600) * 1000;
+    const d1 = B1.filter((b) => (b.t + 86_400) * 1000 <= now);
+    const rowsAt = (end: number) => scanSymbol("BTCUSDT", { "4h": B4.slice(end - 760, end), "1d": d1 }, boxesCfgOf(undefined));
+    const a = rowsAt(1493);
+    const b = rowsAt(1494);
+    const same = a.find((r) => b.some((x) => x.id === r.id));
+    expect(same).toBeDefined();
+    const next = b.find((x) => x.id === same!.id)!;
+    expect(next.at).toBeGreaterThan(same!.at);
+    expect(scanAlertKey(next)).toBe(scanAlertKey(same!));
+    expect(scanAlertKey(same!)).toBe(`x:${same!.id}`);
+  });
+
   it("a state that was already true at start never alerts later", () => {
     const r = range();
     const atBreak = B4.slice(0, r.brkI! + 1);
@@ -487,6 +516,33 @@ describe("box alerts", () => {
     await vi.advanceTimersByTimeAsync(300);
     expect(useUi.getState().toasts).toHaveLength(0); // seeding
     stop();
+    __resetBoxes();
+    __resetScanner();
+    vi.useRealTimers();
+  });
+
+  it("alerts off: the host keeps neither the box store nor the scanner running; on again → both, seeded silently", async () => {
+    vi.useFakeTimers();
+    __resetBoxes();
+    market.real = null;
+    market.current = fakeProvider();
+    vi.setSystemTime(NOW);
+    feedsAt(NOW);
+    const net: Net = { log: [], fail: () => undefined, serverSkewMs: 0, proxyUp: true, wsUp: true };
+    __resetScanner({ rest: () => binanceRest({ fetch: makeFetch(net) }), proxy: () => proxyRest({ fetch: makeFetch(net) }), kv: () => memoryKV(), now: () => Date.now(), random: () => 0.5 });
+    setBoxesSettings({ alerts: false });
+    const stop = startBoxAlerts();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(__boxStats().refs).toBe(0);
+    expect(requests(net, "/fapi/v1/klines")).toHaveLength(0);
+    setBoxesSettings({ alerts: true, watchlist: ["BTCUSDT"] });
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(__boxStats().refs).toBe(1);
+    expect(requests(net, "/fapi/v1/klines").length).toBeGreaterThan(0);
+    expect(useUi.getState().toasts).toHaveLength(0); // seeded silently
+    stop();
+    expect(__boxStats().refs).toBe(0);
+    setBoxesSettings(undefined);
     __resetBoxes();
     __resetScanner();
     vi.useRealTimers();

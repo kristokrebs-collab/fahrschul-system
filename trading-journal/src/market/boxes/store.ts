@@ -447,8 +447,16 @@ function start(): void {
       }
     },
   ];
-  ctl.provider = null;
+  // the same provider as before a release (a keep-alive page shown again): keep the bars, boxes and the 4h history page –
+  // no recompute, no second history request; a new provider starts over
+  const prev = ctl.provider;
   syncProvider();
+  if (ctl.provider === prev) {
+    if (prev && ctl.cfg.on) requestHistory(prev);
+    readSeries();
+    schedule();
+    publish();
+  }
 }
 
 function stop(): void {
