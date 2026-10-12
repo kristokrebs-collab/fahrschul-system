@@ -32,7 +32,7 @@ export const SECTIONS = {
   edge: "Wo deine Edge liegt",
   execution: "Ausführung",
   patterns: "Muster",
-  compare: "Vergleich",
+  compare: "Gegen den Markt",
 } as const;
 
 export const CARD_TITLES = {
@@ -89,6 +89,12 @@ export const RATIO_LABELS: Readonly<Record<RatioKey, { label: string; short: str
   edge: { label: "Edge-Test", short: "Edge", what: "Ø R (oder Ø P&L) deiner Trades mit t-Test: Ist der Schnitt sicher größer als 0?" },
 };
 
+/** "= 0,03" or "< 0,01" (with the relation). */
+const pEq = (p: number): string => (p < 0.01 ? pText(p) : `= ${n2(p)}`);
+
+/** p-value text: "0,03", "< 0,01", "< 0,001", "–". */
+export const pText = (p: number | null | undefined): string => (p == null || !Number.isFinite(p) ? DASH : p < 0.001 ? "< 0,001" : p < 0.01 ? "< 0,01" : n2(p));
+
 /** "1,23" | "∞" | "–". */
 export const ratioText = (v: number | null | undefined): string => (v == null ? DASH : v === Infinity ? INFINITY_SIGN : n2(v));
 
@@ -101,8 +107,26 @@ export function metricText(m: Metric, edgeUnit: "R" | "money" = "R", currency = 
   return ratioText(m.value);
 }
 
-/** Verdict of a metric value (thresholds in the explainers). */
+/** One-sided p below which the edge test says "klar" (stricter than the breakdown FDR: it is the headline claim). */
+export const EDGE_CLEAR_P = 0.05;
+
+/** Where an interval must stay above for a "good" ratio to count as sure (0 for most, 1 for the ratio-of-sums ones). */
+const SURE_ABOVE: Partial<Record<RatioKey, number>> = { sharpe: 0, sortino: 0, sharpeTrade: 0, sortinoTrade: 0, calmar: 0, sqn: 0, gainToPain: 0, kelly: 0, halfKelly: 0, omega: 1, tailRatio: 1 };
+
+/**
+ * Verdict of a metric value (thresholds in the explainers). Honest: a good value whose 80 % interval still reaches
+ * below the break-even line is not called good – it is "noch nicht sicher" (mute).
+ */
 export function ratioVerdict(m: Metric): Verdict {
+  const base = baseVerdict(m);
+  const line = SURE_ABOVE[m.key];
+  if (base.tone === "win" && line != null && m.ci && m.ci.lo <= line) {
+    return { tone: "mute", text: `${base.text} Noch nicht sicher: das 80-%-Intervall reicht bis ${line === 0 ? "unter null" : `unter ${line}`}.` };
+  }
+  return base;
+}
+
+function baseVerdict(m: Metric): Verdict {
   const v = m.value;
   if (v == null) return { tone: "mute", text: `Noch zu wenig Daten: ab ${RATIO_MIN[m.key]} ${m.unit === "days" ? "Tagen" : m.unit === "months" ? "Monaten" : "Trades"} (bisher ${m.n}).` };
   const t = (tone: Tone, text: string): Verdict => ({ tone, text });
@@ -130,7 +154,7 @@ export function ratioVerdict(m: Metric): Verdict {
       return v >= 1.2 ? t("win", "Deine großen Gewinne sind größer als deine großen Verluste.") : v >= 0.9 ? t("mute", "Große Gewinne und Verluste halten sich die Waage.") : t("warn", "Deine großen Verluste überwiegen – Stops prüfen.");
     case "edge": {
       const p = m.p ?? 1;
-      return v <= 0 ? t("loss", "Im Schnitt kein Gewinn pro Trade.") : p < FDR_Q ? t("win", `Klar positiv (p = ${n2(p)}).`) : p < 0.2 ? t("warn", `Positive Tendenz, noch nicht sicher (p = ${n2(p)}).`) : t("mute", `Positiv, aber noch Zufall möglich (p = ${n2(p)}).`);
+      return v <= 0 ? t("loss", "Im Schnitt kein Gewinn pro Trade.") : p < EDGE_CLEAR_P ? t("win", `Klar positiv (p ${pEq(p)}).`) : p < 0.2 ? t("warn", `Positive Tendenz, noch nicht sicher (p ${pEq(p)}).`) : t("mute", `Positiv, aber noch Zufall möglich (p ${pEq(p)}).`);
     }
   }
 }
@@ -165,7 +189,7 @@ export function explainRatio(m: Metric, rep: Pick<RatioReport, "edgeUnit" | "tra
   };
   if (m.key === "calmar") rows.push(["Jahresrendite", rep.cagr == null ? DASH : pct(rep.cagr)], ["Max. Drawdown", pct(rep.maxDD)]);
   if (m.key === "edge") {
-    rows.push(["p (einseitig)", m.p == null ? DASH : n2(m.p)], ["Einheit", rep.edgeUnit === "R" ? "R (Trades mit Stop)" : `${currency} pro Trade`]);
+    rows.push(["p (einseitig)", pText(m.p)], ["Einheit", rep.edgeUnit === "R" ? "R (Trades mit Stop)" : `${currency} pro Trade`]);
     rows.push(["Trades bis „sicher“", rep.tradesNeeded == null ? DASH : `≈ ${n0(rep.tradesNeeded)} (bei Ø und Schwankung wie bisher)`]);
   }
   return {
@@ -234,9 +258,12 @@ export function explainBreakdown(b: Breakdown, currency: string): Explanation {
       ["Beste Gruppe (untere Grenze)", b.best ? b.best.label : DASH],
       ["Schwächste Gruppe", b.worst ? b.worst.label : DASH],
     ],
-    verdict: b.best
-      ? { tone: "win", text: `Trade the best: ${b.best.label} ist auch im ungünstigen Fall noch positiv.` }
-      : { tone: "mute", text: "Noch keine Gruppe ist robust positiv – mehr Trades sammeln." },
+    verdict: (() => {
+      const best = b.best ? (b.unit === "R" ? b.best.expR : b.best.exp) : null;
+      if (b.best && best?.ci && best.ci.lo > 0) return { tone: "win" as const, text: `Trade the best: ${b.best.label} ist auch im ungünstigen Fall noch positiv.` };
+      if (b.best) return { tone: "mute" as const, text: `${b.best.label} liegt vorn, aber das Intervall reicht unter null – noch kein Beweis. Mehr Trades sammeln.` };
+      return { tone: "mute" as const, text: "Noch keine Gruppe ist robust positiv – mehr Trades sammeln." };
+    })(),
   };
 }
 
