@@ -19,7 +19,7 @@ export interface SkeletonProps {
 export function Skeleton({ className, style, height }: SkeletonProps) {
   return (
     <div className={cn("relative overflow-hidden rounded-xl bg-white/[0.04]", className)} style={{ height, ...style }} aria-hidden="true">
-      <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_25%,color-mix(in_srgb,var(--color-white,#fff)_5.5%,transparent)_50%,transparent_75%)] [transform:translateX(-100%)] will-change-transform animate-fx-shimmer motion-reduce:hidden" />
+      <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,transparent_25%,rgb(var(--veil-rgb,255_255_255)/0.055)_50%,transparent_75%)] [transform:translateX(-100%)] will-change-transform animate-fx-shimmer motion-reduce:hidden" />
     </div>
   );
 }
@@ -28,7 +28,7 @@ export function Skeleton({ className, style, height }: SkeletonProps) {
 export function ChartSkeleton({ height = 268, className }: { height?: number; className?: string }) {
   return (
     <div className={cn("relative overflow-hidden rounded-xl", className)} style={{ height }} aria-hidden="true">
-      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-white, #fff) 6%, transparent) 1px, transparent 0) 0 0 / 18px 18px" }} />
+      <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 1px 1px, rgb(var(--veil-rgb, 255 255 255) / 0.06) 1px, transparent 0) 0 0 / 18px 18px" }} />
       <div className="absolute inset-x-3 bottom-6 grid gap-6">
         {[0, 1, 2].map((i) => (
           <div key={i} className="h-px bg-white/[0.05]" />

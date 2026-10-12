@@ -66,6 +66,10 @@
   /* the swap: "white" = the veil ink, "black" = the paper (see the header) */
   --color-white: #0b0b0b;
   --color-black: #ebebe9;
+  /* the same veil as channels for literal alphas in JS / arbitrary values: `rgb(var(--veil-rgb, 255 255 255) / a)` –
+     in dark the fallback IS the old literal (byte-identical), here it turns to ink. `--veil-ink-rgb` = ink-950. */
+  --veil-rgb: 11 11 11;
+  --veil-ink-rgb: 242 242 240;
 
   --color-danger-text: #c0141f;
   --color-win-soft: #4f9a70;
@@ -214,6 +218,8 @@
   --color-warn: #ffb020;
   --color-white: #fff;
   --color-black: #000;
+  --veil-rgb: 255 255 255;
+  --veil-ink-rgb: 4 4 4;
   --color-danger-text: #ff8a90;
   --color-win-soft: #65b488;
   --color-loss-soft: #d27a7b;

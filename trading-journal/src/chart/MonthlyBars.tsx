@@ -222,7 +222,7 @@ export const MonthlyBars = memo(function MonthlyBars({ months, currency, height 
           <YAxis width={56} tickLine={false} axisLine={false} interval={0} tick={TICK} tickFormatter={fmt.mio} />
           <ReferenceLine y={0} stroke={themePaint(EQUITY_COLORS.ref)} />
           <Tooltip
-            cursor={{ fill: "color-mix(in srgb, var(--color-white, #fff) 4%, transparent)" }}
+            cursor={{ fill: "rgb(var(--veil-rgb, 255 255 255) / 0.04)" }}
             content={(p) => <MonthTip active={p.active} payload={p.payload} currency={currency} />}
           />
           <Bar dataKey="net" maxBarSize={36} isAnimationActive={false} shape={(p: ShapeProps) => <RoundedBar {...p} grow={animateIn} revealed={revealed} grown={grown} />}>

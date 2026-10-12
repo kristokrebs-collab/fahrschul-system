@@ -19,8 +19,8 @@ export const buttonSize: Record<ButtonSize, string> = { md: "px-4 py-2 text-[13p
 
 /** Ripple ink per variant: white on dark, ink on the white primary, signal red on destructive. */
 export const rippleColor: Record<ButtonVariant, string> = {
-  ghost: "color-mix(in srgb, var(--color-white, #fff) 18%, transparent)",
-  primary: "color-mix(in srgb, var(--color-ink-950, #040404) 14%, transparent)",
+  ghost: "rgb(var(--veil-rgb, 255 255 255) / 0.18)",
+  primary: "rgb(var(--veil-ink-rgb, 4 4 4) / 0.14)",
   danger: "rgb(229 32 46 / 0.32)",
 };
 
