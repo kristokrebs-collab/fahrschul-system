@@ -163,6 +163,8 @@ test.describe("Analyse", () => {
     const mc = page.getByTestId("ana-mc");
     await mc.scrollIntoViewIfNeeded();
     await expect(mc.getByTestId("mc-fan")).toHaveAttribute("data-drawn", "true", { timeout: 20_000 });
+    // web build / dev server: the simulation ran in the module worker (the idle-chunk fallback is for file builds)
+    expect(page.workers().length).toBeGreaterThan(0);
     const readout = mc.getByTestId("mc-readout");
     await expect(readout).toContainText(/^Lauf \d+: Ende/);
     const before = await readout.textContent();
@@ -262,6 +264,22 @@ test.describe("Analyse", () => {
     await shot(page, info, "empty");
     await expectNoHorizontalScroll(page);
     expect(errors).toEqual([]);
+  });
+
+  test("reduced motion: the final picture at once, no errors", async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await seed(page, { extra: { "tj2-trades": analyseTrades() } });
+    test.skip(!(await openAnalyse(page)), "dev harness only");
+    await expect(page.getByRole("heading", { level: 2, name: "Kennzahlen" })).toBeVisible();
+    const mc = page.getByTestId("ana-mc");
+    await mc.scrollIntoViewIfNeeded();
+    await expect(mc.getByTestId("mc-fan")).toHaveAttribute("data-drawn", "true", { timeout: 20_000 });
+    // whiskers / bars carry no pending transform (static end state)
+    const pending = await page.evaluate(() => Array.from(document.querySelectorAll('[data-testid="analyse-view"] span[style*="scaleX(0)"], [data-testid="analyse-view"] span[style*="scaleY(0)"]')).length);
+    expect(pending).toBe(0);
+    // Motion's own dev notice about the emulated setting is not an app defect
+    expect(errors.filter((e) => !/Reduced Motion enabled/.test(e))).toEqual([]);
   });
 
   test("the legacy fixture (11 closed trades): honest small-sample states, no errors", async ({ page }, info) => {

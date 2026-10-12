@@ -28,6 +28,21 @@ export function memoClosed<T>(closed: readonly EnrichedTrade[], key: string, fn:
   return m.get(key) as T;
 }
 
+/**
+ * Order-sensitive fingerprint of a numeric sample (length, Σx, Σ i·x): a re-run key that changes when ANY trade's
+ * result changes (an edit in the middle of the journal included), not only when the last trade does.
+ */
+export function sampleKey(xs: readonly number[] | null | undefined): string {
+  if (!xs || !xs.length) return "0";
+  let s = 0;
+  let w = 0;
+  for (let i = 0; i < xs.length; i++) {
+    s += xs[i]!;
+    w += (i + 1) * xs[i]!;
+  }
+  return `${xs.length}:${s.toFixed(6)}:${w.toFixed(4)}`;
+}
+
 /** The ratio report of an account view (shared by the hero, the widgets and the explainers). */
 export function useRatios(view: AccountView): RatioReport {
   return useMemo(() => memoClosed(view.closed, `ratios:${view.start}`, () => ratioReport(view.closed, view)), [view]);

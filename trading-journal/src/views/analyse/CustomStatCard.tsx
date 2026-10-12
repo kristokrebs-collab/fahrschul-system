@@ -154,8 +154,13 @@ export function CustomStatCard({ view, settings, cur }: { view: AccountView; set
       () => pushToast({ kind: "error", title: "Speichern fehlgeschlagen" }),
     );
   };
+  // a failed write brings the dissolved tile back (new key → fresh mount)
+  const [epoch, setEpoch] = useState(0);
   const remove = (id: string) => {
-    write(customStatsOf(useJournal.getState().settings).filter((s) => s.id !== id)).catch(() => pushToast({ kind: "error", title: "Entfernen fehlgeschlagen" }));
+    write(customStatsOf(useJournal.getState().settings).filter((s) => s.id !== id)).catch(() => {
+      setEpoch((e) => e + 1);
+      pushToast({ kind: "error", title: "Entfernen fehlgeschlagen" });
+    });
   };
 
   return (
@@ -202,7 +207,7 @@ export function CustomStatCard({ view, settings, cur }: { view: AccountView; set
           ) : (
             <ul className="grid gap-2 sm:grid-cols-2">
               {saved.map((s, i) => (
-                <StatTileView key={s.id} stat={s} res={results[i]!} ctx={ctx} cur={cur} onRemove={() => remove(s.id)} />
+                <StatTileView key={`${s.id}:${epoch}`} stat={s} res={results[i]!} ctx={ctx} cur={cur} onRemove={() => remove(s.id)} />
               ))}
             </ul>
           )}

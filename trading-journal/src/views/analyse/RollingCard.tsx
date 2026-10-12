@@ -7,7 +7,7 @@
  * `EquityDraw` of the equity in R draws up to the scrubbed trade – all without a React render per scrub.
  */
 import { motion, useMotionValue, useTransform, type MotionValue } from "motion/react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { aggregate } from "@/domain/agg";
 import { ANA_EMPTY, CARD_TITLES, explainRolling, rollingStats, type RollingPoint } from "@/domain/analytics";
 import type { AccountView } from "@/domain/account";
@@ -117,6 +117,8 @@ export function RollingCard({ view, cur }: { view: AccountView; cur: string }) {
   const overall = metric === "winRate" ? g.winRate : metric === "expR" ? g.avgR : metric === "pf" ? g.pf : null;
   const total = Math.max(1, rep.points.length - 1);
   const time = useMotionValue(total);
+  // another window / journal: back to the newest trade
+  useEffect(() => time.set(total), [time, total]);
   const readout = useRef<HTMLSpanElement>(null);
   // window Ø R → −1…1 (±2 R full scale) for the signed VU meter
   const meter = useTransform(time, (t) => {

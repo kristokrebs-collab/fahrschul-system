@@ -13,7 +13,7 @@
  * Reduced motion: the finished picture at once.
  */
 import { motion, useMotionValue } from "motion/react";
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ANA_EMPTY,
   breakdownUnit,
@@ -37,7 +37,7 @@ import { EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
 import { useAnalyseUi, type McHorizon, type McMethod } from "./analyseStore";
-import { useMonteCarlo } from "./hooks";
+import { sampleKey, useMonteCarlo } from "./hooks";
 import { AnaCard, SEG_TOUCH, Stat, softTone, unitText } from "./ui";
 
 /** Paths drawn into the fan. */
@@ -191,6 +191,8 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
   const order = useMemo(() => finals.map((v, i) => [v, i] as const).sort((a, b) => a[0] - b[0]), [finals]);
   const medianRun = order[Math.floor(order.length / 2)]?.[1] ?? 0;
   const time = useMotionValue(medianRun);
+  // a new result starts on its median run
+  useEffect(() => time.set(medianRun), [time, medianRun]);
   const pathDD = useMemo(
     () =>
       res.paths.map((p) => {
@@ -302,7 +304,7 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
     return xs.length >= MC_MIN_TRADES ? xs : null;
   }, [closed, unit]);
   const opts = { runs: 2000, horizon, method, seed: 1, keepPaths: FAN_PATHS, start: 0 };
-  const key = `${closed.length}:${closed[closed.length - 1]?.id ?? ""}:${closed[closed.length - 1]?.updatedAt ?? ""}:${unit}:${horizon}:${method}:${view.start}`;
+  const key = `${sampleKey(sample)}:${unit}:${horizon}:${method}`;
   const mc = useMonteCarlo(sample, opts, key);
   const res = mc.result;
   const thresholds =
@@ -335,6 +337,7 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
                 <Stat label="Max. DD (95 %)" value={unitText(-(ddQuantile(res, 0.95) ?? 0), unit, cur)} tone="text-loss" sub={res.longestLoss ? `bis ${res.longestLoss.p95} Verluste in Folge` : undefined} />
               </div>
               <DdRisk res={res} thresholds={thresholds} />
+              {sample.length < 30 && <p className="text-[12px] text-warn">Aus {sample.length} Trades gezogen – ein grober Ausblick, belastbar ab etwa 30.</p>}
             </>
           ) : (
             <div className="grid place-items-center rounded-xl border border-line bg-ink-950/60" style={{ height: FAN_H }} />

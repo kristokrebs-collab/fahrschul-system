@@ -13,7 +13,8 @@ import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { getAccountView, getEnriched, useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
-import { AnalyseView, ANALYSE_WIDGETS, analyseDimFromQuery, analyseQuery, DEFAULT_DIM, HERO_TILES, setAnalyseDim, useAnalyseUi } from "@/views/analyse";
+import { monteCarlo } from "@/domain/analytics";
+import { AnalyseView, ANALYSE_WIDGETS, analyseDimFromQuery, analyseQuery, DEFAULT_DIM, fanGeometry, HERO_TILES, setAnalyseDim, useAnalyseUi } from "@/views/analyse";
 import { fixtureTrades, SETTINGS } from "./analytics.fixtures";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
@@ -159,6 +160,23 @@ describe("AnalyseView", () => {
 });
 
 describe("router seam and widgets", () => {
+  it("fan geometry: one scale for paths and bands, inside the box", () => {
+    const res = monteCarlo([1, -1, 2, -0.5, 0.8], { runs: 200, horizon: 30, keepPaths: 12, seed: 3 });
+    const g = fanGeometry(res, 400, 220)!;
+    expect(g.pts).toHaveLength(12);
+    expect(g.pts[0]).toHaveLength(31);
+    expect(g.pathD).toHaveLength(12);
+    for (const p of g.pts.flat()) {
+      expect(p.x).toBeGreaterThanOrEqual(0);
+      expect(p.x).toBeLessThanOrEqual(400);
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeLessThanOrEqual(220);
+    }
+    expect(g.band.endsWith("Z")).toBe(true);
+    expect(fanGeometry(res, 0, 220)).toBeNull();
+    expect(fanGeometry(monteCarlo([]), 400, 220)).toBeNull();
+  });
+
   it("dim query parsing", () => {
     expect(analyseDimFromQuery("?dim=weekday")).toBe("weekday");
     expect(analyseDimFromQuery("dim=nope")).toBeNull();

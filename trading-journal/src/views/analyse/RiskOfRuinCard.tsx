@@ -8,7 +8,7 @@
 import { motion } from "motion/react";
 import { useMemo, useRef } from "react";
 import { aggregate } from "@/domain/agg";
-import { ANA_EMPTY, CARD_TITLES, explainRuin, finite, median, riskPctOf, ROR_TRADES, ruinAnalytic, type RatioReport } from "@/domain/analytics";
+import { CARD_TITLES, explainRuin, finite, median, riskPctOf, ROR_TRADES, ruinAnalytic, type RatioReport } from "@/domain/analytics";
 import type { AccountView } from "@/domain/account";
 import type { Settings } from "@/domain/types";
 import { cn } from "@/lib/cn";
@@ -20,10 +20,11 @@ import { EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
 import { useAnalyseUi } from "./analyseStore";
-import { useRiskOfRuin } from "./hooks";
+import { sampleKey, useRiskOfRuin } from "./hooks";
 import { AnaCard, SEG_TOUCH, Stat } from "./ui";
 
-export const ROR_MIN_TRADES = 10;
+/** A single ruin headline from fewer trades would read as a fact – below this the card says why it waits. */
+export const ROR_MIN_TRADES = 20;
 const RISKS = [0.005, 0.01, 0.02, 0.03] as const;
 const RUINS = [0.3, 0.5] as const;
 /** Stakes of the ruin curve. */
@@ -101,7 +102,7 @@ export function RiskOfRuinCard({ view, settings, rep }: { view: AccountView; set
   }, [rs, g]);
   const enough = closed.length >= ROR_MIN_TRADES && model != null;
   const input = enough && model ? { winRate: model.winRate, payoff: model.payoff, riskPerTrade: risk, ruinAt, sample: model.sample } : null;
-  const key = `${closed.length}:${closed[closed.length - 1]?.id ?? ""}:${closed[closed.length - 1]?.updatedAt ?? ""}:${risk}:${ruinAt}`;
+  const key = `${sampleKey(rs)}:${model ? `${model.winRate.toFixed(6)}:${model.payoff.toFixed(6)}` : "-"}:${risk}:${ruinAt}`;
   const run = useRiskOfRuin(input, { runs: 2000, trades: ROR_TRADES, seed: 1 }, key);
   const res = run.result;
   const sim = res?.simulated ?? null;
@@ -117,7 +118,7 @@ export function RiskOfRuinCard({ view, settings, rep }: { view: AccountView; set
       note={enough ? `Verlust von ${Math.round(ruinAt * 100)} % des Kontos in den nächsten ${ROR_TRADES} Trades${own != null ? ` · dein Ø Risiko pro Trade: ${riskLabel(own)}` : ""}` : undefined}
     >
       {!enough ? (
-        <EmptyState title={ANA_EMPTY.monteCarlo.title} text="Risk of Ruin braucht mindestens 10 abgeschlossene Trades mit Gewinnen und Verlusten." />
+        <EmptyState title="Noch keine Ruin-Rechnung" text={`Risk of Ruin braucht mindestens ${ROR_MIN_TRADES} abgeschlossene Trades mit Gewinnen und Verlusten – bisher ${closed.length}.`} />
       ) : (
         <div className="grid gap-4">
           <div className="grid gap-2">

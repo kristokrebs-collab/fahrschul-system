@@ -127,7 +127,7 @@ export function KennzahlenHero({ rep, cur, n }: { rep: RatioReport; cur: string;
                 <SigBadge verdict={ev} />
               </div>
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className={cn("num font-mono text-[20px] font-medium", edge.value == null ? "text-mute" : edge.value > 0 ? "text-win" : "text-loss")}>{valueNode(edge, rep, cur, "ana-edge")}</span>
+                <span className={cn("num font-mono text-[20px] font-medium", edge.value == null ? "text-mute" : edge.value <= 0 ? "text-loss" : ev === "klar" ? "text-win" : "text-fg")}>{valueNode(edge, rep, cur, "ana-edge")}</span>
                 <span className="text-[12px] text-mute">pro Trade · p {edge.p != null && edge.p < 0.01 ? pText(edge.p) : `= ${pText(edge.p)}`} · {edge.n} Trades</span>
               </div>
               <p className="text-[12px] leading-snug text-mute">
