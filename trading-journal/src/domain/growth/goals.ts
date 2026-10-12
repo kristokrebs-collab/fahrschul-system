@@ -203,6 +203,9 @@ export function addGoalFromDraft(draft: GoalDraft): Promise<Goal | null> {
     const existing = activeGoalsOf(settings).find((g) => sameGoal(g, clean));
     if (existing) return existing;
     const goal: Goal = { ...clean, id: newId("gl_"), createdAt: new Date().toISOString(), status: "active" };
+    // the P08 sheet may pass how often in a row (`Goal.hold`) with the draft
+    const hold = (draft as { hold?: unknown }).hold;
+    if (typeof hold === "number" && Number.isInteger(hold) && hold >= 1) goal.hold = Math.min(HOLD_MAX, hold);
     try {
       await store.saveSettings(withGoalAppended(settings, goal));
       return goal;

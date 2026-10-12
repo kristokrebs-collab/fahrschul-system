@@ -9,6 +9,7 @@ import type { BehaviorKey } from "../coach/events";
 import { reviewed } from "../coach/recommendations";
 import { accountOf, dayFromKey } from "../insights/shared";
 import { hasCheckin } from "../psych/checkin";
+import { localDateKey, tradeTime } from "@/lib/dates";
 import type { TrackerKey } from "../psych/trackers";
 import type { Prepared } from "./context";
 import { addDays } from "./habits";
@@ -83,12 +84,15 @@ const EVENT_RULES: Readonly<Record<string, readonly BehaviorKey[]>> = {
 
 const dayDiff = (a: string, b: string): number => Math.round((+dayFromKey(b) - +dayFromKey(a)) / 86_400_000);
 
-/** Violations of a clean challenge on day `key`. */
-function violationsOn(t: ChallengeTemplate, p: Prepared, key: string): Violation[] {
+/**
+ * Violations of a clean challenge on day `key`. Only what happened after the challenge was accepted counts (`since`,
+ * epoch ms): a trade entered earlier on the start day cannot break a challenge taken on later that day.
+ */
+function violationsOn(t: ChallengeTemplate, p: Prepared, key: string, since: number): Violation[] {
   const out: Violation[] = [];
   const evKeys = EVENT_RULES[t.key];
-  if (evKeys) for (const e of p.eventsByDay.get(key) ?? []) if (evKeys.includes(e.key)) out.push({ key, text: e.note ?? e.key, tradeId: e.tradeIds[e.tradeIds.length - 1] });
-  const trades = p.byDay.get(key) ?? [];
+  if (evKeys) for (const e of p.eventsByDay.get(key) ?? []) if (evKeys.includes(e.key) && e.at >= since) out.push({ key, text: e.note ?? e.key, tradeId: e.tradeIds[e.tradeIds.length - 1] });
+  const trades = (p.byDay.get(key) ?? []).filter((tr) => +tradeTime(tr) >= since);
   if (t.key === "stop14") for (const tr of trades) if (!(typeof tr.stop === "number" && tr.stop > 0)) out.push({ key, text: `${tr.pair} ohne Stop`, tradeId: tr.id });
   if (t.key === "limit10") {
     const count: Record<string, number> = {};
@@ -111,6 +115,10 @@ function counts(t: ChallengeTemplate, p: Prepared, key: string): boolean {
 export function challengeProgress(c: Challenge, p: Prepared): ChallengeProgress | null {
   const t = templateOf(c.template);
   if (!t) return null;
+  // accepted at `createdAt` on the start day (an older / foreign record: the start of that day)
+  const created = Date.parse(c.createdAt);
+  const startMs = +dayFromKey(c.start);
+  const since = Number.isFinite(created) && localDateKey(new Date(created)) === c.start ? created : startMs;
   const endKey = addDays(c.start, t.days - 1);
   const day = dayDiff(c.start, p.todayKey) + 1;
   const cells: ChallengeDay[] = [];
@@ -123,7 +131,7 @@ export function challengeProgress(c: Challenge, p: Prepared): ChallengeProgress 
       continue;
     }
     if (t.mode === "clean") {
-      const v = violationsOn(t, p, key);
+      const v = violationsOn(t, p, key, since);
       violations.push(...v);
       const pendingReview = t.key === "review7" && key >= addDays(p.todayKey, -1);
       if (v.length) cells.push({ key, state: "fail" });
