@@ -62,7 +62,8 @@ export const MARKT = {
   },
   scanner: {
     title: "Watchlist-Scanner",
-    note: "Alle 4 Stunden nach Kerzenschluss. Nur A+ und A.",
+    note: "Alle 4 Stunden nach Kerzenschluss. Nur A+ und A. Einstieg und CRV gelten zum Kerzenschluss – „Beste Setups“ rechnet mit dem Live-Kurs.",
+    atClose: "Werte bei Kerzenschluss",
     scan: "Jetzt scannen",
     scanning: "Scan läuft",
     empty: "Kein A-Setup in der Watchlist.",

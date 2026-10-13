@@ -5,9 +5,9 @@
  * Binance is not reachable (route via the EU proxy, or the file build without one).
  */
 import { motion, useTransform } from "motion/react";
-import { KIND_TEXT, PHASE_LABEL } from "@/domain/boxes";
+import { BOX_TF_MS, KIND_TEXT, PHASE_LABEL } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
-import { hhmm, hhmmss } from "@/market/format";
+import { ddmmHHmm, hhmm, hhmmss } from "@/market/format";
 import { scanNow, useScan, type ScanRow } from "@/market/boxes/scanner";
 import { useNowMv } from "@/motion/clock";
 import { RadarSweep } from "@/motion/fx/RadarSweep";
@@ -25,6 +25,14 @@ function NextIn({ at }: { at: number }) {
   return <motion.span className="num font-mono">{text}</motion.span>;
 }
 
+/**
+ * When the row's numbers were computed (review F6): the scanner grades at the close of the newest CLOSED candle, the
+ * „Beste Setups“ card at the live price – the same setup can show another entry / CRV there; this says why.
+ */
+export function scanCloseLabel(r: Pick<ScanRow, "at" | "tf">, timeZone?: string): string {
+  return `${S.atClose} ${ddmmHHmm(r.at + BOX_TF_MS[r.tf], timeZone)}`;
+}
+
 function Row({ r }: { r: ScanRow }) {
   const s = r.setup;
   const up = s.side === "long";
@@ -39,6 +47,9 @@ function Row({ r }: { r: ScanRow }) {
         </span>
         <span className="truncate text-[11.5px] text-mute">
           {s.kind === "fakeout" ? PHASE_LABEL[r.phase] : `${KIND_TEXT[s.kind]} · ${PHASE_LABEL[r.phase]}`} · Einstieg {price(s.entry)}
+        </span>
+        <span className="truncate text-[11px] text-faint" data-testid="scan-close">
+          {scanCloseLabel(r)}
         </span>
       </span>
       <span className="grid justify-items-end text-[11px] text-faint">

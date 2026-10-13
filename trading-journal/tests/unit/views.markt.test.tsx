@@ -58,6 +58,7 @@ vi.mock("@/views/markt/BoxChartCard", async () => {
 
 const { MarktView, bandItems, railIndex, pillOf, gaugeY } = await import("@/views/markt");
 const { MotionRoot } = await import("@/motion/MotionRoot");
+const { scanCloseLabel } = await import("@/views/markt/ScannerCard");
 const { MorphDialogProvider } = await import("@/motion/MorphDialog");
 const { useJournal } = await import("@/store/journalStore");
 
@@ -158,11 +159,20 @@ describe("MarktView", () => {
     expect(screen.getByTestId("best-loading")).toHaveTextContent("Lade Kerzen …");
   });
 
+  it("scanCloseLabel: the close of the scanned candle (open + timeframe)", () => {
+    const at = Date.UTC(2026, 9, 13, 4, 0);
+    expect(scanCloseLabel({ at, tf: "4h" }, "UTC")).toBe("Werte bei Kerzenschluss 13.10. 08:00");
+    expect(scanCloseLabel({ at: Date.UTC(2026, 9, 12), tf: "1d" }, "UTC")).toBe("Werte bei Kerzenschluss 13.10. 00:00");
+  });
+
   it("scanner rows list A+ / A only; an error is said honestly", () => {
     const row = { id: "ETHUSDT:4h:long:range:1", symbol: "ETHUSDT", tf: "4h" as const, setup: realView().best[0]!.setup, phase: "inside" as const, price: 3000, box: null, at: Date.now() };
     state.scan = { ...SCAN, rows: [row] };
     const { unmount } = wrap();
     expect(screen.getByTestId("scan-row")).toHaveAttribute("data-symbol", "ETHUSDT");
+    // the row says when its entry / CRV were computed – the live card may differ (review F6)
+    expect(within(screen.getByTestId("scan-row")).getByTestId("scan-close")).toHaveTextContent(/^Werte bei Kerzenschluss \d{2}\.\d{2}\. \d{2}:\d{2}$/);
+    expect(screen.getByTestId("markt-scanner")).toHaveTextContent("„Beste Setups“ rechnet mit dem Live-Kurs");
     unmount();
     state.scan = { ...SCAN, state: "error", rows: [], detail: "Binance nicht erreichbar (Region/CORS) – kein Proxy in der Datei-Version." };
     wrap();
