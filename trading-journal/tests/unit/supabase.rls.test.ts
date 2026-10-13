@@ -173,6 +173,16 @@ describe("aal2 rule (SEC-01): a 2FA user's password-only session reaches nothing
     expect(await as(null, `select next_sync_at, sync_failures from public.exchange_connections`)).toEqual([{ next_sync_at: null, sync_failures: 0 }]);
   });
 
+  it("SETUP.md 4.1: the documented affiliate SQL runs on the schema (set commission, list, mark paid, void, reset)", async () => {
+    const setup = readFileSync(join(__dirname, "../../SETUP.md"), "utf8");
+    const section = setup.slice(setup.indexOf("### 4.1"));
+    const sql = /```sql\n([\s\S]*?)```/.exec(section)![1]!.replaceAll("<user-uuid>", A).replaceAll("in_…", "in_1").replaceAll("ABCD2345", "AAAAAA11");
+    await expect(service(sql)).resolves.toBeUndefined();
+    const rows = await as<{ status: string }>(null, `select status from public.affiliate_ledger where stripe_invoice_id = 'in_1'`);
+    expect(rows).toEqual([{ status: "void" }]);
+    expect(await as(null, `select commission_pct from public.referral_codes where code = 'AAAAAA11'`)).toEqual([{ commission_pct: null }]);
+  });
+
   it("anon reaches none of the guarded tables", async () => {
     await db.exec(`reset role; select set_config('request.jwt.claims', '{}', false); set role anon;`);
     try {

@@ -213,6 +213,40 @@ Eigenen Zugang ohne Abo (z. B. für den Betreiber), im SQL-Editor:
 update profiles set plan = 'premium' where id = '<user-uuid>';   -- bleibt, bis ein Webhook für diesen Nutzer ihn neu setzt
 ```
 
+### 4.1 Affiliates verwalten (SQL, es gibt dafür keine Admin-Seite in der App)
+
+Jeder Nutzer bekommt unter **Konto → Empfehlen** einen Code (er entsteht beim ersten Öffnen der Karte). Ein normaler
+Code bringt dem Werbenden eine einmalige Gutschrift auf seine Stripe-Rechnung (`REFERRAL_REWARD_CENTS`). Zum Affiliate
+wird ein Code erst, wenn der Betreiber eine Provision setzt – dann bucht der Webhook für jede bezahlte Rechnung der
+geworbenen Kunden 12 Monate lang eine Provision als `pending` in `affiliate_ledger` (Beträge in Cent). Ausgezahlt wird
+außerhalb der App; danach markierst du die Einträge als bezahlt. Alles im Supabase-SQL-Editor:
+
+```sql
+-- Affiliate freischalten (Provision in Prozent, erlaubt: über 0 bis 50)
+update referral_codes set commission_pct = 25 where code = 'ABCD2345';
+
+-- offene Provisionen je Affiliate (in Euro)
+select c.code, l.referrer_id, l.currency, count(*) as rechnungen, sum(l.amount) / 100.0 as offen
+from affiliate_ledger l join referral_codes c on c.user_id = l.referrer_id
+where l.kind = 'commission' and l.status = 'pending'
+group by c.code, l.referrer_id, l.currency
+order by offen desc;
+
+-- nach der Auszahlung als bezahlt markieren
+update affiliate_ledger set status = 'paid'
+where referrer_id = '<user-uuid>' and kind = 'commission' and status = 'pending';
+
+-- eine Provision zu einer erstatteten Rechnung stornieren
+update affiliate_ledger set status = 'void' where stripe_invoice_id = 'in_…' and kind = 'commission';
+
+-- Affiliate wieder zum normalen Empfehlungscode machen
+update referral_codes set commission_pct = null where code = 'ABCD2345';
+```
+
+Der Affiliate sieht seine Provisionen (offen / bezahlt) selbst in der Karte **Empfehlen**. Wer eine Oberfläche mit
+Auszahlungen braucht, kann statt dessen einen externen Affiliate-Dienst mit Stripe-Anbindung nutzen – der ist in der App
+nicht eingebaut.
+
 **Live gehen:** dieselben Produkte, Preise, Webhook und Portal-Einstellungen im Live-Modus anlegen, `sk_live_…`,
 das neue `whsec_…` und die Live-`price_…`-IDs in Netlify eintragen, neu deployen. Vorher Impressum, AGB, Widerruf und
 Datenschutzerklärung bereitstellen (die Preisseite weist darauf hin; die Texte liefert der Betreiber).
