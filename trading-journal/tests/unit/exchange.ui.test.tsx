@@ -171,7 +171,9 @@ describe("ExchangeConnectionsCard", () => {
     wrap(<ExchangeConnectionsCard />);
     const box = await screen.findByTestId("exchange-connected");
     expect(box.textContent).toContain("7e2d");
-    expect(box.textContent).toContain("nur Lesen");
+    // review EX-01: the venue cannot report a key's rights – the row says what is known (the user's confirmation)
+    expect(box.textContent).toContain("als Read-only bestätigt");
+    expect(box.textContent).not.toContain("nur Lesen");
     expect(within(box).getByTestId("exchange-sync")).toBeTruthy();
     expect(within(box).getByTestId("exchange-dry")).toBeTruthy();
     expect(document.body.innerHTML).not.toContain(SECRET);

@@ -49,7 +49,10 @@ export const EX = {
   history: "Verlauf",
   runKind: { manual: "Manuell", cron: "Automatisch", backfill: "Erstimport", dry_run: "Probelauf" } as const,
   runStatus: { running: "läuft", ok: "fertig", partial: "teilweise", error: "Fehler" } as const,
-  ipNote: "Ohne IP-Bindung: Unsere Server wechseln ihre IP. Ein Read-only-Key kann kein Geld bewegen – trotzdem nie teilen.",
+  ipNote: "Ohne IP-Bindung: Unsere Server wechseln ihre IP. Bitunix zeigt uns die Rechte eines Keys nicht – vergib deshalb nur Lese-Rechte (kein Handel, keine Auszahlung) und teile den Key nie.",
+  /** connection row: what we know about the key's rights (review EX-01 – the venue cannot be asked) */
+  readOnlyConfirmed: "als Read-only bestätigt",
+  readOnlyTitle: "Von dir beim Verbinden als Read-only bestätigt. Bitunix verrät die Rechte eines Keys nicht – wir prüfen nur, dass er lesen kann.",
   keyLabel: "API-Key",
   secretLabel: "Secret-Key",
 } as const;

@@ -283,7 +283,7 @@ function Connected({ conn, status }: { conn: ExchangeConnection; status: Exchang
                 {conn.label && <span className="truncate text-[12px] text-faint">{conn.label}</span>}
               </span>
               <span className="text-[12.5px] text-mute">
-                <MaskedKey last4={conn.keyLast4} /> · <span className="text-faint">nur Lesen</span>
+                <MaskedKey last4={conn.keyLast4} /> · <span className="text-faint" title={EX.readOnlyTitle}>{EX.readOnlyConfirmed}</span>
               </span>
             </div>
             <span className="flex basis-full items-center gap-1.5 text-[11.5px] text-faint sm:shrink-0 sm:basis-auto">

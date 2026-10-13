@@ -60,7 +60,7 @@ export async function mockExchange(page: Page, sb: MockSupabase, opts: MockExcha
     exchange: "bitunix",
     label: "",
     keyLast4: "7e2d",
-    permissions: ["read"],
+    permissions: [],
     status: "active",
     lastSyncAt: null,
     lastError: null,

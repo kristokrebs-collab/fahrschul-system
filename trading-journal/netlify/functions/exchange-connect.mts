@@ -1,7 +1,9 @@
 /**
  * POST  /api/v1/exchange/connect `{ exchange, apiKey, secret, passphrase?, label?, journalAccount, readOnlyConfirmed }`
  *       → `{ connection, account }` (P11). Validates the key with one read-only call (Bitunix: GET /api/v1/futures/account),
- *       then stores key + secret AES-256-GCM encrypted (AAD `<user>:<connection>:<field>`, `_lib/crypto.ts`). Only the
+ *       which proves it can read – Bitunix cannot report whether a key may also trade or withdraw, so `permissions` stays
+ *       `[]` and the read-only promise rests on the user's confirmation (`readOnlyConfirmed`). Then stores key + secret
+ *       AES-256-GCM encrypted (AAD `<user>:<connection>:<field>`, `_lib/crypto.ts`). Only the
  *       last 4 characters of the key ever leave the server again.
  * PATCH /api/v1/exchange/connect `{ connectionId, journalAccount?, syncEnabled?, label? }` → `{ connection }`.
  *
@@ -78,7 +80,9 @@ export default handler(async (req, ctx) => {
     throw exchangeHttpError(e);
   }
 
-  const row = await insertConnection({ userId: user.id, exchange, label, creds, journalAccount: body.journalAccount, permissions: ["read"] });
+  // Bitunix offers no way to read a key's rights (review EX-01): the validation call only proves it can READ – trade /
+  // withdraw rights stay unknown, so nothing is claimed (the user confirmed "read-only", the UI says exactly that)
+  const row = await insertConnection({ userId: user.id, exchange, label, creds, journalAccount: body.journalAccount, permissions: [] });
   await audit(user.id, "exchange.connect", { exchange, last4: row.key_last4 }, clientIp(req, ctx));
   return json(
     {

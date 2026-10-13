@@ -286,7 +286,7 @@ describe("connect / disconnect", () => {
   it("validates the key, stores it encrypted (AAD-bound), returns only the last 4 chars", async () => {
     const r = await connect();
     expect(r.status).toBe(201);
-    expect(r.body.connection).toMatchObject({ exchange: "bitunix", keyLast4: KEY.slice(-4), journalAccount: "makro", status: "active", permissions: ["read"] });
+    expect(r.body.connection).toMatchObject({ exchange: "bitunix", keyLast4: KEY.slice(-4), journalAccount: "makro", status: "active", permissions: [] });
     expect(r.body.account).toEqual({ marginCoin: "USDT", available: 4182.37, margin: 1366.8, unrealizedPnl: -12.4 });
     const stored = state.tables.exchange_connections![0]!;
     expect(stored.api_key_enc).toMatch(/^v1:/);

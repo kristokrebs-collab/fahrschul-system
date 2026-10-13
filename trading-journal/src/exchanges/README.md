@@ -28,6 +28,9 @@ phones, six from `sm`), the Broker-Abgleich only while it has open items, the AP
    key (masked to `••••7e2d` + TextScramble) and secret → mandatory read-only confirmation → the server signs a test
    call (`/api/v1/futures/account`), stores the encrypted key and answers the balance. The typed secret leaves the
    component state before the check runs (flushSync, so even the exiting form holds no copy) and returns only on error.
+   Honest limit (review EX-01): Bitunix cannot tell anyone whether a key may also trade or withdraw – the test call only
+   proves it can read. `permissions` stays `[]`, the connection row says "als Read-only bestätigt" (the user's
+   confirmation), and the guide asks for read rights only.
 2. **First import**: 30 / 90 / 180 / 365 days, as a background function (`exchange-backfill-background`, 202) with a
    client run id; the card polls the run every 3 s. "Erst Probelauf" shows the dry run instead.
 3. **Sync** (`syncNow`): `POST /api/v1/exchange/sync` repeats while the server says `more` (≤ 6 calls), then pulls.

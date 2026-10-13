@@ -231,7 +231,9 @@ create table public.exchange_connections (
   passphrase_enc text,
   key_version    smallint not null default 1 check (key_version >= 1),
   key_last4      text not null default '' check (char_length(key_last4) <= 4),
-  -- what the validation call reported, e.g. {read}; a key with trade / withdraw rights is rejected by P11
+  -- the key's rights as the VENUE reports them. Bitunix has no endpoint for that: the connect call only proves the key
+  -- can read (GET /api/v1/futures/account) and stores {} – trade / withdraw rights can NOT be detected or rejected; the
+  -- user confirms "read-only" when connecting and the UI says exactly that (review EX-01)
   permissions    text[] not null default '{}',
   status         text not null default 'active' check (status in ('active', 'invalid', 'revoked', 'paused')),
   last_sync_at   timestamptz,
