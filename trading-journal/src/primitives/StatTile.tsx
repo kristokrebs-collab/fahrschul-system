@@ -1,5 +1,5 @@
 import { animate, AnimatePresence, motion, useMotionValue, useTransform, type AnimationPlaybackControls } from "motion/react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { canObserveInView, observeInView } from "@/motion/inView";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
@@ -43,14 +43,33 @@ const LIFT = { scale: 1.03, y: -2 } as const;
 /**
  * Label tracking for narrow tiles: the `label` utility's 0.14em needs ~160 px for `ERWARTUNGSWERT` + `+` glyph, more
  * than a tile gets on phones and in the 3-up row next to the MarketPanel at ~1024–1100 px (less still with a classic
- * scrollbar / reserved gutter). Below 11rem of tile width the tracking drops to 0.08em, so every label stays whole.
+ * scrollbar / reserved gutter). Below 11rem of tile width the tracking drops to 0.08em. `--label-k` is the label's
+ * width per character in em (mono advance + tracking): `fitLabel` sizes the label from it.
  */
-const LABEL_FIT = "max-sm:tracking-[0.08em] @max-[11rem]:tracking-[0.08em]";
+const LABEL_FIT = "[--label-k:0.74] max-sm:[--label-k:0.68] @max-[11rem]:[--label-k:0.68]";
 const REST = { scale: 1, y: 0 } as const;
 /** Value type: 17 px, IBM Plex Mono advance 0.6 em; the tile's horizontal padding + border (px-3 + 2 × 1 px). */
 const VALUE_PX = 17;
 const MONO_ADVANCE = 0.6;
 const TILE_INSET_PX = 26;
+/** Label type: the `label` utility's 10.5 px; beside it the `+` glyph (size-5) and its gap (gap-1). */
+const LABEL_PX = 10.5;
+const LABEL_GLYPH_PX = 24;
+/** The text width and its box are compared in whole px (`scrollWidth` / `clientWidth`): room for their rounding. */
+const LABEL_SLACK_PX = 2;
+
+/**
+ * Label type that never ellipsizes (MO-01 for the labels): the `label` utility's 10.5 px with the tracking of
+ * `LABEL_FIT`, or smaller when `chars` would not fit the tile's own width (container units) – a 375 / 360 px phone, a
+ * classic scrollbar's gutter. The tracking is set in `em` of this size, so it shrinks with it.
+ */
+export function fitLabel(chars: number): CSSProperties | undefined {
+  if (chars <= 0) return undefined;
+  return {
+    fontSize: `min(${LABEL_PX}px, calc((100cqw - ${TILE_INSET_PX + LABEL_GLYPH_PX + LABEL_SLACK_PX}px) / (${chars} * var(--label-k))))`,
+    letterSpacing: `calc((var(--label-k) - ${MONO_ADVANCE}) * 1em)`,
+  };
+}
 
 /**
  * Value font size that never ellipsizes a number (MO-01): 17 px, or smaller when `chars` monospace characters would
@@ -135,7 +154,7 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
   const canHover = useCanHover();
   const lifted = active && canHover;
   return (
-    // `@container`: the label tightens its tracking by the tile's own width (`LABEL_FIT`), not by the viewport
+    // `@container`: the label fits the tile's own width (`LABEL_FIT` tracking, `fitLabel` size), not the viewport
     <div onMouseEnter={onActivate} onFocus={onActivate} className={cn("@container min-w-0", className)}>
       <motion.div className="relative h-full" initial={false} animate={lifted && !reduced ? LIFT : REST} transition={spring.hover}>
         {/* opaque surface (≈ the former white/3 % over the hero): the hero's dot matrix never shows through label or value */}
@@ -149,7 +168,9 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
           />
           <motion.div layout="position" layoutDependency={active} className="relative">
             <MorphTitle id={`fact-${fact}`} as="dt" className={cn("label flex items-center justify-between gap-1 whitespace-nowrap", LABEL_FIT)}>
-              <span className="truncate">{label}</span>
+              <span className="truncate" style={fitLabel(label.length)}>
+                {label}
+              </span>
               <span
                 aria-hidden="true"
                 className={cn(

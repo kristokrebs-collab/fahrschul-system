@@ -11,7 +11,7 @@
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { kindText, STRENGTH_LABEL, wtTurn, type GradedPart, type Signals } from "../../src/domain/signals";
-import { collectErrors, fixture, isMobile, pinClock, screenshot, seed, stored, utcToday, verdictLabel, type FakeClock } from "./helpers";
+import { chartSettled, collectErrors, fixture, isMobile, pinClock, screenshot, seed, stored, utcToday, verdictLabel, type FakeClock } from "./helpers";
 import type { RatioScript } from "./mocks/synth";
 import { expectedBars, expectedSignals, oracleCfg } from "./mocks/synthOracle";
 
@@ -292,8 +292,12 @@ test.describe("chart", () => {
     for (let i = 0; i < Math.min(a.length, b.length); i++) if (Math.abs(a[i]! - b[i]!) > 24) n++;
     return n;
   };
-  /** The canvas print once nothing moves any more (the overlay re-reads its data ≤ 1/s and on new candles). */
+  /**
+   * The canvas print once nothing moves any more: the chart reports itself settled (history in, no morph / wipe /
+   * tween – `chartSettled`), and two prints 700 ms apart agree (the overlay re-reads its data ≤ 1/s and on new candles).
+   */
   async function settledPrint(card: Locator): Promise<number[]> {
+    await chartSettled(card);
     let prev = await canvasPrint(card);
     await expect
       .poll(
@@ -328,7 +332,7 @@ test.describe("chart", () => {
     await expect(interval.getByRole("radio", { name: "1m", exact: true })).toHaveAttribute("aria-checked", "true");
     await expect(card.getByTestId("mcb-legend")).toHaveCount(0);
     await expect(card.getByTestId("chart-layers")).toHaveCount(0);
-    await page.waitForTimeout(800);
+    await chartSettled(card);
     const before = await greenPixels(card);
 
     await interval.getByRole("radio", { name: "30m", exact: true }).click();
@@ -362,6 +366,7 @@ test.describe("chart", () => {
     await toggle("sr").click();
     await expect(toggle("sr")).toHaveAttribute("aria-pressed", "true");
     // MCB off: the dots go (other long-green marks, e.g. the LONG level label, stay)
+    await chartSettled(card);
     const withMcb = await greenPixels(card);
     await toggle("mcb").click();
     await expect(card.getByTestId("mcb-legend")).toHaveCount(0);

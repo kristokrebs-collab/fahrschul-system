@@ -9,7 +9,7 @@
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { GradedPart, Signals } from "../../src/domain/signals";
-import { collectErrors, pinClock, seed, utcToday, verdictLabel } from "./helpers";
+import { chartSettled, collectErrors, pinClock, seed, utcToday, verdictLabel } from "./helpers";
 import { DIV_LEVELS } from "./mocks/synth";
 import { expectedSignals } from "./mocks/synthOracle";
 
@@ -177,7 +177,9 @@ test.describe("graded parts on a divergence market", () => {
         return out;
       });
     const diff = (a: number[], b: number[]) => a.reduce((n, v, i) => n + (Math.abs(v - (b[i] ?? -999)) > 24 ? 1 : 0), Math.abs(a.length - b.length));
+    // the chart reports itself settled (history in, no morph / wipe / tween), then two prints 700 ms apart agree
     const settled = async () => {
+      await chartSettled(card);
       let prev = await print();
       await expect
         .poll(
@@ -201,6 +203,7 @@ test.describe("graded parts on a divergence market", () => {
       await expect.poll(async () => diff(on, await print()), { timeout: 5_000, message: `${layer} lines leave the canvas` }).toBeGreaterThan(15);
       await toggle(layer).click();
       await expect(toggle(layer)).toHaveAttribute("aria-pressed", "true");
+      await chartSettled(card);
       await expect.poll(async () => diff(on, await print()), { timeout: 5_000, message: `${layer} lines are back` }).toBeLessThan(15);
     }
     expect(errors, errors.join("\n")).toEqual([]);

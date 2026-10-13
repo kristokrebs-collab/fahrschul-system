@@ -91,6 +91,15 @@ first array before those frames ran: the tail-append path reveals too); then the
 the Nothing dot-matrix loader (`DotMatrix preset="loader"`, decorative) and a transform-only shimmer
 (`animate-fx-shimmer`). Reduced motion → instant, static.
 
+### Settled (`data-settled`)
+
+The wrapper carries `data-settled="true"` once the bars are drawn and nothing on the canvas moves: no history `setData`
+waiting for the chart font, range morph, interval strip wipe, pane crossfade, box draw-in / edge wipe or zone fade-in.
+Everything that starts one of them calls `unsettle()` (`"false"`); a frame loop that runs only while one is in flight
+(each of them ends) and is queued behind lightweight-charts' own frame flips it back. Written straight to the DOM, never
+a render; reduced motion has no tweens, so it is settled as soon as the bars are drawn. The overview card adds
+`data-history="loading|ready"` (`Lade Historie …`); the e2e helper `chartSettled` waits for both before a canvas print.
+
 ## Data helpers (`panes.ts`, `markers.ts`, `levels.ts`, `animateRange.ts`, `tooltip.tsx`)
 
 | Export | Purpose |
@@ -109,7 +118,7 @@ the Nothing dot-matrix loader (`DotMatrix preset="loader"`, decorative) and a tr
 | `resampleCandles(src, srcMs, ms)`, `resampleTail` (`resample.ts`) | `30m` chart interval from `kline_15m` (UTC-aligned buckets, `closed` with the last source bar); the tail keeps the live push O(1) |
 | `rightOffsetBars(bars, width)`, `RIGHT_FREE_PX`, `RightOffset` | right offset in bars that leaves ≥ 72 px free right of the last bar (price-line titles + live pulse), used by every range target; a fixed 8 bars shrank to ~6 px on 30m · 1M |
 | `toTradeMarkers(trades)`, `buildMarkers(markers, snap, bounds)` → `{ markers, outside, byId }`, `snapTime`, `boundsOf`, `markerTradeId`, `hitMarker` | entry ▲/▼ (`#3ddc84`/`#ff4d4f`, journal exception), exit ● toned win/loss/be; ids `e:{id}` / `x:{id}`; exit sits on the entry candle (model has no exit time) |
-| `RangeAnimator` (`goTo(range, animated)`, `cancel()`, `dispose()`), `rangeForDays`, `rangeIndices`, `lerpRange`, `barsPerDay` | visible-logical-range morph through two MotionValues with `spring.smooth`; wheel/pointerdown cancels; reduced motion sets directly |
+| `RangeAnimator` (`goTo(range, animated)`, `shift(delta)`, `cancel()`, `dispose()`, option `onMorph`), `rangeForDays`, `rangeIndices`, `lerpRange`, `barsPerDay` | visible-logical-range morph through two MotionValues with `spring.smooth`; wheel/pointerdown cancels; reduced motion sets directly; `shift` moves a running morph (position and target) with older bars prepended mid-flight, so a range pill whose history lands during the morph still ends at the live edge; `onMorph` reports start / end (both edges landed) |
 | `ChartTooltip` (`ref: TooltipHandle { move, hide }`), `formatTooltip`, `placeTooltip`, `TOOLTIP_CLASS` | O/H/L/C, Δ % (close vs open), `dd.MM., HH:mm`; position via `useSpring(spring.tooltip)`, text via DOM refs; box measured once, tone class swapped only on change, bounds from a ResizeObserver (no layout read per crosshair move) |
 | `fmt` (`format.ts`), `tradeTime` | internal de-DE formatters (`n0/n1/n2/signed/pct0/price/date/time/mio`), bundle `tt` |
 
@@ -136,7 +145,8 @@ ticks next to the visible S/R axis labels too.
 range, size, price mapping, last bar's range, layers, inputs) – a redraw for a live print that moves none of it reuses
 the last geometry. Bar indices are rebuilt only when the inputs or the loaded bars change. No React state, no timers.
 `ChartCard` feeds it from one external store re-read when the check publishes (≤ 1/s) and per new bar, each layer
-memoised by content (`signalMarkersKey`, `divergencesKey`, `structureKey`); hidden layers are not computed. Legend
+memoised by content (`signalMarkersKey`, `divergencesKey`, `structureKey`); every layer is computed whether shown or not,
+so a toggle only shows or hides what the chart holds and never re-reads the engine (it cannot move another layer). Legend
 toggles under the chart (`ChartLayers`, `aria-pressed`, ≥ 44 px on coarse pointers) persist in `tj2-ui.flags`
 (`chartMcbOff`, `chartDivOff`, `chartSrOff`, `chartStructOn`).
 

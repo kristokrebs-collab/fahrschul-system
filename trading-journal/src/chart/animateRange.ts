@@ -78,6 +78,8 @@ export const sameRange = (a: LogicalRange | Range | null, b: Range, eps = 0.01):
 
 export interface RangeAnimatorOptions {
   reducedMotion?: () => boolean;
+  /** a morph started (`true`) or ended / was cancelled (`false`) */
+  onMorph?: (running: boolean) => void;
 }
 
 /** Drives the visible logical range through two MotionValues. One instance per chart. */
@@ -87,6 +89,10 @@ export class RangeAnimator {
   private controls: AnimationPlaybackControls[] = [];
   private unsub: (() => void)[] = [];
   private disposed = false;
+  /** where the running morph is heading (`null` at rest) */
+  private target: Range | null = null;
+  /** generation of the running morph: a stopped one never reports its end */
+  private gen = 0;
 
   constructor(
     private readonly chart: IChartApi,
@@ -128,24 +134,63 @@ export class RangeAnimator {
       this.from.jump(cur.from);
       this.to.jump(cur.to);
     }
+    this.morph(target);
+  }
+
+  /**
+   * Older bars were put in front of the loaded ones while a morph runs (a range pill tapped just before its history
+   * arrived): every logical index moved up by `delta`, so the morph – where it is and where it is heading – moves with
+   * them and still lands on the SAME bars (the live edge), keeping its velocity. Without a running morph nothing
+   * happens and `false` comes back (the caller keeps the window on the same bars itself).
+   */
+  shift(delta: number): boolean {
+    const target = this.target;
+    if (this.disposed || !target || !this.isAnimating()) return false;
+    if (!delta) return true;
+    const v = { from: this.from.getVelocity(), to: this.to.getVelocity() };
     this.stopControls();
-    const done = () => {
-      this.controls = [];
-    };
-    this.controls = [
-      animate(this.from, target.from, { ...spring.smooth, onComplete: done }),
-      animate(this.to, target.to, { ...spring.smooth, onComplete: done }),
-    ];
+    // the edge that moves away first, so the range never inverts in between (`push` skips an inverted one)
+    const order = delta > 0 ? [this.to, this.from] : [this.from, this.to];
+    for (const mv of order) mv.jump(mv.get() + delta);
+    this.morph({ from: target.from + delta, to: target.to + delta }, v);
+    return true;
   }
 
   /** Abort a running morph (user wheel/pointerdown); the range stays where it is. */
   cancel(): void {
+    const running = this.isAnimating();
     this.stopControls();
+    if (running) this.opts.onMorph?.(false);
   }
 
+  private morph(target: Range, velocity?: { from: number; to: number }): void {
+    this.stopControls();
+    const gen = this.gen;
+    let left = 2;
+    const done = () => {
+      // both edges have landed (a retarget or a cancel stops these and starts a new generation)
+      if (gen !== this.gen || --left > 0) return;
+      this.controls = [];
+      this.target = null;
+      this.opts.onMorph?.(false);
+    };
+    this.target = target;
+    this.opts.onMorph?.(true);
+    // the list first: an edge that is already there may complete inside `animate` (its `done` empties `this.controls`)
+    const controls: AnimationPlaybackControls[] = [];
+    this.controls = controls;
+    controls.push(
+      animate(this.from, target.from, { ...spring.smooth, ...(velocity ? { velocity: velocity.from } : {}), onComplete: done }),
+      animate(this.to, target.to, { ...spring.smooth, ...(velocity ? { velocity: velocity.to } : {}), onComplete: done }),
+    );
+  }
+
+  /** Stops the edges without reporting (a retarget continues the morph; `cancel` reports its end). */
   private stopControls(): void {
+    this.gen += 1;
     for (const c of this.controls) c.stop();
     this.controls = [];
+    this.target = null;
   }
 
   dispose(): void {

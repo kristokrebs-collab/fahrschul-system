@@ -14,7 +14,7 @@
  * harness `/dev/wachstum.html` under `npm run dev`). `P08_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, stored, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, settledBox, stored, toast } from "./helpers";
 
 const URL_ = process.env.PW_WACHSTUM_URL ?? "/#wachstum";
 const SHOTS = process.env.P08_SHOTS;
@@ -226,11 +226,22 @@ test.describe("Wachstum", () => {
     expect(today.mood).toBe(4);
     expect(today.checkin).toMatchObject({ stress: 2, energy: 5, sleep: 11, emotions: ["Fokussiert"] });
 
-    // pre-trade check: tick every point → ready
+    // pre-trade check: tick every point → ready. Ticked from a still page (the sheet gone, the card's reveal – it
+    // only starts once the list scrolls into view on a phone – done), each tick confirmed before the next
+    await expect(sheet).toHaveCount(0);
     const ready = page.getByTestId("growth-ready");
-    const boxes = ready.getByTestId("growth-ready-checklist").getByRole("checkbox");
+    const list = ready.getByTestId("growth-ready-checklist");
+    const boxes = list.getByRole("checkbox");
+    await list.scrollIntoViewIfNeeded();
+    await settledBox(list);
     const n = await boxes.count();
-    for (let i = 0; i < n; i++) await boxes.nth(i).click();
+    expect(n, "checklist points").toBeGreaterThan(0);
+    await expect(ready.getByTestId("growth-ready-count")).toHaveText(`0/${n}`);
+    for (let i = 0; i < n; i++) {
+      await boxes.nth(i).click();
+      await expect(boxes.nth(i), `point ${i + 1} ticked`).toHaveAttribute("aria-checked", "true");
+      await expect(ready.getByTestId("growth-ready-count")).toHaveText(`${i + 1}/${n}`);
+    }
     await expect(ready).toHaveAttribute("data-state", "ready");
     await expect(ready.getByTestId("growth-ready-label")).toHaveText("Bereit");
     await shot(page, info, "ready");

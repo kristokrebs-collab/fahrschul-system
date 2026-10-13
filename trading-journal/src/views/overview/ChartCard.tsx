@@ -249,7 +249,9 @@ export function structureKey(s: StructureOverlay | null): string {
  * External store of the check overlay of one chart interval (MCB dots, divergences, structure + S/R): re-read when the
  * entry check publishes (≤ 1/s, only on a real change) and on a new bar (the store is re-created per history change),
  * each part memoised by content, so the chart re-sets a layer only when something on it appears, moves or changes
- * state. Hidden layers are not computed; all layers come from one build of the bars (`getChartOverlay`).
+ * state. Every layer is computed, all from one build of the bars (`getChartOverlay`), whether it is shown or not: a
+ * layer toggle only shows or hides what the chart already holds – it never re-reads the engine, so it can never move
+ * or restyle another layer (or this one) with data newer than the last re-read.
  *
  * Off the publish path: the engine publishes inside its own timer task, so a publish only marks the overlay stale and
  * schedules ONE re-read in a task of its own (the re-read costs ≈ 0.2 ms on 4h, ≈ 2.4 ms on 30m × 1500 bars). While
@@ -262,7 +264,7 @@ interface OverlayStore {
   setVisible: (on: boolean) => void;
 }
 
-function createOverlayStore(interval: ChartIv, enabled: boolean, bars: number, layers: OverlayLayers): OverlayStore {
+function createOverlayStore(interval: ChartIv, enabled: boolean, bars: number): OverlayStore {
   let dirty = true;
   let visible = true;
   let pending: ReturnType<typeof setTimeout> | null = null;
@@ -274,7 +276,7 @@ function createOverlayStore(interval: ChartIv, enabled: boolean, bars: number, l
     if (dirty) {
       dirty = false;
       let next = value;
-      const o = getChartOverlay(interval, { bars, mcb: layers.mcb, div: layers.div, structure: layers.sr || layers.struct });
+      const o = getChartOverlay(interval, { bars, mcb: true, div: true, structure: true });
       const mcb = o.mcb.length ? o.mcb : NO_SIGNALS;
       const mk = signalMarkersKey(mcb);
       if (mk !== keys.mcb) {
@@ -326,10 +328,10 @@ function createOverlayStore(interval: ChartIv, enabled: boolean, bars: number, l
 }
 
 /** The check overlay for the chart (`createOverlayStore`); empty while collapsed or on 1m. */
-function useCheckOverlay(interval: ChartIv, enabled: boolean, bars: number, layers: OverlayLayers, history: readonly Candle[]): CheckOverlay {
+function useCheckOverlay(interval: ChartIv, enabled: boolean, bars: number, history: readonly Candle[]): CheckOverlay {
   // a new bar (history identity) re-creates the store: dots, pivots and levels follow the new candle
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `history` is the re-read trigger, not an input
-  const store = useMemo(() => createOverlayStore(interval, enabled, bars, layers), [interval, enabled, bars, layers, history]);
+  const store = useMemo(() => createOverlayStore(interval, enabled, bars), [interval, enabled, bars, history]);
   // re-read only while the chart card is on screen (shared IntersectionObserver; without one it always is)
   useEffect(() => {
     const el = document.getElementById(CHART_CARD_ID);
@@ -654,8 +656,10 @@ export function ChartCard() {
   }, [feedId, symbol, rangeDays, requestKey]);
   const loading = loadedKey !== requestKey;
   const markers = useMemo(() => toTradeMarkers(trades), [trades]);
-  const overlay = useCheckOverlay(interval, chart.open, Math.min(1500, Math.ceil((rangeDays * 86_400) / IV_SECONDS[interval]) + 60), layers, candles);
+  const overlay = useCheckOverlay(interval, chart.open, Math.min(1500, Math.ceil((rangeDays * 86_400) / IV_SECONDS[interval]) + 60), candles);
   const signals = overlay.signals;
+  // the MCB legend names dots that are drawn
+  const mcbShown = layers.mcb && signals.length > 0;
   const onLayer = useCallback(
     (k: keyof OverlayLayers) => {
       if (k === "struct") setFlag(LAYER_FLAGS.struct, !layers.struct);
@@ -743,10 +747,11 @@ export function ChartCard() {
   );
 
   return (
-    <div id={CHART_CARD_ID} className="scroll-mt-20">
+    // `data-history`: the history of the chosen range is still on its way (`Lade Historie …`) or in (e2e)
+    <div id={CHART_CARD_ID} className="scroll-mt-20" data-history={loading ? "loading" : "ready"}>
       <Card
         title={`Chart · ${sym} Perp`}
-        note={<ChartNote feedId={feedId} outside={outside} loading={loading} mcb={signals.length > 0} />}
+        note={<ChartNote feedId={feedId} outside={outside} loading={loading} mcb={mcbShown} />}
         action={
           // wrapped rows spread apart on touch: the ±10 px tap bands of the range pills and the expander never overlap
           <div className="flex flex-wrap items-center gap-2 pointer-coarse:gap-y-5">

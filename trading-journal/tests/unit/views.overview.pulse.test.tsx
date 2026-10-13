@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { digitsOnlyChange, StatusPill } from "@/motion/StatusPill";
 import { EmptyState, EMPTY_LINE } from "@/primitives/EmptyState";
-import { fitValue } from "@/primitives/StatTile";
+import { fitLabel, fitValue } from "@/primitives/StatTile";
 import { verdictKey } from "@/primitives/VerdictPanel";
 import { MARKET_TILE_IDS, MARKET_TILES_KEY, parseTileOrder, useMarketTileOrder } from "@/views/overview/marketTiles";
 import { milestoneProgress, milestoneVisual } from "@/views/overview/projectionTimeline";
@@ -68,6 +68,15 @@ describe("StatTile value fit (MO-01)", () => {
   it("caps at 17 px and shrinks by the tile's container width", () => {
     expect(fitValue(0)).toBeUndefined();
     expect(fitValue(16)).toBe("min(17px, calc((100cqw - 26px) / 9.60))");
+  });
+
+  it("labels: 10.5 px, shrunk by the tile's width beside the `+` glyph; the tracking is em of that size", () => {
+    expect(fitLabel(0)).toBeUndefined();
+    // ERWARTUNGSWERT: 14 characters at `--label-k` em each (advance 0.6 + tracking 0.14 / 0.08 by `LABEL_FIT`)
+    expect(fitLabel(14)).toEqual({
+      fontSize: "min(10.5px, calc((100cqw - 52px) / (14 * var(--label-k))))",
+      letterSpacing: "calc((var(--label-k) - 0.6) * 1em)",
+    });
   });
 });
 

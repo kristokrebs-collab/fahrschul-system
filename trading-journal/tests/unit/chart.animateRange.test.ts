@@ -76,6 +76,36 @@ describe("RangeAnimator", () => {
     anim.dispose();
   });
 
+  it("reports a morph's start and its end once both edges landed; a cancel ends it", async () => {
+    const { chart } = fakeChart();
+    const events: boolean[] = [];
+    const anim = new RangeAnimator(chart, { reducedMotion: () => false, onMorph: (running) => events.push(running) });
+    anim.goTo({ from: 60, to: 160 });
+    expect(events).toEqual([true]);
+    anim.cancel();
+    expect(events).toEqual([true, false]);
+    anim.goTo({ from: 70, to: 170 });
+    await vi.waitFor(() => expect(anim.isAnimating()).toBe(false), { timeout: 5_000 });
+    expect(events).toEqual([true, false, true, false]);
+    anim.dispose();
+  });
+
+  it("older bars prepended mid-morph: the morph shifts with them and still lands on the same bars", async () => {
+    const { chart, current } = fakeChart();
+    const anim = new RangeAnimator(chart, { reducedMotion: () => false });
+    anim.goTo({ from: 60, to: 160 });
+    await new Promise((r) => setTimeout(r, 30));
+    expect(anim.shift(1000)).toBe(true);
+    // never an inverted or stale-indexed range on the way
+    expect(current().to).toBeGreaterThan(current().from);
+    await vi.waitFor(() => expect(anim.isAnimating()).toBe(false), { timeout: 5_000 });
+    expect(current().from).toBeCloseTo(1060, 1);
+    expect(current().to).toBeCloseTo(1160, 1);
+    // at rest there is no morph to shift: the caller keeps the window on its bars itself
+    expect(anim.shift(5)).toBe(false);
+    anim.dispose();
+  });
+
   it("ignores inverted ranges while animating", () => {
     const { chart, setVisibleLogicalRange } = fakeChart();
     const anim = new RangeAnimator(chart);
