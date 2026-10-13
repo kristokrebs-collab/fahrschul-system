@@ -7,6 +7,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useState, type FormEvent } from "react";
 import { boxesCfgOf, DEFAULT_WATCHLIST, normalizeWatchSymbol, WATCHLIST_MAX, withBoxesSettings, type BoxesCfg, type MinGrade } from "@/domain/boxes";
+import { useEntitlement } from "@/billing/entitlements";
 import { cn } from "@/lib/cn";
 import { Autocomplete } from "@/motion/pulse/Autocomplete";
 import { Switch } from "@/motion/Switch";
@@ -68,6 +69,8 @@ function Row({ id, label, help, checked, onChange, disabled }: { id: string; lab
 
 export const BoxSettingsCard = memo(function BoxSettingsCard() {
   const stored = useStoredBoxes();
+  // the scanner (and its alerts) is a Pro feature; the close alerts of this symbol are free (F03)
+  const scannerPlan = useEntitlement("boxScanner");
   const pushToast = useUi((s) => s.pushToast);
   const reduced = useReducedFx();
   const [pending, setPending] = useState<Patch | null>(null);
@@ -112,7 +115,14 @@ export const BoxSettingsCard = memo(function BoxSettingsCard() {
           <Row id="bx-on" label={S.on} help={S.onHelp} checked={cur.on} onChange={(on) => apply({ on })} />
           <Row id="bx-alerts" label={S.alerts} help={S.alertsHelp} checked={cur.alerts} onChange={(alerts) => apply({ alerts })} disabled={!cur.on} />
           <Row id="bx-notify" label={S.notify} help={hint === S.notifyDenied || hint === S.notifyUnsupported ? hint : S.notifyHelp} checked={cur.notify} onChange={(v) => void onNotify(v)} disabled={!cur.on || !cur.alerts} />
-          <Row id="bx-scanner" label={S.scanner} help={S.scannerHelp} checked={cur.scanner} onChange={(scanner) => apply({ scanner })} />
+          <Row
+            id="bx-scanner"
+            label={S.scanner}
+            help={scannerPlan ? S.scannerHelp : S.scannerLocked}
+            checked={cur.scanner && scannerPlan}
+            onChange={(scanner) => apply({ scanner })}
+            disabled={!scannerPlan}
+          />
           <div className="grid gap-1.5 pt-1">
             <span id="bx-grade-label" className="label">
               {S.minGrade}

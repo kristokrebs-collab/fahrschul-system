@@ -86,7 +86,7 @@ vi.mock("@/market/marketStore", () => ({
 const { retainBoxes, getBoxes, subscribeBoxes, getBoxBars, closedBars, __boxStats, __resetBoxes } = await import("@/market/boxes/store");
 const { scanSymbol, getScan, retainScanner, scanNow, nextScanAt, lastClosedOpen, __resetScanner, SCAN_BUDGET, budgetedKlines } = await import("@/market/boxes/scanner");
 const { boxSnapCandidates, backfillBoxSnap, startBoxSnapBackfill, BOXSNAP_TRIED_KEY, BOXSNAP_START_MS, BOXSNAP_GAP_MS, BOXSNAP_RETRY_MS } = await import("@/market/boxes/backfill");
-const { evaluateBoxes, __resetBoxAlerts, startBoxAlerts, scanAlertKey, BOX_ALERTS_KEY } = await import("@/market/boxes/alerts");
+const { evaluateBoxes, __resetBoxAlerts, startBoxAlerts, scanAlertKey, setBoxScannerAllowed, BOX_ALERTS_KEY } = await import("@/market/boxes/alerts");
 const { resolveTradeBoxes, tradeDateMs, barOpenOf, __resetBoxSnapshotMemo } = await import("@/market/boxes/snapshot");
 const { priceMv } = await import("@/market/motionValues");
 
@@ -624,6 +624,36 @@ describe("box alerts", () => {
     stop();
     expect(__boxStats().refs).toBe(0);
     setBoxesSettings(undefined);
+    __resetBoxes();
+    __resetScanner();
+    vi.useRealTimers();
+  });
+});
+
+describe("box alerts without the scanner plan (Review F03)", () => {
+  it("a Free plan still gets the candle-close alerts of the Markt symbol; only the scanner part waits for boxScanner", async () => {
+    vi.useFakeTimers();
+    localStorage.removeItem(BOX_ALERTS_KEY);
+    __resetBoxAlerts();
+    __resetBoxes();
+    market.real = null;
+    market.current = fakeProvider();
+    vi.setSystemTime(NOW);
+    feedsAt(NOW);
+    const net: Net = { log: [], fail: () => undefined, serverSkewMs: 0, proxyUp: true, wsUp: true };
+    __resetScanner({ rest: () => binanceRest({ fetch: makeFetch(net) }), proxy: () => proxyRest({ fetch: makeFetch(net) }), kv: () => memoryKV(), now: () => Date.now(), random: () => 0.5 });
+    setBoxesSettings({ alerts: true, scanner: true, watchlist: ["BTCUSDT"] });
+    setBoxScannerAllowed(false);
+    const stop = startBoxAlerts();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(__boxStats().refs).toBe(1); // the box store runs for the close alerts
+    expect(requests(net, "/fapi/v1/klines")).toHaveLength(0); // no watchlist scan
+    setBoxScannerAllowed(true); // upgrade
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(requests(net, "/fapi/v1/klines").length).toBeGreaterThan(0);
+    stop();
+    setBoxesSettings(undefined);
+    __resetBoxAlerts();
     __resetBoxes();
     __resetScanner();
     vi.useRealTimers();

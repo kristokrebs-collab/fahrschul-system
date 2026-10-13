@@ -7,7 +7,7 @@
  *
  * | host | package | does |
  * |---|---|---|
- * | `BoxAlertHost` | P02 | box alerts + the watchlist scanner while `settings.boxes.alerts` is on (gate `boxScanner`) |
+ * | `BoxAlertHost` | P02 | candle-close box alerts of the Markt symbol while `settings.boxes.alerts` is on (free, like the box chart); the watchlist-scanner alerts only with gate `boxScanner` (F03) |
  * | `CoachWatcher` | P04 | live coach alerts after a save (revenge, overtrading …) (gate `coach`) |
  * | `ReportReadyHost` | P04 | "Bericht bereit" wipe → Berichte (checks `reports` itself) |
  * | `RiskGuardHost` | P05 | limit / cooldown toasts after a save (gate `riskLive`) |
@@ -44,6 +44,11 @@ function Entitled({ feature, children }: { feature: Feature; children: ReactNode
   return useEntitlement(feature) ? children : null;
 }
 
+/** Box alerts: the Markt symbol's close alerts for every plan, the scanner part only with `boxScanner`. */
+function BoxAlerts() {
+  return <BoxAlertHost scanner={useEntitlement("boxScanner")} />;
+}
+
 export default function DeferredHosts() {
   return (
     <>
@@ -54,9 +59,7 @@ export default function DeferredHosts() {
         <ExchangeHost />
       </HostSlot>
       <HostSlot name="Box-Alarme">
-        <Entitled feature="boxScanner">
-          <BoxAlertHost />
-        </Entitled>
+        <BoxAlerts />
       </HostSlot>
       <HostSlot name="Coach-Wächter">
         <Entitled feature="coach">

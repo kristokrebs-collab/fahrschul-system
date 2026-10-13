@@ -21,7 +21,7 @@ export {
   type BoxesView,
   type BoxTfView,
 } from "./store";
-export { ALERT_PHASES, BOX_ALERTS_KEY, BoxAlertHost, evaluateBoxes, phaseAlertText, scanAlertKey, startBoxAlerts, useRecentBoxAlerts, type BoxAlert } from "./alerts";
+export { ALERT_PHASES, BOX_ALERTS_KEY, BoxAlertHost, evaluateBoxes, setBoxScannerAllowed, phaseAlertText, scanAlertKey, startBoxAlerts, useRecentBoxAlerts, type BoxAlert } from "./alerts";
 export {
   SCAN_BUDGET,
   SCAN_JITTER_MS,

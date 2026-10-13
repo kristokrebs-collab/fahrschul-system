@@ -50,13 +50,19 @@ interface AlertCtl {
   offs: Array<() => void>;
   /** retain + subscription of the box store while `on` and `alerts` are set (else the host keeps nothing running) */
   boxOffs: Array<() => void> | null;
-  /** retain + subscription of the scanner while `alerts` and `scanner` are set */
+  /** retain + subscription of the scanner while `alerts` and `scanner` are set and the plan includes the scanner */
   scanOffs: Array<() => void> | null;
   settingsRaw: unknown;
+  /**
+   * The plan includes the watchlist scanner (`boxScanner`, Pro). The candle-close alerts of the Markt symbol are free
+   * like the box chart itself (Review F03: the whole host used to sit behind the scanner gate, so a Free trader saw
+   * "Alarm bei Kerzenschluss" ON and never got one).
+   */
+  scanAllowed: boolean;
 }
 
 const recentListeners = new Set<() => void>();
-const fresh = (): AlertCtl => ({ refs: 0, seen: [], closed: new Map(), seeded: false, scanSeeded: false, recent: [], offs: [], boxOffs: null, scanOffs: null, settingsRaw: undefined });
+const fresh = (): AlertCtl => ({ refs: 0, seen: [], closed: new Map(), seeded: false, scanSeeded: false, recent: [], offs: [], boxOffs: null, scanOffs: null, settingsRaw: undefined, scanAllowed: true });
 const ctl: AlertCtl = fresh();
 const settingsBoxes = (s: unknown): unknown => (s && typeof s === "object" ? (s as { boxes?: unknown }).boxes : undefined);
 const cfgNow = (): BoxesCfg => boxesCfgOf(settingsBoxes(useJournal.getState().settings));
@@ -219,7 +225,7 @@ const release = (offs: Array<() => void> | null): null => {
 function syncHost(): void {
   const cfg = cfgNow();
   const wantBoxes = cfg.on && cfg.alerts;
-  const wantScan = cfg.alerts && cfg.scanner;
+  const wantScan = cfg.alerts && cfg.scanner && ctl.scanAllowed;
   if (wantBoxes && !ctl.boxOffs) {
     ctl.seeded = false;
     ctl.closed.clear();
@@ -265,9 +271,21 @@ export function startBoxAlerts(): () => void {
   };
 }
 
-/** Leaf host (mount once in the app, `data-layer` per the hosts contract): runs the alerts, renders nothing. */
-export function BoxAlertHost(): null {
+/** Whether the scanner part may run (the plan gate `boxScanner`); re-evaluates the running host. */
+export function setBoxScannerAllowed(allowed: boolean): void {
+  if (ctl.scanAllowed === allowed) return;
+  ctl.scanAllowed = allowed;
+  if (ctl.refs > 0) syncHost();
+}
+
+/**
+ * Leaf host (mount once in the app, `data-layer` per the hosts contract): runs the alerts, renders nothing. The
+ * candle-close alerts of the Markt symbol always run (while `settings.boxes.alerts` is on); the scanner alerts only with
+ * `scanner` (the plan's `boxScanner`).
+ */
+export function BoxAlertHost({ scanner = true }: { scanner?: boolean } = {}): null {
   useEffect(() => startBoxAlerts(), []);
+  useEffect(() => setBoxScannerAllowed(scanner), [scanner]);
   return null;
 }
 

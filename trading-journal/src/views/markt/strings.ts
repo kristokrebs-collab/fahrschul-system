@@ -84,6 +84,7 @@ export const MARKT = {
     notifyUnsupported: "Dieser Browser kann keine Benachrichtigungen.",
     scanner: "Watchlist-Scanner",
     scannerHelp: "Scannt die Watchlist nach jedem 4h-Schluss.",
+    scannerLocked: "Ab Pro: scannt die Watchlist nach jedem 4h-Schluss. Die Alarme für dieses Symbol laufen auch ohne.",
     minGrade: "Mindestnote",
     watchlist: "Watchlist",
     add: "Symbol hinzufügen",
