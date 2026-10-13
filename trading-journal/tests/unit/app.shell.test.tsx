@@ -43,6 +43,15 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
 
+/**
+ * How long a page switch may take to reach the DOM here. `PageHost` takes a new page one painted frame later
+ * (`afterNextPaint`: a frame, then a task) and renders it in a transition, while the shell's leaving page still runs its
+ * exit; in jsdom that is 0.8–2 s on an idle machine (measured: Übersicht → Markt ≈ 0.9 s, Markt → Coach ≈ 1.0–2.0 s),
+ * beyond Testing Library's 1-s `findBy` default – and 3–4 s with the full suite's workers in parallel. Only the wait is
+ * longer: each find still requires the page itself.
+ */
+const SWITCH = { timeout: 8_000 };
+
 function renderApp() {
   return render(
     <MotionRoot>
@@ -72,7 +81,7 @@ describe("App shell", () => {
     // first (cold) mount of the whole app: transforms + overview render exceed 5 s when the workers run in parallel
   }, 20_000);
 
-  it("dock navigation changes the page and the hash", async () => {
+  it("dock navigation changes the page and the hash", { timeout: 20_000 }, async () => {
     renderApp();
     const dock = screen.getByRole("toolbar", { name: "Navigation" });
     await act(async () => {
@@ -80,7 +89,7 @@ describe("App shell", () => {
     });
     expect(useUi.getState().page).toBe("trades");
     expect(location.hash).toBe("#trades");
-    expect(await screen.findByTestId("page-trades")).toBeInTheDocument();
+    expect(await screen.findByTestId("page-trades", {}, SWITCH)).toBeInTheDocument();
     expect(within(dock).getByRole("button", { name: "Trades" })).toHaveAttribute("aria-current", "page");
     await act(async () => {
       fireEvent.click(within(dock).getByRole("button", { name: "Einstellungen" }));
@@ -89,7 +98,8 @@ describe("App shell", () => {
     expect(location.hash).toBe("#settings");
   });
 
-  it("feature pages: the dock's Markt tab and the router reach the lazy pages; the feature hosts mount (P14)", async () => {
+  // two page switches after a cold mount (see `SWITCH`): beyond vitest's 5-s default test timeout under the parallel run
+  it("feature pages: the dock's Markt tab and the router reach the lazy pages; the feature hosts mount (P14)", { timeout: 30_000 }, async () => {
     renderApp();
     const dock = screen.getByRole("toolbar", { name: "Navigation" });
     await act(async () => {
@@ -97,13 +107,13 @@ describe("App shell", () => {
     });
     expect(useUi.getState().page).toBe("markt");
     expect(location.hash).toBe("#markt");
-    expect(await screen.findByTestId("page-markt")).toBeInTheDocument();
+    expect(await screen.findByTestId("page-markt", {}, SWITCH)).toBeInTheDocument();
     expect(within(dock).getByRole("button", { name: "Markt" })).toHaveAttribute("aria-current", "page");
     // a page outside the dock (no payments in tests → the coach gate is open)
     await act(async () => {
       navigate("coach");
     });
-    expect(await screen.findByTestId("page-coach")).toBeInTheDocument();
+    expect(await screen.findByTestId("page-coach", {}, SWITCH)).toBeInTheDocument();
     expect(within(dock).queryByRole("button", { current: "page" })).toBeNull();
     expect(await screen.findByTestId("feature-hosts")).toBeInTheDocument();
     for (const layer of ["Suche", "Tastenkürzel", "Einführung", "Cloud"]) expect(document.querySelector(`[data-layer="${layer}"]`)).not.toBeNull();
@@ -118,14 +128,14 @@ describe("App shell", () => {
     expect(JSON.parse(localStorage.getItem("tj2-ui") ?? "{}").hideLocalBanner).toBe(true);
   });
 
-  it("keeps the overview mounted but hidden on other tabs and shows the same instance again", async () => {
+  it("keeps the overview mounted but hidden on other tabs and shows the same instance again", { timeout: 20_000 }, async () => {
     renderApp();
     const hero = screen.getByTestId("hero-net");
     const dock = screen.getByRole("toolbar", { name: "Navigation" });
     await act(async () => {
       fireEvent.click(within(dock).getByRole("button", { name: "Trades" }));
     });
-    expect(await screen.findByTestId("page-trades")).toBeInTheDocument();
+    expect(await screen.findByTestId("page-trades", {}, SWITCH)).toBeInTheDocument();
     // same DOM node, parked behind React Activity (display:none) once its exit played, instead of unmounted
     await waitFor(() => expect(hero).not.toBeVisible(), { timeout: 1500 });
     expect(screen.getByTestId("hero-net")).toBe(hero);
