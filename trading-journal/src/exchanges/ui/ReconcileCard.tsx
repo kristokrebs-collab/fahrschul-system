@@ -15,6 +15,7 @@ import { readJson, storageKey, writeJson } from "@/store/storage";
 import { mergeDuplicate, reconcile, type DuplicatePair, type ReconcileReport } from "../reconcile";
 import { primaryConnection, syncNow, useExchange } from "../store";
 import { RECON } from "../strings";
+import { deleteTradeWithShots } from "@/journal/screenshots/release";
 import { fmtPlain, Money, shortWhen } from "./parts";
 
 const IGNORE_KEY = storageKey("exchange-recon-ignored");
@@ -142,7 +143,8 @@ export function ReconcileCard({ className }: { className?: string }) {
       return;
     }
     try {
-      await remove(d.manual.id);
+      // the merged record took the pictures (lists are united): only screenshots nobody references any more leave the cloud
+      await deleteTradeWithShots(remove, d.manual);
     } catch {
       pushToast({ kind: "error", title: RECON.removeFailed });
       return;

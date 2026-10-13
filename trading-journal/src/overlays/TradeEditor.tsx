@@ -38,6 +38,7 @@ import { AutoHeight } from "@/views/trades/AutoHeight";
 import { DETAIL_DIM_HANDOFF } from "./TradeDetail";
 import { SAVE_CHECK_TIMEOUT_MS, SIGNAL_SECTION_TITLE, SignalSection, resolveTradeSignal, signalSectionSub, type MtfAuto } from "./SignalSection";
 import { boxSnapOf, resolveTradeBoxes, type BoxSnapshot } from "@/market/boxes/snapshot";
+import { deleteTradeWithShots, releaseCloudShots, removedCloudPaths } from "@/journal/screenshots/release";
 import { normalizeWatchSymbol } from "@/domain/boxes/config";
 import { useEntitlement } from "@/billing/entitlements";
 
@@ -675,6 +676,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         // is awaited first; nothing closes before the write is known to have happened (zero data loss).
         const { persisted, done } = saveTradeNow(record);
         if (!persisted) await done;
+        // pictures removed from the trade leave the cloud with this save (PRIV-01)
+        if (trade) void releaseCloudShots(removedCloudPaths(trade, record));
         pushToast({
           kind: "success",
           title: trade ? "Trade aktualisiert" : "Trade gespeichert",
@@ -726,7 +729,7 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   const onDelete = async () => {
     if (!trade) return;
     try {
-      await deleteTrade(trade.id);
+      await deleteTradeWithShots(deleteTrade, trade);
       pushToast({ kind: "info", title: "Trade gelöscht" });
       closeEditor();
     } catch {

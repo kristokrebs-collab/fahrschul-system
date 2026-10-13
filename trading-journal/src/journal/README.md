@@ -9,7 +9,8 @@ fields looks, derives and exports exactly as before (the fields themselves: `src
 ```
 editor/        form.ts (JournalForm ↔ trade, validation), ExecutionSection.tsx, PsychSection.tsx
 ui/            JournalDetail.tsx (detail block), ExcursionBar, FillsBar, FillsTimeline, RatingDots, TagInput
-screenshots/   store.ts (IndexedDB blobs), cloud.ts (Supabase Storage), image.ts (intake), shots.ts (refs / URLs),
+screenshots/   store.ts (IndexedDB blobs), cloud.ts (Supabase Storage), release.ts (freeing cloud objects), image.ts
+               (intake), shots.ts (refs / URLs),
                ShotsField (editor), ShotThumb, ShotReel (detail), ShotLightbox
 annotations/   AnnotationToolbar.tsx (tools / colours for the mini chart)
 filters/       JournalFilterBar.tsx (views, quick picks, grouping switch, `Mehr Filter`; `JournalFilterSlot` = store-wired)
@@ -74,6 +75,11 @@ instant under reduced motion); a tap selects, `Zeichnung löschen` removes. Save
   (`<uid>/<id>.<ext>`, policies of `supabase/migrations/0001_core.sql`); the reference becomes `store: "cloud"` with the local
   blob kept as `cacheKey` (offline display on this device). Display via signed URLs (1 h, renewed early). Without a
   configured cloud or while signed out everything stays local – nothing pretends to sync.
+- Cloud objects leave Storage with the trade (`release.ts`, DSGVO): a picture removed in the editor (on save), a
+  deleted trade (editor, detail, Broker-Abgleich) and an upload of an editor closed without saving (also one that
+  finishes after the close) are deleted – only objects of the own folder that no trade of the loaded journal still
+  references, and also after a downgrade. There is deliberately no sweep over the folder (client or server): a device
+  with cloud sync off holds references the server never sees. Account deletion removes the whole folder.
 - **A JSON backup does NOT contain the pictures** (only the references); a restored journal on another device shows
   local screenshots as `Nicht verfügbar`. Cloud screenshots come back with the account.
 - Display: `ShotThumb` (`NotchedFrame`), `ShotReel` (one picture: thumbnail; several: the pulse `ReelWindow` montage →

@@ -23,6 +23,7 @@ import { stripEnrichment } from "@/domain/csv";
 import { useEntitlement } from "@/billing/entitlements";
 import { ShareButton } from "@/social/ui/ShareButton";
 import { JournalDetail } from "@/journal/ui/JournalDetail";
+import { deleteTradeWithShots } from "@/journal/screenshots/release";
 
 /** P04 coach panel of this trade (grade, plan vs. execution, behaviours) – a lazy chunk, mounted once the morph settled. */
 const TradeCoachPanel = lazy(() => import("@/views/coach/TradeCoachPanel").then((m) => ({ default: m.TradeCoachPanel })));
@@ -153,7 +154,7 @@ function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
 
   const remove = async (id: string) => {
     focusAfterDelete.current = deleteNeighbour(id);
-    await deleteTrade(id);
+    await deleteTradeWithShots(deleteTrade, useJournal.getState().trades.find((t) => t.id === id) ?? { id });
     pushToast({ kind: "info", title: "Trade gelöscht" });
     closeDetail();
   };

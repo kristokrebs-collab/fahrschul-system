@@ -64,10 +64,21 @@ export async function cloudShotUrl(path: string): Promise<string | null> {
   }
 }
 
-/** Removes a cloud object (best effort). */
+/**
+ * The signed-in user (2FA satisfied) whatever the plan: removing one's own pictures must keep working after a
+ * downgrade (the bucket policies only check the folder).
+ */
+function signedInUid(): string | null {
+  if (!cloudEnabled()) return null;
+  const s = useCloudSession.getState();
+  return s.phase === "signedIn" && s.user && !s.needsMfa ? s.user.id : null;
+}
+
+/** Removes a cloud object of the signed-in user (best effort; another user's folder is never touched). */
 export async function deleteCloudShot(path: string): Promise<boolean> {
   signed.delete(path);
-  if (!cloudShotOwner()) return false;
+  const uid = signedInUid();
+  if (!uid || !path.startsWith(`${uid}/`)) return false;
   try {
     const m = await ensureCloud();
     const { error } = await m.getClient().storage.from(SHOTS_BUCKET).remove([path]);

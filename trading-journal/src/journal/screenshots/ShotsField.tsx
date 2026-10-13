@@ -11,6 +11,7 @@ import { imagesOf } from "./image";
 import { ShotLightbox } from "./ShotLightbox";
 import { ShotThumb } from "./ShotThumb";
 import { addShots, MAX_SHOTS, promoteToCloud } from "./shots";
+import { releaseCloudShots } from "./release";
 import { collectShotGarbage, referencedShotKeys, shotStorage } from "./store";
 
 export interface ShotsFieldProps {
@@ -36,6 +37,9 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
   const [busy, setBusy] = useState(0);
   const [view, setView] = useState<number | null>(null);
   const depth = useRef(0);
+  /** Cloud objects uploaded by this field (freed at unmount unless a saved trade references them). */
+  const uploads = useRef(new Set<string>());
+  const alive = useRef(true);
   const countRef = useRef(value.length);
   useEffect(() => {
     countRef.current = value.length;
@@ -52,7 +56,11 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
       if (refs.length && cloudShotOwner()) {
         for (const ref of refs) {
           void promoteToCloud(ref).then((cloud) => {
-            if (cloud) onChange((prev) => prev.map((r) => (r.id === ref.id ? cloud : r)));
+            if (!cloud?.key) return;
+            uploads.current.add(cloud.key);
+            // the editor closed while the upload ran: the reference can no longer reach a trade – free the object
+            if (!alive.current) void releaseCloudShots([cloud.key]);
+            else onChange((prev) => prev.map((r) => (r.id === ref.id ? cloud : r)));
           });
         }
       }
@@ -77,15 +85,19 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
     return () => document.removeEventListener("paste", onPaste);
   }, []);
 
-  // unmount (editor closed): collect the blobs no trade references
-  useEffect(
-    () => () => {
+  // unmount (editor closed): collect the blobs no trade references, and the cloud uploads of this editor session that
+  // no saved trade took (closed without saving, picture removed before saving – PRIV-01)
+  useEffect(() => {
+    alive.current = true;
+    const mine = uploads.current;
+    return () => {
+      alive.current = false;
       const s = useJournal.getState();
       if (!s.loaded) return;
       void collectShotGarbage(referencedShotKeys(s.trades));
-    },
-    [],
-  );
+      void releaseCloudShots(mine);
+    };
+  }, []);
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
