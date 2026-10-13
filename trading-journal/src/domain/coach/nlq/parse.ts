@@ -210,16 +210,28 @@ function valueFilters(norm: string, dim: FilterDim, values: readonly FilterValue
   return out;
 }
 
-function setupFilters(norm: string, setups: ParseContext["setups"]): Filter[] {
+/**
+ * Words that already mean something in another dimension ("makro" / "scalp" = account, "long" / "short" = side,
+ * sessions, weekdays, results, feelings): a setup is never found by one of them alone – "Vergleiche Scalp und Makro"
+ * compares the two accounts and does not also filter on every setup with "Makro" in its name (Review F09).
+ */
+const LEXICON_WORDS: ReadonlySet<string> = new Set(
+  [SIDE_VALUES, ACCOUNT_VALUES, WEEKDAY_VALUES, SESSION_VALUES, RESULT_VALUES, EMOTION_VALUES].flatMap((vs) => vs.flatMap((v) => v.syn.flatMap((x) => x.split(" ")))),
+);
+
+/** Setups named in the question; `spans` = where a WHOLE setup name stands (its words belong to the name). */
+function setupFilters(norm: string, setups: ParseContext["setups"]): { filters: Filter[]; spans: Array<[number, number]> } {
   const out: Filter[] = [];
+  const spans: Array<[number, number]> = [];
   for (const s of setups) {
     const name = normalize(s.name).trim();
     if (!name) continue;
     let at = findPhrase(norm, name);
-    if (at < 0) {
-      // a distinctive word of the name (≥ 4 letters, not a generic word)
+    if (at >= 0) spans.push([at, at + name.length + 1]);
+    else {
+      // a distinctive word of the name (≥ 4 letters, not a generic word, not a word of another dimension)
       for (const w of name.split(" ")) {
-        if (w.length < 4 || ["setup", "trade", "trades", "long", "short", "nur", "mit", "ohne"].includes(w)) continue;
+        if (w.length < 4 || ["setup", "trade", "trades", "long", "short", "nur", "mit", "ohne"].includes(w) || LEXICON_WORDS.has(w)) continue;
         const a = findPhrase(norm, w);
         if (a >= 0) {
           at = a;
@@ -229,7 +241,7 @@ function setupFilters(norm: string, setups: ParseContext["setups"]): Filter[] {
     }
     if (at >= 0) out.push({ dim: "setup", value: s.id, label: s.name, at });
   }
-  return out;
+  return { filters: out, spans };
 }
 
 function assetFilters(norm: string, assets: readonly string[]): Filter[] {
@@ -276,9 +288,15 @@ function numericFilters(norm: string): Filter[] {
     const num = Number(l1[2]);
     const op = w === "ueber" || w === "mehr als" || w === ">" ? ">" : w === "unter" || w === "weniger als" || w === "<" ? "<" : w === "ab" ? ">=" : w === "bis" ? "<=" : "=";
     out.push({ dim: "leverage", value: `${op}${num}`, label: `Hebel ${op === "=" ? "" : `${op.replace(">=", "≥").replace("<=", "≤")} `}${num}×`, op, num, at: l1.index });
-  } else {
-    const l2 = / (\d{1,3}) ?x(?= )/.exec(norm);
-    if (l2) out.push({ dim: "leverage", value: `=${l2[1]}`, label: `Hebel ${l2[1]}×`, op: "=", num: Number(l2[1]), at: l2.index });
+  }
+  // bare "4x" / "1x" (every one – "mit Hebel 4x profitabler als mit 1x" names two)
+  const seen = new Set(out.filter((f) => f.dim === "leverage").map((f) => f.num));
+  for (const l2 of norm.matchAll(/ (\d{1,3}) ?x(?= )/g)) {
+    if (l1 && l2.index! >= l1.index && l2.index! < l1.index + l1[0].length) continue;
+    const num = Number(l2[1]);
+    if (seen.has(num)) continue;
+    seen.add(num);
+    out.push({ dim: "leverage", value: `=${num}`, label: `Hebel ${num}×`, op: "=", num, at: l2.index! });
   }
   return out;
 }
@@ -355,6 +373,9 @@ export function parseQuestion(text: string, ctx: ParseContext): Intent {
   const periods = parsePeriods(norm, ctx.now);
   const behavior = detectBehavior(norm);
   const metricHit = detectMetric(norm);
+  const named = setupFilters(norm, ctx.setups);
+  // a word inside a whole setup name ("Makro-Long Support-Zone") is part of that name, not an account / side filter
+  const inName = (f: Filter) => f.dim !== "setup" && named.spans.some(([a, b]) => f.at >= a && f.at < b);
   const filters: Filter[] = [
     ...valueFilters(norm, "side", SIDE_VALUES),
     ...valueFilters(norm, "account", ACCOUNT_VALUES),
@@ -362,14 +383,18 @@ export function parseQuestion(text: string, ctx: ParseContext): Intent {
     ...valueFilters(norm, "session", SESSION_VALUES),
     ...valueFilters(norm, "result", RESULT_VALUES),
     ...valueFilters(norm, "emotion", EMOTION_VALUES),
-    ...setupFilters(norm, ctx.setups),
+    ...named.filters,
     ...assetFilters(norm, ctx.assets),
     ...numericFilters(norm),
     ...otherFilters(norm, ctx),
-  ].sort((a, b) => a.at - b.at);
+  ]
+    .filter((f) => !inName(f))
+    .sort((a, b) => a.at - b.at);
   // "wochenende" is a session; a weekday filter of the same words would double it
   let groupBy = detectGroup(norm);
-  const wantsCompare = COMPARE_WORDS.some((w) => findPhrase(norm, w) >= 0);
+  // "profitabler als", "besser als", "lieber als": a comparative between two values of one dimension compares them
+  const comparative = / (?:\S+er|besser|lieber) als /.test(norm);
+  const wantsCompare = COMPARE_WORDS.some((w) => findPhrase(norm, w) >= 0) || (comparative && filters.length >= 2);
   const sort: Intent["sort"] = SORT_WORST.some((w) => findPhrase(norm, w) >= 0) ? "worst" : SORT_BEST.some((w) => findPhrase(norm, w) >= 0) ? "best" : null;
 
   // comparison: two values of the same dimension, or two periods

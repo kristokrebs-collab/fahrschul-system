@@ -186,3 +186,47 @@ describe("Antworten", () => {
     expect(a.text).toContain("Noch keine abgeschlossenen Trades");
   });
 });
+
+describe("Makro vs. Scalp, Hebel 4x vs. 1x (Review F09)", () => {
+  // the legacy journal's setup names carry the account word: "Früher Makro-Trendbruch", "Makro-Long Support-Zone"
+  const SETUPS = [...COACH_SETTINGS.setups, { id: "s_mk1", name: "Früher Makro-Trendbruch" }, { id: "s_mk2", name: "Makro-Long Support-Zone" }, { id: "s_sc", name: "Scalp Reclaim" }] as typeof COACH_SETTINGS.setups;
+  const ctx = { ...CTX, setups: SETUPS };
+  const q = (text: string) => parseQuestion(text, ctx);
+
+  it("compares the two accounts and filters on no setup whose name merely contains the word", () => {
+    for (const text of ["Vergleiche Scalp und Makro", "Lohnt sich Scalp oder Makro mehr?"]) {
+      const i = q(text);
+      expect(i.type, text).toBe("compare");
+      expect(i.compare?.map((f) => [f.dim, f.value]), text).toEqual([["account", "scalp"], ["account", "makro"]]);
+      expect(i.filters, text).toEqual([]);
+    }
+    // the account alone, without the "Makro…" setups ANDed in
+    expect(q("Win-Rate im Makro-Konto").filters.map((f) => [f.dim, f.value])).toEqual([["account", "makro"]]);
+    // a whole setup name still finds the setup – and its words are no account / side filters
+    expect(q("Wie läuft Makro-Long Support-Zone?").filters.map((f) => [f.dim, f.value])).toEqual([["setup", "s_mk2"]]);
+    // a distinctive word that is no lexicon word still finds a setup
+    expect(q("Wie läuft der Trendbruch?").filters.map((f) => [f.dim, f.value])).toEqual([["setup", "s_mk1"]]);
+  });
+
+  it("two leverage values with a comparative are a comparison", () => {
+    const i = q("Bin ich mit Hebel 4x profitabler als mit 1x?");
+    expect(i.type).toBe("compare");
+    expect(i.compare?.map((f) => f.value)).toEqual(["=4", "=1"]);
+    expect(q("Win-Rate mit Hebel über 10").filters.map((f) => f.value)).toEqual([">10"]);
+  });
+
+  it("the answer compares the accounts on real trades instead of an empty AND of setups", () => {
+    const settings = { ...COACH_SETTINGS, setups: SETUPS };
+    // a third of the trades on the scalp account; the "Makro…" setups have closed trades of their own
+    const journal = coachJournal(120).map((t, i) => ({ ...t, account: i % 3 ? "makro" : "scalp", ...(i % 7 === 0 ? { setups: ["s_mk1"] } : null) }) as typeof t);
+    const enriched = enrichC(journal);
+    const view = accountView(enriched, settings, "all", { now: () => NOW });
+    const events = detectBehaviors({ trades: enriched, settings });
+    const data: AnswerData = { closed: view.closed, settings, events, now: NOW, currency: "USDT", start: view.start };
+    expect(view.closed.some((t) => t.account === "makro") && view.closed.some((t) => t.account === "scalp")).toBe(true);
+    const a = askJournal("Vergleiche Scalp und Makro", data);
+    expect(a.kind).toBe("compare");
+    expect(a.text).toMatch(/Makro|Scalp/);
+    expect(a.text).not.toMatch(/keine abgeschlossenen Trades/);
+  });
+});
