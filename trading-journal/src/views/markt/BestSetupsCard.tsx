@@ -1,7 +1,7 @@
 /**
  * `Beste Setups` (P02): only the A+ / A Box-zu-Box setups of the live symbol across 4h / 1D / 1W, best score first –
  * "trade the best, fuck the rest". Each setup is a MorphCard (→ dialog with every reason and its weight, the plan with
- * entry, stop, targets and CRV, the higher timeframe).
+ * entry, stop, targets and CRV, the higher timeframe, and the two ways on: `Als Trade eintragen` / `Im Rechner öffnen`).
  *
  * Motion: the cards are dealt in (`CardSpread`, on first view and when the set changes); the grade glows in dot-matrix
  * digits (`A+` with the red bloom); a breakout / retest card runs one `BorderBeam` lap, shoots `BreakoutStreak` chevrons
@@ -12,7 +12,14 @@
 import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { memo, useMemo } from "react";
-import { KIND_TEXT, PHASE_LABEL, type BoxSetup } from "@/domain/boxes";
+import { KIND_TEXT, PHASE_LABEL, normalizeWatchSymbol, toBoxSnapshot, type BoxSetup } from "@/domain/boxes";
+import { nowLocalInput } from "@/lib/dates";
+import { useMorphDialog } from "@/motion/MorphDialog";
+import { Button } from "@/primitives/Button";
+import { useJournal } from "@/store/journalStore";
+import { navigate } from "@/store/router";
+import { useUi } from "@/store/uiStore";
+import { toInput, useRiskUi } from "@/views/risiko/riskStore";
 import { cn } from "@/lib/cn";
 import type { BestSetup, BoxesView } from "@/market/boxes/store";
 import { BreakoutStreak } from "@/motion/fx/BreakoutStreak";
@@ -40,8 +47,58 @@ export function hashIds(s: string): number {
 }
 const isBreak = (s: BoxSetup): boolean => s.kind === "breakout" || s.kind === "retest";
 
-/** Dialog body: what the grade is made of, the plan, the higher timeframe. */
-export function SetupExplain({ b }: { b: BestSetup }) {
+/**
+ * The two ways out of a setup (review F2: the dialog used to end in "Schließen"): `Im Rechner öffnen` hands side,
+ * entry, stop and target 1 to the risk calculator (programmatic fill → its results cascade in) and switches to Risiko;
+ * `Als Trade eintragen` opens the trade editor pre-filled (`openEditor({ draft })`) with the setup's box context as
+ * `boxSnap` – the editor keeps a draft's own snapshot. Both close the dialog first (its reverse morph runs, a page switch
+ * from inside the dialog is handled by the MorphCard).
+ */
+function SetupActions({ b, symbol }: { b: BestSetup; symbol: string | null }) {
+  const { close } = useMorphDialog();
+  const journalPair = useJournal((st) => st.settings.pair);
+  const s = b.setup;
+  // the journal's own spelling ("BTC/USDT") when it is this symbol, else the venue symbol itself
+  const pair = symbol && normalizeWatchSymbol(journalPair) !== symbol ? symbol : journalPair;
+  const t1 = s.targets[0]?.price ?? null;
+  const toCalc = () => {
+    useRiskUi.getState().setCalc({ side: s.side, pair, entry: toInput(s.entry), stop: toInput(s.stop), target: t1 != null ? toInput(t1) : "" }, true);
+    close();
+    navigate("risiko");
+  };
+  const toTrade = () => {
+    close();
+    useUi.getState().openEditor({
+      draft: {
+        side: s.side,
+        status: "open",
+        date: nowLocalInput(),
+        pair,
+        timeframe: TF_TEXT[b.tf],
+        entry: s.entry,
+        stop: s.stop,
+        target: t1,
+        ...(symbol ? { boxSnap: toBoxSnapshot(b.analysis, { symbol, tf: b.tf, side: s.side, source: "live" }) } : {}),
+      },
+    });
+  };
+  return (
+    <StaggerItem as="section" className="grid gap-2" data-testid="setup-actions">
+      <div className="flex flex-wrap gap-2">
+        <Button variant="primary" onClick={toTrade} data-testid="setup-to-trade">
+          {S.toTrade}
+        </Button>
+        <Button variant="ghost" onClick={toCalc} data-testid="setup-to-calc">
+          {S.toCalc}
+        </Button>
+      </div>
+      <p className="text-[11.5px] leading-snug text-faint">{S.actionsNote}</p>
+    </StaggerItem>
+  );
+}
+
+/** Dialog body: what the grade is made of, the plan, the higher timeframe, and the way into a trade. */
+export function SetupExplain({ b, symbol = null }: { b: BestSetup; symbol?: string | null }) {
   const s = b.setup;
   const reduced = useReducedFx();
   const max = Math.max(...s.reasons.map((r) => r.weight), 1);
@@ -119,6 +176,7 @@ export function SetupExplain({ b }: { b: BestSetup }) {
           )}
         </StaggerItem>
       )}
+      <SetupActions b={b} symbol={symbol} />
     </div>
   );
 }
@@ -133,7 +191,7 @@ function PlanTile({ k, v, tone }: { k: string; v: string; tone?: "win" | "loss" 
 }
 
 /** One setup card (the MorphCard source). */
-const SetupTile = memo(function SetupTile({ b }: { b: BestSetup }) {
+const SetupTile = memo(function SetupTile({ b, symbol }: { b: BestSetup; symbol: string | null }) {
   const s = b.setup;
   const box = b.analysis.box.box;
   const brk = isBreak(s);
@@ -141,7 +199,7 @@ const SetupTile = memo(function SetupTile({ b }: { b: BestSetup }) {
   const edge = box ? edgeOf(s, box) : null;
   const id = `box-setup-${b.id}`;
   return (
-    <MorphCard id={id} title={s.title} body={() => <SetupExplain b={b} />} className="relative h-full overflow-hidden rounded-2xl border border-line-2 bg-ink-950/40 p-4 text-left hover:border-white/30">
+    <MorphCard id={id} title={s.title} body={() => <SetupExplain b={b} symbol={symbol} />} className="relative h-full overflow-hidden rounded-2xl border border-line-2 bg-ink-950/40 p-4 text-left hover:border-white/30">
       <div className="relative grid gap-3.5" data-testid="best-setup" data-grade={s.grade} data-kind={s.kind} data-side={s.side}>
         {brk && (
           <span aria-hidden="true" className="pointer-events-none absolute -inset-4">
@@ -236,7 +294,7 @@ export function BestSetupsCard({ view }: { view: BoxesView }) {
       ) : best.length ? (
         <CardSpread variant="deal" play={deal} className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-3" itemClassName="min-w-0" label={S.title}>
           {best.map((b) => (
-            <SetupTile key={b.id} b={b} />
+            <SetupTile key={b.id} b={b} symbol={view.symbol} />
           ))}
         </CardSpread>
       ) : (

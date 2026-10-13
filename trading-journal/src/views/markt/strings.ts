@@ -23,6 +23,10 @@ export const MARKT = {
     htf: "Höherer Timeframe",
     loading: "Rechne Boxen …",
     open: "Details",
+    /** the two ways out of a setup (review F2) */
+    toCalc: "Im Rechner öffnen",
+    toTrade: "Als Trade eintragen",
+    actionsNote: "Einstieg, Stop und Ziel 1 werden übernommen – Größe und Hebel rechnet der Rechner aus deinem Risiko.",
   },
   chart: {
     title: "Box-Chart",

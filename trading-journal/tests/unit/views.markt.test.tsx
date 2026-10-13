@@ -110,6 +110,35 @@ describe("MarktView", () => {
     expect(within(explain).getAllByText(/^T1 /).length).toBeGreaterThan(0);
   });
 
+  it("the setup leads on (review F2): „Als Trade eintragen“ → the editor with entry, stop, target 1 and the box context", async () => {
+    const { useUi } = await import("@/store/uiStore");
+    useUi.setState({ editor: { open: false, fromFab: false } });
+    wrap();
+    fireEvent.click(screen.getAllByTestId("best-setup")[0]!.closest("button")!);
+    const dialog = await screen.findByRole("dialog");
+    const b = (state.view as BoxesView).best[0]!;
+    fireEvent.click(within(dialog).getByRole("button", { name: "Als Trade eintragen" }));
+    const ed = useUi.getState().editor;
+    expect(ed.open).toBe(true);
+    expect(ed.draft).toMatchObject({ side: b.setup.side, status: "open", entry: b.setup.entry, stop: b.setup.stop, target: b.setup.targets[0]!.price, timeframe: "4h" });
+    expect(ed.draft!.pair && ed.draft!.pair.replace("/", "").toUpperCase()).toBe("BTCUSDT");
+    expect(ed.draft!.boxSnap).toMatchObject({ v: 1, symbol: "BTCUSDT", tf: b.tf, source: "live", setup: { side: b.setup.side, grade: b.setup.grade } });
+  });
+
+  it("„Im Rechner öffnen“ fills the calculator (programmatic, cascades) and switches to Risiko", async () => {
+    const { useUi } = await import("@/store/uiStore");
+    const { useRiskUi, toInput, EMPTY_CALC } = await import("@/views/risiko/riskStore");
+    useRiskUi.setState({ calc: EMPTY_CALC, fillSeq: 0 });
+    wrap();
+    fireEvent.click(screen.getAllByTestId("best-setup")[0]!.closest("button")!);
+    const dialog = await screen.findByRole("dialog");
+    const b = (state.view as BoxesView).best[0]!;
+    fireEvent.click(within(dialog).getByRole("button", { name: "Im Rechner öffnen" }));
+    expect(useRiskUi.getState().calc).toMatchObject({ side: b.setup.side, entry: toInput(b.setup.entry), stop: toInput(b.setup.stop), target: toInput(b.setup.targets[0]!.price) });
+    expect(useRiskUi.getState().fillSeq).toBe(1);
+    await waitFor(() => expect(useUi.getState().page).toBe("risiko"));
+  });
+
   it("trade the best: no A-setup → the honest empty state and the strongest candidate to watch", () => {
     state.view = realView({ best: [] });
     wrap();

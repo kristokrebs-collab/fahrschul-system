@@ -2,7 +2,8 @@
  * P02 Box zu Box end to end against the market mock with REAL BTCUSDT 4h / 1D bars (`mockMarket(…, { boxes: true })`:
  * the 4h bar of 2026-10-11 00:00 UTC is "now" – an A+ range long at the support with a broken RSI line).
  *
- * Markt page: `h1 Markt`, the best setups (A+ / A only, a MorphCard dialog with every reason and weight), the box phase
+ * Markt page: `h1 Markt`, the best setups (A+ / A only, a MorphCard dialog with every reason and weight, and the way on:
+ * `Als Trade eintragen` → the editor pre-filled, `Im Rechner öffnen` → the calculator on Risiko), the box phase
  * rail with the candle-close countdown, the own chart with boxes + targets + RSI pane (timeframe switch 4h / 1D / 1W),
  * the RSI trendlines, the watchlist scanner (on demand), the settings written at once, no horizontal scroll at 390 px,
  * no console errors. Runs on the routed page `/#markt` of the production build (P14; `PW_MARKT_URL` overrides it, e.g.
@@ -195,6 +196,40 @@ test.describe("Markt · Box zu Box", () => {
     await shot(page, info, "setup-dialog");
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("a setup leads on (review F2): „Als Trade eintragen“ opens the editor pre-filled, „Im Rechner öffnen“ fills the calculator on Risiko", async ({ page }, info) => {
+    const errors = collectErrors(page);
+    await seed(page, { boxes: true });
+    await openMarkt(page);
+    const card = page.getByTestId("best-setup").first();
+    await expect(card).toBeVisible({ timeout: 30_000 });
+
+    // → trade draft: entry, stop and target 1 of the plan, the editor keeps the setup's box context
+    await card.click();
+    let dialog = page.getByRole("dialog");
+    await expect(dialog.getByTestId("setup-actions")).toBeVisible();
+    await shot(page, info, "setup-actions");
+    await dialog.getByRole("button", { name: "Als Trade eintragen" }).click();
+    const editor = page.getByRole("dialog").filter({ has: page.getByLabel("Stop-Loss") });
+    await expect(editor).toBeVisible();
+    for (const label of ["Einstieg", "Stop-Loss", "Take-Profit"]) await expect(editor.getByLabel(label, { exact: true })).toHaveValue(/\d/);
+    await expect(editor.getByLabel("Paar")).toHaveValue(/BTC/);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
+    // → calculator: the same plan on Risiko, the sizing computes at once
+    await card.click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Im Rechner öffnen" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Risiko" })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const calc = page.getByTestId("risk-calc");
+    await expect(calc.getByLabel("Einstieg", { exact: true })).toHaveValue(/\d/);
+    await expect(calc.getByLabel("Stop", { exact: true })).toHaveValue(/\d/);
+    await expect(calc.getByLabel("Ziel", { exact: true })).toHaveValue(/\d/);
+    await expect(calc.getByTestId("risk-adopt")).toBeVisible();
+    expect(errors).toEqual([]);
   });
 
   test("box fix: every box sits on its own bars – the active box starts at the bar of its t0, no candle under a box closes outside (4h / 1D / 1W)", async ({ page }, info) => {
