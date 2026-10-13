@@ -6,8 +6,12 @@
  * - A journal trade that IS an exchange position is counted once (the venue's numbers win): same `externalId` /
  *   `positionId` as the position id, or the same venue + symbol + side.
  * - Value: qty × mark when a mark is known (live price / venue mark), else qty × entry.
+ * - A journal trade with fills counts only what is still held after partial exits (`openPositionOf`): remaining
+ *   quantity at its running Ø entry – for the notional, uPnL, margin, open risk and everything built on the legs
+ *   (live uPnL, scenarios, liquidation).
  */
 import { normalizeWatchSymbol } from "../boxes/config";
+import { hasFills, heldPosition } from "../fills";
 import type { EnrichedTrade, MarginMode, Side } from "../types";
 
 /** Minimal shape of a live venue position (P11 `ExchangePosition`). */
@@ -120,13 +124,37 @@ export function qtyOf(t: Pick<EnrichedTrade, "size" | "entry"> & { qty?: number 
   return null;
 }
 
+/**
+ * Quantity and Ø entry still OPEN of a journal trade: with fills the remainder after partial exits at its running Ø
+ * entry (`heldPosition`), else the whole position (`qtyOf`, `entry`). `qty` 0 = nothing left open. The trade's derived
+ * `risk` / `qty` stay on the initial position (that is what R is measured against) – live exposure must not (MM-1).
+ */
+export function openPositionOf(t: Pick<EnrichedTrade, "size" | "entry" | "side"> & { qty?: number | null; fills?: EnrichedTrade["fills"] }): { qty: number; entry: number } | null {
+  const held = hasFills(t) ? heldPosition(t) : null;
+  if (held) return held;
+  const qty = qtyOf(t);
+  return qty != null && fin(t.entry) && t.entry > 0 ? { qty, entry: t.entry } : null;
+}
+
+/**
+ * Money to the stop of what is still open: `|Ø entry held − stop| × remaining` for a trade with fills, else the derived
+ * `risk`. `null` without a stop (or without a position); 0 once the stop sits at the held Ø entry or nothing is open.
+ */
+export function openRiskOf(t: EnrichedTrade): number | null {
+  if (!hasFills(t)) return fin(t.risk) ? t.risk : null;
+  const pos = openPositionOf(t);
+  if (!pos || !(fin(t.stop) && t.stop > 0)) return null;
+  return Math.abs(pos.entry - t.stop) * pos.qty;
+}
+
 /** An open journal trade as a leg; `price` = a live mark for its symbol (or null). */
 export function journalLeg(t: EnrichedTrade, price: number | null): ExposureLeg | null {
-  const qty = qtyOf(t);
-  if (qty == null || !fin(t.entry) || t.entry <= 0) return null;
+  const pos = openPositionOf(t);
+  if (!pos || pos.qty <= 0) return null;
+  const { qty, entry } = pos;
   const mark = fin(price) && price > 0 ? price : null;
   const dir = t.side === "short" ? -1 : 1;
-  const notional = qty * (mark ?? t.entry);
+  const notional = qty * (mark ?? entry);
   const lev = fin(t.leverage) && t.leverage > 0 ? t.leverage : null;
   return {
     id: `j:${t.id}`,
@@ -137,17 +165,17 @@ export function journalLeg(t: EnrichedTrade, price: number | null): ExposureLeg 
     venue: t.exchange || "journal",
     side: t.side,
     qty,
-    entry: t.entry,
+    entry,
     mark,
     notional,
     signed: dir * notional,
     leverage: lev,
     marginMode: t.marginMode ?? null,
-    margin: fin(t.margin) && t.margin > 0 ? t.margin : lev ? (qty * t.entry) / lev : null,
+    margin: fin(t.margin) && t.margin > 0 ? t.margin : lev ? (qty * entry) / lev : null,
     liqPrice: fin(t.liqPrice) && t.liqPrice > 0 ? t.liqPrice : null,
     stop: fin(t.stop) && t.stop > 0 ? t.stop : null,
-    upnl: mark != null ? dir * qty * (mark - t.entry) : null,
-    risk: fin(t.risk) ? t.risk : null,
+    upnl: mark != null ? dir * qty * (mark - entry) : null,
+    risk: openRiskOf(t),
     label: `${t.pair || "–"} ${t.side === "short" ? "Short" : "Long"}`,
   };
 }

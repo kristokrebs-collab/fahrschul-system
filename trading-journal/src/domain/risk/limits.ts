@@ -15,6 +15,7 @@ import type { AccountId, EnrichedTrade, Settings } from "../types";
 import { localDateKey, tradeTime, weekStart } from "@/lib/dates";
 import { n0 } from "@/lib/format";
 import { riskLimits, type RiskLimits } from "./config";
+import { openRiskOf } from "./exposure";
 
 export type LimitKey = "day" | "week" | "drawdown" | "trade" | "trades" | "leverage" | "openRisk";
 export type LimitState = "ok" | "warn" | "breach";
@@ -187,7 +188,9 @@ function numbersOf(acc: AccountId, trades: readonly EnrichedTrade[], capital: nu
     if (accountOf(t) !== acc) continue;
     if (localDateKey(tradeTime(t)) === today) tradesToday++;
     if (t.result === "open") {
-      if (fin(t.risk) && t.risk > 0) openRisk += t.risk;
+      // what is still open (after partial exits only the remainder, review MM-1)
+      const risk = openRiskOf(t);
+      if (fin(risk) && risk > 0) openRisk += risk;
       else if (!(fin(t.stop) && t.stop > 0)) openNoStop++;
       if (fin(t.leverage) && t.leverage > 0) maxLev = Math.max(maxLev ?? 0, t.leverage);
       continue;

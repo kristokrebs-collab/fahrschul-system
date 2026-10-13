@@ -22,7 +22,10 @@ limits.ts       limitStatus(input) → LimitReport: rows day / week / drawdown /
                 the worst; P&L counts on the CLOSE day (exitDate → the guard's mark → entry time); cooldownOf: a
                 breached day pauses until midnight, `cooldownLosses` losses in a row pause `cooldownMin` minutes
 exposure.ts     exposureReport: open journal trades + venue positions (P11 contract) as legs (a trade that IS a venue
-                position counts once), gross / net / hedged per asset and venue, HHI, cross-venue assets, uPnL
+                position counts once), gross / net / hedged per asset and venue, HHI, cross-venue assets, uPnL;
+                a trade with fills counts only what is still held after partial exits (`openPositionOf`: remaining
+                qty at the running Ø entry) – notional, uPnL, margin, liquidation, scenarios and the open-risk limit
+                (`openRiskOf`); the trade's own `risk` / R stay on the initial position (review MM-1)
 correlation.ts  logReturns, pearson, correlationMatrix (aligned by UTC day, ≥ 20 overlapping days, last 90),
                 correlationClusters (union-find, ρ ≥ 0,7), clusterRisks (same-side legs inside a cluster)
 streakRisk.ts   expected longest losing streak over 100 trades (P03 Schilling) + Monte Carlo of the own results (P03

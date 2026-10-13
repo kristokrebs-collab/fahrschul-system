@@ -233,6 +233,17 @@ export function fillPosition(t: Pick<Trade, "exit" | "side" | "status"> & { fill
   return { entry: s.avgEntry, qty: s.openQty, gross: closed ? gross : null, exit: exitQty > QTY_EPS ? exitNotional / exitQty : null };
 }
 
+/**
+ * What is still held of a position with fills: the remaining quantity and its Ø entry (the running cost after the last
+ * fill). `null` without an opening fill – then the trade's own `entry` / `qty` are the position. After a partial exit
+ * this, not the opened quantity, is what exposure, open risk, uPnL and liquidation must use (review MM-1).
+ */
+export function heldPosition(t: { fills?: readonly Fill[] | null; side?: Side }): { qty: number; entry: number } | null {
+  const s = fillStats(t.fills ?? undefined, t.side ?? "long");
+  if (s.avgEntry == null) return null;
+  return { qty: s.remaining, entry: runningCost(s.ordered) ?? s.avgEntry };
+}
+
 /** Ø entry of the position still held after all fills (`null` when flat or never opened). */
 export function runningCost(ordered: readonly Fill[]): number | null {
   let pos = 0;

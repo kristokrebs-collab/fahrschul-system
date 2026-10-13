@@ -223,3 +223,79 @@ describe("Risiko je Strategie und Asset", () => {
     expect(byAsset.overall!.n).toBe(4);
   });
 });
+
+describe("Partial exits (review MM-1): only what is still held counts as open exposure", () => {
+  // what the editor stores for a trade with fills: Ø entry, qty = Σ opened, size = Ø × Σ opened
+  const partial = (extra: Partial<Trade> = {}): Trade =>
+    mkTrade({
+      id: "p1",
+      date: "2026-10-13T08:00",
+      status: "open",
+      exit: null,
+      pair: "BTC/USDT",
+      side: "long",
+      entry: 60000,
+      stop: 59000,
+      target: 63000,
+      size: 120000,
+      qty: 2,
+      leverage: 5,
+      fills: [
+        { id: "a", at: "2026-10-13T08:00", side: "open", price: 60000, qty: 2, kind: "entry" },
+        { id: "b", at: "2026-10-13T09:00", side: "close", price: 61500, qty: 1, kind: "partial" },
+      ],
+      ...extra,
+    });
+
+  it("exposure, uPnL, margin and risk of the leg use the remaining 1 BTC, not the 2 opened", () => {
+    const [t] = enrich([partial()]);
+    const r = exposureReport({ open: [t!], prices: { BTCUSDT: 61500 }, capital: 10000 });
+    const leg = r.legs[0]!;
+    expect(leg).toMatchObject({ qty: 1, entry: 60000 });
+    expect(r.gross).toBeCloseTo(61500, 8);
+    expect(r.upnl).toBeCloseTo(1500, 8);
+    expect(leg.margin).toBeCloseTo(12000, 8); // 1 × 60000 ÷ 5
+    expect(leg.risk).toBeCloseTo(1000, 8);
+    // the trade's own R basis stays the initial position (2 BTC × 1000 to the stop)
+    expect(t!.risk).toBeCloseTo(2000, 8);
+  });
+
+  it("the running Ø entry of what is held (DCA add after a partial)", () => {
+    const [t] = enrich([
+      partial({
+        fills: [
+          { id: "a", at: "2026-10-13T08:00", side: "open", price: 60000, qty: 2, kind: "entry" },
+          { id: "b", at: "2026-10-13T09:00", side: "close", price: 61500, qty: 1, kind: "partial" },
+          { id: "c", at: "2026-10-13T10:00", side: "open", price: 63000, qty: 1, kind: "add" },
+        ],
+      }),
+    ]);
+    const leg = exposureReport({ open: [t!], prices: { BTCUSDT: 62000 } }).legs[0]!;
+    expect(leg.qty).toBeCloseTo(2, 8);
+    expect(leg.entry).toBeCloseTo(61500, 8);
+    expect(leg.upnl).toBeCloseTo(1000, 8);
+    expect(leg.risk).toBeCloseTo(5000, 8); // |61500 − 59000| × 2
+  });
+
+  it("everything closed by fills while the status is still open: no leg at all", () => {
+    const [t] = enrich([
+      partial({
+        fills: [
+          { id: "a", at: "2026-10-13T08:00", side: "open", price: 60000, qty: 2, kind: "entry" },
+          { id: "b", at: "2026-10-13T09:00", side: "close", price: 61500, qty: 2, kind: "exit" },
+        ],
+      }),
+    ]);
+    expect(exposureReport({ open: [t!], prices: { BTCUSDT: 61500 } }).legs).toEqual([]);
+  });
+
+  it("open risk limit: 1000 for the remainder, nothing once the stop sits at the entry", () => {
+    const s = settingsWith({ capital: { makro: 10_000, scalp: 100_000 } });
+    const now = new Date(2026, 9, 13, 10, 0).getTime();
+    const report = limitStatus({ trades: enrich([partial()], s), settings: s, scope: "scalp", now });
+    expect(report.rows.find((x) => x.key === "openRisk")!.used).toBeCloseTo(1000, 8);
+    const be = limitStatus({ trades: enrich([partial({ stop: 60000 })], s), settings: s, scope: "scalp", now });
+    expect(be.rows.find((x) => x.key === "openRisk")!.used).toBe(0);
+    expect(be.openNoStop).toBe(0);
+  });
+});
