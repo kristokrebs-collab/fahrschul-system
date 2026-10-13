@@ -38,6 +38,7 @@ export type DimensionKey =
   | "month"
   | "box"
   | "origin"
+  | "exchangeAccount"
   | "account"
   | "tag"
   | "strength";
@@ -307,6 +308,15 @@ const DIMS: Dimension[] = [
       return [o.kind === "bot" && o.botId ? `bot:${o.botId}` : o.kind];
     },
     labelOf: (k) => (k.startsWith("bot:") ? `Bot · ${k.slice(4)}` : (ORIGIN[k] ?? k)),
+  },
+  {
+    // review F15: sub-accounts of one exchange (Haupt, Sub-Konto 2, …) side by side
+    key: "exchangeAccount",
+    label: "Börsenkonto",
+    hint: "Konto bei der Börse (Ausführung → Börsenkonto, beim Bitunix-Sync der Name der Verbindung)",
+    none: "Ohne Börsenkonto",
+    keys: (t) => [typeof t.exchangeAccount === "string" && t.exchangeAccount.trim() ? t.exchangeAccount.trim().toLowerCase() : NONE_KEY],
+    labelOf: (k) => k.charAt(0).toUpperCase() + k.slice(1),
   },
   {
     key: "account",

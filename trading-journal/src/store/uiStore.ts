@@ -153,6 +153,8 @@ export interface TradeExtraFilter {
   to?: string;
   pair?: string;
   exchange?: string;
+  /** Exchange account label (`trade.exchangeAccount`, e.g. „Haupt“, „Sub-Konto 2“ – review F15), case-insensitive. */
+  exchangeAccount?: string;
   market?: "perp" | "spot";
   tags?: string[];
   pnlMin?: number | null;

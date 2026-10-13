@@ -119,6 +119,7 @@ export interface JournalFilterable {
   exitDate?: string;
   pair: string;
   exchange?: string;
+  exchangeAccount?: string;
   market?: "perp" | "spot";
   tags?: string[];
   rating?: number | null;
@@ -135,6 +136,7 @@ export function journalFilterCount(e: TradeExtraFilter): number {
   if (e.from || e.to) n += 1;
   if (e.pair) n += 1;
   if (e.exchange) n += 1;
+  if (e.exchangeAccount) n += 1;
   if (e.market) n += 1;
   if (e.tags?.length) n += 1;
   if (e.pnlMin != null || e.pnlMax != null) n += 1;
@@ -146,7 +148,7 @@ export function journalFilterCount(e: TradeExtraFilter): number {
 }
 
 function journalFilterKey(e: TradeExtraFilter): string {
-  const parts = [e.from ?? "", e.to ?? "", e.pair ?? "", e.exchange ?? "", e.market ?? "", (e.tags ?? []).join(",")];
+  const parts = [e.from ?? "", e.to ?? "", e.pair ?? "", e.exchange ?? "", e.exchangeAccount ?? "", e.market ?? "", (e.tags ?? []).join(",")];
   for (const k of RANGE_KEYS) parts.push(e[k] == null ? "" : String(e[k]));
   return parts.join("/");
 }
@@ -166,6 +168,7 @@ export function matchJournal(t: Partial<JournalFilterable>, e: TradeExtraFilter)
   }
   if (e.pair && pairKey(t.pair ?? "") !== pairKey(e.pair)) return false;
   if (e.exchange && (t.exchange ?? "").toLowerCase() !== e.exchange.toLowerCase()) return false;
+  if (e.exchangeAccount && (t.exchangeAccount ?? "").trim().toLowerCase() !== e.exchangeAccount.trim().toLowerCase()) return false;
   if (e.market && (t.market ?? "perp") !== e.market) return false;
   if (e.tags?.length) {
     const own = new Set((t.tags ?? []).map((x) => x.toLowerCase()));
@@ -186,6 +189,8 @@ export function matchJournal(t: Partial<JournalFilterable>, e: TradeExtraFilter)
 export interface JournalFilterOptions {
   pairs: string[];
   exchanges: string[];
+  /** Exchange account labels of the journal (review F15). */
+  exchangeAccounts: string[];
   tags: string[];
   /** The journal has spot trades (the Perp / Spot switch shows only then). */
   spot: boolean;
@@ -198,6 +203,7 @@ export interface JournalFilterOptions {
 export function journalFilterOptions(trades: readonly Partial<JournalFilterable>[]): JournalFilterOptions {
   const pairs = new Map<string, string>();
   const exchanges = new Map<string, string>();
+  const accounts = new Map<string, string>();
   const tags = new Map<string, number>();
   let spot = false;
   let hold = false;
@@ -207,6 +213,8 @@ export function journalFilterOptions(trades: readonly Partial<JournalFilterable>
     const pk = pairKey(t.pair ?? "");
     if (pk && !pairs.has(pk)) pairs.set(pk, pk);
     if (t.exchange) exchanges.set(t.exchange.toLowerCase(), t.exchange);
+    const acc = t.exchangeAccount?.trim();
+    if (acc && !accounts.has(acc.toLowerCase())) accounts.set(acc.toLowerCase(), acc);
     for (const g of t.tags ?? []) tags.set(g, (tags.get(g) ?? 0) + 1);
     if (t.market === "spot") spot = true;
     if (t.exitDate) hold = true;
@@ -216,6 +224,7 @@ export function journalFilterOptions(trades: readonly Partial<JournalFilterable>
   return {
     pairs: [...pairs.values()].sort(),
     exchanges: [...exchanges.values()].sort((a, b) => a.localeCompare(b, "de")),
+    exchangeAccounts: [...accounts.values()].sort((a, b) => a.localeCompare(b, "de")),
     tags: [...tags.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de")).map(([g]) => g),
     spot,
     hold,

@@ -73,7 +73,7 @@ export function parseExtra(raw: unknown): TradeExtraFilter {
     mistake: typeof e.mistake === "string" ? e.mistake : DEFAULT_TRADE_EXTRA.mistake,
     strength: STRENGTHS.includes(e.strength as TradeExtraFilter["strength"]) ? (e.strength as TradeExtraFilter["strength"]) : "all",
   };
-  for (const k of ["from", "to", "pair", "exchange"] as const) if (typeof e[k] === "string" && e[k]) out[k] = e[k] as string;
+  for (const k of ["from", "to", "pair", "exchange", "exchangeAccount"] as const) if (typeof e[k] === "string" && e[k]) out[k] = e[k] as string;
   if (e.market === "perp" || e.market === "spot") out.market = e.market;
   if (Array.isArray(e.tags)) {
     const tags = e.tags.filter((x): x is string => typeof x === "string" && x.trim() !== "");

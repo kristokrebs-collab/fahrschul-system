@@ -232,6 +232,16 @@ export function JournalFilterBar({ filter, extra, sort, onExtraChange, onExtraRe
               <MorphSelect aria-label="Börse" value={extra.exchange ?? ""} onChange={(exchange) => onExtraChange({ exchange: exchange || undefined })} options={[{ value: "", label: "Alle Börsen" }, ...options.exchanges.map((x) => ({ value: x, label: x }))]} />
             </Group>
           )}
+          {options.exchangeAccounts.length > 0 && (
+            <Group label="Börsenkonto">
+              <MorphSelect
+                aria-label="Börsenkonto"
+                value={extra.exchangeAccount ?? ""}
+                onChange={(exchangeAccount) => onExtraChange({ exchangeAccount: exchangeAccount || undefined })}
+                options={[{ value: "", label: "Alle Konten" }, ...options.exchangeAccounts.map((x) => ({ value: x, label: x }))]}
+              />
+            </Group>
+          )}
           {options.spot && (
             <Group label="Markt">
               <Segmented<"all" | "perp" | "spot">

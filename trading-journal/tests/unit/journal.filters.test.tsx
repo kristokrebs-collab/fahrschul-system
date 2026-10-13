@@ -55,6 +55,18 @@ describe("matchJournal / journalFilterCount / options", () => {
     expect(filterExtra(rows, DEFAULT_TRADE_EXTRA)).toBe(rows);
   });
 
+  it("exchange account: filter case-insensitive, offered only when the journal has accounts, counted, kept in a view (F15)", () => {
+    const a = { ...withPnl(T1, 20, 2), exchangeAccount: "Haupt" };
+    const b = { ...withPnl(T2, -10, -0.5), exchangeAccount: "Sub-Konto 2" };
+    const c = withPnl(T3, 10, 1);
+    expect(ids(filterExtra([a, b, c], ex({ exchangeAccount: "haupt" })))).toEqual(["T1"]);
+    expect(ids(filterExtra([a, b, c], ex({ exchangeAccount: "Sub-Konto 2" })))).toEqual(["T2"]);
+    expect(journalFilterOptions([a, b, c, { ...c, id: "T4", exchangeAccount: " haupt " }]).exchangeAccounts).toEqual(["Haupt", "Sub-Konto 2"]);
+    expect(journalFilterOptions(TRADES).exchangeAccounts).toEqual([]);
+    expect(journalFilterCount(ex({ exchangeAccount: "Haupt" }))).toBe(1);
+    expect(parseExtra({ mistake: "all", strength: "all", exchangeAccount: "Haupt" })).toMatchObject({ exchangeAccount: "Haupt" });
+  });
+
   it("options list only what the journal has (tags by use)", () => {
     const o = journalFilterOptions(TRADES);
     expect(o.pairs).toEqual(["BTCUSDT", "ETHUSDT", "SOLUSDT"]);
@@ -151,6 +163,16 @@ describe("TradesView – journal filter bar", () => {
     expect(within(bar).getByRole("button", { name: /Mehr Filter/ })).toHaveTextContent("1");
     fireEvent.click(within(bar).getByRole("button", { name: "Diese Filter leeren" }));
     expect(useUi.getState().tradeExtra).toEqual(DEFAULT_TRADE_EXTRA);
+  });
+
+  it("`Mehr Filter` offers „Börsenkonto“ once trades carry one (F15)", async () => {
+    useJournal.setState({ trades: [{ ...T1, exchangeAccount: "Haupt" }, { ...T2, exchangeAccount: "Sub-Konto 2" }, T3, H1, H2] });
+    mount();
+    const bar = screen.getByTestId("journal-filters");
+    fireEvent.click(within(bar).getByRole("button", { name: /Mehr Filter/ }));
+    expect(within(bar).getByText("Börsenkonto")).toBeInTheDocument();
+    useUi.setState({ tradeExtra: { ...DEFAULT_TRADE_EXTRA, exchangeAccount: "Sub-Konto 2" } });
+    await waitFor(() => expect(rowIds()).toEqual(["T2"]));
   });
 
   it("grouping folds the automatic hedge into one row that unfolds its legs", async () => {

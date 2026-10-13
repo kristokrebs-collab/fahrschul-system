@@ -33,6 +33,10 @@ describe("dimensions", () => {
     expect(k("volatility", one({ atrPct: 2.5 }))).toEqual(["v2"]);
     expect(k("volatility", plain)).toEqual([NONE_KEY]);
     expect(k("exchange", one({ exchange: "Bitunix" }))).toEqual(["bitunix"]);
+    // review F15: sub-accounts side by side
+    expect(k("exchangeAccount", one({ exchangeAccount: " Sub-Konto 2 " }))).toEqual(["sub-konto 2"]);
+    expect(k("exchangeAccount", plain)).toEqual([NONE_KEY]);
+    expect(DIMENSIONS.exchangeAccount.labelOf("haupt", CTX)).toBe("Haupt");
     expect(k("tag", one({ tags: ["a", "b", "a"] }))).toEqual(["a", "b"]);
     expect(k("origin", plain)).toEqual(["manual"]);
     expect(k("origin", one({ origin: { kind: "bot", botId: "grid1" } }))).toEqual(["bot:grid1"]);
