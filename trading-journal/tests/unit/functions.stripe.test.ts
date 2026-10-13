@@ -819,6 +819,39 @@ describe("POST /api/v1/stripe/webhook", () => {
     expect(stripe.balance).toHaveLength(0);
   });
 
+  it("invoice.paid before checkout.session.completed still pays the affiliate (Stripe does not order events, review MONEY-02)", async () => {
+    db.tables.referral_codes!.push({ user_id: U2, code: "AFFIL123", commission_pct: 25 });
+    // yearly plan without a trial: the first invoice is the only one for 12 months
+    stripe.subs.set("sub_1", stripeSub("sub_1", { customer: "cus_9", user: U1, status: "active", trialEnd: null, price: "price_pro_y", ref: "AFFIL123" }));
+    const paid = await deliver(
+      event("invoice.paid", { id: "in_1", object: "invoice", amount_paid: 2400, currency: "eur", parent: { subscription_details: { subscription: "sub_1" } } }),
+    );
+    expect(paid.body.result).toBe("processed");
+    const done = await deliver(
+      event("checkout.session.completed", { id: "cs_1", mode: "subscription", client_reference_id: U1, customer: "cus_9", subscription: "sub_1", metadata: { ref: "AFFIL123" } }),
+    );
+    expect(done.body.result).toBe("processed");
+    expect(db.tables.affiliate_ledger!.map((l) => [l.kind, l.amount, l.status])).toEqual([["commission", 600, "pending"]]);
+    expect(db.tables.referrals).toEqual([expect.objectContaining({ referrer_id: U2, referred_id: U1, status: "paying", converted_at: expect.any(String) })]);
+  });
+
+  it("a referral credit is booked even when the first invoice is the first event that arrives", async () => {
+    db.tables.referral_codes!.push({ user_id: U2, code: "ABCD2345" });
+    db.tables.billing_customers!.push({ user_id: U2, stripe_customer_id: "cus_ref" });
+    stripe.subs.set("sub_1", stripeSub("sub_1", { customer: "cus_9", user: U1, status: "active", trialEnd: null, ref: "ABCD2345" }));
+    await deliver(event("invoice.paid", { id: "in_1", object: "invoice", amount_paid: 1200, currency: "eur", parent: { subscription_details: { subscription: "sub_1" } } }));
+    expect(db.tables.affiliate_ledger).toEqual([expect.objectContaining({ referrer_id: U2, kind: "credit", amount: 1000, status: "applied" })]);
+    expect(stripe.balance).toEqual([{ customer: "cus_ref", amount: -1000, key: expect.stringMatching(/^tj-ref-credit-/) }]);
+  });
+
+  it("a stored subscription with a code books the referral at invoice.paid even when Stripe cannot be re-read", async () => {
+    db.tables.referral_codes!.push({ user_id: U2, code: "AFFIL123", commission_pct: 25 });
+    db.tables.subscriptions!.push({ id: "sub_1", user_id: U1, stripe_customer_id: "cus_9", status: "active", plan: "pro", ref_code: "AFFIL123", updated_at: new Date().toISOString() });
+    stripe.retrieveFails = true;
+    await deliver(event("invoice.paid", { id: "in_1", object: "invoice", amount_paid: 2400, currency: "eur", parent: { subscription_details: { subscription: "sub_1" } } }));
+    expect(db.tables.affiliate_ledger!.map((l) => [l.kind, l.amount])).toEqual([["commission", 600]]);
+  });
+
   it("a credit earned before the referrer had a customer is applied at their first checkout", async () => {
     db.tables.affiliate_ledger!.push({ id: 77, referrer_id: U2, kind: "credit", amount: 1000, currency: "eur", status: "pending", stripe_invoice_id: "in_x" });
     await call(checkoutFn, req("/api/v1/billing/checkout", { body: { plan: "pro", interval: "month" }, user: U2 }));

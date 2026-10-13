@@ -414,6 +414,10 @@ export async function syncSubscription(
     dbFail("subscriptions write", error);
   }
   await linkCustomer(userId, customer);
+  // the referral travels in the subscription's metadata: book it on WHICHEVER event comes first – Stripe does not
+  // order `invoice.paid` after `checkout.session.completed`, and a missing row would lose the credit / commission
+  // (review MONEY-02). recordReferral is idempotent (first referrer wins).
+  if (row.ref_code) await recordReferral(row.ref_code, userId, sub.id);
   const plan = await recomputePlan(userId);
   if (row.plan === "team") await recomputeMembers(userId);
   return { userId, row, plan };
@@ -824,10 +828,17 @@ const COMMISSION_MONTHS = 12;
 export async function rewardReferral(inv: Stripe.Invoice, subscriptionId: string | null): Promise<void> {
   if (!subscriptionId || inv.amount_paid <= 0) return;
   const sb = supabaseAdmin();
-  const { data: subRow } = await sb.from("subscriptions").select("user_id").eq("id", subscriptionId).maybeSingle();
-  const referredId = validUuid((subRow as { user_id?: string } | null)?.user_id);
+  const { data: subRow } = await sb.from("subscriptions").select("user_id,ref_code").eq("id", subscriptionId).maybeSingle();
+  const stored = subRow as { user_id?: string; ref_code?: string | null } | null;
+  const referredId = validUuid(stored?.user_id);
   if (!referredId) return;
-  const { data: ref, error } = await sb.from("referrals").select("id,referrer_id,status,converted_at").eq("referred_id", referredId).maybeSingle();
+  const readReferral = () => sb.from("referrals").select("id,referrer_id,status,converted_at").eq("referred_id", referredId).maybeSingle();
+  let { data: ref, error } = await readReferral();
+  // stored subscription with a code but no referral yet (an older row, or Stripe could not be re-read): book it now
+  if (!error && !ref && stored?.ref_code) {
+    await recordReferral(stored.ref_code, referredId, subscriptionId);
+    ({ data: ref, error } = await readReferral());
+  }
   if (error) {
     if (!isMissingTable(error)) console.error("[fn] referrals read failed", error.code);
     return;
