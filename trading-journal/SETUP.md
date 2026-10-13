@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0004
+### 2.1 Migrationen 0001 → 0005
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -70,9 +70,10 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0002_billing.sql` | Stripe-Kunden, Abos, Team-Plätze, Empfehlungscodes, Gutschriften, Webhook-Idempotenz |
 | `0003_exchange.sql` | Sync-Läufe, Sync-Cursor, API-Tokens, `upsert_synced_trade(s)` |
 | `0004_social.sql` | Gruppen, Mitglieder, Pseudonyme, Einladungen, Reviews, Kommentare, Ziele, Teilen-Links, Bestenlisten (k ≥ 10) |
+| `0005_mfa_everywhere.sql` | 2FA-Regel überall: mit aktiver 2FA sieht eine Sitzung ohne Code-Eingabe weder Screenshots noch Audit-Log, Abo-, Teilen-, Token- oder Community-Daten |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002`, `0003`, `0004` genauso.
+**Run** → „Success“ abwarten. Dann `0002`, `0003`, `0004`, `0005` genauso.
 
 **Variante B – CLI:**
 

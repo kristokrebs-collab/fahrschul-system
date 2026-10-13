@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "latest",
+    "@electric-sql/pglite": "0.3.16",
     "@eslint/js": "latest",
     "@netlify/functions": "^6.0.2",
     "@playwright/test": "latest",

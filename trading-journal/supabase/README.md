@@ -12,6 +12,8 @@ single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `sr
 | `migrations/0003_exchange.sql` | P11 | `exchange_connections` + `journal_account`, `sync_enabled`, `meta`; `sync_runs`, `sync_cursor`, `api_tokens`, `upsert_synced_trade()` / `upsert_synced_trades()` – secrets stay in `exchange_connections` (0001) |
 | `migrations/0004_social.sql` | P12 | `groups`, `group_members` (role, `share_level`), `social_profiles` (pseudonyms), `group_invites`, `group_reviews`, `comments`, `group_goals`, `shares`, `feedback`, `member_stats`, `leaderboard_snapshots`, `community_stats`; helpers `is_group_member()`, `group_role()`, `shares_group_with()`, `can_see_review()`, `shared_payload()`, `social_candidates()` |
 
+| `migrations/0005_mfa_everywhere.sql` | review SEC-01 | the aal2 rule (`mfa_satisfied()`) on every remaining client-readable table – `audit_log`, `subscriptions`, `team_seats`, `referral_codes`, `referrals`, `affiliate_ledger`, `api_tokens`, `social_profiles`, `group_invites`, `group_goals`, `shares`, `feedback`, `member_stats` – and on the four `screenshots` storage policies |
+
 Apply with the Supabase CLI (`supabase db push`) or paste each file into the SQL editor. Every migration runs once;
 never edit an applied migration – add a new one.
 
@@ -26,7 +28,10 @@ never edit an applied migration – add a new one.
   settings (`update … where rev = $seen`). **No hard delete for clients** – deletes are tombstones (`deleted = true`),
   because offline devices must not resurrect records and Realtime does not apply RLS to DELETE events.
 - **MFA**: as soon as a user has a verified TOTP factor, `journal_docs` and `exchange_connections` require an aal2
-  session (restrictive policies via `mfa_satisfied()`).
+  session (restrictive policies via `mfa_satisfied()`). Since 0005 the same holds for every other client-readable table
+  except `profiles` (privacy opt-ins are read before the code step) and the k-anonymous `community_stats`, and for the
+  `screenshots` bucket (read, signed URLs, upload, overwrite, delete). The functions mirror it with
+  `requireUser(req, { aal2: "ifEnrolled" })`; `billing/status` answers such a session like a signed-out visitor.
 - **`exchange_connections`**: API key / secret / passphrase as AES-256-GCM blobs (`netlify/functions/_lib/crypto.ts`,
   AAD `<user_id>:<connection id>:<field>`). Clients may read only the metadata columns of their own rows
   (`id, user_id, exchange, label, key_version, key_last4, permissions, status, last_sync_at, last_error, created_at,
@@ -48,6 +53,11 @@ tombstone-only deletes, the aal2 rule, `rate_hit` counting and privileges, and t
 PGlite 0.3 (Postgres 17) with an `auth` + `storage` shim: `my_sessions()` (own rows only, current first, coarsened IPs,
 anon refused), `backup_candidates()` (distinct, keyset paging, service role only), bucket creation and the screenshot
 folder policies, the `rev` bump on a tombstone update and a stale optimistic `rev` update matching nothing.
+
+**Committed check (0001 – latest):** `tests/unit/supabase.rls.test.ts` applies every migration in order on PGlite with
+the Supabase shim (roles, default grants, `auth`, `storage`) and checks the aal2 rule table by table: a user with a
+verified factor and a password-only (aal1) JWT sees nothing and cannot write screenshots, the same user with aal2 sees
+the own rows, a user without 2FA keeps working with aal1, and `anon` is refused everywhere.
 
 ## Rules the schema enforces (0002, billing)
 

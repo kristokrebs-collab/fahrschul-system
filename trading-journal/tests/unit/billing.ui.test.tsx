@@ -164,6 +164,17 @@ describe("gates", () => {
   });
 });
 
+describe("2FA", () => {
+  it("BillingHost loads the account again once the code step is done (status answers aal1 like a visitor)", async () => {
+    const statusCalls = () => posts.filter((p) => p.path.endsWith("/billing/status")).length;
+    useCloudSession.setState({ phase: "signedIn", user: { ...USER, mfaEnrolled: true }, needsMfa: true });
+    wrap(<BillingHost />);
+    await waitFor(() => expect(statusCalls()).toBe(1));
+    act(() => useCloudSession.setState({ user: { ...USER, aal: "aal2", mfaEnrolled: true }, needsMfa: false }));
+    await waitFor(() => expect(statusCalls()).toBe(2));
+  });
+});
+
 describe("cancellation", () => {
   it("reason → offer → confirm → done, the reason reaches the server", async () => {
     useCloudSession.setState({ phase: "signedIn", user: USER });

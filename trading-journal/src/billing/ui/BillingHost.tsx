@@ -28,6 +28,7 @@ export function BillingHost({ onNavigate }: BillingHostProps) {
   const active = billingActive();
   const phase = useCloudSession((s) => s.phase);
   const userId = useCloudSession((s) => (s.phase === "signedIn" ? (s.user?.id ?? null) : null));
+  const needsMfa = useCloudSession((s) => s.needsMfa);
   const pending = useBilling((s) => s.pending);
   const sheetOpen = useCloudSession((s) => s.sheet.open);
 
@@ -42,11 +43,12 @@ export function BillingHost({ onNavigate }: BillingHostProps) {
     else setReturned(r);
   }, [active]);
 
+  // `needsMfa`: a 2FA account gets its plan only after the code step (billing/status answers aal1 like a visitor)
   useEffect(() => {
     if (!active || phase === "idle" || phase === "loading") return;
     if (!userId) clearAccount();
     void loadBilling();
-  }, [active, phase, userId]);
+  }, [active, phase, userId, needsMfa]);
 
   // a checkout that waited for the login continues once the login sheet is closed (the first sync ran in it);
   // closing the sheet without signing in drops it

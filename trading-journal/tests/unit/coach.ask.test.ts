@@ -31,12 +31,17 @@ interface State {
   claims: Record<string, unknown> | null;
   rate: number;
   plan: string;
+  /** MFA factors of the user (`auth.admin.mfa.listFactors`). */
+  factors: { status: string }[];
 }
 let state: State;
 
 function fakeAdmin() {
   const client = {
-    auth: { getClaims: vi.fn(async () => (state.claims ? { data: { claims: state.claims }, error: null } : { data: null, error: { message: "bad" } })) },
+    auth: {
+      getClaims: vi.fn(async () => (state.claims ? { data: { claims: state.claims }, error: null } : { data: null, error: { message: "bad" } })),
+      admin: { mfa: { listFactors: vi.fn(async () => ({ data: { factors: state.factors }, error: null })) } },
+    },
     rpc: vi.fn(async (fn: string) => (fn === "rate_hit" ? { data: state.rate, error: null } : { data: null, error: { code: "42883" } })),
     from: () => {
       const q = {
@@ -64,7 +69,7 @@ const post = (body: unknown = BODY, auth = true) =>
   coachAsk(new Request("https://x.test/api/v1/coach/ask", { method: "POST", headers: { "content-type": "application/json", ...(auth ? { authorization: `Bearer ${JWT}` } : {}) }, body: JSON.stringify(body) }), ctx);
 
 beforeEach(() => {
-  state = { claims: { sub: U1, role: "authenticated", aal: "aal1" }, rate: 1, plan: "premium" };
+  state = { claims: { sub: U1, role: "authenticated", aal: "aal1" }, rate: 1, plan: "premium", factors: [] };
   fakeAdmin();
   process.env.ANTHROPIC_API_KEY = "sk-test";
   delete process.env.COACH_MODEL;
@@ -97,6 +102,17 @@ describe("Verfügbarkeit", () => {
   it("needs a login", async () => {
     const res = await post(BODY, false);
     expect(res.status).toBe(401);
+  });
+
+  it("with 2FA on, a password-only session (aal1) must enter the code first (review SEC-01)", async () => {
+    const create = fakeModel({ content: [{ type: "text", text: "Breakout bringt +1.240 USDT.", citations: null }] as Anthropic.Beta.BetaContentBlock[] });
+    state.factors = [{ status: "verified" }];
+    const res = await post();
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toMatchObject({ code: "mfa_required" });
+    expect(create).not.toHaveBeenCalled();
+    state.claims = { sub: U1, role: "authenticated", aal: "aal2" };
+    expect((await post()).status).toBe(200);
   });
 });
 

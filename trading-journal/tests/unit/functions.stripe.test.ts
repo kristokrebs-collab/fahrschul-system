@@ -58,6 +58,8 @@ interface Db {
   seq: number;
   rpcHits: number;
   rateLimit: number;
+  /** Users with a verified TOTP factor (`auth.admin.mfa.listFactors`). */
+  mfa: Set<string>;
 }
 
 function query(db: Db, table: string) {
@@ -130,7 +132,7 @@ function query(db: Db, table: string) {
 }
 
 const b64url = (s: string) => Buffer.from(s).toString("base64url");
-const tokenFor = (sub: string) => `eyJhbGciOiJFUzI1NiJ9.${b64url(JSON.stringify({ sub }))}.c2ln`;
+const tokenFor = (sub: string, aal: "aal1" | "aal2" = "aal1") => `eyJhbGciOiJFUzI1NiJ9.${b64url(JSON.stringify({ sub, aal }))}.c2ln`;
 
 function fakeDb(): Db {
   const db: Db = {
@@ -148,6 +150,7 @@ function fakeDb(): Db {
     seq: 0,
     rpcHits: 0,
     rateLimit: 1,
+    mfa: new Set(),
   };
   const client = {
     from: (t: string) => query(db, t),
@@ -158,13 +161,15 @@ function fakeDb(): Db {
     auth: {
       getClaims: async (jwt: string) => {
         try {
-          const claims = JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString()) as { sub: string };
-          return { data: { claims: { ...claims, role: "authenticated", aal: "aal1" } }, error: null };
+          const claims = JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString()) as { sub: string; aal?: string };
+          return { data: { claims: { ...claims, role: "authenticated", aal: claims.aal ?? "aal1" } }, error: null };
         } catch {
           return { data: null, error: { message: "bad" } };
         }
       },
-      admin: { mfa: { listFactors: async () => ({ data: { factors: [] }, error: null }) } },
+      admin: {
+        mfa: { listFactors: async ({ userId }: { userId: string }) => ({ data: { factors: db.mfa.has(userId) ? [{ status: "verified" }] : [] }, error: null }) },
+      },
     },
   };
   setSupabaseAdminForTests(client as unknown as SupabaseClient);
@@ -403,9 +408,9 @@ function setEnv(on: boolean): void {
   }
 }
 
-function req(path: string, init: { method?: string; body?: unknown; user?: string; headers?: Record<string, string> } = {}): Request {
+function req(path: string, init: { method?: string; body?: unknown; user?: string; aal?: "aal1" | "aal2"; headers?: Record<string, string> } = {}): Request {
   const h = new Headers(init.headers);
-  if (init.user) h.set("authorization", `Bearer ${tokenFor(init.user)}`);
+  if (init.user) h.set("authorization", `Bearer ${tokenFor(init.user, init.aal)}`);
   let body: string | undefined;
   if (init.body !== undefined) {
     body = typeof init.body === "string" ? init.body : JSON.stringify(init.body);
@@ -912,6 +917,52 @@ describe("GET /api/v1/billing/referral", () => {
     const bad = await call(referralFn, req("/api/v1/billing/referral?code=ZZZZ0000"));
     expect(bad.body).toEqual({ valid: false, trialDays: 0 });
     expect((await call(referralFn, req("/api/v1/billing/referral"))).status).toBe(401);
+  });
+});
+
+/* ------------------------------------------------------------------ 2FA */
+
+describe("2FA: a password-only session (aal1) of a 2FA account reaches no billing data (review SEC-01)", () => {
+  beforeEach(async () => {
+    stripe.subs.set("sub_1", stripeSub("sub_1", { user: U1, status: "active", trialEnd: null }));
+    await deliver(event("customer.subscription.created", stripe.subs.get("sub_1")));
+    db.mfa.add(U1);
+  });
+
+  it("billing/status answers like for a visitor until the code is entered", async () => {
+    const aal1 = await call(statusFn, req("/api/v1/billing/status?invoices=1", { user: U1 }));
+    expect(aal1.status).toBe(200);
+    expect(aal1.body).toMatchObject({ plan: null, subscription: null, invoices: null, hasCustomer: false, team: null });
+    expect((aal1.body.config as { enabled: boolean }).enabled).toBe(true);
+    const aal2 = await call(statusFn, req("/api/v1/billing/status?invoices=1", { user: U1, aal: "aal2" }));
+    expect(aal2.body.plan).toMatchObject({ plan: "pro", status: "active" });
+    expect((aal2.body.invoices as unknown[]).length).toBe(1);
+  });
+
+  it("portal, in-app cancel, checkout and the referral info need aal2", async () => {
+    for (const r of [
+      req("/api/v1/billing/portal", { body: { flow: "manage" }, user: U1 }),
+      req("/api/v1/billing/portal", { body: { action: "cancel", reason: "too_expensive" }, user: U1 }),
+      req("/api/v1/billing/checkout", { body: { plan: "premium", interval: "month" }, user: U1 }),
+      req("/api/v1/billing/referral", { user: U1 }),
+    ]) {
+      const fn = r.url.includes("portal") ? portalFn : r.url.includes("checkout") ? checkoutFn : referralFn;
+      const res = await call(fn, r);
+      expect(res.status, r.url).toBe(403);
+      expect((res.body.error as { code: string }).code).toBe("mfa_required");
+    }
+    expect(stripe.portal).toHaveLength(0);
+    expect(stripe.updates).toHaveLength(0);
+    expect(stripe.checkout).toHaveLength(0);
+    expect(db.tables.referral_codes).toHaveLength(0);
+    expect((await call(portalFn, req("/api/v1/billing/portal", { body: { flow: "manage" }, user: U1, aal: "aal2" }))).status).toBe(200);
+    expect((await call(referralFn, req("/api/v1/billing/referral", { user: U1, aal: "aal2" }))).status).toBe(200);
+  });
+
+  it("an account without 2FA keeps working with aal1", async () => {
+    db.mfa.clear();
+    expect((await call(portalFn, req("/api/v1/billing/portal", { body: { flow: "manage" }, user: U1 }))).status).toBe(200);
+    expect((await call(statusFn, req("/api/v1/billing/status", { user: U1 }))).body.plan).toMatchObject({ plan: "pro" });
   });
 });
 

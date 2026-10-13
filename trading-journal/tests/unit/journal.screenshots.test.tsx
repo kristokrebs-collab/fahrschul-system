@@ -8,6 +8,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ScreenshotRef } from "@/domain/types";
 import { IntakeError, INTAKE_MESSAGES, MAX_INPUT_BYTES, fitSize, imagesOf, isImage, prepareImage } from "@/journal/screenshots/image";
 import { MAX_SHOTS, addShots, promoteToCloud, shotPlace, shotUrl } from "@/journal/screenshots/shots";
+import { cloudShotOwner } from "@/journal/screenshots/cloud";
+import { setCloudEnabledForTests } from "@/cloud/env";
+import { resetCloudSession, useCloudSession } from "@/cloud/session";
+import { resetBilling, useBilling } from "@/billing/store";
 import { ShotsField } from "@/journal/screenshots/ShotsField";
 import { collectShotGarbage, deleteShotBlob, getShotBlob, listShotKeys, localKeyOf, putShotBlob, referencedShotKeys, resetShotStoreForTests, shotStorage } from "@/journal/screenshots/store";
 import { MotionRoot } from "@/motion/MotionRoot";
@@ -102,5 +106,24 @@ describe("ShotsField", () => {
     await waitFor(() => expect(useUi.getState().toasts.map((t) => [t.title, t.detail])).toEqual([["Screenshot nicht übernommen", INTAKE_MESSAGES.type]]));
     fireEvent.click(screen.getByRole("button", { name: /Screenshot 1 entfernen/ }));
     await waitFor(() => expect(screen.getByTestId("n")).toHaveTextContent("0"));
+  });
+});
+
+describe("cloud owner", () => {
+  afterEach(() => {
+    setCloudEnabledForTests(null);
+    resetCloudSession();
+    resetBilling();
+  });
+
+  it("a 2FA account before its code step keeps screenshots local (the bucket refuses aal1, review SEC-01)", () => {
+    setCloudEnabledForTests(true);
+    // payments not set up: nothing is gated, the cloud store is available to every signed-in user
+    useBilling.setState({ config: { enabled: false, reason: "stripe_missing", trialDays: 14, referralTrialDays: 30, cardless: false, prices: {}, available: [] } });
+    const user = { id: "11111111-1111-4111-8111-111111111111", email: "t@example.com", aal: "aal1" as const, mfaEnrolled: true };
+    useCloudSession.setState({ phase: "signedIn", user, needsMfa: true });
+    expect(cloudShotOwner()).toBeNull();
+    useCloudSession.setState({ user: { ...user, aal: "aal2" }, needsMfa: false });
+    expect(cloudShotOwner()).toBe(user.id);
   });
 });

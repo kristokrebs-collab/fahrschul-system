@@ -26,7 +26,7 @@ const Body = z.object({
 
 export default handler(async (req, ctx) => {
   requireMethod(req, "POST");
-  const user = await requireUser(req);
+  const user = await requireUser(req, { aal2: "ifEnrolled" });
   await enforceRateLimit(rateKey("billing-checkout", user.id), 10, 600);
   const body = await readJson(req, Body, { maxBytes: 2048 });
   const out = await createCheckout(user, body, siteOrigin(req));

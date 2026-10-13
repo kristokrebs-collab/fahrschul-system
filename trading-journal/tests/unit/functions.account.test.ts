@@ -340,6 +340,22 @@ describe("audit", () => {
     const r2 = await auditFn(get(`/api/v1/audit?limit=5&before=3`), ctx);
     expect((await r2.json()).items.map((i: Row) => i.id)).toEqual([1]);
   });
+
+  it("with 2FA on, a password-only session (aal1) records only the pre-code events and reads nothing (review SEC-01)", async () => {
+    state.factors = [{ status: "verified" }];
+    state.tables.audit_log = [{ id: 1, user_id: U1, action: "exchange.connect", meta: { last4: "7e2d" }, at: "a" }];
+    const read = await auditFn(get("/api/v1/audit"), ctx);
+    expect(read.status).toBe(403);
+    expect((await read.json()).error.code).toBe("mfa_required");
+    expect((await auditFn(post("/api/v1/audit", { action: "auth.signin" }), ctx)).status).toBe(201);
+    expect((await auditFn(post("/api/v1/audit", { action: "auth.signout" }), ctx)).status).toBe(201);
+    expect((await auditFn(post("/api/v1/audit", { action: "privacy.update" }), ctx)).status).toBe(403);
+    expect(state.tables.audit_log!.map((a) => a.action)).toEqual(["exchange.connect", "auth.signin", "auth.signout"]);
+    state.claims = { ...state.claims, aal: "aal2" };
+    const ok = await auditFn(get("/api/v1/audit"), ctx);
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).items).toHaveLength(3);
+  });
 });
 
 describe("backups", () => {

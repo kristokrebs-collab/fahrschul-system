@@ -22,7 +22,7 @@ export default handler(async (req, ctx) => {
     const valid = !!code && (await referrerOf(code)) !== null;
     return json({ valid, trialDays: valid ? referralTrialDays() : 0 });
   }
-  const user = await requireUser(req);
+  const user = await requireUser(req, { aal2: "ifEnrolled" });
   await enforceRateLimit(rateKey("billing-referral", user.id), 60, 600);
   return json(await referralInfo(user.id));
 });

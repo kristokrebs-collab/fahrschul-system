@@ -13,7 +13,7 @@ Functions, never `VITE_`).
 | file | exports |
 |---|---|
 | `http.ts` | `handler`, `json`, `error`, `errorFrom`, `HttpError`, `requireMethod`, `readJson(req, zod)`, `clientIp`, `BASE_HEADERS` – one error envelope `{ error: { code, message, details? } }`, German messages |
-| `auth.ts` | `requireUser(req, { aal2?: true \| "ifEnrolled" })` (JWT via `auth.getClaims`), `optionalUser`, `bearerToken` |
+| `auth.ts` | `requireUser(req, { aal2?: true \| "ifEnrolled" })` (JWT via `auth.getClaims`), `assertAal2(user, mode)`, `mfaSatisfied(user)`, `optionalUser`, `bearerToken`. Rule (review SEC-01): every endpoint that returns or changes account data uses `aal2: "ifEnrolled"` – the same rule as `public.mfa_satisfied()` in the database (0001 / 0005) |
 | `supabase.ts` | `supabaseAdmin()` / `admin()` (service role, bypasses RLS – always filter by the verified user), `setSupabaseAdminForTests` |
 | `env.ts` | `env`, `envOptional`, `envInt`, `envNumber`, `envBool`, `SERVER_ENV` |
 | `crypto.ts` | AES-256-GCM `encrypt` / `decrypt` (`v<n>:iv:tag:ct`, AAD `<user>:<connection>:<field>`), key rotation |
@@ -33,18 +33,18 @@ Functions, never `VITE_`).
 | `account-delete.mts` | POST `/api/v1/account/delete` `{ confirm: "LÖSCHEN" }` | aal2 if 2FA; 3/h fail-closed; Stripe first, audit, bucket files, `auth.admin.deleteUser` (cascades) |
 | `account-backups.mts` | GET `/api/v1/account/backups[?day=YYYY-MM-DD]` | list / download the nightly backups (client restores through `importBackup`) |
 | `log.mts` | POST `/api/v1/log` | error reports (telemetry opt-in on the client), scrubbed again, `LOG_SAMPLE_RATE`, per-IP-hash and per-fingerprint limits → `app_errors` |
-| `audit.mts` | GET/POST `/api/v1/audit` | the user's trail (paged) / client-side security events from an allowlist |
+| `audit.mts` | GET/POST `/api/v1/audit` | the user's trail (paged, aal2 if 2FA) / client-side security events from an allowlist (aal2 if 2FA, except sign-in / sign-out / password reset, which happen before the code step) |
 | `backup-nightly.mts` | `@daily` (published deploys) | `backups/<user>/<day>.json` for every journal changed in the last 50 h, 14 days kept (newest always), `app_errors` purged after 30 days, 22-s budget |
 
 ## Functions (P10 billing)
 
 | file | route | notes |
 |---|---|---|
-| `billing-status.mts` | GET `/api/v1/billing/status[?invoices=1]` | public config (`enabled`, trial days, real prices, available plans); signed in: plan, subscription, invoices (Stripe-hosted links), team, `trialUsed`; 120/10 min |
-| `billing-checkout.mts` | POST `/api/v1/billing/checkout` `{ plan, interval, seats?, code?, ref?, returnTo? }` | Stripe Checkout URL (subscription mode, `locale: de`); 409 `already_subscribed` → portal; `returnTo` only same-origin paths; 10/10 min |
-| `billing-portal.mts` | POST `/api/v1/billing/portal` `{ flow?, returnTo? }` or `{ action: "cancel" \| "resume" \| "pause", reason?, comment?, months? }` | Customer Portal (deep links: cancel, plan change, payment method) or the in-app change (§ 312k BGB "Vertrag hier kündigen"), audited; 20/10 min |
+| `billing-status.mts` | GET `/api/v1/billing/status[?invoices=1]` | public config (`enabled`, trial days, real prices, available plans); signed in: plan, subscription, invoices (Stripe-hosted links), team, `trialUsed` – a 2FA account before its code step gets the signed-out answer; 120/10 min |
+| `billing-checkout.mts` | POST `/api/v1/billing/checkout` `{ plan, interval, seats?, code?, ref?, returnTo? }` | Stripe Checkout URL (subscription mode, `locale: de`); 409 `already_subscribed` → portal; `returnTo` only same-origin paths; aal2 if 2FA; 10/10 min |
+| `billing-portal.mts` | POST `/api/v1/billing/portal` `{ flow?, returnTo? }` or `{ action: "cancel" \| "resume" \| "pause", reason?, comment?, months? }` | Customer Portal (deep links: cancel, plan change, payment method) or the in-app change (§ 312k BGB "Vertrag hier kündigen"), audited; aal2 if 2FA; 20/10 min |
 | `billing-code.mts` | POST `/api/v1/billing/code` `{ code }` | promotion-code preview ("−20 % für 3 Monate"); 10/min per IP-hash fail-closed (+30/h per user) against brute force |
-| `billing-referral.mts` | GET `/api/v1/billing/referral[?code=]` | public `?code=` check (valid / trial days) or the user's own code, stats and credit ledger |
+| `billing-referral.mts` | GET `/api/v1/billing/referral[?code=]` | public `?code=` check (valid / trial days) or the user's own code, stats and credit ledger (aal2 if 2FA) |
 | `stripe-webhook.mts` | POST `/api/v1/stripe/webhook` | raw body (≤ 1 MB) + `Stripe-Signature` → `constructEventAsync`; events: `checkout.session.completed`, `customer.subscription.created/updated/deleted/paused/resumed/trial_will_end`, `invoice.paid`, `invoice.payment_failed`; duplicates → 200, concurrent delivery → 409, failures → 500 (Stripe retries) |
 
 ## Functions (P11 exchange sync, API & webhooks)
@@ -84,7 +84,7 @@ shows the button – nothing breaks.
 
 | file | route | notes |
 |---|---|---|
-| `coach-ask.mts` | GET `/api/v1/coach/ask` → `{ enabled }` · POST `{ question?, title, text, facts[≤ 12], confidence, notes?[≤ 3, opt-in] }` → `{ text \| null, model, reason? }` | official SDK `@anthropic-ai/sdk` (server only, never in the client bundle); model `COACH_MODEL` (default `claude-opus-5-5`), effort `low`, server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`); signed in, plan feature `coachAi` (Premium, not gated while payments are not set up), 10 / 10 min + `coachAiPerDay` per day (50 without payments); body ≤ 8 KiB, only computed facts; every number of the answer must occur in the input, else `text: null, reason: "unverified"` (refusal → `"refusal"`); German errors 503 `coach_ai_unavailable`, 429 `coach_ai_busy`, 502 `coach_ai_failed`; nothing stored, only error codes logged |
+| `coach-ask.mts` | GET `/api/v1/coach/ask` → `{ enabled }` · POST `{ question?, title, text, facts[≤ 12], confidence, notes?[≤ 3, opt-in] }` → `{ text \| null, model, reason? }` | official SDK `@anthropic-ai/sdk` (server only, never in the client bundle); model `COACH_MODEL` (default `claude-opus-5-5`), effort `low`, server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`); signed in (aal2 if 2FA), plan feature `coachAi` (Premium, not gated while payments are not set up), 10 / 10 min + `coachAiPerDay` per day (50 without payments); body ≤ 8 KiB, only computed facts; every number of the answer must occur in the input, else `text: null, reason: "unverified"` (refusal → `"refusal"`); German errors 503 `coach_ai_unavailable`, 429 `coach_ai_busy`, 502 `coach_ai_failed`; nothing stored, only error codes logged |
 
 Tests: `tests/unit/coach.ask.test.ts` (fake admin + fake Anthropic client: availability, auth, plan gate, rate limits,
 request shape, number guard, refusal, error mapping).

@@ -48,11 +48,26 @@ export async function requireUser(req: Request, opts: RequireUserOptions = {}): 
     sessionId: typeof claims.session_id === "string" ? claims.session_id : null,
     jwt,
   };
-  if (opts.aal2 && user.aal !== "aal2") {
-    const required = opts.aal2 === true || (await hasVerifiedFactor(user.id));
-    if (required) throw new HttpError(403, "mfa_required", "Bitte bestätige zuerst mit deinem Authenticator-Code.");
-  }
+  if (opts.aal2) await assertAal2(user, opts.aal2);
   return user;
+}
+
+/** The German 403 of a session that still needs the TOTP step. */
+export const MFA_REQUIRED_MESSAGE = "Bitte bestätige zuerst mit deinem Authenticator-Code.";
+
+/**
+ * Throws 403 `mfa_required` unless the session satisfies the aal2 rule – `true`: always aal2, `"ifEnrolled"`: aal2 as
+ * soon as the user has a verified factor (the database rule `public.mfa_satisfied()`, 0001 / 0005).
+ */
+export async function assertAal2(user: AuthUser, mode: true | "ifEnrolled" = "ifEnrolled"): Promise<void> {
+  if (user.aal === "aal2") return;
+  const required = mode === true || (await hasVerifiedFactor(user.id));
+  if (required) throw new HttpError(403, "mfa_required", MFA_REQUIRED_MESSAGE);
+}
+
+/** `true` when the session may see account data: aal2, or the user has no verified factor (fails closed). */
+export async function mfaSatisfied(user: AuthUser): Promise<boolean> {
+  return user.aal === "aal2" || !(await hasVerifiedFactor(user.id));
 }
 
 /** Like `requireUser`, but `null` when no Authorization header is sent (public endpoints with optional login). */

@@ -1,7 +1,7 @@
 /**
  * Screenshots in Supabase Storage (Journal v3, P06 on the P09 cloud): bucket `screenshots` (private), object path
- * `<auth.uid()>/<file>` – the row-level policies of `supabase/migrations/0001_core.sql` let a user read / write only
- * below the own folder. Display goes through short-lived signed URLs (cached until shortly before they expire).
+ * `<auth.uid()>/<file>` – the row-level policies of `supabase/migrations/0001_core.sql` (+ the aal2 rule of 0005) let a
+ * user read / write only below the own folder, and with 2FA on only after the code step. Display goes through short-lived signed URLs (cached until shortly before they expire).
  *
  * Everything degrades: without a configured cloud or while signed out the helpers report `null` / `false` and the
  * screenshot simply stays local (`store: "idb"`). The Supabase chunk is loaded lazily (`ensureCloud()`).
@@ -15,12 +15,13 @@ const SIGNED_TTL_S = 3600;
 
 /**
  * A signed-in user id when the cloud is usable right now and the plan stores screenshots there (`screenshotsCloud`,
- * `src/billing/plans.ts` – without payments always), else `null`: the screenshot stays on this device.
+ * `src/billing/plans.ts` – without payments always), else `null`: the screenshot stays on this device. A 2FA account
+ * before its code step (`needsMfa`) counts as signed out – the bucket refuses that session anyway.
  */
 export function cloudShotOwner(): string | null {
   if (!cloudEnabled() || !entitledNow("screenshotsCloud")) return null;
   const s = useCloudSession.getState();
-  return s.phase === "signedIn" && s.user ? s.user.id : null;
+  return s.phase === "signedIn" && s.user && !s.needsMfa ? s.user.id : null;
 }
 
 /** File extension of a mime type. */

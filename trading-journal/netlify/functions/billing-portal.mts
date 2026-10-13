@@ -26,7 +26,7 @@ const Body = z.object({
 
 export default handler(async (req, ctx) => {
   requireMethod(req, "POST");
-  const user = await requireUser(req);
+  const user = await requireUser(req, { aal2: "ifEnrolled" });
   await enforceRateLimit(rateKey("billing-portal", user.id), 20, 600);
   const body = await readJson(req, Body, { maxBytes: 4096 });
   if (body.action) {

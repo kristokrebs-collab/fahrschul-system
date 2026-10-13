@@ -141,7 +141,7 @@ export default handler(async (req) => {
   requireMethod(req, "GET", "POST");
   const apiKey = envOptional("ANTHROPIC_API_KEY");
   if (req.method.toUpperCase() === "GET") return json({ enabled: !!apiKey });
-  const user = await requireUser(req);
+  const user = await requireUser(req, { aal2: "ifEnrolled" });
   if (!apiKey) throw new HttpError(503, "coach_ai_unavailable", COACH_OFF_MESSAGE);
   const plan = await requireFeature(user.id, "coachAi");
   await enforceRateLimit(rateKey("coach-ask", user.id), 10, 600);
