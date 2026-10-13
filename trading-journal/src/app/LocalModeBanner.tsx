@@ -19,6 +19,12 @@ export const LOCAL_BANNER_TEXT =
   " Die Datenbank ist hier nicht erreichbar, Trades bleiben nur in diesem Browser. Öffne das Journal über claude.ai, damit es auf allen Geräten synchron ist.";
 /** NEW (Plan 1.5): appended when the page runs outside claude.ai (Netlify). */
 export const LOCAL_BANNER_NETLIFY = " Nutze Backup (JSON) unter Einstellungen → Daten.";
+/**
+ * Review F8: a standalone web build without cloud config (a sold deployment) cannot point to claude.ai – that sentence
+ * (PR #3) stays for the claude.ai runtime only. Here the banner says what the Konto card says: the trades stay in this
+ * browser, back them up.
+ */
+export const STANDALONE_BANNER_TEXT = " Trades bleiben nur in diesem Browser auf diesem Gerät.";
 export const LOCAL_BANNER_CLOSE = "Hinweis schließen";
 /** Single-file builds: the data lives in this browser, there is no claude.ai sync to point to. */
 export const FILE_BANNER_STRONG = "Datei-Version.";
@@ -67,7 +73,8 @@ const CLIP_CLOSED = "inset(0% 0% 100% 0% round 16px)";
 const CLIP_OPEN = "inset(0% 0% 0% 0% round 16px)";
 
 /**
- * `Lokaler Modus.` banner (Plan 1.5): text 1:1, Netlify variant sentence, close cross (`aria-label="Hinweis
+ * `Lokaler Modus.` banner (Plan 1.5): text 1:1 inside the claude.ai runtime; on the web without cloud the honest
+ * standalone sentence + the backup hint (review F8), close cross (`aria-label="Hinweis
  * schließen"`) → `tj2-ui.hideLocalBanner`; single-file builds say `Datei-Version.` instead. Without usable storage
  * (`useJournal.storage === "unavailable"`) a red, non-dismissible `Speichern nicht möglich.` variant with
  * `Backup importieren` (opens the `ImportDialog`) and `Backup exportieren` replaces it; the soft warn pulse in front of the text is WarnBanner's own dot (three
@@ -130,7 +137,7 @@ export function LocalModeBanner() {
                 }
               >
                 <strong className="font-semibold">{IS_FILE_BUILD ? FILE_BANNER_STRONG : LOCAL_BANNER_STRONG}</strong>
-                {IS_FILE_BUILD ? FILE_BANNER_TEXT : cloud ? cloudText : LOCAL_BANNER_TEXT}
+                {IS_FILE_BUILD ? FILE_BANNER_TEXT : cloud ? cloudText : netlify ? STANDALONE_BANNER_TEXT : LOCAL_BANNER_TEXT}
                 {!IS_FILE_BUILD && netlify && !cloud && LOCAL_BANNER_NETLIFY}
                 {cloud && cloudAction && (
                   <span className="mt-2.5 flex flex-wrap gap-2">

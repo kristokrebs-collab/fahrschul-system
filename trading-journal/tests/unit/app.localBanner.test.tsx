@@ -3,8 +3,8 @@
  * `Speichern nicht möglich.` banner with the backup import/export path (not dismissible).
  */
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
-import { LocalModeBanner, NO_STORAGE_EXPORT, NO_STORAGE_IMPORT, NO_STORAGE_STRONG, useLocalBannerOpen } from "@/app/LocalModeBanner";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { LOCAL_BANNER_TEXT, LocalModeBanner, NO_STORAGE_EXPORT, NO_STORAGE_IMPORT, NO_STORAGE_STRONG, useLocalBannerOpen } from "@/app/LocalModeBanner";
 import { resetJournal, useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 
@@ -16,6 +16,9 @@ describe("LocalModeBanner", () => {
   beforeEach(() => {
     resetJournal();
     useUi.setState({ hideLocalBanner: false });
+  });
+  afterEach(() => {
+    delete (window as unknown as { claude?: unknown }).claude;
   });
 
   it("local mode with storage: dismissible `Lokaler Modus.` hint", () => {
@@ -39,6 +42,24 @@ describe("LocalModeBanner", () => {
     expect(screen.getByRole("button", { name: NO_STORAGE_EXPORT })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: NO_STORAGE_IMPORT }));
     expect(screen.getByRole("dialog", { name: "Backup importieren" })).toBeInTheDocument();
+  });
+
+  it("standalone web build without cloud: no claude.ai advice, the backup path instead (review F8)", () => {
+    act(() => useJournal.setState({ mode: "local", storage: "ok" }));
+    render(<LocalModeBanner />);
+    const text = screen.getByText("Lokaler Modus.").closest('[role="status"]')!.textContent!;
+    expect(text).not.toContain("claude.ai");
+    expect(text).toContain("Trades bleiben nur in diesem Browser auf diesem Gerät.");
+    expect(text).toContain("Nutze Backup (JSON) unter Einstellungen → Daten.");
+  });
+
+  it("inside the claude.ai runtime the PR #3 sentence stays word for word", () => {
+    (window as unknown as { claude?: unknown }).claude = { use: () => Promise.resolve(null) };
+    act(() => useJournal.setState({ mode: "local", storage: "ok" }));
+    render(<LocalModeBanner />);
+    const text = screen.getByText("Lokaler Modus.").closest('[role="status"]')!.textContent!;
+    expect(text).toContain(LOCAL_BANNER_TEXT.trim());
+    expect(text).not.toContain("Nutze Backup (JSON)");
   });
 
   it("cloud / connecting: no banner", () => {
