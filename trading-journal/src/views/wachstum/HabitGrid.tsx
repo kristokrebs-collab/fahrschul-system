@@ -14,6 +14,7 @@ import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
+import { EmptyState } from "@/primitives/EmptyState";
 import { Collapse } from "@/primitives/Expander";
 import { Input } from "@/primitives/Input";
 import { addHabit, archiveHabit, setHabitDone } from "./actions";
@@ -133,7 +134,8 @@ export function HabitGrid({ rows, columns, todayKey, existing, className }: { ro
         </div>
       </Collapse>
       {rows.length === 0 ? (
-        <p className="text-[12.5px] leading-relaxed text-mute">{H.empty}</p>
+        // the whole card is empty → the one empty state of the app (fills the row beside the challenges)
+        <EmptyState title={H.emptyTitle} text={H.empty} line={false} className="flex-1" />
       ) : (
         <div className="grid gap-2">
           <div className="grid gap-[3px] text-[9.5px] text-faint" style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }} aria-hidden="true">

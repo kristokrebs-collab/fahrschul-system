@@ -46,9 +46,10 @@ Phones: one column in the same order, no horizontal scroll at 390 px. Every cell
   (`goalActual` of the reports domain). "Plan übernehmen" pins the plan (`settings.coach.plan`) and creates the goals
   (`addGoalFromDraft`, P08); "Neuen Vorschlag übernehmen" when the pinned plan differs from today's analysis; "Plan lösen".
 - **Timeline** (`TimelineCard.tsx`): every detected behaviour, newest first, grouped by day, filter chips with counts
-  (`aria-pressed`), rows open the trade, 30 per page.
+  (`aria-pressed`), rows open the trade, 6 per page (ends with the plan beside it), „Ältere anzeigen“ pages on.
 - **Profil** (`ProfileCard.tsx`): Personal Trading Intelligence – strengths, weaknesses, best time / asset / setup, the
-  traits orbiting (`OrbitSpread`, focusable group). Under 10 trades an empty state.
+  traits orbiting (`OrbitSpread`, focusable group) around „Du.“ – the headline stands once, above the trait list; under
+  `sm` the ring rests without its cards (the list carries every value). Under 10 trades an empty state.
 
 ## Watcher, trade panel, state
 - `CoachWatcher.tsx`: **`useCoachWatch()` / `CoachWatcher`** – after a save, `coachAlert` (pure, domain) compares the

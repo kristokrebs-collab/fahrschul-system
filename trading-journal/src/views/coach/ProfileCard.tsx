@@ -2,7 +2,8 @@
  * Behaviour profile – "Personal Trading Intelligence" (P04): style, direction, best session, weakest day, strongest
  * setup, risk per trade, tempo, the edge and the most expensive pattern, all measured from the journal. The traits
  * fan out into an elliptical ring once the card is in view (`OrbitSpread`: depth scale, pointer drift, ←/→ turn it)
- * – the plain trait list next to it carries the same facts for small screens and screen readers.
+ * – the plain trait list next to it carries the same facts for small screens and screen readers. The headline stands
+ * once (above the list); the ring's centre is only „Du.“, and under `sm` the ring rests without its cards.
  */
 import type { BehaviorProfile, ProfileTrait } from "@/domain/coach";
 import { cn } from "@/lib/cn";
@@ -51,10 +52,15 @@ export function ProfileCard({ profile, className }: { profile: BehaviorProfile; 
           </dl>
         </div>
         <div className="min-w-0 overflow-hidden rounded-2xl border border-line">
-          <OrbitSpread label="Dein Profil als Ring" listLabel="Eigenschaften" items={orbit.map((t) => <OrbitTrait key={t.id} t={t} />)}>
-            <span className="text-[5cqw] font-semibold leading-none tracking-[-0.06em] text-fg">Du.</span>
-            {/* the caption sits on an ink backing: a back card passing behind it never runs through the words */}
-            <span className="relative z-20 max-w-[60cqw] rounded-full bg-ink-950/85 px-[1.2cqw] py-[0.4cqw] text-[max(10px,1.5cqw)] text-white/60">{profile.headline}</span>
+          {/* the centre says only „Du.“ – the headline stands once, above the table (P2-07); on a phone the satellites
+              would be cut to „EMOTION…“ and only repeat the table: there the ring rests as a calm picture */}
+          <OrbitSpread
+            label="Dein Profil als Ring"
+            listLabel="Eigenschaften"
+            items={orbit.map((t) => <OrbitTrait key={t.id} t={t} />)}
+            className="max-sm:aspect-[2/1] max-sm:[&>ul]:hidden"
+          >
+            <span className="text-[5cqw] font-semibold leading-none tracking-[-0.06em] text-fg max-sm:pt-[3cqh] max-sm:text-[9cqw]">Du.</span>
           </OrbitSpread>
         </div>
       </div>

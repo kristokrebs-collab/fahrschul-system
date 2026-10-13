@@ -5,6 +5,7 @@ import { RevealGroup, RevealItem } from "@/motion/Reveal";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
+import { EmptyState } from "@/primitives/EmptyState";
 import { Skeleton } from "@/primitives/Skeleton";
 import { isStripeUrl } from "../api";
 import { formatDay, formatMoney } from "../format";
@@ -23,6 +24,8 @@ export function BillingCard({ className }: { className?: string }) {
   const busy = useBilling((s) => s.busy);
   const hasCustomer = !!account?.hasCustomer;
   const invoices = account?.invoices ?? null;
+  // Premium / Pro without an own subscription = a seat of a team plan (the plan card says "Über den Team-Tarif …")
+  const seatMember = !!account && !account.subscription && !!account.plan && account.plan.plan !== "free";
 
   // once per user: an answer without invoices (Stripe down) must not trigger the next request
   const asked = useRef<string | null>(null);
@@ -46,7 +49,13 @@ export function BillingCard({ className }: { className?: string }) {
             <Skeleton className="h-9 w-full" />
           </div>
         ) : !hasCustomer ? (
-          <p className="text-[13px] text-mute">{BILLING_CARD.noCustomer}</p>
+          // the whole card is empty → the one empty state (fills the row beside the plan card); a team seat has a plan
+          // but no invoices of its own – it says so instead of "sobald du ein Abo hast"
+          seatMember ? (
+            <EmptyState title={BILLING_CARD.seatTitle} text={BILLING_CARD.seat} line={false} className="flex-1" />
+          ) : (
+            <EmptyState title={BILLING_CARD.noCustomerTitle} text={BILLING_CARD.noCustomer} line={false} className="flex-1" />
+          )
         ) : (
           <div className="grid gap-4">
             {invoices === null ? (

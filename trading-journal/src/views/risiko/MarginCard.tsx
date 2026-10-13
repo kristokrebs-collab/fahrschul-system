@@ -3,6 +3,7 @@
  * `LiquidGauge` (red from 50 %) plus the split per venue. Without an exchange connection (P11
  * `useHasExchangeConnection`) an honest empty state: no fake numbers.
  */
+import { DotUnit } from "@/primitives/DotUnit";
 import type { ExposureReport } from "@/domain/risk";
 import { useHasExchangeConnection } from "@/exchanges/positions";
 import { LiquidGauge } from "@/motion/fx";
@@ -32,8 +33,11 @@ export function MarginCard({ ex, capital, cur }: { ex: ExposureReport; capital: 
       <div className="grid gap-4">
         <LiquidGauge value={Math.min(1, load)} danger={MARGIN_DANGER} shape="round" label={S.load} valueText={`${pct(load, 0)} ${S.load}`} className="mx-auto size-36">
           <span className="grid justify-items-center gap-0.5">
-            <span className="dot-num text-[26px] leading-none">{Math.round(load * 100)}%</span>
-            <span className="label !text-[9px]">{S.load}</span>
+            <span className="dot-num text-[26px] leading-none">
+              {Math.round(load * 100)}
+              <DotUnit>%</DotUnit>
+            </span>
+            <span className="label !text-[9.5px]">{S.load}</span>
           </span>
         </LiquidGauge>
         <div className="grid grid-cols-2 gap-3">

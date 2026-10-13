@@ -4,6 +4,7 @@
  * best": the most frequent pattern gets the headline (count in dot digits, its cost in R, one red `SpotlightSweep`
  * across the card once), the others are compact rows with 8 weekly bars that rise on first view. All quiet = said so.
  */
+import { DotUnit } from "@/primitives/DotUnit";
 import { motion } from "motion/react";
 import { useRef } from "react";
 import { topTracker, trackerLine, type Tracker } from "@/domain/psych";
@@ -57,7 +58,10 @@ export function TrackersCard({ trackers, className }: { trackers: readonly Track
                 <span className="text-[12px] text-mute">{top.hint}</span>
               </div>
               <div className="flex items-end gap-3">
-                <span className="dot-num text-[40px] leading-none text-signal">{top.count}×</span>
+                <span className="dot-num text-[40px] leading-none text-signal">
+                  {top.count}
+                  <DotUnit>×</DotUnit>
+                </span>
                 <Bars weekly={top.weekly} tone="signal" />
               </div>
             </div>

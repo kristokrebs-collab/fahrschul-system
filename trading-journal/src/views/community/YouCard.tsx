@@ -1,4 +1,5 @@
 import { themePaint } from "@/lib/themePaint";
+import { DotUnit } from "@/primitives/DotUnit";
 import { useId } from "react";
 import { cn } from "@/lib/cn";
 import { NumberCascade } from "@/motion/fx/NumberCascade";
@@ -30,7 +31,8 @@ function Figure({ metric, value, active }: { metric: SocialMetric; value: number
           <>
             <span className="sr-only">{isR ? fmtR(value) : fmtPct(value)}</span>
             <span aria-hidden="true">
-              <NumberCascade value={value} decimals={isR ? 2 : 0} signed={isR} suffix={isR ? "R" : "%"} />
+              <NumberCascade value={value} decimals={isR ? 2 : 0} signed={isR} />
+              <DotUnit>{isR ? "R" : "%"}</DotUnit>
             </span>
           </>
         )}
@@ -105,7 +107,16 @@ export function YouCard({ className }: { className?: string }) {
           <div className="grid justify-items-center gap-1.5" data-testid="you-percentile">
             <RingGauge value={pct == null ? null : pct / 100} marker={hasDist ? 0.5 : null} size={124} stroke={8} passColor={themePaint("#3ddc84")} aria-label={pct == null ? YOU.percentileTitle : YOU.percentile(pct)}>
               <span className="grid justify-items-center">
-                <span className="dot-num text-[26px] leading-none">{pct == null ? "–" : <NumberCascade value={pct} suffix="%" />}</span>
+                <span className="dot-num text-[26px] leading-none">
+                  {pct == null ? (
+                    "–"
+                  ) : (
+                    <>
+                      <NumberCascade value={pct} />
+                      <DotUnit>%</DotUnit>
+                    </>
+                  )}
+                </span>
                 <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-faint">{YOU.percentileTitle}</span>
               </span>
             </RingGauge>

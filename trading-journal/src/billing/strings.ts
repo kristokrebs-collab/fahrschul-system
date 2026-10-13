@@ -36,7 +36,11 @@ export const PLAN_CARD = {
 export const BILLING_CARD = {
   title: "Rechnungen",
   empty: "Noch keine Rechnungen.",
+  noCustomerTitle: "Noch keine Rechnungen",
   noCustomer: "Rechnungen erscheinen hier, sobald du ein Abo hast.",
+  /** a seat of a team plan (Premium through the group's team, no own subscription) – never "sobald du ein Abo hast" */
+  seatTitle: "Keine eigenen Rechnungen",
+  seat: "Dein Tarif läuft über das Team deiner Gruppe – die Rechnungen bekommt der Inhaber.",
   open: "Ansehen",
   pdf: "PDF",
   paymentMethod: "Zahlungsmittel ändern",

@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
+import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
 import { WACHSTUM } from "./strings";
@@ -84,16 +85,9 @@ export function MoodCard({ factors, cur, className }: { factors: readonly PsychF
           <p className="text-[10.5px] text-faint">Korrelation (Rang) ρ = {f.rho == null ? "–" : f.rho.toFixed(2).replace(".", ",").replace("-", "−")} · Muster, kein Beweis.</p>
         </div>
       ) : (
-        <div className="grid gap-2" data-testid="mood-empty">
-          <p className="text-[13px] leading-relaxed text-mute">{WACHSTUM.psyche.noFactor}</p>
-          <div className="flex items-center gap-2">
-            <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-              <span className="block h-full origin-left rounded-full bg-fg/70" style={{ transform: `scaleX(${Math.min(1, covered / MIN_FACTOR_N)})` }} />
-            </span>
-            <span className="num font-mono text-[11px] text-faint">
-              {Math.min(covered, MIN_FACTOR_N)}/{MIN_FACTOR_N} Tage
-            </span>
-          </div>
+        // the whole card waits for check-ins → the empty state with the honest progress line („3 / 8 Tage“)
+        <div className="flex flex-1 flex-col" data-testid="mood-empty">
+          <EmptyState title={WACHSTUM.psyche.noFactorTitle} text={WACHSTUM.psyche.noFactor} line={progressLine(covered, MIN_FACTOR_N, "Tage")} className="flex-1" />
         </div>
       )}
     </Card>

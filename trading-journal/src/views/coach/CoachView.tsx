@@ -60,7 +60,7 @@ export function CoachView({ className }: { className?: string }) {
         action={<Segmented<AccFilter> aria-label="Konto des Coachs" options={ACC_OPTIONS} value={c.acc} onChange={setAcc} size="sm" className={SEG_TOUCH} />}
       />
       <Cell index={0} span="lg:col-span-12">
-        <HeroCard lesson={c.lesson} tips={c.tips} score={c.score} headline={c.profile.headline} />
+        <HeroCard lesson={c.lesson} tips={c.tips} score={c.score} />
       </Cell>
       <Cell index={0} span="lg:col-span-7">
         <ChatCard data={data} enriched={view.list} aiNotes={c.prefs.aiNotes} />

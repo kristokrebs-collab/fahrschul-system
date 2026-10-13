@@ -5,6 +5,7 @@
  * text – zero React renders while dragging. Only when the shock crosses a liquidation does React render: that row
  * dissolves (`DissolveOut`) and comes back when the slider returns. Presets glide the value (`spring.smooth`).
  */
+import { DotUnit } from "@/primitives/DotUnit";
 import { animate, motion, useMotionValue, useMotionValueEvent, useTransform, type MotionValue } from "motion/react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { liquidationShock, scenarioAt, scenarioCurve, SCENARIO_MAX, shockLeg, type ScenarioLeg } from "@/domain/risk";
@@ -19,7 +20,9 @@ import { RiskCard, money, pct } from "./ui";
 const S = RISIKO.scenario;
 const H = 150;
 const PRESETS = [-0.2, -0.1, 0, 0.1, 0.2];
-const shockText = (s: number) => `${s > 0 ? "+" : s < 0 ? "−" : "±"}${(Math.abs(s) * 100).toFixed(1).replace(".", ",")} %`;
+/** The shock as a figure (`−30,0`) – the Doto number; its unit stays beside it in Plex Sans (`DotUnit`). */
+const shockNum = (s: number) => `${s > 0 ? "+" : s < 0 ? "−" : "±"}${(Math.abs(s) * 100).toFixed(1).replace(".", ",")}`;
+const shockText = (s: number) => `${shockNum(s)} %`;
 
 function LegPnl({ leg, shock, cur }: { leg: ScenarioLeg; shock: MotionValue<number>; cur: string }) {
   const text = useTransform(shock, (s) => money(shockLeg(leg, s).pnl, cur, true));
@@ -79,7 +82,7 @@ export function ScenarioCard({ legs, equity, cur }: { legs: readonly ScenarioLeg
   });
   const pnlText = useTransform(shock, (s) => money(scenarioAt(legs, s, equity).pnl, cur, true));
   const eqText = useTransform(shock, (s) => money(scenarioAt(legs, s, equity).equityAfter, cur));
-  const sText = useTransform(shock, shockText);
+  const sText = useTransform(shock, shockNum);
 
   useMotionValueEvent(shock, "change", (s) => {
     const el = input.current;
@@ -115,9 +118,10 @@ export function ScenarioCard({ legs, equity, cur }: { legs: readonly ScenarioLeg
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="grid gap-1">
             <span className="label !text-[10px]">{S.slider}</span>
-            <motion.span className="dot-num text-[30px] leading-none" data-testid="scenario-shock">
-              {sText}
-            </motion.span>
+            <span className="dot-num text-[30px] leading-none" data-testid="scenario-shock">
+              <motion.span>{sText}</motion.span>
+              <DotUnit> %</DotUnit>
+            </span>
           </div>
           <div className="grid gap-1 text-right">
             <span className="label !text-[10px]">{S.pnl}</span>

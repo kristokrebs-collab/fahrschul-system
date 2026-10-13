@@ -26,6 +26,8 @@ export const PREISE = {
   freeNote: "für immer",
   recommended: "Beliebt",
   current: "Dein Tarif",
+  /** the own column's pill on a phone (a 44-px column) */
+  currentShort: "Du",
   ctaFree: "Kostenlos starten",
   ctaFreeSignedIn: "Im Free-Tarif",
   ctaTrial: (days: number) => (days > 0 ? `${days} Tage gratis testen` : "Abonnieren"),

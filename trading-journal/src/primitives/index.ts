@@ -11,6 +11,7 @@ export { Badge, badgeTone, type BadgeProps, type BadgeTone } from "@/primitives/
 export { CheckboxRow, type CheckboxRowProps } from "@/primitives/CheckboxRow";
 export { EmptyState, type EmptyStateProps } from "@/primitives/EmptyState";
 export { Label, type LabelProps } from "@/primitives/Label";
+export { DotUnit } from "@/primitives/DotUnit";
 export { StatTile, type StatTileProps } from "@/primitives/StatTile";
 export { Expander, Collapse, type ExpanderProps, type CollapseProps } from "@/primitives/Expander";
 export { RingGauge, crossing, type RingGaugeProps } from "@/primitives/RingGauge";

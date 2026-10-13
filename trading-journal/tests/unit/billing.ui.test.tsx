@@ -7,7 +7,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BillingStatus, SubscriptionSummary } from "@/billing/contract";
 import { resetBilling, useBilling } from "@/billing/store";
-import { BillingBanner, BillingHost, LimitMeter, PlanCard, UpgradeTeaser } from "@/billing/ui";
+import { BillingBanner, BillingCard, BillingHost, LimitMeter, PlanCard, UpgradeTeaser } from "@/billing/ui";
 import { setCloudEnabledForTests } from "@/cloud/env";
 import { resetCloudSession, useCloudSession } from "@/cloud/session";
 import { MotionRoot } from "@/motion/MotionRoot";
@@ -123,6 +123,24 @@ describe("PlanCard", () => {
     wrap(<PlanCard />);
     expect(screen.getByRole("button", { name: "Kündigung zurücknehmen" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Vertrag hier kündigen" })).toBeNull();
+  });
+});
+
+describe("BillingCard", () => {
+  it("no invoices of its own: a team seat says who gets them, a free account when they appear (P2-08)", async () => {
+    useCloudSession.setState({ phase: "signedIn", user: USER });
+    // Premium through the group's team: a plan, no own subscription, no Stripe customer
+    useBilling.setState({ config: CONFIG, account: { ...ACCOUNT(null, { plan: "premium", status: "active", trialEnd: null }), hasCustomer: false } });
+    const seat = wrap(<BillingCard />);
+    const card = screen.getByTestId("billing-card");
+    expect(card).toHaveTextContent("Keine eigenen Rechnungen");
+    expect(card).toHaveTextContent("die Rechnungen bekommt der Inhaber");
+    expect(card).not.toHaveTextContent("sobald du ein Abo hast");
+    seat.unmount();
+    useBilling.setState({ config: CONFIG, account: ACCOUNT(null) });
+    wrap(<BillingCard />);
+    expect(screen.getByTestId("billing-card")).toHaveTextContent("Noch keine Rechnungen");
+    expect(screen.getByTestId("billing-card")).toHaveTextContent("Rechnungen erscheinen hier, sobald du ein Abo hast.");
   });
 });
 

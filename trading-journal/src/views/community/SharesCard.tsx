@@ -7,6 +7,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
+import { EmptyState } from "@/primitives/EmptyState";
 import { Skeleton } from "@/primitives/Skeleton";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
@@ -67,7 +68,7 @@ export function SharesCard({ className }: { className?: string }) {
   const chosen = setups.some((s) => s.id === setup) ? setup : (setups[0]?.id ?? "");
   return (
     <Card title={SHARE.myLinks} className={cn("h-full", className)} data-testid="shares-card">
-      <div className="grid gap-4">
+      <div className="flex flex-1 flex-col gap-4">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => openShare({ kind: "stats" })} data-testid="share-stats">
             <Glyph name="share" className="size-3.5" />
@@ -88,7 +89,8 @@ export function SharesCard({ className }: { className?: string }) {
             <Skeleton className="h-12" />
           </div>
         ) : list.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line-2 px-4 py-6 text-center text-[13px] text-mute">{SHARE.linksEmpty}</p>
+          // the list is what the card is for → the one empty state (fills the row beside the feedback card)
+          <EmptyState title={SHARE.linksEmptyTitle} text={SHARE.linksEmpty} line={false} className="min-h-[132px] flex-1" />
         ) : (
           <ul className="grid gap-1.5">
             <AnimatePresence initial={false}>

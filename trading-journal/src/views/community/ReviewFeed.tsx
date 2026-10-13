@@ -7,6 +7,7 @@ import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
+import { EmptyState } from "@/primitives/EmptyState";
 import { Input } from "@/primitives/Input";
 import { Sheet } from "@/motion/Sheet";
 import { useEnriched } from "@/store/journalStore";
@@ -277,9 +278,9 @@ export function ReviewFeed({ group, reviews, focusId }: { group: GroupDetail; re
         </Button>
       </div>
       {reviews.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-line-2 px-4 py-8 text-center text-[13px] leading-relaxed text-mute" data-testid="feed-empty">
-          {FEED.empty}
-        </p>
+        <div data-testid="feed-empty">
+          <EmptyState title={FEED.emptyTitle} text={FEED.empty} line={false} />
+        </div>
       ) : (
         <AnimatePresence initial={false}>
           {reviews.map((r, i) => (

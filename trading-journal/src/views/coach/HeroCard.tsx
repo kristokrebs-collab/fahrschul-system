@@ -85,7 +85,7 @@ const SCORE_TONE = (v: number | null) => (v == null ? "text-faint" : v >= 75 ? "
 const LABEL_TONE = (l: TradingScore["label"]) => (l === "Stark" ? "border-win/30 text-win" : l === "Kritisch" ? "border-loss/30 text-loss" : "border-line-2 text-mute");
 
 /** The trading score as the hero's one big number (cascades in), the unit muted in Plex Sans, the verdict as a pill. */
-export function ScoreHero({ score, headline, className }: { score: TradingScore; headline?: string; className?: string }) {
+export function ScoreHero({ score, className }: { score: TradingScore; className?: string }) {
   const num = "dot-num text-[clamp(56px,13vw,96px)] leading-none";
   return (
     <div className={cn("grid min-w-0 gap-2", className)} data-testid="coach-score">
@@ -93,13 +93,11 @@ export function ScoreHero({ score, headline, className }: { score: TradingScore;
         <span className="label">Trading-Score</span>
         <span className={cn("rounded-full border px-2.5 py-0.5 font-mono text-[11px] tracking-wide", LABEL_TONE(score.label))}>{score.label}</span>
       </div>
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <span className="flex items-baseline gap-2">
-          {score.score == null ? <span className={cn(num, "text-faint")}>–</span> : <NumberCascade value={score.score} decimals={0} className={cn(num, SCORE_TONE(score.score))} />}
-          <span className="font-sans text-lg font-medium text-mute">/ 100</span>
-        </span>
-        {headline && <span className="max-w-[28ch] pb-1 text-[12px] leading-snug text-mute sm:text-right">{headline}</span>}
-      </div>
+      {/* the profile headline lives in „Dein Profil“ only (it stood here, in the orbit and above the table – P2-07) */}
+      <span className="flex items-baseline gap-2">
+        {score.score == null ? <span className={cn(num, "text-faint")}>–</span> : <NumberCascade value={score.score} decimals={0} className={cn(num, SCORE_TONE(score.score))} />}
+        <span className="font-sans text-lg font-medium text-mute">/ 100</span>
+      </span>
     </div>
   );
 }
@@ -145,12 +143,12 @@ export function ScoreParts({ score, className }: { score: TradingScore; classNam
   );
 }
 
-export function HeroCard({ lesson, tips, score, headline, className }: { lesson: WeeklyLesson; tips: readonly string[]; score: TradingScore; headline: string; className?: string }) {
+export function HeroCard({ lesson, tips, score, className }: { lesson: WeeklyLesson; tips: readonly string[]; score: TradingScore; className?: string }) {
   return (
     <Card className={className} data-testid="coach-hero" innerClassName="!p-0">
       <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-10">
         <div className="grid min-w-0 content-start gap-5">
-          <ScoreHero score={score} headline={headline} />
+          <ScoreHero score={score} />
           <Lesson lesson={lesson} />
           {tips.length > 0 && (
             <div className="flex min-w-0 items-center gap-2.5 border-t border-line pt-3.5">

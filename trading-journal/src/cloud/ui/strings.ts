@@ -188,7 +188,12 @@ export const PRIVACY_CARD = {
   leaderboard: "In der Rangliste erscheinen",
   leaderboardHelp: "Nur Kennzahlen wie Win-Rate, nie einzelne Trades.",
   needsAccount: "Nur mit Konto",
+  toDataHint: "Deine Daten gehören dir.",
+  toData: "Exportieren oder löschen",
 } as const;
+
+/** Anchor of „Deine Daten“ (Datenschutz → „Daten exportieren oder löschen ↓“ scrolls there). */
+export const DATA_CARD_ID = "konto-deine-daten";
 
 export const DATA_CARD = {
   title: "Deine Daten",

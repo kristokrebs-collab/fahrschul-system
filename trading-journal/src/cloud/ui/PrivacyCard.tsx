@@ -5,11 +5,12 @@ import { Switch } from "@/motion/Switch";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
+import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { setPrivacy, usePrivacy, type PrivacyPrefs } from "../privacy";
 import { cloudEnabled } from "../env";
 import { useCloudSession } from "../session";
-import { PRIVACY_CARD } from "./strings";
+import { DATA_CARD_ID, PRIVACY_CARD } from "./strings";
 
 interface Row {
   key: keyof PrivacyPrefs;
@@ -45,7 +46,7 @@ export function PrivacyCard({ className }: { className?: string }) {
   return (
     <Card title={PRIVACY_CARD.title} className={className}>
       <p className="mb-4 text-[13px] leading-relaxed text-mute">{PRIVACY_CARD.intro}</p>
-      <ul className="grid gap-2">
+      <ul className={cn("grid gap-2", signedIn && "mb-4")}>
         {ROWS.map((r, i) => {
           const disabled = !!r.account && !signedIn;
           const on = prefs[r.key] && !disabled;
@@ -77,6 +78,24 @@ export function PrivacyCard({ className }: { className?: string }) {
           );
         })}
       </ul>
+      {signedIn && (
+        // the card floor (Sicherheit beside it is taller): the way to export / delete, like the Community footer
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+          <span className="text-[11.5px] text-faint">{PRIVACY_CARD.toDataHint}</span>
+          <Button size="sm" variant="ghost" onClick={() => toDataCard(reduced)} data-testid="privacy-to-data">
+            {PRIVACY_CARD.toData}
+            <span aria-hidden="true">↓</span>
+          </Button>
+        </div>
+      )}
     </Card>
   );
+}
+
+/** Scrolls to „Deine Daten“ (export, backups, delete) and moves the focus there – no route change (hash routing). */
+function toDataCard(reduced: boolean): void {
+  const el = document.getElementById(DATA_CARD_ID);
+  if (!el) return;
+  el.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  el.focus({ preventScroll: true });
 }

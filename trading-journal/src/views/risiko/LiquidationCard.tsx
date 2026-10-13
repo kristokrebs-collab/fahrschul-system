@@ -4,6 +4,7 @@
  * closer the liquidation is (scaleX on first view, `spring.enter`, staggered). Every computed price says "Näherung";
  * a liquidation in front of the stop is flagged.
  */
+import { DotUnit } from "@/primitives/DotUnit";
 import { motion } from "motion/react";
 import { useRef } from "react";
 import { liquidationPrice, type MaintTier } from "@/domain/risk";
@@ -96,7 +97,8 @@ export function LiquidationCard({ rows, planned }: { rows: readonly LiqRow[]; pl
               <div className="grid gap-1">
                 <span className="label !text-[10px]">{S.nearest}</span>
                 <span className={cn("dot-num text-[34px] leading-none", nearest.distPct < 0.05 ? "text-loss" : "text-fg")}>
-                  <NumberCascade value={nearest.distPct * 100} decimals={1} suffix=" %" />
+                  <NumberCascade value={nearest.distPct * 100} decimals={1} />
+                  <DotUnit> %</DotUnit>
                 </span>
               </div>
               <span className="max-w-[16rem] text-right text-[11.5px] text-mute">{nearest.label}</span>

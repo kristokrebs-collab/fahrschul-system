@@ -15,6 +15,7 @@ import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { Card } from "@/primitives/Card";
+import { EmptyState } from "@/primitives/EmptyState";
 import { useUi } from "@/store/uiStore";
 import { WACHSTUM } from "./strings";
 import { MoodGlyph } from "./ui";
@@ -128,7 +129,7 @@ export function DiaryCard({ days, className }: { days: readonly DiaryDay[]; clas
   return (
     <Card title={WACHSTUM.psyche.diary} note={total ? `Die letzten ${total} Einträge · ziehen oder abspielen` : undefined} className={className} data-testid="growth-diary" data-n={total}>
       {total === 0 ? (
-        <p className="text-[12.5px] leading-relaxed text-mute">{WACHSTUM.psyche.diaryEmpty}</p>
+        <EmptyState title={WACHSTUM.psyche.diaryEmptyTitle} text={WACHSTUM.psyche.diaryEmpty} line={false} className="flex-1" />
       ) : (
         // a new entry starts a fresh timeline (playhead on the newest day)
         <Timeline key={`${total}:${shown[total - 1]!.key}`} shown={shown} />

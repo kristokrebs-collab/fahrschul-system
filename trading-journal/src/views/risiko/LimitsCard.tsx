@@ -5,6 +5,7 @@
  * error `StatusPill` whose ring runs to `endsAt` ("Pause · mm:ss" on `nowMv`, zero renders per second) with a
  * `HoldConfirm` "Limit überschreiben" (hold = do it, a tap asks inline). Only the strongest warnings are listed.
  */
+import { DotUnit } from "@/primitives/DotUnit";
 import { themePaint } from "@/lib/themePaint";
 import { AnimatePresence, motion, useTransform } from "motion/react";
 import { useEffect, useState } from "react";
@@ -45,16 +46,18 @@ function PauseLabel({ endsAt }: { endsAt: number }) {
   return <motion.span className="num font-mono">{text}</motion.span>;
 }
 
-function ringCentre(r: LimitRow): string {
-  if (r.unit === "count") return `${r.used}/${r.limit}`;
-  if (r.unit === "x") return r.used > 0 ? `${String(Math.round(r.used * 10) / 10).replace(".", ",")}×` : "0×";
-  return `${Math.round(Math.min(r.ratio, 9.99) * 100)}%`;
+/** The ring's centre: the figure in Doto, its unit (`×`, `%`) beside it in Plex Sans (`DotUnit`). */
+function ringCentre(r: LimitRow): { n: string; unit: string } {
+  if (r.unit === "count") return { n: `${r.used}/${r.limit}`, unit: "" };
+  if (r.unit === "x") return { n: r.used > 0 ? String(Math.round(r.used * 10) / 10).replace(".", ",") : "0", unit: "×" };
+  return { n: String(Math.round(Math.min(r.ratio, 9.99) * 100)), unit: "%" };
 }
 
 const STATE_TEXT: Record<LimitRow["state"], string> = { ok: "text-mute", warn: "text-warn", breach: "text-loss" };
 
 function LimitRing({ r, warnAt, index }: { r: LimitRow; warnAt: number; index: number }) {
   const reduced = useReducedFx();
+  const centre = ringCentre(r);
   return (
     <motion.li
       className="grid min-w-0 justify-items-center gap-1.5 rounded-xl border border-line bg-ink-950/40 px-2 pb-2.5 pt-3 text-center"
@@ -65,7 +68,10 @@ function LimitRing({ r, warnAt, index }: { r: LimitRow; warnAt: number; index: n
       transition={{ ...spring.enter, delay: reduced ? 0 : Math.min(index, stagger.max) * stagger.reveal }}
     >
       <RingGauge value={Math.min(1, r.ratio)} marker={warnAt} size={92} stroke={8} color="var(--color-gauge-ink, #cfcfcf)" passColor={SIGNAL} aria-label={`${r.label}: ${r.detail}`}>
-        <span className={cn("dot-num text-[15px] leading-none", r.state === "breach" ? "text-loss" : "text-fg")}>{ringCentre(r)}</span>
+        <span className={cn("dot-num text-[15px] leading-none", r.state === "breach" ? "text-loss" : "text-fg")}>
+          {centre.n}
+          {centre.unit && <DotUnit>{centre.unit}</DotUnit>}
+        </span>
       </RingGauge>
       <span className="label !text-[9.5px]">{r.label}</span>
       <span className={cn("line-clamp-2 text-[10.5px] leading-snug", STATE_TEXT[r.state])}>{r.detail}</span>
@@ -118,7 +124,10 @@ export function LimitsCard({ report, now, warnings: all }: { report: LimitReport
           <div className="grid content-start gap-2" data-testid="limit-day" data-state={day.state}>
             <LiquidGauge value={Math.min(1, day.ratio)} danger={report.limits.warnAt} label={S.dayGauge} valueText={`${pct(day.ratio, 0)} vom Tageslimit`} className="h-32 w-full sm:h-48">
               <span className="grid justify-items-center gap-0.5 text-center">
-                <span className={cn("dot-num text-[34px] leading-none", day.state === "breach" ? "text-loss" : "text-fg")}>{Math.round(Math.min(day.ratio, 9.99) * 100)}%</span>
+                <span className={cn("dot-num text-[34px] leading-none", day.state === "breach" ? "text-loss" : "text-fg")}>
+                  {Math.round(Math.min(day.ratio, 9.99) * 100)}
+                  <DotUnit>%</DotUnit>
+                </span>
                 <span className="num font-mono text-[11px] text-mute">{day.used > 0 ? money(-day.used, report.currency) : money(0, report.currency)}</span>
               </span>
             </LiquidGauge>

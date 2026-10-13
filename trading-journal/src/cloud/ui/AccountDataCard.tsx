@@ -19,7 +19,7 @@ import { agoLabel } from "../device";
 import { ensureCloud } from "../runtime";
 import { openAuthSheet, useCloudSession } from "../session";
 import { PixelDissolve } from "./PixelDissolve";
-import { AUDIT_LABELS, DATA_CARD } from "./strings";
+import { AUDIT_LABELS, DATA_CARD, DATA_CARD_ID } from "./strings";
 import { useTick } from "./SyncStatusCard";
 
 interface BackupItem {
@@ -58,7 +58,7 @@ export function AccountDataCard({ className }: { className?: string }) {
   if (!signedIn && !dissolving) return null;
   return (
     <PixelDissolve active={dissolving} onDone={() => setDissolving(false)} className="h-full rounded-2xl">
-      <Card title={DATA_CARD.title} className={className}>
+      <Card title={DATA_CARD.title} className={cn("scroll-mt-24 outline-none", className)} id={DATA_CARD_ID} tabIndex={-1}>
         <p className="mb-4 text-[13px] leading-relaxed text-mute">{DATA_CARD.intro}</p>
         <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
           <div className="grid content-start gap-6">

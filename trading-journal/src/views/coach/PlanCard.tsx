@@ -93,7 +93,7 @@ export function PlanCard({ plan, list, events, settings, now, className }: { pla
       {items.length === 0 ? (
         <EmptyState title="Noch kein Plan" text="Sobald der Coach Muster mit genug Belegen findet, schlägt er hier drei Schritte vor." line={false} />
       ) : (
-        <div className="grid gap-4">
+        <div className="flex flex-1 flex-col gap-4">
           {!pinned && (
             <ul className="flex flex-wrap gap-1.5" aria-label="Konfidenz der Schritte">
               {plan.map((r, i) => (
@@ -105,7 +105,8 @@ export function PlanCard({ plan, list, events, settings, now, className }: { pla
             </ul>
           )}
           <MilestoneRail key={items.map((m) => m.id).join("|") + active} items={items} active={active} label={pinned ? "Gepinnter Plan" : "Vorgeschlagener Plan"} />
-          <div className="flex flex-wrap items-center gap-2">
+          {/* the action sits on the card floor (the timeline beside it is taller) */}
+          <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-4">
             {!pinned && (
               <Button variant="primary" onClick={() => void accept()} disabled={busy} data-testid="coach-plan-accept">
                 Plan übernehmen

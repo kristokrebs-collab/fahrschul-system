@@ -4,6 +4,7 @@
  * as columns rising from the baseline (scaleY, staggered). Weeks without data are gaps, never fake zeros; each panel
  * shows its change between the last 4 weeks and the 4 before.
  */
+import { DotUnit } from "@/primitives/DotUnit";
 import { motion } from "motion/react";
 import { useRef } from "react";
 import { seriesTrend, type WeekPoint } from "@/domain/growth";
@@ -29,7 +30,16 @@ function LinePanel({ title, points, pick, unit, scale = 1, testId }: { title: st
     <div className="grid min-w-0 content-start gap-2 rounded-2xl border border-line bg-ink-950/40 p-3.5" data-testid={testId} data-points={vals.length}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="label !text-[10px]">{title}</span>
-        <span className="dot-num text-[20px] leading-none">{last == null ? "–" : `${Math.round(last)}${unit}`}</span>
+        <span className="dot-num text-[20px] leading-none">
+          {last == null ? (
+            "–"
+          ) : (
+            <>
+              {Math.round(last)}
+              <DotUnit>{unit}</DotUnit>
+            </>
+          )}
+        </span>
       </div>
       {vals.length >= 2 ? <EquityDraw values={vals} height={74} tone={d != null && d < 0 ? "loss" : "win"} baseline={null} label={`${title}: ${vals.map((v) => Math.round(v)).join(", ")}`} /> : <div className="grid h-[74px] place-items-center text-[11px] text-faint">Noch zu wenig Wochen</div>}
       <span className={cn("text-[10.5px]", d == null ? "text-faint" : d > 0 ? "text-win" : d < 0 ? "text-loss" : "text-faint")}>{trendText(d == null ? null : d * scale, unit)}</span>

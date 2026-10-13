@@ -1,8 +1,8 @@
 /**
  * Behaviour timeline (P04): every event of the detectors, newest first, grouped by day – severity dot, the behaviour,
  * the evidence line and the triggering trade (opens the trade detail). Filter chips per behaviour with their count
- * (only behaviours that occurred). Rows cascade in once (`RevealGroup` / `RevealItem`); 30 per page, "ältere" loads
- * more. Read-only: the journal is the source, nothing here is stored.
+ * (only behaviours that occurred). Rows cascade in once (`RevealGroup` / `RevealItem`); 6 per page (the card sits beside
+ * the plan and ends with its row – Reihen-Regel), "Ältere anzeigen" loads 6 more. Read-only: the journal is the source, nothing here is stored.
  */
 import { useMemo, useState } from "react";
 import { BEHAVIOR_LABEL, BEHAVIOR_ORDER, triggerOf, type BehaviorEvent, type BehaviorKey } from "@/domain/coach";
@@ -17,7 +17,8 @@ import { openTrade } from "@/views/insights/ui";
 import { useCoachUi } from "./coachStore";
 import { SeverityDot } from "./ui";
 
-const PAGE = 30;
+/** newest six first: the timeline sits beside the plan (~330 px) and ends with it; „Ältere anzeigen“ pages on */
+const PAGE = 6;
 
 const dayLabel = (key: string): string => {
   const [y, m, d] = key.split("-").map(Number);

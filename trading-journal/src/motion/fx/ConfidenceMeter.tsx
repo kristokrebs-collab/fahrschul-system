@@ -91,7 +91,8 @@ export function ConfidenceMeter({ value, label = "Konfidenz", hideLabel = false,
       {showValue ? (
         <span aria-hidden="true" className={cn("dot-num inline-flex items-baseline text-[20px] leading-none", textTone)}>
           <RollingDigits value={v} />
-          <span className="ml-0.5 text-[0.7em] text-mute">%</span>
+          {/* the unit beside the Doto figure in Plex Sans, muted (Doto's „%“ is a checkerboard X) */}
+          <span className="ml-0.5 font-sans text-[0.7em] font-medium text-mute">%</span>
         </span>
       ) : null}
       {hideLabel ? null : (
