@@ -426,6 +426,11 @@ export interface BoxState {
   zone: "top" | "mid" | "bottom" | null;
   /** live candle beyond an edge, close pending */
   pending: 0 | 1 | -1;
+  /**
+   * After a close-confirmed breakout: the live candle is back inside the box, the close is pending. Only the CLOSE
+   * makes it a failed breakout (phase `failed`, fakeout setup) – a wick back in never does (Review MM-5).
+   */
+  pendingBack: boolean;
   targets: Target[];
   up: Target[];
   down: Target[];
@@ -443,7 +448,7 @@ export function boxState(bars: readonly Bar[], cfg: BoxCfg = DEFAULT_BOX_CFG, li
   const price = fin(live) ? live : n ? bars[n - 1]!.c : NaN;
   const A = n ? atrSeries(bars)[n - 1]! : 0;
   const levels = srLevels(bars, cfg);
-  const empty: BoxState = { boxes, levels, box: null, phase: "none", dir: 0, price, pos: null, zone: null, pending: 0, targets: [], up: [], down: [], barsSince: null, progress: null, atr: A };
+  const empty: BoxState = { boxes, levels, box: null, phase: "none", dir: 0, price, pos: null, zone: null, pending: 0, pendingBack: false, targets: [], up: [], down: [], barsSince: null, progress: null, atr: A };
   if (!boxes.length) return empty;
   const k = boxes.length - 1;
   const B = boxes[k]!;
@@ -473,14 +478,15 @@ export function boxState(bars: readonly Bar[], cfg: BoxCfg = DEFAULT_BOX_CFG, li
   const t1 = targets[0];
   const progress = t1 ? Math.max(0, Math.min(1, (price - edge) / (t1.price - edge || 1))) : null;
   const reached = !!t1 && (dir > 0 ? ext >= t1.price : ext <= t1.price);
-  const back = dir > 0 ? price < B.top - buf : price > B.bottom + buf;
+  // the LAST CLOSE is beyond the edge: the breakout stands until a close back inside (then `now === 0` above → failed);
+  // the live price back inside is only a pending re-entry, like `pending` for breakouts
+  const pendingBack = fin(live) && (dir > 0 ? live < B.top - buf : live > B.bottom + buf);
   let phase: BoxPhase;
   if (reached) phase = "target";
-  else if (back) phase = "failed";
   else {
     const recent = bars.slice(Math.max(brkI + 1, n - 3));
     const tested = recent.some((b) => (dir > 0 ? b.l <= B.top + buf * 2 && b.c > B.top : b.h >= B.bottom - buf * 2 && b.c < B.bottom));
     phase = tested && since >= 2 ? "retest" : since > 24 ? "running" : "breakout";
   }
-  return { ...base, phase, dir, targets, barsSince: since, progress };
+  return { ...base, phase, dir, targets, barsSince: since, progress, pendingBack };
 }

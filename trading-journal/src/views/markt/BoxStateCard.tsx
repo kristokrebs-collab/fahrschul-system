@@ -46,6 +46,8 @@ export function railIndex(phase: BoxPhase, pending: number): number {
 export function pillOf(v: BoxTfView): { tone: "live" | "warn" | "error" | "muted"; label: string } {
   const st = v.analysis?.box;
   if (!st || !st.box) return { tone: "muted", label: S.none };
+  // a wick back into the box after a close-confirmed breakout: only the close decides (MM-5)
+  if (st.pendingBack && st.phase !== "target") return { tone: "warn", label: S.pendingBack };
   if (st.phase === "breakout" || st.phase === "retest" || st.phase === "target") return { tone: "live", label: `${PHASE_LABEL[st.phase]} ${st.dir > 0 ? "↑" : "↓"}` };
   if (st.pending !== 0) return { tone: "warn", label: S.pending };
   if (st.phase === "failed") return { tone: "error", label: PHASE_LABEL.failed };

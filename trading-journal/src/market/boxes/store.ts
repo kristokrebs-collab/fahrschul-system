@@ -45,6 +45,7 @@ import {
   type RsiLineState,
   type TraderBias,
 } from "@/domain/boxes";
+import { sanitizeWhaleCfg } from "@/domain/signals/config";
 import { traderReading } from "@/domain/signals/traders";
 import type { Bar } from "@/domain/signals/indicators";
 import { useJournal } from "@/store/journalStore";
@@ -249,7 +250,10 @@ function livePrice(tf: BoxTf): number | undefined {
 function readBias(): TraderBias {
   const s = getTraderSeries();
   if (!s) return null;
-  return traderBiasOf(traderReading(s, {}, s.now));
+  // the user's whale settings: the box reason reads "Retail rot" exactly like the Einstiegs-Check (MM-4)
+  const signals = (useJournal.getState().settings as { signals?: { whale?: unknown } } | undefined)?.signals;
+  const whale = sanitizeWhaleCfg(signals?.whale);
+  return traderBiasOf(traderReading(s, { whale: { ...whale, on: true } }, s.now), whale);
 }
 
 function runLive(): void {

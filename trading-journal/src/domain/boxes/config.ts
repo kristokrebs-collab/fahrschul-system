@@ -5,6 +5,8 @@
  * the live store re-evaluates only on a real change. Also the Binance top-trader read the setups grade with
  * (`traderBiasOf`). Pure – no React, no I/O.
  */
+import { DEFAULT_WHALE_CFG, type WhaleCfg } from "../signals/config";
+import { deltaMet } from "../signals/traders";
 import { DEFAULT_BOX_CFG, type BoxCfg } from "./engine";
 import type { Grade, TraderBias } from "./setups";
 
@@ -146,18 +148,24 @@ export const gradePasses = (g: Grade, min: MinGrade): boolean => (min === "A+" ?
 export const BIAS_LONG_PCT = 55;
 
 /**
- * Binance top-trader read for the box setups: top traders (mean of positions and accounts) at ≥ 55 % long and the
- * Whale–Retail-Delta (top accounts − all accounts) not negative → `1`; ≤ 45 % long and the delta not positive → `−1`;
- * data but neither → `0`; no fresh Binance data → `null` (the setup reason then counts as not met, never as a fail).
+ * Binance top-trader read for the box setups, on the SAME "Retail rot / grün" rule as the Einstiegs-Check
+ * (`deltaMet`, user decision 2026-10-08 "Delta wie bei Hyblock"): top traders (mean of positions and accounts) at
+ * ≥ 55 % long AND the Whale–Retail-Delta negative (`< deltaRed`) or falling (`deltaChg ≤ −deltaFall`) → `1`; ≤ 45 %
+ * long and the delta positive or rising → `−1`; data but neither → `0`; no fresh Binance data → `null` (the setup
+ * reason then counts as not met, never as a fail). No delta reading at all does not block the side (as before).
+ * `w` = the user's whale settings (`settings.signals.whale`), defaults otherwise.
  */
-export function traderBiasOf(r: { position: number | null; account: number | null; delta?: number | null } | null | undefined): TraderBias {
+export function traderBiasOf(
+  r: { position: number | null; account: number | null; delta?: number | null; deltaChg?: number | null } | null | undefined,
+  w: Pick<WhaleCfg, "deltaRed" | "deltaFall"> = DEFAULT_WHALE_CFG,
+): TraderBias {
   if (!r) return null;
   const vals = [r.position, r.account].filter((v): v is number => v != null && Number.isFinite(v));
   if (!vals.length) return null;
   const top = vals.reduce((s, v) => s + v, 0) / vals.length;
-  const delta = r.delta ?? null;
-  if (top >= BIAS_LONG_PCT && (delta == null || delta >= 0)) return 1;
-  if (top <= 100 - BIAS_LONG_PCT && (delta == null || delta <= 0)) return -1;
+  const retail = (side: "long" | "short") => deltaMet(side, r.delta ?? null, r.deltaChg ?? null, w) !== false;
+  if (top >= BIAS_LONG_PCT && retail("long")) return 1;
+  if (top <= 100 - BIAS_LONG_PCT && retail("short")) return -1;
   return 0;
 }
 

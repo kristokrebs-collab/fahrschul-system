@@ -48,8 +48,10 @@ export function bandItems(view: BoxesView, recent: readonly { id: string; title:
     const st = view.tfs[tf].analysis?.box;
     if (!st?.box) continue;
     const pending = st.pending !== 0 && (st.phase === "inside" || st.phase === "failed");
-    const tone: Tone = pending ? "warn" : st.dir > 0 && st.phase !== "failed" ? "win" : st.dir < 0 && st.phase !== "failed" ? "loss" : "mute";
-    out.push({ id: `p:${tf}`, text: `${BOX_TF_LABEL[tf]} · ${pending ? MARKT.state.pending : PHASE_LABEL[st.phase]}${st.dir !== 0 && st.phase !== "failed" ? (st.dir > 0 ? " ↑" : " ↓") : ""}`, tone });
+    const back = !!st.pendingBack && st.phase !== "target";
+    const tone: Tone = pending || back ? "warn" : st.dir > 0 && st.phase !== "failed" ? "win" : st.dir < 0 && st.phase !== "failed" ? "loss" : "mute";
+    const label = pending ? MARKT.state.pending : back ? MARKT.state.pendingBack : PHASE_LABEL[st.phase];
+    out.push({ id: `p:${tf}`, text: `${BOX_TF_LABEL[tf]} · ${label}${st.dir !== 0 && st.phase !== "failed" ? (st.dir > 0 ? " ↑" : " ↓") : ""}`, tone });
   }
   for (const b of view.best) out.push({ id: `s:${b.id}`, text: `${b.setup.grade} · ${b.setup.title} · ${BOX_TF_LABEL[b.tf]}`, tone: b.setup.side === "long" ? "win" : "loss" });
   for (const r of recent) out.push({ id: `a:${r.id}`, text: r.title, tone: r.tone === "fg" ? "mute" : r.tone });

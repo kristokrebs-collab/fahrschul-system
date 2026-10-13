@@ -132,7 +132,7 @@ describe("diagonal RSI lines", () => {
 
 describe("setups – trade the best", () => {
   const base = (over: Partial<BoxState>): BoxState => ({
-    boxes: [], levels: [], phase: "inside", dir: 0, price: 100, pos: 0.1, zone: "bottom", pending: 0, targets: [], up: [], down: [], barsSince: null, progress: null, atr: 1,
+    boxes: [], levels: [], phase: "inside", dir: 0, price: 100, pos: 0.1, zone: "bottom", pending: 0, pendingBack: false, targets: [], up: [], down: [], barsSince: null, progress: null, atr: 1,
     box: { i0: 0, i1: 50, formedAt: 20, t0: 0, t1: 50, top: 110, topIn: 109, bottom: 100, bottomIn: 101, mid: 105, height: 10, atr: 1, touchesTop: 3, touchesBottom: 3, sweeps: 1, brk: 0, brkI: null, quality: 80, grade: "stark" },
     ...over,
   });
@@ -168,5 +168,55 @@ describe("setups – trade the best", () => {
     expect(a.box.box).not.toBeNull();
     expect(a.rsi).not.toBeNull();
     for (const s of a.setups) expect(["A+", "A", "B", "C"]).toContain(s.grade);
+  });
+});
+
+describe("close-only rule after a breakout (Review MM-5)", () => {
+  /** A clean 'stark' range 99.9 … 110.1 (16-bar swings) after a lead-in, then one close 1 ATR above the top. */
+  function rangeThenBreakout(): { bars: Bar[]; top: number; atr: number } {
+    const bars: Bar[] = [];
+    let t = 1_700_000_000;
+    for (let i = 0; i < 30; i++) {
+      const c = 80 + i * 0.7;
+      bars.push({ t: (t += 14_400), o: c - 0.3, h: c + 0.6, l: c - 0.8, c });
+    }
+    for (let i = 0; i < 96; i++) {
+      const m = 105 + 4.2 * Math.sin((i / 16) * 2 * Math.PI);
+      bars.push({ t: (t += 14_400), o: m - 0.2, h: m + 0.9, l: m - 0.9, c: m + 0.2 });
+    }
+    const B = findBoxes(bars).at(-1)!;
+    expect(B.grade).toBe("stark");
+    expect(B.brk).toBe(0);
+    const c = B.top + B.atr;
+    bars.push({ t: t + 14_400, o: B.top - 0.2, h: c + 0.3, l: B.top - 0.4, c });
+    return { bars, top: B.top, atr: B.atr };
+  }
+
+  it("a wick back into the box keeps the close-confirmed breakout (pending re-entry), no fakeout setup before a close", () => {
+    const { bars, top, atr } = rangeThenBreakout();
+    expect(boxState(bars).phase).toBe("breakout");
+    const wick = top - 0.5 * atr;
+    const st = boxState(bars, DEFAULT_BOX_CFG, wick);
+    expect(st.phase).toBe("breakout");
+    expect(st.dir).toBe(1);
+    expect(st.pendingBack).toBe(true);
+    expect(st.pending).toBe(0);
+    const a = analyzeBoxes({ tf: "4h", bars, live: wick, bias: -1 })!;
+    expect(a.setups.some((s) => s.kind === "fakeout")).toBe(false);
+    expect(a.setups.some((s) => s.kind === "breakout" && s.side === "long")).toBe(true);
+    // the live price beyond the top again: nothing pending
+    expect(boxState(bars, DEFAULT_BOX_CFG, top + atr).pendingBack).toBe(false);
+  });
+
+  it("a CLOSE back inside makes it a failed breakout with a fakeout setup", () => {
+    const { bars, top, atr } = rangeThenBreakout();
+    const last = bars.at(-1)!;
+    const back = top - 0.5 * atr;
+    bars.push({ t: last.t + 14_400, o: last.c, h: last.c + 0.2, l: back - 0.3, c: back });
+    const st = boxState(bars);
+    expect(st.phase).toBe("failed");
+    expect(st.pendingBack).toBe(false);
+    const a = analyzeBoxes({ tf: "4h", bars, bias: -1 })!;
+    expect(a.setups.some((s) => s.kind === "fakeout" && s.side === "short")).toBe(true);
   });
 });

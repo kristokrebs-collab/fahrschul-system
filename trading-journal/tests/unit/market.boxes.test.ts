@@ -5,6 +5,8 @@
  * trade snapshot resolver (live / retro). Real BTCUSDT bars (fixtures), a real provider on the synthetic Binance of the
  * net harness.
  */
+import { deltaMet } from "@/domain/signals/traders";
+import { DEFAULT_WHALE_CFG } from "@/domain/signals/config";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import btc4h from "./fixtures/binance-btcusdt-4h.json";
 import btc1d from "./fixtures/binance-btcusdt-1d.json";
@@ -141,12 +143,24 @@ describe("domain: settings.boxes, bias, snapshot, key", () => {
     expect(boxesCfgKey(boxesCfgOf(next))).not.toBe(boxesCfgKey(boxesCfgOf(raw)));
   });
 
-  it("traderBiasOf: long-heavy with a non-negative delta, short-heavy mirrored, else neutral; no data → null", () => {
+  it("traderBiasOf reads 'Retail rot / grün' exactly like the Einstiegs-Check (deltaMet): long-heavy with a negative or falling delta, short-heavy with a positive or rising one, else neutral; no data → null (MM-4)", () => {
     expect(traderBiasOf(null)).toBeNull();
     expect(traderBiasOf({ position: null, account: null })).toBeNull();
-    expect(traderBiasOf({ position: 62, account: 58, delta: 4 })).toBe(1);
-    expect(traderBiasOf({ position: 62, account: 58, delta: -2 })).toBe(0);
-    expect(traderBiasOf({ position: 40, account: 42, delta: -3 })).toBe(-1);
+    // the review's probe: top 66 % long, delta −3,5 pp → Retail rot → long (was neutral); delta +2 pp → not long (was long)
+    expect(traderBiasOf({ position: 66, account: 66, delta: -3.5 })).toBe(1);
+    expect(deltaMet("long", -3.5, null, DEFAULT_WHALE_CFG)).toBe(true);
+    expect(traderBiasOf({ position: 66, account: 66, delta: 2 })).toBe(0);
+    expect(deltaMet("long", 2, null, DEFAULT_WHALE_CFG)).toBe(false);
+    // a positive delta that FELL by ≥ deltaFall still counts as Retail rot
+    expect(traderBiasOf({ position: 62, account: 58, delta: 2, deltaChg: -1.5 })).toBe(1);
+    // short mirrored: positive delta (Retail grün) or rising
+    expect(traderBiasOf({ position: 40, account: 42, delta: 3 })).toBe(-1);
+    expect(traderBiasOf({ position: 40, account: 42, delta: -3 })).toBe(0);
+    expect(traderBiasOf({ position: 40, account: 42, delta: -3, deltaChg: 2 })).toBe(-1);
+    // the user's thresholds count (deltaRed −2: a delta of −1 is not red enough)
+    expect(traderBiasOf({ position: 66, account: 66, delta: -1 }, { deltaRed: -2, deltaFall: 1 })).toBe(0);
+    // no delta reading does not block the side; flat top traders stay neutral
+    expect(traderBiasOf({ position: 62, account: 58 })).toBe(1);
     expect(traderBiasOf({ position: 50, account: 51 })).toBe(0);
   });
 

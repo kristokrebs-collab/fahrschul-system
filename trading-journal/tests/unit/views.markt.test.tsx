@@ -203,6 +203,8 @@ describe("Markt helpers", () => {
     const a = v.analysis!;
     expect(pillOf({ ...v, analysis: { ...a, box: { ...a.box, pending: 1 } } }).tone).toBe("warn");
     expect(pillOf({ ...v, analysis: { ...a, box: { ...a.box, phase: "breakout", dir: 1 } } })).toMatchObject({ tone: "live", label: "Ausbruch ↑" });
+    // MM-5: a wick back into the box after a close-confirmed breakout is a pending close, never "Fehlausbruch"
+    expect(pillOf({ ...v, analysis: { ...a, box: { ...a.box, phase: "breakout", dir: 1, pendingBack: true } } })).toMatchObject({ tone: "warn", label: "Kurs zurück in der Box – Schluss abwarten" });
     expect(pillOf({ ...v, analysis: null }).tone).toBe("muted");
   });
 

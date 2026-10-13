@@ -47,6 +47,7 @@ export const MARKT = {
     pos: "Position",
     closeIn: "Kerzenschluss in",
     pending: "Kurs außerhalb – Schluss abwarten",
+    pendingBack: "Kurs zurück in der Box – Schluss abwarten",
     none: "Noch keine saubere Box.",
     targetsUp: "Ziele oben",
     targetsDown: "Ziele unten",
