@@ -45,7 +45,8 @@ test("row click → TradeDetail morph, `Bearbeiten` → prefilled editor", async
   const detail = page.getByRole("dialog", { name: "Trade-Details" });
   await expect(detail).toBeVisible();
   await expect(detail.getByText("Einstieg")).toBeVisible();
-  await expect(detail.getByText("Checkliste")).toBeVisible();
+  // the detail's own section label (P14: the coach panel in the detail lists a "Checkliste" figure too)
+  await expect(detail.locator(".label", { hasText: /^Checkliste$/ }).first()).toBeVisible();
   await screenshot(page, info, "trade-detail");
   const entry = (await detail.locator("dt", { hasText: "Einstieg" }).locator("xpath=following-sibling::dd[1]").textContent()) ?? "";
 

@@ -40,12 +40,24 @@ export interface SeedOptions extends MockMarketOptions {
    * device (`tj2-report-ready`) – specs that are not about the reports never have the wipe over their page.
    */
   reportReady?: boolean;
+  /**
+   * Let the P08 post-trade review open by itself after a closed trade was saved (a sheet over the page). By default the
+   * automatic prompt is off on this device (`tj2-growth-review` `{ auto: false }`, the sheet's own switch) – specs that
+   * save closed trades for other reasons never get the sheet in their way.
+   */
+  reviewPrompt?: boolean;
 }
 
 /** The finished tour (`storageKey("onboarding")` of both editions). */
 export const ONBOARDING_DONE: Record<string, string> = {
   "tj2-onboarding": JSON.stringify({ status: "done", at: "", v: 1 }),
   "tj2share-onboarding": JSON.stringify({ status: "done", at: "", v: 1 }),
+};
+
+/** The automatic post-trade review switched off (`storageKey("growth-review")` of both editions). */
+export const REVIEW_PROMPT_OFF: Record<string, string> = {
+  "tj2-growth-review": JSON.stringify({ auto: false }),
+  "tj2share-growth-review": JSON.stringify({ auto: false }),
 };
 
 /**
@@ -75,7 +87,7 @@ function lageOff(extra: Record<string, unknown>, empty: boolean): Record<string,
  */
 export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
   await mockMarket(page, opts.scenario ?? "live", opts);
-  const given = { ...(opts.firstRun ? {} : ONBOARDING_DONE), ...(opts.extra ?? {}) };
+  const given = { ...(opts.firstRun ? {} : ONBOARDING_DONE), ...(opts.reviewPrompt ? {} : REVIEW_PROMPT_OFF), ...(opts.extra ?? {}) };
   const extra = (opts.lage ?? !opts.synth) ? given : lageOff(given, !!opts.empty);
   await page.addInitScript(
     ({ fx, extra, announce }) => {

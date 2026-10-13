@@ -31,7 +31,7 @@ test("reduced motion: every page and overlay renders, nothing stays invisible", 
     ["settings", "Einstellungen"],
   ] as const) {
     await page.goto(`/#${hash}`);
-    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
     // no element of the page body is stuck at opacity 0 / visibility hidden
     const stuck = await page.evaluate(() => {
       const out: string[] = [];
@@ -89,7 +89,7 @@ test("mobile 390×844: dock reachable, bottom sheet, cards, readable hero, no ho
   await expectNoHorizontalScroll(page);
 
   await dock.getByRole("button", { name: "Einstellungen" }).click();
-  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   await expectNoHorizontalScroll(page);
   await screenshot(page, info, "mobile-settings");
   expect(errors, errors.join("\n")).toEqual([]);
@@ -132,12 +132,13 @@ test("keyboard: Tab reaches the dock, Enter opens the editor, Escape closes it a
   // Tab through the dock: focus the first dock tab, then Tab along the toolbar to the FAB
   await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Übersicht" }).focus();
   const labels: string[] = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 7; i++) {
     labels.push(await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? ""));
     if (labels[labels.length - 1] === "Trade eintragen") break;
     await page.keyboard.press("Tab");
   }
-  expect(labels).toEqual(["Übersicht", "Trades", "Entscheidungsgrundlagen", "Einstellungen", "Trade eintragen"]);
+  // P14: the dock carries five tabs (Markt joined), then the FAB
+  expect(labels).toEqual(["Übersicht", "Trades", "Entscheidungsgrundlagen", "Markt", "Einstellungen", "Trade eintragen"]);
   await expect(fab).toBeFocused();
   await page.keyboard.press("Enter");
   const editor = page.getByRole("dialog", { name: "Trade eintragen" });

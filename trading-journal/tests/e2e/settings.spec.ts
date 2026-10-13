@@ -10,7 +10,7 @@ import { collectErrors, expectNoHorizontalScroll, fixture, isMobile, screenshot,
 
 async function gotoSettings(page: import("@playwright/test").Page) {
   await page.goto("/#settings");
-  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
 }
 
 test("Startkapital → `Speichern` → toast, hero subline shows the new capital", async ({ page }, info) => {
@@ -111,7 +111,7 @@ test("the unsaved bar fits the phone width after an in-app navigation (no horizo
   await page.goto("/#overview");
   await expect(page.getByTestId("market-panel")).toBeVisible();
   await page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Einstellungen" }).click();
-  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   await page.locator("#s-makro").fill("12345");
   const discard = page.getByRole("button", { name: "Verwerfen" });
   await expect(discard).toBeVisible();

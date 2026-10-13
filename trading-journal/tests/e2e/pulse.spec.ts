@@ -12,7 +12,7 @@ async function gotoOverview(page: Page) {
 
 async function gotoSettings(page: Page) {
   await page.goto("/#settings");
-  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
 }
 
 test("command navigation: Ctrl+K opens, Escape closes, the menu button opens it and gets focus back", async ({ page }) => {

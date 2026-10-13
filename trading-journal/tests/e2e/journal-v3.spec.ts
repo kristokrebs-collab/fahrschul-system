@@ -216,8 +216,9 @@ test("detail: execution facts, fills rail, MAE / MFE from the market, a chart dr
   await gotoTrades(page);
   await openTrade(page, "t_v3short");
   const d = detail(page);
-  await expect(d.getByText("Haltedauer")).toBeVisible();
-  await expect(d.getByText("10 Std")).toBeVisible();
+  // the detail's own facts come first (P14: the coach panel further down lists the hold time too)
+  await expect(d.getByText("Haltedauer").first()).toBeVisible();
+  await expect(d.getByText("10 Std").first()).toBeVisible();
   await expect(d.getByText("Perp · Bitunix · Haupt")).toBeVisible();
   await expect(d.getByRole("list", { name: "Fills der Position" })).toBeVisible();
   // MAE / MFE: measured on demand (or already by the idle backfill)

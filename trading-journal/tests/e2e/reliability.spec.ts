@@ -64,7 +64,7 @@ test.describe("data reliability", () => {
     const req = requestLog();
     await seed(page, { onRequest: req.onRequest });
     await page.goto("/#settings");
-    await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
     const live = page.getByText("Live-Daten", { exact: true }).first();
     await live.scrollIntoViewIfNeeded();
     const card = page.locator("section, div").filter({ has: page.getByText("Gesamtstatus", { exact: true }) }).last();

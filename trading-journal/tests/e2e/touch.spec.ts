@@ -95,7 +95,7 @@ test("toast: a half swipe springs back, a sideways flick dismisses it before its
   touchOnly(info);
   await seed(page);
   await page.goto("/#settings");
-  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   const island = toast(page);
   const card = island.getByRole("button").first();
   const kit = await touchKit(page);

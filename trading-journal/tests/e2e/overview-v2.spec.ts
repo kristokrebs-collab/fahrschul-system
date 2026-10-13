@@ -37,7 +37,7 @@ test.describe("Übersicht v2", () => {
     expect(s?.market?.shortTrigger).toBe(95_000);
     // the settings still edit it, with the new help text
     await page.goto("/#settings");
-    await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
     await expect(page.getByText("Nur SHORT-Linie im Chart · Übersicht ohne Short-Trigger")).toBeVisible();
     expect(errors, errors.join("\n")).toEqual([]);
   });

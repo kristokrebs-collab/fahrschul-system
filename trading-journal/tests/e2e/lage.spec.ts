@@ -76,7 +76,7 @@ test.describe("Lage-Ampel", () => {
     await expect(dialog).toHaveCount(0);
 
     await page.goto("/#settings");
-    await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
     const daily = page.locator("td", { hasText: /^Kerzen 1D/ });
     await daily.scrollIntoViewIfNeeded();
     await expect(daily).toBeVisible({ timeout: 15_000 });

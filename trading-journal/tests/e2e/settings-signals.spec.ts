@@ -13,7 +13,7 @@ const LIVE_PRICE = 84_199;
 
 async function gotoSettings(page: Page) {
   await page.goto("/#settings");
-  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
 }
 
 async function save(page: Page) {
@@ -95,7 +95,7 @@ test("Einstiegs-Check card: ladder, confirmation and the Top-Trader-Kombi are sa
 
   // reload: the card shows the stored values
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   await expect(card.getByRole("button", { name: "Stufe 2h", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(whale.locator("#s-sgWhaleTop")).toHaveValue("70");
   await expect(whale.getByRole("radiogroup", { name: /Delta-Fenster/ }).getByRole("radio", { name: "2h", exact: true })).toHaveAttribute("aria-checked", "true");

@@ -128,8 +128,8 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P08-psych-growth-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-async function open(page: Page, s: GrowthSeed | null): Promise<void> {
-  await seed(page, s ? { extra: { "tj2-trades": s.trades, "tj2-days": s.days, "tj2-settings": s.settings } } : { empty: true });
+async function open(page: Page, s: GrowthSeed | null, opts: { reviewPrompt?: boolean } = {}): Promise<void> {
+  await seed(page, s ? { ...opts, extra: { "tj2-trades": s.trades, "tj2-days": s.days, "tj2-settings": s.settings } } : { ...opts, empty: true });
   await openRoute(page, URL_, "Wachstum");
 }
 
@@ -320,7 +320,8 @@ test.describe("Wachstum", () => {
 
   test("Post-Trade-Review: offene Reviews und automatische Frage nach dem Schließen", async ({ page }, info) => {
     const errors = collectErrors(page);
-    await open(page, growthSeed(Date.now()));
+    // this test is about the automatic prompt: it stays on (the seed switches it off for every other spec)
+    await open(page, growthSeed(Date.now()), { reviewPrompt: true });
     await page.getByTestId("growth-review-open").click();
     const review = page.getByTestId("post-trade-review");
     await expect(review).toBeVisible();

@@ -40,7 +40,7 @@ test("Backup importieren: the other version's backup keeps signal, mistakes, sig
   const errors = collectErrors(page);
   await seed(page);
   await page.goto("/#settings");
-  await expect(page.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   const dir = mkdtempSync(join(tmpdir(), "tj-other-"));
   const file = join(dir, "trade-journal-2026-10-03.json");
   writeFileSync(file, JSON.stringify(otherBackup()));
@@ -121,7 +121,7 @@ test("two tabs: a trade saved in A and settings saved in the stale tab B both su
   const b = await context.newPage();
   await seed(b);
   await b.goto("/#settings");
-  await expect(b.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(b.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   // B starts editing before A saves anything
   await b.locator("#s-makro").fill("33333");
 
@@ -150,7 +150,7 @@ test("two tabs: a trade saved in A and settings saved in the stale tab B both su
 
   // A (stale settings) saves a different setting: B's capital stays
   await a.goto("/#settings");
-  await expect(a.getByRole("heading", { name: "Einstellungen" })).toBeVisible();
+  await expect(a.getByRole("heading", { level: 1, name: "Einstellungen" })).toBeVisible();
   await expect(a.locator("#s-makro")).toHaveValue("33333");
   await a.locator("#s-scalp").fill("7777");
   await a.getByRole("button", { name: "Speichern", exact: true }).first().click();

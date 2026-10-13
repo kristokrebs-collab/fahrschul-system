@@ -259,8 +259,10 @@ test.describe("Markt · Box zu Box", () => {
     });
     expect(stored?.watchlist).not.toContain("DOGEUSDT");
     expect(stored?.minGrade).toBe("A+");
-    // every listed setup now is A+
-    for (const g of await page.getByTestId("best-setup").evaluateAll((els) => els.map((e) => e.getAttribute("data-grade")))) expect(g).toBe("A+");
+    // every listed setup now is A+ (an A card that is still playing its exit leaves the DOM a moment later)
+    await expect
+      .poll(async () => (await page.getByTestId("best-setup").evaluateAll((els) => els.map((e) => e.getAttribute("data-grade")))).filter((g) => g !== "A+"), { timeout: 5_000 })
+      .toEqual([]);
     await shot(page, info, "settings");
     if (isMobile(info)) await expectNoHorizontalScroll(page);
     expect(errors).toEqual([]);
