@@ -60,11 +60,11 @@ function RuinCurve({ winRate, payoff, ruinAt, risk, halfKelly }: { winRate: numb
         ))}
         {hk > 0 && (
           <span aria-hidden="true" className="absolute inset-y-0 border-l border-dashed border-white/40" style={{ left: `${(hk / CURVE.length) * 100}%` }}>
-            <span className="absolute -top-0.5 left-1 whitespace-nowrap font-mono text-[9px] text-mute">½ Kelly</span>
+            <span className="absolute -top-0.5 left-1 whitespace-nowrap font-mono text-[9.5px] text-mute">½ Kelly</span>
           </span>
         )}
       </div>
-      <div className="grid text-center font-mono text-[9px] text-faint" style={{ gridTemplateColumns: `repeat(${CURVE.length}, minmax(0, 1fr))` }} aria-hidden="true">
+      <div className="grid text-center font-mono text-[9.5px] text-faint" style={{ gridTemplateColumns: `repeat(${CURVE.length}, minmax(0, 1fr))` }} aria-hidden="true">
         {CURVE.map((f, i) => (
           <span key={f} className={cn(i === near && "text-fg", i % 2 === 1 && i !== near && "max-sm:invisible")}>
             {riskLabel(f).replace(" %", "")}

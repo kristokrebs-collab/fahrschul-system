@@ -404,7 +404,7 @@ function Tick({ x, tone, label, inline }: { x: number; tone: "win" | "loss" | "f
   return (
     <span className={cn("grid justify-items-center gap-0.5", !inline && "absolute top-1/2 -translate-x-1/2 -translate-y-[30%]")} style={inline ? undefined : { left: `${x}%` }}>
       <span className={cn("size-2 rounded-full", color)} />
-      <span className={cn("font-mono text-[9px] leading-none", text)}>{label}</span>
+      <span className={cn("font-mono text-[9.5px] leading-none", text)}>{label}</span>
     </span>
   );
 }

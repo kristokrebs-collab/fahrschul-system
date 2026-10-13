@@ -6,6 +6,7 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import { useJournal } from "@/store/journalStore";
 import { DEFAULT_TRADE_EXTRA, DEFAULT_TRADE_FILTER, DEFAULT_TRADE_SORT, loadPrefs, useUi } from "@/store/uiStore";
 import { TradesView } from "@/views/trades";
+import { SignalBadge } from "@/views/trades/tradeCells";
 import { ANY_MISTAKE, NO_MISTAKE, filterExtra, listKey, mistakeFilterTags, mistakesOf, signalOf, strengthKey } from "@/views/trades/tradesModel";
 import { SAMPLE, settings } from "./domain.fixtures";
 
@@ -132,5 +133,15 @@ describe("uiStore additions", () => {
     useUi.getState().openDetail("A", "insights");
     expect(useUi.getState().detailTempo).toBe(0);
     expect(useUi.getState().detail.source).toBe("insights");
+  });
+});
+
+describe("SignalBadge", () => {
+  it("without a stored check: the table keeps its placeholder, a card shows nothing (no lone dot after „Check 7/7“, P2-13)", () => {
+    const { unmount } = render(<SignalBadge t={{}} />);
+    expect(screen.getByRole("img", { name: "Kein Einstiegs-Check gespeichert" })).toBeInTheDocument();
+    unmount();
+    const card = render(<SignalBadge t={{}} hideEmpty />);
+    expect(card.container).toBeEmptyDOMElement();
   });
 });

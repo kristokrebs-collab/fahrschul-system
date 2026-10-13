@@ -31,7 +31,7 @@ export function HeatmapCard({ view, cur }: { view: AccountView; cur: string }) {
         <div className="grid gap-3">
           <div className="grid grid-cols-[1.6rem_minmax(0,1fr)] gap-x-1.5 gap-y-1">
             <span aria-hidden="true" />
-            <div className="grid grid-cols-12 text-center font-mono text-[9px] text-faint" aria-hidden="true">
+            <div className="grid grid-cols-12 text-center font-mono text-[9.5px] text-faint" aria-hidden="true">
               {HEAT_HOURS.map((h, i) => (
                 <span key={h} className={cn(i % 2 === 1 && "max-sm:invisible")}>
                   {h}

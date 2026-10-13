@@ -206,7 +206,7 @@ function ColHead({ title, right }: { title: string; right: string }) {
   return (
     <div className="mb-1 flex items-center justify-between gap-2">
       <span className="label !text-[9.5px] !tracking-[0.12em]">{title}</span>
-      <span className="label !text-[9px] !tracking-[0.1em] !text-faint">{right}</span>
+      <span className="label !text-[9.5px] !tracking-[0.1em] !text-faint">{right}</span>
     </div>
   );
 }

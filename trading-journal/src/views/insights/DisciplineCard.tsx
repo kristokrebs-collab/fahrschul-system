@@ -120,7 +120,7 @@ function HeatMap({ days, today, selected, onSelect, onOpen }: { days: readonly D
   return (
     <div className="grid min-w-0 gap-1.5">
       <div className="flex gap-2">
-        <div className="grid shrink-0 grid-rows-[12px_1fr] gap-1 text-[9px] leading-none text-faint" aria-hidden="true">
+        <div className="grid shrink-0 grid-rows-[12px_1fr] gap-1 text-[9.5px] leading-none text-faint" aria-hidden="true">
           <span />
           <div className="grid grid-rows-7" style={{ rowGap: HEAT.gap }}>
             {WEEKDAYS.map((w, i) => (
@@ -237,7 +237,7 @@ function ScoreTrend({ points, avg, selected }: { points: readonly TrendPoint[]; 
       <div ref={root} aria-hidden="true" className="relative h-[76px]">
         {/* 80 % streak line + 0 baseline */}
         <span className="absolute inset-x-0 border-t border-dashed border-(--color-chart-ref)" style={{ bottom: `${STREAK_MIN}%` }} />
-        <span className="absolute left-0 -translate-y-full pb-0.5 font-mono text-[9px] leading-none text-faint" style={{ bottom: `${STREAK_MIN}%` }}>
+        <span className="absolute left-0 -translate-y-full pb-0.5 font-mono text-[9.5px] leading-none text-faint" style={{ bottom: `${STREAK_MIN}%` }}>
           {STREAK_MIN} %
         </span>
         <span className="absolute inset-x-0 bottom-0 h-px bg-line" />

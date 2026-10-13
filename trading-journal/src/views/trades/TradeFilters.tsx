@@ -59,6 +59,9 @@ const SIDE_OPTIONS = [
 const DEBOUNCE_FILL: Transition = tween.debounce;
 const PILL_LAYOUT: Transition = { layout: spring.island };
 
+/** The result segment under `sm`: one full-width row, the options grow from their own width (never wrap) with tighter padding (P2-12). */
+const RESULT_ROW = "pointer-coarse:gap-y-5 max-sm:flex max-sm:w-full max-sm:flex-nowrap max-sm:[&>button]:flex-auto max-sm:[&>button]:justify-center max-sm:[&>button]:whitespace-nowrap max-sm:[&>button]:px-1";
+
 /**
  * Filter bar of `Alle Trades` (bundle `H$`, Plan 6.2): search (`Trades durchsuchen`, 150 ms debounce; a pulse
  * `Autocomplete` with grouped suggestions), setup select (pulse `MorphSelect`, `Alle Grundlagen` / setups / `Ohne
@@ -167,7 +170,8 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
           )}
         </AnimatePresence>
       </label>
-      <div className="w-[min(100%,272px)] min-w-[190px]">
+      {/* phone: the select spans the row like the search field above it (P2-12) */}
+      <div className="w-[min(100%,272px)] min-w-[190px] max-sm:w-full">
         <MorphSelect aria-label="Entscheidungsgrundlage" value={filter.setup} onChange={(setup) => onChange({ setup })} options={setupOptions} />
       </div>
       {extra && onExtraChange && (mistakeTags?.length ?? 0) > 0 && (
@@ -182,7 +186,8 @@ export function TradeFilters({ filter, onChange, setups, count, closed, suggesti
       )}
       <Segmented<"all" | AccountId> aria-label="Konto" size="sm" value={filter.acc} onChange={(acc) => onChange({ acc })} options={ACC_OPTIONS} />
       {/* wraps on a phone: a coarse-pointer row gap keeps the ±10 px tap bands of both rows apart */}
-      <Segmented aria-label="Ergebnis" size="sm" className="pointer-coarse:gap-y-5" value={filter.result} onChange={(result) => onChange({ result })} options={RESULT_OPTIONS} />
+      {/* phone: five results in ONE row across the width (tighter padding, equal share) – „Offen“ never wraps inside the pill (P2-12) */}
+      <Segmented aria-label="Ergebnis" size="sm" className={RESULT_ROW} value={filter.result} onChange={(result) => onChange({ result })} options={RESULT_OPTIONS} />
       <Segmented aria-label="Richtung" size="sm" value={filter.side} onChange={(side) => onChange({ side })} options={SIDE_OPTIONS} />
       <CountPill count={count} closed={closed} reduced={reduced} />
       {/* Journal v3 (P06): saved views, Top-Trades / ≥ 2 R, grouping switch and `Mehr Filter` (period, pair, venue, tags, ranges) */}

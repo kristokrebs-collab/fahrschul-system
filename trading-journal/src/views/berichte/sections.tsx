@@ -41,7 +41,8 @@ export function GroupTable({ rows, cur, label, unit = "money", mark }: { rows: r
       {rows.map((r) => (
         <div key={r.key} role="row" className="grid grid-cols-[minmax(0,1fr)_2.5rem_3.5rem_5.5rem] items-baseline gap-2 border-b border-line/60 py-1.5 last:border-b-0">
           <span role="cell" className="flex min-w-0 items-center gap-1.5 text-fg">
-            <span className={cn("truncate", mark?.[r.key] === "win" ? "text-win" : mark?.[r.key] === "loss" ? "text-loss" : undefined)}>{r.label}</span>
+            {/* long setup names wrap to a second line instead of „BSL/EQL Liquidity Sw…“ (P2-15) */}
+            <span className={cn("line-clamp-2 min-w-0 [overflow-wrap:anywhere]", mark?.[r.key] === "win" ? "text-win" : mark?.[r.key] === "loss" ? "text-loss" : undefined)}>{r.label}</span>
             {mark?.[r.key] && (
               <Badge tone={mark[r.key]} className="hidden shrink-0 sm:inline-flex">
                 {mark[r.key] === "win" ? "stärkstes" : "schwächstes"}
@@ -219,16 +220,31 @@ export function StrategyCard({ report, className }: { report: Report; className?
   if (s.best) mark[s.best.key] = "win";
   if (s.worst) mark[s.worst.key] = "loss";
   return (
-    <Card title="Strategie" note="Setups, Richtung und Session – Trade the best, fuck the rest." className={className} data-testid="report-strategy" innerClassName="grid content-start gap-4">
+    <Card title="Strategie" note="Setups, Richtung und Session – Trade the best, fuck the rest." className={className} data-testid="report-strategy" innerClassName="gap-4">
       {s.setups.length ? <GroupTable rows={s.setups} cur={cur} label="Setup" mark={mark} /> : <Empty text="Keine Setups in diesem Zeitraum." />}
       <div className="grid gap-4 sm:grid-cols-2">
         <GroupTable rows={s.sides} cur={cur} label="Richtung" />
         <GroupTable rows={s.sessions} cur={cur} label="Session" />
       </div>
-      {s.bestSession && s.bestSession.net > 0 && (
-        <p className="text-[12px] text-mute">
-          Beste Session: <span className="text-fg">{s.bestSession.label}</span> ({money(s.bestSession.net, cur)}, {s.bestSession.n} Trades)
-        </p>
+      {/* the verdict on the card floor – the Risiko card beside it is taller (Reihen-Regel, P2-14) */}
+      {(s.best || (s.bestSession && s.bestSession.net > 0)) && (
+        <div className="mt-auto grid gap-1 border-t border-line pt-3 text-[12px] text-mute" data-testid="report-strategy-verdict">
+          {s.best && (
+            <p>
+              Stärkstes Setup: <span className="text-win">{s.best.label}</span> ({money(s.best.net, cur)})
+              {s.worst && s.worst.key !== s.best.key && (
+                <>
+                  {" · "}Schwächstes: <span className="text-loss">{s.worst.label}</span> ({money(s.worst.net, cur)})
+                </>
+              )}
+            </p>
+          )}
+          {s.bestSession && s.bestSession.net > 0 && (
+            <p>
+              Beste Session: <span className="text-fg">{s.bestSession.label}</span> ({money(s.bestSession.net, cur)}, {s.bestSession.n} Trades)
+            </p>
+          )}
+        </div>
       )}
     </Card>
   );

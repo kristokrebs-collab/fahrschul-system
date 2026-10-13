@@ -53,7 +53,7 @@ export function FillsTimeline({ stats, className }: { stats: FillStats; classNam
               transition={reduced ? { duration: 0 } : { scale: { ...spring.pop, delay: xs[i]! * draw + Math.min(i, stagger.max) * stagger.rows }, opacity: { ...tween.fade, delay: xs[i]! * draw } }}
             >
               <span className={cn("size-[11px] rounded-full border-2 border-ink-850", tone)} />
-              <span className="font-mono text-[9px] leading-none text-faint">{SHORT[f.kind] ?? "·"}</span>
+              <span className="font-mono text-[9.5px] leading-none text-faint">{SHORT[f.kind] ?? "·"}</span>
             </motion.span>
           );
         })}

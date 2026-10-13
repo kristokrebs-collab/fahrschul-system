@@ -176,12 +176,13 @@ export function BerichteView({ className }: { className?: string }) {
             </Cell>
           )}
           {show("psychology") && (
-            <Cell index={0} span={focus === "all" ? "lg:col-span-6" : "lg:col-span-12"}>
+            // 7 / 5 like the rows above – the column gutter runs through (P2-14)
+            <Cell index={0} span={focus === "all" ? "lg:col-span-7" : "lg:col-span-12"}>
               <PsychCard report={report} />
             </Cell>
           )}
           {show("mistakes") && (
-            <Cell index={1} span={focus === "all" ? "lg:col-span-6" : "lg:col-span-12"}>
+            <Cell index={1} span={focus === "all" ? "lg:col-span-5" : "lg:col-span-12"}>
               <MistakesCard report={report} />
             </Cell>
           )}

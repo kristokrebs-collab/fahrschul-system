@@ -97,7 +97,7 @@ function StartCard({ label, index }: { label: string; index: number }) {
   // decorative illustration (no figures – nothing here pretends to be data)
   return (
     <div className="grid aspect-[16/10] content-between bg-ink-900 p-2.5">
-      <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-mute">{label}</span>
+      <span className="font-mono text-[9.5px] uppercase tracking-[0.14em] text-mute">{label}</span>
       <span className="grid grid-cols-6 gap-[3px]" aria-hidden="true">
         {Array.from({ length: 18 }, (_, i) => (
           <span key={i} className={cn("aspect-square rounded-full", (i * 7 + index * 5) % 4 === 0 ? (index === 3 ? "bg-signal" : "bg-fg") : "bg-white/10")} />

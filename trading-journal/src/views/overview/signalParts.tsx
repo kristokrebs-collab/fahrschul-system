@@ -611,7 +611,7 @@ export const Reasons = memo(function Reasons({ v }: { v: Verdict }) {
         <li key={r.text} className="flex items-start gap-2 text-[12.5px] leading-snug">
           <span
             aria-hidden="true"
-            className={cn("mt-px grid size-4 shrink-0 place-items-center rounded-full text-[9px] font-bold", r.ok ? "bg-win/20 text-win" : "bg-white/[0.06] text-faint")}
+            className={cn("mt-px grid size-4 shrink-0 place-items-center rounded-full text-[9.5px] font-bold", r.ok ? "bg-win/20 text-win" : "bg-white/[0.06] text-faint")}
           >
             {r.ok ? "✓" : "·"}
           </span>

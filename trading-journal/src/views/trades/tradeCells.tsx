@@ -72,8 +72,14 @@ export function CheckCount({ t }: { t: Pick<EnrichedTrade, "checked" | "items" |
 }
 
 /** Strength bars of the stored Einstiegs-Check (`Signal-Stärke n von 4`, a dot without one) – table `Check` cell / cards. */
-export function SignalBadge({ t, className }: { t: { signal?: unknown }; className?: string }) {
-  return <StrengthBars snap={signalOf(t)} className={className} />;
+/**
+ * The stored entry check's strength bars. Without a stored check the table keeps its placeholder (a column of its own);
+ * a card passes `hideEmpty` – there a lone dot after „Check 7/7“ reads like stray punctuation (P2-13).
+ */
+export function SignalBadge({ t, className, hideEmpty = false }: { t: { signal?: unknown }; className?: string; hideEmpty?: boolean }) {
+  const snap = signalOf(t);
+  if (!snap && hideEmpty) return null;
+  return <StrengthBars snap={snap} className={className} />;
 }
 
 /**

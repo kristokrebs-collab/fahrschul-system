@@ -205,7 +205,7 @@ const TradeCard = memo(function TradeCard({ t, index, insert, setups, listKey, s
             <span className="inline-flex items-center gap-1.5">
               <span className="text-faint">Check </span>
               <CheckCount t={t} />
-              <SignalBadge t={t} />
+              <SignalBadge t={t} hideEmpty />
             </span>
           </span>
         </div>

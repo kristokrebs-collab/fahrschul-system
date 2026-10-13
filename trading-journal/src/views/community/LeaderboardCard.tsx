@@ -23,12 +23,16 @@ import { Monogram } from "@/social/ui/Monogram";
 
 const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
 
-function Movement({ row }: { row: LeaderboardRow }) {
-  if (row.prevRank == null) return <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{BOARD.newEntry}</span>;
+/**
+ * The move against the previous night: `▲2` / `▼1` in its tone, `neu` for a first entry, NOTHING when the rank held
+ * (a lone `·` read like stray punctuation – P2-13). `small`: the phone form under the rank (9.5 px).
+ */
+function Movement({ row, small = false, className }: { row: LeaderboardRow; small?: boolean; className?: string }) {
+  if (row.prevRank == null) return <span className={cn("font-mono uppercase text-faint", small ? "text-[9.5px] tracking-[0.06em]" : "text-[10px] tracking-[0.12em]", className)}>{BOARD.newEntry}</span>;
   const d = row.prevRank - row.rank;
-  if (d === 0) return <span aria-hidden="true" className="text-faint">·</span>;
+  if (d === 0) return null;
   return (
-    <span className={cn("num font-mono text-[11px]", d > 0 ? "text-win" : "text-loss")} title={d > 0 ? BOARD.up(d) : BOARD.down(-d)}>
+    <span className={cn("num font-mono", small ? "text-[9.5px] leading-none" : "text-[11px]", d > 0 ? "text-win" : "text-loss", className)} title={d > 0 ? BOARD.up(d) : BOARD.down(-d)}>
       {d > 0 ? "▲" : "▼"}
       {Math.abs(d)}
     </span>
@@ -93,11 +97,17 @@ function Row({ row, metric, index, hover, pulse }: { row: LeaderboardRow; metric
     >
       <HoverPillFor store={hover} id={id} group="community-board" className="inset-y-0.5" />
       {row.me && <SpotlightSweep play={pulse} />}
-      <div className="relative z-10 grid grid-cols-[2.4rem_1.6rem_auto_minmax(0,1fr)_auto] items-center gap-2.5 px-2 py-2">
-        <span className="num text-right font-mono text-[13px] text-mute">
-          <TextRoll text={`#${row.rank}`} mode="roll" direction={row.prevRank != null && row.prevRank < row.rank ? "down" : "up"} />
+      {/* phone: no movement column (it cost the names their room) – the move sits small under the rank (P2-13) */}
+      <div className="relative z-10 grid grid-cols-[2rem_auto_minmax(0,1fr)_auto] items-center gap-2.5 px-2 py-2 sm:grid-cols-[2.4rem_1.6rem_auto_minmax(0,1fr)_auto]">
+        <span className="grid justify-items-end gap-0.5">
+          <span className="num text-right font-mono text-[13px] text-mute">
+            <TextRoll text={`#${row.rank}`} mode="roll" direction={row.prevRank != null && row.prevRank < row.rank ? "down" : "up"} />
+          </span>
+          <Movement row={row} small className="sm:hidden" />
         </span>
-        <Movement row={row} />
+        <span className="max-sm:hidden">
+          <Movement row={row} />
+        </span>
         <Monogram pseudonym={row.pseudonym} size="sm" tone={row.me ? "signal" : "fg"} />
         <span className="grid min-w-0">
           <span className={cn("truncate text-[13px]", row.me ? "font-semibold text-fg" : "text-fg")}>{row.me ? `${BOARD.you} · ${row.pseudonym}` : row.pseudonym}</span>

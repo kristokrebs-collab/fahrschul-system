@@ -34,7 +34,7 @@ function CurveThumb({ seed, win, label }: { seed: number; win?: boolean; label?:
         <polyline points={`0,90 ${pts} 160,90`} fill={`url(#preise-thumb-${seed})`} stroke="none" />
         <polyline points={pts} fill="none" stroke={tone} strokeWidth="1.6" vectorEffect="non-scaling-stroke" />
       </svg>
-      {label && <span className="absolute left-2 top-1.5 font-mono text-[9px] tracking-[0.1em] text-mute">{label}</span>}
+      {label && <span className="absolute left-2 top-1.5 font-mono text-[9.5px] tracking-[0.1em] text-mute">{label}</span>}
     </div>
   );
 }

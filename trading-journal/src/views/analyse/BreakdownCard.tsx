@@ -82,7 +82,8 @@ function Row({ b, r, i, domain, cur, open, onToggle }: { b: Breakdown; r: Breakd
         className="grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-2 py-2 text-left hover:bg-white/[0.03] sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_minmax(0,9rem)_auto]"
       >
         <span className="flex min-w-0 items-center gap-2">
-          <span className={cn("min-w-0 truncate text-[13px]", r === b.best ? "font-semibold text-fg" : "text-fg")}>
+          {/* long setup names wrap to a second line instead of „4H-Neckline-Short unter 84.5…“ (P2-15) */}
+          <span className={cn("line-clamp-2 min-w-0 text-[13px] leading-snug [overflow-wrap:anywhere]", r === b.best ? "font-semibold text-fg" : "text-fg")}>
             {klar ? (
               <TactileHighlight playOnView tab={false} padX={0.06} tone={m.mean != null && m.mean < 0 ? "signal" : "invert"}>
                 {r.label}

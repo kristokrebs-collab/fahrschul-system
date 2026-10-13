@@ -107,7 +107,7 @@ function Row({ tf, s }: { tf: BoxTf; s: RsiLineState | null }) {
       {s ? (
         <div className="flex items-center gap-3">
           <span className="grid justify-items-end">
-            <span className="label !text-[9px]">RSI</span>
+            <span className="label !text-[9.5px]">RSI</span>
             <span className="dot-num text-[20px] leading-none">{fmt.n1(s.last)}</span>
           </span>
           <Mini s={s} label={`RSI ${tf}: ${t.title}`} />

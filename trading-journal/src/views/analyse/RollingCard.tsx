@@ -165,9 +165,9 @@ export function RollingCard({ view, cur }: { view: AccountView; cur: string }) {
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-3">
             <Chart points={rep.points} metric={metric} overall={overall ?? null} time={time} />
             <div className="grid content-between justify-items-center gap-1" data-testid="rolling-vu">
-              <span className="label !text-[9px]">Ø R</span>
+              <span className="label !text-[9.5px]">Ø R</span>
               <DotMatrix meter={meter} signed rows={11} cols={9} size={3} gap={2} tone="win" negativeTone="loss" sampleMs={120} label="Ø R des Fensters als Pegel" />
-              <span className="font-mono text-[9px] text-faint">±2 R</span>
+              <span className="font-mono text-[9.5px] text-faint">±2 R</span>
             </div>
           </div>
           <span ref={readout} className={cn("num min-h-4 font-mono text-[11.5px] leading-snug text-mute")} data-testid="rolling-readout" />

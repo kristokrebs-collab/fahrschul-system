@@ -38,7 +38,7 @@ function Scatter({ rep }: { rep: ExcursionReport }) {
           {/* 1 R guides */}
           <span aria-hidden="true" className="absolute inset-y-0 border-l border-dashed border-white/15" style={{ left: `${(1 / maxX) * 100}%` }} />
           <span aria-hidden="true" className="absolute inset-x-0 border-t border-dashed border-white/15" style={{ bottom: `${(1 / maxY) * 100}%` }} />
-          <span aria-hidden="true" className="absolute bottom-1 font-mono text-[9px] text-faint" style={{ left: `calc(${(1 / maxX) * 100}% + 4px)` }}>
+          <span aria-hidden="true" className="absolute bottom-1 font-mono text-[9.5px] text-faint" style={{ left: `calc(${(1 / maxX) * 100}% + 4px)` }}>
             1 R
           </span>
           {pts.map((p, i) => (
@@ -76,7 +76,7 @@ export function ExcursionCard({ view, cur }: { view: AccountView; cur: string })
             <RingGauge value={eff} size={92} stroke={8} color={themePaint("#3ddc84")} aria-label={`Exit-Effizienz ${pct0(eff)}`}>
               <span className="grid justify-items-center">
                 <span className="dot-num text-[19px] leading-none">{pct0(eff)}</span>
-                <span className="text-[9px] uppercase tracking-[0.1em] text-faint">Exit</span>
+                <span className="text-[9.5px] uppercase tracking-[0.1em] text-faint">Exit</span>
               </span>
             </RingGauge>
             <div className="grid min-w-[15rem] flex-1 grid-cols-2 gap-2">

@@ -283,7 +283,7 @@ function HeatBody({ heat, runSeq }: { heat: NonNullable<LabResult["heat"]>; runS
               style={{ background: c.meanR == null ? "var(--color-ink-850)" : heatColor(c.meanR / maxAbs, "diverging") }}
             >
               <span className="num font-mono text-[12px] font-semibold text-fg">{c.meanR == null ? "–" : numText(c.meanR)}</span>
-              <span className="num absolute bottom-0.5 right-1.5 font-mono text-[9px] text-fg/60">{c.thin ? LABOR.heatThin : c.n}</span>
+              <span className="num absolute bottom-0.5 right-1.5 font-mono text-[9.5px] text-fg/60">{c.thin ? LABOR.heatThin : c.n}</span>
             </div>
           ))}
         </HeatGridReveal>

@@ -124,7 +124,7 @@ function Probe() {
       {[16, 32, 48].map((y) => (
         <span {...DIAG} key={y} className="absolute left-0 flex items-center gap-1" style={{ bottom: y - 0.5 }}>
           <span className="h-px w-3 bg-fg" />
-          <span className="rounded-[3px] bg-ink-950 px-1 font-mono text-[9px] leading-3 text-fg">{y}</span>
+          <span className="rounded-[3px] bg-ink-950 px-1 font-mono text-[9.5px] leading-3 text-fg">{y}</span>
         </span>
       ))}
       <span {...DIAG} className="absolute left-1/2 top-1 -translate-x-1/2 whitespace-nowrap rounded-md border border-signal bg-ink-950 px-2 font-mono text-[10px] leading-4 tracking-[0.08em] text-fg">

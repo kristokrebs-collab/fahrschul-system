@@ -383,7 +383,7 @@ function PlaybookBlock({ stats, playbook, currency }: { stats: RankedSetupStats;
 function PbValue({ label, value, className }: { label: string; value: ReactNode; className?: string }) {
   return (
     <span className="grid min-w-0 gap-0.5">
-      <span className="text-[9px] font-semibold uppercase leading-tight tracking-[0.08em] text-faint">{label}</span>
+      <span className="text-[9.5px] font-semibold uppercase leading-tight tracking-[0.08em] text-faint">{label}</span>
       <span className={cn("num whitespace-nowrap font-mono text-[12.5px] font-medium", className)}>{value}</span>
     </span>
   );

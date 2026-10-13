@@ -45,7 +45,7 @@ function Row({ r }: { r: ScanRow }) {
           <TfChip tf={r.tf} />
           <span className={cn("text-[11px] font-semibold", up ? "text-win" : "text-loss")}>{up ? "Long" : "Short"}</span>
         </span>
-        <span className="truncate text-[11.5px] text-mute">{s.kind === "fakeout" ? PHASE_LABEL[r.phase] : `${KIND_TEXT[s.kind]} · ${PHASE_LABEL[r.phase]}`}</span>
+        <span className="line-clamp-2 text-[11.5px] leading-snug text-mute">{s.kind === "fakeout" ? PHASE_LABEL[r.phase] : `${KIND_TEXT[s.kind]} · ${PHASE_LABEL[r.phase]}`}</span>
       </span>
       {/* the entry is the figure of the row: a number line of its own (it was cut off at 390 px – P2-15), CRV below */}
       <span className="grid justify-items-end gap-0.5 text-[11px] text-faint">
