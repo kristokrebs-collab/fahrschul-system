@@ -1,7 +1,7 @@
 /**
  * Analyse page (P03, `h1 Analyse`): pro statistics with honest uncertainty over the account view of the Hero's switch
  * (`uiStore.acc`). Sections (lg, 12 columns):
- *   Kennzahlen       KennzahlenHero (12)
+ *   Kennzahlen       KennzahlenHero (12) · CostsCard (12, Brutto vor Kosten → Gebühren → Funding → Netto)
  *   Was kommen kann  MonteCarloCard (8) · RiskOfRuinCard (4)
  *   Wo deine Edge…   BreakdownCard (7) · HeatmapCard (5)
  *   Ausführung       ExcursionCard (6) · DistributionCard (6)
@@ -27,6 +27,7 @@ import { PageHeader } from "@/views/setups/PageHeader";
 import { BenchmarkCard } from "./BenchmarkCard";
 import { BreakdownCard } from "./BreakdownCard";
 import { CompareCard } from "./CompareCard";
+import { CostsCard } from "./CostsCard";
 import { CustomStatCard } from "./CustomStatCard";
 import { DistributionCard } from "./DistributionCard";
 import { ExcursionCard } from "./ExcursionCard";
@@ -99,6 +100,9 @@ export function AnalyseView({ className }: { className?: string }) {
             <SectionTitle id={ids.ratios} title={SECTIONS.ratios} sub={`${view.closed.length} abgeschlossene Trades · ${ACCOUNT_LABELS[acc]} · Intervalle 80 %`} className="lg:col-span-12" />
             <Cell index={0} span="lg:col-span-12">
               <KennzahlenHero rep={rep} cur={cur} n={view.closed.length} />
+            </Cell>
+            <Cell index={1} span="lg:col-span-12">
+              <CostsCard closed={view.closed} cur={cur} />
             </Cell>
           </section>
           <section aria-labelledby={ids.future} className="contents">

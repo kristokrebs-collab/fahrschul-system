@@ -131,6 +131,8 @@ export function PerformanceCard({ report, bars, className }: { report: Report; b
         <AnswerBars key={report.period.key} spec={{ type: "bars", unit: "money", rows: bars }} cur={cur} label={`Netto ${per} · ${report.period.label}`} />
       )}
       <div className="grid gap-x-6 sm:grid-cols-2">
+        <KV label="Brutto vor Kosten" value={money(p.g.gross, cur)} tone={toneOf(p.g.gross)} />
+        <KV label="Gebühren · Funding" value={`${money(-p.g.fees || 0, cur)} · ${money(-p.g.funding || 0, cur)}`} tone={p.g.fees + p.g.funding > 0 ? "loss" : "mute"} />
         <KV label="Summe R" value={fmtR(p.sumR)} tone={toneOf(p.sumR)} />
         <KV label="Handelstage" value={`${p.tradingDays} · ${pct0(p.dayWinRate)} grün`} />
         <KV
@@ -246,6 +248,11 @@ export function ReportRiskCard({ report, className }: { report: Report; classNam
         <KV label="Verluste über 1 R" value={`${k.bigLosses}`} tone={k.bigLosses ? "loss" : "win"} />
         <KV label="Tage über dem Tageslimit" value={`${k.dayBreaches}`} tone={k.dayBreaches ? "loss" : "win"} />
         <KV label="Längste Verlustserie" value={`${k.longestLosing}`} />
+        <KV
+          label="Funding gezahlt / erhalten"
+          value={`${money(-report.performance.g.fundingPaid || 0, report.currency)} / ${money(report.performance.g.fundingReceived, report.currency)}`}
+          tone={report.performance.g.funding > 0 ? "loss" : report.performance.g.funding < 0 ? "win" : "mute"}
+        />
       </div>
     </Card>
   );

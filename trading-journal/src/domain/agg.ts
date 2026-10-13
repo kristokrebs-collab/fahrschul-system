@@ -3,6 +3,7 @@
  */
 import type { EnrichedTrade } from "./types";
 import { isFin } from "@/lib/format";
+import { effectiveFees } from "./fills";
 
 export interface Agg {
   n: number;
@@ -13,7 +14,18 @@ export interface Agg {
   gw: number;
   /** negative */
   gl: number;
+  /**
+   * Fees the P&L carries: `trade.fees`, or the Σ of the fill fees when that is empty (`effectiveFees` – exactly what
+   * the derivation subtracted; Review MM-7: fill fees used to be deducted but reported as 0).
+   */
   fees: number;
+  /** Σ funding (positive = paid, negative = received) of the trades that carry it */
+  funding: number;
+  fundingPaid: number;
+  /** received funding as a positive amount */
+  fundingReceived: number;
+  /** P&L before fees and funding: net + fees + funding (Review F05 "Brutto vor Kosten") */
+  gross: number;
   winRate: number | null;
   /** may be Infinity (gains, no losses) */
   pf: number | null;
@@ -48,7 +60,9 @@ export function aggregate(list: readonly EnrichedTrade[]): Agg {
     net = 0,
     gw = 0,
     gl = 0,
-    fees = 0;
+    fees = 0,
+    fundingPaid = 0,
+    fundingReceived = 0;
   let rSum = 0,
     rN = 0,
     r2 = 0;
@@ -66,7 +80,11 @@ export function aggregate(list: readonly EnrichedTrade[]): Agg {
   for (const t of list) {
     const p = t.pnl || 0;
     net += p;
-    fees += t.fees || 0;
+    fees += effectiveFees(t);
+    if (isFin(t.fundingFees)) {
+      if (t.fundingFees > 0) fundingPaid += t.fundingFees;
+      else fundingReceived -= t.fundingFees;
+    }
     if (p > 0) {
       wins++;
       gw += p;
@@ -106,6 +124,10 @@ export function aggregate(list: readonly EnrichedTrade[]): Agg {
     gw,
     gl,
     fees,
+    funding: fundingPaid - fundingReceived,
+    fundingPaid,
+    fundingReceived,
+    gross: net + fees + (fundingPaid - fundingReceived),
     winRate: n ? wins / n : null,
     pf: gl < 0 ? gw / -gl : gw > 0 ? Infinity : null,
     avgWin,

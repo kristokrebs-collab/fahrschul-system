@@ -61,6 +61,8 @@ export function formatCustom(v: number | null, f: CustomFormat, cur: string): st
       return fmtR(v);
     case "ratio":
       return n2(v);
+    case "pctFine":
+      return `${(v * 100).toLocaleString("de-DE", { minimumFractionDigits: 3, maximumFractionDigits: 3 })} %`;
   }
 }
 

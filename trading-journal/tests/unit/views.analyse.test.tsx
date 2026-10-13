@@ -62,7 +62,7 @@ describe("AnalyseView", () => {
     const view = screen.getByTestId("analyse-view");
     expect(view).toHaveAttribute("data-n", "60");
     for (const title of ["Kennzahlen", "Was kommen kann", "Wo deine Edge liegt", "Ausführung", "Muster", "Gegen den Markt"]) expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument();
-    for (const id of ["ana-hero", "ana-mc", "ana-ror", "ana-breakdown", "ana-heat", "ana-excursion", "ana-dist", "ana-rolling", "ana-streaks", "ana-bench", "ana-compare", "ana-custom"]) expect(screen.getByTestId(id)).toBeInTheDocument();
+    for (const id of ["ana-hero", "ana-costs", "ana-mc", "ana-ror", "ana-breakdown", "ana-heat", "ana-excursion", "ana-dist", "ana-rolling", "ana-streaks", "ana-bench", "ana-compare", "ana-custom"]) expect(screen.getByTestId(id)).toBeInTheDocument();
     const hero = screen.getByTestId("ana-hero");
     expect(within(hero).getByTestId("ana-sharpe").textContent).toMatch(/\d/);
     expect(within(hero).getByTestId("ana-edge")).toHaveTextContent(/pro Trade · p/);

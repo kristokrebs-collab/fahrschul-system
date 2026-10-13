@@ -167,6 +167,9 @@ describe("Export", () => {
       | Kennzahl | Wert |
       | --- | --- |
       | Netto | +20 USDT |
+      | Brutto vor Kosten | +20 USDT |
+      | Gebühren | 0 USDT |
+      | Funding | 0 USDT |
       | Rendite | +0,1 % |
       | Trades | 3 |
       | Win-Rate | 33 % |

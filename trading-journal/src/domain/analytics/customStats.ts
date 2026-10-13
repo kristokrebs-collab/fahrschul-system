@@ -11,8 +11,8 @@ import { DIMENSIONS, bucketLabel, groupByDimension, isDimensionKey, type Dimensi
 import { tradeReturns, sharpeOf } from "./ratios";
 import { finite, meanCI, sd, wilsonCI, type Interval } from "./stats";
 
-export type CustomMetricKey = "trades" | "winRate" | "net" | "exp" | "avgR" | "pf" | "payoff" | "sqn" | "sharpeTrade";
-export type CustomFormat = "int" | "pct" | "money" | "r" | "ratio";
+export type CustomMetricKey = "trades" | "winRate" | "net" | "exp" | "avgR" | "pf" | "payoff" | "sqn" | "sharpeTrade" | "gross" | "fees" | "feesPct" | "funding";
+export type CustomFormat = "int" | "pct" | "money" | "r" | "ratio" | "pctFine";
 
 export interface CustomMetric {
   key: CustomMetricKey;
@@ -24,6 +24,31 @@ export interface CustomMetric {
 }
 
 const rsOf = (list: readonly EnrichedTrade[]) => finite(list.map((t) => t.r));
+
+/** Position value of a trade at entry (`size`, else the opening fills, else entry × qty) – the base of "fees in %". */
+function notionalOf(t: EnrichedTrade): number | null {
+  if (typeof t.size === "number" && Number.isFinite(t.size) && t.size > 0) return t.size;
+  const opened = (t.fills ?? []).filter((f) => f.side === "open").reduce((s, f) => s + f.price * f.qty, 0);
+  if (opened > 0) return opened;
+  const q = (t as { qty?: unknown }).qty;
+  return typeof q === "number" && q > 0 && t.entry != null && t.entry > 0 ? q * t.entry : null;
+}
+
+/**
+ * Fees in % of the traded notional (Review F12): Σ fees ÷ Σ position value of the trades that have both – so a
+ * "Gebühren nach Börse / Monat" comparison is fair across position sizes.
+ */
+export function feesPctOf(list: readonly EnrichedTrade[]): number | null {
+  let fees = 0;
+  let base = 0;
+  for (const t of list) {
+    const n = notionalOf(t);
+    if (n == null) continue;
+    fees += aggregate([t]).fees;
+    base += n;
+  }
+  return base > 0 ? fees / base : null;
+}
 
 export const CUSTOM_METRICS: Readonly<Record<CustomMetricKey, CustomMetric>> = {
   trades: { key: "trades", label: "Trades", format: "int", compute: (l) => l.length },
@@ -53,8 +78,14 @@ export const CUSTOM_METRICS: Readonly<Record<CustomMetricKey, CustomMetric>> = {
     },
   },
   sharpeTrade: { key: "sharpeTrade", label: "Sharpe pro Trade", format: "ratio", compute: (l, start) => (l.length >= 5 ? sharpeOf(tradeReturns(l, start)) : null) },
+  // costs (Review F05 / F12 / F13): group them by "Börse", "Monat" or "Asset"
+  gross: { key: "gross", label: "Brutto vor Kosten", format: "money", compute: (l) => (l.length ? aggregate(l).gross : null) },
+  // as their effect on the P&L: paid fees / funding are negative (red bars), received funding positive
+  fees: { key: "fees", label: "Gebühren", format: "money", compute: (l) => (l.length ? -aggregate(l).fees || 0 : null) },
+  feesPct: { key: "feesPct", label: "Gebühren in % vom Positionswert", format: "pctFine", compute: feesPctOf },
+  funding: { key: "funding", label: "Funding (− gezahlt / + erhalten)", format: "money", compute: (l) => (l.length ? -aggregate(l).funding || 0 : null) },
 };
-export const CUSTOM_METRIC_ORDER: readonly CustomMetricKey[] = ["winRate", "exp", "avgR", "net", "pf", "payoff", "sqn", "sharpeTrade", "trades"];
+export const CUSTOM_METRIC_ORDER: readonly CustomMetricKey[] = ["winRate", "exp", "avgR", "net", "pf", "payoff", "sqn", "sharpeTrade", "trades", "gross", "fees", "feesPct", "funding"];
 
 export type CustomSince = "all" | "30d" | "90d" | "365d";
 export const SINCE_LABELS: Record<CustomSince, string> = { all: "Gesamt", "30d": "30 Tage", "90d": "90 Tage", "365d": "12 Monate" };

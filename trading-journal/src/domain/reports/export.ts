@@ -41,6 +41,9 @@ export function reportToMarkdown(r: Report, focus: ReportFocus = "all"): string 
         ["Kennzahl", "Wert"],
         [
           ["Netto", money(p.g.net, c)],
+          ["Brutto vor Kosten", money(p.g.gross, c)],
+          ["Gebühren", money(-p.g.fees || 0, c)],
+          ["Funding", money(-p.g.funding || 0, c)],
           ["Rendite", pct(p.returnPct)],
           ["Trades", `${p.g.n}`],
           ["Win-Rate", pct0(p.g.winRate)],
@@ -126,6 +129,9 @@ export function reportToCsv(r: Report, focus: ReportFocus = "all"): string {
   const p = r.performance;
   if (focus === "all") {
     add("Performance", "Netto", p.g.net);
+    add("Performance", "Brutto vor Kosten", p.g.gross);
+    add("Performance", "Gebühren", p.g.fees);
+    add("Performance", "Funding", p.g.funding);
     add("Performance", "Trades", p.g.n);
     add("Performance", "Win-Rate", p.g.winRate);
     add("Performance", "Profit-Faktor", p.g.pf === Infinity ? null : p.g.pf);

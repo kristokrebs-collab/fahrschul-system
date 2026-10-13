@@ -152,6 +152,10 @@ test.describe("Analyse", () => {
     await expect(hero.getByTestId("ana-sharpe")).toContainText(/\d/);
     await expect(hero.getByTestId("ana-edge")).toContainText(/p (=|<) 0,\d/);
     await expect(hero.locator("[data-testid^=ana-tile-]")).toHaveCount(9);
+    // costs: Brutto vor Kosten → Gebühren → Funding → Netto (Review F05)
+    const costs = page.getByTestId("ana-costs");
+    await expect(costs.getByText("Brutto vor Kosten")).toBeVisible();
+    await expect(costs.getByTestId("ana-cost-net")).toContainText(/\d/);
     await shot(page, info, "top");
 
     // a tile opens its explainer (MorphCard dialog) with the sample and the 80 % interval

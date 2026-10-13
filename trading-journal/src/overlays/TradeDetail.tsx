@@ -24,6 +24,7 @@ import { useEntitlement } from "@/billing/entitlements";
 import { ShareButton } from "@/social/ui/ShareButton";
 import { JournalDetail } from "@/journal/ui/JournalDetail";
 import { deleteTradeWithShots } from "@/journal/screenshots/release";
+import { effectiveFees } from "@/domain/fills";
 
 /** P04 coach panel of this trade (grade, plan vs. execution, behaviours) – a lazy chunk, mounted once the morph settled. */
 const TradeCoachPanel = lazy(() => import("@/views/coach/TradeCoachPanel").then((m) => ({ default: m.TradeCoachPanel })));
@@ -421,7 +422,8 @@ function DetailContent({ trade: e, setups, currency, candles, settled, onClose, 
     ["Ziel", e.target == null ? "–" : price(e.target)],
     ["Größe", e.size == null ? "–" : `${n0(e.size)} ${currency}`],
     ["Hebel", e.leverage == null ? "–" : `${n1(e.leverage).replace(",0", "")}x`],
-    ["Gebühren", e.fees == null ? "–" : `${n2(e.fees)} ${currency}`],
+    // the fees the P&L carries: the trade's own, else the Σ of its fill fees (Review MM-7)
+    ["Gebühren", e.fees == null && !e.fills?.some((f) => f.fee != null) ? "–" : `${n2(effectiveFees(e))} ${currency}`],
     ["CRV", e.rr == null ? "–" : `1 : ${n2(e.rr)}`],
   ];
 
