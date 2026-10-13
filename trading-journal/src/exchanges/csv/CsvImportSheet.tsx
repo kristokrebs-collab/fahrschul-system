@@ -25,6 +25,7 @@ import {
   FORMATS,
   guessMapping,
   importCsvTrades,
+  planCsvMerge,
   loadCsv,
   MAP_FIELDS,
   MAP_LABEL,
@@ -60,6 +61,12 @@ export const CSV_STRINGS = {
   run: "Importieren",
   running: "Importiert …",
   done: (n: number) => (n === 1 ? "1 Trade importiert" : `${n} Trades importiert`),
+  updatedOnly: (n: number) => (n === 1 ? "1 Trade aktualisiert" : `${n} Trades aktualisiert`),
+  /** the preview against the journal (review F7: a re-import used to promise "Importieren (2)" and import 0) */
+  plan: (fresh: number, known: number, changed: number) =>
+    [fresh ? `${fresh} neu` : "", known ? `${known} bereits im Journal` : "", changed ? `davon ${changed} mit neuen Börsendaten` : ""].filter(Boolean).join(" · "),
+  nothingNew: "Alles schon im Journal",
+  nothingNewText: "Diese Trades sind schon importiert – es gibt nichts Neues. Notizen und Setups bleiben, wie sie sind.",
   doneDetail: (u: number, s: number) =>
     [u ? `${u} aktualisiert` : "", s ? `${s} unverändert` : ""].filter(Boolean).join(" · ") || "Notizen und Setups bleiben unberührt.",
   failed: "Import fehlgeschlagen",
@@ -161,9 +168,15 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
     return { n: trades.length, wins: pnls.filter((v) => v > 0).length, net: Math.round(pnls.reduce((a, b) => a + b, 0) * 100) / 100 };
   }, [trades]);
   const top = useMemo(() => [...trades].sort((a, b) => Math.abs(pnlOf(b) ?? 0) - Math.abs(pnlOf(a) ?? 0)).slice(0, 6), [trades]);
+  // what the import would really do: new records, records with new exchange data, records already in the journal
+  const journalTrades = useJournal((s) => s.trades);
+  const merge = useMemo(() => {
+    const p = planCsvMerge(journalTrades, trades, new Date(0).toISOString());
+    return { fresh: p.added.length, changed: p.updated.length, known: p.updated.length + p.unchanged, writes: p.added.length + p.updated.length };
+  }, [journalTrades, trades]);
   const missingField = !loaded?.format && mapping ? MAP_REQUIRED.find((f) => mapping[f] < 0) : undefined;
   const needsPair = !!loaded && (loaded.format?.id === "tradingview" || (!loaded.format && mapping !== null && mapping.pair < 0));
-  const canRun = trades.length > 0 && !busy && !missingField;
+  const canRun = merge.writes > 0 && !busy && !missingField;
 
   async function run() {
     if (!canRun) return;
@@ -174,7 +187,11 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
       pushToast({ kind: "error", title: CSV_STRINGS.failed, detail: res.error });
       return;
     }
-    pushToast({ kind: "success", title: CSV_STRINGS.done(res.added), detail: CSV_STRINGS.doneDetail(res.updated, res.unchanged) });
+    pushToast({
+      kind: "success",
+      title: res.added > 0 || res.updated === 0 ? CSV_STRINGS.done(res.added) : CSV_STRINGS.updatedOnly(res.updated),
+      detail: CSV_STRINGS.doneDetail(res.added > 0 ? res.updated : 0, res.unchanged),
+    });
     if (res.added > 0 && stats.net > 0 && runRef.current) celebrateFrom(runRef.current, { kind: "win", tone: "win" });
     closeCsvImport();
   }
@@ -204,7 +221,10 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
             Abbrechen
           </Button>
           <Button ref={runRef} variant="primary" disabled={!canRun} onClick={() => void run()} aria-busy={busy || undefined} data-testid="csv-run">
-            <TextRoll mode="roll" text={busy ? CSV_STRINGS.running : trades.length ? `${CSV_STRINGS.run} (${trades.length})` : CSV_STRINGS.run} />
+            <TextRoll
+              mode="roll"
+              text={busy ? CSV_STRINGS.running : merge.writes ? `${CSV_STRINGS.run} (${merge.writes})` : trades.length ? CSV_STRINGS.nothingNew : CSV_STRINGS.run}
+            />
           </Button>
         </>
       }
@@ -357,6 +377,11 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
                           <span className="mt-1 block text-[11px] text-faint">{CSV_STRINGS.net}</span>
                         </div>
                       </div>
+                      {merge.known > 0 && (
+                        <p className={cn("text-[12px]", merge.writes ? "text-mute" : "text-fg")} data-testid="csv-known" data-writes={merge.writes}>
+                          {merge.writes ? CSV_STRINGS.plan(merge.fresh, merge.known, merge.changed) : CSV_STRINGS.nothingNewText}
+                        </p>
+                      )}
                       <span className="text-[11.5px] text-faint">{CSV_STRINGS.top}</span>
                       <ul className="grid gap-1.5">
                         {top.map((t, i) => (

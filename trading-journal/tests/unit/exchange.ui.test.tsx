@@ -286,6 +286,31 @@ describe("CsvImportSheet", () => {
     expect(await screen.findByText(/größer als 20 MB/)).toBeTruthy();
     expect(read).not.toHaveBeenCalled();
   });
+
+  it("re-importing the same file promises nothing it will not do (review F7): „Alles schon im Journal“, button off", async () => {
+    const read = vi.fn(async () => BITUNIX_CSV);
+    wrap(<CsvImportSheet readFile={read} />);
+    const load = async () => {
+      act(() => openCsvImport());
+      fireEvent.change(await screen.findByTestId("csv-file"), { target: { files: [new File([BITUNIX_CSV], "bitunix.csv", { type: "text/csv" })] } });
+      await screen.findByTestId("csv-row");
+    };
+    await load();
+    const run = screen.getByTestId("csv-run");
+    expect(run).toHaveTextContent("Importieren (1)");
+    expect(run).not.toBeDisabled();
+    expect(screen.queryByTestId("csv-known")).toBeNull();
+    // the journal already holds exactly what this export imports (an earlier import)
+    const { loadCsv, buildTrades } = await import("@/exchanges/csv");
+    const l = loadCsv(BITUNIX_CSV);
+    act(() => useJournal.setState({ trades: buildTrades(l.format!.parse(l.table), { formatId: l.format!.id, venue: l.format!.venue, account: "scalp", fallbackPair: "BTC/USDT" }) }));
+    // the same export again: the preview says it is already there, nothing to click
+    await load();
+    await waitFor(() => expect(screen.getByTestId("csv-run")).toHaveTextContent("Alles schon im Journal"));
+    expect(screen.getByTestId("csv-run")).toBeDisabled();
+    expect(screen.getByTestId("csv-known")).toHaveTextContent("schon importiert");
+    expect(screen.getByTestId("csv-known")).toHaveAttribute("data-writes", "0");
+  });
 });
 
 describe("live positions (P05 contract)", () => {

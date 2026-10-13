@@ -268,6 +268,16 @@ test.describe("Börse (P11)", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect.poll(async () => (await journalIds(page)).length).toBe(2);
 
+    // the same export again (review F7): the preview says so and offers nothing to import
+    await csvButton.click();
+    await sheet.getByTestId("csv-file").setInputFiles({ name: "binance-trades.csv", mimeType: "text/csv", buffer: Buffer.from(binance) });
+    await expect(sheet.getByTestId("csv-known")).toContainText("schon importiert");
+    await expect(sheet.getByTestId("csv-run")).toBeDisabled();
+    await expect(sheet.getByTestId("csv-run")).toContainText("Alles schon im Journal");
+    await sheet.getByRole("button", { name: "Abbrechen" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect((await journalIds(page)).length).toBe(2);
+
     // unknown German export → mapping assistant pre-filled from the header
     await csvButton.click();
     const de = `Datum;Paar;Richtung;Einstieg;Ausstieg;Menge;Gebühren;Gewinn
