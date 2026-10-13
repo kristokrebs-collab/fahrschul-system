@@ -6,7 +6,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LEVERAGE_RULE, LEVERAGE_WARNING } from "@/domain/defaults";
 import type { Trade } from "@/domain/types";
-import { JOURNAL_KEYS } from "@/journal/editor/form";
+import { JOURNAL_KEYS, openRemainderMessage, statusAfterFills, type FillRow } from "@/journal/editor/form";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { TradeEditor, formFromDraft, draftExtras, type TradeRecord } from "@/overlays/TradeEditor";
 import { useJournal } from "@/store/journalStore";
@@ -95,6 +95,61 @@ describe("TradeEditor – Journal v3", () => {
     expect(t).toMatchObject({ entry: 83800, exit: 85000, size: 16760, qty: 0.2, tags: ["Range-Low"], rating: 4, psych: { stress: 2, flags: ["tilt"], exitReason: "Ziel erreicht" } });
     expect(t.fills?.map((f) => f.kind)).toEqual(["entry", "add", "exit"]);
     expect(t.pnl).toBeCloseTo(240, 6);
+  });
+
+  it("a partial exit switches the status to „Noch offen“ and saves; forced „Geschlossen“ names what is open (F4)", async () => {
+    mount();
+    fireEvent.click(screen.getByRole("radio", { name: "▼ Short" }));
+    type("Stop-Loss", "85500");
+    fireEvent.click(screen.getByRole("button", { name: "+ Einstieg" }));
+    type("Fill 1 Preis", "84000");
+    type("Fill 1 Menge", "0,2");
+    fireEvent.click(screen.getByRole("button", { name: "+ Teil-Exit" }));
+    type("Fill 2 Preis", "83000");
+    type("Fill 2 Menge", "0,1");
+    expect(screen.getByRole("radio", { name: "Noch offen" })).toHaveAttribute("aria-checked", "true");
+    // the trader insists on „Geschlossen“: the message says what is open and how to go on
+    fireEvent.click(screen.getByRole("radio", { name: "Geschlossen" }));
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("0,1 noch offen – Status „Noch offen“ wählen oder den Rest-Exit eintragen.");
+    expect(saveTrade).not.toHaveBeenCalled();
+    // the rest exit closes the position: saved as closed with the Ø exit
+    fireEvent.click(screen.getByRole("button", { name: "+ Teil-Exit" }));
+    type("Fill 3 Preis", "82000");
+    type("Fill 3 Menge", "0,1");
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
+    expect(saved()).toMatchObject({ side: "short", status: "closed", entry: 84000, exit: 82500 });
+  });
+
+  it("a partial exit alone saves as an open trade", async () => {
+    mount();
+    fireEvent.click(screen.getByRole("radio", { name: "▼ Short" }));
+    type("Stop-Loss", "85500");
+    fireEvent.click(screen.getByRole("button", { name: "+ Einstieg" }));
+    type("Fill 1 Preis", "84000");
+    type("Fill 1 Menge", "0,2");
+    fireEvent.click(screen.getByRole("button", { name: "+ Teil-Exit" }));
+    type("Fill 2 Preis", "83000");
+    type("Fill 2 Menge", "0,1");
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
+    expect(saved()).toMatchObject({ status: "open", exit: null });
+    expect(saved().fills?.map((f) => f.kind)).toEqual(["entry", "partial"]);
+  });
+
+  it("statusAfterFills: open remainder → open, flat again → back, a typed exit or the trader's open stays (F4)", () => {
+    const row = (id: string, side: "open" | "close", price: string, qty: string): FillRow => ({ id, at: "", side, price, qty, fee: "" });
+    const partial = [row("a", "open", "84000", "0,2"), row("b", "close", "83000", "0,1")];
+    const flat = [...partial, row("c", "close", "82000", "0,1")];
+    const ctx = { side: "short" as const, status: "closed" as const, exit: "", pnlManual: "", autoOpened: false };
+    expect(statusAfterFills(partial, ctx)).toEqual({ status: "open", autoOpened: true });
+    expect(statusAfterFills(flat, { ...ctx, status: "open", autoOpened: true })).toEqual({ status: "closed", autoOpened: false });
+    expect(statusAfterFills(flat, { ...ctx, status: "open", autoOpened: false })).toEqual({ status: "open", autoOpened: false });
+    expect(statusAfterFills(partial, { ...ctx, exit: "83500" })).toEqual({ status: "closed", autoOpened: false });
+    expect(statusAfterFills(partial, { ...ctx, pnlManual: "50" }).status).toBe("closed");
+    expect(statusAfterFills([], ctx).status).toBe("closed");
+    expect(openRemainderMessage(0.1)).toBe("0,1 noch offen – Status „Noch offen“ wählen oder den Rest-Exit eintragen.");
   });
 
   it("an incomplete fill blocks saving with its message", () => {

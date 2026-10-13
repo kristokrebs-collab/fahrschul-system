@@ -74,6 +74,30 @@ export const JOURNAL_MESSAGES = {
   stopIncomplete: "Ein Stop im Verlauf hat keinen Preis.",
 } as const;
 
+/**
+ * Review F4: the fills leave part of the position open while the trade is marked closed and has no exit – the generic
+ * "Bitte Ausstieg angeben" did not say why. Names the open quantity and both ways out.
+ */
+export function openRemainderMessage(remaining: number): string {
+  return `${toInputString(Number(remaining.toPrecision(8)))} noch offen – Status „Noch offen“ wählen oder den Rest-Exit eintragen.`;
+}
+
+/**
+ * The trade status after the trader changed the fills (review F4). Fills that leave part of the position open switch a
+ * closed trade without exit / manual P&L to `open` (it could not be saved as closed anyway); once the fills are flat
+ * again a trade the fills had opened goes back to `closed`. `autoOpened` = the fills, not the trader, set `open`.
+ */
+export function statusAfterFills(
+  rows: readonly FillRow[],
+  ctx: { side: Side; status: TradeStatus; exit: string; pnlManual: string; autoOpened: boolean },
+): { status: TradeStatus; autoOpened: boolean } {
+  const s = fillStats(fillsOf(rows), ctx.side);
+  const open = s.avgEntry != null && !s.flat && s.remaining > 0;
+  if (open && ctx.status === "closed" && !ctx.exit.trim() && !ctx.pnlManual.trim()) return { status: "open", autoOpened: true };
+  if (s.flat && ctx.status === "open" && ctx.autoOpened) return { status: "closed", autoOpened: false };
+  return { status: ctx.status, autoOpened: ctx.autoOpened && ctx.status === "open" };
+}
+
 /** Exit reasons offered as chips (free text is allowed too). */
 export const EXIT_REASONS = ["Ziel erreicht", "Stop", "Trailing-Stop", "Manuell", "Zeitstop", "Signal dreht", "Liquidation"] as const;
 

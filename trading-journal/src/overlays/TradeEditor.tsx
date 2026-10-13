@@ -27,7 +27,7 @@ import { jsonEqual } from "@/store/merge3";
 import { pushToast, useUi, type AccFilter, type TradeDraft } from "@/store/uiStore";
 import { ExecutionSection } from "@/journal/editor/ExecutionSection";
 import { PsychSection } from "@/journal/editor/PsychSection";
-import { dropEmptyJournalKeys, fillFix, journalDefaults, journalFromTrade, journalKey, journalRecord, journalReset, validateJournal, type JournalForm } from "@/journal/editor/form";
+import { dropEmptyJournalKeys, fillFix, journalDefaults, journalFromTrade, journalKey, journalRecord, journalReset, openRemainderMessage, statusAfterFills, validateJournal, type JournalForm } from "@/journal/editor/form";
 import { ShotsField } from "@/journal/screenshots/ShotsField";
 import { RatingDots } from "@/journal/ui/RatingDots";
 import { TagInput, tagSuggestions } from "@/journal/ui/TagInput";
@@ -395,7 +395,11 @@ export function validateRecord(rec: ReturnType<typeof toRecord>, rawChart: strin
   if (!rec.date) return EDITOR_MESSAGES.date;
   if (!(rec.entry != null && rec.entry > 0)) return EDITOR_MESSAGES.entry;
   if (rec.status !== "open" && rec.pnlManual == null) {
-    if (!(rec.exit != null && rec.exit > 0)) return EDITOR_MESSAGES.exit;
+    if (!(rec.exit != null && rec.exit > 0)) {
+      // fills with an open remainder: say what is open and how to go on (review F4)
+      const fix = j ? fillFix(j.fills, rec.side) : null;
+      return fix && fix.exit == null && fix.remaining > 0 ? openRemainderMessage(fix.remaining) : EDITOR_MESSAGES.exit;
+    }
     if (!(rec.size != null && rec.size > 0) && !(rec.qty != null && rec.qty > 0)) return EDITOR_MESSAGES.size;
   }
   if (rawChart.trim() && !rec.chart) return EDITOR_MESSAGES.chart;
@@ -550,7 +554,24 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
   // Journal v3: fills fix Einstieg / Größe (and Ausstieg once flat); journal tags offered as quick picks
   const fix = useMemo(() => fillFix(t.j.fills, t.side), [t.j.fills, t.side]);
   const journalTags = useMemo(() => tagSuggestions(trades), [trades]);
-  const patchJ = useCallback((patch: Partial<JournalForm>) => setT((o) => ({ ...o, j: { ...o.j, ...patch } })), []);
+  // Review F4: the status follows the fills while the trader edits them (a partial exit → „Noch offen“, flat again →
+  // back to „Geschlossen“ when the fills opened it); a status the trader picks wins. Decided in the event, not in an
+  // updater (the flag is a ref), from the form as last rendered.
+  const autoOpened = useRef(false);
+  const statusCtx = useRef({ side: t.side, status: t.status, exit: d.exit, pnlManual: d.pnlManual });
+  useLayoutEffect(() => {
+    statusCtx.current = { side: t.side, status: t.status, exit: d.exit, pnlManual: d.pnlManual };
+  });
+  const patchJ = useCallback((patch: Partial<JournalForm>) => {
+    let status: TradeStatus | null = null;
+    if (patch.fills) {
+      const cur = statusCtx.current;
+      const next = statusAfterFills(patch.fills, { ...cur, autoOpened: autoOpened.current });
+      autoOpened.current = next.autoOpened;
+      if (next.status !== cur.status) status = next.status;
+    }
+    setT((o) => ({ ...o, ...(status ? { status } : null), j: { ...o.j, ...patch } }));
+  }, []);
   const updateShots = useCallback((update: (prev: ScreenshotRef[]) => ScreenshotRef[]) => setT((o) => ({ ...o, j: { ...o.j, screenshots: update(o.j.screenshots) } })), []);
   const leverageOver = leverageOverRule(rec.leverage, account);
   const sortedSetups = useMemo(
@@ -920,7 +941,10 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
               <Segmented<TradeStatus>
                 aria-label="Status"
                 value={t.status}
-                onChange={(status) => patchT({ status })}
+                onChange={(status) => {
+                  autoOpened.current = false; // the trader's own choice wins over the fills (F4)
+                  patchT({ status });
+                }}
                 options={[
                   { v: "closed", label: "Geschlossen" },
                   { v: "open", label: "Noch offen" },
