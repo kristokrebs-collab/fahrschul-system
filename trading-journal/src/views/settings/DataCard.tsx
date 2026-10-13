@@ -15,6 +15,7 @@ import { readQuarantine } from "@/store/migrate";
 import { KEYS } from "@/store/storage";
 import { ActionButton, GlyphDownload } from "./fx";
 import { IntroPref } from "./IntroPref";
+import { exportJsonWithShots, localShotCount } from "@/journal/screenshots/backupShots";
 
 export const DATA_STRINGS = {
   title: "Daten",
@@ -37,6 +38,10 @@ export const DATA_STRINGS = {
   footer: (trades: number, setups: number, rules: number) => `${trades} Trades gespeichert · ${setups} Grundlagen · ${rules} Grundregeln`,
   trades: (n: number) => `${n} Trades`,
   showAll: "Alle anzeigen",
+  /** Review F08: the plain JSON backup carries only references to the pictures. */
+  jsonShots: "Backup mit Bildern",
+  shotsLocal: (n: number) =>
+    `${n === 1 ? "1 Screenshot liegt" : `${n} Screenshots liegen`} nur in diesem Browser – das normale JSON-Backup enthält nur Verweise. „Backup mit Bildern“ nimmt ${n === 1 ? "ihn" : "sie"} mit.`,
 } as const;
 
 export const BACKUP_KIND_LABELS: Record<BackupKind, string> = { auto: "Automatisch", import: "Vor Import", v0: "Migration" };
@@ -75,6 +80,7 @@ export function DataCard({ onImport, className }: DataCardProps) {
   const [showQuarantine, setShowQuarantine] = useState(false);
   const [busy, setBusy] = useState(false);
   const downloadable = canDownload();
+  const localShots = useMemo(() => localShotCount(trades), [trades]);
 
   // Snapshot list: recomputed after every journal change (import / restore / auto backup) or manual refresh.
   const backups: BackupEntry[] = useMemo(() => listBackups(), [trades, settings, version]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -118,6 +124,11 @@ export function DataCard({ onImport, className }: DataCardProps) {
             <ActionButton icon={<GlyphDownload />} onRun={() => exportJson()}>
               {DATA_STRINGS.json}
             </ActionButton>
+            {localShots > 0 && (
+              <ActionButton icon={<GlyphDownload />} onRun={() => exportJsonWithShots()}>
+                {DATA_STRINGS.jsonShots}
+              </ActionButton>
+            )}
           </>
         ) : (
           <p className="text-[12.5px] text-faint">{DOWNLOAD_UNAVAILABLE}</p>
@@ -125,6 +136,11 @@ export function DataCard({ onImport, className }: DataCardProps) {
         <Button onClick={onImport}>{DATA_STRINGS.import}</Button>
       </div>
       <p className="mt-2.5 text-[11.5px] leading-relaxed text-faint">{DATA_STRINGS.importHint}</p>
+      {localShots > 0 && (
+        <p className="mt-1.5 text-[11.5px] leading-relaxed text-warn" data-testid="data-shots-local">
+          {DATA_STRINGS.shotsLocal(localShots)}
+        </p>
+      )}
 
       <div className="mt-5 grid gap-3 border-t border-line pt-4">
         <div className="flex flex-wrap items-center justify-between gap-2 text-[12.5px] text-mute">

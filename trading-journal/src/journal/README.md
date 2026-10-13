@@ -80,8 +80,11 @@ instant under reduced motion); a tap selects, `Zeichnung löschen` removes. Save
   finishes after the close) are deleted – only objects of the own folder that no trade of the loaded journal still
   references, and also after a downgrade. There is deliberately no sweep over the folder (client or server): a device
   with cloud sync off holds references the server never sees. Account deletion removes the whole folder.
-- **A JSON backup does NOT contain the pictures** (only the references); a restored journal on another device shows
-  local screenshots as `Nicht verfügbar`. Cloud screenshots come back with the account.
+- **The plain JSON backup does NOT contain the pictures** (only the references, PR #3 format); Daten says so as soon
+  as a picture lives only in this browser and offers **„Backup mit Bildern“** (`backupShots.ts`: the same JSON plus
+  `screenshots: { key: { mime, data } }` for the local blobs and the offline copies of cloud pictures – old importers
+  ignore the key). The import preview names what a file carries („inkl. n Screenshots“) or lacks („n Screenshots sind
+  nicht enthalten“) and an import writes the carried pictures back. Cloud screenshots come back with the account.
 - Display: `ShotThumb` (`NotchedFrame`), `ShotReel` (one picture: thumbnail; several: the pulse `ReelWindow` montage →
   tableau), `ShotLightbox` (portal, `StripWipe` between pictures, swipe / arrows, Escape closes only the lightbox).
 

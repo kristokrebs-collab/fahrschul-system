@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState, type ChangeEvent } from "react";
+import { backupShotInfo, restoreShotsFromBackup } from "@/journal/screenshots/backupShots";
 import { fmt } from "@/lib/format";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { Sheet } from "@/motion/Sheet";
@@ -49,7 +50,14 @@ export const IMPORT_MODES: readonly { v: ImportMode; label: string }[] = [
   { v: "replace", label: IMPORT_STRINGS.replace },
 ];
 
-type Parsed = { ok: true; text: string; preview: ImportPreview } | { ok: false; error: string };
+/** Pictures in the file (Review F08). */
+export const IMPORT_SHOT_STRINGS = {
+  embedded: (n: number) => `inkl. ${n === 1 ? "1 Screenshot" : `${n} Screenshots`} – sie kommen auf dieses Gerät.`,
+  missing: (n: number) =>
+    `${n === 1 ? "1 Screenshot ist" : `${n} Screenshots sind`} nicht enthalten – nur Verweise. Die Bilder liegen auf dem Gerät, von dem das Backup stammt („Backup mit Bildern“ unter Einstellungen → Daten nimmt sie mit).`,
+} as const;
+
+type Parsed = { ok: true; text: string; preview: ImportPreview; shots: { embedded: number; missing: number } } | { ok: false; error: string };
 
 export interface ImportDialogProps {
   open: boolean;
@@ -101,7 +109,7 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
     try {
       const text = await (readFile ? readFile(file) : file.text());
       const res = parseBackup(text);
-      setParsed(res.ok ? { ok: true, text, preview: res.preview } : { ok: false, error: res.path ? `${res.path}: ${res.error}` : res.error });
+      setParsed(res.ok ? { ok: true, text, preview: res.preview, shots: backupShotInfo(text) } : { ok: false, error: res.path ? `${res.path}: ${res.error}` : res.error });
     } catch {
       setParsed({ ok: false, error: IMPORT_STRINGS.readError });
     }
@@ -113,6 +121,8 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
     const tick = setInterval(() => setProgress((p) => (p == null ? p : Math.min(85, p + 10))), 120);
     try {
       const result = await importBackup(parsed.text, { mode });
+      // pictures a "Backup mit Bildern" carries go back into this device's store (Review F08)
+      if (result.ok && shots.embedded > 0) await restoreShotsFromBackup(parsed.text);
       clearInterval(tick);
       setProgress(100);
       if (result.ok) {
@@ -129,6 +139,7 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
     }
   }
 
+  const shots = parsed?.ok ? parsed.shots : { embedded: 0, missing: 0 };
   const busy = progress != null && progress < 100;
   const canRun = Boolean(parsed?.ok) && !busy;
 
@@ -238,6 +249,16 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
               <p className="text-[12.5px] text-mute" data-testid="import-preview-text">
                 {previewText(parsed.preview)}
               </p>
+              {shots.embedded > 0 && (
+                <p className="text-[12px] text-mute" data-testid="import-shots">
+                  {IMPORT_SHOT_STRINGS.embedded(shots.embedded)}
+                </p>
+              )}
+              {shots.missing > 0 && (
+                <p className="text-[12px] text-warn" data-testid="import-shots-missing">
+                  {IMPORT_SHOT_STRINGS.missing(shots.missing)}
+                </p>
+              )}
               {parsed.preview.exportedAt && <span className="sr-only">{`${IMPORT_STRINGS.exportedAt} ${fmt.date(new Date(parsed.preview.exportedAt))}`}</span>}
             </motion.div>
           )}
