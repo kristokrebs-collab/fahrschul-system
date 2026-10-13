@@ -228,5 +228,21 @@ describe("PreiseView", () => {
     expect(screen.getByTestId("billing-closed")).toHaveTextContent("Keine Abos in dieser Version");
     expect(screen.queryByTestId("cta-pro")).toBeNull();
     expect(screen.getByTestId("note-pro")).toHaveTextContent("Noch nicht buchbar");
+     // no action → the notch disc is plainly decorative (no red arrow pretending to be a button, review F5)
+    for (const p of ["free", "pro", "premium", "team"]) {
+      expect(within(screen.getByTestId(`plan-${p}`)).queryByRole("button")).toBeNull();
+      expect(within(screen.getByTestId(`plan-${p}`)).getByTestId("notch-disc-quiet")).toBeInTheDocument();
+    }
+  });
+
+  it("the notch disc of a card with an action IS that action (review F5)", async () => {
+    useBilling.setState({ config: CONFIG });
+    wrap(<PreiseView />);
+    const disc = screen.getByTestId("disc-free");
+    expect(disc.tagName).toBe("BUTTON");
+    expect(disc).toHaveAccessibleName("Kostenlos starten");
+    fireEvent.click(disc);
+    await waitFor(() => expect(useCloudSession.getState().sheet).toMatchObject({ open: true, view: "signup" }));
+    expect(screen.getByTestId("disc-pro")).toHaveAccessibleName(screen.getByTestId("cta-pro").textContent!);
   });
 });

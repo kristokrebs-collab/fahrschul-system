@@ -185,6 +185,8 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
         wrapperClassName="h-full"
         className={cn("flex h-full flex-col", cat.recommended ? "bg-ink-850" : "bg-ink-900")}
         media={<PlanArt plan={plan} />}
+        // the disc is the card's CTA when it has one, and plainly decorative when it has none (review F5)
+        disc={cta ? { label: cta.label, onClick: cta.run, disabled: !!busy, testId: `disc-${plan}` } : "quiet"}
       >
         <div className="flex flex-1 flex-col gap-4 px-5 pb-6 pt-4">
           <header className="grid gap-1.5">

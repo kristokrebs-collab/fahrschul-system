@@ -47,6 +47,20 @@ export interface NotchedFrameProps {
   /** Classes for the outer wrapper (grid placement). */
   wrapperClassName?: string;
   style?: CSSProperties;
+  /**
+   * What the notch disc is (review F5): `"decor"` (default – the whole card is the action, the disc follows its hover),
+   * `"quiet"` (the card offers no action: no red, no arrow – a plain dot, so nothing looks clickable that is not), or
+   * an action – the disc becomes a real button (the card's CTA) with its own label.
+   */
+  disc?: "decor" | "quiet" | NotchDiscAction;
+}
+
+/** The disc as the card's own button. */
+export interface NotchDiscAction {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  testId?: string;
 }
 
 /** SVG path of the card outline with the notch (+ concave ears) cut out of the bottom-right corner. */
@@ -90,6 +104,10 @@ const CSS = `@layer components{
 .pn-color{position:absolute;inset:0;opacity:var(--pn-on);transition:opacity ${CONFIG.grayMs}ms ${CONFIG.grayEase}}
 .pn-disc-hot{opacity:var(--pn-on);transition:opacity ${CONFIG.discMs}ms ${CONFIG.discEase}}
 .pn-icon{color:color-mix(in srgb,${CONFIG.iconColor} calc(var(--pn-on) * 100%),${CONFIG.iconRest});transform:translate(calc(var(--pn-on) * ${CONFIG.iconShift}px),calc(var(--pn-on) * -${CONFIG.iconShift}px));transition:transform ${CONFIG.discMs}ms ${CONFIG.discEase}}
+.pn-frame[data-disc=quiet] .pn-disc-hot{opacity:0}
+.pn-disc-btn{pointer-events:auto;cursor:pointer;outline:none}
+.pn-disc-btn:focus-visible{box-shadow:0 0 0 2px var(--color-ink-950,#0a0a0a),0 0 0 4px var(--color-signal,#e5202e)}
+.pn-disc-btn:disabled{cursor:default;opacity:.5}
 @media (prefers-reduced-motion:reduce){.pn-color,.pn-disc-hot,.pn-icon{transition-duration:.01ms}}
 }`;
 
@@ -97,7 +115,7 @@ const CSS = `@layer components{
  * Card surface with the pack's notch: the outline (rounded corners + notch + ears) is ONE SVG mask, built once per
  * size (ResizeObserver), so the cut works on any background. The disc sits in the notch outside the mask.
  */
-export function NotchedFrame({ children, media, radius = 16, notchSize = 56, active, outline, className, mediaClassName, wrapperClassName, style }: NotchedFrameProps) {
+export function NotchedFrame({ children, media, radius = 16, notchSize = 56, active, outline, className, mediaClassName, wrapperClassName, style, disc: discMode = "decor" }: NotchedFrameProps) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const outlineRef = useRef<SVGSVGElement>(null);
   const hasOutline = !!outline;
@@ -149,8 +167,21 @@ export function NotchedFrame({ children, media, radius = 16, notchSize = 56, act
   const out = -notchSize * CONFIG.discOut;
   const icon = Math.max(14, Math.round(notchSize * CONFIG.icon));
 
+  const quiet = discMode === "quiet";
+  const action = typeof discMode === "object" ? discMode : null;
+  const discStyle = { right: out, bottom: out, width: disc, height: disc, background: CONFIG.discRest } as const;
+  const arrow = (
+    <>
+      <span className="pn-disc-hot absolute inset-0 rounded-full" style={{ background: CONFIG.discHover }} />
+      <svg className="pn-icon relative" width={icon} height={icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M7 7h10v10" />
+        <path d="M7 17 17 7" />
+      </svg>
+    </>
+  );
+
   return (
-    <div className={cn("pn-frame relative isolate min-w-0", wrapperClassName)} data-active={active ? "" : undefined} style={style}>
+    <div className={cn("pn-frame relative isolate min-w-0", wrapperClassName)} data-active={active ? "" : undefined} data-disc={quiet ? "quiet" : action ? "action" : undefined} style={style}>
       <style href="pulse-notched-frame" precedence="default">
         {CSS}
       </style>
@@ -170,13 +201,23 @@ export function NotchedFrame({ children, media, radius = 16, notchSize = 56, act
           <path transform="translate(.5 .5)" fill="none" stroke={outline} strokeWidth="1" />
         </svg>
       )}
-      <span aria-hidden="true" className="pointer-events-none absolute grid place-items-center rounded-full" style={{ right: out, bottom: out, width: disc, height: disc, background: CONFIG.discRest }}>
-        <span className="pn-disc-hot absolute inset-0 rounded-full" style={{ background: CONFIG.discHover }} />
-        <svg className="pn-icon relative" width={icon} height={icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M7 7h10v10" />
-          <path d="M7 17 17 7" />
-        </svg>
-      </span>
+      {action ? (
+        <button
+          type="button"
+          aria-label={action.label}
+          disabled={action.disabled}
+          onClick={action.onClick}
+          data-testid={action.testId}
+          className="pn-disc-btn absolute grid place-items-center rounded-full"
+          style={discStyle}
+        >
+          {arrow}
+        </button>
+      ) : (
+        <span aria-hidden="true" className="pointer-events-none absolute grid place-items-center rounded-full" style={discStyle} data-testid={quiet ? "notch-disc-quiet" : undefined}>
+          {quiet ? <span className="block size-1.5 rounded-full" style={{ background: CONFIG.iconRest, opacity: 0.45 }} /> : arrow}
+        </span>
+      )}
     </div>
   );
 }
