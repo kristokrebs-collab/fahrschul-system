@@ -13,6 +13,7 @@ import { ApiError, FUNCTIONS_MISSING } from "@/cloud/api";
 import { cloudEnabled } from "@/cloud/env";
 import { hasStoredSession } from "@/cloud/hint";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
+import { legalShown } from "@/legal/config";
 import { hasClaudeRuntime } from "@/store/capability";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
@@ -76,6 +77,11 @@ export interface BillingState {
   interval: BillingInterval;
   /** Team seats picked on the pricing page. */
   seats: number;
+  /**
+   * The buyer accepted the operator's AGB (and took note of the Widerrufsbelehrung) in the upgrade sheet – this
+   * session only. Every checkout passes through it (Review F07); not asked inside claude.ai (nothing is sold there).
+   */
+  termsAccepted: boolean;
 }
 
 export interface BillingCache {
@@ -107,6 +113,7 @@ const INITIAL: BillingState = {
   referralInfo: null,
   upgrade: { open: false, feature: null, plan: null },
   cancelOpen: false,
+  termsAccepted: false,
   pending: null,
   returned: null,
   interval: "year",
@@ -290,6 +297,11 @@ export async function startCheckout(intent: CheckoutIntent): Promise<void> {
     useBilling.setState({ pending: intent });
     return;
   }
+  if (legalShown() && !s.termsAccepted) {
+    // the consent first: the upgrade sheet asks for it, its button continues the checkout
+    useBilling.setState({ pending: null, upgrade: { open: true, feature: null, plan: intent.plan } });
+    return;
+  }
   useBilling.setState({ busy: "checkout", pending: null });
   try {
     const code = s.promo?.valid ? s.promo.code : undefined;
@@ -414,6 +426,11 @@ export async function loadReferral(): Promise<ReferralInfo | null> {
 
 export function openUpgrade(feature: Feature | null = null, plan: PaidPlanId | null = null): void {
   useBilling.setState({ upgrade: { open: true, feature, plan } });
+}
+
+/** The consent of the upgrade sheet (AGB / Widerruf) for this session. */
+export function acceptTerms(v: boolean): void {
+  useBilling.setState({ termsAccepted: v });
 }
 
 export function closeUpgrade(): void {

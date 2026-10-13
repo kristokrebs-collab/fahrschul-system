@@ -16,6 +16,7 @@ import { hasClaudeRuntime } from "@/store/capability";
 import { navigate } from "@/store/router";
 import { useViews } from "@/store/viewsStore";
 import { useCockpit } from "@/views/cockpit/cockpitStore";
+import { LegalLinks } from "@/legal/LegalLinks";
 import { KontoView } from "./KontoView";
 
 function Cell({ index, span, children }: { index: number; span: string; children: ReactNode }) {
@@ -60,6 +61,9 @@ function KontoExtras() {
       {cells}
       {/* the app mounts the one ExchangeHost (sheets) – no fallback host here */}
       <ExchangeSection withHost={false} startIndex={index} />
+      <Cell key="legal" index={index + 3} span="lg:col-span-12">
+        <LegalLinks className="justify-center pt-1" />
+      </Cell>
     </>
   );
 }

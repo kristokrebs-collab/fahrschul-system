@@ -54,7 +54,7 @@ export const PREISE = {
   faqTitle: "Häufige Fragen",
   legalCancel: "Verträge hier kündigen",
   legalNoContract: "Es läuft gerade kein Vertrag.",
-  legalNote: "Preise in Euro. Zahlung und Rechnungen über Stripe. AGB, Widerruf und Datenschutz stellt der Betreiber bereit.",
+  legalNote: "Preise in Euro. Zahlung und Rechnungen über Stripe. Es gelten die Dokumente des Betreibers:",
   closedCta: "Alles freigeschaltet",
 } as const;
 

@@ -17,6 +17,7 @@ import { isLazyPage, lazyView, OverviewView, PAGE_FEATURE, preloadPage, Settings
 import { installViewportInset } from "@/app/pwa";
 import { ScenarioWatcher } from "@/app/ScenarioWatcher";
 import { ShortcutHost } from "@/app/ShortcutHost";
+import { LegalHost } from "@/legal/LegalHost";
 import { toIslandToast } from "@/app/toasts";
 import { useDetailCandles } from "@/app/useDetailCandles";
 import { useEntitlement } from "@/billing/entitlements";
@@ -264,6 +265,9 @@ function Shell() {
       </HostSlot>
       <HostSlot name="Cloud">
         <CloudSyncHost onOpenAccount={() => navigate("konto")} />
+      </HostSlot>
+      <HostSlot name="Rechtliches">
+        <LegalHost />
       </HostSlot>
       <FeatureHosts />
       <Celebrate />

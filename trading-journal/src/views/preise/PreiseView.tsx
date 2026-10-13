@@ -1,3 +1,4 @@
+import { LegalLinks } from "@/legal/LegalLinks";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -86,7 +87,10 @@ function LegalLine() {
   };
   return (
     <footer className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-line pt-4 text-[12.5px] text-faint">
-      <span className="max-w-[70ch]">{PREISE.legalNote}</span>
+      <span className="flex max-w-[70ch] flex-wrap items-center gap-x-2 gap-y-1">
+        {PREISE.legalNote}
+        <LegalLinks className="text-[12.5px]" />
+      </span>
       <button
         type="button"
         onClick={cancel}

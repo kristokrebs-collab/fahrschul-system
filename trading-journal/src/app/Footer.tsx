@@ -11,6 +11,7 @@ import { motion, useMotionValue, useSpring, type MotionValue } from "motion/reac
 import { memo, useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { shellStatTexts, useLivePriceText, useShellStats } from "@/app/shellStats";
 import { ChartAttribution } from "@/chart/Attribution";
+import { LegalLinks } from "@/legal/LegalLinks";
 import { cn } from "@/lib/cn";
 import { DancingSvgWord } from "@/motion/pulse/DancingLetters";
 import { Marquee } from "@/motion/pulse/Marquee";
@@ -275,8 +276,9 @@ export function Footer() {
           <FooterOutlineMemo draw={drawn} />
         </div>
         <div className="mx-auto flex max-w-[1320px] items-end justify-between gap-4 px-4 sm:px-6">
-          <div style={part(shown, reduced, CONFIG.bar)}>
+          <div className="grid gap-2" style={part(shown, reduced, CONFIG.bar)}>
             <ChartAttribution className="touch-hit-links" />
+            <LegalLinks />
           </div>
           <div style={part(shown, reduced, CONFIG.links)}>
             <button

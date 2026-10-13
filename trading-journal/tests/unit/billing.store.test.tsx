@@ -175,9 +175,18 @@ describe("store flows", () => {
     expect(calls).toHaveLength(0);
   });
 
+  it("checkout without the AGB consent of this session: the upgrade sheet asks first, nothing is posted (Review F07)", async () => {
+    signIn();
+    useBilling.setState({ config: CONFIG, termsAccepted: false });
+    await startCheckout({ plan: "premium", interval: "month" });
+    expect(calls).toHaveLength(0);
+    expect(useBilling.getState().upgrade).toMatchObject({ open: true, plan: "premium" });
+    expect(redirects).toHaveLength(0);
+  });
+
   it("checkout signed in: sends code + referral + return path, then leaves for Stripe only", async () => {
     signIn();
-    useBilling.setState({ config: CONFIG, promo: { valid: true, code: "TRADER20", percentOff: 20 } });
+    useBilling.setState({ config: CONFIG, promo: { valid: true, code: "TRADER20", percentOff: 20 }, termsAccepted: true });
     localStorage.setItem(REF_KEY, JSON.stringify({ code: "FRIEND30", at: Date.now() }));
     window.history.replaceState(null, "", "/#preise");
     handler = () => ({ body: { url: "https://checkout.stripe.com/c/pay/cs_test_1", sessionId: "cs_test_1" } });
@@ -195,11 +204,11 @@ describe("store flows", () => {
 
   it("503 from the checkout closes the shop; 409 reloads the account", async () => {
     signIn();
-    useBilling.setState({ config: CONFIG });
+    useBilling.setState({ config: CONFIG, termsAccepted: true });
     handler = (u) => (u.pathname.endsWith("/checkout") ? { status: 503, body: { error: { code: "billing_unavailable", message: "Zahlungen sind noch nicht eingerichtet." } } } : { body: status() });
     await startCheckout({ plan: "pro", interval: "month" });
     expect(useBilling.getState().config?.enabled).toBe(false);
-    useBilling.setState({ config: CONFIG });
+    useBilling.setState({ config: CONFIG, termsAccepted: true });
     handler = (u) =>
       u.pathname.endsWith("/checkout")
         ? { status: 409, body: { error: { code: "already_subscribed", message: "x" } } }

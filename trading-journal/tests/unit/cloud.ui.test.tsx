@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const signInPassword = vi.fn();
 const sendMagicLink = vi.fn();
+const signUp = vi.fn();
 vi.mock("@/cloud/runtime", async (orig) => {
   const real = await orig<typeof import("@/cloud/runtime")>();
   return {
@@ -14,6 +15,7 @@ vi.mock("@/cloud/runtime", async (orig) => {
     ensureCloud: vi.fn(async () => ({
       signInPassword,
       sendMagicLink,
+      signUp,
       listSessions: async () => ({ ok: true, value: [{ id: "s1", createdAt: null, lastActiveAt: new Date().toISOString(), userAgent: "Mozilla/5.0 (Macintosh) Chrome/140", ip: "10.0.0.x", aal: "aal1", current: true }] }),
       signOutScope: async () => ({ ok: true }),
       syncNow: async () => true,
@@ -145,6 +147,45 @@ describe("AuthSheet", () => {
     await waitFor(() => expect(useCloudSession.getState().sheet).toMatchObject({ view: "sent", sent: "magic", email: "trader@example.com" }));
     expect(await screen.findByText(/Wir haben einen Anmelde-Link an trader@example.com geschickt/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Erneut senden/ })).toBeDisabled();
+  });
+});
+
+describe("AuthSheet – Registrierung mit Zustimmung (Review F07)", () => {
+  it("a sign-up needs the AGB / Datenschutz box; the documents are links that open without ticking it", async () => {
+    openAuthSheet("signup", "card");
+    render(
+      <MotionRoot>
+        <AuthSheet />
+      </MotionRoot>,
+    );
+    await screen.findByRole("dialog");
+    fireEvent.change(screen.getByLabelText("E-Mail"), { target: { value: "neu@example.com" } });
+    fireEvent.change(screen.getByLabelText("Passwort"), { target: { value: "Sehr-sicheres-Passwort-42!" } });
+    const consent = screen.getByTestId("signup-consent");
+    expect(consent).toHaveAttribute("data-checked", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Konto erstellen" }));
+    expect(await screen.findByText("Bitte bestätige die AGB und die Datenschutzerklärung.")).toBeInTheDocument();
+    expect(signUp).not.toHaveBeenCalled();
+    // the links are real links to the operator's documents
+    expect(consent.querySelector('[data-testid="legal-agb"]')).toHaveAttribute("href", "?rechtliches=agb");
+    expect(consent.querySelector('[data-testid="legal-datenschutz"]')).toHaveAttribute("href", "?rechtliches=datenschutz");
+    fireEvent.click(screen.getByRole("checkbox"));
+    expect(consent).toHaveAttribute("data-checked", "true");
+    signUp.mockResolvedValueOnce({ ok: true, value: { confirm: true } });
+    fireEvent.click(screen.getByRole("button", { name: "Konto erstellen" }));
+    await waitFor(() => expect(signUp).toHaveBeenCalledWith("neu@example.com", "Sehr-sicheres-Passwort-42!"));
+  });
+
+  it("signing in shows the documents as a note, no box", async () => {
+    openAuthSheet("signin", "card");
+    render(
+      <MotionRoot>
+        <AuthSheet />
+      </MotionRoot>,
+    );
+    await screen.findByRole("dialog", { name: "Anmelden" });
+    expect(screen.queryByTestId("signup-consent")).toBeNull();
+    expect(screen.getByTestId("auth-legal-note")).toHaveTextContent("Es gelten die AGB und die Datenschutzerklärung des Betreibers.");
   });
 });
 

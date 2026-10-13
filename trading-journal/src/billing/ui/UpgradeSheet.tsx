@@ -8,7 +8,10 @@ import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
 import { displayPrice, formatMoney } from "../format";
 import { featureOffered, FEATURE_INFO, featuresGained, PAID_PLANS, PLAN_CATALOG, planIncludes, upgradePlanFor, yearlySavingsPct, type PaidPlanId } from "../plans";
-import { closeUpgrade, setBillingInterval, startCheckout, useBilling, useBillingMode, useEffectivePlan, useOffer, useTrialDays } from "../store";
+import { acceptTerms, closeUpgrade, setBillingInterval, startCheckout, useBilling, useBillingMode, useEffectivePlan, useOffer, useTrialDays } from "../store";
+import { legalShown } from "@/legal/config";
+import { ConsentCheck } from "@/legal/ConsentCheck";
+import { LegalLink } from "@/legal/LegalLinks";
 import { BILLING, UPGRADE } from "../strings";
 import type { BillingInterval } from "../types";
 import { ClosedNotice, Mark, PriceDigits } from "./parts";
@@ -24,6 +27,17 @@ export interface UpgradeSheetProps {
  * the plan's price rolls between Monat / Jahr (shared toggle with the pricing page), the gained features check in one
  * after another (drawn ticks). The CTA starts Stripe Checkout (signed out: the login sheet first, then the checkout).
  */
+/** The consent before Stripe Checkout (the operator's own documents are linked – Review F07). */
+export const UPGRADE_LEGAL = {
+  consentPre: "Ich akzeptiere die ",
+  consentMid: " des Betreibers und habe die ",
+  widerruf: "Widerrufsbelehrung",
+  consentMid2: " und die ",
+  datenschutz: "Datenschutzerklärung",
+  consentPost: " zur Kenntnis genommen.",
+  missing: "Bitte bestätige zuerst die AGB.",
+} as const;
+
 export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
   const upgrade = useBilling((s) => s.upgrade);
   const interval = useBilling((s) => s.interval);
@@ -54,7 +68,14 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
     setPicked(null);
     closeUpgrade();
   };
+  const consentNeeded = legalShown();
+  const termsAccepted = useBilling((s) => s.termsAccepted);
+  const [consentMissing, setConsentMissing] = useState(false);
   const go = () => {
+    if (consentNeeded && !termsAccepted) {
+      setConsentMissing(true);
+      return;
+    }
     if (!signedIn) {
       openAuthSheet("signup", "card");
       useBilling.setState({
@@ -156,6 +177,33 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
                 </li>
               ))}
             </ul>
+          </StaggerItem>
+        )}
+
+        {consentNeeded && mode === "open" && (
+          <StaggerItem className="grid gap-1.5">
+            <ConsentCheck
+              checked={termsAccepted}
+              onChange={(v) => {
+                acceptTerms(v);
+                if (v) setConsentMissing(false);
+              }}
+              invalid={consentMissing}
+              testId="upgrade-consent"
+            >
+              {UPGRADE_LEGAL.consentPre}
+              <LegalLink doc="agb" />
+              {UPGRADE_LEGAL.consentMid}
+              <LegalLink doc="widerruf">{UPGRADE_LEGAL.widerruf}</LegalLink>
+              {UPGRADE_LEGAL.consentMid2}
+              <LegalLink doc="datenschutz">{UPGRADE_LEGAL.datenschutz}</LegalLink>
+              {UPGRADE_LEGAL.consentPost}
+            </ConsentCheck>
+            {consentMissing && !termsAccepted && (
+              <p role="alert" className="text-[12px] text-loss">
+                {UPGRADE_LEGAL.missing}
+              </p>
+            )}
           </StaggerItem>
         )}
 

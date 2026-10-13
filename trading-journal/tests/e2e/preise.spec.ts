@@ -125,6 +125,15 @@ test.describe("Preise & Abo", () => {
     await page.getByRole("button", { name: "Kann ich jederzeit kündigen?" }).click();
     await expect(page.getByText("Vertrag hier kündigen", { exact: false }).first()).toBeVisible();
     await expect(page.getByTestId("legal-cancel")).toHaveText("Verträge hier kündigen");
+    // the operator's documents (Review F07): unset in this build → the Impressum shows marked placeholders
+    const legal = page.getByTestId("preise-view").getByTestId("legal-links");
+    await expect(legal).toBeVisible();
+    await legal.getByTestId("legal-impressum").click();
+    const legalSheet = page.getByTestId("legal-sheet");
+    await expect(legalSheet).toHaveAttribute("data-doc", "impressum");
+    await expect(legalSheet.getByTestId("legal-placeholder").first()).toContainText("VITE_LEGAL_OPERATOR");
+    await page.keyboard.press("Escape");
+    await expect(legalSheet).toHaveCount(0);
     await expectNoHorizontalScroll(page);
 
     // signed out, the trial button opens the registration first
@@ -141,6 +150,13 @@ test.describe("Preise & Abo", () => {
     await expect(page.getByTestId("current-plan")).toContainText("Free");
     await page.getByTestId("plan-pro").scrollIntoViewIfNeeded();
     await page.getByTestId("cta-pro").click();
+    // the operator's AGB / Widerruf / Datenschutz first (Review F07): the upgrade sheet asks, its button continues
+    const sheet = page.getByTestId("upgrade-sheet");
+    await expect(sheet).toBeVisible();
+    await page.getByTestId("upgrade-cta").click();
+    await expect(page.getByText("Bitte bestätige zuerst die AGB.")).toBeVisible();
+    await page.getByTestId("upgrade-consent").getByRole("checkbox").check();
+    await page.getByTestId("upgrade-cta").click();
     // left the app for (the fake) Stripe Checkout
     await page.waitForURL(/checkout\.stripe\.com/);
     expect(bill.checkouts[0]).toMatchObject({ plan: "pro", interval: "year", ref: "FRIEND30", returnTo: expect.stringMatching(/^\/(#preise)?$/) });

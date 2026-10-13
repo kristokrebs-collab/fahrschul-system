@@ -1,3 +1,6 @@
+import { legalShown } from "@/legal/config";
+import { ConsentCheck } from "@/legal/ConsentCheck";
+import { LegalLink } from "@/legal/LegalLinks";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
@@ -217,7 +220,22 @@ const MODE_OPTIONS = [
   { v: "signup" as const, label: AUTH.modes.signup },
 ];
 
+/** Consent at registration (the operator's own documents are linked – Review F07). */
+export const AUTH_LEGAL = {
+  consentPre: "Ich akzeptiere die ",
+  consentMid: " und habe die ",
+  datenschutz: "Datenschutzerklärung",
+  consentPost: " gelesen.",
+  missing: "Bitte bestätige die AGB und die Datenschutzerklärung.",
+  notePre: "Es gelten die ",
+  noteMid: " und die ",
+  notePost: " des Betreibers.",
+} as const;
+
 function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
+  const consentNeeded = legalShown();
+  const [consent, setConsent] = useState(false);
+  const [consentMissing, setConsentMissing] = useState(false);
   const stored = useCloudSession((s) => s.sheet.email);
   const [email, setEmail] = useState(stored);
   const [password, setPassword] = useState("");
@@ -237,6 +255,11 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
     if (mode !== "magic") {
       const pp = mode === "signup" ? passwordProblem(password) : password ? null : "Bitte gib dein Passwort ein.";
       if (pp) return setErr(errorOf("password", pp));
+    }
+    // registration: the operator's AGB and privacy policy first (Review F07)
+    if (mode === "signup" && consentNeeded && !consent) {
+      setConsentMissing(true);
+      return setErr(errorOf(null, AUTH_LEGAL.missing));
     }
     setErr(null);
     setBusy(true);
@@ -264,6 +287,10 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
   }
 
   async function oauth(p: OAuthProvider) {
+    if (mode === "signup" && consentNeeded && !consent) {
+      setConsentMissing(true);
+      return setErr(errorOf(null, AUTH_LEGAL.missing));
+    }
     setBusy(true);
     const m = await cloudOrError();
     const r = m ? await m.signInOAuth(p) : null;
@@ -324,6 +351,28 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
           {mode === "signup" && <StrengthMeter password={password} />}
         </StaggerItem>
       )}
+      {mode === "signup" && consentNeeded && (
+        <StaggerItem>
+          <ConsentCheck
+            checked={consent}
+            onChange={(v) => {
+              setConsent(v);
+              if (v) {
+                setConsentMissing(false);
+                if (err?.message === AUTH_LEGAL.missing) setErr(null);
+              }
+            }}
+            invalid={consentMissing}
+            testId="signup-consent"
+          >
+            {AUTH_LEGAL.consentPre}
+            <LegalLink doc="agb" />
+            {AUTH_LEGAL.consentMid}
+            <LegalLink doc="datenschutz">{AUTH_LEGAL.datenschutz}</LegalLink>
+            {AUTH_LEGAL.consentPost}
+          </ConsentCheck>
+        </StaggerItem>
+      )}
       {err && err.field === null && (
         <motion.p role="alert" className="text-[12.5px] text-loss" initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} transition={tween.fade} key={err.key}>
           {err.message}
@@ -336,6 +385,19 @@ function EntryView({ mode }: { mode: "signin" | "magic" | "signup" }) {
       {mode === "signup" && (
         <StaggerItem>
           <p className="text-[11.5px] leading-relaxed text-faint">{AUTH.euNote}</p>
+        </StaggerItem>
+      )}
+      {mode !== "signup" && consentNeeded && (
+        <StaggerItem>
+          <p className="text-[11.5px] leading-relaxed text-faint" data-testid="auth-legal-note">
+            {AUTH_LEGAL.notePre}
+            <LegalLink doc="agb" className="text-mute underline" />
+            {AUTH_LEGAL.noteMid}
+            <LegalLink doc="datenschutz" className="text-mute underline">
+              {AUTH_LEGAL.datenschutz}
+            </LegalLink>
+            {AUTH_LEGAL.notePost}
+          </p>
         </StaggerItem>
       )}
     </form>

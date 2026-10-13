@@ -130,6 +130,7 @@ Netlify → **Site configuration → Environment variables → Add a variable**.
 | `VITE_SUPABASE_URL` | Project URL | Builds |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_…` | Builds |
 | `VITE_SUPABASE_OAUTH_PROVIDERS` | optional, z. B. `google,github` | Builds |
+| `VITE_LEGAL_*` | Impressum-Daten und Links zu Datenschutz / AGB / Widerruf – siehe 4.2 | Builds |
 | `SUPABASE_URL` | Project URL (gleicher Wert) | Functions |
 | `SUPABASE_SECRET_KEY` | `sb_secret_…` | Functions, secret |
 | `SITE_ORIGIN` | `https://<deine-site>.netlify.app` (ohne `/` am Ende) | Functions |
@@ -249,7 +250,40 @@ nicht eingebaut.
 
 **Live gehen:** dieselben Produkte, Preise, Webhook und Portal-Einstellungen im Live-Modus anlegen, `sk_live_…`,
 das neue `whsec_…` und die Live-`price_…`-IDs in Netlify eintragen, neu deployen. Vorher Impressum, AGB, Widerruf und
-Datenschutzerklärung bereitstellen (die Preisseite weist darauf hin; die Texte liefert der Betreiber).
+Datenschutzerklärung bereitstellen und eintragen (Abschnitt 4.2).
+
+### 4.2 Rechtliches (Impressum, Datenschutz, AGB, Widerruf)
+
+Die App erfindet weder Betreiber noch Anschrift, Steuernummer oder Rechtstexte. Sie zeigt nur, was du als Betreiber
+in Netlify unter **Environment variables** (Scope **Builds**, öffentlich – keine Geheimnisse) einträgst, und markiert
+alles Fehlende sichtbar als **„Platzhalter – vom Betreiber auszufüllen“**. Nach jeder Änderung neu deployen (Vite
+übernimmt `VITE_*` beim Build).
+
+| Variable | Pflicht | Inhalt |
+|---|---|---|
+| `VITE_LEGAL_OPERATOR` | ja* | Name bzw. Firma des Anbieters |
+| `VITE_LEGAL_ADDRESS` | ja* | ladungsfähige Anschrift, Zeilen mit `|` getrennt, z. B. `Musterstraße 1|12345 Musterstadt` |
+| `VITE_LEGAL_EMAIL` | ja* | Kontakt-E-Mail |
+| `VITE_LEGAL_PHONE` | nein | Telefon |
+| `VITE_LEGAL_REPRESENTATIVE` | je nach Rechtsform | vertretungsberechtigte Person (z. B. Geschäftsführer) |
+| `VITE_LEGAL_REGISTER` | je nach Rechtsform | Registergericht und -nummer |
+| `VITE_LEGAL_VAT_ID` | falls vorhanden | Umsatzsteuer-ID |
+| `VITE_LEGAL_RESPONSIBLE` | je nach Inhalt | Verantwortlicher für den Inhalt |
+| `VITE_LEGAL_IMPRESSUM_URL` | nein | eigene Impressum-Seite statt der App-Ansicht (*dann entfallen die drei Pflichtfelder) |
+| `VITE_LEGAL_DATENSCHUTZ_URL` | ja | deine Datenschutzerklärung (https-Link oder Pfad auf dieser Site) |
+| `VITE_LEGAL_AGB_URL` | ja | deine AGB |
+| `VITE_LEGAL_WIDERRUF_URL` | nein | eigene Widerrufsbelehrung; ohne sie verweist die App auf die AGB |
+
+Wo die Links erscheinen: im Footer jeder Seite, auf **Konto**, im Rechtshinweis der **Preise**, bei der Registrierung
+(Pflicht-Häkchen „Ich akzeptiere die AGB und habe die Datenschutzerklärung gelesen“ – auch vor einer Registrierung über
+Google & Co.) und vor jedem Stripe-Checkout (Pflicht-Häkchen zu AGB, Widerrufsbelehrung und Datenschutzerklärung im
+Upgrade-Dialog). Direkte Links für Stripe, E-Mails oder die Website: `https://<deine-site>/?rechtliches=impressum`
+(ebenso `datenschutz`, `agb`, `widerruf`). In Stripe unter **Einstellungen → Öffentliche Details** die Links zu AGB und
+Datenschutz eintragen. Innerhalb von claude.ai (persönliches Journal) wird nichts verkauft – dort bleiben die Links aus.
+
+Die Texte selbst (Datenschutzerklärung mit Supabase/Netlify/Stripe/Binance als Empfänger, AGB mit Laufzeit und Kündigung,
+Widerrufsbelehrung für digitale Abos, ggf. AVV) musst du als Betreiber erstellen bzw. von einem Anwalt oder
+Rechtstext-Dienst prüfen lassen – die App liefert dafür keine Vorlage, die als fertig gelten könnte.
 
 ---
 
