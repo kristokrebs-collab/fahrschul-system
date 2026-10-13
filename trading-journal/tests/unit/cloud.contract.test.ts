@@ -3,6 +3,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { downloadLinkOf, fetchDownload } from "@/cloud/api";
 import { API_BASE, ApiError, apiFetch, cloudConfig, FUNCTIONS_MISSING, getAccessToken, installErrorReporting, isCloudAvailable, reportError, setAccessTokenProvider, useCloudUser } from "@/cloud";
 
 const ENV = { VITE_SUPABASE_URL: "https://abc.supabase.co/", VITE_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_x" };
@@ -68,5 +69,19 @@ describe("apiFetch", () => {
     const e = await apiFetch("/account/export", { fetchImpl: async () => reply(200, "<!doctype html><html></html>", "text/html") }).catch((x: unknown) => x);
     expect(e).toMatchObject({ status: 0, code: "unavailable", message: FUNCTIONS_MISSING });
     await expect(apiFetch("/x", { fetchImpl: async () => reply(200, "ok", "text/plain") })).resolves.toBe("ok");
+  });
+
+  it("a large export / backup arrives as a short Storage link and is fetched without the bearer token (DSGVO-02)", async () => {
+    expect(downloadLinkOf({ format: "trade-journal-account-export" })).toBeNull();
+    expect(downloadLinkOf({ download: { url: "javascript:alert(1)" } })).toBeNull();
+    expect(downloadLinkOf([{ download: { url: "https://x" } }])).toBeNull();
+    const link = downloadLinkOf({ download: { url: "https://p.supabase.co/storage/v1/object/sign/backups/u/x.json?token=t", bytes: 7_000_000, name: "konto.json", expiresAt: "x" } })!;
+    expect(link).toEqual({ url: "https://p.supabase.co/storage/v1/object/sign/backups/u/x.json?token=t", bytes: 7_000_000, name: "konto.json" });
+    const seen: RequestInit[] = [];
+    const text = await fetchDownload(link, async (_u, init) => (seen.push(init ?? {}), new Response('{"format":"trade-journal-account-export"}')));
+    expect(JSON.parse(text)).toEqual({ format: "trade-journal-account-export" });
+    expect(seen[0]).toMatchObject({ credentials: "omit" });
+    expect(new Headers(seen[0]!.headers).has("authorization")).toBe(false);
+    await expect(fetchDownload(link, async () => new Response("", { status: 400 }))).rejects.toMatchObject({ code: "download_failed" });
   });
 });

@@ -45,7 +45,10 @@ function table(state: FakeState, name: string) {
   let limit: number | null = null;
   let op: "select" | "delete" | "update" = "select";
   let patch: Row = {};
+  let columns: string[] | null = null;
   const missing = () => state.tables[name] === undefined;
+  // PostgREST returns only the selected columns (plain lists; `*` and embeds return the row)
+  const project = (r: Row): Row => (columns ? Object.fromEntries(columns.filter((c) => c in r).map((c) => [c, r[c]])) : r);
   const run = () => {
     if (missing()) return { data: null, error: { code: "PGRST205", message: "missing" } };
     const all = state.tables[name]!;
@@ -62,10 +65,10 @@ function table(state: FakeState, name: string) {
     for (const o of [...order].reverse()) rows = [...rows].sort((a, b) => (String(a[o.col]) < String(b[o.col]) ? -1 : String(a[o.col]) > String(b[o.col]) ? 1 : 0) * (o.asc ? 1 : -1));
     if (range) rows = rows.slice(range[0], range[1] + 1);
     if (limit !== null) rows = rows.slice(0, limit);
-    return { data: rows, error: null };
+    return { data: rows.map(project), error: null };
   };
   const q = {
-    select: () => q,
+    select: (cols?: string) => ((columns = cols && cols !== "*" && !cols.includes("(") ? cols.split(",").map((c) => c.trim()) : null), q),
     eq: (col: string, v: unknown) => (filters.push((r) => r[col] === v), q),
     lt: (col: string, v: unknown) => (filters.push((r) => (r[col] as never) < (v as never)), q),
     order: (col: string, o?: { ascending?: boolean }) => (order.push({ col, asc: o?.ascending !== false }), q),
@@ -119,6 +122,14 @@ function fakeAdmin(state: FakeState) {
       const o = state.storage[b]?.find((x) => x.name === path);
       return o ? { data: new Blob([o.body]), error: null } : { data: null, error: { message: "not found" } };
     },
+    createSignedUrls: async (paths: string[], ttl: number) => ({
+      data: paths.map((p) => (state.storage[b]?.some((o) => o.name === p) ? { path: p, signedUrl: `https://store.test/${b}/${p}?ttl=${ttl}`, error: null } : { path: p, signedUrl: "", error: "not found" })),
+      error: null,
+    }),
+    createSignedUrl: async (path: string, ttl: number, o: { download?: string } = {}) =>
+      state.storage[b]?.some((x) => x.name === path)
+        ? { data: { signedUrl: `https://store.test/${b}/${path}?ttl=${ttl}&download=${o.download ?? ""}` }, error: null }
+        : { data: null, error: { message: "not found" } },
   });
   const client = {
     auth: {
@@ -213,6 +224,47 @@ describe("account-export", () => {
     // tables of later migrations are simply skipped
     expect(body.tables.subscriptions).toBeUndefined();
     expect(state.tables.audit_log!.at(-1)).toMatchObject({ user_id: U1, action: "account.export" });
+  });
+
+  it("includes API tokens (never the hash), leaderboard ranks, own invites and 24-h links to every stored file (DSGVO-01)", async () => {
+    state.tables.api_tokens = [{ id: "k1", user_id: U1, name: "Bot", prefix: "tj_ab12", scopes: ["trades:read"], token_hash: "f".repeat(64), last_used_at: null, created_at: "2026-10-01T00:00:00Z", revoked_at: null }];
+    state.tables.leaderboard_snapshots = [
+      { day: "2026-10-10", metric: "expectancy", user_id: U1, rank: 3, value: 0.42, trades: 31 },
+      { day: "2026-10-10", metric: "expectancy", user_id: U2, rank: 1, value: 0.9, trades: 50 },
+    ];
+    state.tables.group_invites = [{ code: "ABCDEFGH12", group_id: "g1", role: "member", created_by: U1, max_uses: 25, uses: 1, expires_at: "2026-10-20T00:00:00Z", created_at: "2026-10-06T00:00:00Z" }];
+    const body = await (await accountExport(get("/api/v1/account/export"), ctx)).json();
+    expect(body.tables.api_tokens).toEqual([{ id: "k1", name: "Bot", prefix: "tj_ab12", scopes: ["trades:read"], last_used_at: null, created_at: "2026-10-01T00:00:00Z", revoked_at: null }]);
+    expect(JSON.stringify(body)).not.toContain("f".repeat(64));
+    expect(body.tables.leaderboard_snapshots).toEqual([{ day: "2026-10-10", metric: "expectancy", rank: 3, value: 0.42, trades: 31 }]);
+    expect(body.tables.group_invites).toHaveLength(1);
+    expect(body.links.screenshots).toEqual([{ path: `${U1}/t_1/a.png`, url: `https://store.test/screenshots/${U1}/t_1/a.png?ttl=86400` }]);
+    expect(body.links.backups).toEqual([{ path: `${U1}/2026-10-01.json`, url: `https://store.test/backups/${U1}/2026-10-01.json?ttl=86400` }]);
+    expect(Date.parse(body.links.expiresAt) - Date.parse(body.exportedAt)).toBe(86_400_000);
+  });
+
+  it("an export too big for a function response is staged in Storage and answered as a short link (DSGVO-02)", async () => {
+    // ~4.6 MB of synced trades with fills – a busy scalper's year
+    const fill = { t: "2026-10-01T10:00:00Z", side: "buy", qty: 0.01, price: 61234.5, fee: 0.0245, id: "f".repeat(24) };
+    for (let i = 0; i < 4200; i++) state.tables.journal_docs!.push({ user_id: U1, kind: "trade", id: `t_bx_${i}`, data: { id: `t_bx_${i}`, pair: "BTC/USDT", fills: Array(12).fill(fill) }, deleted: false, rev: 1, updated_at: "2026-10-11T10:00:00Z" });
+    const r = await accountExport(get("/api/v1/account/export"), ctx);
+    expect(r.status).toBe(200);
+    const { download } = await r.json();
+    expect(download).toMatchObject({ url: expect.stringMatching(/^https:\/\/store\.test\/backups\//), name: expect.stringMatching(/^trade-journal-konto-.*\.json$/) });
+    expect(download.bytes).toBeGreaterThan(4 * 1024 * 1024);
+    const staged = state.storage.backups!.filter((o) => o.name.startsWith(`${U1}/exports/`));
+    expect(staged).toHaveLength(1);
+    const full = JSON.parse(staged[0]!.body);
+    expect(full.format).toBe("trade-journal-account-export");
+    expect(full.journal.trades).toHaveLength(4201);
+    // the nightly backup list never shows it; a second export replaces it; listing removes old ones
+    expect((await (await accountBackups(get("/api/v1/account/backups"), ctx)).json()).items.map((i: { day: string }) => i.day)).toEqual(["2026-10-01"]);
+    await new Promise((res) => setTimeout(res, 5));
+    await accountExport(get("/api/v1/account/export"), ctx);
+    expect(state.storage.backups!.filter((o) => o.name.startsWith(`${U1}/exports/`))).toHaveLength(1);
+    state.storage.backups!.find((o) => o.name.startsWith(`${U1}/exports/`))!.name = `${U1}/exports/${Date.now() - 2 * 3_600_000}-old.json`;
+    await accountBackups(get("/api/v1/account/backups"), ctx);
+    expect(state.storage.backups!.filter((o) => o.name.startsWith(`${U1}/exports/`))).toHaveLength(0);
   });
 
   it("needs a session, aal2 once 2FA is on, and rate-limits", async () => {
@@ -439,5 +491,12 @@ describe("backups", () => {
     expect(await one.json()).toEqual({ trades: [] });
     expect((await accountBackups(get("/api/v1/account/backups?day=2026-01-01"), ctx)).status).toBe(404);
     expect((await accountBackups(get("/api/v1/account/backups?day=../x"), ctx)).status).toBe(400);
+  });
+
+  it("a backup too big for a function response is answered as a link to the file in Storage (DSGVO-02)", async () => {
+    state.storage.backups!.push({ name: `${U1}/2026-10-02.json`, body: JSON.stringify({ trades: [{ note: "x".repeat(4.5 * 1024 * 1024) }] }) });
+    const r = await accountBackups(get("/api/v1/account/backups?day=2026-10-02"), ctx);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ download: { url: expect.stringContaining(`https://store.test/backups/${U1}/2026-10-02.json`), bytes: 10, expiresAt: expect.any(String), name: "trade-journal-backup-2026-10-02.json" } });
   });
 });

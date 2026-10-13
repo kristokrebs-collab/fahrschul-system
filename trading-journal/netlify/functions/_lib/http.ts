@@ -78,6 +78,11 @@ export function json(data: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(data), { ...init, headers: withBase(init, "application/json; charset=utf-8") });
 }
 
+/** JSON response from text that is already serialized (large exports: measured before they are sent). */
+export function jsonText(text: string, init: ResponseInit = {}): Response {
+  return new Response(text, { ...init, headers: withBase(init, "application/json; charset=utf-8") });
+}
+
 /** Error response in the shared envelope. `message` defaults to the German text of the status. */
 export function error(status: number, code: string, message?: string, details?: unknown, init: ResponseInit = {}): Response {
   const body: ErrorBody = { error: { code, message: message ?? defaultMessage(status), ...(details === undefined ? {} : { details }) } };

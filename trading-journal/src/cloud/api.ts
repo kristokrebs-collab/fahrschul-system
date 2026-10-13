@@ -102,3 +102,32 @@ export async function apiFetch<T = unknown>(path: string, init: ApiFetchInit = {
   }
   return data as T;
 }
+
+/** A `{ download: { url, … } }` answer: the account export or a backup too big for a function response (review DSGVO-02). */
+export interface DownloadLink {
+  url: string;
+  name: string | null;
+  bytes: number | null;
+}
+
+/** The download link of a function answer, or `null` when the answer carries the data itself. */
+export function downloadLinkOf(data: unknown): DownloadLink | null {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
+  const d = (data as { download?: unknown }).download;
+  if (typeof d !== "object" || d === null) return null;
+  const { url, name, bytes } = d as { url?: unknown; name?: unknown; bytes?: unknown };
+  if (typeof url !== "string" || !/^https?:\/\//.test(url)) return null;
+  return { url, name: typeof name === "string" ? name : null, bytes: typeof bytes === "number" ? bytes : null };
+}
+
+/** Loads the file behind a download link (a short signed Storage URL, no bearer token) as text. */
+export async function fetchDownload(link: DownloadLink, fetchImpl: typeof fetch = fetch): Promise<string> {
+  let res: Response;
+  try {
+    res = await fetchImpl(link.url, { credentials: "omit" });
+  } catch {
+    throw new ApiError(0, "unavailable", "Die Datei konnte nicht geladen werden. Bitte erneut versuchen.");
+  }
+  if (!res.ok) throw new ApiError(res.status, "download_failed", "Die Datei konnte nicht geladen werden. Bitte erneut versuchen.");
+  return res.text();
+}

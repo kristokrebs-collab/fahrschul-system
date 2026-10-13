@@ -14,7 +14,7 @@ import { importBackup } from "@/store/backup";
 import { download } from "@/store/download";
 import { pushToast } from "@/store/uiStore";
 import { ActionButton, GlyphDownload } from "@/views/settings/fx";
-import { ApiError, apiFetch } from "../api";
+import { ApiError, apiFetch, downloadLinkOf, fetchDownload } from "../api";
 import { agoLabel } from "../device";
 import { ensureCloud } from "../runtime";
 import { openAuthSheet, useCloudSession } from "../session";
@@ -84,6 +84,13 @@ function ExportSection({ onDone }: { onDone: () => void }) {
         onRun={async () => {
           try {
             const data = await apiFetch<unknown>("/account/export");
+            // a large account comes as a short link to the file in Storage (review DSGVO-02)
+            const link = downloadLinkOf(data);
+            if (link) {
+              const ok = await download(link.name ?? `trade-journal-konto-${new Date().toISOString().slice(0, 10)}.json`, await fetchDownload(link), "application/json");
+              onDone();
+              return ok;
+            }
             if (!isObj(data)) throw new ApiError(0, "unavailable", "Unerwartete Antwort vom Server.");
             const day = typeof data.exportedAt === "string" ? data.exportedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
             const ok = await download(`trade-journal-konto-${day}.json`, JSON.stringify(data, null, 2), "application/json");
@@ -129,7 +136,8 @@ function BackupsSection() {
     setBusy(true);
     try {
       const data = await apiFetch<unknown>("/account/backups", { query: { day } });
-      const res = await importBackup(JSON.stringify(data), { mode: "merge" });
+      const link = downloadLinkOf(data);
+      const res = await importBackup(link ? await fetchDownload(link) : JSON.stringify(data), { mode: "merge" });
       if (res.ok) pushToast({ kind: "success", title: DATA_CARD.restored, value: dayLabel(day) });
     } catch (e) {
       pushToast({ kind: "error", title: "Wiederherstellen fehlgeschlagen", detail: errorText(e) });

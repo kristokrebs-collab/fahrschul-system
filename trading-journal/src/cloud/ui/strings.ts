@@ -194,7 +194,7 @@ export const DATA_CARD = {
   title: "Deine Daten",
   intro: "Alles, was über dich gespeichert ist – als Datei, jederzeit. Und auf Wunsch komplett gelöscht.",
   export: "Daten exportieren",
-  exportHint: "JSON mit Journal, Profil, Sicherheitsprotokoll und Verbindungen (ohne Schlüssel).",
+  exportHint: "JSON mit Journal, Profil, Sicherheitsprotokoll, Verbindungen (ohne Schlüssel) und Download-Links zu deinen Screenshots und Backups (24 h gültig).",
   exported: "Export bereit",
   backupsTitle: "Cloud-Backups",
   backupsHint: "Jede Nacht automatisch, 14 Tage lang.",

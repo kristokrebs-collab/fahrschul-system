@@ -93,6 +93,10 @@ export const EXPORT_TABLES: ExportTable[] = [
   { table: "shares", userColumn: "user_id", columns: "id,kind,payload,created_at,expires_at,revoked_at,views" },
   { table: "member_stats", userColumn: "user_id", columns: "*" },
   { table: "feedback", userColumn: "user_id", columns: "id,kind,message,page,target_type,target_id,status,created_at" },
+  // review DSGVO-01: API tokens (never the hash), the user's daily leaderboard ranks, invites the user created
+  { table: "api_tokens", userColumn: "user_id", columns: "id,name,prefix,scopes,last_used_at,created_at,revoked_at" },
+  { table: "leaderboard_snapshots", userColumn: "user_id", columns: "day,metric,rank,value,trades" },
+  { table: "group_invites", userColumn: "created_by", columns: "code,group_id,role,max_uses,uses,expires_at,created_at" },
 ];
 
 const SECRET_KEY = /secret|password|passphrase|token|api[-_]?key|authorization|cookie|jwt|_enc$/i;
@@ -134,6 +138,32 @@ export interface AccountExport {
   journal: BackupShape & { counts: Record<string, number> };
   tables: Record<string, unknown[]>;
   files: Record<UserBucket, string[]>;
+  /**
+   * Download links (signed URLs, valid `FILE_LINK_TTL_S`) for the stored files – the export lists the screenshots and
+   * backups AND lets the user fetch them (review DSGVO-01). A file without a link is still listed in `files`.
+   */
+  links: { expiresAt: string } & Record<UserBucket, { path: string; url: string }[]>;
+}
+
+/** Validity of the file links in an export (24 h). */
+export const FILE_LINK_TTL_S = 24 * 3600;
+
+/** Signed URLs for `paths` of `bucket` (chunks of 100); paths Storage refuses are left out. Never throws. */
+export async function signedLinks(bucket: UserBucket, paths: readonly string[], ttlS: number, sb: SupabaseClient = supabaseAdmin()): Promise<{ path: string; url: string }[]> {
+  const out: { path: string; url: string }[] = [];
+  for (let i = 0; i < paths.length; i += 100) {
+    try {
+      const { data, error } = await sb.storage.from(bucket).createSignedUrls(paths.slice(i, i + 100), ttlS);
+      if (error) {
+        console.error("[fn] signed links failed", bucket);
+        continue;
+      }
+      for (const d of data ?? []) if (d.path && d.signedUrl && !d.error) out.push({ path: d.path, url: d.signedUrl });
+    } catch {
+      console.error("[fn] signed links failed", bucket);
+    }
+  }
+  return out;
 }
 
 /** Everything stored about the user (DSGVO Art. 15 / 20), secrets excluded. */
@@ -148,6 +178,9 @@ export async function collectExport(userId: string, now: Date = new Date(), sb: 
   }
   const files = {} as Record<UserBucket, string[]>;
   for (const b of USER_BUCKETS) files[b] = await listUserFiles(b, userId, sb);
+  const links = { expiresAt: new Date(now.getTime() + FILE_LINK_TTL_S * 1000).toISOString() } as AccountExport["links"];
+  // staged exports (`exports/`) are the export itself, not stored data
+  for (const b of USER_BUCKETS) links[b] = await signedLinks(b, files[b].filter((p) => !p.startsWith(`${userId}/${EXPORTS_DIR}/`)), FILE_LINK_TTL_S, sb);
   return {
     format: "trade-journal-account-export",
     version: 1,
@@ -162,6 +195,7 @@ export async function collectExport(userId: string, now: Date = new Date(), sb: 
     journal: await journalBackup(userId, now, sb),
     tables,
     files,
+    links,
   };
 }
 
@@ -235,6 +269,83 @@ export interface BackupFile {
   day: string;
   path: string;
   size: number | null;
+}
+
+/* ------------------------------------------------------------------ large downloads (review DSGVO-02) */
+
+/**
+ * Netlify answers a buffered function response with at most 6 MB. A heavy scalper's export or backup (one synced trade
+ * with its fills is ~1 KB) passes that after a year, and the download fails with a platform 502. Anything above this
+ * size goes through Storage instead: the function answers `{ download: { url, bytes, expiresAt, name } }` with a short
+ * signed URL, and the client fetches the file from Storage directly.
+ */
+export const INLINE_JSON_MAX = 4 * 1024 * 1024;
+/** Validity of the link to a staged export / large backup (s). */
+export const DOWNLOAD_LINK_TTL_S = 15 * 60;
+/** Folder of staged exports inside the user's `backups/<uid>/` (removed by the next export, the next backup list and the account deletion). */
+export const EXPORTS_DIR = "exports";
+/** A staged export older than this is removed when the user's backups are listed. */
+export const STAGED_EXPORT_KEEP_MS = 60 * 60_000;
+
+export interface DownloadLink {
+  url: string;
+  bytes: number | null;
+  expiresAt: string;
+  name: string;
+}
+
+const utf8Bytes = (text: string): number => Buffer.byteLength(text, "utf8");
+
+/** True when `text` fits a buffered function response. */
+export const fitsInline = (text: string): boolean => utf8Bytes(text) <= INLINE_JSON_MAX;
+
+async function signedLink(path: string, name: string, bytes: number | null, now: Date, sb: SupabaseClient): Promise<DownloadLink> {
+  const { data, error } = await sb.storage.from(BACKUP_BUCKET).createSignedUrl(path, DOWNLOAD_LINK_TTL_S, { download: name });
+  if (error || !data?.signedUrl) {
+    console.error("[fn] download link failed");
+    throw new HttpError(502, "storage_unavailable", "Der Dateispeicher antwortet gerade nicht.");
+  }
+  return { url: data.signedUrl, bytes, expiresAt: new Date(now.getTime() + DOWNLOAD_LINK_TTL_S * 1000).toISOString(), name };
+}
+
+/** Removes staged exports of the user (all, or those older than `olderThanMs`). Best effort; returns the number removed. */
+export async function removeStagedExports(userId: string, opts: { olderThanMs?: number; now?: Date; keep?: string } = {}, sb: SupabaseClient = supabaseAdmin()): Promise<number> {
+  try {
+    const { data, error } = await sb.storage.from(BACKUP_BUCKET).list(`${userId}/${EXPORTS_DIR}`, { limit: LIST_PAGE, sortBy: { column: "name", order: "asc" } });
+    if (error || !data?.length) return 0;
+    const now = (opts.now ?? new Date()).getTime();
+    const stale = (data as StorageEntry[])
+      .filter((e) => e.id)
+      .map((e) => ({ path: `${userId}/${EXPORTS_DIR}/${e.name}`, at: Number(/^(\d+)-/.exec(e.name)?.[1] ?? 0) }))
+      .filter((e) => e.path !== opts.keep && (opts.olderThanMs === undefined || now - e.at > opts.olderThanMs))
+      .map((e) => e.path);
+    if (!stale.length) return 0;
+    const rm = await sb.storage.from(BACKUP_BUCKET).remove(stale);
+    return rm.error ? 0 : stale.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Stores an export too big for a function response under `backups/<uid>/exports/<ms>-<name>` and answers a signed
+ * link (`DOWNLOAD_LINK_TTL_S`). Earlier staged exports of the user are removed.
+ */
+export async function stageExport(userId: string, name: string, text: string, now: Date = new Date(), sb: SupabaseClient = supabaseAdmin()): Promise<DownloadLink> {
+  await ensureBackupBucket(sb);
+  const path = `${userId}/${EXPORTS_DIR}/${now.getTime()}-${name}`;
+  const { error } = await sb.storage.from(BACKUP_BUCKET).upload(path, new Blob([text], { type: "application/json" }), { contentType: "application/json", upsert: true });
+  if (error) {
+    console.error("[fn] export staging failed");
+    throw new HttpError(502, "storage_unavailable", "Der Dateispeicher antwortet gerade nicht.");
+  }
+  await removeStagedExports(userId, { keep: path }, sb);
+  return signedLink(path, name, utf8Bytes(text), now, sb);
+}
+
+/** A link to a stored backup (it already lives in Storage – nothing is copied). */
+export function backupLink(file: BackupFile, now: Date = new Date(), sb: SupabaseClient = supabaseAdmin()): Promise<DownloadLink> {
+  return signedLink(file.path, `trade-journal-backup-${file.day}.json`, file.size, now, sb);
 }
 
 /** The user's nightly backups, newest first. */
