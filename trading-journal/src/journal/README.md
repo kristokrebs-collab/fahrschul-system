@@ -14,7 +14,8 @@ screenshots/   store.ts (IndexedDB blobs), cloud.ts (Supabase Storage), release.
                ShotsField (editor), ShotThumb, ShotReel (detail), ShotLightbox
 annotations/   AnnotationToolbar.tsx (tools / colours for the mini chart)
 filters/       JournalFilterBar.tsx (views, quick picks, grouping switch, `Mehr Filter`; `JournalFilterSlot` = store-wired)
-grouping/      GroupRows.tsx (table rows + mobile cards of a group, hedge connector, group curve)
+grouping/      GroupRows.tsx (table rows + mobile cards of a group, hedge connector, group curve), links.ts +
+               GroupLinksSection.tsx (manual group / hedge links in the trade detail)
 sharePng.ts    1200 × 675 share picture (canvas, no amounts by default)
 ExcursionBackfillHost.tsx   idle MAE / MFE backfill (renders nothing)
 ```
@@ -97,6 +98,10 @@ instant under reduced motion); a tap selects, `Zeichnung löschen` removes. Save
 - Saved views (`src/store/viewsStore.ts`): `storageKey("views")`, at most 24, a UI preference like `tj2-ui` – never in a
   backup, never synced. `applyView(id)` writes filter, extra filter and sort in one update; `matchView` names the current
   one. P14 can offer them in the command palette via `useViews().views` / `applyView`.
+- Manual links (Review F04): the trade detail's „Gruppe & Hedge“ offers the trades of the same pair within ± 14 days –
+  „Gruppieren“ gives both the same `groupId` (an existing one or a new `grp_…`), „Als Hedge“ (opposite side only) sets
+  `hedgeOf`, „Lösen“ removes this trade's own links. `positionId` stays reserved for one exchange position split over
+  several records – the Bitunix sync and the CSV importers write one record per position, so nothing writes it yet.
 - Grouping (`uiStore.tradeExtra.group`): `groupTrades` folds positions (`positionId`), groups (`groupId`) and hedges
   (`hedgeOf` or detected: long + short on the same pair overlapping in time) into one row / card (`GroupTableRows`,
   `GroupCard`) with Ø prices, Σ P&L, group R and result; unfolding (AutoHeight) shows the legs on a drawn connector and the

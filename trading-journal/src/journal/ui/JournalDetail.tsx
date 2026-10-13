@@ -14,10 +14,11 @@ import { measureAndStore, measurablePair, MEASURE_HINTS, type MeasureStatus } fr
 import { StaggerItem } from "@/motion/Stagger";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { useJournal } from "@/store/journalStore";
+import { useEnriched, useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { openReplay } from "@/views/trades/replay/replayStore";
 import { SCALE_LABELS } from "../editor/PsychSection";
+import { GroupLinksSection } from "../grouping/GroupLinksSection";
 import { ShotReel } from "../screenshots/ShotReel";
 import { downloadShareCard } from "../sharePng";
 import { ExcursionBar } from "./ExcursionBar";
@@ -63,6 +64,7 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
   const reduced = useReducedFx();
   const provider = useProvider();
   const saveTrade = useJournal((s) => s.saveTrade);
+  const all = useEnriched();
   const [measuring, setMeasuring] = useState(false);
   const [measureNote, setMeasureNote] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
@@ -206,6 +208,10 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
           <ShotReel shots={t.screenshots!} title={t.pair || "Trade"} />
         </StaggerItem>
       )}
+
+      <StaggerItem>
+        <GroupLinksSection trade={t} all={all} currency={currency} />
+      </StaggerItem>
 
       <StaggerItem className="flex flex-wrap items-center gap-2">
         {/* plan gate `replay` (P10 / P14): a locked replay opens the upgrade sheet instead */}
