@@ -199,7 +199,7 @@ const SetupTile = memo(function SetupTile({ b, symbol }: { b: BestSetup; symbol:
   const edge = box ? edgeOf(s, box) : null;
   const id = `box-setup-${b.id}`;
   return (
-    <MorphCard id={id} title={s.title} body={() => <SetupExplain b={b} symbol={symbol} />} className="relative h-full overflow-hidden rounded-2xl border border-line-2 bg-ink-950/40 p-4 text-left hover:border-white/30">
+    <MorphCard id={id} title={s.title} body={() => <SetupExplain b={b} symbol={symbol} />} className="@container relative h-full overflow-hidden rounded-2xl border border-line-2 bg-ink-950/40 p-4 text-left hover:border-white/30">
       <div className="relative grid gap-3.5" data-testid="best-setup" data-grade={s.grade} data-kind={s.kind} data-side={s.side}>
         {brk && (
           <span aria-hidden="true" className="pointer-events-none absolute -inset-4">
@@ -228,7 +228,8 @@ const SetupTile = memo(function SetupTile({ b, symbol }: { b: BestSetup; symbol:
             </span>
           </div>
         </div>
-        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {/* the tile's own width decides (two cards side by side at 1440 are ~330 px): 2 × 2 there, 4 × 1 at full width */}
+        <dl className="grid grid-cols-2 gap-2 @md:grid-cols-4">
           <Metric k={S.entry} v={price(s.entry)} />
           <Metric k={S.stop} v={price(s.stop)} tone="loss" />
           <Metric k={S.target} v={price(s.targets[0]?.price)} tone="win" />

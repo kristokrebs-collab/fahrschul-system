@@ -5,7 +5,9 @@
  * Look: active lines 1 px `ink.mute`, extended a few bars into the future space (dotted); a broken line in its tone
  * (falling line broken up = win, rising line broken down = loss) ending one bar past the break; the break marker a dot
  * with a soft canvas glow (`shadowBlur`, none under `data-safe-fx`) and a halo ring at α .5 – the "strong" dot style of the
- * check overlay; a provisional break (forming bar) in the ~50 % saturated soft tone, outlined. A tiny `Bruch ↑` label.
+ * check overlay; a provisional break (forming bar) in the ~50 % saturated soft tone, outlined. A tiny `Bruch ↑` label
+ * centred above the dot on a plate in the pane colour (lines never strike it through). On paper (light mode) no
+ * canvas glow – the dot and its ring carry the break.
  * The breathing glow over the newest break is DOM (`GlowBreak` in the chart's ripple layer), never a canvas loop.
  *
  * Geometry in `updateAllViews` (visible items only, memoised); y from the RSI series, height from the RSI pane
@@ -13,7 +15,7 @@
  */
 import type { IChartApiBase, IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, Logical, PrimitivePaneViewZOrder, SeriesAttachedParameter, SeriesType, Time } from "lightweight-charts";
 import { isSafeFx } from "@/motion/safeFx";
-import { ink, withAlpha } from "../ink";
+import { ink, inkIsPaper, withAlpha } from "../ink";
 import { estimateTextWidth } from "../overlayLayout";
 
 type RenderTarget = Parameters<IPrimitivePaneRenderer["draw"]>[0];
@@ -51,6 +53,10 @@ export const EMPTY_RSI_OVERLAY: RsiOverlayData = { lines: [], breaks: [] };
 
 const FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 const TINY_PX = 9;
+/** CSS px between the dot's edge and its `Bruch ↑` label (the halo ring sits at +2.25 px) */
+const LABEL_GAP = 4;
+/** horizontal padding of the label plate (CSS px) */
+const PLATE_PAD = 3;
 
 interface Seg {
   x1: number;
@@ -80,8 +86,9 @@ class RsiRenderer implements IPrimitivePaneRenderer {
   draw(target: RenderTarget): void {
     const g = this.g;
     if (!g.segs.length && !g.dots.length) return;
-    const glow = !isSafeFx();
-    target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio: hr, verticalPixelRatio: vr }) => {
+    // the canvas glow only on ink: on paper a blurred green reads as a smudge (the dot + ring carry the break there)
+    const glow = !isSafeFx() && !inkIsPaper();
+    target.useBitmapCoordinateSpace(({ context: ctx, bitmapSize, horizontalPixelRatio: hr, verticalPixelRatio: vr }) => {
       ctx.save();
       ctx.lineCap = "round";
       ctx.lineWidth = Math.max(1, Math.round(hr));
@@ -125,12 +132,27 @@ class RsiRenderer implements IPrimitivePaneRenderer {
           ctx.stroke();
         }
         if (d.text) {
+          // centred above the dot (clear of its halo ring), below it when the pane has no room on top; kept inside the
+          // pane; on a nearly opaque plate in the pane colour (like the box labels) – the RSI line and the trendlines
+          // never run through the letters or the gaps between them
+          const w = estimateTextWidth(d.text, TINY_PX) * hr + 2 * PLATE_PAD * hr;
+          const h = (TINY_PX + 3) * vr;
+          const off = r + LABEL_GAP * vr;
+          const above = y - off - h >= 0;
+          const cx = Math.min(Math.max(x, w / 2 + hr), bitmapSize.width - w / 2 - hr);
+          const cy = above ? y - off - h / 2 : y + off + h / 2;
+          ctx.globalAlpha = 0.92;
+          ctx.fillStyle = ink.bg;
+          ctx.beginPath();
+          if (typeof ctx.roundRect === "function") ctx.roundRect(Math.round(cx - w / 2), Math.round(cy - h / 2), Math.round(w), Math.round(h), 3 * hr);
+          else ctx.rect(Math.round(cx - w / 2), Math.round(cy - h / 2), Math.round(w), Math.round(h));
+          ctx.fill();
+          ctx.font = `${TINY_PX * vr}px ${FONT}`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
           ctx.globalAlpha = d.fresh ? 0.95 : 0.6;
           ctx.fillStyle = d.color;
-          ctx.font = `${TINY_PX * vr}px ${FONT}`;
-          ctx.textBaseline = "middle";
-          const w = estimateTextWidth(d.text, TINY_PX) * hr;
-          ctx.fillText(d.text, x - w - r - 5 * hr, y);
+          ctx.fillText(d.text, cx, cy + 0.5 * vr);
         }
       }
       ctx.restore();

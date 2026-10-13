@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { INK_DEFAULTS, ink, resetInk } from "@/chart/ink";
+import { INK_DEFAULTS, ink, inkIsPaper, resetInk } from "@/chart/ink";
 import {
   applyInitialTheme,
   applyThemeToDom,
@@ -115,15 +115,22 @@ describe("themeStore", () => {
   it("the chart bridge reads the CSS mirrors in light mode and resets to the exact defaults in dark", () => {
     const root = document.documentElement;
     root.dataset.theme = "light";
-    const vars: Record<string, string> = { "--chart-ink-bg": " #fdfdfc", "--chart-ink-fg": "#121212", "--chart-ink-win": "#0c8441" };
+    const vars: Record<string, string> = { "--chart-ink-bg": " #fdfdfc", "--chart-ink-fg": "#121212", "--chart-ink-win": "#0c8441", "--chart-ink-axis": "#555555" };
     vi.spyOn(window, "getComputedStyle").mockReturnValue({ getPropertyValue: (k: string) => vars[k] ?? "" } as unknown as CSSStyleDeclaration);
+    expect(inkIsPaper()).toBe(false);
     syncChartInk(root);
     expect(ink.bg).toBe("#fdfdfc");
     expect(ink.fg).toBe("#121212");
     expect(ink.win).toBe("#0c8441");
+    // the axis text has its own key (P2-04): darker than the faint tick grey on paper
+    expect(ink.axis).toBe("#555555");
     expect(ink.grid).toBe(INK_DEFAULTS.grid);
+    // on paper the canvas drops its glows (the RSI break)
+    expect(inkIsPaper()).toBe(true);
     root.dataset.theme = "dark";
     syncChartInk(root);
     expect(ink).toEqual(INK_DEFAULTS);
+    expect(ink.axis).toBe("#808080");
+    expect(inkIsPaper()).toBe(false);
   });
 });

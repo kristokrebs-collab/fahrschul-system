@@ -38,23 +38,27 @@ function Row({ r }: { r: ScanRow }) {
   const up = s.side === "long";
   return (
     <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-line bg-ink-950/30 px-3 py-2.5" data-testid="scan-row" data-symbol={r.symbol} data-grade={s.grade}>
-      <GradeMatrix grade={s.grade} size={3} />
+      <GradeMatrix grade={s.grade} size={3} className="row-span-2" />
       <span className="grid min-w-0 gap-0.5">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className="num font-mono text-[13px] font-semibold text-fg">{r.symbol}</span>
           <TfChip tf={r.tf} />
           <span className={cn("text-[11px] font-semibold", up ? "text-win" : "text-loss")}>{up ? "Long" : "Short"}</span>
         </span>
-        <span className="truncate text-[11.5px] text-mute">
-          {s.kind === "fakeout" ? PHASE_LABEL[r.phase] : `${KIND_TEXT[s.kind]} · ${PHASE_LABEL[r.phase]}`} · Einstieg {price(s.entry)}
+        <span className="truncate text-[11.5px] text-mute">{s.kind === "fakeout" ? PHASE_LABEL[r.phase] : `${KIND_TEXT[s.kind]} · ${PHASE_LABEL[r.phase]}`}</span>
+      </span>
+      {/* the entry is the figure of the row: a number line of its own (it was cut off at 390 px – P2-15), CRV below */}
+      <span className="grid justify-items-end gap-0.5 text-[11px] text-faint">
+        <span className="whitespace-nowrap">
+          Einstieg <span className="num font-mono text-[12.5px] text-fg" data-testid="scan-entry">{price(s.entry)}</span>
         </span>
-        <span className="truncate text-[11px] text-faint" data-testid="scan-close">
-          {scanCloseLabel(r)}
+        <span className="whitespace-nowrap">
+          CRV <span className="num font-mono text-[13px] text-fg">{rrText(s.rr)}</span>
         </span>
       </span>
-      <span className="grid justify-items-end text-[11px] text-faint">
-        <span>CRV</span>
-        <span className="num font-mono text-[13px] text-fg">{rrText(s.rr)}</span>
+      {/* when the values were computed: a line under text and figures, across both columns */}
+      <span className="col-span-2 col-start-2 -mt-2 truncate text-[11px] text-faint" data-testid="scan-close">
+        {scanCloseLabel(r)}
       </span>
     </div>
   );

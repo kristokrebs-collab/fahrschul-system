@@ -348,18 +348,15 @@ function syncBoxes(i: Instance, boxes: ChartBox[] | undefined): void {
   i.boxes.setBoxes(boxes ?? NO_BOXES);
 }
 
-/** Chart-relative top (CSS px) of the sub pane – one layout read, only on a resize / pane switch. */
+/**
+ * Chart-relative top (CSS px) of the sub pane from the chart's model: the panes above plus lightweight-charts' 1 px
+ * separator each. No layout read, so `place` re-derives it whenever it runs – a DOM measure taken on a resize went stale
+ * when the panes re-laid out afterwards (the RSI glow sat 5 px above its canvas dot, P2-02).
+ */
 function subPaneTop(i: Instance): number {
   const idx = i.panes.paneIndex();
   if (idx == null) return 0;
   const panes = i.chart.panes();
-  const pane = panes[idx] as { getHTMLElement?: () => HTMLElement | null } | undefined;
-  const el = pane?.getHTMLElement?.();
-  if (el) {
-    const top = el.getBoundingClientRect().top - i.node.getBoundingClientRect().top;
-    if (Number.isFinite(top) && top > 0) return top;
-  }
-  // without the element: the panes above plus lightweight-charts' 1 px separator each
   let y = 0;
   for (let k = 0; k < idx; k++) y += (panes[k]?.getHeight() ?? 0) + 1;
   return y;
@@ -721,18 +718,29 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       // no bars yet (no history, offline): nothing to wait for – the next history apply starts the loop again
       if (busy) settleRaf = requestAnimationFrame(settle);
     };
+    /** the sub pane's top from the model; the RSI legend follows it (written only when it moved) */
+    const syncSubTop = () => {
+      const top = subPaneTop(instance);
+      const el = fx.current.legend.current;
+      if (top === instance.subTop && el?.dataset.top === String(top)) return;
+      instance.subTop = top;
+      if (el) {
+        el.style.transform = `translate3d(0, ${top + 4}px, 0)`;
+        el.dataset.top = String(top);
+      }
+    };
     const measure = () => {
       measureRaf = 0;
       if (inst.current !== instance) return;
-      instance.subTop = subPaneTop(instance);
-      const el = fx.current.legend.current;
-      if (el) el.style.transform = `translate3d(0, ${instance.subTop + 4}px, 0)`;
+      syncSubTop();
       instance.requestPlace();
     };
     const isActive = () => readyRef.current && visibleRef.current && !pausedRef.current;
     const place = () => {
       placeRaf = 0;
       if (inst.current !== instance) return;
+      // the panes may have re-laid out since the last resize (model heights – no layout read)
+      syncSubTop();
       const last = instance.data[instance.data.length - 1];
       pulse.current?.place(isActive() && last ? pointInPane(instance, last.time, last.close) : null);
       placeGlow(instance, fx.current);

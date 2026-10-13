@@ -210,9 +210,11 @@ unchanged, `INK_DEFAULTS`; `resetInk()`), `subscribeInk(cb)` notifies; `NothingC
 Live colours everywhere (P14 light pass): the series option sets (`NOTHING_CANDLES`, `NOTHING_VOLUME`, the line sets),
 `MARKER_COLORS`, `LEVEL_STYLES`, `RSI_LEVELS`, `MINI_LINES` and `ZONE_DEFAULTS` read their colours through getters, so a
 chart built AFTER a theme switch starts in the current ink (charts are created with `makeNothingTheme()` /
-`inkChartOptions()`, never with a palette frozen at module load). Two ink keys besides the ramp: `veil` (the
-maximum-foreground ink, always with an alpha: volume bars, bands, the zone fill) and `onFill` (text on a filled axis
-label). Helpers: `withAlpha(hex, a)` → `rgba(r,g,b,a)` (the dark ink gives exactly the former literals, e.g.
+`inkChartOptions()`, never with a palette frozen at module load). Three ink keys besides the ramp: `veil` (the
+maximum-foreground ink, always with an alpha: volume bars, bands, the zone fill), `onFill` (text on a filled axis
+label) and `axis` (price / time axis text, `#808080` dark / `#555555` light – measured ≥ 3 : 1 after anti-aliasing;
+`tick` stays the grey of faint lines). `inkIsPaper()` tells a light palette (no canvas glow on paper). Helpers:
+`withAlpha(hex, a)` → `rgba(r,g,b,a)` (the dark ink gives exactly the former literals, e.g.
 `rgba(255,255,255,0.14)`), `inkOf(storedHex)` maps a stored dark-palette colour (an annotation's `#f2f2f2`) onto the
 live ink of the same role.
 

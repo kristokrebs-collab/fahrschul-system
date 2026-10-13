@@ -168,6 +168,12 @@ describe("MarktView", () => {
     expect(card).toHaveTextContent("Lädt");
     expect(card).not.toHaveTextContent("Noch keine saubere Box.");
     expect(screen.getByTestId("markt-band")).toHaveTextContent("Lade Kerzen …");
+    // … said visibly once (Beste Setups): band and Box-Status show the loader and keep the sentence for screen readers,
+    // the header pill names the symbol (P2-09)
+    expect(within(card).getByTestId("state-wait").querySelector(".sr-only")).toHaveTextContent("Lade Kerzen …");
+    expect(screen.getByTestId("markt-band").querySelector(".sr-only")).toHaveTextContent("Lade Kerzen …");
+    expect(screen.getByTestId("markt-status")).toHaveTextContent(/^BTCUSDT/);
+    expect(screen.getByTestId("markt-status").querySelector(".sr-only")).toHaveTextContent("Lade Kerzen …");
   });
 
   it("scanCloseLabel: the close of the scanned candle (open + timeframe)", () => {

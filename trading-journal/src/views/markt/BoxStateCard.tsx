@@ -218,8 +218,9 @@ export function BoxStateCard({ view }: { view: BoxesView }) {
         {wait ? (
           <div className="pt-1 text-[13px] text-mute" style={{ minHeight: BODY_PX }} data-testid="state-wait" data-loading={wait.loading || undefined}>
             <span className="flex items-center gap-3">
+              {/* loading: the „Lädt“ pill + the loader say it – the sentence stands once, in Beste Setups (P2-09) */}
               {wait.loading && <DotMatrix preset="loader" size={3} gap={2} />}
-              <span>{wait.text}</span>
+              <span className={cn(wait.loading && "sr-only")}>{wait.text}</span>
             </span>
           </div>
         ) : (

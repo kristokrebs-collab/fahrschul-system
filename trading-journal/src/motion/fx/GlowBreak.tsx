@@ -12,7 +12,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
  * rests at the halo's resting glow. Place it in a `relative` (or absolutely positioned overlay) parent; `x` / `y` are
  * the point in that parent's px – numbers or MotionValues (a chart overlay can glide it without React renders).
  * Pre-rendered radial gradients only (no blur filter), transform / opacity animations (WAAPI), aria-hidden.
- * Reduced motion: the resting glow, no breathing, no rings.
+ * Reduced motion: the resting glow, no breathing, no rings. Light mode: the halo at half strength (ring, not cloud).
  */
 export type GlowBreakTone = "win" | "loss" | "soft";
 
@@ -89,11 +89,15 @@ export function GlowBreak({ x = 0, y = 0, tone = "win", size = GLOW_BREAK.size, 
   return (
     <motion.span aria-hidden="true" data-fx="glow-break" data-tone={tone} className={cn("pointer-events-none absolute left-0 top-0 z-[1]", className)} style={{ x, y }}>
       <span className="absolute -translate-x-1/2 -translate-y-1/2" style={{ width: size, height: size }}>
-        <span
-          ref={haloRef}
-          className="absolute inset-[-40%] rounded-full"
-          style={{ opacity: GLOW_BREAK.rest, background: `radial-gradient(circle, color-mix(in srgb, ${color} 55%, transparent) 0%, color-mix(in srgb, ${color} 18%, transparent) 38%, transparent 68%)` }}
-        />
+        {/* on paper (light mode) the halo at half strength: a full green cloud reads as a smudge there, a ring of light
+            does not (the wrapper scales the breathing opacity of the halo, the WAAPI keyframes stay the same) */}
+        <span className="absolute inset-0 [:root[data-theme=light]_&]:opacity-50">
+          <span
+            ref={haloRef}
+            className="absolute inset-[-40%] rounded-full"
+            style={{ opacity: GLOW_BREAK.rest, background: `radial-gradient(circle, color-mix(in srgb, ${color} 55%, transparent) 0%, color-mix(in srgb, ${color} 18%, transparent) 38%, transparent 68%)` }}
+          />
+        </span>
         {Array.from({ length: ringCount }, (_, i) => (
           <span
             key={i}

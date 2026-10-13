@@ -10,14 +10,16 @@
 import { Gate } from "@/billing/entitlements";
 import { UpgradeTeaser } from "@/billing/ui/UpgradeTeaser";
 import { type ReactNode } from "react";
-import { biasText, BOX_TF_LABEL, PHASE_LABEL, type BoxTf } from "@/domain/boxes";
+import { biasText, BOX_TF_LABEL, normalizeWatchSymbol, PHASE_LABEL, type BoxTf } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
 import { useRecentBoxAlerts } from "@/market/boxes/alerts";
 import { useBoxes, type BoxesView } from "@/market/boxes/store";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
+import { DotMatrix } from "@/motion/DotMatrix";
 import { Marquee } from "@/motion/pulse/Marquee";
 import { Reveal } from "@/motion/Reveal";
 import { StatusPill } from "@/motion/StatusPill";
+import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { BestSetupsCard } from "./BestSetupsCard";
@@ -75,13 +77,22 @@ function AlertBand({ view, className }: { view: BoxesView; className?: string })
   const items = bandItems(view, recent);
   if (!items.length) {
     // the band keeps its place while the candles load (and when no box exists yet): nothing below jumps when the
-    // first messages arrive (P1-02); off / error have no band at all
-    const text = view.state === "loading" || view.state === "idle" ? (view.detail ?? MARKT.best.loading) : view.state === "ok" ? MARKT.state.none : null;
+    // first messages arrive (P1-02); off / error have no band at all. Loading shows only the dot-matrix loader – the
+    // sentence „Lade Kerzen …“ is said once, in Beste Setups (P2-09); screen readers still get it here
+    const loading = view.state === "loading" || view.state === "idle";
+    const text = loading ? (view.detail ?? MARKT.best.loading) : view.state === "ok" ? MARKT.state.none : null;
     if (!text) return null;
     return (
       <div className={cn(BAND, "px-4", className)} data-testid="markt-band" data-waiting="">
         <span className="flex items-center">
-          <BandItem text={text} tone="mute" />
+          {loading ? (
+            <>
+              <DotMatrix preset="loader" size={2} gap={1.5} tone="mute" />
+              <span className="sr-only">{text}</span>
+            </>
+          ) : (
+            <BandItem text={text} tone="mute" />
+          )}
         </span>
       </div>
     );
@@ -100,11 +111,23 @@ function AlertBand({ view, className }: { view: BoxesView; className?: string })
 }
 
 function HeaderStatus({ view }: { view: BoxesView }) {
+  const pair = useJournal((s) => s.settings.pair);
   const tone = view.state === "ok" ? "live" : view.state === "error" ? "error" : view.state === "off" ? "muted" : "warn";
-  const label = view.state === "ok" ? `${view.symbol ?? ""} · ${biasText(view.bias)}` : (view.detail ?? MARKT.best.loading);
+  const loading = view.state === "loading" || view.state === "idle";
+  // while loading: the symbol beside the pending (warn) dot – the sentence stands once, in Beste Setups (P2-09)
+  const symbol = view.symbol ?? normalizeWatchSymbol(pair) ?? "";
+  const text = view.state === "ok" ? `${view.symbol ?? ""} · ${biasText(view.bias)}` : loading ? symbol : (view.detail ?? MARKT.best.loading);
+  const label = loading ? (
+    <>
+      {symbol}
+      <span className="sr-only"> · {view.detail ?? MARKT.best.loading}</span>
+    </>
+  ) : (
+    text
+  );
   return (
-    <span data-testid="markt-status" data-state={view.state}>
-      <StatusPill tone={tone} expanded label={label} layoutKey={label} />
+    <span data-testid="markt-status" data-state={view.state} title={loading ? (view.detail ?? MARKT.best.loading) : undefined}>
+      <StatusPill tone={tone} expanded label={label} layoutKey={text} />
     </span>
   );
 }

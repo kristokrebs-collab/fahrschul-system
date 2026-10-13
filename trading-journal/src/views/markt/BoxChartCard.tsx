@@ -44,13 +44,15 @@ function merge(older: readonly Candle[], data: readonly Candle[]): Candle[] {
 }
 
 /** Legend glyphs (decorative). */
-function Glyph({ kind }: { kind: "box" | "broken" | "pending" | "target" | "stop" | "rsi" }) {
+function Glyph({ kind }: { kind: "box" | "brokenUp" | "brokenDown" | "pending" | "target" | "stop" | "rsi" }) {
   const common = { width: 18, height: 10, viewBox: "0 0 18 10", "aria-hidden": true, className: "shrink-0" } as const;
-  if (kind === "box" || kind === "broken" || kind === "pending") {
-    const c = kind === "broken" ? "var(--color-win)" : kind === "pending" ? themePaint("#65b488") : themePaint("#9b9b9b");
+  if (kind === "box" || kind === "brokenUp" || kind === "brokenDown" || kind === "pending") {
+    // a box broken up is drawn in the win tone, one broken down in the loss tone (BoxPrimitive `toneOf`)
+    const tone = kind === "brokenUp" ? "var(--color-win)" : kind === "brokenDown" ? "var(--color-loss)" : null;
+    const c = tone ?? (kind === "pending" ? themePaint("#65b488") : themePaint("#9b9b9b"));
     return (
       <svg {...common}>
-        <rect x="1" y="1.5" width="16" height="7" fill={kind === "broken" ? "rgba(61,220,132,0.12)" : "rgb(var(--veil-rgb, 255 255 255) / 0.08)"} stroke={c} strokeWidth="1" strokeDasharray={kind === "pending" ? "2 2" : undefined} />
+        <rect x="1" y="1.5" width="16" height="7" fill={tone ? `color-mix(in srgb, ${tone} 12%, transparent)` : "rgb(var(--veil-rgb, 255 255 255) / 0.08)"} stroke={c} strokeWidth="1" strokeDasharray={kind === "pending" ? "2 2" : undefined} />
       </svg>
     );
   }
@@ -64,7 +66,8 @@ function Glyph({ kind }: { kind: "box" | "broken" | "pending" | "target" | "stop
 
 const LEGEND: readonly { kind: Parameters<typeof Glyph>[0]["kind"]; label: string }[] = [
   { kind: "box", label: S.legendBox },
-  { kind: "broken", label: S.legendBroken },
+  { kind: "brokenUp", label: S.legendBrokenUp },
+  { kind: "brokenDown", label: S.legendBrokenDown },
   { kind: "pending", label: S.legendPending },
   { kind: "target", label: S.legendTarget },
   { kind: "stop", label: S.legendStop },
@@ -138,7 +141,7 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
           />
         </Suspense>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[11px] text-faint" data-testid="markt-chart-legend">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[11px] text-mute" data-testid="markt-chart-legend">
         {LEGEND.map((l) => (
           <span key={l.kind} className="inline-flex items-center gap-1.5 whitespace-nowrap">
             <Glyph kind={l.kind} />

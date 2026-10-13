@@ -109,6 +109,7 @@ const INK_VARS: Record<InkKey, string> = {
   grid: "--chart-ink-grid",
   ref: "--chart-ink-ref",
   tick: "--chart-ink-tick",
+  axis: "--chart-ink-axis",
   mute: "--chart-ink-mute",
   fg: "--chart-ink-fg",
   separator: "--chart-ink-separator",

@@ -62,7 +62,7 @@ export function makeNothingTheme(background: string = CHART_BACKGROUND_TRANSPARE
     autoSize: true,
     layout: {
       background: { type: ColorType.Solid, color: background },
-      textColor: ink.tick,
+      textColor: ink.axis,
       fontSize: 11,
       fontFamily: CHART_FONT,
       attributionLogo: false,
@@ -113,7 +113,7 @@ export const NOTHING_DARK: DeepPartial<ChartOptions> = makeNothingTheme();
  */
 export function inkChartOptions(): DeepPartial<ChartOptions> {
   return {
-    layout: { textColor: ink.tick, panes: { separatorColor: ink.separator, separatorHoverColor: withAlpha(ink.veil, 0.05) } },
+    layout: { textColor: ink.axis, panes: { separatorColor: ink.separator, separatorHoverColor: withAlpha(ink.veil, 0.05) } },
     grid: { vertLines: { color: ink.grid }, horzLines: { color: ink.grid } },
     crosshair: { vertLine: { color: ink.ref, labelBackgroundColor: ink.labelBg }, horzLine: { color: ink.ref, labelBackgroundColor: ink.labelBg } },
   };

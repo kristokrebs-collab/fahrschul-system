@@ -12,6 +12,8 @@ const INK_BASE = {
   grid: "#1c1c1c",
   ref: "#3a3a3a",
   tick: "#5f5f5f",
+  /** price / time axis text: working information, measured ≥ 3 : 1 after anti-aliasing (tick grey stays for faint lines) */
+  axis: "#808080",
   mute: "#9b9b9b",
   fg: "#f2f2f2",
   separator: "#1f1f1f",
@@ -75,6 +77,18 @@ export function withAlpha(color: string, alpha: number): string {
   const h = m[1]!.length === 3 ? [...m[1]!].map((c) => c + c).join("") : m[1]!;
   const n = parseInt(h, 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
+/**
+ * The live palette is a light one (the chart sits on paper): the pane background's relative luminance is above one
+ * half. Glows and blurs that read as light on ink read as a smudge on paper.
+ */
+export function inkIsPaper(): boolean {
+  const m = /^#([0-9a-f]{6})$/i.exec(ink.bg.trim());
+  if (!m) return false;
+  const n = parseInt(m[1]!, 16);
+  const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+  return lum > 0.5;
 }
 
 const KEY_OF_DEFAULT = new Map<string, InkKey>();

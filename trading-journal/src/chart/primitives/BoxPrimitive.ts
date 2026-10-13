@@ -8,7 +8,8 @@
  * - provisional (live price beyond an edge, close pending): dashed edges in the soft tone; the confirmation at the close
  *   wipes the solid edge over the dashed one left → right;
  * - targets: thin lines from the box's right end to the pane edge (T dotted in the tone, stop dashed loss, entry solid
- *   fg), a small label `T1 86.100` left of the price-line strip.
+ *   fg), a small label `T1 86.100` left of the price-line strip – the label ends its line (the stroke stops at the
+ *   plate), unless it had to move off the line.
  *
  * Motion (finite canvas tweens only – every one ends, nothing animates at rest; reduced motion: static):
  * - a NEW box id draws in: the fill grows from → to (`easeOutCubic` over `tween.draw`), the edges fade in
@@ -260,7 +261,11 @@ class BoxRenderer implements IPrimitivePaneRenderer {
         for (const t of b.targets) {
           if (t.grow <= 0) continue;
           const tx1 = Math.round(t.x1 * hr);
-          const tx2 = Math.round((t.x1 + (t.x2 - t.x1) * t.grow) * hr);
+          // a label on its own line is the line's end: the line stops at the plate (no dash pokes out behind the price
+          // – „82.264,96 -“ read like a minus); a label nudged off the line leaves it full length
+          const onLine = t.label != null && Math.abs(t.label.box.y + t.label.box.h / 2 - t.y) < 1;
+          const end = onLine ? Math.min(t.x2, t.label!.box.x - 2) : t.x2;
+          const tx2 = Math.round((t.x1 + Math.max(0, end - t.x1) * t.grow) * hr);
           const ty = Math.round(t.y * vr) + (lw % 2 ? 0.5 : 0);
           ctx.globalAlpha = 0.85 * b.edge;
           ctx.strokeStyle = t.color;
