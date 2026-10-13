@@ -30,7 +30,7 @@ export function RDistributionCard() {
   return (
     <InsightCard title={TITLES.r} explain={() => explainR(d)} note={d.rN ? `${d.rN} Trades mit Stop` : undefined} data-testid="insights-r">
       {!d.rN ? (
-        <EmptyState title={EMPTY.r.title} text={EMPTY.r.text} />
+        <EmptyState title={EMPTY.r.title} text={EMPTY.r.text} line={false} />
       ) : (
         <div ref={root} className="grid gap-4">
           <div className="grid gap-1.5">

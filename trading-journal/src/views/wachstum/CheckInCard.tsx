@@ -78,7 +78,8 @@ export function CheckInCard({ today }: { today: TodayState }) {
   const has = !!c || mood != null;
   return (
     <Card title="Check-in" note={has ? "Heute eingecheckt" : undefined} data-testid="growth-checkin" data-has={has ? "1" : "0"}>
-      <div className="grid gap-4">
+      {/* row rule (P1-08): the free height of the taller neighbour goes above the review footer, which sits at the bottom */}
+      <div className="flex flex-1 flex-col gap-4">
         <div className="flex items-center gap-4">
           <div className="grid size-[78px] shrink-0 place-items-center rounded-2xl border border-line bg-ink-950/60">
             <MoodGlyph mood={mood} size={6} label={mood ? `Stimmung: ${MOOD_LABELS[mood - 1]}` : "Noch keine Stimmung"} />
@@ -117,7 +118,7 @@ export function CheckInCard({ today }: { today: TodayState }) {
         <Button variant={has ? "ghost" : "primary"} onClick={() => openCheckin(today.key)} data-testid="growth-checkin-open">
           {has ? C.ctaEdit : C.cta}
         </Button>
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3" data-testid="growth-reviews" data-open={unreviewed.length}>
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3" data-testid="growth-reviews" data-open={unreviewed.length}>
           {unreviewed.length ? (
             <>
               <span className="flex items-center gap-2 text-[12.5px]">

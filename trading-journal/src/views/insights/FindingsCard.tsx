@@ -4,7 +4,7 @@ import { EDGE_MIN_TRADES, EMPTY, explainFindings, FINDING_MIN_N, findings, TITLE
 import { cn } from "@/lib/cn";
 import { RevealGroup, RevealItem } from "@/motion/Reveal";
 import { Badge } from "@/primitives/Badge";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { Collapse } from "@/primitives/Expander";
 import { Bar } from "@/views/overview/Bar";
 import { InsightCard, TradeList, useInsightsBase } from "./ui";
@@ -55,7 +55,7 @@ export function FindingsCard() {
         view.closed.length ? (
           <EmptyState title={EMPTY.findings.title} text={EMPTY.findings.text} line={false} action={<Progress have={view.closed.length} />} />
         ) : (
-          <EmptyState title={EMPTY.trades.title} text={EMPTY.trades.text} />
+          <EmptyState title={EMPTY.trades.title} text={EMPTY.trades.text} line={EMPTY_LINE_CLOSED} />
         )
       ) : (
         <RevealGroup as="ol" className="grid gap-2.5">

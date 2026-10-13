@@ -2,6 +2,7 @@ import { themePaint } from "@/lib/themePaint";
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
+import { formatNumber } from "@/motion/MotionNumber";
 import { NumberCascade } from "@/motion/fx/NumberCascade";
 import { SpotlightSweep } from "@/motion/fx/SpotlightSweep";
 import { HoverPillFor, useHoverStore, type HoverStore } from "@/motion/HoverPill";
@@ -34,14 +35,17 @@ function Movement({ row }: { row: LeaderboardRow }) {
   );
 }
 
-function Value({ metric, value, className }: { metric: SocialMetric; value: number; className?: string }) {
+/**
+ * A ranking value. The digit rain (`NumberCascade`) is a result effect (motion map): only the podium and the own row run
+ * it; the other rows show the settled number and arrive with their row's reveal (P1-13 – 13 rows raining at once).
+ */
+function Value({ metric, value, cascade, className }: { metric: SocialMetric; value: number; cascade: boolean; className?: string }) {
   const isR = metric === "expectancy";
+  const fmt = { decimals: isR ? 2 : 0, signed: isR, suffix: isR ? "R" : " %" };
   return (
     <span className={cn("num font-mono", isR ? (value > 0 ? "text-win" : value < 0 ? "text-loss" : "text-fg") : "text-fg", className)}>
       <span className="sr-only">{metricText(metric, value)}</span>
-      <span aria-hidden="true">
-        <NumberCascade value={value} decimals={isR ? 2 : 0} signed={isR} suffix={isR ? "R" : " %"} />
-      </span>
+      <span aria-hidden="true">{cascade ? <NumberCascade value={value} {...fmt} /> : formatNumber(value, fmt)}</span>
     </span>
   );
 }
@@ -67,7 +71,7 @@ function Podium({ row, metric, place, pulse }: { row: LeaderboardRow; metric: So
       <DotMatrixText text={String(row.rank)} tone={place === 1 ? "signal" : "fg"} size={place === 1 ? 4 : 3} gap={1} label={`Platz ${row.rank}`} />
       <Monogram pseudonym={row.pseudonym} size="sm" tone={row.me ? "signal" : "fg"} />
       <span className="line-clamp-2 min-h-[2.4em] text-[12px] font-medium leading-tight [overflow-wrap:anywhere]">{row.me ? `${BOARD.you} · ${row.pseudonym}` : row.pseudonym}</span>
-      <Value metric={metric} value={row.value} className="text-[14px] sm:text-[15px]" />
+      <Value metric={metric} value={row.value} cascade className="text-[14px] sm:text-[15px]" />
       <span className="font-mono text-[10px] text-faint">{BOARD.trades(row.trades)}</span>
     </motion.li>
   );
@@ -99,7 +103,7 @@ function Row({ row, metric, index, hover, pulse }: { row: LeaderboardRow; metric
           <span className={cn("truncate text-[13px]", row.me ? "font-semibold text-fg" : "text-fg")}>{row.me ? `${BOARD.you} · ${row.pseudonym}` : row.pseudonym}</span>
           <span className="font-mono text-[10.5px] text-faint">{BOARD.trades(row.trades)}</span>
         </span>
-        <Value metric={metric} value={row.value} className="text-[13.5px]" />
+        <Value metric={metric} value={row.value} cascade={!!row.me} className="text-[13.5px]" />
       </div>
     </motion.li>
   );

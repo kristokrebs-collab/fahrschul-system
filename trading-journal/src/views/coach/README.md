@@ -8,7 +8,7 @@ an API key; the optional AI wording (`ask.ts`) only rephrases numbers that were 
 | Row (lg, 12 columns) | Cards |
 |---|---|
 | header | `PageHeader` (title, lead with `COACH_LEAD_FILL` = `storageKey("fill-coach")`, account switch) |
-| Hero | `HeroCard` (12) – `COACH` wordmark, lesson of the week, rotating tips, trading score |
+| Hero | `HeroCard` (12) – trading score as the hero numeral, lesson of the week, rotating tips, the score's parts |
 | Fragen · Heute | `ChatCard` (7) · `TodayCard` (5) |
 | Leaks & Edges | `EdgesCard` (12) |
 | Plan · Timeline | `PlanCard` (5) · `TimelineCard` (7) |
@@ -18,11 +18,12 @@ Phones: one column in the same order, no horizontal scroll at 390 px. Every cell
 `transform: none`).
 
 ## Cards and effects
-- **Hero** (`HeroCard.tsx`): the wordmark as `DancingLetters` (decorative, `aria-hidden`), the lesson of the week – the
+- **Hero** (`HeroCard.tsx`): the trading score as the one big number (`ScoreHero`: Doto in the size of Analyse's Sharpe,
+  `NumberCascade`, `/ 100` muted in Plex Sans, the verdict pill; no `COACH` wordmark – the `h1` says it), the lesson of the week – the
   first time per lesson (`storageKey("coach-lesson-<hash>")`) its words fill in with `PixelTextFill`, afterwards the key
   phrase carries a `TactileHighlight` (`tab={false}`); short tips cycle with `TextMorph` (finite, `aria-hidden`, the list
-  is in an `sr-only` copy); the trading score (Edge · Disziplin · Risikokonstanz · Journaling) as `NumberCascade` with
-  four part bars, "Zu wenig Daten" under 10 trades.
+  is in an `sr-only` copy); the score's parts (`ScoreParts`: Edge · Disziplin · Risikokonstanz · Journaling as four
+  growing bars, the biggest lever), "Zu wenig Daten" under 10 trades.
 - **Frag deinen Coach** (`ChatCard.tsx`): German questions → `askJournal` (`@/domain/coach/nlq`). "Coach denkt …"
   shimmers for one reveal, then the answer types itself (`CoachStream`, 65 ms / character, capped), the facts land with
   `ValueFlash`, bars grow (`scaleX`), a line answer draws (`EquityDraw`), the `ConfidenceMeter` fills, the evidence trades

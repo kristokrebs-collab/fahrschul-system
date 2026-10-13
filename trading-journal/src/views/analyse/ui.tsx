@@ -43,7 +43,8 @@ export function SectionTitle({ title, sub, id, className }: { title: string; sub
   const reduced = useReducedFx();
   const seen = useFirstInView(ref, !reduced);
   return (
-    <div ref={ref} className={cn("flex flex-wrap items-end justify-between gap-x-6 gap-y-1 pt-4", className)}>
+    // the head of PR #3's „Auswertung“ (`InsightsSection`): the lead sits UNDER the title, never in a column of its own (P1-07)
+    <div ref={ref} className={cn("grid min-w-0 gap-1.5 pt-6", className)}>
       <div className="flex min-w-0 items-center gap-2">
         <span className="size-1.5 shrink-0 rounded-full bg-signal" aria-hidden="true" />
         <h2 id={id} className="label !text-fg">
@@ -54,7 +55,7 @@ export function SectionTitle({ title, sub, id, className }: { title: string; sub
           )}
         </h2>
       </div>
-      {sub && <p className="max-w-[60ch] text-[12.5px] text-mute">{sub}</p>}
+      {sub && <p className="max-w-[60ch] text-[13px] text-mute">{sub}</p>}
     </div>
   );
 }

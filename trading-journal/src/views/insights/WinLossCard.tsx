@@ -16,7 +16,7 @@ export function WinLossCard() {
   return (
     <InsightCard title={TITLES.winloss} explain={explainWinLoss} data-testid="insights-winloss">
       {!ok ? (
-        <EmptyState title={EMPTY.winloss.title} text={EMPTY.winloss.text} />
+        <EmptyState title={EMPTY.winloss.title} text={EMPTY.winloss.text} line={false} />
       ) : (
         <div className="@container/wl grid">
           <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 px-1 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.1em]" aria-hidden="true">

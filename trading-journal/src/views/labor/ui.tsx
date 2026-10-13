@@ -58,9 +58,10 @@ export function ChipPick<T extends string | number>({ value, options, onChange, 
             role="radio"
             aria-checked={on}
             onClick={() => onChange(o.v)}
-            className={cn("relative isolate min-h-9 rounded-full border px-3 text-[12px] font-medium transition-colors duration-200 pointer-coarse:min-h-11", on ? "border-transparent text-ink-900" : "border-line-2 text-mute hover:border-white/30 hover:text-fg")}
+            className={cn("relative isolate min-h-9 rounded-full border px-3 text-[12px] font-medium transition-colors duration-200 pointer-coarse:min-h-11", on ? "border-transparent text-fg" : "border-line-2 text-mute hover:border-white/30 hover:text-fg")}
           >
-            {on && <motion.span layoutId={`labor-chip-${id}`} aria-hidden="true" className="absolute inset-0 -z-10 bg-fg" style={{ borderRadius: radius.pill }} transition={reduced ? { duration: 0 } : spring.segment} />}
+            {/* the ink thumb of `Segmented` (PR #3), not a white pill: the one white surface is the primary action (P1-06) */}
+            {on && <motion.span layoutId={`labor-chip-${id}`} aria-hidden="true" className="absolute -inset-px -z-10 border border-line-2 bg-ink-750" style={{ borderRadius: radius.pill }} transition={reduced ? { duration: 0 } : spring.segment} />}
             {o.label}
           </button>
         );

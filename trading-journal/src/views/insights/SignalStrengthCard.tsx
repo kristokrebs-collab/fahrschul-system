@@ -299,7 +299,7 @@ export function SignalStrengthCard() {
       data-testid="insights-signal"
     >
       {!res.withCheck ? (
-        <EmptyState title={EMPTY.signal.title} text={EMPTY.signal.text} />
+        <EmptyState title={EMPTY.signal.title} text={EMPTY.signal.text} line={false} />
       ) : (
         <div className="grid gap-5">
           <GroupTable head="Stärke" rows={strengthGroup} group="strength" pill="signal-strength" />

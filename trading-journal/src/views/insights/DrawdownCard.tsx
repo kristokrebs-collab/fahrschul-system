@@ -6,7 +6,7 @@ import { tradeTime } from "@/lib/dates";
 import { date as fmtDate, n0, n2, pct } from "@/lib/format";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { InsightCard, Stat, useInsightsBase } from "./ui";
 
@@ -112,7 +112,7 @@ export function DrawdownCard() {
   return (
     <InsightCard title={TITLES.drawdown} explain={() => explainDrawdown(rep, view.g, cur)} data-testid="insights-drawdown">
       {!view.closed.length ? (
-        <EmptyState title={EMPTY.trades.title} text={EMPTY.trades.text} />
+        <EmptyState title={EMPTY.trades.title} text={EMPTY.trades.text} line={EMPTY_LINE_CLOSED} />
       ) : (
         // the curve takes the height the row leaves (the card stretches to its neighbour), the tiles stay compact
         <div className="flex flex-1 flex-col gap-4">

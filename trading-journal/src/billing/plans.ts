@@ -143,7 +143,7 @@ export const PLAN_CATALOG: Readonly<Record<PlanId, PlanCatalogEntry>> = {
     name: "Premium",
     tagline: "Das volle Labor für Vollzeit-Trader.",
     highlights: ["Alles aus Pro", COACH_AI_HIGHLIGHT, "Backtest-Labor, API & Webhooks", "5 Bitunix-Verbindungen · 20 GB Screenshots"],
-    glyph: "MAX",
+    glyph: "PREMIUM",
   },
   team: {
     id: "team",

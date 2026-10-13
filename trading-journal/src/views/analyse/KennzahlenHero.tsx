@@ -16,7 +16,7 @@ import { TextPrism } from "@/motion/pulse/TextPrism";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { radius } from "@/motion/tokens";
 import { Card } from "@/primitives/Card";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { GlyphPlus } from "@/primitives/icons";
 import { ExplanationView } from "@/views/overview/explainer";
 import { CiWhisker, CountValue, SigBadge, ciText, whiskerDomain } from "./ui";
@@ -97,7 +97,7 @@ export function KennzahlenHero({ rep, cur, n }: { rep: RatioReport; cur: string;
   return (
     <Card data-testid="ana-hero" innerClassName="gap-5">
       {n < 5 ? (
-        <EmptyState title="Noch zu wenig Trades" text="Die Profi-Kennzahlen brauchen mindestens 5 abgeschlossene Trades. Bis dahin wäre jede Zahl Zufall." />
+        <EmptyState title="Noch zu wenig Trades" text="Die Profi-Kennzahlen brauchen mindestens 5 abgeschlossene Trades. Bis dahin wäre jede Zahl Zufall." line={progressLine(n, 5)} />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-8">
           <div className="grid min-w-0 content-start gap-3">

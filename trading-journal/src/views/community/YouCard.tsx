@@ -62,7 +62,8 @@ export function YouCard({ className }: { className?: string }) {
   const optIn = me?.optIn ?? false;
   return (
     <Card title={YOU.title} className={cn("h-full", className)} data-testid="you-card">
-      <div className="grid gap-5">
+      {/* row rule (P1-08): next to the taller ranking the footer sits at the card's bottom, the free height above it */}
+      <div className="flex flex-1 flex-col gap-5">
         <div className="flex items-center gap-4">
           <Monogram pseudonym={me?.pseudonym ?? "?"} size="lg" />
           <div className="grid min-w-0 flex-1 gap-1">
@@ -124,7 +125,7 @@ export function YouCard({ className }: { className?: string }) {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
           <span className="text-[11.5px] text-faint">{YOU.syncHint}</span>
           <Button size="sm" onClick={() => void refreshMe()} disabled={!me || busy === "refresh"} data-testid="you-refresh">
             {YOU.refresh}

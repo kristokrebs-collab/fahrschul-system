@@ -9,7 +9,7 @@ import type { AccountView } from "@/domain/account";
 import { cn } from "@/lib/cn";
 import { pct0 } from "@/lib/format";
 import { HeatGridReveal, heatColor } from "@/motion/fx/HeatGridReveal";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { memoClosed } from "./hooks";
 import { AnaCard, unitText } from "./ui";
 
@@ -26,7 +26,7 @@ export function HeatmapCard({ view, cur }: { view: AccountView; cur: string }) {
   return (
     <AnaCard title={CARD_TITLES.heatmap} explain={explainHeatmap} data-testid="ana-heat" note={`Ø ${grid.unit === "R" ? "R" : cur} pro Trade · Ortszeit · beste Zelle ab ${HEAT_MIN_N} Trades`}>
       {!view.closed.length ? (
-        <EmptyState title="Noch keine Trades" text="Die Heatmap zeigt, zu welcher Zeit du gut handelst." />
+        <EmptyState title="Noch keine Trades" text="Die Heatmap zeigt, zu welcher Zeit du gut handelst." line={EMPTY_LINE_CLOSED} />
       ) : (
         <div className="grid gap-3">
           <div className="grid grid-cols-[1.6rem_minmax(0,1fr)] gap-x-1.5 gap-y-1">

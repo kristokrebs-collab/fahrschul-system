@@ -133,7 +133,7 @@ export function BerichteView({ className }: { className?: string }) {
               aria-pressed={focus === f}
               onClick={() => setFocus(f)}
               data-testid="report-focus"
-              className={cn("touch-hit min-h-8 rounded-full border px-3 py-1 text-[12px] transition-colors", focus === f ? "border-fg/60 bg-fg text-ink-950" : "border-line-2 text-mute hover:border-steel/40 hover:text-fg")}
+              className={cn("touch-hit min-h-8 rounded-full border px-3 py-1 text-[12px] transition-colors", focus === f ? "border-line-2 bg-ink-750 text-fg" : "border-line-2 text-mute hover:border-steel/40 hover:text-fg")}
             >
               {FOCUS_LABEL[f]}
             </button>

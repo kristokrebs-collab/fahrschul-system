@@ -17,8 +17,14 @@ export interface EmptyStateProps {
   className?: string;
 }
 
-/** Default status line of an empty state. */
+/** Default status line of an empty state – only true while the journal (or this list) has no entry at all. */
 export const EMPTY_LINE = "Bereit für den ersten Eintrag.";
+
+/** Status line while there are trades, but none is closed yet. */
+export const EMPTY_LINE_CLOSED = "Wartet auf den ersten abgeschlossenen Trade.";
+
+/** Status line of a threshold: what is there of what is needed (`11 / 20 Trades`) – never the default line (P1-11). */
+export const progressLine = (have: number, need: number, unit = "Trades"): string => `${Math.min(have, need)} / ${need} ${unit}`;
 
 /** Marching-ants border (`.fx-ants`): calm white dashes, paused while the box is off-screen. */
 const ANTS_STYLE = { "--fx-ants-color": "rgb(var(--veil-rgb, 255 255 255) / 0.16)", "--fx-ants-dash": "4px", "--fx-ants-speed": "1.8s" } as CSSProperties;

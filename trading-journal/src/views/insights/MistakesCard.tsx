@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { EMPTY, explainMistakes, mistakeReport, TITLES } from "@/domain/insights";
 import { cn } from "@/lib/cn";
 import { pct0, r as fmtR, signed } from "@/lib/format";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { Collapse } from "@/primitives/Expander";
 import { Segmented } from "@/primitives/Segmented";
 import { Bar } from "@/views/overview/Bar";
@@ -39,7 +39,7 @@ export function MistakesCard() {
       data-testid="insights-mistakes"
     >
       {!rep.rows.length ? (
-        <EmptyState title={view.closed.length ? EMPTY.mistakes.title : EMPTY.trades.title} text={view.closed.length ? EMPTY.mistakes.text : EMPTY.trades.text} />
+        <EmptyState title={view.closed.length ? EMPTY.mistakes.title : EMPTY.trades.title} text={view.closed.length ? EMPTY.mistakes.text : EMPTY.trades.text} line={view.closed.length ? false : EMPTY_LINE_CLOSED} />
       ) : (
         <div className="grid gap-3">
           {rep.leak && (

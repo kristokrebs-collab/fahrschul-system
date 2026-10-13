@@ -20,7 +20,7 @@ import { ScrubTimeline } from "@/motion/pulse/ScrubTimeline";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
 import { useAnalyseUi } from "./analyseStore";
@@ -151,7 +151,7 @@ export function RollingCard({ view, cur }: { view: AccountView; cur: string }) {
       }
     >
       {!rep.points.length ? (
-        <EmptyState title={ANA_EMPTY.rolling(window).title} text={ANA_EMPTY.rolling(window).text} />
+        <EmptyState title={ANA_EMPTY.rolling(window).title} text={ANA_EMPTY.rolling(window).text} line={progressLine(view.closed.length, window)} />
       ) : (
         <div className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

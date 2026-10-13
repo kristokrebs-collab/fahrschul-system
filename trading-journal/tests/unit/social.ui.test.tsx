@@ -165,6 +165,12 @@ describe("CommunityView", () => {
     expect(within(boardCard).getByTestId("podium-2")).toHaveTextContent("Ruhige Eule 81");
     const mine = boardCard.querySelector("[data-me]");
     expect(mine).toHaveTextContent("Du · Stiller Falke 27");
+    // the digit rain is a result effect: the podium and the own row run it, the other rows show the settled value (P1-13)
+    for (const p of [1, 2, 3]) expect(within(boardCard).getByTestId(`podium-${p}`).querySelector('[data-fx="number-cascade"]')).not.toBeNull();
+    const rows = within(boardCard).getAllByTestId("board-row");
+    expect(rows.filter((r) => r.querySelector('[data-fx="number-cascade"]')).map((r) => r.hasAttribute("data-me"))).toEqual([true]);
+    expect(rows.find((r) => !r.hasAttribute("data-me"))).toHaveTextContent("Klare Möwe 33");
+    expect(rows.find((r) => !r.hasAttribute("data-me"))).toHaveTextContent("+0,83R");
     // percentile of +0,42R in the distribution (between p50 0,18 and p75 0,45)
     await waitFor(() => expect(within(you).getByTestId("you-percentile")).toHaveTextContent("Besser als 72 % der Teilnehmer"));
     expect(screen.getByTestId("distribution-strip")).toBeInTheDocument();

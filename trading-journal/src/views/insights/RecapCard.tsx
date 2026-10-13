@@ -43,7 +43,7 @@ export function RecapCard() {
       data-testid="insights-recap"
     >
       {!g.n ? (
-        <EmptyState title={EMPTY.recap.title} text={EMPTY.recap.text} />
+        <EmptyState title={EMPTY.recap.title} text={EMPTY.recap.text} line={false} />
       ) : (
         <div className="grid gap-4">
           <div className="grid gap-2">

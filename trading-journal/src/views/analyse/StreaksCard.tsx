@@ -11,7 +11,7 @@ import { cn } from "@/lib/cn";
 import { n1, pct0 } from "@/lib/format";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { memoClosed } from "./hooks";
 import { AnaCard, CountValue, SigBadge } from "./ui";
@@ -89,7 +89,7 @@ export function StreaksCard({ view }: { view: AccountView }) {
   return (
     <AnaCard title={CARD_TITLES.streaks} explain={() => explainStreaks(rep)} data-testid="ana-streaks">
       {rep.n < 3 ? (
-        <EmptyState title="Noch keine Serien" text="Serien zeigen sich ab ein paar abgeschlossenen Trades." />
+        <EmptyState title="Noch keine Serien" text="Serien zeigen sich ab ein paar abgeschlossenen Trades." line={progressLine(rep.n, 3)} />
       ) : (
         <div className="grid gap-4">
           <span className="label -mb-2">Längste Serie</span>

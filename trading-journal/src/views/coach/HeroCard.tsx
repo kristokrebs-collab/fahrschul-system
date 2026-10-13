@@ -1,8 +1,9 @@
 /**
- * Coach hero (P04): the "COACH" wordmark (letters jump away from the pointer – `DancingLetters`, hover devices), the
- * lesson of the week (once per session a pixel ember fills it – `PixelTextFill` – then the key word gets the red
- * marker, `TactileHighlight tab={false}`), rotating short tips (`TextMorph cycle`) and the personal trading score
- * (`NumberCascade` + four part bars growing on `spring.enter`). Reduced motion: everything in its final state.
+ * Coach hero (P04): the personal trading score as the hero numeral (Doto in the size of Analyse's Sharpe, `NumberCascade`
+ * once in view; the page's `h1` already says „Coach“, so no wordmark repeats it – P1-10), the lesson of the week as the
+ * headline (once per session a pixel ember fills it – `PixelTextFill` – then the key word gets the red marker,
+ * `TactileHighlight tab={false}`), rotating short tips (`TextMorph cycle`) and the score's four parts (bars growing on
+ * `spring.enter`). Reduced motion: everything in its final state.
  */
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -10,7 +11,6 @@ import type { TradingScore, WeeklyLesson } from "@/domain/coach";
 import { cn } from "@/lib/cn";
 import { NumberCascade } from "@/motion/fx/NumberCascade";
 import { useFirstInView } from "@/motion/inView";
-import { DancingLetters } from "@/motion/pulse/DancingLetters";
 import { PixelTextFill } from "@/motion/pulse/PixelTextFill";
 import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
 import { TextMorph } from "@/motion/pulse/TextMorph";
@@ -81,28 +81,38 @@ export function Lesson({ lesson, className }: { lesson: WeeklyLesson; className?
 
 const PART_TONE = (v: number | null) => (v == null ? "bg-white/15" : v >= 70 ? "bg-win/80" : v >= 45 ? "bg-white/60" : "bg-loss/75");
 
-/** Trading score: the number cascades in, the four parts grow. */
-export function ScoreBlock({ score, className }: { score: TradingScore; className?: string }) {
+const SCORE_TONE = (v: number | null) => (v == null ? "text-faint" : v >= 75 ? "text-win" : v >= 45 ? "text-fg" : "text-loss");
+const LABEL_TONE = (l: TradingScore["label"]) => (l === "Stark" ? "border-win/30 text-win" : l === "Kritisch" ? "border-loss/30 text-loss" : "border-line-2 text-mute");
+
+/** The trading score as the hero's one big number (cascades in), the unit muted in Plex Sans, the verdict as a pill. */
+export function ScoreHero({ score, headline, className }: { score: TradingScore; headline?: string; className?: string }) {
+  const num = "dot-num text-[clamp(56px,13vw,96px)] leading-none";
+  return (
+    <div className={cn("grid min-w-0 gap-2", className)} data-testid="coach-score">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="label">Trading-Score</span>
+        <span className={cn("rounded-full border px-2.5 py-0.5 font-mono text-[11px] tracking-wide", LABEL_TONE(score.label))}>{score.label}</span>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-2">
+        <span className="flex items-baseline gap-2">
+          {score.score == null ? <span className={cn(num, "text-faint")}>–</span> : <NumberCascade value={score.score} decimals={0} className={cn(num, SCORE_TONE(score.score))} />}
+          <span className="font-sans text-lg font-medium text-mute">/ 100</span>
+        </span>
+        {headline && <span className="max-w-[28ch] pb-1 text-[12px] leading-snug text-mute sm:text-right">{headline}</span>}
+      </div>
+    </div>
+  );
+}
+
+/** What the score is made of: the four parts grow once in view, the biggest lever below. */
+export function ScoreParts({ score, className }: { score: TradingScore; className?: string }) {
   const reduced = useReducedFx();
   const ref = useRef<HTMLDivElement>(null);
   const seen = useFirstInView(ref, !reduced);
   const on = seen || reduced;
   return (
-    <div ref={ref} className={cn("grid content-start gap-3", className)} data-testid="coach-score">
-      <div className="flex items-end justify-between gap-3">
-        <div className="grid">
-          <span className="label">Trading-Score</span>
-          <span className="mt-1 flex items-baseline gap-2">
-            {score.score == null ? (
-              <span className="dot-num text-[44px] leading-none text-faint">–</span>
-            ) : (
-              <NumberCascade value={score.score} decimals={0} className={cn("dot-num text-[52px] leading-none", score.score >= 75 ? "text-win" : score.score >= 45 ? "text-fg" : "text-loss")} />
-            )}
-            <span className="text-[13px] text-mute">/ 100</span>
-          </span>
-        </div>
-        <span className={cn("rounded-full border px-2.5 py-1 font-mono text-[11px] tracking-wide", score.label === "Stark" ? "border-win/30 text-win" : score.label === "Kritisch" ? "border-loss/30 text-loss" : "border-line-2 text-mute")}>{score.label}</span>
-      </div>
+    <div ref={ref} className={cn("grid content-start gap-3", className)} data-testid="coach-score-parts">
+      <span className="label">Teile des Scores</span>
       <ul className="grid gap-2" aria-label="Teile des Scores">
         {score.parts.map((p, i) => (
           <li key={p.key} className="grid gap-1">
@@ -140,10 +150,7 @@ export function HeroCard({ lesson, tips, score, headline, className }: { lesson:
     <Card className={className} data-testid="coach-hero" innerClassName="!p-0">
       <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-10">
         <div className="grid min-w-0 content-start gap-5">
-          <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-4 gap-y-2">
-            <DancingLetters text="COACH" className="font-dot text-[clamp(44px,13vw,84px)] font-extrabold leading-[0.85] tracking-[0.04em] text-fg" />
-            {headline && <span className="max-w-[28ch] pb-1 text-[12px] leading-snug text-mute sm:text-right">{headline}</span>}
-          </div>
+          <ScoreHero score={score} headline={headline} />
           <Lesson lesson={lesson} />
           {tips.length > 0 && (
             <div className="flex min-w-0 items-center gap-2.5 border-t border-line pt-3.5">
@@ -157,7 +164,7 @@ export function HeroCard({ lesson, tips, score, headline, className }: { lesson:
             </div>
           )}
         </div>
-        <ScoreBlock score={score} className="border-t border-line pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" />
+        <ScoreParts score={score} className="border-t border-line pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" />
       </div>
     </Card>
   );

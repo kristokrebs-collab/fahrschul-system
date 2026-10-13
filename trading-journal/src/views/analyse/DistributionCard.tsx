@@ -12,7 +12,7 @@ import { cn } from "@/lib/cn";
 import { n2, pct0, pf as fmtPf, signed } from "@/lib/format";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
 import { memoClosed } from "./hooks";
@@ -165,7 +165,7 @@ export function DistributionCard({ view, cur }: { view: AccountView; cur: string
       }
     >
       {rep.n < 5 ? (
-        <EmptyState title="Noch zu wenig Trades" text="Die Verteilung braucht mindestens 5 abgeschlossene Trades." />
+        <EmptyState title="Noch zu wenig Trades" text="Die Verteilung braucht mindestens 5 abgeschlossene Trades." line={progressLine(rep.n, 5)} />
       ) : (
         <div className="grid gap-4">
           <Histogram key={unit} rep={rep} cur={cur} />

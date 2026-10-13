@@ -16,7 +16,7 @@ import { n1, pct } from "@/lib/format";
 import { NumberCascade } from "@/motion/fx/NumberCascade";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
 import { useAnalyseUi } from "./analyseStore";
@@ -118,7 +118,7 @@ export function RiskOfRuinCard({ view, settings, rep }: { view: AccountView; set
       note={enough ? `Verlust von ${Math.round(ruinAt * 100)} % des Kontos in den nächsten ${ROR_TRADES} Trades${own != null ? ` · dein Ø Risiko pro Trade: ${riskLabel(own)}` : ""}` : undefined}
     >
       {!enough ? (
-        <EmptyState title="Noch keine Ruin-Rechnung" text={`Risk of Ruin braucht mindestens ${ROR_MIN_TRADES} abgeschlossene Trades mit Gewinnen und Verlusten – bisher ${closed.length}.`} />
+        <EmptyState title="Noch keine Ruin-Rechnung" text={`Risk of Ruin braucht mindestens ${ROR_MIN_TRADES} abgeschlossene Trades mit Gewinnen und Verlusten – bisher ${closed.length}.`} line={progressLine(closed.length, ROR_MIN_TRADES)} />
       ) : (
         <div className="grid gap-4">
           <div className="grid gap-2">

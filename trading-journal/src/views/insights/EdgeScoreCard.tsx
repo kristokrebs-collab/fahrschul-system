@@ -7,7 +7,7 @@ import { signed } from "@/lib/format";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { Collapse } from "@/primitives/Expander";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Bar } from "@/views/overview/Bar";
@@ -159,7 +159,7 @@ export function EdgeScoreCard() {
       data-testid="insights-edge"
     >
       {e.score == null ? (
-        <EmptyState title={EMPTY.edge.title} text={EMPTY.edge.text} />
+        <EmptyState title={EMPTY.edge.title} text={EMPTY.edge.text} line={EMPTY_LINE_CLOSED} />
       ) : (
         <div className="grid gap-4">
           <div className="flex flex-wrap items-end justify-between gap-3">

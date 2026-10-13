@@ -18,7 +18,7 @@ import { pointAt, type EquityPoint } from "@/motion/fx/EquityDraw";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { isSafeFx } from "@/motion/safeFx";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { memoClosed } from "./hooks";
 import { AnaCard, Stat } from "./ui";
@@ -132,7 +132,7 @@ export function BenchmarkCard({ view }: { view: AccountView }) {
     <AnaCard title={CARD_TITLES.benchmark} explain={() => explainBenchmark(rep, adaptive, symbol)} data-testid="ana-bench" note={rep ? `Konto gegen ${ANA_EMPTY.benchmarkSymbol(symbol)} · Tageskerzen des Live-Markts` : undefined}>
       <div className="grid gap-4">
         {!view.closed.length ? (
-          <EmptyState title="Noch keine Trades" text="Sobald du Trades abschließt, siehst du hier, ob du den Markt schlägst." />
+          <EmptyState title="Noch keine Trades" text="Sobald du Trades abschließt, siehst du hier, ob du den Markt schlägst." line={EMPTY_LINE_CLOSED} />
         ) : rep ? (
           <>
             <Race rep={rep} symbol={symbol} />

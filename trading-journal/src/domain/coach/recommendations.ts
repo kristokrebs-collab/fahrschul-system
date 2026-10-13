@@ -13,7 +13,7 @@ import { bootRuns, bootstrapCI, mean, sum, type Interval } from "../analytics/st
 import { holdLabel, holdMs } from "../excursion";
 import { disciplineAvg, disciplineDays, disciplineLimits } from "../insights/discipline";
 import { edgeScore } from "../insights/edge";
-import { bucketSummary, bySession, byWeekday } from "../insights/time";
+import { bucketSummary, bySession, byWeekday, type SessionKey } from "../insights/time";
 import { riskSpread } from "../risk/perStrategy";
 import { localDateKey, tradeTime } from "@/lib/dates";
 import { pct0, r as fmtR, signed } from "@/lib/format";
@@ -283,6 +283,11 @@ export interface BehaviorProfile {
 
 export const PROFILE_MIN_TRADES = 10;
 
+
+/** The session with its preposition: „am Wochenende“, „in London“, „in der Spät-Session“ (never „in Wochenende“). */
+const SESSION_PHRASE: Readonly<Record<SessionKey, string>> = { asia: "in Asien", london: "in London", ny: "in New York", late: "in der Spät-Session", weekend: "am Wochenende" };
+export const sessionPhrase = (key: string, label: string): string => SESSION_PHRASE[key as SessionKey] ?? `in ${label}`;
+
 /** Personal Trading Intelligence: style, direction, best session / day / setup, risk style, strengths, weaknesses. */
 export function behaviorProfile(input: { closed: readonly EnrichedTrade[]; list: readonly EnrichedTrade[]; settings: Settings; events: readonly BehaviorEvent[]; edges: EdgeReport; currency: string }): BehaviorProfile {
   const { closed, settings, events, edges, currency: cur } = input;
@@ -327,7 +332,7 @@ export function behaviorProfile(input: { closed: readonly EnrichedTrade[]; list:
   const emo = closed.filter((t) => ["FOMO", "Gierig", "Revenge"].includes(t.emotion)).length / n;
   if (closed.some((t) => t.emotion)) traits.push({ id: "emotion", label: "Emotionale Einstiege", value: pct0(emo), detail: "FOMO, Gierig oder Revenge", tone: emo > 0.2 ? "loss" : emo > 0.1 ? "fg" : "win" });
 
-  const headline = [style ? `${dir === "Beidseitig" ? "" : `${dir}er `}${style}` : dir, sess.best ? `stark in ${sess.best.label}` : null].filter(Boolean).join(", ");
+  const headline = [style ? `${dir === "Beidseitig" ? "" : `${dir}er `}${style}` : dir, sess.best ? `stark ${sessionPhrase(sess.best.key, sess.best.label)}` : null].filter(Boolean).join(", ");
   return { headline, traits, n };
 }
 

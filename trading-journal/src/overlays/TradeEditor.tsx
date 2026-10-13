@@ -42,6 +42,9 @@ import { deleteTradeWithShots, releaseCloudShots, removedCloudPaths } from "@/jo
 import { normalizeWatchSymbol } from "@/domain/boxes/config";
 import { useEntitlement } from "@/billing/entitlements";
 
+/** Phone footer of a new trade: the `size="sm"` metrics (12 px, tighter padding) so three buttons share one row. */
+const FOOT_SM = "max-sm:px-2.5 max-sm:text-xs";
+
 /** P05 risk preview (limits, liquidation, risk %) – a lazy chunk of the editor (P14 slot). */
 const RiskPreviewSlot = lazy(() => import("./slots/RiskPreviewSlot"));
 /** P07 strategy suggestion for a trade without a setup – a lazy chunk of the editor (P14 slot). */
@@ -784,7 +787,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           </span>
         </motion.div>
       ) : (
-        <motion.div key="actions" className="flex w-full flex-wrap items-center gap-2.5" {...confirmSwapMotion(reduced)}>
+        // a new trade on a phone: ONE row – Abbrechen (small) + the two saves in equal columns, an error above them
+        // (P1-12; the 3 buttons wrapped into two rows ≈ 150 px of an 844-px screen). Editing keeps the flex row (it fits).
+        <motion.div key="actions" className={cn("flex w-full flex-wrap items-center gap-2.5", !trade && "max-sm:grid max-sm:grid-cols-[auto_1fr_1fr] max-sm:gap-2")} {...confirmSwapMotion(reduced)}>
       {trade && (
         <span className="flex min-h-10 items-center">
           <AnimatePresence mode="wait" initial={false}>
@@ -808,8 +813,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           </AnimatePresence>
         </span>
       )}
-      <span className="flex-1" />
-      <span ref={alertRef} id={ERROR_ID} role="alert" className="text-[12.5px] font-medium text-(--color-danger-text)">
+      <span className={cn("flex-1", !trade && "max-sm:hidden")} />
+      <span ref={alertRef} id={ERROR_ID} role="alert" className={cn("text-[12.5px] font-medium text-(--color-danger-text)", !trade && "max-sm:col-span-full max-sm:empty:-mb-2")}>
         <AnimatePresence mode="wait" initial={false}>
           {err && (
             <motion.span
@@ -825,16 +830,16 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
           )}
         </AnimatePresence>
       </span>
-      <Button ref={discardTrigger} className="pointer-coarse:min-h-11" onClick={cancel}>
+      <Button ref={discardTrigger} className={cn("pointer-coarse:min-h-11", !trade && FOOT_SM)} onClick={cancel}>
         Abbrechen
       </Button>
-      <span className="inline-flex gap-1.5">
+      <span className={cn("inline-flex gap-1.5", !trade && "max-sm:contents")}>
         {!trade && (
-          <Button ref={againRef} disabled={saving} className="pointer-coarse:min-h-11" onClick={() => void save("again")}>
+          <Button ref={againRef} disabled={saving} className={cn("pointer-coarse:min-h-11", FOOT_SM)} onClick={() => void save("again")}>
             Speichern & neu
           </Button>
         )}
-        <Button ref={saveRef} variant="primary" type="submit" form="trade-form" disabled={saving} aria-busy={saving || undefined} className="min-w-[110px] pointer-coarse:min-h-11">
+        <Button ref={saveRef} variant="primary" type="submit" form="trade-form" disabled={saving} aria-busy={saving || undefined} className={cn("min-w-[110px] pointer-coarse:min-h-11", !trade && cn(FOOT_SM, "max-sm:min-w-0"))}>
           <TextRoll mode="roll" text={saving ? "Speichert …" : "Speichern"} />
         </Button>
       </span>

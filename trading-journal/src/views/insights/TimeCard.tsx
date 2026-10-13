@@ -5,7 +5,7 @@ import { cn } from "@/lib/cn";
 import { pct0, signed } from "@/lib/format";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { EmptyState } from "@/primitives/EmptyState";
+import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
 import { InsightCard, SEG_TOUCH, Stat, softTone, useInsightsBase } from "./ui";
@@ -123,7 +123,7 @@ export function TimeCard() {
       data-testid="insights-time"
     >
       {!view.closed.length ? (
-        <EmptyState title={EMPTY.trades.title} text={EMPTY.trades.text} />
+        <EmptyState title={EMPTY.trades.title} text={EMPTY.trades.text} line={EMPTY_LINE_CLOSED} />
       ) : (
         <div className="grid gap-4">
           <Columns key={tab} buckets={buckets} selected={sel?.key ?? null} onSelect={setSelected} />

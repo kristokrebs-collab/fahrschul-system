@@ -255,6 +255,7 @@ export function CockpitView({ className }: { className?: string }) {
               {S.empty.action}
             </Button>
           }
+          line={false}
           className="min-h-[320px]"
         />
       ) : editing ? (

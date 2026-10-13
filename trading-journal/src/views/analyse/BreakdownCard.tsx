@@ -143,7 +143,7 @@ export function BreakdownCard({ view, settings, cur }: { view: AccountView; sett
         <span className="min-w-0 text-[11.5px] text-faint">{DIMENSIONS[dim].hint}</span>
       </div>
       {!b.rows.length || b.rows.every((r) => r.none) ? (
-        <EmptyState title={ANA_EMPTY.breakdown.title} text={ANA_EMPTY.breakdown.text} />
+        <EmptyState title={ANA_EMPTY.breakdown.title} text={ANA_EMPTY.breakdown.text} line={false} />
       ) : (
         <div className="grid gap-3">
           <BestBanner b={b} cur={cur} />

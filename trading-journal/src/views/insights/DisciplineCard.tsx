@@ -372,7 +372,7 @@ export function DisciplineCard() {
   return (
     <InsightCard title={TITLES.discipline} explain={() => explainDiscipline(sum)} note="automatisch geprüft – nichts abhaken" data-testid="insights-discipline">
       {!sum.last ? (
-        <EmptyState title={EMPTY.discipline.title} text={EMPTY.discipline.text} />
+        <EmptyState title={EMPTY.discipline.title} text={EMPTY.discipline.text} line={false} />
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,23rem)] lg:gap-8">
           <div className="grid min-w-0 content-start gap-6">

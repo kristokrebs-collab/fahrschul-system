@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { accountView } from "@/domain/account";
 import { detectBehaviors } from "@/domain/coach/events";
 import { findEdges } from "@/domain/coach/edges";
-import { behaviorProfile, coachTips, improvementPlan, journalRate, recommendations, tradingScore, weeklyLesson, whatIf } from "@/domain/coach/recommendations";
+import { behaviorProfile, coachTips, improvementPlan, journalRate, recommendations, sessionPhrase, tradingScore, weeklyLesson, whatIf } from "@/domain/coach/recommendations";
 import { tradeReview } from "@/domain/coach/tradeReview";
 import { coachAlert, newEvents } from "@/domain/coach/watch";
 import { behaviorReport } from "@/domain/coach/behaviors";
@@ -88,6 +88,14 @@ describe("Trading-Score", () => {
 });
 
 describe("Profil, Lektion, Tipps", () => {
+  it("the profile headline puts the right preposition before the session (P1-09)", () => {
+    expect(sessionPhrase("weekend", "Wochenende")).toBe("am Wochenende");
+    expect(sessionPhrase("london", "London")).toBe("in London");
+    expect(sessionPhrase("ny", "New York")).toBe("in New York");
+    expect(sessionPhrase("late", "Spät")).toBe("in der Spät-Session");
+    expect(sessionPhrase("other", "Irgendwo")).toBe("in Irgendwo");
+  });
+
   it("builds a profile with a headline from 10 trades", () => {
     const { view, events, edges } = setup();
     const p = behaviorProfile({ closed: view.closed, list: view.list, settings: COACH_SETTINGS, events, edges, currency: "USDT" });

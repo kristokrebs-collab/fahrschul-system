@@ -6,7 +6,7 @@
  * strongest lines ("trade the best") cascade in under it.
  */
 import { motion, type Variants } from "motion/react";
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { KIND_REPORT, type Report } from "@/domain/reports";
 import { cn } from "@/lib/cn";
 import { pct, pct0, pf as fmtPf, r as fmtR } from "@/lib/format";
@@ -22,6 +22,7 @@ import { Card } from "@/primitives/Card";
 import type { FlapDir } from "./berichteStore";
 import { paintEquity } from "./paint";
 
+/** Minimum curve height; next to a taller archive the well takes the card's free height (row rule, P1-08). */
 export const HERO_CURVE_HEIGHT = 132;
 
 const HL_DOT: Readonly<Record<Report["highlights"][number]["tone"], string>> = { win: "bg-win", loss: "bg-loss", fg: "bg-fg/70" };
@@ -62,12 +63,25 @@ function CurveWell({ report, dir }: { report: Report; dir: FlapDir }) {
   }, [key, values, reduced, dir]);
   useLayoutEffect(() => () => cancel.current?.(), []);
 
+  // the well grows with the card (flex-1, at least HERO_CURVE_HEIGHT); the drawing sits absolutely inside, so it never
+  // holds the row open – one ResizeObserver, a render only when the whole-pixel height changes
+  const [height, setHeight] = useState(HERO_CURVE_HEIGHT);
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    if (!host || typeof ResizeObserver !== "function") return;
+    const ro = new ResizeObserver(() => setHeight(Math.max(HERO_CURVE_HEIGHT, Math.round(host.clientHeight))));
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div ref={hostRef} className="relative overflow-hidden rounded-xl bg-ink-950" style={{ height: HERO_CURVE_HEIGHT }} data-testid="report-curve">
+    <div ref={hostRef} className="relative flex-1 overflow-hidden rounded-xl bg-ink-950" style={{ minHeight: HERO_CURVE_HEIGHT }} data-testid="report-curve">
       {values.length >= 2 ? (
-        <EquityDraw values={values} height={HERO_CURVE_HEIGHT} label={`Kumuliertes P&L ${report.period.label}`} />
+        <div className="absolute inset-x-0 top-0">
+          <EquityDraw values={values} height={height} label={`Kumuliertes P&L ${report.period.label}`} />
+        </div>
       ) : (
-        <p className="grid h-full place-items-center px-4 text-center text-[12px] text-faint">{report.empty ? "Keine Kurve – keine abgeschlossenen Trades." : "Eine Kurve braucht mindestens einen Trade."}</p>
+        <p className="absolute inset-0 grid place-items-center px-4 text-center text-[12px] text-faint">{report.empty ? "Keine Kurve – keine abgeschlossenen Trades." : "Eine Kurve braucht mindestens einen Trade."}</p>
       )}
     </div>
   );
@@ -83,7 +97,7 @@ export function ReportHero({ report, dir, className }: { report: Report; dir: Fl
       title={KIND_REPORT[report.period.kind]}
       action={report.complete ? <Badge tone="mute">abgeschlossen</Badge> : <Badge tone="warn" dot ping>läuft noch</Badge>}
       className={className}
-      innerClassName="grid content-start gap-4"
+      innerClassName="flex flex-col gap-4"
       data-testid="report-hero"
       data-key={report.period.key}
     >
