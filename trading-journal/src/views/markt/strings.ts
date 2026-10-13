@@ -49,6 +49,10 @@ export const MARKT = {
     pending: "Kurs außerhalb – Schluss abwarten",
     pendingBack: "Kurs zurück in der Box – Schluss abwarten",
     none: "Noch keine saubere Box.",
+    /** pills while there is nothing to judge yet (P1-01): never „Noch keine saubere Box.“ before the candles are in */
+    loadingPill: "Lädt",
+    offPill: "Aus",
+    errorPill: "Keine Kerzen",
     targetsUp: "Ziele oben",
     targetsDown: "Ziele unten",
     targetsBoth: "Ziele ↑ / ↓",

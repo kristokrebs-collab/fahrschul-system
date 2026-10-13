@@ -155,8 +155,19 @@ describe("MarktView", () => {
     expect(within(screen.getByTestId("markt-best")).getByText(/Box-zu-Box ist aus/)).toBeInTheDocument();
     unmount();
     state.view = { ...realView(), state: "loading", detail: "Lade Kerzen …", best: [] };
-    wrap();
+    const loading = wrap();
     expect(screen.getByTestId("best-loading")).toHaveTextContent("Lade Kerzen …");
+    loading.unmount();
+    // nothing loaded yet: Box-Status says it is loading – never the verdict „Noch keine saubere Box.“ (P1-01) – and the
+    // band keeps its place with the same line, so nothing below jumps when the candles arrive (P1-02)
+    const empty = { "4h": { ...realView().tfs["4h"], analysis: null }, "1d": { ...realView().tfs["1d"], analysis: null }, "1w": realView().tfs["1w"] };
+    state.view = { ...realView(), state: "loading", detail: "Lade Kerzen …", best: [], tfs: empty };
+    wrap();
+    const card = screen.getByTestId("markt-state");
+    expect(within(card).getByTestId("state-wait")).toHaveTextContent("Lade Kerzen …");
+    expect(card).toHaveTextContent("Lädt");
+    expect(card).not.toHaveTextContent("Noch keine saubere Box.");
+    expect(screen.getByTestId("markt-band")).toHaveTextContent("Lade Kerzen …");
   });
 
   it("scanCloseLabel: the close of the scanned candle (open + timeframe)", () => {

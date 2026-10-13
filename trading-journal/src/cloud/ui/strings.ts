@@ -185,7 +185,7 @@ export const PRIVACY_CARD = {
   syncHelp: "Aus: Dein Journal bleibt nur hier, das Konto bleibt angemeldet.",
   telemetry: "Fehlerberichte senden",
   telemetryHelp: "Anonym und ohne Trade-Werte. Hilft, Fehler schnell zu finden.",
-  leaderboard: "In Ranglisten erscheinen",
+  leaderboard: "In der Rangliste erscheinen",
   leaderboardHelp: "Nur Kennzahlen wie Win-Rate, nie einzelne Trades.",
   needsAccount: "Nur mit Konto",
 } as const;

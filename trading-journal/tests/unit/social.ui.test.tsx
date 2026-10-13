@@ -303,6 +303,18 @@ describe("helpers", () => {
     expect(stripPos(1, 1, 1)).toBe(50);
   });
 
+  it("Konto → Datenschutz follows the server's ranking opt-in without a Community visit (P1-03)", async () => {
+    const { PrivacyCard } = await import("@/cloud/ui/PrivacyCard");
+    boardResponse = board({ me: { ...ME, optIn: true } });
+    wrap(<PrivacyCard />);
+    signIn();
+    const sw = screen.getByRole("switch", { name: /In der Rangliste erscheinen/ });
+    await waitFor(() => expect(sw).toBeChecked());
+    expect(calls.some((c) => c.method === "GET" && c.path === "/api/v1/social/leaderboard")).toBe(true);
+    // adopted silently: no POST back to the server
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+  });
+
   it("setOptIn without login does nothing", async () => {
     expect(await setOptIn(true)).toBe(false);
     expect(calls).toHaveLength(0);

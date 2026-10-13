@@ -9,7 +9,7 @@
 import { create } from "zustand";
 import { ApiError, FUNCTIONS_MISSING } from "@/cloud/api";
 import { cloudEnabled } from "@/cloud/env";
-import { setPrivacy } from "@/cloud/privacy";
+import { setPrivacy, usePrivacy } from "@/cloud/privacy";
 import { useCloudSession } from "@/cloud/session";
 import { addGoalFromDraft } from "@/domain/growth/goals";
 import { hasClaudeRuntime } from "@/store/capability";
@@ -202,6 +202,19 @@ export async function loadCommunity(): Promise<void> {
 /** The server's opt-in is the truth – the local switch (PrivacyCard) follows it silently. */
 function syncOptIn(me: SocialMe): void {
   setPrivacy({ leaderboard: me.optIn }, { silent: true });
+}
+
+/**
+ * Konto → Datenschutz shows the same ranking switch as Community (P1-03): on its mount (signed in) it asks the server
+ * for my status and adopts the opt-in – without a Community visit first. A switch flipped while the answer is on its
+ * way wins (the answer is dropped). Fills the board cache the Community page reuses.
+ */
+export async function followServerOptIn(): Promise<void> {
+  if (!communityEnabled() || !signedIn()) return;
+  const before = usePrivacy.getState().leaderboard;
+  await loadBoard();
+  const me = useSocial.getState().me;
+  if (me && usePrivacy.getState().leaderboard === before) syncOptIn(me);
 }
 
 export async function loadFeed(groupId: string): Promise<void> {

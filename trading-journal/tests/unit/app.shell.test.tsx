@@ -203,4 +203,29 @@ describe("App shell", () => {
     expect(useUi.getState().editor.open).toBe(true);
     expect(useUi.getState().editor.fromFab).toBe(false);
   });
+
+  it("signed in to the cloud: one sync status in the header – the account pill, no second mode pill (P1-04)", async () => {
+    const { Header } = await import("@/app/Header");
+    const { setCloudEnabledForTests } = await import("@/cloud/env");
+    const { resetCloudSession, useCloudSession } = await import("@/cloud/session");
+    const { useJournal } = await import("@/store/journalStore");
+    setCloudEnabledForTests(true);
+    try {
+      act(() => useJournal.setState({ mode: "cloud", storage: "ok" }));
+      act(() => useCloudSession.setState({ phase: "signedOut" }));
+      const { unmount } = render(
+        <MotionRoot>
+          <Header />
+        </MotionRoot>,
+      );
+      expect(screen.getByText("Synchronisiert")).toBeInTheDocument();
+      act(() => useCloudSession.setState({ phase: "signedIn", user: { id: "u1", email: "t@example.com", aal: "aal1", mfaEnrolled: false } }));
+      await waitFor(() => expect(screen.queryByText("Synchronisiert")).toBeNull());
+      expect(screen.getByRole("button", { name: "Konto: t@example.com" })).toBeInTheDocument();
+      unmount();
+    } finally {
+      act(() => resetCloudSession());
+      setCloudEnabledForTests(null);
+    }
+  });
 });

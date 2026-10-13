@@ -1,5 +1,5 @@
 import { motion } from "motion/react";
-import { useId } from "react";
+import { useEffect, useId } from "react";
 import { cn } from "@/lib/cn";
 import { Switch } from "@/motion/Switch";
 import { spring, stagger, tween } from "@/motion/tokens";
@@ -7,6 +7,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
 import { Card } from "@/primitives/Card";
 import { setPrivacy, usePrivacy, type PrivacyPrefs } from "../privacy";
+import { cloudEnabled } from "../env";
 import { useCloudSession } from "../session";
 import { PRIVACY_CARD } from "./strings";
 
@@ -27,13 +28,20 @@ const ROWS: readonly Row[] = [
 /**
  * `Datenschutz` card (P09): Sync on this device, anonymous error reports (opt-in, default off), ranking opt-in (P12).
  * Every row is an elastic `Switch`; rows cascade in (`stagger.cards`), a row that is on gets a soft win edge that fades
- * (`tween.crossfade`). Telemetry and ranking follow the account (`profiles.privacy`) when signed in.
+ * (`tween.crossfade`). Telemetry and ranking follow the account (`profiles.privacy`) when signed in; the ranking row
+ * also adopts the server's opt-in on mount (`followServerOptIn`), so Konto and Community never disagree.
  */
 export function PrivacyCard({ className }: { className?: string }) {
   const prefs = usePrivacy();
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const reduced = useReducedFx();
   const id = useId();
+  // the ranking row is the same switch as Community's „In der Rangliste erscheinen“: it follows the server's opt-in
+  // as soon as the card shows (P1-03) – the social store loads on demand, it stays out of this chunk
+  useEffect(() => {
+    if (!signedIn || !cloudEnabled()) return;
+    void import("@/social/store").then((m) => m.followServerOptIn()).catch(() => undefined);
+  }, [signedIn]);
   return (
     <Card title={PRIVACY_CARD.title} className={className}>
       <p className="mb-4 text-[13px] leading-relaxed text-mute">{PRIVACY_CARD.intro}</p>

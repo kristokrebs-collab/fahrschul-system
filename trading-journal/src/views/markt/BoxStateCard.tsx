@@ -21,6 +21,7 @@ import { celebrateFrom } from "@/motion/Celebrate";
 import { StatusPill } from "@/motion/StatusPill";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { DotMatrix } from "@/motion/DotMatrix";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
 import { MARKT, RAIL, TF_TEXT } from "./strings";
@@ -163,10 +164,26 @@ const BoxDetail = memo(function BoxDetail({ tf, v }: { tf: BoxTf; v: BoxTfView }
   );
 });
 
+/**
+ * No analysis yet because the page is still loading / off / failing: the card says that (the same loader as „Beste
+ * Setups“) instead of „Noch keine saubere Box.“ – that line is a verdict about loaded candles.
+ */
+export function waitOf(view: BoxesView, v: BoxTfView): { tone: "warn" | "error" | "muted"; label: string; text: string; loading: boolean } | null {
+  if (v.analysis) return null;
+  if (view.state === "loading" || view.state === "idle") return { tone: "muted", label: S.loadingPill, text: view.detail ?? MARKT.best.loading, loading: true };
+  if (view.state === "off") return { tone: "muted", label: S.offPill, text: view.detail ?? S.none, loading: false };
+  if (view.state === "error") return { tone: "error", label: S.errorPill, text: view.detail ?? S.none, loading: false };
+  return null;
+}
+
+/** Height of the loaded body (rail 41 + gap 16 + gauge): the loader keeps it, so nothing below moves when the box arrives. */
+const BODY_PX = 41 + 16 + GAUGE_PX;
+
 export function BoxStateCard({ view }: { view: BoxesView }) {
   const [tf, setTf] = useState<BoxTf>("4h");
   const v = view.tfs[tf];
-  const pill = pillOf(v);
+  const wait = waitOf(view, v);
+  const pill = wait ?? pillOf(v);
   const closesAt = v.closesAt;
   const ref = useRef<HTMLDivElement>(null);
   // a confirmed upward breakout to a new high of the loaded history celebrates once per box
@@ -196,9 +213,18 @@ export function BoxStateCard({ view }: { view: BoxesView }) {
       <div ref={ref} className="grid gap-4" data-phase={v.analysis?.box.phase ?? "none"} data-tf={tf}>
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill tone={pill.tone} label={pill.label} expanded ring={closesAt ? { endsAt: closesAt, ms: BOX_TF_MS[tf] } : null} layoutKey={`${tf}:${pill.label}`} />
-          {closesAt ? <CloseIn at={closesAt} /> : null}
+          {closesAt && !wait ? <CloseIn at={closesAt} /> : null}
         </div>
-        <BoxDetail tf={tf} v={v} />
+        {wait ? (
+          <div className="pt-1 text-[13px] text-mute" style={{ minHeight: BODY_PX }} data-testid="state-wait" data-loading={wait.loading || undefined}>
+            <span className="flex items-center gap-3">
+              {wait.loading && <DotMatrix preset="loader" size={3} gap={2} />}
+              <span>{wait.text}</span>
+            </span>
+          </div>
+        ) : (
+          <BoxDetail tf={tf} v={v} />
+        )}
       </div>
     </Card>
   );

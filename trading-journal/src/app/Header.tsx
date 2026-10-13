@@ -4,6 +4,8 @@ import { EdgeBlur, type BlurBand } from "@/app/BottomFade";
 import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/CommandNav";
 import { FullscreenButton } from "@/app/DisplayActions";
 import { HeaderTicker } from "@/app/HeaderTicker";
+import { cloudEnabled } from "@/cloud/env";
+import { useCloudSession } from "@/cloud/session";
 import { AccountPill } from "@/cloud/ui/AccountPill";
 import { createTapCounter, MULTI_TAP, toggleLayerDiag } from "@/app/layerDiag";
 import type { StoreMode } from "@/domain/types";
@@ -190,7 +192,7 @@ function MenuButton() {
 
 /**
  * Sticky app header (Plan 2.5 "Header", 6.6): logo tile `₿` → overview + ASCII-cascade decode of the wordmark +
- * `replayIntro()` after the multi-tap window (five quick taps open the layer diagnostics instead; 3D flip on hover, press squash), dancing-letters wordmark, subtitle, command-nav menu button, live market ticker, sync pill (`hidden md:inline-flex`), Magnetic →
+ * `replayIntro()` after the multi-tap window (five quick taps open the layer diagnostics instead; 3D flip on hover, press squash), dancing-letters wordmark, subtitle, command-nav menu button, live market ticker, sync pill (`hidden md:inline-flex`; signed in to the cloud the account pill carries the sync state instead), Magnetic →
  * `.shiny-cta` `Trade eintragen` (label `max-sm:sr-only`) opening the editor without a morph source, `Vollbild` (lg+, where
  * the Fullscreen API exists). Opaque ink background. Scroll-linked hairline / shade (edge blur off, `TOP_BANDS`) and the
  * red reading-progress bar sit on its bottom edge.
@@ -204,6 +206,10 @@ export function Header() {
   const [decode, setDecode] = useState(0);
   // "Nicht gespeichert" (loss) when nothing persists, else the mode label
   const label = modeLabelFor(mode, storage);
+  // signed in, the account pill carries the sync state (`Sync · live`, `Offline` …): one status, not two (P1-04) – a
+  // journal that cannot persist still says so
+  const accountSync = useCloudSession((s) => s.phase === "signedIn") && cloudEnabled();
+  const showMode = !accountSync || storage === "unavailable";
   // five quick taps on the logo open / close the layer diagnostics (decision 7); the replay of a single tap waits for
   // the multi-tap window (MULTI_TAP.gapMs), so a series never replays the intro (which parks the header) mid-way
   const [taps] = useState(() => createTapCounter());
@@ -269,9 +275,11 @@ export function Header() {
         </motion.button>
         <div className="flex shrink-0 items-center gap-3">
           <HeaderTicker />
-          <span className="hidden md:inline-flex" title={label.text}>
-            <StatusPill tone={MODE_TONE[mode]} expanded label={label.text} feed="sync" />
-          </span>
+          {showMode && (
+            <span className="hidden md:inline-flex" title={label.text}>
+              <StatusPill tone={MODE_TONE[mode]} expanded label={label.text} feed="sync" />
+            </span>
+          )}
           {/* P09: login / sync state of the cloud (renders nothing without cloud) – the ONE `auth-sheet` morph source */}
           <AccountPill />
           {/* grey-bar fix: hide the browser UI + system bars (Fullscreen API); lg+ only (at 768 the wordmark would run into the ticker) – narrower screens reach it in the command navigation */}

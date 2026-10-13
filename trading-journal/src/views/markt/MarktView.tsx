@@ -58,19 +58,40 @@ export function bandItems(view: BoxesView, recent: readonly { id: string; title:
   return out;
 }
 
+/** Band height (border + `py-2` + one 12 px line, rounded up): the loading shell and the running band share it. */
+const BAND = "flex min-h-[38px] flex-col justify-center overflow-hidden rounded-2xl border border-line bg-ink-950/40 py-2";
+
+function BandItem({ text, tone }: { text: string; tone: Tone }) {
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap text-[12px] text-mute">
+      <span aria-hidden="true" className={cn("size-1.5 rounded-full", DOT[tone])} />
+      {text}
+    </span>
+  );
+}
+
 function AlertBand({ view, className }: { view: BoxesView; className?: string }) {
   const recent = useRecentBoxAlerts();
   const items = bandItems(view, recent);
-  if (!items.length) return null;
+  if (!items.length) {
+    // the band keeps its place while the candles load (and when no box exists yet): nothing below jumps when the
+    // first messages arrive (P1-02); off / error have no band at all
+    const text = view.state === "loading" || view.state === "idle" ? (view.detail ?? MARKT.best.loading) : view.state === "ok" ? MARKT.state.none : null;
+    if (!text) return null;
+    return (
+      <div className={cn(BAND, "px-4", className)} data-testid="markt-band" data-waiting="">
+        <span className="flex items-center">
+          <BandItem text={text} tone="mute" />
+        </span>
+      </div>
+    );
+  }
   return (
-    <div className={cn("overflow-hidden rounded-2xl border border-line bg-ink-950/40 py-2", className)} data-testid="markt-band">
+    <div className={cn(BAND, className)} data-testid="markt-band">
       <Marquee aria-label={MARKT.alerts.band} speed={36} gap={40}>
         <span className="flex items-center gap-8 pr-8">
           {items.map((it) => (
-            <span key={it.id} className="inline-flex items-center gap-2 whitespace-nowrap text-[12px] text-mute">
-              <span aria-hidden="true" className={cn("size-1.5 rounded-full", DOT[it.tone])} />
-              {it.text}
-            </span>
+            <BandItem key={it.id} text={it.text} tone={it.tone} />
           ))}
         </span>
       </Marquee>

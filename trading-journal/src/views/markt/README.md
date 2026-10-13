@@ -9,7 +9,7 @@ live" and `src/domain/boxes/README.md`.
 | Row (lg, 12 columns) | Cards |
 |---|---|
 | header | `PageHeader` (title, lead with `MARKT_LEAD_FILL`, status pill: Lädt / Live / Teilweise / Aus / Fehler) |
-| band | `AlertBand` – `Marquee` of every timeframe's phase, a pending close, the A-setups and this session's alerts |
+| band | `AlertBand` – `Marquee` of every timeframe's phase, a pending close, the A-setups and this session's alerts; while the candles load (and when no box exists) a static 38-px shell with one muted line keeps its place – nothing below jumps when the first messages arrive |
 | 1 | `BestSetupsCard` (7) · `BoxStateCard` (5) |
 | 2 | `BoxChartCard` (12) |
 | 3 | `RsiLinesCard` (5) · `ScannerCard` (7) |
@@ -27,7 +27,9 @@ trade markers, so there is no `position: fixed` ghost a reveal could trap).
   honest "Kein A-Setup" with the best B setup as "beobachten"; loading and "aus" states say why.
 - **Box-Status** (`BoxStateCard.tsx`): per timeframe the phase rail (Range → Druck → Ausbruch → Retest → Ziel;
   `railIndex`), the price gauge inside the box (`gaugeY`, transform only), `StatusPill` (`pillOf`: warn while a close is
-  pending, live after a breakout, with the candle-close countdown ring) and the countdown to the close.
+  pending, live after a breakout, with the candle-close countdown ring) and the countdown to the close. Before any
+  analysis (`waitOf`): loading → the „Beste Setups“ loader and a `Lädt` pill in the height of the loaded body; off /
+  error → the store's reason – never the verdict „Noch keine saubere Box.“ before the candles are in.
 - **Box-Chart** (`BoxChartCard.tsx`): its own lazy `NothingCandleChart` (the overview chart is a separate keep-alive
   instance) with `boxes` (`toChartBoxes`: the active box, earlier boxes faded, the open reference box while price is
   inside / failed, targets) and `boxAutoscale`. A box covers only its own bars – never a candle that closed outside it: a

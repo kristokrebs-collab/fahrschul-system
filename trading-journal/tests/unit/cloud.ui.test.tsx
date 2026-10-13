@@ -73,7 +73,7 @@ describe("KontoView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Konto erstellen" }));
     expect(useCloudSession.getState().sheet).toMatchObject({ open: true, view: "signup", source: "card" });
     expect(screen.getByRole("switch", { name: /Fehlerberichte senden/ })).toBeEnabled();
-    expect(screen.getByRole("switch", { name: /In Ranglisten erscheinen/ })).toBeDisabled();
+    expect(screen.getByRole("switch", { name: /In der Rangliste erscheinen/ })).toBeDisabled();
     expect(screen.queryByText("Sicherheit")).toBeNull();
   });
 
@@ -210,7 +210,7 @@ describe("PrivacyCard + banner", () => {
     fireEvent.click(screen.getByRole("switch", { name: /Fehlerberichte senden/ }));
     expect(readPrivacy().telemetry).toBe(true);
     act(() => signIn());
-    fireEvent.click(screen.getByRole("switch", { name: /In Ranglisten erscheinen/ }));
+    fireEvent.click(screen.getByRole("switch", { name: /In der Rangliste erscheinen/ }));
     expect(readPrivacy().leaderboard).toBe(true);
   });
 
