@@ -11,7 +11,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { Field, Input, Segmented } from "@/primitives";
 import { AutoHeight } from "@/views/trades/AutoHeight";
 import { FillsBar } from "../ui/FillsBar";
-import { fillsOf, newFillRow, newStopRow, newTargetRow, type FillRow, type JournalForm, type StopRow, type TargetRow } from "./form";
+import { fillsOf, newFillRow, newStopRow, newTargetRow, originEditable, type FillRow, type JournalForm, type StopRow, type TargetRow } from "./form";
 
 export interface ExecutionSectionProps {
   j: JournalForm;
@@ -26,6 +26,55 @@ export interface ExecutionSectionProps {
 }
 
 type Tab = "fills" | "targets" | "stops";
+
+const ORIGIN_SOURCE: Readonly<Record<string, string>> = { api: "Börsen-Sync", csv: "CSV-Import", webhook: "TradingView-Webhook" };
+
+/**
+ * „Herkunft“ (review F14): Manuell or Bot with its name – feeds the „Herkunft“ breakdown („Bot · Grid BTC“). Trades of
+ * an exchange sync, a CSV import or the webhook show where they came from instead (their import owns the origin).
+ */
+function OriginField({ j, onChange }: { j: JournalForm; onChange: (patch: Partial<JournalForm>) => void }) {
+  const reduced = useReducedFx();
+  if (!originEditable(j)) {
+    return (
+      <Field label="Herkunft" className="col-span-2 md:col-span-4">
+        <span className="text-[13px] text-mute" data-testid="origin-fixed">
+          {ORIGIN_SOURCE[j.originSrc?.kind ?? ""] ?? j.originSrc?.kind}
+        </span>
+      </Field>
+    );
+  }
+  return (
+    <Field label="Herkunft" className="col-span-2 md:col-span-4" help="Bot-Trades getrennt auswerten (Analyse → Herkunft)">
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented<"manual" | "bot">
+          aria-label="Herkunft"
+          size="sm"
+          value={j.botOn ? "bot" : "manual"}
+          onChange={(v) => onChange({ botOn: v === "bot" })}
+          options={[
+            { v: "manual", label: "Manuell" },
+            { v: "bot", label: "Bot" },
+          ]}
+        />
+        <AnimatePresence initial={false}>
+          {j.botOn && (
+            <motion.div
+              key="bot-name"
+              className="min-w-0 flex-1 basis-40"
+              initial={reduced ? { opacity: 0 } : { opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0, transitionEnd: { transform: "none" } }}
+              exit={{ opacity: 0, transition: tween.exit }}
+              transition={{ x: spring.enter, opacity: tween.fade }}
+            >
+              <Input id="f-bot" aria-label="Bot-Name" autoComplete="off" value={j.bot} onChange={(e) => onChange({ bot: e.target.value })} placeholder="z. B. Grid BTC" maxLength={40} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </Field>
+  );
+}
 
 const ROW: Variants = {
   hidden: { opacity: 0, y: 8 },
@@ -98,6 +147,7 @@ export function ExecutionSection({ j, onChange, side, status, date, entry, stop,
         <Field label="Börsenkonto" htmlFor="f-exacc" className="col-span-1 md:col-span-3">
           <Input id="f-exacc" autoComplete="off" value={j.exchangeAccount} onChange={set("exchangeAccount")} placeholder="z. B. Haupt oder Sub-Konto 2" maxLength={40} />
         </Field>
+        <OriginField j={j} onChange={onChange} />
       </div>
 
       <div className="grid gap-3 rounded-2xl border border-line bg-ink-950/40 p-3 sm:p-3.5">

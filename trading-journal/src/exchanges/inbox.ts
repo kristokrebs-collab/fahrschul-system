@@ -15,7 +15,9 @@ export interface InboxItem {
   weight: number;
 }
 
-const IMPORTED = new Set(["api", "webhook", "bot", "csv"]);
+// `bot` is no import kind on its own: REST-API bot trades carry `syncSource: "rest-api"`, CSV bot rows `csv:…`, and a
+// trade the trader marks as a bot in the editor (review F14) was still typed by hand
+const IMPORTED = new Set(["api", "webhook", "csv"]);
 const DONE_KEY = storageKey("exchange-inbox-done");
 const DONE_MAX = 3000;
 

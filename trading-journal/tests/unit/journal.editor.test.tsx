@@ -6,7 +6,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LEVERAGE_RULE, LEVERAGE_WARNING } from "@/domain/defaults";
 import type { Trade } from "@/domain/types";
-import { JOURNAL_KEYS, openRemainderMessage, statusAfterFills, type FillRow } from "@/journal/editor/form";
+import { JOURNAL_KEYS, openRemainderMessage, originRecord, statusAfterFills, type FillRow } from "@/journal/editor/form";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { TradeEditor, formFromDraft, draftExtras, type TradeRecord } from "@/overlays/TradeEditor";
 import { useJournal } from "@/store/journalStore";
@@ -38,7 +38,9 @@ describe("draft helpers", () => {
     expect(f.d).toMatchObject({ pair: "ETH/USDT", entry: "2500", stop: "2550", date: "2026-10-01T10:00" });
     expect(f.t.side).toBe("short");
     expect(f.t.j?.tags).toEqual(["Signal"]);
-    expect(draftExtras(draft)).toEqual({ origin: { kind: "bot", botId: "b1" }, positionId: "p1" });
+    // the origin now goes through the form's „Herkunft“ (review F14) – a bot draft opens with „Bot · b1“
+    expect(f.t.j).toMatchObject({ botOn: true, bot: "b1", originSrc: { kind: "bot", botId: "b1" } });
+    expect(draftExtras(draft)).toEqual({ positionId: "p1" });
   });
 });
 
@@ -150,6 +152,43 @@ describe("TradeEditor – Journal v3", () => {
     expect(statusAfterFills(partial, { ...ctx, pnlManual: "50" }).status).toBe("closed");
     expect(statusAfterFills([], ctx).status).toBe("closed");
     expect(openRemainderMessage(0.1)).toBe("0,1 noch offen – Status „Noch offen“ wählen oder den Rest-Exit eintragen.");
+  });
+
+  it("Herkunft: a hand-entered trade marked as a bot is saved with origin bot + name; cleared again it is manual (F14)", async () => {
+    mount();
+    type("Einstieg", "80000");
+    type("Ausstieg", "81000");
+    type("Größe (USDT)", "1000");
+    expect(screen.queryByLabelText("Bot-Name")).toBeNull();
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Herkunft" })).getByRole("radio", { name: "Bot" }));
+    type("Bot-Name", "  Grid BTC ");
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
+    expect(saved().origin).toEqual({ kind: "bot", botId: "Grid BTC" });
+  });
+
+  it("Herkunft of a synced trade is shown, never rewritten by the form (F14)", async () => {
+    const synced = { ...SAMPLE[0]!, id: "SYNC", origin: { kind: "api" as const }, syncSource: "bitunix" };
+    useJournal.setState({ trades: [...SAMPLE, synced] });
+    seed({ tradeId: "SYNC" });
+    useJournal.setState({ trades: [...SAMPLE, synced] });
+    mount();
+    expect(screen.getByTestId("origin-fixed")).toHaveTextContent("Börsen-Sync");
+    expect(screen.queryByRole("radiogroup", { name: "Herkunft" })).toBeNull();
+    type("Learnings & Notizen", "geprüft");
+    fireEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    await waitFor(() => expect(saveTrade).toHaveBeenCalledTimes(1));
+    expect(saved().origin).toEqual({ kind: "api" });
+  });
+
+  it("originRecord: bot with / without name, manual kept, none stays none, imports untouched", () => {
+    const base = { botOn: false, bot: "", originSrc: null };
+    expect(originRecord(base)).toBeUndefined();
+    expect(originRecord({ ...base, botOn: true })).toEqual({ kind: "bot" });
+    expect(originRecord({ ...base, botOn: true, bot: "x".repeat(50) })).toEqual({ kind: "bot", botId: "x".repeat(40) });
+    expect(originRecord({ ...base, originSrc: { kind: "manual" } })).toEqual({ kind: "manual" });
+    expect(originRecord({ ...base, originSrc: { kind: "bot", botId: "old" } })).toBeUndefined(); // switched back to Manuell
+    expect(originRecord({ botOn: true, bot: "", originSrc: { kind: "csv" } })).toEqual({ kind: "csv" });
   });
 
   it("an incomplete fill blocks saving with its message", () => {

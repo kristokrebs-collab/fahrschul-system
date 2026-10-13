@@ -246,6 +246,7 @@ const FORM_KEYS = new Set<string>([
   "rating",
   "psych",
   "screenshots",
+  "origin",
 ]);
 
 /**
@@ -278,7 +279,7 @@ export function formFromDraft(settings: Pick<Settings, "pair">, account: Account
   return { d, t };
 }
 
-/** The keys of a draft the form does not edit (`signal`, `boxSnap`, `origin`, `externalId`, …): saved verbatim. */
+/** The keys of a draft the form does not edit (`signal`, `boxSnap`, `externalId`, …): saved verbatim (`origin` goes through the form's „Herkunft“, F14). */
 export function draftExtras(draft: TradeDraft | undefined): Partial<Trade> {
   if (!draft) return {};
   const out: Record<string, unknown> = {};

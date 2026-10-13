@@ -48,6 +48,8 @@ export interface CsvTrade {
   fills?: { id: string; at: number; side: "open" | "close"; price: number; qty: number; fee: number; kind: "entry" | "add" | "partial" | "exit" }[];
   tags?: string[];
   notes?: string;
+  /** Bot / strategy that placed the trade (mapping assistant column „Bot“, review F14) → origin `bot`. */
+  bot?: string;
 }
 
 export interface ParseResult {
@@ -238,7 +240,7 @@ export function toJournalTrade(t: CsvTrade, ctx: ToTradeContext): Trade {
     createdAt: ctx.nowIso,
     updatedAt: ctx.nowIso,
     mistakes: [],
-    origin: { kind: "csv" },
+    origin: t.bot ? { kind: "bot", botId: t.bot.slice(0, 40) } : { kind: "csv" },
     syncSource: `csv:${ctx.formatId}`,
     syncedAt: ctx.nowIso,
   };

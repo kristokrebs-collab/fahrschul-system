@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { deriveTrade } from "@/domain/derive";
 import { normalizeTrade } from "@/domain/normalize";
 import { buildTrades, detectFormat, guessMapping, loadCsv, parseWithMapping, toWallClock } from "@/exchanges/csv";
+import { isImported } from "@/exchanges/inbox";
 
 const utc = (s: string) => Date.parse(`${s}Z`);
 const local = (y: number, mo: number, d: number, h: number, mi: number, s = 0) => new Date(y, mo - 1, d, h, mi, s).getTime();
@@ -197,6 +198,23 @@ describe("mapping assistant", () => {
       ["ETH/USDT", "short", 2450.5, 1.2, 2.37, -39.88],
     ]);
     expect(parsed.trades[0]!.openedAt).toBe(local(2026, 10, 5, 9, 30));
+  });
+
+  it("a Bot column marks the rows as bot trades – Herkunft „Bot · <Name>“ (review F14)", () => {
+    const l = loadCsv(`Datum;Paar;Richtung;Einstieg;Ausstieg;Menge;Bot
+05.10.2026 09:30;BTC/USDT;Long;62000;63240;0,05;Grid BTC
+06.10.2026 15:15;ETH/USDT;Short;2450,5;2482,1;1,2;
+`);
+    const m = guessMapping(l.table.header);
+    expect(m.bot).toBe(6);
+    const parsed = parseWithMapping(l.table, m, { assume: "local", fallbackPair: "BTC/USDT" });
+    expect(parsed.trades.map((t) => t.bot ?? null)).toEqual(["Grid BTC", null]);
+    const trades = buildTrades(parsed, { formatId: "generic", account: "scalp", fallbackPair: "BTC/USDT" });
+    expect(trades.map((t) => t.origin)).toEqual([{ kind: "bot", botId: "Grid BTC" }, { kind: "csv" }]);
+    expect(trades.every((t) => isImported(t))).toBe(true);
+    // a trade the trader marks as a bot in the editor was typed by hand – it is no import (inbox, reconcile)
+    expect(isImported({ origin: { kind: "bot", botId: "Grid BTC" } })).toBe(false);
+    expect(isImported({ origin: { kind: "bot", botId: "api" }, syncSource: "rest-api" })).toBe(true);
   });
 
   it("a remapped column changes the result (fallback pair when no pair column)", () => {

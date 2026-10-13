@@ -7,7 +7,7 @@
  * drops undefined keys before saving), and every key the stored trade had can be cleared again. Unknown keys inside
  * fills / targets / stop moves / psych survive an edit (the row keeps its source object).
  */
-import type { Fill, MarginMode, MarketKind, ScreenshotRef, Side, StopChange, Trade, TradePsych, TradeRating, TradeStatus, TradeTarget } from "@/domain/types";
+import type { Fill, MarginMode, MarketKind, ScreenshotRef, Side, StopChange, Trade, TradeOrigin, TradePsych, TradeRating, TradeStatus, TradeTarget } from "@/domain/types";
 import { fillStats, QTY_EPS, relabelFills } from "@/domain/fills";
 import { newId } from "@/lib/ids";
 import { parseNumber, toInputString } from "@/lib/parse";
@@ -63,7 +63,17 @@ export interface JournalForm {
   preNote: string;
   postNote: string;
   screenshots: ScreenshotRef[];
+  /** Herkunft (review F14): the trade was placed by a bot … */
+  botOn: boolean;
+  /** … with this name (`origin.botId`, the „Herkunft“ breakdown shows „Bot · <name>“). */
+  bot: string;
+  /** The stored origin (its extra keys survive; exchange / CSV / webhook origins are owned by their sync). */
+  originSrc: TradeOrigin | null;
 }
+
+/** Origins the trader edits in the form; the others belong to their import / sync and are kept as they are. */
+export const EDITABLE_ORIGINS: readonly (TradeOrigin["kind"] | undefined)[] = [undefined, "manual", "bot"];
+export const originEditable = (j: Pick<JournalForm, "originSrc">): boolean => EDITABLE_ORIGINS.includes(j.originSrc?.kind);
 
 export const JOURNAL_MESSAGES = {
   exitBeforeEntry: "Die Ausstiegszeit liegt vor dem Einstieg.",
@@ -126,6 +136,9 @@ export function journalDefaults(): JournalForm {
     preNote: "",
     postNote: "",
     screenshots: [],
+    botOn: false,
+    bot: "",
+    originSrc: null,
   };
 }
 
@@ -159,15 +172,18 @@ export function journalFromTrade(t: Partial<Trade>): JournalForm {
     preNote: p.preNote ?? "",
     postNote: p.postNote ?? "",
     screenshots: [...(t.screenshots ?? [])],
+    botOn: t.origin?.kind === "bot",
+    bot: t.origin?.kind === "bot" ? (t.origin.botId ?? "") : "",
+    originSrc: t.origin ?? null,
   };
 }
 
 /**
- * `Speichern & neu`: keeps what belongs to the venue / instrument (market, margin mode, exchange, account label) and
- * clears everything of the trade itself.
+ * `Speichern & neu`: keeps what belongs to the venue / instrument (market, margin mode, exchange, account label, the bot)
+ * and clears everything of the trade itself.
  */
 export function journalReset(j: JournalForm): JournalForm {
-  return { ...journalDefaults(), market: j.market, marginMode: j.marginMode, exchange: j.exchange, exchangeAccount: j.exchangeAccount };
+  return { ...journalDefaults(), market: j.market, marginMode: j.marginMode, exchange: j.exchange, exchangeAccount: j.exchangeAccount, botOn: j.botOn, bot: j.bot };
 }
 
 /** A new, empty fill row (time = the entry time for the first, else empty). */
@@ -220,6 +236,23 @@ const numOrUndef = (s: string): number | undefined => {
   const v = parseNumber(s);
   return v == null ? undefined : v;
 };
+
+/**
+ * `origin` the form writes (review F14): a bot when „Bot“ is on (with its name), the stored manual origin otherwise,
+ * nothing for a trade that never had one. Exchange / CSV / webhook origins stay untouched (their sync owns them).
+ */
+export function originRecord(j: Pick<JournalForm, "botOn" | "bot" | "originSrc">): TradeOrigin | undefined {
+  const src = j.originSrc ?? undefined;
+  if (!originEditable(j)) return src;
+  if (j.botOn) {
+    const o: TradeOrigin = { ...(src?.kind === "bot" ? src : {}), kind: "bot" };
+    const name = j.bot.trim().slice(0, 40);
+    if (name) o.botId = name;
+    else delete o.botId;
+    return o;
+  }
+  return src?.kind === "manual" ? src : undefined;
+}
 
 /**
  * The v3 keys the form writes. Every empty value is `undefined` (the editor drops those keys, so an untouched legacy
@@ -278,11 +311,13 @@ export function journalRecord(j: JournalForm, base: { status: TradeStatus; side:
     rating: j.rating ?? undefined,
     psych: Object.keys(psych).length ? psych : undefined,
     screenshots: j.screenshots.length ? [...j.screenshots] : undefined,
+    origin: originRecord(j),
   };
 }
 
 /** Keys `journalRecord` writes (the editor removes them when `undefined`). */
 export const JOURNAL_KEYS = [
+  "origin",
   "exitDate",
   "qty",
   "fills",

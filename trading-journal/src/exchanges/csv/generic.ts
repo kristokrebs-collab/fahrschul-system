@@ -5,7 +5,7 @@
 import type { CsvTrade, ParseResult } from "./model";
 import { cell, normalizePair, parseNum, parseSide, parseTime, type CsvTable } from "./parse";
 
-export const MAP_FIELDS = ["date", "exitDate", "pair", "side", "entry", "exit", "qty", "size", "fees", "pnl", "stop", "target", "leverage"] as const;
+export const MAP_FIELDS = ["date", "exitDate", "pair", "side", "entry", "exit", "qty", "size", "fees", "pnl", "stop", "target", "leverage", "bot"] as const;
 export type MapField = (typeof MAP_FIELDS)[number];
 
 /** Field → column index (−1 = not mapped). */
@@ -25,6 +25,7 @@ export const MAP_LABEL: Readonly<Record<MapField, string>> = {
   stop: "Stop",
   target: "Ziel",
   leverage: "Hebel",
+  bot: "Bot (Name)",
 };
 
 /** Fields without which a row is skipped. */
@@ -44,6 +45,8 @@ const GUESS: Readonly<Record<MapField, RegExp[]>> = {
   stop: [/^(stop|sl|s ?\/ ?l|stop.?loss)$/i],
   target: [/^(target|tp|t ?\/ ?p|take.?profit|ziel)$/i],
   leverage: [/leverage|hebel/i],
+  // review F14: a bot / strategy column marks the rows as bot trades (Herkunft „Bot · <Name>“)
+  bot: [/^(bot|bot.?name|bot.?id|strateg(y|ie)|algo)$/i],
 };
 
 /** First-guess mapping from the header (each column used once). */
@@ -104,6 +107,7 @@ export function parseWithMapping(t: CsvTable, m: ColumnMapping, opts: GenericOpt
       stop: parseNum(cell(r, m.stop), decimalComma),
       target: parseNum(cell(r, m.target), decimalComma),
       leverage: parseNum(cell(r, m.leverage), decimalComma),
+      ...(cell(r, m.bot ?? -1) ? { bot: cell(r, m.bot ?? -1).slice(0, 40) } : null),
     });
   });
   return { trades: out, skipped, warnings: [] };
