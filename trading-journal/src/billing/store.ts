@@ -149,6 +149,12 @@ export function currentMode(): BillingMode {
   return modeOf(billingActive(), s.config, s.cached);
 }
 
+/** What this deployment can deliver (the AI coach only with a server key – `BillingConfig.coachAi`, Review F06). */
+export function useOffer(): { coachAi: boolean } {
+  const coachAi = useBilling((s) => s.config?.coachAi === true);
+  return { coachAi };
+}
+
 export function useBillingMode(): BillingMode {
   const config = useBilling((s) => s.config);
   const cached = useBilling((s) => s.cached);

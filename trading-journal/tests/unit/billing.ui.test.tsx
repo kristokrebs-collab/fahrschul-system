@@ -199,14 +199,26 @@ describe("cancellation", () => {
 
 describe("PreiseView", () => {
   it("h1 Preise, four plans, the full comparison table and the cancel link", () => {
-    useBilling.setState({ config: CONFIG });
+    // a server with ANTHROPIC_API_KEY sells the AI coach
+    useBilling.setState({ config: { ...CONFIG, coachAi: true } });
     wrap(<PreiseView />);
     expect(screen.getByRole("heading", { level: 1, name: "Preise" })).toBeInTheDocument();
     for (const p of ["free", "pro", "premium", "team"]) expect(screen.getByTestId(`plan-${p}`)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Alle Funktionen im Vergleich" });
     expect(within(table).getByRole("rowheader", { name: "KI-Coach" })).toBeInTheDocument();
+    expect(screen.getByTestId("plan-premium")).toHaveTextContent("KI-Coach mit Wochenanalyse");
     expect(screen.getByTestId("legal-cancel")).toHaveTextContent("Verträge hier kündigen");
     expect(screen.getByTestId("cta-pro")).toHaveTextContent("14 Tage gratis testen");
+  });
+
+  it("without an AI key on the server the page never sells the KI-Coach (Review F06)", () => {
+    useBilling.setState({ config: CONFIG });
+    wrap(<PreiseView />);
+    const table = screen.getByRole("table", { name: "Alle Funktionen im Vergleich" });
+    expect(within(table).queryByRole("rowheader", { name: "KI-Coach" })).toBeNull();
+    expect(within(table).queryByRole("rowheader", { name: "KI-Coach pro Tag" })).toBeNull();
+    expect(screen.getByTestId("plan-premium")).not.toHaveTextContent("KI-Coach");
+    expect(screen.getByTestId("plan-premium")).toHaveTextContent("Berichte als PDF & eigene Dashboards");
   });
 
   it("without cloud: plans shown, no checkout, honest line", () => {

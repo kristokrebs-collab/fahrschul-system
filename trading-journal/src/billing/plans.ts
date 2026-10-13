@@ -114,6 +114,9 @@ export interface PlanCatalogEntry {
   maxSeats?: number;
 }
 
+/** Premium's AI highlight – sold only where the AI coach works (`highlightsFor`, Review F06). */
+export const COACH_AI_HIGHLIGHT = "KI-Coach mit Wochenanalyse";
+
 export const PLAN_CATALOG: Readonly<Record<PlanId, PlanCatalogEntry>> = {
   free: {
     id: "free",
@@ -139,7 +142,7 @@ export const PLAN_CATALOG: Readonly<Record<PlanId, PlanCatalogEntry>> = {
     id: "premium",
     name: "Premium",
     tagline: "Das volle Labor für Vollzeit-Trader.",
-    highlights: ["Alles aus Pro", "KI-Coach mit Wochenanalyse", "Backtest-Labor, API & Webhooks", "5 Bitunix-Verbindungen · 20 GB Screenshots"],
+    highlights: ["Alles aus Pro", COACH_AI_HIGHLIGHT, "Backtest-Labor, API & Webhooks", "5 Bitunix-Verbindungen · 20 GB Screenshots"],
     glyph: "MAX",
   },
   team: {
@@ -153,6 +156,26 @@ export const PLAN_CATALOG: Readonly<Record<PlanId, PlanCatalogEntry>> = {
     maxSeats: 50,
   },
 };
+
+/**
+ * Features / limits that only exist where the server can deliver them: the AI coach needs `ANTHROPIC_API_KEY`
+ * (`BillingConfig.coachAi`). Not offered → not listed in highlights, comparison or upgrade sheet (Review F06: Premium
+ * sold "KI-Coach mit Wochenanalyse" although the button never appeared without the key).
+ */
+/** What Premium's highlight says instead while the AI coach is not offered (features Premium really adds). */
+export const COACH_AI_FALLBACK_HIGHLIGHT = "Berichte als PDF & eigene Dashboards";
+
+export interface Offer {
+  coachAi: boolean;
+}
+
+export const featureOffered = (f: Feature, o: Offer): boolean => f !== "coachAi" || o.coachAi;
+export const limitOffered = (k: LimitKey, o: Offer): boolean => k !== "coachAiPerDay" || o.coachAi;
+
+/** The plan's highlights as they can honestly be sold right now. */
+export function highlightsFor(plan: PlanId, o: Offer): string[] {
+  return PLAN_CATALOG[plan].highlights.map((h) => (h === COACH_AI_HIGHLIGHT && !o.coachAi ? COACH_AI_FALLBACK_HIGHLIGHT : h));
+}
 
 /** List prices in cents (EUR, gross) – per seat for `team`. Owner-editable; Stripe's real prices win at runtime. */
 export const LIST_PRICES: Readonly<Record<PaidPlanId, Readonly<Record<BillingInterval, number>>>> = {

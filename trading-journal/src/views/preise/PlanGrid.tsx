@@ -5,8 +5,8 @@ import { themePaint } from "@/lib/themePaint";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import type { CodeLookup } from "@/billing/contract";
 import { displayPrice, formatMoney, priceDigits, withCoupon, type DisplayPrice } from "@/billing/format";
-import { PLAN_CATALOG, yearlySavingsPct, type PaidPlanId } from "@/billing/plans";
-import { openPortal, setSeats, startCheckout, useBilling, useBillingMode, useEffectivePlan, useTrialDays } from "@/billing/store";
+import { highlightsFor, PLAN_CATALOG, yearlySavingsPct, type PaidPlanId } from "@/billing/plans";
+import { openPortal, setSeats, startCheckout, useBilling, useBillingMode, useEffectivePlan, useOffer, useTrialDays } from "@/billing/store";
 import { Mark, PriceDigits } from "@/billing/ui/parts";
 import type { PlanId } from "@/billing/types";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
@@ -138,6 +138,7 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
   const current = useEffectivePlan();
   const trial = useTrialDays();
   const cat = PLAN_CATALOG[plan];
+  const highlights = highlightsFor(plan, useOffer());
   const isCurrent = mode === "open" && signedIn && current.plan === plan;
   const paid = plan !== "free";
   const available = !config || config.available.includes(plan as PaidPlanId);
@@ -224,7 +225,7 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
           {plan === "team" && mode === "open" && <SeatStepper />}
 
           <ul className="grid gap-2.5 text-[13.5px]">
-            {cat.highlights.map((h, i) => (
+            {highlights.map((h, i) => (
               <motion.li
                 key={h}
                 className="flex items-start gap-2.5"

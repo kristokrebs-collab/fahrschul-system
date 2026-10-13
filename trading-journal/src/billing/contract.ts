@@ -36,6 +36,11 @@ export interface BillingConfig {
   prices: Partial<Record<PaidPlanId, Partial<Record<BillingInterval, PriceInfo>>>>;
   /** Plans that can be bought right now (a configured price id). */
   available: PaidPlanId[];
+  /**
+   * The AI coach can actually answer (`ANTHROPIC_API_KEY` set on the server). Without it the pricing page never sells
+   * "KI-Coach" (Review F06); absent (older server / no functions) counts as off.
+   */
+  coachAi?: boolean;
 }
 
 export interface SubscriptionSummary {

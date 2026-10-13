@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useCloudSession } from "@/cloud/session";
-import { COMPARISON_GROUPS, FEATURE_INFO, LIMIT_INFO, PLAN_CATALOG, PLAN_LIMITS, planIncludes, type FeatureGroup } from "@/billing/plans";
-import { useBillingMode, useEffectivePlan } from "@/billing/store";
+import { COMPARISON_GROUPS, featureOffered, FEATURE_INFO, LIMIT_INFO, limitOffered, PLAN_CATALOG, PLAN_LIMITS, planIncludes, type FeatureGroup, type Offer } from "@/billing/plans";
+import { useBillingMode, useEffectivePlan, useOffer } from "@/billing/store";
 import { FEATURES, LIMIT_KEYS, type Feature, type LimitKey, type PlanId } from "@/billing/types";
 import { Mark } from "@/billing/ui/parts";
 import { HeatGridReveal } from "@/motion/fx/HeatGridReveal";
@@ -37,10 +37,11 @@ interface Group {
   rows: Row[];
 }
 
-function groups(): Group[] {
+/** The comparison as this deployment can deliver it (no "KI-Coach" rows without a server key – Review F06). */
+function groups(offer: Offer): Group[] {
   const out: Group[] = COMPARISON_GROUPS.map((g) => ({
     title: g.label,
-    rows: byGroup(g.group).map((f) => ({
+    rows: byGroup(g.group).filter((f) => featureOffered(f, offer)).map((f) => ({
       key: f,
       label: FEATURE_INFO[f].label,
       cells: PLANS.map((p) => {
@@ -54,7 +55,7 @@ function groups(): Group[] {
   }));
   out.push({
     title: PREISE.limitsGroup,
-    rows: LIMIT_KEYS.map((k) => ({
+    rows: LIMIT_KEYS.filter((k) => limitOffered(k, offer)).map((k) => ({
       key: k,
       label: LIMIT_INFO[k].label,
       cells: PLANS.map((p) => {
@@ -110,7 +111,7 @@ export function PlanComparison({ className }: { className?: string }) {
   const mode = useBillingMode();
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const mine = mode === "open" && signedIn ? PLANS.indexOf(current.plan) : -1;
-  const data = groups();
+  const data = groups(useOffer());
   return (
     <Card title={PREISE.compareTitle} note={PREISE.compareLead} className={className}>
       <div data-testid="plan-comparison">

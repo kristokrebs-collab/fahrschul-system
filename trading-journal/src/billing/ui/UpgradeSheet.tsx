@@ -7,8 +7,8 @@ import { stagger } from "@/motion/tokens";
 import { Button } from "@/primitives/Button";
 import { Segmented } from "@/primitives/Segmented";
 import { displayPrice, formatMoney } from "../format";
-import { FEATURE_INFO, featuresGained, PAID_PLANS, PLAN_CATALOG, planIncludes, upgradePlanFor, yearlySavingsPct, type PaidPlanId } from "../plans";
-import { closeUpgrade, setBillingInterval, startCheckout, useBilling, useBillingMode, useEffectivePlan, useTrialDays } from "../store";
+import { featureOffered, FEATURE_INFO, featuresGained, PAID_PLANS, PLAN_CATALOG, planIncludes, upgradePlanFor, yearlySavingsPct, type PaidPlanId } from "../plans";
+import { closeUpgrade, setBillingInterval, startCheckout, useBilling, useBillingMode, useEffectivePlan, useOffer, useTrialDays } from "../store";
 import { BILLING, UPGRADE } from "../strings";
 import type { BillingInterval } from "../types";
 import { ClosedNotice, Mark, PriceDigits } from "./parts";
@@ -44,7 +44,9 @@ export function UpgradeSheet({ onNavigate }: UpgradeSheetProps) {
   const yearly = displayPrice(plan, "year", config?.prices);
   const savings = yearlySavingsPct(monthly.amount, yearly.amount);
   // the feature that opened the sheet first ("trade the best"), then the plan's other gains
+  const offer = useOffer();
   const gained = featuresGained(plan, current.plan)
+    .filter((f) => featureOffered(f, offer))
     .sort((a, b) => Number(b === feature) - Number(a === feature))
     .slice(0, 6);
   const close = () => {

@@ -516,6 +516,8 @@ export async function billingConfig(): Promise<BillingConfig> {
     cardless: cardlessTrial(),
     prices: enabled ? await configuredPrices() : {},
     available: enabled ? availablePlans() : [],
+    // only sold where it works: the pricing page hides "KI-Coach" without a key (Review F06)
+    coachAi: !!envOptional("ANTHROPIC_API_KEY"),
   };
 }
 

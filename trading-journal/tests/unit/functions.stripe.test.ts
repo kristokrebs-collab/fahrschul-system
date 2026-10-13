@@ -549,6 +549,16 @@ describe("GET /api/v1/billing/status", () => {
     expect(body.plan).toBeNull();
   });
 
+  it("says whether the AI coach can answer – the pricing page only sells it with a key (Review F06)", async () => {
+    const prev = process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    expect((await call(statusFn, req("/api/v1/billing/status"))).body.config).toMatchObject({ coachAi: false });
+    process.env.ANTHROPIC_API_KEY = "sk-ant-test";
+    expect((await call(statusFn, req("/api/v1/billing/status"))).body.config).toMatchObject({ coachAi: true });
+    if (prev === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = prev;
+  });
+
   it("reports the real Stripe prices and the buyable plans", async () => {
     const { body } = await call(statusFn, req("/api/v1/billing/status"));
     const config = body.config as { enabled: boolean; prices: Record<string, Record<string, { amount: number }>>; available: string[] };
