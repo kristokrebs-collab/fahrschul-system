@@ -58,6 +58,25 @@ test.describe("hero", () => {
     }
   });
 
+  test("tiles stay readable on narrower phones (375 / 360 px) – labels and values fit the tile, never an ellipsis", async ({ page }, info) => {
+    test.skip(!isMobile(info), "phone widths");
+    await seed(page);
+    await gotoOverview(page);
+    for (const label of HERO_LABELS) await expect(heroTile(page, label)).toBeVisible();
+    // the KPI grid: every tile's label and value read in one go
+    const grid = page.locator("dl", { has: page.locator('[aria-haspopup="dialog"] dt', { hasText: "Erwartungswert" }) }).first();
+    const clipped = () =>
+      grid.evaluate((dl) =>
+        Array.from(dl.querySelectorAll<HTMLElement>('[aria-haspopup="dialog"] dt span.truncate, [aria-haspopup="dialog"] dd'))
+          .filter((c) => c.scrollWidth > c.clientWidth + 1)
+          .map((c) => c.textContent ?? ""),
+      );
+    for (const width of [375, 360]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect.poll(clipped, { message: `truncated hero cells at ${width} px` }).toEqual([]);
+    }
+  });
+
   test("tile `+` opens the fact dialog with formula + verdict; Escape closes and reveals the tile again", async ({ page }, info) => {
     const errors = collectErrors(page);
     await seed(page);

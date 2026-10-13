@@ -91,6 +91,15 @@ first array before those frames ran: the tail-append path reveals too); then the
 the Nothing dot-matrix loader (`DotMatrix preset="loader"`, decorative) and a transform-only shimmer
 (`animate-fx-shimmer`). Reduced motion → instant, static.
 
+### Settled (`data-settled`)
+
+The wrapper carries `data-settled="true"` once the bars are drawn and nothing on the canvas moves: no history `setData`
+waiting for the chart font, range morph, interval strip wipe, pane crossfade, box draw-in / edge wipe or zone fade-in.
+Everything that starts one of them calls `unsettle()` (`"false"`); a frame loop that runs only while one is in flight
+(each of them ends) and is queued behind lightweight-charts' own frame flips it back. Written straight to the DOM, never
+a render; reduced motion has no tweens, so it is settled as soon as the bars are drawn. The overview card adds
+`data-history="loading|ready"` (`Lade Historie …`); the e2e helper `chartSettled` waits for both before a canvas print.
+
 ## Data helpers (`panes.ts`, `markers.ts`, `levels.ts`, `animateRange.ts`, `tooltip.tsx`)
 
 | Export | Purpose |
@@ -109,7 +118,7 @@ the Nothing dot-matrix loader (`DotMatrix preset="loader"`, decorative) and a tr
 | `resampleCandles(src, srcMs, ms)`, `resampleTail` (`resample.ts`) | `30m` chart interval from `kline_15m` (UTC-aligned buckets, `closed` with the last source bar); the tail keeps the live push O(1) |
 | `rightOffsetBars(bars, width)`, `RIGHT_FREE_PX`, `RightOffset` | right offset in bars that leaves ≥ 72 px free right of the last bar (price-line titles + live pulse), used by every range target; a fixed 8 bars shrank to ~6 px on 30m · 1M |
 | `toTradeMarkers(trades)`, `buildMarkers(markers, snap, bounds)` → `{ markers, outside, byId }`, `snapTime`, `boundsOf`, `markerTradeId`, `hitMarker` | entry ▲/▼ (`#3ddc84`/`#ff4d4f`, journal exception), exit ● toned win/loss/be; ids `e:{id}` / `x:{id}`; exit sits on the entry candle (model has no exit time) |
-| `RangeAnimator` (`goTo(range, animated)`, `cancel()`, `dispose()`), `rangeForDays`, `rangeIndices`, `lerpRange`, `barsPerDay` | visible-logical-range morph through two MotionValues with `spring.smooth`; wheel/pointerdown cancels; reduced motion sets directly |
+| `RangeAnimator` (`goTo(range, animated)`, `shift(delta)`, `cancel()`, `dispose()`, option `onMorph`), `rangeForDays`, `rangeIndices`, `lerpRange`, `barsPerDay` | visible-logical-range morph through two MotionValues with `spring.smooth`; wheel/pointerdown cancels; reduced motion sets directly; `shift` moves a running morph (position and target) with older bars prepended mid-flight, so a range pill whose history lands during the morph still ends at the live edge; `onMorph` reports start / end (both edges landed) |
 | `ChartTooltip` (`ref: TooltipHandle { move, hide }`), `formatTooltip`, `placeTooltip`, `TOOLTIP_CLASS` | O/H/L/C, Δ % (close vs open), `dd.MM., HH:mm`; position via `useSpring(spring.tooltip)`, text via DOM refs; box measured once, tone class swapped only on change, bounds from a ResizeObserver (no layout read per crosshair move) |
 | `fmt` (`format.ts`), `tradeTime` | internal de-DE formatters (`n0/n1/n2/signed/pct0/price/date/time/mio`), bundle `tt` |
 
@@ -136,7 +145,8 @@ ticks next to the visible S/R axis labels too.
 range, size, price mapping, last bar's range, layers, inputs) – a redraw for a live print that moves none of it reuses
 the last geometry. Bar indices are rebuilt only when the inputs or the loaded bars change. No React state, no timers.
 `ChartCard` feeds it from one external store re-read when the check publishes (≤ 1/s) and per new bar, each layer
-memoised by content (`signalMarkersKey`, `divergencesKey`, `structureKey`); hidden layers are not computed. Legend
+memoised by content (`signalMarkersKey`, `divergencesKey`, `structureKey`); every layer is computed whether shown or not,
+so a toggle only shows or hides what the chart holds and never re-reads the engine (it cannot move another layer). Legend
 toggles under the chart (`ChartLayers`, `aria-pressed`, ≥ 44 px on coarse pointers) persist in `tj2-ui.flags`
 (`chartMcbOff`, `chartDivOff`, `chartSrOff`, `chartStructOn`).
 
@@ -152,6 +162,7 @@ effect 6c (identity = content upstream), `invalidate()` + re-sync after every `s
 | `ChartBox` | `{ id, from (ms), to (ms \| null = live edge), top, btm, tone: win\|loss\|neutral, state?: provisional\|confirmed, active?, label?, targets?: { price, label?, kind: tp\|sl\|entry }[] }` |
 | x mapping | `logicalAt(bars, sec, intervalSec)`: the bar at or after a time; times past the last bar → logical indices into the empty space on the right (targets reach into the future). A box spans its bars edge to edge (`i − 0.5`); a box older than the loaded bars starts off screen on the same grid, one that ENDED before them is not drawn (never the live edge) |
 | ⚠ fractional logicals | lwc 5.2 `timeScale().logicalToCoordinate(l)` maps WHOLE logicals only – a fractional one answers **0** (the left pane edge). Use `logicalToX(ts, l)` (`logicalX.ts`, interpolates between the whole neighbours) for bar edges, sub-bar times and the future space. (Box fix: the active box was drawn from the pane's left edge, finished boxes had zero width; `AnnotationPrimitive.xOf` and the replay's MAE / MFE band had the same bug.) |
+| ⚠ float noise | bar centres sit on half pixels (`(k + ½) · barSpacing`); the same view can come back at a bar spacing one ulp off (`3.0000000000000004` after a range morph / history shift) with the SAME visible range – so a geometry memoised on that range keeps whichever x it saw first, and a whole-pixel `Math.round` at `79.49999999999977` vs `79.5` lands 1 px apart. `logicalToX` snaps to 1/1024 px (`snapX`); the check overlay's `xOf` goes through it (CI desktop signal-parts "div lines are back": labels and the dotted S/R line 1 px off after a layer toggle redrew them). |
 | debug hook | `NothingCandleChart` puts a read-only `BoxDebugHook` on its chart host (`[role=img][aria-label=Kerzenchart]`) under `BOX_DEBUG_KEY` (`__tjBoxes`): `geometry()`, `boxes()`, `bars()`, `x(logical)` – a plain property (nothing runs until it is read); the e2e `markt.spec.ts` checks every box against the bars with it |
 | look | fill `fillAlpha` .08 in the tone (active ×1.4, older boxes at half alpha), edges `edgeAlpha` .55; provisional = dashed edges in the soft tone; targets from the box's right end to the price-line strip (`tp` dotted in the tone, `sl` dashed loss, `entry` solid fg) |
 | labels | `T1 84.028` / `Stop …` / caption `BOX STARK` (two parts of one box with the same caption show it once: the first part in view with room) on a nearly opaque plate, placed by `placeLabels` against the 64 px price-line strip, the zone caption and the check overlay's labels (`BoxHost.reserved`) – a label that finds no free spot is left out (its line stays) |

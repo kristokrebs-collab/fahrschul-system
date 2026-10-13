@@ -51,12 +51,12 @@ const ms = (i: number) => (T0 + i * HOUR) * 1000;
 /** The same 60 bars far below the pane (price ~60): no candle in view, every label spot is free. */
 const LOW_BARS = BARS.map((b) => ({ ...b, low: 59, high: 61, close: 60 }));
 
-function mount(opts: { axisPrices?: number[]; width?: number; bars?: typeof BARS } = {}) {
+function mount(opts: { axisPrices?: number[]; width?: number; bars?: typeof BARS; x?: (i: number) => number } = {}) {
   const width = opts.width ?? 800;
   const height = 400;
   // 10 px per bar, 2 px per price unit (price 100 at y 360)
   const chart = {
-    timeScale: () => ({ getVisibleLogicalRange: () => ({ from: 0, to: 60 }), width: () => width, logicalToCoordinate: (i: number) => i * 10 + 5 }),
+    timeScale: () => ({ getVisibleLogicalRange: () => ({ from: 0, to: 60 }), width: () => width, logicalToCoordinate: opts.x ?? ((i: number) => i * 10 + 5) }),
     panes: () => [{ getHeight: () => height }],
   };
   const series = { priceToCoordinate: (p: number) => 360 - (p - 100) * 2 };
@@ -229,6 +229,30 @@ describe("SignalOverlay (check overlay primitive)", () => {
     expect(o.geometry()).toBe(g);
     o.setLayers({ ...DEFAULT_LAYERS });
     expect(updates()).toBe(before + 1); // same layers → no redraw request
+  });
+});
+
+describe("SignalOverlay on a bar spacing one ulp off", () => {
+  it("the same view draws the same overlay: no label or dash moves by the float noise of the time scale", () => {
+    // lightweight-charts' indexToCoordinate (`width − (baseIndex + rightOffset − i + ½) · barSpacing − 1`) puts the bar
+    // centres on half pixels. A range morph / history shift can land the same view at a bar spacing of
+    // 11.000000000000002 instead of 11 – the visible range reads the same, x(0) is 23.499999999999886 instead of 23.5,
+    // and every whole-pixel rounding of the overlay flipped (CI desktop, signal-parts "div lines are back": the labels
+    // and the dotted S/R line 1 px off after a layer toggle redrew them)
+    const lwcX = (barSpacing: number) => (i: number) => 800 - (70 - i + 0.5) * barSpacing - 1;
+    const draw = (barSpacing: number) => {
+      const { o } = mount({ bars: LOW_BARS, x: lwcX(barSpacing) });
+      o.setStructure(STRUCT);
+      o.setDivergences([div({ from: { time: ms(10), price: 59 }, to: { time: ms(20), price: 59 }, active: true })]);
+      o.setLayers({ ...DEFAULT_LAYERS, struct: true });
+      o.updateAllViews();
+      return o.geometry();
+    };
+    expect(lwcX(11.000000000000002)(0)).not.toBe(lwcX(11)(0));
+    const exact = draw(11);
+    expect(exact.labels.length).toBeGreaterThan(2);
+    expect(exact.hlines.length).toBeGreaterThan(1);
+    expect(draw(11.000000000000002)).toEqual(exact);
   });
 });
 

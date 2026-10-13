@@ -84,6 +84,8 @@ export interface BoxHost {
   axisPrices?(): readonly number[];
   /** boxes (CSS px) the labels keep clear of: the check overlay's labels, the zone caption */
   reserved?(): readonly OverlayBox[];
+  /** a draw-in or edge wipe starts its frame loop (the chart is not settled until `busy()` is false again) */
+  onTween?(): void;
 }
 
 export interface BoxOptions {
@@ -435,7 +437,15 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
       this.requestUpdate?.();
       if (this.animating(performance.now())) this.raf = requestAnimationFrame(step);
     };
-    if (this.animating(performance.now())) this.raf = requestAnimationFrame(step);
+    if (this.animating(performance.now())) {
+      this.raf = requestAnimationFrame(step);
+      this.host.onTween?.();
+    }
+  }
+
+  /** A draw-in or edge wipe is running (its frame loop; reduced motion: never). */
+  busy(): boolean {
+    return this.raf !== 0;
   }
 
   private animating(now: number): boolean {

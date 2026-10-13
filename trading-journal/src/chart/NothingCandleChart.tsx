@@ -209,6 +209,8 @@ interface Instance {
     pane?: readonly unknown[];
     boxes?: ChartBox[] | undefined;
   };
+  /** a history `setData` is waiting for the chart font (effect 2): the canvas is about to change */
+  applying: boolean;
   /** ready, on screen and not collapsed */
   isActive(): boolean;
   /** re-evaluates `isActive` for the pulse and the live engine */
@@ -217,6 +219,8 @@ interface Instance {
   requestPlace(): void;
   /** re-reads the sub pane's top after a resize / pane switch (one layout read, in a frame) */
   measurePanes(): void;
+  /** something on the canvas starts to move or change: `data-settled` is false until it is still again */
+  unsettle(): void;
 }
 
 type Callbacks = Pick<NothingCandleChartProps, "onMarkerClick" | "onCrosshair" | "onOutsideCount">;
@@ -287,6 +291,7 @@ function windowFor(i: Instance, days: RangeDays, interval: ChartInterval): Range
 
 function syncLevels(i: Instance, levels: MarketLevels | undefined, active: ActiveScenario, reduced = false): void {
   i.applied.levels = { levels, active };
+  i.unsettle();
   if (!levels) {
     clearLevels(i.main.candles, i.levels);
     i.levels = null;
@@ -327,6 +332,7 @@ function zoneCaptionBox(i: Instance, levels: MarketLevels | undefined): Box[] {
 /** Overlay inputs; the overlay re-indexes itself when the inputs or the loaded bars change. */
 function syncOverlay(i: Instance, p: { signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers }): void {
   i.applied.overlay = [p.signals, p.divergences, p.structure, p.layers];
+  i.unsettle();
   i.check.setMarkers(p.signals ?? NO_MARKERS);
   i.check.setDivergences(p.divergences ?? NO_LINES);
   i.check.setStructure(p.structure ?? null);
@@ -338,6 +344,7 @@ const NO_BOXES: ChartBox[] = [];
 /** Box-zu-Box boxes (P02): a new id draws in, the rest is re-indexed by the primitive. */
 function syncBoxes(i: Instance, boxes: ChartBox[] | undefined): void {
   i.applied.boxes = boxes;
+  i.unsettle();
   i.boxes.setBoxes(boxes ?? NO_BOXES);
 }
 
@@ -488,6 +495,7 @@ function opaque(snap: HTMLCanvasElement, wrap: HTMLElement): HTMLCanvasElement {
  */
 function stripWipe(i: Instance, wrap: HTMLElement | null): void {
   if (!wrap) return;
+  i.unsettle();
   i.cancelWipe?.();
   i.cancelWipe = null;
   i.overlay?.remove();
@@ -508,6 +516,7 @@ function stripWipe(i: Instance, wrap: HTMLElement | null): void {
 /** Screenshot of the current canvas faded out on top of the new state (sub-pane switch). */
 function crossfade(i: Instance, wrap: HTMLElement | null): void {
   if (!wrap) return;
+  i.unsettle();
   i.cancelWipe?.();
   i.cancelWipe = null;
   try {
@@ -677,6 +686,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       axisPrices: () => [...axisLabelPrices(instance, latest.current.levels), ...check.axisLabelPrices()],
       // target labels / captions keep clear of the check overlay's labels and the zone caption
       reserved: () => [...zoneCaptionBox(instance, latest.current.levels), ...check.geometry().labels.map((l) => l.box)],
+      onTween: () => instance.unsettle(),
     });
     main.candles.attachPrimitive(boxes);
     // read-only diagnostics hook (e2e / dev tools): the boxes as drawn against the bar grid – a property, no cost
@@ -684,9 +694,33 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     Object.defineProperty(node, BOX_DEBUG_KEY, { value: boxDebug, configurable: true });
     main.candles.attachPrimitive(check);
     const markersApi = createSeriesMarkers(main.candles, [], { zOrder: "aboveSeries" });
-    const range = new RangeAnimator(chart, { reducedMotion: () => reduceRef.current });
+    const range = new RangeAnimator(chart, { reducedMotion: () => reduceRef.current, onMorph: () => instance.unsettle() });
     let placeRaf = 0;
     let measureRaf = 0;
+    let settleRaf = 0;
+    // `data-settled` on the wrapper (e2e, diagnostics): the chart shows its bars and nothing on the canvas moves – no
+    // history waiting for its draw, range morph, interval wipe, pane crossfade or box / zone tween. Written only when it
+    // flips; the frame loop runs only while something moves (each of those ends), queued behind lightweight-charts' own
+    // frame, so "true" means that frame is painted. Reduced motion: no tweens, settled once drawn.
+    const moving = () =>
+      instance.applying ||
+      range.isAnimating() ||
+      !!instance.cancelWipe ||
+      !!instance.overlay?.isConnected ||
+      boxes.busy() ||
+      (instance.levels?.zone.busy() ?? false) ||
+      // bars drawn, the reveal two frames later
+      (!readyRef.current && instance.data.length > 0);
+    const settle = () => {
+      settleRaf = 0;
+      const el = wrap.current;
+      if (!el || inst.current !== instance) return;
+      const busy = moving();
+      const v = readyRef.current && !busy ? "true" : "false";
+      if (el.dataset.settled !== v) el.dataset.settled = v;
+      // no bars yet (no history, offline): nothing to wait for – the next history apply starts the loop again
+      if (busy) settleRaf = requestAnimationFrame(settle);
+    };
     const measure = () => {
       measureRaf = 0;
       if (inst.current !== instance) return;
@@ -768,6 +802,14 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       },
       measurePanes: () => {
         if (!measureRaf) measureRaf = requestAnimationFrame(measure);
+      },
+      applying: false,
+      unsettle: () => {
+        const el = wrap.current;
+        if (el && el.dataset.settled !== "false") el.dataset.settled = "false";
+        // re-queued on every call: behind the frame lightweight-charts requested for the change that called it
+        if (settleRaf) cancelAnimationFrame(settleRaf);
+        settleRaf = requestAnimationFrame(settle);
       },
     };
 
@@ -911,6 +953,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         placeRaf = 0;
         if (measureRaf) cancelAnimationFrame(measureRaf);
         measureRaf = 0;
+        if (settleRaf) cancelAnimationFrame(settleRaf);
+        settleRaf = 0;
         offInk();
         live.dispose();
         instance.overlay?.remove();
@@ -953,6 +997,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     };
     const apply = () => {
       if (cancelled || inst.current !== i) return;
+      i.applying = false;
+      i.unsettle();
       i.applied.candles = candles;
       const data = normalizeSeries(candles.map(toCandleData));
       const intervalChanged = i.lastInterval !== null && i.lastInterval !== interval;
@@ -992,9 +1038,10 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         if (target) i.range.goTo(target, false);
       } else if (prevRange) {
         // same interval, different history (older bars prepended, source switch): keep the user's window on the same
-        // bars – prepended bars shift every logical index by their count
+        // bars – prepended bars shift every logical index by their count. A range morph still running (a range pill
+        // tapped just before its history arrived) shifts with them, or it would land `shift` bars left of the live edge
         const shift = prevFirst === undefined ? 0 : Math.max(0, data.findIndex((d) => d.time === prevFirst));
-        i.chart.timeScale().setVisibleLogicalRange({ from: prevRange.from + shift, to: prevRange.to + shift });
+        if (!i.range.shift(shift)) i.chart.timeScale().setVisibleLogicalRange({ from: prevRange.from + shift, to: prevRange.to + shift });
       }
       // levels & markers depend on the loaded bars (zone left edge, snapping, bounds)
       syncLevels(i, latest.current.levels, latest.current.activeScenario, reduceRef.current);
@@ -1011,9 +1058,13 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       i.requestPlace();
       reveal();
     };
+    // the canvas is about to change: not settled until this history is drawn
+    i.applying = true;
+    i.unsettle();
     i.fontReady.then(apply);
     return () => {
       cancelled = true;
+      i.applying = false;
       if (raf1) cancelAnimationFrame(raf1);
       if (raf2) cancelAnimationFrame(raf2);
     };

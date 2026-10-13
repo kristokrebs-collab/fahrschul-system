@@ -342,6 +342,23 @@ export async function settledBox(locator: Locator, timeout = 10_000): Promise<Bo
   return box;
 }
 
+/**
+ * Waits until the overview chart (`card` = `#chart-card`) is still: the history of the chosen range is in
+ * (`data-history="ready"`, the card's `Lade Historie …` is gone) and nothing on its canvas moves any more
+ * (`data-settled="true"` on the chart: bars drawn, no range morph, interval wipe, pane crossfade or box / zone tween –
+ * `NothingCandleChart`). A slow machine still has a range morph or the 1M history in flight when a fast one is long
+ * done. The pointer goes to the page corner first: a layout shift under a resting pointer would hover the chart, and a
+ * crosshair is not a layer of a canvas print.
+ */
+export async function chartSettled(card: Locator, timeout = 15_000): Promise<void> {
+  const page = card.page();
+  await page.mouse.move(0, 0);
+  await expect(card).toHaveAttribute("data-history", "ready", { timeout });
+  // the passive effects of the commit that flipped it run after its paint (a history apply unsettles the chart there)
+  await page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  await expect(card.locator("[data-settled]")).toHaveAttribute("data-settled", "true", { timeout });
+}
+
 /** Centre of a locator's box (throws when it has none). */
 export async function centre(locator: Locator): Promise<{ x: number; y: number }> {
   const b = await locator.boundingBox();

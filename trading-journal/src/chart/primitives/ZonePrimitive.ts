@@ -279,6 +279,11 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
     this.requestUpdate?.();
   }
 
+  /** The fade-in is running. */
+  busy(): boolean {
+    return this.raf !== 0;
+  }
+
   /** Tweens `opacity` 0 → target over `ms` with rAF + requestUpdate (ease-out cubic). Reduced motion → instant. */
   fadeIn(ms = 320, reducedMotion = false): void {
     const target = this.options.opacity || 1;

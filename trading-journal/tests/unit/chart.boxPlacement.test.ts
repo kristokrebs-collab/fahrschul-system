@@ -64,6 +64,15 @@ describe("logicalToX (lwc maps whole logicals only)", () => {
     expect(logicalToX({ logicalToCoordinate: () => null }, 2.5)).toBeNull();
     expect(logicalToX(lwcScale, Number.NaN)).toBeNull();
   });
+
+  it("drops the float noise of a bar spacing one ulp off: a half-pixel bar centre stays a half pixel", () => {
+    // lwc at width 1144, rightOffset + baseIndex 1464, bar spacing 3.0000000000000004 instead of 3 (CI desktop, 30m / 1M)
+    const scale = (barSpacing: number) => ({ logicalToCoordinate: (l: number) => 1144 - (1464 - l + 0.5) * barSpacing - 1 });
+    expect(scale(3.0000000000000004).logicalToCoordinate(1110)).toBe(79.49999999999977);
+    expect(logicalToX(scale(3.0000000000000004), 1110)).toBe(79.5);
+    expect(logicalToX(scale(3.0000000000000004), 1109.5)).toBe(78);
+    expect(logicalToX(scale(3), 1110)).toBe(79.5);
+  });
 });
 
 describe("BoxPrimitive on the real bar grid", () => {

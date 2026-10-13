@@ -129,6 +129,16 @@ describe("NothingCandleChart", () => {
     expect(seriesSpies.setData).toHaveBeenCalledTimes(2);
   });
 
+  it("data-settled: true once the bars are drawn, false while a range morph runs, true again once it landed", async () => {
+    const { container, rerender } = render(<NothingCandleChart candles={candles} interval="1h" rangeDays={30} />);
+    const settled = () => container.firstElementChild?.getAttribute("data-settled");
+    await ready(container);
+    await waitFor(() => expect(settled()).toBe("true"));
+    rerender(<NothingCandleChart candles={candles} interval="1h" rangeDays={7} />);
+    expect(settled()).toBe("false");
+    await waitFor(() => expect(settled()).toBe("true"), { timeout: 5_000 });
+  });
+
   it("sets data once, applies live ticks via update and exposes the handle", async () => {
     const ref = createRef<ChartHandle>();
     const outside = vi.fn();
