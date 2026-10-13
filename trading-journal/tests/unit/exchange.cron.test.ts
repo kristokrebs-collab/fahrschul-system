@@ -72,6 +72,7 @@ vi.mock("../../netlify/functions/_lib/exchanges/store", () => ({
   runningRun: async () => null,
   loadConnection: async (_u: string, id: string) => ({ id }),
   profileTz: async () => null,
+  rotateStaleConnections: async () => ({ rotated: 0, failed: 0, remaining: 0 }),
 }));
 
 const { runExchangeCron, backoffMs, CRON_MIN_GAP_MS, CRON_PLAN_RECHECK_MS, CRON_MAX_BACKOFF_MS } = await import("../../netlify/functions/exchange-sync-cron.mts");

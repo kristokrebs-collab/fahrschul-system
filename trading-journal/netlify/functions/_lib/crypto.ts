@@ -5,7 +5,8 @@
  * The AAD binds a blob to its row and field (`secretAad(userId, connectionId, "secret")` – generate the connection
  * id with `crypto.randomUUID()` before inserting), so a ciphertext copied to another row or column does not decrypt.
  * Keys: `EXCHANGE_ENC_KEY_V1`, `…_V2`, … (each `openssl rand -base64 32`); new blobs use the highest version present,
- * old blobs keep decrypting with theirs (`needsReencrypt` → rotate lazily on next sync).
+ * old blobs keep decrypting with theirs (`needsReencrypt` → re-encrypted after each sync / positions read and by the
+ * cron's sweep, `rotateIfNeeded` / `rotateStaleConnections` in exchanges/store.ts).
  * Never log plaintext, blobs or keys.
  */
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";

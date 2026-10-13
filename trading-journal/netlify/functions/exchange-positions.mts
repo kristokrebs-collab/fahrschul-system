@@ -11,7 +11,7 @@ import { requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { mapOpenPosition, type LivePosition } from "./_lib/exchanges/mapping";
 import { adapterFor } from "./_lib/exchanges/registry";
-import { credentialsOf, listConnections, loadConnection } from "./_lib/exchanges/store";
+import { credentialsOf, listConnections, loadConnection, rotateIfNeeded } from "./_lib/exchanges/store";
 import { syncErrorMessage } from "./_lib/exchanges/sync";
 
 export default handler(async (req) => {
@@ -26,8 +26,10 @@ export default handler(async (req) => {
     try {
       const row = await loadConnection(user.id, meta.id);
       if (!row) continue;
-      const adapter = adapterFor(row.exchange, credentialsOf(row));
+      const creds = credentialsOf(row);
+      const adapter = adapterFor(row.exchange, creds);
       const open = await adapter.fetchOpenPositions();
+      await rotateIfNeeded(row, creds); // review KEY-01: the key worked → newest key version
       const tickers = open.length ? await adapter.fetchTickers(open.map((p) => p.symbol)).catch(() => []) : [];
       const now = Date.now();
       for (const p of open) positions.push(mapOpenPosition(p, row.exchange, tickers.find((t) => t.symbol === p.symbol), now, row.label || undefined));

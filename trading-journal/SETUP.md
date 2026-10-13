@@ -298,8 +298,11 @@ openssl rand -base64 32
 Ergebnis als `EXCHANGE_ENC_KEY_V1` (Scope Functions, secret) eintragen und neu deployen. Damit werden API-Schlüssel
 und -Geheimnis AES-256-GCM-verschlüsselt gespeichert; der Browser sieht nach dem Verbinden nur noch die letzten vier
 Zeichen. **Diesen Schlüssel nie verlieren oder ändern** – ohne ihn sind gespeicherte Verbindungen unlesbar.
-Rotation: `EXCHANGE_ENC_KEY_V2` zusätzlich anlegen; alte Verbindungen werden weiter entschlüsselt und bei der
-nächsten Nutzung neu verschlüsselt.
+Rotation: `EXCHANGE_ENC_KEY_V2` zusätzlich anlegen und neu deployen. Alte Verbindungen werden weiter entschlüsselt
+und mit V2 neu verschlüsselt – sofort bei jedem Sync und jeder Positionsabfrage, alle übrigen (auch ungültige oder
+pausierte) durch den 30-Minuten-Job, 50 pro Lauf. Im Function-Log von `exchange-sync-cron` steht danach
+`"keys":{"rotated":…,"failed":…,"remaining":…}`; erst bei `"remaining":0` darf `EXCHANGE_ENC_KEY_V1` entfernt werden.
+`failed` zählt Verbindungen, die sich nicht entschlüsseln lassen (Schlüssel fehlt) – diese müssen neu verbunden werden.
 
 ### 5.2 API-Schlüssel bei Bitunix anlegen
 

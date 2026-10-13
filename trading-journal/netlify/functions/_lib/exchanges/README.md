@@ -57,7 +57,7 @@ filtered by open time), `position/get_pending_positions` (live positions + the o
 |---|---|
 | `types.ts` | `ExchangeAdapter`, `Venue*` types, `ExchangeError`, `AdapterRuntime` (fetch / clock / sleep, injectable) |
 | `registry.ts` | `adapterFor(exchange, creds)` – Bitunix live; Binance / Bybit / OKX answer 501 with the CSV hint (phase 2) |
-| `store.ts` | connections (`insertConnection` encrypts with the pre-generated id as AAD, `credentialsOf` decrypts, `rotateIfNeeded` re-encrypts with the newest key version), cursor, runs, `upsertSyncedTrades`, `pullSyncedTrades` (server-written trades only), `profileTz` |
+| `store.ts` | connections (`insertConnection` encrypts with the pre-generated id as AAD, `credentialsOf` decrypts, `rotateIfNeeded` re-encrypts with the newest key version after a sync or positions read, `rotateStaleConnections` is the cron's sweep over the rest), cursor, runs, `upsertSyncedTrades`, `pullSyncedTrades` (server-written trades only), `profileTz` |
 | `api.ts` | `requireExchangeSetup` (503 without `EXCHANGE_ENC_KEY_V1`), `exchangeHttpError`, `exchangePlanState`, `cronEnabled` (`SYNC_CRON_ENABLED`, default on), `nextCronAt`, `clientTz` |
 | `tokens.ts` | `tj_<43 base64url>` tokens, SHA-256 at rest, max 10 per user, `resolveToken`, `personalToken(req)` |
 | `inbound.ts` | TradingView alert schema (`open` / `close`, `{{ticker}}` → pair, timeframe), `tvOpenItem` / `tvCloseSet`, REST trade schema → upsert item |

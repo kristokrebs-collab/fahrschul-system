@@ -16,7 +16,7 @@ import { HttpError } from "../http";
 import { supabaseAdmin } from "../supabase";
 import { detectPnlConvention, mapClosedPosition, safeTz, type MappedPosition, type PnlConvention, type PositionCheck, type SyncedTrade } from "./mapping";
 import { adapterFor } from "./registry";
-import { credentialsOf, finishRun, getCursor, setCursor, startRun, updateConnection, upsertSyncedTrades, type ConnectionRow, type RunCounts, type RunKind, type RunStatus } from "./store";
+import { credentialsOf, finishRun, getCursor, rotateIfNeeded, setCursor, startRun, updateConnection, upsertSyncedTrades, type ConnectionRow, type RunCounts, type RunKind, type RunStatus } from "./store";
 import { ExchangeError, type ExchangeAdapter, type VenueClosedPosition, type VenueFill, type VenueTpSl } from "./types";
 
 export const DAY_MS = 86_400_000;
@@ -260,6 +260,8 @@ export async function runSync(req: SyncRequest): Promise<SyncOutcome> {
     const connPatch: Parameters<typeof updateConnection>[2] = { last_sync_at: nowIso, last_error: null, status: "active" };
     if (detected.feesIncluded !== null && detected.feesIncluded !== connMeta.feesIncluded) connPatch.meta = { ...(conn.meta ?? {}), feesIncluded: detected.feesIncluded };
     await updateConnection(req.userId, conn.id, connPatch);
+    // the key just worked: blobs of an older key version move to the newest one (review KEY-01, best effort)
+    await rotateIfNeeded(conn, creds);
 
     const status: RunStatus = more ? "partial" : "ok";
     await finishRun(req.userId, runId, status, counts, { windowFrom, windowTo, meta: { more, requests, feesIncluded, fillsSkipped } });

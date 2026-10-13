@@ -107,18 +107,77 @@ export function credentialsOf(row: ConnectionRow, ring: Keyring = keyringFromEnv
   return creds;
 }
 
-/** Re-encrypts the blobs of a connection with the newest key version (lazy key rotation after a sync). */
-export async function rotateIfNeeded(row: ConnectionRow, creds: ExchangeCredentials, ring: Keyring = keyringFromEnv()): Promise<boolean> {
-  if (!row.api_key_enc || !needsReencrypt(row.api_key_enc, ring)) return false;
-  const patch: Record<string, unknown> = {
-    api_key_enc: encrypt(creds.apiKey, secretAad(row.user_id, row.id, "api_key"), ring),
-    secret_enc: encrypt(creds.secret, secretAad(row.user_id, row.id, "secret"), ring),
-    key_version: ring.current,
-  };
-  if (creds.passphrase) patch.passphrase_enc = encrypt(creds.passphrase, secretAad(row.user_id, row.id, "passphrase"), ring);
-  const { error } = await supabaseAdmin().from("exchange_connections").update(patch).eq("id", row.id).eq("user_id", row.user_id);
-  if (error) console.error("[fn] exchange key rotation failed", error.code);
-  return !error;
+/** True when any secret blob of the row was written with an older key version than the keyring's current one. */
+export function rowNeedsReencrypt(row: Pick<ConnectionRow, "api_key_enc" | "secret_enc" | "passphrase_enc">, ring: Keyring = keyringFromEnv()): boolean {
+  return [row.api_key_enc, row.secret_enc, row.passphrase_enc].some((b) => !!b && needsReencrypt(b, ring));
+}
+
+/**
+ * Re-encrypts the blobs of a connection with the newest key version (lazy key rotation, review KEY-01): called after
+ * every successful use of the key (sync, live positions) and by the cron's sweep (`rotateStaleConnections`), so an
+ * old `EXCHANGE_ENC_KEY_V<n>` can be retired once no blob uses it. Best effort – never throws; true when rotated.
+ */
+export async function rotateIfNeeded(row: ConnectionRow, creds: ExchangeCredentials, ring?: Keyring): Promise<boolean> {
+  try {
+    const kr = ring ?? keyringFromEnv();
+    if (!rowNeedsReencrypt(row, kr)) return false;
+    const patch: Record<string, unknown> = {
+      api_key_enc: encrypt(creds.apiKey, secretAad(row.user_id, row.id, "api_key"), kr),
+      secret_enc: encrypt(creds.secret, secretAad(row.user_id, row.id, "secret"), kr),
+      passphrase_enc: creds.passphrase ? encrypt(creds.passphrase, secretAad(row.user_id, row.id, "passphrase"), kr) : null,
+      key_version: kr.current,
+    };
+    const { error } = await supabaseAdmin().from("exchange_connections").update(patch).eq("id", row.id).eq("user_id", row.user_id);
+    if (error) console.error("[fn] exchange key rotation failed", error.code);
+    return !error;
+  } catch (e) {
+    console.error("[fn] exchange key rotation failed", e instanceof Error ? e.name : "");
+    return false;
+  }
+}
+
+export interface RotationSweep {
+  /** connections re-encrypted in this sweep */
+  rotated: number;
+  /** connections whose blobs could not be decrypted (unknown key version, wrong AAD) – need a reconnect */
+  failed: number;
+  /** connections still on an older key version after the sweep (0 = old keys can be removed) */
+  remaining: number;
+}
+
+/**
+ * Re-encrypts up to `limit` connections still on an older key version – also invalid, paused or switched-off ones
+ * that never sync again (review KEY-01). The cron logs `remaining`; at 0 the old `EXCHANGE_ENC_KEY_V<n>` can go.
+ */
+export async function rotateStaleConnections(limit = 50, ring?: Keyring): Promise<RotationSweep> {
+  const out: RotationSweep = { rotated: 0, failed: 0, remaining: 0 };
+  let kr: Keyring;
+  try {
+    kr = ring ?? keyringFromEnv();
+  } catch {
+    return out;
+  }
+  const { data, error } = await supabaseAdmin()
+    .from("exchange_connections")
+    .select(`${CONNECTION_COLUMNS},api_key_enc,secret_enc,passphrase_enc`)
+    .lt("key_version", kr.current)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) {
+    console.error("[fn] exchange key sweep failed", error.code);
+    return out;
+  }
+  for (const row of (data ?? []) as unknown as ConnectionRow[]) {
+    try {
+      if (await rotateIfNeeded(row, credentialsOf(row, kr), kr)) out.rotated++;
+      else out.failed++;
+    } catch {
+      out.failed++; // never log the user or the key
+    }
+  }
+  const left = await supabaseAdmin().from("exchange_connections").select("id").lt("key_version", kr.current).limit(10_000);
+  out.remaining = left.error ? -1 : (left.data ?? []).length;
+  return out;
 }
 
 export interface NewConnection {

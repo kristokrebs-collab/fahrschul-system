@@ -487,6 +487,54 @@ describe("positions, backfill, cron", () => {
   });
 });
 
+describe("key rotation (KEY-01)", () => {
+  it("a sync re-encrypts with the newest key, the cron sweeps idle connections, then the old key can go", async () => {
+    const id = ((await connect()).body.connection as Row).id as string;
+    const idle = ((await connect({ label: "Zweitkonto" })).body.connection as Row).id as string;
+    const conns = () => state.tables.exchange_connections!;
+    const row = (cid: string) => conns().find((c) => c.id === cid)!;
+    expect(conns().every((c) => String(c.api_key_enc).startsWith("v1:") && c.key_version === 1)).toBe(true);
+    // the idle connection never syncs again (key revoked at the venue → invalid)
+    row(idle).status = "invalid";
+
+    // V1 leaked: the operator adds V2
+    process.env.EXCHANGE_ENC_KEY_V2 = randomBytes(32).toString("base64");
+    const r = await read(await syncFn(req("POST", "/api/v1/exchange/sync", { connectionId: id, tz: "Europe/Berlin" }), ctx()));
+    expect(r.status).toBe(200);
+    expect(row(id)).toMatchObject({ key_version: 2 });
+    expect(String(row(id).api_key_enc)).toMatch(/^v2:/);
+    expect(String(row(id).secret_enc)).toMatch(/^v2:/);
+    expect(String(row(idle).api_key_enc)).toMatch(/^v1:/);
+
+    // the cron's sweep takes the idle connection too and reports nothing left
+    state.tables.sync_runs = [];
+    const s = await runExchangeCron();
+    expect(s.keys).toEqual({ rotated: 1, failed: 0, remaining: 0 });
+    expect(String(row(idle).secret_enc)).toMatch(/^v2:/);
+    expect(JSON.stringify(state.tables)).not.toContain(SECRET);
+
+    // V1 removed: every connection still decrypts and signs (the fake venue verifies the signature)
+    delete process.env.EXCHANGE_ENC_KEY_V1;
+    state.tables.sync_runs = [];
+    const again = await read(await syncFn(req("POST", "/api/v1/exchange/sync", { connectionId: id, from: "2026-10-01T00:00:00Z" }), ctx()));
+    expect(again.status).toBe(200);
+    const live = await read(await positionsFn(req("GET", "/api/v1/exchange/positions"), ctx()));
+    expect(live.body.errors).toEqual([]);
+  });
+
+  it("live positions rotate too; an undecryptable blob is counted, never logged", async () => {
+    const id = ((await connect()).body.connection as Row).id as string;
+    process.env.EXCHANGE_ENC_KEY_V2 = randomBytes(32).toString("base64");
+    await positionsFn(req("GET", "/api/v1/exchange/positions"), ctx());
+    expect(state.tables.exchange_connections![0]).toMatchObject({ id, key_version: 2 });
+    // a row written with a key that is gone: the sweep counts it as failed and keeps it
+    state.tables.exchange_connections!.push({ ...state.tables.exchange_connections![0]!, id: crypto.randomUUID(), label: "alt", key_version: 1, api_key_enc: "v1:AAAA:AAAA:AAAA", secret_enc: "v1:AAAA:AAAA:AAAA" });
+    delete process.env.EXCHANGE_ENC_KEY_V1;
+    const s = await runExchangeCron();
+    expect(s.keys).toEqual({ rotated: 0, failed: 1, remaining: 1 });
+  });
+});
+
 describe("API tokens, REST, TradingView webhook", () => {
   async function token(scopes: string[]) {
     const r = await read(await tradesFn(req("POST", "/api/v1/trades/tokens", { name: "Bot", scopes }), ctx()));

@@ -9,6 +9,10 @@
  * (20 min · 2^(n−1), ≤ 12 h), plan without auto-sync → in 6 h – so connections that keep failing or whose trial ended
  * can no longer hold the 40 places of the batch while paying traders wait. Without migration 0006 the cron falls back
  * to the old order by `last_sync_at`.
+ *
+ * Key rotation (review KEY-01): after the syncs, up to 50 connections still encrypted with an older
+ * `EXCHANGE_ENC_KEY_V<n>` are re-encrypted with the newest one (also invalid or switched-off ones); the logged summary
+ * (`keys.remaining`) says when the old key can be removed.
  */
 import type { Config } from "@netlify/functions";
 import { planIncludes } from "../../src/billing/plans";
@@ -17,13 +21,15 @@ import { paymentsConfigured, planOf } from "./_lib/plan";
 import { supabaseAdmin } from "./_lib/supabase";
 import { cronEnabled } from "./_lib/exchanges/api";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
-import { CONNECTION_COLUMNS, loadConnection, profileTz, runningRun, type ConnectionRow } from "./_lib/exchanges/store";
+import { CONNECTION_COLUMNS, loadConnection, profileTz, rotateStaleConnections, runningRun, type ConnectionRow, type RotationSweep } from "./_lib/exchanges/store";
 import { runSync } from "./_lib/exchanges/sync";
 
 export const CRON_TOTAL_MS = 24_000;
 export const CRON_PER_CONNECTION_MS = 8_000;
 export const CRON_MIN_GAP_MS = 20 * 60_000;
 export const CRON_BATCH = 40;
+/** Connections re-encrypted per run by the key rotation sweep. */
+export const CRON_ROTATE_BATCH = 50;
 /** A connection whose plan has no auto-sync is looked at again after this long. */
 export const CRON_PLAN_RECHECK_MS = 6 * 60 * 60_000;
 /** Longest back-off of a connection that keeps failing. */
@@ -35,6 +41,8 @@ export interface CronSummary {
   synced: number;
   skipped: number;
   failed: number;
+  /** key rotation sweep (review KEY-01): re-encrypted / undecryptable / still on an older key version */
+  keys?: RotationSweep;
 }
 
 /** A connection row as the cron reads it (0006 adds the schedule columns). */
@@ -128,6 +136,9 @@ export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
       await plan(meta, now + backoffMs(failures + 1), failures + 1);
     }
   }
+  // key rotation (review KEY-01): connections still on an older EXCHANGE_ENC_KEY_V<n> – also invalid or switched-off
+  // ones that never sync again – move to the newest key; the log shows how many are left (0 → the old key can go)
+  if (Date.now() < end) summary.keys = await rotateStaleConnections(CRON_ROTATE_BATCH);
   return summary;
 }
 
