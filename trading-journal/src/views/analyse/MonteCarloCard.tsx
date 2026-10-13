@@ -46,6 +46,22 @@ import { AnaCard, SEG_TOUCH, Stat, softTone, unitText } from "./ui";
 /** Paths drawn into the fan. */
 export const FAN_PATHS = 120;
 export const MC_MIN_TRADES = 10;
+
+/**
+ * What the simulation draws from (review F3 / F17): R when enough trades carry an R, else the money P&L of every
+ * closed trade – 11 closed trades of which 9 have a stop still simulate (in money) instead of claiming "fewer than 10".
+ * `sample` is null only when fewer than `MC_MIN_TRADES` trades are closed; `rCount` = closed trades with an R.
+ */
+export function mcSampleOf(
+  closed: readonly { r?: number | null; pnl?: number | null }[],
+  preferred: "R" | "money",
+): { sample: number[] | null; unit: "R" | "money"; rCount: number } {
+  const rs = finite(closed.map((t) => t.r ?? null));
+  if (preferred === "R" && rs.length >= MC_MIN_TRADES) return { sample: rs, unit: "R", rCount: rs.length };
+  const money = closed.map((t) => t.pnl ?? 0);
+  if (money.length >= MC_MIN_TRADES) return { sample: money, unit: "money", rCount: rs.length };
+  return { sample: null, unit: preferred, rCount: rs.length };
+}
 const FAN_H = 220;
 const PAD = { l: 4, r: 4, t: 10, b: 10 };
 
@@ -304,11 +320,7 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
   const method = useAnalyseUi((s) => s.mcMethod);
   const set = useAnalyseUi((s) => s.set);
   const closed = view.closed;
-  const unit = useMemo(() => breakdownUnit(closed), [closed]);
-  const sample = useMemo(() => {
-    const xs = unit === "R" ? finite(closed.map((t) => t.r)) : closed.map((t) => t.pnl ?? 0);
-    return xs.length >= MC_MIN_TRADES ? xs : null;
-  }, [closed, unit]);
+  const { sample, unit } = useMemo(() => mcSampleOf(closed, breakdownUnit(closed)), [closed]);
   const opts = { runs: 2000, horizon, method, seed: 1, keepPaths: FAN_PATHS, start: 0 };
   const key = `${sampleKey(sample)}:${unit}:${horizon}:${method}`;
   const mc = useMonteCarlo(sample, opts, key);
@@ -326,7 +338,11 @@ export function MonteCarloCard({ view, cur }: { view: AccountView; cur: string }
       note={sample ? `2000 Läufe · ${unit === "R" ? "in R" : `in ${cur}`} · gezogen aus ${sample.length} Trades` : undefined}
     >
       {!sample ? (
-        <EmptyState title={ANA_EMPTY.monteCarlo.title} text={ANA_EMPTY.monteCarlo.text} />
+        <EmptyState
+          title={ANA_EMPTY.monteCarlo.title}
+          text={closed.length ? `${ANA_EMPTY.monteCarlo.text} Bisher: ${closed.length}.` : ANA_EMPTY.monteCarlo.text}
+          line={closed.length ? false : undefined}
+        />
       ) : (
         <div className="relative grid gap-4" data-state={mc.status}>
           <div className="flex flex-wrap items-center gap-2" data-testid="mc-controls">

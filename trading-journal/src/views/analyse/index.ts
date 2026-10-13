@@ -1,7 +1,7 @@
 /** Analyse page (P03): pro statistics with honest uncertainty. See `README.md`. */
 export { AnalyseView, ANALYSE_LEAD_FILL, PREVIEW_ITEMS } from "./AnalyseView";
 export { KennzahlenHero, HERO_TILES } from "./KennzahlenHero";
-export { MonteCarloCard, fanGeometry, FAN_PATHS, MC_MIN_TRADES } from "./MonteCarloCard";
+export { MonteCarloCard, fanGeometry, FAN_PATHS, MC_MIN_TRADES, mcSampleOf } from "./MonteCarloCard";
 export { RiskOfRuinCard, ROR_MIN_TRADES } from "./RiskOfRuinCard";
 export { BreakdownCard, BREAKDOWN_ROWS } from "./BreakdownCard";
 export { HeatmapCard } from "./HeatmapCard";

@@ -14,7 +14,7 @@ import { MotionRoot } from "@/motion/MotionRoot";
 import { getAccountView, getEnriched, useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { monteCarlo } from "@/domain/analytics";
-import { AnalyseView, ANALYSE_WIDGETS, analyseDimFromQuery, analyseQuery, DEFAULT_DIM, fanGeometry, HERO_TILES, setAnalyseDim, useAnalyseUi } from "@/views/analyse";
+import { AnalyseView, ANALYSE_WIDGETS, analyseDimFromQuery, analyseQuery, DEFAULT_DIM, fanGeometry, HERO_TILES, mcSampleOf, setAnalyseDim, useAnalyseUi } from "@/views/analyse";
 import { fixtureTrades, SETTINGS } from "./analytics.fixtures";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
@@ -141,8 +141,9 @@ describe("AnalyseView", () => {
     const view = getAccountView(getEnriched(trades, settings), settings, "all");
     expect(screen.getByTestId("analyse-view")).toHaveAttribute("data-n", String(view.closed.length));
     expect(screen.getByTestId("ana-excursion")).toHaveTextContent("Noch keine MAE / MFE");
-    // 9 trades with a stop: too few to draw from
-    expect(screen.getByTestId("ana-mc")).toHaveTextContent("Monte Carlo braucht mindestens 10");
+    // 9 of 11 trades carry an R: Monte Carlo draws from the 11 money P&Ls instead of claiming "fewer than 10" (F3 / F17)
+    expect(screen.getByTestId("ana-mc")).not.toHaveTextContent("braucht mindestens");
+    expect(screen.getByTestId("ana-mc")).toHaveTextContent(`gezogen aus ${view.closed.length} Trades`);
     // the hero's sample follows aggregate()
     expect(aggregate(view.closed).n).toBe(view.closed.length);
   });
@@ -175,6 +176,22 @@ describe("router seam and widgets", () => {
     expect(g.band.endsWith("Z")).toBe(true);
     expect(fanGeometry(res, 0, 220)).toBeNull();
     expect(fanGeometry(monteCarlo([]), 400, 220)).toBeNull();
+  });
+
+  it("Monte Carlo sample: R when 10 trades carry one, else the money P&L of every closed trade (F3 / F17)", () => {
+    const t = (r: number | null, pnl: number) => ({ r, pnl });
+    // 11 closed, 9 with R → money, all 11
+    const mixed = [...Array.from({ length: 9 }, (_, i) => t(i % 2 ? 1 : -1, i % 2 ? 100 : -50)), t(null, 20), t(null, -10)];
+    expect(mcSampleOf(mixed, "R")).toMatchObject({ unit: "money", rCount: 9 });
+    expect(mcSampleOf(mixed, "R").sample).toHaveLength(11);
+    // 10 with R → R
+    const rich = [...mixed, t(2, 200)];
+    expect(mcSampleOf(rich, "R")).toMatchObject({ unit: "R", rCount: 10 });
+    expect(mcSampleOf(rich, "R").sample).toHaveLength(10);
+    // money preferred stays money
+    expect(mcSampleOf(rich, "money").unit).toBe("money");
+    // fewer than 10 closed → nothing to draw from
+    expect(mcSampleOf(mixed.slice(0, 7), "R")).toEqual({ sample: null, unit: "R", rCount: 7 });
   });
 
   it("dim query parsing", () => {
