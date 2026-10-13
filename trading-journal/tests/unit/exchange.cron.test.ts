@@ -6,7 +6,7 @@
  * The Supabase table is an in-memory fake that orders and updates like PostgREST; plan, store helpers and the sync
  * itself are mocked (the sync proper is covered by exchange.functions.test.ts).
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = Record<string, unknown>;
 const H = 3_600_000;
@@ -88,10 +88,18 @@ const conn = (id: string, user: string, lastSyncAgoMs: number | null): Row => ({
 });
 const run = (minutes: number) => {
   clock = NOW + minutes * 60_000;
+  // the cron's time budget reads the wall clock: it must agree with the run's "now"
+  vi.setSystemTime(clock);
   return runExchangeCron(clock);
 };
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
   db.rows = [];
   db.hasSchedule = true;
   synced.length = 0;
