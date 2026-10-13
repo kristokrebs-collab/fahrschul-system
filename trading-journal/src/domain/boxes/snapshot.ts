@@ -6,7 +6,7 @@
  * so the live store publishes only on a visible change.
  */
 import type { Side, Trade } from "../types";
-import type { BoxTf } from "./config";
+import { normalizeWatchSymbol, type BoxTf } from "./config";
 import type { BoxGrade, BoxPhase } from "./engine";
 import type { BoxAnalysis, BoxSetup, Grade, SetupKind } from "./setups";
 
@@ -59,9 +59,21 @@ export function parseBoxSnapshot(raw: unknown): BoxSnapshot | null {
   return raw as unknown as BoxSnapshot;
 }
 
+/**
+ * The trade's snapshot when it belongs to the trade's own pair (review MM-6): a snapshot of another symbol – stored by
+ * an older editor that always used the live market's symbol – says nothing about this trade and is ignored. A trade
+ * without a readable pair keeps its snapshot (nothing contradicts it).
+ */
+export function boxSnapOf(trade: Pick<Trade, "boxSnap"> & { pair?: string | null }): BoxSnapshot | null {
+  const snap = parseBoxSnapshot(trade.boxSnap);
+  if (!snap) return null;
+  const own = normalizeWatchSymbol(trade.pair ?? "");
+  return own && own !== snap.symbol.toUpperCase() ? null : snap;
+}
+
 /** Grade of the box setup on the trade's side at entry ("A+" … "C"), `null` when unknown – reader for P03/P07. */
-export function boxGradeOf(trade: Pick<Trade, "boxSnap">): Grade | null {
-  const g = parseBoxSnapshot(trade.boxSnap)?.setup?.grade;
+export function boxGradeOf(trade: Pick<Trade, "boxSnap"> & { pair?: string | null }): Grade | null {
+  const g = boxSnapOf(trade)?.setup?.grade;
   return GRADES.includes(g as Grade) ? (g as Grade) : null;
 }
 

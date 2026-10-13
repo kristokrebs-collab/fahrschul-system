@@ -82,7 +82,8 @@ vi.mock("@/market/marketStore", () => ({
 }));
 
 const { retainBoxes, getBoxes, subscribeBoxes, getBoxBars, closedBars, __boxStats, __resetBoxes } = await import("@/market/boxes/store");
-const { scanSymbol, getScan, retainScanner, scanNow, nextScanAt, lastClosedOpen, __resetScanner, SCAN_BUDGET } = await import("@/market/boxes/scanner");
+const { scanSymbol, getScan, retainScanner, scanNow, nextScanAt, lastClosedOpen, __resetScanner, SCAN_BUDGET, budgetedKlines } = await import("@/market/boxes/scanner");
+const { boxSnapCandidates, backfillBoxSnap, startBoxSnapBackfill, BOXSNAP_TRIED_KEY, BOXSNAP_START_MS, BOXSNAP_GAP_MS, BOXSNAP_RETRY_MS } = await import("@/market/boxes/backfill");
 const { evaluateBoxes, __resetBoxAlerts, startBoxAlerts, scanAlertKey, BOX_ALERTS_KEY } = await import("@/market/boxes/alerts");
 const { resolveTradeBoxes, tradeDateMs, barOpenOf, __resetBoxSnapshotMemo } = await import("@/market/boxes/snapshot");
 const { priceMv } = await import("@/market/motionValues");
@@ -657,11 +658,141 @@ describe("resolveTradeBoxes", () => {
     expect(fetchKlines).toHaveBeenCalledTimes(2);
   });
 
+  it("another pair (review MM-6): BTC's live box and the provider's BTC klines never answer for an ETH trade", async () => {
+    // the live store holds BTC, the entry lies in the current bar: a BTC trade gets the live context …
+    const now = NOW;
+    market.current = fakeProvider({ serverNow: () => now, fetchKlines: vi.fn() });
+    const release = retainBoxes();
+    feedsAt(now);
+    await vi.waitFor(() => expect(getBoxes().tfs["4h"]?.analysis).toBeTruthy());
+    const d = new Date(now - 60_000);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    expect((await resolveTradeBoxes(local, "long", { symbol: "BTCUSDT" }))?.symbol).toBe("BTCUSDT");
+    // … an ETH trade at the same moment gets none (no kline source for ETH) – never BTC's box
+    expect(await resolveTradeBoxes(local, "long", { symbol: "ETHUSDT" })).toBeNull();
+    expect((market.current as { fetchKlines: ReturnType<typeof vi.fn> }).fetchKlines).not.toHaveBeenCalled();
+    // the editor's save path passes the trade's pair (it used to resolve the live symbol for every pair)
+    const { boxSnapAt } = await import("@/overlays/TradeEditor");
+    expect(await boxSnapAt(local, "long", "ETH/USDT")).toBeNull();
+    expect((await boxSnapAt(local, "long", "BTC/USDT"))?.symbol).toBe("BTCUSDT");
+    expect(await boxSnapAt(local, "long", "")).toBeNull();
+    release();
+  });
+
+  it("another pair with its own kline source: the retro analysis of THAT symbol", async () => {
+    const entry = new Date((B4[1493]!.t + 3600) * 1000);
+    const at = entry.getTime();
+    const providerKlines = vi.fn();
+    market.current = fakeProvider({ fetchKlines: providerKlines, serverNow: () => at + 30 * DAY });
+    const klines = vi.fn(async (symbol: string, tf: string, o: { endTime: number; limit: number }) => {
+      expect(symbol).toBe("ETHUSDT");
+      const src = tf === "4h" ? B4 : B1;
+      const ms = tf === "4h" ? H4 : DAY;
+      return src.filter((b) => b.t * 1000 <= o.endTime).slice(-o.limit).map((b) => toCandle(b, ms, o.endTime));
+    });
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const local = `${entry.getFullYear()}-${pad(entry.getMonth() + 1)}-${pad(entry.getDate())}T${pad(entry.getHours())}:${pad(entry.getMinutes())}`;
+    const snap = await resolveTradeBoxes(local, "short", { symbol: "ETHUSDT", klines });
+    expect(snap).toMatchObject({ symbol: "ETHUSDT", source: "retro", tf: "4h" });
+    expect(klines.mock.calls.map((c) => c[1])).toEqual(["4h", "1d"]);
+    expect(providerKlines).not.toHaveBeenCalled();
+  });
+
   it("no provider / unreadable date / failing request → null", async () => {
     market.current = null;
     expect(await resolveTradeBoxes("2026-10-02T10:00", "long")).toBeNull();
     market.current = fakeProvider({ fetchKlines: vi.fn(() => Promise.reject(new Error("offline"))) });
     expect(await resolveTradeBoxes("2026-10-02T10:00", "long")).toBeNull();
     expect(await resolveTradeBoxes("kaputt", "long")).toBeNull();
+  });
+});
+
+// ------------------------------------------------------------------ snapshot backfill (review F02)
+
+describe("box snapshot backfill (F02): synced and imported trades get the context of their own pair", () => {
+  const snapOf = (symbol: string) => ({ v: 1, symbol, tf: "4h", at: 1, source: "retro", phase: "inside", dir: 0, pos: 0.5, zone: "mid", box: null, setup: null, htf: null, rsi: null });
+  const trade = (id: string, pair: string, extra: Record<string, unknown> = {}) =>
+    ({ id, pair, side: "long", status: "closed", date: "2026-10-01T10:00", entry: 1, account: "scalp", ...extra }) as unknown as import("@/domain/types").Trade;
+  const NOW_MS = Date.UTC(2026, 9, 12, 9, 30);
+
+  beforeEach(() => localStorage.removeItem(BOXSNAP_TRIED_KEY));
+
+  it("candidates: no snapshot of the own pair, a readable pair, a past entry, not tried within a day; newest first", () => {
+    const list = [
+      trade("a", "ETH/USDT", { date: "2026-09-01T10:00" }),
+      trade("b", "BTC/USDT", { boxSnap: snapOf("BTCUSDT") }), // has its own: done
+      trade("c", "ETH/USDT", { boxSnap: snapOf("BTCUSDT"), date: "2026-10-05T10:00" }), // foreign snapshot: missing (MM-6)
+      trade("d", "", {}), // no pair
+      trade("e", "SOL/USDT", { date: "2027-01-01T10:00" }), // future
+      trade("f", "XRP/USDT", {}),
+    ];
+    expect(boxSnapCandidates(list, {}, NOW_MS).map((t) => t.id)).toEqual(["c", "f", "a"]);
+    expect(boxSnapCandidates(list, { f: NOW_MS - 1000 }, NOW_MS).map((t) => t.id)).toEqual(["c", "a"]);
+    expect(boxSnapCandidates(list, { f: NOW_MS - BOXSNAP_RETRY_MS - 1 }, NOW_MS).map((t) => t.id)).toEqual(["c", "f", "a"]);
+  });
+
+  it("stores the resolved context; never over a changed trade, never a foreign symbol", async () => {
+    const t = trade("a", "ETH/USDT");
+    const saved: unknown[] = [];
+    const deps = { latest: () => t, save: async (x: unknown) => void saved.push(x) };
+    expect(await backfillBoxSnap(t, deps, async () => snapOf("ETHUSDT") as never)).toBe(true);
+    expect(saved[0]).toMatchObject({ id: "a", boxSnap: { symbol: "ETHUSDT" } });
+    // the resolver handed back another symbol: nothing stored
+    expect(await backfillBoxSnap(t, deps, async () => snapOf("BTCUSDT") as never)).toBe(false);
+    // the pair was edited meanwhile: nothing stored
+    expect(await backfillBoxSnap(t, { ...deps, latest: () => ({ ...t, pair: "SOL/USDT" }) }, async () => snapOf("ETHUSDT") as never)).toBe(false);
+    expect(saved).toHaveLength(1);
+  });
+
+  it("the idle queue: waits a minute, one trade per gap, remembers every attempt, looks again later", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW_MS);
+    const trades = [trade("a", "ETH/USDT"), trade("b", "SOL/USDT", { date: "2026-10-02T10:00" })];
+    const resolved: string[] = [];
+    const job = startBoxSnapBackfill(
+      {
+        trades: () => trades,
+        latest: (id) => trades.find((x) => x.id === id),
+        save: async (x) => {
+          trades.splice(trades.findIndex((y) => y.id === x.id), 1, x);
+        },
+      },
+      {
+        resolve: async (x) => {
+          resolved.push(x.id);
+          return x.id === "b" ? (snapOf("SOLUSDT") as never) : null;
+        },
+      },
+    );
+    await vi.advanceTimersByTimeAsync(BOXSNAP_START_MS - 100);
+    expect(resolved).toEqual([]);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(resolved).toEqual(["b"]);
+    await vi.advanceTimersByTimeAsync(BOXSNAP_GAP_MS + 100);
+    expect(resolved).toEqual(["b", "a"]);
+    expect(trades.find((x) => x.id === "b")!.boxSnap).toMatchObject({ symbol: "SOLUSDT" });
+    expect(Object.keys(JSON.parse(localStorage.getItem(BOXSNAP_TRIED_KEY)!))).toEqual(expect.arrayContaining(["a", "b"]));
+    // an imported trade arrives later in the session: picked up on the next look
+    trades.push(trade("c", "XRP/USDT", { date: "2026-10-03T10:00" }));
+    await vi.advanceTimersByTimeAsync(6 * 60_000);
+    expect(resolved).toEqual(["b", "a", "c"]);
+    job.stop();
+    vi.useRealTimers();
+  });
+
+  it("budgetedKlines: any symbol with an end time, through the scanner's own route", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 9, 12, 9, 30));
+    const net: Net = { log: [], fail: () => undefined, serverSkewMs: 0, proxyUp: true, wsUp: true };
+    __resetScanner({ rest: () => binanceRest({ fetch: makeFetch(net) }), proxy: () => proxyRest({ fetch: makeFetch(net) }), kv: () => memoryKV(), now: () => Date.now(), random: () => 0.5 });
+    const end = Date.UTC(2026, 8, 1);
+    const rows = await budgetedKlines("ETHUSDT", "4h", { endTime: end, limit: 100 });
+    expect(rows.length).toBeGreaterThan(0);
+    const url = requests(net, "/fapi/v1/klines")[0]!;
+    expect(url.searchParams.get("symbol")).toBe("ETHUSDT");
+    expect(url.searchParams.get("endTime")).toBe(String(end));
+    __resetScanner();
+    vi.useRealTimers();
   });
 });

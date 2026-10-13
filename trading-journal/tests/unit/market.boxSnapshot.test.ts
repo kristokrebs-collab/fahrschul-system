@@ -2,7 +2,9 @@
  * Box snapshot contract (`src/market/boxes/snapshot.ts`, Wave 0): the stored `Trade.boxSnap` is read defensively.
  */
 import { describe, expect, it } from "vitest";
-import { boxGradeOf, parseBoxSnapshot, resolveTradeBoxes, type BoxSnapshot } from "@/market/boxes/snapshot";
+import { boxGradeOf, boxSnapOf, parseBoxSnapshot, resolveTradeBoxes, type BoxSnapshot } from "@/market/boxes/snapshot";
+import { DIMENSIONS } from "@/domain/analytics/dimensions";
+import type { EnrichedTrade } from "@/domain/types";
 
 const SNAP: BoxSnapshot = {
   v: 1,
@@ -39,5 +41,24 @@ describe("box snapshot", () => {
   it("resolveTradeBoxes resolves a snapshot or null", async () => {
     const r = await resolveTradeBoxes("2026-10-02T10:00", "long");
     expect(r === null || parseBoxSnapshot(r) !== null).toBe(true);
+  });
+});
+
+describe("box snapshot of another pair (review MM-6)", () => {
+  it("readers ignore a snapshot whose symbol is not the trade's pair", () => {
+    expect(boxSnapOf({ pair: "BTC/USDT", boxSnap: SNAP })).toBe(SNAP);
+    expect(boxSnapOf({ pair: "BINANCE:BTCUSDT.P", boxSnap: SNAP })).toBe(SNAP);
+    expect(boxSnapOf({ pair: "ETH/USDT", boxSnap: SNAP })).toBeNull();
+    expect(boxGradeOf({ pair: "ETH/USDT", boxSnap: SNAP })).toBeNull();
+    expect(boxGradeOf({ pair: "BTC/USDT", boxSnap: SNAP })).toBe("A");
+    // no readable pair: nothing contradicts the stored context
+    expect(boxGradeOf({ pair: "", boxSnap: SNAP })).toBe("A");
+  });
+
+  it("Analyse „Box-Note“: an ETH trade carrying BTC's box lands in „Ohne Box“, not in BTC's grade", () => {
+    const ctx = { settings: { setups: [], capital: { makro: 0, scalp: 0 } } };
+    const keys = (pair: string) => DIMENSIONS.box.keys({ pair, boxSnap: SNAP } as unknown as EnrichedTrade, ctx);
+    expect(keys("BTC/USDT")).toEqual(["A"]);
+    expect(keys("ETH/USDT")).not.toContain("A");
   });
 });

@@ -37,7 +37,8 @@ import { HoldConfirm, confirmSwapMotion, useConfirmFocus } from "@/motion/HoldCo
 import { AutoHeight } from "@/views/trades/AutoHeight";
 import { DETAIL_DIM_HANDOFF } from "./TradeDetail";
 import { SAVE_CHECK_TIMEOUT_MS, SIGNAL_SECTION_TITLE, SignalSection, resolveTradeSignal, signalSectionSub, type MtfAuto } from "./SignalSection";
-import { resolveTradeBoxes, type BoxSnapshot } from "@/market/boxes/snapshot";
+import { boxSnapOf, resolveTradeBoxes, type BoxSnapshot } from "@/market/boxes/snapshot";
+import { normalizeWatchSymbol } from "@/domain/boxes/config";
 import { useEntitlement } from "@/billing/entitlements";
 
 /** P05 risk preview (limits, liquidation, risk %) – a lazy chunk of the editor (P14 slot). */
@@ -47,12 +48,16 @@ const ClassifyChipSlot = lazy(() => import("./slots/ClassifyChipSlot"));
 
 /**
  * P02 box context of the entry for `trade.boxSnap` (P14 save path): resolved next to the entry check and never waited
- * for longer than it (`SAVE_CHECK_TIMEOUT_MS`); `null` = no data (offline, another symbol, too little history).
+ * for longer than it (`SAVE_CHECK_TIMEOUT_MS`); `null` = no data (offline, too little history) – and for a pair other
+ * than the live market's: the editor never judges an ETH trade by BTC's box (review MM-6); the idle backfill
+ * (`BoxSnapBackfillHost`) resolves those from the pair's own klines later.
  */
-export function boxSnapAt(date: string, side: Side, timeoutMs = SAVE_CHECK_TIMEOUT_MS): Promise<BoxSnapshot | null> {
+export function boxSnapAt(date: string, side: Side, pair: string, timeoutMs = SAVE_CHECK_TIMEOUT_MS): Promise<BoxSnapshot | null> {
+  const symbol = normalizeWatchSymbol(pair);
+  if (!symbol) return Promise.resolve(null);
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(null), timeoutMs);
-    resolveTradeBoxes(date, side)
+    resolveTradeBoxes(date, side, { symbol })
       .then((snap) => resolve(snap), () => resolve(null))
       .finally(() => clearTimeout(timer));
   });
@@ -620,7 +625,8 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         let at = { date: d.date, side: t.side };
         // P02 box context, in parallel with the entry check (a draft that brought its own – the box card's setup – keeps it)
         const ownBoxes = !trade && draft?.boxSnap != null;
-        const boxesFor = (a: { date: string; side: Side }): Promise<BoxSnapshot | null> | null => (checking && !ownBoxes ? boxSnapAt(a.date, a.side) : null);
+        const boxesFor = (a: { date: string; side: Side }): Promise<BoxSnapshot | null> | null =>
+          checking && !ownBoxes ? boxSnapAt(a.date, a.side, latestRef.current.d.pair) : null;
         let boxes = boxesFor(at);
         let signal = checking ? await resolveTradeSignal(at.date, at.side) : undefined;
         // input typed while the check loaded is written with the trade: the form as it stands now (a date / side moved
@@ -655,8 +661,9 @@ export function TradeEditor({ livePrice, livePriceLabel = LIVE_PRICE_LABEL, onNe
         };
         if (trade?.id) record.id = trade.id;
         else delete record.id;
-        // a re-checked entry without box data drops the old context (it belonged to another time / side)
-        if (boxSnap === null) delete (record as Partial<Trade>).boxSnap;
+        // a re-checked entry without box data drops the old context (it belonged to another time / side), and so does
+        // a context of another pair (the pair was edited, or an older save took the live market's symbol – MM-6)
+        if (boxSnap === null || (record.boxSnap != null && !boxSnapOf(record))) delete (record as Partial<Trade>).boxSnap;
         // Journal v3: an empty v3 field writes no key (an untouched legacy trade gains nothing, a cleared one loses it)
         dropEmptyJournalKeys(record);
         // stored MAE / MFE were measured from the old entry / exit / stop: drop them, the backfill measures again

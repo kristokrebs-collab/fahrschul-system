@@ -45,6 +45,6 @@ export {
   type BoxesCfg,
   type MinGrade,
 } from "./config";
-export { bestSetupFor, boxGradeOf, boxIdOf, boxKey, parseBoxSnapshot, r6, toBoxSnapshot, type BoxSnapshot, type ToSnapshotOptions } from "./snapshot";
+export { bestSetupFor, boxGradeOf, boxSnapOf, boxIdOf, boxKey, parseBoxSnapshot, r6, toBoxSnapshot, type BoxSnapshot, type ToSnapshotOptions } from "./snapshot";
 // P02 box fix: where the newest box is live again after a breakout (the chart never spans the bars that closed outside)
 export { reentryIndex } from "./live";

@@ -132,7 +132,7 @@ describe("box snapshot of the save path (P02)", () => {
 
   it("resolves null without a provider and never waits longer than the entry check", async () => {
     vi.useFakeTimers();
-    const p = boxSnapAt("2026-10-01T10:00", "long", 50);
+    const p = boxSnapAt("2026-10-01T10:00", "long", "BTC/USDT", 50);
     await vi.advanceTimersByTimeAsync(60);
     await expect(p).resolves.toBeNull();
   });

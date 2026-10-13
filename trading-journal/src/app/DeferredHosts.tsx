@@ -16,6 +16,7 @@
  * | `ExchangeHost` | P11 | connect / dry-run / CSV sheets, server pulls (CSV works without cloud) |
  * | `SocialHost` | P12 | the share sheet |
  * | `ReplayHost`, `ExcursionBackfillHost` | P06 | trade replay sheet, idle MAE / MFE backfill |
+ * | `BoxSnapBackfillHost` | P02 | idle Box-zu-Box context at entry for synced / imported trades and other pairs (F02) |
  */
 import type { ReactNode } from "react";
 import { installE2eHooks } from "@/app/e2eHooks";
@@ -26,6 +27,7 @@ import { BillingHost } from "@/billing/ui/BillingHost";
 import { ExchangeHost } from "@/exchanges/ExchangeHost";
 import { ExcursionBackfillHost } from "@/journal/ExcursionBackfillHost";
 import { BoxAlertHost } from "@/market/boxes/alerts";
+import { BoxSnapBackfillHost } from "@/market/boxes/BoxSnapBackfillHost";
 import { SocialHost } from "@/social/ui/SocialHost";
 import { navigate } from "@/store/router";
 import { ReportReadyHost } from "@/views/berichte/ReportReady";
@@ -82,6 +84,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="MAE/MFE">
         <ExcursionBackfillHost />
+      </HostSlot>
+      <HostSlot name="Box-Kontext">
+        <BoxSnapBackfillHost />
       </HostSlot>
     </>
   );

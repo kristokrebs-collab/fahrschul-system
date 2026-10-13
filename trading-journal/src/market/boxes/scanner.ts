@@ -26,6 +26,7 @@ import { idbKV, type KVStore } from "../cache";
 import { binanceRest, type BinanceRest } from "../sources/binance";
 import { toRestError } from "../sources/http";
 import { proxyRest } from "../sources/proxy";
+import type { FetchInterval } from "../period";
 import type { Candle } from "../types";
 
 export type ScanTf = "4h" | "1d";
@@ -222,25 +223,38 @@ async function take(units: number): Promise<void> {
   }
 }
 
-async function klines(symbol: string, tf: ScanTf): Promise<Bar[]> {
-  const limit = SCAN_LIMIT[tf];
-  await take(klineWeight(limit));
-  const asOf = ctl.deps.now();
+/** One kline page through the scanner's budget and route (direct, then the same-origin proxy for the session). */
+async function fetchPage(symbol: string, tf: FetchInterval, p: { limit: number; endTime?: number }): Promise<Candle[]> {
+  await take(klineWeight(p.limit));
   const client = ctl.viaProxy ? ctl.deps.proxy() : ctl.deps.rest();
   if (!client) throw new Error("no client");
   try {
-    const res = await client.klines(symbol, tf, { limit });
-    return res.data.filter((c) => c.time + BOX_TF_MS[tf] <= asOf).map(toBar);
+    return (await client.klines(symbol, tf, p.endTime != null ? { limit: p.limit, endTime: p.endTime } : { limit: p.limit })).data;
   } catch (err) {
     const e = toRestError(err);
     if (e.kind === "rate_limited") ctl.bucket?.backoff(60_000, ctl.deps.now());
     // geo-block / CORS / network on the direct route: the rest of the session goes through the same-origin proxy
     if (!ctl.viaProxy && (e.kind === "blocked_451" || e.kind === "network" || e.kind === "cors") && ctl.deps.proxy()) {
       ctl.viaProxy = true;
-      return klines(symbol, tf);
+      return fetchPage(symbol, tf, p);
     }
     throw e;
   }
+}
+
+async function klines(symbol: string, tf: ScanTf): Promise<Bar[]> {
+  const asOf = ctl.deps.now();
+  const data = await fetchPage(symbol, tf, { limit: SCAN_LIMIT[tf] });
+  return data.filter((c) => c.time + BOX_TF_MS[tf] <= asOf).map(toBar);
+}
+
+/**
+ * Historic klines of ANY symbol (the newest `limit` bars up to `endTime`) through the scanner's own budget (≤ 20
+ * weight / min, never the live feeds' buckets) and route – for background jobs such as the box-snapshot backfill of
+ * imported trades (`./backfill.ts`). Works while the scanner itself is off.
+ */
+export function budgetedKlines(symbol: string, tf: FetchInterval, p: { endTime: number; limit: number }): Promise<Candle[]> {
+  return fetchPage(symbol, tf, { limit: Math.max(1, Math.min(1500, Math.round(p.limit))), endTime: p.endTime });
 }
 
 async function persist(symbol: string, d: SymData): Promise<void> {

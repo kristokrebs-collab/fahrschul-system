@@ -14,7 +14,7 @@
  * check by itself.
  * Every suggestion carries its reasons. Bulk: `classifyUntagged` for trades without any setup.
  */
-import { boxGradeOf, parseBoxSnapshot, type Grade, type SetupKind } from "../boxes";
+import { boxGradeOf, boxSnapOf, type Grade, type SetupKind } from "../boxes";
 import { MTF_SETUP_ID } from "../defaults";
 import { snapOf } from "../insights/signal";
 import { sessionOf, type SessionKey } from "../insights/time";
@@ -78,7 +78,8 @@ interface Facts {
 }
 
 function factsOf(t: Ctx): Facts {
-  const box = parseBoxSnapshot(t.boxSnap);
+  // only a snapshot of the trade's own pair (MM-6)
+  const box = boxSnapOf(t);
   const snap = snapOf(t as Parameters<typeof snapOf>[0]);
   return {
     side: t.side,

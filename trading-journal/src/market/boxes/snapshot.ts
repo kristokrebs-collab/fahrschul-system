@@ -8,7 +8,8 @@
  *   box store's analysis (no request);
  * - retro: `provider.fetchKlines(tf, { endTime })` for the closed bars before the entry plus the higher timeframe
  *   (1D for 4h, 1W for 1D) → the same pure analysis (closed bars only, no look-ahead), memoised per bar.
- * Resolves `null` when no data is available (offline, no provider, file build without klines, timeout).
+ * Resolves `null` when no data is available (offline, no provider, file build without klines, timeout) and for a
+ * symbol other than the provider's unless the caller passes a kline source (`opts.klines`).
  */
 import { analyzeBoxes, boxState, DEFAULT_BOX_CFG, HTF_OF, BOX_TF_MS, toBoxSnapshot, type BoxAnalysis, type BoxSnapshot, type BoxTf } from "@/domain/boxes";
 import type { Bar } from "@/domain/signals/indicators";
@@ -17,7 +18,10 @@ import { getProvider } from "../marketStore";
 import type { Candle } from "../types";
 import { getBoxes } from "./store";
 
-export { boxGradeOf, parseBoxSnapshot, toBoxSnapshot, type BoxSnapshot, type BoxTf } from "@/domain/boxes";
+export { boxGradeOf, boxSnapOf, parseBoxSnapshot, toBoxSnapshot, type BoxSnapshot, type BoxTf } from "@/domain/boxes";
+
+/** Historic klines of one symbol (newest `limit` bars up to `endTime`), e.g. the scanner's budgeted fetch. */
+export type SymbolKlines = (symbol: string, tf: BoxTf, p: { endTime: number; limit: number }) => Promise<readonly Candle[]>;
 
 export interface ResolveBoxesOptions {
   /** Default: the journal's market symbol (the running provider's symbol). */
@@ -25,6 +29,11 @@ export interface ResolveBoxesOptions {
   /** Default "4h". */
   tf?: BoxTf;
   signal?: AbortSignal;
+  /**
+   * Klines for a symbol OTHER than the provider's (retro only). Without it such a trade resolves `null` – the editor
+   * never fetches other symbols; the idle backfill (`./backfill.ts`) passes the scanner's budgeted fetch.
+   */
+  klines?: SymbolKlines;
 }
 
 /** Bars of a retro analysis per timeframe (the engine scans 700, the setups need ≥ 60). */
@@ -53,27 +62,32 @@ export const closedBefore = (cs: readonly Candle[], tf: BoxTf, atMs: number): Ba
 const memo = new Map<string, Promise<BoxAnalysis | null>>();
 const MEMO_MAX = 40;
 
-async function fetchClosed(tf: BoxTf, atMs: number, signal?: AbortSignal): Promise<Bar[]> {
-  const p = getProvider();
-  if (!p) return [];
-  const res = await p.fetchKlines(tf, { endTime: atMs, limit: RETRO_LIMIT[tf], maxWaitMs: 3000 });
+/** The provider's own klines (its budget and route) – only for the provider's symbol. */
+const providerKlines: SymbolKlines = async (_symbol, tf, p) => {
+  const prov = getProvider();
+  if (!prov) return [];
+  return (await prov.fetchKlines(tf, { endTime: p.endTime, limit: p.limit, maxWaitMs: 3000 })).data;
+};
+
+async function fetchClosed(source: SymbolKlines, symbol: string, tf: BoxTf, atMs: number, signal?: AbortSignal): Promise<Bar[]> {
+  const data = await source(symbol, tf, { endTime: atMs, limit: RETRO_LIMIT[tf] });
   if (signal?.aborted) return [];
-  return closedBefore(res.data, tf, atMs);
+  return closedBefore(data, tf, atMs);
 }
 
 /** The analysis of `tf` as of `atMs` from historic klines (memoised per symbol, timeframe and bar). */
-async function retroAnalysis(symbol: string, tf: BoxTf, atMs: number, signal?: AbortSignal): Promise<BoxAnalysis | null> {
+async function retroAnalysis(source: SymbolKlines, symbol: string, tf: BoxTf, atMs: number, signal?: AbortSignal): Promise<BoxAnalysis | null> {
   const bar = barOpenOf(atMs, tf);
   const key = `${symbol}:${tf}:${bar}:${Math.floor(atMs / 60_000)}`;
   const hit = memo.get(key);
   if (hit) return hit;
   const run = (async () => {
-    const bars = await fetchClosed(tf, atMs, signal);
+    const bars = await fetchClosed(source, symbol, tf, atMs, signal);
     if (bars.length < 60) return null;
     const htfTf = HTF_OF[tf];
     let htf: { tf: string; state: ReturnType<typeof boxState> } | null = null;
     if (htfTf) {
-      const hb = await fetchClosed(htfTf, atMs, signal).catch(() => [] as Bar[]);
+      const hb = await fetchClosed(source, symbol, htfTf, atMs, signal).catch(() => [] as Bar[]);
       if (hb.length >= 60) htf = { tf: htfTf, state: boxState(hb, DEFAULT_BOX_CFG) };
     }
     // the top-trader read is not known retro (Binance keeps ~30 days, not at every bar): the bias reason stays open
@@ -117,8 +131,11 @@ export async function resolveTradeBoxes(date: string, side: Side, opts: ResolveB
   const view = getBoxes();
   const live = view.symbol === symbol ? view.tfs[tf]?.analysis : null;
   if (live && barOpenOf(atMs, tf) >= barOpenOf(now, tf) - BOX_TF_MS[tf]) return toBoxSnapshot(live, { symbol, tf, side, source: "live" });
-  if (!p || p.symbol.toUpperCase() !== symbol) return null; // retro needs the provider of that symbol
-  const a = await withTimeout(retroAnalysis(symbol, tf, atMs, opts.signal), RESOLVE_TIMEOUT_MS, opts.signal);
+  // retro: the provider for its own symbol; another symbol only with an explicit kline source (never the provider's
+  // klines of a DIFFERENT symbol – that was review MM-6: an ETH trade stored with BTC's box)
+  const source = p && p.symbol.toUpperCase() === symbol ? providerKlines : (opts.klines ?? null);
+  if (!source) return null;
+  const a = await withTimeout(retroAnalysis(source, symbol, tf, atMs, opts.signal), RESOLVE_TIMEOUT_MS, opts.signal);
   return a ? toBoxSnapshot(a, { symbol, tf, side, source: "retro" }) : null;
 }
 
