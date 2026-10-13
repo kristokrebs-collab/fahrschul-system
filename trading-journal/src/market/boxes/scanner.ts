@@ -3,8 +3,12 @@
  * (Binance USDT perpetuals, default ~10), listing ONLY the setups that pass the minimum grade (A+ / A), best score
  * first. `useScan()` / `getScan()` / `subscribeScan()` / `retainScanner()` / `scanNow()`.
  *
- * - Data: per symbol one 4h page (499 bars, weight 2) and one 1D page (300 bars, weight 2) from `binanceRest().klines`;
- *   the 1D boxes grade the 4h setups (higher timeframe). Closed bars only. No top-trader read for other symbols (the
+ * - Data: per symbol one 4h page (499 bars, weight 2) and one 1D page (300 bars, weight 2) from `binanceRest().klines`,
+ *   plus one 1W page (200 bars, weight 2) once per closed week (reused from the cache until a new week closed). The
+ *   owner's rule is support / resistance on 4h / 1D / 1W: the 1D boxes grade the 4h setups, the 1W boxes grade the 1D
+ *   setups (exactly like the Markt page – Review MM-8: a 1D setup the weekly box speaks against is no "Scanner: A+"),
+ *   and 1W setups are listed too (Review F16). Without a weekly page yet (an old cache) the 1D series aggregated to
+ *   Monday weeks stands in as the 1D's higher timeframe. Closed bars only. No top-trader read for other symbols (the
  *   reason stays open – never invented).
  * - Cadence: once on start (from the cache when it is current), then after every 4h close (UTC) plus a 20–80 s jitter;
  *   `scanNow()` on demand. Nothing runs while no one retains it or the tab is hidden (an overdue scan runs on return).
@@ -17,6 +21,7 @@
  */
 import { startTransition, useEffect, useState } from "react";
 import { analyzeBoxes, boxesCfgKey, boxesCfgOf, boxState, BOX_TF_MS, DEFAULT_BOXES_CFG, gradePasses, type BoxesCfg, type BoxPhase, type BoxSetup } from "@/domain/boxes";
+import { toWeekly, weekOpenS } from "@/domain/backtest/bars";
 import type { Bar } from "@/domain/signals/indicators";
 import { isFileProtocol, IS_FILE_BUILD } from "@/edition";
 import { useJournal } from "@/store/journalStore";
@@ -29,8 +34,10 @@ import { proxyRest } from "../sources/proxy";
 import type { FetchInterval } from "../period";
 import type { Candle } from "../types";
 
-export type ScanTf = "4h" | "1d";
-export const SCAN_LIMIT: Readonly<Record<ScanTf, number>> = { "4h": 499, "1d": 300 };
+export type ScanTf = "4h" | "1d" | "1w";
+export const SCAN_LIMIT: Readonly<Record<ScanTf, number>> = { "4h": 499, "1d": 300, "1w": 200 };
+/** Bars a scan reads per symbol: 4h and 1D always, 1W when fetched (once per closed week). */
+export type ScanBars = Record<"4h" | "1d", readonly Bar[]> & { "1w"?: readonly Bar[] };
 /** The scanner's own budget: ≤ 20 Binance weight per minute. */
 export const SCAN_BUDGET = { capacity: 20, windowMs: 60_000 } as const;
 /** Jitter after a 4h close before the scan starts (the exchange needs a moment; many clients hit :00 exactly). */
@@ -92,7 +99,7 @@ const defaultDeps = (): ScannerDeps => ({
 });
 
 interface SymData {
-  bars: Record<ScanTf, Bar[]>;
+  bars: Record<"4h" | "1d", Bar[]> & { "1w"?: Bar[] };
   fetchedAt: number;
 }
 
@@ -143,9 +150,10 @@ const toBar = (c: Candle): Bar => ({ t: c.time / 1000, o: c.open, h: c.high, l: 
 const settingsBoxes = (s: unknown): unknown => (s && typeof s === "object" ? (s as { boxes?: unknown }).boxes : undefined);
 const cacheKeyOf = (symbol: string, tf: ScanTf): string => `${SCAN_CACHE_PREFIX}:${symbol}:${tf}`;
 
-/** Open time of the newest 4h bar that has closed at `now`. */
+/** Open time of the newest bar of `tf` that has closed at `now` (weeks open Monday 00:00 UTC, like Binance's). */
 export function lastClosedOpen(now: number, tf: ScanTf = "4h"): number {
   const iv = BOX_TF_MS[tf];
+  if (tf === "1w") return weekOpenS(Math.floor(now / 1000)) * 1000 - iv;
   return Math.floor(now / iv) * iv - iv;
 }
 
@@ -156,18 +164,29 @@ export function nextScanAt(now: number, random: () => number): number {
   return Math.floor(now / iv) * iv + iv + lo + Math.round(random() * (hi - lo));
 }
 
-/** Setups of one symbol that pass the grade (pure: closed 4h + 1D bars). */
-export function scanSymbol(symbol: string, bars: Record<ScanTf, readonly Bar[]>, cfg: BoxesCfg): ScanRow[] {
+/** Weekly bars the 1W analysis needs at least (findBoxes needs ~30; fewer → no weekly context). */
+const MIN_WEEKS = 30;
+
+/**
+ * Setups of one symbol that pass the grade (pure: closed 4h + 1D bars, 1W when given). Each timeframe is graded with the
+ * next higher one, as on the Markt page: 4h with 1D, 1D with 1W (the given weekly page, else 1D aggregated to weeks);
+ * 1W setups are listed only from a real weekly page.
+ */
+export function scanSymbol(symbol: string, bars: ScanBars, cfg: BoxesCfg): ScanRow[] {
   const out: ScanRow[] = [];
   const d1 = bars["1d"];
-  const htfState = d1.length >= 60 ? boxState(d1, cfg.box) : null;
-  const runs: Array<[ScanTf, ReturnType<typeof analyzeBoxes>]> = [
-    ["4h", analyzeBoxes({ tf: "4h", bars: bars["4h"], htf: htfState ? { tf: "1d", state: htfState } : null, boxCfg: cfg.box })],
-    ["1d", analyzeBoxes({ tf: "1d", bars: d1, boxCfg: cfg.box })],
+  const w1Page = bars["1w"]?.length ? bars["1w"] : null;
+  const w1 = w1Page ?? toWeekly(d1);
+  const d1State = d1.length >= 60 ? boxState(d1, cfg.box) : null;
+  const w1State = w1.length >= MIN_WEEKS ? boxState(w1, cfg.box) : null;
+  const runs: Array<[ScanTf, readonly Bar[], ReturnType<typeof analyzeBoxes>]> = [
+    ["4h", bars["4h"], analyzeBoxes({ tf: "4h", bars: bars["4h"], htf: d1State ? { tf: "1d", state: d1State } : null, boxCfg: cfg.box })],
+    ["1d", d1, analyzeBoxes({ tf: "1d", bars: d1, htf: w1State ? { tf: "1w", state: w1State } : null, boxCfg: cfg.box })],
   ];
-  for (const [tf, a] of runs) {
+  if (w1Page && w1Page.length >= MIN_WEEKS) runs.push(["1w", w1Page, analyzeBoxes({ tf: "1w", bars: w1Page, boxCfg: cfg.box })]);
+  for (const [tf, series, a] of runs) {
     if (!a) continue;
-    const last = bars[tf][bars[tf].length - 1]!;
+    const last = series[series.length - 1]!;
     for (const s of a.setups) {
       if (!s.best || !gradePasses(s.grade, cfg.minGrade)) continue;
       const b = a.box.box;
@@ -261,7 +280,10 @@ async function persist(symbol: string, d: SymData): Promise<void> {
   const kv = ctl.deps.kv();
   if (!kv) return;
   try {
-    for (const tf of ["4h", "1d"] as const) await kv.set(cacheKeyOf(symbol, tf), { fetchedAt: d.fetchedAt, bars: d.bars[tf].map((b) => [b.t, b.o, b.h, b.l, b.c]) });
+    for (const tf of ["4h", "1d", "1w"] as const) {
+      const series = d.bars[tf];
+      if (series) await kv.set(cacheKeyOf(symbol, tf), { fetchedAt: d.fetchedAt, bars: series.map((b) => [b.t, b.o, b.h, b.l, b.c]) });
+    }
   } catch {
     /* private mode / quota: the scan still works, only the reload cache is missing */
   }
@@ -275,10 +297,10 @@ async function hydrate(): Promise<void> {
   for (const symbol of ctl.cfg.watchlist) {
     if (ctl.data.has(symbol)) continue;
     try {
-      const raw = await Promise.all((["4h", "1d"] as const).map((tf) => kv.get(cacheKeyOf(symbol, tf)) as Promise<{ fetchedAt?: number; bars?: number[][] } | undefined>));
+      const raw = await Promise.all((["4h", "1d", "1w"] as const).map((tf) => kv.get(cacheKeyOf(symbol, tf)) as Promise<{ fetchedAt?: number; bars?: number[][] } | undefined>));
       if (!raw[0]?.bars || !raw[1]?.bars) continue;
       const bars = (x: number[][]): Bar[] => x.map(([t, o, h, l, c]) => ({ t: t!, o: o!, h: h!, l: l!, c: c! }));
-      const d: SymData = { bars: { "4h": bars(raw[0].bars), "1d": bars(raw[1].bars) }, fetchedAt: raw[0].fetchedAt ?? 0 };
+      const d: SymData = { bars: { "4h": bars(raw[0].bars), "1d": bars(raw[1].bars), ...(raw[2]?.bars ? { "1w": bars(raw[2].bars) } : null) }, fetchedAt: raw[0].fetchedAt ?? 0 };
       ctl.data.set(symbol, d);
       rowsFor(symbol, d); // analysed here, one symbol per task (between the cache reads), not all at once below
     } catch {
@@ -291,6 +313,8 @@ async function hydrate(): Promise<void> {
 
 /** Is the symbol's cached 4h series current (holds the newest closed bar)? */
 const isCurrent = (d: SymData | undefined, now: number): boolean => !!d && (d.bars["4h"].at(-1)?.t ?? 0) * 1000 >= lastClosedOpen(now);
+/** Does the cached weekly series hold the newest closed week? (one weekly page per symbol and week) */
+const weekCurrent = (w: readonly Bar[] | undefined, now: number): boolean => !!w?.length && w[w.length - 1]!.t * 1000 >= lastClosedOpen(now, "1w");
 
 async function runScan(symbols: readonly string[], force: boolean): Promise<void> {
   const now0 = ctl.deps.now();
@@ -307,7 +331,9 @@ async function runScan(symbols: readonly string[], force: boolean): Promise<void
     try {
       const h4 = await klines(symbol, "4h");
       const d1 = await klines(symbol, "1d");
-      const d: SymData = { bars: { "4h": h4, "1d": d1 }, fetchedAt: ctl.deps.now() };
+      const held = ctl.data.get(symbol)?.bars["1w"];
+      const w1 = weekCurrent(held, ctl.deps.now()) ? held! : await klines(symbol, "1w").catch(() => held);
+      const d: SymData = { bars: { "4h": h4, "1d": d1, ...(w1?.length ? { "1w": w1 } : null) }, fetchedAt: ctl.deps.now() };
       ctl.data.set(symbol, d);
       void persist(symbol, d);
     } catch {

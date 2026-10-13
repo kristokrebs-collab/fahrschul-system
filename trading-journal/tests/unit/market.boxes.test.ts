@@ -27,6 +27,7 @@ import {
   WATCHLIST_MAX,
 } from "@/domain/boxes";
 import type { Bar } from "@/domain/signals/indicators";
+import { toWeekly } from "@/domain/backtest/bars";
 import { buildFeedSpecs } from "@/market/feeds";
 import { initialHealth } from "@/market/health";
 import { memoryKV, type KVStore } from "@/market/cache";
@@ -454,6 +455,32 @@ describe("watchlist scanner", () => {
     vi.useRealTimers();
   });
 
+  it("1D setups are graded with the 1W boxes like on the Markt page; 1W setups are listed from a weekly page (Review MM-8, F16)", () => {
+    // 20.04.2026: the 1D fakeout short is A+ without context, but the weekly box (target reached downward) costs it the
+    // "higher timeframe" reason → A, so the scanner no longer fires "Scanner: A+" against the weekly picture
+    const cut = 825;
+    const d1 = B1.slice(cut - 300, cut);
+    const w1 = toWeekly(B1.slice(0, cut)).slice(-200);
+    const cfg = boxesCfgOf(undefined);
+    const without = analyzeBoxes({ tf: "1d", bars: d1 })!.setups.find((x) => x.best)!;
+    expect(without).toMatchObject({ kind: "fakeout", side: "short", grade: "A+" });
+    const rows = scanSymbol("BTCUSDT", { "4h": [], "1d": d1, "1w": w1 }, cfg);
+    const d1Row = rows.find((r) => r.tf === "1d" && r.setup.kind === "fakeout")!;
+    expect(d1Row.setup.grade).toBe("A");
+    expect(d1Row.setup.reasons.find((x) => x.text.startsWith("Höherer Timeframe"))!.ok).toBe(false);
+    // without a weekly page the 1D series aggregated to weeks stands in (never "no context")
+    const fallback = scanSymbol("BTCUSDT", { "4h": [], "1d": B1.slice(0, cut), }, cfg).find((r) => r.tf === "1d" && r.setup.kind === "fakeout");
+    expect(fallback?.setup.grade ?? "A").toBe("A");
+    // 1W rows come only from a real weekly page, graded like the others
+    for (let end = w1.length - 30; end <= w1.length; end++) {
+      for (const r of scanSymbol("BTCUSDT", { "4h": [], "1d": [], "1w": w1.slice(0, end) }, cfg)) {
+        expect(r.tf).toBe("1w");
+        expect(["A+", "A"]).toContain(r.setup.grade);
+      }
+    }
+    expect(scanSymbol("BTCUSDT", { "4h": [], "1d": d1 }, cfg).some((r) => r.tf === "1w")).toBe(false);
+  });
+
   it("pure: only setups at the minimum grade, best score first", () => {
     const now = (B4[1493]!.t + 3600) * 1000;
     const h4 = B4.slice(733, 1493);
@@ -473,7 +500,7 @@ describe("watchlist scanner", () => {
     expect(lastClosedOpen(now)).toBe(Date.UTC(2026, 9, 12, 4));
   });
 
-  it("its own budget: ≤ 20 weight per minute (10 symbols × 2 pages × weight 2 take ~2 minutes)", { timeout: 20_000 }, async () => {
+  it("its own budget: ≤ 20 weight per minute (10 symbols × 3 pages (4h, 1D, 1W) × weight 2 take ~3 minutes; the weekly page once per week)", { timeout: 20_000 }, async () => {
     const release = retainScanner();
     await vi.advanceTimersByTimeAsync(1000);
     const first = requests(net, "/fapi/v1/klines").length;
@@ -482,8 +509,9 @@ describe("watchlist scanner", () => {
     expect(getScan().progress).toMatchObject({ total: 10 });
     await vi.advanceTimersByTimeAsync(60 * SEC);
     expect(requests(net, "/fapi/v1/klines").length).toBeLessThanOrEqual(first + 11);
-    await vi.advanceTimersByTimeAsync(70 * SEC);
-    expect(requests(net, "/fapi/v1/klines").length).toBe(20);
+    await vi.advanceTimersByTimeAsync(130 * SEC);
+    expect(requests(net, "/fapi/v1/klines").length).toBe(30);
+    expect(requests(net, "/fapi/v1/klines").filter((u) => u.searchParams.get("interval") === "1w")).toHaveLength(10);
     expect(getScan().state).toBe("ok");
     expect(getScan().lastScanAt).not.toBeNull();
     expect(getScan().nextScanAt).toBe(nextScanAt(Date.now(), () => 0.5));
@@ -497,7 +525,7 @@ describe("watchlist scanner", () => {
     net.fail = (_u, host) => (host === "binance" ? 451 : undefined);
     const release = retainScanner();
     await vi.advanceTimersByTimeAsync(2000);
-    expect(requests(net, "/api/binance/fapi/v1/klines").length).toBe(4);
+    expect(requests(net, "/api/binance/fapi/v1/klines").length).toBe(6); // 4h, 1D, 1W per symbol
     expect(getScan().viaProxy).toBe(true);
     expect(getScan().state).toBe("ok");
     expect(await kv.keys()).toEqual(expect.arrayContaining([expect.stringContaining(":BTCUSDT:4h"), expect.stringContaining(":ETHUSDT:1d")]));
@@ -702,7 +730,8 @@ describe("resolveTradeBoxes", () => {
     expect(fetchKlines).toHaveBeenCalledTimes(2);
   });
 
-  it("another pair (review MM-6): BTC's live box and the provider's BTC klines never answer for an ETH trade", async () => {
+  // the dynamic import of the whole trade editor below is a cold transform of ~4 s on a busy machine
+  it("another pair (review MM-6): BTC's live box and the provider's BTC klines never answer for an ETH trade", { timeout: 20_000 }, async () => {
     // the live store holds BTC, the entry lies in the current bar: a BTC trade gets the live context …
     const now = NOW;
     market.current = fakeProvider({ serverNow: () => now, fetchKlines: vi.fn() });
