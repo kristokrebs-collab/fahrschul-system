@@ -24,7 +24,6 @@ import type {
   ISeriesApi,
   ISeriesPrimitive,
   ISeriesPrimitiveAxisView,
-  Logical,
   PrimitivePaneViewZOrder,
   SeriesAttachedParameter,
   SeriesType,
@@ -34,6 +33,7 @@ import type { SignalState } from "@/domain/signals/state";
 import { AXIS_LABEL_GAP } from "../axisLabels";
 import { fmt } from "../format";
 import { ink, withAlpha } from "../ink";
+import { logicalToX } from "../logicalX";
 import { axisLabelClear, barIndex, barIndexAtOrAfter, estimateTextWidth, LINE_NUDGE, placeLabels, type Box, type LabelCandidate } from "../overlayLayout";
 import { signalDots, type SignalDot, type SignalMarker } from "../signalMarkers";
 
@@ -651,7 +651,10 @@ export class SignalOverlay implements ISeriesPrimitive<Time> {
     this.geoIx = ix;
     const lo = Math.floor(vis.from) - 2;
     const hi = Math.ceil(vis.to) + 2;
-    const xOf = (i: number): number | null => ts.logicalToCoordinate(i as Logical);
+    // snapped (`logicalToX`): the geometry is memoised on the visible range, which reads the same for a bar spacing one
+    // ulp off – the labels and dashes are rounded to whole pixels at half-pixel bar centres and must not flip between
+    // two draws of the same view
+    const xOf = (i: number): number | null => logicalToX(ts, i);
     const g: Geometry = { bands: [], hlines: [], segs: [], divs: [], dots: [], labels: [] };
     const cands: LabelCandidate<{ text: string; color: string; px: number; alpha: number }>[] = [];
     const obstacles: Box[] = [{ x: width - RIGHT_RESERVED, y: 0, w: RIGHT_RESERVED, h: height }, ...reserved];

@@ -47,6 +47,15 @@ const LIFT = { scale: 1.03, y: -2 } as const;
  * width per character in em (mono advance + tracking): `fitLabel` sizes the label from it.
  */
 const LABEL_FIT = "[--label-k:0.74] max-sm:[--label-k:0.68] @max-[11rem]:[--label-k:0.68]";
+/**
+ * Label and value are sized from the outline advance of IBM Plex Mono (0.6 em, `fitLabel` / `fitValue`). Hinted text
+ * does not keep it: with medium / full hinting (a Linux desktop set to it; the headless Chromium of the CI runner shows
+ * the same widths) Chromium sets each glyph at the hinted advance of the whole-px size – 10.5 px → 7 px instead of
+ * 6.3 px, 11 % wider – and `ERWARTUNGSWERT` (110 instead of 100 px) no longer fits the 104 px a 390 px phone leaves it.
+ * `geometricPrecision` lays the text out at the outline advances everywhere, so the model holds; text that is laid
+ * out that way already (subpixel positioning: macOS, iOS, Android, unhinted Linux) does not change.
+ */
+const FIT_TEXT = "[text-rendering:geometricPrecision]";
 const REST = { scale: 1, y: 0 } as const;
 /** Value type: 17 px, IBM Plex Mono advance 0.6 em; the tile's horizontal padding + border (px-3 + 2 × 1 px). */
 const VALUE_PX = 17;
@@ -166,7 +175,7 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
             animate={{ opacity: lifted ? 1 : 0 }}
             transition={tween.crossfade}
           />
-          <motion.div layout="position" layoutDependency={active} className="relative">
+          <motion.div layout="position" layoutDependency={active} className={cn("relative", FIT_TEXT)}>
             <MorphTitle id={`fact-${fact}`} as="dt" className={cn("label flex items-center justify-between gap-1 whitespace-nowrap", LABEL_FIT)}>
               <span className="truncate" style={fitLabel(label.length)}>
                 {label}
