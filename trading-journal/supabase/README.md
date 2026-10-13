@@ -74,7 +74,10 @@ the own rows, a user without 2FA keeps working with aal1, and `anon` is refused 
   (credits / commissions, unique per `(stripe_invoice_id, kind)` so a retried webhook never pays twice; the invoice id is
   not client-readable).
 - **`stripe_events`** (`id` = `evt_…`): webhook idempotency – processed, attempts, last error; service role only.
-- Account deletion: the referrer keeps the history (`referred_id` → `null`), everything else of the user cascades.
+- Account deletion: the referrer keeps the history (`referred_id` → `null`), everything else of the user cascades. The
+  cascade of `team_seats` alone would leave the members on the Team plan, so `account-delete` releases a team owner's
+  seats through `releaseSeat` first (each member's plan is recomputed); a webhook for the deleted user fails the FK
+  (23503) and is acknowledged as `ignored`.
 
 0002 was checked on PGlite (Postgres 17) with the 0001 shims (`scratchpad` script, not committed): own-row visibility
 for every table, refused client writes, hidden columns (`referred_id`, `stripe_invoice_id`), the code / id checks, the

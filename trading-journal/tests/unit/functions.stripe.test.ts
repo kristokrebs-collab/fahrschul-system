@@ -53,7 +53,18 @@ const UNIQUE: Record<string, string[][]> = {
   team_seats: [["member_id"]],
 };
 
+/** Foreign keys to auth.users per table (0002): a write for a deleted user fails with 23503, like Postgres. */
+const USER_FKS: Record<string, string[]> = {
+  subscriptions: ["user_id"],
+  billing_customers: ["user_id"],
+  referrals: ["referrer_id", "referred_id"],
+  affiliate_ledger: ["referrer_id"],
+  team_seats: ["owner_id", "member_id"],
+};
+
 interface Db {
+  /** Users removed by `auth.admin.deleteUser` (their rows are gone; new rows pointing at them violate the FK). */
+  deletedUsers: Set<string>;
   tables: Record<string, Row[] | undefined>;
   seq: number;
   rpcHits: number;
@@ -80,6 +91,7 @@ function query(db: Db, table: string) {
     if (op === "insert" || op === "upsert") {
       for (const raw of Array.isArray(payload) ? payload : [payload]) {
         const row: Row = { ...raw };
+        if ((USER_FKS[table] ?? []).some((c) => typeof row[c] === "string" && db.deletedUsers.has(row[c] as string))) return { data: null, error: { code: "23503" } };
         if ((table === "referrals" || table === "affiliate_ledger") && row.id === undefined) row.id = ++db.seq;
         row.updated_at ??= new Date(Date.now() + ++db.seq).toISOString();
         row.created_at ??= new Date().toISOString();
@@ -136,6 +148,7 @@ const tokenFor = (sub: string, aal: "aal1" | "aal2" = "aal1") => `eyJhbGciOiJFUz
 
 function fakeDb(): Db {
   const db: Db = {
+    deletedUsers: new Set(),
     tables: {
       profiles: [U1, U2, U3].map((id) => ({ id, plan: "free", plan_status: "none", trial_end: null })),
       subscriptions: [],
@@ -728,6 +741,25 @@ describe("POST /api/v1/stripe/webhook", () => {
     stripe.subs.set("sub_x", stripeSub("sub_x", { customer: "cus_unknown" }));
     expect((await deliver(event("customer.subscription.created", stripe.subs.get("sub_x")))).body.result).toBe("ignored");
     expect((await deliver(event("charge.refunded", { id: "ch_1" }))).body.result).toBe("ignored");
+  });
+
+  it("events for a deleted account are acknowledged as ignored, never a 502 loop (review MONEY-01)", async () => {
+    stripe.subs.set("sub_t", stripeSub("sub_t", { customer: "cus_t", user: U1, price: "price_team_m", quantity: 3, status: "active", trialEnd: null }));
+    await deliver(event("customer.subscription.created", stripe.subs.get("sub_t")));
+    expect(db.tables.subscriptions).toHaveLength(1);
+    // account-delete: Stripe cancelled first, then auth.admin.deleteUser cascades the user's billing rows
+    db.deletedUsers.add(U1);
+    for (const t of ["subscriptions", "billing_customers", "team_seats"]) db.tables[t] = db.tables[t]!.filter((r) => r.user_id !== U1 && r.owner_id !== U1);
+    db.tables.profiles = db.tables.profiles!.filter((p) => p.id !== U1);
+    stripe.subs.set("sub_t", stripeSub("sub_t", { customer: "cus_t", user: U1, price: "price_team_m", quantity: 3, status: "canceled", trialEnd: null }));
+    const res = await deliver(event("customer.subscription.deleted", stripe.subs.get("sub_t"), NOW + 5));
+    expect(res).toMatchObject({ status: 200, body: { received: true, result: "ignored" } });
+    expect(db.tables.subscriptions).toHaveLength(0);
+    const late = await deliver(
+      event("checkout.session.completed", { id: "cs_9", mode: "subscription", client_reference_id: U1, customer: "cus_t", subscription: "sub_t", metadata: {} }),
+    );
+    expect(late).toMatchObject({ status: 200, body: { result: "ignored" } });
+    expect(db.tables.stripe_events!.every((e) => e.processed_at)).toBe(true);
   });
 
   it("invoice.paid credits the referrer once (Stripe balance, idempotent) and marks the referral paying", async () => {

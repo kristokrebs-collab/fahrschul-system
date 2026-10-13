@@ -337,12 +337,15 @@ async function userForCustomer(customerId: string): Promise<string | null> {
   return validUuid((sub as { user_id?: string } | null)?.user_id);
 }
 
-/** Links the user to a Stripe customer (the first link wins). */
+/** Postgres foreign-key violation: the user the row points to no longer exists (account deleted). */
+const FK_VIOLATION = "23503";
+
+/** Links the user to a Stripe customer (the first link wins; a deleted account is skipped). */
 export async function linkCustomer(userId: string, customerId: string): Promise<void> {
   const { error } = await supabaseAdmin()
     .from("billing_customers")
     .upsert({ user_id: userId, stripe_customer_id: customerId }, { onConflict: "user_id", ignoreDuplicates: true });
-  if (error && !isMissingTable(error) && error.code !== "23505") dbFail("billing_customers write", error);
+  if (error && !isMissingTable(error) && error.code !== "23505" && error.code !== FK_VIOLATION) dbFail("billing_customers write", error);
 }
 
 /** The best plan a user is entitled to: own granting subscriptions and a team seat of an owner with a live team plan. */
@@ -401,7 +404,15 @@ export async function syncSubscription(
   }
   if (Number.isFinite(storedAt) && (!opts.eventAt || storedAt > opts.eventAt * 1000)) row.last_event_at = prevRow!.last_event_at!;
   const { error } = await sb.from("subscriptions").upsert(row, { onConflict: "id" });
-  if (error) dbFail("subscriptions write", error);
+  if (error) {
+    // the account was deleted (its rows cascaded away, e.g. the `customer.subscription.deleted` that follows the
+    // cancellation in account-delete): nothing to store – acknowledge instead of letting Stripe retry for days
+    if (error.code === FK_VIOLATION) {
+      console.error("[fn] subscription of a deleted account", sub.id);
+      return null;
+    }
+    dbFail("subscriptions write", error);
+  }
   await linkCustomer(userId, customer);
   const plan = await recomputePlan(userId);
   if (row.plan === "team") await recomputeMembers(userId);
@@ -445,6 +456,22 @@ export async function releaseSeat(ownerId: string, memberId: string): Promise<Pl
   const { error } = await supabaseAdmin().from("team_seats").delete().eq("owner_id", ownerId).eq("member_id", memberId);
   if (error && !isMissingTable(error)) dbFail("team_seats delete", error);
   return recomputePlan(memberId);
+}
+
+/**
+ * Account deletion of a team owner (`account-delete`, BEFORE `auth.admin.deleteUser`): frees every seat of the team so
+ * each member's plan is recomputed from their own subscriptions. The cascade alone would drop the seats without touching
+ * the members' `profiles.plan` – they would keep the Team plan for free. Returns the number of members released.
+ */
+export async function releaseOwnedSeats(ownerId: string): Promise<number> {
+  const { data, error } = await supabaseAdmin().from("team_seats").select("member_id").eq("owner_id", ownerId).limit(1000);
+  if (error) {
+    if (isMissingTable(error)) return 0;
+    dbFail("team_seats read", error);
+  }
+  const members = ((data ?? []) as { member_id: string }[]).map((m) => m.member_id);
+  for (const m of members) await releaseSeat(ownerId, m);
+  return members.length;
 }
 
 /* ------------------------------------------------------------------ config + status */

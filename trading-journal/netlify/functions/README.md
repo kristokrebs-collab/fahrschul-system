@@ -30,7 +30,7 @@ Functions, never `VITE_`).
 | file | route | notes |
 |---|---|---|
 | `account-export.mts` | GET `/api/v1/account/export` | DSGVO Art. 15/20: journal (backup format), profile, audit, connection metadata (no secrets), file list; aal2 if 2FA; 5/h |
-| `account-delete.mts` | POST `/api/v1/account/delete` `{ confirm: "LÖSCHEN" }` | aal2 if 2FA; 3/h fail-closed; Stripe first, audit, bucket files, `auth.admin.deleteUser` (cascades) |
+| `account-delete.mts` | POST `/api/v1/account/delete` `{ confirm: "LÖSCHEN" }` | aal2 if 2FA; 3/h fail-closed; Stripe first, audit, a team owner's seats released one by one (members' plans recomputed), bucket files, `auth.admin.deleteUser` (cascades); the webhook events that follow for the deleted user are acknowledged as `ignored` (FK 23503 → no retry loop) |
 | `account-backups.mts` | GET `/api/v1/account/backups[?day=YYYY-MM-DD]` | list / download the nightly backups (client restores through `importBackup`) |
 | `log.mts` | POST `/api/v1/log` | error reports (telemetry opt-in on the client), scrubbed again, `LOG_SAMPLE_RATE`, per-IP-hash and per-fingerprint limits → `app_errors` |
 | `audit.mts` | GET/POST `/api/v1/audit` | the user's trail (paged, aal2 if 2FA) / client-side security events from an allowlist (aal2 if 2FA, except sign-in / sign-out / password reset, which happen before the code step) |

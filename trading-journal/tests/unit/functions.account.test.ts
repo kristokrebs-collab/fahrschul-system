@@ -43,7 +43,8 @@ function table(state: FakeState, name: string) {
   let order: { col: string; asc: boolean }[] = [];
   let range: [number, number] | null = null;
   let limit: number | null = null;
-  let op: "select" | "delete" = "select";
+  let op: "select" | "delete" | "update" = "select";
+  let patch: Row = {};
   const missing = () => state.tables[name] === undefined;
   const run = () => {
     if (missing()) return { data: null, error: { code: "PGRST205", message: "missing" } };
@@ -51,6 +52,10 @@ function table(state: FakeState, name: string) {
     if (op === "delete") {
       const keep = all.filter((r) => !filters.every((f) => f(r)));
       state.tables[name] = keep;
+      return { data: null, error: null };
+    }
+    if (op === "update") {
+      for (const r of all) if (filters.every((f) => f(r))) Object.assign(r, patch);
       return { data: null, error: null };
     }
     let rows = all.filter((r) => filters.every((f) => f(r)));
@@ -67,6 +72,7 @@ function table(state: FakeState, name: string) {
     range: (a: number, b: number) => ((range = [a, b]), q),
     limit: (n: number) => ((limit = n), q),
     delete: () => ((op = "delete"), q),
+    update: (p: Row) => ((op = "update"), (patch = p), q),
     insert: async (row: Row) => {
       if (missing()) return { error: { code: "PGRST205" } };
       state.tables[name]!.push(row);
@@ -123,7 +129,9 @@ function fakeAdmin(state: FakeState) {
         deleteUser: vi.fn(async (id: string) => {
           if (state.failDelete) return { data: null, error: { status: 500 } };
           state.deleted.push(id);
-          for (const k of ["journal_docs", "profiles"]) state.tables[k] = state.tables[k]?.filter((r) => r.user_id !== id && r.id !== id);
+          for (const k of ["journal_docs", "profiles", "subscriptions"]) state.tables[k] = state.tables[k]?.filter((r) => r.user_id !== id && r.id !== id);
+          // 0002: team_seats cascade on owner_id AND member_id – without touching anybody's profiles.plan
+          state.tables.team_seats = state.tables.team_seats?.filter((r) => r.owner_id !== id && r.member_id !== id);
           return { data: {}, error: null };
         }),
       },
@@ -264,6 +272,35 @@ describe("account-delete", () => {
     const r2 = await accountDelete(post("/api/v1/account/delete", { confirm: "LÖSCHEN" }), ctx);
     expect(r2.status).toBe(502);
     expect(state.deleted).toEqual([]);
+  });
+
+  it("a team owner's deletion releases every seat first: the members fall back to their own plan (review MONEY-01)", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_x");
+    const U3 = "33333333-3333-4333-8333-333333333333";
+    const sub = (id: string, user: string, plan: string, status = "active") => ({ id, user_id: user, stripe_customer_id: `cus_${id}`, status, plan, seats: 5, trial_end: null, updated_at: "2026-10-01T00:00:00Z" });
+    state.tables.profiles = [
+      { id: U1, plan: "team", plan_status: "active", trial_end: null, privacy: {} },
+      { id: U2, plan: "team", plan_status: "active", trial_end: null, privacy: {} },
+      { id: U3, plan: "team", plan_status: "active", trial_end: null, privacy: {} },
+    ];
+    // U3 also pays for Pro on their own – that plan must come back, not "free"
+    state.tables.subscriptions = [sub("sub_team", U1, "team"), sub("sub_u3", U3, "pro")];
+    state.tables.team_seats = [
+      { owner_id: U1, member_id: U2 },
+      { owner_id: U1, member_id: U3 },
+    ];
+    const stripe: StripeLike = {
+      customers: { search: vi.fn(async () => ({ data: [] })) },
+      subscriptions: { list: vi.fn(async () => ({ data: [{ id: "sub_team", status: "active" }] })), cancel: vi.fn(async (id: string) => ({ id, status: "canceled" })) },
+    };
+    setStripeForTests(async () => stripe);
+    const r = await accountDelete(post("/api/v1/account/delete", { confirm: "LÖSCHEN" }), ctx);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ deleted: true, canceledSubscriptions: 1, releasedSeats: 2 });
+    expect(state.tables.team_seats).toEqual([]);
+    const plan = (id: string) => state.tables.profiles!.find((p) => p.id === id);
+    expect(plan(U2)).toMatchObject({ plan: "free" });
+    expect(plan(U3)).toMatchObject({ plan: "pro", plan_status: "active" });
   });
 
   it("fails closed on the rate limiter and reports a failed deleteUser", async () => {
