@@ -131,6 +131,8 @@ export interface PulledTrade {
 export interface PullResult {
   trades: PulledTrade[];
   more: boolean;
+  /** Cursor after the last trade of this page (send it as `since`); null for an empty page. Older servers omit it. */
+  next?: string | null;
   serverAt: string;
 }
 

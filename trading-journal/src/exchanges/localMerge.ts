@@ -24,7 +24,7 @@ const MAX_PAGES = 20;
 
 interface PullMark {
   userId: string;
-  /** Server `updated_at` of the newest trade merged (or the server time of an empty pull). */
+  /** Server cursor after the newest trade merged (`next`; older marks: its `updated_at`), or the server time of an empty pull. */
   since: string | null;
 }
 
@@ -110,7 +110,8 @@ export async function pullAndMerge(userId: string, now = new Date()): Promise<Pu
       added += plan.added.length;
       updated += plan.updated.length;
     }
-    since = last ?? (since === null ? res.serverAt : since);
+    // `next` is a keyset cursor (updated_at, id): one sync chunk shares one updated_at, a bare timestamp would skip or repeat
+    since = res.next ?? last ?? (since === null ? res.serverAt : since);
     writePullMark(userId, since);
     if (!res.more) break;
   }

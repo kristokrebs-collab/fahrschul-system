@@ -304,6 +304,10 @@ test.describe("Börse (P11)", () => {
     await expect(api.getByTestId("api-fresh")).toBeVisible();
     await expect(api.getByTestId("api-token-value")).toContainText("tj_e2e");
     await expect(api.getByText("/api/v1/hooks/tradingview/tj_e2e", { exact: false })).toBeVisible();
+    // separate entry / exit templates; the entry carries a size (no size → no P&L) and no constant Pine order id
+    await expect(api.getByTestId("tv-template-open")).toContainText('"qty":{{strategy.order.contracts}}');
+    await expect(api.getByTestId("tv-template-open")).not.toContainText("strategy.order.id");
+    await expect(api.getByTestId("tv-template-close")).toContainText('"action":"close"');
     await expect(api.getByTestId("api-token")).toHaveCount(1);
     await shot(page, info, "api", api);
     await expectNoHorizontalScroll(page);

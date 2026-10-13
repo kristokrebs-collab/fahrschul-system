@@ -525,18 +525,106 @@ describe("API tokens, REST, TradingView webhook", () => {
     expect((await tradesFn(new Request("https://journal.test/api/v1/trades"), ctx())).status).toBe(401);
   });
 
+  it("REST + pull: pages walk (updated_at, id) – a sync chunk sharing one microsecond updated_at is neither repeated nor skipped (API-01)", async () => {
+    const docs: Row[] = [];
+    // 30 earlier trades, then one upsert chunk of 100 that all carry the same transaction timestamp
+    for (let i = 0; i < 30; i++) docs.push({ user_id: U1, kind: "trade", id: `t_api_a${String(i).padStart(3, "0")}`, deleted: false, updated_at: `2026-10-12T07:00:${String(i).padStart(2, "0")}.250731+00:00`, data: { pair: "BTC/USDT", origin: { kind: "api" } } });
+    for (let i = 0; i < 100; i++) docs.push({ user_id: U1, kind: "trade", id: `t_bx_${String(1000 + ((i * 37) % 100))}`, deleted: false, updated_at: "2026-10-12T08:00:00.123456+00:00", data: { pair: "ETH/USDT", origin: { kind: "api" } } });
+    docs.push({ user_id: U1, kind: "trade", id: "t_gone", deleted: true, updated_at: "2026-10-12T09:00:00.5+00:00", data: { origin: { kind: "api" } } });
+    state.tables.journal_docs = docs;
+    const ro = await token(["trades:read"]);
+    for (const limit of [100, 7, 500]) {
+      const seen: string[] = [];
+      let since: string | null = null;
+      for (let page = 0; page < 40; page++) {
+        const qs: string = `limit=${limit}${since ? `&since=${encodeURIComponent(since)}` : ""}`;
+        const r = await read(await tradesFn(new Request(`https://journal.test/api/v1/trades?${qs}`, { headers: { authorization: `Bearer ${ro}` } }), ctx()));
+        expect(r.status).toBe(200);
+        seen.push(...(r.body.trades as Row[]).map((t) => t.id as string));
+        since = r.body.next as string | null;
+        if (!since) break;
+        expect(since).toMatch(/^c1\.[A-Za-z0-9_-]+$/);
+      }
+      expect(since).toBeNull();
+      expect(seen).toHaveLength(130);
+      expect(new Set(seen).size).toBe(130);
+      expect(seen.slice(0, 30)).toEqual(docs.slice(0, 30).map((d) => d.id));
+    }
+    // the device pull walks the same way and hands back `next` as its mark
+    const pulled: string[] = [];
+    let mark: string | null = null;
+    for (let page = 0; page < 40; page++) {
+      const r = await read(await syncFn(req("GET", mark ? `/api/v1/exchange/sync?since=${encodeURIComponent(mark)}` : "/api/v1/exchange/sync?pull=1"), ctx()));
+      pulled.push(...(r.body.trades as Row[]).map((t) => t.id as string));
+      if (!r.body.more) break;
+      mark = r.body.next as string;
+    }
+    expect(new Set(pulled).size).toBe(130);
+    // a plain time keeps working; a broken cursor is a 400
+    const after = await read(await tradesFn(new Request(`https://journal.test/api/v1/trades?since=${encodeURIComponent("2026-10-12T07:59:59Z")}`, { headers: { authorization: `Bearer ${ro}` } }), ctx()));
+    expect((after.body.trades as Row[]).length).toBe(100);
+    const unencoded = await read(await tradesFn(new Request("https://journal.test/api/v1/trades?since=2026-10-12T07:59:59.000001+00:00", { headers: { authorization: `Bearer ${ro}` } }), ctx()));
+    expect((unencoded.body.trades as Row[]).length).toBe(100);
+    expect((await tradesFn(new Request("https://journal.test/api/v1/trades?since=c1.@@", { headers: { authorization: `Bearer ${ro}` } }), ctx())).status).toBe(400);
+  });
+
+  it("TradingView: a Pine strategy's constant order id never swallows later trades, the exit's own id closes by symbol, every trade gets its P&L (MM-2, MM-3)", async () => {
+    const t = await token(["webhook:tradingview"]);
+    const hook = (b: unknown) => hookFn(new Request(`https://journal.test/api/v1/hooks/tradingview/${t}`, { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify(b) }), ctx({ token: t }));
+    const docOf = (id: unknown) => state.tables.journal_docs!.find((d) => d.id === id)!;
+    // no size → 422 with a German hint (a trade without qty can never get a P&L)
+    const noSize = await read(await hook({ action: "open", id: "Long", symbol: "BTCUSDT", side: "long", price: 60000, stop: 0, target: 0 }));
+    expect(noSize.status).toBe(422);
+    expect((noSize.body.error as Row).message).toMatch(/Positionsgröße.*qty/);
+    // trade 1 under "Long", closed by the exit order's OWN id ("Exit") → symbol fallback
+    const o1 = await read(await hook({ action: "open", id: "Long", symbol: "BINANCE:BTCUSDT.P", side: "long", price: 60000, qty: 0.5, stop: 0, target: 0 }));
+    expect(o1.body.result).toBe("created");
+    expect(docOf(o1.body.id).data).toMatchObject({ qty: 0.5, size: 30000, stop: null, target: null });
+    const c1 = await read(await hook({ action: "close", id: "Exit", symbol: "BINANCE:BTCUSDT.P", side: "sell", price: 61200 }));
+    expect(c1.body).toMatchObject({ result: "closed", id: o1.body.id });
+    // trade 2 under the same Pine id eight days later is a NEW trade, not "exists"
+    const o2 = await read(await hook({ action: "open", id: "Long", symbol: "BTCUSDT", side: "long", price: 62000, qty: 0.25 }));
+    expect(o2.body.result).toBe("created");
+    expect(o2.body.id).not.toBe(o1.body.id);
+    // its re-delivery while open is still "exists"
+    expect((await read(await hook({ action: "open", id: "Long", symbol: "BTCUSDT", side: "long", price: 62000, qty: 0.25 }))).body).toMatchObject({ result: "exists", id: o2.body.id });
+    // a short of another key stays untouched by a close of the long side
+    const s1 = await read(await hook({ action: "open", symbol: "BTCUSDT", side: "short", price: 62100, qty: 0.1 }));
+    const c2 = await read(await hook({ action: "close", symbol: "BTCUSDT", side: "long", price: 61000 }));
+    expect(c2.body).toMatchObject({ result: "closed", id: o2.body.id });
+    expect(docOf(s1.body.id).data).toMatchObject({ status: "open" });
+    // P&L and result of the closed webhook trades, as the app computes them
+    const { normalizeTrade } = await import("../../src/domain/normalize");
+    const { deriveTrade } = await import("../../src/domain/derive");
+    const d1 = deriveTrade(normalizeTrade(docOf(o1.body.id).data));
+    expect(d1.pnl).toBeCloseTo(600, 6);
+    expect(d1.result).toBe("win");
+    const d2 = deriveTrade(normalizeTrade(docOf(o2.body.id).data));
+    expect(d2.pnl).toBeCloseTo(-250, 6);
+    expect(d2.result).toBe("loss");
+    // a trade opened before qty was required gets its size from a close that carries one
+    state.tables.journal_docs!.push({ user_id: U1, kind: "trade", id: "t_tv_legacy", deleted: false, updated_at: "2026-10-01T00:00:00.000Z", data: { pair: "ETH/USDT", side: "long", status: "open", entry: 2500, size: null, stop: 0, origin: { kind: "webhook" }, externalId: "Old" } });
+    const c3 = await read(await hook({ action: "close", id: "Old", symbol: "ETHUSDT", price: 2600, qty: 2 }));
+    expect(c3.body.result).toBe("closed");
+    expect(docOf("t_tv_legacy").data).toMatchObject({ qty: 2, size: 5000, exit: 2600 });
+    expect(deriveTrade(normalizeTrade(docOf("t_tv_legacy").data)).pnl).toBeCloseTo(200, 6);
+  });
+
   it("TradingView: open matches the setup name, close by id; re-delivery changes nothing", async () => {
     state.tables.journal_docs = [{ user_id: U1, kind: "settings", id: "settings", deleted: false, data: { setups: [{ id: "s_box", name: "Box-Breakout" }] } }];
     const t = await token(["webhook:tradingview"]);
     const hook = (b: unknown) => hookFn(new Request(`https://journal.test/api/v1/hooks/tradingview/${t}`, { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify(b) }), ctx({ token: t }));
-    const open = await read(await hook({ action: "open", id: "L1", symbol: "BINANCE:BTCUSDT.P", side: "long", price: 64000, stop: 63000, target: 66000, setup: "box-breakout", timeframe: "240" }));
+    const open = await read(await hook({ action: "open", id: "L1", symbol: "BINANCE:BTCUSDT.P", side: "long", price: 64000, qty: 0.1, stop: 63000, target: 66000, setup: "box-breakout", timeframe: "240" }));
     expect(open.body).toMatchObject({ ok: true, result: "created" });
     const doc = state.tables.journal_docs!.find((d) => d.id === open.body.id)!;
     expect(doc.data).toMatchObject({ pair: "BTC/USDT", side: "long", status: "open", entry: 64000, stop: 63000, target: 66000, setups: ["s_box"], timeframe: "4h", origin: { kind: "webhook" } });
-    expect((await read(await hook({ action: "open", id: "L1", symbol: "BTCUSDT", side: "long", price: 1 }))).body.result).toBe("exists");
+    expect((await read(await hook({ action: "open", id: "L1", symbol: "BTCUSDT", side: "long", price: 1, qty: 1 }))).body.result).toBe("exists");
     const close = await read(await hook({ action: "close", id: "L1", symbol: "BTCUSDT", price: 65500 }));
     expect(close.body).toMatchObject({ result: "closed" });
     expect(doc.data).toMatchObject({ status: "closed", exit: 65500, entry: 64000 });
+    // a re-delivered close under the known key changes nothing; an unknown key with no open trade of the symbol is a 404
+    expect((await read(await hook({ action: "close", id: "L1", symbol: "BTCUSDT", price: 1 }))).body).toMatchObject({ id: open.body.id, result: "unchanged" });
+    expect(doc.data).toMatchObject({ exit: 65500 });
     expect((await hook({ action: "close", id: "nope", symbol: "BTCUSDT", price: 1 })).status).toBe(404);
     const bad = await read(await hookFn(new Request(`https://journal.test/api/v1/hooks/tradingview/${t}`, { method: "POST", body: "BTC long now!" }), ctx({ token: t })));
     expect(bad.status).toBe(422);

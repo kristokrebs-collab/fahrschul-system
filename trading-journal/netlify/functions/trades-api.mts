@@ -2,8 +2,10 @@
  * Personal REST API (P11, plan feature `apiAccess`).
  *
  * With a personal token (`Authorization: Bearer tj_…`):
- *   GET  /api/v1/trades[?since=<ISO>&limit=<1–500>]  (scope trades:read)  → `{ trades, next }`, oldest change first;
- *        `next` = the `since` of the next page. Tombstones are left out.
+ *   GET  /api/v1/trades[?since=<ISO | next>&limit=<1–500>]  (scope trades:read)  → `{ trades, next }`, oldest change
+ *        first; `next` = the `since` of the next page (an opaque cursor over (updated_at, id), so a page boundary inside
+ *        one sync chunk – all of its records share one updated_at – neither repeats nor skips trades; null once the
+ *        last page is reached). Tombstones are left out.
  *   GET  /api/v1/trades/<id>                          (scope trades:read)  → `{ trade }`
  *   POST /api/v1/trades  `{ pair, side, date, … }`    (scope trades:write) → `{ id, created }` – insert-only; with
  *        `externalId` idempotent (`t_api_<externalId>`), the trader's later edits are never overwritten.
@@ -22,7 +24,7 @@ import { requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { supabaseAdmin } from "./_lib/supabase";
 import { RestTrade, restTradeItem } from "./_lib/exchanges/inbound";
-import { upsertSyncedTrades } from "./_lib/exchanges/store";
+import { parseCursor, tradeDocPage, upsertSyncedTrades } from "./_lib/exchanges/store";
 import { createToken, hashToken, listTokens, personalToken, resolveToken, revokeToken, TOKEN_SCOPES } from "./_lib/exchanges/tokens";
 
 const TokenBody = z.object({
@@ -69,15 +71,11 @@ export default handler(async (req, ctx) => {
   const sb = supabaseAdmin();
 
   if (method === "GET" && rest.length === 0) {
-    const since = url.searchParams.get("since");
-    if (since && Number.isNaN(Date.parse(since))) throw new HttpError(400, "invalid_since", "Ungültiger Zeitpunkt.");
+    const cursor = parseCursor(url.searchParams.get("since"));
+    if (cursor === undefined) throw new HttpError(400, "invalid_since", "Ungültiger Zeitpunkt.");
     const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit")) || 100));
-    let q = sb.from("journal_docs").select("id,data,updated_at").eq("user_id", owner.userId).eq("kind", "trade").eq("deleted", false);
-    if (since) q = q.gt("updated_at", new Date(since).toISOString());
-    const { data, error } = await q.order("updated_at", { ascending: true }).limit(limit);
-    if (error) throw new HttpError(500, "db_error");
-    const rows = (data ?? []) as { id: string; data: Record<string, unknown>; updated_at: string }[];
-    return json({ trades: rows.map((r) => ({ ...r.data, id: r.id })), next: rows.length >= limit ? rows[rows.length - 1]!.updated_at : null });
+    const page = await tradeDocPage(owner.userId, cursor, limit, { what: "rest" });
+    return json({ trades: page.rows.map((r) => ({ ...r.data, id: r.id })), next: page.more ? page.next : null });
   }
   if (method === "GET" && rest.length === 1) {
     const { data, error } = await sb.from("journal_docs").select("id,data,deleted").eq("user_id", owner.userId).eq("kind", "trade").eq("id", rest[0]!).maybeSingle();

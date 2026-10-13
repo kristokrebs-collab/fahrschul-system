@@ -2,8 +2,9 @@
  * Exchange sync (P11).
  *
  * GET  /api/v1/exchange/sync → status: `{ configured, cron, plan, connections, runs }` (no secrets – key last 4 only).
- * GET  /api/v1/exchange/sync?since=<ISO>|&pull=1 → `{ trades: [{ id, data, updatedAt }], more, serverAt }`: trades the
- *      server wrote (sync, webhook, REST) changed after `since` – signed-in devices WITHOUT cloud sync merge them locally.
+ * GET  /api/v1/exchange/sync?since=<ISO | next>|&pull=1 → `{ trades: [{ id, data, updatedAt }], more, next, serverAt }`:
+ *      trades the server wrote (sync, webhook, REST) changed after `since` – signed-in devices WITHOUT cloud sync merge
+ *      them locally and keep `next` (a keyset cursor over (updated_at, id)) as their pull mark.
  * POST /api/v1/exchange/sync[?dryRun=1] `{ connectionId?, tz?, from? }` → one incremental sync (≈ 8 s budget; `more`
  *      = call again to continue). `dryRun=1` reads and maps without writing and returns the preview + per-position checks.
  *
@@ -17,7 +18,7 @@ import { requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { clientTz, CRON_EVERY_MIN, cronEnabled, exchangePlanState, nextCronAt, SYNC_BUDGET_MS } from "./_lib/exchanges/api";
 import { DEFAULT_TZ } from "./_lib/exchanges/mapping";
-import { connectionInfo, encryptionConfigured, listConnections, loadConnection, profileTz, pullSyncedTrades, recentRuns, runningRun } from "./_lib/exchanges/store";
+import { connectionInfo, encryptionConfigured, listConnections, loadConnection, parseCursor, profileTz, pullSyncedTrades, recentRuns, runningRun } from "./_lib/exchanges/store";
 import { runSync } from "./_lib/exchanges/sync";
 
 const Body = z.object({
@@ -38,9 +39,10 @@ export default handler(async (req) => {
     await enforceRateLimit(rateKey("exchange-status", user.id), 240, 600);
     const since = url.searchParams.get("since");
     if (since !== null || url.searchParams.get("pull") === "1") {
-      if (since && Number.isNaN(Date.parse(since))) throw new HttpError(400, "invalid_since", "Ungültiger Zeitpunkt.");
+      const cursor = parseCursor(since);
+      if (cursor === undefined) throw new HttpError(400, "invalid_since", "Ungültiger Zeitpunkt.");
       const serverAt = new Date().toISOString();
-      const page = await pullSyncedTrades(user.id, since ? new Date(since).toISOString() : null);
+      const page = await pullSyncedTrades(user.id, cursor);
       return json({ ...page, serverAt });
     }
     const [rows, runs, plan] = await Promise.all([listConnections(user.id), recentRuns(user.id, 12), exchangePlanState(user.id)]);

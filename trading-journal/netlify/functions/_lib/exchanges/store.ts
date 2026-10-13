@@ -321,23 +321,107 @@ export interface PulledTrade {
 /** Origins the server writes (exchange sync, TradingView webhook, REST API) – what the pull delivers. */
 export const SERVER_ORIGINS = ["api", "webhook", "bot"] as const;
 
+/* ------------------------------------------------------------------ keyset pages over journal_docs */
+
 /**
- * Server-written trades (exchange sync, webhook, REST) changed after `sinceIso`, oldest change first – for signed-in
- * devices whose cloud sync is off: they merge these locally. `limit` ≤ 500; `more` when the page is full.
+ * Position in a page walk over `journal_docs` ordered by `(updated_at, id)`. `updated_at` is `now()` of the writing
+ * transaction, so every record of one `upsert_synced_trades` chunk (100) shares ONE timestamp: a cursor on the
+ * timestamp alone either skips the rest of such a group (`gt`) or returns the same page forever. `id` breaks the tie;
+ * `ts` is kept as the raw microsecond string the database returned (a JS Date would cut it to milliseconds).
  */
-export async function pullSyncedTrades(userId: string, sinceIso: string | null, limit = 500): Promise<{ trades: PulledTrade[]; more: boolean }> {
-  let q = supabaseAdmin()
-    .from("journal_docs")
-    .select("id,data,updated_at")
-    .eq("user_id", userId)
-    .eq("kind", "trade")
-    .eq("deleted", false)
-    .in("data->origin->>kind", [...SERVER_ORIGINS]);
-  if (sinceIso) q = q.gt("updated_at", sinceIso);
-  const { data, error } = await q.order("updated_at", { ascending: true }).limit(limit);
-  if (error) throw dbFail("pull", error.code);
-  const rows = (data ?? []) as { id: string; data: Record<string, unknown>; updated_at: string }[];
-  return { trades: rows.map((r) => ({ id: r.id, data: r.data, updatedAt: r.updated_at })), more: rows.length >= limit };
+export interface PageCursor {
+  ts: string;
+  /** Null for a plain point in time (`?since=<ISO>`): everything changed strictly after it. */
+  id: string | null;
+}
+
+const CURSOR_PREFIX = "c1.";
+/** A timestamp as PostgREST renders `timestamptz` (or as a client sends it): safe to pass to a filter verbatim. */
+const TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/;
+
+/** The opaque `next` value of a page (`c1.` + base64url of `<updated_at>|<id>`); URL-safe without encoding. */
+export function encodeCursor(c: { ts: string; id: string }): string {
+  return CURSOR_PREFIX + Buffer.from(`${c.ts}|${c.id}`, "utf8").toString("base64url");
+}
+
+/**
+ * Reads a `since` parameter: an opaque cursor from `next`, or a plain point in time (ISO 8601). Undefined when it is
+ * neither (→ 400); null when absent.
+ */
+export function parseCursor(raw: string | null): PageCursor | null | undefined {
+  if (raw === null || raw === "") return null;
+  if (raw.startsWith(CURSOR_PREFIX)) {
+    let plain: string;
+    try {
+      plain = Buffer.from(raw.slice(CURSOR_PREFIX.length), "base64url").toString("utf8");
+    } catch {
+      return undefined;
+    }
+    const cut = plain.indexOf("|");
+    if (cut < 0) return undefined;
+    const ts = plain.slice(0, cut);
+    const id = plain.slice(cut + 1);
+    if (!TS_RE.test(ts) || !id || id.length > 200) return undefined;
+    return { ts, id };
+  }
+  // a `+00:00` offset that arrived unencoded in a query string reads as a space
+  const iso = raw.replace(/ (\d{2}(?::?\d{2})?)$/, "+$1");
+  if (TS_RE.test(iso)) return { ts: iso, id: null };
+  if (Number.isNaN(Date.parse(iso))) return undefined;
+  return { ts: new Date(iso).toISOString(), id: null };
+}
+
+interface DocRow {
+  id: string;
+  data: Record<string, unknown>;
+  updated_at: string;
+}
+
+/**
+ * One page of the user's live trade records after `cursor`, ordered by `(updated_at, id)`: first the rest of the
+ * cursor's timestamp group (`updated_at = ts and id > cursor.id`), then everything newer. `next` is the cursor of the
+ * last row (null for an empty page), `more` when the page is full.
+ */
+export async function tradeDocPage(
+  userId: string,
+  cursor: PageCursor | null,
+  limit: number,
+  opts: { origins?: readonly string[]; what?: string } = {},
+): Promise<{ rows: DocRow[]; more: boolean; next: string | null }> {
+  const base = () => {
+    let q = supabaseAdmin().from("journal_docs").select("id,data,updated_at").eq("user_id", userId).eq("kind", "trade").eq("deleted", false);
+    if (opts.origins) q = q.in("data->origin->>kind", [...opts.origins]);
+    return q;
+  };
+  const rows: DocRow[] = [];
+  if (cursor?.id) {
+    const { data, error } = await base().eq("updated_at", cursor.ts).gt("id", cursor.id).order("id", { ascending: true }).limit(limit);
+    if (error) throw dbFail(opts.what ?? "page", error.code);
+    rows.push(...((data ?? []) as DocRow[]));
+  }
+  if (rows.length < limit) {
+    let q = base();
+    if (cursor) q = q.gt("updated_at", cursor.ts);
+    const { data, error } = await q.order("updated_at", { ascending: true }).order("id", { ascending: true }).limit(limit - rows.length);
+    if (error) throw dbFail(opts.what ?? "page", error.code);
+    rows.push(...((data ?? []) as DocRow[]));
+  }
+  const last = rows[rows.length - 1];
+  return { rows, more: rows.length >= limit, next: last ? encodeCursor({ ts: last.updated_at, id: last.id }) : null };
+}
+
+/**
+ * Server-written trades (exchange sync, webhook, REST) changed after `cursor`, oldest change first – for signed-in
+ * devices whose cloud sync is off: they merge these locally. `limit` ≤ 500; `more` when the page is full; `next` is
+ * the cursor of the following page (keep it as the pull mark).
+ */
+export async function pullSyncedTrades(
+  userId: string,
+  cursor: PageCursor | null,
+  limit = 500,
+): Promise<{ trades: PulledTrade[]; more: boolean; next: string | null }> {
+  const page = await tradeDocPage(userId, cursor, limit, { origins: SERVER_ORIGINS, what: "pull" });
+  return { trades: page.rows.map((r) => ({ id: r.id, data: r.data, updatedAt: r.updated_at })), more: page.more, next: page.next };
 }
 
 /** The user's time zone (`profiles.tz`), or null. */

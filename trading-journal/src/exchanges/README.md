@@ -37,7 +37,9 @@ phones, six from `sm`), the Broker-Abgleich only while it has open items, the AP
    The server writes `journal_docs` directly (deterministic id `t_bx_<positionId>`, upsert by `externalId`).
 4. **Into this device**: with the cloud sync live the trades arrive through Realtime. Without it (`localMerge.ts`)
    `ExchangeHost` pulls `GET /api/v1/exchange/sync?since=` on start, every 10 min and when the tab returns, and merges
-   with the field rule below (≥ 10 changes through `importBackup(…, merge)` with a safety snapshot).
+   with the field rule below (≥ 10 changes through `importBackup(…, merge)` with a safety snapshot). The pull mark is
+   the server's `next` – a keyset cursor over `(updated_at, id)`, because all records of one sync chunk share one
+   `updated_at` (a bare timestamp would skip the rest of the chunk or repeat a page).
 5. **Dry run** (`DryRunSheet`): what would land, nothing stored – net / gross / fee / funding per position and the
    fee-convention check ("Bitunix meldet den Gewinn ohne Gebühren …, n Positionen nachgerechnet").
 
@@ -94,7 +96,11 @@ The column names follow the exports as documented in 2026; an unknown or changed
 
 Personal tokens `tj_…` (shown once, stored as SHA-256 only) with scopes `webhook:tradingview`, `trades:read`,
 `trades:write`. Webhook URL `/api/v1/hooks/tradingview/<token>` (TradingView cannot send headers, so the token is in
-the path – revoke it in the card if it leaks); the card offers the alert template `{"action":"open"|"close", …}`.
+the path – revoke it in the card if it leaks); the card offers two alert templates (`TV_TEMPLATES`): entry
+`{"action":"open", …, "qty":{{strategy.order.contracts}}}` – a size (`qty` or `size`) is required, else 422, because a
+webhook trade without one never gets a P&L – and exit `{"action":"close", …}`. Neither uses `{{strategy.order.id}}`:
+the server pairs the exit with the newest open webhook trade of the symbol (and side). An `id` still works: while a
+trade under it is open, a repeat is a re-delivery; after the close the same key opens the next trade (sequence number).
 REST: `GET/POST /api/v1/trades` with `Authorization: Bearer tj_…`.
 
 ## Wiring (P14)

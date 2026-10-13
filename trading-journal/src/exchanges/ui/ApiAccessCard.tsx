@@ -22,7 +22,15 @@ import { Notice } from "./parts";
 
 const SCOPES: readonly TokenScope[] = ["webhook:tradingview", "trades:read", "trades:write"];
 
-export const TV_TEMPLATE = `{"action":"open","id":"{{strategy.order.id}}","symbol":"{{ticker}}","side":"long","price":{{close}},"stop":0,"target":0,"setup":"Box-Breakout","timeframe":"{{interval}}"}`;
+/**
+ * Alert messages for the webhook (`hooks-tradingview.mts`): one for the entry, one for the exit. No `id` – the server
+ * pairs the exit with the newest open webhook trade of the symbol, so a Pine strategy's constant order id ("Long") can
+ * never swallow later trades. `qty` is required on the entry (no size → no P&L).
+ */
+export const TV_TEMPLATES = {
+  open: `{"action":"open","symbol":"{{ticker}}","side":"long","price":{{close}},"qty":{{strategy.order.contracts}},"setup":"Box-Breakout","timeframe":"{{interval}}"}`,
+  close: `{"action":"close","symbol":"{{ticker}}","side":"long","price":{{close}}}`,
+} as const;
 
 function webhookUrl(token: string): string {
   const origin = typeof location !== "undefined" ? location.origin : "";
@@ -184,7 +192,11 @@ export function ApiAccessCard({ className }: { className?: string }) {
                     {fresh.info.scopes.includes("webhook:tradingview") && (
                       <>
                         <CopyRow label={API_CARD.webhookUrl} value={webhookUrl(fresh.token)} />
-                        <CopyRow label={API_CARD.template} value={TV_TEMPLATE} />
+                        <CopyRow label={API_CARD.templateOpen} value={TV_TEMPLATES.open} testId="tv-template-open" />
+                        <CopyRow label={API_CARD.templateClose} value={TV_TEMPLATES.close} testId="tv-template-close" />
+                        <p className="text-[11.5px] leading-relaxed text-faint" data-testid="tv-template-hint">
+                          {API_CARD.templateHint}
+                        </p>
                       </>
                     )}
                   </motion.div>

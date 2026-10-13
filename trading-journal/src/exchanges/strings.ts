@@ -161,7 +161,10 @@ export const API_CARD = {
   copy: "Kopieren",
   copied: "Kopiert",
   webhookUrl: "Webhook-URL für TradingView",
-  template: "Alarm-Nachricht (Vorlage)",
+  templateOpen: "Alarm-Nachricht Einstieg (Vorlage)",
+  templateClose: "Alarm-Nachricht Ausstieg (Vorlage)",
+  templateHint:
+    "qty ist Pflicht: Bei Strategie-Alarmen setzt {{strategy.order.contracts}} die Kontrakte ein, bei Indikator-Alarmen trägst du eine feste Zahl ein (oder size = Positionswert in USDT). side auf short ändern für Shorts. Optional: stop, target, note. Der Ausstieg schließt den neuesten offenen Webhook-Trade des Symbols. Strategie mit einem Alarm für alle Orders: Einstiegs- und Ausstiegs-JSON in Pine als alert_message hinterlegen und als Nachricht {{strategy.order.alert_message}} eintragen.",
   revoke: "Widerrufen",
   revokeAsk: "Token widerrufen? Tools mit diesem Token verlieren den Zugriff.",
   none: "Noch kein Token.",
