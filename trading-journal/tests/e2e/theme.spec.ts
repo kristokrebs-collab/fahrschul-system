@@ -200,7 +200,9 @@ test.describe("Themes", () => {
     const ink = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--chart-ink-veil").trim());
     // (the CSS minifier may shorten the hex)
     expect(await ink()).toMatch(/^#fff(fff)?$/i);
-    const chart = page.locator('[data-page="markt"][data-page-role="current"] canvas').first();
+    // the box chart's pane canvas – not just the page's first canvas: a „Beste Setups“ card above it carries its own
+    // canvas once the seeded market yields a setup (Box-zu-Box reads Top Trader like the Einstiegs-Check since MM-4)
+    const chart = page.locator('[data-page="markt"][data-page-role="current"] [data-testid="markt-chart"] canvas').first();
     await chart.waitFor();
     await chart.scrollIntoViewIfNeeded();
     // the pane canvas in the ink theme: candles in near-white ink, the volume bars as a faint WHITE veil (low alpha)
