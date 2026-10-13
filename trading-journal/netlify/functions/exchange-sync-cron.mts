@@ -1,8 +1,14 @@
 /**
  * Scheduled (every 30 min, published deploys only): automatic exchange sync (P11). Takes the active connections that
- * waited longest, skips those synced in the last 20 min, those whose plan lacks `exchangeSync` (unless payments are not
- * set up) and those with a sync running; each gets ≤ 8 s, the whole run ≤ 24 s (scheduled functions stop at 30 s).
- * Unfinished windows resume on the next run. Off with `SYNC_CRON_ENABLED=0`; inert without `EXCHANGE_ENC_KEY_V1`.
+ * are due (`next_sync_at`, 0006), skips those synced in the last 20 min, those whose plan lacks `exchangeSync` (unless
+ * payments are not set up) and those with a sync running; each gets ≤ 8 s, the whole run ≤ 24 s (scheduled functions
+ * stop at 30 s). Unfinished windows resume on the next run. Off with `SYNC_CRON_ENABLED=0`; inert without
+ * `EXCHANGE_ENC_KEY_V1`.
+ *
+ * Fair queue (review SYNC-01): every attempt writes the connection's next turn – synced → next run, failing → back-off
+ * (20 min · 2^(n−1), ≤ 12 h), plan without auto-sync → in 6 h – so connections that keep failing or whose trial ended
+ * can no longer hold the 40 places of the batch while paying traders wait. Without migration 0006 the cron falls back
+ * to the old order by `last_sync_at`.
  */
 import type { Config } from "@netlify/functions";
 import { planIncludes } from "../../src/billing/plans";
@@ -18,6 +24,10 @@ export const CRON_TOTAL_MS = 24_000;
 export const CRON_PER_CONNECTION_MS = 8_000;
 export const CRON_MIN_GAP_MS = 20 * 60_000;
 export const CRON_BATCH = 40;
+/** A connection whose plan has no auto-sync is looked at again after this long. */
+export const CRON_PLAN_RECHECK_MS = 6 * 60 * 60_000;
+/** Longest back-off of a connection that keeps failing. */
+export const CRON_MAX_BACKOFF_MS = 12 * 60 * 60_000;
 
 export interface CronSummary {
   enabled: boolean;
@@ -27,33 +37,80 @@ export interface CronSummary {
   failed: number;
 }
 
-export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
-  const summary: CronSummary = { enabled: cronEnabled(), considered: 0, synced: 0, skipped: 0, failed: 0 };
-  if (!summary.enabled) return summary;
-  const end = now + CRON_TOTAL_MS;
+/** A connection row as the cron reads it (0006 adds the schedule columns). */
+type CronRow = ConnectionRow & { next_sync_at?: string | null; sync_failures?: number | null };
+
+/** Delay before the next attempt after `failures` failures in a row (1 → 20 min, 2 → 40 min, …, ≤ 12 h). */
+export function backoffMs(failures: number): number {
+  const n = Math.max(1, Math.floor(failures));
+  return Math.min(CRON_MAX_BACKOFF_MS, CRON_MIN_GAP_MS * 2 ** Math.min(n - 1, 16));
+}
+
+/** Postgres "undefined column": migration 0006 is not applied yet. */
+const UNDEFINED_COLUMN = "42703";
+
+async function dueConnections(): Promise<{ rows: CronRow[]; scheduled: boolean }> {
   const { data, error } = await supabaseAdmin()
+    .from("exchange_connections")
+    .select(`${CONNECTION_COLUMNS},next_sync_at,sync_failures`)
+    .eq("status", "active")
+    .eq("sync_enabled", true)
+    .order("next_sync_at", { ascending: true, nullsFirst: true })
+    .order("last_sync_at", { ascending: true, nullsFirst: true })
+    .limit(CRON_BATCH);
+  if (!error) return { rows: (data ?? []) as unknown as CronRow[], scheduled: true };
+  if (error.code !== UNDEFINED_COLUMN) throw new Error(`connections: ${error.code}`);
+  const legacy = await supabaseAdmin()
     .from("exchange_connections")
     .select(CONNECTION_COLUMNS)
     .eq("status", "active")
     .eq("sync_enabled", true)
     .order("last_sync_at", { ascending: true, nullsFirst: true })
     .limit(CRON_BATCH);
-  if (error) throw new Error(`connections: ${error.code}`);
+  if (legacy.error) throw new Error(`connections: ${legacy.error.code}`);
+  return { rows: (legacy.data ?? []) as unknown as CronRow[], scheduled: false };
+}
+
+/** Writes the connection's next turn (best effort: a failed write only costs fairness, never the run). */
+async function schedule(row: CronRow, nextAt: number, failures: number): Promise<void> {
+  const { error } = await supabaseAdmin()
+    .from("exchange_connections")
+    .update({ next_sync_at: new Date(nextAt).toISOString(), sync_failures: Math.min(failures, 32_000) })
+    .eq("user_id", row.user_id)
+    .eq("id", row.id);
+  if (error) console.error("[fn] exchange-sync-cron schedule failed", error.code ?? "");
+}
+
+export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
+  const summary: CronSummary = { enabled: cronEnabled(), considered: 0, synced: 0, skipped: 0, failed: 0 };
+  if (!summary.enabled) return summary;
+  const end = now + CRON_TOTAL_MS;
+  const { rows, scheduled } = await dueConnections();
+  const plan = scheduled ? schedule : async () => undefined;
   const gated = paymentsConfigured();
-  for (const meta of (data ?? []) as unknown as ConnectionRow[]) {
+  for (const meta of rows) {
     if (Date.now() >= end - 1_000) break;
     summary.considered++;
+    const failures = Math.max(0, Number(meta.sync_failures) || 0);
     try {
+      // not due yet (ordered last, so only seen when fewer than a batch are due)
+      if (meta.next_sync_at && Date.parse(meta.next_sync_at) > now) {
+        summary.skipped++;
+        continue;
+      }
       if (meta.last_sync_at && now - Date.parse(meta.last_sync_at) < CRON_MIN_GAP_MS) {
         summary.skipped++;
+        await plan(meta, Date.parse(meta.last_sync_at) + CRON_MIN_GAP_MS, failures);
         continue;
       }
       if (gated && !planIncludes((await planOf(meta.user_id)).plan, "exchangeSync")) {
         summary.skipped++;
+        await plan(meta, now + CRON_PLAN_RECHECK_MS, failures);
         continue;
       }
       if (await runningRun(meta.user_id, meta.id, 2 * 60_000)) {
         summary.skipped++;
+        await plan(meta, now + CRON_MIN_GAP_MS, failures);
         continue;
       }
       const connection = await loadConnection(meta.user_id, meta.id);
@@ -64,9 +121,11 @@ export async function runExchangeCron(now = Date.now()): Promise<CronSummary> {
       const tz = (await profileTz(meta.user_id)) ?? DEFAULT_TZ;
       await runSync({ userId: meta.user_id, connection, kind: "cron", dryRun: false, tz, deadline: Math.min(end, Date.now() + CRON_PER_CONNECTION_MS) });
       summary.synced++;
+      await plan(meta, now + CRON_MIN_GAP_MS, 0);
     } catch {
       // recorded in sync_runs / last_error by runSync; never log the user or the key
       summary.failed++;
+      await plan(meta, now + backoffMs(failures + 1), failures + 1);
     }
   }
   return summary;

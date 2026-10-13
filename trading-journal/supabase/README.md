@@ -13,6 +13,7 @@ single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `sr
 | `migrations/0004_social.sql` | P12 | `groups`, `group_members` (role, `share_level`), `social_profiles` (pseudonyms), `group_invites`, `group_reviews`, `comments`, `group_goals`, `shares`, `feedback`, `member_stats`, `leaderboard_snapshots`, `community_stats`; helpers `is_group_member()`, `group_role()`, `shares_group_with()`, `can_see_review()`, `shared_payload()`, `social_candidates()` |
 
 | `migrations/0005_mfa_everywhere.sql` | review SEC-01 | the aal2 rule (`mfa_satisfied()`) on every remaining client-readable table – `audit_log`, `subscriptions`, `team_seats`, `referral_codes`, `referrals`, `affiliate_ledger`, `api_tokens`, `social_profiles`, `group_invites`, `group_goals`, `shares`, `feedback`, `member_stats` – and on the four `screenshots` storage policies |
+| `migrations/0006_sync_schedule.sql` | review SYNC-01 | `exchange_connections.next_sync_at` + `sync_failures` (service only, no client grant) and the partial index the cron orders by – every cron attempt sets the next turn (synced → next run, failing → back-off 20 min · 2^(n−1) ≤ 12 h, plan without auto-sync → 6 h) |
 
 Apply with the Supabase CLI (`supabase db push`) or paste each file into the SQL editor. Every migration runs once;
 never edit an applied migration – add a new one.

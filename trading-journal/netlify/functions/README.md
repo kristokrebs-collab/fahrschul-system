@@ -61,7 +61,7 @@ returned, logged or audited – only `key_last4`.
 | `exchange-sync.mts` | GET `/api/v1/exchange/sync` (status: `configured`, plan, cron, connections, runs) · GET `?since=` / `?pull=1` (server-written trades for devices without cloud sync) · POST `[?dryRun=1]` `{ connectionId?, tz, from? }` | one budgeted sync (8 s, `more: true` → the client continues); dry run writes nothing; 30 POST / 10 min |
 | `exchange-backfill-background.mts` | POST `/api/v1/exchange/backfill` `{ connectionId, from, runId, tz }` → 202 | background function (15 min): first import up to 366 days, 13-min budget, progress as the run `runId`; 3 / h fail-closed |
 | `exchange-positions.mts` | GET `/api/v1/exchange/positions` | live positions of all active connections + mark prices (P05 `useExchangePositions`); per-venue errors listed, not thrown; 120 / 10 min |
-| `exchange-sync-cron.mts` | schedule `*/30 * * * *` (in code) | longest-waiting active connections first, ≥ 20 min gap, 8 s each, ≤ 24 s total; `SYNC_CRON_ENABLED=false` stops it |
+| `exchange-sync-cron.mts` | schedule `*/30 * * * *` (in code) | due connections first (`next_sync_at`, 0006 – every attempt sets the next turn: synced → next run, failing → back-off 20 min · 2^(n−1) ≤ 12 h, plan without auto-sync → 6 h; without 0006 the old order by `last_sync_at`), ≥ 20 min gap, 8 s each, ≤ 24 s total; `SYNC_CRON_ENABLED=false` stops it |
 | `hooks-tradingview.mts` | POST `/api/v1/hooks/tradingview/:token` | TradingView alert JSON (`open` / `close`); token in the path (TradingView sends no headers), scope `webhook:tradingview`, plan `apiAccess`; idempotent per alert id; 60 / min per token; never echoes the token |
 | `trades-api.mts` | GET/POST `/api/v1/trades[/<id>]` (Bearer `tj_…`, scopes `trades:read` / `trades:write`) · GET/POST/DELETE `/api/v1/trades/tokens[/<id>]` (app session) | personal REST API, insert-only writes (`externalId` → idempotent `t_api_<id>`); tokens stored as SHA-256, plain token shown once, max 10; 120 / 10 min |
 
@@ -72,7 +72,8 @@ Tests: `tests/unit/functions.lib.test.ts`, `tests/unit/functions.account.test.ts
 storage, auth admin; fake Stripe), `tests/unit/functions.stripe.test.ts` (P10: fake Stripe API + admin fake – checkout,
 portal, codes, referrals, seats, webhook signature / idempotency / ordering), `tests/unit/functions.bitunix.test.ts` (P11: signer vs. the doc vector and the official demo, request building,
 pagination, rate spacing, read-only allowlist), `tests/unit/exchange.mapping.test.ts` (positions → trades on the documented
-payloads), `tests/unit/exchange.functions.test.ts` (P11: connect / sync / dry run / pull / positions / backfill / cron /
+payloads), `tests/unit/exchange.cron.test.ts` (cron fairness: lapsed plans, back-off, manual syncs, missing 0006),
+`tests/unit/exchange.functions.test.ts` (P11: connect / sync / dry run / pull / positions / backfill / cron /
 webhook / REST against an admin fake with a JS twin of `upsert_synced_trades` and a fake Bitunix that verifies every
 signature). `functions-disabled/binance.mts` stays out of the build.
 

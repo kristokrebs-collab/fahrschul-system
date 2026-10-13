@@ -167,6 +167,12 @@ describe("aal2 rule (SEC-01): a 2FA user's password-only session reaches nothing
     expect(await as(jwt(A, "aal1"), `select plan, privacy from public.profiles`)).toEqual([{ plan: "free", privacy: {} }]);
   });
 
+  it("0006: the sync schedule columns are server bookkeeping – not readable by the owner either", async () => {
+    await expect(as(jwt(A, "aal2"), `select next_sync_at from public.exchange_connections`)).rejects.toThrow(/permission denied/);
+    await expect(as(jwt(A, "aal2"), `select sync_failures from public.exchange_connections`)).rejects.toThrow(/permission denied/);
+    expect(await as(null, `select next_sync_at, sync_failures from public.exchange_connections`)).toEqual([{ next_sync_at: null, sync_failures: 0 }]);
+  });
+
   it("anon reaches none of the guarded tables", async () => {
     await db.exec(`reset role; select set_config('request.jwt.claims', '{}', false); set role anon;`);
     try {
