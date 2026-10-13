@@ -5,6 +5,7 @@
  */
 import { FEATURE_INFO, limitOf, PAID_PLANS, planIncludes, upgradePlanFor } from "../../../src/billing/plans";
 import { FREE_PLAN, grantsPlan, isPlanId, isPlanStatus, type Feature, type LimitKey, type PlanId, type PlanInfo } from "../../../src/billing/types";
+import { isMissingTable } from "./account";
 import { envOptional, type ServerEnvName } from "./env";
 import { HttpError } from "./http";
 import { supabaseAdmin } from "./supabase";
@@ -72,4 +73,31 @@ export async function requireLimit(userId: string, key: LimitKey, used: number):
   const limit = limitOf(info.plan, key);
   if (used < limit || !paymentsConfigured()) return limit;
   throw new HttpError(402, "limit_reached", "Das Limit deines Tarifs ist erreicht.", { key, limit, plan: info.plan });
+}
+
+let reportedPayments: boolean | null = null;
+
+/**
+ * Tells the database whether payments are switched on (`app_config` key 'billing', migration 0007): the storage
+ * policies of the screenshots bucket gate uploads by plan only then (review STOR-01) – the Stripe keys live in the
+ * Netlify env, which Postgres cannot see. Written once per function instance and whenever the answer changes; called
+ * by billing/status (every client load) and the Stripe webhook. Never throws.
+ */
+export async function reportPaymentsConfig(): Promise<void> {
+  const on = paymentsConfigured();
+  if (reportedPayments === on) return;
+  try {
+    const { error } = await supabaseAdmin()
+      .from("app_config")
+      .upsert({ key: "billing", value: { paymentsEnabled: on }, updated_at: new Date().toISOString() }, { onConflict: "key" });
+    if (!error || isMissingTable(error)) reportedPayments = on; // without 0007 there is nothing to report
+    else console.error("[fn] app_config write failed", error.code);
+  } catch (e) {
+    console.error("[fn] app_config write failed", e instanceof Error ? e.name : typeof e);
+  }
+}
+
+/** Tests: forget what was reported. */
+export function resetPaymentsReportForTests(): void {
+  reportedPayments = null;
 }

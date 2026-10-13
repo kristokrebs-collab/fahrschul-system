@@ -59,7 +59,7 @@ Prüfbefehle (dieselben wie in der CI): `npm run typecheck && npm run lint && np
    - **Publishable key** (`sb_publishable_…`) → `VITE_SUPABASE_PUBLISHABLE_KEY` (öffentlich, landet im Bundle)
    - **Secret key** (`sb_secret_…`) → `SUPABASE_SECRET_KEY` (**nur** für die Functions, niemals mit `VITE_`-Präfix)
 
-### 2.1 Migrationen 0001 → 0006
+### 2.1 Migrationen 0001 → 0007
 
 Die Dateien liegen in `trading-journal/supabase/migrations/` und werden **genau einmal, in dieser Reihenfolge**
 ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als neue Datei):
@@ -72,9 +72,10 @@ ausgeführt (nie eine angewendete Migration ändern – Änderungen kommen als n
 | `0004_social.sql` | Gruppen, Mitglieder, Pseudonyme, Einladungen, Reviews, Kommentare, Ziele, Teilen-Links, Bestenlisten (k ≥ 10) |
 | `0005_mfa_everywhere.sql` | 2FA-Regel überall: mit aktiver 2FA sieht eine Sitzung ohne Code-Eingabe weder Screenshots noch Audit-Log, Abo-, Teilen-, Token- oder Community-Daten |
 | `0006_sync_schedule.sql` | Faire Warteschlange für den automatischen Börsen-Sync (`next_sync_at`, `sync_failures`): fehlschlagende oder nicht mehr berechtigte Verbindungen blockieren zahlende Trader nicht mehr |
+| `0007_seats_screenshots.sql` | Team-Plätze unter Sperre vergeben (gleichzeitige Beitritte überschreiten nie die bezahlte Anzahl); Bucket `screenshots` mit 5 MB / PNG, JPEG, WebP, GIF und Upload nur mit Tarif „Screenshots in der Cloud“, sobald Zahlungen aktiv sind (Lesen und Löschen bleiben nach einem Downgrade erlaubt) |
 
 **Variante A – SQL-Editor (ohne CLI):** Supabase → **SQL Editor → New query** → Inhalt von `0001_core.sql` einfügen →
-**Run** → „Success“ abwarten. Dann `0002` bis `0006` genauso.
+**Run** → „Success“ abwarten. Dann `0002` bis `0007` genauso.
 
 **Variante B – CLI:**
 

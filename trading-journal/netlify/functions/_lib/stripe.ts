@@ -441,15 +441,35 @@ export async function seatUsage(ownerId: string): Promise<{ seats: number; used:
   return { seats: team?.seats ?? 0, used: 1 + (count ?? 0) };
 }
 
-/** Gives `memberId` a seat of the owner's team plan (409 `no_seats` when all are taken, 402 without a team plan). */
+const NO_SEATS = () => new HttpError(409, "no_seats", "Alle Sitzplätze sind belegt. Erhöhe die Anzahl im Kundenportal.");
+const SEAT_TAKEN = () => new HttpError(409, "seat_taken", "Dieses Mitglied hat schon einen Team-Sitz.");
+/** PostgREST / Postgres: the function does not exist (migration 0007 not applied yet). */
+const MISSING_FUNCTION = new Set(["PGRST202", "42883"]);
+
+/**
+ * Gives `memberId` a seat of the owner's team plan (409 `no_seats` when all are taken, 402 without a team plan).
+ * Count and insert run in ONE transaction under a per-owner lock (`assign_team_seat`, migration 0007, review
+ * MONEY-03): two members joining at the same moment can no longer both take the last seat. Without 0007 the old
+ * two-step write is used.
+ */
 export async function assignSeat(ownerId: string, memberId: string): Promise<PlanInfo> {
   if (ownerId === memberId) throw new HttpError(422, "invalid_member");
   const usage = await seatUsage(ownerId);
   if (usage.seats === 0) throw new HttpError(402, "plan_required", "Dafür brauchst du den Team-Tarif.");
-  if (usage.used >= usage.seats) throw new HttpError(409, "no_seats", "Alle Sitzplätze sind belegt. Erhöhe die Anzahl im Kundenportal.");
+  if (usage.used >= usage.seats) throw NO_SEATS();
+  const rpc = await supabaseAdmin().rpc("assign_team_seat", { p_owner: ownerId, p_member: memberId, p_seats: usage.seats });
+  if (!rpc.error) {
+    if (rpc.data === "no_seats") throw NO_SEATS();
+    if (rpc.data === "seat_taken") throw SEAT_TAKEN();
+    if (rpc.data === "invalid_member") throw new HttpError(422, "invalid_member");
+    if (rpc.data !== "ok") dbFail("team_seats write", { code: "unexpected" });
+    return recomputePlan(memberId);
+  }
+  if (rpc.error.code === "23505") throw SEAT_TAKEN();
+  if (!MISSING_FUNCTION.has(rpc.error.code ?? "")) dbFail("team_seats write", rpc.error);
   const { error } = await supabaseAdmin().from("team_seats").insert({ owner_id: ownerId, member_id: memberId });
   if (error) {
-    if (error.code === "23505") throw new HttpError(409, "seat_taken", "Dieses Mitglied hat schon einen Team-Sitz.");
+    if (error.code === "23505") throw SEAT_TAKEN();
     dbFail("team_seats write", error);
   }
   return recomputePlan(memberId);

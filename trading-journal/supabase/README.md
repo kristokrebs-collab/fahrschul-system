@@ -14,6 +14,7 @@ single-file builds) the app never talks to Supabase (`isCloudAvailable()` in `sr
 
 | `migrations/0005_mfa_everywhere.sql` | review SEC-01 | the aal2 rule (`mfa_satisfied()`) on every remaining client-readable table – `audit_log`, `subscriptions`, `team_seats`, `referral_codes`, `referrals`, `affiliate_ledger`, `api_tokens`, `social_profiles`, `group_invites`, `group_goals`, `shares`, `feedback`, `member_stats` – and on the four `screenshots` storage policies |
 | `migrations/0006_sync_schedule.sql` | review SYNC-01 | `exchange_connections.next_sync_at` + `sync_failures` (service only, no client grant) and the partial index the cron orders by – every cron attempt sets the next turn (synced → next run, failing → back-off 20 min · 2^(n−1) ≤ 12 h, plan without auto-sync → 6 h) |
+| `migrations/0007_seats_screenshots.sql` | reviews MONEY-03, STOR-01 | `assign_team_seat()` (per-owner advisory lock, count + insert in one transaction, service only); `app_config` (service only; the functions report `billing.paymentsEnabled`); `cloud_shots_allowed()`; bucket `screenshots` 5 MB, PNG/JPEG/WebP/GIF, upload / overwrite only with a `screenshotsCloud` plan while payments are on (read / delete unchanged) |
 
 Apply with the Supabase CLI (`supabase db push`) or paste each file into the SQL editor. Every migration runs once;
 never edit an applied migration – add a new one.

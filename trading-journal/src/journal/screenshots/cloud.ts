@@ -32,10 +32,15 @@ function extOf(mime: string): string {
   return "png";
 }
 
+/** Limits of the bucket (migration 0007, review STOR-01): anything else stays on this device instead of failing. */
+export const CLOUD_SHOT_MAX_BYTES = 5 * 1024 * 1024;
+export const CLOUD_SHOT_TYPES: readonly string[] = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+
 /** Uploads a blob for the signed-in user; resolves the object path, or `null` (no cloud, signed out, refused). */
 export async function uploadShot(blob: Blob, id: string, mime = blob.type || "image/png"): Promise<string | null> {
   const uid = cloudShotOwner();
   if (!uid) return null;
+  if (blob.size > CLOUD_SHOT_MAX_BYTES || !CLOUD_SHOT_TYPES.includes(mime)) return null;
   try {
     const m = await ensureCloud();
     const path = `${uid}/${id}.${extOf(mime)}`;

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 import { setSupabaseAdminForTests } from "../../netlify/functions/_lib/supabase";
-import { paymentsConfigured, requireFeature, requireLimit } from "../../netlify/functions/_lib/plan";
+import { paymentsConfigured, requireFeature, requireLimit, resetPaymentsReportForTests } from "../../netlify/functions/_lib/plan";
 import { EXPORT_TABLES } from "../../netlify/functions/_lib/account";
 import {
   assignSeat,
@@ -69,6 +69,8 @@ interface Db {
   seq: number;
   rpcHits: number;
   rateLimit: number;
+  /** Migration 0007 not applied: `assign_team_seat` answers "function not found". */
+  noSeatFn?: boolean;
   /** Users with a verified TOTP factor (`auth.admin.mfa.listFactors`). */
   mfa: Set<string>;
 }
@@ -159,6 +161,7 @@ function fakeDb(): Db {
       stripe_events: [],
       team_seats: [],
       audit_log: [],
+      app_config: [],
     },
     seq: 0,
     rpcHits: 0,
@@ -167,7 +170,16 @@ function fakeDb(): Db {
   };
   const client = {
     from: (t: string) => query(db, t),
-    rpc: async () => {
+    rpc: async (name: string, args: Row = {}) => {
+      if (name === "assign_team_seat") {
+        // 0007: count + insert in one transaction under a per-owner lock – atomic here (no await in between)
+        if (db.noSeatFn) return { data: null, error: { code: "PGRST202" } };
+        const seats = db.tables.team_seats!;
+        if (seats.some((r) => r.member_id === args.p_member)) return { data: "seat_taken", error: null };
+        if (1 + seats.filter((r) => r.owner_id === args.p_owner).length >= Number(args.p_seats)) return { data: "no_seats", error: null };
+        seats.push({ owner_id: args.p_owner, member_id: args.p_member, created_at: new Date().toISOString() });
+        return { data: "ok", error: null };
+      }
       db.rpcHits++;
       return { data: db.rateLimit, error: null };
     },
@@ -465,6 +477,7 @@ let stripe: FakeStripe;
 
 beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
+  resetPaymentsReportForTests();
   db = fakeDb();
   stripe = fakeStripe();
   setEnv(true);
@@ -557,6 +570,18 @@ describe("GET /api/v1/billing/status", () => {
     expect((await call(statusFn, req("/api/v1/billing/status"))).body.config).toMatchObject({ coachAi: true });
     if (prev === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = prev;
+  });
+
+  it("tells the database whether payments are on – the screenshots bucket gates uploads only then (STOR-01)", async () => {
+    await call(statusFn, req("/api/v1/billing/status"));
+    expect(db.tables.app_config).toEqual([expect.objectContaining({ key: "billing", value: { paymentsEnabled: true } })]);
+    setEnv(false);
+    await call(statusFn, req("/api/v1/billing/status"));
+    expect(db.tables.app_config).toEqual([expect.objectContaining({ key: "billing", value: { paymentsEnabled: false } })]);
+    // without migration 0007 nothing breaks
+    delete db.tables.app_config;
+    setEnv(true);
+    expect((await call(statusFn, req("/api/v1/billing/status"))).status).toBe(200);
   });
 
   it("reports the real Stripe prices and the buyable plans", async () => {
@@ -880,6 +905,25 @@ describe("POST /api/v1/stripe/webhook", () => {
     expect(profile(db, U2)).toMatchObject({ plan: "free" });
     expect(await releaseSeat(U1, U2)).toMatchObject({ plan: "free" });
     expect(db.tables.team_seats).toHaveLength(0);
+  });
+
+  it("team: two members joining at the same moment never take more seats than were paid (MONEY-03)", async () => {
+    stripe.subs.set("sub_t", stripeSub("sub_t", { customer: "cus_t", user: U1, price: "price_team_m", quantity: 2, status: "active", trialEnd: null }));
+    await deliver(event("customer.subscription.created", stripe.subs.get("sub_t")));
+    const res = await Promise.allSettled([assignSeat(U1, U2), assignSeat(U1, U3)]);
+    expect(res.map((r) => r.status).sort()).toEqual(["fulfilled", "rejected"]);
+    expect((res.find((r) => r.status === "rejected") as PromiseRejectedResult).reason).toMatchObject({ status: 409, code: "no_seats" });
+    expect(db.tables.team_seats).toHaveLength(1);
+    // a member who already holds a seat
+    await expect(assignSeat(U1, db.tables.team_seats![0]!.member_id as string)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("team: without migration 0007 the seat is still written (old two-step path)", async () => {
+    db.noSeatFn = true;
+    stripe.subs.set("sub_t", stripeSub("sub_t", { customer: "cus_t", user: U1, price: "price_team_m", quantity: 3, status: "active", trialEnd: null }));
+    await deliver(event("customer.subscription.created", stripe.subs.get("sub_t")));
+    expect(await assignSeat(U1, U2)).toMatchObject({ plan: "team" });
+    expect(db.tables.team_seats).toEqual([expect.objectContaining({ owner_id: U1, member_id: U2 })]);
   });
 });
 

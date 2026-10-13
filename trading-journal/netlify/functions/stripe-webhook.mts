@@ -9,6 +9,7 @@
  */
 import type { Config } from "@netlify/functions";
 import { handler, HttpError, json, requireMethod } from "./_lib/http";
+import { reportPaymentsConfig } from "./_lib/plan";
 import { processEvent, verifyWebhook } from "./_lib/stripe";
 
 /** Stripe events are far below this; anything bigger is not from Stripe. */
@@ -23,6 +24,7 @@ export default handler(async (req) => {
   if (raw.length > MAX_BYTES) throw new HttpError(413, "payload_too_large");
   const event = await verifyWebhook(raw, req.headers.get("stripe-signature"));
   const { result } = await processEvent(event);
+  await reportPaymentsConfig(); // payments are evidently on (review STOR-01)
   return json({ received: true, result });
 });
 

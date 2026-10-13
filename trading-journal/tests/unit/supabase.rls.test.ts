@@ -13,6 +13,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { PLAN_FEATURES } from "../../src/billing/plans";
+import { grantsPlan, PLAN_STATUSES, type PlanId } from "../../src/billing/types";
 
 const MIG_DIR = join(__dirname, "../../supabase/migrations");
 
@@ -33,7 +35,7 @@ grant execute on function auth.jwt() to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
 create publication supabase_realtime;
 create schema storage; grant usage on schema storage to anon, authenticated, service_role;
-create table storage.buckets (id text primary key, name text, public boolean);
+create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint, allowed_mime_types text[]);
 create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
 alter table storage.objects enable row level security;
 create function storage.foldername(name text) returns text[] language sql immutable as $$ select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
@@ -189,6 +191,69 @@ describe("aal2 rule (SEC-01): a 2FA user's password-only session reaches nothing
       for (const t of GUARDED) await expect(db.query(`select ${COLS[t] ?? "*"} from public.${t}`)).rejects.toThrow(/permission denied/);
     } finally {
       await db.exec("reset role;");
+    }
+  });
+});
+
+describe("0007: paid seats are a hard limit, the screenshots bucket has limits and a plan gate (MONEY-03, STOR-01)", () => {
+  const seat = async (owner: string, member: string, seats: number) =>
+    (await as<{ r: string }>(null, `select public.assign_team_seat('${owner}', '${member}', ${seats}) as r`))[0]!.r;
+
+  it("assign_team_seat counts and inserts under one lock; only the service role may call it", async () => {
+    await service(`delete from public.team_seats`);
+    expect(await seat(A, B, 2)).toBe("ok");
+    expect(await seat(A, C, 2)).toBe("no_seats"); // owner + B = 2 of 2
+    expect(await seat(A, B, 3)).toBe("seat_taken");
+    expect(await seat(A, A, 3)).toBe("invalid_member");
+    expect(await seat(A, C, 3)).toBe("ok");
+    expect(await as(null, `select count(*)::int as n from public.team_seats where owner_id = '${A}'`)).toEqual([{ n: 2 }]);
+    await expect(as(jwt(A, "aal2"), `select public.assign_team_seat('${A}', '${C}', 9)`)).rejects.toThrow(/permission denied/);
+    await service(`delete from public.team_seats; insert into public.team_seats (owner_id, member_id) values ('${A}', '${C}')`);
+  });
+
+  it("the bucket takes at most 5 MB of PNG / JPEG / WebP / GIF", async () => {
+    expect((await db.query(`select file_size_limit::int as max, allowed_mime_types as types from storage.buckets where id = 'screenshots'`)).rows).toEqual([
+      { max: 5 * 1024 * 1024, types: ["image/png", "image/jpeg", "image/webp", "image/gif"] },
+    ]);
+  });
+
+  it("with payments on, a Free plan cannot upload or overwrite – but still reads and deletes its own pictures", async () => {
+    await service(`insert into public.app_config (key, value) values ('billing', '{"paymentsEnabled": true}') on conflict (key) do update set value = excluded.value`);
+    try {
+      await service(`update public.profiles set plan = 'free', plan_status = 'none' where id = '${B}'`);
+      await expect(as(jwt(B, "aal1"), `insert into storage.objects (bucket_id, name) values ('screenshots', '${B}/t_8/free.png')`)).rejects.toThrow(/row-level security/);
+      await expect(as(jwt(B, "aal1"), `update storage.objects set name = '${B}/t_2/renamed.png' where name = '${B}/t_2/shot.png'`)).rejects.toThrow(/row-level security/);
+      expect(await as(jwt(B, "aal1"), `select name from storage.objects where name = '${B}/t_2/shot.png'`)).toHaveLength(1);
+
+      // Pro (active) uploads; an ended Pro (canceled) no longer does
+      await service(`update public.profiles set plan = 'pro', plan_status = 'active' where id = '${B}'`);
+      expect(await as(jwt(B, "aal1"), `insert into storage.objects (bucket_id, name) values ('screenshots', '${B}/t_8/pro.png') returning name`)).toHaveLength(1);
+      await service(`update public.profiles set plan = 'pro', plan_status = 'canceled' where id = '${B}'`);
+      await expect(as(jwt(B, "aal1"), `insert into storage.objects (bucket_id, name) values ('screenshots', '${B}/t_8/late.png')`)).rejects.toThrow(/row-level security/);
+      expect(await as(jwt(B, "aal1"), `delete from storage.objects where name = '${B}/t_8/pro.png' returning name`)).toHaveLength(1);
+
+      // the clients never read the switch
+      await expect(as(jwt(B, "aal1"), `select * from public.app_config`)).rejects.toThrow(/permission denied/);
+    } finally {
+      await service(`delete from public.app_config; update public.profiles set plan = 'free', plan_status = 'none' where id = '${B}'`);
+    }
+    // payments off (or not reported yet): no paywall, like every other gate
+    expect(await as(jwt(B, "aal1"), `insert into storage.objects (bucket_id, name) values ('screenshots', '${B}/t_8/open.png') returning name`)).toHaveLength(1);
+  });
+
+  it("the SQL plan list matches src/billing/plans.ts (screenshotsCloud) for every plan and status", async () => {
+    await service(`insert into public.app_config (key, value) values ('billing', '{"paymentsEnabled": true}') on conflict (key) do update set value = excluded.value`);
+    try {
+      for (const plan of Object.keys(PLAN_FEATURES) as PlanId[]) {
+        for (const status of PLAN_STATUSES) {
+          await service(`update public.profiles set plan = '${plan}', plan_status = '${status}' where id = '${B}'`);
+          const [row] = await as<{ ok: boolean }>(null, `select public.cloud_shots_allowed('${B}') as ok`);
+          const want = PLAN_FEATURES[plan].has("screenshotsCloud") && (plan === "free" || grantsPlan(status));
+          expect({ plan, status, ok: row!.ok }).toEqual({ plan, status, ok: want });
+        }
+      }
+    } finally {
+      await service(`delete from public.app_config; update public.profiles set plan = 'free', plan_status = 'none' where id = '${B}'`);
     }
   });
 });
