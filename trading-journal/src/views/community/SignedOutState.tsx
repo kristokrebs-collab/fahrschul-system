@@ -51,7 +51,7 @@ export function SignedOutState({ mfa = false }: { mfa?: boolean }) {
               </div>
               <Principles className="mt-2" delay={0.3} />
             </div>
-            <div className="hidden place-items-center rounded-2xl border border-line-2 bg-[radial-gradient(100%_100%_at_50%_0%,#1c1c1c_0%,#0a0a0a_70%)] px-6 py-7 md:grid">
+            <div className="hidden place-items-center rounded-2xl border border-line-2 bg-[radial-gradient(100%_100%_at_50%_0%,var(--color-ink-750)_0%,var(--color-ink-900)_70%)] px-6 py-7 md:grid">
               <Constellation size={6} gap={2} />
             </div>
           </div>

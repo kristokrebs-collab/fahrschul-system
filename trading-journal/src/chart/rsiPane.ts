@@ -18,11 +18,29 @@ import { NOTHING_RSI_LINE } from "./theme";
 import { EMPTY_RSI_OVERLAY, RsiOverlay, type RsiOverlayBreak, type RsiOverlayData, type RsiOverlayLine } from "./primitives/RsiOverlay";
 
 export const RSI_LEN = 14;
-/** Reference lines of the pane. */
+/** Reference lines of the pane (colours from the live palette, read when a pane is built or re-inked). */
 export const RSI_LEVELS = [
-  { price: 70, color: ink.ref, style: LineStyle.Dotted },
-  { price: 50, color: ink.grid, style: LineStyle.Solid },
-  { price: 30, color: ink.ref, style: LineStyle.Dotted },
+  {
+    price: 70,
+    get color(): string {
+      return ink.ref;
+    },
+    style: LineStyle.Dotted,
+  },
+  {
+    price: 50,
+    get color(): string {
+      return ink.grid;
+    },
+    style: LineStyle.Solid,
+  },
+  {
+    price: 30,
+    get color(): string {
+      return ink.ref;
+    },
+    style: LineStyle.Dotted,
+  },
 ] as const;
 /** Bars an active trendline is extended into the future space (dotted). */
 export const RSI_EXTEND_BARS = 6;
@@ -145,6 +163,12 @@ export class RsiPane {
     this.series = chart.addSeries(LineSeries, { ...NOTHING_RSI_LINE, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) }, paneIndex);
     this.levels = RSI_LEVELS.map((l) => this.series.createPriceLine({ price: l.price, color: l.color, lineWidth: 1, lineStyle: l.style, axisLabelVisible: false, title: "" }));
     this.series.attachPrimitive(this.overlay);
+  }
+
+  /** The palette changed (light mode / accent): line, crosshair dot and guides follow; the overlay reads `ink` per draw. */
+  applyInk(): void {
+    this.series.applyOptions({ color: ink.fg, crosshairMarkerBorderColor: ink.bg, crosshairMarkerBackgroundColor: ink.fg });
+    this.levels.forEach((line, i) => line.applyOptions({ color: RSI_LEVELS[i]!.color }));
   }
 
   /** Every bar of the chart (the last one forming): full RSI, Wilder state, and – on a closed-bar change – the trendlines. */

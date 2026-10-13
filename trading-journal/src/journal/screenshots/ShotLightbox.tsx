@@ -116,6 +116,8 @@ export function ShotLightbox({ shots, index, onIndex, onClose, title = "Screensh
       {open && shot && (
         <motion.div
           key="lightbox"
+          // a cinematic layer: the screenshots stay on ink in light mode too (themes.css dark island)
+          data-theme-scope="dark"
           className="fixed inset-0 z-[75] grid place-items-center bg-black/90 p-3 sm:p-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

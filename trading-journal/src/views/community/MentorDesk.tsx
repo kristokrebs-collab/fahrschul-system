@@ -122,7 +122,7 @@ export function GoalSheet() {
 function QueueCard({ r, group, onAnswer }: { r: ReviewInfo; group: GroupDetail; onAnswer: (id: string) => void }) {
   const p = r.payload;
   return (
-    <div className="grid h-full content-between gap-3 rounded-2xl border border-line-2 bg-[linear-gradient(160deg,#1c1c1c_0%,#111_60%)] p-4" data-testid="queue-card">
+    <div className="grid h-full content-between gap-3 rounded-2xl border border-line-2 bg-[linear-gradient(160deg,var(--color-ink-750)_0%,var(--color-ink-850)_60%)] p-4" data-testid="queue-card">
       <div className="grid gap-2">
         <div className="flex items-center gap-2">
           <Monogram pseudonym={r.author} size="xs" />

@@ -33,7 +33,7 @@ import { observeInView } from "@/motion/inView";
 import { playStripWipe } from "@/motion/pulse/StripWipe";
 import { tween } from "@/motion/tokens";
 import { cn } from "@/lib/cn";
-import { CHART_FONT, CHART_FONT_LOAD, CHART_MIN_BAR_SPACING, CHART_PRICE_MIN_MOVE, CHART_RIGHT_OFFSET, NOTHING_DARK, ink, inkCandleOptions, inkChartOptions, subscribeInk } from "./theme";
+import { CHART_FONT, CHART_FONT_LOAD, CHART_MIN_BAR_SPACING, CHART_PRICE_MIN_MOVE, CHART_RIGHT_OFFSET, ink, inkCandleOptions, inkChartOptions, inkVolumeOptions, makeNothingTheme, subscribeInk } from "./theme";
 import {
   INTERVAL_SECONDS,
   PaneController,
@@ -42,6 +42,7 @@ import {
   sec,
   toCandleData,
   toVolumeData,
+  volumeColor,
   type ChartInterval,
   type MainSeries,
   type PaneKind,
@@ -468,7 +469,7 @@ function surfaceColor(el: HTMLElement): string {
     const c = getComputedStyle(n).backgroundColor;
     if (c && c !== "transparent" && !/rgba\([^)]*,\s*0\)$/.test(c)) return c;
   }
-  return "#0a0a0a";
+  return ink.bg;
 }
 
 /**
@@ -667,7 +668,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   function buildChart(node: HTMLDivElement): ChartRecord {
     // autoSize off: our observer below sizes the chart and ignores the 0 × 0 report of a hidden (display:none) page, so
     // hiding and showing the kept-alive overview never resizes (or repaints) the chart at 0 × 0 and back
-    const chart = createChart(node, { ...NOTHING_DARK, autoSize: false });
+    // the theme from the LIVE palette (light mode): a chart built after a theme switch starts in the current ink
+    const chart = createChart(node, { ...makeNothingTheme(), autoSize: false });
     const main = createMainSeries(chart);
     const panes = new PaneController(chart);
     // the check overlay first (S/R under the candles, dots / lines / labels with the series), trade markers above it
@@ -897,6 +899,21 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     const offInk = subscribeInk(() => {
       chart.applyOptions(inkChartOptions());
       main.candles.applyOptions(inkCandleOptions());
+      main.volume.applyOptions(inkVolumeOptions());
+      // per-bar volume tints, the sub pane, level lines + zone and the trade markers carry colours of their own
+      const vol = main.volume.data();
+      if (vol.length) {
+        const bar = new Map(instance.data.map((d) => [d.time, d]));
+        main.volume.setData(
+          vol.map((d) => {
+            const c = bar.get(d.time as UTCTimestamp);
+            return c && "value" in d ? { ...d, color: volumeColor(c.open, c.close) } : d;
+          }),
+        );
+      }
+      panes.applyInk();
+      if (instance.levels) syncLevels(instance, latest.current.levels, latest.current.activeScenario, true);
+      if (instance.data.length) syncMarkers(instance, latest.current.markers);
       check.invalidate();
       boxes.invalidate();
     });

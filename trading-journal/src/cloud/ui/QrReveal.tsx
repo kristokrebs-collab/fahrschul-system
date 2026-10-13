@@ -41,7 +41,7 @@ export function QrReveal({ src, alt, className }: QrRevealProps) {
   const [done, setDone] = useState(reduced);
   const span = tween.draw.duration;
   return (
-    <div className={cn("relative mx-auto aspect-square w-[min(100%,13rem)] rounded-2xl bg-white p-3 shadow-[0_18px_50px_rgb(0_0_0/0.45)]", className)}>
+    <div className={cn("relative mx-auto aspect-square w-[min(100%,13rem)] rounded-2xl bg-white p-3 shadow-[0_18px_50px_rgb(0_0_0/calc(0.45*var(--shade,1)))]", className)}>
       <motion.img
         src={src}
         alt={alt}

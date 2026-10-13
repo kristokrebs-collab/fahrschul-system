@@ -17,6 +17,7 @@ import { memo, useEffect, useRef, useState, type ReactNode } from "react";
 import { ageText, mmss, TOO_FEW_BARS, whaleCfgOf, ZONE_TEXT, zoneFooterText, zonePillText, type SignalCfg, type SignalState, type Side, type TfCheck, type TraderReading, type Verdict } from "@/domain/signals";
 import type { DeltaPoint } from "@/domain/signals/traders";
 import { cn } from "@/lib/cn";
+import { themePaint } from "@/lib/themePaint";
 import { n0, n1 } from "@/lib/format";
 import { priceMv, signalClockOffset } from "@/market";
 import { useNowMv } from "@/motion/clock";
@@ -132,7 +133,7 @@ export const StrengthDots = memo(function StrengthDots({ strength, color, outlin
         <span key={i} className={cn("relative rounded-full bg-(--color-line-2)", size === "md" ? "size-2" : "size-1.5")} aria-hidden="true">
           <motion.span
             className="absolute inset-0 rounded-full"
-            style={outlined ? { border: `1.5px dashed ${color}`, backgroundColor: "#0a0a0a" } : { backgroundColor: color }}
+            style={outlined ? { border: `1.5px dashed ${color}`, backgroundColor: "var(--color-ink-900, #0a0a0a)" } : { backgroundColor: color }}
             initial={false}
             animate={{ opacity: i <= strength ? 1 : 0, scale: i <= strength ? 1 : 0.4 }}
             transition={reduced ? tween.crossfade : { opacity: tween.fade, scale: { ...spring.pop, delay: (i - 1) * stagger.reveal } }}
@@ -160,7 +161,7 @@ export interface VerdictRowProps {
  */
 export const VerdictRow = memo(function VerdictRow({ v, ladderLength, flash, line }: VerdictRowProps) {
   const reduced = useReducedFx();
-  const color = verdictColor(v);
+  const color = themePaint(verdictColor(v));
   const st = strengthView(v, ladderLength);
   const lbl = labelParts(v.label);
   const lage = lageLine(v);
@@ -179,7 +180,7 @@ export const VerdictRow = memo(function VerdictRow({ v, ladderLength, flash, lin
           className="pointer-events-none absolute -inset-1 rounded-full opacity-0"
           style={{ boxShadow: `0 0 28px 3px color-mix(in srgb, ${color} 45%, transparent), inset 0 0 18px color-mix(in srgb, ${color} 35%, transparent)` }}
         />
-        <RingGauge value={v.score / 100} size={86} stroke={8} color={color} track="#1f1f1f" aria-label={`Score ${v.score} von 100`}>
+        <RingGauge value={v.score / 100} size={86} stroke={8} color={color} track={themePaint("#1f1f1f")} aria-label={`Score ${v.score} von 100`}>
           <span className="dot-num text-[26px] leading-none text-fg">
             <ScoreRoll score={v.score} />
           </span>
@@ -297,15 +298,15 @@ export const Meter = memo(function Meter({ label, value, min, max, bands, active
 export function StateDot({ tone, strong, state, lit, size = 8 }: { tone: Side | null; strong: boolean; state: SignalState; lit: boolean; size?: number }) {
   if (!tone) return <span aria-hidden="true" className="block shrink-0 rounded-full bg-line-2" style={{ width: size, height: size }} />;
   if (state === "provisional") {
-    const c = PROV_COLOR[tone];
+    const c = themePaint(PROV_COLOR[tone]);
     return (
       <svg aria-hidden="true" viewBox="0 0 10 10" className="block shrink-0" style={{ width: size + 2, height: size + 2, margin: -1 }}>
         <circle cx="5" cy="5" r="4" fill={strong ? c : "none"} fillOpacity={strong ? 0.35 : 0} stroke={c} strokeWidth="1.5" strokeDasharray="2.1 1.55" />
       </svg>
     );
   }
-  const color = SIDE_COLOR[tone];
-  const ring = state === "strong" ? `0 0 0 1.5px #0a0a0a, 0 0 0 2.5px ${color}` : "";
+  const color = themePaint(SIDE_COLOR[tone]);
+  const ring = state === "strong" ? `0 0 0 1.5px var(--color-ink-900, #0a0a0a), 0 0 0 2.5px ${color}` : "";
   const glow = lit ? `0 0 8px 1px ${GLOW[tone]}` : "";
   const shadow = [ring, glow].filter(Boolean).join(", ");
   return (
@@ -578,7 +579,7 @@ export const ZoneGauge = memo(function ZoneGauge({ c, side }: { c: TfCheck | nul
         <div className="absolute inset-y-0 right-0 w-[5%] bg-loss/35" />
         <div className="absolute inset-y-0 left-[47.5%] w-[5%] bg-white/[0.07]" />
         <motion.span className="absolute inset-y-0 left-0 w-full will-change-transform" style={{ x }} aria-hidden="true">
-          <span className="absolute inset-y-1 left-0 w-[3px] -translate-x-1/2 rounded-full bg-fg shadow-[0_0_0_3px_rgb(4_4_4/0.6)]" />
+          <span className="absolute inset-y-1 left-0 w-[3px] -translate-x-1/2 rounded-full bg-fg shadow-[0_0_0_3px_rgb(var(--veil-ink-rgb,4_4_4)/0.6)]" />
         </motion.span>
       </div>
       <div className="mt-1.5 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-[0.1em]">

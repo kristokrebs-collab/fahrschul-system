@@ -23,6 +23,10 @@ const INK_BASE = {
   /** `win` / `loss` at ~50 % saturation: provisional (forming-candle) signals, decision 9 */
   winSoft: "#65b488",
   lossSoft: "#d2797a",
+  /** the veil ink (maximum-foreground ink, always used with an alpha via `withAlpha`): volume bars, bands, zone fill */
+  veil: "#ffffff",
+  /** text on a mid-grey / signal axis label (the fg ink on ink, the paper on paper) */
+  onFill: "#f2f2f2",
 } as const;
 
 export type InkKey = keyof typeof INK_BASE;
@@ -59,4 +63,28 @@ export function resetInk(): void {
 export function subscribeInk(cb: () => void): () => void {
   listeners.add(cb);
   return () => void listeners.delete(cb);
+}
+
+/**
+ * A palette colour with an alpha as a canvas colour: `withAlpha("#ffffff", 0.14)` → `rgba(255,255,255,0.14)` (the very
+ * string the charts used before the palette went live, so the dark look is unchanged). Non-hex input passes through.
+ */
+export function withAlpha(color: string, alpha: number): string {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color.trim());
+  if (!m) return color;
+  const h = m[1]!.length === 3 ? [...m[1]!].map((c) => c + c).join("") : m[1]!;
+  const n = parseInt(h, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
+
+const KEY_OF_DEFAULT = new Map<string, InkKey>();
+for (const k of Object.keys(INK_BASE) as InkKey[]) if (!KEY_OF_DEFAULT.has(INK_BASE[k])) KEY_OF_DEFAULT.set(INK_BASE[k], k);
+
+/**
+ * A stored dark-palette colour (an annotation's `#f2f2f2`, a setup marker …) as the live palette's colour of the same
+ * role: `inkOf("#f2f2f2")` is `ink.fg` (`#121212` in light mode). Colours that are no palette default pass through.
+ */
+export function inkOf(color: string): string {
+  const k = KEY_OF_DEFAULT.get(color.trim().toLowerCase());
+  return k ? ink[k] : color;
 }

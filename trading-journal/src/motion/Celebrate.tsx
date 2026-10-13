@@ -3,6 +3,7 @@ import { memo, useLayoutEffect, useMemo, useRef } from "react";
 import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useUi, type Celebration, type CelebrateKind, type CelebrateTone } from "@/store/uiStore";
+import { themePaint } from "@/lib/themePaint";
 
 /**
  * Confetti burst overlay (21st.dev "Confetti burst", Nothing variant): round glyph dots only, white + win-green,
@@ -183,7 +184,7 @@ const Burst = memo(function Burst({ burst, reduced, onDone }: { burst: Celebrati
           key={i}
           data-record={p.record || undefined}
           className="absolute left-0 top-0 rounded-full will-change-transform"
-          style={{ width: p.size, height: p.size, background: p.color, opacity: 0, transform: p.transform[0], boxShadow: p.record ? `0 0 10px ${PARTICLE_COLORS.signal}` : undefined }}
+          style={{ width: p.size, height: p.size, background: themePaint(p.color), opacity: 0, transform: p.transform[0], boxShadow: p.record ? `0 0 10px ${themePaint(PARTICLE_COLORS.signal)}` : undefined }}
         />
       ))}
     </div>

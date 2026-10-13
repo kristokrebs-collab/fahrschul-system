@@ -374,14 +374,14 @@ function LayerGlyph({ layer }: { layer: keyof OverlayLayers }) {
   if (layer === "sr")
     return (
       <svg {...common}>
-        <rect x="1" y="3.5" width="16" height="3" fill="rgba(255,255,255,0.08)" />
-        <path d="M1 3.5 H17" stroke="#9b9b9b" strokeWidth="1" />
+        <rect x="1" y="3.5" width="16" height="3" fill="rgb(var(--veil-rgb, 255 255 255) / 0.08)" />
+        <path d="M1 3.5 H17" stroke="var(--color-mute, #9b9b9b)" strokeWidth="1" />
       </svg>
     );
   return (
     <svg {...common}>
-      <path d="M1 6.5 H17" stroke="#9b9b9b" strokeWidth="1" strokeDasharray="2 2.5" />
-      <path d="M7 3 H11" stroke="#5f5f5f" strokeWidth="1" />
+      <path d="M1 6.5 H17" stroke="var(--color-mute, #9b9b9b)" strokeWidth="1" strokeDasharray="2 2.5" />
+      <path d="M7 3 H11" stroke="var(--color-faint, #5f5f5f)" strokeWidth="1" />
     </svg>
   );
 }
@@ -390,7 +390,7 @@ function LayerGlyph({ layer }: { layer: keyof OverlayLayers }) {
 function BoxGlyph() {
   return (
     <svg width="18" height="10" viewBox="0 0 18 10" aria-hidden="true" className="shrink-0">
-      <rect x="1" y="2.5" width="9" height="5" fill="rgba(255,255,255,0.1)" stroke="#9b9b9b" strokeWidth="1" />
+      <rect x="1" y="2.5" width="9" height="5" fill="rgb(var(--veil-rgb, 255 255 255) / 0.1)" stroke="var(--color-mute, #9b9b9b)" strokeWidth="1" />
       <path d="M10 1.5 H17" stroke="var(--color-win)" strokeWidth="1" strokeDasharray="1.5 2" />
     </svg>
   );
@@ -401,11 +401,11 @@ function StateGlyph({ state }: { state: "provisional" | "confirmed" | "strong" }
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" className="shrink-0">
       {state === "provisional" ? (
-        <circle cx="6" cy="6" r="3" fill="none" stroke="#9b9b9b" strokeWidth="1.25" />
+        <circle cx="6" cy="6" r="3" fill="none" stroke="var(--color-mute, #9b9b9b)" strokeWidth="1.25" />
       ) : (
-        <circle cx="6" cy="6" r="3.25" fill="#d9d9d9" />
+        <circle cx="6" cy="6" r="3.25" fill="var(--color-teal, #d9d9d9)" />
       )}
-      {state === "strong" && <circle cx="6" cy="6" r="5.4" fill="none" stroke="#d9d9d9" strokeOpacity="0.5" strokeWidth="1" />}
+      {state === "strong" && <circle cx="6" cy="6" r="5.4" fill="none" stroke="var(--color-teal, #d9d9d9)" strokeOpacity="0.5" strokeWidth="1" />}
     </svg>
   );
 }
@@ -413,7 +413,7 @@ function StateGlyph({ state }: { state: "provisional" | "confirmed" | "strong" }
 function LineGlyph({ dashed }: { dashed?: boolean }) {
   return (
     <svg width="16" height="8" viewBox="0 0 16 8" aria-hidden="true" className="shrink-0">
-      <path d="M1 4 H15" stroke="#d9d9d9" strokeWidth="1.25" strokeDasharray={dashed ? "3.5 2.5" : undefined} />
+      <path d="M1 4 H15" stroke="var(--color-teal, #d9d9d9)" strokeWidth="1.25" strokeDasharray={dashed ? "3.5 2.5" : undefined} />
     </svg>
   );
 }

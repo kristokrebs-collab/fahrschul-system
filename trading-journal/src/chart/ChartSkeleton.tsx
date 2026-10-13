@@ -35,7 +35,7 @@ export function ChartSkeleton({ className, rows = 5, cols = 6, label = "Chart wi
         aria-hidden
         className="absolute inset-0"
         style={{
-          backgroundImage: "radial-gradient(circle at 1px 1px, #ffffff0e 1px, transparent 0)",
+          backgroundImage: "radial-gradient(circle at 1px 1px, var(--page-dots, #ffffff0e) 1px, transparent 0)",
           backgroundSize: "22px 22px",
         }}
       />

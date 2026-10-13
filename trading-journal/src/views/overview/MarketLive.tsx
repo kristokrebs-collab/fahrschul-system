@@ -175,7 +175,7 @@ interface TileExplain {
   body: () => ReactNode;
 }
 
-const TILE_SURFACE = "@container relative isolate min-w-0 overflow-hidden rounded-xl border border-line bg-ink-900 bg-[linear-gradient(rgb(4_4_4/0.3),rgb(4_4_4/0.3))] px-2.5 py-1.5";
+const TILE_SURFACE = "@container relative isolate min-w-0 overflow-hidden rounded-xl border border-line bg-ink-900 bg-[linear-gradient(rgb(var(--veil-ink-rgb,4_4_4)/0.3),rgb(var(--veil-ink-rgb,4_4_4)/0.3))] px-2.5 py-1.5";
 
 /**
  * Mini tile; `flashOn` washes the whole tile green/red when that value moves by at least `minMove`, at most once per

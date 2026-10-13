@@ -490,7 +490,7 @@ function UnsavedBar({
     <div className="sticky z-[41] flex justify-center" style={{ top: BAR_TOP }} data-unsaved-bar="">
       <motion.div
         className={cn(
-          "flex min-w-0 max-w-full items-center gap-2 rounded-full border border-line-2 bg-ink-850 py-1.5 pl-3 pr-1.5 shadow-[0_18px_48px_rgb(0_0_0/0.55)] sm:gap-3 sm:pl-4",
+          "flex min-w-0 max-w-full items-center gap-2 rounded-full border border-line-2 bg-ink-850 py-1.5 pl-3 pr-1.5 shadow-[0_18px_48px_rgb(0_0_0/calc(0.55*var(--shade,1)))] sm:gap-3 sm:pl-4",
           !open && "pointer-events-none",
         )}
         style={{ clipPath }}

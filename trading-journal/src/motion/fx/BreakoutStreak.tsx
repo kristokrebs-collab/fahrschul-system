@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
-import { FX_HEX, type FxTone } from "@/motion/fx/shared";
+import { liveHex, type FxTone } from "@/motion/fx/shared";
 import { cubicBezier, seeded } from "@/motion/pulse/engine";
 import { createTimeline, usePlayTrigger, type Timeline } from "@/motion/pulse/textKit";
 import { ease, stagger, tween } from "@/motion/tokens";
@@ -150,7 +150,7 @@ export function BreakoutStreak({ direction = "up", tone = "win", count = BREAKOU
     burst.current += 1;
     const ps = streakParticles(n, sd + burst.current);
     const total = streakDuration(ps);
-    const color = FX_HEX[tn];
+    const color = liveHex(tn);
     const angle = ANGLE[dir];
     const timeline = createTimeline(c, (ms) => {
       const t = ms / 1000;

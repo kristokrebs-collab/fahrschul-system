@@ -193,7 +193,7 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
             ref={(el) => {
               cardRefs.current[i] = el;
             }}
-            className={cn("absolute overflow-hidden rounded-[1.2cqw] border border-white/10 bg-ink-850 shadow-[0_1.5cqw_3cqw_-1cqw_rgb(0_0_0/0.6)]", !cards && "aspect-[3/2] [&>*]:size-full")}
+            className={cn("absolute overflow-hidden rounded-[1.2cqw] border border-white/10 bg-ink-850 shadow-[0_1.5cqw_3cqw_-1cqw_rgb(0_0_0/calc(0.6*var(--shade,1)))]", !cards && "aspect-[3/2] [&>*]:size-full")}
             style={{ left: `${cx * 100}%`, top: `${cy * 100}%`, width: `${w * 100}%`, transform: "translate(-50%,-50%)" }}
           >
             {card}
@@ -217,7 +217,7 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
         <span className="pointer-events-none absolute inset-0 shadow-[inset_0_0_0_1px_rgb(229_32_46/0.35),inset_0_0_4cqw_rgb(229_32_46/0.12)]" />
       </div>
       {/* headline lines */}
-      <span ref={topRef} aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/0.85)]" style={{ transform: "translate(-50%,-100%)" }}>
+      <span ref={topRef} aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/calc(0.85*var(--shade,1)))]" style={{ transform: "translate(-50%,-100%)" }}>
         <span className="grid [grid-template-areas:'l'] justify-items-center">
           <span ref={topA} className="[grid-area:l]">
             {lines[0]}
@@ -227,7 +227,7 @@ export function ReelWindow({ reels, lines, swapLines, cards, play, playOnView = 
           </span>
         </span>
       </span>
-      <span ref={botRef} aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/0.85)]" style={{ transform: "translate(-50%,0)" }}>
+      <span ref={botRef} aria-hidden="true" className="pointer-events-none absolute left-1/2 top-1/2 whitespace-nowrap text-[4.6cqw] font-medium leading-none tracking-[-0.045em] text-fg [text-shadow:0_0.4cqw_2.4cqw_rgb(0_0_0/calc(0.85*var(--shade,1)))]" style={{ transform: "translate(-50%,0)" }}>
         <span className="grid [grid-template-areas:'l'] justify-items-center">
           <span ref={botA} className="[grid-area:l]">
             {lines[1]}

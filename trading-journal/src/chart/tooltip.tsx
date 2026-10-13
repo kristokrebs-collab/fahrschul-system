@@ -10,7 +10,7 @@ import { fmt } from "./format";
 import { formatChartTime } from "./timeFormat";
 
 export const TOOLTIP_CLASS =
-  "rounded-xl border border-line-2 bg-ink-850/95 px-3 py-2 text-xs shadow-[0_12px_32px_rgb(0_0_0/0.45)] backdrop-blur-sm";
+  "rounded-xl border border-line-2 bg-ink-850/95 px-3 py-2 text-xs shadow-[0_12px_32px_rgb(0_0_0/calc(0.45*var(--shade,1)))] backdrop-blur-sm";
 
 export interface TooltipData {
   /** UTC seconds */

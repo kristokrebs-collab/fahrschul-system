@@ -150,7 +150,7 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
             <span
               aria-hidden="true"
               className="fx-ants -inset-px opacity-0 transition-opacity duration-200 before:[animation-play-state:paused] group-hover:opacity-100 group-hover:before:[animation-play-state:running] group-focus-visible:opacity-100 group-focus-visible:before:[animation-play-state:running]"
-              style={{ "--fx-ants-color": "rgb(255 255 255 / 0.38)" } as CSSProperties}
+              style={{ "--fx-ants-color": "rgb(var(--veil-rgb, 255 255 255) / 0.38)" } as CSSProperties}
             />
             <span className="grid justify-items-center gap-2 text-[13.5px] font-semibold">
               <motion.span variants={PLUS} transition={spring.plus} className="grid size-10 place-items-center rounded-full border border-line-2 transition-colors group-hover:border-white/40 [&>svg]:size-4">

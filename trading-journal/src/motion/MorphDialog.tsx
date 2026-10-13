@@ -357,7 +357,7 @@ export function MorphDialogProvider({ children }: { children: ReactNode }) {
               <motion.div ref={columnRef} className={cn("pointer-events-none relative w-full max-w-[620px]", open.className)} style={swipe.style}>
                 <motion.div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 shadow-[0_40px_90px_rgb(0_0_0/0.45)]"
+                  className="pointer-events-none absolute inset-0 shadow-[0_40px_90px_rgb(0_0_0/calc(0.45*var(--shade,1)))]"
                   style={{ borderRadius: radius.dialog }}
                   initial={reduced ? false : { opacity: 0 }}
                   animate={{ opacity: morphDone || reduced ? 1 : 0 }}

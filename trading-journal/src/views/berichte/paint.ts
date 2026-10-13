@@ -4,10 +4,7 @@
  * away strip by strip over the new, already drawn curve. One layout read (the host size) per switch, nothing per frame.
  */
 import { EQUITY_DRAW, equityPoints } from "@/motion/fx/EquityDraw";
-import { FX_HEX } from "@/motion/fx/shared";
-
-/** Surface behind the curve (`bg-ink-950` of the chart well) – the snapshot must be opaque. */
-export const WELL_HEX = "#040404";
+import { liveHex } from "@/motion/fx/shared";
 
 export type CurveTone = "win" | "loss" | "fg";
 
@@ -34,17 +31,18 @@ export function paintEquity(values: readonly number[], w: number, h: number, dpr
   }
   if (!ctx) return null;
   ctx.scale(dpr, dpr);
-  ctx.fillStyle = WELL_HEX;
+  // the well and the curve in the current theme (a light-mode snapshot must not flash the ink well)
+  ctx.fillStyle = liveHex("fg", "--color-ink-950");
   ctx.fillRect(0, 0, w, h);
   const base = values.find((v) => Number.isFinite(v));
   const pts = equityPoints(values, w, h, EQUITY_DRAW.pad, base);
   if (pts.length < 2) return c;
-  const color = FX_HEX[curveTone(values)];
+  const color = liveHex(curveTone(values));
   // baseline (dashed reference at the first value)
   const by = equityPoints([...values, base ?? 0], w, h, EQUITY_DRAW.pad, base).at(-1)!.y;
   ctx.save();
   ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = "#2c2c2c";
+  ctx.strokeStyle = liveHex("fg", "--color-line-2");
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, by);

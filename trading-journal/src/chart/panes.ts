@@ -17,7 +17,7 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { Candle, OpenInterestPoint, RatioPoint } from "@/market/types";
-import { NOTHING_CANDLES, NOTHING_OI_LINE, NOTHING_RATIO_LINE, NOTHING_VOLUME, VOLUME_SCALE_MARGINS, ink } from "./theme";
+import { NOTHING_CANDLES, NOTHING_OI_LINE, NOTHING_RATIO_LINE, NOTHING_VOLUME, VOLUME_SCALE_MARGINS, ink, withAlpha } from "./theme";
 import { RsiPane, type RsiBar } from "./rsiPane";
 
 export type PaneKind = "none" | "ratio" | "oi" | "rsi";
@@ -33,8 +33,8 @@ export const sec = (ms: number): UTCTimestamp => Math.floor(ms / 1000) as UTCTim
 export function toCandleData(c: Candle): CandlestickData<UTCTimestamp> {
   return { time: sec(c.time), open: c.open, high: c.high, low: c.low, close: c.close };
 }
-/** Volume bar tint: brighter under rising candles. */
-export const volumeColor = (open: number, close: number): string => (close >= open ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.07)");
+/** Volume bar tint: brighter under rising candles (the live palette's veil ink – `rgba(255,255,255,…)` in dark). */
+export const volumeColor = (open: number, close: number): string => withAlpha(ink.veil, close >= open ? 0.14 : 0.07);
 
 export function toVolumeData(c: Candle): HistogramData<UTCTimestamp> {
   return { time: sec(c.time), value: c.volume, color: volumeColor(c.open, c.close) };
@@ -195,6 +195,17 @@ export class PaneController {
   dispose(): void {
     this.remove();
     this.kind = "none";
+  }
+
+  /** The palette changed (light mode / accent, `subscribeInk`): the pane's line, baseline and RSI guides follow. */
+  applyInk(): void {
+    if (this.rsiPane) {
+      this.rsiPane.applyInk();
+      return;
+    }
+    if (!this.line) return;
+    this.line.applyOptions({ color: this.kind === "ratio" ? ink.fg : ink.mute });
+    this.baseline?.applyOptions({ color: ink.ref });
   }
 
   private apply(): void {

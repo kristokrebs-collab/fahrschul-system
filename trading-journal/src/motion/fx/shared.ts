@@ -29,6 +29,32 @@ export const FX_HEX: Record<FxTone, string> = {
   warn: "#ffb020",
 };
 
+/**
+ * A theme colour as plain hex for a canvas, read from the document's tokens when the canvas is painted (light mode /
+ * accent, P13): `--color-<tone>`, or – with `token` – any other colour token. Falls back to `FX_HEX` (the dark values,
+ * which the tokens hold in the dark theme) without a DOM or for a non-hex value.
+ */
+export function liveHex(tone: FxTone, token?: string): string {
+  const fallback = token ? (TOKEN_FALLBACK[token] ?? FX_HEX[tone]) : FX_HEX[tone];
+  if (typeof document === "undefined" || typeof getComputedStyle !== "function") return fallback;
+  try {
+    const v = getComputedStyle(document.documentElement)
+      .getPropertyValue(token ?? `--color-${tone}`)
+      .trim()
+      .toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(v) ? v : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Dark values of the surface tokens a canvas snapshot may need (`liveHex(tone, token)`). */
+const TOKEN_FALLBACK: Readonly<Record<string, string>> = {
+  "--color-ink-950": "#040404",
+  "--color-ink-900": "#0a0a0a",
+  "--color-line-2": "#2c2c2c",
+};
+
 export interface WaapiTiming {
   /** seconds (tween token units) */
   duration: number;

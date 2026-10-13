@@ -19,7 +19,7 @@ import { AnnotationPrimitive } from "./primitives/AnnotationPrimitive";
 import type { Candle } from "@/market/types";
 import { tween } from "@/motion/tokens";
 import { cn } from "@/lib/cn";
-import { CHART_FONT, CHART_FONT_LOAD, NOTHING_MINI, ink } from "./theme";
+import { CHART_FONT, CHART_FONT_LOAD, NOTHING_MINI, ink, inkChartOptions } from "./theme";
 import { INTERVAL_SECONDS, createMainSeries, normalizeSeries, toCandleData, type ChartInterval, type MainSeries } from "./panes";
 import { boundsOf, buildMarkers, snapSourceOf, snapTime, toTradeMarkers } from "./markers";
 import { ChartSkeleton } from "./ChartSkeleton";
@@ -40,11 +40,36 @@ export interface MiniTradeChartProps {
   onAnnotationsChange?: (next: Annotation[]) => void;
 }
 
+/** Trade lines of the mini chart; colours from the live palette (read when a line is created). */
 export const MINI_LINES = {
-  entry: { title: "Einstieg", color: ink.fg, lineStyle: LineStyle.Solid },
-  stop: { title: "Stop", color: ink.mute, lineStyle: LineStyle.Dashed },
-  target: { title: "Ziel", color: ink.tick, lineStyle: LineStyle.Dotted },
-  exit: { title: "Ausstieg", color: ink.fg, lineStyle: LineStyle.Dotted },
+  entry: {
+    title: "Einstieg",
+    get color(): string {
+      return ink.fg;
+    },
+    lineStyle: LineStyle.Solid,
+  },
+  stop: {
+    title: "Stop",
+    get color(): string {
+      return ink.mute;
+    },
+    lineStyle: LineStyle.Dashed,
+  },
+  target: {
+    title: "Ziel",
+    get color(): string {
+      return ink.tick;
+    },
+    lineStyle: LineStyle.Dotted,
+  },
+  exit: {
+    title: "Ausstieg",
+    get color(): string {
+      return ink.fg;
+    },
+    lineStyle: LineStyle.Dotted,
+  },
 } as const;
 export type MiniLineKey = keyof typeof MINI_LINES;
 
@@ -78,6 +103,8 @@ export function MiniTradeChart({ candles, trade, interval = "1h", height = 160, 
     const node = host.current;
     if (!node) return;
     const chart = createChart(node, NOTHING_MINI);
+    // the current palette (light mode): `NOTHING_MINI` holds the ink of the moment the chart module loaded
+    chart.applyOptions(inkChartOptions());
     const main = createMainSeries(chart, { volume: false });
     main.candles.applyOptions({ priceLineVisible: false, lastValueVisible: false });
     const markers = createSeriesMarkers(main.candles, [], { zOrder: "aboveSeries" });

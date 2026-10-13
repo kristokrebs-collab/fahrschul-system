@@ -37,7 +37,7 @@ export function FillsBar({ stats, className }: { stats: FillStats; className?: s
             transition={{ layout: spring.layout, scaleX: spring.enter, opacity: tween.fade }}
             title={s.label}
           >
-            {s.tone === "open" && <span className="fx-ants absolute inset-0 opacity-60 [--fx-ants-color:rgb(255_255_255/0.35)] before:[animation-play-state:paused]" />}
+            {s.tone === "open" && <span className="fx-ants absolute inset-0 opacity-60 [--fx-ants-color:rgb(var(--veil-rgb,255_255_255)/0.35)] before:[animation-play-state:paused]" />}
           </motion.span>
         ))}
       </AnimatePresence>

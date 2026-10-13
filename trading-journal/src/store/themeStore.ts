@@ -118,6 +118,8 @@ const INK_VARS: Record<InkKey, string> = {
   loss: "--chart-ink-loss",
   winSoft: "--chart-ink-win-soft",
   lossSoft: "--chart-ink-loss-soft",
+  veil: "--chart-ink-veil",
+  onFill: "--chart-ink-on-fill",
 };
 
 /** Chart bridge (P02 `applyInk`): dark → `resetInk()` (the exact defaults), light / accents → the CSS mirrors. */

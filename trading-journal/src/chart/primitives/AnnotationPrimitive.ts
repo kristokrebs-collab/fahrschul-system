@@ -11,6 +11,7 @@
  */
 import type { IChartApiBase, IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, PrimitivePaneViewZOrder, SeriesAttachedParameter, SeriesType, Time } from "lightweight-charts";
 import type { Annotation, AnnotationKind } from "@/domain/types";
+import { ink, inkOf, withAlpha } from "../ink";
 import { logicalToX } from "../logicalX";
 
 type RenderTarget = Parameters<IPrimitivePaneRenderer["draw"]>[0];
@@ -161,7 +162,7 @@ class AnnotationRenderer implements IPrimitivePaneRenderer {
             const padX = 6 * hr;
             const h = 18 * vr;
             ctx.globalAlpha = 0.92 * k;
-            ctx.fillStyle = "rgba(10,10,10,0.88)";
+            ctx.fillStyle = withAlpha(ink.bg, 0.88);
             ctx.fillRect(a.x, a.y - h / 2, tw + padX * 2, h);
             ctx.globalAlpha = k;
             ctx.strokeRect(a.x, a.y - h / 2, tw + padX * 2, h);
@@ -176,7 +177,7 @@ class AnnotationRenderer implements IPrimitivePaneRenderer {
           ctx.globalAlpha = 1;
           for (const q of p) {
             ctx.beginPath();
-            ctx.fillStyle = "#0a0a0a";
+            ctx.fillStyle = ink.bg;
             ctx.arc(q.x, q.y, 4 * hr, 0, Math.PI * 2);
             ctx.fill();
             ctx.lineWidth = 1.5 * hr;
@@ -330,11 +331,11 @@ export class AnnotationPrimitive implements ISeriesPrimitive<Time> {
     for (const a of this.items) {
       const pts = toPts(a.points);
       if (!pts?.length) continue;
-      shapes.push({ id: a.id, kind: a.kind, pts, color: a.color || ANNOTATION_COLORS.fg, text: a.text, progress: this.progressOf(a.id), selected: a.id === this.selected, draft: false });
+      shapes.push({ id: a.id, kind: a.kind, pts, color: inkOf(a.color || ANNOTATION_COLORS.fg), text: a.text, progress: this.progressOf(a.id), selected: a.id === this.selected, draft: false });
     }
     if (this.draft) {
       const pts = toPts(this.draft.points);
-      if (pts?.length) shapes.push({ id: "__draft", kind: this.draft.kind, pts, color: this.draft.color || ANNOTATION_COLORS.fg, progress: 1, selected: false, draft: true });
+      if (pts?.length) shapes.push({ id: "__draft", kind: this.draft.kind, pts, color: inkOf(this.draft.color || ANNOTATION_COLORS.fg), progress: 1, selected: false, draft: true });
     }
     return { shapes, width };
   }

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { DATA_SOURCE_NOTE, DEFAULT_SIGNAL_CFG, LOADING_TEXT, OFFLINE_TEXT, SIGNAL_TITLE, signalInfo, type Side } from "@/domain/signals";
 import { cn } from "@/lib/cn";
+import { themePaint } from "@/lib/themePaint";
 import { SIGNAL_HOLD_MS, useSignalCheck, type LiveSignals } from "@/market";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
@@ -248,7 +249,7 @@ export function SignalCard() {
       >
         {badge && (
           <span aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-[15px]">
-            <BorderBeam fire={badge.seq} size={110} colorFrom={badge.side === "long" ? "#3ddc84" : "#ff4d4f"} />
+            <BorderBeam fire={badge.seq} size={110} colorFrom={themePaint(badge.side === "long" ? "#3ddc84" : "#ff4d4f")} />
           </span>
         )}
         {!snap || !v ? (

@@ -768,7 +768,7 @@ export function DotMatrix({
             </filter>
           )}
         </defs>
-        <g fill="#fff" fillOpacity={0.08}>
+        <g fill="var(--color-white, #fff)" fillOpacity={0.08}>
           {cells.map((c, i) => (
             <circle key={i} cx={c.cx} cy={c.cy} r={r} />
           ))}

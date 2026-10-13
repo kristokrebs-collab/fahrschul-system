@@ -33,7 +33,7 @@ import type {
 import type { SignalState } from "@/domain/signals/state";
 import { AXIS_LABEL_GAP } from "../axisLabels";
 import { fmt } from "../format";
-import { ink } from "../ink";
+import { ink, withAlpha } from "../ink";
 import { axisLabelClear, barIndex, barIndexAtOrAfter, estimateTextWidth, LINE_NUDGE, placeLabels, type Box, type LabelCandidate } from "../overlayLayout";
 import { signalDots, type SignalDot, type SignalMarker } from "../signalMarkers";
 
@@ -118,11 +118,9 @@ const LABEL_H_TINY = 12;
 /** price-line titles (LONG / INVAL / HART …) sit at the right edge of the pane: labels keep this strip free */
 export const RIGHT_RESERVED = 64;
 /** nearly opaque: price action behind a label never shows through its text */
-const LABEL_BG = "rgba(10,10,10,0.92)";
-const BAND_FILL = "rgba(255,255,255,0.035)";
-const NEAR_LINE = ink.mute;
-const FAR_LINE = ink.tick;
-const STRUCT_LINE = ink.tick;
+// colours from the live palette, read per draw (light mode): the dark ink gives rgba(10,10,10,.92) / rgba(255,255,255,.035)
+const labelBg = (): string => withAlpha(ink.bg, 0.92);
+const bandFill = (): string => withAlpha(ink.veil, 0.035);
 /** alpha of divergence lines that no longer count in the check */
 const OLD_DIV_ALPHA = 0.38;
 
@@ -351,7 +349,7 @@ class BottomRenderer implements IPrimitivePaneRenderer {
     if (!g.bands.length && !g.hlines.length && !g.segs.length) return;
     target.useBitmapCoordinateSpace(({ context: ctx, horizontalPixelRatio: hr, verticalPixelRatio: vr }) => {
       ctx.save();
-      ctx.fillStyle = BAND_FILL;
+      ctx.fillStyle = bandFill();
       for (const b of g.bands) {
         const x = Math.round(b.x1 * hr);
         const y = Math.round(Math.min(b.y1, b.y2) * vr);
@@ -414,7 +412,7 @@ class TopRenderer implements IPrimitivePaneRenderer {
           const w = Math.max(1, 1.25 * hr);
           ctx.lineWidth = w;
           ctx.strokeStyle = d.color;
-          ctx.fillStyle = "rgba(10,10,10,0.6)";
+          ctx.fillStyle = withAlpha(ink.bg, 0.6);
           ctx.arc(x, y, Math.max(1, r - w / 2), 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
@@ -440,7 +438,7 @@ class TopRenderer implements IPrimitivePaneRenderer {
         const w = Math.round(l.box.w * hr);
         const h = Math.round(l.box.h * vr);
         ctx.globalAlpha = 1;
-        ctx.fillStyle = LABEL_BG;
+        ctx.fillStyle = labelBg();
         const rr = 3 * hr;
         ctx.beginPath();
         if (typeof ctx.roundRect === "function") ctx.roundRect(x, y, w, h, rr);
@@ -486,7 +484,7 @@ class LevelAxisView implements ISeriesPrimitiveAxisView {
     return ink.mute;
   }
   backColor(): string {
-    return "#161616";
+    return ink.labelBg;
   }
   visible(): boolean {
     return this.src.axisY(this.dir) != null;
@@ -676,7 +674,7 @@ export class SignalOverlay implements ISeriesPrimitive<Time> {
         // the nearest support / resistance run across the pane with their label at the left edge (clear of the
         // newest candles); further levels start at their origin bar with a small label beside it
         const x1 = l.nearest ? 0 : origin;
-        g.hlines.push({ x1, x2: width, y, color: l.nearest ? NEAR_LINE : FAR_LINE, dash: l.nearest ? [] : [1, 3], alpha: l.nearest ? 0.85 : 0.7 });
+        g.hlines.push({ x1, x2: width, y, color: l.nearest ? ink.mute : ink.tick, dash: l.nearest ? [] : [1, 3], alpha: l.nearest ? 0.85 : 0.7 });
         const px = l.nearest ? SR_PX : TINY_PX;
         const h = l.nearest ? LABEL_H_SR : LABEL_H_TINY;
         // a narrow pane (phone) gets the label without the level kind
@@ -705,7 +703,7 @@ export class SignalOverlay implements ISeriesPrimitive<Time> {
         const y1 = yOf(s.p1);
         const y2 = yOf(s.p2);
         if (x1 == null || x2 == null || y1 == null || y2 == null) continue;
-        g.segs.push({ x1, y1, x2, y2, color: STRUCT_LINE, dash: [2, 3], alpha: s.faint ? 0.55 : 0.9 });
+        g.segs.push({ x1, y1, x2, y2, color: ink.tick, dash: [2, 3], alpha: s.faint ? 0.55 : 0.9 });
         const sz = tiny(s.text);
         const mx = (x1 + x2) / 2 - sz.w / 2;
         const my = (y1 + y2) / 2;

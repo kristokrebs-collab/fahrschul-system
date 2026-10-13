@@ -16,7 +16,7 @@ const ORBIT_MAX = 8;
 
 function OrbitTrait({ t }: { t: ProfileTrait }) {
   return (
-    <div className="grid size-full content-between bg-[linear-gradient(160deg,#1c1c1c,#0a0a0a)] p-[1.3cqw]">
+    <div className="grid size-full content-between bg-[linear-gradient(160deg,var(--color-ink-750),var(--color-ink-900))] p-[1.3cqw]">
       <span className="truncate font-mono text-[max(8px,1.25cqw)] uppercase tracking-[0.12em] text-mute">{t.label}</span>
       <span className={cn("line-clamp-2 text-[max(10px,2.1cqw)] font-semibold leading-tight", TONE_TEXT[t.tone])}>{t.value}</span>
       <span className="truncate text-[max(7px,1.05cqw)] text-faint">{t.detail}</span>

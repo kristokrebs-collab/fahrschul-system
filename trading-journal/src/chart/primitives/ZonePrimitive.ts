@@ -22,6 +22,7 @@ import type {
   Time,
 } from "lightweight-charts";
 import { fmt } from "../format";
+import { ink, withAlpha } from "../ink";
 
 type RenderTarget = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 
@@ -45,15 +46,24 @@ export interface ZoneOptions {
 }
 
 export const ZONE_DEFAULTS: ZoneOptions = {
-  fill: "#ffffff0e",
-  stroke: "#f2f2f2",
+  // colours from the live palette (read when a zone is built or re-inked; the dark ink gives the values above)
+  get fill() {
+    return /^#[0-9a-f]{6}$/i.test(ink.veil) ? `${ink.veil}0e` : withAlpha(ink.veil, 14 / 255);
+  },
+  get stroke() {
+    return ink.fg;
+  },
   strokeOpacity: 0.35,
   opacity: 1,
   label: "Zone",
   formatPrice: (p) => fmt.price(p),
   labelFont: '10px "IBM Plex Mono", ui-monospace, monospace',
-  labelBackground: "#1c1c1c",
-  labelText: "#9b9b9b",
+  get labelBackground() {
+    return ink.grid;
+  },
+  get labelText() {
+    return ink.mute;
+  },
 };
 
 /** The caption only fits a band at least this tall (CSS px). */

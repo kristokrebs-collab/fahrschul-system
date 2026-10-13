@@ -33,7 +33,7 @@ export const CONFIG = {
   /** Drop of a thrown tile: `springLayout` for a slow release, blending to this short, slightly bouncy spring when fast. */
   dropFast: appleSpring(0.33, 0.26),
   /** Nothing palette (pack: light glow 0 20px 40px rgba(255,255,255,.075)). */
-  glowShadow: "0 20px 40px rgb(255 255 255 / 0.075), 0 18px 36px rgb(0 0 0 / 0.45)",
+  glowShadow: "0 20px 40px rgb(var(--veil-rgb, 255 255 255) / 0.075), 0 18px 36px rgb(0 0 0 / calc(0.45 * var(--shade, 1)))",
   roleDescription: "verschiebbare Kachel",
   hint: "Leertaste oder Enter nimmt die Kachel auf, Pfeiltasten verschieben, Leertaste legt ab, Escape bricht ab. Mit der Maus oder dem Finger: gedrückt halten und ziehen.",
 } as const;
@@ -654,7 +654,7 @@ export function WidgetGrid({ items, order, onOrderChange, holdMs = CONFIG.holdMs
             onKeyDown={onKeyDown(id)}
             onBlur={onBlur(id)}
             className={cn(
-              "relative min-w-0 touch-pan-y select-none rounded-2xl outline-none [-webkit-touch-callout:none] focus-visible:shadow-[0_0_0_2px_rgb(255_255_255/0.35)] data-[grabbed]:cursor-grabbing",
+              "relative min-w-0 touch-pan-y select-none rounded-2xl outline-none [-webkit-touch-callout:none] focus-visible:shadow-[0_0_0_2px_rgb(var(--veil-rgb,255_255_255)/0.35)] data-[grabbed]:cursor-grabbing",
               itemClassName,
             )}
           >

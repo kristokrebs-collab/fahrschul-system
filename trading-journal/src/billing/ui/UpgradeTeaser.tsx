@@ -58,7 +58,7 @@ export function UpgradeTeaser({ feature, className, compact }: UpgradeTeaserProp
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 -z-10 opacity-70"
         style={{
-          backgroundImage: "radial-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1.4px)",
+          backgroundImage: "radial-gradient(rgb(var(--veil-rgb, 255 255 255) / 0.06) 1px, transparent 1.4px)",
           backgroundSize: "18px 18px",
           maskImage: "linear-gradient(120deg, black, transparent 70%)",
         }}

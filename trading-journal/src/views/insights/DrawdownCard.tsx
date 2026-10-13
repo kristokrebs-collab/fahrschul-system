@@ -76,9 +76,9 @@ function Underwater({ points, minDD }: { points: { dd: number; label: string }[]
           transition={tween.draw}
         >
           <svg viewBox={`0 -2 ${W} ${H}`} preserveAspectRatio="none" className="h-full w-full overflow-visible">
-            <line x1="0" x2={W} y1="0" y2="0" stroke="#2c2c2c" vectorEffect="non-scaling-stroke" />
+            <line x1="0" x2={W} y1="0" y2="0" stroke="var(--color-line-2, #2c2c2c)" vectorEffect="non-scaling-stroke" />
             <path d={area} fill="rgb(255 77 79 / 0.16)" />
-            <path d={line} fill="none" stroke="#ff4d4f" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+            <path d={line} fill="none" stroke="var(--color-loss, #ff4d4f)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
           </svg>
           {dots.map((d, i) => (
             <span key={i} className={cn("absolute size-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full", d.low ? "bg-loss" : "bg-(--color-loss)/70")} style={{ left: d.left, top: d.top }} />

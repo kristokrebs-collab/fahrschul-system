@@ -36,7 +36,7 @@ export const CONFIG = {
   panelRadius: 16, // radius.card (pack 24 at a 38 px pill)
   typeaheadMs: 500,
   /** Nothing palette (pack: #1e1e1e panel, blue active row). */
-  panelShadow: "0 14px 40px rgb(0 0 0 / 0.45), 0 2px 8px rgb(0 0 0 / 0.3)",
+  panelShadow: "0 14px 40px rgb(0 0 0 / calc(0.45 * var(--shade, 1))), 0 2px 8px rgb(0 0 0 / calc(0.3 * var(--shade, 1)))",
   zIndex: 75, // above Sheet (60) / MorphDialog (70), below Celebrate (80)
 } as const;
 
@@ -753,7 +753,7 @@ export function MorphSelect<T extends string = string>({
                       className={cn(
                         "flex shrink-0 cursor-pointer select-none items-center gap-2.5 rounded-[10px] px-3 text-[13.5px] transition-colors duration-[120ms] ease-out",
                         isSel ? "bg-ink-700 font-medium text-fg" : "text-fg/80 data-[active]:bg-ink-750 data-[active]:text-fg",
-                        i === active && "shadow-[inset_0_0_0_1px_rgb(255_255_255/0.14)]",
+                        i === active && "shadow-[inset_0_0_0_1px_rgb(var(--veil-rgb,255_255_255)/0.14)]",
                       )}
                       style={{ height: g.rowH }}
                     >

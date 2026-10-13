@@ -201,7 +201,7 @@ function TradeDetailDialog({ candles, onEdit, className }: TradeDetailProps) {
             {/* the big shadow sits on an unscaled sibling and fades in after the morph: no per-frame shadow repaint */}
             <motion.div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 shadow-[0_30px_80px_rgb(0_0_0/0.6)]"
+              className="pointer-events-none absolute inset-0 shadow-[0_30px_80px_rgb(0_0_0/calc(0.6*var(--shade,1)))]"
               style={{ borderRadius: radius.dialog }}
               initial={{ opacity: 0 }}
               animate={{ opacity: phase.settled && phase.id === trade.id ? 1 : 0 }}

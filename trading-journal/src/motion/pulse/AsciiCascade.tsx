@@ -25,7 +25,7 @@ export const CONFIG = {
   /** Nothing palette: resolved = fg white, scramble tone = muted grey (pack: blue slate). */
   hiColor: "var(--color-fg, #f2f2f2)",
   loColor: "var(--color-mute, #9b9b9b)",
-  glowShadow: "0 0 .35em rgba(255,255,255,.55), 0 0 .08em rgba(255,255,255,.7)",
+  glowShadow: "0 0 .35em rgb(var(--veil-rgb, 255 255 255) / .55), 0 0 .08em rgb(var(--veil-rgb, 255 255 255) / .7)",
 } as const;
 
 export interface CascadeFrame {

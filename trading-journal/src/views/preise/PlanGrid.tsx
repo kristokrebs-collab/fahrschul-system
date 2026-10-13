@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useRef } from "react";
 import { cn } from "@/lib/cn";
+import { themePaint } from "@/lib/themePaint";
 import { openAuthSheet, useCloudSession } from "@/cloud/session";
 import type { CodeLookup } from "@/billing/contract";
 import { displayPrice, formatMoney, priceDigits, withCoupon, type DisplayPrice } from "@/billing/format";
@@ -35,7 +36,7 @@ function PlanArt({ plan }: { plan: PlanId }) {
         ? "rgb(61 220 132 / 0.22)"
         : plan === "team"
           ? "rgb(255 176 32 / 0.2)"
-          : "rgb(255 255 255 / 0.08)";
+          : "rgb(var(--veil-rgb, 255 255 255) / 0.08)";
   return (
     <div
       aria-hidden="true"
@@ -172,14 +173,14 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
       {cat.recommended && seen && !reduced && (
         // the beam's disc is larger than the card: clip it here (a mask clips the paint, not the scroll overflow)
         <span aria-hidden="true" className="pointer-events-none absolute inset-0 z-[2] overflow-hidden rounded-[16px]">
-          <BorderBeam fire={1} colorFrom="#e5202e" colorTo="#ffffff" />
+          <BorderBeam fire={1} colorFrom={themePaint("#e5202e")} colorTo="var(--color-white, #ffffff)" />
         </span>
       )}
       <NotchedFrame
         radius={16}
         notchSize={NOTCH}
         active={isCurrent || undefined}
-        outline={cat.recommended ? "rgb(229 32 46 / 0.55)" : isCurrent ? "rgb(242 242 242 / 0.5)" : "var(--color-line-2, #2c2c2c)"}
+        outline={cat.recommended ? "rgb(229 32 46 / 0.55)" : isCurrent ? "rgb(var(--fg-rgb, 242 242 242) / 0.5)" : "var(--color-line-2, #2c2c2c)"}
         wrapperClassName="h-full"
         className={cn("flex h-full flex-col", cat.recommended ? "bg-ink-850" : "bg-ink-900")}
         media={<PlanArt plan={plan} />}

@@ -35,4 +35,11 @@ describe("codemod-veil", () => {
     expect(r.left.map((l) => l.kind).sort()).toEqual(["rgb-class", "string"]);
     expect(r.veils).toBe(2);
   });
+
+  it("does not report rgb classes whose channels or alpha already come from a theme token", () => {
+    const src = `const a = "shadow-[0_0_0_3px_rgb(var(--veil-rgb,255_255_255)/0.07)] shadow-[0_18px_40px_rgb(0_0_0/calc(0.45*var(--shade,1)))] shadow-[0_0_8px_rgb(255_77_79/0.55)]";`;
+    const r = transform(src);
+    expect(r.text).toBe(src);
+    expect(r.left).toEqual([{ kind: "rgb-class", text: "shadow-[0_0_8px_rgb(255_77_79/0.55)]" }]);
+  });
 });

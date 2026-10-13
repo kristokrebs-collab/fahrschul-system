@@ -21,7 +21,7 @@ export const CONFIG = {
   padXEm: 0.16,
   radius: "5px",
   tones: {
-    invert: { bar: "var(--color-fg, #f2f2f2)", text: "var(--color-ink-950, #040404)", glow: "0 8px 20px rgba(255,255,255,.07)" },
+    invert: { bar: "var(--color-fg, #f2f2f2)", text: "var(--color-ink-950, #040404)", glow: "0 8px 20px rgb(var(--veil-rgb, 255 255 255) / .07)" },
     signal: { bar: "var(--color-signal, #e5202e)", text: "#ffffff", glow: "0 8px 20px rgba(229,32,46,.16)" },
   },
 } as const;

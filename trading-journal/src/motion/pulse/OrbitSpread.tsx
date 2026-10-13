@@ -251,7 +251,7 @@ export function OrbitSpread({ items, children, trigger = "view", open: openProp,
             ref={(el) => {
               cardRefs.current[i] = el;
             }}
-            className="absolute left-1/2 top-1/2 aspect-[5/4] overflow-hidden rounded-[1.6cqw] border border-white/10 bg-ink-800 shadow-[0_2cqw_4cqw_-1.5cqw_rgb(0_0_0/0.6)]"
+            className="absolute left-1/2 top-1/2 aspect-[5/4] overflow-hidden rounded-[1.6cqw] border border-white/10 bg-ink-800 shadow-[0_2cqw_4cqw_-1.5cqw_rgb(0_0_0/calc(0.6*var(--shade,1)))]"
             style={{ width: `${CONFIG.card}cqw`, transform: "translate(-50%,-50%)" }}
           >
             {item}

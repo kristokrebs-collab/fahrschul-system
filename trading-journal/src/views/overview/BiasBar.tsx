@@ -183,7 +183,7 @@ const BiasTrack = memo(function BiasTrack({ score, firm, compact = false, empty 
           )}
           <span
             className={cn(
-              "absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg shadow-[0_0_0_3px_rgb(4_4_4/0.75)]",
+              "absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg shadow-[0_0_0_3px_rgb(var(--veil-ink-rgb,4_4_4)/0.75)]",
               compact ? "h-3 w-[3px]" : "h-6 w-1",
             )}
           />

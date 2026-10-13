@@ -15,6 +15,7 @@ import { Button } from "@/primitives/Button";
 import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useEnriched, useJournal } from "@/store/journalStore";
+import { useTheme } from "@/store/themeStore";
 import { pushToast } from "@/store/uiStore";
 import type { SharePayload, SharedTrade } from "../contract";
 import { fmtMove, fmtR, shareTitle } from "../format";
@@ -42,7 +43,7 @@ function wordOf(p: SharePayload): string {
 function Hero({ p }: { p: SharePayload }) {
   const tone = (v: number | null | undefined) => (v == null || v === 0 ? "fg" : v > 0 ? "win" : "loss");
   return (
-    <div className="grid size-full place-items-center bg-[radial-gradient(120%_90%_at_50%_0%,#1c1c1c_0%,#0a0a0a_60%)] p-5">
+    <div className="grid size-full place-items-center bg-[radial-gradient(120%_90%_at_50%_0%,var(--color-ink-750)_0%,var(--color-ink-900)_60%)] p-5">
       <div className="grid justify-items-center gap-3 text-center">
         <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-mute">
           {p.kind === "trade" ? `${p.pair === "-" ? "Trade" : p.pair} · ${p.side === "short" ? "Short" : "Long"}${p.timeframe ? ` · ${p.timeframe}` : ""}` : p.kind === "setup" ? "Entscheidungsgrundlage" : `${p.trades} Trades`}
@@ -239,6 +240,8 @@ function Body({ target, trade, setup, open }: { target: ShareTarget; trade: Enri
   const [withStats, setWithStats] = useState(false);
   const enabled = communityEnabled();
   const phase = useCloudSession((s) => s.phase);
+  // the wall the camera dives through: the ink well in dark, the paper well in light (= --color-ink-900 of each theme)
+  const wall = useTheme((s) => (s.resolved === "light" ? "#ebebe9" : "#0a0a0a"));
 
   const payload = useMemo<SharePayload | null>(() => {
     if (target.kind === "trade") return trade ? redactTrade(trade, opts, settings.setups) : null;
@@ -256,7 +259,7 @@ function Body({ target, trade, setup, open }: { target: ShareTarget; trade: Enri
   return (
     <div className="grid gap-3">
       <StaggerItem>
-        <GlyphZoom word={wordOf(payload)} open={open && dive} label={shareTitle(payload)} className="h-[220px] rounded-2xl border border-line-2 sm:h-[250px]">
+        <GlyphZoom word={wordOf(payload)} open={open && dive} label={shareTitle(payload)} wallColor={wall} className="h-[220px] rounded-2xl border border-line-2 sm:h-[250px]">
           <Hero p={payload} />
         </GlyphZoom>
       </StaggerItem>

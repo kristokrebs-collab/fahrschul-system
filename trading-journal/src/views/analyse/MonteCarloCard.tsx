@@ -12,6 +12,7 @@
  * While the worker simulates, `DotMatrixText` waves "SIM" (only shown when it takes longer than a beat).
  * Reduced motion: the finished picture at once.
  */
+import { ink, withAlpha } from "@/chart/ink";
 import { themePaint } from "@/lib/themePaint";
 import { motion, useMotionValue } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -34,6 +35,7 @@ import { createFrameLoop } from "@/motion/pulse/engine";
 import { ScrubTimeline, type ScrubMarker } from "@/motion/pulse/ScrubTimeline";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { useTheme } from "@/store/themeStore";
 import { EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
@@ -126,6 +128,8 @@ function drawStep(ctx: CanvasRenderingContext2D, pts: FanGeometry["pts"], drawn:
 
 function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "money"; cur: string; start: number }) {
   const reduced = useReducedFx();
+  // the canvas reads the palette while it draws: a theme switch repaints it
+  const theme = useTheme((s) => `${s.resolved}:${s.accent}`);
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const hl = useRef<SVGPathElement>(null);
@@ -163,7 +167,8 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
     ctx.clearRect(0, 0, geo.w, geo.h);
     ctx.lineWidth = 1;
     ctx.lineJoin = "round";
-    ctx.strokeStyle = "rgba(242,242,242,0.075)";
+    // the fan in the current ink (light mode: dark strokes on paper) – redrawn when the theme changes
+    ctx.strokeStyle = withAlpha(ink.fg, 0.075);
     const drawn = geo.pts.map(() => 0);
     if (reduced || animated.current === res || !seen) {
       if (!(reduced || animated.current === res)) return;
@@ -184,7 +189,7 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
     });
     loop.wake();
     return () => loop.stop();
-  }, [geo, res, reduced, seen]);
+  }, [geo, res, reduced, seen, theme]);
 
   // the scrubbed run: red path + readout, straight to the DOM
   const runs = res.paths.length;
@@ -239,8 +244,8 @@ function Fan({ res, unit, cur, start }: { res: MonteCarloResult; unit: "R" | "mo
             transition={tween.draw}
           >
             <line x1={0} x2={geo.w} y1={geo.startY} y2={geo.startY} stroke={themePaint("#5f5f5f")} strokeDasharray="3 4" strokeWidth={1} />
-            <path d={geo.band} fill="rgb(242 242 242 / 0.05)" stroke="rgb(242 242 242 / 0.22)" strokeDasharray="2 3" strokeWidth={1} />
-            <path d={geo.core} fill="rgb(242 242 242 / 0.08)" />
+            <path d={geo.band} fill="rgb(var(--fg-rgb, 242 242 242) / 0.05)" stroke="rgb(var(--fg-rgb, 242 242 242) / 0.22)" strokeDasharray="2 3" strokeWidth={1} />
+            <path d={geo.core} fill="rgb(var(--fg-rgb, 242 242 242) / 0.08)" />
             <path d={geo.median} fill="none" stroke={themePaint("#f2f2f2")} strokeWidth={1.6} strokeLinejoin="round" />
             <path ref={hl} fill="none" stroke={themePaint("#e5202e")} strokeWidth={1.6} strokeLinejoin="round" opacity={0.95} />
           </motion.svg>

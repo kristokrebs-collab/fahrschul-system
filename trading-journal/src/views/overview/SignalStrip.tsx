@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { memo, useState, type CSSProperties } from "react";
 import { LOADING_TEXT, NO_KIND_TEXT, OFFLINE_TEXT, SIGNAL_TITLE } from "@/domain/signals";
 import { cn } from "@/lib/cn";
+import { themePaint } from "@/lib/themePaint";
 import { useSignalCheck } from "@/market";
 import { spring, tween } from "@/motion/tokens";
 import { TextRoll } from "@/motion/TextRoll";
@@ -117,7 +118,7 @@ export function SignalStrip({ className }: { className?: string }) {
   const chips = v ? partChips(v) : [];
   const traders = v?.parts?.find((p) => p.id === "traders");
   const pill = statusPill(check.state);
-  const color = v ? verdictColor(v) : "#9b9b9b";
+  const color = themePaint(v ? verdictColor(v) : "#9b9b9b");
   const st = v ? strengthView(v, snap?.cfg.ladder.length ?? 4) : null;
   const open = () => document.getElementById(SIGNAL_CARD_ID)?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
   const whaleSaid = traders?.ok ? `${traders.label}. ` : "";

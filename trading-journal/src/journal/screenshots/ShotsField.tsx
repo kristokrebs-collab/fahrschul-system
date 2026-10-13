@@ -121,7 +121,7 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
         onDrop={onDrop}
         data-testid="shots-drop"
       >
-        {over && <span aria-hidden="true" className="fx-ants rounded-2xl [--fx-ants-color:rgb(255_255_255/0.55)] [--fx-ants-width:1.5px]" />}
+        {over && <span aria-hidden="true" className="fx-ants rounded-2xl [--fx-ants-color:rgb(var(--veil-rgb,255_255_255)/0.55)] [--fx-ants-width:1.5px]" />}
         <span className="text-[13px] font-medium text-fg">{over ? "Loslassen zum Ablegen" : busy ? "Wird übernommen …" : "Screenshot hierher ziehen"}</span>
         <span className="text-[11.5px] text-mute">oder einfügen (Strg / ⌘ + V) · bis {MAX_SHOTS} Bilder</span>
         <label htmlFor={`${id}-file`} className={cn("mt-1.5 cursor-pointer rounded-full border border-line-2 px-3 py-1.5 text-[12px] text-fg transition-colors hover:border-white/40 pointer-coarse:min-h-11 pointer-coarse:py-2.5", full && "pointer-events-none opacity-40")}>

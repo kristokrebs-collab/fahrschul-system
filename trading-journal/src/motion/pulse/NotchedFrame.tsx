@@ -23,7 +23,9 @@ export const CONFIG = {
   /** Nothing palette (pack: disc #1d1d1d → #520000). */
   discRest: "var(--color-ink-750, #1c1c1c)",
   discHover: "var(--color-signal, #e5202e)",
+  /** at rest the veil ink (white on ink, ink on paper), on the hot (signal) disc always white */
   iconColor: "rgb(255 255 255 / 0.72)",
+  iconRest: "rgb(var(--veil-rgb, 255 255 255) / 0.72)",
 } as const;
 
 export interface NotchedFrameProps {
@@ -87,7 +89,7 @@ const CSS = `@layer components{
 .pn-gray{filter:grayscale(1)}
 .pn-color{position:absolute;inset:0;opacity:var(--pn-on);transition:opacity ${CONFIG.grayMs}ms ${CONFIG.grayEase}}
 .pn-disc-hot{opacity:var(--pn-on);transition:opacity ${CONFIG.discMs}ms ${CONFIG.discEase}}
-.pn-icon{transform:translate(calc(var(--pn-on) * ${CONFIG.iconShift}px),calc(var(--pn-on) * -${CONFIG.iconShift}px));transition:transform ${CONFIG.discMs}ms ${CONFIG.discEase}}
+.pn-icon{color:color-mix(in srgb,${CONFIG.iconColor} calc(var(--pn-on) * 100%),${CONFIG.iconRest});transform:translate(calc(var(--pn-on) * ${CONFIG.iconShift}px),calc(var(--pn-on) * -${CONFIG.iconShift}px));transition:transform ${CONFIG.discMs}ms ${CONFIG.discEase}}
 @media (prefers-reduced-motion:reduce){.pn-color,.pn-disc-hot,.pn-icon{transition-duration:.01ms}}
 }`;
 
@@ -170,7 +172,7 @@ export function NotchedFrame({ children, media, radius = 16, notchSize = 56, act
       )}
       <span aria-hidden="true" className="pointer-events-none absolute grid place-items-center rounded-full" style={{ right: out, bottom: out, width: disc, height: disc, background: CONFIG.discRest }}>
         <span className="pn-disc-hot absolute inset-0 rounded-full" style={{ background: CONFIG.discHover }} />
-        <svg className="pn-icon relative" width={icon} height={icon} viewBox="0 0 24 24" fill="none" stroke={CONFIG.iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="pn-icon relative" width={icon} height={icon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M7 7h10v10" />
           <path d="M7 17 17 7" />
         </svg>

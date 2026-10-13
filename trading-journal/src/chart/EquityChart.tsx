@@ -708,7 +708,7 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
             <span ref={fill} className="absolute inset-0 origin-left rounded-full bg-white/35" />
           </span>
           <span ref={thumb} aria-hidden="true" className="absolute left-0 top-1/2 block size-0">
-            <span className="absolute -left-1.5 -top-1.5 size-3 rounded-full bg-fg shadow-[0_0_0_3px_rgb(4_4_4)] transition-transform duration-150 group-hover/scrub:scale-110 group-focus-visible/scrub:shadow-[0_0_0_3px_rgb(4_4_4),0_0_0_5px_rgb(255_255_255/0.45)] group-active/scrub:scale-125" />
+            <span className="absolute -left-1.5 -top-1.5 size-3 rounded-full bg-fg shadow-[0_0_0_3px_rgb(var(--veil-ink-rgb,4_4_4))] transition-transform duration-150 group-hover/scrub:scale-110 group-focus-visible/scrub:shadow-[0_0_0_3px_rgb(var(--veil-ink-rgb,4_4_4)),0_0_0_5px_rgb(var(--veil-rgb,255_255_255)/0.45)] group-active/scrub:scale-125" />
           </span>
         </div>
       </div>

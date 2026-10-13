@@ -16,7 +16,7 @@ import {
   type Time,
 } from "lightweight-charts";
 import { fmt } from "./format";
-import { ink } from "./ink";
+import { ink, withAlpha } from "./ink";
 
 // time zone + label formatters: their own module (no `lightweight-charts` value import), so the overview's tooltip in
 // the first load stays free of the chart library (P14) – re-exported here, the import paths stay
@@ -25,7 +25,7 @@ import { formatChartTime, tickFmt, toMs } from "./timeFormat";
 export const CHART_FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 export const CHART_FONT_LOAD = '11px "IBM Plex Mono"';
 
-export { ink, applyInk, resetInk, subscribeInk, INK_DEFAULTS, type Ink, type InkKey } from "./ink";
+export { ink, applyInk, resetInk, subscribeInk, withAlpha, INK_DEFAULTS, type Ink, type InkKey } from "./ink";
 
 /** Empty bar slots right of the last candle (the live edge); `follow()` restores it. */
 export const CHART_RIGHT_OFFSET = 8;
@@ -66,7 +66,7 @@ export function makeNothingTheme(background: string = CHART_BACKGROUND_TRANSPARE
       fontSize: 11,
       fontFamily: CHART_FONT,
       attributionLogo: false,
-      panes: { separatorColor: ink.separator, separatorHoverColor: "rgba(255,255,255,0.05)", enableResize: false },
+      panes: { separatorColor: ink.separator, separatorHoverColor: withAlpha(ink.veil, 0.05), enableResize: false },
     },
     grid: {
       vertLines: { color: ink.grid, style: LineStyle.SparseDotted },
@@ -113,7 +113,7 @@ export const NOTHING_DARK: DeepPartial<ChartOptions> = makeNothingTheme();
  */
 export function inkChartOptions(): DeepPartial<ChartOptions> {
   return {
-    layout: { textColor: ink.tick, panes: { separatorColor: ink.separator } },
+    layout: { textColor: ink.tick, panes: { separatorColor: ink.separator, separatorHoverColor: withAlpha(ink.veil, 0.05) } },
     grid: { vertLines: { color: ink.grid }, horzLines: { color: ink.grid } },
     crosshair: { vertLine: { color: ink.ref, labelBackgroundColor: ink.labelBg }, horzLine: { color: ink.ref, labelBackgroundColor: ink.labelBg } },
   };
@@ -124,18 +124,43 @@ export function inkCandleOptions(): CandlestickSeriesPartialOptions {
   return { upColor: ink.fg, downColor: ink.bg, borderUpColor: ink.mute, borderDownColor: ink.mute, wickUpColor: ink.mute, wickDownColor: ink.mute, priceLineColor: ink.signal };
 }
 
+/** Volume colour from the live palette (the histogram's series colour; the bars carry their own `volumeColor`). */
+export function inkVolumeOptions(): HistogramSeriesPartialOptions {
+  return { color: withAlpha(ink.veil, 0.12) };
+}
+
+/*
+ * The series option sets below read their colours from the LIVE palette when a chart reads them (getters): a chart
+ * created after a theme switch starts in the current ink, not in the ink of the moment this module was loaded. With the
+ * default ink the values are the dark ones of Plan 5.2.
+ */
+
 /** Up = filled white, down = hollow (`#0a0a0a` body) with grey borders and wicks. */
 export const NOTHING_CANDLES: CandlestickSeriesPartialOptions = {
-  upColor: ink.fg,
-  downColor: ink.bg,
+  get upColor() {
+    return ink.fg;
+  },
+  get downColor() {
+    return ink.bg;
+  },
   borderVisible: true,
-  borderUpColor: ink.mute,
-  borderDownColor: ink.mute,
+  get borderUpColor() {
+    return ink.mute;
+  },
+  get borderDownColor() {
+    return ink.mute;
+  },
   wickVisible: true,
-  wickUpColor: ink.mute,
-  wickDownColor: ink.mute,
+  get wickUpColor() {
+    return ink.mute;
+  },
+  get wickDownColor() {
+    return ink.mute;
+  },
   priceLineVisible: true,
-  priceLineColor: ink.signal,
+  get priceLineColor() {
+    return ink.signal;
+  },
   priceLineStyle: LineStyle.Dotted,
   lastValueVisible: true,
   priceFormat: { type: "price", precision: 1, minMove: CHART_PRICE_MIN_MOVE },
@@ -144,7 +169,9 @@ export const NOTHING_CANDLES: CandlestickSeriesPartialOptions = {
 export const NOTHING_VOLUME: HistogramSeriesPartialOptions = {
   priceScaleId: "",
   priceFormat: { type: "volume" },
-  color: "rgba(255,255,255,0.12)",
+  get color() {
+    return withAlpha(ink.veil, 0.12);
+  },
   lastValueVisible: false,
   priceLineVisible: false,
 };
@@ -152,7 +179,9 @@ export const NOTHING_VOLUME: HistogramSeriesPartialOptions = {
 export const VOLUME_SCALE_MARGINS = { top: 0.82, bottom: 0 } as const;
 
 export const NOTHING_RATIO_LINE: LineSeriesPartialOptions = {
-  color: ink.fg,
+  get color() {
+    return ink.fg;
+  },
   lineWidth: 1,
   lastValueVisible: false,
   priceLineVisible: false,
@@ -161,7 +190,9 @@ export const NOTHING_RATIO_LINE: LineSeriesPartialOptions = {
 };
 
 export const NOTHING_OI_LINE: LineSeriesPartialOptions = {
-  color: ink.mute,
+  get color() {
+    return ink.mute;
+  },
   lineWidth: 1,
   lastValueVisible: false,
   priceLineVisible: false,
@@ -171,14 +202,20 @@ export const NOTHING_OI_LINE: LineSeriesPartialOptions = {
 
 /** RSI pane line (P02): 1 px fg, a small crosshair dot, no axis label (the pane legend carries the value). */
 export const NOTHING_RSI_LINE: LineSeriesPartialOptions = {
-  color: ink.fg,
+  get color() {
+    return ink.fg;
+  },
   lineWidth: 1,
   lastValueVisible: false,
   priceLineVisible: false,
   crosshairMarkerVisible: true,
   crosshairMarkerRadius: 2.5,
-  crosshairMarkerBorderColor: ink.bg,
-  crosshairMarkerBackgroundColor: ink.fg,
+  get crosshairMarkerBorderColor() {
+    return ink.bg;
+  },
+  get crosshairMarkerBackgroundColor() {
+    return ink.fg;
+  },
   priceFormat: { type: "price", precision: 1, minMove: 0.1 },
 };
 

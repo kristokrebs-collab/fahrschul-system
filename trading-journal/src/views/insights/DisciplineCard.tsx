@@ -20,7 +20,8 @@ import { InsightCard, useInsightsBase } from "./ui";
  * Opaque cell colours (no white-alpha: Samsung Internet's dark filter turns translucent white into translucent black,
  * which made the empty days vanish on the user's tablet). Index = heat level (1 < 50 % · 2 < 75 % · 3 < 100 % · 4 = 100 %).
  */
-const LEVEL_BG = ["bg-(--color-line-2)", "bg-(--conv-1)", "bg-[#7d7d7d]", "bg-[#b5b5b5]", "bg-fg"] as const;
+// the two middle steps follow the light ramp too (`--heat-2/3`, themes.css): line-2 → … → fg stays a monotonic ramp
+const LEVEL_BG = ["bg-(--color-line-2)", "bg-(--conv-1)", "bg-[var(--heat-2,#7d7d7d)]", "bg-[var(--heat-3,#b5b5b5)]", "bg-fg"] as const;
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 /**
  * Fat-finger radius (px) of a heat-map tap: a tap that misses every traded cell picks the nearest traded cell whose
@@ -174,7 +175,7 @@ function HeatMap({ days, today, selected, onSelect, onOpen }: { days: readonly D
                     className={cn(
                       "relative grid aspect-square min-h-0 place-items-center rounded-[3px] transition-opacity duration-300",
                       has ? cn(LEVEL_BG[c.level], "cursor-pointer") : "",
-                      isToday && "shadow-[inset_0_0_0_1px_#9b9b9b]",
+                      isToday && "shadow-[inset_0_0_0_1px_var(--color-mute,#9b9b9b)]",
                       on && "outline outline-2 outline-offset-1 outline-signal",
                       seen || reduced ? "opacity-100" : "opacity-30",
                     )}
@@ -197,7 +198,7 @@ function HeatMap({ days, today, selected, onSelect, onOpen }: { days: readonly D
             kein Trade
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="size-2.5 rounded-[2px] shadow-[inset_0_0_0_1px_#9b9b9b]" />
+            <span className="size-2.5 rounded-[2px] shadow-[inset_0_0_0_1px_var(--color-mute,#9b9b9b)]" />
             heute
           </span>
         </span>

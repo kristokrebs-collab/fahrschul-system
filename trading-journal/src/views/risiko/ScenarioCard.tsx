@@ -139,7 +139,7 @@ export function ScenarioCard({ legs, equity, cur }: { legs: readonly ScenarioLeg
             const y = pointAt(pts, x).y;
             return <span key={k.id} aria-hidden="true" className="absolute left-0 top-0 -ml-1 -mt-1 size-2 rounded-full bg-signal ring-2 ring-ink-850" style={{ transform: `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px)` }} />;
           })}
-          <motion.span aria-hidden="true" className="absolute left-0 top-0 -ml-[7px] -mt-[7px] size-3.5 rounded-full border-2 border-fg bg-ink-900 shadow-[0_0_12px_rgb(255_255_255/0.35)]" style={{ transform: marker }} />
+          <motion.span aria-hidden="true" className="absolute left-0 top-0 -ml-[7px] -mt-[7px] size-3.5 rounded-full border-2 border-fg bg-ink-900 shadow-[0_0_12px_rgb(var(--veil-rgb,255_255_255)/0.35)]" style={{ transform: marker }} />
         </div>
 
         <div className="grid gap-2">

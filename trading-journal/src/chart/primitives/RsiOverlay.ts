@@ -13,7 +13,7 @@
  */
 import type { IChartApiBase, IPrimitivePaneRenderer, IPrimitivePaneView, ISeriesApi, ISeriesPrimitive, Logical, PrimitivePaneViewZOrder, SeriesAttachedParameter, SeriesType, Time } from "lightweight-charts";
 import { isSafeFx } from "@/motion/safeFx";
-import { ink } from "../ink";
+import { ink, withAlpha } from "../ink";
 import { estimateTextWidth } from "../overlayLayout";
 
 type RenderTarget = Parameters<IPrimitivePaneRenderer["draw"]>[0];
@@ -104,7 +104,7 @@ class RsiRenderer implements IPrimitivePaneRenderer {
         if (d.provisional) {
           ctx.lineWidth = Math.max(1, 1.25 * hr);
           ctx.strokeStyle = d.color;
-          ctx.fillStyle = "rgba(10,10,10,0.6)";
+          ctx.fillStyle = withAlpha(ink.bg, 0.6);
           ctx.arc(x, y, r, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();

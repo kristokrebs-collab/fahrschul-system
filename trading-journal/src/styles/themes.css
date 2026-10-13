@@ -22,6 +22,9 @@
   --color-loss-soft: #d27a7b;
   /* destructive actions stay red whatever the accent (= the signal red in the default look) */
   --color-danger: #e5202e;
+  /* ink ON a saturated fill (a switch thumb on the signal track …): white in both themes – `bg-white` would turn to the
+     veil ink in light mode */
+  --color-on-fill: #fff;
 }
 
 /* Mirrors for the canvas charts (`syncChartInk` → `applyInk`, P02 `src/chart/ink.ts`). Dark values = `INK_DEFAULTS`. */
@@ -39,6 +42,9 @@
   --chart-ink-loss: #ff4d4f;
   --chart-ink-win-soft: #65b488;
   --chart-ink-loss-soft: #d2797a;
+  /* the veil ink of the canvas charts (volume bars, bands, the zone fill – always with an alpha) */
+  --chart-ink-veil: #ffffff;
+  --chart-ink-on-fill: #f2f2f2;
 }
 
 :root[data-theme="light"] {
@@ -70,6 +76,16 @@
      in dark the fallback IS the old literal (byte-identical), here it turns to ink. `--veil-ink-rgb` = ink-950. */
   --veil-rgb: 11 11 11;
   --veil-ink-rgb: 242 242 240;
+  /* the foreground ink as channels (`rgb(var(--fg-rgb, 242 242 242) / a)`: fg-tinted SVG bands, outlines) */
+  --fg-rgb: 18 18 18;
+  /* strength of the black drop shadows of floating layers (`rgb(0 0 0 / calc(a * var(--shade, 1)))`): paper needs a
+     softer shadow than the ink ground */
+  --shade: 0.4;
+  /* a neutral gauge arc that is light grey on ink (`#cfcfcf`) is a dark grey on paper */
+  --color-gauge-ink: #3a3a3a;
+  /* the middle steps of the opaque heat ramps (discipline calendar): line-2 → conv-1 → heat-2 → heat-3 → fg */
+  --heat-2: #8f8f8c;
+  --heat-3: #5a5a58;
 
   --color-danger-text: #c0141f;
   --color-win-soft: #4f9a70;
@@ -146,6 +162,8 @@
   --chart-ink-loss: #cc1e29;
   --chart-ink-win-soft: #5a9e78;
   --chart-ink-loss-soft: #c46a6c;
+  --chart-ink-veil: #0b0b0b;
+  --chart-ink-on-fill: #fdfdfc;
 }
 
 /* the page itself (wins over the bootstrap `<style>` in index.html regardless of source order) */
@@ -209,7 +227,9 @@
   --color-line-2: #2c2c2c;
   --color-fg: #f2f2f2;
   --color-mute: #9b9b9b;
-  --color-faint: #5f5f5f;
+  /* the dark theme's faint (#5f5f5f, ~3 : 1) stays untouched there (pixel identity); on the ink islands of the LIGHT mode
+     it is lifted to WCAG AA on every ink plane (≥ 4.5 : 1 on ink-950 … ink-700) */
+  --color-faint: #8a8a8a;
   --color-steel: #e6e6e6;
   --color-teal: #d9d9d9;
   --color-aqua: #fff;
@@ -220,6 +240,9 @@
   --color-black: #000;
   --veil-rgb: 255 255 255;
   --veil-ink-rgb: 4 4 4;
+  --fg-rgb: 242 242 242;
+  --shade: 1;
+  --color-gauge-ink: #cfcfcf;
   --color-danger-text: #ff8a90;
   --color-win-soft: #65b488;
   --color-loss-soft: #d27a7b;

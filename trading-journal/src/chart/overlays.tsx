@@ -281,7 +281,7 @@ export function FollowPill({ show, label, right, reduced, onFollow }: FollowPill
           type="button"
           data-fx="follow"
           onClick={onFollow}
-          className="absolute bottom-9 z-[6] inline-flex items-center gap-1.5 rounded-full border border-line-2 bg-ink-850/90 py-1 pl-3 pr-2.5 text-xs font-medium text-fg shadow-[0_10px_28px_rgb(0_0_0/0.5)] backdrop-blur-sm transition-colors hover:border-faint"
+          className="absolute bottom-9 z-[6] inline-flex items-center gap-1.5 rounded-full border border-line-2 bg-ink-850/90 py-1 pl-3 pr-2.5 text-xs font-medium text-fg shadow-[0_10px_28px_rgb(0_0_0/calc(0.5*var(--shade,1)))] backdrop-blur-sm transition-colors hover:border-faint"
           style={{ right }}
           initial={reduced ? false : { opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

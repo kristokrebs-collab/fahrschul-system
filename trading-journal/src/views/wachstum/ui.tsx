@@ -202,7 +202,7 @@ export function ElasticSlider({ label, min, max, step, value, onChange, format, 
         </div>
         <motion.span aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -ml-[11px] -mt-[11px] block size-[22px]" style={{ x }}>
           <motion.span
-            className={cn("absolute inset-0 rounded-full shadow-[0_2px_8px_rgb(0_0_0/0.45)]", set ? "bg-white" : "border border-dashed border-white/35 bg-ink-800")}
+            className={cn("absolute inset-0 rounded-full shadow-[0_2px_8px_rgb(0_0_0/calc(0.45*var(--shade,1)))]", set ? "bg-white" : "border border-dashed border-white/35 bg-ink-800")}
             style={reduced ? undefined : { scaleX: stretch }}
           />
         </motion.span>

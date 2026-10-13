@@ -65,7 +65,7 @@ interface Flung extends SwipeDismissInfo {
 /** The morphed body starts revealing ≈ 65 % into the morph (OV-06): never a blank panel landing, never a body over a small one. */
 const BODY_REVEAL_MS = bodyRevealDelay(spring.sheet) * 1000;
 
-const SHADOW = "shadow-[0_30px_80px_rgb(0_0_0/0.6)]";
+const SHADOW = "shadow-[0_30px_80px_rgb(0_0_0/calc(0.6*var(--shade,1)))]";
 const WIDTH: Record<NonNullable<SheetProps["size"]>, string> = { md: "sm:max-w-[540px]", lg: "sm:max-w-[860px]" };
 
 /** Morph body: fades up from ≈ 65 % of the morph (no extra delay) and cascades its `StaggerItem`s. */
