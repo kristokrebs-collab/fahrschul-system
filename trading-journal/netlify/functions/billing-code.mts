@@ -5,7 +5,7 @@
  */
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
-import { hashIp } from "./_lib/audit";
+import { ipRateId } from "./_lib/audit";
 import { optionalUser } from "./_lib/auth";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
@@ -16,7 +16,7 @@ const Body = z.object({ code: z.string().min(1).max(60) });
 export default handler(async (req, ctx) => {
   requireMethod(req, "POST");
   const user = await optionalUser(req);
-  await enforceRateLimit(rateKey("billing-code", hashIp(clientIp(req, ctx)) ?? "anon"), 10, 60, { failClosed: true });
+  await enforceRateLimit(rateKey("billing-code", ipRateId(clientIp(req, ctx)) ?? "anon"), 10, 60, { failClosed: true });
   if (user) await enforceRateLimit(rateKey("billing-code-user", user.id), 30, 3600, { failClosed: true });
   const { code } = await readJson(req, Body, { maxBytes: 512 });
   if (!billingConfigured()) throw new HttpError(503, "billing_unavailable", OFF_MESSAGE);

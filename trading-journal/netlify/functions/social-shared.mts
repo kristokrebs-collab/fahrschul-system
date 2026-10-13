@@ -6,7 +6,7 @@
  */
 import type { Config, Context } from "@netlify/functions";
 import { parseSharePayload, type SharedResponse } from "../../src/social/contract";
-import { hashIp } from "./_lib/audit";
+import { ipRateId } from "./_lib/audit";
 import { clientIp, handler, HttpError, json, requireMethod } from "./_lib/http";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 import { supabaseAdmin } from "./_lib/supabase";
@@ -28,7 +28,7 @@ interface SharedRow {
 
 export default handler(async (req, ctx) => {
   requireMethod(req, "GET");
-  await enforceRateLimit(rateKey("social-shared", hashIp(clientIp(req, ctx)) ?? "anon"), 60, 600);
+  await enforceRateLimit(rateKey("social-shared", ipRateId(clientIp(req, ctx)) ?? "anon"), 60, 600);
   const token = tokenOf(req, ctx);
   if (!/^[A-Za-z0-9_-]{22}$/.test(token)) throw NOT_FOUND();
   const { data, error } = await supabaseAdmin().rpc("shared_payload", { p_token: token });

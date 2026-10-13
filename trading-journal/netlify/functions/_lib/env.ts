@@ -21,6 +21,7 @@ export const SERVER_ENV = [
   "SITE_ORIGIN",
   "SYNC_CRON_ENABLED",
   "LOG_SAMPLE_RATE",
+  "IP_HASH_PEPPER",
   "ANTHROPIC_API_KEY",
   "COACH_MODEL",
 ] as const;

@@ -2,7 +2,8 @@
  * Security audit trail → `public.audit_log` (Wave-0 contract, owner P09). Users can read their own rows (Konto →
  * Sicherheit); only functions write. Never throws – an audit failure must not break the action.
  */
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
+import { envOptional } from "./env";
 import { supabaseAdmin } from "./supabase";
 
 export type AuditAction =
@@ -36,9 +37,32 @@ export function scrubMeta(meta: unknown, depth = 0): unknown {
   return typeof meta === "string" && meta.length > 500 ? `${meta.slice(0, 500)}…` : meta;
 }
 
-/** Truncated SHA-256 of an IP (`null` passes through) – the raw IP is never stored. */
+/**
+ * Secret key of the IP pseudonyms (review PRIV-02): `IP_HASH_PEPPER`, else derived from `SUPABASE_SECRET_KEY` (server
+ * only, never in a dump of the database). A plain hash with a public salt can be reversed for all 2^32 IPv4 addresses
+ * in minutes; an HMAC with a secret key cannot without the key. Without either variable nothing is stored anyway (the
+ * audit log and the rate limits live in Supabase) – the fixed key only keeps tests and local runs working.
+ */
+function ipPepper(): string {
+  const own = envOptional("IP_HASH_PEPPER");
+  if (own) return own;
+  const sb = envOptional("SUPABASE_SECRET_KEY");
+  return sb ? createHash("sha256").update(`tj-ip-pepper:${sb}`).digest("hex") : "tj-local-only";
+}
+
+/** Pseudonym of an IP for the audit log: truncated HMAC-SHA-256 with the server secret (`null` passes through). */
 export function hashIp(ip: string | null): string | null {
-  return ip ? createHash("sha256").update(`tj-audit:${ip}`).digest("hex").slice(0, 32) : null;
+  return ip ? createHmac("sha256", ipPepper()).update(`tj-audit:${ip}`).digest("hex").slice(0, 32) : null;
+}
+
+/**
+ * Pseudonym of an IP for rate-limit keys (`rate_hits`): like `hashIp` plus the UTC day, so the keys of one address are
+ * not linkable across days and not to its audit rows. `null` passes through.
+ */
+export function ipRateId(ip: string | null, nowMs = Date.now()): string | null {
+  if (!ip) return null;
+  const day = new Date(nowMs).toISOString().slice(0, 10);
+  return createHmac("sha256", ipPepper()).update(`tj-rate:${day}:${ip}`).digest("hex").slice(0, 32);
 }
 
 /** Appends one audit row. `meta` is scrubbed; pass `ip` from `clientIp(req, ctx)`. */

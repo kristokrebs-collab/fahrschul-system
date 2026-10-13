@@ -18,7 +18,7 @@ Functions, never `VITE_`).
 | `env.ts` | `env`, `envOptional`, `envInt`, `envNumber`, `envBool`, `SERVER_ENV` |
 | `crypto.ts` | AES-256-GCM `encrypt` / `decrypt` (`v<n>:iv:tag:ct`, AAD `<user>:<connection>:<field>`), key rotation |
 | `rateLimit.ts` | `rateLimit(key, max, windowSec)`, `enforceRateLimit` (429 + `Retry-After`), `rateKey` – backed by `rate_hit()` |
-| `audit.ts` | `audit(userId, action, meta, ip)` (scrubbed meta, hashed IP, never throws), `scrubMeta`, `hashIp` |
+| `audit.ts` | `audit(userId, action, meta, ip)` (scrubbed meta, IP as HMAC with the server secret `IP_HASH_PEPPER`, never throws), `scrubMeta`, `hashIp`, `ipRateId` (daily rotating IP pseudonym for rate-limit keys) |
 | `plan.ts` | `planOf(userId)`, `requirePlan`, `effectivePlan`; P10: `paymentsConfigured()`, `requireFeature(userId, feature)` (402 `plan_required`, details `{ feature, required, plan }`), `requireLimit(userId, key, used)` – both pass while payments are not set up, so a cloud build without Stripe never locks anyone out |
 | `account.ts` | `collectExport`, `EXPORT_TABLES` (later packages append their per-user tables; missing tables are skipped), `fetchAllDocs`, `journalBackup`, `listUserFiles` / `removeUserFiles` (buckets `screenshots`, `backups`), `listBackups`, `expiredBackups`, `ensureBackupBucket`, `runNightlyBackup`, `DELETE_CONFIRM_WORD`, `redactSecrets` |
 | `billingCleanup.ts` | `cancelBillingForUser(userId)` – P09 ↔ P10 contract: cancels open Stripe subscriptions BEFORE an account is deleted; throws (409 `subscription_active` without Stripe config, 502 on Stripe errors) → nothing is deleted. P10 may delegate the body to its `_lib/stripe.ts`; keep the signature and the throw-means-abort rule |

@@ -7,7 +7,7 @@
  */
 import type { Config } from "@netlify/functions";
 import { normalizeRefCode } from "../../src/billing/contract";
-import { hashIp } from "./_lib/audit";
+import { ipRateId } from "./_lib/audit";
 import { requireUser } from "./_lib/auth";
 import { clientIp, handler, json, requireMethod } from "./_lib/http";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
@@ -17,7 +17,7 @@ export default handler(async (req, ctx) => {
   requireMethod(req, "GET");
   const raw = new URL(req.url).searchParams.get("code");
   if (raw !== null) {
-    await enforceRateLimit(rateKey("billing-ref-check", hashIp(clientIp(req, ctx)) ?? "anon"), 20, 60, { failClosed: true });
+    await enforceRateLimit(rateKey("billing-ref-check", ipRateId(clientIp(req, ctx)) ?? "anon"), 20, 60, { failClosed: true });
     const code = normalizeRefCode(raw);
     const valid = !!code && (await referrerOf(code)) !== null;
     return json({ valid, trialDays: valid ? referralTrialDays() : 0 });

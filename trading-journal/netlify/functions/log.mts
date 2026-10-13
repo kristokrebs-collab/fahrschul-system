@@ -7,7 +7,7 @@
 import type { Config } from "@netlify/functions";
 import { z } from "zod";
 import { errorFingerprint, scrubExtra, scrubStack, scrubText, scrubUrl } from "../../src/cloud/scrub";
-import { hashIp } from "./_lib/audit";
+import { ipRateId } from "./_lib/audit";
 import { optionalUser } from "./_lib/auth";
 import { envNumber } from "./_lib/env";
 import { clientIp, handler, HttpError, json, readJson, requireMethod } from "./_lib/http";
@@ -34,8 +34,7 @@ export default handler(async (req, ctx) => {
     // an expired session must not swallow the report – it is stored without the user
     if (!(e instanceof HttpError) || e.status !== 401) throw e;
   }
-  const ipHash = hashIp(clientIp(req, ctx)) ?? "anon";
-  await enforceRateLimit(rateKey("log", ipHash), 30, 600);
+  await enforceRateLimit(rateKey("log", ipRateId(clientIp(req, ctx)) ?? "anon"), 30, 600);
   const body = await readJson(req, Body, { maxBytes: 32 * 1024 });
 
   const message = scrubText(body.message, 2000);

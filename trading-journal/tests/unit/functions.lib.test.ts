@@ -5,7 +5,7 @@
  * know no `@/` alias. The Supabase admin client is replaced by a fake via `setSupabaseAdminForTests`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { error, errorFrom, handler, HttpError, json, readJson, requireMethod, clientIp } from "../../netlify/functions/_lib/http";
@@ -14,7 +14,7 @@ import { setSupabaseAdminForTests } from "../../netlify/functions/_lib/supabase"
 import { bearerToken, optionalUser, requireUser } from "../../netlify/functions/_lib/auth";
 import { CryptoError, decrypt, encrypt, keyFromBase64, keyringFromEnv, keyVersionOf, last4, needsReencrypt, secretAad, type Keyring } from "../../netlify/functions/_lib/crypto";
 import { enforceRateLimit, rateKey, rateLimit, windowReset } from "../../netlify/functions/_lib/rateLimit";
-import { audit, hashIp, scrubMeta } from "../../netlify/functions/_lib/audit";
+import { audit, hashIp, ipRateId, scrubMeta } from "../../netlify/functions/_lib/audit";
 import { effectivePlan, planOf, requirePlan } from "../../netlify/functions/_lib/plan";
 
 const ctx = {} as Parameters<ReturnType<typeof handler>>[1];
@@ -273,6 +273,38 @@ describe("_lib/audit", () => {
     const { inserts } = fakeAdmin();
     await audit(U1, "exchange.connect", { exchange: "bitunix", secret: "s" }, "1.2.3.4");
     expect(inserts).toEqual([{ table: "audit_log", row: { user_id: U1, action: "exchange.connect", meta: { exchange: "bitunix", secret: "[redacted]" }, ip_hash: hashIp("1.2.3.4") } }]);
+  });
+
+  it("IP pseudonyms are keyed with the server secret, rate-limit ids rotate daily (PRIV-02)", () => {
+    const publicSalt = createHash("sha256").update("tj-audit:1.2.3.4").digest("hex").slice(0, 32);
+    const prev = { pepper: process.env.IP_HASH_PEPPER, sb: process.env.SUPABASE_SECRET_KEY };
+    try {
+      delete process.env.IP_HASH_PEPPER;
+      process.env.SUPABASE_SECRET_KEY = "sb_secret_one";
+      const derived = hashIp("1.2.3.4");
+      expect(derived).not.toBe(publicSalt); // no longer brute-forceable from a dump with the public salt
+      process.env.SUPABASE_SECRET_KEY = "sb_secret_two";
+      expect(hashIp("1.2.3.4")).not.toBe(derived);
+      process.env.IP_HASH_PEPPER = "pepper-a";
+      const a = hashIp("1.2.3.4");
+      expect(a).toMatch(/^[0-9a-f]{32}$/);
+      expect(hashIp("1.2.3.4")).toBe(a); // stable for one key
+      expect(hashIp("1.2.3.5")).not.toBe(a);
+      process.env.IP_HASH_PEPPER = "pepper-b";
+      expect(hashIp("1.2.3.4")).not.toBe(a);
+      const day1 = Date.parse("2026-10-13T10:00:00Z");
+      const r1 = ipRateId("1.2.3.4", day1);
+      expect(r1).toMatch(/^[0-9a-f]{32}$/);
+      expect(ipRateId("1.2.3.4", day1 + 3_600_000)).toBe(r1);
+      expect(ipRateId("1.2.3.4", day1 + 86_400_000)).not.toBe(r1);
+      expect(r1).not.toBe(hashIp("1.2.3.4"));
+      expect(ipRateId(null)).toBeNull();
+    } finally {
+      if (prev.pepper === undefined) delete process.env.IP_HASH_PEPPER;
+      else process.env.IP_HASH_PEPPER = prev.pepper;
+      if (prev.sb === undefined) delete process.env.SUPABASE_SECRET_KEY;
+      else process.env.SUPABASE_SECRET_KEY = prev.sb;
+    }
   });
 
   it("never throws", async () => {

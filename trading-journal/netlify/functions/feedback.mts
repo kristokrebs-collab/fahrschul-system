@@ -7,7 +7,7 @@
  */
 import type { Config } from "@netlify/functions";
 import { FeedbackSchema } from "../../src/social/contract";
-import { hashIp } from "./_lib/audit";
+import { ipRateId } from "./_lib/audit";
 import { optionalUser } from "./_lib/auth";
 import { clientIp, handler, json, readJson, requireMethod } from "./_lib/http";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
@@ -17,7 +17,7 @@ export default handler(async (req, ctx) => {
   requireMethod(req, "POST");
   const user = await optionalUser(req);
   if (user) await enforceRateLimit(rateKey("feedback", user.id), 10, 600);
-  else await enforceRateLimit(rateKey("feedback-anon", hashIp(clientIp(req, ctx)) ?? "anon"), 5, 600, { failClosed: true });
+  else await enforceRateLimit(rateKey("feedback-anon", ipRateId(clientIp(req, ctx)) ?? "anon"), 5, 600, { failClosed: true });
   const body = await readJson(req, FeedbackSchema, { maxBytes: 8 * 1024 });
   return json(await submitFeedback(user?.id ?? null, body), { status: 201 });
 });

@@ -147,6 +147,7 @@ Netlify → **Site configuration → Environment variables → Add a variable**.
 | `EXCHANGE_ENC_KEY_V1` | `openssl rand -base64 32` (Schritt 5) | Functions, secret |
 | `SYNC_CRON_ENABLED` | optional `false` stoppt den 30-Minuten-Sync | Functions |
 | `LOG_SAMPLE_RATE` | optional `0`–`1`, Anteil gespeicherter Fehlerberichte (Standard `1`) | Functions |
+| `IP_HASH_PEPPER` | empfohlen, `openssl rand -base64 32`: geheimer Schlüssel der IP-Pseudonyme in Audit-Log und Rate-Limits (HMAC). Ohne ihn wird er aus `SUPABASE_SECRET_KEY` abgeleitet; die rohe IP wird nie gespeichert | Functions, secret |
 | `ANTHROPIC_API_KEY` | optional, KI-Formulierung im Coach (Premium). Ohne Schlüssel verkauft die Preisseite keinen „KI-Coach“: Premium-Highlight, Vergleichstabelle und Upgrade-Dialog lassen ihn weg (`billing/status` meldet `coachAi: false`) | Functions, secret |
 | `COACH_MODEL` | optional, Standard `claude-opus-5-5` | Functions |
 
