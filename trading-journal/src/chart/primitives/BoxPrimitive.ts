@@ -38,7 +38,7 @@ import type {
 import { stagger, tween } from "@/motion/tokens";
 import { AXIS_LABEL_GAP } from "../axisLabels";
 import { fmt } from "../format";
-import { ink } from "../ink";
+import { ink, withAlpha } from "../ink";
 import { logicalToX } from "../logicalX";
 import { axisLabelClear, barIndexAtOrAfter, estimateTextWidth, LINE_NUDGE, placeLabels, type Box as OverlayBox, type LabelCandidate } from "../overlayLayout";
 import { RIGHT_RESERVED } from "./SignalOverlay";
@@ -121,7 +121,8 @@ const CAPTION_PX = 10;
 const LABEL_PAD = 3;
 const LABEL_H = 12;
 const CAPTION_H = 14;
-const LABEL_BG = "rgba(10,10,10,0.92)";
+/** label plate from the live palette (dark: rgba(10,10,10,0.92)) */
+const labelBg = (): string => withAlpha(ink.bg, 0.92);
 /** faint alpha multiplier of older (inactive) boxes */
 const OLD = 0.5;
 /** reveal of the confirmation wipe (ms) */
@@ -188,7 +189,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, l: PlacedLabel, px: number, al
   const h = Math.round(l.box.h * vr);
   ctx.setLineDash([]);
   ctx.globalAlpha = Math.min(1, alpha + 0.1);
-  ctx.fillStyle = LABEL_BG;
+  ctx.fillStyle = labelBg();
   ctx.beginPath();
   if (typeof ctx.roundRect === "function") ctx.roundRect(x, y, w, h, 3 * hr);
   else ctx.rect(x, y, w, h);
@@ -305,7 +306,7 @@ class EdgeAxisView implements ISeriesPrimitiveAxisView {
     return ink.fg;
   }
   backColor(): string {
-    return "#1c1c1c";
+    return ink.grid;
   }
   visible(): boolean {
     return this.src.axisY(this.edge) != null;

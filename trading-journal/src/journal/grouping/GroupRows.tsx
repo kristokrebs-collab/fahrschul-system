@@ -181,7 +181,7 @@ export function GroupPanel({ group: g, onOpenTrade }: { group: Group; onOpenTrad
           <motion.path
             d={`M11 ${ROW_H / 2} V ${h - ROW_H / 2}`}
             fill="none"
-            stroke="rgb(255 255 255 / 0.35)"
+            stroke="rgb(var(--veil-rgb, 255 255 255) / 0.35)"
             strokeWidth="1.5"
             strokeDasharray={g.kind === "hedge" ? "0" : "3 3"}
             initial={reduced ? false : { pathLength: 0 }}

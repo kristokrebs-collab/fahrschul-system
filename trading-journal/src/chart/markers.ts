@@ -22,14 +22,27 @@ export interface TradeMarker {
   result: TradeResult;
 }
 
+/** Marker colours from the live palette (read when markers are built – a theme switch rebuilds them). */
 export const MARKER_COLORS = {
-  long: ink.win,
-  short: ink.loss,
-  win: ink.win,
-  loss: ink.loss,
-  be: ink.mute,
-  open: ink.fg,
-} as const;
+  get long(): string {
+    return ink.win;
+  },
+  get short(): string {
+    return ink.loss;
+  },
+  get win(): string {
+    return ink.win;
+  },
+  get loss(): string {
+    return ink.loss;
+  },
+  get be(): string {
+    return ink.mute;
+  },
+  get open(): string {
+    return ink.fg;
+  },
+};
 
 export function toTradeMarkers(
   trades: readonly Pick<EnrichedTrade, "id" | "side" | "entry" | "exit" | "pnl" | "result" | "date" | "createdAt">[],

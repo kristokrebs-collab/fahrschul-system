@@ -82,7 +82,7 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
                 className={cn("relative isolate grid min-h-[76px] content-start gap-1 overflow-hidden rounded-2xl border px-3.5 py-3 text-left outline-none transition-colors duration-200 disabled:opacity-60", on ? "border-white/40 bg-white/[0.04]" : "border-line hover:border-white/20 focus-visible:border-white/40")}
                 style={{ borderRadius: radius.card }}
               >
-                {on && <motion.span layoutId={`labor-strat-${uid}`} aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(120%_120%_at_0%_0%,rgba(255,255,255,0.09),transparent_60%)]" style={{ borderRadius: radius.card }} transition={reduced ? { duration: 0 } : spring.layout} />}
+                {on && <motion.span layoutId={`labor-strat-${uid}`} aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(120%_120%_at_0%_0%,rgb(var(--veil-rgb,255_255_255)/0.09),transparent_60%)]" style={{ borderRadius: radius.card }} transition={reduced ? { duration: 0 } : spring.layout} />}
                 <span className="flex items-center gap-2 text-[14px] font-semibold">
                   <span className={cn("size-1.5 rounded-full transition-colors", on ? "bg-signal" : "bg-line-2")} aria-hidden="true" />
                   {t.title}

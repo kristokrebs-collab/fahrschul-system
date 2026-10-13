@@ -145,8 +145,8 @@ function DayCurve({ curve }: { curve: number[] }) {
   return (
     <motion.div initial={reduced ? false : { clipPath: "inset(0 100% 0 0)" }} animate={{ clipPath: "inset(0 0% 0 0)" }} transition={tween.draw} aria-hidden="true">
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block h-11 w-full overflow-visible">
-        <line x1="0" x2={W} y1={zero} y2={zero} stroke="#2c2c2c" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
-        <path d={d} fill="none" stroke={last >= 0 ? "#3ddc84" : "#ff4d4f"} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        <line x1="0" x2={W} y1={zero} y2={zero} stroke="var(--color-line-2, #2c2c2c)" strokeDasharray="2 3" vectorEffect="non-scaling-stroke" />
+        <path d={d} fill="none" stroke={last >= 0 ? "var(--color-win, #3ddc84)" : "var(--color-loss, #ff4d4f)"} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
       </svg>
     </motion.div>
   );

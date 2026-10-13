@@ -192,8 +192,18 @@ series' own last-price line. `NOTHING_RSI_LINE` (P02).
 
 Runtime palette (P02 hook for the light mode, P13): `applyInk(partial)` changes the live `ink` in place (defaults
 unchanged, `INK_DEFAULTS`; `resetInk()`), `subscribeInk(cb)` notifies; `NothingCandleChart` re-applies
-`inkChartOptions()` / `inkCandleOptions()` and invalidates its overlays (which read `ink` at draw time). Fonts: `document.fonts.load('11px "IBM Plex Mono"')` is awaited (≤ 600 ms)
-before the first `setData`.
+`inkChartOptions()` / `inkCandleOptions()` / `inkVolumeOptions()`, re-tints the volume bars, re-inks the sub pane
+(`PaneController.applyInk`, `RsiPane.applyInk`), the level lines + zone and rebuilds the trade markers; its overlays read
+`ink` at draw time. Fonts: `document.fonts.load('11px "IBM Plex Mono"')` is awaited (≤ 600 ms) before the first `setData`.
+
+Live colours everywhere (P14 light pass): the series option sets (`NOTHING_CANDLES`, `NOTHING_VOLUME`, the line sets),
+`MARKER_COLORS`, `LEVEL_STYLES`, `RSI_LEVELS`, `MINI_LINES` and `ZONE_DEFAULTS` read their colours through getters, so a
+chart built AFTER a theme switch starts in the current ink (charts are created with `makeNothingTheme()` /
+`inkChartOptions()`, never with a palette frozen at module load). Two ink keys besides the ramp: `veil` (the
+maximum-foreground ink, always with an alpha: volume bars, bands, the zone fill) and `onFill` (text on a filled axis
+label). Helpers: `withAlpha(hex, a)` → `rgba(r,g,b,a)` (the dark ink gives exactly the former literals, e.g.
+`rgba(255,255,255,0.14)`), `inkOf(storedHex)` maps a stored dark-palette colour (an annotation's `#f2f2f2`) onto the
+live ink of the same role.
 
 ## Recharts cards (`EquityChart.tsx`, `MonthlyBars.tsx`)
 
@@ -263,7 +273,9 @@ Fixture: `tests/fixtures/candles-1h.json` (240 hourly BTC-like candles from 2026
 ## Light mode (P13)
 
 - Canvas (lightweight-charts): `themeStore.syncChartInk()` calls `applyInk()` with the `--chart-ink-*` mirrors of
-  `themes.css` on every theme / accent change, `resetInk()` for dark – the P02 hook above, nothing else to wire.
+  `themes.css` on every theme / accent change, `resetInk()` for dark – the P02 hook above, nothing else to wire. Other
+  canvases (Monte Carlo fan, report snapshot, breakout streak) read `ink` / `liveHex()` (`@/motion/fx/shared`) while
+  they paint and repaint on a theme change.
 - SVG (Recharts cards): JS colours go through `themePaint(hex)` (`@/lib/themePaint`) – the dark hex becomes
   `var(--token, hex)` (grid, reference line, ticks, bars, the equity stroke), so the SVG follows the theme and the dark
   render is unchanged. Never use `themePaint` for canvas (`fillStyle` cannot resolve `var()`).

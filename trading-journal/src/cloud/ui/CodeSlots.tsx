@@ -79,7 +79,7 @@ export function CodeSlots({ value, onChange, onComplete, label, disabled, invali
               {!d && <span className={cn("absolute size-1.5 rounded-full", isActive ? "bg-fg" : "bg-faint/60")} />}
               {isActive && !reduced && (
                 <motion.span
-                  className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_0_18px_rgb(255_255_255/0.08)]"
+                  className="pointer-events-none absolute inset-0 rounded-[inherit] shadow-[inset_0_0_18px_rgb(var(--veil-rgb,255_255_255)/0.08)]"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={tween.fade}

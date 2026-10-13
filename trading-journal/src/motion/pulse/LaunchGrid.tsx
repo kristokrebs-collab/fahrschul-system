@@ -226,7 +226,7 @@ export function LaunchGrid({ children, slots = [], cards = [], aside, hud, play,
               ref={gridRef}
               aria-hidden="true"
               className="pointer-events-none absolute inset-0"
-              style={{ backgroundImage: "radial-gradient(rgb(255 255 255 / 0.085) 1px, transparent 1.4px)", backgroundSize: "24px 24px", backgroundPosition: "12px 12px" }}
+              style={{ backgroundImage: "radial-gradient(rgb(var(--veil-rgb, 255 255 255) / 0.085) 1px, transparent 1.4px)", backgroundSize: "24px 24px", backgroundPosition: "12px 12px" }}
             />
             <span aria-hidden="true" className="pointer-events-none absolute inset-0" style={{ background: "radial-gradient(70% 60% at 30% 40%, rgb(229 32 46 / 0.07), transparent 70%)" }} />
             <span ref={squareRef} aria-hidden="true" className="pointer-events-none absolute right-[9%] top-[14%] size-[clamp(38px,6vw,64px)] rounded-[6px] border border-white/25 max-sm:top-auto max-sm:bottom-[5%] max-sm:right-[7%]" />
@@ -242,7 +242,7 @@ export function LaunchGrid({ children, slots = [], cards = [], aside, hud, play,
                         ref={(el) => {
                           cardRefs.current[j] = el;
                         }}
-                        className="absolute w-[38cqw] max-w-[180px] overflow-hidden rounded-[6px] border border-white/10 bg-ink-800 shadow-[0_18px_40px_-12px_rgb(0_0_0/0.7)]"
+                        className="absolute w-[38cqw] max-w-[180px] overflow-hidden rounded-[6px] border border-white/10 bg-ink-800 shadow-[0_18px_40px_-12px_rgb(0_0_0/calc(0.7*var(--shade,1)))]"
                         style={{ left: `${x}%`, top: `${y}%`, zIndex: j === 0 ? cards.length + 1 : cards.length - j }}
                       >
                         {card}

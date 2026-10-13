@@ -5,11 +5,18 @@
  *     (applied in `main.tsx` before the render – no flash, no inline script),
  *   - the "Darstellung" card: Hell / System (follows the OS live) / an accent,
  *   - light-mode contrast of the text tokens on every plane, the overview hero as a dark island, the canvas charts on
- *     the light ink, no horizontal scroll, no console errors.
+ *     the light ink, no horizontal scroll, no console errors,
+ *   - every page of the app (P14 light-mode pass) in BOTH themes: no horizontal scroll, no console errors; in light the
+ *     page's text passes axe `color-contrast` (WCAG AA – the dark theme's faint ink is ~3 : 1 by design and stays out),
+ *   - the canvas charts follow a theme switch made while they are on screen (the chart palette is read live).
  */
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, stored } from "./helpers";
 import { openUx, themeSettled, UX_PROJECTS } from "./uxHarness";
+
+/** Every page of the app (`PAGES` in `src/store/uiStore.ts` – the store module itself cannot be imported here). */
+const PAGES = ["overview", "trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise"] as const;
 
 const css = (page: Page, name: string, sel = ":root") => page.evaluate(([n, s]) => getComputedStyle(document.querySelector(s!)!).getPropertyValue(n!).trim(), [name, sel] as const);
 
@@ -165,4 +172,85 @@ test.describe("Themes", () => {
     await expectNoHorizontalScroll(page);
     expect(errors).toEqual([]);
   });
+
+  // Every page in both themes (the light pass of P14): the page comes up in the stored theme, the layout never scrolls
+  // sideways, nothing logs an error; light-mode text is readable (axe colour contrast, WCAG AA) once the entrances ran.
+  for (const name of PAGES) {
+    for (const theme of ["dark", "light"] as const) {
+      test(`${name} (${theme}): no horizontal scroll, no console errors${theme === "light" ? ", readable text" : ""}`, async ({ page }) => {
+        test.setTimeout(90_000);
+        const errors = collectErrors(page);
+        await openUx(page, "app", name, theme === "light" ? { theme: "light" } : {});
+        await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+        await settlePage(page);
+        await expectNoHorizontalScroll(page);
+        if (theme === "light") {
+          const res = await new AxeBuilder({ page }).include(`[data-page="${name}"][data-page-role="current"]`).withRules(["color-contrast"]).analyze();
+          const lines = res.violations.flatMap((v) => v.nodes.map((n) => `${n.target.join(" ")}: ${n.failureSummary ?? v.help}`));
+          expect(lines, `${name}: light-mode colour contrast`).toEqual([]);
+        }
+        expect(errors).toEqual([]);
+      });
+    }
+  }
+
+  test("a theme switch repaints the canvas charts that are on screen (live chart palette)", async ({ page }) => {
+    const errors = collectErrors(page);
+    await openUx(page, "app", "markt");
+    const ink = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--chart-ink-veil").trim());
+    // (the CSS minifier may shorten the hex)
+    expect(await ink()).toMatch(/^#fff(fff)?$/i);
+    const chart = page.locator('[data-page="markt"][data-page-role="current"] canvas').first();
+    await chart.waitFor();
+    await chart.scrollIntoViewIfNeeded();
+    // the pane canvas in the ink theme: candles in near-white ink, the volume bars as a faint WHITE veil (low alpha)
+    const ink2 = () =>
+      chart.evaluate((c: HTMLCanvasElement) => {
+        if (!c.width || !c.height) return null;
+        // read a copy (one readback per throwaway canvas – repeated reads of the chart's own canvas make Chrome warn)
+        const copy = document.createElement("canvas");
+        copy.width = c.width;
+        copy.height = c.height;
+        const ctx = copy.getContext("2d", { willReadFrequently: true });
+        if (!ctx) return null;
+        ctx.drawImage(c, 0, 0);
+        const d = ctx.getImageData(0, 0, c.width, c.height).data;
+        const n = { solidLight: 0, solidDark: 0, veilLight: 0, veilDark: 0 };
+        for (let i = 0; i < d.length; i += 4) {
+          const a = d[i + 3]!;
+          const l = (d[i]! + d[i + 1]! + d[i + 2]!) / 3;
+          if (a >= 200) {
+            if (l > 200) n.solidLight++;
+            else if (l < 60) n.solidDark++;
+          } else if (a >= 10 && a <= 90) {
+            if (l > 200) n.veilLight++;
+            else if (l < 60) n.veilDark++;
+          }
+        }
+        return n;
+      });
+    await expect.poll(async () => (await ink2())?.solidLight ?? 0, { timeout: 15_000 }).toBeGreaterThan(50);
+    expect((await ink2())?.veilLight ?? 0).toBeGreaterThan(50);
+    await page.locator("body").press("t");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+    await themeSettled(page);
+    expect(await ink()).toBe("#0b0b0b");
+    // the same canvas, repainted in the paper theme: candles in ink, and the volume veil (per-bar colours) dark too
+    await expect.poll(async () => (await ink2())?.solidDark ?? 0, { timeout: 15_000 }).toBeGreaterThan(50);
+    await expect.poll(async () => (await ink2())?.veilDark ?? 0, { timeout: 15_000 }).toBeGreaterThan(50);
+    expect((await ink2())?.veilLight ?? 0).toBeLessThan(20);
+    expect(errors).toEqual([]);
+  });
 });
+
+/** Lets a page's entrances play: a walk to the bottom (in-view reveals) and back, then a short rest. */
+async function settlePage(page: Page): Promise<void> {
+  await page.waitForTimeout(800);
+  const h = await page.evaluate(() => document.documentElement.scrollHeight);
+  for (let y = 0; y < h; y += 700) {
+    await page.evaluate((top) => window.scrollTo(0, top), y);
+    await page.waitForTimeout(120);
+  }
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(1200);
+}

@@ -3,6 +3,7 @@ import { useId, useRef, useState } from "react";
 import { streakLabel } from "@/domain/account";
 import { explain } from "@/domain/explain";
 import { pct0 } from "@/lib/format";
+import { themePaint } from "@/lib/themePaint";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { radius, spring, tween } from "@/motion/tokens";
 import { Card } from "@/primitives/Card";
@@ -15,8 +16,8 @@ import { ExplanationView } from "./explainer";
 
 export const NO_STREAK = "Noch keine Serie";
 
-const WIN = "#3ddc84";
-const FG = "#f2f2f2";
+// SVG paints that follow the theme (the dark values are the hex fallbacks)
+const WIN = themePaint("#3ddc84");
 
 /** Centre counter: the ring's own progress ×100, so the number and the arc arrive on the same frame. */
 function GaugeCentre({ progress, label }: { progress: MotionValue<number>; label: string }) {
@@ -69,7 +70,7 @@ export function WinRateCard() {
           design pass v3); the explainer below takes that free height first, so opening it glides the group up instead
           of moving it down and back while the row re-balances (OV-01) */}
       <div className="flex flex-1 flex-col items-center justify-center gap-4">
-        <RingGauge value={g.winRate} marker={bt} color={FG} passColor={WIN} track="#222" aria-label={`Win-Rate ${label}`}>
+        <RingGauge value={g.winRate} marker={bt} passColor={WIN} aria-label={`Win-Rate ${label}`}>
           {(progress) => (
             <div>
               <div className="dot-num text-[34px] leading-none">

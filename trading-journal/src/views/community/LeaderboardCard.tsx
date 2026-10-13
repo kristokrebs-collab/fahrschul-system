@@ -53,7 +53,7 @@ function Podium({ row, metric, place, pulse }: { row: LeaderboardRow; metric: So
     <motion.li
       className={cn(
         "relative grid min-w-0 content-start justify-items-center gap-2 overflow-hidden rounded-2xl border px-2 pb-3 pt-3 text-center",
-        place === 1 ? "border-line-2 bg-[radial-gradient(120%_80%_at_50%_0%,#242424_0%,#111_70%)] sm:-mt-3 sm:pb-5" : "border-line bg-ink-950/50",
+        place === 1 ? "border-line-2 bg-[radial-gradient(120%_80%_at_50%_0%,var(--color-ink-700)_0%,var(--color-ink-850)_70%)] sm:-mt-3 sm:pb-5" : "border-line bg-ink-950/50",
         row.me && "ring-1 ring-signal/50",
       )}
       initial={reduced ? false : { opacity: 0, y: 18, scale: 0.94 }}

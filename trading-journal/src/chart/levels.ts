@@ -7,7 +7,7 @@
 import { LineStyle, type IPriceLine, type ISeriesApi, type LineWidth, type Time } from "lightweight-charts";
 import type { MarketLevels } from "@/domain/types";
 import { ink } from "./theme";
-import { ZonePrimitive } from "./primitives/ZonePrimitive";
+import { ZONE_DEFAULTS, ZonePrimitive } from "./primitives/ZonePrimitive";
 
 export type LevelKey = "longTrigger" | "longStop" | "shortTrigger" | "invalidation" | "lowerHigh";
 export const LEVEL_KEYS: readonly LevelKey[] = ["longTrigger", "longStop", "shortTrigger", "invalidation", "lowerHigh"];
@@ -23,46 +23,77 @@ export interface LevelStyle {
   axisLabelTextColor: string;
 }
 
+/** Level line styles; the colours come from the live palette (read when a line is created or re-synced). */
 export const LEVEL_STYLES: Record<LevelKey, LevelStyle> = {
   longTrigger: {
-    color: ink.fg,
+    get color() {
+      return ink.fg;
+    },
     lineStyle: LineStyle.Dotted,
     title: "LONG",
     label: "Long-Trigger (4H über)",
-    axisLabelColor: ink.fg,
-    axisLabelTextColor: ink.bg,
+    get axisLabelColor() {
+      return ink.fg;
+    },
+    get axisLabelTextColor() {
+      return ink.bg;
+    },
   },
   longStop: {
-    color: ink.mute,
+    get color() {
+      return ink.mute;
+    },
     lineStyle: LineStyle.SparseDotted,
     title: "INVAL",
     label: "Long-Invalidierung",
-    axisLabelColor: ink.mute,
-    axisLabelTextColor: ink.bg,
+    get axisLabelColor() {
+      return ink.mute;
+    },
+    get axisLabelTextColor() {
+      return ink.bg;
+    },
   },
   shortTrigger: {
-    color: ink.fg,
+    get color() {
+      return ink.fg;
+    },
     lineStyle: LineStyle.Dotted,
     title: "SHORT",
     label: "Short-Trigger (4H unter)",
-    axisLabelColor: ink.fg,
-    axisLabelTextColor: ink.bg,
+    get axisLabelColor() {
+      return ink.fg;
+    },
+    get axisLabelTextColor() {
+      return ink.bg;
+    },
   },
   invalidation: {
-    color: ink.signal,
+    get color() {
+      return ink.signal;
+    },
     lineStyle: LineStyle.Dashed,
     title: "HART",
     label: "Harte Invalidierung",
-    axisLabelColor: ink.signal,
-    axisLabelTextColor: ink.fg,
+    get axisLabelColor() {
+      return ink.signal;
+    },
+    get axisLabelTextColor() {
+      return ink.onFill;
+    },
   },
   lowerHigh: {
-    color: ink.tick,
+    get color() {
+      return ink.tick;
+    },
     lineStyle: LineStyle.Dotted,
     title: "LH W",
     label: "Lower High (Weekly)",
-    axisLabelColor: ink.tick,
-    axisLabelTextColor: ink.fg,
+    get axisLabelColor() {
+      return ink.tick;
+    },
+    get axisLabelTextColor() {
+      return ink.onFill;
+    },
   },
 };
 
@@ -126,13 +157,19 @@ export function setLevels(
     for (const key of LEVEL_KEYS) {
       const price = levels[key];
       const line = prev.lines[key];
+      const st = LEVEL_STYLES[key];
       line.applyOptions({
         price: isSetPrice(price) ? price : 0,
         lineVisible: isSetPrice(price),
         axisLabelVisible: isSetPrice(price),
         lineWidth: levelWidth(key, active),
+        // the palette may have changed since the line was created (light mode)
+        color: st.color,
+        axisLabelColor: st.axisLabelColor,
+        axisLabelTextColor: st.axisLabelTextColor,
       });
     }
+    prev.zone.applyOptions({ fill: ZONE_DEFAULTS.fill, stroke: ZONE_DEFAULTS.stroke, labelBackground: ZONE_DEFAULTS.labelBackground, labelText: ZONE_DEFAULTS.labelText });
     prev.zone.setRange({ low: lo, high: hi, from: opts.from ?? null, to: null });
     if (!zoneOn) prev.zone.applyOptions({ opacity: 0 });
     else if (prev.zone.options.opacity === 0) prev.zone.applyOptions({ opacity: 1 });

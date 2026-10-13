@@ -64,7 +64,7 @@ function LimitRing({ r, warnAt, index }: { r: LimitRow; warnAt: number; index: n
       animate={{ opacity: 1, y: 0, transitionEnd: { transform: "none" } }}
       transition={{ ...spring.enter, delay: reduced ? 0 : Math.min(index, stagger.max) * stagger.reveal }}
     >
-      <RingGauge value={Math.min(1, r.ratio)} marker={warnAt} size={92} stroke={8} color="#cfcfcf" passColor={SIGNAL} aria-label={`${r.label}: ${r.detail}`}>
+      <RingGauge value={Math.min(1, r.ratio)} marker={warnAt} size={92} stroke={8} color="var(--color-gauge-ink, #cfcfcf)" passColor={SIGNAL} aria-label={`${r.label}: ${r.detail}`}>
         <span className={cn("dot-num text-[15px] leading-none", r.state === "breach" ? "text-loss" : "text-fg")}>{ringCentre(r)}</span>
       </RingGauge>
       <span className="label !text-[9.5px]">{r.label}</span>

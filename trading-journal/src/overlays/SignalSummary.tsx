@@ -122,7 +122,7 @@ export interface SignalSummaryProps {
 /** Soft (~50 % saturation) tones of a provisional signal (decision 9), as in the chart. */
 const SOFT = {
   long: { text: "text-(--color-win-soft)", dot: "bg-(--color-win-soft)", ring: "border-(--color-win-soft)", on: "border-dashed border-(--color-win-soft)/45 bg-(--color-win-soft)/[0.05]" },
-  short: { text: "text-[#d2797a]", dot: "bg-[#d2797a]", ring: "border-[#d2797a]", on: "border-dashed border-[#d2797a]/45 bg-[#d2797a]/[0.05]" },
+  short: { text: "text-(--chart-ink-loss-soft)", dot: "bg-(--chart-ink-loss-soft)", ring: "border-(--chart-ink-loss-soft)", on: "border-dashed border-(--chart-ink-loss-soft)/45 bg-(--chart-ink-loss-soft)/[0.05]" },
 } as const;
 
 /** The verdict label without the stored `Vorläufig: ` prefix (the state chip says it). */

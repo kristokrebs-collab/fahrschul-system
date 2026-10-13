@@ -121,7 +121,7 @@ function Deck({ suggestions, todayKey }: { suggestions: readonly ChallengeTempla
         ) : (
           <motion.div
             key={`front-${cur.key}`}
-            className="grid h-full min-h-[210px] content-start gap-3 rounded-2xl border border-white/40 bg-ink-850 p-4 shadow-[0_18px_40px_rgb(0_0_0/0.45)]"
+            className="grid h-full min-h-[210px] content-start gap-3 rounded-2xl border border-white/40 bg-ink-850 p-4 shadow-[0_18px_40px_rgb(0_0_0/calc(0.45*var(--shade,1)))]"
             initial={reduced ? false : { rotateY: -90, scale: 1.03 }}
             animate={{ rotateY: 0, scale: 1, transitionEnd: { transform: "none" } }}
             exit={{ rotateY: 90, transition: tween.exit }}

@@ -46,7 +46,7 @@ function Tile({ children, className }: { children: ReactNode; className?: string
     <span
       className={cn(
         "relative inline-flex min-w-[1.15em] items-center justify-center overflow-hidden rounded-[6px] border border-line-2 bg-ink-800 px-[0.32em] py-[0.12em] leading-none text-fg",
-        "shadow-[inset_0_1px_0_rgb(255_255_255/0.05)]",
+        "shadow-[inset_0_1px_0_rgb(var(--veil-rgb,255_255_255)/0.05)]",
         className,
       )}
     >

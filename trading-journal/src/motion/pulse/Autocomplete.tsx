@@ -27,7 +27,7 @@ export const CONFIG = {
   maxResults: 8,
   minBelow: 140,
   /** Nothing palette (pack: #1f1f1f panel, faint white halo). */
-  panelShadow: "0 10px 40px rgb(255 255 255 / 0.04), 0 16px 36px rgb(0 0 0 / 0.5)",
+  panelShadow: "0 10px 40px rgb(var(--veil-rgb, 255 255 255) / 0.04), 0 16px 36px rgb(0 0 0 / calc(0.5 * var(--shade, 1)))",
   zIndex: 75,
 } as const;
 

@@ -14,7 +14,7 @@ import type { LabResult } from "@/domain/backtest/index";
 import { spawnMarkerRipple } from "@/chart/overlays";
 import { cn } from "@/lib/cn";
 import { DotMatrix } from "@/motion/DotMatrix";
-import { DotMatrixText, EquityDraw, EQUITY_DRAW, equityPoints, FX_HEX, NumberCascade, playWaapi, RadarSweep, useFxPlay } from "@/motion/fx";
+import { DotMatrixText, EquityDraw, EQUITY_DRAW, equityPoints, FX_TONE, NumberCascade, playWaapi, RadarSweep, useFxPlay } from "@/motion/fx";
 import { TextRoll } from "@/motion/TextRoll";
 import { ease, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -156,7 +156,7 @@ function Stage({ result, runSeq }: { result: LabResult; runSeq: number }) {
             playWaapi(el, [{ transform: "translate(-50%, -50%) scale(0)" }, { transform: "translate(-50%, -50%) scale(1.6)" }, { transform: "translate(-50%, -50%) scale(1)" }], { duration: tween.flash.duration * 0.6, ease: "easeOut" });
             if (layer && ripples < RIPPLE_CAP && p < 1) {
               ripples++;
-              spawnMarkerRipple(layer, { x: d.x, y: d.y }, d.win ? FX_HEX.win : FX_HEX.loss);
+              spawnMarkerRipple(layer, { x: d.x, y: d.y }, d.win ? FX_TONE.win : FX_TONE.loss);
             }
           }
         } else if (!on && shown.has(i)) {

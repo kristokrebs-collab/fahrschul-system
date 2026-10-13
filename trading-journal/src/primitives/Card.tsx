@@ -193,7 +193,7 @@ export function Card({
     <div className="group relative h-full">
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 rounded-2xl shadow-[0_18px_40px_rgb(0_0_0/0.35)] opacity-0 transition-[opacity,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5 group-hover:opacity-100"
+        className="pointer-events-none absolute inset-0 rounded-2xl shadow-[0_18px_40px_rgb(0_0_0/calc(0.35*var(--shade,1)))] opacity-0 transition-[opacity,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5 group-hover:opacity-100"
       />
       <motion.div
         {...rest}

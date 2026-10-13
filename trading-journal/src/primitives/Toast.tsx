@@ -289,7 +289,7 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
         onClick={() => onDismiss(null)}
         whileTap={reduced ? undefined : { scale: 0.97, transition: spring.press }}
         layoutRoot
-        className="relative flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/0.35)]"
+        className="relative flex items-center gap-3 overflow-hidden border border-line-2 bg-ink-800 pl-2 pr-4 text-left shadow-[0_18px_40px_rgb(0_0_0/calc(0.35*var(--shade,1)))]"
         style={{ maxWidth: "calc(100vw - 32px)" }}
         // motion-exception: toast-island — width/height/borderRadius animate as in the bundle (44×44 → auto×50), Plan 3.2 rule 1.
         initial={{ width: 44, height: 44, borderRadius: radius.toastStart, opacity: 0, y: initialLane === "top" ? -24 : 24, scale: 0.6 }}
@@ -356,7 +356,7 @@ function QueueBadge({ count, reduced }: { count: number; reduced: boolean }) {
   return (
     <motion.span
       aria-hidden="true"
-      className="pointer-events-none absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center overflow-hidden rounded-full border border-line-2 bg-ink-750 px-1.5 font-mono text-[10px] font-semibold text-fg shadow-[0_4px_12px_rgb(0_0_0/0.4)]"
+      className="pointer-events-none absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center overflow-hidden rounded-full border border-line-2 bg-ink-750 px-1.5 font-mono text-[10px] font-semibold text-fg shadow-[0_4px_12px_rgb(0_0_0/calc(0.4*var(--shade,1)))]"
       initial={reduced ? false : { scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0, opacity: 0, transition: reduced ? { duration: 0 } : tween.exit }}

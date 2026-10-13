@@ -20,7 +20,8 @@ const DIM: Record<SwitchSize, { track: string; thumb: string; travel: number }> 
   sm: { track: "h-5 w-[34px] p-[3px]", thumb: "size-[14px]", travel: 14 },
 };
 const TRACK_ON: Record<SwitchTone, string> = { fg: "bg-fg border-transparent", signal: "bg-signal border-transparent", win: "bg-win border-transparent" };
-const THUMB_ON: Record<SwitchTone, string> = { fg: "bg-ink-950", signal: "bg-white", win: "bg-ink-950" };
+// on the signal track the thumb stays white in light mode too (`bg-white` would turn to the veil ink there)
+const THUMB_ON: Record<SwitchTone, string> = { fg: "bg-ink-950", signal: "bg-(--color-on-fill)", win: "bg-ink-950" };
 
 // Velocity → stretch, normalised by the travel: `spring.press` peaks at ≈10.5 travels/s for any size, so the thumb
 // is ≈1.3× wider mid-travel and round at rest.
@@ -79,7 +80,7 @@ export function Switch({ checked, onCheckedChange, size = "md", tone = "fg", dis
           style={{ originX: checked ? 1 : 0 }}
           transition={spring.press}
         >
-          <motion.span className="absolute inset-0 rounded-full shadow-[0_1px_3px_rgb(0_0_0/0.35)]" style={reduced ? undefined : { scaleX: stretch }}>
+          <motion.span className="absolute inset-0 rounded-full shadow-[0_1px_3px_rgb(0_0_0/calc(0.35*var(--shade,1)))]" style={reduced ? undefined : { scaleX: stretch }}>
             <span className="absolute inset-0 rounded-full bg-mute" />
             <motion.span className={cn("absolute inset-0 rounded-full", THUMB_ON[tone])} initial={false} animate={{ opacity: checked ? 1 : 0 }} transition={fade} />
           </motion.span>

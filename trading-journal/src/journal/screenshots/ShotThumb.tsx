@@ -33,7 +33,7 @@ export function ShotThumb({ shot, index, onOpen, className, badge }: ShotThumbPr
       <NotchedFrame
         radius={14}
         notchSize={40}
-        outline="rgb(255 255 255 / 0.12)"
+        outline="rgb(var(--veil-rgb, 255 255 255) / 0.12)"
         className="overflow-hidden bg-ink-850"
         media={
           <div className="aspect-[4/3] w-full">

@@ -17,7 +17,7 @@ import type { ReplayStep } from "@/domain/excursion";
 import { cn } from "@/lib/cn";
 import { playStripWipe } from "@/motion/pulse/StripWipe";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { CHART_FONT, CHART_FONT_LOAD, NOTHING_MINI, ink } from "./theme";
+import { CHART_FONT, CHART_FONT_LOAD, NOTHING_MINI, ink, inkChartOptions, withAlpha } from "./theme";
 import { logicalToX } from "./logicalX";
 import { createMainSeries, type MainSeries } from "./panes";
 import { spawnMarkerRipple } from "./overlays";
@@ -123,8 +123,8 @@ class ReplayBand implements ISeriesPrimitive<Time> {
         ctx.fillStyle = color;
         ctx.fillRect(x1 * hr, top, (x2 - x1) * hr, h);
       };
-      band(a, "rgba(255,77,79,0.12)");
-      band(f, "rgba(61,220,132,0.12)");
+      band(a, withAlpha(ink.loss, 0.12));
+      band(f, withAlpha(ink.win, 0.12));
     });
   }
 }
@@ -157,6 +157,8 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, height 
     if (!node) return;
     // the window stays put while bars are appended (lwc would otherwise scroll one bar per `update`)
     const chart = createChart(node, { ...NOTHING_MINI, timeScale: { ...NOTHING_MINI.timeScale, rightOffset: 0, fixLeftEdge: false, fixRightEdge: false, shiftVisibleRangeOnNewBar: false } });
+    // the current palette (light mode): `NOTHING_MINI` holds the ink of the moment the chart module loaded
+    chart.applyOptions(inkChartOptions());
     const main = createMainSeries(chart, { volume: false });
     main.candles.applyOptions({ priceLineVisible: false, lastValueVisible: false });
     const band = new ReplayBand();

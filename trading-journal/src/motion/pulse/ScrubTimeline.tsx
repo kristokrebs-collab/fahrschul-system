@@ -446,7 +446,7 @@ export function ScrubTimeline({
           <div ref={headRef} aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-full" style={{ transform: `translate3d(${((initial / Math.max(1e-9, total)) * 100).toFixed(3)}%,0,0)` }}>
             <span className="absolute top-2 bottom-3 left-0 w-px -translate-x-1/2 bg-signal/75" />
             <span className="absolute top-[9px] left-0 size-[7px] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-signal" />
-            <span className="absolute bottom-3 left-0 size-3 -translate-x-1/2 translate-y-1/2 rounded-full bg-steel shadow-[0_0_0_4px_rgb(0_0_0/0.35)]" />
+            <span className="absolute bottom-3 left-0 size-3 -translate-x-1/2 translate-y-1/2 rounded-full bg-steel shadow-[0_0_0_4px_rgb(0_0_0/calc(0.35*var(--shade,1)))]" />
           </div>
         </div>
       </div>

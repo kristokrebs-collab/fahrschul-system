@@ -290,7 +290,7 @@ function Fan({ children, cards = [], open: controlled, onOpenChange, autoplay = 
             cardRefs.current[i] = el;
           }}
           aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-[62%] overflow-hidden rounded-[1cqw] border border-white/10 bg-ink-800 shadow-[0_1.1cqw_2.8cqw_rgb(0_0_0/0.45)]"
+          className="pointer-events-none absolute left-1/2 top-[62%] overflow-hidden rounded-[1cqw] border border-white/10 bg-ink-800 shadow-[0_1.1cqw_2.8cqw_rgb(0_0_0/calc(0.45*var(--shade,1)))]"
           style={{ width: `${U(CONFIG.fan.card.w)}cqw`, height: `${U(CONFIG.fan.card.h)}cqw`, transform: "translate(-50%,-50%)" }}
         >
           {card}

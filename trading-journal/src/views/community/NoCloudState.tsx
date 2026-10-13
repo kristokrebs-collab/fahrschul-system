@@ -28,7 +28,7 @@ export function NoCloudState() {
           <SpotlightSweep tone="signal" />
           <div className="grid gap-6 p-5 sm:p-7 md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:gap-10">
             <motion.div
-              className="relative grid place-items-center justify-self-start rounded-2xl border border-line-2 bg-[radial-gradient(100%_100%_at_50%_0%,#1c1c1c_0%,#0a0a0a_70%)] px-5 py-6 md:justify-self-auto"
+              className="relative grid place-items-center justify-self-start rounded-2xl border border-line-2 bg-[radial-gradient(100%_100%_at_50%_0%,var(--color-ink-750)_0%,var(--color-ink-900)_70%)] px-5 py-6 md:justify-self-auto"
               initial={reduced ? false : { opacity: 0, scale: 0.94 }}
               animate={{ opacity: 1, scale: 1, transitionEnd: { transform: "none" } }}
               transition={{ default: spring.enter, opacity: tween.fade }}

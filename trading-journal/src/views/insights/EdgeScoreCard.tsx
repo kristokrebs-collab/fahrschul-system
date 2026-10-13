@@ -52,11 +52,11 @@ function Radar({ axes, selected, onSelect }: { axes: readonly EdgeAxis[]; select
   return (
     <svg ref={root} viewBox={`0 0 ${W} ${H}`} className="mx-auto block w-full max-w-[340px] overflow-visible" role="img" aria-label={axes.map((a) => `${a.label} ${Math.round(a.value)}`).join(", ")}>
       {[25, 50, 75, 100].map((v) => (
-        <polygon key={v} points={ring(v)} fill="none" stroke={v === 100 ? "#2c2c2c" : "#1f1f1f"} strokeWidth="1" />
+        <polygon key={v} points={ring(v)} fill="none" stroke={v === 100 ? "var(--color-line-2, #2c2c2c)" : "var(--color-line, #1f1f1f)"} strokeWidth="1" />
       ))}
       {axes.map((a, i) => {
         const [x, y] = vertex(i, 100);
-        return <line key={a.key} x1={CX} y1={CY} x2={x} y2={y} stroke={selected === a.key ? "#5f5f5f" : "#1f1f1f"} strokeWidth="1" />;
+        return <line key={a.key} x1={CX} y1={CY} x2={x} y2={y} stroke={selected === a.key ? "var(--color-faint, #5f5f5f)" : "var(--color-line, #1f1f1f)"} strokeWidth="1" />;
       })}
       <AnimatePresence initial={false}>
         <motion.g
@@ -67,14 +67,14 @@ function Radar({ axes, selected, onSelect }: { axes: readonly EdgeAxis[]; select
           exit={{ opacity: 0, transition: tween.exit }}
           transition={{ scale: spring.smooth, opacity: tween.fade }}
         >
-          <polygon points={poly} fill="rgb(242 242 242 / 0.12)" stroke="#f2f2f2" strokeWidth="1.5" strokeLinejoin="round" />
+          <polygon points={poly} fill="rgb(var(--fg-rgb, 242 242 242) / 0.12)" stroke="var(--color-fg, #f2f2f2)" strokeWidth="1.5" strokeLinejoin="round" />
           {pts.map(([x, y], i) => (
             <motion.circle
               key={i}
               cx={x}
               cy={y}
               r={selected === axes[i]!.key ? 4 : 2.6}
-              fill={selected === axes[i]!.key ? "#e5202e" : "#f2f2f2"}
+              fill={selected === axes[i]!.key ? "var(--color-signal, #e5202e)" : "var(--color-fg, #f2f2f2)"}
               style={{ transformOrigin: `${x}px ${y}px`, transformBox: "view-box" }}
               initial={reduced ? false : { scale: 0 }}
               animate={grow ? { scale: 1 } : { scale: 0 }}

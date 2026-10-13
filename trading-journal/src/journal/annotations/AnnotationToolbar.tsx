@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useId, useState, type KeyboardEvent } from "react";
 import type { AnnotationKind } from "@/domain/types";
 import { cn } from "@/lib/cn";
+import { themePaint } from "@/lib/themePaint";
 import { radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 
@@ -82,7 +83,7 @@ export function AnnotationToolbar({ tool, onTool, color, onColor, placed, select
         <div className="flex items-center gap-1" role="group" aria-label="Farbe">
           {DRAW_COLORS.map((c) => (
             <button key={c.key} type="button" aria-pressed={color === c.hex} aria-label={c.label} onClick={() => onColor(c.hex)} className="grid size-7 place-items-center rounded-full pointer-coarse:size-11">
-              <span className={cn("size-3.5 rounded-full ring-offset-2 ring-offset-ink-850 transition-shadow", color === c.hex && "ring-1 ring-white/70")} style={{ background: c.hex }} />
+              <span className={cn("size-3.5 rounded-full ring-offset-2 ring-offset-ink-850 transition-shadow", color === c.hex && "ring-1 ring-white/70")} style={{ background: themePaint(c.hex) }} />
             </button>
           ))}
         </div>

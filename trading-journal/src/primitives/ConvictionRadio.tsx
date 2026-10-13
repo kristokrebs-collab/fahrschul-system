@@ -92,7 +92,7 @@ export function ConvictionRadio({ value, onChange, options = convictionOptions, 
                   style={{
                     width: 11 + i * 1.5,
                     height: 11 + i * 1.5,
-                    background: lit ? o.color : "rgb(255 255 255 / 0.16)",
+                    background: lit ? o.color : "rgb(var(--veil-rgb, 255 255 255) / 0.16)",
                     boxShadow: lit ? `0 0 16px color-mix(in srgb, ${o.color} 25%, transparent)` : "none",
                   }}
                 />
@@ -126,7 +126,7 @@ export function ConvictionRadio({ value, onChange, options = convictionOptions, 
                 <span
                   className="mx-2 h-1 flex-1 rounded-full transition-[background] duration-300"
                   aria-hidden="true"
-                  style={{ background: idx > i ? `linear-gradient(to right, ${o.color}, ${next.color})` : "rgb(255 255 255 / 0.10)" }}
+                  style={{ background: idx > i ? `linear-gradient(to right, ${o.color}, ${next.color})` : "rgb(var(--veil-rgb, 255 255 255) / 0.10)" }}
                 />
               )}
             </div>

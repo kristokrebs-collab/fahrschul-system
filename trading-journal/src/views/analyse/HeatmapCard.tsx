@@ -60,7 +60,7 @@ export function HeatmapCard({ view, cur }: { view: AccountView; cur: string }) {
                     data-testid="heat-cell"
                     data-best={grid.best?.i === c.i ? "true" : undefined}
                     className={cn("relative aspect-square w-full rounded-[5px] outline-offset-1", on ? "outline outline-1 outline-white/70" : "outline-transparent")}
-                    style={{ background: c.trades.length ? heatColor(t, "diverging") : "rgb(255 255 255 / 0.025)" }}
+                    style={{ background: c.trades.length ? heatColor(t, "diverging") : "rgb(var(--veil-rgb, 255 255 255) / 0.025)" }}
                   >
                     {c.trades.length > 0 && c.trades.length < HEAT_MIN_N && <span aria-hidden="true" className="absolute right-[3px] top-[3px] size-[3px] rounded-full bg-white/40" />}
                   </button>

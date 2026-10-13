@@ -163,7 +163,7 @@ const DayChart = memo(function DayChart({ bars, className }: { bars: Candle[]; c
         )}
         {ready && (
           // the live price: its own layer, moved by transform only
-          <motion.span className="pointer-events-none absolute -mt-[4px] size-2 rounded-full bg-fg shadow-[0_0_0_3px_rgb(255_255_255/0.12),0_0_10px_rgb(255_255_255/0.45)] will-change-transform" style={{ y: dotY, top: 0, right: 0 }} />
+          <motion.span className="pointer-events-none absolute -mt-[4px] size-2 rounded-full bg-fg shadow-[0_0_0_3px_rgb(var(--veil-rgb,255_255_255)/0.12),0_0_10px_rgb(var(--veil-rgb,255_255_255)/0.45)] will-change-transform" style={{ y: dotY, top: 0, right: 0 }} />
         )}
       </div>
       <div className="flex justify-between font-mono text-[10px] text-faint">

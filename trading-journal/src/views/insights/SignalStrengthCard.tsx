@@ -196,8 +196,8 @@ function StateGlyph({ k }: { k: StateKey }) {
   if (k === "none" || k === "unknown") return <span aria-hidden="true" className="h-px w-2.5 shrink-0 bg-line-2" />;
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" className="shrink-0">
-      {k === "provisional" ? <circle cx="6" cy="6" r="3" fill="none" stroke="#9b9b9b" strokeWidth="1.25" /> : <circle cx="6" cy="6" r="3.25" fill="#d9d9d9" />}
-      {k === "strong" && <circle cx="6" cy="6" r="5.4" fill="none" stroke="#d9d9d9" strokeOpacity="0.5" strokeWidth="1" />}
+      {k === "provisional" ? <circle cx="6" cy="6" r="3" fill="none" stroke="var(--color-mute, #9b9b9b)" strokeWidth="1.25" /> : <circle cx="6" cy="6" r="3.25" fill="var(--color-teal, #d9d9d9)" />}
+      {k === "strong" && <circle cx="6" cy="6" r="5.4" fill="none" stroke="var(--color-teal, #d9d9d9)" strokeOpacity="0.5" strokeWidth="1" />}
     </svg>
   );
 }

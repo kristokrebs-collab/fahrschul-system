@@ -61,7 +61,7 @@ function totalText(unit: CalendarUnit, v: number | null, currency: string): stri
 /** Cell tint: 8 % … 38 % of the P&L colour by the day's size relative to the month (p90). */
 function tint(c: DayCell): string | undefined {
   if (!c.g) return undefined;
-  if (c.g.net === 0) return "rgb(255 255 255 / 0.06)";
+  if (c.g.net === 0) return "rgb(var(--veil-rgb, 255 255 255) / 0.06)";
   return `rgb(${c.g.net > 0 ? WIN : LOSS} / ${(0.08 + 0.3 * c.intensity).toFixed(3)})`;
 }
 

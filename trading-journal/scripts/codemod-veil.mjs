@@ -85,7 +85,9 @@ export function transform(src) {
     return next;
   });
   for (const m of out.matchAll(STRING_HEX_RE)) left.push({ kind: "string", text: m[1] });
-  for (const m of out.matchAll(RGB_IN_CLASS_RE)) left.push({ kind: "rgb-class", text: m[0] });
+  // an rgb() whose channels / alpha already come from a theme token (`rgb(var(--veil-rgb,255_255_255)/0.08)`,
+  // `rgb(0_0_0/calc(0.45*var(--shade,1)))`) follows the light mode – only literal-only ones are left to look at
+  for (const m of out.matchAll(RGB_IN_CLASS_RE)) if (!m[0].includes("var(--")) left.push({ kind: "rgb-class", text: m[0] });
   const veils = [...out.matchAll(VEIL_RE)].length;
   return { text: out, changes, left, veils };
 }

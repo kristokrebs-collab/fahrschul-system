@@ -50,7 +50,7 @@ function Glyph({ kind }: { kind: "box" | "broken" | "pending" | "target" | "stop
     const c = kind === "broken" ? "var(--color-win)" : kind === "pending" ? themePaint("#65b488") : themePaint("#9b9b9b");
     return (
       <svg {...common}>
-        <rect x="1" y="1.5" width="16" height="7" fill={kind === "broken" ? "rgba(61,220,132,0.12)" : "rgba(255,255,255,0.08)"} stroke={c} strokeWidth="1" strokeDasharray={kind === "pending" ? "2 2" : undefined} />
+        <rect x="1" y="1.5" width="16" height="7" fill={kind === "broken" ? "rgba(61,220,132,0.12)" : "rgb(var(--veil-rgb, 255 255 255) / 0.08)"} stroke={c} strokeWidth="1" strokeDasharray={kind === "pending" ? "2 2" : undefined} />
       </svg>
     );
   }

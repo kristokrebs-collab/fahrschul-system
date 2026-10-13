@@ -42,7 +42,7 @@ function TooltipContent({
         sideOffset={sideOffset}
         className={cn(
           // Bundle chart-tooltip recipe (Plan 2.5); no arrow, Motion handles entrance where needed
-          "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-xl border border-line-2 bg-ink-850/95 px-3 py-2 text-xs text-fg shadow-[0_12px_32px_rgb(0_0_0/0.45)] backdrop-blur-sm",
+          "z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-xl border border-line-2 bg-ink-850/95 px-3 py-2 text-xs text-fg shadow-[0_12px_32px_rgb(0_0_0/calc(0.45*var(--shade,1)))] backdrop-blur-sm",
           className
         )}
         {...props}
