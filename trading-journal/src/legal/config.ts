@@ -77,7 +77,7 @@ export function legalConfigOf(env: Env): LegalConfig {
 let cached: LegalConfig | null = null;
 /** The config of this build. */
 export function legalConfig(): LegalConfig {
-  return (cached ??= legalConfigOf(import.meta.env as Env));
+  return (cached ??= legalConfigOf(import.meta.env as unknown as Env));
 }
 
 /** Tests: pin a config (`null` = back to the build env). */
