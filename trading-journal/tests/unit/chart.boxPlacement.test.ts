@@ -11,7 +11,7 @@
 import { describe, expect, it } from "vitest";
 import btc4h from "./fixtures/binance-btcusdt-4h.json";
 import btc1d from "./fixtures/binance-btcusdt-1d.json";
-import { analyzeBoxes, DEFAULT_BOX_CFG, reentryIndex, type Box } from "@/domain/boxes";
+import { analyzeBoxes, boxTargets, DEFAULT_BOX_CFG, reentryIndex, type Box } from "@/domain/boxes";
 import type { Bar } from "@/domain/signals/indicators";
 import { logicalToX } from "@/chart/logicalX";
 import { BoxPrimitive, type ChartBox } from "@/chart/primitives/BoxPrimitive";
@@ -128,7 +128,9 @@ describe("real BTCUSDT: every drawn box hugs its range (engine and chart see the
   });
 
   it("4h at the e2e's 'now' (2026-10-11 00:00): the box of 23.09. starts on its first bar, the live part on the re-entry", () => {
-    expect(expectHugging("4h", B4, 1493, 4 * 3600)).toBe(7); // six boxes + the live part of the newest one
+    // seven boxes + the live part of the newest one (Review F1: the 4.–8. Sep box broke down into the 8.–15. Sep box
+    // below it – Box zu Box, no longer merged into one)
+    expect(expectHugging("4h", B4, 1493, 4 * 3600)).toBe(8);
   });
 
   it("1D and 1W", () => {
@@ -136,13 +138,18 @@ describe("real BTCUSDT: every drawn box hugs its range (engine and chart see the
     for (let cut = W1.length - 12; cut < W1.length; cut += 1) expectHugging("1w", W1, cut, WEEK);
   });
 
-  it("targets are real prices: the 2024–26 weekly box (53k–126k) has no measured move below zero", () => {
+  it("targets are real prices on 1W; a box taller than its distance to zero gets no measured move below zero", () => {
     for (let cut = W1.length - 12; cut < W1.length; cut += 1) {
       const a = analyzeBoxes({ tf: "1w", bars: W1.slice(0, cut), live: W1[cut]!.c })!;
       const st = a.box;
-      expect(st.box!.bottom - st.box!.height).toBeLessThan(0); // the case: a measured move down would be negative
       for (const t of [...st.up, ...st.down, ...st.targets]) expect(t.price).toBeGreaterThan(0);
       for (const b of toChartBoxes(a, { intervalMs: WEEK * 1000 })) for (const t of b.targets ?? []) expect(t.price).toBeGreaterThan(0);
     }
+    // the case itself (formerly the merged 53k–126k weekly box, gone with Review F1): bottom − height < 0
+    const flat = Array.from({ length: 40 }, (_, i) => ({ t: i * WEEK, o: 90_000, h: 120_000, l: 60_000, c: 90_000 }));
+    const tall = { i0: 30, i1: 39, t0: 30 * WEEK, top: 126_000, bottom: 53_000, height: 73_000, grade: "stark" } as Box;
+    expect(tall.bottom - tall.height).toBeLessThan(0);
+    expect(boxTargets(flat, [tall], 0, -1)).toEqual([]);
+    expect(boxTargets(flat, [tall], 0, 1).every((t) => t.price > 0)).toBe(true);
   });
 });

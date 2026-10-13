@@ -229,25 +229,59 @@ function walk(bars: readonly Bar[], top: number, bottom: number, buf: number, fr
 }
 
 /**
- * A trader draws one range where the engine found neighbouring sub-boxes with fake breakouts in between: two boxes
- * merge when they touch or overlap in price, lie close in time, the union is not taller than 70 % of `maxHeightAtr`
- * and every close from the first box to the second stayed inside the union. The union is walked forward again, so a
- * later box inside it is absorbed as well.
+ * May box `b` (the next one) be merged into `a`? A trader draws ONE range where the engine found sub-ranges with fake
+ * breakouts in between – but a close-out that CONTINUES into a box stacked above / below is Box zu Box and stays two
+ * boxes (Review F1: the merge used to swallow real breakouts – one 53–126k weekly box over the whole chart, a daily
+ * range plus its breakout leg as one box whose top floated above the price). Merge only when:
+ * 1. close in time, the union not taller than 70 % of `maxHeightAtr`, every close from `a` to `b` inside the union;
+ * 2. no continuation: `a` broke out and `b` lies mostly beyond the broken edge (its mid) without breaking back → no;
+ * 3. and either real price overlap (≥ 50 % of the smaller box's height: a sub-range), or the failed stacked breakout:
+ *    `b` sits on `a`'s broken edge (its near edge within `tolAtr` × ATR – resistance turned support), then broke back
+ *    the other way with a close back INSIDE `a`'s own edges – `a`'s breakout failed (union ≤ 2.2 × the taller box).
+ */
+function mergeable(bars: readonly Bar[], a: Box, b: Box, cfg: BoxCfg): boolean {
+  const top = Math.max(a.top, b.top);
+  const bottom = Math.min(a.bottom, b.bottom);
+  const A = Math.max(a.atr, b.atr);
+  const buf = cfg.breakAtr * A;
+  if (b.i0 - a.i1 > Math.max(cfg.minBars, 12) || top - bottom > cfg.maxHeightAtr * 0.7 * A) return false;
+  for (let i = a.i0; i < b.i0; i++) {
+    const c = bars[i]!.c;
+    if (c > top + buf || c < bottom - buf) return false;
+  }
+  // 2. continuation: broke out of `a`, built `b` beyond the broken edge, `b` did not break back
+  const beyond = a.brk > 0 ? b.mid > a.top : a.brk < 0 ? b.mid < a.bottom : false;
+  if (beyond && b.brk !== -a.brk) return false;
+  // 3a. a sub-range: real overlap
+  const overlap = Math.min(a.top, b.top) - Math.max(a.bottom, b.bottom);
+  if (overlap >= 0.5 * Math.min(a.height, b.height)) return true;
+  // 3b. the failed stacked breakout
+  if (a.brk === 0 || b.brk !== -a.brk || b.brkI == null) return false;
+  const near = a.brk > 0 ? b.bottom : b.top;
+  const edge = a.brk > 0 ? a.top : a.bottom;
+  if (Math.abs(near - edge) > cfg.tolAtr * A) return false;
+  if (top - bottom > 2.2 * Math.max(a.height, b.height)) return false;
+  for (let i = b.brkI; i <= Math.min(bars.length - 1, b.brkI + 2); i++) {
+    const c = bars[i]!.c;
+    if (c <= a.top && c >= a.bottom) return true;
+  }
+  return false;
+}
+
+/**
+ * Merges neighbouring boxes (`mergeable`). The union is walked forward again, so a later box inside it is absorbed as
+ * well.
  */
 function mergeBoxes(bars: readonly Bar[], raw: readonly Box[], cfg: BoxCfg): Box[] {
   const out: Box[] = [];
   for (const b of raw) {
     const a = out[out.length - 1];
     if (a) {
-      const top = Math.max(a.top, b.top);
-      const bottom = Math.min(a.bottom, b.bottom);
-      const A = Math.max(a.atr, b.atr);
-      const buf = cfg.breakAtr * A;
-      const gap = b.i0 - a.i1;
-      const vGap = Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top); // > 0: ranges apart
-      let inside = gap <= Math.max(cfg.minBars, 12) && vGap <= 0.25 * Math.min(a.height, b.height) && top - bottom <= cfg.maxHeightAtr * 0.7 * A;
-      for (let i = a.i0; inside && i < b.i0; i++) { const c = bars[i]!.c; if (c > top + buf || c < bottom - buf) inside = false; }
-      if (inside) {
+      if (mergeable(bars, a, b, cfg)) {
+        const top = Math.max(a.top, b.top);
+        const bottom = Math.min(a.bottom, b.bottom);
+        const A = Math.max(a.atr, b.atr);
+        const buf = cfg.breakAtr * A;
         const w = walk(bars, top, bottom, buf, b.formedAt + 1);
         const i1 = Math.max(w.i1, b.formedAt);
         let sweeps = 0;

@@ -220,3 +220,40 @@ describe("close-only rule after a breakout (Review MM-5)", () => {
     expect(a.setups.some((s) => s.kind === "fakeout" && s.side === "short")).toBe(true);
   });
 });
+
+describe("merge keeps real breakouts apart (Review F1)", () => {
+  const D1 = load("binance-btcusdt-1d");
+  const DAY = 86_400;
+  const WEEK = 7 * DAY;
+  const W1: Bar[] = [];
+  for (const d of D1) {
+    const open = Math.floor((d.t - 4 * DAY) / WEEK) * WEEK + 4 * DAY;
+    const last = W1[W1.length - 1];
+    if (last && last.t === open) Object.assign(last, { h: Math.max(last.h, d.h), l: Math.min(last.l, d.l), c: d.c });
+    else W1.push({ ...d, t: open });
+  }
+  const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
+
+  it("1W: the 2024 53–74k range, the 74–112k range and the 101–126k range are three boxes, each left by a close – not one 53–126k box", () => {
+    const boxes = findBoxes(W1);
+    const r2024 = boxes.find((b) => Math.round(b.bottom) === 53_330 && Math.round(b.top) === 73_881);
+    expect(r2024, "the 2024 range").toBeDefined();
+    expect(r2024!.brk).toBe(1);
+    expect(day(r2024!.t0)).toBe("2024-02-26");
+    expect(boxes.some((b) => b.bottom < 60_000 && b.top > 120_000)).toBe(false);
+    expect(boxes.some((b) => Math.round(b.bottom) === 74_457 && Math.round(b.top) === 111_960 && b.brk === 1)).toBe(true);
+    expect(boxes.some((b) => Math.round(b.bottom) === 101_517 && Math.round(b.top) === 126_209 && b.brk === -1)).toBe(true);
+  });
+
+  it("1D: the Mar–Apr 2026 range (65.6–76.0k, broke up) and the box above it (73.7–79.5k) stay two boxes – Box zu Box", () => {
+    const boxes = findBoxes(D1);
+    const range = boxes.find((b) => Math.round(b.bottom) === 65_569 && Math.round(b.top) === 75_999);
+    expect(range, "Mar–Apr range").toBeDefined();
+    expect(range!.brk).toBe(1);
+    const above = boxes.find((b) => Math.round(b.bottom) === 73_669 && Math.round(b.top) === 79_455);
+    expect(above, "box above").toBeDefined();
+    expect(above!.i0).toBeGreaterThan(range!.i1);
+    // no box mixes the range and its breakout leg (top above 79k with a bottom below 70k)
+    expect(boxes.some((b) => b.top > 79_000 && b.bottom < 70_000)).toBe(false);
+  });
+});
