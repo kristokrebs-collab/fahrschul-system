@@ -42,6 +42,8 @@ export const CSV_STRINGS = {
   drop: "CSV hier ablegen",
   choose: "Datei wählen",
   formats: "Erkennt diese Exporte",
+  /** review F11: there is no wallet / on-chain connector – the honest way in is the CSV + the mapping assistant */
+  otherSources: "Wallets, DEX und andere Plattformen: Trade-Historie als CSV exportieren und hier hineinziehen – du ordnest die Spalten einmal zu (Datum, Paar, Richtung, Preise, Menge).",
   detected: "Erkannt",
   unknown: "Format nicht erkannt – ordne die Spalten zu.",
   mapping: "Spalten zuordnen",
@@ -287,6 +289,9 @@ export function CsvImportSheet({ readFile }: CsvImportSheetProps = {}) {
                 </li>
               ))}
             </ul>
+            <p className="text-[11.5px] leading-snug text-faint" data-testid="csv-other-sources">
+              {CSV_STRINGS.otherSources}
+            </p>
           </StaggerItem>
         )}
 

@@ -34,7 +34,8 @@ export interface FeatureInfo {
 export const FEATURE_INFO: Readonly<Record<Feature, FeatureInfo>> = {
   cloudSync: { label: "Cloud-Sync", pitch: "Dein Journal auf allen Geräten – offline zuerst, lokal immer dabei.", group: "sync" },
   csvImport: { label: "CSV-Import", pitch: "Bestehende Trades aus Tabellen und Börsen-Exporten übernehmen.", group: "sync" },
-  exchangeSync: { label: "Börsen-Sync", pitch: "Trades kommen automatisch von der Börse – kein Abtippen mehr.", group: "sync" },
+  // honest scope (review F10): the API sync speaks Bitunix; every other venue comes in through its CSV export
+  exchangeSync: { label: "Börsen-Sync", pitch: "Trades kommen automatisch von Bitunix – andere Börsen per CSV-Export.", group: "sync" },
   screenshotsCloud: { label: "Screenshots in der Cloud", pitch: "Chart-Screenshots sicher gespeichert und auf jedem Gerät da.", group: "sync" },
   apiAccess: { label: "API & Webhooks", pitch: "TradingView-Alerts und eigene Tools direkt anbinden.", group: "sync" },
   analyticsPro: { label: "Profi-Statistik", pitch: "Sharpe, Sortino und Breakdowns mit ehrlicher Unsicherheit.", group: "analyse" },
@@ -126,7 +127,7 @@ export const PLAN_CATALOG: Readonly<Record<PlanId, PlanCatalogEntry>> = {
     name: "Pro",
     tagline: "Für Trader, die ihren Edge messen wollen.",
     highlights: [
-      "Börsen-Sync – Trades kommen automatisch",
+      "Bitunix-Sync – Trades kommen automatisch",
       "Coach findet deine teuersten Fehler",
       "Profi-Statistik & Monte Carlo",
       "Trade-Replay & Box-Scanner",
@@ -138,7 +139,7 @@ export const PLAN_CATALOG: Readonly<Record<PlanId, PlanCatalogEntry>> = {
     id: "premium",
     name: "Premium",
     tagline: "Das volle Labor für Vollzeit-Trader.",
-    highlights: ["Alles aus Pro", "KI-Coach mit Wochenanalyse", "Backtest-Labor, API & Webhooks", "5 Börsen · 20 GB Screenshots"],
+    highlights: ["Alles aus Pro", "KI-Coach mit Wochenanalyse", "Backtest-Labor, API & Webhooks", "5 Bitunix-Verbindungen · 20 GB Screenshots"],
     glyph: "MAX",
   },
   team: {

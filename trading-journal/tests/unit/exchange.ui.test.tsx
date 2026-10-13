@@ -275,6 +275,12 @@ describe("CsvImportSheet", () => {
     "BTCUSDT,Long,2026-10-01 09:00:00,2026-10-01 12:00:00,62000,62600,0.1,60,3.1,-0.4,10",
   ].join("\n");
 
+  it("names the way in for wallets / DEX exports (review F11: no wallet connector – CSV + mapping)", async () => {
+    wrap(<CsvImportSheet />);
+    act(() => openCsvImport());
+    expect(await screen.findByTestId("csv-other-sources")).toHaveTextContent(/Wallets, DEX/);
+  });
+
   it("refuses files over the size cap without reading them", async () => {
     const read = vi.fn(async () => BITUNIX_CSV);
     wrap(<CsvImportSheet readFile={read} />);

@@ -19,7 +19,7 @@ export const EX = {
   ],
   connect: "Börse verbinden",
   csv: "CSV importieren",
-  otherVenues: "Binance, Bybit, OKX & Co.: per CSV-Export.",
+  otherVenues: "Binance, Bybit, OKX & Co., Wallets und DEX: per CSV-Export.",
   upgradeLine: "Der automatische Börsen-Sync ist ab Pro dabei.",
   upgrade: "Pro freischalten",
   loading: "Lade Verbindung …",
