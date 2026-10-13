@@ -1,8 +1,8 @@
 /**
  * Kennzahlen hero (P03): the annualised Sharpe as the headline (Doto digits, `TextPrism` lens on hover devices, counts
  * up on first view), its 80 % interval as a growing whisker with the sample, the edge test (Ø R with p and the
- * trades still needed), strengths / weak spots as chips ("trade the best": the strongest first, the key one marked
- * by `TactileHighlight`) and one `MorphCard` tile per ratio (`fact-ana-{key}` → explainer dialog with formula,
+ * trades still needed), strengths / weak spots as chips ("trade the best": the strongest first; the win tone is the
+ * emphasis) and one `MorphCard` tile per ratio (`fact-ana-{key}` → explainer dialog with formula,
  * sample, interval and verdict). Tiles count up (`MotionNumber countOnReveal`) and roll their sample size
  * (`RollingDigits`).
  */
@@ -11,7 +11,6 @@ import { EDGE_CLEAR_P, explainRatio, metricText, pText, RATIO_LABELS, ratioVerdi
 import { cn } from "@/lib/cn";
 import { n0, n1 } from "@/lib/format";
 import { MorphCard, MorphTitle } from "@/motion/MorphCard";
-import { TactileHighlight } from "@/motion/pulse/TactileHighlight";
 import { TextPrism } from "@/motion/pulse/TextPrism";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { radius } from "@/motion/tokens";
@@ -143,15 +142,10 @@ export function KennzahlenHero({ rep, cur, n }: { rep: RatioReport; cur: string;
                 {strengths.length > 0 && (
                   <p className="flex flex-wrap items-center gap-1.5">
                     <span className="text-mute">Stärken:</span>
-                    {strengths.map((m, i) => (
+                    {/* the chip's win tone is the emphasis – no lead marker inside it (a white block in a green chip, P1-16) */}
+                    {strengths.map((m) => (
                       <span key={m.key} className="rounded-full border border-win/25 bg-win/10 px-2 py-0.5 text-win">
-                        {i === 0 ? (
-                          <TactileHighlight playOnView tab={false} padX={0}>
-                            {RATIO_LABELS[m.key].short}
-                          </TactileHighlight>
-                        ) : (
-                          RATIO_LABELS[m.key].short
-                        )}
+                        {RATIO_LABELS[m.key].short}
                       </span>
                     ))}
                   </p>

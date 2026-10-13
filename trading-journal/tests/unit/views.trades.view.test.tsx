@@ -101,7 +101,7 @@ describe("TradesView", () => {
     expect(field).toHaveValue("FOMO");
   });
 
-  it("the subtitle fills once per session (real text stays readable), then keeps the marker on `Klick`", () => {
+  it("the subtitle fills once per session (real text stays readable), then keeps the marker on the page's promise", () => {
     seed(SAMPLE, { fillSeen: false });
     const view = mount();
     expect(document.querySelector('[data-pulse="pixel-text-fill"]')).not.toBeNull();
@@ -109,7 +109,7 @@ describe("TradesView", () => {
     seed(SAMPLE, { fillSeen: true });
     mount();
     expect(document.querySelector('[data-pulse="pixel-text-fill"]')).toBeNull();
-    expect(document.querySelector('[data-pulse="tactile-highlight"]')).toHaveTextContent("Klick");
+    expect(document.querySelector('[data-pulse="tactile-highlight"]')).toHaveTextContent("öffnet den Trade");
   });
 
   it("search is debounced 150 ms and matches emotion", () => {

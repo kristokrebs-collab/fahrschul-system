@@ -25,4 +25,4 @@ export const COCKPIT_STRINGS = {
   span: (n: number) => `${n}/12`,
 } as const;
 
-export const COCKPIT_LEAD_FILL = { storageKey: storageKey("fill-cockpit"), highlight: "gedrückt" } as const;
+export const COCKPIT_LEAD_FILL = { storageKey: storageKey("fill-cockpit"), highlight: "Dashboard" } as const;

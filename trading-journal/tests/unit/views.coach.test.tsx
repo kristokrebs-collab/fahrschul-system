@@ -159,6 +159,11 @@ describe("CoachView", () => {
     const panel = screen.getByTestId("trade-coach-panel");
     expect(panel).toHaveTextContent("Verhalten");
     expect(panel).toHaveTextContent("Revenge");
+    // similar trades say what they were: day and result (R, else P&L), never „Trade 1“ (P1-21)
+    const similar = within(panel).queryAllByRole("button", { name: /^Trade vom \d{2}\.\d{2}\. öffnen, / });
+    expect(similar.length).toBeGreaterThan(0);
+    expect(panel).not.toHaveTextContent(/Trade 1\b/);
+    for (const b of similar) expect(b.textContent).toMatch(/^\d{2}\.\d{2}\. [+−-]?[\d.,]+(R| \w+)$/);
     rerender(
       <MotionRoot>
         <TradeCoachPanel tradeId="nope" />

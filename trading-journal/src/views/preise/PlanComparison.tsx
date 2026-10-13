@@ -70,6 +70,9 @@ function groups(offer: Offer): Group[] {
   return out;
 }
 
+/** The recommended column: a signal breath on ink; on paper the same share of signal reads pink, like a warning – there an ink tint (P1-19). */
+const ORIGIN_TINT = "bg-signal/[0.05] [:root[data-theme=light]_&]:bg-fg/[0.04]";
+
 /** One group: labels on the left, the plan cells cascade in from the recommended column (HeatGridReveal). */
 function VisualGroup({ group, first, mine }: { group: Group; first: boolean; mine: number }) {
   return (
@@ -88,7 +91,7 @@ function VisualGroup({ group, first, mine }: { group: Group; first: boolean; min
             r.cells.map((c, i) => (
               <div
                 key={`${r.key}-${i}`}
-                className={cn("grid h-11 place-items-center border-b border-line/60", i === ORIGIN_COL && "bg-signal/[0.05]", i === mine && "bg-white/[0.04]")}
+                className={cn("grid h-11 place-items-center border-b border-line/60", i === ORIGIN_COL && ORIGIN_TINT, i === mine && "bg-white/[0.04]")}
               >
                 {c.node}
               </div>

@@ -28,7 +28,7 @@ export interface TradesViewProps {
 
 export const TRADES_LEAD = "Filtere nach Konto, Entscheidungsgrundlage, Ergebnis oder Richtung. Ein Klick auf eine Zeile öffnet den Trade.";
 /** Subtitle recipe (same as the setups / settings pages): pixel fill once per session, then the marker on the key word. */
-export const TRADES_LEAD_FILL = { storageKey: storageKey("fill-trades"), highlight: "Klick" } as const;
+export const TRADES_LEAD_FILL = { storageKey: storageKey("fill-trades"), highlight: "öffnet den Trade" } as const;
 
 /** Which body the card shows; the key of the crossfade. */
 type BodyState = "list" | "none" | "empty";

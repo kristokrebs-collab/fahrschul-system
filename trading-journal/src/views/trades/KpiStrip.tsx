@@ -40,7 +40,15 @@ export function KpiStrip({ closed, count, currency, className }: KpiStripProps) 
   return (
     <RevealGroup className={cn("mb-4 grid grid-cols-3 gap-2", className)} aria-label="Kennzahlen der Auswahl" role="group">
       <Tile id="kpi-net" label="Netto" title="Netto der Auswahl" body={() => <NetBody a={closed} currency={currency} />}>
-        {closed.n ? <MotionNumber value={closed.net} decimals={2} signed tone="auto" flash countOnReveal revealKey="kpi-net" suffix={` ${currency}`} /> : <span className="text-faint">–</span>}
+        {closed.n ? (
+          <>
+            <MotionNumber value={closed.net} decimals={2} signed tone="auto" flash countOnReveal revealKey="kpi-net" />
+            {/* the unit from sm: at 390 px „+1.232,00 USDT“ wrapped and pushed the tiles out of line (P1-17) */}
+            <span className={cn("max-sm:sr-only", colorClass(closed.net))}> {currency}</span>
+          </>
+        ) : (
+          <span className="text-faint">–</span>
+        )}
       </Tile>
       <Tile id="kpi-trades" label="Trades" title="Trades der Auswahl" body={() => <TradesBody a={closed} open={open} />}>
         <MotionNumber value={closed.n} decimals={0} countOnReveal revealKey="kpi-n" />
@@ -69,7 +77,8 @@ export function KpiStrip({ closed, count, currency, className }: KpiStripProps) 
 function Tile({ id, label, title, body, children }: { id: string; label: string; title: string; body: () => ReactNode; children: ReactNode }) {
   return (
     <RevealItem className="min-w-0">
-      <MorphCard id={id} title={title} body={body} borderRadius={12} className="h-full rounded-xl border border-line bg-ink-950/50 px-3 py-2 transition-colors hover:border-white/25">
+      {/* content top-aligned: a button centres it vertically, so the shorter tiles' figures sat lower than their neighbours' */}
+      <MorphCard id={id} title={title} body={body} borderRadius={12} className="flex h-full flex-col justify-start rounded-xl border border-line bg-ink-950/50 px-3 py-2 transition-colors hover:border-white/25">
         <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{label}</div>
         <div className="num mt-0.5 font-mono text-[14px] font-medium">{children}</div>
       </MorphCard>

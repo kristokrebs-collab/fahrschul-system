@@ -42,7 +42,8 @@ function SpreadRow({ r, axis, limit, steadiest, index }: { r: RiskSpreadRow; axi
   );
   return (
     <li ref={ref} className="grid gap-1.5" data-testid="spread-row" data-key={r.key}>
-      <div className="flex min-w-0 items-baseline justify-between gap-2 text-[12.5px] text-fg">
+      {/* phones: the name gets the full width above its figures (it was cut to ≈ 116 px beside them, P1-18) */}
+      <div className="grid min-w-0 grid-cols-1 gap-0.5 text-[12.5px] text-fg sm:flex sm:items-baseline sm:justify-between sm:gap-2">
         {steadiest ? (
           <TactileHighlight playOnView tone="invert" className="min-w-0">
             {label}

@@ -103,7 +103,12 @@ export function ReportHero({ report, dir, className }: { report: Report; dir: Fl
     >
       <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="grid min-w-0 gap-1.5">
-          <SplitFlap text={report.period.short} tiles direction={dir} className="text-[26px] sm:text-[32px]" tileClassName="dot-num" />
+          {/* one flap group per word („KW“ · „17“): a space would be an empty tile that reads like a missing digit (P1-15) */}
+          <span className="inline-flex flex-wrap gap-3">
+            {report.period.short.split(" ").map((word, i) => (
+              <SplitFlap key={i} text={word} tiles direction={dir} className="text-[26px] sm:text-[32px]" tileClassName="dot-num" />
+            ))}
+          </span>
           <span className="text-[12px] text-mute">
             {report.period.label} · {report.period.range}
           </span>
@@ -111,7 +116,9 @@ export function ReportHero({ report, dir, className }: { report: Report; dir: Fl
         <div className="grid justify-items-start gap-0.5 sm:justify-items-end">
           <span className="label">Netto</span>
           <span className={cn("dot-num text-[34px] leading-none sm:text-[40px]", net > 0 ? "text-win" : net < 0 ? "text-loss" : "text-fg")} data-testid="report-net">
-            <NumberCascade value={Math.round(net)} signed suffix={` ${cur}`} />
+            <NumberCascade value={Math.round(net)} signed />
+            {/* the unit as in the Übersicht hero: Plex Sans, muted, not in the figure's Doto (P1-14) */}
+            <span className="font-sans text-lg font-medium text-mute"> {cur}</span>
           </span>
         </div>
       </div>

@@ -19,7 +19,8 @@ import { CountValue } from "./ui";
 export const COSTS_STRINGS = {
   title: "Kosten",
   note: "Was deine Trades vor Gebühren und Funding verdient haben – und was die Kosten genommen haben.",
-  gross: "Brutto vor Kosten",
+  /** „Brutto vor Kosten“ was cut to „Brutto vor Kost…“ in the 390-px tile; the note above already says „vor Gebühren und Funding“ (P1-18) */
+  gross: "Brutto",
   fees: "Gebühren",
   funding: "Funding",
   net: "Netto",

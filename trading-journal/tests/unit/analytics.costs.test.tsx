@@ -62,7 +62,7 @@ describe("aggregate carries the real costs", () => {
 });
 
 describe("Analyse „Kosten“ and the report", () => {
-  it("the card shows Brutto vor Kosten, Gebühren, Funding and Netto", () => {
+  it("the card shows Brutto (vor Kosten), Gebühren, Funding and Netto", () => {
     const list = enriched([FILLS, FUNDED, RECEIVED]);
     const g = aggregate(list);
     render(
@@ -71,7 +71,7 @@ describe("Analyse „Kosten“ and the report", () => {
       </MotionRoot>,
     );
     const card = screen.getByTestId("ana-costs");
-    expect(within(card).getByText("Brutto vor Kosten")).toBeInTheDocument();
+    expect(within(card).getByText("Brutto")).toBeInTheDocument();
     expect(Number(screen.getByTestId("ana-cost-gross").dataset.value)).toBeCloseTo(Math.round(g.gross * 100) / 100, 2);
     expect(Number(screen.getByTestId("ana-cost-fees").dataset.value)).toBeCloseTo(-63.5, 2);
     expect(Number(screen.getByTestId("ana-cost-funding").dataset.value)).toBe(1);

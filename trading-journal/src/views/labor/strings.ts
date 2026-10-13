@@ -2,7 +2,7 @@
 export const LABOR = {
   title: "Labor",
   lead: "Teste Strategien auf echter Binance-Historie. Mit Gebühren, Slippage und Funding, ohne Blick in die Zukunft.",
-  highlight: "echter",
+  highlight: "echter Binance-Historie",
   sections: {
     setup: { title: "Versuchsaufbau", sub: "Strategie, Markt und Kosten wählen. Gerechnet wird nur auf geschlossenen Kerzen." },
     run: { title: "Lauf", sub: "Deine Parameter über den ganzen Zeitraum." },

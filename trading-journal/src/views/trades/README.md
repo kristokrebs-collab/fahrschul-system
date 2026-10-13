@@ -28,7 +28,7 @@ Bundle `H$` (Plan 6.2). Import from `@/views/trades`.
 - Mobile cards use the table's choreography (sync presence, settle tick, `INSERT_DELAY` for inserts, re-key per sort) – TR-02.
 - Rows inserted into a shown list wait `INSERT_DELAY` (= `spring.layout` settled) – TR-03.
 - The subtitle is the shared `LeadFill` recipe (`@/views/setups/LeadFill`): pixel fill once per session (`tj2-fill-trades`), then the
-  marker on "Klick".
+  marker on "öffnet den Trade".
 - `content-visibility: auto` is intentionally NOT used on table rows: it is a no-op on `<tr>`, and on cell content it breaks auto column sizing.
 
 ## Tablet / touch

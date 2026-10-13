@@ -109,6 +109,10 @@ describe("BerichteView", () => {
     const last = trades.map((t) => t.date).sort().at(-1)!;
     expect(periodFromKey(key)!.from).toBeLessThanOrEqual(new Date(last).getTime());
     expect(screen.getByTestId("report-hero")).toHaveTextContent("abgeschlossen");
+    // „KW 17“ as two flap groups – no empty tile for the space (P1-15); the unit beside the Doto net in Plex Sans (P1-14)
+    const flaps = [...screen.getByTestId("report-hero").querySelectorAll('[data-fx="split-flap"]')].map((f) => f.querySelector(".sr-only")?.textContent);
+    expect(flaps).toEqual(["KW", String(Number(key.slice(-2)))]);
+    expect(screen.getByTestId("report-net").querySelector(".font-sans")).toHaveTextContent("USDT");
     for (const id of ["report-performance", "report-compare", "report-strategy", "report-risk", "report-psych", "report-mistakes", "report-goals"]) expect(screen.getByTestId(id)).toBeInTheDocument();
     expect(screen.getByTestId("report-strategy")).toHaveTextContent("Breakout");
 

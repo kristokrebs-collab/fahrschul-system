@@ -9,6 +9,7 @@ import { motion } from "motion/react";
 import { useMemo } from "react";
 import { tradeReview, type ReviewLine, type ReviewSection } from "@/domain/coach";
 import { cn } from "@/lib/cn";
+import { tradeTime } from "@/lib/dates";
 import { pct0, r as fmtR, signed } from "@/lib/format";
 import { StaggerItem } from "@/motion/Stagger";
 import { spring } from "@/motion/tokens";
@@ -20,6 +21,9 @@ import { eventsOf } from "./hooks";
 const SECTION: Readonly<Record<ReviewSection, string>> = { plan: "Plan & Ausführung", excursion: "MAE / MFE", rules: "Regeln", context: "Kontext", behavior: "Verhalten" };
 const ORDER: readonly ReviewSection[] = ["behavior", "plan", "rules", "excursion", "context"];
 const TONE: Readonly<Record<ReviewLine["tone"], string>> = { win: "text-win", loss: "text-loss", warn: "text-warn", fg: "text-fg", mute: "text-mute" };
+/** „26.04.“ – the day of a similar trade on its chip. */
+const dayMonth = (d: Date) => d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+
 const GRADE_TONE: Readonly<Record<"A" | "B" | "C" | "D", string>> = { A: "text-win border-win/30", B: "text-fg border-line-2", C: "text-warn border-warn/30", D: "text-loss border-loss/30" };
 
 export function TradeCoachPanel({ tradeId, className }: { tradeId: string; className?: string }) {
@@ -80,11 +84,25 @@ export function TradeCoachPanel({ tradeId, className }: { tradeId: string; class
             </span>
           </p>
           <div className="flex flex-wrap gap-1.5">
-            {review.similar.ids.map((id, i) => (
-              <button key={id} type="button" onClick={() => openTrade(id)} className="touch-hit rounded-full border border-line-2 px-2.5 py-0.5 font-mono text-[11px] text-mute hover:text-fg">
-                Trade {i + 1}
-              </button>
-            ))}
+            {/* each chip says what the trade was – day and result in R (else P&L), toned by the result (P1-21) */}
+            {review.similar.ids.map((id) => {
+              const o = enriched.find((x) => x.id === id);
+              if (!o) return null;
+              const v = o.r ?? o.pnl ?? 0;
+              const result = o.r != null ? fmtR(o.r).replace(" R", "R") : `${signed(o.pnl ?? 0, 0)} ${settings.currency}`;
+              const day = dayMonth(tradeTime(o));
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => openTrade(id)}
+                  aria-label={`Trade vom ${day} öffnen, ${o.r != null ? fmtR(o.r) : result}`}
+                  className={cn("touch-hit rounded-full border border-line-2 px-2.5 py-0.5 font-mono text-[11px] hover:border-white/30", v > 0 ? "text-win" : v < 0 ? "text-loss" : "text-mute")}
+                >
+                  <span className="text-mute">{day}</span> {result}
+                </button>
+              );
+            })}
           </div>
         </StaggerItem>
       )}

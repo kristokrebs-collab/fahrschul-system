@@ -1,7 +1,7 @@
 /**
  * Analyse page (P03, `h1 Analyse`): pro statistics with honest uncertainty over the account view of the Hero's switch
  * (`uiStore.acc`). Sections (lg, 12 columns):
- *   Kennzahlen       KennzahlenHero (12) · CostsCard (12, Brutto vor Kosten → Gebühren → Funding → Netto)
+ *   Kennzahlen       KennzahlenHero (12) · CostsCard (12, Brutto → Gebühren → Funding → Netto)
  *   Was kommen kann  MonteCarloCard (8) · RiskOfRuinCard (4)
  *   Wo deine Edge…   BreakdownCard (7) · HeatmapCard (5)
  *   Ausführung       ExcursionCard (6) · DistributionCard (6)

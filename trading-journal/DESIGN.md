@@ -143,4 +143,42 @@ dunkel/hell, Hell-Modus aller Seiten (Kontrast, Inseln), kein horizontaler Scrol
 Hinweis: Die weiche Chart-Schrift in 390-Shots ist ein Emulationsartefakt (Chromium-Emulation meldet
 `devicePixelContentBox` ohne DPR), kein App-Fehler.
 
+#### Umsetzung Durchgang 1
+
+Alle 21 Befunde bearbeitet, 20 umgesetzt, einer teilweise (#8 Labor). Nachher-Shots mit denselben Builds/Mocks/Seeds:
+`…/scratchpad/shots/refine/pass1-after/` (alle 15 Seiten 1440/390 dunkel/hell, Sheets, Details, Markt-Bildfolge;
+Kacheln unter `tiles/`, Ausschnitte unter `crops/`). Keine Konsolenfehler, kein horizontaler Scroll; Messung
+„abgeschnittener Text“: Kosten-Kachel und Strategienamen nicht mehr gekürzt.
+
+| # | Was geändert wurde (oder warum nicht) | Nachher |
+|---|---|---|
+| 1 | `BoxStateCard`: ohne Analyse und solange `view.state` lädt/idle → Punktmatrix-Lader + `view.detail` („Lade Kerzen …“) und Pille „Lädt“; aus/Fehler → Grund des Stores (Pillen „Aus“ / „Keine Kerzen“). Der Lader hält die Höhe des geladenen Körpers (41 + 16 + 144 px). „Noch keine saubere Box.“ nur noch nach dem Laden. | `crops/markt-1440-loading-vs-loaded.png`, `crops/markt-frames-1235.png` |
+| 2 | `AlertBand` bleibt beim Laden (und ohne Box) als Hülle `min-h-[38px]` mit einer gedämpften Zeile stehen; Hülle und Laufband teilen die Klasse – Karten und Chart stehen in Lade- und Fertig-Bild auf derselben y. | `frames/markt-1440-2.png` → `-5.png` |
+| 3 | `PrivacyCard` ruft angemeldet `followServerOptIn()` (Social-Store per dynamischem Import, ein GET der Rangliste, still übernommen; während der Antwort umgelegter Schalter gewinnt). Wortlaut beider Schalter „In der Rangliste erscheinen“. | `konto-1440-dark.png` (an, wie Community) |
+| 4 | `Header`: Modus-Pille nur, solange die Konto-Pille nicht angemeldet ist (Ausnahme: Speicher nicht verfügbar). | `crops/header-konto-1440.png` |
+| 5 | `plans.ts` Premium-Glyphe `PREMIUM` (passt in Karte und Konto-Kachel, auch bei 390). | `tiles/dl/preise-0.png`, `crops/konto-abo-1440.png` |
+| 6 | Labor `ChipPick`: Daumen `border-line-2 bg-ink-750` (−1 px auf die Chip-Kante), aktiver Text `text-fg`; Berichte-Fokus gleich. Weiß bleibt der Primäraktion. | `tiles/d/labor-0.png`, `crops/chips-light.png` |
+| 7 | `SectionTitle`: `grid gap-1.5 pt-6`, Sub 13 px `text-mute max-w-[60ch]` unter dem Titel (Analyse, Risiko, Labor, Wachstum). | `tiles/d/analyse-0.png`, `tiles/d/labor-0.png` |
+| 8 | Wachstum Check-in: Review-Fuß `mt-auto`; Community: „Jetzt neu berechnen“-Zeile `mt-auto`; Berichte: Kurvenmulde `flex-1`, mind. 132 px, Zeichnung absolut darin (misst ihre Höhe per ResizeObserver, hält die Reihe nie offen) → „Stärkstes Setup“ sitzt unten. **Labor „Annahmen“ nicht geändert**: die Karte ist eine reine Liste ohne Fuß; nach einem Lauf füllen 8 – 9 Zeilen sie, vorher bleibt Raum. | `tiles/d/wachstum-0.png`, `tiles/d/community-0.png`, `tiles/d/berichte-0.png` |
+| 9 | Orbit-Mindestmaße 9,5 / 10 / 10 px (Label-Laufweite 0.06em, Detail zweizeilig statt gekürzt), Mittel-Zeile auf Tinten-Grund `relative z-20`; Kopfzeile „stark am Wochenende“ / „in London“ / „in der Spät-Session“ (`sessionPhrase`). | `detail-coach-profile-1440-dark.png` |
+| 10 | Coach-Hero: Wortmarke „COACH“ entfernt; Trading-Score ist die Hero-Zahl (`ScoreHero`: Doto `clamp(56px,13vw,96px)` wie Analyse-Sharpe, `/ 100` Plex Sans gedämpft, Urteil als Pille); rechts nur noch die vier Teile (`ScoreParts`). | `tiles/d/coach-0.png` |
+| 11 | `EmptyState`: `progressLine(have, need)` („11 / 20 Trades“) und `EMPTY_LINE_CLOSED` („Wartet auf den ersten abgeschlossenen Trade.“). Schwellen: Risk of Ruin, Kennzahlen, Verteilung, Serien, MAE/MFE („… Trades gemessen“), Rolling; nur offene Trades: Heatmap, Benchmark, Edge-Score, Erkenntnisse, Drawdown, Zeit, Fehler; sonst `line={false}` (Breakdown, Win/Loss, Disziplin, Rückblick, Signal, R, Cockpit). Übersicht/Trades behalten die Standardzeile – dort fehlt wirklich der erste Eintrag. | `detail-analyse-ror-1440-dark.png` |
+| 12 | Trade-Editor (neuer Trade, unter sm): `grid-cols-[auto_1fr_1fr] gap-2`, drei Knöpfe in `size="sm"`-Maßen, Fehlerzeile darüber über die ganze Breite; Bearbeiten behält die Flex-Zeile (passt). | `sheet-editor-390-dark-1.png` |
+| 13 | Rangliste: `NumberCascade` nur Podium + eigene Zeile, übrige Zeilen zeigen den fertigen Wert mit der Zeilen-Reveal. | `tiles/d/community-0.png` (Plätze 11 – 13 ruhig) |
+| 14 | Berichte-Netto: Einheit `font-sans text-lg font-medium text-mute` neben der Doto-Zahl. | `tiles/d/berichte-0.png` |
+| 15 | Split-Flap je Wort („KW“ · „17“, `gap-3`), keine Leerkachel. | `tiles/d/berichte-0.png` |
+| 16 | Kein Marker im „Sharpe“-Stärken-Chip. | `tiles/d/analyse-0.png` |
+| 17 | KPI-Streifen: Einheit `max-sm:sr-only` (Screenreader liest sie weiter), Kachel `flex flex-col justify-start`. | `crops/trades-390-mid.png` |
+| 18 | Kosten-Kachel „Brutto“ (Notiz sagt „vor Gebühren und Funding“); Risiko je Strategie unter sm Name über den Zahlen (`grid-cols-1`). | `tiles/d/analyse-0.png`, `crops/risiko-390-spread.png` |
+| 19 | Vergleichstabelle: empfohlene Spalte im Hellen `bg-fg/[0.04]` (`[:root[data-theme=light]_&]`), dunkel unverändert Signal-Hauch. | `tiles/dl/preise-0.png` |
+| 20 | Marker: „öffnet den Trade“, „Dashboard“, „echter Binance-Historie“. | `crops/trades-390-top.png`, `tiles/d/labor-0.png` |
+| 21 | „Ähnliche Trades“: Chip = Tag + R (ohne Stop: P&L), Ton nach Ergebnis, `aria-label` „Trade vom … öffnen“. | `sheet-detail-390-dark-2.png` |
+
+Neu gesehen, für Durchgang 2 (nicht in diesem Durchgang geändert):
+- Markt „Beste Setups“ bei 1440 mit zwei Setups nebeneinander: Einstieg/Stop/Ziel-Kacheln kürzen auf 48 px
+  („82.77…“) – verstößt gegen „keine abgeschnittenen Kennzahlen“ (z. B. 2 × 2 statt 4 × 1 bei schmaler Karte).
+- Konto: „Datenschutz“ neben „Sicherheit“ und „Rechnungen“ neben „Abo“ mit leerem Kartenboden (Reihen-Regel).
+- Preise hell: empfohlene (Pro) und eigene Spalte (Premium) haben jetzt denselben Tinten-Ton.
+- Markt beim Laden: „Lade Kerzen …“ steht viermal (Kopf-Pille, Band, Beste Setups, Box-Status) – ehrlich, aber laut.
+
 ### Durchgang 2
