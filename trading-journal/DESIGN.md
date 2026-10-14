@@ -293,3 +293,8 @@ Uhrzeit. Shots (390 / 1440, dunkel / hell, Element-Ausschnitte): `…/scratchpad
 Gemessen danach (alle 15 Seiten, 390 + 1440): keine Doto-gesetzte Einheit, keine gekürzten Texte außer den
 Absichts-Überläufen (Kopien der Prisma-Linse in Netto- und Sharpe-Zahl – die Sharpe-Linse misst bei 1440 2 px mehr als
 ihre Box, die Zahl steht sichtbar ganz –, Rollziffern-Streifen der Preise), keine Konsolenfehler.
+
+Nachgezogen: Der „Bericht bereit“-Wipe kürzte seine Zahlen (`truncate`): „−1.235 USDT“ schon bei 390 (110 > 106 px),
+„−123.457 USDT“ 134 > 106 / 201 > 179 px (390 / 1440, gehintet ±1 px). Jetzt ganz: Spalten `minmax(max-content,1fr)`,
+gleiche Drittel, solange alles passt; E2E mit langen Werten, Berichte-E2E auf festem Mittwoch (sonntags kam kein Wipe).
+Übersicht „FAB …“ mit angehaltener Seitenuhr erzwungen: 95eb012 rot wie in CI, HEAD grün; geprüft wird der zweite Toast.

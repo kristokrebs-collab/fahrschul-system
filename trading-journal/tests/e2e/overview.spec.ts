@@ -184,7 +184,9 @@ test.describe("editor from the FAB", () => {
     await dialog.locator("#f-size").fill("4000");
     await dialog.getByRole("button", { name: "Speichern", exact: true }).click();
     await expect(dialog).toBeHidden();
-    await expect(toast(page)).toContainText("Trade gespeichert");
+    // the second save's own toast (its P&L): "Trade gespeichert" alone also matched the first save's toast while that
+    // was still in front (2.8 s) – the check then never saw the second one
+    await expect(toast(page)).toContainText(/Trade gespeichert\s*−49,38/);
     await screenshot(page, info, "editor-saved-toast");
 
     await page.goto("/#trades");
