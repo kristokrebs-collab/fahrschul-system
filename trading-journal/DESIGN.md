@@ -273,3 +273,23 @@ Neu gesehen, für Durchgang 3 (nicht in diesem Durchgang geändert):
 - Community 390: Mitgliedszeile „+0,31R · 74 % Disz. · 34 Tr.“ und die Setup-Auswahl in „Deine Links“ („Früher
   Makro-Trendbruch“) kürzen; Coach 390: Timeline-Notizen einzeilig gekürzt.
 - Coach: zwischen Plan-Schritten und Fuß bleiben ~300 px – der Plan könnte die Wochenwerte je Schritt zeigen.
+
+### Nachtrag
+
+Die offenen Punkte aus „Neu gesehen, für Durchgang 3“ (ohne den Coach-Plan) und die letzten Testabhängigkeiten von der
+Uhrzeit. Shots (390 / 1440, dunkel / hell, Element-Ausschnitte): `…/scratchpad/shots/refine/pass3/`
+(`<seite>-<stelle>-<390|1440>-<dark|light>.png`); Messung aller 15 Seiten vorher / nachher unter `pass3/probe-before/`,
+`pass3/probe-after/` (Doto-Einheiten und gekürzte Texte je Seite und Breite).
+
+| Was | Änderung | Nachher |
+|---|---|---|
+| Community 390: Mitgliedszeile | „+0,31R · 74 % Disz. · 34 Tr.“ bricht zwischen ihren Teilen um (jeder Teil `nowrap`, der Punkt beginnt die neue Zeile) statt gekürzt zu werden. E2E: keine gekürzte Zeile in `member-row`. | `community-members-390-dark.png` |
+| „Früher Makro-Trendbruch“ (Deine Links, 390 + 1440) | `MorphSelect` ohne `max-w-[180px]`, neue Option `wrap` (ein langer Name bricht um, nie Ellipse); die offene Liste wird so breit wie der längste Name (`panelContentWidth`, Textbreite über `OffscreenCanvas`, kein Layout-Read) – vorher kürzten dort „4H-Neckline-Short unter 84.500“ und „Multi-TF Signal (MCB + RSI + Discount)“. E2E prüft Feld und offene Liste, Unit-Tests Breite und `wrap`. | `community-shares-*.png`, `community-select-open-*.png` |
+| Community 1440: eigene Kennzahl | „+0,42R“ war 2 px gekürzt: die Kacheln bleiben ab `lg` bei 17 px (kein `xl:19px`). | `community-you-1440-dark.png` |
+| Coach 390: Timeline-Notiz | Notiz bricht um (`overflow-wrap:anywhere`) statt einzeilig gekürzt. E2E: keine gekürzte Zeile in der Timeline. | `coach-timeline-390-dark.png` |
+| Doto-Einheiten | Neu `DotFigure` (+ `splitUnit`): eine formatierte Zahl bleibt in Doto, ihre Einheit (`%`, `R`, `×`, `€`, `USDT` …) kommt in `DotUnit` – Textinhalt unverändert. Übersicht: Einstiegs-Check „53 % LONG“, Top-Trader „64,6 %“, Win-Rate-Ring (auch im Cockpit), Disziplin-Ring; Risiko „Unrealisiert −222 USDT“; Konto „Guthaben 10 €“. Per Grep und Seitenmessung dazu: Analyse (eigene Kennzahl, Exit-Effizienz, Risk of Ruin, Kennzahl-Dialog), Grundlagen (R im Trade-Bild), Bericht-bereit-Wipe, Befehlsnavigation, Toast-Werte, Onboarding-Konten. Messung: 0 Doto-Einheiten auf allen Seiten (vorher 8 Stellen auf Übersicht, Cockpit, Analyse, Risiko, Konto). | `overview-bias-*.png`, `overview-toptrader-*.png`, `overview-winrate-*.png`, `overview-discipline-*.png`, `risiko-exposure-*.png`, `konto-referral-*.png`, `analyse-custom-*.png`, `cockpit-winrate-*.png` |
+| Tests und Uhrzeit | Risiko- und Wachstums-Seeds (E2E und Unit) laufen auf einer festen Mittagszeit (`middayToday` + `pinClock`, Unit `pinMidday`): vorher rot zwischen 00:00 und ~00:25 (Berlin bzw. UTC in CI) und – Wachstum – zwischen 23:00 und 24:00. Übersicht „FAB …“ speichert Trades mit Stop (sonst stand ein 5,2-s-Coach-Toast vor „Trade gespeichert“). Der CI-Fehler auf `95eb012` (Unit „Check-in …“) war ein Lastrennen: die Seite wird einen Scheduler-Takt nach dem Entfernen des Sheets freigegeben; der Test wartet jetzt darauf. | – |
+
+Gemessen danach (alle 15 Seiten, 390 + 1440): keine Doto-gesetzte Einheit, keine gekürzten Texte außer den
+Absichts-Überläufen (Kopien der Prisma-Linse in Netto- und Sharpe-Zahl – die Sharpe-Linse misst bei 1440 2 px mehr als
+ihre Box, die Zahl steht sichtbar ganz –, Rollziffern-Streifen der Preise), keine Konsolenfehler.
