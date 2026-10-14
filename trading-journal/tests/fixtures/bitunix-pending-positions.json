@@ -1,0 +1,46 @@
+{
+  "_comment": "Shape per Bitunix docs 'Get Pending Positions' (data is a bare array).",
+  "code": 0,
+  "msg": "Success",
+  "data": [
+    {
+      "positionId": "1846609912001233921",
+      "symbol": "BTCUSDT",
+      "qty": "0.06",
+      "entryValue": "3828",
+      "side": "LONG",
+      "positionMode": "ONE_WAY",
+      "marginMode": "ISOLATION",
+      "leverage": 10,
+      "fee": "1.53",
+      "funding": "-0.21",
+      "realizedPNL": "0",
+      "margin": "382.8",
+      "unrealizedPNL": "18.6",
+      "liqPrice": "57716.2",
+      "marginRate": "0.0124",
+      "avgOpenPrice": "63800",
+      "ctime": 1791720000000,
+      "mtime": 1791789300000
+    },
+    {
+      "positionId": "1846611100912558080",
+      "symbol": "ETHUSDT",
+      "qty": "2",
+      "entryValue": "4920",
+      "side": "SHORT",
+      "positionMode": "ONE_WAY",
+      "marginMode": "CROSS",
+      "leverage": 5,
+      "fee": "1.97",
+      "funding": "0.12",
+      "realizedPNL": "0",
+      "margin": "984",
+      "unrealizedPNL": "-31",
+      "liqPrice": "0",
+      "marginRate": "0.0031",
+      "ctime": 1791789300000,
+      "mtime": 1791789300000
+    }
+  ]
+}
