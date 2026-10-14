@@ -47,7 +47,18 @@ function MemberRow({ m, group, index }: { m: MemberInfo; group: GroupDetail; ind
             {m.pseudonym}
             {m.me && <span className="text-faint"> · du</span>}
           </span>
-          <span className="truncate font-mono text-[10.5px] text-faint">{f ? `${fmtR(f.expectancyR)} · ${fmtPct(f.discipline)} Disz. · ${f.trades} Tr.` : GROUPS.noFigures}</span>
+          {/* the figures wrap between their parts instead of being cut (a narrow phone row: badge + menu beside them); a
+              wrapped part starts with its "·", no line ends on one */}
+          <span className="font-mono text-[10.5px] leading-snug text-faint">
+            {f ? (
+              <>
+                <span className="whitespace-nowrap">{fmtR(f.expectancyR)}</span> <span className="whitespace-nowrap">· {fmtPct(f.discipline)} Disz.</span>{" "}
+                <span className="whitespace-nowrap">· {f.trades} Tr.</span>
+              </>
+            ) : (
+              GROUPS.noFigures
+            )}
+          </span>
         </span>
         {m.seat && (
           <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] text-mute" title={GROUPS.seat}>

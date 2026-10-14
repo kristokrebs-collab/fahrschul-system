@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { CONFIG, MorphSelect, placePanel, typeaheadIndex } from "@/motion/pulse/MorphSelect";
+import { CONFIG, MorphSelect, panelContentWidth, placePanel, typeaheadIndex } from "@/motion/pulse/MorphSelect";
 
 const OPTIONS = [
   { value: "all", label: "Alle Grundlagen" },
@@ -178,6 +178,31 @@ describe("MorphSelect", () => {
     expect(above.left + above.w).toBeLessThanOrEqual(400 - CONFIG.edge);
     // origin keeps the start box exactly under the field even when shifted left
     expect(above.left + above.ox * (1 - above.sx0)).toBeCloseTo(300);
+  });
+
+  it("the panel grows to the widest option (label + hint + row chrome), never past the viewport edge", () => {
+    // a fake measurer: 7 px per character for the sans, 6.6 px for the mono hint
+    const measure = (t: string, font: string) => t.length * (font.includes("mono") ? 6.6 : 7);
+    const long = [...OPTIONS, { value: "mtf", label: "Multi-TF Signal (MCB + RSI + Discount)" }];
+    const need = panelContentWidth(long, measure, "sans", "mono");
+    expect(need).toBe(Math.ceil(38 * 7 + CONFIG.rowChrome + 1));
+    // a hint counts with its gap
+    expect(panelContentWidth([{ label: "BSL", hint: "12" }], measure, "sans", "mono")).toBe(Math.ceil(3 * 7 + 2 * 6.6 + CONFIG.hintGap + CONFIG.rowChrome + 1));
+    expect(panelContentWidth(long, null, "sans", "mono")).toBe(0);
+    // wider than the field and the minimum: the panel takes it; a phone keeps 8 px to each edge
+    expect(placePanel({ left: 20, top: 100, width: 150, height: 38 }, long.length, false, 1440, 900, CONFIG.rowH, need).w).toBe(need);
+    expect(placePanel({ left: 20, top: 100, width: 150, height: 38 }, long.length, false, 300, 800, CONFIG.rowH, need).w).toBe(300 - 2 * CONFIG.edge);
+    expect(placePanel({ left: 20, top: 100, width: 150, height: 38 }, 4, false, 400, 800, CONFIG.rowH, 0).w).toBe(CONFIG.panelMinW);
+  });
+
+  it("wrap: a long value stays whole (wraps) instead of an ellipsis; default stays one truncated line", () => {
+    const opts = [{ value: "a", label: "Früher Makro-Trendbruch" }];
+    const { rerender } = render(<MorphSelect aria-label="Grundlage" value="a" options={opts} onChange={() => {}} wrap />);
+    const value = () => screen.getByRole("button", { name: "Grundlage" }).querySelector("span")!;
+    expect(value()).toHaveTextContent("Früher Makro-Trendbruch");
+    expect(value().className).not.toMatch(/\btruncate\b/);
+    rerender(<MorphSelect aria-label="Grundlage" value="a" options={opts} onChange={() => {}} />);
+    expect(value().className).toMatch(/\btruncate\b/);
   });
 
   it("typeaheadIndex cycles repeated letters", () => {

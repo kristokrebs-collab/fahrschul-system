@@ -17,7 +17,7 @@
  * override them, e.g. the dev harnesses under `npm run dev`). `P04_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, openRoute, seed, toast } from "./helpers";
+import { clippedTexts, collectErrors, expectNoHorizontalScroll, openRoute, seed, toast } from "./helpers";
 
 const COACH_URL = process.env.PW_COACH_URL ?? "/#coach";
 const BERICHTE_URL = process.env.PW_BERICHTE_URL ?? "/#berichte";
@@ -213,6 +213,8 @@ test.describe("Coach", () => {
     const tl = page.getByTestId("coach-timeline");
     await tl.scrollIntoViewIfNeeded();
     await expect(tl.getByTestId("coach-timeline-row").first()).toBeVisible();
+    // every note is whole – it wraps instead of the one cut line it was at 390 px
+    expect(await clippedTexts(tl.getByTestId("coach-timeline-row")), "cut timeline texts").toEqual([]);
     await tl.getByRole("button", { name: /^Revenge/ }).click();
     await expect(tl.getByTestId("coach-timeline-row").first()).toContainText("Revenge");
     await shot(page, info, "coach-plan-timeline");

@@ -75,8 +75,9 @@ export function SharesCard({ className }: { className?: string }) {
             {SHARE.shareStats}
           </Button>
           {setups.length > 0 && (
-            <span className="flex min-w-0 items-center gap-2">
-              <MorphSelect<string> aria-label={SHARE.pickSetup} value={chosen} onChange={setSetup} options={setups.map((s) => ({ value: s.id, label: s.name }))} size="sm" className="max-w-[180px]" />
+            // the setup's whole name: the select is as wide as its name (it wraps only when a name is wider than the card)
+            <span className="flex min-w-0 max-w-full items-center gap-2">
+              <MorphSelect<string> aria-label={SHARE.pickSetup} value={chosen} onChange={setSetup} options={setups.map((s) => ({ value: s.id, label: s.name }))} size="sm" wrap />
               <Button size="sm" onClick={() => chosen && openShare({ kind: "setup", setupId: chosen })} data-testid="share-setup">
                 {SHARE.shareSetup}
               </Button>

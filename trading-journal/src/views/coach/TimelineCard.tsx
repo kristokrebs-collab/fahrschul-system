@@ -85,7 +85,7 @@ export function TimelineCard({ events, trades, className }: { events: readonly B
                           <SeverityDot severity={e.severity} />
                           <span className="min-w-0">
                             <span className="block text-[13px] font-medium text-fg">{BEHAVIOR_LABEL[e.key]}</span>
-                            {e.note && <span className="block truncate text-[11.5px] text-mute">{e.note}</span>}
+                            {e.note && <span className="block text-[11.5px] leading-snug text-mute [overflow-wrap:anywhere]">{e.note}</span>}
                           </span>
                           <span className="grid justify-items-end text-[11px]">
                             <span className="num font-mono text-faint">{fmtTime(new Date(e.at))}</span>

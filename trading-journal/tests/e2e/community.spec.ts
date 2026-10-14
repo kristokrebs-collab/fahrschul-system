@@ -11,7 +11,7 @@
  * `PW_SHARE_BASE` override the cloud URLs. `P12_SHOTS_DIR` writes review screenshots.
  */
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
-import { CLOUD_BASE, cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
+import { clippedTexts, CLOUD_BASE, cloudUrl, collectErrors, expectNoHorizontalScroll, seed, toast } from "./helpers";
 import { mockBilling } from "./mocks/billing";
 import { fig, mockSocial, mockTradePayload, type MockGroup, type MockSocialOptions } from "./mocks/social";
 import { mockSupabase } from "./mocks/supabase";
@@ -126,6 +126,9 @@ test.describe("Community", () => {
     await expect(board.getByTestId("podium-1")).toContainText("Kühner Luchs 14");
     await expect(board.getByTestId("board-row").first()).toBeVisible();
     await expect(board.locator("[data-me]")).toHaveCount(0);
+    // the own figures are whole (the R figure was cut by 2 px at 1440)
+    await expect(you.getByTestId("you-expectancy")).toContainText("R");
+    expect(await clippedTexts(you.locator('[data-testid^="you-"] > .dot-num')), "cut own figures").toEqual([]);
     await expectNoHorizontalScroll(page);
     await shot(page, info, "board");
 
@@ -189,6 +192,9 @@ test.describe("Community", () => {
     await expect(review.getByTestId("comment")).toHaveCount(1);
     expect(g.reviews[0]!.comments[0]!.mentions).toEqual(["22222222-2222-4222-8222-222222222222"]);
     await expect(groups.getByTestId("member-row")).toHaveCount(2);
+    // the member lines are whole: "+0,31R · 74 % Disz. · 58 Tr." wraps between its parts at 390 px (was cut)
+    await expect(groups.getByTestId("member-row").filter({ hasText: "Disz." })).toHaveCount(1);
+    expect(await clippedTexts(groups.getByTestId("member-row")), "cut member texts").toEqual([]);
     await expectNoHorizontalScroll(page);
     await review.scrollIntoViewIfNeeded();
     await shot(page, info, "group");
@@ -334,6 +340,16 @@ test.describe("Community", () => {
     await page.goto(COMMUNITY_URL);
     const links = page.getByTestId("shares-card");
     await expect(links.getByTestId("share-row")).toHaveCount(1);
+    // the setup select shows the whole name ("Früher Makro-Trendbruch" was cut at 390 and 1440), and so does its list
+    const pick = links.getByRole("button", { name: "Welche Grundlage?" });
+    await expect(pick).toHaveText("Früher Makro-Trendbruch");
+    expect(await clippedTexts(links), "cut texts in Deine Links").toEqual([]);
+    await pick.click();
+    const options = page.getByRole("listbox", { name: "Welche Grundlage?" });
+    await expect(options.getByRole("option", { name: "4H-Neckline-Short unter 84.500" })).toBeVisible();
+    expect(await clippedTexts(options), "cut setup names in the open select").toEqual([]);
+    await page.keyboard.press("Escape");
+    await expect(options).toHaveCount(0);
     await links.getByTestId("share-revoke").click();
     await expect(toast(page).getByText("Link zurückgezogen")).toBeVisible();
     viewer.shares.splice(0, viewer.shares.length, ...soc.shares);

@@ -24,7 +24,7 @@ function Figure({ metric, value, active }: { metric: SocialMetric; value: number
   return (
     <div className={cn("grid gap-1 rounded-xl border px-3 py-2.5 transition-colors duration-200", active ? "border-line-2 bg-white/[0.04]" : "border-line bg-ink-950/40")} data-testid={`you-${metric}`}>
       <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{METRIC_LABEL[metric]}</span>
-      <span className={cn("dot-num truncate text-[17px] leading-none sm:text-[19px] lg:text-[17px] xl:text-[19px]", tone)}>
+      <span className={cn("dot-num truncate text-[17px] leading-none sm:text-[19px] lg:text-[17px]", tone)}>
         {value == null ? (
           "–"
         ) : (

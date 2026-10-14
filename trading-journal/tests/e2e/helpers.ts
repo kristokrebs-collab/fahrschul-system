@@ -193,6 +193,25 @@ export async function screenshot(page: Page, info: TestInfo, name: string, fullP
  * too: under mobile emulation an overflowing page widens the layout viewport itself (`innerWidth` grows with the
  * content), so `scrollWidth <= innerWidth` alone would never fail.
  */
+/**
+ * Cut texts in `scope` (each matched element and everything below it): an element that clips its own text – an
+ * ellipsis (`truncate`) or one hidden line (`overflow` not visible + `nowrap`) – and whose text is wider than its box
+ * (`scrollWidth > clientWidth + 1`, the check of the KPI tiles). Screen-reader-only text (1 px boxes) never counts.
+ */
+export async function clippedTexts(scope: Locator): Promise<string[]> {
+  return scope.evaluateAll((roots) =>
+    roots.flatMap((root) =>
+      [root, ...Array.from(root.querySelectorAll<HTMLElement>("*"))]
+        .filter((el) => {
+          const st = getComputedStyle(el);
+          const clips = st.textOverflow === "ellipsis" || (st.overflowX !== "visible" && st.whiteSpace === "nowrap");
+          return clips && el.clientWidth > 2 && el.scrollWidth > el.clientWidth + 1 && (el.textContent ?? "").trim() !== "";
+        })
+        .map((el) => `${(el.textContent ?? "").trim()} (${el.scrollWidth} > ${el.clientWidth})`),
+    ),
+  );
+}
+
 export async function expectNoHorizontalScroll(page: Page): Promise<void> {
   const [scrollWidth, width] = await page.evaluate(() => [document.documentElement.scrollWidth, Math.min(window.innerWidth, document.documentElement.clientWidth)]);
   expect(scrollWidth, `scrollWidth ${scrollWidth} > viewport width ${width}`).toBeLessThanOrEqual(width);

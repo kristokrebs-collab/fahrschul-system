@@ -28,7 +28,13 @@ export const CONFIG = {
   headH: 36,
   listPad: 6,
   panelMaxH: 275, // pack panel 230 × 275
-  panelMinW: 240, // pack 230; room for the longest setup name + hint
+  panelMinW: 240, // pack 230; wider when an option needs it (`panelContentWidth`)
+  /** Horizontal chrome of an option row around its label: panel border 2 + list padding 12 + row padding 24 + gap 10 + check 14. */
+  rowChrome: 62,
+  /** Option text: `text-[13.5px]`, measured at the selected row's weight (500); the hint `font-mono text-[11px]` + its gap. */
+  optionFont: "500 13.5px",
+  hintFont: "11px",
+  hintGap: 10,
   gap: 6, // px between field and panel
   edge: 8, // px kept free to the viewport edge
   minBelow: 160, // flip up when less room than this below (and more above)
@@ -63,6 +69,11 @@ export interface MorphSelectProps<T extends string = string> {
   size?: "sm" | "md";
   /** Optional uppercase panel header with a close button. */
   heading?: string;
+  /**
+   * The shown value may wrap onto further lines instead of being cut with an ellipsis – for free text the trader named
+   * (a setup), where a cut name is a different name. Off: one line, truncated (fixed-vocabulary filters).
+   */
+  wrap?: boolean;
   "data-testid"?: string;
 }
 
@@ -105,11 +116,43 @@ const SIZE = {
 
 const fold = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
-/** Panel placement from ONE measurement of the trigger: below (or flipped above), clamped to the viewport. */
-export function placePanel(r: { left: number; top: number; width: number; height: number }, rows: number, heading: boolean, vw: number, vh: number, rowH: number = CONFIG.rowH): Geo {
+/**
+ * Width the panel needs so that no option label is cut: the widest label (+ hint) plus the row chrome, rounded up.
+ * `measure(text, font)` is a text width (canvas `measureText`, no layout read); 0 without a measurer (jsdom).
+ */
+export function panelContentWidth(options: readonly { label: string; hint?: string }[], measure: ((text: string, font: string) => number) | null, family: string, mono: string): number {
+  if (!measure) return 0;
+  let widest = 0;
+  for (const o of options) {
+    const hint = o.hint ? measure(o.hint, `${CONFIG.hintFont} ${mono}`) + CONFIG.hintGap : 0;
+    widest = Math.max(widest, measure(o.label, `${CONFIG.optionFont} ${family}`) + hint);
+  }
+  return widest > 0 ? Math.ceil(widest + CONFIG.rowChrome + 1) : 0;
+}
+
+/**
+ * Text measurer on one shared `OffscreenCanvas` 2D context (on the main thread it uses the document's web fonts; no
+ * layout read), or null where there is none (jsdom, engines without OffscreenCanvas – the panel then keeps its width).
+ */
+let measureCtx: OffscreenCanvasRenderingContext2D | null | undefined;
+function textMeasurer(): ((text: string, font: string) => number) | null {
+  if (measureCtx === undefined) measureCtx = typeof OffscreenCanvas === "undefined" ? null : new OffscreenCanvas(1, 1).getContext("2d");
+  const ctx = measureCtx;
+  if (!ctx) return null;
+  return (text, font) => {
+    ctx.font = font;
+    return ctx.measureText(text).width;
+  };
+}
+
+/**
+ * Panel placement from ONE measurement of the trigger: below (or flipped above), clamped to the viewport. `contentW`
+ * (`panelContentWidth`) widens the panel beyond the field and `panelMinW` so every option label stays whole.
+ */
+export function placePanel(r: { left: number; top: number; width: number; height: number }, rows: number, heading: boolean, vw: number, vh: number, rowH: number = CONFIG.rowH, contentW = 0): Geo {
   const C = CONFIG;
   const needed = (heading ? C.headH : 0) + C.listPad * 2 + rows * rowH + Math.max(0, rows - 1) * C.rowGap + 2;
-  const w = Math.min(Math.max(r.width, C.panelMinW), vw - C.edge * 2);
+  const w = Math.min(Math.max(r.width, C.panelMinW, contentW), vw - C.edge * 2);
   const left = Math.min(Math.max(r.left, C.edge), Math.max(C.edge, vw - C.edge - w));
   const below = vh - (r.top + r.height) - C.gap - C.edge;
   const above = r.top - C.gap - C.edge;
@@ -187,6 +230,7 @@ export function MorphSelect<T extends string = string>({
   className,
   size = "md",
   heading,
+  wrap = false,
   "data-testid": testId,
 }: MorphSelectProps<T>) {
   const reduced = useReducedFx();
@@ -315,12 +359,15 @@ export function MorphSelect<T extends string = string>({
     if (!t || disabled || options.length === 0) return;
     const r = t.getBoundingClientRect();
     placedAt.current = { left: r.left, top: r.top };
-    const g = placePanel(r, options.length, !!heading, window.innerWidth, window.innerHeight, coarsePointer() ? CONFIG.rowHCoarse : CONFIG.rowH);
+    // the panel is portalled to <body>: its rows use the body's sans (and mono for hints)
+    const body = getComputedStyle(document.body).fontFamily;
+    const contentW = panelContentWidth(options, textMeasurer(), body, "\"IBM Plex Mono\", ui-monospace, monospace");
+    const g = placePanel(r, options.length, !!heading, window.innerWidth, window.innerHeight, coarsePointer() ? CONFIG.rowHCoarse : CONFIG.rowH, contentW);
     geoRef.current = g;
     setGeo(g);
     setActive(selectedIndex >= 0 ? selectedIndex : 0);
     setPhase("open");
-  }, [disabled, options.length, heading, selectedIndex]);
+  }, [disabled, options, heading, selectedIndex]);
 
   const close = useCallback(
     (choose?: T, focusTrigger = true, flingVelocity = 0) => {
@@ -672,7 +719,7 @@ export function MorphSelect<T extends string = string>({
           className,
         )}
       >
-        <span id={valueId} className={cn("min-w-0 flex-1 truncate", !selected && "text-faint")}>
+        <span id={valueId} className={cn("min-w-0 flex-1", wrap ? "[overflow-wrap:anywhere]" : "truncate", !selected && "text-faint")}>
           {selected ? selected.label : placeholder}
         </span>
         <svg
