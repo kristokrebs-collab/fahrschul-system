@@ -89,7 +89,9 @@ export function ReportReadyHost({ onOpen }: { onOpen?: (key: string) => void }) 
           </h2>
         </WipeItem>
         <WipeItem index={2}>
-          <dl className="grid max-w-[560px] grid-cols-3 gap-3">
+          {/* never cut (no ellipsis): each column is at least as wide as its figure – equal thirds while all three
+              fit, a long Netto („−123.457 USDT“) widens its own column and the two short ones share the rest */}
+          <dl className="grid max-w-[560px] grid-cols-[repeat(3,minmax(max-content,1fr))] gap-3">
             {[
               ["Netto", `${signed(net, 0)} ${settings.currency}`, net > 0 ? "text-win" : net < 0 ? "text-loss" : "text-fg"],
               ["Trades", `${pending.n}`, "text-fg"],
@@ -97,7 +99,7 @@ export function ReportReadyHost({ onOpen }: { onOpen?: (key: string) => void }) 
             ].map(([k, v, c]) => (
               <div key={k} className="grid min-w-0 gap-1 border-t border-white/15 pt-2">
                 <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">{k}</dt>
-                <dd className={cn("dot-num truncate text-[clamp(20px,4vw,30px)] leading-none", c)}>
+                <dd className={cn("dot-num whitespace-nowrap text-[clamp(20px,4vw,30px)] leading-none", c)}>
                   <DotFigure text={v ?? ""} />
                 </dd>
               </div>

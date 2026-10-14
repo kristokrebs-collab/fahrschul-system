@@ -10,14 +10,15 @@
  * and the trade panel in the trade detail (P14 mounts it there; a timeline row opens it).
  * Berichte: "Bericht bereit" (full-screen wipe once, "Bericht öffnen"), `h1 Berichte`, the newest finished week, the
  * period stepper (split flap), month / focus switches, the archive, the seen marker, Markdown export (download) and the
- * PDF print view (print stubbed: the light print document is mounted while printing).
+ * PDF print view (print stubbed: the light print document is mounted while printing); the wipe with long figures (a
+ * busy quarter: nothing cut, no figure over its column).
  * Both: the empty journal, no horizontal scroll at 390 px, no console errors.
  *
  * Runs on the routed pages `/#coach` and `/#berichte` of the production build (P14; `PW_COACH_URL` / `PW_BERICHTE_URL`
  * override them, e.g. the dev harnesses under `npm run dev`). `P04_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { clippedTexts, collectErrors, expectNoHorizontalScroll, openRoute, seed, toast } from "./helpers";
+import { clippedTexts, collectErrors, expectNoHorizontalScroll, openRoute, pinClock, seed, toast } from "./helpers";
 
 const COACH_URL = process.env.PW_COACH_URL ?? "/#coach";
 const BERICHTE_URL = process.env.PW_BERICHTE_URL ?? "/#berichte";
@@ -122,6 +123,26 @@ export function coachTrades(now: number): Record<string, unknown>[] {
   // today: one loss closed 25 minutes ago
   out.push(trade("e_co_today", now - 85 * MIN, 60, "s_sweep", -1, { emotion: "Unsicher" }));
   return out;
+}
+
+/**
+ * A busy quarter with long figures for the "Bericht bereit" wipe: 1.234 closed trades over Q3 2026, 469 winners
+ * (38 %), Netto exactly −123.456,78 USDT (`pnlManual`; the wipe shows „−123.457 USDT“).
+ */
+function longQuarter(): Record<string, unknown>[] {
+  const n = 1234;
+  const wins = 469;
+  const net = -123_456.78;
+  const from = Date.UTC(2026, 6, 1, 8);
+  const step = (Date.UTC(2026, 8, 30, 8) - from) / (n - 1);
+  const loss = Math.round(((wins * 100 - net) / (n - wins)) * 100) / 100;
+  let sum = 0;
+  return Array.from({ length: n }, (_, i) => {
+    const win = Math.floor(((i + 1) * wins) / n) > Math.floor((i * wins) / n);
+    const pnl = i === n - 1 ? Math.round((net - sum) * 100) / 100 : win ? 100 : -loss;
+    sum += pnl;
+    return trade(`e_long_${i}`, from + Math.round(i * step), 45, "s_bo", win ? 1 : -1, { pnlManual: pnl });
+  });
 }
 
 async function shot(page: Page, info: TestInfo, name: string, fullPage = false): Promise<void> {
@@ -279,8 +300,11 @@ test.describe("Berichte", () => {
 
   test("Bericht bereit, Woche, Zeitraum-Wechsel, Monat, Fokus, Archiv, gesehen, Export Markdown + PDF – no errors, no horizontal scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
-    const now = Date.now();
-    await seed(page, { reportReady: true, extra: { "tj2-trades": coachTrades(now) } });
+    // a fixed Wednesday (2026-10-14 12:30 Berlin): a week report is ready for six days only, so on a Sunday without a
+    // month / quarter that just ended there was no wipe at all (e.g. 2026-10-25 – the test failed there)
+    const c = await pinClock(page, Date.UTC(2026, 9, 14, 10, 30));
+    const now = c.now();
+    await seed(page, { reportReady: true, clock: c.now, extra: { "tj2-trades": coachTrades(now) } });
     // the print dialog: record that the light print document is mounted at the moment print() is called
     await page.addInitScript(() => {
       const w = window as unknown as { __printed?: { n: number; cls: boolean; doc: boolean; html: string } };
@@ -376,6 +400,26 @@ test.describe("Berichte", () => {
       await page.screenshot({ path: `${SHOTS}/P04-coach-reports-print-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage: true, animations: "disabled" });
       await page.emulateMedia({ media: "screen" });
     }
+    expect(errors).toEqual([]);
+  });
+
+  test("Bericht bereit mit langen Werten: Netto, Trades und Win-Rate stehen ganz – keine Ellipse, keine Zahl über ihrer Spalte", async ({ page }) => {
+    const errors = collectErrors(page);
+    // pinned to Wed 2026-10-07 12:30 Berlin: Q3 2026 ended six days before, the wipe announces its quarter on every run
+    const c = await pinClock(page, Date.UTC(2026, 9, 7, 10, 30));
+    await seed(page, { reportReady: true, clock: c.now, extra: { "tj2-trades": longQuarter() } });
+    await open(page, BERICHTE_URL, "Berichte");
+    const ready = page.getByTestId("report-ready");
+    await expect(ready).toBeVisible();
+    await expect(ready).toContainText("Quartalsbericht");
+    await expect(ready.locator("dd")).toHaveText(["−123.457 USDT", "1234", "38 %"]);
+    await page.waitForTimeout(1400);
+    // before: `truncate` cut „−123.457 …“ (390: 134 > 106 px, 1440: 201 > 179 px; „−1.235 USDT“ already at 390)
+    expect(await clippedTexts(ready)).toEqual([]);
+    // no ellipsis is not enough – a figure must not run into the next column either
+    const over = await ready.locator("dd").evaluateAll((dds) => dds.filter((d) => d.scrollWidth > d.clientWidth + 1).map((d) => `${d.textContent} (${d.scrollWidth} > ${d.clientWidth})`));
+    expect(over).toEqual([]);
+    await expectNoHorizontalScroll(page);
     expect(errors).toEqual([]);
   });
 
