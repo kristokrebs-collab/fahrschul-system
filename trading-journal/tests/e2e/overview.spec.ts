@@ -163,7 +163,11 @@ test.describe("editor from the FAB", () => {
     await live.click();
     await expect(dialog.locator("#f-entry")).toHaveValue(/84\.?199/);
 
+    // trades with a stop, as the rules want them: a stopless trade is a coach "Regelverstoß" (severity 2) whose toast
+    // (5.2 s) queues behind "Trade gespeichert" (2.8 s) – a runner that took > 2.8 s to the second save found the coach
+    // on the island instead of the save asserted below (a loaded full run; a timing race, not the clock)
     await dialog.locator("#f-entry").fill("80000");
+    await dialog.locator("#f-stop").fill("79000");
     await dialog.locator("#f-exit").fill("82000");
     await dialog.locator("#f-size").fill("5000");
     await dialog.locator("#f-reason").fill("E2E Trade");
@@ -175,6 +179,7 @@ test.describe("editor from the FAB", () => {
     await expect(dialog.locator("#f-reason")).toHaveValue("");
 
     await dialog.locator("#f-entry").fill("81000");
+    await dialog.locator("#f-stop").fill("80000");
     await dialog.locator("#f-exit").fill("80000");
     await dialog.locator("#f-size").fill("4000");
     await dialog.getByRole("button", { name: "Speichern", exact: true }).click();

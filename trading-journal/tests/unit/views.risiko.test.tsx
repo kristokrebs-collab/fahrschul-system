@@ -16,6 +16,7 @@ import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { changedTrades, guardToasts, newlyClosed, pruneMarks, RiskGuardHost, RisikoView, RISIKO_WIDGETS, useRiskGuardStore, useRiskPreview, useRiskUi, parseInput, toInput, MARKS_MAX } from "@/views/risiko";
 import { mkTrade } from "./domain.fixtures";
+import { pinMidday } from "./midday.fixture";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
 const MIN = 60_000;
@@ -53,6 +54,11 @@ async function load(trades: Trade[] = journal()) {
     useJournal.setState({ trades });
   });
 }
+
+// "now" at midday (`Date` only, flowing): the journals' "today" trades – losses 20 and 5 min ago – are today's at any
+// hour the suite runs (CI: UTC; at 00:10 the first loss fell on yesterday)
+beforeEach(pinMidday);
+afterEach(() => vi.useRealTimers());
 
 describe("RisikoView", () => {
   beforeAll(() => {

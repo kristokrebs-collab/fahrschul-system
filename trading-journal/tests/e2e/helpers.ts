@@ -152,6 +152,15 @@ export function utcToday(h: number, m: number): number {
 }
 
 /**
+ * A fixed midday for `pinClock` (10:30 UTC = 12:30 / 11:30 in Berlin) for specs whose seeds place "today's" trades
+ * minutes or hours before now (the P05 day loss and pause, yesterday's unreviewed trades). Pinned there, the seed's
+ * "today" is the browser's today at any hour CI runs: unpinned, a run at 00:10 Berlin found the losses "25 min ago" on
+ * yesterday (day loss 70 instead of 160), a run at 23:30 found the trade "23 h ago" on today ("Größter Verlust").
+ * Seed with the clock's `now()` and pass `clock` to `seed` so the market mock agrees.
+ */
+export const middayToday = (): number => utcToday(10, 30);
+
+/**
  * The Einstiegs-Check verdict label inside `scope` (card, editor summary). During a label change the leaving label is
  * popped out of the layout (AnimatePresence `popLayout`) and carries `data-motion-pop-id` until its exit ends.
  */

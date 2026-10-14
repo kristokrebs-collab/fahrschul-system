@@ -6,11 +6,12 @@
  * "Ziel erreicht" transition.
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { addGoalFromDraft, growthOf } from "@/domain/growth";
 import { checkinOf } from "@/domain/psych";
 import type { DayNote, DayNotes, Settings, Trade } from "@/domain/types";
 import { localDateKey, nowLocalInput } from "@/lib/dates";
+import { UNREACHABLE_SELECTOR } from "@/motion/a11y";
 import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { useJournal } from "@/store/journalStore";
@@ -18,6 +19,7 @@ import { useUi } from "@/store/uiStore";
 import { useRiskGuardStore } from "@/views/risiko/guard";
 import { __resetTransitions, PostTradeReviewHost, PostTradeReviewSheet, useGrowthUi, WachstumView, WACHSTUM_WIDGETS } from "@/views/wachstum";
 import { mkTrade } from "./domain.fixtures";
+import { pinMidday } from "./midday.fixture";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
 const DAY = 86_400_000;
@@ -92,6 +94,11 @@ function renderPage() {
   );
 }
 
+// "now" at midday (`Date` only, flowing): the seed's "today" – the pause's losses 20 and 5 min ago – is today at any
+// hour the suite runs (CI: UTC; at 00:10 the first loss fell on yesterday: "1 Verlust" instead of "2 Verluste in Folge")
+beforeEach(pinMidday);
+afterEach(() => vi.useRealTimers());
+
 describe("WachstumView", () => {
   beforeAll(() => {
     installDomPolyfills();
@@ -161,10 +168,13 @@ describe("WachstumView", () => {
     expect(today?.mood).toBe(4);
     expect(checkinOf(today)).toMatchObject({ stress: 2, energy: 5, sleep: 11, emotions: ["Fokussiert"] });
     await waitFor(() => expect(screen.getByTestId("growth-checkin")).toHaveAttribute("data-has", "1"));
-    // the sheet has left (the page behind it is isolated while a dialog is open)
+    // the sheet has left (the page behind it is isolated while a dialog is open) …
     await waitFor(() => expect(screen.queryByTestId("checkin-sheet")).toBeNull(), { timeout: 3000 });
-
+    // … and has released the page: the session ends in a passive effect of the exit's commit, which React's scheduler
+    // may run one task after the commit that removed the sheet – on a loaded runner after the wait above resolved
+    // (CI: "Unable to find an accessible element with the role checkbox")
     const ready = screen.getByTestId("growth-ready");
+    await waitFor(() => expect(ready.closest(UNREACHABLE_SELECTOR)).toBeNull());
     for (const box of within(within(ready).getByTestId("growth-ready-checklist")).getAllByRole("checkbox")) fireEvent.click(box);
     await waitFor(() => expect(ready).toHaveAttribute("data-state", "ready"));
     expect(within(ready).getByTestId("growth-ready-label")).toHaveTextContent("Bereit");

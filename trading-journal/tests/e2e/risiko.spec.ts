@@ -16,7 +16,7 @@
  * `/dev/risiko.html` under `npm run dev`). `P05_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, middayToday, openRoute, pinClock, seed } from "./helpers";
 import { boxFixture } from "./mocks/boxFixture";
 
 const RISIKO_URL = process.env.PW_RISIKO_URL ?? "/#risiko";
@@ -118,8 +118,8 @@ export function riskTrades(now: number, live: number, opts: { pause?: boolean } 
   return out;
 }
 
-/** ETH and SOL daily candles from one driver (ρ high), XRP independent; BTC stays the real fixture. */
-async function routeDaily(page: Page, requests: string[]): Promise<void> {
+/** ETH and SOL daily candles from one driver (ρ high), XRP independent; BTC stays the real fixture. `clock` = the page's. */
+async function routeDaily(page: Page, requests: string[], clock: () => number = Date.now): Promise<void> {
   await page.route("https://fapi.binance.com/fapi/v1/klines**", async (route) => {
     const u = new URL(route.request().url());
     const sym = u.searchParams.get("symbol") ?? "";
@@ -130,7 +130,7 @@ async function routeDaily(page: Page, requests: string[]): Promise<void> {
     const limit = Number(u.searchParams.get("limit") ?? 99);
     const driver = rng(7);
     const own = rng(sym.charCodeAt(0) * 31 + sym.length);
-    const today = Math.floor(Date.now() / DAY) * DAY;
+    const today = Math.floor(clock() / DAY) * DAY;
     const px0 = sym === "ETHUSDT" ? 3000 : sym === "SOLUSDT" ? 170 : 2.2;
     let px = px0;
     const rows: unknown[] = [];
@@ -175,11 +175,13 @@ test.describe("Risiko", () => {
 
   test("Limits, Pause, Exposure, Rechner → Editor, Liquidation, Szenario, Korrelation – no errors, no horizontal scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
-    const now = Date.now();
+    // the page clock at midday: the two losses "25 and 8 min ago" are today's at any hour the suite runs
+    const clock = await pinClock(page, middayToday());
+    const now = clock.now();
     const live = boxFixture(now).live;
-    await seed(page, { boxes: true, extra: { "tj2-trades": riskTrades(now, live) } });
+    await seed(page, { boxes: true, clock: clock.now, extra: { "tj2-trades": riskTrades(now, live) } });
     const daily: string[] = [];
-    await routeDaily(page, daily);
+    await routeDaily(page, daily, clock.now);
     await openRisiko(page);
     await expect(page.getByTestId("risiko-view")).toBeVisible();
 
@@ -274,10 +276,11 @@ test.describe("Risiko", () => {
 
   test("Pause überschreiben per Halten, Einstellungen schreiben sofort, Wächter-Toast nach dem Speichern", async ({ page }) => {
     const errors = collectErrors(page);
-    const now = Date.now();
+    const clock = await pinClock(page, middayToday());
+    const now = clock.now();
     const live = boxFixture(now).live;
-    await seed(page, { boxes: true, extra: { "tj2-trades": riskTrades(now, live) } });
-    await routeDaily(page, []);
+    await seed(page, { boxes: true, clock: clock.now, extra: { "tj2-trades": riskTrades(now, live) } });
+    await routeDaily(page, [], clock.now);
     await openRisiko(page);
 
     // override the pause by holding
@@ -317,7 +320,7 @@ test.describe("Risiko", () => {
     await page.evaluate((args) => {
       const j = (window as unknown as { __tjJournal: { getState(): { saveTrade(t: unknown): Promise<void> } } }).__tjJournal;
       void j.getState().saveTrade({ ...args.t });
-    }, { t: base({ side: "long", status: "closed", date: local(now - 5 * 60_000), exitDate: local(now - 60_000), pair: "BTC/USDT", entry: live, stop: live * 0.99, exit: live * 0.995, size: 2000, pnlManual: -30, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }) });
+    }, { t: base({ side: "long", status: "closed", date: local(now - 5 * 60_000), exitDate: local(now - 60_000), pair: "BTC/USDT", entry: live, stop: live * 0.99, exit: live * 0.995, size: 2000, pnlManual: -30, createdAt: new Date(clock.now()).toISOString(), updatedAt: new Date(clock.now()).toISOString() }) });
     // the guard's toast joins the island's queue (box alerts of the app may be in front of it)
     await expect
       .poll(() => page.evaluate(() => (window as unknown as { __tjUi: { getState(): { toasts: { title: string; detail?: string }[] } } }).__tjUi.getState().toasts.map((t) => `${t.title} ${t.detail ?? ""}`).join(" | ")), { timeout: 10_000 })

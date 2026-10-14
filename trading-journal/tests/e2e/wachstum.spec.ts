@@ -14,7 +14,7 @@
  * harness `/dev/wachstum.html` under `npm run dev`). `P08_SHOTS=<dir>` writes review screenshots.
  */
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, fixture, openRoute, seed, settledBox, stored, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, fixture, middayToday, openRoute, pinClock, seed, settledBox, stored, toast, type FakeClock } from "./helpers";
 
 const URL_ = process.env.PW_WACHSTUM_URL ?? "/#wachstum";
 const SHOTS = process.env.P08_SHOTS;
@@ -128,9 +128,17 @@ async function shot(page: Page, info: TestInfo, name: string, fullPage = false):
   await page.screenshot({ path: `${SHOTS}/P08-psych-growth-${name}-${info.project.name === "mobile" ? "390" : "1440"}.png`, fullPage, animations: "disabled" });
 }
 
-async function open(page: Page, s: GrowthSeed | null, opts: { reviewPrompt?: boolean } = {}): Promise<void> {
-  await seed(page, s ? { ...opts, extra: { "tj2-trades": s.trades, "tj2-days": s.days, "tj2-settings": s.settings } } : { ...opts, empty: true });
+/**
+ * Opens the page on a journal built relative to the page clock, pinned at midday (`middayToday`): "today" and
+ * "yesterday" of the seed are the browser's at any hour the suite runs (unpinned, the trade closed "23 h ago" fell on
+ * today between 23:00 and midnight and the readiness check said "Größter Verlust: nah an der Grenze"). Returns the clock.
+ */
+async function open(page: Page, build: ((now: number) => GrowthSeed) | null, opts: { reviewPrompt?: boolean } = {}): Promise<FakeClock> {
+  const clock = await pinClock(page, middayToday());
+  const s = build?.(clock.now());
+  await seed(page, s ? { ...opts, clock: clock.now, extra: { "tj2-trades": s.trades, "tj2-days": s.days, "tj2-settings": s.settings } } : { ...opts, clock: clock.now, empty: true });
   await openRoute(page, URL_, "Wachstum");
+  return clock;
 }
 
 test.describe("Wachstum", () => {
@@ -142,7 +150,7 @@ test.describe("Wachstum", () => {
 
   test("Seite: Heute, Serien, Ziele, Challenges, Gewohnheiten, Psyche, Fortschritt – keine Fehler, kein horizontaler Scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
-    await open(page, growthSeed(Date.now()));
+    await open(page, (now) => growthSeed(now));
     const view = page.getByTestId("wachstum-view");
     await expect(view).toBeVisible();
     for (const t of ["Heute", "Serien", "Ziele", "Challenges & Gewohnheiten", "Psyche", "Fortschritt"]) await expect(page.getByRole("heading", { level: 2, name: t, exact: true })).toBeAttached();
@@ -199,7 +207,7 @@ test.describe("Wachstum", () => {
 
   test("Check-in: Stimmung, Regler per Tastatur, Wörter → Tagesjournal; Checkliste → Bereit", async ({ page }, info) => {
     const errors = collectErrors(page);
-    await open(page, growthSeed(Date.now()));
+    const clock = await open(page, (now) => growthSeed(now));
     await page.getByTestId("wachstum-checkin").click();
     const sheet = page.getByTestId("checkin-sheet");
     await expect(sheet).toBeVisible();
@@ -222,7 +230,7 @@ test.describe("Wachstum", () => {
     await expect(toast(page)).toContainText("Check-in gespeichert");
     await expect(page.getByTestId("growth-checkin")).toHaveAttribute("data-has", "1");
     const days = await stored<Record<string, { mood?: number; checkin?: { stress?: number; energy?: number; sleep?: number; emotions?: string[] } }>>(page, "tj2-days");
-    const today = days![dayKey(Date.now())]!;
+    const today = days![dayKey(clock.now())]!;
     expect(today.mood).toBe(4);
     expect(today.checkin).toMatchObject({ stress: 2, energy: 5, sleep: 11, emotions: ["Fokussiert"] });
 
@@ -250,7 +258,7 @@ test.describe("Wachstum", () => {
 
   test("Pause: zwei Verluste gerade geschlossen → P05-Pause im Bereitschafts-Check", async ({ page }) => {
     const errors = collectErrors(page);
-    await open(page, growthSeed(Date.now(), { pause: true }));
+    await open(page, (now) => growthSeed(now, { pause: true }));
     const ready = page.getByTestId("growth-ready");
     await expect(ready).toHaveAttribute("data-state", "pause");
     await expect(ready).toContainText(/Pause · \d+:\d\d/);
@@ -267,7 +275,7 @@ test.describe("Wachstum", () => {
         if (el) (window as unknown as { __wipe?: string }).__wipe = el.textContent ?? "";
       }).observe(document, { childList: true, subtree: true });
     });
-    await open(page, growthSeed(Date.now(), { reached: true }));
+    await open(page, (now) => growthSeed(now, { reached: true }));
     await expect.poll(() => page.evaluate(() => (window as unknown as { __wipe?: string }).__wipe ?? ""), { timeout: 15_000 }).toContain("Jeden Trade reviewen");
     const wipe = page.getByTestId("goal-wipe");
     if (await wipe.isVisible()) {
@@ -301,7 +309,7 @@ test.describe("Wachstum", () => {
 
   test("Challenge ziehen und annehmen, Gewohnheit anlegen und abhaken", async ({ page }, info) => {
     const errors = collectErrors(page);
-    await open(page, growthSeed(Date.now()));
+    const clock = await open(page, (now) => growthSeed(now));
     const ch = page.getByTestId("growth-challenges");
     await ch.scrollIntoViewIfNeeded();
     await ch.getByTestId("challenge-draw").click();
@@ -325,14 +333,14 @@ test.describe("Wachstum", () => {
     await row.getByTestId("habit-today").click();
     await expect(row).toHaveAttribute("data-done", "1");
     const days = await stored<Record<string, { checkin?: { habits?: Record<string, boolean> } }>>(page, "tj2-days");
-    expect(Object.values(days![dayKey(Date.now())]!.checkin!.habits!)).toContain(true);
+    expect(Object.values(days![dayKey(clock.now())]!.checkin!.habits!)).toContain(true);
     expect(errors).toEqual([]);
   });
 
   test("Post-Trade-Review: offene Reviews und automatische Frage nach dem Schließen", async ({ page }, info) => {
     const errors = collectErrors(page);
     // this test is about the automatic prompt: it stays on (the seed switches it off for every other spec)
-    await open(page, growthSeed(Date.now()), { reviewPrompt: true });
+    await open(page, (now) => growthSeed(now), { reviewPrompt: true });
     await page.getByTestId("growth-review-open").click();
     const review = page.getByTestId("post-trade-review");
     await expect(review).toBeVisible();
