@@ -18,6 +18,7 @@ import { useEnriched, useJournal } from "@/store/journalStore";
 import { useShareRoute } from "@/store/router";
 import { readRaw, storageKey, writeRaw } from "@/store/storage";
 import { useMinuteClock } from "@/views/coach/hooks";
+import { DotFigure } from "@/primitives/DotUnit";
 import { openReport } from "./berichteStore";
 
 export const READY_KEY = storageKey("report-ready");
@@ -96,7 +97,9 @@ export function ReportReadyHost({ onOpen }: { onOpen?: (key: string) => void }) 
             ].map(([k, v, c]) => (
               <div key={k} className="grid min-w-0 gap-1 border-t border-white/15 pt-2">
                 <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-mute">{k}</dt>
-                <dd className={cn("dot-num truncate text-[clamp(20px,4vw,30px)] leading-none", c)}>{v}</dd>
+                <dd className={cn("dot-num truncate text-[clamp(20px,4vw,30px)] leading-none", c)}>
+                  <DotFigure text={v ?? ""} />
+                </dd>
               </div>
             ))}
           </dl>

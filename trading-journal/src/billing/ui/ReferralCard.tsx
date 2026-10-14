@@ -8,6 +8,7 @@ import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
+import { DotFigure } from "@/primitives/DotUnit";
 import { Skeleton } from "@/primitives/Skeleton";
 import { pushToast } from "@/store/uiStore";
 import { formatDay, formatMoney } from "../format";
@@ -116,7 +117,7 @@ export function ReferralCard({ className }: { className?: string }) {
               {[
                 { k: REFERRAL.signups, v: <RollingDigits value={info.stats.signups} className="dot-num text-[24px] leading-none" /> },
                 { k: REFERRAL.paying, v: <RollingDigits value={info.stats.paying} className="dot-num text-[24px] leading-none" /> },
-                { k: REFERRAL.earned, v: <span className="dot-num text-[20px] leading-none">{formatMoney(info.earned.applied, info.currency)}</span> },
+                { k: REFERRAL.earned, v: <span className="dot-num text-[20px] leading-none"><DotFigure text={formatMoney(info.earned.applied, info.currency)} /></span> },
               ].map((s) => (
                 <div key={s.k} className="grid gap-1 rounded-xl border border-line bg-ink-950/40 p-3">
                   <dt className="text-[11.5px] text-mute">{s.k}</dt>

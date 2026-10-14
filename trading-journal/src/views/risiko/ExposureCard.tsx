@@ -15,6 +15,7 @@ import { LiveText } from "@/motion/LiveText";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Badge } from "@/primitives/Badge";
+import { DotUnit } from "@/primitives/DotUnit";
 import { EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { useLiveUpnl } from "./hooks";
@@ -115,7 +116,11 @@ export function ExposureCard({ ex, cur }: { ex: ExposureReport; cur: string }) {
           </div>
           <div className="grid gap-1">
             <span className="label !text-[10px]">{S.upnl}</span>
-            <LiveText source={upnl} smooth flash format={(v) => money(v, cur, true)} className={cn("dot-num text-[26px] leading-none")} aria-label={S.upnl} />
+            {/* the figure in Doto, the currency beside it in Plex Sans (`DotUnit`) */}
+            <span className="dot-num text-[26px] leading-none">
+              <LiveText source={upnl} smooth flash format={(v) => money(v, "", true).trim()} aria-label={S.upnl} />
+              <DotUnit> {cur}</DotUnit>
+            </span>
             <span className="num font-mono text-[11px] text-faint">{ex.legs.length} offen</span>
           </div>
         </div>

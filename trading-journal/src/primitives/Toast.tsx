@@ -6,8 +6,10 @@ import { useTouchMoveGuard } from "@/motion/a11y";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { gesture, radius, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { DotFigure, DotUnit } from "@/primitives/DotUnit";
 import { GlyphCheck, GlyphCross, GlyphInfo } from "@/primitives/icons";
 import { formatRoll, parseRollValue } from "@/primitives/rollValue";
+import { splitUnit } from "@/primitives/splitUnit";
 import { toastDuration, toastLane, useToastStore, type Toast, type ToastKind, type ToastLane } from "@/primitives/toastStore";
 
 const KIND_DISC: Record<ToastKind, string> = { ok: "bg-win/20 text-win", error: "bg-loss/20 text-loss", warn: "bg-signal/25 text-signal" };
@@ -316,7 +318,9 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
             (win && !reduced ? (
               <RollingValue value={note.value} />
             ) : (
-              <span className={cn("dot-num text-[15px]", note.valueTone === "win" ? "text-win" : note.valueTone === "loss" ? "text-loss" : "text-mute")}>{note.value}</span>
+              <span className={cn("dot-num text-[15px]", note.valueTone === "win" ? "text-win" : note.valueTone === "loss" ? "text-loss" : "text-mute")}>
+                <DotFigure text={note.value} />
+              </span>
             ))}
         </motion.span>
         {ms > 0 && !reduced && (
@@ -334,7 +338,9 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
 function RollingValue({ value }: { value: string }) {
   const [spec] = useState(() => parseRollValue(value));
   const n = useMotionValue(0);
-  const text = useTransform(n, (v) => (spec && v !== spec.value ? formatRoll(spec, v) : value));
+  // the figure rolls in Doto, its unit (`USDT`, `%`) stays beside it in Plex Sans (`DotUnit`)
+  const [figure, unit] = splitUnit(value);
+  const text = useTransform(n, (v) => (spec && v !== spec.value ? formatRoll(spec, v) : value).slice(0, unit ? -unit.length : undefined));
 
   useEffect(() => {
     if (!spec) return;
@@ -346,7 +352,10 @@ function RollingValue({ value }: { value: string }) {
   return (
     <span className="relative dot-num text-[15px] text-win">
       <span className="sr-only">{value}</span>
-      <motion.span aria-hidden="true">{spec ? text : value}</motion.span>
+      <span aria-hidden="true">
+        <motion.span>{spec ? text : figure}</motion.span>
+        {unit && <DotUnit>{unit}</DotUnit>}
+      </span>
     </span>
   );
 }

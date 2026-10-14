@@ -37,6 +37,7 @@ import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
+import { DotFigure } from "@/primitives/DotUnit";
 import { EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
@@ -109,7 +110,9 @@ function StatTileView({ stat, res, ctx, cur, onRemove }: { stat: CustomStat; res
         </button>
       </div>
       <div className="flex flex-wrap items-baseline gap-x-3">
-        <span className="dot-num text-[26px] leading-none">{formatCustom(res.value, m.format, cur)}</span>
+        <span className="dot-num text-[26px] leading-none">
+          <DotFigure text={formatCustom(res.value, m.format, cur)} />
+        </span>
         <span className="num text-[11px] text-faint">
           n {res.n}
           {res.ci ? ` · 80 %: ${ciText(res.ci, m.format === "pct" ? "pct" : m.format === "r" ? "R" : m.format === "money" ? "money" : "ratio", cur)}` : ""}
@@ -190,7 +193,9 @@ export function CustomStatCard({ view, settings, cur }: { view: AccountView; set
           <div className="grid gap-2 rounded-2xl border border-white/[0.08] bg-ink-800 p-3" data-testid="custom-preview">
             <span className="label">{customStatTitle(draft, ctx)}</span>
             <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="dot-num text-[30px] leading-none">{formatCustom(preview.value, m.format, cur)}</span>
+              <span className="dot-num text-[30px] leading-none">
+                <DotFigure text={formatCustom(preview.value, m.format, cur)} />
+              </span>
               <span className="num text-[11px] text-faint">
                 n {preview.n}
                 {preview.ci ? ` · 80 %: ${ciText(preview.ci, m.format === "pct" ? "pct" : m.format === "r" ? "R" : m.format === "money" ? "money" : "ratio", cur)}` : ""}

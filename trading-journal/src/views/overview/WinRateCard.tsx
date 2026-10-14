@@ -7,6 +7,7 @@ import { themePaint } from "@/lib/themePaint";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { radius, spring, tween } from "@/motion/tokens";
 import { Card } from "@/primitives/Card";
+import { DotUnit } from "@/primitives/DotUnit";
 import { Collapse, Expander } from "@/primitives/Expander";
 import { RingGauge } from "@/primitives/RingGauge";
 import { useRevealValue } from "@/primitives/revealValue";
@@ -75,7 +76,7 @@ export function WinRateCard() {
             <div>
               <div className="dot-num text-[34px] leading-none">
                 <GaugeCentre progress={progress} label={label} />
-                <span className="text-base text-mute"> %</span>
+                <DotUnit className="text-base"> %</DotUnit>
               </div>
               {/* two lines inside the ring's inner circle (one line was ~2 px wider than the circle at that height: OV-02) */}
               <div className="mx-auto mt-1 max-w-[96px] text-[11px] leading-[1.3] text-mute">

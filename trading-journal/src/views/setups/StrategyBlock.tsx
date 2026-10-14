@@ -21,6 +21,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { ShotImage } from "@/journal/screenshots/ShotThumb";
 import { useAccountView, useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
+import { DotFigure } from "@/primitives/DotUnit";
 import type { PlaybookStats } from "./playbook";
 
 export const STRATEGY_BLOCK_STRINGS = {
@@ -206,7 +207,7 @@ function ExampleFace({ t, fill = false }: { t: EnrichedTrade; fill?: boolean }) 
         <span className="grid size-full place-items-center p-3 text-center">
           <span className="grid gap-1">
             <span className="font-mono text-[11px] text-faint">{t.pair}</span>
-            <span className={cn("dot-num text-[26px]", (t.r ?? 0) >= 0 ? "text-win" : "text-loss")}>{t.r != null ? fmtR(t.r) : "–"}</span>
+            <span className={cn("dot-num text-[26px]", (t.r ?? 0) >= 0 ? "text-win" : "text-loss")}>{t.r != null ? <DotFigure text={fmtR(t.r)} /> : "–"}</span>
           </span>
         </span>
       )}

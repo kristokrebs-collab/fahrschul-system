@@ -1,6 +1,7 @@
 import { motion, useTransform } from "motion/react";
 import { PHASE_LABEL, type BoxPhase } from "@/domain/boxes";
 import { useBoxes, type BoxesView } from "@/market/boxes/store";
+import { DotFigure, DotUnit } from "@/primitives/DotUnit";
 import { Collapse } from "@/primitives/Expander";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { HYBLOCK_LINK } from "@/domain/defaults";
@@ -581,7 +582,10 @@ export function TopTraderCard() {
               {tt.onlyBinance ? (
                 tt.globalLongPct != null && (
                   <div className="mt-1 flex items-center gap-2 text-[11.5px] text-mute">
-                    <span className="dot-num text-[18px] text-fg">{n1(tt.globalLongPct)} %</span>
+                    <span className="dot-num text-[18px] text-fg">
+                      {n1(tt.globalLongPct)}
+                      <DotUnit> %</DotUnit>
+                    </span>
                     <span>Alle Konten (Bybit)</span>
                     <TapTooltip content={COHORT_HINT.bybit}>
                       <button type="button" className="touch-hit rounded-full">
@@ -597,7 +601,7 @@ export function TopTraderCard() {
                   className="touch-hit mt-1 flex items-center gap-2 text-[11.5px] text-mute hover:text-fg"
                   title="Basis wechseln"
                 >
-                  <span className="dot-num text-[18px] text-fg">{otherBase == null ? "–" : `${n1(otherBase)} %`}</span>
+                  <span className="dot-num text-[18px] text-fg">{otherBase == null ? "–" : <DotFigure text={`${n1(otherBase)} %`} />}</span>
                   <span>{base === "positions" ? "Konten" : "Positionen"}</span>
                 </button>
               )}

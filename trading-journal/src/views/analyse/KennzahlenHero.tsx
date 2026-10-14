@@ -15,6 +15,7 @@ import { TextPrism } from "@/motion/pulse/TextPrism";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { radius } from "@/motion/tokens";
 import { Card } from "@/primitives/Card";
+import { DotFigure } from "@/primitives/DotUnit";
 import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { GlyphPlus } from "@/primitives/icons";
 import { ExplanationView } from "@/views/overview/explainer";
@@ -43,7 +44,9 @@ function RatioBody({ m, rep, cur }: { m: Metric; rep: RatioReport; cur: string }
   const v = ratioVerdict(m);
   return (
     <div className="grid gap-4">
-      <div className={cn("dot-num text-[40px] leading-none", TONE_TEXT[v.tone])}>{metricText(m, rep.edgeUnit, cur)}</div>
+      <div className={cn("dot-num text-[40px] leading-none", TONE_TEXT[v.tone])}>
+        <DotFigure text={metricText(m, rep.edgeUnit, cur)} />
+      </div>
       <ExplanationView bare d={explainRatio(m, rep, cur)} />
     </div>
   );

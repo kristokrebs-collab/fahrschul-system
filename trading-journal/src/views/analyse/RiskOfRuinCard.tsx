@@ -16,6 +16,7 @@ import { n1, pct } from "@/lib/format";
 import { NumberCascade } from "@/motion/fx/NumberCascade";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { DotUnit } from "@/primitives/DotUnit";
 import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { Segmented } from "@/primitives/Segmented";
@@ -134,7 +135,14 @@ export function RiskOfRuinCard({ view, settings, rep }: { view: AccountView; set
           <div className="grid justify-items-start gap-1" data-testid="ror-value" data-state={run.status}>
             <span className="label">Ruin-Wahrscheinlichkeit</span>
             <span className={cn("dot-num text-[clamp(44px,9vw,64px)] leading-none", sim == null ? "text-mute" : sim < 0.01 ? "text-win" : sim < 0.05 ? "text-warn" : "text-loss")}>
-              {sim == null ? "–" : sim < 0.001 ? "< 0,1 %" : <NumberCascade value={sim * 100} decimals={1} suffix=" %" />}
+              {sim == null ? (
+                "–"
+              ) : (
+                <>
+                  {sim < 0.001 ? "< 0,1" : <NumberCascade value={sim * 100} decimals={1} />}
+                  <DotUnit> %</DotUnit>
+                </>
+              )}
             </span>
             <span className="text-[12px] text-mute">simuliert mit {input?.sample ? `deinen ${rs.length} R-Werten` : "Win-Rate und Payoff"}</span>
           </div>

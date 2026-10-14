@@ -6,6 +6,7 @@ import { localDateKey } from "@/lib/dates";
 import { date as fmtDate } from "@/lib/format";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { DotUnit } from "@/primitives/DotUnit";
 import { EmptyState } from "@/primitives/EmptyState";
 import { Collapse } from "@/primitives/Expander";
 import { useSeenOnce } from "@/primitives/revealValue";
@@ -54,7 +55,12 @@ function nearestTraded(host: HTMLElement, x: number, y: number): string | null {
 
 function RingCentre({ progress }: { progress: MotionValue<number> }) {
   const v = useTransform(progress, (p) => p * 100);
-  return <MotionNumber source={v} suffix=" %" className="dot-num text-[26px] leading-none text-fg" />;
+  return (
+    <span className="dot-num text-[26px] leading-none text-fg">
+      <MotionNumber source={v} />
+      <DotUnit> %</DotUnit>
+    </span>
+  );
 }
 
 const dayHead = (d: Date, weekday: number): string => `${WEEKDAYS[weekday]} ${fmtDate(d)}`;

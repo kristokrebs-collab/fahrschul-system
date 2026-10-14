@@ -48,6 +48,7 @@ import { StaggerItem } from "@/motion/Stagger";
 import { TextRoll } from "@/motion/TextRoll";
 import { spring } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { DotUnit } from "@/primitives/DotUnit";
 import { useRevealValue } from "@/primitives/revealValue";
 import { useJournal } from "@/store/journalStore";
 
@@ -210,7 +211,7 @@ function BiasFigure({ bias, dir, size = "card" }: { bias: Bias; dir: "up" | "dow
     <span className="flex shrink-0 items-baseline gap-2" data-testid="bias-percent">
       <span className={cn("dot-num leading-none text-fg", size === "card" ? "text-[26px]" : "text-[24px]")}>
         <TextRoll text={String(bias.pct)} mode="roll" direction={dir} />
-        <span className="ml-1 text-[0.62em] text-mute">%</span>
+        <DotUnit className="ml-1">%</DotUnit>
       </span>
       <span className={cn("text-[12px] font-semibold uppercase tracking-[0.08em] transition-colors duration-300", bias.side ? LEVEL_TEXT[bias.side] : "text-faint")}>
         {bias.side === "long" ? "Long" : bias.side === "short" ? "Short" : "ausgeglichen"}

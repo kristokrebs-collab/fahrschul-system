@@ -28,6 +28,7 @@ import { useDialogBehaviour } from "@/motion/a11y";
 import { NoLayoutCascade } from "@/motion/NoLayoutCascade";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { DotFigure } from "@/primitives/DotUnit";
 import { Icon } from "@/primitives/icons";
 import { openSearch } from "@/search/searchStore";
 import { exportCsv, exportJson } from "@/store/backup";
@@ -329,7 +330,9 @@ function Panel({ reduced }: { reduced: boolean }) {
                           {pageNo(i)}
                         </span>
                         <span className="min-w-0 break-words text-[clamp(22px,4.6vw,56px)] font-normal leading-[1.08] tracking-[-0.02em]">{PAGE_LABELS[p]}</span>
-                        <span className={cn("dot-num shrink-0 self-start pt-[0.5em] text-[12px] sm:text-[14px]", counts[p].tone ?? "text-mute")}>{counts[p].text}</span>
+                        <span className={cn("dot-num shrink-0 self-start pt-[0.5em] text-[12px] sm:text-[14px]", counts[p].tone ?? "text-mute")}>
+                          <DotFigure text={counts[p].text} />
+                        </span>
                         {page === p && <span aria-hidden="true" className="size-1.5 shrink-0 self-center rounded-full bg-signal" />}
                       </a>
                     </Item>
@@ -365,7 +368,9 @@ function Panel({ reduced }: { reduced: boolean }) {
                             </span>
                             <span className="grid min-w-0 flex-1">
                               <span className="truncate text-[15px] font-medium leading-tight">{PAGE_LABELS[p]}</span>
-                              <span className={cn("dot-num truncate text-[11.5px]", counts[p].tone ?? "text-mute")}>{counts[p].text}</span>
+                              <span className={cn("dot-num truncate text-[11.5px]", counts[p].tone ?? "text-mute")}>
+                                <DotFigure text={counts[p].text} />
+                              </span>
                             </span>
                             <span aria-hidden="true" className="shrink-0 self-start font-mono text-[10px] text-faint">
                               {pageNo(i)}

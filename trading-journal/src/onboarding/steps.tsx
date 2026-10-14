@@ -4,6 +4,7 @@ import type { GoalDraft } from "@/domain/growth/goals";
 import { cn } from "@/lib/cn";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { AsciiCascade, LaunchGrid, LaunchSlot, PixelTextFill, Typewriter } from "@/motion/pulse";
+import { DotUnit } from "@/primitives/DotUnit";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
@@ -180,7 +181,8 @@ export function StepKonten({ draft, onChange, invalid }: { draft: KontenDraft; o
         <span className="grid justify-items-end gap-0.5">
           <span className="label">{TOUR.konten.total}</span>
           <span className="dot-num text-[26px] leading-none text-fg">
-            <MotionNumber value={total} decimals={0} suffix={` ${draft.currency}`} tone="none" />
+            <MotionNumber value={total} decimals={0} tone="none" />
+            <DotUnit> {draft.currency}</DotUnit>
           </span>
         </span>
       </div>

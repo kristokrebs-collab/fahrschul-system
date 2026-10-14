@@ -13,6 +13,7 @@ import { cn } from "@/lib/cn";
 import { n0, n2, pct0 } from "@/lib/format";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { DotFigure } from "@/primitives/DotUnit";
 import { EmptyState, progressLine } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
 import { RingGauge } from "@/primitives/RingGauge";
@@ -75,7 +76,9 @@ export function ExcursionCard({ view, cur }: { view: AccountView; cur: string })
           <div className="flex flex-wrap items-center gap-4">
             <RingGauge value={eff} size={92} stroke={8} color={themePaint("#3ddc84")} aria-label={`Exit-Effizienz ${pct0(eff)}`}>
               <span className="grid justify-items-center">
-                <span className="dot-num text-[19px] leading-none">{pct0(eff)}</span>
+                <span className="dot-num text-[19px] leading-none">
+                  <DotFigure text={pct0(eff)} />
+                </span>
                 <span className="text-[9.5px] uppercase tracking-[0.1em] text-faint">Exit</span>
               </span>
             </RingGauge>
