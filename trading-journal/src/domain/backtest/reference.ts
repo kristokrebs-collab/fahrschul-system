@@ -6,7 +6,7 @@
 import type { BacktestReference } from "../types";
 import type { RunStats } from "./metrics";
 
-export const STRATEGY_TITLE: Readonly<Record<string, string>> = { box: "Box-zu-Box", mcb: "MCB-Leiter", rules: "Regel-Baukasten" };
+export const STRATEGY_TITLE: Readonly<Record<string, string>> = { custom: "Eigene Idee", box: "Box-zu-Box", mcb: "MCB-Leiter", rules: "Regel-Baukasten" };
 
 /** Short label ("Labor · Box-zu-Box 4h · BTCUSDT · 86 Trades"), at most 60 characters. */
 export function referenceLabel(x: { strategy: string; interval: string; symbol: string; n: number }): string {

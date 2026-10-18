@@ -39,6 +39,37 @@ export interface Stepper<T> {
   result(): T;
 }
 
+/** One row of a strategy's rule funnel: how many bars of the window a leaf / group / step was true, false or unknown. */
+export interface FunnelNode {
+  id: string;
+  label: string;
+  kind: "side" | "group" | "leaf";
+  side: "long" | "short";
+  depth: number;
+  /** bars true / false / unknown (not enough data) inside the window */
+  t: number;
+  f: number;
+  u: number;
+}
+
+/** What a strategy can tell about its signals before the engine sees them (`diagnoseRun` reads it). */
+export interface StrategyFunnel {
+  nodes: FunnelNode[];
+  /** bars of the window where a NEW signal appeared (the condition turned true), per side, conflicts included */
+  edges: number;
+  /** both sides fired on the same close: nothing is traded */
+  conflicts: number;
+  /** bars where `signalAt` would hand the engine a valid entry if it were flat (stop computed) */
+  candidates: number[];
+}
+
+/** A comparison variant of a strategy ("ohne diesen Filter", "ohne Verwaltung"). */
+export interface StrategyVariant {
+  id: string;
+  label: string;
+  kind: "noLeaf" | "noExits";
+}
+
 export interface LabStrategy<F = unknown, C = unknown> {
   id: string;
   /** exchange intervals the preparation needs (first = execution interval) */
@@ -48,6 +79,10 @@ export interface LabStrategy<F = unknown, C = unknown> {
   prepare(data: BarsBy, cfg: C, startMs: number): Stepper<Prepared<F>>;
   specs(cfg: C): ParamSpec[];
   build(prep: Prepared<F>, params: Params): BtStrategy;
+  /** optional diagnosis hooks (custom strategy): the rule funnel over a window, and variants for "ohne …" comparisons */
+  funnel?(prep: Prepared<F>, params: Params, win: { from: number; to: number }): StrategyFunnel;
+  variants?(cfg: C): StrategyVariant[];
+  buildVariant?(prep: Prepared<F>, params: Params, id: string): BtStrategy | null;
 }
 
 /** Every combination of the grid specs (others fixed to `base`). */

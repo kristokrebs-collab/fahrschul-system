@@ -1,7 +1,8 @@
 /**
  * Labor page (P07, `h1 Labor`): honest backtests on real Binance history.
- *   Versuchsaufbau  ConfigCard (7) · AssumptionsCard (5)
+ *   Versuchsaufbau  ConfigCard (7, with "Eigene Idee" 8) · AssumptionsCard (5, 4)
  *   Lauf            RunCard (7) · TradesCard (5)
+ *   Diagnose        DiagnosisCard (12)                                                        (after a run)
  *   Robustheit      OverfitCard (5) · OosCard (7) · WalkForwardCard (7) · HeatmapCard (5)     (after a run)
  *   Vergleich       CompareRunsCard (8) · ReferenceCard (4)                                   (after a run)
  * Every cell reveals once (`Reveal`, ends at `transform: none`), section titles rise letter by letter. The replay
@@ -14,6 +15,7 @@ import { storageKey } from "@/store/storage";
 import { useJournal } from "@/store/journalStore";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ConfigCard } from "./ConfigCard";
+import { DiagnosisCard } from "./DiagnosisCard";
 import { LabReplayHost } from "./LabReplay";
 import { useLabor } from "./laborStore";
 import { HeatmapCard, OosCard, OverfitCard, WalkForwardCard } from "./RobustCards";
@@ -40,17 +42,18 @@ export function LaborView({ className }: { className?: string }) {
   const hasResult = useLabor((s) => s.result != null);
   const status = useLabor((s) => s.status);
   const runs = useLabor((s) => s.runs.length);
+  const custom = useLabor((s) => s.cfg.strategy === "custom");
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), robust: useId(), compare: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), robust: useId(), compare: useId() };
   const T = LABOR.sections;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
       <PageHeader className="lg:col-span-12" title={LABOR.title} lead={LABOR.lead} leadFill={LABOR_LEAD_FILL} />
       <Section id={ids.setup} title={T.setup.title} sub={T.setup.sub}>
-        <Cell index={0} span="lg:col-span-7">
+        <Cell index={0} span={custom ? "lg:col-span-8" : "lg:col-span-7"}>
           <ConfigCard signal={signal} />
         </Cell>
-        <Cell index={1} span="lg:col-span-5">
+        <Cell index={1} span={custom ? "lg:col-span-4" : "lg:col-span-5"}>
           <AssumptionsCard />
         </Cell>
       </Section>
@@ -64,6 +67,13 @@ export function LaborView({ className }: { className?: string }) {
           </Cell>
         )}
       </Section>
+      {hasResult && !busy && (
+        <Section id={ids.diagnose} title={T.diagnose.title} sub={T.diagnose.sub}>
+          <Cell index={0} span="lg:col-span-12">
+            <DiagnosisCard />
+          </Cell>
+        </Section>
+      )}
       {hasResult && !busy && (
         <Section id={ids.robust} title={T.robust.title} sub={T.robust.sub}>
           <Cell index={0} span="lg:col-span-5">

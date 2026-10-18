@@ -4,7 +4,8 @@
  * UNIX SECONDS).
  */
 import { atr } from "../signals/structure";
-import type { Bar } from "./types";
+import type { Bar, BarsBy, HistInterval } from "./types";
+import { HIST_MS, HIST_SOURCE } from "./types";
 
 const DAY_S = 86_400;
 const WEEK_S = 7 * DAY_S;
@@ -102,6 +103,24 @@ export function cleanBars(bars: readonly Bar[]): Bar[] {
   for (const b of sorted) {
     if (out.length && out[out.length - 1]!.t === b.t) out[out.length - 1] = b;
     else out.push(b);
+  }
+  return out;
+}
+
+/**
+ * Completes `data` with the DERIVED intervals in `wanted` (`30m` = 2 × 15m, `2h` = 2 × 1h): complete exchange buckets
+ * only, on the UTC grid (every length divides a day, so epoch alignment is the exchange's). Data that is already there
+ * stays; a missing source leaves the derived interval empty.
+ */
+export function deriveBars(data: BarsBy, wanted: readonly HistInterval[]): BarsBy {
+  const out: BarsBy = { ...data };
+  for (const iv of wanted) {
+    const src = HIST_SOURCE[iv];
+    if (src === iv || out[iv]) continue;
+    const base = data[src];
+    if (!base) continue;
+    const sec = HIST_MS[iv] / 1000;
+    out[iv] = aggregateBars(base, (t) => Math.floor(t / sec) * sec, HIST_MS[iv] / HIST_MS[src]);
   }
   return out;
 }

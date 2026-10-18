@@ -25,3 +25,16 @@ Honest backtests on real Binance USDⓈ-M history: `h1 Labor`. Import from `@/vi
 All motion uses transform / opacity / clip-path, tokens from `@/motion/tokens`, finite loops, `useReducedFx` end states; decorative layers are `aria-hidden`.
 
 Tests: `tests/unit/views.labor.test.tsx`, `tests/unit/backtest.*.test.ts`, e2e `tests/e2e/labor.spec.ts` (dev harness `dev/labor.html`, `PW_LABOR_URL`).
+
+## Eigene Idee und Diagnose (F73)
+- `ConfigCard`: strategy tiles – **Eigene Idee** first and widest (`labor-strategy-custom`), then the three templates. For the custom
+  idea the card shows `RuleBuilder` (`labor-builder`): name + drafts (`labor-drafts`, save / load / duplicate / delete, versioned in
+  `storageKey("labor-drafts")`, ≤ 24), templates (`labor-template-<id>`), execution interval (15m … 1D), side (Long / Short / Beide), the
+  AND / OR tree (`labor-tree`, `labor-leaf` with `data-block`, `labor-add-cond` → block gallery `labor-block-<id>`), stop / target /
+  management, the plain-language summary (`labor-idea-summary`) and the live check (`labor-check`). Unavailable options are disabled
+  WITH a reason (timeframes below the execution interval, the MCB ladder off 1h / 4h, exit on counter signal without both sides).
+  An idea with errors cannot start (`labor-start` disabled, `aria-describedby` → the check).
+- `DiagnosisCard` (`labor-diagnosis`, section "Diagnose", under every finished run): ranked findings (`labor-finding`), rule funnel
+  (`labor-funnel-row`), comparison table (`labor-compare-table`), costs, exits, direction / time, data coverage. `useDiagnosis()`
+  returns the `Diagnosis` of the shown run (from `@/domain/lab`).
+- Store: `cfg.custom` (sanitised `CustomConfig`), `drafts`, `setCustom`, `saveDraft`, `loadDraft`, `duplicateDraft`, `deleteDraft`.

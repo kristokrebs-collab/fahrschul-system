@@ -5,7 +5,8 @@
  * - `useLabor`, `startLab`, `cancelLab` – the page's store (e.g. a CommandNav action "Backtest starten").
  */
 export { LaborView, LABOR_LEAD_FILL } from "./LaborView";
-export { useLabor, startLab, cancelLab, planOf, pagesEstimate, sanitizeCfg, DEFAULT_LAB, PERIOD_DAYS, RUNS_MAX, __resetLabor, type LabConfig, type LabStatus, type RunSummary } from "./laborStore";
+export { useLabor, startLab, cancelLab, planOf, pagesEstimate, sanitizeCfg, readDrafts, DEFAULT_LAB, PERIOD_DAYS, RUNS_MAX, DRAFTS_MAX, __resetLabor, type LabConfig, type LabStatus, type RunSummary, type CustomDraft } from "./laborStore";
+export { useDiagnosis } from "./DiagnosisCard";
 export { loadLabData, LAB_BUDGET, LAB_CACHE_PREFIX, __setHistoryDeps, type HistoryDeps } from "./historySource";
 export { labReplayModel, type LabReplayModel } from "./labReplay";
 export { assumptionLines, principleLines } from "./SideCards";

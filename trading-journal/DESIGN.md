@@ -298,3 +298,15 @@ Nachgezogen: Der „Bericht bereit“-Wipe kürzte seine Zahlen (`truncate`): �
 „−123.457 USDT“ 134 > 106 / 201 > 179 px (390 / 1440, gehintet ±1 px). Jetzt ganz: Spalten `minmax(max-content,1fr)`,
 gleiche Drittel, solange alles passt; E2E mit langen Werten, Berichte-E2E auf festem Mittwoch (sonntags kam kein Wipe).
 Übersicht „FAB …“ mit angehaltener Seitenuhr erzwungen: 95eb012 rot wie in CI, HEAD grün; geprüft wird der zweite Toast.
+
+### Anhang: Labor „Eigene Idee“ und „Warum so schwach?“ (F65 / F73)
+
+- Auswahl: „Eigene Idee“ ist die erste und breiteste Kachel (volle Zeile), die drei Vorlagen folgen darunter. Der Baukasten sitzt in
+  der Versuchsaufbau-Karte; bei „Eigene Idee“ bekommt sie 8 statt 7 Spalten.
+- Gesperrte Optionen bleiben sichtbar (halbtransparent, `disabled`, `title` + sichtbarer Satz) und nennen ihren Grund – nichts wird
+  stillschweigend ignoriert. Fehler (rot, `--color-danger-text`) sperren den Start, Hinweise (`text-warn`) nicht.
+- Die Diagnose-Karte ist eine eigene Sektion unter dem Lauf: Befunde als nummerierte Liste (Gewicht als `Badge`: „Wichtig“ in
+  `warn`, sonst `mute` – kein Signalrot), darunter einklappbare Details (Trichter, Vergleich, Kosten, Ausstiege, Richtung & Zeit,
+  Daten). Texte sind Beobachtungen mit Zahlen („71 % der Stopp-Verluste kamen innerhalb von 3 Kerzen …“), nie bewiesene Ursachen.
+- Bewegung: nur Einblenden (`tween.fade`, 6 px) neuer Zeilen und die vorhandene `Collapse`; `useReducedFx` → Endzustand. Tippflächen
+  ≥ 44 px bei grobem Zeiger, alle Felder mit `aria-label`, keine zusätzliche Live-Region (Toast-Insel bleibt die einzige).

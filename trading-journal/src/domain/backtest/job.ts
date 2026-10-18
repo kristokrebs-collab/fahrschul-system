@@ -10,6 +10,7 @@
  *   overfit      the grid over the whole period → PBO (CSCV), Deflated Sharpe, parameter heat map, verdict
  */
 import { boxToBox, type BoxCfgIn } from "./strategies/boxToBox";
+import { customStrategy, defaultCustomIn, type CustomCfgIn } from "./strategies/custom";
 import { mcbLadder, type McbCfgIn } from "./strategies/mcbLadder";
 import { ruleBuilder, type RulesCfgIn } from "./strategies/rules";
 import { now, paramGrid, paramKey, type LabStrategy, type ParamSpec, type Params, type Prepared, type Stepper } from "./strategies/types";
@@ -17,11 +18,14 @@ import { bestTrial, evaluate, oosSplit, trialOf, type Trial, type Window } from 
 import { downsampleIdx, runStats, type RunStats } from "./metrics";
 import { summarizeWf, wfLayout, wfWindow, type WalkForward, type WfWindow } from "./walkForward";
 import { deflatedSharpe, paramHeat, pboOf, robustness, type Dsr, type Heat, type Pbo, type Robustness } from "./overfit";
+import { customKey, sanitizeCustom } from "../lab/rules/tree";
 import { gapsOf } from "./bars";
-import type { BarsBy, BtTrade, EngineCfg, EquityPoint, FundingPoint, RunResult } from "./types";
+import { runBacktest } from "./engine";
+import type { BarsBy, BtStrategy, BtTrade, EngineCfg, EquityPoint, FundingPoint, RunResult } from "./types";
 import { HIST_MS } from "./types";
+import type { FunnelNode, StrategyFunnel, StrategyVariant } from "./strategies/types";
 
-export type LabStrategyId = "box" | "mcb" | "rules";
+export type LabStrategyId = "custom" | "box" | "mcb" | "rules";
 
 export interface LabJobInput {
   strategy: LabStrategyId;
@@ -29,6 +33,8 @@ export interface LabJobInput {
   box: BoxCfgIn;
   mcb: McbCfgIn;
   rules: RulesCfgIn;
+  /** "Eigene Idee": the rule tree and the app's MCB setting (absent = the default idea) */
+  custom?: CustomCfgIn;
   /** the chosen parameter set (missing keys → the spec's first option) */
   params: Params;
   /** first tradable time (ms) – bars before are warm-up – and the end of the period */
@@ -41,7 +47,7 @@ export interface LabJobInput {
   wfWindows?: number;
 }
 
-export type LabPhase = "signals" | "run" | "optimise" | "walkforward" | "overfit" | "done";
+export type LabPhase = "signals" | "run" | "optimise" | "walkforward" | "overfit" | "diagnose" | "done";
 
 export const PHASE_LABEL: Readonly<Record<LabPhase, string>> = {
   signals: "Signale auf jeder Kerze",
@@ -49,6 +55,7 @@ export const PHASE_LABEL: Readonly<Record<LabPhase, string>> = {
   optimise: "In-Sample / Out-of-Sample",
   walkforward: "Walk-forward",
   overfit: "Overfitting-Check",
+  diagnose: "Diagnose",
   done: "Fertig",
 };
 
@@ -89,8 +96,64 @@ export interface WfWindowLite extends Omit<WfWindow, "testTrades"> {
   testN: number;
 }
 
+/** Data of one interval the run used: what was loaded and where the holes are. */
+export interface CoverageRow {
+  interval: string;
+  /** the execution interval (the engine walks it) or a higher / ladder interval */
+  role: "exec" | "other";
+  bars: number;
+  /** ms, null when empty */
+  first: number | null;
+  last: number | null;
+  gaps: number;
+  missing: number;
+}
+
+/** The rule funnel of a run: from the examined bars to the closed trades. */
+export interface RunFunnel {
+  /** bars of the period the strategy was asked about */
+  examined: number;
+  /** strategy-specific rows (the custom strategy's leaves and groups); empty for the templates */
+  nodes: FunnelNode[];
+  /** new signals (rising edges) / both sides at once / valid entries ignoring an open position / of these blocked by an open position; null = the strategy does not tell */
+  edges: number | null;
+  conflicts: number | null;
+  candidates: number | null;
+  blockedByPosition: number | null;
+  /** engine: entries handed over while flat, skipped at the next open (gap beyond stop / target), skipped (stop too close / no size), executed */
+  signals: number;
+  skippedGap: number;
+  skippedRisk: number;
+  executed: number;
+}
+
+/** A re-run of the same run with one thing removed (costs, a filter, the position management). */
+export interface VariantLite {
+  id: string;
+  label: string;
+  kind: "noCosts" | "noLeaf" | "noExits";
+  n: number;
+  avgR: number | null;
+  sumR: number;
+  net: number;
+  netPct: number;
+  winRate: number | null;
+  pf: number | null;
+  maxDD: number;
+}
+
 export interface LabResult {
   strategy: LabStrategyId;
+  /** name of the custom idea / stable key of its rules (compare cards); null for the templates */
+  name: string | null;
+  configKey: string | null;
+  /** data of the execution interval and every other interval the run used */
+  coverage: CoverageRow[];
+  /** execution bars the period should hold (from its length) and the warm-up bars wanted before it / found */
+  expectedBars: number;
+  warmup: { wanted: number; got: number };
+  funnel: RunFunnel;
+  variants: VariantLite[];
   symbol: string;
   interval: string;
   params: Params;
@@ -126,11 +189,11 @@ export interface LabJob extends Stepper<LabResult> {
 type AnyStrategy = LabStrategy<any, any>;
 
 export function strategyOf(id: LabStrategyId): AnyStrategy {
-  return id === "box" ? boxToBox : id === "mcb" ? mcbLadder : ruleBuilder;
+  return id === "custom" ? customStrategy : id === "box" ? boxToBox : id === "mcb" ? mcbLadder : ruleBuilder;
 }
 
-export function strategyCfg(input: Pick<LabJobInput, "strategy" | "box" | "mcb" | "rules">): unknown {
-  return input.strategy === "box" ? input.box : input.strategy === "mcb" ? input.mcb : input.rules;
+export function strategyCfg(input: Pick<LabJobInput, "strategy" | "box" | "mcb" | "rules" | "custom">): unknown {
+  return input.strategy === "custom" ? (input.custom ?? defaultCustomIn()) : input.strategy === "box" ? input.box : input.strategy === "mcb" ? input.mcb : input.rules;
 }
 
 /** The chosen parameters completed with each spec's first option (unknown values → the first option). */
@@ -143,12 +206,20 @@ export function completeParams(specs: readonly ParamSpec[], p: Params): Params {
   return out;
 }
 
+/** Most "ohne …" comparisons one run computes. */
+const MAX_VARIANTS = 14;
+
+function variantLite(v: Pick<VariantLite, "id" | "label" | "kind">, run: RunResult): VariantLite {
+  const s = runStats(run);
+  return { ...v, n: s.n, avgR: s.avgR, sumR: s.sumR, net: s.net, netPct: s.netPct, winRate: s.winRate, pf: s.pf === Infinity ? null : s.pf, maxDD: s.maxDD };
+}
+
 const curveR = (trades: readonly BtTrade[]): number[] => {
   let s = 0;
   return [0, ...trades.map((t) => (s += t.r))];
 };
 
-const WEIGHTS: Readonly<Record<Exclude<LabPhase, "done">, number>> = { signals: 0.72, run: 0.04, optimise: 0.08, walkforward: 0.08, overfit: 0.08 };
+const WEIGHTS: Readonly<Record<Exclude<LabPhase, "done">, number>> = { signals: 0.7, run: 0.04, optimise: 0.08, walkforward: 0.08, overfit: 0.08, diagnose: 0.02 };
 
 export function createLabJob(input: LabJobInput): LabJob {
   const strategy = strategyOf(input.strategy);
@@ -174,6 +245,8 @@ export function createLabJob(input: LabJobInput): LabJob {
   let split: SplitResult = { params: null, is: null, oos: null, isCurveR: [], oosCurveR: [], cutTime: null };
   const wfWins: WfWindow[] = [];
   const fullTrials: Trial[] = [];
+  const variantsOut: VariantLite[] = [];
+  let funnelInfo: StrategyFunnel | null = null;
 
   const setPhase = (p: LabPhase) => {
     if (p === phase) return;
@@ -216,6 +289,23 @@ export function createLabJob(input: LabJobInput): LabJob {
     const layout = ok ? wfLayout(window.from, window.to, input.wfWindows ?? 5) : null;
     if (layout) layout.forEach((w, k) => q.push({ phase: "walkforward", run: () => void wfWins.push(wfWindow(strategy, pr, grid, input.engine, k, w.train, w.test, secLen)) }));
     if (ok) for (const p of grid) q.push({ phase: "overfit", run: () => void fullTrials.push(trialOf(p, evaluate(strategy, pr, p, input.engine, window).trades)) });
+    if (ok) {
+      // diagnosis: the same run without costs, without single filters / the management, and the strategy's rule funnel
+      const rerun = (s: BtStrategy, eng: EngineCfg): RunResult => runBacktest(pr.bars, s, eng, { from: window.from, to: window.to, equity: false, atr: pr.atr, secLen });
+      const free: EngineCfg = { ...input.engine, costs: { fees: { exchange: "none", makerBps: 0, takerBps: 0 }, slippage: { kind: "none" }, funding: { kind: "none" } } };
+      q.push({ phase: "diagnose", run: () => void variantsOut.push(variantLite({ id: "noCosts", label: "Ohne Kosten (Gebühren, Slippage, Funding)", kind: "noCosts" }, rerun(strategy.build(pr, params), free))) });
+      const vs: StrategyVariant[] = (strategy.variants?.(cfg) ?? []).slice(0, MAX_VARIANTS);
+      for (const v of vs) {
+        q.push({
+          phase: "diagnose",
+          run: () => {
+            const built = strategy.buildVariant?.(pr, params, v.id) ?? null;
+            if (built) variantsOut.push(variantLite(v, rerun(built, input.engine)));
+          },
+        });
+      }
+      q.push({ phase: "diagnose", run: () => void (funnelInfo = strategy.funnel?.(pr, params, window) ?? null) });
+    }
     units = q;
   };
 
@@ -223,7 +313,7 @@ export function createLabJob(input: LabJobInput): LabJob {
     setPhase("done");
     const bars = pr.bars;
     const secLen = HIST_MS[pr.interval] / 1000;
-    const empty: RunResult = { trades: [], equity: [], from: input.fromMs, to: input.toMs, capital: input.engine.capital, skipped: 0 };
+    const empty: RunResult = { trades: [], equity: [], from: input.fromMs, to: input.toMs, capital: input.engine.capital, skipped: 0, skippedGap: 0, skippedRisk: 0, signals: 0 };
     const run: RunResult = main ?? empty;
     const stats = runStats(run);
     // buy & hold: the whole capital in the market from the first close to the last (no leverage, no costs)
@@ -247,8 +337,44 @@ export function createLabJob(input: LabJobInput): LabJob {
     });
     const inPeriod = bars.slice(window.from, window.to + 1);
     const idx = downsampleIdx(run.equity, 360);
+    const ivMs = HIST_MS[pr.interval];
+    const sf: StrategyFunnel | null = funnelInfo;
+    let blocked: number | null = null;
+    if (sf) {
+      // candidates inside a holding period [entry, exit) were never offered to the engine
+      blocked = 0;
+      let k = 0;
+      for (const c of sf.candidates) {
+        while (k < run.trades.length && run.trades[k]!.exitIndex <= c) k++;
+        if (k < run.trades.length && run.trades[k]!.entryIndex <= c) blocked++;
+      }
+    }
+    const custom = input.strategy === "custom" ? sanitizeCustom((cfg as { config: unknown }).config) : null;
+    const coverage: CoverageRow[] = strategy.intervals(cfg).map((iv) => {
+      const b = input.data[iv] ?? [];
+      const g = gapsOf(b, HIST_MS[iv] / 1000);
+      return { interval: iv, role: iv === pr.interval ? "exec" : "other", bars: b.length, first: b.length ? b[0]!.t * 1000 : null, last: b.length ? (b[b.length - 1]!.t + HIST_MS[iv] / 1000) * 1000 : null, gaps: g.gaps, missing: g.missing };
+    });
     return {
       strategy: input.strategy,
+      name: custom?.name ?? null,
+      configKey: custom ? customKey(custom) : null,
+      coverage,
+      expectedBars: Math.max(0, Math.floor((input.toMs - input.fromMs) / ivMs)),
+      warmup: { wanted: Math.ceil(strategy.warmupMs(cfg) / ivMs), got: pr.start },
+      funnel: {
+        examined: window.to > window.from ? window.to - window.from + 1 : 0,
+        nodes: sf?.nodes ?? [],
+        edges: sf ? sf.edges : null,
+        conflicts: sf ? sf.conflicts : null,
+        candidates: sf ? sf.candidates.length : null,
+        blockedByPosition: blocked,
+        signals: run.signals,
+        skippedGap: run.skippedGap,
+        skippedRisk: run.skippedRisk,
+        executed: run.trades.length,
+      },
+      variants: variantsOut,
       symbol: input.symbol,
       interval: pr.interval,
       params,

@@ -1,11 +1,13 @@
 /**
- * Versuchsaufbau (P07): strategy tiles (Box-zu-Box · MCB-Leiter · Regel-Baukasten), market, period, the strategy's own
- * choices (timeframe / check interval / rule builder), its parameters as chips, the cost model (exchange fees,
- * slippage, funding), capital / risk / leverage and the start button with an honest estimate of the Binance pages.
+ * Versuchsaufbau (P07): strategy tiles ("Eigene Idee" first and widest, then the templates Box-zu-Box · MCB-Leiter ·
+ * Regel-Baukasten), market, period, the strategy's own choices (the rule builder of the custom idea / timeframe / check
+ * interval / the template's rule builder), its parameters as chips, the cost model (exchange fees, slippage, funding),
+ * capital / risk / leverage and the start button with an honest estimate of the Binance pages.
  * Everything writes the per-viewer set-up (`useLabor().setCfg`) at once.
  */
 import { AnimatePresence, motion } from "motion/react";
 import { useId, useMemo, useState, type CSSProperties } from "react";
+import { validateCustom } from "@/domain/lab";
 import { condText, FEE_PRESETS, RULE_DEFAULTS, RULE_LABEL, sanitizeCond, strategyCfg, strategyOf, type LabStrategyId, type RuleCond, type RuleKind, type SlippageModel } from "@/domain/backtest/index";
 import { boxesCfgOf, normalizeWatchSymbol } from "@/domain/boxes";
 import type { SignalCfg } from "@/domain/signals";
@@ -22,10 +24,12 @@ import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
 import { cancelLab, pagesEstimate, planOf, startLab, useLabor, type LabConfig } from "./laborStore";
+import { RuleBuilder } from "./RuleBuilder";
 import { LABOR, type LaborPeriod } from "./strings";
 import { ChipPick, FieldRow, SEG_TOUCH } from "./ui";
 
-const STRATS: readonly LabStrategyId[] = ["box", "mcb", "rules"];
+/** "Eigene Idee" is the first and widest choice; the three templates stay as ready-made starting points. */
+const STRATS: readonly LabStrategyId[] = ["custom", "box", "mcb", "rules"];
 const PERIODS = (Object.keys(LABOR.periods) as LaborPeriod[]).map((v) => ({ v, label: LABOR.periods[v] }));
 const SLIPS: readonly { v: string; label: string; model: SlippageModel }[] = [
   { v: "fixed", label: "Fix 2 bp", model: { kind: "fixed", bps: 2 } },
@@ -51,6 +55,7 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
   const specs = useMemo(() => strategyOf(cfg.strategy).specs(strategyCfg(plan.input)), [cfg.strategy, plan.input]);
   const pages = useMemo(() => pagesEstimate(cfg, signal), [cfg, signal]);
   const reduced = useReducedFx();
+  const ideaErrors = useMemo(() => (cfg.strategy === "custom" ? validateCustom(cfg.custom).filter((i) => i.level === "error").length : 0), [cfg.strategy, cfg.custom]);
 
   const commitSymbol = (raw: string) => {
     const s = normalizeWatchSymbol(raw);
@@ -68,6 +73,7 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
           {STRATS.map((id) => {
             const on = cfg.strategy === id;
             const t = LABOR.strategies[id];
+            const hero = id === "custom";
             return (
               <motion.button
                 key={id}
@@ -79,11 +85,11 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
                 onClick={() => setCfg({ strategy: id })}
                 whileTap={reduced ? undefined : { scale: 0.98 }}
                 transition={spring.press}
-                className={cn("relative isolate grid min-h-[76px] content-start gap-1 overflow-hidden rounded-2xl border px-3.5 py-3 text-left outline-none transition-colors duration-200 disabled:opacity-60", on ? "border-white/40 bg-white/[0.04]" : "border-line hover:border-white/20 focus-visible:border-white/40")}
+                className={cn("relative isolate grid min-h-[76px] content-start gap-1 overflow-hidden rounded-2xl border px-3.5 py-3 text-left outline-none transition-colors duration-200 disabled:opacity-60", hero && "sm:col-span-3 sm:min-h-[84px]", on ? "border-white/40 bg-white/[0.04]" : "border-line hover:border-white/20 focus-visible:border-white/40")}
                 style={{ borderRadius: radius.card }}
               >
                 {on && <motion.span layoutId={`labor-strat-${uid}`} aria-hidden="true" className="absolute inset-0 -z-10 bg-[radial-gradient(120%_120%_at_0%_0%,rgb(var(--veil-rgb,255_255_255)/0.09),transparent_60%)]" style={{ borderRadius: radius.card }} transition={reduced ? { duration: 0 } : spring.layout} />}
-                <span className="flex items-center gap-2 text-[14px] font-semibold">
+                <span className={cn("flex items-center gap-2 font-semibold", hero ? "text-[15.5px]" : "text-[14px]")}>
                   <span className={cn("size-1.5 rounded-full transition-colors", on ? "bg-signal" : "bg-line-2")} aria-hidden="true" />
                   {t.title}
                 </span>
@@ -136,9 +142,11 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
               </FieldRow>
             )}
             {cfg.strategy === "rules" && <RulesEditor cfg={cfg} uid={uid} />}
+            {cfg.strategy === "custom" && <RuleBuilder uid={uid} />}
+            {cfg.strategy === "custom" && <p className="text-[11.5px] leading-snug text-faint">Die Robustheitsprüfung testet deinen Stop und dein Ziel plus je zwei Nachbarwerte (Out-of-Sample, Walk-forward, Heatmap).</p>}
 
             <div className="grid gap-3 sm:grid-cols-2">
-              {specs.map((s) => (
+              {(cfg.strategy === "custom" ? [] : specs).map((s) => (
                 <FieldRow key={s.key} label={s.label}>
                   <ChipPick
                     id={`p-${s.key}-${uid}`}
@@ -189,7 +197,7 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
               {LABOR.cancel}
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => void startLab(signal)} disabled={!symValid || (cfg.strategy === "rules" && !cfg.rules.conds.length)} data-testid="labor-start">
+            <Button variant="primary" onClick={() => void startLab(signal)} disabled={!symValid || (cfg.strategy === "rules" && !cfg.rules.conds.length) || ideaErrors > 0} aria-describedby={ideaErrors > 0 ? `${uid}-check` : undefined} data-testid="labor-start">
               {status === "done" ? LABOR.again : LABOR.start}
             </Button>
           )}
