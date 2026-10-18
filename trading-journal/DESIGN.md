@@ -298,3 +298,21 @@ Nachgezogen: Der „Bericht bereit“-Wipe kürzte seine Zahlen (`truncate`): �
 „−123.457 USDT“ 134 > 106 / 201 > 179 px (390 / 1440, gehintet ±1 px). Jetzt ganz: Spalten `minmax(max-content,1fr)`,
 gleiche Drittel, solange alles passt; E2E mit langen Werten, Berichte-E2E auf festem Mittwoch (sonntags kam kein Wipe).
 Übersicht „FAB …“ mit angehaltener Seitenuhr erzwungen: 95eb012 rot wie in CI, HEAD grün; geprüft wird der zweite Toast.
+
+### Schlüsselmarken, Tagesplan, Alarme (F09 / F08 / F22) und „Warum handeln oder auslassen?“ (F10)
+
+Keine neue Sprache, nur die vorhandene: auf der Markt-Seite drei Karten (`Card` + `Label`, Raster `lg:col-span-7/5/12`, kein
+zweiter großer Chart, keine zweite Akzentfarbe). Status ist **Text + Glyphe + Ton**, nie Farbe allein: `○ Wartet` (mute),
+`◐ Vorläufig` (warn, gestrichelt), `● Bestätigt` (Datenfarbe nach Richtung: über = Gewinn-Ton, unter = Verlust-Ton),
+`✕ Ungültig` (mute), `? Keine Daten` (mute, gestrichelter Rand); „vorläufig“ (laufende Kerze) und „Schluss“ tragen immer eine eigene
+Pille, im Verlauf getrennt protokolliert. Chart-Linien eigener Marken bleiben in der Grauleiter und lesen den Zustand an Strich
+und Stärke (bestätigt durchgezogen 2 px, vorläufig gestrichelt, wartet gepunktet, ungültig/keine Daten weit gepunktet) – Signalrot bleibt
+der harten Invalidierung. Nicht verfügbare Zeiteinheiten bleiben im Segment sichtbar, sind **deaktiviert und nennen den Grund**
+darunter (nie still ersetzt). Der Tagesplan hebt das aktive Szenario durch Rahmen, `aria-current` und Wort („aktiv“) hervor,
+„vorläufig“ und „überstimmt“ stehen als Wort; Bewegung nur bestehende Tokens (`tween.fade`, `tween.exit`, kein neues Timing).
+Das Zustellprotokoll sagt ehrlich, was zurückgehalten wurde und warum, und die Karte sagt in einem Satz, dass Alarme nur bei geöffneter
+App laufen – kein Server-Versprechen. „Warum handeln oder auslassen?“ sitzt eingeklappt im Einstiegs-Check (eine Zeile mit Urteil und
+Pille), aufgeklappt in vier Gruppen (Pflicht · Optional · Widersprüche · Fehlende Daten) mit Glyphe `✓ ✕ ? !` und Klartext; der Skeleton
+der Karte reserviert die Zeile (kein Layout-Sprung). Bekannte Abweichung: die `Segmented`-Radios (primitive `COARSE_HIT`-Regel) messen
+im Hit-Box-Audit auf Touch 33 statt 44 px – genauso in der bestehenden Box-Einstellungen-Karte derselben Seite; die neuen Schaltflächen,
+Schalter, Chips und Felder bestehen den Audit.
