@@ -37,11 +37,12 @@ export const FEATURES = [
   "community", // P12 groups, leaderboards
   "mentor", // P12 mentor / student
   "customDashboards", // P13 cockpit layouts
+  "shotExtract", // F29/F30 read trade values from screenshots (LLM vision, Premium)
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
 /** Numeric limits per plan (`useLimit`); `Infinity` = unlimited. */
-export const LIMIT_KEYS = ["exchangeConnections", "screenshotStorageMb", "savedViews", "dashboards", "groups", "coachAiPerDay"] as const;
+export const LIMIT_KEYS = ["exchangeConnections", "screenshotStorageMb", "savedViews", "dashboards", "groups", "coachAiPerDay", "shotExtractPerDay"] as const;
 export type LimitKey = (typeof LIMIT_KEYS)[number];
 
 /** Effective plan of a user (server: `planOf(userId)`, client: `usePlan()`). */
