@@ -89,6 +89,8 @@ export const ExtractedTrade = z.object({
   /** Executed entry fills (a pending limit order is NOT an entry – see `status`). */
   entries: z.array(Execution).max(20).default([]),
   exits: z.array(Execution).max(20).default([]),
+  /** Price of a NOT yet executed entry order (limit / trigger / planned entry); never an entry fill. */
+  plannedEntry: Raw.nullable().default(null),
   /** The stop-loss price that is visible (planned order line / SL field), as shown. */
   stop: Raw.nullable().default(null),
   /** Visible take-profit prices, nearest first. */
@@ -159,7 +161,7 @@ const execution = {
 
 /** The forced tool call (kept next to the zod schema; a test checks both list the same keys). */
 export const TOOL_NAME = "report_trades";
-export const TRADE_KEYS = ["market", "side", "entries", "exits", "stop", "targets", "leverage", "fees", "funding", "realizedPnl", "pnlCurrency", "exchange", "productType", "status", "confidence", "unreadable", "sources"] as const;
+export const TRADE_KEYS = ["market", "side", "entries", "exits", "plannedEntry", "stop", "targets", "leverage", "fees", "funding", "realizedPnl", "pnlCurrency", "exchange", "productType", "status", "confidence", "unreadable", "sources"] as const;
 export const TOOL_INPUT_SCHEMA = {
   type: "object",
   additionalProperties: false,
@@ -177,6 +179,7 @@ export const TOOL_INPUT_SCHEMA = {
           side: { type: ["string", "null"], enum: ["long", "short", null] },
           entries: { type: "array", maxItems: 20, items: execution, description: "Ausgeführte Einstiege (Teil-Einstiege einzeln). Eine noch offene Limit-Order ist KEIN Einstieg." },
           exits: { type: "array", maxItems: 20, items: execution, description: "Ausgeführte Ausstiege (Teil-Ausstiege einzeln). Sichtbare TP-/SL-Linien sind KEINE Ausstiege." },
+          plannedEntry: str("Preis einer noch NICHT ausgeführten Einstiegs-Order (Limit/Trigger/geplanter Einstieg) wie angezeigt, sonst null"),
           stop: str("Sichtbarer Stop-Loss-Preis (geplante SL-Order / SL-Feld) wie angezeigt, sonst null. Niemals ableiten oder schätzen."),
           targets: { type: "array", maxItems: 6, items: { type: "string" }, description: "Sichtbare Take-Profit-Preise wie angezeigt" },
           leverage: str("Hebel wie angezeigt, z. B. 10x"),
@@ -209,7 +212,7 @@ export const SYSTEM_PROMPT = [
   "Du liest Handels-Screenshots (Börsen-Apps, Positionsansichten, Orderhistorien, Charts mit Positionswerkzeug) und gibst die sichtbaren Werte über das Werkzeug report_trades zurück.",
   "Regeln: Lies nur, was sichtbar ist. Rate nie, rechne nichts aus und ergänze nichts aus Erfahrung. Was nicht zu sehen oder nicht sicher lesbar ist, bekommt null (bzw. eine leere Liste) und Konfidenz 0 – schreibe das Feld zusätzlich in unreadable, wenn es sichtbar, aber unleserlich ist.",
   "Zahlen und Zeiten gibst du exakt als Text zurück, wie sie dastehen: Dezimalkomma oder -punkt, Tausendertrenner, Vorzeichen und Datumsformat unverändert. Keine Umrechnung, keine Rundung, keine Einheiten in die Zahl schreiben.",
-  "Unterscheide geplante Orders von Ausführungen: Take-Profit-/Stop-Loss-Linien, offene Limit- oder Trigger-Orders und Order-Eingabemasken sind geplant, keine Einstiege oder Ausstiege. Nur gefüllte Orders (Filled, Ausgeführt, Trade-History) sind entries bzw. exits. Zeigt das Bild ausschließlich Planwerte, ist status planned.",
+  "Unterscheide geplante Orders von Ausführungen: Take-Profit-/Stop-Loss-Linien, offene Limit- oder Trigger-Orders und Order-Eingabemasken sind geplant, keine Einstiege oder Ausstiege. Nur gefüllte Orders (Filled, Ausgeführt, Trade-History) sind entries bzw. exits; der Preis einer noch nicht ausgeführten Einstiegsorder gehört nach plannedEntry, nie nach entries. Zeigt das Bild ausschließlich Planwerte, ist status planned.",
   "Erfinde niemals einen ursprünglichen Stop: Trage als stop nur einen Stop ein, den du im Bild als Zahl siehst. Ein Stop, der auf einer laufenden oder geschlossenen Position sichtbar ist, kann nachgezogen worden sein – du meldest ihn trotzdem nur als sichtbaren Wert.",
   "Mehrere Trades in einem Bild werden getrennt gemeldet; zeigen mehrere Bilder denselben Trade, meldest du ihn einmal und trägst alle Bildnummern in sources ein. Teil-Einstiege und Teil-Ausstiege einzeln auflisten.",
   "Nenne die Zeitzone nur, wenn sie im Bild steht. Long/Short nur, wenn die Richtung sichtbar ist (z. B. Long/Short-Label, Kauf/Verkauf einer Position, Positionswerkzeug) – sonst null.",

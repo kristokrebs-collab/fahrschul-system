@@ -76,7 +76,7 @@ export function buildPrompt(body: ExtractBody): string {
 
 /** A trade that carries no reading at all (the model found nothing worth reporting). */
 function isEmptyTrade(t: ExtractedTrade): boolean {
-  return !t.market && !t.entries.length && !t.exits.length && !t.stop && !t.targets.length && !t.realizedPnl;
+  return !t.market && !t.entries.length && !t.exits.length && !t.plannedEntry && !t.stop && !t.targets.length && !t.realizedPnl;
 }
 
 /**
@@ -90,7 +90,7 @@ export function sanitize(x: Extraction, imageCount: number): Extraction {
       const c = { ...t.confidence };
       if (!t.market) c.market = 0;
       if (!t.side) c.side = 0;
-      if (!t.entries.length) c.entries = 0;
+      if (!t.entries.length && !t.plannedEntry) c.entries = 0;
       if (!t.exits.length) c.exits = 0;
       if (!t.stop) c.stop = 0;
       if (!t.targets.length) c.targets = 0;

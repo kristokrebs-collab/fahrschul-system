@@ -26,6 +26,7 @@ const TRADE = {
   side: "long",
   entries: [{ price: "67.250,5", qty: "0,05", time: "17.10.2026 14:32:08" }],
   exits: [{ price: "67.800", qty: "0,05", time: "17.10.2026 15:10:44" }],
+  plannedEntry: null,
   stop: null,
   targets: ["68.500"],
   leverage: "10x",
@@ -216,7 +217,7 @@ describe("Lesen", () => {
   });
 
   it("drops trades without any reading and image numbers beyond the request", () => {
-    const blank = { ...TRADE, market: null, entries: [], exits: [], stop: null, targets: [], realizedPnl: null };
+    const blank = { ...TRADE, market: null, entries: [], exits: [], plannedEntry: null, stop: null, targets: [], realizedPnl: null };
     const x = sanitize(Extraction.parse({ trades: [{ ...TRADE, sources: [0, 3, 0] }, blank], timezone: null }), 1);
     expect(x.trades).toHaveLength(1);
     expect(x.trades[0]!.sources).toEqual([0]);
@@ -316,7 +317,7 @@ describe("Grenzen", () => {
 
 describe("Tool-Schema", () => {
   it("lists the same keys as the zod schema", () => {
-    const item = (TOOL_INPUT_SCHEMA.properties.trades.items as { required: string[]; properties: Record<string, unknown> });
+    const item = (TOOL_INPUT_SCHEMA.properties.trades.items as unknown as { required: string[]; properties: Record<string, unknown> });
     expect([...item.required].sort()).toEqual([...TRADE_KEYS].sort());
     expect(Object.keys(item.properties).sort()).toEqual([...TRADE_KEYS].sort());
     expect(Object.keys(Extraction.shape.trades.element.shape).sort()).toEqual([...TRADE_KEYS].sort());
