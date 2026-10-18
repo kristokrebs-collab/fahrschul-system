@@ -15,6 +15,6 @@ export { wfLayout, wfWindow, summarizeWf, type WalkForward, type WfWindow } from
 export { deflatedSharpe, expectedMaxSharpe, pboOf, combinations, paramHeat, robustness, ROBUST, VERDICT_TEXT, PBO_MIN_TRADES, DSR_MIN_TRADES, type Dsr, type Pbo, type Heat, type HeatCell, type RobustVerdict, type Robustness, type RobustInput } from "./overfit";
 export { loadKlines, loadFunding, estimatePages, sourceIntervals, lastClosedOpen, KLINE_PAGE, FUNDING_PAGE, CACHE_MAX_BARS, type KlinePager, type KlineQuery, type FundingPager, type SeriesStore, type LoadProgress, type Loaded } from "./history";
 export { toBacktestReference, referenceLabel, STRATEGY_TITLE } from "./reference";
-export { createLabJob, completeParams, strategyOf, strategyCfg, fundingModelOf, PHASE_LABEL, type LabJobInput, type LabJob, type LabPhase, type LabResult, type LabStrategyId, type SplitResult, type TrialLite, type WfWindowLite, type HeatLite, type HeatAxis } from "./job";
+export { createLabJob, completeParams, strategyOf, strategyCfg, fundingModelOf, PHASE_LABEL, type LabJobInput, type LabJob, type LabPhase, type LabResult, type CoverageRow, type RunFunnel, type VariantLite, type LabStrategyId, type SplitResult, type TrialLite, type WfWindowLite, type HeatLite, type HeatAxis } from "./job";
 export { runLab, runLabIdle, labWorkerAllowed, isLabAbort, LAB_WORKER_SILENCE_MS, __resetLabRunner, type LabRunOptions, type LabRunMode } from "./labRunner";
 export * from "./strategies";

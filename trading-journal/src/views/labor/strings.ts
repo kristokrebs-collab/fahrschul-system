@@ -10,6 +10,7 @@ export const LABOR = {
     compare: { title: "Vergleich", sub: "Deine letzten Läufe nebeneinander. Trade the best." },
   },
   strategies: {
+    custom: { title: "Eigene Idee", sub: "Baue deine Regeln aus vielen Bausteinen – mit beliebigen Timeframes", short: "Eigene" },
     box: { title: "Box-zu-Box", sub: "Echte Box-Engine, nur A+ / A", short: "Box" },
     mcb: { title: "MCB-Leiter", sub: "Dein Einstiegs-Check, Kerze für Kerze", short: "MCB" },
     rules: { title: "Regel-Baukasten", sub: "Eigene Bedingungen kombinieren", short: "Regeln" },
@@ -47,6 +48,7 @@ export const LABOR = {
     optimise: "In-Sample / Out-of-Sample",
     walkforward: "Walk-forward",
     overfit: "Overfitting-Check",
+    diagnose: "Diagnose",
     done: "Fertig",
   },
   idleHint: "Noch kein Lauf. Wähle oben eine Strategie und starte den Backtest.",
