@@ -12,7 +12,7 @@
  */
 import { cleanBars } from "./bars";
 import type { Bar, FundingPoint, HistInterval } from "./types";
-import { HIST_MS } from "./types";
+import { HIST_MS, HIST_SOURCE } from "./types";
 
 export interface KlineQuery {
   symbol: string;
@@ -226,5 +226,10 @@ export async function loadFunding(o: LoadFundingOptions): Promise<Loaded<Funding
 
 /** Pages a load of `interval` over [from, to] costs at most (for the budget hint before a run). */
 export function estimatePages(interval: HistInterval, from: number, to: number): number {
-  return pagesFor(from, to, HIST_MS[interval]);
+  return pagesFor(from, to, HIST_MS[HIST_SOURCE[interval]]);
+}
+
+/** The exchange intervals a set of lab intervals is loaded from (derived `30m` / `2h` come from their source), unique, in order. */
+export function sourceIntervals(intervals: readonly HistInterval[]): HistInterval[] {
+  return [...new Set(intervals.map((iv) => HIST_SOURCE[iv]))];
 }

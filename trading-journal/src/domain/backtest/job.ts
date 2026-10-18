@@ -223,7 +223,7 @@ export function createLabJob(input: LabJobInput): LabJob {
     setPhase("done");
     const bars = pr.bars;
     const secLen = HIST_MS[pr.interval] / 1000;
-    const empty: RunResult = { trades: [], equity: [], from: input.fromMs, to: input.toMs, capital: input.engine.capital, skipped: 0 };
+    const empty: RunResult = { trades: [], equity: [], from: input.fromMs, to: input.toMs, capital: input.engine.capital, skipped: 0, skippedGap: 0, skippedRisk: 0, signals: 0 };
     const run: RunResult = main ?? empty;
     const stats = runStats(run);
     // buy & hold: the whole capital in the market from the first close to the last (no leverage, no costs)

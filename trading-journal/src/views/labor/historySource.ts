@@ -6,8 +6,9 @@
  * only fetches the new tail. The paging / cache rules are the pure `loadKlines` / `loadFunding`
  * (`@/domain/backtest/index`).
  */
-import { estimatePages, loadFunding, loadKlines, type Bar, type BarsBy, type FundingPoint, type HistInterval, type SeriesStore } from "@/domain/backtest/index";
+import { deriveBars, estimatePages, HIST_MS, loadFunding, loadKlines, sourceIntervals, type Bar, type BarsBy, type FundingPoint, type HistInterval, type SeriesStore } from "@/domain/backtest/index";
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
+import type { FetchInterval } from "@/market/period";
 import { klineWeight, TokenBucket } from "@/market/budget";
 import { idbKV } from "@/market/cache";
 import { binanceRest, type BinanceRest } from "@/market/sources/binance";
@@ -98,10 +99,12 @@ export interface LoadedData {
 export async function loadLabData(req: LoadRequest): Promise<LoadedData> {
   const store = deps.store();
   const now = deps.now();
-  const est = req.intervals.reduce((s, iv) => s + estimatePages(iv, req.from, Math.min(req.to, now)), 0);
+  // 30m / 2h are built from 15m / 1h: the exchange is asked for the source intervals only
+  const sources = sourceIntervals(req.intervals);
+  const est = sources.reduce((s, iv) => s + estimatePages(iv, req.from, Math.min(req.to, now)), 0);
   let done = 0;
-  const data: BarsBy = {};
-  for (const interval of req.intervals) {
+  let data: BarsBy = {};
+  for (const interval of sources) {
     const base = done;
     const res = await loadKlines({
       symbol: req.symbol,
@@ -115,13 +118,14 @@ export async function loadLabData(req: LoadRequest): Promise<LoadedData> {
       onProgress: (p) => req.onProgress?.(base + p.done, Math.max(est, base + p.total)),
       fetchPage: async (q) => {
         await take(klineWeight(q.limit), req.signal);
-        const page = await withRoute((c) => c.klines(q.symbol, q.interval, { startTime: q.startTime, limit: q.limit }));
+        const page = await withRoute((c) => c.klines(q.symbol, q.interval as FetchInterval, { startTime: q.startTime, limit: q.limit }));
         return page.data.filter((c) => (c.closed ?? true) && c.time + intervalMs(q.interval) <= deps.now()).map(toBar);
       },
     });
     done += res.fetched;
     data[interval] = res.data;
   }
+  data = deriveBars(data, req.intervals);
   let funding: FundingPoint[] | null = null;
   if (req.funding) {
     try {
@@ -148,7 +152,7 @@ export async function loadLabData(req: LoadRequest): Promise<LoadedData> {
   return { data, funding, pages: done, viaProxy };
 }
 
-const intervalMs = (iv: HistInterval): number => ({ "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000 })[iv];
+const intervalMs = (iv: HistInterval): number => HIST_MS[iv];
 
 /** German message of a load error. */
 export function loadErrorKind(err: unknown): "blocked" | "rate" | "symbol" | "failed" {

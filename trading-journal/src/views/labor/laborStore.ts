@@ -15,6 +15,7 @@ import {
   fundingModelOf,
   isLabAbort,
   runLab,
+  sourceIntervals,
   strategyCfg,
   strategyOf,
   type Bar,
@@ -212,7 +213,7 @@ export function planOf(cfg: LabConfig, signal: SignalCfg): { input: Omit<LabJobI
 export function pagesEstimate(cfg: LabConfig, signal: SignalCfg, now = Date.now()): number {
   const p = planOf(cfg, signal);
   const from = now - PERIOD_DAYS[cfg.period] * 86_400_000 - p.warmupMs;
-  return p.intervals.reduce((s, iv) => s + estimatePages(iv, from, now), 0);
+  return sourceIntervals(p.intervals).reduce((s, iv) => s + estimatePages(iv, from, now), 0);
 }
 
 let ctl: AbortController | null = null;
