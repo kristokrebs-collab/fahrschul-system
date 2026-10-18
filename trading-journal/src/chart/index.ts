@@ -34,3 +34,4 @@ export { EquityChart, equityAccent, equityTickLabel, nearestIndex, EQUITY_COLORS
 export { MonthlyBars, monthFill, roundedBarPath, barDelay, toBarIndex, MONTH_COLORS, type MonthlyBarsProps, type MonthBucket, type RoundedBarGeometry } from "./MonthlyBars";
 export { MiniTradeChart, MINI_LINES, type MiniTradeChartProps, type MiniTrade, type MiniLineKey } from "./MiniTradeChart";
 export { ChartAttribution } from "./Attribution";
+export * from "./mirror";

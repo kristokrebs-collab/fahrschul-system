@@ -292,3 +292,23 @@ Fixture: `tests/fixtures/candles-1h.json` (240 hourly BTC-like candles from 2026
 - SVG (Recharts cards): JS colours go through `themePaint(hex)` (`@/lib/themePaint`) – the dark hex becomes
   `var(--token, hex)` (grid, reference line, ticks, bars, the equity stroke), so the SVG follows the theme and the dark
   render is unchanged. Never use `themePaint` for canvas (`fillStyle` cannot resolve `var()`).
+
+## Chart spiegeln (F62)
+
+`mirror.ts` is the pure part (no lightweight-charts runtime import); `NothingCandleChart` takes `mirror?: ChartMirror`
+(`flipped`, `rsiMirrored`, `trendlines`, `breakouts`, `neutral`), `ReplayChart` the same as `flipped` / `showTrade` / `neutral`.
+
+- **Display only**: `flipped` sets `invertScale` on the main price scale. No data is written again (bars, prices, times,
+  boxes, break indices stay identical); flipping twice is the original chart. `axisFraction` / `priceAtFraction` /
+  `viewBars` document and test exactly that.
+- **RSI**: a separate axis, NOT mirrored with the price axis. `rsiMirrored` (only with `flipped`) inverts it too and the
+  legend reads `100−RSI 14` (`mirrorRsi`). `RsiPane.setView({ trendlines, breakouts, mirrored, neutral })` hides active lines
+  ("Trendlinien") or broken lines + break dots + the glow ("Ausbrüche") without touching the computed values.
+- **Blind colours**: `neutral` → `BoxPrimitive` option `neutral` (boxes and targets in the grey ramp, form tells stop from
+  target), `RsiOverlay.setNeutral`, trade markers via `neutralizeMarkers`, the DOM glow in `soft`.
+- **No look-ahead**: `lastClosedAnchor(bars, intervalMs, now)` is the bar a test freezes at, `clipAtAnchor` cuts everything
+  later. Overlays such as the MCB dots of the overview chart place themselves by pixel offsets and are not meant for a
+  mirrored axis – only the Markt box chart and the replay use `mirror`.
+
+Tests: `tests/unit/chart.mirror.test.ts` (mapping, flip-twice property, anchors, RSI view, marker rules),
+`tests/unit/chart.mirror.component.test.tsx` (`invertScale` on the faked chart, no `setData`, RSI legend).

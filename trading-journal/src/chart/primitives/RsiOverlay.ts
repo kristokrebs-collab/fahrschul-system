@@ -178,6 +178,7 @@ export class RsiOverlay implements ISeriesPrimitive<Time> {
   private data: RsiOverlayData = EMPTY_RSI_OVERLAY;
   private geo: Geo = EMPTY;
   private geoKey = "";
+  private neutral = false;
 
   attached({ chart, series, requestUpdate }: SeriesAttachedParameter<Time>): void {
     this.chart = chart;
@@ -194,6 +195,14 @@ export class RsiOverlay implements ISeriesPrimitive<Time> {
 
   setData(d: RsiOverlayData): void {
     this.data = d;
+    this.geoKey = "";
+    this.requestUpdate?.();
+  }
+
+  /** Blind mode (F62): broken lines and break dots in the neutral grey ramp instead of the win / loss tones. */
+  setNeutral(on: boolean): void {
+    if (on === this.neutral) return;
+    this.neutral = on;
     this.geoKey = "";
     this.requestUpdate?.();
   }
@@ -246,7 +255,7 @@ export class RsiOverlay implements ISeriesPrimitive<Time> {
     const g: Geo = { segs: [], dots: [] };
     for (const l of d.lines) {
       const at = (i: number) => l.a.v + l.slope * (i - l.a.i);
-      const tone = l.broken ? (l.kind === "res" ? ink.win : ink.loss) : ink.mute;
+      const tone = l.broken && !this.neutral ? (l.kind === "res" ? ink.win : ink.loss) : ink.mute;
       const push = (i1: number, i2: number, dash: readonly number[], alpha: number) => {
         if (i2 < lo || i1 > hi) return;
         const x1 = xOf(i1);
@@ -265,7 +274,7 @@ export class RsiOverlay implements ISeriesPrimitive<Time> {
       const y = yOf(b.v);
       if (x == null || y == null) continue;
       const up = b.dir === 1;
-      const color = b.provisional ? (up ? ink.winSoft : ink.lossSoft) : up ? ink.win : ink.loss;
+      const color = this.neutral ? (b.provisional ? ink.mute : ink.fg) : b.provisional ? (up ? ink.winSoft : ink.lossSoft) : up ? ink.win : ink.loss;
       g.dots.push({ x, y, color, provisional: b.provisional, fresh: b.fresh, text: b.fresh ? (up ? "Bruch ↑" : "Bruch ↓") : "" });
     }
     this.geo = g;

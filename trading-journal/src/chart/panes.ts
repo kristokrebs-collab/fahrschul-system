@@ -18,7 +18,7 @@ import {
 } from "lightweight-charts";
 import type { Candle, OpenInterestPoint, RatioPoint } from "@/market/types";
 import { NOTHING_CANDLES, NOTHING_OI_LINE, NOTHING_RATIO_LINE, NOTHING_VOLUME, VOLUME_SCALE_MARGINS, ink, withAlpha } from "./theme";
-import { RsiPane, type RsiBar } from "./rsiPane";
+import { DEFAULT_RSI_VIEW, RsiPane, type RsiBar, type RsiView } from "./rsiPane";
 
 export type PaneKind = "none" | "ratio" | "oi" | "rsi";
 export type ChartInterval = "1m" | "30m" | "1h" | "4h" | "1d" | "1w";
@@ -114,8 +114,15 @@ export class PaneController {
   private data: PaneData = {};
   private grid: UTCTimestamp[] = [];
   private bars: readonly RsiBar[] = [];
+  private rsiView: RsiView = { ...DEFAULT_RSI_VIEW };
 
   constructor(private readonly chart: IChartApi) {}
+
+  /** Trendlines / breakouts / mirrored axis of the RSI pane (F62); kept for a pane that is created later. */
+  setRsiView(v: Partial<RsiView>): void {
+    this.rsiView = { ...this.rsiView, ...v };
+    this.rsiPane?.setView(this.rsiView);
+  }
 
   /** Candle times (seconds, ascending) the pane series snaps onto; call after every `setData` of the candles. */
   setGrid(times: readonly UTCTimestamp[]): void {
@@ -170,6 +177,7 @@ export class PaneController {
     if (kind === "none") return;
     if (kind === "rsi") {
       this.rsiPane = new RsiPane(this.chart, 1);
+      this.rsiPane.setView(this.rsiView);
       this.line = this.rsiPane.series;
       this.rsiPane.setBars(this.bars);
     } else {
