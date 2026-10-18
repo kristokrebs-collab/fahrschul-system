@@ -47,5 +47,6 @@ export {
   type Combined,
   type SeriesSet,
 } from "./rules/tree";
+export { CUSTOM_TEMPLATES, type CustomTemplate } from "./rules/templates";
 export { diagnoseRun, DIAG } from "./diagnosis/diagnose";
 export * from "./diagnosis/types";

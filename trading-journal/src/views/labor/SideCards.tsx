@@ -37,6 +37,11 @@ export function assumptionLines(r: LabResult, cfg: LabConfig, funding: "history"
   if (r.strategy === "box") lines.push("Box-Engine wie live. Top-Trader-Bias gibt es historisch nicht: zählt als „keine Daten“. Vorbereitete Ausbrüche werden nie gehandelt.");
   if (r.strategy === "mcb") lines.push("Einstiegs-Check wie live, aber ohne Top-Trader-Teil und Lage-Ampel (keine Historie). Einstieg nur bei einem neuen Signal.");
   if (r.strategy === "rules") lines.push("Einstieg nur, wenn alle Bedingungen neu zutreffen. Stop und Ziel über die ATR(14).");
+  if (r.strategy === "custom") {
+    lines.push("Eigene Idee: Einstieg nur bei einem NEUEN Signal (die Regel war an der Kerze davor nicht erfüllt). Höhere Zeitebenen zählen erst nach ihrem Kerzenschluss.");
+    lines.push("Fehlen Daten für eine Bedingung (zu wenig Vorlauf, Lücke, kein Volumen), gilt sie als unbekannt und ist nie erfüllt.");
+    lines.push("Break-even, Trailing und Teilverkauf werden zum Kerzenschluss entschieden und gelten ab der nächsten Kerze. Der Stop wird nie gelockert, R misst am ursprünglichen Stop.");
+  }
   return lines;
 }
 
@@ -180,10 +185,10 @@ export function CompareRunsCard({ className }: { className?: string }) {
 
 function RunCardFace({ run, best }: { run: RunSummary; best: boolean }) {
   return (
-    <article className={cn("grid h-full content-start gap-2 rounded-2xl border p-3.5", best ? "border-white/35 bg-white/[0.04]" : "border-line bg-ink-950/50")} aria-label={`${STRATEGY_TITLE[run.strategy]} ${run.symbol}`} data-testid="labor-run-card">
+    <article className={cn("grid h-full content-start gap-2 rounded-2xl border p-3.5", best ? "border-white/35 bg-white/[0.04]" : "border-line bg-ink-950/50")} aria-label={`${run.name || STRATEGY_TITLE[run.strategy]} ${run.symbol}`} data-testid="labor-run-card">
       <div className="flex items-start justify-between gap-2">
         <div className="grid min-w-0 gap-0.5">
-          <span className="truncate text-[13.5px] font-semibold">{STRATEGY_TITLE[run.strategy]}</span>
+          <span className="truncate text-[13.5px] font-semibold">{run.name || STRATEGY_TITLE[run.strategy]}</span>
           <span className="truncate font-mono text-[10.5px] text-faint">
             {run.symbol} · {run.interval === "1d" ? "1D" : run.interval} · {LABOR.periods[run.period]}
           </span>
