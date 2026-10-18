@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { aggregateBars, type Bar } from "@/domain/backtest/index";
 import { BLOCKS, BLOCK_ORDER, defaultParams, makeCtx, sanitizeParams, type BlockDef } from "@/domain/lab/rules/blocks";
 import { luxZoneSeries } from "@/domain/lab/rules/indicators";
+import { CUSTOM_TEMPLATES } from "@/domain/lab/rules/templates";
 import {
   blockAvailability,
   combineTree,
@@ -156,6 +157,18 @@ describe("Konfiguration: Version, Säubern, Roundtrip", () => {
     const r = m.children[0] as Leaf;
     expect(r.params).toMatchObject({ mode: "above", level: 60 });
     expect((m.children[1] as Leaf).params).toMatchObject({ mode: "below" });
+  });
+});
+
+describe("Vorlagen", () => {
+  it("jede Vorlage ist gültig (keine Fehler), gesäubert und liest sich als Klartext", () => {
+    expect(CUSTOM_TEMPLATES.length).toBeGreaterThanOrEqual(4);
+    for (const t of CUSTOM_TEMPLATES) {
+      const c = t.build();
+      expect(validateCustom(c).filter((i) => i.level === "error"), t.id).toEqual([]);
+      expect(sanitizeCustom(c)).toEqual(c);
+      expect(summarizeCustom(c)[0]).toMatch(/^(Long|Short) wenn /);
+    }
   });
 });
 
