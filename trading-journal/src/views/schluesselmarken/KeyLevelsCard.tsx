@@ -11,6 +11,7 @@ import { cn } from "@/lib/cn";
 import { dateTime, n2, price as fmtPrice } from "@/lib/format";
 import { usePriceSnapshot } from "@/market";
 import { useKeyLevels, type KeyLevelEntry } from "@/market/keylevels";
+import { MorphSelect } from "@/motion/pulse/MorphSelect";
 import { Switch } from "@/motion/Switch";
 import { tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
@@ -18,7 +19,6 @@ import { Badge, type BadgeTone } from "@/primitives/Badge";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
-import { Segmented } from "@/primitives/Segmented";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
 import { KeyLevelEditor } from "./KeyLevelEditor";
@@ -141,7 +141,7 @@ const LevelRow = memo(function LevelRow({ entry, onEdit, onCopy, onRemove, onTog
         {l.enabled ? ev.reason : "Ausgeschaltet – nicht bewertet, keine Linie, kein Alarm."}
         {dist && <span className="text-faint"> · {dist}</span>}
       </p>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-3.5">
         {!fixed && (
           <span className="mr-1 inline-flex items-center gap-2">
             <Switch size="sm" checked={l.enabled} onCheckedChange={(v) => onToggle(l, v)} aria-label={`${l.name} ${l.enabled ? "ausschalten" : "einschalten"}`} className="touch-hit" />
@@ -259,7 +259,7 @@ export const KeyLevelsCard = memo(function KeyLevelsCard() {
           <span id="kl-prec-l" className="label">
             {KL.precedence}
           </span>
-          <Segmented<Precedence> aria-labelledby="kl-prec-l" size="sm" className="justify-self-start" value={view.precedence} onChange={(v) => void onPrecedence(v)} options={PRECEDENCE_OPTIONS.map((o) => ({ v: o.v, label: o.label }))} />
+          <MorphSelect<Precedence> aria-labelledby="kl-prec-l" value={view.precedence} onChange={(v) => void onPrecedence(v)} options={PRECEDENCE_OPTIONS.map((o) => ({ value: o.v, label: o.label }))} className="justify-self-start sm:min-w-[16rem]" />
           <p className="text-[11px] text-faint">
             {help} {KL.precedenceHelp}
           </p>

@@ -129,7 +129,7 @@ export const AlertsCard = memo(function AlertsCard() {
                 <span id="kla-unit-l" className="label">
                   Einheit
                 </span>
-                <Segmented<DistanceMode> aria-labelledby="kla-unit-l" size="sm" className="justify-self-start" value={cfg.prepare.mode} onChange={(mode) => void apply({ prepare: { ...cfg.prepare, mode } })} options={[{ v: "pct", label: "%" }, { v: "atr", label: "× ATR" }]} />
+                <Segmented<DistanceMode> aria-labelledby="kla-unit-l" size="md" className="justify-self-start" value={cfg.prepare.mode} onChange={(mode) => void apply({ prepare: { ...cfg.prepare, mode } })} options={[{ v: "pct", label: "%" }, { v: "atr", label: "× ATR" }]} />
               </div>
             </div>
             <Field label={A.cooldown} htmlFor="kla-cd" help={A.cooldownHelp}>

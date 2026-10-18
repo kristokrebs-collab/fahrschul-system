@@ -89,7 +89,7 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
           </span>
           <Segmented<KeyTf>
             aria-labelledby={id("tf-l")}
-            size="sm"
+            size="md"
             className="justify-self-start"
             value={f.tf}
             onChange={(v) => set("tf", v)}
@@ -119,7 +119,7 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
           </span>
           <Segmented<"above" | "below">
             aria-labelledby={id("dir-l")}
-            size="sm"
+            size="md"
             className="justify-self-start"
             value={f.direction}
             onChange={(v) => set("direction", v)}
@@ -145,7 +145,7 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
               <span id={id("unit-l")} className="label">
                 {E.distanceUnit}
               </span>
-              <Segmented<"pct" | "atr"> aria-labelledby={id("unit-l")} size="sm" className="justify-self-start" value={f.distMode} onChange={(v) => set("distMode", v)} options={[{ v: "pct", label: "% vom Level" }, { v: "atr", label: "× ATR(14)" }]} />
+              <Segmented<"pct" | "atr"> aria-labelledby={id("unit-l")} size="md" className="justify-self-start" value={f.distMode} onChange={(v) => set("distMode", v)} options={[{ v: "pct", label: "% vom Level" }, { v: "atr", label: "× ATR(14)" }]} />
             </div>
           </>
         )}
@@ -157,7 +157,7 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
           <span id={id("prio-l")} className="label">
             {E.priority}
           </span>
-          <Segmented<string> aria-labelledby={id("prio-l")} size="sm" className="justify-self-start" value={String(f.priority)} onChange={(v) => set("priority", Number(v))} options={PRIORITY_OPTIONS} />
+          <Segmented<string> aria-labelledby={id("prio-l")} size="md" className="justify-self-start" value={String(f.priority)} onChange={(v) => set("priority", Number(v))} options={PRIORITY_OPTIONS} />
           <span className="text-[11px] text-faint">{E.priorityHelp}</span>
         </div>
         <Field label={E.role} htmlFor={id("role")} help={ROLE_HELP}>
@@ -211,7 +211,7 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
               </span>
               <Segmented<"once" | "recurring">
                 aria-labelledby={id("mode-l")}
-                size="sm"
+                size="md"
                 className="justify-self-start"
                 value={f.recurring ? "recurring" : "once"}
                 onChange={(v) => set("recurring", v === "recurring")}
@@ -223,11 +223,11 @@ export function KeyLevelEditor({ level, symbol, tf, price, onSave, onCancel, cla
         )}
       </fieldset>
 
-      <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="ghost" size="sm" onClick={onCancel}>
+      <div className="flex flex-wrap justify-end gap-x-2 gap-y-3.5">
+        <Button variant="ghost" onClick={onCancel}>
           {E.cancel}
         </Button>
-        <Button type="submit" variant="primary" size="sm" disabled={!sym} data-testid="keylevel-save">
+        <Button type="submit" variant="primary" disabled={!sym} data-testid="keylevel-save">
           {E.save}
         </Button>
       </div>
