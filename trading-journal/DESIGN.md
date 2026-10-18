@@ -298,3 +298,15 @@ Nachgezogen: Der „Bericht bereit“-Wipe kürzte seine Zahlen (`truncate`): �
 „−123.457 USDT“ 134 > 106 / 201 > 179 px (390 / 1440, gehintet ±1 px). Jetzt ganz: Spalten `minmax(max-content,1fr)`,
 gleiche Drittel, solange alles passt; E2E mit langen Werten, Berichte-E2E auf festem Mittwoch (sonntags kam kein Wipe).
 Übersicht „FAB …“ mit angehaltener Seitenuhr erzwungen: 95eb012 rot wie in CI, HEAD grün; geprüft wird der zweite Toast.
+
+## Chart spiegeln / Bias prüfen (F62)
+
+Ein Prüfwerkzeug, kein neues Gesicht: unter dem Markt-Box-Chart und im Trade-Replay sitzt dieselbe Leiste – der Schalter
+„Chart spiegeln“ (`Switch`, Beschriftung + eine Zeile „Nur die Preisachse steht auf dem Kopf. Kurse, Zeiten und Signale bleiben
+unverändert.“), darunter die Ebenen als Chips (`aria-pressed`, ≥ 44 px auf groben Zeigern: Ausbrüche · Trendlinien · Boxen ·
+Eigene Trades · RSI) und die ausdrückliche Option „RSI als 100−RSI spiegeln“. Der geführte Test erscheint als eine ruhige
+Fläche (`rounded-2xl border-line-2 bg-ink-950/40`, Überblendung `tween.fade`) mit drei Schritten; gesprochen wird nüchtern –
+„Widerspruch“ statt „Bias“, nie eine Zahl, die eine Person bewertet. Blindmodus heißt: keine Farbe als Aussage – Long/Short
+laufen in der Grau-Rampe, Stop und Ziel unterscheiden sich über die Strichform. Während des Tests zeigt die Markt-Seite nur
+den Chart (Setups, Box-Status und Alarme würden die Richtung verraten). Keine Animation außer der Überblendung, keine neuen
+Tokens, keine Schleifen.

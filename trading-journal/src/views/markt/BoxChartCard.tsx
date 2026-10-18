@@ -10,14 +10,22 @@ import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from 
 import { ChartSkeleton } from "@/chart/ChartSkeleton";
 import type { BarsListener, RangeDays } from "@/chart/NothingCandleChart";
 import type { ChartInterval } from "@/chart/panes";
-import { BOX_TF_MS, type BoxTf } from "@/domain/boxes";
+import type { ChartBox } from "@/chart/primitives/BoxPrimitive";
+import { lastClosedAnchor } from "@/chart/mirror";
+import { toTradeMarkers } from "@/chart/markers";
+import { BOX_TF_MS, normalizeWatchSymbol, type BoxTf } from "@/domain/boxes";
+import type { BiasContext, BiasTest } from "@/domain/biasTest";
 import { getProvider, priceMv, subscribeFeed, tickDirMv, tradeTimeMv, useFeedSelect, volAccumMv, type Candle, type Stamped } from "@/market";
 import { BOX_FEED, type BoxesView } from "@/market/boxes/store";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
+import { useEnriched } from "@/store/journalStore";
+import { MirrorPanel, useFrozenBars, useMirrorState, visibleMarkers } from "@/views/biasTest";
+import { BIAS } from "@/views/biasTest/strings";
 import { chartBoxesKey, toChartBoxes } from "./chartBoxes";
 import { MARKT, TF_TEXT } from "./strings";
 
+const NO_BOXES: ChartBox[] = [];
 const NothingCandleChart = lazy(() => import("@/chart/NothingCandleChart").then((m) => ({ default: m.NothingCandleChart })));
 
 const S = MARKT.chart;
@@ -114,28 +122,46 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
 
   const subscribeBars = useCallback((listener: BarsListener) => subscribeFeed(feedId, (v) => v && listener(v.data, v.asOf)), [feedId]);
 
+  // "Chart spiegeln / Bias prüfen" (F62): the mirror, the layers and – during a test – the frozen picture
+  const mirror = useMirrorState("markt");
+  const shownCandles = useFrozenBars(candles, mirror.anchorMs);
+  const trades = useEnriched();
+  const markers = useMemo(() => {
+    if (!mirror.view.layers.trades || !symbol) return undefined;
+    const own = toTradeMarkers(trades.filter((t) => normalizeWatchSymbol(t.pair) === symbol));
+    return visibleMarkers(own, { layerOn: true, anchorMs: mirror.anchorMs, intervalMs: BOX_TF_MS[tf], blind: mirror.blind });
+  }, [trades, symbol, tf, mirror.view.layers.trades, mirror.anchorMs, mirror.blind]);
+  const capture = useCallback((): BiasContext | { reason: string } => {
+    const anchorMs = lastClosedAnchor(candles, BOX_TF_MS[tf], Date.now());
+    return anchorMs == null || !symbol ? { reason: BIAS.setup.noAnchor } : { surface: "markt", symbol, interval: tf, anchorMs };
+  }, [candles, tf, symbol]);
+  const canResume = useCallback((t: BiasTest) => t.context.symbol === symbol && t.context.interval === tf && candles.some((c) => c.time === t.context.anchorMs), [candles, symbol, tf]);
+
   return (
     <Card
       title={S.title}
       note={S.note}
-      action={<Segmented<BoxTf> size="sm" aria-label={S.tf} options={TFS} value={tf} onChange={setTf} />}
+      action={<Segmented<BoxTf> size="sm" aria-label={S.tf} options={mirror.frozen ? TFS.map((o) => ({ ...o, disabled: o.v !== tf })) : TFS} value={tf} onChange={setTf} />}
       data-testid="markt-chart"
     >
       <div data-tf={tf} data-boxes={stable.boxes.length}>
         <Suspense fallback={<ChartSkeleton className="h-[360px] md:h-[480px]" />}>
           <NothingCandleChart
             key={symbol}
-            candles={candles}
+            candles={shownCandles as Candle[]}
             interval={INTERVAL[tf]}
-            boxes={stable.boxes}
+            boxes={mirror.view.layers.boxes ? stable.boxes : NO_BOXES}
             boxAutoscale
-            pane="rsi"
+            pane={mirror.view.layers.rsi ? "rsi" : "none"}
             rangeDays={RANGE[tf]}
-            price={priceMv}
-            tradeTime={tradeTimeMv}
-            tickDir={tickDirMv}
-            tradeVolume={volAccumMv}
-            subscribeBars={subscribeBars}
+            mirror={mirror.chart}
+            markers={markers}
+            // a frozen test picture takes no live data: nothing after the anchor may move it
+            price={mirror.frozen ? undefined : priceMv}
+            tradeTime={mirror.frozen ? undefined : tradeTimeMv}
+            tickDir={mirror.frozen ? undefined : tickDirMv}
+            tradeVolume={mirror.frozen ? undefined : volAccumMv}
+            subscribeBars={mirror.frozen ? undefined : subscribeBars}
             followLabel="Folgen"
             className="h-[360px] md:h-[480px]"
           />
@@ -149,6 +175,7 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
           </span>
         ))}
       </div>
+      <MirrorPanel surface="markt" capture={capture} canResume={canResume} className="mt-3 border-t border-line pt-3" />
     </Card>
   );
 });

@@ -17,7 +17,10 @@ import { spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Segmented, Skeleton } from "@/primitives";
 import { useEnriched } from "@/store/journalStore";
-import { buildReplay, defaultReplayInterval, phaseLabel, readoutAt, REPLAY_INTERVALS, replayWindow, type ReplayInterval } from "./replayModel";
+import type { BiasContext, BiasTest } from "@/domain/biasTest";
+import { MirrorPanel, useMirrorState } from "@/views/biasTest";
+import { BIAS } from "@/views/biasTest/strings";
+import { barAt, buildReplay, defaultReplayInterval, phaseLabel, readoutAt, REPLAY_INTERVALS, replayWindow, type ReplayInterval } from "./replayModel";
 import { closeReplay, useReplay } from "./replayStore";
 
 /** The replay chart is its own lightweight-charts chunk. */
@@ -47,8 +50,10 @@ export function ReplayHost() {
  */
 export function TradeReplay({ trade, onClose }: { trade: EnrichedTrade | null; onClose: () => void }) {
   const open = trade != null;
+  // blind bias test (F62): the market name stays covered in the title too
+  const blindName = useMirrorState("replay").blind.hideName;
   return (
-    <Sheet open={open} onClose={onClose} title={trade ? `Replay · ${trade.pair || "Trade"}` : "Replay"} size="lg">
+    <Sheet open={open} onClose={onClose} title={trade && !blindName ? `Replay · ${trade.pair || "Trade"}` : "Replay"} size="lg">
       {trade ? <ReplayBody key={trade.id} trade={trade} /> : null}
     </Sheet>
   );
@@ -82,17 +87,22 @@ function ReplayBody({ trade }: { trade: EnrichedTrade }) {
     [provider, pairOk, load, key],
   );
   const model = useMemo(() => (state.status === "ok" ? buildReplay(trade, state.bars, interval) : null), [state, trade, interval]);
+  const mirror = useMirrorState("replay");
+  // the header tells the position and the result: covered in a blind test, and the exit never shows while the picture is frozen
+  const coverPosition = mirror.blind.hidePosition;
+  const coverResult = mirror.frozen || mirror.blind.hidePnl || coverPosition;
 
   return (
     <div className="grid gap-4">
       <StaggerItem className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-0.5">
-          <span className={cn("font-mono text-xs font-semibold uppercase tracking-[0.12em]", trade.side === "short" ? "text-loss" : "text-win")}>{trade.side === "short" ? "▼ Short" : "▲ Long"}</span>
+          {!coverPosition && <span className={cn("font-mono text-xs font-semibold uppercase tracking-[0.12em]", trade.side === "short" && !mirror.blind.neutralColors ? "text-loss" : trade.side !== "short" && !mirror.blind.neutralColors ? "text-win" : "text-fg")}>{trade.side === "short" ? "▼ Short" : "▲ Long"}</span>}
           <span className="text-[12.5px] text-mute">
-            {fmtDate(new Date(trade.date))} {fmtTime(new Date(trade.date))} · {fmtPrice(trade.entry)} → {trade.result === "open" ? "offen" : fmtPrice(trade.exit)}
+            {fmtDate(new Date(trade.date))} {fmtTime(new Date(trade.date))}
+            {!coverPosition && ` · ${fmtPrice(trade.entry)}${coverResult ? "" : ` → ${trade.result === "open" ? "offen" : fmtPrice(trade.exit)}`}`}
           </span>
         </div>
-        <Segmented<ReplayInterval> aria-label="Kerzen" size="sm" value={interval} onChange={setTf} options={REPLAY_INTERVALS.map((v) => ({ v, label: v }))} />
+        <Segmented<ReplayInterval> aria-label="Kerzen" size="sm" value={interval} onChange={setTf} options={REPLAY_INTERVALS.map((v) => ({ v, label: v, disabled: mirror.frozen && v !== interval }))} />
       </StaggerItem>
       <StaggerItem>
         <AnimatePresence mode="wait" initial={false}>
@@ -129,6 +139,21 @@ function ReplayPlayer({ trade, model, bars, interval }: { trade: EnrichedTrade; 
   const mfeMv = useMotionValue(0);
   const [phase, setPhase] = useState(() => phaseLabel(model, 0));
   const hasR = model.steps.some((s) => s.r != null);
+  const mirror = useMirrorState("replay");
+  // a bias test (F62) freezes the picture at the anchor bar: the chart gets only the bars up to it and no exit / target
+  const frozenN = mirror.anchorMs != null ? barAt(bars, mirror.anchorMs) + 1 : null;
+  const fixed = useMotionValue(frozenN ?? 0);
+  useEffect(() => {
+    if (frozenN != null) fixed.set(frozenN);
+  }, [fixed, frozenN]);
+  const chartBars = useMemo(() => (frozenN != null ? bars.slice(0, frozenN) : bars), [bars, frozenN]);
+  const chartTrade = useMemo(() => (frozenN != null ? { ...model.trade, exit: null, exitIndex: null, target: null, result: "open" as const } : model.trade), [model.trade, frozenN]);
+  const capture = (): BiasContext | { reason: string } => {
+    const n = Math.floor(step.get());
+    const bar = bars[n - 1];
+    return n < 1 || !bar ? { reason: BIAS.setup.noStep } : { surface: "replay", symbol: trade.pair, interval, anchorMs: bar.time, tradeId: trade.id };
+  };
+  const canResume = (t: BiasTest) => t.context.tradeId === trade.id && t.context.interval === interval && bars.some((b) => b.time === t.context.anchorMs);
   const barTime = (t: number) => {
     const b = bars[Math.max(0, Math.min(bars.length - 1, Math.ceil(t) - 1))];
     if (!b) return "–";
@@ -146,44 +171,59 @@ function ReplayPlayer({ trade, model, bars, interval }: { trade: EnrichedTrade; 
   return (
     <div className="grid gap-3">
       <Suspense fallback={<Skeleton height={CHART_H} />}>
-        <ReplayChart bars={bars} trade={model.trade} steps={model.steps} step={step} wipeKey={interval} height={CHART_H} />
+        <ReplayChart
+          bars={chartBars}
+          trade={chartTrade}
+          steps={model.steps}
+          step={frozenN != null ? fixed : step}
+          wipeKey={interval}
+          height={CHART_H}
+          flipped={mirror.view.flipped}
+          showTrade={mirror.view.layers.trades && !mirror.blind.hidePosition}
+          neutral={mirror.blind.neutralColors}
+        />
       </Suspense>
-      <div className="grid grid-cols-3 gap-2" role="group" aria-label="Replay-Werte">
-        <Readout label="R">{hasR ? <RollingDigits source={rMv} decimals={2} className="dot-num text-[22px]" aria-label="R im Replay" /> : <span className="text-faint">–</span>}</Readout>
-        <Readout label="MAE">
-          <span className="text-loss">
-            <MotionNumber source={maeMv} decimals={2} />
-          </span>
-        </Readout>
-        <Readout label="MFE">
-          <span className="text-win">
-            <MotionNumber source={mfeMv} decimals={2} />
-          </span>
-        </Readout>
-      </div>
-      <div className="flex items-center justify-between text-[12px]">
-        <span className="label">Phase</span>
-        <span className="font-mono text-fg/85">
-          <TextRoll text={phase} mode="morph" />
-        </span>
-      </div>
-      <ScrubTimeline
-        label="Replay-Zeitleiste"
-        title={`${model.total} Kerzen · ${interval}`}
-        total={model.total}
-        spans={model.spans}
-        markers={model.markers}
-        time={step}
-        defaultTime={0}
-        autoPlay
-        playSeconds={Math.max(6, Math.min(16, model.total / 9))}
-        step={1}
-        bigStep={10}
-        formatTime={barTime}
-      />
-      <p className="text-[11.5px] text-faint">
-        Leertaste spielt ab, Pfeile gehen eine Kerze weiter. {trade.mfeR != null ? `Gespeichert: MFE ${trade.mfeR.toFixed(2).replace(".", ",")} R.` : ""}
-      </p>
+      {!mirror.frozen && (
+        <>
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Replay-Werte">
+            <Readout label="R">{hasR ? <RollingDigits source={rMv} decimals={2} className="dot-num text-[22px]" aria-label="R im Replay" /> : <span className="text-faint">–</span>}</Readout>
+            <Readout label="MAE">
+              <span className="text-loss">
+                <MotionNumber source={maeMv} decimals={2} />
+              </span>
+            </Readout>
+            <Readout label="MFE">
+              <span className="text-win">
+                <MotionNumber source={mfeMv} decimals={2} />
+              </span>
+            </Readout>
+          </div>
+          <div className="flex items-center justify-between text-[12px]">
+            <span className="label">Phase</span>
+            <span className="font-mono text-fg/85">
+              <TextRoll text={phase} mode="morph" />
+            </span>
+          </div>
+          <ScrubTimeline
+            label="Replay-Zeitleiste"
+            title={`${model.total} Kerzen · ${interval}`}
+            total={model.total}
+            spans={model.spans}
+            markers={model.markers}
+            time={step}
+            defaultTime={0}
+            autoPlay
+            playSeconds={Math.max(6, Math.min(16, model.total / 9))}
+            step={1}
+            bigStep={10}
+            formatTime={barTime}
+          />
+          <p className="text-[11.5px] text-faint">
+            Leertaste spielt ab, Pfeile gehen eine Kerze weiter. {trade.mfeR != null ? `Gespeichert: MFE ${trade.mfeR.toFixed(2).replace(".", ",")} R.` : ""}
+          </p>
+        </>
+      )}
+      <MirrorPanel surface="replay" capture={capture} canResume={canResume} layers={["trades"]} tradeId={trade.id} className="border-t border-line pt-3" />
     </div>
   );
 }
