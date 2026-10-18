@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { EdgeBlur, type BlurBand } from "@/app/BottomFade";
 import { openCommandNav, useCommandNavOpen, COMMAND_NAV_ID } from "@/app/CommandNav";
 import { FullscreenButton } from "@/app/DisplayActions";
+import { AssistantButton } from "@/assistant/AssistantButton";
 import { HeaderTicker } from "@/app/HeaderTicker";
 import { cloudEnabled } from "@/cloud/env";
 import { useCloudSession } from "@/cloud/session";
@@ -283,6 +284,7 @@ export function Header() {
           {/* P09: login / sync state of the cloud (renders nothing without cloud) – the ONE `auth-sheet` morph source */}
           <AccountPill />
           {/* grey-bar fix: hide the browser UI + system bars (Fullscreen API); lg+ only (at 768 the wordmark would run into the ticker) – narrower screens reach it in the command navigation */}
+          <AssistantButton />
           <FullscreenButton className="max-lg:hidden" />
           <MenuButton />
           <Magnetic intensity={0.25} range={120}>

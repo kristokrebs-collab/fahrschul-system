@@ -18,9 +18,10 @@
  * | `ReplayHost`, `ExcursionBackfillHost` | P06 | trade replay sheet, idle MAE / MFE backfill |
  * | `BoxSnapBackfillHost` | P02 | idle Box-zu-Box context at entry for synced / imported trades and other pairs (F02) |
  */
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { installE2eHooks } from "@/app/e2eHooks";
 import { HostSlot } from "@/app/HostSlot";
+import { useAssistantOpen } from "@/assistant/open";
 import { useEntitlement } from "@/billing/entitlements";
 import type { Feature } from "@/billing/types";
 import { BillingHost } from "@/billing/ui/BillingHost";
@@ -35,6 +36,18 @@ import { CoachWatcher } from "@/views/coach/CoachWatcher";
 import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
 import { ReplayHost } from "@/views/trades/replay/TradeReplay";
 import { PostTradeReviewHost } from "@/views/wachstum/PostTradeReview";
+
+const AssistantHost = lazy(() => import("@/assistant/AssistantHost"));
+
+/** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
+function AssistantMount() {
+  const used = useAssistantOpen((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <AssistantHost />
+    </Suspense>
+  ) : null;
+}
 
 // e2e only (`src/app/e2eHooks.ts`): the risk guard's store (override / marks)
 installE2eHooks({ __tjGuard: useRiskGuardStore });
@@ -52,6 +65,9 @@ function BoxAlerts() {
 export default function DeferredHosts() {
   return (
     <>
+      <HostSlot name="Assistent">
+        <AssistantMount />
+      </HostSlot>
       <HostSlot name="Abo">
         <BillingHost onNavigate={(p) => navigate(p)} />
       </HostSlot>

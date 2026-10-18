@@ -24,6 +24,7 @@ export const SERVER_ENV = [
   "IP_HASH_PEPPER",
   "ANTHROPIC_API_KEY",
   "COACH_MODEL",
+  "ROUTER_MODEL",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */

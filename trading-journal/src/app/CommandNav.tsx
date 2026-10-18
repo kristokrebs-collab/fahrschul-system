@@ -18,6 +18,8 @@ import { PAGE_ICON, PAGE_LABELS } from "@/app/Dock";
 import { preloadPage } from "@/app/pages";
 import { DISPLAY_STRINGS, isIosSafari, isSamsungInternet, promptInstall, toggleFullscreen, useCanInstall, useFullscreen, useFullscreenSupported, useStandalone } from "@/app/pwa";
 import { useLivePriceText, usePageCounts, useShellStats } from "@/app/shellStats";
+import { GlyphSpark } from "@/assistant/icons";
+import { openAssistant } from "@/assistant/open";
 import { cloudEnabled } from "@/cloud/env";
 import { ensureCloud } from "@/cloud/runtime";
 import { useCloudSession } from "@/cloud/session";
@@ -224,6 +226,15 @@ function Panel({ reduced }: { reduced: boolean }) {
       run: () => {
         closeCommandNav(true);
         openEditor();
+      },
+    },
+    {
+      key: "assistant",
+      label: "Assistent öffnen",
+      icon: <GlyphSpark />,
+      run: () => {
+        closeCommandNav(true);
+        openAssistant();
       },
     },
     {

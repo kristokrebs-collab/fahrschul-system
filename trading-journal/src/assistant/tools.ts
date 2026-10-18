@@ -1,0 +1,237 @@
+/**
+ * Tools of the assistant (F74): everything that is not a plain journal question. Each tool is a pure function of
+ * `ToolEnv` (data in, reply out; the few side effects – navigate, open the editor, change the memory – are callbacks of
+ * the env, so the tests run without a browser). Numbers always come from the deterministic domain code; a tool never
+ * asks a language model for a figure.
+ */
+import type { Recommendation } from "@/domain/coach";
+import type { Answer, AnswerData, AnswerFact, Tone } from "@/domain/coach/nlq";
+import type { SignalCheckState } from "@/market/signals";
+import type { Page } from "@/store/uiStore";
+import { addFact, forgetAll, removeFact, setStyle, topInterests, type AnswerStyle, type AssistantMemory } from "./memory";
+import { PAGE_LABEL, type ToolId } from "./understand";
+
+export interface ReplyAction {
+  label: string;
+  run: () => void;
+}
+
+export interface ToolReply {
+  title: string;
+  text: string;
+  facts: AnswerFact[];
+  followUps: string[];
+  actions: ReplyAction[];
+  tone: Tone;
+  /** the sheet closes after this reply (navigation, editor): the user sees the page, not the chat */
+  close?: boolean;
+}
+
+/** What the lab knows about its last finished run (filled by the Labor store; `null` = no run yet). */
+export interface LabSummary {
+  name: string;
+  trades: number;
+  net: string;
+  /** deterministic findings of `diagnoseRun`, strongest first, each with its numbers */
+  findings: string[];
+  /** headline numbers */
+  facts: AnswerFact[];
+}
+
+export interface ToolEnv {
+  data: AnswerData;
+  prev: { question: string; answer: Answer } | null;
+  mem: AssistantMemory;
+  signal: SignalCheckState;
+  /** ranked recommendations of the coach (computed on demand) */
+  recs: () => readonly Recommendation[];
+  lab: LabSummary | null;
+  go: (page: Page) => void;
+  newTrade: () => void;
+  setMem: (fn: (m: AssistantMemory) => AssistantMemory) => void;
+  now: number;
+}
+
+const fact = (label: string, value: string, tone: Tone = "fg", raw: number | null = null): AnswerFact => ({ label, value, raw, tone });
+const reply = (r: Partial<ToolReply> & Pick<ToolReply, "title" | "text">): ToolReply => ({ facts: [], followUps: [], actions: [], tone: "fg", ...r });
+
+/* ------------------------------------------------------------------ memory */
+
+const STYLE_WORD: Readonly<Record<AnswerStyle, string>> = { kurz: "kurz", normal: "normal", detail: "ausführlich" };
+
+/** The text after "merk dir", cleaned. */
+export function factOf(text: string): string {
+  return text
+    .replace(/^\s*(bitte\s+)?(du\s+)?(kannst\s+dir\s+)?merk(e|t)?\s+(dir\s+)?(bitte\s+)?(mal\s+)?(,|:)?\s*/i, "")
+    .replace(/^\s*(dass|das)\s+/i, "")
+    .trim();
+}
+
+function memoryTool(arg: string, env: ToolEnv): ToolReply {
+  const t = arg.toLowerCase();
+  const { mem } = env;
+  if (/\b(merk|merke|merkt)\b/.test(t)) {
+    const f = factOf(arg);
+    if (!f) return reply({ title: "Was soll ich mir merken?", text: "Sag es mir so: „Merk dir: ich handle nur in der London-Session.“", followUps: ["Was weißt du über mich?"] });
+    env.setMem((m) => addFact(m, f, env.now));
+    return reply({ title: "Gemerkt", text: `Ich habe mir gemerkt: „${f}“. Du kannst es jederzeit unter „Was ich über dich weiß“ löschen.`, tone: "win", followUps: ["Was weißt du über mich?"] });
+  }
+  if (/\bvergiss\b|\bvergessen\b/.test(t)) {
+    if (/\b(alles|alle|komplett|samt)\b/.test(t)) {
+      env.setMem(forgetAll);
+      return reply({ title: "Alles vergessen", text: "Ich habe mein Gedächtnis über dich geleert: Notizen, Stil und was dich interessiert.", tone: "win" });
+    }
+    const word = t.replace(/^.*\bvergiss(e|t)?\b/, "").replace(/\b(bitte|das|dass|mal|dir)\b/g, "").trim();
+    const hits = word ? mem.facts.filter((f) => f.text.toLowerCase().includes(word)) : mem.facts.slice(-1);
+    if (!hits.length) return reply({ title: "Nichts gefunden", text: word ? `Ich habe nichts zu „${word}“ gespeichert.` : "Es ist nichts gespeichert.", followUps: ["Was weißt du über mich?"] });
+    env.setMem((m) => hits.reduce((acc, h) => removeFact(acc, h.id), m));
+    return reply({ title: "Vergessen", text: `${hits.length === 1 ? "Eintrag" : `${hits.length} Einträge`} gelöscht: ${hits.map((h) => `„${h.text}“`).join(", ")}.`, tone: "win" });
+  }
+  const style: AnswerStyle | null = /\bkurz|knapp|kuerzer|kürzer/.test(t) ? "kurz" : /\bausfuehrlich|ausführlich|detail/.test(t) ? "detail" : /\bnormal\b/.test(t) ? "normal" : null;
+  if (style) {
+    env.setMem((m) => setStyle(m, style));
+    return reply({ title: "Stil geändert", text: `Ich antworte ab jetzt ${STYLE_WORD[style]}.`, tone: "win" });
+  }
+  // "was weißt du über mich"
+  const top = topInterests(mem, 3).map(topicLabel);
+  const lines = [
+    mem.facts.length ? `Gemerkt: ${mem.facts.map((f) => `„${f.text}“`).join("; ")}.` : "Ich habe keine Notizen von dir gespeichert.",
+    `Antwortstil: ${STYLE_WORD[mem.style]}.`,
+    top.length ? `Du fragst am häufigsten nach: ${top.join(", ")}.` : "Ich weiß noch nicht, was dich am meisten interessiert – das lerne ich aus deinen Fragen.",
+  ];
+  return reply({ title: "Das weiß ich über dich", text: lines.join(" "), facts: [fact("Fragen", String(mem.asked)), fact("Notizen", String(mem.facts.length))], followUps: ["Fass dich kürzer", "Vergiss alles"] });
+}
+
+const TOPIC_LABEL: Readonly<Record<string, string>> = { good: "Stärken", bad: "Schwächen", status: "Überblick", entry: "Einstiegs-Check", improve: "Verbesserungen", lab: "Labor", memory: "Gedächtnis", compare: "Vergleiche", list: "Trade-Listen" };
+
+/** German label of a learned topic key. */
+export function topicLabel(key: string): string {
+  if (TOPIC_LABEL[key]) return TOPIC_LABEL[key]!;
+  if (key.startsWith("metric:")) return `Kennzahl ${key.slice(7)}`;
+  if (key.startsWith("group:")) return `Auswertung nach ${key.slice(6)}`;
+  if (key.startsWith("behavior:")) return `Verhalten (${key.slice(9)})`;
+  if (key.startsWith("page:")) return `Seite ${PAGE_LABEL[key.slice(5) as Page] ?? key.slice(5)}`;
+  return key;
+}
+
+/* ------------------------------------------------------------------ the tools */
+
+function improveTool(env: ToolEnv): ToolReply {
+  const recs = env.recs().slice(0, 3);
+  if (!env.data.closed.length || !recs.length)
+    return reply({ title: "Noch keine belastbare Empfehlung", text: "Für Empfehlungen brauche ich abgeschlossene Trades mit genügend Wiederholungen. Sobald welche da sind, nenne ich dir die drei teuersten Muster mit Belegen.", followUps: ["Was kannst du?"] });
+  const cur = env.data.currency;
+  return reply({
+    title: "Daran würde ich arbeiten",
+    text: recs.map((r, i) => `${i + 1}. ${r.title} – ${r.why}`).join(" "),
+    facts: recs.map((r) => fact(r.title.slice(0, 40), r.unit === "R" ? `${r.impact.toFixed(1).replace(".", ",")} R` : `${Math.round(r.impact)} ${cur}`, r.impact < 0 ? "loss" : "win", r.impact)),
+    followUps: ["Was kostet mich Revenge?", "Wie war letzte Woche?"],
+    actions: [{ label: "Im Coach öffnen", run: () => env.go("coach") }],
+  });
+}
+
+function entryTool(env: ToolEnv): ToolReply {
+  const { state, snapshot, message } = env.signal;
+  if (!snapshot) return reply({ title: "Kein Live-Check", text: message ?? "Der Einstiegs-Check hat noch keine Kerzen geladen. Öffne die Übersicht, dann verbindet er sich.", actions: [{ label: "Zur Übersicht", run: () => env.go("overview") }] });
+  const parts = (v: typeof snapshot.long, name: string): string => {
+    const missing = v.reasons.filter((r) => !r.ok).map((r) => r.text);
+    return `${name}: ${v.valid ? "Einstieg gültig" : "kein gültiger Einstieg"} (${v.label}, Score ${v.score})${missing.length ? `. Es fehlt: ${missing.slice(0, 4).join("; ")}` : ""}.`;
+  };
+  const stale = state === "stale" || state === "offline" ? " Achtung: die Daten sind nicht mehr ganz frisch." : "";
+  const best = snapshot.best;
+  return reply({
+    title: best.valid ? `${best.side === "long" ? "Long" : "Short"}-Einstieg gültig` : "Aktuell kein gültiger Einstieg",
+    text: `${parts(snapshot.long, "Long")} ${parts(snapshot.short, "Short")}${stale}`,
+    facts: [fact("Long-Score", String(snapshot.long.score), snapshot.long.valid ? "win" : "mute", snapshot.long.score), fact("Short-Score", String(snapshot.short.score), snapshot.short.valid ? "loss" : "mute", snapshot.short.score), fact("Stand", env.signal.updatedAt ? new Date(env.signal.updatedAt).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) : "–")],
+    tone: best.valid ? (best.side === "long" ? "win" : "loss") : "mute",
+    followUps: ["Was kostet mich FOMO?", "Öffne den Markt"],
+    actions: [{ label: "Einstiegs-Check öffnen", run: () => env.go("overview") }],
+  });
+}
+
+function labTool(env: ToolEnv): ToolReply {
+  const lab = env.lab;
+  if (!lab) return reply({ title: "Noch kein Labor-Lauf", text: "Ich sehe keinen fertigen Lauf. Starte im Labor einen Test, dann kann ich ihn mit Trichter, Kosten und Ausstiegsgründen auseinandernehmen.", actions: [{ label: "Labor öffnen", run: () => env.go("labor") }], followUps: ["Öffne das Labor"] });
+  return reply({
+    title: `Labor-Lauf: ${lab.name}`,
+    text: lab.findings.length ? `${lab.trades} Trades, Ergebnis ${lab.net}. Das fällt auf: ${lab.findings.slice(0, 4).join(" ")} Das sind Beobachtungen aus den Zahlen, keine bewiesene Ursache.` : `${lab.trades} Trades, Ergebnis ${lab.net}. Die Diagnose findet nichts Auffälliges – prüfe Datenabdeckung und Kosten im Labor.`,
+    facts: lab.facts.slice(0, 4),
+    actions: [{ label: "Diagnose im Labor", run: () => env.go("labor") }],
+    followUps: ["Und ohne Gebühren?"],
+  });
+}
+
+function explainTool(env: ToolEnv): ToolReply {
+  const p = env.prev;
+  if (!p) return reply({ title: "Wozu?", text: "Ich habe noch keine Antwort gegeben, die ich begründen könnte. Stell mir erst eine Frage." });
+  const a = p.answer;
+  const n = a.confidence.n;
+  return reply({
+    title: "So bin ich darauf gekommen",
+    text: `Grundlage: ${n} Trade${n === 1 ? "" : "s"} im gewählten Bereich${a.intent.understood.length ? ` (${a.intent.understood.join(", ")})` : ""}. ${a.confidence.note} Alle Zahlen rechne ich direkt aus deinen Trades, nichts ist geschätzt.${a.trades.length ? " Die Belege stehen unter der Antwort." : ""}`,
+    facts: a.facts.slice(0, 3),
+    followUps: a.followUps.slice(0, 3),
+  });
+}
+
+const GREETING_PARTS = ["Moin", "Hallo"];
+
+function helloTool(arg: string, env: ToolEnv): ToolReply {
+  if (/danke/i.test(arg)) return reply({ title: "Gern", text: "Gern geschehen. Frag einfach weiter – auch per Mikrofon.", followUps: suggestFor(env) });
+  const g = GREETING_PARTS[env.now % GREETING_PARTS.length]!;
+  const top = topInterests(env.mem, 1).map(topicLabel)[0];
+  return reply({
+    title: `${g}!`,
+    text: env.mem.asked === 0 ? "Ich bin dein Assistent im Journal. Ich beantworte Fragen zu deinen Trades, prüfe den Einstieg, erkläre Laborläufe und öffne Seiten. Ich rechne alles aus deinen Daten und lerne, was dich interessiert." : `Schön, dich zu sehen.${top ? ` Zuletzt hat dich vor allem „${top}“ interessiert.` : ""} Womit kann ich helfen?`,
+    followUps: suggestFor(env),
+  });
+}
+
+function helpTool(env: ToolEnv): ToolReply {
+  return reply({
+    title: "Das kann ich",
+    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“) oder Verbesserungen. Ich öffne auch Seiten („Öffne das Labor“) und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
+    followUps: suggestFor(env),
+  });
+}
+
+/** Chips for the greeting and help: the most asked topics first, then a few safe defaults. */
+export function suggestFor(env: Pick<ToolEnv, "mem">): string[] {
+  const base = ["Was lief gut?", "Was fehlt für meinen Einstieg?", "Wie war letzte Woche?", "Woran soll ich arbeiten?", "Was ist mein bestes Setup?"];
+  const asked = topInterests(env.mem, 3);
+  const bias: Record<string, string> = { good: "Was lief gut?", bad: "Was lief schlecht?", entry: "Was fehlt für meinen Einstieg?", improve: "Woran soll ich arbeiten?", lab: "Warum ist der Backtest so schlecht?", status: "Wie läuft es?" };
+  const first = asked.map((k) => bias[k]).filter((x): x is string => !!x);
+  return [...new Set([...first, ...base])].slice(0, 4);
+}
+
+/** Runs a tool; never throws – a failing tool answers honestly. */
+export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
+  try {
+    switch (tool) {
+      case "memory":
+        return memoryTool(arg, env);
+      case "improve":
+        return improveTool(env);
+      case "entry":
+        return entryTool(env);
+      case "lab":
+        return labTool(env);
+      case "explain":
+        return explainTool(env);
+      case "hello":
+        return helloTool(arg, env);
+      case "help":
+        return helpTool(env);
+      case "navigate": {
+        const page = arg as Page;
+        env.go(page);
+        return reply({ title: `${PAGE_LABEL[page] ?? "Seite"} geöffnet`, text: `Ich habe ${PAGE_LABEL[page] ?? "die Seite"} für dich geöffnet.`, close: true });
+      }
+      case "newTrade":
+        env.newTrade();
+        return reply({ title: "Trade eintragen", text: "Das Formular ist offen.", close: true });
+    }
+  } catch {
+    return reply({ title: "Das hat nicht geklappt", text: "Dabei ist ein Fehler aufgetreten. Versuch es bitte noch einmal oder frag anders.", tone: "mute" });
+  }
+}

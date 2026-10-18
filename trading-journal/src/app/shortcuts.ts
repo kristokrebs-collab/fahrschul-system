@@ -17,6 +17,7 @@ import { PAGE_LABELS } from "@/app/Dock";
 import { navigate } from "@/store/router";
 import { toggleTheme } from "@/store/themeStore";
 import { NAV_ORDER, PAGE_KEYS, PAGES, useUi, type Page } from "@/store/uiStore";
+import { openAssistant } from "@/assistant/open";
 import { openSearch } from "@/search/searchStore";
 
 export const CHORD_MS = 1200;
@@ -79,6 +80,7 @@ export function shortcutList(): ShortcutDef[] {
     { id: "page-next", keys: ["]"], label: "Nächste Seite", group: "Navigation", run: () => stepPage(1) },
     { id: "nav", keys: ["⌘", "K"], label: "Navigation öffnen (Ctrl+K)", group: "Navigation" },
     { id: "new-trade", keys: ["n"], label: "Neuen Trade eintragen", group: "Aktionen", run: () => useUi.getState().openEditor() },
+    { id: "assistant", keys: ["a"], label: "Assistent öffnen", group: "Aktionen", run: () => openAssistant() },
     { id: "theme", keys: ["t"], label: "Hell / Dunkel umschalten", group: "Aktionen", run: () => toggleTheme() },
     { id: "search", keys: ["/"], label: "Suche öffnen", group: "Suche & Hilfe", run: () => openSearch() },
     { id: "search-mod", keys: ["⌘", "⇧", "F"], label: "Suche öffnen (Ctrl+⇧+F)", group: "Suche & Hilfe", run: () => openSearch() },
