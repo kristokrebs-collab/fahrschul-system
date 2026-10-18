@@ -20,6 +20,7 @@ import { BiasBar } from "./BiasBar";
 import { PartsSection, Reasons, RungTile, VerdictRow, ZoneGauge } from "./signalParts";
 import { entryLevels, freshEntry, ladderText, partViews, rungViews, statusPill, verdictStateLine, type EntryLevels, type RungView } from "./signalView";
 import { useForceRefresh } from "./useMarket";
+import { WhySection } from "./WhySection";
 
 export const SIGNAL_CARD_ID = "signal-card";
 export const SIGNAL_INFO_ID = `${SIGNAL_CARD_ID}-info`;
@@ -200,7 +201,11 @@ function SignalSkeleton({ rungs, message }: { rungs: number; message: string }) 
         <Skeleton className={cn(SK, "h-[161px] sm:h-[146px] md:h-[203px]")} />
         <Skeleton className={cn(SK, "h-[203px]")} />
       </div>
-      <Skeleton className="h-[30px] w-3/4 rounded-md sm:h-[15px]" aria-hidden="true" />
+      {/* "Warum handeln oder auslassen?" (collapsed: label, verdict line) + the source note: one block, like the evaluated card's end */}
+      <div className="grid gap-5" aria-hidden="true">
+        <Skeleton className={cn(SK, "h-[72px]")} />
+        <Skeleton className="h-[30px] w-3/4 rounded-md sm:h-[15px]" />
+      </div>
     </div>
   );
 }
@@ -297,6 +302,7 @@ export function SignalCard() {
               <ZoneGauge c={snap.zone} side={cur} />
               <Reasons v={v} />
             </div>
+            <WhySection snap={snap} side={cur} feed={check.state} />
             {check.state === "stale" && check.message && <p className="text-[11.5px] text-warn">{check.message}</p>}
             <p className="text-[11px] leading-snug text-faint">{DATA_SOURCE_NOTE}</p>
           </div>
