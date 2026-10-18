@@ -22,6 +22,7 @@ import { StatusPill } from "@/motion/StatusPill";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { PageHeader } from "@/views/setups/PageHeader";
+import { AlertsCard, KeyLevelsCard, PlanCard } from "@/views/schluesselmarken";
 import { BestSetupsCard } from "./BestSetupsCard";
 import { BoxChartCard } from "./BoxChartCard";
 import { BoxSettingsCard } from "./BoxSettingsCard";
@@ -148,6 +149,13 @@ export function MarktView({ className }: { className?: string }) {
       <Cell index={2} span="lg:col-span-12">
         <BoxChartCard view={view} />
       </Cell>
+      {/* Schlüsselmarken (F09), Tagesplan (F08): the user's own levels with live status, the plan built from them */}
+      <Cell index={6} span="lg:col-span-7">
+        <KeyLevelsCard />
+      </Cell>
+      <Cell index={7} span="lg:col-span-5">
+        <PlanCard />
+      </Cell>
       <Cell index={3} span="lg:col-span-5">
         <RsiLinesCard view={view} />
       </Cell>
@@ -159,6 +167,9 @@ export function MarktView({ className }: { className?: string }) {
       </Cell>
       <Cell index={5} span="lg:col-span-12">
         <BoxSettingsCard />
+      </Cell>
+      <Cell index={8} span="lg:col-span-12">
+        <AlertsCard />
       </Cell>
     </div>
   );

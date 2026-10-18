@@ -164,7 +164,7 @@ export const OUTCOME_LABEL: Readonly<Record<DeliveryOutcome, string>> = {
   sent: "gesendet",
   duplicate: "unterdrückt – Dublette",
   hours: "unterdrückt – außerhalb der Aktivzeit",
-  channels: "unterdrückt – kein Kanal aktiv",
+  channels: "unterdrückt – kein passender Kanal",
 };
 
 export interface DeliveryRecord {
@@ -226,6 +226,14 @@ export interface DeliveryDecision {
   channels: DeliveryChannel[];
 }
 
+/** Channel / active-hours check shared by stage alerts and plan toasts: `null` = go ahead, else the reason to hold back. */
+export function quietOutcome(settings: Pick<AlertSettings, "channels" | "hours">, now: number): { outcome: DeliveryOutcome; channels: DeliveryChannel[] } | null {
+  const channels = (Object.keys(settings.channels) as DeliveryChannel[]).filter((c) => settings.channels[c]);
+  if (!channels.length) return { outcome: "channels", channels };
+  if (!inActiveHours(settings.hours, new Date(now))) return { outcome: "hours", channels };
+  return null;
+}
+
 /**
  * Whether a stage message is delivered. Order of the checks: channels, active hours, dedupe (same key sent before, or
  * the same level and stage within the cooldown). A suppressed message is still logged by the caller.
@@ -235,9 +243,9 @@ export function decideDelivery(
   settings: Pick<AlertSettings, "channels" | "hours" | "cooldownMin">,
   log: readonly DeliveryRecord[],
 ): DeliveryDecision {
+  const quiet = quietOutcome(settings, q.now);
   const channels = (Object.keys(settings.channels) as DeliveryChannel[]).filter((c) => settings.channels[c]);
-  if (!channels.length) return { send: false, outcome: "channels", channels };
-  if (!inActiveHours(settings.hours, new Date(q.now))) return { send: false, outcome: "hours", channels };
+  if (quiet) return { send: false, outcome: quiet.outcome, channels };
   const key = dedupeKey(q.levelId, q.cycle, q.stage);
   const cooldown = settings.cooldownMin * 60_000;
   for (const r of log) {

@@ -13,6 +13,7 @@ import type { ChartInterval } from "@/chart/panes";
 import { BOX_TF_MS, type BoxTf } from "@/domain/boxes";
 import { getProvider, priceMv, subscribeFeed, tickDirMv, tradeTimeMv, useFeedSelect, volAccumMv, type Candle, type Stamped } from "@/market";
 import { BOX_FEED, type BoxesView } from "@/market/boxes/store";
+import { useKeyLines } from "@/market/keylevels/chartLines";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
 import { chartBoxesKey, toChartBoxes } from "./chartBoxes";
@@ -79,6 +80,8 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
   const feedId = BOX_FEED[tf];
   const feed = useFeedSelect(feedId, selectBars, sameBarKey);
   const symbol = view.symbol ?? "";
+  // the user's own key levels (F09) as lines in this chart as well
+  const keyLines = useKeyLines(symbol);
   // 4h: one history page so the oldest boxes have their bars (the provider's ring keeps ~600)
   const [older, setOlder] = useState<{ symbol: string; candles: Candle[] }>({ symbol: "", candles: [] });
   useEffect(() => {
@@ -128,6 +131,7 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
             candles={candles}
             interval={INTERVAL[tf]}
             boxes={stable.boxes}
+            keyLines={keyLines}
             boxAutoscale
             pane="rsi"
             rangeDays={RANGE[tf]}
