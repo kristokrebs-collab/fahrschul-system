@@ -232,7 +232,9 @@ test.describe("Chart spiegeln", () => {
           // the live boxes are where they were before the test; a box id that existed only transiently (the first
           // computation from the REST candles, replaced by the ":live" one once the stream is in) is not compared
           const ids = Object.keys(now).filter((id) => id in before.centres);
-          const ok = ids.length > 0 && ids.every((id) => Math.abs((before.centres[id] ?? 0) - (now[id] ?? 1e9)) < 2);
+          // 8 px: overlays that arrive late (trendlines, key lines) can move the price range by a few px (CI: 3.3 px); a still
+          // mirrored axis would be off by the distance to the pane's middle (tens of px) – the flip itself is asserted above
+          const ok = ids.length > 0 && ids.every((id) => Math.abs((before.centres[id] ?? 0) - (now[id] ?? 1e9)) < 8);
           // the values travel with the result: a CI failure then says what was compared
           return ok ? "ok" : JSON.stringify({ before: before.centres, now });
         },
