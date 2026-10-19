@@ -10,7 +10,7 @@
 export type AdapterStatus = "supported" | "forward" | "unsupported";
 
 export interface TvAdapter {
-  id: "tester-export" | "alert-webhook" | "pine-strategy" | "pine-indicator" | "indicator-series" | "account";
+  id: "pine-export" | "tester-export" | "alert-webhook" | "pine-strategy" | "pine-indicator" | "indicator-series" | "account";
   title: string;
   status: AdapterStatus;
   /** one sentence: what it is */
@@ -22,6 +22,13 @@ export interface TvAdapter {
 export const STATUS_LABEL: Readonly<Record<AdapterStatus, string>> = { supported: "unterstützt", forward: "nur Forwardtest über Alert", unsupported: "nicht unterstützt" };
 
 export const TV_ADAPTERS: readonly TvAdapter[] = [
+  {
+    id: "pine-export",
+    title: "Pine-Skript aus deiner Idee („Eigene Idee“)",
+    status: "supported",
+    what: "Das Labor schreibt den Regelbaum deiner Idee als lesbare Pine-v6-Strategie. Du fügst sie in TradingView ein und siehst dieselben Regeln auf dessen Kerzen.",
+    limits: "Nur ein Text zum Einfügen und ein Link auf den Chart, kein Login. Bausteine ohne Pine-Entsprechung (MCB-Punkte, MCB-Leiter, Premium/Discount, RSI-Linie, Funding) werden namentlich aufgelistet und stehen im Skript als Eingabe, Standard aus. Die Ergebnisse weichen wegen Kerzen, Gebühren und Annahmen ab; die App kann das Skript nicht selbst ausführen oder prüfen.",
+  },
   {
     id: "tester-export",
     title: "Strategietester-Export („List of trades“, CSV)",
@@ -38,9 +45,9 @@ export const TV_ADAPTERS: readonly TvAdapter[] = [
   },
   {
     id: "pine-strategy",
-    title: "Pine-Strategie ausführen oder in Regeln übersetzen",
+    title: "Fremde Pine-Strategie ausführen oder in Regeln übersetzen",
     status: "unsupported",
-    what: "Fremden Pine-Code laden, ausführen oder automatisch in den Regelbaum des Labors umwandeln.",
+    what: "Fremden Pine-Code laden, ausführen oder automatisch in den Regelbaum des Labors umwandeln (der umgekehrte Weg zum Pine-Export).",
     limits: "Die App führt keinen fremden Code aus und liest keinen Pine-Quelltext. Baue die Regeln im Labor („Eigene Idee“) nach und vergleiche sie mit dem Export deiner Strategie.",
   },
   {

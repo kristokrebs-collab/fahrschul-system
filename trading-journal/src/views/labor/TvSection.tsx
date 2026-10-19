@@ -14,6 +14,7 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { Expander } from "@/primitives/Expander";
 import { useLabor } from "./laborStore";
+import { PineCard } from "./PineCard";
 import { Cell, ChipPick, Kpi, moneyText } from "./ui";
 
 export const TV = {
@@ -289,6 +290,9 @@ export function TvCompareCard({ className }: { className?: string }) {
 export default function TvSection() {
   return (
     <>
+      <Cell index={0} span="lg:col-span-12">
+        <PineCard />
+      </Cell>
       <Cell index={0} span="lg:col-span-6">
         <AdapterStatusCard />
       </Cell>
