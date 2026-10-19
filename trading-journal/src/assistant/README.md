@@ -50,3 +50,14 @@ coach wording, body ≤ 4 KiB. Env: `ANTHROPIC_API_KEY` (the operator's key – 
 
 `tests/unit/assistant.understand.test.ts` (typos, phrases, tools, follow-ups, memory), `tests/unit/assistant.route.test.ts`
 (the function against fake Supabase and Anthropic clients), `tests/e2e/assistant.spec.ts` (sheet, voice stub, memory, navigation).
+
+## „Wo finde ich …?“ (Funktionsregister)
+
+Werkzeug `where` (`tools.ts` `whereTool`, additiv): beantwortet Ortsfragen („Wo finde ich den Belastungstest?“, „Wie komme ich zum Positionsrechner?“, „Wo kann
+ich ein Backup machen?“, „Welche Funktionen gibt es?“) **nur aus dem Register** (`src/app/features.ts`, `whereIs`). Ein klarer Treffer wird geöffnet
+(`ToolEnv.openFeature` → `featureOpen.openFeature`: Seite + Scrollen zur Karte, oder das Sheet) und mit Nutzensatz, Tarif, Lücke und Voraussetzung genannt; bei
+mehreren nahen Treffern erscheinen die besten drei als Knöpfe und nichts öffnet sich; ohne Treffer sagt der Assistent das und verweist auf die Liste;
+ohne Gegenstand („Welche Funktionen gibt es?“) öffnet er die Seite „Funktionen“. In `understand.ts` steht die Regel vor den anderen Werkzeugen (der genannte
+Gegenstand – „Einstiegs-Check“, „Üben“ – darf das Gegenstands-Werkzeug nicht auslösen); die lockere Form „wo ist / wo sind …“ gilt nur ohne eigenen
+Journal-Gegenstand und nie für die umgangssprachlichen Journalfragen („wo sind meine Schwächen“). Der Leerzustand des Sheets trägt den leisen Link „Alle
+Funktionen ansehen →“. Gelernt wird nur das Thema `where` (Zähler), nichts über den Gegenstand. Tests: `tests/unit/assistant.where.test.ts`.

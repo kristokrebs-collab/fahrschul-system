@@ -31,6 +31,7 @@ import { Segmented } from "@/primitives/Segmented";
 import { useSearch } from "@/search/searchStore";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
+import { SEG_TOUCH } from "@/views/insights/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { FeatureCard } from "./FeatureCard";
 import { FUNKTIONEN } from "./strings";
@@ -45,8 +46,8 @@ const STATUS_OPTIONS = [
 
 const TIER_OPTIONS = [{ v: "alle", label: FUNKTIONEN.filters.all }, ...PLAN_TIERS.map((t) => ({ v: t, label: FUNKTIONEN.tierFilter[t] }))] as const satisfies readonly { v: TierFilter; label: string }[];
 
-/** Phones and tablets: the segmented rows wrap instead of scrolling sideways. */
-const SEGMENTS = "max-w-full flex-wrap";
+/** Phones and tablets: the segmented rows wrap instead of scrolling sideways; taller taps on coarse pointers. */
+const SEGMENTS = cn("max-w-full flex-wrap", SEG_TOUCH);
 
 /** Hover / focus warms the target page's chunk (the lazy pages), exactly like the command navigation does. */
 function warm(id: string): void {

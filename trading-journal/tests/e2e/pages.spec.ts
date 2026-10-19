@@ -28,6 +28,7 @@ const PAGES: readonly [string, RegExp][] = [
   ["cockpit", /^Cockpit$/],
   ["konto", /^Konto$/],
   ["preise", /^Preise$/],
+  ["funktionen", /^Funktionen$/],
 ];
 
 /** The visible page's h1 (the page host keeps the overview mounted but hidden). */
@@ -81,7 +82,7 @@ test.describe("pages (P14)", () => {
     await page.getByRole("button", { name: /Navigation öffnen|Menü/ }).first().click();
     const nav = page.getByRole("dialog", { name: "Navigation" });
     await expect(nav).toBeVisible();
-    for (const label of ["Übersicht", "Trades", "Markt", "Analyse", "Risiko", "Coach", "Berichte", "Labor", "Wachstum", "Community", "Cockpit", "Konto", "Preise"]) {
+    for (const label of ["Übersicht", "Trades", "Markt", "Analyse", "Risiko", "Coach", "Berichte", "Labor", "Wachstum", "Community", "Cockpit", "Konto", "Preise", "Funktionen"]) {
       await expect(nav.getByRole("link", { name: new RegExp(label) }).first()).toBeVisible();
     }
     await nav.getByRole("link", { name: /Wachstum/ }).click();

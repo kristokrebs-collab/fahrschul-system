@@ -623,6 +623,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     keywords: ["Experiment", "Hypothese", "Sollwert", "annehmen", "ablehnen", "Verbesserung", "prüfbar"],
     status: "fertig",
     gate: "reports",
+    needs: "Steht im Wochenbericht der laufenden Woche, sobald sie Trades hat und der Coach eine messbare Hypothese vorschlägt – oder als Auswertung eines angenommenen Experiments.",
     topics: ["experiment"],
   },
   {
@@ -696,10 +697,10 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     benefit: "Die Preisachse umdrehen, die These vorher festhalten und danach beide Antworten vergleichen – ohne Bias-Score. Auch im Trade-Replay.",
     group: "lernen",
     page: "markt",
-    anchor: { testid: "bias-panel" },
+    anchor: { testid: "bias-controls" },
     keywords: ["Spiegeln", "Bias", "umdrehen", "invertieren", "Blindmodus", "These", "Voreingenommenheit", "Widerspruch"],
     status: "fertig",
-    needs: "Sitzt unter dem Box-Chart und erscheint, sobald der Chart geladen ist.",
+    needs: "Sitzt unter dem Box-Chart der Markt-Seite und erscheint, sobald die Karte geladen ist.",
   },
   {
     id: "signal-beim-einstieg",

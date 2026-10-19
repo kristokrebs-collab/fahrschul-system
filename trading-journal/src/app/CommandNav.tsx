@@ -14,6 +14,7 @@
 import { AnimatePresence, motion, type Transition } from "motion/react";
 import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { GlyphFullscreen } from "@/app/DisplayActions";
+import type { FeatureChip } from "@/app/featureChips";
 import { PAGE_ICON, PAGE_LABELS } from "@/app/Dock";
 import { preloadPage } from "@/app/pages";
 import { DISPLAY_STRINGS, isIosSafari, isSamsungInternet, promptInstall, toggleFullscreen, useCanInstall, useFullscreen, useFullscreenSupported, useStandalone } from "@/app/pwa";
@@ -32,7 +33,7 @@ import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { DotFigure } from "@/primitives/DotUnit";
 import { Icon } from "@/primitives/icons";
-import { openSearch } from "@/search/searchStore";
+import { openSearch, useSearch } from "@/search/searchStore";
 import { exportCsv, exportJson } from "@/store/backup";
 import { canDownload } from "@/store/download";
 import { navigate } from "@/store/router";
@@ -81,6 +82,7 @@ export const COMMAND_NAV_STRINGS = {
   backup: "Backup herunterladen",
   more: "Werkzeuge & Konto",
   views: "Gespeicherte Ansichten",
+  recentFeatures: "Zuletzt benutzte Funktionen",
   hints: "↑↓ wählen · ↵ öffnen · 1–9 Seite · Esc schließt",
 } as const;
 
@@ -150,6 +152,25 @@ function Item({ delay, reduced, className, children }: { delay: number; reduced:
   );
 }
 
+/**
+ * Deep links into the function register: the functions opened last (the search's recent list, `feature:<id>`). The register is a
+ * lazy chunk – it is fetched only when there is something recent to name, and never for the first paint.
+ */
+function useRecentFeatures(): FeatureChip[] {
+  const recent = useSearch((s) => s.recent);
+  const key = recent.filter((id) => id.startsWith("feature:")).join("|");
+  const [chips, setChips] = useState<{ key: string; list: FeatureChip[] }>({ key: "", list: [] });
+  useEffect(() => {
+    if (!key) return;
+    let alive = true;
+    void import("@/app/featureChips").then((m) => alive && setChips({ key, list: m.recentChips(key.split("|")) }));
+    return () => {
+      alive = false;
+    };
+  }, [key]);
+  return key && chips.key === key ? chips.list : [];
+}
+
 const PAGE_HASH = Object.fromEntries(PAGES.map((p) => [p, `#${p}`])) as Record<Page, string>;
 /** The pack's big links: the four original pages (digits 1–4); the feature pages follow in a compact grid. */
 const PRIMARY = PAGES.slice(0, 4);
@@ -167,6 +188,7 @@ function Panel({ reduced }: { reduced: boolean }) {
   const price = useLivePriceText();
   const theme = useTheme((s) => s.resolved);
   const views = useViews((s) => s.views);
+  const recentFeatures = useRecentFeatures();
   const signedIn = useCloudSession((s) => s.phase === "signedIn");
   const syncOn = useSyncStatus((s) => s.phase !== "off");
   const ref = useRef<HTMLDivElement>(null);
@@ -436,6 +458,30 @@ function Panel({ reduced }: { reduced: boolean }) {
                           className="max-w-full truncate rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] text-fg outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60 pointer-coarse:min-h-11"
                         >
                           {v.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Item>
+              )}
+              {recentFeatures.length > 0 && (
+                <Item delay={CONFIG.delays.views} reduced={reduced}>
+                  <div role="group" aria-label={COMMAND_NAV_STRINGS.recentFeatures} className="grid gap-2 px-1 pt-1" data-testid="cmd-recent-features">
+                    <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">{COMMAND_NAV_STRINGS.recentFeatures}</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {recentFeatures.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          data-cmd-item=""
+                          data-feature={c.id}
+                          onClick={() => {
+                            closeCommandNav(true);
+                            void import("@/app/featureOpen").then((m) => m.openFeature(c.id));
+                          }}
+                          className="max-w-full truncate rounded-full border border-line-2 px-3 py-1.5 text-[12.5px] text-fg outline-none transition-colors duration-200 hover:border-white/30 focus-visible:border-white/60 pointer-coarse:min-h-11"
+                        >
+                          {c.name}
                         </button>
                       ))}
                     </div>
