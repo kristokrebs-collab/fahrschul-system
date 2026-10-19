@@ -59,6 +59,16 @@ Phones: one column in the same order, no horizontal scroll at 390 px. Every cell
   It states plainly that traits of the missed signals are NOT set against comparable failures – a missed signal has no stored outcome –
   and names the sample; no cause is claimed.
 
+- **Signal-Posteingang** (`SignalInboxCard.tsx`, F28, volle Breite, einklappbar): the archived signals with status (neu · angesehen · gehandelt · bewusst ausgelassen · abgelaufen), filter chips
+  (status, „Nur Einstiege“, „Nur meine Märkte“), order by a written-out relevance (`@/domain/missed/inbox`). Per entry: **Ansehen** (marks it seen, shows the marks and, once computed, the outcome), **Ausgelassen – Grund**
+  (five reasons, reversible), **Im Labor testen** (`TestIdeaButton` → „Diese Idee testen“ for the entry check and Box setups; key-level hits have no translation), **Im Journal verknüpfen** (trades of the same market within ±24 h).
+  The marks live on the archive event (this device). No counter in the page header (no such pattern exists; the dashboard is untouched).
+- **Verpasste Chancen** (`MissedCard.tsx`, F32) now shows the **Ausgang** per signal after „Ausgänge berechnen“ (target first / stop first / still open / not usable) and, from 20 missed signals with an outcome, the traits of the missed winners
+  against the missed losers – with counterexamples, the sample and the interval, no cause.
+- **Signalbilanz** (`SignalBalanceCard.tsx`, F25, 7) and **Daten- und Alarmqualität** (`DataQualityCard.tsx`, F27, 5): see `@/domain/missed` README. Shared helpers: `signalUi.tsx` (chips, outcome badge, the `OutcomeControl`),
+  `signalOutcomes.ts` (on-demand loader + cache of final results `tj2-signal-outcomes`), `candleCheck.ts` (on-demand gap check, 1h candles, 14 days).
+- Tests: `views.coach.signalchain.test.tsx`, `views.coach.signalOutcomes.test.ts`, e2e `signal-chain.spec.ts`.
+
 ## Watcher, trade panel, state
 - `CoachWatcher.tsx`: **`useCoachWatch()` / `CoachWatcher`** – after a save, `coachAlert` (pure, domain) compares the
   journal before and after; a new pattern of severity ≥ 2 on the saved trade becomes ONE toast (advice + suggested

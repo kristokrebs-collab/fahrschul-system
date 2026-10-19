@@ -4,7 +4,7 @@
  * request, nothing is fetched until it is asked for.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Bar } from "@/domain/backtest";
+import type { Bar } from "@/domain/backtest/types";
 import { __resetOutcomes, cachedOutcomes, computeOutcomes, getOutcomeState, OUTCOME_CACHE_KEY, outcomeFingerprint, parseOutcomeCache, primeOutcomes } from "@/views/coach/signalOutcomes";
 import { H, signalEvent } from "./missed.fixtures";
 

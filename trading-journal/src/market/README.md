@@ -468,6 +468,14 @@ time, market and side – the input of the „Verpasste Chancen“ card (`@/doma
 synced); a stored newer version is never overwritten. `recordSignalEvent` is called next to `logExternalDelivery` in
 `signals/notify.ts` and `boxes/alerts.ts` and after `recordDelivery` in `keylevels/alerts.ts`; it never throws.
 
+### Erweiterung des Signalarchivs und Anwesenheitsspur (F25 · F27 · F28 · F60)
+The three recording points now also store the marks the signal had (`price` / `stop` / `target` / `name` / `setupKind` / `grade` / `rr` of a Box setup, the invalidation of an own
+level as `stop`) and `barClose` (the close of the candle the alert rests on, for the delay between close and alert); the inbox marks `seenAt` / `skip` / `tradeId` are written by
+`markSeen` / `skipSignal` / `linkTrade`. `presence.ts` writes the **Anwesenheitsspur**: a beat every 30 s while a tab runs the app (`PresenceHost`, mounted in `DeferredHosts`),
+stored as segments under `tj2-presence` (`{ v: 1, segs: [{ id, a, b }] }`, 35 days, ≤ 400 segments, this device only, not in the backup or the cloud sync); a beat later than
+150 s after the previous one starts a new segment. It exists from the day it is first written – before that the share of open time is „unbekannt“. The candles for the outcome per signal and the
+gap check are loaded **on demand** through the lab's history source (`views/coach/signalOutcomes.ts`, `candleCheck.ts`), never by the live provider.
+
 ## Preis- und RSI-Struktur live (`trendlines/`, F05)
 
 Pure engine: `@/domain/trendlines`. `store.ts` (`useTrendlines` / `getTrendlines` / `subscribeTrendlines` /

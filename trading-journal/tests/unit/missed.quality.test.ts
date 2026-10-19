@@ -14,8 +14,8 @@ import {
   presenceReport,
   qualityReport,
   SLOW_ALERT_MS,
-  type DeliveryRecord,
 } from "@/domain/missed";
+import type { DeliveryRecord } from "@/domain/keylevels/delivery";
 import { applyBeat, BEAT_MS, __resetPresence, beat, parsePresence, PRESENCE_CAP, PRESENCE_KEY, presenceSegments, startPresence } from "@/market/presence";
 import { H, signalEvent } from "./missed.fixtures";
 
