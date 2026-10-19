@@ -45,6 +45,14 @@ export interface ReplayTrade {
   result: "win" | "loss" | "be" | "open";
 }
 
+/** An extra horizontal level (training: the trader's own stop; what-if: the variant's stop and exit), drawn even when `showTrade` is off. */
+export interface ReplayLine {
+  price: number;
+  label: string;
+  tone?: "fg" | "mute" | "win" | "loss";
+  dashed?: boolean;
+}
+
 export interface ReplayChartProps {
   bars: readonly ReplayBar[];
   trade: ReplayTrade;
@@ -59,6 +67,8 @@ export interface ReplayChartProps {
   showTrade?: boolean;
   /** blind mode: markers and band without long / short / win / loss colours */
   neutral?: boolean;
+  /** extra levels besides the own trade (stable identity: memoise) */
+  lines?: readonly ReplayLine[];
   height?: number;
   className?: string;
 }
@@ -146,7 +156,7 @@ interface Inst {
 
 const sec = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
 
-export default function ReplayChart({ bars, trade, steps, step, wipeKey, flipped = false, showTrade = true, neutral = false, height = 300, className }: ReplayChartProps) {
+export default function ReplayChart({ bars, trade, steps, step, wipeKey, flipped = false, showTrade = true, neutral = false, lines: extraLines, height = 300, className }: ReplayChartProps) {
   const host = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const ripples = useRef<HTMLDivElement>(null);
@@ -193,7 +203,7 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, flipped
     const i = inst.current;
     if (!i || !bars.length) return;
     const data = bars.map((b) => ({ time: sec(b.time), open: b.open, high: b.high, low: b.low, close: b.close }));
-    const prices = [...bars.flatMap((b) => [b.high, b.low]), ...(showTrade ? [trade.entry, trade.stop ?? NaN, trade.exit ?? NaN] : [])].filter((v) => Number.isFinite(v));
+    const prices = [...bars.flatMap((b) => [b.high, b.low]), ...(showTrade ? [trade.entry, trade.stop ?? NaN, trade.exit ?? NaN] : []), ...(extraLines ?? []).map((l) => l.price)].filter((v) => Number.isFinite(v));
     const lo = Math.min(...prices);
     const hi = Math.max(...prices);
     const pad = (hi - lo) * 0.06 || hi * 0.002;
@@ -205,6 +215,11 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, flipped
           ...(trade.target ? [i.main.candles.createPriceLine({ price: trade.target, color: ink.tick, lineWidth: 1, lineStyle: LineStyle.Dotted, title: "Ziel", axisLabelVisible: false })] : []),
         ]
       : [];
+    const toneColor = { fg: ink.fg, mute: ink.mute, win: ink.win, loss: ink.loss };
+    for (const l of extraLines ?? []) {
+      const color = neutral ? ink.mute : toneColor[l.tone ?? "fg"];
+      lines.push(i.main.candles.createPriceLine({ price: l.price, color, lineWidth: 1, lineStyle: l.dashed ? LineStyle.Dashed : LineStyle.Solid, title: l.label, axisLabelVisible: true, axisLabelColor: color, axisLabelTextColor: ink.bg }));
+    }
     i.band.set({ entry: trade.entry, long: trade.side !== "short", mae: 0, mfe: 0, from: trade.entryIndex - 0.5, to: trade.entryIndex - 0.5, neutral });
     const longColor = neutral ? ink.fg : trade.side === "short" ? MARKER_COLORS.short : MARKER_COLORS.long;
     const exitColor = neutral ? ink.fg : MARKER_COLORS[trade.result === "loss" ? "loss" : trade.result === "win" ? "win" : "be"];
@@ -268,7 +283,7 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, flipped
       for (const l of lines) i.main.candles.removePriceLine(l);
       i.markers.setMarkers([]);
     };
-  }, [bars, trade, steps, step, showTrade, neutral]);
+  }, [bars, trade, steps, step, showTrade, neutral, extraLines]);
 
   // strip wipe on a new key: the cleanup of the previous key snapshots the picture still shown (layout cleanups run
   // before the new key's layout effect and before the passive data effect swaps the bars)

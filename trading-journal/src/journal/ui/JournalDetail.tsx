@@ -17,6 +17,8 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { openReplay } from "@/views/trades/replay/replayStore";
+import { openWhatIf } from "@/views/trades/whatif/whatIfStore";
+import { openTraining } from "@/views/ueben/trainingStore";
 import { SCALE_LABELS } from "../editor/PsychSection";
 import { GroupLinksSection } from "../grouping/GroupLinksSection";
 import { ShotReel } from "../screenshots/ShotReel";
@@ -217,6 +219,13 @@ export function JournalDetail({ trade: t, currency, setups }: JournalDetailProps
         {/* plan gate `replay` (P10 / P14): a locked replay opens the upgrade sheet instead */}
         <ActionButton onClick={() => (replayOk ? openReplay(t.id, { fromDetail: true }) : openUpgrade("replay"))} icon="M7 5v14l11-7z">
           Replay
+        </ActionButton>
+        {/* F33 / F38: other rules on the same candles; practise this kind of situation without the future */}
+        <ActionButton onClick={() => (replayOk ? openWhatIf(t.id, { fromDetail: true }) : openUpgrade("replay"))} icon="M4 7h10M4 12h16M4 17h7M17 4l3 3-3 3">
+          Was wäre wenn
+        </ActionButton>
+        <ActionButton onClick={() => (replayOk ? openTraining({ tradeId: t.id, fromDetail: true }) : openUpgrade("replay"))} icon="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zM12 12l8-4.5M12 12v9M12 12L4 7.5">
+          Üben
         </ActionButton>
         <ActionButton onClick={() => void share()} disabled={sharing} icon="M12 4v11M7 9l5-5 5 5M5 20h14">
           {sharing ? "Erzeugt …" : "Als Bild"}
