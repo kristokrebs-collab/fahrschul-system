@@ -478,3 +478,17 @@ Zeit), den Änderungen als Punktliste in Klartext, einer Notiz und „Wiederhers
 aus dem Labor als zwei Kästen oder der Satz „Kein Lauf dieser Version“. **Playbook:** zwei Spalten (Export | Import, mobil untereinander); der Export zeigt den Text zum Lesen (Mono, `readOnly`), der Import
 Fehler als Fläche in Verlust-Ton mit allen Gründen, sonst eine **Vorschau** mit dem Badge „fremdes Playbook“, Autor als ungeprüfte Angabe, den Regeln im Klartext, Hinweisen in warn und erst dann dem Knopf „Als fremden
 Entwurf anlegen“, danach „Probe im Labor“. Bewegung: nur die vorhandenen `Reveal`-Zellen, `Collapse` und `EquityDraw`; reduzierte Bewegung zeigt das Ende sofort. Touch-Ziele über `Button` / `ChipPick` (≥ 44 px bei grobem Zeiger).
+
+## Funktionen (Auffindbarkeit)
+
+Keine neue Sprache, kein neues Gesicht: die Seite „Funktionen“ ist ein Verzeichnis im Stil der anderen Seiten (`PageHeader` mit Punkt, Wortstaffel und `LeadFill`,
+Karten `rounded-2xl border-line bg-ink-850 p-4`, Abschnittsüberschriften als `Label`). Sie ist bewusst **nicht** im Dock und keine Dashboard-Karte; sie hängt in der
+Befehlsnavigation (Nr. 16, Zusatzzeile „Index“), in der Suche (Art „Funktionen“), auf `g f`, in „Weitere Einstellungen“ und im Assistenten. Stand und Lücke sind
+**Text + Punkt + Ton**, nie Farbe allein: Badge `Fertig` (Gewinn-Ton) / `Teilweise` (Warn-Ton), darunter in Mono-Versalien „Fehlt noch“ (warn) bzw. „Zu wissen“ (mute),
+„So geht’s“, „Voraussetzung“, „Gerät“. Der Tarif steht als Steel-Badge („Ab Premium“); fehlt er dem Nutzer (nur bei aktiver Zahlung), wird er zum Warn-Badge „… ·
+nicht in deinem Tarif“, der Knopf bleibt (die Zielseite zeigt dann den Tarif-Teaser). „Für dich“ und „Zuletzt benutzt“ sind zwei ruhige Listen aus Zeilenknöpfen; ohne
+Daten steht ein ehrlicher Satz statt eines Platzhalters, und während gesucht oder gefiltert wird, verschwinden sie. Filter sind `Segmented` (Stand, Tarif), die Suche
+ein `Input type=search`. Bewegung nur über `src/motion`: gestaffeltes `Reveal` je Abschnittskopf und Karte (`index % 3`, endet bei `transform: none`), reduzierte Bewegung →
+Endzustand; keine Karten-Spotlights (siebzig Karten auf einer Seite). Mobil 390 px: eine Spalte, Segmente umbrechen, Tippflächen ≥ 44 px, kein horizontaler Scroll. Das
+Öffnen einer Funktion scrollt die Zielkarte unter den Kopf und lässt einmal den Signal-Streifen darüber laufen (derselbe Griff wie bei Einstellungen in der Suche,
+`src/app/reveal.ts`); fehlt die Stelle, steht der Grund in einem Toast. Die Zeile „Auch hier: …“ (`FeatureLinks`) ist Mono-Versal-Label plus Textlinks, nie auf dem Dashboard.

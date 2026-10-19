@@ -15,6 +15,7 @@
  * Cells reveal once (`Reveal`, ends at `transform: none`). Registered by the integrator (P14) as page `coach`.
  */
 import { useMemo, type ReactNode } from "react";
+import { FeatureLinks } from "@/app/FeatureLinks";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
 import { COACH_HIGHLIGHT, COACH_LEAD, COACH_TITLE } from "@/domain/coach";
 import type { AnswerData } from "@/domain/coach/nlq";
@@ -65,6 +66,15 @@ export function CoachView({ className }: { className?: string }) {
         lead={COACH_LEAD}
         leadFill={COACH_LEAD_FILL}
         action={<Segmented<AccFilter> aria-label="Konto des Coachs" options={ACC_OPTIONS} value={c.acc} onChange={setAcc} size="sm" className={SEG_TOUCH} />}
+      />
+      {/* related functions that are otherwise found by chance: a card at the bottom of this page, the sheets of a trade */}
+      <FeatureLinks
+        className="lg:col-span-12"
+        items={[
+          { id: "verpasste-chancen", label: "Verpasste Chancen" },
+          { id: "ueben", label: "Üben" },
+          { id: "was-waere-wenn", label: "Was wäre wenn" },
+        ]}
       />
       <Cell index={0} span="lg:col-span-12">
         <HeroCard lesson={c.lesson} tips={c.tips} score={c.score} />

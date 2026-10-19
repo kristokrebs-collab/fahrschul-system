@@ -1,6 +1,7 @@
 import { motion, useIsPresent, type Transition } from "motion/react";
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { PAGE_LABELS } from "@/app/Dock";
+import { FEATURE_REGISTRY } from "@/app/features";
 import { KeyCombo, Kbd } from "@/app/Kbd";
 import { fullscreenSupported } from "@/app/pwa";
 import { cn } from "@/lib/cn";
@@ -88,7 +89,7 @@ function useIndex() {
     const fs = fullscreenSupported();
     const dl = canDownload();
     const available = (id: CommandId) => (id === "fullscreen" ? fs : id === "export-json" || id === "export-csv" ? dl : true);
-    return buildSearchIndex({ trades, settings, days, pages: PAGES, labels: PAGE_LABELS, pageKeys: PAGE_KEYS, now, commandAvailable: available });
+    return buildSearchIndex({ trades, settings, days, pages: PAGES, labels: PAGE_LABELS, pageKeys: PAGE_KEYS, features: FEATURE_REGISTRY, now, commandAvailable: available });
   }, [trades, settings, days, now]);
   return { items, trades, settings, recent };
 }

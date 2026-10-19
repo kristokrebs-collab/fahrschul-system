@@ -339,3 +339,15 @@ the widget error state a throwing cockpit widget).
 
 Tests: `tests/unit/theme.{store,transition,codemod,card,budget}.test.*`, `shortcuts.{registry,host}.test.*`,
 `app.errorBoundary.test.tsx`; e2e `theme.spec.ts`, `search.spec.ts` (shortcuts too), `a11y.spec.ts`.
+
+## Funktionsregister und Seite „Funktionen“ (Auffindbarkeit)
+
+`features.ts` ist die einzige Wahrheit, welche Funktionen es gibt und wo sie stehen (F-IDs, Name, ein Satz Nutzen, Gruppe nach Aufgabe, Seite +
+Anker oder Öffner, Stichwörter, Status `fertig` / `teilweise` mit Lücke, Plan-Gate, Gerätehinweis). Gelesen von der Seite `funktionen`
+(`src/views/funktionen`, Hash `#funktionen`, `g f`, Befehlsnavigation Nr. 16 – **nicht im Dock, keine Dashboard-Karte**), der globalen Suche
+(Art `feature`) und dem Assistenten („Wo finde ich …?“). `featureQuery.ts` = reine Fragen ans Register (Suche, Filter, Gruppen, „Für dich“ aus
+`settings.assistant.interests`, „Zuletzt benutzt“ aus `searchStore.recent`, `whereIs`); `featureOpen.ts` = `openFeature(id)` (Aktion oder Seite + Scrollen
+mit ehrlichem Toast, wenn die Stelle fehlt); `reveal.ts` = `whenShown` / `revealCard` (aus `search/actions.ts` herausgelöst, dort re-exportiert);
+`featureChips.ts` = die Chips „Zuletzt benutzte Funktionen“ der Befehlsnavigation (dynamischer Import, nur bei vorhandenen Einträgen); `FeatureLinks.tsx` = „Auch hier: …“-Zeile für Seiten, deren Nachbarfunktionen sonst zufällig gefunden würden (Coach). Das Register ist nur im Lazy-Chunk
+der Seite / Suche / des Assistenten – die Erstladung importiert es nicht (`shellStats` zeigt für die Seite den festen Text „Index“).
+Dokument zum Register: `docs/COVERAGE.md` (eine Zeile je F01–F74; Test `tests/unit/features.registry.test.ts`).

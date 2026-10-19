@@ -158,6 +158,7 @@ function AssistantBody() {
         lab,
         applyIdea: (d) => useLabor.getState().applyIdea(d),
         go: (p) => navigate(p),
+        openFeature: (id) => void import("@/app/featureOpen").then((m) => m.openFeature(id)),
         newTrade: () => openEditor(),
         train: () => openTraining(),
         setMem: (fn) => conv.getState().setMem(fn),
@@ -252,6 +253,17 @@ function AssistantBody() {
                   </Chip>
                 ))}
               </div>
+              <button
+                type="button"
+                onClick={() => {
+                  closeAssistant();
+                  navigate("funktionen");
+                }}
+                className="touch-hit justify-self-start text-[12.5px] text-mute underline decoration-line-2 underline-offset-4 hover:text-fg hover:decoration-fg"
+                data-testid="assistant-all-features"
+              >
+                Alle Funktionen ansehen →
+              </button>
             </div>
           ) : (
             <div className="grid gap-5">

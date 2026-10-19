@@ -178,7 +178,7 @@ describe("command navigation counts (pure)", () => {
   it("one figure per page, the market symbol without its exchange prefix", () => {
     const s: ShellStats = { trades: 13, setups: 8, rules: 5, net: -12.5, winRate: 0.55, currency: "USDT", open: 2, mistakes: 3, goals: 1, symbol: "BINANCE:BTCUSDT" };
     const c = pageCounts(s, { cloud: false, signedIn: false, plan: null, labRuns: 4, boards: 2, now: new Date("2026-10-12T10:00:00Z") });
-    expect(Object.keys(c)).toHaveLength(15);
+    expect(Object.keys(c)).toHaveLength(16);
     expect(c.overview.tone).toBe("text-loss");
     expect(c.markt.text).toBe("BTCUSDT");
     expect(c.analyse.text).toBe("55 %");
@@ -188,6 +188,8 @@ describe("command navigation counts (pure)", () => {
     expect(c.cockpit.text).toBe("2");
     expect(c.konto.text).toBe("lokal");
     expect(c.preise.text).toBe("–");
+    // the function index: a fixed word – the register itself is a lazy chunk the navigation must not load for a number
+    expect(c.funktionen.text).toBe("Index");
     expect(pageCounts(s, { cloud: true, signedIn: true, plan: "Pro", labRuns: 0, boards: 1, now: new Date() }).preise.text).toBe("Pro");
   });
 });

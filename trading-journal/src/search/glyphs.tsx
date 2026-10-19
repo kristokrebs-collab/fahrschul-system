@@ -47,6 +47,13 @@ export function KindGlyph({ kind, className }: { kind: SearchKind; className?: s
           <rect x="9" y="9" width="4.6" height="4.6" rx="1.2" />
         </svg>
       );
+    case "feature":
+      return (
+        <svg {...p}>
+          <circle cx="8" cy="8" r="5.6" />
+          <path d="M10.4 5.6L9 9 5.6 10.4 7 7z" />
+        </svg>
+      );
     case "setting":
       return (
         <svg {...p}>

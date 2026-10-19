@@ -4,16 +4,16 @@
  *   - setup   → the Setups page, scrolled to that card with a signal sweep (hidden by a filter → its editor),
  *   - day     → the Übersicht, the calendar opens that day,
  *   - page    → the page,
+ *   - feature → a function of the register (`src/app/features.ts`): its page, scrolled to the card – or its sheet,
  *   - setting → the settings page, scrolled to the card with that title + sweep,
  *   - report  → the Berichte page on that period (only indexed once the page exists),
  *   - command → the command.
  */
 import { closeCommandNav, openCommandNav } from "@/app/CommandNav";
+import { revealCard, whenShown } from "@/app/reveal";
 import { toggleFullscreen } from "@/app/pwa";
 import { openShortcutSheet } from "@/app/shortcuts";
 import { replayIntro } from "@/intro/introStore";
-import { tween } from "@/motion/tokens";
-import { prefersReducedMotion } from "@/motion/pulse/engine";
 import { startOnboarding } from "@/onboarding/onboardingStore";
 import { exportCsv, exportJson } from "@/store/backup";
 import { navigate } from "@/store/router";
@@ -23,48 +23,9 @@ import { openReport } from "@/views/berichte/berichteStore";
 import { useInsightsUi } from "@/views/insights/insightsStore";
 import type { CommandId, SearchAction } from "./sources";
 
+export { revealCard, whenShown };
+
 const isPage = (p: string): p is Page => (PAGES as readonly string[]).includes(p);
-
-/** Polls (rAF, ≤ 2.5 s) until `find` returns an element of the current page layer, then runs `then`. */
-export function whenShown(page: string, find: (layer: Element) => HTMLElement | null, then: (el: HTMLElement) => void, onMiss?: () => void): void {
-  if (typeof document === "undefined") return;
-  const deadline = performance.now() + 2500;
-  const tick = () => {
-    const layer = document.querySelector(`[data-page="${page}"][data-page-role="current"]`) ?? (document.querySelector("[data-page]") ? null : document.body);
-    const el = layer ? find(layer) : null;
-    if (el) {
-      then(el);
-      return;
-    }
-    if (performance.now() < deadline) requestAnimationFrame(tick);
-    else onMiss?.();
-  };
-  requestAnimationFrame(tick);
-}
-
-/** Scrolls `el` under the header and runs one signal sweep across its card (decorative, removed after). */
-export function revealCard(el: HTMLElement): void {
-  const reduced = prefersReducedMotion();
-  el.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
-  const card = el.closest<HTMLElement>(".rounded-2xl, [class*='rounded-[']") ?? el;
-  if (reduced || typeof card.animate !== "function") return;
-  const sweep = document.createElement("span");
-  sweep.setAttribute("aria-hidden", "true");
-  Object.assign(sweep.style, {
-    position: "absolute",
-    inset: "0",
-    zIndex: "30",
-    pointerEvents: "none",
-    borderRadius: "inherit",
-    background: "linear-gradient(100deg, transparent 35%, color-mix(in srgb, var(--color-signal) 18%, transparent) 50%, transparent 65%)",
-    transform: "translateX(-100%)",
-  } satisfies Partial<CSSStyleDeclaration>);
-  if (getComputedStyle(card).position === "static") card.style.position = "relative";
-  card.appendChild(sweep);
-  const a = sweep.animate([{ transform: "translateX(-100%)" }, { transform: "translateX(100%)" }], { duration: tween.sweep.duration * 1000, delay: 250, easing: "cubic-bezier(0.22,1,0.36,1)", fill: "forwards" });
-  a.onfinish = () => sweep.remove();
-  a.oncancel = () => sweep.remove();
-}
 
 const headingWith = (title: string) => (layer: Element) =>
   Array.from(layer.querySelectorAll<HTMLElement>("h2, h3")).find((h) => (h.textContent ?? "").replace(/\s+/g, " ").trim().startsWith(title)) ?? null;
@@ -148,6 +109,10 @@ export function runSearchAction(a: SearchAction): void {
       return;
     case "page":
       goPage(a.page);
+      return;
+    case "feature":
+      // the register is a lazy chunk of its own (search + page + assistant); the recent list was written by the overlay
+      void import("@/app/featureOpen").then((m) => m.openFeature(a.id, { remember: false }));
       return;
     case "setup":
       navigate("setups");

@@ -45,3 +45,12 @@ never fights the closing panel.
 arrows, Enter runs after the exit, Escape); e2e `tests/e2e/search.spec.ts` (dev harness `/dev/ux.html`, mobile +
 desktop) and `tests/e2e/a11y.spec.ts` (axe, dark + light; the rule `scrollable-region-focusable` is off for the result
 list only – it scrolls through the combobox by design).
+
+## Funktionen (Register `src/app/features.ts`)
+
+`buildSearchIndex({ …, features })` nimmt das Funktionsregister auf: je Funktion ein Treffer der Art `feature` („Funktionen“) mit Name, Untertitel
+„Gruppe · Seite“, Markierung „teilweise“ und der Aktion `{ type: "feature", id }`; gefunden wird auch über Stichwörter, Nutzensatz, Gruppe, Seite,
+F-ID und Tarif (`featureHaystack`). Die Gruppe steht hinter den Seiten (`KIND_BIAS`), so liefert „Labor“ die Seite *und* die Labor-Funktionen.
+`runSearchAction` öffnet einen Treffer über `openFeature` (Seite + Scrollen zur Karte, oder das Sheet); der Overlay-Chunk merkt ihn in der
+„Zuletzt geöffnet“-Liste (`feature:<id>`), die auch „Zuletzt benutzt“ der Seite „Funktionen“ speist. Ohne `features` im Input gibt es keine Funktionstreffer
+(das Register ist ein Lazy-Chunk). Tests: `tests/unit/search.features.test.ts`.

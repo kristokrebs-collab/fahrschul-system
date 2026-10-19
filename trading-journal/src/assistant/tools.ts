@@ -5,6 +5,8 @@
  * asks a language model for a figure.
  */
 import type { Recommendation } from "@/domain/coach";
+import { featureQueryOf, whereIs } from "@/app/featureQuery";
+import { FEATURE_GROUPS, PLAN_TIER_LABEL, tierOf, type FeatureEntry } from "@/app/features";
 import { translateIdea, type IdeaDraft } from "@/domain/lab";
 import type { Answer, AnswerData, AnswerFact, Tone } from "@/domain/coach/nlq";
 import { measureNoun, targetText, valueText, type ExperimentOverview } from "@/domain/reports/experiment";
@@ -55,6 +57,8 @@ export interface ToolEnv {
   /** fills the lab's "Eigene Idee" from an idea (F12) – returns false when the lab refused it; saves nothing, starts nothing */
   applyIdea?: (draft: IdeaDraft) => boolean;
   go: (page: Page) => void;
+  /** opens a function of the register (`src/app/featureOpen.ts`): its page scrolled to the card, or its sheet – without it the tool only navigates to the page */
+  openFeature?: (id: string) => void;
   newTrade: () => void;
   /** opens the training sheet (F38) – it only opens; the user chooses, decides and writes everything there */
   train?: () => void;
@@ -112,7 +116,7 @@ function memoryTool(arg: string, env: ToolEnv): ToolReply {
   return reply({ title: "Das weiß ich über dich", text: lines.join(" "), facts: [fact("Fragen", String(mem.asked)), fact("Notizen", String(mem.facts.length))], followUps: ["Fass dich kürzer", "Vergiss alles"] });
 }
 
-const TOPIC_LABEL: Readonly<Record<string, string>> = { good: "Stärken", bad: "Schwächen", status: "Überblick", entry: "Einstiegs-Check", improve: "Verbesserungen", idea: "Ideen testen", experiment: "Wochenexperiment", lab: "Labor", memory: "Gedächtnis", compare: "Vergleiche", list: "Trade-Listen" };
+const TOPIC_LABEL: Readonly<Record<string, string>> = { where: "Funktionen finden", good: "Stärken", bad: "Schwächen", status: "Überblick", entry: "Einstiegs-Check", improve: "Verbesserungen", idea: "Ideen testen", experiment: "Wochenexperiment", lab: "Labor", memory: "Gedächtnis", compare: "Vergleiche", list: "Trade-Listen" };
 
 /** German label of a learned topic key. */
 export function topicLabel(key: string): string {
@@ -264,8 +268,68 @@ function helloTool(arg: string, env: ToolEnv): ToolReply {
 function helpTool(env: ToolEnv): ToolReply {
   return reply({
     title: "Das kann ich",
-    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“, „Teste diese Idee“), Verbesserungen oder deinem Wochenexperiment. Ich öffne auch Seiten („Öffne das Labor“), das Training („Ich will üben“) und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
+    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“, „Teste diese Idee“), Verbesserungen oder deinem Wochenexperiment. Ich öffne auch Seiten („Öffne das Labor“), das Training („Ich will üben“), zeige dir, wo eine Funktion steht („Wo finde ich den Belastungstest?“), und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
     followUps: suggestFor(env),
+  });
+}
+
+/** Where a register entry lives, in a sentence ("auf der Seite Labor …"). */
+function placeOf(f: FeatureEntry): string {
+  if (f.action) return `als Fenster über der aktuellen Seite${f.path ? ` (${f.path})` : ""}`;
+  const page = PAGE_LABEL[f.page] ?? f.page;
+  if (f.path) return `auf der Seite ${page} – ${f.path}`;
+  return f.anchor ? `auf der Seite ${page}, ich scrolle zur Karte` : `auf der Seite ${page}`;
+}
+
+/**
+ * "Wo finde ich …?": answered from the function register (`src/app/features.ts`), nothing else. A clear best hit is opened
+ * (its page scrolled to the card, or its sheet) and named with its one-sentence benefit, its limits and its plan; with
+ * several close hits the best three are offered as buttons and nothing opens. No hit says so and points to the full list.
+ */
+export function whereTool(arg: string, env: ToolEnv): ToolReply {
+  const open = (f: FeatureEntry): void => (env.openFeature ? env.openFeature(f.id) : env.go(f.page));
+  if (!featureQueryOf(arg)) {
+    // "Welche Funktionen gibt es?" – nothing specific to look for: the whole list is the answer
+    env.go("funktionen");
+    return reply({ title: "Funktionen geöffnet", text: "Die Übersicht aller Funktionen ist offen – nach Aufgaben geordnet, durchsuchbar, mit ehrlichem Stand.", close: true });
+  }
+  const { hits, clear } = whereIs(arg);
+  const all: ReplyAction = { label: "Alle Funktionen", run: () => env.go("funktionen") };
+  if (!hits.length)
+    return reply({
+      title: "Dazu finde ich keine Funktion",
+      text: "Dazu steht nichts in der Funktionsübersicht. Sie ist nach Aufgaben geordnet und durchsuchbar – vielleicht heißt es dort anders. Frag mich auch gern mit dem Namen, zum Beispiel „Wo finde ich den Belastungstest?“.",
+      actions: [all],
+      followUps: ["Wo finde ich das Labor?", "Wo finde ich den Positionsrechner?"],
+      tone: "mute",
+    });
+  const f = hits[0]!.entry;
+  const tier = tierOf(f.gate);
+  const group = FEATURE_GROUPS.find((g) => g.id === f.group)?.name ?? "";
+  const parts = [
+    `${f.name} (${group}): ${f.benefit}`,
+    `Zu finden ${placeOf(f)}.`,
+    tier !== "frei" ? `Tarif: ab ${PLAN_TIER_LABEL[tier]}.` : "",
+    f.status === "teilweise" && f.note ? `Noch nicht vollständig: ${f.note}` : f.note ? `Zu wissen: ${f.note}` : "",
+    f.needs ? `Voraussetzung: ${f.needs}` : "",
+  ].filter(Boolean);
+  const others = hits.slice(1).map((h) => h.entry);
+  if (clear) {
+    open(f);
+    return reply({
+      title: `${f.name} geöffnet`,
+      text: parts.join(" "),
+      facts: [fact("Stand", f.status === "fertig" ? "fertig" : "teilweise", f.status === "fertig" ? "win" : "mute"), fact("Tarif", PLAN_TIER_LABEL[tier])],
+      actions: others.map((o) => ({ label: `${o.name} öffnen`, run: () => open(o) })),
+      followUps: others.length ? [] : ["Welche Funktionen gibt es?"],
+      close: true,
+    });
+  }
+  return reply({
+    title: "Das kommt infrage",
+    text: `Ich bin nicht sicher, welche du meinst. ${hits.map((h) => `${h.entry.name}: ${h.entry.benefit}`).join(" ")} Tipp auf eine, dann öffne ich sie.`,
+    actions: [...hits.map((h) => ({ label: `${h.entry.name} öffnen`, run: () => open(h.entry) })), all],
+    tone: "mute",
   });
 }
 
@@ -305,6 +369,8 @@ export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
         env.go(page);
         return reply({ title: `${PAGE_LABEL[page] ?? "Seite"} geöffnet`, text: `Ich habe ${PAGE_LABEL[page] ?? "die Seite"} für dich geöffnet.`, close: true });
       }
+      case "where":
+        return whereTool(arg, env);
       case "train":
         env.train?.();
         return reply({ title: "Training geöffnet", text: env.train ? "Du wählst dort ein Setup, bekommst Situationen aus deinem Journal ohne den weiteren Verlauf gezeigt und entscheidest selbst. Ich öffne nur – eingetragen wird erst, was du dort festhältst." : "Das Training ist hier gerade nicht verfügbar.", close: !!env.train });

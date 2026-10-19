@@ -21,7 +21,8 @@ export type IconName =
   | "users"
   | "gauge"
   | "user"
-  | "tag";
+  | "tag"
+  | "compass";
 
 type SvgProps = Omit<SVGProps<SVGSVGElement>, "children">;
 
@@ -160,6 +161,13 @@ export function Icon({ name, className, ...props }: { name: IconName } & SvgProp
         <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
           <path d="M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" />
           <circle cx="8" cy="8" r="1.5" />
+        </svg>
+      );
+    case "compass":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M15.5 8.5l-2 5-5 2 2-5z" />
         </svg>
       );
   }

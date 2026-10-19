@@ -4,6 +4,9 @@
  * `PAGES` holds – pages the integrator adds later appear by themselves), the settings sections, the report archive
  * (only once the `berichte` page exists) and the app commands.
  */
+import type { FeatureEntry } from "@/app/features";
+import { FEATURE_GROUPS } from "@/app/features";
+import { featureHaystack, featureSearchId } from "@/app/featureQuery";
 import { aggregate } from "@/domain/agg";
 import { KIND_REPORT, reportArchive } from "@/domain/reports";
 import type { DayNotes, EnrichedTrade, Settings } from "@/domain/types";
@@ -11,7 +14,7 @@ import { tradeTime } from "@/lib/dates";
 import { fmt, isFin } from "@/lib/format";
 import { haystack, type Haystack } from "./fuzzy";
 
-export type SearchKind = "best" | "recent" | "command" | "page" | "trade" | "setup" | "day" | "setting" | "report";
+export type SearchKind = "best" | "recent" | "command" | "page" | "feature" | "trade" | "setup" | "day" | "setting" | "report";
 
 export type CommandId =
   | "new-trade"
@@ -35,6 +38,7 @@ export type CommandId =
 
 export type SearchAction =
   | { type: "page"; page: string }
+  | { type: "feature"; id: string }
   | { type: "trade"; id: string }
   | { type: "setup"; id: string }
   | { type: "day"; key: string }
@@ -66,6 +70,7 @@ export const KIND_LABEL: Record<SearchKind, string> = {
   recent: "Zuletzt geöffnet",
   command: "Befehle",
   page: "Seiten",
+  feature: "Funktionen",
   trade: "Trades",
   setup: "Entscheidungsgrundlagen",
   day: "Tagesnotizen",
@@ -90,6 +95,7 @@ export const FALLBACK_PAGE_LABELS: Record<string, string> = {
   cockpit: "Cockpit",
   konto: "Konto",
   preise: "Preise",
+  funktionen: "Funktionen",
 };
 
 const PAGE_WORDS: Record<string, string[]> = {
@@ -108,6 +114,7 @@ const PAGE_WORDS: Record<string, string[]> = {
   cockpit: ["Widgets", "Eigenes Dashboard", "Anordnen"],
   konto: ["Anmelden", "Cloud", "Sync", "Abo", "Börse", "Sicherheit"],
   preise: ["Abo", "Pro", "Premium", "Tarife", "Upgrade"],
+  funktionen: ["Alle Funktionen", "Übersicht der Funktionen", "Wo finde ich", "Index", "Hilfe", "Verzeichnis"],
 };
 
 /** Settings sections: the card titles of the settings page (scroll target) + what they hold. */
@@ -168,6 +175,8 @@ export interface IndexInput {
   commandAvailable?: (id: CommandId) => boolean;
   /** `g` + letter per page (`PAGE_KEYS`) */
   pageKeys?: Partial<Record<string, string>>;
+  /** the function register (`src/app/features.ts`) – absent: no function items (the register is a lazy chunk) */
+  features?: readonly FeatureEntry[];
 }
 
 const RESULT_WORD: Record<EnrichedTrade["result"], string> = { win: "Gewinn", loss: "Verlust", be: "Break-even", open: "Offen" };
@@ -299,6 +308,24 @@ function pageItems(pages: readonly string[], labels: IndexInput["labels"], keys:
   });
 }
 
+/** The register's functions (deep links): "Kosten- und Belastungstest · Testen · Labor". Register order = tie order. */
+function featureItems(features: readonly FeatureEntry[], labels: IndexInput["labels"]): SearchItem[] {
+  return features.map((f, i) => {
+    const page = pageLabel(f.page, labels);
+    return {
+      id: featureSearchId(f.id),
+      kind: "feature",
+      title: f.name,
+      subtitle: `${FEATURE_GROUPS.find((g) => g.id === f.group)?.name ?? "Funktion"} · ${page}`,
+      meta: f.status === "teilweise" ? "teilweise" : undefined,
+      metaTone: f.status === "teilweise" ? "mute" : undefined,
+      boost: 2 - i * 0.01,
+      action: { type: "feature", id: f.id },
+      hay: featureHaystack(f, page),
+    } satisfies SearchItem;
+  });
+}
+
 function settingItems(): SearchItem[] {
   return SETTING_SECTIONS.map((s) => ({
     id: `setting:${s.title}`,
@@ -346,10 +373,11 @@ function commandItems(available: IndexInput["commandAvailable"]): SearchItem[] {
 
 /** The whole index. Pure: same input → same items. */
 export function buildSearchIndex(input: IndexInput): SearchItem[] {
-  const { trades, settings, days, pages, labels, now, commandAvailable, pageKeys } = input;
+  const { trades, settings, days, pages, labels, now, commandAvailable, pageKeys, features } = input;
   return [
     ...commandItems(commandAvailable),
     ...pageItems(pages, labels, pageKeys),
+    ...(features ? featureItems(features, labels) : []),
     ...tradeItems(trades, settings, now),
     ...setupItems(trades, settings),
     ...dayItems(days, now),
