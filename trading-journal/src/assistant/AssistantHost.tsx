@@ -21,6 +21,7 @@ import { useUi } from "@/store/uiStore";
 import { openReport } from "@/views/berichte/berichteStore";
 import { useDiagnosis } from "@/views/labor/DiagnosisCard";
 import { useLabor } from "@/views/labor/laborStore";
+import { openTraining } from "@/views/ueben/trainingStore";
 import { Chip, EntryView } from "./AssistantAnswer";
 import { useConversation } from "./conversation";
 import { execute, replyText, respond, type EngineEnv, type Reply } from "./engine";
@@ -158,6 +159,7 @@ function AssistantBody() {
         applyIdea: (d) => useLabor.getState().applyIdea(d),
         go: (p) => navigate(p),
         newTrade: () => openEditor(),
+        train: () => openTraining(),
         setMem: (fn) => conv.getState().setMem(fn),
         now: Date.now(),
       };

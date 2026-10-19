@@ -20,6 +20,8 @@
  * | `ShotImportHost` | F29 | the lazy preview sheet of „Aus Screenshot übernehmen“ + the pill for queued drafts |
  * | `BoxSnapBackfillHost` | P02 | idle Box-zu-Box context at entry for synced / imported trades and other pairs (F02) |
  * | `KeyLevelHost` | F22 / F08 | stage alerts of the user's own key levels + day-plan change toast, only while the app is open (no plan gate) |
+ * | `WhatIfMount` | F33 | the „Was wäre wenn“ sheet of a trade – its own chunk, fetched the first time it is opened |
+ * | `TrainingMount` | F38 | the training sheet (Lernmodus: situations without the future, decision, reveal, reflection) – its own chunk, fetched the first time it is opened |
  */
 import { lazy, Suspense, type ReactNode } from "react";
 import { installE2eHooks } from "@/app/e2eHooks";
@@ -40,10 +42,14 @@ import { ReportReadyHost } from "@/views/berichte/ReportReady";
 import { CoachWatcher } from "@/views/coach/CoachWatcher";
 import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
 import { ReplayHost } from "@/views/trades/replay/TradeReplay";
+import { useWhatIf } from "@/views/trades/whatif/whatIfStore";
+import { useTraining } from "@/views/ueben/trainingStore";
 import { DailyCheckinHost } from "@/views/wachstum/DailyCheckinHost";
 import { PostTradeReviewHost } from "@/views/wachstum/PostTradeReview";
 
 const AssistantHost = lazy(() => import("@/assistant/AssistantHost"));
+const WhatIfHost = lazy(() => import("@/views/trades/whatif/WhatIfHost"));
+const TrainingHost = lazy(() => import("@/views/ueben/TrainingHost"));
 
 /** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
 function AssistantMount() {
@@ -51,6 +57,26 @@ function AssistantMount() {
   return used ? (
     <Suspense fallback={null}>
       <AssistantHost />
+    </Suspense>
+  ) : null;
+}
+
+/** „Was wäre wenn“ (F33): the chunk is fetched the first time a trade asks for it, then stays mounted (close animation). */
+function WhatIfMount() {
+  const used = useWhatIf((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <WhatIfHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Training (F38): same pattern – nothing of it loads before the first „Üben“. */
+function TrainingMount() {
+  const used = useTraining((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <TrainingHost />
     </Suspense>
   ) : null;
 }
@@ -111,6 +137,12 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Replay">
         <ReplayHost />
+      </HostSlot>
+      <HostSlot name="Was wäre wenn">
+        <WhatIfMount />
+      </HostSlot>
+      <HostSlot name="Training">
+        <TrainingMount />
       </HostSlot>
       <HostSlot name="MAE/MFE">
         <ExcursionBackfillHost />

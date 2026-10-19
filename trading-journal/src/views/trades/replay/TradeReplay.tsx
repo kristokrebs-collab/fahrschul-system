@@ -21,6 +21,7 @@ import type { BiasContext, BiasTest } from "@/domain/biasTest";
 import { MirrorPanel, useMirrorState } from "@/views/biasTest";
 import { BIAS } from "@/views/biasTest/strings";
 import { barAt, buildReplay, defaultReplayInterval, phaseLabel, readoutAt, REPLAY_INTERVALS, replayWindow, type ReplayInterval } from "./replayModel";
+import { openTraining } from "@/views/ueben/trainingStore";
 import { closeReplay, useReplay } from "./replayStore";
 
 /** The replay chart is its own lightweight-charts chunk. */
@@ -102,7 +103,23 @@ function ReplayBody({ trade }: { trade: EnrichedTrade }) {
             {!coverPosition && ` · ${fmtPrice(trade.entry)}${coverResult ? "" : ` → ${trade.result === "open" ? "offen" : fmtPrice(trade.exit)}`}`}
           </span>
         </div>
-        <Segmented<ReplayInterval> aria-label="Kerzen" size="sm" value={interval} onChange={setTf} options={REPLAY_INTERVALS.map((v) => ({ v, label: v, disabled: mirror.frozen && v !== interval }))} />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* F38: practise this kind of situation without the future (the replay steps aside; the detail comes back afterwards) */}
+          {!mirror.testing && (
+            <button
+              type="button"
+              onClick={() => {
+                const back = useReplay.getState().back;
+                useReplay.setState({ id: null, back: false });
+                openTraining({ tradeId: trade.id, returnToDetail: back });
+              }}
+              className="rounded-full border border-line-2 px-3 py-1.5 text-[12px] font-medium text-fg transition-colors hover:border-white/40 pointer-coarse:min-h-11"
+            >
+              Ähnliches üben
+            </button>
+          )}
+          <Segmented<ReplayInterval> aria-label="Kerzen" size="sm" value={interval} onChange={setTf} options={REPLAY_INTERVALS.map((v) => ({ v, label: v, disabled: mirror.frozen && v !== interval }))} />
+        </div>
       </StaggerItem>
       <StaggerItem>
         <AnimatePresence mode="wait" initial={false}>

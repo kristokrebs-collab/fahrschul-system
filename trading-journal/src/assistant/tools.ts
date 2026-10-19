@@ -56,6 +56,8 @@ export interface ToolEnv {
   applyIdea?: (draft: IdeaDraft) => boolean;
   go: (page: Page) => void;
   newTrade: () => void;
+  /** opens the training sheet (F38) – it only opens; the user chooses, decides and writes everything there */
+  train?: () => void;
   setMem: (fn: (m: AssistantMemory) => AssistantMemory) => void;
   now: number;
 }
@@ -262,7 +264,7 @@ function helloTool(arg: string, env: ToolEnv): ToolReply {
 function helpTool(env: ToolEnv): ToolReply {
   return reply({
     title: "Das kann ich",
-    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“, „Teste diese Idee“), Verbesserungen oder deinem Wochenexperiment. Ich öffne auch Seiten („Öffne das Labor“) und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
+    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“, „Teste diese Idee“), Verbesserungen oder deinem Wochenexperiment. Ich öffne auch Seiten („Öffne das Labor“), das Training („Ich will üben“) und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
     followUps: suggestFor(env),
   });
 }
@@ -303,6 +305,9 @@ export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
         env.go(page);
         return reply({ title: `${PAGE_LABEL[page] ?? "Seite"} geöffnet`, text: `Ich habe ${PAGE_LABEL[page] ?? "die Seite"} für dich geöffnet.`, close: true });
       }
+      case "train":
+        env.train?.();
+        return reply({ title: "Training geöffnet", text: env.train ? "Du wählst dort ein Setup, bekommst Situationen aus deinem Journal ohne den weiteren Verlauf gezeigt und entscheidest selbst. Ich öffne nur – eingetragen wird erst, was du dort festhältst." : "Das Training ist hier gerade nicht verfügbar.", close: !!env.train });
       case "newTrade":
         env.newTrade();
         return reply({ title: "Trade eintragen", text: "Das Formular ist offen.", close: true });

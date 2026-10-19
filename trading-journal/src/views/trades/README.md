@@ -50,3 +50,12 @@ layoutIds (contracts in `src/motion/README.md`):
   `borderRadius radius.pill`, `aria-hidden` (the direction stays as sr-only ` ↑` / ` ↓` text).
 
 Tests: `tests/unit/views.trades.{view,model,geometry,filters}.test.*`.
+
+## Was wäre wenn (F33) – `whatif/`
+
+`WhatIfHost` (eigener Lazy-Chunk über `DeferredHosts`, geöffnet mit `openWhatIf`, Knopf „Was wäre wenn“ im Trade-Detail): derselbe Trade auf
+seinen Kerzen (`useCandles` = MAE/MFE-Lader) – Zeilen **Ist (Journal)**, **Nachrechnung mit deinen Regeln**, sieben Varianten (Stopp enger / weiter, Break-even, Teilziel,
+Ziel +2 R, Trailing, Weiterlaufen) und die **Eigene Variante** aus dem Baukasten (Stopp, Break-even, Teilziel, Ziel, Dauer, Trailing). Jede Zeile nennt R, Betrag
+(vor Gebühren), Ausstiegsgrund, Δ zur Nachrechnung; eine Zeile wählen zeigt Stopp und Ausstieg der Variante im Chart (`ReplayChart` `lines`). Immer sichtbar:
+Rückschaufehler-Hinweis, die konservative Reihenfolge innerhalb einer Kerze, die Annahmen. Es wird nichts gespeichert. Details: `src/domain/whatif/README.md`.
+`replay/useCandles.ts` ist der gemeinsame Kerzen-Hook (Replay-ähnliche Sheets, auch das Training).

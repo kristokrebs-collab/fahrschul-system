@@ -2,9 +2,10 @@
  * F74 assistant – local understanding: typo repair, colloquial phrases, tools, follow-ups, honest fallback and the
  * memory writers. Every canonical question of the phrase table must be one the journal parser really understands.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { parseQuestion, type Intent } from "@/domain/coach/nlq";
 import { EMPTY_MEMORY, addFact, byInterest, learnInterest, memoryOf, removeFact, setStyle, topInterests, withMemory } from "@/assistant/memory";
+import { runTool, type ToolEnv } from "@/assistant/tools";
 import { closestQuestions, editDistance, mergeFollowUp, repairTypos, squeeze, understand, type Plan } from "@/assistant/understand";
 import { COACH_SETTINGS } from "./coach.fixtures";
 
@@ -122,6 +123,25 @@ describe("tools", () => {
     expect(tool("wie läuft mein Wochenexperiment")).toBe("experiment");
     expect(tool("Was ist mein Experiment diese Woche?")).toBe("experiment");
     expect(tool("zeig mir die Hypothese der Woche")).toBe("experiment");
+  });
+  it("routes practice requests to the training tool – and only those", () => {
+    for (const q of ["Ich will üben", "ich will ueben", "Training starten", "öffne das Training", "lernmodus", "kann ich was trainieren?", "Übung bitte"]) expect(tool(q), q).toBe("train");
+    // a journal question or a plain improvement question is not a training request
+    expect(tool("wie kann ich besser werden")).toBe("improve");
+    expect(tool("Win-Rate diesen Monat")).toBe("journal");
+    expect(tool("öffne das Labor")).toBe("navigate");
+  });
+  it("the training tool only opens: it calls the callback, saves nothing and closes the sheet; without it, it says so", () => {
+    const train = vi.fn();
+    const setMem = vi.fn();
+    const env = { train, setMem, now: NOW } as unknown as ToolEnv;
+    const r = runTool("train", "Ich will üben", env);
+    expect(train).toHaveBeenCalledTimes(1);
+    expect(setMem).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ title: "Training geöffnet", close: true });
+    const none = runTool("train", "Ich will üben", { now: NOW } as unknown as ToolEnv);
+    expect(none.close).toBe(false);
+    expect(none.text).toContain("nicht verfügbar");
   });
   it("memory commands", () => {
     expect(tool("merk dir: ich handle nur nach dem Londoner Open")).toBe("memory");

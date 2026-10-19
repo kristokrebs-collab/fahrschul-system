@@ -35,6 +35,8 @@ lage/         Lage-Ampel (daily / weekly trend state, decision 23)
 boxes/        Box zu Box (P02): box detection, phases, setups with grade, snapshot – see src/domain/boxes/README.md
 analytics/    Analyse (P03): ratios with intervals, Monte Carlo (+ worker), risk of ruin, breakdowns, dimensions, rolling,
               benchmark, compare, custom stats, significance labels – see src/domain/analytics/README.md
+whatif/       „Was wäre wenn“ (F33): one trade re-run on its own candles with another stop / break-even / partial / exit on the backtest engine – src/domain/whatif/README.md
+training/     Lernmodus (F38): practice rounds without the future, decision rules, history numbers – settings.training, src/domain/training/README.md
 coach/        Coach (P04): behaviour detectors, edges / leaks, recommendations, trade review, German Q&A (nlq) –
               see src/domain/coach/README.md
 reports/      Berichte (P04): periods, report builder, archive, pending "Bericht bereit", exports – src/domain/reports/README.md
