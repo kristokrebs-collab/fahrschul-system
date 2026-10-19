@@ -56,3 +56,34 @@ is its own chunk (`lazy` in `LaborView`); its three cards are collapsible (`labo
   `labor-filter-reason` for locked ones), `labor-filters-run`, then `labor-filter-table` (rows `labor-filter-row`, `data-variant`), the contribution table
   (`labor-contrib-table`) and the overlap note (`labor-filter-overlap`).
 - Tests: `tests/unit/views.labor.extras.test.tsx`, e2e `tests/e2e/labor-extras.spec.ts`.
+
+## Diese Idee testen (F12)
+A Box setup (`Beste Setups` dialog → `setup-to-lab`), the entry check (`Warum handeln oder auslassen?` → `signal-to-lab`), a
+journal edge / leak (`Leaks & Edges` → `coach-test-idea`) and the assistant ("Teste diese Idee", `ideaTool`) hand their data to
+`translateIdea` (`@/domain/lab/idea.ts`, pure, tested in `tests/unit/lab.idea.test.ts`). The result, an `IdeaDraft`, is a complete
+"Eigene Idee": market, execution interval, side, rule tree (AND), stop, target – plus three lists that are never empty by accident:
+`mapped` (what became a rule), `gaps` (what did NOT, each with its reason: top-trader ratios and the Lage-Ampel have no history, a
+journal setup is a playbook, behaviour / feeling is no market state, box quality is no block …) and `notes` (approximations and
+defaults: "Näherung: …", stop / target defaults, UTC vs local time).
+- Box setup: breakout / retest → `breakout` block with the box length as look-back (named approximation), range → premium /
+  discount zone (named approximation), RSI trendline break → `rsiLine`, stop = the plan's distance in %, target = the plan's CRV.
+  A rule that would consist only of exclusions ("NICHT …") or of nothing is not testable.
+- Entry check: the lab's own `mcbLadder` block IS that check, candle by candle; minimum strength = the verdict's (without the
+  top-trader bonus point the lab cannot reproduce).
+- Journal combination: weekday + session → the new block `timeWindow` (UTC; `sessionOfSec` equals the journal's `sessionOf`),
+  side / asset / timeframe / signal strength → market, interval, side, ladder. Without any rule the lab stays untouched and the
+  reason shows under the button (`TestIdeaButton`, lazy `openIdea`).
+- `useLabor`: `idea` (memory only), `applyIdea(draft)` (fills `cfg`: strategy `custom`, symbol, rules; keeps the trader's own set-up
+  as the way back), `restoreBeforeIdea()`, `dismissIdea()`. `IdeaCard` (`labor-idea`, lists `labor-idea-mapped|gaps|notes`) sits
+  above the set-up while an idea is active. Nothing is saved as a draft, no run is started.
+
+## TradingView (F14)
+Section `TradingView` (lazy chunk `TvSection.tsx`): `AdapterStatusCard` (`labor-tv-status`, data from `@/domain/tvimport` `TV_ADAPTERS`:
+tester export = unterstützt · alert webhook = nur Forwardtest über Alert · Pine execution / indicator as block / indicator series /
+account access = nicht unterstützt, each with its limits) and `TvCompareCard` (`labor-tv-compare`): the strategy-tester export "List
+of trades" (CSV, EN or DE headers, comma / semicolon / tab, point or comma decimals, any column order) is read in the browser
+(`parseTvTrades`, nothing is uploaded), unreadable lines are listed with their line number (`labor-tv-errors`), the file's time zone is
+chosen (UTC … UTC+3) and the file is compared with the SHOWN lab run (`compareTrades`): pairing by direction and entry time (one
+execution bar of tolerance), common period only, open trades left out, net difference (all compared / paired only) next to the
+unit-free sum of price moves, and observations on possible reasons (costs, position size, order of high / low inside a candle,
+delay, unpaired trades) – each backed by figures and phrased as "kann", never as a proven cause. See `src/domain/tvimport/README.md`.

@@ -6,6 +6,8 @@
  *   Belastung …     ExtrasSection (12): stress scenarios, Prüfbericht, filter comparison      (after a run, lazy)
  *   Robustheit      OverfitCard (5) · OosCard (7) · WalkForwardCard (7) · HeatmapCard (5)     (after a run)
  *   Vergleich       CompareRunsCard (8) · ReferenceCard (4)                                   (after a run)
+ *   TradingView     AdapterStatusCard (6) · TvCompareCard (6)                                 (lazy chunk, always; F14)
+ * Above the set-up, when an idea came from the journal ("Diese Idee testen", F12): IdeaCard (12).
  * Every cell reveals once (`Reveal`, ends at `transform: none`), section titles rise letter by letter. The replay
  * sheet of a backtest trade is mounted here (`LabReplayHost`). Registered by the integrator (P14) as page `labor`.
  */
@@ -17,6 +19,7 @@ import { useJournal } from "@/store/journalStore";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ConfigCard } from "./ConfigCard";
 import { DiagnosisCard } from "./DiagnosisCard";
+import { IdeaCard } from "./IdeaCard";
 import { LabReplayHost } from "./LabReplay";
 import { useLabor } from "./laborStore";
 import { HeatmapCard, OosCard, OverfitCard, WalkForwardCard } from "./RobustCards";
@@ -28,6 +31,8 @@ import { Cell, SectionTitle } from "./ui";
 
 /** F20 / F18 / F17: its own chunk, fetched only when a finished run is on the page. */
 const ExtrasSection = lazy(() => import("./ExtrasSection"));
+/** F14: adapter status + TradingView export comparison – its own chunk (the CSV reader and the comparison load with it). */
+const TvSection = lazy(() => import("./TvSection"));
 
 export const LABOR_LEAD_FILL = { storageKey: storageKey("fill-labor"), highlight: LABOR.highlight } as const;
 
@@ -47,13 +52,19 @@ export function LaborView({ className }: { className?: string }) {
   const status = useLabor((s) => s.status);
   const runs = useLabor((s) => s.runs.length);
   const custom = useLabor((s) => s.cfg.strategy === "custom");
+  const hasIdea = useLabor((s) => s.idea != null);
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), diagnose: useId(), extras: useId(), robust: useId(), compare: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), extras: useId(), robust: useId(), compare: useId(), tv: useId() };
   const T = LABOR.sections;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
       <PageHeader className="lg:col-span-12" title={LABOR.title} lead={LABOR.lead} leadFill={LABOR_LEAD_FILL} />
       <Section id={ids.setup} title={T.setup.title} sub={T.setup.sub}>
+        {hasIdea && (
+          <Cell index={0} span="lg:col-span-12">
+            <IdeaCard />
+          </Cell>
+        )}
         <Cell index={0} span={custom ? "lg:col-span-8" : "lg:col-span-7"}>
           <ConfigCard signal={signal} />
         </Cell>
@@ -115,6 +126,11 @@ export function LaborView({ className }: { className?: string }) {
           )}
         </Section>
       )}
+      <Section id={ids.tv} title={T.tv.title} sub={T.tv.sub}>
+        <Suspense fallback={null}>
+          <TvSection />
+        </Suspense>
+      </Section>
       <LabReplayHost />
     </div>
   );

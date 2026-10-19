@@ -20,6 +20,7 @@ import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
 import { openReport } from "@/views/berichte/berichteStore";
 import { useDiagnosis } from "@/views/labor/DiagnosisCard";
+import { useLabor } from "@/views/labor/laborStore";
 import { Chip, EntryView } from "./AssistantAnswer";
 import { useConversation } from "./conversation";
 import { execute, replyText, respond, type EngineEnv, type Reply } from "./engine";
@@ -154,6 +155,7 @@ function AssistantBody() {
         experiment: () => experimentOverview({ settings, events, now: Date.now(), list: view.list, acc: base.acc, recs: () => analyse(view, settings, events, days, Date.now()).recs, listOf: (a) => accountView(base.enriched, settings, a).list }),
         openReport: (key) => void openReport(key),
         lab,
+        applyIdea: (d) => useLabor.getState().applyIdea(d),
         go: (p) => navigate(p),
         newTrade: () => openEditor(),
         setMem: (fn) => conv.getState().setMem(fn),

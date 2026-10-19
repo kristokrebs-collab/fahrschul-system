@@ -6,7 +6,7 @@ Everything numerical is computed by the app (`@/domain/…`); a language model i
 
 ```
 question ─▶ understand.ts ─┬─ journal   ─▶ answerIntent (domain/coach/nlq)  ─▶ Answer (numbers, chart, confidence, evidence)
- (typed or     (local,     ├─ tool      ─▶ tools.ts (improve · entry · lab · memory · navigate · explain · …)
+ (typed or     (local,     ├─ tool      ─▶ tools.ts (improve · entry · idea · lab · memory · navigate · explain · …)
   spoken)       no key)    └─ clarify   ─▶ "Meintest du …?" + closest known questions
                                    │
                                    └─ optional server router (route.ts → netlify/functions/assistant-route.mts):
@@ -39,6 +39,8 @@ coach wording, body ≤ 4 KiB. Env: `ANTHROPIC_API_KEY` (the operator's key – 
 * no figure from a language model; tools and answers are deterministic functions of the journal;
 * the week experiment is never accepted, declined or changed by the assistant;
 * no state-changing action without the user: "öffne …" navigates and "Trade eintragen" opens the form, nothing is saved,
+
+* no state-changing action without the user: "öffne …" navigates, "Trade eintragen" opens the form and "Teste diese Idee" (`ideaTool`, F12) only pre-fills the lab's "Eigene Idee" from the live entry check and opens the lab – nothing is saved or started,
   alerts are not created by voice (planned with confirmation);
 * no background listening; the microphone runs only between two taps.
 

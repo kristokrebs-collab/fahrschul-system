@@ -43,7 +43,8 @@ export type BlockId =
   | "breakout"
   | "keyLevel"
   | "volume"
-  | "rsiLine";
+  | "rsiLine"
+  | "timeWindow";
 
 export type LeafParams = Record<string, number | string>;
 
@@ -135,7 +136,7 @@ export interface ParamDef {
   when?: (p: LeafParams) => boolean;
 }
 
-export type Family = "momentum" | "mcb" | "trend" | "volatility" | "structure" | "price";
+export type Family = "momentum" | "mcb" | "trend" | "volatility" | "structure" | "price" | "time";
 export const FAMILY_LABEL: Readonly<Record<Family, string>> = {
   momentum: "Momentum",
   mcb: "MCB / WaveTrend",
@@ -143,4 +144,5 @@ export const FAMILY_LABEL: Readonly<Record<Family, string>> = {
   volatility: "Volatilität",
   structure: "Struktur & Zonen",
   price: "Preis & Volumen",
+  time: "Zeit",
 };

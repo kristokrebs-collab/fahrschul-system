@@ -397,3 +397,16 @@ eigener Satz in einem umrandeten Feld („Nächste Woche: … – bei mindestens
 sonst eine Kennzahlenzeile und Signalzeilen mit Zeit (Mono), Richtung (▲ Long / ▼ Short), Quelle (Badge), Markt · Zeiteinheit und den zwei
 Knöpfen „Im Labor testen“ / „Beobachten“ (`aria-pressed`); die Einschränkungen („bewusst ausgelassen oder übersehen“, kein Ausgang gespeichert,
 keine Ursache) stehen unter einer Trennlinie in `text-faint`, nie versteckt. Bewegung: nur die Zellen-`Reveal`s der Seiten, keine neuen Tokens.
+
+### Diese Idee testen (F12) und TradingView im Labor (F14)
+
+Keine neue Sprache. **Diese Idee testen** ist ein ruhiger `Button` (ghost, `sm` in Listen) neben den bestehenden Wegen („Als Trade
+eintragen“, „Im Rechner öffnen“); er füllt vor, startet nichts und speichert nichts. Geht aus der Quelle keine Regel hervor, bleibt
+das Labor unverändert und der Grund steht als Satz unter dem Knopf (`role="status"`, `text-mute`), nie als stiller Fehlschlag. Im
+Labor steht darüber die Karte **Idee aus dem Journal** (volle Breite, ein `Card`): drei Listen – *Übernommen*, *Nicht abgebildet*
+(jeder Punkt mit Grund in `text-mute`), *Näherungen und Standardwerte* – mit den Wegen „Vorheriges Setup zurück“ und „Ausblenden“.
+Nicht Abbildbares ist Text, nie ein ausgegrauter Baustein. Der Abschnitt **TradingView** zeigt jeden Weg als Zeile mit `Badge`
+(unterstützt = win, nur Forwardtest über Alert = warn, nicht unterstützt = mute) und den Grenzen in einem Satz; der Vergleich trennt
+Zahlen (Kacheln, Differenz Netto) von Beobachtungen („Mögliche Gründe“, immer im Konjunktiv) und nennt Lesefehler mit „Zeile n“ in
+Signalrot-Text, nie als Dialog. Bewegung: nur die vorhandenen `Reveal`-Zellen, nichts Eigenes. Mobil: alle Listen einspaltig, Paare
+als Karten statt Tabelle (kein horizontaler Scroll), Touch-Ziele über `Button` / `ChipPick` (≥ 44 px bei grobem Zeiger).

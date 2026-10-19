@@ -16,6 +16,7 @@ import { Segmented } from "@/primitives/Segmented";
 import { lageSettingsOf } from "@/domain/lage";
 import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
+import { TestIdeaButton } from "@/views/labor/TestIdeaButton";
 import { triggerClose, whyInput } from "./whyView";
 
 export const WHY_ID = "why-section";
@@ -126,6 +127,10 @@ export function WhySection({ snap, side, feed }: { snap: LiveSignals; side: Side
               {why.scoreNote}
             </p>
           )}
+          <div className="flex flex-wrap items-start gap-x-4 gap-y-2 border-t border-line pt-3" data-testid="why-test-idea">
+            <TestIdeaButton input={{ kind: "signal", symbol: snap.symbol, baseTf: snap.cfg.ladder[0] ?? null, verdict: snap[side] }} testId="signal-to-lab" />
+            <p className="min-w-0 flex-1 basis-56 text-[11.5px] leading-snug text-faint">Legt die Regeln dieses Einstiegs-Checks als „Eigene Idee“ ins Labor, mit allem, was dort nicht abbildbar ist. Gestartet oder gespeichert wird nichts.</p>
+          </div>
         </div>
       </Collapse>
     </section>

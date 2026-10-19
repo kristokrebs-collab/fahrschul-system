@@ -20,6 +20,7 @@ import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
 import { toInput, useRiskUi } from "@/views/risiko/riskStore";
+import { TestIdeaButton } from "@/views/labor/TestIdeaButton";
 import { cn } from "@/lib/cn";
 import type { BestSetup, BoxesView } from "@/market/boxes/store";
 import { BreakoutStreak } from "@/motion/fx/BreakoutStreak";
@@ -91,6 +92,11 @@ function SetupActions({ b, symbol }: { b: BestSetup; symbol: string | null }) {
         <Button variant="ghost" onClick={toCalc} data-testid="setup-to-calc">
           {S.toCalc}
         </Button>
+        <TestIdeaButton
+          input={{ kind: "box", symbol, tf: b.tf, setup: s, boxBars: b.analysis.box.box ? b.analysis.box.box.i1 - b.analysis.box.box.i0 + 1 : null }}
+          onOpen={close}
+          testId="setup-to-lab"
+        />
       </div>
       <p className="text-[11.5px] leading-snug text-faint">{S.actionsNote}</p>
     </StaggerItem>
