@@ -19,11 +19,15 @@ h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
 .row label { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
 button, input, select { font: inherit; color: inherit; }
 button { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
-.cell { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 12px 12px; display: grid; justify-items: center; gap: 12px; }
-.cell { cursor: pointer; outline-offset: 2px; }
-.cell[data-playing="true"] { border-color: rgba(128,128,128,.5); }
-.cell code { color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
+.stage .main { min-width: 72px; min-height: 72px; display: grid; place-items: center; }
+.stage code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.stage p { margin: 2px 0 0; color: var(--muted); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 12px; }
+.thumb { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 8px 8px; display: grid; justify-items: center; gap: 8px; cursor: pointer; }
+.thumb[aria-pressed="true"] { border-color: var(--ink); }
+.thumb img { width: 64px; height: 64px; display: block; }
+.thumb code { color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .inline { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .inline .orb { margin: 0 2px; }
 </style>
@@ -31,17 +35,18 @@ button { background: var(--panel); border: 1px solid var(--line); border-radius:
 <body>
 <div class="wrap">
   <h1>Thinking Orbs</h1>
-  <p class="sub">Neun „Denk“-Zustände aus gepunkteten Kugeln – Canvas 2D, zeitbasiert, zwei fein abgestimmte Größen (64 / 20) plus interpolierte 32. Hover, Fokus oder Klick auf eine Kachel spielt sie ab (max. 3 gleichzeitig).</p>
+  <p class="sub">Neun „Denk“-Zustände aus gepunkteten Kugeln – Canvas 2D, zeitbasiert, zwei fein abgestimmte Größen (64 / 20) plus interpolierte 32. Die Kacheln sind Standbilder – Klick wählt den Zustand für den großen Orb (so bleibt die Seite leicht: wenige Canvas-Ebenen).</p>
   <div class="row">
     <button id="c-theme">theme: dark</button>
     <button id="c-pause" aria-pressed="false">paused: false</button>
-    <button id="c-all">alle abspielen (Stresstest)</button>
+    <label>size <select id="c-size"><option>64</option><option>32</option><option>20</option></select></label>
     <label>speed <input id="c-speed" type="range" min=".25" max="3" step=".05" value="1"></label>
     <label>dots <input id="c-dots" type="range" min=".4" max="2" step=".1" value="1"></label>
     <label>dotSize <input id="c-dotsize" type="range" min=".6" max="1.8" step=".1" value="1"></label>
     <label>color <input id="c-color" type="color" value="#7c8cff"> <input id="c-tint" type="checkbox" aria-label="Farbe verwenden"></label>
   </div>
-  <div class="grid" id="grid"></div>
+  <div class="stage"><div class="main" id="main"></div><div><code id="main-name"></code><p id="main-desc"></p></div></div>
+  <div class="grid" id="grid" role="group" aria-label="Zustand wählen"></div>
   <div class="inline" id="inline"></div>
 </div>
 
@@ -264,36 +269,35 @@ function initThinkingOrb(target, opts = {}) {
 }
 
 /* ============ Demo ============
-   Es spielen höchstens DEFAULT_ACTIVE (3) große Orbs gleichzeitig (schont Rechenleistung); Hover/Fokus/Klick auf eine andere Kachel startet sie und
-   pausiert die älteste. „Alle abspielen“ = Stresstest (Qualitätsregler senkt dann die Punktdichte). */
-const grid = document.getElementById('grid'), inline = document.getElementById('inline'), orbs = [], cells = [];
-const DEFAULT_ACTIVE = 3; let MAX_ACTIVE = DEFAULT_ACTIVE, pz = false; const active = [];
-ORB_STATES.forEach((st, i) => {
-  const cell = document.createElement('div'); cell.className = 'cell'; cell.tabIndex = 0; cell.title = 'Hover / Fokus / Klick: abspielen';
-  const holder = document.createElement('div'); const code = document.createElement('code'); code.textContent = st; cell.append(holder, code); grid.appendChild(cell); cells.push(cell);
-  orbs.push(initThinkingOrb(holder, { state: st, size: 64, theme: 'auto', paused: true, tau: ORB_STATIC_T[st] }));
-  const go = () => activate(i); cell.addEventListener('pointerenter', go); cell.addEventListener('focus', go); cell.addEventListener('click', go);
-});
-function activate(i) {
-  if (!active.includes(i)) active.push(i);
-  while (active.length > MAX_ACTIVE) { const j = active.shift(); orbs[j].set({ paused: true }); cells[j].dataset.playing = 'false'; }
-  if (!pz) { orbs[i].set({ paused: false }); cells[i].dataset.playing = 'true'; }
+   Ein großer Orb spielt; die Kacheln sind Standbilder (einmal gerendert, <img>), Klick wählt den Zustand. Wenige Canvas-Ebenen = leicht fürs Compositing. */
+const ORB_DESC = { working: 'Partikel auf geneigten Bahnen', searching: 'Scan-Meridian über Punkt-Globus', solving: 'Bänder drehen in Vierteln, klicken zurück', listening: 'Wellenform rollt durch Breitenkreise',
+  connecting: 'Konstellation verdrahtet sich, Pakete laufen', weaving: 'drei Stränge flechten sich', composing: 'wogende Mehrband-Schärpe', breathing: 'frontaler Ring, langsam morphend', shaping: 'Kontur: Kreis → Dreieck → Quadrat' };
+const $ = (id) => document.getElementById(id), grid = $('grid'), inline = $('inline');
+let th = 'dark', pz = false, cur = 'working', tintOn = false, dn = 1, ds = 1;
+const main = initThinkingOrb($('main'), { state: cur, size: 64, theme: 'auto' });
+function describe() { $('main-name').textContent = cur; $('main-desc').textContent = ORB_DESC[cur]; grid.querySelectorAll('.thumb').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.state === cur))); }
+function thumb(st) {                                              // Standbild: Orb auf losgelöstem Canvas einmal zeichnen, als Bild exportieren
+  const c = document.createElement('canvas'), h = initThinkingOrb(c, { state: st, size: 64, theme: th, paused: true, tau: ORB_STATIC_T[st], color: tintOn ? $('c-color').value : null, dots: dn, dotSize: ds });
+  const url = c.toDataURL(); h.destroy(); return url;
 }
-[0, 1, 4].forEach(activate);
+ORB_STATES.forEach((st) => {
+  const b = document.createElement('button'); b.className = 'thumb'; b.dataset.state = st; b.setAttribute('aria-pressed', 'false'); b.setAttribute('aria-label', st + ' – ' + ORB_DESC[st]);
+  const img = document.createElement('img'); img.alt = ''; const code = document.createElement('code'); code.textContent = st; b.append(img, code); grid.appendChild(b);
+  b.onclick = () => { cur = st; main.set({ state: st }); describe(); };
+});
+const rethumb = () => grid.querySelectorAll('.thumb').forEach((b) => { b.firstChild.src = thumb(b.dataset.state); });
 inline.append('Analysiere Repository ');
 const small = [['working', 'Arbeitet'], ['searching', 'Sucht'], ['shaping', 'Formt']], smallOrbs = [];
-small.forEach(([st, txt]) => { const s = document.createElement('span'); s.append(txt + ' '); const h = document.createElement('span'); s.appendChild(h); inline.appendChild(s); smallOrbs.push(initThinkingOrb(h, { state: st, size: 20 })); });
-const $ = (id) => document.getElementById(id), every = () => orbs.concat(smallOrbs), all = (p) => every().forEach((x) => x.set(p));
-let th = 'dark'; $('c-theme').onclick = (e) => { th = th === 'dark' ? 'light' : 'dark'; e.target.textContent = 'theme: ' + th; document.body.dataset.theme = th; };
-$('c-pause').onclick = (e) => { pz = !pz; e.target.textContent = 'paused: ' + pz; e.target.setAttribute('aria-pressed', pz);
-  orbs.forEach((x, i) => x.set({ paused: pz || !active.includes(i) })); smallOrbs.forEach((x) => x.set({ paused: pz })); };
-$('c-all').onclick = (e) => { const on = MAX_ACTIVE === DEFAULT_ACTIVE; MAX_ACTIVE = on ? 99 : DEFAULT_ACTIVE; e.target.textContent = on ? 'nur ' + DEFAULT_ACTIVE + ' spielen' : 'alle abspielen (Stresstest)';
-  if (on) { ORB_STATES.forEach((_, i) => activate(i)); } else { while (active.length > DEFAULT_ACTIVE) { const j = active.shift(); orbs[j].set({ paused: true }); cells[j].dataset.playing = 'false'; } } };
+small.forEach(([st, txt]) => { const sp = document.createElement('span'); sp.append(txt + ' '); const h = document.createElement('span'); sp.appendChild(h); inline.appendChild(sp); smallOrbs.push(initThinkingOrb(h, { state: st, size: 20 })); });
+const every = () => [main, ...smallOrbs], all = (p) => every().forEach((x) => x.set(p));
+$('c-theme').onclick = (e) => { th = th === 'dark' ? 'light' : 'dark'; e.target.textContent = 'theme: ' + th; document.body.dataset.theme = th; requestAnimationFrame(rethumb); };
+$('c-pause').onclick = (e) => { pz = !pz; e.target.textContent = 'paused: ' + pz; e.target.setAttribute('aria-pressed', pz); all({ paused: pz }); if (!pz) every().forEach((x) => x.play()); };
+$('c-size').onchange = (e) => main.set({ size: +e.target.value });
 $('c-speed').oninput = (e) => all({ speed: +e.target.value });
-$('c-dots').oninput = (e) => all({ dots: +e.target.value });
-$('c-dotsize').oninput = (e) => all({ dotSize: +e.target.value });
-const tint = () => all({ color: $('c-tint').checked ? $('c-color').value : null }); $('c-color').oninput = tint; $('c-tint').onchange = tint;
-document.body.dataset.theme = 'dark';
+$('c-dots').oninput = (e) => { dn = +e.target.value; all({ dots: dn }); rethumb(); };
+$('c-dotsize').oninput = (e) => { ds = +e.target.value; all({ dotSize: ds }); rethumb(); };
+const tint = () => { tintOn = $('c-tint').checked; all({ color: tintOn ? $('c-color').value : null }); rethumb(); }; $('c-color').oninput = tint; $('c-tint').onchange = tint;
+document.body.dataset.theme = 'dark'; describe(); rethumb();
 </script>
 </body>
 </html>
