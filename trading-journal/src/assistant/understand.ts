@@ -30,8 +30,10 @@ import {
 import { ACCOUNT_VALUES, EMOTION_VALUES, RESULT_VALUES, SESSION_VALUES, SIDE_VALUES, WEEKDAY_VALUES } from "@/domain/coach/nlq/lexicon";
 import { parseQuestion, type Filter, type FilterDim, type Intent, type ParseContext } from "@/domain/coach/nlq/parse";
 import type { Page } from "@/store/uiStore";
+import { editDistance } from "./fuzzy";
+import { INSIGHT_RULES, followsInsight, type InsightToolId } from "./insightRoutes";
 
-export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar";
+export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar" | InsightToolId;
 
 export type Plan =
   | { kind: "journal"; intents: Intent[]; via: string[]; topic: string }
@@ -44,6 +46,8 @@ export interface UnderstandCtx {
   prev?: Intent | null;
   /** number of closed trades (decides how "was lief gut" is phrased) */
   closed: number;
+  /** the evaluation tool the LAST answer came from (a short „und letzte Woche?“ continues it) */
+  prevTool?: { tool: InsightToolId; question: string } | null;
 }
 
 /* ------------------------------------------------------------------ typo repair */
@@ -81,29 +85,7 @@ export function vocabulary(): ReadonlySet<string> {
   return v;
 }
 
-/** Damerau-Levenshtein distance (optimal string alignment), early exit above `max`. */
-export function editDistance(a: string, b: string, max: number): number {
-  if (a === b) return 0;
-  if (Math.abs(a.length - b.length) > max) return max + 1;
-  const prev2: number[] = [];
-  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
-  for (let i = 1; i <= a.length; i++) {
-    const cur = [i];
-    let rowMin = i;
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      let d = Math.min(prev[j]! + 1, cur[j - 1]! + 1, prev[j - 1]! + cost);
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d = Math.min(d, (prev2[j - 2] ?? Infinity) + 1);
-      cur[j] = d;
-      if (d < rowMin) rowMin = d;
-    }
-    if (rowMin > max) return max + 1;
-    prev2.length = 0;
-    prev2.push(...prev);
-    prev = cur;
-  }
-  return prev[b.length]!;
-}
+export { editDistance };
 
 /** Collapses stretched letters ("guuut" → "gut") – three or more of the same letter become one. */
 export const squeeze = (s: string): string => s.replace(/([a-z])\1{2,}/g, "$1");
@@ -232,12 +214,14 @@ export function pageOf(norm: string): Page | null {
   return null;
 }
 
-const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: RegExp; topic: string; label: string; soft?: true }> = [
+const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: { test(norm: string): boolean }; topic: string; label: string; soft?: true }> = [
   // "Wo finde ich …?" (the function register): first, because the thing asked for is named in the question ("Wo finde ich den Einstiegs-Check?"
   // must not run the entry tool). The unmistakable phrasings win outright; the loose ones ("wo ist …") only when the journal parser found no subject
   { tool: "where", test: /\bwo (finde|find|sehe|seh|komme|geht|kann ich|kann man)\b|\bwie komme ich (zu|zum|zur|an|auf|in|dahin|dorthin)\b|\bwelche funktionen\b|\bwas (gibt es|gibts) (alles |noch )?(an )?funktionen\b/, topic: "where", label: "Wo finde ich …?" },
   { tool: "where", test: /\bwo (ist|sind|steht|stehen|gibt es|gibts)\b/, topic: "where", label: "Wo finde ich …?", soft: true },
   { tool: "memory", test: /\b(merk|merke|merkt)\b.*\b(dir|mal)\b|\bvergiss\b|\bvergessen\b|was weisst du (alles )?(ueber|von) mich|was hast du dir gemerkt|\b(fass dich|antworte|antworten|sei) (kurz|kuerzer|ausfuehrlicher|knapper)|\bkuerzer bitte\b|\bausfuehrlicher bitte\b|\bin kurzform\b|\bnur kurz\b/, topic: "memory", label: "Gedächtnis" },
+  // the evaluation tools (`insightRoutes.ts`): after the place questions and the memory commands, before every tool whose words they may contain
+  ...INSIGHT_RULES,
   { tool: "lab", test: /\bbacktest\b.*\b(schlecht|mies|negativ|verlust|schwach|warum|wieso|kacke|mist|mau|miserabel|bescheiden|katastroph\w*|scheiss\w*)\b|\b(warum|wieso|weshalb)\b.*\b(backtest|labor|testlauf|strategie)\b|\bdiagnose\b.*\b(lauf|backtest|labor)\b|\bwas stimmt .* nicht .*(backtest|strategie)/, topic: "lab", label: "Labor-Diagnose" },
   { tool: "idea", test: /\b(teste?|testen|pruef\w*|probier\w*)\b.{0,24}\b(idee|ideen)\b|\bidee\b.{0,24}\b(testen|pruefen|ausprobieren)\b|\b(diesen|den|meinen) einstieg (testen|pruefen|backtesten|im labor)\b|\bdiese idee\b/, topic: "idea", label: "Idee testen" },
   { tool: "train", test: /\b(ueben|uebe|uebung|uebungen|trainier\w*|trainingsmodus|lernmodus|replay training)\b|\btraining\b.*\b(starten|oeffnen|beginnen|machen)\b|\b(starte|oeffne|mach)\b.*\btraining\b/, topic: "train", label: "Training" },
@@ -393,6 +377,13 @@ export function understand(text: string, ctx: UnderstandCtx): Plan {
 
   // 5) colloquial phrases
   if (intent.type === "unknown") for (const p of PHRASES) if (p.test.test(norm0)) return phrasePlan(p, ctx, []);
+
+  // 5b) a short continuation of the last evaluation: "und letzte Woche?", "und auf 1h?" – the old question with the new period / timeframe behind it
+  if (ctx.prevTool && FOLLOW_START.test(norm0) && followsInsight(norm0, ctx.prevTool.tool)) {
+    const prev = ctx.prevTool;
+    const topic = INSIGHT_RULES.find((r) => r.tool === prev.tool)?.topic ?? prev.tool;
+    return { kind: "tool", tool: prev.tool, arg: `${prev.question} ${raw}`, via: ["Folgefrage zu: " + prev.question.slice(0, 40)], topic };
+  }
 
   // 6) a continuation of the last question
   if (ctx.prev && intent.type !== "unknown" && looksLikeFollowUp(norm0, intent)) {
