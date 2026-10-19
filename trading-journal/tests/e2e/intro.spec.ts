@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { collectErrors, fixture, seed } from "./helpers";
+import { CHECKIN_PROMPT_OFF, collectErrors, fixture, seed } from "./helpers";
 import { mockMarket } from "./mocks/market";
 
 /**
@@ -10,7 +10,7 @@ async function seedWithIntro(page: Page): Promise<void> {
   await mockMarket(page, "live");
   await page.addInitScript((fx) => {
     for (const [k, v] of Object.entries(fx as Record<string, unknown>)) localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
-  }, fixture);
+  }, { ...fixture, ...CHECKIN_PROMPT_OFF });
 }
 
 const stage = (page: Page) => page.getByRole("dialog", { name: "Intro" });

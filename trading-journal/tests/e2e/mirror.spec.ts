@@ -229,7 +229,8 @@ test.describe("Chart spiegeln", () => {
       .poll(
         async () => {
           const now = (await snapshot(page)).centres;
-          return Object.keys(frozen.centres).every((id) => Math.abs((frozen.centres[id] ?? 0) - (now[id] ?? 1e9)) < 2);
+          // the live picture of before the test (the frozen one lacks the forming candle, which can move the price range)
+          return Object.keys(before.centres).every((id) => Math.abs((before.centres[id] ?? 0) - (now[id] ?? 1e9)) < 2);
         },
         { timeout: 20_000 },
       )
