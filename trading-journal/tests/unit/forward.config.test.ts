@@ -97,6 +97,9 @@ describe("settings.forward lesen und schreiben", () => {
     expect(newAccountError({ ...input, riskPct: 50 }, [])).toMatch(/Risiko/);
     expect(newAccountError({ ...input, maxLeverage: 0 }, [])).toMatch(/Hebel/);
     expect(newAccountError(input, Array.from({ length: MAX_ACCOUNTS }, (_, k) => make(`x${k}`, 300)))).toMatch(/Mehr als 8/);
+    const five = Array.from({ length: 5 }, (_, k) => make(`x${k}`, 300));
+    expect(newAccountError(input, five)).toMatch(/Es laufen schon 5 Konten/);
+    expect(newAccountError(input, [...five.slice(0, 4), { ...five[4]!, status: "ended" as const }])).toBeNull();
   });
 
   it("a new account freezes a sanitised copy of the rules and starts at the candle that contains the creation time", () => {

@@ -15,6 +15,7 @@ import {
   MAX_ACCOUNTS,
   MAX_NAME,
   MAX_PAUSES,
+  MAX_RUNNING,
   MAX_TRADES,
   type ForwardAccount,
   type ForwardCfg,
@@ -31,6 +32,8 @@ type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => typeof v === "object" && v !== null && !Array.isArray(v);
 const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 const inRange = (v: unknown, lo: number, hi: number): v is number => fin(v) && v >= lo && v <= hi;
+
+export { hasActiveForward } from "./active";
 
 export const EMPTY_FORWARD: ForwardCfg = Object.freeze({ v: FORWARD_VERSION, accounts: [], rejected: [] }) as ForwardCfg;
 
@@ -199,12 +202,6 @@ export function forwardCfgOf(raw: unknown): ForwardCfg {
 
 export const forwardOfSettings = (s: { forward?: unknown } | null | undefined): ForwardCfg => forwardCfgOf(s?.forward);
 
-/** Cheap check for the host: does any account still need the app's attention (running, or ended but not flattened yet)? */
-export function hasActiveForward(raw: unknown): boolean {
-  if (!isObj(raw) || !Array.isArray(raw.accounts)) return false;
-  return raw.accounts.some((a) => isObj(a) && (a.status === "running" || a.status === "paused" || (a.status === "ended" && isObj(a.cursor) && a.cursor.done !== true)));
-}
-
 /**
  * `settings.forward` with the accounts replaced – the unknown keys of the root and the `rejected` entries survive. Returns the
  * SAME object when nothing changes (the caller skips the save).
@@ -243,8 +240,9 @@ export interface NewAccountInput {
 export const startOf = (interval: CustomConfig["interval"], now: number): number => Math.floor(now / HIST_MS[interval]) * HIST_MS[interval];
 
 /** Why an account cannot be created from this input (`null` = it can). The rules must run: errors of the check block it. */
-export function newAccountError(input: Pick<NewAccountInput, "config" | "symbol" | "capital" | "riskPct" | "maxLeverage">, existing: readonly ForwardAccount[]): string | null {
+export function newAccountError(input: Pick<NewAccountInput, "config" | "symbol" | "capital" | "riskPct" | "maxLeverage">, existing: readonly { status?: unknown }[]): string | null {
   if (existing.length >= MAX_ACCOUNTS) return `Mehr als ${MAX_ACCOUNTS} virtuelle Konten gehen nicht. Beende und lösche eines, um Platz zu schaffen.`;
+  if (existing.filter((a) => a.status !== "ended").length >= MAX_RUNNING) return `Es laufen schon ${MAX_RUNNING} Konten (laufend oder pausiert). Beende eines, bevor du ein weiteres startest.`;
   const bad = validateCustom(sanitizeCustom(input.config)).find((i) => i.level === "error");
   if (bad) return `Die Regeln lassen sich so nicht laufen lassen: ${bad.text}`;
   if (!/^[A-Z0-9]{2,24}$/.test(input.symbol)) return "Bitte einen Markt wie BTCUSDT angeben.";

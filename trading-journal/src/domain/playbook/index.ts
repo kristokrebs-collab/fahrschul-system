@@ -45,7 +45,14 @@ export type PlaybookRead = { ok: true; playbook: Playbook; warnings: string[] } 
 
 type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => typeof v === "object" && v !== null && !Array.isArray(v);
-const clean = (s: string, max: number): string => s.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+/** Control characters and line separators become spaces. */
+const blank = (s: string): string =>
+  Array.from(s, (ch) => {
+    const c = ch.charCodeAt(0);
+    return c < 32 || c === 127 || c === 0x2028 || c === 0x2029 ? " " : ch;
+  }).join("");
+/** One line of plain text, runs of white space collapsed, bounded. */
+const clean = (s: string, max: number): string => blank(s).replace(/\s+/g, " ").trim().slice(0, max);
 /** A name taken from foreign input, made safe for a message (no markup, bounded). */
 const safeName = (v: unknown): string => clean(typeof v === "string" ? v : typeof v === "number" || typeof v === "boolean" ? String(v) : typeof v, 40).replace(/[^\p{L}\p{N} ._:/-]/gu, "?");
 

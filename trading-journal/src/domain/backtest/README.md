@@ -129,3 +129,15 @@ All pure, deterministic and JSON-safe (a missing number is `null`; every stateme
   signals (handed / skipped / blocked; "nachträglich sichtbar" is `null` = not measured, with the reason: excluded by construction, tested in the unit tests),
   test periods (OOS cut and share, walk-forward test vs train-only share, empty windows, the longest quiet stretches, the period in thirds).
 - Tests: `tests/unit/lab.{stress,filters,audit}.test.ts` (hand-derived numbers + real BTCUSDT runs, runner in idle mode = direct result).
+
+## Resumable runs (F23, forward test)
+`runBacktest` can stop at a window's end WITHOUT closing the position and continue later – for a virtual account that follows the market candle by candle:
+- `RunOptions.keepOpen`: the window's last bar does not force-close the position and still decides at its close (a signal / exit becomes the pending order);
+  the result carries `carry: EngineCarry` (plain JSON: realised money, entry fee / slippage of the open trade, the position incl. its management state,
+  the pending order, the counters). The open position holds the entry bar's open TIME (`entryT`), not a bar index – indices depend on the series.
+- `RunOptions.resume`: continue with `from` as the next bar. A `from` beyond the last bar means "nothing new" (no loop; only `flatten` can act).
+  A carry whose entry bar is not in the series throws (the caller rebuilds from the candles).
+- `RunOptions.flatten` (with `keepOpen`): close an open position at the window's last close (reason `end`) and drop the pending order – the account ends there.
+- `carryEquity(carry, close)`: the marked-to-market equity (realised + booked parts + open P&L − the entry fee).
+Chunked calls give exactly the trades of one pass (`tests/unit/forward.advance.test.ts`). Without these options nothing changes: `carry` is absent and
+the last bar closes the position as before.

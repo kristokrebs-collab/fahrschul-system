@@ -440,7 +440,14 @@ function DraftsPanel({ uid }: { uid: string }) {
               {drafts.map((d) => (
                 <li key={d.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-line px-3 py-2" data-testid="labor-draft">
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-medium">{d.name}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="block truncate text-[13px] font-medium">{d.name}</span>
+                      {d.origin && (
+                        <Badge tone="warn" title={`Fremdes Playbook${d.origin.author ? ` von ${d.origin.author}` : ""} – nicht von dir geprüft`}>
+                          fremd
+                        </Badge>
+                      )}
+                    </span>
                     <span className="block truncate text-[11px] text-faint">{summarizeCustom(d.config)[0]}</span>
                   </span>
                   <Button

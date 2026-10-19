@@ -67,7 +67,7 @@ describe("Import: der Weg zurück", () => {
   });
 
   it("a BOM and surrounding whitespace are fine", () => {
-    expect(readPlaybook(`﻿  ${playbookText(idea())}  `).ok).toBe(true);
+    expect(readPlaybook(`${String.fromCharCode(0xfeff)}  ${playbookText(idea())}  `).ok).toBe(true);
   });
 });
 
@@ -103,9 +103,12 @@ describe("Import: Ablehnungen mit Grund", () => {
   });
 
   it("unknown timeframes, operators, kinds, types and wrong value types", () => {
-    const mut = (f: (i: Record<string, any>) => void): string => {
+    // the tree is edited loosely on purpose: the test feeds the reader wrong shapes
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type Loose = Record<string, any>;
+    const mut = (f: (i: Loose) => void): string => {
       const pb = good();
-      f(pb.idea as Record<string, any>);
+      f(pb.idea as Loose);
       return errorsOf(pb).join("\n");
     };
     expect(mut((i) => (i.long.children[0].tf = "3d"))).toMatch(/Unbekannte Zeitebene „3d“/);

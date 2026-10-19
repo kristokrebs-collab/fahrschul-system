@@ -87,3 +87,48 @@ chosen (UTC … UTC+3) and the file is compared with the SHOWN lab run (`compare
 execution bar of tolerance), common period only, open trades left out, net difference (all compared / paired only) next to the
 unit-free sum of price moves, and observations on possible reasons (costs, position size, order of high / low inside a candle,
 delay, unpaired trades) – each backed by figures and phrased as "kann", never as a proven cause. See `src/domain/tvimport/README.md`.
+
+## Forward-Test (F23)
+Section `Forward-Test` (`forward-section`, lazy chunk `forward/ForwardSection.tsx`, between the extras and the robustness cards, always shown):
+a rule tree ("Eigene Idee" editor state, a saved draft or a ready-made template) runs as a **virtual account** on NEW, closed candles from
+a fixed start on – never backwards. The pure part is `@/domain/forward` (see its README); this folder holds the runner and the UI.
+- `forward/NewAccountCard` (`forward-new`): rules (`forward-rules`, the plain-language text `forward-rules-text` under it), name, market,
+  start capital, risk per trade, leverage; costs are the lab's current ones (`forward-costs`). `forward-start` freezes a sanitised copy of
+  the rules (and the signal setting) and saves the account into `settings.forward` (`forward/forwardActions.ts`, always from the LATEST
+  settings). Refusals name their reason (`forward-problem`): rules that cannot run, more than 8 accounts, more than 5 running / paused.
+- `forward/AccountCard` (`forward-account`, `data-status`): status badge, source badge (Editor · Entwurf V2 · Vorlage · fremd), **"Stand: bis
+  Kerzenschluss …"** (`forward-stand`; "noch keine Kerze seit dem Start geschlossen" before the first close), the runtime line
+  (`forward-runtime`, `data-phase`), equity curve, KPIs with sample size and 80 % intervals (`forward-kpis`), the open position / waiting
+  entry (`forward-open`), pause / resume / end / delete (end and delete ask first, `forward-confirm`), the frozen rules, the trades, and
+  **"Hält der Forward-Test, was der Rückblick zeigt?"** (`forward-compare`): the backtest of the same rules, costs and risk over 6 / 12 / 24
+  months BEFORE the start, next to the account with the deviation per figure; below 10 trades on either side it only says "zu früh".
+  When the draft the account came from was edited afterwards, `forward-changed` says: a change is a new version = a new account.
+- `forward/forwardRunner.ts`: `catchUp(id)` loads the account's candles with the lab's loader (cache first, only the missing tail from the
+  exchange), cuts every series at the account's fixed anchor (`startMs − warm-up`, so the indicators are the same however often it runs),
+  prepares the strategy facts in slices, lets `advanceAccount` continue the engine and saves – only if the user did not change the account
+  meanwhile (else it repeats). One run per account at a time. `runCompare(id, days)` is the backtest comparison (memory only).
+- `forward/ForwardHost.tsx` (mounted by `DeferredHosts` → `ForwardMount`, only while an account is running / paused / being wound up): catch-up
+  when the app opens, after every candle close of the soonest interval (`setTimeout` from the real clock, +4 s grace), when the tab returns.
+  **Honest limit:** nothing runs while the app is closed; the missing candles are calculated at the next open – exactly as if it had been open.
+- `forward/forwardStore.ts`: runtime state (phase, load progress, last check, error, comparison result), memory only.
+- Assistant (not built): fits "Wie läuft mein Forward-Test?" and "Hält mein virtuelles Konto, was der Backtest zeigt?" – `accountView` and
+  `compareForward` are the deterministic sources.
+- Tests: `tests/unit/forward.advance.test.ts` (catch-up = one pass, property), `forward.config.test.ts` (stored shape, merge, comparison),
+  `views.labor.forward.test.tsx`, e2e `tests/e2e/forward.spec.ts`.
+
+## Versionen und Playbooks (F15 / F13 / F45)
+Section `Versionen und Playbooks` (`labor-drafts-section`, lazy chunk `DraftsSection.tsx`, at the end of the page, always shown).
+- **Versionen** (`VersionsCard`, `labor-versions`): `saveDraft` / `duplicateDraft` / `addForeignDraft` record a version of the draft when the
+  rules or the name changed (`versionsStore.ts`, `storageKey("labor-draft-versions")`, ≤ 20 per draft and 240 in total, numbering never reuses a
+  number; drafts that existed before get a first version "Stand vor der Versionierung"). Each version shows its time, the change against the one
+  before in plain language (`diffConfigs` in `@/domain/lab/versions`: "Long · RSI Niveau: 30 → 25", "Stop: 1,5 × ATR(14) → 2 % vom Schlusskurs"),
+  an editable note and **Wiederherstellen** (puts the rules back into the draft and the editor; that is a new version "Wiederhergestellt aus
+  Version n"). "Editor-Stand als neue Version speichern" has an optional note. **Zwei Versionen nebeneinander** (`labor-version-compare`): the
+  parameters row by row (changed rows marked) and – when the lab remembers a run of that version (`RunSummary.id` carries the rules' key) –
+  its key numbers, else "Kein Lauf dieser Version".
+- **Playbook** (`PlaybookCard`, `labor-playbook`): export a draft / template / the editor state as versioned JSON (`@/domain/playbook`:
+  title, description, optional author and market, the rule tree, a checksum – nothing from the journal) to a file or the clipboard; import
+  by paste or file (file size checked before reading). The reader refuses with named reasons (see `src/domain/playbook/README.md`), shows a
+  **preview** with the rules in plain language and warnings, and only a click creates the draft – marked `origin` (**fremd**, kept through
+  edits and copies, badge in the draft list). **Probe im Labor** puts the rules in the set-up and runs them on the market history.
+- Tests: `tests/unit/lab.versions.test.ts`, `lab.playbook.test.ts` (incl. prototype pollution, huge / deep input), `views.labor.drafts.test.tsx`.

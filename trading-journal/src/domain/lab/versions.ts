@@ -178,7 +178,9 @@ export function compareRows(a: CustomConfig, b: CustomConfig): CompareRow[] {
 
 // ── the version list ──────────────────────────────────────────────────────────────────────────────────────────────
 
-const cleanNote = (s: unknown): string => (typeof s === "string" ? s.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, MAX_NOTE) : "");
+/** Control characters (line breaks, tabs …) become spaces. */
+const blankControls = (s: string): string => Array.from(s, (ch) => (ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127 ? " " : ch)).join("");
+const cleanNote = (s: unknown): string => (typeof s === "string" ? blankControls(s).trim().slice(0, MAX_NOTE) : "");
 
 /**
  * The list with a new version of `config` appended when the rules or the name differ from the newest one; the SAME list when

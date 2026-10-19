@@ -433,3 +433,19 @@ der Schalter „Markt und Datum verdecken“ und die Verlaufskarte (drei Zählun
 Runden aus ✓ ✕ –, nie Gewinnfarben als Wertung). Im Fall: nummerierte Blöcke (Einordnen · Entscheiden · Regeln abhaken · Begründen), eingefrorener Chart ohne Trade; nach dem Speichern
 läuft der Chart weiter (`ScrubTimeline`), drei Marken (Erkannt · Regeln · Reflexion) in Text + Glyphe + Ton, „Damals im Journal“, der gestrichelte Vergleichsplan und die Reflexion.
 Belohnt werden Erkennen, Regelbefolgung und Nachdenken – es gibt keine Punkte aus Gewinn, kein Ranking, keine Animation für Treffer. Bewegung nur bestehende Tokens; reduzierte Bewegung zeigt das Ende sofort.
+
+## Forward-Test (F23), Versionen (F15) und Playbooks (F13 / F45)
+
+Keine neue Sprache, alles im Labor. **Forward-Test:** ein Abschnitt mit zwei Teilen – das Formular „Neues virtuelles Konto“ (`Card`, Regeln-Auswahl als `MorphSelect`, darunter die Regeln
+im Klartext in einer Fläche `border-line bg-ink-950/50`, vier Zahlenfelder, ein Satz zu den Kosten, ein primärer Knopf; der Grund, warum nicht gestartet werden kann, steht als Satz links daneben,
+nie nur ein ausgegrauter Knopf) und die Liste der Konten, je eine `Card` mit Kopf aus Name, Markt · Zeiteinheit · Start und rechts den Marken (**Läuft** = Win-`Badge` mit atmendem Punkt, **Pausiert** = warn,
+**Beendet** = mute; Quelle = steel; **fremd** = warn). Die erste Zeile jeder Karte ist der **Stand** („bis Kerzenschluss …“ oder „noch keine Kerze seit dem Start geschlossen“) in Mono-Ziffern, darunter eine
+ruhige Statuszeile (`role="status"`: lädt / rechnet / zuletzt geprüft / Fehler mit Grund in Signalrot-Text). Dann die Eigenkapitalkurve (`EquityDraw`, Basislinie 0 %, 72 px), sechs `Kpi`-Kacheln
+(Zahl groß, 80-%-Bereich oder „n = …“ als Unterzeile) und ein Satz zur Stichprobe in `text-faint` – unter 10 Trades steht dort, dass die Zahlen wenig sagen. Offene Position und wartender Einstieg stehen
+in einer eigenen Fläche. Pausieren / Fortsetzen sind `Button sm`; Beenden und Löschen fragen mit einer Fläche („Ja, beenden“ / „Abbrechen“, `role="alert"`) nach. Regeln, Trades und der Rückblick-Vergleich
+klappen auf (`Collapse`, `aria-expanded`); der Vergleich ist eine Tabelle (Kennzahl · Forward · Rückblick · Abweichung, daneben „im Bereich“ / „außerhalb“ in text-faint / warn) unter einem Urteilssatz (`thin` und `holds` in
+Standardfarbe, `differs` in warn – nie rot, nie ein Siegel) und zwei Hinweisen; Mobil scrollt nur die Tabelle in ihrem Rahmen. **Versionen:** eine Karte, je Version eine Fläche mit Kopf (Versionsnummer, „aktuell“-Badge,
+Zeit), den Änderungen als Punktliste in Klartext, einer Notiz und „Wiederherstellen“; darunter der Vergleich zweier Versionen als Tabelle, geänderte Zeilen mit leichter Aufhellung (`bg-white/[0.03]`), die Kennzahlen
+aus dem Labor als zwei Kästen oder der Satz „Kein Lauf dieser Version“. **Playbook:** zwei Spalten (Export | Import, mobil untereinander); der Export zeigt den Text zum Lesen (Mono, `readOnly`), der Import
+Fehler als Fläche in Verlust-Ton mit allen Gründen, sonst eine **Vorschau** mit dem Badge „fremdes Playbook“, Autor als ungeprüfte Angabe, den Regeln im Klartext, Hinweisen in warn und erst dann dem Knopf „Als fremden
+Entwurf anlegen“, danach „Probe im Labor“. Bewegung: nur die vorhandenen `Reveal`-Zellen, `Collapse` und `EquityDraw`; reduzierte Bewegung zeigt das Ende sofort. Touch-Ziele über `Button` / `ChipPick` (≥ 44 px bei grobem Zeiger).
