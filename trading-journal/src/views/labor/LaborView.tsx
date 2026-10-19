@@ -16,6 +16,7 @@ import { useJournal } from "@/store/journalStore";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ConfigCard } from "./ConfigCard";
 import { DiagnosisCard } from "./DiagnosisCard";
+import { IdeaCard } from "./IdeaCard";
 import { LabReplayHost } from "./LabReplay";
 import { useLabor } from "./laborStore";
 import { HeatmapCard, OosCard, OverfitCard, WalkForwardCard } from "./RobustCards";
@@ -43,6 +44,7 @@ export function LaborView({ className }: { className?: string }) {
   const status = useLabor((s) => s.status);
   const runs = useLabor((s) => s.runs.length);
   const custom = useLabor((s) => s.cfg.strategy === "custom");
+  const hasIdea = useLabor((s) => s.idea != null);
   const busy = status === "loading" || status === "running";
   const ids = { setup: useId(), run: useId(), diagnose: useId(), robust: useId(), compare: useId() };
   const T = LABOR.sections;
@@ -50,6 +52,11 @@ export function LaborView({ className }: { className?: string }) {
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
       <PageHeader className="lg:col-span-12" title={LABOR.title} lead={LABOR.lead} leadFill={LABOR_LEAD_FILL} />
       <Section id={ids.setup} title={T.setup.title} sub={T.setup.sub}>
+        {hasIdea && (
+          <Cell index={0} span="lg:col-span-12">
+            <IdeaCard />
+          </Cell>
+        )}
         <Cell index={0} span={custom ? "lg:col-span-8" : "lg:col-span-7"}>
           <ConfigCard signal={signal} />
         </Cell>

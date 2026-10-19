@@ -31,7 +31,7 @@ import { ACCOUNT_VALUES, EMOTION_VALUES, RESULT_VALUES, SESSION_VALUES, SIDE_VAL
 import { parseQuestion, type Filter, type FilterDim, type Intent, type ParseContext } from "@/domain/coach/nlq/parse";
 import type { Page } from "@/store/uiStore";
 
-export type ToolId = "improve" | "entry" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help";
+export type ToolId = "improve" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help";
 
 export type Plan =
   | { kind: "journal"; intents: Intent[]; via: string[]; topic: string }
@@ -233,6 +233,7 @@ export function pageOf(norm: string): Page | null {
 const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: RegExp; topic: string; label: string }> = [
   { tool: "memory", test: /\b(merk|merke|merkt)\b.*\b(dir|mal)\b|\bvergiss\b|\bvergessen\b|was weisst du (alles )?(ueber|von) mich|was hast du dir gemerkt|\b(fass dich|antworte|antworten|sei) (kurz|kuerzer|ausfuehrlicher|knapper)|\bkuerzer bitte\b|\bausfuehrlicher bitte\b|\bin kurzform\b|\bnur kurz\b/, topic: "memory", label: "Gedächtnis" },
   { tool: "lab", test: /\bbacktest\b.*\b(schlecht|mies|negativ|verlust|schwach|warum|wieso|kacke|mist|mau|miserabel|bescheiden|katastroph\w*|scheiss\w*)\b|\b(warum|wieso|weshalb)\b.*\b(backtest|labor|testlauf|strategie)\b|\bdiagnose\b.*\b(lauf|backtest|labor)\b|\bwas stimmt .* nicht .*(backtest|strategie)/, topic: "lab", label: "Labor-Diagnose" },
+  { tool: "idea", test: /\b(teste?|testen|pruef\w*|probier\w*)\b.{0,24}\b(idee|ideen)\b|\bidee\b.{0,24}\b(testen|pruefen|ausprobieren)\b|\b(diesen|den|meinen) einstieg (testen|pruefen|backtesten|im labor)\b|\bdiese idee\b/, topic: "idea", label: "Idee testen" },
   { tool: "entry", test: /\b(was fehlt|fehlt (mir|noch|da))\b|\beinstiegs ?check\b|\beinstiegssignal\b|\bkann ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bsoll ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bist (jetzt |gerade )?(ein|kein) (einstieg|signal)\b|\bwie ist (der|die|das) (markt|lage)\b|\bmarktlage\b/, topic: "entry", label: "Einstiegs-Check" },
   { tool: "improve", test: /\bverbesser\w*|\bbesser werden\b|\bworan (soll|muss|kann|sollte) ich (arbeiten|feilen)\b|\bwas (soll|sollte|kann) ich (aendern|tun|machen|anders)\b|\bnaechster schritt\b|\bempfehl\w*|\btipps?\b|\bratschlag\b/, topic: "improve", label: "Verbesserungen" },
   { tool: "newTrade", test: /\b(neuen? trade|trade eintragen|trade erfassen|trade hinzufuegen|trade anlegen)\b/, topic: "newTrade", label: "Trade eintragen" },

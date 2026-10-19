@@ -30,7 +30,7 @@ import {
   type RuleCond,
   type SlippageModel,
 } from "@/domain/backtest/index";
-import { defaultCustom, parseCustom, sanitizeCustom, validateCustom, type CustomConfig } from "@/domain/lab";
+import { defaultCustom, parseCustom, sanitizeCustom, validateCustom, type CustomConfig, type IdeaDraft } from "@/domain/lab";
 import type { SignalCfg } from "@/domain/signals";
 import { storageKey } from "@/store/storage";
 import { isFileProtocol, IS_FILE_BUILD } from "@/edition";
@@ -89,6 +89,15 @@ export interface CustomDraft {
 
 export const DRAFTS_MAX = 24;
 
+/**
+ * An idea handed over by "Diese Idee testen" (F12): the draft with its mapped / not-mapped lists and the set-up it replaced
+ * (so the trader can step back). Memory only – nothing of it is saved until the trader saves a draft.
+ */
+export interface IdeaOrigin {
+  draft: IdeaDraft;
+  before: { strategy: LabStrategyId; symbol: string; custom: CustomConfig };
+}
+
 export interface RunSummary {
   id: string;
   at: number;
@@ -129,6 +138,13 @@ interface LaborState {
   runCfg: LabConfig | null;
   /** saved versions of the custom idea */
   drafts: CustomDraft[];
+  /** the idea the set-up was filled from (F12), `null` = the trader built it */
+  idea: IdeaOrigin | null;
+  /** fills strategy "Eigene Idee", market and rules from an idea; `false` (nothing changed) when it is not testable */
+  applyIdea(draft: IdeaDraft): boolean;
+  /** puts the set-up back that the idea replaced */
+  restoreBeforeIdea(): void;
+  dismissIdea(): void;
   setCfg(patch: Partial<LabConfig>): void;
   /** edits the custom idea (the result is sanitised and remembered) */
   setCustom(next: CustomConfig | ((c: CustomConfig) => CustomConfig)): void;
@@ -226,6 +242,23 @@ export const useLabor = create<LaborState>()((set, get) => ({
   fundingUsed: null,
   runCfg: null,
   drafts: readDrafts(),
+  idea: null,
+  applyIdea(draft) {
+    if (!draft.testable) return false;
+    const cur = get().cfg;
+    // a second idea on top of the first keeps the trader's own set-up as the way back
+    const before = get().idea?.before ?? { strategy: cur.strategy, symbol: cur.symbol, custom: cur.custom };
+    get().setCfg({ strategy: "custom", custom: draft.config, ...(draft.symbol ? { symbol: draft.symbol } : {}) });
+    set({ idea: { draft, before } });
+    return true;
+  },
+  restoreBeforeIdea() {
+    const o = get().idea;
+    if (!o) return;
+    get().setCfg({ strategy: o.before.strategy, symbol: o.before.symbol, custom: o.before.custom });
+    set({ idea: null });
+  },
+  dismissIdea: () => set({ idea: null }),
   setCustom(next) {
     const cur = get().cfg.custom;
     get().setCfg({ custom: typeof next === "function" ? next(cur) : next });
@@ -424,5 +457,5 @@ function summarize(r: LabResult, period: LaborPeriod): RunSummary {
 export function __resetLabor(): void {
   ctl?.abort();
   ctl = null;
-  useLabor.setState({ cfg: DEFAULT_LAB, drafts: [], status: "idle", phase: "load", progress: 0, load: { done: 0, total: 0 }, error: null, result: null, bars: [], runSeq: 0, runs: [], replayId: null, fundingUsed: null, runCfg: null });
+  useLabor.setState({ cfg: DEFAULT_LAB, drafts: [], status: "idle", phase: "load", progress: 0, load: { done: 0, total: 0 }, error: null, result: null, bars: [], runSeq: 0, runs: [], replayId: null, fundingUsed: null, runCfg: null, idea: null });
 }

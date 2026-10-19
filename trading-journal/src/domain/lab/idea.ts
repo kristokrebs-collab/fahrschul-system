@@ -33,7 +33,9 @@ export interface IdeaDraft {
   symbol: string | null;
   /** the complete "Eigene Idee" (already sanitised) */
   config: CustomConfig;
-  /** what was taken over, in plain language: market, side, every condition, stop, target */
+  /** the entry conditions as plain text (all must hold) */
+  rules: string[];
+  /** everything taken over, in plain language: market, side, every condition, stop, target */
   mapped: string[];
   /** approximations and defaults the translation chose */
   notes: string[];
@@ -121,13 +123,14 @@ function assemble(a: Assemble): IdeaDraft {
     : errors.length
       ? errors[0]!.text
       : null;
+  const rules = leavesOf(config[side]).map(leafText);
   const mapped = [
     `Markt${a.symbol ? ` ${a.symbol}` : " (unverändert)"}, Zeiteinheit ${TF_LABEL[config.interval]}, ${side === "long" ? "nur Long" : "nur Short"}`,
-    ...leavesOf(config[side]).map(leafText),
+    ...rules,
     `Stop: ${stopText(config.stop)}`,
     ...exitsText(config),
   ];
-  return { source: a.source, origin: a.origin, symbol: a.symbol, config, mapped, notes: a.b.notes, gaps: a.b.gaps, testable: blocked === null, blocked };
+  return { source: a.source, origin: a.origin, symbol: a.symbol, config, rules, mapped, notes: a.b.notes, gaps: a.b.gaps, testable: blocked === null, blocked };
 }
 
 const sideWord = (s: "long" | "short"): string => (s === "long" ? "Long" : "Short");

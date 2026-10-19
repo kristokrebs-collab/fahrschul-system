@@ -14,6 +14,7 @@ import { ConfidenceMeter } from "@/motion/fx/ConfidenceMeter";
 import { SpotlightSweep } from "@/motion/fx/SpotlightSweep";
 import { Card } from "@/primitives/Card";
 import { Collapse, Expander } from "@/primitives/Expander";
+import { TestIdeaButton } from "@/views/labor/TestIdeaButton";
 import { EmptyState } from "@/primitives/EmptyState";
 import { EvidenceTrades, SampleLine, VerdictBadge } from "./ui";
 
@@ -58,6 +59,7 @@ function EdgeItem({ c, closed, cur, minN, kind }: { c: EdgeCandidate; closed: Ed
           </dd>
         </div>
       </dl>
+      <TestIdeaButton size="sm" input={{ kind: "combo", label: c.label, factors: c.factors }} testId="coach-test-idea" />
       <div className="flex items-center justify-between gap-2">
         <span className="text-[11px] text-faint">{c.halves.stable ? "stabil in beiden Hälften" : c.halves.stable === false ? "nicht stabil über die Zeit" : "Hälften zu klein"}</span>
         <Expander open={open} onToggle={() => setOpen((o) => !o)} label={`Belege: ${c.label}`} controls={id} className="touch-hit" />

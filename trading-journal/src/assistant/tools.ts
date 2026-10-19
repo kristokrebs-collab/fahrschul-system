@@ -5,6 +5,7 @@
  * asks a language model for a figure.
  */
 import type { Recommendation } from "@/domain/coach";
+import { translateIdea, type IdeaDraft } from "@/domain/lab";
 import type { Answer, AnswerData, AnswerFact, Tone } from "@/domain/coach/nlq";
 import type { SignalCheckState } from "@/market/signals";
 import type { Page } from "@/store/uiStore";
@@ -46,6 +47,8 @@ export interface ToolEnv {
   /** ranked recommendations of the coach (computed on demand) */
   recs: () => readonly Recommendation[];
   lab: LabSummary | null;
+  /** fills the lab's "Eigene Idee" from an idea (F12) – returns false when the lab refused it; saves nothing, starts nothing */
+  applyIdea?: (draft: IdeaDraft) => boolean;
   go: (page: Page) => void;
   newTrade: () => void;
   setMem: (fn: (m: AssistantMemory) => AssistantMemory) => void;
@@ -102,7 +105,7 @@ function memoryTool(arg: string, env: ToolEnv): ToolReply {
   return reply({ title: "Das weiß ich über dich", text: lines.join(" "), facts: [fact("Fragen", String(mem.asked)), fact("Notizen", String(mem.facts.length))], followUps: ["Fass dich kürzer", "Vergiss alles"] });
 }
 
-const TOPIC_LABEL: Readonly<Record<string, string>> = { good: "Stärken", bad: "Schwächen", status: "Überblick", entry: "Einstiegs-Check", improve: "Verbesserungen", lab: "Labor", memory: "Gedächtnis", compare: "Vergleiche", list: "Trade-Listen" };
+const TOPIC_LABEL: Readonly<Record<string, string>> = { good: "Stärken", bad: "Schwächen", status: "Überblick", entry: "Einstiegs-Check", idea: "Ideen testen", improve: "Verbesserungen", lab: "Labor", memory: "Gedächtnis", compare: "Vergleiche", list: "Trade-Listen" };
 
 /** German label of a learned topic key. */
 export function topicLabel(key: string): string {
@@ -149,6 +152,25 @@ function entryTool(env: ToolEnv): ToolReply {
   });
 }
 
+/**
+ * "Teste diese Idee" (F12): the live entry check becomes a draft of "Eigene Idee" in the lab. Only navigates and pre-fills –
+ * nothing is saved and no run is started. What could not be turned into a rule is named in the answer.
+ */
+export function ideaTool(env: ToolEnv): ToolReply {
+  const snap = env.signal.snapshot;
+  if (!snap) return reply({ title: "Keine Idee zum Testen", text: env.signal.message ?? "Der Einstiegs-Check hat noch keine Kerzen geladen. Öffne die Übersicht, dann kann ich seine Regeln ins Labor übernehmen.", actions: [{ label: "Zur Übersicht", run: () => env.go("overview") }], tone: "mute" });
+  const draft = translateIdea({ kind: "signal", symbol: snap.symbol, baseTf: snap.cfg.ladder[0] ?? null, verdict: snap.best });
+  if (!draft.testable || !env.applyIdea?.(draft)) return reply({ title: "Das kann ich nicht ins Labor übernehmen", text: draft.blocked ?? "Das Labor hat den Entwurf nicht angenommen. Öffne es und baue die Regel dort selbst.", actions: [{ label: "Labor öffnen", run: () => env.go("labor") }], tone: "mute" });
+  env.go("labor");
+  const gaps = draft.gaps.map((g) => `${g.what} (${g.why})`).join(" ");
+  return reply({
+    title: "Idee im Labor vorbereitet",
+    text: `Ich habe den Einstiegs-Check ${snap.symbol} als „Eigene Idee“ ins Labor gelegt: Regel: ${draft.rules.join(" UND ")}. Gestartet oder gespeichert habe ich nichts – du prüfst die Regeln und startest den Test. ${gaps ? `Nicht abgebildet: ${gaps}` : ""}`.trim(),
+    facts: [fact("Markt", snap.symbol), fact("Zeiteinheit", draft.config.interval === "1d" ? "1D" : draft.config.interval), fact("Nicht abgebildet", String(draft.gaps.length), draft.gaps.length ? "mute" : "fg", draft.gaps.length)],
+    close: true,
+  });
+}
+
 function labTool(env: ToolEnv): ToolReply {
   const lab = env.lab;
   if (!lab) return reply({ title: "Noch kein Labor-Lauf", text: "Ich sehe keinen fertigen Lauf. Starte im Labor einen Test, dann kann ich ihn mit Trichter, Kosten und Ausstiegsgründen auseinandernehmen.", actions: [{ label: "Labor öffnen", run: () => env.go("labor") }], followUps: ["Öffne das Labor"] });
@@ -190,7 +212,7 @@ function helloTool(arg: string, env: ToolEnv): ToolReply {
 function helpTool(env: ToolEnv): ToolReply {
   return reply({
     title: "Das kann ich",
-    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“) oder Verbesserungen. Ich öffne auch Seiten („Öffne das Labor“) und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
+    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“, „Teste diese Idee“) oder Verbesserungen. Ich öffne auch Seiten („Öffne das Labor“) und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
     followUps: suggestFor(env),
   });
 }
@@ -214,6 +236,8 @@ export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
         return improveTool(env);
       case "entry":
         return entryTool(env);
+      case "idea":
+        return ideaTool(env);
       case "lab":
         return labTool(env);
       case "explain":
