@@ -42,10 +42,12 @@ Optionen: `state, size (64|32|20), theme ('auto'|'dark'|'light'), speed, paused,
 - DPR auf 2 begrenzt; nur 2D-Arcs/Linien (kein Filter, kein WebGL).
 
 ## 120 Hz (Technik + check120)
-- **Zeitbasiert:** jeder Frame ist eine reine Funktion von `tau` (Akkumulation mit `dt`), also bildratenunabhängig; kein `setInterval`, keine festen 16.67 ms.
-- **Engine-Kosten** (Chromium, Software-Canvas, ungedrosselt, Berechnen+Zeichnen pro Orb/Frame, 64px): working 208 µs (279 Punkte) · breathing 137 · searching 99 · listening 96 · weaving 76 · composing 75 · shaping 61 · solving 43 · connecting 34 µs — bei 120 Hz (8333 µs) Platz für Dutzende Orbs auf Desktop-Niveau.
-- **Zeichnen gebündelt:** Punkte nach 15 Alpha-Stufen gruppiert (Counting-Sort, 1 Pfad + 1 `fill` je Stufe), Fill-Styles vorberechnet, Puffer statt Objekte.
-- **check120** (4× CPU-Drosselung, Software-Compositor): **1 Orb p95 9.2 ms (ok, Schwelle 10.4)**; 3 gleichzeitige Canvas-Ebenen 15.4 ms, 8 Orbs 34.9 ms → **ZU LANGSAM im Headless-Test**. Das ist Compositor-/Upload-Overhead je Canvas-Ebene im Software-Raster, nicht Rechenzeit der Engine; auf echter GPU unkritisch. Faustregel Mobil: **≤ 3–4 gleichzeitig sichtbare Orbs**; die Demo (13 Canvas) ist ein Stresstest. Statische Lint-Meldung „style.width“ ist ein Fehlalarm (einmalig bei Init/Größenwechsel).
+- **Zeitbasiert:** jeder Frame ist eine reine Funktion von `tau` (Akkumulation mit `dt`, ≤ 50 ms), also bildratenunabhängig; kein `setInterval`, keine festen 16.67 ms.
+- **Gemessener Engpass:** nicht Rechnen, sondern das **Rastern der Punkte** (Pfad-Arcs) im Software-Canvas. Probiert und verworfen: Einzel-Fills (langsamer), vorgerenderte Sprites + `drawImage` (**2–3× langsamer**). Geblieben: je Alpha-Stufe **ein Pfad + ein `fill`** (≤ 15 Füllvorgänge), vorberechnete Styles, Counting-Sort, Puffer statt Objekte.
+- **Qualitätsregler** (`ORB_ADAPTIVE`, `GOV`): misst die synchrone Zeichenzeit aller Orbs je Frame (gleitender Mittelwert). Über **1.0 ms** → Punktdichte alle 12 Frames ×0.85 (Minimum 0.35), unter 0.5 ms → langsam ×1.03 zurück. Auf GPU-Geräten bleibt die Dichte bei 1; der Takt/Zeitbasis ändert sich nie. Unter Last werden Punkte weniger, nicht Frames.
+- **Engine-Kosten** (Chromium, ungedrosselt, Berechnen+Zeichnen je Orb/Frame, 64px): working 208 µs (279 Punkte) · breathing 137 · searching 99 · listening 96 · weaving 76 · composing 75 · shaping 61 · solving 43 · connecting 34 µs (Budget bei 120 Hz: 8333 µs).
+- **check120** (Headless-Software-Raster, 4× CPU-Drosselung, Schwelle p95 ≤ 10.4 ms, Budget 8.33 ms): **1 Orb 7.5 · 3 Orbs 7.4 · 5 Orbs 8.3 ms (ok)**; 8 Orbs 15.7, 13 Orbs 17.4 ms (Regler am Minimum, trotzdem zu langsam). Ohne Regler waren es 9.2 / 15.4 / 28.9 ms.
+- **Demo-Seite** (3 große + 3 kleine spielen, 13 Canvas-Ebenen im DOM): **11–14 ms** → knapp **über** der Schwelle. Ursache vermutlich das Zusammensetzen aller Canvas-Ebenen pro Frame im Software-Compositor (selbst pausierte Kacheln), nicht die Engine. Auf echter GPU/Hardware **nicht geprüft**. Faustregel Mobil: ≤ 4–5 gleichzeitig sichtbare/animierte Orbs. Die Lint-Warnungen „style.width/left“ sind Fehlalarme (einmalig bei Init/Größenwechsel).
 
 ## Einbindung (assets/thinking-orbs.html)
 ```html
@@ -74,6 +76,6 @@ Weitere Props der Bibliothek, die hier **nicht** nachgebaut sind: `opts` (rohe E
 
 ## Bekannte Abweichungen (ehrlich)
 - **Eigene Geometrie:** Die neun Zustände folgen den Beschreibungen der Bibliothek, sind aber nicht dieselben Kurven/Punktzahlen/Takte; Optik ähnlich, nicht identisch. Kein Video- oder Pixelvergleich.
-- Preset-Werte (64/20/32), Tempi und Dichten sind Schätzungen; 32 ist interpoliert (die Bibliothek sagt dasselbe über ihre 32).
+- Preset-Werte (64/20/32), Tempi und Dichten sind Schätzungen; 32 ist interpoliert (die Bibliothek sagt dasselbe über ihre 32). Der **Qualitätsregler** (Dichte sinkt bei langsamem Zeichnen) ist eine eigene Ergänzung.
 - `gravity`, `opts`, `frame` fehlen; die Theme-Erkennung ist vereinfacht (Ahnen + Media-Query).
 - Für einen exakten Fit: Bildschirmaufnahme der Bibliothek-Demo schicken → Skill-Ablauf „Neue Animation aufnehmen“.

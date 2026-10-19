@@ -92,6 +92,6 @@ Schickt der Nutzer weitere „Style Reference“-Blöcke: verdichten statt kopie
 
 ## Ehrliche Grenzen
 - Nachbauten sind aus Videos rekonstruiert, nicht der Original-Quellcode: Timing/Look sind gegen das Video gefittet (Fidelity je Spec benannt), Nicht-Sichtbares (z. B. `:active`, Touch-Verhalten des Originals) ist als „nicht erkennbar“ markiert.
-- 120-Hz-Messung läuft in Headless-Chromium (Software-Raster, kein echtes 120-Hz-Display). Sie beweist Zeitbasiertheit und niedrige Frame-Kosten, ersetzt aber keinen Test auf dem Gerät.
+- 120-Hz-Messung läuft in Headless-Chromium (Software-Raster, 4× CPU-Drosselung, kein echtes 120-Hz-Display). Sie beweist Zeitbasiertheit und niedrige Frame-Kosten, ersetzt aber keinen Test auf dem Gerät. Ausnahmen stehen in der jeweiligen Spec: `thinking-orbs` besteht das Gate bis 5 gleichzeitige Orbs, seine Demo-Seite (13 Canvas-Ebenen) knapp nicht; `border-beam` ist ab ~5 gleichzeitigen Strahlen zu schwer (→ `quality: 'lite'`).
 - Demo-Bilder in Specs sind aus dem Video extrahierte Platzhalter, keine Originale.
 - Style-Referenzen sind aus Beschreibungen öffentlicher Seiten abgeleitet (Inspiration); Schriften sind proprietär und nur als Ersatzstack hinterlegt.
