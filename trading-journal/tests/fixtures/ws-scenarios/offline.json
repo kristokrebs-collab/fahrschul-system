@@ -1,0 +1,19 @@
+{
+  "name": "offline",
+  "description": "No network at all: every fetch rejects, WS never opens.",
+  "baseTime": 1790762400000,
+  "rest": {
+    "mode": "offline",
+    "bybit": "offline"
+  },
+  "ws": {
+    "steps": [
+      {
+        "t": 50,
+        "type": "close",
+        "code": 1006
+      }
+    ],
+    "reconnect": "fail"
+  }
+}
