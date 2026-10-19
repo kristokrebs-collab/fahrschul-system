@@ -39,8 +39,8 @@ headline(r.summary, 12) // „In 14 von 24 ähnlichen Situationen lag der Kurs n
 - Fewer than `MIN_HITS` (20) hits → `status: "few"`, `summary: null`, text „Zu wenig Daten“; the hits can still be looked at.
 - Similarity is a description of the past, not a forecast (`NOT_A_FORECAST`); many features and many tried variants produce chance
   patterns (`MULTIPLE_TESTING`); both texts are always shown by the card.
-- The loaded period is what the market layer holds (1h ≈ 500 candles, 4h ≈ 500, 1D ≈ 1000, 1W ≈ 200, 15m-based 30m ≈ 750): on short
-  feeds „zu wenig Daten“ is the usual, honest answer.
+- The loaded period is what the market layer holds (REST bootstrap ≈ 500 candles for 1h / 4h, ≈ 1500 for 15m, ≈ 1000 for 1D, ≈ 200 for 1W;
+  the rings keep more if the chart loaded older ones): on the short feeds „zu wenig Daten“ is the usual, honest answer.
 
 ## Proof that nothing looks ahead (`tests/unit/similar.features.test.ts`, `similar.search.test.ts`)
 - the feature table of a series cut at candle i equals the full table at i, for **every** i and feature;

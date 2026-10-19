@@ -433,3 +433,16 @@ der Schalter „Markt und Datum verdecken“ und die Verlaufskarte (drei Zählun
 Runden aus ✓ ✕ –, nie Gewinnfarben als Wertung). Im Fall: nummerierte Blöcke (Einordnen · Entscheiden · Regeln abhaken · Begründen), eingefrorener Chart ohne Trade; nach dem Speichern
 läuft der Chart weiter (`ScrubTimeline`), drei Marken (Erkannt · Regeln · Reflexion) in Text + Glyphe + Ton, „Damals im Journal“, der gestrichelte Vergleichsplan und die Reflexion.
 Belohnt werden Erkennen, Regelbefolgung und Nachdenken – es gibt keine Punkte aus Gewinn, kein Ranking, keine Animation für Treffer. Bewegung nur bestehende Tokens; reduzierte Bewegung zeigt das Ende sofort.
+
+### Ähnliche Situationen (F19)
+
+Keine neue Sprache: eine `Card` im Raster der Markt-Seite (`lg:col-span-12`) unter der Preis- & RSI-Struktur. Oben die Wahl in der
+Reihenfolge Zeiteinheit (Chips wie bei der Struktur, gewählt = weiße Pille) → Verlauf danach und Einheit (`Segmented`) → „Merkmale ändern“
+(Chips, gesperrte mit Grund). Das Ergebnis ist eine Aussage in Fließtext mit Zahl und Spanne (Überschrift `clamp(15px,3.8vw,18px)`, keine
+Prozent als Dekoration), darunter ein ruhiger Balken (Gewinn-/Verlust-Ton **nur** für die Anteile höher/tiefer, flach = `faint`), die
+Kennzahlen als `dl`-Zeilen in Mono, der Vergleich mit dem ganzen Zeitraum in einem `border-line`-Kasten. **Gegenbeispiele** haben eine
+eigene Überschrift mit Warn-Punkt und stehen immer vor der Stichprobe; jede Fundstelle ist eine Zeile-als-Button (≥ 44 px bei grobem
+Zeiger, mobil zwei Zeilen statt Tabelle, kein horizontaler Scroll), Gegenbeispiele tragen ein `Badge tone="warn"`. Unter 20 Fundstellen
+steht statt der Verteilung ein ruhiger Kasten „Zu wenig Daten“ – nie eine Quote. Die Hinweise (keine Prognose, Mehrfachtest) sind ein
+fester Kasten am Ende, nicht wegklickbar. Das Fundstellen-Sheet nutzt `Sheet` + Replay-Chart + `ScrubTimeline` unverändert; es öffnet
+auf der Situation und zeigt den Verlauf erst, wenn man abspielt oder zieht. Keine eigene Bewegung der Karte.

@@ -21,6 +21,7 @@ import { useUi } from "@/store/uiStore";
 import { openReport } from "@/views/berichte/berichteStore";
 import { useDiagnosis } from "@/views/labor/DiagnosisCard";
 import { useLabor } from "@/views/labor/laborStore";
+import { openSimilar } from "@/views/markt/similarOpen";
 import { openTraining } from "@/views/ueben/trainingStore";
 import { Chip, EntryView } from "./AssistantAnswer";
 import { useConversation } from "./conversation";
@@ -160,6 +161,10 @@ function AssistantBody() {
         go: (p) => navigate(p),
         newTrade: () => openEditor(),
         train: () => openTraining(),
+        similar: () => {
+          navigate("markt");
+          openSimilar();
+        },
         setMem: (fn) => conv.getState().setMem(fn),
         now: Date.now(),
       };

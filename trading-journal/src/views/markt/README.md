@@ -107,3 +107,27 @@ from the **frozen bars** only (nothing after the anchor shapes a line). `data-tr
 The old „RSI-Linien“ card stays (box engine, 4h / 1D / 1W, no retest); the new card reads the same kind of line with retest on
 the free timeframes. Domain: `src/domain/trendlines/README.md`; live side: `src/market/trendlines`.
 Tests: `views.markt.trend.test.tsx`, `chart.trendline.test.ts`, `tests/e2e/trendlines.spec.ts`.
+
+## Ähnliche Situationen (F19)
+
+`SimilarCard` (lazy chunk, `lg:col-span-12` right under the structure card; fallback = a skeleton card of the same title). The last
+closed candle of the chosen timeframe (chips `30m … 1W`, any the feed serves; default 4h) is described by up to nine features (RSI,
+RSI slope, distance to EMA 50 / 200 in ATR, range / ATR, relative volume, trend of 10 candles, weekday, session – a collapsible
+chip group, defaults without EMA 200 / weekday / session; a feature that makes no sense on a timeframe is disabled with its reason).
+Horizon 6 / 12 / 24 / 48 candles and unit R (1 R = 1 ATR of the hit's candle) or % are `Segmented`; the choice is remembered on
+this device (`storageKey("similar")`, `similarPrefs.ts`, not part of the synced settings).
+
+The card shows, in this order: the sample size (closed candles, comparable candles), features that had to be dropped (with the
+reason), then – only with ≥ 20 hits – the headline („In 14 von 24 ähnlichen Situationen lag der Kurs nach 12 Kerzen höher (58 %,
+Spanne 41–73 %)“), the up / down bar, median, quartiles, σ, typical high / low after, the setback against the majority, the first
+touch of ±1 and its median time, the yardstick (the same horizon after every comparable candle) and **Gegenbeispiele** (every hit
+that went against the majority, largest move first, first four shown, „Alle zeigen“); then the **Stichprobe** (every hit, nearest
+first, first eight shown). Under 20 hits: „Zu wenig Daten …“, no shares, no counter-examples list – the hits remain. The
+caveats (Ähnlichkeit ist keine Prognose; Mehrfachtest) are always at the bottom of the card.
+
+A hit is a button: `SimilarHitSheet` (lazy, third chunk, fetched on the first click) opens the situation on the real candles in the
+shared `ReplayChart` (`showTrade` off, lines: the hit's close and ±1 unit) with `ScrubTimeline` – it opens on the situation, the
+candles after the hit appear when you play or drag – plus the features of the hit next to the current situation and the outcome
+numbers. Model: `similarModel.ts` (`hitModel`, pure). The assistant's tool `similar` calls `openSimilar()` (`similarOpen.ts`, zustand):
+the page navigates, the card scrolls into view and takes focus. Domain: `src/domain/similar/README.md`; live side:
+`src/market/similar`. Tests: `views.markt.similar.test.tsx`, `similar.*.test.ts`, `assistant.similar.test.ts`, e2e `similar.spec.ts`.
