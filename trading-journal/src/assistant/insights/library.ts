@@ -16,12 +16,12 @@ import { fact, reply } from "./shared";
 
 /** Words of the question that say what is asked, not which strategy: they are not looked up in the cards. */
 const STOP = new Set(
-  "gibt es eine ein einen einem einer strategie strategien handelsstrategie system systeme mit ohne fuer fuers auf nach und oder die der das den dem des zur zum zu im in von bei aus wie was wo welche welcher welches werte wert nimmt nehmen man ueblich ueblichen typisch typische typischen standard standardwerte einstellung einstellungen parameter zahlen hast du kennst ich mir mich mal bitte nenn nenne zeig zeige gibts basiert basierend indikator indikatoren bibliothek idee ideen ist sind kann gibt's gaebe existiert empfiehl empfiehlst fuer's alle alles noch auch gern".split(" "),
+  "gibt es eine ne nen ein einen einem einer strategie strategien handelsstrategie system systeme mit ohne fuer fuers auf nach und oder die der das den dem des zur zum zu im in von bei aus wie was wo welche welcher welches werte wert nimmt nehmen man ueblich ueblichen typisch typische typischen standard standardwerte einstellung einstellungen parameter zahlen hast du kennst ich mir mich mal bitte nenn nenne zeig zeige gibts basiert basierend indikator indikatoren bibliothek idee ideen ist sind kann gibt's gaebe existiert empfiehl empfiehlst fuer's alle alles noch auch gern".split(" "),
 );
 
 /** Cards whose words match the question's content words best (all of them if several tie, at most three). */
 export function findCards(norm: string, cards: readonly StrategyCard[] = STRATEGY_CARDS): { cards: StrategyCard[]; keywords: string[] } {
-  const keywords = tokensOf(norm).filter((w) => w.length >= 2 && !STOP.has(w));
+  const keywords = tokensOf(norm).filter((w) => w.length >= 3 && !STOP.has(w));
   if (!keywords.length) return { cards: [], keywords };
   const scored = cards.map((c, i) => {
     const hay = tokensOf(` ${c.id.replace(/-/g, " ")} ${c.title} ${c.sub} ${c.knownFrom} ${KIND_LABEL[c.kind]} ${c.params.map((p) => p.name).join(" ")} ${c.tfs.join(" ")} `.toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9 ]+/g, " "));

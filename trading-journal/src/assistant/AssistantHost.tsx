@@ -29,7 +29,8 @@ import { execute, replyText, respond, settled, type EngineEnv, type Reply } from
 import { summarizeLab } from "./labSummary";
 import { GlyphMic, GlyphSpeaker, GlyphStop } from "./icons";
 import { isInsightTool } from "./insightRoutes";
-import { forgetAll, forgetInterests, learnInterest, removeInterest, setSpeak, type AnswerStyle } from "./memory";
+import { forgetInterests, interestsOf, removeInterest } from "./interests";
+import { forgetAll, learnInterest, setSpeak, type AnswerStyle } from "./memory";
 import { closeAssistant, useAssistantOpen } from "./open";
 import { routeViaServer, useRouterAvailable } from "./route";
 import { speak, speechMessage, speechOutputSupported, stopSpeaking, useSpeechInput } from "./speech";
@@ -78,7 +79,7 @@ function MemoryPanel() {
   const setMem = useConversation((s) => s.setMem);
   const [open, setOpen] = useState(false);
   // every learned topic, most asked first (ties by name); each can be forgotten on its own
-  const interests = Object.entries(mem.interests).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const interests = interestsOf(mem);
   return (
     <section className="grid gap-2 border-t border-line pt-4" aria-label="Was ich über dich weiß" data-testid="assistant-memory">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="touch-hit flex items-center justify-between text-left text-[12.5px] font-semibold text-mute hover:text-fg">

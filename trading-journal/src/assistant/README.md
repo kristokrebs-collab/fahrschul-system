@@ -61,3 +61,30 @@ ohne Gegenstand („Welche Funktionen gibt es?“) öffnet er die Seite „Funkt
 Gegenstand – „Einstiegs-Check“, „Üben“ – darf das Gegenstands-Werkzeug nicht auslösen); die lockere Form „wo ist / wo sind …“ gilt nur ohne eigenen
 Journal-Gegenstand und nie für die umgangssprachlichen Journalfragen („wo sind meine Schwächen“). Der Leerzustand des Sheets trägt den leisen Link „Alle
 Funktionen ansehen →“. Gelernt wird nur das Thema `where` (Zähler), nichts über den Gegenstand. Tests: `tests/unit/assistant.where.test.ts`.
+
+## Auswertungen (Prüfbericht, Belastung, Forward-Test, Trendlinien, Signale, Nutzen, Situationen, Passt zu dir?, Bibliothek)
+
+Der Assistent beantwortet die fertigen Auswertungen der App. „Intelligent“ heißt: er versteht die Frage (Umgangssprache, Tippfehler, Folgefragen), holt die ZAHLEN aus den vorhandenen deterministischen Funktionen und formuliert eine kurze Antwort mit Stichprobe und Unsicherheit plus einem Knopf, der die Stelle öffnet. Nie eine Zahl aus einem Sprachmodell; gespeichert oder gestartet wird nichts (nur öffnen / navigieren; „In Eigene Idee laden“ füllt nur den Entwurf, mit dem Weg zurück des Idee-Banners).
+
+| Werkzeug | Fragen (Beispiele) | Quelle der Zahlen | Öffnen |
+|---|---|---|---|
+| `audit` | „Hängt mein Backtest an wenigen Trades?“, Datenlücken, Prüfzeiträume | `auditRun` (`@/domain/lab/report`) auf dem letzten Labor-Lauf | Prüfbericht |
+| `stress` | „Wie lang war die längste Verlustserie?“, Belastungstest, Filtervergleich | `lossStreakStress`; Szenarien und Filter **nur**, wenn in `useExtras` schon gerechnet | Belastungstest |
+| `forward` | „Wie läuft mein Forward-Test?“, „Hält das virtuelle Konto, was der Backtest zeigt?“ | `accountView`; `compareForward` nur, wenn der Vergleich im Konto schon gerechnet ist | Forward-Test |
+| `trend` | Annäherung / Bruch / Retest je Zeiteinheit, Abstand zur nächsten Linie, gesperrte Zeiteinheiten mit Grund | `getTrendlines()` (`analyzeTrendlines`, `describeLine`) | Preis- und RSI-Struktur |
+| `signals` | ausgelassen und warum, Trefferquote der Box-Setups, verpasste Signale mit Ziel zuerst | `buildInbox`, `buildBalance`, `matchSignals` über das Signalarchiv; Ausgänge **nur** aus Cache / Sitzung, sonst Verweis auf „Ausgänge berechnen“ | Posteingang, Bilanz, Verpasste Chancen |
+| `quality` | „Wie lange war die App letzten Monat offen?“, Alarme über 5 Minuten Verspätung | `qualityReport` (30 Tage, kein Kalendermonat – so gesagt) | Daten- und Alarmqualität |
+| `benefit` | „Was hat mir das Journal im September gebracht?“ | `monthBenefit` | Monatsbericht |
+| `situation` | „Wie ging es nach ähnlichen Situationen weiter?“ | `findSimilar` (`headline`, Gegenbeispiele, `fewText`) | Karte (das bestehende `similar`-Werkzeug öffnet sie nur) |
+| `fit`, `demands` | „Passt diese Strategie zu mir?“, „Was verlangt die Idee von mir?“ | `compareFit` (`FitItem.text`), `strategyFacts` | Passt zu dir? |
+| `library` | „Gibt es eine Strategie mit Bollinger?“, „Welche Werte nimmt man für die Supertrend-Strategie?“ | `@/domain/lab/library` (Karte, typische Werte, tolerant gegen Tippfehler) | „In Eigene Idee laden“, Bibliothek |
+
+**Aufbau.** `insightRoutes.ts` (Routing, klein, Teil des Assistenten-Chunks; Wortvergleich mit Tippfehler-Toleranz, `fuzzy.ts`) → `engine.ts` (`Turn.later`: die Antwort kommt asynchron, der Eintrag zeigt solange den Warte-Takt; `settled(turn)` wartet auf beides) → `insights/index.ts` lädt je Thema eine eigene Datei und diese ihre Datenquelle erst beim Fragen (`insights/sources.ts`: Labor-Store, Extras-Store, `settings.forward`, Trendlinien-Store, Signalarchiv, Marktfeed). Tests übergeben die Eingaben über `ToolEnv.insight`. Erstladung: +0,6 KiB (Chunk-Liste des Preload-Verzeichnisses), sonst alles lazy.
+
+**Routing ohne falsche Treffer.** Die Regeln stehen hinter „Wo finde ich …?“ und den Gedächtnis-Befehlen, vor den älteren Werkzeugen. „Win-Rate am Montag“ und alle Journalfragen haben keines der Substantive; was es im Journal UND im Labor gibt (Verlustserie), geht nur dann ins Labor, wenn die Frage den Lauf nennt oder kein „mein / im Journal“ sagt – ohne Lauf bietet die Antwort die Journalfrage als Knopf an. „Zeig mir ähnliche Situationen“ öffnet weiter nur die Karte (`similar`); erst Fragen nach dem Verlauf („wie ging es … weiter“, „Gegenbeispiele“) werden ausgewertet. Folgefragen: „und letzte Woche?“ nach einer Signal-, Qualitäts- oder Nutzen-Antwort setzt die alte Frage mit dem neuen Zeitraum fort (der zuletzt genannte Zeitraum gewinnt, `insights/period.ts`).
+
+**Ehrlichkeit.** Jede Antwort nennt die Stichprobe; ohne Daten (kein Lauf, leeres Archiv, Markt nicht verbunden, zu wenig Fundstellen) sagt sie das und verweist darauf, wo man es startet. Ob ein Signal bewusst ausgelassen oder übersehen wurde, weiß die App nur dort, wo der Nutzer „Ausgelassen – Grund“ gesetzt hat.
+
+**Lernen.** Das Gedächtnis zählt weiter nur, wonach der Nutzer fragt (`plan.topic`, jetzt auch `audit`, `stress`, `forward`, `trend`, `signals`, `quality`, `benefit`, `situation`, `fit`, `library`). Die Chips (`suggestFor`) bieten zu den meistgefragten Themen die passende Frage an (`INTEREST_QUESTION`); im Gedächtnis-Bereich der Sheet-Oberfläche steht „Was dich interessiert“ mit Klartext-Namen und Zähler, jedes Thema einzeln löschbar, dazu „Interessen löschen“ (`interests.ts`; Notizen, Stil und Vorlesen bleiben).
+
+Tests: `tests/unit/assistant.tools.test.ts` (Routing mit Tippfehlern und Gegenbeispielen, Antworten auf Fixture-Daten mit handgerechneten Zahlen, Standard-Quellen, Lernen), `tests/e2e/assistant.spec.ts` („Assistent · Auswertungen“, mobil + Desktop).

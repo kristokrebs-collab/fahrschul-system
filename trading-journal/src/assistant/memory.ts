@@ -82,15 +82,6 @@ export function addFact(mem: AssistantMemory, text: string, now: number): Assist
 }
 
 export const removeFact = (mem: AssistantMemory, id: string): AssistantMemory => ({ ...mem, facts: mem.facts.filter((f) => f.id !== id) });
-/** Forgets what the trader asked about one topic (the counter goes; asking again starts it anew). */
-export function removeInterest(mem: AssistantMemory, key: string): AssistantMemory {
-  if (!(key in mem.interests)) return mem;
-  const { [key]: _gone, ...rest } = mem.interests;
-  void _gone;
-  return { ...mem, interests: rest };
-}
-/** Forgets every topic counter (facts, style and the voice flag stay). */
-export const forgetInterests = (mem: AssistantMemory): AssistantMemory => (Object.keys(mem.interests).length ? { ...mem, interests: {} } : mem);
 export const setStyle = (mem: AssistantMemory, style: AnswerStyle): AssistantMemory => (mem.style === style ? mem : { ...mem, style });
 export const setSpeak = (mem: AssistantMemory, speak: boolean): AssistantMemory => (mem.voice.speak === speak ? mem : { ...mem, voice: { speak } });
 export const forgetAll = (): AssistantMemory => ({ ...EMPTY_MEMORY });

@@ -76,7 +76,7 @@ function periodsReply(a: Audit, name: string, env: ToolEnv): ToolReply {
   return reply({
     title: "Welche Zeiträume ungesehen getestet sind",
     text: `Letzter Labor-Lauf (${name}, ${Math.round(p.days)} Tage): ${parts.join(" ")} ${p.notes.join(" ")}`.replace("  ", " "),
-    facts: [fact("Zeitraum", `${Math.round(p.days)} Tage`), fact("Dritteltrades", p.thirds.map((t) => t.n).join(" · "), "fg"), fact("Ungesehen (OOS)", p.oos.n == null ? "–" : String(p.oos.n), "fg", p.oos.n)],
+    facts: [fact("Zeitraum", `${Math.round(p.days)} Tage`), fact("Trades je Drittel", p.thirds.map((t) => t.n).join(" · "), "fg"), fact("Ungesehen (OOS)", p.oos.n == null ? "–" : String(p.oos.n), "fg", p.oos.n)],
     actions: [openAction(env, "Prüfbericht öffnen", { page: "labor", feature: "pruefbericht" })],
     followUps: ["Hängt mein Backtest an wenigen Trades?"],
   });
@@ -153,7 +153,7 @@ async function scenarioReply(run: LabRunInput, env: ToolEnv): Promise<ToolReply>
   const base = rows.find((r) => r.id === "base");
   if (ex.status !== "done" || !base?.stats) return reply({ title: "Belastungstest noch nicht gerechnet", text: `Für diesen Lauf (${nameOf(run)}) hat noch niemand den Kosten- und Belastungstest gerechnet. ${STARTS}`, tone: "mute", actions: [open], followUps: ["Wie lang war die längste Verlustserie?"] });
   const usable = (r: ScenarioRow): r is ScenarioRow & { stats: NonNullable<ScenarioRow["stats"]> } => r.id !== "base" && r.status !== "unavailable" && r.stats != null && r.dSumR != null;
-  const worst = rows.filter(usable).sort((a, b) => a.dSumR! - b.dSumR!)[0];
+  const worst = rows.filter((r) => usable(r) && r.id !== "combined").sort((a, b) => a.dSumR! - b.dSumR!)[0] as (ScenarioRow & { stats: NonNullable<ScenarioRow["stats"]> }) | undefined;
   const combined = rows.find((r) => r.id === "combined" && usable(r));
   const parts = [`Gerechnet für den Lauf (${nameOf(run)}): Basis ${plural(base.stats.n, "Trade", "Trades")}, ${rText(base.stats.sumR)}, größter Rückgang ${pctText(base.stats.maxDD, 1)}.`];
   if (worst) parts.push(`Am meisten kostet „${worst.label}“: ${rText(worst.stats.sumR)} (${rText(worst.dSumR)} gegenüber der Basis).${worst.status === "approx" ? " Mit einer Annahme gerechnet, siehe Hinweis in der Tabelle." : ""}`);
@@ -187,10 +187,11 @@ async function filterReply(run: LabRunInput, env: ToolEnv): Promise<ToolReply> {
 }
 
 export async function stressAnswer(norm: string, env: ToolEnv): Promise<ToolReply> {
-  const own = has(tokensOf(norm), "=mein", "=meine", "=meinen", "=meiner", "journal");
-  const run = await labRun(env);
-  if (!run) return noRun(env, "dessen Verlustserien ich nachzählen könnte", own || !env.data.closed.length ? undefined : "Wie lang war meine längste Verlustserie im Journal?");
   const t = tokensOf(norm);
+  // „die längste Verlustserie“ without a word for the lab may as well be about the journal: offer that question too
+  const journalMaybe = !has(t, "=mein", "=meine", "=meinen", "=meiner", "journal", "backtest", "=labor", "=lauf", "testlauf", "simulation") && env.data.closed.length > 0;
+  const run = await labRun(env);
+  if (!run) return noRun(env, "dessen Verlustserien ich nachzählen könnte", journalMaybe ? "Wie lang war meine längste Verlustserie im Journal?" : undefined);
   const streak = has(t, "verlustserie", "serie", "serien", "=streak", "drawdown", "rueckgang", "hintereinander", "folge", "verlustreihe", "durststrecke");
   if (!streak && has(t, "filter", "filtervergleich")) return filterReply(run, env);
   if (!streak && has(t, "belastungstest", "belastung", "stresstest", "=stress", "szenario", "gebuehr", "slippage", "funding", "kosten", "spaeter", "stopp", "stop")) return scenarioReply(run, env);
