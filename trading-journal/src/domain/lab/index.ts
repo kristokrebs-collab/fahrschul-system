@@ -50,3 +50,4 @@ export {
 export { CUSTOM_TEMPLATES, type CustomTemplate } from "./rules/templates";
 export { diagnoseRun, DIAG } from "./diagnosis/diagnose";
 export * from "./diagnosis/types";
+export { translateIdea, ideaFromBoxSetup, ideaFromSignal, ideaFromCombo, classifyBoxReason, symbolOfPair, type IdeaDraft, type IdeaGap, type IdeaInput, type IdeaFactor, type BoxSetupLike, type VerdictLike } from "./idea";

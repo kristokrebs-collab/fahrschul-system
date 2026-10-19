@@ -55,7 +55,7 @@ import { LABOR } from "./strings";
 import { ChipPick, FieldRow, SEG_TOUCH } from "./ui";
 
 const B = LABOR.builder;
-const FAMILIES: readonly Family[] = ["momentum", "mcb", "trend", "structure", "volatility", "price"];
+const FAMILIES: readonly Family[] = ["momentum", "mcb", "trend", "structure", "volatility", "price", "time"];
 const de = (v: number): string => String(v).replace(".", ",");
 
 /** Everything the nested editors need from the builder. */

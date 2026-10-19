@@ -736,6 +736,66 @@ const volumeBlock: BlockDef = {
   mirror: (p) => swap(p, "candle", { bull: "bear", bear: "bull", any: "any" }),
 };
 
+// ── time ──────────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Session bands in UTC, the same as the journal's "Zeit & Session" (`insights/time.ts` `sessionOf`; a test keeps them equal). */
+const SESSION_OPTIONS = [
+  { v: "any", label: "egal" },
+  { v: "asia", label: "Asien (00–07 UTC)" },
+  { v: "london", label: "London (07–13 UTC)" },
+  { v: "ny", label: "New York (13–21 UTC)" },
+  { v: "late", label: "Spät (21–24 UTC)" },
+  { v: "weekend", label: "Wochenende (Sa–So UTC)" },
+] as const;
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+const WEEKDAY_NAME: Record<string, string> = { mon: "Montag", tue: "Dienstag", wed: "Mittwoch", thu: "Donnerstag", fri: "Freitag", sat: "Samstag", sun: "Sonntag" };
+const SESSION_NAME: Record<string, string> = { asia: "Asien", london: "London", ny: "New York", late: "Spät", weekend: "Wochenende" };
+
+/** Session key of a UTC instant given in seconds: Sa / So = weekend, else Asien < 07, London < 13, New York < 21, Spät. */
+export function sessionOfSec(t: number): string {
+  const d = new Date(t * 1000);
+  const wd = d.getUTCDay();
+  if (wd === 0 || wd === 6) return "weekend";
+  const h = d.getUTCHours();
+  return h < 7 ? "asia" : h < 13 ? "london" : h < 21 ? "ny" : "late";
+}
+
+const timeWindowBlock: BlockDef = {
+  id: "timeWindow",
+  label: "Wochentag / Session",
+  family: "time",
+  help: "Die Kerze öffnet an einem bestimmten Wochentag und / oder in einer Handels-Session (alles in UTC).",
+  params: [
+    {
+      key: "weekday",
+      label: "Wochentag",
+      kind: "select",
+      def: "any",
+      options: [{ v: "any", label: "egal" }, ...(["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const).map((v) => ({ v, label: WEEKDAY_NAME[v]! }))],
+    },
+    { key: "session", label: "Session", kind: "select", def: "any", options: SESSION_OPTIONS },
+  ],
+  warmup: () => 0,
+  execOnly: "Der Zeitfilter gilt für die Ausführungskerze (UTC).",
+  eval(c, p) {
+    const wd = str(p, "weekday");
+    const se = str(p, "session");
+    return triFrom(c.n, (i) => {
+      const t = c.bars[i]!.t;
+      if (!Number.isFinite(t)) return null;
+      if (wd !== "any" && WEEKDAY_KEYS[new Date(t * 1000).getUTCDay()] !== wd) return false;
+      return se === "any" || sessionOfSec(t) === se;
+    });
+  },
+  text(p) {
+    const wd = str(p, "weekday");
+    const se = str(p, "session");
+    const parts = [wd !== "any" ? `am ${WEEKDAY_NAME[wd] ?? wd}` : "", se !== "any" ? `in der Session ${SESSION_NAME[se] ?? se}` : ""].filter(Boolean);
+    return parts.length ? `Kerze öffnet ${parts.join(" ")} (UTC)` : "Zeitfilter ohne Einschränkung";
+  },
+  mirror: (p) => ({ ...p }),
+};
+
 export const BLOCKS: Readonly<Record<BlockId, BlockDef>> = {
   rsi: rsiBlock,
   rsiMa: rsiMaBlock,
@@ -752,10 +812,11 @@ export const BLOCKS: Readonly<Record<BlockId, BlockDef>> = {
   keyLevel: keyLevelBlock,
   volume: volumeBlock,
   rsiLine: rsiLineBlock,
+  timeWindow: timeWindowBlock,
 };
 
 /** Order the picker shows them in. */
-export const BLOCK_ORDER: readonly BlockId[] = ["rsi", "rsiMa", "wtEvent", "wtState", "mcbLadder", "maPrice", "maCross", "macd", "zone", "breakout", "keyLevel", "rsiLine", "bollinger", "atrPct", "volume"];
+export const BLOCK_ORDER: readonly BlockId[] = ["rsi", "rsiMa", "wtEvent", "wtState", "mcbLadder", "maPrice", "maCross", "macd", "zone", "breakout", "keyLevel", "rsiLine", "bollinger", "atrPct", "volume", "timeWindow"];
 
 export const isBlockId = (v: unknown): v is BlockId => typeof v === "string" && Object.prototype.hasOwnProperty.call(BLOCKS, v);
 
