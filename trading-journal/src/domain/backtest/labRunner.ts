@@ -7,6 +7,7 @@
  * Identical results either way (the job is deterministic). Progress is reported at most once per slice.
  */
 import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
+import type { ExtraJobInput, ExtraResult } from "../lab/extras/job";
 import { createLabJob, type LabJobInput, type LabPhase, type LabResult } from "./job";
 import type { LabRequest, LabResponse } from "./labProtocol";
 
@@ -34,7 +35,10 @@ export function labWorkerAllowed(): boolean {
 
 class WorkerFailed extends Error {}
 
-async function viaWorker(input: LabJobInput, o: LabRunOptions): Promise<LabResult> {
+/** The request without its id (the runner numbers the runs). */
+type LabRequestBody = { kind: "run"; input: LabJobInput } | { kind: "extra"; input: ExtraJobInput };
+
+async function viaWorker<R>(body: LabRequestBody, o: LabRunOptions): Promise<R> {
   let W: new (opts?: { name?: string }) => Worker;
   try {
     W = (await import("./lab.worker?worker&inline")).default;
@@ -43,7 +47,7 @@ async function viaWorker(input: LabJobInput, o: LabRunOptions): Promise<LabResul
     throw new WorkerFailed("no worker");
   }
   if (o.signal?.aborted) throw abortError();
-  return new Promise<LabResult>((resolve, reject) => {
+  return new Promise<R>((resolve, reject) => {
     let w: Worker;
     try {
       w = new W({ name: "tj-labor" });
@@ -78,7 +82,7 @@ async function viaWorker(input: LabJobInput, o: LabRunOptions): Promise<LabResul
       if (m.id !== id) return;
       arm();
       if (m.kind === "progress") o.onProgress?.(m.progress, m.phase);
-      else if (m.kind === "done") done(() => resolve(m.result));
+      else if (m.kind === "done" || m.kind === "extra-done") done(() => resolve(m.result as R));
       else done(() => reject(new Error(m.message)));
     };
     w.onerror = () => {
@@ -86,7 +90,7 @@ async function viaWorker(input: LabJobInput, o: LabRunOptions): Promise<LabResul
       done(() => reject(new WorkerFailed("worker error")));
     };
     arm();
-    const msg: LabRequest = { kind: "run", id, input };
+    const msg: LabRequest = { ...body, id };
     w.postMessage(msg);
   });
 }
@@ -103,9 +107,15 @@ function nextSlice(cb: (deadlineMs: number) => void): void {
   setTimeout(() => cb(performance.now() + FALLBACK_SLICE_MS), 0);
 }
 
-/** The job in idle chunks on the main thread. */
-export function runLabIdle(input: LabJobInput, o: LabRunOptions = {}): Promise<LabResult> {
-  const job = createLabJob(input);
+/** A stepped job (the lab job or the extra job). */
+interface SteppedJob<R> {
+  step(deadline: number): boolean;
+  progress(): number;
+  phase(): LabPhase;
+  result(): R;
+}
+
+function runIdleJob<R>(job: SteppedJob<R>, o: LabRunOptions): Promise<R> {
   return new Promise((resolve, reject) => {
     const slice = (deadline: number) => {
       if (o.signal?.aborted) return reject(abortError());
@@ -123,19 +133,44 @@ export function runLabIdle(input: LabJobInput, o: LabRunOptions = {}): Promise<L
   });
 }
 
-/** Runs the lab job: worker when allowed, else (or when the worker fails) idle chunks. */
-export async function runLab(input: LabJobInput, o: LabRunOptions = {}): Promise<LabResult> {
+/** The job in idle chunks on the main thread. */
+export function runLabIdle(input: LabJobInput, o: LabRunOptions = {}): Promise<LabResult> {
+  return runIdleJob(createLabJob(input), o);
+}
+
+/** Worker when allowed, else (or when the worker fails) idle chunks – the same for every kind of job. */
+async function execute<R>(body: LabRequestBody, idle: () => Promise<R>, o: LabRunOptions): Promise<R> {
   if (o.signal?.aborted) throw abortError();
   if (o.mode !== "idle" && labWorkerAllowed()) {
     try {
-      return await viaWorker(input, o);
+      return await viaWorker<R>(body, o);
     } catch (e) {
       if (isLabAbort(e)) throw e;
       if (!(e instanceof WorkerFailed)) throw e;
       // worker unavailable → idle chunks below
     }
   }
-  return runLabIdle(input, o);
+  return idle();
+}
+
+/** Runs the lab job: worker when allowed, else (or when the worker fails) idle chunks. */
+export function runLab(input: LabJobInput, o: LabRunOptions = {}): Promise<LabResult> {
+  return execute<LabResult>({ kind: "run", input }, () => runLabIdle(input, o), o);
+}
+
+/**
+ * Runs the extra job (stress scenarios / filter comparison, F20 / F17) the same way. The job module is loaded on demand,
+ * so a page that never opens those cards never pays for it.
+ */
+export function runExtra(input: ExtraJobInput, o: LabRunOptions = {}): Promise<ExtraResult> {
+  return execute<ExtraResult>(
+    { kind: "extra", input },
+    async () => {
+      const { createExtraJob } = await import("../lab/extras/job");
+      return runIdleJob(createExtraJob(input), o);
+    },
+    o,
+  );
 }
 
 /** Test hook: forget a recorded worker failure. */

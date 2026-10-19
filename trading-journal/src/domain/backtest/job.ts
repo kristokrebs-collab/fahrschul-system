@@ -206,6 +206,14 @@ export function completeParams(specs: readonly ParamSpec[], p: Params): Params {
   return out;
 }
 
+/** The bar window of a run: from the first tradable bar to the last bar that had closed by `toMs`. */
+export function windowOf(pr: Pick<Prepared<unknown>, "bars" | "interval" | "start">, toMs: number): Window {
+  const secLen = HIST_MS[pr.interval] / 1000;
+  let to = pr.bars.length - 1;
+  while (to > pr.start && (pr.bars[to]!.t + secLen) * 1000 > toMs) to--;
+  return { from: pr.start, to };
+}
+
 /** Most "ohne …" comparisons one run computes. */
 const MAX_VARIANTS = 14;
 
@@ -258,9 +266,8 @@ export function createLabJob(input: LabJobInput): LabJob {
   const plan = (pr: Prepared<unknown>) => {
     const bars = pr.bars;
     const secLen = HIST_MS[pr.interval] / 1000;
-    let to = bars.length - 1;
-    while (to > pr.start && (bars[to]!.t + secLen) * 1000 > input.toMs) to--;
-    window = { from: pr.start, to };
+    window = windowOf(pr, input.toMs);
+    const to = window.to;
     const ok = bars.length > 0 && to > pr.start;
     const q: Unit[] = [];
     q.push({

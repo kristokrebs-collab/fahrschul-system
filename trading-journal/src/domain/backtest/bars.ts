@@ -96,6 +96,25 @@ export function gapsOf(bars: readonly Bar[], secLen: number): { gaps: number; mi
   return { gaps, missing };
 }
 
+/** One hole of a series: between the bars `index - 1` and `index` (open times in seconds) `missing` bars are absent. */
+export interface GapSpan {
+  index: number;
+  /** open of the last bar before the hole / of the first bar after it (seconds) */
+  fromS: number;
+  toS: number;
+  missing: number;
+}
+
+/** The holes of a series one by one (the same rule as `gapsOf`, whose totals they add up to). */
+export function gapSpans(bars: readonly Bar[], secLen: number): GapSpan[] {
+  const out: GapSpan[] = [];
+  for (let i = 1; i < bars.length; i++) {
+    const d = bars[i]!.t - bars[i - 1]!.t;
+    if (d > secLen) out.push({ index: i, fromS: bars[i - 1]!.t, toS: bars[i]!.t, missing: Math.round(d / secLen) - 1 });
+  }
+  return out;
+}
+
 /** Ascending, de-duplicated (last write wins), finite bars only. */
 export function cleanBars(bars: readonly Bar[]): Bar[] {
   const sorted = bars.filter((b) => [b.t, b.o, b.h, b.l, b.c].every(Number.isFinite) && b.h >= b.l).sort((a, b) => a.t - b.t);
