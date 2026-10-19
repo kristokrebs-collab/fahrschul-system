@@ -526,3 +526,7 @@ keine Wertung ist. Jeder Eintrag ist eine `rounded-xl border-line`-Zeile: Badge 
 (Idee | Du) als zweispaltige `dl` in Mono (mobil untereinander), darunter der Vorbehalt dieser Aussage in `text-faint`. Es gibt keine Gesamtnote,
 kein Gauge, keine Ampel. Ein fester Kasten am Ende sagt, dass es ein Zahlenabgleich aus der Vergangenheit ist. Leerzustände sind ein ruhiger Kasten mit
 der konkreten Zahl („Dein Journal hat 7 Trades abgeschlossen. Ab 20 …“). Keine eigene Bewegung (die Zelle blendet ein).
+
+### Assistent: Auswertungen und Interessen
+
+Keine neue Sprache. Die Antworten der Auswertungswerkzeuge sind gewöhnliche Werkzeug-Antworten (`ToolView`: Etikett mit Punkt, Fließtext mit Zahlen und Stichprobe, bis zu vier Kennzahlen-Kacheln, danach die Knöpfe). Beim Laden der Quelle zeigt der Eintrag den vorhandenen Warte-Takt („Ich suche die passende Auswertung …“). Knöpfe heißen nach dem Ziel („Prüfbericht öffnen“, „In Eigene Idee laden“) und schließen das Sheet, bevor die Seite wechselt; Ton nur für Vorzeichen (R, Ergebnis), nie für Wertung – „hängt an wenigen Trades“ bekommt den Verlust-Ton als Warnung, „passt“ keinen Gewinn-Ton. Im Gedächtnis-Bereich steht unter den Notizen „Was dich interessiert“: ein Satz, was gezählt wird (nur Fragen), je Thema eine `rounded-lg border-line`-Zeile mit Klartext-Name, Zähler in Mono und einem ×-Knopf (≥ 44 px bei grobem Zeiger), darunter „Interessen löschen“ (Ghost); ohne Eintrag ein ruhiger Satz. Keine eigene Bewegung.

@@ -9,10 +9,13 @@ import { featureQueryOf, whereIs } from "@/app/featureQuery";
 import { FEATURE_GROUPS, PLAN_TIER_LABEL, tierOf, type FeatureEntry } from "@/app/features";
 import { translateIdea, type IdeaDraft } from "@/domain/lab";
 import type { Answer, AnswerData, AnswerFact, Tone } from "@/domain/coach/nlq";
+import type { DayNotes, EnrichedTrade } from "@/domain/types";
 import { measureNoun, targetText, valueText, type ExperimentOverview } from "@/domain/reports/experiment";
 import type { SignalCheckState } from "@/market/signals";
 import type { Page } from "@/store/uiStore";
 import { addFact, forgetAll, removeFact, setStyle, topInterests, type AnswerStyle, type AssistantMemory } from "./memory";
+import type { InsightInputs } from "./insights/types";
+import { isInsightTool } from "./insightRoutes";
 import { PAGE_LABEL, type ToolId } from "./understand";
 
 export interface ReplyAction {
@@ -66,6 +69,15 @@ export interface ToolEnv {
   similar?: () => void;
   setMem: (fn: (m: AssistantMemory) => AssistantMemory) => void;
   now: number;
+  /** every trade of the account view, open ones included, and the day notes – the month benefit and „Passt zu dir?“ read them; without them the closed trades serve */
+  list?: readonly EnrichedTrade[];
+  days?: DayNotes;
+  /** opens a card of a page by its test id (page, scroll, one sweep) – only opens */
+  openSpot?: (page: Page, testid: string) => void;
+  /** opens the strategy library sheet of the lab – it only opens; loading a card is the trader's click there (or the assistant's button „In Eigene Idee laden“) */
+  openLibrary?: () => void;
+  /** the evaluation tools (`insights/`) fetch their figures from the app's stores when asked; a test hands them in here instead */
+  insight?: InsightInputs;
 }
 
 const fact = (label: string, value: string, tone: Tone = "fg", raw: number | null = null): AnswerFact => ({ label, value, raw, tone });
@@ -118,7 +130,34 @@ function memoryTool(arg: string, env: ToolEnv): ToolReply {
   return reply({ title: "Das weiß ich über dich", text: lines.join(" "), facts: [fact("Fragen", String(mem.asked)), fact("Notizen", String(mem.facts.length))], followUps: ["Fass dich kürzer", "Vergiss alles"] });
 }
 
-const TOPIC_LABEL: Readonly<Record<string, string>> = { where: "Funktionen finden", good: "Stärken", bad: "Schwächen", status: "Überblick", entry: "Einstiegs-Check", improve: "Verbesserungen", idea: "Ideen testen", experiment: "Wochenexperiment", lab: "Labor", memory: "Gedächtnis", compare: "Vergleiche", list: "Trade-Listen" };
+const TOPIC_LABEL: Readonly<Record<string, string>> = {
+  where: "Funktionen finden",
+  good: "Stärken",
+  bad: "Schwächen",
+  status: "Überblick",
+  entry: "Einstiegs-Check",
+  improve: "Verbesserungen",
+  idea: "Ideen testen",
+  experiment: "Wochenexperiment",
+  lab: "Labor",
+  memory: "Gedächtnis",
+  compare: "Vergleiche",
+  list: "Trade-Listen",
+  train: "Üben",
+  similar: "Ähnliche Situationen öffnen",
+  newTrade: "Trade eintragen",
+  // the evaluation tools (`insights/`)
+  audit: "Prüfbericht des Backtests",
+  stress: "Verlustserien und Belastung",
+  forward: "Forward-Test",
+  trend: "Trendlinien",
+  signals: "Signale und Posteingang",
+  quality: "Alarm- und Datenqualität",
+  benefit: "Nutzen des Journals im Monat",
+  situation: "Ähnliche Situationen auswerten",
+  fit: "Passt die Strategie zu mir?",
+  library: "Strategie-Bibliothek",
+};
 
 /** German label of a learned topic key. */
 export function topicLabel(key: string): string {
@@ -335,11 +374,25 @@ export function whereTool(arg: string, env: ToolEnv): ToolReply {
   });
 }
 
+/** One question per evaluation topic: what the chips offer once the trader has asked about the topic more than once. */
+export const INTEREST_QUESTION: Readonly<Record<string, string>> = {
+  audit: "Hängt mein Backtest an wenigen Trades?",
+  stress: "Wie lang war die längste Verlustserie?",
+  forward: "Wie läuft mein Forward-Test?",
+  trend: "Welche Zeiteinheiten haben eine Trendlinie in Annäherung?",
+  signals: "Welche Signale habe ich diese Woche ausgelassen?",
+  quality: "Wie lange war die App letzten Monat offen?",
+  benefit: "Was hat mir das Journal diesen Monat gebracht?",
+  situation: "Wie ging es nach ähnlichen Situationen weiter?",
+  fit: "Passt diese Strategie zu mir?",
+  library: "Gibt es eine Strategie mit Bollinger?",
+};
+
 /** Chips for the greeting and help: the most asked topics first, then a few safe defaults. */
 export function suggestFor(env: Pick<ToolEnv, "mem">): string[] {
   const base = ["Was lief gut?", "Was fehlt für meinen Einstieg?", "Wie war letzte Woche?", "Woran soll ich arbeiten?", "Was ist mein bestes Setup?"];
   const asked = topInterests(env.mem, 3);
-  const bias: Record<string, string> = { good: "Was lief gut?", bad: "Was lief schlecht?", entry: "Was fehlt für meinen Einstieg?", improve: "Woran soll ich arbeiten?", lab: "Warum ist der Backtest so schlecht?", status: "Wie läuft es?" };
+  const bias: Record<string, string> = { ...INTEREST_QUESTION, good: "Was lief gut?", bad: "Was lief schlecht?", entry: "Was fehlt für meinen Einstieg?", improve: "Woran soll ich arbeiten?", lab: "Warum ist der Backtest so schlecht?", status: "Wie läuft es?" };
   const first = asked.map((k) => bias[k]).filter((x): x is string => !!x);
   return [...new Set([...first, ...base])].slice(0, 4);
 }
@@ -347,6 +400,8 @@ export function suggestFor(env: Pick<ToolEnv, "mem">): string[] {
 /** Runs a tool; never throws – a failing tool answers honestly. */
 export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
   try {
+    // the evaluation tools fetch their figures from the app's stores: the engine runs them asynchronously (`insights/`)
+    if (isInsightTool(tool)) return reply({ title: "Ich rechne nach …", text: "Die Auswertung wird geladen.", tone: "mute" });
     switch (tool) {
       case "memory":
         return memoryTool(arg, env);

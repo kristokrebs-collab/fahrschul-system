@@ -25,9 +25,11 @@ import { openSimilar } from "@/views/markt/similarOpen";
 import { openTraining } from "@/views/ueben/trainingStore";
 import { Chip, EntryView } from "./AssistantAnswer";
 import { useConversation } from "./conversation";
-import { execute, replyText, respond, type EngineEnv, type Reply } from "./engine";
+import { execute, replyText, respond, settled, type EngineEnv, type Reply } from "./engine";
 import { summarizeLab } from "./labSummary";
 import { GlyphMic, GlyphSpeaker, GlyphStop } from "./icons";
+import { isInsightTool } from "./insightRoutes";
+import { forgetInterests, interestsOf, removeInterest } from "./interests";
 import { forgetAll, learnInterest, setSpeak, type AnswerStyle } from "./memory";
 import { closeAssistant, useAssistantOpen } from "./open";
 import { routeViaServer, useRouterAvailable } from "./route";
@@ -76,9 +78,8 @@ function MemoryPanel() {
   const mem = useConversation((s) => s.mem);
   const setMem = useConversation((s) => s.setMem);
   const [open, setOpen] = useState(false);
-  const top = Object.entries(mem.interests)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4);
+  // every learned topic, most asked first (ties by name); each can be forgotten on its own
+  const interests = interestsOf(mem);
   return (
     <section className="grid gap-2 border-t border-line pt-4" aria-label="Was ich über dich weiß" data-testid="assistant-memory">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="touch-hit flex items-center justify-between text-left text-[12.5px] font-semibold text-mute hover:text-fg">
@@ -102,11 +103,33 @@ function MemoryPanel() {
           ) : (
             <p>Keine Notizen. Sag zum Beispiel: „Merk dir: ich handle nur in der London-Session.“</p>
           )}
-          {top.length > 0 && (
-            <p>
-              Du fragst am häufigsten nach: <span className="text-fg">{top.map(([k, n]) => `${topicLabel(k)} (${n}×)`).join(", ")}</span>.
-            </p>
-          )}
+          <div className="grid gap-1.5" data-testid="assistant-interests">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-mute">Was dich interessiert</span>
+            {interests.length > 0 ? (
+              <>
+                <p>Ich zähle nur, wie oft du nach einem Thema fragst – nie, was in deinen Trades steht. Danach ordne ich meine Vorschläge.</p>
+                <ul className="grid gap-1.5">
+                  {interests.map(([k, n]) => (
+                    <li key={k} className="flex items-center justify-between gap-3 rounded-lg border border-line px-2.5 py-1.5" data-testid="assistant-interest" data-topic={k}>
+                      <span className="text-fg">
+                        {topicLabel(k)} <span className="num font-mono text-faint">({n}×)</span>
+                      </span>
+                      <button type="button" onClick={() => setMem((m) => removeInterest(m, k))} aria-label={`„${topicLabel(k)}“ aus dem Gedächtnis löschen`} className="touch-hit shrink-0 text-faint hover:text-fg">
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div>
+                  <Button size="sm" variant="ghost" onClick={() => setMem(forgetInterests)} data-testid="assistant-interests-clear">
+                    Interessen löschen
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <p>Noch nichts gelernt – das kommt aus deinen Fragen.</p>
+            )}
+          </div>
           <div>
             <Button size="sm" variant="danger" onClick={() => setMem(forgetAll)}>
               Alles vergessen
@@ -148,9 +171,20 @@ function AssistantBody() {
     (): EngineEnv => {
       const lastJournal = [...conv.getState().entries].reverse().find((e) => e.replies[0]?.kind === "journal");
       const jr = lastJournal?.replies.find((r): r is Extract<Reply, { kind: "journal" }> => r.kind === "journal");
+      // a short „und letzte Woche?“ continues an evaluation only when the newest answer was one
+      const newest = conv.getState().entries.at(-1);
+      const nt = newest?.replies[0];
       return {
         data: { ...data, now: Date.now() },
         prev: lastJournal && jr ? { question: lastJournal.question, answer: jr.answer } : null,
+        prevTool: newest && nt?.kind === "tool" && isInsightTool(nt.tool) ? { tool: nt.tool, question: newest.question } : null,
+        list: view.list,
+        days,
+        openSpot: (p, testid) => void import("./openSpot").then((m) => m.openSpot(p, testid)),
+        openLibrary: () => {
+          navigate("labor");
+          void import("@/views/labor/LibraryHost").then((m) => m.useLibrary.getState().show());
+        },
         mem: conv.getState().mem,
         signal: sig,
         recs: () => analyse(view, settings, events, days, Date.now()).recs,
@@ -182,7 +216,8 @@ function AssistantBody() {
       const e = env();
       const turn = respond(q, e);
       const st = conv.getState();
-      const id = st.push({ question: q, via: turn.via, replies: turn.replies, routing: turn.needsServer && routerOk, topic: turn.topic });
+      // an evaluation tool loads its figures first (`turn.later`): the usual waiting beat shows meanwhile
+      const id = st.push({ question: q, via: turn.via, replies: turn.replies, routing: (turn.needsServer && routerOk) || !!turn.later, topic: turn.topic });
       if (turn.topic) st.setMem((m) => learnInterest(m, turn.topic!));
       else st.setMem((m) => ({ ...m, asked: m.asked + 1 }));
       const first = turn.replies[0];
@@ -190,7 +225,12 @@ function AssistantBody() {
       const aloud = (rs: readonly Reply[]) => {
         if (conv.getState().mem.voice.speak) speak(rs.slice(0, 2).map(replyText).join(" "));
       };
-      if (turn.needsServer && routerOk) {
+      if (turn.later) {
+        void turn.later.then((replies) => {
+          conv.getState().update(id, { replies, routing: false });
+          aloud(replies);
+        });
+      } else if (turn.needsServer && routerOk) {
         const history = conv.getState().entries.filter((x) => x.id !== id).slice(-3).map((x) => x.question);
         const uctx = { parse: parseCtx, prev: e.prev?.answer.intent ?? null, closed: data.closed.length };
         void routeViaServer(q, { history, page, setups: settings.setups.map((s) => s.name), assets: parseCtx.assets as string[] }, uctx)
@@ -200,9 +240,11 @@ function AssistantBody() {
               conv.getState().update(id, { replies, routing: false });
               return;
             }
-            const replies = questions.flatMap((cq) => execute(understand(cq, uctx), cq, env()).replies);
-            conv.getState().update(id, { replies, via: ["KI-Sprachhilfe", ...questions.slice(0, 2)], routing: false });
-            aloud(replies);
+            return Promise.all(questions.map((cq) => settled(execute(understand(cq, uctx), cq, env())))).then((rs) => {
+              const replies = rs.flat();
+              conv.getState().update(id, { replies, via: ["KI-Sprachhilfe", ...questions.slice(0, 2)], routing: false });
+              aloud(replies);
+            });
           })
           .catch(() => conv.getState().update(id, { routing: false }));
       } else aloud(turn.replies);

@@ -5,7 +5,7 @@
  * memory; the microphone (a stubbed `SpeechRecognition`) fills and sends the question; without recognition the reason
  * is shown and typing still works; 390 px has no horizontal scroll; no console errors.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, openRoute, seed } from "./helpers";
 
 const open = async (page: Page) => {
@@ -131,6 +131,98 @@ test.describe("Assistent", () => {
     const dialog = await open(page);
     await ask(page, "was lief gut");
     await expect(dialog.getByTestId("assistant-answer").first()).toBeVisible();
+    await expectNoHorizontalScroll(page);
+  });
+});
+
+/**
+ * The evaluation tools (Prüfbericht, Forward-Test, Trendlinien, Signale, Monatsnutzen, Bibliothek …): one question gets an
+ * answer from the app's own functions, the „Öffnen“ button navigates, nothing is saved or started. Deterministic questions
+ * only (the strategy library is static, the signal archive is empty in a fresh browser) – no clock, no market data.
+ * Mobile + desktop.
+ */
+test.describe("Assistent · Auswertungen", () => {
+  test.setTimeout(90_000);
+
+  const only = (info: TestInfo): void => test.skip(!["mobile", "desktop"].includes(info.project.name), "mobile + desktop");
+
+  test("Bibliothek: Antwort mit typischen Werten, „In Eigene Idee laden“ öffnet den Entwurf im Labor – gestartet wird nichts", async ({ page }, info) => {
+    only(info);
+    const errors = collectErrors(page);
+    await seed(page, { extra: { "tj2-labor": { strategy: "custom", symbol: "BTCUSDT", period: "6m" } } });
+    await openRoute(page, "/#overview", "Übersicht");
+    const dialog = await open(page);
+
+    await ask(page, "Welche Werte nimmt man für die Supertrend-Strategie?");
+    const entry = dialog.getByTestId("assistant-entry").last();
+    const answer = entry.getByTestId("assistant-answer");
+    await expect(answer).toBeVisible({ timeout: 15_000 });
+    await expect(answer).toContainText("Supertrend (10, 3)");
+    await expect(answer).toContainText("ATR-Länge: 10 Kerzen (konservativ 14, aggressiv 7)");
+    await expect(answer).toContainText("bekannt heißt nicht wirksam");
+    await expectNoHorizontalScroll(page);
+
+    // the button appears once the answer has been written out; it only fills the draft and opens the lab
+    await answer.getByRole("button", { name: "In Eigene Idee laden" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(/#labor/);
+    await expect(page.getByTestId("labor-idea")).toContainText("Strategie-Bibliothek: Supertrend (10, 3) (Standard)");
+    await expect(page.getByTestId("labor-view")).toHaveAttribute("data-status", "idle");
+    await expectNoHorizontalScroll(page);
+    expect(errors).toEqual([]);
+  });
+
+  test("Signale: ehrliche Antwort bei leerem Archiv, der Knopf führt zum Posteingang", async ({ page }, info) => {
+    only(info);
+    await seed(page);
+    await openRoute(page, "/#overview", "Übersicht");
+    const dialog = await open(page);
+    await ask(page, "Welche Signale habe ich diese Woche ausgelassen und warum?");
+    const answer = dialog.getByTestId("assistant-entry").last().getByTestId("assistant-answer");
+    await expect(answer).toBeVisible({ timeout: 15_000 });
+    await expect(answer).toContainText("Noch keine Signale festgehalten");
+    await expect(answer).toContainText("lässt sich nicht nachtragen");
+    await answer.getByRole("button", { name: "Posteingang öffnen" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(/#coach/);
+    await expect(page.getByTestId("inbox-card")).toBeVisible({ timeout: 15_000 });
+    await expectNoHorizontalScroll(page);
+  });
+
+  test("Gedächtnis: gelernte Interessen sind sichtbar und einzeln löschbar", async ({ page }, info) => {
+    only(info);
+    await seed(page);
+    await openRoute(page, "/#overview", "Übersicht");
+    const dialog = await open(page);
+    await ask(page, "Gibt es eine Strategie mit Bollinger?");
+    await expect(dialog.getByTestId("assistant-entry").last().getByTestId("assistant-answer")).toBeVisible({ timeout: 15_000 });
+    await ask(page, "Welche Werte nimmt man für die Supertrend-Strategie?");
+    await expect(dialog.getByTestId("assistant-entry")).toHaveCount(2);
+    await ask(page, "Welche Signale habe ich diese Woche ausgelassen?");
+    await expect(dialog.getByTestId("assistant-entry")).toHaveCount(3);
+
+    await dialog.getByRole("button", { name: /Was ich über dich weiß/ }).click();
+    const interests = dialog.getByTestId("assistant-interests");
+    await expect(interests).toContainText("Was dich interessiert");
+    await expect(interests).toContainText("nie, was in deinen Trades steht");
+    const library = interests.locator('[data-topic="library"]');
+    await expect(library).toContainText("Strategie-Bibliothek");
+    await expect(library).toContainText("(2×)");
+    await expect(interests.locator('[data-topic="signals"]')).toContainText("(1×)");
+    await expect
+      .poll(() => page.evaluate(() => (JSON.parse(localStorage.getItem("tj2-settings") ?? "{}") as { assistant?: { interests?: Record<string, number> } }).assistant?.interests?.library ?? 0), { timeout: 10_000 })
+      .toBe(2);
+
+    // forget one topic: it disappears from the panel and from the stored settings, the others stay
+    await library.getByRole("button", { name: /Strategie-Bibliothek.*löschen/ }).click();
+    await expect(interests.locator('[data-topic="library"]')).toHaveCount(0);
+    await expect(interests.locator('[data-topic="signals"]')).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => Object.keys((JSON.parse(localStorage.getItem("tj2-settings") ?? "{}") as { assistant?: { interests?: Record<string, number> } }).assistant?.interests ?? {}).sort().join(",")), { timeout: 10_000 })
+      .toBe("signals");
+    await dialog.getByTestId("assistant-interests-clear").click();
+    await expect(interests.getByTestId("assistant-interest")).toHaveCount(0);
+    await expect(interests).toContainText("Noch nichts gelernt");
     await expectNoHorizontalScroll(page);
   });
 });
