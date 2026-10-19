@@ -310,6 +310,16 @@ export function pagesEstimate(cfg: LabConfig, signal: SignalCfg, now = Date.now(
 
 let ctl: AbortController | null = null;
 let lastUi = 0;
+/**
+ * The job input of the SHOWN result (data, engine, parameters, period) – memory only. The extra runs of the lab (stress
+ * scenarios F20, filter comparison F17) repeat exactly this set-up; without it there is nothing to repeat.
+ */
+let shownInput: LabJobInput | null = null;
+
+/** The input the shown result was computed with, or null before a run (and after a reset). */
+export function shownRunInput(): LabJobInput | null {
+  return shownInput;
+}
 
 /** Starts a run (aborting a running one). */
 export async function startLab(signal: SignalCfg, now = Date.now()): Promise<void> {
@@ -375,6 +385,7 @@ export async function startLab(signal: SignalCfg, now = Date.now()): Promise<voi
     const summary = summarize(result, cfg.period);
     const runs = [summary, ...useLabor.getState().runs.filter((r) => r.id !== summary.id)].slice(0, RUNS_MAX);
     writeJson(RUNS_KEY, runs);
+    shownInput = input;
     useLabor.setState((s) => ({ status: "done", phase: "done", progress: 1, result, bars: exec, runSeq: s.runSeq + 1, runs, fundingUsed, runCfg: cfg }));
   } catch (e) {
     if (ctl !== mine) return;
@@ -424,5 +435,6 @@ function summarize(r: LabResult, period: LaborPeriod): RunSummary {
 export function __resetLabor(): void {
   ctl?.abort();
   ctl = null;
+  shownInput = null;
   useLabor.setState({ cfg: DEFAULT_LAB, drafts: [], status: "idle", phase: "load", progress: 0, load: { done: 0, total: 0 }, error: null, result: null, bars: [], runSeq: 0, runs: [], replayId: null, fundingUsed: null, runCfg: null });
 }

@@ -22,7 +22,7 @@ import {
   variantPlan,
   type FilterSelection,
 } from "@/domain/lab/filters";
-import { ENGINE, realInput } from "./lab.extras.helpers";
+import { ENGINE, H4, realInput } from "./lab.extras.helpers";
 
 const bars = (closes: readonly number[], sec: number, t0 = 1_700_000_000): Bar[] => closes.map((c, i) => ({ t: t0 + i * sec, o: c, h: c + 0.5, l: c - 0.5, c }));
 const rising = (n: number, sec: number): Bar[] => bars(Array.from({ length: n }, (_, i) => 100 + i * 0.7), sec);
@@ -222,4 +222,22 @@ describe("Filtervergleich auf echten BTCUSDT-Kerzen", () => {
     expect(r.what === "filters" && r.compare.active).toEqual([]);
     expect(r.what === "filters" && r.compare.rows.map((x) => x.id)).toEqual(["base"]);
   });
+});
+
+describe("Filtervergleich bei Box-zu-Box", () => {
+  it("Retest ist hier wählbar: er lässt nur Retest-Setups durch – auf diesen Kerzen gibt es keins, jede Zeile sagt es", () => {
+    const input = realInput({ strategy: "box", params: { target: 1, maxBars: 42, minGrade: "A", kinds: "alle" }, data: { "4h": H4 } });
+    const out = createExtraJob({ base: input, what: "filters", filters: { v: 1, on: ["retest", "topTrader"], rsiLimit: 70, trendLen: 20 } }).result();
+    if (out.what !== "filters") throw new Error("filters expected");
+    // Top-Trader is chosen but locked: only Retest is active
+    expect(out.compare.active).toEqual(["retest"]);
+    const base = out.compare.rows.find((r) => r.id === "base")!;
+    const only = out.compare.rows.find((r) => r.id === "only:retest")!;
+    expect(base.stats!.n).toBeGreaterThan(0);
+    expect(only.asked).toBeGreaterThan(0);
+    // every signal of the run is a Range setup: the retest filter rejects all of them
+    expect(only.blocked).toBe(only.asked);
+    expect(only.stats!.n).toBe(0);
+    expect(only.delta!.dN).toBe(-base.stats!.n);
+  }, 60_000);
 });

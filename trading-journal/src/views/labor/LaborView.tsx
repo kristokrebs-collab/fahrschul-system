@@ -3,12 +3,13 @@
  *   Versuchsaufbau  ConfigCard (7, with "Eigene Idee" 8) · AssumptionsCard (5, 4)
  *   Lauf            RunCard (7) · TradesCard (5)
  *   Diagnose        DiagnosisCard (12)                                                        (after a run)
+ *   Belastung …     ExtrasSection (12): stress scenarios, Prüfbericht, filter comparison      (after a run, lazy)
  *   Robustheit      OverfitCard (5) · OosCard (7) · WalkForwardCard (7) · HeatmapCard (5)     (after a run)
  *   Vergleich       CompareRunsCard (8) · ReferenceCard (4)                                   (after a run)
  * Every cell reveals once (`Reveal`, ends at `transform: none`), section titles rise letter by letter. The replay
  * sheet of a backtest trade is mounted here (`LabReplayHost`). Registered by the integrator (P14) as page `labor`.
  */
-import { useId, useMemo, type ReactNode } from "react";
+import { lazy, Suspense, useId, useMemo, type ReactNode } from "react";
 import { sanitizeSignalCfg } from "@/domain/signals";
 import { cn } from "@/lib/cn";
 import { storageKey } from "@/store/storage";
@@ -24,6 +25,9 @@ import { AssumptionsCard, CompareRunsCard, ReferenceCard } from "./SideCards";
 import { LABOR } from "./strings";
 import { TradesCard } from "./TradesCard";
 import { Cell, SectionTitle } from "./ui";
+
+/** F20 / F18 / F17: its own chunk, fetched only when a finished run is on the page. */
+const ExtrasSection = lazy(() => import("./ExtrasSection"));
 
 export const LABOR_LEAD_FILL = { storageKey: storageKey("fill-labor"), highlight: LABOR.highlight } as const;
 
@@ -44,7 +48,7 @@ export function LaborView({ className }: { className?: string }) {
   const runs = useLabor((s) => s.runs.length);
   const custom = useLabor((s) => s.cfg.strategy === "custom");
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), diagnose: useId(), robust: useId(), compare: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), extras: useId(), robust: useId(), compare: useId() };
   const T = LABOR.sections;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
@@ -71,6 +75,15 @@ export function LaborView({ className }: { className?: string }) {
         <Section id={ids.diagnose} title={T.diagnose.title} sub={T.diagnose.sub}>
           <Cell index={0} span="lg:col-span-12">
             <DiagnosisCard />
+          </Cell>
+        </Section>
+      )}
+      {hasResult && !busy && (
+        <Section id={ids.extras} title={T.extras.title} sub={T.extras.sub}>
+          <Cell index={0} span="lg:col-span-12">
+            <Suspense fallback={null}>
+              <ExtrasSection />
+            </Suspense>
           </Cell>
         </Section>
       )}
