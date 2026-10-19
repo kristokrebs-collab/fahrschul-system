@@ -90,6 +90,21 @@ shows the button – nothing breaks.
 Tests: `tests/unit/coach.ask.test.ts` (fake admin + fake Anthropic client: availability, auth, plan gate, rate limits,
 request shape, number guard, refusal, error mapping).
 
+## Functions (F29 / F30 screenshot import – optional)
+
+Reads trade values from up to four screenshots (position view, order history, planned order …) and returns a PROPOSAL the
+app shows in a preview; nothing is saved by the server or the app. Without `ANTHROPIC_API_KEY` it reports `enabled: false`
+and the editor never shows „Aus Screenshot übernehmen“ (settings → Daten → „Screenshot-Import“ says why).
+
+| file | route | notes |
+|---|---|---|
+| `shot-extract.mts` | GET `/api/v1/shot-extract` → `{ enabled, maxImages, maxLongEdge, maxImageBytes }` · POST `{ images: [{ mediaType: "image/jpeg" \| "image/png" \| "image/webp", data(base64) }] (1–4), hint?: { market?, timezone?, exchange?, pair? } }` → `{ trades[], timezone, notes[], model, reason? }` | `@anthropic-ai/sdk` with image blocks and a FORCED tool call `report_trades` (`tool_choice`), JSON schema + system prompt + zod in `src/journal/extract/contract.ts` (shared with the client; a test keeps schema and zod in step); model `VISION_MODEL`, else `COACH_MODEL`, else `claude-opus-5-5`, effort `medium`, server-side refusal fallback; the result is validated with zod again (violation → 502 `shot_extract_invalid`), `sanitize` zeroes the confidence of absent fields and drops empty trades; numbers and times stay TEXT as shown (the client parses comma / point, zones). Refusal / no tool call / nothing found → 200 with `trades: []` and `reason` `"refusal" \| "empty"` (manual entry). Signed in (aal2 if 2FA), plan feature `shotExtract` (Premium; not gated while payments are not set up), 6 / 10 min + `shotExtractPerDay` per day (30; free / pro 0) – counted only for a valid body; body ≤ 5.9 MB (platform limit 6 MB), ≤ 1.5 MB per image, ≤ 4.2 MB together, declared type must match the bytes. The model is told that image text is data, never to guess, to separate planned orders from fills and never to invent an original stop. No retry (a second attempt would double the wait), 25 s client timeout. Pictures are only forwarded – never stored, never logged (only error codes: `shot_extract_busy` 429, `shot_extract_unavailable` 503, `shot_extract_failed` / `_invalid` 502) |
+
+Tests: `tests/unit/shot.extract.test.ts` (fake admin + fake Anthropic client: availability, auth / 2FA, plan gate, daily and
+burst limit, oversize / malformed bodies, forced tool call and request shape, schema violation, refusal, API errors, no
+pictures in logs), `tests/unit/shot.numbers-time.test.ts` + `tests/unit/shot.candidates.test.ts` (client maths),
+`tests/e2e/shot-extract.spec.ts` (canned endpoint, preview → draft).
+
 ## Functions (P12 community)
 
 Shared logic in `_lib/social/` (`store.ts` pseudonyms, opt-in, figures, membership checks · `groups.ts` groups, invites,

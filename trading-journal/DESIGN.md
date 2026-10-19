@@ -298,3 +298,19 @@ Nachgezogen: Der „Bericht bereit“-Wipe kürzte seine Zahlen (`truncate`): �
 „−123.457 USDT“ 134 > 106 / 201 > 179 px (390 / 1440, gehintet ±1 px). Jetzt ganz: Spalten `minmax(max-content,1fr)`,
 gleiche Drittel, solange alles passt; E2E mit langen Werten, Berichte-E2E auf festem Mittwoch (sonntags kam kein Wipe).
 Übersicht „FAB …“ mit angehaltener Seitenuhr erzwungen: 95eb012 rot wie in CI, HEAD grün; geprüft wird der zweite Toast.
+
+## Nachtrag: Screenshot-Import (F29 / F30)
+
+„Aus Screenshot übernehmen“ ist ein Vorschlag, kein Automatismus: Der Knopf unter den Screenshots des **neuen** Trades (nur
+mit Konto, Tarif und Server-Schlüssel – sonst fehlt er still, die Einstellungen → Daten → „Screenshot-Import“ erklären warum) öffnet
+ein Sheet in drei Schritten: Bilder wählen (bis 4, Datenschutzhinweis direkt darunter) → Auslesen → **Vorschau**. Die Vorschau
+zeigt jedes Feld mit seiner Sicherheit in Prozent; nur Unsicheres (amber Rahmen, „unsicher“) und Fehlendes (gestrichelt,
+„fehlt“) bekommt ein Eingabefeld, Optionales ohne Wert bleibt ruhig („—“). Zusammengehörige Bilder erscheinen als **ein** Trade
+mit den Quellbildern als Miniaturen, mögliche Dubletten tragen „Wahrscheinlich schon vorhanden“ und sind nicht vorgewählt.
+Unter jedem Trade stehen die Prüfungen (Stop/Ziel auf der falschen Seite, Zahlenformat, Ergebnis laut Screenshot gegen
+Ergebnis aus den Preisen – mit Angebot „Aus Preisen berechnen“, Richtung vertauscht …), die Zeitzone ist wählbar und die Annahme
+steht im Klartext da. Regeln, die das Design trägt: nichts wird erfunden (unbekannt = leer), ein sichtbarer Stop einer laufenden
+oder geschlossenen Position ist **nicht** der Original-Stop (Notiz, R bleibt leer – außer der Trader bestätigt ihn), geplante Orders
+werden offene Trades mit geplantem Einstieg ohne Fills, und gespeichert wird erst im Editor mit „Speichern“ (mehrere Trades:
+der erste öffnet sofort, die weiteren erscheinen nacheinander in der Pille „Noch n Entwürfe“). Das Sheet ist ein eigener
+Lazy-Chunk (~18 KiB gzip), die Erstladung bleibt im Budget.
