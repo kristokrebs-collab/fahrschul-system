@@ -94,7 +94,7 @@ delay, unpaired trades) – each backed by figures and phrased as "kann", never 
   plus neue Modi für Bollinger (Rückkehr ins Band, Mittellinie, Squeeze mit Fenster) und MACD (Histogramm). Alle aus geschlossenen Kerzen, im Builder in den
   bisherigen Familien. `check(p, tfSec)` meldet unpassende Parameter (Opening Range 15 min auf 1h-Kerzen, Session-VWAP auf 4h) als Fehler der Prüfung;
   **Funding-Extrem** ist ohne die echte Funding-Historie (`Kosten → Funding: Historie`) gesperrt, im Baustein-Picker mit Grund (`validateCustom(cfg, { funding })`).
-- **Strategie-Bibliothek** (`LibrarySheet.tsx`, lazy; Daten `@/domain/lab/library`): Button `labor-lib-open` neben den Vorlagen → Sheet `labor-lib` mit 32 Karten
+- **Strategie-Bibliothek** (`LibrarySheet.tsx`, lazy; Daten `@/domain/lab/library`): Button `labor-lib-open` neben den Vorlagen (`useLibrary.show()`) → Sheet `labor-lib` mit 32 Karten, gehostet von `LibraryHost` auf Seitenebene (wie das Replay-Sheet; in einer Zelle läge es unter dem Dock), 
   (`labor-lib-card`, `data-card`, `data-kind`), Suche `labor-lib-search`, Typ-Filter, Details (Bekannt aus · Gedacht für · Schwächen · übliche Zeiteinheiten · typische Werte
   konservativ / Standard / aggressiv mit Erklärung je Zahl). `labor-lib-load-<id>-<level>` lädt den Entwurf in „Eigene Idee“ (`setCustom`), schließt das Sheet, startet nichts.
   Karten tragen keine Ergebnisse und keine Erfolgsaussagen (ein Test sucht nach Versprechen). Die Zahl auf der Karte und im Entwurf sind **dieselbe Quelle** (`params` → `make`).

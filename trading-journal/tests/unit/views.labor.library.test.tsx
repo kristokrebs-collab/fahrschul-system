@@ -11,6 +11,7 @@ import { MorphDialogProvider } from "@/motion/MorphDialog";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { __resetLabor, __setHistoryDeps, LaborView, useLabor } from "@/views/labor";
 import { __resetExtras } from "@/views/labor/extrasStore";
+import { __resetLibrary } from "@/views/labor/LibraryHost";
 import { bootFixtureJournal, installDomPolyfills } from "./views.overview.harness";
 
 type Row = [number, number, number, number, number];
@@ -51,11 +52,13 @@ beforeEach(async () => {
   localStorage.clear();
   __resetLabor();
   __resetExtras();
+  __resetLibrary();
   __setHistoryDeps(null);
 });
 afterEach(() => {
   __resetLabor();
   __resetExtras();
+  __resetLibrary();
   __setHistoryDeps(null);
   vi.useRealTimers();
 });

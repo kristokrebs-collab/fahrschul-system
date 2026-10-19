@@ -6,7 +6,7 @@
  * DISABLED with the reason – nothing is silently ignored.
  */
 import { motion } from "motion/react";
-import { lazy, Suspense, useId, useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import {
   BLOCKS,
   BLOCK_ORDER,
@@ -51,12 +51,10 @@ import { Icon } from "@/primitives/icons";
 import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useUi } from "@/store/uiStore";
+import { useLibrary } from "./LibraryHost";
 import { DRAFTS_MAX, useLabor } from "./laborStore";
 import { LABOR } from "./strings";
 import { ChipPick, FieldRow, SEG_TOUCH } from "./ui";
-
-/** F06: the strategy library is its own chunk – the cards carry a lot of text and load on the first opening. */
-const LibrarySheet = lazy(() => import("./LibrarySheet"));
 
 const B = LABOR.builder;
 const FAMILIES: readonly Family[] = ["momentum", "mcb", "trend", "structure", "volatility", "price", "time"];
@@ -516,8 +514,6 @@ export function RuleBuilder({ uid }: { uid: string }) {
   const pushToast = useUi((s) => s.pushToast);
   const [sideTab, setSideTab] = useState<"long" | "short">("long");
   const [picker, setPicker] = useState<string | null>(null);
-  const [libOpen, setLibOpen] = useState(false);
-  const [libSeen, setLibSeen] = useState(false);
   const fundingMode = useLabor((s) => s.cfg.funding);
   const env = useMemo<CheckEnv>(() => ({ funding: fundingMode === "history" }), [fundingMode]);
   const issues = useMemo(() => validateCustom(custom, env), [custom, env]);
@@ -574,20 +570,12 @@ export function RuleBuilder({ uid }: { uid: string }) {
           <Button
             size="sm"
             disabled={busy}
-            onClick={() => {
-              setLibSeen(true);
-              setLibOpen(true);
-            }}
+            onClick={() => useLibrary.getState().show()}
             data-testid="labor-lib-open"
           >
             Strategie-Bibliothek öffnen
           </Button>
         </div>
-        {libSeen && (
-          <Suspense fallback={null}>
-            <LibrarySheet open={libOpen} onClose={() => setLibOpen(false)} />
-          </Suspense>
-        )}
       </FieldRow>
 
       <div className="grid gap-4 sm:grid-cols-2">
