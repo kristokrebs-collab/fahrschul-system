@@ -55,7 +55,7 @@ export function ConfigCard({ signal, className }: { signal: SignalCfg; className
   const specs = useMemo(() => strategyOf(cfg.strategy).specs(strategyCfg(plan.input)), [cfg.strategy, plan.input]);
   const pages = useMemo(() => pagesEstimate(cfg, signal), [cfg, signal]);
   const reduced = useReducedFx();
-  const ideaErrors = useMemo(() => (cfg.strategy === "custom" ? validateCustom(cfg.custom).filter((i) => i.level === "error").length : 0), [cfg.strategy, cfg.custom]);
+  const ideaErrors = useMemo(() => (cfg.strategy === "custom" ? validateCustom(cfg.custom, { funding: cfg.funding === "history" }).filter((i) => i.level === "error").length : 0), [cfg.strategy, cfg.custom, cfg.funding]);
 
   const commitSymbol = (raw: string) => {
     const s = normalizeWatchSymbol(raw);

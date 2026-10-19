@@ -19,6 +19,7 @@ import {
   TF_IDS,
   TF_LABEL,
   blockAvailability,
+  type CheckEnv,
   editNode,
   leafText,
   leavesOf,
@@ -63,6 +64,8 @@ interface Ed {
   side: "long" | "short";
   exec: TfId;
   issues: readonly Issue[];
+  /** what the run offers (funding history …) – locks blocks that need it */
+  env: CheckEnv;
   disabled: boolean;
   uid: string;
   leafCount: number;
@@ -229,7 +232,7 @@ function BlockPicker({ parent, ed }: { parent: string; ed: Ed }) {
             <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{FAMILY_LABEL[fam]}</span>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {ids.map((b) => {
-                const a = blockAvailability(b, ed.exec);
+                const a = blockAvailability(b, ed.exec, ed.env);
                 return (
                   <button
                     key={b}
@@ -510,7 +513,9 @@ export function RuleBuilder({ uid }: { uid: string }) {
   const pushToast = useUi((s) => s.pushToast);
   const [sideTab, setSideTab] = useState<"long" | "short">("long");
   const [picker, setPicker] = useState<string | null>(null);
-  const issues = useMemo(() => validateCustom(custom), [custom]);
+  const fundingMode = useLabor((s) => s.cfg.funding);
+  const env = useMemo<CheckEnv>(() => ({ funding: fundingMode === "history" }), [fundingMode]);
+  const issues = useMemo(() => validateCustom(custom, env), [custom, env]);
   const lines = useMemo(() => summarizeCustom(custom), [custom]);
   const side: "long" | "short" = custom.sides === "both" ? sideTab : custom.sides;
   const root = custom[side];
@@ -521,6 +526,7 @@ export function RuleBuilder({ uid }: { uid: string }) {
     side,
     exec: custom.interval,
     issues,
+    env,
     disabled: busy,
     uid,
     leafCount: leavesOf(root).length,
