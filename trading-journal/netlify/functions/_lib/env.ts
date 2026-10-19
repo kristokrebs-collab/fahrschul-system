@@ -25,6 +25,7 @@ export const SERVER_ENV = [
   "ANTHROPIC_API_KEY",
   "COACH_MODEL",
   "ROUTER_MODEL",
+  "VISION_MODEL",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */

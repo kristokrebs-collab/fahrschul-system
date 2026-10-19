@@ -6,6 +6,7 @@ import { radius, spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
+import { ExtractButton } from "@/journal/extract/ExtractButton";
 import { cloudShotOwner } from "./cloud";
 import { imagesOf } from "./image";
 import { ShotLightbox } from "./ShotLightbox";
@@ -172,6 +173,7 @@ export function ShotsField({ value, onChange }: ShotsFieldProps) {
           </AnimatePresence>
         </ul>
       )}
+      <ExtractButton shots={value} />
       <ShotLightbox shots={value} index={view} onIndex={setView} onClose={() => setView(null)} />
     </div>
   );

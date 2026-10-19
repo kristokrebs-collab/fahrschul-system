@@ -333,3 +333,19 @@ Satz, der sagt, was das für die Auswertung heißt. Das Anpassen (Felder, Zeitzo
 nicht in einem zweiten Dialog. Die Auswertungskarte „Check-in und Handelstag“ zeigt zuerst die Stichprobe („15 Tage mit 30 Trades“), dann
 eine kleine Matrix aus ρ in Mono (unter 8 Tagen „–“), was nicht gezählt wurde, und immer „Keine Diagnose, keine Kausalität“ – kein
 Gewinn-/Verlustton, keine Ampel. Bewegung: nur die vorhandenen Sheet-/Stagger-Tokens, keine neuen.
+
+## Nachtrag: Screenshot-Import (F29 / F30)
+
+„Aus Screenshot übernehmen“ ist ein Vorschlag, kein Automatismus: Der Knopf unter den Screenshots des **neuen** Trades (nur
+mit Konto, Tarif und Server-Schlüssel – sonst fehlt er still, die Einstellungen → Daten → „Screenshot-Import“ erklären warum) öffnet
+ein Sheet in drei Schritten: Bilder wählen (bis 4, Datenschutzhinweis direkt darunter) → Auslesen → **Vorschau**. Die Vorschau
+zeigt jedes Feld mit seiner Sicherheit in Prozent; nur Unsicheres (amber Rahmen, „unsicher“) und Fehlendes (gestrichelt,
+„fehlt“) bekommt ein Eingabefeld, Optionales ohne Wert bleibt ruhig („—“). Zusammengehörige Bilder erscheinen als **ein** Trade
+mit den Quellbildern als Miniaturen, mögliche Dubletten tragen „Wahrscheinlich schon vorhanden“ und sind nicht vorgewählt.
+Unter jedem Trade stehen die Prüfungen (Stop/Ziel auf der falschen Seite, Zahlenformat, Ergebnis laut Screenshot gegen
+Ergebnis aus den Preisen – mit Angebot „Aus Preisen berechnen“, Richtung vertauscht …), die Zeitzone ist wählbar und die Annahme
+steht im Klartext da. Regeln, die das Design trägt: nichts wird erfunden (unbekannt = leer), ein sichtbarer Stop einer laufenden
+oder geschlossenen Position ist **nicht** der Original-Stop (Notiz, R bleibt leer – außer der Trader bestätigt ihn), geplante Orders
+werden offene Trades mit geplantem Einstieg ohne Fills, und gespeichert wird erst im Editor mit „Speichern“ (mehrere Trades:
+der erste öffnet sofort, die weiteren erscheinen nacheinander in der Pille „Noch n Entwürfe“). Das Sheet ist ein eigener
+Lazy-Chunk (~18 KiB gzip), die Erstladung bleibt im Budget.

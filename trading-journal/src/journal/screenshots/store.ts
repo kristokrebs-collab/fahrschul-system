@@ -121,13 +121,23 @@ export function localKeyOf(ref: ScreenshotRef): string | null {
 }
 
 /**
+ * Keys kept alive although no saved trade references them yet: the pictures of drafts waiting in the screenshot
+ * import's queue (`journal/extract/store.ts`). `pinShotKeys` / `unpinShotKeys` are called by that queue only.
+ */
+const pinned = new Set<string>();
+export const pinShotKeys = (keys: Iterable<string>): void => void [...keys].forEach((k) => pinned.add(k));
+export const unpinShotKeys = (keys: Iterable<string>): void => void [...keys].forEach((k) => pinned.delete(k));
+/** Whether a local key or cloud path is pinned (the cloud release honours it too). */
+export const isShotPinned = (key: string): boolean => pinned.has(key);
+
+/**
  * Collects local blobs no trade references any more (a screenshot removed from a trade, a deleted trade, an editor
  * closed without saving). `referenced` = every local key of every trade. Returns the number of removed blobs.
  */
 export async function collectShotGarbage(referenced: ReadonlySet<string>): Promise<number> {
   let n = 0;
   for (const k of await listShotKeys()) {
-    if (referenced.has(k)) continue;
+    if (referenced.has(k) || pinned.has(k)) continue;
     await deleteShotBlob(k);
     n += 1;
   }
@@ -149,5 +159,6 @@ export function resetShotStoreForTests(): void {
   store = null;
   idbBroken = false;
   memory.clear();
+  pinned.clear();
   for (const k of [...objectUrls.keys()]) revokeUrl(k);
 }

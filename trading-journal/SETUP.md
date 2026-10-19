@@ -152,6 +152,7 @@ Netlify → **Site configuration → Environment variables → Add a variable**.
 | `ANTHROPIC_API_KEY` | optional, KI-Formulierung im Coach (Premium). Ohne Schlüssel verkauft die Preisseite keinen „KI-Coach“: Premium-Highlight, Vergleichstabelle und Upgrade-Dialog lassen ihn weg (`billing/status` meldet `coachAi: false`) | Functions, secret |
 | `COACH_MODEL` | optional, Standard `claude-opus-5-5` | Functions |
 | `ROUTER_MODEL` | optional, Standard = `COACH_MODEL` – Sprach-Router des Assistenten (`/api/v1/assistant/route`, nutzt denselben `ANTHROPIC_API_KEY`) | Functions |
+| `VISION_MODEL` | optional, Modell des Screenshot-Imports (F29, braucht denselben `ANTHROPIC_API_KEY`); Standard: `COACH_MODEL`, sonst `claude-opus-5-5`. Ohne Schlüssel erscheint „Aus Screenshot übernehmen“ nicht, die Preisseite verkauft den Import dann nicht (`coachAi: false`) | Functions |
 
 `.env.example` listet dieselben Namen (ein Test stellt sicher, dass dort jede Variable steht, die App oder Functions
 lesen). Die `HYBLOCK_*`-Zeilen sind reserviert und werden derzeit von keiner Function gelesen.

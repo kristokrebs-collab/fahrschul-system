@@ -17,6 +17,7 @@
  * | `ExchangeHost` | P11 | connect / dry-run / CSV sheets, server pulls (CSV works without cloud) |
  * | `SocialHost` | P12 | the share sheet |
  * | `ReplayHost`, `ExcursionBackfillHost` | P06 | trade replay sheet, idle MAE / MFE backfill |
+ * | `ShotImportHost` | F29 | the lazy preview sheet of „Aus Screenshot übernehmen“ + the pill for queued drafts |
  * | `BoxSnapBackfillHost` | P02 | idle Box-zu-Box context at entry for synced / imported trades and other pairs (F02) |
  */
 import { lazy, Suspense, type ReactNode } from "react";
@@ -28,6 +29,7 @@ import type { Feature } from "@/billing/types";
 import { BillingHost } from "@/billing/ui/BillingHost";
 import { ExchangeHost } from "@/exchanges/ExchangeHost";
 import { ExcursionBackfillHost } from "@/journal/ExcursionBackfillHost";
+import { ShotImportHost } from "@/journal/extract/ShotImportHost";
 import { BoxAlertHost } from "@/market/boxes/alerts";
 import { BoxSnapBackfillHost } from "@/market/boxes/BoxSnapBackfillHost";
 import { SocialHost } from "@/social/ui/SocialHost";
@@ -113,6 +115,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Box-Kontext">
         <BoxSnapBackfillHost />
+      </HostSlot>
+      <HostSlot name="Screenshot-Import">
+        <ShotImportHost />
       </HostSlot>
     </>
   );

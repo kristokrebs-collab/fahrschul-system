@@ -50,6 +50,7 @@ export const FEATURE_INFO: Readonly<Record<Feature, FeatureInfo>> = {
   growth: { label: "Ziele & Gewohnheiten", pitch: "Challenges, Streaks und Routinen, die dich dranbleiben lassen.", group: "coach" },
   backtestLab: { label: "Backtest-Labor", pitch: "Strategien gegen Historie testen – Walk-Forward inklusive.", group: "tools" },
   customDashboards: { label: "Eigene Dashboards", pitch: "Cockpit-Layouts genau für deinen Workflow.", group: "tools" },
+  shotExtract: { label: "Screenshot-Import", pitch: "Liest Einstieg, Ausstieg, Stop und Ergebnis aus Börsen-Screenshots – du prüfst nur die unsicheren Werte.", group: "tools" },
   community: { label: "Community", pitch: "Gruppen und Ranglisten – anonym und nur mit Zustimmung.", group: "team" },
   mentor: { label: "Mentor-Modus", pitch: "Trades gezielt mit Mentor oder Schülern teilen.", group: "team" },
 };
@@ -68,7 +69,7 @@ const PRO_FEATURES: readonly Feature[] = [
   "boxScanner",
   "growth",
 ];
-const PREMIUM_FEATURES: readonly Feature[] = [...PRO_FEATURES, "apiAccess", "coachAi", "reportsPdf", "backtestLab", "mentor", "customDashboards"];
+const PREMIUM_FEATURES: readonly Feature[] = [...PRO_FEATURES, "apiAccess", "coachAi", "reportsPdf", "backtestLab", "mentor", "customDashboards", "shotExtract"];
 
 /** Which plan includes which feature (owner-editable). Every feature must be in `team`. */
 export const PLAN_FEATURES: Readonly<Record<PlanId, ReadonlySet<Feature>>> = {
@@ -80,10 +81,10 @@ export const PLAN_FEATURES: Readonly<Record<PlanId, ReadonlySet<Feature>>> = {
 
 /** Numeric limits per plan (`Infinity` = unlimited; owner-editable). Team limits are per seat. */
 export const PLAN_LIMITS: Readonly<Record<PlanId, Readonly<Record<LimitKey, number>>>> = {
-  free: { exchangeConnections: 0, screenshotStorageMb: 0, savedViews: 3, dashboards: 1, groups: 1, coachAiPerDay: 0 },
-  pro: { exchangeConnections: 1, screenshotStorageMb: 2048, savedViews: 25, dashboards: 3, groups: 3, coachAiPerDay: 0 },
-  premium: { exchangeConnections: 5, screenshotStorageMb: 20480, savedViews: Infinity, dashboards: Infinity, groups: 10, coachAiPerDay: 50 },
-  team: { exchangeConnections: 5, screenshotStorageMb: 20480, savedViews: Infinity, dashboards: Infinity, groups: Infinity, coachAiPerDay: 50 },
+  free: { exchangeConnections: 0, screenshotStorageMb: 0, savedViews: 3, dashboards: 1, groups: 1, coachAiPerDay: 0, shotExtractPerDay: 0 },
+  pro: { exchangeConnections: 1, screenshotStorageMb: 2048, savedViews: 25, dashboards: 3, groups: 3, coachAiPerDay: 0, shotExtractPerDay: 0 },
+  premium: { exchangeConnections: 5, screenshotStorageMb: 20480, savedViews: Infinity, dashboards: Infinity, groups: 10, coachAiPerDay: 50, shotExtractPerDay: 30 },
+  team: { exchangeConnections: 5, screenshotStorageMb: 20480, savedViews: Infinity, dashboards: Infinity, groups: Infinity, coachAiPerDay: 50, shotExtractPerDay: 30 },
 };
 
 export const LIMIT_INFO: Readonly<Record<LimitKey, { label: string; unit?: string }>> = {
@@ -93,6 +94,7 @@ export const LIMIT_INFO: Readonly<Record<LimitKey, { label: string; unit?: strin
   dashboards: { label: "Dashboards" },
   groups: { label: "Gruppen" },
   coachAiPerDay: { label: "KI-Coach pro Tag" },
+  shotExtractPerDay: { label: "Screenshot-Import pro Tag" },
 };
 
 /* ------------------------------------------------------------------ catalog */
@@ -169,8 +171,10 @@ export interface Offer {
   coachAi: boolean;
 }
 
-export const featureOffered = (f: Feature, o: Offer): boolean => f !== "coachAi" || o.coachAi;
-export const limitOffered = (k: LimitKey, o: Offer): boolean => k !== "coachAiPerDay" || o.coachAi;
+// `Offer.coachAi` = "the server has an AI key" (`ANTHROPIC_API_KEY`): the screenshot import (vision) needs the same key.
+const NEEDS_AI_KEY: readonly (Feature | LimitKey)[] = ["coachAi", "coachAiPerDay", "shotExtract", "shotExtractPerDay"];
+export const featureOffered = (f: Feature, o: Offer): boolean => !NEEDS_AI_KEY.includes(f) || o.coachAi;
+export const limitOffered = (k: LimitKey, o: Offer): boolean => !NEEDS_AI_KEY.includes(k) || o.coachAi;
 
 /** The plan's highlights as they can honestly be sold right now. */
 export function highlightsFor(plan: PlanId, o: Offer): string[] {

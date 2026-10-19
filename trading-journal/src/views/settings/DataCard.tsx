@@ -15,6 +15,7 @@ import { readQuarantine } from "@/store/migrate";
 import { KEYS } from "@/store/storage";
 import { ActionButton, GlyphDownload } from "./fx";
 import { IntroPref } from "./IntroPref";
+import { ExtractSettingsNote } from "@/journal/extract/ExtractSettingsNote";
 import { exportJsonWithShots, localShotCount } from "@/journal/screenshots/backupShots";
 
 export const DATA_STRINGS = {
@@ -183,6 +184,8 @@ export function DataCard({ onImport, className }: DataCardProps) {
           )}
         </div>
       )}
+
+      <ExtractSettingsNote />
 
       <IntroPref />
 
