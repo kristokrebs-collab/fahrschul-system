@@ -20,11 +20,15 @@
  *    bar's close can never fill inside the same bar.
  *
  * The equity is marked to market at every close (realised + booked partials + open P&L − the entry fee).
+ *
+ * Resumable (F23, forward test): `keepOpen` leaves a position open at the window's end and still decides at its last
+ * close; the `carry` of the result (plain JSON) lets a later call continue with the next bar (`resume`). Chunked calls
+ * give exactly the trades of one pass over all bars (tested as a property); `flatten` ends the account at the last close.
  */
 import { feeFor, fundingCost } from "./fees";
 import { slipDistance, slipped } from "./slippage";
 import { indexAtOrAfter } from "./bars";
-import type { Bar, BtPartial, BtStrategy, BtTrade, EngineCfg, EntrySignal, EquityPoint, ExitReason, OpenPosition, PositionMgmt, RunResult } from "./types";
+import type { Bar, BtPartial, BtStrategy, BtTrade, CarryPending, EngineCarry, EngineCfg, EntrySignal, EquityPoint, ExitReason, OpenPosition, PositionMgmt, RunResult } from "./types";
 
 /** Smallest stop distance the engine accepts, as a share of the price (a 0-risk trade would get an absurd size). */
 export const MIN_RISK_FRAC = 0.0005;
@@ -39,12 +43,21 @@ export interface RunOptions {
   atr?: readonly number[];
   /** bar length in seconds (for times in ms of the exit at a close) */
   secLen: number;
+  /** forward test: do not close the position at the window's end and decide at its last close; the result's `carry` continues the run */
+  keepOpen?: boolean;
+  /** state of an earlier call (`RunResult.carry`): this call continues at `from`; a `from` beyond the last bar means nothing new */
+  resume?: EngineCarry | null;
+  /** with `keepOpen`: close an open position at the window's last close (reason "end") and drop the pending order – the account ends there */
+  flatten?: boolean;
 }
 
-interface Pending {
-  kind: "entry" | "exit";
-  signal?: EntrySignal;
-  reason?: string;
+type Pending = CarryPending;
+
+/** Marked-to-market equity of a carry at price `close` (realised + booked parts + open P&L − the entry fee). */
+export function carryEquity(c: EngineCarry, close: number): number {
+  const p = c.pos;
+  if (!p) return c.realised;
+  return c.realised + p.booked + (p.side === "long" ? 1 : -1) * (close - p.entry) * p.qty - c.entryFee;
 }
 
 const ms = (s: number): number => s * 1000;
@@ -76,21 +89,32 @@ const rPrice = (p: { side: "long" | "short"; entry: number; stop0: number }, r: 
 /** Runs `strategy` over `bars` with `cfg`. */
 export function runBacktest(bars: readonly Bar[], strategy: BtStrategy, cfg: EngineCfg, opts: RunOptions): RunResult {
   const n = bars.length;
-  const from = Math.max(0, Math.min(n - 1, opts.from ?? 0));
-  const to = Math.max(from, Math.min(n - 1, opts.to ?? n - 1));
+  const resume = opts.resume ?? null;
+  const keepOpen = opts.keepOpen === true;
+  // a resumed call whose first bar lies beyond the series has nothing new: the loop below does not run
+  const idle = resume != null && (opts.from ?? 0) > n - 1;
+  const from = idle ? n : Math.max(0, Math.min(n - 1, opts.from ?? 0));
+  const to = idle ? n - 1 : Math.max(from, Math.min(n - 1, opts.to ?? n - 1));
   const withEquity = opts.equity !== false;
   const { fees: feeModel, slippage, funding } = cfg.costs;
   const atrAt = (i: number): number | null => (opts.atr && i >= 0 && i < opts.atr.length ? (opts.atr[i] ?? null) : null);
   const trades: BtTrade[] = [];
   const equity: EquityPoint[] = [];
-  let realised = cfg.capital;
+  let realised = resume ? resume.realised : cfg.capital;
   let pos: LivePos | null = null;
-  let entryFee = 0;
-  let entrySlip = 0;
-  let pending: Pending | null = null;
-  let skippedGap = 0;
-  let skippedRisk = 0;
-  let signals = 0;
+  let entryFee = resume ? resume.entryFee : 0;
+  let entrySlip = resume ? resume.entrySlip : 0;
+  let pending: Pending | null = resume?.pending ? { ...resume.pending } : null;
+  let skippedGap = resume ? resume.skippedGap : 0;
+  let skippedRisk = resume ? resume.skippedRisk : 0;
+  let signals = resume ? resume.signals : 0;
+  if (resume?.pos) {
+    const { entryT, ...rest } = resume.pos;
+    const k = indexAtOrAfter(bars, entryT);
+    // the entry bar must be in this series, else the carry does not belong to it
+    if (k >= n || bars[k]!.t !== entryT) throw new Error("engine carry does not match the bars");
+    pos = { ...rest, entryIndex: k, parts: rest.parts.map((x) => ({ ...x })) };
+  }
   const priceAt = (tMs: number): number => {
     const k = Math.max(0, indexAtOrAfter(bars, tMs / 1000 + 1) - 1);
     return bars[Math.min(k, n - 1)]!.c;
@@ -304,7 +328,7 @@ export function runBacktest(bars: readonly Bar[], strategy: BtStrategy, cfg: Eng
     // 2b) management at this close: in force from the next bar on
     if (pos) manageAtClose(i);
     // 3) decisions at this close (never on the window's last bar: there is no next open inside the window)
-    if (i < to) {
+    if (i < to || keepOpen) {
       if (pos) {
         const why = strategy.exitAt?.(i, pos) ?? null;
         if (why) pending = { kind: "exit", reason: why };
@@ -318,6 +342,10 @@ export function runBacktest(bars: readonly Bar[], strategy: BtStrategy, cfg: Eng
     } else if (pos) {
       close(i, b.c, "end", false, true);
     }
+    if (keepOpen && opts.flatten && i === to) {
+      pending = null;
+      if (pos) close(i, b.c, "end", false, true);
+    }
     if (withEquity) {
       let eq = realised;
       if (pos) {
@@ -327,5 +355,24 @@ export function runBacktest(bars: readonly Bar[], strategy: BtStrategy, cfg: Eng
       equity.push({ t: ms(b.t + opts.secLen), equity: eq });
     }
   }
-  return { trades, equity, from: ms(bars[from]!.t), to: ms(bars[to]!.t + opts.secLen), capital: cfg.capital, skipped: skippedGap + skippedRisk, skippedGap, skippedRisk, signals };
+  // nothing new since the carry: only the account's end can still change something
+  if (idle && opts.flatten && n > 0) {
+    pending = null;
+    if (pos) close(n - 1, bars[n - 1]!.c, "end", false, true);
+  }
+  const result: RunResult = { trades, equity, from: ms(bars[Math.min(from, n - 1)]!.t), to: ms(bars[to]!.t + opts.secLen), capital: cfg.capital, skipped: skippedGap + skippedRisk, skippedGap, skippedRisk, signals };
+  if (keepOpen) {
+    const lp = pos as LivePos | null;
+    result.carry = {
+      realised,
+      entryFee,
+      entrySlip,
+      pos: lp ? { ...lp, entryT: bars[lp.entryIndex]!.t, parts: lp.parts.map((x) => ({ ...x })) } : null,
+      pending: pending ? { ...pending } : null,
+      signals,
+      skippedGap,
+      skippedRisk,
+    };
+  }
+  return result;
 }

@@ -228,4 +228,48 @@ export interface RunResult {
   skippedRisk: number;
   /** entry signals the strategy handed over while flat (executed + skipped, minus orders cancelled by the window end) */
   signals: number;
+  /** forward test (`RunOptions.keepOpen`): the state to continue with */
+  carry?: EngineCarry;
+}
+
+// ── resumable runs (F23, forward test) ────────────────────────────────────────────────────────────────────────
+
+/** The pending order of the engine: decided at a close, filled at the next open. */
+export interface CarryPending {
+  kind: "entry" | "exit";
+  signal?: EntrySignal;
+  reason?: string;
+}
+
+/** The open position in the carry: `entryT` (open time of the entry bar, seconds) stands for the bar index, which depends on the series. */
+export interface CarryPos extends OpenPosition {
+  entryT: number;
+  stop0: number;
+  qty0: number;
+  manage: PositionMgmt | null;
+  /** best price since the fill */
+  peak: number;
+  stopBy: "none" | "be" | "trail";
+  beDone: boolean;
+  partialDone: boolean;
+  partialPx: number | null;
+  booked: number;
+  partFees: number;
+  partFunding: number;
+  partNotional: number;
+  parts: BtPartial[];
+}
+
+/** Everything the engine needs to continue after a window: plain data, safe to store as JSON. */
+export interface EngineCarry {
+  /** start capital plus the net P&L of the closed trades */
+  realised: number;
+  entryFee: number;
+  entrySlip: number;
+  pos: CarryPos | null;
+  pending: CarryPending | null;
+  /** counters over all calls so far */
+  signals: number;
+  skippedGap: number;
+  skippedRisk: number;
 }
