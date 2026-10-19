@@ -806,7 +806,7 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     page: "coach",
     anchor: { testid: "missed-card" },
     keywords: ["verpasst", "nicht gehandelt", "ausgelassen", "Signalarchiv", "Beobachten", "regelgerecht", "Merkmale", "Gewinner", "Verlierer", "Gegenbeispiele"],
-    status: "fertig",
+    status: "teilweise",
     note: "Das Archiv beginnt mit der Nutzung (lokal, nur bei geöffneter App, 300 Ereignisse / 120 Tage) und lässt sich nicht nachtragen. Der Merkmalsvergleich gilt nur unter den verpassten Signalen, nennt Stichprobe und Gegenbeispiele und behauptet keine Ursache.",
     gate: "coach",
   },
