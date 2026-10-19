@@ -74,7 +74,7 @@ test.describe("Idee testen · TradingView", () => {
 
     const file = page.getByTestId("labor-tv-file");
     await file.setInputFiles({ name: "trades.csv", mimeType: "text/csv", buffer: Buffer.from(EN) });
-    await expect(page.getByTestId("labor-tv-summary")).toContainText("1 Trade gelesen");
+    await expect(page.getByTestId("labor-tv-summary")).toContainText("2 Trades gelesen, davon 1 offen");
     await expect(page.getByTestId("labor-tv-summary")).toContainText("1 Zeile nicht lesbar");
     await expect(page.getByTestId("labor-tv-errors")).toContainText("Zeile 4");
     await expect(page.getByTestId("labor-tv-errors")).toContainText("Preis „abc“ ist keine Zahl");

@@ -290,7 +290,7 @@ function kindOf(type: string): RowKind | null {
 export function parseTvTrades(text: string, opts: TvParseOptions = {}): TvParseResult {
   const offset = opts.utcOffsetMinutes ?? 0;
   const out: TvParseResult = { trades: [], errors: [], errorsCut: false, warnings: [], currency: null, delimiter: null, language: "unknown", rows: 0 };
-  const body = text.replace(/^﻿/, "");
+  const body = text.replace(/^\ufeff/, "");
   const err = (line: number, message: string) => {
     if (out.errors.length < MAX_ERRORS) out.errors.push({ line, message });
     else out.errorsCut = true;
