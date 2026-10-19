@@ -234,11 +234,11 @@ test.describe("Chart spiegeln", () => {
           const ids = Object.keys(now).filter((id) => id in before.centres);
           const ok = ids.length > 0 && ids.every((id) => Math.abs((before.centres[id] ?? 0) - (now[id] ?? 1e9)) < 2);
           // the values travel with the result: a CI failure then says what was compared
-          return { ok, before: before.centres, now };
+          return ok ? "ok" : JSON.stringify({ before: before.centres, now });
         },
         { timeout: 20_000 },
       )
-      .toMatchObject({ ok: true });
+      .toBe("ok");
 
     await revealed.getByTestId("bias-done").click();
     await expect(ctl.getByTestId("bias-panel")).toHaveCount(0);
