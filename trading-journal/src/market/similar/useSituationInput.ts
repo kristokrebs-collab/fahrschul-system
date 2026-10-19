@@ -32,7 +32,7 @@ export function useSituationInput(tf: KeyTf): SituationInput {
   const healthKey = useHealthSelect((h) => `${h.feeds[feed]?.state ?? ""}|${h.feeds[feed]?.reason ?? ""}|${h.feeds[feed]?.detail ?? ""}`);
   return useMemo((): SituationInput => {
     const avail = timeframeAvailability(feedAvailability(provider)).find((a) => a.tf === tf)!;
-    if (!provider) return { state: "idle", symbol: null, avail, candles: null, now: Date.now(), key: "" };
+    if (!provider) return { state: "idle", symbol: null, avail, candles: null, now: 0, key: "" };
     const symbol = provider.symbolInfo.binance;
     const candles = avail.ok ? levelCandles(provider, tf) : null;
     return { state: candles ? "ok" : "waiting", symbol, avail, candles, now: provider.serverNow(), key: `${symbol}|${tf}|${barKey}` };
