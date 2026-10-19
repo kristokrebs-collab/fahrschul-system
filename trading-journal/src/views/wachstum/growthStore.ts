@@ -59,6 +59,8 @@ interface GrowthUi {
   checkinOpen: boolean;
   /** day the check-in sheet edits (`YYYY-MM-DD`) */
   checkinDay: string | null;
+  /** the sheet was opened by the daily prompt (`DailyCheckinHost`): Später / Heute überspringen / Erledigt */
+  checkinDaily: boolean;
   goalOpen: boolean;
   /** post-trade review: the trade on screen and the waiting ones (oldest first) */
   reviewId: string | null;
@@ -74,7 +76,7 @@ interface GrowthUi {
   /** records that became new this session (TextScramble + burst once) */
   newBests: string[];
 
-  openCheckin(day: string): void;
+  openCheckin(day: string, daily?: boolean): void;
   closeCheckin(): void;
   openGoal(): void;
   closeGoal(): void;
@@ -97,6 +99,7 @@ interface GrowthUi {
 export const useGrowthUi = create<GrowthUi>()((set, get) => ({
   checkinOpen: false,
   checkinDay: null,
+  checkinDaily: false,
   goalOpen: false,
   reviewId: null,
   queue: [],
@@ -108,7 +111,7 @@ export const useGrowthUi = create<GrowthUi>()((set, get) => ({
   levelUp: null,
   newBests: [],
 
-  openCheckin: (day) => set({ checkinOpen: true, checkinDay: day }),
+  openCheckin: (day, daily = false) => set({ checkinOpen: true, checkinDay: day, checkinDaily: daily }),
   closeCheckin: () => set({ checkinOpen: false }),
   openGoal: () => set({ goalOpen: true }),
   closeGoal: () => set({ goalOpen: false }),

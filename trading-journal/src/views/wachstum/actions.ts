@@ -5,26 +5,62 @@
  * `withGrowthPatch` – unknown keys kept, `merge3` merges devices per id).
  */
 import { addGoalFromDraft, sameGoal, activeGoalsOf, withGrowthItem, withGrowthPatch, type Challenge, type Goal, type GoalDraft, type Habit } from "@/domain/growth";
-import { checkinInput, dayIsEmptyWithout, habitInput, type CheckIn, type Level5 } from "@/domain/psych";
+import { checkinConfigOf, dayKeyIn, deviceTimeZone, effectiveTimeZone, withCheckinConfig, type ConfigPatch } from "@/domain/checkin";
+import { checkinInput, checkinStatusOf, dailyCheckinInput, dayIsEmptyWithout, EMPTY_CHECKIN, habitInput, type CheckIn, type CheckinStatus, type Level5 } from "@/domain/psych";
 import type { Settings, Trade, TradePsych } from "@/domain/types";
 import { newId } from "@/lib/ids";
 import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
+import { DAILY } from "./checkinStrings";
 import { WACHSTUM } from "./strings";
 
 const fail = (title: string) => pushToast({ kind: "error", title, detail: "Bitte noch einmal versuchen." });
 
-/** Saves (or clears) the check-in + mood of `day`. Resolves `true` on success. */
-export async function saveCheckin(day: string, c: CheckIn, mood: Level5 | null): Promise<boolean> {
+/** Today's key in the zone the trader configured for the check-in (the device's zone when none). */
+export function checkinToday(now: number = Date.now()): string {
+  return dayKeyIn(now, effectiveTimeZone(checkinConfigOf(useJournal.getState().settings), deviceTimeZone()));
+}
+
+/**
+ * Saves (or clears) the check-in + mood of `day`. Resolves `true` on success. A save carries how the prompt ended
+ * (`status`, default "done") and the bookkeeping of `dailyCheckinInput` (`firstAt`, `editedAt`, `late`). Clearing TODAY's
+ * check-in writes "skipped" instead of removing it – the daily prompt must not come back for what the trader just cleared;
+ * clearing an earlier day removes the entry (or just the check-in when the day has more).
+ */
+export async function saveCheckin(day: string, c: CheckIn, mood: Level5 | null, opts: { status?: CheckinStatus; clear?: boolean; now?: number } = {}): Promise<boolean> {
   const st = useJournal.getState();
-  const input = checkinInput(c, mood, Date.now());
+  const now = opts.now ?? Date.now();
+  const todayKey = checkinToday(now);
+  const clear = opts.clear === true;
   try {
-    if (input.checkin == null && mood == null && dayIsEmptyWithout(st.days[day], ["checkin", "mood"])) {
-      if (st.days[day]) await st.deleteDay(day);
-    } else await st.saveDay(day, input);
+    if (clear && day !== todayKey) {
+      if (dayIsEmptyWithout(st.days[day], ["checkin", "mood"])) {
+        if (st.days[day]) await st.deleteDay(day);
+      } else await st.saveDay(day, checkinInput({ ...EMPTY_CHECKIN, emotions: [], habits: {} }, null, now));
+      return true;
+    }
+    const answers = clear ? { ...EMPTY_CHECKIN, emotions: [], habits: {} } : c;
+    await st.saveDay(day, dailyCheckinInput(st.days[day], answers, clear ? null : mood, { now, day, todayKey, status: clear ? "skipped" : (opts.status ?? "done") }));
     return true;
   } catch {
     fail(WACHSTUM.checkin.failed);
+    return false;
+  }
+}
+
+/** "Heute überspringen": the day's outcome is written (and synced) – no other device asks again. Never over answers. */
+export async function skipCheckin(day: string, now: number = Date.now()): Promise<boolean> {
+  if (checkinStatusOf(useJournal.getState().days[day]) != null) return true;
+  return saveCheckin(day, { ...EMPTY_CHECKIN, emotions: [], habits: {} }, null, { status: "skipped", now });
+}
+
+/** The check-in settings (`settings.checkin`) through the synced settings path. */
+export async function saveCheckinConfig(patch: ConfigPatch): Promise<boolean> {
+  try {
+    await useJournal.getState().saveSettings(withCheckinConfig(useJournal.getState().settings, patch));
+    return true;
+  } catch {
+    fail(DAILY.settings.failed);
     return false;
   }
 }

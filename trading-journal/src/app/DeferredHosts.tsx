@@ -12,6 +12,7 @@
  * | `ReportReadyHost` | P04 | "Bericht bereit" wipe → Berichte (checks `reports` itself) |
  * | `RiskGuardHost` | P05 | limit / cooldown toasts after a save (gate `riskLive`) |
  * | `PostTradeReviewHost` | P08 | review prompt for closed trades + the review sheet (gate `growth`) |
+ * | `DailyCheckinHost` | F61 | the daily check-in dialog at the first open of the day + the check-in sheet (gate `growth`) |
  * | `BillingHost` | P10 | upgrade / cancel sheets, Stripe return, `?ref=` (inert without billing) |
  * | `ExchangeHost` | P11 | connect / dry-run / CSV sheets, server pulls (CSV works without cloud) |
  * | `SocialHost` | P12 | the share sheet |
@@ -34,6 +35,7 @@ import { ReportReadyHost } from "@/views/berichte/ReportReady";
 import { CoachWatcher } from "@/views/coach/CoachWatcher";
 import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
 import { ReplayHost } from "@/views/trades/replay/TradeReplay";
+import { DailyCheckinHost } from "@/views/wachstum/DailyCheckinHost";
 import { PostTradeReviewHost } from "@/views/wachstum/PostTradeReview";
 
 // e2e only (`src/app/e2eHooks.ts`): the risk guard's store (override / marks)
@@ -77,6 +79,11 @@ export default function DeferredHosts() {
       <HostSlot name="Trade-Review">
         <Entitled feature="growth">
           <PostTradeReviewHost />
+        </Entitled>
+      </HostSlot>
+      <HostSlot name="Täglicher Check-in">
+        <Entitled feature="growth">
+          <DailyCheckinHost />
         </Entitled>
       </HostSlot>
       <HostSlot name="Teilen">

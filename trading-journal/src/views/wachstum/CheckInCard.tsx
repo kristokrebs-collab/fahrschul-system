@@ -4,13 +4,14 @@
  * review) with "Jetzt reviewen" (the post-trade review sheet, newest first).
  */
 import { motion } from "motion/react";
-import { emotionTone, ENERGY_LABELS, MOOD_LABELS, STRESS_LABELS } from "@/domain/psych";
+import { checkinStatusOf, emotionTone, ENERGY_LABELS, MOOD_LABELS, STRESS_LABELS } from "@/domain/psych";
 import { cn } from "@/lib/cn";
 import { RollingDigits } from "@/motion/RollingDigits";
 import { spring, stagger } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
+import { DAILY } from "./checkinStrings";
 import { useGrowthUi } from "./growthStore";
 import type { TodayState } from "./hooks";
 import { WACHSTUM } from "./strings";
@@ -76,8 +77,10 @@ export function CheckInCard({ today }: { today: TodayState }) {
   const openReview = useGrowthUi((s) => s.openReview);
   const { checkin: c, mood, unreviewed } = today;
   const has = !!c || mood != null;
+  // "Heute überspringen" is an outcome, not a check-in: said so, never shown as a good day
+  const skipped = !has && checkinStatusOf(today.note) === "skipped";
   return (
-    <Card title="Check-in" note={has ? "Heute eingecheckt" : undefined} data-testid="growth-checkin" data-has={has ? "1" : "0"}>
+    <Card title="Check-in" note={has ? "Heute eingecheckt" : skipped ? DAILY.skippedNote : undefined} data-testid="growth-checkin" data-has={has ? "1" : "0"} data-skipped={skipped ? "1" : "0"}>
       {/* row rule (P1-08): the free height of the taller neighbour goes above the review footer, which sits at the bottom */}
       <div className="flex flex-1 flex-col gap-4">
         <div className="flex items-center gap-4">
