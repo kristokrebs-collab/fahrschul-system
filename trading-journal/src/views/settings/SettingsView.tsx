@@ -15,6 +15,7 @@ import { Card } from "@/primitives/Card";
 import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { useJournal } from "@/store/journalStore";
+import { navigate } from "@/store/router";
 import { storageKey } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
 import { PageHeader } from "@/views/setups/PageHeader";
@@ -395,6 +396,13 @@ const TriggerCard = memo(function TriggerCard(props: DraftCardProps) {
         <SymbolField label={S.symbol} help={S.symbolHelp} value={props.draft.symbol ?? ""} onChange={props.onChange} changed={props.changed.has("symbol")} />
         <DraftFields fields={TRIGGER_FIELDS} {...props} />
       </div>
+      <p className="mt-4 text-[11.5px] leading-snug text-faint" data-testid="settings-keylevels-hint">
+        Mehr Level, eigene Zeiteinheiten und Regeln (Berührung, Schluss, Retest …):{" "}
+        <button type="button" onClick={() => navigate("markt")} className="touch-hit text-mute underline-offset-2 hover:text-fg hover:underline">
+          Schlüsselmarken auf der Markt-Seite
+        </button>
+        .
+      </p>
     </Card>
   );
 });

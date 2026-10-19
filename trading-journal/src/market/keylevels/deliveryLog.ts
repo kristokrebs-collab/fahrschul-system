@@ -6,7 +6,7 @@
  * Browser storage can be empty or blocked (private window): the log then lives in memory for the session.
  */
 import { useSyncExternalStore } from "react";
-import { appendDelivery, DELIVERY_LOG_CAP, parseDeliveryLog, type DeliveryRecord } from "@/domain/keylevels";
+import { appendDelivery, DELIVERY_LOG_CAP, parseDeliveryLog, type DeliveryRecord } from "@/domain/keylevels/delivery";
 import { newId } from "@/lib/ids";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 

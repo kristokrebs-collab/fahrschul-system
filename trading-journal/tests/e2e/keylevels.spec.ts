@@ -10,9 +10,11 @@
  * - the signal card carries „Warum handeln oder auslassen?“ with its four groups;
  * - no console errors, no horizontal scroll, touch targets ≥ 44 px on the touch project.
  */
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, fixture, hasTouch, openRoute, seed, stored } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
+import { openUx } from "./uxHarness";
 
 const MARKT_URL = process.env.PW_MARKT_URL ?? "/#markt";
 const KL_PROJECTS = ["mobile", "desktop"];
@@ -193,4 +195,28 @@ test.describe("Warum handeln oder auslassen? (Übersicht)", () => {
     if ((await why.getAttribute("data-decision")) === "skip") await expect(page.getByTestId("why-score-note")).toContainText("Score");
     expect(errors).toEqual([]);
   });
+});
+
+test.describe("Schlüsselmarken · Barrierefreiheit (axe)", () => {
+  test.setTimeout(120_000);
+  test.beforeEach(({ page }, info) => {
+    void page;
+    test.skip(!KL_PROJECTS.includes(info.project.name), "runs on mobile + desktop");
+  });
+
+  for (const theme of ["dark", "light"] as const) {
+    test(`Marken (mit Editor), Tagesplan und Alarme (${theme})`, async ({ page }) => {
+      await openUx(page, "app", "markt", { theme, boxes: true });
+      await expect(page.getByTestId("markt-view")).toHaveAttribute("data-state", "ok", { timeout: 30_000 });
+      await page.getByTestId("keylevel-add").click();
+      await expect(page.getByTestId("keylevel-editor")).toBeVisible();
+      await page.waitForTimeout(900); // entrances settle: contrast is measured on the final colours
+      for (const id of ["keylevels-card", "plan-card", "alerts-card"]) {
+        await page.getByTestId(id).scrollIntoViewIfNeeded();
+        const res = await new AxeBuilder({ page }).include(`[data-testid="${id}"]`).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+        const lines = res.violations.map((v) => `${v.id} (${v.impact}): ${v.help} → ${v.nodes.slice(0, 4).map((n) => n.target.join(" ")).join(" | ")}`);
+        expect(lines, `${id}: axe violations`).toEqual([]);
+      }
+    });
+  }
 });

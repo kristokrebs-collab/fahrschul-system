@@ -361,7 +361,9 @@ test.describe("chart", () => {
     const withSr = await settledPrint(card);
     await toggle("sr").click();
     await expect(toggle("sr")).toHaveAttribute("aria-pressed", "false");
-    await expect.poll(async () => changed(withSr, await canvasPrint(card)), { timeout: 5_000, message: "S/R lines removed from the canvas" }).toBeGreaterThan(30);
+    // the S/R lines are ~30 sampled pixels on a phone (31 in the measured build, 28 after a 0.1 px layout shift above the
+    // chart); a settled chart differs by < 3 (see `settledPrint`), so 20 still means "the lines are gone"
+    await expect.poll(async () => changed(withSr, await canvasPrint(card)), { timeout: 5_000, message: "S/R lines removed from the canvas" }).toBeGreaterThan(20);
     await expect.poll(async () => (await stored<{ flags?: Record<string, unknown> }>(page, "tj2-ui"))?.flags?.chartSrOff).toBe(true);
     await toggle("sr").click();
     await expect(toggle("sr")).toHaveAttribute("aria-pressed", "true");
