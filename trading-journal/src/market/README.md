@@ -467,3 +467,15 @@ time, market and side – the input of the „Verpasste Chancen“ card (`@/doma
 (`storageKey("signal-events")`), versioned `{ v: 1, items }`, the newest 300 / 120 days, this device only (not in the backup, not
 synced); a stored newer version is never overwritten. `recordSignalEvent` is called next to `logExternalDelivery` in
 `signals/notify.ts` and `boxes/alerts.ts` and after `recordDelivery` in `keylevels/alerts.ts`; it never throws.
+
+## Preis- und RSI-Struktur live (`trendlines/`, F05)
+
+Pure engine: `@/domain/trendlines`. `store.ts` (`useTrendlines` / `getTrendlines` / `subscribeTrendlines` /
+`retainTrendlines`, pattern of `keylevels/store.ts`) reads the selected timeframes of `settings.trendlines`, takes the REAL
+candles of each (`keylevels/candles.ts` `levelCandles`: 1h / 4h / 1D / 1W straight from their feeds, 30m from 15m, 2h / 3h
+from 1h) and runs `analyzeTrendlines` on the closed ones; a timeframe `timeframeAvailability` cannot serve is listed with
+its German reason and not analysed (nothing substituted). One 1 s timer, recompute only when a used feed's bar key, the
+minute or the settings changed, publish only a changed view; nothing runs without a subscriber. `useTrendView(on)` is the
+lazy consumer (store imported on demand, own chunk) for the chart; `write.ts` saves `settings.trendlines` at once.
+Import from `@/market/trendlines/<file>` (the index re-exports the store, so eager code must not use it). Tests:
+`tests/unit/market.trendlines.test.ts`.

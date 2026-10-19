@@ -410,3 +410,14 @@ Nicht Abbildbares ist Text, nie ein ausgegrauter Baustein. Der Abschnitt **Tradi
 Zahlen (Kacheln, Differenz Netto) von Beobachtungen („Mögliche Gründe“, immer im Konjunktiv) und nennt Lesefehler mit „Zeile n“ in
 Signalrot-Text, nie als Dialog. Bewegung: nur die vorhandenen `Reveal`-Zellen, nichts Eigenes. Mobil: alle Listen einspaltig, Paare
 als Karten statt Tabelle (kein horizontaler Scroll), Touch-Ziele über `Button` / `ChipPick` (≥ 44 px bei grobem Zeiger).
+
+### Preis- & RSI-Struktur (F05)
+
+Keine neue Sprache: eine `Card` im Raster der Markt-Seite (`lg:col-span-12`), Kopf mit `Label`-Punkt, darunter Chips der Zeiteinheiten
+(`aria-pressed`, Pille wie die Ebenen-Chips der Übersicht, ≥ 44 px auf grobem Zeiger, gewählt = weiße Pille) und je gewählter
+Zeiteinheit eine Zeile (`rounded-xl border-line`) mit zwei Spalten (Preis | RSI, mobil untereinander) und je Linienart einer
+Aussage aus **Punkt + Ton + Wort**: Annäherung (warn), Bruch nach oben/unten (Gewinn-/Verlust-Ton nach Richtung, wie der RSI-Bruchpunkt),
+Retest läuft (warn) / bestätigt (Richtungston) / Bruch zurückgenommen (warn) / ohne Retest (mute), intakt (mute) – nie Farbe allein.
+Nicht lieferbare Zeiteinheiten bleiben als **deaktivierter Chip mit Grund darunter** sichtbar. Im Chart: dünne Linien in der Grauleiter
+(1,1 px, Verlängerung gepunktet), Annäherung `fg` und kräftiger, Bruch im Richtungston mit Kurzbeschriftung auf Platte (`4H ↘ Bruch ↑`);
+Blind-Modus ohne Gewinn-/Verlusttöne. Keine eigene Bewegung der Karte (die Zelle blendet ein); der Chart-Layer ist statisch.

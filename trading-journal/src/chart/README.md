@@ -312,3 +312,15 @@ Fixture: `tests/fixtures/candles-1h.json` (240 hourly BTC-like candles from 2026
 
 Tests: `tests/unit/chart.mirror.test.ts` (mapping, flip-twice property, anchors, RSI view, marker rules),
 `tests/unit/chart.mirror.component.test.tsx` (`invertScale` on the faked chart, no `setData`, RSI legend).
+
+## Preis-Trendlinien (F05)
+
+`primitives/TrendlinePrimitive.ts` draws diagonal price lines given as `ChartTrendline` (two points in ms / price, where the
+solid part ends, an optional dotted extension, tone, a short caption). Geometry is time / price → pixel (`logicalFrac` on the
+bar grid + `logicalToX`, `series.priceToCoordinate`), so it is independent of the chart's interval and follows the mirror
+(`invertScale`) with no code of its own: prices and times never change, only the picture is upside down. Static (no tween,
+no timer); captions on plates placed with `placeLabels` (never over the price-line strip or another label); blind mode draws
+win / loss in the foreground ink (`trendColor`). `NothingCandleChart` takes `priceLines?: ChartTrendline[]` and imports the
+primitive **dynamically** with the first line (own chunk, nothing in the first load); a diagnostics hook `__tjTrend`
+(`lines()`, `geometry()`) sits on the host like `__tjBoxes`. The prop is called `priceLines` because `mirror.trendlines` already
+means the RSI lines. Tests: `tests/unit/chart.trendline.test.ts`.

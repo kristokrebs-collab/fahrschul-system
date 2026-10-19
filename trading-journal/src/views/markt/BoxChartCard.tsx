@@ -6,27 +6,37 @@
  * from the trade stream and the kline frames – never a React render per tick.
  */
 import { themePaint } from "@/lib/themePaint";
+import { cn } from "@/lib/cn";
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ChartSkeleton } from "@/chart/ChartSkeleton";
 import type { BarsListener, RangeDays } from "@/chart/NothingCandleChart";
 import type { ChartInterval } from "@/chart/panes";
 import type { ChartBox } from "@/chart/primitives/BoxPrimitive";
+import type { ChartTrendline } from "@/chart/primitives/TrendlinePrimitive";
 import { lastClosedAnchor } from "@/chart/mirror";
 import { toTradeMarkers } from "@/chart/markers";
 import { BOX_TF_MS, normalizeWatchSymbol, type BoxTf } from "@/domain/boxes";
+import { analyzeTrendlines, trendlinesCfgOf } from "@/domain/trendlines";
+import type { KeyTf } from "@/domain/keylevels";
 import type { BiasContext, BiasTest } from "@/domain/biasTest";
 import { getProvider, priceMv, subscribeFeed, tickDirMv, tradeTimeMv, useFeedSelect, volAccumMv, type Candle, type Stamped } from "@/market";
 import { BOX_FEED, type BoxesView } from "@/market/boxes/store";
 import { useKeyLines } from "@/market/keylevels/chartLines";
+import { useTrendView } from "@/market/trendlines/useTrendView";
+import { writeTrendlines } from "@/market/trendlines/write";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
-import { useEnriched } from "@/store/journalStore";
+import { useEnriched, useJournal } from "@/store/journalStore";
 import { MirrorPanel, useFrozenBars, useMirrorState, visibleMarkers } from "@/views/biasTest";
 import { BIAS } from "@/views/biasTest/strings";
 import { chartBoxesKey, toChartBoxes } from "./chartBoxes";
+import { chartTrendlinesKey, toChartTrendlines } from "./chartTrendlines";
 import { MARKT, TF_TEXT } from "./strings";
+import { TREND } from "./trendStrings";
 
 const NO_BOXES: ChartBox[] = [];
+const NO_LINES: ChartTrendline[] = [];
+const KEY_TF: Readonly<Record<BoxTf, KeyTf>> = { "4h": "4h", "1d": "1D", "1w": "1W" };
 const NothingCandleChart = lazy(() => import("@/chart/NothingCandleChart").then((m) => ({ default: m.NothingCandleChart })));
 
 const S = MARKT.chart;
@@ -53,7 +63,7 @@ function merge(older: readonly Candle[], data: readonly Candle[]): Candle[] {
 }
 
 /** Legend glyphs (decorative). */
-function Glyph({ kind }: { kind: "box" | "brokenUp" | "brokenDown" | "pending" | "target" | "stop" | "rsi" }) {
+function Glyph({ kind }: { kind: "box" | "brokenUp" | "brokenDown" | "pending" | "target" | "stop" | "rsi" | "trend" }) {
   const common = { width: 18, height: 10, viewBox: "0 0 18 10", "aria-hidden": true, className: "shrink-0" } as const;
   if (kind === "box" || kind === "brokenUp" || kind === "brokenDown" || kind === "pending") {
     // a box broken up is drawn in the win tone, one broken down in the loss tone (BoxPrimitive `toneOf`)
@@ -68,7 +78,7 @@ function Glyph({ kind }: { kind: "box" | "brokenUp" | "brokenDown" | "pending" |
   const stroke = kind === "stop" ? "var(--color-loss)" : kind === "target" ? "var(--color-win)" : themePaint("#9b9b9b");
   return (
     <svg {...common}>
-      <path d={kind === "rsi" ? "M1 2 L17 8" : "M1 5 H17"} stroke={stroke} strokeWidth="1.25" strokeDasharray={kind === "target" ? "1.5 2.5" : kind === "stop" ? "4 3" : undefined} strokeLinecap="round" />
+      <path d={kind === "rsi" || kind === "trend" ? "M1 2 L17 8" : "M1 5 H17"} stroke={stroke} strokeWidth="1.25" strokeDasharray={kind === "target" ? "1.5 2.5" : kind === "stop" ? "4 3" : undefined} strokeLinecap="round" />
     </svg>
   );
 }
@@ -81,6 +91,7 @@ const LEGEND: readonly { kind: Parameters<typeof Glyph>[0]["kind"]; label: strin
   { kind: "target", label: S.legendTarget },
   { kind: "stop", label: S.legendStop },
   { kind: "rsi", label: S.legendRsi },
+  { kind: "trend", label: TREND.legend },
 ];
 
 export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesView }) {
@@ -128,6 +139,24 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
   // "Chart spiegeln / Bias prüfen" (F62): the mirror, the layers and – during a test – the frozen picture
   const mirror = useMirrorState("markt");
   const shownCandles = useFrozenBars(candles, mirror.anchorMs);
+  // price trendlines (F05): the store loads only while the switch is on; a frozen bias-test picture computes its own lines
+  // from the frozen bars of the chart's timeframe (nothing after the anchor may shape a line)
+  const trendCfg = trendlinesCfgOf(useJournal((st) => st.settings.trendlines));
+  const trendOn = trendCfg.chart && mirror.view.layers.trendlines;
+  const trendView = useTrendView(trendOn && !mirror.frozen);
+  const trendLines = useMemo(() => {
+    if (!trendOn) return NO_LINES;
+    if (mirror.frozen) {
+      // "now" of the frozen picture = the close of its last bar: the lines of that moment, with no clock involved
+      const lastBar = shownCandles[shownCandles.length - 1];
+      const a = analyzeTrendlines(shownCandles, KEY_TF[tf], lastBar ? lastBar.time + BOX_TF_MS[tf] : 0);
+      return toChartTrendlines([{ tf: KEY_TF[tf], selected: true, avail: { tf: KEY_TF[tf], ok: true, reason: null }, analysis: a }], BOX_TF_MS[tf]);
+    }
+    return trendView ? toChartTrendlines(trendView.items, BOX_TF_MS[tf]) : NO_LINES;
+  }, [trendOn, trendView, tf, mirror.frozen, shownCandles]);
+  const trendKeyed = useMemo(() => ({ key: chartTrendlinesKey(trendLines), lines: trendLines }), [trendLines]);
+  const [trendStable, setTrendStable] = useState(trendKeyed);
+  if (trendStable.key !== trendKeyed.key) setTrendStable(trendKeyed);
   const trades = useEnriched();
   const markers = useMemo(() => {
     if (!mirror.view.layers.trades || !symbol) return undefined;
@@ -147,7 +176,7 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
       action={<Segmented<BoxTf> size="sm" aria-label={S.tf} options={mirror.frozen ? TFS.map((o) => ({ ...o, disabled: o.v !== tf })) : TFS} value={tf} onChange={setTf} />}
       data-testid="markt-chart"
     >
-      <div data-tf={tf} data-boxes={stable.boxes.length}>
+      <div data-tf={tf} data-boxes={stable.boxes.length} data-trendlines={trendStable.lines.length}>
         <Suspense fallback={<ChartSkeleton className="h-[360px] md:h-[480px]" />}>
           <NothingCandleChart
             key={symbol}
@@ -155,6 +184,7 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
             interval={INTERVAL[tf]}
             boxes={mirror.view.layers.boxes ? stable.boxes : NO_BOXES}
             keyLines={keyLines}
+            priceLines={trendStable.lines}
             boxAutoscale
             pane={mirror.view.layers.rsi ? "rsi" : "none"}
             rangeDays={RANGE[tf]}
@@ -178,6 +208,19 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
             {l.label}
           </span>
         ))}
+        <button
+          type="button"
+          aria-pressed={trendCfg.chart}
+          title={TREND.legendHelp}
+          onClick={() => void writeTrendlines({ chart: !trendCfg.chart })}
+          data-testid="chart-trend-toggle"
+          className={cn(
+            "inline-flex items-center rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-[color,border-color,background-color] duration-200 pointer-coarse:min-h-11 pointer-coarse:px-3",
+            trendCfg.chart ? "border-white/25 bg-white/[0.06] text-fg" : "border-line-2 text-faint hover:text-mute",
+          )}
+        >
+          {TREND.chartShort}
+        </button>
       </div>
       <MirrorPanel surface="markt" capture={capture} canResume={canResume} className="mt-3 border-t border-line pt-3" />
     </Card>
