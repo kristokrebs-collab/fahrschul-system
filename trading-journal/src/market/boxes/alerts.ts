@@ -21,6 +21,7 @@ import { fmt } from "@/chart/format";
 import { getBoxes, retainBoxes, subscribeBoxes, type BoxesView } from "./store";
 import { getScan, retainScanner, subscribeScan, type ScanRow } from "./scanner";
 import { logExternalDelivery } from "../keylevels/deliveryLog";
+import { recordSignalEvent } from "../signalArchive";
 
 export const BOX_ALERTS_KEY = storageKey("box-alerts");
 const MAX_SEEN = 200;
@@ -36,6 +37,10 @@ export interface BoxAlert {
   /** device time it fired */
   at: number;
   symbol: string;
+  /** F32: what kind of alert and which way it points, for the signal archive (`setup` / `scan` are entries) */
+  kind?: "breakout" | "retest" | "failed" | "target" | "setup" | "scan";
+  side?: "long" | "short";
+  tf?: BoxTf;
 }
 
 interface AlertCtl {
@@ -97,11 +102,14 @@ export function phaseAlertText(symbol: string, tf: BoxTf, v: BoxesView["tfs"][Bo
       title: `Ausbruch ${dirArrow(st.dir)} · ${where}`,
       detail: `Schluss ${up ? "über" : "unter"} ${priceText(up ? b.top : b.bottom)}${t1 ? ` · Ziel ${priceText(t1.price)} (${t1.label})` : ""}`,
       tone: up ? "win" : "loss",
+      kind: "breakout",
+      side: up ? "long" : "short",
+      tf,
     };
   }
-  if (st.phase === "retest") return { title: `Retest der Kante · ${where}`, detail: `Kante ${priceText(st.dir > 0 ? b.top : b.bottom)} wird getestet${t1 ? ` · Ziel ${priceText(t1.price)}` : ""}`, tone: st.dir > 0 ? "win" : "loss" };
-  if (st.phase === "failed") return { title: `Fehlausbruch · ${where}`, detail: `Zurück in der Box ${priceText(b.bottom)} – ${priceText(b.top)}`, tone: "fg" };
-  if (st.phase === "target") return { title: `Ziel erreicht · ${where}`, detail: t1 ? `${t1.label} bei ${priceText(t1.price)}` : PHASE_LABEL.target, tone: st.dir > 0 ? "win" : "loss" };
+  if (st.phase === "retest") return { title: `Retest der Kante · ${where}`, detail: `Kante ${priceText(st.dir > 0 ? b.top : b.bottom)} wird getestet${t1 ? ` · Ziel ${priceText(t1.price)}` : ""}`, tone: st.dir > 0 ? "win" : "loss", kind: "retest", side: st.dir > 0 ? "long" : "short", tf };
+  if (st.phase === "failed") return { title: `Fehlausbruch · ${where}`, detail: `Zurück in der Box ${priceText(b.bottom)} – ${priceText(b.top)}`, tone: "fg", kind: "failed", tf };
+  if (st.phase === "target") return { title: `Ziel erreicht · ${where}`, detail: t1 ? `${t1.label} bei ${priceText(t1.price)}` : PHASE_LABEL.target, tone: st.dir > 0 ? "win" : "loss", kind: "target", side: st.dir > 0 ? "long" : "short", tf };
   return null;
 }
 
@@ -112,6 +120,8 @@ function canNotify(): boolean {
 function fire(alert: BoxAlert, notify: boolean): void {
   pushToast({ kind: "signal", title: alert.title, detail: alert.detail });
   logExternalDelivery("box", alert.title, alert.detail);
+  // F32: the setups (and the scanner's A+ rows) are entries one could have taken; the phases are context
+  if (alert.kind) recordSignalEvent({ key: `box|${alert.id}`, at: alert.at, source: "box", kind: alert.kind, entry: alert.kind === "setup" || alert.kind === "scan", symbol: alert.symbol, side: alert.side ?? null, tf: alert.tf ?? null, label: alert.title, detail: alert.detail, strength: null, score: null, ref: alert.id });
   ctl.recent = [alert, ...ctl.recent].slice(0, RECENT_MAX);
   for (const l of [...recentListeners]) l();
   if (notify && canNotify() && typeof document !== "undefined" && document.visibilityState !== "visible") {
@@ -164,6 +174,9 @@ export function evaluateBoxes(view: BoxesView, now = Date.now()): BoxAlert[] {
       title: `${s.grade}-Setup · ${s.title} · ${symbol} ${BOX_TF_LABEL[b.tf]}`,
       detail: `Einstieg ${priceText(s.entry)} · Stop ${priceText(s.stop)}${s.rr != null ? ` · CRV ${s.rr.toFixed(1).replace(".", ",")}` : ""}`,
       tone: s.side === "long" ? "win" : "loss",
+      kind: "setup",
+      side: s.side === "long" ? "long" : "short",
+      tf: b.tf,
     });
   }
   ctl.seeded = true;
@@ -207,6 +220,9 @@ function onScan(): void {
         title: `Scanner: A+ · ${r.setup.title} · ${r.symbol} ${BOX_TF_LABEL[r.tf]}`,
         detail: `Einstieg ${priceText(r.setup.entry)} · Stop ${priceText(r.setup.stop)}${r.setup.rr != null ? ` · CRV ${r.setup.rr.toFixed(1).replace(".", ",")}` : ""}`,
         tone: r.setup.side === "long" ? "win" : "loss",
+        kind: "scan",
+        side: r.setup.side === "long" ? "long" : "short",
+        tf: r.tf,
       },
       cfg.notify,
     );

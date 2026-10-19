@@ -383,3 +383,17 @@ ihren Grund als sichtbaren Satz, nicht nur als Tooltip, der Schalter ist deaktiv
 Trades …“), nie eine Ampel. Filterbeiträge tragen immer den Hinweis, dass sie sich überlappen. Der Prüfbericht zeigt Walk-forward und
 Out-of-Sample als zwei statische Streifen (grau = nur Training bzw. Auswahl, hell = ungesehen); keine neue Farbe, keine neue Bewegung.
 Touch: Schalter und Chips bestehen den Hit-Box-Audit (die Chips bekommen auf grobem Zeiger zusätzlich `min-w-11`).
+
+### Wochenreview, Wochenexperiment (F37) und Verpasste Chancen (F32)
+
+Keine neue Sprache. **Wochenreview**: eine `Card`, darin vier Befunde als ruhige Blöcke (`rounded-xl border-line bg-ink-950/50`): Mono-Versal-Titel
+und die Stichprobe („n 6“) in einer Zeile, darunter der eine Satz, der zählt (Ton nur nach Vorzeichen des Ergebnisses, die Unsicherheit bleibt
+immer `mute`), die Zahlen als Fließtext in `text-mute`. Zu jedem Befund öffnen Pillen-Schaltflächen („Regelverstöße · 2 Trades öffnen“,
+`aria-expanded`) die Trades als Zeilen – kein Dauer-Auf, keine Bewegung außer dem Aufklappen. **Wochenexperiment**: der Status ist ein Badge
+mit Punkt **und** Wort (erfüllt = win, nicht erfüllt = loss, zu wenig Daten = mute, läuft = warn), nie Farbe allein; der Sollwert steht als
+eigener Satz in einem umrandeten Feld („Nächste Woche: … – bei mindestens 5 Trades.“). „Annehmen“ ist der einzige primäre Knopf der Karte,
+„Ablehnen“ ghost; beides ist umkehrbar („Zurückziehen“, „Wieder öffnen“). Die Annahme hinter dem Vorschlag steht in `text-faint` und ist als
+„in einer Woche nicht prüfbar“ gekennzeichnet. **Verpasste Chancen** (Coach-Seite, 12 Spalten): Leerzustand mit `EmptyState` (ohne Statuszeile),
+sonst eine Kennzahlenzeile und Signalzeilen mit Zeit (Mono), Richtung (▲ Long / ▼ Short), Quelle (Badge), Markt · Zeiteinheit und den zwei
+Knöpfen „Im Labor testen“ / „Beobachten“ (`aria-pressed`); die Einschränkungen („bewusst ausgelassen oder übersehen“, kein Ausgang gespeichert,
+keine Ursache) stehen unter einer Trennlinie in `text-faint`, nie versteckt. Bewegung: nur die Zellen-`Reveal`s der Seiten, keine neuen Tokens.

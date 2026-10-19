@@ -6,7 +6,7 @@
  *   2. typo repair: unknown words are matched against the parser's own vocabulary (Damerau-Levenshtein ≤ 1 for short,
  *      ≤ 2 for long words, only when exactly one word fits) and the parser runs again;
  *   3. colloquial phrases ("was lief gut", "wie läuft's") expand into up to three questions the parser knows;
- *   4. tools: navigate, improve, entry check, lab diagnosis, memory commands, "warum?", greetings;
+ *   4. tools: navigate, improve, week experiment, entry check, lab diagnosis, memory commands, "warum?", greetings;
  *   5. follow-ups: a short question without its own subject inherits metric / filters / period of the last one.
  *
  * Anything it cannot place becomes a `clarify` plan with the closest known questions ("Meintest du …?") instead of a
@@ -31,7 +31,7 @@ import { ACCOUNT_VALUES, EMOTION_VALUES, RESULT_VALUES, SESSION_VALUES, SIDE_VAL
 import { parseQuestion, type Filter, type FilterDim, type Intent, type ParseContext } from "@/domain/coach/nlq/parse";
 import type { Page } from "@/store/uiStore";
 
-export type ToolId = "improve" | "entry" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help";
+export type ToolId = "improve" | "experiment" | "entry" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help";
 
 export type Plan =
   | { kind: "journal"; intents: Intent[]; via: string[]; topic: string }
@@ -234,6 +234,7 @@ const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: RegExp; topic: string; lab
   { tool: "memory", test: /\b(merk|merke|merkt)\b.*\b(dir|mal)\b|\bvergiss\b|\bvergessen\b|was weisst du (alles )?(ueber|von) mich|was hast du dir gemerkt|\b(fass dich|antworte|antworten|sei) (kurz|kuerzer|ausfuehrlicher|knapper)|\bkuerzer bitte\b|\bausfuehrlicher bitte\b|\bin kurzform\b|\bnur kurz\b/, topic: "memory", label: "Gedächtnis" },
   { tool: "lab", test: /\bbacktest\b.*\b(schlecht|mies|negativ|verlust|schwach|warum|wieso|kacke|mist|mau|miserabel|bescheiden|katastroph\w*|scheiss\w*)\b|\b(warum|wieso|weshalb)\b.*\b(backtest|labor|testlauf|strategie)\b|\bdiagnose\b.*\b(lauf|backtest|labor)\b|\bwas stimmt .* nicht .*(backtest|strategie)/, topic: "lab", label: "Labor-Diagnose" },
   { tool: "entry", test: /\b(was fehlt|fehlt (mir|noch|da))\b|\beinstiegs ?check\b|\beinstiegssignal\b|\bkann ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bsoll ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bist (jetzt |gerade )?(ein|kein) (einstieg|signal)\b|\bwie ist (der|die|das) (markt|lage)\b|\bmarktlage\b/, topic: "entry", label: "Einstiegs-Check" },
+  { tool: "experiment", test: /experiment\w*|\bhypothese\w*/, topic: "experiment", label: "Wochenexperiment" },
   { tool: "improve", test: /\bverbesser\w*|\bbesser werden\b|\bworan (soll|muss|kann|sollte) ich (arbeiten|feilen)\b|\bwas (soll|sollte|kann) ich (aendern|tun|machen|anders)\b|\bnaechster schritt\b|\bempfehl\w*|\btipps?\b|\bratschlag\b/, topic: "improve", label: "Verbesserungen" },
   { tool: "newTrade", test: /\b(neuen? trade|trade eintragen|trade erfassen|trade hinzufuegen|trade anlegen)\b/, topic: "newTrade", label: "Trade eintragen" },
   { tool: "explain", test: /^ ?(und )?(warum|wieso|weshalb|woran liegt das|wie kommt das|beweis|belege|woher weisst du das|woher hast du das)( das| denn| genau)? ?$/, topic: "explain", label: "Begründung" },

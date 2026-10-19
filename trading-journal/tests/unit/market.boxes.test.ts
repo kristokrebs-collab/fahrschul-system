@@ -586,6 +586,9 @@ describe("box alerts", () => {
     expect(fired[0]!.id).toContain(`:${phase}`);
     expect(fired[0]!.title).toMatch(/^(Ausbruch ↑|Retest der Kante|Ziel erreicht) · BTCUSDT 4h$/);
     expect(fired[0]!.tone).toBe("win");
+    // F32: what the archive needs – the kind of alert, the way it points, the timeframe
+    expect(fired[0]).toMatchObject({ side: "long", tf: "4h" });
+    expect(["breakout", "retest", "target"]).toContain(fired[0]!.kind);
     const brk = evaluateBoxes(viewAt(B4.slice(0, r.brkI! + 1)));
     expect(brk).toEqual([]);
     // the same state again (a re-publish, a reload of the store) – nothing

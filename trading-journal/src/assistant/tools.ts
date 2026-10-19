@@ -6,6 +6,7 @@
  */
 import type { Recommendation } from "@/domain/coach";
 import type { Answer, AnswerData, AnswerFact, Tone } from "@/domain/coach/nlq";
+import { measureNoun, targetText, valueText, type ExperimentOverview } from "@/domain/reports/experiment";
 import type { SignalCheckState } from "@/market/signals";
 import type { Page } from "@/store/uiStore";
 import { addFact, forgetAll, removeFact, setStyle, topInterests, type AnswerStyle, type AssistantMemory } from "./memory";
@@ -46,6 +47,10 @@ export interface ToolEnv {
   /** ranked recommendations of the coach (computed on demand) */
   recs: () => readonly Recommendation[];
   lab: LabSummary | null;
+  /** the week experiment as stored + the proposal that could be made (read-only; computed on demand) */
+  experiment?: () => ExperimentOverview;
+  /** selects the report of a period on the Berichte page (the accept button of a proposal lives there) */
+  openReport?: (key: string) => void;
   go: (page: Page) => void;
   newTrade: () => void;
   setMem: (fn: (m: AssistantMemory) => AssistantMemory) => void;
@@ -102,7 +107,7 @@ function memoryTool(arg: string, env: ToolEnv): ToolReply {
   return reply({ title: "Das weiß ich über dich", text: lines.join(" "), facts: [fact("Fragen", String(mem.asked)), fact("Notizen", String(mem.facts.length))], followUps: ["Fass dich kürzer", "Vergiss alles"] });
 }
 
-const TOPIC_LABEL: Readonly<Record<string, string>> = { good: "Stärken", bad: "Schwächen", status: "Überblick", entry: "Einstiegs-Check", improve: "Verbesserungen", lab: "Labor", memory: "Gedächtnis", compare: "Vergleiche", list: "Trade-Listen" };
+const TOPIC_LABEL: Readonly<Record<string, string>> = { good: "Stärken", bad: "Schwächen", status: "Überblick", entry: "Einstiegs-Check", improve: "Verbesserungen", experiment: "Wochenexperiment", lab: "Labor", memory: "Gedächtnis", compare: "Vergleiche", list: "Trade-Listen" };
 
 /** German label of a learned topic key. */
 export function topicLabel(key: string): string {
@@ -127,6 +132,51 @@ function improveTool(env: ToolEnv): ToolReply {
     facts: recs.map((r) => fact(r.title.slice(0, 40), r.unit === "R" ? `${r.impact.toFixed(1).replace(".", ",")} R` : `${Math.round(r.impact)} ${cur}`, r.impact < 0 ? "loss" : "win", r.impact)),
     followUps: ["Was kostet mich Revenge?", "Wie war letzte Woche?"],
     actions: [{ label: "Im Coach öffnen", run: () => env.go("coach") }],
+  });
+}
+
+/**
+ * „Wochenexperiment“: shows the experiment the trader accepted (week, hypothesis, target, the automatic reading with its
+ * sample) and, when none is accepted for the running week, the proposal the Wochenbericht would make. Read-only: accepting,
+ * declining and withdrawing stay on the report page – the assistant changes nothing here.
+ */
+function experimentTool(env: ToolEnv): ToolReply {
+  const ov = env.experiment?.();
+  const toReport = (key?: string): ReplyAction => ({
+    label: "Wochenbericht öffnen",
+    run: () => {
+      if (key) env.openReport?.(key);
+      env.go("berichte");
+    },
+  });
+  if (!ov) return reply({ title: "Wochenexperiment", text: "Das Wochenexperiment steht in dieser Ansicht nicht zur Verfügung. Du findest es im Wochenbericht.", actions: [toReport()] });
+  if (!ov.items.length && !ov.proposal)
+    return reply({
+      title: "Kein Wochenexperiment",
+      text: "Du hast kein Experiment angenommen, und der Coach hat gerade keine Hypothese, die sich in einer Woche messen lässt. Dafür braucht es Muster mit genug Belegen (Verhalten, Journal, ein wiederkehrend teures Setup).",
+      actions: [toReport()],
+      followUps: ["Woran soll ich arbeiten?"],
+    });
+  const lines: string[] = [];
+  const facts: AnswerFact[] = [];
+  for (const { experiment: e, phase, week, result } of ov.items) {
+    const head = `${week.short} (${phase}): ${e.title}.`;
+    const target = `Sollwert: ${measureNoun(e.measure)} ${targetText(e)}, mindestens ${e.minTrades} Trades.`;
+    lines.push(result ? `${head} ${target} ${result.text}` : `${head} ${target} Die Woche hat noch nicht begonnen.`);
+    if (result) {
+      facts.push(fact("Status", result.status, result.status === "erfüllt" ? "win" : result.status === "nicht erfüllt" ? "loss" : "mute"));
+      facts.push(fact("Ist", valueText(e.measure, result.actual, result.n), "fg", result.actual));
+      facts.push(fact("Trades", `${result.n} (min. ${result.minTrades})`, "fg", result.n));
+    }
+  }
+  if (ov.proposal) lines.push(`Noch nicht angenommen: ${ov.proposal.experiment.title}. ${ov.proposal.target} Annehmen oder ablehnen kannst du es im Wochenbericht ${ov.proposalReport?.short ?? ""} – ich ändere daran nichts.`.replace("  ", " "));
+  return reply({
+    title: ov.items.length ? "Dein Wochenexperiment" : "Vorschlag für ein Wochenexperiment",
+    text: lines.join(" "),
+    facts: facts.slice(0, 6),
+    tone: "fg",
+    actions: [toReport(ov.proposalReport?.key ?? ov.items[0]?.week.key)],
+    followUps: ["Woran soll ich arbeiten?", "Wie war letzte Woche?"],
   });
 }
 
@@ -190,7 +240,7 @@ function helloTool(arg: string, env: ToolEnv): ToolReply {
 function helpTool(env: ToolEnv): ToolReply {
   return reply({
     title: "Das kann ich",
-    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“) oder Verbesserungen. Ich öffne auch Seiten („Öffne das Labor“) und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
+    text: "Frag in deinen Worten: nach Kennzahlen („Win-Rate am Montag“), Stärken und Schwächen („Was lief gut?“), Verhalten („Was kostet mich Revenge?“), dem Einstieg („Was fehlt für meinen Einstieg?“), dem Labor („Warum ist der Backtest schlecht?“), Verbesserungen oder deinem Wochenexperiment. Ich öffne auch Seiten („Öffne das Labor“) und merke mir, was du mir sagst („Merk dir …“). Du kannst tippen oder das Mikrofon nutzen.",
     followUps: suggestFor(env),
   });
 }
@@ -212,6 +262,8 @@ export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
         return memoryTool(arg, env);
       case "improve":
         return improveTool(env);
+      case "experiment":
+        return experimentTool(env);
       case "entry":
         return entryTool(env);
       case "lab":

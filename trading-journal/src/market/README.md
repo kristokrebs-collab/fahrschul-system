@@ -459,3 +459,11 @@ only seeds. The plan-change toast (`tj2-keylevel-plan`) is on by default only fo
 and box alerts add their toasts to the same log as lines (log only – their own rules are unchanged). `chartLines.ts`:
 `useKeyLines(symbol)` for the chart lines. **Alerts run only while the app is open** – no server-side monitoring (F21 is not
 part of this). Tests: `tests/unit/market.keylevels.test.ts`.
+
+## Signalarchiv (`signalArchive.ts`, F32)
+
+The signal events the app raised (valid entry of the Einstiegs-Check, Box-zu-Box setups, confirmed own key levels) as data with a
+time, market and side – the input of the „Verpasste Chancen“ card (`@/domain/missed`, see its README). `tj2-signal-events`
+(`storageKey("signal-events")`), versioned `{ v: 1, items }`, the newest 300 / 120 days, this device only (not in the backup, not
+synced); a stored newer version is never overwritten. `recordSignalEvent` is called next to `logExternalDelivery` in
+`signals/notify.ts` and `boxes/alerts.ts` and after `recordDelivery` in `keylevels/alerts.ts`; it never throws.

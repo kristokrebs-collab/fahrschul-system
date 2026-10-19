@@ -29,6 +29,7 @@ import {
 } from "@/market/signals/engine";
 import { __clearRetroMemo, checkTradeAt, retroCheck } from "@/market/signals/retro";
 import { noteSignals, resetSignalNotifier, SIGNAL_HOLD_MS, SIGNAL_LAST_KEY, signalBarOpen, signalNotifyDetail, signalNotifyMinStrength } from "@/market/signals/notify";
+import { __resetSignalArchive, getSignalArchive, SIGNAL_ARCHIVE_KEY } from "@/market/signalArchive";
 import { useUi } from "@/store/uiStore";
 import { benchAgg, synthBars } from "./signals.fixtures";
 
@@ -436,6 +437,8 @@ describe("notification on a new valid entry", () => {
 
   it("baseline first, then an edge that holds 60 s → one toast per bar; persisted", async () => {
     resetSignalNotifier();
+    __resetSignalArchive();
+    localStorage.removeItem(SIGNAL_ARCHIVE_KEY);
     const bar = 1_790_000_100;
     noteSignals(sig({ long: true, short: false }, bar), NOW); // baseline: already valid → no toast
     noteSignals(sig({ long: false, short: false }, bar), NOW + 1000);
@@ -446,6 +449,9 @@ describe("notification on a new valid entry", () => {
     noteSignals(sig({ long: true, short: false }, bar), NOW + 2000 + SIGNAL_HOLD_MS);
     expect(useUi.getState().toasts).toEqual([expect.objectContaining({ kind: "signal", title: "Starker Long-Einstieg", value: "Score 85", valueTone: "win", duration: 5200 })]);
     expect(JSON.parse(localStorage.getItem(SIGNAL_LAST_KEY)!).long).toMatchObject({ barOpen: bar * 1000, strength: 2 });
+    // F32: the same signal is archived as a structured event (time, side, strength) – once (the archive loads on demand)
+    await vi.waitFor(() => expect(getSignalArchive()).toHaveLength(1));
+    expect(getSignalArchive()).toEqual([expect.objectContaining({ source: "entry", entry: true, side: "long", strength: 2, score: 85, label: "Starker Long-Einstieg", at: NOW + 2000 + SIGNAL_HOLD_MS })]);
     // flicker in the same bar → no second toast
     noteSignals(sig({ long: false, short: false }, bar), NOW + 70_000);
     noteSignals(sig({ long: true, short: false }, bar), NOW + 71_000);

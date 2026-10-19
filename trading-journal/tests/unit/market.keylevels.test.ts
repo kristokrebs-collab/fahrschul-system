@@ -15,6 +15,7 @@ vi.mock("@/market/marketStore", async (importOriginal) => {
 });
 
 import { levelCandles } from "@/market/keylevels/candles";
+import { __resetSignalArchive, getSignalArchive } from "@/market/signalArchive";
 import { __resetDeliveryLog, clearDeliveryLog, getDeliveryLog, logExternalDelivery, recordDelivery } from "@/market/keylevels/deliveryLog";
 import { __resetKeyLevelAlerts, KEYLEVEL_MEM_KEY, processKeyLevelView, processPlanView } from "@/market/keylevels/alerts";
 import { __resetKeyLevels, computeKeyLevels, getKeyLevels } from "@/market/keylevels/store";
@@ -62,6 +63,7 @@ beforeEach(() => {
   __resetKeyLevels();
   __resetKeyLevelAlerts();
   __resetDeliveryLog();
+  __resetSignalArchive();
   useUi.setState({ toasts: [] });
   useJournal.setState({ settings: defaultSettings() });
 });
@@ -176,6 +178,8 @@ describe("alert runtime", () => {
       ["prepare", "sent", "intrabar"],
     ]);
     expect(log.every((r) => r.channels.join() === "toast")).toBe(true);
+    // F32: the confirmation is archived as an entry-like hit of the own level (the preparation is not)
+    expect(getSignalArchive()).toEqual([expect.objectContaining({ source: "key", kind: "confirm", entry: true, side: "long", symbol: "BTCUSDT", tf: "4h", ref: "k1" })]);
   });
 
   it("a reload in the middle of a cycle continues without repeating a stage", () => {
