@@ -12,16 +12,20 @@ import { activeFilters, type FilterSelection } from "../filters/types";
 import { filterUnits, type FilterCompare } from "../filters/compare";
 import { stressUnits } from "../stress/run";
 import type { StressRows } from "../stress/types";
+import { gridUnits, type GridResult, type GridSpec } from "./paramGrid";
+import type { CustomCfgIn } from "../../backtest/strategies/custom";
 
 export interface ExtraJobInput {
   /** the input of the finished run (data, engine, parameters, period) */
   base: LabJobInput;
-  what: "stress" | "filters";
+  what: "stress" | "filters" | "params";
   /** the chosen filters (`what: "filters"`) */
   filters?: FilterSelection;
+  /** the two rule parameters of the grid (`what: "params"`, F11 / F16) */
+  grid?: GridSpec;
 }
 
-export type ExtraResult = { what: "stress"; rows: StressRows } | { what: "filters"; compare: FilterCompare };
+export type ExtraResult = { what: "stress"; rows: StressRows } | { what: "filters"; compare: FilterCompare } | { what: "params"; grid: GridResult | null; note: string | null };
 
 export interface ExtraJob extends Stepper<ExtraResult> {
   phase(): LabPhase;
@@ -47,6 +51,9 @@ export function createExtraJob(input: ExtraJobInput): ExtraJob {
     if (input.what === "stress") {
       const s = stressUnits(strategy, pr, params, b.engine, win, ok);
       units = { count: s.count, run: s.run, result: () => ({ what: "stress", rows: s.rows() }) };
+    } else if (input.what === "params") {
+      const g = gridUnits(cfg as CustomCfgIn, b.data, b.fromMs, pr, params, b.engine, win, ok, input.grid ?? { x: "", y: null });
+      units = { count: g.count, run: g.run, result: () => ({ what: "params", grid: g.result(), note: g.note }) };
     } else {
       const sel = input.filters;
       const active = sel ? activeFilters(sel, b.strategy, pr.interval) : [];

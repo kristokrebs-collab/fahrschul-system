@@ -6,6 +6,7 @@
  */
 import { create } from "zustand";
 import { isLabAbort, runExtra } from "@/domain/backtest/index";
+import type { GridResult, GridSpec } from "@/domain/lab/extras";
 import type { FilterCompare } from "@/domain/lab/filters";
 import { sanitizeFilters, type FilterId, type FilterSelection } from "@/domain/lab/filters/types";
 import type { StressRows } from "@/domain/lab/stress/types";
@@ -24,9 +25,19 @@ export interface ExtraSlice<R> {
 
 const idle = <R>(): ExtraSlice<R> => ({ status: "idle", progress: 0, result: null, error: null });
 
+/** The parameter grid (F11 / F16): the grid, or the reason there is none. */
+export interface ParamsOut {
+  grid: GridResult | null;
+  note: string | null;
+}
+
 interface ExtrasState {
   stress: ExtraSlice<StressRows>;
   filters: ExtraSlice<FilterCompare>;
+  params: ExtraSlice<ParamsOut>;
+  /** the two rule parameters of the next grid (ids like `n1.len`); memory only */
+  gridSel: GridSpec;
+  setGridSel(sel: GridSpec): void;
   selection: FilterSelection;
   setFilterOn(id: FilterId, on: boolean): void;
   setFilterParam(key: "rsiLimit" | "trendLen", value: number): void;
@@ -54,6 +65,9 @@ function writeSelection(sel: FilterSelection): void {
 export const useExtras = create<ExtrasState>()((set, get) => ({
   stress: idle(),
   filters: idle(),
+  params: idle(),
+  gridSel: { x: "", y: null },
+  setGridSel: (gridSel) => set({ gridSel, params: get().params.status === "running" ? get().params : idle() }),
   selection: readSelection(),
   setFilterOn(id, on) {
     const cur = get().selection;
@@ -69,14 +83,15 @@ export const useExtras = create<ExtrasState>()((set, get) => ({
   },
 }));
 
-const ctl: Record<"stress" | "filters", AbortController | null> = { stress: null, filters: null };
+type Kind = "stress" | "filters" | "params";
+const ctl: Record<Kind, AbortController | null> = { stress: null, filters: null, params: null };
 let lastUi = 0;
 
-function patch(kind: "stress" | "filters", p: Partial<Pick<ExtraSlice<unknown>, "status" | "progress" | "error">>): void {
-  useExtras.setState((s) => (kind === "stress" ? { stress: { ...s.stress, ...p } } : { filters: { ...s.filters, ...p } }));
+function patch(kind: Kind, p: Partial<Pick<ExtraSlice<unknown>, "status" | "progress" | "error">>): void {
+  useExtras.setState((s) => (kind === "stress" ? { stress: { ...s.stress, ...p } } : kind === "params" ? { params: { ...s.params, ...p } } : { filters: { ...s.filters, ...p } }));
 }
 
-async function start(kind: "stress" | "filters"): Promise<void> {
+async function start(kind: Kind): Promise<void> {
   ctl[kind]?.abort();
   const input = shownRunInput();
   if (!input) {
@@ -85,9 +100,10 @@ async function start(kind: "stress" | "filters"): Promise<void> {
   }
   const mine = new AbortController();
   ctl[kind] = mine;
-  useExtras.setState(kind === "stress" ? { stress: { status: "running", progress: 0, result: null, error: null } } : { filters: { status: "running", progress: 0, result: null, error: null } });
+  const running = { status: "running", progress: 0, result: null, error: null } as const;
+  useExtras.setState(kind === "stress" ? { stress: running } : kind === "params" ? { params: running } : { filters: running });
   try {
-    const res = await runExtra(kind === "stress" ? { base: input, what: "stress" } : { base: input, what: "filters", filters: useExtras.getState().selection }, {
+    const res = await runExtra(kind === "stress" ? { base: input, what: "stress" } : kind === "params" ? { base: input, what: "params", grid: useExtras.getState().gridSel } : { base: input, what: "filters", filters: useExtras.getState().selection }, {
       signal: mine.signal,
       onProgress: (p) => {
         const t = Date.now();
@@ -98,6 +114,7 @@ async function start(kind: "stress" | "filters"): Promise<void> {
     });
     if (ctl[kind] !== mine) return;
     if (res.what === "stress") useExtras.setState({ stress: { status: "done", progress: 1, result: res.rows, error: null } });
+    else if (res.what === "params") useExtras.setState({ params: { status: "done", progress: 1, result: { grid: res.grid, note: res.note }, error: null } });
     else useExtras.setState({ filters: { status: "done", progress: 1, result: res.compare, error: null } });
   } catch (e) {
     if (ctl[kind] !== mine) return;
@@ -113,8 +130,9 @@ async function start(kind: "stress" | "filters"): Promise<void> {
 
 export const runStress = (): Promise<void> => start("stress");
 export const runFilters = (): Promise<void> => start("filters");
+export const runParams = (): Promise<void> => start("params");
 
-export function cancelExtra(kind: "stress" | "filters"): void {
+export function cancelExtra(kind: Kind): void {
   ctl[kind]?.abort();
 }
 
@@ -122,9 +140,11 @@ export function cancelExtra(kind: "stress" | "filters"): void {
 function clearAll(): void {
   ctl.stress?.abort();
   ctl.filters?.abort();
+  ctl.params?.abort();
   ctl.stress = null;
   ctl.filters = null;
-  useExtras.setState({ stress: idle(), filters: idle() });
+  ctl.params = null;
+  useExtras.setState({ stress: idle(), filters: idle(), params: idle() });
 }
 
 useLabor.subscribe((s, prev) => {

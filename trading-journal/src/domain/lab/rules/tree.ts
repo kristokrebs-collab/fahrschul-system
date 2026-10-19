@@ -6,7 +6,7 @@
  */
 import { DEFAULT_SIGNAL_CFG, type SignalCfg } from "../../signals/config";
 import { MIN_RISK_FRAC } from "../../backtest/engine";
-import type { Bar } from "../../backtest/types";
+import type { Bar, FundingPoint } from "../../backtest/types";
 import { now, type Stepper } from "../../backtest/strategies/types";
 import type { McbFacts } from "../../backtest/strategies/mcbLadder";
 import { BLOCKS, BLOCK_ORDER, defaultParams, isBlockId, makeCtx, sanitizeParams, type EvalCtx } from "./blocks";
@@ -259,9 +259,18 @@ export function customKey(cfg: CustomConfig): string {
 
 // ── availability (disabled options come with a reason) ────────────────────────────────────────────────────────
 
-/** Can this block run on the execution interval? */
-export function blockAvailability(id: BlockId, exec: TfId): { ok: boolean; reason?: string } {
+/** What the surrounding lab set-up offers (a block that needs run data is locked without it). Absent = not checked. */
+export interface CheckEnv {
+  /** the run loads the real funding history (cost setting "Funding: Historie") */
+  funding?: boolean;
+}
+
+export const FUNDING_LOCK = "Funding-Extrem braucht die echte Funding-Historie des Laufs. Stelle bei den Kosten „Funding“ auf „Historie“ – ohne sie gibt es keine Funding-Werte, und der Baustein bliebe unbekannt.";
+
+/** Can this block run on the execution interval (and with the run's data)? */
+export function blockAvailability(id: BlockId, exec: TfId, env?: CheckEnv): { ok: boolean; reason?: string } {
   if (id === "mcbLadder" && exec !== "1h" && exec !== "4h") return { ok: false, reason: "Die MCB-Leiter prüft im Takt 1h oder 4h wie dein Einstiegs-Check. Wähle diese Ausführung." };
+  if (BLOCKS[id].needsRunData === "funding" && env && env.funding === false) return { ok: false, reason: FUNDING_LOCK };
   return { ok: true };
 }
 
@@ -276,7 +285,7 @@ export function tfAvailability(tf: TfId, exec: TfId, block?: BlockId): { ok: boo
 
 // ── validation ────────────────────────────────────────────────────────────────────────────────────────────────
 
-export function validateCustom(cfg: CustomConfig): Issue[] {
+export function validateCustom(cfg: CustomConfig, env?: CheckEnv): Issue[] {
   const out: Issue[] = [];
   const err = (text: string, node?: string) => out.push({ level: "error", text, node });
   const warn = (text: string, node?: string) => out.push({ level: "warn", text, node });
@@ -289,12 +298,14 @@ export function validateCustom(cfg: CustomConfig): Issue[] {
     for (const l of ls) {
       const def = BLOCKS[l.block];
       const label = `${sideName[side]} · ${def.label}`;
-      const av = blockAvailability(l.block, cfg.interval);
+      const av = blockAvailability(l.block, cfg.interval, env);
       if (!av.ok) err(`${label}: ${av.reason}`, l.id);
       if (l.tf !== "exec") {
         const t = tfAvailability(l.tf, cfg.interval, l.block);
         if (!t.ok) err(`${label} [${TF_LABEL[l.tf]}]: ${t.reason}`, l.id);
       }
+      const problem = def.check?.(l.params, TF_SEC[l.tf === "exec" ? cfg.interval : l.tf]);
+      if (problem) err(`${label}: ${problem}`, l.id);
       if (l.block === "keyLevel" && !(Number(l.params.level) > 0)) err(`${label}: Der Preis fehlt.`, l.id);
       if (def.heavy && TF_SEC[l.tf === "exec" ? cfg.interval : l.tf] < 3600 && l.block !== "mcbLadder") warn(`${label}: ${def.heavy}`, l.id);
       if (l.block === "mcbLadder" && l.not) warn(`${label}: „Nicht“ bei der Leiter heißt nur „kein gültiges Urteil“ – ohne Urteil (zu wenig Daten) bleibt es unbekannt.`, l.id);
@@ -408,14 +419,14 @@ export interface SeriesSet {
  * Evaluates every leaf of `leaves` onto the execution bars (tri-state, WITHOUT the `not` flag). Unique (block, timeframe,
  * parameters) are computed once. Stepped: heavy blocks give the loop back between slices.
  */
-export function evaluateLeaves(leaves: readonly Leaf[], series: SeriesSet, signal: SignalCfg = DEFAULT_SIGNAL_CFG, ladder: McbFacts | null = null): Stepper<Map<string, Uint8Array>> {
+export function evaluateLeaves(leaves: readonly Leaf[], series: SeriesSet, signal: SignalCfg = DEFAULT_SIGNAL_CFG, ladder: McbFacts | null = null, funding: readonly FundingPoint[] | null = null): Stepper<Map<string, Uint8Array>> {
   const execSec = TF_SEC[series.exec.tf];
   const n = series.exec.bars.length;
   const ctxs = new Map<string, EvalCtx>();
   const ctxOf = (tf: TfId, bars: readonly Bar[], withLadder: boolean): EvalCtx => {
     const key = `${tf}${withLadder ? "L" : ""}`;
     let c = ctxs.get(key);
-    if (!c) ctxs.set(key, (c = makeCtx(bars, signal, withLadder ? ladder : null)));
+    if (!c) ctxs.set(key, (c = makeCtx(bars, signal, withLadder ? ladder : null, { tfSec: TF_SEC[tf], funding })));
     return c;
   };
   const keyOf = (l: Leaf): string => `${l.block}|${l.tf === "exec" ? series.exec.tf : l.tf}|${Object.keys(l.params).sort().map((k) => `${k}=${String(l.params[k])}`).join(",")}`;

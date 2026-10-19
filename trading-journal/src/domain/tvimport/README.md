@@ -23,3 +23,10 @@ backtest. A signal-only alert (no trade) would need its own table and a retentio
 ## Tests
 `tests/unit/tvimport.test.ts` (reader, numbers, dates, columns, errors with lines, adapters, comparison),
 `tests/unit/views.labor.tv.test.tsx` (cards, upload in the browser, comparison, zone shift, error lines).
+
+## Hinweg: Pine-Export (F14 / F64)
+Der Rückweg (Strategietester-Export) hat jetzt einen Hinweg: `@/domain/lab/pine` – `toPine(config, options)` erzeugt aus dem Regelbaum von „Eigene Idee“ eine
+lesbare Pine-v6-Strategie (`strategy()`, Bausteine als `ta.*`, Stop/Ziel/Break-even/Trailing/Teil-Gewinn/Zeit-Stop, Gebühr/Größe/Slippage aus dem Lauf,
+höhere Zeitebenen per `request.security` ohne Blick in die Zukunft). Nicht übersetzbare Bausteine (MCB-Punkte, MCB-Leiter, Premium/Discount, RSI-Linie, Funding)
+werden namentlich aufgelistet und stehen im Skript als Eingabe „als erfüllt annehmen“ (Standard aus) – nie still weggelassen. `tvChartUrl(symbol, interval)` ist nur ein Link
+auf `BINANCE:<SYMBOL>.P`. Adapterstatus `pine-export` = unterstützt. Die App führt Pine weder aus noch prüft sie es; ein Compilerfehler in TradingView steht dort in Zeile und Text.

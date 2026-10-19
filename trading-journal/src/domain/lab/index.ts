@@ -31,6 +31,8 @@ export {
   parseCustom,
   customKey,
   blockAvailability,
+  FUNDING_LOCK,
+  type CheckEnv,
   tfAvailability,
   validateCustom,
   leafText,

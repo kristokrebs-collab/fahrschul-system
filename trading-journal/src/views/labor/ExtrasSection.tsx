@@ -12,6 +12,7 @@ import { LABOR } from "./strings";
 const StressBody = lazy(() => import("./StressBody"));
 const ReportBody = lazy(() => import("./ReportBody"));
 const FilterBody = lazy(() => import("./FilterBody"));
+const ParamGridBody = lazy(() => import("./ParamGridBody"));
 
 const X = LABOR.extras;
 
@@ -65,6 +66,9 @@ export function ExtrasSection() {
       </ExtraCard>
       <ExtraCard id="filters" title={X.filters.title} sub={X.filters.sub}>
         <FilterBody />
+      </ExtraCard>
+      <ExtraCard id="params" title="Parameter-Raster" sub="Wie stabil ist diese Idee gegen die Parameter? Zwei Zahlen der Regeln um ±25 % verschoben.">
+        <ParamGridBody />
       </ExtraCard>
     </div>
   );

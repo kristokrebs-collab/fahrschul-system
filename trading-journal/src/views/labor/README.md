@@ -132,3 +132,22 @@ Section `Versionen und Playbooks` (`labor-drafts-section`, lazy chunk `DraftsSec
   **preview** with the rules in plain language and warnings, and only a click creates the draft – marked `origin` (**fremd**, kept through
   edits and copies, badge in the draft list). **Probe im Labor** puts the rules in the set-up and runs them on the market history.
 - Tests: `tests/unit/lab.versions.test.ts`, `lab.playbook.test.ts` (incl. prototype pollution, huge / deep input), `views.labor.drafts.test.tsx`.
+
+## Mehr Bausteine, Strategie-Bibliothek, Pine, Parameter-Raster (F06 / F11 / F14 / F15 / F16 / F64)
+- **Bausteine** (`@/domain/lab/rules/blocksPlus.ts`, Reihen in `series.ts`): 17 neue – Donchian, ADX/DI, Stochastic, Keltner, Ichimoku, CCI, Williams %R, OBV,
+  VWAP (Tag/Session/Woche, UTC), Opening Range, Inside Bar, Heikin-Ashi, Pivot-Bruch, Fibonacci-Rücksetzer (Golden Pocket), Supertrend, Chandelier, Funding-Extrem –
+  plus neue Modi für Bollinger (Rückkehr ins Band, Mittellinie, Squeeze mit Fenster) und MACD (Histogramm). Alle aus geschlossenen Kerzen, im Builder in den
+  bisherigen Familien. `check(p, tfSec)` meldet unpassende Parameter (Opening Range 15 min auf 1h-Kerzen, Session-VWAP auf 4h) als Fehler der Prüfung;
+  **Funding-Extrem** ist ohne die echte Funding-Historie (`Kosten → Funding: Historie`) gesperrt, im Baustein-Picker mit Grund (`validateCustom(cfg, { funding })`).
+- **Strategie-Bibliothek** (`LibrarySheet.tsx`, lazy; Daten `@/domain/lab/library`): Button `labor-lib-open` neben den Vorlagen (`useLibrary.show()`) → Sheet `labor-lib` mit 32 Karten, gehostet von `LibraryHost` auf Seitenebene (wie das Replay-Sheet; in einer Zelle läge es unter dem Dock), 
+  (`labor-lib-card`, `data-card`, `data-kind`), Suche `labor-lib-search`, Typ-Filter, Details (Bekannt aus · Gedacht für · Schwächen · übliche Zeiteinheiten · typische Werte
+  konservativ / Standard / aggressiv mit Erklärung je Zahl). `labor-lib-load-<id>-<level>` lädt den Entwurf in „Eigene Idee“ (`setCustom`), schließt das Sheet, startet nichts.
+  Karten tragen keine Ergebnisse und keine Erfolgsaussagen (ein Test sucht nach Versprechen). Die Zahl auf der Karte und im Entwurf sind **dieselbe Quelle** (`params` → `make`).
+- **Pine** (`PineCard.tsx` in der TradingView-Sektion, lazy; Domain `@/domain/lab/pine`): Schritte „Pine erzeugen → in TradingView testen → Export hier vergleichen“,
+  Knopf `labor-pine-make` → lesbares Pine-v6-Skript (`labor-pine-code`), Kopieren, Datei, Notizen zu Abweichungen, Link „Chart in TradingView öffnen“ (`BINANCE:BTCUSDT.P` + Intervall;
+  nur ein Link). Nicht übersetzbare Bausteine (`labor-pine-gaps`) stehen namentlich da und im Skript als `input.bool(false)`. Kosten stammen aus dem letzten Lauf (`runCfg`), sonst
+  aus den Einstellungen; eine optionale Tick-Größe macht die Slippage zu Ticks. Kein Login, kein Kontozugriff.
+- **Parameter-Raster** (Karte `labor-extra-params` unter „Belastung, Bericht, Filter“, `ParamGridBody.tsx`, lazy; Domain `@/domain/lab/extras/paramGrid`): zwei Zahlen der
+  Regeln um ±25 % (3 × 3), derselbe Lauf je Zelle (`runExtra` mit `what: "params"`, Mitte = gezeigter Lauf). Gesperrt mit Grund bei rechenintensiven Bausteinen; nur für „Eigene Idee“.
+  Zellen mit weniger als 10 Trades werden als schwach markiert, es gibt keine „beste“ Zelle.
+- Tests: `tests/unit/lab.blocksPlus.test.ts`, `lab.library.test.ts`, `lab.pine.test.ts` (Snapshots), `lab.paramGrid.test.ts`, `views.labor.library.test.tsx`, e2e `tests/e2e/library.spec.ts`.

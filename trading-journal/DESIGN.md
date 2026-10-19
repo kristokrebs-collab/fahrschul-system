@@ -492,3 +492,14 @@ ein `Input type=search`. Bewegung nur über `src/motion`: gestaffeltes `Reveal` 
 Endzustand; keine Karten-Spotlights (siebzig Karten auf einer Seite). Mobil 390 px: eine Spalte, Segmente umbrechen, Tippflächen ≥ 44 px, kein horizontaler Scroll. Das
 Öffnen einer Funktion scrollt die Zielkarte unter den Kopf und lässt einmal den Signal-Streifen darüber laufen (derselbe Griff wie bei Einstellungen in der Suche,
 `src/app/reveal.ts`); fehlt die Stelle, steht der Grund in einem Toast. Die Zeile „Auch hier: …“ (`FeatureLinks`) ist Mono-Versal-Label plus Textlinks, nie auf dem Dashboard.
+
+## Strategie-Bibliothek, Pine-Export, Parameter-Raster (F06 / F14 / F15 / F64)
+
+Keine neue Sprache. **Bibliothek:** ein `Sheet` (groß) mit Einleitung und einem ruhigen Kasten „Bekannt heißt nicht wirksam“, Suchfeld, `ChipPick` für den Typ und einem
+zweispaltigen Raster von Karten (`rounded-2xl border-line bg-ink-950/50`). Karte = Titel, `Badge` für den Typ (Ton nur zur Unterscheidung, nie Wertung), ein Satz, die Zeiteinheiten in Mono,
+„Herkunft, Schwächen, typische Werte“ hinter dem runden `Expander`; unten drei Knöpfe Konservativ · **Standard** (primär) · Aggressiv. Typische Werte: je Zahl ein Block mit Name,
+Erklärung und drei Werten in einem Dreier-Raster (Standard heller) – mobil ohne Scroll. Keine Gewinn- oder Verlustfarben auf Karten.
+**Pine:** eine volle `Card` in der TradingView-Sektion: drei nummerierte Schritte, der Satz zum fehlenden Konto, dann „Pine-Skript erzeugen“ (primär) und der Chart-Link (Ghost-Knopf als `<a>`);
+Ergebnis: Zusammenfassung, bei Lücken ein Warn-Kasten mit den Bausteinen beim Namen, ein schreibgeschütztes Mono-Textfeld (eigener Scroll, nie die Seite), Kopieren / Datei, Notizen eingeklappt.
+**Raster:** ein Eintrag unter „Belastung, Bericht, Filter“; zwei `MorphSelect`, ein 3 × 3-Gitter aus Zellen (Σ R im Vorzeichen-Ton, darunter Trades und Ø R, die Mitte mit hellem Rand und „Deine Einstellung“,
+Zellen unter 10 Trades gedimmt), eine Zusammenfassung ohne „beste“ Zelle. Bewegung nur die vorhandenen `Collapse`-/`Sheet`-Tokens; reduzierte Bewegung zeigt das Ende sofort.

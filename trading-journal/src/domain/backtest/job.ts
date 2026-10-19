@@ -192,8 +192,14 @@ export function strategyOf(id: LabStrategyId): AnyStrategy {
   return id === "custom" ? customStrategy : id === "box" ? boxToBox : id === "mcb" ? mcbLadder : ruleBuilder;
 }
 
-export function strategyCfg(input: Pick<LabJobInput, "strategy" | "box" | "mcb" | "rules" | "custom">): unknown {
-  return input.strategy === "custom" ? (input.custom ?? defaultCustomIn()) : input.strategy === "box" ? input.box : input.strategy === "mcb" ? input.mcb : input.rules;
+export function strategyCfg(input: Pick<LabJobInput, "strategy" | "box" | "mcb" | "rules" | "custom"> & Partial<Pick<LabJobInput, "engine">>): unknown {
+  if (input.strategy === "custom") {
+    const base = input.custom ?? defaultCustomIn();
+    // the real funding history of the run (not the flat assumption) is what the funding block may read
+    const f = input.engine?.costs.funding;
+    return f && f.kind === "history" ? { ...base, funding: f.points } : base;
+  }
+  return input.strategy === "box" ? input.box : input.strategy === "mcb" ? input.mcb : input.rules;
 }
 
 /** The chosen parameters completed with each spec's first option (unknown values → the first option). */

@@ -30,7 +30,7 @@ import {
   type RuleCond,
   type SlippageModel,
 } from "@/domain/backtest/index";
-import { defaultCustom, parseCustom, sanitizeCustom, validateCustom, type CustomConfig, type IdeaDraft } from "@/domain/lab";
+import { activeLeaves, defaultCustom, parseCustom, sanitizeCustom, validateCustom, type CustomConfig, type IdeaDraft } from "@/domain/lab";
 import type { SignalCfg } from "@/domain/signals";
 import { storageKey } from "@/store/storage";
 import { isFileProtocol, IS_FILE_BUILD } from "@/edition";
@@ -103,6 +103,8 @@ export interface CustomDraft {
 }
 
 export const DRAFTS_MAX = 24;
+
+const FUNDING_MISSING = "Die Funding-Historie konnte nicht geladen werden. Der Baustein „Funding-Extrem“ braucht sie – ohne sie würde die Idee nie handeln. Versuche es noch einmal oder entferne den Baustein.";
 
 /**
  * An idea handed over by "Diese Idee testen" (F12): the draft with its mapped / not-mapped lists and the set-up it replaced
@@ -415,7 +417,7 @@ export async function startLab(signal: SignalCfg, now = Date.now()): Promise<voi
   const mine = new AbortController();
   ctl = mine;
   const cfg = useLabor.getState().cfg;
-  if (cfg.strategy === "custom" && validateCustom(cfg.custom).some((i) => i.level === "error")) {
+  if (cfg.strategy === "custom" && validateCustom(cfg.custom, { funding: cfg.funding === "history" }).some((i) => i.level === "error")) {
     useLabor.setState({ status: "error", error: LABOR.errors.invalidIdea, progress: 0 });
     if (ctl === mine) ctl = null;
     return;
@@ -443,6 +445,11 @@ export async function startLab(signal: SignalCfg, now = Date.now()): Promise<voi
       return;
     }
     const fundingUsed: LaborState["fundingUsed"] = cfg.funding === "none" ? "none" : cfg.funding === "history" && loaded.funding ? "history" : "flat";
+    // the block „Funding-Extrem“ reads the real history only: without it the idea would silently never trade
+    if (cfg.strategy === "custom" && fundingUsed !== "history" && activeLeaves(cfg.custom).some((l) => l.block === "funding")) {
+      useLabor.setState({ status: "error", error: FUNDING_MISSING, progress: 0 });
+      return;
+    }
     const fee = feePreset(cfg.exchange);
     const input: LabJobInput = {
       ...plan.input,

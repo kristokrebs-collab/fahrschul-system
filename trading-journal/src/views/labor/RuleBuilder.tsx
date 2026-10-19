@@ -19,6 +19,7 @@ import {
   TF_IDS,
   TF_LABEL,
   blockAvailability,
+  type CheckEnv,
   editNode,
   leafText,
   leavesOf,
@@ -50,6 +51,7 @@ import { Icon } from "@/primitives/icons";
 import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
 import { useUi } from "@/store/uiStore";
+import { useLibrary } from "./LibraryHost";
 import { DRAFTS_MAX, useLabor } from "./laborStore";
 import { LABOR } from "./strings";
 import { ChipPick, FieldRow, SEG_TOUCH } from "./ui";
@@ -63,6 +65,8 @@ interface Ed {
   side: "long" | "short";
   exec: TfId;
   issues: readonly Issue[];
+  /** what the run offers (funding history …) – locks blocks that need it */
+  env: CheckEnv;
   disabled: boolean;
   uid: string;
   leafCount: number;
@@ -229,7 +233,7 @@ function BlockPicker({ parent, ed }: { parent: string; ed: Ed }) {
             <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-faint">{FAMILY_LABEL[fam]}</span>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {ids.map((b) => {
-                const a = blockAvailability(b, ed.exec);
+                const a = blockAvailability(b, ed.exec, ed.env);
                 return (
                   <button
                     key={b}
@@ -517,7 +521,9 @@ export function RuleBuilder({ uid }: { uid: string }) {
   const pushToast = useUi((s) => s.pushToast);
   const [sideTab, setSideTab] = useState<"long" | "short">("long");
   const [picker, setPicker] = useState<string | null>(null);
-  const issues = useMemo(() => validateCustom(custom), [custom]);
+  const fundingMode = useLabor((s) => s.cfg.funding);
+  const env = useMemo<CheckEnv>(() => ({ funding: fundingMode === "history" }), [fundingMode]);
+  const issues = useMemo(() => validateCustom(custom, env), [custom, env]);
   const lines = useMemo(() => summarizeCustom(custom), [custom]);
   const side: "long" | "short" = custom.sides === "both" ? sideTab : custom.sides;
   const root = custom[side];
@@ -528,6 +534,7 @@ export function RuleBuilder({ uid }: { uid: string }) {
     side,
     exec: custom.interval,
     issues,
+    env,
     disabled: busy,
     uid,
     leafCount: leavesOf(root).length,
@@ -567,6 +574,14 @@ export function RuleBuilder({ uid }: { uid: string }) {
               {t.title}
             </button>
           ))}
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => useLibrary.getState().show()}
+            data-testid="labor-lib-open"
+          >
+            Strategie-Bibliothek öffnen
+          </Button>
         </div>
       </FieldRow>
 

@@ -23,6 +23,7 @@ import { ConfigCard } from "./ConfigCard";
 import { DiagnosisCard } from "./DiagnosisCard";
 import { IdeaCard } from "./IdeaCard";
 import { LabReplayHost } from "./LabReplay";
+import { LibraryHost } from "./LibraryHost";
 import { useLabor } from "./laborStore";
 import { HeatmapCard, OosCard, OverfitCard, WalkForwardCard } from "./RobustCards";
 import { RunCard } from "./RunCard";
@@ -155,6 +156,7 @@ export function LaborView({ className }: { className?: string }) {
         </Cell>
       </Section>
       <LabReplayHost />
+      <LibraryHost />
     </div>
   );
 }
