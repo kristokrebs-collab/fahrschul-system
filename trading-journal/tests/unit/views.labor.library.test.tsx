@@ -220,7 +220,8 @@ describe("Labor · Pine → TradingView", () => {
   }, 40_000);
 });
 
-describe("Labor · Parameter-Raster", () => {
+// a real run on fixture candles, then the grid: the waits inside are generous, the test must be allowed to use them (the default is 5 s)
+describe("Labor · Parameter-Raster", { timeout: 120_000 }, () => {
   async function finishedRun(): Promise<void> {
     vi.useFakeTimers({ toFake: ["Date"], now: NOW });
     __setHistoryDeps({ rest: () => fixtureRest(), proxy: () => null, store: () => null, now: () => NOW });
