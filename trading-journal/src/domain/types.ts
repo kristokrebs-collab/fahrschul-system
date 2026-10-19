@@ -289,6 +289,11 @@ export interface Settings {
    * The five fixed levels stay in `market` and are derived into the model on read.
    */
   keyLevels?: unknown;
+  /**
+   * Preis- und RSI-Struktur (F05): the timeframes read and the chart switch. Versioned passthrough (`{ v: 1, tfs, chart }`,
+   * see `@/domain/trendlines`); absent until the user changes something.
+   */
+  trendlines?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */
