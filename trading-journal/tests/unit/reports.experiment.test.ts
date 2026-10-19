@@ -136,7 +136,7 @@ describe("Vorschlag", () => {
     const p = proposeExperiment({ recs: [rec({ id: "behavior:revenge", behavior: "revenge" })], settings: COACH_SETTINGS, events, list, acc: "all", sourceWeek: WEEK_B })!;
     expect(p.experiment).toMatchObject({ id: "2026-W12|behavior:revenge", weekKey: "2026-W12", sourceWeek: "2026-W11", comparator: "atMost", target: 0, minTrades: 5, acc: "all" });
     expect(p.experiment.baseline).toEqual({ n: 7, value: 1 });
-    expect(p.experiment.hypothesis).toBe("Ich kann Revenge-Trade in einer Woche ganz vermeiden.");
+    expect(p.experiment.hypothesis).toBe("Ich kann in einer Woche ganz auf das Muster „Revenge-Trade“ verzichten.");
     expect(p.target).toBe("Nächste Woche: Revenge-Trade: 0 – bei mindestens 5 Trades.");
     expect(p.declined).toBe(false);
     expect(p.experiment.evidence).toEqual(["a", "b"]);

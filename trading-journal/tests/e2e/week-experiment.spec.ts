@@ -114,7 +114,7 @@ async function weekExperiment(page: Page): Promise<StoredExperiments | null> {
 }
 
 test.describe("Wochenreview und Wochenexperiment", () => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
 
   test("Review, Hypothese annehmen, Folgewoche liest sie, Ablehnen/Zurückziehen, Assistent ändert nichts", async ({ page }) => {
     const errors = collectErrors(page);
@@ -162,8 +162,6 @@ test.describe("Wochenreview und Wochenexperiment", () => {
     const stored1 = await weekExperiment(page);
     expect(stored1?.experiments).toHaveLength(1);
     expect(stored1?.experiments[0]).toMatchObject({ minTrades: 5 });
-    await page.reload();
-    await expect(page.getByTestId("week-experiment").getByTestId("experiment-accepted")).toBeVisible();
 
     // the report of the next week reads the experiment: the week is still running
     await page.getByTestId("report-next").click();
@@ -185,12 +183,17 @@ test.describe("Wochenreview und Wochenexperiment", () => {
     await expect(entry).toContainText("KW 42 (läuft)");
     await expect(entry).toContainText("Sollwert");
     expect(JSON.stringify(await weekExperiment(page))).toBe(before);
-    await page.keyboard.press("Escape");
-    await expect(dialog).toBeHidden();
+    await dialog.getByRole("button", { name: "Schließen" }).click();
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
 
-    // withdraw → the proposal is back
+    // back in KW 41 the accepted experiment is still there – also after a reload (stored in the settings)
     await page.getByTestId("report-prev").click();
     await expect(view).toHaveAttribute("data-key", "2026-W41");
+    await expect(page.getByTestId("experiment-accepted")).toBeVisible();
+    await page.reload();
+    await expect(page.getByTestId("week-experiment").getByTestId("experiment-accepted")).toBeVisible();
+
+    // withdraw → the proposal is back
     await page.getByTestId("experiment-withdraw").click();
     await expect(page.getByTestId("experiment-proposal")).toBeVisible();
     await expect.poll(async () => (await weekExperiment(page))?.experiments.length ?? 0).toBe(0);

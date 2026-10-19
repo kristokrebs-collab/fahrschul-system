@@ -23,7 +23,6 @@ import type { GradedPart, Side, Signals, SignalCfg } from "@/domain/signals";
 import { pushToast } from "@/store/uiStore";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { logExternalDelivery } from "../keylevels/deliveryLog";
-import { recordSignalEvent } from "../signalArchive";
 
 export const SIGNAL_LAST_KEY = storageKey("signal-last");
 export const SIGNAL_TOAST_MS = 5200;
@@ -145,9 +144,14 @@ function fire(side: Side, s: Signals & { cfg: SignalCfg }, now: number): void {
   const detail = signalNotifyDetail(s, side);
   pushToast({ kind: "signal", title: v.label, value: `Score ${v.score}`, valueTone: side === "long" ? "win" : "loss", detail, duration: SIGNAL_TOAST_MS });
   logExternalDelivery("signal", v.label, `Score ${v.score} · ${detail}`);
-  // F32: the structured event (market, side, time) for the „Verpasste Chancen“ comparison with the journal
+  // F32: the structured event (market, side, time) for the „Verpasste Chancen“ comparison with the journal – loaded on demand,
+  // the archive code stays out of the first load
   const symbol = (s as { symbol?: string }).symbol ?? "";
-  recordSignalEvent({ key: `entry|${symbol}|${side}|${barOpen}`, at: now, source: "entry", kind: "entry", entry: true, symbol, side, tf: s.checks[0]?.tf ?? null, label: v.label, detail, strength: v.strength, score: v.score, ref: null });
+  const tf = s.checks[0]?.tf ?? null;
+  const score = v.score;
+  void import("../signalArchive").then((m) =>
+    m.recordSignalEvent({ key: `entry|${symbol}|${side}|${barOpen}`, at: now, source: "entry", kind: "entry", entry: true, symbol, side, tf, label: v.label, detail, strength: v.strength, score, ref: null }),
+  );
   if (s.cfg.notify) systemNotification(v.label, `Score ${v.score} · ${detail}`);
   writeJson(SIGNAL_LAST_KEY, { ...last, [side]: { barOpen, strength: v.strength, at: now } satisfies Notified });
 }

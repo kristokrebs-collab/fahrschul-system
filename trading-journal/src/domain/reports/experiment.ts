@@ -340,7 +340,7 @@ export function proposeExperiment(input: ProposeInput): ExperimentProposal | nul
 function hypothesisOf(m: ExperimentMeasure, comparator: "atLeast" | "atMost", target: number): string {
   switch (m.kind) {
     case "behavior":
-      return `Ich kann ${BEHAVIOR_LABEL[m.behavior]} in einer Woche ${target === 0 ? "ganz vermeiden" : `auf höchstens ${target} begrenzen`}.`;
+      return `Ich kann in einer Woche ${target === 0 ? "ganz auf" : `höchstens ${target}× auf`} das Muster „${BEHAVIOR_LABEL[m.behavior]}“ ${target === 0 ? "verzichten" : "zurückgreifen"}.`;
     case "ruleBreaks":
       return "Ich kann eine Woche ohne Regelverstoß handeln.";
     case "journalRate":

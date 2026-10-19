@@ -34,7 +34,7 @@ const EXP: Experiment = {
   v: 1,
   recId: "behavior:revenge",
   title: "Revenge-Trades vermeiden",
-  hypothesis: "Ich kann Revenge-Trade in einer Woche ganz vermeiden.",
+  hypothesis: "Ich kann in einer Woche ganz auf das Muster „Revenge-Trade“ verzichten.",
   why: "x",
   measure: { kind: "behavior", behavior: "revenge" },
   comparator: "atMost",
