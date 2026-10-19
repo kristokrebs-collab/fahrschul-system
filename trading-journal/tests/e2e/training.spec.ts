@@ -194,10 +194,13 @@ test.describe("Was wäre wenn · Lernmodus", () => {
     if (isMobile(info)) await expectNoHorizontalScroll(page);
 
     // the remaining cases: wait, with a reason; the last button ends the round
-    for (let i = 0; i < 3; i++) {
-      await kase.getByTestId("training-next").click();
+    const total = Number(/von (\d+)/.exec((await kase.locator("span").first().textContent()) ?? "")?.[1]);
+    expect(total).toBeGreaterThanOrEqual(2);
+    for (let i = 2; i <= total; i++) {
+      await sheet.getByTestId("training-next").click();
       const next = sheet.getByTestId("training-case");
-      if (!(await next.isVisible().catch(() => false))) break;
+      await expect(next).toContainText(`Fall ${i} von ${total}`, { timeout: 30_000 });
+      await expect(next).toHaveAttribute("data-phase", "decide");
       await expect(next.locator('[data-ready="true"]')).toBeVisible({ timeout: 20_000 });
       await next.getByRole("radio", { name: "Unsicher" }).click();
       await next.getByRole("radio", { name: "Warten" }).click();
@@ -205,6 +208,7 @@ test.describe("Was wäre wenn · Lernmodus", () => {
       await next.getByTestId("training-commit").click();
       await expect(next.getByTestId("training-reveal")).toBeVisible({ timeout: 20_000 });
     }
+    await expect(sheet.getByTestId("training-next")).toHaveText("Training beenden");
     await sheet.getByTestId("training-next").click();
 
     // back at the start: the summary of the round and the history with its sample size
@@ -214,7 +218,7 @@ test.describe("Was wäre wenn · Lernmodus", () => {
     await expect(hist.getByTestId("hist-recognition")).toContainText("n = ");
     await expect(hist).toContainText("keine Aussage über deinen Handel");
     const rounds = (await stored<{ training: { rounds: unknown[] } }>(page, "tj2-settings"))!.training.rounds;
-    expect(rounds.length).toBeGreaterThanOrEqual(2);
+    expect(rounds.length).toBe(total);
     // the journal's trades are untouched
     expect(((await stored<unknown[]>(page, "tj2-trades")) ?? []).length).toBe(4);
     if (isMobile(info)) await expectNoHorizontalScroll(page);
