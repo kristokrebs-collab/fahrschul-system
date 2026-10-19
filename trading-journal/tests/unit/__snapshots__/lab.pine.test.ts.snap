@@ -1,0 +1,950 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Pine-Skripte (Snapshots) > EMA-Kreuz, beide Seiten, Trailing und Gegensignal 1`] = `
+"//@version=6
+// ════════════════════════════════════════════════════════════════════════════════
+// Trading-Journal · Labor → Pine · Test
+// Idee: EMA-Kreuz 9/21 · Markt im Labor: BTCUSDT · Ausführung 1h
+//
+// So liest sich die Idee:
+//   Long wenn EMA 9 kreuzt EMA 21 nach oben.
+//   Short wenn EMA 9 kreuzt EMA 21 nach unten.
+//   Stop: 2 × ATR(14). Kein festes Ziel. Trailing-Stop 2,5 × ATR hinter dem besten Kurs ab +1 R. Ausstieg bei neuem Gegensignal.
+//
+// WICHTIG – lies das, bevor du Zahlen vergleichst:
+//   Das ist ein Nachbau der Regeln, kein Beweis. Ergebnisse in TradingView weichen vom Labor ab, weil Kerzen,
+//   Gebühren und Annahmen verschieden sind:
+//   • Kerzen: Das Labor rechnet auf Binance-USDⓈ-M-Kerzen, TradingView auf dem Feed des gewählten Symbols. Schon kleine Unterschiede in Hoch, Tief oder Volumen verschieben einzelne Signale.
+//   • Gebühren: Das Labor zahlt für Ziele (Limit) die Maker-Gebühr und für alles andere die Taker-Gebühr. Das Skript setzt EINE Gebühr (Taker) für jeden Fill.
+//   • Slippage: TradingView kennt sie nur in Ticks. Das Labor rechnet je Market- und Stop-Fill, nie bei Zielen.
+//   • Reihenfolge in einer Kerze: Liegen Stop und Ziel in derselben Kerze, nimmt das Labor den Stop (vorsichtig). TradingView simuliert einen Weg durch die Kerze und kann das Ziel zuerst treffen.
+//   • Lücken: Liegt die Eröffnung der Folgekerze schon hinter Stop oder Ziel, überspringt das Labor das Signal. Das Skript steigt trotzdem ein.
+//   • Verwaltung (Break-even, Trailing, Teil-Gewinn, Zeit-Stop): Das Labor entscheidet zum Kerzenschluss und wirkt ab der nächsten Kerze; das Skript tut dasselbe, der Zeit-Stop läuft aber zur nächsten Eröffnung.
+//   • Höhere Zeitebenen: nur geschlossene Kerzen (request.security ohne lookahead).
+//   • Slippage: im Lauf 2 bp je Fill ≈ 130 Ticks bei Kurs 65000 und Tick 0,1.
+//   • Funding: im Lauf die echte Historie der Börse; TradingView rechnet kein Funding.
+//
+// Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
+// Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// ════════════════════════════════════════════════════════════════════════════════
+
+strategy("EMA-Kreuz 9/21", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
+
+// ── Einstellungen ───────────────────────────────────────────────────────────────
+float riskPct = input.float(1.0, "Risiko je Trade (% des Kontos)", minval = 0.05, maxval = 10, step = 0.05, group = "Größe")
+float maxLev = input.float(5.0, "Maximaler Hebel (Positionswert / Konto)", minval = 1, maxval = 125, step = 1, group = "Größe")
+float stopAtr = input.float(2.0, "Stop (× ATR 14)", minval = 0.3, maxval = 10, step = 0.1, group = "Stop und Ziel")
+float trailVal = input.float(2.5, "Trailing-Stop (× ATR 14)", minval = 0.2, step = 0.1, group = "Verwaltung")
+float trailFromR = input.float(1.0, "Trailing ab R", minval = 0, step = 0.25, group = "Verwaltung")
+int n1_fast = input.int(9, "n1 · Schnell", minval = 2, maxval = 400, group = "Long · MA-Kreuzung")
+int n1_slow = input.int(21, "n1 · Langsam", minval = 3, maxval = 400, group = "Long · MA-Kreuzung")
+int n1_within = input.int(1, "n1 · Innerhalb der letzten (Kerzen)", minval = 1, maxval = 50, group = "Long · MA-Kreuzung")
+int n11_fast = input.int(9, "n11 · Schnell", minval = 2, maxval = 400, group = "Short · MA-Kreuzung")
+int n11_slow = input.int(21, "n11 · Langsam", minval = 3, maxval = 400, group = "Short · MA-Kreuzung")
+int n11_within = input.int(1, "n11 · Innerhalb der letzten (Kerzen)", minval = 1, maxval = 50, group = "Short · MA-Kreuzung")
+
+// ── Hilfsfunktionen ─────────────────────────────────────────────────────────────
+// „innerhalb der letzten n Kerzen“ für Ereignisse
+f_within(bool ev, int n) =>
+    int bs = ta.barssince(ev)
+    n <= 1 ? ev : (not na(bs) and bs < n)
+
+// ── Bausteine (jeweils auf der Zeitebene des Bausteins, nur geschlossene Kerzen) ───
+// n1 · Long · EMA 9 kreuzt EMA 21 nach oben
+f_n1() =>
+    float fastMa = ta.ema(close, n1_fast)
+    float slowMa = ta.ema(close, n1_slow)
+    bool res = f_within(ta.crossover(fastMa, slowMa), n1_within)
+    bar_index < 64 ? false : res
+// n11 · Short · EMA 9 kreuzt EMA 21 nach unten
+f_n11() =>
+    float fastMa = ta.ema(close, n11_fast)
+    float slowMa = ta.ema(close, n11_slow)
+    bool res = f_within(ta.crossunder(fastMa, slowMa), n11_within)
+    bar_index < 64 ? false : res
+
+// ── Bedingungen auf dem Chart ───────────────────────────────────────────────────
+bool n1 = f_n1()
+bool n11 = f_n11()
+bool longHit = n1
+bool shortHit = n11
+
+// ── Signale: nur ein NEUES Signal zählt (die Bedingung war an der Kerze davor nicht erfüllt) ──
+bool flat = strategy.position_size == 0
+bool longEdge = longHit and not longHit[1]
+bool shortEdge = shortHit and not shortHit[1]
+float atr14 = ta.atr(14)
+
+// ── Größe: Risiko % des Kontos zwischen Einstieg und Stop, gedeckelt durch den Hebel ──
+f_qty(float entryPx, float stopPx) =>
+    float dist = math.abs(entryPx - stopPx)
+    float eq = strategy.equity
+    float risk = dist > 0 ? eq * riskPct / 100 / dist : 0.0
+    math.min(risk, eq * maxLev / entryPx)
+
+var float sigStop = na
+var float sigTgt = na
+var float curStop = na
+var float stop0 = na
+var float tgt = na
+var float peak = na
+var float posQty0 = na
+var float partPx = na
+var bool beDone = false
+var bool partDone = false
+
+// ── Einstieg: bei Schluss der Signalkerze bestellt, gefüllt zur Eröffnung der nächsten ──
+if flat and longEdge and not shortEdge
+    float stopPx = close - stopAtr * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx < close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := na
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Long", strategy.long, qty = qty, comment = "EMA-Kreuz 9/21")
+            strategy.exit("Long X", "Long", stop = sigStop, limit = sigTgt)
+if flat and shortEdge and not longEdge
+    float stopPx = close + stopAtr * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx > close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := na
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Short", strategy.short, qty = qty, comment = "EMA-Kreuz 9/21")
+            strategy.exit("Short X", "Short", stop = sigStop, limit = sigTgt)
+
+// ── Verwaltung der offenen Position (zum Kerzenschluss entschieden, ab der nächsten Kerze wirksam) ──
+bool newPos = strategy.position_size != 0 and strategy.position_size[1] == 0
+if strategy.position_size != 0
+    bool isLong = strategy.position_size > 0
+    string idn = isLong ? "Long" : "Short"
+    float entryPx = strategy.position_avg_price
+    if newPos
+        stop0 := sigStop
+        curStop := sigStop
+        tgt := sigTgt
+        peak := entryPx
+        posQty0 := math.abs(strategy.position_size)
+        beDone := false
+        partDone := false
+    float risk0 = math.abs(entryPx - stop0)
+    peak := isLong ? math.max(peak, high) : math.min(peak, low)
+    bool armed = trailFromR <= 0 or (isLong ? peak >= entryPx + trailFromR * risk0 : peak <= entryPx - trailFromR * risk0)
+    if armed
+        float tdist = trailVal * atr14
+        if tdist > 0
+            float tlvl = isLong ? peak - tdist : peak + tdist
+            curStop := isLong ? math.max(curStop, tlvl) : math.min(curStop, tlvl)
+    strategy.exit(idn + " X", idn, stop = curStop, limit = tgt)
+    if isLong and shortEdge
+        strategy.close("Long", comment = "Gegensignal")
+    if not isLong and longEdge
+        strategy.close("Short", comment = "Gegensignal")
+
+// ── Anzeige ─────────────────────────────────────────────────────────────────────
+plotshape(flat and longEdge, "Long-Signal", shape.triangleup, location.belowbar, color.new(color.teal, 0), size = size.tiny)
+plotshape(flat and shortEdge, "Short-Signal", shape.triangledown, location.abovebar, color.new(color.red, 0), size = size.tiny)
+plot(strategy.position_size != 0 ? curStop : na, "Stop", color.new(color.orange, 20), style = plot.style_linebr)
+"
+`;
+
+exports[`Pine-Skripte (Snapshots) > Opening-Range-Ausbruch London (Sitzung, Swing-Stop, beide Seiten) 1`] = `
+"//@version=6
+// ════════════════════════════════════════════════════════════════════════════════
+// Trading-Journal · Labor → Pine · Test
+// Idee: Opening-Range-Ausbruch London · Markt im Labor: BTCUSDT · Ausführung 15m
+//
+// So liest sich die Idee:
+//   Long wenn Schluss über der Opening Range (60 Min ab London (07:00 UTC), 4 h gültig, erster Ausbruch).
+//   Short wenn Schluss unter der Opening Range (60 Min ab London (07:00 UTC), 4 h gültig, erster Ausbruch).
+//   Stop: 5-Kerzen-Swing plus 0,1 × ATR. Ziel bei 2 R. Zeit-Stop nach 32 Kerzen.
+//
+// WICHTIG – lies das, bevor du Zahlen vergleichst:
+//   Das ist ein Nachbau der Regeln, kein Beweis. Ergebnisse in TradingView weichen vom Labor ab, weil Kerzen,
+//   Gebühren und Annahmen verschieden sind:
+//   • Kerzen: Das Labor rechnet auf Binance-USDⓈ-M-Kerzen, TradingView auf dem Feed des gewählten Symbols. Schon kleine Unterschiede in Hoch, Tief oder Volumen verschieben einzelne Signale.
+//   • Gebühren: Das Labor zahlt für Ziele (Limit) die Maker-Gebühr und für alles andere die Taker-Gebühr. Das Skript setzt EINE Gebühr (Taker) für jeden Fill.
+//   • Slippage: TradingView kennt sie nur in Ticks. Das Labor rechnet je Market- und Stop-Fill, nie bei Zielen.
+//   • Reihenfolge in einer Kerze: Liegen Stop und Ziel in derselben Kerze, nimmt das Labor den Stop (vorsichtig). TradingView simuliert einen Weg durch die Kerze und kann das Ziel zuerst treffen.
+//   • Lücken: Liegt die Eröffnung der Folgekerze schon hinter Stop oder Ziel, überspringt das Labor das Signal. Das Skript steigt trotzdem ein.
+//   • Verwaltung (Break-even, Trailing, Teil-Gewinn, Zeit-Stop): Das Labor entscheidet zum Kerzenschluss und wirkt ab der nächsten Kerze; das Skript tut dasselbe, der Zeit-Stop läuft aber zur nächsten Eröffnung.
+//   • Höhere Zeitebenen: nur geschlossene Kerzen (request.security ohne lookahead).
+//   • Slippage: im Lauf 2 bp je Fill ≈ 130 Ticks bei Kurs 65000 und Tick 0,1.
+//   • Funding: im Lauf die echte Historie der Börse; TradingView rechnet kein Funding.
+//
+// Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
+// Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// ════════════════════════════════════════════════════════════════════════════════
+
+strategy("Opening-Range-Ausbruch London", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
+
+// ── Einstellungen ───────────────────────────────────────────────────────────────
+float riskPct = input.float(1.0, "Risiko je Trade (% des Kontos)", minval = 0.05, maxval = 10, step = 0.05, group = "Größe")
+float maxLev = input.float(5.0, "Maximaler Hebel (Positionswert / Konto)", minval = 1, maxval = 125, step = 1, group = "Größe")
+int stopSwing = input.int(5, "Stop: Swing über N Kerzen", minval = 2, maxval = 200, group = "Stop und Ziel")
+float stopBuf = input.float(0.1, "Stop: Puffer (× ATR 14)", minval = 0, maxval = 3, step = 0.05, group = "Stop und Ziel")
+float targetR = input.float(2.0, "Ziel (Vielfaches des Risikos, R)", minval = 0.25, maxval = 20, step = 0.25, group = "Stop und Ziel")
+int maxBarsIn = input.int(32, "Zeit-Stop (Kerzen)", minval = 1, group = "Verwaltung")
+int n1_minutes = input.int(60, "n1 · Spanne (Minuten)", minval = 5, maxval = 480, group = "Long · Opening-Range-Ausbruch")
+int n1_validHours = input.int(4, "n1 · Gültig (Stunden)", minval = 1, maxval = 12, group = "Long · Opening-Range-Ausbruch")
+int n2_minutes = input.int(60, "n2 · Spanne (Minuten)", minval = 5, maxval = 480, group = "Short · Opening-Range-Ausbruch")
+int n2_validHours = input.int(4, "n2 · Gültig (Stunden)", minval = 1, maxval = 12, group = "Short · Opening-Range-Ausbruch")
+
+// ── Hilfsfunktionen ─────────────────────────────────────────────────────────────
+// „innerhalb der letzten n Kerzen“ für Ereignisse
+f_within(bool ev, int n) =>
+    int bs = ta.barssince(ev)
+    n <= 1 ? ev : (not na(bs) and bs < n)
+
+// ── Bausteine (jeweils auf der Zeitebene des Bausteins, nur geschlossene Kerzen) ───
+// n1 · Long · Schluss über der Opening Range (60 Min ab London (07:00 UTC), 4 h gültig, erster Ausbruch)
+f_n1() =>
+    // Spanne: die ersten 60 Minuten ab 7:00 UTC; gilt 4 Stunden nach ihrem Ende
+    int sod = hour(time, "UTC") * 3600 + minute(time, "UTC") * 60
+    int dkey = math.floor(time / 86400000)
+    int barSec = timeframe.in_seconds()
+    int rangeEnd = 25200 + n1_minutes * 60
+    var float hi = na
+    var float lo = na
+    var int cnt = 0
+    var int firedDay = -1
+    if dkey != dkey[1]
+        hi := na
+        lo := na
+        cnt := 0
+    if sod >= 25200 and sod + barSec <= rangeEnd
+        hi := na(hi) ? high : math.max(hi, high)
+        lo := na(lo) ? low : math.min(lo, low)
+        cnt += 1
+    bool valid = sod >= rangeEnd and sod < rangeEnd + n1_validHours * 3600 and cnt >= math.round(n1_minutes * 60 / barSec)
+    bool hit = valid and close > hi
+    bool res = hit and firedDay != dkey
+    if hit
+        firedDay := dkey
+    bar_index < 0 ? false : res
+// n2 · Short · Schluss unter der Opening Range (60 Min ab London (07:00 UTC), 4 h gültig, erster Ausbruch)
+f_n2() =>
+    // Spanne: die ersten 60 Minuten ab 7:00 UTC; gilt 4 Stunden nach ihrem Ende
+    int sod = hour(time, "UTC") * 3600 + minute(time, "UTC") * 60
+    int dkey = math.floor(time / 86400000)
+    int barSec = timeframe.in_seconds()
+    int rangeEnd = 25200 + n2_minutes * 60
+    var float hi = na
+    var float lo = na
+    var int cnt = 0
+    var int firedDay = -1
+    if dkey != dkey[1]
+        hi := na
+        lo := na
+        cnt := 0
+    if sod >= 25200 and sod + barSec <= rangeEnd
+        hi := na(hi) ? high : math.max(hi, high)
+        lo := na(lo) ? low : math.min(lo, low)
+        cnt += 1
+    bool valid = sod >= rangeEnd and sod < rangeEnd + n2_validHours * 3600 and cnt >= math.round(n2_minutes * 60 / barSec)
+    bool hit = valid and close < lo
+    bool res = hit and firedDay != dkey
+    if hit
+        firedDay := dkey
+    bar_index < 0 ? false : res
+
+// ── Bedingungen auf dem Chart ───────────────────────────────────────────────────
+bool n1 = f_n1()
+bool n2 = f_n2()
+bool longHit = n1
+bool shortHit = n2
+
+// ── Signale: nur ein NEUES Signal zählt (die Bedingung war an der Kerze davor nicht erfüllt) ──
+bool flat = strategy.position_size == 0
+bool longEdge = longHit and not longHit[1]
+bool shortEdge = shortHit and not shortHit[1]
+float atr14 = ta.atr(14)
+float swLow = ta.lowest(low, stopSwing)
+float swHigh = ta.highest(high, stopSwing)
+
+// ── Größe: Risiko % des Kontos zwischen Einstieg und Stop, gedeckelt durch den Hebel ──
+f_qty(float entryPx, float stopPx) =>
+    float dist = math.abs(entryPx - stopPx)
+    float eq = strategy.equity
+    float risk = dist > 0 ? eq * riskPct / 100 / dist : 0.0
+    math.min(risk, eq * maxLev / entryPx)
+
+var float sigStop = na
+var float sigTgt = na
+var float curStop = na
+var float stop0 = na
+var float tgt = na
+var float peak = na
+var float posQty0 = na
+var float partPx = na
+var bool beDone = false
+var bool partDone = false
+
+// ── Einstieg: bei Schluss der Signalkerze bestellt, gefüllt zur Eröffnung der nächsten ──
+if flat and longEdge and not shortEdge
+    float stopPx = swLow - stopBuf * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx < close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := close + dist * targetR
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Long", strategy.long, qty = qty, comment = "Opening-Range-Ausbruch London")
+            strategy.exit("Long X", "Long", stop = sigStop, limit = sigTgt)
+if flat and shortEdge and not longEdge
+    float stopPx = swHigh + stopBuf * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx > close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := close - dist * targetR
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Short", strategy.short, qty = qty, comment = "Opening-Range-Ausbruch London")
+            strategy.exit("Short X", "Short", stop = sigStop, limit = sigTgt)
+
+// ── Verwaltung der offenen Position (zum Kerzenschluss entschieden, ab der nächsten Kerze wirksam) ──
+bool newPos = strategy.position_size != 0 and strategy.position_size[1] == 0
+if strategy.position_size != 0
+    bool isLong = strategy.position_size > 0
+    string idn = isLong ? "Long" : "Short"
+    float entryPx = strategy.position_avg_price
+    if newPos
+        stop0 := sigStop
+        curStop := sigStop
+        tgt := sigTgt
+        peak := entryPx
+        posQty0 := math.abs(strategy.position_size)
+        beDone := false
+        partDone := false
+    float risk0 = math.abs(entryPx - stop0)
+    peak := isLong ? math.max(peak, high) : math.min(peak, low)
+    strategy.exit(idn + " X", idn, stop = curStop, limit = tgt)
+    if bar_index - strategy.opentrades.entry_bar_index(0) + 1 >= maxBarsIn
+        strategy.close_all(comment = "Zeit-Stop")
+
+// ── Anzeige ─────────────────────────────────────────────────────────────────────
+plotshape(flat and longEdge, "Long-Signal", shape.triangleup, location.belowbar, color.new(color.teal, 0), size = size.tiny)
+plotshape(flat and shortEdge, "Short-Signal", shape.triangledown, location.abovebar, color.new(color.red, 0), size = size.tiny)
+plot(strategy.position_size != 0 ? curStop : na, "Stop", color.new(color.orange, 20), style = plot.style_linebr)
+"
+`;
+
+exports[`Pine-Skripte (Snapshots) > Rücksetzer im Trend: Break-even auf Netto, höhere Zeit-Ebene in einer Gruppe 1`] = `
+"//@version=6
+// ════════════════════════════════════════════════════════════════════════════════
+// Trading-Journal · Labor → Pine · Test
+// Idee: Rücksetzer im Trend · Markt im Labor: BTCUSDT · Ausführung 4h
+//
+// So liest sich die Idee:
+//   Long wenn Schluss über EMA 200 UND RSI(14) kreuzt nach oben 40 (innerhalb der letzten 3 Kerzen) UND Schluss über EMA 50 [1D].
+//   Short wenn Schluss unter EMA 200 UND RSI(14) kreuzt nach unten 60 (innerhalb der letzten 3 Kerzen).
+//   Stop: 1,5 × ATR(14). Ziel bei 2 R. Break-even nach +1 R (Stop auf den Netto-Break-even inkl. Gebühren).
+//
+// WICHTIG – lies das, bevor du Zahlen vergleichst:
+//   Das ist ein Nachbau der Regeln, kein Beweis. Ergebnisse in TradingView weichen vom Labor ab, weil Kerzen,
+//   Gebühren und Annahmen verschieden sind:
+//   • Kerzen: Das Labor rechnet auf Binance-USDⓈ-M-Kerzen, TradingView auf dem Feed des gewählten Symbols. Schon kleine Unterschiede in Hoch, Tief oder Volumen verschieben einzelne Signale.
+//   • Gebühren: Das Labor zahlt für Ziele (Limit) die Maker-Gebühr und für alles andere die Taker-Gebühr. Das Skript setzt EINE Gebühr (Taker) für jeden Fill.
+//   • Slippage: TradingView kennt sie nur in Ticks. Das Labor rechnet je Market- und Stop-Fill, nie bei Zielen.
+//   • Reihenfolge in einer Kerze: Liegen Stop und Ziel in derselben Kerze, nimmt das Labor den Stop (vorsichtig). TradingView simuliert einen Weg durch die Kerze und kann das Ziel zuerst treffen.
+//   • Lücken: Liegt die Eröffnung der Folgekerze schon hinter Stop oder Ziel, überspringt das Labor das Signal. Das Skript steigt trotzdem ein.
+//   • Verwaltung (Break-even, Trailing, Teil-Gewinn, Zeit-Stop): Das Labor entscheidet zum Kerzenschluss und wirkt ab der nächsten Kerze; das Skript tut dasselbe, der Zeit-Stop läuft aber zur nächsten Eröffnung.
+//   • Höhere Zeitebenen: nur geschlossene Kerzen (request.security ohne lookahead).
+//   • Slippage: im Lauf 2 bp je Fill ≈ 130 Ticks bei Kurs 65000 und Tick 0,1.
+//   • Funding: im Lauf die echte Historie der Börse; TradingView rechnet kein Funding.
+//
+// Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
+// Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// ════════════════════════════════════════════════════════════════════════════════
+
+strategy("Rücksetzer im Trend", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
+
+// ── Einstellungen ───────────────────────────────────────────────────────────────
+float riskPct = input.float(1.0, "Risiko je Trade (% des Kontos)", minval = 0.05, maxval = 10, step = 0.05, group = "Größe")
+float maxLev = input.float(5.0, "Maximaler Hebel (Positionswert / Konto)", minval = 1, maxval = 125, step = 1, group = "Größe")
+float stopAtr = input.float(1.5, "Stop (× ATR 14)", minval = 0.3, maxval = 10, step = 0.1, group = "Stop und Ziel")
+float targetR = input.float(2.0, "Ziel (Vielfaches des Risikos, R)", minval = 0.25, maxval = 20, step = 0.25, group = "Stop und Ziel")
+float beVal = input.float(1.0, "Break-even nach R", minval = 0.1, step = 0.1, group = "Verwaltung")
+int n1_len = input.int(200, "n1 · Länge", minval = 2, maxval = 400, group = "Long · Kurs gegen Durchschnitt")
+int n2_len = input.int(14, "n2 · Länge", minval = 2, maxval = 100, group = "Long · RSI Niveau")
+float n2_level = input.float(40.0, "n2 · Niveau", minval = 1.0, maxval = 99.0, step = 1.0, group = "Long · RSI Niveau")
+int n2_within = input.int(3, "n2 · Innerhalb der letzten (Kerzen)", minval = 1, maxval = 50, group = "Long · RSI Niveau")
+int n90_len = input.int(50, "n90 · Länge", minval = 2, maxval = 400, group = "Long · Kurs gegen Durchschnitt")
+int n12_len = input.int(200, "n12 · Länge", minval = 2, maxval = 400, group = "Short · Kurs gegen Durchschnitt")
+int n13_len = input.int(14, "n13 · Länge", minval = 2, maxval = 100, group = "Short · RSI Niveau")
+float n13_level = input.float(60.0, "n13 · Niveau", minval = 1.0, maxval = 99.0, step = 1.0, group = "Short · RSI Niveau")
+int n13_within = input.int(3, "n13 · Innerhalb der letzten (Kerzen)", minval = 1, maxval = 50, group = "Short · RSI Niveau")
+
+// ── Hilfsfunktionen ─────────────────────────────────────────────────────────────
+// „innerhalb der letzten n Kerzen“ für Ereignisse
+f_within(bool ev, int n) =>
+    int bs = ta.barssince(ev)
+    n <= 1 ? ev : (not na(bs) and bs < n)
+
+// ── Bausteine (jeweils auf der Zeitebene des Bausteins, nur geschlossene Kerzen) ───
+// n1 · Long · Schluss über EMA 200
+f_n1() =>
+    float ma = ta.ema(close, n1_len)
+    bool res = close > ma
+    bar_index < 601 ? false : res
+// n2 · Long · RSI(14) kreuzt nach oben 40 (innerhalb der letzten 3 Kerzen)
+f_n2() =>
+    float r = ta.rsi(close, n2_len)
+    bool res = f_within(ta.crossover(r, n2_level), n2_within)
+    bar_index < 16 ? false : res
+// n90 · Long · Schluss über EMA 50 [1D]
+f_n90() =>
+    float ma = ta.ema(close, n90_len)
+    bool res = close > ma
+    bar_index < 151 ? false : res
+// n12 · Short · Schluss unter EMA 200
+f_n12() =>
+    float ma = ta.ema(close, n12_len)
+    bool res = close < ma
+    bar_index < 601 ? false : res
+// n13 · Short · RSI(14) kreuzt nach unten 60 (innerhalb der letzten 3 Kerzen)
+f_n13() =>
+    float r = ta.rsi(close, n13_len)
+    bool res = f_within(ta.crossunder(r, n13_level), n13_within)
+    bar_index < 16 ? false : res
+
+// ── Bedingungen auf dem Chart ───────────────────────────────────────────────────
+bool n1 = f_n1()
+bool n2 = f_n2()
+bool n90 = request.security(syminfo.tickerid, "1D", f_n90(), lookahead = barmerge.lookahead_off)
+bool n12 = f_n12()
+bool n13 = f_n13()
+bool longHit = n1 and n2 and n90
+bool shortHit = n12 and n13
+
+// ── Signale: nur ein NEUES Signal zählt (die Bedingung war an der Kerze davor nicht erfüllt) ──
+bool flat = strategy.position_size == 0
+bool longEdge = longHit and not longHit[1]
+bool shortEdge = shortHit and not shortHit[1]
+float atr14 = ta.atr(14)
+
+// ── Größe: Risiko % des Kontos zwischen Einstieg und Stop, gedeckelt durch den Hebel ──
+f_qty(float entryPx, float stopPx) =>
+    float dist = math.abs(entryPx - stopPx)
+    float eq = strategy.equity
+    float risk = dist > 0 ? eq * riskPct / 100 / dist : 0.0
+    math.min(risk, eq * maxLev / entryPx)
+
+var float sigStop = na
+var float sigTgt = na
+var float curStop = na
+var float stop0 = na
+var float tgt = na
+var float peak = na
+var float posQty0 = na
+var float partPx = na
+var bool beDone = false
+var bool partDone = false
+
+// ── Einstieg: bei Schluss der Signalkerze bestellt, gefüllt zur Eröffnung der nächsten ──
+if flat and longEdge and not shortEdge
+    float stopPx = close - stopAtr * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx < close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := close + dist * targetR
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Long", strategy.long, qty = qty, comment = "Rücksetzer im Trend")
+            strategy.exit("Long X", "Long", stop = sigStop, limit = sigTgt)
+if flat and shortEdge and not longEdge
+    float stopPx = close + stopAtr * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx > close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := close - dist * targetR
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Short", strategy.short, qty = qty, comment = "Rücksetzer im Trend")
+            strategy.exit("Short X", "Short", stop = sigStop, limit = sigTgt)
+
+// ── Verwaltung der offenen Position (zum Kerzenschluss entschieden, ab der nächsten Kerze wirksam) ──
+bool newPos = strategy.position_size != 0 and strategy.position_size[1] == 0
+if strategy.position_size != 0
+    bool isLong = strategy.position_size > 0
+    string idn = isLong ? "Long" : "Short"
+    float entryPx = strategy.position_avg_price
+    if newPos
+        stop0 := sigStop
+        curStop := sigStop
+        tgt := sigTgt
+        peak := entryPx
+        posQty0 := math.abs(strategy.position_size)
+        beDone := false
+        partDone := false
+    float risk0 = math.abs(entryPx - stop0)
+    peak := isLong ? math.max(peak, high) : math.min(peak, low)
+    float beTrig = isLong ? entryPx + beVal * risk0 : entryPx - beVal * risk0
+    float beLvl = entryPx * (1 + (isLong ? 1 : -1) * 0.001) // Gebühren für Ein- und Ausstieg gedeckt (Näherung)
+    if not beDone and ((isLong ? peak >= beTrig : peak <= beTrig))
+        if (isLong ? beLvl < close : beLvl > close)
+            curStop := isLong ? math.max(curStop, beLvl) : math.min(curStop, beLvl)
+            beDone := true
+    strategy.exit(idn + " X", idn, stop = curStop, limit = tgt)
+
+// ── Anzeige ─────────────────────────────────────────────────────────────────────
+plotshape(flat and longEdge, "Long-Signal", shape.triangleup, location.belowbar, color.new(color.teal, 0), size = size.tiny)
+plotshape(flat and shortEdge, "Short-Signal", shape.triangledown, location.abovebar, color.new(color.red, 0), size = size.tiny)
+plot(strategy.position_size != 0 ? curStop : na, "Stop", color.new(color.orange, 20), style = plot.style_linebr)
+"
+`;
+
+exports[`Pine-Skripte (Snapshots) > Teil-Gewinn, Break-even danach, Zeit-Stop, Swing-Stop (Golden Pocket) 1`] = `
+"//@version=6
+// ════════════════════════════════════════════════════════════════════════════════
+// Trading-Journal · Labor → Pine · Test
+// Idee: Golden-Pocket-Rücksetzer · Markt im Labor: BTCUSDT · Ausführung 4h
+//
+// So liest sich die Idee:
+//   Long wenn Kurs schließt in der Fibonacci-Zone 0,618–0,65 des letzten Aufwärts-Swings (Pivot 8) UND Schluss über EMA 200.
+//   Short wenn Kurs schließt in der Fibonacci-Zone 0,618–0,65 des letzten Abwärts-Swings (Pivot 8) UND Schluss unter EMA 200.
+//   Stop: 1,5 × ATR(14). Ziel bei 2,5 R. Break-even nach +1 R (Stop auf den Netto-Break-even inkl. Gebühren). 50 % der Position bei +1 R verkaufen, dann Stop auf Break-even. Zeit-Stop nach 40 Kerzen.
+//
+// WICHTIG – lies das, bevor du Zahlen vergleichst:
+//   Das ist ein Nachbau der Regeln, kein Beweis. Ergebnisse in TradingView weichen vom Labor ab, weil Kerzen,
+//   Gebühren und Annahmen verschieden sind:
+//   • Kerzen: Das Labor rechnet auf Binance-USDⓈ-M-Kerzen, TradingView auf dem Feed des gewählten Symbols. Schon kleine Unterschiede in Hoch, Tief oder Volumen verschieben einzelne Signale.
+//   • Gebühren: Das Labor zahlt für Ziele (Limit) die Maker-Gebühr und für alles andere die Taker-Gebühr. Das Skript setzt EINE Gebühr (Taker) für jeden Fill.
+//   • Slippage: TradingView kennt sie nur in Ticks. Das Labor rechnet je Market- und Stop-Fill, nie bei Zielen.
+//   • Reihenfolge in einer Kerze: Liegen Stop und Ziel in derselben Kerze, nimmt das Labor den Stop (vorsichtig). TradingView simuliert einen Weg durch die Kerze und kann das Ziel zuerst treffen.
+//   • Lücken: Liegt die Eröffnung der Folgekerze schon hinter Stop oder Ziel, überspringt das Labor das Signal. Das Skript steigt trotzdem ein.
+//   • Verwaltung (Break-even, Trailing, Teil-Gewinn, Zeit-Stop): Das Labor entscheidet zum Kerzenschluss und wirkt ab der nächsten Kerze; das Skript tut dasselbe, der Zeit-Stop läuft aber zur nächsten Eröffnung.
+//   • Höhere Zeitebenen: nur geschlossene Kerzen (request.security ohne lookahead).
+//   • Slippage: im Lauf 2 bp je Fill ≈ 130 Ticks bei Kurs 65000 und Tick 0,1.
+//   • Funding: im Lauf die echte Historie der Börse; TradingView rechnet kein Funding.
+//
+// Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
+// Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// ════════════════════════════════════════════════════════════════════════════════
+
+strategy("Golden-Pocket-Rücksetzer", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
+
+// ── Einstellungen ───────────────────────────────────────────────────────────────
+float riskPct = input.float(1.0, "Risiko je Trade (% des Kontos)", minval = 0.05, maxval = 10, step = 0.05, group = "Größe")
+float maxLev = input.float(5.0, "Maximaler Hebel (Positionswert / Konto)", minval = 1, maxval = 125, step = 1, group = "Größe")
+float stopAtr = input.float(1.5, "Stop (× ATR 14)", minval = 0.3, maxval = 10, step = 0.1, group = "Stop und Ziel")
+float targetR = input.float(2.5, "Ziel (Vielfaches des Risikos, R)", minval = 0.25, maxval = 20, step = 0.25, group = "Stop und Ziel")
+float beVal = input.float(1.0, "Break-even nach R", minval = 0.1, step = 0.1, group = "Verwaltung")
+float partAtR = input.float(1.0, "Teil-Gewinn bei R", minval = 0.2, step = 0.1, group = "Verwaltung")
+float partPct = input.float(50.0, "Teil-Gewinn: Anteil %", minval = 5, maxval = 95, step = 5, group = "Verwaltung")
+int maxBarsIn = input.int(40, "Zeit-Stop (Kerzen)", minval = 1, group = "Verwaltung")
+float n1_to = input.float(0.65, "n1 · Zone bis", minval = 0.1, maxval = 1.0, step = 0.01, group = "Long · Fibonacci-Rücksetzer (Golden Pocket)")
+float n1_from = input.float(0.618, "n1 · Zone von", minval = 0.1, maxval = 1.0, step = 0.01, group = "Long · Fibonacci-Rücksetzer (Golden Pocket)")
+int n1_len = input.int(8, "n1 · Pivot-Länge (Kerzen)", minval = 2, maxval = 50, group = "Long · Fibonacci-Rücksetzer (Golden Pocket)")
+int n2_len = input.int(200, "n2 · Länge", minval = 2, maxval = 400, group = "Long · Kurs gegen Durchschnitt")
+float n12_from = input.float(0.618, "n12 · Zone von", minval = 0.1, maxval = 1.0, step = 0.01, group = "Short · Fibonacci-Rücksetzer (Golden Pocket)")
+float n12_to = input.float(0.65, "n12 · Zone bis", minval = 0.1, maxval = 1.0, step = 0.01, group = "Short · Fibonacci-Rücksetzer (Golden Pocket)")
+int n12_len = input.int(8, "n12 · Pivot-Länge (Kerzen)", minval = 2, maxval = 50, group = "Short · Fibonacci-Rücksetzer (Golden Pocket)")
+int n13_len = input.int(200, "n13 · Länge", minval = 2, maxval = 400, group = "Short · Kurs gegen Durchschnitt")
+
+// ── Hilfsfunktionen ─────────────────────────────────────────────────────────────
+// „innerhalb der letzten n Kerzen“ für Ereignisse
+f_within(bool ev, int n) =>
+    int bs = ta.barssince(ev)
+    n <= 1 ? ev : (not na(bs) and bs < n)
+
+// ── Bausteine (jeweils auf der Zeitebene des Bausteins, nur geschlossene Kerzen) ───
+// n1 · Long · Kurs schließt in der Fibonacci-Zone 0,618–0,65 des letzten Aufwärts-Swings (Pivot 8)
+f_n1() =>
+    float ph = ta.pivothigh(high, n1_len, n1_len)
+    float pl = ta.pivotlow(low, n1_len, n1_len)
+    var float swH = na
+    var float swL = na
+    var int swHBar = na
+    var int swLBar = na
+    if not na(ph)
+        swH := ph
+        swHBar := bar_index - n1_len
+    if not na(pl)
+        swL := pl
+        swLBar := bar_index - n1_len
+    bool known = not na(swH) and not na(swL) and swH > swL
+    bool upLeg = swLBar < swHBar
+    float rng = swH - swL
+    float zoneLo = swH - n1_to * rng
+    float zoneHi = swH - n1_from * rng
+    bool inZone = close >= zoneLo and close <= zoneHi
+    bool res = known and upLeg and inZone
+    bar_index < 34 ? false : res
+// n2 · Long · Schluss über EMA 200
+f_n2() =>
+    float ma = ta.ema(close, n2_len)
+    bool res = close > ma
+    bar_index < 601 ? false : res
+// n12 · Short · Kurs schließt in der Fibonacci-Zone 0,618–0,65 des letzten Abwärts-Swings (Pivot 8)
+f_n12() =>
+    float ph = ta.pivothigh(high, n12_len, n12_len)
+    float pl = ta.pivotlow(low, n12_len, n12_len)
+    var float swH = na
+    var float swL = na
+    var int swHBar = na
+    var int swLBar = na
+    if not na(ph)
+        swH := ph
+        swHBar := bar_index - n12_len
+    if not na(pl)
+        swL := pl
+        swLBar := bar_index - n12_len
+    bool known = not na(swH) and not na(swL) and swH > swL
+    bool upLeg = swLBar < swHBar
+    float rng = swH - swL
+    float zoneLo = swL + n12_from * rng
+    float zoneHi = swL + n12_to * rng
+    bool inZone = close >= zoneLo and close <= zoneHi
+    bool res = known and not upLeg and inZone
+    bar_index < 34 ? false : res
+// n13 · Short · Schluss unter EMA 200
+f_n13() =>
+    float ma = ta.ema(close, n13_len)
+    bool res = close < ma
+    bar_index < 601 ? false : res
+
+// ── Bedingungen auf dem Chart ───────────────────────────────────────────────────
+bool n1 = f_n1()
+bool n2 = f_n2()
+bool n12 = f_n12()
+bool n13 = f_n13()
+bool longHit = n1 and n2
+bool shortHit = n12 and n13
+
+// ── Signale: nur ein NEUES Signal zählt (die Bedingung war an der Kerze davor nicht erfüllt) ──
+bool flat = strategy.position_size == 0
+bool longEdge = longHit and not longHit[1]
+bool shortEdge = shortHit and not shortHit[1]
+float atr14 = ta.atr(14)
+
+// ── Größe: Risiko % des Kontos zwischen Einstieg und Stop, gedeckelt durch den Hebel ──
+f_qty(float entryPx, float stopPx) =>
+    float dist = math.abs(entryPx - stopPx)
+    float eq = strategy.equity
+    float risk = dist > 0 ? eq * riskPct / 100 / dist : 0.0
+    math.min(risk, eq * maxLev / entryPx)
+
+var float sigStop = na
+var float sigTgt = na
+var float curStop = na
+var float stop0 = na
+var float tgt = na
+var float peak = na
+var float posQty0 = na
+var float partPx = na
+var bool beDone = false
+var bool partDone = false
+
+// ── Einstieg: bei Schluss der Signalkerze bestellt, gefüllt zur Eröffnung der nächsten ──
+if flat and longEdge and not shortEdge
+    float stopPx = close - stopAtr * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx < close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := close + dist * targetR
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Long", strategy.long, qty = qty, comment = "Golden-Pocket-Rücksetzer")
+            float pPx = close + dist * partAtR
+            if na(sigTgt) or pPx < sigTgt
+                strategy.exit("Long P", "Long", qty_percent = partPct, limit = pPx, stop = sigStop)
+            strategy.exit("Long X", "Long", stop = sigStop, limit = sigTgt)
+if flat and shortEdge and not longEdge
+    float stopPx = close + stopAtr * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx > close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := close - dist * targetR
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Short", strategy.short, qty = qty, comment = "Golden-Pocket-Rücksetzer")
+            float pPx = close - dist * partAtR
+            if na(sigTgt) or pPx > sigTgt
+                strategy.exit("Short P", "Short", qty_percent = partPct, limit = pPx, stop = sigStop)
+            strategy.exit("Short X", "Short", stop = sigStop, limit = sigTgt)
+
+// ── Verwaltung der offenen Position (zum Kerzenschluss entschieden, ab der nächsten Kerze wirksam) ──
+bool newPos = strategy.position_size != 0 and strategy.position_size[1] == 0
+if strategy.position_size != 0
+    bool isLong = strategy.position_size > 0
+    string idn = isLong ? "Long" : "Short"
+    float entryPx = strategy.position_avg_price
+    if newPos
+        stop0 := sigStop
+        curStop := sigStop
+        tgt := sigTgt
+        peak := entryPx
+        posQty0 := math.abs(strategy.position_size)
+        beDone := false
+        partDone := false
+    float risk0 = math.abs(entryPx - stop0)
+    peak := isLong ? math.max(peak, high) : math.min(peak, low)
+    partPx := isLong ? entryPx + partAtR * risk0 : entryPx - partAtR * risk0
+    if not partDone and math.abs(strategy.position_size) < posQty0 * 0.999
+        partDone := true
+    float beTrig = isLong ? entryPx + beVal * risk0 : entryPx - beVal * risk0
+    float beLvl = entryPx * (1 + (isLong ? 1 : -1) * 0.001) // Gebühren für Ein- und Ausstieg gedeckt (Näherung)
+    if not beDone and ((isLong ? peak >= beTrig : peak <= beTrig) or partDone)
+        if (isLong ? beLvl < close : beLvl > close)
+            curStop := isLong ? math.max(curStop, beLvl) : math.min(curStop, beLvl)
+            beDone := true
+    if not partDone and (na(tgt) or (isLong ? partPx < tgt : partPx > tgt))
+        strategy.exit(idn + " P", idn, qty_percent = partPct, limit = partPx, stop = curStop)
+    strategy.exit(idn + " X", idn, stop = curStop, limit = tgt)
+    if bar_index - strategy.opentrades.entry_bar_index(0) + 1 >= maxBarsIn
+        strategy.close_all(comment = "Zeit-Stop")
+
+// ── Anzeige ─────────────────────────────────────────────────────────────────────
+plotshape(flat and longEdge, "Long-Signal", shape.triangleup, location.belowbar, color.new(color.teal, 0), size = size.tiny)
+plotshape(flat and shortEdge, "Short-Signal", shape.triangledown, location.abovebar, color.new(color.red, 0), size = size.tiny)
+plot(strategy.position_size != 0 ? curStop : na, "Stop", color.new(color.orange, 20), style = plot.style_linebr)
+"
+`;
+
+exports[`Pine-Skripte (Snapshots) > die Standardidee (RSI + Tages-EMA, nur Long, ATR-Stop, 2 R) 1`] = `
+"//@version=6
+// ════════════════════════════════════════════════════════════════════════════════
+// Trading-Journal · Labor → Pine · Test
+// Idee: Meine Idee · Markt im Labor: BTCUSDT · Ausführung 4h
+//
+// So liest sich die Idee:
+//   Long wenn RSI(14) unter 40 UND Schluss über EMA 50 [1D].
+//   Stop: 1,5 × ATR(14). Ziel bei 2 R.
+//
+// WICHTIG – lies das, bevor du Zahlen vergleichst:
+//   Das ist ein Nachbau der Regeln, kein Beweis. Ergebnisse in TradingView weichen vom Labor ab, weil Kerzen,
+//   Gebühren und Annahmen verschieden sind:
+//   • Kerzen: Das Labor rechnet auf Binance-USDⓈ-M-Kerzen, TradingView auf dem Feed des gewählten Symbols. Schon kleine Unterschiede in Hoch, Tief oder Volumen verschieben einzelne Signale.
+//   • Gebühren: Das Labor zahlt für Ziele (Limit) die Maker-Gebühr und für alles andere die Taker-Gebühr. Das Skript setzt EINE Gebühr (Taker) für jeden Fill.
+//   • Slippage: TradingView kennt sie nur in Ticks. Das Labor rechnet je Market- und Stop-Fill, nie bei Zielen.
+//   • Reihenfolge in einer Kerze: Liegen Stop und Ziel in derselben Kerze, nimmt das Labor den Stop (vorsichtig). TradingView simuliert einen Weg durch die Kerze und kann das Ziel zuerst treffen.
+//   • Lücken: Liegt die Eröffnung der Folgekerze schon hinter Stop oder Ziel, überspringt das Labor das Signal. Das Skript steigt trotzdem ein.
+//   • Verwaltung (Break-even, Trailing, Teil-Gewinn, Zeit-Stop): Das Labor entscheidet zum Kerzenschluss und wirkt ab der nächsten Kerze; das Skript tut dasselbe, der Zeit-Stop läuft aber zur nächsten Eröffnung.
+//   • Höhere Zeitebenen: nur geschlossene Kerzen (request.security ohne lookahead).
+//   • Slippage: im Lauf 2 bp je Fill ≈ 130 Ticks bei Kurs 65000 und Tick 0,1.
+//   • Funding: im Lauf die echte Historie der Börse; TradingView rechnet kein Funding.
+//
+// Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
+// Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// ════════════════════════════════════════════════════════════════════════════════
+
+strategy("Meine Idee", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
+
+// ── Einstellungen ───────────────────────────────────────────────────────────────
+float riskPct = input.float(1.0, "Risiko je Trade (% des Kontos)", minval = 0.05, maxval = 10, step = 0.05, group = "Größe")
+float maxLev = input.float(5.0, "Maximaler Hebel (Positionswert / Konto)", minval = 1, maxval = 125, step = 1, group = "Größe")
+float stopAtr = input.float(1.5, "Stop (× ATR 14)", minval = 0.3, maxval = 10, step = 0.1, group = "Stop und Ziel")
+float targetR = input.float(2.0, "Ziel (Vielfaches des Risikos, R)", minval = 0.25, maxval = 20, step = 0.25, group = "Stop und Ziel")
+int n1_len = input.int(14, "n1 · Länge", minval = 2, maxval = 100, group = "Long · RSI Niveau")
+float n1_level = input.float(40.0, "n1 · Niveau", minval = 1.0, maxval = 99.0, step = 1.0, group = "Long · RSI Niveau")
+int n2_len = input.int(50, "n2 · Länge", minval = 2, maxval = 400, group = "Long · Kurs gegen Durchschnitt")
+
+// ── Hilfsfunktionen ─────────────────────────────────────────────────────────────
+// „innerhalb der letzten n Kerzen“ für Ereignisse
+f_within(bool ev, int n) =>
+    int bs = ta.barssince(ev)
+    n <= 1 ? ev : (not na(bs) and bs < n)
+
+// ── Bausteine (jeweils auf der Zeitebene des Bausteins, nur geschlossene Kerzen) ───
+// n1 · Long · RSI(14) unter 40
+f_n1() =>
+    float r = ta.rsi(close, n1_len)
+    bool res = r < n1_level
+    bar_index < 16 ? false : res
+// n2 · Long · Schluss über EMA 50 [1D]
+f_n2() =>
+    float ma = ta.ema(close, n2_len)
+    bool res = close > ma
+    bar_index < 151 ? false : res
+
+// ── Bedingungen auf dem Chart ───────────────────────────────────────────────────
+bool n1 = f_n1()
+bool n2 = request.security(syminfo.tickerid, "1D", f_n2(), lookahead = barmerge.lookahead_off)
+bool longHit = n1 and n2
+
+// ── Signale: nur ein NEUES Signal zählt (die Bedingung war an der Kerze davor nicht erfüllt) ──
+bool flat = strategy.position_size == 0
+bool longEdge = longHit and not longHit[1]
+float atr14 = ta.atr(14)
+
+// ── Größe: Risiko % des Kontos zwischen Einstieg und Stop, gedeckelt durch den Hebel ──
+f_qty(float entryPx, float stopPx) =>
+    float dist = math.abs(entryPx - stopPx)
+    float eq = strategy.equity
+    float risk = dist > 0 ? eq * riskPct / 100 / dist : 0.0
+    math.min(risk, eq * maxLev / entryPx)
+
+var float sigStop = na
+var float sigTgt = na
+var float curStop = na
+var float stop0 = na
+var float tgt = na
+var float peak = na
+var float posQty0 = na
+var float partPx = na
+var bool beDone = false
+var bool partDone = false
+
+// ── Einstieg: bei Schluss der Signalkerze bestellt, gefüllt zur Eröffnung der nächsten ──
+if flat and longEdge
+    float stopPx = close - stopAtr * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx < close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := close + dist * targetR
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Long", strategy.long, qty = qty, comment = "Meine Idee")
+            strategy.exit("Long X", "Long", stop = sigStop, limit = sigTgt)
+
+// ── Verwaltung der offenen Position (zum Kerzenschluss entschieden, ab der nächsten Kerze wirksam) ──
+bool newPos = strategy.position_size != 0 and strategy.position_size[1] == 0
+if strategy.position_size != 0
+    bool isLong = strategy.position_size > 0
+    string idn = isLong ? "Long" : "Short"
+    float entryPx = strategy.position_avg_price
+    if newPos
+        stop0 := sigStop
+        curStop := sigStop
+        tgt := sigTgt
+        peak := entryPx
+        posQty0 := math.abs(strategy.position_size)
+        beDone := false
+        partDone := false
+    float risk0 = math.abs(entryPx - stop0)
+    peak := isLong ? math.max(peak, high) : math.min(peak, low)
+    strategy.exit(idn + " X", idn, stop = curStop, limit = tgt)
+
+// ── Anzeige ─────────────────────────────────────────────────────────────────────
+plotshape(flat and longEdge, "Long-Signal", shape.triangleup, location.belowbar, color.new(color.teal, 0), size = size.tiny)
+plot(strategy.position_size != 0 ? curStop : na, "Stop", color.new(color.orange, 20), style = plot.style_linebr)
+"
+`;
+
+exports[`Pine-Skripte (Snapshots) > nicht übersetzbare Bausteine: Funding und MCB-Leiter, namentlich im Kopf, als Eingabe aus 1`] = `
+"//@version=6
+// ════════════════════════════════════════════════════════════════════════════════
+// Trading-Journal · Labor → Pine · Test
+// Idee: Meine Idee · Markt im Labor: BTCUSDT · Ausführung 4h
+//
+// So liest sich die Idee:
+//   Long wenn Funding unter -0,02 % je 8 h ODER RSI(14) unter 25 ODER MCB-Leiter: Long gültig mit Stärke ≥ 3.
+//   Stop: 1,5 × ATR(14). Ziel bei 2 R.
+//
+// WICHTIG – lies das, bevor du Zahlen vergleichst:
+//   Das ist ein Nachbau der Regeln, kein Beweis. Ergebnisse in TradingView weichen vom Labor ab, weil Kerzen,
+//   Gebühren und Annahmen verschieden sind:
+//   • Kerzen: Das Labor rechnet auf Binance-USDⓈ-M-Kerzen, TradingView auf dem Feed des gewählten Symbols. Schon kleine Unterschiede in Hoch, Tief oder Volumen verschieben einzelne Signale.
+//   • Gebühren: Das Labor zahlt für Ziele (Limit) die Maker-Gebühr und für alles andere die Taker-Gebühr. Das Skript setzt EINE Gebühr (Taker) für jeden Fill.
+//   • Slippage: TradingView kennt sie nur in Ticks. Das Labor rechnet je Market- und Stop-Fill, nie bei Zielen.
+//   • Reihenfolge in einer Kerze: Liegen Stop und Ziel in derselben Kerze, nimmt das Labor den Stop (vorsichtig). TradingView simuliert einen Weg durch die Kerze und kann das Ziel zuerst treffen.
+//   • Lücken: Liegt die Eröffnung der Folgekerze schon hinter Stop oder Ziel, überspringt das Labor das Signal. Das Skript steigt trotzdem ein.
+//   • Verwaltung (Break-even, Trailing, Teil-Gewinn, Zeit-Stop): Das Labor entscheidet zum Kerzenschluss und wirkt ab der nächsten Kerze; das Skript tut dasselbe, der Zeit-Stop läuft aber zur nächsten Eröffnung.
+//   • Höhere Zeitebenen: nur geschlossene Kerzen (request.security ohne lookahead).
+//   • Slippage: im Lauf 2 bp je Fill ≈ 130 Ticks bei Kurs 65000 und Tick 0,1.
+//   • Funding: im Lauf die echte Historie der Börse; TradingView rechnet kein Funding.
+//
+// NICHT ÜBERSETZT (nicht still weggelassen, sondern als Eingabe sichtbar, Standard: nicht erfüllt):
+//   • n1 (Long) Funding-Extrem: Funding unter -0,02 % je 8 h – Pine kennt keine Funding-Historie der Börse; der Baustein kann dort nicht rechnen.
+//   • n3 (Long) MCB-Leiter Urteil: MCB-Leiter: Long gültig mit Stärke ≥ 3 – Die MCB-Leiter prüft mehrere Zeitebenen gemeinsam nach den Regeln deines Einstiegs-Checks; das lässt sich nicht als kurzer Pine-Baustein ausdrücken.
+//
+// Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
+// Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// ════════════════════════════════════════════════════════════════════════════════
+
+strategy("Meine Idee", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
+
+// ── Einstellungen ───────────────────────────────────────────────────────────────
+float riskPct = input.float(1.0, "Risiko je Trade (% des Kontos)", minval = 0.05, maxval = 10, step = 0.05, group = "Größe")
+float maxLev = input.float(5.0, "Maximaler Hebel (Positionswert / Konto)", minval = 1, maxval = 125, step = 1, group = "Größe")
+float stopAtr = input.float(1.5, "Stop (× ATR 14)", minval = 0.3, maxval = 10, step = 0.1, group = "Stop und Ziel")
+float targetR = input.float(2.0, "Ziel (Vielfaches des Risikos, R)", minval = 0.25, maxval = 20, step = 0.25, group = "Stop und Ziel")
+bool allow_n1 = input.bool(false, "n1 · NICHT ÜBERSETZT: Funding unter -0,02 % je 8 h – als erfüllt annehmen", group = "NICHT übersetzte Bausteine")
+int n2_len = input.int(14, "n2 · Länge", minval = 2, maxval = 100, group = "Long · RSI Niveau")
+float n2_level = input.float(25.0, "n2 · Niveau", minval = 1.0, maxval = 99.0, step = 1.0, group = "Long · RSI Niveau")
+bool allow_n3 = input.bool(false, "n3 · NICHT ÜBERSETZT: MCB-Leiter: Long gültig mit Stärke ≥ 3 – als erfüllt annehmen", group = "NICHT übersetzte Bausteine")
+
+// ── Hilfsfunktionen ─────────────────────────────────────────────────────────────
+// „innerhalb der letzten n Kerzen“ für Ereignisse
+f_within(bool ev, int n) =>
+    int bs = ta.barssince(ev)
+    n <= 1 ? ev : (not na(bs) and bs < n)
+
+// ── Bausteine (jeweils auf der Zeitebene des Bausteins, nur geschlossene Kerzen) ───
+// n1 · Long · Funding unter -0,02 % je 8 h
+// (nicht übersetzt – siehe Eingabe „allow_n1“)
+// n2 · Long · RSI(14) unter 25
+f_n2() =>
+    float r = ta.rsi(close, n2_len)
+    bool res = r < n2_level
+    bar_index < 16 ? false : res
+// n3 · Long · MCB-Leiter: Long gültig mit Stärke ≥ 3
+// (nicht übersetzt – siehe Eingabe „allow_n3“)
+
+// ── Bedingungen auf dem Chart ───────────────────────────────────────────────────
+bool n1 = allow_n1
+bool n2 = f_n2()
+bool n3 = allow_n3
+bool longHit = n1 or n2 or n3
+
+// ── Signale: nur ein NEUES Signal zählt (die Bedingung war an der Kerze davor nicht erfüllt) ──
+bool flat = strategy.position_size == 0
+bool longEdge = longHit and not longHit[1]
+float atr14 = ta.atr(14)
+
+// ── Größe: Risiko % des Kontos zwischen Einstieg und Stop, gedeckelt durch den Hebel ──
+f_qty(float entryPx, float stopPx) =>
+    float dist = math.abs(entryPx - stopPx)
+    float eq = strategy.equity
+    float risk = dist > 0 ? eq * riskPct / 100 / dist : 0.0
+    math.min(risk, eq * maxLev / entryPx)
+
+var float sigStop = na
+var float sigTgt = na
+var float curStop = na
+var float stop0 = na
+var float tgt = na
+var float peak = na
+var float posQty0 = na
+var float partPx = na
+var bool beDone = false
+var bool partDone = false
+
+// ── Einstieg: bei Schluss der Signalkerze bestellt, gefüllt zur Eröffnung der nächsten ──
+if flat and longEdge
+    float stopPx = close - stopAtr * atr14
+    float dist = math.abs(close - stopPx)
+    if stopPx < close and dist > close * 0.0005
+        sigStop := stopPx
+        sigTgt := close + dist * targetR
+        float qty = f_qty(close, stopPx)
+        if qty > 0
+            strategy.entry("Long", strategy.long, qty = qty, comment = "Meine Idee")
+            strategy.exit("Long X", "Long", stop = sigStop, limit = sigTgt)
+
+// ── Verwaltung der offenen Position (zum Kerzenschluss entschieden, ab der nächsten Kerze wirksam) ──
+bool newPos = strategy.position_size != 0 and strategy.position_size[1] == 0
+if strategy.position_size != 0
+    bool isLong = strategy.position_size > 0
+    string idn = isLong ? "Long" : "Short"
+    float entryPx = strategy.position_avg_price
+    if newPos
+        stop0 := sigStop
+        curStop := sigStop
+        tgt := sigTgt
+        peak := entryPx
+        posQty0 := math.abs(strategy.position_size)
+        beDone := false
+        partDone := false
+    float risk0 = math.abs(entryPx - stop0)
+    peak := isLong ? math.max(peak, high) : math.min(peak, low)
+    strategy.exit(idn + " X", idn, stop = curStop, limit = tgt)
+
+// ── Anzeige ─────────────────────────────────────────────────────────────────────
+plotshape(flat and longEdge, "Long-Signal", shape.triangleup, location.belowbar, color.new(color.teal, 0), size = size.tiny)
+plot(strategy.position_size != 0 ? curStop : na, "Stop", color.new(color.orange, 20), style = plot.style_linebr)
+"
+`;
