@@ -7,7 +7,8 @@
  *   toolbar (12)       kind · ‹ period › · "Neuester" / "Laufend" · focus chips (the hero's split flap rolls along)
  *   Hero (8) · side (4) report hero (net, figures, curve with strip wipe, highlights) · Export + Archiv
  *   sections (focus)   Performance (7) · Vergleich (5) · Strategie (7) · Risiko (5) · Psychologie (6) · Fehler (6) ·
- *                      Zielerreichung (12) · week report only: Wochenreview (7) · Wochenexperiment (5) (F37)
+ *                      Zielerreichung (12) · week report only: Wochenreview (7) · Wochenexperiment (5) (F37) ·
+ *                      month report only: Monatsnutzen (12) (F60)
  *
  * Opening a finished report marks it seen (`settings.coach.reports.seen`, after a short look – flipping through does
  * not count). Registered by the integrator (P14) as page `berichte`.
@@ -31,6 +32,7 @@ import { useBerichteUi } from "./berichteStore";
 import { ExportCard } from "./ExportCard";
 import { useReportPage } from "./hooks";
 import { ReportHero } from "./ReportHero";
+import { MonthBenefitCard } from "./MonthBenefitCard";
 import { ExperimentCard, WeekReviewCard } from "./WeekReview";
 import { CompareCard, GoalsCard, MistakesCard, PerformanceCard, PsychCard, ReportRiskCard, StrategyCard } from "./sections";
 
@@ -203,6 +205,12 @@ export function BerichteView({ className }: { className?: string }) {
       {focus === "all" && kind === "week" && (
         <Cell index={1} span="lg:col-span-5">
           <ExperimentCard page={page} />
+        </Cell>
+      )}
+      {/* F60: the month's look back – also for a month without trades (alerts, check-ins and experiments are recorded too) */}
+      {focus === "all" && kind === "month" && (
+        <Cell index={0} span="lg:col-span-12">
+          <MonthBenefitCard page={page} />
         </Cell>
       )}
     </div>

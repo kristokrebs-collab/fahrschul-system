@@ -8,7 +8,9 @@
  *   Leaks & Edges (12)      edges with confidence meters, leaks with a red sweep, what-if, evidence
  *   Plan (5) · Timeline (7) the three strongest steps (pinnable) · every detected pattern, newest first
  *   Profil (12)             Personal Trading Intelligence, the traits orbiting
- *   Verpasste Chancen (12)  signals of the app without a journal trade (F32, honest about the archive that starts empty)
+ *   Signal-Posteingang (12) the signals / alerts the app raised, with a status and actions (F28)
+ *   Verpasste Chancen (12)  signals of the app without a journal trade, with their outcome (F32, honest about the archive that starts empty)
+ *   Signalbilanz (7) · Daten- und Alarmqualität (5)  per kind / setup / timeframe (F25) · gaps, delay, downtime (F27)
  *
  * Cells reveal once (`Reveal`, ends at `transform: none`). Registered by the integrator (P14) as page `coach`.
  */
@@ -25,12 +27,15 @@ import { useUi, type AccFilter } from "@/store/uiStore";
 import { SEG_TOUCH } from "@/views/insights/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ChatCard } from "./ChatCard";
+import { DataQualityCard } from "./DataQualityCard";
 import { MissedCard } from "./MissedCard";
 import { EdgesCard } from "./EdgesCard";
 import { HeroCard } from "./HeroCard";
 import { useCoach } from "./hooks";
 import { PlanCard } from "./PlanCard";
 import { ProfileCard } from "./ProfileCard";
+import { SignalBalanceCard } from "./SignalBalanceCard";
+import { SignalInboxCard } from "./SignalInboxCard";
 import { TimelineCard } from "./TimelineCard";
 import { TodayCard } from "./TodayCard";
 
@@ -83,7 +88,16 @@ export function CoachView({ className }: { className?: string }) {
         <ProfileCard profile={c.profile} />
       </Cell>
       <Cell index={0} span="lg:col-span-12">
+        <SignalInboxCard list={view.list} now={now} />
+      </Cell>
+      <Cell index={0} span="lg:col-span-12">
         <MissedCard list={view.list} now={now} />
+      </Cell>
+      <Cell index={0} span="lg:col-span-7">
+        <SignalBalanceCard list={view.list} now={now} />
+      </Cell>
+      <Cell index={1} span="lg:col-span-5">
+        <DataQualityCard now={now} />
       </Cell>
     </div>
   );

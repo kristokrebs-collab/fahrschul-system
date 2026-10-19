@@ -78,6 +78,12 @@ export function signalBarOpen(s: Signals, side: Side): number {
   return (c.closeAt - (e ? e.barsAgo : 0) * tfSeconds(c.tf)) * 1000;
 }
 
+/** Close (ms) of the base bar that opened at `barOpen`; `null` when the timeframe is not readable. */
+function barClose(barOpen: number, tf: string | null): number | null {
+  const sec = tf ? tfSeconds(tf) : 0;
+  return barOpen > 0 && sec > 0 ? barOpen + sec * 1000 : null;
+}
+
 /** Feeds one live evaluation into the edge detector (called by the engine, ≤ 1/s). */
 export function noteSignals(s: Signals & { cfg: SignalCfg }, now: number = Date.now()): void {
   st.latest = s;
@@ -150,7 +156,7 @@ function fire(side: Side, s: Signals & { cfg: SignalCfg }, now: number): void {
   const tf = s.checks[0]?.tf ?? null;
   const score = v.score;
   void import("../signalArchive").then((m) =>
-    m.recordSignalEvent({ key: `entry|${symbol}|${side}|${barOpen}`, at: now, source: "entry", kind: "entry", entry: true, symbol, side, tf, label: v.label, detail, strength: v.strength, score, ref: null }),
+    m.recordSignalEvent({ key: `entry|${symbol}|${side}|${barOpen}`, at: now, source: "entry", kind: "entry", entry: true, symbol, side, tf, label: v.label, detail, strength: v.strength, score, ref: null, barClose: barClose(barOpen, tf) }),
   );
   if (s.cfg.notify) systemNotification(v.label, `Score ${v.score} · ${detail}`);
   writeJson(SIGNAL_LAST_KEY, { ...last, [side]: { barOpen, strength: v.strength, at: now } satisfies Notified });

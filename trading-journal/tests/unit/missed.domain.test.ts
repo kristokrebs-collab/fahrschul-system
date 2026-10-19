@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { appendSignalEvent, matchSignals, MISSED_LEAD_MS, MISSED_WINDOW_MS, parseSignalArchive, prune, setSignalWatch, SIGNAL_ARCHIVE_CAP, SIGNAL_ARCHIVE_DAYS, tradeMatchesSignal, type SignalEvent, type SignalEventInput } from "@/domain/missed";
 import { __resetSignalArchive, clearSignalArchive, getSignalArchive, recordSignalEvent, setSignalWatched, SIGNAL_ARCHIVE_KEY } from "@/market/signalArchive";
 import { at, ct, enrichC } from "./coach.fixtures";
+import { signalEvent } from "./missed.fixtures";
 
 const H = 3_600_000;
 const DAY = 24 * H;
@@ -14,7 +15,7 @@ const T = new Date(2026, 2, 4, 10, 0).getTime(); // Wed 10:00
 const NOW = T + 2 * DAY;
 
 const input = (over: Partial<SignalEventInput> = {}): SignalEventInput => ({ key: "k1", at: T, source: "entry", kind: "entry", entry: true, symbol: "BTCUSDT", side: "long", tf: "1h", label: "Starker Long-Einstieg", detail: "Score 85", strength: 3, score: 85, ref: null, ...over });
-const ev = (over: Partial<SignalEventInput> = {}, id = over.key ?? "k1"): SignalEvent => ({ ...input(over), id, watch: false });
+const ev = (over: Partial<SignalEventInput> = {}, id = over.key ?? "k1"): SignalEvent => signalEvent(over, id);
 
 describe("Signalarchiv", () => {
   it("reads garbage as empty and a newer version as foreign", () => {
