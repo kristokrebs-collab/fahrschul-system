@@ -166,3 +166,12 @@ const netExplainer = explain("net", view, settings);        // { title, what, fo
 ## Tests / fixture
 `tests/unit/domain.*.test.ts` (Journal v3: `domain.fills`, `domain.grouping`, `domain.excursion`, `domain.tradeFields`), `tests/unit/lib.*.test.ts`; `tests/fixtures/tj2-v0.json` is a legacy localStorage snapshot
 (`tj2-settings` partial/raw, 13 trades incl. 2 open + one without `account`, 3 `tj2-hyblock` readings) for migration tests.
+
+## Schlüsselmarken, Tagesplan, Alarmstufen, Warum-handeln (F09 / F08 / F22 / F10)
+```
+keylevels/    own key levels (touch · running break · close · N closes · buffer · retest), `evaluateLevel(level, candles, now)`,
+              the five fixed levels derived from `settings.market` (nothing copied), `settings.keyLevels` (versioned passthrough),
+              day plan (range / long / short / wait), alert stages + Zustellprotokoll – see src/domain/keylevels/README.md
+decision/     `explainDecision`: required conditions · optional confirmations · contradictions · missing data, „zu spät“
+              (`lateEntry`, `settings.signals.lateMaxR`, default 0.5 R); a high score never overrides a failed required condition
+```

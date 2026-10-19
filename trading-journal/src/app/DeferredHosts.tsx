@@ -19,6 +19,7 @@
  * | `ReplayHost`, `ExcursionBackfillHost` | P06 | trade replay sheet, idle MAE / MFE backfill |
  * | `ShotImportHost` | F29 | the lazy preview sheet of „Aus Screenshot übernehmen“ + the pill for queued drafts |
  * | `BoxSnapBackfillHost` | P02 | idle Box-zu-Box context at entry for synced / imported trades and other pairs (F02) |
+ * | `KeyLevelHost` | F22 / F08 | stage alerts of the user's own key levels + day-plan change toast, only while the app is open (no plan gate) |
  */
 import { lazy, Suspense, type ReactNode } from "react";
 import { installE2eHooks } from "@/app/e2eHooks";
@@ -32,6 +33,7 @@ import { ExcursionBackfillHost } from "@/journal/ExcursionBackfillHost";
 import { ShotImportHost } from "@/journal/extract/ShotImportHost";
 import { BoxAlertHost } from "@/market/boxes/alerts";
 import { BoxSnapBackfillHost } from "@/market/boxes/BoxSnapBackfillHost";
+import { KeyLevelHost } from "@/market/keylevels/alerts";
 import { SocialHost } from "@/social/ui/SocialHost";
 import { navigate } from "@/store/router";
 import { ReportReadyHost } from "@/views/berichte/ReportReady";
@@ -118,6 +120,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Screenshot-Import">
         <ShotImportHost />
+      </HostSlot>
+      <HostSlot name="Schlüsselmarken-Alarme">
+        <KeyLevelHost />
       </HostSlot>
     </>
   );

@@ -73,3 +73,16 @@ icon) and mount `<BoxAlertHost />` (re-exported here) once among the app hosts. 
   timeframe switch, scanner on demand, settings, alerts, no horizontal scroll, mobile + desktop. Opens
   `PW_MARKT_URL` (default `/dev/markt.html`, i.e. a dev server; set `/#markt` once routed – the markt tests skip when
   the harness is not served). The overview test (RSI pane, box layer, order-flow row) runs on any server.
+
+## Schlüsselmarken, Tagesplan, Alarme (F09 / F08 / F22)
+
+Three cards of this page live in `src/views/schluesselmarken` (`KeyLevelsCard` + `PlanCard` between the chart and the RSI
+lines, `AlertsCard` at the end): the user's own key levels with a status computed from the real candles of each level's
+timeframe, add / edit / duplicate / delete, history with intrabar and close events apart, the precedence rule for
+timeframes that disagree; the day plan (range / long / short / abwarten, each with trigger, invalidation and „Was den Plan
+ändert“); channels, active hours, prepare distance, cooldown and the **Zustellprotokoll** with the plain note that alerts
+only run while the app is open. The five fixed levels of the settings are listed read-only („aus Einstellungen“). Writes go
+to `settings.keyLevels` at once (`writes.ts`, like the Box-Einstellungen). Own levels also draw as chart lines in this
+chart and in the Übersicht chart (`keyLines` prop of `NothingCandleChart`, `src/chart/levels.ts`). Domain, rules and
+migration: `src/domain/keylevels/README.md`; live side: `src/market/keylevels`. Tests: `views.schluesselmarken*.test.ts(x)`,
+`tests/e2e/keylevels.spec.ts`.

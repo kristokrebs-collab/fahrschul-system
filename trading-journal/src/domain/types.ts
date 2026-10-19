@@ -283,6 +283,12 @@ export interface Settings {
    * signal module parses it with its own defaults. Absent until the user saves the signal settings.
    */
   signals?: unknown;
+  /**
+   * Schlüsselmarken (F09/F08/F22): the user's own key levels, the precedence, the alert settings. Versioned passthrough
+   * (`{ v: 1, levels, precedence, alerts, planToast }`, see `@/domain/keylevels`); absent until the user adds a level.
+   * The five fixed levels stay in `market` and are derived into the model on read.
+   */
+  keyLevels?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */

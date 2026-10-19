@@ -17,6 +17,7 @@ import { BOX_TF_MS, normalizeWatchSymbol, type BoxTf } from "@/domain/boxes";
 import type { BiasContext, BiasTest } from "@/domain/biasTest";
 import { getProvider, priceMv, subscribeFeed, tickDirMv, tradeTimeMv, useFeedSelect, volAccumMv, type Candle, type Stamped } from "@/market";
 import { BOX_FEED, type BoxesView } from "@/market/boxes/store";
+import { useKeyLines } from "@/market/keylevels/chartLines";
 import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
 import { useEnriched } from "@/store/journalStore";
@@ -87,6 +88,8 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
   const feedId = BOX_FEED[tf];
   const feed = useFeedSelect(feedId, selectBars, sameBarKey);
   const symbol = view.symbol ?? "";
+  // the user's own key levels (F09) as lines in this chart as well
+  const keyLines = useKeyLines(symbol);
   // 4h: one history page so the oldest boxes have their bars (the provider's ring keeps ~600)
   const [older, setOlder] = useState<{ symbol: string; candles: Candle[] }>({ symbol: "", candles: [] });
   useEffect(() => {
@@ -151,6 +154,7 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
             candles={shownCandles as Candle[]}
             interval={INTERVAL[tf]}
             boxes={mirror.view.layers.boxes ? stable.boxes : NO_BOXES}
+            keyLines={keyLines}
             boxAutoscale
             pane={mirror.view.layers.rsi ? "rsi" : "none"}
             rangeDays={RANGE[tf]}

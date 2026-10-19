@@ -216,3 +216,72 @@ export function clearLevels(series: ISeriesApi<"Candlestick">, handle: LevelLine
     /* series already disposed */
   }
 }
+
+/* ------------------------------------------------------------------------------------ own key levels (F09) */
+
+/** Status of an own key level as the line shows it (mirrors `LevelStatus` of the key-level domain). */
+export type KeyLineStatus = "waiting" | "provisional" | "confirmed" | "invalidated" | "unknown";
+
+/** One own key level as a chart line (the five fixed levels keep their own lines above). */
+export interface KeyLine {
+  id: string;
+  price: number;
+  /** short on-canvas title (name + status glyph), already shortened by the caller */
+  title: string;
+  status: KeyLineStatus;
+}
+
+/** The created lines by level id. */
+export type KeyLineHandle = Map<string, IPriceLine>;
+
+function keyLineOptions(l: KeyLine) {
+  // grey ramp only (the red accent stays the hard invalidation): the state reads from weight and dash
+  const color = l.status === "confirmed" ? ink.fg : l.status === "provisional" ? ink.mute : ink.tick;
+  const lineStyle = l.status === "confirmed" ? LineStyle.Solid : l.status === "provisional" ? LineStyle.Dashed : l.status === "waiting" ? LineStyle.Dotted : LineStyle.SparseDotted;
+  return {
+    price: l.price,
+    color,
+    lineWidth: (l.status === "confirmed" ? 2 : 1) as LineWidth,
+    lineStyle,
+    lineVisible: true,
+    axisLabelVisible: true,
+    title: l.title,
+    axisLabelColor: color,
+    axisLabelTextColor: l.status === "confirmed" || l.status === "provisional" ? ink.bg : ink.onFill,
+  };
+}
+
+/** Creates, updates (in place) and removes the lines of the own key levels; returns the new handle. */
+export function syncKeyLines(series: ISeriesApi<"Candlestick">, lines: readonly KeyLine[], prev: KeyLineHandle | null): KeyLineHandle {
+  const next: KeyLineHandle = new Map();
+  const want = new Set(lines.filter((l) => isSetPrice(l.price)).map((l) => l.id));
+  for (const [id, line] of prev ?? []) {
+    if (want.has(id)) continue;
+    try {
+      series.removePriceLine(line);
+    } catch {
+      /* series already disposed */
+    }
+  }
+  for (const l of lines) {
+    if (!want.has(l.id)) continue;
+    const opts = keyLineOptions(l);
+    const old = prev?.get(l.id);
+    if (old) {
+      old.applyOptions(opts);
+      next.set(l.id, old);
+    } else next.set(l.id, series.createPriceLine({ id: `kl-${l.id}`, ...opts }));
+  }
+  return next;
+}
+
+/** Removes the own-level lines. Safe on a series that is about to be removed. */
+export function clearKeyLines(series: ISeriesApi<"Candlestick">, handle: KeyLineHandle | null): void {
+  for (const line of handle?.values() ?? []) {
+    try {
+      series.removePriceLine(line);
+    } catch {
+      /* series already disposed */
+    }
+  }
+}

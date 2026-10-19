@@ -39,6 +39,7 @@ import { EmptyState } from "@/primitives/EmptyState";
 import { Expander } from "@/primitives/Expander";
 import { Segmented } from "@/primitives/Segmented";
 import { useBoxes } from "@/market/boxes/store";
+import { useKeyLines } from "@/market/keylevels/chartLines";
 import { useEnriched, useJournal } from "@/store/journalStore";
 import { useUi, type ChartInterval, type ChartPane } from "@/store/uiStore";
 import { toChartBoxes } from "@/views/markt/chartBoxes";
@@ -678,6 +679,8 @@ export function ChartCard() {
   const onBoxLayer = useMemo(() => ({ on: boxesOn, onToggle: () => setFlag(BOX_LAYER_FLAG, !boxesOn) }), [boxesOn, setFlag]);
   const active = levelsOn && close4h != null ? scenario(close4h, settings.market) : null;
   const activeScenario = active?.key === "long" || active?.key === "short" ? active.key : null;
+  // the user's own key levels (F09) as lines; the five fixed levels above keep theirs
+  const keyLines = useKeyLines(symbol);
 
   // forming candle: kline frames go straight into the chart (≤ 1 per frame), never through a render
   const subscribeBars = useCallback(
@@ -722,6 +725,7 @@ export function ChartCard() {
         candles={candles}
         interval={interval}
         levels={settings.market}
+        keyLines={keyLines}
         activeScenario={activeScenario}
         markers={markers}
         signals={signals}

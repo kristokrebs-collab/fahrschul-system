@@ -22,6 +22,7 @@ import { STATE_TEXT, strengthText, tfSeconds, WHALE_TITLE } from "@/domain/signa
 import type { GradedPart, Side, Signals, SignalCfg } from "@/domain/signals";
 import { pushToast } from "@/store/uiStore";
 import { readJson, storageKey, writeJson } from "@/store/storage";
+import { logExternalDelivery } from "../keylevels/deliveryLog";
 
 export const SIGNAL_LAST_KEY = storageKey("signal-last");
 export const SIGNAL_TOAST_MS = 5200;
@@ -142,6 +143,7 @@ function fire(side: Side, s: Signals & { cfg: SignalCfg }, now: number): void {
   if (prev && prev.barOpen >= barOpen) return; // once per signal bar (also across reloads and tabs)
   const detail = signalNotifyDetail(s, side);
   pushToast({ kind: "signal", title: v.label, value: `Score ${v.score}`, valueTone: side === "long" ? "win" : "loss", detail, duration: SIGNAL_TOAST_MS });
+  logExternalDelivery("signal", v.label, `Score ${v.score} · ${detail}`);
   if (s.cfg.notify) systemNotification(v.label, `Score ${v.score} · ${detail}`);
   writeJson(SIGNAL_LAST_KEY, { ...last, [side]: { barOpen, strength: v.strength, at: now } satisfies Notified });
 }

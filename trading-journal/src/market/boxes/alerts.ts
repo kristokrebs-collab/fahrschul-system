@@ -20,6 +20,7 @@ import { pushToast } from "@/store/uiStore";
 import { fmt } from "@/chart/format";
 import { getBoxes, retainBoxes, subscribeBoxes, type BoxesView } from "./store";
 import { getScan, retainScanner, subscribeScan, type ScanRow } from "./scanner";
+import { logExternalDelivery } from "../keylevels/deliveryLog";
 
 export const BOX_ALERTS_KEY = storageKey("box-alerts");
 const MAX_SEEN = 200;
@@ -110,6 +111,7 @@ function canNotify(): boolean {
 
 function fire(alert: BoxAlert, notify: boolean): void {
   pushToast({ kind: "signal", title: alert.title, detail: alert.detail });
+  logExternalDelivery("box", alert.title, alert.detail);
   ctl.recent = [alert, ...ctl.recent].slice(0, RECENT_MAX);
   for (const l of [...recentListeners]) l();
   if (notify && canNotify() && typeof document !== "undefined" && document.visibilityState !== "visible") {

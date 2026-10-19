@@ -443,3 +443,19 @@ Stream-drop scenarios (silent socket → REST price within 20 s and ≤ 6 s old 
 6 min → visible, Page Lifecycle `resume`, `pageshow` / `online`, REST failing too → `Verbinde …` → `Kein Live-Kurs`):
 `tests/unit/market.priceFallback.test.ts`; the ladder itself in `market.ws.test.ts`, the pill in `market.mapping.test.ts`
 and `views.overview.marketPill.test.tsx`.
+
+## Schlüsselmarken live (`keylevels/`, F09 / F08 / F22)
+
+Import from `@/market/keylevels` (not part of the `@/market` barrel). `candles.ts`: the candles of a level's OWN timeframe from
+the provider's feeds (30m = 2 × `kline_15m`, 2h / 3h from `kline_1h` – epoch-aligned like the chart's 30m, 4h / 1D / 1W
+straight; a timeframe without candles gives `null` → the level is `unknown`, never another timeframe) and
+`feedAvailability` for the picker. `store.ts`: `useKeyLevels()` / `getKeyLevels()` / `retainKeyLevels()` evaluate the five fixed
+levels and the user's own on a 1-s timer (only when an input changed; published only when something shown changed), levels
+of another symbol are listed but not judged. `alerts.ts`: `KeyLevelHost` (mounted in `DeferredHosts`, only while an own enabled
+level exists) steps the pure stage machine, delivers through the toast island and – permission granted, page not in front – a
+system notification, and writes every outcome to the Zustellprotokoll (`deliveryLog.ts`, `tj2-keylevel-log`, newest 200,
+browser-local). The stage memory is stored (`tj2-keylevel-mem`), so a reload never repeats a stage; the first look at a level
+only seeds. The plan-change toast (`tj2-keylevel-plan`) is on by default only for users with an own level. The existing signal
+and box alerts add their toasts to the same log as lines (log only – their own rules are unchanged). `chartLines.ts`:
+`useKeyLines(symbol)` for the chart lines. **Alerts run only while the app is open** – no server-side monitoring (F21 is not
+part of this). Tests: `tests/unit/market.keylevels.test.ts`.

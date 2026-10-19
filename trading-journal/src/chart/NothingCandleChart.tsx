@@ -47,7 +47,7 @@ import {
   type MainSeries,
   type PaneKind,
 } from "./panes";
-import { clearLevels, LEVEL_KEYS, setLevels, zoneIsSet, type ActiveScenario, type LevelLines } from "./levels";
+import { clearKeyLines, clearLevels, LEVEL_KEYS, setLevels, syncKeyLines, zoneIsSet, type ActiveScenario, type KeyLine, type KeyLineHandle, type LevelLines } from "./levels";
 import { filterTickLabels } from "./axisLabels";
 import { mirrorRsi, NO_MIRROR, type ChartMirror } from "./mirror";
 import { fmt } from "./format";
@@ -122,6 +122,8 @@ export interface NothingCandleChartProps {
   candles: Candle[];
   interval: ChartInterval;
   levels?: MarketLevels;
+  /** the user's own key levels (F09) as lines - the five fixed levels above keep their own */
+  keyLines?: readonly KeyLine[];
   /** highlights the trigger line of the active scenario */
   activeScenario?: ActiveScenario;
   markers?: TradeMarker[];
@@ -193,6 +195,7 @@ interface Instance {
   range: RangeAnimator;
   live: LiveCandle;
   levels: LevelLines | null;
+  keyLines: KeyLineHandle | null;
   built: BuiltMarkers | null;
   /** trade ids that had a marker after the last sync; `null` right after a history load (seed, no ripple) */
   markerIds: Set<string> | null;
@@ -323,6 +326,7 @@ function axisLabelPrices(i: Instance, levels: MarketLevels | undefined): number[
     for (const k of LEVEL_KEYS) if (levels[k] > 0) out.push(levels[k]);
     if (zoneIsSet(levels)) out.push(levels.zoneLow, levels.zoneHigh);
   }
+  for (const l of i.keyLines?.values() ?? []) out.push(l.options().price);
   const last = i.data[i.data.length - 1];
   if (last) out.push(last.close);
   return out;
@@ -548,6 +552,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   candles,
   interval,
   levels,
+  keyLines,
   activeScenario = null,
   markers,
   signals,
@@ -585,7 +590,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   const parked = useRef<ChartRecord | null>(null);
   const tip = useRef<TooltipHandle>(null);
   const cb = useRef<Callbacks>({});
-  const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers; levels?: MarketLevels; activeScenario: ActiveScenario; boxes?: ChartBox[] }>({
+  const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers; levels?: MarketLevels; keyLines?: readonly KeyLine[]; activeScenario: ActiveScenario; boxes?: ChartBox[] }>({
     activeScenario: null,
   });
   /** RSI legend (top left of the RSI pane): text and position written through refs, never React state */
@@ -627,8 +632,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     reduceRef.current = reduce;
   }, [reduce]);
   useEffect(() => {
-    latest.current = { markers, signals, divergences, structure, layers, levels, activeScenario, boxes };
-  }, [markers, signals, divergences, structure, layers, levels, activeScenario, boxes]);
+    latest.current = { markers, signals, divergences, structure, layers, levels, keyLines, activeScenario, boxes };
+  }, [markers, signals, divergences, structure, layers, levels, keyLines, activeScenario, boxes]);
 
   // 1. create once and keep it. A keep-alive <Activity> (the Übersicht on another tab) destroys this effect while the page
   // is hidden but keeps the DOM: the cleanup then PARKS the instance (host still in the document) and the next run
@@ -805,6 +810,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       range,
       live,
       levels: null,
+      keyLines: null,
       built: null,
       markerIds: null,
       bounds: null,
@@ -940,6 +946,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       }
       panes.applyInk();
       if (instance.levels) syncLevels(instance, latest.current.levels, latest.current.activeScenario, true);
+      if (instance.keyLines) instance.keyLines = syncKeyLines(main.candles, latest.current.keyLines ?? [], instance.keyLines);
       if (instance.data.length) syncMarkers(instance, latest.current.markers);
       check.invalidate();
       boxes.invalidate();
@@ -993,6 +1000,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         main.candles.detachPrimitive(boxes);
         Reflect.deleteProperty(node, BOX_DEBUG_KEY);
         clearLevels(main.candles, instance.levels);
+        clearKeyLines(main.candles, instance.keyLines);
         panes.dispose();
         readyRef.current = false;
         // `awayRef` is NOT reset: it mirrors the `follow` state, which a keep-alive <Activity> preserves – a re-created
@@ -1072,6 +1080,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       }
       // levels & markers depend on the loaded bars (zone left edge, snapping, bounds)
       syncLevels(i, latest.current.levels, latest.current.activeScenario, reduceRef.current);
+      if (i.keyLines || latest.current.keyLines?.length) i.keyLines = syncKeyLines(i.main.candles, latest.current.keyLines ?? [], i.keyLines);
       i.markerIds = null;
       i.check.invalidate();
       syncOverlay(i, latest.current);
@@ -1154,6 +1163,14 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     if (!i || (i.applied.levels && i.applied.levels.levels === levels && i.applied.levels.active === activeScenario)) return;
     syncLevels(i, levels, activeScenario, reduceRef.current);
   }, [levels, activeScenario]);
+
+  // 5b. the user's own key levels -> price lines (update in place, no churn while the list is unchanged)
+  useEffect(() => {
+    const i = inst.current;
+    if (!i) return;
+    if (!i.keyLines && !keyLines?.length) return;
+    i.keyLines = syncKeyLines(i.main.candles, keyLines ?? [], i.keyLines);
+  }, [keyLines]);
 
   // 6. markers (re-snapped after every history load, see step 2); a newly saved trade ripples at its marker
   useEffect(() => {

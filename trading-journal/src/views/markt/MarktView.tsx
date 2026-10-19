@@ -24,6 +24,7 @@ import { storageKey } from "@/store/storage";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { useMirrorState } from "@/views/biasTest";
 import { BIAS } from "@/views/biasTest/strings";
+import { AlertsCard, KeyLevelsCard, PlanCard } from "@/views/schluesselmarken";
 import { BestSetupsCard } from "./BestSetupsCard";
 import { BoxChartCard } from "./BoxChartCard";
 import { BoxSettingsCard } from "./BoxSettingsCard";
@@ -166,6 +167,12 @@ export function MarktView({ className }: { className?: string }) {
       </Cell>
       {!focus && (
         <>
+          <Cell index={6} span="lg:col-span-7">
+            <KeyLevelsCard />
+          </Cell>
+          <Cell index={7} span="lg:col-span-5">
+            <PlanCard />
+          </Cell>
           <Cell index={3} span="lg:col-span-5">
             <RsiLinesCard view={view} />
           </Cell>
@@ -177,6 +184,9 @@ export function MarktView({ className }: { className?: string }) {
           </Cell>
           <Cell index={5} span="lg:col-span-12">
             <BoxSettingsCard />
+          </Cell>
+          <Cell index={8} span="lg:col-span-12">
+            <AlertsCard />
           </Cell>
         </>
       )}
