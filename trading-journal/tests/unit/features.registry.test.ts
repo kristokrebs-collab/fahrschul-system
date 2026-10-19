@@ -128,6 +128,54 @@ describe("function register", () => {
       expect(names, part).toContain(part);
     }
   });
+
+  it("lists what was built after the first register: library, blocks, Pine, grid, forward test, versions, playbook, similar situations, fit, signal chain, month benefit", () => {
+    // id → [page, F-IDs that must be among its fids]
+    const built: Record<string, [string, string[]]> = {
+      "strategie-bibliothek": ["labor", ["F06"]],
+      "indikator-bausteine": ["labor", ["F06", "F11"]],
+      "pine-export": ["labor", ["F14", "F64"]],
+      "parameter-raster": ["labor", ["F17"]],
+      belastungstest: ["labor", ["F20"]],
+      pruefbericht: ["labor", ["F18"]],
+      filtervergleich: ["labor", ["F17"]],
+      "forward-test": ["labor", ["F23"]],
+      "entwurf-versionen": ["labor", ["F15"]],
+      "playbook-austausch": ["labor", ["F13", "F45"]],
+      "idee-testen": ["markt", ["F12"]],
+      "aehnliche-situationen": ["markt", ["F19"]],
+      "passt-zu-dir": ["labor", ["F49"]],
+      "signal-posteingang": ["coach", ["F28"]],
+      signalbilanz: ["coach", ["F25"]],
+      "daten-alarmqualitaet": ["coach", ["F27"]],
+      "verpasste-chancen": ["coach", ["F32"]],
+      "signal-ausgang": ["coach", ["F25", "F32"]],
+      monatsnutzen: ["berichte", ["F60"]],
+      "screenshot-import": ["overview", ["F29"]],
+      wochenexperiment: ["berichte", ["F37"]],
+      ueben: ["trades", ["F38"]],
+      "was-waere-wenn": ["trades", ["F33"]],
+      struktur: ["markt", ["F05"]],
+      "bias-test": ["markt", ["F62"]],
+      checkin: ["wachstum", ["F61"]],
+      schluesselmarken: ["markt", ["F09"]],
+      tagesplan: ["markt", ["F08"]],
+      alarme: ["markt", ["F22"]],
+      "eigene-idee": ["labor", ["F11", "F73"]],
+      positionsverwaltung: ["labor", ["F65"]],
+      assistent: ["overview", ["F74"]],
+    };
+    for (const [id, [page, fids]] of Object.entries(built)) {
+      const f = featureById(id);
+      expect(f, `${id} is missing from the register`).toBeTruthy();
+      expect(f!.page, id).toBe(page);
+      for (const fid of fids) expect(f!.fids, id).toContain(fid);
+    }
+    // what only exists after a run or a click says so
+    for (const id of ["parameter-raster", "belastungstest", "pruefbericht", "filtervergleich", "passt-zu-dir", "signal-ausgang", "monatsnutzen", "indikator-bausteine", "strategie-bibliothek"]) {
+      expect(featureById(id)!.needs?.length ?? 0, `${id} needs a precondition`).toBeGreaterThan(10);
+    }
+  });
 });
 
 describe("docs/COVERAGE.md", () => {
