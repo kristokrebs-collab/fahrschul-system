@@ -118,6 +118,11 @@ describe("tools", () => {
     expect(tool("was kannst du")).toBe("help");
     expect(tool("neuen Trade eintragen")).toBe("newTrade");
   });
+  it("routes the week experiment", () => {
+    expect(tool("wie läuft mein Wochenexperiment")).toBe("experiment");
+    expect(tool("Was ist mein Experiment diese Woche?")).toBe("experiment");
+    expect(tool("zeig mir die Hypothese der Woche")).toBe("experiment");
+  });
   it("memory commands", () => {
     expect(tool("merk dir: ich handle nur nach dem Londoner Open")).toBe("memory");
     expect(tool("fass dich kürzer")).toBe("memory");

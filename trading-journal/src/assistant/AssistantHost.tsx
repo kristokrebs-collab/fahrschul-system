@@ -7,8 +7,10 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { analyse, useCoachBase, useMinuteClock } from "@/views/coach/hooks";
+import { accountView } from "@/domain/account";
 import type { AnswerData } from "@/domain/coach/nlq";
 import { parseContextOf } from "@/domain/coach/nlq";
+import { experimentOverview } from "@/domain/reports/experiment";
 import { cn } from "@/lib/cn";
 import { useSignalCheck } from "@/market/signals";
 import { Switch } from "@/motion/Switch";
@@ -16,6 +18,7 @@ import { Sheet, StaggerItem } from "@/motion/Sheet";
 import { Button } from "@/primitives/Button";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
+import { openReport } from "@/views/berichte/berichteStore";
 import { useDiagnosis } from "@/views/labor/DiagnosisCard";
 import { Chip, EntryView } from "./AssistantAnswer";
 import { useConversation } from "./conversation";
@@ -148,6 +151,8 @@ function AssistantBody() {
         mem: conv.getState().mem,
         signal: sig,
         recs: () => analyse(view, settings, events, days, Date.now()).recs,
+        experiment: () => experimentOverview({ settings, events, now: Date.now(), list: view.list, acc: base.acc, recs: () => analyse(view, settings, events, days, Date.now()).recs, listOf: (a) => accountView(base.enriched, settings, a).list }),
+        openReport: (key) => void openReport(key),
         lab,
         go: (p) => navigate(p),
         newTrade: () => openEditor(),
@@ -155,7 +160,7 @@ function AssistantBody() {
         now: Date.now(),
       };
     },
-    [conv, data, sig, view, settings, events, days, openEditor, lab],
+    [conv, data, sig, view, settings, events, days, openEditor, lab, base.acc, base.enriched],
   );
 
   const ask = useCallback(
