@@ -151,7 +151,7 @@ test.describe("Signal-Kette", () => {
     const errors = collectErrors(page);
     const c = await pinClock(page, PINNED);
     const now = c.now();
-    await seed(page, { clock: c.now, extra: { "tj2-trades": [trade("e_sc_2", now - 3 * DAY, 1.2), trade("e_sc_3", now - 2 * DAY, -1)] } });
+    await seed(page, { clock: c.now, extra: { "tj2-trades": [trade("e_sc_2", now - 21 * DAY, 1.2), trade("e_sc_3", now - 20 * DAY, -1)] } });
     await openRoute(page, "/#berichte", "Berichte");
     await page.getByRole("radio", { name: "Monat" }).click();
     const card = page.getByTestId("benefit-card");
