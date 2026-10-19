@@ -367,3 +367,19 @@ Pille), aufgeklappt in vier Gruppen (Pflicht · Optional · Widersprüche · Feh
 der Karte reserviert die Zeile (kein Layout-Sprung). Bekannte Abweichung: die `Segmented`-Radios (primitive `COARSE_HIT`-Regel) messen
 im Hit-Box-Audit auf Touch 33 statt 44 px – genauso in der bestehenden Box-Einstellungen-Karte derselben Seite; die neuen Schaltflächen,
 Schalter, Chips und Felder bestehen den Audit.
+
+## Labor: Belastung, Prüfbericht, Filtervergleich (F20 / F18 / F17)
+
+Unter der Diagnose, vor der Robustheit: drei zusammenklappbare Karten (`Card`, Kopfzeile mit kleinem Auf-/Zuklappen-Button, `Collapse`
+mit den vorhandenen Tokens). Zugeklappt kosten sie eine Zeile; der Inhalt jeder Karte ist ein eigener Lazy-Chunk und wird beim ersten
+Öffnen geladen. Gerechnet wird nichts vor dem Klick: die Szenarien und der Filtervergleich starten mit eigenem Knopf (Fortschritt als
+dünner Balken, `scaleX`, daneben „Abbrechen“; der Hinweis sagt ehrlich, dass die Signale dafür noch einmal berechnet werden), der
+Prüfbericht und die Verlustserien kommen sofort aus dem gezeigten Lauf. Tabellen scrollen **in sich** (`role="region"`, tastaturfokussierbar),
+nie die Seite. Änderungen gegenüber dem Basislauf stehen als eigene Spalte: Netto-R in R, Drawdown in Prozentpunkten, PF absolut;
+Ton nur bei echter Veränderung (grün besser, rot schlechter, bei Drawdown umgekehrt), nie als Urteil über die Strategie.
+Ehrlichkeit vor Optik: ein Szenario ohne die nötigen Daten bleibt in der Tabelle, mit Pille **Ersatz** (gerechnet mit genannter Annahme)
+oder **nicht gerechnet** und dem Grund in der Zeile darunter; gesperrte Filter (Top-Trader, Retest außerhalb von Box-zu-Box) zeigen
+ihren Grund als sichtbaren Satz, nicht nur als Tooltip, der Schalter ist deaktiviert. Kleine Stichproben bekommen Pille und Satz („Mit 12
+Trades …“), nie eine Ampel. Filterbeiträge tragen immer den Hinweis, dass sie sich überlappen. Der Prüfbericht zeigt Walk-forward und
+Out-of-Sample als zwei statische Streifen (grau = nur Training bzw. Auswahl, hell = ungesehen); keine neue Farbe, keine neue Bewegung.
+Touch: Schalter und Chips bestehen den Hit-Box-Audit (die Chips bekommen auf grobem Zeiger zusätzlich `min-w-11`).

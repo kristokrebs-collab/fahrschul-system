@@ -102,3 +102,30 @@ from the NEXT bar – never retroactive inside the bar that triggered it:
   OBSERVATION with the numbers it rests on. Thresholds are exported as `DIAG`.
 - Tests: `tests/unit/backtest.exits.test.ts`, `lab.rules.test.ts`, `lab.custom.test.ts`, `lab.diagnosis.test.ts`,
   `views.labor.custom.test.tsx`, e2e `tests/e2e/labor-custom.spec.ts`.
+
+## Belastungstest, Prüfbericht, Filtervergleich (F20 / F18 / F17) – `src/domain/lab/{stress,report,filters,extras}`
+All pure, deterministic and JSON-safe (a missing number is `null`; every statement carries its sample size).
+- `extras/job.ts` – `createExtraJob({ base: LabJobInput, what: "stress" | "filters", filters? })`: stepped like `createLabJob`, same preparation of
+  the same input (so its base scenario IS the run above, tested to the digit), then one cheap engine loop per scenario / variant. Driven by
+  `runExtra` (`labRunner.ts`: the lab worker with `kind: "extra"`, or idle chunks; the job module is loaded on demand). Reports the phase `diagnose`.
+  `windowOf(prep, toMs)` (`job.ts`) is the one place that decides the run's bar window.
+- `stress/` (F20) – `scenarioDefs(engine)`: base · fees ×2 · slippage ×2 · funding off / on / ×2 · one candle later (`delayed`: the order is placed
+  one close later, stop and target keep their prices; a signal that appeared while in a position stays unused) · stop distance ×0,75 / ×1,5
+  (`stopScaled`: around the signal close, target price kept) · fees ×2 + slippage ×2 + delay. A scenario whose data the run lacks is NOT blocked: `approx`
+  (substitute named: no slippage → 2 bp fixed; no funding → flat 0,01 % / 8 h) or `unavailable` (reason: no fees to double, window too short).
+  `lossStreakStress(trades, riskPct)` – from the real order: longest losing run, worst 3 / 5 / 10 trades in a row, deepest drawdown of the cumulative R
+  (and its share of the capital at the run's risk, no compounding), and the order Monte Carlo (`monteCarlo` reshuffle, 2000 paths, FIXED seed
+  `MC_SEED`, ≥ 10 trades): drawdown p50 / p95 / p99 and where the real order lies in that distribution.
+- `filters/` (F17) – `FilterSelection` (`v: 1`, `on`, `rsiLimit`, `trendLen`; `sanitizeFilters`), `filterInfos(strategy, interval)` with availability:
+  **RSI-Zone** (long while RSI(14) ≤ limit, short ≥ 100 − limit), **Höherer Trend** (the closed higher-timeframe candle above / below its EMA; the
+  higher timeframe is built from complete buckets of the execution bars: 15m → 1h, 30m / 1h → 4h, 2h / 4h → 1D, 1D → 1W), **Retest** (Box-zu-Box
+  only: the setup kind), **Top-Trader** (locked: Binance keeps ~30 days). `applyFilters` wraps ANY strategy: the signal at the close of bar i passes
+  only if every chosen filter says yes at that close; unknown (not enough history) never passes and is counted apart; a rejected signal does not come
+  back (an edge-triggered rule has no second edge; a Box idea counts as seen). `variantPlan`: none · each alone · all · all without one (≥ 3 filters);
+  `filterUnits` → `FilterCompare` with Δ trades / net R / hit rate against the unfiltered run, the contribution of each filter alone and on top of the others,
+  and the overlap (signals rejected by two or more filters).
+- `report/` (F18) – `auditRun(result, bars)`: outliers (without the best / worst 1 / 3 / 5: net R, Ø R, PF; verdict `tragfaehig | abhaengig | verlust |
+  zuwenig`, nothing below 10 trades), data holes (`gapSpans` in `bars.ts`: the biggest ones with dates, trades open across a hole, the 2 % rule, warm-up),
+  signals (handed / skipped / blocked; "nachträglich sichtbar" is `null` = not measured, with the reason: excluded by construction, tested in the unit tests),
+  test periods (OOS cut and share, walk-forward test vs train-only share, empty windows, the longest quiet stretches, the period in thirds).
+- Tests: `tests/unit/lab.{stress,filters,audit}.test.ts` (hand-derived numbers + real BTCUSDT runs, runner in idle mode = direct result).

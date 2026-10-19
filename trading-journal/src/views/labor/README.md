@@ -38,3 +38,21 @@ Tests: `tests/unit/views.labor.test.tsx`, `tests/unit/backtest.*.test.ts`, e2e `
   (`labor-funnel-row`), comparison table (`labor-compare-table`), costs, exits, direction / time, data coverage. `useDiagnosis()`
   returns the `Diagnosis` of the shown run (from `@/domain/lab`).
 - Store: `cfg.custom` (sanitised `CustomConfig`), `drafts`, `setCustom`, `saveDraft`, `loadDraft`, `duplicateDraft`, `deleteDraft`.
+
+## Belastung, Prüfbericht, Filtervergleich (F20 / F18 / F17)
+Section `Belastung, Bericht, Filter` (`labor-extras`) between the diagnosis and the robustness cards, only with a finished run. `ExtrasSection`
+is its own chunk (`lazy` in `LaborView`); its three cards are collapsible (`labor-extra-{stress|report|filters}`, toggle
+`labor-extra-toggle-*`, `aria-expanded`) and mount their body (`StressBody`, `ReportBody`, `FilterBody`, each a lazy chunk) on the first opening.
+- `extrasStore.ts` (`useExtras`): `stress` / `filters` slices (`idle|running|done|error|cancelled`, `progress`, `result`), the filter choice
+  (`selection`, versioned in `storageKey("labor-filters")`, a convenience), `runStress()` / `runFilters()` / `cancelExtra(kind)`. They take the
+  input of the SHOWN run from `shownRunInput()` (`laborStore.ts`, memory only, set by `startLab`) and run `runExtra` (worker or idle chunks,
+  `@/domain/backtest/index`). A new run, or a changed filter choice, clears the results that described the old one.
+- **Belastungstest** (`labor-stress`): the loss-series block (`labor-streaks`, `labor-mc`) is instant from the trades; the scenario table
+  (`labor-stress-table`, rows `labor-stress-row` with `data-scenario` / `data-status`) starts with `labor-stress-run`. Pills `Ersatz` /
+  `nicht gerechnet` with the reason under the label.
+- **Prüfbericht** (`labor-report`): `useAudit()` = `auditRun(result, bars)` – outliers (`labor-outlier-table`, `-text`), data holes
+  (`labor-datagaps`, `labor-gap-list`), signals (`labor-signals`, `labor-late-text`), test periods (`labor-period-wf`, `-oos`, `labor-quiet`, `labor-thirds`).
+- **Filtervergleich** (`labor-filters`): one row per filter (`labor-filter`, `data-filter`, `data-available`; `labor-filter-switch-<id>`,
+  `labor-filter-reason` for locked ones), `labor-filters-run`, then `labor-filter-table` (rows `labor-filter-row`, `data-variant`), the contribution table
+  (`labor-contrib-table`) and the overlap note (`labor-filter-overlap`).
+- Tests: `tests/unit/views.labor.extras.test.tsx`, e2e `tests/e2e/labor-extras.spec.ts`.
