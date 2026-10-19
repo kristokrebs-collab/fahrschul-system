@@ -71,9 +71,12 @@ test.describe("Funktionen", () => {
 
     await page.goto("/#settings");
     await expect(h1(page, "settings")).toBeVisible({ timeout: 25_000 });
-    await page.locator("body").press("g");
-    await page.locator("body").press("f");
-    await expect(page).toHaveURL(/#funktionen$/);
+    // the shortcut host mounts right after the first commit: press the chord until it is listening
+    await expect(async () => {
+      await page.locator("body").press("g");
+      await page.locator("body").press("f");
+      await expect(page).toHaveURL(/#funktionen$/, { timeout: 1500 });
+    }).toPass({ timeout: 15_000 });
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
