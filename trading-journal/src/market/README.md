@@ -459,3 +459,15 @@ only seeds. The plan-change toast (`tj2-keylevel-plan`) is on by default only fo
 and box alerts add their toasts to the same log as lines (log only – their own rules are unchanged). `chartLines.ts`:
 `useKeyLines(symbol)` for the chart lines. **Alerts run only while the app is open** – no server-side monitoring (F21 is not
 part of this). Tests: `tests/unit/market.keylevels.test.ts`.
+
+## Preis- und RSI-Struktur live (`trendlines/`, F05)
+
+Pure engine: `@/domain/trendlines`. `store.ts` (`useTrendlines` / `getTrendlines` / `subscribeTrendlines` /
+`retainTrendlines`, pattern of `keylevels/store.ts`) reads the selected timeframes of `settings.trendlines`, takes the REAL
+candles of each (`keylevels/candles.ts` `levelCandles`: 1h / 4h / 1D / 1W straight from their feeds, 30m from 15m, 2h / 3h
+from 1h) and runs `analyzeTrendlines` on the closed ones; a timeframe `timeframeAvailability` cannot serve is listed with
+its German reason and not analysed (nothing substituted). One 1 s timer, recompute only when a used feed's bar key, the
+minute or the settings changed, publish only a changed view; nothing runs without a subscriber. `useTrendView(on)` is the
+lazy consumer (store imported on demand, own chunk) for the chart; `write.ts` saves `settings.trendlines` at once.
+Import from `@/market/trendlines/<file>` (the index re-exports the store, so eager code must not use it). Tests:
+`tests/unit/market.trendlines.test.ts`.

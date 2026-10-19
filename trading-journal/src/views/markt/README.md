@@ -86,3 +86,24 @@ to `settings.keyLevels` at once (`writes.ts`, like the Box-Einstellungen). Own l
 chart and in the Übersicht chart (`keyLines` prop of `NothingCandleChart`, `src/chart/levels.ts`). Domain, rules and
 migration: `src/domain/keylevels/README.md`; live side: `src/market/keylevels`. Tests: `views.schluesselmarken*.test.ts(x)`,
 `tests/e2e/keylevels.spec.ts`.
+
+## Preis- & RSI-Struktur (F05)
+
+`TrendStructureCard` (lazy chunk, `lg:col-span-12` right under the chart; fallback = a skeleton card of the same title):
+per selected timeframe (chips `30m 1h 2h 3h 4h 1D 1W`, default `1h 4h 1D 1W`, stored in `settings.trendlines.tfs`) the
+diagonal trendlines of the **price** (through pivot highs / lows) and of the **RSI** – Abwärtstrendlinie and
+Aufwärtstrendlinie – with **Annäherung, Bruch und Retest as separate statements** (`describeLine`: „Annäherung an die
+Abwärtstrendlinie“, „Abwärtstrendlinie nach oben gebrochen“, „Retest läuft / bestätigt“, „Bruch zurückgenommen“, „Bruch
+ohne Retest“), the distance of the newest close in % and ATR (RSI: points), touches, and the candle count / RSI / ATR of
+the row. Only CLOSED candles of the timeframe's own feed; a timeframe the feed cannot serve is a **disabled chip with the
+reason listed below** (and, when selected, a row that says why) – never swapped for another one. A switch („Preislinien im
+Chart“) and a chip in the chart legend write `settings.trendlines.chart`.
+
+Chart: `BoxChartCard` hands `priceLines` (`toChartTrendlines`, only price lines of timeframes ≥ the chart's interval) to
+`NothingCandleChart`, which loads `TrendlinePrimitive` on the first line. The lines are in time and price, so they follow the
+mirror (only the price axis flips) and a 1D line also reads on the 4h chart (anchored at the middle of its candles when the
+timeframe is longer than the chart's). The mirror's „Trendlinien“ layer hides them; during a bias test the lines are computed
+from the **frozen bars** only (nothing after the anchor shapes a line). `data-trendlines` on the chart wrapper counts them.
+The old „RSI-Linien“ card stays (box engine, 4h / 1D / 1W, no retest); the new card reads the same kind of line with retest on
+the free timeframes. Domain: `src/domain/trendlines/README.md`; live side: `src/market/trendlines`.
+Tests: `views.markt.trend.test.tsx`, `chart.trendline.test.ts`, `tests/e2e/trendlines.spec.ts`.

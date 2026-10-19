@@ -147,7 +147,9 @@ export const BoxChartCard = memo(function BoxChartCard({ view }: { view: BoxesVi
   const trendLines = useMemo(() => {
     if (!trendOn) return NO_LINES;
     if (mirror.frozen) {
-      const a = analyzeTrendlines(shownCandles, KEY_TF[tf], Date.now());
+      // "now" of the frozen picture = the close of its last bar: the lines of that moment, with no clock involved
+      const lastBar = shownCandles[shownCandles.length - 1];
+      const a = analyzeTrendlines(shownCandles, KEY_TF[tf], lastBar ? lastBar.time + BOX_TF_MS[tf] : 0);
       return toChartTrendlines([{ tf: KEY_TF[tf], selected: true, avail: { tf: KEY_TF[tf], ok: true, reason: null }, analysis: a }], BOX_TF_MS[tf]);
     }
     return trendView ? toChartTrendlines(trendView.items, BOX_TF_MS[tf]) : NO_LINES;

@@ -107,7 +107,8 @@ export function logicalFrac(bars: ReadonlyArray<{ time: number }>, sec: number, 
 /** Price of the line `l` at `ms`. */
 export const priceAtTime = (l: Pick<ChartTrendline, "t1" | "p1" | "t2" | "p2">, ms: number): number => l.p1 + ((l.p2 - l.p1) * (ms - l.t1)) / Math.max(1, l.t2 - l.t1);
 
-const colorOf = (tone: TrendTone, neutral: boolean): string => {
+/** Canvas colour of a tone from the live palette; blind mode (`neutral`) draws win / loss in the foreground ink. */
+export const trendColor = (tone: TrendTone, neutral: boolean): string => {
   const t: TrendTone = neutral && (tone === "win" || tone === "loss") ? "fg" : tone;
   return t === "win" ? ink.win : t === "loss" ? ink.loss : t === "fg" ? ink.fg : ink.mute;
 };
@@ -127,7 +128,7 @@ class TrendRenderer implements IPrimitivePaneRenderer {
       ctx.clip();
       ctx.lineCap = "round";
       for (const g of this.geo) {
-        const color = colorOf(g.tone, this.o.neutral);
+        const color = trendColor(g.tone, this.o.neutral);
         ctx.strokeStyle = color;
         ctx.lineWidth = Math.max(1, Math.round((g.strong ? 1.75 : 1.1) * hr));
         ctx.globalAlpha = g.strong ? 1 : 0.8;
@@ -284,7 +285,7 @@ export class TrendlinePrimitive implements ISeriesPrimitive<Time> {
       const t = (cx + w / 2 - x1) / Math.max(1e-6, x2 - x1);
       const cy = y1 + (y2 - y1) * Math.min(1, Math.max(0, t));
       const dy = l.captionAbove ? -LABEL_H - 3 : 3;
-      cands.push({ box: { x: cx, y: cy + dy, w, h: LABEL_H }, prio: l.strong ? 0 : 1, nudge: LINE_NUDGE, data: { set: (c) => (g.label = c), text: l.label, color: colorOf(l.tone, this.options.neutral) } });
+      cands.push({ box: { x: cx, y: cy + dy, w, h: LABEL_H }, prio: l.strong ? 0 : 1, nudge: LINE_NUDGE, data: { set: (c) => (g.label = c), text: l.label, color: trendColor(l.tone, this.options.neutral) } });
     }
     const height = (chart.panes()[0]?.getHeight() ?? 0) || 10_000;
     const placed = placeLabels(cands, [{ x: width - RIGHT_RESERVED, y: 0, w: RIGHT_RESERVED, h: height }, ...(this.host.reserved?.() ?? [])], { x: 0, y: 0, w: width, h: height });
