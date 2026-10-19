@@ -7,6 +7,7 @@
 import { useMemo } from "react";
 import { challengeProgress, growthOf, goalProgress, habitGrid, activeHabits, milestones, nextMilestones, personalBests, prepare, prepareAt, progressSeries, rankGoals, skillProfile, streakBoard, suggestChallenges, weekSummary, type ChallengeProgress, type GoalProgress, type GrowthPrefs, type Prepared } from "@/domain/growth";
 import { reviewed } from "@/domain/coach/recommendations";
+import { checkinConfigOf, dayKeyIn, deviceTimeZone, effectiveTimeZone } from "@/domain/checkin";
 import { checkinOf, diaryDays, hasCheckin, moodOf, psychFactors, psychTrackers, type CheckIn, type Level5 } from "@/domain/psych";
 import type { DayNote, EnrichedTrade } from "@/domain/types";
 import { tradeTime } from "@/lib/dates";
@@ -47,17 +48,19 @@ export interface TodayState {
 }
 
 export function useToday(b: GrowthBase): TodayState {
-  const { p, days } = b;
+  const { p, days, settings, now: clock } = b;
+  // the check-in's "today" is the day of the zone the trader configured (F61); the device's zone when none
+  const todayKey = useMemo(() => dayKeyIn(clock, effectiveTimeZone(checkinConfigOf(settings), deviceTimeZone())), [clock, settings]);
   return useMemo(() => {
-    const note = days[p.todayKey];
+    const note = days[todayKey];
     const since = p.now - REVIEW_WINDOW_DAYS * DAY;
     const unreviewed = p.closed.filter((t) => +tradeTime(t) >= since && !reviewed(t)).reverse();
     const week = Array.from({ length: 7 }, (_, i) => {
-      const key = addDays(p.todayKey, i - 6);
+      const key = addDays(todayKey, i - 6);
       return { key, mood: moodOf(days[key]), checked: hasCheckin(days[key]) };
     });
-    return { key: p.todayKey, note, checkin: checkinOf(note), mood: moodOf(note), unreviewed, week };
-  }, [p, days]);
+    return { key: todayKey, note, checkin: checkinOf(note), mood: moodOf(note), unreviewed, week };
+  }, [p, days, todayKey]);
 }
 
 export function useGoals(b: GrowthBase): { active: GoalProgress[]; week: ReturnType<typeof weekSummary> } {

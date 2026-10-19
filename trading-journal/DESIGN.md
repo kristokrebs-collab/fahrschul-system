@@ -310,3 +310,26 @@ gleiche Drittel, solange alles passt; E2E mit langen Werten, Berichte-E2E auf fe
   Daten). Texte sind Beobachtungen mit Zahlen („71 % der Stopp-Verluste kamen innerhalb von 3 Kerzen …“), nie bewiesene Ursachen.
 - Bewegung: nur Einblenden (`tween.fade`, 6 px) neuer Zeilen und die vorhandene `Collapse`; `useReducedFx` → Endzustand. Tippflächen
   ≥ 44 px bei grobem Zeiger, alle Felder mit `aria-label`, keine zusätzliche Live-Region (Toast-Insel bleibt die einzige).
+
+## Chart spiegeln / Bias prüfen (F62)
+
+Ein Prüfwerkzeug, kein neues Gesicht: unter dem Markt-Box-Chart und im Trade-Replay sitzt dieselbe Leiste – der Schalter
+„Chart spiegeln“ (`Switch`, Beschriftung + eine Zeile „Nur die Preisachse steht auf dem Kopf. Kurse, Zeiten und Signale bleiben
+unverändert.“), darunter die Ebenen als Chips (`aria-pressed`, ≥ 44 px auf groben Zeigern: Ausbrüche · Trendlinien · Boxen ·
+Eigene Trades · RSI) und die ausdrückliche Option „RSI als 100−RSI spiegeln“. Der geführte Test erscheint als eine ruhige
+Fläche (`rounded-2xl border-line-2 bg-ink-950/40`, Überblendung `tween.fade`) mit drei Schritten; gesprochen wird nüchtern –
+„Widerspruch“ statt „Bias“, nie eine Zahl, die eine Person bewertet. Blindmodus heißt: keine Farbe als Aussage – Long/Short
+laufen in der Grau-Rampe, Stop und Ziel unterscheiden sich über die Strichform. Während des Tests zeigt die Markt-Seite nur
+den Chart (Setups, Box-Status und Alarme würden die Richtung verraten). Keine Animation außer der Überblendung, keine neuen
+Tokens, keine Schleifen.
+
+## Täglicher Check-in (F61)
+
+Kein neuer Dialog, sondern das bestehende Check-in-Sheet mit anderer Fußzeile: **Später** und **Heute überspringen** als Ghost-Buttons
+links, **Erledigt** als die eine Primäraktion rechts (Tinte auf Weiß). Beim ersten Öffnen des Tages ein ruhiger Satz („Kurz einchecken,
+freiwillig. Es bleibt auf deinem Gerät und in deinem Konto …“), darunter nur die eingeschalteten Felder – Regler mit Geisterdaumen
+(„Ziehen zum Setzen“), nichts vorbelegt, nie ein „gut“ als Standard. „Nachgetragen“ ist eine kleine Warn-Pille (Mono, Versalien) mit einem
+Satz, der sagt, was das für die Auswertung heißt. Das Anpassen (Felder, Zeitzone, Erinnerung, eigene Fragen) klappt unter dem Formular auf,
+nicht in einem zweiten Dialog. Die Auswertungskarte „Check-in und Handelstag“ zeigt zuerst die Stichprobe („15 Tage mit 30 Trades“), dann
+eine kleine Matrix aus ρ in Mono (unter 8 Tagen „–“), was nicht gezählt wurde, und immer „Keine Diagnose, keine Kausalität“ – kein
+Gewinn-/Verlustton, keine Ampel. Bewegung: nur die vorhandenen Sheet-/Stagger-Tokens, keine neuen.

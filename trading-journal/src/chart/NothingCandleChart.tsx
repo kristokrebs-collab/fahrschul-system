@@ -49,6 +49,7 @@ import {
 } from "./panes";
 import { clearLevels, LEVEL_KEYS, setLevels, zoneIsSet, type ActiveScenario, type LevelLines } from "./levels";
 import { filterTickLabels } from "./axisLabels";
+import { mirrorRsi, NO_MIRROR, type ChartMirror } from "./mirror";
 import { fmt } from "./format";
 import type { SignalMarker } from "./signalMarkers";
 import { DEFAULT_LAYERS, SignalOverlay, type DivergenceLine, type OverlayLayers, type StructureOverlay } from "./primitives/SignalOverlay";
@@ -59,6 +60,7 @@ import type { Box } from "./overlayLayout";
 import {
   MARKER_ENTRY_PREFIX,
   MARKER_EXIT_PREFIX,
+  neutralizeMarkers,
   boundsOf,
   buildMarkers,
   hitMarker,
@@ -140,6 +142,12 @@ export interface NothingCandleChartProps {
   /** keep the boxes overlapping the view and the active box's targets in the price range (default false) */
   boxAutoscale?: boolean;
   rangeDays?: RangeDays;
+  /**
+   * "Chart spiegeln" (F62, `./mirror.ts`): the price axis runs upside down (`invertScale`) – a DISPLAY change only: bars,
+   * prices, times, boxes and every signal stay as they are. `rsiMirrored` inverts the RSI pane too (read as 100−RSI,
+   * labelled in the legend); `trendlines` / `breakouts` show or hide those RSI parts. Default: the plain chart.
+   */
+  mirror?: ChartMirror;
   /** last traded price: every print moves the forming candle (the close jumps; the canvas never glides) */
   price?: MotionValue<number>;
   /** exchange time (ms) of the print in `price` (buckets the forming candle); required with `price` */
@@ -180,6 +188,8 @@ interface Instance {
   boxes: BoxPrimitive;
   /** chart-relative top (CSS px) of the sub pane, measured on resize / pane switch only (RSI legend + glow) */
   subTop: number;
+  /** blind mode (F62): trade markers in one neutral colour */
+  neutral: boolean;
   range: RangeAnimator;
   live: LiveCandle;
   levels: LevelLines | null;
@@ -372,6 +382,10 @@ interface RsiFx {
   setGlow: (g: { key: string; dir: 1 | -1 } | null) => void;
   mv: { x: MotionValue<number>; y: MotionValue<number>; shown: MotionValue<number> };
   reduced: () => boolean;
+  /** the RSI axis is mirrored (legend shows 100−RSI) */
+  mirrored: () => boolean;
+  /** blind mode: no win / loss colours */
+  neutral: () => boolean;
 }
 
 /** RSI legend text: the hovered bar's RSI (`time`, UTC s) or the newest; written only when it changes. */
@@ -380,7 +394,7 @@ function writeRsiLegend(i: Instance, fx: RsiFx, time: number | null): void {
   const rp = i.panes.rsi();
   if (!el || !rp) return;
   const v = time != null ? rp.valueAt(time) : rp.lastValue();
-  const text = v == null ? "–" : fmt.n1(v);
+  const text = v == null ? "–" : fmt.n1(fx.mirrored() ? mirrorRsi(v) : v);
   if (el.textContent !== text) el.textContent = text;
 }
 
@@ -406,7 +420,7 @@ function syncGlow(i: Instance, fx: RsiFx, appended: boolean): void {
   const layer = fx.ripples.current;
   if (appended && prev !== null && b && !fx.reduced() && layer) {
     const at = glowPoint(i, b);
-    if (at) spawnMarkerRipple(layer, at, b.dir === 1 ? ink.win : ink.loss);
+    if (at) spawnMarkerRipple(layer, at, fx.neutral() ? ink.fg : b.dir === 1 ? ink.win : ink.loss);
   }
   i.requestPlace();
 }
@@ -430,7 +444,7 @@ function syncMarkers(i: Instance, markers: TradeMarker[] | undefined): BuiltMark
   const built = buildMarkers(markers ?? [], (t) => snapTime(src, t), i.bounds);
   i.built = built;
   i.applied.markers = markers;
-  i.markersApi.setMarkers(built.markers);
+  i.markersApi.setMarkers(i.neutral ? neutralizeMarkers(built.markers, ink.fg) : built.markers);
   return built;
 }
 
@@ -546,6 +560,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   boxes,
   boxAutoscale = false,
   rangeDays = 30,
+  mirror = NO_MIRROR,
   price,
   tradeTime,
   tickDir,
@@ -591,7 +606,10 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     setGlow,
     mv: { x: glowX, y: glowY, shown: glowShown },
     reduced: () => reduceRef.current,
+    mirrored: () => mirrorRef.current.flipped && mirrorRef.current.rsiMirrored,
+    neutral: () => mirrorRef.current.neutral,
   });
+  const mirrorRef = useRef<ChartMirror>(mirror);
   const reduceRef = useRef(false);
   const readyRef = useRef(false);
   const visibleRef = useRef(true);
@@ -783,6 +801,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       check,
       boxes,
       subTop: 0,
+      neutral: false,
       range,
       live,
       levels: null,
@@ -1192,6 +1211,28 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     i.requestPlace();
   }, [pane, ratio, oi]);
 
+  // 7b. "Chart spiegeln" (F62): the price axis upside down, the RSI axis only on request, RSI parts shown / hidden. Only
+  // options change – no data is touched, so a second flip draws the original picture again.
+  const { flipped, rsiMirrored, trendlines, breakouts, neutral } = mirror;
+  useEffect(() => {
+    mirrorRef.current = { flipped, rsiMirrored, trendlines, breakouts, neutral };
+    const i = inst.current;
+    if (!i) return;
+    i.unsettle();
+    i.main.candles.priceScale().applyOptions({ invertScale: flipped });
+    i.panes.setRsiView({ trendlines, breakouts, mirrored: flipped && rsiMirrored, neutral });
+    i.boxes.applyOptions({ neutral });
+    if (i.neutral !== neutral) {
+      i.neutral = neutral;
+      if (i.data.length) syncMarkers(i, latest.current.markers);
+    }
+    syncGlow(i, fx.current, false);
+    writeRsiLegend(i, fx.current, null);
+    i.check.invalidate();
+    i.boxes.invalidate();
+    i.requestPlace();
+  }, [flipped, rsiMirrored, trendlines, breakouts, neutral]);
+
   // 8. collapsed card: stop pushing to the canvas and park the pulse
   useEffect(() => {
     pausedRef.current = paused;
@@ -1256,14 +1297,16 @@ export const NothingCandleChart = memo(function NothingCandleChart({
           <div ref={ripples} className="absolute inset-0" />
           {pane === "rsi" && glow ? (
             <motion.span className="absolute inset-0" style={{ opacity: glowShown }} data-fx="rsi-glow">
-              <GlowBreak key={glow.key} x={glowX} y={glowY} tone={glow.dir === 1 ? "win" : "loss"} size={30} />
+              <GlowBreak key={glow.key} x={glowX} y={glowY} tone={neutral ? "soft" : glow.dir === 1 ? "win" : "loss"} size={30} />
             </motion.span>
           ) : null}
           <LivePulse ref={pulse} reduced={reduce} />
         </div>
         {pane === "rsi" ? (
           <div ref={rsiLegend} className="pointer-events-none absolute left-2 top-0 z-[3] flex items-baseline gap-1.5 font-mono text-[10px] text-faint" data-testid="rsi-legend">
-            <span className="uppercase tracking-[0.12em]">RSI 14</span>
+            <span className="uppercase tracking-[0.12em]" data-mirrored={mirror.flipped && mirror.rsiMirrored ? "true" : undefined}>
+              {mirror.flipped && mirror.rsiMirrored ? "100−RSI 14" : "RSI 14"}
+            </span>
             <span ref={rsiValue} className="num text-[11px] text-mute">
               –
             </span>

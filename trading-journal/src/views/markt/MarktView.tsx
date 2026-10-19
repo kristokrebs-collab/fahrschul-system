@@ -22,6 +22,8 @@ import { StatusPill } from "@/motion/StatusPill";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { PageHeader } from "@/views/setups/PageHeader";
+import { useMirrorState } from "@/views/biasTest";
+import { BIAS } from "@/views/biasTest/strings";
 import { BestSetupsCard } from "./BestSetupsCard";
 import { BoxChartCard } from "./BoxChartCard";
 import { BoxSettingsCard } from "./BoxSettingsCard";
@@ -110,13 +112,14 @@ function AlertBand({ view, className }: { view: BoxesView; className?: string })
   );
 }
 
-function HeaderStatus({ view }: { view: BoxesView }) {
+function HeaderStatus({ view, maskName = false }: { view: BoxesView; maskName?: boolean }) {
   const pair = useJournal((s) => s.settings.pair);
   const tone = view.state === "ok" ? "live" : view.state === "error" ? "error" : view.state === "off" ? "muted" : "warn";
   const loading = view.state === "loading" || view.state === "idle";
   // while loading: the symbol beside the pending (warn) dot – the sentence stands once, in Beste Setups (P2-09)
-  const symbol = view.symbol ?? normalizeWatchSymbol(pair) ?? "";
-  const text = view.state === "ok" ? `${view.symbol ?? ""} · ${biasText(view.bias)}` : loading ? symbol : (view.detail ?? MARKT.best.loading);
+  // blind bias test (F62): the market name stays covered until the original view is uncovered
+  const symbol = maskName ? BIAS.blindName : (view.symbol ?? normalizeWatchSymbol(pair) ?? "");
+  const text = maskName ? BIAS.blindName : view.state === "ok" ? `${view.symbol ?? ""} · ${biasText(view.bias)}` : loading ? symbol : (view.detail ?? MARKT.best.loading);
   const label = loading ? (
     <>
       {symbol}
@@ -135,31 +138,48 @@ function HeaderStatus({ view }: { view: BoxesView }) {
 export function MarktView({ className }: { className?: string }) {
   const view = useBoxes();
   useCloseMorphDialogOnUnmount();
+  // a running bias test (F62) shows only the chart: the setups, box status and alerts would tell the direction
+  const test = useMirrorState("markt");
+  const focus = test.frozen;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="markt-view" data-state={view.state}>
-      <PageHeader className="lg:col-span-12" title={MARKT.title} lead={MARKT.lead} leadFill={MARKT_LEAD_FILL} action={<HeaderStatus view={view} />} />
-      <AlertBand view={view} className="lg:col-span-12" />
-      <Cell index={0} span="lg:col-span-7">
-        <BestSetupsCard view={view} />
-      </Cell>
-      <Cell index={1} span="lg:col-span-5">
-        <BoxStateCard view={view} />
-      </Cell>
+      <PageHeader className="lg:col-span-12" title={MARKT.title} lead={MARKT.lead} leadFill={MARKT_LEAD_FILL} action={<HeaderStatus view={view} maskName={focus && test.blind.hideName} />} />
+      {focus ? (
+        <p className="text-[12px] text-faint lg:col-span-12" data-testid="bias-focus-note">
+          {BIAS.blindFocus}
+        </p>
+      ) : (
+        <AlertBand view={view} className="lg:col-span-12" />
+      )}
+      {!focus && (
+        <>
+          <Cell index={0} span="lg:col-span-7">
+            <BestSetupsCard view={view} />
+          </Cell>
+          <Cell index={1} span="lg:col-span-5">
+            <BoxStateCard view={view} />
+          </Cell>
+        </>
+      )}
       <Cell index={2} span="lg:col-span-12">
         <BoxChartCard view={view} />
       </Cell>
-      <Cell index={3} span="lg:col-span-5">
-        <RsiLinesCard view={view} />
-      </Cell>
-      <Cell index={4} span="lg:col-span-7">
-        {/* plan gate `boxScanner` (P10 / P14): the watchlist scan + alarms; the box chart itself stays free */}
-        <Gate feature="boxScanner" fallback={<UpgradeTeaser feature="boxScanner" className="h-full" />}>
-          <ScannerCard />
-        </Gate>
-      </Cell>
-      <Cell index={5} span="lg:col-span-12">
-        <BoxSettingsCard />
-      </Cell>
+      {!focus && (
+        <>
+          <Cell index={3} span="lg:col-span-5">
+            <RsiLinesCard view={view} />
+          </Cell>
+          <Cell index={4} span="lg:col-span-7">
+            {/* plan gate `boxScanner` (P10 / P14): the watchlist scan + alarms; the box chart itself stays free */}
+            <Gate feature="boxScanner" fallback={<UpgradeTeaser feature="boxScanner" className="h-full" />}>
+              <ScannerCard />
+            </Gate>
+          </Cell>
+          <Cell index={5} span="lg:col-span-12">
+            <BoxSettingsCard />
+          </Cell>
+        </>
+      )}
     </div>
   );
 }

@@ -139,6 +139,25 @@ export function rsiOverlayData(state: RsiLineState | null, lastClosed: number, l
   return { lines, breaks };
 }
 
+/**
+ * Which parts of the RSI pane are shown (F62 "Chart spiegeln"): the active diagonal trendlines, the breakouts (the break
+ * dot with its glow and the broken line) and – on request only – the mirrored axis (read as 100−RSI; the data stays).
+ */
+export interface RsiView {
+  trendlines: boolean;
+  breakouts: boolean;
+  mirrored: boolean;
+  /** blind mode: break dots / broken lines without win / loss tones */
+  neutral: boolean;
+}
+export const DEFAULT_RSI_VIEW: Readonly<RsiView> = Object.freeze({ trendlines: true, breakouts: true, mirrored: false, neutral: false });
+
+/** The overlay data for a view: active lines are "Trendlinien", broken lines and break dots are "Ausbrüche". Pure. */
+export function filterRsiOverlay(d: RsiOverlayData, v: Pick<RsiView, "trendlines" | "breakouts">): RsiOverlayData {
+  if (v.trendlines && v.breakouts) return d;
+  return { lines: d.lines.filter((l) => (l.broken ? v.breakouts : v.trendlines)), breaks: v.breakouts ? d.breaks : [] };
+}
+
 /** Identity of a provisional / fresh break set (the overlay is re-set only when it changes). */
 const breaksKey = (d: RsiOverlayData): string => d.breaks.map((b) => `${b.i}${b.dir}${b.provisional ? "p" : ""}`).join(",");
 
@@ -154,6 +173,7 @@ export class RsiPane {
   private closedKey = "";
   private overlayKey = "";
   private liveValue: number | null = null;
+  private view: RsiView = { ...DEFAULT_RSI_VIEW };
 
   constructor(
     chart: IChartApi,
@@ -204,11 +224,26 @@ export class RsiPane {
   }
 
   private syncOverlay(): void {
-    const data = rsiOverlayData(this.lines, this.times.length - 2, this.liveValue);
-    const key = `${this.closedKey}|${breaksKey(data)}`;
+    const data = filterRsiOverlay(rsiOverlayData(this.lines, this.times.length - 2, this.liveValue), this.view);
+    const key = `${this.closedKey}|${breaksKey(data)}|${this.view.trendlines ? "t" : "-"}${this.view.breakouts ? "b" : "-"}`;
     if (key === this.overlayKey) return;
     this.overlayKey = key;
     this.overlay.setData(data);
+  }
+
+  /** Shows / hides trendlines and breakouts and (un)mirrors the axis. Data, indicator values and break times never change. */
+  setView(v: Partial<RsiView>): void {
+    const next = { ...this.view, ...v };
+    const axis = next.mirrored !== this.view.mirrored;
+    this.view = next;
+    if (axis) this.series.priceScale().applyOptions({ invertScale: next.mirrored });
+    this.overlay.setNeutral(next.neutral);
+    this.syncOverlay();
+  }
+
+  /** The 100−RSI axis is on. */
+  isMirrored(): boolean {
+    return this.view.mirrored;
   }
 
   /** RSI at a bar time (crosshair legend); `null` when unknown. */
@@ -235,6 +270,7 @@ export class RsiPane {
 
   /** The newest fresh break of a CLOSED bar (the DOM glow sits on it), `null` when none. */
   freshBreak(): RsiOverlayBreak | null {
+    if (!this.view.breakouts) return null;
     const d = rsiOverlayData(this.lines, this.times.length - 2, null);
     const fresh = d.breaks.filter((b) => b.fresh && !b.provisional).sort((a, b) => b.i - a.i);
     return fresh[0] ?? null;

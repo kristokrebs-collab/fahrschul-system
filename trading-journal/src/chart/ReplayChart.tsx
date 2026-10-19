@@ -53,6 +53,12 @@ export interface ReplayChartProps {
   step: MotionValue<number>;
   /** a change plays the strip wipe from the previous picture */
   wipeKey?: unknown;
+  /** "Chart spiegeln" (F62): the price axis upside down – a display change only; bars, prices and times stay */
+  flipped?: boolean;
+  /** the own trade (entry / stop / target lines, entry / exit markers, MAE / MFE band) is drawn; default true */
+  showTrade?: boolean;
+  /** blind mode: markers and band without long / short / win / loss colours */
+  neutral?: boolean;
   height?: number;
   className?: string;
 }
@@ -64,7 +70,7 @@ class ReplayBand implements ISeriesPrimitive<Time> {
   private series: ISeriesApi<SeriesType, Time> | null = null;
   private chart: IChartApi | null = null;
   private request: (() => void) | null = null;
-  private v = { entry: 0, mae: 0, mfe: 0, long: true, from: 0, to: 0 };
+  private v = { entry: 0, mae: 0, mfe: 0, long: true, from: 0, to: 0, neutral: false };
   private y = { e: null as number | null, a: null as number | null, f: null as number | null, x1: null as number | null, x2: null as number | null };
   private readonly views: IPrimitivePaneView[];
 
@@ -123,8 +129,8 @@ class ReplayBand implements ISeriesPrimitive<Time> {
         ctx.fillStyle = color;
         ctx.fillRect(x1 * hr, top, (x2 - x1) * hr, h);
       };
-      band(a, withAlpha(ink.loss, 0.12));
-      band(f, withAlpha(ink.win, 0.12));
+      band(a, withAlpha(this.v.neutral ? ink.mute : ink.loss, 0.12));
+      band(f, withAlpha(this.v.neutral ? ink.fg : ink.win, 0.12));
     });
   }
 }
@@ -140,7 +146,7 @@ interface Inst {
 
 const sec = (ms: number) => Math.floor(ms / 1000) as UTCTimestamp;
 
-export default function ReplayChart({ bars, trade, steps, step, wipeKey, height = 300, className }: ReplayChartProps) {
+export default function ReplayChart({ bars, trade, steps, step, wipeKey, flipped = false, showTrade = true, neutral = false, height = 300, className }: ReplayChartProps) {
   const host = useRef<HTMLDivElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
   const ripples = useRef<HTMLDivElement>(null);
@@ -177,30 +183,40 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, height 
     };
   }, []);
 
+  // "Chart spiegeln": only the axis option changes – the data below is never touched, so flipping twice is the original
+  useEffect(() => {
+    inst.current?.main.candles.priceScale().applyOptions({ invertScale: flipped });
+  }, [flipped]);
+
   // data window: fixed scales, price lines, then follow `step`
   useEffect(() => {
     const i = inst.current;
     if (!i || !bars.length) return;
     const data = bars.map((b) => ({ time: sec(b.time), open: b.open, high: b.high, low: b.low, close: b.close }));
-    const prices = [...bars.flatMap((b) => [b.high, b.low]), trade.entry, trade.stop ?? NaN, trade.exit ?? NaN].filter((v) => Number.isFinite(v));
+    const prices = [...bars.flatMap((b) => [b.high, b.low]), ...(showTrade ? [trade.entry, trade.stop ?? NaN, trade.exit ?? NaN] : [])].filter((v) => Number.isFinite(v));
     const lo = Math.min(...prices);
     const hi = Math.max(...prices);
     const pad = (hi - lo) * 0.06 || hi * 0.002;
     i.main.candles.applyOptions({ autoscaleInfoProvider: () => ({ priceRange: { minValue: lo - pad, maxValue: hi + pad } }) });
-    const lines = [
-      i.main.candles.createPriceLine({ price: trade.entry, color: ink.fg, lineWidth: 1, lineStyle: LineStyle.Solid, title: "Einstieg", axisLabelVisible: true, axisLabelColor: ink.fg, axisLabelTextColor: ink.bg }),
-      ...(trade.stop ? [i.main.candles.createPriceLine({ price: trade.stop, color: ink.mute, lineWidth: 1, lineStyle: LineStyle.Dashed, title: "Stop", axisLabelVisible: true, axisLabelColor: ink.mute, axisLabelTextColor: ink.bg })] : []),
-      ...(trade.target ? [i.main.candles.createPriceLine({ price: trade.target, color: ink.tick, lineWidth: 1, lineStyle: LineStyle.Dotted, title: "Ziel", axisLabelVisible: false })] : []),
-    ];
-    i.band.set({ entry: trade.entry, long: trade.side !== "short", mae: 0, mfe: 0, from: trade.entryIndex - 0.5, to: trade.entryIndex - 0.5 });
+    const lines = showTrade
+      ? [
+          i.main.candles.createPriceLine({ price: trade.entry, color: ink.fg, lineWidth: 1, lineStyle: LineStyle.Solid, title: "Einstieg", axisLabelVisible: true, axisLabelColor: ink.fg, axisLabelTextColor: ink.bg }),
+          ...(trade.stop ? [i.main.candles.createPriceLine({ price: trade.stop, color: ink.mute, lineWidth: 1, lineStyle: LineStyle.Dashed, title: "Stop", axisLabelVisible: true, axisLabelColor: ink.mute, axisLabelTextColor: ink.bg })] : []),
+          ...(trade.target ? [i.main.candles.createPriceLine({ price: trade.target, color: ink.tick, lineWidth: 1, lineStyle: LineStyle.Dotted, title: "Ziel", axisLabelVisible: false })] : []),
+        ]
+      : [];
+    i.band.set({ entry: trade.entry, long: trade.side !== "short", mae: 0, mfe: 0, from: trade.entryIndex - 0.5, to: trade.entryIndex - 0.5, neutral });
+    const longColor = neutral ? ink.fg : trade.side === "short" ? MARKER_COLORS.short : MARKER_COLORS.long;
+    const exitColor = neutral ? ink.fg : MARKER_COLORS[trade.result === "loss" ? "loss" : trade.result === "win" ? "win" : "be"];
 
     const fit = () => i.chart.timeScale().setVisibleLogicalRange({ from: -0.5, to: data.length - 0.5 });
     const markerList = (n: number): SeriesMarker<Time>[] => {
       const out: SeriesMarker<Time>[] = [];
+      if (!showTrade) return out;
       const e = data[trade.entryIndex];
-      if (e && n > trade.entryIndex) out.push({ time: e.time, position: trade.side === "short" ? "aboveBar" : "belowBar", shape: trade.side === "short" ? "arrowDown" : "arrowUp", color: trade.side === "short" ? MARKER_COLORS.short : MARKER_COLORS.long, text: "E" });
+      if (e && n > trade.entryIndex) out.push({ time: e.time, position: trade.side === "short" ? "aboveBar" : "belowBar", shape: trade.side === "short" ? "arrowDown" : "arrowUp", color: longColor, text: "E" });
       const x = trade.exitIndex != null ? data[trade.exitIndex] : undefined;
-      if (x && trade.exitIndex != null && n > trade.exitIndex) out.push({ time: x.time, position: "inBar", shape: "circle", color: MARKER_COLORS[trade.result === "loss" ? "loss" : trade.result === "win" ? "win" : "be"], text: "X" });
+      if (x && trade.exitIndex != null && n > trade.exitIndex) out.push({ time: x.time, position: "inBar", shape: "circle", color: exitColor, text: "X" });
       return out;
     };
     const ripple = (index: number, price: number, color: string) => {
@@ -221,13 +237,13 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, height 
       const forward = n > i.shown;
       i.shown = n;
       const st = steps[Math.max(0, n - 1)];
-      i.band.set({ mae: n > trade.entryIndex && st ? st.mae : 0, mfe: n > trade.entryIndex && st ? st.mfe : 0, to: Math.min(n, trade.exitIndex != null ? trade.exitIndex + 1 : n) - 0.5 });
+      i.band.set({ mae: showTrade && n > trade.entryIndex && st ? st.mae : 0, mfe: showTrade && n > trade.entryIndex && st ? st.mfe : 0, to: Math.min(n, trade.exitIndex != null ? trade.exitIndex + 1 : n) - 0.5 });
       const entered = n > trade.entryIndex;
       const exited = trade.exitIndex != null && n > trade.exitIndex;
       if (entered !== i.marked.entry || exited !== i.marked.exit) {
         i.markers.setMarkers(markerList(n));
-        if (forward && entered && !i.marked.entry) ripple(trade.entryIndex, trade.entry, trade.side === "short" ? MARKER_COLORS.short : MARKER_COLORS.long);
-        if (forward && exited && !i.marked.exit && trade.exitIndex != null) ripple(trade.exitIndex, trade.exit ?? data[trade.exitIndex]!.close, MARKER_COLORS[trade.result === "loss" ? "loss" : trade.result === "win" ? "win" : "be"]);
+        if (showTrade && forward && entered && !i.marked.entry) ripple(trade.entryIndex, trade.entry, longColor);
+        if (showTrade && forward && exited && !i.marked.exit && trade.exitIndex != null) ripple(trade.exitIndex, trade.exit ?? data[trade.exitIndex]!.close, exitColor);
         i.marked = { entry: entered, exit: exited };
       }
     };
@@ -252,7 +268,7 @@ export default function ReplayChart({ bars, trade, steps, step, wipeKey, height 
       for (const l of lines) i.main.candles.removePriceLine(l);
       i.markers.setMarkers([]);
     };
-  }, [bars, trade, steps, step]);
+  }, [bars, trade, steps, step, showTrade, neutral]);
 
   // strip wipe on a new key: the cleanup of the previous key snapshots the picture still shown (layout cleanups run
   // before the new key's layout effect and before the passive data effect swaps the bars)

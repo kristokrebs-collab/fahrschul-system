@@ -98,6 +98,8 @@ export interface BoxOptions {
   autoscale: boolean;
   /** price-axis labels of the active box's edges */
   axisLabels: boolean;
+  /** blind mode (F62): no win / loss tones – boxes and targets in the neutral grey ramp (form, not colour, tells them apart) */
+  neutral: boolean;
 }
 
 /**
@@ -116,7 +118,7 @@ export interface BoxDebugHook {
   x(logical: number): number | null;
 }
 
-export const BOX_DEFAULTS: BoxOptions = { fillAlpha: 0.08, edgeAlpha: 0.55, inMs: tween.draw.duration * 1000, autoscale: false, axisLabels: true };
+export const BOX_DEFAULTS: BoxOptions = { fillAlpha: 0.08, edgeAlpha: 0.55, inMs: tween.draw.duration * 1000, autoscale: false, axisLabels: true, neutral: false };
 
 const FONT = '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace';
 const LABEL_PX = 9;
@@ -137,7 +139,7 @@ const PENDING = Number.NaN;
 /** Tone colours, read at draw time (follows `applyInk`). */
 const toneOf = (t: BoxTone): { solid: string; soft: string } =>
   t === "win" ? { solid: ink.win, soft: ink.winSoft } : t === "loss" ? { solid: ink.loss, soft: ink.lossSoft } : { solid: ink.fg, soft: ink.mute };
-const TARGET_COLOR = (kind: ChartBoxTarget["kind"], tone: BoxTone): string => (kind === "sl" ? ink.loss : kind === "entry" ? ink.fg : tone === "loss" ? ink.loss : tone === "win" ? ink.win : ink.mute);
+const TARGET_COLOR = (kind: ChartBoxTarget["kind"], tone: BoxTone, neutral = false): string => (neutral ? (kind === "entry" ? ink.fg : ink.mute) : kind === "sl" ? ink.loss : kind === "entry" ? ink.fg : tone === "loss" ? ink.loss : tone === "win" ? ink.win : ink.mute);
 const TARGET_DASH: Record<ChartBoxTarget["kind"], readonly number[]> = { tp: [1, 3], sl: [4, 3], entry: [] };
 
 export const easeOutCubic = (p: number): number => 1 - Math.pow(1 - Math.min(1, Math.max(0, p)), 3);
@@ -527,7 +529,7 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
       const edge = Math.min(1, Math.max(0, age / (this.options.inMs * 0.45)));
       const c0 = this.confirmedAt.get(b.id);
       const wipe = c0 == null ? 1 : easeOutCubic((now - c0) / WIPE_MS);
-      const tone = b.tone;
+      const tone = this.options.neutral ? "neutral" : b.tone;
       const targets: BoxGeo["targets"] = [];
       (b.targets ?? []).forEach((t, k) => {
         const y = yOf(t.price);
@@ -538,7 +540,7 @@ export class BoxPrimitive implements ISeriesPrimitive<Time> {
           y,
           x1: tx1,
           x2: right,
-          color: TARGET_COLOR(t.kind, tone),
+          color: TARGET_COLOR(t.kind, tone, this.options.neutral),
           dash: TARGET_DASH[t.kind],
           text: t.label ? `${t.label} ${fmt.price(t.price)}` : fmt.price(t.price),
           grow: Number.isFinite(t0) ? easeOutCubic(tAge / (this.options.inMs * 0.6)) : 1,

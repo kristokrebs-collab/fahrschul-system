@@ -46,6 +46,12 @@ export interface SeedOptions extends MockMarketOptions {
    * save closed trades for other reasons never get the sheet in their way.
    */
   reviewPrompt?: boolean;
+  /**
+   * Let the F61 daily check-in open by itself at the first open of the day (a sheet over the page). By default the
+   * prompt is off on this device (`tj2-checkin-device` `{ prompt: false }`) – specs that are not about the check-in never
+   * have the sheet in their way.
+   */
+  checkinPrompt?: boolean;
 }
 
 /** The finished tour (`storageKey("onboarding")` of both editions). */
@@ -58,6 +64,12 @@ export const ONBOARDING_DONE: Record<string, string> = {
 export const REVIEW_PROMPT_OFF: Record<string, string> = {
   "tj2-growth-review": JSON.stringify({ auto: false }),
   "tj2share-growth-review": JSON.stringify({ auto: false }),
+};
+
+/** The daily check-in prompt switched off for this device (`storageKey("checkin-device")` of both editions). */
+export const CHECKIN_PROMPT_OFF: Record<string, string> = {
+  "tj2-checkin-device": JSON.stringify({ prompt: false }),
+  "tj2share-checkin-device": JSON.stringify({ prompt: false }),
 };
 
 /**
@@ -87,7 +99,7 @@ function lageOff(extra: Record<string, unknown>, empty: boolean): Record<string,
  */
 export async function seed(page: Page, opts: SeedOptions = {}): Promise<void> {
   await mockMarket(page, opts.scenario ?? "live", opts);
-  const given = { ...(opts.firstRun ? {} : ONBOARDING_DONE), ...(opts.reviewPrompt ? {} : REVIEW_PROMPT_OFF), ...(opts.extra ?? {}) };
+  const given = { ...(opts.firstRun ? {} : ONBOARDING_DONE), ...(opts.reviewPrompt ? {} : REVIEW_PROMPT_OFF), ...(opts.checkinPrompt ? {} : CHECKIN_PROMPT_OFF), ...(opts.extra ?? {}) };
   const extra = (opts.lage ?? !opts.synth) ? given : lageOff(given, !!opts.empty);
   await page.addInitScript(
     ({ fx, extra, announce }) => {

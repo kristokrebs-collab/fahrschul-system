@@ -198,6 +198,11 @@ export function hitMarker(
   return best ? markerTradeId(best.id) : null;
 }
 
+/** Blind mode (F62): the same markers in one neutral colour (no long / short / win / loss tone; the arrow shape stays). */
+export function neutralizeMarkers(markers: readonly SeriesMarker<Time>[], color: string): SeriesMarker<Time>[] {
+  return markers.map((m) => ({ ...m, color }));
+}
+
 /** Convenience: snap source from a candlestick series and its chart's time scale. */
 export function snapSourceOf(series: ISeriesApi<"Candlestick">, timeScale: { timeToIndex: SnapSource["timeToIndex"] }): SnapSource {
   return {

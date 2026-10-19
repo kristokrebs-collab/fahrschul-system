@@ -6,7 +6,7 @@
  *   Serien                      StreakBoard (12)
  *   Ziele                       GoalsCard (12)
  *   Challenges & Gewohnheiten   ChallengeCard (5) · HabitGrid (7)
- *   Psyche                      TrackersCard (7) · MoodCard (5) · DiaryCard (12)
+ *   Psyche                      TrackersCard (7) · MoodCard (5) · CheckInInsights (12) · DiaryCard (12)
  *   Fortschritt                 SkillRadar (5) · BestsCard (7) · ProgressCard (12)
  * Every cell reveals once (`Reveal`, ends at `transform: none`), section titles rise letter by letter. The sheets
  * (check-in, goal, post-trade review) and the "Ziel erreicht" wipe are mounted here; the review sheet only once even
@@ -23,6 +23,7 @@ import { PageHeader } from "@/views/setups/PageHeader";
 import { BestsCard } from "./BestsCard";
 import { ChallengeCard } from "./ChallengeCard";
 import { CheckInCard } from "./CheckInCard";
+import { CheckInInsights } from "./CheckInInsights";
 import { CheckInSheet } from "./CheckInSheet";
 import { DiaryCard } from "./DiaryCard";
 import { GoalsCard } from "./GoalCard";
@@ -113,6 +114,9 @@ export function WachstumView({ className }: { className?: string }) {
         </Cell>
         <Cell index={1} span="lg:col-span-5">
           <MoodCard factors={factors} cur={b.settings.currency} />
+        </Cell>
+        <Cell index={0} span="lg:col-span-12">
+          <CheckInInsights days={b.days} trades={b.enriched} settings={b.settings} />
         </Cell>
         <Cell index={0} span="lg:col-span-12">
           <DiaryCard days={diary} />
