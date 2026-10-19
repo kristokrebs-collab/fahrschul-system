@@ -9,7 +9,7 @@
  */
 import { Gate } from "@/billing/entitlements";
 import { UpgradeTeaser } from "@/billing/ui/UpgradeTeaser";
-import { type ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { biasText, BOX_TF_LABEL, normalizeWatchSymbol, PHASE_LABEL, type BoxTf } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
 import { useRecentBoxAlerts } from "@/market/boxes/alerts";
@@ -21,6 +21,8 @@ import { Reveal } from "@/motion/Reveal";
 import { StatusPill } from "@/motion/StatusPill";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
+import { Card } from "@/primitives/Card";
+import { Skeleton } from "@/primitives/Skeleton";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { useMirrorState } from "@/views/biasTest";
 import { BIAS } from "@/views/biasTest/strings";
@@ -32,6 +34,10 @@ import { BoxStateCard } from "./BoxStateCard";
 import { RsiLinesCard } from "./RsiLinesCard";
 import { ScannerCard } from "./ScannerCard";
 import { MARKT } from "./strings";
+import { TREND } from "./trendStrings";
+
+// F05: the structure card (store, analysis, texts) is its own chunk – loaded when the page is opened, never with the app
+const TrendStructureCard = lazy(() => import("./TrendStructureCard").then((m) => ({ default: m.TrendStructureCard })));
 
 export const MARKT_LEAD_FILL = { storageKey: storageKey("fill-markt"), highlight: MARKT.leadHighlight } as const;
 
@@ -167,6 +173,17 @@ export function MarktView({ className }: { className?: string }) {
       </Cell>
       {!focus && (
         <>
+          <Cell index={3} span="lg:col-span-12">
+            <Suspense
+              fallback={
+                <Card title={TREND.title} data-testid="markt-trend-loading">
+                  <Skeleton height={180} />
+                </Card>
+              }
+            >
+              <TrendStructureCard />
+            </Suspense>
+          </Cell>
           <Cell index={6} span="lg:col-span-7">
             <KeyLevelsCard />
           </Cell>

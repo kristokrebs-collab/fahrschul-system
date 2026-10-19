@@ -137,7 +137,8 @@ export function sortBroken(lines: readonly TrendLine[], inp: SeriesInput): Trend
 
 /**
  * What the price did at a broken line after the break, on the closed bars `brokeAt + 1 … n − 1`:
- * - touch  – the wick (RSI: the value) comes back within the retest tolerance of the line, inside `retestBars` of the break;
+ * - touch  – after a close clear of the line (further than the retest tolerance), the wick (RSI: the value) comes back
+ *            within the retest tolerance of the line, inside `retestBars` of the break;
  * - held   – a candle closes beyond the line again (the touch candle itself counts);
  * - failed – a candle closes back on the old side by more than the break tolerance (also after a held retest);
  * - expired – no touch within the window.
@@ -151,6 +152,9 @@ export function retestOf(inp: SeriesInput, line: TrendLine, cfg: Pick<EngineCfg,
   let touchedAt: number | null = null;
   let heldAt: number | null = null;
   let failedAt: number | null = null;
+  // a retest is a RETURN: the price must first have closed clear of the line (further than the retest tolerance) – the
+  // candle after a hesitant break that merely stays next to the line is no retest
+  let away = sgn * (inp.close[broke]! - lineAt(line, broke)) > inp.retest(broke);
   for (let k = broke + 1; k < n; k++) {
     const c = inp.close[k]!;
     if (!Number.isFinite(c)) continue;
@@ -159,12 +163,13 @@ export function retestOf(inp: SeriesInput, line: TrendLine, cfg: Pick<EngineCfg,
       failedAt = k;
       break;
     }
-    if (touchedAt == null && k - broke <= cfg.retestBars) {
+    if (touchedAt == null && away && k - broke <= cfg.retestBars) {
       // the extreme on the old side of the price: the low of a break upward, the high of a break downward
       const reach = sgn > 0 ? inp.lo[k]! : inp.hi[k]!;
       if (Number.isFinite(reach) && sgn * (reach - l) <= inp.retest(k)) touchedAt = k;
     }
     if (touchedAt != null && heldAt == null && sgn * (c - l) > 0) heldAt = k;
+    if (sgn * (c - l) > inp.retest(k)) away = true;
   }
   let state: RetestState;
   if (failedAt != null) state = "failed";

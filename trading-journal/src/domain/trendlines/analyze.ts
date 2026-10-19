@@ -28,9 +28,9 @@ export function closedCandles<T extends EvalCandle>(candles: readonly T[], tf: T
   return out;
 }
 
-const engineCfg = (cfg: TrendlineCfg): EngineCfg => ({ pivotL: cfg.pivotL, pivotR: cfg.pivotR, lookback: cfg.lookback, minGap: cfg.minGap, maxPivots: cfg.maxPivots, retestBars: cfg.retestBars });
+export const engineCfg = (cfg: TrendlineCfg): EngineCfg => ({ pivotL: cfg.pivotL, pivotR: cfg.pivotR, lookback: cfg.lookback, minGap: cfg.minGap, maxPivots: cfg.maxPivots, retestBars: cfg.retestBars });
 
-function priceInput(closed: readonly EvalCandle[], atr: readonly (number | null)[], cfg: TrendlineCfg): SeriesInput {
+export function priceSeries(closed: readonly EvalCandle[], atr: readonly (number | null)[], cfg: TrendlineCfg): SeriesInput {
   const at = (i: number): number => atr[i] ?? 0;
   const k = cfg.price;
   return {
@@ -49,7 +49,7 @@ function priceInput(closed: readonly EvalCandle[], atr: readonly (number | null)
   };
 }
 
-function rsiInput(r: readonly number[], cfg: TrendlineCfg): SeriesInput {
+export function rsiSeries(r: readonly number[], cfg: TrendlineCfg): SeriesInput {
   const k = cfg.rsi;
   return {
     hi: r,
@@ -135,7 +135,7 @@ export function analyzeTrendlines(candles: readonly EvalCandle[], tf: TrendTf, n
     cfg.rsi.len,
   );
   const rsiLast = Number.isFinite(r[n - 1]) ? r[n - 1]! : null;
-  const price = seriesOf({ tf, series: "price", closed, inp: priceInput(closed, atrs, cfg), cfg, atr });
-  const rsi = rsiLast == null ? EMPTY_SERIES : seriesOf({ tf, series: "rsi", closed, inp: rsiInput(r, cfg), cfg, atr });
+  const price = seriesOf({ tf, series: "price", closed, inp: priceSeries(closed, atrs, cfg), cfg, atr });
+  const rsi = rsiLast == null ? EMPTY_SERIES : seriesOf({ tf, series: "rsi", closed, inp: rsiSeries(r, cfg), cfg, atr });
   return { ...base, status: "ok", atr, rsiLast, price, rsi };
 }

@@ -54,6 +54,7 @@ import { fmt } from "./format";
 import type { SignalMarker } from "./signalMarkers";
 import { DEFAULT_LAYERS, SignalOverlay, type DivergenceLine, type OverlayLayers, type StructureOverlay } from "./primitives/SignalOverlay";
 import { BOX_DEBUG_KEY, BoxPrimitive, type BoxDebugHook, type ChartBox } from "./primitives/BoxPrimitive";
+import type { ChartTrendline, TrendlinePrimitive } from "./primitives/TrendlinePrimitive";
 import { logicalToX } from "./logicalX";
 import type { RsiOverlayBreak } from "./primitives/RsiOverlay";
 import type { Box } from "./overlayLayout";
@@ -143,6 +144,11 @@ export interface NothingCandleChartProps {
   boxes?: ChartBox[];
   /** keep the boxes overlapping the view and the active box's targets in the price range (default false) */
   boxAutoscale?: boolean;
+  /**
+   * Diagonal price trendlines (F05, `primitives/TrendlinePrimitive.ts`): lines in time / price, so they follow the mirror
+   * (`invertScale`) and also read on a lower interval. The primitive is a separate chunk, loaded with the first line.
+   */
+  priceLines?: readonly ChartTrendline[];
   rangeDays?: RangeDays;
   /**
    * "Chart spiegeln" (F62, `./mirror.ts`): the price axis runs upside down (`invertScale`) – a DISPLAY change only: bars,
@@ -188,6 +194,10 @@ interface Instance {
   check: SignalOverlay;
   /** Box-zu-Box boxes + targets (P02), under the check overlay */
   boxes: BoxPrimitive;
+  /** price trendlines (F05): created with the first line (lazy chunk), `null` before */
+  trend: TrendlinePrimitive | null;
+  /** the chart was destroyed: a late-loading chunk attaches nothing */
+  dead: boolean;
   /** chart-relative top (CSS px) of the sub pane, measured on resize / pane switch only (RSI legend + glow) */
   subTop: number;
   /** blind mode (F62): trade markers in one neutral colour */
@@ -221,6 +231,7 @@ interface Instance {
     live?: Candle;
     pane?: readonly unknown[];
     boxes?: ChartBox[] | undefined;
+    trend?: readonly ChartTrendline[] | undefined;
   };
   /** a history `setData` is waiting for the chart font (effect 2): the canvas is about to change */
   applying: boolean;
@@ -354,6 +365,27 @@ function syncOverlay(i: Instance, p: { signals?: SignalMarker[]; divergences?: D
 }
 
 const NO_BOXES: ChartBox[] = [];
+
+/** Key of the read-only diagnostics hook of the trendlines on the host element (same value as `TREND_DEBUG_KEY`). */
+const TREND_KEY = "__tjTrend";
+
+/** Price trendlines (F05): the primitive's chunk loads with the first line; later calls update it in place. */
+function syncTrend(i: Instance, lines: readonly ChartTrendline[] | undefined, now: { neutral: () => boolean; levels: () => MarketLevels | undefined }): void {
+  i.applied.trend = lines;
+  if (i.trend) {
+    i.trend.setLines(lines ?? []);
+    return;
+  }
+  if (!lines?.length) return;
+  void import("./primitives/TrendlinePrimitive").then(({ TrendlinePrimitive: Prim }) => {
+    if (i.dead || i.trend) return;
+    const prim = new Prim({ bars: () => i.data, intervalSec: () => INTERVAL_SECONDS[i.lastInterval ?? "1h"], reserved: () => zoneCaptionBox(i, now.levels()) }, { neutral: now.neutral() });
+    i.main.candles.attachPrimitive(prim);
+    i.trend = prim;
+    Object.defineProperty(i.node, TREND_KEY, { value: { lines: () => prim.chartLines(), geometry: () => prim.geometry() }, configurable: true });
+    prim.setLines(i.applied.trend ?? []);
+  });
+}
 
 /** Box-zu-Box boxes (P02): a new id draws in, the rest is re-indexed by the primitive. */
 function syncBoxes(i: Instance, boxes: ChartBox[] | undefined): void {
@@ -564,6 +596,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   pane = "none",
   boxes,
   boxAutoscale = false,
+  priceLines,
   rangeDays = 30,
   mirror = NO_MIRROR,
   price,
@@ -590,7 +623,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
   const parked = useRef<ChartRecord | null>(null);
   const tip = useRef<TooltipHandle>(null);
   const cb = useRef<Callbacks>({});
-  const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers; levels?: MarketLevels; keyLines?: readonly KeyLine[]; activeScenario: ActiveScenario; boxes?: ChartBox[] }>({
+  const latest = useRef<{ markers?: TradeMarker[]; signals?: SignalMarker[]; divergences?: DivergenceLine[]; structure?: StructureOverlay | null; layers?: OverlayLayers; levels?: MarketLevels; keyLines?: readonly KeyLine[]; activeScenario: ActiveScenario; boxes?: ChartBox[]; priceLines?: readonly ChartTrendline[] }>({
     activeScenario: null,
   });
   /** RSI legend (top left of the RSI pane): text and position written through refs, never React state */
@@ -632,8 +665,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     reduceRef.current = reduce;
   }, [reduce]);
   useEffect(() => {
-    latest.current = { markers, signals, divergences, structure, layers, levels, keyLines, activeScenario, boxes };
-  }, [markers, signals, divergences, structure, layers, levels, keyLines, activeScenario, boxes]);
+    latest.current = { markers, signals, divergences, structure, layers, levels, keyLines, activeScenario, boxes, priceLines };
+  }, [markers, signals, divergences, structure, layers, levels, keyLines, activeScenario, boxes, priceLines]);
 
   // 1. create once and keep it. A keep-alive <Activity> (the Übersicht on another tab) destroys this effect while the page
   // is hidden but keeps the DOM: the cleanup then PARKS the instance (host still in the document) and the next run
@@ -788,6 +821,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         // a bar closed: RSI + trendlines of the closed bars (once per bar), the box geometry re-indexes
         panes.setBars(instance.data);
         boxes.invalidate();
+        instance.trend?.invalidate();
         syncGlow(instance, fx.current, true);
         writeRsiLegend(instance, fx.current, null);
       },
@@ -811,6 +845,8 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       live,
       levels: null,
       keyLines: null,
+      trend: null,
+      dead: false,
       built: null,
       markerIds: null,
       bounds: null,
@@ -950,6 +986,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       if (instance.data.length) syncMarkers(instance, latest.current.markers);
       check.invalidate();
       boxes.invalidate();
+      instance.trend?.invalidate();
     });
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
     node.addEventListener("wheel", stopMorph, { passive: true });
@@ -999,6 +1036,9 @@ export const NothingCandleChart = memo(function NothingCandleChart({
         boxes.dispose();
         main.candles.detachPrimitive(boxes);
         Reflect.deleteProperty(node, BOX_DEBUG_KEY);
+        instance.dead = true;
+        if (instance.trend) main.candles.detachPrimitive(instance.trend);
+        Reflect.deleteProperty(node, TREND_KEY);
         clearLevels(main.candles, instance.levels);
         clearKeyLines(main.candles, instance.keyLines);
         panes.dispose();
@@ -1085,6 +1125,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
       i.check.invalidate();
       syncOverlay(i, latest.current);
       i.boxes.invalidate();
+      i.trend?.invalidate();
       syncBoxes(i, latest.current.boxes);
       syncGlow(i, fx.current, false);
       writeRsiLegend(i, fx.current, null);
@@ -1212,6 +1253,13 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     inst.current?.boxes.applyOptions({ autoscale: boxAutoscale });
   }, [boxAutoscale]);
 
+  // 6d. price trendlines (F05): identity = content upstream; the primitive's chunk loads with the first line
+  useEffect(() => {
+    const i = inst.current;
+    if (!i || ("trend" in i.applied && i.applied.trend === priceLines)) return;
+    syncTrend(i, priceLines, { neutral: () => mirrorRef.current.neutral, levels: () => latest.current.levels });
+  }, [priceLines]);
+
   // 7. optional sub pane; switching the kind crossfades from a screenshot
   useEffect(() => {
     const i = inst.current;
@@ -1239,6 +1287,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     i.main.candles.priceScale().applyOptions({ invertScale: flipped });
     i.panes.setRsiView({ trendlines, breakouts, mirrored: flipped && rsiMirrored, neutral });
     i.boxes.applyOptions({ neutral });
+    i.trend?.applyOptions({ neutral });
     if (i.neutral !== neutral) {
       i.neutral = neutral;
       if (i.data.length) syncMarkers(i, latest.current.markers);
@@ -1247,6 +1296,7 @@ export const NothingCandleChart = memo(function NothingCandleChart({
     writeRsiLegend(i, fx.current, null);
     i.check.invalidate();
     i.boxes.invalidate();
+    i.trend?.invalidate();
     i.requestPlace();
   }, [flipped, rsiMirrored, trendlines, breakouts, neutral]);
 
