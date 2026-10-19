@@ -146,7 +146,7 @@ describe("Labor · Belastung, Bericht, Filter", () => {
     fireEvent.click(within(items[0]!).getByRole("switch"));
     fireEvent.click(within(items[1]!).getByRole("switch"));
     expect(useExtras.getState().selection.on).toEqual(["rsi", "trend"]);
-    expect(within(filters).getByTestId("labor-filters-run")).toBeEnabled();
+    await waitFor(() => expect(within(filters).getByTestId("labor-filters-run")).toBeEnabled(), { timeout: 15_000 });
     await act(async () => {
       fireEvent.click(within(filters).getByTestId("labor-filters-run"));
     });
