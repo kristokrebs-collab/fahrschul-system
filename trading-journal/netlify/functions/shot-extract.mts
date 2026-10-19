@@ -22,6 +22,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Config } from "@netlify/functions";
 import { limitOf } from "../../src/billing/plans";
+import { normalizeToolInput } from "../../src/journal/extract/lenient";
 import {
   ExtractBody,
   Extraction,
@@ -42,7 +43,10 @@ import { paymentsConfigured, requireFeature } from "./_lib/plan";
 import { enforceRateLimit, rateKey } from "./_lib/rateLimit";
 
 export const DEFAULT_VISION_MODEL = "claude-opus-5-5";
-export const VISION_OFF_MESSAGE = "Der Screenshot-Import ist auf diesem Server nicht eingerichtet.";
+/** No key at all: the operator has to set `ANTHROPIC_API_KEY` (Netlify → Site configuration → Environment variables, scope Functions). */
+export const VISION_OFF_MESSAGE = "Der KI-Dienst ist auf dem Server nicht eingerichtet: Es ist kein KI-Schlüssel hinterlegt. Der Betreiber muss ANTHROPIC_API_KEY in den Netlify-Umgebungsvariablen setzen.";
+/** A key is set, but Anthropic refuses it. */
+export const VISION_KEY_MESSAGE = "Der KI-Schlüssel auf dem Server wurde abgelehnt (ungültig, abgelaufen, ohne Guthaben oder ohne Zugriff auf das Modell). Der Betreiber muss ANTHROPIC_API_KEY prüfen.";
 /** Reads per user without payments (the plan limit applies once payments are set up). */
 export const DEFAULT_DAILY = 30;
 
@@ -132,18 +136,31 @@ export async function extract(body: ExtractBody, apiKey: string, model: string):
       ],
     });
   } catch (e) {
-    if (e instanceof Anthropic.RateLimitError) throw new HttpError(429, "shot_extract_busy", "Die KI ist gerade ausgelastet – bitte gleich noch einmal.", undefined, { "retry-after": "30" });
+    // every branch names the REASON (the trader sees it as it is); only status codes are logged, never texts or pictures
+    if (e instanceof Anthropic.RateLimitError || (e instanceof Anthropic.APIError && e.status === 529)) throw new HttpError(429, "shot_extract_busy", "Die KI ist gerade ausgelastet – bitte gleich noch einmal.", undefined, { "retry-after": "30" });
     if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
       console.error("[fn] shot-extract auth", e.status);
-      throw new HttpError(503, "shot_extract_unavailable", VISION_OFF_MESSAGE);
+      throw new HttpError(503, "shot_extract_key_rejected", VISION_KEY_MESSAGE);
+    }
+    if (e instanceof Anthropic.NotFoundError) {
+      console.error("[fn] shot-extract model", e.status);
+      throw new HttpError(502, "shot_extract_model", `Das eingestellte KI-Modell „${model}“ gibt es bei Anthropic nicht (oder dein Schlüssel hat keinen Zugriff darauf). Der Betreiber muss VISION_MODEL bzw. COACH_MODEL prüfen.`);
     }
     if (e instanceof Anthropic.BadRequestError) {
       console.error("[fn] shot-extract bad request", e.status);
-      throw new HttpError(502, "shot_extract_failed", "Die KI konnte die Bilder nicht lesen. Probiere einen anderen Ausschnitt oder trage die Werte von Hand ein.");
+      throw new HttpError(502, "shot_extract_failed", "Die KI konnte die Bilder nicht lesen (Anfrage abgelehnt). Probiere einen anderen Ausschnitt oder trage die Werte von Hand ein.");
+    }
+    if (e instanceof Anthropic.APIConnectionTimeoutError) {
+      console.error("[fn] shot-extract timeout");
+      throw new HttpError(504, "shot_extract_timeout", "Die KI hat nicht innerhalb von 25 Sekunden geantwortet. Schneide den Screenshot auf die Trades zu und versuche es noch einmal.");
+    }
+    if (e instanceof Anthropic.APIConnectionError) {
+      console.error("[fn] shot-extract network");
+      throw new HttpError(502, "shot_extract_network", "Der Server erreicht den KI-Dienst nicht (Netzwerkfehler). Bitte gleich noch einmal versuchen.");
     }
     if (e instanceof Anthropic.APIError) {
       console.error("[fn] shot-extract api", e.status ?? "network");
-      throw new HttpError(502, "shot_extract_failed", "Die KI antwortet gerade nicht – du kannst die Werte von Hand eintragen.");
+      throw new HttpError(502, "shot_extract_failed", `Der KI-Dienst meldet einen Fehler (Status ${e.status ?? "unbekannt"}) – du kannst die Werte von Hand eintragen.`);
     }
     throw e;
   }
@@ -151,10 +168,14 @@ export async function extract(body: ExtractBody, apiKey: string, model: string):
   if (res.stop_reason === "refusal") return { trades: [], timezone: null, notes: [], model: served, reason: "refusal" };
   const call = res.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === TOOL_NAME);
   if (!call) return { trades: [], timezone: null, notes: [], model: served, reason: "empty" };
-  const parsed = Extraction.safeParse(call.input);
+  // formatting slips ("" for unknown, a confidence of 1.2, an execution without a price) are repaired and reported;
+  // what is really wrong (a missing status, `trades` not a list) still fails – with the field named
+  const lenient = normalizeToolInput(call.input);
+  const parsed = Extraction.safeParse(lenient.input);
   if (!parsed.success) {
+    const where = [...new Set(parsed.error.issues.slice(0, 3).map((i) => i.path.join(".") || "Antwort"))].join(", ");
     console.error("[fn] shot-extract invalid", parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".")}:${i.code}`).join(","));
-    throw new HttpError(502, "shot_extract_invalid", "Die KI-Antwort war unvollständig. Bitte versuche es noch einmal.");
+    throw new HttpError(502, "shot_extract_invalid", `Die KI-Antwort passte nicht zum erwarteten Format (Feld: ${where}). Bitte versuche es noch einmal.`);
   }
   const clean = sanitize(parsed.data, body.images.length);
   if (!clean.trades.length) return { ...clean, model: served, reason: "empty" };

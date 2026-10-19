@@ -129,7 +129,12 @@ describe("Verfügbarkeit", () => {
     delete process.env.ANTHROPIC_API_KEY;
     const res = await post();
     expect(res.status).toBe(503);
-    expect((await res.json()).error).toMatchObject({ code: "shot_extract_unavailable", message: "Der Screenshot-Import ist auf diesem Server nicht eingerichtet." });
+    const err = (await res.json()).error;
+    expect(err).toMatchObject({ code: "shot_extract_unavailable" });
+    // the REASON, and what the operator has to do
+    expect(err.message).toMatch(/KI-Dienst ist auf dem Server nicht eingerichtet/);
+    expect(err.message).toMatch(/kein KI-Schlüssel/);
+    expect(err.message).toContain("ANTHROPIC_API_KEY");
   });
 
   it("needs a login, and with 2FA the code step", async () => {
@@ -185,7 +190,7 @@ describe("Lesen", () => {
     delete process.env.COACH_MODEL;
   });
 
-  it("fills missing optional keys with null / [] but needs the required ones: a schema violation is a 502", async () => {
+  it("fills missing optional keys with null / [] but needs the required ones: a real schema violation is a 502 that names the field", async () => {
     const lean = { ...TRADE } as Record<string, unknown>;
     delete lean.stop;
     delete lean.funding;
@@ -197,11 +202,19 @@ describe("Lesen", () => {
     fakeModel(toolUse({ trades: [{ ...TRADE, status: "halb-offen" }], timezone: null, notes: [] }));
     let res = await post();
     expect(res.status).toBe(502);
-    expect((await res.json()).error).toMatchObject({ code: "shot_extract_invalid" });
+    const bad = (await res.json()).error;
+    expect(bad).toMatchObject({ code: "shot_extract_invalid" });
+    expect(bad.message).toContain("trades.0.status");
 
-    fakeModel(toolUse({ trades: [{ ...TRADE, confidence: { ...conf(0.9), stop: 1.4 } }], timezone: null }));
+    // formatting slips are repaired, not fatal: a confidence of 1.4 is 1, "" is unknown, an execution without a price is dropped and said so
+    fakeModel(toolUse({ trades: [{ ...TRADE, confidence: { ...conf(0.9), stop: 1.4 }, fees: "  ", entries: [...TRADE.entries, { price: "", qty: "1", time: null }] }], timezone: "" }));
     res = await post();
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(200);
+    const fixed = await res.json();
+    expect(fixed.trades[0]).toMatchObject({ fees: null, stop: null });
+    expect(fixed.trades[0].entries).toHaveLength(1);
+    expect(fixed.timezone).toBeNull();
+    expect(fixed.notes.join(" ")).toMatch(/Ausführung ohne lesbaren Preis wurde ausgelassen/);
 
     fakeModel(toolUse({ trades: "kein Array" }));
     expect((await post()).status).toBe(502);
@@ -229,7 +242,27 @@ describe("Lesen", () => {
     expect(res.status).toBe(429);
     expect((await res.json()).error.code).toBe("shot_extract_busy");
     fakeModel(new Anthropic.AuthenticationError(401, { type: "error", error: { type: "authentication_error", message: "x" } }, "x", new Headers()));
-    expect((await post()).status).toBe(503);
+    res = await post();
+    expect(res.status).toBe(503);
+    // a key that is SET but refused is not „nicht eingerichtet“: the reason differs, so does the code
+    const refused = (await res.json()).error;
+    expect(refused.code).toBe("shot_extract_key_rejected");
+    expect(refused.message).toMatch(/Schlüssel .* abgelehnt/);
+    expect(refused.message).not.toMatch(/nicht eingerichtet/);
+    fakeModel(new Anthropic.NotFoundError(404, { type: "error", error: { type: "not_found_error", message: "model: x" } }, "model: x", new Headers()));
+    res = await post();
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toMatchObject({ code: "shot_extract_model", message: expect.stringContaining(DEFAULT_VISION_MODEL) });
+    fakeModel(new Anthropic.APIConnectionTimeoutError());
+    res = await post();
+    expect(res.status).toBe(504);
+    expect((await res.json()).error).toMatchObject({ code: "shot_extract_timeout", message: expect.stringContaining("25 Sekunden") });
+    fakeModel(new Anthropic.APIConnectionError({ message: "down" }));
+    res = await post();
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toMatchObject({ code: "shot_extract_network" });
+    fakeModel(new Anthropic.InternalServerError(529, { type: "error", error: { type: "overloaded_error", message: "x" } }, "x", new Headers()));
+    expect((await post()).status).toBe(429); // overloaded = busy, try again
     fakeModel(new Anthropic.BadRequestError(400, { type: "error", error: { type: "invalid_request_error", message: "image bad" } }, "image bad", new Headers()));
     res = await post();
     expect(res.status).toBe(502);
@@ -237,7 +270,9 @@ describe("Lesen", () => {
     fakeModel(new Anthropic.InternalServerError(500, { type: "error", error: { type: "api_error", message: "x" } }, "x", new Headers()));
     res = await post();
     expect(res.status).toBe(502);
-    expect((await res.json()).error.message).toContain("von Hand");
+    const generic = (await res.json()).error;
+    expect(generic.message).toContain("von Hand");
+    expect(generic.message).toContain("Status 500"); // the reason is named, not a blanket sentence
   });
 
   it("does not log the pictures (only error codes)", async () => {

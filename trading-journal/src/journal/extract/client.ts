@@ -28,6 +28,8 @@ export class ExtractError extends Error {
   constructor(
     message: string,
     readonly code: "decode" | "size" | "api" | "offline" | "gone" = "api",
+    /** The server's error code (`shot_extract_unavailable` …) when the answer carried one – shown small for support. */
+    readonly detail?: string,
   ) {
     super(message);
   }
@@ -132,7 +134,7 @@ export async function requestExtraction(images: readonly WireImage[], hint?: Ext
   }
   // the server validated it already – a reply that does not fit the contract (old / foreign server) is never used
   const parsed = Extraction.safeParse(raw);
-  if (!parsed.success) throw new ExtractError("Die Antwort des Servers war unvollständig. Du kannst die Werte von Hand eintragen.", "api");
+  if (!parsed.success) throw new ExtractError("Die Antwort des Servers hat nicht das erwartete Format (ein anderer oder älterer Server?). Du kannst die Werte von Hand eintragen.", "api", "bad_reply");
   return { ...parsed.data, model: typeof raw.model === "string" ? raw.model : "", ...(raw.reason ? { reason: raw.reason } : {}) };
 }
 
@@ -144,8 +146,13 @@ export function extractError(e: unknown): ExtractError {
     if (e.status === 0) return new ExtractError(`${e.message} Du kannst die Werte wie gewohnt von Hand eintragen.`, "offline");
     if (e.status === 401) return new ExtractError("Bitte melde dich an, um Screenshots auslesen zu lassen.", "api");
     if (e.status === 402) return new ExtractError(e.code === "limit_reached" ? "Das Tageslimit deines Tarifs für den Screenshot-Import ist erreicht." : "Der Screenshot-Import gehört nicht zu deinem Tarif.", "api");
-    if (e.status === 413 || e.status === 422) return new ExtractError("Die Bilder sind zu groß oder in einem nicht unterstützten Format (PNG, JPEG, WebP).", "size");
-    return new ExtractError(e.message, "api");
+    if (e.status === 413 || e.status === 422) return new ExtractError("Die Bilder sind zu groß oder in einem nicht unterstützten Format (PNG, JPEG, WebP).", "size", e.code);
+    // an answer the function did not write itself (the platform's page): the REASON is where it came from, not "unwell"
+    if (e.code.startsWith("http_")) {
+      if (e.status === 404 || e.status === 405) return new ExtractError(`Die Funktion „shot-extract“ ist auf diesem Server nicht bereitgestellt (HTTP ${e.status}).`, "api", e.code);
+      if (e.status >= 500) return new ExtractError(`Der Server hat nicht (rechtzeitig) geantwortet (HTTP ${e.status}) – meist das Zeitlimit der Netlify-Funktion beim Auslesen. Versuche es noch einmal, mit weniger oder kleineren Bildern.`, "api", e.code);
+    }
+    return new ExtractError(e.message, "api", e.code);
   }
   return new ExtractError("Das Auslesen hat nicht geklappt. Du kannst die Werte von Hand eintragen.", "api");
 }

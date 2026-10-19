@@ -11,6 +11,7 @@ import type { Fill, FillSide, MarketKind, Side } from "@/domain/types";
 import { newId } from "@/lib/ids";
 import { parseNumber } from "@/lib/parse";
 import type { ConfidenceKey, Extraction, ExtractedExecution, ExtractedTrade } from "./contract";
+import { parseOrderLabel } from "./orders";
 import { detectNumberStyle, parseLeverage, parseShotNumber, type NumberStyle, type ParsedNumber } from "./numbers";
 import { localZoneId, parseShotTime, parseZone, toLocalWall, type ZoneSpec } from "./time";
 
@@ -40,6 +41,18 @@ export interface Leg {
   /** Something about this leg is a guess (ambiguous number, assumed year, time zone). */
   uncertain: boolean;
   notes: string[];
+  /** The order's name as displayed („Long schließen“), `null` when the screenshot shows none. */
+  label?: string | null;
+}
+
+/**
+ * An entry the trader had COMPUTED from the exit, quantity and realised PnL (`implied.ts`) because the opening order is
+ * not in the screenshot. It is an assumption, not a reading: the preview, the draft's notes and the checks say so until
+ * the trader types a value of their own.
+ */
+export interface EntryAssumption {
+  basis: "gross" | "net";
+  price: number;
 }
 
 export type CandidateStatus = "planned" | "open" | "closed";
@@ -75,6 +88,8 @@ export interface Candidate {
   pnlCurrency: string | null;
   /** Which result goes into the trade: the screenshot's number or the one computed from the prices. */
   pnlMode: "auto" | "shot" | "calc";
+  /** Set while the only entry is the computed one (`implied.ts`); cleared by any entry the trader types. */
+  entryAssumed?: EntryAssumption | null;
   unreadable: string[];
   notes: string[];
 }
@@ -213,7 +228,7 @@ function buildLegs(list: readonly ExtractedExecution[], c: number, style: Number
         if (!t.date) notes.push("Datum fehlte – vom anderen Fill übernommen");
       } else notes.push(t ? "Datum fehlt im Screenshot" : `Zeit „${e.time}“ nicht lesbar`);
     }
-    legs.push({ id: newId("leg_"), price: price.value, qty: qty && qty.value > 0 ? Math.abs(qty.value) : null, at, conf: c, uncertain, notes });
+    legs.push({ id: newId("leg_"), price: price.value, qty: qty && qty.value > 0 ? Math.abs(qty.value) : null, at, conf: c, uncertain, notes, label: e.label ?? null });
   }
   return { legs, dropped };
 }
@@ -243,14 +258,62 @@ export const totalQty = (legs: readonly Leg[]): number | null => (legs.length &&
 export const firstAt = (legs: readonly Leg[]): string | null => legs.map((l) => l.at).filter((a): a is string => !!a).sort()[0] ?? null;
 export const lastAt = (legs: readonly Leg[]): string | null => legs.map((l) => l.at).filter((a): a is string => !!a).sort().at(-1) ?? null;
 
+const SIDE_DE = { long: "Long", short: "Short" } as const;
+
+/**
+ * Sorts the executions by what their own NAME says („Long schließen“ is an exit, „Short öffnen“ an entry) and reads the
+ * position side from it. The model's sorting and `side` are kept wherever the names are silent; a contradiction is
+ * resolved in favour of the displayed text and written down.
+ */
+function routeByLabel(t: ExtractedTrade): { entries: ExtractedExecution[]; exits: ExtractedExecution[]; side: Side | null; sideLabel: string | null; sideConflict: boolean; notes: string[] } {
+  const entries: ExtractedExecution[] = [];
+  const exits: ExtractedExecution[] = [];
+  const notes: string[] = [];
+  const sides = new Map<Side, string>();
+  const note = (e: ExtractedExecution, is: "Einstieg" | "Ausstieg") => notes.push(`Auftrag „${e.label}“ ist ein ${is}, stand aber bei den ${is === "Ausstieg" ? "Einstiegen" : "Ausstiegen"} – umsortiert.`);
+  for (const e of t.entries) {
+    const o = parseOrderLabel(e.label);
+    if (o) sides.set(o.side, e.label!);
+    if (o?.action === "close") {
+      exits.push(e);
+      note(e, "Ausstieg");
+    } else entries.push(e);
+  }
+  for (const e of t.exits) {
+    const o = parseOrderLabel(e.label);
+    if (o) sides.set(o.side, e.label!);
+    if (o?.action === "open") {
+      entries.push(e);
+      note(e, "Einstieg");
+    } else exits.push(e);
+  }
+  const only = sides.size === 1 ? [...sides.entries()][0]! : null;
+  return { entries, exits, side: only?.[0] ?? null, sideLabel: only?.[1] ?? null, sideConflict: sides.size > 1, notes };
+}
+
+/**
+ * The position side: what the orders' own names say wins over the model's `side` (a „Long schließen“ is a LONG position
+ * whatever the colour or the sell direction suggested); two different sides in the names are a conflict, left unsure.
+ */
+function sideCell(t: ExtractedTrade, r: ReturnType<typeof routeByLabel>): Cell<Side> {
+  const c = conf(t, "side");
+  if (r.sideConflict) return t.side ? { ...readCell<Side>(t.side, t.side, c), state: "uncertain", note: "Die Auftragsnamen nennen Long und Short – Richtung prüfen." } : cell<Side>({ note: "Die Auftragsnamen nennen Long und Short – Richtung prüfen.", state: "missing" });
+  if (!r.side) return readCell<Side>(t.side, t.side, c);
+  const note = t.side && t.side !== r.side ? `Position ${SIDE_DE[r.side]} laut „${r.sideLabel}“ – die KI hatte ${SIDE_DE[t.side]} gemeldet; der Auftragsname gilt.` : undefined;
+  return { value: r.side, raw: r.sideLabel, conf: Math.max(0.9, t.side === r.side ? c : 0), state: "ok", ...(note ? { note } : {}) };
+}
+
 /** Builds the candidates of an extraction (one per extracted trade). */
 export function buildCandidates(ex: Extraction, ctx: BuildContext): Candidate[] {
   const style = ctx.style !== undefined ? ctx.style : detectNumberStyle(allRaws(ex));
   return ex.trades.map((t, i): Candidate => {
     const notes: string[] = [];
-    const dateHint = dateOfAny([...t.entries, ...t.exits], ctx.now);
-    const en = buildLegs(t.entries, conf(t, "entries"), style, ctx, dateHint);
-    const ex2 = buildLegs(t.exits, conf(t, "exits"), style, ctx, dateHint);
+    const routed = routeByLabel(t);
+    notes.push(...routed.notes);
+    const moved = routed.notes.length > 0;
+    const dateHint = dateOfAny([...routed.entries, ...routed.exits], ctx.now);
+    const en = buildLegs(routed.entries, conf(t, "entries"), style, ctx, dateHint);
+    const ex2 = buildLegs(routed.exits, moved ? Math.max(conf(t, "exits"), conf(t, "entries")) : conf(t, "exits"), style, ctx, dateHint);
     if (en.dropped + ex2.dropped) notes.push(`${en.dropped + ex2.dropped} Preis nicht lesbar – ausgelassen.`);
 
     const kindRaw = t.productType;
@@ -280,7 +343,7 @@ export function buildCandidates(ex: Extraction, ctx: BuildContext): Candidate[] 
       status,
       statusConf: conf(t, "status"),
       pair: readCell(pair, t.market, conf(t, "market")),
-      side: readCell<Side>(t.side, t.side, conf(t, "side")),
+      side: sideCell(t, routed),
       kind,
       exchange: readCell(t.exchange, t.exchange, conf(t, "exchange")),
       plannedEntry: priceCell(t.plannedEntry, conf(t, "entries"), style, ctx.fallbackStyle),
@@ -300,6 +363,7 @@ export function buildCandidates(ex: Extraction, ctx: BuildContext): Candidate[] 
       pnl: pnl ? readCell(pnl.value, t.realizedPnl, conf(t, "realizedPnl"), pnl.ambiguous ? "Zahlenformat unklar" : undefined) : cell<number>({ raw: t.realizedPnl }),
       pnlCurrency: t.pnlCurrency,
       pnlMode: "auto",
+      entryAssumed: null,
       unreadable: [...t.unreadable],
       notes,
     };

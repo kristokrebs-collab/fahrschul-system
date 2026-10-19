@@ -9,6 +9,7 @@ import type { Side } from "@/domain/types";
 import { newId } from "@/lib/ids";
 import { averagePrice, cell, editedCell, firstAt, lastAt, normalizePair, totalQty, typedNumber, UNSURE, type Candidate, type Cell, type FieldState, type Leg } from "./candidate";
 import type { FieldKey } from "./checks";
+import { impliedEntries, type ImpliedBasis } from "./implied";
 
 export interface Row {
   key: FieldKey;
@@ -24,6 +25,9 @@ export interface Row {
   /** The preview offers an input for it. */
   editable: boolean;
 }
+
+/** Shown under the entry row of a trade whose opening order is not in the screenshot. */
+export const ENTRY_MISSING = "Einstieg fehlt im Bild – die Eröffnungsorder ist nicht zu sehen.";
 
 const nf = (d: number) => new Intl.NumberFormat("de-DE", { maximumFractionDigits: d });
 export const fmtPrice = (v: number): string => nf(8).format(v);
@@ -57,21 +61,42 @@ export function rowsOf(c: Candidate, currency: string): Row[] {
     rows.push(fromCell("entry", "Geplanter Einstieg", c.plannedEntry, fmtPrice, { editable: true }));
   } else {
     const entry = averagePrice(c.entries);
+    const noEntry = !c.entries.length;
     const state = legsState(c.entries, c.entriesConf);
     rows.push({
       key: "entry",
-      label: c.entries.length > 1 ? `Einstieg (Ø aus ${c.entries.length})` : "Einstieg",
+      label: c.entryAssumed ? "Einstieg (berechnet)" : c.entries.length > 1 ? `Einstieg (Ø aus ${c.entries.length})` : "Einstieg",
       text: entry == null ? "—" : fmtPrice(entry),
       state,
-      conf: c.entries.length ? c.entriesConf : 0,
-      ...(legNotes(c.entries) ? { note: legNotes(c.entries) } : {}),
+      conf: c.entries.length && !c.entryAssumed ? c.entriesConf : null,
+      ...(noEntry ? { note: ENTRY_MISSING } : legNotes(c.entries) ? { note: legNotes(c.entries) } : {}),
       optional: false,
       editable: c.entries.length <= 1,
     });
-    const qty = totalQty(c.entries);
-    rows.push({ key: "qty", label: "Menge", text: qty == null ? "—" : fmtPrice(qty), state: qty == null ? "missing" : legsState(c.entries, c.entriesConf), conf: c.entriesConf, optional: false, editable: c.entries.length <= 1 });
+    // the closing orders carry the quantity when the opening order is not in the picture
+    const qtyLegs = noEntry ? c.exits : c.entries;
+    const qty = totalQty(qtyLegs);
+    rows.push({
+      key: "qty",
+      label: noEntry ? "Menge (laut Ausstieg)" : "Menge",
+      text: qty == null ? "—" : fmtPrice(qty),
+      state: qty == null ? "missing" : legsState(qtyLegs, noEntry ? c.exitsConf : c.entriesConf),
+      conf: noEntry ? c.exitsConf : c.entriesConf,
+      optional: noEntry && qty == null,
+      editable: c.entries.length === 1,
+    });
     const at = firstAt(c.entries);
-    rows.push({ key: "date", label: "Einstiegszeit", text: at ? fmtTime(at) : "—", state: at ? (c.entries.some((l) => l.uncertain && l.notes.some((n) => /Jahr|Reihenfolge|Datum|Zeit/.test(n))) ? "uncertain" : "ok") : "missing", conf: null, optional: false, editable: false });
+    rows.push({
+      key: "date",
+      label: "Einstiegszeit",
+      text: at ? fmtTime(at) : "—",
+      state: at ? (c.entries.some((l) => l.uncertain && l.notes.some((n) => /Jahr|Reihenfolge|Datum|Zeit/.test(n))) ? "uncertain" : "ok") : "missing",
+      conf: null,
+      // without an opening order the time cannot be there either: the missing entry is the one thing to look at
+      optional: noEntry,
+      editable: false,
+      ...(noEntry ? { note: "Fehlt im Bild – im Editor setzen." } : {}),
+    });
     if (c.status === "closed" || c.exits.length) {
       const exit = averagePrice(c.exits);
       rows.push({
@@ -132,7 +157,8 @@ export function editField(c: Candidate, key: FieldKey, text: string): Candidate 
       return { ...c, pair: t ? editedCell(normalizePair(t) ?? t.toUpperCase()) : cell({ edited: true }) };
     case "entry":
       if (c.status === "planned") return { ...c, plannedEntry: price == null ? cell({ edited: true }) : editedCell(price) };
-      return { ...c, entries: price == null ? [] : withLeg(c.entries, (l) => ({ ...l, price })), entriesConf: 1 };
+      // a value the trader types replaces a computed one for good: from here on it is theirs, not an assumption
+      return { ...c, entries: price == null ? [] : withLeg(c.entries, (l) => ({ ...l, price })), entriesConf: 1, entryAssumed: null };
     case "exit":
       return { ...c, exits: price == null ? [] : withLeg(c.exits, (l) => ({ ...l, price })), exitsConf: 1 };
     case "qty": {
@@ -160,12 +186,37 @@ function withLegAt(legs: readonly Leg[], qty: number | null): Leg[] {
 
 export const setSide = (c: Candidate, side: Side): Candidate => ({ ...c, side: editedCell(side) });
 
+/**
+ * Takes the COMPUTED entry (`implied.ts`) for a trade without an opening order – only ever called for a button the
+ * trader pressed. `basis: null` drops it again. The leg carries the closed quantity, no time, and is marked uncertain, so
+ * the preview, the draft's notes and the checks keep calling it an assumption. An entry the trader typed stays.
+ */
+export function setImpliedEntry(c: Candidate, basis: ImpliedBasis | null): Candidate {
+  if (basis === null) return c.entryAssumed ? { ...c, entries: [], entriesConf: 0, entryAssumed: null } : c;
+  if (c.entries.length && !c.entryAssumed) return c;
+  const imp = impliedEntries({ ...c, entries: [] });
+  const pick = imp?.[basis];
+  if (!imp || !pick) return c;
+  const leg: Leg = {
+    id: c.entries[0]?.id ?? newId("leg_"),
+    price: pick.price,
+    qty: imp.qty,
+    at: null,
+    conf: 0,
+    uncertain: true,
+    notes: [`Berechnet aus dem Ergebnis (Annahme: ${basis === "gross" ? "PnL vor Gebühr" : "PnL nach Gebühr"}) – nicht im Screenshot gelesen`],
+    label: null,
+  };
+  return { ...c, entries: [leg], entriesConf: 0, entryAssumed: { basis, price: pick.price } };
+}
+
 /** What the trader did in the preview – replayed on freshly built candidates when the time zone choice changes. */
 export type Edit =
   | { id: string; kind: "field"; key: FieldKey; text: string }
   | { id: string; kind: "side"; value: Side }
   | { id: string; kind: "stopOriginal"; value: boolean }
-  | { id: string; kind: "pnlMode"; value: "shot" | "calc" };
+  | { id: string; kind: "pnlMode"; value: "shot" | "calc" }
+  | { id: string; kind: "impliedEntry"; basis: ImpliedBasis | null };
 
 export function applyEdits(list: readonly Candidate[], edits: readonly Edit[]): Candidate[] {
   return list.map((c) =>
@@ -175,6 +226,7 @@ export function applyEdits(list: readonly Candidate[], edits: readonly Edit[]): 
         if (e.kind === "field") return editField(acc, e.key, e.text);
         if (e.kind === "side") return setSide(acc, e.value);
         if (e.kind === "stopOriginal") return { ...acc, stopOriginal: e.value };
+        if (e.kind === "impliedEntry") return setImpliedEntry(acc, e.basis);
         return { ...acc, pnlMode: e.value };
       }, c),
   );

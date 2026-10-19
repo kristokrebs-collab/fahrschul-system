@@ -12,7 +12,7 @@ import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import { ShotImage } from "@/journal/screenshots/ShotThumb";
 import { buildCandidates, resolveZone, type Candidate } from "./candidate";
-import { checksOf, type Check, type FieldKey } from "./checks";
+import { checksOf, type Check, type CheckFix, type FieldKey } from "./checks";
 import { blobOfShot, extractError, ExtractError, prepareImages, requestExtraction } from "./client";
 import { MAX_IMAGES, type ExtractReply } from "./contract";
 import { assignShots, toDraft } from "./draft";
@@ -47,7 +47,7 @@ const S = EXTRACT_STRINGS;
 
 /* ------------------------------------------------------------------ state */
 
-type Phase = { name: "select" } | { name: "preparing" } | { name: "reading" } | { name: "preview"; reply: ExtractReply; sent: ScreenshotRef[] } | { name: "empty"; text: string } | { name: "error"; text: string };
+type Phase = { name: "select" } | { name: "preparing" } | { name: "reading" } | { name: "preview"; reply: ExtractReply; sent: ScreenshotRef[] } | { name: "empty"; text: string; notes: string[] } | { name: "error"; text: string; detail?: string };
 
 interface State {
   phase: Phase;
@@ -135,12 +135,12 @@ export default function ExtractSheet() {
       dispatch({ type: "phase", phase: { name: "reading" } });
       const reply = await requestExtraction(images, { timezone: localZoneId() }, ctl.signal);
       if (ctl.signal.aborted) return;
-      if (!reply.trades.length) dispatch({ type: "phase", phase: { name: "empty", text: reply.reason === "refusal" ? S.refusal : S.none } });
+      if (!reply.trades.length) dispatch({ type: "phase", phase: { name: "empty", text: reply.reason === "refusal" ? S.refusal : S.none, notes: reply.notes } });
       else dispatch({ type: "phase", phase: { name: "preview", reply, sent: chosen } });
     } catch (e) {
       const err = extractError(e);
       if (ctl.signal.aborted) return;
-      dispatch({ type: "phase", phase: { name: "error", text: err.message } });
+      dispatch({ type: "phase", phase: { name: "error", text: err.message, ...(err.detail ? { detail: err.detail } : {}) } });
     }
   }, [state.picked, shots]);
 
@@ -231,6 +231,16 @@ export default function ExtractSheet() {
           <StaggerItem>
             <p role="alert" className="rounded-xl border border-warn/40 bg-warn/[0.07] px-3.5 py-3 text-[13px] leading-relaxed text-fg" data-testid="extract-message">
               {phase.text}
+              {phase.name === "empty" && phase.notes.length > 0 && (
+                <span className="mt-1.5 block text-[12px] text-mute" data-testid="extract-message-notes">
+                  KI-Hinweis: {phase.notes.join(" · ")}
+                </span>
+              )}
+              {phase.name === "error" && phase.detail && (
+                <span className="mt-1.5 block font-mono text-[11px] text-faint" data-testid="extract-message-code">
+                  Fehlercode: {phase.detail}
+                </span>
+              )}
             </p>
           </StaggerItem>
         )}
@@ -369,16 +379,15 @@ function CandidateCard({ c, index, checks, sent, currency, taken, onTake, onEdit
   const need = attentionRows(rows).length;
   const dup = checks.find((k) => k.level === "dup");
   const title = [c.pair.value ?? "Markt unbekannt", c.side.value ? (c.side.value === "long" ? "Long" : "Short") : null].filter(Boolean).join(" · ");
-  const apply = (k: Check) => {
-    if (!k.fix) return;
-    onEdit(k.fix.kind === "side" ? { id: c.id, kind: "side", value: k.fix.value } : { id: c.id, kind: "pnlMode", value: k.fix.value });
-  };
+  const apply = (f: CheckFix) => onEdit(f.kind === "side" ? { id: c.id, kind: "side", value: f.value } : f.kind === "pnlMode" ? { id: c.id, kind: "pnlMode", value: f.value } : { id: c.id, kind: "impliedEntry", basis: f.basis });
   return (
     <section className={cn("grid gap-3 rounded-2xl border bg-ink-850 p-3.5", taken ? "border-line-2" : "border-line opacity-80")} aria-label={`Trade ${index + 1}: ${title}`} data-testid="extract-trade" data-pair={c.pair.value ?? ""} data-status={c.status}>
       <header className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h3 className="text-[15px] font-semibold">{title}</h3>
         <Badge tone={c.status === "planned" ? "steel" : c.status === "closed" ? "mute" : "teal"}>{STATUS_LABEL[c.status]}</Badge>
         {dup && <Badge tone="warn">Wahrscheinlich schon vorhanden</Badge>}
+        {c.status !== "planned" && !c.entries.length && <Badge tone="warn">Einstieg fehlt im Bild</Badge>}
+        {c.entryAssumed && <Badge tone="warn">Einstieg berechnet (Annahme)</Badge>}
         <span className="ml-auto flex items-center gap-1.5" aria-label={`Quellen: ${c.sources.map((s) => `Bild ${s + 1}`).join(", ")}`}>
           {c.sources.map((s) => {
             const ref = sent[s];
@@ -402,6 +411,12 @@ function CandidateCard({ c, index, checks, sent, currency, taken, onTake, onEdit
         ))}
       </ul>
 
+      {c.unreadable.length > 0 && (
+        <p className="text-[12px] leading-snug text-warn" data-testid="extract-unreadable">
+          Sichtbar, aber nicht sicher lesbar: {c.unreadable.join(", ")}.
+        </p>
+      )}
+
       {c.stop.value != null && c.status !== "planned" && (
         <CheckboxRow checked={c.stopOriginal} onToggle={() => onEdit({ id: c.id, kind: "stopOriginal", value: !c.stopOriginal })} sub="Sonst kommt der Stop nur als Notiz in den Trade und R bleibt leer.">
           Das war mein ursprünglicher Stop
@@ -413,11 +428,11 @@ function CandidateCard({ c, index, checks, sent, currency, taken, onTake, onEdit
           {checks.map((k) => (
             <li key={k.code} className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border px-3 py-2 text-[12.5px] leading-relaxed", k.level === "info" ? "border-line text-mute" : "border-warn/40 bg-warn/[0.06] text-fg")} data-check={k.code}>
               <span className="min-w-0 flex-1">{k.text}</span>
-              {k.fix && (
-                <Button size="sm" onClick={() => apply(k)}>
-                  {k.fix.label}
+              {[...(k.fix ? [k.fix] : []), ...(k.fixes ?? [])].map((f) => (
+                <Button key={f.label} size="sm" className="max-w-full whitespace-normal text-left" onClick={() => apply(f)} data-testid={f.kind === "impliedEntry" ? `extract-fix-${f.basis ?? "drop"}` : undefined}>
+                  {f.label}
                 </Button>
-              )}
+              ))}
             </li>
           ))}
         </ul>

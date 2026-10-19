@@ -7,19 +7,28 @@
 import type { Side, Trade } from "@/domain/types";
 import { averagePrice, firstAt, grossPnl, lastAt, pairKey, totalQty, type Candidate } from "./candidate";
 import { findDuplicate, unjudged, type DuplicateMatch } from "./dedupe";
+import { impliedEntries, type ImpliedBasis, type ImpliedEntries } from "./implied";
 import { entryRef } from "./merge";
 import { minutesBetween } from "./time";
 
 export type CheckLevel = "warn" | "info" | "dup";
 export type FieldKey = "pair" | "side" | "kind" | "exchange" | "entry" | "exit" | "qty" | "date" | "exitDate" | "stop" | "targets" | "leverage" | "fees" | "funding" | "pnl";
 
+/** An offer the preview shows as a button; it only ever changes the preview's draft when the trader presses it. */
+export type CheckFix =
+  | { kind: "side"; value: Side; label: string }
+  | { kind: "pnlMode"; value: "shot" | "calc"; label: string }
+  /** `basis: null` drops a computed entry again. */
+  | { kind: "impliedEntry"; basis: ImpliedBasis | null; label: string };
+
 export interface Check {
   code: string;
   level: CheckLevel;
   text: string;
   field?: FieldKey;
-  /** An offer the preview can show as a button. */
-  fix?: { kind: "side"; value: Side; label: string } | { kind: "pnlMode"; value: "shot" | "calc"; label: string };
+  fix?: CheckFix;
+  /** Several offers at once (the two readings of the realised PnL). */
+  fixes?: CheckFix[];
   /** `dup`: the stored trade. */
   duplicate?: DuplicateMatch;
 }
@@ -73,10 +82,29 @@ export function comparePnl(c: Candidate, side: Side | null = c.side.value): PnlC
 export function resolvedPnlMode(c: Candidate): "shot" | "calc" {
   if (c.pnlMode !== "auto") return c.pnlMode;
   if (c.pnl.value == null) return "calc";
+  // without an opening order the prices give no result at all: the exchange's number is the only one there is
+  if (!c.entries.length) return "shot";
   const cmp = comparePnl(c);
   if (!cmp.comparable) return c.exits.length || c.status !== "closed" ? "calc" : "shot";
   return cmp.match ? "calc" : "shot";
 }
+
+/* ------------------------------------------------------------------ entry from the result */
+
+const BASIS_TEXT: Record<ImpliedBasis, string> = { gross: "PnL vor Gebühr", net: "PnL nach Gebühr" };
+
+/** The German offer text of a computed entry: both readings, the difference, and that it is an assumption. */
+export function impliedText(imp: ImpliedEntries, currency: string): string {
+  const head = `Vorschlag, nicht gelesen: ${imp.side === "long" ? "Long" : "Short"}, ${num(imp.qty, 8)} bei ${num(imp.exit, 8)} geschlossen, Realisierter PnL ${signedNum(imp.pnl)} ${currency} → Einstieg ≈ ${num(imp.gross.price, 8)} (${BASIS_TEXT.gross})`;
+  if (!imp.net || imp.diffMoney == null || imp.diffPrice == null) return `${head}. Angenommen wird: der PnL ist vor Gebühren und die ganze Position wurde mit diesem einen Auftrag geschlossen. Eine Gebühr steht nicht im Bild.`;
+  return `${head} oder ≈ ${num(imp.net.price, 8)} (${BASIS_TEXT.net}, Gebühr ${num(imp.diffMoney, 8)} ${currency}). Unterschied: ${num(imp.diffMoney, 8)} ${currency}, im Preis ${num(imp.diffPrice, 8)}. Ob die Börse die Gebühr im PnL schon abzieht, zeigt der Screenshot nicht; angenommen wird außerdem, dass dieser eine Auftrag die ganze Position geschlossen hat.`;
+}
+
+const impliedFix = (imp: ImpliedEntries, basis: ImpliedBasis): CheckFix => ({
+  kind: "impliedEntry",
+  basis,
+  label: `Einstieg aus PnL berechnen · ${basis === "gross" ? "ohne" : "nach"} Gebühr (≈ ${num((basis === "gross" ? imp.gross : imp.net!).price, 8)})`,
+});
 
 /* ------------------------------------------------------------------ checks */
 
@@ -99,6 +127,29 @@ export function checksOf(c: Candidate, ctx: CheckContext): Check[] {
   const cur = ctx.currency;
 
   if (c.status === "planned") out.push({ code: "planned", level: "info", text: "Geplante Order – noch nichts ausgeführt. Sie wird als offener Trade mit geplantem Einstieg angelegt, ohne Fills." });
+
+  // a closing order whose opening order is not in the picture: say so, offer a computed entry, never apply it unasked
+  if (c.status !== "planned" && !c.entries.length && (c.exits.length || c.status === "closed")) {
+    out.push({
+      code: "entry_missing",
+      level: "warn",
+      field: "entry",
+      text: "Einstieg fehlt im Bild – die Eröffnungsorder ist nicht zu sehen und wurde nicht erfunden. Trage den Einstieg im Editor ein (ohne ihn lässt sich der Trade nicht speichern) oder lies den Screenshot der Eröffnung mit ein. Die Einstiegszeit fehlt damit ebenfalls.",
+    });
+    const imp = impliedEntries(c);
+    if (imp) out.push({ code: "entry_implied", level: "info", field: "entry", text: impliedText(imp, cur), fixes: [impliedFix(imp, "gross"), ...(imp.net ? [impliedFix(imp, "net")] : [])] });
+  }
+  if (c.entryAssumed) {
+    const other: ImpliedBasis = c.entryAssumed.basis === "gross" ? "net" : "gross";
+    const imp = impliedEntries({ ...c, entries: [] });
+    out.push({
+      code: "entry_assumed",
+      level: "warn",
+      field: "entry",
+      text: `Der Einstieg ${num(c.entryAssumed.price, 8)} ist berechnet, nicht gelesen (Annahme: ${BASIS_TEXT[c.entryAssumed.basis]}, die ganze Position mit diesem einen Auftrag geschlossen). Vergleiche ihn mit deiner Börse oder trage den echten Einstieg ein – er kommt mit dem Hinweis „berechnet“ in die Notizen.`,
+      fixes: [...(imp?.[other] ? [impliedFix(imp, other)] : []), { kind: "impliedEntry", basis: null, label: "Berechneten Einstieg verwerfen" }],
+    });
+  }
 
   if (side && ref != null) {
     if (stop != null && (side === "long" ? stop >= ref : stop <= ref))
@@ -128,9 +179,11 @@ export function checksOf(c: Candidate, ctx: CheckContext): Check[] {
   // closed without any way to a result
   if (c.status === "closed" && !exit && c.pnl.value == null) out.push({ code: "closed_no_exit", level: "warn", field: "exit", text: "Als geschlossen erkannt, aber weder Ausstieg noch Ergebnis gelesen. Bitte ergänzen oder den Trade als offen anlegen." });
 
-  // the screenshot's result against the prices
+  // the screenshot's result against the prices (an entry computed FROM that result would only agree with itself)
   const cmp = comparePnl(c);
-  if (cmp.comparable && cmp.shot != null && cmp.net != null) {
+  if (c.entryAssumed) {
+    // nothing to compare
+  } else if (cmp.comparable && cmp.shot != null && cmp.net != null) {
     if (cmp.match) {
       out.push({
         code: "pnl_ok",
@@ -170,7 +223,7 @@ export function checksOf(c: Candidate, ctx: CheckContext): Check[] {
 
   // duplicates
   const dup = findDuplicate(c, ctx.trades);
-  if (dup) out.push({ code: "duplicate", level: "dup", text: `Wahrscheinlich schon vorhanden: ${dup.trade.pair} ${dup.trade.side === "long" ? "Long" : "Short"} vom ${dup.trade.date.replace("T", " ")} (Einstieg ${num(dup.priceDiff * 100, 3)} % daneben, ${Math.round(dup.minutes)} min Abstand).`, duplicate: dup });
+  if (dup) out.push({ code: "duplicate", level: "dup", text: `Wahrscheinlich schon vorhanden: ${dup.trade.pair} ${dup.trade.side === "long" ? "Long" : "Short"} vom ${dup.trade.date.replace("T", " ")} (${dup.by === "exit" ? "Ausstieg" : "Einstieg"} ${num(dup.priceDiff * 100, 3)} % daneben, ${Math.round(dup.minutes)} min Abstand${dup.by === "exit" ? " – verglichen am Ausstieg, weil die Eröffnung nicht im Bild ist" : ""}).`, duplicate: dup });
   else {
     const why = unjudged(c);
     if (why && c.status !== "planned") out.push({ code: "dup_unjudged", level: "info", text: why });

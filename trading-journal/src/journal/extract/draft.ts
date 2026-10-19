@@ -8,7 +8,10 @@
  *    entry / exit / size;
  *  - the original stop is never invented: a stop seen on a running or finished position goes into the notes unless the
  *    trader says it was the original (a planned order's stop is the plan);
- *  - the result is the screenshot's (`pnlManual`) when the prices disagree with it, otherwise it is computed;
+ *  - the result is the screenshot's (`pnlManual`) when the prices disagree with it (or there is no opening order to
+ *    compute from), otherwise it is computed;
+ *  - a closing order without its opening order gets NO entry and no entry time (the editor's required entry stays open);
+ *    an entry the trader had computed from the result is marked as such in the notes;
  *  - the pictures the trade was read from stay attached (`screenshots`).
  */
 import type { ScreenshotRef, TradeTarget } from "@/domain/types";
@@ -61,7 +64,13 @@ export function toDraft(c: Candidate, screenshots: readonly ScreenshotRef[]): Tr
     if (qty != null) {
       d.qty = clean(qty);
       if (entry != null) d.size = clean(entry * qty);
+    } else if (!c.entries.length && c.exits.length) {
+      // only the closing orders are in the picture: the closed quantity is what they show (the entry stays for the trader)
+      const closed = totalQty(c.exits);
+      if (closed != null) d.qty = clean(closed);
+      notes.push("Der Screenshot zeigte nur die Schließung – Einstieg und Einstiegszeit stammen nicht aus dem Bild.");
     }
+    if (c.entryAssumed) notes.push(`Einstieg ${fmtPrice(c.entryAssumed.price)} berechnet aus Ausstieg, Menge und Realisiertem PnL (Annahme: ${c.entryAssumed.basis === "gross" ? "PnL vor Gebühr" : "PnL nach Gebühr"}) – nicht im Screenshot gelesen.`);
     const fills = fillsOf(c);
     if (fills && (c.entries.length > 1 || c.exits.length > 1)) d.fills = fills;
     if (c.fees.value != null) d.fees = clean(c.fees.value);
