@@ -367,3 +367,15 @@ Pille), aufgeklappt in vier Gruppen (Pflicht · Optional · Widersprüche · Feh
 der Karte reserviert die Zeile (kein Layout-Sprung). Bekannte Abweichung: die `Segmented`-Radios (primitive `COARSE_HIT`-Regel) messen
 im Hit-Box-Audit auf Touch 33 statt 44 px – genauso in der bestehenden Box-Einstellungen-Karte derselben Seite; die neuen Schaltflächen,
 Schalter, Chips und Felder bestehen den Audit.
+
+## Was wäre wenn (F33) und Üben / Lernmodus (F38)
+
+Zwei Sheets im Stil des Replays, keine neue Sprache. **Was wäre wenn:** oben der Trade in einer Zeile, darunter ein ruhiger Hinweis im Warn-Ton
+(„Im Nachhinein gewählt“ – Rückschaufehler, ein Fall ist keine Empfehlung), dann der Replay-Chart mit Stopp und Ausstieg der gewählten Variante, dann die Ergebniszeilen
+(Karten mit `border-line`, die gewählte mit hellem Rand; rechts R und Betrag in Mono, darunter Δ zur Nachrechnung; die eigene Variante gestrichelt) und der Baukasten
+(vier Gruppen mit `Segmented`, `CheckboxRow`, Zahlenfeldern). Zahlen tragen Vorzeichen-Ton, nie eine Bewertung wie „beste Variante“; die Reihenfolge-Regel
+der Kerze und die Annahmen stehen als Fließtext darunter. **Üben:** erst die Auswahl des Setups (Radiogruppe, ≥ 44 px bei grobem Zeiger) mit der Zahl der Fälle,
+der Schalter „Markt und Datum verdecken“ und die Verlaufskarte (drei Zählungen jeweils mit „n = …“ und, unter 10, „zu wenig für eine Aussage“; ein Streifen der letzten
+Runden aus ✓ ✕ –, nie Gewinnfarben als Wertung). Im Fall: nummerierte Blöcke (Einordnen · Entscheiden · Regeln abhaken · Begründen), eingefrorener Chart ohne Trade; nach dem Speichern
+läuft der Chart weiter (`ScrubTimeline`), drei Marken (Erkannt · Regeln · Reflexion) in Text + Glyphe + Ton, „Damals im Journal“, der gestrichelte Vergleichsplan und die Reflexion.
+Belohnt werden Erkennen, Regelbefolgung und Nachdenken – es gibt keine Punkte aus Gewinn, kein Ranking, keine Animation für Treffer. Bewegung nur bestehende Tokens; reduzierte Bewegung zeigt das Ende sofort.

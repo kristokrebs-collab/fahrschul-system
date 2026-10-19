@@ -17,9 +17,15 @@ export interface TrainingState {
   backTo: string | null;
   /** bumps per open: the host mounts its chunk on the first one and resets its session on every one */
   seq: number;
+  /** typed input that is not stored yet (a half-made decision, an unsaved reflection): closing asks first */
+  dirty: boolean;
 }
 
-export const useTraining = create<TrainingState>()(() => ({ open: false, tradeId: null, setupId: null, backTo: null, seq: 0 }));
+export const useTraining = create<TrainingState>()(() => ({ open: false, tradeId: null, setupId: null, backTo: null, seq: 0, dirty: false }));
+
+export const setTrainingDirty = (dirty: boolean): void => {
+  if (useTraining.getState().dirty !== dirty) useTraining.setState({ dirty });
+};
 
 export interface OpenTrainingOptions {
   tradeId?: string;
@@ -33,11 +39,11 @@ export interface OpenTrainingOptions {
 export function openTraining(opts: OpenTrainingOptions = {}): void {
   if (opts.fromDetail) useUi.getState().closeDetail();
   const backTo = (opts.fromDetail || opts.returnToDetail) && opts.tradeId ? opts.tradeId : null;
-  useTraining.setState((s) => ({ open: true, tradeId: opts.tradeId ?? null, setupId: opts.setupId ?? null, backTo, seq: s.seq + 1 }));
+  useTraining.setState((s) => ({ open: true, tradeId: opts.tradeId ?? null, setupId: opts.setupId ?? null, backTo, seq: s.seq + 1, dirty: false }));
 }
 
 export function closeTraining(): void {
   const { backTo } = useTraining.getState();
-  useTraining.setState({ open: false, tradeId: null, setupId: null, backTo: null });
+  useTraining.setState({ open: false, tradeId: null, setupId: null, backTo: null, dirty: false });
   if (backTo) useUi.getState().openDetail(backTo, "insights");
 }

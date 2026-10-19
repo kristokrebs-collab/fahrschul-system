@@ -6,7 +6,7 @@
  * decides anything.
  */
 import { motionValue } from "motion/react";
-import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ReplayBar, ReplayLine, ReplayTrade } from "@/chart/ReplayChart";
 import { ACTION_LABEL, ACTIONS, CASE_INTERVAL_MS, caseInterval, caseWindow, decisionAt, decisionGaps, decisionOfDraft, EMPTY_DECISION, planOutcome, RECOGNITION_LABEL, RECOGNITIONS, ruleResult, stopCheck, TRAINING_VERSION, VERDICT_LABEL, VERDICTS, visibleBars, type Action, type DecisionDraft, type Recognition, type TrainingRound, type Verdict } from "@/domain/training";
 import type { ChecklistEntry, EnrichedTrade, Setup } from "@/domain/types";
@@ -22,6 +22,7 @@ import { buildReplay, type ReplayInterval } from "@/views/trades/replay/replayMo
 import { useCandles } from "@/views/trades/replay/useCandles";
 import { persistReflection, persistRound } from "./actions";
 import { TRAIN } from "./strings";
+import { setTrainingDirty } from "./trainingStore";
 
 const ReplayChart = lazy(() => import("@/chart/ReplayChart"));
 const CHART_H = 300;
@@ -92,6 +93,16 @@ function Loaded({ trade, positive, setup, setups, items, blind, index, total, is
   const [showGaps, setShowGaps] = useState(false);
   const [round, setRound] = useState<TrainingRound | null>(null);
   const visible = useMemo(() => (decision ? visibleBars(bars, decision) : []), [bars, decision]);
+  const started = draft.recognition != null || draft.action != null || draft.stop !== "" || draft.reason !== "" || Object.values(draft.checks).some(Boolean);
+  const unsaved = phase === "decide" && started;
+  useEffect(() => {
+    if (phase !== "revealed") setTrainingDirty(unsaved);
+  }, [unsaved, phase]);
+  useEffect(() => () => setTrainingDirty(false), []);
+  const top = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (phase === "revealed") top.current?.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+  }, [phase, reduced]);
   const lastClose = visible[visible.length - 1]?.close ?? 0;
   if (!decision) return <Notice text={TRAIN.tooLittle}>{skip}</Notice>;
 
@@ -136,7 +147,7 @@ function Loaded({ trade, positive, setup, setups, items, blind, index, total, is
 
   const revealed = phase === "revealed" && round != null;
   return (
-    <div className="grid gap-4" data-testid="training-case" data-phase={phase}>
+    <div ref={top} className="grid gap-4 scroll-mt-2" data-testid="training-case" data-phase={phase}>
       <StaggerItem className="flex flex-wrap items-center justify-between gap-2">
         <div className="grid gap-0.5">
           <span className="font-mono text-xs font-semibold uppercase tracking-[0.12em] text-fg">{TRAIN.caseOf(index + 1, total)}</span>
@@ -287,13 +298,18 @@ function Revealed({ round, trade, bars, setup, setups, items, intervalMs, decisi
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const d = round.decision;
-  const gapsList = useMemo(() => ruleResult(d.action, d.stop != null ? String(d.stop) : "", bars[decisionIdx - 1]?.close ?? 0, items, d.checks).gaps, [d, items, bars, decisionIdx]);
   const exitMs = trade.status === "closed" && trade.exitDate ? ms(trade.exitDate) : null;
   const plan = useMemo(() => (d.action === "wait" || d.stop == null ? null : planOutcome(d.action, d.stop, bars, { entryIdx: decisionIdx, visible: decisionIdx, anchorMs: round.anchorMs }, intervalMs, exitMs)), [d, bars, decisionIdx, intervalMs, exitMs, round.anchorMs]);
   const names = (trade.setups ?? []).map((id) => setups.find((s) => s.id === id)?.name ?? id);
   const said = RECOGNITION_LABEL[d.recognition];
   const truth = round.positive ? TRAIN.truthYes(setup.name) : TRAIN.truthNo(setup.name);
   const reflected = saved;
+  const unsavedNote = !saved && note.trim() !== "";
+  useEffect(() => {
+    setTrainingDirty(unsavedNote);
+  }, [unsavedNote]);
+  const openRules = items.filter((i) => !d.checks[i.id]);
+  const stopGap = d.action === "wait" ? null : stopCheck(d.action, d.stop != null ? String(d.stop) : "", bars[decisionIdx - 1]?.close ?? 0).why;
 
   const save = async () => {
     if (!verdict || saving) return;
@@ -314,7 +330,18 @@ function Revealed({ round, trade, bars, setup, setups, items, intervalMs, decisi
           </Mark>
           <Mark label={TRAIN.marks.rules} value={round.rules.followed} testId="mark-rules">
             {round.rules.total ? `${round.rules.checked} von ${round.rules.total} Regeln abgehakt. ` : ""}
-            {d.action === "wait" ? TRAIN.rulesWait : round.rules.total === 0 ? TRAIN.rulesNone : round.rules.followed ? TRAIN.rulesDone : gapsList.join(" ")}
+            {d.action === "wait" ? TRAIN.rulesWait : round.rules.total === 0 ? TRAIN.rulesNone : round.rules.followed ? TRAIN.rulesDone : null}
+            {d.action !== "wait" && stopGap && <span className="mt-1 block text-warn">{stopGap}</span>}
+            {d.action !== "wait" && openRules.length > 0 && (
+              <>
+                <span className="mt-1 block">Einstieg trotz offener Regel{openRules.length === 1 ? "" : "n"}:</span>
+                <ul className="mt-0.5 grid list-disc gap-0.5 pl-4 text-faint">
+                  {openRules.map((i) => (
+                    <li key={i.id}>{i.text}</li>
+                  ))}
+                </ul>
+              </>
+            )}
           </Mark>
           <Mark label={TRAIN.marks.reflection} value={reflected ? true : null} testId="mark-reflection">
             {reflected ? TRAIN.reflectSaved : TRAIN.reflectNote}

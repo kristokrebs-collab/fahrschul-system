@@ -32,7 +32,7 @@ export default function WhatIfHost() {
   const enriched = useEnriched();
   const trade = id ? enriched.find((t) => t.id === id) : undefined;
   return (
-    <Sheet open={trade != null} onClose={closeWhatIf} title={WHATIF.title} size="lg">
+    <Sheet open={trade != null} onClose={closeWhatIf} title={WHATIF.title} size="lg" dismissGuard={false}>
       {trade ? <WhatIfBody key={trade.id} trade={trade} /> : null}
     </Sheet>
   );

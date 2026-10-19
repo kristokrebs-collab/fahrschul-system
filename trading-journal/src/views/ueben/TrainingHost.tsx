@@ -25,7 +25,7 @@ export default function TrainingHost() {
   const open = useTraining((s) => s.open);
   const seq = useTraining((s) => s.seq);
   return (
-    <Sheet open={open} onClose={closeTraining} title={TRAIN.title} size="lg">
+    <Sheet open={open} onClose={closeTraining} title={TRAIN.title} size="lg" dismissGuard={() => useTraining.getState().dirty}>
       {open ? <TrainingBody key={seq} /> : null}
     </Sheet>
   );

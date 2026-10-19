@@ -17,6 +17,7 @@ import { Button } from "@/primitives/Button";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
 import { useDiagnosis } from "@/views/labor/DiagnosisCard";
+import { openTraining } from "@/views/ueben/trainingStore";
 import { Chip, EntryView } from "./AssistantAnswer";
 import { useConversation } from "./conversation";
 import { execute, replyText, respond, type EngineEnv, type Reply } from "./engine";
@@ -151,6 +152,7 @@ function AssistantBody() {
         lab,
         go: (p) => navigate(p),
         newTrade: () => openEditor(),
+        train: () => openTraining(),
         setMem: (fn) => conv.getState().setMem(fn),
         now: Date.now(),
       };
