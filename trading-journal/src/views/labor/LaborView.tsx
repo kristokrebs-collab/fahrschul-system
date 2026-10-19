@@ -4,9 +4,11 @@
  *   Lauf            RunCard (7) · TradesCard (5)
  *   Diagnose        DiagnosisCard (12)                                                        (after a run)
  *   Belastung …     ExtrasSection (12): stress scenarios, Prüfbericht, filter comparison      (after a run, lazy)
+ *   Forward-Test    ForwardSection (12): virtual accounts on new closed candles                (always, lazy chunk; F23)
  *   Robustheit      OverfitCard (5) · OosCard (7) · WalkForwardCard (7) · HeatmapCard (5)     (after a run)
  *   Vergleich       CompareRunsCard (8) · ReferenceCard (4)                                   (after a run)
  *   TradingView     AdapterStatusCard (6) · TvCompareCard (6)                                 (lazy chunk, always; F14)
+ *   Versionen …     VersionsCard · PlaybookCard (DraftsSection, 12)                            (lazy chunk, always; F15 / F13 / F45)
  * Above the set-up, when an idea came from the journal ("Diese Idee testen", F12): IdeaCard (12).
  * Every cell reveals once (`Reveal`, ends at `transform: none`), section titles rise letter by letter. The replay
  * sheet of a backtest trade is mounted here (`LabReplayHost`). Registered by the integrator (P14) as page `labor`.
@@ -28,11 +30,18 @@ import { AssumptionsCard, CompareRunsCard, ReferenceCard } from "./SideCards";
 import { LABOR } from "./strings";
 import { TradesCard } from "./TradesCard";
 import { Cell, SectionTitle } from "./ui";
+import { DRAFTS } from "./draftStrings";
+import { FORWARD } from "./forward/strings";
 
 /** F20 / F18 / F17: its own chunk, fetched only when a finished run is on the page. */
 const ExtrasSection = lazy(() => import("./ExtrasSection"));
 /** F14: adapter status + TradingView export comparison – its own chunk (the CSV reader and the comparison load with it). */
 const TvSection = lazy(() => import("./TvSection"));
+
+/** F23: the forward test's accounts – its own chunk, fetched when the page is shown (the background catch-up is `ForwardHost`). */
+const ForwardSection = lazy(() => import("./forward/ForwardSection"));
+/** F15 / F13 / F45: draft versions and the playbook exchange – its own chunk. */
+const DraftsSection = lazy(() => import("./DraftsSection"));
 
 export const LABOR_LEAD_FILL = { storageKey: storageKey("fill-labor"), highlight: LABOR.highlight } as const;
 
@@ -54,7 +63,7 @@ export function LaborView({ className }: { className?: string }) {
   const custom = useLabor((s) => s.cfg.strategy === "custom");
   const hasIdea = useLabor((s) => s.idea != null);
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), diagnose: useId(), extras: useId(), robust: useId(), compare: useId(), tv: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId() };
   const T = LABOR.sections;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
@@ -98,6 +107,13 @@ export function LaborView({ className }: { className?: string }) {
           </Cell>
         </Section>
       )}
+      <Section id={ids.forward} title={FORWARD.section.title} sub={FORWARD.section.sub}>
+        <Cell index={0} span="lg:col-span-12">
+          <Suspense fallback={null}>
+            <ForwardSection />
+          </Suspense>
+        </Cell>
+      </Section>
       {hasResult && !busy && (
         <Section id={ids.robust} title={T.robust.title} sub={T.robust.sub}>
           <Cell index={0} span="lg:col-span-5">
@@ -130,6 +146,13 @@ export function LaborView({ className }: { className?: string }) {
         <Suspense fallback={null}>
           <TvSection />
         </Suspense>
+      </Section>
+      <Section id={ids.drafts} title={DRAFTS.section.title} sub={DRAFTS.section.sub}>
+        <Cell index={0} span="lg:col-span-12">
+          <Suspense fallback={null}>
+            <DraftsSection />
+          </Suspense>
+        </Cell>
       </Section>
       <LabReplayHost />
     </div>

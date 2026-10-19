@@ -8,7 +8,7 @@ export * from "./types";
 export { FEE_PRESETS, DEFAULT_FEES, DEFAULT_FUNDING_RATE, FUNDING_EVERY_MS, feePreset, feeFor, settlementsBetween, rateAt, fundingCost, type FeePreset } from "./fees";
 export { DEFAULT_SLIPPAGE, SLIPPAGE_LABEL, slipDistance, slipped, slippageText } from "./slippage";
 export { atrSeries, aggregateBars, toDaily, toWeekly, dayOpenS, weekOpenS, closedCount, indexAtOrAfter, gapsOf, gapSpans, cleanBars, deriveBars, type GapSpan } from "./bars";
-export { runBacktest, MIN_RISK_FRAC, type RunOptions } from "./engine";
+export { runBacktest, carryEquity, MIN_RISK_FRAC, type RunOptions } from "./engine";
 export { runStats, maxDrawdown, dailyReturns, sharpeOf, downsample, downsampleIdx, type RunStats } from "./metrics";
 export { evaluate, scoreOf, trialOf, bestTrial, oosSplit, MIN_TRADES, type Trial, type Window } from "./optimize";
 export { wfLayout, wfWindow, summarizeWf, type WalkForward, type WfWindow } from "./walkForward";

@@ -36,6 +36,7 @@ import { storageKey } from "@/store/storage";
 import { isFileProtocol, IS_FILE_BUILD } from "@/edition";
 import { loadErrorKind, loadLabData } from "./historySource";
 import { LABOR, type LaborPeriod } from "./strings";
+import { __resetVersions, useVersions } from "./versionsStore";
 
 export type FundingMode = "history" | "flat" | "none";
 
@@ -79,12 +80,26 @@ export const PERIOD_DAYS: Readonly<Record<LaborPeriod, number>> = { "3m": 91, "6
 
 export type LabStatus = "idle" | "loading" | "running" | "done" | "error" | "cancelled";
 
+/** Where a draft came from when it is not the trader's own: an imported playbook (F13 / F45). Such a draft stays marked "fremd". */
+export interface DraftOrigin {
+  kind: "playbook";
+  /** the title in the file */
+  title: string;
+  author: string | null;
+  /** ms */
+  importedAt: number;
+  /** `customKey` of the rules as imported */
+  key: string;
+}
+
 /** A named, saved version of the custom idea (kept in the browser like the other lab settings). */
 export interface CustomDraft {
   id: string;
   name: string;
   savedAt: number;
   config: CustomConfig;
+  /** set for an imported playbook, absent for the trader's own ideas */
+  origin?: DraftOrigin;
 }
 
 export const DRAFTS_MAX = 24;
@@ -150,6 +165,10 @@ interface LaborState {
   setCustom(next: CustomConfig | ((c: CustomConfig) => CustomConfig)): void;
   /** saves the current idea under `name` (same name = overwritten); null when the list is full */
   saveDraft(name?: string): string | null;
+  /** adds an imported playbook as a new, marked draft; null when the list is full */
+  addForeignDraft(name: string, config: CustomConfig, origin: DraftOrigin): string | null;
+  /** puts the rules (and the name) of a draft back to `config`; false when the draft is gone */
+  replaceDraftConfig(id: string, config: CustomConfig): boolean;
   loadDraft(id: string): boolean;
   duplicateDraft(id: string): string | null;
   deleteDraft(id: string): void;
@@ -188,7 +207,14 @@ export function readDrafts(): CustomDraft[] {
     if (!it || typeof it !== "object") continue;
     const d = it as Partial<CustomDraft>;
     const { config } = parseCustom(d.config);
-    if (config && typeof d.id === "string" && typeof d.name === "string") out.push({ id: d.id, name: d.name.slice(0, 60), savedAt: typeof d.savedAt === "number" ? d.savedAt : 0, config });
+    if (config && typeof d.id === "string" && typeof d.name === "string") {
+      const item: CustomDraft = { id: d.id, name: d.name.slice(0, 60), savedAt: typeof d.savedAt === "number" ? d.savedAt : 0, config };
+      const o = d.origin as Partial<DraftOrigin> | undefined;
+      if (o && o.kind === "playbook" && typeof o.title === "string") {
+        item.origin = { kind: "playbook", title: o.title.slice(0, 80), author: typeof o.author === "string" ? o.author.slice(0, 40) : null, importedAt: typeof o.importedAt === "number" ? o.importedAt : 0, key: typeof o.key === "string" ? o.key.slice(0, 20) : "" };
+      }
+      out.push(item);
+    }
   }
   return out.slice(0, DRAFTS_MAX);
 }
@@ -271,12 +297,36 @@ export const useLabor = create<LaborState>()((set, get) => ({
     const same = list.find((d) => d.name === title);
     if (!same && list.length >= DRAFTS_MAX) return null;
     const id = same?.id ?? nextDraftId(list);
-    const item: CustomDraft = { id, name: title, savedAt: Date.now(), config };
+    const item: CustomDraft = { id, name: title, savedAt: Date.now(), config, ...(same?.origin ? { origin: same.origin } : {}) };
     const drafts = same ? list.map((d) => (d.id === id ? item : d)) : [item, ...list];
     writeDrafts(drafts);
     set({ drafts });
+    useVersions.getState().record(id, config, "", item.savedAt);
     get().setCfg({ custom: config });
     return id;
+  },
+  addForeignDraft(name, config, origin) {
+    const list = get().drafts;
+    if (list.length >= DRAFTS_MAX) return null;
+    const base = name.trim().slice(0, 52) || "Playbook";
+    let title = base;
+    for (let k = 2; list.some((x) => x.name === title); k++) title = `${base} (${k})`;
+    const item: CustomDraft = { id: nextDraftId(list), name: title, savedAt: Date.now(), config: sanitizeCustom({ ...config, name: title }), origin };
+    const drafts = [item, ...list];
+    writeDrafts(drafts);
+    set({ drafts });
+    useVersions.getState().record(item.id, item.config, "Importiertes Playbook", item.savedAt);
+    return item.id;
+  },
+  replaceDraftConfig(id, config) {
+    const list = get().drafts;
+    const d = list.find((x) => x.id === id);
+    if (!d) return false;
+    const clean = sanitizeCustom(config);
+    const drafts = list.map((x) => (x.id === id ? { ...x, name: clean.name, savedAt: Date.now(), config: clean } : x));
+    writeDrafts(drafts);
+    set({ drafts });
+    return true;
   },
   loadDraft(id) {
     const d = get().drafts.find((x) => x.id === id);
@@ -290,16 +340,18 @@ export const useLabor = create<LaborState>()((set, get) => ({
     if (!d || list.length >= DRAFTS_MAX) return null;
     let name = `${d.name} (Kopie)`.slice(0, 60);
     for (let k = 2; list.some((x) => x.name === name); k++) name = `${d.name} (Kopie ${k})`.slice(0, 60);
-    const copy: CustomDraft = { id: nextDraftId(list), name, savedAt: Date.now(), config: { ...d.config, name } };
+    const copy: CustomDraft = { id: nextDraftId(list), name, savedAt: Date.now(), config: { ...d.config, name }, ...(d.origin ? { origin: d.origin } : {}) };
     const drafts = [copy, ...list];
     writeDrafts(drafts);
     set({ drafts });
+    useVersions.getState().record(copy.id, copy.config, `Kopie von „${d.name}“`, copy.savedAt);
     return copy.id;
   },
   deleteDraft(id) {
     const drafts = get().drafts.filter((d) => d.id !== id);
     writeDrafts(drafts);
     set({ drafts });
+    useVersions.getState().drop(id);
   },
   setCfg(patch) {
     const cfg = sanitizeCfg({ ...get().cfg, ...patch });
@@ -316,6 +368,9 @@ export const useLabor = create<LaborState>()((set, get) => ({
     set({ runs: [] });
   },
 }));
+
+// drafts saved before versions existed get a first version, so the first change after this is a second one (F15)
+useVersions.getState().seed(useLabor.getState().drafts);
 
 /** Execution / loaded intervals and warm-up of a set-up. */
 export function planOf(cfg: LabConfig, signal: SignalCfg): { input: Omit<LabJobInput, "data" | "engine" | "fromMs" | "toMs">; intervals: HistInterval[]; warmupMs: number } {
@@ -466,6 +521,7 @@ function summarize(r: LabResult, period: LaborPeriod): RunSummary {
 
 /** Test hook. */
 export function __resetLabor(): void {
+  __resetVersions();
   ctl?.abort();
   ctl = null;
   shownInput = null;

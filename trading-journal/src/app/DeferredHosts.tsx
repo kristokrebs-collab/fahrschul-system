@@ -23,6 +23,7 @@
  * | `PresenceHost` | F27 | the beat that records when the app was open (alerts run only then) – this device only |
  * | `WhatIfMount` | F33 | the „Was wäre wenn“ sheet of a trade – its own chunk, fetched the first time it is opened |
  * | `TrainingMount` | F38 | the training sheet (Lernmodus: situations without the future, decision, reveal, reflection) – its own chunk, fetched the first time it is opened |
+ * | `ForwardMount` | F23 | the forward test's catch-up of the virtual accounts – its own chunk, fetched only while an account is running / paused / being wound up, only while the app is open |
  */
 import { lazy, Suspense, type ReactNode } from "react";
 import { installE2eHooks } from "@/app/e2eHooks";
@@ -39,6 +40,8 @@ import { BoxSnapBackfillHost } from "@/market/boxes/BoxSnapBackfillHost";
 import { KeyLevelHost } from "@/market/keylevels/alerts";
 import { PresenceHost } from "@/market/presence";
 import { SocialHost } from "@/social/ui/SocialHost";
+import { hasActiveForward } from "@/domain/forward/active";
+import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { ReportReadyHost } from "@/views/berichte/ReportReady";
 import { CoachWatcher } from "@/views/coach/CoachWatcher";
@@ -52,6 +55,7 @@ import { PostTradeReviewHost } from "@/views/wachstum/PostTradeReview";
 const AssistantHost = lazy(() => import("@/assistant/AssistantHost"));
 const WhatIfHost = lazy(() => import("@/views/trades/whatif/WhatIfHost"));
 const TrainingHost = lazy(() => import("@/views/ueben/TrainingHost"));
+const ForwardHost = lazy(() => import("@/views/labor/forward/ForwardHost"));
 
 /** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
 function AssistantMount() {
@@ -79,6 +83,16 @@ function TrainingMount() {
   return used ? (
     <Suspense fallback={null}>
       <TrainingHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Forward test (F23): the chunk is fetched only while a virtual account needs the app (nothing without one). */
+function ForwardMount() {
+  const active = useJournal((s) => hasActiveForward(s.settings.forward));
+  return active ? (
+    <Suspense fallback={null}>
+      <ForwardHost />
     </Suspense>
   ) : null;
 }
@@ -160,6 +174,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Anwesenheit">
         <PresenceHost />
+      </HostSlot>
+      <HostSlot name="Forward-Test">
+        <ForwardMount />
       </HostSlot>
     </>
   );

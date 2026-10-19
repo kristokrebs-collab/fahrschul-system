@@ -294,6 +294,12 @@ export interface Settings {
    * see `@/domain/trendlines`); absent until the user changes something.
    */
   trendlines?: unknown;
+  /**
+   * Forward test (F23): the virtual accounts. Versioned passthrough (`{ v: 1, accounts: [{ id, … }] }`, see `@/domain/forward`:
+   * frozen rules, start, cursor of the engine, closed trades – the cursor is a cache the candles can rebuild); absent until the
+   * user starts an account. An id list, so the cloud / two-tab merge works per account and per trade.
+   */
+  forward?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */
