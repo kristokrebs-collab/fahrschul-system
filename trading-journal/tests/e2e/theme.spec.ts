@@ -204,7 +204,10 @@ test.describe("Themes", () => {
     // canvas once the seeded market yields a setup (Box-zu-Box reads Top Trader like the Einstiegs-Check since MM-4)
     const chart = page.locator('[data-page="markt"][data-page-role="current"] [data-testid="markt-chart"] canvas').first();
     await chart.waitFor();
-    await chart.scrollIntoViewIfNeeded();
+    // the chart's canvas can be swapped while the page settles (panes are added once the data is in): retry the scroll
+    await expect(async () => {
+      await chart.scrollIntoViewIfNeeded({ timeout: 3000 });
+    }).toPass({ timeout: 20_000 });
     // the pane canvas in the ink theme: candles in near-white ink, the volume bars as a faint WHITE veil (low alpha)
     const ink2 = () =>
       chart.evaluate((c: HTMLCanvasElement) => {
