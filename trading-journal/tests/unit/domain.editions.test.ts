@@ -59,6 +59,15 @@ describe("editions", () => {
     expect(EXTRA_MARKERS).toContain("MegaWhale");
   });
 
+  it("findLeaks does not read the bundler's chunk-number table as a number", () => {
+    // `62,15` here is two chunk indices; the same digits in a string or a real array still count
+    expect(findLeaks("x=__vite__mapDeps([113,1,11,65,61,62,15,63,42])")).toEqual([]);
+    expect(findLeaks("x=__vite__mapDeps([62, 15])")).toEqual([]);
+    expect(findLeaks('x="Winrate 62,15 %"')).toEqual(["62,15"]);
+    expect(findLeaks("x=[1,2,62,15]")).toEqual(["62,15"]);
+    expect(findLeaks("x=__vite__mapDeps([1]),y=85900")).toEqual(["85900"]);
+  });
+
   it("literalsOf ignores comments and reads strings with escapes", () => {
     const lit = literalsOf('// "comment 123"\n/* 99999 */ export const A = { s: "a \\"b\\" c", n: 85900, u: "https://x.y/z" };');
     expect([...lit.strings]).toEqual(['a "b" c', "https://x.y/z"]);

@@ -103,7 +103,10 @@ function numberPattern(spelling: string): RegExp {
 const NUMBER_PATTERNS = PERSONAL_NUMBERS.flatMap((n) => numberSpellings(n).map((sp) => ({ label: String(n), re: numberPattern(sp) })));
 
 /** All personal markers found in `text` (empty = clean). */
-export function findLeaks(text: string): string[] {
+export function findLeaks(source: string): string[] {
+  // the bundler's preload table lists chunk numbers (`__vite__mapDeps([113,1,62,15,…])`): "62,15" there is two chunk
+  // indices, not the personal win rate – it moves with every build, so it is not part of what is scanned
+  const text = source.replace(/__vite__mapDeps\(\[[\d,\s]*\]\)/g, "__vite__mapDeps([])");
   const leaks = new Set<string>();
   for (const m of EXTRA_MARKERS) if (text.includes(m)) leaks.add(m);
   for (const str of PERSONAL_STRINGS) {
