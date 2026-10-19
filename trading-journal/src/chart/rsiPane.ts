@@ -161,6 +161,17 @@ export function filterRsiOverlay(d: RsiOverlayData, v: Pick<RsiView, "trendlines
 /** Identity of a provisional / fresh break set (the overlay is re-set only when it changes). */
 const breaksKey = (d: RsiOverlayData): string => d.breaks.map((b) => `${b.i}${b.dir}${b.provisional ? "p" : ""}`).join(",");
 
+/**
+ * The pane's visible scale: the line's own range plus the 30 / 70 guides and a little air, never wider than 0–100. A fixed
+ * 0–100 squeezed the usual 35–65 wander into a third of the pane; this keeps the line readable while the guides stay in view.
+ */
+export function rsiRange(base: () => { priceRange: { minValue: number; maxValue: number } } | null): { priceRange: { minValue: number; maxValue: number } } {
+  const r = base()?.priceRange;
+  const lo = Math.min(r?.minValue ?? 30, 30);
+  const hi = Math.max(r?.maxValue ?? 70, 70);
+  return { priceRange: { minValue: Math.max(0, lo - 4), maxValue: Math.min(100, hi + 4) } };
+}
+
 export class RsiPane {
   readonly series: ISeriesApi<"Line">;
   readonly overlay = new RsiOverlay();
@@ -180,7 +191,7 @@ export class RsiPane {
     paneIndex = 1,
     private readonly len = RSI_LEN,
   ) {
-    this.series = chart.addSeries(LineSeries, { ...NOTHING_RSI_LINE, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) }, paneIndex);
+    this.series = chart.addSeries(LineSeries, { ...NOTHING_RSI_LINE, autoscaleInfoProvider: rsiRange }, paneIndex);
     this.levels = RSI_LEVELS.map((l) => this.series.createPriceLine({ price: l.price, color: l.color, lineWidth: 1, lineStyle: l.style, axisLabelVisible: false, title: "" }));
     this.series.attachPrimitive(this.overlay);
   }

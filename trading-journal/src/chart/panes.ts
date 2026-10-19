@@ -25,8 +25,8 @@ export type ChartInterval = "1m" | "30m" | "1h" | "4h" | "1d" | "1w";
 
 /** Seconds per bar for each interval (`30m` is built from 15m klines, UTC-aligned like every other bucket). */
 export const INTERVAL_SECONDS: Record<ChartInterval, number> = { "1m": 60, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400, "1w": 604800 };
-/** Stretch factors: pane 0 : pane 1 = 3 : 1 → sub pane takes ~25 % of the height. */
-export const PANE_STRETCH = { main: 3, sub: 1 } as const;
+/** Stretch factors: pane 0 : pane 1 = 3 : 1 → sub pane takes ~25 % of the height; the RSI pane gets ~36 % (its line needs the room to be read). */
+export const PANE_STRETCH = { main: 3, sub: 1, rsi: 1.7 } as const;
 
 export const sec = (ms: number): UTCTimestamp => Math.floor(ms / 1000) as UTCTimestamp;
 
@@ -196,7 +196,7 @@ export class PaneController {
     }
     const panes = this.chart.panes();
     panes[0]?.setStretchFactor(PANE_STRETCH.main);
-    panes[this.paneIndex() ?? 1]?.setStretchFactor(PANE_STRETCH.sub);
+    panes[this.paneIndex() ?? 1]?.setStretchFactor(this.kind === "rsi" ? PANE_STRETCH.rsi : PANE_STRETCH.sub);
     this.apply();
   }
 
