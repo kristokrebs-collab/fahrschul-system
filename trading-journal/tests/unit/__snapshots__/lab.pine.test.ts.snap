@@ -223,7 +223,7 @@ f_n1() =>
     bool res = hit and firedDay != dkey
     if hit
         firedDay := dkey
-    bar_index < 0 ? false : res
+    res
 // n2 · Short · Schluss unter der Opening Range (60 Min ab London (07:00 UTC), 4 h gültig, erster Ausbruch)
 f_n2() =>
     // Spanne: die ersten 60 Minuten ab 7:00 UTC; gilt 4 Stunden nach ihrem Ende
@@ -248,7 +248,7 @@ f_n2() =>
     bool res = hit and firedDay != dkey
     if hit
         firedDay := dkey
-    bar_index < 0 ? false : res
+    res
 
 // ── Bedingungen auf dem Chart ───────────────────────────────────────────────────
 bool n1 = f_n1()

@@ -128,7 +128,7 @@ export default function ParamGridBody() {
   const sel = useExtras((s) => s.gridSel);
   const setSel = useExtras((s) => s.setGridSel);
   const av = useMemo(() => (runCfg && result?.strategy === "custom" ? gridAxes(runCfg.custom) : null), [runCfg, result?.strategy]);
-  const axes: GridAxisChoice[] = av?.axes ?? [];
+  const axes: GridAxisChoice[] = useMemo(() => av?.axes ?? [], [av]);
 
   // a sensible first choice: the first two numbers, preferably of different rules
   useEffect(() => {

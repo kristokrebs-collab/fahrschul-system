@@ -485,7 +485,8 @@ function buildLeaf(l: Leaf, side: "long" | "short", cfg: CustomConfig, sig: Sign
   const body = tr(l.params, ctx);
   const inputs = [...declared.entries()].filter(([key]) => body.some((line) => new RegExp(`\\b${v(key)}\\b`).test(line))).map(([, line]) => line);
   const warm = def.warmup(l.params);
-  const last = `bar_index < ${Math.max(0, Math.round(warm))} ? false : ${l.not ? "not res" : "res"}`;
+  const w = Math.max(0, Math.round(warm));
+  const last = w > 0 ? `bar_index < ${w} ? false : ${l.not ? "not res" : "res"}` : l.not ? "not res" : "res";
   const fn = [`f_${l.id}() =>`, ...body.map((b) => `    ${b}`), `    ${last}`];
   const call = l.tf === "exec" || l.tf === cfg.interval ? `f_${l.id}()` : `request.security(syminfo.tickerid, ${q(PINE_TF[l.tf])}, f_${l.id}(), lookahead = barmerge.lookahead_off)`;
   return { inputs, fn, use: `bool ${l.id} = ${call}` };
@@ -517,8 +518,8 @@ const HEAD_NOTES = [
 function slipTicks(e: PineEngine, o: PineOptions): { ticks: number; note: string } {
   const s = e.slippage;
   if (s.kind === "none") return { ticks: 0, note: "Slippage: im Lauf keine." };
-  const bps = s.kind === "fixed" ? s.bps : s.kind === "spread" ? s.bps / 2 : null;
-  if (bps == null) return { ticks: 0, note: `Slippage: im Lauf ${Math.round(s.frac * 100)} % der ATR je Fill – das lässt sich nicht in feste Ticks fassen; im Skript steht 0. Stelle sie bei Bedarf unter Einstellungen → Eigenschaften → Slippage ein.` };
+  if (s.kind === "atr") return { ticks: 0, note: `Slippage: im Lauf ${Math.round(s.frac * 100)} % der ATR je Fill – das lässt sich nicht in feste Ticks fassen; im Skript steht 0. Stelle sie bei Bedarf unter Einstellungen → Eigenschaften → Slippage ein.` };
+  const bps = s.kind === "fixed" ? s.bps : s.bps / 2;
   if (o.tick && o.refPrice && o.tick > 0 && o.refPrice > 0) {
     const t = Math.max(0, Math.round((o.refPrice * (bps / 10_000)) / o.tick));
     return { ticks: t, note: `Slippage: im Lauf ${de(bps)} bp je Fill ≈ ${t} Ticks bei Kurs ${de(o.refPrice)} und Tick ${de(o.tick)}.` };
