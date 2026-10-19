@@ -19,9 +19,9 @@ export interface SearchGroup {
   hits: SearchHit[];
 }
 
-const PER_GROUP: Partial<Record<SearchKind, number>> = { trade: 7, command: 5, page: 6, setup: 5, day: 4, setting: 5, report: 4 };
+const PER_GROUP: Partial<Record<SearchKind, number>> = { trade: 7, command: 5, page: 6, feature: 6, setup: 5, day: 4, setting: 5, report: 4 };
 /** small kind bias for ties: navigation targets before records */
-const KIND_BIAS: Partial<Record<SearchKind, number>> = { page: 6, command: 4, setting: 2, setup: 3, trade: 0, day: 0, report: 1 };
+const KIND_BIAS: Partial<Record<SearchKind, number>> = { page: 6, feature: 5, command: 4, setting: 2, setup: 3, trade: 0, day: 0, report: 1 };
 
 export function searchIndex(items: readonly SearchItem[], query: string): SearchGroup[] {
   const tokens = tokenize(query);

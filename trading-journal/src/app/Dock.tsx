@@ -33,6 +33,7 @@ export const PAGE_LABELS: Record<Page, string> = {
   cockpit: "Cockpit",
   konto: "Konto",
   preise: "Preise",
+  funktionen: "Funktionen",
 };
 export const FAB_LABEL = "Trade eintragen";
 export const PAGE_ICON: Record<Page, IconName> = {
@@ -51,6 +52,7 @@ export const PAGE_ICON: Record<Page, IconName> = {
   cockpit: "gauge",
   konto: "user",
   preise: "tag",
+  funktionen: "compass",
 };
 
 /**

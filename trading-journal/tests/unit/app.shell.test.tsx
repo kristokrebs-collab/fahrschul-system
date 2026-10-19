@@ -17,7 +17,7 @@ vi.mock("@/app/pages", async () => {
       <h1>{name}</h1>
     </div>
   );
-  const LAZY_VIEWS = Object.fromEntries(["markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise"].map((p) => [p, stub(p)]));
+  const LAZY_VIEWS = Object.fromEntries(["markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise", "funktionen"].map((p) => [p, stub(p)]));
   return {
     OverviewView: overview.OverviewView,
     TradesView: () => <div data-testid="page-trades">Alle Trades</div>,

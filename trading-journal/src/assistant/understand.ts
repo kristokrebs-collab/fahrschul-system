@@ -31,7 +31,7 @@ import { ACCOUNT_VALUES, EMOTION_VALUES, RESULT_VALUES, SESSION_VALUES, SIDE_VAL
 import { parseQuestion, type Filter, type FilterDim, type Intent, type ParseContext } from "@/domain/coach/nlq/parse";
 import type { Page } from "@/store/uiStore";
 
-export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train";
+export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where";
 
 export type Plan =
   | { kind: "journal"; intents: Intent[]; via: string[]; topic: string }
@@ -199,6 +199,7 @@ const PAGE_WORDS: ReadonlyArray<[RegExp, Page]> = [
   [/\bcockpit\b/, "cockpit"],
   [/\bkonto\b|\bprofil\b|\babo\b/, "konto"],
   [/\bpreise?\b|\btarife?\b/, "preise"],
+  [/\bfunktionsuebersicht\b|\bfunktionen\b(?!.*\bwo\b)/, "funktionen"],
   [/\beinstellungen?\b|\bsettings\b/, "settings"],
   [/\btrades\b|\bjournal\b|\bhandelsliste\b/, "trades"],
   [/\bsetups?\b|\bgrundlagen\b/, "setups"],
@@ -221,6 +222,7 @@ export const PAGE_LABEL: Readonly<Record<Page, string>> = {
   cockpit: "Cockpit",
   konto: "Konto",
   preise: "Preise",
+  funktionen: "Funktionen",
 };
 
 /** The page named by an "open …" request, or null. */
@@ -230,7 +232,11 @@ export function pageOf(norm: string): Page | null {
   return null;
 }
 
-const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: RegExp; topic: string; label: string }> = [
+const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: RegExp; topic: string; label: string; soft?: true }> = [
+  // "Wo finde ich …?" (the function register): first, because the thing asked for is named in the question ("Wo finde ich den Einstiegs-Check?"
+  // must not run the entry tool). The unmistakable phrasings win outright; the loose ones ("wo ist …") only when the journal parser found no subject
+  { tool: "where", test: /\bwo (finde|find|sehe|seh|komme|geht|kann ich|kann man)\b|\bwie komme ich (zu|zum|zur|an|auf|in|dahin|dorthin)\b|\bwelche funktionen\b|\bwas (gibt es|gibts) (alles |noch )?(an )?funktionen\b/, topic: "where", label: "Wo finde ich …?" },
+  { tool: "where", test: /\bwo (ist|sind|steht|stehen|gibt es|gibts)\b/, topic: "where", label: "Wo finde ich …?", soft: true },
   { tool: "memory", test: /\b(merk|merke|merkt)\b.*\b(dir|mal)\b|\bvergiss\b|\bvergessen\b|was weisst du (alles )?(ueber|von) mich|was hast du dir gemerkt|\b(fass dich|antworte|antworten|sei) (kurz|kuerzer|ausfuehrlicher|knapper)|\bkuerzer bitte\b|\bausfuehrlicher bitte\b|\bin kurzform\b|\bnur kurz\b/, topic: "memory", label: "Gedächtnis" },
   { tool: "lab", test: /\bbacktest\b.*\b(schlecht|mies|negativ|verlust|schwach|warum|wieso|kacke|mist|mau|miserabel|bescheiden|katastroph\w*|scheiss\w*)\b|\b(warum|wieso|weshalb)\b.*\b(backtest|labor|testlauf|strategie)\b|\bdiagnose\b.*\b(lauf|backtest|labor)\b|\bwas stimmt .* nicht .*(backtest|strategie)/, topic: "lab", label: "Labor-Diagnose" },
   { tool: "idea", test: /\b(teste?|testen|pruef\w*|probier\w*)\b.{0,24}\b(idee|ideen)\b|\bidee\b.{0,24}\b(testen|pruefen|ausprobieren)\b|\b(diesen|den|meinen) einstieg (testen|pruefen|backtesten|im labor)\b|\bdiese idee\b/, topic: "idea", label: "Idee testen" },
@@ -349,8 +355,10 @@ export function understand(text: string, ctx: UnderstandCtx): Plan {
   // 1) tool phrasing: memory, lab, explain, hello, help and "new trade" are unmistakable; "entry" and "improve" use
   //    common words ("verbessert", "Einstieg") and only win when the journal parser found nothing of its own
   for (const r of TOOL_RULES) {
-    const soft = r.tool === "entry" || r.tool === "improve";
-    if (r.test.test(norm0) && (!soft || ownSubject(intent) === false)) return { kind: "tool", tool: r.tool, arg: raw, via: [r.label], topic: r.topic };
+    const soft = r.soft === true || r.tool === "entry" || r.tool === "improve";
+    // the loose "wo ist / wo sind …" is a place question only when it is no colloquial journal phrase ("wo sind meine Schwächen")
+    const phrase = r.soft === true && PHRASES.some((p) => p.test.test(norm0));
+    if (r.test.test(norm0) && !phrase && (!soft || ownSubject(intent) === false)) return { kind: "tool", tool: r.tool, arg: raw, via: [r.label], topic: r.topic };
   }
   let via: string[] = [];
 

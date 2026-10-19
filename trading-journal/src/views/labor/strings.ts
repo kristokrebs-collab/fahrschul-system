@@ -54,7 +54,7 @@ export const LABOR = {
     diagnose: "Diagnose",
     done: "Fertig",
   },
-  idleHint: "Noch kein Lauf. Wähle oben eine Strategie und starte den Backtest.",
+  idleHint: "Noch kein Lauf. Wähle oben eine Strategie und starte den Backtest. Danach erscheinen darunter Diagnose, Belastungstest, Prüfbericht, Filtervergleich und Robustheit.",
   cancelled: "Abgebrochen.",
   errors: {
     blocked: "Binance ist gerade nicht erreichbar (Netzwerk oder Region). Später noch einmal versuchen.",

@@ -25,6 +25,7 @@ export const MORE_SETTINGS = {
     preise: { label: "Preise & Abo", sub: "Tarife vergleichen, Abo verwalten" },
     markt: { label: "Box-Einstellungen", sub: "Box-zu-Box, Alarme, Scanner-Watchlist", heading: "Box-Einstellungen" },
     risiko: { label: "Risiko-Einstellungen", sub: "Limits, Liquidations-Stufen, Korrelation", heading: "Risiko-Einstellungen" },
+    funktionen: { label: "Alle Funktionen", sub: "Was die App kann und wo es steht" },
   },
 } as const;
 
@@ -85,6 +86,7 @@ export function MoreSettingsCard({ className }: { className?: string }) {
       : []),
     { page: "markt", ...MORE_SETTINGS.rows.markt },
     { page: "risiko", ...MORE_SETTINGS.rows.risiko },
+    { page: "funktionen", ...MORE_SETTINGS.rows.funktionen },
   ];
   return (
     <Card title={MORE_SETTINGS.title} note={MORE_SETTINGS.note} className={className} data-testid="settings-more">

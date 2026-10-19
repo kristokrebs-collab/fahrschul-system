@@ -109,6 +109,8 @@ export function pageCounts(s: ShellStats, env: PageCountEnv): Record<Page, PageC
     cockpit: { text: n0(env.boards) },
     konto: { text: env.cloud ? (env.signedIn ? "Cloud" : "lokal") : "lokal" },
     preise: { text: env.plan ?? "–" },
+    // the register itself (`features.ts`) is a lazy chunk – the navigation does not load it for a number
+    funktionen: { text: "Index" },
   };
 }
 
