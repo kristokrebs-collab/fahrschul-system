@@ -315,7 +315,7 @@ describe("Entwurf und Editor", () => {
 
   it("der Editor lässt so einen Entwurf nicht speichern, bis der Einstieg da ist (Pflichtfeld bleibt)", async () => {
     const [c1] = await build()();
-    const { d, t } = formFromDraft(settings, "scalp", toDraft(c1!, []));
+    const { d, t } = formFromDraft(settings(), "scalp", toDraft(c1!, []));
     expect(d.entry).toBe("");
     expect(d.exit).toBe("82701,8");
     expect(validateRecord(toRecord(d, t), "")).toBe("Bitte einen Einstiegspreis angeben.");
@@ -332,7 +332,7 @@ describe("Entwurf und Editor", () => {
     expect(d.size).toBeCloseTo(82566.995 * 0.0562, 2);
     expect(d.pnlManual).toBeUndefined(); // computed from entry and exit, fee off
     expect(d.notes).toMatch(/Einstieg 82\.566,995 berechnet aus Ausstieg, Menge und Realisiertem PnL \(Annahme: PnL vor Gebühr\) – nicht im Screenshot gelesen/);
-    const { d: form, t: typed } = formFromDraft(settings, "scalp", d);
+    const { d: form, t: typed } = formFromDraft(settings(), "scalp", d);
     expect(validateRecord(toRecord(form, typed), "")).toBeNull();
     // the trade is still marked as unsure by its time: the entry time is the editor's „jetzt“ until the trader sets it
     expect(d.date).toBeUndefined();
@@ -346,7 +346,7 @@ describe("Entwurf und Editor", () => {
     expect(d.exit).toBeUndefined();
     expect(d.exitDate).toBeUndefined();
     expect(d.pnlManual).toBeUndefined();
-    const { d: form, t } = formFromDraft(settings, "scalp", d);
+    const { d: form, t } = formFromDraft(settings(), "scalp", d);
     expect(t.status).toBe("open");
     expect(validateRecord(toRecord(form, t), "")).toBeNull();
   });

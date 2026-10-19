@@ -433,3 +433,18 @@ der Schalter „Markt und Datum verdecken“ und die Verlaufskarte (drei Zählun
 Runden aus ✓ ✕ –, nie Gewinnfarben als Wertung). Im Fall: nummerierte Blöcke (Einordnen · Entscheiden · Regeln abhaken · Begründen), eingefrorener Chart ohne Trade; nach dem Speichern
 läuft der Chart weiter (`ScrubTimeline`), drei Marken (Erkannt · Regeln · Reflexion) in Text + Glyphe + Ton, „Damals im Journal“, der gestrichelte Vergleichsplan und die Reflexion.
 Belohnt werden Erkennen, Regelbefolgung und Nachdenken – es gibt keine Punkte aus Gewinn, kein Ranking, keine Animation für Treffer. Bewegung nur bestehende Tokens; reduzierte Bewegung zeigt das Ende sofort.
+
+## Nachtrag: Screenshot-Import – Orderhistorien (F29)
+
+Eine Börsen-Auftragshistorie (z. B. Bitunix „Vertragsaufträge › Auftragshistorie“) zeigt Schließungen, deren Eröffnung nicht im Bild ist.
+Die Vorschau hält dafür **eine** Pflichtzeile offen: „Einstieg“ (gestrichelt, „fehlt“) mit dem Satz „Einstieg fehlt im Bild – die
+Eröffnungsorder ist nicht zu sehen.“, dazu eine warn-Pille „Einstieg fehlt im Bild“ am Kartenkopf; die Einstiegszeit ist dann nur ein
+ruhiger optionaler Eintrag, die Menge kommt als „Menge (laut Ausstieg)“. Darunter steht die Prüfung „Vorschlag, nicht gelesen“ mit **beiden**
+Lesarten des Realisierten PnL (vor / nach der sichtbaren Gebühr), der Differenz in USDT und im Preis und zwei Knöpfen „Einstieg aus PnL
+berechnen · ohne / nach Gebühr (≈ …)“ – umbrechende, ruhige Ghost-Buttons, nichts vorgewählt. Ein übernommener Vorschlag bleibt eine
+**Annahme**: Zeile „Einstieg (berechnet)“ im amber Rahmen ohne Sicherheitsprozent, Pille „Einstieg berechnet (Annahme)“, Prüfung mit
+Angebot „andere Lesart“ / „Berechneten Einstieg verwerfen“, und der Entwurf trägt den Hinweis in den Notizen. Tippt der Trader einen
+eigenen Einstieg, ist die Annahme weg. Der Editor behält sein Pflichtfeld: ohne Einstieg meldet „Speichern“ „Bitte einen Einstiegspreis
+angeben.“. Fehler nennen den Grund im Klartext (kein Schlüssel / Schlüssel abgelehnt / Modell / Zeitlimit / Antwortformat) und zeigen den
+Fehlercode klein in Mono; die Einstellungen-Karte unterscheidet „kein Schlüssel“ von „Server antwortet nicht“ („Status unbekannt“).
+Keine neuen Tokens, keine neue Bewegung.

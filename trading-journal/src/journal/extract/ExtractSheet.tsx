@@ -24,7 +24,7 @@ import { detectLocaleStyle } from "./locale";
 
 export const EXTRACT_STRINGS = {
   title: "Aus Screenshot übernehmen",
-  lead: "Die KI liest Einstieg, Ausstieg, Stop, Menge, Gebühren und Ergebnis aus deinen Screenshots. Du prüfst nur, was markiert ist – gespeichert wird erst, wenn du im Editor auf „Speichern“ drückst.",
+  lead: "Die KI liest Einstieg, Ausstieg, Stop, Menge, Gebühren und Ergebnis aus deinen Screenshots, auch aus Orderhistorien (Long/Short öffnen, schließen). Was nicht im Bild ist, bleibt leer. Du prüfst nur, was markiert ist – gespeichert wird erst, wenn du im Editor auf „Speichern“ drückst.",
   privacy: "Die gewählten Bilder werden verkleinert und nur zum Auslesen an die KI (Anthropic) gesendet. Sie werden dort nicht von dir gespeichert und hier nicht protokolliert.",
   pick: (max: number) => `Wähle bis zu ${max} Bilder, die zu denselben Trades gehören (z. B. Position und Orderhistorie).`,
   read: "Auslesen",

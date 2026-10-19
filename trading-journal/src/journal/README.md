@@ -113,6 +113,29 @@ instant under reduced motion); a tap selects, `Zeichnung löschen` removes. Save
 `renderShareCard` / `shareCardBlob` / `downloadShareCard` (`trade-BTCUSDT-2026-10-02.png`). Default privacy `percent`:
 no money amounts, no account size; `full` adds the P&L. Nothing leaves the device. P12's share flow builds on it.
 
+## Screenshot import: order histories (`extract/`, F29)
+The model only READS (`contract.ts`: tool schema + system prompt, incl. `ORDER_HISTORY_PROMPT` – the vocabulary of Bitunix /
+Binance / Bybit / OKX histories: „Long öffnen“, „Short schließen“, „Realisierter PnL“, „Durchschnittspreis“, „Ausgeführt“, „Gebühr“; the
+word Long / Short is the POSITION's side, the red / green colour is only the order's buy / sell side). Everything else is
+deterministic client code:
+- `orders.ts` reads an order's name (`parseOrderLabel`: open / close + position side); `candidate.ts` sorts executions by it
+  and lets it overrule the model's `side` / entry-or-exit sorting (written into the notes).
+- A closing order WITHOUT its opening order is a candidate with `entries = []`: rows say „Einstieg fehlt im Bild“, the quantity
+  comes from the exit, the draft carries exit / quantity / fees / leverage / result but no entry and no entry time (the editor's
+  required entry stays open; saving is refused until it is typed).
+- `implied.ts` offers „Einstieg aus PnL berechnen“: Long `exit − PnL ÷ qty`, Short `exit + PnL ÷ qty`, in two readings (PnL before /
+  after the visible fee; the difference is the fee). It is an ASSUMPTION: only a pressed button applies it (`rows.ts`
+  `setImpliedEntry`, edit kind `impliedEntry`), the leg is `uncertain`, `Candidate.entryAssumed` keeps the checks / badge / draft
+  note alive until the trader types an entry. A filled opening without a closing order becomes an open trade draft.
+- `dedupe.ts` compares a closing order without opening by its EXIT (price ±0.05 %, time ±10 min).
+- Times without a zone stay „deine Zeit“ (the device's zone) with an override in the preview.
+- Errors name the reason (`netlify/functions/shot-extract.mts`: `shot_extract_unavailable` = no key, `_key_rejected`, `_model`,
+  `_timeout`, `_network`, `_invalid` with the field, `_failed` with the status; `client.ts` `extractError` also names platform 404 / 5xx).
+  `lenient.ts` repairs formatting slips of the model's tool input (empty text, confidence > 1, execution without a price) instead of
+  failing the whole reading. `availability.ts` tells „no key“ from „server did not answer“.
+Tests: `tests/unit/shot.{orderhistory,errors,extract,candidates}.test.ts`, `tests/e2e/shot-orderhistory.spec.ts` (fixture
+`tests/fixtures/orderhistory-bitunix-report.json` = the `report_trades` input for the transcribed Bitunix cards).
+
 ## Motion
 Tokens only (`@/motion/tokens`), `useReducedFx` everywhere (reduced: no draw-ins, ripples, wipes or blur; values appear
 directly), transform / opacity / clip-path only, every loop finite, decorative layers `aria-hidden`, per-frame work
