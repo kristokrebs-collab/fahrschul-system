@@ -7,7 +7,7 @@ import { VersionsCard } from "./VersionsCard";
 
 export function DraftsSection() {
   return (
-    <div className="grid gap-4" data-testid="labor-drafts-section">
+    <div className="grid grid-cols-1 gap-4" data-testid="labor-drafts-section">
       <VersionsCard />
       <PlaybookCard />
     </div>

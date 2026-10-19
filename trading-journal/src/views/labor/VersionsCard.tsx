@@ -152,7 +152,7 @@ export function VersionsCard({ className }: { className?: string }) {
                     <MorphSelect aria-label={V.b} value={String(b.n)} onChange={(v) => setBPick(Number(v))} options={list.map((v) => ({ value: String(v.n), label: V.version(v.n) }))} data-testid="labor-compare-b" />
                   </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="min-w-0 overflow-x-auto">
                   <table className="w-full min-w-[30rem] text-left text-[12px]" data-testid="labor-compare-rows">
                     <thead>
                       <tr className="text-[10.5px] uppercase tracking-[0.1em] text-faint">

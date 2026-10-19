@@ -26,7 +26,7 @@ export function ForwardSection() {
 
   const running = accounts.filter((a) => a.status !== "ended").length;
   return (
-    <div className="grid gap-4" data-testid="forward-section">
+    <div className="grid grid-cols-1 gap-4" data-testid="forward-section">
       <p className="max-w-[78ch] text-[13px] leading-relaxed text-mute">{F.lead}</p>
       <p className="max-w-[78ch] text-[12px] leading-relaxed text-faint">{F.honest}</p>
       <NewAccountCard />
@@ -40,7 +40,7 @@ export function ForwardSection() {
       {!accounts.length ? (
         <EmptyState title="Noch kein virtuelles Konto" text={F.empty} />
       ) : (
-        <div className="grid gap-4" data-testid="forward-list">
+        <div className="grid grid-cols-1 gap-4" data-testid="forward-list">
           {accounts.map((a, i) => (
             <Reveal key={a.id} index={i} className="min-w-0">
               <AccountCard account={a} />

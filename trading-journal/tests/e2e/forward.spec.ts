@@ -41,7 +41,7 @@ test.describe("Labor · Forward-Test", () => {
     const errors = await open(page, info);
     const section = page.getByTestId("forward-section");
     await scrollUntilVisible(page, section);
-    await expect(section.getByText("Noch kein virtuelles Konto")).toBeVisible();
+    await expect(section.getByText("Noch kein virtuelles Konto", { exact: true })).toBeVisible();
     await expect(page.getByTestId("forward-rules-text")).toContainText("Long wenn");
     await expectNoHorizontalScroll(page);
 

@@ -250,7 +250,7 @@ export function AccountCard({ account: a, className }: { account: ForwardAccount
             {cmp.status === "done" && cmp.result && (
               <div className="grid gap-3" data-testid="forward-compare-result" data-level={cmp.result.level}>
                 <p className={cn("text-[13px] leading-relaxed", cmp.result.level === "differs" ? "text-warn" : "text-fg")}>{cmp.result.headline}</p>
-                <div className="overflow-x-auto">
+                <div className="min-w-0 overflow-x-auto">
                   <table className="w-full min-w-[34rem] text-left text-[12px]" data-testid="forward-compare-table">
                     <thead>
                       <tr className="text-[10.5px] uppercase tracking-[0.1em] text-faint">
