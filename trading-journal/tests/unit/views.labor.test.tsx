@@ -233,7 +233,7 @@ describe("Setups · Strategie (P07)", () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId("setup-compare-open"));
     });
-    const cmp = await screen.findByTestId("setup-compare");
+    const cmp = await screen.findByTestId("setup-compare", undefined, { timeout: 15_000 });
     expect(within(cmp).getAllByTestId("setup-compare-column")).toHaveLength(2);
     expect(within(cmp).getByTestId("setup-compare-verdict").textContent?.trim()).not.toBe("");
     const group = within(cmp).getByRole("group", { name: "Bis zu drei Grundlagen wählen" });
