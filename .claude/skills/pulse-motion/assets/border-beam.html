@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Border Beam</title>
+<style>
+/* ============ CONFIG (hier hochdrehen) ============
+   Alle Werte sind Defaults; pro Instanz per Option oder CSS-Variable am Wrapper überschreibbar. */
+:root {
+  --bb-fade-in: .6s;          /* active: false -> true (Einblenden) */
+  --bb-fade-out: .5s;         /* active: true -> false (Ausblenden) */
+  --bb-hue-cycle: 12s;        /* Dauer eines Hue-Shift-Zyklus (ease-in-out, hin und her) */
+  --bb-ease: ease;
+  --stage: #0b0b0d; --card: #16161a; --ink: #ececf1; --muted: #8b8b97;
+}
+body { margin: 0; min-height: 100vh; background: var(--stage); color: var(--ink); font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; display: grid; place-items: center; padding: 28px 16px; box-sizing: border-box; }
+body[data-theme="light"] { --stage: #f1f1f4; --card: #ffffff; --ink: #18181b; --muted: #6b6b76; }
+
+/* ============ COMPONENT CSS ============ */
+.bb { --bb-duration: 1.96s; --bb-strength: 1; --bb-r: 16px; --bb-bw: 1px; --bb-brightness: 1.3; --bb-saturate: 1.2; --bb-glow: 1; --bb-hue: 30deg;
+  --bb-stroke-o: .95; --bb-inner-o: .5; --bb-bloom-o: .5; --bb-core: rgba(255,255,255,.9); --bb-spread: 8px; --bb-d: 400px;
+  --bb-c1: #ff3264; --bb-c2: #288cff; --bb-c3: #32c850; --bb-c4: #6446ff; --bb-c5: #ff7828; --bb-c6: #f032b4;
+  position: relative; display: block; isolation: isolate; border-radius: var(--bb-r); }
+.bb__layers { position: absolute; inset: 0; pointer-events: none; border-radius: var(--bb-r); opacity: 0; transition: opacity var(--bb-fade-in) var(--bb-ease); z-index: 2; }
+.bb[data-active="true"] .bb__layers { opacity: 1; }
+.bb[data-active="false"] .bb__layers { transition-duration: var(--bb-fade-out); }
+.bb[data-size="pulse-outside"] .bb__layers { z-index: -1; }          /* Halo hinter dem Inhalt: Kind muss deckend sein */
+
+/* rotierender Strahl: großes Quadrat (>= Diagonale) dreht per transform im Compositor */
+.bb__spin { position: absolute; left: 50%; top: 50%; width: var(--bb-d); height: var(--bb-d); margin: calc(var(--bb-d) / -2) 0 0 calc(var(--bb-d) / -2);
+  background: conic-gradient(from 0deg, transparent 0 50%, var(--bb-c1) 54%, var(--bb-c2) 58%, var(--bb-c3) 62%, var(--bb-core) 66%, var(--bb-c4) 70%, var(--bb-c5) 74%, var(--bb-c6) 78%, transparent 83% 100%);
+  animation: bb-spin var(--bb-duration) linear infinite; will-change: transform; }
+.bb[data-paused="true"] .bb__spin, .bb[data-paused="true"] .bb__line-run, .bb[data-paused="true"] .bb__pulse, .bb[data-paused="true"] .bb__hue { animation-play-state: paused; }
+@keyframes bb-spin { to { transform: rotate(360deg); } }
+
+/* Ring-Maske: nur die Randlinie sichtbar (statisch -> kein Repaint pro Frame) */
+.bb__ring { position: absolute; inset: 0; border-radius: var(--bb-r); padding: var(--bb-bw); overflow: hidden;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); }
+.bb__hue { position: absolute; inset: 0; border-radius: var(--bb-r); animation: bb-hue var(--bb-hue-cycle) ease-in-out infinite alternate; }
+@keyframes bb-hue { from { filter: hue-rotate(calc(var(--bb-hue) * -1)) brightness(var(--bb-brightness)) saturate(var(--bb-saturate)); } to { filter: hue-rotate(var(--bb-hue)) brightness(var(--bb-brightness)) saturate(var(--bb-saturate)); } }
+.bb[data-static="true"] .bb__hue, .bb[data-variant="mono"] .bb__hue { animation: none; filter: brightness(var(--bb-brightness)) saturate(var(--bb-saturate)); }
+.bb__stroke { position: absolute; inset: 0; opacity: calc(var(--bb-stroke-o) * var(--bb-strength)); }
+
+/* Innen-Glow: weich geblurter Ring, innen am Rand geclippt */
+.bb__inner { position: absolute; inset: 0; border-radius: var(--bb-r); overflow: hidden; opacity: calc(var(--bb-inner-o) * var(--bb-strength)); }
+.bb__inner .bb__blur { position: absolute; inset: 0; filter: blur(calc(6px * var(--bb-glow))); }
+.bb__inner .bb__ring { padding: calc(var(--bb-bw) + 7px); }
+
+/* Außen-Bloom: Ring mit Überstand, Blur am Elternelement (Maske kappt sonst den Blur) */
+.bb__bloom { position: absolute; inset: calc(var(--bb-spread) * -1); border-radius: calc(var(--bb-r) + var(--bb-spread)); opacity: calc(var(--bb-bloom-o) * var(--bb-strength)); }
+.bb__bloom .bb__blur { position: absolute; inset: 0; filter: blur(calc(8px * var(--bb-glow))); }
+.bb__bloom .bb__ring { border-radius: calc(var(--bb-r) + var(--bb-spread)); padding: calc(var(--bb-spread) + var(--bb-bw) + 2px); }
+.bb__bloom .bb__spin { --bb-d: calc(var(--bb-d-base) + var(--bb-spread) * 2); }
+
+/* quality="lite": für Listen/Raster mit vielen Beams – kein Innen-Glow, kleinerer Bloom (~40 % weniger Raster-Arbeit) */
+.bb[data-quality="lite"] .bb__inner { display: none; }
+.bb[data-quality="lite"] .bb__bloom .bb__blur { filter: blur(calc(4px * var(--bb-glow))); }
+.bb[data-quality="lite"] { --bb-spread: 4px; }
+
+/* Größen */
+.bb[data-size="sm"] { --bb-spread: 5px; --bb-stroke-o: 1; --bb-inner-o: .38; --bb-bloom-o: .55; }
+.bb[data-size="sm"] .bb__inner .bb__ring { padding: calc(var(--bb-bw) + 4px); }
+.bb[data-size="sm"] .bb__bloom .bb__blur { filter: blur(calc(5px * var(--bb-glow))); }
+
+/* line: nur unten, wandernder Strahl */
+.bb__line { position: absolute; left: 0; right: 0; bottom: 0; height: var(--bb-bw); overflow: hidden; border-radius: 0 0 var(--bb-r) var(--bb-r); opacity: calc(var(--bb-stroke-o) * var(--bb-strength)); }
+.bb__line-run { position: absolute; top: 0; bottom: 0; left: 0; width: 55%; background: linear-gradient(90deg, transparent, var(--bb-c1) 18%, var(--bb-c2) 36%, var(--bb-core) 50%, var(--bb-c4) 64%, var(--bb-c5) 82%, transparent); animation: bb-line var(--bb-duration) ease-in-out infinite alternate; will-change: transform; }
+@keyframes bb-line { from { transform: translateX(-55%); } to { transform: translateX(182%); } }
+.bb__linebloom { position: absolute; left: 6px; right: 6px; bottom: -4px; height: 14px; overflow: hidden; opacity: calc(var(--bb-bloom-o) * var(--bb-strength)); filter: blur(calc(7px * var(--bb-glow))); }
+.bb__linebloom .bb__line-run { top: 6px; bottom: 2px; }
+
+/* pulse: atmende Opazität (keine Rotation), nur opacity/transform animiert */
+.bb[data-size^="pulse"] .bb__spin { animation: none; background: conic-gradient(from 20deg, var(--bb-c1), var(--bb-c2), var(--bb-c3), var(--bb-c4), var(--bb-c5), var(--bb-c6), var(--bb-c1)); }
+.bb[data-size^="pulse"] { --bb-duration: 2.3s; }
+.bb__pulse { position: absolute; inset: 0; animation: bb-breathe var(--bb-duration) ease-in-out infinite; }
+@keyframes bb-breathe { 0%, 100% { opacity: .22; transform: scale(1); } 50% { opacity: 1; transform: scale(var(--bb-breathe-scale, 1)); } }
+.bb[data-size="pulse-outside"] { --bb-spread: 14px; --bb-bloom-o: .9; --bb-breathe-scale: 1.025; --bb-brightness: 1.9; }
+.bb[data-size="pulse-outside"] .bb__bloom .bb__blur { filter: blur(calc(14px * var(--bb-glow))); }
+.bb[data-size="pulse-inner"] { --bb-inner-o: .85; }
+
+/* Light-Theme: dunkler Kern, andere Gewichtung */
+.bb[data-theme="light"] { --bb-core: rgba(0,0,0,.6); --bb-saturate: 1.6; --bb-stroke-o: .8; --bb-inner-o: .35; --bb-bloom-o: .35; }
+
+@media (prefers-reduced-motion: reduce) { .bb__spin, .bb__line-run, .bb__hue, .bb__pulse { animation: none !important; } .bb__layers { transition-duration: .01ms !important; } }
+
+/* ============ Demo-Layout ============ */
+.wrap { width: min(920px, 100%); display: grid; gap: 22px; }
+h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.sub { color: var(--muted); margin: -14px 0 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 26px; align-items: start; }   /* Wrapper muss exakt so groß sein wie sein Kind (nicht stretchen) */
+.card { background: var(--card); border-radius: 16px; padding: 22px; min-height: 96px; border: 1px solid rgba(128,128,128,.14); }
+.card b { display: block; margin-bottom: 4px; }
+.card span { color: var(--muted); font-size: 13px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.row label { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+select, input[type=range], button { font: inherit; color: inherit; }
+select, button { background: var(--card); border: 1px solid rgba(128,128,128,.3); border-radius: 8px; padding: 6px 10px; }
+.search { border-radius: 14px; background: var(--card); padding: 12px 16px; color: var(--muted); border: 1px solid rgba(128,128,128,.14); }
+.btnsm { border-radius: 12px; background: var(--card); padding: 8px 14px; border: 1px solid rgba(128,128,128,.14); display: inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Border Beam</h1>
+  <p class="sub">Wandernder bzw. atmender Rand-Glow – 5 Größen, 8 Farbvarianten, Hue-Shift. Läuft per Compositor (transform/opacity/filter). Alle Größen/Farben per Regler wählbar.</p>
+
+  <div class="row" id="controls">
+    <label>size <select id="c-size"><option>md</option><option>sm</option><option>line</option><option>pulse-inner</option><option>pulse-outside</option></select></label>
+    <label>colorVariant <select id="c-variant"><option>colorful</option><option>mono</option><option>ocean</option><option>sunset</option><option>forest</option><option>candy</option><option>ice</option><option>gold</option></select></label>
+    <label>strength <input id="c-strength" type="range" min="0" max="1" step=".05" value="1"></label>
+    <label>glowSize <input id="c-glow" type="range" min=".4" max="2" step=".1" value="1"></label>
+    <button id="c-active" aria-pressed="true">active: true</button>
+    <button id="c-theme">theme: dark</button>
+  </div>
+
+  <div class="grid">
+    <!-- COMPONENT:START (Nutzung: Wrapper um ein Kind; initBorderBeam(wrapper, opts)) -->
+    <div id="live" class="bb"><div class="card"><b>Live-Vorschau</b><span>Alle Regler oben wirken auf diese Karte.</span></div></div>
+    <!-- COMPONENT:END -->
+    <div id="b-sm" class="bb"><div class="card"><b>size="sm"</b><span>Kompakter Glow für kleine Elemente</span></div></div>
+    <div id="b-line" class="bb"><div class="search">Search the docs…</div></div>
+    <div id="b-po" class="bb"><div class="card"><b>size="pulse-outside"</b><span>Halo blüht nach außen (Kind deckend)</span></div></div>
+  </div>
+</div>
+
+<script>
+/* ============ COMPONENT JS ============
+   initBorderBeam(root, opts) -> { update(partial), destroy() }
+   opts: size 'md'|'sm'|'line'|'pulse-inner'|'pulse-outside', colorVariant (8), theme 'dark'|'light'|'auto', strength 0..1, active, duration (s),
+         borderRadius (px, sonst auto vom ersten Kind), brightness, saturation, glowSize, hueRange (deg), staticColors, onActivate, onDeactivate
+   Zeit/Takt kommt komplett aus CSS-Animationen (bildratenunabhängig); JS läuft nur bei Init/Resize/Optionswechsel. */
+const BB_PALETTES = {
+  colorful: ['#ff3264', '#288cff', '#32c850', '#6446ff', '#ff7828', '#f032b4'],
+  mono:     ['#9a9aa2', '#c4c4cb', '#7d7d86', '#d9d9de', '#a8a8b0', '#8b8b94'],
+  ocean:    ['#288cff', '#6446ff', '#1eb9ff', '#8c50ff', '#3c64ff', '#50c8ff'],
+  sunset:   ['#ff7828', '#ffb428', '#ff3c50', '#ff9650', '#f03296', '#ffd250'],
+  forest:   ['#32c850', '#1eb9aa', '#8cdc50', '#14a078', '#50dc96', '#a0e664'],
+  candy:    ['#f032b4', '#ff78c8', '#b428f0', '#ff3264', '#ff9ade', '#c864ff'],
+  ice:      ['#78dcff', '#b4ebff', '#50a0ff', '#dcf5ff', '#8cc8ff', '#a0f0ff'],
+  gold:     ['#ffb428', '#ffd750', '#ff9628', '#fff0a0', '#ffc850', '#ffaa3c']
+};
+const BB_DEFAULTS = { size: 'md', colorVariant: 'colorful', theme: 'dark', strength: 1, active: true, duration: null, borderRadius: null,
+  brightness: null, saturation: null, glowSize: 1, hueRange: 30, staticColors: false, quality: 'full' };
+const BB_FALLBACK_R = { md: 16, sm: 12, line: 16, 'pulse-inner': 16, 'pulse-outside': 16 };
+
+function initBorderBeam(root, userOpts = {}) {
+  let o = { ...BB_DEFAULTS, ...userOpts };
+  const mm = matchMedia('(prefers-color-scheme: dark)');
+  const child = root.firstElementChild;
+  let layers = null, ro = null, fadeTimer = 0;
+  root.classList.add('bb');
+
+  const theme = () => (o.theme === 'auto' ? (mm.matches ? 'dark' : 'light') : o.theme);
+  const detectRadius = () => {
+    if (o.borderRadius != null) return o.borderRadius;
+    const v = child ? parseFloat(getComputedStyle(child).borderTopLeftRadius) : NaN;
+    return Number.isFinite(v) && v > 0 ? v : BB_FALLBACK_R[o.size];
+  };
+  const build = () => {                                           // Layer-DOM je nach Größe (nur bei Init / size-Wechsel)
+    layers && layers.remove();
+    const spin = '<i class="bb__spin"></i>', ring = `<span class="bb__ring">${spin}</span>`;
+    const hueRing = `<span class="bb__hue"><span class="bb__stroke">${ring}</span></span>`;
+    const inner = `<span class="bb__inner"><span class="bb__blur"><span class="bb__hue">${ring}</span></span></span>`;
+    const bloom = `<span class="bb__bloom"><span class="bb__blur"><span class="bb__hue">${ring}</span></span></span>`;
+    let html;
+    if (o.size === 'line') html = `<span class="bb__linebloom"><i class="bb__line-run"></i></span><span class="bb__line"><i class="bb__line-run"></i></span>`;
+    else if (o.size === 'pulse-outside') html = `<span class="bb__pulse">${bloom}${hueRing}</span>`;
+    else if (o.size === 'pulse-inner') html = `<span class="bb__pulse">${inner}${hueRing}</span>`;
+    else html = `${bloom}${inner}${hueRing}`;
+    layers = document.createElement('span'); layers.className = 'bb__layers'; layers.setAttribute('aria-hidden', 'true'); layers.innerHTML = html;
+    root.appendChild(layers);
+  };
+  const measure = () => {                                         // Diagonale nur bei Resize messen, nie pro Frame
+    const r = root.getBoundingClientRect();
+    const d = Math.ceil(Math.hypot(r.width, r.height)) + 4;
+    root.style.setProperty('--bb-d-base', d + 'px'); root.style.setProperty('--bb-d', d + 'px');
+  };
+  const apply = () => {
+    root.dataset.size = o.size; root.dataset.variant = o.colorVariant; root.dataset.theme = theme();
+    root.dataset.quality = o.quality; root.dataset.static = String(!!o.staticColors); root.dataset.active = String(!!o.active); root.dataset.paused = String(!o.active && root.dataset.settled === 'true');
+    const p = BB_PALETTES[o.colorVariant] || BB_PALETTES.colorful;
+    p.forEach((c, i) => root.style.setProperty('--bb-c' + (i + 1), c));
+    const s = root.style;
+    s.setProperty('--bb-strength', String(Math.max(0, Math.min(1, o.strength))));
+    s.setProperty('--bb-r', detectRadius() + 'px');
+    s.setProperty('--bb-glow', String(o.glowSize));
+    s.setProperty('--bb-hue', o.hueRange + 'deg');
+    o.duration != null ? s.setProperty('--bb-duration', o.duration + 's') : s.removeProperty('--bb-duration');
+    o.brightness != null ? s.setProperty('--bb-brightness', String(o.brightness)) : s.removeProperty('--bb-brightness');
+    o.saturation != null ? s.setProperty('--bb-saturate', String(o.saturation)) : s.removeProperty('--bb-saturate');
+  };
+  const settle = () => {                                          // nach dem Ausblenden Animation anhalten (spart Arbeit), nach Einblenden Callback
+    clearTimeout(fadeTimer);
+    const fade = o.active ? 600 : 500;
+    fadeTimer = setTimeout(() => {
+      root.dataset.settled = 'true'; root.dataset.paused = String(!o.active);
+      (o.active ? o.onActivate : o.onDeactivate)?.();
+    }, fade + 20);
+    root.dataset.settled = 'false'; root.dataset.paused = 'false';
+  };
+
+  build(); measure(); apply(); settle();
+  ro = new ResizeObserver(() => { measure(); if (o.borderRadius == null) root.style.setProperty('--bb-r', detectRadius() + 'px'); });
+  ro.observe(root);
+  const onMq = () => o.theme === 'auto' && apply();
+  mm.addEventListener('change', onMq);
+
+  return {
+    update(partial) {
+      const sizeChanged = partial.size && partial.size !== o.size, activeChanged = 'active' in partial && partial.active !== o.active;
+      o = { ...o, ...partial };
+      if (sizeChanged) { build(); measure(); }
+      apply(); if (activeChanged) settle();
+    },
+    destroy() { ro.disconnect(); mm.removeEventListener('change', onMq); clearTimeout(fadeTimer); layers && layers.remove(); root.classList.remove('bb'); }
+  };
+}
+
+/* ============ Demo ============ */
+const live = initBorderBeam(document.getElementById('live'), { size: 'md' });
+initBorderBeam(document.getElementById('b-sm'), { size: 'sm', colorVariant: 'ocean', quality: 'lite' });
+initBorderBeam(document.getElementById('b-line'), { size: 'line', colorVariant: 'colorful', borderRadius: 14 });
+initBorderBeam(document.getElementById('b-po'), { size: 'pulse-outside', colorVariant: 'sunset', quality: 'lite' });
+const $ = (id) => document.getElementById(id);
+$('c-size').onchange = (e) => live.update({ size: e.target.value });
+$('c-variant').onchange = (e) => live.update({ colorVariant: e.target.value });
+$('c-strength').oninput = (e) => live.update({ strength: +e.target.value });
+$('c-glow').oninput = (e) => live.update({ glowSize: +e.target.value });
+let act = true; $('c-active').onclick = (e) => { act = !act; e.target.textContent = 'active: ' + act; e.target.setAttribute('aria-pressed', act); live.update({ active: act }); };
+let th = 'dark'; $('c-theme').onclick = (e) => { th = th === 'dark' ? 'light' : 'dark'; e.target.textContent = 'theme: ' + th; document.body.dataset.theme = th; live.update({ theme: th });
+  document.querySelectorAll('.bb').forEach((el) => { if (el.id !== 'live') el.dataset.theme = th; }); };
+</script>
+</body>
+</html>

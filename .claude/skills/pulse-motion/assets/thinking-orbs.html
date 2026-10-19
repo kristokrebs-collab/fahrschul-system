@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Thinking Orbs</title>
+<style>
+/* ============ CONFIG ============ */
+:root { --stage: #0c0c0f; --panel: #15151a; --ink: #ececf1; --muted: #8b8b97; --line: rgba(128,128,128,.22); }
+body[data-theme="light"] { --stage: #f2f2f5; --panel: #ffffff; --ink: #17171c; --muted: #6a6a76; }
+body { margin: 0; min-height: 100vh; background: var(--stage); color: var(--ink); font: 14px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; display: grid; place-items: center; padding: 28px 16px; box-sizing: border-box; }
+/* ============ COMPONENT CSS ============ */
+.orb { display: inline-block; vertical-align: middle; }
+/* ============ Demo-Layout ============ */
+.wrap { width: min(900px, 100%); display: grid; gap: 22px; }
+h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.sub { color: var(--muted); margin: -14px 0 0; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.row label { color: var(--muted); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+button, input, select { font: inherit; color: inherit; }
+button { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.cell { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 12px 12px; display: grid; justify-items: center; gap: 12px; }
+.cell code { color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.inline { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.inline .orb { margin: 0 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Thinking Orbs</h1>
+  <p class="sub">Neun „Denk“-Zustände aus gepunkteten Kugeln – Canvas 2D, zeitbasiert, zwei fein abgestimmte Größen (64 / 20) plus interpolierte 32.</p>
+  <div class="row">
+    <button id="c-theme">theme: dark</button>
+    <button id="c-pause" aria-pressed="false">paused: false</button>
+    <label>speed <input id="c-speed" type="range" min=".25" max="3" step=".05" value="1"></label>
+    <label>dots <input id="c-dots" type="range" min=".4" max="2" step=".1" value="1"></label>
+    <label>dotSize <input id="c-dotsize" type="range" min=".6" max="1.8" step=".1" value="1"></label>
+    <label>color <input id="c-color" type="color" value="#7c8cff"> <input id="c-tint" type="checkbox" aria-label="Farbe verwenden"></label>
+  </div>
+  <div class="grid" id="grid"></div>
+  <div class="inline" id="inline"></div>
+</div>
+
+<script>
+/* ============ COMPONENT JS ============
+   initThinkingOrb(target, opts) -> { set(partial), pause(), play(), destroy() }
+   target: <canvas> oder Container (Canvas wird angelegt).  opts: state, size (64|32|20), theme 'auto'|'dark'|'light', speed, paused,
+   color ('#rgb'|'#rrggbb'|'rgb()'), dots (Dichte-Faktor), dotSize (Radius-Faktor), label (aria-label).
+   Zeitbasis: ein geteilter rAF-Takt mit dt-Akkumulation (bildratenunabhängig); pausiert außerhalb des Sichtbereichs / bei verstecktem Tab;
+   prefers-reduced-motion = statisches Bild. Nur 2D-Canvas-Arcs/Linien, kein Filter, kein WebGL. */
+const TAU = Math.PI * 2;
+const ORB_STATES = ['working', 'searching', 'solving', 'listening', 'connecting', 'weaving', 'composing', 'breathing', 'shaping'];
+const ORB_LABEL = { working: 'Arbeitet…', searching: 'Sucht…', solving: 'Löst…', listening: 'Hört zu…', connecting: 'Verbindet…', weaving: 'Webt…', composing: 'Komponiert…', breathing: 'Atmet…', shaping: 'Formt…' };
+const ORB_STATIC_T = { working: 2.1, searching: 1.3, solving: 6.2, listening: 1.7, connecting: 4.6, weaving: 1.0, composing: 1.2, breathing: 1.5, shaping: 1.0 };   // repräsentatives Standbild
+/* Zwei handabgestimmte Presets (keine Skalierung): Dichte, Punktradius (CSS-px), Tempo. 32 wird in Log-Raum dazwischen interpoliert. */
+const ORB_PRESET = { 64: { dots: 1, r: 1.3, speed: 1 }, 20: { dots: .34, r: .95, speed: 1.12 } };
+function orbPreset(size) {
+  if (ORB_PRESET[size]) return ORB_PRESET[size];
+  const a = ORB_PRESET[20], b = ORB_PRESET[64], k = (Math.log(size) - Math.log(20)) / (Math.log(64) - Math.log(20)), L = (x, y) => Math.exp(Math.log(x) + (Math.log(y) - Math.log(x)) * k);
+  return { dots: L(a.dots, b.dots), r: L(a.r, b.r), speed: L(a.speed, b.speed) };
+}
+
+/* ---- Geometrie-Helfer (keine Allokation pro Punkt: Ergebnis in VX/VY/VZ) ---- */
+let VX = 0, VY = 0, VZ = 0;
+function view(x, y, z, ay, ax) {                                   // erst um Y, dann um X drehen
+  const cy = Math.cos(ay), sy = Math.sin(ay), x1 = x * cy + z * sy, z1 = -x * sy + z * cy, cx = Math.cos(ax), sx = Math.sin(ax);
+  VX = x1; VY = y * cx - z1 * sx; VZ = y * sx + z1 * cx;
+}
+const FIB = {};
+function fib(N) { if (FIB[N]) return FIB[N]; const p = new Float32Array(N * 3); for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + .5) / N, r = Math.sqrt(1 - y * y), f = i * 2.399963; p[3 * i] = r * Math.cos(f); p[3 * i + 1] = y; p[3 * i + 2] = r * Math.sin(f); } return (FIB[N] = p); }
+const cnt = (n, c, dm = 1, min = 3) => Math.max(min, Math.round(n * c.d * dm * c.u));       // c.d Preset-Dichte, c.u Nutzer-Faktor
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = (x) => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const smooth = (x) => x * x * (3 - 2 * x);
+
+/* ---- Punkt-/Linien-Puffer ---- */
+const CAP = 2200;
+const B = { x: new Float32Array(CAP), y: new Float32Array(CAP), z: new Float32Array(CAP), a: new Float32Array(CAP), s: new Float32Array(CAP), n: 0,
+  l: new Float32Array(CAP * 3), ln: 0 };
+const add = (x, y, z, a = 1, s = 1) => { const i = B.n++; if (i >= CAP) { B.n = CAP; return; } B.x[i] = x; B.y[i] = y; B.z[i] = z; B.a[i] = a; B.s[i] = s; };
+const line = (x1, y1, x2, y2, a) => { const i = B.ln * 5; if (i + 5 > B.l.length) return; B.l[i] = x1; B.l[i + 1] = y1; B.l[i + 2] = x2; B.l[i + 3] = y2; B.l[i + 4] = a; B.ln++; };
+
+/* ---- Die neun Zustände: frame(t, c) füllt den Puffer ---- */
+function orbitPt(th, ax, az, t) {
+  const x = Math.cos(th), y0 = Math.sin(th), ca = Math.cos(ax), sa = Math.sin(ax), y = y0 * ca, z = y0 * sa;
+  const cb = Math.cos(az), sb = Math.sin(az); view(x * cb - y * sb, x * sb + y * cb, z, t * .25, .25);
+}
+const FRAMES = {
+  working(t, c) {                                                  // Partikel mit Schweif auf geneigten Bahnen
+    const O = [[.5, .1, 1.1], [-.7, 1.5, -.85], [1.15, 2.5, 1.4]], P = cnt(9, c, 1, 3), L = cnt(7, c, 1, 3), G = cnt(30, c, 1, 8);
+    for (let j = 0; j < 3; j++) {
+      const [ax, az, w] = O[j], dir = Math.sign(w);
+      for (let g = 0; g < G; g++) { orbitPt(g / G * TAU, ax, az, t); add(VX, VY, VZ, .13, .55); }
+      for (let p = 0; p < P; p++) for (let k = 0; k < L; k++) { const f = 1 - k / L; orbitPt(w * t * .7 + j + p / P * TAU - dir * k * .1, ax, az, t); add(VX, VY, VZ, .25 + .75 * f * f, .5 + .5 * f); }
+    }
+  },
+  searching(t, c) {                                                // Scan-Meridian über gepunktetem Globus
+    const N = cnt(170, c, 1, 24), g = fib(N), s = (t * 1.5) % TAU;
+    for (let i = 0; i < N; i++) {
+      view(g[3 * i], g[3 * i + 1], g[3 * i + 2], t * .3, .35);
+      let d = Math.atan2(VZ, VX) - s; d = Math.atan2(Math.sin(d), Math.cos(d)); const gl = Math.exp(-(d / .3) * (d / .3));
+      add(VX, VY, VZ, .3 + .7 * gl, 1 + .7 * gl);
+    }
+  },
+  solving(t, c) {                                                  // Bänder drehen in Vierteln, dann „klicken“ sie zurück
+    const ys = [-.8, -.4, 0, .4, .8], M = [[1, 1], [3, -1], [0, 1], [2, -1], [4, 1]], n = cnt(12, c, 1, 6), u = t % 9, off = [0, 0, 0, 0, 0];
+    for (let m = 0; m < 5; m++) { const xs = ease(clamp((u - (.4 + .6 * m)) / .45)), xu = ease(clamp((u - (4.6 + .6 * (4 - m))) / .45)); off[M[m][0]] = M[m][1] * (Math.PI / 2) * (xs - xu); }
+    for (let bi = 0; bi < 5; bi++) { const rr = Math.sqrt(1 - ys[bi] * ys[bi]) * .98; for (let k = 0; k < n; k++) { const a = k / n * TAU + off[bi]; view(rr * Math.cos(a), ys[bi], rr * Math.sin(a), t * .22, .38); add(VX, VY, VZ, 1, 1); } }
+  },
+  listening(t, c) {                                                // Wellenform läuft durch die Breitenkreise
+    const R = cnt(9, c, 1, 5), nMax = cnt(24, c, 1, 8);
+    for (let i = 0; i < R; i++) {
+      const y0 = -.86 + 1.72 * i / (R - 1), w = Math.sin(i / (R - 1) * TAU * .9 - t * 3), rr = Math.sqrt(Math.max(0, 1 - y0 * y0)), n = Math.max(5, Math.round(nMax * rr)), rad = rr * (1 + .1 * w), pw = Math.max(0, w);
+      for (let k = 0; k < n; k++) { const a = k / n * TAU + i * .35; view(rad * Math.cos(a), y0 + .07 * w, rad * Math.sin(a), t * .3, .3); add(VX, VY, VZ, .45 + .55 * pw, 1 + .4 * pw); }
+    }
+  },
+  connecting(t, c) {                                               // Konstellation verdrahtet sich, Pakete laufen über die Kanten
+    const N = cnt(16, c, 1, 6), net = connNet(N), g = net.p, u = t % 7, p = u / 5.2, master = 1 - clamp((u - 5.9) / 1), E = net.e.length;
+    const P = new Array(N);                                         // projizierte Knoten (kleine Allokation, N <= ~30)
+    for (let i = 0; i < N; i++) { view(g[3 * i], g[3 * i + 1], g[3 * i + 2], t * .3, .3); P[i] = [VX, VY, VZ]; }
+    for (let e = 0; e < E; e++) {
+      const [i, j] = net.e[e], f = clamp((p - (e * .618 % 1) * .75) / .25) * master; if (f <= 0) continue; const a = P[i], b = P[j], z = (a[2] + b[2]) / 2;
+      line(a[0], a[1], a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, (.15 + .45 * (z + 1) / 2) * f);
+      if (f >= 1 && e % 3 === 0) { const q = (t * .8 + e * .37) % 1; add(a[0] + (b[0] - a[0]) * q, a[1] + (b[1] - a[1]) * q, z + .1, 1, .7); }
+    }
+    for (let i = 0; i < N; i++) add(P[i][0], P[i][1], P[i][2], .55 + .45 * master, 1.5);
+  },
+  weaving(t, c) {                                                  // drei Stränge flechten sich um die Kugel
+    const M = cnt(46, c, 1, 12), turns = 2.2;
+    for (let s = 0; s < 3; s++) for (let i = 0; i < M; i++) {
+      const u = -.93 + 1.86 * i / (M - 1), th = turns * Math.PI * u + s * TAU / 3 + t * 1.1, rr = Math.sqrt(1 - u * u) * (.96 + .06 * Math.sin(th * 2 + s));
+      view(rr * Math.cos(th), u, rr * Math.sin(th), 0, .28); add(VX, VY, VZ, .95, 1);
+    }
+  },
+  composing(t, c) {                                                // wogende Mehrband-Schärpe
+    const K = 4, n = cnt(36, c, 1, 10);
+    for (let kb = 0; kb < K; kb++) for (let j = 0; j < n; j++) {
+      const psi = j / n * TAU, y = -.45 + .3 * kb + .26 * Math.sin(2 * psi + 1.4 * t + kb * .8), rr = Math.sqrt(Math.max(0, 1 - y * y)), a = psi + .35 * t * (kb % 2 ? 1 : -.6);
+      view(rr * Math.cos(a), y, rr * Math.sin(a), 0, .45); add(VX, VY, VZ, .9, 1);
+    }
+  },
+  breathing(t, c) {                                                // frontaler Ring, langsam morphend
+    const n = cnt(70, c, 1, 18);
+    for (let r = 0; r < 2; r++) {
+      const base = r ? .66 : .8, ph = r * 1.7;
+      for (let j = 0; j < n; j++) {
+        const th = j / n * TAU + .12 * t * (r ? -1 : 1), rho = base * (1 + .04 * Math.sin(.9 * t + ph)) * (1 + .14 * Math.sin(2 * th + .6 * t + ph) + .08 * Math.sin(3 * th - .45 * t + 1 + ph) + .04 * Math.sin(5 * th + .8 * t));
+        add(rho * Math.cos(th), rho * Math.sin(th), .4 + .4 * Math.sin(th + t * .5), r ? .5 : .95, r ? .8 : 1);
+      }
+    }
+  },
+  shaping(t, c) {                                                  // gepunktete Kontur: Kreis → Dreieck → Quadrat
+    const n = cnt(64, c, 1, 16), T = 2.4, ph = (t / T) | 0, f = smooth(clamp((t % T) / 1.1)), A = ph % 3, Bs = (ph + 1) % 3, spin = t * .2;
+    const pt = (shape, s, o) => {
+      if (shape === 0) { const a = s * TAU - Math.PI / 2; o[0] = Math.cos(a) * .84; o[1] = Math.sin(a) * .84; return; }
+      const k = shape === 1 ? 3 : 4, r = shape === 1 ? .98 : .92, a0 = shape === 1 ? -Math.PI / 2 : -3 * Math.PI / 4, e = Math.floor(s * k), l = s * k - e;
+      const ax = Math.cos(a0 + e * TAU / k) * r, ay = Math.sin(a0 + e * TAU / k) * r, bx = Math.cos(a0 + (e + 1) * TAU / k) * r, by = Math.sin(a0 + (e + 1) * TAU / k) * r;
+      o[0] = ax + (bx - ax) * l; o[1] = ay + (by - ay) * l;
+    };
+    const o1 = [0, 0], o2 = [0, 0], cs = Math.cos(spin), sn = Math.sin(spin);
+    for (let i = 0; i < n; i++) { const s = i / n; pt(A, s, o1); pt(Bs, s, o2); const x = o1[0] + (o2[0] - o1[0]) * f, y = o1[1] + (o2[1] - o1[1]) * f; add(x * cs - y * sn, x * sn + y * cs, .6, 1, 1); }
+  }
+};
+const NETS = {};
+function connNet(N) {                                              // statisches Netz je Knotenzahl (Abstände ändern sich durch Rotation nicht)
+  if (NETS[N]) return NETS[N];
+  const p = fib(N), thr = 1.35 * Math.sqrt(4 * Math.PI / N), e = [];
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) { const dx = p[3 * i] - p[3 * j], dy = p[3 * i + 1] - p[3 * j + 1], dz = p[3 * i + 2] - p[3 * j + 2]; if (dx * dx + dy * dy + dz * dz < thr * thr) e.push([i, j]); }
+  return (NETS[N] = { p, e });
+}
+
+/* ---- Painter ---- */
+const LV = new Uint8Array(CAP), KD = new Float32Array(CAP), ORD = new Uint16Array(CAP), BUCKET = new Uint16Array(17);
+function paintOrb(o) {
+  const { ctx, size, dpr } = o, R = size * .5 * .86, cx = size / 2, cy = size / 2, preset = o.preset;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, size, size);
+  B.n = 0; B.ln = 0;
+  FRAMES[o.state](o.tau, { d: preset.dots, u: o.dots });
+  if (B.ln) {                                                      // Linien (nur connecting)
+    ctx.lineWidth = Math.max(.6, size / 90); ctx.lineCap = 'round';
+    for (let i = 0; i < B.ln; i++) { const k = i * 5; ctx.strokeStyle = o.styles[clamp(Math.round(B.l[k + 4] * 15), 1, 15)]; ctx.beginPath(); ctx.moveTo(cx + B.l[k] * R, cy - B.l[k + 1] * R); ctx.lineTo(cx + B.l[k + 2] * R, cy - B.l[k + 3] * R); ctx.stroke(); }
+  }
+  // Punkte nach Alpha-Stufe bündeln (Counting-Sort, kein Comparator): hell/vorne zuletzt, je Stufe EIN Pfad + EIN fill -> höchstens 15 Füllvorgänge
+  const n = B.n, rBase = preset.r * o.dotSize; BUCKET.fill(0);
+  for (let i = 0; i < n; i++) { const k = clamp((B.z[i] + 1) / 2), l = clamp(Math.round(B.a[i] * (.18 + .82 * Math.pow(k, 1.3)) * 15), 1, 15); LV[i] = l; KD[i] = k; BUCKET[l]++; }
+  let acc = 0; for (let l = 1; l <= 15; l++) { const c = BUCKET[l]; BUCKET[l] = acc; acc += c; }
+  for (let i = 0; i < n; i++) ORD[BUCKET[LV[i]]++] = i;                    // danach zeigt BUCKET[l] auf das Ende der Stufe l
+  let q = 0;
+  for (let l = 1; l <= 15; l++) {
+    const e = BUCKET[l]; if (q === e) continue;
+    ctx.fillStyle = o.styles[l]; ctx.beginPath();
+    for (; q < e; q++) { const i = ORD[q], pers = 1 + B.z[i] * .08, px = cx + B.x[i] * R * pers, py = cy - B.y[i] * R * pers, r = rBase * B.s[i] * (.62 + .55 * KD[i]); ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, TAU); }
+    ctx.fill();
+  }
+}
+
+/* ---- Farbe/Theme ---- */
+function parseColor(s) {
+  if (!s) return null; s = s.trim(); let m;
+  if ((m = /^#([0-9a-f]{3})$/i.exec(s))) return [...m[1]].map((h) => parseInt(h + h, 16));
+  if ((m = /^#([0-9a-f]{6})$/i.exec(s))) return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
+  if ((m = /^rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/i.exec(s))) return [+m[1], +m[2], +m[3]];
+  return null;
+}
+function detectTheme(el) {                                         // 1) Ahnen data-theme/class, 2) prefers-color-scheme
+  for (let e = el; e; e = e.parentElement) {
+    const d = e.getAttribute && e.getAttribute('data-theme'); if (d === 'dark' || d === 'light') return d;
+    if (e.classList) { if (e.classList.contains('dark')) return 'dark'; if (e.classList.contains('light')) return 'light'; }
+  }
+  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function buildStyles(o) {                                          // 16 vorberechnete Alpha-Stufen (kein String-Bauen pro Punkt)
+  const ink = parseColor(o.color) || (o.themeNow === 'dark' ? [236, 236, 242] : [22, 22, 28]);
+  o.styles = Array.from({ length: 16 }, (_, i) => `rgba(${ink[0]},${ink[1]},${ink[2]},${(i / 15).toFixed(3)})`);
+}
+
+/* ---- Geteilter Takt ---- */
+const CLOCK = { set: new Set(), raf: 0, last: 0 };
+function tickOrbs(now) {
+  const dt = Math.min(.05, (now - CLOCK.last) / 1000); CLOCK.last = now; let any = false;
+  for (const o of CLOCK.set) { if (!o.visible || o.paused || o.reduced) continue; o.tau += dt * o.speed * o.preset.speed; paintOrb(o); any = true; }
+  CLOCK.raf = any && !document.hidden ? requestAnimationFrame(tickOrbs) : 0;
+}
+function wakeOrbs() { if (!CLOCK.raf && !document.hidden) { CLOCK.last = performance.now(); CLOCK.raf = requestAnimationFrame(tickOrbs); } }
+document.addEventListener('visibilitychange', wakeOrbs);
+
+function initThinkingOrb(target, opts = {}) {
+  const canvas = target instanceof HTMLCanvasElement ? target : target.appendChild(document.createElement('canvas'));
+  const o = { canvas, ctx: canvas.getContext('2d'), state: 'working', size: 64, theme: 'auto', speed: 1, paused: false, color: null, dots: 1, dotSize: 1, label: null,
+    tau: 0, visible: true, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, themeNow: 'dark', ...opts };
+  canvas.classList.add('orb'); canvas.setAttribute('role', 'img');
+  const mq = matchMedia('(prefers-color-scheme: dark)'), mo = new MutationObserver(() => refresh()), io = new IntersectionObserver((e) => { o.visible = e[e.length - 1].isIntersecting; if (o.visible) { wakeOrbs(); if (o.paused || o.reduced) paintOrb(o); } });
+  function layout() {
+    o.dpr = Math.min(2, window.devicePixelRatio || 1); canvas.width = Math.round(o.size * o.dpr); canvas.height = Math.round(o.size * o.dpr);
+    canvas.style.width = o.size + 'px'; canvas.style.height = o.size + 'px'; o.preset = orbPreset(o.size);
+  }
+  function refresh() {                                             // Theme/Farbe/Label neu auflösen und (bei Stillstand) neu zeichnen
+    o.themeNow = o.theme === 'auto' ? detectTheme(canvas) : o.theme; buildStyles(o);
+    canvas.setAttribute('aria-label', o.label || ORB_LABEL[o.state] || 'Lädt');
+    if (o.reduced) o.tau = ORB_STATIC_T[o.state] || 1;
+    if (o.paused || o.reduced) paintOrb(o);
+  }
+  layout(); refresh(); CLOCK.set.add(o); io.observe(canvas); paintOrb(o); wakeOrbs();
+  mq.addEventListener('change', refresh);
+  for (let e = canvas; e; e = e.parentElement) mo.observe(e, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+  return {
+    set(p) { const sizeChanged = p.size && p.size !== o.size, stateChanged = p.state && p.state !== o.state; Object.assign(o, p); if (sizeChanged) layout(); if (stateChanged) o.tau = 0; refresh(); paintOrb(o); wakeOrbs(); },
+    pause() { o.paused = true; }, play() { o.paused = false; wakeOrbs(); },
+    destroy() { CLOCK.set.delete(o); io.disconnect(); mo.disconnect(); mq.removeEventListener('change', refresh); canvas.remove(); }
+  };
+}
+
+/* ============ Demo ============ */
+const grid = document.getElementById('grid'), inline = document.getElementById('inline'), orbs = [];
+ORB_STATES.forEach((st) => {
+  const cell = document.createElement('div'); cell.className = 'cell';
+  const holder = document.createElement('div'); const code = document.createElement('code'); code.textContent = st; cell.append(holder, code); grid.appendChild(cell);
+  orbs.push(initThinkingOrb(holder, { state: st, size: 64, theme: 'auto' }));
+});
+inline.append('Analysiere Repository ');
+const small = [['working', 'Arbeitet'], ['searching', 'Sucht'], ['connecting', 'Verbindet'], ['shaping', 'Formt']];
+small.forEach(([st, txt]) => { const s = document.createElement('span'); s.append(txt + ' '); const h = document.createElement('span'); s.appendChild(h); inline.appendChild(s); orbs.push(initThinkingOrb(h, { state: st, size: 20 })); });
+const $ = (id) => document.getElementById(id), all = (p) => orbs.forEach((x) => x.set(p));
+let th = 'dark'; $('c-theme').onclick = (e) => { th = th === 'dark' ? 'light' : 'dark'; e.target.textContent = 'theme: ' + th; document.body.dataset.theme = th; };
+let pz = false; $('c-pause').onclick = (e) => { pz = !pz; e.target.textContent = 'paused: ' + pz; e.target.setAttribute('aria-pressed', pz); all({ paused: pz }); if (!pz) orbs.forEach((x) => x.play()); };
+$('c-speed').oninput = (e) => all({ speed: +e.target.value });
+$('c-dots').oninput = (e) => all({ dots: +e.target.value });
+$('c-dotsize').oninput = (e) => all({ dotSize: +e.target.value });
+const tint = () => all({ color: $('c-tint').checked ? $('c-color').value : null }); $('c-color').oninput = tint; $('c-tint').onchange = tint;
+document.body.dataset.theme = 'dark';
+</script>
+</body>
+</html>
