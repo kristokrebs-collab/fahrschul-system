@@ -109,7 +109,12 @@ export function FunktionenView({ className }: { className?: string }) {
   const filtered = isFiltered(filter);
   const locked = (f: FeatureEntry): boolean => mode === "open" && !!f.gate && !planIncludes(plan.plan, f.gate);
 
-  const open = (id: string): void => void openFeature(id);
+  // opening a function leaves the page; the search and filters are cleared with it (the page stays mounted, so coming back
+  // would otherwise show yesterday's query and hide "Für dich" / "Zuletzt benutzt")
+  const open = (id: string): void => {
+    void openFeature(id);
+    setFilter(NO_FILTER);
+  };
   const set = (patch: Partial<FeatureFilter>): void => setFilter((f) => ({ ...f, ...patch }));
   const onSearchKey = (e: KeyboardEvent<HTMLInputElement>): void => {
     if (e.key === "Enter" && filter.q.trim() && shown[0]) {
