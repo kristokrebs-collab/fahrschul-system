@@ -100,3 +100,39 @@ the real journal store, the trade editor + detail, the risk guard host and the r
   (manual + automatic), sheet owner, the reached goal, `addGoalFromDraft` through the real store, widgets.
 - `tests/e2e/wachstum.spec.ts` – seeded journal on mobile + desktop (`PW_WACHSTUM_URL`, default `/dev/wachstum.html`;
   `P08_SHOTS=<dir>` writes review screenshots).
+
+## Täglicher Check-in beim ersten Öffnen (F61)
+
+`DailyCheckinHost` (a leaf in `app/DeferredHosts.tsx`, gate `growth`) opens the check-in sheet ONCE per calendar day of the
+trader's configured time zone (`openCheckin(day, true)`: **Später** / **Heute überspringen** / **Erledigt**). The decision
+is the pure `decidePrompt` of `@/domain/checkin` (clock injectable: the `now` prop, `setCheckinClock` for the sheet):
+
+- **One record per user and date, on every device**: the outcome (`checkin.status` `done` | `skipped`) lives in the synced
+  day entry (`tj2-days` / the cloud `day` row), so a second device that has synced does not ask again; until its first
+  sync landed (`useSyncStatus` connecting / syncing, at most 12 s) it waits instead of asking for what is already
+  answered. Two offline devices that both answer fall back to the day-entry merge (newer `updatedAt` wins) – one record per day
+  stays. An open prompt closes quietly when another device's outcome arrives and nothing was typed.
+- **The day** is `dayKeyIn(now, tz)` (`Intl`, not device getters): correct at 00:00, on the 23 h / 25 h days of a clock
+  change (tests: 29.03. / 25.10.2026) and when the device zone differs from the configured one.
+- **When it does not ask**: before the intro / onboarding is done (a first run with an empty journal is the tour's), over an
+  editor, the trade detail, a replay, another sheet or dialog (`backStackState().want`), before sync, when the trader
+  switched it off (account: `settings.checkin.prompt`, device: `storageKey("checkin-device")` `{ prompt: false }`).
+- **Später** is per device (`storageKey("checkin-snooze")` `{ day, until }`): until the reminder time (`settings.checkin.reminder`
+  `HH:mm` in the zone) when it is still ahead, else two hours; the next day ignores it.
+- **Fields** (`settings.checkin.fields`, switchable in "Felder und Erinnerung anpassen" inside the sheet): Stimmung, Schlafdauer,
+  Schlafqualität, Stress, Konzentration, Energie, verfügbare Zeit, geplante Session, Tagesrisiko, Kommentar, Gefühle, Gewohnheiten
+  + up to five own questions with a 1–N scale (`custom`). New journals ask the original check-in plus Konzentration. Every value
+  starts unset and stays absent from the record until set – nothing is pre-filled, no health data beyond the trader's own entries.
+- **Honesty of the record** (`dailyCheckinInput`): `firstAt` (never moves), `editedAt` (moves only when an ANSWER changes, not a habit
+  tick), `late` – a check-in saved on a later day than it describes is marked **nachgetragen** (badge in the sheet) and never counts as
+  known at entry. A skipped day is not a check-in (`checkinOf` → `null`, not a streak day, the Heute card says "Heute übersprungen").
+- **Evaluation** (`CheckInInsights`, Psyche section): per day the trades that STARTED AFTER the answers were last changed – count,
+  plan adherence, risk, result in R, quick re-entries (≤ 15 min after the previous exit, only where the exit time is known) –
+  rank-correlated (ρ) with each check-in value; under 8 days a pair stays blank. The card names the sample, what was left out
+  (skipped, nachgetragen, trades before the check-in, no check-in) and says "keine Diagnose, keine Kausalität".
+- **Private**: the data is the day journal; nothing in `src/social`, the community views or the social functions reads it (guarded by a
+  test). `useToday` counts "today" in the configured zone; streaks / habit grids keep the device day.
+
+Tests: `tests/unit/domain.checkin.test.ts` (days, DST, prompt decision, config merge, bookkeeping, evaluation, privacy guard),
+`tests/unit/views.checkin.test.tsx` (host with an injected clock, Später / Überspringen / Erledigt, no second prompt, next day,
+sync / editor gating, late fill, settings, the card), `tests/e2e/checkin.spec.ts` (pinned clock: skip → reload → 23:59 → next day).
