@@ -13,7 +13,7 @@
  * (Markt page marquee).
  */
 import { useEffect, useSyncExternalStore } from "react";
-import { BOX_TF_LABEL, boxesCfgOf, PHASE_LABEL, type BoxesCfg, type BoxPhase, type BoxTf } from "@/domain/boxes";
+import { BOX_TF_LABEL, BOX_TF_MS, boxesCfgOf, PHASE_LABEL, type BoxesCfg, type BoxPhase, type BoxSetup, type BoxTf } from "@/domain/boxes";
 import { useJournal } from "@/store/journalStore";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { pushToast } from "@/store/uiStore";
@@ -41,6 +41,9 @@ export interface BoxAlert {
   kind?: "breakout" | "retest" | "failed" | "target" | "setup" | "scan";
   side?: "long" | "short";
   tf?: BoxTf;
+  /** F32: the setup's own marks (entry, stop, first target) and name; the close (ms) of the candle a phase alert rests on */
+  levels?: { entry: number; stop: number; target: number | null; name: string; kind: string; grade: string; rr: number | null };
+  barClose?: number;
 }
 
 interface AlertCtl {
@@ -88,6 +91,9 @@ function markSeen(key: string): boolean {
 const priceText = (p: number): string => fmt.price(p);
 const dirArrow = (d: number): string => (d > 0 ? "↑" : d < 0 ? "↓" : "");
 
+/** The marks of a setup for the signal archive. */
+const setupLevels = (s: BoxSetup): NonNullable<BoxAlert["levels"]> => ({ entry: s.entry, stop: s.stop, target: s.targets[0]?.price ?? null, name: s.title, kind: s.kind, grade: s.grade, rr: s.rr });
+
 /** German title / detail / tone of a phase alert. */
 export function phaseAlertText(symbol: string, tf: BoxTf, v: BoxesView["tfs"][BoxTf]): Omit<BoxAlert, "id" | "at" | "symbol"> | null {
   const a = v.analysis;
@@ -121,7 +127,7 @@ function fire(alert: BoxAlert, notify: boolean): void {
   pushToast({ kind: "signal", title: alert.title, detail: alert.detail });
   logExternalDelivery("box", alert.title, alert.detail);
   // F32: the setups (and the scanner's A+ rows) are entries one could have taken; the phases are context
-  if (alert.kind) recordSignalEvent({ key: `box|${alert.id}`, at: alert.at, source: "box", kind: alert.kind, entry: alert.kind === "setup" || alert.kind === "scan", symbol: alert.symbol, side: alert.side ?? null, tf: alert.tf ?? null, label: alert.title, detail: alert.detail, strength: null, score: null, ref: alert.id });
+  if (alert.kind) recordSignalEvent({ key: `box|${alert.id}`, at: alert.at, source: "box", kind: alert.kind, entry: alert.kind === "setup" || alert.kind === "scan", symbol: alert.symbol, side: alert.side ?? null, tf: alert.tf ?? null, label: alert.title, detail: alert.detail, strength: null, score: null, ref: alert.id, price: alert.levels?.entry ?? null, stop: alert.levels?.stop ?? null, target: alert.levels?.target ?? null, name: alert.levels?.name ?? null, setupKind: alert.levels?.kind ?? null, grade: alert.levels?.grade ?? null, rr: alert.levels?.rr ?? null, barClose: alert.barClose ?? null });
   ctl.recent = [alert, ...ctl.recent].slice(0, RECENT_MAX);
   for (const l of [...recentListeners]) l();
   if (notify && canNotify() && typeof document !== "undefined" && document.visibilityState !== "visible") {
@@ -155,7 +161,7 @@ export function evaluateBoxes(view: BoxesView, now = Date.now()): BoxAlert[] {
         if (seeding || prevClosed === undefined) markSeen(key);
       } else if (markSeen(key)) {
         const t = phaseAlertText(symbol, tf, v);
-        if (t) out.push({ id: key, at: now, symbol, ...t });
+        if (t) out.push({ id: key, at: now, symbol, ...t, barClose: v.closedAt + BOX_TF_MS[tf] });
       }
     }
   }
@@ -177,6 +183,8 @@ export function evaluateBoxes(view: BoxesView, now = Date.now()): BoxAlert[] {
       kind: "setup",
       side: s.side === "long" ? "long" : "short",
       tf: b.tf,
+      levels: setupLevels(s),
+      ...(view.tfs[b.tf].closedAt != null ? { barClose: view.tfs[b.tf].closedAt! + BOX_TF_MS[b.tf] } : {}),
     });
   }
   ctl.seeded = true;
@@ -223,6 +231,7 @@ function onScan(): void {
         kind: "scan",
         side: r.setup.side === "long" ? "long" : "short",
         tf: r.tf,
+        levels: setupLevels(r.setup),
       },
       cfg.notify,
     );

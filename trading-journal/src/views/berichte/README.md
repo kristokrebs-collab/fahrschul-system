@@ -62,3 +62,9 @@ Only for the week report with the focus „Alles“ (lazy with the page, no new 
   an honest „Kein Vorschlag“. Other report kinds show neither card.
 - Settings key `settings.weekExperiment` (see `@/domain/reports` README); synced like every setting.
 - Tests: `tests/unit/views.berichte.experiment.test.tsx`, `tests/e2e/week-experiment.spec.ts`.
+
+## Monatsnutzen (F60, `MonthBenefitCard.tsx`)
+Only for the month report with the focus „Alles“ (also for a month without trades). „Was hat dir das Journal diesen Monat gebracht?“ from `monthBenefit` (`@/domain/reports/benefit`): trades with a stored Einstiegs-Check / Box context at entry,
+signals the archive recorded and lines the Zustellprotokoll sent, checklist complete / incomplete, logged rule violations, plan followed, days over the day limit, trades over the per-trade limit, the review share, check-in days,
+the accepted weekly experiments of the month's weeks with their reading. A trace that does not reach back to the month's start is flagged. **Not claimed:** avoided rule violations, money „saved“, estimates, causes (the card says so).
+Tests: `reports.benefit.test.ts`, `views.coach.signalchain.test.tsx`, e2e `signal-chain.spec.ts`.

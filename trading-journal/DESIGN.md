@@ -448,3 +448,17 @@ eigenen Einstieg, ist die Annahme weg. Der Editor behält sein Pflichtfeld: ohne
 angeben.“. Fehler nennen den Grund im Klartext (kein Schlüssel / Schlüssel abgelehnt / Modell / Zeitlimit / Antwortformat) und zeigen den
 Fehlercode klein in Mono; die Einstellungen-Karte unterscheidet „kein Schlüssel“ von „Server antwortet nicht“ („Status unbekannt“).
 Keine neuen Tokens, keine neue Bewegung.
+
+## Signal-Kette (F25 · F27 · F28 · F32 · F60)
+
+Fünf Karten im Raster der Coach-Seite (unter „Profil“) und eine im Monatsbericht, alle mit `Card`, `Badge`, `Button`, Filter-Chips (`aria-pressed`,
+≥ 44 px auf grobem Zeiger, gewählt = heller Rand) und Zeilen im Stil `rounded-xl border-line bg-ink-950/50` – keine neue Sprache, keine eigene Bewegung
+(nur die `Reveal`-Zellen der Seite). **Posteingang** (volle Breite, einklappbar; die Wahl bleibt im Browser): Zeile = Zeit (Mono) · Status-`Badge`
+(neu = steel mit Punkt, gehandelt = win, bewusst ausgelassen = warn, angesehen / abgelaufen = mute) · Richtung (Pfeil + Wort, nie Farbe allein) · Markt · Art · Stufe,
+darunter die Überschrift des Signals und vier Aktionen (Ansehen · Ausgelassen – Grund · Im Labor testen · Im Journal verknüpfen); Ausgelassen und Verknüpfen
+klappen eine Auswahl als Chips unter der Zeile auf. Die Reihenfolge steht als Satz unter der Liste. **Verpasste Chancen** trägt je Signal eine `Badge` mit dem
+Ausgang (Ziel zuerst = win, Stopp zuerst = loss, offen = mute, nicht auswertbar = warn – immer mit Wort und, wo es gilt, „gleiche Kerze, Stopp zählt“ /
+„Standardmaß“), darunter der Vergleich verpasster Gewinner und Verlierer als Zeilen mit Quote, Intervall und **immer** Gegenbeispielen. **Bilanz**: je Gruppe ein Block
+(Zahlenpaare als `KV`, die Unsicherheit als Mono-Zeile „n … · Stichprobe … · Quote a … b“), mobil gestapelt statt Tabelle; der Vergleich „deine Trades
+gegen alle Signale“ nennt den Auswahleffekt im Fließtext darunter. **Qualität**: ein Warn-Hinweis „Alarme laufen nur bei offener App“ steht immer oben;
+Unbekanntes heißt „unbekannt“. **Monatsnutzen**: zwei Spalten `KV`-Blöcke, Lücken der Spuren in Warn-Ton, darunter der Satz, was nie behauptet wird.

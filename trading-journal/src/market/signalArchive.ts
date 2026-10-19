@@ -7,7 +7,7 @@
  * wrapper of a NEWER version is never overwritten (the events are kept in memory only).
  */
 import { useSyncExternalStore } from "react";
-import { appendSignalEvent, parseSignalArchive, setSignalWatch, SIGNAL_ARCHIVE_VERSION, type SignalEvent, type SignalEventInput } from "@/domain/missed/archive";
+import { appendSignalEvent, linkSignalTrade, markSignalSeen, parseSignalArchive, setSignalSkip, setSignalWatch, SIGNAL_ARCHIVE_VERSION, type SignalEvent, type SignalEventInput, type SkipReason } from "@/domain/missed/archive";
 import { newId } from "@/lib/ids";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 
@@ -56,6 +56,21 @@ export function recordSignalEvent(input: SignalEventInput): void {
 /** „Beobachten“ on / off for one event. */
 export function setSignalWatched(id: string, watch: boolean): void {
   publish(setSignalWatch(load(), id, watch));
+}
+
+/** Inbox (F28): the trader looked at the event. */
+export function markSeen(id: string): void {
+  publish(markSignalSeen(load(), id, Date.now()));
+}
+
+/** Inbox (F28): „Ausgelassen – Grund“ (`null` takes it back). */
+export function skipSignal(id: string, reason: SkipReason | null): void {
+  publish(setSignalSkip(load(), id, reason, Date.now()));
+}
+
+/** Inbox (F28): links a journal trade to the event (`null` removes the link). */
+export function linkTrade(id: string, tradeId: string | null): void {
+  publish(linkSignalTrade(load(), id, tradeId));
 }
 
 export function clearSignalArchive(): void {

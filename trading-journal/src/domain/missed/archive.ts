@@ -45,9 +45,40 @@ export interface SignalEvent {
   ref: string | null;
   /** the trader marked it „Beobachten“ */
   watch: boolean;
+
+  // ── additive fields (archive version stays 1: a record without them reads as `null`) ──
+  /** the signal's own entry price when the raising code knew one (Box setup); `null` = the next candle's open counts */
+  price: number | null;
+  /** the signal's own stop / first target when it had one (Box setup, an own level's invalidation); `null` = none */
+  stop: number | null;
+  target: number | null;
+  /** ms: close of the candle the signal rests on (for the delay between close and alert); `null` = unknown */
+  barClose: number | null;
+  /** the setup's name, kind (`breakout` · `retest` · `range` …), grade (`A+` …) and CRV when the source has them (Box setup) – what „Diese Idee testen“ needs */
+  name: string | null;
+  setupKind: string | null;
+  grade: string | null;
+  rr: number | null;
+  /** inbox (F28): ms the trader looked at it / left it out on purpose (with the reason) / linked a journal trade by hand */
+  seenAt: number | null;
+  skip: SkipReason | null;
+  skipAt: number | null;
+  tradeId: string | null;
 }
 
-export type SignalEventInput = Omit<SignalEvent, "id" | "watch"> & { id?: string };
+/** Why the trader left a signal out on purpose (short list, so F32 / F36 can learn from it). */
+export const SKIP_REASONS = ["limit", "context", "doubt", "time", "other"] as const;
+export type SkipReason = (typeof SKIP_REASONS)[number];
+export const SKIP_LABEL: Readonly<Record<SkipReason, string>> = {
+  limit: "Risiko- oder Verlustlimit",
+  context: "Marktlage passt nicht",
+  doubt: "Zweifel am Signal",
+  time: "Keine Zeit",
+  other: "Sonstiges",
+};
+
+export type SignalEventInput = Omit<SignalEvent, "id" | "watch" | "price" | "stop" | "target" | "barClose" | "name" | "setupKind" | "grade" | "rr" | "seenAt" | "skip" | "skipAt" | "tradeId"> &
+  Partial<Pick<SignalEvent, "price" | "stop" | "target" | "barClose" | "name" | "setupKind" | "grade" | "rr">> & { id?: string };
 
 const SOURCES: readonly SignalSource[] = ["entry", "box", "key"];
 const fin = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
@@ -74,6 +105,18 @@ function eventOf(v: unknown): SignalEvent | null {
     score: fin(o.score) ? o.score : null,
     ref: typeof o.ref === "string" && o.ref ? o.ref.slice(0, 80) : null,
     watch: o.watch === true,
+    price: fin(o.price) && o.price > 0 ? o.price : null,
+    stop: fin(o.stop) && o.stop > 0 ? o.stop : null,
+    target: fin(o.target) && o.target > 0 ? o.target : null,
+    barClose: fin(o.barClose) ? o.barClose : null,
+    name: typeof o.name === "string" && o.name ? o.name.slice(0, 80) : null,
+    setupKind: typeof o.setupKind === "string" && o.setupKind ? o.setupKind.slice(0, 16) : null,
+    grade: typeof o.grade === "string" && o.grade ? o.grade.slice(0, 4) : null,
+    rr: fin(o.rr) && o.rr > 0 ? o.rr : null,
+    seenAt: fin(o.seenAt) ? o.seenAt : null,
+    skip: SKIP_REASONS.includes(o.skip as SkipReason) ? (o.skip as SkipReason) : null,
+    skipAt: fin(o.skipAt) ? o.skipAt : null,
+    tradeId: typeof o.tradeId === "string" && o.tradeId ? o.tradeId.slice(0, 60) : null,
   };
 }
 
@@ -116,7 +159,7 @@ export function prune(items: readonly SignalEvent[], now: number): SignalEvent[]
 /** Adds one event (newest first). The same `key` is stored once; the list is returned as is when it is a duplicate. */
 export function appendSignalEvent(items: readonly SignalEvent[], input: SignalEventInput, id: string, now: number): readonly SignalEvent[] {
   if (items.some((e) => e.key === input.key)) return items;
-  const ev = eventOf({ ...input, id, watch: false });
+  const ev = eventOf({ ...input, id, watch: false, seenAt: null, skip: null, skipAt: null, tradeId: null });
   if (!ev) return items;
   return prune([ev, ...items].sort((a, b) => b.at - a.at), now);
 }
@@ -124,4 +167,31 @@ export function appendSignalEvent(items: readonly SignalEvent[], input: SignalEv
 /** Sets or clears the „Beobachten“ mark of one event. */
 export function setSignalWatch(items: readonly SignalEvent[], id: string, watch: boolean): readonly SignalEvent[] {
   return items.some((e) => e.id === id && e.watch !== watch) ? items.map((e) => (e.id === id ? { ...e, watch } : e)) : items;
+}
+
+const patch = (items: readonly SignalEvent[], id: string, fn: (e: SignalEvent) => SignalEvent | null): readonly SignalEvent[] => {
+  let changed = false;
+  const next = items.map((e) => {
+    if (e.id !== id) return e;
+    const n = fn(e);
+    if (!n) return e;
+    changed = true;
+    return n;
+  });
+  return changed ? next : items;
+};
+
+/** The trader looked at the event (first time only; a later look keeps the first). */
+export function markSignalSeen(items: readonly SignalEvent[], id: string, at: number): readonly SignalEvent[] {
+  return patch(items, id, (e) => (e.seenAt == null ? { ...e, seenAt: at } : null));
+}
+
+/** „Ausgelassen – Grund“: leaving a signal out on purpose (`reason` null takes the mark back). */
+export function setSignalSkip(items: readonly SignalEvent[], id: string, reason: SkipReason | null, at: number): readonly SignalEvent[] {
+  return patch(items, id, (e) => (e.skip === reason ? null : { ...e, skip: reason, skipAt: reason ? at : null, seenAt: e.seenAt ?? (reason ? at : null) }));
+}
+
+/** Links a journal trade to the event by hand (`tradeId` null removes the link). */
+export function linkSignalTrade(items: readonly SignalEvent[], id: string, tradeId: string | null): readonly SignalEvent[] {
+  return patch(items, id, (e) => (e.tradeId === tradeId ? null : { ...e, tradeId }));
 }
