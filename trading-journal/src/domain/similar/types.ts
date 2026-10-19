@@ -121,6 +121,8 @@ export interface Outcome {
   /** price of the hit's close and of the close after the horizon */
   ref: number;
   last: number;
+  /** price distance of one unit (1 R = the hit's ATR, 1 % = 1 % of `ref`) – to draw ±1 and to convert back */
+  size: number;
 }
 
 export interface SimilarHit {

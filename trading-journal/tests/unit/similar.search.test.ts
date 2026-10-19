@@ -63,7 +63,7 @@ describe("pickHits – hand-computed", () => {
   });
 });
 
-const out = (change: number, o: Partial<Outcome> = {}): Outcome => ({ up: Math.max(0, change), down: Math.max(0, -change), change, dir: change > 0 ? "up" : change < 0 ? "down" : "flat", first: "none", firstBars: null, ref: 100, last: 100, ...o });
+const out = (change: number, o: Partial<Outcome> = {}): Outcome => ({ up: Math.max(0, change), down: Math.max(0, -change), change, dir: change > 0 ? "up" : change < 0 ? "down" : "flat", first: "none", firstBars: null, ref: 100, last: 100, size: 1, ...o });
 const hit = (index: number, change: number, o: Partial<Outcome> = {}): SimilarHit => ({ index, time: T0 + index * H, distance: 0.1 * index, values: {}, outcome: out(change, o) });
 
 describe("summarize – hand-computed", () => {

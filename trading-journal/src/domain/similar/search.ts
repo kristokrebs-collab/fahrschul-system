@@ -75,6 +75,7 @@ export function outcomeAt(closed: readonly SimCandle[], j: number, horizon: numb
     firstBars,
     ref,
     last,
+    size,
   };
 }
 

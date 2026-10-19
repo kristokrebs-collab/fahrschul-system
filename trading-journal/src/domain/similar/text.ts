@@ -80,3 +80,27 @@ export const featureNames = (ids: readonly (keyof typeof FEATURES)[]): string =>
 export function similarityText(r: SimilarResult): string {
   return `Ähnlich heißt: die letzte geschlossene Kerze wird durch ${r.features.length} Merkmal${r.features.length === 1 ? "" : "e"} beschrieben (${featureNames(r.features)}). Als Fundstelle zählt, was nach Abstand am nächsten liegt (höchstens ${de(r.cfg.maxDistance, 1)}), mit mindestens ${horizonText(r.cfg.minGap)} Abstand zwischen zwei Fundstellen.`;
 }
+
+const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"] as const;
+const SESSIONS = ["Wochenende", "Asien", "London", "New York", "Spät"] as const;
+
+/** A feature value as the card shows it (RSI one decimal, ATR distances two, ln-volume as a factor, categories by name). */
+export function featureValueText(id: keyof typeof FEATURES, v: number | null | undefined): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "–";
+  switch (id) {
+    case "weekday":
+      return WEEKDAYS[v] ?? "–";
+    case "session":
+      return SESSIONS[v] ?? "–";
+    case "rsi":
+      return de(v, 1);
+    case "rsiSlope":
+      return `${sign(v)}${de(v, 1)}`;
+    case "volume":
+      return `${de(Math.exp(v), 2)}×`;
+    case "range":
+      return `${de(v, 2)} ATR`;
+    default:
+      return `${sign(v)}${de(v, 2)} ATR`;
+  }
+}
