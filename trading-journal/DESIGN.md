@@ -367,3 +367,16 @@ Pille), aufgeklappt in vier Gruppen (Pflicht · Optional · Widersprüche · Feh
 der Karte reserviert die Zeile (kein Layout-Sprung). Bekannte Abweichung: die `Segmented`-Radios (primitive `COARSE_HIT`-Regel) messen
 im Hit-Box-Audit auf Touch 33 statt 44 px – genauso in der bestehenden Box-Einstellungen-Karte derselben Seite; die neuen Schaltflächen,
 Schalter, Chips und Felder bestehen den Audit.
+
+### Diese Idee testen (F12) und TradingView im Labor (F14)
+
+Keine neue Sprache. **Diese Idee testen** ist ein ruhiger `Button` (ghost, `sm` in Listen) neben den bestehenden Wegen („Als Trade
+eintragen“, „Im Rechner öffnen“); er füllt vor, startet nichts und speichert nichts. Geht aus der Quelle keine Regel hervor, bleibt
+das Labor unverändert und der Grund steht als Satz unter dem Knopf (`role="status"`, `text-mute`), nie als stiller Fehlschlag. Im
+Labor steht darüber die Karte **Idee aus dem Journal** (volle Breite, ein `Card`): drei Listen – *Übernommen*, *Nicht abgebildet*
+(jeder Punkt mit Grund in `text-mute`), *Näherungen und Standardwerte* – mit den Wegen „Vorheriges Setup zurück“ und „Ausblenden“.
+Nicht Abbildbares ist Text, nie ein ausgegrauter Baustein. Der Abschnitt **TradingView** zeigt jeden Weg als Zeile mit `Badge`
+(unterstützt = win, nur Forwardtest über Alert = warn, nicht unterstützt = mute) und den Grenzen in einem Satz; der Vergleich trennt
+Zahlen (Kacheln, Differenz Netto) von Beobachtungen („Mögliche Gründe“, immer im Konjunktiv) und nennt Lesefehler mit „Zeile n“ in
+Signalrot-Text, nie als Dialog. Bewegung: nur die vorhandenen `Reveal`-Zellen, nichts Eigenes. Mobil: alle Listen einspaltig, Paare
+als Karten statt Tabelle (kein horizontaler Scroll), Touch-Ziele über `Button` / `ChipPick` (≥ 44 px bei grobem Zeiger).

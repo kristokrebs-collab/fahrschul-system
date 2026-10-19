@@ -9,6 +9,7 @@ export const LABOR = {
     diagnose: { title: "Diagnose", sub: "Warum das Ergebnis so aussieht, wie es aussieht. Deterministisch gerechnet, ohne KI." },
     robust: { title: "Robustheit", sub: "Hält das Ergebnis auf Daten, die die Optimierung nie gesehen hat?" },
     compare: { title: "Vergleich", sub: "Deine letzten Läufe nebeneinander. Trade the best." },
+    tv: { title: "TradingView", sub: "Was geht und was nicht – und dein Strategietester-Export gegen einen Labor-Lauf." },
   },
   strategies: {
     custom: { title: "Eigene Idee", sub: "Baue deine Regeln aus vielen Bausteinen – mit beliebigen Timeframes", short: "Eigene" },
