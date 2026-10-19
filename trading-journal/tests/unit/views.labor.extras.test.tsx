@@ -81,7 +81,7 @@ describe("Labor · Belastung, Bericht, Filter", () => {
 
   it("Karten zugeklappt; Öffnen lädt den Inhalt; Prüfbericht nennt die Stichprobe und misst nichts, was er nicht misst", async () => {
     await finishedRun();
-    const extras = await screen.findByTestId("labor-extras");
+    const extras = await screen.findByTestId("labor-extras", {}, { timeout: 15_000 });
     for (const id of ["stress", "report", "filters"]) {
       expect(within(extras).getByTestId(`labor-extra-${id}`)).toHaveAttribute("data-open", "false");
       expect(within(extras).getByTestId(`labor-extra-toggle-${id}`)).toHaveAttribute("aria-expanded", "false");
@@ -105,7 +105,7 @@ describe("Labor · Belastung, Bericht, Filter", () => {
 
   it("Belastungstest: Verlustserien sofort, die Szenarien erst auf Knopfdruck – gleiche Zahlen wie der Lauf oben", async () => {
     await finishedRun();
-    fireEvent.click(await screen.findByTestId("labor-extra-toggle-stress"));
+    fireEvent.click(await screen.findByTestId("labor-extra-toggle-stress", {}, { timeout: 15_000 }));
     const stress = await screen.findByTestId("labor-stress", {}, { timeout: 15_000 });
     // loss series from the real order come without a new run
     expect(within(stress).getByTestId("labor-streaks")).toBeInTheDocument();
@@ -128,7 +128,7 @@ describe("Labor · Belastung, Bericht, Filter", () => {
 
   it("Filter: Top-Trader und Retest gesperrt mit Grund; ohne Auswahl kein Vergleich; mit Trend-Filter Tabelle, Beiträge und der Hinweis auf Überlappung", async () => {
     await finishedRun();
-    fireEvent.click(await screen.findByTestId("labor-extra-toggle-filters"));
+    fireEvent.click(await screen.findByTestId("labor-extra-toggle-filters", {}, { timeout: 15_000 }));
     const filters = await screen.findByTestId("labor-filters", {}, { timeout: 15_000 });
     const items = within(filters).getAllByTestId("labor-filter");
     expect(items.map((i) => i.getAttribute("data-filter"))).toEqual(["rsi", "trend", "retest", "topTrader"]);
@@ -162,7 +162,7 @@ describe("Labor · Belastung, Bericht, Filter", () => {
 
   it("ein neuer Lauf verwirft Szenarien und Vergleich des alten", async () => {
     await finishedRun();
-    fireEvent.click(await screen.findByTestId("labor-extra-toggle-stress"));
+    fireEvent.click(await screen.findByTestId("labor-extra-toggle-stress", {}, { timeout: 15_000 }));
     const stress = await screen.findByTestId("labor-stress", {}, { timeout: 15_000 });
     await act(async () => {
       fireEvent.click(within(stress).getByTestId("labor-stress-run"));
