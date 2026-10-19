@@ -9,6 +9,7 @@
 import type { ScreenshotRef } from "@/domain/types";
 import { useJournal } from "@/store/journalStore";
 import { deleteCloudShot } from "./cloud";
+import { isShotPinned } from "./store";
 
 /** Object paths of the cloud screenshots of a trade. */
 export function cloudPathsOf(t: { screenshots?: readonly ScreenshotRef[] } | null | undefined): string[] {
@@ -36,6 +37,7 @@ export async function releaseCloudShots(paths: Iterable<string>): Promise<number
   const s = useJournal.getState();
   if (!s.loaded) return 0;
   for (const t of s.trades) for (const p of cloudPathsOf(t)) want.delete(p);
+  for (const p of [...want]) if (isShotPinned(p)) want.delete(p); // a draft of the screenshot import still waits for it
   let n = 0;
   for (const p of want) {
     try {

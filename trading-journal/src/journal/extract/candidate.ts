@@ -274,7 +274,7 @@ export function buildCandidates(ex: Extraction, ctx: BuildContext): Candidate[] 
     const stopCell = priceCell(t.stop, conf(t, "stop"), style, ctx.fallbackStyle);
     const status = t.status;
     return {
-      id: `c${i}_${Math.random().toString(36).slice(2, 7)}`,
+      id: `c${i}`,
       sources: [...t.sources],
       merged: 1,
       status,

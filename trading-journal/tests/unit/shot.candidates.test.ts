@@ -8,7 +8,7 @@ import { buildCandidates, fillsOf, normalizePair, pairKey, resolveZone, type Bui
 import { checksOf, comparePnl, resolvedPnlMode } from "@/journal/extract/checks";
 import { CONFIDENCE_KEYS, Extraction, type ExtractedTrade } from "@/journal/extract/contract";
 import { findDuplicate } from "@/journal/extract/dedupe";
-import { IMPORT_TAG, shotsFor, toDraft } from "@/journal/extract/draft";
+import { assignShots, IMPORT_TAG, shotsFor, toDraft } from "@/journal/extract/draft";
 import { mergeCandidates, sameTrade } from "@/journal/extract/merge";
 import { attentionRows, editField, rowsOf, setSide } from "@/journal/extract/rows";
 import { parseZone } from "@/journal/extract/time";
@@ -444,5 +444,12 @@ describe("rows and edits", () => {
     expect(shotsFor({ sources: [2, 0] }, all).map((r) => r.id)).toEqual(["c", "a"]);
     expect(shotsFor({ sources: [] }, all)).toHaveLength(3);
     expect(shotsFor({ sources: [9] }, all)).toHaveLength(3);
+  });
+  it("assignShots: pictures nobody claims ride along with the first draft, nothing is lost", () => {
+    const all: ScreenshotRef[] = [{ id: "a", store: "idb" }, { id: "b", store: "idb" }, { id: "c", store: "idb" }, { id: "d", store: "idb" }];
+    const out = assignShots([{ sources: [0] }, { sources: [1] }], all.slice(0, 2), all);
+    expect(out[0]!.map((r) => r.id)).toEqual(["a", "c", "d"]);
+    expect(out[1]!.map((r) => r.id)).toEqual(["b"]);
+    expect(assignShots([{ sources: [0] }], all, all, 2)[0]).toHaveLength(2);
   });
 });

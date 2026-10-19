@@ -159,3 +159,23 @@ function withLegAt(legs: readonly Leg[], qty: number | null): Leg[] {
 }
 
 export const setSide = (c: Candidate, side: Side): Candidate => ({ ...c, side: editedCell(side) });
+
+/** What the trader did in the preview – replayed on freshly built candidates when the time zone choice changes. */
+export type Edit =
+  | { id: string; kind: "field"; key: FieldKey; text: string }
+  | { id: string; kind: "side"; value: Side }
+  | { id: string; kind: "stopOriginal"; value: boolean }
+  | { id: string; kind: "pnlMode"; value: "shot" | "calc" };
+
+export function applyEdits(list: readonly Candidate[], edits: readonly Edit[]): Candidate[] {
+  return list.map((c) =>
+    edits
+      .filter((e) => e.id === c.id)
+      .reduce<Candidate>((acc, e) => {
+        if (e.kind === "field") return editField(acc, e.key, e.text);
+        if (e.kind === "side") return setSide(acc, e.value);
+        if (e.kind === "stopOriginal") return { ...acc, stopOriginal: e.value };
+        return { ...acc, pnlMode: e.value };
+      }, c),
+  );
+}

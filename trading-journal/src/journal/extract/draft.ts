@@ -77,3 +77,15 @@ export function shotsFor(c: Pick<Candidate, "sources">, all: readonly Screenshot
   const picked = c.sources.map((i) => all[i]).filter((r): r is ScreenshotRef => !!r);
   return picked.length ? picked : [...all];
 }
+
+/**
+ * The pictures of each confirmed draft. A trade keeps the pictures it was read from; pictures of the editor that no
+ * confirmed trade claims (a chart, a duplicate the trader skipped) ride along with the FIRST draft, so nothing the
+ * trader attached is lost when the editor is re-seeded. At most `max` pictures per draft.
+ */
+export function assignShots(selected: readonly Pick<Candidate, "sources">[], sent: readonly ScreenshotRef[], all: readonly ScreenshotRef[], max = 12): ScreenshotRef[][] {
+  const own = selected.map((c) => shotsFor(c, sent));
+  const claimed = new Set(own.flat().map((r) => r.id));
+  const extras = all.filter((r) => !claimed.has(r.id));
+  return own.map((list, i) => (i === 0 ? [...list, ...extras] : list).slice(0, max));
+}
