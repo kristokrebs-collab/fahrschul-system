@@ -46,3 +46,19 @@ Phones: one column in the same order, no horizontal scroll at 390 px.
 - App.tsx: `<ReportReadyHost onOpen={() => navigate("berichte")} />` once, as a leaf with `data-layer`.
 - Router: parse `p` of `#berichte?p=<key>` with `berichtePeriodFromQuery` and call `openReport(key)` (the router keeps
   the query of `trades` only today).
+
+## Wochenreview und Wochenexperiment (F37, `WeekReview.tsx`)
+Only for the week report with the focus „Alles“ (lazy with the page, no new chunk).
+- **`WeekReviewCard`** (7): four findings from `weekReview` – Ergebnis nach Kosten · Setups · Disziplin · Unsicherheit – each with
+  its sample (`n`) and evidence buttons („Bester Trade · 1 Trade öffnen“, „Regelverstöße · 2 Trades öffnen“ …) that expand into
+  trade rows (`TradeList` → trade detail). A week without trades says so.
+- **`ExperimentCard`** (5): (1) „Experiment dieser Woche“ – the experiment the trader accepted for the displayed week, read
+  against the journal: status pill (erfüllt · nicht erfüllt · zu wenig Daten · läuft), Sollwert, Ist, Stichprobe („n 6 · min. 5“),
+  the sentence of the reading and the trades that count against the target. Shown even for a week without trades („zu wenig
+  Daten“). (2) „Für nächste Woche“ – ONE hypothesis from the coach's plan with the target sentence („Nächste Woche: Revenge-Trade:
+  0 – bei mindestens 5 Trades.“), the same measure in this week, the assumption behind it (labelled as not testable in a week),
+  the evidence trades, and **Experiment annehmen** / **Ablehnen** – both the trader's click, both reversible („Zurückziehen“,
+  „Wieder öffnen“). Offered only while the next week is not over and the report week has trades; no measurable recommendation →
+  an honest „Kein Vorschlag“. Other report kinds show neither card.
+- Settings key `settings.weekExperiment` (see `@/domain/reports` README); synced like every setting.
+- Tests: `tests/unit/views.berichte.experiment.test.tsx`, `tests/e2e/week-experiment.spec.ts`.

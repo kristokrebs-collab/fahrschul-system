@@ -8,6 +8,7 @@
  *   Leaks & Edges (12)      edges with confidence meters, leaks with a red sweep, what-if, evidence
  *   Plan (5) · Timeline (7) the three strongest steps (pinnable) · every detected pattern, newest first
  *   Profil (12)             Personal Trading Intelligence, the traits orbiting
+ *   Verpasste Chancen (12)  signals of the app without a journal trade (F32, honest about the archive that starts empty)
  *
  * Cells reveal once (`Reveal`, ends at `transform: none`). Registered by the integrator (P14) as page `coach`.
  */
@@ -24,6 +25,7 @@ import { useUi, type AccFilter } from "@/store/uiStore";
 import { SEG_TOUCH } from "@/views/insights/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ChatCard } from "./ChatCard";
+import { MissedCard } from "./MissedCard";
 import { EdgesCard } from "./EdgesCard";
 import { HeroCard } from "./HeroCard";
 import { useCoach } from "./hooks";
@@ -79,6 +81,9 @@ export function CoachView({ className }: { className?: string }) {
       </Cell>
       <Cell index={0} span="lg:col-span-12">
         <ProfileCard profile={c.profile} />
+      </Cell>
+      <Cell index={0} span="lg:col-span-12">
+        <MissedCard list={view.list} now={now} />
       </Cell>
     </div>
   );

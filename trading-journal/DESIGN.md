@@ -367,3 +367,17 @@ Pille), aufgeklappt in vier Gruppen (Pflicht · Optional · Widersprüche · Feh
 der Karte reserviert die Zeile (kein Layout-Sprung). Bekannte Abweichung: die `Segmented`-Radios (primitive `COARSE_HIT`-Regel) messen
 im Hit-Box-Audit auf Touch 33 statt 44 px – genauso in der bestehenden Box-Einstellungen-Karte derselben Seite; die neuen Schaltflächen,
 Schalter, Chips und Felder bestehen den Audit.
+
+### Wochenreview, Wochenexperiment (F37) und Verpasste Chancen (F32)
+
+Keine neue Sprache. **Wochenreview**: eine `Card`, darin vier Befunde als ruhige Blöcke (`rounded-xl border-line bg-ink-950/50`): Mono-Versal-Titel
+und die Stichprobe („n 6“) in einer Zeile, darunter der eine Satz, der zählt (Ton nur nach Vorzeichen des Ergebnisses, die Unsicherheit bleibt
+immer `mute`), die Zahlen als Fließtext in `text-mute`. Zu jedem Befund öffnen Pillen-Schaltflächen („Regelverstöße · 2 Trades öffnen“,
+`aria-expanded`) die Trades als Zeilen – kein Dauer-Auf, keine Bewegung außer dem Aufklappen. **Wochenexperiment**: der Status ist ein Badge
+mit Punkt **und** Wort (erfüllt = win, nicht erfüllt = loss, zu wenig Daten = mute, läuft = warn), nie Farbe allein; der Sollwert steht als
+eigener Satz in einem umrandeten Feld („Nächste Woche: … – bei mindestens 5 Trades.“). „Annehmen“ ist der einzige primäre Knopf der Karte,
+„Ablehnen“ ghost; beides ist umkehrbar („Zurückziehen“, „Wieder öffnen“). Die Annahme hinter dem Vorschlag steht in `text-faint` und ist als
+„in einer Woche nicht prüfbar“ gekennzeichnet. **Verpasste Chancen** (Coach-Seite, 12 Spalten): Leerzustand mit `EmptyState` (ohne Statuszeile),
+sonst eine Kennzahlenzeile und Signalzeilen mit Zeit (Mono), Richtung (▲ Long / ▼ Short), Quelle (Badge), Markt · Zeiteinheit und den zwei
+Knöpfen „Im Labor testen“ / „Beobachten“ (`aria-pressed`); die Einschränkungen („bewusst ausgelassen oder übersehen“, kein Ausgang gespeichert,
+keine Ursache) stehen unter einer Trennlinie in `text-faint`, nie versteckt. Bewegung: nur die Zellen-`Reveal`s der Seiten, keine neuen Tokens.

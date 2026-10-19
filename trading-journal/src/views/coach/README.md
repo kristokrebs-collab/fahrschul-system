@@ -13,6 +13,7 @@ an API key; the optional AI wording (`ask.ts`) only rephrases numbers that were 
 | Leaks & Edges | `EdgesCard` (12) |
 | Plan · Timeline | `PlanCard` (5) · `TimelineCard` (7) |
 | Profil | `ProfileCard` (12) |
+| Verpasste Chancen | `MissedCard` (12) – F32 |
 
 Phones: one column in the same order, no horizontal scroll at 390 px. Every cell is a `Reveal` (ends at
 `transform: none`).
@@ -50,6 +51,13 @@ Phones: one column in the same order, no horizontal scroll at 390 px. Every cell
 - **Profil** (`ProfileCard.tsx`): Personal Trading Intelligence – strengths, weaknesses, best time / asset / setup, the
   traits orbiting (`OrbitSpread`, focusable group) around „Du.“ – the headline stands once, above the trait list; under
   `sm` the ring rests without its cards (the list carries every value). Under 10 trades an empty state.
+
+- **Verpasste Chancen** (`MissedCard.tsx`, F32): signals of the app (valid entry, Box-Setup, confirmed own key level) the journal holds no trade for –
+  „regelgerecht, nicht gehandelt“ (`@/domain/missed`, see its README). Rows: time, side, source, market · timeframe, the headline the trader
+  saw, **Im Labor testen** (opens the Labor page; no draft yet) and **Beobachten** (a mark, persisted). The archive starts empty: the
+  card says what is stored from now on (this device, 300 events / 120 days, only while the app is open) and that the past cannot be added.
+  It states plainly that traits of the missed signals are NOT set against comparable failures – a missed signal has no stored outcome –
+  and names the sample; no cause is claimed.
 
 ## Watcher, trade panel, state
 - `CoachWatcher.tsx`: **`useCoachWatch()` / `CoachWatcher`** – after a save, `coachAlert` (pure, domain) compares the

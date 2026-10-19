@@ -7,7 +7,7 @@
  *   toolbar (12)       kind · ‹ period › · "Neuester" / "Laufend" · focus chips (the hero's split flap rolls along)
  *   Hero (8) · side (4) report hero (net, figures, curve with strip wipe, highlights) · Export + Archiv
  *   sections (focus)   Performance (7) · Vergleich (5) · Strategie (7) · Risiko (5) · Psychologie (6) · Fehler (6) ·
- *                      Zielerreichung (12)
+ *                      Zielerreichung (12) · week report only: Wochenreview (7) · Wochenexperiment (5) (F37)
  *
  * Opening a finished report marks it seen (`settings.coach.reports.seen`, after a short look – flipping through does
  * not count). Registered by the integrator (P14) as page `berichte`.
