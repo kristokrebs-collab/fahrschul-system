@@ -16,9 +16,11 @@ import { Sheet, StaggerItem } from "@/motion/Sheet";
 import { Button } from "@/primitives/Button";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
+import { useDiagnosis } from "@/views/labor/DiagnosisCard";
 import { Chip, EntryView } from "./AssistantAnswer";
 import { useConversation } from "./conversation";
 import { execute, replyText, respond, type EngineEnv, type Reply } from "./engine";
+import { summarizeLab } from "./labSummary";
 import { GlyphMic, GlyphSpeaker, GlyphStop } from "./icons";
 import { forgetAll, learnInterest, setSpeak, type AnswerStyle } from "./memory";
 import { closeAssistant, useAssistantOpen } from "./open";
@@ -127,6 +129,9 @@ function AssistantBody() {
   const { settings, view, events, days } = base;
   const clock = useMinuteClock();
 
+  const diagnosis = useDiagnosis();
+  const lab = useMemo(() => summarizeLab(diagnosis), [diagnosis]);
+
   useEffect(() => conv.getState().hydrate(settings), [conv, settings]);
 
   const data: AnswerData = useMemo(() => ({ closed: view.closed, settings, events, now: clock, currency: settings.currency, start: view.start }), [view, settings, events, clock]);
@@ -143,14 +148,14 @@ function AssistantBody() {
         mem: conv.getState().mem,
         signal: sig,
         recs: () => analyse(view, settings, events, days, Date.now()).recs,
-        lab: null,
+        lab,
         go: (p) => navigate(p),
         newTrade: () => openEditor(),
         setMem: (fn) => conv.getState().setMem(fn),
         now: Date.now(),
       };
     },
-    [conv, data, sig, view, settings, events, days, openEditor],
+    [conv, data, sig, view, settings, events, days, openEditor, lab],
   );
 
   const ask = useCallback(
