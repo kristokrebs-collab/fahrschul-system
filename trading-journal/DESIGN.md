@@ -446,3 +446,13 @@ Zeiger, mobil zwei Zeilen statt Tabelle, kein horizontaler Scroll), Gegenbeispie
 steht statt der Verteilung ein ruhiger Kasten „Zu wenig Daten“ – nie eine Quote. Die Hinweise (keine Prognose, Mehrfachtest) sind ein
 fester Kasten am Ende, nicht wegklickbar. Das Fundstellen-Sheet nutzt `Sheet` + Replay-Chart + `ScrubTimeline` unverändert; es öffnet
 auf der Situation und zeigt den Verlauf erst, wenn man abspielt oder zieht. Keine eigene Bewegung der Karte.
+
+### Passt zu dir? (F49)
+
+Eine `Card` im Raster des Labors (`lg:col-span-12`) unter der Diagnose, eigene Sektion „Passt zu dir?“. Oben eine Zeile Stichprobe (Idee: n Trades,
+Zeitraum · Journal: n Trades) in `text-faint`. Darunter drei Gruppen mit `Label` und Punkt: **Reibungspunkte** (Warn-Punkt, `Badge tone="warn"`),
+**Übereinstimmungen** (Aqua-Punkt, `Badge tone="teal"`), **Nicht beurteilbar** (neutral, `Badge tone="mute"`) – Reibung ist kein Verlust-Ton, weil es
+keine Wertung ist. Jeder Eintrag ist eine `rounded-xl border-line`-Zeile: Badge + Thema, ein Satz mit den Zahlen in `text-mute`, die beiden Zahlen
+(Idee | Du) als zweispaltige `dl` in Mono (mobil untereinander), darunter der Vorbehalt dieser Aussage in `text-faint`. Es gibt keine Gesamtnote,
+kein Gauge, keine Ampel. Ein fester Kasten am Ende sagt, dass es ein Zahlenabgleich aus der Vergangenheit ist. Leerzustände sind ein ruhiger Kasten mit
+der konkreten Zahl („Dein Journal hat 7 Trades abgeschlossen. Ab 20 …“). Keine eigene Bewegung (die Zelle blendet ein).

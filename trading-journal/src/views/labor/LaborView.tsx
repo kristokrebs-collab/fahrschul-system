@@ -3,6 +3,7 @@
  *   Versuchsaufbau  ConfigCard (7, with "Eigene Idee" 8) · AssumptionsCard (5, 4)
  *   Lauf            RunCard (7) · TradesCard (5)
  *   Diagnose        DiagnosisCard (12)                                                        (after a run)
+ *   Passt zu dir?   FitCard (12): the run against the journal (F49)                        (after a run, lazy)
  *   Belastung …     ExtrasSection (12): stress scenarios, Prüfbericht, filter comparison      (after a run, lazy)
  *   Robustheit      OverfitCard (5) · OosCard (7) · WalkForwardCard (7) · HeatmapCard (5)     (after a run)
  *   Vergleich       CompareRunsCard (8) · ReferenceCard (4)                                   (after a run)
@@ -31,6 +32,8 @@ import { Cell, SectionTitle } from "./ui";
 
 /** F20 / F18 / F17: its own chunk, fetched only when a finished run is on the page. */
 const ExtrasSection = lazy(() => import("./ExtrasSection"));
+/** F49: „Passt zu dir?“ – the run against the journal; its own chunk (profile, comparison, texts). */
+const FitCard = lazy(() => import("./FitCard"));
 /** F14: adapter status + TradingView export comparison – its own chunk (the CSV reader and the comparison load with it). */
 const TvSection = lazy(() => import("./TvSection"));
 
@@ -54,7 +57,7 @@ export function LaborView({ className }: { className?: string }) {
   const custom = useLabor((s) => s.cfg.strategy === "custom");
   const hasIdea = useLabor((s) => s.idea != null);
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), diagnose: useId(), extras: useId(), robust: useId(), compare: useId(), tv: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), robust: useId(), compare: useId(), tv: useId() };
   const T = LABOR.sections;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
@@ -86,6 +89,15 @@ export function LaborView({ className }: { className?: string }) {
         <Section id={ids.diagnose} title={T.diagnose.title} sub={T.diagnose.sub}>
           <Cell index={0} span="lg:col-span-12">
             <DiagnosisCard />
+          </Cell>
+        </Section>
+      )}
+      {hasResult && !busy && (
+        <Section id={ids.fit} title={T.fit.title} sub={T.fit.sub}>
+          <Cell index={0} span="lg:col-span-12">
+            <Suspense fallback={null}>
+              <FitCard />
+            </Suspense>
           </Cell>
         </Section>
       )}

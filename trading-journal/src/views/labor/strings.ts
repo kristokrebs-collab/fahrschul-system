@@ -7,6 +7,7 @@ export const LABOR = {
     setup: { title: "Versuchsaufbau", sub: "Strategie, Markt und Kosten wählen. Gerechnet wird nur auf geschlossenen Kerzen." },
     run: { title: "Lauf", sub: "Deine Parameter über den ganzen Zeitraum." },
     diagnose: { title: "Diagnose", sub: "Warum das Ergebnis so aussieht, wie es aussieht. Deterministisch gerechnet, ohne KI." },
+    fit: { title: "Passt zu dir?", sub: "Was die getestete Idee von dir verlangt – gegen das, was dein Journal zeigt. Ein Zahlenabgleich, kein Urteil." },
     extras: { title: "Belastung, Bericht, Filter", sub: "Was hält das Ergebnis aus, was fehlt an der Prüfung, was bringt jeder Filter? Aufklappen, wenn du es brauchst." },
     robust: { title: "Robustheit", sub: "Hält das Ergebnis auf Daten, die die Optimierung nie gesehen hat?" },
     compare: { title: "Vergleich", sub: "Deine letzten Läufe nebeneinander. Trade the best." },
@@ -104,6 +105,15 @@ export const LABOR = {
   compareBest: "Bester Lauf",
   clearRuns: "Läufe leeren",
   /** "Warum so schwach?" (F73) */
+  fit: {
+    title: "Passt zu dir?",
+    note: "Der Lauf gegen dein Journal: Trefferquote, Haltedauer, Verlustserien, Drawdown, Frequenz, Zeitfenster, Risiko und Regeltreue – mit beiden Zahlen nebeneinander. Es gibt keine Gesamtnote und keine Empfehlung.",
+    kind: { friction: "Reibung", match: "Passt", unknown: "Nicht beurteilbar" },
+    group: { friction: "Reibungspunkte", match: "Übereinstimmungen", unknown: "Nicht beurteilbar" },
+    sampleIdea: (name: string, n: number, from: string, to: string) => `Idee „${name}“: ${n} Trades im Test (${from} bis ${to}).`,
+    sampleJournal: (n: number) => `Dein Journal: ${n} abgeschlossene Trades (alle Konten und Märkte).`,
+    caveat: "Das ist ein Abgleich von Zahlen aus der Vergangenheit. Er sagt nicht, ob du die Idee handeln solltest, und er sagt nicht voraus, wie du sie handeln würdest. Zeiten in UTC; jede Aussage gilt nur für die genannte Stichprobe.",
+  },
   diagnosis: {
     title: "Warum so schwach?",
     note: "Beobachtungen aus diesem Lauf, jede mit ihren Zahlen. Das sind Hinweise, keine bewiesenen Ursachen.",

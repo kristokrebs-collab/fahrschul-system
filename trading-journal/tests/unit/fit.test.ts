@@ -4,19 +4,12 @@
  * are built FROM UTC instants so the tests do not depend on the time zone.
  */
 import { describe, expect, it } from "vitest";
-import { compareFit, drawdownDepth, journalProfile, strategyFacts, type FitRunInput } from "@/domain/fit";
+import { compareFit, drawdownDepth, journalProfile, strategyFacts } from "@/domain/fit";
 import type { BehaviorEvent } from "@/domain/coach/events";
 import { COACH_SETTINGS, ct, enrichC } from "./coach.fixtures";
+import { D, H, MON, idea, journalRaw, local } from "./fit.fixtures";
 
-const H = 3_600_000;
-const D = 24 * H;
-const MON = Date.UTC(2026, 0, 5); // Monday 2026-01-05 00:00 UTC
-
-const local = (ms: number): string => {
-  const d = new Date(ms);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-};
+const journalE = (o: { exits?: boolean; followed?: boolean } = {}) => enrichC(journalRaw(o));
 
 describe("drawdownDepth – hand-computed", () => {
   it("cumulative 1, −1, −2, 1, −3 → peak 1, trough −3 → 4", () => {
@@ -28,20 +21,6 @@ describe("drawdownDepth – hand-computed", () => {
     expect(drawdownDepth([])).toBe(0);
   });
 });
-
-/** Ten trades of an idea: W L L L W L W L L L with +2 / −1 R; six on Mondays 08:00 UTC (London), four on Saturdays 10:00 UTC. */
-function idea(): FitRunInput {
-  const signs = [1, -1, -1, -1, 1, -1, 1, -1, -1, -1];
-  const entries = [MON + 8 * H, MON + 5 * D + 10 * H, MON + 7 * D + 8 * H, MON + 12 * D + 10 * H, MON + 14 * D + 8 * H, MON + 19 * D + 10 * H, MON + 21 * D + 8 * H, MON + 26 * D + 10 * H, MON + 28 * D + 8 * H, MON + 35 * D + 8 * H];
-  return {
-    name: "Test-Idee",
-    from: MON,
-    to: MON + 28 * D,
-    riskPct: 2,
-    maxDD: 0.06,
-    trades: entries.map((t, i) => ({ entryTime: t, exitTime: t + (i + 1) * H, r: signs[i]! > 0 ? 2 : -1, pnl: signs[i]! > 0 ? 200 : -100 })),
-  };
-}
 
 describe("strategyFacts – hand-computed", () => {
   const s = strategyFacts(idea());
@@ -74,39 +53,12 @@ describe("strategyFacts – hand-computed", () => {
   });
 });
 
-/**
- * 24 closed trades, four weeks, Tuesday / Wednesday / Thursday at 14:00 and 16:00 UTC (New York), W L W L … (+2 R / −1 R),
- * each held 1 h, risk 100 on a 10 000 account (1 %), every trade with a stop; the first 20 marked „Plan befolgt“, 4 not.
- */
-function journal(opts: { exits?: boolean; followed?: boolean } = {}) {
-  const { exits = true, followed = true } = opts;
-  const ts = [];
-  let i = 0;
-  for (let w = 0; w < 4; w++) {
-    for (const day of [1, 2, 3]) {
-      for (const hour of [14, 16]) {
-        const at = MON + (w * 7 + day) * D + hour * H;
-        ts.push(
-          ct(local(at), {
-            id: `f${i}`,
-            p: i % 2 === 0 ? 200 : -100,
-            ...(exits ? { exitDate: local(at + H) } : {}),
-            followedPlan: followed ? i < 20 : null,
-          }),
-        );
-        i++;
-      }
-    }
-  }
-  return enrichC(ts);
-}
-
 describe("journalProfile – hand-computed", () => {
   const events: BehaviorEvent[] = [
     { key: "stopMoved", tradeIds: ["f3", "f9"], at: 0, severity: 2 },
     { key: "revenge", tradeIds: ["f4"], at: 0, severity: 2 },
   ];
-  const j = journalProfile(journal(), COACH_SETTINGS, events);
+  const j = journalProfile(journalE(), COACH_SETTINGS, events);
   it("12 wins of 24, longest losing run 1, drawdown 1 R", () => {
     expect(j.n).toBe(24);
     expect(j.win.k).toBe(12);
@@ -139,7 +91,7 @@ describe("journalProfile – hand-computed", () => {
     expect(j.discipline.followed.n).toBe(24);
   });
   it("open trades are not part of the profile", () => {
-    const withOpen = [...journal(), ...enrichC([ct(local(MON + 30 * D), { id: "open1", status: "open", p: 0 })])];
+    const withOpen = [...journalE(), ...enrichC([ct(local(MON + 30 * D), { id: "open1", status: "open", p: 0 })])];
     expect(journalProfile(withOpen, COACH_SETTINGS).n).toBe(24);
   });
 });
@@ -147,7 +99,7 @@ describe("journalProfile – hand-computed", () => {
 describe("compareFit – hand-computed", () => {
   const s = strategyFacts(idea());
   const events: BehaviorEvent[] = [{ key: "stopMoved", tradeIds: ["f3", "f9"], at: 0, severity: 2 }];
-  const j = journalProfile(journal(), COACH_SETTINGS, events);
+  const j = journalProfile(journalE(), COACH_SETTINGS, events);
   const r = compareFit(s, j);
   const by = (id: string) => r.items.find((i) => i.id === id)!;
 
@@ -207,14 +159,14 @@ describe("compareFit – hand-computed", () => {
   });
 
   it("an idea shaped like the journal matches everywhere (and discipline matches without moved stops)", () => {
-    const jj = journalProfile(journal(), COACH_SETTINGS);
+    const jj = journalProfile(journalE(), COACH_SETTINGS);
     const mirror = strategyFacts({
       name: "Spiegel",
       from: jj.from!,
       to: jj.to!,
       riskPct: 1,
       maxDD: 0.02,
-      trades: journal().map((t, i) => ({ entryTime: new Date(t.date).getTime(), exitTime: new Date(t.exitDate!).getTime(), r: t.r!, pnl: i % 2 === 0 ? 200 : -100 })),
+      trades: journalE().map((t, i) => ({ entryTime: new Date(t.date).getTime(), exitTime: new Date(t.exitDate!).getTime(), r: t.r!, pnl: i % 2 === 0 ? 200 : -100 })),
     });
     const m = compareFit(mirror, jj);
     expect(m.items.map((i) => `${i.id}:${i.kind}`)).toEqual(["winRate:match", "hold:match", "streak:match", "drawdown:match", "frequency:match", "window:match", "risk:match", "discipline:match"]);
@@ -230,7 +182,7 @@ describe("compareFit – honest empty states and unknowns", () => {
     expect(r.reason).toMatch(/noch keinen abgeschlossenen Trade/);
   });
   it("19 trades are too few (the reason names the number and the threshold)", () => {
-    const r = compareFit(s, journalProfile(journal().slice(0, 19), COACH_SETTINGS));
+    const r = compareFit(s, journalProfile(journalE().slice(0, 19), COACH_SETTINGS));
     expect(r.status).toBe("journalFew");
     expect(r.reason).toContain("19 Trades");
     expect(r.reason).toContain("Ab 20");
@@ -238,11 +190,11 @@ describe("compareFit – honest empty states and unknowns", () => {
   });
   it("an idea with fewer than 10 trades is not compared; none at all neither", () => {
     const small = strategyFacts({ ...idea(), trades: idea().trades.slice(0, 9) });
-    expect(compareFit(small, journalProfile(journal(), COACH_SETTINGS)).status).toBe("strategyFew");
-    expect(compareFit(null, journalProfile(journal(), COACH_SETTINGS)).status).toBe("strategyFew");
+    expect(compareFit(small, journalProfile(journalE(), COACH_SETTINGS)).status).toBe("strategyFew");
+    expect(compareFit(null, journalProfile(journalE(), COACH_SETTINGS)).status).toBe("strategyFew");
   });
   it("a statement without enough journal data is „nicht beurteilbar“ with the reason, never a guess", () => {
-    const r = compareFit(s, journalProfile(journal({ exits: false }), COACH_SETTINGS));
+    const r = compareFit(s, journalProfile(journalE({ exits: false }), COACH_SETTINGS));
     const hold = r.items.find((i) => i.id === "hold")!;
     expect(hold.kind).toBe("unknown");
     expect(hold.text).toContain("0 eine Ausstiegszeit");
@@ -250,7 +202,7 @@ describe("compareFit – honest empty states and unknowns", () => {
     expect(r.items.filter((i) => i.kind !== "unknown").length).toBe(7);
   });
   it("without „Plan befolgt“ answers that part is left out and said so", () => {
-    const r = compareFit(s, journalProfile(journal({ followed: false }), COACH_SETTINGS));
+    const r = compareFit(s, journalProfile(journalE({ followed: false }), COACH_SETTINGS));
     const d = r.items.find((i) => i.id === "discipline")!;
     expect(d.text).toContain("liegen nur 0 Angaben vor");
     expect(d.evidence.map((e) => e.label)).not.toContain("Plan befolgt (laut dir)");

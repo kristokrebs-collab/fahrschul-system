@@ -87,3 +87,13 @@ chosen (UTC … UTC+3) and the file is compared with the SHOWN lab run (`compare
 execution bar of tolerance), common period only, open trades left out, net difference (all compared / paired only) next to the
 unit-free sum of price moves, and observations on possible reasons (costs, position size, order of high / low inside a candle,
 delay, unpaired trades) – each backed by figures and phrased as "kann", never as a proven cause. See `src/domain/tvimport/README.md`.
+
+## Passt zu dir? (F49)
+Section `Passt zu dir?` (`labor-fit`, lazy chunk `FitCard.tsx`) between the diagnosis and the extras, only with a finished run. The shown
+run's trades (`strategyFacts`) are held against the journal (`journalProfile` over `useEnriched()` + the coach's behaviour events,
+`compareFit`; all in `@/domain/fit`, see its README): win rate, time in a trade, losing runs, drawdown depth, trade frequency, time windows
+(UTC), risk per trade, rule discipline. Three groups – **Reibungspunkte** (`fit-group-friction`), **Übereinstimmungen** (`fit-group-match`),
+**Nicht beurteilbar** (`fit-group-unknown`) – each item (`fit-item`, `data-id`, `data-kind`) with a `Badge`, one sentence with the
+numbers, the two figures side by side and its own caveat. No score, no recommendation; with fewer than 20 closed journal trades (or < 10
+trades in the run) the card is an honest empty state (`fit-empty`, `data-status`) that names the numbers. It reads `useLabor` (`result`,
+`runCfg`) and the journal and changes neither. Tests: `views.labor.fit.test.tsx`, `fit.test.ts`, e2e `fit.spec.ts`.
