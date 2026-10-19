@@ -229,8 +229,10 @@ test.describe("Chart spiegeln", () => {
       .poll(
         async () => {
           const now = (await snapshot(page)).centres;
-          // the live picture of before the test (the frozen one lacks the forming candle, which can move the price range)
-          return Object.keys(before.centres).every((id) => Math.abs((before.centres[id] ?? 0) - (now[id] ?? 1e9)) < 2);
+          // the live boxes are where they were before the test; a box id that existed only transiently (the first
+          // computation from the REST candles, replaced by the ":live" one once the stream is in) is not compared
+          const ids = Object.keys(now).filter((id) => id in before.centres);
+          return ids.length > 0 && ids.every((id) => Math.abs((before.centres[id] ?? 0) - (now[id] ?? 1e9)) < 2);
         },
         { timeout: 20_000 },
       )
