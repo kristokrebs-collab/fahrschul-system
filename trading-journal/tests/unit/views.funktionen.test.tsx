@@ -55,6 +55,28 @@ describe("Funktionen page", () => {
     expect(screen.getByTestId("feature-results")).toHaveTextContent(`${FEATURE_COUNT} Funktionen`);
   });
 
+  it("shows the functions built after the first register, each with its honest status", () => {
+    renderPage();
+    const status = (id: string) => cards().find((c) => c.getAttribute("data-feature") === id)?.getAttribute("data-status");
+    const expected: Record<string, string> = {
+      "strategie-bibliothek": "teilweise",
+      "indikator-bausteine": "teilweise",
+      "pine-export": "fertig",
+      "parameter-raster": "fertig",
+      "forward-test": "fertig",
+      "entwurf-versionen": "fertig",
+      "playbook-austausch": "teilweise",
+      "aehnliche-situationen": "fertig",
+      "passt-zu-dir": "teilweise",
+      "signal-posteingang": "teilweise",
+      "signal-ausgang": "fertig",
+      signalbilanz: "teilweise",
+      "daten-alarmqualitaet": "teilweise",
+      monatsnutzen: "fertig",
+    };
+    for (const [id, st] of Object.entries(expected)) expect(status(id), id).toBe(st);
+  });
+
   it("shows status, plan, benefit and what is missing on each card – nothing 'teilweise' without its gap", () => {
     renderPage();
     const labor = screen.getAllByTestId("feature-card").find((c) => c.getAttribute("data-feature") === "labor")!;
