@@ -25,7 +25,7 @@ import {
 } from "../../lab/rules/tree";
 import { TRUE, UNKNOWN, type CustomConfig, type Group, type Node, type StopCfg, type TfId } from "../../lab/rules/types";
 import { atrSeries } from "../bars";
-import type { Bar, BarsBy, BtSide, BtStrategy, EntrySignal, HistInterval, PositionMgmt } from "../types";
+import type { Bar, BarsBy, BtSide, BtStrategy, EntrySignal, FundingPoint, HistInterval, PositionMgmt } from "../types";
 import { mcbLadder, type McbFacts, type McbStep } from "./mcbLadder";
 import type { FunnelNode, LabStrategy, ParamSpec, Params, Prepared, Stepper, StrategyFunnel, StrategyVariant } from "./types";
 
@@ -33,6 +33,8 @@ export interface CustomCfgIn {
   config: CustomConfig;
   /** the app's MCB / signal setting: WaveTrend parameters, swing size, ladder */
   signal: SignalCfg;
+  /** the funding history of the run (only when it has one) – the block "Funding-Extrem" reads it */
+  funding?: readonly FundingPoint[] | null;
 }
 
 export interface CustomFacts {
@@ -174,7 +176,7 @@ export const customStrategy: LabStrategy<CustomFacts, CustomCfgIn> = {
           if (!ladderStep.step(deadline)) return false;
           ladder = ladderStep.result().facts;
         }
-        if (!leafStep) leafStep = evaluateLeaves(leaves, { exec: { tf: cfg.interval, bars }, other }, c.signal, ladder);
+        if (!leafStep) leafStep = evaluateLeaves(leaves, { exec: { tf: cfg.interval, bars }, other }, c.signal, ladder, c.funding ?? null);
         if (!leafStep.step(deadline)) return false;
         result = finish(leafStep.result());
         return true;

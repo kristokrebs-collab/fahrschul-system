@@ -8,119 +8,17 @@
  * equal to `luxZone`), the RSI trendline (`@/domain/boxes/rsiLines`, evaluated on the window ending at every bar).
  */
 import { rsiLines, DEFAULT_RSI_LINE_CFG } from "../../boxes/rsiLines";
-import { DEFAULT_SIGNAL_CFG, type SignalCfg } from "../../signals/config";
-import { ema, rolling, rsi as rsiOf, sma, waveTrend, type Bar } from "../../signals/indicators";
+import type { SignalCfg } from "../../signals/config";
+import { rolling, rsi as rsiOf, sma, waveTrend } from "../../signals/indicators";
 import { mcbEvents, type WtKind } from "../../signals/mcb";
 import { atr as atrOf } from "../../signals/structure";
 import { zoneOf } from "../../signals/zones";
-import type { McbFacts } from "../../backtest/strategies/mcbLadder";
-import { loopStepper, type Stepper } from "../../backtest/strategies/types";
+import { loopStepper } from "../../backtest/strategies/types";
 import { bollingerSeries, luxZoneSeries, macdSeries, percentRank, triFrom, withinBars } from "./indicators";
-import { FALSE, TRUE, UNKNOWN, type BlockId, type Family, type LeafParams, type ParamDef } from "./types";
-
-/** What a block evaluates on. */
-export interface EvalCtx {
-  bars: readonly Bar[];
-  n: number;
-  /** the app's MCB / signal setting (WaveTrend parameters, RSI MA length, swing size …) */
-  signal: SignalCfg;
-  /** prepared MCB ladder verdicts per execution bar (only on the execution series) */
-  ladder: McbFacts | null;
-  /** per-series cache of shared indicator series */
-  memo<T>(key: string, make: () => T): T;
-}
-
-export function makeCtx(bars: readonly Bar[], signal: SignalCfg = DEFAULT_SIGNAL_CFG, ladder: McbFacts | null = null): EvalCtx {
-  const cache = new Map<string, unknown>();
-  return {
-    bars,
-    n: bars.length,
-    signal,
-    ladder,
-    memo<T>(key: string, make: () => T): T {
-      if (!cache.has(key)) cache.set(key, make());
-      return cache.get(key) as T;
-    },
-  };
-}
-
-export interface BlockDef {
-  id: BlockId;
-  label: string;
-  family: Family;
-  /** one sentence: what it checks */
-  help: string;
-  params: readonly ParamDef[];
-  /** bars of its own timeframe before the first valid value */
-  warmup(p: LeafParams): number;
-  /** cross-parameter repairs after clamping (fast < slow …) */
-  fix?(p: LeafParams): LeafParams;
-  /** the block cannot use another timeframe; the text says why */
-  execOnly?: string;
-  /** the block is expensive (the UI says so) */
-  heavy?: string;
-  needsVolume?: boolean;
-  eval(ctx: EvalCtx, p: LeafParams): Uint8Array | Stepper<Uint8Array>;
-  /** plain-language phrase ("RSI(14) unter 30") */
-  text(p: LeafParams): string;
-  /** the same idea for the other side ("RSI(14) über 70") */
-  mirror(p: LeafParams): LeafParams;
-}
-
-const num = (p: LeafParams, k: string): number => Number(p[k]);
-const str = (p: LeafParams, k: string): string => String(p[k]);
-const de = (v: number): string => String(Math.round(v * 10_000) / 10_000).replace(".", ",");
-const swap = (p: LeafParams, key: string, pairs: Record<string, string>): LeafParams => ({ ...p, [key]: pairs[str(p, key)] ?? p[key]! });
-const within = (n: number): string => (n > 1 ? ` (innerhalb der letzten ${n} Kerzen)` : "");
-
-type Rel = "above" | "below" | "crossUp" | "crossDown";
-const REL_OPTIONS = [
-  { v: "above", label: "darüber" },
-  { v: "below", label: "darunter" },
-  { v: "crossUp", label: "kreuzt nach oben" },
-  { v: "crossDown", label: "kreuzt nach unten" },
-] as const;
-const REL_MIRROR: Record<string, string> = { above: "below", below: "above", crossUp: "crossDown", crossDown: "crossUp" };
-const REL_WORD: Record<Rel, string> = { above: "über", below: "unter", crossUp: "kreuzt nach oben", crossDown: "kreuzt nach unten" };
-const isCross = (m: string): boolean => m === "crossUp" || m === "crossDown";
-const WITHIN: ParamDef = { key: "within", label: "Innerhalb der letzten", kind: "int", def: 1, min: 1, max: 50, unit: "Kerzen", hint: "Das Ereignis darf so viele Kerzen zurückliegen." };
-const whenCross: ParamDef["when"] = (p) => isCross(str(p, "mode"));
-
-/** value series vs a level or another series: state or cross; NaN on either side = unknown. */
-function relate(n: number, v: ArrayLike<number>, ref: number | ArrayLike<number>, mode: Rel, win: number, warm = 0): Uint8Array {
-  const at = (i: number): number => (typeof ref === "number" ? ref : ref[i]!);
-  const out = triFrom(n, (i) => {
-    if (i < warm) return null;
-    const a = v[i]!;
-    const b = at(i);
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-    if (mode === "above") return a > b;
-    if (mode === "below") return a < b;
-    if (i < 1) return null;
-    const pa = v[i - 1]!;
-    const pb = at(i - 1);
-    if (!Number.isFinite(pa) || !Number.isFinite(pb)) return null;
-    return mode === "crossUp" ? pa <= pb && a > b : pa >= pb && a < b;
-  });
-  return isCross(mode) ? withinBars(out, win) : out;
-}
-
-const closeOf = (c: EvalCtx): number[] => c.memo("close", () => c.bars.map((b) => b.c));
-const highOf = (c: EvalCtx): number[] => c.memo("high", () => c.bars.map((b) => b.h));
-const lowOf = (c: EvalCtx): number[] => c.memo("low", () => c.bars.map((b) => b.l));
-const maOf = (c: EvalCtx, type: string, len: number): number[] => c.memo(`${type}${len}`, () => (type === "sma" ? sma(closeOf(c), len) : ema(closeOf(c), len)));
-const maWarm = (type: string, len: number): number => (type === "sma" ? len : len * 3);
-
-const MA_TYPE: ParamDef = {
-  key: "type",
-  label: "Art",
-  kind: "select",
-  def: "ema",
-  options: [
-    { v: "ema", label: "EMA" },
-    { v: "sma", label: "SMA" },
-  ],
-};
+import { PLUS_BLOCKS } from "./blocksPlus";
+import { FALSE, TRUE, UNKNOWN, type BlockId, type LeafParams } from "./types";
+import { type BlockDef, type EvalCtx, makeCtx, sessionOfSec, num, str, de, swap, within, REL_OPTIONS, REL_MIRROR, REL_WORD, isCross, WITHIN, whenCross, relate, closeOf, highOf, lowOf, maOf, maWarm, MA_TYPE, type Rel } from "./kit";
+export { makeCtx, sessionOfSec, type BlockDef, type EvalCtx };
 
 // ── momentum ──────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -572,6 +470,10 @@ const macdBlock: BlockDef = {
         { v: "zeroDown", label: "kreuzt Null nach unten" },
         { v: "aboveZero", label: "über Null" },
         { v: "belowZero", label: "unter Null" },
+        { v: "histPos", label: "Histogramm positiv" },
+        { v: "histNeg", label: "Histogramm negativ" },
+        { v: "histRising", label: "Histogramm steigt (Momentum nimmt zu)" },
+        { v: "histFalling", label: "Histogramm fällt (Momentum lässt nach)" },
       ],
     },
     { ...WITHIN, when: (p) => /cross|zero(Up|Down)/.test(str(p, "mode")) },
@@ -597,21 +499,40 @@ const macdBlock: BlockDef = {
         return relate(c.n, m.macd, 0, "crossDown", w, warm);
       case "aboveZero":
         return relate(c.n, m.macd, 0, "above", 1, warm);
+      case "histPos":
+        return relate(c.n, m.hist, 0, "above", 1, warm);
+      case "histNeg":
+        return relate(c.n, m.hist, 0, "below", 1, warm);
+      case "histRising":
+      case "histFalling": {
+        const rising = str(p, "mode") === "histRising";
+        return triFrom(c.n, (i) => (i < warm + 1 || !Number.isFinite(m.hist[i]!) ? null : rising ? m.hist[i]! > m.hist[i - 1]! : m.hist[i]! < m.hist[i - 1]!));
+      }
       default:
         return relate(c.n, m.macd, 0, "below", 1, warm);
     }
   },
   text: (p) => {
-    const lab: Record<string, string> = { crossUp: "kreuzt die Signallinie nach oben", crossDown: "kreuzt die Signallinie nach unten", zeroUp: "kreuzt Null nach oben", zeroDown: "kreuzt Null nach unten", aboveZero: "liegt über Null", belowZero: "liegt unter Null" };
+    const lab: Record<string, string> = { crossUp: "kreuzt die Signallinie nach oben", crossDown: "kreuzt die Signallinie nach unten", zeroUp: "kreuzt Null nach oben", zeroDown: "kreuzt Null nach unten", aboveZero: "liegt über Null", belowZero: "liegt unter Null", histPos: "Histogramm ist positiv", histNeg: "Histogramm ist negativ", histRising: "Histogramm steigt", histFalling: "Histogramm fällt" };
     const m = str(p, "mode");
     return `MACD(${num(p, "fast")},${num(p, "slow")},${num(p, "signal")}) ${lab[m]}${/cross|zero(Up|Down)/.test(m) ? within(num(p, "within")) : ""}`;
   },
-  mirror: (p) => swap(p, "mode", { crossUp: "crossDown", crossDown: "crossUp", zeroUp: "zeroDown", zeroDown: "zeroUp", aboveZero: "belowZero", belowZero: "aboveZero" }),
+  mirror: (p) => swap(p, "mode", { crossUp: "crossDown", crossDown: "crossUp", zeroUp: "zeroDown", zeroDown: "zeroUp", aboveZero: "belowZero", belowZero: "aboveZero", histPos: "histNeg", histNeg: "histPos", histRising: "histFalling", histFalling: "histRising" }),
 };
 
 // ── volatility ────────────────────────────────────────────────────────────────────────────────────────────────
 
-const BB_LABEL: Record<string, string> = { touchLower: "berührt das untere Band", touchUpper: "berührt das obere Band", closeBelow: "Schluss unter dem unteren Band", closeAbove: "Schluss über dem oberen Band", squeeze: "Bänder eng (Squeeze)" };
+const BB_LABEL: Record<string, string> = {
+  touchLower: "berührt das untere Band",
+  touchUpper: "berührt das obere Band",
+  closeBelow: "Schluss unter dem unteren Band",
+  closeAbove: "Schluss über dem oberen Band",
+  backInLower: "Schluss kehrt über das untere Band zurück",
+  backInUpper: "Schluss kehrt unter das obere Band zurück",
+  midUp: "Schluss kreuzt die Mittellinie nach oben",
+  midDown: "Schluss kreuzt die Mittellinie nach unten",
+  squeeze: "Bänder eng (Squeeze)",
+};
 
 const bollingerBlock: BlockDef = {
   id: "bollinger",
@@ -624,7 +545,7 @@ const bollingerBlock: BlockDef = {
     { key: "mode", label: "Bedingung", kind: "select", def: "touchLower", options: Object.keys(BB_LABEL).map((v) => ({ v, label: BB_LABEL[v]! })) },
     { key: "pct", label: "Squeeze: unterste", kind: "float", def: 20, min: 1, max: 50, step: 1, unit: "%", hint: "Bandbreite im untersten Anteil der letzten Kerzen.", when: (p) => str(p, "mode") === "squeeze" },
     { key: "lookback", label: "Squeeze: Rückblick", kind: "int", def: 120, min: 20, max: 500, unit: "Kerzen", when: (p) => str(p, "mode") === "squeeze" },
-    { ...WITHIN, when: (p) => str(p, "mode") !== "squeeze" },
+    { ...WITHIN, hint: "Das Ereignis (bei Squeeze: der enge Zustand) darf so viele Kerzen zurückliegen." },
   ],
   warmup: (p) => num(p, "len") + (str(p, "mode") === "squeeze" ? num(p, "lookback") : 0) + 1,
   eval(c, p) {
@@ -633,12 +554,21 @@ const bollingerBlock: BlockDef = {
     const mode = str(p, "mode");
     if (mode === "squeeze") {
       const rank = c.memo(`bbw${len}_${num(p, "mult")}_${num(p, "lookback")}`, () => percentRank(bb.width, num(p, "lookback")));
-      return triFrom(c.n, (i) => (Number.isFinite(rank[i]!) ? rank[i]! <= num(p, "pct") : null));
+      return withinBars(triFrom(c.n, (i) => (Number.isFinite(rank[i]!) ? rank[i]! <= num(p, "pct") : null)), num(p, "within"));
     }
     const ev = triFrom(c.n, (i) => {
       const b = c.bars[i]!;
       if (!Number.isFinite(bb.upper[i]!)) return null;
+      const prev = i > 0 ? c.bars[i - 1]! : null;
       switch (mode) {
+        case "backInLower":
+          return prev != null && Number.isFinite(bb.lower[i - 1]!) ? prev.c < bb.lower[i - 1]! && b.c >= bb.lower[i]! : null;
+        case "backInUpper":
+          return prev != null && Number.isFinite(bb.upper[i - 1]!) ? prev.c > bb.upper[i - 1]! && b.c <= bb.upper[i]! : null;
+        case "midUp":
+          return prev != null && Number.isFinite(bb.mid[i - 1]!) ? prev.c <= bb.mid[i - 1]! && b.c > bb.mid[i]! : null;
+        case "midDown":
+          return prev != null && Number.isFinite(bb.mid[i - 1]!) ? prev.c >= bb.mid[i - 1]! && b.c < bb.mid[i]! : null;
         case "touchLower":
           return b.l <= bb.lower[i]!;
         case "touchUpper":
@@ -653,9 +583,9 @@ const bollingerBlock: BlockDef = {
   },
   text: (p) => {
     const m = str(p, "mode");
-    return m === "squeeze" ? `Bollinger(${num(p, "len")}) Bandbreite unter den untersten ${de(num(p, "pct"))} % der letzten ${num(p, "lookback")} Kerzen` : `Kurs: ${BB_LABEL[m]} (${num(p, "len")}, ${de(num(p, "mult"))}σ)${within(num(p, "within"))}`;
+    return m === "squeeze" ? `Bollinger(${num(p, "len")}) Bandbreite unter den untersten ${de(num(p, "pct"))} % der letzten ${num(p, "lookback")} Kerzen${within(num(p, "within"))}` : `Kurs: ${BB_LABEL[m]} (${num(p, "len")}, ${de(num(p, "mult"))}σ)${within(num(p, "within"))}`;
   },
-  mirror: (p) => swap(p, "mode", { touchLower: "touchUpper", touchUpper: "touchLower", closeBelow: "closeAbove", closeAbove: "closeBelow", squeeze: "squeeze" }),
+  mirror: (p) => swap(p, "mode", { touchLower: "touchUpper", touchUpper: "touchLower", closeBelow: "closeAbove", closeAbove: "closeBelow", backInLower: "backInUpper", backInUpper: "backInLower", midUp: "midDown", midDown: "midUp", squeeze: "squeeze" }),
 };
 
 const atrPctBlock: BlockDef = {
@@ -751,15 +681,6 @@ const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
 const WEEKDAY_NAME: Record<string, string> = { mon: "Montag", tue: "Dienstag", wed: "Mittwoch", thu: "Donnerstag", fri: "Freitag", sat: "Samstag", sun: "Sonntag" };
 const SESSION_NAME: Record<string, string> = { asia: "Asien", london: "London", ny: "New York", late: "Spät", weekend: "Wochenende" };
 
-/** Session key of a UTC instant given in seconds: Sa / So = weekend, else Asien < 07, London < 13, New York < 21, Spät. */
-export function sessionOfSec(t: number): string {
-  const d = new Date(t * 1000);
-  const wd = d.getUTCDay();
-  if (wd === 0 || wd === 6) return "weekend";
-  const h = d.getUTCHours();
-  return h < 7 ? "asia" : h < 13 ? "london" : h < 21 ? "ny" : "late";
-}
-
 const timeWindowBlock: BlockDef = {
   id: "timeWindow",
   label: "Wochentag / Session",
@@ -813,10 +734,11 @@ export const BLOCKS: Readonly<Record<BlockId, BlockDef>> = {
   volume: volumeBlock,
   rsiLine: rsiLineBlock,
   timeWindow: timeWindowBlock,
+  ...PLUS_BLOCKS,
 };
 
 /** Order the picker shows them in. */
-export const BLOCK_ORDER: readonly BlockId[] = ["rsi", "rsiMa", "wtEvent", "wtState", "mcbLadder", "maPrice", "maCross", "macd", "zone", "breakout", "keyLevel", "rsiLine", "bollinger", "atrPct", "volume", "timeWindow"];
+export const BLOCK_ORDER: readonly BlockId[] = ["rsi", "rsiMa", "wtEvent", "wtState", "mcbLadder", "maPrice", "maCross", "macd", "zone", "breakout", "keyLevel", "rsiLine", "bollinger", "atrPct", "volume", "timeWindow", "donchian", "adx", "stoch", "keltner", "ichimoku", "cci", "willr", "obv", "vwap", "orb", "insideBar", "heikin", "pivotBreak", "fib", "funding", "supertrend", "chandelier"];
 
 export const isBlockId = (v: unknown): v is BlockId => typeof v === "string" && Object.prototype.hasOwnProperty.call(BLOCKS, v);
 

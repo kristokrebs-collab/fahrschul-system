@@ -44,7 +44,25 @@ export type BlockId =
   | "keyLevel"
   | "volume"
   | "rsiLine"
-  | "timeWindow";
+  | "timeWindow"
+  // F06: more known indicators
+  | "donchian"
+  | "adx"
+  | "stoch"
+  | "keltner"
+  | "ichimoku"
+  | "cci"
+  | "willr"
+  | "obv"
+  | "vwap"
+  | "orb"
+  | "insideBar"
+  | "heikin"
+  | "pivotBreak"
+  | "fib"
+  | "funding"
+  | "supertrend"
+  | "chandelier";
 
 export type LeafParams = Record<string, number | string>;
 
