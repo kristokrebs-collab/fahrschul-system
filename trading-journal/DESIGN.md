@@ -503,3 +503,26 @@ Erklärung und drei Werten in einem Dreier-Raster (Standard heller) – mobil oh
 Ergebnis: Zusammenfassung, bei Lücken ein Warn-Kasten mit den Bausteinen beim Namen, ein schreibgeschütztes Mono-Textfeld (eigener Scroll, nie die Seite), Kopieren / Datei, Notizen eingeklappt.
 **Raster:** ein Eintrag unter „Belastung, Bericht, Filter“; zwei `MorphSelect`, ein 3 × 3-Gitter aus Zellen (Σ R im Vorzeichen-Ton, darunter Trades und Ø R, die Mitte mit hellem Rand und „Deine Einstellung“,
 Zellen unter 10 Trades gedimmt), eine Zusammenfassung ohne „beste“ Zelle. Bewegung nur die vorhandenen `Collapse`-/`Sheet`-Tokens; reduzierte Bewegung zeigt das Ende sofort.
+
+### Ähnliche Situationen (F19)
+
+Keine neue Sprache: eine `Card` im Raster der Markt-Seite (`lg:col-span-12`) unter der Preis- & RSI-Struktur. Oben die Wahl in der
+Reihenfolge Zeiteinheit (Chips wie bei der Struktur, gewählt = weiße Pille) → Verlauf danach und Einheit (`Segmented`) → „Merkmale ändern“
+(Chips, gesperrte mit Grund). Das Ergebnis ist eine Aussage in Fließtext mit Zahl und Spanne (Überschrift `clamp(15px,3.8vw,18px)`, keine
+Prozent als Dekoration), darunter ein ruhiger Balken (Gewinn-/Verlust-Ton **nur** für die Anteile höher/tiefer, flach = `faint`), die
+Kennzahlen als `dl`-Zeilen in Mono, der Vergleich mit dem ganzen Zeitraum in einem `border-line`-Kasten. **Gegenbeispiele** haben eine
+eigene Überschrift mit Warn-Punkt und stehen immer vor der Stichprobe; jede Fundstelle ist eine Zeile-als-Button (≥ 44 px bei grobem
+Zeiger, mobil zwei Zeilen statt Tabelle, kein horizontaler Scroll), Gegenbeispiele tragen ein `Badge tone="warn"`. Unter 20 Fundstellen
+steht statt der Verteilung ein ruhiger Kasten „Zu wenig Daten“ – nie eine Quote. Die Hinweise (keine Prognose, Mehrfachtest) sind ein
+fester Kasten am Ende, nicht wegklickbar. Das Fundstellen-Sheet nutzt `Sheet` + Replay-Chart + `ScrubTimeline` unverändert; es öffnet
+auf der Situation und zeigt den Verlauf erst, wenn man abspielt oder zieht. Keine eigene Bewegung der Karte.
+
+### Passt zu dir? (F49)
+
+Eine `Card` im Raster des Labors (`lg:col-span-12`) unter der Diagnose, eigene Sektion „Passt zu dir?“. Oben eine Zeile Stichprobe (Idee: n Trades,
+Zeitraum · Journal: n Trades) in `text-faint`. Darunter drei Gruppen mit `Label` und Punkt: **Reibungspunkte** (Warn-Punkt, `Badge tone="warn"`),
+**Übereinstimmungen** (Aqua-Punkt, `Badge tone="teal"`), **Nicht beurteilbar** (neutral, `Badge tone="mute"`) – Reibung ist kein Verlust-Ton, weil es
+keine Wertung ist. Jeder Eintrag ist eine `rounded-xl border-line`-Zeile: Badge + Thema, ein Satz mit den Zahlen in `text-mute`, die beiden Zahlen
+(Idee | Du) als zweispaltige `dl` in Mono (mobil untereinander), darunter der Vorbehalt dieser Aussage in `text-faint`. Es gibt keine Gesamtnote,
+kein Gauge, keine Ampel. Ein fester Kasten am Ende sagt, dass es ein Zahlenabgleich aus der Vergangenheit ist. Leerzustände sind ein ruhiger Kasten mit
+der konkreten Zahl („Dein Journal hat 7 Trades abgeschlossen. Ab 20 …“). Keine eigene Bewegung (die Zelle blendet ein).

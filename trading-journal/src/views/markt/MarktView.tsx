@@ -39,6 +39,9 @@ import { TREND } from "./trendStrings";
 // F05: the structure card (store, analysis, texts) is its own chunk – loaded when the page is opened, never with the app
 const TrendStructureCard = lazy(() => import("./TrendStructureCard").then((m) => ({ default: m.TrendStructureCard })));
 
+// F19: „Ähnliche Situationen“ – own chunk too (domain search, market hook, texts), the hit sheet is a third one
+const SimilarCard = lazy(() => import("./SimilarCard").then((m) => ({ default: m.SimilarCard })));
+
 export const MARKT_LEAD_FILL = { storageKey: storageKey("fill-markt"), highlight: MARKT.leadHighlight } as const;
 
 function Cell({ index, span, children }: { index: number; span: string; children: ReactNode }) {
@@ -182,6 +185,17 @@ export function MarktView({ className }: { className?: string }) {
               }
             >
               <TrendStructureCard />
+            </Suspense>
+          </Cell>
+          <Cell index={4} span="lg:col-span-12">
+            <Suspense
+              fallback={
+                <Card title="Ähnliche Situationen" data-testid="markt-similar-loading">
+                  <Skeleton height={140} />
+                </Card>
+              }
+            >
+              <SimilarCard />
             </Suspense>
           </Cell>
           <Cell index={6} span="lg:col-span-7">

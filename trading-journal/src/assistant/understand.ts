@@ -31,7 +31,7 @@ import { ACCOUNT_VALUES, EMOTION_VALUES, RESULT_VALUES, SESSION_VALUES, SIDE_VAL
 import { parseQuestion, type Filter, type FilterDim, type Intent, type ParseContext } from "@/domain/coach/nlq/parse";
 import type { Page } from "@/store/uiStore";
 
-export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where";
+export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar";
 
 export type Plan =
   | { kind: "journal"; intents: Intent[]; via: string[]; topic: string }
@@ -241,6 +241,7 @@ const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: RegExp; topic: string; lab
   { tool: "lab", test: /\bbacktest\b.*\b(schlecht|mies|negativ|verlust|schwach|warum|wieso|kacke|mist|mau|miserabel|bescheiden|katastroph\w*|scheiss\w*)\b|\b(warum|wieso|weshalb)\b.*\b(backtest|labor|testlauf|strategie)\b|\bdiagnose\b.*\b(lauf|backtest|labor)\b|\bwas stimmt .* nicht .*(backtest|strategie)/, topic: "lab", label: "Labor-Diagnose" },
   { tool: "idea", test: /\b(teste?|testen|pruef\w*|probier\w*)\b.{0,24}\b(idee|ideen)\b|\bidee\b.{0,24}\b(testen|pruefen|ausprobieren)\b|\b(diesen|den|meinen) einstieg (testen|pruefen|backtesten|im labor)\b|\bdiese idee\b/, topic: "idea", label: "Idee testen" },
   { tool: "train", test: /\b(ueben|uebe|uebung|uebungen|trainier\w*|trainingsmodus|lernmodus|replay training)\b|\btraining\b.*\b(starten|oeffnen|beginnen|machen)\b|\b(starte|oeffne|mach)\b.*\btraining\b/, topic: "train", label: "Training" },
+  { tool: "similar", test: /\b(aehnlich\w*|vergleichbar\w*)\b.{0,30}\b(situation\w*|marktlage|lage|muster|kerze\w*|faelle|fall)\b|\b(situation\w*|muster|kerze\w*)\b.{0,30}\b(aehnlich\w*|vergleichbar\w*)\b|\bhistorisch\w*\b.{0,20}\b(aehnlich\w*|vergleich\w*)\b|\bwann (war|gab) (es|das) (schon )?(mal )?(so|aehnlich)\b/, topic: "similar", label: "Ähnliche Situationen" },
   { tool: "entry", test: /\b(was fehlt|fehlt (mir|noch|da))\b|\beinstiegs ?check\b|\beinstiegssignal\b|\bkann ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bsoll ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bist (jetzt |gerade )?(ein|kein) (einstieg|signal)\b|\bwie ist (der|die|das) (markt|lage)\b|\bmarktlage\b/, topic: "entry", label: "Einstiegs-Check" },
   { tool: "experiment", test: /experiment\w*|\bhypothese\w*/, topic: "experiment", label: "Wochenexperiment" },
   { tool: "improve", test: /\bverbesser\w*|\bbesser werden\b|\bworan (soll|muss|kann|sollte) ich (arbeiten|feilen)\b|\bwas (soll|sollte|kann) ich (aendern|tun|machen|anders)\b|\bnaechster schritt\b|\bempfehl\w*|\btipps?\b|\bratschlag\b/, topic: "improve", label: "Verbesserungen" },

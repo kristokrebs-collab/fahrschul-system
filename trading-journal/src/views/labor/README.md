@@ -151,3 +151,13 @@ Section `Versionen und Playbooks` (`labor-drafts-section`, lazy chunk `DraftsSec
   Regeln um ±25 % (3 × 3), derselbe Lauf je Zelle (`runExtra` mit `what: "params"`, Mitte = gezeigter Lauf). Gesperrt mit Grund bei rechenintensiven Bausteinen; nur für „Eigene Idee“.
   Zellen mit weniger als 10 Trades werden als schwach markiert, es gibt keine „beste“ Zelle.
 - Tests: `tests/unit/lab.blocksPlus.test.ts`, `lab.library.test.ts`, `lab.pine.test.ts` (Snapshots), `lab.paramGrid.test.ts`, `views.labor.library.test.tsx`, e2e `tests/e2e/library.spec.ts`.
+
+## Passt zu dir? (F49)
+Section `Passt zu dir?` (`labor-fit`, lazy chunk `FitCard.tsx`) between the diagnosis and the extras, only with a finished run. The shown
+run's trades (`strategyFacts`) are held against the journal (`journalProfile` over `useEnriched()` + the coach's behaviour events,
+`compareFit`; all in `@/domain/fit`, see its README): win rate, time in a trade, losing runs, drawdown depth, trade frequency, time windows
+(UTC), risk per trade, rule discipline. Three groups – **Reibungspunkte** (`fit-group-friction`), **Übereinstimmungen** (`fit-group-match`),
+**Nicht beurteilbar** (`fit-group-unknown`) – each item (`fit-item`, `data-id`, `data-kind`) with a `Badge`, one sentence with the
+numbers, the two figures side by side and its own caveat. No score, no recommendation; with fewer than 20 closed journal trades (or < 10
+trades in the run) the card is an honest empty state (`fit-empty`, `data-status`) that names the numbers. It reads `useLabor` (`result`,
+`runCfg`) and the journal and changes neither. Tests: `views.labor.fit.test.tsx`, `fit.test.ts`, e2e `fit.spec.ts`.

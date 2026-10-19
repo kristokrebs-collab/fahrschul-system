@@ -62,6 +62,8 @@ export interface ToolEnv {
   newTrade: () => void;
   /** opens the training sheet (F38) – it only opens; the user chooses, decides and writes everything there */
   train?: () => void;
+  /** opens the Markt page at the card „Ähnliche Situationen“ (F19) – it only opens; the user picks timeframe and horizon there */
+  similar?: () => void;
   setMem: (fn: (m: AssistantMemory) => AssistantMemory) => void;
   now: number;
 }
@@ -374,6 +376,9 @@ export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
       case "train":
         env.train?.();
         return reply({ title: "Training geöffnet", text: env.train ? "Du wählst dort ein Setup, bekommst Situationen aus deinem Journal ohne den weiteren Verlauf gezeigt und entscheidest selbst. Ich öffne nur – eingetragen wird erst, was du dort festhältst." : "Das Training ist hier gerade nicht verfügbar.", close: !!env.train });
+      case "similar":
+        env.similar?.();
+        return reply({ title: "Ähnliche Situationen geöffnet", text: env.similar ? "Die Karte steht auf der Markt-Seite unter den Trendlinien. Ich öffne sie nur – du wählst Zeiteinheit und Horizont, gesucht und gerechnet wird dort aus den geladenen Kerzen, mit den Gegenbeispielen. Ähnlichkeit ist keine Prognose." : "Die Karte ist hier gerade nicht verfügbar.", close: !!env.similar });
       case "newTrade":
         env.newTrade();
         return reply({ title: "Trade eintragen", text: "Das Formular ist offen.", close: true });

@@ -487,3 +487,12 @@ minute or the settings changed, publish only a changed view; nothing runs withou
 lazy consumer (store imported on demand, own chunk) for the chart; `write.ts` saves `settings.trendlines` at once.
 Import from `@/market/trendlines/<file>` (the index re-exports the store, so eager code must not use it). Tests:
 `tests/unit/market.trendlines.test.ts`.
+
+## Ähnliche Situationen (`similar/`, F19)
+
+`useSituationInput(tf)` hands the card the REAL candles of one timeframe (`keylevels/candles.ts` `levelCandles`: 1h / 4h / 1D / 1W
+straight from their feeds, 30m from 15m, 2h / 3h from 1h) plus `timeframeAvailability` and the data source's clock; a timeframe
+the feed cannot serve yields no candles and its German reason – nothing is substituted. It re-renders only when the source
+feed's bar key (`klineBarKey`: a bar appended or closed, not forming ticks) or the feed's health text changes; nothing runs
+without a mounted caller (no timer, no store). The search itself is the pure `@/domain/similar` and runs on the main thread in
+the card's `useMemo` (milliseconds for ≤ 1500 candles). Tests: `tests/unit/views.markt.similar.test.tsx`.
