@@ -130,7 +130,7 @@ class TrendRenderer implements IPrimitivePaneRenderer {
       for (const g of this.geo) {
         const color = trendColor(g.tone, this.o.neutral);
         ctx.strokeStyle = color;
-        ctx.lineWidth = Math.max(1, Math.round((g.strong ? 1.75 : 1.1) * hr));
+        ctx.lineWidth = Math.max(1, Math.round((g.strong ? 1.5 : 1.1) * hr));
         ctx.globalAlpha = g.strong ? 1 : 0.8;
         ctx.setLineDash([]);
         ctx.beginPath();

@@ -379,7 +379,7 @@ function syncTrend(i: Instance, lines: readonly ChartTrendline[] | undefined, no
   if (!lines?.length) return;
   void import("./primitives/TrendlinePrimitive").then(({ TrendlinePrimitive: Prim }) => {
     if (i.dead || i.trend) return;
-    const prim = new Prim({ bars: () => i.data, intervalSec: () => INTERVAL_SECONDS[i.lastInterval ?? "1h"], reserved: () => zoneCaptionBox(i, now.levels()) }, { neutral: now.neutral() });
+    const prim = new Prim({ bars: () => i.data, intervalSec: () => INTERVAL_SECONDS[i.lastInterval ?? "1h"], reserved: () => [...zoneCaptionBox(i, now.levels()), ...i.check.geometry().labels.map((l) => l.box), ...i.boxes.geometry().flatMap((g) => [g.caption, ...g.targets.map((t) => t.label)].flatMap((l) => (l ? [l.box] : [])))] }, { neutral: now.neutral() });
     i.main.candles.attachPrimitive(prim);
     i.trend = prim;
     Object.defineProperty(i.node, TREND_KEY, { value: { lines: () => prim.chartLines(), geometry: () => prim.geometry() }, configurable: true });

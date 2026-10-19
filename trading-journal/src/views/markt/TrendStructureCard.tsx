@@ -88,7 +88,7 @@ function Row({ item, running }: { item: TrendTfItem; running: boolean }) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {(["price", "rsi"] as const).map((s) => (
-            <section key={s} className="grid gap-3" aria-label={s === "price" ? TREND.price : TREND.rsi} data-testid="trend-series" data-series={s}>
+            <section key={s} className="grid content-start gap-3" aria-label={s === "price" ? TREND.price : TREND.rsi} data-testid="trend-series" data-series={s}>
               <h3 className="label flex items-center gap-2">
                 <span className="size-1.5 rounded-full bg-signal" aria-hidden="true" />
                 {s === "price" ? TREND.price : TREND.rsi}
