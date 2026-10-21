@@ -8,3 +8,13 @@ Unveränderte Kopien; vor der Übernahme gelesen (nur Markdown, kein ausführbar
 
 Bewusst **nicht** übernommen: `04-theme-factory` (gibt es schon als `anthropic-skills:theme-factory`), `05-website-rebuild` und `07-azerbaijan-website-build` (überlappen mit `local-business-rebuild` bzw. nicht relevant).
 Aktualisieren: Repo neu klonen, Ordner vergleichen (`diff -r`), dann ersetzen.
+
+## ECC (Everything Claude Code) – nur Auswahl
+
+| Dateien | Quelle | Stand | Lizenz |
+|---|---|---|---|
+| `.claude/agents/{code-reviewer,a11y-architect,e2e-runner,doc-updater}.md`, `.claude/rules/web/*.md` | https://github.com/affaan-m/everything-claude-code | Commit 90606c8 (2026-10-20) | MIT |
+
+Unveränderte Kopien nach Durchsicht (nur Markdown, keine Hooks, keine Netzwerk-/Shell-Befehle im Text). `e2e-runner` und `doc-updater` dürfen schreiben und Bash nutzen, laufen aber nur auf Abruf.
+**Bewusst nicht übernommen:** die 27 ECC-Hooks (laufen bei jedem Tool-Aufruf, Selbst-Update per git pull), `rules/common` (immer aktiv, ~5.000 Tokens pro Sitzung), `rules/react` (Projekt nutzt kein React), die übrigen 67 Agenten und 311 Skills.
+Aktualisieren: Repo neu klonen, `diff -r`, ersetzen.
