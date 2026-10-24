@@ -15,7 +15,7 @@ import { PERIOD_DAYS, useLabor } from "@/views/labor/laborStore";
 import { LABOR } from "@/views/labor/strings";
 import { EvolvePanel } from "./EvolvePanel";
 import { draftEntryId, EDITOR_ID, saveProposalAsVersion, startProposalAsChallenger } from "./labHost";
-import type { CandleSet, CandleStatus, StrategyEntry } from "./types";
+import type { CandleSet, CandleStatus, EvolvePanelProps, StrategyEntry } from "./types";
 
 const MAX_DRAFTS = 5;
 const MIN_BARS = 300;
@@ -34,8 +34,21 @@ interface Loaded {
   funding: FundingPoint[] | null;
 }
 
-export function EvolveSection() {
-  const cfg = useLabor((s) => s.cfg);
+/** What a host other than the Labor page (the Strategie-Studio) hands in instead of the Labor's editor idea and drafts. */
+export interface EvolveSectionProps {
+  /** the strategies to improve (default: the Labor's editor idea and drafts) */
+  configs?: readonly { id: string; name: string; config: CustomConfig; label?: string | undefined }[];
+  /** market and period the candles are loaded for (default: the Labor's set-up) */
+  symbol?: string;
+  period?: keyof typeof PERIOD_DAYS;
+  onSaveVersion?: EvolvePanelProps["onSaveVersion"];
+  onStartChallenger?: EvolvePanelProps["onStartChallenger"];
+  defaultSelected?: readonly string[];
+}
+
+export function EvolveSection(props: EvolveSectionProps = {}) {
+  const labCfg = useLabor((s) => s.cfg);
+  const cfg = useMemo(() => ({ ...labCfg, ...(props.symbol ? { symbol: props.symbol } : {}), ...(props.period ? { period: props.period } : {}) }), [labCfg, props.symbol, props.period]);
   const drafts = useLabor((s) => s.drafts);
   const rawSignals = useJournal((s) => s.settings.signals);
   const signal = useMemo(() => sanitizeSignalCfg(rawSignals), [rawSignals]);
@@ -45,10 +58,11 @@ export function EvolveSection() {
 
   const editorIdea = cfg.custom;
   const configs = useMemo(() => {
+    if (props.configs) return props.configs.map((c) => ({ ...c }));
     const list: { id: string; name: string; config: CustomConfig; label?: string }[] = [{ id: EDITOR_ID, name: `${editorIdea.name} (Editor)`, config: editorIdea }];
     for (const d of drafts.slice(0, MAX_DRAFTS)) list.push({ id: draftEntryId(d.id), name: d.name, config: d.config, label: d.origin ? "fremd" : undefined });
     return list;
-  }, [editorIdea, drafts]);
+  }, [editorIdea, drafts, props.configs]);
 
   const keyOf = useCallback((id: string, c: (typeof configs)[number]): string => `${id}|${cfg.symbol}|${cfg.period}|${cfg.funding}|${c.config.interval}|${searchIntervals(c.config, higherTfsOf(c.config)).join(",")}`, [cfg.symbol, cfg.period, cfg.funding]);
 
@@ -115,7 +129,7 @@ export function EvolveSection() {
 
   return (
     <div data-testid="evolve-section">
-      <EvolvePanel strategies={entries} candles={candles} candleStatus={status} onLoadCandles={load} onSaveVersion={saveProposalAsVersion} onStartChallenger={startProposalAsChallenger} defaultSelected={[EDITOR_ID]} />
+      <EvolvePanel strategies={entries} candles={candles} candleStatus={status} onLoadCandles={load} onSaveVersion={props.onSaveVersion ?? saveProposalAsVersion} onStartChallenger={props.onStartChallenger ?? startProposalAsChallenger} defaultSelected={props.defaultSelected ?? [EDITOR_ID]} />
     </div>
   );
 }

@@ -397,4 +397,23 @@ describe("Strategie-Studio", () => {
       }
     }
   });
+  it("Mehr Werkzeuge: before a backtest the pattern search asks for one; after it, both real panels are there (no placeholder)", async () => {
+    renderStudio();
+    await screen.findByTestId("studio-view");
+    type(RSI_TEXT);
+    understand();
+    await screen.findByTestId("studio-more");
+    expect(await screen.findByTestId("studio-discovery")).toHaveAttribute("data-state", "empty");
+    expect(screen.getByTestId("studio-more")).not.toHaveTextContent("Kommt gleich");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("studio-run"));
+    });
+    await screen.findByTestId("studio-result", {}, { timeout: 60_000 });
+    await waitFor(() => expect(screen.getByTestId("studio-discovery")).toHaveAttribute("data-state", "ready"), { timeout: 30_000 });
+    expect(await screen.findByTestId("discovery-panel", {}, { timeout: 30_000 })).toBeInTheDocument();
+    const evolve = await screen.findByTestId("evolve-panel", {}, { timeout: 30_000 });
+    expect(evolve).toBeInTheDocument();
+    // the optimiser starts nothing by itself
+    expect(screen.getByTestId("studio-more")).not.toHaveTextContent("Läuft:");
+  });
 });

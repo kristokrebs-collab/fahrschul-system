@@ -83,7 +83,7 @@ export function labCfgFor(config: CustomConfig, symbol: string, period: StudioPe
 
 const FUNDING_MISSING = "Die Funding-Historie konnte nicht geladen werden. Der Baustein „Funding-Extrem“ braucht sie – ohne sie würde die Strategie nie handeln. Versuche es noch einmal oder entferne den Baustein.";
 
-function engineOf(cfg: LabConfig, fundingUsed: "history" | "flat" | "none", history: Parameters<typeof fundingModelOf>[0]): EngineCfg {
+export function engineOf(cfg: LabConfig, fundingUsed: "history" | "flat" | "none", history: Parameters<typeof fundingModelOf>[0]): EngineCfg {
   const fee = feePreset(cfg.exchange);
   return {
     capital: cfg.capital,
