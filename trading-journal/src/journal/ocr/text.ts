@@ -16,7 +16,7 @@ export function cleanNumberText(raw: string): Cleaned {
   let t = raw.trim().replace(MINUS, "-");
   let repaired = false;
   // brackets / icons glued to the number („[4“, „)“, „›“)
-  t = t.replace(/^[^\d+\-.,]+(?=[+\-]?\d)/, "").replace(/[)\]›>»]+$/g, "");
+  t = t.replace(/^[^\d+\-.,]+(?=[+-]?\d)/, "").replace(/[)\]›>»]+$/g, "");
   // everything after a „%“ is the icon next to it („-2.99%4“), not part of the number
   const pct = /%/.test(t);
   t = t.replace(/%.*$/, "");

@@ -49,6 +49,8 @@ export interface RawCell {
   unit?: string | null;
   /** Set by the second reading (`refine.ts`): how many of the readings agreed on the final text. */
   reread?: { agree: number; of: number; before: string };
+  /** The label was NOT read: the row was assigned by its place in the other cards (a marked assumption). */
+  inferred?: boolean;
 }
 
 export interface RawRecord {
@@ -65,6 +67,10 @@ export interface RawRecord {
   marginMode?: { word: MarginWord; cell: RawCell };
   leverage?: { value: number; repaired: boolean; cell: RawCell };
   status?: { word: NonNullable<ReturnType<typeof parseStatusWord>>; cell: RawCell };
+  /** Values on a line of their own whose label was not read; `inferLabels` places them by the other cards. */
+  unlabeled?: RawCell[];
+  /** Label rows whose value the engine skipped; `refine.ts` reads the place right of the label again. */
+  empty?: { field: FieldId; label: string; unit: string | null; box: Box; labelBox: Box; /** Where the value must be (table gaps); else right of the label. */ region?: Box }[];
   notes: string[];
 }
 
@@ -87,6 +93,8 @@ export interface ParsedPage {
   /** Exchange whose brand word is on the page (never guessed from the layout). */
   exchange: { id: string; name: string } | null;
   layout: "cards" | "table" | "none";
+  /** The header row of a table (where the column names stand). */
+  header?: Box;
   records: RawRecord[];
   orphans: Orphan[];
   lines: Line[];
@@ -292,6 +300,38 @@ function readGrid(labelLine: Line, valueLine: Line): RowRead[] {
   return out;
 }
 
+/**
+ * Cards of one list have the same rows in the same places. A value whose label the engine did not read (it stands alone on
+ * its line) is assigned to the field the OTHER cards have at that place – only when the place is clear (the nearest row
+ * is closer than a third of the row pitch and the field is missing in this card) – and is marked `inferred`.
+ */
+export function inferLabels(records: readonly RawRecord[]): void {
+  if (records.length < 2) return;
+  const offsets = new Map<FieldId, number[]>();
+  for (const r of records)
+    for (const [f, c] of Object.entries(r.fields) as [FieldId, RawCell][]) {
+      if (c.inferred) continue;
+      const list = offsets.get(f) ?? [];
+      list.push(boxCy(c.box) - boxCy(r.symbol.box));
+      offsets.set(f, list);
+    }
+  const med = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
+  const table = [...offsets.entries()].filter(([, v]) => v.length >= Math.max(2, Math.ceil(records.length / 2))).map(([f, v]) => ({ f, dy: med(v) }));
+  if (table.length < 3) return;
+  const sorted = table.map((t) => t.dy).sort((a, b) => a - b);
+  const pitch = med(sorted.slice(1).map((v, i) => v - sorted[i]!).filter((d) => d > 4));
+  if (!Number.isFinite(pitch) || pitch <= 0) return;
+  for (const r of records) {
+    for (const cell of r.unlabeled ?? []) {
+      const dy = boxCy(cell.box) - boxCy(r.symbol.box);
+      const best = table.filter((t) => !r.fields[t.f]).sort((a, b) => Math.abs(a.dy - dy) - Math.abs(b.dy - dy))[0];
+      if (!best || Math.abs(best.dy - dy) > pitch / 3) continue;
+      r.fields[best.f] = { ...cell, inferred: true, label: "(Bezeichnung nicht gelesen)" };
+      r.notes.push(`Eine Zeile ohne lesbare Bezeichnung wurde nach den anderen Karten als „${best.f}“ gedeutet.`);
+    }
+  }
+}
+
 function parseCards(lines: readonly Line[], page: OcrPage): { records: RawRecord[]; orphans: Orphan[] } {
   const anchors: Anchor[] = [];
   for (const l of lines) {
@@ -326,6 +366,14 @@ function parseCards(lines: readonly Line[], page: OcrPage): { records: RawRecord
       }
     }
     readHead(block.slice(0, Math.max(1, headEnd)), a.seg, rec);
+    // a value whose label the engine did not read stands alone on its line (a dashed underline under the label is enough)
+    const loose = (line: Line): void => {
+      // one cell alone, or a garbled label (no known field) followed by a value
+      if (line.segs.length < 1 || (line.segs.length > 1 && labelOf(line.segs))) return;
+      const v = trimToValue(line.segs[line.segs.length - 1]!);
+      if (v && !parseLeverageToken(v.text) && /\d{2}/.test(v.text)) (rec.unlabeled ??= []).push(cellOf(v));
+    };
+    for (let i = 1; i < headEnd; i++) loose(block[i]!);
     for (let i = headEnd; i < block.length; i++) {
       const line = block[i]!;
       const row = readRow(line);
@@ -334,6 +382,7 @@ function parseCards(lines: readonly Line[], page: OcrPage): { records: RawRecord
         else rec.notes.push(`„${row.cell.label}“ steht mehrfach – der erste Wert gilt.`);
         continue;
       }
+      if (!block[i + 1] || block[i + 1]!.cy - line.cy >= Math.max(line.h, block[i + 1]!.h) * 2.6 || !labelOf(line.segs)) loose(line);
       // labels above values (grid)
       const next = block[i + 1];
       if (next && next.cy - line.cy < Math.max(line.h, next.h) * 2.6) {
@@ -350,14 +399,28 @@ function parseCards(lines: readonly Line[], page: OcrPage): { records: RawRecord
           if (v && !labelOf(next.segs)) {
             if (!rec.fields[lab.field]) rec.fields[lab.field] = cellOf(v, { label: lab.text, unit: lab.unit });
             i += 1;
+            continue;
           }
         }
       }
+      // a label with NO value on its line (the engine skipped it): the second reading looks for it to the right of the label
+      const alone = labelOf(line.segs);
+      if (alone && line.segs.length === alone.used && !rec.fields[alone.field]) (rec.empty ??= []).push({ field: alone.field, label: alone.text, unit: alone.unit, box: line.box, labelBox: unionBox(line.segs.map((s) => s.box)) });
     }
+    // a time printed in the card's head („BTCUSDT … 2026-10-24 15:22:57“) when no row carries one
+    if (!rec.fields.time && !rec.fields.openTime && !rec.fields.closeTime)
+      for (const l of block.slice(0, Math.max(1, headEnd)))
+        for (const s of l.segs) {
+          const t = s.text.trim();
+          if (s.words.includes(a.seg.words[0]!) || !/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}[ T]\d{1,2}[:.]\d{2}/.test(t)) continue;
+          rec.fields.time = cellOf(s, { label: "Zeit" });
+        }
     const used = [a.line.box, ...Object.values(rec.fields).map((c) => c!.box)];
     rec.box = unionBox(used.concat(rec.side ? [rec.side.cell.box] : [], rec.status ? [rec.status.cell.box] : []));
     records.push(rec);
   });
+
+  inferLabels(records);
 
   // label rows above the first symbol: the lower part of a card that is cut at the top of the picture
   const orphans: Orphan[] = [];
@@ -432,7 +495,7 @@ function columnOf(box: Box, cols: readonly Column[]): number {
   return best;
 }
 
-function parseTable(lines: readonly Line[], page: OcrPage): { records: RawRecord[]; orphans: Orphan[]; ok: boolean } {
+function parseTable(lines: readonly Line[], page: OcrPage): { records: RawRecord[]; orphans: Orphan[]; ok: boolean; header?: Box } {
   let hi = -1;
   let cols: Column[] | null = null;
   for (let i = 0; i < lines.length; i++) {
@@ -523,7 +586,30 @@ function parseTable(lines: readonly Line[], page: OcrPage): { records: RawRecord
         }
     records.push(rec);
   });
-  return { records, orphans: [], ok: records.length > 0 };
+  markTableGaps(records, cols);
+  return { records, orphans: [], ok: records.length > 0, header: unionBox(lines.slice(hi, bandEnd + 1).map((l) => l.box)) };
+}
+
+/**
+ * A column that most rows have a value in, but one row does not: the engine skipped that cell. The place where the cell
+ * must be (the column's x range, the row's line) is handed to the second reading (`RawRecord.empty`).
+ */
+function markTableGaps(records: readonly RawRecord[], cols: readonly Column[]): void {
+  if (records.length < 3) return;
+  for (const col of cols) {
+    const f = col.field;
+    if (!["entry", "exit", "qty", "price", "orderPrice", "fee", "pnl", "openTime", "closeTime", "time"].includes(f)) continue;
+    const have = records.filter((r) => r.fields[f]);
+    if (have.length < Math.ceil(records.length * 0.6) || have.length === records.length) continue;
+    const x0 = Math.min(...have.map((r) => r.fields[f]!.box.x0)) - 6;
+    const x1 = Math.max(...have.map((r) => r.fields[f]!.box.x1)) + 6;
+    for (const r of records) {
+      if (r.fields[f]) continue;
+      const y0 = r.symbol.box.y0 - 2;
+      const y1 = r.symbol.box.y1 + 2;
+      (r.empty ??= []).push({ field: f, label: col.label, unit: col.unit, box: { x0, y0, x1, y1 }, labelBox: { x0, y0, x1: x0, y1 }, region: { x0, y0, x1, y1 } });
+    }
+  }
 }
 
 /* ------------------------------------------------------------------ page */
@@ -538,18 +624,20 @@ export function parsePage(page: OcrPage): ParsedPage {
   let layout: ParsedPage["layout"] = "none";
   let records: RawRecord[] = [];
   let orphans: Orphan[] = [];
+  let header: Box | undefined;
   const cards = parseCards(lines, page);
   // a table with a header wins when it found rows; cards otherwise
   if (table.ok && table.records.length >= Math.max(1, cards.records.filter((r) => Object.keys(r.fields).length >= 3).length)) {
     layout = "table";
     records = table.records;
+    header = table.header;
   } else if (cards.records.length || cards.orphans.length) {
     layout = "cards";
     records = cards.records;
     orphans = cards.orphans;
   }
   if (!records.length && !orphans.length) notes.push("Auf dem Bild wurde keine Orderliste erkannt (kein Symbol wie BTCUSDT mit Werten dahinter).");
-  return { page: page.index, width: page.width, height: page.height, view, viewLabel: VIEW_LABEL[view], viewHow: how, exchange, layout, records, orphans, lines, notes };
+  return { page: page.index, width: page.width, height: page.height, view, viewLabel: VIEW_LABEL[view], viewHow: how, exchange, layout, ...(header ? { header } : {}), records, orphans, lines, notes };
 }
 
 export { boxCy, boxH };

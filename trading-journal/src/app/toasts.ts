@@ -16,5 +16,5 @@ export function toastLifetime(t: Pick<UiToast, "kind" | "duration">): number {
 }
 
 export function toIslandToast(t: UiToast): IslandToast {
-  return { id: t.id, kind: KIND[t.kind], title: t.title, value: t.value, valueTone: t.valueTone, detail: t.detail, duration: toastLifetime(t) };
+  return { id: t.id, kind: KIND[t.kind], title: t.title, value: t.value, valueTone: t.valueTone, detail: t.detail, duration: toastLifetime(t), ...(t.action ? { action: t.action } : {}) };
 }

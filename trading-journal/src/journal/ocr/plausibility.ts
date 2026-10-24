@@ -59,6 +59,17 @@ export const MAX_FEE_SHARE = 0.006;
 /** Beyond this share the numbers cannot belong together. */
 export const IMPLAUSIBLE_FEE_SHARE = 0.02;
 
+/**
+ * Fees + funding (gross − result) as a share of the position value, or `null`. Used as the TRIGGER for a second reading:
+ * the usual taker fees of both sides are ~ 0.1 % of the position value, so beyond `UNUSUAL_FEE_SHARE` a number was probably
+ * misread (a lost decimal point in the quantity turns 0.12 % into 3 %). Not a verdict – the preview only flags what is far off.
+ */
+export function feeShareOf(i: PlausibilityInput): number | null {
+  if (!i.side || i.entry == null || i.exit == null || i.qty == null || i.pnl == null || !(i.entry * i.qty > 0)) return null;
+  return ((i.exit - i.entry) * i.qty * dir(i.side) - i.pnl) / (i.entry * i.qty);
+}
+export const UNUSUAL_FEE_SHARE = 0.0025;
+
 export function checkRecord(i: PlausibilityInput): Plausibility {
   const out: Plausibility = { gross: null, notional: null, derivedFees: null, roiExpected: null, leverageImplied: null, roiOk: null, flags: [] };
   const { entry, exit, qty, pnl, roi, leverage, side } = i;

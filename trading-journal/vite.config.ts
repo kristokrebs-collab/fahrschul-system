@@ -12,9 +12,10 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
-import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { privacyGuard } from "./scripts/privacyGuard.ts";
+import { OCR_URL_ROOT, OCR_VERSION, ocrSources } from "./src/journal/ocr/assets.ts";
 
 /**
  * Copies the repo's legacy static dashboard into the out dir (`dist/` on Netlify) so the site keeps serving
@@ -31,6 +32,53 @@ function keepLegacyDashboard(): Plugin {
     closeBundle() {
       const src = fileURLToPath(new URL("../dashboard.html", import.meta.url));
       if (existsSync(src) && existsSync(outDir)) copyFileSync(src, join(outDir, "dashboard.html"));
+    },
+  };
+}
+
+/**
+ * Self-hosted files of the local screenshot reader (OCR): tesseract.js's worker script, the WebAssembly cores and the
+ * language data, copied from the pinned packages to `<outDir>/ocr/<version>/` (the list is `src/journal/ocr/assets.ts`;
+ * the version in the path makes `Cache-Control: immutable` safe) and served at the same URL by `vite dev`. They are NOT
+ * part of any bundle and nothing precaches them: the browser fetches them the first time a screenshot is read.
+ * The share edition does not carry a copy – it reads the personal build's `/ocr/` (same site).
+ */
+function ocrAssets(share: boolean): Plugin {
+  const nm = fileURLToPath(new URL("./node_modules", import.meta.url));
+  const prefix = `${OCR_URL_ROOT}${OCR_VERSION}/`;
+  let outDir = fileURLToPath(new URL("./dist", import.meta.url));
+  let command: "build" | "serve" = "build";
+  return {
+    name: "tj-ocr-assets",
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir);
+      command = config.command;
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = (req.url ?? "").split("?")[0] ?? "";
+        if (!url.startsWith(prefix)) return next();
+        const src = ocrSources().find((s) => `${prefix}${s.to}` === url);
+        const file = src ? join(nm, src.from) : "";
+        if (!src || !existsSync(file)) {
+          res.statusCode = 404;
+          res.end("not found");
+          return;
+        }
+        res.setHeader("Content-Type", src.to.endsWith(".js") ? "text/javascript" : "application/octet-stream");
+        res.setHeader("Cache-Control", "no-cache");
+        res.end(readFileSync(file));
+      });
+    },
+    closeBundle() {
+      if (share || command !== "build" || !existsSync(outDir)) return;
+      for (const s of ocrSources()) {
+        const from = join(nm, s.from);
+        const to = join(outDir, prefix.replace(/^\//, ""), s.to);
+        if (!existsSync(from)) throw new Error(`OCR-Datei fehlt: ${s.from} (npm ci ausführen)`);
+        mkdirSync(dirname(to), { recursive: true });
+        copyFileSync(from, to);
+      }
     },
   };
 }
@@ -65,7 +113,7 @@ export default defineConfig(({ mode }) => {
   const share = mode === "share";
   return {
     base: share ? SHARE_BASE : "/",
-    plugins: [react(), tailwindcss(), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
+    plugins: [react(), tailwindcss(), ocrAssets(share), ...(share ? [privacyGuard(), shareAppName()] : [keepLegacyDashboard()])],
     define: {
       __TJ_EDITION__: JSON.stringify(share ? "share" : "personal"),
       __TJ_TARGET__: JSON.stringify("web"),

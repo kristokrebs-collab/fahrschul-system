@@ -97,9 +97,24 @@ const LABEL_DE: Partial<Record<FieldId, string>> = {
   time: "Zeit",
 };
 
+/** Which colour the page paints losses in: red (most apps) or green (some markets paint red for up). */
+export type Convention = "red-loss" | "red-gain";
+
+/** From the explicitly signed results of the page: „-“ in red / „+“ in green vote for red = loss, the reverse against it. */
+export function colourConvention(cells: readonly RawCell[]): Convention {
+  let v = 0;
+  for (const c of cells) {
+    const t = cleanNumberText(c.text).text;
+    if (c.conf < 70 || (c.ink !== "red" && c.ink !== "green")) continue;
+    if (/^-/.test(t)) v += c.ink === "red" ? 1 : -1;
+    else if (/^\+/.test(t)) v += c.ink === "green" ? 1 : -1;
+  }
+  return v < 0 ? "red-gain" : "red-loss";
+}
+
 const conf01 = (c: number): number => Math.max(0, Math.min(1, c / 100));
 
-function numField(cell: RawCell, style: NumberStyle | null, opts: { negativeByInk?: boolean } = {}): RField {
+function numField(cell: RawCell, style: NumberStyle | null, opts: { negativeByInk?: boolean; convention?: Convention } = {}): RField {
   const cleaned = cleanNumberText(cell.text);
   let text = cleaned.text;
   const notes: string[] = [];
@@ -113,12 +128,24 @@ function numField(cell: RawCell, style: NumberStyle | null, opts: { negativeByIn
     conf = Math.min(conf, 0.6);
     notes.push("die Lesungen widersprechen sich");
   }
-  // the minus sign is thin: the colour tells (exchanges paint losses red) – a marked assumption
-  if (opts.negativeByInk && cell.ink === "red" && text && !hasSign(text)) {
+  if (cell.inferred) {
+    conf = Math.min(conf, 0.65);
+    notes.push("Die Zeilenbezeichnung war nicht lesbar – nach den anderen Karten zugeordnet");
+  }
+  // the minus sign is thin: the colour tells (most exchanges paint losses red) – a marked assumption
+  const redLoss = (opts.convention ?? "red-loss") === "red-loss";
+  const negInk = redLoss ? "red" : "green";
+  if (opts.negativeByInk && cell.ink === negInk && text && /^\+/.test(text)) {
+    // a plus sign in the colour of losses: the glyph was torn (a „<“ read as „+“) – the colour is the better witness
+    text = `-${text.slice(1)}`;
+    conf = Math.min(conf, 0.6);
+    derived = true;
+    notes.push("Die Farbe (Verlust) widerspricht dem gelesenen Pluszeichen – Minus angenommen");
+  } else if (opts.negativeByInk && cell.ink === negInk && text && !hasSign(text)) {
     text = `-${text}`;
     conf = Math.min(conf, 0.65);
     derived = true;
-    notes.push("Minus aus der roten Farbe ergänzt – nicht gelesen");
+    notes.push(`Minus aus der ${redLoss ? "roten" : "grünen"} Farbe ergänzt – nicht gelesen`);
   }
   const p = parseShotNumber(text, style);
   if (!p) return { text, conf: 0, value: null, box: cell.box, notes: [...notes, `„${cell.text}“ ist keine lesbare Zahl`] };
@@ -150,13 +177,13 @@ const TIME_FIELDS: readonly TimeField[] = ["openTime", "closeTime", "time"];
 
 const cut = (t: string, n = 28): string => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
 
-function readOne(raw: RawRecord, i: number, view: ViewId, style: NumberStyle | null): ReadRecord {
+function readOne(raw: RawRecord, i: number, view: ViewId, style: NumberStyle | null, convention: Convention): ReadRecord {
   const nums: ReadRecord["nums"] = {};
   const times: ReadRecord["times"] = {};
   const notes = [...raw.notes];
   for (const f of NUM_FIELDS) {
     const c = raw.fields[f];
-    if (c) nums[f] = numField(c, style, { negativeByInk: f === "pnl" || f === "roi" || f === "funding" });
+    if (c) nums[f] = numField(c, style, { negativeByInk: f === "pnl" || f === "roi" || f === "funding", convention });
   }
   for (const f of TIME_FIELDS) {
     const c = raw.fields[f];
@@ -220,6 +247,11 @@ function readOne(raw: RawRecord, i: number, view: ViewId, style: NumberStyle | n
       side = { value: s, conf: 0.5, notes: ["Richtung aus Preisen und Ergebnis abgeleitet – nicht gelesen"], derived: true, text: "" };
       plausibility = checkRecord({ side: s, entry: nums.entry.value, exit: nums.exit.value, qty: nums.qty?.value ?? null, pnl: nums.pnl.value, roi: nums.roi?.value ?? null, leverage: leverage?.value ?? null, fee: null });
     }
+  }
+  // a result that sits where the others do, with an ROI that agrees with it, is confirmed by that
+  if (plausibility.roiOk === true && nums.pnl?.notes.some((n) => /Zeilenbezeichnung/.test(n))) {
+    nums.pnl.conf = Math.max(nums.pnl.conf, 0.85);
+    nums.pnl.notes = ["Zeile nach den anderen Karten zugeordnet – durch den ROI bestätigt"];
   }
   // the leverage the ROI proves confirms an uncertain reading
   const proven = leverageFromRoi(plausibility);
@@ -306,12 +338,30 @@ export function finalizePage(parsed: ParsedPage): PageRecords {
   const allTexts: string[] = [];
   for (const r of raws) for (const c of Object.values(r.fields)) if (c && /\d/.test(c.text) && !/\d{1,2}:\d{2}/.test(c.text)) allTexts.push(cleanNumberText(c.text).text);
   const style = detectNumberStyle(allTexts);
-  const read = raws.map((r, i) => readOne(r, i, parsed.view, style));
+  const convention = colourConvention(raws.flatMap((r) => [r.fields.pnl, r.fields.roi].filter((c): c is RawCell => !!c)));
+  const read = raws.map((r, i) => readOne(r, i, parsed.view, style, convention));
 
   // fields most cards of the page show: a card that lacks one of them as the LAST one is cut off
   const rich = read.filter((r) => presentIds(r).size >= 4);
   const expected = new Set<FieldId>();
   for (const f of SEEN_FIELDS) if (rich.length && rich.filter((r) => presentIds(r).has(f)).length >= Math.ceil(rich.length / 2)) expected.add(f);
+
+  // where each field sits in a card (offset from the symbol line, median of the cards that have it): a card is CUT OFF only
+  // when everything it lacks lies BELOW its last row – a row missing in the middle is a reading gap, not the edge of the picture
+  const fieldY = (r: ReadRecord, f: FieldId): number | null => {
+    const b = (r.nums as Partial<Record<FieldId, RField>>)[f]?.box ?? (r.times as Partial<Record<FieldId, RField>>)[f]?.box;
+    return b ? (b.y0 + b.y1) / 2 - (r.symbol.box.y0 + r.symbol.box.y1) / 2 : null;
+  };
+  const offsets = new Map<FieldId, number>();
+  for (const f of SEEN_FIELDS) {
+    const ys = rich.map((r) => fieldY(r, f)).filter((y): y is number => y != null).sort((a, b) => a - b);
+    if (ys.length >= 2) offsets.set(f, ys[Math.floor(ys.length / 2)]!);
+  }
+  const lacksOnlyBelow = (r: ReadRecord, missing: readonly FieldId[]): boolean => {
+    if (!offsets.size) return true;
+    const lastRow = Math.max(-Infinity, ...SEEN_FIELDS.map((f) => fieldY(r, f) ?? -Infinity));
+    return missing.every((f) => !offsets.has(f) || offsets.get(f)! > lastRow - 4);
+  };
 
   const records: ReadRecord[] = [];
   const incomplete: IncompleteCard[] = [];
@@ -321,10 +371,12 @@ export function finalizePage(parsed: ParsedPage): PageRecords {
     const last = i === read.length - 1;
     const lackCore = core.filter((f) => !have.has(f));
     const lackTime = r.kind === "position" && !have.has("openTime") && !have.has("closeTime") && !have.has("time");
-    const lackExpected = last ? [...expected].filter((f) => !have.has(f) && f !== "time" && !(f === "fee" && r.derivedFees != null)) : [];
+    // only a card list can be cut off by the edge of the picture; an order has no result before it is closed
+    const lackExpected = last && r.layout === "cards" ? [...expected].filter((f) => !have.has(f) && f !== "time" && !(f === "fee" && r.derivedFees != null) && !(f === "pnl" && r.kind === "order")) : [];
     const missingIds = [...new Set<FieldId>([...lackCore, ...(lackTime ? (["openTime"] as FieldId[]) : []), ...lackExpected])];
     r.missing = missingIds.map((f) => LABEL_DE[f] ?? f);
-    const cutOff = last && missingIds.length > 0;
+    const rowMissing = missingIds.filter((f) => f !== "symbol" && f !== "side");
+    const cutOff = last && rowMissing.length > 0 && lacksOnlyBelow(r, rowMissing);
     if (cutOff) {
       const known = [r.symbol.text, r.side.value ? (r.side.value === "long" ? "Long" : "Short") : null, r.leverage ? `${r.leverage.value}×` : null, r.nums.pnl ? `Ergebnis ${r.nums.pnl.text}` : null].filter((x): x is string => !!x);
       incomplete.push({

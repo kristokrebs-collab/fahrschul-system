@@ -273,7 +273,24 @@ export function matchLabel(label: string): LabelMatch | null {
     const score = 1 - d / Math.max(folded.length, phrase.length);
     if (!best || score > best.score) best = { field, score, unit };
   }
-  return best;
+  if (best) return best;
+  // a label the engine garbled in the middle („Position pA 4 0 Lp PnL A“, a dashed underline in the way): it still STARTS with the
+  // phrase's first word and holds the rest in order – the longest such phrase names the field
+  const words = folded.split(" ");
+  let hit: { field: FieldId; len: number } | null = null;
+  for (const { field, phrase } of PHRASES) {
+    const parts = phrase.split(" ");
+    if (phrase.length < 6 || words[0] !== parts[0] || words.length > parts.length + 8) continue;
+    let at = 0;
+    const inOrder = parts.every((p) => {
+      const j = words.indexOf(p, at);
+      if (j < 0) return false;
+      at = j + 1;
+      return true;
+    });
+    if (inOrder && (!hit || phrase.length > hit.len)) hit = { field, len: phrase.length };
+  }
+  return hit ? { field: hit.field, score: 0.82, unit } : null;
 }
 
 /* ------------------------------------------------------------------ tabs / views */

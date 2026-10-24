@@ -12,6 +12,8 @@ export const MIN_SCALE = 0.5;
 export const MAX_SCALE = 3.5;
 /** Widest picture handed to the engine (px): above it the scale is lowered. */
 export const MAX_SCALED_WIDTH = 4800;
+/** Largest scaled picture (pixels) the reader works on: ≈ 6 s per 10 MP in Node, about twice that in a browser. */
+export const MAX_SCALED_PIXELS = 11_000_000;
 /** Tallest strip handed to the engine (px). */
 export const MAX_STRIP_PX = 3200;
 /** White margin around a strip (px, scaled). */
@@ -31,10 +33,12 @@ export interface Prepared {
 const roundScale = (s: number): number => Math.round(s * 4) / 4;
 
 /** The scale for text of `lineHeight` px in a picture `width` px wide. */
-export function chooseScale(lineHeight: number | null, width: number): number {
+export function chooseScale(lineHeight: number | null, width: number, height = 0): number {
   let s = lineHeight ? TARGET_LINE_PX / lineHeight : width < 1300 ? 2 : width < 2200 ? 1.5 : 1;
   s = Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
   if (width * s > MAX_SCALED_WIDTH) s = MAX_SCALED_WIDTH / width;
+  // a very tall picture would take minutes in WebAssembly: the scaled area is capped (long screenshots are read in strips anyway)
+  if (height > 0 && width * height * s * s > MAX_SCALED_PIXELS) s = Math.sqrt(MAX_SCALED_PIXELS / (width * height));
   return Math.max(MIN_SCALE, roundScale(s));
 }
 
@@ -62,7 +66,7 @@ export function prepare(raster: Raster): Prepared {
   const ink = inkPlane(raster, bg);
   const full = Math.max(160, inkQuantile(ink, 0.9995));
   const lh = textLineHeight(ink);
-  const scale = chooseScale(lh, raster.width);
+  const scale = chooseScale(lh, raster.width, raster.height);
   const strips = planStrips(ink, scale);
   return { raster, ink, full, brightness: meanBrightness(raster), info: { dark: isDarkBackground(bg), scale, background: bg, strips } };
 }
@@ -82,8 +86,11 @@ export function toOriginal(p: Prepared, strip: { y0: number }, x: number, y: num
   return { x: (x - STRIP_PAD) / s, y: (y - STRIP_PAD) / s + strip.y0 };
 }
 
-/** A small crop of the ORIGINAL ink, printed and scaled for a re-read of one cell. */
-export function printCrop(p: Prepared, box: { x0: number; y0: number; x1: number; y1: number }, scale: number, pad = { x: 8, y: 6 }): Plane {
+/**
+ * A small crop of the ORIGINAL ink, printed and scaled for a re-read; also says where the crop sits (`x0`, `y0` in picture
+ * pixels) and its scale, so words found in it map back with `fromCrop`.
+ */
+export function printCropAt(p: Prepared, box: { x0: number; y0: number; x1: number; y1: number }, scale: number, pad = { x: 8, y: 6 }): { plane: Plane; x0: number; y0: number; scale: number } {
   const x0 = Math.max(0, Math.floor(box.x0 - pad.x));
   const y0 = Math.max(0, Math.floor(box.y0 - pad.y));
   const x1 = Math.min(p.ink.width, Math.ceil(box.x1 + pad.x));
@@ -93,5 +100,14 @@ export function printCrop(p: Prepared, box: { x0: number; y0: number; x1: number
   const data = new Uint8ClampedArray(w * h);
   for (let y = 0; y < h; y++) data.set(p.ink.data.subarray((y0 + y) * p.ink.width + x0, (y0 + y) * p.ink.width + x0 + w), y * w);
   const crop: Plane = { width: w, height: h, data };
-  return padPlane(printPlane(resizePlane(crop, w * scale, h * scale), p.full), STRIP_PAD);
+  return { plane: padPlane(printPlane(resizePlane(crop, w * scale, h * scale), p.full), STRIP_PAD), x0, y0, scale };
+}
+
+export function printCrop(p: Prepared, box: { x0: number; y0: number; x1: number; y1: number }, scale: number, pad = { x: 8, y: 6 }): Plane {
+  return printCropAt(p, box, scale, pad).plane;
+}
+
+/** Picture coordinates of a point found in a crop made by `printCropAt`. */
+export function fromCrop(c: { x0: number; y0: number; scale: number }, x: number, y: number): { x: number; y: number } {
+  return { x: c.x0 + (x - STRIP_PAD) / c.scale, y: c.y0 + (y - STRIP_PAD) / c.scale };
 }

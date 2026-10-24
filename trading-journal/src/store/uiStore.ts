@@ -92,6 +92,8 @@ export interface ToastInput {
   detail?: string;
   /** Override the visible time (ms, counted by the island while the toast is in front); `0` keeps it until dismissed. */
   duration?: number;
+  /** One button beside the island („Rückgängig“): runs, then the toast leaves. */
+  action?: { label: string; onClick: () => void };
 }
 export interface Toast extends ToastInput {
   id: number;

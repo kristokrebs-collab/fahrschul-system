@@ -56,7 +56,7 @@ function coverage(): CoverageRow[] {
     });
 }
 
-const ACTIONS: readonly FeatureAction[] = ["training", "assistant", "newTrade", "csvImport", "shortcuts"];
+const ACTIONS: readonly FeatureAction[] = ["training", "assistant", "newTrade", "csvImport", "shortcuts", "shotImport"];
 
 describe("function register", () => {
   it("has unique, slug-shaped ids and a name, a benefit sentence and keywords on every entry", () => {

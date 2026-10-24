@@ -12,6 +12,8 @@ export interface Toast {
   valueTone?: "win" | "loss" | "mute";
   /** Secondary line under the title. */
   detail?: string;
+  /** One button beside the island („Rückgängig“): runs, then the toast leaves. */
+  action?: { label: string; onClick: () => void };
 }
 
 export type ToastInput = Omit<Toast, "id"> & { id?: number };

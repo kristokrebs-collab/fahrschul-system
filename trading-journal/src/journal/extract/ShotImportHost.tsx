@@ -3,10 +3,13 @@ import { lazy, Suspense, useState } from "react";
 import { spring, tween } from "@/motion/tokens";
 import { Button } from "@/primitives/Button";
 import { useUi } from "@/store/uiStore";
+import { useOcrImport } from "@/journal/ocr/store";
 import { discardQueue, openNextDraft, useShotImport } from "./store";
 
 /** The preview sheet is its own chunk: it (and the maths behind it) only loads when the trader starts the import. */
 const ExtractSheet = lazy(() => import("./ExtractSheet"));
+/** The screenshot import of the trades page (local text recognition, optional model): its own chunk, like the sheet above. */
+const OcrImportSheet = lazy(() => import("@/journal/ocr/ui/OcrImportSheet"));
 
 /**
  * Host of the screenshot import (F29), mounted with the other hosts (`app/DeferredHosts`): the lazy preview sheet and
@@ -17,14 +20,22 @@ export function ShotImportHost() {
   const open = useShotImport((s) => s.open);
   const queue = useShotImport((s) => s.queue);
   const editorOpen = useUi((s) => s.editor.open);
+  const ocrOpen = useOcrImport((s) => s.open);
   // keep the sheet mounted after its first opening, so it can play its exit
   const [seen, setSeen] = useState(false);
   if (open && !seen) setSeen(true);
+  const [ocrSeen, setOcrSeen] = useState(false);
+  if (ocrOpen && !ocrSeen) setOcrSeen(true);
   return (
     <>
       {seen && (
         <Suspense fallback={null}>
           <ExtractSheet />
+        </Suspense>
+      )}
+      {ocrSeen && (
+        <Suspense fallback={null}>
+          <OcrImportSheet />
         </Suspense>
       )}
       <AnimatePresence>

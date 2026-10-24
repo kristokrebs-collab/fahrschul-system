@@ -266,7 +266,7 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
     <motion.div
       ref={wrapperRef}
       data-lane={initialLane}
-      className="pointer-events-auto relative isolate self-end [grid-area:1/1] data-[lane=top]:self-start"
+      className={cn("pointer-events-auto relative isolate self-end [grid-area:1/1] data-[lane=top]:self-start", note.action && "flex items-center gap-2")}
       {...handle}
       style={{ ...h.style, x: swipe.x }}
       onPointerEnter={(e) => e.pointerType === "mouse" && holdOn("hover")}
@@ -329,6 +329,22 @@ function IslandCard({ note, queued, reduced, onDismiss }: IslandCardProps) {
           </span>
         )}
       </motion.button>
+      {note.action && (
+        <motion.button
+          type="button"
+          data-testid="toast-action"
+          onClick={() => {
+            note.action!.onClick();
+            onDismiss(null);
+          }}
+          className="h-[50px] shrink-0 rounded-full border border-line-2 bg-ink-800 px-4 text-[13px] font-medium text-fg shadow-[0_18px_40px_rgb(0_0_0/calc(0.35*var(--shade,1)))] transition-colors hover:bg-ink-750 pointer-coarse:min-h-11"
+          initial={reduced ? false : { opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={reduced ? instant : { ...spring.pop, delay: tween.toastText.delay }}
+        >
+          {note.action.label}
+        </motion.button>
+      )}
       <AnimatePresence>{queued > 0 && <QueueBadge count={queued} reduced={reduced} />}</AnimatePresence>
     </motion.div>
   );

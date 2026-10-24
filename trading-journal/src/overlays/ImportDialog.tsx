@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRef, useState, type ChangeEvent } from "react";
 import { backupShotInfo, restoreShotsFromBackup } from "@/journal/screenshots/backupShots";
 import { fmt } from "@/lib/format";
+import { openScreenshotImport } from "@/journal/ocr/store";
 import { MotionNumber } from "@/motion/MotionNumber";
 import { Sheet } from "@/motion/Sheet";
 import { StaggerItem } from "@/motion/Stagger";
@@ -38,6 +39,8 @@ export const IMPORT_STRINGS = {
   readError: "Datei konnte nicht gelesen werden",
   csvLead: "Trades aus einer Tabelle oder einem Börsen-Export (Bitunix, Binance, Bybit, OKX …)?",
   csv: "CSV importieren",
+  shotLead: "Oder ein Screenshot deiner Order- / Positionshistorie? Die Texterkennung läuft nur auf deinem Gerät.",
+  shot: "Screenshot importieren",
 } as const;
 
 /** P11 CSV import (mapping assistant, duplicates check) – the sheet lives in the app's ExchangeHost; works without cloud. */
@@ -202,6 +205,21 @@ export function ImportDialog({ open, onClose, onDone, readFile }: ImportDialogPr
             data-testid="import-csv"
           >
             {IMPORT_STRINGS.csv}
+          </Button>
+        </StaggerItem>
+
+        <StaggerItem className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-ink-950/40 px-3.5 py-2.5">
+          <span className="text-[12.5px] text-mute">{IMPORT_STRINGS.shotLead}</span>
+          <Button
+            size="sm"
+            onClick={() => {
+              onClose();
+              openScreenshotImport();
+            }}
+            disabled={busy}
+            data-testid="import-shot"
+          >
+            {IMPORT_STRINGS.shot}
           </Button>
         </StaggerItem>
 

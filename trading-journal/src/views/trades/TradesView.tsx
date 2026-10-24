@@ -8,6 +8,7 @@ import { useMediaQuery } from "@/motion/useMediaQuery";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button, Card, EmptyState } from "@/primitives";
 import { useEnriched, useJournal } from "@/store/journalStore";
+import { openScreenshotImport } from "@/journal/ocr/store";
 import { storageKey } from "@/store/storage";
 import { useUi, type SortKey } from "@/store/uiStore";
 import { LeadFill } from "@/views/setups/LeadFill";
@@ -127,7 +128,17 @@ export function TradesView({ onNew, onOpen, className }: TradesViewProps) {
 
   return (
     <div className={className ?? "grid grid-cols-1 gap-5"}>
-      <PageHeader title="Alle Trades" lead={TRADES_LEAD} count={all.length} leadFill={TRADES_LEAD_FILL} />
+      <PageHeader
+        title="Alle Trades"
+        lead={TRADES_LEAD}
+        count={all.length}
+        leadFill={TRADES_LEAD_FILL}
+        action={
+          <Button size="sm" onClick={() => openScreenshotImport()} data-testid="trades-shot-import">
+            Screenshot importieren
+          </Button>
+        }
+      />
       <Card>
         <TradeFilters
           filter={liveFilter}

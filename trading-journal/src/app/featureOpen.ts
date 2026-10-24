@@ -14,6 +14,7 @@ import { PLAN_TIER_LABEL, featureById, tierOf, type FeatureAction, type FeatureA
 import { openShortcutSheet } from "@/app/shortcuts";
 import { revealCard, whenShown } from "@/app/reveal";
 import { openAssistant } from "@/assistant/open";
+import { openScreenshotImport } from "@/journal/ocr/store";
 import { entitledNow } from "@/billing/entitlements";
 import { openUpgrade } from "@/billing/store";
 import { rememberRecent } from "@/search/searchStore";
@@ -42,6 +43,7 @@ const ACTIONS: Record<FeatureAction, (f: FeatureEntry) => void> = {
     if (f.path) pushToast({ kind: "info", title: f.name, detail: f.path });
   },
   csvImport: () => void import("@/exchanges/store").then((m) => m.openCsvImport()),
+  shotImport: () => openScreenshotImport(),
   shortcuts: () => openShortcutSheet(),
 };
 

@@ -62,18 +62,26 @@ export function scoreAgainstTruth(cands: readonly Candidate[], truth: readonly T
   let found = 0;
   const reads = cands.map(readOf);
   truth.forEach((t, ti) => {
-    // the candidate that reads like this trade: same entry time, else closest entry price × quantity
+    // the reading that agrees with this trade in most fields (a single misread number must not make the whole trade "missing")
     let bi = -1;
-    let bd = Infinity;
+    let bn = 0;
     reads.forEach((r, i) => {
       if (used.has(i)) return;
-      const d = (typeof r.entry === "number" ? Math.abs(r.entry - t.entry) / t.entry : 1) + (typeof r.qty === "number" ? Math.abs(r.qty - t.qty) / t.qty : 1) + (r.openTime && t.openTime && r.openTime === wall(t.openTime) ? -1 : 0);
-      if (d < bd) {
-        bd = d;
+      const n =
+        Number(r.pair === normalizePair(t.pair)) +
+        Number(r.side === t.side) +
+        Number(same(r.qty as number | null, t.qty)) +
+        Number(same(r.entry as number | null, t.entry)) +
+        Number(same(r.exit as number | null, t.exit)) +
+        Number(same(r.pnl as number | null, t.pnl)) +
+        Number(r.openTime === wall(t.openTime)) +
+        Number(r.closeTime === wall(t.closeTime));
+      if (n > bn) {
+        bn = n;
         bi = i;
       }
     });
-    const ok = bi >= 0 && bd < 0.5;
+    const ok = bi >= 0 && bn >= 3;
     if (ok) {
       used.add(bi);
       found += 1;

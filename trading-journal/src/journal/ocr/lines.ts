@@ -86,7 +86,10 @@ function mergeSigns(words: readonly OcrWord[]): OcrWord[] {
 
 /** The words of a picture as lines, top to bottom, each cut into cells. */
 export function buildLines(words: readonly OcrWord[]): Line[] {
-  const kept = words.filter((w) => !isNoise(w));
+  // a chevron glued to a number („80,726.1>“, „0.01»“) is the app's arrow, not part of it; a „<“ in front of one is a torn minus
+  const kept = words
+    .filter((w) => !isNoise(w))
+    .map((w) => (/\d[>»›]+$/.test(w.text) || /^[<‹«]+\d/.test(w.text) ? { ...w, text: w.text.replace(/[>»›]+$/, "").replace(/^[<‹«]+(?=\d)/, "") } : w));
   if (!kept.length) return [];
   const medH = median(kept.filter((w) => /[A-Za-z0-9]/.test(w.text)).map((w) => boxH(w.box))) || 20;
   const sorted = [...kept].sort((a, b) => boxCy(a.box) - boxCy(b.box));

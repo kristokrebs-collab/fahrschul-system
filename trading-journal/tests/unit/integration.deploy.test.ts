@@ -41,7 +41,8 @@ describe("netlify.toml", () => {
 
   it("CSP: same origin, the public market feeds and Supabase (https + wss, storage images); nothing inline, no frames", () => {
     expect(directive("default-src")).toEqual(["'self'"]);
-    expect(directive("script-src")).toEqual(["'self'"]);
+    // the local screenshot reader (tesseract.js) compiles WebAssembly: that, and only that, is allowed beyond 'self'
+    expect(directive("script-src")).toEqual(["'self'", "'wasm-unsafe-eval'"]);
     expect(directive("connect-src")).toEqual(expect.arrayContaining(["'self'", "https://fapi.binance.com", "wss://fstream.binance.com", "https://*.supabase.co", "wss://*.supabase.co"]));
     expect(directive("img-src")).toEqual(expect.arrayContaining(["'self'", "data:", "blob:", "https://*.supabase.co"]));
     expect(directive("worker-src")).toEqual(["'self'", "blob:"]);
@@ -51,6 +52,12 @@ describe("netlify.toml", () => {
     expect(csp).not.toMatch(/stripe|bitunix|anthropic/i);
     expect(toml).toMatch(/Strict-Transport-Security = "max-age=63072000; includeSubDomains"/);
     expect(toml).toMatch(/Permissions-Policy = "camera=\(\), microphone=\(\), geolocation=\(\)"/);
+  });
+
+  it("the self-hosted OCR files are cached for good (their version is in the path) and never come from a third party", () => {
+    expect(toml).toMatch(/for = "\/ocr\/\*"\s+\[headers\.values\]\s+Cache-Control = "public, max-age=31536000, immutable"/);
+    // no CDN anywhere in the policy: language data, worker and core are same-origin (`connect-src 'self'` covers the fetches)
+    expect(csp).not.toMatch(/jsdelivr|unpkg|cdnjs|projectnaptha/);
   });
 
   it("every function is routed under /api/v1 or scheduled in its code, and the toml names the schedules", () => {
