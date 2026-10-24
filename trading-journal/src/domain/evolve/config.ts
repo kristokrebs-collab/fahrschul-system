@@ -122,6 +122,8 @@ function metrics(raw: unknown): WinMetrics | null {
     netPct: fin(raw.netPct) ? raw.netPct : 0,
     // an infinite profit factor is stored as null by JSON
     pf: numOrNull(raw.pf),
+    best3Share: numOrNull(raw.best3Share),
+    incomeR: fin(raw.incomeR) ? raw.incomeR : 0,
   };
 }
 
@@ -177,7 +179,7 @@ export function proposalOf(raw: unknown): StoredProposal | null {
     score: raw.score,
     baseScore: numOrNull(raw.baseScore),
     windowsBetter: cnt(raw.windowsBetter),
-    overfit: { p: Math.min(1, Math.max(0, o.p)), pRun: fin(o.pRun) ? o.pRun : o.p, pNaive: numOrNull(o.pNaive), trialsRun: cnt(o.trialsRun), trialsPrior: cnt(o.trialsPrior), strategiesInRun: Math.max(1, cnt(o.strategiesInRun)) },
+    overfit: { p: Math.min(1, Math.max(0, o.p)), pRun: fin(o.pRun) ? o.pRun : o.p, pNaive: numOrNull(o.pNaive), floor: numOrNull(o.floor), trialsRun: cnt(o.trialsRun), trialsPrior: cnt(o.trialsPrior), strategiesInRun: Math.max(1, cnt(o.strategiesInRun)) },
     plateau: pl,
     freedom: { base: cnt(fr.base), cand: cnt(fr.cand) },
     expected: { avgR: numOrNull(ex.avgR), avgRCI: interval(ex.avgRCI), pctPer30d: numOrNull(ex.pctPer30d), n: cnt(ex.n), days: fin(ex.days) ? ex.days : 0 },

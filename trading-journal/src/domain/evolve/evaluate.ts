@@ -15,7 +15,7 @@ import { customKey, sanitizeCustom } from "../lab/rules/tree";
 import type { CustomConfig } from "../lab/rules/types";
 import type { SignalCfg } from "../signals/config";
 import { freedomOf } from "./mutations";
-import { metricsOf, robustScore } from "./score";
+import { metricsOf, robustScore, scoredR } from "./score";
 import type { Evaluation, EvolveOpts, WinMetrics } from "./types";
 import { evolveWindows, type EvolveWindows, type Win, type WindowResult } from "./windows";
 
@@ -110,9 +110,10 @@ export class Evaluator {
       const len = win.to - win.from + 1;
       let sum = 0;
       for (const t of ts) {
-        sum += t.r;
+        const r = scoredR(t);
+        sum += r;
         const b = k * sub + Math.max(0, Math.min(sub - 1, Math.floor(((t.exitIndex - win.from) * sub) / len)));
-        blocks[b]! += t.r;
+        blocks[b]! += r;
       }
       all.push(...ts);
       return { n: ts.length, sumR: sum };
@@ -125,7 +126,7 @@ export class Evaluator {
       score: robustScore(test, freedom - baseFreedom),
       test,
       perWindow,
-      train: { n: tr.length, avgR: tr.length ? tr.reduce((a, t) => a + t.r, 0) / tr.length : null },
+      train: { n: tr.length, avgR: tr.length ? tr.reduce((a, t) => a + scoredR(t), 0) / tr.length : null },
       freedom,
     };
     return { ev, blocks };

@@ -46,6 +46,9 @@ export function proposalWarnings(w: WarnInput): string[] {
   else if (o.p >= 0.2) out.push(`Nicht klar vom Zufall zu trennen: Nach ${total} getesteten Varianten ist ein so gutes Ergebnis noch zu ${pct(o.p)} allein durch Glück zu erwarten.`);
   const n = w.test.cand.n;
   if (n < WARN_TRADES) out.push(`Kleine Stichprobe: nur ${n} Trades in den Testfenstern (ab ${WARN_TRADES} wird es belastbarer).`);
+  if (w.test.cand.incomeR >= 0.5) out.push(`Funding-Einnahmen von ${de(w.test.cand.incomeR, 1)} R wurden nicht mitgezählt – der Vorschlag sitzt offenbar lange in einer Richtung, die Funding bekommt. Das ist eine Annahme, die sich ändern kann.`);
+  const top = w.test.cand.best3Share;
+  if (top != null && w.test.cand.n >= 6 && top > 0.6) out.push(`Hängt an wenigen Trades: die drei besten machen ${pct(top)} des Gewinns aus.`);
   if (!w.plateau) out.push("Die Nachbarwerte konnten nicht geprüft werden (keine Zahl zum Verschieben). Ob es ein Plateau oder eine Spitze ist, ist offen.");
   else if (!isPlateau(w.plateau)) out.push(`Eher eine Spitze als ein Plateau: nur ${w.plateau.ok} von ${w.plateau.checked} Nachbarwerten sind ähnlich gut.`);
   const h = w.holdout;

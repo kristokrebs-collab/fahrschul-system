@@ -80,9 +80,18 @@ export function realityCheck(d: readonly ArrayLike<number>[], o: RcOptions): RcR
     let best = -Infinity;
     for (let k = 0; k < N; k++) {
       const row = d[k]!;
-      let s = 0;
-      for (let t = 0; t < T; t++) s += row[idx[t]!]!;
-      const stat = (s / T - mean[k]!) / se[k]!;
+      let s1 = 0;
+      let s2 = 0;
+      for (let t = 0; t < T; t++) {
+        const v = row[idx[t]!]!;
+        s1 += v;
+        s2 += v * v;
+      }
+      const m = s1 / T;
+      // studentised again inside every resample (the sample's own spread, floored): this keeps the heavy tails of a t-statistic on
+      // ~24 blocks instead of treating the spread as known
+      const sd = Math.sqrt(Math.max(0, (s2 - T * m * m) / (T - 1)));
+      const stat = (m - mean[k]!) / (Math.max(sd, RC_SD_FLOOR) / Math.sqrt(T));
       if (stat > best) best = stat;
     }
     maxima[b] = best;
@@ -108,4 +117,19 @@ export const naiveP = (z: number): number => 1 - normCdf(z);
 /** Words for a p-value as the cards show them. */
 export function overfitLevel(p: number): "low" | "mid" | "high" {
   return p < 0.2 ? "low" : p < 0.5 ? "mid" : "high";
+}
+
+/** Fewest confirmation-window trades before a failure there raises the probability (fewer trades say nothing either way). */
+export const HOLDOUT_MIN_TRADES = 5;
+
+/**
+ * The confirmation window is data no search ever used for a choice. A proposal that FAILS there cannot be called "unlikely to be
+ * luck": negative Ø R → at least 50 %, worse than the current version → at least 20 %. (A pass proves nothing; it only leaves the
+ * probability as it is.)
+ */
+export function holdoutFloor(cand: { n: number; avgR: number | null } | null, base: { avgR: number | null } | null): number | null {
+  if (!cand || cand.n < HOLDOUT_MIN_TRADES || cand.avgR == null) return null;
+  if (cand.avgR < 0) return 0.5;
+  if (base?.avgR != null && cand.avgR < base.avgR) return 0.2;
+  return null;
 }

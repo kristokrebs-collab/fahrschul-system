@@ -37,8 +37,9 @@ export type WindowResult = { ok: true; windows: EvolveWindows } | { ok: false; r
 export function evolveWindows(lo: number, hi: number, o: Pick<EvolveOpts, "folds" | "trainFrac" | "holdoutFrac">): WindowResult {
   const span = hi - lo + 1;
   if (!(span > 0)) return { ok: false, reason: "Keine Kerzen im Zeitraum." };
-  const holdLen = Math.floor(span * o.holdoutFrac);
-  const testLen = Math.floor((span * (1 - o.trainFrac - o.holdoutFrac)) / o.folds);
+  // rounded targets (0.7 − 0.2 is not exactly 0.5 in floating point): the rest after training and confirmation is split evenly
+  const holdLen = Math.round(span * o.holdoutFrac);
+  const testLen = Math.floor((span - Math.round(span * o.trainFrac) - holdLen) / o.folds);
   const trainLen = span - holdLen - o.folds * testLen;
   if (testLen < MIN_WINDOW_BARS || holdLen < MIN_WINDOW_BARS || trainLen < MIN_WINDOW_BARS) {
     return { ok: false, reason: `Zu wenige Kerzen für ${o.folds} Testfenster plus Training und Bestätigungsfenster (${span} Kerzen; jedes Fenster braucht mindestens ${MIN_WINDOW_BARS}). Wähle einen längeren Zeitraum.` };

@@ -25,7 +25,7 @@ import { Evaluator, type Evaluated, type Facts } from "./evaluate";
 import { freedomOf, lightOnly, mutateChain, type MutationCtx } from "./mutations";
 import { neighborsOf, plateauOf } from "./plateau";
 import { buildDraft, changeLines } from "./proposal";
-import { inflateForPrior, naiveP } from "./significance";
+import { holdoutFloor, inflateForPrior, naiveP } from "./significance";
 import type { Evaluation, EvolveOpts, HoldoutPair, LeaderRow, LogEntry, MutationKind, ProposalDraft, Step, StrategyInput, StrategyResult, StrategySnapshot, TrialVia, WinMetrics } from "./types";
 
 export const DEFAULT_OPTS: EvolveOpts = { folds: 4, sub: 6, trainFrac: 0.3, holdoutFrac: 0.2, elite: 6, restartP: 0.1, stagnation: 120, proposals: 3, boot: 400, neighbors: 12, minGain: 0.25 };
@@ -372,6 +372,7 @@ export class EvolveJob {
       const holdBase = this.holds.get(base.key);
       const holdCand = this.holds.get(f.key);
       const holdout: HoldoutPair | null = holdBase && holdCand && this.windowsMs ? { window: this.windowsMs.holdout, base: holdBase, cand: holdCand } : null;
+      const floor = holdoutFloor(holdCand ?? null, holdBase ?? null);
       const plateau = plateauOf(f.ev.score!, this.nbScores.get(f.key) ?? []);
       out.push(
         buildDraft({
@@ -386,9 +387,10 @@ export class EvolveJob {
           windows: { tests: this.windowsMs!.tests },
           holdout,
           overfit: {
-            p: sig ? inflateForPrior(pRun, sig.trialsRun, sig.trialsPrior) : pRun,
+            p: Math.max(sig ? inflateForPrior(pRun, sig.trialsRun, sig.trialsPrior) : pRun, floor ?? 0),
             pRun,
             pNaive: i >= 0 ? naiveP(z) : null,
+            floor,
             trialsRun: sig?.trialsRun ?? this.trials,
             trialsPrior: Math.round(sig?.trialsPrior ?? 0),
             strategiesInRun: sig?.strategies ?? 1,

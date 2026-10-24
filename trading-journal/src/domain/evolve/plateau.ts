@@ -50,7 +50,7 @@ export function allNeighbors(cfg: CustomConfig): Neighbor[] {
       ? [0.75, 1.25].map((f) => [`Stop ${snap(s.atr * f, 0.05)} × ATR`, { atr: snap(s.atr * f, 0.05) }] as [string, Partial<typeof s>])
       : s.kind === "percent"
         ? [0.8, 1.25].map((f) => [`Stop ${snap(s.pct * f, 0.05)} %`, { pct: snap(s.pct * f, 0.05) }] as [string, Partial<typeof s>])
-        : [0.75, 1.25].map((f) => [`Stop ${Math.max(3, Math.round(s.swing * f))} Kerzen`, { swing: Math.max(3, Math.round(s.swing * f)) }] as [string, Partial<typeof s>]);
+        : [0.75, 1.25].map((f) => [`Stop ${Math.max(5, Math.round(s.swing * f))} Kerzen`, { swing: Math.max(5, Math.round(s.swing * f)) }] as [string, Partial<typeof s>]);
   for (const [label, patch] of stopPairs) pushVariant(out, cfg, label, { ...cfg, stop: { ...s, ...patch } });
   if (cfg.target.kind === "r") for (const f of [0.75, 1.25]) pushVariant(out, cfg, `Ziel ${snap(cfg.target.r * f, 0.05)} R`, { ...cfg, target: { kind: "r", r: snap(cfg.target.r * f, 0.05) } });
   const e = cfg.exits;

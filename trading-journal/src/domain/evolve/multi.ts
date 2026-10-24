@@ -120,8 +120,7 @@ export class EvolveMulti {
   snapshot(): MultiSnapshot {
     const strategies = this.jobs.map((j) => j.snapshot());
     const trialsBudget = this.jobs.reduce((s, j) => s + j.input.maxTrials, 0);
-    // a search that ended early (stagnation, stop) counts as spent: the bar must be able to reach its end
-    const trialsDone = this.jobs.reduce((s, j) => s + (j.phase === "prepare" || j.phase === "search" ? Math.min(j.trialsDone, j.input.maxTrials) : j.input.maxTrials), 0);
+    const trialsDone = this.jobs.reduce((s, j) => s + j.trialsDone, 0);
     const progress = this.final ? 1 : this.jobs.length ? this.jobs.reduce((s, j) => s + j.progress(), 0) / this.jobs.length : 1;
     const anyCheck = this.jobs.some((j) => j.phase === "check" || j.phase === "wait");
     return { phase: this.final ? "done" : this.stopping ? "stopping" : anyCheck ? "check" : "running", strategies, trialsDone, trialsBudget, progress };

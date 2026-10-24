@@ -85,6 +85,10 @@ export interface WinMetrics {
   /** Σ money of the trades ÷ start capital (windows are not compounded into each other) */
   netPct: number;
   pf: number | null;
+  /** share of Σ R that the three best trades make up (null without a positive Σ R) – "hängt an wenigen Trades" */
+  best3Share: number | null;
+  /** funding received that was NOT counted (in R) – see `score.ts` */
+  incomeR: number;
 }
 
 export interface WindowMs {
@@ -249,6 +253,8 @@ export interface Overfit {
   pRun: number;
   /** the same without any correction (one single test of this variant) – for contrast */
   pNaive: number | null;
+  /** a proposal that fails on the confirmation window cannot have a low probability: the floor it was raised to (0.5 negative, 0.2 worse than now), else null */
+  floor: number | null;
   /** variants of this run (all strategies) / earlier ones (weighted) */
   trialsRun: number;
   trialsPrior: number;

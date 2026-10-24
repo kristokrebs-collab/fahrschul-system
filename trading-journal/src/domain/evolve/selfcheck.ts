@@ -8,11 +8,13 @@
  *   below      Ø R live is under that lower end
  *   open       in between (e.g. Ø R fine, money not) – no verdict
  *
+ * Both sides are measured the same way as in the search: R per trade limited to ±5, funding income not counted (`score.ts`).
  * "Confirmed" is a statement about a few weeks and a few trades, not a proof; the text says so. Prediction and outcome are
  * both shown in percent per 30 days so they can be read side by side.
  */
 import type { Interval } from "../analytics/stats";
 import { accountView, type ForwardAccount } from "../forward";
+import { scoredPnl, scoredR } from "./score";
 import type { Expected } from "./types";
 
 export const MIN_LIVE_DAYS = 21;
@@ -51,7 +53,11 @@ export interface LiveCheck {
 /** The live facts of a forward account. */
 export function liveFactsOf(a: ForwardAccount): LiveFacts {
   const v = accountView(a);
-  return { startMs: a.startMs, asOfMs: v.upTo, n: v.stats.n, avgR: v.stats.avgR, avgRCI: v.stats.rCI, netPct: v.nowPct };
+  // the expectation was made without funding income and with R capped per trade (`score.ts`); the live figure is measured the same way
+  const rs = a.trades.map(scoredR);
+  const avgR = rs.length ? rs.reduce((x, y) => x + y, 0) / rs.length : null;
+  const net = a.capital > 0 ? a.trades.reduce((s, t) => s + scoredPnl(t), 0) / a.capital : null;
+  return { startMs: a.startMs, asOfMs: v.upTo, n: v.stats.n, avgR, avgRCI: v.stats.rCI, netPct: net };
 }
 
 export function liveCheck(exp: Expected, live: LiveFacts): LiveCheck {

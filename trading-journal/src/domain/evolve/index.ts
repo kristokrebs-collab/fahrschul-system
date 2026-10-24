@@ -4,10 +4,10 @@
  * Import from `@/domain/evolve` only where it is needed – the optimiser is a lazy chunk. See README.md.
  */
 export * from "./types";
-export { mutate, mutateWeighted, mutateChain, allowedKinds, lightOnly, freedomOf, searchIntervals, LIGHT_KINDS, type MutationCtx, type Freedom } from "./mutations";
+export { mutate, mutateWeighted, mutateChain, allowedKinds, lightOnly, freedomOf, searchIntervals, searchWarmupMs, LIGHT_KINDS, type MutationCtx, type Freedom } from "./mutations";
 export { evolveWindows, MIN_WINDOW_BARS, type EvolveWindows, type Win, type WindowResult } from "./windows";
-export { metricsOf, robustScore, MIN_TEST_TRADES, WARN_TRADES, DD_WEIGHT, COMPLEXITY_W } from "./score";
-export { realityCheck, inflateForPrior, naiveP, overfitLevel, RC_BOOT, RC_SD_FLOOR, type RcResult } from "./significance";
+export { metricsOf, robustScore, chronological, capR, scoredR, scoredPnl, riskMoney, fundingIncome, R_CAP, type TradeFacts, MIN_TEST_TRADES, WARN_TRADES, DD_WEIGHT, COMPLEXITY_W } from "./score";
+export { realityCheck, inflateForPrior, naiveP, overfitLevel, holdoutFloor, HOLDOUT_MIN_TRADES, RC_BOOT, RC_SD_FLOOR, type RcResult } from "./significance";
 export { allNeighbors, neighborsOf, plateauOf, isPlateau, NEIGHBOUR_SHARE, PLATEAU_MIN, type Neighbor } from "./plateau";
 export { Evaluator, signalKey, type EvalEnv } from "./evaluate";
 export { EvolveJob, DEFAULT_OPTS, mixSeed } from "./search";

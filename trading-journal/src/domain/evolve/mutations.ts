@@ -14,7 +14,7 @@
  * re-run that block for the whole history (`lightOnly`).
  */
 import { BLOCKS, defaultParams, sanitizeParams } from "../lab/rules/blocks";
-import { activeLeaves, customKey, editNode, leafText, leavesOf, mirrorGroup, nextNum, sanitizeCustom, sidesOf, stopText, validateCustom } from "../lab/rules/tree";
+import { activeLeaves, customKey, editNode, leafText, leavesOf, mirrorGroup, nextNum, sanitizeCustom, sidesOf, stopText, validateCustom, warmupMsOf } from "../lab/rules/tree";
 import { TF_IDS, TF_SEC, type BlockId, type CustomConfig, type ExitsCfg, type Group, type Leaf, type LeafParams, type ParamDef, type StopCfg, type TfId } from "../lab/rules/types";
 import { MUTATION_KINDS, type Mutated, type MutationKind, type Step } from "./types";
 
@@ -154,9 +154,9 @@ function withExits(cfg: CustomConfig, f: (e: ExitsCfg) => void): CustomConfig {
 function stopSize(cfg: CustomConfig, ctx: MutationCtx): Mutated | null {
   const s = { ...cfg.stop };
   const dir = sign(ctx.rng);
-  if (s.kind === "atr") s.atr = clamp(round(s.atr + dir * pick(ctx.rng, [0.25, 0.5]), 0.25), 0.5, 5);
-  else if (s.kind === "percent") s.pct = clamp(round(s.pct * (dir > 0 ? 1.25 : 0.8), 0.05), 0.3, 10);
-  else s.swing = clamp(s.swing + dir * pick(ctx.rng, [2, 3, 5]), 3, 60);
+  if (s.kind === "atr") s.atr = clamp(round(s.atr + dir * pick(ctx.rng, [0.25, 0.5]), 0.25), 0.75, 5);
+  else if (s.kind === "percent") s.pct = clamp(round(s.pct * (dir > 0 ? 1.25 : 0.8), 0.05), 0.5, 10);
+  else s.swing = clamp(s.swing + dir * pick(ctx.rng, [2, 3, 5]), 5, 60);
   return done(cfg, { ...cfg, stop: s }, [{ kind: "stopSize", text: `Der Stop wurde von ${stopText(cfg.stop)} auf ${stopText(s)} geändert.` }], ctx);
 }
 
@@ -492,3 +492,12 @@ export function searchIntervals(cfg: CustomConfig, higherOfRules: readonly TfId[
   return TF_IDS.filter((t) => out.includes(t));
 }
 
+
+/**
+ * History the search needs before the first tradable candle: the rules' own warm-up, and enough of the next larger timeframe for
+ * a trend filter the search may add (an EMA 200 needs ~600 candles of its own timeframe to be defined) – capped at 450 candles.
+ */
+export function searchWarmupMs(cfg: CustomConfig): number {
+  const up = HIGHER[cfg.interval] ?? cfg.interval;
+  return Math.max(warmupMsOf(cfg), 450 * TF_SEC[up] * 1000);
+}
