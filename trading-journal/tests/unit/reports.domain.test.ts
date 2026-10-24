@@ -243,6 +243,8 @@ describe("Export", () => {
       | Ø R | +0,33 R | +0,83 R |
       | Profit-Faktor | 1,07 | 3,50 |
       | Disziplin | 85 | 83 |
+
+      _Berechnet aus deinem Journal – eine Rückschau, keine Prognose. Keine professionelle Finanzberatung._
       "
     `);
   });

@@ -26,6 +26,7 @@ exports[`Pine-Skripte (Snapshots) > EMA-Kreuz, beide Seiten, Trailing und Gegens
 //
 // Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
 // Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// Ein Test der Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.
 // ════════════════════════════════════════════════════════════════════════════════
 
 strategy("EMA-Kreuz 9/21", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
@@ -176,6 +177,7 @@ exports[`Pine-Skripte (Snapshots) > Opening-Range-Ausbruch London (Sitzung, Swin
 //
 // Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
 // Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// Ein Test der Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.
 // ════════════════════════════════════════════════════════════════════════════════
 
 strategy("Opening-Range-Ausbruch London", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
@@ -357,6 +359,7 @@ exports[`Pine-Skripte (Snapshots) > Rücksetzer im Trend: Break-even auf Netto, 
 //
 // Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
 // Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// Ein Test der Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.
 // ════════════════════════════════════════════════════════════════════════════════
 
 strategy("Rücksetzer im Trend", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
@@ -522,6 +525,7 @@ exports[`Pine-Skripte (Snapshots) > Teil-Gewinn, Break-even danach, Zeit-Stop, S
 //
 // Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
 // Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// Ein Test der Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.
 // ════════════════════════════════════════════════════════════════════════════════
 
 strategy("Golden-Pocket-Rücksetzer", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
@@ -729,6 +733,7 @@ exports[`Pine-Skripte (Snapshots) > die Standardidee (RSI + Tages-EMA, nur Long,
 //
 // Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
 // Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// Ein Test der Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.
 // ════════════════════════════════════════════════════════════════════════════════
 
 strategy("Meine Idee", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)
@@ -853,6 +858,7 @@ exports[`Pine-Skripte (Snapshots) > nicht übersetzbare Bausteine: Funding und M
 //
 // Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.
 // Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.
+// Ein Test der Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.
 // ════════════════════════════════════════════════════════════════════════════════
 
 strategy("Meine Idee", overlay = true, initial_capital = 10000.0, pyramiding = 0, calc_on_every_tick = false, process_orders_on_close = false, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 130, default_qty_type = strategy.fixed, default_qty_value = 1)

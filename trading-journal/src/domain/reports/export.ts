@@ -117,6 +117,8 @@ export function reportToMarkdown(r: Report, focus: ReportFocus = "all"): string 
       ),
     );
   }
+  // the file travels without the page: it carries the same calm line (trading-desk rule: no analysis without it)
+  out.push("", "_Berechnet aus deinem Journal – eine Rückschau, keine Prognose. Keine professionelle Finanzberatung._");
   return out.join("\n") + "\n";
 }
 

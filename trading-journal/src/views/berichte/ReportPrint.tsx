@@ -203,7 +203,7 @@ export function ReportDocument({ report: r, focus }: { report: Report; focus: Re
           )}
         </>
       )}
-      <footer className="rp-foot">Berechnet aus deinem Journal – auf deinem Gerät. Keine Anlageberatung.</footer>
+      <footer className="rp-foot">Berechnet aus deinem Journal – auf deinem Gerät. Keine professionelle Finanzberatung.</footer>
     </article>
   );
 }

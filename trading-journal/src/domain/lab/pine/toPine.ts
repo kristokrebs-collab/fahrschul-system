@@ -575,6 +575,7 @@ export function toPine(config: CustomConfig, options: PineOptions = {}): PineRes
   add("//");
   add("// Zurück ins Labor: Strategietester → „Liste der Trades“ → als CSV exportieren und im Labor unter „TradingView“ laden.");
   add("// Die App kann Pine weder ausführen noch prüfen: meldet TradingView einen Fehler, steht er in Zeile und Text im Editor.");
+  add("// Ein Test der Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.");
   add("// ════════════════════════════════════════════════════════════════════════════════");
   add("");
 
