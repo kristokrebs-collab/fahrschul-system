@@ -93,6 +93,8 @@ export const EMPTY_STUDIO: StudioCfg = Object.freeze({ v: STUDIO_VERSION, strate
 export const DEFAULT_SYMBOL = "BTCUSDT";
 export const DEFAULT_PERIOD: StudioPeriod = "1y";
 
+// control characters (except tab and line break) never belong in a name or a note
+// eslint-disable-next-line no-control-regex
 const clean = (s: unknown, max: number): string => (typeof s === "string" ? s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, " ").trim().slice(0, max) : "");
 
 function answersOf(raw: unknown): Record<string, string> {

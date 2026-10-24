@@ -67,7 +67,7 @@ const DEFS: readonly { kind: Kind; rx: RegExp; read?: (m: RegExpExecArray, an: A
   { kind: "donchian", rx: /\bdonchian\w*(?:\s*(?:\(\s*(\d+)\s*\)|[- ](\d+)\b))?/ },
   {
     kind: "breakout",
-    rx: /\b(?:ausbruch|ausbrueche\w*|breakout|ausbrechen|bricht\s+aus|ausbrechend\w*)\b|\b(?:neues?\s+)?(\d+)[- ]?(?:kerzen|tage|tages|bars|wochen)[- ]?(hoch|tief)\b|\b(hoch|tief)\s+der\s+(?:letzten|vorherigen)\s+(\d+)\s*(?:kerzen|tage\w*|bars)/,
+    rx: /\b(?:ausbruch|ausbrueche\w*|breakout|ausbrechen|bricht\s+aus|ausbrechend\w*)\b|\b(?:neues?\s+)?(\d+)[- ]?(?:kerzen|tage|tages|bars|wochen|perioden?|periods?)[- ]?(hoch|tief)\b|\b(hoch|tief)\s+der\s+(?:letzten|vorherigen)\s+(\d+)\s*(?:kerzen|tage\w*|bars|perioden?|periods?)/,
   },
   { kind: "inside", rx: /\binside[- ]?bar\w*|\binnenkerze\w*|\binnenstab\w*/ },
   { kind: "heikin", rx: /\bheikin[- ]?ashi\w*/ },
@@ -677,12 +677,22 @@ function interpBoll(slot: Slot): Done {
   let mode: string | null = null;
   let ev = false;
   if (squeeze) mode = "squeeze";
-  else if (mid && (rel === "crossUp" || rel === "crossDown")) (mode = rel === "crossUp" ? "midUp" : "midDown"), (ev = true);
-  else if (back && (lower || upper)) (mode = lower ? "backInLower" : "backInUpper"), (ev = true);
-  else if (touch && (lower || upper)) (mode = lower ? "touchLower" : "touchUpper"), (ev = true);
-  else if ((rel === "below" || rel === "crossDown") && lower) (mode = "closeBelow"), (ev = true);
-  else if ((rel === "above" || rel === "crossUp") && upper) (mode = "closeAbove"), (ev = true);
-  else if (lower !== upper) {
+  else if (mid && (rel === "crossUp" || rel === "crossDown")) {
+    mode = rel === "crossUp" ? "midUp" : "midDown";
+    ev = true;
+  } else if (back && (lower || upper)) {
+    mode = lower ? "backInLower" : "backInUpper";
+    ev = true;
+  } else if (touch && (lower || upper)) {
+    mode = lower ? "touchLower" : "touchUpper";
+    ev = true;
+  } else if ((rel === "below" || rel === "crossDown") && lower) {
+    mode = "closeBelow";
+    ev = true;
+  } else if ((rel === "above" || rel === "crossUp") && upper) {
+    mode = "closeAbove";
+    ev = true;
+  } else if (lower !== upper) {
     ctx.assume({ id: "bollMode", text: `Bollinger „${lower ? "unteres" : "oberes"} Band“ ohne Verb gelesen als: der Kurs berührt das ${lower ? "untere" : "obere"} Band.`, options: [], def: null });
     mode = lower ? "touchLower" : "touchUpper";
     ev = true;
@@ -721,7 +731,7 @@ function interpVolume(slot: Slot): Done {
   const selfSpike = /bestaetig/.test(an.m[0]);
   if (!mult && !spike && !selfSpike) return dangling(ctx, an, "Zum Volumen fehlt, was gelten soll (z. B. „Volumen doppelt so hoch wie der Durchschnitt“).");
   let factor = 2;
-  let end = an.b;
+  let end: number;
   if (mult) {
     const w = mult[1]!;
     factor = /^doppelt/.test(w) ? 2 : /^dreifach/.test(w) ? 3 : /^vierfach/.test(w) ? 4 : /^fuenffach/.test(w) ? 5 : parseNum(w);
@@ -751,7 +761,7 @@ function interpBreakout(slot: Slot): Done {
   const m = an.m;
   const nWord = m[1] ?? m[4];
   const dirWord = m[2] ?? m[3];
-  const nInText = /(?:letzten?|vorherigen?)\s+(\d+)\s*(?:kerzen|tage\w*|bars)|(\d+)[- ]?(?:kerzen|tage|bars)/.exec(text);
+  const nInText = /(?:letzten?|vorherigen?)\s+(\d+)\s*(?:kerzen|tage\w*|bars|perioden?|periods?)|(\d+)[- ]?(?:kerzen|tage|bars|perioden?|periods?)/.exec(text);
   const n = nWord ? Number(nWord) : nInText ? Number(nInText[1] ?? nInText[2]) : null;
   const unitDays = /tage|tages/.test(m[0]) || (nInText != null && /tage/.test(nInText[0]));
   const down = dirWord ? dirWord === "tief" : /\b(?:nach\s+unten|unter|abwaerts|short|tief)\b/.test(`${lead} ${text}`) && !/\bnach\s+oben\b/.test(`${lead} ${text}`);
@@ -770,7 +780,10 @@ function interpBreakout(slot: Slot): Done {
   if (unitDays) l.tf = "1d";
   const neg = NEG_LEAD_RX.test(slot.before.trimEnd());
   if (neg) l.not = true;
-  const objEnd = an.b + (nInText ? nInText.index + nInText[0].length : /^\s*(?:ueber|unter|nach\s+(?:oben|unten))\s*(?:das|den|dem)?\s*(?:hoch|tief)?\w*/.exec(text)?.[0].length ?? 0);
+  const objLen = nInText ? nInText.index + nInText[0].length : /^\s*(?:ueber|unter|nach\s+(?:oben|unten))\s*(?:das|den|dem)?\s*(?:hoch|tief)?\w*/.exec(text)?.[0].length ?? 0;
+  // "… 20-Perioden-Hoch ausbricht": the verb belongs to the breakout
+  const verb = /^\s*(?:ausbricht|ausbrechen|bricht\s+aus|durchbricht|ausgebrochen|ueberschreitet|ueberwindet|schliesst|schliessen)\b/.exec(text.slice(objLen));
+  const objEnd = an.b + objLen + (verb ? verb[0].length : 0);
   const start = price?.a ?? an.a;
   emit(ctx, l, start, Math.max(objEnd, an.b), winOf(slot));
   return { end: Math.max(objEnd, an.b) };

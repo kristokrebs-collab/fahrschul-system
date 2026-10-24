@@ -200,13 +200,22 @@ export function scanBreakEven(ctx: Ctx): void {
     let value: { trigger: "r" | "pct"; v: number } | null = null;
     const ra = rIn(aft.t);
     const pa = ra ? null : pctIn(aft.t);
-    if (ra) (value = { trigger: "r", v: ra.v }), (b = kwEnd + ra.b);
-    else if (pa) (value = { trigger: "pct", v: pa.v }), (b = kwEnd + pa.b);
-    else {
+    if (ra) {
+      value = { trigger: "r", v: ra.v };
+      b = kwEnd + ra.b;
+    } else if (pa) {
+      value = { trigger: "pct", v: pa.v };
+      b = kwEnd + pa.b;
+    } else {
       const rb = rIn(bef);
       const pb = rb ? null : pctIn(bef);
-      if (rb) (value = { trigger: "r", v: rb.v }), (a = befStart + rb.a);
-      else if (pb) (value = { trigger: "pct", v: pb.v }), (a = befStart + pb.a);
+      if (rb) {
+        value = { trigger: "r", v: rb.v };
+        a = befStart + rb.a;
+      } else if (pb) {
+        value = { trigger: "pct", v: pb.v };
+        a = befStart + pb.a;
+      }
     }
     ctx.add({ kind: "breakEven", trigger: value?.trigger ?? "r", value: value?.v ?? 1, to: net ? "net" : "entry", fromDefault: !value, a, b });
     if (!value) ctx.assume({ id: "be", text: "Break-even ab +1 R (im Text stand kein Wert)", options: [0.5, 1, 1.5, 2].map((v) => ({ id: String(v), label: `+${String(v).replace(".", ",")} R` })), def: "1" });
@@ -299,7 +308,7 @@ const SESSION_RX: readonly [string, RegExp][] = [
   ["london", /\blondon\w*/],
   ["asia", /\b(?:asien\w*|asia\w*|asiatisch\w*|tokio\w*|tokyo\w*)/],
 ];
-const SESSION_OTHER = /\b(?:frankfurt\w*|europa\w*|eu-?(?:session|handel|zeit)|europaeisch\w*|sydney\w*)\b/;
+const SESSION_OTHER = /\b(?:frankfurt\w*|europa\w*|eu-?(?:session|handel|zeit)|europaeisch\w*|sydney\w*)(?:[- ](?:session|handel\w*|zeit|boerse))?\b/;
 const DAYS = ["montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonntag"] as const;
 const DAY_KEY = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 const DAY_NAME: Record<string, string> = { mon: "Montag", tue: "Dienstag", wed: "Mittwoch", thu: "Donnerstag", fri: "Freitag", sat: "Samstag", sun: "Sonntag" };
@@ -322,9 +331,18 @@ export function scanTimeFilters(ctx: Ctx): void {
   const toks: Tok[] = [];
   for (const [key, rx] of SESSION_RX) each(ctx, rx, (m) => (toks.push({ kind: "session", key, a: m.index, b: m.index + m[0].length }), ctx.consume(m.index, m.index + m[0].length)));
   each(ctx, new RegExp(String.raw`\b(${DAYS.join("|")})s?\b`), (m) => (toks.push({ kind: "day", key: DAY_KEY[DAYS.indexOf(m[1] as (typeof DAYS)[number])]!, a: m.index, b: m.index + m[0].length }), ctx.consume(m.index, m.index + m[0].length)));
+  // the answer decides: a session chip becomes the time filter, "keine Zeitbeschränkung" drops the words on purpose
+  const SESSION_ANSWERS = ["london", "ny", "asia", "none"] as const;
+  const answered = (id: string, m: RegExpExecArray): boolean => {
+    const ans = ctx.answer(id, SESSION_ANSWERS);
+    if (ans == null) return false;
+    if (ans === "none") ctx.consume(m.index, m.index + m[0].length);
+    else ctx.add({ kind: "cond", filter: true, node: timeLeaf({ session: ans }), a: m.index, b: m.index + m[0].length });
+    return true;
+  };
   each(ctx, SESSION_OTHER, (m) => {
-    ctx.noteUnclear(m.index, m.index + m[0].length, "Diese Session kennt das Labor nicht – es rechnet Asien (00–07 UTC), London (07–13), New York (13–21), Spät (21–24) und das Wochenende.");
     ctx.ask({ id: "session-other", text: `Welche Session meinst du mit „${ctx.phrase(m.index, m.index + m[0].length)}“?`, options: [{ id: "london", label: "London" }, { id: "ny", label: "New York" }, { id: "asia", label: "Asien" }, { id: "none", label: "Keine Zeitbeschränkung" }], blocking: false, span: { a: m.index, b: m.index + m[0].length } });
+    if (!answered("session-other", m)) ctx.noteUnclear(m.index, m.index + m[0].length, "Diese Session kennt das Labor nicht – es rechnet Asien (00–07 UTC), London (07–13), New York (13–21), Spät (21–24) und das Wochenende.");
   });
   toks.sort((x, y) => x.a - y.a);
   // group tokens of one kind that are only joined by "und / oder / , / bis"
@@ -346,21 +364,35 @@ export function scanTimeFilters(ctx: Ctx): void {
     }
     const a = first.a;
     // the phrase includes the little words before it ("nur in der", "nicht am")
-    const lead = /(?:nur\s+|nicht\s+|kein\w*\s+|ohne\s+|ausser\s+)?(?:in\s+der\s+|in\s+den\s+|im\s+|am\s+|an\s+|waehrend\s+(?:der\s+|des\s+)?)?(?:nur\s+)?$/.exec(ctx.s.slice(Math.max(0, a - 22), a));
+    const lead = /(?:(?:nur|nicht|kein\w*|ohne|ausser|niemals|nie)\s+(?:(?:handel\w*|handeln|trade\w*|traden|einstieg\w*|einstiege|position\w*|signal\w*|eroeffnung\w*|orders?)\s+)?)?(?:in\s+der\s+|in\s+den\s+|im\s+|am\s+|an\s+|waehrend\s+(?:der\s+|des\s+)?)?(?:nur\s+)?$/.exec(ctx.s.slice(Math.max(0, a - 30), a));
     const start = a - (lead ? lead[0].length : 0);
     const lastTok = group[group.length - 1]!;
-    const trailWord = /^[\s,]*(?:\w+\s+)?(?:ausgeschlossen|ausschliessen|meiden|vermeiden|gesperrt|weglassen|auslassen)\b/.exec(ctx.s.slice(lastTok.b, lastTok.b + 28));
+    const trailWord = /^[\s,]*(?:\w+\s+)?(?:ausgeschlossen|ausschliessen|meiden|vermeiden|gesperrt|weglassen|auslassen|(?:nicht|nie|niemals)\s+(?:handeln|traden|einsteigen|kaufen|verkaufen)|(?:kein|keine)\s+(?:handel|trades?|einstiege?|positionen))\b/.exec(ctx.s.slice(lastTok.b, lastTok.b + 40));
     const end = lastTok.b + (/^[- ]?(?:session|handel\w*|zeit|boerse)\b/.exec(ctx.s.slice(lastTok.b, lastTok.b + 14))?.[0].length ?? 0) + (trailWord ? trailWord[0].length : 0);
-    const trailNeg = /^[\s,]*(?:\w+\s+)?(ausgeschlossen|ausschliessen|meiden|vermeiden|gesperrt|weglassen|auslassen|raus|aus)\b/.exec(ctx.s.slice(group[group.length - 1]!.b, group[group.length - 1]!.b + 28));
-    const neg = (lead != null && /\b(?:nicht|kein\w*|ohne|ausser)\b/.test(lead[0]) && !/\bnicht\s+nur\b/.test(lead[0])) || trailNeg != null;
+    const trailNeg = /^[\s,]*(?:\w+\s+)?(ausgeschlossen|ausschliessen|meiden|vermeiden|gesperrt|weglassen|auslassen|raus|aus|(?:nicht|nie|niemals)\s+(?:handeln|traden|einsteigen|kaufen|verkaufen)|(?:kein|keine)\s+(?:handel|trades?|einstiege?|positionen))\b/.exec(ctx.s.slice(group[group.length - 1]!.b, group[group.length - 1]!.b + 40));
+    const neg = (lead != null && /\b(?:nicht|kein\w*|ohne|ausser|nie|niemals)\b/.test(lead[0]) && !/\bnicht\s+nur\b/.test(lead[0])) || trailNeg != null;
+    // a negation close before the time that the patterns above did not attach to it: never read it as "only then"
+    const near = ctx.s.slice(Math.max(0, a - 34), a);
+    if (!neg && /\b(?:nicht|kein\w*|ohne|ausser|nie|niemals)\b[^,;.\d]*$/.test(near) && !/\bnicht\s+nur\b/.test(near)) {
+      ctx.noteUnclear(Math.max(0, start - 20), end, "Hier steht eine Verneinung (nicht / kein / ohne). Ich weiß nicht sicher, ob du diese Zeit ausschließen oder allein handeln willst – schreib es z. B. als „nicht am Wochenende“ oder „nur in der London-Session“.");
+      i = j;
+      continue;
+    }
     const leaves: SpecNode[] = keys.map((k) => timeLeaf(first.kind === "session" ? { session: k } : { weekday: k }, neg));
     const node: SpecNode = leaves.length === 1 ? leaves[0]! : { t: "group", op: neg ? "and" : "or", kids: leaves };
     ctx.add({ kind: "cond", filter: true, node, a: Math.min(start, a), b: end });
     i = j;
   }
   // clock times are not part of the lab's rules
+  let clockUsed = false;
   each(ctx, /\b(?:von|ab|zwischen|um|bis)\s*\d{1,2}(?::\d\d)?\s*(?:uhr)?\s*(?:bis|-|und)\s*\d{1,2}(?::\d\d)?\s*uhr\b|\b\d{1,2}:\d\d\s*(?:uhr)?(?:\s*(?:bis|-)\s*\d{1,2}:\d\d)?|\b\d{1,2}\s*uhr\b/, (m) => {
-    ctx.noteUnclear(m.index, m.index + m[0].length, "Uhrzeiten kennt das Labor nicht – nur feste Sessions (Asien 00–07, London 07–13, New York 13–21 UTC, Spät 21–24) und Wochentage.");
+    // the chosen session replaces the clock time (once); "keine Zeitbeschränkung" drops it on purpose
+    const ans = ctx.answer("clock", SESSION_ANSWERS);
+    if (ans != null) {
+      if (ans === "none" || clockUsed) ctx.consume(m.index, m.index + m[0].length);
+      else ctx.add({ kind: "cond", filter: true, node: timeLeaf({ session: ans }), a: m.index, b: m.index + m[0].length });
+      clockUsed = true;
+    } else ctx.noteUnclear(m.index, m.index + m[0].length, "Uhrzeiten kennt das Labor nicht – nur feste Sessions (Asien 00–07, London 07–13, New York 13–21 UTC, Spät 21–24) und Wochentage.");
     ctx.ask({ id: "clock", text: "Welche Session kommt deiner Uhrzeit am nächsten?", options: [{ id: "asia", label: "Asien (00–07 UTC)" }, { id: "london", label: "London (07–13 UTC)" }, { id: "ny", label: "New York (13–21 UTC)" }, { id: "none", label: "Keine Zeitbeschränkung" }], blocking: false, span: { a: m.index, b: m.index + m[0].length } });
   });
 }

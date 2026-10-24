@@ -129,7 +129,7 @@ describe("settings.studio as a passthrough key", () => {
 
   it("keeps unknown keys of the root, of a strategy, and entries it cannot read", () => {
     const a = saveVersion(fresh("s_a", "A"), input(T1), 2000, "a1");
-    const raw = { ...(withStrategies(undefined, [a]) as Record<string, unknown>), futureRoot: { x: 1 } };
+    const raw = { ...(withStrategies(undefined, [a]) as { strategies: unknown[] }), futureRoot: { x: 1 } } as { strategies: unknown[]; futureRoot: unknown };
     (raw.strategies as Record<string, unknown>[])[0]!.futureField = [1, 2];
     (raw.strategies as unknown[]).push({ id: "s_new", somethingNew: true }, "garbage", { id: "s_bad", text: "x", versions: [{ n: 1, text: "x", config: { version: 99 } }] });
     const cfg = studioCfgOf(raw);

@@ -100,6 +100,14 @@ const CASES: Case[] = [
   { text: "Long nur Dienstag bis Donnerstag, wenn RSI unter 40", long: [["rsi", { level: 40 }]], unclear: 0 },
   { text: "Long wenn RSI unter 30 in der London und New York Session", long: [RSI_L], unclear: 0 },
   { text: "Kaufe bei RSI unter 30 aber nur am Montag", long: [RSI_L, ["timeWindow", { weekday: "mon" }]], unclear: 0 },
+  // a negation with a noun in between is still a negation: never "only on the weekend"
+  { text: "Kaufe, wenn der RSI unter 30 liegt, kein Handel am Wochenende", long: [RSI_L, ["timeWindow", { session: "weekend" }, { not: true }]], unclear: 0 },
+  { text: "Long wenn RSI unter 30, am Wochenende nicht handeln", long: [RSI_L, ["timeWindow", { session: "weekend" }, { not: true }]], unclear: 0 },
+  { text: "Long wenn RSI unter 30, keine Trades am Freitag", long: [RSI_L, ["timeWindow", { weekday: "fri" }, { not: true }]], unclear: 0 },
+  { text: "Long wenn der RSI nicht über 70 ist, in der London-Session", long: [["rsi", { mode: "above", level: 70 }, { not: true }], ["timeWindow", { session: "london" }]], unclear: 0 },
+  // a number in front of a candle / period word is a count, never a price level
+  { text: "Kaufe, wenn der Kurs über das 20-Perioden-Hoch ausbricht, Stop 2 ATR, Ziel 2R", long: [["breakout", { mode: "up", n: 20 }]], stop: { atr: 2 }, target: { r: 2 }, unclear: 0 },
+  { text: "Long wenn der Kurs über dem Hoch der letzten 50 Kerzen schließt", long: [["breakout", { mode: "up", n: 50 }]], unclear: 0 },
   { text: "Montag bis Freitag, Long wenn RSI unter 35, Zeitstop nach 20 Kerzen", long: [["rsi", { level: 35 }], ["timeWindow", { session: "weekend" }, { not: true }]], exits: { maxBars: 20 }, unclear: 0 },
   // ── exits and management ───────────────────────────────────────────────────────────────────────────────
   {
@@ -248,6 +256,25 @@ describe("parseStrategyText · answers complete the rules", () => {
     const both = parseStrategyText(text, { answers: { side: "both" } });
     expect(both.rules.sides).toBe("both");
     expect(nodeText(both.rules.short)).toBe("RSI(14) kreuzt nach oben 70");
+  });
+
+  it("a session chip for an unknown session or a clock time becomes the time filter (or drops the words on purpose)", () => {
+    const text = "Long wenn RSI unter 30, nur in der Frankfurt-Session";
+    const open = parseStrategyText(text);
+    expect(open.unclear.some((u) => /Session/.test(u.why))).toBe(true);
+    expect(leavesOf(open.rules.long).map((l) => l.block)).toEqual(["rsi"]);
+    const london = parseStrategyText(text, { answers: { "session-other": "london" } });
+    expect(leavesOf(london.rules.long).map((l) => [l.block, l.params.session])).toEqual([["rsi", undefined], ["timeWindow", "london"]]);
+    expect(london.unclear).toHaveLength(0);
+    expect(london.understood.some((u) => u.kind === "filter")).toBe(true);
+    const none = parseStrategyText(text, { answers: { "session-other": "none" } });
+    expect(leavesOf(none.rules.long).map((l) => l.block)).toEqual(["rsi"]);
+    expect(none.unclear).toHaveLength(0);
+    const clock = "Long wenn RSI unter 30, nur von 8 bis 12 Uhr";
+    expect(parseStrategyText(clock).unclear.length).toBeGreaterThan(0);
+    const ny = parseStrategyText(clock, { answers: { clock: "ny" } });
+    expect(leavesOf(ny.rules.long).find((l) => l.block === "timeWindow")?.params.session).toBe("ny");
+    expect(ny.unclear).toHaveLength(0);
   });
 
   it("an EMA/SMA answer changes the average; an unanswered question uses the named provisional reading", () => {

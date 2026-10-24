@@ -75,6 +75,8 @@ export interface LevelPair {
 const NUM = String.raw`-?\d+(?:[.,]\d+)?`;
 const REL_WORD_RX = /(?:\b(?:ueber|oberhalb|darueber|drueber|groesser|hoeher|mehr als|unter|unterhalb|darunter|drunter|kleiner|niedriger|tiefer|weniger als|kreuz\w*|schneid\w*|durchbr\w*|faellt|fallen|sinkt|sinken|rutscht|steigt|steigen|springt|klettert|unterschreit\w*|ueberschreit\w*)\b|[<>])/;
 
+const COUNT_UNIT_RX = /^[- ]?(?:perioden?|periods?|kerzen?|bars?|candles?|tage[ns]?|tages|wochen|stunden|minuten)\b/;
+
 /**
  * Every "relation + number" in `text`: "unter 30", "kreuzt 50 nach oben", "fällt unter 30", "über 30 und unter 70".
  * "zwischen 30 und 70" is two pairs (above 30, below 70). A number without a relation is not a pair.
@@ -92,6 +94,8 @@ export function levelPairs(text: string, parse: (raw: string) => number = parseN
       a++;
       s = s.slice(1);
     }
+    // "20-Perioden-Hoch", "5 Kerzen", "3 Tage": a count of candles or days, never a price level
+    if (COUNT_UNIT_RX.test(text.slice(m.index + m[0].length))) continue;
     nums.push({ v: parse(s), a, b: m.index + m[0].length });
   }
   if (between) {
