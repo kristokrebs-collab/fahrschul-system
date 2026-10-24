@@ -569,3 +569,28 @@ ein `Sheet` (lazy) mit den Versuchen als Zeilen.
 
 Jede Karte endet mit „Vergangene Ergebnisse sind keine Prognose. Keine professionelle Finanzberatung.“ (`evolve-disclaimer`, `text-faint`, nicht wegklickbar).
 Keine eigene Bewegung außer dem Balken; alles Weitere kommt aus `src/motion`.
+### Strategie-Studio (F73)
+
+Keine neue Sprache: die Seite `#studio` ist ein Raster aus den vorhandenen `Card`s (Zellen `Reveal`, Abschnittstitel wie im Labor). Oben links die **Strategie-Liste** (je Strategie eine
+`rounded-xl border-line`-Zeile: Haken als `role="checkbox"` mit 44-px-Zielfläche, Name, darunter „v2 · 2 Versionen · 1 Papierkonto“ in `text-faint`; die geöffnete hat den helleren Rand), rechts der
+**Editor**: großes Textfeld (`Textarea`, 14 px, Zeilen mit Luft), darunter Beispiel-Chips (`rounded-full border-line-2`, wie die Chips des Labors), Markt und Zeitraum, dann „Verstehen“ als
+**einziger** weißer Primärknopf der Gruppe, „Als Entwurf speichern“ als Ghost.
+
+**Verstehen = Lesen, nicht Raten.** Der eigene Text erscheint mit markierten Wörtern: verstanden = grünlicher Grund mit dünner Unterkante und kleiner Nummer (`sup`, 9,5 px) passend zur Liste darunter,
+unklar = Bernstein. Die Farbe ist hier **keine Wertung**, sondern „gelesen / nicht gelesen“; deshalb steht eine Legende darunter und jede Markierung trägt ihren Grund im `title`. Die Liste „Das habe ich
+verstanden“ ist je Zeile ein Paar „deine Wörter | was das Labor daraus macht“ (mobil untereinander). „Unklar“ sind `border-warn/25`-Zeilen mit dem Grund; „Fragen an dich“ sind Zeilen mit einer
+Marke (Nötig = warn, vorläufig = mute, beantwortet = win) und den Antwort-Chips (`role="radiogroup"`, gewählt = hellerer Grund, ≥ 44 px bei grobem Zeiger); „Meine Annahmen“ nutzt dieselben Chips. Ändert
+man den Text, wird der ganze Block gedämpft (`opacity-60`), die Chips sind gesperrt und ein Satz verlangt ein neues „Verstehen“ – nichts wird still neu gelesen.
+
+**Ergebnis.** Der Backtest zeigt Kennzahlen als `Kpi`-Kacheln (Vorzeichen-Ton nur für Ø R und Netto), einen Kasten zur Stichprobe (unter 30 Trades Warn-Ton mit dem Satz dazu), die Eigenkapital-Kurve
+(`EquityDraw`, eine Fläche, kein Fanfarenton), Train / Test als zwei ruhige Kacheln und höchstens drei Beobachtungen. **Jede Ergebniskarte endet mit „Keine professionelle Finanzberatung.“**, Backtest
+und Vergleich davor mit dem einen ruhigen Satz, dass er die Vergangenheit zeigt.
+
+**Vergleich („Alle testen“).** Die **Zahl der verglichenen Strategien** steht groß und in Mono über der Tabelle – schon vor dem Lauf –, darunter ein Warn-Kasten (`border-warn/30 bg-warn/[0.06]`) mit dem
+Mehrfachtest-Satz. Ab 768 px eine echte Tabelle (Rang, Strategie, Trades, Trefferquote, Ø R, Profit-Faktor, Max. DD, Test-Fenster in zwei Mono-Zeilen, p angepasst, Stichprobe als `Badge`), darunter
+als Karten je Strategie mit dreispaltigem `dl` – nie ein seitlich scrollender Seitenkörper. Rang 1 bekommt keine Krone und keine Farbe: es ist eine Zahl im Kreis. Nicht gerechnete Strategien stehen
+mit Grund unter „Nicht verglichen“.
+
+**Papierkonten** fragen immer zuerst (ein Kasten mit dem Satz „Kein Echtgeld, keine Order.“ und dem Bestätigen-Knopf). Die Slot-Karten „Muster entdecken“ / „Weiterentwickeln“ sind gestrichelte
+Platzhalter („Kommt gleich.“), bis die echten Werkzeuge eingebaut sind; ein Vorschlag erscheint als Kasten mit dem Unterschied in Klartext und „Übernehmen“ / „Verwerfen“. Keine eigene Bewegung
+außer den vorhandenen Tokens (Zellen-Reveal, `EquityDraw`); reduzierte Bewegung zeigt das Ende sofort.

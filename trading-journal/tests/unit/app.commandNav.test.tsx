@@ -59,8 +59,8 @@ describe("command navigation: pure helpers", () => {
     expect(CONFIG.wipeEase).toEqual([0.76, 0, 0.24, 1]);
     expect(CONFIG.itemMs).toBe(650);
     expect(CONFIG.itemEase).toEqual([0.22, 1, 0.36, 1]);
-    // the pack's four, then one 60 ms beat per further page (P14: 15 pages, + Funktionen)
-    expect(CONFIG.delays.links).toEqual([620, 720, 820, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560, 1620]);
+    // the pack's four, then one 60 ms beat per further page (P14: 15 pages, + Funktionen, + Strategie-Studio)
+    expect(CONFIG.delays.links).toEqual([620, 720, 820, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560, 1620, 1680]);
     expect(CONFIG.delays.links).toHaveLength(PAGES.length);
   });
 });
@@ -100,6 +100,7 @@ describe("command navigation", () => {
       expect.stringMatching(/^Konto.+14$/),
       expect.stringMatching(/^Preise.+15$/),
       expect.stringMatching(/^FunktionenIndex16$/),
+      expect.stringMatching(/^Strategie-StudioText17$/),
     ]);
     expect(within(d).getByRole("link", { name: /Übersicht/ })).toHaveAttribute("aria-current", "page");
     expect(within(d).getByRole("button", { name: COMMAND_NAV_STRINGS.newTrade })).toBeInTheDocument();

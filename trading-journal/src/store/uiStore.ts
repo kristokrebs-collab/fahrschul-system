@@ -9,9 +9,9 @@ import { KEYS, readJson, writeJson } from "./storage";
  * pages follow (markt 5, analyse 6, risiko 7, coach 8, berichte 9, …). The order is the digit order – the dock and the
  * slide direction use `NAV_ORDER`.
  */
-export const PAGES = ["overview", "trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise", "funktionen"] as const;
+export const PAGES = ["overview", "trades", "setups", "settings", "markt", "analyse", "risiko", "coach", "berichte", "labor", "wachstum", "community", "cockpit", "konto", "preise", "funktionen", "studio"] as const;
 export type Page = (typeof PAGES)[number];
-export type PageKey = "o" | "t" | "s" | "e" | "m" | "a" | "r" | "c" | "b" | "l" | "w" | "g" | "d" | "k" | "p" | "f";
+export type PageKey = "o" | "t" | "s" | "e" | "m" | "a" | "r" | "c" | "b" | "l" | "w" | "g" | "d" | "k" | "p" | "f" | "u";
 /** `g` + letter (shortcuts): the bundle's `o|t|s|e` plus one letter per feature page. */
 export const PAGE_KEYS: Record<Page, PageKey> = {
   overview: "o",
@@ -30,6 +30,7 @@ export const PAGE_KEYS: Record<Page, PageKey> = {
   konto: "k",
   preise: "p",
   funktionen: "f",
+  studio: "u",
 };
 /** The five tabs of the dock (fits 390 px with the FAB); every other page is reached via CommandNav, search, `g`+letter and links. */
 export const DOCK_PAGES = ["overview", "trades", "setups", "markt", "settings"] as const satisfies readonly Page[];

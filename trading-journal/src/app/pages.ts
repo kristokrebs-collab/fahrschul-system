@@ -37,6 +37,7 @@ const LOADERS: Record<LazyPage, Loader> = {
   konto: () => import("@/views/konto/KontoPage").then((m) => ({ default: m.KontoPage })),
   preise: () => import("@/views/preise/PreiseView").then((m) => ({ default: m.PreiseView })),
   funktionen: () => import("@/views/funktionen/FunktionenView").then((m) => ({ default: m.FunktionenView })),
+  studio: () => import("@/views/studio/StudioView").then((m) => ({ default: m.StudioView })),
 };
 
 export const LAZY_PAGES = Object.keys(LOADERS) as LazyPage[];
@@ -81,6 +82,7 @@ export const PAGE_FEATURE: Partial<Record<Page, Feature>> = {
   coach: "coach",
   berichte: "reports",
   labor: "backtestLab",
+  studio: "backtestLab",
   wachstum: "growth",
   cockpit: "customDashboards",
 };
