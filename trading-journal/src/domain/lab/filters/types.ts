@@ -7,11 +7,12 @@
 import type { LabStrategyId } from "../../backtest/job";
 import type { HistInterval } from "../../backtest/types";
 import { HIST_MS } from "../../backtest/types";
+import { sanitizePatternSpec, type PatternFilterSpec } from "../../discovery/spec";
 
 export const FILTER_VERSION = 1 as const;
 
-export type FilterId = "rsi" | "trend" | "retest" | "topTrader";
-export const FILTER_IDS: readonly FilterId[] = ["rsi", "trend", "retest", "topTrader"];
+export type FilterId = "rsi" | "trend" | "retest" | "topTrader" | "pattern";
+export const FILTER_IDS: readonly FilterId[] = ["rsi", "trend", "retest", "topTrader", "pattern"];
 
 /** The user's choice (persisted by the Labor page; versioned like the other lab settings). */
 export interface FilterSelection {
@@ -21,6 +22,8 @@ export interface FilterSelection {
   rsiLimit: number;
   /** trend: the higher timeframe's close against its EMA of this length (long above, short below) */
   trendLen: number;
+  /** pattern: a confirmed finding of the Muster-Entdecker, chosen by the user ("Mit diesem Filter testen"); absent = none chosen */
+  pattern?: PatternFilterSpec;
 }
 
 export const FILTER_LIMITS = { rsiLimit: { min: 55, max: 90, step: 5 }, trendLen: { min: 5, max: 100, step: 5 } } as const;
@@ -34,11 +37,13 @@ export function sanitizeFilters(raw: unknown): FilterSelection {
   const r = (raw && typeof raw === "object" ? raw : {}) as Partial<FilterSelection>;
   if (r.v !== undefined && r.v !== FILTER_VERSION) return DEFAULT_FILTERS;
   const on = Array.isArray(r.on) ? FILTER_IDS.filter((id) => (r.on as unknown[]).includes(id)) : [];
+  const pattern = sanitizePatternSpec(r.pattern);
   return {
     v: FILTER_VERSION,
     on,
     rsiLimit: clampInt(r.rsiLimit, FILTER_LIMITS.rsiLimit.min, FILTER_LIMITS.rsiLimit.max, DEFAULT_FILTERS.rsiLimit),
     trendLen: clampInt(r.trendLen, FILTER_LIMITS.trendLen.min, FILTER_LIMITS.trendLen.max, DEFAULT_FILTERS.trendLen),
+    ...(pattern ? { pattern } : {}),
   };
 }
 
@@ -70,7 +75,7 @@ const de = (v: number): string => String(v).replace(".", ",");
 /** The filters with their availability for a strategy on an execution interval. */
 export function filterInfos(strategy: LabStrategyId, interval: HistInterval, sel: FilterSelection = DEFAULT_FILTERS): FilterInfo[] {
   const tf = trendTimeframe(interval);
-  return [
+  const list: FilterInfo[] = [
     { id: "rsi", label: "RSI-Zone", sub: `Long nur bei RSI(14) bis ${de(sel.rsiLimit)}, Short nur ab ${de(100 - sel.rsiLimit)} – kein Einstieg in eine überhitzte Bewegung.`, available: true, reason: null },
     { id: "trend", label: "Höherer Trend", sub: `Long nur, wenn die ${tf.label}-Kerze über ihrem EMA ${sel.trendLen} schließt, Short nur darunter. Es zählen nur geschlossene ${tf.label}-Kerzen.`, available: true, reason: null },
     {
@@ -88,6 +93,11 @@ export function filterInfos(strategy: LabStrategyId, interval: HistInterval, sel
       reason: "Binance hält die Top-Trader-Quote nur für etwa die letzten 30 Tage vor. Für Zeiträume von Monaten gäbe es keine echten Werte, und erfundene Werte zählen nicht.",
     },
   ];
+  // the pattern of the Muster-Entdecker is listed only once the user has chosen one there ("Mit diesem Filter testen")
+  if (sel.pattern) {
+    list.push({ id: "pattern", label: "Muster aus dem Muster-Entdecker", sub: `Nur Einstiege, bei denen gilt: ${sel.pattern.label}. Gerechnet aus den geschlossenen Kerzen vor dem Einstieg.`, available: true, reason: null });
+  }
+  return list;
 }
 
 /** Filters that are chosen AND possible for this strategy, in the fixed order. */

@@ -7,6 +7,7 @@
 import { create } from "zustand";
 import { isLabAbort, runExtra } from "@/domain/backtest/index";
 import type { GridResult, GridSpec } from "@/domain/lab/extras";
+import type { PatternFilterSpec } from "@/domain/discovery/spec";
 import type { FilterCompare } from "@/domain/lab/filters";
 import { sanitizeFilters, type FilterId, type FilterSelection } from "@/domain/lab/filters/types";
 import type { StressRows } from "@/domain/lab/stress/types";
@@ -41,6 +42,8 @@ interface ExtrasState {
   selection: FilterSelection;
   setFilterOn(id: FilterId, on: boolean): void;
   setFilterParam(key: "rsiLimit" | "trendLen", value: number): void;
+  /** the pattern of the Muster-Entdecker as a filter (switches it on); `null` removes it */
+  setPattern(spec: PatternFilterSpec | null): void;
 }
 
 const SEL_KEY = storageKey("labor-filters");
@@ -78,6 +81,14 @@ export const useExtras = create<ExtrasState>()((set, get) => ({
   },
   setFilterParam(key, value) {
     const next = sanitizeFilters({ ...get().selection, [key]: value });
+    writeSelection(next);
+    set({ selection: next, filters: get().filters.status === "running" ? get().filters : idle() });
+  },
+  setPattern(spec) {
+    const cur = get().selection;
+    const { pattern: _old, ...rest } = cur;
+    const on = spec ? [...cur.on.filter((x) => x !== "pattern"), "pattern" as const] : cur.on.filter((x) => x !== "pattern");
+    const next = sanitizeFilters({ ...rest, on, ...(spec ? { pattern: spec } : {}) });
     writeSelection(next);
     set({ selection: next, filters: get().filters.status === "running" ? get().filters : idle() });
   },
