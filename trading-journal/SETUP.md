@@ -151,7 +151,7 @@ Netlify → **Site configuration → Environment variables → Add a variable**.
 | `IP_HASH_PEPPER` | empfohlen, `openssl rand -base64 32`: geheimer Schlüssel der IP-Pseudonyme in Audit-Log und Rate-Limits (HMAC). Ohne ihn wird er aus `SUPABASE_SECRET_KEY` abgeleitet; die rohe IP wird nie gespeichert | Functions, secret |
 | `ANTHROPIC_API_KEY` | optional, KI-Formulierung im Coach und **Screenshot-Import** (Premium). Ohne den Schlüssel ist der Screenshot-Import aus: „Aus Screenshot übernehmen“ erscheint nicht, die Einstellungen → Daten nennen den Grund. Ein abgelehnter Schlüssel zeigt sich erst beim Auslesen („Der KI-Schlüssel auf dem Server wurde abgelehnt“). Ohne Schlüssel verkauft die Preisseite keinen „KI-Coach“: Premium-Highlight, Vergleichstabelle und Upgrade-Dialog lassen ihn weg (`billing/status` meldet `coachAi: false`) | Functions, secret |
 | `COACH_MODEL` | optional, Standard `claude-opus-5-5` | Functions |
-| `ROUTER_MODEL` | optional, Standard = `COACH_MODEL` – Sprach-Router des Assistenten (`/api/v1/assistant/route`, nutzt denselben `ANTHROPIC_API_KEY`) | Functions |
+| `ROUTER_MODEL` | optional, Standard = `COACH_MODEL` – Sprach-Router des Assistenten (`/api/v1/assistant/route`) und KI-Hilfe des Strategie-Studios (`/api/v1/strategy/compile`), nutzen denselben `ANTHROPIC_API_KEY` | Functions |
 | `VISION_MODEL` | optional, Modell des Screenshot-Imports (F29, braucht denselben `ANTHROPIC_API_KEY`); Standard: `COACH_MODEL`, sonst `claude-opus-5-5`. Ohne Schlüssel erscheint „Aus Screenshot übernehmen“ nicht, die Preisseite verkauft den Import dann nicht (`coachAi: false`) | Functions |
 
 `.env.example` listet dieselben Namen (ein Test stellt sicher, dass dort jede Variable steht, die App oder Functions

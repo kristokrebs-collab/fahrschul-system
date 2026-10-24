@@ -149,7 +149,7 @@ const CASES: Case[] = [
 const leafOf = (l: ReturnType<typeof leavesOf>[number]): LeafExp => [l.block, l.params, { not: l.not === true, tf: l.tf }];
 
 function expectLeaves(group: Group, want: LeafExp[], label: string): void {
-  const got = leavesOf(group).filter((l) => want.length === 0 || true);
+  const got = leavesOf(group);
   // the expected list is a subsequence of the leaves in order (extra time filters etc. may follow)
   let at = 0;
   for (const w of want) {
