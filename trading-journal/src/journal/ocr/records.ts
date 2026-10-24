@@ -7,7 +7,7 @@
 import type { Side } from "@/domain/types";
 import { detectNumberStyle, parseShotNumber, type NumberStyle } from "@/journal/extract/numbers";
 import type { RawCell, RawRecord, ParsedPage } from "./layout";
-import { checkRecord, leverageFromRoi, type Plausibility, type PlauField } from "./plausibility";
+import { checkRecord, leverageFromRoi, type Plausibility } from "./plausibility";
 import { cleanNumberText, cleanTimeText, hasSign, isFullTime } from "./text";
 import type { Box } from "./types";
 import { baseAsset, parseLeverageToken, type FieldId, type ViewId } from "./vocab";
@@ -259,22 +259,8 @@ function readOne(raw: RawRecord, i: number, view: ViewId, style: NumberStyle | n
     leverage.conf = 0.9;
     leverage.notes = [`durch ROI bestätigt (${proven}×)`];
   }
-  // fields that do not fit together are doubtful – the preview marks them
-  const fieldOf = (f: PlauField): RField | null => (f === "leverage" ? leverage : f === "entry" || f === "exit" || f === "qty" || f === "pnl" || f === "roi" ? (nums[f] ?? null) : null);
-  for (const flag of plausibility.flags) {
-    if (flag.code === "side_hint" && !flag.fields.includes("entry")) continue;
-    for (const f of flag.fields) {
-      const x = fieldOf(f);
-      if (x) {
-        x.conf = Math.min(x.conf, 0.65);
-        if (!x.notes.includes(flag.text)) x.notes.push(flag.text);
-      }
-    }
-    if (flag.fields.includes("side") && flag.code === "side_hint" && flag.fields.includes("entry")) {
-      side.conf = Math.min(side.conf, 0.65);
-      side.notes.push(flag.text);
-    }
-  }
+  // (what the numbers say about each other - `plausibility.flags` - is NOT folded into the fields here: the preview checks the
+  // CURRENT values again after every edit, so a corrected field clears the doubt it caused)
 
   const symbol: RField = { text: raw.symbol.text, conf: conf01(raw.symbol.conf), value: null, box: raw.symbol.box, notes: raw.notes.filter((n) => /Symbol/.test(n)) };
   if (symbol.notes.length) symbol.conf = Math.min(symbol.conf, 0.65);

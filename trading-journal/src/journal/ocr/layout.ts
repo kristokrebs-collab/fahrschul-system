@@ -316,7 +316,7 @@ export function inferLabels(records: readonly RawRecord[]): void {
       offsets.set(f, list);
     }
   const med = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
-  const table = [...offsets.entries()].filter(([, v]) => v.length >= Math.max(2, Math.ceil(records.length / 2))).map(([f, v]) => ({ f, dy: med(v) }));
+  const table = [...offsets.entries()].filter(([, v]) => v.length >= Math.max(1, Math.floor(records.length / 2))).map(([f, v]) => ({ f, dy: med(v) }));
   if (table.length < 3) return;
   const sorted = table.map((t) => t.dy).sort((a, b) => a - b);
   const pitch = med(sorted.slice(1).map((v, i) => v - sorted[i]!).filter((d) => d > 4));

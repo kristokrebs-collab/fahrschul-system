@@ -12,6 +12,7 @@ import { applyEdits, fmtPrice, type Edit } from "@/journal/extract/rows";
 import { parseShotTime } from "@/journal/extract/time";
 import { toInputString } from "@/lib/parse";
 import { findDuplicateLoose } from "./duplicates";
+import { checkRecord, type PlauField } from "./plausibility";
 import type { ReadRecord, RField } from "./records";
 import type { Box } from "./types";
 
@@ -70,12 +71,24 @@ function withEntryQty(c: Candidate): Candidate {
   return q == null ? c : { ...c, entries: c.entries.map((l, i) => (i === 0 ? { ...l, qty: q } : l)) };
 }
 
+/**
+ * The exchange's result is NET of fees; when the screenshot shows no fee, the fees follow from the CURRENT prices, quantity and
+ * result (gross - result) - after an edit too. Only a believable amount is taken, and it is marked derived in the preview.
+ */
+function withDerivedFees(c: Candidate): Candidate {
+  if (c.fees.value != null || c.status !== "closed" || c.pnl.value == null || !c.side.value || !c.entries.length || !c.exits.length) return c;
+  const d = checkRecord({ side: c.side.value, entry: averagePrice(c.entries), exit: averagePrice(c.exits), qty: totalQty(c.entries) ?? totalQty(c.exits), pnl: c.pnl.value, roi: null, leverage: null, fee: null }).derivedFees;
+  return d == null ? c : { ...c, fees: { value: Number(d.toPrecision(12)), raw: null, conf: 0.8, state: "ok" } };
+}
+
 /** The import's edits, the typed times, and the entry quantity fix – on freshly built candidates. */
 export function applyOcrEdits(list: readonly Candidate[], edits: readonly OcrEdit[], now: Date): Candidate[] {
   const base = applyEdits(
     list,
     edits.filter((e): e is Edit => !isTimeEdit(e)),
-  ).map(withEntryQty);
+  )
+    .map(withEntryQty)
+    .map(withDerivedFees);
   return base.map((c) =>
     edits
       .filter(isTimeEdit)
@@ -139,6 +152,7 @@ export function cellsOf(c: Candidate, recs: readonly ReadRecord[], ctx: PreviewC
   const sideDerived = recs.some((r) => r.side.derived);
   const sideConf = recs[0]?.side.conf ?? 1;
   const sideNotes = recs.flatMap((r) => r.side.notes);
+  const plau = checkRecord({ side: c.side.value, entry: averagePrice(c.entries), exit: averagePrice(c.exits), qty, pnl: c.pnl.value, roi: recs.find((r) => r.nums.roi?.value != null)?.nums.roi?.value ?? null, leverage: c.leverage.value, fee: null });
   const cells: PreviewCell[] = [
     mk("pair", "Markt", c.pair.value ?? "", c.pair.value ?? "", symbol, c.pair.value, { required: true }),
     {
@@ -171,8 +185,20 @@ export function cellsOf(c: Candidate, recs: readonly ReadRecord[], ctx: PreviewC
   if (closed || c.exits.length) cells.push(mk("exitDate", "Ausstiegszeit", fmtWhen(t1), t1 ? t1.replace("T", " ") : "", fResult("closeTime"), t1, { required: false }));
   if (c.leverage.value != null || recs.some((r) => r.leverage)) cells.push(mk("leverage", "Hebel", c.leverage.value == null ? "—" : `${nf(2).format(c.leverage.value)}×`, c.leverage.value == null ? "" : toInputString(c.leverage.value), recs[0]?.leverage ?? null, c.leverage.value));
   if (c.fees.value != null) {
-    const derivedFees = recs.some((r) => r.derivedFees != null) && !edited(ctx.edits, c.id, "fees");
+    // derived: from the record's own derivation or from the current numbers (a fee the picture shows has the text it was read from)
+    const derivedFees = (recs.some((r) => r.derivedFees != null) || (c.fees.raw == null && !c.fees.edited)) && !edited(ctx.edits, c.id, "fees");
     cells.push({ ...mk("fees", `Gebühren (${ctx.currency})`, nf(4).format(c.fees.value), toInputString(Number(c.fees.value.toPrecision(12))), null, c.fees.value), state: "ok", derived: derivedFees, notes: derivedFees ? ["abgeleitet: Preise × Menge − Ergebnis (inkl. Funding), nicht im Screenshot gelesen"] : [] });
+  }
+  // what the numbers say about each other: a field that does not fit the others is doubtful until it is corrected
+  const keyOf: Partial<Record<PlauField, CellKey>> = { entry: "entry", exit: "exit", qty: "qty", pnl: "pnl", leverage: "leverage", side: "side" };
+  for (const flag of plau.flags) {
+    if (flag.code === "side_hint" && !flag.fields.includes("entry")) continue;
+    for (const f of flag.fields) {
+      const cell = cells.find((x) => x.key === keyOf[f]);
+      if (!cell || cell.state === "missing" || edited(ctx.edits, c.id, cell.key)) continue;
+      cell.state = "uncertain";
+      if (!cell.notes.includes(flag.text)) cell.notes.push(flag.text);
+    }
   }
   return cells;
 }
@@ -191,8 +217,9 @@ export function previewRows(cands: readonly Candidate[], recordsOf: ReadonlyMap<
     const dup = checks.find((k): k is Check & { duplicate: NonNullable<Check["duplicate"]> } => k.level === "dup" && !!k.duplicate);
     const loose = dup ? null : findDuplicateLoose(c, ctx.trades);
     const draft = toDraft(c, []);
+    const live = checkRecord({ side: c.side.value, entry: averagePrice(c.entries), exit: averagePrice(c.exits), qty: totalQty(c.entries) ?? totalQty(c.exits), pnl: c.pnl.value, roi: recs.find((r) => r.nums.roi?.value != null)?.nums.roi?.value ?? null, leverage: c.leverage.value, fee: null });
     const warnings = [
-      ...recs.flatMap((r) => r.plausibility.flags.filter((f) => f.code !== "side_hint" || f.fields.includes("entry")).map((f) => f.text)),
+      ...live.flags.filter((f) => f.code !== "side_hint" || f.fields.includes("entry")).map((f) => f.text),
       ...checks.filter((k) => k.level === "warn" && !["pnl_mismatch", "side_flip", "entry_missing", "entry_implied", "stop_not_original", "no_time"].includes(k.code)).map((k) => k.text),
     ];
     const title = [c.pair.value ?? "Markt unbekannt", c.side.value ? (c.side.value === "long" ? "Long" : "Short") : null, c.leverage.value != null ? `${nf(2).format(c.leverage.value)}×` : null].filter(Boolean).join(" · ");
