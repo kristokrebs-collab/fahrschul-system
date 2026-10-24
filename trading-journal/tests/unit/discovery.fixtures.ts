@@ -51,7 +51,7 @@ export function noiseR(r: () => number): number {
 
 export interface PlantedEffect {
   /** the effect: where this holds, the trade wins with `pWin` (else with `pBase`) */
-  where: (row: Partial<Record<FeatureId, FeatureValue>>) => boolean;
+  where: (row: Partial<Record<FeatureId, FeatureValue>>, i: number, n: number) => boolean;
   pWin: number;
   pBase: number;
 }
@@ -76,7 +76,7 @@ export function makeTable(n: number, seed: number, effect?: PlantedEffect, extra
     }
     let rv: number;
     if (effect) {
-      const p = effect.where(row) ? effect.pWin : effect.pBase;
+      const p = effect.where(row, i, n) ? effect.pWin : effect.pBase;
       rv = r() < p ? 1 + r() * 1.5 : -1;
     } else rv = noiseR(r);
     for (const f of [...numIds, ...catIds]) cols[f]!.push(row[f]!);
@@ -102,7 +102,7 @@ export function tradesOnBars(bars: readonly Bar[], seed: number, opts: { gap?: n
     const row = barFeatures(series, k, atS, side) as Partial<Record<FeatureId, FeatureValue>>;
     let rv: number;
     if (opts.effect) {
-      const p = opts.effect.where(row) ? opts.effect.pWin : opts.effect.pBase;
+      const p = opts.effect.where(row, out.length, Infinity) ? opts.effect.pWin : opts.effect.pBase;
       rv = r() < p ? 1 + r() * 1.5 : -1;
     } else rv = noiseR(r);
     out.push({ id: `b${k}`, entryTime: atS * 1000, exitTime: (atS + gap * sec * 0.6) * 1000, side, r: rv });

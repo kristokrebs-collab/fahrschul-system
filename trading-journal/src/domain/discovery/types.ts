@@ -177,8 +177,6 @@ export interface Finding {
   shareLosers: number | null;
   /** the combination does more than its best single part (combos only) */
   nonObvious: boolean;
-  /** a combination that its single parts explain – kept out of the lists, still counted as tested */
-  redundant: boolean;
   /** at least one feature in it is one most traders do not look at */
   obscure: boolean;
   /** uses a description that is only known after the trade (hold time) – never turned into a filter */
@@ -195,7 +193,7 @@ export interface DiscoveryCounts {
   confirmed: number;
   hint: number;
   rejected: number;
-  /** combinations explained by a simpler pattern (not shown separately) */
+  /** survivors that a simpler or stronger pattern already covers (a combination its parts explain, a near copy) – counted, not shown */
   redundant: number;
   /** classes that had too few trades to be tested at all */
   skippedSmall: number;

@@ -70,6 +70,18 @@ export function holmAdjusted(ps: readonly (number | null)[]): (number | null)[] 
   return out;
 }
 
+/** Same features and, feature by feature, overlapping ranges (or the same category): one pattern is a near copy of the other. */
+export function overlapping(a: readonly Cond[], b: readonly Cond[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((x) => {
+    const y = b.find((c) => c.f === x.f);
+    if (!y || x.k !== y.k) return false;
+    if (x.k === "cat" && y.k === "cat") return x.v === y.v;
+    if (x.k === "num" && y.k === "num") return (x.lo ?? -Infinity) < (y.hi ?? Infinity) && (y.lo ?? -Infinity) < (x.hi ?? Infinity);
+    return false;
+  });
+}
+
 const sgn = (x: number): 1 | -1 => (x >= 0 ? 1 : -1);
 const meanOf = (a: readonly number[]): number | null => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null);
 
@@ -464,73 +476,65 @@ export function* mineTable(table: FeatureTable, ctx: MineContext, prog: { value:
     return { state: "tested", p: (1 + ge) / (LIMITS.confPerms + 1), idx: members };
   };
 
+  /** does a combination do more than its best part? (single conditions are always "their own" pattern) */
+  const comboOf = (conds: readonly Cond[]): { nonObvious: boolean; redundant: boolean } => {
+    if (conds.length < 2) return { nonObvious: false, redundant: false };
+    const full = meanDelta(conds);
+    let best = 0;
+    const L = conds.length;
+    for (let mask = 1; mask < (1 << L) - 1; mask++) {
+      const d = meanDelta(conds.filter((_, k) => (mask >> k) & 1));
+      if (d.n >= 5 && sgn(d.delta) === sgn(full.delta)) best = Math.max(best, Math.abs(d.delta));
+    }
+    const nonObvious = Math.abs(full.delta) - best >= Math.max(0.05, 0.5 * Math.abs(full.delta));
+    return { nonObvious, redundant: !nonObvious };
+  };
+
   interface Pre {
     ct: ReturnType<typeof confTest>;
-    /** BH-adjusted p of the confirmation tests of all candidates, and whether it passed */
+    /** Holm-adjusted p of the confirmation tests of all tested candidates, and whether it passed */
     confQ: number | null;
     ok: boolean;
+    nonObvious: boolean;
   }
-  const makeFinding = (i: number, level: "candidate" | "shown", pre?: Pre): Finding => {
+  /**
+   * The finding of tested cell `i`. `pre` = a candidate that went through the confirmation test; without it the pattern is shown
+   * as it is (rejected for `why`, or described as a hint that the confirmation did not cover).
+   */
+  const makeFinding = (i: number, pre?: Pre, why: Reason = "chance"): Finding => {
     const p = cellParent[i]!;
     const conds = p.condsOf(cellClass[i]!);
     const key = condsKey(conds);
     const z = zObs[i]!;
     const dir = sgn(z);
     const all = statsOf(membersOf(conds, 0, N), "all", true, `all:${key}`);
-    const discIdx = membersOf(conds, 0, nd);
-    const disc = statsOf(discIdx, "disc", false, `disc:${key}`);
+    const disc = statsOf(membersOf(conds, 0, nd), "disc", false, `disc:${key}`);
     const reasons: Reason[] = [];
-    let tier: Tier;
+    let tier: Tier = "rejected";
     let conf: CellStats | null = null;
     let confP: number | null = null;
     let confQ: number | null = null;
-    let blocks: (1 | -1 | 0)[] = blocksOf(conds, dir);
-    const gate = parentP.get(p)!;
+    const blocks = blocksOf(conds, dir);
 
-    if (level === "shown") {
+    if (!pre) {
       // a pattern that did not survive: its numbers are shown anyway, so nothing is hidden
-      tier = "rejected";
-      reasons.push("chance");
+      reasons.push(why);
       const ci = membersOf(conds, nd, N);
       conf = ci.length ? statsOf(ci, "conf", false, `conf:${key}`) : null;
     } else {
-      const ct = pre!.ct;
-      const ci = ct.idx;
-      conf = ci.length ? statsOf(ci, "conf", true, `conf:${key}`) : null;
+      const ct = pre.ct;
+      conf = ct.idx.length ? statsOf(ct.idx, "conf", true, `conf:${key}`) : null;
       confP = ct.p;
-      confQ = pre!.confQ;
-      const agree = blocks.filter((b) => b === 1).length;
-      const stable = agree >= LIMITS.blocksAgree;
-      if (gate > LIMITS.parentGate) {
-        tier = "rejected";
-        reasons.push("gate");
-      } else if (ct.state === "flipped") {
-        tier = "rejected";
-        reasons.push("flipped");
-      } else if (pre!.ok && stable) tier = "confirmed";
+      confQ = pre.confQ;
+      const stable = blocks.filter((b) => b === 1).length >= LIMITS.blocksAgree;
+      if (ct.state === "flipped") reasons.push("flipped");
+      else if (pre.ok && stable) tier = "confirmed";
       else {
         tier = "hint";
         if (ct.state === "small") reasons.push("confirmSmall");
-        else if (!pre!.ok) reasons.push("confirmWeak");
+        else if (!pre.ok) reasons.push("confirmWeak");
         if (!stable) reasons.push("unstable");
       }
-    }
-
-    // combination: does it do more than its best part?
-    let nonObvious = false;
-    let redundant = false;
-    if (conds.length >= 2 && level === "candidate" && tier !== "rejected") {
-      const full = meanDelta(conds);
-      let best = 0;
-      const L = conds.length;
-      for (let mask = 1; mask < (1 << L) - 1; mask++) {
-        const sub = conds.filter((_, k) => (mask >> k) & 1);
-        const d = meanDelta(sub);
-        if (d.n >= 5 && sgn(d.delta) === sgn(full.delta)) best = Math.max(best, Math.abs(d.delta));
-      }
-      const syn = Math.abs(full.delta) - best;
-      nonObvious = syn >= Math.max(0.05, 0.5 * Math.abs(full.delta));
-      redundant = !nonObvious;
     }
 
     let winnersIn = 0;
@@ -552,14 +556,13 @@ export function* mineTable(table: FeatureTable, ctx: MineContext, prog: { value:
       z,
       p: pCell[i]!,
       q: q[i] ?? 1,
-      parentP: gate,
+      parentP: parentP.get(p)!,
       confP,
       confQ,
       blocks,
       shareWinners: winsAll ? winnersIn / winsAll : null,
       shareLosers: losersAll ? losersIn / losersAll : null,
-      nonObvious,
-      redundant,
+      nonObvious: pre?.nonObvious ?? false,
       obscure: conds.some((c) => FEATURES[c.f].obscure),
       postEntry: isPostEntry(conds),
     };
@@ -567,46 +570,64 @@ export function* mineTable(table: FeatureTable, ctx: MineContext, prog: { value:
 
   // ── candidates, confirmation, stability ───────────────────────────────────────────────────────────────────
   const order = Array.from({ length: testedCells }, (_, i) => i).sort((a, b) => (q[a] ?? 1) - (q[b] ?? 1) || Math.abs(zObs[b]!) - Math.abs(zObs[a]!) || a - b);
-  const candidates = order.filter((i) => (q[i] ?? 1) <= LIMITS.fdr);
-  const findings: Finding[] = [];
-  const untested: Finding[] = [];
+  const survivors = order.filter((i) => (q[i] ?? 1) <= LIMITS.fdr);
+  // the feature (pair, triple) as a whole must show an association too (its own permutation test)
+  const gated = survivors.filter((i) => parentP.get(cellParent[i]!)! > LIMITS.parentGate);
+  const gatedSet = new Set(gated);
+  const candidates = survivors.filter((i) => !gatedSet.has(i));
+  // a combination that its single parts explain is no extra finding – it is counted, not tested again
+  const combos = new Map<number, { nonObvious: boolean; redundant: boolean }>();
+  for (const i of candidates) {
+    combos.set(i, comboOf(cellParent[i]!.condsOf(cellClass[i]!)));
+    if ((combos.size & 15) === 0) yield;
+  }
+  // … and neither is a pattern that only repeats a stronger one (same features, overlapping ranges, same direction)
+  const kept: number[] = [];
+  const independent = candidates.filter((i) => {
+    if (combos.get(i)!.redundant) return false;
+    const conds = cellParent[i]!.condsOf(cellClass[i]!);
+    if (kept.some((k) => sgn(zObs[k]!) === sgn(zObs[i]!) && overlapping(cellParent[k]!.condsOf(cellClass[k]!), conds))) return false;
+    kept.push(i);
+    return true;
+  });
+  const tested = independent.slice(0, LIMITS.maxCandidates);
+  const overflow = independent.slice(LIMITS.maxCandidates);
+
   // confirmation tests of the strongest candidates, corrected over all of them (Holm: a cluster of related patterns must not
   // get many chances to replicate by luck). Candidates the confirmation part is too small for are not in the family.
-  const tested = candidates.slice(0, LIMITS.maxCandidates);
-  const cts = tested.map((i) => {
-    const conds = cellParent[i]!.condsOf(cellClass[i]!);
-    return confTest(conds, sgn(zObs[i]!), condsKey(conds));
-  });
-  const adj = holmAdjusted(cts.map((c) => (c.state === "small" ? null : (c.p ?? 1))));
-  for (let k = 0; k < candidates.length; k++) {
-    const i = candidates[k]!;
-    if (k < tested.length) findings.push(makeFinding(i, "candidate", { ct: cts[k]!, confQ: adj[k] ?? null, ok: cts[k]!.state === "tested" && adj[k] != null && adj[k]! <= LIMITS.confirmAlpha }));
-    else {
-      // beyond the limit of the confirmation test: described, never confirmed
-      const f = makeFinding(i, "shown");
-      untested.push({ ...f, tier: "hint", reasons: ["untested"] });
-    }
-    prog.value = 0.75 + (0.25 * (k + 1)) / Math.max(1, candidates.length);
+  const cts: ReturnType<typeof confTest>[] = [];
+  for (let k = 0; k < tested.length; k++) {
+    const conds = cellParent[tested[k]!]!.condsOf(cellClass[tested[k]!]!);
+    cts.push(confTest(conds, sgn(zObs[tested[k]!]!), condsKey(conds)));
+    prog.value = 0.75 + (0.2 * (k + 1)) / Math.max(1, tested.length);
     yield;
   }
-  const all = [...findings, ...untested];
-  const keep = all.filter((f) => !f.redundant);
-  const confirmed = keep.filter((f) => f.tier === "confirmed");
-  const hints = keep.filter((f) => f.tier === "hint");
+  const adj = holmAdjusted(cts.map((c) => (c.state === "small" ? null : (c.p ?? 1))));
+  const verdicts = tested.map((i, k) => makeFinding(i, { ct: cts[k]!, confQ: adj[k] ?? null, ok: cts[k]!.state === "tested" && adj[k] != null && adj[k]! <= LIMITS.confirmAlpha, nonObvious: combos.get(i)!.nonObvious }));
+  // beyond the limit of the confirmation test: described, never confirmed
+  const untested: Finding[] = overflow.map((i) => ({ ...makeFinding(i), tier: "hint" as const, reasons: ["untested" as const] }));
+  prog.value = 0.97;
+  yield;
+
+  const confirmed = verdicts.filter((f) => f.tier === "confirmed");
+  const hints = [...verdicts.filter((f) => f.tier === "hint"), ...untested];
   counts.confirmed = confirmed.length;
   counts.hint = hints.length;
-  counts.redundant = all.filter((f) => f.redundant && f.tier !== "rejected").length;
+  counts.redundant = candidates.length - independent.length;
   counts.rejected = testedCells - counts.confirmed - counts.hint - counts.redundant;
 
-  // the closest misses (so the card can show what was thrown away)
-  const candSet = new Set(candidates);
-  const miss = order.filter((i) => !candSet.has(i)).slice(0, LIMITS.maxRejectedShown);
-  const rejected = miss.map((i) => makeFinding(i, "shown"));
-  // candidates the gate or the confirmation threw out are rejected too and shown with their reason
-  const thrown = all.filter((f) => f.tier === "rejected").slice(0, LIMITS.maxRejectedShown);
+  // the closest rejected ones (so the card can show what was thrown away, with the reason)
+  const thrown = [
+    ...verdicts.filter((f) => f.tier === "rejected"),
+    ...gated.slice(0, LIMITS.maxRejectedShown).map((i) => makeFinding(i, undefined, "gate")),
+    ...order
+      .filter((i) => !(q[i]! <= LIMITS.fdr))
+      .slice(0, LIMITS.maxRejectedShown)
+      .map((i) => makeFinding(i)),
+  ];
 
   const byQ = (a: Finding, b: Finding): number => a.q - b.q || Math.abs(b.z) - Math.abs(a.z);
-  const out = [...confirmed.sort(byQ), ...hints.sort(byQ).slice(0, LIMITS.maxHints), ...[...thrown, ...rejected].sort(byQ).slice(0, LIMITS.maxRejectedShown)];
+  const out = [...confirmed.sort(byQ), ...hints.sort(byQ).slice(0, LIMITS.maxHints), ...thrown.sort(byQ).slice(0, LIMITS.maxRejectedShown)];
   prog.value = 1;
   return result("ok", null, out, usable, B);
 }

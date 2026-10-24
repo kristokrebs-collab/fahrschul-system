@@ -74,7 +74,7 @@ export function countsSentence(c: DiscoveryCounts): string {
 /** The breakdown: bestätigt · Hinweis · verworfen (Zufall) – the rejected ones count too. */
 export function breakdownText(c: DiscoveryCounts): string {
   const parts = [`${c.confirmed} bestätigt`, `${c.hint} ${c.hint === 1 ? "Hinweis" : "Hinweise"}`, `${c.rejected.toLocaleString("de-DE")} verworfen (Zufall)`];
-  if (c.redundant > 0) parts.push(`${c.redundant} schon durch Einzelmerkmale erklärt`);
+  if (c.redundant > 0) parts.push(`${c.redundant} schon durch ein einfacheres oder stärkeres Muster abgedeckt`);
   return parts.join(" · ");
 }
 

@@ -30,7 +30,7 @@ export function filterBlockReason(f: Cond["f"]): string | null {
 const isCond = (c: unknown): c is Cond => {
   if (!c || typeof c !== "object") return false;
   const x = c as Record<string, unknown>;
-  if (typeof x.f !== "string" || !(x.f in FEATURES)) return false;
+  if (typeof x.f !== "string" || !Object.hasOwn(FEATURES, x.f)) return false;
   if (x.k === "cat") return typeof x.v === "string" && x.v.length > 0 && x.v.length < 60;
   if (x.k !== "num") return false;
   const ok = (v: unknown): boolean => v === null || (typeof v === "number" && Number.isFinite(v));
