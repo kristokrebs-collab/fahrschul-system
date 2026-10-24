@@ -68,3 +68,7 @@ Only for the month report with the focus „Alles“ (also for a month without t
 signals the archive recorded and lines the Zustellprotokoll sent, checklist complete / incomplete, logged rule violations, plan followed, days over the day limit, trades over the per-trade limit, the review share, check-in days,
 the accepted weekly experiments of the month's weeks with their reading. A trace that does not reach back to the month's start is flagged. **Not claimed:** avoided rule violations, money „saved“, estimates, causes (the card says so).
 Tests: `reports.benefit.test.ts`, `views.coach.signalchain.test.tsx`, e2e `signal-chain.spec.ts`.
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Die Chips folgen Fokus und Art des Berichts (Performance/Vergleich nur bei Fokus „Alles“, Wochenreview/-experiment nur im Wochenbericht, Monatsnutzen nur im Monatsbericht); gefunden über `data-testid`. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.

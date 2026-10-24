@@ -71,6 +71,7 @@ export function FunktionenView({ className }: { className?: string }) {
 
   const interests = useMemo(() => memoryOf(settings).interests, [settings]);
   const lastUsed = useMemo(() => recentFeatures(recent, 3), [recent]);
+  // four at most; on a phone the first two – the tiles below are the page
   const picks = useMemo(() => suggestFeatures({ interests, now, skip: lastUsed.map((f) => f.id), k: 4 }), [interests, now, lastUsed]);
   const both = lastUsed.length > 0 && picks.length > 0;
   const grouped = useMemo(() => groupFeatures(FEATURE_REGISTRY), []);
@@ -167,7 +168,7 @@ export function FunktionenView({ className }: { className?: string }) {
             </button>
           )}
         </div>
-        <p className="min-h-[18px] text-[12px] text-faint" role="status" aria-live="polite" data-testid="feature-results">
+        <p className="min-h-[18px] text-[12px] text-mute" role="status" aria-live="polite" data-testid="feature-results">
           {query ? (shown.length ? `${weak ? FUNKTIONEN.results.weak(shown.length) : FUNKTIONEN.results.some(hits.length)}${hits.length > shown.length ? ` · ${FUNKTIONEN.results.more(shown.length)}` : ""} · ${FUNKTIONEN.search.hint}` : "") : ""}
         </p>
       </Reveal>
@@ -211,11 +212,11 @@ export function FunktionenView({ className }: { className?: string }) {
                     <Label as="h2" id={`${inputId}-recent`}>
                       {FUNKTIONEN.recent.title}
                     </Label>
-                    <p className="text-[12px] text-faint">{FUNKTIONEN.recent.note}</p>
+                    <p className="text-[12px] text-mute">{FUNKTIONEN.recent.note}</p>
                   </div>
                   <ul className="grid gap-2">
-                    {lastUsed.map((f) => (
-                      <li key={f.id}>
+                    {lastUsed.map((f, i) => (
+                      <li key={f.id} className={cn(i >= 2 && "max-md:hidden")}>
                         <FeatureRow entry={f} locked={locked(f)} now={now} onOpen={open} onIntent={warm} showGroup compact testId="feature-quick" />
                       </li>
                     ))}
@@ -228,11 +229,11 @@ export function FunktionenView({ className }: { className?: string }) {
                     <Label as="h2" id={`${inputId}-picks`}>
                       {FUNKTIONEN.picks.title}
                     </Label>
-                    <p className="text-[12px] text-faint">{FUNKTIONEN.picks.note}</p>
+                    <p className="text-[12px] text-mute">{FUNKTIONEN.picks.note}</p>
                   </div>
                   <ul className={cn("grid gap-2", !both && "md:grid-cols-2")}>
                     {picks.map((p, i) => (
-                      <li key={p.entry.id} className={cn(i === 3 && "max-md:hidden")}>
+                      <li key={p.entry.id} className={cn(i >= 2 && "max-md:hidden")}>
                         <FeatureRow entry={p.entry} locked={locked(p.entry)} now={now} onOpen={open} onIntent={warm} showGroup compact testId="feature-quick" reason={p.reason} />
                       </li>
                     ))}
@@ -293,7 +294,7 @@ export function FunktionenView({ className }: { className?: string }) {
                 <Reveal index={0}>
                   <Label as="h3">
                     {sg.sub}
-                    <span className="ml-1 font-mono text-[11px] font-normal text-faint">{sg.items.length}</span>
+                    <span className="ml-1 font-mono text-[11px] font-normal text-mute">{sg.items.length}</span>
                   </Label>
                 </Reveal>
               )}
@@ -309,7 +310,7 @@ export function FunktionenView({ className }: { className?: string }) {
         </section>
       )}
 
-      <p className="text-center text-[12px] text-faint">{FUNKTIONEN.stand}</p>
+      <p className="text-center text-[12px] text-mute">{FUNKTIONEN.stand}</p>
     </div>
   );
 }

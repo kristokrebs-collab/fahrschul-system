@@ -154,18 +154,33 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
     };
   }, []);
 
-  // the chip of the section in view slides into the strip (the strip only, never the page)
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+  // the chip of the section in view slides into the strip (the strip only, never the page) – but never under a finger or a
+  // pointer that is pressing a chip right now: the chip would move away between press and release and the tap would be lost
+  const pressed = useRef(false);
+  const centre = useCallback((): void => {
     const list = strip.current;
     const chip = list?.querySelector<HTMLElement>('[aria-current="location"]');
     if (!list || !chip) return;
     const left = chip.offsetLeft - (list.clientWidth - chip.offsetWidth) / 2;
     list.scrollTo?.({ left: Math.max(0, left), behavior: prefersReducedMotion() ? "auto" : "smooth" });
-  }, [active]);
+  }, []);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    if (!pressed.current) centre();
+  }, [active, centre]);
+  const onPress = (): void => {
+    pressed.current = true;
+    const release = (): void => {
+      pressed.current = false;
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+    };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+  };
 
   const go = useCallback((item: SectionNavItem, byKeyboard: boolean) => {
     const el = findSection(layerOf(nav.current), item.id, item.heading);
@@ -197,8 +212,8 @@ export function SectionNav({ items, label = "Inhalt", className }: { items: read
       className={cn("sticky z-30 -mx-4 bg-ink-900 px-4 sm:-mx-6 sm:px-6", SECTION_NAV_BOX, className)}
     >
       <div className="flex items-center gap-3 border-b border-line py-2">
-        <span className="label shrink-0 !text-faint">{label}</span>
-        <ul ref={strip} onKeyDown={onKeyDown} className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <span className="label shrink-0 !text-mute">{label}</span>
+        <ul ref={strip} onKeyDown={onKeyDown} onPointerDown={onPress} className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {shown.map((it) => {
             const on = it.id === active;
             return (

@@ -40,11 +40,11 @@ export function GroupTile({ group, items, onOpen, onIntent, className }: GroupTi
         <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center rounded-xl border border-line-2 text-mute transition-colors duration-200 group-hover/tile:text-fg [&>svg]:size-5">
           <Icon name={group.icon} />
         </span>
-        <span className="flex items-center gap-2 pt-1 font-mono text-[11.5px] text-faint">
+        <span className="flex items-center gap-2 pt-1 font-mono text-[11.5px] text-mute">
           <span aria-hidden="true" className={cn("size-2 rounded-full", partial ? "bg-warn" : "bg-win")} />
           <span>
             {FUNKTIONEN.tiles.count(total)}
-            <span className="text-faint"> · {partial ? FUNKTIONEN.tiles.partial(partial) : FUNKTIONEN.tiles.allDone}</span>
+            <span className="text-mute"> · {partial ? FUNKTIONEN.tiles.partial(partial) : FUNKTIONEN.tiles.allDone}</span>
           </span>
         </span>
       </span>

@@ -45,7 +45,7 @@ export function NavFinder({ onOpen, onAll }: NavFinderProps) {
   return (
     <div className="grid gap-2" data-testid="nav-finder">
       <div className="flex items-baseline justify-between gap-3">
-        <label htmlFor={id} className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">
+        <label htmlFor={id} className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-mute">
           {NAV_FINDER_STRINGS.label}
         </label>
         <a
@@ -78,7 +78,7 @@ export function NavFinder({ onOpen, onAll }: NavFinderProps) {
           enterKeyHint="search"
           data-cmd-item=""
           data-testid="nav-finder-input"
-          className="h-12 w-full rounded-xl border border-line-2 bg-ink-900 pl-10 pr-3 text-[16px] text-fg outline-none transition-colors duration-200 placeholder:text-faint hover:border-white/30 focus:border-white/50 [&::-webkit-search-cancel-button]:hidden"
+          className="h-12 w-full rounded-xl border border-line-2 bg-ink-900 pl-10 pr-3 text-[16px] text-fg outline-none transition-colors duration-200 placeholder:text-mute hover:border-white/30 focus:border-white/50 [&::-webkit-search-cancel-button]:hidden"
         />
       </div>
       {query && (

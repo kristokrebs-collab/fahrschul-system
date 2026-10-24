@@ -342,12 +342,16 @@ Tests: `tests/unit/theme.{store,transition,codemod,card,budget}.test.*`, `shortc
 
 ## Funktionsregister und Seite „Funktionen“ (Auffindbarkeit)
 
-`features.ts` ist die einzige Wahrheit, welche Funktionen es gibt und wo sie stehen (F-IDs, Name, ein Satz Nutzen, Gruppe nach Aufgabe, Seite +
-Anker oder Öffner, Stichwörter, Status `fertig` / `teilweise` mit Lücke, Plan-Gate, Gerätehinweis). Gelesen von der Seite `funktionen`
-(`src/views/funktionen`, Hash `#funktionen`, `g f`, Befehlsnavigation Nr. 16 – **nicht im Dock, keine Dashboard-Karte**), der globalen Suche
-(Art `feature`) und dem Assistenten („Wo finde ich …?“). `featureQuery.ts` = reine Fragen ans Register (Suche, Filter, Gruppen, „Für dich“ aus
-`settings.assistant.interests`, „Zuletzt benutzt“ aus `searchStore.recent`, `whereIs`); `featureOpen.ts` = `openFeature(id)` (Aktion oder Seite + Scrollen
-mit ehrlichem Toast, wenn die Stelle fehlt); `reveal.ts` = `whenShown` / `revealCard` (aus `search/actions.ts` herausgelöst, dort re-exportiert);
-`featureChips.ts` = die Chips „Zuletzt benutzte Funktionen“ der Befehlsnavigation (dynamischer Import, nur bei vorhandenen Einträgen); `FeatureLinks.tsx` = „Auch hier: …“-Zeile für Seiten, deren Nachbarfunktionen sonst zufällig gefunden würden (Coach). Das Register ist nur im Lazy-Chunk
-der Seite / Suche / des Assistenten – die Erstladung importiert es nicht (`shellStats` zeigt für die Seite den festen Text „Index“).
-Dokument zum Register: `docs/COVERAGE.md` (eine Zeile je F01–F74; Test `tests/unit/features.registry.test.ts`).
+`features.ts` ist die einzige Wahrheit, welche Funktionen es gibt und wo sie stehen (F-IDs, Name, **Aufgabe in einfachen Worten** `task`, ein Satz Nutzen, **eine
+Hauptgruppe nach Aufgabe** + Zwischenüberschrift `sub`, Seite + Anker + Abschnitt `place` oder Öffner, Stichwörter, **Absichten** `intents`, „Siehe auch“ `see`,
+`since` / `star`, Status `fertig` / `teilweise` mit Lücke, Plan-Gate, Gerätehinweis). Gelesen von der Seite `funktionen` (`src/views/funktionen`, Hash `#funktionen`,
+`g f` – **nicht im Dock, keine Dashboard-Karte**), der globalen Suche (Art `feature`), dem Finder der Befehlsnavigation und dem Assistenten („Wo finde ich …?“).
+`featureQuery.ts` = reine Fragen ans Register (ein tippfehlertoleranter Scorer für Absichten, Gruppen + Zwischenüberschriften, „Für dich“ aus
+`settings.assistant.interests`, „Zuletzt benutzt“ aus `searchStore.recent`, „Empfohlen / Neu“, `whereIs`); `featureOpen.ts` = `openFeature(id)` (Aktion oder Seite +
+Scrollen mit ehrlichem Toast, wenn die Stelle fehlt); `reveal.ts` = `whenShown` / `revealCard` / `revealSection` / `keepAligned` (aus `search/actions.ts`
+herausgelöst, dort re-exportiert); `featureChips.ts` = die Chips „Zuletzt benutzte Funktionen“ der Befehlsnavigation (dynamischer Import, nur bei vorhandenen
+Einträgen); `NavFinder.tsx` (+ lazy `NavFinderResults.tsx`) = **das Feld „Was willst du tun?“ der Befehlsnavigation** mit dem deutlichen Weg „Alle Funktionen →“: Es
+findet jede Funktion, nicht nur Seiten (das Register lädt mit dem ersten Buchstaben), Enter öffnet den besten Treffer, Pfeile gehen von Feld zu Treffern zu den Seitenlinks, im
+Feld sind Ziffern und Pos1/Ende Text, das erste Esc leert; `FeatureLinks.tsx` = „Auch hier: …“-Zeile für Seiten, deren Nachbarfunktionen sonst zufällig gefunden würden (Coach). Das Register
+ist nur im Lazy-Chunk der Seite / Suche / des Assistenten – die Erstladung importiert es nicht (`shellStats` zeigt für die Seite den festen Text „Index“).
+Dokumente zum Register: `docs/COVERAGE.md` (eine Zeile je F01–F74; Test `tests/unit/features.registry.test.ts`) und `docs/UEBERSICHT.md` (Karte Aufgabe → Seite → Abschnitt).

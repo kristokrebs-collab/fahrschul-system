@@ -71,3 +71,7 @@ Card order: Konten · Backtest-Referenz · Live-Status · Live-Daten · **Einsti
 - Touch: Grundregeln handles/remove, mistake remove `pointer-coarse:size-11`; switches `touch-hit`; wrapped action rows `pointer-coarse:gap-3.5`.
 - Lead-fill key `storageKey("fill-settings")` (personal: `tj2-fill-settings` unchanged).
 - Tests: `tests/unit/views.settings.signals.test.tsx` (+ the existing settings tests).
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. `SettingsNav.tsx`: 15 Chips, gefunden über die Überschrift der Karte (die Karten tragen keine eigenen Abschnittsnamen); die Leiste lädt als eigener Chunk und hält ihren Platz frei (`SECTION_NAV_BOX`), damit unter ihr nichts springt. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.

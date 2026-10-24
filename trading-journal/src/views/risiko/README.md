@@ -75,3 +75,7 @@ trade editor, the trade detail, the guard host, toasts and confetti.
 - `tests/unit/views.risiko.test.tsx` – empty / filled states, the pause override, calculator → editor draft, settings,
   guard, preview, widgets.
 - `tests/e2e/risiko.spec.ts` – real Box-zu-Box market, seeded journal (`PW_RISIKO_URL`, default `/dev/risiko.html`).
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Fünf Chips für Jetzt, Vor dem Trade, Portfolio, Muster, Einstellungen (`Section section=…` → `data-section` am Abschnittstitel). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.

@@ -161,3 +161,7 @@ run's trades (`strategyFacts`) are held against the journal (`journalProfile` ov
 numbers, the two figures side by side and its own caveat. No score, no recommendation; with fewer than 20 closed journal trades (or < 10
 trades in the run) the card is an honest empty state (`fit-empty`, `data-status`) that names the numbers. It reads `useLabor` (`result`,
 `runCfg`) and the journal and changes neither. Tests: `views.labor.fit.test.tsx`, `fit.test.ts`, e2e `fit.spec.ts`.
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Chips für die Abschnitte, die gerade da sind (Diagnose, Passt zu dir?, Belastung, Robustheit erst nach einem fertigen Lauf, Vergleich ab dem ersten gespeicherten Lauf); `Section section=…` setzt `data-section` am Titel. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.

@@ -188,6 +188,27 @@ describe("SectionNav", () => {
     expect(chip("Vierte")).toHaveFocus();
   });
 
+  it("never slides the strip under a chip that is being pressed (the tap would be lost), and does again after the release", () => {
+    const scrollTo = vi.fn();
+    const had = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollTo");
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", { value: scrollTo, configurable: true, writable: true });
+    try {
+      render(<Page />);
+      const io = FakeIO.all.at(-1)!;
+      fireEvent.pointerDown(chip("Dritte"));
+      io.report({ first: -400, "second-card": -200, third: 40 }); // the page moves on while the finger is down
+      expect(chip("Dritte")).toHaveAttribute("aria-current", "location");
+      expect(scrollTo).not.toHaveBeenCalled();
+      fireEvent(window, new Event("pointerup"));
+      io.report({ third: -400, "the-card": 40 });
+      expect(chip("Vierte")).toHaveAttribute("aria-current", "location");
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+    } finally {
+      if (had) Object.defineProperty(HTMLElement.prototype, "scrollTo", had);
+      else delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
+    }
+  });
+
   it("works without an IntersectionObserver (the first section stays marked, nothing breaks)", () => {
     vi.stubGlobal("IntersectionObserver", undefined);
     render(<Page />);

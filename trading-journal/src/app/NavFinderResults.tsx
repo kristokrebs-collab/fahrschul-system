@@ -34,7 +34,7 @@ export default function NavFinderResults({ query, onOpen, onAll }: { query: stri
           >
             <span className="truncate text-[14.5px] font-medium text-fg">{h.entry.name}</span>
             <span className="truncate text-[12px] text-mute">{h.entry.task ?? groupOf(h.entry).name}</span>
-            <span className="truncate font-mono text-[11px] text-faint">
+            <span className="truncate font-mono text-[11px] text-mute">
               {groupOf(h.entry).name} · {placeText(h.entry)}
             </span>
           </button>

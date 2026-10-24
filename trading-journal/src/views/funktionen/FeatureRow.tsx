@@ -36,7 +36,7 @@ export interface FeatureRowProps {
 function Line({ label, tone, children }: { label: string; tone?: "warn"; children: string }) {
   return (
     <p className="text-[12.5px] leading-relaxed text-mute [overflow-wrap:anywhere]">
-      <span className={cn("font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em]", tone === "warn" ? "text-warn" : "text-faint")}>{label}</span>
+      <span className={cn("font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em]", tone === "warn" ? "text-warn" : "text-mute")}>{label}</span>
       <span className="ml-1.5">{children}</span>
     </p>
   );
@@ -93,7 +93,7 @@ export function FeatureRow({ entry: f, locked, now, onOpen, onIntent, showGroup,
               )}
             </span>
             {!compact && <span className="text-[13px] leading-snug text-mute [overflow-wrap:anywhere]">{f.task ?? f.benefit}</span>}
-            <span className="font-mono text-[11.5px] text-faint [overflow-wrap:anywhere]">
+            <span className="font-mono text-[11.5px] text-mute [overflow-wrap:anywhere]">
               <span className="sr-only">{FUNKTIONEN.where}: </span>
               {place}
             </span>
@@ -135,7 +135,7 @@ export function FeatureRow({ entry: f, locked, now, onOpen, onIntent, showGroup,
             {tier !== "frei" && <Line label="Tarif">{`${PLAN_TIER_LABEL[tier]}${locked ? ` – ${FUNKTIONEN.locked}` : ""}`}</Line>}
             {see.length > 0 && (
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-[12.5px] text-mute">
-                <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">{FUNKTIONEN.see}</span>
+                <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.12em] text-mute">{FUNKTIONEN.see}</span>
                 {see.map((s) => (
                   <button
                     key={s.id}
@@ -152,7 +152,7 @@ export function FeatureRow({ entry: f, locked, now, onOpen, onIntent, showGroup,
               </div>
             )}
             {f.fids.length > 0 && (
-              <p className="font-mono text-[10.5px] text-faint">
+              <p className="font-mono text-[10.5px] text-mute">
                 <span className="sr-only">{FUNKTIONEN.fids} </span>
                 {f.fids.join(" · ")}
               </p>

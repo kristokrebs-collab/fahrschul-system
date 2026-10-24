@@ -136,3 +136,7 @@ is the pure `decidePrompt` of `@/domain/checkin` (clock injectable: the `now` pr
 Tests: `tests/unit/domain.checkin.test.ts` (days, DST, prompt decision, config merge, bookkeeping, evaluation, privacy guard),
 `tests/unit/views.checkin.test.tsx` (host with an injected clock, Später / Überspringen / Erledigt, no second prompt, next day,
 sync / editor gating, late fill, settings, the card), `tests/e2e/checkin.spec.ts` (pinned clock: skip → reload → 23:59 → next day).
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Sechs Chips (Heute, Serien, Ziele, Challenges & Gewohnheiten, Psyche, Fortschritt; `Section section=…` → `data-section`). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
