@@ -4,6 +4,7 @@
  *   RSI = 100 (only rises), the closes are a straight line (slope 1, efficiency 1).
  * Candle 0 opens at 00:00 UTC of Tuesday 2023-11-14, one candle = one hour.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { barFeatures, buildSeries, calendarFeatures, emaSeeded, htfOf, rollingMean, streakLabel, FEATURES, FEATURE_IDS, type FeatureSeries } from "@/domain/discovery/features";
 import { buildTable, lossStreaks } from "@/domain/discovery/table";
@@ -252,5 +253,27 @@ describe("feature table", () => {
     expect(t.trades).toHaveLength(20);
     expect(t.droppedCap).toBe(10);
     expect(t.trades[0]!.id).toBe("t10");
+  });
+});
+
+describe("Abgleich mit TradingView", () => {
+  // BINANCE:BTCUSDT 1D, fetched 2026-10-19 ~09:30 UTC with the TradingView connector (see the fixture's `source`): the screener's
+  // daily bar differs from `get-ohlcv` by about 0,1 % (close 82 888,84 vs 82 989,99), so the values agree only within these tolerances –
+  // the source's difference, not the formula's. The last bar is the forming one: TradingView's numbers belong to it.
+  const fx = JSON.parse(readFileSync("tests/unit/fixtures/tv-binance-btcusdt-1d-indicators.json", "utf8")) as { bars: number[][]; tv: Record<string, number> };
+  const bars: Bar[] = fx.bars.map(([t, o, h, l, c, v]) => ({ t: t!, o: o!, h: h!, l: l!, c: c!, v: v! }));
+  const n = bars.length;
+  const f = barFeatures(buildSeries({ intervalSec: 86_400, bars }), n, bars[n - 1]!.t + 86_400, "long");
+  const { tv } = fx;
+  const tvClose = 82_888.84; // the screener's close at the same minute (stated in the fixture)
+
+  it("RSI(14)", () => {
+    expect(Math.abs(f.rsi! - tv.RSI!)).toBeLessThan(0.5);
+  });
+  it("Bollinger position and width (20, 2σ, population σ like ta.bb)", () => {
+    const pos = ((tvClose - tv["BB.lower"]!) / (tv["BB.upper"]! - tv["BB.lower"]!)) * 100;
+    const width = ((tv["BB.upper"]! - tv["BB.lower"]!) / tv.SMA20!) * 100;
+    expect(Math.abs(f.bbPos! - pos)).toBeLessThan(1.5);
+    expect(Math.abs(f.bbWidth! - width)).toBeLessThan(0.15);
   });
 });

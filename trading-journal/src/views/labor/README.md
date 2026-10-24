@@ -161,3 +161,9 @@ run's trades (`strategyFacts`) are held against the journal (`journalProfile` ov
 numbers, the two figures side by side and its own caveat. No score, no recommendation; with fewer than 20 closed journal trades (or < 10
 trades in the run) the card is an honest empty state (`fit-empty`, `data-status`) that names the numbers. It reads `useLabor` (`result`,
 `runCfg`) and the journal and changes neither. Tests: `views.labor.fit.test.tsx`, `fit.test.ts`, e2e `fit.spec.ts`.
+
+## Muster-Entdecker (Auftrag B)
+Abschnitt `Muster-Entdecker` (`labor-discovery`, lazy chunk `DiscoverySection.tsx`) ganz unten. Er wählt die Quelle der Karte `DiscoveryPanel` (`src/views/discovery`, README dort): die Trades und Kerzen des **gezeigten Laufs**
+(`useLabor.result` / `bars`, dazu die Schlüsselmarken desselben Markts, die schon vor dem Einstieg angelegt waren) oder die **Journal-Trades**, und verdrahtet „Mit diesem Filter testen“: das bestätigte Muster wird mit `useExtras.setPattern(spec)`
+zum Muster-Filter der Filterauswahl und `runFilters()` rechnet denselben Lauf mit und ohne Muster; das Ergebnis steht unter dem Befund und sagt, dass das Muster aus denselben Trades stammt (nur ein Test auf denselben Daten). Nichts wird
+automatisch übernommen. Tests: `views.labor.discovery.test.tsx`, `discovery.sources.test.ts` (Filtervergleich auf dem echten BTCUSDT-Lauf), e2e `discovery.spec.ts`.

@@ -511,7 +511,7 @@ export function* mineTable(table: FeatureTable, ctx: MineContext, prog: { value:
     const disc = statsOf(membersOf(conds, 0, nd), "disc", false, `disc:${key}`);
     const reasons: Reason[] = [];
     let tier: Tier = "rejected";
-    let conf: CellStats | null = null;
+    let conf: CellStats | null;
     let confP: number | null = null;
     let confQ: number | null = null;
     const blocks = blocksOf(conds, dir);

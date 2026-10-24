@@ -92,6 +92,7 @@ describe("the search", () => {
     expect(within(f).getByTestId("discovery-blocks")).toHaveAccessibleName(/Zeitabschnitt 1: gleiche Richtung/);
     // the method line shows the split and the permutations
     expect(screen.getByTestId("discovery-method-line").textContent).toMatch(/Suche an den älteren 252 Trades, Bestätigung an den neueren 168\./);
+    expect(screen.getByTestId("discovery-stand").textContent).toMatch(/^Stand: gerechnet am \d\d\.\d\d\.\d{4} \d\d:\d\d · Trades von \d\d\.\d\d\.\d{4} bis \d\d\.\d\d\.\d{4} · Quelle: dein Journal\. Zahlen aus einer deterministischen Rechnung, kein Sprachmodell\.$/);
     expect(screen.getByTestId("discovery-disclaimer")).toBeVisible();
   }, 60_000);
 

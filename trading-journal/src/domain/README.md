@@ -38,6 +38,7 @@ analytics/    Analyse (P03): ratios with intervals, Monte Carlo (+ worker), risk
 whatif/       „Was wäre wenn“ (F33): one trade re-run on its own candles with another stop / break-even / partial / exit on the backtest engine – src/domain/whatif/README.md
 training/     Lernmodus (F38): practice rounds without the future, decision rules, history numbers – settings.training, src/domain/training/README.md
 fit/          „Passt zu dir?“ (F49): a finished Labor run (what it demands) held against the journal (what it shows) – agreements and frictions with numbers, no score – src/domain/fit/README.md
+discovery/    „Muster-Entdecker“: Merkmale des Einstiegs ohne Look-ahead, Permutationstest + Benjamini-Hochberg + 60/40-Bestätigung, Befund → Backtest-Filter – src/domain/discovery/README.md
 similar/      „Ähnliche Situationen“ (F19): the last closed candle described by a few numbers, the most alike earlier candles (not overlapping) and what really followed, with counter-examples – src/domain/similar/README.md
 coach/        Coach (P04): behaviour detectors, edges / leaks, recommendations, trade review, German Q&A (nlq) –
               see src/domain/coach/README.md

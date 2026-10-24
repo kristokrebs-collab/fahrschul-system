@@ -8,7 +8,7 @@ Reine Domain-Logik (kein React, kein I/O). Die Oberfläche steht in `src/views/l
 | `library/` | Strategie-Bibliothek: `cards.ts` (32 Karten, typische Werte in drei Einstellungen, eine Quelle für Karte und Entwurf), `search.ts`. Wird nur vom lazy Sheet importiert, nicht vom Barrel. |
 | `pine/` | `toPine` (Pine-v6-Skript aus dem Regelbaum, Lücken namentlich), `links.ts` (TradingView-Chart-Link). |
 | `extras/` | Zusatzläufe auf dem gezeigten Lauf: `job.ts` (Belastung, Filter, Parameter-Raster), `paramGrid.ts` (Achsen ±25 %, Zellen). |
-| `stress/`, `filters/`, `diagnosis/`, `report/`, `idea.ts` | siehe die Kommentare in den Dateien. |
+| `stress/`, `filters/`, `diagnosis/`, `report/`, `idea.ts` | siehe die Kommentare in den Dateien. `filters/` kennt zusätzlich den **Muster-Filter** (`pattern`, `FilterSelection.pattern`): nur wenn der Nutzer im Muster-Entdecker ein bestätigtes Muster gewählt hat, erscheint die Zeile; die Maske rechnet `@/domain/discovery/filter`. |
 
 Regeln: Jeder Baustein ist eine reine Funktion über geschlossene Kerzen mit Tri-State (0 falsch · 1 wahr · 2 unbekannt); unbekannt erfüllt nie eine Bedingung.
 Zahlen auf Bibliothekskarten sind keine Ergebnisse. Ein Baustein, der Daten des Laufs braucht (Funding), ist ohne sie gesperrt – mit Grund.

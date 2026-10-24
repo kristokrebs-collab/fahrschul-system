@@ -54,9 +54,18 @@ interface RunState {
   error: string | null;
   /** the signature of the input this state belongs to */
   sig: string;
+  /** epoch ms the search finished (the "Stand" under the result) */
+  at: number;
 }
 
-const IDLE: RunState = { status: "idle", progress: 0, result: null, error: null, sig: "" };
+const IDLE: RunState = { status: "idle", progress: 0, result: null, error: null, sig: "", at: 0 };
+
+const p2 = (n: number): string => String(n).padStart(2, "0");
+const dayText = (ms: number): string => {
+  const d = new Date(ms);
+  return `${p2(d.getDate())}.${p2(d.getMonth() + 1)}.${d.getFullYear()}`;
+};
+const stampText = (ms: number): string => `${dayText(ms)} ${p2(new Date(ms).getHours())}:${p2(new Date(ms).getMinutes())}`;
 
 /** A cheap fingerprint of what is analysed: when it changes, an old result no longer describes the data. */
 function signature(p: Pick<DiscoveryPanelProps, "trades" | "markets" | "source" | "label" | "seed" | "includePostEntry">): string {
@@ -92,8 +101,6 @@ export function DiscoveryPanel(props: DiscoveryPanelProps) {
   const [run, setRun] = useState<RunState>(IDLE);
   const ctl = useRef<AbortController | null>(null);
   const lastUi = useRef(0);
-  const latest = useRef(input);
-  latest.current = input;
   const titleId = useId();
   const [showMethod, setShowMethod] = useState(false);
   const [showHints, setShowHints] = useState(false);
@@ -112,9 +119,9 @@ export function DiscoveryPanel(props: DiscoveryPanelProps) {
     const mine = new AbortController();
     ctl.current = mine;
     const forSig = sig;
-    setRun({ status: "running", progress: 0, result: null, error: null, sig: forSig });
+    setRun({ status: "running", progress: 0, result: null, error: null, sig: forSig, at: 0 });
     try {
-      const result = await runDiscovery(latest.current, {
+      const result = await runDiscovery(input, {
         signal: mine.signal,
         mode,
         onProgress: (p) => {
@@ -126,19 +133,19 @@ export function DiscoveryPanel(props: DiscoveryPanelProps) {
       });
       if (ctl.current !== mine) return;
       // the assistant quotes the last finished search (it never starts one itself)
-      rememberDiscovery({ result, at: Date.now(), source: latest.current.source, label: latest.current.label ?? null });
-      setRun({ status: "done", progress: 1, result, error: null, sig: forSig });
+      rememberDiscovery({ result, at: Date.now(), source: input.source, label: input.label ?? null });
+      setRun({ status: "done", progress: 1, result, error: null, sig: forSig, at: Date.now() });
     } catch (e) {
       if (ctl.current !== mine) return;
-      if (isDiscoveryAbort(e)) setRun({ status: "cancelled", progress: 0, result: null, error: DISC.cancelled, sig: forSig });
+      if (isDiscoveryAbort(e)) setRun({ status: "cancelled", progress: 0, result: null, error: DISC.cancelled, sig: forSig, at: 0 });
       else {
         console.error("Muster-Entdecker: Suche fehlgeschlagen", e);
-        setRun({ status: "error", progress: 0, result: null, error: DISC.failed, sig: forSig });
+        setRun({ status: "error", progress: 0, result: null, error: DISC.failed, sig: forSig, at: 0 });
       }
     } finally {
       if (ctl.current === mine) ctl.current = null;
     }
-  }, [sig, mode]);
+  }, [input, sig, mode]);
 
   const cancel = useCallback((): void => {
     ctl.current?.abort();
@@ -155,6 +162,10 @@ export function DiscoveryPanel(props: DiscoveryPanelProps) {
   const hints = findings.filter((f) => f.tier === "hint");
   const rejected = findings.filter((f) => f.tier === "rejected");
   const tested = res?.counts.tested ?? 0;
+  const span = useMemo<[number, number] | null>(() => {
+    const ts = trades.filter((t) => t.r != null && Number.isFinite(t.r)).map((t) => t.entryTime);
+    return ts.length ? [Math.min(...ts), Math.max(...ts)] : null;
+  }, [trades]);
 
   const body = (
     <div className="grid gap-4" data-testid="discovery-panel" data-status={current.status} data-source={source}>
@@ -219,6 +230,9 @@ export function DiscoveryPanel(props: DiscoveryPanelProps) {
             </h3>
             <p className="text-[12.5px] leading-snug text-mute" data-testid="discovery-breakdown">
               {breakdownText(res.counts)}
+            </p>
+            <p className="text-[11.5px] leading-snug text-faint" data-testid="discovery-stand">
+              {DISC.stand(stampText(current.at), span ? dayText(span[0]) : null, span ? dayText(span[1]) : null, source)}
             </p>
             <p className="text-[11.5px] leading-snug text-faint" data-testid="discovery-method-line">
               {[DISC.setup.split(res.nDisc, res.nConf), DISC.setup.perms(res.permutations), DISC.setup.features(res.featuresUsed.length), res.droppedNoR ? DISC.setup.noR(res.droppedNoR) : "", res.droppedCap ? DISC.setup.cap(res.droppedCap) : ""].filter(Boolean).join(" ")}

@@ -27,8 +27,8 @@ export interface FilterTestState {
 const dec = (v: number, d: number): string => v.toFixed(d).replace(".", ",").replace("-", "−");
 const ppText = (v: number | null): string => (v == null ? "–" : `${v > 0 ? "+" : ""}${dec(v * 100, 0)} Pp.`);
 const ci = (c: { lo: number; hi: number } | null, pct: boolean): string => (c ? (pct ? `${Math.round(c.lo * 100)}–${Math.round(c.hi * 100)} %` : `${dec(c.lo, 2)} bis ${dec(c.hi, 2)} R`) : "–");
-/** p / q for people: tiny values as "< 0,001". */
-export const smallP = (v: number | null): string => (v == null ? "–" : v < 0.001 ? "< 0,001" : dec(v, v < 0.01 ? 3 : 2));
+/** p / q for people, with its sign: "< 0,001" or "= 0,034". */
+export const smallP = (v: number | null): string => (v == null ? "–" : v < 0.001 ? "< 0,001" : `= ${dec(v, v < 0.01 ? 3 : 2)}`);
 
 const TIER_TONE: Record<Finding["tier"], BadgeTone> = { confirmed: "win", hint: "warn", rejected: "mute" };
 const DOT: Record<Finding["tier"], string> = { confirmed: "bg-win", hint: "bg-warn", rejected: "border border-faint bg-transparent" };
