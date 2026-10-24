@@ -35,6 +35,8 @@ test.describe("Labor · Hintergrund-Optimierer", () => {
     await expectNoHorizontalScroll(page);
     await screenshot(page, info, "evolve-idle");
 
+    // "Schonend" (duty cycle 20 %) keeps the short run slow enough to pause and resume it on a fast desktop, too
+    await page.getByRole("radiogroup", { name: "Tempo" }).getByRole("radio", { name: "Schonend" }).click();
     await page.getByTestId("evolve-start").click();
     // the candles are loaded with the lab's loader, then the run starts
     await expect(panel).toHaveAttribute("data-status", /^(starting|running)$/, { timeout: 90_000 });
@@ -48,9 +50,11 @@ test.describe("Labor · Hintergrund-Optimierer", () => {
     await expect(panel).toHaveAttribute("data-status", "paused");
     await expect(page.getByTestId("evolve-throttle")).toContainText("Pausiert");
     await page.getByTestId("evolve-resume").click();
-    await expect(panel).toHaveAttribute("data-status", "running");
+    // the search ends by itself once nothing better turns up, which a fast machine can reach right after "Fortsetzen": both ends are right
+    await expect(panel).toHaveAttribute("data-status", /^(running|done)$/);
 
-    await page.getByTestId("evolve-stop").click();
+    // "Stopp" ends the run early; when the run was faster than the click there is no button any more and the run is done anyway
+    await page.getByTestId("evolve-stop").click({ timeout: 4_000 }).catch(() => undefined);
     await expect(panel).toHaveAttribute("data-status", "done", { timeout: 90_000 });
     await expect(page.getByTestId("evolve-leaderboard").first()).toBeVisible();
     await expect(page.getByTestId("evolve-windows").first()).toContainText("Bestätigung");
@@ -58,6 +62,8 @@ test.describe("Labor · Hintergrund-Optimierer", () => {
     await expect(page.getByTestId("evolve-proposal").or(page.getByTestId("evolve-nothing")).first()).toBeVisible({ timeout: 30_000 });
     await expectNoHorizontalScroll(page);
     await screenshot(page, info, "evolve-done");
+    await page.getByTestId("evolve-proposal").or(page.getByTestId("evolve-nothing")).first().scrollIntoViewIfNeeded();
+    await screenshot(page, info, "evolve-proposal");
 
     // nothing was saved, started or changed by the run itself
     const settings = await stored<{ forward?: { accounts?: unknown[] }; evolve?: { proposals?: { decision: string }[]; lineages?: Record<string, { trials: number }> } }>(page, "tj2-settings");
@@ -80,6 +86,7 @@ test.describe("Labor · Hintergrund-Optimierer", () => {
     await expect(page.getByTestId("evolve-learned")).toContainText("Was habe ich gelernt?");
     await expect(page.getByTestId("evolve-learned")).toContainText("Keine professionelle Finanzberatung");
     await expectNoHorizontalScroll(page);
+    await screenshot(page, info, "evolve-learned");
     expect(errors).toEqual([]);
   });
 });

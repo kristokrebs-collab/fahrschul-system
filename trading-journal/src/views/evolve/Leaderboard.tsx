@@ -41,12 +41,12 @@ export function Leaderboard({ snap }: { snap: StrategySnapshot }) {
         <span className="text-[11px] text-faint">{L.sub}</span>
       </div>
       {b && (
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-line bg-ink-950/50 px-3 py-2 text-[12px]" data-testid="evolve-base-row">
+        <div className="grid items-center gap-x-3 gap-y-0.5 rounded-xl border border-line bg-ink-950/50 px-3 py-2 text-[12px] sm:grid-cols-[minmax(0,1fr)_auto]" data-testid="evolve-base-row">
           <span className="min-w-0">
             <span className="font-medium">{L.current}</span>
-            <span className="ml-2 text-faint">{b.freedom} Freiheitsgrade</span>
+            <span className="ml-2 whitespace-nowrap text-faint">{b.freedom} Freiheitsgrade</span>
           </span>
-          <span className="num text-right">
+          <span className="num sm:text-right">
             {b.score != null ? `Score ${num(b.score)}` : "nicht gewertet"} · {b.n} Trades · <span className={toneOf(b.avgR)}>Ø {rText(b.avgR)}</span>
           </span>
         </div>
