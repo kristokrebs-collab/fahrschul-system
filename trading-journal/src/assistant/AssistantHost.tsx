@@ -18,6 +18,7 @@ import { Sheet, StaggerItem } from "@/motion/Sheet";
 import { Button } from "@/primitives/Button";
 import { navigate } from "@/store/router";
 import { useUi } from "@/store/uiStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { openReport } from "@/views/berichte/berichteStore";
 import { useDiagnosis } from "@/views/labor/DiagnosisCard";
 import { useLabor } from "@/views/labor/laborStore";
@@ -345,6 +346,7 @@ function AssistantBody() {
             Fragen
           </Button>
         </form>
+        <AnalysisNote variant="assistant" />
         {listening && <p className="text-[11.5px] text-faint">{ASSISTANT_STRINGS.micNote}</p>}
         {note && !listening && (
           <p role="status" className="text-[12px] text-warn" data-testid="assistant-voice-note">

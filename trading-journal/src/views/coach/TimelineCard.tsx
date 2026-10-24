@@ -65,7 +65,7 @@ export function TimelineCard({ events, trades, className }: { events: readonly B
                   setFilter(k);
                   setLimit(PAGE);
                 }}
-                className={cn("touch-hit inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-colors", filter === k ? "border-fg/40 bg-white/[0.08] text-fg" : "border-line-2 text-mute hover:text-fg")}
+                className={cn("touch-hit inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-colors pointer-coarse:min-h-11", filter === k ? "border-fg/40 bg-white/[0.08] text-fg" : "border-line-2 text-mute hover:text-fg")}
               >
                 {k === "all" ? "Alle" : BEHAVIOR_LABEL[k]}
                 <span className="num font-mono text-faint">{n}</span>

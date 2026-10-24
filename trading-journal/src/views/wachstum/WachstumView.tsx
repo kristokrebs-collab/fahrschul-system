@@ -20,6 +20,7 @@ import { useMediaQuery } from "@/motion/useMediaQuery";
 import { Button } from "@/primitives/Button";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { storageKey } from "@/store/storage";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { BestsCard } from "./BestsCard";
 import { ChallengeCard } from "./ChallengeCard";
@@ -145,6 +146,7 @@ export function WachstumView({ className }: { className?: string }) {
           <ProgressCard points={series} />
         </Cell>
       </Section>
+      <AnalysisNote lead="Auswertung deiner Einträge und Trades – Beobachtungen, keine Prognose." />
       {/* the overlays live outside the page's subtree (transformed while it enters): fixed layers need the viewport */}
       {typeof document !== "undefined" &&
         createPortal(

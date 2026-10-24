@@ -135,7 +135,7 @@ export const BoxSettingsCard = memo(function BoxSettingsCard() {
             <span className="label">
               {S.watchlist} · {cur.watchlist.length}/{WATCHLIST_MAX}
             </span>
-            <Button size="sm" variant="ghost" onClick={() => apply({ watchlist: [...DEFAULT_WATCHLIST] })}>
+            <Button size="sm" variant="ghost" className="pointer-coarse:min-h-11" onClick={() => apply({ watchlist: [...DEFAULT_WATCHLIST] })}>
               {S.reset}
             </Button>
           </div>
@@ -150,10 +150,10 @@ export const BoxSettingsCard = memo(function BoxSettingsCard() {
                   exit={{ opacity: 0, scale: 0.8, transition: tween.exit }}
                   transition={spring.pop}
                   style={{ borderRadius: radius.pill }}
-                  className="inline-flex items-center gap-1 rounded-full border border-line-2 bg-white/[0.03] py-0.5 pl-2.5 pr-1 font-mono text-[11.5px] text-fg"
+                  className="inline-flex items-center gap-1 rounded-full border border-line-2 bg-white/[0.03] py-0.5 pl-2.5 pr-1 font-mono text-[11.5px] text-fg pointer-coarse:min-h-11"
                 >
                   {s}
-                  <button type="button" aria-label={S.remove(s)} className="touch-hit grid size-5 place-items-center rounded-full text-faint hover:bg-white/10 hover:text-fg" onClick={() => apply({ watchlist: cur.watchlist.filter((x) => x !== s) })}>
+                  <button type="button" aria-label={S.remove(s)} className="touch-hit grid size-5 place-items-center rounded-full text-faint hover:bg-white/10 hover:text-fg pointer-coarse:size-8" onClick={() => apply({ watchlist: cur.watchlist.filter((x) => x !== s) })}>
                     ×
                   </button>
                 </motion.li>

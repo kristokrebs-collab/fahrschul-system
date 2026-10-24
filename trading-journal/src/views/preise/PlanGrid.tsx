@@ -212,7 +212,8 @@ function PlanTile({ plan, index }: { plan: PlanId; index: number }) {
             <PriceBlock plan={plan as PaidPlanId} price={price} base={base} promo={promo} />
           ) : (
             <div className="grid gap-1.5">
-              <span className="inline-flex items-baseline gap-1 leading-none" aria-label={PREISE.free}>
+              <span className="inline-flex items-baseline gap-1 leading-none">
+                <span className="sr-only">{PREISE.free}</span>
                 <span aria-hidden="true" className="dot-num text-[48px]">
                   0
                 </span>

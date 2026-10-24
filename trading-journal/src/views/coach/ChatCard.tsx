@@ -38,7 +38,7 @@ function Chip({ children, onClick, testId }: { children: string; onClick: () => 
       whileTap={press.whileTap}
       transition={press.transition}
       data-testid={testId}
-      className="touch-hit min-h-8 rounded-full border border-line-2 bg-white/[0.03] px-3 py-1 text-left text-[12px] text-mute transition-colors hover:border-steel/40 hover:text-fg"
+      className="touch-hit min-h-8 rounded-full border border-line-2 bg-white/[0.03] px-3 py-1 text-left text-[12px] text-mute transition-colors hover:border-steel/40 hover:text-fg pointer-coarse:min-h-11"
     >
       {children}
     </motion.button>

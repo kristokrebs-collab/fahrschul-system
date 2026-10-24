@@ -22,6 +22,7 @@ import { cn } from "@/lib/cn";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { storageKey } from "@/store/storage";
 import { useJournal } from "@/store/journalStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ConfigCard } from "./ConfigCard";
 import { DiagnosisCard } from "./DiagnosisCard";
@@ -204,6 +205,7 @@ export function LaborView({ className }: { className?: string }) {
           </Suspense>
         </Cell>
       </Section>
+      <AnalysisNote lead="Ein Test zeigt, wie eine Idee in der Vergangenheit gelaufen wäre – keine Prognose." />
       <LabReplayHost />
       <LibraryHost />
     </div>

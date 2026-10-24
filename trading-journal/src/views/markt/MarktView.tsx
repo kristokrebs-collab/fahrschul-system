@@ -24,6 +24,7 @@ import { storageKey } from "@/store/storage";
 import { Card } from "@/primitives/Card";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Skeleton } from "@/primitives/Skeleton";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { useMirrorState } from "@/views/biasTest";
 import { BIAS } from "@/views/biasTest/strings";
@@ -238,6 +239,7 @@ export function MarktView({ className }: { className?: string }) {
           </Cell>
         </>
       )}
+      <AnalysisNote />
     </div>
   );
 }

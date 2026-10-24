@@ -18,6 +18,7 @@ import { DotMatrix } from "@/motion/DotMatrix";
 import { Sheet, StaggerItem } from "@/motion/Sheet";
 import { CheckboxRow, Input, Segmented, Skeleton } from "@/primitives";
 import { useEnriched, useJournal } from "@/store/journalStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { buildReplay, defaultReplayInterval, INTERVAL_MS, REPLAY_INTERVALS, replayWindow, type ReplayInterval } from "../replay/replayModel";
 import { useCandles } from "../replay/useCandles";
 import { closeWhatIf, useWhatIf } from "./whatIfStore";
@@ -155,6 +156,10 @@ function Study({ trade, sim, bars, interval, currency }: { trade: EnrichedTrade;
           <span className="font-semibold text-fg/85">{WHATIF.assumptionsTitle}. </span>
           {WHATIF.assumptions}
         </p>
+      </StaggerItem>
+
+      <StaggerItem>
+        <AnalysisNote lead="Nachrechnung auf den Kerzen dieses einen Trades – keine Prognose." />
       </StaggerItem>
     </div>
   );

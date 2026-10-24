@@ -336,7 +336,7 @@ export function ScrubTimeline({
               onClick={() => play(!playing)}
               aria-label={playing ? "Pause" : "Abspielen"}
               data-testid="scrub-play"
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-ink-700 text-fg transition-transform active:scale-95"
+              className="touch-hit grid size-8 shrink-0 place-items-center rounded-full bg-ink-700 text-fg transition-transform active:scale-95"
             >
               <svg viewBox="0 0 16 16" className="size-3.5" aria-hidden="true">
                 {playing ? <path d="M4.5 3h2.4v10H4.5zM9.1 3h2.4v10H9.1z" fill="currentColor" /> : <path d="M5 3.2v9.6L12.8 8z" fill="currentColor" />}
@@ -355,7 +355,7 @@ export function ScrubTimeline({
               type="button"
               onClick={() => setSpeedIdx((i) => (i + 1) % speeds.length)}
               aria-label={`Tempo ${speed}×, wechseln`}
-              className="rounded-full border border-line-2 px-2.5 py-1 font-mono text-[11px] text-mute tabular-nums hover:text-fg"
+              className="touch-hit rounded-full border border-line-2 px-2.5 py-1 font-mono text-[11px] text-mute tabular-nums hover:text-fg"
             >
               {speed}×
             </button>
@@ -439,7 +439,7 @@ export function ScrubTimeline({
             aria-valuetext={formatTime(initial)}
             data-testid="scrub-track"
             onKeyDown={onKeyDown}
-            className="relative mt-1 h-6 cursor-ew-resize rounded-full outline-none focus-visible:ring-2 focus-visible:ring-steel/60"
+            className="touch-hit-y relative mt-1 h-6 cursor-ew-resize rounded-full outline-none focus-visible:ring-2 focus-visible:ring-steel/60"
           >
             <span aria-hidden="true" className="absolute inset-x-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-ink-700" />
           </div>
