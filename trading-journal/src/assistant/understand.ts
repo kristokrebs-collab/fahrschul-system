@@ -33,7 +33,7 @@ import type { Page } from "@/store/uiStore";
 import { editDistance } from "./fuzzy";
 import { INSIGHT_RULES, followsInsight, type InsightToolId } from "./insightRoutes";
 
-export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar" | InsightToolId;
+export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar" | "studio" | InsightToolId;
 
 export type Plan =
   | { kind: "journal"; intents: Intent[]; via: string[]; topic: string }
@@ -170,6 +170,7 @@ const PHRASES: readonly PhraseRule[] = [
 /* ------------------------------------------------------------------ tools */
 
 const PAGE_WORDS: ReadonlyArray<[RegExp, Page]> = [
+  [/\bstrategie-?studio\b|\bstudio\b/, "studio"],
   [/\blabor\b|\bbacktest(s|er)?\b|\bstrategielabor\b/, "labor"],
   [/\bcoach\b/, "coach"],
   [/\bmarkt\b|\bmaerkte\b|\bchart\b|\blage\b/, "markt"],
@@ -205,6 +206,7 @@ export const PAGE_LABEL: Readonly<Record<Page, string>> = {
   konto: "Konto",
   preise: "Preise",
   funktionen: "Funktionen",
+  studio: "Strategie-Studio",
 };
 
 /** The page named by an "open …" request, or null. */
@@ -224,6 +226,8 @@ const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: { test(norm: string): bool
   ...INSIGHT_RULES,
   { tool: "lab", test: /\bbacktest\b.*\b(schlecht|mies|negativ|verlust|schwach|warum|wieso|kacke|mist|mau|miserabel|bescheiden|katastroph\w*|scheiss\w*)\b|\b(warum|wieso|weshalb)\b.*\b(backtest|labor|testlauf|strategie)\b|\bdiagnose\b.*\b(lauf|backtest|labor)\b|\bwas stimmt .* nicht .*(backtest|strategie)/, topic: "lab", label: "Labor-Diagnose" },
   { tool: "idea", test: /\b(teste?|testen|pruef\w*|probier\w*)\b.{0,24}\b(idee|ideen)\b|\bidee\b.{0,24}\b(testen|pruefen|ausprobieren)\b|\b(diesen|den|meinen) einstieg (testen|pruefen|backtesten|im labor)\b|\bdiese idee\b/, topic: "idea", label: "Idee testen" },
+  // „Strategie als Text“ / „Neue Strategie“: opens the studio (the page does the reading, the questions and the backtest)
+  { tool: "studio", test: /\bstrategie als text\b|\bneue strategie\b|\bstrategie (schreiben|aufschreiben|eingeben|formulieren|beschreiben|in worten)\b|\bstrategie-? ?studio\b|\bregeln aus (einem |meinem )?text\b|\bstrategien? (vergleichen|nebeneinander)\b/, topic: "studio", label: "Strategie-Studio" },
   { tool: "train", test: /\b(ueben|uebe|uebung|uebungen|trainier\w*|trainingsmodus|lernmodus|replay training)\b|\btraining\b.*\b(starten|oeffnen|beginnen|machen)\b|\b(starte|oeffne|mach)\b.*\btraining\b/, topic: "train", label: "Training" },
   { tool: "similar", test: /\b(aehnlich\w*|vergleichbar\w*)\b.{0,30}\b(situation\w*|marktlage|lage|muster|kerze\w*|faelle|fall)\b|\b(situation\w*|muster|kerze\w*)\b.{0,30}\b(aehnlich\w*|vergleichbar\w*)\b|\bhistorisch\w*\b.{0,20}\b(aehnlich\w*|vergleich\w*)\b|\bwann (war|gab) (es|das) (schon )?(mal )?(so|aehnlich)\b/, topic: "similar", label: "Ähnliche Situationen" },
   { tool: "entry", test: /\b(was fehlt|fehlt (mir|noch|da))\b|\beinstiegs ?check\b|\beinstiegssignal\b|\bkann ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bsoll ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bist (jetzt |gerade )?(ein|kein) (einstieg|signal)\b|\bwie ist (der|die|das) (markt|lage)\b|\bmarktlage\b/, topic: "entry", label: "Einstiegs-Check" },

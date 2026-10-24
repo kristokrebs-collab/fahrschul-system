@@ -300,6 +300,13 @@ export interface Settings {
    * user starts an account. An id list, so the cloud / two-tab merge works per account and per trade.
    */
   forward?: unknown;
+  /**
+   * Strategie-Studio: several strategies written as text, each with its own saved versions (text, answers, the rules as
+   * understood then, figures of a backtest) and the paper accounts started from it. Versioned passthrough (`{ v: 1, strategies }`,
+   * see `@/domain/strategytext`); absent until the first strategy is saved. Arrays of objects with an id, so the cloud /
+   * two-tab merge works per strategy and per version; entries a newer version wrote survive untouched.
+   */
+  studio?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */

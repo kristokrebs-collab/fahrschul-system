@@ -96,6 +96,7 @@ export const FALLBACK_PAGE_LABELS: Record<string, string> = {
   konto: "Konto",
   preise: "Preise",
   funktionen: "Funktionen",
+  studio: "Strategie-Studio",
 };
 
 const PAGE_WORDS: Record<string, string[]> = {
@@ -115,6 +116,7 @@ const PAGE_WORDS: Record<string, string[]> = {
   konto: ["Anmelden", "Cloud", "Sync", "Abo", "Börse", "Sicherheit"],
   preise: ["Abo", "Pro", "Premium", "Tarife", "Upgrade"],
   funktionen: ["Alle Funktionen", "Übersicht der Funktionen", "Wo finde ich", "Index", "Hilfe", "Verzeichnis"],
+  studio: ["Strategie als Text", "Neue Strategie", "Strategie schreiben", "Regeln aus Text", "Strategien vergleichen", "Alle testen", "Papier-Konto"],
 };
 
 /** Settings sections: the card titles of the settings page (scroll target) + what they hold. */

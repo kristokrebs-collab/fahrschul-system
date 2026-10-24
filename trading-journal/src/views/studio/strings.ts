@@ -2,6 +2,16 @@
 export const NO_ADVICE = "Keine professionelle Finanzberatung.";
 export const PAST_NOT_FORECAST = "Ein Backtest zeigt die Vergangenheit, keine Prognose.";
 
+/** Example chips of the editor: a clean sentence per idea, and one that is deliberately vague (it shows the questions). */
+export const EXAMPLES: readonly { id: string; label: string; text: string }[] = [
+  { id: "rsi", label: "RSI-Dip", text: "Long, wenn der RSI unter 30 fällt und der Kurs über dem EMA 200 liegt, Stop 1,5 ATR, Ziel 2R, nur in der London-Session" },
+  { id: "boll", label: "Bollinger-Short", text: "Short, wenn der Kurs das obere Bollinger-Band berührt und der RSI über 70 ist, Stop 2 ATR, Ziel 1,5R" },
+  { id: "cross", label: "EMA-Kreuz", text: "Long, wenn der EMA 20 den EMA 50 nach oben kreuzt, Stop 1 ATR, Ziel 3R, 4h" },
+  { id: "break", label: "Ausbruch", text: "Kaufe, wenn der Kurs über das 20-Perioden-Hoch ausbricht und das Volumen über dem Durchschnitt liegt, Stop 2 ATR, Ziel 2R" },
+  { id: "macd", label: "Ohne Wochenende", text: "Kaufe, wenn der MACD nach oben kreuzt und der ADX über 25 ist, kein Handel am Wochenende, Stop 1,5 ATR, Ziel 2R" },
+  { id: "vague", label: "Mit Rückfragen", text: "Long, wenn der RSI unter 30 ist und der Kurs über dem EMA 200 liegt oder das Volumen steigt, mit engem Stop" },
+];
+
 export const STUDIO = {
   title: "Strategie-Studio",
   lead: "Schreib deine Strategie in normalen Worten. Das Studio macht daraus Regeln, prüft sie an echter Historie und lässt sie auf Papier mitlaufen – nie mit Geld, nie mit einer Order.",
@@ -9,6 +19,7 @@ export const STUDIO = {
   sections: {
     write: { title: "Deine Strategie", sub: "Text eingeben, verstehen lassen, Fragen beantworten." },
     test: { title: "Prüfen", sub: "Backtest auf echten Kerzen und Papierkonto." },
+    compare: { title: "Vergleichen", sub: "Mehrere Strategien auf denselben Daten – mit der Warnung, die dazugehört." },
     versions: { title: "Entwürfe und Versionen", sub: "Jede gespeicherte Änderung ist eine Version – vergleichbar mit den Zahlen von damals." },
     more: { title: "Weitere Werkzeuge", sub: "Muster entdecken und Varianten ausprobieren." },
   },
@@ -26,6 +37,11 @@ export const STUDIO = {
     removeYes: "Ja, löschen",
     removeNo: "Abbrechen",
     full: (n: number) => `Mehr als ${n} Strategien gehen nicht.`,
+    removeFailed: "Das Löschen ist fehlgeschlagen.",
+    draftOnly: "Entwurf, noch keine Version",
+    live: (n: number) => (n === 1 ? "1 Papierkonto" : `${n} Papierkonten`),
+    selectAll: "Alle auswählen",
+    selectNone: "Auswahl aufheben",
   },
   editor: {
     title: "Strategie als Text",
@@ -46,6 +62,11 @@ export const STUDIO = {
     market: "Markt",
     period: "Zeitraum",
     marketInvalid: "Bitte einen Markt wie BTCUSDT angeben.",
+    saveFailed: "Das Speichern ist fehlgeschlagen",
+    namePlaceholder: "z. B. RSI-Dip",
+    autosave: "Der Text wird als Arbeitskopie automatisch gesichert.",
+    override: { title: "Regeln durch einen Vorschlag geändert", text: (note: string) => `${note} Der Text beschreibt die Regeln jetzt nicht mehr genau.`, back: "Zurück zum Text" },
+    tooLongForAi: "Für die KI-Hilfe ist der Text zu lang (höchstens 1500 Zeichen).",
   },
   ai: {
     button: "Mit KI genauer verstehen",
@@ -118,9 +139,11 @@ export const STUDIO = {
     run: "Alle testen",
     pickNone: "Setze links bei mindestens zwei Strategien einen Haken.",
     pickOne: "Mit einer Strategie ist das ein einfacher Backtest – wähle mindestens zwei zum Vergleichen.",
+    needTwo: "Mindestens zwei der ausgewählten Strategien müssen rechenbar sein – siehe „Nicht verglichen“.",
     count: (n: number) => (n === 1 ? "1 Strategie ausgewählt" : `${n} Strategien ausgewählt`),
     compared: "Verglichene Strategien",
     running: (pct: number) => `Vergleich läuft … ${pct} %`,
+    loading: "Lade Kerzen …",
     market: "Markt für alle",
     period: "Zeitraum für alle",
     notReady: (name: string, why: string) => `${name}: ${why}`,
