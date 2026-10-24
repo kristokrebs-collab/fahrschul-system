@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Draggable Widget Grid</title>
+<style>
+/* ==========================================================================
+   CONFIG (CSS) - alle Look-Werte zum "Hochdrehen". Referenz-Viewport 1234x673
+   (4 Spalten a 289px, Abstand 12.5px, Seitenrand 20px, Karten 289x289).
+   Motion-Werte (Federn, Haltezeit, Lift) stehen im CONFIG (JS) weiter unten.
+   ========================================================================== */
+:root {
+  /* Buehne + Karten (gemessen) */
+  --dwg-stage:   #1f1f1f;   /* Buehne; die Karten haben DENSELBEN Grund (nur der Rand hebt sie ab) */
+  --dwg-card-bg: #1f1f1f;   /* Kartengrund - muss deckend sein, damit die gezogene Karte alles verdeckt */
+  --dwg-border:  #4e4e4e;   /* 1px Rand (~ weiss 21%) */
+  --dwg-radius:  22px;      /* Kartenradius */
+  --dwg-pad:     21.5px;    /* Innenabstand (inkl. Rand) */
+  --dwg-gap:     12.5px;      /* Abstand zwischen den Karten */
+  --dwg-edge:    20px;      /* Seitenrand der Buehne */
+
+  /* Lift / Schatten: im Dunkeln ein HELLER Schein, kein dunkler Schatten (stark nach unten versetzt) */
+  --dwg-glow:    0 20px 40px rgba(255,255,255,.075);
+  --dwg-glow-max: 1;        /* Intensitaet des Scheins im gehobenen Zustand (0..1, Multiplikator) */
+
+  /* Inhalts-Palette */
+  --w-ink:     #f8f8f8;     /* helle Schrift */
+  --w-mute:    #adacb5;     /* gedaempfte Schrift (Labels, Einheiten, Zahlen rechts) */
+  --w-green:   #4ee9b6;  --w-green-dot:  #29e4a5;
+  --w-pink:    #fa77b5;  --w-pink-dot:   #fe6ba2;
+  --w-orange:  #fc8c1b;  --w-orange-dot: #e07b00;
+  --w-blue:    #001899;     /* Akzent-Balken (tiefes Ultramarin) */
+  --w-gray-dot:#74737a;
+  --w-heat:    89,160,221;  /* Heatmap-Akzent (rgb) - 4 Stufen als Deckkraft */
+  --w-heat-now:#78c1fe;     /* "jetzt"-Zelle */
+  --w-heat-off:#2c2c2c;     /* Zukunft (noch keine Daten) */
+  --w-track:   #1b1b1b;     /* Spur der Balken */
+  --w-fill:    #161616;     /* Fuellung der Nicht-Spitzen-Balken (dunkler als der Grund) */
+  --w-col-bar: #191919;     /* Saeulen "Total Cost" */
+  --w-seg:     #3e3e3e;     /* Segmente "System Status" */
+  --w-seg-warn:#a0680e;
+
+  /* Typo */
+  --w-font:    "JetBrains Mono", "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --dwg-hint-font: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", "Liberation Mono", monospace;
+  --w-label-size: 12px;   --w-label-track: .11em;
+  --w-meta-size:  13.33px; --w-meta-track: .045em;
+  --w-text-size:  13.33px;
+  --w-value-size: 28px;
+}
+html, body { margin: 0; }
+html { background: var(--dwg-stage); scrollbar-width: thin; scrollbar-color: #585858 transparent; }
+body {
+  background: var(--dwg-stage);
+  min-height: 100vh;
+  color: var(--w-ink);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+.stage { padding: 0 var(--dwg-edge) 72px; }
+.hint {
+  margin: -2px 0 21px; font: 14.2px/15px var(--dwg-hint-font); color: var(--w-mute);
+}
+
+/* ===== COMPONENT CSS ===== */
+.dwg__grid {
+  position: relative; height: var(--dwg-h, auto);   /* Hoehe + Zellmasse setzt das JS als CSS-Variablen (nur bei Layout-Aenderung) */
+  contain: layout;                         /* Layout der Spielflaeche isolieren; Karten haben eigenes paint-contain */
+  touch-action: pan-y;                     /* vertikal scrollen bleibt moeglich, bis der Lift aktiv ist */
+  -webkit-touch-callout: none;
+}
+.dwg__item {
+  position: absolute; left: 0; top: 0;
+  width:  calc(var(--sp, 1) * var(--dwg-cell, 289px) + (var(--sp, 1) - 1) * var(--dwg-gapw, 12.5px));
+  height: calc(var(--rw, 1) * var(--dwg-rowh, 289px) + (var(--rw, 1) - 1) * var(--dwg-gapw, 12.5px));
+  transform: translate3d(0,0,0);
+  transform-origin: 50% 50%;
+  cursor: grab;
+  user-select: none; -webkit-user-select: none;
+  outline: none;
+  touch-action: pan-y;
+}
+.dwg__item.is-lifted { cursor: grabbing; z-index: 30; }
+.dwg__item.is-dropping { z-index: 20; }
+.dwg__item.is-anim { will-change: transform; }          /* nur waehrend der Bewegung */
+.dwg__item:focus-visible .dwg__card { box-shadow: 0 0 0 2px rgba(255,255,255,.55); }
+.dwg__glow {
+  position: absolute; inset: 0; border-radius: var(--dwg-radius);
+  box-shadow: var(--dwg-glow); opacity: 0; pointer-events: none;
+}
+.dwg__item.is-anim .dwg__glow { will-change: opacity; }
+.dwg__card {
+  position: relative; box-sizing: border-box; width: 100%; height: 100%;
+  background: var(--dwg-card-bg);
+  border: 1px solid var(--dwg-border); border-radius: var(--dwg-radius);
+  padding: calc(var(--dwg-pad) - 1px);
+  display: flex; flex-direction: column;
+  contain: layout paint;                  /* jede Karte isoliert (kein Layout-Einfluss auf Nachbarn) */
+  container-type: inline-size;            /* Inhalte duerfen auf schmalen Karten per @container umbrechen */
+}
+.dwg__live {                              /* Screenreader-Ansagen (Tastatur-Umsortieren) */
+  position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) { .dwg__item.is-anim, .dwg__item.is-anim .dwg__glow { will-change: auto; } .dot--pulse::after { animation: none; opacity: 0; } }
+/* ===== /COMPONENT CSS ===== */
+
+/* ===== WIDGET CONTENT CSS (Demo-Inhalte, frei austauschbar) ===== */
+.w { font-family: var(--w-font); font-size: var(--w-text-size); line-height: 17px; color: var(--w-ink); }
+.w__head { display: flex; justify-content: space-between; align-items: center; height: 14px; line-height: 14px; white-space: nowrap; }
+.w__label { font-size: var(--w-label-size); letter-spacing: var(--w-label-track); text-transform: uppercase; color: var(--w-mute); }
+.w__meta  { font-size: var(--w-meta-size);  letter-spacing: var(--w-meta-track); color: var(--w-mute); }
+.w__value { display: flex; align-items: baseline; margin-top: 16px; line-height: 32px; white-space: nowrap; }
+.w__num   { font-size: var(--w-value-size); letter-spacing: 0; color: var(--w-ink); }
+.w__unit  { font-size: var(--w-text-size); color: var(--w-mute); margin-left: 7.5px; }
+.w__delta { font-size: var(--w-text-size); color: var(--w-green); margin-left: 10px; }
+.w__grow  { flex: 1 1 auto; min-height: 0; }
+.up   { color: var(--w-green); }
+.arr { display: inline-block; width: 1ch; height: .75em; vertical-align: -.02em; fill: none; stroke: currentColor; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.warn { color: var(--w-pink); }
+.w__status { display: flex; align-items: center; margin-top: 5.5px; line-height: 18px; white-space: nowrap; }
+.w__status > span { margin-left: 9px; }
+.w__status[data-state="degraded"] { color: var(--w-orange); }
+.dot { position: relative; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--w-green-dot); }
+.dot--pink   { background: var(--w-pink-dot); }
+.dot--gray   { background: var(--w-gray-dot); }
+.dot--orange { background: var(--w-orange-dot); }
+.dot--pulse::after {                      /* sanfter Ping-Ring (kaum sichtbar, wie im Video) */
+  content: ""; position: absolute; inset: 0; border-radius: 50%; background: inherit; opacity: .35;
+  animation: w-ping 2.4s ease-out infinite;
+}
+@keyframes w-ping { 0% { transform: scale(1); opacity: .35; } 70%, 100% { transform: scale(2.4); opacity: 0; } }
+
+.segs { display: grid; grid-template-columns: repeat(30, 1fr); gap: 2.4px; height: 20px; }
+.segs i { background: var(--w-seg); border-radius: 1px; }
+.segs i.is-warn { background: var(--w-seg-warn); }
+.cols { display: flex; align-items: flex-end; gap: 2.5px; height: 44px; }
+.cols i { flex: 1 1 0; border-radius: 99px; background: var(--w-col-bar); height: var(--h, 0); }
+.cols i:last-child { background: var(--w-blue); }
+.list { display: flex; flex-direction: column; gap: 11.5px; margin-bottom: 2px; }
+.list > div { display: grid; grid-template-columns: 1fr auto; align-items: center; line-height: 17px; }
+.list--dots > div { grid-template-columns: 8px 1fr auto; column-gap: 9px; }
+.list b { font-weight: 400; color: var(--w-mute); }
+.rows { margin-bottom: 1px; }
+.rows > div { display: grid; grid-template-columns: repeat(3, 1fr); align-items: center; height: 32.1px; color: var(--w-mute); }
+.rows > div:first-child { color: var(--w-ink); }
+.rows .n { text-align: right; color: var(--w-mute); }
+.bar { height: 4px; border-radius: 2px; background: var(--w-track); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 2px; background: var(--w-fill); transform-origin: 0 50%; }
+.rows > div:first-child .bar i { background: var(--w-blue); }
+
+.heat { margin-bottom: 2px; display: grid; grid-template-columns: 46.5px repeat(32, 1fr); gap: 3px; align-items: center; }
+.heat__row { color: var(--w-mute); font-size: 12.3px; line-height: 12px; white-space: nowrap; }
+.heat__row.is-today { color: var(--w-ink); }
+.heat i { display: block; aspect-ratio: 1; border-radius: 3px; background: rgba(var(--w-heat), .22); }
+.heat i.l1 { background: rgba(var(--w-heat), .40); }
+.heat i.l2 { background: rgba(var(--w-heat), .64); }
+.heat i.l3 { background: rgba(var(--w-heat), 1); }
+.heat i.now { background: var(--w-heat-now); }
+.heat i.off { background: var(--w-heat-off); }
+.heat__axis { grid-column: 2 / span 8; font-size: 12.3px; line-height: 17px; color: var(--w-mute); white-space: nowrap; margin-top: 8px; }
+.heat__axis.a1 { grid-column: 2 / span 8; } .heat__axis.a2 { grid-column: 10 / span 8; }
+.heat__axis.a3 { grid-column: 18 / span 8; } .heat__axis.a4 { grid-column: 26 / span 8; }
+@container (max-width: 420px) {
+  .heat { grid-template-columns: 36px repeat(32, 1fr); gap: 2px; }
+  .heat i { border-radius: 2px; }
+  .w__meta { font-size: 12px; }
+}
+.tok { display: flex; height: 8px; gap: 2px; margin-top: 18px; }
+.tok i { display: block; border-radius: 2px; background: var(--w-fill); }
+.tok i:first-child { background: var(--w-blue); }
+.trace { display: grid; grid-template-columns: 8px 1fr 1fr auto; column-gap: 9px; align-items: center; height: 32.1px; color: var(--w-mute); }
+.trace .id { color: var(--w-ink); }
+.trace .ms { text-align: right; min-width: 6ch; }
+/* ===== /WIDGET CONTENT CSS ===== */
+</style>
+</head>
+<body>
+
+<main class="stage">
+<p class="hint" id="dwg-hint">Press and hold a widget, then drag to rearrange the layout.</p>
+
+<!-- COMPONENT:START -->
+<div class="dwg__grid" id="dwg" role="list" aria-describedby="dwg-hint">
+
+  <article class="w" data-id="runs" data-span="2" data-label="Runs Today">
+    <div class="w__head"><span class="w__label">Runs Today</span><span class="w__meta"><span class="up"><svg class="arr" viewBox="0 0 9 10" aria-hidden="true"><path d="M4.5 9.4V1M1.2 4.2 4.5 1l3.3 3.2"/></svg> 12%</span> vs yesterday</span></div>
+    <div class="w__value"><span class="w__num" data-k="runs">1,322</span></div>
+    <div class="w__grow"></div>
+    <div class="heat" id="heat"></div>
+  </article>
+
+  <article class="w" data-id="system" data-span="1" data-label="System Status">
+    <div class="w__head"><span class="w__label">System Status</span><span class="w__meta">30d</span></div>
+    <div class="w__value"><span class="w__num">99.98%</span><span class="w__unit">uptime</span></div>
+    <div class="w__status" data-k="status" data-state="ok"><i class="dot dot--pulse"></i><span data-k="statusText">All systems operational</span></div>
+    <div class="w__grow"></div>
+    <div class="segs" id="segs"></div>
+  </article>
+
+  <article class="w" data-id="cost" data-span="1" data-label="Total Cost">
+    <div class="w__head"><span class="w__label">Total Cost</span><span class="w__meta"><span class="warn"><svg class="arr" viewBox="0 0 9 10" aria-hidden="true"><path d="M4.5 9.4V1M1.2 4.2 4.5 1l3.3 3.2"/></svg> 8%</span> MoM</span></div>
+    <div class="w__value"><span class="w__num">$185</span><span class="w__unit">MTD</span></div>
+    <div class="w__grow"></div>
+    <div class="cols" id="cols"></div>
+  </article>
+
+  <article class="w" data-id="errors" data-span="1" data-label="Errors">
+    <div class="w__head"><span class="w__label">Errors</span><span class="w__meta">24h</span></div>
+    <div class="w__value"><span class="w__num" data-k="errors">24</span><span class="w__unit" style="margin-left:8px" data-k="errRate">1.9% rate</span></div>
+    <div class="w__grow"></div>
+    <div class="list list--dots">
+      <div><i class="dot dot--pink"></i><span>timeout</span><b data-k="e1">10</b></div>
+      <div><i class="dot dot--gray"></i><span>rate-limit</span><b data-k="e2">7</b></div>
+      <div><i class="dot dot--gray"></i><span>tool-error</span><b data-k="e3">5</b></div>
+    </div>
+  </article>
+
+  <article class="w" data-id="eval" data-span="1" data-label="Eval Score">
+    <div class="w__head"><span class="w__label">Eval Score</span></div>
+    <div class="w__value"><span class="w__num">0.91</span><span class="w__delta"><svg class="arr" viewBox="0 0 9 10" aria-hidden="true"><path d="M4.5 9.4V1M1.2 4.2 4.5 1l3.3 3.2"/></svg> 0.03</span></div>
+    <div class="w__grow"></div>
+    <div class="list">
+      <div><span>Faithfulness</span><b>0.94</b></div>
+      <div><span>Relevancy</span><b>0.89</b></div>
+      <div><span>Correctness</span><b>0.91</b></div>
+    </div>
+  </article>
+
+  <article class="w" data-id="tools" data-span="2" data-label="Tool Calls">
+    <div class="w__head"><span class="w__label">Tool Calls</span><span class="w__meta">24h</span></div>
+    <div class="w__value"><span class="w__num" data-k="tools">1,054</span></div>
+    <div class="w__grow"></div>
+    <div class="rows" id="toolrows"></div>
+  </article>
+
+  <article class="w" data-id="tokens" data-span="2" data-label="Token Usage">
+    <div class="w__head"><span class="w__label">Token Usage</span><span class="w__meta">by model · 24h</span></div>
+    <div class="w__value"><span class="w__num">2.41M</span><span class="w__unit">tokens</span></div>
+    <div class="tok" id="tok"></div>
+    <div class="w__grow"></div>
+    <div class="rows" id="tokrows"></div>
+  </article>
+
+  <article class="w" data-id="traces" data-span="2" data-label="Recent Traces">
+    <div class="w__head"><span class="w__label">Recent Traces</span><span class="w__meta" style="display:flex;align-items:center"><i class="dot dot--pulse" style="margin-right:6px"></i>live</span></div>
+    <div class="w__grow"></div>
+    <div id="traces"></div>
+  </article>
+
+</div>
+<!-- COMPONENT:END -->
+</main>
+
+<script>
+/* ==========================================================================
+   CONFIG (JS) - Motion-/Verhaltens-Werte zum "Hochdrehen"
+   ========================================================================== */
+const DRAGGABLE_WIDGET_GRID_CONFIG = {
+  holdMs: 250,                    // so lange gedrueckt halten, bis die Karte "abhebt" (Video: ~0.25-0.3 s)
+  holdTolerance: { mouse: 120, touch: 10, pen: 10 },  // px Bewegung waehrend des Haltens, danach Abbruch (Touch = Scrollen)
+  liftScale: 1.06,                // Vergroesserung der gehobenen Karte (gemessen 305.5/288)
+  followTau: 40,                  // ms: gezogene Karte folgt dem Zeiger als Tiefpass 1. Ordnung (a = 1 - exp(-dt/tau)); 0 = starr am Zeiger
+  springs: {                      // gedaempfte Federn (exakt analytisch geloest -> bildratenunabhaengig)
+    layout: { stiffness: 230,  damping: 27, mass: 1 },  // Umsortieren der anderen + Drop in den Slot (~0.35 s, ~0.5% Overshoot)
+    scale:  { stiffness: 900,  damping: 40, mass: 1 },  // Lift 1 -> 1.06 und zurueck (~120 ms, leichter Overshoot)
+  },
+  glowTau: 70,                    // ms: Schein blendet exponentiell ein/aus
+  reorderDelay: 10,               // ms: Kartenmitte muss so lange im fremden Slot liegen, bevor umsortiert wird (Hover-Intent; im Video 0-50 ms Versatz je nach Zug)
+  hitInset: 10,                   // px: Kartenmitte muss so tief im fremden Slot liegen (kein Ausloesen an Ecken/Luecken)
+  reorderCooldown: 90,            // ms Mindestabstand zwischen zwei Umsortierungen (verhindert Flattern)
+  columns: [[900, 4], [520, 2], [0, 1]],  // [Mindestbreite des Gitters, Spalten]
+  gap: 12.5, aspect: 1,           // Abstand; Zeilenhoehe = Spaltenbreite * aspect (Karte 289x289)
+  autoscroll: { edge: 56, speed: 900 },   // px Randzone / px pro Sekunde (Fenster-Scroll waehrend des Ziehens)
+  keyboard: true,                 // Leertaste/Enter greifen, Pfeile verschieben, Esc bricht ab
+  texts: {                        // Screenreader-Texte
+    role: 'verschiebbares Widget',
+    grabbed: (l, i, n) => l + ' aufgenommen, Position ' + (i + 1) + ' von ' + n + '. Pfeiltasten verschieben, Leertaste legt ab, Escape bricht ab.',
+    moved:   (l, i, n) => l + ', Position ' + (i + 1) + ' von ' + n,
+    dropped: (l, i, n) => l + ' abgelegt auf Position ' + (i + 1) + ' von ' + n,
+    cancel:  l => 'Verschieben von ' + l + ' abgebrochen',
+  },
+};
+
+/* ===== COMPONENT JS ===== */
+/* initDraggableWidgetGrid(root, opts) -> { getOrder(), setOrder(ids), relayout(), destroy() }
+   root: Element, dessen Kinder die Widgets sind. Jedes Kind: data-id, data-span (Spalten, Standard 1), data-rows (Standard 1),
+   optional data-label (Screenreader-Name). Die Kinder werden von je einem .dwg__item-Wrapper (Position/Glow) umschlossen.
+   opts ueberschreibt DRAGGABLE_WIDGET_GRID_CONFIG (tief gemerged) + onReorder(ids), onDragStart(id), onDragEnd(id). */
+function initDraggableWidgetGrid(root, opts) {
+  const DEF = { holdMs: 250, holdTolerance: { mouse: 120, touch: 10, pen: 10 }, liftScale: 1.06,
+    followTau: 40, springs: { layout: { stiffness: 230, damping: 27, mass: 1 }, scale: { stiffness: 900, damping: 40, mass: 1 } },
+    glowTau: 70, reorderDelay: 10, hitInset: 10, reorderCooldown: 90, columns: [[900, 4], [520, 2], [0, 1]], gap: 12.5, aspect: 1,
+    autoscroll: { edge: 56, speed: 900 }, keyboard: true,
+    texts: { role: 'verschiebbares Widget', grabbed: (l, i, n) => l + ' aufgenommen, Position ' + (i + 1) + ' von ' + n, moved: (l, i, n) => l + ', Position ' + (i + 1) + ' von ' + n,
+      dropped: (l, i, n) => l + ' abgelegt auf Position ' + (i + 1) + ' von ' + n, cancel: l => 'Verschieben von ' + l + ' abgebrochen' } };
+  const base = (typeof DRAGGABLE_WIDGET_GRID_CONFIG !== 'undefined') ? DRAGGABLE_WIDGET_GRID_CONFIG : DEF;
+  const merge = (a, b) => { const r = Object.assign({}, a); for (const k in (b || {})) r[k] = (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && typeof b[k] !== 'function' && a[k] && typeof a[k] === 'object') ? merge(a[k], b[k]) : b[k]; return r; };
+  const o = merge(merge(DEF, base), opts || {});
+
+  const mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+  const ac = new AbortController(), L = { signal: ac.signal }, LP = { signal: ac.signal, passive: true };
+
+  // --- Federn: exakte analytische Loesung der gedaempften Feder (jede Bildrate, jedes dt) ---
+  // Zustand s = {x, v}; Ziel t; liefert neuen Zustand nach dt Sekunden bei konstantem Ziel.
+  function spring(s, t, sp, dt) {
+    const w0 = Math.sqrt(sp.stiffness / sp.mass), z = sp.damping / (2 * Math.sqrt(sp.stiffness * sp.mass));
+    const d = s.x - t, v = s.v;
+    let nd, nv;
+    if (z < 0.9999) {
+      const wd = w0 * Math.sqrt(1 - z * z), e = Math.exp(-z * w0 * dt), c = Math.cos(wd * dt), n = Math.sin(wd * dt), B = (v + z * w0 * d) / wd;
+      nd = e * (d * c + B * n); nv = e * ((B * wd - z * w0 * d) * c + (-d * wd - z * w0 * B) * n);
+    } else if (z <= 1.0001) {
+      const e = Math.exp(-w0 * dt), B = v + w0 * d;
+      nd = e * (d + B * dt); nv = e * (v - w0 * B * dt);
+    } else {
+      const q = w0 * Math.sqrt(z * z - 1), r1 = -z * w0 + q, r2 = -z * w0 - q, c2 = (v - r1 * d) / (r2 - r1), c1 = d - c2, e1 = Math.exp(r1 * dt), e2 = Math.exp(r2 * dt);
+      nd = c1 * e1 + c2 * e2; nv = c1 * r1 * e1 + c2 * r2 * e2;
+    }
+    s.x = t + nd; s.v = nv;
+  }
+
+  // --- DOM: jedes Kind in .dwg__item (Glow + Karte) einwickeln ---
+  const live = document.createElement('div'); live.className = 'dwg__live'; live.setAttribute('aria-live', 'polite'); live.setAttribute('role', 'status');
+  const items = [...root.children].map(card => {
+    const el = document.createElement('div'); el.className = 'dwg__item';
+    const glow = document.createElement('div'); glow.className = 'dwg__glow'; glow.setAttribute('aria-hidden', 'true');
+    root.replaceChild(el, card);
+    card.classList.add('dwg__card'); el.append(glow, card);
+    el.setAttribute('role', 'listitem'); el.setAttribute('aria-roledescription', o.texts.role);
+    if (o.keyboard) el.tabIndex = 0;
+    const label = card.getAttribute('data-label') || (card.querySelector('h1,h2,h3,[data-title]') || card).textContent.trim().slice(0, 60);
+    el.setAttribute('aria-label', label);
+    return { el, glow, card, id: card.getAttribute('data-id') || label, label,
+      span: Math.max(1, +card.getAttribute('data-span') || 1), rows: Math.max(1, +card.getAttribute('data-rows') || 1),
+      x: { x: 0, v: 0 }, y: { x: 0, v: 0 }, s: { x: 1, v: 0 }, g: 0, w: 0, h: 0, tx: 0, ty: 0, sp: 0, rwSet: 0, anim: false, active: false, lastT: '', glowV: '' };
+  });
+  root.parentNode.insertBefore(live, root.nextSibling);
+  let order = items.slice();            // aktuelle Reihenfolge (Datenmodell)
+  let slots = [];                       // pro Index: {x,y,w,h} (Ziel-Layout)
+  let cols = 4, cell = 288, contentH = 0, gridW = 0;
+
+  // --- Layout (Spalten/Slots) - nur bei Resize/Umsortieren, nie pro Frame gemessen ---
+  function pickCols(w) { for (const [min, c] of o.columns) if (w >= min) return c; return 1; }
+  function computeSlots() {
+    const gap = o.gap, occ = [];
+    const free = (r, c, sp, rw) => { for (let i = 0; i < rw; i++) for (let j = 0; j < sp; j++) if (occ[r + i] && occ[r + i][c + j]) return false; return true; };
+    let r = 0, c = 0, maxRow = 0; const rowH = cell * o.aspect;
+    slots = order.map(it => {
+      const sp = Math.min(it.span, cols), rw = it.rows;
+      for (;;) { if (c + sp > cols) { c = 0; r++; } if (free(r, c, sp, rw)) break; c++; }
+      for (let i = 0; i < rw; i++) { occ[r + i] = occ[r + i] || []; for (let j = 0; j < sp; j++) occ[r + i][c + j] = 1; }
+      const s = { x: c * (cell + gap), y: r * (rowH + gap), w: sp * cell + (sp - 1) * gap, h: rw * rowH + (rw - 1) * gap };
+      maxRow = Math.max(maxRow, r + rw); c += sp; return s;
+    });
+    contentH = maxRow * rowH + Math.max(0, maxRow - 1) * gap;
+    root.style.setProperty('--dwg-h', contentH + 'px');
+    order.forEach((it, i) => {
+      const s = slots[i];
+      if (!(it === st.it && st.phase === 'drag' && !st.kbd)) { it.tx = s.x; it.ty = s.y; }   // gezogene Karte behaelt ihr Zeiger-Ziel
+      if (Math.abs(it.x.x - it.tx) > 0.01 || Math.abs(it.y.x - it.ty) > 0.01) it.active = true;
+      it.w = s.w; it.h = s.h;
+      const sp = Math.min(it.span, cols);
+      if (it.sp !== sp) { it.sp = sp; it.el.style.setProperty('--sp', sp); }
+      if (it.rwSet !== it.rows) { it.rwSet = it.rows; it.el.style.setProperty('--rw', it.rows); }
+    });
+  }
+  function measure(first) {
+    gridW = root.clientWidth; cols = pickCols(gridW);
+    cell = (gridW - (cols - 1) * o.gap) / cols;
+    root.style.setProperty('--dwg-cell', cell + 'px'); root.style.setProperty('--dwg-rowh', cell * o.aspect + 'px'); root.style.setProperty('--dwg-gapw', o.gap + 'px');
+    computeSlots();
+    if (first) order.forEach(it => { it.x.x = it.tx; it.y.x = it.ty; paint(it, true); });
+    else kick();
+  }
+
+  // --- Rendern (nur transform + opacity) ---
+  let glowMax = 1;
+  function readVars() { const v = parseFloat(getComputedStyle(root).getPropertyValue('--dwg-glow-max')); glowMax = isFinite(v) ? v : 1; }
+  function paint(it, force) {
+    const t = 'translate3d(' + it.x.x.toFixed(2) + 'px,' + it.y.x.toFixed(2) + 'px,0) scale(' + it.s.x.toFixed(4) + ')';
+    if (force || t !== it.lastT) { it.el.style.transform = t; it.lastT = t; }
+    const gl = (Math.max(0, Math.min(1, it.g)) * glowMax).toFixed(3);
+    if (gl !== it.glowV) { it.glow.style.opacity = gl; it.glowV = gl; }
+  }
+
+  // --- Zustand Ziehen ---
+  const st = { phase: 'idle', it: null, pid: null, ptype: 'mouse', sx: 0, sy: 0, px: 0, py: 0, offX: 0, offY: 0, timer: 0, kbd: false, lastReorder: -1e9, cand: -1, candSince: 0, gx: 0, gy: 0, startOrder: null };
+  let raf = 0, last = 0;
+
+  function toGrid(cx, cy) { return [cx + window.scrollX - st.gx, cy + window.scrollY - st.gy]; }
+  function cacheGridOrigin() { const r = root.getBoundingClientRect(); st.gx = r.left + window.scrollX; st.gy = r.top + window.scrollY; }
+
+  function announce(msg) { live.textContent = ''; live.textContent = msg; }
+  function ids() { return order.map(it => it.id); }
+
+  function setLifted(it, on) {
+    it.el.classList.toggle('is-lifted', on);
+    it.el.classList.toggle('is-dropping', !on);
+  }
+  function moveTo(it, newIdx) {
+    const i = order.indexOf(it); if (i === newIdx || newIdx < 0 || newIdx >= order.length) return false;
+    order.splice(i, 1); order.splice(newIdx, 0, it); computeSlots();
+    if (o.onReorder) o.onReorder(ids());
+    return true;
+  }
+
+  function beginDrag() {
+    const it = st.it; if (!it || st.phase !== 'hold') return;
+    st.phase = 'drag'; st.startOrder = ids();
+    if (!st.kbd) { try { it.el.setPointerCapture(st.pid); } catch (e) {} }
+    setLifted(it, true); it.active = true;
+    if (o.onDragStart) o.onDragStart(it.id);
+    if (navigator.vibrate && st.ptype === 'touch') { try { navigator.vibrate(8); } catch (e) {} }
+    kick();
+  }
+  function endDrag(cancel) {
+    const it = st.it; clearTimeout(st.timer); st.timer = 0;
+    if (!it) { st.phase = 'idle'; return; }
+    if (st.phase === 'drag') {
+      if (cancel && st.startOrder) { const want = st.startOrder; order.sort((a, b) => want.indexOf(a.id) - want.indexOf(b.id)); computeSlots(); }
+      setLifted(it, false); it.active = true;
+      if (o.onDragEnd) o.onDragEnd(it.id);
+      announce(cancel ? o.texts.cancel(it.label) : o.texts.dropped(it.label, order.indexOf(it), order.length));
+    }
+    if (st.pid != null) { try { it.el.releasePointerCapture(st.pid); } catch (e) {} }
+    window.removeEventListener('touchmove', blockTouch, true);
+    st.phase = 'idle'; st.it = null; st.pid = null; st.kbd = false;
+    computeSlots(); kick();                       // Ziel der losgelassenen Karte = ihr Slot (Drop-Feder)
+  }
+  function blockTouch(e) { if (st.phase === 'drag' || st.phase === 'hold') { if (e.cancelable && st.phase === 'drag') e.preventDefault(); } }
+
+  // --- Eingabe: Zeiger ---
+  const interactive = t => t.closest && t.closest('a,button,input,select,textarea,[data-no-drag]');
+  root.addEventListener('pointerdown', e => {
+    if (st.phase !== 'idle') return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const el = e.target.closest && e.target.closest('.dwg__item'); if (!el || interactive(e.target)) return;
+    const it = items.find(i => i.el === el); if (!it) return;
+    cacheGridOrigin(); readVars();
+    st.it = it; st.pid = e.pointerId; st.ptype = e.pointerType || 'mouse'; st.phase = 'hold'; st.kbd = false;
+    st.sx = st.px = e.clientX; st.sy = st.py = e.clientY;
+    const [gx, gy] = toGrid(e.clientX, e.clientY);
+    st.offX = it.x.x + it.w / 2 - gx; st.offY = it.y.x + it.h / 2 - gy;       // Greifpunkt relativ zur Kartenmitte (bleibt erhalten)
+    if (st.ptype === 'touch') window.addEventListener('touchmove', blockTouch, { passive: false, capture: true, signal: ac.signal });
+    clearTimeout(st.timer); st.timer = setTimeout(beginDrag, mq.matches ? Math.min(o.holdMs, 150) : o.holdMs);   // einmaliger Halte-Timer (kein Animationstakt)
+  }, L);
+  root.addEventListener('pointermove', e => {
+    if (e.pointerId !== st.pid) return;
+    st.px = e.clientX; st.py = e.clientY;          // nur merken; angewendet wird einmal pro Frame im rAF (tick)
+    if (st.phase === 'hold') {
+      const tol = o.holdTolerance[st.ptype] != null ? o.holdTolerance[st.ptype] : 10;
+      if (Math.hypot(st.px - st.sx, st.py - st.sy) > tol) endDrag(true);
+    } else if (st.phase === 'drag') kick();
+  }, LP);
+  const up = e => { if (e.pointerId === st.pid && !st.kbd) endDrag(e.type === 'pointercancel'); };
+  root.addEventListener('pointerup', up, L);
+  root.addEventListener('pointercancel', up, L);
+  root.addEventListener('lostpointercapture', e => { if (e.pointerId === st.pid && st.phase === 'drag' && !st.kbd) endDrag(false); }, L);
+  root.addEventListener('contextmenu', e => { if (st.phase !== 'idle') e.preventDefault(); }, L);
+  root.addEventListener('dragstart', e => e.preventDefault(), L);
+
+  // --- Eingabe: Tastatur (Leertaste/Enter greift, Pfeile verschieben, Esc bricht ab) ---
+  if (o.keyboard) root.addEventListener('keydown', e => {
+    const el = e.target.closest && e.target.closest('.dwg__item'); if (!el || e.target !== el) return;
+    const it = items.find(i => i.el === el); if (!it) return;
+    if (st.phase === 'drag' && st.kbd && st.it === it) {
+      const i = order.indexOf(it); let n = null;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') n = i - 1;
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') n = i + 1;
+      else if (e.key === 'Home') n = 0; else if (e.key === 'End') n = order.length - 1;
+      else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); endDrag(false); return; }
+      else if (e.key === 'Escape') { e.preventDefault(); endDrag(true); return; }
+      if (n != null) { e.preventDefault(); if (moveTo(it, n)) { announce(o.texts.moved(it.label, order.indexOf(it), order.length)); kick(); } }
+    } else if (st.phase === 'idle' && (e.key === ' ' || e.key === 'Enter')) {
+      e.preventDefault(); st.it = it; st.phase = 'hold'; st.kbd = true; st.pid = null; st.ptype = 'key';
+      beginDrag(); announce(o.texts.grabbed(it.label, order.indexOf(it), order.length));
+    }
+  }, L);
+  root.addEventListener('focusout', e => { if (st.kbd && st.phase === 'drag' && !root.contains(e.relatedTarget)) endDrag(false); }, L);
+
+  // --- Frame-Schleife: dt aus dem rAF-Zeitstempel, alles zeitbasiert ---
+  function kick() { if (!raf) { last = 0; raf = requestAnimationFrame(tick); } }
+  function tick(now) {
+    raf = 0;
+    const dt = last ? Math.min(now - last, 50) / 1000 : 1 / 120; last = now;
+    const reduce = mq.matches;
+    const drag = st.phase === 'drag' ? st.it : null;
+    let busy = st.phase === 'hold';
+
+    if (drag) {
+      // Zielposition der gezogenen Karte = Zeiger + Greif-Offset (oder Slot bei Tastatur)
+      if (st.kbd) { const i = order.indexOf(drag); drag.tx = slots[i].x; drag.ty = slots[i].y; }
+      else {
+        const [gx, gy] = toGrid(st.px, st.py);
+        drag.tx = gx + st.offX - drag.w / 2; drag.ty = gy + st.offY - drag.h / 2;
+        // Autoscroll am Fensterrand (Fenster = Scroller)
+        const ed = o.autoscroll.edge, vh = window.innerHeight;
+        if (ed) { const top = st.py < ed ? (st.py - ed) / ed : st.py > vh - ed ? (st.py - (vh - ed)) / ed : 0;
+          if (top) window.scrollBy(0, Math.max(-1, Math.min(1, top)) * o.autoscroll.speed * dt); }
+      }
+      // Umsortieren: Mitte der (folgenden) Karte liegt im Slot eines anderen Widgets - nach kurzer Verweildauer (Hover-Intent)
+      if (!st.kbd) {
+        const cx = drag.x.x + drag.w / 2, cy = drag.y.x + drag.h / 2, di = order.indexOf(drag);
+        let hit = -1;
+        for (let j = 0; j < order.length; j++) { if (j === di) continue; const s = slots[j]; if (cx >= s.x + o.hitInset && cx <= s.x + s.w - o.hitInset && cy >= s.y + o.hitInset && cy <= s.y + s.h - o.hitInset) { hit = j; break; } }
+        if (hit !== st.cand) { st.cand = hit; st.candSince = now; }
+        else if (hit >= 0 && now - st.candSince >= o.reorderDelay && now - st.lastReorder > o.reorderCooldown) {
+          if (moveTo(drag, hit)) { st.lastReorder = now; st.cand = -1; announce(o.texts.moved(drag.label, hit, order.length)); }
+        }
+      }
+    }
+
+    for (let k = 0; k < order.length; k++) {
+      const it = order[k], isDrag = it === drag;
+      if (!isDrag && !it.active) continue;
+      if (!it.anim) { it.anim = true; it.el.classList.add('is-anim'); }
+      const kf = isDrag && !st.kbd && o.followTau > 0;
+      const tx = it.tx, ty = it.ty, ts = isDrag ? o.liftScale : 1, tg = isDrag ? 1 : 0;
+      if (reduce) { it.x.x = tx; it.y.x = ty; it.x.v = it.y.v = 0; it.s.x = 1; it.s.v = 0; it.g = tg; }
+      else {
+        if (kf) {                                   // Tiefpass: exakt bildratenunabhaengig, Geschwindigkeit fuer den spaeteren Drop merken
+          const a = 1 - Math.exp(-dt * 1000 / o.followTau), nx = it.x.x + (tx - it.x.x) * a, ny = it.y.x + (ty - it.y.x) * a;
+          it.x.v = (nx - it.x.x) / dt; it.y.v = (ny - it.y.x) / dt; it.x.x = nx; it.y.x = ny;
+        } else if (isDrag && !st.kbd) { it.x.x = tx; it.y.x = ty; it.x.v = it.y.v = 0; }
+        else { spring(it.x, tx, o.springs.layout, dt); spring(it.y, ty, o.springs.layout, dt); }
+        spring(it.s, ts, o.springs.scale, dt);
+        it.g += (tg - it.g) * (1 - Math.exp(-dt * 1000 / o.glowTau));
+      }
+      const settled = Math.abs(it.x.x - tx) < 0.05 && Math.abs(it.y.x - ty) < 0.05 && Math.abs(it.x.v) < 0.5 && Math.abs(it.y.v) < 0.5 &&
+        Math.abs(it.s.x - ts) < 0.0005 && Math.abs(it.s.v) < 0.01 && Math.abs(it.g - tg) < 0.004;
+      if (settled && !isDrag) {
+        it.x.x = tx; it.y.x = ty; it.x.v = it.y.v = 0; it.s.x = 1; it.s.v = 0; it.g = 0; paint(it, false);
+        it.active = false; it.anim = false; it.el.classList.remove('is-anim', 'is-dropping');
+      } else { paint(it, false); busy = true; }
+    }
+    if (busy || st.phase === 'drag') raf = requestAnimationFrame(tick);
+  }
+
+  // --- Resize / Scroll ---
+  let ro = null;
+  if (window.ResizeObserver) { ro = new ResizeObserver(() => { if (root.clientWidth !== gridW) measure(false); }); ro.observe(root); }
+  else window.addEventListener('resize', () => measure(false), L);
+  if (mq.addEventListener) mq.addEventListener('change', () => kick(), L);
+
+  readVars(); measure(true);
+  if (opts && opts.order) setOrder(opts.order);
+
+  function setOrder(idList) {
+    const map = new Map(items.map(i => [i.id, i])); const next = [];
+    idList.forEach(id => { if (map.has(id)) { next.push(map.get(id)); map.delete(id); } }); map.forEach(i => next.push(i));
+    order = next; computeSlots(); kick();
+  }
+  return {
+    getOrder: ids, setOrder, relayout() { measure(false); },
+    destroy() { ac.abort(); cancelAnimationFrame(raf); clearTimeout(st.timer); ro && ro.disconnect();
+      items.forEach(it => { root.replaceChild(it.card, it.el); it.card.classList.remove('dwg__card'); }); live.remove(); ['--dwg-h', '--dwg-cell', '--dwg-rowh', '--dwg-gapw'].forEach(v => root.style.removeProperty(v)); }
+  };
+}
+/* ===== /COMPONENT JS ===== */
+
+/* ===== DEMO: Inhalt + "live"-Daten exakt wie im Video ===== */
+(function demo() {
+  const $ = s => document.querySelector(s), $$ = (s, r) => [...(r || document).querySelectorAll(s)];
+  const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+
+  // Heatmap: 5 Reihen x 32 Spalten (45 min je Zelle), Stufen 0..3, n = "jetzt", f = Zukunft
+  const HEAT = ['00000000000001010010101100000000', '00000000000110001011101101000000', '00000000001122333111311221111000', '00000000011111212121221312211100', '0000000010121133112332131100nfff'];
+  const days = ['Sat', 'Sun', 'Mon', 'Tue', 'Today'], heat = $('#heat');
+  HEAT.forEach((row, r) => {
+    heat.append(mk('span', 'heat__row' + (r === 4 ? ' is-today' : ''), days[r]));
+    for (const ch of row) heat.append(mk('i', ch === 'n' ? 'now' : ch === 'f' ? 'off' : 'l' + ch));
+  });
+  ['12AM', '6AM', '12PM', '6PM'].forEach((t, i) => heat.append(mk('span', 'heat__axis a' + (i + 1), t)));
+  // Spacer-Zelle links neben den Achsen-Labels (Gitterspalte 1) entfaellt: Labels starten in Spalte 2
+
+  // System-Status-Segmente (30), 2 gelbe
+  const segs = $('#segs'); for (let i = 0; i < 30; i++) segs.append(mk('i', i === 8 || i === 21 ? 'is-warn' : ''));
+  // Saeulen "Total Cost" (14), letzte blau und waechst
+  const COLS = [36, 32, 36, 39, 36, 34, 32, 29, 32, 41, 33, 34, 41, 32], cols = $('#cols');
+  COLS.forEach(h => { const i = mk('i'); i.style.setProperty('--h', h + 'px'); cols.append(i); });
+  // Balkenlisten
+  const TOOLS = [['web_search', 426], ['code_interpreter', 278], ['sql_query', 204], ['retrieve_docs', 146]];
+  const bars = (host, data, fmt) => data.map(([n, v]) => { const d = mk('div'); const b = mk('div', 'bar'), f = mk('i'); b.append(f); d.append(mk('span', '', n), b, mk('span', 'n', fmt ? fmt(v) : v)); host.append(d); return { f, num: d.lastChild, v }; });
+  const toolBars = bars($('#toolrows'), TOOLS);
+  const TOKENS = [['claude-sonnet', 1120], ['claude-haiku', 760], ['claude-opus', 310], ['embeddings', 220]];
+  const tokBars = bars($('#tokrows'), TOKENS, v => (v / 1000).toFixed(2) + 'M');
+  const tok = $('#tok'); TOKENS.forEach(([, v]) => { const i = mk('i'); i.style.flex = v + ' 0 0'; tok.append(i); });
+  const TRACES = [['run_8f2a', 'web_search', '412ms'], ['run_8f29', 'sql_query', '188ms'], ['run_8f28', 'code_interpreter', '1.2s'], ['run_8f27', 'retrieve_docs', '96ms']];
+  const tr = $('#traces'); TRACES.forEach(([id, n, ms]) => { const d = mk('div', 'trace'); d.append(mk('i', 'dot'), mk('span', 'id', id), mk('span', '', n), mk('span', 'ms', ms)); tr.append(d); });
+
+  // --- Live-Daten (Zeiten aus dem Video; Aenderungen sind harte Textwechsel ohne Animation) ---
+  const fmt = n => n.toLocaleString('en-US');
+  const set = (el, t) => { if (el && el.textContent !== t) el.textContent = t; };
+  const K = k => $('[data-k="' + k + '"]');
+  const S = { runs: 1322, tools: 1054, counts: TOOLS.map(t => t[1]), errors: 24, e: [10, 7, 5], bar: 32 };
+  function drawTools() {
+    const max = Math.max(...S.counts);
+    toolBars.forEach((b, i) => { b.f.style.transform = 'scaleX(' + (S.counts[i] / max).toFixed(4) + ')'; set(b.num, String(S.counts[i])); });
+    set(K('tools'), fmt(S.tools));
+  }
+  function drawTok() { const max = Math.max(...tokBars.map(b => b.v)); tokBars.forEach(b => { b.f.style.transform = 'scaleX(' + (b.v / max).toFixed(4) + ')'; }); }
+  const TOOL_STEPS = [[2, 2, 1, 1], [3, 2, 1, 0]];                 // 1054 -> 1060 -> 1066 (Video); danach zufaellig
+  let toolN = 0, runN = 0;
+  function toolTick() {
+    const st = TOOL_STEPS[toolN++] || [0, 1, 2, 3].map(() => Math.random() < .55 ? 1 + (Math.random() * 2 | 0) : 0);
+    st.forEach((d, i) => { S.counts[i] += d; S.tools += d; }); drawTools();
+  }
+  function runTick() { S.runs += 1; set(K('runs'), fmt(S.runs)); }
+  function incident(on) {                                           // 7.0 s: Fehler +1, Rate 2.0%, Status "Degraded performance"
+    const box = K('status');
+    if (on) { S.errors = 25; S.e[2] = 6; box.dataset.state = 'degraded'; set(K('statusText'), 'Degraded performance'); box.querySelector('.dot').className = 'dot dot--orange'; S.bar = 34; }
+    else { box.dataset.state = 'ok'; set(K('statusText'), 'All systems operational'); box.querySelector('.dot').className = 'dot dot--pulse'; }
+    set(K('errors'), String(S.errors)); set(K('errRate'), (S.errors / 1260 * 100).toFixed(1) + '% rate'); set(K('e3'), String(S.e[2]));
+    cols.lastChild.style.setProperty('--h', S.bar + 'px');
+  }
+  drawTools(); drawTok();
+  const t0 = performance.now(), timers = [];
+  const at = (ms, fn, every) => { const run = () => { fn(); if (every) timers.push(setTimeout(run, every)); }; timers.push(setTimeout(run, Math.max(0, ms - (performance.now() - t0)))); };
+  at(2020, runTick, 2500);        // Runs Today: 2.02 s, 4.52 s, 7.02 s ... (+1)
+  at(3040, toolTick, 3000);       // Tool Calls: 3.04 s, 6.04 s ... (+6)
+  at(7010, () => incident(true)); // Vorfall bei 7.0 s
+  at(19000, () => incident(false));
+
+  initDraggableWidgetGrid($('#dwg'));
+})();
+</script>
+</body>
+</html>
