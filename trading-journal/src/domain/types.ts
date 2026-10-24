@@ -300,6 +300,12 @@ export interface Settings {
    * user starts an account. An id list, so the cloud / two-tab merge works per account and per trade.
    */
   forward?: unknown;
+  /**
+   * Background optimiser: what the user decided about its proposals and what it learned from that. Versioned passthrough
+   * (`{ v: 1, learn, stats, proposals, lineages, prefs }`, see `@/domain/evolve`); absent until the first proposal is decided.
+   * Proposals are an id list, so the cloud / two-tab merge works per proposal. The trial log itself stays on the device.
+   */
+  evolve?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */

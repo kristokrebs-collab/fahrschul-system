@@ -167,3 +167,11 @@ Abschnitt `Muster-Entdecker` (`labor-discovery`, lazy chunk `DiscoverySection.ts
 (`useLabor.result` / `bars`, dazu die Schlüsselmarken desselben Markts, die schon vor dem Einstieg angelegt waren) oder die **Journal-Trades**, und verdrahtet „Mit diesem Filter testen“: das bestätigte Muster wird mit `useExtras.setPattern(spec)`
 zum Muster-Filter der Filterauswahl und `runFilters()` rechnet denselben Lauf mit und ohne Muster; das Ergebnis steht unter dem Befund und sagt, dass das Muster aus denselben Trades stammt (nur ein Test auf denselben Daten). Nichts wird
 automatisch übernommen. Tests: `views.labor.discovery.test.tsx`, `discovery.sources.test.ts` (Filtervergleich auf dem echten BTCUSDT-Lauf), e2e `discovery.spec.ts`.
+## Hintergrund-Optimierer (F66)
+Section `Hintergrund-Optimierer` (`evolve-section`, lazy chunk `EvolveSection.tsx` of `@/views/evolve`) after the forward test. It lists the editor
+idea ("Eigene Idee") and up to five drafts as strategies; the candles come from the Labor's own loader (`loadLabData`, same cache and limits as a
+run). The card runs them together in a Web Worker (only while the app is open), judges every variant only on windows it was not trained on and
+shows proposals – **Als neue Version speichern** (a new draft "… v2" for the editor idea, a new version for a draft; rules that changed since the
+proposal are never overwritten), **Als Herausforderer live testen** (a virtual forward account, nothing retroactive), **Ablehnen**. The only
+additive change to the Labor store is `addDraft(name, config, note)`. The rest is in `src/views/evolve/README.md` and `src/domain/evolve/README.md`.
+Tests: `views.evolve.labor.test.tsx`, e2e `evolve.spec.ts`.

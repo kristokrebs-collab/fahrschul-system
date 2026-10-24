@@ -12,7 +12,7 @@
  */
 import { has, tokensOf } from "./fuzzy";
 
-export const INSIGHT_TOOL_IDS = ["audit", "stress", "forward", "trend", "signals", "quality", "benefit", "situation", "fit", "demands", "library", "discovery"] as const;
+export const INSIGHT_TOOL_IDS = ["audit", "stress", "forward", "trend", "signals", "quality", "benefit", "situation", "fit", "demands", "library", "discovery", "evolve"] as const;
 export type InsightToolId = (typeof INSIGHT_TOOL_IDS)[number];
 export const isInsightTool = (t: string): t is InsightToolId => (INSIGHT_TOOL_IDS as readonly string[]).includes(t);
 
@@ -122,6 +122,20 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
       (strategy && !journal && has(t, "=gibt", "=gibts", "kennst", "existiert", "gaebe", "empfiehl", "=nenn", "=zeig")) ||
       // „Welche Werte nimmt man für …?“ – the usual settings of an idea
       (has(t, "=wert", "=werte", "einstellung", "parameter", "standardwert") && has(t, "=man", "nimmt", "nehmen", "ueblich", "typisch"))
+    );
+  }),
+  // 8 · the background optimiser: „Verbessere meine Strategie im Hintergrund“, what it found, what it learned. „Woran soll ich arbeiten?“
+  //     and the other journal improvements stay with the existing `improve` tool: the optimiser needs the strategy AND one of its own words
+  rule("evolve", "evolve", "Hintergrund-Optimierer", (t) => {
+    const strategy = has(t, "strategie", "strategien", "=idee", "=ideen", "regelsatz", "regelsaetze", "=regeln");
+    const better = has(t, "verbesser", "optimier", "weiterentwickel", "verfeiner", "nachjustier", "feinschleif");
+    const proposals = has(t, "=vorschlag", "=vorschlaege", "=vorschlaegen"); // the noun – „vorschlagen“ (suggest) asks the library
+    const own = proposals || has(t, "hintergrund", "automatisch", "laufend", "staendig", "herausforder", "turnier", "versuchsprotokoll");
+    return (
+      has(t, "optimierer", "hintergrundoptimierer", "hintergrundoptimierung", "strategieoptimierer") ||
+      (strategy && better && (own || has(t, "optimier", "weiterentwickel"))) ||
+      (strategy && proposals) ||
+      ((has(t, "optimierer", "hintergrund") || proposals) && has(t, "gelernt", "treffer", "bewaehrt"))
     );
   }),
 ];

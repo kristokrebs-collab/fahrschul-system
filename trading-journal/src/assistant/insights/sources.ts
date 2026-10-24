@@ -101,3 +101,9 @@ export async function similarSource(env: Env, norm: string): Promise<SimilarInpu
   if (!candles) return { ...base, state: "waiting", reason: avail && !avail.ok ? avail.reason : null, result: null };
   return { ...base, state: "ok", reason: null, result: findSimilar(candles, tf, provider.serverNow(), { features: prefs.features, horizon: prefs.horizon, unit: prefs.unit, minGap: prefs.horizon }) };
 }
+
+/** `settings.evolve` (the optimiser's proposals, counters and learning) as the journal holds it. */
+export function evolveSource(env: Env): unknown {
+  if (env.insight && "evolve" in env.insight) return env.insight.evolve;
+  return (env.data.settings as { evolve?: unknown }).evolve;
+}

@@ -537,3 +537,35 @@ Keine neue Sprache: eine `Card` ganz unten im Labor (`lg:col-span-12`, eigene Se
 Das Ergebnis beginnt mit der **Zählzeile** (`text-[15px] font-semibold`: „Ich habe 412 Zusammenhänge geprüft, 3 halten stand.“), darunter die Aufschlüsselung inklusive „verworfen (Zufall)“ in `text-mute`. **Gewinn-Muster** und **Verlust-Muster** sind zwei Gruppen mit `label`-Kopf und Vorzeichen-Punkt (Gewinn-/Verlust-Ton **nur** als Vorzeichen), darunter einklappbar „Hinweise“ und „Verworfen (Zufall)“ (Zeilenknopf mit `+`/`−`, `Collapse`).
 Jeder Befund ist eine **Ampel-Karte** (`rounded-xl border-line bg-ink-950/50 p-3.5`): Punkt (grün bestätigt, gelb Hinweis, nur Umriss = verworfen) **mit** dem Stufenwort im `Badge` – nie Farbe allein –, der Satz in `text-[14px] font-medium`, vier Kennzahlen als `dl` in Mono (2 × 2 mobil, 4 × 1 ab `sm`), „trifft auf x % der Gewinner und y % der Verlierer zu“, vier kleine Quadrate für die Zeitblöcke (✓ gleiche Richtung · ✗ Gegenrichtung · – zu wenige Trades, mit `aria-label`), Abzeichen (`steel`: „Kombination stärker als jede Einzelwirkung“, `mute`: „Merkmal, das kaum jemand prüft“, `warn`: „erst nach dem Trade bekannt“), Gründe als kurze Sätze, Details hinter einem Ghost-Knopf. „Mit diesem Filter testen“ ist ein primärer `Button sm` unter dem Befund (≥ 44 px bei grobem Zeiger), das Testergebnis eine `rounded-lg border-line`-Zeile (`role="status"`), die Gründe gegen den Filter stehen als `text-mute`-Satz. Unten: „So wurde geprüft“ als Textknopf mit Aufzählung und der feste Hinweis in einem `border-line`-Kasten (*Beobachtung, keine Ursache; kein Versprechen für die Zukunft. Keine professionelle Finanzberatung.*).
 Mobil 390 px: eine Spalte, kein Querscroll, die Kennzahlen in zwei Spalten, Knöpfe umbrechen. Bewegung nur über vorhandene Bausteine (`Button`-Press, `Collapse`, die `Reveal`-Zelle des Labors); der Balken bewegt nur `transform`; reduzierte Bewegung zeigt den Endzustand.
+## Hintergrund-Optimierer (F66)
+
+Keine neue Sprache, nur bestehende Bausteine (`Card`, `Badge`, `Sheet`, `Button`, Mono-Zahlen). Eine `Card` im Raster des Labors (`lg:col-span-12`) in
+der eigenen Sektion „Hintergrund-Optimierer“ nach dem Forward-Test. Ganz oben ein `border-line`-Kasten mit dem festen Satz **„Läuft nur, solange die App
+offen ist.“** und dem Zusatz, dass nie von selbst etwas geändert wird – er ist nicht wegklickbar und steht vor jedem Start. Darunter die Strategien als
+Zeilen mit Checkbox (≥ 44 px bei grobem Zeiger; Name, Symbol/Intervall, Freiheitsgrade in Mono, Grund in `text-mute`, wenn eine Strategie nicht laufen kann),
+dann Start / Pause / Fortsetzen / Stopp (ein primärer Knopf zur Zeit), Budget und Tempo (Schonend / Normal / Volle Leistung) als zwei kleine Auswahlen.
+
+**Lauf.** Ein dünner Balken (`h-1.5`, weiß auf `white/[0.06]`, nur `transform: scaleX`, im Reduced-Motion-Fall ohne Übergang) mit „Versuch n von N“ in Mono,
+darunter je Strategie eine Zeile mit Phase. Eine ruhige Zeile (`evolve-throttle`) nennt, ob der Worker oder die Zeitscheiben im Hauptthread rechnen und warum
+gebremst wird (Tab im Hintergrund, Energiesparmodus, Datensparmodus, Touch-Gerät, eigene Einstellung). Pausiert steht „Pausiert“. Der Status-`Badge` ist
+neutral/blau, nur „Läuft“ trägt den Gewinn-Ton als Punkt, Fehler den Verlust-Ton.
+
+**Ergebnis.** Je Strategie eine Zeile der Rangliste: jetzige Version | beste Variante auf den **Testfenstern** (Ø R, Trades, größter Rückgang in R), darunter
+der Streifen der Fenster (`WindowsStrip`: Training | 4 Tests | Bestätigung, gleiche Breite wie die Zeit, Bestätigung gestrichelt umrandet, damit sichtbar
+ist, dass sie nie zur Auswahl diente). Die Trainingszahl steht nie als Schlagzeile. Das **Turnier** ist eine Tabelle (mobil: eine Zeile-als-Karte je
+Eintrag, kein Seitwärts-Scroll) der Bestätigungsfenster-Ergebnisse aller Strategien und Varianten mit der über ALLES Getestete korrigierten
+Wahrscheinlichkeit; die naive Zahl steht klein daneben. „Nichts gefunden“ ist ein ruhiger Kasten (`evolve-nothing`) mit der Zahl der Versuche – kein Fehler.
+
+**Vorschlag.** Je Vorschlag eine `Card` mit dem `Badge` „Überanpassung n %“ (gering = Aqua, unsicher = Warn, hoch = Verlust – ein geringer Wert ist **kein**
+Gewinn-Ton). Inhalt: die Änderungen als Sätze (Liste, je Änderung eine Zeile), erwartetes Ergebnis gegen jetzige Version in Mono, Plateau („hält bei
+kleinen Änderungen“ n von m), Warnungen (wenige Trades, hängt an wenigen Trades, Bestätigung schlechter) als `text-warn`-Zeilen vor den Knöpfen. Drei Knöpfe
+gleichrangig, ≥ 44 px: **Als neue Version speichern**, **Als Herausforderer live testen**, **Ablehnen** (klappt ein Feld für den optionalen Grund auf).
+Entschiedene Vorschläge wandern in eine eingeklappte Liste; „Hat sich der Vorschlag live bestätigt?“ zeigt Erwartung und Ergebnis in Prozent je 30 Tage
+nebeneinander (bestätigt = Aqua, darunter = Warn, zu früh = neutral, mit den fehlenden Tagen/Trades in Worten).
+
+**Was habe ich gelernt?** Eine eigene `Card` unter den Vorschlägen: Zeilen mit Zahl und Stichprobe („Trend-Filter: 3 von 3 angenommen“), Trefferquote der eigenen
+Vorschläge mit 80-%-Bereich, Vorhersage gegen Live. Unter der Mindeststichprobe steht ein ruhiger Satz, was fehlt – nie eine Quote. Das Versuchsprotokoll ist
+ein `Sheet` (lazy) mit den Versuchen als Zeilen.
+
+Jede Karte endet mit „Vergangene Ergebnisse sind keine Prognose. Keine professionelle Finanzberatung.“ (`evolve-disclaimer`, `text-faint`, nicht wegklickbar).
+Keine eigene Bewegung außer dem Balken; alles Weitere kommt aus `src/motion`.

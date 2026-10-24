@@ -69,4 +69,6 @@ export interface InsightInputs {
   similar?: SimilarInput;
   /** the last finished search of the Muster-Entdecker (`null` = none this session) */
   discovery?: DiscoveryMemory | null;
+  /** `settings.evolve` as stored (the optimiser's proposals, counters and learning), `undefined` = none */
+  evolve?: unknown;
 }

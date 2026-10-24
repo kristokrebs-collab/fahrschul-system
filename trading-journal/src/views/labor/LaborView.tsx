@@ -6,6 +6,7 @@
  *   Passt zu dir?   FitCard (12): the run against the journal (F49)                        (after a run, lazy)
  *   Belastung …     ExtrasSection (12): stress scenarios, Prüfbericht, filter comparison      (after a run, lazy)
  *   Forward-Test    ForwardSection (12): virtual accounts on new closed candles                (always, lazy chunk; F23)
+ *   Optimierer      EvolveSection: improves strategies in the background, proposals only (lazy chunk; always)
  *   Robustheit      OverfitCard (5) · OosCard (7) · WalkForwardCard (7) · HeatmapCard (5)     (after a run)
  *   Vergleich       CompareRunsCard (8) · ReferenceCard (4)                                   (after a run)
  *   TradingView     AdapterStatusCard (6) · TvCompareCard (6)                                 (lazy chunk, always; F14)
@@ -35,6 +36,7 @@ import { TradesCard } from "./TradesCard";
 import { Cell, SectionTitle } from "./ui";
 import { DRAFTS } from "./draftStrings";
 import { FORWARD } from "./forward/strings";
+import { EVOLVE } from "@/views/evolve/strings";
 
 /** F20 / F18 / F17: its own chunk, fetched only when a finished run is on the page. */
 const ExtrasSection = lazy(() => import("./ExtrasSection"));
@@ -49,6 +51,8 @@ const ForwardSection = lazy(() => import("./forward/ForwardSection"));
 const DraftsSection = lazy(() => import("./DraftsSection"));
 /** Muster-Entdecker: patterns in the entries of a backtest or the journal, tested against chance – its own chunk (the whole search domain). */
 const DiscoverySection = lazy(() => import("./DiscoverySection"));
+/** F66: the background optimiser – its own chunk (the panel, the worker and the search load with it). */
+const EvolveSection = lazy(() => import("@/views/evolve/EvolveSection"));
 
 export const LABOR_LEAD_FILL = { storageKey: storageKey("fill-labor"), highlight: LABOR.highlight } as const;
 
@@ -70,7 +74,7 @@ export function LaborView({ className }: { className?: string }) {
   const custom = useLabor((s) => s.cfg.strategy === "custom");
   const hasIdea = useLabor((s) => s.idea != null);
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId(), discovery: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId(), discovery: useId(), evolve: useId() };
   const T = LABOR.sections;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
@@ -127,6 +131,13 @@ export function LaborView({ className }: { className?: string }) {
         <Cell index={0} span="lg:col-span-12">
           <Suspense fallback={null}>
             <ForwardSection />
+          </Suspense>
+        </Cell>
+      </Section>
+      <Section id={ids.evolve} title={EVOLVE.section.title} sub={EVOLVE.section.sub}>
+        <Cell index={0} span="lg:col-span-12">
+          <Suspense fallback={null}>
+            <EvolveSection />
           </Suspense>
         </Cell>
       </Section>

@@ -158,6 +158,7 @@ const TOPIC_LABEL: Readonly<Record<string, string>> = {
   fit: "Passt die Strategie zu mir?",
   library: "Strategie-Bibliothek",
   discovery: "Muster der Gewinner und Verlierer",
+  evolve: "Hintergrund-Optimierer",
 };
 
 /** German label of a learned topic key. */
@@ -388,6 +389,7 @@ export const INTEREST_QUESTION: Readonly<Record<string, string>> = {
   fit: "Passt diese Strategie zu mir?",
   library: "Gibt es eine Strategie mit Bollinger?",
   discovery: "Was haben meine Gewinner gemeinsam?",
+  evolve: "Was hat der Optimierer gefunden?",
 };
 
 /** Chips for the greeting and help: the most asked topics first, then a few safe defaults. */

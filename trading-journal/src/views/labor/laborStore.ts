@@ -169,6 +169,8 @@ interface LaborState {
   saveDraft(name?: string): string | null;
   /** adds an imported playbook as a new, marked draft; null when the list is full */
   addForeignDraft(name: string, config: CustomConfig, origin: DraftOrigin): string | null;
+  /** adds rules as a NEW draft of the trader's own (e.g. a proposal of the optimiser the trader saved); the editor stays as it is; null when the list is full */
+  addDraft(name: string, config: CustomConfig, note: string): string | null;
   /** puts the rules (and the name) of a draft back to `config`; false when the draft is gone */
   replaceDraftConfig(id: string, config: CustomConfig): boolean;
   loadDraft(id: string): boolean;
@@ -318,6 +320,19 @@ export const useLabor = create<LaborState>()((set, get) => ({
     writeDrafts(drafts);
     set({ drafts });
     useVersions.getState().record(item.id, item.config, "Importiertes Playbook", item.savedAt);
+    return item.id;
+  },
+  addDraft(name, config, note) {
+    const list = get().drafts;
+    if (list.length >= DRAFTS_MAX) return null;
+    const base = name.trim().slice(0, 52) || "Neue Idee";
+    let title = base;
+    for (let k = 2; list.some((x) => x.name === title); k++) title = `${base} (${k})`;
+    const item: CustomDraft = { id: nextDraftId(list), name: title, savedAt: Date.now(), config: sanitizeCustom({ ...config, name: title }) };
+    const drafts = [item, ...list];
+    writeDrafts(drafts);
+    set({ drafts });
+    useVersions.getState().record(item.id, item.config, note, item.savedAt);
     return item.id;
   },
   replaceDraftConfig(id, config) {
