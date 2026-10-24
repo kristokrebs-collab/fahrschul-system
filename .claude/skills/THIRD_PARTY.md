@@ -18,3 +18,12 @@ Aktualisieren: Repo neu klonen, Ordner vergleichen (`diff -r`), dann ersetzen.
 Unveränderte Kopien nach Durchsicht (nur Markdown, keine Hooks, keine Netzwerk-/Shell-Befehle im Text). `e2e-runner` und `doc-updater` dürfen schreiben und Bash nutzen, laufen aber nur auf Abruf.
 **Bewusst nicht übernommen:** die 27 ECC-Hooks (laufen bei jedem Tool-Aufruf, Selbst-Update per git pull), `rules/common` (immer aktiv, ~5.000 Tokens pro Sitzung), `rules/react` (Projekt nutzt kein React), die übrigen 67 Agenten und 311 Skills.
 Aktualisieren: Repo neu klonen, `diff -r`, ersetzen.
+
+## day-trader-skill (11 trader-* Skills)
+
+| Dateien | Quelle | Stand | Lizenz |
+|---|---|---|---|
+| `.claude/skills/trader-{scanner,news,entry,exit,timemachine,risk,budget,broker,alerts,analyst,pelosi}/` | https://github.com/Jakeschincariol/day-trader-skill | Commit 3d0f4ef (2026-10-20) | MIT |
+
+Unverändert kopiert (ohne `tests/`). Vorher gelesen: Python nur Standardbibliothek, Netzwerk nur lesend (Yahoo Chart, Nasdaq Trader, SEC EDGAR, House Clerk), `trader-broker/ticket.py` spricht **nie** mit einem Broker (erzeugt nur Tickets). Syntax geprüft, **nicht ausgeführt**. Eigene Ergänzungen (nicht aus der Quelle): `trading-desk`, `morning-note`, `dcf`.
+Kronos (https://github.com/shiyu-coder/Kronos, MIT, Commit 67b630e): **nicht** kopiert; nur Setup-Befehl `setup-claude-extras.sh kronos` und `trading-desk/references/kronos.md`.

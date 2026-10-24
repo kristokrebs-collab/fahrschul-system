@@ -62,7 +62,16 @@ Dann:
 Ohne Kamera: `/whatsapp:configure pair +49…` (8-stelliger Code statt QR). Freigaben für Tool-Aufrufe lassen sich per Permission-Relay über WhatsApp bestätigen (siehe README des Plugins, Abschnitt „Permission requests over WhatsApp“).
 Alternativen: `gokapso/claude-code-whatsapp` (E2B-Sandbox + Kapso, 4 API-Schlüssel, keine Lizenzdatei), `mnott/Whazaa` (nur Selbst-Chat, braucht AIBroker, macOS-lastig).
 
-## 5. Prüfen
+## 5. Trading-Desk (Paper Trading, ohne automatische Orders)
+Die 11 `trader-*` Skills, `trading-desk`, `/morning-note` und `/dcf` liegen schon in `.claude/skills/`; für alle Projekte: `cp -r .claude/skills/{trader-*,trading-desk,morning-note,dcf} ~/.claude/skills/`. Python ≥ 3.8 reicht, nichts zu installieren.
+Broker (optional): Alpaca-MCP oder Composio nur mit **Paper-Schlüsseln**, Schlüssel nur in der Konnektor-Konfiguration auf Deinem Rechner, **nie im Chat**. In Claude unter Konnektoren/Berechtigungen die Order-Tools auf **„Needs approval“** stellen, nie „Always allow“. Details: `trader-broker/SKILL.md`.
+Kronos (Kerzen-Prognose, braucht PyTorch, ~1 GB Platz, Modell-Download beim ersten Lauf):
+```bash
+.claude/setup/setup-claude-extras.sh kronos          # klont nach ~/kronos, eigene venv
+```
+Nichts davon ist Finanzberatung; Prognosen sind Wahrscheinlichkeiten.
+
+## 6. Prüfen
 ```bash
 ls ~/.claude/skills            # Skills vorhanden?
 claude                         # neue Sitzung, dann /skills bzw. nach dem Skill fragen
