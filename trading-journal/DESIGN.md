@@ -530,3 +530,36 @@ der konkreten Zahl („Dein Journal hat 7 Trades abgeschlossen. Ab 20 …“). K
 ### Assistent: Auswertungen und Interessen
 
 Keine neue Sprache. Die Antworten der Auswertungswerkzeuge sind gewöhnliche Werkzeug-Antworten (`ToolView`: Etikett mit Punkt, Fließtext mit Zahlen und Stichprobe, bis zu vier Kennzahlen-Kacheln, danach die Knöpfe). Beim Laden der Quelle zeigt der Eintrag den vorhandenen Warte-Takt („Ich suche die passende Auswertung …“). Knöpfe heißen nach dem Ziel („Prüfbericht öffnen“, „In Eigene Idee laden“) und schließen das Sheet, bevor die Seite wechselt; Ton nur für Vorzeichen (R, Ergebnis), nie für Wertung – „hängt an wenigen Trades“ bekommt den Verlust-Ton als Warnung, „passt“ keinen Gewinn-Ton. Im Gedächtnis-Bereich steht unter den Notizen „Was dich interessiert“: ein Satz, was gezählt wird (nur Fragen), je Thema eine `rounded-lg border-line`-Zeile mit Klartext-Name, Zähler in Mono und einem ×-Knopf (≥ 44 px bei grobem Zeiger), darunter „Interessen löschen“ (Ghost); ohne Eintrag ein ruhiger Satz. Keine eigene Bewegung.
+
+## Hintergrund-Optimierer (F66)
+
+Keine neue Sprache, nur bestehende Bausteine (`Card`, `Badge`, `Sheet`, `Button`, Mono-Zahlen). Eine `Card` im Raster des Labors (`lg:col-span-12`) in
+der eigenen Sektion „Hintergrund-Optimierer“ nach dem Forward-Test. Ganz oben ein `border-line`-Kasten mit dem festen Satz **„Läuft nur, solange die App
+offen ist.“** und dem Zusatz, dass nie von selbst etwas geändert wird – er ist nicht wegklickbar und steht vor jedem Start. Darunter die Strategien als
+Zeilen mit Checkbox (≥ 44 px bei grobem Zeiger; Name, Symbol/Intervall, Freiheitsgrade in Mono, Grund in `text-mute`, wenn eine Strategie nicht laufen kann),
+dann Start / Pause / Fortsetzen / Stopp (ein primärer Knopf zur Zeit), Budget und Tempo (Schonend / Normal / Volle Leistung) als zwei kleine Auswahlen.
+
+**Lauf.** Ein dünner Balken (`h-1.5`, weiß auf `white/[0.06]`, nur `transform: scaleX`, im Reduced-Motion-Fall ohne Übergang) mit „Versuch n von N“ in Mono,
+darunter je Strategie eine Zeile mit Phase. Eine ruhige Zeile (`evolve-throttle`) nennt, ob der Worker oder die Zeitscheiben im Hauptthread rechnen und warum
+gebremst wird (Tab im Hintergrund, Energiesparmodus, Datensparmodus, Touch-Gerät, eigene Einstellung). Pausiert steht „Pausiert“. Der Status-`Badge` ist
+neutral/blau, nur „Läuft“ trägt den Gewinn-Ton als Punkt, Fehler den Verlust-Ton.
+
+**Ergebnis.** Je Strategie eine Zeile der Rangliste: jetzige Version | beste Variante auf den **Testfenstern** (Ø R, Trades, größter Rückgang in R), darunter
+der Streifen der Fenster (`WindowsStrip`: Training | 4 Tests | Bestätigung, gleiche Breite wie die Zeit, Bestätigung gestrichelt umrandet, damit sichtbar
+ist, dass sie nie zur Auswahl diente). Die Trainingszahl steht nie als Schlagzeile. Das **Turnier** ist eine Tabelle (mobil: eine Zeile-als-Karte je
+Eintrag, kein Seitwärts-Scroll) der Bestätigungsfenster-Ergebnisse aller Strategien und Varianten mit der über ALLES Getestete korrigierten
+Wahrscheinlichkeit; die naive Zahl steht klein daneben. „Nichts gefunden“ ist ein ruhiger Kasten (`evolve-nothing`) mit der Zahl der Versuche – kein Fehler.
+
+**Vorschlag.** Je Vorschlag eine `Card` mit dem `Badge` „Überanpassung n %“ (gering = Aqua, unsicher = Warn, hoch = Verlust – ein geringer Wert ist **kein**
+Gewinn-Ton). Inhalt: die Änderungen als Sätze (Liste, je Änderung eine Zeile), erwartetes Ergebnis gegen jetzige Version in Mono, Plateau („hält bei
+kleinen Änderungen“ n von m), Warnungen (wenige Trades, hängt an wenigen Trades, Bestätigung schlechter) als `text-warn`-Zeilen vor den Knöpfen. Drei Knöpfe
+gleichrangig, ≥ 44 px: **Als neue Version speichern**, **Als Herausforderer live testen**, **Ablehnen** (klappt ein Feld für den optionalen Grund auf).
+Entschiedene Vorschläge wandern in eine eingeklappte Liste; „Hat sich der Vorschlag live bestätigt?“ zeigt Erwartung und Ergebnis in Prozent je 30 Tage
+nebeneinander (bestätigt = Aqua, darunter = Warn, zu früh = neutral, mit den fehlenden Tagen/Trades in Worten).
+
+**Was habe ich gelernt?** Eine eigene `Card` unter den Vorschlägen: Zeilen mit Zahl und Stichprobe („Trend-Filter: 3 von 3 angenommen“), Trefferquote der eigenen
+Vorschläge mit 80-%-Bereich, Vorhersage gegen Live. Unter der Mindeststichprobe steht ein ruhiger Satz, was fehlt – nie eine Quote. Das Versuchsprotokoll ist
+ein `Sheet` (lazy) mit den Versuchen als Zeilen.
+
+Jede Karte endet mit „Vergangene Ergebnisse sind keine Prognose. Keine professionelle Finanzberatung.“ (`evolve-disclaimer`, `text-faint`, nicht wegklickbar).
+Keine eigene Bewegung außer dem Balken; alles Weitere kommt aus `src/motion`.

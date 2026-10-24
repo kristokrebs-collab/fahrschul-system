@@ -161,3 +161,12 @@ run's trades (`strategyFacts`) are held against the journal (`journalProfile` ov
 numbers, the two figures side by side and its own caveat. No score, no recommendation; with fewer than 20 closed journal trades (or < 10
 trades in the run) the card is an honest empty state (`fit-empty`, `data-status`) that names the numbers. It reads `useLabor` (`result`,
 `runCfg`) and the journal and changes neither. Tests: `views.labor.fit.test.tsx`, `fit.test.ts`, e2e `fit.spec.ts`.
+
+## Hintergrund-Optimierer (F66)
+Section `Hintergrund-Optimierer` (`evolve-section`, lazy chunk `EvolveSection.tsx` of `@/views/evolve`) after the forward test. It lists the editor
+idea ("Eigene Idee") and up to five drafts as strategies; the candles come from the Labor's own loader (`loadLabData`, same cache and limits as a
+run). The card runs them together in a Web Worker (only while the app is open), judges every variant only on windows it was not trained on and
+shows proposals – **Als neue Version speichern** (a new draft "… v2" for the editor idea, a new version for a draft; rules that changed since the
+proposal are never overwritten), **Als Herausforderer live testen** (a virtual forward account, nothing retroactive), **Ablehnen**. The only
+additive change to the Labor store is `addDraft(name, config, note)`. The rest is in `src/views/evolve/README.md` and `src/domain/evolve/README.md`.
+Tests: `views.evolve.labor.test.tsx`, e2e `evolve.spec.ts`.

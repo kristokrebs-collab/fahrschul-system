@@ -22,7 +22,7 @@ import { DISCLAIMER, EVOLVE } from "./strings";
 import type { EvolveActionResult, StrategyEntry } from "./types";
 
 const P = EVOLVE.proposals;
-const LEVEL_TONE: Record<"low" | "mid" | "high", BadgeTone> = { low: "win", mid: "warn", high: "loss" };
+const LEVEL_TONE: Record<"low" | "mid" | "high", BadgeTone> = { low: "teal", mid: "warn", high: "loss" }; // a low probability of luck is no "win": only the warnings get a tone
 
 function MetricRows({ base, cand }: { base: WinMetrics; cand: WinMetrics }) {
   const rows: { label: string; a: string; b: string; tone?: [number | null, number | null]; sub?: [string, string] }[] = [
@@ -58,7 +58,7 @@ function MetricRows({ base, cand }: { base: WinMetrics; cand: WinMetrics }) {
 }
 
 function LiveBox({ check, p }: { check: LiveCheck; p: StoredProposal }) {
-  const tone: BadgeTone = check.level === "confirmed" ? "win" : check.level === "below" ? "warn" : "mute";
+  const tone: BadgeTone = check.level === "confirmed" ? "teal" : check.level === "below" ? "warn" : "mute";
   return (
     <div className="grid gap-1.5 rounded-xl border border-line bg-ink-950/50 p-3" data-testid="evolve-live" data-level={check.level}>
       <div className="flex flex-wrap items-center gap-2">

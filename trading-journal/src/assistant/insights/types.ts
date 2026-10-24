@@ -66,4 +66,6 @@ export interface InsightInputs {
   signals?: SignalsInput;
   /** the answer for the asked timeframe (`tf` of the question, else the card's choice) */
   similar?: SimilarInput;
+  /** `settings.evolve` as stored (the optimiser's proposals, counters and learning), `undefined` = none */
+  evolve?: unknown;
 }
