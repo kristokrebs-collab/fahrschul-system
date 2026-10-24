@@ -22,6 +22,7 @@ import { StatusPill } from "@/motion/StatusPill";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { Card } from "@/primitives/Card";
+import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Skeleton } from "@/primitives/Skeleton";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { useMirrorState } from "@/views/biasTest";
@@ -41,6 +42,21 @@ const TrendStructureCard = lazy(() => import("./TrendStructureCard").then((m) =>
 
 // F19: „Ähnliche Situationen“ – own chunk too (domain search, market hook, texts), the hit sheet is a third one
 const SimilarCard = lazy(() => import("./SimilarCard").then((m) => ({ default: m.SimilarCard })));
+
+/** The cards of the page in reading order, for its "Inhalt" strip (each card is found by its `data-testid`). */
+const NAV: readonly SectionNavItem[] = [
+  { id: "markt-best", label: "Beste Setups" },
+  { id: "markt-state", label: "Box-Status" },
+  { id: "markt-chart", label: "Chart" },
+  { id: "markt-trend", label: "Struktur" },
+  { id: "markt-similar", label: "Ähnliche Situationen" },
+  { id: "keylevels-card", label: "Marken" },
+  { id: "plan-card", label: "Tagesplan" },
+  { id: "markt-rsi", label: "RSI-Linien" },
+  { id: "markt-scanner", label: "Scanner" },
+  { id: "markt-settings", label: "Einstellungen" },
+  { id: "alerts-card", label: "Alarme" },
+];
 
 export const MARKT_LEAD_FILL = { storageKey: storageKey("fill-markt"), highlight: MARKT.leadHighlight } as const;
 
@@ -154,6 +170,7 @@ export function MarktView({ className }: { className?: string }) {
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="markt-view" data-state={view.state}>
       <PageHeader className="lg:col-span-12" title={MARKT.title} lead={MARKT.lead} leadFill={MARKT_LEAD_FILL} action={<HeaderStatus view={view} maskName={focus && test.blind.hideName} />} />
+      {!focus && <SectionNav items={NAV} className="lg:col-span-12" />}
       {focus ? (
         <p className="text-[12px] text-faint lg:col-span-12" data-testid="bias-focus-note">
           {BIAS.blindFocus}

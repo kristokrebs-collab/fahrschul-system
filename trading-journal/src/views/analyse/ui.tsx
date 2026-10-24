@@ -37,14 +37,17 @@ export function AnaCard({ note, children, ...rest }: InsightCardProps) {
 /** Detail source of trades opened from the Analyse page (detached, like the Auswertung's). */
 export const ANA_DETAIL_SOURCE = "insights" as const;
 
-/** Section heading: the red signal dot + an `h2` whose letters rise once on first view (`SplitText`). */
-export function SectionTitle({ title, sub, id, className }: { title: string; sub?: string; id?: string; className?: string }) {
+/**
+ * Section heading: the red signal dot + an `h2` whose letters rise once on first view (`SplitText`). `section` is the stable
+ * name of the section (`data-section`): the page's `SectionNav` and the function register scroll to it.
+ */
+export function SectionTitle({ title, sub, id, section, className }: { title: string; sub?: string; id?: string; section?: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduced = useReducedFx();
   const seen = useFirstInView(ref, !reduced);
   return (
     // the head of PR #3's „Auswertung“ (`InsightsSection`): the lead sits UNDER the title, never in a column of its own (P1-07)
-    <div ref={ref} className={cn("grid min-w-0 gap-1.5 pt-6", className)}>
+    <div ref={ref} data-section={section} className={cn("grid min-w-0 gap-1.5 pt-6", className)}>
       <div className="flex min-w-0 items-center gap-2">
         <span className="size-1.5 shrink-0 rounded-full bg-signal" aria-hidden="true" />
         <h2 id={id} className="label !text-fg">

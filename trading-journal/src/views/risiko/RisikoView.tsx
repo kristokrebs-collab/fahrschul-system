@@ -18,6 +18,7 @@ import { useProvider } from "@/market";
 import { useBoxes } from "@/market/boxes";
 import { useMultiDaily } from "@/market/multiDaily";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
+import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { storageKey } from "@/store/storage";
 import { useUi, type AccFilter } from "@/store/uiStore";
@@ -41,14 +42,23 @@ import { Cell, SEG_TOUCH } from "./ui";
 export const RISIKO_LEAD_FILL = { storageKey: storageKey("fill-risiko"), highlight: RISIKO.highlight } as const;
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
 
-function Section({ id, title, sub, children }: { id: string; title: string; sub: string; children: ReactNode }) {
+function Section({ id, section, title, sub, children }: { id: string; section: string; title: string; sub: string; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="contents">
-      <SectionTitle id={id} title={title} sub={sub} className="lg:col-span-12" />
+      <SectionTitle id={id} section={section} title={title} sub={sub} className="lg:col-span-12" />
       {children}
     </section>
   );
 }
+
+/** The sections of the page, for its "Inhalt" strip (`data-section` on each section title). */
+const NAV: readonly SectionNavItem[] = [
+  { id: "now", label: RISIKO.sections.now.title },
+  { id: "before", label: RISIKO.sections.before.title },
+  { id: "portfolio", label: RISIKO.sections.portfolio.title },
+  { id: "patterns", label: RISIKO.sections.patterns.title },
+  { id: "settings", label: RISIKO.sections.settings.title },
+];
 
 export function RisikoView({ className }: { className?: string }) {
   const base = useRiskBase();
@@ -98,7 +108,8 @@ export function RisikoView({ className }: { className?: string }) {
         leadFill={RISIKO_LEAD_FILL}
         action={<Segmented<AccFilter> aria-label={RISIKO.accLabel} options={ACC_OPTIONS} value={base.acc} onChange={setAcc} size="sm" className={SEG_TOUCH} />}
       />
-      <Section id={ids.now} title={T.now.title} sub={`${T.now.sub} ${ACCOUNT_LABELS[base.acc]}.`}>
+      <SectionNav items={NAV} className="lg:col-span-12" />
+      <Section id={ids.now} section="now" title={T.now.title} sub={`${T.now.sub} ${ACCOUNT_LABELS[base.acc]}.`}>
         <Cell index={0} span="lg:col-span-7">
           <LimitsCard report={report} now={base.now} warnings={warnings} />
         </Cell>
@@ -106,7 +117,7 @@ export function RisikoView({ className }: { className?: string }) {
           <ExposureCard ex={ex} cur={base.cur} />
         </Cell>
       </Section>
-      <Section id={ids.before} title={T.before.title} sub={T.before.sub}>
+      <Section id={ids.before} section="before" title={T.before.title} sub={T.before.sub}>
         <Cell index={0} span="lg:col-span-7">
           <CalculatorCard base={base} />
         </Cell>
@@ -114,7 +125,7 @@ export function RisikoView({ className }: { className?: string }) {
           <LiquidationCard rows={rows} planned={planned} />
         </Cell>
       </Section>
-      <Section id={ids.portfolio} title={T.portfolio.title} sub={T.portfolio.sub}>
+      <Section id={ids.portfolio} section="portfolio" title={T.portfolio.title} sub={T.portfolio.sub}>
         <Cell index={0} span="lg:col-span-8">
           <ScenarioCard legs={legs} equity={equityNow} cur={base.cur} />
         </Cell>
@@ -122,7 +133,7 @@ export function RisikoView({ className }: { className?: string }) {
           <MarginCard ex={ex} capital={base.capital} cur={base.cur} />
         </Cell>
       </Section>
-      <Section id={ids.patterns} title={T.patterns.title} sub={T.patterns.sub}>
+      <Section id={ids.patterns} section="patterns" title={T.patterns.title} sub={T.patterns.sub}>
         <Cell index={0} span="lg:col-span-7">
           <CorrelationCard symbols={symbols} view={daily} cm={cm} clusters={clusters} />
         </Cell>
@@ -133,7 +144,7 @@ export function RisikoView({ className }: { className?: string }) {
           <RiskSpreadCard closed={closed} settings={base.settings} limit={base.limits.maxLossTradePct} />
         </Cell>
       </Section>
-      <Section id={ids.settings} title={T.settings.title} sub={T.settings.sub}>
+      <Section id={ids.settings} section="settings" title={T.settings.title} sub={T.settings.sub}>
         <Cell index={0} span="lg:col-span-12">
           <RiskSettingsCard />
         </Cell>

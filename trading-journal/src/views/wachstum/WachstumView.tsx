@@ -18,6 +18,7 @@ import { cn } from "@/lib/cn";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { useMediaQuery } from "@/motion/useMediaQuery";
 import { Button } from "@/primitives/Button";
+import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { storageKey } from "@/store/storage";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { BestsCard } from "./BestsCard";
@@ -41,6 +42,16 @@ import { WACHSTUM } from "./strings";
 import { TrackersCard } from "./TrackersCard";
 import { GoalWipe, useGrowthTransitions } from "./transitions";
 import { Cell, Section } from "./ui";
+
+/** The sections of the page, for its "Inhalt" strip (`data-section` on each section title). */
+const NAV: readonly SectionNavItem[] = [
+  { id: "today", label: WACHSTUM.sections.today.title },
+  { id: "streaks", label: WACHSTUM.sections.streaks.title },
+  { id: "goals", label: WACHSTUM.sections.goals.title },
+  { id: "routines", label: WACHSTUM.sections.routines.title },
+  { id: "psyche", label: WACHSTUM.sections.psyche.title },
+  { id: "progress", label: WACHSTUM.sections.progress.title },
+];
 
 export const WACHSTUM_LEAD_FILL = { storageKey: storageKey("fill-wachstum"), highlight: WACHSTUM.highlight } as const;
 
@@ -82,7 +93,8 @@ export function WachstumView({ className }: { className?: string }) {
           </Button>
         }
       />
-      <Section id={ids.today} title={S.today.title} sub={S.today.sub}>
+      <SectionNav items={NAV} className="lg:col-span-12" />
+      <Section id={ids.today} section="today" title={S.today.title} sub={S.today.sub}>
         <Cell index={0} span="lg:col-span-5">
           <CheckInCard today={today} />
         </Cell>
@@ -90,17 +102,17 @@ export function WachstumView({ className }: { className?: string }) {
           <PreTradeCheck checkin={today.checkin} mood={today.mood} events={b.events} todayKey={today.key} />
         </Cell>
       </Section>
-      <Section id={ids.streaks} title={S.streaks.title} sub={S.streaks.sub}>
+      <Section id={ids.streaks} section="streaks" title={S.streaks.title} sub={S.streaks.sub}>
         <Cell index={0} span="lg:col-span-12">
           <StreakBoard streaks={streaks} />
         </Cell>
       </Section>
-      <Section id={ids.goals} title={S.goals.title} sub={S.goals.sub}>
+      <Section id={ids.goals} section="goals" title={S.goals.title} sub={S.goals.sub}>
         <Cell index={0} span="lg:col-span-12">
           <GoalsCard goals={goals.active} week={goals.week} />
         </Cell>
       </Section>
-      <Section id={ids.routines} title={S.routines.title} sub={S.routines.sub}>
+      <Section id={ids.routines} section="routines" title={S.routines.title} sub={S.routines.sub}>
         <Cell index={0} span="lg:col-span-5">
           <ChallengeCard running={challenges} suggestions={deck} todayKey={today.key} done={doneChallenges} />
         </Cell>
@@ -108,7 +120,7 @@ export function WachstumView({ className }: { className?: string }) {
           <HabitGrid rows={habits.rows} columns={habits.columns} todayKey={today.key} existing={existingHabits} />
         </Cell>
       </Section>
-      <Section id={ids.psyche} title={S.psyche.title} sub={S.psyche.sub}>
+      <Section id={ids.psyche} section="psyche" title={S.psyche.title} sub={S.psyche.sub}>
         <Cell index={0} span="lg:col-span-7">
           <TrackersCard trackers={trackers} />
         </Cell>
@@ -122,7 +134,7 @@ export function WachstumView({ className }: { className?: string }) {
           <DiaryCard days={diary} />
         </Cell>
       </Section>
-      <Section id={ids.progress} title={S.progress.title} sub={S.progress.sub}>
+      <Section id={ids.progress} section="progress" title={S.progress.title} sub={S.progress.sub}>
         <Cell index={0} span="lg:col-span-5">
           <SkillRadar now={skills.now} before={skills.before} />
         </Cell>

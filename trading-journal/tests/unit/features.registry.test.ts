@@ -1,9 +1,10 @@
 /**
  * The function register (`src/app/features.ts`) is the one truth for "what can the app do and where is it" – this test
  * keeps it honest: every entry points to a real page and a known sheet, every anchor text really stands in the code of
- * the app, every status is explained, every gate is a real plan feature – and `docs/COVERAGE.md` (one row per F-ID,
- * F01–F74) has each F-ID exactly once, only existing code paths, and nothing the register lists as a function may be
- * marked "fehlt" there.
+ * the app (`tests/e2e/funktionen-anker.spec.ts` then finds it in the DOM of the page), every function sits in exactly one
+ * group with its task in plain words and its intents, where something has no anchor it says how to get there, every status
+ * is explained, every gate is a real plan feature – and `docs/COVERAGE.md` (one row per F-ID, F01–F74) has each F-ID
+ * exactly once, only existing code paths, and nothing the register lists as a function may be marked "fehlt" there.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
@@ -86,9 +87,77 @@ describe("function register", () => {
     expect(LAZY_PAGES).toContain("funktionen");
   });
 
-  it("uses every group, and lists the user's groups first", () => {
-    for (const g of FEATURE_GROUPS) expect(FEATURE_REGISTRY.some((f) => f.group === g.id), g.id).toBe(true);
-    expect(FEATURE_GROUPS.slice(0, 7).map((g) => g.name)).toEqual(["Heute vorbereiten", "Beobachten & Alarme", "Einstieg prüfen", "Testen", "Auswerten & Lernen", "Daten & Import", "Community"]);
+  it("names the groups after what a trader does and keeps every group readable", () => {
+    expect(FEATURE_GROUPS.map((g) => g.name)).toEqual([
+      "Heute vorbereiten",
+      "Trade prüfen & Chart",
+      "Risiko & Disziplin",
+      "Strategie entwickeln & testen",
+      "Aus Fehlern lernen",
+      "Auswerten & Berichte",
+      "Üben & Wachsen",
+      "Trades eintragen & Daten",
+      "Community & Teilen",
+      "Konto, Einstellungen & Hilfe",
+    ]);
+    for (const g of FEATURE_GROUPS) {
+      const members = FEATURE_REGISTRY.filter((f) => f.group === g.id);
+      expect(members.length, `${g.id} has too few functions to be a group`).toBeGreaterThanOrEqual(5);
+      expect(g.lead.length, g.id).toBeLessThan(80);
+      expect(g.icon, g.id).toBeTruthy();
+      // a long list needs sub headings, and every sub heading holds at least two functions
+      if (members.length > 8) {
+        for (const f of members) expect(f.sub, `${f.id} (group ${g.id} holds ${members.length} functions)`).toBeTruthy();
+        const subs = new Map<string, number>();
+        for (const f of members) subs.set(f.sub!, (subs.get(f.sub!) ?? 0) + 1);
+        for (const [sub, n] of subs) expect(n, `${g.id} › ${sub}`).toBeGreaterThanOrEqual(2);
+      }
+    }
+  });
+
+  it("gives every function its task in plain words and the intents someone searches with", () => {
+    for (const f of FEATURE_REGISTRY) {
+      expect(f.task, `${f.id}: no task`).toBeTruthy();
+      expect(f.task!.length, `${f.id}: task too long`).toBeLessThanOrEqual(75);
+      expect(f.task!.length, `${f.id}: task too short`).toBeGreaterThan(12);
+      expect(f.task, `${f.id}: a task is a short line without a full stop`).not.toMatch(/[.!?]$/);
+      expect(f.intents?.length ?? 0, `${f.id}: needs at least three intents`).toBeGreaterThanOrEqual(3);
+      for (const t of f.intents ?? []) expect(t, `${f.id}: intents are written in lower case, like people type`).toBe(t.toLowerCase());
+    }
+  });
+
+  it("anchors every function in its page – or gives an opener or a way to it", () => {
+    for (const f of FEATURE_REGISTRY) {
+      expect(!!f.anchor || !!f.action || !!f.path, `${f.id}: neither anchor, action nor path`).toBe(true);
+      // a place in words belongs to something on a page
+      if (f.place) expect(!!f.anchor || !!f.action, `${f.id}: place without anchor`).toBe(true);
+    }
+  });
+
+  it("names the section of a function the way the page says it", () => {
+    const src = sourceText();
+    for (const f of FEATURE_REGISTRY) {
+      if (!f.place) continue;
+      for (const part of f.place.split(/ [·›] /)) expect(src.includes(part), `${f.id}: place "${part}" is nowhere in src/`).toBe(true);
+    }
+  });
+
+  it("points 'Siehe auch' only at other functions that exist, once each", () => {
+    for (const f of FEATURE_REGISTRY) {
+      const see = f.see ?? [];
+      expect(new Set(see).size, f.id).toBe(see.length);
+      for (const id of see) {
+        expect(id, `${f.id} sees itself`).not.toBe(f.id);
+        expect(featureById(id), `${f.id} → ${id} does not exist`).toBeTruthy();
+      }
+    }
+  });
+
+  it("keeps the 'Neu' and 'Empfohlen' marks few and well-formed", () => {
+    const stars = FEATURE_REGISTRY.filter((f) => f.star);
+    expect(stars.length).toBeGreaterThanOrEqual(4);
+    expect(stars.length).toBeLessThanOrEqual(8);
+    for (const f of FEATURE_REGISTRY) if (f.since) expect(f.since, f.id).toMatch(/^20\d\d-(0[1-9]|1[0-2])$/);
   });
 
   it("explains every 'teilweise' with a note; a way ('So geht’s') only where something lives inside a sheet or dialog", () => {

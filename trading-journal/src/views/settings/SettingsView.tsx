@@ -34,6 +34,7 @@ import { MistakesCard } from "./MistakesCard";
 import { RulesCard } from "./RulesCard";
 import { SignalCheckCard } from "./SignalCheckCard";
 import { StorageCard } from "./StorageCard";
+import { SettingsNav } from "./SettingsNav";
 import { SymbolField } from "./SymbolField";
 
 export const SETTINGS_STRINGS = {
@@ -227,6 +228,7 @@ export function SettingsView({ health, statusLabels, onRefresh, onReconnect, onC
   return (
     <div className={cn("grid grid-cols-1 gap-5", className)}>
       <PageHeader title={SETTINGS_STRINGS.title} lead={SETTINGS_STRINGS.lead} leadFill={SETTINGS_LEAD_FILL} action={<SaveButton phase={pagePhase} onClick={onSave} />} />
+      <SettingsNav />
 
       {barPresent && <UnsavedBar open={barOpen} phase={phase} buttonPhase={barButtonPhase} onSave={onSaveBar} onDiscard={discard} onExited={onBarExited} />}
 

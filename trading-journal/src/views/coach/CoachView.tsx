@@ -22,6 +22,7 @@ import type { AnswerData } from "@/domain/coach/nlq";
 import { cn } from "@/lib/cn";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
+import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { storageKey } from "@/store/storage";
 import { useUi, type AccFilter } from "@/store/uiStore";
@@ -39,6 +40,20 @@ import { SignalBalanceCard } from "./SignalBalanceCard";
 import { SignalInboxCard } from "./SignalInboxCard";
 import { TimelineCard } from "./TimelineCard";
 import { TodayCard } from "./TodayCard";
+
+/** The cards of the page in reading order, for its "Inhalt" strip (each card is found by its `data-testid`). */
+const NAV: readonly SectionNavItem[] = [
+  { id: "coach-chat", label: "Fragen" },
+  { id: "coach-today", label: "Heute" },
+  { id: "coach-edges", label: "Leaks & Edges" },
+  { id: "coach-plan", label: "Plan" },
+  { id: "coach-timeline", label: "Timeline" },
+  { id: "coach-profile", label: "Profil" },
+  { id: "inbox-card", label: "Signal-Posteingang" },
+  { id: "missed-card", label: "Verpasste Chancen" },
+  { id: "balance-card", label: "Signalbilanz" },
+  { id: "quality-card", label: "Datenqualität" },
+];
 
 export const COACH_LEAD_FILL = { storageKey: storageKey("fill-coach"), highlight: COACH_HIGHLIGHT } as const;
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
@@ -67,6 +82,7 @@ export function CoachView({ className }: { className?: string }) {
         leadFill={COACH_LEAD_FILL}
         action={<Segmented<AccFilter> aria-label="Konto des Coachs" options={ACC_OPTIONS} value={c.acc} onChange={setAcc} size="sm" className={SEG_TOUCH} />}
       />
+      <SectionNav items={NAV} className="lg:col-span-12" />
       {/* related functions that are otherwise found by chance: a card at the bottom of this page, the sheets of a trade */}
       <FeatureLinks
         className="lg:col-span-12"

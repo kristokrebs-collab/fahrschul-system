@@ -1,8 +1,9 @@
 /**
  * Page "Funktionen" end to end (mobile 390 + desktop): it opens by hash, from the command navigation and with the `g f`
- * chord (never as a dock tab); the global search finds "Labor" among the functions and a function hit navigates; the page
- * filters and opens a function (navigates and scrolls to its card); the assistant answers "Wo finde ich …?" by opening the
- * place. No horizontal scroll at 390 px, no console errors. No clocks, nothing that depends on the market mock's time.
+ * chord (never as a dock tab); the large search answers in the user's own words; ten task tiles open a group whose rows open
+ * the place (navigates and scrolls to its card); the command navigation finds functions and has the way to "Alle Funktionen";
+ * the global search finds "Labor" among the functions; the assistant answers "Wo finde ich …?". No horizontal scroll at
+ * 390 px, touch targets ≥ 44 px, no console errors. No clocks, nothing that depends on the market mock's time.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, hasTouch, seed } from "./helpers";
@@ -26,46 +27,62 @@ test.describe("Funktionen", () => {
     test.skip(!PROJECTS.includes(info.project.name), "runs on mobile + desktop");
   });
 
-  test("opens by hash with every group, honest empty lists, no sideways scroll", async ({ page }) => {
+  test("opens by hash with the search and ten task tiles, one column on a phone, no sideways scroll", async ({ page }, info) => {
     const errors = collectErrors(page);
     await openFunktionen(page);
-    const groups = layer(page, "funktionen").getByTestId("funktionen-group");
-    await expect(groups).toHaveCount(8);
-    for (const name of ["Heute vorbereiten", "Beobachten & Alarme", "Einstieg prüfen", "Testen", "Auswerten & Lernen", "Daten & Import", "Community"]) {
-      await expect(layer(page, "funktionen").getByRole("heading", { level: 2, name })).toBeVisible();
+    const tiles = layer(page, "funktionen").getByTestId("funktionen-tile");
+    await expect(tiles).toHaveCount(10);
+    for (const name of ["Heute vorbereiten", "Trade prüfen & Chart", "Risiko & Disziplin", "Strategie entwickeln & testen", "Aus Fehlern lernen", "Auswerten & Berichte", "Üben & Wachsen", "Trades eintragen & Daten", "Community & Teilen", "Konto, Einstellungen & Hilfe"]) {
+      await expect(layer(page, "funktionen").getByRole("button", { name: `${name}: Funktionen anzeigen` })).toHaveCount(1);
     }
-    // nothing asked, nothing opened: an honest line instead of a placeholder
-    await expect(page.getByTestId("funktionen-for-you")).toContainText("Noch nichts gelernt");
-    await expect(page.getByTestId("funktionen-recent")).toContainText("Noch nichts geöffnet");
+    await expect(layer(page, "funktionen").getByRole("searchbox", { name: "Was willst du tun?" })).toBeVisible();
+    // always something to start with
+    await expect(page.getByTestId("funktionen-picks")).toBeVisible();
     // the dock does not carry it
     await expect(page.getByRole("toolbar", { name: "Navigation" }).getByRole("button", { name: "Funktionen" })).toHaveCount(0);
+    if (info.project.name === "mobile") {
+      // a single column: every tile spans the content width
+      const widths = await tiles.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
+      expect(new Set(widths).size).toBe(1);
+      expect(widths[0]).toBeGreaterThan(300);
+    }
     await expectNoHorizontalScroll(page);
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
-  test("touch targets are at least 44 px (search, filters, open buttons, quick lists)", async ({ page }, info) => {
+  test("touch targets are at least 44 px (search, tiles, rows, details, back)", async ({ page }, info) => {
     test.skip(!hasTouch(info), "touch projects");
     test.setTimeout(120_000);
     await openFunktionen(page);
-    const h = await page.evaluate(() => document.documentElement.scrollHeight);
-    for (let y = 0; y < h + 1800; y += 600) {
-      await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), y);
-      await page.waitForTimeout(60);
-    }
-    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
-    await page.waitForTimeout(400);
-    const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root: '[data-page="funktionen"][data-page-role="current"]' });
-    expect(misses.map((m) => `${m.where} · ${m.name} ${m.w}×${m.h} → ${m.ew}×${m.eh} (taken by ${m.stolenBy})`)).toEqual([]);
+    const root = '[data-page="funktionen"][data-page-role="current"]';
+    const audit = async () => {
+      const h = await page.evaluate(() => document.documentElement.scrollHeight);
+      for (let y = 0; y < h + 1200; y += 600) {
+        await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), y);
+        await page.waitForTimeout(60);
+      }
+      await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+      await page.waitForTimeout(400);
+      const misses = await page.evaluate(auditHitBoxes, { selector: HIT_SELECTOR, root });
+      return misses.map((m) => `${m.where} · ${m.name} ${m.w}×${m.h} → ${m.ew}×${m.eh} (taken by ${m.stolenBy})`);
+    };
+    expect(await audit()).toEqual([]);
+    await page.getByTestId("funktionen-tile").nth(3).click();
+    await expect(page.getByTestId("funktionen-group-view")).toBeVisible();
+    await page.getByTestId("feature-details").first().click();
+    expect(await audit()).toEqual([]);
   });
 
-  test("is reached from the command navigation and with g f", async ({ page }) => {
+  test("is reached from the command navigation (finder + 'Alle Funktionen') and with g f", async ({ page }) => {
     const errors = collectErrors(page);
     await seed(page);
     await page.goto("/");
     await page.getByRole("button", { name: /Navigation öffnen|Menü/ }).first().click();
     const nav = page.getByRole("dialog", { name: "Navigation" });
     await expect(nav).toBeVisible();
-    await nav.getByRole("link", { name: /Funktionen/ }).click();
+    // a clear way to the whole list, above the page links
+    await expect(nav.getByTestId("nav-all-functions")).toBeVisible();
+    await nav.getByTestId("nav-all-functions").click();
     await expect(page).toHaveURL(/#funktionen$/);
     await expect(h1(page, "funktionen")).toHaveText("Funktionen", { timeout: 25_000 });
 
@@ -77,6 +94,27 @@ test.describe("Funktionen", () => {
       await page.locator("body").press("f");
       await expect(page).toHaveURL(/#funktionen$/, { timeout: 1500 });
     }).toPass({ timeout: 15_000 });
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  test("the command navigation finds a function by what you want to do and opens its place", async ({ page }) => {
+    const errors = collectErrors(page);
+    await seed(page);
+    await page.goto("/#overview");
+    await expect(h1(page, "overview")).toBeAttached({ timeout: 25_000 });
+    await page.getByRole("button", { name: /Navigation öffnen|Menü/ }).first().click();
+    const nav = page.getByRole("dialog", { name: "Navigation" });
+    await expect(nav).toBeVisible();
+    const finder = nav.getByRole("searchbox", { name: "Was willst du tun?" });
+    await finder.fill("Risiko berechnen");
+    const hits = nav.getByTestId("nav-finder-results").getByRole("button");
+    await expect(hits.first()).toBeVisible({ timeout: 15_000 });
+    await expect(hits.first()).toHaveAttribute("data-feature", "positionsrechner");
+    await expectNoHorizontalScroll(page);
+    await hits.first().click();
+    await expect(page).toHaveURL(/#risiko$/);
+    await expect(h1(page, "risiko")).toHaveText("Risiko", { timeout: 25_000 });
+    await expect(layer(page, "risiko").getByTestId("risk-calc")).toBeInViewport({ timeout: 15_000 });
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
@@ -103,28 +141,25 @@ test.describe("Funktionen", () => {
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
-  test("filters, opens a function and scrolls to its card; Zuletzt benutzt remembers it", async ({ page }) => {
+  test("the search understands what you want to do, opens a function from its row and scrolls to its card; Zuletzt benutzt remembers it", async ({ page }) => {
     const errors = collectErrors(page);
     await openFunktionen(page);
-    const search = page.getByRole("searchbox", { name: "Funktionen durchsuchen" });
-    await search.fill("Positionsrechner");
-    const cards = layer(page, "funktionen").getByTestId("feature-card");
-    await expect(cards).toHaveCount(1);
-    await expect(cards.first()).toHaveAttribute("data-feature", "positionsrechner");
-    await expect(cards.first()).toContainText("Fertig");
+    const search = page.getByRole("searchbox", { name: "Was willst du tun?" });
+    await search.fill("Risiko berechnen");
+    const rows = layer(page, "funktionen").getByTestId("feature-row");
+    await expect(rows.first()).toHaveAttribute("data-feature", "positionsrechner");
+    await expect(rows.first()).toContainText("Positionsgröße aus Risiko und Stop berechnen");
     await expectNoHorizontalScroll(page);
-
-    // the status filter is exact
-    await search.fill("");
-    await layer(page, "funktionen").getByRole("radio", { name: "Teilweise" }).click();
-    const partial = await cards.evaluateAll((els) => els.map((e) => e.getAttribute("data-status")));
-    expect(partial.length).toBeGreaterThan(5);
-    expect(new Set(partial)).toEqual(new Set(["teilweise"]));
-    await layer(page, "funktionen").getByRole("radio", { name: "Alle", exact: true }).first().click();
+    // in the user's own words, with a typo
+    await search.fill("warum verliere ich");
+    await expect(rows.first()).toBeVisible();
+    expect(await rows.evaluateAll((els) => els.slice(0, 3).map((e) => e.getAttribute("data-feature")))).toContain("leaks-edges");
+    await search.fill("Wochenbricht");
+    expect(await rows.evaluateAll((els) => els.slice(0, 3).map((e) => e.getAttribute("data-feature")))).toContain("berichte");
 
     // open: navigates and brings the card into view
     await search.fill("Positionsrechner");
-    await cards.first().getByRole("button", { name: "Positionsrechner öffnen" }).click();
+    await rows.first().getByRole("button", { name: "Positionsrechner öffnen" }).click();
     await expect(page).toHaveURL(/#risiko$/);
     await expect(h1(page, "risiko")).toHaveText("Risiko", { timeout: 25_000 });
     const calc = layer(page, "risiko").getByTestId("risk-calc");
@@ -136,6 +171,32 @@ test.describe("Funktionen", () => {
     await expect(h1(page, "funktionen")).toHaveText("Funktionen", { timeout: 25_000 });
     await expect(page.getByTestId("funktionen-recent")).toHaveAttribute("data-n", "1");
     await expect(page.getByTestId("funktionen-recent").getByTestId("feature-quick")).toHaveAttribute("data-feature", "positionsrechner");
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
+  test("a tile opens its group; a row opens the place; the system back button returns to the tiles", async ({ page }) => {
+    const errors = collectErrors(page);
+    await openFunktionen(page);
+    await page.locator('[data-testid="funktionen-tile"][data-group="pruefen"]').click();
+    const view = page.getByTestId("funktionen-group-view");
+    await expect(view).toHaveAttribute("data-group", "pruefen");
+    await expect(view.getByRole("heading", { level: 2, name: "Trade prüfen & Chart" })).toBeVisible();
+    await expect(view.getByTestId("feature-row").first()).toBeVisible();
+    await expectNoHorizontalScroll(page);
+    // the system back button (the history layer) goes back to the tiles, not away from the page
+    await page.goBack();
+    await expect(page.getByTestId("funktionen-tiles")).toBeVisible();
+    await expect(page).toHaveURL(/#funktionen$/);
+    await page.locator('[data-testid="funktionen-tile"][data-group="risiko"]').click();
+    await expect(page.getByTestId("funktionen-group-view")).toHaveAttribute("data-group", "risiko");
+    // details: the honest part and "Siehe auch"
+    const row = page.locator('[data-testid="feature-row"][data-feature="verlustlimits"]');
+    await row.getByTestId("feature-details").click();
+    await expect(row.getByTestId("feature-detail-panel")).toContainText("Siehe auch");
+    // open from the row
+    await row.getByRole("button", { name: "Verlustlimits & Pause öffnen" }).click();
+    await expect(page).toHaveURL(/#risiko$/);
+    await expect(layer(page, "risiko").getByTestId("risk-limits")).toBeInViewport({ timeout: 15_000 });
     expect(errors, errors.join("\n")).toEqual([]);
   });
 

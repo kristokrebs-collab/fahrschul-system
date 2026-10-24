@@ -39,9 +39,9 @@ html {
    under a running morph: keep its gutter reserved. */
 html {
   scrollbar-gutter: stable;
-  /* keyboard focus scrolls controls clear of the sticky header (top) and the bottom fade + dock (bottom); this also
+  /* keyboard focus scrolls controls clear of the sticky header (top; plus the section strip of a long page, `SectionNav`) and the bottom fade + dock (bottom); this also
      lets the focused control's Reveal cell cross its in-view threshold, so a focus ring never sits at opacity 0 */
-  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 72px);
+  scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 72px + var(--section-nav-h, 0px));
   scroll-padding-bottom: calc(var(--safe-bottom) + 120px);
 }
 
