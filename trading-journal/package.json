@@ -15,7 +15,8 @@
     "build:share": "vite build --mode share",
     "build:e2e-cloud": "VITE_SUPABASE_URL=https://e2e-mock.supabase.co VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_e2e vite build --outDir dist-e2e-cloud --emptyOutDir",
     "build:single": "tsc -b && node scripts/build-single.mjs",
-    "budget": "node scripts/bundleBudget.mjs"
+    "budget": "node scripts/bundleBudget.mjs",
+    "ocr:check": "node scripts/ocrCheck.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",
@@ -35,6 +36,7 @@
     "recharts": "^3.10.1",
     "stripe": "^23.0.0",
     "tailwind-merge": "^3.3.1",
+    "tesseract.js": "7.0.0",
     "vaul": "^1.1.2",
     "zod": "^3.25.76",
     "zustand": "^5.0.8"
@@ -46,10 +48,13 @@
     "@netlify/functions": "^6.0.2",
     "@playwright/test": "latest",
     "@tailwindcss/vite": "^4.3.3",
+    "@tesseract.js-data/deu": "1.0.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "@testing-library/dom": "^10",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@types/node": "^22",
+    "@types/pngjs": "6.0.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "latest",
@@ -57,7 +62,10 @@
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
+    "jiti": "2.7.0",
+    "jpeg-js": "0.4.4",
     "jsdom": "latest",
+    "pngjs": "7.0.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.6",
     "typescript-eslint": "latest",

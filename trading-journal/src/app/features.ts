@@ -27,7 +27,7 @@ import type { Page } from "@/store/uiStore";
 export type FeatureGroupId = "heute" | "beobachten" | "einstieg" | "testen" | "lernen" | "daten" | "community" | "konto";
 export type FeatureStatus = "fertig" | "teilweise";
 /** Sheets and dialogs that open over the current page (no navigation). */
-export type FeatureAction = "training" | "assistant" | "newTrade" | "csvImport" | "shortcuts";
+export type FeatureAction = "training" | "assistant" | "newTrade" | "csvImport" | "shortcuts" | "shotImport";
 /** Where on the page: a `data-testid` of the page layer, else the start of a card heading (`h2` / `h3`). */
 export interface FeatureAnchor {
   testid?: string;
@@ -1068,10 +1068,23 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
 
   /* ----------------------------------------------------------------------------------------- Daten & Import */
   {
+    id: "screenshot-ocr",
+    fids: ["F29", "F30"],
+    name: "Screenshot importieren (Texterkennung)",
+    benefit: "Screenshot einer Order-, Positions- oder Trade-Historie hochladen, ziehen oder einfügen – alle Trades werden direkt im Browser erkannt (nichts verlässt dein Gerät), in einer Vorschau geprüft und mit einem Klick eingetragen, mit „Rückgängig“.",
+    group: "daten",
+    page: "trades",
+    action: "shotImport",
+    path: "Alle Trades → Screenshot importieren",
+    keywords: ["Screenshot", "Bild", "OCR", "Texterkennung", "Import", "Positionshistorie", "Orderhistorie", "Tradehistorie", "Bitunix", "Bybit", "Binance", "BingX", "MEXC", "OKX", "Bitget", "KuCoin", "Blofin", "einfügen", "Zwischenablage"],
+    status: "fertig",
+    note: "Ohne Konto, Tarif oder Server-Schlüssel. Abgeschnittene Karten werden gemeldet und nie geraten; Gebühren und Zeitzone sind als abgeleitet bzw. angenommen markiert. Die Erkennung kann sich vertun – gelb markierte Felder prüfen.",
+  },
+  {
     id: "screenshot-import",
     fids: ["F29", "F30"],
-    name: "Aus Screenshot übernehmen",
-    benefit: "Liest Einstieg, Ausstieg, Stop und Ergebnis aus Börsen-Screenshots und Orderhistorien – du prüfst die unsicheren Werte; gespeichert wird erst im Editor.",
+    name: "Aus Screenshot übernehmen (KI, optional)",
+    benefit: "Liest Screenshots mit einer KI – nur wenn der Betreiber einen Schlüssel eingerichtet hat; du prüfst die unsicheren Werte, gespeichert wird erst im Editor. Ohne Schlüssel gilt die Texterkennung auf dem Gerät.",
     group: "daten",
     page: "overview",
     action: "newTrade",

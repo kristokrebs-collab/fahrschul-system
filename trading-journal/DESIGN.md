@@ -594,3 +594,19 @@ mit Grund unter „Nicht verglichen“.
 **Papierkonten** fragen immer zuerst (ein Kasten mit dem Satz „Kein Echtgeld, keine Order.“ und dem Bestätigen-Knopf). Die Slot-Karten „Muster entdecken“ / „Weiterentwickeln“ sind gestrichelte
 Platzhalter („Kommt gleich.“), bis die echten Werkzeuge eingebaut sind; ein Vorschlag erscheint als Kasten mit dem Unterschied in Klartext und „Übernehmen“ / „Verwerfen“. Keine eigene Bewegung
 außer den vorhandenen Tokens (Zellen-Reveal, `EquityDraw`); reduzierte Bewegung zeigt das Ende sofort.
+### Screenshot importieren (lokale Texterkennung, F29)
+
+Keine neue Sprache: ein `Sheet` mit den vorhandenen Bausteinen (`Button`, `Segmented`, `Collapse`/`Expander`, `Badge`). Drei Phasen im selben Sheet:
+**Wählen** (gestrichelte Ablagefläche „Bilder hierher ziehen, einfügen oder wählen“, Miniaturen mit Entfernen, darunter eine ehrliche Zeile – die Erkennung
+läuft nur auf dem Gerät und kann sich vertun, Bilder werden weder gespeichert noch gesendet, beim ersten Mal einmaliges Laden der Erkennungsdateien),
+**Lesen** (ein ruhiger Fortschrittskasten mit Text je Schritt, Abbrechen möglich, keine Prozent-Zahl als Dekoration) und **Vorschau**. Die Vorschau beginnt mit
+einer Zusammenfassung („2 Trades erkannt · 1 Karte unvollständig“), danach die Annahmen als Auswahl (Zeitzone mit Satz „keine Zeitzone im Bild – angenommen: …“,
+Konto Scalp/Makro), dann je Trade eine `rounded-xl`-Zeile mit Häkchen (abgewählt = gedimmt), Titel „BTC/USDT · Long · 5×“ und einer Mono-Zeile mit den Kerndaten.
+Aufgeklappt: der Ausschnitt des Originals (die Zeile im Bild, nur im Speicher) und die Felder als Zellen. **Gelb** (`border-warn/50 bg-warn/[0.07]`) =
+unsicher gelesen oder angenommen, mit dem Grund darunter und einem Eingabefeld zum Ändern an Ort und Stelle; „abgeleitet“ = aus anderen Zahlen berechnet, nicht
+gelesen (z. B. Gebühren). Eine Korrektur nimmt das Gelb sofort zurück, wenn die Zahlen wieder zusammenpassen. Unvollständige Karten stehen in eigenen Warn-Kästen
+(„abgeschnitten … Bitte den nächsten Ausschnitt mit hochladen“) und haben keine Auswahl. Schon vorhandene Trades sind abgewählt mit „Schon vorhanden“.
+Der Hauptknopf unten heißt „Alle N Trades eintragen“ (bei Abwahl „N Trades eintragen“); danach schließt das Sheet und ein Toast „N Trades eingetragen“ trägt die
+Aktion „Rückgängig“ (9 s). Der feste Schlusssatz nennt: unvollständige Karten werden nicht eingetragen, Gelb/abgeleitet erklärt, „Keine professionelle
+Finanzberatung.“ Bewegung nur die vorhandenen `Sheet`-/`Collapse`-Tokens; reduzierte Bewegung zeigt das Ende sofort. 390 px: Zellen untereinander, Ausschnitt oben,
+kein horizontaler Scroll.

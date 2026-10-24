@@ -101,13 +101,16 @@
 #                this repo, so the host is the wildcard *.supabase.co – after the setup it may be narrowed to
 #                https://<ref>.supabase.co wss://<ref>.supabase.co (SETUP.md, step 7).
 #   img-src      screenshots from Supabase Storage (signed URLs), data: (2FA QR code), blob: (local screenshots / share PNG).
-#   worker-src   blob: – Monte Carlo and the backtest run in inline workers.
+#   worker-src   blob: – Monte Carlo and the backtest run in inline workers; 'self' – the screenshot reader's own worker script.
+#   script-src   'wasm-unsafe-eval' – ONLY WebAssembly may compile (the local screenshot OCR, tesseract.js core); no eval() of
+#                strings, no foreign script host. The worker script, core and language data come from /ocr/<version>/ of this
+#                site (self-hosted: nothing about a screenshot leaves the device, nothing is fetched from a CDN).
 # Stripe Checkout / Customer Portal are full-page redirects (no Stripe.js), Bitunix / Stripe / Anthropic are reached by
 # the functions only – none of them needs a client entry. The CSP applies on Netlify only (check a deploy preview).
 [[headers]]
   for = "/*"
   [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; connect-src 'self' https://fapi.binance.com wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; manifest-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' https://fapi.binance.com wss://fstream.binance.com https://api.bybit.com wss://stream.bybit.com https://www.okx.com https://*.supabase.co wss://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; manifest-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=63072000; includeSubDomains"
@@ -122,5 +125,13 @@
 
 [[headers]]
   for = "/teilen/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Local screenshot reader (OCR): the version is part of the path (`src/journal/ocr/assets.ts`), so the files may be cached for
+# good. They are fetched only when a screenshot is read for the first time – nothing precaches them, the first load never
+# touches them. (Also reachable from the share edition at /teilen/: it reuses these files.)
+[[headers]]
+  for = "/ocr/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"

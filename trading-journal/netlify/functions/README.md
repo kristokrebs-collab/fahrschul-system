@@ -92,6 +92,10 @@ request shape, number guard, refusal, error mapping).
 
 ## Functions (F29 / F30 screenshot import – optional)
 
+**Optional.** The app reads screenshots WITHOUT this function: the default path is the local text recognition in the browser
+(`src/journal/ocr/`, no server, no key, nothing is sent). `shot-extract` is only the second, model-based engine; the sheet
+offers it ("KI") when `GET /api/v1/shot-extract` reports `enabled: true`. Without `ANTHROPIC_API_KEY` nothing is lost.
+
 Reads trade values from up to four screenshots (position view, order history, planned order …) and returns a PROPOSAL the
 app shows in a preview; nothing is saved by the server or the app. Without `ANTHROPIC_API_KEY` it reports `enabled: false`
 and the editor never shows „Aus Screenshot übernehmen“ (settings → Daten → „Screenshot-Import“ says why).

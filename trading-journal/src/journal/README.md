@@ -12,6 +12,7 @@ ui/            JournalDetail.tsx (detail block), ExcursionBar, FillsBar, FillsTi
 screenshots/   store.ts (IndexedDB blobs), cloud.ts (Supabase Storage), release.ts (freeing cloud objects), image.ts
                (intake), shots.ts (refs / URLs),
                ShotsField (editor), ShotThumb, ShotReel (detail), ShotLightbox
+ocr/           screenshot import without a key (local text recognition, parser, preview sheet) – see its README
 annotations/   AnnotationToolbar.tsx (tools / colours for the mini chart)
 filters/       JournalFilterBar.tsx (views, quick picks, grouping switch, `Mehr Filter`; `JournalFilterSlot` = store-wired)
 grouping/      GroupRows.tsx (table rows + mobile cards of a group, hedge connector, group curve), links.ts +
@@ -113,7 +114,15 @@ instant under reduced motion); a tap selects, `Zeichnung löschen` removes. Save
 `renderShareCard` / `shareCardBlob` / `downloadShareCard` (`trade-BTCUSDT-2026-10-02.png`). Default privacy `percent`:
 no money amounts, no account size; `full` adds the P&L. Nothing leaves the device. P12's share flow builds on it.
 
-## Screenshot import: order histories (`extract/`, F29)
+## Screenshot import without a key (`ocr/`, F29 / F30)
+The default path: text recognition on the device (tesseract.js in a Web Worker, files self-hosted under `/ocr/<version>/`), a
+layout-aware parser for phone cards and desktop tables (EN / DE, position / trade / order histories), a second reading of doubtful
+cells, pure plausibility checks (gross, derived fees, ROI, leverage) and the same normalisers as the model path (`extract/`:
+`candidate.ts`, `implied.ts`, `merge.ts`, `dedupe.ts`). The sheet (`ocr/ui/OcrImportSheet.tsx`, opened from „Alle Trades“ or
+Einstellungen → Daten → Import) previews every trade, writes them in one step and offers „Rückgängig“. Folder README:
+`src/journal/ocr/README.md`; terminal check: `npm run ocr:check -- <image>`.
+
+## Screenshot import: order histories (`extract/`, F29 – the optional model path)
 The model only READS (`contract.ts`: tool schema + system prompt, incl. `ORDER_HISTORY_PROMPT` – the vocabulary of Bitunix /
 Binance / Bybit / OKX histories: „Long öffnen“, „Short schließen“, „Realisierter PnL“, „Durchschnittspreis“, „Ausgeführt“, „Gebühr“; the
 word Long / Short is the POSITION's side, the red / green colour is only the order's buy / sell side). Everything else is
