@@ -30,7 +30,8 @@ test.describe("Screenshot-Import mit Texterkennung im Browser", () => {
     const errors = collectErrors(page);
     await seed(page, { empty: true });
     await openRoute(page, "/#trades", "Alle Trades");
-    await expect(page.getByText("Noch keine Trades")).toBeVisible();
+    await expect(page.getByTestId("trades-shot-import")).toBeVisible();
+    expect(await trades(page)).toHaveLength(0);
 
     await page.getByTestId("trades-shot-import").click();
     const sheet = page.getByTestId("ocr-sheet");
