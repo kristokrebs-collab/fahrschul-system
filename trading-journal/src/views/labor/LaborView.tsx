@@ -10,6 +10,7 @@
  *   Vergleich       CompareRunsCard (8) · ReferenceCard (4)                                   (after a run)
  *   TradingView     AdapterStatusCard (6) · TvCompareCard (6)                                 (lazy chunk, always; F14)
  *   Versionen …     VersionsCard · PlaybookCard (DraftsSection, 12)                            (lazy chunk, always; F15 / F13 / F45)
+ *   Muster-Entdecker DiscoverySection (12): patterns of a backtest / the journal vs. chance        (lazy chunk, always; Auftrag B)
  * Above the set-up, when an idea came from the journal ("Diese Idee testen", F12): IdeaCard (12).
  * Every cell reveals once (`Reveal`, ends at `transform: none`), section titles rise letter by letter. The replay
  * sheet of a backtest trade is mounted here (`LabReplayHost`). Registered by the integrator (P14) as page `labor`.
@@ -46,6 +47,8 @@ const TvSection = lazy(() => import("./TvSection"));
 const ForwardSection = lazy(() => import("./forward/ForwardSection"));
 /** F15 / F13 / F45: draft versions and the playbook exchange – its own chunk. */
 const DraftsSection = lazy(() => import("./DraftsSection"));
+/** Muster-Entdecker: patterns in the entries of a backtest or the journal, tested against chance – its own chunk (the whole search domain). */
+const DiscoverySection = lazy(() => import("./DiscoverySection"));
 
 export const LABOR_LEAD_FILL = { storageKey: storageKey("fill-labor"), highlight: LABOR.highlight } as const;
 
@@ -67,7 +70,7 @@ export function LaborView({ className }: { className?: string }) {
   const custom = useLabor((s) => s.cfg.strategy === "custom");
   const hasIdea = useLabor((s) => s.idea != null);
   const busy = status === "loading" || status === "running";
-  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId() };
+  const ids = { setup: useId(), run: useId(), diagnose: useId(), fit: useId(), extras: useId(), forward: useId(), robust: useId(), compare: useId(), tv: useId(), drafts: useId(), discovery: useId() };
   const T = LABOR.sections;
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="labor-view" data-status={status}>
@@ -164,6 +167,13 @@ export function LaborView({ className }: { className?: string }) {
         <Cell index={0} span="lg:col-span-12">
           <Suspense fallback={null}>
             <DraftsSection />
+          </Suspense>
+        </Cell>
+      </Section>
+      <Section id={ids.discovery} title="Muster-Entdecker" sub="Was haben Gewinner und Verlierer gemeinsam – und hält das gegen den Zufall?">
+        <Cell index={0} span="lg:col-span-12">
+          <Suspense fallback={null}>
+            <DiscoverySection />
           </Suspense>
         </Cell>
       </Section>
