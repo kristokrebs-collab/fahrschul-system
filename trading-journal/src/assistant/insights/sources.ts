@@ -5,6 +5,7 @@
  * `ToolEnv.insight` (tests) replaces any of them.
  */
 import type { ToolEnv } from "../tools";
+import type { DiscoveryMemory } from "@/views/discovery/lastResult";
 import type { ExtraInput, ForwardInput, LabRunInput, SignalsInput, SimilarInput } from "./types";
 import type { StressRows } from "@/domain/lab/stress/types";
 import type { FilterCompare } from "@/domain/lab/filters";
@@ -19,6 +20,12 @@ export async function labRun(env: Env): Promise<LabRunInput | null> {
   const { useLabor } = await import("@/views/labor/laborStore");
   const s = useLabor.getState();
   return s.result ? { result: s.result, bars: s.bars, riskPct: s.runCfg?.riskPct ?? null } : null;
+}
+
+/** The last finished search of the Muster-Entdecker in this session, or `null` – nothing is searched here. */
+export async function discoveryMemory(env: Env): Promise<DiscoveryMemory | null> {
+  if (env.insight && "discovery" in env.insight) return env.insight.discovery ?? null;
+  return (await import("@/views/discovery/lastResult")).lastDiscovery();
 }
 
 /** The stress scenarios the trader has computed for the shown run (`idle` when none). */

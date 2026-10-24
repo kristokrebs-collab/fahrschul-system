@@ -36,5 +36,7 @@ export async function runInsight(tool: InsightToolId, question: string, env: Too
       return (await import("./fit")).demandsAnswer(norm, env);
     case "library":
       return (await import("./library")).libraryAnswer(norm, env);
+    case "discovery":
+      return (await import("./discovery")).discoveryAnswer(norm, env);
   }
 }

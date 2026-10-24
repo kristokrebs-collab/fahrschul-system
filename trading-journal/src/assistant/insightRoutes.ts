@@ -12,7 +12,7 @@
  */
 import { has, tokensOf } from "./fuzzy";
 
-export const INSIGHT_TOOL_IDS = ["audit", "stress", "forward", "trend", "signals", "quality", "benefit", "situation", "fit", "demands", "library"] as const;
+export const INSIGHT_TOOL_IDS = ["audit", "stress", "forward", "trend", "signals", "quality", "benefit", "situation", "fit", "demands", "library", "discovery"] as const;
 export type InsightToolId = (typeof INSIGHT_TOOL_IDS)[number];
 export const isInsightTool = (t: string): t is InsightToolId => (INSIGHT_TOOL_IDS as readonly string[]).includes(t);
 
@@ -105,6 +105,12 @@ export const INSIGHT_RULES: readonly InsightRule[] = [
     return idea && (has(t, "verlang", "abverlang", "erwartet", "fordert", "anforderung", "voraussetzung", "aushalten", "aushalt") || (has(t, "braucht", "benoetigt", "muss") && has(t, "=mir", "=mich", "=ich", "=von")));
   }),
   rule("fit", "fit", "Passt zu dir?", (t) => has(t, ...LAB, "=methode", "=ansatz") && has(t, "passt", "passen", "passend", "geeignet", "taugt", "liegt") && has(t, "=mir", "=mich", "=dir", "=dich", "=mein", "=meinem", "=meinen", "=meiner", "stil", "handelsstil", "journal", "typ")),
+  // 6 · what the winners (or losers) have in common: the Muster-Entdecker of the Labor (only quotes a finished search – it never starts one)
+  rule("discovery", "discovery", "Muster der Gewinner", (t) => {
+    const side = has(t, "gewinner", "gewinntrade", "gewinnende", "gewonnene", "gewonnenen", "verlierer", "verlusttrade", "verlierende", "verlorene", "verlorenen", "erfolgreiche", "erfolgreichen");
+    const common = has(t, "gemeinsam", "gemeinsamkeit", "unterscheid", "zusammenhang", "zusammenhaeng", "muster", "auffaellig");
+    return has(t, "musterentdecker", "mustersuche", "musteranalyse") || (side && common);
+  }),
   // 7 · strategy library (cards with typical values)
   rule("library", "library", "Strategie-Bibliothek", (t) => {
     const strategy = has(t, "strategie", "strategien", "handelsstrategie", "=system", "=systeme");

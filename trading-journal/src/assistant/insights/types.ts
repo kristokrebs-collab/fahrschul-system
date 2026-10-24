@@ -16,6 +16,7 @@ import type { PresenceSeg } from "@/domain/missed/presence";
 import type { SignalOutcome } from "@/domain/missed/outcome";
 import type { SimilarResult, SimUnit } from "@/domain/similar";
 import type { TrendView } from "@/market/trendlines/store";
+import type { DiscoveryMemory } from "@/views/discovery/lastResult";
 
 /** The last finished Labor run as the store holds it (`null` = none). */
 export interface LabRunInput {
@@ -66,4 +67,6 @@ export interface InsightInputs {
   signals?: SignalsInput;
   /** the answer for the asked timeframe (`tf` of the question, else the card's choice) */
   similar?: SimilarInput;
+  /** the last finished search of the Muster-Entdecker (`null` = none this session) */
+  discovery?: DiscoveryMemory | null;
 }

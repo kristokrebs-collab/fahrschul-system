@@ -18,6 +18,7 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { Collapse } from "@/primitives/Expander";
 import { FindingCard, type FilterTestState } from "./FindingCard";
+import { rememberDiscovery } from "./lastResult";
 import { DISC } from "./strings";
 
 export type { FilterTestState } from "./FindingCard";
@@ -124,6 +125,8 @@ export function DiscoveryPanel(props: DiscoveryPanelProps) {
         },
       });
       if (ctl.current !== mine) return;
+      // the assistant quotes the last finished search (it never starts one itself)
+      rememberDiscovery({ result, at: Date.now(), source: latest.current.source, label: latest.current.label ?? null });
       setRun({ status: "done", progress: 1, result, error: null, sig: forSig });
     } catch (e) {
       if (ctl.current !== mine) return;
