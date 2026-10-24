@@ -88,3 +88,7 @@ Phones: one column in the same order, no horizontal scroll at 390 px. Every cell
 - App.tsx: `<CoachWatcher />` once, as a leaf with `data-layer`, after `SetupEditor`, before `Celebrate`.
 - `src/overlays/TradeDetail.tsx`: `<TradeCoachPanel tradeId={trade.id} />` (e.g. under the psyche section).
 - Gate: plan feature `coach` (page), `coachAi` (AI wording – checked here as well).
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Zehn Chips für die Karten von „Fragen“ bis „Datenqualität“ (gefunden über ihre `data-testid`). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.

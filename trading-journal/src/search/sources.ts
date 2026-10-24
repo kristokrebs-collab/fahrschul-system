@@ -5,14 +5,13 @@
  * (only once the `berichte` page exists) and the app commands.
  */
 import type { FeatureEntry } from "@/app/features";
-import { FEATURE_GROUPS } from "@/app/features";
-import { featureHaystack, featureSearchId } from "@/app/featureQuery";
+import { featureSearchId, groupOf, parseFeatureQuery, scoreFeature } from "@/app/featureQuery";
 import { aggregate } from "@/domain/agg";
 import { KIND_REPORT, reportArchive } from "@/domain/reports";
 import type { DayNotes, EnrichedTrade, Settings } from "@/domain/types";
 import { tradeTime } from "@/lib/dates";
 import { fmt, isFin } from "@/lib/format";
-import { haystack, type Haystack } from "./fuzzy";
+import { haystack, type FieldMatch, type Haystack } from "./fuzzy";
 
 export type SearchKind = "best" | "recent" | "command" | "page" | "feature" | "trade" | "setup" | "day" | "setting" | "report";
 
@@ -63,6 +62,8 @@ export interface SearchItem {
   boost: number;
   action: SearchAction;
   hay: Haystack;
+  /** a scorer of its own (the function register: intents, typos, spoken questions); without it `hay` is scored */
+  match?: (query: string) => FieldMatch | null;
 }
 
 export const KIND_LABEL: Record<SearchKind, string> = {
@@ -310,7 +311,7 @@ function pageItems(pages: readonly string[], labels: IndexInput["labels"], keys:
   });
 }
 
-/** The register's functions (deep links): "Kosten- und Belastungstest · Testen · Labor". Register order = tie order. */
+/** The register's functions (deep links): "Kosten- und Belastungstest · Strategie entwickeln & testen · Labor". Register order = tie order. */
 function featureItems(features: readonly FeatureEntry[], labels: IndexInput["labels"]): SearchItem[] {
   return features.map((f, i) => {
     const page = pageLabel(f.page, labels);
@@ -318,12 +319,13 @@ function featureItems(features: readonly FeatureEntry[], labels: IndexInput["lab
       id: featureSearchId(f.id),
       kind: "feature",
       title: f.name,
-      subtitle: `${FEATURE_GROUPS.find((g) => g.id === f.group)?.name ?? "Funktion"} · ${page}`,
+      subtitle: `${f.task ?? groupOf(f).name} · ${f.place ? `${page} › ${f.place}` : page}`,
       meta: f.status === "teilweise" ? "teilweise" : undefined,
       metaTone: f.status === "teilweise" ? "mute" : undefined,
       boost: 2 - i * 0.01,
       action: { type: "feature", id: f.id },
-      hay: featureHaystack(f, page),
+      hay: haystack(f.name, [...f.keywords, ...(f.intents ?? []), f.task ?? "", f.benefit, groupOf(f).name, page]),
+      match: (query) => scoreFeature(f, parseFeatureQuery(query)),
     } satisfies SearchItem;
   });
 }

@@ -33,7 +33,7 @@ describe("search index with the function register", () => {
     expect(fs).toHaveLength(FEATURE_REGISTRY.length);
     expect(fs.find((i) => i.id === featureSearchId("belastungstest"))).toMatchObject({
       title: "Kosten- und Belastungstest",
-      subtitle: "Testen · Labor",
+      subtitle: "Prüfen, ob die Strategie höhere Kosten übersteht · Labor › Kosten- und Belastungstest",
       action: { type: "feature", id: "belastungstest" },
     });
     expect(new Set(items.map((i) => i.id)).size).toBe(items.length);

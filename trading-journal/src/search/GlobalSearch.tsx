@@ -46,7 +46,7 @@ export const CONFIG = {
 
 export const SEARCH_STRINGS = {
   label: "Suche",
-  placeholder: "Trades, Setups, Seiten, Einstellungen …",
+  placeholder: "Was willst du tun? Funktionen, Trades, Seiten …",
   close: "Suche schließen",
   empty: "Nichts gefunden",
   emptyHint: "Anders schreiben oder weniger Wörter – die Suche verzeiht Tippfehler.",

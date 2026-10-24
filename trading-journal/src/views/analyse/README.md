@@ -97,3 +97,7 @@ store, `bootMarket` (daily candles for the benchmark), the trade detail, toasts 
 - `tests/e2e/analyse.spec.ts` – 140 generated trades: every card, dialog, scrubbing, dimension switch, rows → trades,
   heatmap, custom stat persisted / removed, `?dim=`, empty journal, legacy fixture, no horizontal scroll, no console
   errors (`PW_ANALYSE_URL`, default `/dev/analyse.html`; skips where the harness is not served).
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Sechs Chips für die Abschnitte (`SectionTitle section="ratios" | "future" | "edge" | "execution" | "patterns" | "compare"` → `data-section`); ohne Trades (Vorschau-Karte) keine Leiste. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.

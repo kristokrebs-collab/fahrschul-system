@@ -610,3 +610,31 @@ Der Hauptknopf unten heißt „Alle N Trades eintragen“ (bei Abwahl „N Trade
 Aktion „Rückgängig“ (9 s). Der feste Schlusssatz nennt: unvollständige Karten werden nicht eingetragen, Gelb/abgeleitet erklärt, „Keine professionelle
 Finanzberatung.“ Bewegung nur die vorhandenen `Sheet`-/`Collapse`-Tokens; reduzierte Bewegung zeigt das Ende sofort. 390 px: Zellen untereinander, Ausschnitt oben,
 kein horizontaler Scroll.
+### Funktionen finden: Seite „Funktionen“, Inhalt-Leiste, Finder im Menü
+
+Keine neue Sprache, aber ein neuer Grundsatz: **jede Funktion hat genau einen Ort in Worten der Aufgabe** („Trade prüfen & Chart“, nicht „Markt“) – und man
+kommt in drei Handgriffen hin: suchen, Kachel wählen, Zeile antippen.
+
+- **Seite**: `PageHeader`, darunter ein einziges, großes Suchfeld (`Input`, 56 px, 16 px Schrift, Lupe links, ✕ rechts ≥ 44 px) mit der Frage „Was willst du tun?“ als
+  sichtbarem Label (kein Platzhalter-Ersatz). Danach – nur wenn etwas da ist – „Zuletzt benutzt“ und „Empfohlen“ (`Label` + eine Zeile Notiz + kompakte Zeilen: Punkt, Name,
+  Tag `Badge` „Neu“ / „Für dich“ / „Empfohlen“, darunter nur die Gruppe, `text-mute`). Dann die **Aufgaben** als Kacheln: `rounded-2xl border-line bg-ink-850`, Symbol in
+  `size-11 rounded-xl border-line-2`, rechts oben in Mono Anzahl · Zustand, Name 17 px / 600, darunter ein Satz 13 px `text-mute`; eine Spalte mobil, zwei ab `md`, drei ab
+  `xl`; Hover nur Rand (`border-line-2`), kein Spotlight, keine Neigung.
+- **Zustandspunkt**: grün = fertig, bernstein = teilweise – der Punkt ist nie allein: bei „teilweise“ steht das Wort in Mono-Versalien daneben, auf der Kachel die Zahl
+  („9 teilweise“), in den Details „Fehlt noch“. Der Tarif steht als Teil der Ortszeile („Labor › Diagnose · Premium“), nicht als Pille auf jeder Zeile; nur was der eigene
+  Tarif *nicht* enthält, trägt die bernsteinfarbene `Badge`.
+- **Gruppenliste**: „← Alle Aufgaben“ (`Button size="sm"`), Titel `clamp(20px,5.4vw,24px)` mit Symbol, Satz, dann je Zwischenüberschrift ein `Label as="h3"` mit Zähler und die
+  Zeilen (eine Spalte, ab `xl` zwei). Eine Zeile ist ein `article` mit zwei Knöpfen: die Fläche öffnet die Stelle, ein stiller Knopf rechts (Haarlinie links, der Pfeil dreht
+  um 180°) klappt die Details (`Collapse`). Mobil nichts unter 56 px.
+- **Inhalt-Leiste** (`SectionNav`): ein Streifen aus `rounded-full`-Chips (Rand `line-2`, aktiv `border-white/40 bg-white/[0.07] text-fg`) mit dem Mono-Label „Inhalt“ davor, in der
+  Seite eingebaut unter dem Kopf, oben **klebend direkt unter dem Header** (`top = env(safe-area-inset-top) + 64 px`, Fläche `ink-900`, Haarlinie unten). Er sitzt im Fluss –
+  beim Ankleben springt nichts –, ist 53 px hoch (65 px mit 44-px-Chips auf grobem Zeiger), scrollt waagerecht nur in sich (Scrollbalken aus, kein Seiten-Scroll) und verdrängt
+  nichts: `--section-nav-h` erweitert `scroll-padding-top`, damit jedes Ziel (Chip, Suche, „Alle Funktionen“) unter dem Streifen landet.
+- **Anspringen** (`revealSection` / `revealCard`): weiches Scrollen, danach hebt sich der Abschnittstitel kurz (Deckkraft .3 → 1, 8 px nach oben, `tween.reveal`) – oder die Karte
+  bekommt die eine rote Signal-Welle –, beides nur `opacity` / `transform`; reduzierte Bewegung springt und lässt die Hervorhebung weg. Kommen darüber noch Karten nach (Lazy), holt
+  `keepAligned` das Ziel zurück an die Linie, bis die Person selbst scrollt.
+- **Finder im Menü**: über den Seitenlinks ein 48-px-Feld („Funktion suchen: …“), rechts neben dem Label der Textlink „Alle Funktionen →“. Treffer sind Navigations-Elemente
+  (Name, Aufgabe, Gruppe · Ort) im Stil der Schnellaktionen; ohne Treffer ein Satz und der Weg zur ganzen Liste.
+- **Kontrast**: lesbarer Text ist `text-fg` oder `text-mute` (≥ 4,5 : 1, hell und dunkel, axe-geprüft); `text-faint` bleibt Dekor. **Fokus**: der globale Ring (`:focus-visible`), nie
+  entfernt. **Landmarken**: `role="search"` um das Feld, `nav "Inhalt dieser Seite"`, `section` + `aria-labelledby` je Liste, `aria-current="location"` im Streifen, `aria-expanded` an den
+  Details, `role="status"` für die Trefferzahl. **Zurück-Taste**: die offene Gruppe ist ein History-Eintrag (`openBackEntry`).

@@ -1,12 +1,15 @@
 /**
- * Page "Funktionen": the register as a grid of groups with search, status / plan filters and direct opening; "Für dich"
- * from the assistant's own counters and "Zuletzt benutzt" from the search's recent ids – each with an honest empty line.
+ * Page "Funktionen": a large search ("Was willst du tun?"), "Zuletzt benutzt" and "Empfohlen", ten task tiles; a tile opens its
+ * group (sub headings, one row per function, the details one fold away); a row opens the function. Each list says honestly
+ * when it has nothing yet.
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const open = vi.hoisted(() => vi.fn());
+const assistant = vi.hoisted(() => vi.fn());
 vi.mock("@/app/featureOpen", () => ({ openFeature: open }));
+vi.mock("@/assistant/open", () => ({ openAssistant: assistant }));
 
 import { featureSearchId } from "@/app/featureQuery";
 import { FEATURE_COUNT, FEATURE_GROUPS, FEATURE_REGISTRY } from "@/app/features";
@@ -30,9 +33,11 @@ function renderPage() {
   );
 }
 
-const cards = () => screen.queryAllByTestId("feature-card");
-const search = () => screen.getByRole("searchbox", { name: "Funktionen durchsuchen" });
-const groupIds = () => screen.queryAllByTestId("funktionen-group").map((g) => g.getAttribute("data-group"));
+const tiles = () => screen.queryAllByTestId("funktionen-tile");
+const rows = () => screen.queryAllByTestId("feature-row");
+const search = () => screen.getByRole("searchbox", { name: "Was willst du tun?" });
+const tile = (id: string) => tiles().find((t) => t.getAttribute("data-group") === id)!;
+const view = () => screen.getByTestId("funktionen-view").getAttribute("data-view");
 
 describe("Funktionen page", () => {
   beforeAll(() => {
@@ -41,129 +46,182 @@ describe("Funktionen page", () => {
   });
   beforeEach(() => {
     open.mockClear();
+    assistant.mockClear();
     useSearch.setState({ recent: [] });
     useJournal.setState({ settings: defaultSettings() });
   });
+  afterEach(() => vi.useRealTimers());
 
-  it("names itself with an h1 and shows every function in the groups of a trader's day", () => {
+  it("names itself with an h1, asks 'Was willst du tun?' and shows the ten tasks as tiles – no function list yet", () => {
     renderPage();
     expect(screen.getByRole("heading", { level: 1, name: "Funktionen" })).toBeInTheDocument();
     expect(screen.getByTestId("funktionen-view")).toHaveAttribute("data-count", String(FEATURE_COUNT));
-    expect(cards()).toHaveLength(FEATURE_COUNT);
-    expect(groupIds()).toEqual(FEATURE_GROUPS.map((g) => g.id));
-    for (const g of FEATURE_GROUPS) expect(screen.getByRole("heading", { level: 2, name: g.name })).toBeInTheDocument();
-    expect(screen.getByTestId("feature-results")).toHaveTextContent(`${FEATURE_COUNT} Funktionen`);
+    expect(view()).toBe("tiles");
+    expect(tiles().map((t) => t.getAttribute("data-group"))).toEqual(FEATURE_GROUPS.map((g) => g.id));
+    expect(tiles()).toHaveLength(10);
+    for (const g of FEATURE_GROUPS) {
+      expect(tile(g.id)).toHaveTextContent(g.name);
+      expect(tile(g.id)).toHaveTextContent(g.lead);
+    }
+    expect(rows()).toHaveLength(0);
+    expect(screen.getByRole("search")).toBeInTheDocument();
+    // a sentence about the state, never a promise
+    expect(screen.getByText(/Keine professionelle Finanzberatung\./)).toBeInTheDocument();
   });
 
-  it("shows the functions built after the first register, each with its honest status", () => {
+  it("says on each tile how many functions it holds and whether some are only partial", () => {
     renderPage();
-    const status = (id: string) => cards().find((c) => c.getAttribute("data-feature") === id)?.getAttribute("data-status");
-    const expected: Record<string, string> = {
-      "strategie-bibliothek": "teilweise",
-      "indikator-bausteine": "teilweise",
-      "pine-export": "fertig",
-      "parameter-raster": "fertig",
-      "forward-test": "fertig",
-      "entwurf-versionen": "fertig",
-      "playbook-austausch": "teilweise",
-      "aehnliche-situationen": "fertig",
-      "passt-zu-dir": "teilweise",
-      "signal-posteingang": "teilweise",
-      "signal-ausgang": "fertig",
-      signalbilanz: "teilweise",
-      "daten-alarmqualitaet": "teilweise",
-      monatsnutzen: "fertig",
-    };
-    for (const [id, st] of Object.entries(expected)) expect(status(id), id).toBe(st);
+    for (const g of FEATURE_GROUPS) {
+      const items = FEATURE_REGISTRY.filter((f) => f.group === g.id);
+      const partial = items.filter((f) => f.status === "teilweise").length;
+      expect(tile(g.id)).toHaveAttribute("data-n", String(items.length));
+      expect(tile(g.id)).toHaveAttribute("data-partial", String(partial));
+      expect(tile(g.id)).toHaveTextContent(partial ? `${partial} teilweise` : "alle fertig");
+    }
   });
 
-  it("shows status, plan, benefit and what is missing on each card – nothing 'teilweise' without its gap", () => {
+  it("opens a tile to its group: sub headings, one row per function, honest state per row", () => {
     renderPage();
-    const labor = screen.getAllByTestId("feature-card").find((c) => c.getAttribute("data-feature") === "labor")!;
-    expect(within(labor).getByRole("heading", { level: 3, name: "Backtest-Labor" })).toBeInTheDocument();
-    expect(labor).toHaveAttribute("data-status", "fertig");
-    expect(labor).toHaveAttribute("data-tier", "premium");
-    expect(labor).toHaveTextContent("Ab Premium");
-    expect(labor).toHaveTextContent("F16");
-    const partial = screen.getAllByTestId("feature-card").filter((c) => c.getAttribute("data-status") === "teilweise");
-    expect(partial.length).toBeGreaterThan(10);
-    for (const c of partial) expect(c, c.getAttribute("data-feature") ?? "").toHaveTextContent("Fehlt noch");
-    const alarms = screen.getAllByTestId("feature-card").find((c) => c.getAttribute("data-feature") === "alarme")!;
-    expect(alarms).toHaveTextContent("nur, solange die App offen ist");
+    fireEvent.click(tile("testen"));
+    expect(view()).toBe("group");
+    expect(screen.getByRole("heading", { level: 2, name: "Strategie entwickeln & testen" })).toBeInTheDocument();
+    const members = FEATURE_REGISTRY.filter((f) => f.group === "testen");
+    expect(rows()).toHaveLength(members.length);
+    expect(screen.getAllByTestId("funktionen-sub").map((s) => s.getAttribute("data-sub"))).toEqual(["Idee bauen", "Test & Ergebnis", "Härtetest", "Live prüfen & teilen"]);
+    const row = rows().find((r) => r.getAttribute("data-feature") === "pine-export")!;
+    expect(within(row).getByText("Aus deiner Idee ein TradingView-Skript machen")).toBeInTheDocument();
+    expect(row).toHaveTextContent("Labor › Pine-Skript für TradingView");
+    expect(row).toHaveAttribute("data-page", "labor");
+    expect(row).toHaveAttribute("data-anchor", "labor-pine");
+    // partial = said in words next to its dot
+    const partial = rows().find((r) => r.getAttribute("data-feature") === "eigene-idee")!;
+    expect(partial).toHaveAttribute("data-status", "teilweise");
+    expect(partial).toHaveTextContent("Teilweise");
+    // the tiles are gone while a group is open
+    expect(tiles()).toHaveLength(0);
   });
 
-  it("says honestly that 'Für dich' and 'Zuletzt benutzt' have nothing yet", () => {
+  it("goes back to the tiles with the button and with Escape, and hands the focus back to the tile", () => {
     renderPage();
-    const mine = screen.getByTestId("funktionen-for-you");
-    expect(mine).toHaveAttribute("data-n", "0");
-    expect(mine).toHaveTextContent("Noch nichts gelernt");
-    expect(mine).toHaveTextContent("die Fragen selbst werden nicht gespeichert");
-    const recent = screen.getByTestId("funktionen-recent");
-    expect(recent).toHaveAttribute("data-n", "0");
-    expect(recent).toHaveTextContent("Noch nichts geöffnet");
-    expect(within(mine).queryAllByTestId("feature-quick")).toHaveLength(0);
+    fireEvent.click(tile("risiko"));
+    expect(view()).toBe("group");
+    fireEvent.click(screen.getByRole("button", { name: "Zurück zu allen Aufgaben" }));
+    expect(view()).toBe("tiles");
+    expect(document.activeElement).toBe(tile("risiko"));
+    fireEvent.click(tile("daten"));
+    fireEvent.keyDown(screen.getByTestId("funktionen-group-view"), { key: "Escape" });
+    expect(view()).toBe("tiles");
   });
 
-  it("'Für dich' follows the assistant's counters, 'Zuletzt benutzt' the search's recent ids", () => {
-    useJournal.setState({ settings: withMemory(defaultSettings(), { ...EMPTY_MEMORY, interests: { train: 5, lab: 3 }, asked: 8 }) });
-    useSearch.setState({ recent: [featureSearchId("belastungstest"), "page:coach", featureSearchId("backup")] });
+  it("opens a function from its row, and from a 'Siehe auch' link in the details", () => {
     renderPage();
-    const mine = within(screen.getByTestId("funktionen-for-you"));
-    expect(mine.getAllByTestId("feature-quick")[0]).toHaveAttribute("data-feature", "ueben");
-    expect(mine.getAllByTestId("feature-quick").map((b) => b.getAttribute("data-feature"))).toContain("labor");
-    const last = within(screen.getByTestId("funktionen-recent")).getAllByTestId("feature-quick");
-    expect(last.map((b) => b.getAttribute("data-feature"))).toEqual(["belastungstest", "backup"]);
-    fireEvent.click(last[0]!);
-    expect(open).toHaveBeenCalledWith("belastungstest");
-  });
-
-  it("opens a function from its card", () => {
-    renderPage();
+    fireEvent.click(tile("pruefen"));
     fireEvent.click(screen.getByRole("button", { name: "Positionsrechner öffnen" }));
     expect(open).toHaveBeenCalledWith("positionsrechner");
+    expect(view()).toBe("tiles");
+    fireEvent.click(tile("heute"));
+    fireEvent.click(screen.getByRole("button", { name: "Details zu Tagesplan" }));
+    const panel = screen.getByTestId("feature-detail-panel");
+    expect(panel).toHaveTextContent("Vier Szenarien");
+    const see = within(panel).getByRole("button", { name: /Schlüsselmarken/ });
+    expect(see).toHaveAttribute("data-see", "schluesselmarken");
+    fireEvent.click(see);
+    expect(open).toHaveBeenCalledWith("schluesselmarken");
   });
 
-  it("filters by search (typo-tolerant), hides the quick lists meanwhile, and Enter opens the first hit", () => {
+  it("shows in the details what is missing, what a function needs and what plan it asks for", async () => {
+    renderPage();
+    fireEvent.click(tile("testen"));
+    fireEvent.click(screen.getByRole("button", { name: "Details zu Eigene Idee (Regelbaukasten)" }));
+    const panel = screen.getByTestId("feature-detail-panel");
+    expect(panel).toHaveTextContent("Fehlt noch");
+    expect(panel).toHaveTextContent("Kein Freitext- oder Diktat-Entwurf");
+    expect(panel).toHaveTextContent("Premium");
+    expect(rows().find((r) => r.getAttribute("data-feature") === "eigene-idee")).toHaveTextContent("Premium");
+    fireEvent.click(screen.getByRole("button", { name: "Details zu Eigene Idee (Regelbaukasten)" }));
+    await waitFor(() => expect(screen.queryByTestId("feature-detail-panel")).toBeNull());
+  });
+
+  it("finds by what you want to do, hides the tiles meanwhile, and Enter opens the first hit", () => {
+    renderPage();
+    fireEvent.change(search(), { target: { value: "warum verliere ich" } });
+    expect(view()).toBe("search");
+    expect(tiles()).toHaveLength(0);
+    expect(rows().map((r) => r.getAttribute("data-feature")).slice(0, 3)).toContain("leaks-edges");
+    expect(screen.getByTestId("feature-results")).toHaveTextContent(/Treffer/);
+    expect(screen.getByTestId("feature-results")).toHaveTextContent("Enter öffnet den ersten Treffer");
+    // the row names the group it lives in
+    expect(rows()[0]).toHaveTextContent("Aus Fehlern lernen");
+    const first = rows()[0]!.getAttribute("data-feature")!;
+    fireEvent.keyDown(search(), { key: "Enter" });
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(open).toHaveBeenCalledWith(first);
+  });
+
+  it("forgives typos, clears with Escape and with the button", () => {
     renderPage();
     fireEvent.change(search(), { target: { value: "belastungstst" } });
-    expect(cards().map((c) => c.getAttribute("data-feature"))[0]).toBe("belastungstest");
-    expect(screen.queryByTestId("funktionen-for-you")).toBeNull();
+    expect(rows()[0]).toHaveAttribute("data-feature", "belastungstest");
+    fireEvent.keyDown(search(), { key: "Escape" });
+    expect(search()).toHaveValue("");
+    expect(view()).toBe("tiles");
+    fireEvent.change(search(), { target: { value: "Backup" } });
+    fireEvent.click(screen.getByRole("button", { name: "Suche leeren" }));
+    expect(search()).toHaveValue("");
+    expect(view()).toBe("tiles");
+  });
+
+  it("says 'nichts' honestly and offers the assistant", () => {
+    renderPage();
+    fireEvent.change(search(), { target: { value: "zzzqqq" } });
+    expect(rows()).toHaveLength(0);
+    expect(screen.getByText("Dazu steht nichts in der Liste")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Assistenten fragen" }));
+    expect(assistant).toHaveBeenCalledTimes(1);
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: "Zurück zu den Aufgaben" }));
+    });
+    expect(view()).toBe("tiles");
+  });
+
+  it("'Zuletzt benutzt' is absent without history and lists the search's recent functions with it", () => {
+    const { unmount } = renderPage();
     expect(screen.queryByTestId("funktionen-recent")).toBeNull();
-    expect(screen.getByTestId("feature-results")).toHaveTextContent(/von \d+ Funktionen/);
-    expect(screen.getByTestId("feature-results")).toHaveTextContent("Enter öffnet den ersten Treffer");
-    fireEvent.keyDown(search(), { key: "Enter" });
+    unmount();
+    useSearch.setState({ recent: [featureSearchId("belastungstest"), "page:coach", featureSearchId("backup")] });
+    renderPage();
+    const recent = within(screen.getByTestId("funktionen-recent")).getAllByTestId("feature-quick");
+    expect(recent.map((b) => b.getAttribute("data-feature"))).toEqual(["belastungstest", "backup"]);
+    fireEvent.click(within(recent[0]!).getByTestId("feature-open"));
     expect(open).toHaveBeenCalledWith("belastungstest");
   });
 
-  it("filters by status and by plan, exactly", () => {
+  it("'Empfohlen' is never empty: the assistant's counters first, the new next, the starting points last", () => {
     renderPage();
-    fireEvent.click(screen.getByRole("radio", { name: "Teilweise" }));
-    expect(cards().length).toBeGreaterThan(5);
-    expect(cards().length).toBeLessThan(FEATURE_COUNT);
-    expect(cards().every((c) => c.getAttribute("data-status") === "teilweise")).toBe(true);
-    fireEvent.click(screen.getByRole("radio", { name: "Premium" }));
-    expect(cards().length).toBeGreaterThan(2);
-    expect(cards().every((c) => c.getAttribute("data-status") === "teilweise" && c.getAttribute("data-tier") === "premium")).toBe(true);
-    fireEvent.click(screen.getByRole("radio", { name: "Fertig" }));
-    expect(cards().every((c) => c.getAttribute("data-status") === "fertig" && c.getAttribute("data-tier") === "premium")).toBe(true);
+    const picks = within(screen.getByTestId("funktionen-picks")).getAllByTestId("feature-quick");
+    expect(picks.length).toBeGreaterThanOrEqual(3);
+    expect(picks.length).toBeLessThanOrEqual(4);
+    expect(within(screen.getByTestId("funktionen-picks")).getByRole("heading", { level: 2, name: "Empfohlen" })).toBeInTheDocument();
   });
 
-  it("says 'Nichts gefunden' and brings everything back with 'Filter zurücksetzen'", () => {
+  it("puts what the assistant's counters point at first in 'Empfohlen'", () => {
+    useJournal.setState({ settings: withMemory(defaultSettings(), { ...EMPTY_MEMORY, interests: { train: 5 }, asked: 8 }) });
     renderPage();
-    fireEvent.change(search(), { target: { value: "zzzqqq" } });
-    expect(cards()).toHaveLength(0);
-    expect(screen.getByText("Nichts gefunden")).toBeInTheDocument();
-    act(() => {
-      fireEvent.click(screen.getByRole("button", { name: "Filter zurücksetzen" }));
-    });
-    expect(cards()).toHaveLength(FEATURE_COUNT);
-    expect(search()).toHaveValue("");
+    const picks = within(screen.getByTestId("funktionen-picks")).getAllByTestId("feature-quick");
+    expect(picks[0]).toHaveAttribute("data-feature", "ueben");
+    expect(picks[0]).toHaveTextContent("Für dich");
   });
 
-  it("covers every group the user asked for", () => {
+  it("marks a function of the last release as new – and only in that window", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-24T12:00:00Z"));
+    const first = renderPage();
+    fireEvent.click(tile("testen"));
+    expect(rows().find((r) => r.getAttribute("data-feature") === "pine-export")).toHaveTextContent("Neu");
+    first.unmount();
+    vi.setSystemTime(new Date("2027-03-01T12:00:00Z"));
     renderPage();
-    const names = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    for (const n of ["Heute vorbereiten", "Beobachten & Alarme", "Einstieg prüfen", "Testen", "Auswerten & Lernen", "Daten & Import", "Community"]) expect(names).toContain(n);
-    expect(FEATURE_REGISTRY.length).toBe(FEATURE_COUNT);
+    fireEvent.click(tile("testen"));
+    expect(rows().find((r) => r.getAttribute("data-feature") === "pine-export")).not.toHaveTextContent("Neu");
   });
 });

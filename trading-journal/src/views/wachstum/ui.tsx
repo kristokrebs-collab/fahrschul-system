@@ -22,10 +22,11 @@ export function Cell({ index, span, children, className }: { index: number; span
   );
 }
 
-export function Section({ id, title, sub, children }: { id: string; title: string; sub: string; children: ReactNode }) {
+/** One section of the page: its title carries `data-section` (the page's `SectionNav` and the function register scroll to it). */
+export function Section({ id, section, title, sub, children }: { id: string; section: string; title: string; sub: string; children: ReactNode }) {
   return (
     <section aria-labelledby={id} className="contents">
-      <SectionTitle id={id} title={title} sub={sub} className="lg:col-span-12" />
+      <SectionTitle id={id} section={section} title={title} sub={sub} className="lg:col-span-12" />
       {children}
     </section>
   );

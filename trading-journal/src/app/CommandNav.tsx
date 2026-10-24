@@ -16,6 +16,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type 
 import { GlyphFullscreen } from "@/app/DisplayActions";
 import type { FeatureChip } from "@/app/featureChips";
 import { PAGE_ICON, PAGE_LABELS } from "@/app/Dock";
+import { NavFinder } from "@/app/NavFinder";
 import { preloadPage } from "@/app/pages";
 import { DISPLAY_STRINGS, isIosSafari, isSamsungInternet, promptInstall, toggleFullscreen, useCanInstall, useFullscreen, useFullscreenSupported, useStandalone } from "@/app/pwa";
 import { useLivePriceText, usePageCounts, useShellStats } from "@/app/shellStats";
@@ -206,12 +207,15 @@ function Panel({ reduced }: { reduced: boolean }) {
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     const items = Array.from(ref.current?.querySelectorAll<HTMLElement>("[data-cmd-item]") ?? []);
     const at = items.indexOf(document.activeElement as HTMLElement);
-    const next = rovingIndex(e.key, at, items.length);
+    // in the finder's field Home / End move the caret and the digits are text – only the arrows leave it
+    const typing = e.target instanceof HTMLInputElement;
+    const next = typing && e.key !== "ArrowDown" && e.key !== "ArrowUp" ? null : rovingIndex(e.key, at, items.length);
     if (next !== null) {
       e.preventDefault();
       items[next]?.focus();
       return;
     }
+    if (typing) return;
     const digit = Number(e.key);
     const target = Number.isInteger(digit) && digit >= 1 && digit <= PAGES.length && !e.metaKey && !e.ctrlKey ? PAGES[digit - 1] : undefined;
     if (target) {
@@ -344,79 +348,90 @@ function Panel({ reduced }: { reduced: boolean }) {
 
           {/* minmax(0,1fr): the longest page name may never widen the column past the screen (390: it overflowed 24 px) */}
           <div className="grid flex-1 grid-cols-[minmax(0,1fr)] content-center gap-10 py-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,360px)] xl:gap-16">
-            <nav aria-label={COMMAND_NAV_STRINGS.pages} className="grid gap-7">
-              <ul className="cmdnav-links grid">
-                {PRIMARY.map((p, i) => (
-                  <li key={p}>
-                    <Item delay={CONFIG.delays.links[i] ?? 900} reduced={reduced}>
-                      <a
-                        href={PAGE_HASH[p]}
-                        data-cmd-item=""
-                        aria-current={page === p ? "page" : undefined}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          go(p);
-                        }}
-                        className="cmdnav-link group/link inline-flex max-w-full items-baseline gap-3 rounded-lg py-1.5 text-fg outline-none max-sm:pointer-coarse:py-2.5 transition-opacity duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:gap-5"
-                      >
-                        <span aria-hidden="true" className="w-6 shrink-0 font-mono text-[11px] text-faint sm:w-8">
-                          {pageNo(i)}
-                        </span>
-                        <span className="min-w-0 break-words text-[clamp(22px,4.6vw,56px)] font-normal leading-[1.08] tracking-[-0.02em]">{PAGE_LABELS[p]}</span>
-                        <span className={cn("dot-num shrink-0 self-start pt-[0.5em] text-[12px] sm:text-[14px]", counts[p].tone ?? "text-mute")}>
-                          <DotFigure text={counts[p].text} />
-                        </span>
-                        {page === p && <span aria-hidden="true" className="size-1.5 shrink-0 self-center rounded-full bg-signal" />}
-                      </a>
-                    </Item>
-                  </li>
-                ))}
-              </ul>
-              {/* the feature pages: a compact grid (icon, name, live count, digit) – preloading their chunk on intent */}
-              <div className="grid gap-2.5">
-                <Item delay={CONFIG.delays.links[PRIMARY.length] ?? 960} reduced={reduced}>
-                  <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">{COMMAND_NAV_STRINGS.more}</p>
-                </Item>
-                <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,168px),1fr))] gap-2">
-                  {SECONDARY.map((p, k) => {
-                    const i = PRIMARY.length + k;
-                    return (
-                      <li key={p} className="min-w-0">
-                        <Item delay={CONFIG.delays.links[i] ?? 1560} reduced={reduced} className="h-full">
-                          <a
-                            href={PAGE_HASH[p]}
-                            data-cmd-item=""
-                            aria-current={page === p ? "page" : undefined}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              go(p);
-                            }}
-                            onPointerEnter={() => preloadPage(p)}
-                            onFocus={() => preloadPage(p)}
-                            onPointerDown={() => preloadPage(p)}
-                            className="cmdnav-link group/link relative flex h-full min-h-12 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
-                          >
-                            <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg border border-line-2 text-mute group-hover/link:text-fg [&>svg]:size-4">
-                              <Icon name={PAGE_ICON[p]} />
-                            </span>
-                            <span className="grid min-w-0 flex-1">
-                              <span className="truncate text-[15px] font-medium leading-tight">{PAGE_LABELS[p]}</span>
-                              <span className={cn("dot-num truncate text-[11.5px]", counts[p].tone ?? "text-mute")}>
-                                <DotFigure text={counts[p].text} />
-                              </span>
-                            </span>
-                            <span aria-hidden="true" className="shrink-0 self-start font-mono text-[10px] text-faint">
-                              {pageNo(i)}
-                            </span>
-                            {page === p && <span aria-hidden="true" className="absolute right-2 bottom-2 size-1.5 rounded-full bg-signal" />}
-                          </a>
-                        </Item>
-                      </li>
-                    );
-                  })}
+            <div className="grid min-w-0 content-start gap-7">
+              <Item delay={CONFIG.delays.brand} reduced={reduced}>
+                <NavFinder
+                  onOpen={(id) => {
+                    closeCommandNav(true);
+                    void import("@/app/featureOpen").then((m) => m.openFeature(id));
+                  }}
+                  onAll={() => go("funktionen")}
+                />
+              </Item>
+              <nav aria-label={COMMAND_NAV_STRINGS.pages} className="grid gap-7">
+                <ul className="cmdnav-links grid">
+                  {PRIMARY.map((p, i) => (
+                    <li key={p}>
+                      <Item delay={CONFIG.delays.links[i] ?? 900} reduced={reduced}>
+                        <a
+                          href={PAGE_HASH[p]}
+                          data-cmd-item=""
+                          aria-current={page === p ? "page" : undefined}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            go(p);
+                          }}
+                          className="cmdnav-link group/link inline-flex max-w-full items-baseline gap-3 rounded-lg py-1.5 text-fg outline-none max-sm:pointer-coarse:py-2.5 transition-opacity duration-[250ms] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white sm:gap-5"
+                        >
+                          <span aria-hidden="true" className="w-6 shrink-0 font-mono text-[11px] text-faint sm:w-8">
+                            {pageNo(i)}
+                          </span>
+                          <span className="min-w-0 break-words text-[clamp(22px,4.6vw,56px)] font-normal leading-[1.08] tracking-[-0.02em]">{PAGE_LABELS[p]}</span>
+                          <span className={cn("dot-num shrink-0 self-start pt-[0.5em] text-[12px] sm:text-[14px]", counts[p].tone ?? "text-mute")}>
+                            <DotFigure text={counts[p].text} />
+                          </span>
+                          {page === p && <span aria-hidden="true" className="size-1.5 shrink-0 self-center rounded-full bg-signal" />}
+                        </a>
+                      </Item>
+                    </li>
+                  ))}
                 </ul>
-              </div>
-            </nav>
+                {/* the feature pages: a compact grid (icon, name, live count, digit) – preloading their chunk on intent */}
+                <div className="grid gap-2.5">
+                  <Item delay={CONFIG.delays.links[PRIMARY.length] ?? 960} reduced={reduced}>
+                    <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-faint">{COMMAND_NAV_STRINGS.more}</p>
+                  </Item>
+                  <ul className="cmdnav-links grid grid-cols-[repeat(auto-fill,minmax(min(100%,168px),1fr))] gap-2">
+                    {SECONDARY.map((p, k) => {
+                      const i = PRIMARY.length + k;
+                      return (
+                        <li key={p} className="min-w-0">
+                          <Item delay={CONFIG.delays.links[i] ?? 1560} reduced={reduced} className="h-full">
+                            <a
+                              href={PAGE_HASH[p]}
+                              data-cmd-item=""
+                              aria-current={page === p ? "page" : undefined}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                go(p);
+                              }}
+                              onPointerEnter={() => preloadPage(p)}
+                              onFocus={() => preloadPage(p)}
+                              onPointerDown={() => preloadPage(p)}
+                              className="cmdnav-link group/link relative flex h-full min-h-12 items-center gap-3 rounded-xl border border-line-2 bg-ink-900 px-3 py-2.5 text-fg outline-none transition-[opacity,border-color] duration-[250ms] hover:border-white/30 focus-visible:border-white/60"
+                            >
+                              <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg border border-line-2 text-mute group-hover/link:text-fg [&>svg]:size-4">
+                                <Icon name={PAGE_ICON[p]} />
+                              </span>
+                              <span className="grid min-w-0 flex-1">
+                                <span className="truncate text-[15px] font-medium leading-tight">{PAGE_LABELS[p]}</span>
+                                <span className={cn("dot-num truncate text-[11.5px]", counts[p].tone ?? "text-mute")}>
+                                  <DotFigure text={counts[p].text} />
+                                </span>
+                              </span>
+                              <span aria-hidden="true" className="shrink-0 self-start font-mono text-[10px] text-faint">
+                                {pageNo(i)}
+                              </span>
+                              {page === p && <span aria-hidden="true" className="absolute right-2 bottom-2 size-1.5 rounded-full bg-signal" />}
+                            </a>
+                          </Item>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              </nav>
+            </div>
 
             <section aria-label={COMMAND_NAV_STRINGS.actions} className="grid content-start gap-3">
               {actions.map((a, i) => (

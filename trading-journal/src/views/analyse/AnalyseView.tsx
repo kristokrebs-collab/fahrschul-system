@@ -20,6 +20,7 @@ import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
 import { Card } from "@/primitives/Card";
 import { EmptyState } from "@/primitives/EmptyState";
+import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { storageKey } from "@/store/storage";
 import { useUi, type AccFilter } from "@/store/uiStore";
@@ -50,6 +51,16 @@ function Cell({ index, span, children }: { index: number; span: string; children
     </Reveal>
   );
 }
+
+/** The sections of the page, for its "Inhalt" strip (`data-section` on each `SectionTitle`). */
+const NAV: readonly SectionNavItem[] = [
+  { id: "ratios", label: SECTIONS.ratios },
+  { id: "future", label: SECTIONS.future },
+  { id: "edge", label: SECTIONS.edge },
+  { id: "execution", label: SECTIONS.execution },
+  { id: "patterns", label: SECTIONS.patterns },
+  { id: "compare", label: SECTIONS.compare },
+];
 
 export const PREVIEW_ITEMS = [CARD_TITLES.hero, CARD_TITLES.monteCarlo, CARD_TITLES.ruin, CARD_TITLES.breakdown, CARD_TITLES.heatmap, CARD_TITLES.excursion, CARD_TITLES.distribution, CARD_TITLES.rolling, CARD_TITLES.streaks, CARD_TITLES.benchmark, CARD_TITLES.compare, CARD_TITLES.custom];
 
@@ -90,6 +101,7 @@ export function AnalyseView({ className }: { className?: string }) {
         leadFill={ANALYSE_LEAD_FILL}
         action={<Segmented<AccFilter> aria-label="Konto der Analyse" options={ACC_OPTIONS} value={acc} onChange={setAcc} size="sm" className={SEG_TOUCH} />}
       />
+      {!empty && <SectionNav items={NAV} className="lg:col-span-12" />}
       {empty ? (
         <Cell index={0} span="lg:col-span-12">
           <PreviewCard />
@@ -97,7 +109,7 @@ export function AnalyseView({ className }: { className?: string }) {
       ) : (
         <>
           <section aria-labelledby={ids.ratios} className="contents">
-            <SectionTitle id={ids.ratios} title={SECTIONS.ratios} sub={`${view.closed.length} abgeschlossene Trades · ${ACCOUNT_LABELS[acc]} · Intervalle 80 %`} className="lg:col-span-12" />
+            <SectionTitle id={ids.ratios} section="ratios" title={SECTIONS.ratios} sub={`${view.closed.length} abgeschlossene Trades · ${ACCOUNT_LABELS[acc]} · Intervalle 80 %`} className="lg:col-span-12" />
             <Cell index={0} span="lg:col-span-12">
               <KennzahlenHero rep={rep} cur={cur} n={view.closed.length} />
             </Cell>
@@ -106,7 +118,7 @@ export function AnalyseView({ className }: { className?: string }) {
             </Cell>
           </section>
           <section aria-labelledby={ids.future} className="contents">
-            <SectionTitle id={ids.future} title={SECTIONS.future} sub="Tausende mögliche Zukünfte aus deinen echten Trades." className="lg:col-span-12" />
+            <SectionTitle id={ids.future} section="future" title={SECTIONS.future} sub="Tausende mögliche Zukünfte aus deinen echten Trades." className="lg:col-span-12" />
             {/* plan gate `monteCarlo` (P10 / P14; without payments always open) */}
             <Gate
               feature="monteCarlo"
@@ -125,7 +137,7 @@ export function AnalyseView({ className }: { className?: string }) {
             </Gate>
           </section>
           <section aria-labelledby={ids.edge} className="contents">
-            <SectionTitle id={ids.edge} title={SECTIONS.edge} sub="Trade the best, fuck the rest – aber nur, was den Zufall übersteht." className="lg:col-span-12" />
+            <SectionTitle id={ids.edge} section="edge" title={SECTIONS.edge} sub="Trade the best, fuck the rest – aber nur, was den Zufall übersteht." className="lg:col-span-12" />
             <Cell index={0} span="lg:col-span-7">
               <BreakdownCard view={view} settings={settings} cur={cur} />
             </Cell>
@@ -134,7 +146,7 @@ export function AnalyseView({ className }: { className?: string }) {
             </Cell>
           </section>
           <section aria-labelledby={ids.exec} className="contents">
-            <SectionTitle id={ids.exec} title={SECTIONS.execution} className="lg:col-span-12" />
+            <SectionTitle id={ids.exec} section="execution" title={SECTIONS.execution} className="lg:col-span-12" />
             <Cell index={0} span="lg:col-span-6">
               <ExcursionCard view={view} cur={cur} />
             </Cell>
@@ -143,7 +155,7 @@ export function AnalyseView({ className }: { className?: string }) {
             </Cell>
           </section>
           <section aria-labelledby={ids.patterns} className="contents">
-            <SectionTitle id={ids.patterns} title={SECTIONS.patterns} className="lg:col-span-12" />
+            <SectionTitle id={ids.patterns} section="patterns" title={SECTIONS.patterns} className="lg:col-span-12" />
             <Cell index={0} span="lg:col-span-7">
               <RollingCard view={view} cur={cur} />
             </Cell>
@@ -152,7 +164,7 @@ export function AnalyseView({ className }: { className?: string }) {
             </Cell>
           </section>
           <section aria-labelledby={ids.compare} className="contents">
-            <SectionTitle id={ids.compare} title={SECTIONS.compare} className="lg:col-span-12" />
+            <SectionTitle id={ids.compare} section="compare" title={SECTIONS.compare} className="lg:col-span-12" />
             <Cell index={0} span="lg:col-span-6">
               <BenchmarkCard view={view} />
             </Cell>

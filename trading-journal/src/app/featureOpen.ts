@@ -73,6 +73,16 @@ export function openFeature(id: string, opts: { remember?: boolean } = {}): bool
     return true;
   }
   const a = f.anchor;
-  whenShown(f.page, (layer) => findAnchor(layer, a), revealCard, () => tell(f, f.needs ?? "Die Stelle ist gerade nicht sichtbar – die Seite ist offen."), ANCHOR_WAIT_MS);
+  whenShown(
+    f.page,
+    (layer) => findAnchor(layer, a),
+    (el) => {
+      revealCard(el);
+      // the place is only the start: what to tap next ("Beste Setups → Setup öffnen → Diese Idee testen") is said once
+      if (f.path) tell(f, `So geht’s: ${f.path}`);
+    },
+    () => tell(f, f.needs ?? "Die Stelle ist gerade nicht sichtbar – die Seite ist offen."),
+    ANCHOR_WAIT_MS,
+  );
   return true;
 }

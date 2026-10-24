@@ -175,3 +175,6 @@ shows proposals – **Als neue Version speichern** (a new draft "… v2" for the
 proposal are never overwritten), **Als Herausforderer live testen** (a virtual forward account, nothing retroactive), **Ablehnen**. The only
 additive change to the Labor store is `addDraft(name, config, note)`. The rest is in `src/views/evolve/README.md` and `src/domain/evolve/README.md`.
 Tests: `views.evolve.labor.test.tsx`, e2e `evolve.spec.ts`.
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Chips für die Abschnitte, die gerade da sind (Diagnose, Passt zu dir?, Belastung, Robustheit erst nach einem fertigen Lauf, Vergleich ab dem ersten gespeicherten Lauf); `Section section=…` setzt `data-section` am Titel. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.

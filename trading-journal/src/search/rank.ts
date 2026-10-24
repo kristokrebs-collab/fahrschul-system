@@ -28,7 +28,7 @@ export function searchIndex(items: readonly SearchItem[], query: string): Search
   if (!tokens.length) return [];
   const byKind = new Map<SearchKind, SearchHit[]>();
   for (const item of items) {
-    const m = scoreFields(tokens, item.hay);
+    const m = item.match ? item.match(query) : scoreFields(tokens, item.hay);
     if (!m) continue;
     const score = m.score + item.boost + (KIND_BIAS[item.kind] ?? 0);
     const list = byKind.get(item.kind) ?? [];

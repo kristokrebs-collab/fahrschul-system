@@ -24,12 +24,63 @@ export function whenShown(page: string, find: (layer: Element) => HTMLElement | 
   requestAnimationFrame(tick);
 }
 
-/** Scrolls `el` under the header and runs one signal sweep across its card (decorative, removed after). */
-export function revealCard(el: HTMLElement): void {
+/** After a jump the target is looked at again at these moments (ms): a smooth scroll is over by the first. */
+const REALIGN_AT = [800, 1600, 2600] as const;
+/** Further than this from its line (px) the target is brought back. */
+const REALIGN_TOLERANCE = 24;
+
+/**
+ * Content above a target may still arrive after the jump (a lazy card swaps its skeleton for the card, an image loads): the
+ * target then sits lower than the line it was scrolled to. For a few seconds it is brought back to that line – never against
+ * the person: any wheel, touch, key or press ends this at once.
+ */
+export function keepAligned(el: HTMLElement): void {
+  if (typeof window === "undefined" || typeof window.scrollBy !== "function") return;
+  const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
+  const timers: ReturnType<typeof setTimeout>[] = [];
+  const stop = (): void => {
+    timers.forEach(clearTimeout);
+    events.forEach((e) => window.removeEventListener(e, stop));
+  };
+  const line = (): number => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+  for (const ms of REALIGN_AT) {
+    timers.push(
+      setTimeout(() => {
+        if (!el.isConnected) return stop();
+        const d = el.getBoundingClientRect().top - line();
+        if (Math.abs(d) > REALIGN_TOLERANCE) window.scrollBy({ top: d, behavior: "instant" });
+      }, ms),
+    );
+  }
+  timers.push(setTimeout(stop, REALIGN_AT[REALIGN_AT.length - 1]! + 100));
+  events.forEach((e) => window.addEventListener(e, stop, { passive: true, once: true }));
+}
+
+/**
+ * The start of a section (`data-section`, the title row of a long page): scrolls it under the header – and under the section
+ * navigation (`scroll-padding-top`, base.css) – and lets the title answer once with a short lift and fade. Opacity and
+ * transform only; with reduced motion it just jumps there.
+ */
+export function revealSection(el: HTMLElement): void {
   const reduced = prefersReducedMotion();
   el.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+  keepAligned(el);
+  if (reduced || typeof el.animate !== "function") return;
+  el.animate([{ opacity: 0.3, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: tween.reveal.duration * 1000, delay: 250, easing: "cubic-bezier(0.22,1,0.36,1)" });
+}
+
+/** A card is swept only when it is a card: not a whole page and not something taller than a screen and a half. */
+const SWEEP_MAX_VIEWPORTS = 1.5;
+
+/** Scrolls `el` under the header and runs one signal sweep across its card (decorative, removed after). */
+export function revealCard(el: HTMLElement): void {
+  if (el.hasAttribute("data-section")) return revealSection(el);
+  const reduced = prefersReducedMotion();
+  el.scrollIntoView({ block: "start", behavior: reduced ? "auto" : "smooth" });
+  keepAligned(el);
   const card = el.closest<HTMLElement>(".rounded-2xl, [class*='rounded-[']") ?? el;
   if (reduced || typeof card.animate !== "function") return;
+  if (card.getBoundingClientRect().height > window.innerHeight * SWEEP_MAX_VIEWPORTS) return;
   const sweep = document.createElement("span");
   sweep.setAttribute("aria-hidden", "true");
   Object.assign(sweep.style, {

@@ -131,3 +131,7 @@ candles after the hit appear when you play or drag – plus the features of the 
 numbers. Model: `similarModel.ts` (`hitModel`, pure). The assistant's tool `similar` calls `openSimilar()` (`similarOpen.ts`, zustand):
 the page navigates, the card scrolls into view and takes focus. Domain: `src/domain/similar/README.md`; live side:
 `src/market/similar`. Tests: `views.markt.similar.test.tsx`, `similar.*.test.ts`, `assistant.similar.test.ts`, e2e `similar.spec.ts`.
+
+## Inhalt-Leiste (Auffindbarkeit)
+
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Die Karten tragen ihre `data-testid` (`markt-best` … `alerts-card`); die Leiste nennt sie in Lesereihenfolge (elf Chips; ein laufender Bias-Test zeigt nur den Chart, dann auch keine Leiste). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.

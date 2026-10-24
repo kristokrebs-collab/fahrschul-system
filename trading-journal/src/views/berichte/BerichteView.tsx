@@ -21,6 +21,7 @@ import { cn } from "@/lib/cn";
 import { tradeTime } from "@/lib/dates";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
+import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
@@ -100,6 +101,25 @@ export function BerichteView({ className }: { className?: string }) {
   }, [key, saveSettings]);
 
   const show = (s: Exclude<ReportFocus, "all">) => focus === "all" || focus === s;
+  // the cards on the page right now (they follow the focus and the kind of report), for the "Inhalt" strip
+  const nav: SectionNavItem[] = [
+    { id: "report-hero", label: "Bericht" },
+    { id: "report-export", label: "Export" },
+    { id: "report-archive", label: "Archiv" },
+    ...(report.empty
+      ? []
+      : [
+          ...(focus === "all" ? [{ id: "report-performance", label: "Performance" }, { id: "report-compare", label: "Vergleich" }] : []),
+          ...(show("strategy") ? [{ id: "report-strategy", label: "Strategie" }] : []),
+          ...(show("risk") ? [{ id: "report-risk", label: "Risiko" }] : []),
+          ...(show("psychology") ? [{ id: "report-psych", label: "Psychologie" }] : []),
+          ...(show("mistakes") ? [{ id: "report-mistakes", label: "Fehler" }] : []),
+          ...(focus === "all" ? [{ id: "report-goals", label: "Ziele" }] : []),
+          ...(focus === "all" && kind === "week" ? [{ id: "week-review", label: "Wochenreview" }] : []),
+        ]),
+    ...(focus === "all" && kind === "week" ? [{ id: "week-experiment", label: "Experiment" }] : []),
+    ...(focus === "all" && kind === "month" ? [{ id: "benefit-card", label: "Monatsnutzen" }] : []),
+  ];
   return (
     <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="berichte-view" data-kind={kind} data-key={period.key}>
       <PageHeader
@@ -143,6 +163,8 @@ export function BerichteView({ className }: { className?: string }) {
           ))}
         </div>
       </div>
+
+      <SectionNav items={nav} className="lg:col-span-12" />
 
       <Cell index={0} span="lg:col-span-8">
         <ReportHero report={report} dir={dir} />
