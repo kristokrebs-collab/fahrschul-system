@@ -16,6 +16,7 @@ import { useAccountView, useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { storageKey } from "@/store/storage";
 import { useUi } from "@/store/uiStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { PageHeader } from "./PageHeader";
 import { playbookBySetup } from "./playbook";
 import { SetupCard } from "./SetupCard";
@@ -182,6 +183,8 @@ export function SetupsView({ onEdit, onNew, onTrades, className }: SetupsViewPro
           ))}
         </RevealGroup>
       </Card>
+
+      <AnalysisNote lead="Auswertung deiner Trades; der Live-Check liest geschlossene Kerzen – keine Prognose." />
 
       {compareMounted && (
         <Suspense fallback={null}>

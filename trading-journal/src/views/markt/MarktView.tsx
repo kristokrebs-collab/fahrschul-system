@@ -35,6 +35,7 @@ import { BoxSettingsCard } from "./BoxSettingsCard";
 import { BoxStateCard } from "./BoxStateCard";
 import { RsiLinesCard } from "./RsiLinesCard";
 import { ScannerCard } from "./ScannerCard";
+import { MarktStand } from "./MarktStand";
 import { MARKT } from "./strings";
 import { TREND } from "./trendStrings";
 
@@ -179,6 +180,7 @@ export function MarktView({ className }: { className?: string }) {
       ) : (
         <AlertBand view={view} className="lg:col-span-12" />
       )}
+      {!focus && <MarktStand view={view} className="lg:col-span-12" />}
       {!focus && (
         <>
           <Cell index={0} span="lg:col-span-7">
