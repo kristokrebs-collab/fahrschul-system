@@ -101,6 +101,8 @@ describe("Strategie-Studio", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Strategie-Studio");
     expect(screen.getByTestId("studio-list-empty")).toBeInTheDocument();
     expect(screen.getByTestId("studio-understand")).toBeDisabled();
+    // no cloud, no sign-in, no server key: the AI reading is not offered and nothing hints at it
+    expect(screen.queryByTestId("studio-ai")).toBeNull();
     expect(screen.queryByTestId("studio-understanding")).toBeNull();
     expect(screen.queryByTestId("studio-backtest")).toBeNull();
   });

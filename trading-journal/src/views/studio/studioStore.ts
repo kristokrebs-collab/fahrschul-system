@@ -125,6 +125,12 @@ let btCtl: AbortController | null = null;
 let cmpCtl: AbortController | null = null;
 let lastUi = 0;
 
+/** The editor moves to another strategy: a running backtest is dropped without a trace (its late end must not show "Abgebrochen" on the new one). */
+function dropBacktest(): void {
+  btCtl?.abort();
+  btCtl = null;
+}
+
 const isFresh = (s: Pick<StudioState, "editor" | "parsed">): s is { editor: Editor; parsed: StrategyParse } => s.parsed != null && s.parsed.text === s.editor.text;
 
 export const triedKey = (config: CustomConfig, symbol: string, period: StudioPeriod): string => `${customKey(config)}|${symbol}|${period}`;
@@ -255,10 +261,12 @@ export const useStudio = create<StudioState>()((set, get) => {
     async open(id) {
       await flush();
       const prev = get().editor.id;
+      // the strategy that is already open keeps its reading and its result
+      if (prev === id) return;
       const target = strategiesNow().find((s) => s.id === id);
       if (!target) return;
       if (prev !== id) await dropEmpty(prev);
-      btCtl?.abort();
+      dropBacktest();
       loadEditor(target);
       // as long as nothing is picked for a comparison, its market and period follow the strategy being worked on
       if (get().selected.length === 0) set({ cmpSetup: { symbol: target.symbol, period: target.period } });
@@ -268,7 +276,7 @@ export const useStudio = create<StudioState>()((set, get) => {
       await flush();
       const prev = get().editor.id;
       await dropEmpty(prev);
-      btCtl?.abort();
+      dropBacktest();
       set({ editor: EMPTY_EDITOR, parsed: null, override: null, ai: { busy: false, message: null }, saveError: null, bt: IDLE_BT, proposal: null });
     },
 
@@ -279,7 +287,7 @@ export const useStudio = create<StudioState>()((set, get) => {
           timer = null;
         }
         await queue;
-        btCtl?.abort();
+        dropBacktest();
         set({ editor: EMPTY_EDITOR, parsed: null, override: null, bt: IDLE_BT, proposal: null });
       }
       const ok = await removeStrategy(id);
