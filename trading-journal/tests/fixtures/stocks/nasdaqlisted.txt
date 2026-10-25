@@ -1,0 +1,20 @@
+Symbol|Security Name|Market Category|Test Issue|Financial Status|Round Lot Size|ETF|NextShares
+AAAP|Pacer Barings CLO Market Flex ETF|G|N|N|100|Y|N
+AACG|ATA Creativity Global - American Depositary Shares, each representing two common shares|S|N|D|100|N|N
+AACI|Armada Acquisition Corp. III - Class A Ordinary Share|G|N|N|100|N|N
+AAPL|Apple Inc. - Common Stock|Q|N|N|40|N|N
+BFRG|Bullfrog AI Holdings, Inc. - Common Stock|S|N|D|100|N|N
+BFRGW|Bullfrog AI Holdings, Inc. - Warrants|S|N|N|100|N|N
+BRKH|Burtech Acquisition Corp II - Class A Ordinary Shares|S|N|N|100|N|N
+BRKHU|Burtech Acquisition Corp II - Units|S|N|N|100|N|N
+BRKR|Bruker Corporation - Common Stock|Q|N|N|100|N|N
+BRKRP|Bruker Corporation - 6.375% Mandatory Convertible Preferred Stock, Series A|Q|N|N|40|N|N
+GOOG|Alphabet Inc. - Class C Capital Stock|Q|N|N|40|N|N
+GOOGL|Alphabet Inc. - Class A Common Stock|Q|N|N|40|N|N
+GOOGM|Alphabet Inc. - Depositary Shares representing a 1/20th Interest in a Share of Series A Mandatory Convertible Preferred Stock|Q|N|N|100|N|N
+PLUG|Plug Power, Inc. - Common Stock|S|N|N|100|N|N
+RIVN|Rivian Automotive, Inc. - Class A Common Stock|Q|N|N|100|N|N
+TSLA|Tesla, Inc.  - Common Stock|Q|N|N|40|N|N
+ZVZZT|NASDAQ TEST STOCK|G|Y|N|100|N|N
+ZYME|Zymeworks Inc. - Common Stock|Q|N|N|100|N|N
+File Creation Time: 1023202621:31|||||||
