@@ -130,9 +130,26 @@ test.describe("Preis- & RSI-Struktur", () => {
     const card = page.getByTestId("markt-trend");
     await card.scrollIntoViewIfNeeded();
     await expect(card.locator('[data-testid="trend-row"][data-tf="4h"]')).toHaveAttribute("data-status", "ok", { timeout: 30_000 });
-    const priceLines = await card
-      .locator('[data-testid="trend-row"]')
-      .evaluateAll((rows) => rows.filter((r) => ["4h", "1D", "1W"].includes(r.getAttribute("data-tf") ?? "")).reduce((n, r) => n + r.querySelectorAll('[data-testid="trend-line"][data-series="price"]').length, 0));
+    // the rows of 1D and 1W analyse a moment after the 4h row (their candles load on their own): the lines of the card and of the
+    // chart are compared once both have stopped changing – a count taken while a row still loads is smaller than the chart's
+    const counts = async (): Promise<{ card: number; chart: number }> => ({
+      card: await card
+        .locator('[data-testid="trend-row"]')
+        .evaluateAll((rows) => rows.filter((r) => ["4h", "1D", "1W"].includes(r.getAttribute("data-tf") ?? "")).reduce((n, r) => n + r.querySelectorAll('[data-testid="trend-line"][data-series="price"]').length, 0)),
+      chart: Number((await wrap.getAttribute("data-trendlines")) ?? "-1"),
+    });
+    await expect
+      .poll(
+        async () => {
+          const a = await counts();
+          await page.waitForTimeout(1200);
+          const b = await counts();
+          return a.card === a.chart && b.card === a.card && b.chart === a.chart;
+        },
+        { timeout: 40_000, intervals: [500] },
+      )
+      .toBe(true);
+    const priceLines = (await counts()).card;
     await chart.scrollIntoViewIfNeeded();
     if (priceLines === 0) {
       // an honest empty picture: no line in the data, no line in the chart
