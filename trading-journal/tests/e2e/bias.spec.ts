@@ -148,7 +148,7 @@ test.describe("Long/Short-Tendenz", () => {
       // the taller strip still clears the KPI tiles under it and the hero's right column
       const hero = page.locator("section[aria-labelledby=hero-net-label]");
       const sb = await strip.boundingBox();
-      const tiles = await hero.locator("dl").first().boundingBox();
+      const tiles = await hero.getByTestId("hero-kpis").boundingBox();
       expect(sb && tiles).toBeTruthy();
       expect(sb!.y + sb!.height, "strip above the KPI tiles").toBeLessThanOrEqual(tiles!.y + 0.5);
       for (const part of ["bias-strip-label", "bias-strip-text"]) {

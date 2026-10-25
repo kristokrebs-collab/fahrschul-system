@@ -2,10 +2,11 @@
  * Selbstprüfung der ganzen App (mobil 390 + Desktop): was der Nutzer verlangt hat, als Messung auf jeder Seite –
  *  - der ruhige Satz „Keine professionelle Finanzberatung.“ steht auf jeder Seite, die analysiert, simuliert oder
  *    vorschlägt, einmal am Seitenende (und als Dauerzeile unter dem Eingabefeld des Assistenten), und NIE auf der
- *    Startseite oder dem Cockpit; die Kleinschrift der Startseite behält ihren Wert, außerhalb ist sie lesbar;
+ *    Startseite oder dem Cockpit; die Kleinschrift ist überall lesbar (die Startseite mit der kleinsten Anhebung);
  *  - Quelle und Stand stehen bei den Marktzahlen (Markt, Korrelation, Benchmark), und was fehlt, heißt „keine Daten“;
  *  - kein seitliches Scrollen, axe (WCAG 2.1 A + AA, Kontrast eingeschlossen) in beiden Themen, Touch-Ziele ≥ 44 px bei
- *    grobem Zeiger – jeweils auf dem Inhalt der Seite (die Startseite und das Cockpit bleiben, wie sie sind).
+ *    grobem Zeiger – jeweils auf dem Inhalt der Seite UND, seit Runde 5, auf der Startseite, dem Cockpit, der Kopf-
+ *    und der Fußzeile (nur Barrierefreiheits-Korrekturen, das Aussehen bleibt).
  * Keine Uhr-Sprünge, nichts, das an der Zeit der Markt-Mocks hängt.
  */
 import AxeBuilder from "@axe-core/playwright";
@@ -21,8 +22,10 @@ const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const NOTE_PAGES = ["markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "setups"] as const;
 /** The start page and its family: never. */
 const NO_NOTE_PAGES = ["overview", "cockpit"] as const;
-/** Every other page the self check walks (the start page and the cockpit stay as they are). */
-const AUDIT_PAGES = [...NOTE_PAGES, "trades", "settings", "funktionen", "konto", "preise", "community"] as const;
+/** Every page the self check walks – the start page and the cockpit included since round 5. */
+const AUDIT_PAGES = [...NOTE_PAGES, "trades", "settings", "funktionen", "konto", "preise", "community", "overview", "cockpit"] as const;
+/** The chrome around every page: scanned together with the page (it carried the header's 3,1 : 1 and 3,9 : 1 before round 5). */
+const CHROME = ["header", "footer"] as const;
 
 const layer = (page: Page, key: string) => page.locator(`[data-page="${key}"][data-page-role="current"]`);
 
@@ -75,7 +78,7 @@ test.describe("Selbstprüfung", () => {
   }
 
   for (const key of NO_NOTE_PAGES) {
-    test(`kein Hinweis auf ${key} (die Startseite bleibt, wie sie ist)`, async ({ page }) => {
+    test(`kein Hinweis auf ${key} (Analyse-Hinweise gehören nicht auf die Startseite)`, async ({ page }) => {
       await seed(page);
       await page.goto(`/#${key}`);
       await ready(page, key);
@@ -84,22 +87,29 @@ test.describe("Selbstprüfung", () => {
     });
   }
 
-  test("Kleinschrift: auf der Startseite wie bisher (#5f5f5f), auf den anderen Seiten lesbar (#8c8c8c)", async ({ page }) => {
+  test("Kleinschrift (dunkel): Startseite und Cockpit mit der kleinsten Anhebung (#868686), die anderen Seiten lesbar (#8c8c8c)", async ({ page }) => {
     await openUx(page, "app", "overview", { theme: "dark" });
     const faint = (key: string) => layer(page, key).evaluate((el) => getComputedStyle(el).getPropertyValue("--color-faint").trim().toLowerCase());
-    expect(await faint("overview")).toBe("#5f5f5f");
+    expect(await faint("overview")).toBe("#868686");
+    // the chrome around the page follows (header, footer)
+    expect(await page.locator("header").first().evaluate((el) => getComputedStyle(el).getPropertyValue("--color-faint").trim().toLowerCase())).toBe("#868686");
     await page.goto("/#markt");
     await ready(page, "markt");
     expect(await faint("markt")).toBe("#8c8c8c");
     await page.goto("/#cockpit");
     await expect(layer(page, "cockpit").locator("h1").first()).toBeAttached({ timeout: 30_000 });
-    expect(await faint("cockpit")).toBe("#5f5f5f");
+    expect(await faint("cockpit")).toBe("#868686");
   });
 
-  test("Kleinschrift im hellen Thema: der eigene Wert bleibt auf jeder Seite (#6b6b6b)", async ({ page }) => {
+  test("Kleinschrift im hellen Thema: #6b6b6b auf den Seiten, #686868 auf Startseite, Cockpit und Kopfzeile (4,46 : 1 auf deren Grund)", async ({ page }) => {
     await openUx(page, "app", "markt", { theme: "light" });
     await ready(page, "markt");
-    expect(await layer(page, "markt").evaluate((el) => getComputedStyle(el).getPropertyValue("--color-faint").trim().toLowerCase())).toBe("#6b6b6b");
+    const faint = (sel: string) => page.locator(sel).first().evaluate((el) => getComputedStyle(el).getPropertyValue("--color-faint").trim().toLowerCase());
+    expect(await faint('[data-page="markt"][data-page-role="current"]')).toBe("#6b6b6b");
+    expect(await faint("header")).toBe("#686868");
+    await page.goto("/#overview");
+    await ready(page, "overview");
+    expect(await faint('[data-page="overview"][data-page-role="current"]')).toBe("#686868");
   });
 
   test("der Assistent trägt den Satz als Dauerzeile unter dem Eingabefeld, nicht in jeder Antwort", async ({ page }) => {
@@ -161,22 +171,25 @@ test.describe("Selbstprüfung", () => {
         await page.waitForTimeout(1200);
         await mountEverything(page);
         await page.waitForTimeout(800);
-        const res = await new AxeBuilder({ page }).include(`[data-page="${key}"][data-page-role="current"]`).withTags(TAGS).analyze();
+        let builder = new AxeBuilder({ page }).include(`[data-page="${key}"][data-page-role="current"]`);
+        for (const chrome of CHROME) builder = builder.include(chrome);
+        const res = await builder.withTags(TAGS).analyze();
         const lines = res.violations.map((v) => `${v.id} (${v.impact}): ${v.help} → ${v.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`);
         expect(lines, `${key} ${theme}: axe`).toEqual([]);
       });
     }
   }
 
-  test("Touch-Ziele ≥ 44 px bei grobem Zeiger auf den Seiten mit Auswertungen", async ({ page }, info) => {
+  test("Touch-Ziele ≥ 44 px bei grobem Zeiger auf den Seiten mit Auswertungen, Startseite und Cockpit eingeschlossen", async ({ page }, info) => {
     test.skip(!hasTouch(info), "touch projects");
     test.setTimeout(240_000);
     await seed(page);
-    // dense heat-map cells (15–22 px, one grid, the grid takes the nearest hit), the horizontally scrolling
-    // „Inhalt“ strip (chips beyond the edge) and file inputs that only a button opens are not tap targets of their own
-    const exempt = (m: { name: string; where: string; w: number }) => m.where === "heat-cell" || m.where === "section-nav" || m.w <= 1;
+    // dense heat-map cells (14–21 px) are no exemption here: their grid carries `data-hit-grid` and the audit measures that the grid
+    // takes every probe (`hitbox.ts`; the snap itself is `heat-grid.spec.ts`). Exempt: the horizontally scrolling „Inhalt“ strip (chips
+    // beyond the edge) and file inputs that only a button opens – they are not tap targets of their own
+    const exempt = (m: { name: string; where: string; w: number }) => m.where === "section-nav" || m.w <= 1;
     const problems: string[] = [];
-    for (const key of ["markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "funktionen", "setups"] as const) {
+    for (const key of ["overview", "cockpit", "markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "funktionen", "setups"] as const) {
       await page.goto(`/#${key}`);
       await ready(page, key);
       await page.waitForTimeout(900);

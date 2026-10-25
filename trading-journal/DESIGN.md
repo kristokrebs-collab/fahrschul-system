@@ -652,3 +652,16 @@ Drei kleine Bausteine, keine neue Sprache; Bewegung: keine.
 - **Kleinschrift**: `--color-faint` ist im dunklen Thema #5f5f5f (≈ 3 : 1) – die Startseite behält ihn Pixel für Pixel. In allen anderen Seiten (`[data-page]` außer `overview` und `cockpit`) und in Sheets
   (`[role="dialog"]`) gilt dort #8c8c8c (≥ 4,5 : 1 auf ink-950 … ink-700), `src/styles/themes.css`. Hell braucht nichts (#6b6b6b). Touch: dichte Chip-Reihen und Export-Knöpfe werden bei grobem Zeiger
   44 px hoch (`pointer-coarse:min-h-11`), unsichtbare Trefferflächen kommen über `touch-hit`.
+
+### Barrierefreiheit der Startseite (Runde 5)
+
+Auf ausdrückliche Erlaubnis des Nutzers, ohne das Aussehen zu ändern – Layout, Texte, Reihenfolge, Animationen, Dock und Kopfzeilen-Layout bleiben.
+
+- **Kleinschrift** `--color-faint`: auf Startseite, Cockpit, Kopf- und Fußzeile dunkel `#868686` (kleinste Anhebung, die auf den dort gemessenen Flächen AA erreicht), hell `#686868`; auf allen anderen
+  Seiten `#8c8c8c` / `#6b6b6b`. Linien, Punkte und Striche in „faint“ nehmen `--color-faint-line` (`bg-faint-line`, unverändert `#5f5f5f` / `#6b6b6b`): nur Text wird angehoben.
+- **Plaketten** (hell): Text in Gewinn-, Verlust- oder Warnfarbe auf der eigenen Tönung (`bg-win/12 text-win` …, Statuspille) holt sich ≈ 6 % dunklere Töne (`--tint-ink-*`, `themes.css`); die dunklen
+  Inseln (Hero, Navigation, `data-theme-scope="dark"`) behalten ihre Werte.
+- **Dichte Raster** (Disziplin-Kalender, Wochentag × Uhrzeit): kein 44-px-Ziel je Zelle möglich – das Raster ist das Ziel: `data-hit-grid="<Fangradius px>"` am Raster, unsichtbarer Rand
+  (`pointer-coarse:before:-inset-3` / `-inset-4`, hinter den Zellen), ein Tipp wählt die nächste Zelle; Raster-Abstand ≥ 24 px, wo die Breite es erlaubt.
+- **Kennzahlenkacheln**: `role="list"` aus sieben Knöpfen (`role="listitem"`), kein `dl` um Knöpfe. **Seitenwechsel**: `overflow-x: clip` um Kopf und Seite – ein ein- oder auslaufendes Blatt macht das
+  Dokument nie breiter als den Bildschirm.

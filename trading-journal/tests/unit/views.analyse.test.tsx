@@ -70,6 +70,50 @@ describe("AnalyseView", () => {
     for (const k of HERO_TILES) expect(within(hero).getByTestId(`ana-tile-${k}`)).toBeInTheDocument();
   });
 
+  it("weekday × time heat map: the grid is the touch target – a click on a gap or the halo picks the nearest cell (round 5)", async () => {
+    await loadFixture();
+    renderView();
+    const card = screen.getByTestId("ana-heat");
+    const host = card.querySelector<HTMLElement>('[data-fx="heat-grid"]')!;
+    expect(host.dataset.hitGrid).toBe("24");
+    const cells = within(card).getAllByTestId("heat-cell");
+    expect(cells).toHaveLength(84);
+    // jsdom has no layout: 21 px cells on a 24 px pitch, 12 columns, origin (100, 50)
+    const rect = (i: number) => ({ left: 100 + (i % 12) * 24, top: 50 + Math.floor(i / 12) * 24, width: 21, height: 21 });
+    const proto = Element.prototype;
+    const real = proto.getBoundingClientRect;
+    proto.getBoundingClientRect = function (this: Element) {
+      const i = (this as HTMLElement).dataset?.cell;
+      if (i == null) return real.call(this);
+      const r = rect(Number(i));
+      return { ...r, right: r.left + r.width, bottom: r.top + r.height, x: r.left, y: r.top, toJSON: () => ({}) } as DOMRect;
+    };
+    try {
+      const tap = async (x: number, y: number) => {
+        await act(async () => {
+          fireEvent.click(host, { clientX: x, clientY: y });
+        });
+      };
+      // 0,8 px right of cell 30's right edge (the gap): cell 30 is nearer than cell 31
+      await tap(rect(30).left + 21 + 0.8, rect(30).top + 10.5);
+      expect(cells[30]).toHaveAttribute("aria-pressed", "true");
+      // 6 px above the first row at column 6 (the halo): cell 6
+      await tap(rect(6).left + 10.5, rect(6).top - 6);
+      expect(cells[6]).toHaveAttribute("aria-pressed", "true");
+      // far outside the snap radius: nothing changes
+      await tap(rect(6).left + 10.5, rect(6).top - 60);
+      expect(cells[6]).toHaveAttribute("aria-pressed", "true");
+      // a click that ends on a cell's own button is that cell's business, not the grid's
+      await act(async () => {
+        fireEvent.click(cells[40]!, { clientX: rect(31).left, clientY: rect(31).top });
+      });
+      expect(cells[40]).toHaveAttribute("aria-pressed", "true");
+      expect(cells[31]).toHaveAttribute("aria-pressed", "false");
+    } finally {
+      proto.getBoundingClientRect = real;
+    }
+  });
+
   it("a ratio tile opens its explainer with sample, interval and verdict", async () => {
     await loadFixture();
     renderView();

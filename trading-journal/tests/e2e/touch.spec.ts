@@ -152,11 +152,11 @@ test("dock: tapping the active tab again scrolls back to the top", async ({ page
 
 test.describe("touch targets ≥ 44 px", () => {
   /**
-   * Exempt by design: the Disziplin heat-map days (15–22 px `role=option` cells of ONE listbox; the grid's click handler
-   * takes an exact hit or the nearest traded day within 24 px – tested below), see src/views/insights/README.md.
+   * No exemption for the heat maps any more (round 5): the Disziplin calendar and the weekday × time map are dense grids – their
+   * host carries `data-hit-grid` and `hitbox.ts` measures that the grid takes every probe around a cell; the snap to the nearest
+   * cell is tested with real taps below and in `heat-grid.spec.ts`.
    */
   const exempt = (m: HitBoxMiss) =>
-    /^div#heat-\d{4}-\d{2}-\d{2}/.test(m.name) ||
     // the "Inhalt" strip scrolls sideways: its chips beyond the edge sit under the strip's fade, a tap scrolls them in first
     m.where === "section-nav" ||
     // a file input that only its button opens (1 px, screen-reader-only) is not a tap target of its own
@@ -173,7 +173,7 @@ test.describe("touch targets ≥ 44 px", () => {
     await page.waitForTimeout(400);
   }
 
-  for (const p of ["overview", "trades", "setups", "settings"] as const) {
+  for (const p of ["overview", "cockpit", "trades", "setups", "settings"] as const) {
     test(`page ${p}`, async ({ page }, info) => {
       test.skip(!isTouchTablet(info), "touch tablets (the user's Galaxy Tab and 1280×800)");
       test.setTimeout(120_000);
@@ -276,7 +276,7 @@ test.describe("touch review fixes", () => {
     await seed(page);
     await page.goto("/#overview");
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
-    const tile = page.locator('dl [aria-haspopup="dialog"]').nth(1);
+    const tile = page.locator('[data-testid="hero-kpis"] [aria-haspopup="dialog"]').nth(1);
     await tile.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
     await page.waitForTimeout(700);
     if (hasTouch(info)) await tile.tap();
@@ -326,7 +326,7 @@ test.describe("touch review fixes", () => {
     await seed(page);
     await page.goto("/#overview");
     await expect(page.getByText("Netto-P&L").first()).toBeVisible();
-    const tile = page.locator('dl [aria-haspopup="dialog"]').nth(1);
+    const tile = page.locator('[data-testid="hero-kpis"] [aria-haspopup="dialog"]').nth(1);
     await tile.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
     await page.waitForTimeout(600);
     await tile.tap();
@@ -336,7 +336,7 @@ test.describe("touch review fixes", () => {
     await dialog.getByRole("button", { name: "Schließen" }).tap();
     await expect(dialog).toHaveCount(0, { timeout: 4000 });
     await page.waitForTimeout(1200);
-    await expect(page.locator("dl p")).toHaveCount(0);
+    await expect(page.locator('[data-testid="hero-kpis"] p')).toHaveCount(0);
   });
 
   test("phone: a tap just below the range pills never collapses the chart", async ({ page }, info) => {

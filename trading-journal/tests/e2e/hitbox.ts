@@ -6,6 +6,12 @@
  * neighbour whose own area covers the point counts against the element. A point outside the viewport counts as a
  * hit (screen edge). The element is scrolled to the middle of its scroll container(s) first (sticky header, dock and
  * sheet footer out of the way).
+ *
+ * Dense grids (`data-hit-grid="<snap px>"` on the grid host: the weekday × time heat map, the Disziplin calendar):
+ * 44 px per cell cannot exist next to a neighbour 17–24 px away, so the GRID is the target. A cell passes when every
+ * probe lands inside its own grid (cell, gap or the invisible halo around the grid), and the host declares a snap
+ * radius of at least the probe radius – the grid's click handler then picks the nearest cell, which the specs
+ * `heat-grid.spec.ts` (tap in a gap, tap in the halo) check with real taps. Nothing else is exempt.
  */
 export interface HitBoxMiss {
   name: string;
@@ -57,6 +63,9 @@ export async function auditHitBoxes({ selector, root, min = 44 }: { selector: st
     const hit = document.elementFromPoint(x, y);
     if (!hit) return [true, null];
     if (hit === el || el.contains(hit)) return [true, hit];
+    // dense grid: the grid takes every tap within its cells, gaps and halo (and snaps it to the nearest cell)
+    const grid = el.closest<HTMLElement>("[data-hit-grid]");
+    if (grid && Number(grid.dataset.hitGrid) >= R && (hit === grid || grid.contains(hit))) return [true, hit];
     const lab = hit.closest("label");
     if (lab && (lab as HTMLLabelElement).control === el) return [true, hit];
     return [false, hit];
