@@ -167,9 +167,6 @@ describe("ReportReadyHost", () => {
     reduceMotion();
   });
   beforeEach(async () => {
-    // a report counts as "just ended" only for a few days after its end: pin the calendar (a Wednesday, two days after a
-    // week ended), or the test fails on the days of the week when none has just ended; only `Date` is faked
-    vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 9, 21, 12, 0, 0) });
     await bootFixtureJournal();
     useBerichteUi.getState().reset();
     localStorage.removeItem(READY_KEY);
@@ -177,9 +174,6 @@ describe("ReportReadyHost", () => {
     // pinned to a Wednesday, so the tests do not depend on the weekday they run on (only `Date` is faked, timers stay real)
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-21T10:30:00Z"));
-  });
-  afterEach(() => {
-    vi.useRealTimers();
   });
   afterEach(() => {
     vi.useRealTimers();
