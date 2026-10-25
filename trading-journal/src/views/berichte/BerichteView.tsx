@@ -26,6 +26,7 @@ import { Segmented } from "@/primitives/Segmented";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
 import { useUi, type AccFilter } from "@/store/uiStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { SEG_TOUCH } from "@/views/insights/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ArchiveCard } from "./ArchiveCard";
@@ -156,7 +157,7 @@ export function BerichteView({ className }: { className?: string }) {
               aria-pressed={focus === f}
               onClick={() => setFocus(f)}
               data-testid="report-focus"
-              className={cn("touch-hit min-h-8 rounded-full border px-3 py-1 text-[12px] transition-colors", focus === f ? "border-line-2 bg-ink-750 text-fg" : "border-line-2 text-mute hover:border-steel/40 hover:text-fg")}
+              className={cn("touch-hit min-h-8 rounded-full border px-3 py-1 text-[12px] transition-colors pointer-coarse:min-h-11", focus === f ? "border-line-2 bg-ink-750 text-fg" : "border-line-2 text-mute hover:border-steel/40 hover:text-fg")}
             >
               {FOCUS_LABEL[f]}
             </button>
@@ -235,6 +236,7 @@ export function BerichteView({ className }: { className?: string }) {
           <MonthBenefitCard page={page} />
         </Cell>
       )}
+      <AnalysisNote className="lg:col-span-12" lead="Berechnet aus deinem Journal – eine Rückschau, keine Prognose." />
     </div>
   );
 }

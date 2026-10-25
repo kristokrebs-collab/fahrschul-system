@@ -19,7 +19,7 @@ function OrbitTrait({ t }: { t: ProfileTrait }) {
   return (
     <div className="grid size-full content-between bg-[linear-gradient(160deg,var(--color-ink-750),var(--color-ink-900))] p-[1.3cqw]">
       {/* never below the 9.5-px floor (DESIGN.md); the ring's depth scale shrinks the back cards on top of it (P1-09) */}
-      <span className="truncate font-mono text-[max(9.5px,1.25cqw)] uppercase tracking-[0.06em] text-mute">{t.label}</span>
+      <span className="truncate font-mono text-[max(9px,1.1cqw)] uppercase tracking-[0.06em] text-mute">{t.label}</span>
       <span className={cn("line-clamp-2 text-[max(10px,2.1cqw)] font-semibold leading-tight", TONE_TEXT[t.tone])}>{t.value}</span>
       <span className="line-clamp-2 text-[max(10px,1.05cqw)] leading-tight text-faint">{t.detail}</span>
     </div>

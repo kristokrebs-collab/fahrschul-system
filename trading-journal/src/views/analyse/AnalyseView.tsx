@@ -24,6 +24,7 @@ import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { storageKey } from "@/store/storage";
 import { useUi, type AccFilter } from "@/store/uiStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { BenchmarkCard } from "./BenchmarkCard";
 import { BreakdownCard } from "./BreakdownCard";
@@ -177,6 +178,7 @@ export function AnalyseView({ className }: { className?: string }) {
           </section>
         </>
       )}
+      <AnalysisNote className="lg:col-span-12" lead="Auswertung deiner Trades – die Zukunftsrechnungen sind Wahrscheinlichkeiten, keine Zusagen." />
     </div>
   );
 }

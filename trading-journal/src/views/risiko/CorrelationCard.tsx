@@ -11,10 +11,12 @@ import { retryDaily, type MultiDailyView } from "@/market/multiDaily";
 import { DotMatrixText, HeatGridReveal, heatColor } from "@/motion/fx";
 import { Button } from "@/primitives/Button";
 import { EmptyState } from "@/primitives/EmptyState";
+import { SourceStand } from "@/ui/SourceStand";
 import { RISIKO } from "./strings";
 import { RiskCard } from "./ui";
 
 const S = RISIKO.corr;
+const DAY_MS = 86_400_000;
 const short = (s: string) => s.replace(/(USDT|USDC|BUSD)$/, "");
 const rhoText = (r: number) => r.toFixed(2).replace(".", ",").replace("-", "−");
 
@@ -40,6 +42,15 @@ export function CorrelationCard({ symbols, view, cm, clusters }: { symbols: read
     return best;
   }, [cm, k]);
   const loading = view.state === "loading" || view.pending.length > 0;
+  /** open time of the newest closed UTC day over all pairs read */
+  const newestDay = useMemo(() => {
+    let t: number | null = null;
+    for (const rows of Object.values(view.series)) {
+      const last = rows[rows.length - 1];
+      if (last && (t == null || last.t > t)) t = last.t;
+    }
+    return t;
+  }, [view.series]);
   const summary = useMemo(() => {
     const pairs: string[] = [];
     for (let i = 0; i < k; i++) for (let j = i + 1; j < k; j++) if (cm.rho[i]![j] != null) pairs.push(`${short(cm.symbols[i]!)}·${short(cm.symbols[j]!)} ${rhoText(cm.rho[i]![j]!)}`);
@@ -125,6 +136,8 @@ export function CorrelationCard({ symbols, view, cm, clusters }: { symbols: read
             {view.detail && !loading && <span className="text-[11px] text-faint">{view.detail}</span>}
           </div>
           <p className="max-w-[46ch] text-[12px] leading-relaxed text-mute">{S.explain}</p>
+          {/* source and the newest closed UTC day behind the matrix (`keine Daten` while nothing was read) */}
+          <SourceStand source={newestDay != null ? `Binance USDⓈ-M, Tageskerzen${view.viaProxy ? " (EU-Proxy)" : ""}` : null} parts={[{ label: "letzter Tagesschluss", at: newestDay != null ? newestDay + DAY_MS : null }]} className="max-w-[46ch]" testId="corr-stand" />
         </div>
       </div>
     </RiskCard>

@@ -64,7 +64,7 @@ export function ArchiveCard({ archive, kind, current, cur, now, className }: { a
         </ul>
       )}
       {archive.length > SHOW && (
-        <button type="button" onClick={() => setAll((v) => !v)} className="touch-hit mt-2 justify-self-start text-[12px] text-mute hover:text-fg" aria-expanded={all}>
+        <button type="button" onClick={() => setAll((v) => !v)} className="touch-hit mt-2 justify-self-start text-[12px] text-mute hover:text-fg pointer-coarse:min-h-11" aria-expanded={all}>
           {all ? "Weniger anzeigen" : `Alle anzeigen (${archive.length})`}
         </button>
       )}

@@ -26,6 +26,7 @@ import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { storageKey } from "@/store/storage";
 import { useUi, type AccFilter } from "@/store/uiStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { SEG_TOUCH } from "@/views/insights/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { ChatCard } from "./ChatCard";
@@ -125,6 +126,7 @@ export function CoachView({ className }: { className?: string }) {
       <Cell index={1} span="lg:col-span-5">
         <DataQualityCard now={now} />
       </Cell>
+      <AnalysisNote className="lg:col-span-12" lead="Hinweise aus deinen Trades und Einträgen – Beobachtungen, keine Prognose." />
     </div>
   );
 }

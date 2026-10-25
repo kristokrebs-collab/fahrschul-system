@@ -28,7 +28,7 @@ export function Chip({ on, onClick, children, testId }: { on: boolean; onClick: 
       aria-pressed={on}
       onClick={onClick}
       data-testid={testId}
-      className={cn("touch-hit inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-colors", on ? "border-fg/40 bg-white/[0.08] text-fg" : "border-line-2 text-mute hover:text-fg")}
+      className={cn("touch-hit inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] transition-colors pointer-coarse:min-h-11", on ? "border-fg/40 bg-white/[0.08] text-fg" : "border-line-2 text-mute hover:text-fg")}
     >
       {children}
     </button>

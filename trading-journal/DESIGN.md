@@ -638,3 +638,17 @@ kommt in drei Handgriffen hin: suchen, Kachel wählen, Zeile antippen.
 - **Kontrast**: lesbarer Text ist `text-fg` oder `text-mute` (≥ 4,5 : 1, hell und dunkel, axe-geprüft); `text-faint` bleibt Dekor. **Fokus**: der globale Ring (`:focus-visible`), nie
   entfernt. **Landmarken**: `role="search"` um das Feld, `nav "Inhalt dieser Seite"`, `section` + `aria-labelledby` je Liste, `aria-current="location"` im Streifen, `aria-expanded` an den
   Details, `role="status"` für die Trefferzahl. **Zurück-Taste**: die offene Gruppe ist ein History-Eintrag (`openBackEntry`).
+
+### Selbstprüfung: der ruhige Hinweis, Quelle und Stand, lesbare Kleinschrift
+
+Drei kleine Bausteine, keine neue Sprache; Bewegung: keine.
+
+- **Hinweis** (`src/ui/AnalysisNote.tsx`): ein einziger Absatz `text-[12px] text-mute`, ohne Rahmen, ohne Symbol, am **Ende** der Seite (letztes Rasterkind, `lg:col-span-12`, höchstens 72 Zeichen
+  breit) – „Auswertung deiner Daten und historischer Kurse – keine Prognose. Keine professionelle Finanzberatung.“ Wo der erste Satz nicht stimmt (Risiko, Berichte, Wachstum, Labor …), setzt die Seite
+  ihren eigenen (`lead`); der zweite Satz ist immer derselbe. Im Assistenten steht die Dauerzeile (`variant="assistant"`) im klebenden Block **unter dem Eingabefeld**, nie in einer Antwortblase. Nie auf der
+  Startseite, dem Cockpit oder den Seiten ohne Auswertung (Konto, Preise, Community, Einstellungen, Funktionen).
+- **Quelle und Stand** (`src/ui/SourceStand.tsx`): eine Zeile `text-[12px] text-mute`, Ziffern tabellarisch – „Quelle: Binance USDⓈ-M · Abruf 25.10. 01:35 · letzter Schluss 4h 24.10. 23:59“. Sie steht
+  unter dem Kopf der Seite (Markt) oder am Ende der Karte, die Marktzahlen zeigt (Labor-Lauf, Korrelation, Benchmark). Was fehlt, heißt „keine Daten“ – nie eine Schätzung, nie ein leerer Platz.
+- **Kleinschrift**: `--color-faint` ist im dunklen Thema #5f5f5f (≈ 3 : 1) – die Startseite behält ihn Pixel für Pixel. In allen anderen Seiten (`[data-page]` außer `overview` und `cockpit`) und in Sheets
+  (`[role="dialog"]`) gilt dort #8c8c8c (≥ 4,5 : 1 auf ink-950 … ink-700), `src/styles/themes.css`. Hell braucht nichts (#6b6b6b). Touch: dichte Chip-Reihen und Export-Knöpfe werden bei grobem Zeiger
+  44 px hoch (`pointer-coarse:min-h-11`), unsichtbare Trefferflächen kommen über `touch-hit`.

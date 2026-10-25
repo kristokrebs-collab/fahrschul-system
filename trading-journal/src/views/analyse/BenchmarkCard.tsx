@@ -12,6 +12,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { adaptiveBenchmark, ANA_EMPTY, benchmark, CARD_TITLES, explainBenchmark, type BenchmarkReport } from "@/domain/analytics";
 import type { AccountView } from "@/domain/account";
 import { useFeedSelect, useProvider, type Candle, type Stamped } from "@/market";
+import type { Source } from "@/market/types";
 import { cn } from "@/lib/cn";
 import { date as fmtDate, n2, pct, pct0 } from "@/lib/format";
 import { pointAt, type EquityPoint } from "@/motion/fx/EquityDraw";
@@ -20,6 +21,7 @@ import { useReducedFx } from "@/motion/useReducedFx";
 import { isSafeFx } from "@/motion/safeFx";
 import { EMPTY_LINE_CLOSED, EmptyState } from "@/primitives/EmptyState";
 import { useSeenOnce } from "@/primitives/revealValue";
+import { SOURCE_LABEL, SourceStand } from "@/ui/SourceStand";
 import { memoClosed } from "./hooks";
 import { AnaCard, Stat } from "./ui";
 
@@ -28,6 +30,10 @@ const PAD = 8;
 const RACE_S = tween.draw.duration * 1.6;
 const EMPTY: Candle[] = [];
 const selectDaily = (v: Stamped<Candle[]> | undefined): Candle[] => v?.data ?? EMPTY;
+/** who served the daily candles and when (to the minute: the card re-renders once a minute, not with every tick) */
+type Stamp = { source: Source; at: number } | null;
+const selectStamp = (v: Stamped<Candle[]> | undefined): Stamp => (v ? { source: v.source, at: Math.floor(v.receivedAt / 60_000) * 60_000 } : null);
+const sameStamp = (a: Stamp, b: Stamp): boolean => a === b || (!!a && !!b && a.source === b.source && a.at === b.at);
 
 function Race({ rep, symbol }: { rep: BenchmarkReport; symbol: string }) {
   const reduced = useReducedFx();
@@ -123,6 +129,7 @@ function Race({ rep, symbol }: { rep: BenchmarkReport; symbol: string }) {
 export function BenchmarkCard({ view }: { view: AccountView }) {
   const provider = useProvider();
   const candles = useFeedSelect("kline_1d", selectDaily);
+  const stamp = useFeedSelect("kline_1d", selectStamp, sameStamp);
   const symbol = provider?.symbol ?? "BTCUSDT";
   const daily = useMemo(() => candles.filter((c) => c.closed !== false).map((c) => ({ time: c.time, open: c.open, close: c.close })), [candles]);
   const rep = useMemo(() => (daily.length ? benchmark(view.closed, view.start, daily) : null), [view.closed, view.start, daily]);
@@ -140,6 +147,7 @@ export function BenchmarkCard({ view }: { view: AccountView }) {
               <Stat label="Differenz" value={pct(rep.alpha)} tone={rep.alpha >= 0 ? "text-win" : "text-loss"} sub={rep.alpha >= 0 ? "vor Buy & Hold" : "hinter Buy & Hold"} />
               <Stat label="Korrelation" value={rep.corr == null ? "–" : n2(rep.corr)} sub="Tagesrenditen" />
             </div>
+            <SourceStand source={stamp ? SOURCE_LABEL[stamp.source] : null} parts={[{ label: "Tageskerzen abgerufen", at: stamp?.at ?? null }]} testId="bench-stand" />
           </>
         ) : (
           <EmptyState title={ANA_EMPTY.benchmark.title} text={ANA_EMPTY.benchmark.text} line={false} />

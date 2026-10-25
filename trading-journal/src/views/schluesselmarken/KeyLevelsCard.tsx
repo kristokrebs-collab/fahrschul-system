@@ -107,7 +107,7 @@ const LevelRow = memo(function LevelRow({ entry, onEdit, onCopy, onRemove, onTog
           {label}
           {l.enabled && ev.basis && status !== "invalidated" && <span className="font-normal opacity-80">· {BASIS_LABEL[ev.basis]}</span>}
         </Badge>
-        <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-fg" title={l.name}>
+        <span className="min-w-0 flex-1 text-[13.5px] [overflow-wrap:anywhere] font-medium text-fg" title={l.name}>
           {l.name}
         </span>
         <span className="num font-mono text-[13.5px] text-fg">{fmtPrice(l.price)}</span>

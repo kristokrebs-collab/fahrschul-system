@@ -14,6 +14,7 @@ import { studioCfgOf } from "@/domain/strategytext";
 import { cn } from "@/lib/cn";
 import { useJournal } from "@/store/journalStore";
 import { storageKey } from "@/store/storage";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { Cell, SectionTitle } from "@/views/labor/ui";
 import { BacktestCard } from "./BacktestCard";
@@ -111,6 +112,7 @@ export function StudioView({ className }: { className?: string }) {
           </Cell>
         </Section>
       )}
+      <AnalysisNote className="lg:col-span-12" lead="Ein Backtest zeigt, wie deine Regeln in der Vergangenheit gelaufen wären – keine Prognose." />
     </div>
   );
 }

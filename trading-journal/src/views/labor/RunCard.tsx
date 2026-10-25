@@ -19,6 +19,7 @@ import { TextRoll } from "@/motion/TextRoll";
 import { ease, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Card } from "@/primitives/Card";
+import { SourceStand } from "@/ui/SourceStand";
 import { useLabor } from "./laborStore";
 import { LABOR } from "./strings";
 import { Kpi, moneyText, numText, pctText, pfText, rText } from "./ui";
@@ -54,6 +55,8 @@ export function RunCard({ className }: { className?: string }) {
       </div>
       {result && !busy && <Kpis result={result} runSeq={runSeq} />}
       {result && !busy && <Race result={result} runSeq={runSeq} />}
+      {/* source and period of the candles behind these numbers (a run reads closed Binance USDⓈ-M candles only) */}
+      {result && !busy && <SourceStand source="Binance USDⓈ-M, geschlossene Kerzen" parts={[{ label: "Zeitraum von", at: result.from, long: true }, { label: "bis", at: result.to, long: true }]} className="mt-3" testId="labor-stand" />}
       {status === "error" && result && <p role="alert" className="mt-3 text-[12.5px] text-(--color-danger-text)">{error}</p>}
     </Card>
   );

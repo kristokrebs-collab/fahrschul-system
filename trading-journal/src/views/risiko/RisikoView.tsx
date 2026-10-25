@@ -22,6 +22,7 @@ import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
 import { storageKey } from "@/store/storage";
 import { useUi, type AccFilter } from "@/store/uiStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { SectionTitle } from "@/views/analyse/ui";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { CalculatorCard, useCalcModel } from "./CalculatorCard";
@@ -149,6 +150,7 @@ export function RisikoView({ className }: { className?: string }) {
           <RiskSettingsCard />
         </Cell>
       </Section>
+      <AnalysisNote className="lg:col-span-12" lead="Rechnung nach deinen Eingaben, Limits und den Kursen des Markts – keine Prognose." />
     </div>
   );
 }

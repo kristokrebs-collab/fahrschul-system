@@ -31,16 +31,16 @@ export function ExportCard({ report, focus, className }: { report: Report; focus
     <Card title="Export" note={empty ? "Keine Trades in diesem Zeitraum – nichts zu exportieren." : "Wie auf dem Bildschirm, mit deinem Fokus."} className={className} data-testid="report-export">
       <div className="grid grid-cols-2 gap-2">
         {(["md", "csv", "json"] as const).map((f) => (
-          <Button key={f} size="sm" onClick={() => void save(f)} disabled={empty} data-testid={`report-export-${f}`}>
+          <Button key={f} size="sm" onClick={() => void save(f)} disabled={empty} className="pointer-coarse:min-h-11" data-testid={`report-export-${f}`}>
             {LABEL[f]}
           </Button>
         ))}
         {pdf ? (
-          <Button size="sm" variant="primary" onClick={() => setPrinting(true)} disabled={empty || printing} data-testid="report-export-pdf">
+          <Button size="sm" variant="primary" onClick={() => setPrinting(true)} disabled={empty || printing} className="pointer-coarse:min-h-11" data-testid="report-export-pdf">
             PDF / Drucken
           </Button>
         ) : (
-          <Button size="sm" onClick={() => openUpgrade("reportsPdf")} data-testid="report-export-pdf-locked" aria-label="PDF-Export – im Premium-Plan">
+          <Button size="sm" onClick={() => openUpgrade("reportsPdf")} className="pointer-coarse:min-h-11" data-testid="report-export-pdf-locked" aria-label="PDF-Export – im Premium-Plan">
             PDF · Premium
           </Button>
         )}

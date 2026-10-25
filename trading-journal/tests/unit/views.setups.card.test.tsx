@@ -50,7 +50,7 @@ describe("SetupCard", () => {
     expect(card.style.borderRadius).toBe("16px");
     // morph source: an empty surface carries the layout id; notch frame + disc are present
     expect(card.querySelector('[data-active], .pn-frame')).not.toBeNull();
-    expect(within(card).getByRole("heading", { level: 3 })).toHaveTextContent("Test-Setup");
+    expect(within(card).getByRole("heading", { level: 2 })).toHaveTextContent("Test-Setup");
     expect(within(card).getByText("Makro")).toBeInTheDocument();
     expect(within(card).getByText(NO_RULES_TEXT)).toBeInTheDocument();
     expect(within(card).getByText("Punkt eins")).toBeInTheDocument();

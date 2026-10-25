@@ -210,7 +210,7 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
           >
             <article ref={articleRef} className="relative flex h-full flex-col gap-4 p-5" aria-label={setup.name}>
               <div className="flex items-start justify-between gap-3">
-                <h3 className="flex min-w-0 items-center gap-2.5 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">
+                <h2 className="flex min-w-0 items-center gap-2.5 text-[15px] font-semibold leading-snug [overflow-wrap:anywhere]">
                   <motion.span
                     layoutId={`setup-dot-${setup.id}`}
                     layout="position"
@@ -221,7 +221,7 @@ export function SetupCard({ stats, index, onEdit, onTrades, hidden = false, layo
                   <motion.span layoutId={`setup-name-${setup.id}`} layout="position">
                     {setup.name}
                   </motion.span>
-                </h3>
+                </h2>
                 <Badge tone={badge.tone}>{badge.label}</Badge>
               </div>
 

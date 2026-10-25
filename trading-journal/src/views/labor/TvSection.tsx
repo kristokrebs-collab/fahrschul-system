@@ -212,6 +212,7 @@ export function TvCompareCard({ className }: { className?: string }) {
             type="file"
             accept=".csv,.txt,text/csv,text/plain"
             className="sr-only"
+            aria-label={TV.pick}
             data-testid="labor-tv-file"
             onChange={(e) => {
               void onFile(e.target.files?.[0]);

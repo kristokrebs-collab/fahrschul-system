@@ -18,6 +18,7 @@ import { ScrubTimeline } from "@/motion/pulse/ScrubTimeline";
 import { StaggerItem } from "@/motion/Sheet";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Button, CheckboxRow, Input, Segmented, Skeleton, Textarea } from "@/primitives";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { buildReplay, type ReplayInterval } from "@/views/trades/replay/replayModel";
 import { useCandles } from "@/views/trades/replay/useCandles";
 import { persistReflection, persistRound } from "./actions";
@@ -390,6 +391,10 @@ function Revealed({ round, trade, bars, setup, setups, items, intervalMs, decisi
             {isLast ? TRAIN.finish : TRAIN.next}
           </Button>
         </div>
+      </StaggerItem>
+
+      <StaggerItem>
+        <AnalysisNote lead="Nachrechnung auf vergangenen Kerzen – ein einzelner Fall, keine Prognose." />
       </StaggerItem>
     </div>
   );

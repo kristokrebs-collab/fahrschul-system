@@ -229,7 +229,7 @@ export function SignalInboxCard({ list, now, className }: { list: readonly Enric
       data-open={open}
       innerClassName="grid content-start gap-4"
       action={
-        <Button size="sm" variant="ghost" aria-expanded={open} aria-controls="inbox-body" onClick={toggleOpen} data-testid="inbox-toggle">
+        <Button size="sm" variant="ghost" aria-expanded={open} aria-controls={open && rep.total > 0 ? "inbox-body" : undefined} onClick={toggleOpen} data-testid="inbox-toggle">
           {open ? "Einklappen" : "Aufklappen"}
         </Button>
       }

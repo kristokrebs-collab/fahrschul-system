@@ -173,6 +173,13 @@ describe("ReportReadyHost", () => {
     await bootFixtureJournal();
     useBerichteUi.getState().reset();
     localStorage.removeItem(READY_KEY);
+    // "just ended" reaches back READY_DAYS (6 for a week): on a Sunday no week qualifies and nothing is announced – the date is
+    // pinned to a Wednesday, so the tests do not depend on the weekday they run on (only `Date` is faked, timers stay real)
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-21T10:30:00Z"));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
   afterEach(() => {
     vi.useRealTimers();

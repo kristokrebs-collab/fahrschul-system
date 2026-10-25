@@ -135,3 +135,9 @@ the page navigates, the card scrolls into view and takes focus. Domain: `src/dom
 ## Inhalt-Leiste (Auffindbarkeit)
 
 Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. Die Karten tragen ihre `data-testid` (`markt-best` … `alerts-card`); die Leiste nennt sie in Lesereihenfolge (elf Chips; ein laufender Bias-Test zeigt nur den Chart, dann auch keine Leiste). Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Quelle und Stand (Selbstprüfung)
+
+`MarktStand.tsx` ist die eine Zeile unter dem Meldungsband: welcher Anbieter die Kerzen der Boxen, Schlüsselmarken und RSI-Linien geliefert hat (aus dem Stempel des Feeds,
+`SOURCE_LABEL` in `src/ui/SourceStand.tsx`), wann sie abgerufen wurden (auf die Minute gerundet – die Zeile rendert einmal pro Minute, nicht mit jedem Kerzen-Tick) und der Schluss der
+letzten **geschlossenen** Kerze je Zeiteinheit (4h, 1D, 1W). Fehlt eine Zeit, steht „keine Daten“. Test: `ui.sourceStand.test.tsx`, e2e `selbstpruefung.spec.ts`.

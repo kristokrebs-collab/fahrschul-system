@@ -24,6 +24,7 @@ import { storageKey } from "@/store/storage";
 import { Card } from "@/primitives/Card";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Skeleton } from "@/primitives/Skeleton";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { useMirrorState } from "@/views/biasTest";
 import { BIAS } from "@/views/biasTest/strings";
@@ -34,6 +35,7 @@ import { BoxSettingsCard } from "./BoxSettingsCard";
 import { BoxStateCard } from "./BoxStateCard";
 import { RsiLinesCard } from "./RsiLinesCard";
 import { ScannerCard } from "./ScannerCard";
+import { MarktStand } from "./MarktStand";
 import { MARKT } from "./strings";
 import { TREND } from "./trendStrings";
 
@@ -178,6 +180,7 @@ export function MarktView({ className }: { className?: string }) {
       ) : (
         <AlertBand view={view} className="lg:col-span-12" />
       )}
+      {!focus && <MarktStand view={view} className="lg:col-span-12" />}
       {!focus && (
         <>
           <Cell index={0} span="lg:col-span-7">
@@ -238,6 +241,7 @@ export function MarktView({ className }: { className?: string }) {
           </Cell>
         </>
       )}
+      <AnalysisNote className="lg:col-span-12" />
     </div>
   );
 }

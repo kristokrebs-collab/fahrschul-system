@@ -16,6 +16,7 @@ import { Sheet, StaggerItem } from "@/motion/Sheet";
 import { Switch } from "@/motion/Switch";
 import { Button, EmptyState } from "@/primitives";
 import { useEnriched, useJournal } from "@/store/journalStore";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { CaseView } from "./CaseView";
 import { HistoryCard } from "./HistoryCard";
 import { TRAIN } from "./strings";
@@ -214,6 +215,10 @@ function Home({ setups, usable, allSetups, rounds, setupId, onSetup, blind, onBl
 
       <StaggerItem>
         <HistoryCard rounds={rounds} setups={allSetups} setupId={setupId} />
+      </StaggerItem>
+
+      <StaggerItem>
+        <AnalysisNote lead="Übungsrunden mit vergangenen Kerzen aus deinem Journal – keine Prognose." />
       </StaggerItem>
     </div>
   );
