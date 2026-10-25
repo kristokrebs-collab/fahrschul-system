@@ -1,0 +1,9 @@
+{
+  "_hinweis": "Vorlage für DEINEN Rechner (Claude Code: .mcp.json im Projekt, oder claude_desktop_config.json). Keine Schlüssel eintragen: EXA_API_KEY nur als Umgebungsvariable setzen. Versionen sind festgenagelt (npm, Stand 2026-10-25). In Claude Code jeden Server nach dem Start prüfen und Tools auf 'Needs approval' lassen.",
+  "mcpServers": {
+    "playwright": { "command": "npx", "args": ["-y", "@playwright/mcp@0.0.83"] },
+    "exa": { "command": "npx", "args": ["-y", "exa-mcp-server@3.4.2"], "env": { "EXA_API_KEY": "${EXA_API_KEY}" } },
+    "glance": { "command": "npx", "args": ["-y", "glance-mcp@1.1.0"] },
+    "repomix": { "command": "npx", "args": ["-y", "repomix@1.18.1", "--mcp"] }
+  }
+}

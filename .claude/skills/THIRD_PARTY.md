@@ -27,3 +27,15 @@ Aktualisieren: Repo neu klonen, `diff -r`, ersetzen.
 
 Unverändert kopiert (ohne `tests/`). Vorher gelesen: Python nur Standardbibliothek, Netzwerk nur lesend (Yahoo Chart, Nasdaq Trader, SEC EDGAR, House Clerk), `trader-broker/ticket.py` spricht **nie** mit einem Broker (erzeugt nur Tickets). Syntax geprüft, **nicht ausgeführt**. Eigene Ergänzungen (nicht aus der Quelle): `trading-desk`, `morning-note`, `dcf`.
 Kronos (https://github.com/shiyu-coder/Kronos, MIT, Commit 67b630e): **nicht** kopiert; nur Setup-Befehl `setup-claude-extras.sh kronos` und `trading-desk/references/kronos.md`.
+
+## Design-/Test-Skills (Auswahl, unverändert kopiert, 2026-10-25)
+
+| Skills | Quelle | Stand | Lizenz |
+|---|---|---|---|
+| `algorithmic-art`, `canvas-design`, `slack-gif-creator`, `webapp-testing` | https://github.com/anthropics/skills | Commit dbd4588 (2026-10-09) | Apache-2.0 (LICENSE.txt je Skill) |
+| `taste-skill` (Name `design-taste-frontend`) | https://github.com/Leonxlnx/taste-skill | Commit 12af471 | MIT |
+| `hallmark` | https://github.com/Nutlope/hallmark | Commit 7ec8682 | MIT |
+| `ui-ux-pro-max` | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill (nur `.claude/skills/ui-ux-pro-max`) | Commit d14efff | MIT |
+| `llm-council` | https://github.com/tenfoldmarc/llm-council-skill | Commit 0dc0327 | MIT (laut README, keine LICENSE-Datei) |
+
+Vorher gelesen: kein `curl | sh`, keine versteckten Netzwerkaufrufe, keine Hooks; Skripte nutzen `child_process`/Puppeteer für lokale Browser-Prüfung (`taste-skill`, `hallmark`, `webapp-testing`) und Python-Standardwerkzeuge. **Nicht ausgeführt.** Nicht übernommen: die Gemini-Bildgeneratoren (`brand`, `design`, `slides`, `ui-styling`) aus ui-ux-pro-max (brauchen API-Schlüssel); Superpowers, Archify, GSD (siehe `.claude/setup/MCP-und-Plugins.md`). `frontend-design` von Anthropic nicht zusätzlich kopiert, der Name ist durch die bestehende Kopie belegt.
