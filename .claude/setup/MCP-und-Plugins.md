@@ -4,7 +4,7 @@ Alles hier läuft auf **Deinem Rechner**. Die Cloud-Sitzung blockiert fremde Hos
 
 ## Im Repo als Skills (`.claude/skills/`, unveränderte Kopien, Herkunft in `THIRD_PARTY.md`)
 `algorithmic-art`, `canvas-design`, `slack-gif-creator`, `webapp-testing` (anthropics/skills, Apache-2.0) · `taste-skill` (MIT) · `hallmark` (MIT) · `ui-ux-pro-max` (MIT, nur dieser eine Skill, ohne die Gemini-Bildgeneratoren) · `llm-council` (MIT).
-`taste-skill` und `hallmark` sind zwei konkurrierende „Anti-Slop“-Regelwerke: pro Projekt **eines** nutzen, sonst widersprechen sie sich.
+`taste-skill` ist aktiv; `hallmark` liegt archiviert in `.claude/skills-archive/` (zwei konkurrierende Anti-Slop-Regelwerke wären widersprüchlich).
 
 ## Als Plugin auf Deinem Rechner (nicht ins Repo kopiert)
 | Name | Warum nicht kopiert | Befehl (in Claude Code) |

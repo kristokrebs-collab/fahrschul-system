@@ -34,7 +34,7 @@ Kronos (https://github.com/shiyu-coder/Kronos, MIT, Commit 67b630e): **nicht** k
 |---|---|---|---|
 | `algorithmic-art`, `canvas-design`, `slack-gif-creator`, `webapp-testing` | https://github.com/anthropics/skills | Commit dbd4588 (2026-10-09) | Apache-2.0 (LICENSE.txt je Skill) |
 | `taste-skill` (Name `design-taste-frontend`) | https://github.com/Leonxlnx/taste-skill | Commit 12af471 | MIT |
-| `hallmark` | https://github.com/Nutlope/hallmark | Commit 7ec8682 | MIT |
+| `hallmark` (archiviert in `.claude/skills-archive/`) | https://github.com/Nutlope/hallmark | Commit 7ec8682 | MIT |
 | `ui-ux-pro-max` | https://github.com/nextlevelbuilder/ui-ux-pro-max-skill (nur `.claude/skills/ui-ux-pro-max`) | Commit d14efff | MIT |
 | `llm-council` | https://github.com/tenfoldmarc/llm-council-skill | Commit 0dc0327 | MIT (laut README, keine LICENSE-Datei) |
 
