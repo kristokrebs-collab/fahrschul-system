@@ -136,7 +136,7 @@ export function PlaybookCard({ className }: { className?: string }) {
           <FieldRow label={P.author} htmlFor={`${uid}-author`} hint={P.authorHint}>
             <Input id={`${uid}-author`} value={author} maxLength={MAX_AUTHOR} onChange={(e) => rememberAuthor(e.target.value)} autoComplete="off" spellCheck={false} data-testid="playbook-author" />
           </FieldRow>
-          <label className="flex min-h-9 items-center gap-2 text-[12.5px] text-mute pointer-coarse:min-h-11">
+          <label className="flex min-h-9 items-center gap-2 text-[12.5px] text-mute pointer-coarse:-mx-3 pointer-coarse:min-h-11 pointer-coarse:px-3">
             <input type="checkbox" checked={withMarket} onChange={(e) => setWithMarket(e.target.checked)} className="size-4 accent-current" data-testid="playbook-market" />
             {P.withMarket(lab.symbol)}
           </label>

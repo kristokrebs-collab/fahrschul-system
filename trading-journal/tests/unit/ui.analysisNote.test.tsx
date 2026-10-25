@@ -62,6 +62,7 @@ describe("AnalysisNote", () => {
       "src/views/studio/StudioView.tsx",
       "src/views/setups/SetupsView.tsx",
       "src/views/ueben/TrainingHost.tsx",
+      "src/views/ueben/CaseView.tsx",
       "src/views/trades/whatif/WhatIfHost.tsx",
       "src/assistant/AssistantHost.tsx",
     ];
