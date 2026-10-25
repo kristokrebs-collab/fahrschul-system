@@ -31,6 +31,10 @@
         "repomix@1.18.1",
         "--mcp"
       ]
+    },
+    "flowstep": {
+      "type": "http",
+      "url": "https://api.flowstep.ai/mcp"
     }
   }
 }

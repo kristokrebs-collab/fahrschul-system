@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Light and Depth</title>
+<style>
+/* Vier „Licht und Tiefe“-Effekte als eigener Vanilla-Nachbau nach Aussehen (Spotlight, Lampe, 3D-Karte, Punktraster-Reveal).
+   Kein Code von Aceternity oder anderen Bibliotheken übernommen. Ohne Abhängigkeiten. */
+:root { --stage:#09090b; --card:#111114; --ink:#ececf1; --muted:#8b8b97; --line:#26262d; --accent:#38bdf8; --accent2:#7c3aed; }
+body[data-theme="light"] { --stage:#f3f3f6; --card:#ffffff; --ink:#18181b; --muted:#6b6b76; --line:#dcdce2; --accent:#0284c7; --accent2:#6d28d9; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--stage); color:var(--ink); font:14px/1.5 Inter,ui-sans-serif,system-ui,sans-serif; padding:32px 16px 72px; }
+.wrap { max-width:960px; margin:0 auto; display:grid; gap:20px; }
+h1 { font-size:20px; margin:0 0 4px; } p.sub { margin:0; color:var(--muted); }
+.panel { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--card); }
+.panel > h2 { position:absolute; z-index:5; left:20px; top:16px; margin:0; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+.toggle { position:fixed; right:12px; top:12px; z-index:9; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; font:inherit; }
+
+/* ============ COMPONENT CSS ============ */
+
+/* 1) Spotlight: weiche Lichtkegel gleiten von oben links/rechts ein (nur transform + opacity) */
+.sl { min-height:320px; display:grid; place-items:center; text-align:center; padding:72px 24px 40px; isolation:isolate; }
+.sl__beam { position:absolute; z-index:-1; width:60%; aspect-ratio:1; top:-45%; pointer-events:none; opacity:0; will-change:transform,opacity;
+  background:radial-gradient(closest-side, color-mix(in srgb, var(--ink) 26%, transparent), transparent 72%); }
+.sl__beam--l { left:-12%; transform:translate3d(-12%,-8%,0) rotate(-35deg) scale(1,.45); }
+.sl__beam--r { right:-12%; transform:translate3d(12%,-8%,0) rotate(35deg) scale(1,.45); }
+.sl.is-in .sl__beam { opacity:1; transition:opacity 1.6s ease-out, transform 2s cubic-bezier(.16,1,.3,1); }
+.sl.is-in .sl__beam--l { transform:translate3d(0,0,0) rotate(-35deg) scale(1,.45); }
+.sl.is-in .sl__beam--r { transform:translate3d(0,0,0) rotate(35deg) scale(1,.45); }
+.sl__title { margin:0; font-size:clamp(28px,5vw,48px); line-height:1.1; font-weight:700; letter-spacing:-.02em; background:linear-gradient(180deg,var(--ink),color-mix(in srgb,var(--ink) 45%,transparent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.sl__sub { margin:12px auto 0; max-width:46ch; color:var(--muted); }
+
+/* 1b) Karten-Spotlight: Lichtfleck folgt dem Zeiger (Kind per transform bewegt, klein halten) */
+.cs { position:relative; overflow:hidden; border:1px solid var(--line); border-radius:16px; padding:28px; background:var(--card); isolation:isolate; }
+.cs__glow { position:absolute; z-index:-1; left:0; top:0; width:360px; height:360px; margin:-180px 0 0 -180px; border-radius:50%; pointer-events:none; opacity:0; transition:opacity .35s ease; will-change:transform;
+  background:radial-gradient(closest-side, color-mix(in srgb, var(--accent) 38%, transparent), transparent 70%); }
+.cs:hover .cs__glow, .cs:focus-within .cs__glow { opacity:1; }
+
+/* 2) Lampe: leuchtende Linie, zwei Lichtkegel öffnen sich, Titel steigt auf (transform/opacity) */
+.lamp { --c:var(--accent); min-height:380px; display:grid; align-content:start; justify-items:center; padding-top:120px; isolation:isolate; }
+.lamp__cone { position:absolute; top:84px; width:min(48%,420px); height:260px; pointer-events:none; opacity:0; transform:scaleX(.5); will-change:transform,opacity; transition:transform 1s ease-in-out, opacity 1s ease-in-out; }
+.lamp__cone--l { right:50%; transform-origin:100% 0; background:conic-gradient(from 180deg at 100% 0, var(--c) 0, transparent 22%); -webkit-mask-image:linear-gradient(to bottom,#000 20%,transparent 95%); mask-image:linear-gradient(to bottom,#000 20%,transparent 95%); }
+.lamp__cone--r { left:50%; transform-origin:0 0; background:conic-gradient(from 101deg at 0 0, transparent 0, var(--c) 22%, transparent 22.1%); -webkit-mask-image:linear-gradient(to bottom,#000 20%,transparent 95%); mask-image:linear-gradient(to bottom,#000 20%,transparent 95%); }
+.lamp__line { position:absolute; top:83px; left:50%; width:min(52%,440px); height:2px; margin-left:calc(min(52%,440px) / -2); background:var(--c); box-shadow:0 0 24px 4px color-mix(in srgb,var(--c) 70%,transparent); transform:scaleX(.4); opacity:.5; transition:transform 1s ease-in-out, opacity 1s ease-in-out; will-change:transform; }
+.lamp__glow { position:absolute; top:40px; left:50%; width:min(40%,340px); height:90px; margin-left:calc(min(40%,340px) / -2); background:var(--c); border-radius:50%; opacity:0; filter:blur(48px); transition:opacity 1s ease-in-out; }
+.lamp.is-in .lamp__cone { opacity:.75; transform:scaleX(1); } .lamp.is-in .lamp__line { transform:scaleX(1); opacity:1; } .lamp.is-in .lamp__glow { opacity:.35; }
+.lamp__title { position:relative; z-index:1; margin:0; font-size:clamp(28px,5vw,52px); font-weight:700; letter-spacing:-.02em; text-align:center; opacity:.4; transform:translate3d(0,64px,0); transition:transform .9s .25s ease-in-out, opacity .9s .25s ease-in-out;
+  background:linear-gradient(180deg,var(--ink),color-mix(in srgb,var(--ink) 40%,transparent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.lamp.is-in .lamp__title { opacity:1; transform:translate3d(0,0,0); }
+
+/* 3) 3D-Karte: neigt sich zum Zeiger, innere Ebenen schweben in Z (nur transform) */
+.t3d-wrap { perspective:1000px; display:grid; place-items:center; padding:64px 16px 40px; }
+.t3d { --rx:0deg; --ry:0deg; position:relative; width:min(100%,340px); padding:24px; border-radius:20px; border:1px solid var(--line); background:linear-gradient(160deg,var(--card),color-mix(in srgb,var(--accent2) 14%,var(--card)));
+  transform-style:preserve-3d; transform:rotateX(var(--rx)) rotateY(var(--ry)); will-change:transform; box-shadow:0 30px 60px -30px rgba(0,0,0,.5); }
+.t3d > * { transform:translateZ(var(--z,0px)); transform-style:preserve-3d; }
+.t3d h3 { margin:0 0 6px; font-size:20px; } .t3d p { margin:0; color:var(--muted); }
+.t3d__img { height:150px; margin:16px 0; border-radius:12px; background:radial-gradient(circle at 30% 30%,var(--accent),transparent 55%),radial-gradient(circle at 70% 70%,var(--accent2),transparent 55%),var(--stage); }
+.t3d__btn { display:inline-block; margin-top:4px; padding:8px 14px; border-radius:999px; background:var(--ink); color:var(--stage); font-weight:600; font-size:13px; }
+
+/* 4) Punktraster-Reveal: beim Überfahren füllt sich das Raster von der Zeigerstelle aus (Canvas 2D, zeichnet nur während der Animation) */
+.cr { position:relative; min-height:240px; display:grid; place-items:center; text-align:center; isolation:isolate; cursor:pointer; }
+.cr canvas { position:absolute; inset:0; width:100%; height:100%; z-index:-1; pointer-events:none; }
+.cr__label { margin:0; font-size:clamp(22px,4vw,34px); font-weight:700; letter-spacing:-.01em; transition:color .3s ease; }
+.cr:hover .cr__label, .cr:focus-visible .cr__label, .cr:hover .cr__hint, .cr:focus-visible .cr__hint { color:#fff; }
+.cr__hint { color:var(--muted); font-size:13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sl__beam, .lamp__cone, .lamp__line, .lamp__glow, .lamp__title { transition:none !important; }
+  .sl .sl__beam { opacity:1; transform:none; } .t3d { transform:none !important; }
+}
+</style>
+</head>
+<body data-theme="dark">
+<button class="toggle" id="theme" type="button">hell / dunkel</button>
+<div class="wrap">
+  <div><h1>Light and Depth</h1><p class="sub">Spotlight, Karten-Spotlight, Lampe, 3D-Karte, Punktraster-Reveal. Vanilla, eigener Nachbau nach Aussehen.</p></div>
+
+  <section class="panel sl" id="sl"><h2>Spotlight</h2>
+    <span class="sl__beam sl__beam--l"></span><span class="sl__beam sl__beam--r"></span>
+    <div><h3 class="sl__title">Licht auf das Wesentliche</h3><p class="sl__sub">Zwei weiche Kegel gleiten beim Einblenden von oben ins Bild. Nur transform und opacity.</p></div>
+  </section>
+
+  <section class="panel" style="padding:64px 20px 20px"><h2>Karten-Spotlight (folgt dem Zeiger)</h2>
+    <div class="cs" id="cs"><span class="cs__glow" aria-hidden="true"></span><h3 style="margin:0 0 6px">Theorie-Check</h3><p style="margin:0;color:var(--muted)">Fahre mit dem Zeiger über die Karte: Der Lichtfleck folgt weich.</p></div>
+  </section>
+
+  <section class="panel lamp" id="lamp"><h2>Lampe</h2>
+    <span class="lamp__glow"></span><span class="lamp__cone lamp__cone--l"></span><span class="lamp__cone lamp__cone--r"></span><span class="lamp__line"></span>
+    <h3 class="lamp__title">Hier geht ein Licht an</h3>
+  </section>
+
+  <section class="panel t3d-wrap"><h2>3D-Karte</h2>
+    <div class="t3d" id="t3d"><h3 style="--z:50px">Fahrstunde buchen</h3><p style="--z:30px">Neigt sich zum Zeiger, Ebenen schweben.</p><div class="t3d__img" style="--z:70px"></div><span class="t3d__btn" style="--z:60px">Termin wählen</span></div>
+  </section>
+
+  <section class="panel cr" id="cr" tabindex="0"><h2>Punktraster-Reveal</h2><canvas></canvas>
+    <div><p class="cr__label">Überfahren zum Aufdecken</p><p class="cr__hint">Raster füllt sich von der Zeigerstelle aus</p></div>
+  </section>
+</div>
+
+<script>
+/* ============ COMPONENT JS ============ */
+(function () {
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* Einblenden, sobald sichtbar (Spotlight, Lampe) */
+  var io = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); } }); }, { threshold: .35 });
+  document.querySelectorAll('.sl, .lamp').forEach(function (el) { io.observe(el); });
+
+  /* Zeitbasierte Glättung: Annäherung an das Ziel mit 1 - exp(-k*dt), unabhängig von der Bildrate */
+
+  /* Karten-Spotlight: Lichtfleck per transform folgen lassen */
+  var cs = document.getElementById('cs'), glow = cs.querySelector('.cs__glow'), c = { x: 0, y: 0, tx: 0, ty: 0, run: false }, lastT = 0;
+  function csTick(t) { var dt = Math.min(.05, (t - lastT) / 1000 || .016); lastT = t; var a = 1 - Math.exp(-14 * dt);
+    c.x += (c.tx - c.x) * a; c.y += (c.ty - c.y) * a; glow.style.transform = 'translate3d(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px,0)';
+    if (Math.abs(c.tx - c.x) + Math.abs(c.ty - c.y) > .3) requestAnimationFrame(csTick); else c.run = false; }
+  cs.addEventListener('pointermove', function (e) { var r = cs.getBoundingClientRect(); c.tx = e.clientX - r.left; c.ty = e.clientY - r.top; if (!c.run) { c.run = true; lastT = performance.now(); requestAnimationFrame(csTick); } }, { passive: true });
+
+  /* 3D-Karte: Neigung zum Zeiger, weiches Zurückfedern */
+  var card = document.getElementById('t3d'), s = { rx: 0, ry: 0, trx: 0, try_: 0, run: false }, lt = 0, MAX = 14;
+  function tTick(t) { var dt = Math.min(.05, (t - lt) / 1000 || .016), k = 1 - Math.exp(-12 * dt); lt = t;
+    s.rx += (s.trx - s.rx) * k; s.ry += (s.try_ - s.ry) * k; card.style.setProperty('--rx', s.rx.toFixed(2) + 'deg'); card.style.setProperty('--ry', s.ry.toFixed(2) + 'deg');
+    if (Math.abs(s.trx - s.rx) + Math.abs(s.try_ - s.ry) > .02) requestAnimationFrame(tTick); else s.run = false; }
+  function tGo() { if (!s.run && !reduce) { s.run = true; lt = performance.now(); requestAnimationFrame(tTick); } }
+  var wrap = card.parentElement;
+  wrap.addEventListener('pointermove', function (e) { var r = card.getBoundingClientRect(), px = (e.clientX - r.left) / r.width - .5, py = (e.clientY - r.top) / r.height - .5;
+    s.try_ = Math.max(-1, Math.min(1, px * 2)) * MAX; s.trx = -Math.max(-1, Math.min(1, py * 2)) * MAX; tGo(); }, { passive: true });
+  wrap.addEventListener('pointerleave', function () { s.trx = s.try_ = 0; tGo(); });
+
+  /* Punktraster-Reveal (Canvas 2D): Punkte erscheinen nach Abstand zum Zeiger + Zufall */
+  var box = document.getElementById('cr'), cv = box.querySelector('canvas'), g = cv.getContext('2d');
+  var GAP = 6, SIZE = 3, cols = 0, rows = 0, delay = null, prog = 0, dir = 0, ox = .5, oy = .5, rt = 0, running = false, DPR = Math.min(2, devicePixelRatio || 1);
+  var cols2 = ['#38bdf8', '#7c3aed', '#22d3ee'];
+  function layout() { var r = box.getBoundingClientRect(); cv.width = Math.round(r.width * DPR); cv.height = Math.round(r.height * DPR); cols = Math.ceil(r.width / GAP); rows = Math.ceil(r.height / GAP);
+    delay = new Float32Array(cols * rows); for (var j = 0; j < rows; j++) for (var i = 0; i < cols; i++) { var dx = (i * GAP) / r.width - ox, dy = (j * GAP) / r.height - oy; delay[j * cols + i] = Math.sqrt(dx * dx + dy * dy) * .75 + Math.random() * .25; } draw(); }
+  function draw() { g.setTransform(DPR, 0, 0, DPR, 0, 0); g.clearRect(0, 0, cv.width, cv.height); if (prog <= 0) return;
+    for (var q = 0; q < 3; q++) { g.fillStyle = cols2[q]; for (var alpha = 1; alpha <= 4; alpha++) { g.globalAlpha = alpha / 4 * .75; g.beginPath();
+      for (var j = 0; j < rows; j++) for (var i = 0; i < cols; i++) { var k = j * cols + i; if ((k % 3) !== q) continue; var p = (prog * 1.4 - delay[k]) / .3; var lv = p >= 1 ? 4 : p <= 0 ? 0 : Math.ceil(p * 4); if (lv === alpha) g.rect(i * GAP, j * GAP, SIZE, SIZE); }
+      g.fill(); } } g.globalAlpha = 1; }
+  function rTick(t) { var dt = Math.min(.05, (t - rt) / 1000 || .016); rt = t; prog = Math.max(0, Math.min(1, prog + dir * dt / .7)); draw();
+    if ((dir > 0 && prog < 1) || (dir < 0 && prog > 0)) requestAnimationFrame(rTick); else running = false; }
+  function rGo(d, e) { if (reduce) { prog = d > 0 ? 1 : 0; draw(); return; } if (d > 0 && e) { var r = box.getBoundingClientRect(); ox = (e.clientX - r.left) / r.width; oy = (e.clientY - r.top) / r.height; layout(); }
+    dir = d; if (!running) { running = true; rt = performance.now(); requestAnimationFrame(rTick); } }
+  box.addEventListener('pointerenter', function (e) { rGo(1, e); }); box.addEventListener('pointerleave', function () { rGo(-1); });
+  box.addEventListener('focus', function () { rGo(1); }); box.addEventListener('blur', function () { rGo(-1); });
+  new ResizeObserver(layout).observe(box); layout();
+
+  document.getElementById('theme').onclick = function () { var b = document.body; b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark'; };
+})();
+</script>
+</body>
+</html>

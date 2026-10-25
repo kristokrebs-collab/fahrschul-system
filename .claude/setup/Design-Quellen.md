@@ -12,7 +12,7 @@ Gelesen wurden die öffentlichen Startseiten. Inhalte hinter Login (Galerien, Ch
 | v0 (Vercel) | Chat → Full-Stack-App („Use your ChatGPT plan in v0“), Registrierung nötig | Dienst, kein Quellcode zum Ziehen. Ablauf: dort prompten, Code exportieren, in Claude Code verfeinern |
 | Bolt | KI-Builder für Websites/Apps, Anmeldung nötig | wie v0 |
 | Lovable | Schutzseite („Just a moment…“), Seite nicht lesbar | nicht gelesen. Dienst, wie v0 |
-| Flowstep | „Design-Canvas für Agenten“: mehrere Screens per Prompt, Export als Code oder Figma, **MCP-Verbindung zu Claude Code, Cursor, Codex, Windsurf**; Preise nicht gelesen | Dienst. MCP wäre eine neue Verbindung: erst klären, ob Du sie willst (`CLAUDE.md`) |
+| Flowstep | „Design-Canvas für Agenten“: mehrere Screens per Prompt, Export als Code oder Figma, **MCP-Verbindung zu Claude Code, Cursor, Codex, Windsurf**; Free-Plan begrenzt, Starter 15 $/Monat | Dienst. Einrichtung auf Deinem Rechner in `MCP-und-Plugins.md` (Eintrag auch in `mcp.example.json`) |
 
 ## Aceternity: was wir schon haben (Zuordnung, ohne deren Code)
 | Aceternity-Komponente (Name) | Vorhanden bei uns |
@@ -27,4 +27,5 @@ Gelesen wurden die öffentlichen Startseiten. Inhalte hinter Login (Galerien, Ch
 | Expandable Card, Draggable Card | `draggable-widget-grid`, `notched-project-card` |
 | Parallax Scroll, Hero Parallax | `parallax-strip-slider`, `slanted-spread-hero` |
 | Floating Navbar, Navbar Menu | `immersive-full-screen-navigation` |
-| 3D Card Effect, Spotlight, Lamp, Canvas Reveal, Vortex, Shaders | nicht vorhanden (offen, wenn Du sie willst: eigener Nachbau nach Aussehen, nicht nach deren Code) |
+| Spotlight, Card Spotlight, Lamp effect, 3D Card Effect, Canvas Reveal Effect | **neu** als eigener Nachbau nach Aussehen: `pulse-motion/assets/light-and-depth.html` (ohne Code von Aceternity) |
+| Vortex, Shaders, Cloud Shader | nicht vorhanden |
