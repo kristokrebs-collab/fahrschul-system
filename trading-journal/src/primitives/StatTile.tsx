@@ -164,7 +164,7 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
   const lifted = active && canHover;
   return (
     // `@container`: the label fits the tile's own width (`LABEL_FIT` tracking, `fitLabel` size), not the viewport
-    <div onMouseEnter={onActivate} onFocus={onActivate} className={cn("@container min-w-0", className)}>
+    <div role="listitem" onMouseEnter={onActivate} onFocus={onActivate} className={cn("@container min-w-0", className)}>
       <motion.div className="relative h-full" initial={false} animate={lifted && !reduced ? LIFT : REST} transition={spring.hover}>
         {/* opaque surface (≈ the former white/3 % over the hero): the hero's dot matrix never shows through label or value */}
         <MorphCard id={`fact-${fact}`} title={label} body={body} className="h-full overflow-hidden rounded-2xl border border-white/[0.06] bg-ink-800 px-3 py-2.5">
@@ -176,7 +176,7 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
             transition={tween.crossfade}
           />
           <motion.div layout="position" layoutDependency={active} className={cn("relative", FIT_TEXT)}>
-            <MorphTitle id={`fact-${fact}`} as="dt" className={cn("label flex items-center justify-between gap-1 whitespace-nowrap", LABEL_FIT)}>
+            <MorphTitle id={`fact-${fact}`} as="div" className={cn("label flex items-center justify-between gap-1 whitespace-nowrap", LABEL_FIT)}>
               <span className="truncate" style={fitLabel(label.length)}>
                 {label}
               </span>
@@ -190,7 +190,8 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
                 <GlyphPlus className="size-3" />
               </span>
             </MorphTitle>
-            <dd
+            <div
+              data-tile-value=""
               className="num mt-1.5 truncate whitespace-nowrap font-mono text-[17px] font-medium text-fg"
               style={typeof value === "string" ? { fontSize: fitValue(value.length + suffixLength) } : undefined}
             >
@@ -202,7 +203,7 @@ export const StatTile = memo(function StatTile({ fact, label, value, suffix, suf
                   {suffix}
                 </>
               )}
-            </dd>
+            </div>
           </motion.div>
         </MorphCard>
         {/* verdict popover: out of flow and outside the card's overflow-hidden, opening upward so it stays inside the

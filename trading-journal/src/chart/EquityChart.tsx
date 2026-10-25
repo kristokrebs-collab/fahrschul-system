@@ -60,7 +60,7 @@ export interface EquityChartProps {
 export const EQUITY_COLORS = {
   up: "#f2f2f2",
   down: "#ff4d4f",
-  strokeStart: "#5f5f5f",
+  strokeStart: "var(--color-faint-line, #5f5f5f)",
   grid: "#1c1c1c",
   ref: "#3a3a3a",
   tick: "#5f5f5f",
@@ -619,7 +619,7 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
         </ChartContainer>
 
         {/* hover: cursor line, point dot, readout */}
-        <motion.div ref={cursor} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 w-px bg-faint" style={{ x: curX, opacity: hover }} />
+        <motion.div ref={cursor} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 w-px bg-faint-line" style={{ x: curX, opacity: hover }} />
         <motion.div aria-hidden="true" className="pointer-events-none absolute left-0 top-0" style={{ x: curX, y: curY, opacity: hover }}>
           <span className="absolute -left-[5px] -top-[5px] size-2.5 rounded-full border-2 border-ink-900" style={{ background: accent }} />
         </motion.div>
@@ -662,7 +662,7 @@ export const EquityChart = memo(function EquityChart({ points, start, balance, c
                 <span key={p.i} className="group/m absolute left-0 top-0">
                   <span
                     className={cn(
-                      "absolute -left-[3px] -top-[3px] size-1.5 scale-[.55] rounded-full bg-faint opacity-40 group-data-[awake]/m:scale-100 group-data-[awake]/m:opacity-100",
+                      "absolute -left-[3px] -top-[3px] size-1.5 scale-[.55] rounded-full bg-faint-line opacity-40 group-data-[awake]/m:scale-100 group-data-[awake]/m:opacity-100",
                       (p.t?.pnl ?? 0) < 0 ? "group-data-[awake]/m:bg-loss" : (p.t?.pnl ?? 0) > 0 ? "group-data-[awake]/m:bg-win" : "group-data-[awake]/m:bg-mute",
                     )}
                     style={{ transition: REPLAY.markerTransition }}

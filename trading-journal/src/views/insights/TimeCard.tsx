@@ -68,7 +68,7 @@ function Columns({ buckets, selected, onSelect }: { buckets: readonly TimeBucket
             >
               {b.g.n === 0 && (
                 // an empty bucket still shows where it is: a faint dot on the zero line (sparse journals)
-                <span aria-hidden="true" className="absolute left-1/2 size-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-faint" style={{ top: `${zero * 100}%` }} />
+                <span aria-hidden="true" className="absolute left-1/2 size-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-faint-line" style={{ top: `${zero * 100}%` }} />
               )}
               {b.g.n > 0 && (
                 <motion.span

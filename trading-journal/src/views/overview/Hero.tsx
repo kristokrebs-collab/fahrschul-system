@@ -192,7 +192,8 @@ export function Hero() {
           <SignalStrip className="mt-auto hidden lg:grid" />
           {/* a grid, so every row's tile edges line up (design pass v3): 2 / 3 / 4 columns; the 7th tile closes the last
               row on phones and tablets, and at xl the wide Erwartungswert spans two columns (4 + 1·2·1) */}
-          <dl className="mt-auto grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:grid-cols-3 lg:mt-0 xl:grid-cols-4" onMouseLeave={() => setActive(null)}>
+          {/* a list of seven buttons: a `dl` cannot hold the tile buttons (`dt` / `dd` must sit directly in the list) */}
+          <div role="list" aria-label="Kennzahlen" data-testid="hero-kpis" className="mt-auto grid grid-cols-2 gap-2 border-t border-white/10 pt-5 sm:grid-cols-3 lg:mt-0 xl:grid-cols-4" onMouseLeave={() => setActive(null)}>
             {tiles.map((t, i) => (
               <StatTile
                 key={t.key}
@@ -209,7 +210,7 @@ export function Hero() {
                 className={TILE_SPAN[t.key]}
               />
             ))}
-          </dl>
+          </div>
         </div>
         <MarketPanel />
         {/* lg+: the Lage-Ampel as a band under both columns (state left, ladder right) — inside the market panel it

@@ -12,7 +12,7 @@ const TONE_BG: Record<PulseTone, string> = {
   live: "bg-win",
   warn: "bg-warn",
   error: "bg-loss",
-  muted: "bg-faint",
+  muted: "bg-faint-line",
   win: "bg-win",
   loss: "bg-loss",
   fg: "bg-fg",

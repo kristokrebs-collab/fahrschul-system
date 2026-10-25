@@ -382,7 +382,7 @@ function LayerGlyph({ layer }: { layer: keyof OverlayLayers }) {
   return (
     <svg {...common}>
       <path d="M1 6.5 H17" stroke="var(--color-mute, #9b9b9b)" strokeWidth="1" strokeDasharray="2 2.5" />
-      <path d="M7 3 H11" stroke="var(--color-faint, #5f5f5f)" strokeWidth="1" />
+      <path d="M7 3 H11" stroke="var(--color-faint-line, #5f5f5f)" strokeWidth="1" />
     </svg>
   );
 }

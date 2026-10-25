@@ -225,7 +225,9 @@ function Shell() {
   return (
     <MorphDialogProvider>
       <ScenarioWatcher />
-      <div className="relative min-h-dvh">
+      {/* `overflow-x-clip` (no scroll container, sticky bars keep working): a page that scales / slides in or out reaches a few px
+          past the screen edge for a moment (its full-bleed rows, the needles of the bias bar) – never a wider document */}
+      <div className="relative min-h-dvh overflow-x-clip">
         <Header />
         <main className="mx-auto max-w-[1320px] px-4 pb-10 pt-6 sm:px-6">
           <LocalModeBanner />
