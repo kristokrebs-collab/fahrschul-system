@@ -19,6 +19,9 @@
 ## Messung (check120, Headless, 4× CPU-Drosselung)
 Ganze Demo mit allen fünf Effekten und Zeiger-Bewegung über jeden: **p95 0.9 ms ungedrosselt, 4.3 ms bei 4× Drosselung**, Schwelle 10.4 ms → „ok“. Echtes 120-Hz-Gerät **nicht geprüft**. Der Hinweis „Layout-Lesezugriffe“ betrifft `getBoundingClientRect` nur bei Zeiger-Ereignissen.
 
+## Prüfdurchgänge
+Durchgang 1 (Dunkel): Lampe hatte zu schmale Kegel, korrigiert. Durchgang 2 (Hell, mit Zeiger-Zuständen): Reveal-Text war auf hellen Punkten unlesbar (jetzt dunkle Unterlage unter dem Raster), Spotlight wirkte grau (jetzt in der Akzentfarbe `--beam`). Beide Themes angesehen, Konsole ohne Fehler.
+
 ## Barrierefreiheit
 `prefers-reduced-motion`: Übergänge aus, Spotlight sofort sichtbar, 3D-Neigung aus, Reveal ohne Animation. Punktraster-Reveal ist per Tastatur fokussierbar (`tabindex`, Fokus deckt auf). Überschriften bleiben echter Text.
 
