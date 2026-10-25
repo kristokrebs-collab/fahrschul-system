@@ -68,7 +68,7 @@ function ProjectionPath({ p }: { p: Projection }) {
       {geo && size && (
         <>
           <svg width={size.w} height={size.h - 16} className="absolute inset-x-0 top-0 overflow-visible">
-            {Math.abs(p.comp - p.linear) >= 0.02 && <path d={geo.compound} fill="none" stroke="var(--color-faint, #5f5f5f)" strokeWidth="1.25" strokeDasharray="3 4" />}
+            {Math.abs(p.comp - p.linear) >= 0.02 && <path d={geo.compound} fill="none" stroke="var(--color-faint-line, #5f5f5f)" strokeWidth="1.25" strokeDasharray="3 4" />}
             <path d={geo.linear} fill="none" stroke="var(--color-fg, #f2f2f2)" strokeWidth="1.5" strokeLinecap="round" />
             <circle cx={geo.now.x} cy={geo.now.y} r="3.5" className="fill-signal" />
           </svg>
@@ -83,7 +83,7 @@ function ProjectionPath({ p }: { p: Projection }) {
               {Math.abs(p.comp - p.linear) >= 0.02 && (
                 <span className="flex items-center gap-1.5">
                   <svg width="12" height="2" className="overflow-visible">
-                    <path d="M0 1H12" stroke="var(--color-faint, #5f5f5f)" strokeWidth="1.25" strokeDasharray="3 2" />
+                    <path d="M0 1H12" stroke="var(--color-faint-line, #5f5f5f)" strokeWidth="1.25" strokeDasharray="3 2" />
                   </svg>
                   Zinseszins
                 </span>

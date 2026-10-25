@@ -91,4 +91,4 @@ export const keepTogether = (text: string): string =>
     .replace(/(\d) %/g, "$1\u00a0%")
     .replace(/([\u2212+]) (?=\d)/g, "$1\u00a0");
 
-export const CHIP_DOT: Readonly<Record<LageTone, string>> = { neg: "bg-loss", pos: "bg-win", warn: "bg-warn", info: "bg-faint" };
+export const CHIP_DOT: Readonly<Record<LageTone, string>> = { neg: "bg-loss", pos: "bg-win", warn: "bg-warn", info: "bg-faint-line" };

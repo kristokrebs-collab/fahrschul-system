@@ -77,6 +77,40 @@ test.describe("pages (P14)", () => {
     await expectNoHorizontalScroll(page);
   });
 
+  test("switching pages never makes the document wider than the screen – not for a single frame (round 5)", async ({ page }) => {
+    await seed(page);
+    await page.goto("/");
+    const dock = page.getByRole("toolbar", { name: "Navigation" });
+    await expect(dock).toBeVisible();
+    // the start page with its live cards (needles of the bias bar, the Einstiegs-Check) has to be up: they were what stuck out
+    await expect(page.getByText("Netto-P&L").first()).toBeVisible();
+    await page.locator('[data-testid="signal-card"][data-state="ok"], [data-testid="signal-card"][data-state="stale"]').first().waitFor({ timeout: 30_000 }).catch(() => undefined);
+    await page.waitForTimeout(1200);
+    for (const tab of ["Markt", "Übersicht", "Trades", "Übersicht"]) {
+      // one probe per animation frame from the click until the new page has settled
+      await page.evaluate(() => {
+        const w = window as unknown as { __wide: number[]; __wideStop: boolean };
+        w.__wide = [];
+        w.__wideStop = false;
+        const step = () => {
+          const de = document.documentElement;
+          w.__wide.push(de.scrollWidth - Math.min(window.innerWidth, de.clientWidth));
+          if (!w.__wideStop) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      });
+      await dock.getByRole("button", { name: tab }).click();
+      await expect(page).toHaveURL(tab === "Übersicht" ? /#overview$|\/$/ : tab === "Markt" ? /#markt$/ : /#trades$/);
+      await page.waitForTimeout(1500);
+      const widest = await page.evaluate(() => {
+        const w = window as unknown as { __wide: number[]; __wideStop: boolean };
+        w.__wideStop = true;
+        return Math.max(0, ...w.__wide);
+      });
+      expect(widest, `the document was ${widest} px wider than the screen while switching to ${tab}`).toBeLessThanOrEqual(0);
+    }
+  });
+
   test("command navigation lists every page with its count; a link opens a lazy page", async ({ page }) => {
     await seed(page);
     await page.goto("/");

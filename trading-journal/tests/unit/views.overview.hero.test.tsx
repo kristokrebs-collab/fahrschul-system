@@ -57,12 +57,21 @@ describe("Hero", () => {
 
   it("KPI tiles sit in an aligned grid: 2 / 3 / 4 columns, Erwartungswert spans two at xl, Serie closes the row below xl", () => {
     renderHero();
-    const grid = screen.getByRole("button", { name: /^Trades/ }).closest("dl")!;
+    const grid = screen.getByRole("button", { name: /^Trades/ }).closest('[data-testid="hero-kpis"]')!;
     expect(grid.className).toMatch(/\bgrid\b.*grid-cols-2.*sm:grid-cols-3.*xl:grid-cols-4/);
-    const cell = (label: RegExp) => screen.getByRole("button", { name: label }).closest("dl > div")!;
+    const cell = (label: RegExp) => screen.getByRole("button", { name: label }).closest('[role="listitem"]')!;
     expect(cell(/^Erwartungswert/).className).toContain("xl:col-span-2");
     expect(cell(/^Serie/).className).toContain("col-span-2 sm:col-span-3 xl:col-span-1");
     expect(cell(/^Win-Rate/).className).not.toContain("col-span");
+  });
+
+  it("KPI tiles are a list of seven buttons – no dl / dt / dd around buttons (axe: definition-list, dlitem)", () => {
+    renderHero();
+    const list = screen.getByRole("list", { name: "Kennzahlen" });
+    const items = within(list).getAllByRole("listitem");
+    expect(items).toHaveLength(7);
+    for (const item of items) expect(within(item).getByRole("button")).toHaveAttribute("aria-haspopup", "dialog");
+    expect(list.querySelector("dl, dt, dd")).toBeNull();
   });
 
   it("account Segmented drives uiStore.acc and the label", async () => {
@@ -88,7 +97,7 @@ describe("Hero", () => {
     const enriched = getEnriched(trades, settings);
     renderHero();
     const tile = screen.getByRole("button", { name: /^Win-Rate/ });
-    const srValue = () => tile.querySelector("dd .sr-only")?.textContent;
+    const srValue = () => tile.querySelector("[data-tile-value] .sr-only")?.textContent;
     expect(srValue()).toBe(heroTileValue("winRate", getAccountView(enriched, settings, "all")));
     await act(async () => {
       fireEvent.click(screen.getByRole("radio", { name: "Makro" }));
@@ -102,7 +111,7 @@ describe("Hero", () => {
     renderHero();
     const hero = screen.getByTestId("hero-net");
     expect(within(hero).queryByLabelText(/^[+−]?\d/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Win-Rate/ }).querySelector("dd [aria-hidden]")).not.toBeNull();
+    expect(screen.getByRole("button", { name: /^Win-Rate/ }).querySelector("[data-tile-value] [aria-hidden]")).not.toBeNull();
     await act(async () => {
       useJournal.setState({ loaded: true });
     });

@@ -13,9 +13,9 @@ async function gotoOverview(page: import("@playwright/test").Page) {
   await expect(page.getByTestId("market-panel")).toContainText("BTC/USDT");
 }
 
-/** A hero tile is the MorphCard button inside the `<dl>`; `hasText` on the label. */
+/** A hero tile is the MorphCard button inside the KPI list (`hero-kpis`); `hasText` on the label. */
 function heroTile(page: import("@playwright/test").Page, label: string) {
-  return page.locator('dl [aria-haspopup="dialog"]', { has: page.locator("dt", { hasText: label }) }).first();
+  return page.locator('[data-testid="hero-kpis"] [aria-haspopup="dialog"]', { has: page.locator(".label", { hasText: label }) }).first();
 }
 
 test.describe("hero", () => {
@@ -29,7 +29,7 @@ test.describe("hero", () => {
       const tile = heroTile(page, label);
       await expect(tile).toBeVisible();
       const overflow = await tile.evaluate((el) => {
-        const cells = Array.from(el.querySelectorAll<HTMLElement>("dt span.truncate, dd"));
+        const cells = Array.from(el.querySelectorAll<HTMLElement>(".label span.truncate, [data-tile-value]"));
         return cells.map((c) => ({ text: c.textContent, clipped: c.scrollWidth > c.clientWidth + 1 }));
       });
       for (const c of overflow) expect(c.clipped, `${label}: "${c.text}" is truncated`).toBe(false);
@@ -53,7 +53,7 @@ test.describe("hero", () => {
     await page.waitForTimeout(800);
     await screenshot(page, info, "overview-hero-1024");
     for (const label of HERO_LABELS) {
-      const clipped = await heroTile(page, label).evaluate((el) => Array.from(el.querySelectorAll<HTMLElement>("dt span.truncate, dd")).some((c) => c.scrollWidth > c.clientWidth + 1));
+      const clipped = await heroTile(page, label).evaluate((el) => Array.from(el.querySelectorAll<HTMLElement>(".label span.truncate, [data-tile-value]")).some((c) => c.scrollWidth > c.clientWidth + 1));
       expect(clipped, `${label} truncated at 1024`).toBe(false);
     }
   });
@@ -64,10 +64,10 @@ test.describe("hero", () => {
     await gotoOverview(page);
     for (const label of HERO_LABELS) await expect(heroTile(page, label)).toBeVisible();
     // the KPI grid: every tile's label and value read in one go
-    const grid = page.locator("dl", { has: page.locator('[aria-haspopup="dialog"] dt', { hasText: "Erwartungswert" }) }).first();
+    const grid = page.getByTestId("hero-kpis");
     const clipped = () =>
-      grid.evaluate((dl) =>
-        Array.from(dl.querySelectorAll<HTMLElement>('[aria-haspopup="dialog"] dt span.truncate, [aria-haspopup="dialog"] dd'))
+      grid.evaluate((list) =>
+        Array.from(list.querySelectorAll<HTMLElement>('[aria-haspopup="dialog"] .label span.truncate, [aria-haspopup="dialog"] [data-tile-value]'))
           .filter((c) => c.scrollWidth > c.clientWidth + 1)
           .map((c) => c.textContent ?? ""),
       );

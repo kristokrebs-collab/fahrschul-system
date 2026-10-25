@@ -58,6 +58,18 @@ function totalText(unit: CalendarUnit, v: number | null, currency: string): stri
   return pct(v);
 }
 
+/**
+ * From this intensity the day's tint (8 % + 30 % · intensity) is deep enough that its figure in the plain win / loss tone
+ * falls under 4.5 : 1 (loss: red on red from ≈ 14 % tint, win: green on green from ≈ 30 %); there it takes `--cal-win` / `--cal-loss`.
+ */
+const DEEP_FROM = { win: 0.7, loss: 0.2 } as const;
+
+/**
+ * The day number of a tinted day: `text-faint` is 2 – 4 : 1 on the tint, so it takes `text-mute` and, from this intensity
+ * (tint ≥ 20 %), `text-fg/85` – an untraded day keeps `text-faint` on the plain card.
+ */
+const DAY_NUM_FG_FROM = 0.4;
+
 /** Cell tint: 8 % … 38 % of the P&L colour by the day's size relative to the month (p90). */
 function tint(c: DayCell): string | undefined {
   if (!c.g) return undefined;
@@ -104,6 +116,8 @@ function DayButton({ c, unit, capital, currency, armed, tabbable, onOpen, onArm 
       </div>
     );
   const v = c.g ? unitValue(c.g, c.rSum, unit, capital) : null;
+  // a strongly tinted day: its figure takes the deeper tone (`--cal-win` / `--cal-loss`, themes.css) to stay ≥ 4.5 : 1
+  const deep = !!c.g && c.g.net !== 0 && v != null && v !== 0 && c.intensity > (v > 0 ? DEEP_FROM.win : DEEP_FROM.loss);
   return (
     <motion.button
       type="button"
@@ -135,10 +149,12 @@ function DayButton({ c, unit, capital, currency, armed, tabbable, onOpen, onArm 
         transition={{ layout: spring.detail }}
       />
       <span className="relative flex items-start justify-between text-[10px] leading-none">
-        <span className={c.isToday ? "font-semibold text-fg" : "text-faint"}>{c.day}</span>
+        <span className={c.isToday ? "font-semibold text-fg" : !c.g || c.g.net === 0 ? "text-faint" : c.intensity > DAY_NUM_FG_FROM ? "text-fg/85" : "text-mute"}>{c.day}</span>
         {c.hasNote && <span aria-hidden="true" className="mt-px size-1 rounded-full bg-mute" />}
       </span>
-      {c.g && <span className={cn("num relative truncate font-mono text-[10px] leading-none sm:text-[11px]", v == null || v === 0 ? "text-mute" : v > 0 ? "text-win" : "text-loss")}>{cellText(unit, v)}</span>}
+      {c.g && (
+        <span className={cn("num relative truncate font-mono text-[10px] leading-none sm:text-[11px]", v == null || v === 0 ? "text-mute" : v > 0 ? (deep ? "text-(--cal-win)" : "text-win") : deep ? "text-(--cal-loss)" : "text-loss")}>{cellText(unit, v)}</span>
+      )}
     </motion.button>
   );
 }

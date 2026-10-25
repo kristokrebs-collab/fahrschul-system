@@ -45,7 +45,10 @@ stays in the header row on phones).
   the rest after Benjamini-Hochberg (`SigBadge`), "klar" rows marked by `TactileHighlight`; a row opens its trades
   (`TradeRows` → trade detail, detached source). Banner: the robust best / worst bucket.
 - **Wochentag × Uhrzeit** (`HeatmapCard.tsx`): 7 × 12 cells via `HeatGridReveal` cascading from the best cell; cells
-  below 3 trades are paler; tap → numbers; the three best times and the weakest one.
+  below 3 trades are paler; tap → numbers; the three best times and the weakest one. Dense grid on coarse pointers (round 5): 21 px
+  cells on a 24 px pitch (WCAG 2.5.8), the gaps and an invisible 12 px halo (`before:-inset-3` behind the cells) belong to the grid, and a
+  tap there picks the nearest cell within 24 px (`data-hit-grid="24"`, `nearestCell`); `tests/e2e/heat-grid.spec.ts` taps gaps and halo.
+  The same card is the cockpit's weekday widget.
 - **MAE / MFE** (`ExcursionCard.tsx`): scatter (dots pop on `spring.pop`), exit efficiency ring, Ø MAE in R, money
   left on the table, losers that were ≥ 1 R up, stop / target hints. Needs P06's measured excursions (honest hint
   otherwise).

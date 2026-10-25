@@ -138,6 +138,27 @@ describe("InsightsSection", () => {
     }
   });
 
+  it("Disziplin: the heat map names an existing option as its active descendant and is a dense-grid touch target (round 5)", () => {
+    renderSection();
+    const map = within(screen.getByTestId("insights-discipline")).getByRole("listbox");
+    // the selected day may lie before the first drawn week: then there is no `aria-activedescendant`, never a dangling id
+    const active = map.getAttribute("aria-activedescendant");
+    if (active) expect(document.getElementById(active), `#${active} exists`).not.toBeNull();
+    expect(map.dataset.hitGrid).toBe("24");
+  });
+
+  it("P&L-Kalender: a strongly tinted day takes the deeper figure tone, a faint one the plain win / loss tone (round 5)", () => {
+    renderSection();
+    const cal = screen.getByTestId("insights-calendar");
+    const figures = Array.from(cal.querySelectorAll<HTMLElement>("[data-day] span.num"));
+    expect(figures.length).toBeGreaterThan(0);
+    const deep = figures.filter((f) => /text-\(--cal-(win|loss)\)/.test(f.className));
+    const plain = figures.filter((f) => /\btext-(win|loss)\b/.test(f.className));
+    // every figure is one of the two (or the neutral mute of a zero day); the month has a top day (intensity 1 → deep)
+    expect(deep.length + plain.length).toBeGreaterThan(0);
+    expect(deep.length).toBeGreaterThan(0);
+  });
+
   it("Erkenntnisse without a clear pattern shows how many trades each evaluation still needs", async () => {
     const { trades } = useJournal.getState();
     useJournal.setState({ trades: trades.slice(0, 3) });

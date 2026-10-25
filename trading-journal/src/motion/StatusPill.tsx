@@ -46,7 +46,7 @@ export interface StatusPillProps {
   layoutKey?: string | number;
 }
 
-const TONE_DOT: Record<StatusTone, string> = { live: "bg-win", warn: "bg-warn", error: "bg-loss", muted: "bg-faint" };
+const TONE_DOT: Record<StatusTone, string> = { live: "bg-win", warn: "bg-warn", error: "bg-loss", muted: "bg-faint-line" };
 const TONE_LAYER: Record<StatusTone, string> = {
   live: "border-win/25 bg-win/12",
   warn: "border-warn/25 bg-warn/12",
@@ -54,7 +54,7 @@ const TONE_LAYER: Record<StatusTone, string> = {
   muted: "border-line-2 bg-white/[0.04]",
 };
 const TONE_TEXT: Record<StatusTone, string> = { live: "text-win", warn: "text-warn", error: "text-loss", muted: "text-mute" };
-const TONE_STROKE: Record<StatusTone, string> = { live: "text-win", warn: "text-warn", error: "text-signal", muted: "text-faint" };
+const TONE_STROKE: Record<StatusTone, string> = { live: "text-win", warn: "text-warn", error: "text-signal", muted: "text-faint-line" };
 const TONES: StatusTone[] = ["live", "warn", "error", "muted"];
 
 /** Heartbeat reach: the 6 px dot grows to ≈ 14 px, the 14 px ring to ≈ 22 px (inside the 28 px pill). */

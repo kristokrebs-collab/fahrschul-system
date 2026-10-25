@@ -14,6 +14,29 @@ import { memoClosed } from "./hooks";
 import { AnaCard, unitText } from "./ui";
 
 const DAY_NAMES = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"] as const;
+/**
+ * Dense grid (21 px cells on a 24 px pitch – WCAG 2.5.8): on coarse pointers the grid is the touch target. A 12 px invisible
+ * halo around it (behind the cells) and its gaps belong to the grid, and a tap there picks the cell whose centre is nearest,
+ * within this many px (`data-hit-grid`, `tests/e2e/hitbox.ts`). A tap on a cell's own button works as before.
+ */
+const SNAP_PX = 24;
+
+/** The cell button nearest to a point, within `SNAP_PX` of its centre (one rect read per cell, at tap time only). */
+function nearestCell(host: HTMLElement, x: number, y: number): HTMLElement | null {
+  let best: HTMLElement | null = null;
+  let bestD = SNAP_PX * SNAP_PX;
+  for (const el of host.querySelectorAll<HTMLElement>("[data-cell]")) {
+    const r = el.getBoundingClientRect();
+    const dx = x - (r.left + r.width / 2);
+    const dy = y - (r.top + r.height / 2);
+    const d = dx * dx + dy * dy;
+    if (d <= bestD) {
+      bestD = d;
+      best = el;
+    }
+  }
+  return best;
+}
 const blockText = (b: number) => `${HEAT_HOURS[b]}–${String(b * 2 + 2).padStart(2, "0")} Uhr`;
 
 export function HeatmapCard({ view, cur }: { view: AccountView; cur: string }) {
@@ -45,7 +68,21 @@ export function HeatmapCard({ view, cur }: { view: AccountView; cur: string }) {
                 </span>
               ))}
             </div>
-            <HeatGridReveal cols={12} origin={grid.best?.i ?? 0} ring={!!grid.best} className="gap-[3px]" role="group" aria-label="Ergebnis nach Wochentag und Uhrzeit">
+            <HeatGridReveal
+              cols={12}
+              origin={grid.best?.i ?? 0}
+              ring={!!grid.best}
+              className="relative isolate gap-[3px] pointer-coarse:before:absolute pointer-coarse:before:-inset-3 pointer-coarse:before:-z-10 pointer-coarse:before:content-['']"
+              role="group"
+              aria-label="Ergebnis nach Wochentag und Uhrzeit"
+              data-hit-grid={SNAP_PX}
+              onClick={(e) => {
+                // a gap or the halo (a cell's own button is the event target for taps on it): the nearest cell
+                if (e.target !== e.currentTarget) return;
+                const hit = nearestCell(e.currentTarget, e.clientX, e.clientY);
+                if (hit) setSel(Number(hit.dataset.cell));
+              }}
+            >
               {grid.cells.map((c) => {
                 // fewer trades than the minimum → paler (an honest cell: one lucky trade is not a strong hour)
                 const t = c.value == null || !grid.maxAbs ? 0 : (c.value / grid.maxAbs) * Math.min(1, c.trades.length / HEAT_MIN_N);
@@ -58,6 +95,7 @@ export function HeatmapCard({ view, cur }: { view: AccountView; cur: string }) {
                     aria-pressed={on}
                     onClick={() => setSel(c.i)}
                     data-testid="heat-cell"
+                    data-cell={c.i}
                     data-best={grid.best?.i === c.i ? "true" : undefined}
                     className={cn("relative aspect-square w-full rounded-[5px] outline-offset-1", on ? "outline outline-1 outline-white/70" : "outline-transparent")}
                     style={{ background: c.trades.length ? heatColor(t, "diverging") : "rgb(var(--veil-rgb, 255 255 255) / 0.025)" }}

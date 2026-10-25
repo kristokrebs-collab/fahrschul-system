@@ -12,11 +12,24 @@ import { openUx, themeSettled, UX_PROJECTS } from "./uxHarness";
 const THEMES = ["dark", "light"] as const;
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
-/** Runs axe on `include` and fails with a readable list (rule, impact, the first targets). */
-async function expectAccessible(page: Page, include: string, what: string, disable: string[] = []): Promise<void> {
+/** Scrolls through the page once, so the deferred cells (`content-visibility`) and revealed cards exist when axe looks. */
+async function mountEverything(page: Page): Promise<void> {
+  const h = await page.evaluate(() => document.documentElement.scrollHeight);
+  for (let y = 0; y < h + 1200; y += 600) {
+    await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" }), y);
+    await page.waitForTimeout(60);
+  }
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await page.waitForTimeout(500);
+}
+
+/** Runs axe on `include` (one selector or several) and fails with a readable list (rule, impact, the first targets). */
+async function expectAccessible(page: Page, include: string | string[], what: string, disable: string[] = []): Promise<void> {
   // let entrance animations settle (contrast is measured on the final colours)
   await page.waitForTimeout(900);
-  const res = await new AxeBuilder({ page }).include(include).withTags(TAGS).disableRules(disable).analyze();
+  let builder = new AxeBuilder({ page });
+  for (const sel of Array.isArray(include) ? include : [include]) builder = builder.include(sel);
+  const res = await builder.withTags(TAGS).disableRules(disable).analyze();
   const lines = res.violations.map(
     (v) =>
       `${v.id} (${v.impact}): ${v.help} → ${v.nodes
@@ -35,11 +48,22 @@ test.describe("Barrierefreiheit (axe)", () => {
   });
 
   for (const theme of THEMES) {
+    // Round 5: the start page and the cockpit are scanned like every other page – with the header and the footer around them
+    // (the header carried a 3,1 : 1 text in the dark and a 3,9 : 1 status pill in the light theme)
+    test(`Startseite mit Kopf- und Fußzeile (${theme})`, async ({ page }) => {
+      await openUx(page, "app", "overview", { theme });
+      await themeSettled(page);
+      await expect(page.locator('[data-page="overview"][data-page-role="current"] h1').first()).toBeAttached({ timeout: 30_000 });
+      await mountEverything(page);
+      await expectAccessible(page, ['[data-page="overview"][data-page-role="current"]', "header", "footer"], "Startseite");
+    });
+
     test(`Cockpit, Anordnen und Katalog (${theme})`, async ({ page }) => {
       await openUx(page, "cockpit", "", { theme });
-      await expectAccessible(page, '[data-testid="cockpit"]', "Cockpit");
+      await mountEverything(page);
+      await expectAccessible(page, ['[data-testid="cockpit"]', "header", "footer"], "Cockpit");
       await page.getByTestId("cockpit-arrange").click();
-      await expectAccessible(page, '[data-testid="cockpit"]', "Cockpit – Anordnen");
+      await expectAccessible(page, ['[data-testid="cockpit"]', "header"], "Cockpit – Anordnen");
       await page.getByTestId("cockpit-arrange").click();
       await page.getByTestId("cockpit-add").click();
       await page.getByTestId("widget-catalog").waitFor();

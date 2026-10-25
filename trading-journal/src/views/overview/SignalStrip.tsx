@@ -17,7 +17,7 @@ import { KIND_SHORT_TEXT, labelParts, partChips, PROV_TEXT, rungViews, statusPil
 
 export const SIGNAL_STRIP_DETAILS = "Details";
 
-const STATUS_DOT: Record<string, string> = { live: "bg-win", warn: "bg-warn", error: "bg-loss", muted: "bg-faint" };
+const STATUS_DOT: Record<string, string> = { live: "bg-win", warn: "bg-warn", error: "bg-loss", muted: "bg-faint-line" };
 /** One-word event names for the chips (the dot colour carries the direction; the small crosses are "Kreuz", not "Einstieg"). */
 const SHORT_KIND = KIND_SHORT_TEXT;
 

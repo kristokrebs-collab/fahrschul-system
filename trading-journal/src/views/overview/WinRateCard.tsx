@@ -41,7 +41,7 @@ function SplitBar({ wins, losses, be, n }: { wins: number; losses: number; be: n
         <>
           {seg((wins / total) * 100, "bg-win", "w")}
           {seg((losses / total) * 100, "bg-loss", "l")}
-          {be > 0 && seg((be / total) * 100, "bg-faint", "b")}
+          {be > 0 && seg((be / total) * 100, "bg-faint-line", "b")}
         </>
       )}
     </motion.div>

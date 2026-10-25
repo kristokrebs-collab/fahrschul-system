@@ -16,6 +16,8 @@
   --color-fg: #f2f2f2;
   --color-mute: #9b9b9b;
   --color-faint: #5f5f5f;
+  /* the same grey for LINES, dots and strokes: where `--color-faint` is lifted for small print (themes.css) these keep the old grey */
+  --color-faint-line: #5f5f5f;
   --color-steel: #e6e6e6;
   --color-teal: #d9d9d9;
   --color-aqua: #fff;

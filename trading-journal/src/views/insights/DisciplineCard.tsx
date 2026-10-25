@@ -26,7 +26,8 @@ const LEVEL_BG = ["bg-(--color-line-2)", "bg-(--conv-1)", "bg-[var(--heat-2,#7d7
 const WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"] as const;
 /**
  * Fat-finger radius (px) of a heat-map tap: a tap that misses every traded cell picks the nearest traded cell whose
- * centre lies within it (cells are 14–17 px, a 44 px tap area per cell would overlap the neighbours).
+ * centre lies within it (cells are 14–17 px, a 44 px tap area per cell would overlap the neighbours). On coarse
+ * pointers an invisible 16 px halo around the map (`before:-inset-4`, behind the cells) lets the map itself take the tap.
  */
 const TAP_RADIUS = 24;
 /** Section label inside the card (mono caps, like the card titles but quieter). */
@@ -102,6 +103,8 @@ function HeatMap({ days, today, selected, onSelect, onOpen }: { days: readonly D
   const root = useRef<HTMLDivElement>(null);
   const seen = useSeenOnce(root);
   const traded = cols.flat().filter((c) => c.day && c.day.score != null);
+  // the selected day may lie before the first drawn week: `aria-activedescendant` must name an element that exists
+  const activeId = selected && cols.some((col) => col.some((c) => c.key === selected && !c.inFuture)) ? `heat-${selected}` : undefined;
   const todayKey = localDateKey(today);
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Enter" && selected) {
@@ -149,7 +152,9 @@ function HeatMap({ days, today, selected, onSelect, onOpen }: { days: readonly D
             role="listbox"
             tabIndex={0}
             aria-label="Disziplin der letzten Wochen, Pfeiltasten wählen einen Handelstag, Enter öffnet ihn im Kalender"
-            aria-activedescendant={selected ? `heat-${selected}` : undefined}
+            aria-activedescendant={activeId}
+            // dense grid: the map is the touch target, a tap within TAP_RADIUS (halo included) picks the nearest traded day
+            data-hit-grid={TAP_RADIUS}
             onKeyDown={onKeyDown}
             onClick={(e) => {
               const key = keyAt(e);
@@ -159,7 +164,7 @@ function HeatMap({ days, today, selected, onSelect, onOpen }: { days: readonly D
               const key = keyAt(e);
               if (key) onOpen(key);
             }}
-            className="grid touch-manipulation grid-flow-col grid-rows-7 rounded-sm outline-offset-4"
+            className="relative isolate grid touch-manipulation grid-flow-col grid-rows-7 rounded-sm outline-offset-4 pointer-coarse:before:absolute pointer-coarse:before:-inset-4 pointer-coarse:before:-z-10 pointer-coarse:before:content-['']"
             style={grid}
             data-weeks={weeks}
           >
@@ -261,7 +266,7 @@ function ScoreTrend({ points, avg, selected }: { points: readonly TrendPoint[]; 
                     className="absolute inset-x-0 bottom-0 origin-bottom transition-transform duration-500 ease-out"
                     style={{ height: `${Math.max(4, p.score)}%`, transform: seen || reduced ? "none" : "scaleY(0.02)", transitionDelay: reduced ? undefined : `${i * 12}ms` }}
                   >
-                    <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-(--color-faint)" />
+                    <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-faint-line" />
                     <span className={cn("absolute left-1/2 top-0 size-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full", TONE_DOT[tone], on && "ring-2 ring-signal ring-offset-2 ring-offset-ink-900")} />
                   </span>
                 )}

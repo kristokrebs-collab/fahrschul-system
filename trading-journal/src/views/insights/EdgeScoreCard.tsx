@@ -56,7 +56,7 @@ function Radar({ axes, selected, onSelect }: { axes: readonly EdgeAxis[]; select
       ))}
       {axes.map((a, i) => {
         const [x, y] = vertex(i, 100);
-        return <line key={a.key} x1={CX} y1={CY} x2={x} y2={y} stroke={selected === a.key ? "var(--color-faint, #5f5f5f)" : "var(--color-line, #1f1f1f)"} strokeWidth="1" />;
+        return <line key={a.key} x1={CX} y1={CY} x2={x} y2={y} stroke={selected === a.key ? "var(--color-faint-line, #5f5f5f)" : "var(--color-line, #1f1f1f)"} strokeWidth="1" />;
       })}
       <AnimatePresence initial={false}>
         <motion.g

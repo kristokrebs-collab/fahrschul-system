@@ -662,3 +662,15 @@ pausiert: der Datensparmodus ist an. „Neu berechnen“ rechnet trotzdem.“, i
 vor dem ersten Lauf „Noch nicht berechnet.“); einer Warnzeile (`text-warn`, `role="status"`) bei Fehlern und dem erklärenden Satz darunter. Wo der Ausgang eines Signals noch fehlt, steht an seiner Stelle
 ein `text-faint`-Satz, der sagt, was gerade ist („Wartet auf die erste volle Kerze nach dem Signal.“, „Wird gleich automatisch ausgewertet.“, „Wird ausgewertet …“, „Noch nicht ausgewertet – pausiert, …“) –
 nie ein geschätztes Ergebnis, nie ein Spinner.
+### Barrierefreiheit der Startseite (Runde 5)
+
+Auf ausdrückliche Erlaubnis des Nutzers, ohne das Aussehen zu ändern – Layout, Texte, Reihenfolge, Animationen, Dock und Kopfzeilen-Layout bleiben.
+
+- **Kleinschrift** `--color-faint`: auf Startseite, Cockpit, Kopf- und Fußzeile dunkel `#868686` (kleinste Anhebung, die auf den dort gemessenen Flächen AA erreicht), hell `#686868`; auf allen anderen
+  Seiten `#8c8c8c` / `#6b6b6b`. Linien, Punkte und Striche in „faint“ nehmen `--color-faint-line` (`bg-faint-line`, unverändert `#5f5f5f` / `#6b6b6b`): nur Text wird angehoben.
+- **Plaketten** (hell): Text in Gewinn-, Verlust- oder Warnfarbe auf der eigenen Tönung (`bg-win/12 text-win` …, Statuspille) holt sich ≈ 6 % dunklere Töne (`--tint-ink-*`, `themes.css`); die dunklen
+  Inseln (Hero, Navigation, `data-theme-scope="dark"`) behalten ihre Werte.
+- **Dichte Raster** (Disziplin-Kalender, Wochentag × Uhrzeit): kein 44-px-Ziel je Zelle möglich – das Raster ist das Ziel: `data-hit-grid="<Fangradius px>"` am Raster, unsichtbarer Rand
+  (`pointer-coarse:before:-inset-3` / `-inset-4`, hinter den Zellen), ein Tipp wählt die nächste Zelle; Raster-Abstand ≥ 24 px, wo die Breite es erlaubt.
+- **Kennzahlenkacheln**: `role="list"` aus sieben Knöpfen (`role="listitem"`), kein `dl` um Knöpfe. **Seitenwechsel**: `overflow-x: clip` um Kopf und Seite – ein ein- oder auslaufendes Blatt macht das
+  Dokument nie breiter als den Bildschirm.

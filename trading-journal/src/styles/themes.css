@@ -63,6 +63,7 @@
   --color-fg: #121212;
   --color-mute: #565656;
   --color-faint: #6b6b6b;
+  --color-faint-line: #6b6b6b;
   --color-steel: #1a1a1a;
   --color-teal: #2d2d2d;
   --color-aqua: #000;
@@ -232,6 +233,7 @@
   /* the dark theme's faint (#5f5f5f, ~3 : 1) stays untouched there (pixel identity); on the ink islands of the LIGHT mode
      it is lifted to WCAG AA on every ink plane (≥ 4.5 : 1 on ink-950 … ink-700) */
   --color-faint: #8a8a8a;
+  --color-faint-line: #8a8a8a;
   --color-steel: #e6e6e6;
   --color-teal: #d9d9d9;
   --color-aqua: #fff;
@@ -248,6 +250,14 @@
   --color-danger-text: #ff8a90;
   --color-win-soft: #65b488;
   --color-loss-soft: #d27a7b;
+  /* the light theme's plaque / soft-text / calendar tones (see "tinted plaques" below) are the dark values here */
+  --tint-ink-win: #3ddc84;
+  --tint-ink-loss: #ff4d4f;
+  --tint-ink-warn: #ffb020;
+  --tint-ink-win-soft: #65b488;
+  --tint-ink-loss-soft: #d27a7b;
+  --cal-win: #58e598;
+  --cal-loss: #ff959b;
   --color-primary-btn-to: #d6d6d6;
   --background: #111;
   --foreground: #f2f2f2;
@@ -274,6 +284,53 @@
    light theme needs nothing (its faint is #6b6b6b, ≥ 4.5 : 1). */
 :root:not([data-theme="light"]) :is([data-page]:not([data-page="overview"], [data-page="cockpit"]), [role="dialog"]) {
   --color-faint: #8c8c8c;
+  --color-faint-line: #8c8c8c;
+}
+/* The start page, the cockpit and the chrome around every page (header, footer) get the smallest lift that reaches
+   WCAG AA on the surfaces measured there (#060606 … #1f1f1f, tinted rows included: 4.5 : 1 on #1f1f1f needs #868686). Lines,
+   dots and strokes use `--color-faint-line` instead, which is NOT lifted here – only text moves. Light theme:
+   `#6b6b6b` is 4.46 : 1 on the header ground (#ebebe9) and 4.4 : 1 on tinted rows; `#686868` clears 4.6 : 1 on both. */
+:root:not([data-theme="light"]) :is([data-page="overview"], [data-page="cockpit"], header, footer) {
+  --color-faint: #868686;
+}
+:root[data-theme="light"] :is([data-page="overview"], [data-page="cockpit"], header, footer) {
+  --color-faint: #686868;
+}
+
+/* ------------------------------------------------------------------------------------- tinted plaques (light) */
+/* Text in win / loss / warn on its OWN 8 – 20 % tint of that colour (badges, status pills, check discs, the local-mode
+   banner) sits at 3.9 – 4.5 : 1 in the light theme, where the tint darkens the ground under the text. Inside such an
+   element the tone token is lifted to ≥ 4.5 : 1 (≈ 6 % darker); the dark islands keep their own values (they re-declare
+   the `--tint-ink-*` below). Dark theme: no rule matches. */
+:root[data-theme="light"] {
+  --tint-ink-win: #096f37;
+  --tint-ink-loss: #bd1a25;
+  --tint-ink-warn: #8a5100;
+  /* the provisional (forming-candle) text tones, a step darker for text only (their fills and strokes keep the soft tone) */
+  --tint-ink-win-soft: #3c7455;
+  --tint-ink-loss-soft: #a44f52;
+  /* strongly tinted calendar days (P&L-Kalender): the day's figure in a deeper tone */
+  --cal-win: #096f37;
+  --cal-loss: #9b0f19;
+}
+:root:not([data-theme="light"]) {
+  --cal-win: #58e598;
+  --cal-loss: #ff959b;
+}
+:root[data-theme="light"] :is([class*="bg-win/"], [data-status-pill]) {
+  --color-win: var(--tint-ink-win);
+}
+:root[data-theme="light"] :is([class*="bg-loss/"], [data-status-pill]) {
+  --color-loss: var(--tint-ink-loss);
+}
+:root[data-theme="light"] :is([class*="bg-warn/"], [data-status-pill]) {
+  --color-warn: var(--tint-ink-warn);
+}
+:root[data-theme="light"] .text-\(--color-win-soft\) {
+  color: var(--tint-ink-win-soft);
+}
+:root[data-theme="light"] .text-\(--color-loss-soft\) {
+  color: var(--tint-ink-loss-soft);
 }
 
 /* ------------------------------------------------------------------------------------- theme switch (reveal) */

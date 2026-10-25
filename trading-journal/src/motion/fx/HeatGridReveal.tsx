@@ -1,5 +1,5 @@
 import { animate, type AnimationPlaybackControls } from "motion/react";
-import { Children, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Children, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { FX_TONE, useFxPlay } from "@/motion/fx/shared";
 import { isSafeFx } from "@/motion/safeFx";
@@ -69,9 +69,13 @@ export interface HeatGridRevealProps {
   ring?: boolean;
   "aria-label"?: string;
   role?: string;
+  /** Click on the grid itself (a gap or the halo around it); a click on a cell's own control never reaches it as `target === currentTarget`. */
+  onClick?: (e: MouseEvent<HTMLDivElement>) => void;
+  /** Dense grid (`tests/e2e/hitbox.ts`): the grid is the touch target and snaps a tap within this many px to the nearest cell. */
+  "data-hit-grid"?: number;
 }
 
-export function HeatGridReveal({ cols, origin = 0, play, playOnView = true, children, className, cellClassName, ring = true, "aria-label": ariaLabel, role }: HeatGridRevealProps) {
+export function HeatGridReveal({ cols, origin = 0, play, playOnView = true, children, className, cellClassName, ring = true, "aria-label": ariaLabel, role, onClick, "data-hit-grid": hitGrid }: HeatGridRevealProps) {
   const reduced = useReducedFx();
   const ref = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLSpanElement>(null);
@@ -118,7 +122,7 @@ export function HeatGridReveal({ cols, origin = 0, play, playOnView = true, chil
   }, [run, reduced, c, originKey]);
 
   return (
-    <div ref={ref} role={role} aria-label={ariaLabel} data-fx="heat-grid" data-run={run} className={cn("grid", className)} style={grid}>
+    <div ref={ref} role={role} aria-label={ariaLabel} data-fx="heat-grid" data-run={run} data-hit-grid={hitGrid} onClick={onClick} className={cn("grid", className)} style={grid}>
       {cells.map((cell, i) => (
         <div key={i} className={cn("relative", cellClassName)} style={hidden ? { opacity: 0 } : undefined}>
           {cell}

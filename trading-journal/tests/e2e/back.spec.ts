@@ -292,7 +292,7 @@ test("morph dialog: back closes a fact dialog and its card takes the panel back"
   await seed(page);
   await page.goto("/#overview");
   await expect(page.getByText("Netto-P&L").first()).toBeVisible();
-  const tile = page.locator('dl [aria-haspopup="dialog"]', { has: page.locator("dt", { hasText: "Win-Rate" }) }).first();
+  const tile = page.locator('[data-testid="hero-kpis"] [aria-haspopup="dialog"]', { has: page.locator(".label", { hasText: "Win-Rate" }) }).first();
   await tile.click();
   const dialog = page.getByRole("dialog", { name: "Win-Rate" });
   await expect(dialog).toBeVisible();

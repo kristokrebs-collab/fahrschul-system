@@ -41,7 +41,12 @@ An account view without any trade shows only the calendar (day notes work withou
   in by clip-path (`tween.draw`), heat map cells fade column by column (CSS opacity, 8 ms stagger).
 - Disziplin heat map: cells are 14–17 px (a 44 px hit area per cell would overlap the neighbours), so ONE click handler on the
   grid takes an exact hit on a traded day, else the nearest traded day whose centre lies within 24 px (`TAP_RADIUS`; one rect
-  read per cell, at tap time only). Double-click / Enter opens the day in the calendar.
+  read per cell, at tap time only). Double-click / Enter opens the day in the calendar. On coarse pointers an invisible 16 px halo
+  (`before:-inset-4`, behind the cells) lets the map itself take the tap; the host declares it as a dense grid (`data-hit-grid="24"`),
+  which `tests/e2e/hitbox.ts` measures instead of exempting the cells. `aria-activedescendant` is set only while the selected day is
+  among the drawn weeks (an id that does not exist is an axe violation).
+- P&L-Kalender: a day's figure takes `--cal-win` / `--cal-loss` once its tint is deep enough that the plain tone falls under 4.5 : 1
+  (win from intensity .7, loss from .2); the day number of a tinted day is `text-mute`, from intensity .4 `text-fg/85`.
 
 ## Disziplin layout (decision 12 – no black holes with a sparse journal)
 Left column: score ring + day / streak / Ø (`Im Kalender öffnen`) beside the heat map; under it the 30-day score trend; then
