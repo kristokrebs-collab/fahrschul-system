@@ -236,7 +236,7 @@ export function BerichteView({ className }: { className?: string }) {
           <MonthBenefitCard page={page} />
         </Cell>
       )}
-      <AnalysisNote lead="Berechnet aus deinem Journal – eine Rückschau, keine Prognose." />
+      <AnalysisNote className="lg:col-span-12" lead="Berechnet aus deinem Journal – eine Rückschau, keine Prognose." />
     </div>
   );
 }

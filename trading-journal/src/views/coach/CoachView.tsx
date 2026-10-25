@@ -126,7 +126,7 @@ export function CoachView({ className }: { className?: string }) {
       <Cell index={1} span="lg:col-span-5">
         <DataQualityCard now={now} />
       </Cell>
-      <AnalysisNote lead="Hinweise aus deinen Trades und Einträgen – Beobachtungen, keine Prognose." />
+      <AnalysisNote className="lg:col-span-12" lead="Hinweise aus deinen Trades und Einträgen – Beobachtungen, keine Prognose." />
     </div>
   );
 }

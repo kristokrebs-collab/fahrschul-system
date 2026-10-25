@@ -205,7 +205,7 @@ export function LaborView({ className }: { className?: string }) {
           </Suspense>
         </Cell>
       </Section>
-      <AnalysisNote lead="Ein Test zeigt, wie eine Idee in der Vergangenheit gelaufen wäre – keine Prognose." />
+      <AnalysisNote className="lg:col-span-12" lead="Ein Test zeigt, wie eine Idee in der Vergangenheit gelaufen wäre – keine Prognose." />
       <LabReplayHost />
       <LibraryHost />
     </div>

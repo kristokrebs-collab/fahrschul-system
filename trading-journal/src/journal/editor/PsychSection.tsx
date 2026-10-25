@@ -128,7 +128,7 @@ export function Meter5({ label, value, onChange, labels, tone }: { label: string
   const fill = tone === "win" ? "bg-win" : tone === "loss" ? "bg-loss" : "bg-fg";
   return (
     <div className="flex items-end gap-3">
-      <div role="radiogroup" aria-label={label} className="flex items-end gap-1.5" onKeyDown={onKey}>
+      <div role="radiogroup" aria-label={label} className="flex items-end gap-1.5 pointer-coarse:gap-0" onKeyDown={onKey}>
         {[1, 2, 3, 4, 5].map((n, i) => {
           const on = value === n;
           const lit = value != null && n <= value;
@@ -142,7 +142,7 @@ export function Meter5({ label, value, onChange, labels, tone }: { label: string
               data-level={n}
               tabIndex={on || (value == null && n === 1) ? 0 : -1}
               onClick={() => onChange(on ? null : n)}
-              className="group grid h-11 w-7 items-end justify-items-center rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/50"
+              className="group grid h-11 w-7 items-end justify-items-center rounded-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white/50 pointer-coarse:w-11"
             >
               <span className="relative block w-3.5 overflow-hidden rounded-[3px] bg-white/[0.08] transition-colors group-hover:bg-white/[0.14]" style={{ height: 10 + n * 6 }}>
                 <motion.span

@@ -112,7 +112,7 @@ export function StudioView({ className }: { className?: string }) {
           </Cell>
         </Section>
       )}
-      <AnalysisNote lead="Ein Backtest zeigt, wie deine Regeln in der Vergangenheit gelaufen wären – keine Prognose." />
+      <AnalysisNote className="lg:col-span-12" lead="Ein Backtest zeigt, wie deine Regeln in der Vergangenheit gelaufen wären – keine Prognose." />
     </div>
   );
 }

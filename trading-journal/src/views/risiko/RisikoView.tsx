@@ -150,7 +150,7 @@ export function RisikoView({ className }: { className?: string }) {
           <RiskSettingsCard />
         </Cell>
       </Section>
-      <AnalysisNote lead="Rechnung nach deinen Eingaben, Limits und den Kursen des Markts – keine Prognose." />
+      <AnalysisNote className="lg:col-span-12" lead="Rechnung nach deinen Eingaben, Limits und den Kursen des Markts – keine Prognose." />
     </div>
   );
 }

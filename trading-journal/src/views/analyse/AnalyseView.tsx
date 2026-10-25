@@ -178,7 +178,7 @@ export function AnalyseView({ className }: { className?: string }) {
           </section>
         </>
       )}
-      <AnalysisNote lead="Auswertung deiner Trades – die Zukunftsrechnungen sind Wahrscheinlichkeiten, keine Zusagen." />
+      <AnalysisNote className="lg:col-span-12" lead="Auswertung deiner Trades – die Zukunftsrechnungen sind Wahrscheinlichkeiten, keine Zusagen." />
     </div>
   );
 }

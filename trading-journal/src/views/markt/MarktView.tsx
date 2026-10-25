@@ -241,7 +241,7 @@ export function MarktView({ className }: { className?: string }) {
           </Cell>
         </>
       )}
-      <AnalysisNote />
+      <AnalysisNote className="lg:col-span-12" />
     </div>
   );
 }

@@ -22,12 +22,13 @@ interface Props {
   lead?: string;
   /** `assistant`: the one-sentence line under the input field instead of the two sentences of a page */
   variant?: "page" | "assistant";
+  /** a page built on the 12-column grid passes `lg:col-span-12`; a one-column grid or a sheet passes nothing */
   className?: string;
 }
 
 export function AnalysisNote({ lead = ANALYSIS_BASIS, variant = "page", className }: Props) {
   return (
-    <p className={cn("text-[12px] leading-relaxed text-mute", variant === "page" && "max-w-[72ch] lg:col-span-12", className)} data-testid="analysis-note" data-variant={variant}>
+    <p className={cn("text-[12px] leading-relaxed text-mute", variant === "page" && "max-w-[72ch]", className)} data-testid="analysis-note" data-variant={variant}>
       {variant === "assistant" ? ASSISTANT_NOTE : `${lead} ${NO_ADVICE_TEXT}`}
     </p>
   );

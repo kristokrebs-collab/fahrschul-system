@@ -31,6 +31,8 @@ dunkel und hell, mobil 390 × 844 (grober Zeiger) und Desktop 1280 × 800, gegen
   Trefferfläche (jetzt 44 px).
 - **Kontrast:** In der dunklen Darstellung hat `--color-faint` (#5f5f5f) nur etwa 3 : 1. Die Startseite behält ihn, wie sie ist; auf allen anderen Seiten und in
   Sheets gilt `#8c8c8c` (≥ 4,5 : 1 auf allen Flächen, `src/styles/themes.css`). Hell war schon in Ordnung (`#6b6b6b`).
+- **Test, der vom Wochentag abhing:** `ReportReadyHost` in `tests/unit/views.berichte.test.tsx` erwartet einen „Bericht bereit“ und war an Sonntagen rot (die Frist einer Woche
+  ist 6 Tage); `Date` ist dort jetzt auf einen Mittwoch festgelegt (Timer bleiben echt).
 - **Platzhalter und Englisch:** keine „Kommt gleich“-Platzhalter, kein `undefined` oder `NaN` im Text; englisch sind nur Fachwörter (Open Interest, Weekly Close, die
   Pine-Felder `open` / `close`) und der eigene Satz „Trade the best, fuck the rest“.
 - **axe (WCAG 2.1 A + AA, Kontrast):** `tests/e2e/selbstpruefung.spec.ts` prüft den Inhalt von 14 Seiten in beiden Themen und beiden Größen: keine Verstöße.
@@ -42,6 +44,10 @@ dunkel und hell, mobil 390 × 844 (grober Zeiger) und Desktop 1280 × 800, gegen
   Tages-Heatmap („Disziplin“) und das Cockpit haben Ziele unter 44 px. Wenn du das willst, ist es eine eigene Entscheidung.
 - **Helles Thema:** Farbige Plaketten („klar“, „Verlust“, „Tendenz“) liegen bei 4,27 – 4,48 : 1 statt 4,5; ihre Farben teilt die Startseite.
 - **Heatmaps:** die Wochentag-×-Uhrzeit-Karte in Analyse hat 21-px-Zellen (ein Raster, das nächste Zelle nimmt den Tipp); mehr passt bei 390 px nicht.
+- **Beim Wechsel von der Startseite** ragen für etwa 0,35 s die Zeiger der Bias-Leiste (Startseite) bis zu 14 px über den Rand, solange die Seite hinausgleitet; `scrollWidth` ist dann
+  kurz größer als die Breite. Das ist auch im Stand vor der Selbstprüfung so (der Test „the dock has five tabs …“ in `pages.spec.ts` wird dadurch gelegentlich rot) und liegt in der
+  Startseite – nicht angefasst.
+- **Setups, grober Zeiger, 1280 px:** die Umschalter im Seitenkopf sind jetzt 44 px hoch; der gemessene Treffer-Streifen liegt wegen der Nachbarn bei 40 px.
 - **Quelle und Stand:** die Liste in der Tabelle oben; der Hinweis am Seitenende ersetzt keine Quelle bei einer einzelnen Zahl.
 - **Abdeckung:** `docs/COVERAGE.md` stimmt in Pfaden (alle genannten Dateien und Tests existieren), Stand-Zeile (32 fertig · 33 teilweise · 9 fehlt) und den
   stichprobenartig nachgezählten Zahlen (33 Bausteine, 32 Bibliothekskarten, 9 CSV-Formate, 20 / 240 Versionen, 8 / 5 / 250 Konten, 80 und 20 als Mindestmengen).

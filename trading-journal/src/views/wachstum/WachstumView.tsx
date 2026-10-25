@@ -146,7 +146,7 @@ export function WachstumView({ className }: { className?: string }) {
           <ProgressCard points={series} />
         </Cell>
       </Section>
-      <AnalysisNote lead="Auswertung deiner Einträge und Trades – Beobachtungen, keine Prognose." />
+      <AnalysisNote className="lg:col-span-12" lead="Auswertung deiner Einträge und Trades – Beobachtungen, keine Prognose." />
       {/* the overlays live outside the page's subtree (transformed while it enters): fixed layers need the viewport */}
       {typeof document !== "undefined" &&
         createPortal(

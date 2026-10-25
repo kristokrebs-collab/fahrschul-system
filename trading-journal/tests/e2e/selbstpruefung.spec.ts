@@ -64,6 +64,12 @@ test.describe("Selbstprüfung", () => {
         return rest.length;
       });
       expect(last, "visible content after the note").toBe(0);
+      // and it really sits BELOW the page header, in the page's own column (a note that spans columns of a one-column grid
+      // would push the header to the end of the page)
+      const h1Box = (await layer(page, key).locator("h1").first().boundingBox())!;
+      const noteBox = (await notes.boundingBox())!;
+      expect(noteBox.y, `note below the header of ${key}`).toBeGreaterThan(h1Box.y + h1Box.height);
+      expect(Math.abs(noteBox.x - h1Box.x), `note starts where the page starts (${key})`).toBeLessThanOrEqual(4);
       expect(errors, errors.join("\n")).toEqual([]);
     });
   }
@@ -170,7 +176,7 @@ test.describe("Selbstprüfung", () => {
     // „Inhalt“ strip (chips beyond the edge) and file inputs that only a button opens are not tap targets of their own
     const exempt = (m: { name: string; where: string; w: number }) => m.where === "heat-cell" || m.where === "section-nav" || m.w <= 1;
     const problems: string[] = [];
-    for (const key of ["markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "funktionen"] as const) {
+    for (const key of ["markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "funktionen", "setups"] as const) {
       await page.goto(`/#${key}`);
       await ready(page, key);
       await page.waitForTimeout(900);
