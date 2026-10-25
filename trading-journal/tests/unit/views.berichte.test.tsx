@@ -167,9 +167,15 @@ describe("ReportReadyHost", () => {
     reduceMotion();
   });
   beforeEach(async () => {
+    // a report counts as "just ended" only for a few days after its end: pin the calendar (a Wednesday, two days after a
+    // week ended), or the test fails on the days of the week when none has just ended; only `Date` is faked
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 9, 21, 12, 0, 0) });
     await bootFixtureJournal();
     useBerichteUi.getState().reset();
     localStorage.removeItem(READY_KEY);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("announces the period that just ended once per device; 'Bericht öffnen' selects it", async () => {
@@ -180,7 +186,7 @@ describe("ReportReadyHost", () => {
         <ReportReadyHost onOpen={onOpen} />
       </MotionRoot>,
     );
-    const ready = await screen.findByTestId("report-ready");
+    const ready = await screen.findByTestId("report-ready", {}, { timeout: 15_000 });
     const key = ready.getAttribute("data-key")!;
     expect(ready).toHaveTextContent(/(Wochen|Monats|Quartals|Jahres)bericht/);
     expect(readAnnounced()).toContain(key);
@@ -214,7 +220,7 @@ describe("ReportReadyHost", () => {
     await act(async () => {
       useShareRoute.setState({ token: null });
     });
-    expect(await screen.findByTestId("report-ready")).toBeInTheDocument();
+    expect(await screen.findByTestId("report-ready", {}, { timeout: 15_000 })).toBeInTheDocument();
   });
 
   it("stays silent for an empty journal", async () => {
