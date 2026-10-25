@@ -29,6 +29,10 @@ dunkel und hell, mobil 390 × 844 (grober Zeiger) und Desktop 1280 × 800, gegen
   (`aria-controls`); die CSV-Datei im Labor hatte kein Label; im Preis stand ein `aria-label` auf einem Element ohne Rolle; der Name einer Schlüsselmarke wurde
   mit „…“ abgeschnitten (jetzt Umbruch); Chips, Export-Knöpfe, Archiv, Watchlist und die Steuerung der Simulation hatten bei grobem Zeiger weniger als 44 px
   Trefferfläche (jetzt 44 px).
+- **Touch-Tests der Tablets (`tests/e2e/touch.spec.ts`, 1280 × 800 und 1692 × 978):** im Stand vor der Selbstprüfung waren „Seite Einstellungen“ und „Overlays“ rot – die Skalen für Stress und
+  Zuversicht im Editor waren 28 px breit (jetzt 44 px bei grobem Zeiger), und die seitlich scrollende „Inhalt“-Leiste und 1-px-Dateifelder zählten als Ziele (jetzt ausgenommen, mit Grund im Test).
+  Mein erster Entwurf des Hinweises hat die Setups-Seite zerlegt (er spannte sich über zwölf Spalten eines Ein-Spalten-Rasters); der Touch-Test der Setups-Seite hat das gefunden, jetzt spannt nur eine
+  12-Spalten-Seite ihn selbst, und `selbstpruefung.spec.ts` prüft, dass der Hinweis unter dem Seitenkopf in dessen Spalte steht.
 - **Kontrast:** In der dunklen Darstellung hat `--color-faint` (#5f5f5f) nur etwa 3 : 1. Die Startseite behält ihn, wie sie ist; auf allen anderen Seiten und in
   Sheets gilt `#8c8c8c` (≥ 4,5 : 1 auf allen Flächen, `src/styles/themes.css`). Hell war schon in Ordnung (`#6b6b6b`).
 - **Test, der vom Wochentag abhing:** `ReportReadyHost` in `tests/unit/views.berichte.test.tsx` erwartet einen „Bericht bereit“ und war an Sonntagen rot (die Frist einer Woche
