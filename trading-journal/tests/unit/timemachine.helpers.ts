@@ -19,7 +19,7 @@ export const STEP = 1.01;
  */
 export function latticeBars(n: number, pUp: number, secLen = 86_400, t0 = 1_700_000_000 - (1_700_000_000 % 86_400), seed = 7): Bar[] {
   const ups = Math.round(pUp * n);
-  const dirs = Array.from({ length: n }, (_, i) => (i < ups ? 1 : -1));
+  const dirs: number[] = Array.from({ length: n }, (_, i) => (i < ups ? 1 : -1));
   const r = rng(seed);
   for (let i = n - 1; i > 0; i--) {
     const j = Math.floor(r() * (i + 1));

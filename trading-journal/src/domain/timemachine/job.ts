@@ -49,13 +49,20 @@ export function createTmJob(input: TmInput): TmJob {
   let col = 0;
   const bands: Record<FanBand, number[]> = { p5: [], p25: [], p50: [], p75: [], p95: [] };
   let tmp: Float64Array;
+  let above = 0;
   let res: TmResult | null = null;
 
   const fanStep = (deadline: number): boolean => {
     const o = sim.out;
     const H = input.horizon;
     while (col <= H) {
-      for (let r = 0; r < o.bandRuns; r++) tmp[r] = o.fan[r * o.stride + col]!;
+      let plus = 0;
+      for (let r = 0; r < o.bandRuns; r++) {
+        const v = o.fan[r * o.stride + col]!;
+        tmp[r] = v;
+        if (v > 0) plus++;
+      }
+      if (col === H) above = o.bandRuns ? plus / o.bandRuns : 0;
       tmp.sort();
       for (const [name, p] of BANDS) bands[name].push(r3(quantile(tmp, p)));
       col++;
@@ -92,7 +99,7 @@ export function createTmJob(input: TmInput): TmJob {
         else return false;
       }
       if (phase === "summary") {
-        res = summarize(input, pool, rel, sim.out, bands, hist);
+        res = summarize(input, pool, rel, sim.out, bands, hist, above);
         phase = "done";
       }
       return true;
@@ -127,7 +134,7 @@ export function runTimeMachineSync(input: TmInput): TmResult {
   return job.result()!;
 }
 
-function summarizeSim(input: TmInput, o: SimOut, bands: Record<FanBand, number[]>, targetR: number): TmSim {
+function summarizeSim(input: TmInput, o: SimOut, bands: Record<FanBand, number[]>, targetR: number, above: number): TmSim {
   const idx: number[] = [];
   for (let k = 0; k < o.runs; k++) if (o.kind[k] !== K_SKIPPED) idx.push(k);
   const n = idx.length;
@@ -180,15 +187,15 @@ function summarizeSim(input: TmInput, o: SimOut, bands: Record<FanBand, number[]
     timeStop: quart(tS),
     maeAll: quart(maeAll),
     maeTarget: quart(maeT),
-    endR: { p5: bands.p5[last] ?? 0, p50: bands.p50[last] ?? 0, p95: bands.p95[last] ?? 0 },
+    endR: { p5: bands.p5[last] ?? 0, p50: bands.p50[last] ?? 0, p95: bands.p95[last] ?? 0, above },
     ambiguous: o.ambiguous,
     fan,
   };
 }
 
-function summarize(input: TmInput, pool: Pool, rel: Relative, o: SimOut, bands: Record<FanBand, number[]>, hist: HistoryJob): TmResult {
+function summarize(input: TmInput, pool: Pool, rel: Relative, o: SimOut, bands: Record<FanBand, number[]>, hist: HistoryJob, above: number): TmResult {
   const targetR = targetROf(input.plan);
-  const sim = summarizeSim(input, o, bands, targetR);
+  const sim = summarizeSim(input, o, bands, targetR, above);
   const history = hist.result();
   let radiusMin = 255;
   let radiusMax = 0;
@@ -207,6 +214,7 @@ function summarize(input: TmInput, pool: Pool, rel: Relative, o: SimOut, bands: 
     plan: { ...input.plan },
     interval: input.interval,
     seed: input.seed,
+    costs: input.costs,
     options: { runs: input.runs, seed: input.seed, horizon: input.horizon, method: input.method, blockLen: input.blockLen, drift: input.drift, vol: input.vol, trigger: input.trigger, validBars: input.validBars, manage: { ...input.manage } },
     targetR,
     pool: { bars: pool.n, slots: pool.slots, radiusMin, radiusMax, thinnest, fromMs: first.t * 1000, toMs: (lastBar.t + pool.secLen) * 1000, driftPerBar: pool.drift, volRatio: now != null && median != null && median > 0 ? now / median : null, volScale: pool.scale },

@@ -3,6 +3,8 @@
  * summary lines. The same functions feed the card, the journal sheet and the assistant, so the words never drift apart. Every
  * figure comes from the result; nothing here estimates anything.
  */
+import { slippageText } from "../backtest/slippage";
+import { triggerText } from "./plan";
 import type { TmCompare, TmCompareRow, TmHistory, TmNote, TmPlan, TmResult, TmSim, TmVerdict } from "./types";
 import { TM_INTERVAL_TEXT, TM_SEC, MIN_EVENTS, MIN_SLOT_BARS, type TmInterval } from "./types";
 
@@ -32,7 +34,7 @@ export function durationText(bars: number, interval: TmInterval): string {
 
 export function planLine(p: TmPlan, symbol: string, interval: TmInterval): string {
   const px = (v: number): string => v.toLocaleString("de-DE", { maximumFractionDigits: v >= 1000 ? 2 : v >= 1 ? 4 : 8 });
-  return `${symbol} · ${p.side === "long" ? "Long" : "Short"} · Einstieg ${px(p.entry)} · Stop ${px(p.stop)} · Ziel ${px(p.target)} · ${TM_INTERVAL_TEXT[interval]}-Kerzen`;
+  return `${symbol} · ${p.side === "long" ? "Long" : "Short"} · Einstieg ${px(p.entry)} · Stop ${px(p.stop)} · Ziel ${px(p.target)}${Math.abs(p.entry - p.stop) > 0 ? ` (${rPlain(Math.abs(p.target - p.entry) / Math.abs(p.entry - p.stop))})` : ""} · Kerzen: ${TM_INTERVAL_TEXT[interval]}`;
 }
 
 /* ------------------------------------------------------------------------------------------------ verdict */
@@ -160,4 +162,45 @@ export function summaryLines(r: TmResult): string[] {
   else lines.push("Echte Vorfälle: keine in den vorhandenen Kerzen.");
   lines.push(r.verdict.text, r.compare.text);
   return lines;
+}
+
+/* ------------------------------------------------------------------------------------------------ assumptions */
+
+const f2n = new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 });
+const day = (ms: number): string => new Date(ms).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+/** The costs the engine charged, in words. */
+export function costText(c: TmResult["costs"]): string {
+  const f = c.fees;
+  const fee = `Gebühren: Taker ${f2n.format(f.takerBps)} bp (Einstieg, Stop, Zeitstopp), Maker ${f2n.format(f.makerBps)} bp (Ziel)`;
+  const slip = `Slippage: ${slippageText(c.slippage)}`;
+  const fund = c.funding.kind === "none" ? "kein Funding" : c.funding.kind === "flat" ? `Funding pauschal ${f2n.format(c.funding.ratePer8h * 100)} % je 8 Std. (Annahme, nicht die echte Historie)` : "Funding aus der echten Historie";
+  return `${fee}; ${slip}; ${fund}.`;
+}
+
+/** What the numbers rest on and what they leave out – every line is a fact about this run or a named limit. */
+export function assumptionsOf(r: TmResult, source?: string | null): string[] {
+  const o = r.options;
+  const p = r.pool;
+  const out: string[] = [];
+  out.push(`Kerzen: ${count(p.bars)} echte Kerzen (${TM_INTERVAL_TEXT[r.interval]} je Kerze) von ${day(p.fromMs)} bis ${day(p.toMs)}${source ? `, Quelle ${source}` : ""}. Nur geschlossene Kerzen.`);
+  out.push(`Jede Sitzung: ${durationText(o.horizon, r.interval)} ab dem Einstieg (der Zeitstopp). Die erste Kerze öffnet auf dem Einstiegspreis und behält ihre Form.`);
+  out.push(
+    o.method === "block"
+      ? `Gezogen werden Reihen von je ${o.blockLen} echten, aufeinanderfolgenden Kerzen (Block-Bootstrap) – so bleiben Phasen mit viel und mit wenig Bewegung erhalten.`
+      : "Gezogen wird jede Kerze einzeln aus der Historie (Bootstrap) – Phasen mit viel oder wenig Bewegung bleiben nicht erhalten.",
+  );
+  out.push(`Tageszeit: zu jeder Tageszeit stammen die Kerzen aus derselben Tageszeit${p.slots > 1 ? ` (± ${p.radiusMax} Kerzen, mindestens ${MIN_SLOT_BARS} im Fenster; die dünnste Tageszeit hat ${count(p.thinnest)})` : " (Tageskerzen haben keine Tageszeit)"}.`);
+  out.push(o.vol === "now" ? "Schwankung: die Kerzen sind auf die heutige Schwankung umgerechnet (Durchschnitt der Kerzenspanne des letzten Tages)." : "Schwankung: die Kerzen bleiben so groß, wie sie waren (nicht an heute angepasst).");
+  out.push(o.drift === "zero" ? "Trend: der Trend der Historie ist herausgerechnet." : "Trend: der Trend der Historie fließt ein.");
+  out.push("Regeln wie in der Backtest-Engine: Stop und Ziel werden je Kerze geprüft (nicht je Tick); liegen beide in einer Kerze, zählt der Stop; ein Stop, durch den der Kurs hinausspringt, füllt zur Eröffnung.");
+  if (o.manage.breakEvenR != null || o.manage.trailAtr != null) {
+    out.push(`Verwaltung: ${o.manage.breakEvenR != null ? `Stop auf den Einstieg ab +${f2n.format(o.manage.breakEvenR)} R` : ""}${o.manage.breakEvenR != null && o.manage.trailAtr != null ? "; " : ""}${o.manage.trailAtr != null ? `Trailing ${f2n.format(o.manage.trailAtr)} × ATR ab +${f2n.format(o.manage.trailFromR)} R` : ""} – entschieden am Kerzenschluss, wirksam ab der nächsten Kerze.`);
+  }
+  out.push(costText(r.costs));
+  out.push("Alle Einstiege wie die Engine sie macht: Market-Fill mit Taker-Gebühr und Slippage (bei Limit-Aufträgen etwas zu pessimistisch).");
+  out.push(`Echte Vorfälle: gesucht nach „${triggerText(o.trigger, r.relative.kind)}“; eine Position nach der anderen. Nach einem Limit-Einstieg kann das Ziel in derselben Kerze nicht zählen (die Reihenfolge von Hoch und Tief ist unbekannt), der Stop schon.`);
+  out.push(`Seed ${r.seed}: gleicher Plan, gleiche Kerzen, gleicher Seed ergeben auf jedem Gerät dieselben Zahlen.`);
+  out.push("Nicht enthalten: Nachrichten, Handelsstopps und Lücken außerhalb der Kerzen, Marktauswirkung großer Aufträge, Ausführung zwischen den Kerzen. Die Simulation mischt die Vergangenheit neu – sie kennt die Zukunft nicht.");
+  return out;
 }

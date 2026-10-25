@@ -6,8 +6,13 @@
  * Simulated sessions and real candles go through exactly this function, so the two parts are comparable by construction.
  */
 import { runBacktest } from "../backtest/engine";
+import { DEFAULT_FEES, DEFAULT_FUNDING_RATE } from "../backtest/fees";
+import { DEFAULT_SLIPPAGE } from "../backtest/slippage";
 import type { BtStrategy, BtTrade, EngineCfg, EntrySignal, PositionMgmt } from "../backtest/types";
 import type { Bar, CostModel, TmManage, TmPlan } from "./types";
+
+/** Costs when the caller gives none: the lab's defaults – Binance base-tier fees, 2 bp slippage, flat funding 0,01 % per 8 h (perpetuals). */
+export const DEFAULT_TM_COSTS: CostModel = { fees: DEFAULT_FEES, slippage: DEFAULT_SLIPPAGE, funding: { kind: "flat", ratePer8h: DEFAULT_FUNDING_RATE } };
 
 /** Capital and risk only scale the position: R, the shares and the costs in R do not depend on them. No leverage cap. */
 export function engineCfg(costs: CostModel): EngineCfg {

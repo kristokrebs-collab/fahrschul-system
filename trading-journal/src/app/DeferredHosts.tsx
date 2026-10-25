@@ -22,6 +22,7 @@
  * | `KeyLevelHost` | F22 / F08 | stage alerts of the user's own key levels + day-plan change toast, only while the app is open (no plan gate) |
  * | `PresenceHost` | F27 | the beat that records when the app was open (alerts run only then) – this device only |
  * | `WhatIfMount` | F33 | the „Was wäre wenn“ sheet of a trade – its own chunk, fetched the first time it is opened |
+ * | `TimeMachineMount` | Zeitmaschine | the „Zeitmaschine für diesen Trade“ sheet (the plan of a trade played through 10 000 simulated sessions and every earlier occasion) – its own chunk, fetched the first time it is opened |
  * | `TrainingMount` | F38 | the training sheet (Lernmodus: situations without the future, decision, reveal, reflection) – its own chunk, fetched the first time it is opened |
  * | `SignalOutcomeHost` | F32 | once after the start: the automatic outcomes of archived signals (idle, a few at a time; own chunk, fetched only when entry signals are stored; gate `coach`) |
  * | `ForwardMount` | F23 | the forward test's catch-up of the virtual accounts – its own chunk, fetched only while an account is running / paused / being wound up, only while the app is open |
@@ -49,6 +50,7 @@ import { CoachWatcher } from "@/views/coach/CoachWatcher";
 import { SignalOutcomeHost } from "@/views/coach/SignalOutcomeHost";
 import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
 import { ReplayHost } from "@/views/trades/replay/TradeReplay";
+import { useTmSheet } from "@/views/timemachine/sheetStore";
 import { useWhatIf } from "@/views/trades/whatif/whatIfStore";
 import { useTraining } from "@/views/ueben/trainingStore";
 import { DailyCheckinHost } from "@/views/wachstum/DailyCheckinHost";
@@ -56,6 +58,7 @@ import { PostTradeReviewHost } from "@/views/wachstum/PostTradeReview";
 
 const AssistantHost = lazy(() => import("@/assistant/AssistantHost"));
 const WhatIfHost = lazy(() => import("@/views/trades/whatif/WhatIfHost"));
+const TimeMachineHost = lazy(() => import("@/views/timemachine/TradeSheet"));
 const TrainingHost = lazy(() => import("@/views/ueben/TrainingHost"));
 const ForwardHost = lazy(() => import("@/views/labor/forward/ForwardHost"));
 
@@ -75,6 +78,16 @@ function WhatIfMount() {
   return used ? (
     <Suspense fallback={null}>
       <WhatIfHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Zeitmaschine für einen Trade: same pattern – the chunk (sheet, card, charts, worker) is fetched the first time a trade asks for it. */
+function TimeMachineMount() {
+  const used = useTmSheet((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <TimeMachineHost />
     </Suspense>
   ) : null;
 }
@@ -158,6 +171,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Was wäre wenn">
         <WhatIfMount />
+      </HostSlot>
+      <HostSlot name="Zeitmaschine">
+        <TimeMachineMount />
       </HostSlot>
       <HostSlot name="Training">
         <TrainingMount />

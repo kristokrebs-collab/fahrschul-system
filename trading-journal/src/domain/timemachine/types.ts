@@ -210,7 +210,7 @@ export interface TmSim extends TmShares {
   maeAll: Quart | null;
   maeTarget: Quart | null;
   /** price at the end of the session relative to the entry, in R (all runs, the session runs to its end whatever the trade did) */
-  endR: { p5: number; p50: number; p95: number };
+  endR: { p5: number; p50: number; p95: number; /** share of the runs whose end price lies above the entry (in the trade's direction) */ above: number };
   ambiguous: number;
   fan: TmFan;
 }
@@ -302,6 +302,8 @@ export interface TmResult {
   interval: TmInterval;
   seed: number;
   options: TmOptions;
+  /** the fees, slippage and funding the engine charged */
+  costs: CostModel;
   /** R of the target in R of the planned risk */
   targetR: number;
   /** the time-of-day pool: candles used, slots, radius range, thinnest slot */
