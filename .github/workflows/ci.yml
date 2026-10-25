@@ -44,6 +44,11 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # the whole suite takes close to an hour on one runner: two shards (split by test) run side by side
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -55,12 +60,12 @@ jobs:
       # Playwright's own Chromium (PW_CHROMIUM stays unset here; it only points at the pinned browser of the dev container)
       - run: npx playwright install --with-deps chromium
       # the config's webServer builds both editions and serves them with `vite preview` (CI=true: retries 1, no reuse)
-      - run: npx playwright test --project=mobile --project=desktop
+      - run: npx playwright test --project=mobile --project=desktop --shard=${{ matrix.shard }}/2
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             trading-journal/playwright-report
             trading-journal/test-results

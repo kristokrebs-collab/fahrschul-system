@@ -225,8 +225,14 @@ export async function clippedTexts(scope: Locator): Promise<string[]> {
 }
 
 export async function expectNoHorizontalScroll(page: Page): Promise<void> {
-  const [scrollWidth, width] = await page.evaluate(() => [document.documentElement.scrollWidth, Math.min(window.innerWidth, document.documentElement.clientWidth)]);
-  expect(scrollWidth, `scrollWidth ${scrollWidth} > viewport width ${width}`).toBeLessThanOrEqual(width);
+  // the page that just opened scales and fades in for a moment: its full-bleed rows (the section strip) reach a few px past
+  // the edge for the length of that transition, so the settled state is what counts – polled, not read once
+  await expect
+    .poll(async () => page.evaluate(() => document.documentElement.scrollWidth - Math.min(window.innerWidth, document.documentElement.clientWidth)), {
+      message: "the page is wider than the viewport (horizontal scroll)",
+      timeout: 4000,
+    })
+    .toBeLessThanOrEqual(0);
 }
 
 /** Asserts that a dialog's footer actions are on screen without scrolling (a sheet taller than the viewport hides them). */
