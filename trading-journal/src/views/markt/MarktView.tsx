@@ -45,6 +45,9 @@ const TrendStructureCard = lazy(() => import("./TrendStructureCard").then((m) =>
 // F19: „Ähnliche Situationen“ – own chunk too (domain search, market hook, texts), the hit sheet is a third one
 const SimilarCard = lazy(() => import("./SimilarCard").then((m) => ({ default: m.SimilarCard })));
 
+// F43: „Heute wichtig“ (Morgenbriefing), „Termine“ (Kalender) and „Ereignisphasen“ – own chunk, loaded with the page
+const TermineSection = lazy(() => import("@/views/termine/TermineSection"));
+
 /** The cards of the page in reading order, for its "Inhalt" strip (each card is found by its `data-testid`). */
 const NAV: readonly SectionNavItem[] = [
   { id: "markt-best", label: "Beste Setups" },
@@ -54,6 +57,9 @@ const NAV: readonly SectionNavItem[] = [
   { id: "markt-similar", label: "Ähnliche Situationen" },
   { id: "keylevels-card", label: "Marken" },
   { id: "plan-card", label: "Tagesplan" },
+  { id: "briefing-card", label: "Heute wichtig" },
+  { id: "termine-card", label: "Termine" },
+  { id: "phasen-card", label: "Ereignisphasen" },
   { id: "markt-rsi", label: "RSI-Linien" },
   { id: "markt-scanner", label: "Scanner" },
   { id: "markt-settings", label: "Einstellungen" },
@@ -223,6 +229,17 @@ export function MarktView({ className }: { className?: string }) {
           </Cell>
           <Cell index={7} span="lg:col-span-5">
             <PlanCard />
+          </Cell>
+          <Cell index={7} span="lg:col-span-12">
+            <Suspense
+              fallback={
+                <Card title="Termine" data-testid="termine-loading">
+                  <Skeleton height={200} />
+                </Card>
+              }
+            >
+              <TermineSection />
+            </Suspense>
           </Cell>
           <Cell index={3} span="lg:col-span-5">
             <RsiLinesCard view={view} />

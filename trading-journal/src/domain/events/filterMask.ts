@@ -9,26 +9,10 @@
  * Pure and deterministic; the windows are computed once for the time range of the bars and swept with the bars.
  */
 import { PASS, FAIL, type SideMask } from "../lab/filters/masks";
+import type { EventFilterKind } from "./filterKinds";
 import { expiryEvents, fundingEvents } from "./rules";
 import { usEvents } from "./usEvents";
 import { MINUTE } from "./types";
-
-export type EventFilterKind = "funding" | "expiry" | "usOpen";
-export const EVENT_FILTER_KINDS: readonly EventFilterKind[] = ["funding", "expiry", "usOpen"];
-
-export const EVENT_FILTER_LABEL: Readonly<Record<EventFilterKind, string>> = {
-  funding: "Funding",
-  expiry: "Verfall",
-  usOpen: "US-Börsenöffnung",
-};
-
-/** What the lab shows for the kinds it cannot offer. */
-export const EVENT_FILTER_REASON =
-  "Nur Termine, die sich nach einer Regel für jede Kerze berechnen lassen. FOMC-Termine liegen nur für 2021–2027 vor und eigene Termine nur ab dem Eintrag – ein Filter über einen längeren Zeitraum würde nur einen Teil der Historie filtern.";
-
-export const EVENT_MINUTES = { min: 15, max: 240, step: 15, def: 60 } as const;
-
-export const DEFAULT_EVENT_KINDS: readonly EventFilterKind[] = ["funding", "expiry", "usOpen"];
 
 /** Merged `[start, end]` windows (ms UTC, both ends blocked) around the appointments in `[from, to]`. */
 export function blockedWindows(from: number, to: number, minutes: number, kinds: readonly EventFilterKind[]): [number, number][] {

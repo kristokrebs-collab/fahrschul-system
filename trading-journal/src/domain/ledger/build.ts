@@ -53,7 +53,6 @@ interface Ctx {
   src: string;
 }
 
-const dirOf = (t: Trade): 1 | -1 => (t.side === "short" ? -1 : 1);
 const actionOf = (t: Trade, kind: "open" | "close"): "Kauf" | "Verkauf" => ((kind === "open") === (t.side !== "short") ? "Kauf" : "Verkauf");
 
 function baseRow(t: Trade, kind: LedgerKind, id: string, at: number): LedgerRow {

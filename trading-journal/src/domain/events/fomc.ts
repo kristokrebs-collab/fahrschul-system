@@ -19,9 +19,12 @@ export interface FomcMeeting {
 
 export const FOMC_MEETINGS: readonly FomcMeeting[] = data.meetings;
 
+/** `2026-10-25` → `25.10.2026` */
+const de = (iso: string): string => iso.split("-").reverse().join(".");
+
 export const FOMC_SOURCE: EventSource = {
   label: data.source.label,
-  rule: `Termin laut Liste der Fed, abgerufen am ${data.source.fetchedAt} (Seitenstand ${data.source.pageUpdated}); ohne Uhrzeit, die Seite nennt keine.`,
+  rule: `Termin laut Liste der Fed, abgerufen am ${de(data.source.fetchedAt)} (Seitenstand ${de(data.source.pageUpdated)}); ohne Uhrzeit, die Seite nennt keine.`,
   url: data.source.url,
   checkedAt: data.source.fetchedAt,
 };

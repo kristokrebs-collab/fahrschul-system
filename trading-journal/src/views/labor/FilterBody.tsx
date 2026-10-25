@@ -10,6 +10,7 @@ import { activeFilters, filterInfos, FILTER_LIMITS, type FilterCompare, type Fil
 import { cn } from "@/lib/cn";
 import { Switch } from "@/motion/Switch";
 import { Badge } from "@/primitives/Badge";
+import { EventFilterRow } from "./EventFilter";
 import { Block, countDelta, deltaTone, ppText, RunBar, ScrollTable, signedText, TH, THL } from "./ExtraParts";
 import { cancelExtra, runFilters, useExtras } from "./extrasStore";
 import { useLabor } from "./laborStore";
@@ -32,16 +33,17 @@ export default function FilterBody() {
   const active = useMemo(() => activeFilters(sel, strategy, interval), [sel, strategy, interval]);
   if (!result) return null;
   const cmp = slice.status === "done" ? slice.result : null;
-  const anyOpen = infos.some((i) => i.available);
   return (
     <div className="grid gap-5" data-testid="labor-filters">
       <Block title={F.title} sub={F.note} id="labor-filter-choose">
         <ul className="grid gap-2.5" aria-label={F.choose}>
-          {infos.map((info) => (
+          {infos
+            .filter((info) => info.id !== "event")
+            .map((info) => (
             <FilterRowItem key={info.id} id={info.id} label={info.label} sub={info.sub} available={info.available} reason={info.reason} />
           ))}
+          <EventFilterRow />
         </ul>
-        {!anyOpen && <p className="text-[12.5px] text-mute">{F.lockedAll}</p>}
         {result.strategy === "custom" && <p className="text-[11.5px] leading-snug text-faint">{F.customNote}</p>}
         <RunBar slice={slice} onRun={() => void runFilters()} onCancel={() => cancelExtra("filters")} label="Vergleich rechnen" id="labor-filters" disabled={active.length === 0} disabledReason={F.none} hint={X.prepNote} />
       </Block>

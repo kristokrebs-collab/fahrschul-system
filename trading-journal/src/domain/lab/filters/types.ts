@@ -8,11 +8,12 @@ import type { LabStrategyId } from "../../backtest/job";
 import type { HistInterval } from "../../backtest/types";
 import { HIST_MS } from "../../backtest/types";
 import { sanitizePatternSpec, type PatternFilterSpec } from "../../discovery/spec";
+import { DEFAULT_EVENT_KINDS, EVENT_FILTER_LABEL, EVENT_MINUTES, eventKindsOf, eventMinutesOf, type EventFilterKind } from "../../events/filterKinds";
 
 export const FILTER_VERSION = 1 as const;
 
-export type FilterId = "rsi" | "trend" | "retest" | "topTrader" | "pattern";
-export const FILTER_IDS: readonly FilterId[] = ["rsi", "trend", "retest", "topTrader", "pattern"];
+export type FilterId = "rsi" | "trend" | "retest" | "topTrader" | "pattern" | "event";
+export const FILTER_IDS: readonly FilterId[] = ["rsi", "trend", "retest", "topTrader", "pattern", "event"];
 
 /** The user's choice (persisted by the Labor page; versioned like the other lab settings). */
 export interface FilterSelection {
@@ -24,6 +25,9 @@ export interface FilterSelection {
   trendLen: number;
   /** pattern: a confirmed finding of the Muster-Entdecker, chosen by the user ("Mit diesem Filter testen"); absent = none chosen */
   pattern?: PatternFilterSpec;
+  /** event (F43): no entry this many minutes before / after an appointment of the chosen kinds; absent = 60 minutes, funding · expiry · US open */
+  eventMinutes?: number;
+  eventKinds?: EventFilterKind[];
 }
 
 export const FILTER_LIMITS = { rsiLimit: { min: 55, max: 90, step: 5 }, trendLen: { min: 5, max: 100, step: 5 } } as const;
@@ -38,12 +42,16 @@ export function sanitizeFilters(raw: unknown): FilterSelection {
   if (r.v !== undefined && r.v !== FILTER_VERSION) return DEFAULT_FILTERS;
   const on = Array.isArray(r.on) ? FILTER_IDS.filter((id) => (r.on as unknown[]).includes(id)) : [];
   const pattern = sanitizePatternSpec(r.pattern);
+  const eventMinutes = eventMinutesOf(r.eventMinutes);
+  const eventKinds = eventKindsOf(r.eventKinds);
   return {
     v: FILTER_VERSION,
     on,
     rsiLimit: clampInt(r.rsiLimit, FILTER_LIMITS.rsiLimit.min, FILTER_LIMITS.rsiLimit.max, DEFAULT_FILTERS.rsiLimit),
     trendLen: clampInt(r.trendLen, FILTER_LIMITS.trendLen.min, FILTER_LIMITS.trendLen.max, DEFAULT_FILTERS.trendLen),
     ...(pattern ? { pattern } : {}),
+    ...(eventMinutes !== null ? { eventMinutes } : {}),
+    ...(eventKinds ? { eventKinds } : {}),
   };
 }
 
@@ -96,6 +104,12 @@ export function filterInfos(strategy: LabStrategyId, interval: HistInterval, sel
   // the pattern of the Muster-Entdecker is listed only once the user has chosen one there ("Mit diesem Filter testen")
   if (sel.pattern) {
     list.push({ id: "pattern", label: "Muster aus dem Muster-Entdecker", sub: `Nur Einstiege, bei denen gilt: ${sel.pattern.label}. Gerechnet aus den geschlossenen Kerzen vor dem Einstieg.`, available: true, reason: null });
+  }
+  // F43: the event filter is listed once the user has switched it on (the Labor card shows its own row for it, with the minutes and kinds)
+  if (sel.on.includes("event")) {
+    const minutes = sel.eventMinutes ?? EVENT_MINUTES.def;
+    const kinds = (sel.eventKinds ?? DEFAULT_EVENT_KINDS).map((k) => EVENT_FILTER_LABEL[k]).join(", ");
+    list.push({ id: "event", label: "Keine Einstiege rund um Termine", sub: `Kein Einstieg ${minutes} Minuten vor oder nach einem Termin (${kinds}). Es zählt der Zeitpunkt des Einstiegs: die Eröffnung der Kerze nach dem Signal.`, available: true, reason: null });
   }
   return list;
 }

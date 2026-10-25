@@ -313,6 +313,12 @@ export interface Settings {
    * two-tab merge works per strategy and per version; entries a newer version wrote survive untouched.
    */
   studio?: unknown;
+  /**
+   * Ereigniskalender (F43): the trader's OWN appointments (name, time, importance). Versioned passthrough
+   * (`{ v: 1, items: [{ id, title, at, importance, note }] }`, see `@/domain/events/own`); absent until the first one is entered.
+   * An id list, so the cloud / two-tab merge works per appointment.
+   */
+  events?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */
