@@ -23,3 +23,9 @@ Vorher die README lesen. Hooks können mit Deinem Stop-Hook kollidieren.
 
 ## MCP-Server (Vorlage `mcp.example.json`)
 Playwright (`@playwright/mcp`), Exa-Suche (braucht `EXA_API_KEY` als Umgebungsvariable), Glance (Browser-Automation, `glance-mcp`), Repomix (Repo-Map, `--mcp`). Versionen festgenagelt; npm-Pakete laufen mit Deinen Rechten, also vorher die READMEs lesen. Pro Projekt nur aktivieren, was gebraucht wird (jeder Server kostet Kontext).
+
+### So aktivierst Du die Vorlage (Claude Code)
+1. Im Projektordner auf Deinem Rechner: `cp .claude/setup/mcp.example.json .mcp.json` (Projekt-Datei, nicht `~/.claude/mcp.json`; das ist kein Standardpfad). Beim ersten Start fragt Claude Code, ob es dem Projekt-Server vertraut.
+2. `export EXA_API_KEY=...` in Deiner Shell, nie in die Datei. Ohne Schlüssel startet `exa` nicht, die anderen laufen.
+3. In Claude Code `/mcp` öffnen und prüfen, welche Server verbunden sind. Nicht Gebrauchte entfernen.
+Superpowers und Archify sind **nicht** installiert, bevor Du die Plugin-Befehle oben selbst ausführst.
