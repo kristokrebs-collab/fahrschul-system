@@ -49,4 +49,4 @@ Vorher gelesen: kein `curl | sh`, keine versteckten Netzwerkaufrufe, keine Hooks
 | `uiverse-lookup` (eigener Such-Helfer; die 3.800 Elemente werden **nicht** kopiert, sondern lokal geklont) | https://github.com/uiverse-io/galaxy | Commit adbd2ad (2024-09-02) | MIT |
 
 Eigene Arbeiten ohne Fremdcode: `trading-lab`, `social-drafts` (Recherche mit verlinkten Quellen in den Referenzdateien).
-Nicht übernommen/nicht erreichbar: Aceternity UI, Refero, Godly, v0, Bolt, Lovable, Flowstep (Seiten aus der Cloud-Umgebung gesperrt; Lizenz von Aceternity nicht geprüft; Refero/Godly zeigen urheberrechtlich geschützte Designs; v0/Bolt/Lovable/Flowstep sind Dienste).
+Nicht übernommen: Aceternity UI (AGB: alle Rechte vorbehalten, Lizenz der kostenlosen Komponenten nicht angegeben), Refero und Godly (fremde Designs), v0, Bolt, Lovable, Flowstep (Dienste). Befund siehe `.claude/setup/Design-Quellen.md`.
