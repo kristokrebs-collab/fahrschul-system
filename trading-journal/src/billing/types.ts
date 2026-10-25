@@ -38,6 +38,7 @@ export const FEATURES = [
   "mentor", // P12 mentor / student
   "customDashboards", // P13 cockpit layouts
   "shotExtract", // F29/F30 read trade values from screenshots (LLM vision, Premium)
+  "stockAnalysis", // F68/F69 earnings analyst, DCF and thesis monitor on SEC filings (server reads SEC EDGAR, Pro)
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
