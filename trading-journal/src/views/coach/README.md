@@ -56,18 +56,30 @@ Phones: one column in the same order, no horizontal scroll at 390 px. Every cell
   „regelgerecht, nicht gehandelt“ (`@/domain/missed`, see its README). Rows: time, side, source, market · timeframe, the headline the trader
   saw, **Im Labor testen** (opens the Labor page; no draft yet) and **Beobachten** (a mark, persisted). The archive starts empty: the
   card says what is stored from now on (this device, 300 events / 120 days, only while the app is open) and that the past cannot be added.
-  It states plainly that traits of the missed signals are NOT set against comparable failures – a missed signal has no stored outcome –
+  It states plainly that traits of the missed signals are NOT set against comparable failures until they have an outcome (see below) –
   and names the sample; no cause is claimed.
 
 - **Signal-Posteingang** (`SignalInboxCard.tsx`, F28, volle Breite, einklappbar): the archived signals with status (neu · angesehen · gehandelt · bewusst ausgelassen · abgelaufen), filter chips
   (status, „Nur Einstiege“, „Nur meine Märkte“), order by a written-out relevance (`@/domain/missed/inbox`). Per entry: **Ansehen** (marks it seen, shows the marks and, once computed, the outcome), **Ausgelassen – Grund**
   (five reasons, reversible), **Im Labor testen** (`TestIdeaButton` → „Diese Idee testen“ for the entry check and Box setups; key-level hits have no translation), **Im Journal verknüpfen** (trades of the same market within ±24 h).
   The marks live on the archive event (this device). No counter in the page header (no such pattern exists; the dashboard is untouched).
-- **Verpasste Chancen** (`MissedCard.tsx`, F32) now shows the **Ausgang** per signal after „Ausgänge berechnen“ (target first / stop first / still open / not usable) and, from 20 missed signals with an outcome, the traits of the missed winners
-  against the missed losers – with counterexamples, the sample and the interval, no cause.
+- **Verpasste Chancen** (`MissedCard.tsx`, F32) shows the **Ausgang** per signal (target first / stop first / still open / not usable) – evaluated **automatically**, see „Automatische Auswertung“ –
+  and, from 20 missed signals with an outcome, the traits of the missed winners against the missed losers – with counterexamples, the sample and the interval, no cause.
 - **Signalbilanz** (`SignalBalanceCard.tsx`, F25, 7) and **Daten- und Alarmqualität** (`DataQualityCard.tsx`, F27, 5): see `@/domain/missed` README. Shared helpers: `signalUi.tsx` (chips, outcome badge, the `OutcomeControl`),
-  `signalOutcomes.ts` (on-demand loader + cache of final results `tj2-signal-outcomes`), `candleCheck.ts` (on-demand gap check, 1h candles, 14 days).
-- Tests: `views.coach.signalchain.test.tsx`, `views.coach.signalOutcomes.test.ts`, e2e `signal-chain.spec.ts`.
+  `signalOutcomes.ts` (loader + cache `tj2-signal-outcomes`), `signalAuto.ts` (the automatic evaluation), `candleCheck.ts` (on-demand gap check, 1h candles, 14 days).
+- **Automatische Auswertung der Ausgänge** (F32, `signalAuto.ts`, `SignalOutcomeHost.tsx`, rule `@/domain/missed/autoplan`): the outcomes are no longer behind a button. The shared control
+  (`OutcomeControl`, in Verpasste Chancen and Signalbilanz) says „Wird automatisch ausgewertet.“, shows **„Zuletzt berechnet: 25.10. 14:32 (automatisch) · Quelle: Binance USDⓈ-M, Kerzen 15 Minuten“**
+  („Zwischenspeicher dieses Browsers“ when nothing had to be fetched, „EU-Proxy“ on the fallback route) and **„Neu berechnen“** (reads every signal without a final outcome at once; the click is
+  disabled while a run is in flight). Triggers: a card that shows outcomes mounts (Posteingang, Verpasste Chancen, Signalbilanz → `useOutcomes` → `requestAutoOutcomes("page")`; while one is open it
+  also looks again every 15 min) and once ~12 s after the app started when entry signals are stored (`SignalOutcomeHost` in `DeferredHosts`, gate `coach`, then at most 3 runs without such a page).
+  A run is queued with `requestIdleCallback` (≤ 5 s late; a timer without it), works one market per slice (the main thread gets a turn in between) and takes what the plan says: **at most 20 signals of at most 3 markets**, the newest first, per market within 30 days
+  of its newest signal, **2 minutes between two runs**; final outcomes are never read again, a signal waits for the first closed candle after it, an `open` one is read again only with a newer closed
+  15m candle and ≥ 15 min after the last look, a failed load waits 30 min. It is the same `computeOutcomes`, the same lab source (`historySource`, cache first, the lab's own token bucket) and a
+  subset of what the click loads – never more. It holds back, and the card says why („Automatische Auswertung pausiert: …“), while the tab is in the background (a run in flight stops between two
+  pages and keeps what it read), with the browser's data-saver, with a low battery (≤ 20 %, not charging) and offline (`@/domain/evolve/environment`); „Neu berechnen“ still works then. Failures stay
+  honest: „Nicht auswertbar: <Grund>“, never counted as a result, never cached. Open results are cached with the time they were read (a reload shows them and reads them again only with a new
+  candle). No setting, no server, nothing from the journal leaves the device (market data only); the assistant only quotes the cache.
+- Tests: `views.coach.signalchain.test.tsx`, `views.coach.missed.test.tsx`, `views.coach.signalOutcomes.test.ts`, `views.coach.signalAuto.test.ts` (fake idle scheduler), `missed.autoplan.test.ts`, e2e `signal-chain.spec.ts`.
 
 ## Watcher, trade panel, state
 - `CoachWatcher.tsx`: **`useCoachWatch()` / `CoachWatcher`** – after a save, `coachAlert` (pure, domain) compares the

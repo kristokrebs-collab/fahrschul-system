@@ -2,12 +2,13 @@
  * F28 Signal-Posteingang, F25 Signalbilanz, F27 Daten- und Alarmqualität (Coach) and F60 Monatsnutzen (Berichte) end to end
  * (no cloud, no API key, no market data needed).
  *
- * The clock is pinned (2026-10-14 12:30 Berlin). Seeded: one closed long on BTC/USDT yesterday and four stored signal events
- * (one inside the window of that trade, a fresh entry, a missed Box short, a breakout that is no entry). Checked: the inbox
- * statuses, the „Ausgelassen – Grund“ mark persisting in the stored archive, filtering, collapsing, the Bilanz and the Qualität
- * cards with their honest hints (alerts only while the app is open), the presence trace, the month card with its limits text.
- * No horizontal scroll at 390 px, no console errors. No clock jumps, no outcome numbers (those depend on market candles and are
- * covered by the unit tests).
+ * The Coach test is seeded relative to the browser's own clock (no fake clock): one closed long on BTC/USDT yesterday and four
+ * stored signal events (one inside the window of that trade, a fresh entry, a missed Box short, a breakout that is no entry).
+ * Checked: the inbox statuses, the „Ausgelassen – Grund“ mark persisting in the stored archive, filtering, collapsing, the Bilanz
+ * and the Qualität cards with their honest hints (alerts only while the app is open), the presence trace, the month card with its
+ * limits text – and the automatic outcomes: the Bilanz states „Wird automatisch ausgewertet.“, the run ends by itself (no click),
+ * the status line names time and source, „Neu berechnen“ runs again. No horizontal scroll at 390 px, no console errors. No clock
+ * jumps, no outcome numbers (those depend on market candles and are covered by the unit tests).
  */
 import { expect, test } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, openRoute, pinClock, seed, stored } from "./helpers";
@@ -78,10 +79,9 @@ const event = (key: string, at: number, over: Record<string, unknown>) => ({
 test.describe("Signal-Kette", () => {
   test.setTimeout(120_000);
 
-  test("Posteingang, Ausgelassen mit Grund, Bilanz und Qualität", async ({ page }) => {
+  test("Posteingang, Ausgelassen mit Grund, Bilanz mit automatischen Ausgängen und Qualität", async ({ page }) => {
     const errors = collectErrors(page);
-    const c = await pinClock(page, PINNED);
-    const now = c.now();
+    const now = Date.now();
     const tradeAt = now - DAY - 7 * HOUR;
     const items = [
       event("traded", tradeAt + 10 * MIN, {}),
@@ -89,7 +89,7 @@ test.describe("Signal-Kette", () => {
       event("missed-box", now - 30 * HOUR, { side: "short", source: "box", kind: "setup", tf: "4h", symbol: "ETHUSDT", strength: null, grade: "A+", label: "A+-Setup · Range-Short", detail: "Einstieg 2.400" }),
       event("breakout", now - 5 * HOUR, { source: "box", kind: "breakout", entry: false, strength: null, label: "Ausbruch ↑ · BTCUSDT 4h" }),
     ];
-    await seed(page, { clock: c.now, extra: { "tj2-trades": [trade("e_sc_1", tradeAt, 1.5)], "tj2-signal-events": { v: 1, items } } });
+    await seed(page, { extra: { "tj2-trades": [trade("e_sc_1", tradeAt, 1.5)], "tj2-signal-events": { v: 1, items } } });
     await openRoute(page, "/#coach", "Coach", { attached: true });
 
     // Posteingang: four entries, statuses from the journal and the clock
@@ -129,13 +129,27 @@ test.describe("Signal-Kette", () => {
     await inbox.getByTestId("inbox-toggle").click();
     await expect(inbox).toHaveAttribute("data-open", "true");
 
-    // Bilanz: the counts at once, the outcomes only on request
+    // Bilanz: the counts at once, the outcomes by themselves – the button is „Neu berechnen“, not a start
     const balance = page.getByTestId("balance-card");
     await balance.scrollIntoViewIfNeeded();
     await expect(balance).toHaveAttribute("data-signals", "3");
     await expect(balance.getByTestId("balance-compare")).toContainText("Deine Trades gegen alle Signale");
     await expect(balance.getByTestId("balance-selection")).toContainText("Auswahl");
-    await expect(balance.getByTestId("outcome-run")).toBeVisible();
+    await expect(balance.getByTestId("outcome-run")).toHaveText(/Neu berechnen|Rechne/);
+    await expect(balance.getByTestId("outcome-auto")).toContainText(/Wird automatisch ausgewertet\.|Automatische Auswertung pausiert/);
+    // no click: the run ends by itself and the status line names time and source
+    const control = balance.getByTestId("outcome-control");
+    await expect(control).toHaveAttribute("data-status", "done", { timeout: 30_000 });
+    const stand = balance.getByTestId("outcome-stand");
+    await expect(stand).toContainText("Zuletzt berechnet:");
+    await expect(stand).toContainText("(automatisch)");
+    await expect(stand).toContainText("Quelle:");
+    await expect(balance).not.toContainText("Ausgänge berechnen");
+    // „Neu berechnen“ reads again on request
+    await balance.getByTestId("outcome-run").click();
+    await expect(stand).toContainText("(von dir gestartet)");
+    await expect(control).toHaveAttribute("data-status", "done");
+    await expectNoHorizontalScroll(page);
 
     // Qualität: the standing hint, the delivery log, the presence trace written by the host
     const quality = page.getByTestId("quality-card");

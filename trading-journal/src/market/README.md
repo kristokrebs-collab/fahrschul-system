@@ -473,8 +473,9 @@ The three recording points now also store the marks the signal had (`price` / `s
 level as `stop`) and `barClose` (the close of the candle the alert rests on, for the delay between close and alert); the inbox marks `seenAt` / `skip` / `tradeId` are written by
 `markSeen` / `skipSignal` / `linkTrade`. `presence.ts` writes the **Anwesenheitsspur**: a beat every 30 s while a tab runs the app (`PresenceHost`, mounted in `DeferredHosts`),
 stored as segments under `tj2-presence` (`{ v: 1, segs: [{ id, a, b }] }`, 35 days, ≤ 400 segments, this device only, not in the backup or the cloud sync); a beat later than
-150 s after the previous one starts a new segment. It exists from the day it is first written – before that the share of open time is „unbekannt“. The candles for the outcome per signal and the
-gap check are loaded **on demand** through the lab's history source (`views/coach/signalOutcomes.ts`, `candleCheck.ts`), never by the live provider.
+150 s after the previous one starts a new segment. It exists from the day it is first written – before that the share of open time is „unbekannt“. The candles for the outcome per signal are loaded
+**automatically** (idle, a few signals per run, cache first, never in a background tab or with data saving – `views/coach/signalAuto.ts`) or on „Neu berechnen“, the gap check **on demand**
+(`candleCheck.ts`); both through the lab's history source (`views/coach/signalOutcomes.ts`), never by the live provider.
 
 ## Preis- und RSI-Struktur live (`trendlines/`, F05)
 

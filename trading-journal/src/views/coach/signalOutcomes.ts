@@ -266,7 +266,10 @@ export async function computeOutcomes(events: readonly SignalEvent[], now: numbe
     if (bySymbol.size) {
       const { loadLabData, loadErrorKind } = await import("@/views/labor/historySource");
       let failed = 0;
+      let slice = 0;
       for (const [symbol, list] of bySymbol) {
+        // the automatic run works in slices: one market, then the main thread gets a turn (the cached series are parsed on it)
+        if (via === "auto" && slice++ > 0) await new Promise<void>((r) => setTimeout(r, 0));
         if (opts.signal?.aborted) {
           aborted = true;
           break;

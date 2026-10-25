@@ -652,3 +652,13 @@ Drei kleine Bausteine, keine neue Sprache; Bewegung: keine.
 - **Kleinschrift**: `--color-faint` ist im dunklen Thema #5f5f5f (≈ 3 : 1) – die Startseite behält ihn Pixel für Pixel. In allen anderen Seiten (`[data-page]` außer `overview` und `cockpit`) und in Sheets
   (`[role="dialog"]`) gilt dort #8c8c8c (≥ 4,5 : 1 auf ink-950 … ink-700), `src/styles/themes.css`. Hell braucht nichts (#6b6b6b). Touch: dichte Chip-Reihen und Export-Knöpfe werden bei grobem Zeiger
   44 px hoch (`pointer-coarse:min-h-11`), unsichtbare Trefferflächen kommen über `touch-hit`.
+
+### Signal-Ausgänge: automatisch, mit ruhiger Statuszeile (F32)
+
+Kein neues Bauteil, keine Bewegung. Der gemeinsame Ausgang-Block (`OutcomeControl`, in Verpasste Chancen und Signalbilanz) besteht aus: dem stillen `ghost`-Knopf **„Neu berechnen“** (`Rechne …`
+und gesperrt, solange ein Lauf läuft) mit dem Zähler „x von y mit Ausgang“ in Mono; einer Zeile `text-[11.5px] text-mute` **„Wird automatisch ausgewertet.“** (bei einer Pause: „Automatische Auswertung
+pausiert: der Datensparmodus ist an. „Neu berechnen“ rechnet trotzdem.“, im Lauf: „Gerade läuft ein Lauf im Hintergrund.“); der **Statuszeile** in `text-faint`, Mono-Ziffern, in Hausform von Quelle und Stand –
+„Zuletzt berechnet: 25.10. 14:32 (automatisch) · Quelle: Binance USDⓈ-M, Kerzen 15 Minuten“ („(von dir gestartet)“ nach dem Klick, „Zwischenspeicher dieses Browsers“, wenn nichts geladen werden musste;
+vor dem ersten Lauf „Noch nicht berechnet.“); einer Warnzeile (`text-warn`, `role="status"`) bei Fehlern und dem erklärenden Satz darunter. Wo der Ausgang eines Signals noch fehlt, steht an seiner Stelle
+ein `text-faint`-Satz, der sagt, was gerade ist („Wartet auf die erste volle Kerze nach dem Signal.“, „Wird gleich automatisch ausgewertet.“, „Wird ausgewertet …“, „Noch nicht ausgewertet – pausiert, …“) –
+nie ein geschätztes Ergebnis, nie ein Spinner.

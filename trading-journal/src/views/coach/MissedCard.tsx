@@ -44,6 +44,8 @@ export const MISSED_STRINGS = {
 } as const;
 
 const SHOWN = 6;
+/** Long values wrap under their label on a phone instead of running out of the card. */
+const KV_STACK = "max-sm:flex-col max-sm:items-start max-sm:gap-0.5";
 
 function Row({ r, now }: { r: SignalRow; now: number }) {
   const e = r.event;
@@ -149,8 +151,8 @@ export function MissedCard({ list, now, className }: { list: readonly EnrichedTr
         <>
           <div className="grid">
             <KV label="Im Archiv seit" value={rep.since ? stamp(rep.since) : "–"} />
-            <KV label="Einstiegs-Signale" value={`${rep.rows.length} (${rep.traded.length} gehandelt · ${rep.missed.length} nicht gehandelt · ${rep.open.length} offen)`} />
-            <KV label="Weitere Ereignisse" value={`${rep.context} (Ausbrüche, Ziele … – keine Einstiege)`} />
+            <KV className={KV_STACK} label="Einstiegs-Signale" value={`${rep.rows.length} (${rep.traded.length} gehandelt · ${rep.missed.length} nicht gehandelt · ${rep.open.length} offen)`} />
+            <KV className={KV_STACK} label="Weitere Ereignisse" value={`${rep.context} (Ausbrüche, Ziele … – keine Einstiege)`} />
           </div>
           {rep.rows.length > 0 && <OutcomeControl events={events} />}
           {!hasTrades ? (

@@ -5,7 +5,7 @@ Pure TypeScript. The signal events the app raised, held against the journal: „
 | File | What |
 |---|---|
 | `archive.ts` | `SignalEvent {id, key, at, source: entry · box · key, kind, entry, symbol, side, tf, label, detail, strength, score, ref, watch}`; `parseSignalArchive` (tolerant, versioned wrapper `{v: 1, items}`, a NEWER version reads as `foreign` and must not be overwritten), `appendSignalEvent` (one per `key`), `prune` (newest `SIGNAL_ARCHIVE_CAP` = 300, at most `SIGNAL_ARCHIVE_DAYS` = 120 days; events marked „Beobachten“ go last), `setSignalWatch`. |
-| `outcome.ts` · `traits.ts` · `inbox.ts` · `balance.ts` · `quality.ts` · `presence.ts` | see the sections below. |
+| `outcome.ts` · `autoplan.ts` · `traits.ts` · `inbox.ts` · `balance.ts` · `quality.ts` · `presence.ts` | see the sections below. |
 | `match.ts` | `matchSignals(events, trades, now)` → `MissedReport {rows, missed, traded, open, context, beforeJournal, total, since, until}`. A signal is **gehandelt** when the journal has a trade of the SAME side on the same market from 30 min before to 6 h after it, **offen** while that window runs, otherwise **nicht gehandelt**. A trade with an unreadable pair counts as a match (the doubt goes to the trader). Only `entry` events with a side can be missed; breakouts, targets, hits without a direction are `context`. Signals older than the journal's first trade are not judged (`beforeJournal`). |
 
 ## Where the events come from (and where they do not)
@@ -20,13 +20,16 @@ not seen.
 
 ## Ausgang je Signal (F32, `outcome.ts`, `traits.ts`)
 `evaluateSignal(event, candles, {now, atrPct, intervalMs})` → `SignalOutcome {kind: target · stop · open · unusable, basis: own · standard, sameBar, entry, stop, target, rr, r, hitAt, bars, horizon, reason}`.
-Pure and deterministic; the candles come in as an argument (the loader is `src/views/coach/signalOutcomes.ts`). Rules, all shown on screen:
+Pure and deterministic; the candles come in as an argument (the loader is `src/views/coach/signalOutcomes.ts`, run automatically by `signalAuto.ts`). Rules, all shown on screen:
 the candle the signal fell into does not count, the first candle that **opens** at or after it is the entry candle (entry = its open unless the
 signal has a price of its own, which must then be touched); stop / target are the signal's own marks (Box setup: entry · stop · first target, own level:
 its invalidation as the stop), a missing mark is filled with the standard measure (stop 1,5 × ATR(14, 1h) before the signal, target 2 R) and the result is
 labelled `standard`; target first → +R, stop first → −1 R, **both inside one candle → the stop counts** (`sameBar`); neither within the candles / 14 days → `open`
 (`horizon` after 14 days, final); marks on the wrong side, no direction / market, no candles → `unusable` with the reason. No fees, no slippage, no funding.
-`isFinalOutcome` marks what can never change (the loader caches only those). `compareTraits(missedEvents, outcomes)` sets the traits (side, kind, timeframe, part of
+`isFinalOutcome` marks what can never change (never read again; an `open` result is cached with the time it was read).
+`planAuto({entries, outcomes, attempts, now})` (`autoplan.ts`) is the rule of the **automatic evaluation**: which signals are due – never read → due once a candle that opened after the signal has closed; `open` → only
+with a newer closed 15m candle and ≥ 15 min after the last look; a failed load → after 30 min; final → never – and a run takes at most 20 signals of at most 3 markets, newest first, per market within
+30 days (`AUTO_LIMITS`); signals without direction or market ride along for free (unusable with the reason). Tests: `missed.autoplan.test.ts`. `compareTraits(missedEvents, outcomes)` sets the traits (side, kind, timeframe, part of
 the day, strength, market) of the missed winners against the missed losers: nothing below **20** decided missed signals, both groups ≥ 3, a value from 5 signals on,
 the 80 % Wilson interval of each quote against the overall quote („sticht heraus“ only when the whole interval is on one side), **counterexamples always** (≤ 3 per row),
 no cause. Tests: `missed.outcome.test.ts`, `missed.outcome.tv.test.ts` (24 real BINANCE:BTCUSDT.P 15m candles from TradingView, hand-counted), `missed.traits.test.ts`.
