@@ -23,6 +23,7 @@
  * | `PresenceHost` | F27 | the beat that records when the app was open (alerts run only then) – this device only |
  * | `WhatIfMount` | F33 | the „Was wäre wenn“ sheet of a trade – its own chunk, fetched the first time it is opened |
  * | `TrainingMount` | F38 | the training sheet (Lernmodus: situations without the future, decision, reveal, reflection) – its own chunk, fetched the first time it is opened |
+ * | `SignalOutcomeHost` | F32 | once after the start: the automatic outcomes of archived signals (idle, a few at a time; own chunk, fetched only when entry signals are stored; gate `coach`) |
  * | `ForwardMount` | F23 | the forward test's catch-up of the virtual accounts – its own chunk, fetched only while an account is running / paused / being wound up, only while the app is open |
  */
 import { lazy, Suspense, type ReactNode } from "react";
@@ -45,6 +46,7 @@ import { useJournal } from "@/store/journalStore";
 import { navigate } from "@/store/router";
 import { ReportReadyHost } from "@/views/berichte/ReportReady";
 import { CoachWatcher } from "@/views/coach/CoachWatcher";
+import { SignalOutcomeHost } from "@/views/coach/SignalOutcomeHost";
 import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
 import { ReplayHost } from "@/views/trades/replay/TradeReplay";
 import { useWhatIf } from "@/views/trades/whatif/whatIfStore";
@@ -174,6 +176,11 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Anwesenheit">
         <PresenceHost />
+      </HostSlot>
+      <HostSlot name="Signal-Ausgänge">
+        <Entitled feature="coach">
+          <SignalOutcomeHost />
+        </Entitled>
       </HostSlot>
       <HostSlot name="Forward-Test">
         <ForwardMount />

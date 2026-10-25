@@ -515,7 +515,7 @@ describe("Signale: Posteingang, Bilanz, Ausgang", () => {
     ]);
     const r = await ask("Welche verpassten Signale hatten das Ziel zuerst?", withTrades(sig(undefined, outcomes)).env);
     expect(r.title).toBe("2 Signale mit Ziel zuerst");
-    expect(r.text).toContain("Von 3 nicht gehandelten Signalen erreichten 2 das Ziel zuerst und 1 den Stopp zuerst; 0 ohne Entscheidung (offen oder nicht auswertbar), bei 0 ist der Ausgang noch nicht berechnet.");
+    expect(r.text).toContain("Stand: 3 von 3 nicht gehandelten Signalen ausgewertet – 2 erreichten das Ziel zuerst und 1 den Stopp zuerst; 0 sind noch offen, 0 nicht auswertbar.");
     // 2 of 3 = 67 %; Wilson 80 %: centre 0,608, half-width 0,287 → 32–89 %
     expect(r.text).toContain("Von den 3 entschiedenen waren das 67 % (80-%-Bereich 32–89 %).");
     expect(r.text).toContain("Ziel zuerst: 03.03. 10:00 ETHUSDT Short (Einstiegs-Check) +1,50 R (Standardmaß); 27.02. 10:00 BTCUSDT Long (Einstiegs-Check) +2,00 R.");
@@ -523,12 +523,29 @@ describe("Signale: Posteingang, Bilanz, Ausgang", () => {
     expect(r.facts.map((f) => `${f.label}: ${f.value}`)).toEqual(["Ziel zuerst: 2", "Stopp zuerst: 1", "Entschieden: 3", "Offen: 0"]);
   });
 
-  it("without known outcomes it points to „Ausgänge berechnen“ and loads nothing", async () => {
+  it("a partly evaluated archive names the state: x of y evaluated, what is open, what the app still reads by itself", async () => {
+    // not traded: e0 e1 e2 – e0 reached the target, e1 is still open, e2 has no result yet
+    const openOut: SignalOutcome = { ...target(2), kind: "open", r: null, hitAt: null };
+    const outcomes = new Map<string, SignalOutcome>([
+      ["e0", target(2)],
+      ["e1", openOut],
+    ]);
+    const r = await ask("Welche verpassten Signale hatten das Ziel zuerst?", withTrades(sig(undefined, outcomes)).env);
+    expect(r.text).toContain("Stand: 2 von 3 nicht gehandelten Signalen ausgewertet – 1 erreichten das Ziel zuerst und 0 den Stopp zuerst; 1 sind noch offen, 0 nicht auswertbar, 1 noch ohne Ergebnis (die App wertet automatisch weiter aus).");
+    expect(r.facts.map((f) => `${f.label}: ${f.value}`)).toEqual(["Ziel zuerst: 1", "Stopp zuerst: 0", "Entschieden: 1", "Offen: 2"]);
+    const hit = await ask("Wie ist die Trefferquote meiner Signale?", withTrades(sig(undefined, outcomes)).env);
+    expect(hit.text).toContain("Stand: 2 von 5 ausgewertet, 3 noch ohne Ergebnis");
+    expect(hit.text).not.toMatch(/Ausgänge berechnen/);
+  });
+
+  it("without known outcomes it names the state („0 von 3 ausgewertet“), says the app evaluates by itself, and loads nothing", async () => {
     const { env, spies } = withTrades(sig());
     const r = await ask("Welche verpassten Signale hatten das Ziel zuerst?", env);
-    expect(r.title).toBe("Ausgänge noch nicht berechnet");
-    expect(r.text).toContain("3 Signale wurden nicht gehandelt, aber für keines ist der Ausgang berechnet.");
-    expect(r.text).toContain("ich lade nichts selbst");
+    expect(r.title).toBe("Noch keine Ausgänge ausgewertet");
+    expect(r.text).toContain("Stand: 0 von 3 nicht gehandelten Signalen ausgewertet.");
+    expect(r.text).toContain("Die App wertet die Ausgänge selbst aus");
+    expect(r.text).toContain("Ich rechne und lade nichts selbst.");
+    expect(r.text).not.toMatch(/Ausgänge berechnen|mit „Ausgänge/);
     act(r, "Verpasste Chancen öffnen")();
     expect(spies.openFeature).toHaveBeenCalledWith("verpasste-chancen");
   });
@@ -553,11 +570,13 @@ describe("Signale: Posteingang, Bilanz, Ausgang", () => {
     expect(r.facts.map((f) => `${f.label}: ${f.value}`)).toEqual(["Signale: 5", "Entschieden: 5", "Trefferquote: 40 %", "Ø R: +0,20 R"]);
   });
 
-  it("Box setups without a computed outcome: no rate, the way to compute it", async () => {
+  it("Box setups without an evaluated outcome: no rate, the state, no click asked for", async () => {
     const box = ev("b1", 0, 600, { source: "box", kind: "setup", name: "Ausbruch Long", tf: "4h", strength: null, symbol: "SOLUSDT" });
     const r = await ask("Wie ist die Trefferquote meiner Box-Setups?", withTrades(sig([box])).env);
     expect(r.title).toBe("Trefferquote bei Box-Setups: noch offen");
-    expect(r.text).toContain("Der Ausgang ist für kein Signal berechnet");
+    expect(r.text).toContain("Stand: 0 von 1 ausgewertet.");
+    expect(r.text).toContain("Die App wertet die Ausgänge selbst aus");
+    expect(r.text).not.toMatch(/Ausgänge berechnen/);
     expect(r.facts[2]!.value).toBe("–");
     const absent = await ask("Wie ist die Trefferquote meiner Box-Setups?", withTrades(sig([E3])).env);
     expect(absent.title).toBe("Keine passenden Signale");

@@ -1,8 +1,8 @@
 /**
  * „Signalbilanz“ (F25): every archived entry signal by kind, setup or timeframe – how many, how many traded / left out /
- * expired, and, once the outcomes are computed, the hit rate and the mean R with the sample and the uncertainty of EACH row;
- * then „deine Trades gegen alle Signale“ with the selection effect named (`SELECTION_NOTE`). Pure numbers from
- * `@/domain/missed/balance`; the outcomes come from the shared on-demand state (`signalOutcomes.ts`).
+ * expired, and, as the outcomes get evaluated (automatically, see `signalAuto.ts`), the hit rate and the mean R with the sample and
+ * the uncertainty of EACH row; then „deine Trades gegen alle Signale“ with the selection effect named (`SELECTION_NOTE`). Pure
+ * numbers from `@/domain/missed/balance`; the outcomes come from the shared state (`signalOutcomes.ts`).
  *
  * Rows are stacked blocks, not a table: at 390 px there is no horizontal scroll.
  */
@@ -24,7 +24,7 @@ export const BALANCE_STRINGS = {
   note: "Alle Einstiegs-Signale je Art, Setup und Zeiteinheit – mit dem, was danach am Kurs geschah.",
   emptyTitle: "Noch keine Signale für eine Bilanz",
   emptyText: "Sobald die App Einstiegs-Signale festgehalten hat (siehe Posteingang), erscheinen sie hier nach Art, Setup und Zeiteinheit.",
-  pendingHint: "Die Ausgänge sind noch nicht berechnet – ohne sie gibt es nur die Zahlen zu Gehandelt, Ausgelassen und Abgelaufen.",
+  pendingHint: "Die Ausgänge werden automatisch ausgewertet – bis dahin gibt es nur die Zahlen zu Gehandelt, Ausgelassen und Abgelaufen.",
   cmpTitle: "Deine Trades gegen alle Signale",
   cmpNone: "Für den Vergleich fehlen Signale mit Ausgang oder gebuchte Trades dazu.",
   rate: "Trefferquote = Ziel zuerst ÷ (Ziel + Stopp zuerst), mit 80 %-Intervall. Offene und nicht auswertbare Signale zählen nicht mit.",
@@ -47,7 +47,7 @@ function RowView({ r }: { r: BalanceRow }) {
         <KV label="Laufend" value={r.running} />
       </div>
       {r.pending === r.n ? (
-        <p className="text-[11.5px] text-faint">Ausgang noch nicht berechnet.</p>
+        <p className="text-[11.5px] text-faint">Ausgang noch nicht ausgewertet.</p>
       ) : (
         <div className="grid gap-1 border-t border-line pt-2">
           <div className="grid grid-cols-2 gap-x-4 sm:grid-cols-4">

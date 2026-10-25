@@ -5,6 +5,7 @@
 export * from "./archive";
 export * from "./match";
 export * from "./outcome";
+export * from "./autoplan";
 export * from "./traits";
 export * from "./inbox";
 export * from "./balance";

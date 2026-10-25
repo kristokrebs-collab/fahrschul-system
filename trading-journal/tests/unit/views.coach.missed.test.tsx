@@ -1,17 +1,26 @@
 /**
  * F32 „Verpasste Chancen“ card: the honest empty state (what is stored from now on, what is not), the list „regelgerecht,
- * nicht gehandelt“ with the two actions, the sample and the plain statement about what cannot be concluded.
+ * nicht gehandelt“ with the two actions, the sample and the plain statement about what cannot be concluded – and the outcome of
+ * each signal, which appears by itself (automatic evaluation, no click) while „Neu berechnen“ stays for reading again.
  */
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { enrichTrades } from "@/domain/enrich";
 import { __resetSignalArchive, recordSignalEvent, SIGNAL_ARCHIVE_KEY } from "@/market/signalArchive";
 import { MotionRoot } from "@/motion/MotionRoot";
 import { MissedCard, MISSED_STRINGS } from "@/views/coach/MissedCard";
+import { __resetAuto, __setAutoDeps } from "@/views/coach/signalAuto";
+import { __resetOutcomes, OUTCOME_CACHE_KEY } from "@/views/coach/signalOutcomes";
 import { at, COACH_SETTINGS, ct } from "./coach.fixtures";
 import { installDomPolyfills } from "./views.overview.harness";
 
 const NOW = new Date(2026, 2, 8, 12).getTime();
+const M15 = 900_000;
+const loadLabData = vi.fn();
+vi.mock("@/views/labor/historySource", () => ({
+  loadLabData: (req: unknown) => loadLabData(req),
+  loadErrorKind: () => "failed",
+}));
 const when = (day: number, min: number) => new Date(at(day, min)).getTime();
 
 function reduceMotion() {
@@ -32,10 +41,22 @@ describe("MissedCard", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(NOW);
     localStorage.removeItem(SIGNAL_ARCHIVE_KEY);
+    localStorage.removeItem(OUTCOME_CACHE_KEY);
     __resetSignalArchive();
+    __resetOutcomes();
+    loadLabData.mockReset();
+    loadLabData.mockResolvedValue({ data: { "15m": [] }, funding: null, pages: 0, viaProxy: false });
+    // the automatic evaluation without its idle wait (the scheduler itself is tested in views.coach.signalAuto)
+    __setAutoDeps({
+      later: (cb) => {
+        const t = setTimeout(cb, 0);
+        return () => clearTimeout(t);
+      },
+    });
     window.location.hash = "";
   });
   afterEach(() => {
+    __resetAuto();
     vi.useRealTimers();
   });
 
@@ -85,6 +106,46 @@ describe("MissedCard", () => {
     expect(JSON.parse(localStorage.getItem(SIGNAL_ARCHIVE_KEY)!).items.filter((e: { watch: boolean }) => e.watch)).toHaveLength(1);
     fireEvent.click(within(rows[0]!).getByTestId("missed-test"));
     expect(window.location.hash).toContain("labor");
+  });
+
+  it("each missed signal gets its outcome by itself: what is going on before, the result after – and „Neu berechnen“ reads again", async () => {
+    const t1 = when(2, 600);
+    const t2 = when(3, 600);
+    signal("won", t1, { stop: 95, target: 110 });
+    signal("lost", t2, { stop: 95, target: 110, symbol: "ETHUSDT" });
+    loadLabData.mockImplementation(async (req: { symbol: string }) => ({
+      data: { "15m": req.symbol === "ETHUSDT" ? [{ t: (t2 + M15) / 1000, o: 100, h: 101, l: 94, c: 100 }] : [{ t: (t1 + M15) / 1000, o: 100, h: 111, l: 99, c: 100 }] },
+      funding: null,
+      pages: 1,
+      viaProxy: false,
+    }));
+    render(
+      <MotionRoot>
+        <MissedCard list={trades} now={NOW} />
+      </MotionRoot>,
+    );
+    // before the first run: no outcome claimed, only what is happening
+    const pending = within(screen.getAllByTestId("missed-row")[0]!).getByTestId("outcome-pending");
+    expect(pending).toHaveTextContent(/Wird (gleich automatisch )?ausgewertet|Noch nicht ausgewertet/);
+    await waitFor(() => expect(screen.getAllByTestId("outcome")).toHaveLength(2));
+    const rows = screen.getAllByTestId("missed-row");
+    expect(within(rows[0]!).getByTestId("outcome")).toHaveAttribute("data-kind", "stop"); // newest first: the ETH signal hit its stop
+    expect(within(rows[1]!).getByTestId("outcome")).toHaveAttribute("data-kind", "target");
+    expect(rows[1]).toHaveTextContent("Ziel zuerst · +2,0 R");
+    expect(screen.getByTestId("outcome-auto")).toHaveTextContent("Wird automatisch ausgewertet.");
+    expect(screen.getByTestId("outcome-stand")).toHaveTextContent("Zuletzt berechnet:");
+    expect(screen.getByTestId("outcome-stand")).toHaveTextContent("Quelle: Binance USDⓈ-M");
+    expect(screen.getByTestId("outcome-run")).toHaveTextContent("Neu berechnen");
+    expect(screen.getByTestId("missed-counter")).not.toHaveTextContent("Ausgänge berechnen");
+    expect(loadLabData).toHaveBeenCalledTimes(2);
+    // both are final: „Neu berechnen“ has nothing to load, and says so by not asking the exchange
+    loadLabData.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("outcome-run"));
+    });
+    await waitFor(() => expect(screen.getByTestId("outcome-stand")).toHaveTextContent("(von dir gestartet)"));
+    expect(loadLabData).not.toHaveBeenCalled();
+    expect(screen.getByTestId("outcome-stand")).toHaveTextContent("Zwischenspeicher dieses Browsers");
   });
 
   it("without any missed signal it says so instead of an empty list", () => {

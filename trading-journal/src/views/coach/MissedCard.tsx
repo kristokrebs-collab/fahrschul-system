@@ -3,10 +3,11 @@
  * key level) that the journal holds NO trade for – „regelgerecht, nicht gehandelt“ – listed with the actions „Im Labor
  * testen“ („Diese Idee testen“ where the source can be translated, else the Labor page) and „Beobachten“.
  *
- * Each signal carries its OUTCOME once the trader asks for it („Ausgänge berechnen“): the real candles after the signal
- * decide Ziel zuerst / Stopp zuerst / noch offen / nicht auswertbar (`@/domain/missed/outcome`; same candle → the stop counts,
- * disclosed). From 20 missed signals with an outcome the traits of the missed winners are set against the missed losers –
- * always with counterexamples and the sample, never with a cause (`@/domain/missed/traits`).
+ * Each signal carries its OUTCOME, evaluated automatically (`signalAuto.ts`: quietly, in idle moments, from the cached or loaded
+ * real candles; „Neu berechnen“ reads again at once): the real candles after the signal decide Ziel zuerst / Stopp zuerst / noch
+ * offen / nicht auswertbar (`@/domain/missed/outcome`; same candle → the stop counts, disclosed). From 20 missed signals with an
+ * outcome the traits of the missed winners are set against the missed losers – always with counterexamples and the sample, never
+ * with a cause (`@/domain/missed/traits`).
  *
  * Honest about the data: the archive starts empty (signals were only toast text before) and fills from now on, on this
  * device, while the app is open. Whether a signal was skipped on purpose or overlooked is not known to the journal either –
@@ -36,15 +37,15 @@ export const MISSED_STRINGS = {
   noJournal: "Ohne Trades im Journal gibt es nichts, womit sich die Signale vergleichen ließen.",
   noMissed: "Zu jedem abgeschlossenen Signal gibt es einen Trade in gleicher Richtung – oder es ist noch offen.",
   limits: `Gehandelt heißt: ein Trade gleicher Richtung auf demselben Markt, von 30 Minuten vor bis ${MISSED_WINDOW_MS / 3_600_000} Stunden nach dem Signal. Ob du ein Signal bewusst ausgelassen oder übersehen hast, weiß das Journal nicht.`,
-  counter: `Ob ein verpasstes Signal gut gewesen wäre, zeigt nur sein Ausgang am Kurs („${OUTCOME_STRINGS.button}“) – und auch der beschreibt dieses eine Signal, keine Ursache. Gemeinsame Merkmale der verpassten Gewinner werden erst ab ${TRAIT_MIN_DECIDED} verpassten Signalen mit Ausgang gegen die verpassten Verlierer gestellt, immer mit Gegenbeispielen und der Stichprobe; keine Ursache, keine Handlungsempfehlung.`,
-  watchHint: "Markiert. Der Ausgang steht am Signal, sobald du die Ausgänge berechnest – die Markierung hält den Fall fest.",
+  counter: `Ob ein verpasstes Signal gut gewesen wäre, zeigt nur sein Ausgang am Kurs (er wird automatisch ausgewertet) – und auch der beschreibt dieses eine Signal, keine Ursache. Gemeinsame Merkmale der verpassten Gewinner werden erst ab ${TRAIT_MIN_DECIDED} verpassten Signalen mit Ausgang gegen die verpassten Verlierer gestellt, immer mit Gegenbeispielen und der Stichprobe; keine Ursache, keine Handlungsempfehlung.`,
+  watchHint: "Markiert. Der Ausgang steht am Signal, sobald er ausgewertet ist – die Markierung hält den Fall fest.",
   traitsTitle: "Verpasste Gewinner und Verlierer im Vergleich",
   traitsNote: "Quote = Anteil der verpassten Signale mit diesem Merkmal, bei denen das Ziel zuerst kam (80 %-Intervall). „Sticht heraus“ heißt nur: das ganze Intervall liegt auf einer Seite der Gesamtquote – bei so vielen Merkmalen geschieht das auch zufällig.",
 } as const;
 
 const SHOWN = 6;
 
-function Row({ r }: { r: SignalRow }) {
+function Row({ r, now }: { r: SignalRow; now: number }) {
   const e = r.event;
   const idea = ideaInputOf(e);
   const outcome = useOutcomeState().outcomes.get(e.id);
@@ -60,7 +61,7 @@ function Row({ r }: { r: SignalRow }) {
       </div>
       <p className="text-[12.5px] leading-snug text-fg">{e.label}</p>
       {e.detail && <p className="text-[11.5px] leading-snug text-mute">{e.detail}</p>}
-      {outcome && <OutcomeBadge o={outcome} />}
+      <OutcomeBadge o={outcome} event={e} now={now} />
       <div className="flex flex-wrap items-center gap-2">
         {idea ? (
           <TestIdeaButton input={idea} size="sm" label="Im Labor testen" testId="missed-test" />
@@ -166,7 +167,7 @@ export function MissedCard({ list, now, className }: { list: readonly EnrichedTr
               </div>
               <ul className="grid gap-2" aria-label="Verpasste Signale">
                 {shown.map((r) => (
-                  <Row key={r.event.id} r={r} />
+                  <Row key={r.event.id} r={r} now={now} />
                 ))}
               </ul>
               {rep.missed.length > SHOWN && (

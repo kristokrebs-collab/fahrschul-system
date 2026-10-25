@@ -3,8 +3,9 @@
  * Trefferquote meiner Box-Setups?“, „Welche verpassten Signale hatten das Ziel zuerst?“, „Wie lange war die App letzten Monat
  * offen?“, „Gab es Alarme mit mehr als 5 Minuten Verspätung?“. The figures are the domain's own (`buildInbox`, `matchSignals`,
  * `buildBalance`, `qualityReport`) over the signal archive of THIS device. Outcomes are named only where they are already known
- * (cache of final results + this session's run); otherwise the answer points to „Ausgänge berechnen“ – the assistant loads no
- * candles itself. Whether a signal was left out on purpose or overlooked is known only where the trader set „Ausgelassen – Grund“.
+ * (the app evaluates them automatically – `views/coach/signalAuto.ts` – and caches them; this session's run); otherwise the answer
+ * names the state („x von y ausgewertet“) – the assistant loads no candles and starts no evaluation itself. Whether a signal was
+ * left out on purpose or overlooked is known only where the trader set „Ausgelassen – Grund“.
  */
 import { wilson } from "@/domain/analytics/stats";
 import { buildBalance, buildInbox, durationText, matchSignals, qualityReport, signalKindLabel, SIGNAL_ARCHIVE_DAYS, SLOW_ALERT_MS, type InboxRow, type OutcomeMap, type SignalEvent } from "@/domain/missed";
@@ -20,6 +21,7 @@ const INBOX = { page: "coach", testid: "inbox-card" } as const;
 const MISSED = { page: "coach", feature: "verpasste-chancen" } as const;
 const BALANCE = { page: "coach", testid: "balance-card" } as const;
 const QUALITY = { page: "coach", testid: "quality-card" } as const;
+const AUTO_NOTE = "Die App wertet die Ausgänge selbst aus – beim Öffnen des Coachs und im Leerlauf nach dem Start, sobald die Kerzen nach dem Signal vorliegen (bei Datensparmodus, schwachem Akku oder im Hintergrund-Tab wartet sie). Ich rechne und lade nichts selbst.";
 const OUTCOME_NOTE = "Der Ausgang ist der Weg des Kurses nach dem Signal (Marken des Signals, sonst Stopp 1,5 × ATR und Ziel 2 R), kein gebuchter Trade und ohne Gebühren, Slippage und Funding.";
 const side = (e: SignalEvent): string => (e.side === "short" ? "Short" : "Long");
 const what = (e: SignalEvent): string => `${stampText(e.at)} ${e.symbol || "Markt unbekannt"} ${side(e)} (${signalKindLabel(e)})`;
@@ -73,19 +75,22 @@ function outcomeReply(events: readonly SignalEvent[], outcomes: OutcomeMap, trad
   const o = rows.map((r) => ({ r, o: outcomes.get(r.event.id) }));
   const target = o.filter((x) => x.o?.kind === "target");
   const stop = o.filter((x) => x.o?.kind === "stop");
-  const unfinished = o.filter((x) => x.o && (x.o.kind === "open" || x.o.kind === "unusable")).length;
+  const openN = o.filter((x) => x.o?.kind === "open").length;
+  const unusableN = o.filter((x) => x.o?.kind === "unusable").length;
+  const unfinished = openN + unusableN;
   const missing = o.filter((x) => !x.o).length;
+  const evaluated = target.length + stop.length + openN;
   if (missing === rows.length) {
     return reply({
-      title: "Ausgänge noch nicht berechnet",
-      text: `${plural(rows.length, "Signal", "Signale")} ${all ? "" : "wurden nicht gehandelt, "}aber für keines ist der Ausgang berechnet. Das geschieht in der Karte „Verpasste Chancen“ mit „Ausgänge berechnen“ – dafür lädt die App Kerzen und fragt vorher nach; ich lade nichts selbst.`,
+      title: "Noch keine Ausgänge ausgewertet",
+      text: `Stand: 0 von ${plural(rows.length, all ? "Signal" : "nicht gehandeltem Signal", all ? "Signalen" : "nicht gehandelten Signalen")} ausgewertet. ${AUTO_NOTE}`,
       tone: "mute",
       actions: [open],
     });
   }
   const decided = target.length + stop.length;
   const ci = decided ? wilson(target.length, decided) : null;
-  const parts = [`Von ${plural(rows.length, all ? "Signal" : "nicht gehandeltem Signal", all ? "Signalen" : "nicht gehandelten Signalen")}${per ? ` in ${per.label}` : ""} erreichten ${target.length} das Ziel zuerst und ${stop.length} den Stopp zuerst; ${unfinished} ohne Entscheidung (offen oder nicht auswertbar), bei ${missing} ist der Ausgang noch nicht berechnet.`];
+  const parts = [`Stand: ${evaluated} von ${plural(rows.length, all ? "Signal" : "nicht gehandeltem Signal", all ? "Signalen" : "nicht gehandelten Signalen")}${per ? ` in ${per.label}` : ""} ausgewertet – ${target.length} erreichten das Ziel zuerst und ${stop.length} den Stopp zuerst; ${openN} sind noch offen, ${unusableN} nicht auswertbar${missing ? `, ${missing} noch ohne Ergebnis (die App wertet automatisch weiter aus)` : ""}.`];
   if (ci && decided) parts.push(`Von den ${decided} entschiedenen waren das ${pctText(target.length / decided)} (80-%-Bereich ${range(ci.lo, ci.hi)}).`);
   if (target.length) {
     const top = target.sort((a, b) => b.r.event.at - a.r.event.at).slice(0, 3);
@@ -117,8 +122,8 @@ function balanceReply(events: readonly SignalEvent[], outcomes: OutcomeMap, trad
   const parts: string[] = [];
   for (const r of rows) {
     const flow = `${plural(r.n, "Signal", "Signale")} (${r.traded} gehandelt, ${r.left} bewusst ausgelassen, ${r.expired} abgelaufen, ${r.running} noch im Zeitfenster)`;
-    if (r.decided) parts.push(`${r.label}: ${flow}. Von ${r.decided} entschiedenen erreichten ${r.target} das Ziel zuerst, ${r.stop} den Stopp: Trefferquote ${pctText(r.hitRate)} (80-%-Bereich ${r.hitCi ? range(r.hitCi.lo, r.hitCi.hi) : "–"}), Ø ${rText(r.avgR)}${r.rCi ? ` (Bereich ${rText(r.rCi.lo)} bis ${rText(r.rCi.hi)})` : ""}. Stichprobe: ${r.level}.`);
-    else parts.push(`${r.label}: ${flow}. ${r.pending === r.n ? "Der Ausgang ist für kein Signal berechnet – in der Signalbilanz mit „Ausgänge berechnen“, dafür lädt die App Kerzen; ich lade nichts selbst." : `Noch kein entschiedener Ausgang (${r.open} offen, ${r.unusable} nicht auswertbar, ${r.pending} nicht berechnet).`}`);
+    if (r.decided) parts.push(`${r.label}: ${flow}. Von ${r.decided} entschiedenen erreichten ${r.target} das Ziel zuerst, ${r.stop} den Stopp: Trefferquote ${pctText(r.hitRate)} (80-%-Bereich ${r.hitCi ? range(r.hitCi.lo, r.hitCi.hi) : "–"}), Ø ${rText(r.avgR)}${r.rCi ? ` (Bereich ${rText(r.rCi.lo)} bis ${rText(r.rCi.hi)})` : ""}. Stichprobe: ${r.level}. Stand: ${r.target + r.stop + r.open} von ${r.n} ausgewertet${r.pending ? `, ${r.pending} noch ohne Ergebnis` : ""}.`);
+    else parts.push(`${r.label}: ${flow}. ${r.pending === r.n ? `Stand: 0 von ${r.n} ausgewertet. ${AUTO_NOTE}` : `Noch kein entschiedener Ausgang – Stand: ${r.open} von ${r.n} ausgewertet, aber noch offen; ${r.unusable} nicht auswertbar, ${r.pending} noch ohne Ergebnis (die App wertet automatisch weiter aus).`}`);
   }
   parts.push(OUTCOME_NOTE, "Die Trefferquote allein sagt nichts über den Gewinn – dafür steht das Ø R daneben.");
   const main = rows[0]!;

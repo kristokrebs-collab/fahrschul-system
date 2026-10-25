@@ -1,8 +1,8 @@
 /**
  * The signal chain cards on the Coach page and the month benefit card in the reports: F28 Posteingang (status, filters, ansehen,
- * ausgelassen mit Grund, im Journal verknüpfen, einklappen), F25 Bilanz (Ausgänge on demand, rows with sample and interval, the
- * comparison with the selection note), F27 Qualität (the banner, the open-share, delays, the log, the candle check) and
- * F60 Monatsnutzen (counts, flagged traces, the limits text).
+ * ausgelassen mit Grund, im Journal verknüpfen, einklappen), F25 Bilanz (Ausgänge evaluated automatically – no click –, „Neu
+ * berechnen“, rows with sample and interval, the comparison with the selection note), F27 Qualität (the banner, the open-share,
+ * delays, the log, the candle check) and F60 Monatsnutzen (counts, flagged traces, the limits text).
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,6 +18,7 @@ import type { ReportPage } from "@/views/berichte/hooks";
 import { DataQualityCard } from "@/views/coach/DataQualityCard";
 import { SignalBalanceCard } from "@/views/coach/SignalBalanceCard";
 import { INBOX_STRINGS, SignalInboxCard } from "@/views/coach/SignalInboxCard";
+import { __resetAuto, __setAutoDeps } from "@/views/coach/signalAuto";
 import { __resetOutcomes, OUTCOME_CACHE_KEY } from "@/views/coach/signalOutcomes";
 import { at, COACH_SETTINGS, ct, enrichC } from "./coach.fixtures";
 import { H, signalInput } from "./missed.fixtures";
@@ -55,9 +56,19 @@ beforeEach(() => {
   __resetDeliveryLog();
   __resetOutcomes();
   loadLabData.mockReset();
+  // the automatic evaluation without its idle wait: the next macrotask (the scheduler itself is tested in views.coach.signalAuto)
+  __setAutoDeps({
+    later: (cb) => {
+      const t = setTimeout(cb, 0);
+      return () => clearTimeout(t);
+    },
+  });
   window.location.hash = "";
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  __resetAuto();
+  vi.useRealTimers();
+});
 
 describe("SignalInboxCard (F28)", () => {
   it("an empty archive says what is stored from now on – and that the past cannot be added", () => {
@@ -103,6 +114,20 @@ describe("SignalInboxCard (F28)", () => {
     expect(screen.getByTestId("inbox-row")).toHaveAttribute("data-status", "angesehen");
     expect(screen.getByTestId("inbox-detail")).toHaveTextContent("Einstieg 100 · Stopp 95 · Ziel 110");
     expect(JSON.parse(localStorage.getItem(SIGNAL_ARCHIVE_KEY)!).items[0].seenAt).toBe(NOW);
+  });
+
+  it("the detail of an entry shows its outcome once it is evaluated – opening the inbox is a trigger, too", async () => {
+    const t0 = NOW - 2 * 24 * H;
+    signal("s", t0, { price: 100, stop: 95, target: 110 });
+    loadLabData.mockResolvedValue({ data: { "15m": [bar15(t0, 0, 100, 111, 99)] }, funding: null, pages: 1, viaProxy: false });
+    render(wrap(<SignalInboxCard list={trades} now={NOW} />));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("inbox-view"));
+    });
+    // no click on a „berechnen“ button: the outcome arrives by itself
+    await waitFor(() => expect(within(screen.getByTestId("inbox-detail")).getByTestId("outcome")).toHaveAttribute("data-kind", "target"));
+    expect(screen.getByTestId("inbox-detail")).toHaveTextContent("Ziel zuerst");
+    expect(loadLabData).toHaveBeenCalledTimes(1);
   });
 
   it("„Ausgelassen – Grund“: a short list, the reason stays on the signal and can be taken back", async () => {
@@ -183,33 +208,42 @@ describe("SignalBalanceCard (F25)", () => {
     expect(screen.queryByTestId("outcome-run")).toBeNull();
   });
 
-  it("shows the counts at once and the outcomes after the click – nothing is fetched before", async () => {
+  it("shows the counts at once and the outcomes by themselves – no click – with the status line; „Neu berechnen“ reads the open ones again", async () => {
     const t0 = NOW - 2 * 24 * H;
     signal("w", t0, { stop: 95, target: 110 });
     signal("l", t0 + H, { stop: 95, target: 110 });
     signal("tr", when(0, 600) + 10 * 60_000, { stop: 95, target: 110 });
-    loadLabData.mockResolvedValue({
-      data: { "15m": [bar15(when(0, 600) + 10 * 60_000, 0, 100, 111, 99), bar15(t0, 0, 100, 111, 99), bar15(t0 + H, 0, 100, 101, 94)] },
+    signal("op", t0 + 2 * H, { stop: 80, target: 130, symbol: "ETHUSDT" });
+    loadLabData.mockImplementation(async (req: { symbol: string }) => ({
+      data: {
+        "15m": req.symbol === "ETHUSDT" ? [bar15(t0 + 2 * H, 0, 100, 102, 99)] : [bar15(when(0, 600) + 10 * 60_000, 0, 100, 111, 99), bar15(t0, 0, 100, 111, 99), bar15(t0 + H, 0, 100, 101, 94)],
+      },
       funding: null,
       pages: 1,
       viaProxy: false,
-    });
+    }));
     render(wrap(<SignalBalanceCard list={trades} now={NOW} />));
-    expect(loadLabData).not.toHaveBeenCalled();
+    expect(loadLabData).not.toHaveBeenCalled(); // nothing is fetched while rendering
     const total = screen.getAllByTestId("balance-row").find((r) => r.getAttribute("data-key") === "alle")!;
-    expect(total).toHaveAttribute("data-n", "3");
-    expect(total).toHaveTextContent("Ausgang noch nicht berechnet");
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("outcome-run"));
-    });
+    expect(total).toHaveAttribute("data-n", "4");
+    expect(total).toHaveTextContent("Ausgang noch nicht ausgewertet");
+    expect(screen.getByTestId("outcome-auto")).toHaveTextContent("Wird automatisch ausgewertet.");
+    expect(screen.getByTestId("outcome-stand")).toHaveTextContent("Noch nicht berechnet.");
+    // no click: the evaluation starts by itself
     await waitFor(() => expect(screen.getByTestId("outcome-control")).toHaveAttribute("data-status", "done"));
+    expect(loadLabData).toHaveBeenCalledTimes(2); // one load per market
     const row = screen.getAllByTestId("balance-row").find((r) => r.getAttribute("data-key") === "Einstiegs-Check")!;
     expect(row).toHaveAttribute("data-decided", "3");
     expect(row).toHaveTextContent("Ziel zuerst");
     expect(row.querySelector("[data-testid=balance-unc]")).toHaveTextContent("n 3 entschieden · Stichprobe zu wenig");
-    // 2 targets (+2 R each), 1 stop (−1 R): the hit rate 67 %, Ø R +1,0 R
+    // 2 targets (+2 R each), 1 stop (−1 R): the hit rate 67 %, Ø R +1,0 R; the open one does not count
     expect(row).toHaveTextContent("67 %");
     expect(row).toHaveTextContent("+1,00 R");
+    // the status line: when, by whom, and the source
+    expect(screen.getByTestId("outcome-stand")).toHaveTextContent("Zuletzt berechnet: 08.03. 12:00 (automatisch) · Quelle: Binance USDⓈ-M, Kerzen 15 Minuten");
+    expect(screen.getByTestId("outcome-control")).toHaveTextContent("3 von 4 mit Ausgang");
+    expect(screen.getByTestId("outcome-run")).toHaveTextContent("Neu berechnen");
+    expect(screen.queryByText("Ausgänge berechnen")).toBeNull();
     // the comparison: the journal booked the traded signal; the selection effect is named
     const cmp = screen.getByTestId("balance-compare");
     expect(cmp).toHaveTextContent("Deine Trades gegen alle Signale");
@@ -221,6 +255,43 @@ describe("SignalBalanceCard (F25)", () => {
     fireEvent.click(screen.getByTestId("balance-basis-standard"));
     const total2 = screen.getAllByTestId("balance-row").find((r) => r.getAttribute("data-key") === "alle")!;
     expect(total2).toHaveAttribute("data-decided", "0");
+
+    // „Neu berechnen“: only the open signal needs candles again (the three decided ones are final)
+    loadLabData.mockClear();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("outcome-run"));
+    });
+    await waitFor(() => expect(screen.getByTestId("outcome-stand")).toHaveTextContent("(von dir gestartet)"));
+    expect(loadLabData).toHaveBeenCalledTimes(1);
+    expect(loadLabData.mock.calls[0]![0]).toMatchObject({ symbol: "ETHUSDT" });
+  });
+
+  it("a market that cannot be loaded stays „nicht auswertbar“ with its reason and never counts as a result", async () => {
+    signal("w", NOW - 2 * 24 * H, { stop: 95, target: 110 });
+    loadLabData.mockRejectedValue(Object.assign(new Error("x"), { kind: "failed" }));
+    render(wrap(<SignalBalanceCard list={trades} now={NOW} />));
+    await waitFor(() => expect(screen.getByTestId("outcome-control")).toHaveAttribute("data-status", "done"));
+    expect(screen.getByTestId("outcome-error")).toHaveTextContent("1 Signal ohne Marktdaten");
+    const row = screen.getAllByTestId("balance-row").find((r) => r.getAttribute("data-key") === "Einstiegs-Check")!;
+    expect(row).toHaveAttribute("data-decided", "0");
+    expect(row).toHaveTextContent("Nicht auswertbar");
+    expect(screen.getByTestId("outcome-control")).toHaveTextContent("0 von 1 mit Ausgang");
+  });
+
+  it("with data saving on it holds back, says so, and „Neu berechnen“ still works", async () => {
+    signal("w", NOW - 2 * 24 * H, { stop: 95, target: 110 });
+    loadLabData.mockResolvedValue({ data: { "15m": [bar15(NOW - 2 * 24 * H, 0, 100, 111, 99)] }, funding: null, pages: 1, viaProxy: false });
+    __setAutoDeps({ env: () => ({ hidden: false, saveData: true, batteryLow: false, offline: false }) });
+    render(wrap(<SignalBalanceCard list={trades} now={NOW} />));
+    expect(screen.getByTestId("outcome-control")).toHaveAttribute("data-auto", "paused");
+    expect(screen.getByTestId("outcome-auto")).toHaveTextContent("Automatische Auswertung pausiert: der Datensparmodus ist an.");
+    await new Promise((r) => setTimeout(r, 20));
+    expect(loadLabData).not.toHaveBeenCalled();
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("outcome-run"));
+    });
+    await waitFor(() => expect(screen.getByTestId("outcome-control")).toHaveAttribute("data-status", "done"));
+    expect(loadLabData).toHaveBeenCalledTimes(1);
   });
 
   it("shows the cached final outcomes after a reload without a request", async () => {
@@ -228,15 +299,15 @@ describe("SignalBalanceCard (F25)", () => {
     signal("w", t0, { stop: 95, target: 110 });
     loadLabData.mockResolvedValue({ data: { "15m": [bar15(t0, 0, 100, 111, 99)] }, funding: null, pages: 1, viaProxy: false });
     const first = render(wrap(<SignalBalanceCard list={trades} now={NOW} />));
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("outcome-run"));
-    });
     await waitFor(() => expect(screen.getByTestId("outcome-control")).toHaveAttribute("data-status", "done"));
     first.unmount();
     __resetOutcomes();
     loadLabData.mockClear();
     render(wrap(<SignalBalanceCard list={trades} now={NOW} />));
     await waitFor(() => expect(screen.getAllByTestId("balance-row")[0]).toHaveAttribute("data-decided", "1"));
+    // the stored last run is shown, too – and nothing is requested for a final result
+    await waitFor(() => expect(screen.getByTestId("outcome-stand")).toHaveTextContent("Zuletzt berechnet:"));
+    await new Promise((r) => setTimeout(r, 20));
     expect(loadLabData).not.toHaveBeenCalled();
   });
 });

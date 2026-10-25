@@ -63,12 +63,16 @@ export async function trendView(env: Env): Promise<TrendView> {
   }
 }
 
-/** The signal archive, the outcomes that are already known (cache of final results + this session's), the delivery log and the presence trace. */
+/**
+ * The signal archive, the outcomes that are already known (cache of final and open results + this session's), the delivery log and
+ * the presence trace. The assistant evaluates nothing itself: the automatic evaluation of the app (`views/coach/signalAuto.ts`) fills
+ * the cache; what it has not read yet is „noch nicht ausgewertet“.
+ */
 export async function signalsSource(env: Env): Promise<SignalsInput> {
   if (env.insight?.signals) return env.insight.signals;
   const [{ getSignalArchive }, { getDeliveryLog }, { presenceSegments }, outcomes] = await Promise.all([import("@/market/signalArchive"), import("@/market/keylevels/deliveryLog"), import("@/market/presence"), import("@/views/coach/signalOutcomes")]);
   const events = getSignalArchive();
-  const known = new Map(outcomes.cachedOutcomes(outcomes.outcomeEvents(events)));
+  const known = new Map(outcomes.cachedKnownOutcomes(outcomes.outcomeEvents(events)));
   for (const [id, o] of outcomes.getOutcomeState().outcomes) known.set(id, o);
   return { events, outcomes: known, log: getDeliveryLog(), presence: presenceSegments() };
 }

@@ -1,7 +1,7 @@
 /**
  * „Signal-Posteingang“ (F28): the signals and alerts the app raised, as a calm list – time, market, kind, direction, level and a
  * status (neu · angesehen · gehandelt · bewusst ausgelassen · abgelaufen) – ordered by relevance for this trader
- * (`@/domain/missed/inbox`: the order is written out on the card). Actions per entry: ansehen, „Ausgelassen – Grund“ (a short
+ * (`@/domain/missed/inbox`: the order is written out on the card). Actions per entry: ansehen (with the outcome, once evaluated), „Ausgelassen – Grund“ (a short
  * list, so the reason is on record), im Labor testen („Diese Idee testen“), im Journal verknüpfen.
  *
  * Honest about its source: only what the app raised while it was open is here (the archive starts empty and cannot be filled
@@ -22,7 +22,7 @@ import { EmptyState } from "@/primitives/EmptyState";
 import { readJson, storageKey, writeJson } from "@/store/storage";
 import { TestIdeaButton } from "@/views/labor/TestIdeaButton";
 import { useOutcomeState } from "./signalOutcomes";
-import { Chip, ideaInputOf, OutcomeBadge, stamp } from "./signalUi";
+import { Chip, ideaInputOf, OutcomeBadge, stamp, useOutcomes } from "./signalUi";
 import { SampleLine } from "./ui";
 
 export const INBOX_STRINGS = {
@@ -55,7 +55,7 @@ const tradeLine = (t: EnrichedTrade): string => `${stamp(+tradeTime(t))} · ${t.
 
 type Panel = "detail" | "skip" | "link" | null;
 
-function InboxRowView({ row, list }: { row: InboxRow; list: readonly EnrichedTrade[] }) {
+function InboxRowView({ row, list, now }: { row: InboxRow; list: readonly EnrichedTrade[]; now: number }) {
   const e = row.event;
   const [panel, setPanel] = useState<Panel>(null);
   const toggle = (p: Exclude<Panel, null>) => {
@@ -118,7 +118,7 @@ function InboxRowView({ row, list }: { row: InboxRow; list: readonly EnrichedTra
           {marks && <p className="num font-mono text-faint">{marks}</p>}
           {row.entry && (
             <div className="grid gap-1">
-              <OutcomeBadge o={outcome} />
+              <OutcomeBadge o={outcome} event={e} now={now} />
             </div>
           )}
           {e.seenAt != null && <p className="text-faint">Zuerst angesehen {stamp(e.seenAt)}</p>}
@@ -200,6 +200,7 @@ function InboxRowView({ row, list }: { row: InboxRow; list: readonly EnrichedTra
 
 export function SignalInboxCard({ list, now, className }: { list: readonly EnrichedTrade[]; now: number; className?: string }) {
   const events = useSignalArchive();
+  useOutcomes(events); // the outcome in the detail of an entry: primed from the cache, evaluated automatically (signalAuto.ts)
   const [open, setOpen] = useState(readOpen);
   const [filter, setFilter] = useState<InboxFilter>(DEFAULT_INBOX_FILTER);
   const [all, setAll] = useState(false);
@@ -268,7 +269,7 @@ export function SignalInboxCard({ list, now, className }: { list: readonly Enric
           ) : (
             <ul className="grid gap-2" aria-label="Eingegangene Signale">
               {shown.map((r) => (
-                <InboxRowView key={r.event.id} row={r} list={list} />
+                <InboxRowView key={r.event.id} row={r} list={list} now={now} />
               ))}
             </ul>
           )}
