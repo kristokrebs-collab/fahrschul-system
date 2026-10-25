@@ -23,6 +23,8 @@ description: >-
 | `/dcf` | DCF-Bewertung mit offengelegten Annahmen und Sensitivität | eigener Skill + `trader-analyst` |
 | `/trader-scanner` → `/trader-news` → `/trader-entry` → `/trader-exit` → `/trader-timemachine` → `/trader-budget` → `/trader-risk` → `/trader-broker` | Tagesablauf Daytrading, links nach rechts | day-trader-skill (MIT) |
 | `/trader-alerts`, `/trader-analyst`, `/trader-pelosi` | Preisalarme, Quartalszahlen (SEC), Kongress-Trades | day-trader-skill |
+| Strategien testen, Journal, aus Fehlern lernen | Backtest-Hygiene, Deflated Sharpe, Trade-Journal, Regelvorschläge | Skill `trading-lab` |
+| Social-Posts zu Trading | nur Entwürfe, Prüfskript, manuelle Freigabe und manuelles Posten | Skill `social-drafts` |
 | Kronos-Prognose | lokales Zeitreihenmodell für Kerzen | `references/kronos.md`, läuft nur auf Deinem Rechner |
 
 Die `trader-*` Skills schreiben nach `trader/` im Projekt (Watchlist, Pläne, Orders, Logs); das Verzeichnis nicht committen (`trader/` ist in `.gitignore`).

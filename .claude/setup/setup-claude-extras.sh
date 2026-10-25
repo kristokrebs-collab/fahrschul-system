@@ -5,6 +5,7 @@
 #   ./setup-claude-extras.sh awesome list            # Skills aus ComposioHQ/awesome-claude-skills anzeigen
 #   ./setup-claude-extras.sh awesome add <name>...   # ausgewählte Skills kopieren (z. B. changelog-generator invoice-organizer)
 #   ./setup-claude-extras.sh ecc                     # ECC "minimal"-Profil NUR als Trockenlauf (zeigt, was installiert würde)
+#   ./setup-claude-extras.sh uiverse [Zielordner]    # Uiverse-Elemente (uiverse-io/galaxy, MIT, ca. 20 MB) für den Skill uiverse-lookup, Standard ~/uiverse-galaxy
 #   ./setup-claude-extras.sh kronos [Zielordner]     # Kronos klonen + eigene venv (Standard ~/kronos); Gewichte laden erst beim ersten Lauf
 # Umgebung: CLAUDE_HOME (Standard ~/.claude)
 set -euo pipefail
@@ -32,6 +33,10 @@ case "${1:-}" in
   ecc)
     echo "Trockenlauf des ECC-Installers (ändert nichts). Erst lesen, dann entscheiden:"
     npx --yes ecc-universal@2.2.3 install --profile minimal --target claude --dry-run ;;
+  uiverse)
+    T="${2:-$HOME/uiverse-galaxy}"; [ -e "$T" ] && { echo "existiert schon: $T (nichts getan)"; exit 1; }
+    GIT_TERMINAL_PROMPT=0 git clone --depth 1 -q https://github.com/uiverse-io/galaxy.git "$T"
+    echo "Fertig: $T. Der Skill uiverse-lookup findet ihn automatisch (oder UIVERSE_DIR=$T setzen)." ;;
   kronos)
     T="${2:-$HOME/kronos}"; [ -e "$T" ] && { echo "existiert schon: $T (nichts getan)"; exit 1; }
     command -v python3 >/dev/null || { echo "python3 (>= 3.10) fehlt"; exit 1; }
@@ -39,5 +44,5 @@ case "${1:-}" in
     python3 -m venv "$T/.venv" && "$T/.venv/bin/pip" install -q -r "$T/requirements.txt"
     echo "Fertig: $T. Aktivieren: source $T/.venv/bin/activate; Beispiel: cd $T/examples && python prediction_example.py"
     echo "Hinweis: erster Lauf lädt Modell-Gewichte von huggingface.co/NeoQuasar. Prognosen sind keine Finanzberatung." ;;
-  *) sed -n '2,10p' "$0"; exit 1 ;;
+  *) sed -n '2,11p' "$0"; exit 1 ;;
 esac

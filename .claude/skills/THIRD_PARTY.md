@@ -39,3 +39,14 @@ Kronos (https://github.com/shiyu-coder/Kronos, MIT, Commit 67b630e): **nicht** k
 | `llm-council` | https://github.com/tenfoldmarc/llm-council-skill | Commit 0dc0327 | MIT (laut README, keine LICENSE-Datei) |
 
 Vorher gelesen: kein `curl | sh`, keine versteckten Netzwerkaufrufe, keine Hooks; Skripte nutzen `child_process`/Puppeteer für lokale Browser-Prüfung (`taste-skill`, `hallmark`, `webapp-testing`) und Python-Standardwerkzeuge. **Nicht ausgeführt.** Nicht übernommen: die Gemini-Bildgeneratoren (`brand`, `design`, `slides`, `ui-styling`) aus ui-ux-pro-max (brauchen API-Schlüssel); Superpowers, Archify, GSD (siehe `.claude/setup/MCP-und-Plugins.md`). `frontend-design` von Anthropic nicht zusätzlich kopiert, der Name ist durch die bestehende Kopie belegt.
+
+## Magic UI und Uiverse (2026-10-25)
+
+| Dateien | Quelle | Stand | Lizenz |
+|---|---|---|---|
+| `.claude/skills/magic-ui/` (unverändert, inkl. `LICENSE.md`) | https://github.com/magicuidesign/magicui, Ordner `skills/magic-ui` | Commit efe76fc (2026-10-17) | MIT |
+| `pulse-motion/assets/magic-primitives.html` (eigener Vanilla-Nachbau von 8 Effekten, Keyframes/Zahlen daraus) | dieselbe Quelle | dieselbe | MIT (Hinweis in der Datei und in `references/magic-primitives.md`) |
+| `uiverse-lookup` (eigener Such-Helfer; die 3.800 Elemente werden **nicht** kopiert, sondern lokal geklont) | https://github.com/uiverse-io/galaxy | Commit adbd2ad (2024-09-02) | MIT |
+
+Eigene Arbeiten ohne Fremdcode: `trading-lab`, `social-drafts` (Recherche mit verlinkten Quellen in den Referenzdateien).
+Nicht übernommen/nicht erreichbar: Aceternity UI, Refero, Godly, v0, Bolt, Lovable, Flowstep (Seiten aus der Cloud-Umgebung gesperrt; Lizenz von Aceternity nicht geprüft; Refero/Godly zeigen urheberrechtlich geschützte Designs; v0/Bolt/Lovable/Flowstep sind Dienste).
