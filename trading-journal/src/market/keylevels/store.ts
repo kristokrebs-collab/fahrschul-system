@@ -13,12 +13,12 @@ import { useEffect, useSyncExternalStore } from "react";
 import {
   allKeyLevels,
   buildDayPlan,
-  currentStage,
   evaluateLevel,
   KEY_TF_SOURCE,
   keyLevelsOfSettings,
-  observe,
   timeframeAvailability,
+  unknownEvaluation,
+  watchEntry,
   type AlertSettings,
   type AlertStage,
   type DayPlan,
@@ -67,22 +67,6 @@ const INITIAL: KeyLevelsView = {
   tf: timeframeAvailability(null),
 };
 
-const unknownEval = (reason: string): LevelEvaluation => ({
-  status: "unknown",
-  basis: null,
-  reason,
-  progress: null,
-  trigger: null,
-  last: null,
-  distancePct: null,
-  retest: "none",
-  broke: false,
-  awaitingRetest: false,
-  atr: null,
-  events: [],
-  asOf: null,
-});
-
 interface Engine {
   refs: number;
   timer: ReturnType<typeof setInterval> | null;
@@ -99,16 +83,15 @@ export function evaluateEntries(levels: readonly KeyLevel[], symbol: string | nu
   return levels.map((level) => {
     let evaluation: LevelEvaluation;
     let live = false;
-    if (!level.enabled) evaluation = unknownEval("Ausgeschaltet.");
-    else if (!marketRunning || !symbol) evaluation = unknownEval("Der Live-Markt läuft nicht – nicht bewertet.");
-    else if (level.symbol !== symbol) evaluation = unknownEval(`Gilt für ${level.symbol}; der aktive Markt ist ${symbol} – nicht bewertet.`);
+    if (!level.enabled) evaluation = unknownEvaluation("Ausgeschaltet.");
+    else if (!marketRunning || !symbol) evaluation = unknownEvaluation("Der Live-Markt läuft nicht – nicht bewertet.");
+    else if (level.symbol !== symbol) evaluation = unknownEvaluation(`Gilt für ${level.symbol}; der aktive Markt ist ${symbol} – nicht bewertet.`);
     else {
       live = true;
       const candles = candlesOf(level.tf);
-      evaluation = candles ? evaluateLevel(level, candles, now) : unknownEval(`Die ${KEY_TF_SOURCE[level.tf].label} für ${level.tf} sind nicht geladen – nicht bewertet.`);
+      evaluation = candles ? evaluateLevel(level, candles, now) : unknownEvaluation(`Die ${KEY_TF_SOURCE[level.tf].label} für ${level.tf} sind nicht geladen – nicht bewertet.`);
     }
-    const obs = observe(level, evaluation, alerts);
-    return { level, evaluation, live, obs, stage: currentStage(obs) };
+    return watchEntry(level, evaluation, live, alerts);
   });
 }
 

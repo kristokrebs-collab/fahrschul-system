@@ -3,7 +3,7 @@
  * are aligned to the epoch (= UTC midnight for every bar length that divides a day, like TradingView for 24/7
  * crypto); a bucket is `closed` once its last source candle has closed and reaches the bucket end.
  */
-import type { Candle } from "@/market/types";
+import type { Candle } from "../market/types";
 
 /** Aggregates ascending `src` candles (`srcMs` each) into `ms` buckets. Keeps the input order; no allocation per tick. */
 export function resampleCandles(src: readonly Candle[], srcMs: number, ms: number): Candle[] {

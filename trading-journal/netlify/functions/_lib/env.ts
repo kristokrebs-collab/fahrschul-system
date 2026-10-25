@@ -26,6 +26,8 @@ export const SERVER_ENV = [
   "COACH_MODEL",
   "ROUTER_MODEL",
   "VISION_MODEL",
+  "RESEND_API_KEY",
+  "ALERT_FROM",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */

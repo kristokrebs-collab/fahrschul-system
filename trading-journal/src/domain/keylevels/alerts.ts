@@ -18,7 +18,7 @@
  *
  * Alerts only run while the app is open in a browser tab – this module knows nothing about a server.
  */
-import { n0, price as fmtPrice } from "@/lib/format";
+import { n0, price as fmtPrice } from "../../lib/format";
 import { distanceDelta } from "./evaluate";
 import { tfLabel } from "./timeframes";
 import { type DeliveryOutcome, type DeliveryRecord } from "./delivery";
@@ -34,14 +34,21 @@ const toMinutes = (hhmm: string): number => {
   return Number(h) * 60 + Number(m);
 };
 
-/** `true` when alerts may be delivered at `at` (device local time). Off = always. `from === to` = the whole day. */
-export function inActiveHours(h: ActiveHours, at: Date): boolean {
+/**
+ * `true` when alerts may be delivered at `minutes` after local midnight. Off = always. `from === to` = the whole day.
+ * The browser asks with the device clock (`inActiveHours`), the server with the clock of the account's time zone.
+ */
+export function inActiveHoursAt(h: ActiveHours, minutes: number): boolean {
   if (!h.on) return true;
   const from = toMinutes(h.from);
   const to = toMinutes(h.to);
   if (!Number.isFinite(from) || !Number.isFinite(to) || from === to) return true;
-  const now = at.getHours() * 60 + at.getMinutes();
-  return from < to ? now >= from && now < to : now >= from || now < to;
+  return from < to ? minutes >= from && minutes < to : minutes >= from || minutes < to;
+}
+
+/** `true` when alerts may be delivered at `at` (device local time). Off = always. `from === to` = the whole day. */
+export function inActiveHours(h: ActiveHours, at: Date): boolean {
+  return inActiveHoursAt(h, at.getHours() * 60 + at.getMinutes());
 }
 
 // ------------------------------------------------------------------------------------------ observation

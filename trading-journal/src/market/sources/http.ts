@@ -42,7 +42,8 @@ export function isAbortLike(err: unknown): boolean {
  */
 export function classifyThrown(err: unknown): FailureReason {
   if (err instanceof RestError) return err.kind;
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return "offline";
+  // `onLine` is a browser property (the server watch bundles this file without the DOM typings)
+  if (typeof navigator !== "undefined" && (navigator as { onLine?: boolean }).onLine === false) return "offline";
   if (isAbortLike(err)) return "timeout";
   return "network";
 }
@@ -69,7 +70,7 @@ export async function fetchJson<S extends ZodTypeAny>(url: string, schema: S, op
   if (ctrl && opts.signal) opts.signal.addEventListener("abort", () => ctrl.abort(), { once: true });
   let res: Response;
   try {
-    res = await f(url, { method: "GET", signal: ctrl?.signal, cache: "no-store" });
+    res = await f(url, { method: "GET", signal: ctrl?.signal, cache: "no-store" } as RequestInit);
   } catch (err) {
     if (timer) clearTimeout(timer);
     throw toRestError(err);

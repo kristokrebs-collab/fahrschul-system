@@ -5,10 +5,10 @@
  * 30m = 2 × `kline_15m`; 1h / 2h / 3h = 1 × / 2 × / 3 × `kline_1h`; 4h, 1D, 1W straight from their feeds. Buckets are
  * aligned to the epoch (= UTC midnight for every length that divides a day), like the chart's 30m and the signal rungs.
  */
-import { resampleCandles } from "@/chart/resample";
-import { KEY_TF_MS, KEY_TF_SOURCE, KEY_TIMEFRAMES, type FeedAvailabilityMap, type KeyTf, type TfFeed } from "@/domain/keylevels";
+import { KEY_TF_SOURCE, KEY_TIMEFRAMES, type FeedAvailabilityMap, type KeyTf, type TfFeed } from "@/domain/keylevels";
 import type { MarketProvider } from "../provider";
 import type { Candle } from "../types";
+import { barsOfTf, isNativeTf } from "./bars";
 
 const memo = new WeakMap<object, Map<KeyTf, Candle[]>>();
 
@@ -17,11 +17,11 @@ export function levelCandles(p: MarketProvider, tf: KeyTf): Candle[] | null {
   const src = KEY_TF_SOURCE[tf];
   const v = p.get(src.feed);
   if (!v || !v.data.length) return null;
-  if (src.srcMs === KEY_TF_MS[tf]) return v.data;
+  if (isNativeTf(tf)) return v.data;
   let byTf = memo.get(v);
   if (!byTf) memo.set(v, (byTf = new Map()));
   let out = byTf.get(tf);
-  if (!out) byTf.set(tf, (out = resampleCandles(v.data, src.srcMs, KEY_TF_MS[tf])));
+  if (!out) byTf.set(tf, (out = barsOfTf(tf, v.data)));
   return out;
 }
 

@@ -19,7 +19,8 @@
  *
  * "Above" below means direction `above` (close > level); `below` mirrors every comparison.
  */
-import { price as fmtPrice } from "@/lib/format";
+// relative on purpose: the Netlify alert-watch function bundles this file (alias-free, see netlify/functions/README.md)
+import { price as fmtPrice } from "../../lib/format";
 import { KEY_TF_MS, type EventBasis, type KeyLevel, type LevelEvaluation, type LevelEvent, type LevelEventKind, type LevelStatus } from "./types";
 
 /** Structurally a `Candle` of the market layer (ms, `closed` = final). */

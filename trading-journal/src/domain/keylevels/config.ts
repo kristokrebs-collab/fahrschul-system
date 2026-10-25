@@ -12,8 +12,8 @@
  * Reading is lenient (`keyLevelsCfgOf` sanitises anything); writing keeps every unknown key of the root object and every
  * entry this version cannot read (`rejected`), so a newer version's data survives a round trip.
  */
-import { tvSymbolToBinance } from "@/market/symbol";
-import { parseNumber } from "@/lib/parse";
+import { tvSymbolToBinance } from "../../market/symbol";
+import { parseNumber } from "../../lib/parse";
 import type { MarketLevels } from "../types";
 import {
   isKeyTf,

@@ -19,13 +19,13 @@ import {
   dedupeKey,
   decideDelivery,
   keyLevelsOfSettings,
+  levelFingerprint,
+  parseWatchMems,
   planChange,
   planToastOn,
   quietOutcome,
-  seedMemory,
   stageMessage,
-  stepStages,
-  type AlertMemory,
+  stepWatch,
   type AlertStage,
   type AlertSettings,
   type DeliveryChannel,
@@ -33,6 +33,7 @@ import {
   type LevelEvaluation,
   KEY_TF_MS,
   type PlanMemory,
+  type WatchMems,
 } from "@/domain/keylevels";
 import { useJournal } from "@/store/journalStore";
 import { readJson, storageKey, writeJson } from "@/store/storage";
@@ -45,34 +46,18 @@ export const KEYLEVEL_MEM_KEY = storageKey("keylevel-mem");
 export const KEYLEVEL_PLAN_KEY = storageKey("keylevel-plan");
 export const KEYLEVEL_TOAST_MS = 5200;
 
-interface MemEntry {
-  fp: string;
-  m: AlertMemory;
-}
-type Mems = Record<string, MemEntry>;
 interface PlanStored {
   mem: PlanMemory | null;
   last: { from: PlanMemory["active"]; to: PlanMemory["active"]; at: number } | null;
 }
 
-let mems: Mems | null = null;
+let mems: WatchMems | null = null;
 let planStored: PlanStored | null = null;
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
-function loadMems(): Mems {
-  if (!mems) {
-    const raw = readJson<unknown>(KEYLEVEL_MEM_KEY, {});
-    const out: Mems = {};
-    if (isObj(raw)) {
-      for (const [id, e] of Object.entries(raw)) {
-        if (isObj(e) && typeof e.fp === "string" && isObj(e.m) && typeof e.m.reached === "number" && typeof e.m.cycle === "number") {
-          out[id] = { fp: e.fp, m: { cycle: e.m.cycle, reached: e.m.reached, fired: isObj(e.m.fired) ? e.m.fired : {}, ever: isObj(e.m.ever) ? e.m.ever : {} } as AlertMemory };
-        }
-      }
-    }
-    mems = out;
-  }
+function loadMems(): WatchMems {
+  mems ??= parseWatchMems(readJson<unknown>(KEYLEVEL_MEM_KEY, {}));
   return mems;
 }
 
@@ -84,10 +69,8 @@ function loadPlan(): PlanStored {
   return planStored;
 }
 
-/** What a stored stage memory is valid for: any change of these starts the level over. */
-export function levelFingerprint(l: KeyLevel): string {
-  return [l.symbol, l.price, l.tf, l.direction, l.kind, l.closes, l.distance.mode, l.distance.value, l.invalidation ?? "", l.since ?? ""].join("|");
-}
+/** What a stored stage memory is valid for: any change of these starts the level over (shared with the server watch). */
+export { levelFingerprint };
 
 /** System notification while the page is not in front (the toast already shows it otherwise). `true` = shown. */
 function systemNotification(title: string, body: string, tag: string): boolean {
@@ -123,44 +106,18 @@ function deliver(level: KeyLevel, stage: AlertStage, ev: LevelEvaluation, cycle:
   }
 }
 
-/** Steps every own level of a published view. Pure given the stores; exported for tests. */
+/**
+ * Steps every own level of a published view (`stepWatch`, the core the e-mail alarm on the server shares) and delivers
+ * what fired. Pure given the stores; exported for tests.
+ */
 export function processKeyLevelView(view: KeyLevelsView, now: number = Date.now()): void {
   if (view.state !== "ok") return;
-  const store = loadMems();
-  let dirty = false;
-  const ids = new Set(view.entries.map((e) => e.level.id));
-  for (const id of Object.keys(store)) {
-    if (!ids.has(id)) {
-      delete store[id];
-      dirty = true;
-    }
+  const res = stepWatch(loadMems(), view.entries, now);
+  if (res.dirty) {
+    mems = res.mems;
+    writeJson(KEYLEVEL_MEM_KEY, res.mems);
   }
-  for (const e of view.entries) {
-    const l = e.level;
-    if (l.legacy) continue;
-    if (!l.enabled) {
-      if (store[l.id]) {
-        delete store[l.id]; // switched off → forgets; switching on again starts with a silent first look
-        dirty = true;
-      }
-      continue;
-    }
-    if (!e.live || e.evaluation.status === "unknown") continue; // other symbol / no usable data: no stage, nothing to step
-    const fp = levelFingerprint(l);
-    const prev = store[l.id];
-    if (!prev || prev.fp !== fp) {
-      store[l.id] = { fp, m: seedMemory(e.stage) };
-      dirty = true;
-      continue;
-    }
-    const res = stepStages(prev.m, e.obs, l.alerts, now);
-    if (res.mem !== prev.m) {
-      store[l.id] = { fp, m: res.mem };
-      dirty = true;
-    }
-    if (res.fire) deliver(l, res.fire, e.evaluation, res.cycle, view.alerts, now);
-  }
-  if (dirty) writeJson(KEYLEVEL_MEM_KEY, store);
+  for (const f of res.fires) deliver(f.level, f.stage, f.evaluation, f.cycle, view.alerts, now);
 }
 
 /** Announces a relevant change of the day plan (once, quiet, never on the first plan or a data hiccup). */
