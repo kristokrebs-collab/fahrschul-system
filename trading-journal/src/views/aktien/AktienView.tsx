@@ -52,14 +52,14 @@ function Section({ id, title, sub, children }: { id: string; title: string; sub:
 }
 
 /** The place of a section that loads as its own chunk, in the height of the finished section (measured): nothing below it moves. */
-const SLOT_SIZE: Record<string, string> = {
-  "aktien-analyse": "min-h-[3093px] lg:min-h-[2179px]",
-  "aktien-kongress": "min-h-[1672px] lg:min-h-[889px]",
+const SLOT_SIZE: Record<string, number | { base: number; lg: number }> = {
+  "aktien-analyse": { base: 3093, lg: 2179 },
+  "aktien-kongress": { base: 1672, lg: 889 },
 };
 function SlotFallback({ id }: { id: string }) {
   return (
     <div data-testid={`${id}-loading`} role="status" aria-label="Wird geladen …">
-      <PendingBlock size={SLOT_SIZE[id] ?? "min-h-[200px]"} />
+      <PendingBlock height={SLOT_SIZE[id] ?? 200} />
     </div>
   );
 }

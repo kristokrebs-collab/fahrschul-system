@@ -206,17 +206,17 @@ export function MarktView({ className }: { className?: string }) {
           <section aria-labelledby={ids.context} className="contents">
             <SectionTitle id={ids.context} section="context" title="Einordnung" sub="Squeeze, Preis- und RSI-Struktur und ähnliche Situationen – Beobachtungen aus Kerzen und Archiv, keine Signale." className="lg:col-span-12" />
             <Cell index={3} span="lg:col-span-12">
-              <Suspense fallback={<PendingCard title="Squeeze-Beobachtung" testId="markt-squeeze-loading" size="min-h-[800px] lg:min-h-[470px]" />}>
+              <Suspense fallback={<PendingCard title="Squeeze-Beobachtung" testId="markt-squeeze-loading" height={{ base: 800, lg: 470 }} />}>
                 <SqueezeCard view={view} />
               </Suspense>
             </Cell>
             <Cell index={3} span="lg:col-span-12">
-              <Suspense fallback={<PendingCard title={TREND.title} testId="markt-trend-loading" size="min-h-[2680px] lg:min-h-[1260px]" />}>
+              <Suspense fallback={<PendingCard title={TREND.title} testId="markt-trend-loading" height={{ base: 2680, lg: 1260 }} />}>
                 <TrendStructureCard />
               </Suspense>
             </Cell>
             <Cell index={4} span="lg:col-span-12">
-              <Suspense fallback={<PendingCard title="Ähnliche Situationen" testId="markt-similar-loading" size="min-h-[2150px] lg:min-h-[1260px]" />}>
+              <Suspense fallback={<PendingCard title="Ähnliche Situationen" testId="markt-similar-loading" height={{ base: 2150, lg: 1260 }} />}>
                 <SimilarCard />
               </Suspense>
             </Cell>
@@ -238,7 +238,7 @@ export function MarktView({ className }: { className?: string }) {
             {/* no `Cell` (Reveal) around the section: it is three cards tall (several thousand px on a phone), and a reveal waits for
                 15 % of its element to be in view – an element that tall never gets there and would stay at opacity 0. The cards reveal themselves. */}
             <div className="min-w-0 lg:col-span-12">
-              <Suspense fallback={<PendingCard title="Termine" testId="termine-loading" size="min-h-[5760px] lg:min-h-[2590px]" />}>
+              <Suspense fallback={<PendingCard title="Termine" testId="termine-loading" height={{ base: 5760, lg: 2590 }} />}>
                 <TermineSection />
               </Suspense>
             </div>

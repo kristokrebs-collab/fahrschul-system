@@ -478,7 +478,7 @@ test.describe("Aktien", () => {
     await mockStocks(page);
     await go(page);
     const nav = page.getByRole("navigation", { name: "Inhalt dieser Seite" });
-    await expect(nav.getByRole("button")).toHaveText(["Scanner", "Watchlist", "News", "Analyse", "Kongress"]);
+    await expect(nav.getByRole("button")).toHaveText(["Scanner", "Watchlist", "News", "Analyse", "DCF-Rechner", "Kaufthese", "Kongress"]);
     for (const id of ["analyst-panel", "dcf-panel", "thesis-panel"]) await expect(page.getByTestId("aktien-analyse").getByTestId(id)).toBeVisible();
     // the Congress tracker is there with its caveats (its own spec: aktien-kongress.spec.ts); no function answers here, so it says why it has no rows
     await expect(page.getByTestId("aktien-kongress")).toContainText("Kongress-Tracker");

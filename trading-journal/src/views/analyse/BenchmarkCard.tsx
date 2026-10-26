@@ -140,23 +140,17 @@ export function BenchmarkCard({ view }: { view: AccountView }) {
       <div className="grid gap-4">
         {!view.closed.length ? (
           <EmptyState title="Noch keine Trades" text="Sobald du Trades abschließt, siehst du hier, ob du den Markt schlägst." line={EMPTY_LINE_CLOSED} />
+        ) : rep ? (
+          <>
+            <Race rep={rep} symbol={symbol} />
+            <div className="grid grid-cols-2 gap-2">
+              <Stat label="Differenz" value={pct(rep.alpha)} tone={rep.alpha >= 0 ? "text-win" : "text-loss"} sub={rep.alpha >= 0 ? "vor Buy & Hold" : "hinter Buy & Hold"} />
+              <Stat label="Korrelation" value={rep.corr == null ? "–" : n2(rep.corr)} sub="Tagesrenditen" />
+            </div>
+            <SourceStand source={stamp ? SOURCE_LABEL[stamp.source] : null} parts={[{ label: "Tageskerzen abgerufen", at: stamp?.at ?? null }]} testId="bench-stand" />
+          </>
         ) : (
-          // the race, its two tiles and the source line: the box is as tall as the finished picture while the daily candles
-          // are still on their way (or missing) – the card does not grow when they arrive (measured: 369 px at 390, 328 px from sm)
-          <div className="grid min-h-[369px] content-start gap-4 sm:min-h-[328px]" data-testid="bench-main">
-            {rep ? (
-              <>
-                <Race rep={rep} symbol={symbol} />
-                <div className="grid grid-cols-2 gap-2">
-                  <Stat label="Differenz" value={pct(rep.alpha)} tone={rep.alpha >= 0 ? "text-win" : "text-loss"} sub={rep.alpha >= 0 ? "vor Buy & Hold" : "hinter Buy & Hold"} />
-                  <Stat label="Korrelation" value={rep.corr == null ? "–" : n2(rep.corr)} sub="Tagesrenditen" />
-                </div>
-                <SourceStand source={stamp ? SOURCE_LABEL[stamp.source] : null} parts={[{ label: "Tageskerzen abgerufen", at: stamp?.at ?? null }]} testId="bench-stand" />
-              </>
-            ) : (
-              <EmptyState title={ANA_EMPTY.benchmark.title} text={ANA_EMPTY.benchmark.text} line={false} className="min-h-[369px] sm:min-h-[328px]" />
-            )}
-          </div>
+          <EmptyState title={ANA_EMPTY.benchmark.title} text={ANA_EMPTY.benchmark.text} line={false} />
         )}
         <div className="grid gap-2 rounded-xl border border-line bg-ink-950/50 px-3 py-2.5" data-testid="bench-adaptive">
           <span className="label">Du gegen dich selbst · 90 Tage</span>

@@ -16,15 +16,17 @@ import { SECTION_NAV_TOP } from "@/primitives/SectionNav";
 import { STATUS_WORD } from "./ui";
 
 const LABEL = { entry: "Einstieg", exit: "Ausstieg", size: "Größe", risk: "Risiko", ticket: "Ticket" } as const;
+/** The card of each step by its `data-testid` (also the anchors of the function register). */
+const CARD = { entry: "hplan-entry", exit: "hplan-exit", size: "hplan-size", risk: "hplan-risk", ticket: "hplan-ticket" } as const;
 const FILL: Record<StepStatus, string> = { done: "bg-win", warn: "bg-warn", blocked: "bg-loss", todo: "bg-white/20" };
 const DOT: Record<StepStatus, string> = { done: "bg-win", warn: "bg-warn", blocked: "bg-loss", todo: "bg-faint-line" };
 
 export function Progress({ steps, progress, className }: { steps: readonly StepState[]; progress: number; className?: string }) {
   const reduced = useReducedFx();
   const root = useRef<HTMLDivElement>(null);
-  const jump = (id: string): void => {
+  const jump = (id: keyof typeof CARD): void => {
     const layer = root.current?.closest("[data-page]") ?? document;
-    const el = layer.querySelector<HTMLElement>(`[data-testid="hplan-${id}"]`);
+    const el = layer.querySelector<HTMLElement>(`[data-testid="${CARD[id]}"]`);
     if (el) revealCard(el);
   };
   const current = steps.find((s) => s.current);

@@ -21,17 +21,17 @@ const CongressCard = lazy(() => import("@/views/aktien/kongress/CongressCard"));
 const STOCK_TICKER = /^[A-Z][A-Z.-]{0,5}$/;
 
 /** The place of a panel that loads as its own chunk, in the height of the finished panel (measured): nothing below it moves. */
-const PANEL_SIZE: Record<string, string> = {
-  "aktien-analyse-zahlen-loading": "min-h-[516px] lg:min-h-[448px]",
-  "aktien-analyse-dcf-loading": "min-h-[1744px] lg:min-h-[1153px]",
-  "aktien-analyse-these-loading": "min-h-[785px] lg:min-h-[530px]",
-  "aktien-kongress-card-loading": "min-h-[1672px] lg:min-h-[889px]",
+const PANEL_SIZE: Record<string, number | { base: number; lg: number }> = {
+  "aktien-analyse-zahlen-loading": { base: 516, lg: 448 },
+  "aktien-analyse-dcf-loading": { base: 1744, lg: 1153 },
+  "aktien-analyse-these-loading": { base: 785, lg: 530 },
+  "aktien-kongress-card-loading": { base: 1672, lg: 889 },
 };
 
 function Loading({ id }: { id: string }) {
   return (
     <div data-testid={id} role="status" aria-label="Wird geladen …">
-      <PendingBlock size={PANEL_SIZE[id] ?? "min-h-[120px]"} />
+      <PendingBlock height={PANEL_SIZE[id] ?? 120} />
     </div>
   );
 }

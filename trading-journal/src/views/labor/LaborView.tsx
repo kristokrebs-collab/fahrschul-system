@@ -135,7 +135,7 @@ export function LaborView({ className }: { className?: string }) {
       {hasResult && !busy && (
         <Section id={ids.fit} section="fit" title={T.fit.title} sub={T.fit.sub}>
           <Cell index={0} span="lg:col-span-12">
-            <Suspense fallback={<PendingBlock size="min-h-[434px] lg:min-h-[270px]" />}>
+            <Suspense fallback={<PendingBlock height={{ base: 434, lg: 270 }} />}>
               <FitCard />
             </Suspense>
           </Cell>
@@ -144,7 +144,7 @@ export function LaborView({ className }: { className?: string }) {
       {hasResult && !busy && (
         <Section id={ids.extras} section="extras" title={T.extras.title} sub={T.extras.sub}>
           <Cell index={0} span="lg:col-span-12">
-            <Suspense fallback={<PendingBlock size="min-h-[810px] lg:min-h-[535px]" />}>
+            <Suspense fallback={<PendingBlock height={{ base: 810, lg: 535 }} />}>
               <ExtrasSection />
             </Suspense>
           </Cell>
@@ -152,14 +152,14 @@ export function LaborView({ className }: { className?: string }) {
       )}
       <Section id={ids.forward} section="forward" title={FORWARD.section.title} sub={FORWARD.section.sub}>
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={<PendingBlock size="min-h-[1380px] lg:min-h-[840px]" />}>
+          <Suspense fallback={<PendingBlock height={{ base: 1380, lg: 840 }} />}>
             <ForwardSection />
           </Suspense>
         </Cell>
       </Section>
       <Section id={ids.evolve} section="evolve" title={EVOLVE.section.title} sub={EVOLVE.section.sub}>
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={<PendingBlock size="min-h-[1375px] lg:min-h-[935px]" />}>
+          <Suspense fallback={<PendingBlock height={{ base: 1375, lg: 935 }} />}>
             <EvolveSection />
           </Suspense>
         </Cell>
@@ -196,7 +196,7 @@ export function LaborView({ className }: { className?: string }) {
         <Suspense
           fallback={
             <Cell index={0} span="lg:col-span-12">
-              <PendingBlock size="min-h-[4010px] lg:min-h-[2200px]" />
+              <PendingBlock height={{ base: 4010, lg: 2200 }} />
             </Cell>
           }
         >
@@ -205,21 +205,21 @@ export function LaborView({ className }: { className?: string }) {
       </Section>
       <Section id={ids.drafts} section="drafts" title={DRAFTS.section.title} sub={DRAFTS.section.sub}>
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={<PendingBlock size="min-h-[1775px] lg:min-h-[1175px]" />}>
+          <Suspense fallback={<PendingBlock height={{ base: 1775, lg: 1175 }} />}>
             <DraftsSection />
           </Suspense>
         </Cell>
       </Section>
       <Section id={ids.discovery} section="discovery" title="Muster-Entdecker" sub="Was haben Gewinner und Verlierer gemeinsam – und hält das gegen den Zufall?">
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={<PendingBlock size="min-h-[710px] lg:min-h-[420px]" />}>
+          <Suspense fallback={<PendingBlock height={{ base: 710, lg: 420 }} />}>
             <DiscoverySection />
           </Suspense>
         </Cell>
       </Section>
       <Section id={ids.timemachine} section="timemachine" title="Zeitmaschine" sub="Den Plan 10 000 Mal durchspielen – und gegen jedes frühere Mal halten, als er ausgelöst hätte.">
         <Cell index={0} span="lg:col-span-12">
-          <Suspense fallback={<PendingBlock size="min-h-[1165px] lg:min-h-[625px]" />}>
+          <Suspense fallback={<PendingBlock height={{ base: 1165, lg: 625 }} />}>
             <TimeMachineSection />
           </Suspense>
         </Cell>
