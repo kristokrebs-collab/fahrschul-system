@@ -4,6 +4,10 @@
  * Uhr, keine Uhr-Sprünge). Gemessen wird der ganze Ablauf mit der Handrechnung des Mocks:
  *   Range 99.880 – 100.250 (Mitte 100.065) · Signal Long 100.380 um 9:55 New Yorker Zeit · Stop 100.065 · Ziel 2R 101.010 ·
  *   0,037 BTC (der Positionsdeckel bindet) · Verlust am Stop 17,21 USDT · Ampel grün.
+ * Aktien (`describe "Handelsplan · Aktien"`): der Link `#plan?symbol=AAPL&side=long`, die Kerzen einer nachgebauten Aktien-Quelle
+ * (`mocks/planStockCandles.ts`, Handrechnung dort: 20 Stück, Stop 185,05, Ziel 187,60, 22,56 USD), die Zeitmaschine auf Stunden- und
+ * Tageskerzen, der Ausfall der Quelle, ein ungültiger Link. Der Tag ist ein junger Handelstag, den die Quelle noch ausliefert (aus der
+ * Uhr gerechnet, die Zahlen hängen nicht daran).
  * Dazu: eine Regel wechseln, Plan speichern → 3 Alarme → Journal-Entwurf → verwerfen, der Ladefehler mit „Neu laden“, der Satz
  * „Keine professionelle Finanzberatung.“ mit Quelle + Stand an jedem Schritt, kein seitliches Scrollen, abgeschnittene Texte,
  * Touch-Ziele, axe in beiden Themen. Die App sendet nie etwas an eine Börse – auch das wird gemessen.

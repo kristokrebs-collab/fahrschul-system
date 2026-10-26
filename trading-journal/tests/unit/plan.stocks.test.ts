@@ -106,6 +106,8 @@ describe("Handelsplan · eine US-Aktie, Rückblick auf Freitag 23.10.2026", () =
   });
 });
 
+const m0 = () => buildPlanModel(input());
+
 describe("Handelsplan · Aktien: Abweichungen vom Krypto-Ablauf", () => {
   it("ein Hebel aus dem Krypto-Formular wirkt bei Aktien nicht: Kaufkraft und Ticket rechnen mit 1×", () => {
     const m = buildPlanModel(input({ form: form({ leverage: 5, riskPct: 0.03 }), prefs: { ...DEFAULT_PREFS, maxPositionPct: 10 } }));
@@ -128,6 +130,23 @@ describe("Handelsplan · Aktien: Abweichungen vom Krypto-Ablauf", () => {
     expect(m.tickSource).toBe("eingegeben");
     expect(m.lot).toBe(0.01);
     expect(m.size?.ok && m.size.qty).toBe(20.17); // 3.750 ÷ 185,90 = 20,17…, abgerundet auf 0,01
+  });
+
+  it("Yahoo liefert Kurse mit vier Stellen: der Einstieg wird auf den Cent gerundet (Gleichstand zum schlechteren Preis), ein getippter Preis bleibt", () => {
+    const withClose = (close: number) => candles().map((c) => (c.time === OPEN + 4 * MIN5 ? { ...c, high: Math.max(c.high, close), close } : c));
+    const near = buildPlanModel(input({ candles: withClose(185.9049) }));
+    expect(near.entry.signal!.price).toBe(185.9049); // the candle stays as the source said it
+    expect(near.entryPrice).toBe(185.9);
+    expect(near.assumptions.entry.join("\n")).toContain("Der Einstieg wird auf den Kursschritt gerundet (185,90)");
+    expect(near.ticketPlan!.entry).toBe(185.9);
+    const tie = buildPlanModel(input({ candles: withClose(185.905) }));
+    expect(tie.entryPrice).toBe(185.91); // Long: auf dem Gleichstand nach oben, zum schlechteren Preis
+    expect(tie.exit?.ok && tie.exit.stop).toBe(185.05);
+    // eine glatte Zahl wird nicht angefasst und nicht erwähnt
+    expect(m0().assumptions.entry.join("\n")).not.toContain("gerundet");
+    // ein getippter Preis bleibt, wie er getippt wurde
+    const typed = buildPlanModel(input({ form: form({ manualEntry: 185.9049 }) }));
+    expect(typed.entryPrice).toBe(185.9049);
   });
 
   it("in Euro geführtes Journal: die App sagt, dass sie nicht umrechnet", () => {

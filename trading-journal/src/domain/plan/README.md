@@ -31,7 +31,7 @@ Kerzen + Symbol ─▶ entryTimer ─▶ exitPlan ─▶ positionSizing ─▶ r
 Die Sitzung „US-Börse“ (9:30–16:00 New York, Feiertage und 13-Uhr-Schlüsse 2026/2027, Sommerzeit) war schon da; ab jetzt gibt es Kerzen dafür. Was der Kern bei einer Aktie anders macht (`model.ts`):
 
 - **Ganze Stück:** Mengenschritt 1 (`DEFAULT_LOT`), „Stück“ als Einheit (`unitOf`); wer Bruchstücke beim Broker hat, trägt den Schritt selbst ein.
-- **Kursschritt 1 Cent** (`STOCK_TICK`), unter einem Dollar 0,0001 – nach der Börsenregel, **nicht** aus den Kerzen abgeleitet (Yahoo liefert mehr Stellen als der Tick). Ein eingegebener Schritt gilt.
+- **Kursschritt 1 Cent** (`STOCK_TICK`), unter einem Dollar 0,0001 – nach der Börsenregel, **nicht** aus den Kerzen abgeleitet (Yahoo liefert Kurse mit bis zu sechs Stellen). Ein eingegebener Schritt gilt. Der Einstieg (Schluss der Signal-Kerze oder Range-Rand) wird auf diesen Schritt gerundet, auf dem Gleichstand zum schlechteren Preis, und das steht in „Angenommen“; die Kerzen selbst bleiben unverändert, ein getippter Einstiegspreis auch.
 - **Währung USD** (`STOCK_CURRENCY`): das Kapital des Kontos wird 1 : 1 als USD gelesen – die App rechnet nicht um; in einem Euro-Journal sagt „Angenommen“ das ausdrücklich. Die Zeilen des Risiko-Checks sprechen dieselbe Währung.
 - **Kein Hebel:** gerechnet wird mit 1× (die Wahl im Formular wirkt bei Aktien nicht, bleibt aber für den Weg zurück zu Krypto); keine Liquidation, keine Funding-Zeile, das Ticket nennt keinen Hebel. Short ist möglich, aber Leihbestand, Marge und Leihgebühr kennt die App nicht (steht in „Angenommen“).
 - **ATR nur aus der Sitzung** (so war es schon: Krypto darf Kerzen vor der Sitzung nehmen, eine Aktie nicht – die Nacht ist eine Lücke).

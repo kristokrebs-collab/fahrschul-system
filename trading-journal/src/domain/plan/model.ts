@@ -11,7 +11,7 @@ import { atrOf, closedUpTo, entryTimer, intervalText, type EntryResult } from ".
 import { exitPlan, stopRuleText, targetRuleText, type ExitResult } from "./exit";
 import { feedLag, type FeedLag } from "./feed";
 import { DEFAULT_LOT, TF_MS, type PlanForm } from "./form";
-import { inferStep, moneyText, num, pctText, priceText, qtyText } from "./format";
+import { inferStep, moneyText, num, pctText, priceText, qtyText, toStep } from "./format";
 import type { PlanPrefs } from "./config";
 import { riskCheck, type RiskVerdict } from "./risk";
 import { flatByMs, latestSession, sessionDay, sessionDef, type SessionDay } from "./sessions";
@@ -164,6 +164,14 @@ export function buildPlanModel(i: ModelInput): PlanModel {
     entryPrice = side === "long" ? entry.range.high : entry.range.low;
     entrySource = "level";
   }
+  // a stock is traded in whole cents, the source quotes up to four places: the plan's entry (a close or a range edge) is rounded to the
+  // price step – to the worse side on a tie – so the ticket holds prices a broker takes; a typed price stays as typed
+  let entryRounded = false;
+  if (stocks && entryPrice != null && entrySource !== "manual") {
+    const rounded = toStep(entryPrice, tick, "nearest-away", side === "short" ? -1 : 1);
+    entryRounded = Math.abs(rounded - entryPrice) > 1e-9;
+    entryPrice = rounded;
+  }
 
   // ATR of the closed candles up to the entry (crypto: with the candles before the session, stocks: the session only)
   const upTo = entry.signal ? entry.signal.barClose : Math.min(now, session.closeMs);
@@ -301,6 +309,7 @@ export function buildPlanModel(i: ModelInput): PlanModel {
       `Range: die ersten ${form.orMinutes} Minuten (${orBars} ${orBars === 1 ? "Kerze" : "Kerzen"}); Signal: erste geschlossene Kerze, deren Schluss außerhalb liegt (${form.sides === "both" ? "Long über dem Hoch, Short unter dem Tief" : form.sides === "long" ? "nur Long über dem Hoch" : "nur Short unter dem Tief"})`,
       `Letzter Einstieg ${clockIn(session.cutoffMs, session.tz)} Uhr · Volumenfilter ${form.minVolumeX ? `${num(form.minVolumeX, 1)}× der Range` : "aus"} · nur geschlossene Kerzen`,
       ...(def.market === "stocks" && !session.calendarKnown ? ["Der Feiertagskalender der App kennt dieses Jahr nicht: erkannt werden nur Wochenenden."] : []),
+      ...(entryRounded ? [`Der Einstieg wird auf den Kursschritt gerundet (${priceText(entryPrice!, tick)}): die Quelle liefert Kurse mit bis zu vier Stellen, ein Broker nimmt ganze Cent.`] : []),
       ...(stocks ? [`Nur die reguläre Handelszeit (${clockIn(session.openMs, session.tz)} bis ${clockIn(session.closeMs, session.tz)} Uhr ${zoneLabel(session.openMs, session.tz)}): kein Vorhandel, kein Nachhandel, Wochenenden und Börsenfeiertage haben keine Sitzung.`] : []),
       ...(i.sourceNotes ?? []),
     ],
