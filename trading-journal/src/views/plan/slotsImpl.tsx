@@ -1,39 +1,46 @@
 /**
  * The Zeitmaschine of the Handelsplan (`Slots.tsx`): "spiel den Plan an echten Kerzen durch". The card itself is the
  * Zeitmaschine (`src/views/timemachine`); this host only gets it the history it needs. Nothing loads before the click: the
- * plan's session candles are too few to rebuild sessions from, so the Labor's own loader (cache first, closed candles only) asks
- * for the longer history of the same market and timeframe – and says what it asks for. A market the exchange does not know
- * (a stock, for now) gets the reason instead of a card. The plan itself is never changed and nothing is sent.
+ * plan's session candles are too few to rebuild sessions from, so a history source (`historySources.ts`) asks for the longer
+ * history of the same market – crypto through the Labor's loader (cache first, closed candles only), stocks through the stock data
+ * contract (hourly or daily candles as far back as Yahoo reaches) – and says what it asks for. Only closed candles that existed
+ * before the plan reach the card. A market the source does not know, too few candles, a blocked source: the reason is shown instead of
+ * a card. The plan itself is never changed and nothing is sent.
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { HIST_MS, HIST_SOURCE, type HistInterval } from "@/domain/backtest/types";
-import { MIN_POOL_BARS } from "@/domain/timemachine";
-import { IS_FILE_BUILD, isFileProtocol } from "@/edition";
+import type { CostModel } from "@/domain/backtest/types";
+import type { TmInterval } from "@/domain/timemachine";
 import { Button } from "@/primitives/Button";
-import { HISTORY_DAYS } from "@/views/timemachine/tradePlan";
+import { Segmented } from "@/primitives/Segmented";
+import { historySourceOf, type TmSetup } from "@/views/timemachine/historySources";
 import type { TimeMachineCandle } from "@/views/timemachine/types";
-import { loadErrorKind, loadLabData } from "@/views/labor/historySource";
-import { LABOR } from "@/views/labor/strings";
+import { SEG_TOUCH } from "@/views/labor/ui";
 import type { TimeMachineSlotProps } from "./types";
 
 const TimeMachineCard = lazy(() => import("@/views/timemachine/TimeMachineCard"));
 
-type Load = { status: "idle" } | { status: "loading"; done: number; total: number } | { status: "error"; message: string } | { status: "ok"; candles: TimeMachineCandle[]; fetchedAt: number };
+type Load =
+  | { status: "idle" }
+  | { status: "loading"; done: number; total: number }
+  | { status: "error"; message: string }
+  | { status: "ok"; candles: TimeMachineCandle[]; fetchedAt: number; sourceLabel: string; interval: TmInterval; notes: string[]; setup: TmSetup };
 
-/** The Labor loads 15m and up; a 5-minute plan is replayed on 15-minute candles (said in the text). */
-function historyInterval(intervalMs: number): { iv: HistInterval; exact: boolean } {
-  const exact = (Object.keys(HIST_MS) as HistInterval[]).find((k) => HIST_MS[k] === intervalMs);
-  if (exact) return { iv: exact, exact: true };
-  return { iv: "15m", exact: false };
+/** A stock has no funding; fees and slippage are the plan's own assumptions (the risk settings), so the replay is costed like the sizing. */
+export function stockCosts(feePct: number, slippagePct: number): CostModel {
+  const bps = (x: number): number => Number((x * 10_000).toFixed(4));
+  return { fees: { exchange: "Risiko-Einstellungen", makerBps: bps(feePct), takerBps: bps(feePct) }, slippage: { kind: "fixed", bps: bps(slippagePct) }, funding: { kind: "none" } };
 }
 
-export function TimeMachineSlotImpl({ symbol, side, entry, stop, target, intervalMs, source }: TimeMachineSlotProps) {
-  const { iv, exact } = useMemo(() => historyInterval(intervalMs), [intervalMs]);
-  const days = HISTORY_DAYS[HIST_SOURCE[iv] as keyof typeof HISTORY_DAYS];
-  const key = `${symbol}|${iv}`;
+export function TimeMachineSlotImpl({ symbol, side, entry, stop, target, intervalMs, sessionOpenMs, sessionCloseMs, entryAt, flatByMs, market, feePct, slippagePct }: TimeMachineSlotProps) {
+  const hist = historySourceOf(market);
+  const offer = useMemo(() => hist.choices(intervalMs), [hist, intervalMs]);
+  const [pick, setPick] = useState<TmInterval | null>(null);
+  const choice = offer.choices.find((c) => c.id === pick) ?? offer.choices[0]!;
+  const key = `${symbol}|${choice.id}`;
   const [load, setLoad] = useState<{ key: string; v: Load }>({ key, v: { status: "idle" } });
   const ctl = useRef<AbortController | null>(null);
   const current: Load = load.key === key ? load.v : { status: "idle" };
+  const costs = useMemo(() => (market === "stocks" ? stockCosts(feePct ?? 0, slippagePct ?? 0) : undefined), [market, feePct, slippagePct]);
 
   useEffect(() => () => ctl.current?.abort(), []);
   // a different market or timeframe drops a running load; the old answer no longer counts
@@ -47,31 +54,20 @@ export function TimeMachineSlotImpl({ symbol, side, entry, stop, target, interva
     ctl.current = mine;
     const put = (v: Load) => !mine.signal.aborted && setLoad({ key, v });
     const now = Date.now();
+    const plan = { intervalMs, sessionOpenMs, sessionCloseMs, entryAt, flatByMs, now, past: now >= sessionCloseMs };
     put({ status: "loading", done: 0, total: 0 });
-    loadLabData({
-      symbol,
-      intervals: [iv],
-      from: now - days * 86_400_000,
-      to: now,
-      funding: false,
-      signal: mine.signal,
-      onProgress: (done, total) => put({ status: "loading", done, total }),
-    }).then(
-      (res) => {
-        const ms = HIST_MS[iv];
-        const candles: TimeMachineCandle[] = (res.data[iv] ?? []).filter((b) => b.t * 1000 + ms <= now).map((b) => ({ time: b.t * 1000, open: b.o, high: b.h, low: b.l, close: b.c, ...(b.v != null ? { volume: b.v } : {}), closed: true }));
-        if (candles.length < MIN_POOL_BARS) {
-          put({ status: "error", message: candles.length ? `Für ${symbol} gibt es auf dem ${iv}-Chart nur ${candles.length} Kerzen – mindestens ${MIN_POOL_BARS} sind nötig.` : `Für ${symbol} liefert die Börse hier keine Kerzen.` });
-          return;
-        }
-        put({ status: "ok", candles, fetchedAt: now });
-      },
-      (e: unknown) => {
-        if (e instanceof Error && e.name === "AbortError") return;
-        const kind = loadErrorKind(e);
-        put({ status: "error", message: kind === "blocked" ? (IS_FILE_BUILD || isFileProtocol() ? LABOR.errors.blockedFile : LABOR.errors.blocked) : kind === "rate" ? LABOR.errors.rate : kind === "symbol" ? `Für ${symbol} gibt es hier keine Kerzen (die Börse kennt den Markt nicht) – die Zeitmaschine kann diesen Plan nicht durchspielen.` : "Die Kerzen konnten nicht geladen werden." });
-      },
-    );
+    hist
+      .load({ symbol, interval: choice.id, signal: mine.signal, until: hist.until(plan), onProgress: (done, total) => put({ status: "loading", done, total }) })
+      .then(
+        (res) => {
+          if (!res.ok) return put({ status: "error", message: res.message });
+          put({ status: "ok", candles: res.candles, fetchedAt: res.fetchedAt, sourceLabel: res.sourceLabel, interval: res.interval, notes: res.notes, setup: hist.setup(choice, plan, res.candles.length) });
+        },
+        (e: unknown) => {
+          if (e instanceof Error && e.name === "AbortError") return;
+          put({ status: "error", message: "Die Kerzen konnten nicht geladen werden." });
+        },
+      );
   };
 
   if (current.status === "ok") {
@@ -85,11 +81,15 @@ export function TimeMachineSlotImpl({ symbol, side, entry, stop, target, interva
             stop={stop}
             target={target}
             candles={current.candles}
-            interval={iv}
-            source={source.label}
+            interval={current.interval}
+            source={current.sourceLabel}
             fetchedAt={current.fetchedAt}
-            note={`Dein Handelsplan, durchgespielt auf ${current.candles.length} Kerzen (${iv}).`}
+            note={[current.setup.note, ...current.notes].join(" ")}
             framed={false}
+            market={market}
+            {...(costs ? { costs } : {})}
+            options={current.setup.options}
+            startMs={current.setup.startMs}
           />
         </Suspense>
       </div>
@@ -99,19 +99,36 @@ export function TimeMachineSlotImpl({ symbol, side, entry, stop, target, interva
     <div className="grid gap-3 rounded-xl border border-line-2 bg-ink-950/40 p-4" data-testid="hplan-timemachine" data-state={current.status}>
       <h3 className="label !text-mute">Zeitmaschine</h3>
       <p className="max-w-[64ch] text-[12.5px] leading-relaxed text-mute">
-        Spielt deinen Plan ({side === "long" ? "Long" : "Short"} {symbol}) 10 000-mal durch neu gemischte Sitzungen echter Kerzen und sagt, wie oft Ziel oder Stop zuerst kam – mit Streuung und ohne die Zukunft zu zeigen. Dafür lädt sie bis zu {days} Tage {iv}-Kerzen von der Börse ({source.label}); erst nach deinem Klick.
-        {exact ? "" : " Das Labor lädt keine kürzeren Kerzen als 15 Minuten, darum läuft der Plan auf 15-Minuten-Kerzen."}
+        Spielt deinen Plan ({side === "long" ? "Long" : "Short"} {symbol}) 10 000-mal durch neu gemischte Sitzungen echter Kerzen und sagt, wie oft Ziel oder Stop zuerst kam – mit Streuung und ohne die Zukunft zu zeigen. {hist.announce(choice)}
+        {offer.hint}
       </p>
+      {offer.choices.length > 1 && (
+        <div className="grid gap-1.5" data-testid="hplan-timemachine-choice">
+          <Segmented<TmInterval>
+            aria-label="Kerzen für die Zeitmaschine"
+            size="sm"
+            options={offer.choices.map((c) => ({ v: c.id, label: c.label }))}
+            value={choice.id}
+            onChange={setPick}
+            className={SEG_TOUCH}
+          />
+          <span className="text-[11.5px] leading-snug text-mute">Reichweite: {choice.reach}.</span>
+        </div>
+      )}
       {current.status === "loading" ? (
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-[12.5px] text-fg" role="status" data-testid="hplan-timemachine-loading">
             Kerzen werden geladen{current.total > 0 ? ` (${current.done} von ${current.total})` : ""} …
           </p>
-          <Button size="md" variant="ghost" onClick={() => {
+          <Button
+            size="md"
+            variant="ghost"
+            onClick={() => {
               ctl.current?.abort();
               setLoad({ key, v: { status: "idle" } });
             }}
-            data-testid="hplan-timemachine-cancel">
+            data-testid="hplan-timemachine-cancel"
+          >
             Abbrechen
           </Button>
         </div>

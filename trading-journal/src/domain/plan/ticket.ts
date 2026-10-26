@@ -7,12 +7,15 @@ import { splitSymbol } from "@/market/symbol";
 import type { Side } from "../types";
 import { moneyText, num, pctText, priceText, qtyText } from "./format";
 import type { Light } from "./risk";
+import type { MarketKind } from "./sessions";
 import { dateTimeIn, clockIn, zoneLabel } from "./time";
 
 export type EntrySource = "signal" | "level" | "manual";
 
 export interface TicketPlan {
   symbol: string;
+  /** the market kind; absent = crypto (plans saved before stocks existed) */
+  market?: MarketKind;
   side: Side;
   entry: number;
   stop: number;
@@ -59,14 +62,18 @@ export interface Ticket {
 const LIGHT_WORD: Record<Light, string> = { green: "Grün", amber: "Gelb", red: "Rot" };
 export const TICKET_NOTE = "Nur ein Plan zum Kopieren – die App sendet nichts an eine Börse und platziert keine Order. Keine professionelle Finanzberatung.";
 
-/** The journal's pair notation of a market symbol ("BTCUSDT" → "BTC/USDT"), else the symbol itself. */
-export function pairOf(symbol: string): string {
+/** The journal's pair notation of a market symbol ("BTCUSDT" → "BTC/USDT"); a stock stays its ticker. */
+export function pairOf(symbol: string, market?: MarketKind): string {
+  if (market === "stocks") return symbol;
   const s = splitSymbol(symbol);
   return s ? `${s.base}/${s.quote}` : symbol;
 }
 
 /** The base asset of a market symbol ("BTCUSDT" → "BTC"), else the symbol itself. */
 export const baseOf = (symbol: string): string => splitSymbol(symbol)?.base ?? symbol;
+
+/** What a quantity counts: the base asset of a crypto pair, whole shares ("Stück") for a stock. */
+export const unitOf = (market: MarketKind | undefined, symbol: string): string => (market === "stocks" ? "Stück" : baseOf(symbol));
 
 function csvCell(v: string): string {
   return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
@@ -76,7 +83,7 @@ const iso = (ms: number): string => new Date(ms).toISOString().replace(".000Z", 
 
 export function buildTicket(p: TicketPlan): Ticket {
   const P = (x: number): string => priceText(x, p.tick);
-  const base = baseOf(p.symbol);
+  const base = unitOf(p.market, p.symbol);
   const entryHow = p.entrySource === "signal" ? `Schlusskurs der Signal-Kerze${p.signalAt != null ? ` (${clockIn(p.signalAt, p.tz)} Uhr)` : ""}` : p.entrySource === "level" ? "geplant am Ausbruchsniveau, noch kein Signal" : "von dir eingegeben";
   const stand =
     p.candlesUntil != null || p.fetchedAt != null

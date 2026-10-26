@@ -39,6 +39,7 @@ export const TM = {
   expectancy: {
     title: "Erwartungswert",
     lead: "Durchschnitt aller Läufe in R nach Gebühren, Slippage und Funding.",
+    leadStocks: "Durchschnitt aller Läufe in R nach Gebühren und Slippage.",
     cost: (c: string) => `Kosten im Schnitt ${c} R je Trade`,
     noise: "Spanne = Rechenrauschen der Läufe.",
   },

@@ -157,7 +157,7 @@ banner opens or closes.
 - `pages.ts`: `LOADERS` import the view MODULES (never a barrel – a barrel pulls lazy code into the first load),
   `lazyView(page)` (`retryableLazy`: a failed download – offline, a deploy replaced the chunk – is tried again by the
   boundary's "Erneut versuchen", a plain `React.lazy` would keep its rejection), `preloadPage`, `PAGE_FEATURE`.
-- Router (`@/store/router`): `#analyse?dim=`, `#berichte?p=`, `#community?invite=` (`QUERY_PAGES`, the page's query
+- Router (`@/store/router`): `#analyse?dim=`, `#berichte?p=`, `#plan?symbol=&side=` (prefills market and direction of the Handelsplan, in memory only), `#community?invite=` (`QUERY_PAGES`, the page's query
   state lives in a lazily loaded seam that mirrors into the URL), `#share/<token>` (`useShareRoute`; leaving it with
   any navigation). The tour (OnboardingHost) and the "Bericht bereit" wipe wait while a share link is on screen.
 - `introBoot.ts`: `OTHER_PAGES` = every page but the overview (the intro plays only on the overview).

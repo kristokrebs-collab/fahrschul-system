@@ -3,7 +3,7 @@
  * rest of today's loss limit. The smallest wins, and the card says which one binds. A stop that is too far for the risk is a plain
  * refusal, never a quietly smaller order.
  */
-import { LIMIT_LABEL, moneyText, num, pctText, priceText, qtyText, baseOf, type LimitRow } from "@/domain/plan";
+import { LIMIT_LABEL, moneyText, num, pctText, priceText, qtyText, unitOf, type LimitRow } from "@/domain/plan";
 import { Badge } from "@/primitives/Badge";
 import { Segmented } from "@/primitives/Segmented";
 import { cn } from "@/lib/cn";
@@ -40,7 +40,8 @@ export function SizeStep({ vm }: { vm: PlanVm }) {
   const step = model.steps[2]!;
   const stand = useStand(vm);
   const size = model.size;
-  const base = baseOf(form.symbol);
+  const stocks = model.market === "stocks";
+  const base = unitOf(model.market, form.symbol);
   const rule = limits.leverageRule[form.account];
   const risk = model.riskPct;
   const M = (x: number): string => `${moneyText(x)} ${currency}`;
@@ -66,9 +67,17 @@ export function SizeStep({ vm }: { vm: PlanVm }) {
               onChange={(v) => set({ account: v })}
             />
           </FieldRow>
-          <FieldRow label="Hebel" hint={`Regel des Kontos: bis ${rule}×. 1× heißt: nur eigenes Geld.`}>
-            <ChipPick id="plan-lev" label="Hebel" value={form.leverage} options={levChoices.map((l) => ({ v: l, label: `${l}×` }))} onChange={(v) => set({ leverage: v })} />
-          </FieldRow>
+          {stocks ? (
+            <FieldRow label="Hebel" hint="Aktien werden ohne Hebel gerechnet. Margin und Leerverkauf prüft die App nicht.">
+              <p className="num text-[13px] text-fg" data-testid="hplan-no-leverage">
+                1× – nur eigenes Geld
+              </p>
+            </FieldRow>
+          ) : (
+            <FieldRow label="Hebel" hint={`Regel des Kontos: bis ${rule}×. 1× heißt: nur eigenes Geld.`}>
+              <ChipPick id="plan-lev" label="Hebel" value={form.leverage} options={levChoices.map((l) => ({ v: l, label: `${l}×` }))} onChange={(v) => set({ leverage: v })} />
+            </FieldRow>
+          )}
         </div>
         <FieldRow label="Risiko pro Trade" hint={`Dein Limit pro Trade: ${pctText(limits.maxLossTradePct, 2)} des Kontos.`}>
           <div className="grid gap-2 sm:grid-cols-[auto_1fr] sm:items-end">
@@ -83,7 +92,7 @@ export function SizeStep({ vm }: { vm: PlanVm }) {
             <NumInput label="Deckel für eine Position" suffix="% des Kontos" value={Math.round(prefs.maxPositionPct * 10000) / 100} onCommit={(v) => v != null && void savePrefs({ maxPositionPct: v / 100 })} min={1} max={1000} testId="hplan-pref-cap" help="Der Positionswert darf nicht mehr als diesen Anteil des Kontos sein." />
             <NumInput label="Cash-Puffer" suffix="% des Kontos" value={Math.round(prefs.cashBufferPct * 10000) / 100} onCommit={(v) => v != null && void savePrefs({ cashBufferPct: v / 100 })} min={0} max={90} testId="hplan-pref-buffer" help="Dieser Anteil bleibt immer frei; die Kaufkraft rechnet ohne ihn." />
             <NumInput label="Kleinster Positionswert" suffix={currency} value={prefs.minOrderValue} onCommit={(v) => v != null && void savePrefs({ minOrderValue: v })} min={0} max={1e9} testId="hplan-pref-min" />
-            <NumInput label="Mengenschritt" value={form.lot} onCommit={(v) => set({ lot: v })} min={0.00000001} placeholder={String(model.lot).replace(".", ",")} help={`Die kleinste Menge, die deine Börse zulässt (Krypto oft 0,001, Aktien 1). Es wird immer abgerundet. Leer = ${String(model.lot).replace(".", ",")}.`} testId="hplan-lot" />
+            <NumInput label="Mengenschritt" value={form.lot} onCommit={(v) => set({ lot: v })} min={0.00000001} placeholder={String(model.lot).replace(".", ",")} help={stocks ? `Aktien gibt es in ganzen Stück (1). Bietet dein Broker Bruchstücke an, trage den Schritt ein (zum Beispiel 0,01). Es wird immer abgerundet. Leer = ${String(model.lot).replace(".", ",")}.` : `Die kleinste Menge, die deine Börse zulässt (Krypto oft 0,001, Aktien 1). Es wird immer abgerundet. Leer = ${String(model.lot).replace(".", ",")}.`} testId="hplan-lot" />
             <NumInput label="Kursschritt" value={form.tick} onCommit={(v) => set({ tick: v })} min={0.00000001} placeholder={priceText(model.tick, model.tick)} help={`Aktuell ${priceText(model.tick, model.tick)} (${model.tickSource}). Stop und Ziel runden darauf.`} testId="hplan-tick" />
           </div>
           <p className="mt-3 text-[11.5px] leading-snug text-mute">Gebühren und Slippage kommen aus den Risiko-Einstellungen. Deckel, Cash-Puffer, Mengen- und Kursschritt gelten für alle deine Pläne; sie werden mit deinen Einstellungen gespeichert.</p>

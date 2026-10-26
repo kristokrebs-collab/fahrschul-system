@@ -48,6 +48,8 @@ export interface AnalystPanelProps extends Common {
   onUseInDcf?: (seed: DcfSeed, ticker: string) => void;
   /** "These zu dieser Firma anlegen" – the button exists only when the host gives this */
   onStartThesis?: (ticker: string) => void;
+  /** "Plan erstellen →" – the button exists only when the host gives this (the host opens the Handelsplan for the ticker; nothing is saved) */
+  onCreatePlan?: (ticker: string) => void;
 }
 
 export interface DcfPanelProps extends Common {

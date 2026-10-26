@@ -8,6 +8,7 @@
 import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import type { DcfSeed } from "@/domain/dcf";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { planHash, planPageExists } from "./ResultsCard";
 import type { AktienSlotProps } from "./types";
 
 const AnalystPanel = lazy(() => import("@/views/analyst/AnalystPanel"));
@@ -56,10 +57,16 @@ export function AnalystSlotImpl({ symbol }: AktienSlotProps) {
     [reveal],
   );
 
+  // the Handelsplan reads the ticker from the link (market and direction only – nothing is saved or sent); the page may not exist in a build without it
+  const planOk = planPageExists();
+  const createPlan = useCallback((t: string) => {
+    window.location.hash = planHash(t, "long");
+  }, []);
+
   return (
     <div className="grid min-w-0 gap-6" data-testid="aktien-analyse" data-state="ready">
       <Suspense fallback={<Loading id="aktien-analyse-zahlen-loading" />}>
-        <AnalystPanel hosted ticker={ticker} onUseInDcf={useInDcf} onStartThesis={startThesis} />
+        <AnalystPanel hosted ticker={ticker} onUseInDcf={useInDcf} onStartThesis={startThesis} {...(planOk ? { onCreatePlan: createPlan } : {})} />
       </Suspense>
       <div ref={dcfRef} className="scroll-mt-24" data-testid="aktien-analyse-dcf">
         <Suspense fallback={<Loading id="aktien-analyse-dcf-loading" />}>

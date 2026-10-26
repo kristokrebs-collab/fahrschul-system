@@ -1,7 +1,7 @@
 /**
  * Everything the Handelsplan page shows, in one hook: the form → the session → the candles (cache first, live refresh while the
- * session runs) → the pure model (`buildPlanModel`) with the live limits of the account. The candles are only loaded for a
- * source that exists (crypto today). The clock of the page ticks every ten seconds while the session is live, once a minute
+ * session runs) → the pure model (`buildPlanModel`) with the live limits of the account. The candles come from the source of the
+ * session's market (crypto: Binance, stocks: the stock data contract). The clock of the page ticks every ten seconds while the session is live, once a minute
  * while the page waits for the next "latest session", and never for a day in the past.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -24,17 +24,23 @@ export interface CandleState {
   fetchedAt: number | null;
   fromCache: boolean;
   error: string | null;
+  /** the time of the last trade the source reports (stocks), `null` = the source does not say */
+  marketTime: number | null;
+  /** what the source says about itself (stocks: unofficial, delayed, how far back it reaches) */
+  notes: readonly string[];
 }
 
-const EMPTY: CandleState = { status: "idle", candles: [], sourceLabel: "keine Daten", fetchedAt: null, fromCache: false, error: null };
+const EMPTY: CandleState = { status: "idle", candles: [], sourceLabel: "keine Daten", fetchedAt: null, fromCache: false, error: null, marketTime: null, notes: [] };
 /** A running session reloads its tail this often (one request of weight 1). */
 export const LIVE_REFRESH_MS = 30_000;
 const LIVE_TICK_MS = 10_000;
 const IDLE_TICK_MS = 60_000;
 
 function stateOf(r: PlanCandles, source: PlanCandleSource, status: CandleStatus): CandleState {
-  const label = r.source === "proxy" ? `${source.label} (EU-Proxy)` : r.source === "cache" ? `${source.label} – Zwischenspeicher dieses Browsers` : source.label;
-  return { status, candles: r.candles, sourceLabel: label, fetchedAt: r.fetchedAt, fromCache: r.fromCache, error: r.error };
+  const name = r.sourceLabel ?? source.label;
+  // a source that names itself (stocks) is "cache" only when its refresh failed and the last good answer is shown
+  const label = r.source === "proxy" ? `${name} (EU-Proxy)` : r.source === "cache" || (r.sourceLabel != null && r.fromCache && r.error != null) ? `${name} – Zwischenspeicher dieses Browsers` : name;
+  return { status, candles: r.candles, sourceLabel: label, fetchedAt: r.fetchedAt, fromCache: r.fromCache, error: r.error, marketTime: r.marketTime ?? null, notes: r.notes ?? [] };
 }
 
 /** Candles for the form's session, cache first; `reload()` asks again at once. */
@@ -47,6 +53,8 @@ export function usePlanCandles(form: PlanForm, session: SessionDay, live: boolea
   const [loading, setLoading] = useState(false);
   const [tick, setTick] = useState(0);
   const loadedKey = useRef("");
+  // "Neu laden" asks the source again even where it would answer from a fresh cache
+  const forceFresh = useRef(false);
 
   useEffect(() => {
     if (!source.ready || !source.load || !tradingDay) return;
@@ -63,6 +71,8 @@ export function usePlanCandles(form: PlanForm, session: SessionDay, live: boolea
       }
       setLoading(true);
       const win = candleWindow({ openMs, closeMs } as SessionDay, TF_MS[tf], Date.now());
+      const fresh = forceFresh.current;
+      forceFresh.current = false;
       try {
         const res = await load({
           symbol,
@@ -70,6 +80,7 @@ export function usePlanCandles(form: PlanForm, session: SessionDay, live: boolea
           from: win.from,
           to: win.to,
           signal: ctl.signal,
+          ...(fresh ? { fresh: true } : {}),
           onCache: (r) => {
             if (alive) setLoaded((cur) => (cur.key === key && cur.state.status === "ready" ? cur : { key, state: stateOf(r, source, "loading") }));
           },
@@ -100,7 +111,14 @@ export function usePlanCandles(form: PlanForm, session: SessionDay, live: boolea
       : loaded.key === key
         ? loaded.state
         : { ...EMPTY, status: "loading", sourceLabel: source.label };
-  return { state, reload: () => setTick((n) => n + 1), loading };
+  return {
+    state,
+    reload: () => {
+      forceFresh.current = true;
+      setTick((n) => n + 1);
+    },
+    loading,
+  };
 }
 
 export interface PlanVm {
@@ -156,7 +174,9 @@ export function usePlanModel(): PlanVm {
   const last = state.candles[state.candles.length - 1];
   const lastClose = last?.close ?? null;
   const fetchedAt = state.fetchedAt;
-  const fresh = useMemo(() => (live && lastClose != null && fetchedAt != null && !state.fromCache ? { price: lastClose, at: fetchedAt } : null), [live, lastClose, fetchedAt, state.fromCache]);
+  // the price is as old as the last trade the source reports (stocks), else as old as the fetch
+  const priceAt = state.marketTime ?? fetchedAt;
+  const fresh = useMemo(() => (live && lastClose != null && priceAt != null && !state.fromCache ? { price: lastClose, at: Math.min(priceAt, fetchedAt ?? priceAt) } : null), [live, lastClose, priceAt, fetchedAt, state.fromCache]);
 
   const model = useMemo(
     () =>
@@ -172,8 +192,10 @@ export function usePlanModel(): PlanVm {
         sourceLabel: state.sourceLabel,
         fetchedAt,
         fresh,
+        marketTime: state.marketTime,
+        sourceNotes: state.notes,
       }),
-    [form, state.candles, state.sourceLabel, fetchedAt, now, cfg.prefs, capital, settings.currency, limits, report, fresh],
+    [form, state.candles, state.sourceLabel, state.marketTime, state.notes, fetchedAt, now, cfg.prefs, capital, settings.currency, limits, report, fresh],
   );
-  return { form, model, candles: state, reload, loading, now, live, limits, report, capital, currency: settings.currency, prefs: cfg.prefs };
+  return { form, model, candles: state, reload, loading, now, live, limits, report, capital, currency: model.currency, prefs: cfg.prefs };
 }

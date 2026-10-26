@@ -37,6 +37,8 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
   const stand = useStand(vm);
   const t = model.ticketPlan;
   const ticket = model.ticket;
+  // stocks: the key-level alarms watch the live crypto market only, so a stock plan gets the clock reminder and nothing else
+  const stocks = model.market === "stocks";
   const P = (x: number): string => priceText(x, model.tick);
 
   const current = (id: string): SavedPlan | null => savedPlanOf(model, form, currency, id, Date.now(), saved);
@@ -67,11 +69,11 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
     const id = saved?.id ?? newId("p_");
     const p = current(id);
     if (!p) return;
-    if (await run(() => createAlarms(p, model.tick), "3 Alarme angelegt")) setPlanId(id);
+    if (await run(() => createAlarms(p, model.tick, Date.now(), { levels: !stocks }), stocks ? "Erinnerung angelegt" : "3 Alarme angelegt")) setPlanId(id);
   };
   const doJournal = async (): Promise<void> => {
     if (!t) return;
-    await planToJournal({ symbol: t.symbol, side: t.side, entry: t.entry, stop: t.stop, target: t.target, qty: t.qty, notional: t.notional, leverage: t.leverage, account: form.account, stopLabel: t.stopLabel, targetLabel: t.targetLabel, sessionLabel: t.sessionLabel, entrySource: t.entrySource }, saved?.id ?? null);
+    await planToJournal({ symbol: t.symbol, side: t.side, entry: t.entry, stop: t.stop, target: t.target, qty: t.qty, notional: t.notional, leverage: t.leverage, account: form.account, stopLabel: t.stopLabel, targetLabel: t.targetLabel, sessionLabel: t.sessionLabel, entrySource: t.entrySource, market: model.market }, saved?.id ?? null);
     pushToast({ kind: "success", title: "Entwurf im Trade-Editor", detail: "Gespeichert wird erst, wenn du dort speicherst." });
   };
   const copy = async (what: "text" | "csv"): Promise<void> => {
@@ -135,11 +137,11 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
               </Button>
               {!alarms ? (
                 <Button onClick={() => void doAlarms()} disabled={busy} data-testid="hplan-alarms">
-                  Plan → 3 Alarme
+                  {stocks ? "Erinnerung „flat by close“" : "Plan → 3 Alarme"}
                 </Button>
               ) : (
-                <Button onClick={() => saved && void run(() => removeAlarms(saved), "Alarme entfernt")} disabled={busy} data-testid="hplan-alarms-remove">
-                  Alarme entfernen
+                <Button onClick={() => saved && void run(() => removeAlarms(saved), stocks ? "Erinnerung entfernt" : "Alarme entfernt")} disabled={busy} data-testid="hplan-alarms-remove">
+                  {stocks ? "Erinnerung entfernen" : "Alarme entfernen"}
                 </Button>
               )}
               <Button onClick={() => void doJournal()} data-testid="hplan-journal">
@@ -149,7 +151,12 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
                 {saved ? "Plan verwerfen" : "Formular zurücksetzen"}
               </Button>
             </div>
-            {!alarms && <p className="text-[12px] leading-snug text-mute">„Plan → 3 Alarme“ legt an: einen Alarm beim Stop ({P(t.stop)}), einen beim Ziel ({t.target != null ? P(t.target) : "–"}) und die Erinnerung „flat by close“ um {clockIn(t.flatByMs ?? model.flatByMs, t.tz)} Uhr. Der Plan wird dabei mitgespeichert.</p>}
+            {!alarms && !stocks && <p className="text-[12px] leading-snug text-mute">„Plan → 3 Alarme“ legt an: einen Alarm beim Stop ({P(t.stop)}), einen beim Ziel ({t.target != null ? P(t.target) : "–"}) und die Erinnerung „flat by close“ um {clockIn(t.flatByMs ?? model.flatByMs, t.tz)} Uhr. Der Plan wird dabei mitgespeichert.</p>}
+            {!alarms && stocks && (
+              <p className="text-[12px] leading-snug text-mute" data-testid="hplan-alarms-stocks">
+                „Erinnerung flat by close“ legt die Uhrzeit-Erinnerung um {clockIn(t.flatByMs ?? model.flatByMs, t.tz)} Uhr an (Toast, nur bei geöffneter App). Preis-Alarme für Stop und Ziel gibt es für Aktien noch nicht: die Schlüsselmarken lesen nur die Live-Daten des Krypto-Markts. Der Plan wird dabei mitgespeichert.
+              </p>
+            )}
             {saved && (
               <p className="num text-[12px] leading-snug text-mute" data-testid="hplan-saved-state">
                 Gespeichert am {dateTimeIn(saved.savedAt, t.tz)} Uhr{dirty ? " – der Plan oben weicht davon ab; „Plan aktualisieren“ übernimmt ihn" : ""}.{saved.journalAt ? " Ein Journal-Entwurf wurde geöffnet." : ""}
@@ -157,10 +164,10 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
             )}
             {alarms && (
               <p className="num text-[12px] leading-snug text-fg/90" data-testid="hplan-alarms-state">
-                3 Alarme: Stop {P(saved!.stop)} und Ziel {saved!.target != null ? P(saved!.target) : "–"} als Schlüsselmarken (Markt › Schlüsselmarken), „flat by close“ {alarms.flatBy ? `um ${clockIn(alarms.flatBy.at, saved!.tz)} Uhr – ${FLAT_STATE[alarms.flatBy.state]}` : "ist nicht gesetzt"}.
+                {alarms.stopId ? `3 Alarme: Stop ${P(saved!.stop)} und Ziel ${saved!.target != null ? P(saved!.target) : "–"} als Schlüsselmarken (Markt › Schlüsselmarken), ` : "Erinnerung: "}„flat by close“ {alarms.flatBy ? `um ${clockIn(alarms.flatBy.at, saved!.tz)} Uhr – ${FLAT_STATE[alarms.flatBy.state]}` : "ist nicht gesetzt"}.
               </p>
             )}
-            {(alarms || symbolMismatch) && symbolMismatch && (
+            {!stocks && symbolMismatch && (
               <p className="text-[12px] leading-snug text-warn" role="status" data-testid="hplan-alarm-symbol">
                 Dein Live-Markt zeigt {marketSymbol}. Die Marken-Alarme für {t.symbol} werden erst bewertet, wenn du den Markt in den Einstellungen (Live-Daten) auf {t.symbol} stellst.
               </p>

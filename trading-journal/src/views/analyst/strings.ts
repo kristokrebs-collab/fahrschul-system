@@ -73,6 +73,7 @@ export const AN = {
   none8k: "keine 8-K-Meldung in der Liste",
   useInDcf: "In den DCF-Rechner übernehmen",
   startThesis: "These zu dieser Firma anlegen",
+  createPlan: "Plan erstellen →",
   disclaimer: "Gemeldete Zahlen aus SEC-Berichten – keine Prognose, kein Konsens.",
 } as const;
 

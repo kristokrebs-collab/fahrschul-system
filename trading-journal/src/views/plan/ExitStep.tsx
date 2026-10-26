@@ -168,7 +168,11 @@ export function ExitStep({ vm }: { vm: PlanVm }) {
               />
             ) : (
               <p className="text-[12.5px] leading-snug text-mute" data-testid="hplan-no-levels">
-                {entry == null ? "Ohne Einstieg lässt sich keine Marke einordnen." : `Keine eigene Schlüsselmarke für ${form.symbol} ${side === "long" ? "über" : "unter"} dem Einstieg. Lege eine auf der Markt-Seite an oder wähle eine andere Regel.`}
+                {entry == null
+                  ? "Ohne Einstieg lässt sich keine Marke einordnen."
+                  : model.market === "stocks"
+                    ? "Schlüsselmarken gibt es nur für den Live-Markt (Krypto); für Aktien wähle eine andere Regel."
+                    : `Keine eigene Schlüsselmarke für ${form.symbol} ${side === "long" ? "über" : "unter"} dem Einstieg. Lege eine auf der Markt-Seite an oder wähle eine andere Regel.`}
               </p>
             ))}
         </FieldRow>

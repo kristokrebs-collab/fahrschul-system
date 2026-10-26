@@ -30,6 +30,11 @@ export interface TimeMachineSlotProps {
   /** price step, for the numbers */
   tick: number;
   currency: string;
+  /** the market kind of the plan; absent = crypto */
+  market?: "crypto" | "stocks";
+  /** the plan's own fee per side and slippage (fractions, from the risk settings) – the stock history is costed with them; crypto keeps the Labor's costs */
+  feePct?: number;
+  slippagePct?: number;
   /** where the candles came from and when they were loaded */
   source: { label: string; fetchedAt: number | null };
 }

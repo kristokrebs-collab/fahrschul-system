@@ -169,12 +169,12 @@ describe("Fenster und Quellen", () => {
     expect(candleWindow(s, IV, s.closeMs + 99_999_999).to).toBe(s.closeMs);
   });
 
-  it("Krypto ist angebunden, Aktien sagen ehrlich, dass ihre Kerzen noch nicht angebunden sind", () => {
+  it("beide Märkte sind angebunden: Krypto über Binance, Aktien über den Aktien-Datenvertrag (Yahoo Finance, inoffiziell)", () => {
     expect(sourceOf("crypto")).toMatchObject({ id: "binance", ready: true, label: "Binance USDⓈ-M" });
     const stocks = sourceOf("stocks");
-    expect(stocks.ready).toBe(false);
-    expect(stocks.notReady).toContain("noch nicht angebunden");
-    expect(stocks.load).toBeUndefined();
+    expect(stocks).toMatchObject({ id: "stocks", kind: "stocks", ready: true, label: "Yahoo Finance (inoffiziell)" });
+    expect(stocks.notReady).toBeUndefined();
+    expect(typeof stocks.load).toBe("function");
     expect(PLAN_SOURCES).toHaveLength(2);
   });
 });

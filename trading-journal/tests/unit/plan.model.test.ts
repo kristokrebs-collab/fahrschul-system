@@ -183,7 +183,7 @@ describe("Handelsplan · Aktien am Wochenende und die Formular-Bereinigung", () 
     expect(m.entry.status).toBe("closed");
     expect(m.lot).toBe(1); // ganze Stück
     expect(m.tick).toBe(0.01);
-    expect(m.tickSource).toBe("Voreinstellung");
+    expect(m.tickSource).toBe("US-Aktien: 1 Cent");
     expect(m.steps[0]!.status).toBe("blocked");
   });
 

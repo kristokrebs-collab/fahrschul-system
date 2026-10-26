@@ -4,7 +4,7 @@
  * creating the three alarms and drafting a journal trade each need their own button.
  */
 import { keyLevelsOfSettings, MAX_KEY_LEVELS, withKeyLevels } from "@/domain/keylevels";
-import { MAX_PLANS, pairOf, planAlarmLevels, planCfgOf, withPlanCfg, type PlanForm, type PlanModel, type PlanPrefs, type SavedPlan } from "@/domain/plan";
+import { MAX_PLANS, pairOf, planAlarmLevels, planCfgOf, withPlanCfg, type MarketKind, type PlanForm, type PlanModel, type PlanPrefs, type SavedPlan } from "@/domain/plan";
 import type { AccountId } from "@/domain/types";
 import { nowLocalInput } from "@/lib/dates";
 import { newId } from "@/lib/ids";
@@ -95,12 +95,17 @@ export async function discardPlan(id: string): Promise<WriteResult> {
   return ok ? "ok" : "failed";
 }
 
-/** The three alarms of a plan: two key levels now, the clock reminder with the plan. The plan is saved by the same write. */
-export async function createAlarms(plan: SavedPlan, tick: number, now: number = Date.now()): Promise<WriteResult> {
+/**
+ * The three alarms of a plan: two key levels now, the clock reminder with the plan. The plan is saved by the same write.
+ * `levels: false` (a stock plan) makes only the clock reminder: the key levels watch the live crypto market, a level for a stock
+ * would never be evaluated.
+ */
+export async function createAlarms(plan: SavedPlan, tick: number, now: number = Date.now(), opts: { levels?: boolean } = {}): Promise<WriteResult> {
+  const withLevels = opts.levels !== false;
   const kl0 = keyLevelsOfSettings(useJournal.getState().settings);
-  if (kl0.levels.length + 2 > MAX_KEY_LEVELS) return "limit";
-  const ids = { stop: newId("k_"), target: newId("k_") };
-  const levels = planAlarmLevels(plan, ids, tick, now);
+  if (withLevels && kl0.levels.length + 2 > MAX_KEY_LEVELS) return "limit";
+  const ids = withLevels ? { stop: newId("k_"), target: newId("k_") } : { stop: "", target: "" };
+  const levels = withLevels ? planAlarmLevels(plan, ids, tick, now) : null;
   const withAlarms: SavedPlan = {
     ...plan,
     alarms: { stopId: ids.stop, targetId: ids.target, createdAt: now, flatBy: plan.flatByMs != null && plan.flatByMs > now ? { at: plan.flatByMs, state: "pending", firedAt: null } : plan.flatByMs != null ? { at: plan.flatByMs, state: "missed", firedAt: null } : null },
@@ -111,7 +116,7 @@ export async function createAlarms(plan: SavedPlan, tick: number, now: number = 
   const plans = exists ? cfg.plans.map((p) => (p.id === plan.id ? withAlarms : p)) : [withAlarms, ...cfg.plans];
   const ok = await writeSettings((s) => ({
     plan: withPlanCfg(s.plan, { plans }),
-    keyLevels: withKeyLevels(s.keyLevels, { levels: [...keyLevelsOfSettings(s).levels, levels.stop, levels.target] }),
+    ...(levels ? { keyLevels: withKeyLevels(s.keyLevels, { levels: [...keyLevelsOfSettings(s).levels, levels.stop, levels.target] }) } : {}),
   }));
   return ok ? "ok" : "failed";
 }
@@ -145,6 +150,8 @@ export interface DraftSource {
   sessionLabel: string;
   /** where the entry came from (`ticketPlan.entrySource`): the Einstiegs-Timer's signal is a rule, the other two are the trader's own plan (F24) */
   entrySource?: "signal" | "level" | "manual";
+  /** the market kind; absent = crypto */
+  market?: MarketKind;
 }
 
 /** The journal draft of a plan: an OPEN trade the trader can edit; nothing is saved until the editor's own "Speichern". */
@@ -154,7 +161,9 @@ export function journalDraftOf(p: DraftSource, now: Date = new Date()): TradeDra
     side: p.side,
     status: "open",
     date: nowLocalInput(now),
-    pair: pairOf(p.symbol),
+    pair: pairOf(p.symbol, p.market),
+    // a stock has neither funding nor leverage: the journal's "spot"
+    ...(p.market === "stocks" ? { market: "spot" as const } : {}),
     entry: p.entry,
     stop: p.stop,
     target: p.target,

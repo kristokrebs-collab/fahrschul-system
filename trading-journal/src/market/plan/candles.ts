@@ -32,18 +32,27 @@ export interface LoadRequest {
   signal?: AbortSignal;
   /** called with the cached candles before the network answers */
   onCache?: (r: PlanCandles) => void;
+  /** ask the source again even if its cache is still fresh ("Neu laden"); the crypto loader needs no such thing */
+  fresh?: boolean;
 }
 
 export interface PlanCandles {
   /** ascending, the last may still be running */
   candles: Candle[];
-  /** who delivered the newest candles: the exchange, its proxy, or the cache */
-  source: Source;
+  /** who delivered the newest candles: the exchange, its proxy, the cache – or "yahoo" for the stock source */
+  source: Source | "yahoo";
   /** when the network answered (ms), `null` = nothing was fetched */
   fetchedAt: number | null;
   fromCache: boolean;
   /** why the network part failed (German), `null` = fine */
   error: string | null;
+  /**
+   * Additive, for sources that are not the crypto exchange (the stock source): how the source names itself in "Quelle: …"
+   * (default: the label of the source in `sources.ts`), what it says about itself, and the time of the last trade it reports.
+   */
+  sourceLabel?: string;
+  notes?: readonly string[];
+  marketTime?: number | null;
 }
 
 export type Row = [number, number, number, number, number, number];

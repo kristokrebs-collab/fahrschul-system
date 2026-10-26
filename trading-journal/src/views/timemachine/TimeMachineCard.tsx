@@ -80,14 +80,14 @@ function Odds({ r }: { r: TmResult }) {
   );
 }
 
-function Expectancy({ r }: { r: TmResult }) {
+function Expectancy({ r, stocks }: { r: TmResult; stocks: boolean }) {
   const s = r.sim;
   const e = s.expectancy;
   return (
-    <Block title={TM.expectancy.title} lead={TM.expectancy.lead} testId="tm-expectancy">
+    <Block title={TM.expectancy.title} lead={stocks ? TM.expectancy.leadStocks : TM.expectancy.lead} testId="tm-expectancy">
       <div className="grid gap-2 sm:grid-cols-2">
         <Tile label="Ø je Trade, nach Kosten" value={<span className={tone(e.mean)}>{rr(e.mean)}</span>} sub={`${TM.odds.ci} ${rr(e.lo)} bis ${rr(e.hi)}`} testId="tm-e-mean" />
-        <Tile label="Kosten im Schnitt" value={`${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.costR)} R`} sub="Gebühren, Slippage, Funding je Trade" testId="tm-e-cost" />
+        <Tile label="Kosten im Schnitt" value={`${new Intl.NumberFormat("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(s.costR)} R`} sub={stocks ? "Gebühren und Slippage je Trade" : "Gebühren, Slippage, Funding je Trade"} testId="tm-e-cost" />
       </div>
       <p className="text-[11.5px] text-faint">{TM.expectancy.noise}</p>
     </Block>
@@ -237,7 +237,7 @@ function Results({ r, run, props }: { r: TmResult; run: TimeMachineRun; props: T
         ))}
       </div>
       <Odds r={r} />
-      <Expectancy r={r} />
+      <Expectancy r={r} stocks={props.market === "stocks"} />
       <Block title={TM.fan.title} lead={TM.fan.lead} testId="tm-fan-block">
         <Suspense fallback={<Skeleton height={260} />}>
           <FanChart result={r} />
@@ -269,7 +269,10 @@ function Results({ r, run, props }: { r: TmResult; run: TimeMachineRun; props: T
       <details className="text-[12.5px] text-mute" data-testid="tm-assumptions">
         <summary className="cursor-pointer select-none py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-mute pointer-coarse:min-h-11 pointer-coarse:py-3">{TM.assumptions.title}</summary>
         <ul className="mt-2 grid gap-1.5 leading-snug">
-          {assumptionsOf(r, props.source).map((a) => (
+          {assumptionsOf(r, props.source)
+            // a stock has no funding: the line about it ("kein Funding") would only be noise
+            .map((a) => (props.market === "stocks" ? a.replace("; kein Funding.", ".") : a))
+            .map((a) => (
             <li key={a} className="flex gap-2">
               <span aria-hidden="true" className="shrink-0 text-faint">
                 ·

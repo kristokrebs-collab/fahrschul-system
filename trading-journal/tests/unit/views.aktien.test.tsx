@@ -229,8 +229,14 @@ describe("Aktien page", () => {
     wrap();
     await scan();
     const links = screen.queryAllByTestId("aktien-hit-plan");
-    // hidden while no page `plan` is registered (the plan is built by another part of the project)
-    expect(links.length > 0).toBe((PAGES as readonly string[]).includes("plan"));
+    // the page `plan` exists (it reads the link: market and direction, nothing else): every hit offers it
+    expect((PAGES as readonly string[]).includes("plan")).toBe(true);
+    expect(links.length).toBe(screen.getAllByTestId("aktien-hit").length);
+    const hit = links[0]!.closest('[data-testid="aktien-hit"]')!;
+    fireEvent.click(links[0]!);
+    expect(window.location.hash).toBe(planHash(hit.getAttribute("data-symbol")!, hit.getAttribute("data-side") as "long" | "short"));
+    expect(window.location.hash).toMatch(/^#plan\?symbol=[A-Z.]+&side=(long|short)$/);
+    history.replaceState(null, "", "#aktien");
   });
 
   it("puts a hit on the watchlist (saved at once into the settings) and takes it off again", async () => {

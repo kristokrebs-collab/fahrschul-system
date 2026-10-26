@@ -2,13 +2,13 @@
  * Schritt 1 · Einstieg: market, candle length, session, range length and day – and the answer in words: the range, the signal
  * (the first closed candle outside it), or why there is none yet. Nothing here places anything.
  */
-import { useState } from "react";
-import { dateTimeIn, OR_CHOICES, PLAN_TFS, priceText, SESSIONS, sessionDef, TF_LABEL, TF_MS, MIN, type PlanTf, type SessionId } from "@/domain/plan";
+import { useMemo, useState } from "react";
+import { dateTimeIn, DEFAULT_STOCK_SYMBOL, formMarket, formPatchFor, OR_CHOICES, PLAN_TFS, priceText, SESSIONS, sessionDef, symbolFits, TF_LABEL, TF_MS, MIN, type PlanTf, type SessionId } from "@/domain/plan";
 import { num, signedPctText } from "@/domain/plan";
+import { watchlistOfSettings } from "@/domain/watchlist";
 import { Button } from "@/primitives/Button";
 import { Input } from "@/primitives/Input";
 import { Segmented } from "@/primitives/Segmented";
-import { sourceOf } from "@/market/plan/sources";
 import { useJournal } from "@/store/journalStore";
 import { tvSymbolToBinance } from "@/market/symbol";
 import { usePlanForm } from "./planStore";
@@ -41,14 +41,17 @@ export function EntryStep({ vm }: { vm: PlanVm }) {
   const { form, model, candles } = vm;
   const set = usePlanForm((s) => s.set);
   const marketSymbol = useJournal((s) => tvSymbolToBinance(s.settings.market.symbol));
+  const watchRaw = useJournal((s) => s.settings.watchlist);
+  const watchStocks = useMemo(() => watchlistOfSettings({ watchlist: watchRaw }).items.filter((i) => i.kind === "stock").map((i) => i.symbol), [watchRaw]);
   const [custom, setCustom] = useState("");
   const [customBad, setCustomBad] = useState(false);
   const step = model.steps[0]!;
   const stand = useStand(vm);
   const s = model.session;
   const def = sessionDef(form.session);
-  const stocksSource = sourceOf("stocks");
-  const markets = [...new Set([...MARKETS, marketSymbol, form.symbol])];
+  const market = formMarket(form);
+  const stocks = market === "stocks";
+  const markets = stocks ? [...new Set([form.symbol, ...watchStocks.slice(0, 8)])] : [...new Set([...MARKETS, marketSymbol, form.symbol])];
   const tfMin = TF_MS[form.tf] / MIN;
   const candleLineState = candleLine(vm);
 
@@ -60,13 +63,23 @@ export function EntryStep({ vm }: { vm: PlanVm }) {
   const addCustom = (): void => {
     const t = custom.trim().toUpperCase();
     if (!t) return;
-    if (!/^[A-Z0-9]{3,20}$/.test(t)) {
+    if (!symbolFits(t, market)) {
       setCustomBad(true);
       return;
     }
     setCustomBad(false);
     setCustom("");
     set({ symbol: t });
+  };
+  // a session of the other market takes its own symbol along (the first stock of the watchlist, the app's market) and drops what only made sense for the old one
+  const pickSession = (id: SessionId): void => {
+    const to = sessionDef(id).market;
+    if (to === market) {
+      set({ session: id });
+      return;
+    }
+    const symbol = to === "stocks" ? (watchStocks[0] ?? DEFAULT_STOCK_SYMBOL) : marketSymbol;
+    set({ ...formPatchFor(form, { symbol, market: to }), session: id });
   };
 
   // the headline: the answer in one sentence
@@ -87,12 +100,12 @@ export function EntryStep({ vm }: { vm: PlanVm }) {
   return (
     <StepCard id="entry" n={1} title="Einstieg" lead="Die Range der ersten Minuten und der erste Schluss außerhalb – oder warum noch keiner da ist." status={step.status} current={step.current} headline={headline} assumed={model.assumptions.entry} stand={stand}>
       <div className="grid gap-4" data-testid="hplan-entry-controls">
-        <FieldRow label="Markt" hint={`Binance USDⓈ-M, Symbol wie ${marketSymbol}`}>
+        <FieldRow label="Markt" hint={stocks ? "US-Aktien, Kürzel wie AAPL oder BRK.B" : `Binance USDⓈ-M, Symbol wie ${marketSymbol}`}>
           <ChipPick id="plan-market" label="Markt" value={form.symbol} options={markets.map((m) => ({ v: m, label: m }))} onChange={(v) => set({ symbol: v })} />
           <div className="flex items-start gap-2">
             <Input
-              aria-label="Anderes Symbol"
-              placeholder="anderes Symbol"
+              aria-label={stocks ? "Anderes Kürzel" : "Anderes Symbol"}
+              placeholder={stocks ? "anderes Kürzel" : "anderes Symbol"}
               value={custom}
               invalid={customBad}
               onChange={(ev) => setCustom(ev.target.value)}
@@ -108,7 +121,7 @@ export function EntryStep({ vm }: { vm: PlanVm }) {
           </div>
           {customBad && (
             <span role="alert" className="text-[11.5px] text-loss">
-              Ein Symbol besteht aus 3 bis 20 Buchstaben oder Ziffern, zum Beispiel BTCUSDT.
+              {stocks ? "Ein US-Kürzel besteht aus ein bis fünf Buchstaben, zum Beispiel AAPL oder BRK.B." : "Ein Symbol besteht aus 3 bis 20 Buchstaben oder Ziffern, zum Beispiel BTCUSDT."}
             </span>
           )}
         </FieldRow>
@@ -119,13 +132,13 @@ export function EntryStep({ vm }: { vm: PlanVm }) {
               id="plan-session"
               label="Sitzung"
               value={form.session}
-              options={SESSIONS.map((x) => ({ v: x.id as SessionId, label: x.label, disabled: x.market === "stocks" && !stocksSource.ready, title: x.market === "stocks" && !stocksSource.ready ? stocksSource.notReady : undefined }))}
-              onChange={(v) => set({ session: v })}
-              describedBy="hplan-stocks-note"
+              options={SESSIONS.map((x) => ({ v: x.id as SessionId, label: x.label }))}
+              onChange={pickSession}
+              describedBy={stocks ? "hplan-stocks-note" : undefined}
             />
-            {!stocksSource.ready && (
+            {stocks && (
               <span id="hplan-stocks-note" className="text-[11.5px] leading-snug text-mute" data-testid="hplan-stocks-note">
-                US-Börse: {stocksSource.notReady}
+                Aktien-Kerzen kommen von Yahoo Finance (inoffiziell, ohne Garantie, möglicherweise verzögert). 5- und 15-Minuten-Kerzen gibt es dort nur für die letzten rund vier Wochen.
               </span>
             )}
           </FieldRow>
@@ -222,6 +235,11 @@ export function EntryStep({ vm }: { vm: PlanVm }) {
         <p className={candleLineState.tone === "warn" ? "text-[12.5px] text-warn" : "text-[12.5px] text-mute"} data-testid="hplan-candle-state" role={candleLineState.tone === "warn" ? "status" : undefined}>
           {candleLineState.text} Zeiten in Ortszeit der Sitzung ({s.zone}).
         </p>
+        {model.lag && (
+          <p className={model.lag.late ? "text-[12.5px] text-warn" : "text-[12.5px] text-mute"} data-testid="hplan-feed-lag" data-late={model.lag.late ? "true" : "false"} role={model.lag.late ? "status" : undefined}>
+            {model.lag.text}
+          </p>
+        )}
       </div>
     </StepCard>
   );
