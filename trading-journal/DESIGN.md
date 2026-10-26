@@ -820,3 +820,11 @@ Keine neue Sprache, nur ruhigere Wege. **Befehlsnavigation:** die fünf Dock-Sei
 dasselbe Raster mit Symbol, Name, Zähler und Ziffer); die jüngsten Seiten tragen eine Pille „Neu“ (`rounded-full border-line-2`, `text-mute`, 9,5 px Mono), bis sie einmal offen waren – kein Farbakzent, keine Bewegung.
 **„Siehe auch“** (`FeatureLinks`): eine Zeile aus Kapitälchen-Anker und unterstrichenen Textlinks mit Pfeil (`text-[12.5px] text-mute`), in Karten durch eine Haarlinie abgesetzt; Touch ≥ 44 px bei grobem Zeiger;
 höchstens drei Links, nie auf der Startseite. **Einführung, Schritt „Mehr“:** eine Liste aus vier schlichten Kästen (Name, ein Satz) und ein einziger Knopf („Demo mit Beispieldaten“); nichts startet von selbst.
+## Bewegung & Leistung global (Feinschliff)
+
+Keine neue Sprache, sondern eine gemeinsame: dieselben Federn und Dauern aus `src/motion/tokens.ts` bei jedem Baustein, dazu Bausteine für lange Seiten. Details: `src/motion/README.md`, `src/primitives/README.md`.
+- **Press-Skalierung nach Zielgröße** (`pressScale`): 24-px-Schalter .88, Icon-Knöpfe (Kopfzeile, Dock) .92, Buttons .96, Label im Segmented und Toast .97, Karten .985. Gleiche Art Element = gleiches Drücken (Feder `spring.press`).
+- **Platz für spät ladende Karten** (`Reserve`, `ReserveFallback`, `ReserveSuspense`, `CardSkeleton`): die Endgröße der Karte steht ab dem ersten Bild (Mindesthöhe je Breakpoint, Platzhalter in Kartenform), nichts darunter rutscht. Die Höhen sind gemessene Pixel; ungefähr reicht.
+- **Lange Seiten**: Zellen unterhalb des ersten Bildschirms als `Reveal defer` (Stil, Layout und Malen entfallen, solange die Zelle weit weg ist) und die Karten darin als `Later` (eigener kleiner Commit nach dem ersten Bild, nie beim Scrollen, sofort wenn sie näher als 500 px kommen). Der Seitenwechsel ist dann nicht mehr ein einziger langer Task.
+- **Reveal** löst auch bei sehr hohen Karten aus (15 % der Karte ODER ein Fünftel des Bildschirms); vorher blieb eine Karte über ≈ 5 000 px auf dem Handy bei Deckkraft 0 (gemessen: Markt, 390 px).
+- Reduzierte Bewegung: jede Seite zeigt alles sofort, keine Endlos-Animation (e2e `motion-global`).

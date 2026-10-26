@@ -1,3 +1,5 @@
+import { useEffect, type RefObject } from "react";
+
 /**
  * First render of `content-visibility: auto` cells in idle time (perf-120 phase B).
  *
@@ -80,4 +82,9 @@ export function startIdlePrerender(root: HTMLElement): () => void {
     window.removeEventListener("scroll", onScroll);
   }
   return stop;
+}
+
+/** `startIdlePrerender` for the lifetime of a page: pass the ref of the element that holds the deferred cells (`Reveal defer`). */
+export function useIdlePrerender(root: RefObject<HTMLElement | null>): void {
+  useEffect(() => (root.current ? startIdlePrerender(root.current) : undefined), [root]);
 }

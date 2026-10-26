@@ -29,6 +29,7 @@ export { Magnetic, type MagneticProps } from "@/primitives/Magnetic";
 export { Tilt, type TiltProps } from "@/primitives/Tilt";
 export { BorderBeam, beamSpan, type BorderBeamProps } from "@/primitives/BorderBeam";
 export { Skeleton, ChartSkeleton, SkeletonSwap, type SkeletonProps, type SkeletonSwapProps } from "@/primitives/Skeleton";
+export { Reserve, ReserveFallback, ReserveSuspense, CardSkeleton, reserveStyle, RESERVE_CLASS, type ReserveProps, type ReserveHeight } from "@/primitives/Reserve";
 export { Icon, GlyphPlus, GlyphClose, GlyphCheck, GlyphCross, GlyphInfo, LiveRing, type IconName, type LiveRingProps } from "@/primitives/icons";
 export { WarnBanner, type WarnBannerProps } from "@/primitives/WarnBanner";
 export { Tooltip, TooltipBox, TooltipRow, tooltipClass, type TooltipProps } from "@/primitives/Tooltip";

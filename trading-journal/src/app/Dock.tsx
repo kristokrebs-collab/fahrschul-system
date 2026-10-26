@@ -5,7 +5,7 @@ import { useIntroPhase, type IntroPhase } from "@/intro/introStore";
 import { cn } from "@/lib/cn";
 import { useTouchMoveGuard } from "@/motion/a11y";
 import { flickStep, haptic, lastPressMs, mixSpring, physics, pressTempo, rubberClamp, setNavTempo, useAxisDrag, type AxisDragRelease } from "@/motion/physics";
-import { radius, spring, stagger, tween } from "@/motion/tokens";
+import { pressScale, radius, spring, stagger, tween } from "@/motion/tokens";
 import { usePressable } from "@/motion/usePressable";
 import { useCanHover } from "@/motion/useMediaQuery";
 import { isSafeFx } from "@/app/pwa";
@@ -310,11 +310,11 @@ export interface DockItemProps {
  * by `fx.x` and its visual (disc, tab marker, icon) scales by `fx.scale` from the bottom edge, so the item grows
  * up out of the tray like the macOS dock without a single layout per frame. The tooltip rides above the scaled visual
  * (CSS `:hover` / `:focus-visible`, no React state). On activation the icon hops (`spring.pop` with an upward launch);
- * `whileTap .94`.
+ * `whileTap pressScale.icon` (.92).
  */
 export function DockItem({ label, onClick, active = false, tab = false, fx, layer, intro = false, waiting = false, index = 0, takeHop, ref, className, children }: DockItemProps) {
   const reduced = useReducedFx();
-  const press = usePressable({ scale: 0.94 });
+  const press = usePressable({ scale: pressScale.icon });
   const hop = useMotionValue(0);
   const ownBump = useMotionValue(1);
   const bump = fx.bump ?? ownBump;
