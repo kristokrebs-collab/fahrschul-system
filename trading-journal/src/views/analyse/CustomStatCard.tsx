@@ -172,7 +172,7 @@ export function CustomStatCard({ view, settings, cur }: { view: AccountView; set
     <AnaCard title={CARD_TITLES.custom} explain={explainCustom} data-testid="ana-custom" note="Kennzahl × Filter × Gruppe – gespeichert in deinen Einstellungen">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-6">
         <div className="grid content-start gap-3" data-testid="custom-builder">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 pointer-coarse:gap-y-3">
             <MorphSelect<CustomMetricKey> value={metric} onChange={setMetric} options={CUSTOM_METRIC_ORDER.map((k) => ({ value: k, label: CUSTOM_METRICS[k].label }))} aria-label="Kennzahl" size="sm" className="w-full" data-testid="custom-metric" />
             <MorphSelect<CustomSince> value={since} onChange={setSince} options={(Object.keys(SINCE_LABELS) as CustomSince[]).map((k) => ({ value: k, label: SINCE_LABELS[k] }))} aria-label="Zeitraum" size="sm" className="w-full" />
             <MorphSelect<string> value={setup} onChange={setSetup} options={[{ value: NONE, label: "Alle Setups" }, ...used.map((s) => ({ value: s.id, label: s.name }))]} aria-label="Setup" size="sm" className="w-full" />

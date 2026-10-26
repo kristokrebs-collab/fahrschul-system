@@ -6,7 +6,7 @@
  */
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { collectErrors, expectNoHorizontalScroll, screenshot, seed, stored, toast } from "./helpers";
+import { collectErrors, expectNoHorizontalScroll, screenshot, seed, stored, toast, waitForStableLayout } from "./helpers";
 
 const PROJECTS = ["mobile", "desktop"];
 const layer = (page: Page, key: string) => page.locator(`[data-page="${key}"][data-page-role="current"]`);
@@ -68,6 +68,7 @@ async function openCard(page: Page): Promise<void> {
   await page.goto("/#analyse");
   await expect(layer(page, "analyse").locator("h1").first()).toHaveText("Analyse", { timeout: 25_000 });
   await expect(page.locator("[data-page-skeleton]")).toHaveCount(0, { timeout: 25_000 });
+  await waitForStableLayout(page);
   const card = page.getByTestId("ana-decision");
   await card.scrollIntoViewIfNeeded();
   await expect(card).toBeVisible({ timeout: 25_000 });

@@ -30,26 +30,48 @@ const REALIGN_AT = [800, 1600, 2600] as const;
 const REALIGN_TOLERANCE = 24;
 
 /**
- * Content above a target may still arrive after the jump (a lazy card swaps its skeleton for the card, an image loads): the
- * target then sits lower than the line it was scrolled to. For a few seconds it is brought back to that line – never against
- * the person: any wheel, touch, key or press ends this at once.
+ * Content above a target may still arrive after the jump (a lazy card swaps its skeleton for the card, a long page mounts its
+ * cards one after another, an image loads): the target then sits lower than the line it was scrolled to. For a few seconds it is
+ * brought back to that line – at the fixed moments and, where the browser can tell, at every change of the page's height – and
+ * never against the person: any wheel, touch, key or press ends this at once.
  */
 export function keepAligned(el: HTMLElement): void {
   if (typeof window === "undefined" || typeof window.scrollBy !== "function") return;
   const events = ["wheel", "touchstart", "keydown", "pointerdown"] as const;
   const timers: ReturnType<typeof setTimeout>[] = [];
+  let ro: ResizeObserver | undefined;
+  let raf = 0;
+  let over = false;
   const stop = (): void => {
+    over = true;
     timers.forEach(clearTimeout);
+    ro?.disconnect();
+    if (raf) cancelAnimationFrame(raf);
     events.forEach((e) => window.removeEventListener(e, stop));
   };
   const line = (): number => parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
-  for (const ms of REALIGN_AT) {
+  const align = (): void => {
+    if (over) return;
+    if (!el.isConnected) return stop();
+    const d = el.getBoundingClientRect().top - line();
+    if (Math.abs(d) > REALIGN_TOLERANCE) window.scrollBy({ top: d, behavior: "instant" });
+  };
+  for (const ms of REALIGN_AT) timers.push(setTimeout(align, ms));
+  // the first moment is after the smooth scroll; a height change before it only matters once that scroll is over, so the observer
+  // starts with it and then follows the page until the last moment
+  if (typeof ResizeObserver === "function") {
     timers.push(
       setTimeout(() => {
-        if (!el.isConnected) return stop();
-        const d = el.getBoundingClientRect().top - line();
-        if (Math.abs(d) > REALIGN_TOLERANCE) window.scrollBy({ top: d, behavior: "instant" });
-      }, ms),
+        if (over) return;
+        ro = new ResizeObserver(() => {
+          if (raf) return;
+          raf = requestAnimationFrame(() => {
+            raf = 0;
+            align();
+          });
+        });
+        ro.observe(document.documentElement);
+      }, REALIGN_AT[0]),
     );
   }
   timers.push(setTimeout(stop, REALIGN_AT[REALIGN_AT.length - 1]! + 100));
