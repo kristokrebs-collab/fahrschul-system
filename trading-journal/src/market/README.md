@@ -497,3 +497,11 @@ the feed cannot serve yields no candles and its German reason – nothing is sub
 feed's bar key (`klineBarKey`: a bar appended or closed, not forming ticks) or the feed's health text changes; nothing runs
 without a mounted caller (no timer, no store). The search itself is the pure `@/domain/similar` and runs on the main thread in
 the card's `useMemo` (milliseconds for ≤ 1500 candles). Tests: `tests/unit/views.markt.similar.test.tsx`.
+
+## Aktien (`stocks/`, F67 / F68)
+
+Stock data comes through its own contract, not through `MarketProvider`: `src/market/stocks` (README there) gives bars, quotes, the Nasdaq Trader
+symbol directory and headlines as typed results `ok | stale | unavailable(reason)`, each value with `source`, `asOf` and `receivedAt`, over four
+public-data functions (`/api/v1/stocks/*`, see `netlify/functions/README.md`). It reuses `cache.ts` (KVStore) and `budget.ts` (TokenBucket) of this
+folder and has its own client, cache ages and throttle. The crypto side of the scanner reads Binance klines and the 24 h ticker through the
+existing REST helpers (`sources/binance.ts`, `sources/http.ts`, `sources/proxy.ts`) with its own budget. Tests: `tests/unit/stocks.client.test.ts`, `tests/unit/stocks.server.test.ts`.

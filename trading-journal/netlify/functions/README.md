@@ -135,3 +135,37 @@ Tests: `tests/unit/functions.social.test.ts` (in-memory PostgREST fake: shares +
 redaction, groups / invites / roles / mentor visibility, comments + mentions, goals, team seats, opt-in + immediate
 withdrawal, k-anonymity, aggregate, feedback + reports, public-read rate limit). `account.ts` `EXPORT_TABLES` lists the P12 tables
 (DSGVO export); account deletion cascades through `auth.users`.
+
+## Functions (F67 / F68 Aktien – public data)
+
+Four read-only functions for US stocks. **Public data, no key, nothing personal in or out**: the only things that travel are
+tickers, an interval and a range (nothing of the journal, the settings or the account). The sources are Yahoo Finance's
+**unofficial** chart endpoint and RSS feed and the Nasdaq Trader symbol files (`nasdaqlisted.txt`, `otherlisted.txt`); Yahoo may
+rate-limit or block the server at any time. That is answered honestly: per ticker `{ ok: false, reason, message }`, and when every
+ticker failed for the same upstream reason HTTP 429 / 502 with `stock_upstream_rate_limited | stock_upstream_blocked |
+stock_upstream_unavailable` (a Nasdaq file in a changed format: `stock_upstream_format`) – never invented values. The client turns
+these into typed results `ok | stale | unavailable(reason)` (`src/market/stocks`, README there).
+
+Shared in `_lib/stocks/`: `guard.ts` (`stockGuard` = plan gate + rate limit, `stockJson`, `createMemo` – a time-boxed memory cache
+that shares one in-flight request between callers) · `yahoo.ts` (chart fetch and parse: no half-empty candles, intraday only inside
+the regular session, one candle per New York day for 1d, `prevClose` from the daily candles, `BRK.B` ↔ `BRK-B`; after a Yahoo limit
+the instance pauses 30 s instead of asking again) · `nasdaq.ts` (directory: common stocks, ADRs / ADS and partnership or trust units;
+no ETFs, test issues, warrants, SPAC units and rights, notes / ETNs, preferred) · `rss.ts` (headline RSS: entities decoded, tracking
+parameters stripped from links, no HTML) · `params.ts` (`parseSymbols`). The New York calendar and the wire format are shared with the
+client by relative import (`src/market/stocks/{session,types,wire}.ts`).
+
+Gate (`stockGuard`): while payments are **not** set up nothing is gated and anyone may read (an expired session is ignored); once
+Stripe is set up the caller must be signed in (401) and the plan must include the feature `boxScanner` (402). Rate limit per user or
+pseudonymised IP through `rate_hit`, with a per-instance counter as the fallback (a public proxy never runs open). Answers carry
+`cache-control: private, max-age=<ttl>` and `vary: authorization`.
+
+| file | route | notes |
+|---|---|---|
+| `stock-bars.mts` | GET `/api/v1/stocks/bars?symbols=AAPL,MSFT&interval=1m\|5m\|15m\|1h\|1d[&range=]` | ≤ 8 tickers, range from a fixed list per interval (defaults in `DEFAULT_RANGE`), 240 / 10 min, TTL 20 s (1m) · 45 s (5m) · 90 s (15m) · 5 min (1h) · 10 min (1d), 9-s budget per request (tickers not started in time answer `timeout`), 4 upstream calls in parallel |
+| `stock-quote.mts` | GET `/api/v1/stocks/quote?symbols=` | ≤ 20 tickers, price / previous close / change / day and 52-week range / volume / market time (from the daily chart), 240 / 10 min, TTL 15 s |
+| `stock-symbols.mts` | GET `/api/v1/stocks/symbols` | the directory as `[symbol, name, exchange, financial status]` rows plus `counts` (rows read, kept, dropped per kind) and the file time; memo 12 h, browser 6 h, 20 / 10 min |
+| `stock-news.mts` | GET `/api/v1/stocks/news?symbols=` | ≤ 8 tickers, headlines with publisher, link and time (`yahoo-rss`), 120 / 10 min, TTL 5 min. Further sources plug in on the client (`registerNewsSource`, `src/market/stocks/newsSources.ts`) – the SEC 8-K feed of another part of the project goes there |
+
+Tests: `tests/unit/stocks.server.test.ts` (fixtures of real Yahoo / Nasdaq / RSS answers from 2026-10-25 in `tests/fixtures/stocks/`,
+`fetch` mocked: parsing and cleaning, the directory filter, gate and rate limit, error mapping, cache headers, in-flight sharing, budget).
+The deployed functions were **not run live** (no deploy from the sandbox); the formats were checked against real upstream answers.
