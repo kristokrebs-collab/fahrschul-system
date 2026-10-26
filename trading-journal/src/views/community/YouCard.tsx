@@ -24,7 +24,7 @@ function Figure({ metric, value, active }: { metric: SocialMetric; value: number
   const tone = value == null ? "text-faint" : isR ? (value > 0 ? "text-win" : value < 0 ? "text-loss" : "text-fg") : "text-fg";
   return (
     <div className={cn("grid gap-1 rounded-xl border px-3 py-2.5 transition-colors duration-200", active ? "border-line-2 bg-white/[0.04]" : "border-line bg-ink-950/40")} data-testid={`you-${metric}`}>
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{METRIC_LABEL[metric]}</span>
+      <span className="truncate font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{METRIC_LABEL[metric]}</span>
       <span className={cn("dot-num truncate text-[17px] leading-none sm:text-[19px] lg:text-[17px]", tone)}>
         {value == null ? (
           "–"
@@ -96,7 +96,7 @@ export function YouCard({ className }: { className?: string }) {
               <Caption>{YOU.figures}</Caption>
               <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{server ? YOU.server : YOU.local}</span>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2">
               {SOCIAL_METRICS.map((m) => (
                 <Figure key={m} metric={m} value={metricValue(fig, m)} active={m === metric} />
               ))}

@@ -22,6 +22,23 @@ const OTHER = "22222222-2222-4222-8222-222222222222";
 const PROJECTS = ["mobile", "desktop"];
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 const H4 = 14_400_000;
+/** `CB_SHOTS_DIR` writes review screenshots (390 / 1440). */
+const SHOTS = process.env.CB_SHOTS_DIR;
+
+async function shot(page: Page, name: string, fullPage = false): Promise<void> {
+  if (!SHOTS) return;
+  if (fullPage) {
+    // the sections reveal when they scroll into view: walk down the page once
+    for (let y = 0; y < 12_000; y += 500) {
+      await page.mouse.wheel(0, 500);
+      await page.waitForTimeout(80);
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
+  }
+  await page.waitForTimeout(1800); // entrances settle
+  const w = page.viewportSize()?.width ?? 0;
+  await page.screenshot({ path: `${SHOTS}/belege-${name}-${w < 600 ? 390 : 1440}.png`, fullPage, animations: "disabled" });
+}
 
 async function open(page: Page, url = COMMUNITY_URL): Promise<void> {
   const res = await page.goto(url);
@@ -91,6 +108,7 @@ test.describe("Community: Belege, Rangliste, Chartfälle", () => {
     await expect(preview).toContainText("Nie dabei: Euro-Beträge, Kontogröße, Börse, Märkte, Uhrzeiten, Notizen, dein Name.");
     await expect(sheet.getByTestId("proof-basis-hint")).toContainText("Das kann die App nicht prüfen");
     await expectAccessible(page, '[data-testid="proof-sheet"]', "Beleg-Baukasten");
+    await shot(page, "sheet");
 
     await sheet.getByTestId("share-create").click();
     await expect(sheet.getByTestId("share-url")).toHaveValue(/#share\/\S{22}$/);
@@ -124,6 +142,7 @@ test.describe("Community: Belege, Rangliste, Chartfälle", () => {
     await expect(proof.getByTestId("proof-curve")).toBeVisible();
     await expectNoHorizontalScroll(pub);
     await expectAccessible(pub, '[data-testid="proof-page"]', "Beleg-Seite");
+    await shot(pub, "page", true);
 
     // revoked in „Deine Links“: the page is gone
     await expect(page.getByTestId("shares-card").getByTestId("share-row")).toHaveCount(1);
@@ -166,6 +185,7 @@ test.describe("Community: Belege, Rangliste, Chartfälle", () => {
     await expect(page.getByTestId("you-card").getByTestId("you-origin")).toContainText("Börsen-API");
     await expectNoHorizontalScroll(page);
     await expectAccessible(page, '[data-testid="leaderboard-card"]', "Rangliste");
+    await shot(page, "board", true);
     expect(errors).toEqual([]);
   });
 
@@ -213,6 +233,7 @@ test.describe("Community: Belege, Rangliste, Chartfälle", () => {
     await expect(card.getByTestId("case-result")).toHaveCount(0);
     await expectNoHorizontalScroll(page);
     await expectAccessible(page, '[data-testid="case-card"]', "Chartfall vor der Hypothese");
+    await shot(page, "case-decide");
 
     // incomplete → nothing is sent
     await card.getByTestId("case-commit").click();
@@ -251,6 +272,7 @@ test.describe("Community: Belege, Rangliste, Chartfälle", () => {
     await expect(rows.filter({ hasText: "Du ·" })).toContainText("trifft zu");
     await expectNoHorizontalScroll(page);
     await expectAccessible(page, '[data-testid="case-card"]', "geschlossener Chartfall");
+    await shot(page, "case-closed");
     expect(requests.length).toBeGreaterThan(0);
     expect(errors).toEqual([]);
   });
@@ -278,6 +300,7 @@ test.describe("Community: Belege, Rangliste, Chartfälle", () => {
     await sheet.getByTestId("case-question").fill("Hält die Box nach oben?");
     await sheet.getByRole("radio", { name: "24 Kerzen" }).click();
     await expectAccessible(page, '[data-testid="case-sheet"]', "Neuer Chartfall");
+    await shot(page, "case-sheet");
     await sheet.getByTestId("case-post").click();
     await expect(toast(page).getByText("Chartfall gestellt")).toBeVisible();
     const made = soc.groups[0]!.cases![0]!;

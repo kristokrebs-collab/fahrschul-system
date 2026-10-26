@@ -41,6 +41,8 @@ picture** (PNG, nothing leaves the device), setup sharing hides itself.
 | `hooks.ts` | `useCommunityBoot` (loads on sign-in, keeps a pending `?invite=` across the login), `useLocalStats` (the same figures from this device's journal, shown until the server computed them), `percentileIn`, `myValue` |
 | `adopt.ts` | `withAdoptedSetup(settings, payload)` – a shared setup becomes the visitor's own (unique name, fresh id) |
 | `strings.ts` | German copy |
+| `proof.ts`, `proofBuild.ts`, `proofStrings.ts` | PURE, alias-free (F57): `buildProof` freezes the closed trades of a period as `[day, r, costR, origin]` tuples (R only, no money, no notes); `proofFigures` recomputes sum, drawdown, hit rate, costs and completeness from the list on the reader's device; `compareProofs` checks a continuation (`prev`) for removed trades |
+| `cases.ts`, `caseStrings.ts` | PURE, alias-free (F47): `caseWindow`, `visibleBars` / `futureBars` (the future stays out of the picture AND the price scale until the hypothesis is stored), `caseOutcome` (up / down / flat from public candles, band ½ · ATR14 % · √horizon), `hitOf`, `delayCandles`, `tally` |
 | `ui/*` | parts used outside the Community page (below) |
 
 ## Components (`@/social/ui`)
@@ -61,3 +63,14 @@ The Community page and the public share page live in `src/views/community` (see 
 leaks money / notes, strict schemas), `tests/unit/social.ui.test.tsx` (view states, share sheet, cards, mentions),
 `tests/unit/functions.social.test.ts` (server), `tests/e2e/community.spec.ts` (+ `tests/e2e/mocks/social.ts`, an
 in-memory server that validates every payload with the real strict schemas).
+
+## Belege, Herkunft, Chartfälle (F57 / F50 / F71 / F47)
+- **Honesty rules.** The app cannot tell real money from demo; a proof therefore carries the *Ergebnisart* as the trader's own word and the
+  *data origin* (`Trade.origin.kind`: api / csv / manual / bot) as the only thing the app can vouch for. Demo runs, backtests and virtual accounts are
+  not part of the journal sync and so never ranked. R is independent of deposits by construction.
+- **Drawdown** is its own board metric (`RANK_ORDER`: lower is better) and shown beside every row; a board can be filtered by data class
+  (`originOf`: ≥ 80 % of the R trades from one origin, else `mixed`).
+- **Chartfälle**: hypotheses are written once and stamped by the database, hidden from others until the case is closed; the outcome is computed on
+  each device from public Binance candles and never stored. That nobody has seen the candles before is a matter of trust – the sheet says so.
+Tests: `social.proof`, `social.cases`, `social.metrics`, `supabase.proofs`, `supabase.cases`, `views.community.{proof,cases}`, `functions.social`;
+e2e `tests/e2e/community-belege.spec.ts`.

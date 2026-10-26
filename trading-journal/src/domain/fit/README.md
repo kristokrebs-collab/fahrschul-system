@@ -34,7 +34,15 @@ All thresholds are in `FIT_RULES` (`types.ts`); the minimums are `MIN_*`.
   `strategyFew` (the run has < 10 trades). A single statement whose journal sample is too small is `unknown` WITH the reason
   (e.g. „Von deinen Trades haben 3 eine Ausstiegszeit; ab 10 …“) – never a guess.
 - It reads the run's trades and the journal; it changes neither `diagnoseRun` nor the extras nor any journal data.
-- Not covered: rule complexity / execution effort of the idea (no honest number for it yet).
+- Execution effort (F49), three further statements, all with both numbers and a caveat:
+  - **Prüftakt** (`cadence`): the run's candle size against the journal's usual candle (median of `Trade.timeframe`, ≥ 10 trades); friction from a factor of 4
+    (`FIT_RULES.cadenceFactor`, inclusive). A "look" is the close of a candle – how long a look takes, the app does not know.
+  - **Regelumfang** (`ruleload`): conditions + exit rules of the idea (only "Eigene Idee" and the rule builder; the fixed templates have no rule list)
+    against the median number of checklist points per trade (global rules + the setup's items, ≥ 10 trades with a checklist); friction from twice AND at
+    least 3 more (`ruleFactor`, `ruleMinExtra`). Different things are compared and the caveat says so.
+  - **Zeitbudget** (`timebudget`): looks per day and trades per week next to the minutes per day from the check-in field "Verfügbare Zeit" (≥ 5 days).
+    Never judged: always `unknown` with both numbers – the verdict stays with the trader.
+- Still approximated, not measured: the effort (no time per look, no hands-on vs. automatic).
 
 ## Reading notes
 - Times are UTC on both sides: the run's entries are epoch ms; a journal trade is a local wall-clock string read as the real instant

@@ -376,7 +376,7 @@ _Trades hineinbekommen, ordnen, sichern und prüfen._ · 12 Funktionen
 
 ### Community & Teilen
 
-_Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 5 Funktionen
+_Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 7 Funktionen
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
@@ -384,7 +384,9 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 5 Funktionen
 | Dich freiwillig mit anderen vergleichen | Rangliste (freiwillig) | Community | teilweise |
 | Mit einem Mentor oder Schüler zusammenarbeiten | Mentor-Modus | Community | fertig |
 | Einen Trade oder ein Setup per Link teilen | Teilen per Link | Community | teilweise |
-| Trades in der Gruppe besprechen | Reviews & Kommentare | Community | teilweise |
+| Trades in der Gruppe besprechen | Reviews & Kommentare | Community | fertig |
+| Eine Kursstrecke in der Gruppe vorab einschätzen und später prüfen | Chartfälle mit Hypothese vorab | Community › Gruppe › Chartfälle | fertig |
+| Meine Ergebnisse als nachprüfbaren Beleg teilen | Ergebnisbeleg | Community › Teilen › Ergebnisbeleg | fertig |
 
 ### Konto, Einstellungen & Hilfe
 
