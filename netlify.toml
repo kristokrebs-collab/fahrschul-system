@@ -26,6 +26,7 @@
 #   /api/v1/coach/ask                                                                        (P04, optional Premium-KI)
 #   /api/v1/shot-extract                                                                     (F29, optional Premium-KI: Screenshot-Import, Bilder ≤ 6 MB Request)
 #   /api/v1/sec/{facts,filings}                                                              (F68 / F69, SEC EDGAR: Env SEC_USER_AGENT nötig, sonst „Einrichtung nötig“; same-origin, keine CSP-Änderung)
+#   /api/v1/stocks/{bars,quote,symbols,news}                                                 (F67/F68, public data: Yahoo chart + RSS, Nasdaq Trader; no key, only tickers go out)
 # Scheduled functions (the cron lives in their code, `config.schedule`; they run on PUBLISHED deploys only):
 #   exchange-sync-cron   */30 * * * *   Bitunix read-only sync (SYNC_CRON_ENABLED=false switches it off)
 #   backup-nightly       @daily         nightly server backup of the journal docs (P09)

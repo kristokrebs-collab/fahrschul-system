@@ -39,6 +39,7 @@ const LOADERS: Record<LazyPage, Loader> = {
   funktionen: () => import("@/views/funktionen/FunktionenView").then((m) => ({ default: m.FunktionenView })),
   studio: () => import("@/views/studio/StudioView").then((m) => ({ default: m.StudioView })),
   plan: () => import("@/views/plan/PlanView").then((m) => ({ default: m.PlanView })),
+  aktien: () => import("@/views/aktien/AktienView").then((m) => ({ default: m.AktienView })),
 };
 
 export const LAZY_PAGES = Object.keys(LOADERS) as LazyPage[];

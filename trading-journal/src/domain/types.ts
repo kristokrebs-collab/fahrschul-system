@@ -339,6 +339,12 @@ export interface Settings {
    * so the cloud / two-tab merge works per plan; entries a newer version wrote survive untouched.
    */
   plan?: unknown;
+  /**
+   * Watchlist (Aktien, F67/F68): the stocks and crypto pairs to keep an eye on – at most 50. Versioned passthrough
+   * (`{ v: 1, items: [{ id, kind, symbol, name, addedAt, note }] }`, see `@/domain/watchlist`); absent until the first entry. An
+   * id list, so the cloud / two-tab merge works per entry; entries a newer version wrote survive untouched.
+   */
+  watchlist?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */

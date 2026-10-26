@@ -142,6 +142,7 @@ const TOPIC_LABEL: Readonly<Record<string, string>> = {
   lab: "Labor",
   studio: "Strategie-Studio",
   plan: "Handelsplan",
+  stocks: "Aktien",
   memory: "Gedächtnis",
   compare: "Vergleiche",
   list: "Trade-Listen",
@@ -437,6 +438,18 @@ export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
           text: "Der Handelsplan führt in fünf Schritten vom Einstiegssignal zum Ticket: Einstieg, Ausstieg (Stop und Ziel), Größe innerhalb deiner Grenzen, Risiko-Check und Ticket zum Kopieren. Ich öffne nur – gerechnet wird aus den Kerzen und deinen Limits, und die App sendet nie eine Order. Keine professionelle Finanzberatung.",
           close: true,
         });
+      case "stocks": {
+        const news = /\b(news|nachrichten|schlagzeilen|meldungen)\b/i.test(arg);
+        if (env.openFeature) env.openFeature(news ? "aktien-news" : "aktien-scanner");
+        else env.go("aktien");
+        return reply({
+          title: news ? "News zur Watchlist geöffnet" : "Aktien-Scanner geöffnet",
+          text: news
+            ? "Dort stehen die Schlagzeilen der Aktien auf deiner Watchlist, mit Quelle und Zeit. Die Einstufung beruht nur auf Stichwörtern in der Überschrift – ein Hinweis, was zuerst gelesen werden will, kein Handelssignal. Ich öffne nur. Keine professionelle Finanzberatung."
+            : "Dort wählst du Markt, Regeln und die Zahl der Charts und startest den Scan selbst. Ich starte nichts: Ein Treffer heißt nur, dass eine Regel auf dem Chart angeschlagen hat – und er ist veraltet, sobald sich der Kurs bewegt. Keine professionelle Finanzberatung.",
+          close: true,
+        });
+      }
       case "explain":
         return explainTool(env);
       case "hello":

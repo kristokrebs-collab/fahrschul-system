@@ -19,7 +19,7 @@ const PROJECTS = ["mobile", "desktop"];
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
 /** The pages that analyse, simulate or suggest – each ends with the note. */
-const NOTE_PAGES = ["markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "setups"] as const;
+const NOTE_PAGES = ["markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "aktien", "setups"] as const;
 /** The start page and its family: never. */
 const NO_NOTE_PAGES = ["overview", "cockpit"] as const;
 /** Every page the self check walks – the start page and the cockpit included since round 5. */
@@ -189,7 +189,7 @@ test.describe("Selbstprüfung", () => {
     // beyond the edge) and file inputs that only a button opens – they are not tap targets of their own
     const exempt = (m: { name: string; where: string; w: number }) => m.where === "section-nav" || m.w <= 1;
     const problems: string[] = [];
-    for (const key of ["overview", "cockpit", "markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "funktionen", "setups"] as const) {
+    for (const key of ["overview", "cockpit", "markt", "analyse", "risiko", "coach", "berichte", "wachstum", "labor", "studio", "aktien", "funktionen", "setups"] as const) {
       await page.goto(`/#${key}`);
       await ready(page, key);
       await page.waitForTimeout(900);

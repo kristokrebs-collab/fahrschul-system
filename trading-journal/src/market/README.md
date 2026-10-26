@@ -511,3 +511,11 @@ Tests: `tests/unit/sec.shared.test.ts`, `tests/unit/sec.client.test.ts`, `tests/
 ## Handelsplan-Kerzen und Erinnerung (`plan/`, F44 · F22)
 
 `plan/candles.ts` lädt die Kerzen des Handelsplans (Binance USDⓈ-M, 5m / 15m / 30m / 1h) für das Fenster einer Sitzung über die REST-Clients dieser Schicht (`fetchJson`, `klinesSchema`, `mapKline`; direkt, bei Sperre / CORS / Netzfehler derselbe Weg über den EU-Proxy, nie in der Einzeldatei-Version). **Zwischenspeicher zuerst**: abgeschlossene Kerzen ändern sich nie – pro Symbol und Zeitrahmen liegt EIN lückenloser Block (IndexedDB `storageKey("plan-klines")`, höchstens 1 500 Kerzen); `onCache` liefert ihn sofort, danach wird nur geholt, was davor und danach fehlt (je Anfrage nur so viele Kerzen, wie fehlen). Die noch laufende Kerze kommt mit, wird aber nie gespeichert. Ohne Netz zeigt die Seite den Zwischenspeicher mit dem Grund. `plan/sources.ts` ist die Tabelle der Kerzenquellen: Krypto bereit, Aktien als Platz vorbereitet (`ready: false`, die Seite sagt es und erfindet keine Kerzen). `plan/clock.tsx` (`PlanClockHost`, in `DeferredHosts` eingehängt) meldet die Erinnerung „flat by close“ eines gespeicherten Plans zur Uhrzeit – ein Timer auf die nächste fällige, Toast und eine Zeile im Zustellprotokoll (`quietOutcome`), bei geöffneter App; eine erst nach 12 Stunden gefundene gilt still als verpasst. Tests: `tests/unit/market.plan.candles.test.ts`, `tests/unit/market.plan.clock.test.tsx`.
+
+## Aktien (`stocks/`, F67 / F68)
+
+Stock data comes through its own contract, not through `MarketProvider`: `src/market/stocks` (README there) gives bars, quotes, the Nasdaq Trader
+symbol directory and headlines as typed results `ok | stale | unavailable(reason)`, each value with `source`, `asOf` and `receivedAt`, over four
+public-data functions (`/api/v1/stocks/*`, see `netlify/functions/README.md`). It reuses `cache.ts` (KVStore) and `budget.ts` (TokenBucket) of this
+folder and has its own client, cache ages and throttle. The crypto side of the scanner reads Binance klines and the 24 h ticker through the
+existing REST helpers (`sources/binance.ts`, `sources/http.ts`, `sources/proxy.ts`) with its own budget. Tests: `tests/unit/stocks.client.test.ts`, `tests/unit/stocks.server.test.ts`.

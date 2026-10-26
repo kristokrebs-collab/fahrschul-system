@@ -33,7 +33,7 @@ import type { Page } from "@/store/uiStore";
 import { editDistance } from "./fuzzy";
 import { INSIGHT_RULES, followsInsight, type InsightToolId } from "./insightRoutes";
 
-export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar" | "studio" | "plan" | InsightToolId;
+export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar" | "studio" | "plan" | "stocks" | InsightToolId;
 
 export type Plan =
   | { kind: "journal"; intents: Intent[]; via: string[]; topic: string }
@@ -172,6 +172,7 @@ const PHRASES: readonly PhraseRule[] = [
 const PAGE_WORDS: ReadonlyArray<[RegExp, Page]> = [
   [/\bhandels-?plan\b/, "plan"],
   [/\bstrategie-?studio\b|\bstudio\b/, "studio"],
+  [/\baktien\b|\baktienseite\b/, "aktien"],
   [/\blabor\b|\bbacktest(s|er)?\b|\bstrategielabor\b/, "labor"],
   [/\bcoach\b/, "coach"],
   [/\bmarkt\b|\bmaerkte\b|\bchart\b|\blage\b/, "markt"],
@@ -209,6 +210,7 @@ export const PAGE_LABEL: Readonly<Record<Page, string>> = {
   funktionen: "Funktionen",
   studio: "Strategie-Studio",
   plan: "Handelsplan",
+  aktien: "Aktien",
 };
 
 /** The page named by an "open …" request, or null. */
@@ -232,6 +234,8 @@ const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: { test(norm: string): bool
   { tool: "plan", test: /\bhandels-?plan\b|\bwie (gross|viel) soll(te)? (die|meine|denn die|denn meine) (position|positionsgroesse)( denn)? (sein|werden)\b|\bwie (gross|viel) (soll|sollte|darf|kann) ich (kaufen|handeln|einsetzen|riskieren|einsteigen)\b|\bpositionsgroesse (berechnen|bestimmen|planen|festlegen)\b|\b(stop|stopp) und ziel (planen|setzen|festlegen)\b|\bplan fuer (diesen|den|meinen) (trade|einstieg)\b|\btrade (planen|durchplanen)\b|\bticket (bauen|erstellen)\b/, topic: "plan", label: "Handelsplan" },
   // „Strategie als Text“ / „Neue Strategie“: opens the studio (the page does the reading, the questions and the backtest)
   { tool: "studio", test: /\bstrategie als text\b|\bneue strategie\b|\bstrategie (schreiben|aufschreiben|eingeben|formulieren|beschreiben|in worten)\b|\bstrategie-? ?studio\b|\bregeln aus (einem |meinem )?text\b|\bstrategien? (vergleichen|nebeneinander)\b/, topic: "studio", label: "Strategie-Studio" },
+  // „Aktien scannen“ / „News zu meiner Watchlist“: opens the Aktien page at the scanner or the news (the page does the reading and the scan)
+  { tool: "stocks", test: /\baktien\b.{0,24}\b(scannen|scan|durchsuchen|screenen|screener|finden|suchen)\b|\b(scanne|scannen|scan|durchsuche|screene)\b.{0,24}\baktien\b|\baktien ?scanner\b|\bopening range\b|\beroeffnungsspanne\b|\bbull ?flag\b|\b(news|nachrichten|schlagzeilen|meldungen)\b.{0,32}\bwatchlist\b|\bwatchlist\b.{0,32}\b(news|nachrichten|schlagzeilen|meldungen)\b/, topic: "stocks", label: "Aktien" },
   { tool: "train", test: /\b(ueben|uebe|uebung|uebungen|trainier\w*|trainingsmodus|lernmodus|replay training)\b|\btraining\b.*\b(starten|oeffnen|beginnen|machen)\b|\b(starte|oeffne|mach)\b.*\btraining\b/, topic: "train", label: "Training" },
   { tool: "similar", test: /\b(aehnlich\w*|vergleichbar\w*)\b.{0,30}\b(situation\w*|marktlage|lage|muster|kerze\w*|faelle|fall)\b|\b(situation\w*|muster|kerze\w*)\b.{0,30}\b(aehnlich\w*|vergleichbar\w*)\b|\bhistorisch\w*\b.{0,20}\b(aehnlich\w*|vergleich\w*)\b|\bwann (war|gab) (es|das) (schon )?(mal )?(so|aehnlich)\b/, topic: "similar", label: "Ähnliche Situationen" },
   { tool: "entry", test: /\b(was fehlt|fehlt (mir|noch|da))\b|\beinstiegs ?check\b|\beinstiegssignal\b|\bkann ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bsoll ich (jetzt |gerade )?(einsteigen|long|short|kaufen|verkaufen)\b|\bist (jetzt |gerade )?(ein|kein) (einstieg|signal)\b|\bwie ist (der|die|das) (markt|lage)\b|\bmarktlage\b/, topic: "entry", label: "Einstiegs-Check" },

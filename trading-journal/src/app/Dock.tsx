@@ -36,6 +36,7 @@ export const PAGE_LABELS: Record<Page, string> = {
   funktionen: "Funktionen",
   studio: "Strategie-Studio",
   plan: "Handelsplan",
+  aktien: "Aktien",
 };
 export const FAB_LABEL = "Trade eintragen";
 export const PAGE_ICON: Record<Page, IconName> = {
@@ -57,6 +58,7 @@ export const PAGE_ICON: Record<Page, IconName> = {
   funktionen: "compass",
   studio: "pen",
   plan: "route",
+  aktien: "stocks",
 };
 
 /**

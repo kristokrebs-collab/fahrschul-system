@@ -113,6 +113,7 @@ export function pageCounts(s: ShellStats, env: PageCountEnv): Record<Page, PageC
     funktionen: { text: "Index" },
     studio: { text: "Text" },
     plan: { text: "5 Schritte" },
+    aktien: { text: "Scan" },
   };
 }
 
