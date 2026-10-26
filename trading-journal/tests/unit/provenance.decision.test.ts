@@ -21,9 +21,11 @@ describe("trade.decision im Datenmodell", () => {
     expect("decision" in t).toBe(false);
   });
 
-  it("wird bereinigt: nur own / rules / ai gelten, via nur plan / box, fremde Schlüssel überleben", () => {
-    expect(normalizeTrade({ ...base(), decision: { by: "ai", via: "box", ref: " p_1 " } }).decision).toEqual({ by: "ai", via: "box", ref: " p_1 " });
-    expect(normalizeTrade({ ...base(), decision: { by: "rules", via: "unbekannt", extra: 7 } }).decision).toEqual({ by: "rules", extra: 7 });
+  it("wird bereinigt: nur own / rules / ai gelten, fremde Schlüssel überleben; via und ref prüft das Lesen", () => {
+    expect(normalizeTrade({ ...base(), decision: { by: "ai", via: "box", ref: "p_1" } }).decision).toEqual({ by: "ai", via: "box", ref: "p_1" });
+    expect(normalizeTrade({ ...base(), decision: { by: "rules", extra: 7 } }).decision).toEqual({ by: "rules", extra: 7 });
+    // ein unbekanntes via zählt beim Lesen als „von dir gesetzt“, nie als Plan oder Box
+    expect(decisionOf(normalizeTrade({ ...base(), decision: { by: "rules", via: "unbekannt" } }))).toEqual({ by: "rules", basis: "set" });
     // unlesbar = unbekannt, nie geraten
     expect("decision" in normalizeTrade({ ...base(), decision: { by: "bot" } })).toBe(false);
     expect("decision" in normalizeTrade({ ...base(), decision: "ai" })).toBe(false);

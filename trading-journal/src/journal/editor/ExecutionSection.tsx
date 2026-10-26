@@ -148,7 +148,7 @@ export function ExecutionSection({ j, onChange, side, status, date, entry, stop,
           <Input id="f-exacc" autoComplete="off" value={j.exchangeAccount} onChange={set("exchangeAccount")} placeholder="z. B. Haupt oder Sub-Konto 2" maxLength={40} />
         </Field>
         <OriginField j={j} onChange={onChange} />
-        <Field label="Entscheidung" className="col-span-2 md:col-span-4" help="Wer hat entschieden? Für den Vergleich unter Analyse → Vergleich">
+        <Field label="Entscheidung" className="col-span-2 md:col-span-4" help="Wer hat entschieden? (Analyse → Vergleich)">
           <Segmented<"" | DecisionBy>
             aria-label="Entscheidung von"
             size="sm"

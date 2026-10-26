@@ -11,7 +11,6 @@ export const ONBOARDING_CARD = {
   start: "Einführung starten",
   keys: "Alle Tastenkürzel",
   demo: "Demo mit Beispieldaten",
-  demoHint: "Import, Regelentwurf, Test, Demokonto und Alarm ausprobieren – mit erfundenen Daten, ohne etwas zu speichern.",
   quick: [
     { keys: ["/"], label: "Suche" },
     { keys: ["n"], label: "Neuer Trade" },
@@ -75,7 +74,6 @@ export function OnboardingCard({ className }: { className?: string }) {
             {ONBOARDING_CARD.demo}
           </Button>
         </div>
-        <p className="text-[12px] leading-relaxed text-mute">{ONBOARDING_CARD.demoHint}</p>
       </div>
     </Card>
   );

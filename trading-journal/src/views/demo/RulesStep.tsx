@@ -66,7 +66,7 @@ function Words({ parse }: { parse: StrategyParse | null }) {
       <Field label={RULES.textLabel} htmlFor="demo-idea" help={RULES.textHelp}>
         <Textarea id="demo-idea" value={text} onChange={(e) => patch({ text: e.target.value.slice(0, 600), answers: {} })} rows={3} maxLength={600} data-testid="demo-idea" spellCheck={false} />
       </Field>
-      <div className="grid gap-1.5">
+      <div className="grid gap-3">
         <span className="label">{RULES.examples}</span>
         <div className="flex flex-wrap gap-2">
           {DEMO_IDEAS.map((i) => (

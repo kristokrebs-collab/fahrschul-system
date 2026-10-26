@@ -52,7 +52,15 @@ export function ImportStep() {
       {stage !== "file" && (
         <section className="grid gap-3" data-testid="demo-import-preview-body">
           <div className="flex flex-wrap items-center gap-2">
-            {preview.format ? <Badge tone="steel" dot>{IMPORT.recognised(preview.format.label, Math.round(preview.score * 100))}</Badge> : <Badge tone="warn">{IMPORT.notRecognised}</Badge>}
+            {preview.format ? (
+              <Badge tone="steel" dot className="whitespace-normal text-left">
+                {IMPORT.recognised(preview.format.label, Math.round(preview.score * 100))}
+              </Badge>
+            ) : (
+              <Badge tone="warn" className="whitespace-normal text-left">
+                {IMPORT.notRecognised}
+              </Badge>
+            )}
             <span className="text-[12px] text-mute" data-testid="demo-import-rows">
               {IMPORT.rows(preview.rows, preview.skipped)}
             </span>

@@ -301,18 +301,8 @@ function originOf(v: unknown): TradeOrigin | undefined {
   return o;
 }
 
-/** `decision` (F24): `by` must be one of the three; `via` / `ref` only when valid; unknown keys survive; anything else is dropped (= unknown, never guessed). */
-function decisionOf(v: unknown): TradeDecision | undefined {
-  if (!isObj(v)) return undefined;
-  const by = oneOf(["own", "rules", "ai"] as const, v.by);
-  if (!by) return undefined;
-  const d: TradeDecision = { ...v, by };
-  if (!oneOf(["plan", "box"] as const, d.via)) delete d.via;
-  const ref = idText(v.ref);
-  if (ref) d.ref = ref.slice(0, 80);
-  else delete d.ref;
-  return d;
-}
+/** `decision` (F24): kept when `by` is one of the three (unknown keys survive), else dropped = unknown, never guessed; `via` / `ref` are checked where they are read. */
+const decisionOf = (v: unknown): TradeDecision | undefined => (isObj(v) && oneOf(["own", "rules", "ai"] as const, v.by) ? (v as unknown as TradeDecision) : undefined);
 
 function marginModeOf(v: unknown): MarginMode | undefined {
   const s = typeof v === "string" ? v.trim().toLowerCase() : "";
