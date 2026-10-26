@@ -188,6 +188,21 @@ describe("AnalystPanel", () => {
     fireEvent.click(screen.getByTestId("analyst-start-thesis"));
     expect(onThesis).toHaveBeenCalledWith("NWIN");
   });
+
+  it("offers \"Plan erstellen →\" only when the host wires it, and passes the ticker (no panel is rebuilt for it)", async () => {
+    const f = asFetch(secFetch());
+    const { unmount } = wrap(<AnalystPanel ticker="NWIN" autoLoad fetchImpl={f} onUseInDcf={vi.fn()} />);
+    await screen.findByTestId("analyst-result");
+    expect(screen.queryByTestId("analyst-create-plan")).toBeNull();
+    unmount();
+    const onPlan = vi.fn();
+    wrap(<AnalystPanel ticker="NWIN" autoLoad fetchImpl={f} onCreatePlan={onPlan} />);
+    await screen.findByTestId("analyst-result");
+    const btn = screen.getByTestId("analyst-create-plan");
+    expect(btn).toHaveTextContent("Plan erstellen →");
+    fireEvent.click(btn);
+    expect(onPlan).toHaveBeenCalledWith("NWIN");
+  });
 });
 
 /* ========================================================================================== DcfPanel */
