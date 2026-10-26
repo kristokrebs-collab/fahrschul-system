@@ -76,16 +76,16 @@ export function AnalystSlotImpl({ symbol }: AktienSlotProps) {
   return (
     <div className="grid min-w-0 gap-6" data-testid="aktien-analyse" data-state="ready">
       <Suspense fallback={<Loading id="aktien-analyse-zahlen-loading" />}>
-        <AnalystPanel ticker={ticker} onUseInDcf={useInDcf} onStartThesis={startThesis} {...(planOk ? { onCreatePlan: createPlan } : {})} />
+        <AnalystPanel hosted ticker={ticker} onUseInDcf={useInDcf} onStartThesis={startThesis} {...(planOk ? { onCreatePlan: createPlan } : {})} />
       </Suspense>
       <div ref={dcfRef} className="scroll-mt-24" data-testid="aktien-analyse-dcf">
         <Suspense fallback={<Loading id="aktien-analyse-dcf-loading" />}>
-          <DcfPanel ticker={seed?.ticker ?? ticker} seed={seed?.seed ?? null} />
+          <DcfPanel hosted ticker={seed?.ticker ?? ticker} seed={seed?.seed ?? null} />
         </Suspense>
       </div>
       <div ref={thesisRef} className="scroll-mt-24" data-testid="aktien-analyse-these">
         <Suspense fallback={<Loading id="aktien-analyse-these-loading" />}>
-          <ThesisPanel ticker={thesisTicker || ticker} />
+          <ThesisPanel hosted ticker={thesisTicker || ticker} />
         </Suspense>
       </div>
     </div>

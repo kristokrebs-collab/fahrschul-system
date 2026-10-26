@@ -29,6 +29,11 @@ interface Common {
   className?: string;
   /** the panel without its own `Card` frame (when the host already has one) */
   bare?: boolean;
+  /**
+   * the host page carries the one `AnalysisNote` ("Keine professionelle Finanzberatung.", once per page): the panel then keeps only
+   * its own lead sentence (what its numbers are made of) as a plain line and leaves the standing sentence to the page
+   */
+  hosted?: boolean;
   /** tests: a `fetch` for the SEC functions instead of the real one */
   fetchImpl?: typeof fetch;
 }

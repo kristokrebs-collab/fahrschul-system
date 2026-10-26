@@ -4,6 +4,7 @@
  */
 import { useId, useState, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { AnalysisNote } from "@/ui/AnalysisNote";
 import { parseNumber, toInputString } from "@/lib/parse";
 import { Button } from "@/primitives/Button";
 import { Collapse, Expander } from "@/primitives/Expander";
@@ -225,3 +226,16 @@ export function NoData({ children = "keine Daten" }: { children?: ReactNode }) {
 }
 
 export { dateDe };
+
+/**
+ * The closing line of a panel: the page-style `AnalysisNote` when the panel stands alone, or – when the host page carries the one
+ * note of the page (`hosted`) – just the panel's own lead sentence, so the standing sentence appears once per page.
+ */
+export function PanelNote({ lead, hosted }: { lead: string; hosted?: boolean }) {
+  if (!hosted) return <AnalysisNote lead={lead} />;
+  return (
+    <p className="max-w-[72ch] text-[12px] leading-relaxed text-mute" data-testid="analysis-lead">
+      {lead}
+    </p>
+  );
+}

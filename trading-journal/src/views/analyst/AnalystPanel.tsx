@@ -20,9 +20,8 @@ import { Field } from "@/primitives/Field";
 import { Input } from "@/primitives/Input";
 import { Skeleton } from "@/primitives/Skeleton";
 import { normalizeTicker, type SecFiling } from "@/market/sec";
-import { AnalysisNote } from "@/ui/AnalysisNote";
 import { useAnalysis, type Analysis } from "./data";
-import { Disclosure, SecErrorBox, SecStamp, Sub } from "./parts";
+import { Disclosure, PanelNote, SecErrorBox, SecStamp, Sub } from "./parts";
 import { QuarterTable } from "./QuarterTable";
 import { AN, ITEM_LABELS } from "./strings";
 import type { AnalystPanelProps } from "./types";
@@ -69,7 +68,7 @@ function Events({ a }: { a: Analysis }) {
   );
 }
 
-export function AnalystPanel({ ticker: tickerProp = "", autoLoad = false, onLoaded, onUseInDcf, onStartThesis, onCreatePlan, className, bare, fetchImpl }: AnalystPanelProps) {
+export function AnalystPanel({ ticker: tickerProp = "", autoLoad = false, onLoaded, onUseInDcf, onStartThesis, onCreatePlan, className, bare, hosted, fetchImpl }: AnalystPanelProps) {
   const id = useId();
   const [text, setText] = useState(tickerProp);
   const { state, load } = useAnalysis(fetchImpl);
@@ -127,7 +126,7 @@ export function AnalystPanel({ ticker: tickerProp = "", autoLoad = false, onLoad
       {state.status === "ready" && <Ready a={state.analysis} onUseInDcf={onUseInDcf} onStartThesis={onStartThesis} onCreatePlan={onCreatePlan} />}
 
       <div data-testid="analyst-note">
-        <AnalysisNote lead={AN.disclaimer} />
+        <PanelNote lead={AN.disclaimer} hosted={hosted} />
       </div>
     </div>
   );

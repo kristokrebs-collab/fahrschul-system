@@ -131,6 +131,9 @@ describe("Aktien page", () => {
     expect(await within(analyse).findByTestId("analyst-panel")).toBeInTheDocument();
     expect(await within(analyse).findByTestId("dcf-panel")).toBeInTheDocument();
     expect(await within(analyse).findByTestId("thesis-panel")).toBeInTheDocument();
+    // the standing sentence appears once per page: the panels keep only their own lead line
+    expect(screen.getAllByTestId("analysis-note")).toHaveLength(1);
+    expect(within(analyse).getAllByTestId("analysis-lead")).toHaveLength(3);
     expect(await screen.findByTestId("aktien-kongress")).toHaveTextContent("Kommt gleich");
     expect(screen.getByText(/Die App sendet nie Orders/)).toBeInTheDocument();
     expect(world.calls).toEqual([]); // opening the page asks for nothing: a scan starts only when the trader starts it
