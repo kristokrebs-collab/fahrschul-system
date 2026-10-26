@@ -41,6 +41,7 @@ import { ExchangeHost } from "@/exchanges/ExchangeHost";
 import { ExcursionBackfillHost } from "@/journal/ExcursionBackfillHost";
 import { ShotImportHost } from "@/journal/extract/ShotImportHost";
 import { BoxAlertHost } from "@/market/boxes/alerts";
+import { squeezeOfSettings } from "@/domain/squeeze/config";
 import { useArchiveOn } from "@/market/archive/store";
 import { BoxSnapBackfillHost } from "@/market/boxes/BoxSnapBackfillHost";
 import { KeyLevelHost } from "@/market/keylevels/alerts";
@@ -67,6 +68,7 @@ const TimeMachineHost = lazy(() => import("@/views/timemachine/TradeSheet"));
 const TrainingHost = lazy(() => import("@/views/ueben/TrainingHost"));
 const ForwardHost = lazy(() => import("@/views/labor/forward/ForwardHost"));
 const ArchiveHost = lazy(() => import("@/market/archive/host"));
+const SqueezeHost = lazy(() => import("@/market/squeeze/host"));
 
 /** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
 function AssistantMount() {
@@ -124,6 +126,17 @@ function ArchiveMount() {
   return on ? (
     <Suspense fallback={null}>
       <ArchiveHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Squeeze observation (F07): the alert's chunk is fetched only after the explicit switch (default off) and while the archive it reads runs. */
+function SqueezeMount() {
+  const alerts = useJournal((s) => squeezeOfSettings(s.settings).alerts);
+  const archiveOn = useArchiveOn();
+  return alerts && archiveOn ? (
+    <Suspense fallback={null}>
+      <SqueezeHost />
     </Suspense>
   ) : null;
 }
@@ -222,6 +235,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Datenarchiv">
         <ArchiveMount />
+      </HostSlot>
+      <HostSlot name="Squeeze-Beobachtung">
+        <SqueezeMount />
       </HostSlot>
     </>
   );
