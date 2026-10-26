@@ -15,7 +15,7 @@ export class ZipError extends Error {
 export interface ZipEntry {
   name: string;
   data: Buffer;
-  /** the entry's DOS time as UTC ms epoch (the Clerk stamps its files), `null` when it is not a valid date */
+  /** the entry's DOS wall-clock time written as if it were UTC (a ZIP carries no zone – the Clerk stamps New York time), `null` when it is not a valid date */
   time: number | null;
 }
 

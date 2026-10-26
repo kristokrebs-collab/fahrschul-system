@@ -2,28 +2,18 @@
  * The bodies of the two slots (`Slots.tsx`). `AnalystSlotImpl` hosts the three analyst panels (Quartalszahlen · DCF · Kaufthese,
  * F68 / F69, `src/views/analyst`), each lazy and each with its own frame. The host only does two hand-overs the panels ask for:
  * "In den DCF-Rechner übernehmen" (the starting numbers go to the DCF panel) and "These anlegen" (the ticker goes to the thesis
- * panel) – and scrolls there. The Congress tracker still says "Kommt gleich"; nothing is computed or promised beyond that.
+ * panel) – and scrolls there. `CongressSlotImpl` hosts the Congress tracker (`./kongress`), lazy as well: the stock trades of
+ * members of the House as the Clerk's public reports state them.
  */
 import { lazy, Suspense, useCallback, useRef, useState } from "react";
 import type { DcfSeed } from "@/domain/dcf";
 import { useReducedFx } from "@/motion/useReducedFx";
-import { Card } from "@/primitives/Card";
 import type { AktienSlotProps } from "./types";
-
-function Soon({ id, title, text }: { id: string; title: string; text: string }) {
-  return (
-    <Card title={title} className="h-full" data-testid={id}>
-      <div className="grid gap-2" data-state="soon">
-        <p className="text-[13px] font-medium text-fg">Kommt gleich</p>
-        <p className="max-w-[64ch] text-[12.5px] leading-relaxed text-mute">{text}</p>
-      </div>
-    </Card>
-  );
-}
 
 const AnalystPanel = lazy(() => import("@/views/analyst/AnalystPanel"));
 const DcfPanel = lazy(() => import("@/views/analyst/DcfPanel"));
 const ThesisPanel = lazy(() => import("@/views/analyst/ThesisPanel"));
+const CongressCard = lazy(() => import("@/views/aktien/kongress/CongressCard"));
 
 /** a stock ticker the SEC knows (letters, dot, hyphen) – a crypto pair like BTCUSDT is not one, the field stays empty then */
 const STOCK_TICKER = /^[A-Z][A-Z.-]{0,5}$/;
@@ -85,6 +75,10 @@ export function AnalystSlotImpl({ symbol }: AktienSlotProps) {
   );
 }
 
-export function CongressSlotImpl(_props: AktienSlotProps) {
-  return <Soon id="aktien-kongress" title="Kongress-Tracker" text="Meldungen von Kongressmitgliedern zu Aktien, die du beobachtest – mit Meldedatum und dem Hinweis, dass die Angaben Wochen zu spät kommen können." />;
+export function CongressSlotImpl(props: AktienSlotProps) {
+  return (
+    <Suspense fallback={<Loading id="aktien-kongress-card-loading" />}>
+      <CongressCard {...props} />
+    </Suspense>
+  );
 }

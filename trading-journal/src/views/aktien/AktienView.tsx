@@ -3,8 +3,8 @@
  *   Scanner     ScannerCard (what to scan, rules, run, honest summary) · ResultsCard (hits with rank, reason, stand, chart)
  *   Watchlist   WatchlistCard (stocks and crypto pairs, quotes with source)
  *   News        NewsCard (headlines of the watchlist, keyword hint, "neu seit dem letzten Besuch")
- *   Analyse     AnalystSlot (Quartalszahlen · DCF · Kaufthese – built by another part of the project, "Kommt gleich" until then)
- *   Kongress    CongressSlot (later)
+ *   Analyse     AnalystSlot (Quartalszahlen · DCF · Kaufthese – `src/views/analyst`)
+ *   Kongress    CongressSlot (the STOCK Act reports of members of the House, `kongress/`)
  * Every number comes from a data source named next to it; a source that cannot be reached is an empty state with the
  * reason. The app never sends an order.
  */

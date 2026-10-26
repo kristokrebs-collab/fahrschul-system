@@ -16,6 +16,7 @@
  *   reported on its own entry (`not-found | timeout | upstream | busy`), the others still come back.
  */
 import { ClerkFormatError, indexUrl, parseIndexXml, ptrUrl } from "../../../../src/market/congress/clerk";
+import { nyToUtc } from "../../../../src/market/stocks/session";
 import { parsePtr } from "../../../../src/market/congress/ptr";
 import {
   CONGRESS_LIMITS,
@@ -122,6 +123,13 @@ export function parseYear(raw: string | null, now: number = Date.now()): number 
   return y;
 }
 
+/** The ZIP entry's wall-clock time (written as UTC by `zip.ts`) is New York time: the real instant. */
+function nyWallToUtc(wall: number | null): number | null {
+  if (wall === null) return null;
+  const d = new Date(wall);
+  return nyToUtc(d.toISOString().slice(0, 10), d.getUTCHours() * 60 + d.getUTCMinutes());
+}
+
 async function readIndex(year: number): Promise<{ at: number; payload: CongressIndexPayload }> {
   let got: Awaited<ReturnType<typeof clerkGet>>;
   try {
@@ -145,7 +153,7 @@ async function readIndex(year: number): Promise<{ at: number; payload: CongressI
         source: CONGRESS_SOURCE,
         year,
         fetchedAt: at,
-        fileTime: got.modified ?? entry.time,
+        fileTime: got.modified ?? nyWallToUtc(entry.time),
         cached: false,
         sourceUrl: indexUrl(year),
         counts: { all: parsed.total, ptr: parsed.filings.length },
