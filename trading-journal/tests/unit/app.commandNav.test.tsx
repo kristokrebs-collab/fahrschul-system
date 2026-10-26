@@ -60,7 +60,7 @@ describe("command navigation: pure helpers", () => {
     expect(CONFIG.itemMs).toBe(650);
     expect(CONFIG.itemEase).toEqual([0.22, 1, 0.36, 1]);
     // the pack's four, then one 60 ms beat per further page (P14: 15 pages, + Funktionen, + Strategie-Studio, + Handelsplan, + Aktien)
-    expect(CONFIG.delays.links).toEqual([620, 720, 820, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560, 1620, 1680, 1740]);
+    expect(CONFIG.delays.links).toEqual([620, 720, 820, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560, 1620, 1680, 1740, 1800]);
     expect(CONFIG.delays.links).toHaveLength(PAGES.length);
   });
 });
