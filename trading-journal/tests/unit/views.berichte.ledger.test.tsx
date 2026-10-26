@@ -158,8 +158,8 @@ describe("Transaktionsbuch", () => {
     fireEvent.click(screen.getByTestId("ledger-csv"));
     await waitFor(() => expect(saved.calls).toHaveLength(1));
     expect(saved.calls[0]!.name).toBe("transaktionsbuch-alle-jahre.csv");
-    expect(saved.calls[0]!.data.startsWith("﻿")).toBe(true);
-    expect(saved.calls[0]!.data.split("\n")[0]).toBe(`﻿"${LEDGER_NOTE}"`);
+    expect(saved.calls[0]!.data.startsWith("\uFEFF")).toBe(true);
+    expect(saved.calls[0]!.data.split("\n")[0]).toBe(`\uFEFF"${LEDGER_NOTE}"`);
     expect(saved.calls[0]!.data).toContain("11.01.2026 09:00;2026-01-11T09:00:00Z;Scalp;;BTCUSDT;Schließen;Verkauf;Long;1,5;130,00;0,10;;35,00;10.01.2026;11.01.2026;USDT;Ausführung;A;");
     fireEvent.click(screen.getByTestId("ledger-csv-match"));
     await waitFor(() => expect(saved.calls).toHaveLength(2));

@@ -40,5 +40,7 @@ export async function runInsight(tool: InsightToolId, question: string, env: Too
       return (await import("./discovery")).discoveryAnswer(norm, env);
     case "evolve":
       return (await import("./evolve")).evolveAnswer(norm, env);
+    case "briefing":
+      return (await import("./briefing")).briefingAnswer(norm, env);
   }
 }

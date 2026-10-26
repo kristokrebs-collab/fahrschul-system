@@ -134,13 +134,13 @@ export default function LedgerSection({ acc }: { acc: AccFilter }) {
   const [pick, setPick] = useState<number | null | undefined>(undefined);
   const [flag, setFlag] = useState<FlagId | null>(null);
   const [shown, setShown] = useState(PAGE);
-  const [printing, setPrinting] = useState(false);
+  const [printAt, setPrintAt] = useState<number | null>(null);
 
   const scoped = useMemo(() => (acc === "all" ? trades : trades.filter((t) => (t.account ?? "scalp") === acc)), [trades, acc]);
   const ledger: Ledger = useMemo(() => buildLedger(scoped, { currency }, { sourceZone: device, displayZone: zone, scope }), [scoped, currency, device, zone, scope]);
 
-  const years = ledger.years.map((y) => y.year);
-  const year: number | null = pick === null ? null : pick !== undefined && years.includes(pick) ? pick : (years[years.length - 1] ?? null);
+  const lastYear = ledger.years.length ? ledger.years[ledger.years.length - 1]!.year : null;
+  const year: number | null = pick === null ? null : pick !== undefined && ledger.years.some((y) => y.year === pick) ? pick : lastYear;
   const yearRows = useMemo(() => rowsOfYear(ledger, year, zone), [ledger, year, zone]);
   const counts = useMemo(() => {
     const c: Partial<Record<FlagId, number>> = {};
@@ -152,7 +152,7 @@ export default function LedgerSection({ acc }: { acc: AccFilter }) {
   const rows = activeFlag ? yearRows.filter((r) => r.flags.some((f) => f.id === activeFlag)) : yearRows;
   const visible = rows.slice(0, shown);
   const summaries = ledger.years.filter((y) => year == null || y.year === year);
-  const yearOptions = [{ value: "all", label: L.allYears }, ...years.map((y) => ({ value: String(y), label: String(y) }))];
+  const yearOptions = [{ value: "all", label: L.allYears }, ...ledger.years.map((y) => ({ value: String(y.year), label: String(y.year) }))];
   const zoneOptions = useMemo(() => {
     const ids = new Set<string>([device, ...ZONE_CHOICES.map((z) => z.id)]);
     return [...ids].map((id) => ({ value: id, label: id === device ? `${L.zoneDevice} (${id})` : (ZONE_CHOICES.find((z) => z.id === id)?.label ?? id) }));
@@ -297,7 +297,7 @@ export default function LedgerSection({ acc }: { acc: AccFilter }) {
                 <Button size="sm" className="pointer-coarse:min-h-11" onClick={() => void save("zuordnung")} disabled={ledger.rows.length === 0} data-testid="ledger-csv-match">
                   {L.csvMatch}
                 </Button>
-                <Button size="sm" variant="primary" className="pointer-coarse:min-h-11" onClick={() => setPrinting(true)} disabled={ledger.rows.length === 0 || printing} data-testid="ledger-print-btn">
+                <Button size="sm" variant="primary" className="pointer-coarse:min-h-11" onClick={() => setPrintAt(Date.now())} disabled={ledger.rows.length === 0 || printAt != null} data-testid="ledger-print-btn">
                   {L.print}
                 </Button>
               </div>
@@ -315,7 +315,7 @@ export default function LedgerSection({ acc }: { acc: AccFilter }) {
           {LEDGER_NOTE}. {NO_ADVICE_TEXT}
         </p>
       </div>
-      {printing && <LedgerPrint ledger={ledger} year={year} now={Date.now()} onDone={() => setPrinting(false)} />}
+      {printAt != null && <LedgerPrint ledger={ledger} year={year} now={printAt} onDone={() => setPrintAt(null)} />}
     </Card>
   );
 }

@@ -50,9 +50,11 @@ import {
   wallToUtc,
   weekendEvents,
   withOwnEvents,
+  type OwnEvent,
   type PhaseTrade,
 } from "@/domain/events";
 import { PASS, FAIL } from "@/domain/lab/filters/masks";
+import { merge3 } from "@/store/merge3";
 
 const Z = (iso: string): number => Date.parse(iso);
 
@@ -218,6 +220,19 @@ describe("FOMC – the Fed's public list", () => {
     expect(FOMC_MEETINGS.find((m) => m.from === "2023-01-31")!.to).toBe("2023-02-01");
   });
 
+  it("agrees with a second, independent source: the decision days TradingView's economic calendar lists for 2026 (fetched 25.10.2026)", () => {
+    const tv = JSON.parse(readFileSync("tests/unit/fixtures/tv-fed-rate-decisions-2026.json", "utf8")) as { decisions: { date: string; at: string }[] };
+    expect(tv.decisions).toHaveLength(7);
+    for (const d of tv.decisions) {
+      expect(isFomcDecisionDay(d.date), d.date).toBe(true);
+      // the instant TradingView gives lies on that New York day (and no time of it is taken over)
+      expect(dayKeyIn(Z(d.at), "America/New_York"), d.date).toBe(d.date);
+    }
+    // and our list has no other decision day in the window the connector covers (Jan – Oct)
+    const ours = FOMC_MEETINGS.filter((m) => m.to >= "2026-01-01" && m.to <= "2026-10-30").map((m) => m.to);
+    expect(ours).toEqual(tv.decisions.map((d) => d.date));
+  });
+
   it("makes an all-day entry on the New York day: 04:00Z in summer time, 05:00Z in winter time", () => {
     const [oct] = fomcEvents(Z("2026-10-25T00:00:00Z"), Z("2026-11-01T00:00:00Z"));
     expect(oct!.allDay).toBe(true);
@@ -256,6 +271,18 @@ describe("own appointments (settings.events)", () => {
     expect(next.future).toBe("x");
     expect((next.items as unknown[]).includes("junk")).toBe(true);
     expect((next.items as unknown[]).length).toBe(3);
+  });
+
+  it("merges two devices per appointment (the three-way merge of the settings keeps an entry each side added)", () => {
+    const e = (id: string, title: string): OwnEvent => ({ id, title, at: 1000, importance: "mittel", note: "" });
+    const base = { v: 1, items: [e("a", "CPI")] };
+    const mine = withOwnEvents(base, [e("a", "CPI"), e("b", "Token-Unlock")]);
+    const theirs = withOwnEvents(base, [e("a", "CPI"), e("c", "Gerichtstermin")]);
+    const merged = merge3(base, mine, theirs) as { v: number; items: { id: string }[] };
+    expect(merged.items.map((i) => i.id).sort()).toEqual(["a", "b", "c"]);
+    // a delete on one side drops the entry only when the other side left it untouched
+    const deleted = merge3(base, withOwnEvents(base, []), base) as { items: unknown[] };
+    expect(deleted.items).toEqual([]);
   });
 
   it("puts own entries into the calendar with the source 'Eigener Eintrag'", () => {
@@ -471,7 +498,7 @@ describe("Morgenbriefing – every line with its source, missing data as 'keine 
     expect(mk.lines[0]!.text).toBe("BTCUSDT: +3,4 % (24 h) · 81.234,5 · bewegt sich");
     expect(mk.lines[1]!.text).toBe("ETHUSDT: −0,4 % (letzter Tagesschluss) · 2.410");
     expect(mk.lines.at(-1)).toMatchObject({ text: "SOLUSDT: keine Daten", missing: true, at: null });
-    expect(b.sections.find((s) => s.id === "alerts")!.lines[0]).toMatchObject({ text: "Alarme: keine Daten.", missing: true });
+    expect(b.sections.find((s) => s.id === "alerts")!.lines[0]).toMatchObject({ text: "Zustellprotokoll: keine Daten.", missing: true });
     expect(b.sections.find((s) => s.id === "checkin")!.lines.map((l) => l.text)).toEqual(["Check-in offen: noch nicht beantwortet.", "Plan für den Tag: noch leer (Tagesnotiz)."]);
   });
 
@@ -482,8 +509,8 @@ describe("Morgenbriefing – every line with its source, missing data as 'keine 
     expect(watch[0]).toMatch(/^FOMC heute: FOMC-Entscheidung\./);
     expect(watch.some((t) => t.startsWith("Long-Trigger 84.500: vorläufig"))).toBe(true);
     const off = buildBriefing({ ...base, markets: [], levels: { available: false, reason: "Der Live-Markt läuft nicht", rows: [], planHeadline: null } });
-    expect(off.sections.find((s) => s.id === "markets")!.lines[0]).toMatchObject({ text: "Märkte und Watchlist: keine Daten.", missing: true });
-    expect(off.sections.find((s) => s.id === "levels")!.lines[0]).toMatchObject({ text: "Schlüsselmarken: Der Live-Markt läuft nicht.", missing: true });
+    expect(off.sections.find((s) => s.id === "markets")!.lines[0]).toMatchObject({ text: "Live-Markt und Watchlist: keine Daten.", missing: true });
+    expect(off.sections.find((s) => s.id === "levels")!.lines[0]).toMatchObject({ text: "Marken: keine Daten (Der Live-Markt läuft nicht).", missing: true });
     expect(briefingText(off)).toContain("[Ereigniskalender]");
   });
 

@@ -283,18 +283,21 @@ export function TermineCard() {
   const today = dayKeyOf(now, tz);
 
   // list: from the start of today, three weeks
-  const listFrom = startOfDay(today, tz);
-  const listEvents = useMemo(() => eventsBetween({ from: listFrom, to: listFrom + LIST_DAYS * DAY, kinds, own }), [listFrom, kinds, own]);
+  const listEvents = useMemo(() => {
+    const from = startOfDay(today, tz);
+    return eventsBetween({ from, to: from + LIST_DAYS * DAY, kinds, own });
+  }, [today, tz, kinds, own]);
   const listDays = useMemo(() => groupByDay(listEvents, tz), [listEvents, tz]);
 
   // month
   const base = new Date(Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 1 + monthShift, 1));
   const year = base.getUTCFullYear();
   const month = base.getUTCMonth() + 1;
-  const grid = useMemo(() => monthGrid(year, month), [year, month]);
-  const monthFrom = startOfDay(grid[0]![0]!.key, tz);
-  const monthTo = startOfDay(addDays(grid[grid.length - 1]![6]!.key, 1), tz);
-  const monthEvents = useMemo(() => (view === "monat" ? eventsBetween({ from: monthFrom, to: monthTo, kinds, own }) : []), [view, monthFrom, monthTo, kinds, own]);
+  const monthEvents = useMemo(() => {
+    if (view !== "monat") return [];
+    const grid = monthGrid(year, month);
+    return eventsBetween({ from: startOfDay(grid[0]![0]!.key, tz), to: startOfDay(addDays(grid[grid.length - 1]![6]!.key, 1), tz), kinds, own });
+  }, [view, year, month, tz, kinds, own]);
   const byDay = useMemo(() => new Map(groupByDay(monthEvents, tz).map((g) => [g.day, g.events])), [monthEvents, tz]);
   const selected = picked ?? today;
   const selectedEvents = byDay.get(selected) ?? [];

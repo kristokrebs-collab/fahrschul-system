@@ -8,7 +8,7 @@ import { ownCalendarEvents } from "./own";
 import { expiryEvents, fundingEvents, weekendEvents } from "./rules";
 import { usEvents } from "./usEvents";
 import { DAY, MINUTE, type CalendarEvent, type EventKind, type OwnEvent } from "./types";
-import { addDays, dayKeyIn, wallToUtc, weekdayOfKey } from "./zone";
+import { addDays, dayKeyIn, weekdayOfKey } from "./zone";
 
 export interface EventQuery {
   from: number;
@@ -60,9 +60,12 @@ export function untilText(at: number, now: number): string {
   return days === 1 ? "in 1 Tag" : `in ${days} Tagen`;
 }
 
-/** Calendar day key (`YYYY-MM-DD`) in `tz` of an event's start (all-day entries keep their own day). */
+/**
+ * Calendar day key (`YYYY-MM-DD`) of an event: an all-day entry (a holiday, an FOMC decision, the weekend) belongs to the date it
+ * names, whatever the zone of the viewer; a timed one to the day its start falls on in `tz`.
+ */
 export function dayOfEvent(e: CalendarEvent, tz: string): string {
-  return e.allDay && e.dayKey && e.dayZone === tz ? e.dayKey : dayKeyIn(e.at, tz);
+  return e.allDay && e.dayKey ? e.dayKey : dayKeyIn(e.at, tz);
 }
 
 /** Events grouped by calendar day of `tz`, days in order. A multi-day range (weekend) appears on every day it covers. */
@@ -76,9 +79,8 @@ export function groupByDay(events: readonly CalendarEvent[], tz: string): { day:
   for (const e of events) {
     const first = dayOfEvent(e, tz);
     put(first, e);
-    if (e.end != null && e.allDay && e.kind === "weekend") {
-      for (let k = addDays(first, 1); wallToUtc({ y: +k.slice(0, 4), m: +k.slice(5, 7), d: +k.slice(8, 10), h: 0, min: 0 }, tz) < e.end; k = addDays(k, 1)) put(k, e);
-    }
+    // the weekend is two dates (Saturday and Sunday, UTC)
+    if (e.kind === "weekend") put(addDays(first, 1), e);
   }
   return [...by.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([day, list]) => ({ day, events: list }));
 }

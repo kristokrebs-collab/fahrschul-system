@@ -71,4 +71,6 @@ export interface InsightInputs {
   discovery?: DiscoveryMemory | null;
   /** `settings.evolve` as stored (the optimiser's proposals, counters and learning), `undefined` = none */
   evolve?: unknown;
+  /** what the Morgenbriefing reads (F43): the stores' values and the clock of the briefing */
+  briefing?: import("@/views/termine/briefingInput").BriefingStores;
 }

@@ -307,7 +307,7 @@ describe("CSV export – head, columns, decimal comma, summary", () => {
 
   it("heads the book with the note, the zone and what is not in it", () => {
     const csv = ledgerToCsv(l, 2026, now);
-    expect(csv.startsWith("﻿")).toBe(true);
+    expect(csv.startsWith("\uFEFF")).toBe(true);
     const lines = csv.slice(1).split("\n");
     expect(lines[0]).toBe(`"${LEDGER_NOTE}"`);
     expect(LEDGER_NOTE).toBe("Hilfsrechnung ohne Steuerberatung; Steuerregeln prüft eine Fachperson");

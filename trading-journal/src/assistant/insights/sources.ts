@@ -106,6 +106,29 @@ export async function similarSource(env: Env, norm: string): Promise<SimilarInpu
   return { ...base, state: "ok", reason: null, result: findSimilar(candles, tf, provider.serverNow(), { features: prefs.features, horizon: prefs.horizon, unit: prefs.unit, minGap: prefs.horizon }) };
 }
 
+/**
+ * What the Morgenbriefing reads (F43): the live 24 h ticker, the daily candles of the watchlist that are ALREADY in the cache (nothing is
+ * fetched here), the key levels (evaluated for the moment of reading), the Zustellprotokoll, the day journal. A value that is not
+ * there stays missing and the briefing says „keine Daten“.
+ */
+export async function briefingSource(env: Env & { now: number; days?: import("@/domain/types").DayNotes }): Promise<import("@/views/termine/briefingInput").BriefingStores> {
+  if (env.insight?.briefing) return env.insight.briefing;
+  const [{ getFeed }, { getMultiDaily }, { retainKeyLevels, getKeyLevels }, { getDeliveryLog }, { deviceTimeZone }] = await Promise.all([
+    import("@/market/marketStore"),
+    import("@/market/multiDaily"),
+    import("@/market/keylevels/store"),
+    import("@/market/keylevels/deliveryLog"),
+    import("@/domain/events/zone"),
+  ]);
+  const release = retainKeyLevels();
+  try {
+    const keyLevels = getKeyLevels();
+    return { now: env.now, tz: deviceTimeZone(), settings: env.data.settings as { boxes?: unknown; events?: unknown }, days: env.days ?? {}, ticker: getFeed("ticker24h"), liveSymbol: keyLevels.symbol, daily: getMultiDaily(), keyLevels, log: getDeliveryLog() };
+  } finally {
+    release();
+  }
+}
+
 /** `settings.evolve` (the optimiser's proposals, counters and learning) as the journal holds it. */
 export function evolveSource(env: Env): unknown {
   if (env.insight && "evolve" in env.insight) return env.insight.evolve;

@@ -163,7 +163,7 @@ describe("Heute wichtig – the Morgenbriefing", () => {
     // 2460 / 2400 − 1 = +2,5 %, the last closed day: 27.10.2026 24:00 -> 00:00 Uhr of the 28th
     expect(markets).toHaveTextContent("ETHUSDT: +2,5 % (letzter Tagesschluss) · 2.460 · bewegt sich");
     // no live feed in this test: the live symbol and the key levels are not available
-    expect(screen.getByTestId("briefing-levels")).toHaveTextContent("Schlüsselmarken: Der Live-Markt läuft nicht, die Marken sind nicht bewertet.");
+    expect(screen.getByTestId("briefing-levels")).toHaveTextContent("Marken: keine Daten (Der Live-Markt läuft nicht, die Marken sind nicht bewertet).");
     expect(screen.getByTestId("briefing-checkin")).toHaveTextContent("Check-in offen: noch nicht beantwortet.");
     const missing = within(screen.getByTestId("briefing-card")).getAllByTestId("briefing-line").filter((l) => l.getAttribute("data-missing") === "true");
     expect(missing.length).toBeGreaterThan(0);

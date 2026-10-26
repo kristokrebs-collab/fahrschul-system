@@ -674,3 +674,12 @@ Auf ausdrückliche Erlaubnis des Nutzers, ohne das Aussehen zu ändern – Layou
   (`pointer-coarse:before:-inset-3` / `-inset-4`, hinter den Zellen), ein Tipp wählt die nächste Zelle; Raster-Abstand ≥ 24 px, wo die Breite es erlaubt.
 - **Kennzahlenkacheln**: `role="list"` aus sieben Knöpfen (`role="listitem"`), kein `dl` um Knöpfe. **Seitenwechsel**: `overflow-x: clip` um Kopf und Seite – ein ein- oder auslaufendes Blatt macht das
   Dokument nie breiter als den Bildschirm.
+
+### Termine, Heute wichtig, Ereignisphasen, Transaktionsbuch (F43, F70)
+
+Keine neuen Bauteile, keine neue Bewegung – vorhandene Primitives (`Card`, `Segmented`, `MorphSelect`, `Badge`, `Button`, `Field`/`Input`) und die Chip-Form der Berichte (`rounded-full`, `min-h-9`, bei grobem Zeiger `min-h-11`).
+- **Zeilen mit Quelle:** jeder Termin und jede Briefing-Zeile ist eine ruhige Zeile (`rounded-xl border border-line bg-ink-950/40`), Zeit in Mono (`num font-mono`), darunter in `text-faint` „Quelle: … · 14:30 Uhr“ oder „keine Zeit“. Die Quelle eines Termins klappt auf Tipp auf (Knopf mit `aria-expanded`, Trefferfläche ≥ 44 px bei grobem Zeiger). „keine Daten“ steht in `text-mute`, nie in einer Signalfarbe.
+- **„gleich“:** eine `Badge` (warn, Punkt) an Terminen in höchstens 60 Minuten; sonst nur bei hoher Wichtigkeit die Badge „hoch“, die Wichtigkeit als sr-only-Text.
+- **Monat:** 7 Spalten, Zellen 48 px hoch (Trefferfläche), Tag als Zahl, darunter bis zu vier Punkte (`size-1.5`) je Art; heute mit `ring-steel/60`, gewählt mit `bg-ink-750`. Die Tagesliste steht darunter, nicht im Raster.
+- **Phasen:** je Phase eine Karte-in-der-Karte mit zwei Spalten „In der Phase“ / „Außerhalb“ (ab `sm`), das Urteil als `Badge` (klar = steel, Tendenz = warn, offen/zu wenig = mute) – nie grün/rot, weil das Urteil die Sicherheit beschreibt, nicht die Richtung. Der Zufallshinweis steht als `role="note"` in der Form der anderen Hinweise (`border-line-2 bg-white/[0.03]`).
+- **Transaktionsbuch:** Zeilen als Raster – ab `md` acht Spalten mit Kopfzeile (Zahlen rechtsbündig), darunter (390 px) zwei Spalten mit Beschriftung je Zelle (leere Zellen entfallen); eine Zeile mit Warnhinweis bekommt `border-warn/30`, ihre Hinweise stehen darunter als `Badge` + Satz. Die Jahreszusammenfassung ist ein Block je Jahr (`dl`, 2 / 3 / 6 Spalten). Druck: weißes A4 wie das PDF der Berichte, nur dichter (7 pt).

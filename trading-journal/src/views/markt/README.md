@@ -141,3 +141,7 @@ Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): e
 `MarktStand.tsx` ist die eine Zeile unter dem Meldungsband: welcher Anbieter die Kerzen der Boxen, Schlüsselmarken und RSI-Linien geliefert hat (aus dem Stempel des Feeds,
 `SOURCE_LABEL` in `src/ui/SourceStand.tsx`), wann sie abgerufen wurden (auf die Minute gerundet – die Zeile rendert einmal pro Minute, nicht mit jedem Kerzen-Tick) und der Schluss der
 letzten **geschlossenen** Kerze je Zeiteinheit (4h, 1D, 1W). Fehlt eine Zeit, steht „keine Daten“. Test: `ui.sourceStand.test.tsx`, e2e `selbstpruefung.spec.ts`.
+
+## Termine, Heute wichtig, Ereignisphasen (F43)
+
+Ein lazy Abschnitt (`src/views/termine`, README dort) zwischen Tagesplan und RSI-Linien: **Heute wichtig** (Morgenbriefing, `briefing-card`), **Termine** (Kalender als Liste oder Monat, `termine-card`) und **Ereignisphasen** (Trades vor/nach Funding, am Verfallstag, FOMC-Tag, in der US-Open-Stunde – Journal oder letzter Backtest, `phasen-card`). Alle drei stehen in der „Inhalt“-Leiste der Seite. Termine sind berechnet (Funding-Raster, Deribit-Verfall, NYSE-Zeiten), stammen aus einer Liste mit Quelle und Abrufdatum (FOMC) oder sind vom Nutzer eingetragen; jede Zeile nennt ihre Quelle, Fehlendes heißt „keine Daten“. Tests: `views.termine.test.tsx`, `tests/e2e/termine.spec.ts`.

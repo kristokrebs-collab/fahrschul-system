@@ -144,7 +144,7 @@ function eventLines(day: string, tz: string, own: readonly OwnEvent[], now: numb
 const pctText = (c: number): string => `${signed(c * 100, 1)} %`;
 
 function marketLines(markets: readonly MarketMove[]): BriefingLine[] {
-  if (!markets.length) return [missingLine("Märkte und Watchlist", "Marktdaten")];
+  if (!markets.length) return [missingLine("Live-Markt und Watchlist", "Marktdaten")];
   const withValue = markets.filter((m) => m.change != null);
   const sorted = [...withValue].sort((a, b) => Math.abs(b.change!) - Math.abs(a.change!));
   const shown = sorted.slice(0, MAX_MARKETS);
@@ -154,12 +154,14 @@ function marketLines(markets: readonly MarketMove[]): BriefingLine[] {
     return line(`${m.symbol}: ${pctText(m.change!)} (${basis})${m.price != null ? ` · ${fmtPrice(m.price)}` : ""}${moving ? " · bewegt sich" : ""}`, m.source ?? "Marktdaten", m.asOf, moving ? (m.change! > 0 ? "win" : "loss") : "fg");
   });
   if (sorted.length > shown.length) out.push(line(`${sorted.length - shown.length} weitere Märkte mit kleinerer Bewegung.`, "Marktdaten", null, "mute"));
-  for (const m of markets.filter((x) => x.change == null)) out.push(line(`${m.symbol}: ${NO_DATA}`, m.source ?? "Marktdaten", null, "mute", true));
+  // the symbols without a value stand in ONE line, not one line each
+  const none = markets.filter((x) => x.change == null).map((x) => x.symbol);
+  if (none.length) out.push(line(`${none.join(", ")}: ${NO_DATA}`, "Marktdaten", null, "mute", true));
   return out;
 }
 
 function levelLines(l: KeyLevelInput): BriefingLine[] {
-  if (!l.available) return [line(`Schlüsselmarken: ${l.reason ?? NO_DATA}.`, "Schlüsselmarken", null, "mute", true)];
+  if (!l.available) return [line(`Marken: ${NO_DATA}${l.reason ? ` (${l.reason})` : ""}.`, "Schlüsselmarken", null, "mute", true)];
   const out: BriefingLine[] = [];
   if (l.planHeadline) out.push(line(`Tagesplan: ${l.planHeadline}`, "Tagesplan (aus den Schlüsselmarken)", null, "fg"));
   if (!l.rows.length) out.push(line("Keine Schlüsselmarke gesetzt.", "Schlüsselmarken", null, "mute"));
@@ -171,14 +173,14 @@ function levelLines(l: KeyLevelInput): BriefingLine[] {
 }
 
 function alertLines(alerts: readonly AlertRow[] | null, day: string, tz: string): BriefingLine[] {
-  if (!alerts) return [missingLine("Alarme", "Zustellprotokoll")];
+  if (!alerts) return [missingLine("Zustellprotokoll", "Zustellprotokoll")];
   const today = alerts.filter((a) => dayKeyIn(a.at, tz) === day);
   if (!today.length) return [line("Heute noch keine Alarm-Meldung im Zustellprotokoll (es hält die letzten 200 Zeilen und läuft nur, solange die App offen ist).", "Zustellprotokoll", null, "mute")];
   return today.slice(0, 5).map((a) => line(`${formatClock(a.at, tz)} Uhr · ${a.title} (${a.outcome})`, "Zustellprotokoll", a.at, "fg"));
 }
 
 function checkinLines(c: CheckinInput | null, tz: string): BriefingLine[] {
-  if (!c) return [missingLine("Check-in", "Tagesjournal")];
+  if (!c) return [missingLine("Tagesjournal", "Tagesjournal")];
   const out: BriefingLine[] = [];
   if (c.state === "done") out.push(line(`Check-in erledigt${c.at != null ? ` um ${formatClock(c.at, tz)} Uhr` : ""}.`, "Tagesjournal", c.at, "win"));
   else if (c.state === "skipped") out.push(line("Check-in heute übersprungen.", "Tagesjournal", c.at, "mute"));
@@ -234,7 +236,25 @@ export function buildBriefing(input: BriefingInput): Briefing {
   };
 }
 
-/** The briefing as plain text (assistant answer, copy). */
+/** The briefing as plain text (copy), every line with its full source. */
 export function briefingText(b: Briefing): string {
   return b.sections.map((s) => `${s.title}\n${s.lines.map((l) => `– ${l.text} [${l.source}]`).join("\n")}`).join("\n\n");
+}
+
+/** "NYSE – Handelszeiten und Feiertage" → "NYSE": the short name of a source, for places with little room. */
+export const shortSource = (source: string): string => source.split(/ – | \(|, /)[0]!.trim();
+
+/**
+ * The briefing as a few sentences for a chat answer: every line keeps its source and time in brackets, a section shows at most
+ * `max` lines (the rest is counted). The full, dated version is the card „Heute wichtig“.
+ */
+export function briefingParagraph(b: Briefing, max = 4): string {
+  const part = (l: BriefingLine): string => `${l.text.replace(/\.$/, "")} [${shortSource(l.source)}${l.at != null ? ` ${formatClock(l.at, b.tz)}` : ""}]`;
+  return b.sections
+    .map((s) => {
+      const shown = s.lines.slice(0, max).map(part);
+      const more = s.lines.length > max ? `; … (${s.lines.length - max} weitere)` : "";
+      return `${s.title}: ${shown.join("; ")}${more}.`;
+    })
+    .join(" ");
 }

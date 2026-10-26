@@ -65,7 +65,8 @@ export function PhasenCard() {
   const bt = useLastBacktest(source === "backtest");
 
   const journal = useMemo(() => toPhaseTrades(enriched.filter((t) => t.result !== "open"), (wall) => wallStringToUtc(wall, zone)), [enriched, zone]);
-  const trades = source === "journal" ? journal.trades : (bt.run?.trades ?? []);
+  const btTrades = bt.run?.trades;
+  const trades = useMemo(() => (source === "journal" ? journal.trades : (btTrades ?? [])), [source, journal.trades, btTrades]);
   const report = useMemo(() => analyzePhases(trades), [trades]);
   const skipped = source === "journal" ? journal.skipped : 0;
   const empty = source === "journal" ? journal.trades.length === 0 : bt.state !== "ok" || trades.length === 0;
