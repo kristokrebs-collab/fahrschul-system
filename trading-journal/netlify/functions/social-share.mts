@@ -3,7 +3,8 @@
  *   GET    /api/v1/social/share          → `{ shares }` (own links, newest first, ≤ 50)
  *   POST   /api/v1/social/share          `{ payload, expiresInDays }` → 201 `{ share }`
  *   DELETE /api/v1/social/share/:id      → `{ ok }` (revoked at once; the public read answers 404 from then on)
- * The payload is the redacted trade / setup / figures card (`src/social/redact.ts`) and is re-validated with the STRICT
+ * The payload is the redacted trade / setup / figures card (`src/social/redact.ts`) or an Ergebnisbeleg (the full R list of a
+ * period, `proofBuild.ts`; up to 500 trades, 64 KB in the database) and is re-validated with the STRICT
  * schema here – unknown keys (P&L, size, notes, …) are a 422, never stored. 20 new links per hour. The token is 16
  * random bytes (base64url) – a capability URL; the public read is `social-shared.mts`.
  */
@@ -30,7 +31,7 @@ export default handler(async (req, ctx) => {
   }
   if (method === "POST" && rest.length === 0) {
     await enforceRateLimit(rateKey("social-share", user.id), 20, 3600);
-    const body = await readJson(req, CreateShareSchema, { maxBytes: 24 * 1024 });
+    const body = await readJson(req, CreateShareSchema, { maxBytes: 32 * 1024 });
     const share = await createShare(user.id, body.payload, body.expiresInDays);
     await audit(user.id, "social.share", { kind: share.kind, expiresInDays: body.expiresInDays }, ip);
     return json({ share }, { status: 201 });

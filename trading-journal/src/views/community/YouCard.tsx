@@ -8,7 +8,7 @@ import { TextScramble } from "@/motion/TextScramble";
 import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { RingGauge } from "@/primitives/RingGauge";
-import { fmtPct, fmtR, METRIC_LABEL } from "@/social/format";
+import { fmtDd, fmtPct, fmtR, METRIC_LABEL, ORIGIN_HINT, ORIGIN_LABEL } from "@/social/format";
 import { percentileIn, useLocalStats } from "@/social/hooks";
 import { metricValue, MIN_TRADES, SOCIAL_METRICS, type SocialMetric } from "@/social/metrics";
 import { refreshMe, rerollPseudonym, setOptIn, useBoard, useSocial } from "@/social/store";
@@ -20,6 +20,7 @@ import { Caption, Progress } from "./parts";
 
 function Figure({ metric, value, active }: { metric: SocialMetric; value: number | null; active: boolean }) {
   const isR = metric === "expectancy";
+  const isDd = metric === "drawdown";
   const tone = value == null ? "text-faint" : isR ? (value > 0 ? "text-win" : value < 0 ? "text-loss" : "text-fg") : "text-fg";
   return (
     <div className={cn("grid gap-1 rounded-xl border px-3 py-2.5 transition-colors duration-200", active ? "border-line-2 bg-white/[0.04]" : "border-line bg-ink-950/40")} data-testid={`you-${metric}`}>
@@ -29,10 +30,10 @@ function Figure({ metric, value, active }: { metric: SocialMetric; value: number
           "–"
         ) : (
           <>
-            <span className="sr-only">{isR ? fmtR(value) : fmtPct(value)}</span>
+            <span className="sr-only">{isR ? fmtR(value) : isDd ? fmtDd(value) : fmtPct(value)}</span>
             <span aria-hidden="true">
-              <NumberCascade value={value} decimals={isR ? 2 : 0} signed={isR} />
-              <DotUnit>{isR ? "R" : "%"}</DotUnit>
+              <NumberCascade value={value} decimals={isR ? 2 : isDd ? 1 : 0} signed={isR} />
+              <DotUnit>{isR || isDd ? "R" : "%"}</DotUnit>
             </span>
           </>
         )}
@@ -54,7 +55,8 @@ export function YouCard({ className }: { className?: string }) {
   const local = useLocalStats();
   const switchId = useId();
   const server = me?.figures ?? null;
-  const fig = server ?? { expectancyR: local.expectancyR, discipline: local.discipline, consistency: local.consistency, winRate: local.winRate };
+  const fig = server ?? { expectancyR: local.expectancyR, discipline: local.discipline, consistency: local.consistency, winRate: local.winRate, drawdownR: local.drawdownR };
+  const origin = server ? (server.origin ?? null) : local.origin;
   const rTrades = server ? server.rTrades : local.rTrades;
   const eligible = server ? server.eligible : local.eligible;
   const value = metricValue(fig, metric);
@@ -94,11 +96,16 @@ export function YouCard({ className }: { className?: string }) {
               <Caption>{YOU.figures}</Caption>
               <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-faint">{server ? YOU.server : YOU.local}</span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
               {SOCIAL_METRICS.map((m) => (
                 <Figure key={m} metric={m} value={metricValue(fig, m)} active={m === metric} />
               ))}
             </div>
+            {origin && (
+              <span className="text-[11.5px] leading-snug text-mute" data-testid="you-origin">
+                {YOU.origin}: <span className="text-fg">{ORIGIN_LABEL[origin]}</span> – {ORIGIN_HINT[origin]}
+              </span>
+            )}
             <div className="grid gap-1.5 pt-1">
               <Progress value={rTrades / MIN_TRADES} tone={eligible ? "win" : "fg"} />
               <span className="text-[11.5px] text-mute">{eligible ? YOU.eligible : YOU.notEnough(rTrades, MIN_TRADES)}</span>

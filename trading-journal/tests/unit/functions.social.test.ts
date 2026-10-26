@@ -20,7 +20,7 @@ import groupsFn from "../../netlify/functions/social-groups.mts";
 import boardFn from "../../netlify/functions/social-leaderboard.mts";
 import feedbackFn from "../../netlify/functions/feedback.mts";
 import aggregateFn, { config as aggregateConfig } from "../../netlify/functions/social-aggregate.mts";
-import type { FeedResponse, GroupsResponse, LeaderboardResponse, SharedTrade } from "../../src/social/contract";
+import type { FeedResponse, GroupsResponse, LeaderboardResponse, SharedProof, SharedTrade } from "../../src/social/contract";
 
 const ctx = { ip: "203.0.113.9" } as Parameters<typeof shareFn>[1];
 const A = "11111111-1111-4111-8111-111111111111";
@@ -415,6 +415,64 @@ describe("share links", () => {
     expect((await call(sharedFn, "GET", "/api/v1/social/shared/kurz")).status).toBe(404);
   });
 
+  describe("Ergebnisbeleg (F57)", () => {
+    const PROOF: SharedProof = {
+      v: 1,
+      kind: "proof",
+      strategy: "Breakout 4h",
+      basis: "live",
+      from: "2026-09-01",
+      to: "2026-10-01",
+      scope: { only: null, inPeriod: 4, open: 1 },
+      trades: [
+        ["2026-09-03", 1.5, 0.04, "api"],
+        ["2026-09-10", -1, 0.05, "api"],
+        ["2026-09-20", -1.2, null, "manual"],
+        ["2026-09-28", null, null, "csv"],
+      ],
+    };
+    const post = (payload: unknown) => call<{ share: { id: string; token: string; title: string; kind: string }; error?: { code: string } }>(shareFn, "POST", "/api/v1/social/share", { user: A, body: { payload, expiresInDays: 0 } });
+
+    it("stores the complete list, serves it publicly, and every loss stays in it", async () => {
+      const res = await post(PROOF);
+      expect(res.status).toBe(201);
+      expect(res.body.share).toMatchObject({ kind: "proof", title: "Beleg · Breakout 4h · 4 Trades" });
+      const pub = await call<{ kind: string; payload: SharedProof }>(sharedFn, "GET", `/api/v1/social/shared/${res.body.share.token}`);
+      expect(pub.status).toBe(200);
+      expect(pub.body.payload).toEqual(PROOF);
+      expect(pub.body.payload.trades.filter((t) => (t[1] ?? 0) < 0)).toHaveLength(2);
+      // the owner revokes: the page is gone at once
+      expect((await call(shareFn, "DELETE", `/api/v1/social/share/${res.body.share.id}`, { user: A })).status).toBe(200);
+      expect((await call(sharedFn, "GET", `/api/v1/social/shared/${res.body.share.token}`)).status).toBe(404);
+    });
+
+    it("refuses anything outside the schema: money, pairs, notes, times", async () => {
+      expect((await post({ ...PROOF, pnl: 420 })).status).toBe(422);
+      expect((await post({ ...PROOF, scope: { ...PROOF.scope, balance: 20000 } })).status).toBe(422);
+      expect((await post({ ...PROOF, trades: [["2026-09-03 10:00", 1, 0, "api"]] })).status).toBe(422); // a time of day
+      expect((await post({ ...PROOF, trades: [["2026-09-03", 1, 0, "api", "BTCUSDT"]] })).status).toBe(422); // a fifth field
+      expect((await post({ ...PROOF, trades: [["2026-09-03", 1, 0, "binance"]] })).status).toBe(422); // an exchange name
+      expect(db.tables.shares).toHaveLength(0);
+    });
+
+    it("refuses a list that cannot be a complete period: outside the period, out of order, fewer than the period says, no selection but gaps", async () => {
+      expect((await post({ ...PROOF, trades: [...PROOF.trades, ["2026-10-05", 1, 0, "api"]], scope: { only: null, inPeriod: 5, open: 0 } })).status).toBe(422);
+      expect((await post({ ...PROOF, trades: [PROOF.trades[1], PROOF.trades[0], PROOF.trades[2], PROOF.trades[3]] })).status).toBe(422);
+      expect((await post({ ...PROOF, scope: { only: null, inPeriod: 9, open: 0 } })).status).toBe(422); // "all trades" with 5 missing ones
+      expect((await post({ ...PROOF, scope: { only: "Breakout", inPeriod: 3, open: 0 } })).status).toBe(422); // fewer in the period than listed
+      expect((await post({ ...PROOF, to: "2025-01-01" })).status).toBe(422);
+      expect((await post({ ...PROOF, from: "2024-01-01" })).status).toBe(422); // longer than 400 days
+      // a named selection of a bigger period is fine
+      expect((await post({ ...PROOF, scope: { only: "Breakout", inPeriod: 9, open: 0 } })).status).toBe(201);
+    });
+
+    it("holds up to 500 trades and not one more", async () => {
+      const many = (n: number): SharedProof => ({ ...PROOF, scope: { only: null, inPeriod: n, open: 0 }, trades: Array.from({ length: n }, (_, i) => ["2026-09-15", i % 3 ? 1.25 : -1, 0.045, "manual"] as SharedProof["trades"][number]) });
+      expect((await post(many(500))).status).toBe(201);
+      expect((await post(many(501))).status).toBe(422);
+    });
+  });
+
   it("the public read is rate-limited per IP", async () => {
     db.rateMax = 60;
     for (let i = 0; i < 60; i++) await call(sharedFn, "GET", `/api/v1/social/shared/${"x".repeat(22)}`);
@@ -632,7 +690,7 @@ describe("leaderboard", () => {
 
     db.tables.profiles!.find((p) => p.id === users[9])!.privacy = { leaderboard: true };
     res = await runSocialAggregate();
-    expect(res.stats).toEqual(["expectancy", "discipline", "consistency", "winrate"]);
+    expect(res.stats).toEqual(["expectancy", "discipline", "consistency", "winrate", "drawdown"]);
     const exp = db.tables.community_stats!.find((r) => r.metric === "expectancy")!;
     expect(exp.n).toBe(10);
     expect(Number(exp.p10)).toBeLessThanOrEqual(Number(exp.p90));
@@ -645,6 +703,37 @@ describe("leaderboard", () => {
     expect(board.body.rows[0]!.rank).toBe(1);
     expect(board.body.rows.find((r) => r.me)).toBeTruthy();
     expect(board.body.community.find((c) => c.metric === "expectancy")!.n).toBe(10);
+  });
+
+  it("drawdown (F71): ranks ascending, sits beside every row, and the data class limits a board", async () => {
+    const users = Array.from({ length: 4 }, (_, i) => `bbbbbbbb-0000-4000-8000-${String(i).padStart(12, "0")}`);
+    for (const u of users) db.tables.profiles!.push({ id: u, plan: "free", plan_status: "none", privacy: { leaderboard: true } });
+    // same trades for everybody except the order of the losses: the deepest drop differs, the origin differs
+    const loss = (i: number, u: number) => (u === 0 ? (i < 3 ? -1 : 1) : u === 1 ? (i % 4 === 0 ? -1 : 1) : u === 2 ? (i === 9 ? -4 : 1) : i % 2 ? -1 : 1);
+    for (const [u, user] of users.entries()) for (let i = 0; i < 24; i++) trade(user, `t_${u}_${i}`, loss(i, u), 30 - i, u === 0 || u === 1 ? { origin: { kind: "api" } } : u === 2 ? { origin: { kind: "csv" } } : {});
+    await runSocialAggregate();
+    const stats = (u: number) => db.tables.member_stats!.find((r) => r.user_id === users[u])!;
+    expect(stats(0)).toMatchObject({ max_dd_r: 3, origin: "api" });
+    expect(stats(2)).toMatchObject({ max_dd_r: 4, origin: "csv" });
+    expect(stats(3)).toMatchObject({ max_dd_r: 1, origin: "manual" });
+
+    const board = await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown", { user: users[0] });
+    expect(board.body.rows.map((r) => r.value)).toEqual([1, 1, 3, 4]); // smaller is better, the best first
+    expect(board.body.rows.map((r) => r.rank)).toEqual([1, 1, 3, 4]);
+    expect(board.body.rows.find((r) => r.me)).toMatchObject({ value: 3, drawdownR: 3, origin: "api" });
+    // the drawdown stands beside the other metrics too
+    const exp = await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=expectancy", { user: users[0] });
+    expect(exp.body.rows.every((r) => typeof r.drawdownR === "number" && r.origin != null)).toBe(true);
+    // the data class: only traders whose records mostly came that way, re-ranked among them
+    const api = await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown&origin=api", { user: users[0] });
+    expect(api.body.origin).toBe("api");
+    expect(api.body.rows.map((r) => r.origin)).toEqual(["api", "api"]);
+    expect(api.body.rows.map((r) => r.rank)).toEqual([1, 2]);
+    expect((await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown&origin=auto", { user: users[0] })).body.rows).toHaveLength(0);
+    expect((await call(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown&origin=demo", { user: users[0] })).status).toBe(400);
+    // withdrawal still works at once for every class
+    db.tables.profiles!.find((p) => p.id === users[0])!.privacy = {};
+    expect((await call<LeaderboardResponse>(boardFn, "GET", "/api/v1/social/leaderboard?metric=drawdown&origin=api", { user: users[1] })).body.rows.map((r) => r.me)).toEqual([true]);
   });
 
   it("under 20 R trades: figures yes, ranking no", async () => {

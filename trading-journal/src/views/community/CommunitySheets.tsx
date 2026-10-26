@@ -1,5 +1,6 @@
 import { CreateGroupSheet, JoinSheet } from "./GroupSheets";
 import { GoalSheet } from "./MentorDesk";
+import { ProofSheet } from "./ProofSheet";
 import { TradePicker } from "./ReviewFeed";
 
 /**
@@ -14,6 +15,7 @@ export function CommunitySheets() {
       <JoinSheet />
       <TradePicker />
       <GoalSheet />
+      <ProofSheet />
     </>
   );
 }

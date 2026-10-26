@@ -23,7 +23,7 @@ import type {
   SharedTrade,
   SocialMe,
 } from "./contract";
-import type { SocialMetric } from "./metrics";
+import type { OriginFilter, SocialMetric } from "./metrics";
 
 const g = (id: string) => `/social/groups/${encodeURIComponent(id)}`;
 
@@ -47,7 +47,8 @@ export const patchGoal = (id: string, gid: string, status: "accepted" | "decline
 export const fetchInvite = (code: string) => apiFetch<InvitePreview>(`/social/invite/${encodeURIComponent(code)}`);
 export const postJoin = (code: string, shareLevel: ShareLevel) => apiFetch<{ group: GroupSummary }>(`/social/invite/${encodeURIComponent(code)}`, { method: "POST", body: { shareLevel } });
 
-export const fetchLeaderboard = (metric: SocialMetric, group?: string | null) => apiFetch<LeaderboardResponse>("/social/leaderboard", { query: { metric, group: group ?? undefined } });
+export const fetchLeaderboard = (metric: SocialMetric, group?: string | null, origin: OriginFilter = "all") =>
+  apiFetch<LeaderboardResponse>("/social/leaderboard", { query: { metric, group: group ?? undefined, origin: origin === "all" || group ? undefined : origin } });
 export const postLeaderboard = (action: LeaderboardAction) => apiFetch<{ me: SocialMe }>("/social/leaderboard", { method: "POST", body: action });
 
 export const fetchShares = () => apiFetch<{ shares: ShareInfo[] }>("/social/share");

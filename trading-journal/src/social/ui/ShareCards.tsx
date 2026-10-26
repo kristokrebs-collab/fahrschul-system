@@ -5,8 +5,9 @@ import { price as fmtPrice } from "@/lib/format";
 import { DotMatrixText } from "@/motion/fx/DotMatrixText";
 import { stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
-import type { SharedSetup, SharedStats, SharedTrade, SharePayload } from "../contract";
+import type { SharedProof, SharedSetup, SharedStats, SharedTrade, SharePayload } from "../contract";
 import { fmtMove, fmtPct, fmtR, METRIC_LABEL } from "../format";
+import { proofFigures } from "../proof";
 import { SHARED } from "../strings";
 
 const RESULT = { win: "Gewinn", loss: "Verlust", be: "Break-even", open: "Offen" } as const;
@@ -192,6 +193,30 @@ export function StatsShareCard({ p, className }: { p: SharedStats; className?: s
   );
 }
 
+/** A shared Ergebnisbeleg in brief (the full page is `views/community/ProofPage`). */
+export function ProofShareCard({ p, className }: { p: SharedProof; className?: string }) {
+  const f = proofFigures(p);
+  return (
+    <article className={cn("grid gap-4 rounded-2xl border border-line-2 bg-ink-900 p-4 sm:p-5", className)} data-testid="proof-share-card">
+      <header className="flex items-baseline justify-between gap-3 font-mono text-[11px] uppercase tracking-[0.14em] text-faint">
+        <span className="min-w-0 truncate text-fg">{p.strategy}</span>
+        <span>
+          {p.from.split("-").reverse().join(".")} – {p.to.split("-").reverse().join(".")}
+        </span>
+      </header>
+      <DotMatrixText text={f.scored ? fmtR(f.sumR).replace("−", "-") : "--"} tone={heroTone(f.scored ? f.sumR : null)} size={6} gap={2} label={fmtR(f.sumR)} />
+      <div className="grid grid-cols-2 gap-2">
+        <Fact index={0} label="Trades" value={String(f.n)} />
+        <Fact index={1} label="Drawdown" value={fmtR(f.maxDrawdownR)} tone={f.maxDrawdownR > 0 ? "loss" : undefined} />
+      </div>
+      <Footer />
+    </article>
+  );
+}
+
 export function PayloadCard({ p, className, big = false }: { p: SharePayload; className?: string; big?: boolean }) {
-  return p.kind === "trade" ? <TradeShareCard p={p} className={className} big={big} /> : p.kind === "setup" ? <SetupShareCard p={p} className={className} /> : <StatsShareCard p={p} className={className} />;
+  if (p.kind === "trade") return <TradeShareCard p={p} className={className} big={big} />;
+  if (p.kind === "setup") return <SetupShareCard p={p} className={className} />;
+  if (p.kind === "proof") return <ProofShareCard p={p} className={className} />;
+  return <StatsShareCard p={p} className={className} />;
 }

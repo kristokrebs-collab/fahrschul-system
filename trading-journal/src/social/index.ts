@@ -19,6 +19,7 @@ export {
   loadShares,
   selectGroup,
   setMetric,
+  setOrigin,
   setGroupBoard,
   useBoard,
   useActiveFeed,

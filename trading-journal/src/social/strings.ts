@@ -45,7 +45,7 @@ export const GROUP_KIND_HINT: Readonly<Record<GroupKind, string>> = {
   team: "Dein Team-Tarif: jedes Mitglied bekommt einen Sitzplatz.",
 };
 export const ROLE_LABEL: Readonly<Record<GroupRole, string>> = { owner: "Owner", mentor: "Mentor", member: "Mitglied", student: "Schüler:in" };
-export const SHARE_KIND_LABEL: Readonly<Record<ShareKind, string>> = { trade: "Trade", setup: "Setup", stats: "Kennzahlen" };
+export const SHARE_KIND_LABEL: Readonly<Record<ShareKind, string>> = { trade: "Trade", setup: "Setup", stats: "Kennzahlen", proof: "Beleg" };
 
 export const COMMUNITY = {
   title: "Community",
@@ -89,7 +89,8 @@ export const YOU = {
   reroll: "Neu würfeln",
   pseudonymHint: "So sehen dich andere. Nie dein Name, nie deine E-Mail.",
   optIn: "In der Rangliste erscheinen",
-  optInHint: "Unter Pseudonym, mit Erwartung (R), Disziplin und Konsistenz deiner synchronisierten Trades der letzten 90 Tage.",
+  optInHint: "Unter Pseudonym, mit Erwartung (R), Disziplin, Konsistenz und Drawdown deiner synchronisierten Trades der letzten 90 Tage – und der Angabe, woher deine Datensätze stammen.",
+  origin: "Deine Daten",
   optOutHint: "Aus – du bist unsichtbar. Widerruf wirkt sofort.",
   figures: "Deine 90 Tage",
   local: "lokal berechnet",
@@ -120,6 +121,13 @@ export const BOARD = {
   asOf: (d: string) => `Stand ${d}`,
   joinCta: "Mitmachen",
   joinHint: "Du bist nicht in der Rangliste. Mitmachen ist freiwillig.",
+  // F50 / F71: the risk beside the result, and where the records came from
+  dd: (v: string) => `Drawdown ${v}`,
+  ddShort: (v: string) => `DD ${v}`,
+  originFilter: "Herkunft der Daten",
+  originNote: "Ob ein Konto Echtgeld oder Demo ist, weiß die App nicht – nur, woher die Datensätze stammen. Demo-Läufe, Backtests und virtuelle Konten stehen nicht im Journal und kommen nicht in die Rangliste.",
+  emptyOrigin: "Aus dieser Datenherkunft ist heute noch niemand in der Rangliste.",
+  riskNote: "Kein Rang sagt, wer der beste Trader ist: Erwartung und Drawdown gehören zusammen gelesen.",
   newEntry: "neu",
   up: (n: number) => `${n} Plätze besser`,
   down: (n: number) => `${n} Plätze schlechter`,

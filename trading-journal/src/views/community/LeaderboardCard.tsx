@@ -15,9 +15,9 @@ import { Card } from "@/primitives/Card";
 import { Segmented } from "@/primitives/Segmented";
 import { Skeleton } from "@/primitives/Skeleton";
 import type { LeaderboardRow } from "@/social/contract";
-import { METRIC_HINT, METRIC_LABEL, metricText } from "@/social/format";
-import { SOCIAL_METRICS, type SocialMetric } from "@/social/metrics";
-import { setGroupBoard, setMetric, setOptIn, useBoard, useSocial } from "@/social/store";
+import { fmtDd, METRIC_HINT, METRIC_LABEL, metricText, ORIGIN_FILTER_LABEL, ORIGIN_HINT, ORIGIN_LABEL } from "@/social/format";
+import { ORIGIN_FILTERS, SOCIAL_METRICS, type OriginFilter, type SocialMetric } from "@/social/metrics";
+import { setGroupBoard, setMetric, setOptIn, setOrigin, useBoard, useSocial } from "@/social/store";
 import { BOARD } from "@/social/strings";
 import { Monogram } from "@/social/ui/Monogram";
 
@@ -45,11 +45,27 @@ function Movement({ row, small = false, className }: { row: LeaderboardRow; smal
  */
 function Value({ metric, value, cascade, className }: { metric: SocialMetric; value: number; cascade: boolean; className?: string }) {
   const isR = metric === "expectancy";
-  const fmt = { decimals: isR ? 2 : 0, signed: isR, suffix: isR ? "R" : " %" };
+  const isDd = metric === "drawdown";
+  const fmt = { decimals: isR ? 2 : isDd ? 1 : 0, signed: isR, suffix: isR || isDd ? "R" : " %" };
   return (
     <span className={cn("num font-mono", isR ? (value > 0 ? "text-win" : value < 0 ? "text-loss" : "text-fg") : "text-fg", className)}>
       <span className="sr-only">{metricText(metric, value)}</span>
       <span aria-hidden="true">{cascade ? <NumberCascade value={value} {...fmt} /> : formatNumber(value, fmt)}</span>
+    </span>
+  );
+}
+
+/**
+ * The line under a name: trades, the drawdown beside every other metric (a result without its risk is half a number) and
+ * where the records came from. Mono, small; it wraps rather than clips.
+ */
+function Meta({ row, metric, className }: { row: LeaderboardRow; metric: SocialMetric; className?: string }) {
+  const origin = row.origin ? ORIGIN_LABEL[row.origin] : null;
+  return (
+    <span className={cn("flex flex-wrap gap-x-2 gap-y-0 font-mono text-[10.5px] text-faint", className)} data-testid="board-meta">
+      <span>{BOARD.trades(row.trades)}</span>
+      {metric !== "drawdown" && row.drawdownR != null && <span title={BOARD.dd(fmtDd(row.drawdownR))}>{BOARD.ddShort(fmtDd(row.drawdownR))}</span>}
+      {origin && <span title={row.origin ? ORIGIN_HINT[row.origin] : undefined}>{origin}</span>}
     </span>
   );
 }
@@ -76,7 +92,7 @@ function Podium({ row, metric, place, pulse }: { row: LeaderboardRow; metric: So
       <Monogram pseudonym={row.pseudonym} size="sm" tone={row.me ? "signal" : "fg"} />
       <span className="line-clamp-2 min-h-[2.4em] text-[12px] font-medium leading-tight [overflow-wrap:anywhere]">{row.me ? `${BOARD.you} · ${row.pseudonym}` : row.pseudonym}</span>
       <Value metric={metric} value={row.value} cascade className="text-[14px] sm:text-[15px]" />
-      <span className="font-mono text-[10px] text-faint">{BOARD.trades(row.trades)}</span>
+      <Meta row={row} metric={metric} className="justify-center" />
     </motion.li>
   );
 }
@@ -111,7 +127,7 @@ function Row({ row, metric, index, hover, pulse }: { row: LeaderboardRow; metric
         <Monogram pseudonym={row.pseudonym} size="sm" tone={row.me ? "signal" : "fg"} />
         <span className="grid min-w-0">
           <span className={cn("truncate text-[13px]", row.me ? "font-semibold text-fg" : "text-fg")}>{row.me ? `${BOARD.you} · ${row.pseudonym}` : row.pseudonym}</span>
-          <span className="font-mono text-[10.5px] text-faint">{BOARD.trades(row.trades)}</span>
+          <Meta row={row} metric={metric} />
         </span>
         <Value metric={metric} value={row.value} cascade={!!row.me} className="text-[13.5px]" />
       </div>
@@ -132,6 +148,7 @@ export function LeaderboardCard({ className }: { className?: string }) {
   const me = useSocial((s) => s.me);
   const pulse = useSocial((s) => s.pulse);
   const busy = useSocial((s) => s.busy);
+  const origin = useSocial((s) => s.origin);
   const board = useBoard();
   const hover = useHoverStore<string>();
   const data = board.data;
@@ -153,6 +170,14 @@ export function LeaderboardCard({ className }: { className?: string }) {
           <Segmented<SocialMetric> aria-label="Kennzahl" options={SOCIAL_METRICS.map((m) => ({ v: m, label: METRIC_LABEL[m] }))} value={metric} onChange={setMetric} className="w-full" />
           <span className="text-[11.5px] text-faint">{METRIC_HINT[metric]}</span>
         </div>
+
+        {!groupBoard && (
+          <div className="grid gap-1.5" data-testid="board-origin">
+            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-faint">{BOARD.originFilter}</span>
+            <Segmented<OriginFilter> size="sm" aria-label={BOARD.originFilter} options={ORIGIN_FILTERS.map((o) => ({ v: o, label: ORIGIN_FILTER_LABEL[o] }))} value={origin} onChange={setOrigin} className="w-full" />
+            <span className="text-[11.5px] leading-snug text-faint">{origin === "all" ? BOARD.originNote : ORIGIN_HINT[origin]}</span>
+          </div>
+        )}
 
         {!groupBoard && me && !me.optIn && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-line-2 px-3.5 py-2.5" data-testid="board-join">
@@ -178,7 +203,7 @@ export function LeaderboardCard({ className }: { className?: string }) {
           <p className="text-[13px] text-loss">{board.error.message}</p>
         ) : !rows.length ? (
           <p className="rounded-xl border border-line bg-ink-950/40 px-4 py-6 text-center text-[13px] text-mute" data-testid="board-empty">
-            {groupBoard ? BOARD.emptyGroup : BOARD.empty}
+            {groupBoard ? BOARD.emptyGroup : origin !== "all" && data?.day ? BOARD.emptyOrigin : BOARD.empty}
           </p>
         ) : (
           <>
@@ -208,6 +233,7 @@ export function LeaderboardCard({ className }: { className?: string }) {
             {BOARD.asOf(dayLabel(data.day))} · {BOARD.participants(data.total)}
           </span>
         )}
+        {rows.length > 0 && <span className="text-[11.5px] leading-snug text-faint">{BOARD.riskNote}</span>}
       </div>
     </Card>
   );

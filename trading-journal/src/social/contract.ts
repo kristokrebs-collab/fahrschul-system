@@ -7,7 +7,7 @@
  * account size, notes or the account's capital.
  */
 import { z } from "zod";
-import { SOCIAL_METRICS, type SocialMetric } from "./metrics";
+import { ORIGIN_KINDS, SOCIAL_METRICS, type OriginClass, type OriginFilter, type SocialMetric } from "./metrics";
 
 /* ------------------------------------------------------------------ shared payloads */
 
@@ -105,7 +105,83 @@ export const SharedStatsSchema = z
   .strict();
 export type SharedStats = z.infer<typeof SharedStatsSchema>;
 
-export const SharePayloadSchema = z.discriminatedUnion("kind", [SharedTradeSchema, SharedSetupSchema, SharedStatsSchema]);
+
+/* ------------------------------------------------------------------ Ergebnisbeleg (F57) */
+
+/**
+ * What kind of results the proof states – the TRADER'S word, because the app cannot tell a real-money account from a demo
+ * account: `live` = Echtgeld, `demo` = Demo- / Papierkonto, `sim` = nachgestellt (Backtest, Replay, Übung).
+ */
+export const PROOF_BASES = ["live", "demo", "sim"] as const;
+export type ProofBasis = (typeof PROOF_BASES)[number];
+/** Most trades one proof carries (a longer history is cut by period, never silently by count). */
+export const PROOF_MAX_TRADES = 500;
+/** Longest period of one proof, in days. */
+export const PROOF_MAX_DAYS = 400;
+
+const dayStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const dayMs = (d: string): number => Date.parse(`${d}T00:00:00Z`);
+
+/** One closed trade: `[entry day, R (null = no R), costs in R (null = not known), where the record came from]`. */
+export const ProofTradeSchema = z.tuple([dayStr, nullableNum(-100, 100), nullableNum(-100, 100), z.enum(ORIGIN_KINDS)]);
+export type ProofTrade = z.infer<typeof ProofTradeSchema>;
+
+/**
+ * An Ergebnisbeleg (v1): the COMPLETE list of the closed trades of a period, in R, with their costs and where the records
+ * came from. Every figure on the proof page is computed from this list on the reader's device, so the headline numbers
+ * cannot disagree with the list. No money, no account size, no notes, no pair, no times. The consistency rules (period,
+ * order, the selection arithmetic) are checked by `SharePayloadSchema`.
+ */
+export const SharedProofSchema = z
+  .object({
+    v: z.literal(1),
+    kind: z.literal("proof"),
+    /** The strategy as the trader names it (free text, a stated label – not a verified account name). */
+    strategy: label(60),
+    basis: z.enum(PROOF_BASES),
+    from: dayStr,
+    to: dayStr,
+    scope: z
+      .object({
+        /** Name of the Grundlage when the proof shows only its trades; `null` = every closed trade of the period. */
+        only: label(40).nullable(),
+        /** Closed trades of the period in the journal, whatever the selection. */
+        inPeriod: z.number().int().min(0).max(100_000),
+        /** Trades still open when the proof was made (not in the list). */
+        open: z.number().int().min(0).max(100_000),
+      })
+      .strict(),
+    trades: z.array(ProofTradeSchema).max(PROOF_MAX_TRADES),
+    /** Token of the earlier version this proof continues (its readers can check that nothing was removed). */
+    prev: z.string().regex(/^[A-Za-z0-9_-]{22}$/).nullable().optional(),
+  })
+  .strict();
+export type SharedProof = z.infer<typeof SharedProofSchema>;
+
+/** The arithmetic a proof must satisfy to be one (period, order, selection). `null` = fine, else the reason. */
+export function proofProblem(p: SharedProof): string | null {
+  const a = dayMs(p.from);
+  const b = dayMs(p.to);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return "invalid day";
+  if (b < a) return "to before from";
+  if (b - a > PROOF_MAX_DAYS * 86_400_000) return "period too long";
+  if (p.scope.inPeriod < p.trades.length) return "fewer trades in the period than listed";
+  if (p.scope.only == null && p.scope.inPeriod !== p.trades.length) return "a proof without a selection lists every trade of the period";
+  let last = "";
+  for (const t of p.trades) {
+    if (t[0] < p.from || t[0] > p.to) return "trade outside the period";
+    if (t[0] < last) return "trades are not in time order";
+    last = t[0];
+  }
+  return null;
+}
+
+export const SharePayloadSchema = z
+  .discriminatedUnion("kind", [SharedTradeSchema, SharedSetupSchema, SharedStatsSchema, SharedProofSchema])
+  .superRefine((p, ctx) => {
+    const problem = p.kind === "proof" ? proofProblem(p) : null;
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem, path: ["trades"] });
+  });
 export type SharePayload = z.infer<typeof SharePayloadSchema>;
 export type ShareKind = SharePayload["kind"];
 
@@ -245,6 +321,10 @@ export interface MemberFigures {
   winRate: number | null;
   discipline: number | null;
   consistency: number | null;
+  /** Deepest drop of the running R sum in the window (≥ 0); absent from an older server. */
+  drawdownR?: number | null;
+  /** Where the records of the R trades came from (see `metrics.ts`); null = not computed. */
+  origin?: OriginClass | null;
   computedAt: string;
 }
 
@@ -376,6 +456,10 @@ export interface LeaderboardRow {
   pseudonym: string;
   value: number;
   trades: number;
+  /** The row's drawdown in R, shown beside every metric (null / absent = not known). */
+  drawdownR?: number | null;
+  /** Where this trader's records came from. */
+  origin?: OriginClass | null;
   me: boolean;
 }
 
@@ -392,6 +476,8 @@ export interface CommunityDistribution {
 
 export interface LeaderboardResponse {
   metric: SocialMetric;
+  /** The data filter of this board (global boards; a group board is always `all`). */
+  origin?: OriginFilter;
   /** Day of the snapshot (null = none yet). */
   day: string | null;
   /** Participants of the snapshot. */

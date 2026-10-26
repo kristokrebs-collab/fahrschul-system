@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { K_ANON, MIN_TRADES, metricValue, percentileOf, quantiles, rankRows, socialStats, tradeEpoch, weekIndex, type MetricTrade } from "@/social/metrics";
+import { betterThanPct, K_ANON, MIN_TRADES, maxDrawdown, metricValue, ORIGIN_DOMINANT, originClassOf, originOf, percentileOf, quantiles, RANK_ORDER, rankRows, socialStats, tradeEpoch, weekIndex, type MetricTrade } from "@/social/metrics";
 import { matrixSafe, monogramOf, pseudonymFrom, PSEUDONYM_RE } from "@/social/pseudonym";
-import { fmtMove, fmtPct, fmtR, metricMatrix, metricText, shareTitle } from "@/social/format";
+import { fmtDd, fmtMove, fmtPct, fmtR, metricMatrix, metricText, shareTitle } from "@/social/format";
 import { inviteUrl, parseInvite, parseShareHash, shareUrl } from "@/social/links";
 
 const NOW = Date.UTC(2026, 9, 12, 12, 0);
@@ -143,5 +143,87 @@ describe("Links", () => {
     expect(parseInvite("#community?invite=abcdefgh12")).toBe("ABCDEFGH12");
     expect(parseInvite("?invite=ABC")).toBeNull();
     expect(parseInvite("#community")).toBeNull();
+  });
+});
+
+describe("Drawdown (F71)", () => {
+  it("tiefster Fall der laufenden R-Summe, nicht der größte Einzelverlust", () => {
+    expect(maxDrawdown([])).toBe(0);
+    expect(maxDrawdown([1, 1, 1])).toBe(0);
+    // Summe 2, 1, 0, 3, -1 → Höchststand 3, danach -1: Fall von 4 (der frühere Fall von 2 auf 0 ist kleiner)
+    expect(maxDrawdown([2, -1, -1, 3, -4])).toBe(4);
+    expect(maxDrawdown([-1, -1, 5])).toBe(2); // der Anfang zählt vom Start (0) aus
+  });
+
+  it("socialStats rechnet ihn in zeitlicher Reihenfolge, nicht in der Reihenfolge der Liste", () => {
+    // gleiche Trades, durcheinander geliefert: Tag 5 bis 1 → +2, −1, −1, +3, −4 in zeitlicher Reihenfolge
+    const shuffled = [t(-4, 1), t(2, 5), t(3, 2), t(-1, 3), t(-1, 4)];
+    expect(socialStats(shuffled, NOW).drawdownR).toBe(4);
+    expect(socialStats([...shuffled].reverse(), NOW).drawdownR).toBe(4);
+  });
+
+  it("deckelt R bei ±10 wie die übrigen Kennzahlen und braucht mindestens 5 Trades mit R", () => {
+    expect(socialStats([t(-50, 1), t(1, 2), t(1, 3), t(1, 4), t(1, 5)], NOW).drawdownR).toBe(10);
+    expect(socialStats([t(-1, 1), t(-1, 2), t(-1, 3), t(-1, 4)], NOW).drawdownR).toBeNull();
+  });
+
+  it("kleiner ist besser: der Rang läuft aufsteigend, Gleichstand teilt den Platz", () => {
+    expect(RANK_ORDER.drawdown).toBe("low");
+    expect(RANK_ORDER.expectancy).toBe("high");
+    const rows = [
+      { userId: "a", value: 3, trades: 30 },
+      { userId: "b", value: 1, trades: 25 },
+      { userId: "c", value: 1, trades: 40 },
+      { userId: "d", value: 4, trades: 22 },
+    ];
+    expect(rankRows(rows, "low").map((r) => [r.userId, r.rank])).toEqual([["c", 1], ["b", 1], ["a", 3], ["d", 4]]);
+    expect(rankRows(rows).map((r) => r.userId)).toEqual(["d", "a", "c", "b"]); // the default stays "more is better"
+  });
+
+  it("'besser als x %' kehrt sich beim Drawdown um", () => {
+    const q = { p10: 1, p25: 2, p50: 3, p75: 5, p90: 8 };
+    expect(betterThanPct("expectancy", 3, q)).toBe(50);
+    expect(betterThanPct("drawdown", 3, q)).toBe(50);
+    expect(betterThanPct("drawdown", 1, q)).toBe(90); // a tiny drop beats 90 % of the field
+    expect(betterThanPct("drawdown", 8, q)).toBe(10);
+    expect(betterThanPct("drawdown", 99, q)).toBe(1);
+  });
+
+  it("metricValue und Format", () => {
+    expect(metricValue({ expectancyR: 1, discipline: 2, consistency: 3, winRate: 4, drawdownR: 5 }, "drawdown")).toBe(5);
+    expect(metricValue({ expectancyR: 1, discipline: 2, consistency: 3, winRate: 4 }, "drawdown")).toBeNull();
+    expect(fmtDd(3.44)).toBe("3,4R");
+    expect(fmtDd(null)).toBe("–");
+    expect(metricText("drawdown", 12)).toBe("12,0R");
+    expect(metricMatrix("drawdown", 3.44)).toBe("3,4");
+  });
+});
+
+describe("Herkunft der Datensätze (F50)", () => {
+  it("ordnet die Marke eines Datensatzes ein; ohne Marke gilt Handeingabe", () => {
+    expect(originOf({ kind: "api" })).toBe("api");
+    expect(originOf({ kind: "csv" })).toBe("csv");
+    expect(originOf({ kind: "bot", botId: "x" })).toBe("auto");
+    expect(originOf({ kind: "webhook" })).toBe("auto");
+    expect(originOf({ kind: "manual" })).toBe("manual");
+    expect(originOf(undefined)).toBe("manual");
+    expect(originOf("api")).toBe("api"); // the kind alone, as a server projection returns it
+    expect(originOf({ kind: "etwas anderes" })).toBe("manual");
+  });
+
+  it(`eine Klasse mit mindestens ${ORIGIN_DOMINANT * 100} % benennt die Daten, sonst gemischt`, () => {
+    expect(originClassOf({ api: 4, csv: 1, manual: 0, auto: 0 })).toBe("api"); // 80 % genau
+    expect(originClassOf({ api: 3, csv: 2, manual: 0, auto: 0 })).toBe("mixed");
+    expect(originClassOf({ api: 0, csv: 0, manual: 20, auto: 0 })).toBe("manual");
+    expect(originClassOf({ api: 0, csv: 0, manual: 0, auto: 0 })).toBeNull();
+  });
+
+  it("socialStats zählt die Herkunft der Trades mit R in der Auswertungszeit", () => {
+    const trades = [t(1, 1, { origin: { kind: "api" } }), t(1, 2, { origin: { kind: "api" } }), t(1, 3, { origin: { kind: "api" } }), t(1, 4, { origin: { kind: "api" } }), t(1, 5, { origin: { kind: "csv" } }), t(null, 6, { origin: { kind: "csv" } }), t(1, 200, { origin: { kind: "csv" } })];
+    const s = socialStats(trades, NOW);
+    expect(s.origins).toEqual({ api: 4, csv: 1, manual: 0, auto: 0 }); // no R and outside the window do not count
+    expect(s.origin).toBe("api");
+    expect(socialStats([t(1, 1), t(1, 2)], NOW).origin).toBe("manual");
+    expect(socialStats([], NOW).origin).toBeNull();
   });
 });

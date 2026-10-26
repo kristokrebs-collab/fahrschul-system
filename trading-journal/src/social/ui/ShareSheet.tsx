@@ -30,8 +30,11 @@ import { Glyph } from "./glyphs";
 
 type Days = 0 | 1 | 7 | 30;
 
+/** What this sheet shows: the Ergebnisbeleg has its own sheet (`views/community/ProofSheet`). */
+type SheetPayload = Exclude<SharePayload, { kind: "proof" }>;
+
 /** The word the camera dives into: the R of a trade, SETUP, the window of the figures. */
-function wordOf(p: SharePayload): string {
+function wordOf(p: SheetPayload): string {
   if (p.kind === "setup") return "SETUP";
   if (p.kind === "stats") return `${p.windowDays}T`;
   if (p.r != null) return fmtR(p.r, 1).replace("−", "-");
@@ -40,7 +43,7 @@ function wordOf(p: SharePayload): string {
 }
 
 /** Big hero inside the dive: what the link will be about, at a glance. */
-function Hero({ p }: { p: SharePayload }) {
+function Hero({ p }: { p: SheetPayload }) {
   const tone = (v: number | null | undefined) => (v == null || v === 0 ? "fg" : v > 0 ? "win" : "loss");
   return (
     <div className="grid size-full place-items-center bg-[radial-gradient(120%_90%_at_50%_0%,var(--color-ink-750)_0%,var(--color-ink-900)_60%)] p-5">
@@ -82,7 +85,7 @@ function Toggle({ label, checked, onChange, testId }: { label: string; checked: 
 }
 
 /** What the payload contains, field by field (transparency before anything leaves). */
-function Fields({ p }: { p: SharePayload }) {
+function Fields({ p }: { p: SheetPayload }) {
   const rows: [string, string][] = [];
   if (p.kind === "trade") {
     rows.push(["R", fmtR(p.r)], ["Bewegung", fmtMove(p.movePct)], ["Tag", p.day ? p.day.split("-").reverse().join(".") : "–"]);
@@ -116,8 +119,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-/** Link part: expiry, create, then copy / native share. Honest without cloud / login. */
-function LinkPart({ payload }: { payload: SharePayload }) {
+/** Link part: expiry, create, then copy / native share. Honest without cloud / login. Also used by the proof sheet. */
+export function LinkPart({ payload }: { payload: SharePayload }) {
   const reduced = useReducedFx();
   const phase = useCloudSession((s) => s.phase);
   const busy = useSocial((s) => s.busy);
@@ -243,7 +246,7 @@ function Body({ target, trade, setup, open }: { target: ShareTarget; trade: Enri
   // the wall the camera dives through: the ink well in dark, the paper well in light (= --color-ink-900 of each theme)
   const wall = useTheme((s) => (s.resolved === "light" ? "#ebebe9" : "#0a0a0a"));
 
-  const payload = useMemo<SharePayload | null>(() => {
+  const payload = useMemo<SheetPayload | null>(() => {
     if (target.kind === "trade") return trade ? redactTrade(trade, opts, settings.setups) : null;
     if (target.kind === "setup") return setup ? redactSetup(setup, withStats ? setupFigures(trades, setup.id) : null) : null;
     return redactStats(stats);

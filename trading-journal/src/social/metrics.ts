@@ -9,6 +9,13 @@
  * - **Disziplin (%)** – share of closed trades marked "nach Plan" AND without a mistake tag, among the trades that
  *   carry the plan flag at all; needs ≥ `MIN_PLAN_TRADES` such trades.
  * - **Konsistenz (%)** – share of green weeks (ΣR > 0) among the weeks with at least one R trade; needs ≥ `MIN_WEEKS`.
+ * - **Drawdown (R)** – deepest drop of the running sum of R (capped like the others) in the window; SMALLER is better, so
+ *   this is the one metric that ranks ascending. It is shown beside every other metric too: a result without its risk is
+ *   half a number.
+ * - **Herkunft der Datensätze** – which share of the R trades was written by the exchange interface (`api`), a file import
+ *   (`csv`), by hand (`manual`, also every record without a mark) or by a bot / webhook (`auto`). A class holding ≥
+ *   `ORIGIN_DOMINANT` of the trades names the trader's data; anything else is `mixed`. The app cannot know whether an
+ *   account is real money or a demo account – only where the records came from; a trade entered by hand is the trader's word.
  * A trader is **eligible** for the ranking with ≥ `MIN_TRADES` R trades in the window.
  *
  * Aggregates are k-anonymous: `quantiles()` returns nothing below `K_ANON` traders (the database enforces the same
@@ -26,11 +33,44 @@ export const K_ANON = 10;
 /** R values are capped at ± this before averaging. */
 export const R_CAP = 10;
 
-export const SOCIAL_METRICS = ["expectancy", "discipline", "consistency"] as const;
+export const SOCIAL_METRICS = ["expectancy", "discipline", "consistency", "drawdown"] as const;
 export type SocialMetric = (typeof SOCIAL_METRICS)[number];
 /** Metrics with a community distribution (`community_stats.metric`). */
-export const STAT_METRICS = ["expectancy", "discipline", "consistency", "winrate"] as const;
+export const STAT_METRICS = ["expectancy", "discipline", "consistency", "winrate", "drawdown"] as const;
 export type StatMetric = (typeof STAT_METRICS)[number];
+
+/** Which end of a metric is better: `high` (more is better) ranks descending, `low` (the drawdown) ascending. */
+export const RANK_ORDER: Readonly<Record<SocialMetric | StatMetric, "high" | "low">> = { expectancy: "high", discipline: "high", consistency: "high", winrate: "high", drawdown: "low" };
+
+/** Where the records of a trade came from (`Trade.origin.kind`; no mark = by hand). */
+export const ORIGIN_KINDS = ["api", "csv", "manual", "auto"] as const;
+export type OriginKind = (typeof ORIGIN_KINDS)[number];
+/** A trader's data class: one origin holding at least `ORIGIN_DOMINANT` of the R trades, else mixed. */
+export type OriginClass = OriginKind | "mixed";
+export const ORIGIN_CLASSES: readonly OriginClass[] = [...ORIGIN_KINDS, "mixed"];
+export const ORIGIN_DOMINANT = 0.8;
+/** The ranking's data filter: everybody, or the traders of one class. */
+export type OriginFilter = "all" | OriginKind;
+export const ORIGIN_FILTERS: readonly OriginFilter[] = ["all", ...ORIGIN_KINDS];
+export const isOriginFilter = (v: unknown): v is OriginFilter => typeof v === "string" && (ORIGIN_FILTERS as readonly string[]).includes(v);
+export const isOriginClass = (v: unknown): v is OriginClass => typeof v === "string" && (ORIGIN_CLASSES as readonly string[]).includes(v);
+
+/** The origin of a journal record: `Trade.origin = { kind }` (or just the kind, as a server projection returns it). */
+export function originOf(raw: unknown): OriginKind {
+  const k = raw && typeof raw === "object" ? (raw as { kind?: unknown }).kind : raw;
+  if (k === "api") return "api";
+  if (k === "csv") return "csv";
+  if (k === "bot" || k === "webhook") return "auto";
+  return "manual";
+}
+
+/** The class of a set of origin counts: the one holding ≥ `ORIGIN_DOMINANT`, else `mixed`; `null` without records. */
+export function originClassOf(counts: Readonly<Record<OriginKind, number>>): OriginClass | null {
+  const total = ORIGIN_KINDS.reduce((a, k) => a + counts[k], 0);
+  if (total <= 0) return null;
+  for (const k of ORIGIN_KINDS) if (counts[k] / total >= ORIGIN_DOMINANT) return k;
+  return "mixed";
+}
 
 export const isSocialMetric = (v: unknown): v is SocialMetric => typeof v === "string" && (SOCIAL_METRICS as readonly string[]).includes(v);
 
@@ -41,6 +81,8 @@ export interface MetricTrade {
   date?: unknown;
   followedPlan?: unknown;
   mistakes?: unknown;
+  /** `{ kind }` of the journal record, or the kind alone. Absent = by hand. */
+  origin?: unknown;
 }
 
 export interface SocialStats {
@@ -56,9 +98,28 @@ export interface SocialStats {
   discipline: number | null;
   /** 0–100. */
   consistency: number | null;
+  /** Deepest drop of the running R sum in the window (≥ 0), `null` under `MIN_R_TRADES` R trades. */
+  drawdownR: number | null;
+  /** The R trades by where their records came from. */
+  origins: Record<OriginKind, number>;
+  /** The data class of the R trades, `null` without any. */
+  origin: OriginClass | null;
   /** Weeks with at least one R trade. */
   weeks: number;
   eligible: boolean;
+}
+
+/** Deepest peak-to-trough drop of the running sum of `rs` (in the given order, start at 0). */
+export function maxDrawdown(rs: readonly number[]): number {
+  let cum = 0;
+  let peak = 0;
+  let dd = 0;
+  for (const r of rs) {
+    cum += r;
+    if (cum > peak) peak = cum;
+    if (peak - cum > dd) dd = peak - cum;
+  }
+  return dd;
 }
 
 const DAY_MS = 86_400_000;
@@ -85,7 +146,8 @@ export const weekIndex = (epochMs: number): number => Math.floor((Math.floor(epo
 export function socialStats(trades: readonly MetricTrade[], now: number, windowDays: number = WINDOW_DAYS): SocialStats {
   const from = now - windowDays * DAY_MS;
   let closed = 0;
-  const rs: number[] = [];
+  const timed: { at: number; r: number }[] = [];
+  const origins: Record<OriginKind, number> = { api: 0, csv: 0, manual: 0, auto: 0 };
   const weeks = new Map<number, number>();
   let planned = 0;
   let clean = 0;
@@ -96,7 +158,8 @@ export function socialStats(trades: readonly MetricTrade[], now: number, windowD
     closed++;
     if (fin(t.r)) {
       const r = Math.max(-R_CAP, Math.min(R_CAP, t.r));
-      rs.push(r);
+      timed.push({ at, r });
+      origins[originOf(t.origin)]++;
       const w = weekIndex(at);
       weeks.set(w, (weeks.get(w) ?? 0) + r);
     }
@@ -106,6 +169,8 @@ export function socialStats(trades: readonly MetricTrade[], now: number, windowD
       if (t.followedPlan && mistakes.length === 0) clean++;
     }
   }
+  // the running sum needs the time order; equal stamps keep the journal's order (a stable sort)
+  const rs = timed.sort((a, b) => a.at - b.at).map((x) => x.r);
   const n = rs.length;
   const sum = rs.reduce((a, b) => a + b, 0);
   const green = [...weeks.values()].filter((v) => v > 0).length;
@@ -117,6 +182,9 @@ export function socialStats(trades: readonly MetricTrade[], now: number, windowD
     winRate: n >= MIN_R_TRADES ? round((rs.filter((r) => r > 0).length / n) * 100, 1) : null,
     discipline: planned >= MIN_PLAN_TRADES ? round((clean / planned) * 100, 1) : null,
     consistency: weeks.size >= MIN_WEEKS ? round((green / weeks.size) * 100, 1) : null,
+    drawdownR: n >= MIN_R_TRADES ? round(maxDrawdown(rs), 2) : null,
+    origins,
+    origin: originClassOf(origins),
     weeks: weeks.size,
     eligible: n >= MIN_TRADES,
   };
@@ -140,8 +208,10 @@ export function setupFigures(trades: readonly (MetricTrade & { setups?: unknown 
 }
 
 /** The value a metric ranks by (`null` = not enough data for it). */
-export function metricValue(s: Pick<SocialStats, "expectancyR" | "discipline" | "consistency" | "winRate">, metric: SocialMetric | StatMetric): number | null {
+export function metricValue(s: Pick<SocialStats, "expectancyR" | "discipline" | "consistency" | "winRate"> & { drawdownR?: number | null }, metric: SocialMetric | StatMetric): number | null {
   switch (metric) {
+    case "drawdown":
+      return s.drawdownR ?? null;
     case "expectancy":
       return s.expectancyR;
     case "discipline":
@@ -164,9 +234,13 @@ export interface RankedRow extends RankInput {
   rank: number;
 }
 
-/** Ranks by value (higher is better); ties share the rank and are listed by more trades first, then id. */
-export function rankRows(rows: readonly RankInput[]): RankedRow[] {
-  const sorted = [...rows].filter((r) => fin(r.value)).sort((a, b) => b.value - a.value || b.trades - a.trades || (a.userId < b.userId ? -1 : 1));
+/**
+ * Ranks by value; ties share the rank and are listed by more trades first, then id. `high` (the default): the higher
+ * value is better; `low` (the drawdown): the smaller one.
+ */
+export function rankRows(rows: readonly RankInput[], order: "high" | "low" = "high"): RankedRow[] {
+  const dir = order === "low" ? -1 : 1;
+  const sorted = [...rows].filter((r) => fin(r.value)).sort((a, b) => dir * (b.value - a.value) || b.trades - a.trades || (a.userId < b.userId ? -1 : 1));
   const out: RankedRow[] = [];
   sorted.forEach((r, i) => {
     const prev = out[i - 1];
@@ -186,7 +260,7 @@ export interface Quantiles {
 }
 
 /** Decimals a metric's aggregates are rounded to (coarser than the individual figure – less to re-identify). */
-export const AGG_DECIMALS: Readonly<Record<StatMetric, number>> = { expectancy: 2, discipline: 0, consistency: 0, winrate: 0 };
+export const AGG_DECIMALS: Readonly<Record<StatMetric, number>> = { expectancy: 2, discipline: 0, consistency: 0, winrate: 0, drawdown: 1 };
 
 /** Linear-interpolated quantile of sorted values. */
 export function quantileOf(sorted: readonly number[], q: number): number {
@@ -240,4 +314,13 @@ export function percentileOf(value: number, q: Pick<Quantiles, "p10" | "p25" | "
     if (value <= x1) return clamp(x1 > x0 ? p0 + ((value - x0) / (x1 - x0)) * (p1 - p0) : p1);
   }
   return 50;
+}
+
+/**
+ * "Better than x %" (1–99) of `value` for `metric`: for a metric where more is better the share of the community below
+ * the value, for the drawdown the share ABOVE it (a smaller drop is better).
+ */
+export function betterThanPct(metric: SocialMetric | StatMetric, value: number, q: Pick<Quantiles, "p10" | "p25" | "p50" | "p75" | "p90">): number {
+  const p = percentileOf(value, q);
+  return RANK_ORDER[metric] === "low" ? Math.max(1, Math.min(99, 100 - p)) : p;
 }

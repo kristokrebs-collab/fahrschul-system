@@ -13,7 +13,8 @@ import { useJournal } from "@/store/journalStore";
 import { pushToast } from "@/store/uiStore";
 import type { ShareInfo } from "@/social/contract";
 import { shareUrl } from "@/social/links";
-import { openShare, revokeShareLink, useSocial } from "@/social/store";
+import { openShare, openSheet, revokeShareLink, useSocial } from "@/social/store";
+import { PROOF } from "@/social/proofStrings";
 import { S, SHARE, SHARE_KIND_LABEL } from "@/social/strings";
 import { copyText } from "@/social/ui/copy";
 import { Glyph } from "@/social/ui/glyphs";
@@ -73,6 +74,10 @@ export function SharesCard({ className }: { className?: string }) {
           <Button size="sm" onClick={() => openShare({ kind: "stats" })} data-testid="share-stats">
             <Glyph name="share" className="size-3.5" />
             {SHARE.shareStats}
+          </Button>
+          <Button size="sm" onClick={() => openSheet({ kind: "proof" })} title={PROOF.createHint} data-testid="share-proof">
+            <Glyph name="share" className="size-3.5" />
+            {PROOF.create}
           </Button>
           {setups.length > 0 && (
             // the setup's whole name: the select is as wide as its name (it wraps only when a name is wider than the card)
