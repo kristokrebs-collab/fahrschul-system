@@ -12,20 +12,21 @@ import { activeFilters, type FilterSelection } from "../filters/types";
 import { filterUnits, type FilterCompare } from "../filters/compare";
 import { stressUnits } from "../stress/run";
 import type { StressRows } from "../stress/types";
+import { manageUnits, type ManageCompare } from "./manageCompare";
 import { gridUnits, type GridResult, type GridSpec } from "./paramGrid";
 import type { CustomCfgIn } from "../../backtest/strategies/custom";
 
 export interface ExtraJobInput {
   /** the input of the finished run (data, engine, parameters, period) */
   base: LabJobInput;
-  what: "stress" | "filters" | "params";
+  what: "stress" | "filters" | "params" | "manage";
   /** the chosen filters (`what: "filters"`) */
   filters?: FilterSelection;
   /** the two rule parameters of the grid (`what: "params"`, F11 / F16) */
   grid?: GridSpec;
 }
 
-export type ExtraResult = { what: "stress"; rows: StressRows } | { what: "filters"; compare: FilterCompare } | { what: "params"; grid: GridResult | null; note: string | null };
+export type ExtraResult = { what: "stress"; rows: StressRows } | { what: "filters"; compare: FilterCompare } | { what: "params"; grid: GridResult | null; note: string | null } | { what: "manage"; compare: ManageCompare };
 
 export interface ExtraJob extends Stepper<ExtraResult> {
   phase(): LabPhase;
@@ -51,6 +52,9 @@ export function createExtraJob(input: ExtraJobInput): ExtraJob {
     if (input.what === "stress") {
       const s = stressUnits(strategy, pr, params, b.engine, win, ok);
       units = { count: s.count, run: s.run, result: () => ({ what: "stress", rows: s.rows() }) };
+    } else if (input.what === "manage") {
+      const m = manageUnits(strategy, pr, params, b.engine, win, ok);
+      units = { count: m.count, run: m.run, result: () => ({ what: "manage", compare: m.result() }) };
     } else if (input.what === "params") {
       const g = gridUnits(cfg as CustomCfgIn, b.data, b.fromMs, pr, params, b.engine, win, ok, input.grid ?? { x: "", y: null });
       units = { count: g.count, run: g.run, result: () => ({ what: "params", grid: g.result(), note: g.note }) };

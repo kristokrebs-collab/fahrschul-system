@@ -777,3 +777,29 @@ Keine neuen Bauteile, keine neue Bewegung – vorhandene Primitives (`Card`, `Se
 - **YouCard**: vier Kacheln, unter 640 px und ab 1024 px zu zweit nebeneinander (die Spalte ist dort schmal), dazwischen vier in einer Reihe; Beschriftung wird gekürzt statt überzulaufen.
 - **Chartfall**: SVG-Kerzen; vor der Hypothese liegt der Verlauf nach dem Anker weder im Bild noch in der Preisskala (sonst verriete die Skala die Richtung). Entscheiden → Warten → Ergebnis ist eine Karte mit drei Zuständen, keine drei Karten. Die Richtung steht immer als Wort (Abzeichen), die Farbe ist nur Zusatz.
 - **Passt zu dir?**: drei weitere Aussagen in derselben Gruppierung (Reibung, Übereinstimmung, nicht beurteilbar); das Zeitbudget steht nie unter "Reibung" oder "passt", nur unter "nicht beurteilbar" mit beiden Zahlen.
+
+
+## Verwaltung planen und vergleichen (F65)
+
+Keine neue Sprache, keine neue Bewegung: zwei Bausteine aus den vorhandenen Primitives (`CheckboxRow`, `ChipPick`, `NumInput`, `Collapse`, `ScrollTable`, `RunBar`), nur transform/opacity aus den Tokens, reduzierte Bewegung = Endzustand sofort.
+
+- **Karte „Verwaltung nach dem Einstieg“** (Handelsplan, Positionsrechner): ein ruhiger Kasten `border-line bg-ink-950/40` mit drei `CheckboxRow`s (Break-even · Teilziel · Trailing-Stop); die Felder einer Regel klappen mit `Collapse` darunter auf (zwei Spalten ab `sm`, mobil eine; Einheit und Zahl nebeneinander, die Zahl mit sichtbarem Etikett und Einheit im Feld). Ohne Regel nur der Satz „Keine Verwaltung geplant“.
+- **Ablauf statt Formel.** „Dein Ablauf“ ist eine nummerierte Liste von Kästchen: Kapitälchen mit Regel („1 · BREAK-EVEN“), darunter „Wenn der Kurs 100.695,0 erreicht hat …“ in `text-mute` und „→ Stop von … auf …“ in `text-fg`. Eine Regel, die nie greifen kann, bekommt `border-warn/30` und das Wort „greift nie“ im Kapitälchen – Farbe nie allein.
+- **Beispielrechnungen** als Liste mit 1-px-Trennern (`gap-px bg-line`): links Satz und Detail, rechts Geld und R in Mono (`+19,58 USDT · +1,68 R`; Vorzeichen als Zeichen, Gewinn `text-win`, Verlust `text-loss`). Darunter ein Satz „Rechenbeispiele … keine Prognose“.
+- **Vergleich im Labor:** zwei `ScrollTable`s (Ergebnis je Variante; weitere Kennzahlen), die erste Zeile „Stop unverändert“ ist der Vergleichspunkt (`bg-white/[0.03]`); Spaltenköpfe in Kapitälchen, Zahlen in Mono, Δ-Spalte mit `deltaTone`. Kein „bester“ Eintrag, keine Hervorhebung einer Zeile; die Warnung bei unter 30 Trades in `text-warn`.
+- **Mobil (390 px):** Karte einspaltig, Tabellen scrollen in ihrem eigenen Bereich (`role="region"`, fokussierbar), nie die Seite. Alle Schalter, Chips und Felder ≥ 44 px bei grobem Zeiger.
+
+## Playbook-Fassungen und Checkliste (F45)
+
+Keine neue Sprache: die vorhandene Karte „Playbook austauschen“ (`Card`, `FieldRow`, `Input`, `Textarea`, `MorphSelect`, `Badge`, `Button`), nichts bewegt sich außer dem, was die Primitives schon tun.
+- **Fassung** ist ein `Badge` (mute) neben „fremdes Playbook“; die Zeile „Neu in dieser Fassung: …“ steht in `text-fg/90`, die Checkliste des Autors als Liste mit leerem Kästchen vor jedem Punkt (`border-faint-line`, nur Zierde, `aria-hidden`) und einem Satz, dass es Prüfpunkte von Hand sind.
+- **Update-Karte** (`playbook-update`): ein ruhiger Kasten `border-line-2 bg-white/[0.03]` im Vorschaukasten; erste Zeile in Worten („Neuere Fassung eines Playbooks, das du schon hast: …“), darunter „Was sich in deinem Entwurf ändern würde“ als Liste in Klartext, die Warnung bei eigenen Änderungen in `text-warn` mit `role="status"`, der Satz „Die App abonniert nichts …“ in `text-faint`. Der Knopf „Als neue Version … übernehmen“ ist die primäre Aktion, „Als eigenen neuen Entwurf anlegen“ tritt dann zurück (ghost); eine ältere oder gleiche Fassung bekommt keinen Übernehmen-Knopf.
+- **Export:** unter dem Entwurf steht in einem Satz (`text-mute`), welche Fassung die Datei wird; das Feld „Was ist neu?“ erscheint nur bei eigenen Entwürfen.
+- Mobil: eine Spalte, Texte brechen um (`[overflow-wrap:anywhere]`), Knöpfe `pointer-coarse:min-h-11`.
+
+## Indikator-Vertrag und Abgleich (F14 / F64)
+
+Keine neue Sprache: eine `Card` in der Labor-Sektion „TradingView“ (volle Breite), `Button` (ghost), `Input`, `MorphSelect`, `Badge`; nichts bewegt sich außer dem, was die Primitives schon tun.
+- **Vertrag** zugeklappt: Überschrift mit Anzahl, ein Satz über „gemessen, nicht behauptet“ und die Zeile „kein Wiederzeichnen“ in `text-mute`; aufgeklappt eine Liste, je Indikator Name, Pine-Aufruf in Mono, Eingaben und die Zeile „ab Kerze N · eingeschwungen nach etwa M“ in Mono (N gemessen, M eine Faustzahl). Die Prüfaussage („gegen TradingView-Werte geprüft“ / „nach Definition nachgebaut“) steht in Worten, nie als Farbe allein.
+- **Abgleich:** je Spalte ein ruhiger Kasten (`border-line-2`), Auswahl „Vergleichen mit“, Eingabefelder des Indikators, dann das Urteil als `Badge` (gleichwertig validiert = Gewinnton, weicht ab = Warnton, offen/zu wenige Werte = neutral) mit dem Satz dazu und den Zahlen (verglichen, erster Wert, größte und mittlere Differenz) in Mono. „Weicht ab“ listet die fünf größten Abweichungen. Der Hinweis „kein allgemeines Zertifikat“ steht in `text-faint` darunter.
+- Mobil: einspaltig, Zahlenraster zweispaltig, Texte brechen um, nie seitliches Scrollen; Felder und Knöpfe ≥ 44 px bei grobem Zeiger.

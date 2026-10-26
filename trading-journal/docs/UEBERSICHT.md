@@ -77,7 +77,7 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 8 Funktionen
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 24 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 25 Funktionen
 
 **Einstieg prüfen**
 
@@ -127,6 +127,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 24 Funktionen
 | Ganze Einheiten innerhalb deiner vier Grenzen wählen | Positionsgröße im Handelsplan | Handelsplan › Größe | teilweise |
 | Prüfen, ob der Plan deine Grenzen einhält | Risiko-Check des Handelsplans | Handelsplan › Risiko-Check | fertig |
 | Den fertigen Plan als Text oder CSV mitnehmen | Ticket zum Kopieren (Handelsplan) | Handelsplan › Ticket | fertig |
+| Vor dem Einstieg festlegen, wann der Stop nachgezogen wird | Verwaltung planen (Handelsplan & Positionsrechner) | Handelsplan › Ausstieg · Verwaltung nach dem Einstieg | fertig |
 
 ### Risiko & Disziplin
 
@@ -161,7 +162,7 @@ _Limits, Exposure und Regeln, bevor es teuer wird._ · 12 Funktionen
 
 ### Strategie entwickeln & testen
 
-_Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
+_Eine Idee bauen und gegen echte Historie prüfen._ · 25 Funktionen
 
 **Idee bauen**
 
@@ -196,6 +197,7 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
 | Prüfen, wie empfindlich die Idee auf Zahlen reagiert | Parameter-Raster | Labor › Parameter-Raster | fertig |
 | Eine Strategie schrittweise verbessern lassen, ohne dich zu überanpassen | Hintergrund-Optimierer | Labor › Optimierer | teilweise |
 | Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
+| Sehen, ob Break-even oder Trailing dem Ergebnis hilft oder schadet | Verwaltung vergleichen | Labor › Verwaltung vergleichen | fertig |
 
 **Live prüfen & teilen**
 
@@ -203,6 +205,7 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
 |---|---|---|---|
 | Eine Regel auf neuen Kerzen live mitlaufen lassen | Forward-Test (virtuelles Konto) | Labor › Forward-Test | fertig |
 | TradingView-Ergebnisse mit dem Labor vergleichen | TradingView-Vergleich | Labor › Export gegen Labor-Lauf | teilweise |
+| Prüfen, ob das Labor einen Indikator wie TradingView rechnet | Indikator-Vertrag und Abgleich | Labor › Indikator-Vertrag und Abgleich | teilweise |
 | Aus deiner Idee ein TradingView-Skript machen | Pine-Export für TradingView | Labor › Pine-Skript für TradingView | fertig |
 | Eine Strategie als Datei weitergeben oder einlesen | Playbook exportieren und importieren | Labor › Playbook austauschen | teilweise |
 

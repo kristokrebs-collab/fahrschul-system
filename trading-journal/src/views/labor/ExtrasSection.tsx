@@ -13,6 +13,7 @@ const StressBody = lazy(() => import("./StressBody"));
 const ReportBody = lazy(() => import("./ReportBody"));
 const FilterBody = lazy(() => import("./FilterBody"));
 const ParamGridBody = lazy(() => import("./ParamGridBody"));
+const ManageBody = lazy(() => import("./ManageBody"));
 
 const X = LABOR.extras;
 
@@ -69,6 +70,9 @@ export function ExtrasSection() {
       </ExtraCard>
       <ExtraCard id="params" title="Parameter-Raster" sub="Wie stabil ist diese Idee gegen die Parameter? Zwei Zahlen der Regeln um ±25 % verschoben.">
         <ParamGridBody />
+      </ExtraCard>
+      <ExtraCard id="manage" title="Verwaltung vergleichen" sub="Break-even, Trailing, Teilziel – derselbe Lauf mit anderen Stops nach dem Einstieg, mit Median, Drawdown, Kosten und Ausstoppern.">
+        <ManageBody />
       </ExtraCard>
     </div>
   );

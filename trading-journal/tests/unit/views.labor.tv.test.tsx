@@ -59,6 +59,7 @@ describe("Adapterstatus", () => {
     expect(rows.map((r) => [r.getAttribute("data-adapter"), r.getAttribute("data-status")])).toEqual([
       ["pine-export", "supported"],
       ["tester-export", "supported"],
+      ["indicator-check", "supported"],
       ["alert-webhook", "forward"],
       ["pine-strategy", "unsupported"],
       ["pine-indicator", "unsupported"],
@@ -67,8 +68,9 @@ describe("Adapterstatus", () => {
     ]);
     expect(within(rows[0]!).getByText("unterstützt")).toBeTruthy();
     expect(within(rows[1]!).getByText("unterstützt")).toBeTruthy();
-    expect(within(rows[2]!).getByText("nur Forwardtest über Alert")).toBeTruthy();
-    expect(within(rows[6]!).getByText("nicht unterstützt")).toBeTruthy();
+    expect(within(rows[2]!).getByText("unterstützt")).toBeTruthy();
+    expect(within(rows[3]!).getByText("nur Forwardtest über Alert")).toBeTruthy();
+    expect(within(rows[7]!).getByText("nicht unterstützt")).toBeTruthy();
     expect(within(rows[0]!).getByText(/kein Login/)).toBeTruthy();
     expect(screen.getByText(/Bewusst ausgeschlossen: kein Login/)).toBeTruthy();
     expect(screen.getByText(/führt keinen fremden Code aus/)).toBeTruthy();

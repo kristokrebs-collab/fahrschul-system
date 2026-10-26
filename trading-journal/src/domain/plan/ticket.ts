@@ -6,6 +6,7 @@
 import { splitSymbol } from "@/market/symbol";
 import type { Side } from "../types";
 import { moneyText, num, pctText, priceText, qtyText } from "./format";
+import type { ManageLine } from "./manage";
 import type { Light } from "./risk";
 import type { MarketKind } from "./sessions";
 import { dateTimeIn, clockIn, zoneLabel } from "./time";
@@ -50,6 +51,8 @@ export interface TicketPlan {
   candlesUntil: number | null;
   /** when the candles were loaded */
   fetchedAt: number | null;
+  /** how the trade is managed after the entry (F65): one line per rule, absent / empty = none planned */
+  manage?: readonly ManageLine[] | null;
 }
 
 export interface Ticket {
@@ -60,6 +63,7 @@ export interface Ticket {
 }
 
 const LIGHT_WORD: Record<Light, string> = { green: "Grün", amber: "Gelb", red: "Rot" };
+export const MANAGE_NOTE = "Die Verwaltung ist eine Anweisung an dich selbst: neue Stops und Teilverkäufe setzt du, die App ändert keine Order.";
 export const TICKET_NOTE = "Nur ein Plan zum Kopieren – die App sendet nichts an eine Börse und platziert keine Order. Keine professionelle Finanzberatung.";
 
 /** The journal's pair notation of a market symbol ("BTCUSDT" → "BTC/USDT"); a stock stays its ticker. */
@@ -98,13 +102,14 @@ export function buildTicket(p: TicketPlan): Ticket {
     ["Größe", `${qtyText(p.qty, p.lot)} ${base} (Positionswert ${moneyText(p.notional)} ${p.currency}${p.leverage > 1 ? `, Hebel ${num(p.leverage, 0)}×` : ""})`],
     ["Max. Verlust am Stop", `${moneyText(p.maxLoss)} ${p.currency} (${pctText(p.maxLossPct, 2)} des Kontos, inkl. Gebühren und Slippage)`],
     ["Chance-Risiko", p.rr != null ? `${num(p.rr, 2)} : 1` : "–"],
+    ...(p.manage ?? []).map((l): [string, string] => [`Verwaltung · ${l.label}`, l.text]),
     ["Flat by", p.flatByMs != null ? `${clockIn(p.flatByMs, p.tz)} Uhr (${zoneLabel(p.flatByMs, p.tz)})` : "nicht gesetzt"],
     ["Risiko-Check", LIGHT_WORD[p.light]],
     ["Sitzung", `${p.sessionLabel}, ${p.intervalLabel}`],
     ["Quelle", `${p.sourceLabel} · ${stand}`],
   ];
-  const text = ["HANDELSPLAN – Ticket zum Kopieren", ...rows.map(([k, v]) => `${k}: ${v}`), TICKET_NOTE].join("\n");
-  const header = ["Symbol", "Richtung", "Einstieg", "Stop", "Ziel", "Menge", "Positionswert", "Max_Verlust", "Max_Verlust_Prozent", "Chance_Risiko", "Flat_by_UTC", "Ampel", "Quelle", "Kerzen_bis_UTC", "Abgerufen_UTC"];
+  const text = ["HANDELSPLAN – Ticket zum Kopieren", ...rows.map(([k, v]) => `${k}: ${v}`), ...(p.manage?.length ? [MANAGE_NOTE] : []), TICKET_NOTE].join("\n");
+  const header = ["Symbol", "Richtung", "Einstieg", "Stop", "Ziel", "Menge", "Positionswert", "Max_Verlust", "Max_Verlust_Prozent", "Chance_Risiko", "Flat_by_UTC", "Ampel", "Quelle", "Kerzen_bis_UTC", "Abgerufen_UTC", ...(p.manage?.length ? ["Verwaltung"] : [])];
   const cells = [
     p.symbol,
     p.side,
@@ -121,6 +126,7 @@ export function buildTicket(p: TicketPlan): Ticket {
     p.sourceLabel,
     p.candlesUntil != null ? iso(p.candlesUntil) : "",
     p.fetchedAt != null ? iso(p.fetchedAt) : "",
+    ...(p.manage?.length ? [p.manage.map((l) => `${l.label}: ${l.text}`).join(" | ")] : []),
   ];
   const csv = `${header.join(",")}\n${cells.map(csvCell).join(",")}`;
   return { text, csv, rows };

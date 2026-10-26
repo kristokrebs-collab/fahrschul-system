@@ -65,6 +65,7 @@ export function savedPlanOf(model: PlanModel, form: PlanForm, currency: string, 
     stopLabel: t.stopLabel,
     targetLabel: t.targetLabel,
     form,
+    ...(model.manage?.ok && model.manage.firstTrigger != null ? { manageTrigger: model.manage.firstTrigger } : {}),
     alarms: prev?.alarms ?? null,
     journalAt: prev?.journalAt ?? null,
   };
@@ -86,7 +87,7 @@ export async function discardPlan(id: string): Promise<WriteResult> {
   const ok = await writeSettings((s) => {
     const next: Record<string, unknown> = { plan: withPlanCfg(s.plan, { plans: cfg.plans.filter((p) => p.id !== id) }) };
     if (plan.alarms) {
-      const ids = new Set([plan.alarms.stopId, plan.alarms.targetId]);
+      const ids = new Set([plan.alarms.stopId, plan.alarms.targetId, ...(plan.alarms.triggerId ? [plan.alarms.triggerId] : [])]);
       const kl = keyLevelsOfSettings(s);
       if (kl.levels.some((l) => ids.has(l.id))) next.keyLevels = withKeyLevels(s.keyLevels, { levels: kl.levels.filter((l) => !ids.has(l.id)) });
     }
@@ -96,19 +97,21 @@ export async function discardPlan(id: string): Promise<WriteResult> {
 }
 
 /**
- * The three alarms of a plan: two key levels now, the clock reminder with the plan. The plan is saved by the same write.
+ * The alarms of a plan: two key levels now (a third one for the trigger of a planned management, F65), the clock reminder with the
+ * plan. The plan is saved by the same write.
  * `levels: false` (a stock plan) makes only the clock reminder: the key levels watch the live crypto market, a level for a stock
  * would never be evaluated.
  */
 export async function createAlarms(plan: SavedPlan, tick: number, now: number = Date.now(), opts: { levels?: boolean } = {}): Promise<WriteResult> {
   const withLevels = opts.levels !== false;
   const kl0 = keyLevelsOfSettings(useJournal.getState().settings);
-  if (withLevels && kl0.levels.length + 2 > MAX_KEY_LEVELS) return "limit";
-  const ids = withLevels ? { stop: newId("k_"), target: newId("k_") } : { stop: "", target: "" };
+  const withTrigger = withLevels && plan.manageTrigger != null;
+  if (withLevels && kl0.levels.length + (withTrigger ? 3 : 2) > MAX_KEY_LEVELS) return "limit";
+  const ids = withLevels ? { stop: newId("k_"), target: newId("k_"), ...(withTrigger ? { trigger: newId("k_") } : {}) } : { stop: "", target: "" };
   const levels = withLevels ? planAlarmLevels(plan, ids, tick, now) : null;
   const withAlarms: SavedPlan = {
     ...plan,
-    alarms: { stopId: ids.stop, targetId: ids.target, createdAt: now, flatBy: plan.flatByMs != null && plan.flatByMs > now ? { at: plan.flatByMs, state: "pending", firedAt: null } : plan.flatByMs != null ? { at: plan.flatByMs, state: "missed", firedAt: null } : null },
+    alarms: { stopId: ids.stop, targetId: ids.target, ...(ids.trigger ? { triggerId: ids.trigger } : {}), createdAt: now, flatBy: plan.flatByMs != null && plan.flatByMs > now ? { at: plan.flatByMs, state: "pending", firedAt: null } : plan.flatByMs != null ? { at: plan.flatByMs, state: "missed", firedAt: null } : null },
   };
   const cfg = planCfgOf(useJournal.getState().settings.plan);
   const exists = cfg.plans.some((p) => p.id === plan.id);
@@ -116,7 +119,7 @@ export async function createAlarms(plan: SavedPlan, tick: number, now: number = 
   const plans = exists ? cfg.plans.map((p) => (p.id === plan.id ? withAlarms : p)) : [withAlarms, ...cfg.plans];
   const ok = await writeSettings((s) => ({
     plan: withPlanCfg(s.plan, { plans }),
-    ...(levels ? { keyLevels: withKeyLevels(s.keyLevels, { levels: [...keyLevelsOfSettings(s).levels, levels.stop, levels.target] }) } : {}),
+    ...(levels ? { keyLevels: withKeyLevels(s.keyLevels, { levels: [...keyLevelsOfSettings(s).levels, levels.stop, levels.target, ...(levels.trigger ? [levels.trigger] : [])] }) } : {}),
   }));
   return ok ? "ok" : "failed";
 }
@@ -124,7 +127,7 @@ export async function createAlarms(plan: SavedPlan, tick: number, now: number = 
 /** Removes the alarms of a plan again (the plan stays). */
 export async function removeAlarms(plan: SavedPlan): Promise<WriteResult> {
   if (!plan.alarms) return "missing";
-  const ids = new Set([plan.alarms.stopId, plan.alarms.targetId]);
+  const ids = new Set([plan.alarms.stopId, plan.alarms.targetId, ...(plan.alarms.triggerId ? [plan.alarms.triggerId] : [])]);
   const cfg = planCfgOf(useJournal.getState().settings.plan);
   const plans = cfg.plans.map((p) => (p.id === plan.id ? { ...p, alarms: null } : p));
   const ok = await writeSettings((s) => ({

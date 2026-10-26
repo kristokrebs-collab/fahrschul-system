@@ -6,7 +6,7 @@
  */
 import { create } from "zustand";
 import { isLabAbort, runExtra } from "@/domain/backtest/index";
-import type { GridResult, GridSpec } from "@/domain/lab/extras";
+import type { GridResult, GridSpec, ManageCompare } from "@/domain/lab/extras";
 import type { PatternFilterSpec } from "@/domain/discovery/spec";
 import type { FilterCompare } from "@/domain/lab/filters";
 import { sanitizeFilters, type FilterId, type FilterSelection } from "@/domain/lab/filters/types";
@@ -36,6 +36,8 @@ interface ExtrasState {
   stress: ExtraSlice<StressRows>;
   filters: ExtraSlice<FilterCompare>;
   params: ExtraSlice<ParamsOut>;
+  /** the management comparison (F65): the same run with other stops after the entry */
+  manage: ExtraSlice<ManageCompare>;
   /** the two rule parameters of the next grid (ids like `n1.len`); memory only */
   gridSel: GridSpec;
   setGridSel(sel: GridSpec): void;
@@ -71,6 +73,7 @@ export const useExtras = create<ExtrasState>()((set, get) => ({
   stress: idle(),
   filters: idle(),
   params: idle(),
+  manage: idle(),
   gridSel: { x: "", y: null },
   setGridSel: (gridSel) => set({ gridSel, params: get().params.status === "running" ? get().params : idle() }),
   selection: readSelection(),
@@ -101,12 +104,12 @@ export const useExtras = create<ExtrasState>()((set, get) => ({
   },
 }));
 
-type Kind = "stress" | "filters" | "params";
-const ctl: Record<Kind, AbortController | null> = { stress: null, filters: null, params: null };
+type Kind = "stress" | "filters" | "params" | "manage";
+const ctl: Record<Kind, AbortController | null> = { stress: null, filters: null, params: null, manage: null };
 let lastUi = 0;
 
 function patch(kind: Kind, p: Partial<Pick<ExtraSlice<unknown>, "status" | "progress" | "error">>): void {
-  useExtras.setState((s) => (kind === "stress" ? { stress: { ...s.stress, ...p } } : kind === "params" ? { params: { ...s.params, ...p } } : { filters: { ...s.filters, ...p } }));
+  useExtras.setState((s) => (kind === "stress" ? { stress: { ...s.stress, ...p } } : kind === "params" ? { params: { ...s.params, ...p } } : kind === "manage" ? { manage: { ...s.manage, ...p } } : { filters: { ...s.filters, ...p } }));
 }
 
 async function start(kind: Kind): Promise<void> {
@@ -119,9 +122,9 @@ async function start(kind: Kind): Promise<void> {
   const mine = new AbortController();
   ctl[kind] = mine;
   const running = { status: "running", progress: 0, result: null, error: null } as const;
-  useExtras.setState(kind === "stress" ? { stress: running } : kind === "params" ? { params: running } : { filters: running });
+  useExtras.setState(kind === "stress" ? { stress: running } : kind === "params" ? { params: running } : kind === "manage" ? { manage: running } : { filters: running });
   try {
-    const res = await runExtra(kind === "stress" ? { base: input, what: "stress" } : kind === "params" ? { base: input, what: "params", grid: useExtras.getState().gridSel } : { base: input, what: "filters", filters: useExtras.getState().selection }, {
+    const res = await runExtra(kind === "stress" ? { base: input, what: "stress" } : kind === "params" ? { base: input, what: "params", grid: useExtras.getState().gridSel } : kind === "manage" ? { base: input, what: "manage" } : { base: input, what: "filters", filters: useExtras.getState().selection }, {
       signal: mine.signal,
       onProgress: (p) => {
         const t = Date.now();
@@ -133,6 +136,7 @@ async function start(kind: Kind): Promise<void> {
     if (ctl[kind] !== mine) return;
     if (res.what === "stress") useExtras.setState({ stress: { status: "done", progress: 1, result: res.rows, error: null } });
     else if (res.what === "params") useExtras.setState({ params: { status: "done", progress: 1, result: { grid: res.grid, note: res.note }, error: null } });
+    else if (res.what === "manage") useExtras.setState({ manage: { status: "done", progress: 1, result: res.compare, error: null } });
     else useExtras.setState({ filters: { status: "done", progress: 1, result: res.compare, error: null } });
   } catch (e) {
     if (ctl[kind] !== mine) return;
@@ -149,6 +153,7 @@ async function start(kind: Kind): Promise<void> {
 export const runStress = (): Promise<void> => start("stress");
 export const runFilters = (): Promise<void> => start("filters");
 export const runParams = (): Promise<void> => start("params");
+export const runManage = (): Promise<void> => start("manage");
 
 export function cancelExtra(kind: Kind): void {
   ctl[kind]?.abort();
@@ -159,10 +164,12 @@ function clearAll(): void {
   ctl.stress?.abort();
   ctl.filters?.abort();
   ctl.params?.abort();
+  ctl.manage?.abort();
   ctl.stress = null;
   ctl.filters = null;
   ctl.params = null;
-  useExtras.setState({ stress: idle(), filters: idle(), params: idle() });
+  ctl.manage = null;
+  useExtras.setState({ stress: idle(), filters: idle(), params: idle(), manage: idle() });
 }
 
 useLabor.subscribe((s, prev) => {

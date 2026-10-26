@@ -40,6 +40,9 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
   // stocks: the key-level alarms watch the live crypto market only, so a stock plan gets the clock reminder and nothing else
   const stocks = model.market === "stocks";
   const P = (x: number): string => priceText(x, model.tick);
+  /** F65: the price at which the planned management starts – a fourth alarm when the plan has one */
+  const trigger = model.manage?.ok ? model.manage.firstTrigger : null;
+  const nAlarms = trigger != null ? 4 : 3;
 
   const current = (id: string): SavedPlan | null => savedPlanOf(model, form, currency, id, Date.now(), saved);
   const dirty = !!saved && !!t && (saved.entry !== t.entry || saved.stop !== t.stop || saved.target !== t.target || saved.qty !== t.qty || saved.side !== t.side || saved.symbol !== t.symbol);
@@ -69,7 +72,7 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
     const id = saved?.id ?? newId("p_");
     const p = current(id);
     if (!p) return;
-    if (await run(() => createAlarms(p, model.tick, Date.now(), { levels: !stocks }), stocks ? "Erinnerung angelegt" : "3 Alarme angelegt")) setPlanId(id);
+    if (await run(() => createAlarms(p, model.tick, Date.now(), { levels: !stocks }), stocks ? "Erinnerung angelegt" : `${nAlarms} Alarme angelegt`)) setPlanId(id);
   };
   const doJournal = async (): Promise<void> => {
     if (!t) return;
@@ -137,7 +140,7 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
               </Button>
               {!alarms ? (
                 <Button onClick={() => void doAlarms()} disabled={busy} data-testid="hplan-alarms">
-                  {stocks ? "Erinnerung „flat by close“" : "Plan → 3 Alarme"}
+                  {stocks ? "Erinnerung „flat by close“" : `Plan → ${nAlarms} Alarme`}
                 </Button>
               ) : (
                 <Button onClick={() => saved && void run(() => removeAlarms(saved), stocks ? "Erinnerung entfernt" : "Alarme entfernt")} disabled={busy} data-testid="hplan-alarms-remove">
@@ -151,7 +154,7 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
                 {saved ? "Plan verwerfen" : "Formular zurücksetzen"}
               </Button>
             </div>
-            {!alarms && !stocks && <p className="text-[12px] leading-snug text-mute">„Plan → 3 Alarme“ legt an: einen Alarm beim Stop ({P(t.stop)}), einen beim Ziel ({t.target != null ? P(t.target) : "–"}) und die Erinnerung „flat by close“ um {clockIn(t.flatByMs ?? model.flatByMs, t.tz)} Uhr. Der Plan wird dabei mitgespeichert.</p>}
+            {!alarms && !stocks && <p className="text-[12px] leading-snug text-mute">„Plan → {nAlarms} Alarme“ legt an: einen Alarm beim Stop ({P(t.stop)}), einen beim Ziel ({t.target != null ? P(t.target) : "–"}){trigger != null ? `, einen beim Auslöser der Verwaltung (${P(trigger)})` : ""} und die Erinnerung „flat by close“ um {clockIn(t.flatByMs ?? model.flatByMs, t.tz)} Uhr. Der Plan wird dabei mitgespeichert.</p>}
             {!alarms && stocks && (
               <p className="text-[12px] leading-snug text-mute" data-testid="hplan-alarms-stocks">
                 „Erinnerung flat by close“ legt die Uhrzeit-Erinnerung um {clockIn(t.flatByMs ?? model.flatByMs, t.tz)} Uhr an (Toast, nur bei geöffneter App). Preis-Alarme für Stop und Ziel gibt es für Aktien noch nicht: die Schlüsselmarken lesen nur die Live-Daten des Krypto-Markts. Der Plan wird dabei mitgespeichert.
@@ -164,7 +167,7 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
             )}
             {alarms && (
               <p className="num text-[12px] leading-snug text-fg/90" data-testid="hplan-alarms-state">
-                {alarms.stopId ? `3 Alarme: Stop ${P(saved!.stop)} und Ziel ${saved!.target != null ? P(saved!.target) : "–"} als Schlüsselmarken (Markt › Schlüsselmarken), ` : "Erinnerung: "}„flat by close“ {alarms.flatBy ? `um ${clockIn(alarms.flatBy.at, saved!.tz)} Uhr – ${FLAT_STATE[alarms.flatBy.state]}` : "ist nicht gesetzt"}.
+                {alarms.stopId ? `${alarms.triggerId ? 4 : 3} Alarme: Stop ${P(saved!.stop)}${alarms.triggerId && saved!.manageTrigger != null ? `, Auslöser der Verwaltung ${P(saved!.manageTrigger)}` : ""} und Ziel ${saved!.target != null ? P(saved!.target) : "–"} als Schlüsselmarken (Markt › Schlüsselmarken), ` : "Erinnerung: "}„flat by close“ {alarms.flatBy ? `um ${clockIn(alarms.flatBy.at, saved!.tz)} Uhr – ${FLAT_STATE[alarms.flatBy.state]}` : "ist nicht gesetzt"}.
               </p>
             )}
             {!stocks && symbolMismatch && (

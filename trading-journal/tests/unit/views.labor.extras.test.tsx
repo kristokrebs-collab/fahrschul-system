@@ -160,6 +160,37 @@ describe("Labor · Belastung, Bericht, Filter", () => {
     expect(within(filters).queryByTestId("labor-filter-table")).toBeNull();
   }, 90_000);
 
+  it("Verwaltung vergleichen (F65): erst auf Knopfdruck, acht Zeilen, „Stop unverändert“ ist der Lauf oben, mit Median, Kosten und Ausstoppern", async () => {
+    await finishedRun();
+    expect(await screen.findByTestId("labor-extra-manage", {}, { timeout: 15_000 })).toHaveAttribute("data-open", "false");
+    fireEvent.click(screen.getByTestId("labor-extra-toggle-manage"));
+    const body = await screen.findByTestId("labor-manage", {}, { timeout: 15_000 });
+    expect(within(body).queryByTestId("labor-manage-table")).toBeNull();
+    expect(within(body).getByTestId("labor-manage-runbar")).toHaveTextContent("noch einmal berechnet");
+    await act(async () => {
+      fireEvent.click(within(body).getByTestId("labor-manage-run"));
+    });
+    await waitFor(() => expect(within(body).getByTestId("labor-manage-runbar")).toHaveAttribute("data-status", "done"), { timeout: 45_000 });
+    const rows = within(body).getAllByTestId("labor-manage-row");
+    expect(rows.map((r) => r.getAttribute("data-variant"))).toEqual(["none", "be05", "be1", "be15", "be1net", "trail2", "trail3", "partial"]);
+    const result = useLabor.getState().result!;
+    expect(within(rows[0]!).getAllByRole("cell")[0]).toHaveTextContent(String(result.stats.n));
+    expect(within(body).getByTestId("labor-manage-table")).toHaveTextContent("Ausgestoppt vor dem Ziel");
+    expect(within(body).getByTestId("labor-manage-table")).toHaveTextContent("Median R");
+    expect(within(body).getAllByTestId("labor-manage-more-row")).toHaveLength(8);
+    expect(within(body).getByTestId("labor-manage-more")).toHaveTextContent("Längste Verlustserie");
+    // die Zeile „Stop unverändert“ hat kein „vor dem Ziel“ (sie ist der Vergleichspunkt), die anderen eine Zahl
+    expect(within(rows[0]!).getByTestId("labor-manage-before")).toHaveTextContent("–");
+    expect(within(rows[2]!).getByTestId("labor-manage-before").textContent).toMatch(/^(0|\d+ von \d+)$/);
+    expect(within(body).getByTestId("labor-manage-foot")).toHaveTextContent("Keine professionelle Finanzberatung.");
+    expect(useExtras.getState().manage.status).toBe("done");
+    // ein neuer Lauf verwirft den Vergleich
+    act(() => {
+      useLabor.setState((st) => ({ runSeq: st.runSeq + 1 }));
+    });
+    expect(useExtras.getState().manage.status).toBe("idle");
+  }, 90_000);
+
   it("ein neuer Lauf verwirft Szenarien und Vergleich des alten", async () => {
     await finishedRun();
     fireEvent.click(await screen.findByTestId("labor-extra-toggle-stress", {}, { timeout: 15_000 }));

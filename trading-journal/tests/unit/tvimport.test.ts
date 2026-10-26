@@ -146,7 +146,7 @@ describe("TradingView-Export lesen (F14)", () => {
 
 describe("Adapterstatus (F14)", () => {
   it("nennt unterstützt, nur Forwardtest und nicht unterstützt – jedes mit Grenzen; kein Login, kein fremder Code", () => {
-    expect(adaptersOf("supported").map((a) => a.id)).toEqual(["pine-export", "tester-export"]);
+    expect(adaptersOf("supported").map((a) => a.id)).toEqual(["pine-export", "tester-export", "indicator-check"]);
     expect(adaptersOf("forward").map((a) => a.id)).toEqual(["alert-webhook"]);
     expect(adaptersOf("unsupported").map((a) => a.id)).toEqual(["pine-strategy", "pine-indicator", "indicator-series", "account"]);
     expect(STATUS_LABEL).toEqual({ supported: "unterstützt", forward: "nur Forwardtest über Alert", unsupported: "nicht unterstützt" });

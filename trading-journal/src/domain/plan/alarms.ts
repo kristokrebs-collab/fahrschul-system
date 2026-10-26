@@ -21,7 +21,7 @@ export const FLAT_BY_STALE_MS = 12 * HOUR;
 const sideWord = (p: Pick<SavedPlan, "side">): string => (p.side === "long" ? "Long" : "Short");
 
 /** The two key levels of a plan: the stop and the target (ids chosen by the caller). */
-export function planAlarmLevels(p: SavedPlan, ids: { stop: string; target: string }, tick: number, now: number): { stop: KeyLevel; target: KeyLevel } {
+export function planAlarmLevels(p: SavedPlan, ids: { stop: string; target: string; trigger?: string }, tick: number, now: number): { stop: KeyLevel; target: KeyLevel; trigger?: KeyLevel } {
   const long = p.side === "long";
   const when = `${dayLabelIn(p.signalAt ?? p.savedAt, p.tz)} ${clockIn(p.signalAt ?? p.savedAt, p.tz)}`;
   const note = (what: string): string => `${what} aus dem Handelsplan (${sideWord(p)} ${p.symbol} vom ${when}, Einstieg ${priceText(p.entry, tick)}). Läuft nur bei geöffneter App; eine Nachricht, keine Order.`;
@@ -47,7 +47,21 @@ export function planAlarmLevels(p: SavedPlan, ids: { stop: string; target: strin
     alerts,
     note: note("Ziel"),
   };
-  return { stop: level, target };
+  // F65: the price at which the planned management starts (stop to break-even, partial target, trailing) – a reminder to act
+  const trigger: KeyLevel | undefined =
+    ids.trigger && p.manageTrigger != null
+      ? {
+          ...blankKeyLevel({ id: ids.trigger, symbol: p.symbol, price: p.manageTrigger }, now),
+          name: `Plan-Verwaltung ${p.symbol}`,
+          tf: ALARM_TF,
+          direction: long ? "above" : "below",
+          kind: "touch",
+          role: "info",
+          alerts,
+          note: note("Auslöser der Verwaltung (Stop nachziehen oder Teilziel nehmen, wie im Plan beschrieben)"),
+        }
+      : undefined;
+  return { stop: level, target, ...(trigger ? { trigger } : {}) };
 }
 
 export interface DueFlatBy {

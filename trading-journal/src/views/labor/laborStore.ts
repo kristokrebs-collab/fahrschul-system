@@ -31,6 +31,7 @@ import {
   type SlippageModel,
 } from "@/domain/backtest/index";
 import { activeLeaves, defaultCustom, parseCustom, sanitizeCustom, validateCustom, type CustomConfig, type IdeaDraft } from "@/domain/lab";
+import { cleanChecklist, MAX_CHANGES, MAX_REV, PLAYBOOK_ID_RE } from "@/domain/playbook";
 import type { SignalCfg } from "@/domain/signals";
 import { storageKey } from "@/store/storage";
 import { isFileProtocol, IS_FILE_BUILD } from "@/edition";
@@ -88,7 +89,22 @@ export interface DraftOrigin {
   author: string | null;
   /** ms */
   importedAt: number;
-  /** `customKey` of the rules as imported */
+  /** `customKey` of the rules as imported (or as last taken over from a newer revision) */
+  key: string;
+  /** F45: the playbook's stable id and the revision taken over (absent = a file without them) */
+  pid?: string;
+  rev?: number;
+  /** F45: what the author said changed in that revision */
+  changes?: string;
+  /** F45: the author's manual checklist */
+  checklist?: string[];
+}
+
+/** F45: a draft of the trader's own that was exported as a playbook – the id and revision of the last export, to number the next one. */
+export interface DraftExport {
+  id: string;
+  rev: number;
+  /** `customKey` of the rules at that export */
   key: string;
 }
 
@@ -100,6 +116,8 @@ export interface CustomDraft {
   config: CustomConfig;
   /** set for an imported playbook, absent for the trader's own ideas */
   origin?: DraftOrigin;
+  /** set once the draft was exported as a playbook (F45) */
+  exported?: DraftExport;
 }
 
 export const DRAFTS_MAX = 24;
@@ -173,6 +191,10 @@ interface LaborState {
   addDraft(name: string, config: CustomConfig, note: string): string | null;
   /** puts the rules (and the name) of a draft back to `config`; false when the draft is gone */
   replaceDraftConfig(id: string, config: CustomConfig): boolean;
+  /** F45: sets the origin of a draft (a newer revision of its playbook was taken over); false when the draft is gone or has none */
+  setDraftOrigin(id: string, origin: DraftOrigin): boolean;
+  /** F45: remembers that the draft was exported as a playbook (id and revision of that export) */
+  markExported(id: string, exported: DraftExport): boolean;
   loadDraft(id: string): boolean;
   duplicateDraft(id: string): string | null;
   deleteDraft(id: string): void;
@@ -216,7 +238,18 @@ export function readDrafts(): CustomDraft[] {
       const o = d.origin as Partial<DraftOrigin> | undefined;
       if (o && o.kind === "playbook" && typeof o.title === "string") {
         item.origin = { kind: "playbook", title: o.title.slice(0, 80), author: typeof o.author === "string" ? o.author.slice(0, 40) : null, importedAt: typeof o.importedAt === "number" ? o.importedAt : 0, key: typeof o.key === "string" ? o.key.slice(0, 20) : "" };
+        if (typeof o.pid === "string" && PLAYBOOK_ID_RE.test(o.pid) && typeof o.rev === "number" && Number.isInteger(o.rev) && o.rev >= 1 && o.rev <= MAX_REV) {
+          item.origin.pid = o.pid;
+          item.origin.rev = o.rev;
+        }
+        if (typeof o.changes === "string" && o.changes) item.origin.changes = o.changes.slice(0, MAX_CHANGES);
+        if (Array.isArray(o.checklist)) {
+          const list = cleanChecklist(o.checklist);
+          if (list.length) item.origin.checklist = list;
+        }
       }
+      const x = d.exported as Partial<DraftExport> | undefined;
+      if (x && typeof x.id === "string" && PLAYBOOK_ID_RE.test(x.id) && typeof x.rev === "number" && Number.isInteger(x.rev) && x.rev >= 1 && x.rev <= MAX_REV && typeof x.key === "string") item.exported = { id: x.id, rev: x.rev, key: x.key.slice(0, 20) };
       out.push(item);
     }
   }
@@ -341,6 +374,22 @@ export const useLabor = create<LaborState>()((set, get) => ({
     if (!d) return false;
     const clean = sanitizeCustom(config);
     const drafts = list.map((x) => (x.id === id ? { ...x, name: clean.name, savedAt: Date.now(), config: clean } : x));
+    writeDrafts(drafts);
+    set({ drafts });
+    return true;
+  },
+  setDraftOrigin(id, origin) {
+    const list = get().drafts;
+    if (!list.some((x) => x.id === id && x.origin)) return false;
+    const drafts = list.map((x) => (x.id === id ? { ...x, origin } : x));
+    writeDrafts(drafts);
+    set({ drafts });
+    return true;
+  },
+  markExported(id, exported) {
+    const list = get().drafts;
+    if (!list.some((x) => x.id === id)) return false;
+    const drafts = list.map((x) => (x.id === id ? { ...x, exported } : x));
     writeDrafts(drafts);
     set({ drafts });
     return true;

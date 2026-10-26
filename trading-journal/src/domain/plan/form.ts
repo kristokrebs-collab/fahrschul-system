@@ -8,6 +8,7 @@ import { parseNumber } from "@/lib/parse";
 import type { AccountId, Side } from "../types";
 import type { EntrySides } from "./entry";
 import type { StopRule, TargetRule } from "./exit";
+import { DEFAULT_MANAGE, manageSpecOf, type ManageSpec } from "./manage";
 import { symbolFits } from "./market";
 import { isSessionId, sessionDef, type SessionId } from "./sessions";
 import { MIN, parseDayKey, parseHHMM } from "./time";
@@ -39,6 +40,8 @@ export interface PlanForm {
   manualSide: Side;
   stop: StopRule;
   target: TargetRule;
+  /** how the trade is managed after the entry (break-even, partial target, trailing) – all off by default (F65) */
+  manage: ManageSpec;
   /** "flat by" clock time in the session's zone; `null` = five minutes before the end */
   flatBy: string | null;
   account: AccountId;
@@ -65,6 +68,7 @@ export const DEFAULT_FORM: Readonly<PlanForm> = Object.freeze({
   manualSide: "long" as Side,
   stop: { kind: "range-mid" } as StopRule,
   target: { kind: "r", r: 2 } as TargetRule,
+  manage: DEFAULT_MANAGE as ManageSpec,
   flatBy: null,
   account: "scalp" as AccountId,
   riskPct: null,
@@ -163,6 +167,7 @@ export function formOf(raw: unknown): PlanForm {
     manualSide: r.manualSide === "short" ? "short" : "long",
     stop: stopRuleOf(r.stop),
     target: targetRuleOf(r.target),
+    manage: manageSpecOf(r.manage),
     flatBy: typeof r.flatBy === "string" && parseHHMM(r.flatBy) != null ? r.flatBy.trim() : null,
     account: r.account === "makro" ? "makro" : "scalp",
     riskPct: risk,

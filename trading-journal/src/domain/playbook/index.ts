@@ -3,7 +3,9 @@
  * as a file or pasted, and read back with STRICT validation. No server, no marketplace, no code: the text is parsed as data
  * (`JSON.parse`), checked against a schema, rebuilt field by field from a whitelist and only then handed on.
  *
- * What a playbook holds: title, description, optional author and market, the rule tree (stop, target, management) – nothing
+ * What a playbook holds: title, description, optional author and market, the rule tree (stop, target, management) and – all
+ * optional – a stable `id` with a revision number `rev` and a note on what changed (so a NEWER file of the same playbook is
+ * recognised as an update the reader decides on, never applied by itself) and a `checklist` of manual pre-trade checks – nothing
  * from the journal (no trades, notes, accounts, amounts). What an import refuses (each reason named): too large, not JSON,
  * a wrong format or a newer version, forbidden keys (`__proto__` …), building blocks this version does not know, a tree
  * beyond the app's limits, values of the wrong type, rules that cannot run. Values outside the allowed range are clamped and
@@ -12,6 +14,7 @@
 import { BLOCKS, isBlockId } from "../lab/rules/blocks";
 import { customKey, MAX_CHILDREN, MAX_DEPTH, MAX_LEAVES_PER_SIDE, sanitizeCustom, validateCustom } from "../lab/rules/tree";
 import { CUSTOM_VERSION, EXEC_TFS, TF_IDS, type CustomConfig } from "../lab/rules/types";
+import { PLAYBOOK_ID_RE } from "./update";
 
 export const PLAYBOOK_FORMAT = "tj-playbook" as const;
 export const PLAYBOOK_VERSION = 1 as const;
@@ -22,12 +25,19 @@ export const MAX_PLAYBOOK_BYTES = 80_000;
 export const MAX_TITLE = 80;
 export const MAX_DESCRIPTION = 1000;
 export const MAX_AUTHOR = 40;
+/** Checklist of a playbook: at most this many points, each at most this long (characters). */
+export const MAX_CHECKLIST = 12;
+export const MAX_CHECK_ITEM = 100;
+/** The note on what changed in a revision. */
+export const MAX_CHANGES = 300;
+/** Highest revision number. */
+export const MAX_REV = 9999;
 
 const MAX_NODES = 8_000;
 const MAX_JSON_DEPTH = 18;
 const MAX_STRING = 2_000;
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
-const ROOT_KEYS = new Set(["format", "version", "title", "description", "author", "symbol", "idea", "key"]);
+const ROOT_KEYS = new Set(["format", "version", "title", "description", "author", "symbol", "idea", "key", "id", "rev", "changes", "checklist"]);
 
 export interface Playbook {
   title: string;
@@ -35,6 +45,14 @@ export interface Playbook {
   author: string | null;
   /** Binance symbol the author tested it on, or null */
   symbol: string | null;
+  /** stable id of the playbook across its revisions, `null` = none (a one-off file) */
+  id: string | null;
+  /** revision number (1, 2, 3 …), `null` without an id */
+  rev: number | null;
+  /** what changed in this revision, "" = not said */
+  changes: string;
+  /** manual pre-trade checks of the author (not rules the lab can run) */
+  checklist: string[];
   /** the sanitised rule tree, named after the title */
   config: CustomConfig;
   /** `customKey(config)` */
@@ -63,6 +81,22 @@ export interface PlaybookMeta {
   description?: string;
   author?: string;
   symbol?: string;
+  id?: string;
+  rev?: number;
+  changes?: string;
+  checklist?: readonly string[];
+}
+
+/** A checklist cleaned: one line each, bounded, no duplicates, at most `MAX_CHECKLIST`. */
+export function cleanChecklist(items: readonly unknown[]): string[] {
+  const out: string[] = [];
+  for (const x of items) {
+    if (typeof x !== "string") continue;
+    const t = clean(x, MAX_CHECK_ITEM);
+    if (t && !out.includes(t)) out.push(t);
+    if (out.length >= MAX_CHECKLIST) break;
+  }
+  return out;
 }
 
 /** The playbook of a draft. Only the rules and the text fields given here go in. */
@@ -75,6 +109,14 @@ export function buildPlaybook(config: CustomConfig, meta: PlaybookMeta = {}): Ra
   const author = clean(meta.author ?? "", MAX_AUTHOR);
   if (author) out.author = author;
   if (meta.symbol && /^[A-Z0-9]{2,24}$/.test(meta.symbol)) out.symbol = meta.symbol;
+  if (meta.id && PLAYBOOK_ID_RE.test(meta.id) && Number.isInteger(meta.rev) && meta.rev! >= 1 && meta.rev! <= MAX_REV) {
+    out.id = meta.id;
+    out.rev = meta.rev;
+    const changes = clean(meta.changes ?? "", MAX_CHANGES);
+    if (changes) out.changes = changes;
+  }
+  const checklist = cleanChecklist(meta.checklist ?? []);
+  if (checklist.length) out.checklist = checklist;
   out.idea = { ...cfg, name: title.slice(0, 60) };
   out.key = customKey(cfg);
   return out;
@@ -258,6 +300,34 @@ export function readPlaybook(text: unknown): PlaybookRead {
     else errors.push("Das Feld „symbol“ muss ein Markt wie BTCUSDT sein.");
   }
 
+  // revision data (all optional; a broken value is dropped with a warning, never a refusal)
+  let id: string | null = null;
+  let rev: number | null = null;
+  let changes = "";
+  if (raw.id !== undefined || raw.rev !== undefined) {
+    if (typeof raw.id === "string" && PLAYBOOK_ID_RE.test(raw.id) && typeof raw.rev === "number" && Number.isInteger(raw.rev) && raw.rev >= 1 && raw.rev <= MAX_REV) {
+      id = raw.id;
+      rev = raw.rev;
+    } else warnings.push("Die Angaben „id“ und „rev“ (Kennung und Fassung des Playbooks) sind unvollständig oder ungültig und werden ignoriert: Eine neuere Fassung lässt sich dann nicht zuordnen.");
+  }
+  if (typeof raw.changes === "string" && id) {
+    changes = clean(raw.changes, MAX_CHANGES + 1);
+    if (changes.length > MAX_CHANGES) {
+      warnings.push(`Die Änderungsnotiz ist länger als ${MAX_CHANGES} Zeichen und wird gekürzt.`);
+      changes = changes.slice(0, MAX_CHANGES);
+    }
+  }
+  let checklist: string[] = [];
+  if (raw.checklist !== undefined) {
+    if (!Array.isArray(raw.checklist)) warnings.push("Die Checkliste ist keine Liste und wird ignoriert.");
+    else {
+      checklist = cleanChecklist(raw.checklist);
+      const given = raw.checklist.filter((x) => typeof x === "string" && x.trim()).length;
+      if (given > checklist.length) warnings.push(`Von ${given} Checklisten-Punkten werden ${checklist.length} übernommen (höchstens ${MAX_CHECKLIST}, je ${MAX_CHECK_ITEM} Zeichen, ohne Doppelte).`);
+      if (raw.checklist.some((x) => typeof x !== "string")) warnings.push("Einträge der Checkliste, die kein Text sind, wurden ignoriert.");
+    }
+  }
+
   const idea = raw.idea;
   let config: CustomConfig | null = null;
   if (!isObj(idea)) errors.push("Dem Playbook fehlt die Regelidee („idea“).");
@@ -285,5 +355,7 @@ export function readPlaybook(text: unknown): PlaybookRead {
   const blocking = issues.filter((i) => i.level === "error");
   if (blocking.length) return { ok: false, errors: blocking.map((i) => `Die Regeln lassen sich so nicht laufen lassen: ${i.text}`) };
   for (const i of issues) if (i.level === "warn") warnings.push(i.text);
-  return { ok: true, playbook: { title, description: description ?? "", author: author || null, symbol, config, key }, warnings: warnings.slice(0, 12) };
+  return { ok: true, playbook: { title, description: description ?? "", author: author || null, symbol, id, rev, changes, checklist, config, key }, warnings: warnings.slice(0, 12) };
 }
+
+export * from "./update";
