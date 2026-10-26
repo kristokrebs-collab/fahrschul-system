@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<rss version="2.0">
+    <channel>
+        <copyright>Copyright (c) 2026 Yahoo Inc. All rights reserved.</copyright>
+        <description>Latest Financial News for TSLA</description>
+        <image>
+            <height>45</height>
+            <link>http://finance.yahoo.com/q/h?s=TSLA</link>
+            <title>Yahoo! Finance: TSLA News</title>
+            <url>https://s.yimg.com/rz/stage/p/yahoo_finance_en-US_h_p_finance_2.png</url>
+            <width>144</width>
+        </image>
+        <item>
+            <description>Wall Street is starting to size up the potential of a combined SpaceX and Tesla.</description>
+            <guid isPermaLink="false">bcf7c99e-c22e-4a39-b76d-505b2f979bf9</guid>
+            <link>https://finance.yahoo.com/markets/stocks/article/the-worlds-super-company-wall-street-weighs-spacex-earnings-companys-likely-tesla-tie-up-173949705.html?.tsrc=rss</link>
+            <pubDate>Sun, 25 Oct 2026 17:39:49 +0000</pubDate>
+            <title>'The world's super company': Wall Street weighs SpaceX earnings, company's likely Tesla tie-up</title>
+        </item>
+        <item>
+            <description>Elon Musk's success is closely linked to that of his two biggest businesses.</description>
+            <guid isPermaLink="false">72dceaea-057f-37a8-9c94-bdb7831b95c6</guid>
+            <link>https://www.fool.com/investing/2026/10/25/elon-musk-became-the-first-person-ever-confirmed-w/?.tsrc=rss</link>
+            <pubDate>Sun, 25 Oct 2026 20:20:00 +0000</pubDate>
+            <title>Elon Musk Became the First Person Ever Confirmed With a Net Worth Above $1 Trillion in June 2026. Here's Why That Milestone Still Matters for Tesla and SpaceX Shareholders.</title>
+        </item>
+        <item>
+            <description>AI infrastructure is suddenly more than a buzzword, with Tesla and SpaceX now talked about in the same breath as hyperscalers and trillion dollar opportunities. That kind of story can pull capital quickly and leave slower investors watching from the sidelines. This article walks through three stocks exposed to that Tesla and SpaceX merger narrative. It explains how the news links to their AI compute ambitions and what that might mean for risk and reward. The stocks covered below are just a...</description>
+            <guid isPermaLink="false">2853316e-0de6-31bb-acc4-34d5f4fbe3b6</guid>
+            <link>https://finance.yahoo.com/technology/ai/articles/3-ai-infrastructure-stocks-riding-190713758.html?.tsrc=rss</link>
+            <pubDate>Sun, 25 Oct 2026 19:07:13 +0000</pubDate>
+            <title>3 AI Infrastructure Stocks Riding The Tesla And SpaceX Compute Buildout</title>
+        </item>
+        <item>
+            <description>Tesla’s analyst fair value estimate has shifted from US$395.57 to US$408.36, giving investors a fresh reference point for where some models place the stock. Much of this recalibration links back to the split in analyst views, with bullish perspectives tying higher targets to AI, autonomy and the possible SpaceX merger. More cautious perspectives flag cash burn, heavy capex and execution risk around Robotaxi, Cybercab, Optimus, Semi and Roadster. As you read on, you will see how these moving...</description>
+            <guid isPermaLink="false">f2f207a8-832a-31fd-8353-648959beea8a</guid>
+            <link>https://finance.yahoo.com/markets/stocks/articles/tesla-tsla-stock-gets-fair-180949186.html?.tsrc=rss</link>
+            <pubDate>Sun, 25 Oct 2026 18:09:49 +0000</pubDate>
+            <title>Tesla (TSLA) Stock Gets Fair Value Bump As Analysts Split On AI And SpaceX</title>
+        </item>
+    </channel>
+</rss>

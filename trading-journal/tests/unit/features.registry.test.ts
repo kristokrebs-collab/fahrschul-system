@@ -1,0 +1,332 @@
+/**
+ * The function register (`src/app/features.ts`) is the one truth for "what can the app do and where is it" – this test
+ * keeps it honest: every entry points to a real page and a known sheet, every anchor text really stands in the code of
+ * the app (`tests/e2e/funktionen-anker.spec.ts` then finds it in the DOM of the page), every function sits in exactly one
+ * group with its task in plain words and its intents, where something has no anchor it says how to get there, every status
+ * is explained, every gate is a real plan feature – and `docs/COVERAGE.md` (one row per F-ID, F01–F74) has each F-ID
+ * exactly once, only existing code paths, and nothing the register lists as a function may be marked "fehlt" there.
+ */
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { FEATURE_GROUPS, FEATURE_REGISTRY, PLAN_TIERS, featureById, tierOf, type FeatureAction } from "@/app/features";
+import { PAGE_LABELS } from "@/app/Dock";
+import { LAZY_PAGES, isLazyPage } from "@/app/pages";
+import { FEATURES } from "@/billing/types";
+import { PAGES } from "@/store/uiStore";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const SRC = join(ROOT, "src");
+
+/** All text of the app's source (the register itself excluded) – an anchor must stand there as a literal. */
+function sourceText(): string {
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    for (const name of readdirSync(dir)) {
+      const p = join(dir, name);
+      if (statSync(p).isDirectory()) walk(p);
+      else if (/\.(ts|tsx)$/.test(name) && relative(SRC, p) !== join("app", "features.ts")) out.push(readFileSync(p, "utf8"));
+    }
+  };
+  walk(SRC);
+  return out.join("\n");
+}
+
+interface CoverageRow {
+  fid: string;
+  status: string;
+  code: string[];
+  tests: string[];
+}
+
+function coverage(): CoverageRow[] {
+  const text = readFileSync(join(ROOT, "docs/COVERAGE.md"), "utf8");
+  const split = (cell: string): string[] =>
+    cell
+      .split(";")
+      .map((x) => x.trim())
+      .filter((x) => x && x !== "–");
+  return text
+    .split("\n")
+    .filter((l) => /^\| F\d\d \|/.test(l))
+    .map((l) => {
+      const c = l.split("|").map((x) => x.trim());
+      // | F01 | Punkt | Status | Code | Daten | Tests | Lücke |
+      return { fid: c[1]!, status: c[3]!, code: split(c[4]!), tests: split(c[6]!) };
+    });
+}
+
+const ACTIONS: readonly FeatureAction[] = ["training", "assistant", "newTrade", "csvImport", "shortcuts", "shotImport", "demo"];
+
+describe("function register", () => {
+  it("has unique, slug-shaped ids and a name, a benefit sentence and keywords on every entry", () => {
+    const ids = FEATURE_REGISTRY.map((f) => f.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const f of FEATURE_REGISTRY) {
+      expect(f.id, f.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+      expect(f.name.trim().length, f.id).toBeGreaterThan(3);
+      expect(f.benefit, f.id).toMatch(/[.“”)]$/);
+      expect(f.benefit.length, f.id).toBeLessThan(260);
+      expect(f.keywords.length, f.id).toBeGreaterThan(2);
+      expect(featureById(f.id)).toBe(f);
+    }
+  });
+
+  it("points every entry to an existing route, a known group and a known sheet", () => {
+    const groups = new Set(FEATURE_GROUPS.map((g) => g.id));
+    for (const f of FEATURE_REGISTRY) {
+      expect(PAGES as readonly string[], `${f.id}: page ${f.page}`).toContain(f.page);
+      expect(PAGE_LABELS[f.page], `${f.id}: a page without a label`).toBeTruthy();
+      expect(isLazyPage(f.page) || ["overview", "trades", "setups", "settings"].includes(f.page), f.id).toBe(true);
+      expect(groups.has(f.group), `${f.id}: group ${f.group}`).toBe(true);
+      if (f.action) expect(ACTIONS, `${f.id}: action ${f.action}`).toContain(f.action);
+      if (f.gate) expect(FEATURES as readonly string[], `${f.id}: gate ${f.gate}`).toContain(f.gate);
+    }
+    // the new page is a lazy chunk of its own
+    expect(LAZY_PAGES).toContain("funktionen");
+  });
+
+  it("names the groups after what a trader does and keeps every group readable", () => {
+    expect(FEATURE_GROUPS.map((g) => g.name)).toEqual([
+      "Heute vorbereiten",
+      "Trade prüfen & Chart",
+      "Aktien beobachten & bewerten",
+      "Trade planen",
+      "Risiko & Disziplin",
+      "Strategie entwickeln & testen",
+      "Aus Fehlern lernen",
+      "Auswerten & Berichte",
+      "Üben & Wachsen",
+      "Trades eintragen & Daten",
+      "Community & Teilen",
+      "Konto, Einstellungen & Hilfe",
+    ]);
+    for (const g of FEATURE_GROUPS) {
+      const members = FEATURE_REGISTRY.filter((f) => f.group === g.id);
+      expect(members.length, `${g.id} has too few functions to be a group`).toBeGreaterThanOrEqual(5);
+      expect(g.lead.length, g.id).toBeLessThan(80);
+      expect(g.icon, g.id).toBeTruthy();
+      // a long list needs sub headings, and every sub heading holds at least two functions
+      if (members.length > 8) {
+        for (const f of members) expect(f.sub, `${f.id} (group ${g.id} holds ${members.length} functions)`).toBeTruthy();
+        const subs = new Map<string, number>();
+        for (const f of members) subs.set(f.sub!, (subs.get(f.sub!) ?? 0) + 1);
+        for (const [sub, n] of subs) expect(n, `${g.id} › ${sub}`).toBeGreaterThanOrEqual(2);
+      }
+      // no block of the page is a wall: the group view is cut by sub headings of at most 8 functions (a group at most 30)
+      expect(members.length, `${g.id} is too long for one tile`).toBeLessThanOrEqual(30);
+      const bySub = new Map<string, number>();
+      for (const f of members) bySub.set(f.sub ?? "", (bySub.get(f.sub ?? "") ?? 0) + 1);
+      for (const [sub, n] of bySub) expect(n, `${g.id} › ${sub || "(no sub heading)"} holds ${n} functions`).toBeLessThanOrEqual(8);
+    }
+  });
+
+  it("keeps a group together by the page it belongs to: Handelsplan and Aktien each have their own group, in the order of a trader's day", () => {
+    const of = (id: string) => featureById(id)!.group;
+    for (const id of ["handelsplan-einstieg", "handelsplan-ausstieg", "handelsplan-groesse", "handelsplan-risiko", "handelsplan-ticket", "ausfuehrbarkeit-live", "verwaltung-planen", "zeitmaschine"]) expect(of(id), id).toBe("planen");
+    for (const id of ["aktien-scanner", "aktien-watchlist", "aktien-news", "aktien-kongress", "zahlen-analyst", "dcf-rechner", "kaufthese"]) expect(of(id), id).toBe("aktien");
+    // the two alarms sit side by side
+    expect(of("alarme")).toBe(of("email-alarm"));
+    // the groups come in the order of the day: prepare → check → stocks → plan → risk → build → learn → evaluate → grow → data → community → account
+    expect(FEATURE_GROUPS.map((g) => g.id)).toEqual(["heute", "pruefen", "aktien", "planen", "risiko", "testen", "lernen", "auswerten", "wachsen", "daten", "community", "konto"]);
+    // the group list of the register follows the group order, and a sub heading stays in one run
+    const order = FEATURE_GROUPS.map((g) => g.id);
+    let last = -1;
+    const closed = new Set<string>();
+    let run = "";
+    for (const f of FEATURE_REGISTRY) {
+      const gi = order.indexOf(f.group);
+      expect(gi, `${f.id} is out of group order`).toBeGreaterThanOrEqual(last);
+      last = gi;
+      const key = `${f.group}/${f.sub ?? ""}`;
+      if (key !== run) {
+        expect(closed.has(key), `${f.id}: the sub heading ${key} is split into two runs`).toBe(false);
+        if (run) closed.add(run);
+        run = key;
+      }
+    }
+  });
+
+  it("writes the tasks in the second person and the names with one word per thing", () => {
+    for (const f of FEATURE_REGISTRY) {
+      // Du-Form: a task never talks about "ich", "mein …", "wir" or "man"
+      expect(f.task, `${f.id}: ${f.task}`).not.toMatch(/\b(ich|mir|mich|mein\w*|wir|uns|unser\w*|man)\b/i);
+      expect(f.task![0], `${f.id}: a task starts with a capital`).toBe(f.task![0]!.toUpperCase());
+      expect(f.name, f.id).not.toMatch(/\s{2,}|\s$|^\s/);
+      expect((f.see ?? []).length, `${f.id}: at most four 'Siehe auch'`).toBeLessThanOrEqual(4);
+    }
+    // the five steps of the Handelsplan and the three kinds of Verwaltung read as a family
+    for (const f of FEATURE_REGISTRY.filter((x) => x.page === "plan")) expect(f.name.startsWith("Handelsplan"), f.id).toBe(true);
+    expect(featureById("verwaltung-planen")!.name).toMatch(/^Handelsplan: Verwaltung planen/);
+    expect(featureById("positionsverwaltung")!.name).toMatch(/^Verwaltung testen/);
+    expect(featureById("verwaltung-vergleich")!.name).toMatch(/^Verwaltung vergleichen/);
+    // a name is used once
+    const names = FEATURE_REGISTRY.map((f) => f.name.toLowerCase());
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("gives every function its task in plain words and the intents someone searches with", () => {
+    for (const f of FEATURE_REGISTRY) {
+      expect(f.task, `${f.id}: no task`).toBeTruthy();
+      expect(f.task!.length, `${f.id}: task too long`).toBeLessThanOrEqual(75);
+      expect(f.task!.length, `${f.id}: task too short`).toBeGreaterThan(12);
+      expect(f.task, `${f.id}: a task is a short line without a full stop`).not.toMatch(/[.!?]$/);
+      expect(f.intents?.length ?? 0, `${f.id}: needs at least three intents`).toBeGreaterThanOrEqual(3);
+      for (const t of f.intents ?? []) expect(t, `${f.id}: intents are written in lower case, like people type`).toBe(t.toLowerCase());
+    }
+  });
+
+  it("anchors every function in its page – or gives an opener or a way to it", () => {
+    for (const f of FEATURE_REGISTRY) {
+      expect(!!f.anchor || !!f.action || !!f.path, `${f.id}: neither anchor, action nor path`).toBe(true);
+      // a place in words belongs to something on a page
+      if (f.place) expect(!!f.anchor || !!f.action, `${f.id}: place without anchor`).toBe(true);
+    }
+  });
+
+  it("names the section of a function the way the page says it", () => {
+    const src = sourceText();
+    for (const f of FEATURE_REGISTRY) {
+      if (!f.place) continue;
+      for (const part of f.place.split(/ [·›] /)) expect(src.includes(part), `${f.id}: place "${part}" is nowhere in src/`).toBe(true);
+    }
+  });
+
+  it("points 'Siehe auch' only at other functions that exist, once each", () => {
+    for (const f of FEATURE_REGISTRY) {
+      const see = f.see ?? [];
+      expect(new Set(see).size, f.id).toBe(see.length);
+      for (const id of see) {
+        expect(id, `${f.id} sees itself`).not.toBe(f.id);
+        expect(featureById(id), `${f.id} → ${id} does not exist`).toBeTruthy();
+      }
+    }
+  });
+
+  it("keeps the 'Neu' and 'Empfohlen' marks few and well-formed", () => {
+    const stars = FEATURE_REGISTRY.filter((f) => f.star);
+    expect(stars.length).toBeGreaterThanOrEqual(4);
+    expect(stars.length).toBeLessThanOrEqual(8);
+    for (const f of FEATURE_REGISTRY) if (f.since) expect(f.since, f.id).toMatch(/^20\d\d-(0[1-9]|1[0-2])$/);
+  });
+
+  it("explains every 'teilweise' with a note; a way ('So geht’s') only where something lives inside a sheet or dialog", () => {
+    for (const f of FEATURE_REGISTRY) {
+      if (f.status === "teilweise") expect(f.note?.length ?? 0, `${f.id} is teilweise without a note`).toBeGreaterThan(20);
+      if (f.path) expect(f.path, f.id).toMatch(/→|Auch|Karten/);
+    }
+  });
+
+  it("anchors on text that really stands in the code (test ids and card headings)", () => {
+    const src = sourceText();
+    for (const f of FEATURE_REGISTRY) {
+      const a = f.anchor;
+      if (!a) continue;
+      expect(a.testid || a.heading, `${f.id}: an empty anchor`).toBeTruthy();
+      if (a.testid) {
+        expect(a.testid, `${f.id}: test id shape`).toMatch(/^[a-z0-9-]+$/);
+        expect(src.includes(`"${a.testid}"`) || src.includes(`data-testid="${a.testid}"`), `${f.id}: test id "${a.testid}" is nowhere in src/`).toBe(true);
+      }
+      if (a.heading) expect(src.includes(`"${a.heading}`), `${f.id}: heading "${a.heading}" is nowhere in src/`).toBe(true);
+    }
+  });
+
+  it("derives the plan from the plan table: no gate is free, a gate is the lowest plan that includes it", () => {
+    expect(PLAN_TIERS).toEqual(["frei", "pro", "premium", "team"]);
+    expect(tierOf(undefined)).toBe("frei");
+    expect(tierOf("csvImport")).toBe("frei");
+    expect(tierOf("coach")).toBe("pro");
+    expect(tierOf("backtestLab")).toBe("premium");
+    expect(tierOf("shotExtract")).toBe("premium");
+    for (const f of FEATURE_REGISTRY) expect(PLAN_TIERS).toContain(tierOf(f.gate));
+  });
+
+  it("names the pages of the user's list: Labor, Bibliothek, Belastungstest, TradingView-Vergleich, Coach, Berichte, Wochenexperiment, Verpasste Chancen, Was wäre wenn, Üben, Bias-Test, Import, Backup, Community", () => {
+    const names = FEATURE_REGISTRY.map((f) => f.name).join(" | ");
+    for (const part of ["Backtest-Labor", "Strategie-Bibliothek", "Belastungstest", "TradingView-Vergleich", "Coach", "Berichte", "Wochenexperiment", "Verpasste Chancen", "Was wäre wenn", "Üben", "Bias", "Screenshot", "CSV-Import", "Backup", "Rangliste", "Tagesplan", "Schlüsselmarken", "Check-in", "Lage-Ampel", "Einstiegs-Check", "Warum handeln", "Positionsrechner"]) {
+      expect(names, part).toContain(part);
+    }
+  });
+
+  it("lists what was built after the first register: library, blocks, Pine, grid, forward test, versions, playbook, similar situations, fit, signal chain, month benefit", () => {
+    // id → [page, F-IDs that must be among its fids]
+    const built: Record<string, [string, string[]]> = {
+      "strategie-bibliothek": ["labor", ["F06"]],
+      "indikator-bausteine": ["labor", ["F06", "F11"]],
+      "pine-export": ["labor", ["F14", "F64"]],
+      "parameter-raster": ["labor", ["F17"]],
+      belastungstest: ["labor", ["F20"]],
+      pruefbericht: ["labor", ["F18"]],
+      filtervergleich: ["labor", ["F17"]],
+      "forward-test": ["labor", ["F23"]],
+      "entwurf-versionen": ["labor", ["F15"]],
+      "playbook-austausch": ["labor", ["F13", "F45"]],
+      "idee-testen": ["markt", ["F12"]],
+      "aehnliche-situationen": ["markt", ["F19"]],
+      "passt-zu-dir": ["labor", ["F49"]],
+      "signal-posteingang": ["coach", ["F28"]],
+      signalbilanz: ["coach", ["F25"]],
+      "daten-alarmqualitaet": ["coach", ["F27"]],
+      "verpasste-chancen": ["coach", ["F32"]],
+      "signal-ausgang": ["coach", ["F25", "F32"]],
+      monatsnutzen: ["berichte", ["F60"]],
+      "screenshot-import": ["overview", ["F29"]],
+      wochenexperiment: ["berichte", ["F37"]],
+      ueben: ["trades", ["F38"]],
+      "was-waere-wenn": ["trades", ["F33"]],
+      struktur: ["markt", ["F05"]],
+      "bias-test": ["markt", ["F62"]],
+      checkin: ["wachstum", ["F61"]],
+      schluesselmarken: ["markt", ["F09"]],
+      tagesplan: ["markt", ["F08"]],
+      alarme: ["markt", ["F22"]],
+      "eigene-idee": ["labor", ["F11", "F73"]],
+      positionsverwaltung: ["labor", ["F65"]],
+      assistent: ["overview", ["F74"]],
+    };
+    for (const [id, [page, fids]] of Object.entries(built)) {
+      const f = featureById(id);
+      expect(f, `${id} is missing from the register`).toBeTruthy();
+      expect(f!.page, id).toBe(page);
+      for (const fid of fids) expect(f!.fids, id).toContain(fid);
+    }
+    // what only exists after a run or a click says so
+    for (const id of ["parameter-raster", "belastungstest", "pruefbericht", "filtervergleich", "passt-zu-dir", "signal-ausgang", "monatsnutzen", "indikator-bausteine", "strategie-bibliothek"]) {
+      expect(featureById(id)!.needs?.length ?? 0, `${id} needs a precondition`).toBeGreaterThan(10);
+    }
+  });
+});
+
+describe("docs/COVERAGE.md", () => {
+  const rows = coverage();
+
+  it("has every F-ID from F01 to F74 exactly once, with a valid status", () => {
+    const fids = rows.map((r) => r.fid);
+    expect(fids).toEqual(Array.from({ length: 74 }, (_, i) => `F${String(i + 1).padStart(2, "0")}`));
+    for (const r of rows) expect(["fertig", "teilweise", "fehlt"], r.fid).toContain(r.status);
+  });
+
+  it("cites only code and test paths that exist", () => {
+    for (const r of rows) {
+      for (const p of [...r.code, ...r.tests]) expect(existsSync(join(ROOT, p)), `${r.fid}: ${p}`).toBe(true);
+      if (r.status === "fertig") expect(r.tests.length, `${r.fid} is fertig without a test`).toBeGreaterThan(0);
+    }
+  });
+
+  it("agrees with the register: a listed F-ID exists there as a row and is not marked 'fehlt'", () => {
+    const byFid = new Map(rows.map((r) => [r.fid, r]));
+    for (const f of FEATURE_REGISTRY) {
+      for (const fid of f.fids) {
+        const row = byFid.get(fid);
+        expect(row, `${f.id}: ${fid} is not in COVERAGE.md`).toBeTruthy();
+        expect(row!.status, `${f.id} lists ${fid}, which COVERAGE.md marks as fehlt`).not.toBe("fehlt");
+      }
+    }
+  });
+
+  it("says 'fehlt' for what the register does not offer: no entry for F13, F19, F21, F23 … F26, F43, F49, F58, F60, F66 … F70", () => {
+    const listed = new Set(FEATURE_REGISTRY.flatMap((f) => f.fids));
+    for (const r of rows.filter((x) => x.status === "fehlt")) expect(listed.has(r.fid), r.fid).toBe(false);
+  });
+});

@@ -1,0 +1,579 @@
+/**
+ * Wire contract of the community functions (P12) – PURE and alias-free: the Netlify functions import this file by
+ * relative path and validate every body with these schemas; the client types its calls with them.
+ *
+ * Shared content is a REDACTED payload (`redact.ts` builds it on the device, the server re-validates it with the strict
+ * schemas below – an unknown key is a 422, so nothing personal can be smuggled through): R and % only, never money,
+ * account size, notes or the account's capital.
+ */
+import { z } from "zod";
+import { ORIGIN_KINDS, SOCIAL_METRICS, type OriginClass, type OriginFilter, type SocialMetric } from "./metrics";
+
+/* ------------------------------------------------------------------ shared payloads */
+
+const label = (max: number) => z.string().trim().min(1).max(max);
+const num = (lo: number, hi: number) => z.number().finite().min(lo).max(hi);
+const nullableNum = (lo: number, hi: number) => num(lo, hi).nullable();
+
+/** A trade as it leaves the journal (v1). Every optional detail is only present when the owner switched it on. */
+export const SharedTradeSchema = z
+  .object({
+    v: z.literal(1),
+    kind: z.literal("trade"),
+    pair: z.string().trim().min(1).max(24).regex(/^[A-Za-z0-9:._/-]+$/),
+    side: z.enum(["long", "short"]),
+    timeframe: z.string().trim().max(8).nullable(),
+    /** Entry day `YYYY-MM-DD` (the time only with `time`). */
+    day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    time: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+    result: z.enum(["win", "loss", "be", "open"]),
+    r: nullableNum(-100, 100),
+    movePct: nullableNum(-1000, 1000),
+    /** Planned reward-to-risk. */
+    rr: nullableNum(0, 100),
+    rating: z.number().int().min(1).max(5).nullable(),
+    followedPlan: z.boolean().nullable(),
+    checklist: z.object({ done: z.number().int().min(0).max(99), total: z.number().int().min(1).max(99) }).nullable(),
+    // details (opt-in)
+    holdMin: nullableNum(0, 525_600).optional(),
+    maeR: nullableNum(0, 100).optional(),
+    mfeR: nullableNum(0, 100).optional(),
+    entry: nullableNum(0, 1e9).optional(),
+    exit: nullableNum(0, 1e9).optional(),
+    stop: nullableNum(0, 1e9).optional(),
+    target: nullableNum(0, 1e9).optional(),
+    leverage: nullableNum(0, 1000).optional(),
+    setups: z.array(label(40)).max(5).optional(),
+    tags: z.array(label(24)).max(8).optional(),
+    mistakes: z.array(label(40)).max(8).optional(),
+    emotion: z.string().trim().max(24).optional(),
+  })
+  .strict();
+export type SharedTrade = z.infer<typeof SharedTradeSchema>;
+
+const riskSchema = z
+  .object({
+    riskPct: nullableNum(0.01, 100),
+    maxLeverage: nullableNum(1, 200),
+    minRR: nullableNum(0.1, 50),
+    stop: z.enum(["box", "struktur", "atr", "fix"]).nullable(),
+  })
+  .strict();
+
+/** R-based figures (a setup's playbook or a trader's 90 days). */
+export const SharedFiguresSchema = z
+  .object({
+    trades: z.number().int().min(0).max(100_000),
+    winRate: nullableNum(0, 100),
+    expectancyR: nullableNum(-100, 100),
+  })
+  .strict();
+
+/** An Entscheidungsgrundlage (SetupX) without personal data: no example trade ids, no money (v1). */
+export const SharedSetupSchema = z
+  .object({
+    v: z.literal(1),
+    kind: z.literal("setup"),
+    name: label(40),
+    desc: z.string().trim().max(500),
+    account: z.enum(["makro", "scalp", "both"]),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    checklist: z.array(label(120)).max(30),
+    entryCriteria: z.array(label(160)).max(30),
+    exitCriteria: z.array(label(160)).max(30),
+    risk: riskSchema.nullable(),
+    tags: z.array(label(40)).max(20),
+    markets: z.array(z.string().regex(/^[A-Z0-9]{2,20}$/)).max(20),
+    tf: z.array(label(8)).max(12),
+    stats: SharedFiguresSchema.nullable(),
+  })
+  .strict();
+export type SharedSetup = z.infer<typeof SharedSetupSchema>;
+
+/** A trader's 90-day figures as a card (v1). */
+export const SharedStatsSchema = z
+  .object({
+    v: z.literal(1),
+    kind: z.literal("stats"),
+    windowDays: z.number().int().min(7).max(366),
+    trades: z.number().int().min(0).max(100_000),
+    expectancyR: nullableNum(-100, 100),
+    winRate: nullableNum(0, 100),
+    discipline: nullableNum(0, 100),
+    consistency: nullableNum(0, 100),
+  })
+  .strict();
+export type SharedStats = z.infer<typeof SharedStatsSchema>;
+
+
+/* ------------------------------------------------------------------ Ergebnisbeleg (F57) */
+
+/**
+ * What kind of results the proof states – the TRADER'S word, because the app cannot tell a real-money account from a demo
+ * account: `live` = Echtgeld, `demo` = Demo- / Papierkonto, `sim` = nachgestellt (Backtest, Replay, Übung).
+ */
+export const PROOF_BASES = ["live", "demo", "sim"] as const;
+export type ProofBasis = (typeof PROOF_BASES)[number];
+/** Most trades one proof carries (a longer history is cut by period, never silently by count). */
+export const PROOF_MAX_TRADES = 500;
+/** Longest period of one proof, in days. */
+export const PROOF_MAX_DAYS = 400;
+
+const dayStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const dayMs = (d: string): number => Date.parse(`${d}T00:00:00Z`);
+
+/** One closed trade: `[entry day, R (null = no R), costs in R (null = not known), where the record came from]`. */
+export const ProofTradeSchema = z.tuple([dayStr, nullableNum(-100, 100), nullableNum(-100, 100), z.enum(ORIGIN_KINDS)]);
+export type ProofTrade = z.infer<typeof ProofTradeSchema>;
+
+/**
+ * An Ergebnisbeleg (v1): the COMPLETE list of the closed trades of a period, in R, with their costs and where the records
+ * came from. Every figure on the proof page is computed from this list on the reader's device, so the headline numbers
+ * cannot disagree with the list. No money, no account size, no notes, no pair, no times. The consistency rules (period,
+ * order, the selection arithmetic) are checked by `SharePayloadSchema`.
+ */
+export const SharedProofSchema = z
+  .object({
+    v: z.literal(1),
+    kind: z.literal("proof"),
+    /** The strategy as the trader names it (free text, a stated label – not a verified account name). */
+    strategy: label(60),
+    basis: z.enum(PROOF_BASES),
+    from: dayStr,
+    to: dayStr,
+    scope: z
+      .object({
+        /** Name of the Grundlage when the proof shows only its trades; `null` = every closed trade of the period. */
+        only: label(40).nullable(),
+        /** Closed trades of the period in the journal, whatever the selection. */
+        inPeriod: z.number().int().min(0).max(100_000),
+        /** Trades still open when the proof was made (not in the list). */
+        open: z.number().int().min(0).max(100_000),
+      })
+      .strict(),
+    trades: z.array(ProofTradeSchema).max(PROOF_MAX_TRADES),
+    /** Token of the earlier version this proof continues (its readers can check that nothing was removed). */
+    prev: z.string().regex(/^[A-Za-z0-9_-]{22}$/).nullable().optional(),
+  })
+  .strict();
+export type SharedProof = z.infer<typeof SharedProofSchema>;
+
+/** The arithmetic a proof must satisfy to be one (period, order, selection). `null` = fine, else the reason. */
+export function proofProblem(p: SharedProof): string | null {
+  const a = dayMs(p.from);
+  const b = dayMs(p.to);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return "invalid day";
+  if (b < a) return "to before from";
+  if (b - a > PROOF_MAX_DAYS * 86_400_000) return "period too long";
+  if (p.scope.inPeriod < p.trades.length) return "fewer trades in the period than listed";
+  if (p.scope.only == null && p.scope.inPeriod !== p.trades.length) return "a proof without a selection lists every trade of the period";
+  let last = "";
+  for (const t of p.trades) {
+    if (t[0] < p.from || t[0] > p.to) return "trade outside the period";
+    if (t[0] < last) return "trades are not in time order";
+    last = t[0];
+  }
+  return null;
+}
+
+export const SharePayloadSchema = z
+  .discriminatedUnion("kind", [SharedTradeSchema, SharedSetupSchema, SharedStatsSchema, SharedProofSchema])
+  .superRefine((p, ctx) => {
+    const problem = p.kind === "proof" ? proofProblem(p) : null;
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem, path: ["trades"] });
+  });
+export type SharePayload = z.infer<typeof SharePayloadSchema>;
+export type ShareKind = SharePayload["kind"];
+
+/** Strictly validated payload, or `null`. */
+export function parseSharePayload(raw: unknown): SharePayload | null {
+  const r = SharePayloadSchema.safeParse(raw);
+  return r.success ? r.data : null;
+}
+
+/* ------------------------------------------------------------------ requests */
+
+export const SHARE_EXPIRY_DAYS = [1, 7, 30, 0] as const; // 0 = no expiry
+
+export const CreateShareSchema = z
+  .object({
+    payload: SharePayloadSchema,
+    /** 0 = until revoked. */
+    expiresInDays: z.union([z.literal(1), z.literal(7), z.literal(30), z.literal(0)]).default(30),
+  })
+  .strict();
+export type CreateShareRequest = z.input<typeof CreateShareSchema>;
+
+export const GROUP_KINDS = ["group", "mentor", "team"] as const;
+export type GroupKind = (typeof GROUP_KINDS)[number];
+export const GROUP_ROLES = ["owner", "mentor", "member", "student"] as const;
+export type GroupRole = (typeof GROUP_ROLES)[number];
+export const SHARE_LEVELS = ["none", "stats"] as const;
+export type ShareLevel = (typeof SHARE_LEVELS)[number];
+
+export const CreateGroupSchema = z
+  .object({
+    kind: z.enum(GROUP_KINDS),
+    name: z.string().trim().min(2).max(40),
+    description: z.string().trim().max(280).default(""),
+  })
+  .strict();
+
+export const InviteSchema = z
+  .object({
+    role: z.enum(["mentor", "member", "student"]),
+    maxUses: z.number().int().min(1).max(500).default(25),
+    days: z.number().int().min(1).max(30).default(14),
+  })
+  .strict();
+
+export const JoinSchema = z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{10}$/), shareLevel: z.enum(SHARE_LEVELS).default("none") }).strict();
+
+export const MemberPatchSchema = z
+  .object({
+    role: z.enum(["mentor", "member", "student"]).optional(),
+    shareLevel: z.enum(SHARE_LEVELS).optional(),
+  })
+  .strict()
+  .refine((b) => b.role !== undefined || b.shareLevel !== undefined, { message: "empty" });
+
+export const ReviewSchema = z.object({ payload: SharedTradeSchema, question: z.string().trim().max(500).default("") }).strict();
+export const ReviewPatchSchema = z.object({ status: z.enum(["open", "done"]) }).strict();
+export const CommentSchema = z.object({ body: z.string().trim().min(1).max(1000) }).strict();
+
+export const GOAL_METRICS = ["journalRate", "planAdherence", "checklistRate", "ruleBreaks", "tradesPerDay", "expectancyR", "winRate", "netR", "custom"] as const;
+/**
+ * Metrics whose target may be negative – the same rule as P08's `SIGNED_METRICS` (`src/domain/growth/goals.ts`, P14):
+ * R-based outcomes and own metrics. A negative target for any other metric is refused (400), so a student never adopts
+ * a goal that was silently changed to 0.
+ */
+export const SIGNED_GOAL_METRICS = ["expectancyR", "netR", "custom"] as const satisfies readonly (typeof GOAL_METRICS)[number][];
+/** A mentor's goal proposal – the subset of P08's `GoalDraft` a mentor may set (no account scope, no personal data). */
+export const GoalDraftSchema = z
+  .object({
+    title: z.string().trim().min(3).max(80),
+    kind: z.enum(["process", "outcome", "limit"]),
+    metric: z.enum(GOAL_METRICS),
+    target: num(-1000, 1000),
+    comparator: z.enum(["atLeast", "atMost"]),
+    period: z.enum(["day", "week", "month", "quarter", "year"]),
+    due: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    why: z.string().trim().max(240).optional(),
+  })
+  .strict()
+  .refine((d) => d.target >= 0 || (SIGNED_GOAL_METRICS as readonly string[]).includes(d.metric), { message: "negative target only for R metrics", path: ["target"] });
+export type MentorGoalDraft = z.infer<typeof GoalDraftSchema>;
+export const GoalSchema = z.object({ studentId: z.string().uuid(), draft: GoalDraftSchema }).strict();
+export const GoalPatchSchema = z.object({ status: z.enum(["accepted", "declined"]) }).strict();
+
+
+/* ------------------------------------------------------------------ Chartfälle (F47) */
+
+/** Candle sizes of a case (UTC grid of the exchange) and the length of the question in candles. */
+export const CASE_INTERVALS = ["15m", "1h", "4h", "1d"] as const;
+export type CaseInterval = (typeof CASE_INTERVALS)[number];
+export const CASE_INTERVAL_MS: Readonly<Record<CaseInterval, number>> = { "15m": 900_000, "1h": 3_600_000, "4h": 14_400_000, "1d": 86_400_000 };
+export const CASE_HORIZONS = [6, 12, 24, 48] as const;
+/** How long hypotheses are taken before everyone sees everyone's (hours). */
+export const CASE_OPEN_HOURS = [1, 6, 24, 72] as const;
+export const CASE_DIRECTIONS = ["up", "down", "flat"] as const;
+export type CaseDirection = (typeof CASE_DIRECTIONS)[number];
+export const CASE_CONFIDENCES = [50, 60, 70, 80, 90] as const;
+/** Earliest anchor the database accepts (2020-01-01 UTC) – the exchange's USDⓈ-M history starts later anyway. */
+export const CASE_MIN_ANCHOR = 1_577_836_800_000;
+
+/**
+ * A case: a stretch of PUBLIC market data (symbol, candle size, the last candle everybody sees, how many candles ahead
+ * the question reaches) plus a question – no journal data, no money, no screenshot. The outcome is never stored: every
+ * reader works it out from the public candles on their own device (`cases.ts`), so nobody can set it.
+ */
+export const CreateCaseSchema = z
+  .object({
+    pair: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{4,20}$/),
+    interval: z.enum(CASE_INTERVALS),
+    /** Open time (ms, UTC) of the last candle that is shown: on the candle grid, already closed. */
+    anchorMs: z.number().int().min(CASE_MIN_ANCHOR).max(4_102_444_800_000),
+    horizon: z.union([z.literal(6), z.literal(12), z.literal(24), z.literal(48)]),
+    question: z.string().trim().max(280).default(""),
+    openHours: z.union([z.literal(1), z.literal(6), z.literal(24), z.literal(72)]).default(24),
+  })
+  .strict();
+export type CreateCaseRequest = z.input<typeof CreateCaseSchema>;
+export type CreateCaseBody = z.infer<typeof CreateCaseSchema>;
+
+/** A hypothesis is written ONCE and never changed: direction after `horizon` candles, how sure, and why. */
+export const HypothesisSchema = z
+  .object({
+    direction: z.enum(CASE_DIRECTIONS),
+    confidence: z.union([z.literal(50), z.literal(60), z.literal(70), z.literal(80), z.literal(90)]),
+    reason: z.string().trim().min(10).max(280),
+  })
+  .strict();
+export type HypothesisRequest = z.infer<typeof HypothesisSchema>;
+export const CasePatchSchema = z.object({ close: z.literal(true) }).strict();
+
+export const FEEDBACK_KINDS = ["bug", "idea", "praise", "report", "other"] as const;
+export type FeedbackKind = (typeof FEEDBACK_KINDS)[number];
+export const REPORT_TARGETS = ["comment", "review", "share", "group", "case"] as const;
+export const FeedbackSchema = z
+  .object({
+    kind: z.enum(FEEDBACK_KINDS),
+    message: z.string().trim().min(3).max(2000),
+    page: z.string().regex(/^[a-z0-9_-]{1,32}$/).optional(),
+    target: z.object({ type: z.enum(REPORT_TARGETS), id: z.string().trim().min(1).max(64) }).strict().optional(),
+    meta: z.object({ release: z.string().max(64).optional(), edition: z.enum(["personal", "share"]).optional() }).strict().optional(),
+  })
+  .strict()
+  .refine((b) => b.kind !== "report" || !!b.target, { message: "target required", path: ["target"] });
+export type FeedbackRequest = z.input<typeof FeedbackSchema>;
+
+export const LeaderboardActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("optIn"), on: z.boolean() }).strict(),
+  z.object({ action: z.literal("refresh") }).strict(),
+  z.object({ action: z.literal("reroll") }).strict(),
+]);
+export type LeaderboardAction = z.infer<typeof LeaderboardActionSchema>;
+
+/* ------------------------------------------------------------------ responses */
+
+export interface ShareInfo {
+  id: string;
+  token: string;
+  kind: ShareKind;
+  /** Short label ("BTCUSDT Long · +2,1R", "Setup Breakout"). */
+  title: string;
+  createdAt: string;
+  expiresAt: string | null;
+  revoked: boolean;
+  views: number;
+}
+
+export interface CreateShareResponse {
+  share: ShareInfo;
+}
+
+export interface SharedResponse {
+  kind: ShareKind;
+  payload: SharePayload;
+  createdAt: string;
+  expiresAt: string | null;
+  views: number;
+}
+
+/** R-based figures of one member as the group may see them (`share_level = 'stats'`). */
+export interface MemberFigures {
+  trades: number;
+  expectancyR: number | null;
+  winRate: number | null;
+  discipline: number | null;
+  consistency: number | null;
+  /** Deepest drop of the running R sum in the window (≥ 0); absent from an older server. */
+  drawdownR?: number | null;
+  /** Where the records of the R trades came from (see `metrics.ts`); null = not computed. */
+  origin?: OriginClass | null;
+  computedAt: string;
+}
+
+export interface MemberInfo {
+  /** Opaque member id (the user's id – needed for roles, seats, goals, mentions). */
+  id: string;
+  pseudonym: string;
+  role: GroupRole;
+  shareLevel: ShareLevel;
+  joinedAt: string;
+  me: boolean;
+  /** Only when the member shares stats with the group. */
+  figures: MemberFigures | null;
+  /** Team groups: the member holds one of the owner's seats. */
+  seat?: boolean;
+}
+
+export interface InviteInfo {
+  code: string;
+  role: "mentor" | "member" | "student";
+  uses: number;
+  maxUses: number;
+  expiresAt: string;
+}
+
+export interface GroupSummary {
+  id: string;
+  kind: GroupKind;
+  name: string;
+  description: string;
+  role: GroupRole;
+  members: number;
+  /** Open reviews visible to me. */
+  openReviews: number;
+  createdAt: string;
+}
+
+export interface GroupAverages {
+  n: number;
+  expectancyR: number | null;
+  discipline: number | null;
+  consistency: number | null;
+}
+
+export interface GroupDetail extends GroupSummary {
+  ownerId: string;
+  shareLevel: ShareLevel;
+  memberList: MemberInfo[];
+  /** Owners / mentors only. */
+  invites: InviteInfo[];
+  /** Averages of the members who share stats – only from `K_ANON` such members on (k-anonymity). */
+  averages: GroupAverages | null;
+  /** Team groups (owner only): the Team plan's seats. */
+  seats: { seats: number; used: number } | null;
+}
+
+export interface CommentInfo {
+  id: string;
+  author: string;
+  authorId: string;
+  me: boolean;
+  body: string;
+  mentionsMe: boolean;
+  hidden: boolean;
+  createdAt: string;
+}
+
+export interface ReviewInfo {
+  id: string;
+  groupId: string;
+  author: string;
+  authorId: string;
+  me: boolean;
+  payload: SharedTrade;
+  question: string;
+  status: "open" | "done";
+  reviewedBy: string | null;
+  createdAt: string;
+  comments: CommentInfo[];
+}
+
+export interface GoalInfo {
+  id: string;
+  groupId: string;
+  groupName: string;
+  mentor: string;
+  student: string;
+  studentId: string;
+  draft: MentorGoalDraft;
+  status: "open" | "accepted" | "declined";
+  createdAt: string;
+  /** I am the student (adopt / decline) – else I am the mentor. */
+  mine: boolean;
+}
+
+export interface SocialMe {
+  pseudonym: string;
+  /** Ranking opt-in as the server sees it (`profiles.privacy.leaderboard`). */
+  optIn: boolean;
+  /** Last figures (null until computed). */
+  figures: (MemberFigures & { eligible: boolean; rTrades: number }) | null;
+}
+
+export interface GroupsResponse {
+  me: SocialMe;
+  groups: GroupSummary[];
+  goals: GoalInfo[];
+}
+
+
+export interface HypothesisInfo {
+  author: string;
+  authorId: string;
+  me: boolean;
+  direction: CaseDirection;
+  confidence: number;
+  reason: string;
+  /** When the server stored it – the proof that it was written before the others saw it. */
+  createdAt: string;
+}
+
+export interface CaseInfo {
+  id: string;
+  groupId: string;
+  author: string;
+  authorId: string;
+  me: boolean;
+  pair: string;
+  interval: CaseInterval;
+  anchorMs: number;
+  horizon: number;
+  question: string;
+  /** Hypotheses are taken until then (or until the author closes the case). */
+  closesAt: string;
+  /** Closed: no more hypotheses, everybody sees what everybody wrote. */
+  closed: boolean;
+  createdAt: string;
+  /** How many hypotheses there are (the texts stay hidden until the case is closed). */
+  hypotheses: number;
+  /** My own hypothesis, always visible to me. */
+  mine: HypothesisInfo | null;
+  /** The others' hypotheses – empty until the case is closed; in mentor groups students see only the mentors' and their own. */
+  revealed: HypothesisInfo[];
+}
+
+export interface FeedResponse {
+  group: GroupDetail;
+  reviews: ReviewInfo[];
+  /** Chartfälle of the group (absent from an older server). */
+  cases?: CaseInfo[];
+}
+
+export interface InvitePreview {
+  code: string;
+  groupName: string;
+  kind: GroupKind;
+  role: "mentor" | "member" | "student";
+  members: number;
+  /** Already a member (the join is a no-op). */
+  member: boolean;
+}
+
+export interface LeaderboardRow {
+  rank: number;
+  /** Rank of the previous snapshot (null = new). */
+  prevRank: number | null;
+  pseudonym: string;
+  value: number;
+  trades: number;
+  /** The row's drawdown in R, shown beside every metric (null / absent = not known). */
+  drawdownR?: number | null;
+  /** Where this trader's records came from. */
+  origin?: OriginClass | null;
+  me: boolean;
+}
+
+export interface CommunityDistribution {
+  metric: SocialMetric | "winrate";
+  n: number;
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  mean: number;
+}
+
+export interface LeaderboardResponse {
+  metric: SocialMetric;
+  /** The data filter of this board (global boards; a group board is always `all`). */
+  origin?: OriginFilter;
+  /** Day of the snapshot (null = none yet). */
+  day: string | null;
+  /** Participants of the snapshot. */
+  total: number;
+  rows: LeaderboardRow[];
+  /** My row when I am ranked outside the top rows. */
+  mine: LeaderboardRow | null;
+  /** Distributions per metric (k-anonymous, empty below k). */
+  community: CommunityDistribution[];
+  me: SocialMe;
+  /** Group leaderboard: the group's name. */
+  group: { id: string; name: string } | null;
+}
+
+export const LEADERBOARD_METRICS: readonly SocialMetric[] = SOCIAL_METRICS;

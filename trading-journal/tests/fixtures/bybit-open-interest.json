@@ -1,0 +1,133 @@
+{
+  "retCode": 0,
+  "retMsg": "OK",
+  "result": {
+    "symbol": "BTCUSDT",
+    "category": "linear",
+    "list": [
+      {
+        "openInterest": "61740.000",
+        "timestamp": "1790762400000"
+      },
+      {
+        "openInterest": "61680.000",
+        "timestamp": "1790758800000"
+      },
+      {
+        "openInterest": "61620.000",
+        "timestamp": "1790755200000"
+      },
+      {
+        "openInterest": "61560.000",
+        "timestamp": "1790751600000"
+      },
+      {
+        "openInterest": "61500.000",
+        "timestamp": "1790748000000"
+      },
+      {
+        "openInterest": "61440.000",
+        "timestamp": "1790744400000"
+      },
+      {
+        "openInterest": "61380.000",
+        "timestamp": "1790740800000"
+      },
+      {
+        "openInterest": "61320.000",
+        "timestamp": "1790737200000"
+      },
+      {
+        "openInterest": "61260.000",
+        "timestamp": "1790733600000"
+      },
+      {
+        "openInterest": "61200.000",
+        "timestamp": "1790730000000"
+      },
+      {
+        "openInterest": "61140.000",
+        "timestamp": "1790726400000"
+      },
+      {
+        "openInterest": "61080.000",
+        "timestamp": "1790722800000"
+      },
+      {
+        "openInterest": "61020.000",
+        "timestamp": "1790719200000"
+      },
+      {
+        "openInterest": "60960.000",
+        "timestamp": "1790715600000"
+      },
+      {
+        "openInterest": "60900.000",
+        "timestamp": "1790712000000"
+      },
+      {
+        "openInterest": "60840.000",
+        "timestamp": "1790708400000"
+      },
+      {
+        "openInterest": "60780.000",
+        "timestamp": "1790704800000"
+      },
+      {
+        "openInterest": "60720.000",
+        "timestamp": "1790701200000"
+      },
+      {
+        "openInterest": "60660.000",
+        "timestamp": "1790697600000"
+      },
+      {
+        "openInterest": "60600.000",
+        "timestamp": "1790694000000"
+      },
+      {
+        "openInterest": "60540.000",
+        "timestamp": "1790690400000"
+      },
+      {
+        "openInterest": "60480.000",
+        "timestamp": "1790686800000"
+      },
+      {
+        "openInterest": "60420.000",
+        "timestamp": "1790683200000"
+      },
+      {
+        "openInterest": "60360.000",
+        "timestamp": "1790679600000"
+      },
+      {
+        "openInterest": "60300.000",
+        "timestamp": "1790676000000"
+      },
+      {
+        "openInterest": "60240.000",
+        "timestamp": "1790672400000"
+      },
+      {
+        "openInterest": "60180.000",
+        "timestamp": "1790668800000"
+      },
+      {
+        "openInterest": "60120.000",
+        "timestamp": "1790665200000"
+      },
+      {
+        "openInterest": "60060.000",
+        "timestamp": "1790661600000"
+      },
+      {
+        "openInterest": "60000.000",
+        "timestamp": "1790658000000"
+      }
+    ],
+    "nextPageCursor": ""
+  },
+  "retExtInfo": {},
+  "time": 1790762400000
+}
