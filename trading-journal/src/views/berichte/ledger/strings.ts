@@ -43,7 +43,6 @@ export const LEDGER = {
   openLotLine: (side: string, qty: string, market: string, price: string, at: string) => `${side} ${qty} ${market} zu ${price} seit ${at}`,
   unresolved: "Klärliste: Einträge ohne Zeilen",
   unresolvedNote: "Diese Einträge lassen sich nicht in Zeilen übersetzen. Sie verschwinden nicht, sondern stehen hier mit dem Grund.",
-  notIncluded: "Nicht enthalten: Ein- und Auszahlungen, Überweisungen zwischen Konten oder Wallets, Staking, Rewards, Airdrops und die Umrechnung in eine Fiat-Währung (die Beträge stehen in der Handelswährung). Offene Positionen sind nicht bewertet. Es wird keine Steuer berechnet und keine Haltefrist behauptet: Anschaffung und Veräußerung sind nur Datumsspalten.",
   export: "Export",
   csvBook: "CSV: Transaktionsbuch",
   csvMatch: "CSV: FIFO-Zuordnung",

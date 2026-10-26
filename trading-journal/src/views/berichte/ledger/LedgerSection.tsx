@@ -69,7 +69,7 @@ function RowItem({ row, zone, cur }: { row: LedgerRow; zone: string; cur: string
       )}
       {row.kind === "close" && row.matches.length > 0 && (
         <details className="text-[11.5px] text-mute md:col-span-full max-md:col-span-2" data-testid="ledger-matches">
-          <summary className="cursor-pointer select-none py-0.5 text-faint hover:text-mute pointer-coarse:py-2.5">
+          <summary className="cursor-pointer select-none py-0.5 text-faint hover:text-mute pointer-coarse:min-h-11 pointer-coarse:py-3.5">
             {L.matches} ({row.matches.length})
           </summary>
           <ul className="grid gap-1 pt-1">
@@ -242,7 +242,7 @@ export default function LedgerSection({ acc }: { acc: AccFilter }) {
               )}
               {ledger.openLots.length > 0 && (
                 <details className="text-[12px] text-mute" data-testid="ledger-open">
-                  <summary className="cursor-pointer select-none py-1 text-faint hover:text-mute pointer-coarse:py-2.5">
+                  <summary className="cursor-pointer select-none py-1 text-faint hover:text-mute pointer-coarse:min-h-11 pointer-coarse:py-3.5">
                     {L.openLots} ({ledger.openLots.length})
                   </summary>
                   <ul className="grid gap-1 pt-1">

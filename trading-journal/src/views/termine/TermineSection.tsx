@@ -14,7 +14,8 @@ export default function TermineSection() {
       <Reveal index={0} className="min-w-0 lg:col-span-5">
         <BriefingCard />
       </Reveal>
-      <Reveal index={1} className="min-w-0 lg:col-span-7">
+      {/* settled: the calendar is a long list (3 000+ px on a phone, more with Funding on) – a reveal waits for 15 % of the element in view and a card that tall would stay at opacity 0 on a short screen */}
+      <Reveal index={1} settled className="min-w-0 lg:col-span-7">
         <TermineCard />
       </Reveal>
       <Reveal index={2} className="min-w-0 lg:col-span-12">

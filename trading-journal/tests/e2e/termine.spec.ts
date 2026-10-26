@@ -14,7 +14,7 @@
  * No clock jumps and no expectation that depends on the time of day (the Funding grid, the number of day cells and the
  * structure of the cards are fixed; the own appointment is placed two days ahead of whatever "now" is).
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, screenshot, seed, stored } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 
@@ -23,6 +23,16 @@ const PROJECTS = ["mobile", "desktop"];
 async function openMarkt(page: Page): Promise<void> {
   await openRoute(page, "/#markt", "Markt");
   await expect(page.getByTestId("termine-card")).toBeAttached({ timeout: 40_000 });
+}
+
+/**
+ * The card and everything around it is really painted. A reveal that never fires (an element taller than the screen never gets
+ * the 15 % in view it waits for) leaves its wrapper at opacity 0 – `toBeVisible` does not notice, a screenshot does.
+ */
+async function expectPainted(card: Locator): Promise<void> {
+  await expect
+    .poll(() => card.evaluate((el) => { for (let n: Element | null = el; n; n = n.parentElement) if (Number(getComputedStyle(n).opacity) < 0.99) return false; return true; }), { timeout: 15_000 })
+    .toBe(true);
 }
 
 /** `datetime-local` value two days ahead at 12:00 – a fixed hour on a day that is within the list's three weeks. */
@@ -51,6 +61,7 @@ test.describe("Termine", () => {
     await openMarkt(page);
     const card = page.getByTestId("termine-card");
     await card.scrollIntoViewIfNeeded();
+    await expectPainted(card);
 
     // the next Funding is always there: computed from the 8-hour grid
     await expect(card.getByTestId("next-funding")).toContainText("Nächstes Funding");
@@ -93,7 +104,7 @@ test.describe("Termine", () => {
     // the sources are listed with their rule and check date
     await card.getByTestId("termine-sources").getByText("Quellen der Termine").click();
     await expect(card.getByTestId("termine-sources")).toContainText("Deribit – Verfallstermine");
-    await expect(card.getByTestId("termine-sources")).toContainText("federalreserve.gov");
+    await expect(card.getByTestId("termine-sources")).toContainText("Federal Reserve – FOMC");
 
     await screenshot(page, info, "termine-kalender");
     await expectNoHorizontalScroll(page);
@@ -156,14 +167,26 @@ test.describe("Termine", () => {
     await openMarkt(page);
     const card = page.getByTestId("briefing-card");
     await card.scrollIntoViewIfNeeded();
+    await expectPainted(card);
     for (const id of ["overview", "events", "markets", "levels", "alerts", "checkin", "watch"]) await expect(card.getByTestId(`briefing-${id}`)).toBeVisible();
-    const sources = await card.getByTestId("briefing-source").allTextContents();
-    expect(sources.length).toBeGreaterThan(8);
-    for (const s of sources) expect(s).toMatch(/^Quelle: .+ · (\d\d:\d\d Uhr|keine Zeit)$/);
-    // a line that says "keine Daten" is marked and has no time
-    for (const line of await card.locator('[data-testid="briefing-line"][data-missing="true"]').all()) {
-      await expect(line).toContainText(/keine Daten/);
-      await expect(line.getByTestId("briefing-source")).toContainText("keine Zeit");
+    // ONE snapshot taken inside the page: the market lines arrive while the page settles and React reuses their <li> in place, so
+    // a query that resolves the elements first and reads them in a second call (evaluateAll, allTextContents) can see a text of
+    // the new state under the attribute of the old one
+    const lines = await card.evaluate((root) =>
+      Array.from(root.querySelectorAll('[data-testid="briefing-line"]')).map((e) => ({
+        missing: e.getAttribute("data-missing") === "true",
+        text: e.textContent ?? "",
+        source: e.querySelector('[data-testid="briefing-source"]')?.textContent ?? "",
+      })),
+    );
+    expect(lines.length).toBeGreaterThan(8);
+    for (const l of lines) {
+      // every line names its source and a time or says there is none; a line that says "keine Daten" is marked and has no time
+      expect(l.source).toMatch(/^Quelle: .+ · (\d\d:\d\d Uhr|keine Zeit)$/);
+      if (l.missing) {
+        expect(l.text).toMatch(/keine Daten/);
+        expect(l.source).toContain("keine Zeit");
+      }
     }
     await expect(card.getByTestId("briefing-events")).toContainText(/Funding-Abrechnungen um /);
     await expect(card.getByTestId("briefing-stand")).toContainText("Stand ");
@@ -179,6 +202,7 @@ test.describe("Termine", () => {
     await openMarkt(page);
     const card = page.getByTestId("phasen-card");
     await card.scrollIntoViewIfNeeded();
+    await expectPainted(card);
     await expect(card.getByTestId("phase-row")).toHaveCount(6);
     expect(await card.getByTestId("phase-row").evaluateAll((els) => els.map((e) => e.getAttribute("data-phase")))).toEqual(["fundingPre", "fundingPost", "expiryDay", "fomcDay", "usOpenHour", "weekend"]);
     for (const v of await card.getByTestId("phase-row").evaluateAll((els) => els.map((e) => e.getAttribute("data-verdict")))) expect(["klar", "tendenz", "offen", "wenig"]).toContain(v);
@@ -212,7 +236,9 @@ test.describe("Termine", () => {
     const answer = dialog.getByTestId("assistant-answer").first();
     await expect(answer).toContainText("Heute wichtig", { timeout: 20_000 });
     await expect(answer).toContainText("Keine professionelle Finanzberatung.", { timeout: 20_000 });
-    await expect(answer).toContainText("keine Daten");
+    // every statement carries its source in brackets (this fixture has data for everything, so nothing reads "keine Daten")
+    await expect(answer).toContainText("[Ereigniskalender");
+    await expect(answer).toContainText("[Marktdaten]");
     await answer.getByRole("button", { name: "Briefing mit allen Quellen öffnen" }).click();
     await expect(dialog).toBeHidden();
     await expect(page.getByTestId("briefing-card")).toBeInViewport({ timeout: 10_000 });

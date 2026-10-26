@@ -514,6 +514,24 @@ describe("Morgenbriefing – every line with its source, missing data as 'keine 
     expect(briefingText(off)).toContain("[Ereigniskalender]");
   });
 
+  it("says when the weekend (Sat 00:00 – Mon 00:00 UTC) begins or ends inside the trader's day instead of calling a whole Monday weekend", () => {
+    const weekendLines = (at: string): string[] =>
+      buildBriefing({ ...base, now: Z(at) })
+        .sections.find((s) => s.id === "events")!
+        .lines.map((l) => l.text)
+        .filter((t) => t.startsWith("Wochenende"));
+    // Saturday 24 Oct 2026 in Berlin (CEST): the day runs from 22:00Z; the weekend begins at 00:00Z = 02:00 CEST
+    expect(weekendLines("2026-10-24T10:00:00Z")).toEqual(["Wochenende (UTC) beginnt um 02:00 Uhr: danach sind die US-Börsen geschlossen, Krypto handelt durchgehend"]);
+    // Sunday 25 Oct (25 hours long, the clock goes back at 03:00 CEST): the whole day lies inside the weekend
+    expect(weekendLines("2026-10-25T10:00:00Z")).toEqual(["Wochenende (UTC): die US-Börsen sind geschlossen, Krypto handelt durchgehend"]);
+    // Monday 26 Oct, 00:30 CET (= Sunday 23:30Z): the weekend ends at 00:00Z = 01:00 CET, still 30 minutes ahead
+    expect(weekendLines("2026-10-25T23:30:00Z")).toEqual(["Wochenende (UTC) endet um 01:00 Uhr: bis dahin sind die US-Börsen geschlossen"]);
+    // later on that Monday the weekend is over: no line
+    expect(weekendLines("2026-10-26T07:30:00Z")).toEqual([]);
+    // a weekday in the middle of the week never mentions it
+    expect(weekendLines("2026-10-28T07:30:00Z")).toEqual([]);
+  });
+
   it("reads the alarms of the day from the protocol and ignores older ones", () => {
     const b = buildBriefing({ ...base, alerts: [{ at: Z("2026-10-28T06:15:00Z"), title: "Long-Trigger: vorbereiten", outcome: "gesendet" }, { at: Z("2026-10-27T10:00:00Z"), title: "alt", outcome: "gesendet" }] });
     expect(b.sections.find((s) => s.id === "alerts")!.lines.map((l) => l.text)).toEqual(["07:15 Uhr · Long-Trigger: vorbereiten (gesendet)"]);

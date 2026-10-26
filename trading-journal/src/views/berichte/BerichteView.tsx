@@ -243,7 +243,8 @@ export function BerichteView({ className }: { className?: string }) {
         </Cell>
       )}
       {/* F70: independent of the period and the focus – the whole journal as a ledger */}
-      <Cell index={0} span="lg:col-span-12">
+      {/* no `Cell` (Reveal): the ledger grows with every 50 rows and a reveal waits for 15 % of its element in view – a card that tall would stay at opacity 0 */}
+      <div className="flex min-w-0 flex-col lg:col-span-12 [&>*]:flex-1">
         <Suspense
           fallback={
             <Card title="Transaktionsbuch" data-testid="ledger-loading">
@@ -253,7 +254,7 @@ export function BerichteView({ className }: { className?: string }) {
         >
           <LedgerSection acc={page.acc} />
         </Suspense>
-      </Cell>
+      </div>
       <AnalysisNote className="lg:col-span-12" lead="Berechnet aus deinem Journal – eine Rückschau, keine Prognose." />
     </div>
   );

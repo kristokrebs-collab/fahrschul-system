@@ -136,7 +136,15 @@ function eventLines(day: string, tz: string, own: readonly OwnEvent[], now: numb
     lines.push(line(`${when} · ${e.title}${e.detail ? ` (${e.detail})` : ""}`, e.source.label, e.at, e.at < now && !e.allDay ? "mute" : tone));
   }
   if (funding.length) lines.push(line(`Funding-Abrechnungen um ${funding.map((e) => formatClock(e.at, tz)).join(", ")} Uhr`, funding[0]!.source.label, funding[0]!.at, "mute"));
-  if (weekend) lines.push(line("Wochenende (UTC): die US-Börsen sind geschlossen, Krypto handelt durchgehend", weekend.source.label, weekend.at, "mute"));
+  if (weekend) {
+    // the weekend is Saturday 00:00 to Monday 00:00 UTC, the day is a day of `tz`: say when it begins or ends inside the day
+    // instead of calling a whole Monday "Wochenende" because its first hour (UTC) still belongs to it
+    const end = weekend.end ?? weekend.at;
+    if (weekend.at > from) lines.push(line(`Wochenende (UTC) beginnt um ${formatClock(weekend.at, tz)} Uhr: danach sind die US-Börsen geschlossen, Krypto handelt durchgehend`, weekend.source.label, weekend.at, "mute"));
+    else if (end < to) {
+      if (end > now) lines.push(line(`Wochenende (UTC) endet um ${formatClock(end, tz)} Uhr: bis dahin sind die US-Börsen geschlossen`, weekend.source.label, end, "mute"));
+    } else lines.push(line("Wochenende (UTC): die US-Börsen sind geschlossen, Krypto handelt durchgehend", weekend.source.label, weekend.at, "mute"));
+  }
   if (!lines.length) lines.push(line("Für heute sind keine Termine eingetragen oder berechnet.", "Ereigniskalender", from, "mute"));
   return lines;
 }

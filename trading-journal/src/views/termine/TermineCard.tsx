@@ -299,7 +299,8 @@ export function TermineCard() {
     return eventsBetween({ from: startOfDay(grid[0]![0]!.key, tz), to: startOfDay(addDays(grid[grid.length - 1]![6]!.key, 1), tz), kinds, own });
   }, [view, year, month, tz, kinds, own]);
   const byDay = useMemo(() => new Map(groupByDay(monthEvents, tz).map((g) => [g.day, g.events])), [monthEvents, tz]);
-  const selected = picked ?? today;
+  // the day shown under the grid: the one tapped, else today, else the first of the month that is shown
+  const selected = picked ?? (monthShift === 0 ? today : `${year}-${String(month).padStart(2, "0")}-01`);
   const selectedEvents = byDay.get(selected) ?? [];
 
   const next = useMemo(
@@ -411,17 +412,17 @@ export function TermineCard() {
         ) : (
           <div className="grid gap-3" data-testid="termine-month">
             <div className="flex items-center gap-2">
-              <Button size="sm" className="pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label={T.prev} onClick={() => setMonthShift(monthShift - 1)} data-testid="month-prev">
+              <Button size="sm" className="pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label={T.prev} onClick={() => { setMonthShift(monthShift - 1); setPicked(null); }} data-testid="month-prev">
                 ‹
               </Button>
               <span className="num min-w-[9rem] text-center text-[13px] text-fg" data-testid="month-label">
                 {MONTHS[month - 1]} {year}
               </span>
-              <Button size="sm" className="pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label={T.following} onClick={() => setMonthShift(monthShift + 1)} data-testid="month-next">
+              <Button size="sm" className="pointer-coarse:min-h-11 pointer-coarse:min-w-11" aria-label={T.following} onClick={() => { setMonthShift(monthShift + 1); setPicked(null); }} data-testid="month-next">
                 ›
               </Button>
               {monthShift !== 0 && (
-                <Button size="sm" className="pointer-coarse:min-h-11" onClick={() => setMonthShift(0)}>
+                <Button size="sm" className="pointer-coarse:min-h-11" onClick={() => { setMonthShift(0); setPicked(null); }}>
                   {T.thisMonth}
                 </Button>
               )}
@@ -453,7 +454,7 @@ export function TermineCard() {
         </div>
 
         <details className="text-[12px] text-mute" data-testid="termine-sources">
-          <summary className="cursor-pointer select-none py-1 text-faint hover:text-mute pointer-coarse:py-2.5">{T.sources.title}</summary>
+          <summary className="cursor-pointer select-none py-1 text-faint hover:text-mute pointer-coarse:min-h-11 pointer-coarse:py-3.5">{T.sources.title}</summary>
           <ul className="grid gap-3 pt-2">
             {[FUNDING_SOURCE, EXPIRY_SOURCE, NYSE_SOURCE, FOMC_SOURCE, WEEKEND_SOURCE, OWN_SOURCE].map((s) => (
               <li key={s.label} className="rounded-xl border border-line bg-ink-950/40 p-3">

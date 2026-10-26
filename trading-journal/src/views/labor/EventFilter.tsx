@@ -70,7 +70,7 @@ export function EventFilterRow() {
         </>
       )}
       <details className="pl-1 text-[12px] leading-snug text-mute">
-        <summary className="cursor-pointer select-none py-1 text-faint hover:text-mute pointer-coarse:py-2.5">{EVENT_FILTER_TEXT.why}</summary>
+        <summary className="cursor-pointer select-none py-1 text-faint hover:text-mute pointer-coarse:min-h-11 pointer-coarse:py-3.5">{EVENT_FILTER_TEXT.why}</summary>
         <p className="pt-1" data-testid="labor-filter-event-reason">
           {EVENT_FILTER_REASON}
         </p>

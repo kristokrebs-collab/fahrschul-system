@@ -6,18 +6,29 @@
  * 390 px, touch targets ≥ 44 px on touch. Nothing here depends on the clock.
  */
 import { readFileSync } from "node:fs";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, hasTouch, openRoute, screenshot, seed } from "./helpers";
 import { auditHitBoxes, HIT_SELECTOR } from "./hitbox";
 
 const PROJECTS = ["mobile", "desktop"];
 const NOTE = "Hilfsrechnung ohne Steuerberatung; Steuerregeln prüft eine Fachperson";
 
+/**
+ * The card and everything around it is really painted. A reveal that never fires (an element taller than the screen never gets
+ * the 15 % in view it waits for) leaves its wrapper at opacity 0 – `toBeVisible` does not notice, a screenshot does.
+ */
+async function expectPainted(card: Locator): Promise<void> {
+  await expect
+    .poll(() => card.evaluate((el) => { for (let n: Element | null = el; n; n = n.parentElement) if (Number(getComputedStyle(n).opacity) < 0.99) return false; return true; }), { timeout: 15_000 })
+    .toBe(true);
+}
+
 async function openLedger(page: Page) {
   await openRoute(page, "/#berichte", "Berichte");
   const card = page.getByTestId("ledger-card");
   await expect(card).toBeAttached({ timeout: 40_000 });
   await card.scrollIntoViewIfNeeded();
+  await expectPainted(card);
   return card;
 }
 
@@ -95,10 +106,16 @@ test.describe("Transaktionsbuch", () => {
   });
 
   test("CSV: the book and the matching with the head, and the print view with the same head", async ({ page }) => {
+    // the stub takes the document as it stands when the dialog would open (the view removes it a moment after print() returns)
     await page.addInitScript(() => {
-      (window as unknown as { __printed: number }).__printed = 0;
+      const w = window as unknown as { __printed: number; __doc: string | null; __note: string | null };
+      w.__printed = 0;
+      w.__doc = null;
+      w.__note = null;
       window.print = () => {
-        (window as unknown as { __printed: number }).__printed++;
+        w.__printed++;
+        w.__doc = document.querySelector('[data-testid="ledger-print"]')?.textContent ?? null;
+        w.__note = document.querySelector('[data-testid="ledger-print-note"]')?.textContent ?? null;
       };
     });
     await seed(page);
@@ -118,10 +135,14 @@ test.describe("Transaktionsbuch", () => {
 
     await card.getByTestId("ledger-print-btn").click();
     await expect.poll(() => page.evaluate(() => (window as unknown as { __printed: number }).__printed)).toBe(1);
-    const doc = page.getByTestId("ledger-print");
-    await expect(doc).toHaveCount(1);
-    await expect(doc.getByTestId("ledger-print-note")).toHaveText(NOTE);
-    await expect(doc).toContainText("Nicht enthalten: Ein- und Auszahlungen");
+    const printed = await page.evaluate(() => {
+      const w = window as unknown as { __doc: string | null; __note: string | null };
+      return { doc: w.__doc, note: w.__note };
+    });
+    expect(printed.note).toBe(NOTE);
+    expect(printed.doc).toContain("Transaktionsbuch");
+    expect(printed.doc).toContain("Nicht enthalten: Ein- und Auszahlungen");
+    expect(printed.doc).toContain("Es wird keine Steuer berechnet und keine Haltefrist behauptet");
     await page.evaluate(() => window.dispatchEvent(new Event("afterprint")));
     await expect(page.getByTestId("ledger-print")).toHaveCount(0);
   });

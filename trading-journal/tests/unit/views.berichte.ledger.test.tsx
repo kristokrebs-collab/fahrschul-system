@@ -187,5 +187,6 @@ describe("Transaktionsbuch", () => {
     wrap("makro");
     expect(screen.getByTestId("ledger-empty")).toHaveTextContent("Im Journal liegt noch kein Trade");
     expect(screen.getByTestId("ledger-scope-note")).toHaveTextContent("Staking, Rewards, Airdrops");
+    expect(screen.getByTestId("ledger-scope-note")).toHaveTextContent("Es wird keine Steuer berechnet und keine Haltefrist behauptet");
   });
 });

@@ -12,7 +12,7 @@ import { FLAG_LABEL, KIND_LABEL, type Ledger, type LedgerRow } from "./types";
 export const LEDGER_NOTE = "Hilfsrechnung ohne Steuerberatung; Steuerregeln prüft eine Fachperson";
 
 /** What the book does not hold – said in every export. */
-export const LEDGER_SCOPE_NOTE = "Nicht enthalten: Ein- und Auszahlungen, Überweisungen zwischen Konten oder Wallets, Staking, Rewards, Airdrops und die Umrechnung in eine Fiat-Währung. Offene Positionen sind nicht bewertet.";
+export const LEDGER_SCOPE_NOTE = "Nicht enthalten: Ein- und Auszahlungen, Überweisungen zwischen Konten oder Wallets, Staking, Rewards, Airdrops und die Umrechnung in eine Fiat-Währung (die Beträge stehen in der Handelswährung). Offene Positionen sind nicht bewertet. Es wird keine Steuer berechnet und keine Haltefrist behauptet: Anschaffung und Veräußerung sind nur Datumsspalten.";
 
 export const SCOPE_TEXT = { position: "je Position (ein Journal-Eintrag)", market: "je Markt (alle Einträge eines Marktes)" } as const;
 

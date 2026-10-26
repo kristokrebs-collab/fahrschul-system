@@ -230,7 +230,9 @@ export function MarktView({ className }: { className?: string }) {
           <Cell index={7} span="lg:col-span-5">
             <PlanCard />
           </Cell>
-          <Cell index={7} span="lg:col-span-12">
+          {/* no `Cell` (Reveal) around the section: it is three cards tall (several thousand px on a phone), and a reveal waits for
+              15 % of its element to be in view – an element that tall never gets there and would stay at opacity 0. The cards reveal themselves. */}
+          <div className="min-w-0 lg:col-span-12">
             <Suspense
               fallback={
                 <Card title="Termine" data-testid="termine-loading">
@@ -240,7 +242,7 @@ export function MarktView({ className }: { className?: string }) {
             >
               <TermineSection />
             </Suspense>
-          </Cell>
+          </div>
           <Cell index={3} span="lg:col-span-5">
             <RsiLinesCard view={view} />
           </Cell>
