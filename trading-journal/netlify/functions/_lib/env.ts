@@ -28,6 +28,7 @@ export const SERVER_ENV = [
   "VISION_MODEL",
   "RESEND_API_KEY",
   "ALERT_FROM",
+  "SEC_USER_AGENT",
 ] as const;
 
 /** Known names plus further key versions for rotation (`EXCHANGE_ENC_KEY_V2`, …). */

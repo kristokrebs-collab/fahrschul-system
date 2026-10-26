@@ -497,3 +497,13 @@ the feed cannot serve yields no candles and its German reason – nothing is sub
 feed's bar key (`klineBarKey`: a bar appended or closed, not forming ticks) or the feed's health text changes; nothing runs
 without a mounted caller (no timer, no store). The search itself is the pure `@/domain/similar` and runs on the main thread in
 the card's `useMemo` (milliseconds for ≤ 1500 candles). Tests: `tests/unit/views.markt.similar.test.tsx`.
+
+## `sec/` – SEC EDGAR für die Aktien-Module (F68 / F69)
+
+Kein Krypto-Feed: der **Vertrag** zu den Server-Funktionen `GET /api/v1/sec/facts?ticker=` und `/api/v1/sec/filings?ticker=` (`netlify/functions/sec-facts.mts`, `sec-filings.mts`; Betrieb, Grenzen und Env siehe `netlify/functions/README.md`). Der Browser spricht nie selbst mit der SEC (Kontakt im User-Agent nötig, `data.sec.gov` ohne CORS, 10 Anfragen je Sekunde).
+Wie `Stamped` der Feeds trägt jedes Ergebnis `source` (`"sec-edgar"`, Anzeige „SEC EDGAR (XBRL)“), `asOf` (Datum, auf das sich die Zahlen beziehen: neuestes Quartalsende bzw. neueste Meldung), `receivedAt` (wann der **Server** die SEC gelesen hat – eine Antwort aus dem Server-Speicher behält ihre ursprüngliche Zeit), `cached`, `stale` und die SEC-URL (`src/ui/SourceStand.tsx` zeigt Quelle + Abruf).
+| Datei | was |
+|---|---|
+| `wire.ts`, `concepts.ts`, `days.ts`, `reduce.ts`, `tickers.ts`, `filings.ts` | **rein und ohne `@/`-Alias** (die Funktionen importieren sie relativ): Antwortformate, die gelesenen XBRL-Konzepte je Kennzahl, Datumshelfer, `reduceCompanyFacts` (SEC-„company facts“ 3–20 MB → bekannte Konzepte, nur Berichte (10-Q/10-K), ~6 Jahre, eine Einheit je Konzept; Werte werden nie geändert, Wiederholungen bleiben), Ticker → CIK (Klassen-Aktien mit `-` oder `.`), die Einreichungsliste (letzte 10-Q/10-K/8-K, jüngste Ergebnismeldung mit Punkt 2.02, Pressemitteilung aus dem Ordner-Index). |
+| `client.ts`, `index.ts` | `fetchSecFacts`, `fetchSecFilings` (5-Minuten-Zwischenspeicher je Browser, gleiche Anfragen in Flug teilen sich einen Aufruf), `SecError` mit `kind`: `setup_required` („Einrichtung nötig“: `SEC_USER_AGENT` fehlt, kein Aufruf), `unknown_ticker`, `no_facts`, `busy`, `timeout`, `upstream`, `invalid`, `invalid_query`, `plan_required`, `unauthenticated`, `rate_limited`, `unavailable` (kein Server hier) – jeweils mit der deutschen Meldung des Servers. |
+Tests: `tests/unit/sec.shared.test.ts`, `tests/unit/sec.client.test.ts`, `tests/unit/functions.sec.test.ts`; Fixtures im echten SEC-Format in `tests/fixtures/sec` (Erzeuger `make.mjs`, Herkunft dort beschrieben).

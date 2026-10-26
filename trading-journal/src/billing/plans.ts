@@ -51,6 +51,8 @@ export const FEATURE_INFO: Readonly<Record<Feature, FeatureInfo>> = {
   backtestLab: { label: "Backtest-Labor", pitch: "Strategien gegen Historie testen – Walk-Forward inklusive.", group: "tools" },
   customDashboards: { label: "Eigene Dashboards", pitch: "Cockpit-Layouts genau für deinen Workflow.", group: "tools" },
   shotExtract: { label: "Screenshot-Import", pitch: "Liest Einstieg, Ausstieg, Stop und Ergebnis aus Börsen-Screenshots – du prüfst nur die unsicheren Werte.", group: "tools" },
+  // honest scope: reported numbers of US filers from SEC filings (no consensus, no price data), a DCF range and a thesis with refutation criteria
+  stockAnalysis: { label: "Aktien-Analyse", pitch: "Quartalszahlen aus den SEC-Berichten, DCF-Spanne und überwachte Kaufthese – ohne Konsens, ohne Kursdaten.", group: "analyse" },
   community: { label: "Community", pitch: "Gruppen und Ranglisten – anonym und nur mit Zustimmung.", group: "team" },
   mentor: { label: "Mentor-Modus", pitch: "Trades gezielt mit Mentor oder Schülern teilen.", group: "team" },
 };
@@ -68,6 +70,7 @@ const PRO_FEATURES: readonly Feature[] = [
   "replay",
   "boxScanner",
   "growth",
+  "stockAnalysis",
 ];
 const PREMIUM_FEATURES: readonly Feature[] = [...PRO_FEATURES, "apiAccess", "coachAi", "reportsPdf", "backtestLab", "mentor", "customDashboards", "shotExtract"];
 

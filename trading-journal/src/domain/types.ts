@@ -320,6 +320,12 @@ export interface Settings {
    * two-tab merge works per strategy and per version; entries a newer version wrote survive untouched.
    */
   studio?: unknown;
+  /**
+   * Kaufthesen (F69): the user's long-term investment theses with scenarios, refutation criteria and versions. Versioned
+   * passthrough (`{ v: 1, theses: [{ id, ticker, … , versions }] }`, see `@/domain/thesis`); absent until the first thesis is
+   * saved. Arrays of objects with an id, so the cloud / two-tab merge works per thesis and per version.
+   */
+  theses?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */
