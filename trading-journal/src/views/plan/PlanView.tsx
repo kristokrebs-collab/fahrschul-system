@@ -1,12 +1,13 @@
 /**
  * Handelsplan (`h1 Handelsplan`): the chain Einstieg → Ausstieg → Größe → Risiko-Check → Ticket as ONE guided flow – five big
  * step cards, the state on top as a progress bar, every step with "Angenommen", Quelle + Stand of the candles and the line
- * „Keine professionelle Finanzberatung.“. Crypto candles today (Binance, cache first, live while the session runs); the rules
- * take symbol + candles, so stocks join as soon as their data contract delivers candles. The app calculates and copies – it
- * never sends an order.
+ * „Keine professionelle Finanzberatung.“. Crypto candles from Binance (cache first, live while the session runs), stock candles from
+ * the stock data contract (Yahoo Finance, said to be unofficial and possibly delayed); the rules take symbol + candles, so both markets
+ * run through the same five steps. `#plan?symbol=…&side=…` prefills market and direction (the line at the top says what it took).
+ * The app calculates and copies – it never sends an order.
  *   Bild            the candles of the session with range, signal, entry, stop and target (right on a wide screen)
  *   1 – 5           EntryStep · ExitStep · SizeStep · RiskStep · TicketStep
- *   Zeitmaschine    the slot of the replay (another agent builds it)
+ *   Zeitmaschine    the slot of the replay (the card of `src/views/timemachine`, history from `historySources.ts`)
  *   Gespeichert     the saved plans (`settings.plan`)
  */
 import { Suspense, useEffect, type ReactNode } from "react";

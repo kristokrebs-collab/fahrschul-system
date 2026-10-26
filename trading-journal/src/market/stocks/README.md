@@ -1,7 +1,7 @@
 # `src/market/stocks` – the stock data contract (F67 / F68)
 
-One door to US stock data for everything that needs it: the scanner, the watchlist, the news monitor – and the parts other agents
-build next to them (analyst, Congress, trade plan). It sits beside `src/market/sources` (Binance) and follows the same rules:
+One door to US stock data for everything that needs it: the scanner, the watchlist, the news monitor, the trade plan (`src/market/plan/stockCandles.ts`:
+the plan's candles; `src/views/timemachine/historySources.ts`: the Zeitmaschine's hourly and daily history) – and the parts other agents build next to them (analyst, Congress). It sits beside `src/market/sources` (Binance) and follows the same rules:
 **every value carries `source`, `asOf` (when the market made it) and `receivedAt` (when this app got it)**, a failure is a typed
 result and never a gap or an invented number, and nothing but tickers, an interval and a range ever leaves the machine.
 

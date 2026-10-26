@@ -6,6 +6,8 @@
  *   chart and a listing with a bad status are skipped, an unknown ticker fails – and the summary counts exactly that, with the
  *   error rate; a chart preview opens; a hit goes to the watchlist and survives a reload;
  * - Scanner (Eröffnungsspanne): a breakout of the 15-minute range on 5-minute candles of a fixed past session;
+ * - "Plan erstellen →" from the watchlist: end to end into the Handelsplan (ticker and direction prefilled, the candles of a faked source, the
+ *   hand calculation of the fixture);
  * - Krypto: the top-N list and the candles come from Binance;
  * - the honest failures: the server functions missing, the directory blocked (the reason is named, nothing is listed);
  * - cancel keeps what was found; the news: merged, rated by keyword, "Neu" since the last visit, marked read;
@@ -15,6 +17,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route, type TestInfo } from "@playwright/test";
 import { collectErrors, expectNoHorizontalScroll, openRoute, seed, stored } from "./helpers";
+import { recentTradingDay, stockSessionBars } from "./mocks/planStockCandles";
 
 const PROJECTS = ["mobile", "desktop"];
 const SHOTS = process.env.AKTIEN_SHOTS_DIR;
@@ -282,6 +285,55 @@ test.describe("Aktien", () => {
     await expect(hit.getByTestId("aktien-hit-detail")).toContainText("Eröffnungsspanne 09:30–09:45 NY");
     await expectNoHorizontalScroll(page);
     await shot(page, info, "aktien-3-orb");
+    expect(errors).toEqual([]);
+  });
+
+  test("Plan erstellen →: von der Watchlist Ende-zu-Ende in den Handelsplan – Aktie und Richtung vorgefüllt, Kerzen der nachgebauten Quelle, Handrechnung", async ({ page }, info) => {
+    const errors = await open(page, info);
+    const day = recentTradingDay(Date.now());
+    await mockStocks(page);
+    // the Handelsplan asks for the 5-minute candles of AAPL: the fixed session of a recent day (a later route wins over the shared one)
+    const planCalls: URL[] = [];
+    await page.route(/\/api\/v1\/stocks\/bars/, async (route: Route) => {
+      const u = new URL(route.request().url());
+      if (u.searchParams.get("interval") !== "5m" || u.searchParams.get("symbols") !== "AAPL") return route.fallback();
+      planCalls.push(u);
+      return route.fulfill({ status: 200, headers: JSON_HEADERS, body: JSON.stringify({ source: "yahoo", interval: "5m", range: u.searchParams.get("range"), fetchedAt: Date.now(), results: { AAPL: { ok: true, bars: stockSessionBars(day), meta: meta("AAPL", 186) } } }) });
+    });
+    await go(page);
+    await page.getByTestId("aktien-watch-input").fill("aapl");
+    await page.getByTestId("aktien-watch-add").click();
+    const row = page.locator('[data-testid="aktien-watch-row"][data-symbol="AAPL"]');
+    await expect(row).toBeVisible();
+    await row.getByTestId("aktien-watch-plan").click();
+
+    // the same app, no reload: the Handelsplan opens with the ticker and the direction – and says what it took from the link
+    const plan = page.locator('[data-page="plan"][data-page-role="current"]');
+    await expect(plan.locator("h1").first()).toHaveText("Handelsplan", { timeout: 30_000 });
+    await expect(plan.getByTestId("hplan-link-applied")).toContainText("Aus dem Link übernommen: Markt AAPL (US-Aktie) · Sitzung US-Börse (9:30 New York) · Richtung Long. Es wurde nichts gespeichert und nichts gesendet.");
+    await expect(plan.getByRole("radio", { name: "AAPL" })).toBeChecked();
+    await expect(plan.getByRole("radiogroup", { name: "Richtung des Signals" }).getByRole("radio", { name: "Long" })).toBeChecked();
+    expect(await stored<{ plan?: unknown }>(page, "tj2-settings").then((s) => s?.plan ?? null)).toBeNull();
+    await expect(page).toHaveURL(/#plan\?symbol=AAPL&side=long$/);
+
+    // the session of the fixed day: five steps, the hand calculation of the fixture (Stop 185,05 · Ziel 187,60 · 20 Stück · 22,56 USD)
+    await plan.getByTestId("hplan-day").fill(day);
+    await expect(plan.getByTestId("hplan-progress")).toHaveAttribute("data-done", "5", { timeout: 30_000 });
+    await expect(plan.getByTestId("hplan-entry-headline")).toHaveText("Signal Long: Schluss 185,90 um 09:55 Uhr über dem Hoch der Range.");
+    await expect(plan.getByTestId("hplan-stop")).toContainText("185,05");
+    await expect(plan.getByTestId("hplan-target")).toContainText("187,60");
+    await expect(plan.getByTestId("hplan-qty")).toHaveText("20");
+    await expect(plan.getByTestId("hplan-maxloss")).toContainText("22,56 USD");
+    await expect(plan.getByTestId("hplan-ticket-rows")).toContainText("20 Stück (Positionswert 3.718,00 USD)");
+    await expect(plan.getByTestId("hplan-ticket-note")).toContainText("Keine professionelle Finanzberatung.");
+    expect(planCalls.length).toBeGreaterThan(0);
+    await expectNoHorizontalScroll(page);
+    await shot(page, info, "aktien-5-plan");
+
+    // back to the stocks page: the watchlist is still there
+    await page.goBack();
+    await expect(page.getByTestId("aktien-scanner")).toBeVisible();
+    await expect(page.locator('[data-testid="aktien-watch-row"][data-symbol="AAPL"]')).toBeVisible();
     expect(errors).toEqual([]);
   });
 

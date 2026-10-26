@@ -4,7 +4,7 @@ Drei eigenständige, lazy-taugliche Panels zu `src/domain/analyst`, `src/domain/
 
 | Export | was |
 |---|---|
-| `AnalystPanel` (auch `default`, `lazy(() => import("@/views/analyst/AnalystPanel"))`) | Props `AnalystPanelProps` (`types.ts`): `ticker?`, `autoLoad?`, `onLoaded?`, `onUseInDcf?(seed, ticker)`, `onStartThesis?(ticker)`, `bare?`, `className?`, `fetchImpl?` (Tests). |
+| `AnalystPanel` (auch `default`, `lazy(() => import("@/views/analyst/AnalystPanel"))`) | Props `AnalystPanelProps` (`types.ts`): `ticker?`, `autoLoad?`, `onLoaded?`, `onUseInDcf?(seed, ticker)`, `onStartThesis?(ticker)`, `onCreatePlan?(ticker)` ("Plan erstellen →", only when the host wires it – the page Aktien opens `#plan?symbol=<ticker>&side=long`), `bare?`, `className?`, `fetchImpl?` (Tests). |
 | `DcfPanel` (auch `default`) | `DcfPanelProps`: `ticker?`, `seed?` (Ausgangszahlen vom Host, z. B. aus `onUseInDcf`), `bare?`, `className?`, `fetchImpl?`, `now?`. Funktioniert ohne SEC mit selbst getippten Zahlen. |
 | `ThesisPanel` (auch `default`), `THESIS_SECTIONS` | `ThesisPanelProps`: `ticker?` (öffnet die These dieser Firma bzw. füllt das Feld „Neue These“), `monitor?` (Standard an), `bare?`, `className?`, `fetchImpl?`, `now?`. `THESIS_SECTIONS` = die Anker (`data-section`) der Abschnitte Begründung / Szenarien / Widerlegen / Versionen für die `SectionNav` des Gastgebers. |
 | `AN`, `DCF`, `TH` | die deutschen Texte. |

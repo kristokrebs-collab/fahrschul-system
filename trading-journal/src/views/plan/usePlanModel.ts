@@ -1,7 +1,7 @@
 /**
  * Everything the Handelsplan page shows, in one hook: the form → the session → the candles (cache first, live refresh while the
- * session runs) → the pure model (`buildPlanModel`) with the live limits of the account. The candles are only loaded for a
- * source that exists (crypto today). The clock of the page ticks every ten seconds while the session is live, once a minute
+ * session runs) → the pure model (`buildPlanModel`) with the live limits of the account. The candles come from the source of the
+ * session's market (crypto: Binance, stocks: the stock data contract). The clock of the page ticks every ten seconds while the session is live, once a minute
  * while the page waits for the next "latest session", and never for a day in the past.
  */
 import { useEffect, useMemo, useRef, useState } from "react";

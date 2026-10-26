@@ -39,8 +39,9 @@ A slot only reads and shows; what it saves goes under its own settings key, neve
 ## Plan link (Handelsplan)
 
 A hit and a watchlist row offer **"Plan erstellen →"** only when the page `plan` exists (`planPageExists()`: `PAGES.includes("plan")`); without
-it the link is not drawn. It sets `location.hash` to `#plan?symbol=<ticker>&side=<long|short>` (`planHash`). The page `plan` reads that query
-(ticker and side, nothing else) when it opens – **the Handelsplan agent registers that query seam**; until then the hash only opens the page.
+it the link is not drawn. It sets `location.hash` to `#plan?symbol=<ticker>&side=<long|short>` (`planHash` = `planLinkHash` of `@/domain/plan/link`). The page `plan` reads that query
+(ticker and side, nothing else) through the router's seam for `#plan` and prefills market and direction – in memory only, nothing is saved or sent; a value it does not understand is ignored and said.
+Works for stocks and for crypto pairs (a hit of the crypto scan links `symbol=BTCUSDT`). The analyst section (`AnalystPanel`) offers the same link next to "These anlegen" ("Plan erstellen →", Long) through the optional `onCreatePlan`.
 
 ## Assistant, search, function register
 
@@ -51,5 +52,5 @@ it the link is not drawn. It sets `location.hash` to `#plan?symbol=<ticker>&side
   news part – no earnings dates, no consensus or surprise, no rule drafts on numbers; the SEC 8-K feed plugs in through `registerNewsSource`).
 
 Tests: `tests/unit/views.aktien.test.tsx` (scan counts and sentences, rank switch, preview, thresholds, watchlist writes, news merge / new / read,
-slots, the plan link rule, the reasons shown), `tests/unit/assistant.stocks.test.ts`, e2e `tests/e2e/aktien.spec.ts` (mobile + desktop, network
-mocked with `page.route`; set `AKTIEN_SHOTS_DIR` for screenshots).
+slots, the plan link rule, the reasons shown), `tests/unit/views.aktien.analystPlan.test.tsx` (the analyst's plan link), `tests/unit/assistant.stocks.test.ts`, e2e `tests/e2e/aktien.spec.ts` (mobile + desktop, network
+mocked with `page.route`; "Plan erstellen →" end to end into the Handelsplan; set `AKTIEN_SHOTS_DIR` for screenshots).
