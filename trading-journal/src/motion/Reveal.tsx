@@ -5,6 +5,8 @@ import { canObserveInView, useRevealSeen } from "@/motion/inView";
 import { isSafeFx } from "@/motion/safeFx";
 import { spring, stagger, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
+import { cn } from "@/lib/cn";
+import { INTRINSIC_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 
 /**
  * Blur-fade entrance (21st.dev / magicui "Blur Fade"): `{opacity 0, y 14, blur 6px}` (Samsung-Internet-safe effects:
@@ -59,11 +61,22 @@ export interface RevealProps extends Omit<HTMLMotionProps<"div">, RevealOwned> {
   as?: RevealTag;
   /** Skip the entrance and rest at the final pose (e.g. the intro already carried this element into place). */
   settled?: boolean;
+  /**
+   * Below-the-fold cell of a long page: it skips style, layout and paint while far off screen (`content-visibility: auto`,
+   * the pattern of the Übersicht) and assumes this end size (px per breakpoint, `ReserveHeight`) until it was rendered once.
+   * Paint containment clips at the cell box, so the cell gets 12 px of room above and below (padding offset by an equal
+   * negative margin: layout is unchanged) for the card's hover lift. Marks the cell `data-defer` for `useIdlePrerender`.
+   */
+  defer?: ReserveHeight;
   children?: ReactNode;
 }
 
+/** The cell classes of a deferred reveal: skip while far away, room for the hover lift (layout-neutral). */
+export const DEFER_CLASS = "[content-visibility:auto] -my-3 py-3";
+
 /** One element that blur-fades in when it scrolls into view (once). */
-export function Reveal({ index = 0, delay = 0, as = "div", settled = false, children, ...rest }: RevealProps) {
+export function Reveal({ index = 0, delay = 0, as = "div", settled = false, defer, children, ...inherited }: RevealProps) {
+  const rest = defer == null ? inherited : { ...inherited, className: cn(DEFER_CLASS, INTRINSIC_CLASS, inherited.className), style: { ...reserveStyle(defer), ...inherited.style }, "data-defer": "" };
   const enabled = useRevealEnabled();
   const gate = useIntroGate();
   const ref = useRef<HTMLDivElement>(null);

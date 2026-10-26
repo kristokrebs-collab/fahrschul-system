@@ -10,7 +10,7 @@
  * Every cell reveals once (`Reveal`, ends at `transform: none`); section titles rise letter by letter. Without trades:
  * one calm preview card. Registered by the integrator (P14) as page `analyse` (`#analyse?dim=<dimension>`).
  */
-import { useId, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { Gate } from "@/billing/entitlements";
 import { UpgradeTeaser } from "@/billing/ui/UpgradeTeaser";
 import { ACCOUNT_LABELS } from "@/domain/defaults";
@@ -19,7 +19,9 @@ import { cn } from "@/lib/cn";
 import { useCloseMorphDialogOnUnmount } from "@/motion/MorphDialog";
 import { Reveal } from "@/motion/Reveal";
 import { Card } from "@/primitives/Card";
-import { RESERVE_CLASS, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
+import { useIdlePrerender } from "@/primitives/idlePrerender";
+import { Later } from "@/primitives/Later";
+import { RESERVE_CLASS, RESERVE_CLASS_DEFER, reserveStyle, type ReserveHeight } from "@/primitives/Reserve";
 import { EmptyState } from "@/primitives/EmptyState";
 import { SectionNav, type SectionNavItem } from "@/primitives/SectionNav";
 import { Segmented } from "@/primitives/Segmented";
@@ -48,21 +50,43 @@ export const ANALYSE_LEAD_FILL = { storageKey: storageKey("fill-analyse"), highl
 const ACC_OPTIONS = (["all", "makro", "scalp"] as const).map((v) => ({ v, label: ACCOUNT_LABELS[v] }));
 
 /**
- * `reserve`: the END size of a card whose content arrives after the first paint (the Monte Carlo run, the daily candles of
- * the benchmark) – a floor from the first frame (`Reserve`, `@/primitives/Reserve`), so the cards below never slide down
- * when it lands (measured on the finished page: Monte Carlo 944 / 744 px, Benchmark 604 / 529 px at 390 / ≥ 640 px).
+ * `size` = the END size of the card in this cell (px at 390 / 640 / 1024 and up, measured on the finished page).
+ * - `late`: the card's content arrives after the first paint (the Monte Carlo run, the daily candles of the benchmark) – the
+ *   cell holds that size as a floor from the first frame (`Reserve`, `@/primitives/Reserve`), so the cards below never slide down
+ *   when it lands (before: +367 px / +172 px after the first paint);
+ * - `defer`: a cell below the first screenful skips style, layout and paint until it nears the viewport
+ *   (`content-visibility: auto`, `Reveal defer`) and is rendered once in idle time (`useIdlePrerender`) – the page mounts
+ *   with the work of its first screen instead of its 9 000 px; the card itself mounts after the page has painted, one per idle
+ *   slice (`Later`), so the switch to the page is no longer one long task.
  */
-function Cell({ index, span, reserve, children }: { index: number; span: string; reserve?: ReserveHeight; children: ReactNode }) {
+function Cell({ index, span, size, late = false, defer = false, children }: { index: number; span: string; size?: ReserveHeight; late?: boolean; defer?: boolean; children: ReactNode }) {
   return (
-    <Reveal index={index} className={cn("flex min-w-0 flex-col [&>*]:flex-1", reserve && RESERVE_CLASS, span)} style={reserve ? reserveStyle(reserve) : undefined}>
-      {children}
+    <Reveal
+      index={index}
+      defer={defer ? size : undefined}
+      className={cn("flex min-w-0 flex-col [&>*]:flex-1", late && size && (defer ? RESERVE_CLASS_DEFER : RESERVE_CLASS), span)}
+      style={!defer && late && size ? reserveStyle(size) : undefined}
+    >
+      {defer ? <Later>{children}</Later> : children}
     </Reveal>
   );
 }
 
-/** End sizes of the late cards (px at 390 / 640 / 1024 and up). */
-const RESERVE_MONTE_CARLO: ReserveHeight = { base: 944, sm: 744 };
-const RESERVE_BENCHMARK: ReserveHeight = { base: 604, sm: 529 };
+/** End sizes (px at 390 / 640 / 1024+) of the cells that load late or sit below the first screenful – measured on the finished page. */
+const SIZE = {
+  monteCarlo: { base: 944, sm: 744 },
+  ruin: { base: 289, sm: 289, lg: 744 },
+  breakdown: { base: 867, sm: 565 },
+  heatmap: { base: 381, sm: 614, lg: 565 },
+  excursion: { base: 333, sm: 333, lg: 510 },
+  distribution: { base: 644, sm: 494, lg: 510 },
+  rolling: { base: 300, sm: 280, lg: 496 },
+  streaks: { base: 496, sm: 479, lg: 496 },
+  benchmark: { base: 604, sm: 529 },
+  compare: { base: 370, sm: 308, lg: 529 },
+  decision: { base: 476, sm: 337, lg: 321 },
+  custom: { base: 686, sm: 650, lg: 430 },
+} as const satisfies Record<string, ReserveHeight>;
 
 /** The sections of the page, for its "Inhalt" strip (`data-section` on each `SectionTitle`). */
 const NAV: readonly SectionNavItem[] = [
@@ -104,8 +128,11 @@ export function AnalyseView({ className }: { className?: string }) {
   const ids = { ratios: useId(), future: useId(), edge: useId(), exec: useId(), patterns: useId(), compare: useId() };
   useCloseMorphDialogOnUnmount();
   const empty = view.closed.length === 0;
+  const root = useRef<HTMLDivElement>(null);
+  // the deferred cells render once in idle time, not inside the first scroll past them
+  useIdlePrerender(root);
   return (
-    <div className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="analyse-view" data-n={view.closed.length}>
+    <div ref={root} className={cn("grid grid-cols-1 gap-5 lg:grid-cols-12", className)} data-testid="analyse-view" data-n={view.closed.length}>
       <PageHeader
         className="lg:col-span-12"
         title={ANALYSE_TITLE}
@@ -140,53 +167,53 @@ export function AnalyseView({ className }: { className?: string }) {
                 </Cell>
               }
             >
-              <Cell index={0} span="lg:col-span-8" reserve={RESERVE_MONTE_CARLO}>
+              <Cell index={0} span="lg:col-span-8" size={SIZE.monteCarlo} late defer>
                 <MonteCarloCard view={view} cur={cur} />
               </Cell>
-              <Cell index={1} span="lg:col-span-4">
+              <Cell index={1} span="lg:col-span-4" size={SIZE.ruin} defer>
                 <RiskOfRuinCard view={view} settings={settings} rep={rep} />
               </Cell>
             </Gate>
           </section>
           <section aria-labelledby={ids.edge} className="contents">
             <SectionTitle id={ids.edge} section="edge" title={SECTIONS.edge} sub="Trade the best, fuck the rest – aber nur, was den Zufall übersteht." className="lg:col-span-12" />
-            <Cell index={0} span="lg:col-span-7">
+            <Cell index={0} span="lg:col-span-7" size={SIZE.breakdown} defer>
               <BreakdownCard view={view} settings={settings} cur={cur} />
             </Cell>
-            <Cell index={1} span="lg:col-span-5">
+            <Cell index={1} span="lg:col-span-5" size={SIZE.heatmap} defer>
               <HeatmapCard view={view} cur={cur} />
             </Cell>
           </section>
           <section aria-labelledby={ids.exec} className="contents">
             <SectionTitle id={ids.exec} section="execution" title={SECTIONS.execution} className="lg:col-span-12" />
-            <Cell index={0} span="lg:col-span-6">
+            <Cell index={0} span="lg:col-span-6" size={SIZE.excursion} defer>
               <ExcursionCard view={view} cur={cur} />
             </Cell>
-            <Cell index={1} span="lg:col-span-6">
+            <Cell index={1} span="lg:col-span-6" size={SIZE.distribution} defer>
               <DistributionCard view={view} cur={cur} />
             </Cell>
           </section>
           <section aria-labelledby={ids.patterns} className="contents">
             <SectionTitle id={ids.patterns} section="patterns" title={SECTIONS.patterns} className="lg:col-span-12" />
-            <Cell index={0} span="lg:col-span-7">
+            <Cell index={0} span="lg:col-span-7" size={SIZE.rolling} defer>
               <RollingCard view={view} cur={cur} />
             </Cell>
-            <Cell index={1} span="lg:col-span-5">
+            <Cell index={1} span="lg:col-span-5" size={SIZE.streaks} defer>
               <StreaksCard view={view} />
             </Cell>
           </section>
           <section aria-labelledby={ids.compare} className="contents">
             <SectionTitle id={ids.compare} section="compare" title={SECTIONS.compare} className="lg:col-span-12" />
-            <Cell index={0} span="lg:col-span-6" reserve={RESERVE_BENCHMARK}>
+            <Cell index={0} span="lg:col-span-6" size={SIZE.benchmark} late defer>
               <BenchmarkCard view={view} />
             </Cell>
-            <Cell index={1} span="lg:col-span-6">
+            <Cell index={1} span="lg:col-span-6" size={SIZE.compare} defer>
               <CompareCard view={view} settings={settings} cur={cur} />
             </Cell>
-            <Cell index={0} span="lg:col-span-12">
+            <Cell index={0} span="lg:col-span-12" size={SIZE.decision} defer>
               <DecisionCard view={view} cur={cur} />
             </Cell>
-            <Cell index={0} span="lg:col-span-12">
+            <Cell index={0} span="lg:col-span-12" size={SIZE.custom} defer>
               <CustomStatCard view={view} settings={settings} cur={cur} />
             </Cell>
           </section>

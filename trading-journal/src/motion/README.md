@@ -70,6 +70,7 @@ seconds unless noted. Additions over the bundle set:
 | `tween.glow` (P01) | `1.6 s easeInOut × 3` | `GlowBreak` halo breathing, `EquityDraw` head after the draw |
 | `tween.streak` / `tween.heat` / `tween.cascade` / `tween.dissolve` / `tween.wave` (P01) | `.9 s` / `.36 s` / `1.2 s` (ease.out) / `.48 s linear` / `1.4 s` | `BreakoutStreak` particle life / `HeatGridReveal` cell fade / `NumberCascade` / `DissolveOut` / `LiquidGauge` wave decay (τ = wave / 4) |
 | `stagger.heat` / `stagger.heatMax` / `stagger.streak` / `stagger.deal` (P01) | `.028` per ring, capped `.42` / `.018` / `.05` | `HeatGridReveal` / `BreakoutStreak` launches / `CardSpread` deal |
+| `pressScale.small / icon / control / label / surface` | `.88 / .92 / .96 / .97 / .985` | **one press squeeze per target size** (`whileTap { scale }` on `spring.press`; the smaller the target the firmer): `Expander` (24 px) / Header + Dock icons / `Button`, `usePressable` default / `Segmented` label, toast island / `MorphCard` |
 | `fxTiming.cascadeReroll` / `fxTiming.dissolveFps` (P01) | `.045 s` / `20` steps·s⁻¹ | `NumberCascade` rain / `DissolveOut` clip steps |
 
 CSS mirrors (`src/styles/tokens.css` cannot import TS; listed at the end of `tokens.ts`): `.fx-strike` = `tween.collapse`,
@@ -170,6 +171,10 @@ Blur-fade entrance `{opacity 0, y 14, blur 6px}` (`REVEAL_FROM`; under `html[dat
 a blur over a card revealed while the page scrolls is the tablet compositor's heaviest work) → rest, once, at the reveal point (`revealReached`, `inView.ts`: 15 % of the element in view with the viewport shrunk by 50 px – OR a fifth of that viewport for an element too tall for 15 % ever to fit, ≥ ≈ 5 000 px on a phone; before, such a card stayed at opacity 0 for ever); one shared observer for all reveals (`useRevealSeen` / `observeReveal`); stagger
 `min(i, stagger.max)·stagger.reveal`; ends at `transform:none` / `filter:none` (transitionEnd), no x offset. Reduced motion or no
 `IntersectionObserver`: `initial={false}`, static. The group is driven by `animate`, so items mounted later also enter.
+`Reveal defer={ReserveHeight}`: a cell below the first screenful of a long page skips style/layout/paint while far off screen (`content-visibility: auto`,
+the Übersicht's pattern: `DEFER_CLASS` = 12 px room above/below for the hover lift, layout-neutral; assumed size = `contain-intrinsic-block-size: auto <end size>`
+per breakpoint, `INTRINSIC_CLASS`) and is marked `data-defer`; the page calls `useIdlePrerender(ref)` (`@/primitives/idlePrerender`) so each cell is rendered once in idle
+time instead of inside the first scroll past it. Pair with `Reserve` (`late`) when the card's content arrives late. Used by the Analyse page.
 
 **Containing-block rule:** a transformed/filtered ancestor becomes the containing block of `position:fixed` descendants. Never wrap
 ancestors of fixed ghosts (the ChartCard body with its marker ghost, the trades table ghost) in `Reveal` or anything else that keeps a
@@ -267,7 +272,7 @@ Live market MotionValues (`priceMv`, `tickDirMv`, `open24hMv`, `flowImbalanceMv`
 
 ### Hooks
 - `useReducedFx()` → boolean; gate every MotionValue/`useSpring` effect with it.
-- `usePressable({ disabled?, scale? (.96), hover?, transition? })` → `{ whileTap, whileHover (hover devices), transition: spring.press }`.
+- `usePressable({ disabled?, scale? (`pressScale.control` .96 – pick the token of the target size), hover?, transition? })` → `{ whileTap, whileHover (hover devices), transition: spring.press }`.
 - `useMediaQuery(q, fallback)`, `useCanHover()`, `useIsDesktop()` (≥ 640 px) – one shared `MediaQueryList` + listener per query
   (stable `subscribe`: renders never re-subscribe or create lists).
 - `safeFx.ts`: `SAFE_FX_ATTR` / `isSafeFx()` – Samsung-Internet-safe effects (`html[data-safe-fx]`, set by `@/app/pwa`); `Reveal`,

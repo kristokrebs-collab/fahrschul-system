@@ -142,6 +142,18 @@ export const gesture = {
   toastFling: 360, // a swiped toast flies out this far (exit timing: tween.toastExit)
 } as const;
 
+/**
+ * NEW: press feedback – ONE scale per target size, so the same kind of element answers a press the same way everywhere
+ * (`whileTap { scale }` on `spring.press`): the smaller the target, the firmer the squeeze.
+ */
+export const pressScale = {
+  small: 0.88, // ≤ 28 px round toggles (Expander "+")
+  icon: 0.92, // icon-only 44 px targets (Header buttons, Dock items)
+  control: 0.96, // buttons, rows with a label (Button default, `usePressable` default)
+  label: 0.97, // a label inside a segmented control / the toast island
+  surface: 0.985, // cards and tiles that open something (MorphCard)
+} as const;
+
 /** Border radii that every `layout`/`layoutId` element must set via `style`, never only via class. */
 export const radius = {
   card: 16,

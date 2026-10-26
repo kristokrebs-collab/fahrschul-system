@@ -35,6 +35,15 @@ export function reserveStyle(height: ReserveHeight): CSSProperties {
 /** The floor itself: `min-height` from the custom properties of `reserveStyle`. */
 export const RESERVE_CLASS = "min-h-(--reserve) sm:min-h-(--reserve-sm) lg:min-h-(--reserve-lg)";
 
+/** Same floor for a deferred cell (`Reveal defer`), whose box carries 12 px of room above and below its card (`DEFER_CLASS`). */
+export const RESERVE_CLASS_DEFER = "min-h-[calc(var(--reserve)+1.5rem)] sm:min-h-[calc(var(--reserve-sm)+1.5rem)] lg:min-h-[calc(var(--reserve-lg)+1.5rem)]";
+
+/**
+ * `content-visibility: auto` remembers the size a skipped cell had when it was last rendered; until then it assumes this one
+ * (the cell's end size per breakpoint, from the same custom properties as the floor).
+ */
+export const INTRINSIC_CLASS = "[contain-intrinsic-block-size:auto_var(--reserve)] sm:[contain-intrinsic-block-size:auto_var(--reserve-sm)] lg:[contain-intrinsic-block-size:auto_var(--reserve-lg)]";
+
 /**
  * Placeholder in a card's shape (rounded-2xl, hairline border, the label bar, then rows) that fills its parent. Use it
  * wherever a whole card is still to come; it is `aria-hidden` – say "wird geladen" through `aria-busy` of the owner.

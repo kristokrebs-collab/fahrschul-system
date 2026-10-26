@@ -14,7 +14,7 @@ import { replayIntro, useIntroPhase, useIntroSettled, type IntroPhase } from "@/
 import { AsciiCascade } from "@/motion/pulse/AsciiCascade";
 import { DancingLetters } from "@/motion/pulse/DancingLetters";
 import { StatusPill, type StatusTone } from "@/motion/StatusPill";
-import { spring, tween } from "@/motion/tokens";
+import { pressScale, spring, tween } from "@/motion/tokens";
 import { useReducedFx } from "@/motion/useReducedFx";
 import { Magnetic } from "@/primitives/Magnetic";
 import { Icon } from "@/primitives/icons";
@@ -49,7 +49,7 @@ export function scrollBar(scrollY: number, progress: number): number {
 const TILE: Variants = {
   rest: { rotateY: 0, scale: 1 },
   flip: { rotateY: 180 },
-  press: { scale: 0.92 },
+  press: { scale: pressScale.icon },
 };
 const TILE_TRANSITION = { rotateY: spring.tilt, scale: spring.press };
 
