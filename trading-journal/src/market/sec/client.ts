@@ -89,11 +89,20 @@ export interface SecStamped<T> {
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
+/** Every link the panels show points to sec.gov – a payload with another link is refused as a whole. */
+const SEC_LINK = /^https:\/\/(www|data)\.sec\.gov\//;
+const linkOk = (u: unknown): boolean => typeof u === "string" && SEC_LINK.test(u);
+const filingOk = (f: unknown): boolean => isObj(f) && typeof f.form === "string" && typeof f.filed === "string" && Array.isArray(f.items) && linkOk(f.url) && linkOk(f.indexUrl);
+
 function factsOk(v: unknown): v is SecFactsPayload {
-  return isObj(v) && v.source === SEC_SOURCE && typeof v.cik === "string" && typeof v.fetchedAt === "number" && isObj(v.facts);
+  return isObj(v) && v.source === SEC_SOURCE && typeof v.cik === "string" && typeof v.fetchedAt === "number" && isObj(v.facts) && linkOk(v.sourceUrl);
 }
 function filingsOk(v: unknown): v is SecFilingsPayload {
-  return isObj(v) && v.source === SEC_SOURCE && typeof v.cik === "string" && typeof v.fetchedAt === "number" && Array.isArray(v.filings) && Array.isArray(v.earningsHistory);
+  if (!(isObj(v) && v.source === SEC_SOURCE && typeof v.cik === "string" && typeof v.fetchedAt === "number" && Array.isArray(v.filings) && Array.isArray(v.earningsHistory) && linkOk(v.sourceUrl))) return false;
+  if (!v.filings.every(filingOk) || !v.earningsHistory.every(filingOk)) return false;
+  if (v.report != null && !filingOk(v.report)) return false;
+  const e = v.earnings8k;
+  return e == null || (filingOk(e) && (isObj(e) && (e.exhibitUrl == null || linkOk(e.exhibitUrl))));
 }
 
 export interface SecFetchOptions {

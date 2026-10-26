@@ -107,6 +107,10 @@ describe("typed errors", () => {
     const wrong = fake(() => json({ source: "other", facts: {} }));
     const a = (await fetchSecFacts("AAPL", { fetchImpl: wrong as unknown as typeof fetch }).catch((x: unknown) => x)) as SecError;
     expect(a.kind).toBe("invalid");
+    // a link that does not point to sec.gov refuses the whole answer
+    const evil = fake(() => json({ ...filingsPayload("AAPL"), filings: [{ ...filingsPayload("AAPL").filings[0]!, url: "javascript:alert(1)" }] }));
+    const c = (await fetchSecFilings("AAPL", { fetchImpl: evil as unknown as typeof fetch }).catch((x: unknown) => x)) as SecError;
+    expect(c.kind).toBe("invalid");
     const none = fake(() => json({}));
     const b = (await fetchSecFacts("../x", { fetchImpl: none as unknown as typeof fetch }).catch((x: unknown) => x)) as SecError;
     expect(b.kind).toBe("invalid_query");
