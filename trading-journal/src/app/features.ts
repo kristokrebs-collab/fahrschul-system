@@ -34,7 +34,7 @@ import type { Page } from "@/store/uiStore";
 export type FeatureGroupId = "heute" | "pruefen" | "risiko" | "testen" | "lernen" | "auswerten" | "wachsen" | "daten" | "community" | "konto";
 export type FeatureStatus = "fertig" | "teilweise";
 /** Sheets and dialogs that open over the current page (no navigation). */
-export type FeatureAction = "training" | "assistant" | "newTrade" | "csvImport" | "shortcuts" | "shotImport";
+export type FeatureAction = "training" | "assistant" | "newTrade" | "csvImport" | "shortcuts" | "shotImport" | "demo";
 /** Where on the page: a `data-testid` of the page layer, else the start of a card heading (`h2` / `h3`). */
 export interface FeatureAnchor {
   testid?: string;
@@ -2881,8 +2881,27 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     place: "Einführung & Hilfe",
     keywords: ["Einführung", "Tour", "Onboarding", "Erste Schritte", "Anleitung", "Hilfe", "Tutorial"],
     intents: ["einführung", "tour", "onboarding", "erste schritte", "anleitung", "tutorial", "hilfe", "intro", "wie funktioniert die app"],
-    see: ["assistent", "tastenkuerzel"],
+    see: ["assistent", "tastenkuerzel", "produktdemo"],
     status: "fertig",
+  },
+  {
+    id: "produktdemo",
+    fids: ["F58"],
+    name: "Demo mit Beispieldaten",
+    task: "Die App in fünf Schritten mit Beispieldaten ausprobieren",
+    benefit: "Beispiel-CSV importieren, eine Idee in Regeln übersetzen, sie auf Beispiel-Kerzen testen, einen Paper-Trade durchspielen und eine Marke mit Alarm setzen – mit den echten Rechenfunktionen der App, alles als Beispiel markiert, nichts wird gespeichert.",
+    group: "konto",
+    sub: "Hilfe & Oberfläche",
+    page: "funktionen",
+    anchor: { testid: "funktionen-demo" },
+    place: "Demo ausprobieren",
+    action: "demo",
+    keywords: ["Demo", "Beispieldaten", "Ausprobieren", "Testversion", "Probe", "Tour", "Vorführung", "Beispiel", "Einführung", "Paper-Trade", "Import", "Backtest"],
+    intents: ["demo", "app ausprobieren", "mit beispieldaten ausprobieren", "wie funktioniert die app", "zeig mir die funktionen", "beispiel durchspielen", "ohne eigene daten testen", "probieren ohne anmelden", "kurze tour mit beispieldaten"],
+    see: ["einfuehrung", "assistent", "csv-import", "eigene-idee"],
+    since: "2026-10",
+    status: "fertig",
+    note: "Die Kerzen sind künstlich (aus Sinus-Wellen berechnet) und sagen nichts über einen Markt; die Demo rechnet auf 1h bis 1D, kennt den Strategie-Text nur im Umfang des Übersetzers und legt nie etwas im Journal, in den Einstellungen oder in der Cloud ab.",
   },
   /* -------------------------------------------------------------------- Ereigniskalender, Strategiefilter, Transaktionsbuch (F43, F70) */
   {

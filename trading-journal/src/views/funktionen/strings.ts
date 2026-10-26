@@ -78,5 +78,10 @@ export const FUNKTIONEN = {
     reset: "Zurück zu den Aufgaben",
     assistant: "Assistenten fragen",
   },
+  demo: {
+    title: "Neu hier? Probier die App mit Beispieldaten aus.",
+    text: "Fünf kurze Schritte – Import, Regelentwurf, Test, Demokonto, Alarm. Alles ist als Beispiel markiert, nichts wird gespeichert.",
+    action: "Demo ausprobieren",
+  },
   stand: "Stand der Funktionen nach dem Code, nicht nach dem Wunsch: „Teilweise“ nennt, was noch fehlt. Keine professionelle Finanzberatung.",
 } as const;

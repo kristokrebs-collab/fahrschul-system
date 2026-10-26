@@ -27,6 +27,7 @@
  * | `TrainingMount` | F38 | the training sheet (Lernmodus: situations without the future, decision, reveal, reflection) – its own chunk, fetched the first time it is opened |
  * | `SignalOutcomeHost` | F32 | once after the start: the automatic outcomes of archived signals (idle, a few at a time; own chunk, fetched only when entry signals are stored; gate `coach`) |
  * | `ForwardMount` | F23 | the forward test's catch-up of the virtual accounts – its own chunk, fetched only while an account is running / paused / being wound up, only while the app is open |
+ * | `DemoMount` | F58 | the interactive demo with marked example data (import, rule draft, test, demo account, alarm) – its own chunk, fetched the first time it is opened; its state is a session in memory that is gone when it closes |
  */
 import { lazy, Suspense, type ReactNode } from "react";
 import { installE2eHooks } from "@/app/e2eHooks";
@@ -52,6 +53,7 @@ import { CoachWatcher } from "@/views/coach/CoachWatcher";
 import { SignalOutcomeHost } from "@/views/coach/SignalOutcomeHost";
 import { RiskGuardHost, useRiskGuardStore } from "@/views/risiko/guard";
 import { ReplayHost } from "@/views/trades/replay/TradeReplay";
+import { useDemo } from "@/views/demo/demoStore";
 import { useTmSheet } from "@/views/timemachine/sheetStore";
 import { useWhatIf } from "@/views/trades/whatif/whatIfStore";
 import { useTraining } from "@/views/ueben/trainingStore";
@@ -63,6 +65,7 @@ const WhatIfHost = lazy(() => import("@/views/trades/whatif/WhatIfHost"));
 const TimeMachineHost = lazy(() => import("@/views/timemachine/TradeSheet"));
 const TrainingHost = lazy(() => import("@/views/ueben/TrainingHost"));
 const ForwardHost = lazy(() => import("@/views/labor/forward/ForwardHost"));
+const DemoHost = lazy(() => import("@/views/demo/DemoHost"));
 
 /** The assistant sheet: its chunk is fetched the first time it is opened and then stays mounted (close animation). */
 function AssistantMount() {
@@ -110,6 +113,16 @@ function ForwardMount() {
   return active ? (
     <Suspense fallback={null}>
       <ForwardHost />
+    </Suspense>
+  ) : null;
+}
+
+/** Demo (F58): same pattern – nothing of it loads before the first „Demo mit Beispieldaten“. */
+function DemoMount() {
+  const used = useDemo((s) => s.seq > 0);
+  return used ? (
+    <Suspense fallback={null}>
+      <DemoHost />
     </Suspense>
   ) : null;
 }
@@ -205,6 +218,9 @@ export default function DeferredHosts() {
       </HostSlot>
       <HostSlot name="Forward-Test">
         <ForwardMount />
+      </HostSlot>
+      <HostSlot name="Demo">
+        <DemoMount />
       </HostSlot>
     </>
   );
