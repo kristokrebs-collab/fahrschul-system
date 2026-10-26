@@ -178,7 +178,7 @@ describe("command navigation counts (pure)", () => {
   it("one figure per page, the market symbol without its exchange prefix", () => {
     const s: ShellStats = { trades: 13, setups: 8, rules: 5, net: -12.5, winRate: 0.55, currency: "USDT", open: 2, mistakes: 3, goals: 1, symbol: "BINANCE:BTCUSDT" };
     const c = pageCounts(s, { cloud: false, signedIn: false, plan: null, labRuns: 4, boards: 2, now: new Date("2026-10-12T10:00:00Z") });
-    expect(Object.keys(c)).toHaveLength(18);
+    expect(Object.keys(c)).toHaveLength(19);
     expect(c.overview.tone).toBe("text-loss");
     expect(c.markt.text).toBe("BTCUSDT");
     expect(c.analyse.text).toBe("55 %");
