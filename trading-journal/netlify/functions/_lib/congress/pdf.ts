@@ -580,7 +580,7 @@ export class PdfDoc {
     };
     const show = (raw: string): void => {
       // the form's small-capital labels ("FILING STATUS") map their lower glyphs to U+0000: dropped, the label stays "F S:"
-      const text = decodeText(raw, font).replace(/\u0000/g, "");
+      const text = decodeText(raw, font).replaceAll("\u0000", "");
       if (!text) return;
       const t = mul(tm, ctm);
       const x = t[4];

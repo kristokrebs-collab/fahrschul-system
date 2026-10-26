@@ -6,15 +6,17 @@
  * forms read without a PDF library → rows), the page-break glue, the owners / sides / options / amounts the filings print, and the
  * refusals: what the reader cannot read cleanly is an unreadable row or report with a reason – never a guess.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { reportOfPdf } from "../../netlify/functions/_lib/congress/load";
 import { parseToUnicode, PdfError, readPdfText } from "../../netlify/functions/_lib/congress/pdf";
 import { readZipEntry, ZipError } from "../../netlify/functions/_lib/congress/zip";
 import { ClerkFormatError, decodeXml, indexUrl, isoOfMdy, parseIndexXml, ptrUrl } from "../../src/market/congress/clerk";
 import { parseAmount, parseOption, parsePtr, type PageText, type TextItem } from "../../src/market/congress/ptr";
 import type { CongressTrade } from "../../src/market/congress/wire";
+import { SCAN_PDF } from "./congress.harness";
 
 const FIX = join(dirname(fileURLToPath(import.meta.url)), "../fixtures/congress");
 const file = (n: string): Buffer => readFileSync(join(FIX, n));
@@ -323,5 +325,16 @@ describe("the PDF reader", () => {
     expect(f.map?.get(0x25)).toBe("B");
     expect(f.map?.get(0x30)).toBe("X");
     expect(f.map?.get(0x31)).toBe("Y");
+  });
+});
+
+describe("the snapshot the browser specs run on", () => {
+  it("is what the reader makes of the fixture PDFs (CONGRESS_SNAPSHOT_WRITE=1 rewrites it after the reader changed)", () => {
+    // the Playwright project cannot import server code, so `tests/e2e/mocks/congress.ts` reads this file; this test keeps it from drifting
+    const ids = ["20035143", "20035408", "20035024", "20034694"];
+    const snap = Object.fromEntries([...ids.map((id) => [id, reportOfPdf(id, 2026, file(`${id}.pdf`), 0)] as const), ["9000001", reportOfPdf("9000001", 2026, SCAN_PDF, 0)] as const]);
+    const path = join(FIX, "reports.json");
+    if (process.env["CONGRESS_SNAPSHOT_WRITE"] === "1") writeFileSync(path, `${JSON.stringify(snap)}\n`);
+    expect(JSON.parse(readFileSync(path, "utf8"))).toEqual(JSON.parse(JSON.stringify(snap)));
   });
 });

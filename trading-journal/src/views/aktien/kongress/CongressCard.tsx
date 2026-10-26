@@ -122,13 +122,16 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
 
   // "neu seit deinem letzten Besuch": the document numbers the index listed at the last visit (kept on this device only)
   const [prevSeen, setPrevSeen] = useState<SeenRecord | null>(() => seenOf(readJson<unknown>(SEEN_KEY, null)));
-  const allIds = useRef<string[]>([]);
-  allIds.current = filings.map((f) => f.docId);
-  const prevRef = useRef(prevSeen);
-  prevRef.current = prevSeen;
+  const allIds = useMemo(() => filings.map((f) => f.docId), [filings]);
+  // what the page-leave handler needs, as of the last render (refs are written in an effect, never during render)
+  const latest = useRef({ ids: allIds, prev: prevSeen });
+  useEffect(() => {
+    latest.current = { ids: allIds, prev: prevSeen };
+  });
   useEffect(() => {
     const save = (): void => {
-      if (allIds.current.length) writeJson(SEEN_KEY, nextSeen(allIds.current, Date.now(), prevRef.current));
+      const { ids, prev } = latest.current;
+      if (ids.length) writeJson(SEEN_KEY, nextSeen(ids, Date.now(), prev));
     };
     window.addEventListener("pagehide", save);
     return () => {
@@ -137,7 +140,7 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
     };
   }, []);
   const markSeen = (): void => {
-    const rec = nextSeen(allIds.current, Date.now(), prevSeen);
+    const rec = nextSeen(allIds, Date.now(), prevSeen);
     writeJson(SEEN_KEY, rec);
     setPrevSeen(rec);
   };

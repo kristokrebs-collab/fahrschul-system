@@ -6,9 +6,6 @@
  * the rate limits, the politeness towards the Clerk (own User-Agent, nothing of the user forwarded, a slot of the account-wide
  * window) and every typed failure – a Clerk that is down, slow, blocking or has changed its file is named, never papered over.
  */
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLERK_USER_AGENT, INDEX_STALE_MS, INDEX_TTL_MS, parseDocs, parseYear, setCongressForTests } from "../../netlify/functions/_lib/congress/load";
@@ -17,34 +14,12 @@ import { resetGuardForTests } from "../../netlify/functions/_lib/stocks/guard";
 import congressIndex from "../../netlify/functions/congress-index.mts";
 import congressPtr from "../../netlify/functions/congress-ptr.mts";
 import { indexPayloadOk, ptrPayloadOk, type CongressIndexPayload, type CongressPtrPayload } from "../../src/market/congress/wire";
-
-const FIX = join(dirname(fileURLToPath(import.meta.url)), "../fixtures/congress");
-const bytes = (n: string): Buffer => readFileSync(join(FIX, n));
-const ZIP = bytes("2026FD.zip");
+import { clerkMock as clerk, fixture, LAST_MODIFIED, reply, SCAN_PDF, zipOf } from "./congress.harness";
 
 const ctx = { ip: "203.0.113.9" } as Parameters<typeof congressIndex>[1];
 const JWT = "eyJhbGciOiJFUzI1NiJ9.eyJzdWIiOiJ1MSJ9.c2ln";
 const U1 = "11111111-1111-4111-8111-111111111111";
-
-const reply = (body: Buffer | string, status = 200, headers: Record<string, string> = {}): Response => new Response(new Uint8Array(typeof body === "string" ? Buffer.from(body) : body), { status, headers });
-const LAST_MODIFIED = "Fri, 23 Oct 2026 13:00:28 GMT";
-const zipReply = (): Response => reply(ZIP, 200, { "content-type": "application/x-zip-compressed", "last-modified": LAST_MODIFIED });
-
-/** a tiny PDF in the structure of a scanned paper filing: an object stream, page images, no font */
-const SCAN = Buffer.from("%PDF-1.5\n1 0 obj\n<< /Type /ObjStm /N 1 /First 8 /Length 4 >>\nstream\n0 0 \nendstream\nendobj\n2 0 obj\n<< /Type /XObject /Subtype /Image /Width 8 /Height 8 /ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /CCITTFaxDecode /Length 2 >>\nstream\n\u0000\u0000\nendstream\nendobj\ntrailer\n<< /Root 3 0 R >>\n%%EOF\n", "latin1");
-
-/** Clerk mock: the index ZIP, the PDFs of the fixtures by document number, 404 for the rest. */
-function clerk(extra: Record<string, () => Response> = {}) {
-  const pdfs: Record<string, string> = { "20035143": "20035143.pdf", "20035408": "20035408.pdf", "20034694": "20034694.pdf", "20034999": "20034999.pdf" };
-  return vi.fn(async (url: string | URL | Request): Promise<Response> => {
-    const u = String(url);
-    for (const [k, fn] of Object.entries(extra)) if (u.includes(k)) return fn();
-    if (u.endsWith("2026FD.zip")) return zipReply();
-    const m = /ptr-pdfs\/(\d{4})\/(\d+)\.pdf$/.exec(u);
-    if (m && pdfs[m[2]!]) return reply(bytes(pdfs[m[2]!]!), 200, { "content-type": "application/pdf" });
-    return reply("Not found", 404);
-  });
-}
+const zipReply = (): Response => reply(fixture("2026FD.zip"), 200, { "content-type": "application/x-zip-compressed", "last-modified": LAST_MODIFIED });
 
 interface State {
   claims: Record<string, unknown> | null;
@@ -148,7 +123,7 @@ describe("congress-index", () => {
       ["network", () => Promise.reject(new TypeError("fetch failed")), 502, "congress_upstream", /nicht erreichbar/],
       ["timeout", () => Promise.reject(Object.assign(new Error("aborted"), { name: "AbortError" })), 504, "congress_timeout", /nicht rechtzeitig/],
       ["an HTML page instead of the ZIP", () => reply("<html>maintenance</html>"), 502, "congress_format", /Aufbau/],
-      ["a ZIP whose XML has another shape", () => zipOf("<html/>"), 502, "congress_format"],
+      ["a ZIP whose XML has another shape", () => reply(zipOf("<html/>")), 502, "congress_format"],
     ];
     for (const [name, answer, status, code, message] of cases) {
       setCongressForTests({ fetch: (async () => answer()) as unknown as typeof fetch });
@@ -189,29 +164,6 @@ describe("congress-index", () => {
     expect(parseYear("2027", Date.UTC(2026, 9, 26))).toBe(2027);
   });
 });
-
-/** a ZIP (stored, one entry) around some text – for the "file in another shape" case */
-function zipOf(text: string): Response {
-  const data = Buffer.from(text);
-  const name = Buffer.from("2026FD.xml");
-  const local = Buffer.alloc(30);
-  local.writeUInt32LE(0x04034b50, 0);
-  local.writeUInt16LE(name.length, 26);
-  const central = Buffer.alloc(46);
-  central.writeUInt32LE(0x02014b50, 0);
-  central.writeUInt32LE(data.length, 20);
-  central.writeUInt32LE(data.length, 24);
-  central.writeUInt16LE(name.length, 28);
-  central.writeUInt32LE(0, 42);
-  const end = Buffer.alloc(22);
-  end.writeUInt32LE(0x06054b50, 0);
-  end.writeUInt16LE(1, 8);
-  end.writeUInt16LE(1, 10);
-  const cdOffset = 30 + name.length + data.length;
-  end.writeUInt32LE(46 + name.length, 12);
-  end.writeUInt32LE(cdOffset, 16);
-  return reply(Buffer.concat([local, name, data, central, name, end]));
-}
 
 describe("congress-ptr", () => {
   it("reads the rows of two real reports: the skill's example and the long one with a page break", async () => {
@@ -265,9 +217,9 @@ describe("congress-ptr", () => {
   it("calls a scan, a page with another document number, a damaged file and an HTML error page unreadable – each with its reason", async () => {
     const f = vi.fn(async (u: string) => {
       const id = /(\d{7,8})\.pdf/.exec(u)![1]!;
-      if (id === "9000001") return reply(SCAN);
-      if (id === "20035144") return reply(bytes("20035143.pdf")); // the Clerk's file of another number under this one
-      if (id === "20035145") return reply(bytes("20035143.pdf").subarray(0, 30_000));
+      if (id === "9000001") return reply(SCAN_PDF);
+      if (id === "20035144") return reply(fixture("20035143.pdf")); // the Clerk's file of another number under this one
+      if (id === "20035145") return reply(fixture("20035143.pdf").subarray(0, 30_000));
       return reply("<html>Service unavailable</html>");
     });
     setCongressForTests({ fetch: f as unknown as typeof fetch });

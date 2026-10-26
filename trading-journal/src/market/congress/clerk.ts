@@ -58,7 +58,7 @@ const FIELD = /<(\w+)\s*\/>|<(\w+)>([\s\S]*?)<\/\2>/g;
 
 /** The PTRs of a yearly index XML. Throws `ClerkFormatError` when it does not look like the Clerk's index. */
 export function parseIndexXml(xml: string, year: number): ParsedIndex {
-  const text = xml.replace(/^﻿/, "");
+  const text = xml.charCodeAt(0) === 0xfeff ? xml.slice(1) : xml; // the Clerk writes a byte order mark
   if (!/<FinancialDisclosure[\s>]/.test(text)) throw new ClerkFormatError("Der Index hat nicht den erwarteten Aufbau (kein <FinancialDisclosure>).");
   const members = [...text.matchAll(/<Member>([\s\S]*?)<\/Member>/g)].map((m) => m[1]!);
   if (!members.length) throw new ClerkFormatError("Der Index enthält keine Einträge (<Member>) – der Aufbau der Datei hat sich vermutlich geändert.");
