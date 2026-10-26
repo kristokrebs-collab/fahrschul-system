@@ -141,6 +141,7 @@ const TOPIC_LABEL: Readonly<Record<string, string>> = {
   experiment: "Wochenexperiment",
   lab: "Labor",
   studio: "Strategie-Studio",
+  stocks: "Aktien",
   memory: "Gedächtnis",
   compare: "Vergleiche",
   list: "Trade-Listen",
@@ -427,6 +428,18 @@ export function runTool(tool: ToolId, arg: string, env: ToolEnv): ToolReply {
           text: "Dort schreibst du deine Strategie in normalen Worten. Das Studio macht daraus die Regeln des Labors, zeigt Unklares und fragt nach, statt zu raten. Ich öffne nur – gerechnet wird erst, wenn du dort den Backtest startest; ein Backtest zeigt die Vergangenheit, keine Prognose. Keine professionelle Finanzberatung.",
           close: true,
         });
+      case "stocks": {
+        const news = /\b(news|nachrichten|schlagzeilen|meldungen)\b/i.test(arg);
+        if (env.openFeature) env.openFeature(news ? "aktien-news" : "aktien-scanner");
+        else env.go("aktien");
+        return reply({
+          title: news ? "News zur Watchlist geöffnet" : "Aktien-Scanner geöffnet",
+          text: news
+            ? "Dort stehen die Schlagzeilen der Aktien auf deiner Watchlist, mit Quelle und Zeit. Die Einstufung beruht nur auf Stichwörtern in der Überschrift – ein Hinweis, was zuerst gelesen werden will, kein Handelssignal. Ich öffne nur. Keine professionelle Finanzberatung."
+            : "Dort wählst du Markt, Regeln und die Zahl der Charts und startest den Scan selbst. Ich starte nichts: Ein Treffer heißt nur, dass eine Regel auf dem Chart angeschlagen hat – und er ist veraltet, sobald sich der Kurs bewegt. Keine professionelle Finanzberatung.",
+          close: true,
+        });
+      }
       case "explain":
         return explainTool(env);
       case "hello":

@@ -111,8 +111,6 @@ export interface StockQuote {
   marketTime: number | null;
 }
 
-export type ListingKind = "stock" | "adr";
-
 export interface SymbolEntry {
   /** as the directory writes it (`BRK.B`) */
   symbol: string;

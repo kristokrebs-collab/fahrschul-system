@@ -17,6 +17,7 @@ export type IconName =
   | "coach"
   | "report"
   | "flask"
+  | "stocks"
   | "sprout"
   | "users"
   | "gauge"
@@ -125,6 +126,13 @@ export function Icon({ name, className, ...props }: { name: IconName } & SvgProp
         <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
           <path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3" />
           <path d="M7 15h10" />
+        </svg>
+      );
+    case "stocks":
+      return (
+        <svg {...p} strokeWidth="1.8" strokeLinejoin="round">
+          <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+          <path d="M12.5 8.5l3.5-3.5 3 3M16 5v6" />
         </svg>
       );
     case "sprout":

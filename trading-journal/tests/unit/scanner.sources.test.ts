@@ -34,7 +34,8 @@ describe("stock scan source", () => {
     const src = stockScanSource("orb", fake((s) => ok(barsOf(s, "5m"), stamp)));
     expect(src).toMatchObject({ interval: "5m", barMs: 300_000 });
     const out = await src.load([{ symbol: "A" }], new AbortController().signal);
-    const candles = out["A"]!.ok ? out["A"].candles : [];
+    const loaded = out["A"]!;
+    const candles = loaded.ok ? loaded.candles : [];
     const s = src.sessionFor!(candles, stamp.fetchedAt);
     expect(s).toMatchObject({ openMs: FRI_OPEN, closeMs: FRI_OPEN + 6.5 * 3_600_000, timeZone: "America/New_York", zoneLabel: "NY" });
     expect(nySessionOf([])).toBeUndefined();
@@ -126,7 +127,8 @@ describe("crypto universe and source", () => {
     });
     const c = createCryptoClient({ fetch: fetchFn });
     const out = await c.source("daily").load([{ symbol: "BTCUSDT" }, { symbol: "ETHUSDT" }], new AbortController().signal);
-    expect(out["BTCUSDT"]!.ok && out["BTCUSDT"].stand.source).toBe("proxy");
+    const btc = out["BTCUSDT"]!;
+    expect(btc.ok && btc.stand.source).toBe("proxy");
     expect(calls.filter((u) => u.startsWith("/api/binance")).length).toBe(2);
     expect(calls.filter((u) => u.startsWith("https://fapi.binance.com")).length).toBe(1); // asked once, then never again
   });

@@ -4,4 +4,5 @@ export { flagSetup, orbSetup, rsiSetup, completeBars, type SessionCtx } from "./
 export { prefilter, rankHits, RANK_NAME, sanitizeParams, scanSymbol, type RankBy, type ScanInput } from "./scan";
 export { HARD_CAP, runScan, type FailedChart, type LoadOutcome, type ScanOutcome, type ScanProgress, type ScanRunOptions, type ScanSource, type ScanTarget } from "./run";
 export { clockText, numText, pctText, priceText, volumeText } from "./text";
+export { describePrefilter, describeRule } from "./describe";
 export { clampCap, cryptoTargets, DEFAULT_CAP, defaultParamsFor, MIN_CAP, parseTickers, stockUniverse, type CryptoTicker, type ScanMode, type StockSource, type Universe, type UniverseSpec } from "./universe";

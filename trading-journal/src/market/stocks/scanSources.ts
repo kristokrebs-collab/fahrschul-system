@@ -106,9 +106,22 @@ export const utcDaySession = (asOf: number): SessionCtx => {
   return { openMs, closeMs: openMs + DAY, timeZone: "UTC", zoneLabel: "UTC", noun: "UTC-Tag" };
 };
 
+export interface CryptoQuote {
+  symbol: string;
+  price: number;
+  /** 24 h change in percent */
+  changePct: number;
+  quoteVolume: number;
+}
+
+type CryptoAnswer<T> = { ok: true; data: T; stamp: Stamp } | { ok: false; reason: UnavailableReason; message: string };
+type TickerRow = z.infer<typeof ticker24hSchema>;
+
 export interface CryptoClient {
   /** the top `n` USDT perpetuals by 24 h quote volume */
   top(n: number, signal?: AbortSignal): Promise<{ ok: true; targets: ScanTarget[]; stamp: Stamp } | { ok: false; reason: UnavailableReason; message: string }>;
+  /** last price and 24 h change of the given pairs (one request for all markets, reused for 15 s) */
+  quotes(symbols: readonly string[], signal?: AbortSignal): Promise<CryptoAnswer<Record<string, CryptoQuote>>>;
   source(mode: ScanMode): ScanSource;
 }
 
@@ -148,22 +161,42 @@ export function createCryptoClient(deps: CryptoDeps = {}): CryptoClient {
 
   const tickerFetch: FetchLike = deps.fetch ?? ((u, i) => fetch(u, i));
 
+  let memo: { at: number; rows: TickerRow[]; via: string } | null = null;
+  /** the exchange's 24 h tickers of all markets: one request (weight 40), reused for 15 s */
+  const tickers = async (signal?: AbortSignal): Promise<CryptoAnswer<TickerRow[]>> => {
+    const t0 = now();
+    if (memo && t0 - memo.at < 15_000) return { ok: true, data: memo.rows, stamp: { source: memo.via, asOf: memo.at, receivedAt: memo.at } };
+    try {
+      await take(40, signal);
+      const rows = await route(async () => fetchJson(`${viaProxy ? PROXY_BASE : BINANCE_REST}/fapi/v1/ticker/24hr`, z.array(ticker24hSchema), { fetch: tickerFetch, timeoutMs: 15_000, ...(signal ? { signal } : {}) }));
+      const t = now();
+      const via = viaProxy ? "proxy" : "binance";
+      memo = { at: t, rows, via };
+      return { ok: true, data: rows, stamp: { source: via, asOf: t, receivedAt: t } };
+    } catch (err) {
+      if (typeof err === "object" && err !== null && (err as { name?: unknown }).name === "AbortError") return { ok: false, reason: "aborted", message: REASON_TEXT.aborted };
+      const e = toRestError(err);
+      const reason = reasonOf(e);
+      return { ok: false, reason, message: e.kind === "blocked_451" ? "Binance ist von hier aus nicht erreichbar (HTTP 451)." : e.kind === "rate_limited" ? "Binance begrenzt die Abrufe gerade." : REASON_TEXT[reason] };
+    }
+  };
+
   return {
     async top(n, signal) {
-      try {
-        await take(40, signal);
-        const rows = await route(async () => fetchJson(`${viaProxy ? PROXY_BASE : BINANCE_REST}/fapi/v1/ticker/24hr`, z.array(ticker24hSchema), { fetch: tickerFetch, timeoutMs: 15_000, ...(signal ? { signal } : {}) }));
-        const tickers: CryptoTicker[] = rows.map((r) => ({ symbol: r.symbol, quoteVolume: r.quoteVolume }));
-        const targets = cryptoTargets(tickers, n);
-        if (!targets.length) return { ok: false, reason: "no-data", message: "Binance hat keine USDT-Kontrakte mit Handelsvolumen gemeldet." };
-        const t = now();
-        return { ok: true, targets, stamp: { source: viaProxy ? "proxy" : "binance", asOf: t, receivedAt: t } };
-      } catch (err) {
-        if (typeof err === "object" && err !== null && (err as { name?: unknown }).name === "AbortError") return { ok: false, reason: "aborted", message: REASON_TEXT.aborted };
-        const e = toRestError(err);
-        const reason = reasonOf(e);
-        return { ok: false, reason, message: e.kind === "blocked_451" ? "Binance ist von hier aus nicht erreichbar (HTTP 451)." : e.kind === "rate_limited" ? "Binance begrenzt die Abrufe gerade." : REASON_TEXT[reason] };
-      }
+      const r = await tickers(signal);
+      if (!r.ok) return r;
+      const rows: CryptoTicker[] = r.data.map((x) => ({ symbol: x.symbol, quoteVolume: x.quoteVolume }));
+      const targets = cryptoTargets(rows, n);
+      if (!targets.length) return { ok: false, reason: "no-data", message: "Binance hat keine USDT-Kontrakte mit Handelsvolumen gemeldet." };
+      return { ok: true, targets, stamp: r.stamp };
+    },
+    async quotes(symbols, signal) {
+      const r = await tickers(signal);
+      if (!r.ok) return r;
+      const want = new Set(symbols);
+      const data: Record<string, CryptoQuote> = {};
+      for (const x of r.data) if (want.has(x.symbol)) data[x.symbol] = { symbol: x.symbol, price: x.lastPrice, changePct: x.priceChangePercent, quoteVolume: x.quoteVolume };
+      return { ok: true, data, stamp: r.stamp };
     },
     source(mode) {
       const interval = mode === "orb" ? "15m" : "1d";
