@@ -118,6 +118,8 @@ const savedPlan = (over: Partial<SavedPlan> = {}): SavedPlan => ({
   notional: 3714.06,
   maxLoss: 17.21,
   rr: 2,
+  tick: 0.1,
+  lot: 0.001,
   light: "green",
   currency: "USDT",
   sourceLabel: "Binance USDⓈ-M",

@@ -49,6 +49,9 @@ export interface SavedPlan {
   /** loss at the stop incl. fees and slippage */
   maxLoss: number;
   rr: number | null;
+  /** price step and quantity step the plan was made with (for the numbers in the list) */
+  tick: number;
+  lot: number;
   light: "green" | "amber" | "red";
   currency: string;
   /** "Binance USDⓈ-M" */
@@ -142,6 +145,8 @@ export function normalizePlan(raw: unknown): SavedPlan | null {
     notional: numOr(raw.notional, 0, 1e15, entry * qty),
     maxLoss: numOr(raw.maxLoss, 0, 1e15, 0),
     rr: num(raw.rr),
+    tick: numOr(raw.tick, 1e-9, 1e9, 0.01),
+    lot: numOr(raw.lot, 1e-9, 1e9, 0.001),
     light,
     currency: str(raw.currency, 8) ?? "USDT",
     sourceLabel: str(raw.sourceLabel) ?? "keine Daten",

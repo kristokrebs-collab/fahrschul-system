@@ -33,7 +33,7 @@ import type { Page } from "@/store/uiStore";
 import { editDistance } from "./fuzzy";
 import { INSIGHT_RULES, followsInsight, type InsightToolId } from "./insightRoutes";
 
-export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar" | "studio" | InsightToolId;
+export type ToolId = "improve" | "experiment" | "entry" | "idea" | "lab" | "memory" | "navigate" | "explain" | "hello" | "newTrade" | "help" | "train" | "where" | "similar" | "studio" | "plan" | InsightToolId;
 
 export type Plan =
   | { kind: "journal"; intents: Intent[]; via: string[]; topic: string }
@@ -170,6 +170,7 @@ const PHRASES: readonly PhraseRule[] = [
 /* ------------------------------------------------------------------ tools */
 
 const PAGE_WORDS: ReadonlyArray<[RegExp, Page]> = [
+  [/\bhandels-?plan\b/, "plan"],
   [/\bstrategie-?studio\b|\bstudio\b/, "studio"],
   [/\blabor\b|\bbacktest(s|er)?\b|\bstrategielabor\b/, "labor"],
   [/\bcoach\b/, "coach"],
@@ -207,6 +208,7 @@ export const PAGE_LABEL: Readonly<Record<Page, string>> = {
   preise: "Preise",
   funktionen: "Funktionen",
   studio: "Strategie-Studio",
+  plan: "Handelsplan",
 };
 
 /** The page named by an "open …" request, or null. */
@@ -226,6 +228,8 @@ const TOOL_RULES: ReadonlyArray<{ tool: ToolId; test: { test(norm: string): bool
   ...INSIGHT_RULES,
   { tool: "lab", test: /\bbacktest\b.*\b(schlecht|mies|negativ|verlust|schwach|warum|wieso|kacke|mist|mau|miserabel|bescheiden|katastroph\w*|scheiss\w*)\b|\b(warum|wieso|weshalb)\b.*\b(backtest|labor|testlauf|strategie)\b|\bdiagnose\b.*\b(lauf|backtest|labor)\b|\bwas stimmt .* nicht .*(backtest|strategie)/, topic: "lab", label: "Labor-Diagnose" },
   { tool: "idea", test: /\b(teste?|testen|pruef\w*|probier\w*)\b.{0,24}\b(idee|ideen)\b|\bidee\b.{0,24}\b(testen|pruefen|ausprobieren)\b|\b(diesen|den|meinen) einstieg (testen|pruefen|backtesten|im labor)\b|\bdiese idee\b/, topic: "idea", label: "Idee testen" },
+  // „Handelsplan“ / „Wie groß soll die Position sein?“: opens the plan page (Einstieg → Ausstieg → Größe → Risiko → Ticket); it only opens
+  { tool: "plan", test: /\bhandels-?plan\b|\bwie (gross|viel) soll(te)? (die|meine|denn die|denn meine) (position|positionsgroesse)( denn)? (sein|werden)\b|\bwie (gross|viel) (soll|sollte|darf|kann) ich (kaufen|handeln|einsetzen|riskieren|einsteigen)\b|\bpositionsgroesse (berechnen|bestimmen|planen|festlegen)\b|\b(stop|stopp) und ziel (planen|setzen|festlegen)\b|\bplan fuer (diesen|den|meinen) (trade|einstieg)\b|\btrade (planen|durchplanen)\b|\bticket (bauen|erstellen)\b/, topic: "plan", label: "Handelsplan" },
   // „Strategie als Text“ / „Neue Strategie“: opens the studio (the page does the reading, the questions and the backtest)
   { tool: "studio", test: /\bstrategie als text\b|\bneue strategie\b|\bstrategie (schreiben|aufschreiben|eingeben|formulieren|beschreiben|in worten)\b|\bstrategie-? ?studio\b|\bregeln aus (einem |meinem )?text\b|\bstrategien? (vergleichen|nebeneinander)\b/, topic: "studio", label: "Strategie-Studio" },
   { tool: "train", test: /\b(ueben|uebe|uebung|uebungen|trainier\w*|trainingsmodus|lernmodus|replay training)\b|\btraining\b.*\b(starten|oeffnen|beginnen|machen)\b|\b(starte|oeffne|mach)\b.*\btraining\b/, topic: "train", label: "Training" },

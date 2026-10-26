@@ -59,6 +59,12 @@ export interface Ticket {
 const LIGHT_WORD: Record<Light, string> = { green: "Grün", amber: "Gelb", red: "Rot" };
 export const TICKET_NOTE = "Nur ein Plan zum Kopieren – die App sendet nichts an eine Börse und platziert keine Order. Keine professionelle Finanzberatung.";
 
+/** The journal's pair notation of a market symbol ("BTCUSDT" → "BTC/USDT"), else the symbol itself. */
+export function pairOf(symbol: string): string {
+  const s = splitSymbol(symbol);
+  return s ? `${s.base}/${s.quote}` : symbol;
+}
+
 /** The base asset of a market symbol ("BTCUSDT" → "BTC"), else the symbol itself. */
 export const baseOf = (symbol: string): string => splitSymbol(symbol)?.base ?? symbol;
 

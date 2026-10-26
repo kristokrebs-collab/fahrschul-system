@@ -30,6 +30,7 @@ const PAGES: readonly [string, RegExp][] = [
   ["preise", /^Preise$/],
   ["funktionen", /^Funktionen$/],
   ["studio", /^Strategie-Studio$/],
+  ["plan", /^Handelsplan$/],
 ];
 
 /** The visible page's h1 (the page host keeps the overview mounted but hidden). */

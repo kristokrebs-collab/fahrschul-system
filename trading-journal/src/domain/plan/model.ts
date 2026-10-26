@@ -78,6 +78,14 @@ export interface PlanModel {
 
 const isCrypto = (s: SessionDay): boolean => s.market === "crypto";
 
+/** Warm-up candles before the session (ATR over 14 candles, plus a margin). */
+export const WARMUP_CANDLES = 40;
+
+/** The candles the plan needs for a session: from the warm-up before the open to now (or the end of a past session). */
+export function candleWindow(session: SessionDay, intervalMs: number, now: number): { from: number; to: number } {
+  return { from: session.openMs - WARMUP_CANDLES * intervalMs, to: Math.min(now, session.closeMs) };
+}
+
 /** The risk fraction of a form: the typed one, else the risk setting but never above the per-trade limit. */
 export function effectiveRiskPct(form: PlanForm, limits: RiskLimits): number {
   return form.riskPct ?? Math.min(limits.riskPerTradePct, limits.maxLossTradePct);
