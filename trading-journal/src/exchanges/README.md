@@ -117,3 +117,18 @@ states, connect flow incl. "no secret in the DOM", inbox, positions), `exchange.
 `csv.import.parse.test.ts`, `csv.import.formats.test.ts`; server: `functions.bitunix.test.ts` (signature vs. the doc
 vector), `exchange.mapping.test.ts`, `exchange.functions.test.ts`. E2E: `tests/e2e/exchange.spec.ts` on the dev harness
 `dev/boerse.html` (mock Supabase + mock Bitunix with the real mapping), screenshots with `P11_SHOTS_DIR`.
+
+## Was unterstützt ist – und was nicht (F42)
+
+Eine Stelle für die Grenzen: `csv/scope.ts` (Erkennung, Zählung, Texte). Der CSV-Dialog (`csv-scope`), die Sync-Karte (`exchange-scope`), die Liquidationskarte und das Funktionsregister sagen dasselbe.
+
+| Fall | Sync (Bitunix) | CSV |
+|---|---|---|
+| lineare USDT-/USDC-Perps, Einweg-Modus | gelesen (nur `/api/v1/futures/*`) | gelesen |
+| **Spot** | wird nicht gelesen | Kraken, Coinbase, OKX Spot nur als **Long-Rundreisen** (Durchschnittskosten); Verkauf ohne bekannten Bestand wird übersprungen; ohne Hebel und Funding |
+| **Coin-M / inverse** (Menge in Kontrakten, Gewinn in Coin) | nicht unterstützt: jede Position wird als linear (Menge × Preis) gerechnet | Binance `BTCUSD_PERP`/`BTCUSD_250328`, Bybit `BTCUSD`/`BTCUSDH25`, OKX `BTC-USD-SWAP`; im Spaltenassistenten nur `…USD_PERP` und `…-USD-SWAP`: **Zeilen werden ausgelassen, gezählt und in der Vorschau benannt** (vorher still als linear gelesen, also falsche Größe und falscher Gewinn) |
+| **Hedge-Modus** (Long und Short am selben Symbol) | beide Seiten kommen als getrennte Positionen (je eine Positions-ID) und werden getrennte Trades; das Exposure verrechnet sie, die Liquidationsnäherung kennt die Gegenposition nicht | Binance-Trade-Historie mit Spalte „Position Side“ = LONG/SHORT: **ausgelassen, gezählt, benannt** (der Füllungs-Import verrechnet Käufe und Verkäufe je Symbol und würde beide Seiten vermischen); Bybit / OKX / Bitunix liefern je Zeile eine Position mit Richtung und sind nicht betroffen |
+
+Grenzen der Absicherung: erkannt wird an der Schreibweise des Symbols und an der Spalte „Position Side“; ein nacktes `BTCUSD` im Spaltenassistenten bleibt unberührt (es kann ein Spot- oder CFD-Paar sein); das Positionsmodell der Bitunix-Konten (`positionMode`) wird gelesen, aber nirgends ausgewertet.
+Tests: `csv.import.scope.test.ts` (Schreibweisen, Zählung, Dateien mit Handrechnung), `exchange.scope.test.tsx` (Dialog und Karte).
+

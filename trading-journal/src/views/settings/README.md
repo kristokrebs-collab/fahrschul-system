@@ -74,4 +74,13 @@ Card order: Konten · Backtest-Referenz · Live-Status · Live-Daten · **Einsti
 
 ## Inhalt-Leiste (Auffindbarkeit)
 
-Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. `SettingsNav.tsx`: 15 Chips, gefunden über die Überschrift der Karte (die Karten tragen keine eigenen Abschnittsnamen); die Leiste lädt als eigener Chunk und hält ihren Platz frei (`SECTION_NAV_BOX`), damit unter ihr nichts springt. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+Unter dem Seitenkopf sitzt die `SectionNav` (`src/primitives/SectionNav.tsx`): ein Chip je Abschnitt, klebt unter dem Header, markiert den sichtbaren Abschnitt (`aria-current="location"`), ein Tipp scrollt weich (reduzierte Bewegung: Sprung) und hebt den Titel kurz hervor. `SettingsNav.tsx`: 16 Chips, gefunden über die Überschrift der Karte (die Karten tragen keine eigenen Abschnittsnamen); die Leiste lädt als eigener Chunk und hält ihren Platz frei (`SECTION_NAV_BOX`), damit unter ihr nichts springt. Test: `tests/e2e/funktionen-anker.spec.ts` (jeder Chip landet unter der Leiste), `tests/unit/primitives.sectionNav.test.tsx`.
+
+## Datenarchiv (F26)
+
+`ArchiveCard.tsx` (lazy, `data-testid="settings-archive-card"`, Chip „Archiv“) zwischen „Einführung & Hilfe“ und „Weitere Einstellungen“ – wirkt sofort (kein „Speichern“, wie die Lage-Karte), weil es eine Gerätesache ist
+(`tj2-archive-cfg`, nicht in `settings`). Oben drei ehrliche Sätze (was gespeichert wird; nichts verlässt das Gerät und kein Teil von Backup oder Cloud-Sync; kein Server-Archiv, Lücken nie gefüllt), dann der Schalter (**aus**),
+die Statuszeile (Läuft · letzter/nächster Abruf · Weg; Grund eines gescheiterten Abrufs), bei „an“ Takt (5/10/15 min), Größenlimit (10–100 MB), Analysezustände und die Symbole (Chips, höchstens 8, „Automatisch“), darunter
+**Was vorliegt**: je Symbol und Reihe Einträge, Zeitraum, ≈ Größe, Lücken („1 Lücke, zusammen 3 h“ → aufklappbar mit Zeitraum, Dauer und Grund), CSV / JSON je Reihe, Löschen je Reihe (Halten = sofort, Tippen fragt „Wirklich löschen?“) und „Alles als JSON“ / „Alles löschen“.
+Lesen: `useArchiveData.ts` (eigene Verbindung, Lücken Zeile für Zeile zwischen zwei Aufgaben), Export: `archiveExport.ts`, Texte und Rechenhilfen: `archiveModel.ts`. Der Sammler selbst ist nicht Teil der Karte (`src/market/archive`). Tests: `views.settings.archive.test.tsx`, e2e `archive.spec.ts`.
+

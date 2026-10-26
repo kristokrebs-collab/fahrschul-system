@@ -145,3 +145,15 @@ letzten **geschlossenen** Kerze je Zeiteinheit (4h, 1D, 1W). Fehlt eine Zeit, st
 ## Termine, Heute wichtig, Ereignisphasen (F43)
 
 Ein lazy Abschnitt (`src/views/termine`, README dort) zwischen Tagesplan und RSI-Linien: **Heute wichtig** (Morgenbriefing, `briefing-card`), **Termine** (Kalender als Liste oder Monat, `termine-card`) und **Ereignisphasen** (Trades vor/nach Funding, am Verfallstag, FOMC-Tag, in der US-Open-Stunde – Journal oder letzter Backtest, `phasen-card`). Alle drei stehen in der „Inhalt“-Leiste der Seite. Termine sind berechnet (Funding-Raster, Deribit-Verfall, NYSE-Zeiten), stammen aus einer Liste mit Quelle und Abrufdatum (FOMC) oder sind vom Nutzer eingetragen; jede Zeile nennt ihre Quelle, Fehlendes heißt „keine Daten“. Tests: `views.termine.test.tsx`, `tests/e2e/termine.spec.ts`.
+
+## Squeeze-Beobachtung (F07)
+
+`SqueezeCard.tsx` (lazy, eigener Chunk, `data-testid="markt-squeeze"`, Chip „Squeeze“ in der Inhalt-Leiste) steht direkt unter dem Box-Chart. Sie liest das
+**Datenarchiv** (F26) für ein Symbol (Chips der archivierten Symbole; zuerst das Markt-Symbol) und zeigt: die Überschrift („Long-Seite überfüllt · 3 von 3 Messwerten“ /
+„Ruhig …“ / „Gegensätzliche Signale …“ / „Keine Daten“ / „Das Archiv wird gerade nicht geschrieben“), drei Messwerte (Funding, Open-Interest-Anstieg, Positionierung der Konten) mit
+Wert, **Schwelle** und „erfüllt / nicht erfüllt / keine Daten“ (mit Grund, z. B. „es reicht erst 1,0 h zurück“), die Top-Trader-Positionen zum Vergleich, den **Box-Kontext** des Markt-Symbols
+(Phase je Zeiteinheit und – bei einer Beobachtung – ein Satz: vor dem Ausbruch / nach dem Ausbruch mit oder gegen die überfüllte Seite / nach einem Fehlausbruch), die **Stichprobe**
+(Fälle im Archiv, Preis nach 4 h und 24 h, Gegenbeispiele, Stichprobenwort), Quelle und Stand (`SourceStand`) und „Keine professionelle Finanzberatung.“. „Schwellen einstellen“ schreibt sofort
+`settings.squeeze` (Funding, OI-Anstieg und -Fenster, Long-Anteil, Mindestzahl der Messwerte; Werte werden auf ihre Grenzen gesetzt); der Alarm ist ein eigener Schalter, **aus** bis zum Einschalten. Ohne Archiv sagt die Karte, was sie liest, und führt
+(`openSettingsOn`) zu Einstellungen › Datenarchiv. Regel und Grenzen: `src/domain/squeeze/README.md`; Alarm: `src/market/squeeze`. Tests: `squeeze.domain.test.ts`, `views.markt.squeeze.test.tsx`, `market.squeeze.alerts.test.ts`, e2e `archive.spec.ts`.
+

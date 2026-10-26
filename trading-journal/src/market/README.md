@@ -519,3 +519,38 @@ symbol directory and headlines as typed results `ok | stale | unavailable(reason
 public-data functions (`/api/v1/stocks/*`, see `netlify/functions/README.md`). It reuses `cache.ts` (KVStore) and `budget.ts` (TokenBucket) of this
 folder and has its own client, cache ages and throttle. The crypto side of the scanner reads Binance klines and the 24 h ticker through the
 existing REST helpers (`sources/binance.ts`, `sources/http.ts`, `sources/proxy.ts`) with its own budget. Tests: `tests/unit/stocks.client.test.ts`, `tests/unit/stocks.server.test.ts`.
+
+## Datenarchiv (F26) – `archive/`
+
+Ein lokales Archiv öffentlicher Binance-USDⓈ-M-Zahlen und der Analysezustände der App, **nur solange die App offen ist** und der Schalter
+an ist (Standard aus, `tj2-archive-cfg` im Browser dieses Geräts – nicht in `settings`, nicht in Backup oder Cloud-Sync). Ansicht:
+Einstellungen › Datenarchiv (`src/views/settings/ArchiveCard.tsx`); warum dort: es ist eine Entscheidung über den Speicher und die Daten dieses Geräts
+(an/aus, Größe, Löschen), keine Tagesansicht – und die Startseite bleibt unberührt.
+
+| Datei | Aufgabe |
+|---|---|
+| `db.ts` | eigene IndexedDB (`tj2-archive`, je Edition): `points` (Schlüssel `[Reihe, Symbol, Zeit]`) und `ticks` (das Protokoll); Zeilenbereiche, Überblick, Ringpuffer-Kürzen von unten, Löschen; `ArchiveUnavailable` / `ArchiveQuotaError` |
+| `collector.ts` | ein Takt: je Symbol `premiumIndex` (Markpreis, zuletzt abgerechnete Funding-Rate), `openInterest`, drei `/futures/data`-Verhältnisse (5 min); Weg direkt → EU-Proxy bei 451 / CORS / Netzwerk / Limit (nicht im Datei-Build); eigener Abstand von 200 ms, 429/418 → 5 min Pause; schreibt **nur**, was die Börse im Fenster des Abrufs meldet; Protokoll mit Grund je Symbol; Stopp bei > 90 % des Browser-Speichers |
+| `runner.ts` | die Uhr: erster Takt nach 15 s (oder wenn der Takt des vorigen Abrufs um ist), danach alle 5/10/15 min; ein aufwachender Tab holt einen überfälligen Takt nach kurzer Pause nach – die Zeit davor bleibt eine Lücke; hält Lage-Ampel und Box-Analyse am Laufen, solange „Analysezustände“ an ist |
+| `states.ts` | liest, was die App gerade zeigt (Lage-Ampel, Box-Phase 4h/1D/1W des Markt-Symbols); fehlt die Auswertung, fehlt der Eintrag |
+| `store.ts` | Schalter (`useArchiveCfg`, `useArchiveOn`) und Laufzustand (`useArchiveStatus`, `rev` zählt jede Änderung des Inhalts) |
+| `host.tsx` | Blatt-Host; `ArchiveMount` in `DeferredHosts` lädt den Chunk **nur bei eingeschaltetem Archiv** |
+
+**Fenster-Regel (keine Lücke wird gefüllt).** Ein Abruf nimmt von den 5-Minuten-Verhältnissen nur Punkte seit dem vorigen Abruf (minus 5 min
+Veröffentlichungsverzug), wenn die App ohne Pause lief (vorheriger Takt höchstens 2,5 Intervalle her), sonst nur die des letzten Intervalls. Binance könnte
+die Zeit dazwischen nachliefern (etwa 30 Tage Historie) – die App holt das bewusst nicht nach. **Lücken** = Abstand > 2,5 × Takt; die Ursache steht im Protokoll
+(`src/domain/archive/gaps.ts`): kein Takt = App zu; Takt mit Fehler = Grund (`blocked_451`, `network`, `rate_limited`, `timeout`, `offline`, `http_5xx`, `quota`);
+Takt ohne das Symbol = nicht gewählt.
+
+**Grenzen:** Ringpuffer je Reihe und Symbol (8 640 Einträge, Zustände 4 320) und ein Größenlimit (10–100 MB, aus der Zahl der Einträge geschätzt – die Ansicht sagt „geschätzt“);
+höchstens 8 Symbole; Zustände nur für das Markt-Symbol; **kein Server-Archiv**. Live gegen Binance nicht geprüft (aus dem Sandbox-Netz antwortet `fapi` mit 451; nur das Testnet ist erreichbar:
+dort stimmen die Formen von `premiumIndex`, `openInterest` und `fundingRate`, `/futures/data` gibt es dort nicht) – die Tests laufen mit gemocktem `fetch` in den dokumentierten Formen und fake-indexeddb.
+Tests: `archive.db.test.ts`, `archive.collector.test.ts`, `archive.runner.test.ts`, `archive.domain.test.ts`, `views.settings.archive.test.tsx`, e2e `archive.spec.ts`.
+
+## Squeeze-Beobachtung (F07) – `squeeze/`
+
+`read.ts` liest die Archivreihen eines Symbols (30 Tage) für die reine Regel in `@/domain/squeeze`; `alerts.ts` meldet **nur nach ausdrücklichem Einschalten**
+(`settings.squeeze.alerts`, Standard aus) über den Weg der Box-Alarme: Toast (`kind: "signal"`), Zustellprotokoll (`logExternalDelivery("box", …)`) und – wenn der Browser-Hinweis der
+Box-Alarme an ist und der Tab im Hintergrund – ein System-Hinweis. Gemeldet wird der **Beginn** je Symbol und Seite (nicht, solange es gilt; höchstens einmal in 6 h; der erste Blick nach
+dem Start merkt sich nur). `host.tsx` hängt als `SqueezeMount` in `DeferredHosts` und lädt nur bei Alarm an **und** laufendem Archiv. Karte und Texte: `src/views/markt/README.md`.
+
