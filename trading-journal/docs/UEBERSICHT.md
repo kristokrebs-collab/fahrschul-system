@@ -139,7 +139,7 @@ _Limits, Exposure und Regeln, bevor es teuer wird._ · 12 Funktionen
 
 ### Strategie entwickeln & testen
 
-_Eine Idee bauen und gegen echte Historie prüfen._ · 22 Funktionen
+_Eine Idee bauen und gegen echte Historie prüfen._ · 23 Funktionen
 
 **Idee bauen**
 
@@ -173,6 +173,7 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 22 Funktionen
 | Sehen, was jeder Filter wirklich bringt | Varianten- und Filtervergleich | Labor › Varianten- und Filtervergleich | teilweise |
 | Prüfen, wie empfindlich die Idee auf Zahlen reagiert | Parameter-Raster | Labor › Parameter-Raster | fertig |
 | Eine Strategie schrittweise verbessern lassen, ohne dich zu überanpassen | Hintergrund-Optimierer | Labor › Optimierer | teilweise |
+| Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
 
 **Live prüfen & teilen**
 

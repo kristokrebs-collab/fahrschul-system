@@ -141,3 +141,7 @@ All pure, deterministic and JSON-safe (a missing number is `null`; every stateme
 - `carryEquity(carry, close)`: the marked-to-market equity (realised + booked parts + open P&L − the entry fee).
 Chunked calls give exactly the trades of one pass (`tests/unit/forward.advance.test.ts`). Without these options nothing changes: `carry` is absent and
 the last bar closes the position as before.
+
+## Zeitmaschine (`src/domain/timemachine`)
+Die Zeitmaschine nutzt `runBacktest` unverändert: ein Segment aus einer Signalkerze und den folgenden Kerzen (simuliert oder echt), ein Signal am Schluss der ersten Kerze, Füllung zur Eröffnung der zweiten – dieselben Regeln, Kosten und Verwaltung wie hier. Siehe `src/domain/timemachine/README.md`.
+
