@@ -744,8 +744,8 @@ describe("Passt diese Strategie zu mir? / Was verlangt die Idee von mir?", () =>
   it("agreements and frictions in the domain's own sentences, with both samples and no verdict", async () => {
     const { env, spies } = fitEnv();
     const r = await ask("Passt diese Strategie zu mir?", env);
-    expect(r.title).toBe("Passt in 1 von 8 Punkten, 7 Reibungen");
-    expect(r.text).toContain("Die Idee „Test-Idee“ (10 Trades) gegen dein Journal (24 abgeschlossene Trades): 1 Punkte stimmen überein, 7 reiben sich.");
+    expect(r.title).toBe("Passt in 1 von 11 Punkten, 7 Reibungen");
+    expect(r.text).toContain("Die Idee „Test-Idee“ (10 Trades) gegen dein Journal (24 abgeschlossene Trades): 1 Punkte stimmen überein, 7 reiben sich, 3 sind nicht beurteilbar.");
     expect(r.text).toContain("Haltedauer: Haltedauer Median 5 Std 30 Min; du schließt im Median nach 1 Std");
     expect(r.text).toContain("Verlustserien: Die Idee verlangt im Test bis zu 3 Verlusttrades in Folge auszuhalten; deine längste Serie waren 1.");
     expect(r.text).toContain("Trefferquote: Trefferquote im selben Bereich: 30 % bei der Idee, 50 % bei dir; die Spannen überlappen");
