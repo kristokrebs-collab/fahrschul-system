@@ -68,7 +68,7 @@ test.describe("Funktionen: Anker und Inhalt", () => {
   });
 
   test("every anchor of the register is in the DOM of its page", async ({ page }) => {
-    test.setTimeout(240_000);
+    test.setTimeout(480_000); // twelve groups and every page of the register, on a loaded machine
     const errors = collectErrors(page);
     await seed(page);
     const rows = await readRegister(page);

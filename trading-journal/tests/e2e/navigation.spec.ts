@@ -241,8 +241,8 @@ test.describe("Finder: die spät gekommenen Bereiche in den Worten des Traders",
     await openPage(page, "overview");
     const nav = await openNav(page);
     await nav.getByRole("searchbox", { name: "Was willst du tun?" }).fill("Pizza bestellen");
-    await expect(nav.getByTestId("nav-finder-results")).toBeVisible({ timeout: 15_000 });
-    await expect(nav.getByTestId("nav-finder-results").locator("[data-feature]")).toHaveCount(0);
+    await expect(nav.getByTestId("nav-finder-none")).toContainText("Dazu steht nichts in der Liste", { timeout: 15_000 });
+    await expect(nav.locator("[data-feature]")).toHaveCount(0);
     expect(errors, errors.join("\n")).toEqual([]);
   });
 
