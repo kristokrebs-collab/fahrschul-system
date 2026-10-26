@@ -75,3 +75,9 @@ Verpasste Chancen, Üben, Was wäre wenn. Nie auf dem Dashboard. Lange Seiten ha
 `assistant.where.test.ts`, `app.commandNav.features.test.tsx`; e2e `tests/e2e/funktionen.spec.ts` (mobil + Desktop: Kacheln, Gruppe, Zurück-Taste,
 Suche, Finder, `g f`, Assistent, Tippflächen), `funktionen-anker.spec.ts` (**jeder Anker des Registers steht im DOM seiner Seite**; jeder Chip der
 Inhalt-Leisten landet unter der Leiste), `a11y-funktionen.spec.ts` (axe, hell und dunkel).
+
+## Einstieg in die Demo (F58)
+
+Unter den Kacheln steht eine ruhige, gestrichelte Box (`data-testid="funktionen-demo"`, Knopf `funktionen-demo-open`): „Neu hier? Probier die App mit
+Beispieldaten aus.“ Der Knopf öffnet das Demo-Blatt (`openFeature` → Aktion `demo` → lazy `DemoHost`, siehe `src/views/demo/README.md`); das Register
+führt die Demo als `produktdemo` (Suche, Finder, Assistent finden sie). Nichts startet von selbst.

@@ -34,7 +34,7 @@ import type { Page } from "@/store/uiStore";
 export type FeatureGroupId = "heute" | "pruefen" | "risiko" | "testen" | "lernen" | "auswerten" | "wachsen" | "daten" | "community" | "konto";
 export type FeatureStatus = "fertig" | "teilweise";
 /** Sheets and dialogs that open over the current page (no navigation). */
-export type FeatureAction = "training" | "assistant" | "newTrade" | "csvImport" | "shortcuts" | "shotImport";
+export type FeatureAction = "training" | "assistant" | "newTrade" | "csvImport" | "shortcuts" | "shotImport" | "demo";
 /** Where on the page: a `data-testid` of the page layer, else the start of a card heading (`h2` / `h3`). */
 export interface FeatureAnchor {
   testid?: string;
@@ -1819,6 +1819,25 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     gate: "analyticsPro",
   },
   {
+    id: "analyse-herkunft",
+    fids: ["F24"],
+    name: "Mensch, Regelwerk oder KI – wer entscheidet besser?",
+    task: "Vergleichen, wie eigene, Regelwerk- und KI-Trades abschneiden",
+    benefit: "Trefferquote, Ø R und Anzahl je Herkunft der Entscheidung mit Spanne und Stichprobenwort, paarweise mit korrigiertem Urteil – dazu das KI-Protokoll (welcher Helfer, welches Modell, übernommen oder nicht).",
+    group: "auswerten",
+    sub: "Kennzahlen & Vergleiche",
+    page: "analyse",
+    anchor: { testid: "ana-decision" },
+    place: "Vergleich · Entscheidung",
+    keywords: ["Herkunft", "Entscheidung", "KI", "Regelwerk", "Signal", "Mensch", "Vergleich", "KI-Protokoll", "Modell", "Vorschlag", "Bot"],
+    intents: ["bin ich besser als die ki", "ki gegen regelwerk", "eigene entscheidungen oder signale", "wer trifft die besseren entscheidungen", "ki vorschläge auswerten", "regelwerk gegen bauchgefühl", "welches modell hat mir etwas vorgeschlagen", "herkunft der trades"],
+    see: ["analyse-vergleich", "signalbilanz", "assistent"],
+    since: "2026-10",
+    status: "teilweise",
+    note: "Die Herkunft eines Trades setzt du (Editor oder Liste „Herkunft nachtragen“); der Handelsplan, Box-Setups, Bot und Webhook sowie im Posteingang verknüpfte Signale tragen sie von selbst. Zeitlich passende Signale sind nur ein Hinweis. Verglichen wird, was du wirklich gehandelt hast – nicht auf gleichen Kerzen, Zeiten und Größen; der Vergleich ist eine Beobachtung, keine Ursache. Das KI-Protokoll kennt nur die KI-Helfer dieser App (Assistent, Strategie-Übersetzer, Coach, Optimierer), keine Werkzeuge außerhalb.",
+    gate: "analyticsPro",
+  },
+  {
     id: "eigene-kennzahl",
     fids: [],
     name: "Eigene Kennzahl",
@@ -2922,8 +2941,27 @@ export const FEATURE_REGISTRY: readonly FeatureEntry[] = [
     place: "Einführung & Hilfe",
     keywords: ["Einführung", "Tour", "Onboarding", "Erste Schritte", "Anleitung", "Hilfe", "Tutorial"],
     intents: ["einführung", "tour", "onboarding", "erste schritte", "anleitung", "tutorial", "hilfe", "intro", "wie funktioniert die app"],
-    see: ["assistent", "tastenkuerzel"],
+    see: ["assistent", "tastenkuerzel", "produktdemo"],
     status: "fertig",
+  },
+  {
+    id: "produktdemo",
+    fids: ["F58"],
+    name: "Demo mit Beispieldaten",
+    task: "Die App in fünf Schritten mit Beispieldaten ausprobieren",
+    benefit: "Beispiel-CSV importieren, eine Idee in Regeln übersetzen, sie auf Beispiel-Kerzen testen, einen Paper-Trade durchspielen und eine Marke mit Alarm setzen – mit den echten Rechenfunktionen der App, alles als Beispiel markiert, nichts wird gespeichert.",
+    group: "konto",
+    sub: "Hilfe & Oberfläche",
+    page: "funktionen",
+    anchor: { testid: "funktionen-demo" },
+    place: "Demo ausprobieren",
+    action: "demo",
+    keywords: ["Demo", "Beispieldaten", "Ausprobieren", "Testversion", "Probe", "Tour", "Vorführung", "Beispiel", "Einführung", "Paper-Trade", "Import", "Backtest"],
+    intents: ["demo", "app ausprobieren", "mit beispieldaten ausprobieren", "wie funktioniert die app", "zeig mir die funktionen", "beispiel durchspielen", "ohne eigene daten testen", "probieren ohne anmelden", "kurze tour mit beispieldaten"],
+    see: ["einfuehrung", "assistent", "csv-import", "eigene-idee"],
+    since: "2026-10",
+    status: "fertig",
+    note: "Die Kerzen sind künstlich (aus Sinus-Wellen berechnet) und sagen nichts über einen Markt; die Demo rechnet auf 1h bis 1D, kennt den Strategie-Text nur im Umfang des Übersetzers und legt nie etwas im Journal, in den Einstellungen oder in der Cloud ab.",
   },
   /* -------------------------------------------------------------------- Ereigniskalender, Strategiefilter, Transaktionsbuch (F43, F70) */
   {

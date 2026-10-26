@@ -25,6 +25,7 @@ import type {
   Setup,
   StopChange,
   Trade,
+  TradeDecision,
   TradeOrigin,
   TradeOriginKind,
   TradePsych,
@@ -300,6 +301,9 @@ function originOf(v: unknown): TradeOrigin | undefined {
   return o;
 }
 
+/** `decision` (F24): kept when `by` is one of the three (unknown keys survive), else dropped = unknown, never guessed; `via` / `ref` are checked where they are read. */
+const decisionOf = (v: unknown): TradeDecision | undefined => (isObj(v) && oneOf(["own", "rules", "ai"] as const, v.by) ? (v as unknown as TradeDecision) : undefined);
+
 function marginModeOf(v: unknown): MarginMode | undefined {
   const s = typeof v === "string" ? v.trim().toLowerCase() : "";
   return s === "isolated" || s === "isolation" ? "isolated" : s === "cross" || s === "crossed" ? "cross" : undefined;
@@ -325,6 +329,7 @@ function normalizeJournalV3(r: Raw, out: Raw): void {
   if (has(r, "targets")) put("targets", targetsOf(r.targets));
   if (has(r, "psych")) put("psych", psychOf(r.psych));
   if (has(r, "origin")) put("origin", originOf(r.origin));
+  if (has(r, "decision")) put("decision", decisionOf(r.decision));
   // boxSnap: opaque (P02 parses it) – kept verbatim by the spread.
 }
 

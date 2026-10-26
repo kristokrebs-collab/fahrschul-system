@@ -71,7 +71,7 @@ export function TicketStep({ vm }: { vm: PlanVm }) {
   };
   const doJournal = async (): Promise<void> => {
     if (!t) return;
-    await planToJournal({ symbol: t.symbol, side: t.side, entry: t.entry, stop: t.stop, target: t.target, qty: t.qty, notional: t.notional, leverage: t.leverage, account: form.account, stopLabel: t.stopLabel, targetLabel: t.targetLabel, sessionLabel: t.sessionLabel }, saved?.id ?? null);
+    await planToJournal({ symbol: t.symbol, side: t.side, entry: t.entry, stop: t.stop, target: t.target, qty: t.qty, notional: t.notional, leverage: t.leverage, account: form.account, stopLabel: t.stopLabel, targetLabel: t.targetLabel, sessionLabel: t.sessionLabel, entrySource: t.entrySource }, saved?.id ?? null);
     pushToast({ kind: "success", title: "Entwurf im Trade-Editor", detail: "Gespeichert wird erst, wenn du dort speicherst." });
   };
   const copy = async (what: "text" | "csv"): Promise<void> => {

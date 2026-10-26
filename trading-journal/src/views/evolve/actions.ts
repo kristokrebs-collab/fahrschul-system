@@ -6,6 +6,7 @@
  */
 import { recordDecision, recordOutcome, effectivePrior, evolveOfSettings, nextLineage, withEvolve, MAX_REASON, type EvolvePatch, type EvolveSettings, type LiveCheck, type ProposalDraft, type StoredProposal } from "@/domain/evolve";
 import { newId } from "@/lib/ids";
+import { recordAi } from "@/store/aiLog";
 import { useJournal } from "@/store/journalStore";
 
 export const evolveNow = (): EvolveSettings => evolveOfSettings(useJournal.getState().settings);
@@ -46,7 +47,8 @@ export type Decide = { decision: "saved"; savedAs: string } | { decision: "chall
  * add information to the proposal.
  */
 export async function decideProposal(id: string, d: Decide, now: number): Promise<boolean> {
-  return writeEvolve((cur) => {
+  const first1 = { accepted: null as boolean | null };
+  const ok = await writeEvolve((cur) => {
     const p = cur.proposals.find((x) => x.id === id);
     if (!p) return null;
     const first = p.decision === "open";
@@ -60,12 +62,16 @@ export async function decideProposal(id: string, d: Decide, now: number): Promis
     const proposals = cur.proposals.map((x) => (x.id === id ? next : x));
     if (!first) return { proposals };
     const accepted = d.decision !== "rejected";
+    first1.accepted = accepted;
     return {
       proposals,
       learn: recordDecision(cur.learn, p.kinds, accepted),
       stats: { ...cur.stats, accepted: cur.stats.accepted + (accepted ? 1 : 0), rejected: cur.stats.rejected + (accepted ? 0 : 1) },
     };
   });
+  // KI-Protokoll (F24): the first decision of a proposal is one line – helper, time, taken over or not (no model: a search, not a language model)
+  if (ok && first1.accepted !== null) void recordAi({ helper: "optimizer", model: null, adopted: first1.accepted, ref: id, at: now });
+  return ok;
 }
 
 /** The first verdict of the live check that is not "too early": recorded once on the proposal and fed into the learning. */

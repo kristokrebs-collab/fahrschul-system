@@ -248,7 +248,7 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 16 Funktionen
 
 ### Auswerten & Berichte
 
-_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 30 Funktionen
+_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 31 Funktionen
 
 **Berichte**
 
@@ -272,6 +272,7 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 30 Funktionen
 | Die auffälligsten Befunde aus deinen Trades lesen | Erkenntnisse | Übersicht › Erkenntnisse | fertig |
 | Dich mit dem Markt vergleichen | Benchmark: Konto gegen Markt | Analyse › Benchmark | fertig |
 | Zwei Zeiträume, Konten oder Setups vergleichen | Zeiträume und Konten vergleichen | Analyse › Vergleich | fertig |
+| Vergleichen, wie eigene, Regelwerk- und KI-Trades abschneiden | Mensch, Regelwerk oder KI – wer entscheidet besser? | Analyse › Vergleich · Entscheidung | teilweise |
 | Eine eigene Kennzahl berechnen lassen | Eigene Kennzahl | Analyse › Eigene Kennzahl | fertig |
 
 **Wann und wo**
@@ -387,7 +388,7 @@ _Gruppen, Mentoren und Teilen – freiwillig und datensparsam._ · 5 Funktionen
 
 ### Konto, Einstellungen & Hilfe
 
-_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 18 Funktionen
+_Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 19 Funktionen
 
 **Konto & Tarif**
 
@@ -421,5 +422,6 @@ _Konto, Tarif, Oberfläche, Einstellungen und Hilfe._ · 18 Funktionen
 | Mit Tasten schneller navigieren | Tastenkürzel | Einstellungen (Fenster: shortcuts) | fertig |
 | Nachlesen, was eine Kennzahl bedeutet | Erklärungen zu Kennzahlen | Übersicht – Karten und Kacheln mit Info-Symbol antippen (Übersicht, Markt, Setups) | teilweise |
 | Die Einführung noch einmal ansehen | Einführung noch einmal ansehen | Einstellungen › Einführung & Hilfe | fertig |
+| Die App in fünf Schritten mit Beispieldaten ausprobieren | Demo mit Beispieldaten | Funktionen › Demo ausprobieren | fertig |
 
 <!-- karte:end -->

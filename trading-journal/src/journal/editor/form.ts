@@ -7,7 +7,7 @@
  * drops undefined keys before saving), and every key the stored trade had can be cleared again. Unknown keys inside
  * fills / targets / stop moves / psych survive an edit (the row keeps its source object).
  */
-import type { Fill, MarginMode, MarketKind, ScreenshotRef, Side, StopChange, Trade, TradeOrigin, TradePsych, TradeRating, TradeStatus, TradeTarget } from "@/domain/types";
+import type { DecisionBy, Fill, MarginMode, MarketKind, ScreenshotRef, Side, StopChange, Trade, TradeDecision, TradeOrigin, TradePsych, TradeRating, TradeStatus, TradeTarget } from "@/domain/types";
 import { fillStats, QTY_EPS, relabelFills } from "@/domain/fills";
 import { newId } from "@/lib/ids";
 import { parseNumber, toInputString } from "@/lib/parse";
@@ -69,6 +69,10 @@ export interface JournalForm {
   bot: string;
   /** The stored origin (its extra keys survive; exchange / CSV / webhook origins are owned by their sync). */
   originSrc: TradeOrigin | null;
+  /** Who decided (F24): "" = not said. */
+  decision: "" | DecisionBy;
+  /** The stored decision (its `via` / `ref` survive while the trader leaves the choice as it is). */
+  decisionSrc: TradeDecision | null;
 }
 
 /** Origins the trader edits in the form; the others belong to their import / sync and are kept as they are. */
@@ -139,6 +143,8 @@ export function journalDefaults(): JournalForm {
     botOn: false,
     bot: "",
     originSrc: null,
+    decision: "",
+    decisionSrc: null,
   };
 }
 
@@ -175,6 +181,8 @@ export function journalFromTrade(t: Partial<Trade>): JournalForm {
     botOn: t.origin?.kind === "bot",
     bot: t.origin?.kind === "bot" ? (t.origin.botId ?? "") : "",
     originSrc: t.origin ?? null,
+    decision: t.decision?.by ?? "",
+    decisionSrc: t.decision ?? null,
   };
 }
 
@@ -312,12 +320,15 @@ export function journalRecord(j: JournalForm, base: { status: TradeStatus; side:
     psych: Object.keys(psych).length ? psych : undefined,
     screenshots: j.screenshots.length ? [...j.screenshots] : undefined,
     origin: originRecord(j),
+    // the trader's choice; left as stored it keeps its `via` / `ref`, changed it is the trader's own word
+    decision: j.decision ? (j.decisionSrc?.by === j.decision ? j.decisionSrc : { by: j.decision }) : undefined,
   };
 }
 
 /** Keys `journalRecord` writes (the editor removes them when `undefined`). */
 export const JOURNAL_KEYS = [
   "origin",
+  "decision",
   "exitDate",
   "qty",
   "fills",

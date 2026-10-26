@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { useEntitlement } from "@/billing/entitlements";
 import { apiFetch, cloudEnabled, useCloudUser } from "@/cloud";
+import { recordAi } from "@/store/aiLog";
 import { understand, type UnderstandCtx } from "./understand";
 
 export interface RouteReply {
@@ -63,5 +64,7 @@ export async function routeViaServer(question: string, rc: RouteContext, uctx: U
     body: { question: question.slice(0, 300), history: rc.history.slice(-3).map((h) => h.slice(0, 200)), page: rc.page.slice(0, 20), setups: rc.setups.slice(0, 30).map((s) => s.slice(0, 60)), assets: rc.assets.slice(0, 20).map((a) => a.slice(0, 12)) },
   });
   const usable = (r.questions ?? []).filter((q) => understand(q, uctx).kind !== "clarify").slice(0, 3);
+  // KI-Protokoll (F24): helper, model, taken over or not – never the question or the proposed questions
+  void recordAi({ helper: "assistant", model: r.model, adopted: usable.length > 0 });
   return { questions: usable, clarify: r.clarify ?? null };
 }

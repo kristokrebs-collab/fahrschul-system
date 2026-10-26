@@ -120,6 +120,22 @@ export interface Trade {
   origin?: TradeOrigin;
   /** Box-zu-Box context at entry (P02 `BoxSnapshot`, `@/market/boxes/snapshot`). Opaque here, kept verbatim. */
   boxSnap?: unknown;
+  /**
+   * Who made the decision to take this trade (F24): the trader, a rule-based signal or an AI suggestion. Optional and
+   * additive; absent = unknown (never guessed). Not the record's origin (`origin`: manual / API / CSV …).
+   */
+  decision?: TradeDecision;
+}
+
+/** Who decided (F24): `own` = the trader's own decision, `rules` = a rule-based signal (Regelwerk), `ai` = an AI suggestion. */
+export type DecisionBy = "own" | "rules" | "ai";
+/** Where the app learned it, besides the trader's own mark: a Handelsplan draft or a Box-zu-Box setup. */
+export type DecisionVia = "plan" | "box";
+export interface TradeDecision {
+  by: DecisionBy;
+  via?: DecisionVia;
+  /** an id the label points to (the Handelsplan's plan id, a signal event) – never text of a conversation */
+  ref?: string;
 }
 
 // ── Journal v3 value types (Wave-0 contract) ────────────────────────────────────────────────────────────────────
@@ -352,6 +368,13 @@ export interface Settings {
    * it lives in this browser's IndexedDB and in a device-local switch, outside backup and cloud sync.
    */
   squeeze?: unknown;
+  /**
+   * KI-Protokoll (F24): which AI helper of the app was asked when, with which model, and whether its answer was taken over.
+   * Versioned passthrough (`{ v: 1, entries: [{ id, helper, model, version, at, adopted, ref }] }`, see `@/domain/provenance`);
+   * absent until the first AI answer. No conversation text, no question, no answer is stored. An id list, so the cloud /
+   * two-tab merge works per entry; entries a newer version wrote survive untouched.
+   */
+  aiLog?: unknown;
 }
 
 /** One trading day's journal entry (`tj2-days`, key `YYYY-MM-DD` local date). Unknown keys survive. */

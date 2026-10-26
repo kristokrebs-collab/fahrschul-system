@@ -45,6 +45,8 @@ const ACTIONS: Record<FeatureAction, (f: FeatureEntry) => void> = {
   csvImport: () => void import("@/exchanges/store").then((m) => m.openCsvImport()),
   shotImport: () => openScreenshotImport(),
   shortcuts: () => openShortcutSheet(),
+  // the demo (F58): its chunk is fetched here, on the first click
+  demo: () => void import("@/views/demo/demoStore").then((m) => m.openDemo()),
 };
 
 function tell(f: FeatureEntry, detail: string): void {

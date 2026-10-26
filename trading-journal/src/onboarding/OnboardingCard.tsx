@@ -10,6 +10,7 @@ export const ONBOARDING_CARD = {
   lead: "Die Tour durch Konten, Setups, Börse und dein erstes Ziel – jederzeit noch einmal.",
   start: "Einführung starten",
   keys: "Alle Tastenkürzel",
+  demo: "Demo mit Beispieldaten",
   quick: [
     { keys: ["/"], label: "Suche" },
     { keys: ["n"], label: "Neuer Trade" },
@@ -67,6 +68,10 @@ export function OnboardingCard({ className }: { className?: string }) {
           </Button>
           <Button size="sm" onClick={() => openShortcutSheet()}>
             {ONBOARDING_CARD.keys}
+          </Button>
+          {/* F58: the demo's chunk is fetched on the click – nothing of it weighs on the first load */}
+          <Button size="sm" onClick={() => void import("@/views/demo/demoStore").then((m) => m.openDemo())} data-testid="onboarding-demo">
+            {ONBOARDING_CARD.demo}
           </Button>
         </div>
       </div>

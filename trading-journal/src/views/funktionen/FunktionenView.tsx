@@ -38,6 +38,7 @@ import { useSearch } from "@/search/searchStore";
 import { useJournal } from "@/store/journalStore";
 import { openBackEntry } from "@/store/backStack";
 import { storageKey } from "@/store/storage";
+import { openDemo } from "@/views/demo/demoStore";
 import { PageHeader } from "@/views/setups/PageHeader";
 import { FeatureRow } from "./FeatureRow";
 import { GroupTile } from "./GroupTile";
@@ -266,6 +267,17 @@ export function FunktionenView({ className }: { className?: string }) {
               ))}
             </ul>
           </section>
+
+          {/* F58: the quiet way into the demo – a dashed box, no accent colour, nothing starts by itself */}
+          <Reveal index={0} className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-line-2 px-4 py-3.5" data-testid="funktionen-demo">
+            <div className="grid min-w-0 gap-0.5">
+              <p className="text-[14px] font-medium text-fg">{FUNKTIONEN.demo.title}</p>
+              <p className="max-w-[60ch] text-[12.5px] leading-relaxed text-mute">{FUNKTIONEN.demo.text}</p>
+            </div>
+            <Button size="sm" onClick={() => openDemo()} data-testid="funktionen-demo-open">
+              {FUNKTIONEN.demo.action}
+            </Button>
+          </Reveal>
         </>
       )}
 

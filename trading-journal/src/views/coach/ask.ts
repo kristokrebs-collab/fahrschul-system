@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useEntitlement } from "@/billing/entitlements";
 import { apiFetch, ApiError, cloudEnabled, useCloudUser } from "@/cloud";
 import type { Answer } from "@/domain/coach/nlq";
+import { recordAi } from "@/store/aiLog";
 
 export interface AiReply {
   text: string | null;
@@ -67,7 +68,10 @@ export function askBody(question: string, a: Answer, notes?: readonly string[]) 
 
 /** Asks the server to rephrase; throws `ApiError` with a German message on failure. */
 export async function rephraseAnswer(question: string, a: Answer, notes?: readonly string[]): Promise<AiReply> {
-  return apiFetch<AiReply>("/coach/ask", { method: "POST", body: askBody(question, a, notes) });
+  const reply = await apiFetch<AiReply>("/coach/ask", { method: "POST", body: askBody(question, a, notes) });
+  // KI-Protokoll (F24): only helper, model and whether the text was shown – never the question or the answer
+  void recordAi({ helper: "coach", model: reply?.model, adopted: reply?.text != null });
+  return reply;
 }
 
 /** German line for a kept deterministic answer. */

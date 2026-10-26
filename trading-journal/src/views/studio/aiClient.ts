@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useEntitlement } from "@/billing/entitlements";
 import { apiFetch, ApiError, cloudEnabled, useCloudUser } from "@/cloud";
 import { AI_TEXT_MAX, aiToParse, parseAiOutput, type StrategyParse } from "@/domain/strategytext";
+import { recordAi } from "@/store/aiLog";
 import { STUDIO } from "./strings";
 
 export interface CompileReply {
@@ -65,8 +66,16 @@ export async function compileViaServer(text: string): Promise<CompileOutcome> {
   } catch (e) {
     return { ok: false, message: e instanceof ApiError ? e.message : A.unavailable };
   }
-  if (!reply || reply.result == null) return { ok: false, message: A.failed(A.reasons[reply?.reason ?? "empty"]) };
+  // KI-Protokoll (F24): helper, model, passed the strict checks or not – never the strategy text or the rules
+  if (!reply || reply.result == null) {
+    if (reply?.model) void recordAi({ helper: "studio", model: reply.model, adopted: false });
+    return { ok: false, message: A.failed(A.reasons[reply?.reason ?? "empty"]) };
+  }
   const checked = parseAiOutput(reply.result, text);
-  if (!checked.ok) return { ok: false, message: A.failed(checked.reason) };
+  if (!checked.ok) {
+    void recordAi({ helper: "studio", model: reply.model, adopted: false });
+    return { ok: false, message: A.failed(checked.reason) };
+  }
+  void recordAi({ helper: "studio", model: reply.model, adopted: true });
   return { ok: true, parse: aiToParse(text, checked.out), model: reply.model };
 }
