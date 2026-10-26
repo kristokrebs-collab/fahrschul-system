@@ -1,10 +1,10 @@
 /**
- * The route to Binance for the archive's reads (collector and history load): direct first; after a 451 / CORS / network /
+ * The route to Binance for reads that may be blocked (the archive's collector and history load, the order-book check): direct first; after a 451 / CORS / network /
  * rate-limit answer the same request is tried once through the same-origin EU proxy (`/api/binance`), and from then on the
  * proxy is used for the rest of the session. The file build has no proxy (`proxy()` returns `null`).
  */
-import type { BinanceRest } from "../sources/binance";
-import { toRestError } from "../sources/http";
+import type { BinanceRest } from "./binance";
+import { toRestError, type FetchLike } from "./http";
 
 /** Failure kinds after which the same request is tried once through the proxy. */
 export const PROXY_FALLBACK: ReadonlySet<string> = new Set(["blocked_451", "network", "cors", "rate_limited"]);
@@ -42,3 +42,9 @@ export class RestRoute {
     }
   }
 }
+
+/** A fetch that is cut off by `signal` (a cancel button reaches a request that is under way). */
+export const abortableFetch =
+  (signal: AbortSignal | undefined): FetchLike =>
+  (input, init) =>
+    fetch(input, { ...init, signal: signal ?? init?.signal });

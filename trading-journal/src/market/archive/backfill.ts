@@ -33,11 +33,11 @@ import {
 } from "@/domain/archive";
 import { isFileProtocol, IS_FILE_BUILD } from "@/edition";
 import { binanceRest, type BinanceRest, type RatioKind } from "../sources/binance";
-import { toRestError, type FetchLike } from "../sources/http";
+import { toRestError } from "../sources/http";
 import { proxyRest } from "../sources/proxy";
+import { RestRoute, abortableFetch } from "../sources/route";
 import { QUOTA_STOP_SHARE } from "./collector";
 import { ArchiveQuotaError, storageEstimate, type ArchiveDb } from "./db";
-import { RestRoute } from "./route";
 
 /** Pause between two requests: ~2 requests a second stays far under the exchange's 1000 per 5 minutes for the history endpoints. */
 export const BACKFILL_GAP_MS = 350;
@@ -51,12 +51,6 @@ export interface BackfillDeps {
   online: () => boolean;
   estimate: () => Promise<{ usage: number; quota: number } | null>;
 }
-
-/** A fetch that is cut off by `signal` (the cancel button reaches a request that is under way). */
-export const abortableFetch =
-  (signal: AbortSignal | undefined): FetchLike =>
-  (input, init) =>
-    fetch(input, { ...init, signal: signal ?? init?.signal });
 
 export const defaultBackfillDeps = (db: ArchiveDb, signal?: AbortSignal): BackfillDeps => ({
   db,

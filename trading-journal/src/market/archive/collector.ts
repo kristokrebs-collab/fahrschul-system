@@ -18,7 +18,7 @@ import { binanceRest } from "../sources/binance";
 import { toRestError } from "../sources/http";
 import { proxyRest } from "../sources/proxy";
 import { ArchiveQuotaError, storageEstimate, type ArchiveDb } from "./db";
-import { RestRoute } from "./route";
+import { RestRoute } from "../sources/route";
 
 /** Pause between two requests. */
 export const REQUEST_GAP_MS = 200;
