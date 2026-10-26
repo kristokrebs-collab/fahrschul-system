@@ -1,6 +1,6 @@
 /**
  * The panel another agent builds in parallel: the Zeitmaschine (replay the plan through the candles). It is a lazy component
- * that loads `./slotsImpl`; until the real module is wired in there, the placeholder says "Kommt gleich". The props are
+ * that loads `./slotsImpl`; the body lives in `slotsImpl.tsx` (the Zeitmaschine card, loaded after a click). The props are
  * `TimeMachineSlotProps` (`./types`). Nothing here imports the other agent's files: the main agent replaces the body in
  * `slotsImpl.tsx`.
  */
