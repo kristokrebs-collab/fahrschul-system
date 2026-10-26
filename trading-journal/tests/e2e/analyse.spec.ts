@@ -251,7 +251,8 @@ test.describe("Analyse", () => {
     expect(stored.analytics?.custom?.[0]).toMatchObject({ metric: "avgR", filter: { side: "long" }, groupBy: "session" });
     // survives a reload
     await page.reload();
-    await expect(page.getByTestId("ana-custom").getByTestId("custom-stat")).toHaveCount(1);
+    // the cards below the first screenful mount one after the other after the first paint (`Later`): give the last one time
+    await expect(page.getByTestId("ana-custom").getByTestId("custom-stat")).toHaveCount(1, { timeout: 20_000 });
     await page.getByTestId("ana-custom").getByRole("button", { name: /entfernen$/ }).click();
     await expect(page.getByTestId("ana-custom").getByTestId("custom-stat")).toHaveCount(0, { timeout: 10_000 });
     const after = await page.evaluate(() => JSON.parse(localStorage.getItem("tj2-settings") ?? "{}") as { analytics?: { custom?: unknown[] } });

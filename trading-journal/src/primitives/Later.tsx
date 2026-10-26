@@ -19,7 +19,7 @@ import { CardSkeleton } from "@/primitives/Reserve";
  *   is ever left out. Reduced motion changes nothing here (it is about when, not how).
  * Once mounted a card stays mounted.
  */
-export const LATER_TIMEOUT_MS = 400;
+export const LATER_TIMEOUT_MS = 120;
 export const LATER_SCROLL_QUIET_MS = 200;
 export const LATER_NEAR_PX = 500;
 
