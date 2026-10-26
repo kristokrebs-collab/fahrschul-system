@@ -8,7 +8,7 @@ Pfad existiert und das Funktionsregister (`src/app/features.ts`) keine F-ID mit 
 
 Verwendete Quellen der Daten: Binance öffentliche REST/WebSocket-Daten (keine Zugangsdaten), das Journal im lokalen Speicher (optional mit Cloud-Sync über
 Supabase), Stripe, Anthropic (nur optional und nur serverseitig); für die Aktien-Funktionen Yahoo Finance (inoffiziell) und die öffentlichen
-Symbolverzeichnisse von Nasdaq Trader, beide nur über Server-Funktionen. Zahlen kommen überall aus deterministischen Funktionen.
+Symbolverzeichnisse von Nasdaq Trader, beide nur über Server-Funktionen. Der Kongress-Tracker (Aktien › Kongress, kein Punkt des Bauplans, daher keine Zeile hier – die 74 Zeilen und die Stand-Zeile bleiben) liest die öffentlichen Meldungen des House Clerk. Zahlen kommen überall aus deterministischen Funktionen.
 
 | F-ID | Punkt | Status | Code-Pfad | Datenquelle | Tests | Offene Lücke |
 |---|---|---|---|---|---|---|

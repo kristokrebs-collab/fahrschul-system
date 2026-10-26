@@ -413,7 +413,7 @@ test.describe("Aktien", () => {
     // the filters: only the new ones, only the important ones
     await page.getByRole("radio", { name: "Wichtige" }).click();
     await expect(stories).toHaveCount(2); // the bankruptcy and the earnings headline
-    await page.getByRole("radio", { name: "Alle" }).click();
+    await page.getByTestId("aktien-news").getByRole("radio", { name: "Alle" }).click(); // the Congress card has its own "Alle"
     // read: nothing is new any more
     await page.getByTestId("aktien-news-markread").click();
     await expect(page.locator('[data-testid="aktien-story"][data-new="1"]')).toHaveCount(0);
@@ -421,14 +421,16 @@ test.describe("Aktien", () => {
     expect(errors).toEqual([]);
   });
 
-  test("Layout: Abschnitte, Platzhalter für die Analyse, keine Seite breiter als der Bildschirm", async ({ page }, info) => {
+  test("Layout: Abschnitte, Analyse und Kongress-Tracker, keine Seite breiter als der Bildschirm", async ({ page }, info) => {
     const errors = await open(page, info);
     await mockStocks(page);
     await go(page);
     const nav = page.getByRole("navigation", { name: "Inhalt dieser Seite" });
     await expect(nav.getByRole("button")).toHaveText(["Scanner", "Watchlist", "News", "Analyse", "Kongress"]);
     for (const id of ["analyst-panel", "dcf-panel", "thesis-panel"]) await expect(page.getByTestId("aktien-analyse").getByTestId(id)).toBeVisible();
-    await expect(page.getByTestId("aktien-kongress")).toContainText("Kommt gleich");
+    // the Congress tracker is there with its caveats (its own spec: aktien-kongress.spec.ts); no function answers here, so it says why it has no rows
+    await expect(page.getByTestId("aktien-kongress")).toContainText("Kongress-Tracker");
+    await expect(page.getByTestId("kongress-caveats")).toContainText("bis zu 45 Tage");
     await expect(page.locator("#aktien-watchlist-h")).toHaveText("Watchlist");
     await expect(page.getByTestId("aktien-watchlist")).toContainText("0 / 50");
     await expectNoHorizontalScroll(page);

@@ -2,7 +2,7 @@
  * The Aktien page (F67 scanner, watchlist, F68 news part) in jsdom, on the real stock contract with a fake API behind it
  * (the wire format of the four functions, parsed by the real client): the scan with its honest counts, the sentence of every
  * hit, the rank switch, the chart preview, the watchlist writes into `settings.watchlist`, the keyword-rated and merged
- * headlines with "Neu seit dem letzten Besuch", the analyst panels and the Congress slot ("Kommt gleich"), the plan link that exists only with a plan page,
+ * headlines with "Neu seit dem letzten Besuch", the analyst panels and the Congress tracker (its own tests: `views.aktien.kongress.test.tsx`), the plan link that exists only with a plan page,
  * and the reasons shown when the data cannot be had.
  */
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -118,7 +118,7 @@ afterEach(() => {
 /* ------------------------------------------------------------------ specs */
 
 describe("Aktien page", () => {
-  it("shows the five sections, the empty states, the placeholders of the two later parts and the closing sentence", async () => {
+  it("shows the five sections, the empty states, the analyst panels, the Congress tracker and the closing sentence", async () => {
     wrap();
     expect(screen.getByRole("heading", { level: 1, name: "Aktien" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Inhalt dieser Seite" });
@@ -126,16 +126,21 @@ describe("Aktien page", () => {
     expect(screen.getByTestId("aktien-results-idle")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-watch-empty")).toBeInTheDocument();
     expect(screen.getByTestId("aktien-news-empty")).toBeInTheDocument();
-    // the analyst section hosts the three panels (numbers, DCF, thesis); the Congress tracker says "Kommt gleich" until it exists
-    const analyse = await screen.findByTestId("aktien-analyse");
-    expect(await within(analyse).findByTestId("analyst-panel")).toBeInTheDocument();
-    expect(await within(analyse).findByTestId("dcf-panel")).toBeInTheDocument();
-    expect(await within(analyse).findByTestId("thesis-panel")).toBeInTheDocument();
-    // the standing sentence appears once per page: the panels keep only their own lead line
+    // the analyst section hosts the three panels (numbers, DCF, thesis); the Congress section hosts the tracker
+    const analyse = await screen.findByTestId("aktien-analyse", undefined, { timeout: 15_000 }); // lazy chunks: more than the default second on a busy machine
+    expect(await within(analyse).findByTestId("analyst-panel", undefined, { timeout: 15_000 })).toBeInTheDocument();
+    expect(await within(analyse).findByTestId("dcf-panel", undefined, { timeout: 15_000 })).toBeInTheDocument();
+    expect(await within(analyse).findByTestId("thesis-panel", undefined, { timeout: 15_000 })).toBeInTheDocument();
+    const kongress = await screen.findByTestId("aktien-kongress", undefined, { timeout: 15_000 });
+    expect(kongress).toHaveTextContent("Kongress-Tracker");
+    expect(kongress).not.toHaveTextContent("Kommt gleich");
+    // the caveats are on screen from the first paint; the Clerk is asked only once the section has been on screen (no observer fires here)
+    expect(within(kongress).getByTestId("kongress-caveats")).toHaveTextContent("bis zu 45 Tage");
+    expect(within(kongress).getByTestId("kongress-senate")).toHaveTextContent("Senat: nur von Hand");
+    // the standing sentence appears once per page: the analyst panels keep only their own lead line
     expect(screen.getAllByTestId("analysis-note")).toHaveLength(1);
     expect(within(analyse).getAllByTestId("analysis-lead")).toHaveLength(3);
-    expect(await screen.findByTestId("aktien-kongress")).toHaveTextContent("Kommt gleich");
-    expect(screen.getByText(/Die App sendet nie Orders/)).toBeInTheDocument();
+    expect(screen.getByTestId("analysis-note")).toHaveTextContent(/Die App sendet nie Orders/);
     expect(world.calls).toEqual([]); // opening the page asks for nothing: a scan starts only when the trader starts it
   });
 

@@ -10,7 +10,7 @@ export const AKTIEN = {
     watchlist: { title: "Watchlist", sub: "Aktien und Krypto-Paare, die du im Blick behalten willst – höchstens 50." },
     news: { title: "News", sub: "Schlagzeilen zu den Aktien deiner Watchlist. Ein Hinweis, was zuerst gelesen werden will – kein Handelssignal." },
     analyse: { title: "Analyse", sub: "Zahlen, Bewertung und Kaufthese." },
-    kongress: { title: "Kongress", sub: "Meldungen aus dem Kongress." },
+    kongress: { title: "Kongress", sub: "Aktiengeschäfte von Kongressmitgliedern laut öffentlicher Meldung – Wochen später, als Spannen, kein Handelssignal." },
   },
   scanner: {
     title: "Scanner",

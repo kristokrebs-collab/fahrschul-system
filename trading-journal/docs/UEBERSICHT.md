@@ -77,7 +77,7 @@ _Lage, Plan, Marken und Check-in vor dem ersten Trade._ · 8 Funktionen
 
 ### Trade prüfen & Chart
 
-_Einstieg prüfen, Chancen finden, den Chart lesen._ · 23 Funktionen
+_Einstieg prüfen, Chancen finden, den Chart lesen._ · 24 Funktionen
 
 **Einstieg prüfen**
 
@@ -106,6 +106,7 @@ _Einstieg prüfen, Chancen finden, den Chart lesen._ · 23 Funktionen
 |---|---|---|---|
 | Titel merken und ihren Kurs im Blick behalten | Watchlist (Aktien und Krypto) | Aktien › Watchlist | fertig |
 | Schlagzeilen zu deiner Watchlist lesen | News-Monitor (Watchlist) | Aktien › News | teilweise |
+| Sehen, welche Aktiengeschäfte Kongressmitglieder gemeldet haben | Kongress-Tracker | Aktien › Kongress | teilweise |
 
 **Chart & Einstellungen**
 
