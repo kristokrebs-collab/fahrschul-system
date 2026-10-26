@@ -225,7 +225,7 @@ _Warum du verlierst, was du verpasst, was du ändern kannst._ · 16 Funktionen
 
 ### Auswerten & Berichte
 
-_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 25 Funktionen
+_Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 28 Funktionen
 
 **Berichte**
 
@@ -271,6 +271,14 @@ _Kennzahlen, Verläufe und Berichte zu deinen Trades._ · 25 Funktionen
 | Sehen, ob sich deine Form verbessert oder verschlechtert | Rollierende Form | Analyse › Rollierend | fertig |
 | Prüfen, ob deine Serien normal sind | Gewinn- und Verlustserien | Analyse › Serien | fertig |
 | Prüfen, wie weit Trades gegen oder für dich liefen | MAE / MFE | Analyse › MAE / MFE | fertig |
+
+**Aktien: Zahlen & Bewertung**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
+| Sehen, was eine Firma zuletzt gemeldet hat | Zahlen-Analyst | Analyse | teilweise |
+| Den Wert einer Aktie als Spanne durchrechnen | DCF-Rechner | Analyse | fertig |
+| Eine Kaufthese festhalten und gegen neue Zahlen prüfen | Kaufthese | Analyse | teilweise |
 
 ### Üben & Wachsen
 

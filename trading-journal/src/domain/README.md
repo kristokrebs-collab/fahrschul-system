@@ -40,6 +40,9 @@ training/     Lernmodus (F38): practice rounds without the future, decision rule
 fit/          „Passt zu dir?“ (F49): a finished Labor run (what it demands) held against the journal (what it shows) – agreements and frictions with numbers, no score – src/domain/fit/README.md
 discovery/    „Muster-Entdecker“: Merkmale des Einstiegs ohne Look-ahead, Permutationstest + Benjamini-Hochberg + 60/40-Bestätigung, Befund → Backtest-Filter – src/domain/discovery/README.md
 evolve/       Hintergrund-Optimierer (F66): mutations of a Labor rule set judged only on walk-forward test windows, robust score, multiple-testing correction over all tried variants, plateau check, learning from decisions, worker protocol – proposals only, never automatic – src/domain/evolve/README.md
+analyst/      Zahlen-Analyst (F68): SEC-Fakten (verkleinert) → Einzelquartale (Restatements, Geschäftsjahr, kumulierte 10-Q-Werte, Q4), Marge/Vorquartal/Vorjahr, „Was sich geändert hat“, Hinweise; kein Konsens – src/domain/analyst/README.md
+dcf/          DCF-Rechner (`/dcf`): Barwert mit Endwert, Spanne aus der 5 × 5-Sensitivität, Randfälle, „Was müsste stimmen?“, Ausgangszahlen aus SEC-Zahlen – src/domain/dcf/README.md
+thesis/       Kaufthese (F69): `settings.theses`, Szenarien über den DCF, prüfbare Widerlegungsbedingungen, Prüfung gegen gemeldete Zahlen, Versionen mit Änderungsliste – src/domain/thesis/README.md
 similar/      „Ähnliche Situationen“ (F19): the last closed candle described by a few numbers, the most alike earlier candles (not overlapping) and what really followed, with counter-examples – src/domain/similar/README.md
 coach/        Coach (P04): behaviour detectors, edges / leaks, recommendations, trade review, German Q&A (nlq) –
               see src/domain/coach/README.md

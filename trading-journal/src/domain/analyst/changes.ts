@@ -5,7 +5,7 @@
  */
 import { daysBetween, msOfIso } from "@/market/sec/days";
 import type { SecFilingsPayload } from "@/market/sec/wire";
-import { dateDe, levelText, money, NO_DATA, perShare, pctText, pointsText, quarterLabel, shareCount, calendarLabel } from "./fmt";
+import { dateDe, levelText, money, perShare, pctText, pointsText, quarterLabel, shareCount, calendarLabel } from "./fmt";
 import { CASHFLOW_DERIVED_TEXT, CONSENSUS_TEXT, DERIVATION_TEXT, EPS_APPROX_TEXT, SEASONAL_TEXT } from "./texts";
 import type { AnalystResult, Cell, ChangeLine, Delta, Note, QuarterRow } from "./types";
 import { MINUS } from "@/lib/format";
@@ -93,7 +93,7 @@ export function buildChanges(r: AnalystResult): ChangeLine[] {
   if (!q.freeCashFlow) missing.push("freier Cashflow");
   if (!q.debt) missing.push("Finanzschulden");
   if (!q.sharesDiluted) missing.push("verwässerte Aktienzahl");
-  if (missing.length) push("missing", "caution", `${NO_DATA} für dieses Quartal: ${missing.join(", ")}.`);
+  if (missing.length) push("missing", "caution", `Keine Daten für dieses Quartal: ${missing.join(", ")}.`);
   return out;
 }
 
@@ -174,7 +174,7 @@ export function buildNotes(r: AnalystResult, ctx: NoteContext): Note[] {
   if (!q.debt) absent.push("Finanzschulden (kein langfristiger Schuldenposten gemeldet)");
   if (!q.freeCashFlow) absent.push("freier Cashflow (Cashflow oder Investitionen nicht gemeldet)");
   if (!q.sharesDiluted) absent.push("verwässerte Aktienzahl");
-  if (absent.length) notes.push({ kind: "missing", text: `${NO_DATA} im neuesten Quartal: ${absent.join("; ")}. Es wird nichts geschätzt.` });
+  if (absent.length) notes.push({ kind: "missing", text: `Keine Daten im neuesten Quartal: ${absent.join("; ")}. Es wird nichts geschätzt.` });
   if (q.debt && !q.debt.complete) notes.push({ kind: "missing", text: "Der kurzfristige Teil der langfristigen Schulden ist nicht gemeldet: die Finanzschulden sind eine Untergrenze." });
 
   if (q.netIncome && q.operatingIncome && q.netIncome.value > q.operatingIncome.value) {

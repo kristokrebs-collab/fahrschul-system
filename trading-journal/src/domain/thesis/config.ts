@@ -319,11 +319,14 @@ export function snapshotOfThesis(t: Thesis): ThesisSnapshot {
   return { text: t.text, horizonYears: t.horizonYears, buyZone: t.buyZone, price: t.price, base: t.base, scenarios: t.scenarios, criteria: t.criteria, catalysts: t.catalysts, risks: t.risks, counter: t.counter };
 }
 
-/** Saves the current state as a new version. The SAME thesis when nothing changed since the newest version. Oldest versions drop out past `MAX_VERSIONS`. */
-export function saveVersion(t: Thesis, note: string, now: number, uid = Math.floor(now % 1e9).toString(36)): Thesis {
+/**
+ * Saves the current state as a new version. The SAME thesis when nothing changed since the newest version (unless `force`: a
+ * version that documents a check result is worth keeping even when the text did not change). Oldest versions drop out past `MAX_VERSIONS`.
+ */
+export function saveVersion(t: Thesis, note: string, now: number, uid = Math.floor(now % 1e9).toString(36), force = false): Thesis {
   const snapshot = snapshotOfThesis(t);
   const last = t.versions[t.versions.length - 1];
-  if (last && canon(last.snapshot) === canon(snapshot)) return t;
+  if (!force && last && canon(last.snapshot) === canon(snapshot)) return t;
   const n = t.versions.reduce((m, v) => Math.max(m, v.n), 0) + 1;
   const triggered = t.check ? t.check.results.filter((r) => r.status === "triggered").length : 0;
   const v: ThesisVersion = {

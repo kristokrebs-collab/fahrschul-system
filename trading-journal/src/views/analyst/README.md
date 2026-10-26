@@ -1,0 +1,27 @@
+# `src/views/analyst` – Zahlen-Analyst, DCF-Rechner, Kaufthese (F68 / F69)
+
+Drei eigenständige, lazy-taugliche Panels zu `src/domain/analyst`, `src/domain/dcf` und `src/domain/thesis`. Die Seite `#aktien` (an anderer Stelle gebaut) bindet sie über einen `AnalystSlot` ein; **diese Ordner bauen keine Seite und keinen Menüeintrag**. Keine professionelle Finanzberatung; nichts sendet eine Order.
+
+| Export | was |
+|---|---|
+| `AnalystPanel` (auch `default`, `lazy(() => import("@/views/analyst/AnalystPanel"))`) | Props `AnalystPanelProps` (`types.ts`): `ticker?`, `autoLoad?`, `onLoaded?`, `onUseInDcf?(seed, ticker)`, `onStartThesis?(ticker)`, `bare?`, `className?`, `fetchImpl?` (Tests). |
+| `DcfPanel` (auch `default`) | `DcfPanelProps`: `ticker?`, `seed?` (Ausgangszahlen vom Host, z. B. aus `onUseInDcf`), `bare?`, `className?`, `fetchImpl?`, `now?`. Funktioniert ohne SEC mit selbst getippten Zahlen. |
+| `ThesisPanel` (auch `default`), `THESIS_SECTIONS` | `ThesisPanelProps`: `ticker?` (öffnet die These dieser Firma bzw. füllt das Feld „Neue These“), `monitor?` (Standard an), `bare?`, `className?`, `fetchImpl?`, `now?`. `THESIS_SECTIONS` = die Anker (`data-section`) der Abschnitte Begründung / Szenarien / Widerlegen / Versionen für die `SectionNav` des Gastgebers. |
+| `AN`, `DCF`, `TH` | die deutschen Texte. |
+
+Importiert wird **nie** über den Index aus der Schale (die Panels ziehen drei Domänen mit); Gastgeber laden jedes Panel mit `lazy()`.
+
+## `AnalystPanel` (F68)
+Kürzel-Feld und „Laden“ (nichts wird von selbst geladen, außer der Gastgeber setzt `autoLoad`). Danach: Kopf (Firma, Kürzel, CIK, Währung, Hinweis „kein Konsens, nur gemeldete Zahlen“, **Quelle · Abruf · neuestes Quartal bis … · Link zur SEC**), Warnungen zu Verzug/alten Zahlen/letzter guter Kopie, die Sätze **Was sich geändert hat**, die letzten acht Quartale (ab `lg` Tabelle mit der kleinen Zeile „Veränderung zum Vorjahresquartal“, darunter je Quartal eine Karte, ältere hinter „Ältere Quartale“), `*` = abgeleitet, `≈` = näherungsweise, fehlend = „keine Daten“; je Quartal der Link zur Ergebnismeldung (8-K) und beim neuesten die Pressemitteilung; **Termine und Ereignisse** (der nächste Bericht ist **unbekannt** – die SEC-Daten enthalten keinen; die letzten Ergebnismeldungen), die letzten zehn Meldungen mit 8-K-Punkten in Klartext, Hinweise zu den Zahlen. Fehler sind **typisiert** (`SecError.kind`) und sagen den Grund: „Einrichtung nötig“ (`SEC_USER_AGENT` fehlt, es wurde nichts abgerufen), unbekanntes Kürzel, keine XBRL-Zahlen, SEC bremst, Konto nötig, kein Server. Fällt nur die Meldungsliste aus, bleiben die Zahlen.
+
+## `DcfPanel` (`/dcf`)
+Links Ausgangszahlen (Kürzel + „Von der SEC laden“ trägt nur Gemeldetes ein, jede Zahl mit dem Satz, woher sie kommt; Beträge in Mio.) und Annahmen (Zeitraum 3/5/7/10 Jahre, Start- und Endwert von Wachstum, Marge, Reinvestition, WACC, Endwachstum; „WACC und Endwachstum einsetzen“ = die Beispielwerte der Anleitung, so beschriftet). Rechts das Ergebnis: **Spanne** (innerer 3 × 3-Block), Rechenwert, Unternehmenswert, Eigenkapitalwert, **Endwert-Anteil** mit Balken und Satz, Warnungen; die **Sensitivitätstabelle** 5 × 5 (Zeilen WACC, Spalten Endwachstum, Mitte hervorgehoben); die **Rechnung Jahr für Jahr** (ab `md` Tabelle und aufgeklappt, auf dem Handy Karten und zu); **Vergleich mit dem Kurs** (Kurs und Quelle selbst eintippen; ohne Quelle kein Vergleich) mit **„Was müsste stimmen?“**; die **offengelegten Annahmen** als Liste. Solange eine Eingabe fehlt, steht „Es fehlt: …“ und es wird nicht gerechnet.
+
+## `ThesisPanel` (F69)
+Links die Liste der Thesen und „Neue These“, rechts der Editor: **Begründung** (Freitext, Horizont, Katalysatoren, Risiken, Gegenargumente, Kaufzone, Kurs mit Quelle, nächster Bericht mit Quelle, Wiedervorlage), **Szenarien** (Ausgangszahlen + Bär/Basis/Bulle mit Spanne je Szenario und Abstand zum eingegebenen Kurs, „Was müsste stimmen?“), **Was würde meine These widerlegen?** (Bedingungen als Schwellen, „Prüfung gegen die gemeldeten Zahlen“ mit Schalter, „Jetzt prüfen“, Stand, Quelle, Quartal, Link zur Meldung, „Neues Quartal“-Hinweis mit „Gesehen“, **Vorschlag** bei ausgelöster Bedingung) und **Versionen** (Notiz, Speichern, je Version die Änderungen gegenüber der davor). Gespeichert wird sofort in `settings.theses` (`thesisStore.ts`: `writeTheses`); Textfelder beim Verlassen, nicht je Taste. **Monitoring** (`useThesisMonitor`) läuft nur, solange das Panel offen ist; jede These höchstens einmal je Tag und nie in einer Fehlerschleife. Eine App-weite, unsichtbare Prüfung gibt es nicht (sie würde die Erstladung vergrößern) – der Gastgeber kann das Panel mit `monitor` an versteckt mounten, wenn er sie will.
+
+## Daten (`data.ts`)
+`loadAnalysis(ticker)` holt Fakten und Meldungsliste parallel (`src/market/sec`, Client mit 5-Minuten-Zwischenspeicher) und rechnet `analyse`; `useAnalysis` ist der kleine Zustandsautomat (idle / loading / ready / error, laufende Ladung wird abgebrochen). Die Panels teilen den Zwischenspeicher, laden dieselbe Firma also nicht doppelt.
+
+## Tests
+`tests/unit/views.analyst.test.tsx` (alle drei Panels gegen eine `fetch`-Attrappe, die die SEC-Fixtures über die App-Routen ausliefert; echte Journal-Schreibvorgänge), Domänen- und Server-Tests siehe die READMEs von `src/domain/{analyst,dcf,thesis}` und `netlify/functions`. Die Panels sind nicht in eine Seite eingebunden; eine temporäre Testseite (`dev/analyst.html`) gibt es nur lokal und wird nicht ausgeliefert.

@@ -93,7 +93,7 @@ describe("AAPL – checked against TradingView and the real skill run", () => {
     expect(q.debt).toBeNull();
     expect(q.netDebt).toBeNull();
     const missing = aapl.changes.find((c) => c.id === "missing")!;
-    expect(missing.text).toContain("keine Daten");
+    expect(missing.text).toContain("Keine Daten für dieses Quartal");
     expect(missing.text).toMatch(/operatives Ergebnis.*freier Cashflow.*Finanzschulden/);
     // the year before has no cash flow for the quarter either: no growth rate invented
     expect(row(aapl, "2025-09-27").freeCashFlow).not.toBeNull();

@@ -9,12 +9,14 @@ import {
   actualText,
   checkDue,
   checkThesis,
+  diffSnapshots,
   computeAll,
   computeScenario,
   criterionText,
   evaluateCriteria,
   newThesis,
   saveVersion,
+  snapshotOfThesis,
   thesesCfgOf,
   thesisOf,
   updateThesis,
@@ -282,5 +284,30 @@ describe("versions are immutable snapshots", () => {
     expect(t.versions).toHaveLength(30);
     expect(t.versions[29]!.snapshot.text).toBe("v32");
     expect(t.versions[0]!.snapshot.text).toBe("v3");
+  });
+});
+
+describe("what changed between two versions", () => {
+  it("lists each changed assumption and the value per share before → after, and nothing for an unchanged state", () => {
+    const a = snapshotOfThesis(handThesis());
+    expect(diffSnapshots(a, a)).toEqual([]);
+    const t = updateThesis(handThesis(), { text: "neu", horizonYears: 3, scenarios: { ...handThesis().scenarios, base: { ...handThesis().scenarios.base, growthStart: 0.12, note: "optimistischer" } }, catalysts: ["Neues Werk"], criteria: [{ id: "k", metric: "grossMargin", op: "<", value: 40, note: "" }] }, 5000);
+    const lines = diffSnapshots(a, snapshotOfThesis(t));
+    expect(lines).toContain("Begründung geändert.");
+    expect(lines).toContain("Basis: Wachstum Jahr 1 10,0 % → 12,0 %.");
+    expect(lines).toContain("Basis: Notiz geändert.");
+    expect(lines).toContain("Katalysator neu: Neues Werk");
+    expect(lines).toContain("Bedingung neu: Bruttomarge unter 40 %");
+    expect(lines.find((l) => l.startsWith("Basis: Wert je Aktie"))).toMatch(/^Basis: Wert je Aktie 24,35 → 2[5-9],\d\d USD\.$/);
+    // the bear and bull values did not change: no line for them
+    expect(lines.some((l) => l.startsWith("Bär: Wert"))).toBe(false);
+  });
+
+  it("names a changed price with its source and a changed buy zone", () => {
+    const a = snapshotOfThesis(handThesis());
+    const b = snapshotOfThesis(updateThesis(handThesis(), { price: { value: 20, date: "2026-10-24", source: "Broker" }, buyZone: { low: 18, high: 22 } }, 9));
+    const lines = diffSnapshots(a, b);
+    expect(lines).toContain("Eingegebener Kurs: keiner → 20,00 (Broker).");
+    expect(lines).toContain("Kaufzone: keine → 18 – 22.");
   });
 });
