@@ -441,7 +441,7 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
           </h3>
           <p className="max-w-[88ch] text-[12.5px] leading-relaxed text-mute">
             {KONGRESS.senateText}{" "}
-            <a href={SENATE_SEARCH_URL} target="_blank" rel="noopener noreferrer" className="underline decoration-line-2 underline-offset-4 hover:text-fg hover:decoration-fg">
+            <a href={SENATE_SEARCH_URL} target="_blank" rel="noopener noreferrer" className="touch-hit underline decoration-line-2 underline-offset-4 hover:text-fg hover:decoration-fg">
               {KONGRESS.senateLink}
               <span className="sr-only"> (öffnet in einem neuen Tab)</span>
             </a>
@@ -456,7 +456,7 @@ export default function CongressCard({ watchlist, symbol }: AktienSlotProps) {
             className={cn("text-[11.5px]", !stamp && "text-faint")}
           />
           <p className="text-[11.5px] leading-relaxed text-faint">
-            <a href={CONGRESS_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="underline decoration-line-2 underline-offset-4 hover:text-fg hover:decoration-fg">
+            <a href={CONGRESS_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="touch-hit underline decoration-line-2 underline-offset-4 hover:text-fg hover:decoration-fg">
               Offene Finanzoffenlegung des House Clerk
               <span className="sr-only"> (öffnet in einem neuen Tab)</span>
             </a>{" "}
