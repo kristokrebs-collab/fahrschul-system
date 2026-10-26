@@ -79,8 +79,8 @@ defaults: "Näherung: …", stop / target defaults, UTC vs local time).
 
 ## TradingView (F14)
 Section `TradingView` (lazy chunk `TvSection.tsx`): `AdapterStatusCard` (`labor-tv-status`, data from `@/domain/tvimport` `TV_ADAPTERS`:
-tester export = unterstützt · alert webhook = nur Forwardtest über Alert · Pine execution / indicator as block / indicator series /
-account access = nicht unterstützt, each with its limits) and `TvCompareCard` (`labor-tv-compare`): the strategy-tester export "List
+tester export and chart-data check = unterstützt · alert webhook = nur Forwardtest über Alert · Pine execution / indicator as block / indicator series
+as a source for a run / account access = nicht unterstützt, each with its limits) and `TvCompareCard` (`labor-tv-compare`): the strategy-tester export "List
 of trades" (CSV, EN or DE headers, comma / semicolon / tab, point or comma decimals, any column order) is read in the browser
 (`parseTvTrades`, nothing is uploaded), unreadable lines are listed with their line number (`labor-tv-errors`), the file's time zone is
 chosen (UTC … UTC+3) and the file is compared with the SHOWN lab run (`compareTrades`): pairing by direction and entry time (one
@@ -192,3 +192,10 @@ Vierte Karte unter „Belastung, Bericht, Filter“ (`labor-extra-manage`, lazy 
 ## Playbook: Fassungen, Checkliste, Journal (F45)
 `PlaybookCard` (Abschnitt „Versionen und Playbooks“): **Export** – wer einen eigenen Entwurf wählt, sieht die Fassungsnummer (`playbook-rev`: „Erster Export … Fassung 1“ / „… als Fassung n weitergegeben“ / „Diese Datei wird Fassung n + 1“) und kann eine Änderungsnotiz (`playbook-changes`) und die Checkliste (`playbook-checklist`, auch aus einer Entscheidungsgrundlage des Journals) mitgeben; erst **Speichern oder Kopieren** merkt sich Kennung und Fassung im Entwurf (`CustomDraft.exported`), die Vorschau allein ändert nichts. **Import** – die Vorschau zeigt Fassung, Notiz und Checkliste; gehört die Datei zu einem Entwurf, den es schon gibt (gleiche Kennung), erscheint `playbook-update` (`data-relation`): „Neuere Fassung eines Playbooks, das du schon hast“, der Unterschied in Klartext (`playbook-update-diff`), die Warnung bei eigenen Änderungen (`playbook-update-local`) und **„Als neue Version von … übernehmen“** (`playbook-update-apply`: neue Version mit Notiz „Fassung n von …“, die alte bleibt über „Wiederherstellen“ erreichbar) neben „Als eigenen neuen Entwurf anlegen“; eine ältere oder gleiche Fassung wird nicht zum Übernehmen angeboten. **„Ins Journal (mit Checkliste)“** (`playbook-journal`) legt auf Klick eine Entscheidungsgrundlage an – keine Trades, nichts wird ausgeführt. `DraftOrigin` merkt sich `pid`, `rev`, `changes` und `checklist`; `laborStore` hat dafür `setDraftOrigin` und `markExported`, `versionActions` `applyPlaybookUpdate`, `findPlaybookDraft`, `relationOf` und `addPlaybookSetup`. Tests: `tests/unit/views.labor.drafts.test.tsx`, e2e `tests/e2e/playbook-revision.spec.ts`.
 
+## Indikator-Vertrag und Abgleich (F14 / F64)
+`IndicatorCheckCard` (`labor-tv-indicators`, in `TvSection` as its own cell): the contract of the 12 indicators (collapsed; Pine call, inputs, series, first candle with a value (measured) and settle
+time (rule of thumb from the smoothing's memory), what supported the value, "kein Wiederzeichnen" as a tested property; `labor-tv-contract*`) and the check of a TradingView "Chartdaten exportieren" CSV
+against the lab's own calculation: the file is read in the browser (`readFileText` from `readFile.ts`, `parseTvChart`; nothing is uploaded), each indicator column is assigned
+(`labor-tv-ind-select`, pre-filled by `guessColumn`, ambiguous names left empty), the chart's inputs are set (`labor-tv-ind-in-<param>`) and the verdict (`labor-tv-ind-result`,
+`data-verdict` equal / differs / open / few) comes with the figures and the five largest deviations. It is an observation for this file and these inputs, no certificate; the columns
+never feed a run. See `src/domain/tvimport/README.md`.

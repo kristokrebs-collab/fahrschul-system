@@ -162,7 +162,7 @@ _Limits, Exposure und Regeln, bevor es teuer wird._ · 12 Funktionen
 
 ### Strategie entwickeln & testen
 
-_Eine Idee bauen und gegen echte Historie prüfen._ · 24 Funktionen
+_Eine Idee bauen und gegen echte Historie prüfen._ · 25 Funktionen
 
 **Idee bauen**
 
@@ -177,19 +177,6 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 24 Funktionen
 | Deine Setups durchsuchen und vergleichen | Setup-Bibliothek (Journal) | Entscheidungsgrundlagen › Entscheidungsgrundlagen | teilweise |
 | Frühere Fassungen deines Entwurfs ansehen | Versionen der Entwürfe | Labor › Versionen deiner Entwürfe | fertig |
 
-**Härtetest**
-
-| Aufgabe | Funktion | Seite › Abschnitt | Stand |
-|---|---|---|---|
-| Sehen, ob Break-even oder Trailing dem Ergebnis hilft oder schadet | Verwaltung vergleichen | Labor › Verwaltung vergleichen | fertig |
-| Prüfen, ob die Strategie höhere Kosten übersteht | Kosten- und Belastungstest | Labor › Kosten- und Belastungstest | fertig |
-| Den Test auf Ausreißer und Datenlücken prüfen | Strategie-Prüfbericht | Labor › Strategie-Prüfbericht | fertig |
-| Prüfen, ob das Ergebnis nur Overfitting ist | Robustheit: Overfitting, Walk-forward, Heatmap | Labor › Overfitting-Check | fertig |
-| Sehen, was jeder Filter wirklich bringt | Varianten- und Filtervergleich | Labor › Varianten- und Filtervergleich | teilweise |
-| Prüfen, wie empfindlich die Idee auf Zahlen reagiert | Parameter-Raster | Labor › Parameter-Raster | fertig |
-| Eine Strategie schrittweise verbessern lassen, ohne dich zu überanpassen | Hintergrund-Optimierer | Labor › Optimierer | teilweise |
-| Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
-
 **Test & Ergebnis**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
@@ -199,12 +186,26 @@ _Eine Idee bauen und gegen echte Historie prüfen._ · 24 Funktionen
 | Mehrere Testläufe nebeneinander vergleichen | Läufe vergleichen | Labor › Vergleich | fertig |
 | Prüfen, ob die Strategie zu deinem Handeln passt | Passt die Strategie zu dir? | Labor › Passt zu dir? | teilweise |
 
+**Härtetest**
+
+| Aufgabe | Funktion | Seite › Abschnitt | Stand |
+|---|---|---|---|
+| Prüfen, ob die Strategie höhere Kosten übersteht | Kosten- und Belastungstest | Labor › Kosten- und Belastungstest | fertig |
+| Den Test auf Ausreißer und Datenlücken prüfen | Strategie-Prüfbericht | Labor › Strategie-Prüfbericht | fertig |
+| Prüfen, ob das Ergebnis nur Overfitting ist | Robustheit: Overfitting, Walk-forward, Heatmap | Labor › Overfitting-Check | fertig |
+| Sehen, was jeder Filter wirklich bringt | Varianten- und Filtervergleich | Labor › Varianten- und Filtervergleich | teilweise |
+| Prüfen, wie empfindlich die Idee auf Zahlen reagiert | Parameter-Raster | Labor › Parameter-Raster | fertig |
+| Eine Strategie schrittweise verbessern lassen, ohne dich zu überanpassen | Hintergrund-Optimierer | Labor › Optimierer | teilweise |
+| Einen Handelsplan durchspielen, bevor Geld im Spiel ist | Zeitmaschine (Plan durchspielen) | Labor › Zeitmaschine | fertig |
+| Sehen, ob Break-even oder Trailing dem Ergebnis hilft oder schadet | Verwaltung vergleichen | Labor › Verwaltung vergleichen | fertig |
+
 **Live prüfen & teilen**
 
 | Aufgabe | Funktion | Seite › Abschnitt | Stand |
 |---|---|---|---|
 | Eine Regel auf neuen Kerzen live mitlaufen lassen | Forward-Test (virtuelles Konto) | Labor › Forward-Test | fertig |
 | TradingView-Ergebnisse mit dem Labor vergleichen | TradingView-Vergleich | Labor › Export gegen Labor-Lauf | teilweise |
+| Prüfen, ob das Labor einen Indikator wie TradingView rechnet | Indikator-Vertrag und Abgleich | Labor › Indikator-Vertrag und Abgleich | teilweise |
 | Aus deiner Idee ein TradingView-Skript machen | Pine-Export für TradingView | Labor › Pine-Skript für TradingView | fertig |
 | Eine Strategie als Datei weitergeben oder einlesen | Playbook exportieren und importieren | Labor › Playbook austauschen | teilweise |
 

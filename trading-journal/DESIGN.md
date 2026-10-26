@@ -778,3 +778,9 @@ Keine neue Sprache: die vorhandene Karte „Playbook austauschen“ (`Card`, `Fi
 - **Export:** unter dem Entwurf steht in einem Satz (`text-mute`), welche Fassung die Datei wird; das Feld „Was ist neu?“ erscheint nur bei eigenen Entwürfen.
 - Mobil: eine Spalte, Texte brechen um (`[overflow-wrap:anywhere]`), Knöpfe `pointer-coarse:min-h-11`.
 
+## Indikator-Vertrag und Abgleich (F14 / F64)
+
+Keine neue Sprache: eine `Card` in der Labor-Sektion „TradingView“ (volle Breite), `Button` (ghost), `Input`, `MorphSelect`, `Badge`; nichts bewegt sich außer dem, was die Primitives schon tun.
+- **Vertrag** zugeklappt: Überschrift mit Anzahl, ein Satz über „gemessen, nicht behauptet“ und die Zeile „kein Wiederzeichnen“ in `text-mute`; aufgeklappt eine Liste, je Indikator Name, Pine-Aufruf in Mono, Eingaben und die Zeile „ab Kerze N · eingeschwungen nach etwa M“ in Mono (N gemessen, M eine Faustzahl). Die Prüfaussage („gegen TradingView-Werte geprüft“ / „nach Definition nachgebaut“) steht in Worten, nie als Farbe allein.
+- **Abgleich:** je Spalte ein ruhiger Kasten (`border-line-2`), Auswahl „Vergleichen mit“, Eingabefelder des Indikators, dann das Urteil als `Badge` (gleichwertig validiert = Gewinnton, weicht ab = Warnton, offen/zu wenige Werte = neutral) mit dem Satz dazu und den Zahlen (verglichen, erster Wert, größte und mittlere Differenz) in Mono. „Weicht ab“ listet die fünf größten Abweichungen. Der Hinweis „kein allgemeines Zertifikat“ steht in `text-faint` darunter.
+- Mobil: einspaltig, Zahlenraster zweispaltig, Texte brechen um, nie seitliches Scrollen; Felder und Knöpfe ≥ 44 px bei grobem Zeiger.

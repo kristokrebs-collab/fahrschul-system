@@ -79,7 +79,7 @@ test.describe("Labor · Playbook-Fassungen", () => {
     // die Version steht im Abschnitt „Versionen“ mit der Notiz der Fassung
     const versions = page.getByTestId("labor-versions");
     await versions.scrollIntoViewIfNeeded();
-    await expect(versions).toContainText("Fassung 2 von Mia: tieferes RSI-Niveau");
+    await expect(versions.getByTestId("version-note").first()).toHaveValue("Fassung 2 von Mia: tieferes RSI-Niveau");
     await expect(versions).toContainText("RSI Niveau: 30 → 22");
 
     // Checkliste → Entscheidungsgrundlage im Journal: erst nach dem Klick

@@ -10,7 +10,7 @@
 export type AdapterStatus = "supported" | "forward" | "unsupported";
 
 export interface TvAdapter {
-  id: "pine-export" | "tester-export" | "alert-webhook" | "pine-strategy" | "pine-indicator" | "indicator-series" | "account";
+  id: "pine-export" | "tester-export" | "indicator-check" | "alert-webhook" | "pine-strategy" | "pine-indicator" | "indicator-series" | "account";
   title: string;
   status: AdapterStatus;
   /** one sentence: what it is */
@@ -37,6 +37,13 @@ export const TV_ADAPTERS: readonly TvAdapter[] = [
     limits: "Die Datei bleibt auf deinem Gerät. Sie nennt weder Markt noch Zeiteinheit; offene Trades zählen nicht. Der Vergleich zeigt Unterschiede, er beweist keine Ursache.",
   },
   {
+    id: "indicator-check",
+    title: "Indikator-Abgleich (Chartdaten-Export, CSV)",
+    status: "supported",
+    what: "Du exportierst die Chartdaten mit deinen Indikatoren aus TradingView und lädst die CSV hier im Browser. Das Labor rechnet den Indikator auf denselben Kerzen selbst und hält ihn Kerze für Kerze gegen die Spalte der Datei.",
+    limits: "Eine Prüfung der Berechnung, keine Datenquelle: Die Spalten werden nicht als Baustein oder für einen Lauf verwendet. Ein Ergebnis gilt für diesen Markt, Zeitraum, diese Zeiteinheit und diese Eingaben. Ein kurzer Export kann am Anfang abweichen, weil TradingView mit mehr Historie startete (das sagt der Abgleich). Warmup, Rechenweg und Wiederzeichnen je Indikator stehen im Vertrag darüber.",
+  },
+  {
     id: "alert-webhook",
     title: "Alerts per Webhook (Konto → API & Webhooks)",
     status: "forward",
@@ -61,8 +68,8 @@ export const TV_ADAPTERS: readonly TvAdapter[] = [
     id: "indicator-series",
     title: "Indikatorreihen und Chartdaten aus TradingView",
     status: "unsupported",
-    what: "Exportierte Indikatorwerte oder Chart-CSV einlesen und im Labor als Datenreihe nutzen.",
-    limits: "Das Labor rechnet nur auf echten Binance-Kerzen mit eigenen Bausteinen. Fremde Datenreihen hätten andere Quellen und Zeitstempel und würden die Ergebnisse unvergleichbar machen.",
+    what: "Exportierte Indikatorwerte oder Chart-CSV im Labor als Datenreihe oder Baustein für einen Lauf nutzen.",
+    limits: "Das Labor rechnet nur auf echten Binance-Kerzen mit eigenen Bausteinen. Fremde Datenreihen hätten andere Quellen und Zeitstempel und würden die Ergebnisse unvergleichbar machen. Zum Prüfen unserer Berechnung lässt sich der Export dagegen einlesen (Indikator-Abgleich).",
   },
   {
     id: "account",

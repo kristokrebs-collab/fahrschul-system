@@ -14,7 +14,9 @@ import { Button } from "@/primitives/Button";
 import { Card } from "@/primitives/Card";
 import { Expander } from "@/primitives/Expander";
 import { useLabor } from "./laborStore";
+import { IndicatorCheckCard } from "./IndicatorCheckCard";
 import { PineCard } from "./PineCard";
+import { readFileText } from "./readFile";
 import { Cell, ChipPick, Kpi, moneyText } from "./ui";
 
 export const TV = {
@@ -62,16 +64,7 @@ export function AdapterStatusCard({ className }: { className?: string }) {
   );
 }
 
-/** Reads a picked file as text (`Blob.text` where it exists, else FileReader). */
-export function readFileText(file: Blob): Promise<string> {
-  if (typeof file.text === "function") return file.text();
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(String(fr.result ?? ""));
-    fr.onerror = () => reject(fr.error ?? new Error("read"));
-    fr.readAsText(file);
-  });
-}
+export { readFileText };
 
 const pct = (v: number | null, d = 2): string => (v == null || !Number.isFinite(v) ? "–" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(d).replace(".", ",")} %`);
 const when = (ms: number | null): string => (ms == null ? "–" : dateTime(new Date(ms)));
@@ -299,6 +292,9 @@ export default function TvSection() {
       </Cell>
       <Cell index={1} span="lg:col-span-6">
         <TvCompareCard />
+      </Cell>
+      <Cell index={2} span="lg:col-span-12">
+        <IndicatorCheckCard />
       </Cell>
     </>
   );
