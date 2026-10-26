@@ -31,6 +31,8 @@ export interface SeriesDef {
 }
 
 const FIVE_MIN = 5 * 60_000;
+/** Funding is settled every 8 hours on most USDⓈ-M contracts (some alts every 4 h or 1 h – that only makes the grid denser). */
+export const FUNDING_STEP_MS = 8 * 3_600_000;
 const RATIO_FIELDS: readonly FieldDef[] = [
   { key: "long", label: "Long-Anteil", unit: "prozent" },
   { key: "short", label: "Short-Anteil", unit: "prozent" },
@@ -129,11 +131,99 @@ export const SERIES: readonly SeriesDef[] = [
   { id: "box1w", kind: "state", label: "Box-Zustand 1W", what: "Phase und Kanten der neuesten Wochen-Box des Markt-Symbols zum Zeitpunkt des Ticks.", source: "Box-zu-Box der App (geschlossene Kerzen)", fields: BOX_FIELDS, stepMs: 0, cap: 4320, bytes: 150 },
 ];
 
-const BY_ID = new Map<SeriesId, SeriesDef>(SERIES.map((s) => [s.id, s]));
+const BACKFILL_NOTE = "Nachgeladen aus der öffentlichen Binance-Historie, getrennt vom selbst Gesammelten gespeichert.";
+const FIVE_MIN_HIST = 8640;
 
-export const SERIES_IDS: readonly SeriesId[] = SERIES.map((s) => s.id);
+/**
+ * The backfilled series („Börsenhistorie nachladen“): what Binance's public history held when the user asked for it. Same
+ * numbers as the collected rows of the same name, but a series of their own – stored under their own id, labelled
+ * „nachgeladen“, never merged with what the app collected. `stepMs` is the exchange's own grid; a stretch without a value is
+ * a gap and stays one.
+ */
+export const BACKFILL_SERIES: readonly SeriesDef[] = [
+  {
+    id: "oiHist",
+    kind: "backfill",
+    label: "Open Interest (nachgeladen)",
+    what: `Offene Kontrakte (Basiswährung) und ihr Wert in USDT, 5-Minuten-Werte der Börsen-Historie. ${BACKFILL_NOTE}`,
+    source: "Binance /futures/data/openInterestHist (5m)",
+    fields: [
+      { key: "oi", label: "Open Interest", unit: "kontrakte" },
+      { key: "value", label: "Open-Interest-Wert (USDT)", unit: "zahl" },
+    ],
+    stepMs: FIVE_MIN,
+    cap: FIVE_MIN_HIST,
+    bytes: 110,
+  },
+  {
+    id: "lsAccHist",
+    kind: "backfill",
+    label: "Long/Short · alle Konten (nachgeladen)",
+    what: `Anteil der Konten mit Long- bzw. Short-Position (alle Binance-Konten), 5-Minuten-Werte der Börsen-Historie. ${BACKFILL_NOTE}`,
+    source: "Binance /futures/data/globalLongShortAccountRatio (5m)",
+    fields: RATIO_FIELDS,
+    stepMs: FIVE_MIN,
+    cap: FIVE_MIN_HIST,
+    bytes: 120,
+  },
+  {
+    id: "lsTopPosHist",
+    kind: "backfill",
+    label: "Long/Short · Top-Trader-Positionen (nachgeladen)",
+    what: `Long-/Short-Anteil der Positionsgrößen der Top-Trader, 5-Minuten-Werte der Börsen-Historie. ${BACKFILL_NOTE}`,
+    source: "Binance /futures/data/topLongShortPositionRatio (5m)",
+    fields: RATIO_FIELDS,
+    stepMs: FIVE_MIN,
+    cap: FIVE_MIN_HIST,
+    bytes: 120,
+  },
+  {
+    id: "lsTopAccHist",
+    kind: "backfill",
+    label: "Long/Short · Top-Trader-Konten (nachgeladen)",
+    what: `Long-/Short-Anteil der Konten der Top-Trader, 5-Minuten-Werte der Börsen-Historie. ${BACKFILL_NOTE}`,
+    source: "Binance /futures/data/topLongShortAccountRatio (5m)",
+    fields: RATIO_FIELDS,
+    stepMs: FIVE_MIN,
+    cap: FIVE_MIN_HIST,
+    bytes: 120,
+  },
+  {
+    id: "fundingHist",
+    kind: "backfill",
+    label: "Funding-Abrechnungen (nachgeladen)",
+    what: `Die abgerechneten Funding-Raten, eine je Abrechnung (meist alle 8 Stunden); die Zeit ist die der Abrechnung. ${BACKFILL_NOTE}`,
+    source: "Binance /fapi/v1/fundingRate",
+    fields: [{ key: "rate", label: "Funding-Rate der Abrechnung (Anteil)", unit: "anteil" }],
+    stepMs: FUNDING_STEP_MS,
+    cap: 1000,
+    bytes: 80,
+  },
+  {
+    id: "markHist",
+    kind: "backfill",
+    label: "Markpreis (nachgeladen)",
+    what: `Schlusskurs des Markpreises je 5-Minuten-Kerze; die Zeit ist das Ende der Kerze. ${BACKFILL_NOTE}`,
+    source: "Binance /fapi/v1/markPriceKlines (5m)",
+    fields: [{ key: "mark", label: "Markpreis (Schluss der Kerze)", unit: "preis" }],
+    stepMs: FIVE_MIN,
+    cap: FIVE_MIN_HIST,
+    bytes: 80,
+  },
+];
+
+const ALL: readonly SeriesDef[] = [...SERIES, ...BACKFILL_SERIES];
+const BY_ID = new Map<SeriesId, SeriesDef>(ALL.map((s) => [s.id, s]));
+
+/** Every series the store can hold: collected first, then the backfilled ones (the order the view lists them in). */
+export const ALL_SERIES: readonly SeriesDef[] = ALL;
+export const SERIES_IDS: readonly SeriesId[] = ALL.map((s) => s.id);
 export const RAW_SERIES: readonly SeriesId[] = SERIES.filter((s) => s.kind === "raw").map((s) => s.id);
 export const STATE_SERIES: readonly SeriesId[] = SERIES.filter((s) => s.kind === "state").map((s) => s.id);
+export const BACKFILL_SERIES_IDS: readonly SeriesId[] = BACKFILL_SERIES.map((s) => s.id);
+
+/** `true` for the series that were loaded afterwards from the exchange's history. */
+export const isBackfillSeries = (id: SeriesId): boolean => BY_ID.get(id)?.kind === "backfill";
 
 export const isSeriesId = (v: unknown): v is SeriesId => typeof v === "string" && BY_ID.has(v as SeriesId);
 

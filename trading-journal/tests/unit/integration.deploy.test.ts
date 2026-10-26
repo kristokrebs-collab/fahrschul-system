@@ -34,7 +34,7 @@ describe("netlify.toml", () => {
     const share = toml.indexOf('from = "/teilen/*"');
     const spa = toml.indexOf('from = "/*"');
     expect(proxy).toBeGreaterThan(0);
-    for (const p of ["futures/data/*", "fapi/v1/time", "fapi/v1/premiumIndex", "fapi/v1/ticker/24hr", "fapi/v1/openInterest", "fapi/v1/fundingRate"]) expect(toml).toContain(`from = "/api/binance/${p}"`);
+    for (const p of ["futures/data/*", "fapi/v1/time", "fapi/v1/premiumIndex", "fapi/v1/ticker/24hr", "fapi/v1/openInterest", "fapi/v1/fundingRate", "fapi/v1/markPriceKlines", "fapi/v1/depth"]) expect(toml).toContain(`from = "/api/binance/${p}"`);
     expect(proxy).toBeLessThan(share);
     expect(share).toBeLessThan(spa);
   });

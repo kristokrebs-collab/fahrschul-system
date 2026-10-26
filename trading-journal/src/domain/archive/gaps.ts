@@ -37,6 +37,8 @@ export function ivAt(ticks: readonly TickRecord[], t: number): number {
 
 /** Longest distance of two neighbouring points that is still no gap (ms). */
 export function gapThreshold(def: SeriesDef, ivMin: number): number {
+  // a backfilled series has the exchange's own grid; the collector's interval says nothing about it
+  if (def.kind === "backfill") return GAP_FACTOR * def.stepMs;
   return GAP_FACTOR * Math.max(ivMin * 60_000, def.stepMs);
 }
 
@@ -56,6 +58,8 @@ function topReason(ticks: readonly TickRecord[], symbol: string): string | null 
 
 /** Why there is no point between `a` and `b`: read from the ticks that ran inside. */
 export function explainGap(def: SeriesDef, symbol: string, a: number, b: number, ticks: readonly TickRecord[]): Pick<Gap, "cause" | "detail" | "ticks"> {
+  // loaded afterwards: the collector's tick log has nothing to say about it – the exchange's history had no value here
+  if (def.kind === "backfill") return { cause: "history", detail: null, ticks: 0 };
   const lag = def.stepMs > 0 ? def.stepMs + ivAt(ticks, a) * 60_000 + PUBLISH_LAG_MS : SKEW_MS;
   const inside: TickRecord[] = [];
   for (let i = lowerBound(ticks, a + lag); i < ticks.length && ticks[i]!.t < b; i++) inside.push(ticks[i]!);
@@ -94,6 +98,7 @@ export const GAP_CAUSE_LABEL: Readonly<Record<GapCause, string>> = {
   unwatched: "Symbol war nicht ausgewählt",
   analysis: "Auswertung der App lag nicht vor",
   unknown: "Grund unbekannt",
+  history: "In der Börsenhistorie fehlt diese Zeit (nicht geliefert oder der Abruf war unvollständig)",
 };
 
 /** German names of the failure reasons the collector logs. */

@@ -58,6 +58,12 @@ export interface BookTop {
   ask: number;
   time: number;
 }
+/** One REST snapshot of the order book (Binance `/fapi/v1/depth`): `[price, quantity]` levels, best first; `time` = exchange time. */
+export interface BookDepth {
+  bids: Array<[number, number]>;
+  asks: Array<[number, number]>;
+  time: number;
+}
 export interface AggTrade {
   price: number;
   qty: number;

@@ -10,7 +10,7 @@
  */
 import { AnimatePresence, motion } from "motion/react";
 import { memo, useMemo, useState } from "react";
-import { ARCHIVE_MAX_SYMBOLS, EVERY_MIN_CHOICES, FAIL_LABEL, MAX_MB_CHOICES, effectiveSymbols, gapText, observedSymbols, seriesDef, type Gap } from "@/domain/archive";
+import { ARCHIVE_MAX_SYMBOLS, EVERY_MIN_CHOICES, FAIL_LABEL, MAX_MB_CHOICES, effectiveSymbols, gapText, isBackfillSeries, observedSymbols, seriesDef, type Gap } from "@/domain/archive";
 import { boxesCfgOf } from "@/domain/boxes";
 import { cn } from "@/lib/cn";
 import { ddmmHHmm } from "@/market/format";
@@ -26,6 +26,7 @@ import { useJournal } from "@/store/journalStore";
 import { useUi } from "@/store/uiStore";
 import { ARCHIVE_STRINGS as S, SIZE_LABEL, bytesText, durationText, gapSummary, groupBySymbol, rangeText, rowLabel, totalsOf, type RowView } from "./archiveModel";
 import { exportAllFile, exportRowFile } from "./archiveExport";
+import { BackfillSection } from "./BackfillSection";
 import { useArchiveData } from "./useArchiveData";
 
 const BIG_POINTS = 150_000;
@@ -128,9 +129,16 @@ function RowItem({ row, onCsv, onJson, onDelete }: { row: RowView; onCsv: () => 
   const def = seriesDef(info.series);
   const hasGaps = !!gaps && gaps.length > 0;
   return (
-    <li className="grid gap-1.5 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5" data-testid="archive-row" data-series={info.series} data-symbol={info.symbol}>
+    <li className="grid gap-1.5 rounded-xl border border-line bg-ink-950/40 px-3 py-2.5" data-testid="archive-row" data-series={info.series} data-symbol={info.symbol} data-kind={def.kind}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <span className="text-[13px] font-medium text-fg">{rowLabel(info.series)}</span>
+        <span className="flex flex-wrap items-baseline gap-x-2 text-[13px] font-medium text-fg">
+          {def.kind === "backfill" ? def.label.replace(" (nachgeladen)", "") : rowLabel(info.series)}
+          {def.kind === "backfill" && (
+            <span className="rounded-full border border-line-2 px-2 py-0.5 text-[11px] font-normal text-mute" data-testid="archive-row-badge" title="Aus der öffentlichen Börsenhistorie nachgeladen, nicht selbst gesammelt">
+              nachgeladen
+            </span>
+          )}
+        </span>
         <span className="num text-[12px] text-mute">
           {n(info.count)} {info.count === 1 ? "Eintrag" : "Einträge"} · ca. {bytesText(info.count * def.bytes)}
         </span>
@@ -169,6 +177,7 @@ export const ArchiveCard = memo(function ArchiveCard({ className }: { className?
   const chosen = effectiveSymbols(cfg, observed);
   const groups = useMemo(() => groupBySymbol(data.rows), [data.rows]);
   const totals = useMemo(() => totalsOf(data.rows), [data.rows]);
+  const loaded = useMemo(() => data.rows.filter((r) => isBackfillSeries(r.info.series)).reduce((s, r) => s + r.info.count, 0), [data.rows]);
   const unavailable = data.phase === "unavailable" || status.state === "unavailable";
 
   const toggleSymbol = (s: string) => {
@@ -298,6 +307,8 @@ export const ArchiveCard = memo(function ArchiveCard({ className }: { className?
           </div>
         )}
 
+        <BackfillSection />
+
         <section className="grid gap-2" aria-labelledby="archive-overview-h" data-testid="archive-overview">
           <h3 id="archive-overview-h" className="label">
             {S.overview}
@@ -314,6 +325,11 @@ export const ArchiveCard = memo(function ArchiveCard({ className }: { className?
                 {n(totals.count)} Einträge · ca. {bytesText(totals.bytes)} (geschätzt aus der Zahl der Einträge) · {totals.first !== null && totals.last !== null ? rangeText(totals.first, totals.last) : ""}
                 {data.storage && <span className="text-mute"> · Browser gesamt: {bytesText(data.storage.usage)} von {bytesText(data.storage.quota)}</span>}
               </p>
+              {loaded > 0 && (
+                <p className="num text-[12px] text-mute" data-testid="archive-loaded-total">
+                  Davon nachgeladen: {n(loaded)} Einträge – eigene Reihen, nicht Teil des Größenlimits und nicht mit dem Gesammelten vermischt.
+                </p>
+              )}
               {groups.map((g) => (
                 <div key={g.symbol} className="grid gap-2" data-testid="archive-group" data-symbol={g.symbol}>
                   <h4 className="num mt-1 text-[13px] font-semibold text-fg">{g.symbol}</h4>

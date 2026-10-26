@@ -7,9 +7,29 @@
  * whether the app was closed or the request failed.
  */
 
-/** Series ids. `raw` = a public number of the exchange, `state` = what the app's own analysis said at that moment. */
-export type SeriesId = "premium" | "oi" | "lsAcc" | "lsTopPos" | "lsTopAcc" | "lage" | "box4h" | "box1d" | "box1w";
-export type SeriesKind = "raw" | "state";
+/**
+ * Series ids. `raw` = a public number of the exchange that the app collected itself, `state` = what the app's own analysis
+ * said at that moment, `backfill` = the exchange's public history, loaded afterwards on the user's explicit request
+ * ("Börsenhistorie nachladen"). A backfilled series has its OWN id (`…Hist`): it is stored beside the collected one under a
+ * different key and is never mixed into it, never smoothed, never filled.
+ */
+export type SeriesId =
+  | "premium"
+  | "oi"
+  | "lsAcc"
+  | "lsTopPos"
+  | "lsTopAcc"
+  | "lage"
+  | "box4h"
+  | "box1d"
+  | "box1w"
+  | "oiHist"
+  | "lsAccHist"
+  | "lsTopPosHist"
+  | "lsTopAccHist"
+  | "fundingHist"
+  | "markHist";
+export type SeriesKind = "raw" | "state" | "backfill";
 
 /** A cell of a point: a number, a word (state / phase) or "no value". Never an estimate. */
 export type Cell = number | string | null;
@@ -73,7 +93,9 @@ export type GapCause =
   /** ticks ran and the symbol was fine, but the analysis was not available (state series only) */
   | "analysis"
   /** ticks ran and none failed, yet the points are missing – said as unknown, never guessed */
-  | "unknown";
+  | "unknown"
+  /** backfilled series only: the exchange's history has no value for this stretch (or the load was cut short) */
+  | "history";
 
 export interface Gap {
   /** last point before / first point after (ms) */
